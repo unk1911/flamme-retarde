@@ -6,7 +6,7 @@ cooked off in the August heat, the hillside above **Jadrija** is alight, and the
 You are one of four Canadair CL-415s. Scoop the Adriatic, drop on the fire, and
 be faster than it.
 
-**Live: [edeliverables.com/flamme-retarde](https://edeliverables.com/flamme-retarde/)**
+**Live: [flamme-retarde.edeliverables.com](https://flamme-retarde.edeliverables.com/)**
 — or clone and open **`flamme-retarde.html`** directly. It is one self-contained
 file: no server, no build step to play it, no network requests, no dependencies
 beyond Three.js, which is inlined.
