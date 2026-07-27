@@ -169,6 +169,14 @@ button {
   flex-wrap: wrap; padding: 0 2rem;
 }
 .credit i { opacity: .4; font-style: normal; }
+/* The one clickable thing on the title screen that is not the button, so it
+   has to look clickable without competing with it. */
+.credit .src {
+  color: var(--sea-dim); text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color .2s ease, border-color .2s ease;
+}
+.credit .src:hover { color: var(--sea); border-bottom-color: var(--sea); }
 
 /* ──────────────────────────────────────────────────────────────────── HUD ── */
 
@@ -510,7 +518,9 @@ button {
   </div>
   <footer class="credit">
     <span>eDeliverables (2026)</span><i>·</i>
-    <span>terrain &amp; town derived from OpenStreetMap &amp; public elevation data</span>
+    <span>terrain &amp; town derived from OpenStreetMap &amp; public elevation data</span><i>·</i>
+    <a class="src" href="https://github.com/unk1911/flamme-retarde" target="_blank" rel="noopener">
+      source on GitHub &#8599;</a>
   </footer>
 </div>
 

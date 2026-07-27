@@ -162,6 +162,14 @@ button {
   flex-wrap: wrap; padding: 0 2rem;
 }
 .credit i { opacity: .4; font-style: normal; }
+/* The one clickable thing on the title screen that is not the button, so it
+   has to look clickable without competing with it. */
+.credit .src {
+  color: var(--sea-dim); text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color .2s ease, border-color .2s ease;
+}
+.credit .src:hover { color: var(--sea); border-bottom-color: var(--sea); }
 
 /* ──────────────────────────────────────────────────────────────────── HUD ── */
 

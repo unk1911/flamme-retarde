@@ -133,6 +133,8 @@ python3 tools/gen_panels.py
 frames, and `window.__fr` exposes hooks for it — including `fastForward(secs)`,
 which steps the simulation without rendering.
 
+Changes are tracked in [CHANGELOG.md](CHANGELOG.md).
+
 ---
 
 ## Sources and credits
