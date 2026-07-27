@@ -1,0 +1,280 @@
+// -----------------------------------------------------------------------------
+// The ground. A fixed grid of world-anchored tiles, each drawn at one of five
+// resolutions depending on how far away it is, batched into one instanced draw
+// call per level. Anchoring the tiles to the world rather than to the camera is
+// what stops the terrain from swimming underneath you at 90 m/s; the skirts
+// round each tile are what hide the cracks where two levels meet.
+//
+// Height comes from the baked DEM. Everything else — the karst fluting, the
+// dry-stone walls, the burn scars, the wet ground behind a drop — is computed
+// in the fragment shader from the cover map.
+// -----------------------------------------------------------------------------
+
+const TERRAIN = {
+  tiles: 40,                     // 40 x 40 tiles of 325 m
+  lods: [64, 32, 16, 8, 4],      // quads per tile side
+  lodDist: [700, 1600, 3200, 6400],
+  skirt: 60,                     // metres the border ring drops
+};
+
+/**
+ * One tile geometry: an n x n grid in local metres, plus a skirt ring around
+ * the edge that the shader pushes downward. Positions carry x and z; y is the
+ * skirt flag, because a whole attribute for one bit is not worth the bandwidth.
+ */
+function tileGeometry(n, size) {
+  const step = size / n;
+  const verts = (n + 1) * (n + 1);
+  const skirtVerts = 4 * (n + 1);
+  const pos = new Float32Array((verts + skirtVerts) * 3);
+
+  let p = 0;
+  for (let j = 0; j <= n; j++) {
+    for (let i = 0; i <= n; i++) {
+      pos[p++] = i * step;
+      pos[p++] = 0;
+      pos[p++] = j * step;
+    }
+  }
+  // Skirt ring: same xz as the border, flagged so the shader drops it.
+  const edge = [];
+  for (let i = 0; i <= n; i++) edge.push([i * step, 0]);               // north
+  for (let i = 0; i <= n; i++) edge.push([size, i * step]);            // east
+  for (let i = 0; i <= n; i++) edge.push([size - i * step, size]);     // south
+  for (let i = 0; i <= n; i++) edge.push([0, size - i * step]);        // west
+  for (const [x, z] of edge) {
+    pos[p++] = x;
+    pos[p++] = 1;
+    pos[p++] = z;
+  }
+
+  const idx = [];
+  const at = (i, j) => j * (n + 1) + i;
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const a = at(i, j), b = at(i + 1, j), c = at(i + 1, j + 1), d = at(i, j + 1);
+      idx.push(a, d, b, b, d, c);
+    }
+  }
+  // Stitch the skirt to the border it shadows.
+  const borderIndex = [];
+  for (let i = 0; i <= n; i++) borderIndex.push(at(i, 0));
+  for (let i = 0; i <= n; i++) borderIndex.push(at(n, i));
+  for (let i = 0; i <= n; i++) borderIndex.push(at(n - i, n));
+  for (let i = 0; i <= n; i++) borderIndex.push(at(0, n - i));
+  for (let k = 0; k < borderIndex.length - 1; k++) {
+    const a = borderIndex[k], b = borderIndex[k + 1];
+    const sa = verts + k, sb = verts + k + 1;
+    idx.push(a, sa, b, b, sa, sb);
+  }
+
+  const g = new THREE.InstancedBufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  // The tiles are placed by instance offset, so a bounding sphere that only
+  // covers the prototype would cull everything. We cull on the CPU instead.
+  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e9);
+  return g;
+}
+
+const TERRAIN_VERT = /* glsl */ `
+attribute vec2 aOffset;      // tile origin in world metres
+
+uniform float uSkirt;
+
+varying vec3 vWorld;
+varying vec2 vUv2;
+varying float vHeight;
+
+${GLSL_TERRAIN}
+
+void main(){
+  vec2 wxz = aOffset + position.xz;
+  float h = texture2D(uTerrain, worldToUv(wxz)).r;
+  vHeight = h;
+  // Skirt vertices (flagged by y = 1) hang below the surface, out of sight,
+  // filling the seam where a coarser neighbour disagrees about the height.
+  h -= position.y * uSkirt;
+  vWorld = vec3(wxz.x, h, wxz.y);
+  vUv2 = worldToUv(wxz);
+  gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0);
+}
+`;
+
+const TERRAIN_FRAG = /* glsl */ `
+precision highp float;
+
+uniform sampler2D uCover;
+uniform vec3 uCoverColor[10];
+uniform float uTexelWorld;
+
+varying vec3 vWorld;
+varying vec2 vUv2;
+varying float vHeight;
+
+${GLSL_NOISE}
+${GLSL_TERRAIN}
+${GLSL_SKY}
+${GLSL_HAZE}
+${GLSL_SHADOW}
+
+uniform vec3 uAmbSky;
+uniform vec3 uAmbGround;
+uniform float uAmbI;
+uniform float uNight;
+
+void main(){
+  // ── normal, from the height field rather than from the mesh ─────────────
+  // The mesh is four different resolutions; the normals must not be, or every
+  // LOD boundary shows up as a shading seam.
+  float e = uTexelWorld;
+  float hL = heightAt(vWorld.xz - vec2(e, 0.0));
+  float hR = heightAt(vWorld.xz + vec2(e, 0.0));
+  float hD = heightAt(vWorld.xz - vec2(0.0, e));
+  float hU = heightAt(vWorld.xz + vec2(0.0, e));
+  vec3 n = normalize(vec3(hL - hR, 2.0 * e, hD - hU));
+
+  vec4 cv = texture2D(uCover, vUv2);
+  int klass = int(cv.r * 255.0 + 0.5);
+  float jitter = cv.g;
+  float urban = cv.b;
+
+  vec3 base = uCoverColor[0];
+  for (int i = 0; i < 10; i++) if (i == klass) base = uCoverColor[i];
+
+  float slope = 1.0 - n.y;
+
+  // ── karst ───────────────────────────────────────────────────────────────
+  // Limestone here weathers into fluted ribs that follow the dip of the beds.
+  // Ridged noise at two scales, pushed hardest where the slope is steepest,
+  // is most of what makes this read as Dalmatia rather than as generic hill.
+  vec2 p = vWorld.xz;
+  float rib = ridge2(p * 0.017, 4);
+  float fine = fbm2(p * 0.14, 3);
+  float rock = smoothstep(0.10, 0.42, slope);
+  vec3 limestone = vec3(0.78, 0.755, 0.695);
+  base = mix(base, limestone, rock * (0.35 + 0.45 * rib));
+  base *= 0.86 + 0.28 * mix(fine, rib, 0.5);
+  base *= 0.90 + 0.20 * jitter;
+
+  // Dry-stone walls and field edges: bright thin lines on the gentler ground.
+  float wall = smoothstep(0.86, 0.97, ridge2(p * 0.055 + 13.7, 2));
+  base = mix(base, limestone * 1.06, wall * (1.0 - rock) * 0.5);
+
+  // Bleach the ground near the waterline — salt, shingle and glare.
+  float shoreT = 1.0 - smoothstep(0.0, 0.055, cv.a);
+  base = mix(base, vec3(0.86, 0.82, 0.72), shoreT * 0.5);
+
+  // ── fire ────────────────────────────────────────────────────────────────
+  vec4 f = fireAt(vWorld.xz);
+  float burning = f.r, scorch = 1.0 - f.g, wet = f.b;
+  // Scorched ground: not black, but the grey-black of burnt maquis over pale
+  // rock, with the rock showing through more as the fuel is used up.
+  vec3 ash = mix(vec3(0.085, 0.072, 0.066), limestone * 0.55, 0.35 * scorch);
+  base = mix(base, ash, smoothstep(0.06, 0.55, scorch));
+  // Wet ground goes dark and saturated, and stays that way for a while.
+  base = mix(base, base * 0.62, wet * 0.75);
+
+  // ── light ───────────────────────────────────────────────────────────────
+  float ndl = max(dot(n, uSunDir), 0.0);
+  float shadow = shadowAt(vWorld);
+  vec3 col = base * uSunColor * uSunI * ndl * shadow * INV_PI;
+  col += base * ambientAt(n, uAmbSky, uAmbGround, uAmbI) * INV_PI * 2.2;
+
+  // Wet ground picks up a specular sheen, which is how a drop reads from above
+  // long after the steam has gone.
+  vec3 viewDir = normalize(vWorld - uCamPos);
+  vec3 h2 = normalize(uSunDir - viewDir);
+  float spec = pow(max(dot(n, h2), 0.0), 60.0) * wet * shadow;
+  col += uSunColor * spec * 0.5;
+
+  // Ground glow under an active flame front.
+  col += vec3(1.0, 0.34, 0.08) * burning * 0.55;
+
+  float dist = length(vWorld - uCamPos);
+  col = applyHaze(col, dist, vWorld, uSunDir, viewDir);
+
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+function buildTerrain(scene) {
+  const size = CONFIG.world / TERRAIN.tiles;
+  const uniforms = {
+    ...shareLight(), ...shareHaze(), ...shareTerrain(), ...shareShadow(),
+    uCover: U.uCover,
+    uCamPos: U.uCamPos,
+    uSkirt: { value: TERRAIN.skirt },
+    uTexelWorld: { value: CONFIG.world / world.grid },
+    uCoverColor: { value: COVER_COLOR.map((c) => new THREE.Color(c[0], c[1], c[2])) },
+  };
+
+  const levels = TERRAIN.lods.map((n) => {
+    const g = tileGeometry(n, size);
+    const max = TERRAIN.tiles * TERRAIN.tiles;
+    const off = new THREE.InstancedBufferAttribute(new Float32Array(max * 2), 2);
+    off.setUsage(THREE.DynamicDrawUsage);
+    g.setAttribute('aOffset', off);
+    const m = new THREE.ShaderMaterial({
+      uniforms,
+      vertexShader: TERRAIN_VERT,
+      fragmentShader: TERRAIN_FRAG,
+    });
+    const mesh = new THREE.Mesh(g, m);
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 0;
+    scene.add(mesh);
+    return { mesh, off, n };
+  });
+
+  // Tile centres, precomputed once.
+  const T = TERRAIN.tiles;
+  const centres = new Float32Array(T * T * 2);
+  for (let j = 0; j < T; j++) {
+    for (let i = 0; i < T; i++) {
+      centres[(j * T + i) * 2] = -HALF + i * size;
+      centres[(j * T + i) * 2 + 1] = -HALF + j * size;
+    }
+  }
+
+  const _sphere = new THREE.Sphere(new THREE.Vector3(), 1);
+  const counts = new Int32Array(levels.length);
+
+  /** Pick a level per tile by distance, cull to the frustum, refill the batches. */
+  function update(camera, frustum) {
+    counts.fill(0);
+    const cx = camera.position.x, cz = camera.position.z;
+    const half = size * 0.5;
+    // A generous radius: tiles are flat in xz but the terrain inside them is
+    // not, so the sphere has to cover the tallest thing they might hold.
+    const radius = Math.hypot(half, half) + 260;
+
+    for (let t = 0; t < T * T; t++) {
+      const ox = centres[t * 2], oz = centres[t * 2 + 1];
+      const mx = ox + half, mz = oz + half;
+      const d = Math.hypot(mx - cx, mz - cz);
+
+      let lod = TERRAIN.lodDist.length;
+      for (let k = 0; k < TERRAIN.lodDist.length; k++) {
+        if (d < TERRAIN.lodDist[k]) { lod = k; break; }
+      }
+
+      _sphere.center.set(mx, 40, mz);
+      _sphere.radius = radius;
+      if (!frustum.intersectsSphere(_sphere)) continue;
+
+      const L = levels[lod];
+      const c = counts[lod]++;
+      L.off.array[c * 2] = ox;
+      L.off.array[c * 2 + 1] = oz;
+    }
+
+    for (let k = 0; k < levels.length; k++) {
+      levels[k].mesh.geometry.instanceCount = counts[k];
+      levels[k].off.addUpdateRange(0, counts[k] * 2);
+      levels[k].off.needsUpdate = true;
+    }
+  }
+
+  return { update, levels, stats: () => Array.from(counts) };
+}

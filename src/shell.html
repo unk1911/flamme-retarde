@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Flamme Retardé — Canadair over Šibenik</title>
+<meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
+<style>/*STYLES*/</style>
+</head>
+<body>
+
+<!-- ───────────────────────────────────────────────────────── loading veil ── -->
+<div id="veil">
+  <div class="veil-inner">
+    <div class="eyebrow">Šibenik &middot; Dalmatia &middot; 14:20</div>
+    <h1>Flamme&nbsp;Retardé</h1>
+    <h2>a Canadair over the Adriatic</h2>
+    <div class="rule"></div>
+    <p class="blurb">
+      A cluster bomblet left in the karst since the war has cooked off in the
+      August heat. The hillside above <b>Jadrija</b> is alight and the
+      <i>lebić</i> is pushing it at the old town. You are one of four.
+    </p>
+    <div class="bar"><i id="bar-fill"></i></div>
+    <div id="stage">warming the engines</div>
+    <button id="enter" hidden>Take off</button>
+    <p class="hint" id="hint" hidden>mouse or arrows to fly &nbsp;·&nbsp; W/S throttle &nbsp;·&nbsp; SPACE scoops &nbsp;·&nbsp; F drops<br><b>Z</b> levels the wings &nbsp;·&nbsp; <b>T</b> autopilot &nbsp;·&nbsp; <b>M</b> settings</p>
+  </div>
+  <footer class="credit">
+    <span>eDeliverables (2026)</span><i>·</i>
+    <span>terrain &amp; town derived from OpenStreetMap &amp; public elevation data</span>
+  </footer>
+</div>
+
+<!-- ────────────────────────────────────────────────────────────── the HUD ── -->
+<div id="hud" hidden>
+
+  <!-- top strip: mission clock, the city, the fire -->
+  <div id="top">
+    <div class="gauge" id="g-clock"><b>—</b><span>elapsed</span></div>
+    <div id="firebar">
+      <div class="fb-row">
+        <label>fire</label>
+        <div class="track"><i id="fb-fire"></i></div>
+        <b id="fb-fire-n">0 ha</b>
+      </div>
+      <div class="fb-row">
+        <label>Šibenik</label>
+        <div class="track"><i id="fb-city"></i></div>
+        <b id="fb-city-n">100%</b>
+      </div>
+    </div>
+    <div class="gauge" id="g-score"><b>0</b><span>score</span></div>
+  </div>
+
+  <!-- left: flight instruments -->
+  <div id="left">
+    <div class="inst"><b id="i-spd">0</b><span>km/h</span></div>
+    <div class="inst"><b id="i-alt">0</b><span>m agl</span></div>
+    <div class="inst"><b id="i-hdg">000</b><span>hdg</span></div>
+    <div class="inst small"><b id="i-vsi">0</b><span>m/s</span></div>
+  </div>
+
+  <!-- right: the tank -->
+  <div id="right">
+    <div id="tank">
+      <div id="tank-fill"></div>
+      <div id="tank-label"><b id="t-litres">0</b><span>litres</span></div>
+    </div>
+    <div id="tank-hint">SPACE to scoop</div>
+  </div>
+
+  <!-- centre: reticle + drop marker -->
+  <svg id="reticle" viewBox="-60 -60 120 120" aria-hidden="true">
+    <path d="M-46 0 h22 M46 0 h-22 M0 -46 v22 M0 46 v-22" />
+    <circle cx="0" cy="0" r="3.5" />
+  </svg>
+
+  <!-- where the virtual stick actually is -->
+  <div id="stick"><i></i></div>
+
+  <!-- warnings + radio -->
+  <div id="ap"></div>
+  <div id="warn"></div>
+  <div id="radio"></div>
+  <div id="wingmen"></div>
+  <div id="compass"><div id="compass-tape"></div></div>
+</div>
+
+<!-- ───────────────────────────────────────────────────────── cinematic bar ── -->
+<div id="panels" hidden><img id="pan-a" alt=""><img id="pan-b" alt=""></div>
+
+<div id="cine" hidden>
+  <div class="cbar top"></div>
+  <div class="cbar bottom"></div>
+  <div id="cine-caption"></div>
+  <button id="cine-skip">skip &rsaquo;&rsaquo;</button>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── end screen ── -->
+<div id="over" hidden>
+  <div class="over-inner">
+    <h1 id="over-title">—</h1>
+    <p id="over-sub"></p>
+    <div id="over-stats"></div>
+    <button id="again">Fly again</button>
+  </div>
+</div>
+
+<div id="panel" hidden>
+  <h3>settings</h3>
+  <div id="panel-rows"></div>
+  <p class="panel-foot">M closes this &middot; Z levels &middot; T autopilot</p>
+</div>
+
+<div id="toast"></div>
+<div id="tint"></div>
+<canvas id="stage-canvas"></canvas>
+
+<script>/*THREE*/</script>
+<script>/*PAYLOAD*/</script>
+<script>/*APP*/</script>
+</body>
+</html>

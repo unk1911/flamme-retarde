@@ -1,0 +1,538 @@
+// -----------------------------------------------------------------------------
+// Sound, synthesised. No recordings — everything below is oscillators and one
+// shared noise buffer, so the whole game stays a single file.
+//
+// The mix is built around one fact: a CL-415 is two 2 380 hp turboprops eighteen
+// feet from your head. The blade-pass tone is the loudest thing in the game and
+// everything else has to find room around it — which is also why the radio is
+// bandpassed to a telephone and the fire is all below 700 Hz.
+// -----------------------------------------------------------------------------
+
+function buildAudio() {
+  let ctx = null;
+  let master = null, verb = null, verbSend = null, verbGain = null;
+  const nodes = {};
+  let started = false;
+  let noiseBuf = null;
+
+  /** One second of pink-ish noise, reused by every noise source in the scene. */
+  function makeNoise(ac) {
+    const n = ac.sampleRate * 2;
+    const buf = ac.createBuffer(1, n, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    // Voss-McCartney-ish: summing octaves of white gives a 1/f slope, which is
+    // what wind, water and fire all actually have.
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0;
+    for (let i = 0; i < n; i++) {
+      const w = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + w * 0.0555179;
+      b1 = 0.99332 * b1 + w * 0.0750759;
+      b2 = 0.96900 * b2 + w * 0.1538520;
+      b3 = 0.86650 * b3 + w * 0.3104856;
+      b4 = 0.55000 * b4 + w * 0.5329522;
+      b5 = -0.7616 * b5 - w * 0.0168980;
+      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + w * 0.5362) * 0.11;
+    }
+    return buf;
+  }
+
+  const loopNoise = (gainVal, type, freq, q) => {
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuf;
+    src.loop = true;
+    const f = ctx.createBiquadFilter();
+    f.type = type; f.frequency.value = freq; f.Q.value = q;
+    const g = ctx.createGain();
+    g.gain.value = gainVal;
+    src.connect(f).connect(g).connect(master);
+    src.start();
+    return { src, f, g };
+  };
+
+  /**
+   * An impulse response for a limestone valley: direct sound, a handful of
+   * slap-backs off the hillsides at plausible distances, then a diffuse tail
+   * that loses its top end as it goes, the way air does.
+   */
+  function valleyIR(ac, secs) {
+    const sr = ac.sampleRate;
+    const n = Math.floor(sr * secs);
+    const buf = ac.createBuffer(2, n, sr);
+    // Metres to the reflecting face, per early reflection.
+    const WALLS = [34, 61, 88, 140, 205, 310, 470];
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      let seed = 0x9e3779b9 ^ (ch * 0x85ebca6b);
+      const rnd = () => {
+        seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
+        return ((seed >>> 0) / 4294967296) * 2 - 1;
+      };
+      for (let i = 0; i < n; i++) {
+        const t = i / sr;
+        // The diffuse tail, rolling off with distance travelled.
+        const env = Math.exp(-t * 2.35) * (1 - Math.exp(-t * 26));
+        d[i] = rnd() * env * 0.36;
+      }
+      for (let w = 0; w < WALLS.length; w++) {
+        // Two ears, slightly different geometry, or it collapses to mono.
+        const dist = WALLS[w] * (1 + (ch ? 0.035 : -0.035));
+        const at = Math.floor((2 * dist / 343) * sr);
+        if (at >= n - 400) continue;
+        const amp = 0.55 / (1 + w * 0.85);
+        for (let k = 0; k < 380; k++) {
+          d[at + k] += rnd() * amp * Math.exp(-k / 90);
+        }
+      }
+    }
+    return buf;
+  }
+
+  function start() {
+    if (started) return;
+    started = true;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    noiseBuf = makeNoise(ctx);
+
+    master = ctx.createGain();
+    master.gain.value = 0.0;
+    // A gentle limiter so a drop over a big fire cannot clip the mix.
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -14;
+    comp.ratio.value = 6;
+    comp.attack.value = 0.006;
+    comp.release.value = 0.22;
+    master.connect(comp).connect(ctx.destination);
+
+    // ── the valley ────────────────────────────────────────────────────────
+    // A convolution bus with a hand-made impulse response: a few discrete
+    // early reflections off the karst walls, then a long noisy tail. It is
+    // what turns a synthesised bang into a bang that happened *somewhere*,
+    // and it is the single cheapest thing that makes the intro feel real.
+    verb = ctx.createConvolver();
+    verb.buffer = valleyIR(ctx, 2.9);
+    verbGain = ctx.createGain();
+    verbGain.gain.value = 0.9;
+    const verbTilt = ctx.createBiquadFilter();
+    verbTilt.type = 'highpass'; verbTilt.frequency.value = 120;
+    verbSend = ctx.createGain();
+    verbSend.gain.value = 1;
+    verbSend.connect(verb).connect(verbTilt).connect(verbGain).connect(master);
+
+    // ── engines ───────────────────────────────────────────────────────────
+    // Blade pass: four blades on each prop, so the fundamental is 4x shaft
+    // speed. Two of them, detuned, because two engines never quite agree —
+    // and the beat frequency between them is the sound of a big turboprop.
+    nodes.eng = [];
+    for (const detune of [0, 7]) {
+      const osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.value = 78;
+      osc.detune.value = detune;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 420; lp.Q.value = 3.5;
+      const g = ctx.createGain();
+      g.gain.value = 0.0;
+      osc.connect(lp).connect(g).connect(master);
+      osc.start();
+      nodes.eng.push({ osc, lp, g });
+    }
+    // Turbine whine, two octaves up and thin.
+    nodes.turbine = (() => {
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.value = 1180;
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 1.2;
+      const g = ctx.createGain();
+      g.gain.value = 0;
+      osc.connect(bp).connect(g).connect(master);
+      osc.start();
+      return { osc, bp, g };
+    })();
+    // Combustion / exhaust rumble.
+    nodes.rumble = loopNoise(0, 'lowpass', 260, 1.0);
+
+    // ── airflow over the airframe ─────────────────────────────────────────
+    nodes.air = loopNoise(0, 'bandpass', 900, 0.7);
+
+    // ── water ─────────────────────────────────────────────────────────────
+    // Scooping is the hull ploughing: broadband, bright, and very loud.
+    nodes.scoop = loopNoise(0, 'bandpass', 2400, 0.55);
+    // Sea state, heard only when low over the water.
+    nodes.sea = loopNoise(0, 'bandpass', 620, 0.8);
+
+    // ── the fire ──────────────────────────────────────────────────────────
+    // A big fire is felt more than heard: a low roar with a slow surge in it.
+    nodes.fire = loopNoise(0, 'lowpass', 520, 0.9);
+    nodes.fireLfo = (() => {
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sine'; lfo.frequency.value = 0.17;
+      const amt = ctx.createGain();
+      amt.gain.value = 180;
+      lfo.connect(amt).connect(nodes.fire.f.frequency);
+      lfo.start();
+      return lfo;
+    })();
+
+    // Fade the whole mix in rather than punching it on.
+    master.gain.setTargetAtTime(0.85, ctx.currentTime, 0.8);
+  }
+
+  /** Short shaped noise burst — crackle, splash, squelch. */
+  function burst({ freq = 1400, q = 1.0, dur = 0.14, gain = 0.2, type = 'bandpass', sweep = 0 }) {
+    if (!ctx) return;
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuf;
+    src.loop = true;
+    const f = ctx.createBiquadFilter();
+    f.type = type; f.frequency.value = freq; f.Q.value = q;
+    if (sweep) f.frequency.exponentialRampToValueAtTime(
+      Math.max(60, freq * sweep), ctx.currentTime + dur);
+    const g = ctx.createGain();
+    const t = ctx.currentTime;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + Math.min(0.02, dur * 0.2));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f).connect(g).connect(master);
+    src.start(t);
+    src.stop(t + dur + 0.02);
+  }
+
+  function beep(freq, dur, gain = 0.06) {
+    if (!ctx) return;
+    const o = ctx.createOscillator();
+    o.type = 'square';
+    o.frequency.value = freq;
+    const g = ctx.createGain();
+    const t = ctx.currentTime;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(master);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+
+  /** The click and hiss either side of a radio call. */
+  function squelch() {
+    burst({ freq: 1800, q: 3.0, dur: 0.07, gain: 0.045, sweep: 0.5 });
+    beep(1650, 0.05, 0.025);
+  }
+
+  function dropWhoosh() {
+    // Six tonnes leaving the hull: a bright rush falling to a rumble.
+    burst({ freq: 3200, q: 0.4, dur: 1.1, gain: 0.30, sweep: 0.06 });
+    burst({ freq: 700, q: 0.7, dur: 1.6, gain: 0.20, sweep: 0.15 });
+  }
+
+  function splash() {
+    burst({ freq: 2600, q: 0.5, dur: 0.35, gain: 0.16, sweep: 0.25 });
+  }
+
+  /**
+   * The sound the intro is built around. A bomblet is a small steel canister on
+   * a ribbon; a few hundred of them coming down together ring against each
+   * other, and that is where the name came from. Struck metal is inharmonic, so
+   * these are deliberately *not* a harmonic series — the ratios below are close
+   * to a small bell's, which is why it sits wrong in the ear.
+   */
+  function jingle(dur = 3.0, gain = 0.85) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const PARTIALS = [1.0, 2.76, 5.40, 8.93, 13.34];
+    const n = Math.round(52 * dur);
+    for (let i = 0; i < n; i++) {
+      // Clustered rather than even: they arrive in gusts.
+      const at = t0 + Math.pow(Math.random(), 0.75) * dur;
+      const base = 1500 + Math.random() * 2600;
+      const amp = (0.010 + Math.random() * 0.016) * gain;
+      const bus = ctx.createGain();
+      bus.gain.value = 1;
+      bus.connect(master);
+      // Bells in a valley. Without this they sound like a phone in a box.
+      if (verbSend) { const w = ctx.createGain(); w.gain.value = 0.55; bus.connect(w).connect(verbSend); }
+      for (let k = 0; k < PARTIALS.length; k++) {
+        const o = ctx.createOscillator();
+        o.type = 'sine';
+        o.frequency.value = base * PARTIALS[k] * (0.995 + Math.random() * 0.01);
+        const g = ctx.createGain();
+        const a = amp / (1 + k * 1.6);
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.exponentialRampToValueAtTime(a, at + 0.004);
+        // Higher partials die first, as they do on real struck metal.
+        g.gain.exponentialRampToValueAtTime(0.0001, at + 0.5 / (1 + k * 0.9));
+        o.connect(g).connect(bus);
+        o.start(at);
+        o.stop(at + 0.9);
+      }
+    }
+  }
+
+  /** The canister coming in: a descending whistle. */
+  function incoming() {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(1250, t0);
+    o.frequency.exponentialRampToValueAtTime(190, t0 + 5.0);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 3.2;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.06, t0 + 1.4);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 5.4);
+    o.connect(bp).connect(g).connect(master);
+    o.start(t0); o.stop(t0 + 5.6);
+  }
+
+  /** Distant artillery — felt, not heard. */
+  function rumble() {
+    burst({ freq: 90, q: 0.6, dur: 2.6, gain: 0.30, type: 'lowpass', sweep: 0.4 });
+  }
+
+  /**
+   * The one that finally cooks off, thirty years late. Four layers, because a
+   * real explosion is four things arriving at slightly different times: the
+   * crack of the case, the shock through the ground, the debris, and the
+   * hillside handing it all back to you a quarter of a second later.
+   */
+  function detonate() {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+
+    // The case letting go — very short, very bright.
+    burst({ freq: 5200, q: 0.5, dur: 0.10, gain: 0.30, sweep: 0.06 });
+    burst({ freq: 1700, q: 0.7, dur: 0.26, gain: 0.34, sweep: 0.10 });
+
+    // The body of it: a swept sub that you feel in the desk.
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(150, t0);
+    o.frequency.exponentialRampToValueAtTime(28, t0 + 0.9);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, t0);
+    og.gain.exponentialRampToValueAtTime(0.55, t0 + 0.02);
+    og.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.5);
+    o.connect(og).connect(master);
+    o.start(t0); o.stop(t0 + 1.7);
+
+    // Stone and grit coming back down.
+    const deb = ctx.createBufferSource();
+    deb.buffer = noiseBuf; deb.loop = true;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 1800;
+    const dg = ctx.createGain();
+    dg.gain.setValueAtTime(0.0001, t0 + 0.18);
+    dg.gain.exponentialRampToValueAtTime(0.09, t0 + 0.34);
+    dg.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.4);
+    deb.connect(hp).connect(dg).connect(master);
+    deb.start(t0); deb.stop(t0 + 2.6);
+
+    // Everything goes to the valley, hard. This is the bit that sells it.
+    if (verbSend) {
+      const w = ctx.createGain(); w.gain.value = 1.6;
+      og.connect(w); dg.connect(w);
+      w.connect(verbSend);
+    }
+  }
+
+  // ── the score ──────────────────────────────────────────────────────────
+  // Not music exactly: a bowed-string bed, synthesised additively, that sits
+  // under the intro and does the emotional work the pictures cannot. Three
+  // colours — dread, lament, and the one that finally opens out.
+
+  const CHORDS = {
+    dread:  [49.0, 73.4, 98.0, 116.5],          // G1 D2 G2 B♭2 — minor, close
+    lament: [58.3, 87.3, 116.5, 138.6, 174.6],  // B♭1 F2 B♭2 D♭3 F3
+    hope:   [65.4, 98.0, 130.8, 164.8, 196.0],  // C2 G2 C3 E3 G3 — major, open
+  };
+
+  let droneVoices = [];
+
+  function drone(kind = 'dread', gain = 0.11, fadeIn = 3.0) {
+    if (!ctx) return;
+    droneOff(2.2);
+    const t0 = ctx.currentTime;
+    const freqs = CHORDS[kind] || CHORDS.dread;
+    const bus = ctx.createGain();
+    bus.gain.setValueAtTime(0.0001, t0);
+    bus.gain.exponentialRampToValueAtTime(gain, t0 + fadeIn);
+    // Dark, and opening slightly as it swells — a bow biting into the string.
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(320, t0);
+    lp.frequency.linearRampToValueAtTime(1250, t0 + fadeIn * 2.2);
+    lp.Q.value = 0.6;
+    bus.connect(lp).connect(master);
+    if (verbSend) { const w = ctx.createGain(); w.gain.value = 0.7; lp.connect(w).connect(verbSend); }
+
+    const parts = [];
+    for (let i = 0; i < freqs.length; i++) {
+      for (const detune of [-4.5, 4.5]) {         // two players per line
+        const o = ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.value = freqs[i];
+        o.detune.value = detune;
+        const g = ctx.createGain();
+        g.gain.value = 0.16 / (1 + i * 0.55);
+        // Vibrato, slow and shallow, and out of step between players.
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = 4.1 + i * 0.37 + (detune > 0 ? 0.5 : 0);
+        const lg = ctx.createGain();
+        lg.gain.value = 1.6 + i * 0.5;
+        lfo.connect(lg).connect(o.detune);
+        o.connect(g).connect(bus);
+        o.start(t0); lfo.start(t0);
+        parts.push(o, lfo);
+      }
+    }
+    droneVoices.push({ bus, parts });
+  }
+
+  function droneOff(fade = 2.5) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    for (const v of droneVoices) {
+      v.bus.gain.cancelScheduledValues(t0);
+      v.bus.gain.setValueAtTime(Math.max(0.0001, v.bus.gain.value), t0);
+      v.bus.gain.exponentialRampToValueAtTime(0.0001, t0 + fade);
+      for (const p of v.parts) { try { p.stop(t0 + fade + 0.1); } catch (e) { /* already */ } }
+    }
+    droneVoices = [];
+  }
+
+  /** Distant artillery over a town, for as long as you can stand it. */
+  function shelling(dur = 8, gain = 1) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    let at = 0.4;
+    while (at < dur) {
+      const far = 0.35 + Math.random() * 0.65;         // 1 = close
+      const when = t0 + at;
+      const src = ctx.createBufferSource();
+      src.buffer = noiseBuf; src.loop = true;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(150 + far * 420, when);
+      lp.frequency.exponentialRampToValueAtTime(55, when + 1.6);
+      const g = ctx.createGain();
+      const a = 0.10 * far * far * gain;
+      g.gain.setValueAtTime(0.0001, when);
+      g.gain.exponentialRampToValueAtTime(a, when + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, when + 1.4 + far);
+      src.connect(lp).connect(g).connect(master);
+      if (verbSend) { const w = ctx.createGain(); w.gain.value = 1.1; g.connect(w).connect(verbSend); }
+      src.start(when); src.stop(when + 2.6 + far);
+      // Irregular: guns do not keep time.
+      at += 0.5 + Math.random() * 2.4;
+    }
+  }
+
+  /**
+   * Cicadas. Thirty summers of them, and the sound of every August afternoon
+   * on this coast — band-passed noise, amplitude-modulated at the wingbeat.
+   */
+  let cicadaNodes = null;
+  function cicadas(on, gain = 0.055) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    if (!on) {
+      if (cicadaNodes) {
+        cicadaNodes.g.gain.setTargetAtTime(0.0001, t0, 0.9);
+        const dead = cicadaNodes;
+        setTimeout(() => { try { dead.src.stop(); } catch (e) { /* gone */ } }, 4000);
+        cicadaNodes = null;
+      }
+      return;
+    }
+    if (cicadaNodes) { cicadaNodes.g.gain.setTargetAtTime(gain, t0, 1.2); return; }
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuf; src.loop = true;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 5200; bp.Q.value = 2.4;
+    const bp2 = ctx.createBiquadFilter();
+    bp2.type = 'bandpass'; bp2.frequency.value = 8400; bp2.Q.value = 3.0;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.setTargetAtTime(gain, t0, 1.6);
+    // Two modulators beating against each other: a whole hillside of them,
+    // never quite in unison.
+    for (const [rate, depth] of [[47, 0.55], [39.5, 0.35]]) {
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sawtooth'; lfo.frequency.value = rate;
+      const lg = ctx.createGain(); lg.gain.value = depth * gain;
+      lfo.connect(lg).connect(g.gain);
+      lfo.start(t0);
+    }
+    src.connect(bp).connect(g);
+    src.connect(bp2).connect(g);
+    g.connect(master);
+    src.start(t0);
+    cicadaNodes = { src, g };
+  }
+
+  let stallT = 0, crackleT = 0;
+
+  function update(dt, s) {
+    if (!ctx || ctx.state === 'suspended') return;
+    const t = ctx.currentTime;
+    const set = (param, v, tau = 0.08) => param.setTargetAtTime(v, t, tau);
+
+    // ── engines ───────────────────────────────────────────────────────────
+    // Shaft speed barely moves on a turboprop — the power comes from blade
+    // pitch — so the pitch shift with throttle is small and the *timbre*
+    // change carries most of the information.
+    const rpm = 0.42 + s.throttle * 0.58;
+    for (let i = 0; i < nodes.eng.length; i++) {
+      const e = nodes.eng[i];
+      set(e.osc.frequency, 64 + rpm * 30 + i * 0.9, 0.15);
+      set(e.lp.frequency, 260 + s.throttle * 900, 0.12);
+      set(e.g.gain, s.inside ? 0.30 : 0.20 * s.near, 0.12);
+    }
+    set(nodes.turbine.osc.frequency, 900 + s.throttle * 620, 0.15);
+    set(nodes.turbine.g.gain, (s.inside ? 0.028 : 0.016) * s.near, 0.12);
+    set(nodes.rumble.g.gain, 0.10 + s.throttle * 0.13, 0.12);
+    set(nodes.rumble.f.frequency, 180 + s.throttle * 160, 0.2);
+
+    // ── airflow ───────────────────────────────────────────────────────────
+    const q = sat(s.speed / 120);
+    set(nodes.air.g.gain, 0.03 + q * q * 0.16, 0.15);
+    set(nodes.air.f.frequency, 500 + q * 1500, 0.2);
+
+    // ── water ─────────────────────────────────────────────────────────────
+    set(nodes.scoop.g.gain, s.scooping ? 0.42 : 0.0, s.scooping ? 0.05 : 0.25);
+    set(nodes.scoop.f.frequency, 1600 + s.speed * 12, 0.15);
+    // The sea itself, only once you are down in ground effect.
+    const low = 1 - sat((s.alt - 8) / 90);
+    set(nodes.sea.g.gain, s.overSea ? low * 0.10 : 0.0, 0.3);
+
+    // ── fire ──────────────────────────────────────────────────────────────
+    // Rolls off with distance, and with how much is actually alight.
+    const near = 1 - sat((s.fireDist - 200) / 2200);
+    const size = sat(s.burning / 260);
+    const fg = near * (0.10 + size * 0.34);
+    set(nodes.fire.g.gain, fg, 0.4);
+    if (fg > 0.05) {
+      crackleT -= dt;
+      if (crackleT <= 0) {
+        crackleT = 0.05 + Math.random() * 0.28 / (0.2 + size);
+        burst({ freq: 900 + Math.random() * 2600, q: 2.2,
+          dur: 0.03 + Math.random() * 0.05, gain: fg * 0.16 });
+      }
+    }
+
+    // ── stall warner ──────────────────────────────────────────────────────
+    if (s.stall) {
+      stallT -= dt;
+      if (stallT <= 0) { stallT = 0.42; beep(880, 0.16, 0.05); }
+    } else stallT = 0;
+  }
+
+  function setVolume(v) {
+    if (master) master.gain.setTargetAtTime(v, ctx.currentTime, 0.1);
+  }
+
+  return { start, update, squelch, dropWhoosh, splash, beep, setVolume,
+    jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas,
+    get ctx() { return ctx; } };
+}

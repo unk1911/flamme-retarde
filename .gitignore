@@ -1,0 +1,32 @@
+# Three.js build cache — build.py downloads these on demand, and the same code
+# is already inlined into the committed flamme-retarde.html.
+vendor/
+
+# Regenerable geodata. tools/fetch_dem.py and tools/fetch_osm.py pull these
+# from AWS Terrarium and Overpass; tools/bake.py turns them into build/payload,
+# which *is* committed so the game builds without a network round trip.
+build/dem.npy
+build/dem_meta.json
+build/osm/
+build/*_preview.png
+build/barrier_debug.png
+
+# Screenshots and scratch output from tools/shoot.mjs
+shots/
+*.png
+!docs/*.png
+!build/payload/*.png
+!refs/panels/*.png
+
+# The reference photographs are other people's work — Wikimedia contributors,
+# press and stock libraries — gathered locally to model from. They are not ours
+# to redistribute, so they stay out of the public repository. tools/gen_panels.py
+# needs them only to regenerate the painted panels, and those are committed.
+refs/*
+!refs/panels/
+!refs/README.md
+*.blend1
+
+# Python bytecode
+__pycache__/
+*.pyc
