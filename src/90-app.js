@@ -300,7 +300,7 @@ function updateCamera(dt) {
 // ── the world ────────────────────────────────────────────────────────────────
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
-  trees, landmarks, alerts;
+  trees, landmarks, alerts, roads, props;
 
 function setSun() {
   const a = sunAngles(state.hour);
@@ -387,6 +387,11 @@ async function boot() {
 
   await step(78, 'load.city');
   city = buildCity(scene);
+
+  await step(80, 'load.streets');
+  roads = buildRoads(scene);
+  props = buildProps(scene, roads.lanes);
+  if (IS_SMALL) props.setDensity(0.45);
 
   await step(82, 'load.fuel');
   fire = buildFire(scene);
@@ -499,6 +504,9 @@ const SETTINGS = [
     fmt: (v) => v <= 0.001 ? T('set.off') : Math.round(v * 100) + '%' },
   { key: 'trees', label: 'set.trees', min: 0, max: 1.6, step: 0.05,
     get: () => trees.getDensity(), set: (v) => trees.setDensity(v),
+    fmt: (v) => v <= 0.001 ? T('set.off') : Math.round(v * 100) + '%' },
+  { key: 'props', label: 'set.props', min: 0, max: 1, step: 0.05,
+    get: () => props.getDensity(), set: (v) => props.setDensity(v),
     fmt: (v) => v <= 0.001 ? T('set.off') : Math.round(v * 100) + '%' },
   { key: 'fov', label: 'set.fov', min: 45, max: 95, step: 1,
     get: () => camera.fov, set: (v) => { camera.fov = v; camera.updateProjectionMatrix(); },
@@ -841,6 +849,7 @@ function frame() {
 
   terrain.update(camera, frustum);
   trees.update(dt, camera.position);
+  props.update(dt);
   sea.update(camera);
   fire.update(dt);
   // The other three keep working while your wreck is still settling.
@@ -948,13 +957,18 @@ window.__fr = {
     tiles: terrain ? terrain.stats() : null,
     trees: trees ? trees.stats() : null,
     landmarks: landmarks ? landmarks.list.length + '/' + LANDMARKS.length : null,
-    city: city ? { built: city.built, tris: city.tris } : null,
+    city: city ? {
+      built: city.built, tris: city.tris, tagged: city.tagged,
+      forms: city.forms && { gable: city.forms[0], hip: city.forms[1], flat: city.forms[2],
+        pyramid: city.forms[3], skillion: city.forms[4], round: city.forms[5] },
+    } : null,
+    roads: roads ? { runs: roads.drawn, km: Math.round(roads.km), tris: roads.tris } : null,
+    props: props ? props.counts : null,
     water: Math.round(flight ? flight.p.water : 0),
     wingmen: wingmen ? wingmen.debug() : null,
     runs: wingmen ? wingmen.runCount() : 0,
     aiLitres: wingmen ? Math.round(wingmen.litres()) : 0,
     burntHa: fire ? Math.round(fire.burntArea()) : 0,
-    city: undefined,
     speed: Math.round(state.speed * 3.6), alt: Math.round(state.altAgl),
     hdg: flight ? Math.round((Math.atan2(flight.axes().fwd.x, -flight.axes().fwd.z)
       * 180 / Math.PI + 360)) % 360 : 0,

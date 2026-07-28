@@ -33,7 +33,7 @@ is a real footprint.
 | `F` / left click | drop |
 | `shift` | flaps |
 | `C` | camera — chase, close, cockpit, wing |
-| `M` | settings — language, stability assist, volume, vegetation, FOV, exposure |
+| `M` | settings — language, stability assist, volume, vegetation, traffic, FOV, exposure |
 | `H` | hide the HUD |
 
 The autopilot is a *fly me to the job* button, not an autoplayer: it lines the
@@ -63,6 +63,27 @@ height field encoded 16-bit across the red and green channels of a PNG, a cover
 raster, and gzipped JSON for the town. The browser decodes the PNG through a
 canvas and the JSON through `DecompressionStream`. Nothing is fetched at run
 time.
+
+**The town is 13 343 real footprints, and OSM knows more about them than a
+height.** 2 456 carry a roof shape, and 82% of those are hipped — so the roofs
+are hipped, gabled, flat with a parapet, pyramidal, skillion and barrel as
+tagged. The 11 234 that say nothing are not given a default: they are drawn
+from that distribution, conditioned on how narrow and how hemmed-in the
+footprint is, because a continuous terrace on a narrow plot is gabled where a
+detached villa is hipped on all four sides. Tagged colours win over the
+palette.
+
+**The roads are the ones in the data**, 320 km of them, draped on the terrain
+and mitred through the bends. Water crossings are cut rather than laid flat on
+the sea, so the Šibenik bridge is a gap: a bridge deck is geometry, not a
+ribbon.
+
+**The traffic, the boats and the parasols are placed from the rasters**, not
+from OSM — cover says where the water is, the shore channel how far the
+waterline is, the urban channel where people are. They are there for scale: a
+four-metre car is the only object in the scene that reads as *small*. There are
+no people, because from a hundred metres a person is one pixel and a parasol is
+six, and they say the same thing.
 
 **The fire is a cellular automaton on a 256² grid** that reads its fuel from the
 land cover — bare limestone is the natural firebreak, maquis is the reason the

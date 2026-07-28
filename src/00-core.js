@@ -229,7 +229,8 @@ float h31(vec3 p){
 /**
  * The world's lookup tables, shared by terrain, flora, city and the aircraft's
  * shadow. uTerrain packs R = height (m, scaled), G = cover class, B = slope,
- * A = scorch. uFire packs R = intensity, G = fuel left, B = wetness, A = heat.
+ * A = scorch. uFire packs R = intensity, G = fraction of fuel left (1 = never
+ * burnt, and 1 for anything that had nothing to burn), B = wetness, A = heat.
  */
 const GLSL_TERRAIN = /* glsl */ `
 uniform float uTime;

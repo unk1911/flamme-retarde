@@ -157,6 +157,13 @@ function urbanAt(x, z) {
   return world.urban[Math.round(gz) * N + Math.round(gx)] / 255;
 }
 
+/** Metres to the waterline, from whichever side you are on. Saturates at 400. */
+function shoreAt(x, z) {
+  const N = world.grid;
+  const { gx, gz } = gridIndex(x, z);
+  return (world.shore[Math.round(gz) * N + Math.round(gx)] / 255) * 400;
+}
+
 const isSea = (x, z) => coverAt(x, z) === COVER.SEA;
 
 /** Ground normal, for shading hints and for how fast fire runs uphill. */

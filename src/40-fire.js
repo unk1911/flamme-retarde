@@ -290,7 +290,17 @@ function buildFire(scene) {
     for (let i = 0; i < n2; i++) {
       const o = i * 4;
       tex[o] = (inten[i] * 255) | 0;
-      tex[o + 1] = (fuel[i] * 255) | 0;
+      // Fuel *remaining*, as a fraction of what this cell started with — which
+      // is what the terrain shader means by `scorch = 1.0 - f.g`.
+      //
+      // This used to write the absolute fuel load, and absolute load is a
+      // property of the land cover, not of the fire: bare karst carries 0.04
+      // and sand 0.02, so the shader read them as 96% and 98% burnt and
+      // painted them ash-black on a map where nothing had burned at all. Only
+      // pine (1.00) and maquis (0.78) ever looked unburnt, which is why the
+      // white limestone this whole coast is made of has never once been white.
+      // A cell with nothing to burn is not a burnt cell.
+      tex[o + 1] = fuel0[i] > 0.02 ? Math.min(255, (fuel[i] / fuel0[i]) * 255) | 0 : 255;
       tex[o + 2] = (wet[i] * 255) | 0;
       tex[o + 3] = (heat[i] * 255) | 0;
     }

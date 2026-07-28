@@ -10,7 +10,55 @@ geodata pipeline.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **The whole landscape was rendering as if it had already burned.** The fire
+  writes a texture the terrain shader reads, and the green channel is supposed
+  to be *how much of this cell's fuel is left* — `scorch = 1.0 - f.g`. It was
+  being written as the **absolute** fuel load instead, which is a property of
+  the land cover and not of the fire: bare karst carries 0.04 and sand 0.02, so
+  the shader read them as 96% and 98% burnt and painted them ash-black on a map
+  where nothing had burned at all. Only Aleppo pine (1.00) and maquis (0.78)
+  ever looked unburnt. This is why the white limestone that this entire coast
+  is quarried out of has never once been white, why every town sat on a black
+  field, and why a real burn scar was almost invisible against ground that was
+  already black. A cell with nothing to burn is not a burnt cell.
+
+### Added
+
+- **The road network, which was in the payload all along.** 1 535 ways and
+  320 km of it, baked since the first release, inflated at load, and never
+  drawn. Ribbons are draped on the terrain — resampled to follow the ground,
+  mitred through the bends, crowned and worn pale at the edges, with a broken
+  centre line on anything above a residential lane. Spans that cross open water
+  are cut rather than laid on the sea: a real bridge deck is geometry, not a
+  draped ribbon.
+- **Real roof forms.** OSM tags 2 456 of these roofs and `bake.py` was reading
+  each one once, for the height, and discarding the rest. Hipped, gabled, flat
+  with a parapet, pyramidal, skillion and barrel are now all drawn as
+  themselves. Of the roofs Šibenik actually records, 82% are hipped — the game
+  drew every one of them as a gable.
+- **A guess worth making for the other 11 234.** An untagged roof is not given
+  a default; it is drawn from the distribution, conditioned on how narrow and
+  how hemmed-in its footprint is. A continuous terrace on a narrow plot is
+  gabled because it shares its side walls with the next house along, and the
+  detached villas up the hill and out at Jadrija are hipped on all four — which
+  is the same thing that decides it in reality.
+- **Tagged colours.** 45 walls, 91 roofs and 103 building materials carry a
+  literal colour in OSM. A building somebody bothered to record as white is now
+  white, and gets less of the random per-building tint, because it is a fact
+  rather than a guess.
+- **Traffic, boats and parasols.** 2 120 cars — moving on the bigger roads,
+  parked in runs down one side of a street where the houses are — 260 boats,
+  moored inshore near towns or shuttling a validated open-water leg, and 900
+  parasols along the developed shoreline. None of it is in OpenStreetMap and
+  none of it needs to be: it is placed from the cover, shore-distance and urban
+  rasters that were already loaded. It is there for scale. A four-metre car is
+  the only object in the scene that reads as *small*, and without something
+  small the town has no size at all. There are no people: from a hundred metres
+  a person is one pixel and a parasol is six, and they say the same thing.
+- A **traffic and boats** density slider, and `roof:levels` now deepens a roof
+  rather than being ignored.
 
 ## [1.1.0] — 2026-07-28
 

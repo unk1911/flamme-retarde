@@ -320,6 +320,116 @@ def build_cover(h, sea, land_d, landcover):
 
 # ── buildings ──────────────────────────────────────────────────────────────
 
+# OSM knows far more about these buildings than a height. Of the 18 402
+# footprints in the Šibenik box, 2 456 carry roof:shape, 1 725 roof:material
+# and a hundred-odd a literal colour — all of which used to be read once, for
+# the height, and thrown away. Keeping it costs a few KB gzipped and is the
+# difference between a field of identical gables and a roofscape.
+
+ROOF_SHAPE = {
+    "gabled": 0, "cross_gabled": 0, "gambrel": 0, "double_saltbox": 0,
+    "hipped": 1, "half-hipped": 1, "hipped-and-gabled": 1, "mansard": 1,
+    # "many" means the mapper gave up on a complex roof; hipped reads best.
+    "many": 1,
+    "flat": 2,
+    "pyramidal": 3, "conical": 3, "cone": 3, "tented": 3,
+    "skillion": 4, "lean_to": 4, "saltbox": 4, "shed": 4,
+    "round": 5, "dome": 5, "onion": 5, "quadruple_saltbox": 5,
+}
+
+# Weathered pantile is the default and the palette already covers it, so
+# roof_tiles maps to None — "use the palette" — and only the materials that
+# genuinely are not terracotta override it.
+ROOF_MATERIAL = {
+    "roof_tiles": None, "tile": None, "tiles": None, "clay": None,
+    "concrete": (0.63, 0.62, 0.59),
+    "concrete_slab": (0.63, 0.62, 0.59),
+    "metal": (0.55, 0.57, 0.58),
+    "tin": (0.58, 0.59, 0.59),
+    "copper": (0.36, 0.55, 0.48),
+    "slate": (0.33, 0.34, 0.37),
+    "stone": (0.66, 0.63, 0.57),
+    "gravel": (0.55, 0.52, 0.47),
+    "tar_paper": (0.26, 0.26, 0.27),
+    "bitumen": (0.26, 0.26, 0.27),
+    "eternit": (0.60, 0.60, 0.58),
+    "asbestos": (0.60, 0.60, 0.58),
+    "glass": (0.34, 0.44, 0.48),
+}
+
+# Likewise: plaster is what the wall palette already is.
+BUILDING_MATERIAL = {
+    "plaster": None, "render": None, "cement_block": None,
+    "stone": (0.75, 0.72, 0.65),
+    "limestone": (0.80, 0.77, 0.70),
+    "sandstone": (0.80, 0.74, 0.62),
+    "concrete": (0.69, 0.69, 0.67),
+    "brick": (0.56, 0.35, 0.28),
+    "wood": (0.50, 0.40, 0.29),
+    "glass": (0.40, 0.50, 0.55),
+    "metal": (0.55, 0.57, 0.58),
+}
+
+# The colour names that actually appear on buildings here, plus the obvious
+# rest. Values are toned for daylight rendering rather than being literal CSS —
+# a roof tagged "red" is pantile, not #FF0000.
+COLOUR_NAMES = {
+    "white": (0.93, 0.92, 0.89), "black": (0.17, 0.17, 0.18),
+    "grey": (0.55, 0.55, 0.55), "gray": (0.55, 0.55, 0.55),
+    "lightgrey": (0.74, 0.74, 0.73), "lightgray": (0.74, 0.74, 0.73),
+    "darkgrey": (0.34, 0.34, 0.35), "darkgray": (0.34, 0.34, 0.35),
+    "silver": (0.72, 0.72, 0.73),
+    "red": (0.62, 0.27, 0.18), "darkred": (0.44, 0.19, 0.14),
+    "maroon": (0.40, 0.20, 0.18), "salmon": (0.80, 0.48, 0.38),
+    "orange": (0.78, 0.44, 0.20), "brown": (0.45, 0.33, 0.24),
+    "beige": (0.87, 0.82, 0.71), "cream": (0.92, 0.89, 0.79),
+    "yellow": (0.84, 0.76, 0.48), "sand": (0.84, 0.78, 0.65),
+    "green": (0.33, 0.44, 0.31), "darkgreen": (0.22, 0.32, 0.22),
+    "blue": (0.35, 0.45, 0.58), "lightblue": (0.60, 0.70, 0.78),
+    "aqua": (0.50, 0.72, 0.72), "pink": (0.85, 0.68, 0.66),
+    "purple": (0.45, 0.35, 0.48), "terracotta": (0.66, 0.34, 0.22),
+}
+
+
+def parse_colour(v):
+    """OSM lets you write a name or a hex triplet; accept either."""
+    if not v:
+        return None
+    s = str(v).strip().lower()
+    if s.startswith("#"):
+        hx = s[1:]
+        if len(hx) == 3:
+            hx = "".join(c * 2 for c in hx)
+        if len(hx) != 6:
+            return None
+        try:
+            return tuple(int(hx[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+        except ValueError:
+            return None
+    return COLOUR_NAMES.get(s)
+
+
+def pack_colour(rgb):
+    """Three floats -> one 24-bit int, because JSON floats are three times the
+    size and nobody can see the difference at 1/255."""
+    if rgb is None:
+        return None
+    r, g, b = (min(255, max(0, int(c * 255 + 0.5))) for c in rgb)
+    return (r << 16) | (g << 8) | b
+
+
+def surface_colours(tags):
+    """(wall, roof) as packed ints, or None where OSM does not say."""
+    wall = parse_colour(tags.get("building:colour")
+                        or tags.get("building:color"))
+    if wall is None and "building:material" in tags:
+        wall = BUILDING_MATERIAL.get(str(tags["building:material"]).lower())
+    roof = parse_colour(tags.get("roof:colour") or tags.get("roof:color"))
+    if roof is None and "roof:material" in tags:
+        roof = ROOF_MATERIAL.get(str(tags["roof:material"]).lower())
+    return pack_colour(wall), pack_colour(roof)
+
+
 def levels_to_height(tags, area):
     if "height" in tags:
         try:
@@ -380,7 +490,27 @@ def build_town(buildings):
             kind = 2
         # 10 cm precision is more than enough and halves the gzipped size
         ring = [[round(p[0], 1), round(p[1], 1)] for p in pts]
-        out.append({"p": ring, "h": round(h, 1), "k": kind})
+        rec = {"p": ring, "h": round(h, 1), "k": kind}
+
+        # Only write what OSM actually said. A missing key means "unknown",
+        # which the city generator answers with the local distribution rather
+        # than with a default — that distinction is the whole point.
+        shape = ROOF_SHAPE.get(str(tags.get("roof:shape", "")).lower())
+        if shape is not None:
+            rec["s"] = shape
+        wall_c, roof_c = surface_colours(tags)
+        if wall_c is not None:
+            rec["wc"] = wall_c
+        if roof_c is not None:
+            rec["rc"] = roof_c
+        # A habitable roof storey is a deeper roof, not a taller wall.
+        try:
+            rl = float(tags["roof:levels"])
+            if rl >= 1:
+                rec["rl"] = min(3, int(rl))
+        except (KeyError, TypeError, ValueError):
+            pass
+        out.append(rec)
     return out
 
 
