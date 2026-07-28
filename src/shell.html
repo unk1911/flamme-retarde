@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#070b0e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Flamme Retardé — Canadair over Šibenik</title>
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <style>/*STYLES*/</style>
@@ -12,25 +15,21 @@
 <!-- ───────────────────────────────────────────────────────── loading veil ── -->
 <div id="veil">
   <div class="veil-inner">
-    <div class="eyebrow">Šibenik &middot; Dalmatia &middot; 14:20</div>
+    <div class="eyebrow" data-i18n="veil.eyebrow">Šibenik &middot; Dalmatia &middot; 6 August 2024</div>
     <h1>Flamme&nbsp;Retardé</h1>
-    <h2>a Canadair over the Adriatic</h2>
+    <h2 data-i18n="veil.sub">a Canadair over the Adriatic</h2>
     <div class="rule"></div>
-    <p class="blurb">
-      A cluster bomblet left in the karst since the war has cooked off in the
-      August heat. The hillside above <b>Jadrija</b> is alight and the
-      <i>lebić</i> is pushing it at the old town. You are one of four.
-    </p>
+    <p class="blurb" data-i18n-html="veil.blurb"></p>
     <div class="bar"><i id="bar-fill"></i></div>
-    <div id="stage">warming the engines</div>
-    <button id="enter" hidden>Take off</button>
-    <p class="hint" id="hint" hidden>mouse or arrows to fly &nbsp;·&nbsp; W/S throttle &nbsp;·&nbsp; SPACE scoops &nbsp;·&nbsp; F drops<br><b>Z</b> levels the wings &nbsp;·&nbsp; <b>T</b> autopilot &nbsp;·&nbsp; <b>M</b> settings</p>
+    <div id="stage" data-i18n="load.warm">warming the engines</div>
+    <button id="enter" hidden data-i18n="veil.enter">Take off</button>
+    <p class="hint" id="hint" hidden></p>
   </div>
   <footer class="credit">
     <span>eDeliverables (2026)</span><i>·</i>
-    <span>terrain &amp; town derived from OpenStreetMap &amp; public elevation data</span><i>·</i>
-    <a class="src" href="https://github.com/unk1911/flamme-retarde" target="_blank" rel="noopener">
-      source on GitHub &#8599;</a>
+    <span data-i18n-html="veil.credit"></span><i>·</i>
+    <a class="src" href="https://github.com/unk1911/flamme-retarde" target="_blank" rel="noopener"
+       data-i18n-html="veil.src">source on GitHub &#8599;</a>
   </footer>
 </div>
 
@@ -39,37 +38,39 @@
 
   <!-- top strip: mission clock, the city, the fire -->
   <div id="top">
-    <div class="gauge" id="g-clock"><b>—</b><span>elapsed</span></div>
+    <div class="gauge" id="g-clock"><b>—</b><span data-i18n="hud.elapsed">elapsed</span></div>
     <div id="firebar">
       <div class="fb-row">
-        <label>fire</label>
+        <label data-i18n="hud.fire">fire</label>
         <div class="track"><i id="fb-fire"></i></div>
         <b id="fb-fire-n">0 ha</b>
       </div>
       <div class="fb-row">
-        <label>Šibenik</label>
+        <label data-i18n="hud.city">Šibenik</label>
         <div class="track"><i id="fb-city"></i></div>
         <b id="fb-city-n">100%</b>
       </div>
     </div>
-    <div class="gauge" id="g-score"><b>0</b><span>score</span></div>
+    <div class="gauge" id="g-score"><b>0</b><span data-i18n="hud.score">score</span></div>
   </div>
 
   <!-- left: flight instruments -->
   <div id="left">
-    <div class="inst"><b id="i-spd">0</b><span>km/h</span></div>
-    <div class="inst"><b id="i-alt">0</b><span>m agl</span></div>
-    <div class="inst"><b id="i-hdg">000</b><span>hdg</span></div>
-    <div class="inst small"><b id="i-vsi">0</b><span>m/s</span></div>
+    <div class="inst"><b id="i-spd">0</b><span data-i18n="hud.kmh">km/h</span></div>
+    <div class="inst"><b id="i-alt">0</b><span data-i18n="hud.agl">m agl</span></div>
+    <div class="inst"><b id="i-hdg">000</b><span data-i18n="hud.hdg">hdg</span></div>
+    <!-- the vertical speed indicator carries the descent warning: it changes
+         colour and grows an arrow long before anything starts shouting -->
+    <div class="inst small" id="inst-vsi"><b id="i-vsi">0</b><span data-i18n="hud.ms">m/s</span></div>
   </div>
 
   <!-- right: the tank -->
   <div id="right">
     <div id="tank">
       <div id="tank-fill"></div>
-      <div id="tank-label"><b id="t-litres">0</b><span>litres</span></div>
+      <div id="tank-label"><b id="t-litres">0</b><span data-i18n="hud.litres">litres</span></div>
     </div>
-    <div id="tank-hint">SPACE to scoop</div>
+    <div id="tank-hint"></div>
   </div>
 
   <!-- centre: reticle + drop marker -->
@@ -84,9 +85,33 @@
   <!-- warnings + radio -->
   <div id="ap"></div>
   <div id="warn"></div>
+  <div id="gpws"></div>
   <div id="radio"></div>
   <div id="wingmen"></div>
   <div id="compass"><div id="compass-tape"></div></div>
+</div>
+
+<!-- ───────────────────────────────────────────────── touch flight controls ── -->
+<!-- Only shown on a coarse pointer. The left half of the screen is a floating
+     stick that appears wherever the thumb lands; everything else is a button
+     big enough to hit without looking at it. -->
+<div id="touch" hidden>
+  <div id="flypad"><i id="flyknob"></i></div>
+  <div id="thr">
+    <div id="thr-track"><i id="thr-fill"></i></div>
+    <b id="thr-n">78</b>
+    <span data-i18n="touch.thr">thr</span>
+  </div>
+  <div id="tbig">
+    <button id="t-scoop" data-i18n="touch.scoop">SCOOP</button>
+    <button id="t-drop" data-i18n="touch.drop">DROP</button>
+  </div>
+  <div id="tmini">
+    <button id="t-ap" data-i18n="touch.ap">AP</button>
+    <button id="t-lvl" data-i18n="touch.lvl">LVL</button>
+    <button id="t-cam" data-i18n="touch.cam">CAM</button>
+    <button id="t-set" data-i18n="touch.set">SET</button>
+  </div>
 </div>
 
 <!-- ───────────────────────────────────────────────────────── cinematic bar ── -->
@@ -96,7 +121,7 @@
   <div class="cbar top"></div>
   <div class="cbar bottom"></div>
   <div id="cine-caption"></div>
-  <button id="cine-skip">skip &rsaquo;&rsaquo;</button>
+  <button id="cine-skip" data-i18n-html="cine.skip">skip &rsaquo;&rsaquo;</button>
 </div>
 
 <!-- ─────────────────────────────────────────────────────────── end screen ── -->
@@ -105,18 +130,36 @@
     <h1 id="over-title">—</h1>
     <p id="over-sub"></p>
     <div id="over-stats"></div>
-    <button id="again">Fly again</button>
+    <button id="again" data-i18n="over.again">Fly again</button>
   </div>
 </div>
 
 <div id="panel" hidden>
-  <h3>settings</h3>
+  <h3 data-i18n="set.title">settings</h3>
+  <div class="row lang">
+    <label data-i18n="set.lang">language</label>
+    <div id="lang-pick"></div>
+  </div>
   <div id="panel-rows"></div>
-  <p class="panel-foot">M closes this &middot; Z levels &middot; T autopilot</p>
+  <p class="panel-foot" id="panel-foot"></p>
 </div>
+
+<!-- ───────────────────────────────── ground proximity + impact ── -->
+<!-- #damage is the red vignette that closes in as the ground does; #flash is
+     the single frame of white or fire at the moment of arrival. -->
+<div id="damage"></div>
+<div id="flash"></div>
 
 <div id="toast"></div>
 <div id="tint"></div>
+
+<!-- portrait on a phone gives you no horizon and nowhere to put the controls -->
+<div id="rotate">
+  <div class="rot-icon"></div>
+  <p data-i18n="touch.rotate">Turn your device sideways.</p>
+  <small data-i18n="touch.rotateSub">This one wants a horizon.</small>
+</div>
+
 <canvas id="stage-canvas"></canvas>
 
 <script>/*THREE*/</script>

@@ -37,6 +37,7 @@ function buildFlight(plane, fire) {
     throttle: 0.78,
     stick: new THREE.Vector2(),      // x roll, y pitch — mouse, self-centring
     kb: new THREE.Vector2(),         // the same, from the arrow keys — held
+    tch: new THREE.Vector2(),        // and from a thumb on the glass — held
     rudder: 0,
     water: 0,
     flaps: 0,
@@ -47,10 +48,13 @@ function buildFlight(plane, fire) {
     crashed: false,
     onWater: false,
     scoopValid: false,
-    scoopReason: '',
+    scoopReason: '',      // an i18n key, not a sentence — see 02-i18n.js
     aoa: 0,
     gLoad: 1,
     lastDropDist: 0,
+    slam: 0,              // vertical speed of the last hull contact, one-shot
+    crashSpeed: 0,
+    crashOnWater: false,
 
     assist: 1,            // 0..1 strength of the hands-off stabiliser
     levelling: false,     // Z held — snap to wings level right now
@@ -81,6 +85,8 @@ function buildFlight(plane, fire) {
     p.throttle = 0.8;
     p.stick.set(0, 0);
     p.kb.set(0, 0);
+    p.tch.set(0, 0);
+    p.slam = 0;
     p.autopilot = false;
     p.levelling = false;
     p.apNote = '';
@@ -184,10 +190,11 @@ function buildFlight(plane, fire) {
     let bank = Math.atan2(right.y, up.y);
     const nose = Math.asin(clamp(fwd.y, -1, 1));
 
-    // Two sticks summed: the mouse one springs back to neutral on its own (see
-    // 90-app.js), the keyboard one is held for as long as the key is.
-    let sx = clamp(p.stick.x + p.kb.x, -1, 1);
-    let sy = clamp(p.stick.y + p.kb.y, -1, 1);
+    // Three sticks summed: the mouse one springs back to neutral on its own
+    // (see 90-app.js), the keyboard one is held for as long as the key is, and
+    // the touch one is held for as long as the thumb is on the glass.
+    let sx = clamp(p.stick.x + p.kb.x + p.tch.x, -1, 1);
+    let sy = clamp(p.stick.y + p.kb.y + p.tch.y, -1, 1);
 
     if (p.autopilot && Math.hypot(sx, sy) > 0.25) { p.autopilot = false; p.apNote = ''; }
     // If the autopilot has nothing to steer to it stays engaged but hands over
@@ -300,7 +307,10 @@ function buildFlight(plane, fire) {
       const vv = p.vel.y;
       const wingsLevel = Math.abs(bank) < 0.35;
       if (overSea && vv > -5.5 && wingsLevel && speed < 125) {
-        // A controlled touch on the water: skim, don't sink.
+        // A controlled touch on the water: skim, don't sink. Anything with
+        // real vertical speed in it still wants to be *felt* — see
+        // 56-alerts.js, which turns this into a bang and a shake.
+        if (vv < -1.6 && p.slam > vv) p.slam = vv;
         p.pos.y = surface + 1.4;
         p.vel.y = Math.max(p.vel.y, 0);
         // Hull drag — this is what makes you firewall the throttle to get off.
@@ -327,19 +337,19 @@ function buildFlight(plane, fire) {
     p.scoopValid = false;
     p.scoopReason = '';
     if (p.water >= CONFIG.tankCapacity - 1) {
-      p.scoopReason = 'tank full';
+      p.scoopReason = 'scoop.full';
     } else if (!overSea) {
-      p.scoopReason = 'not over water';
+      p.scoopReason = 'scoop.notWater';
     } else if (agl > CONFIG.scoopMaxAlt) {
-      p.scoopReason = 'too high';
+      p.scoopReason = 'scoop.tooHigh';
     } else if (speed < CONFIG.scoopSpeed[0]) {
-      p.scoopReason = 'too slow';
+      p.scoopReason = 'scoop.tooSlow';
     } else if (speed > CONFIG.scoopSpeed[1]) {
-      p.scoopReason = 'too fast';
+      p.scoopReason = 'scoop.tooFast';
     } else if (Math.abs(bank) > 0.20) {
-      p.scoopReason = 'wings level';
+      p.scoopReason = 'scoop.bank';
     } else if (!runAhead) {
-      p.scoopReason = 'no run ahead';
+      p.scoopReason = 'scoop.noRun';
     } else {
       p.scoopValid = true;
     }

@@ -12,6 +12,74 @@ geodata pipeline.
 
 Nothing yet.
 
+## [1.1.0] — 2026-07-28
+
+### Added
+
+- **English, Croatian and French**, switchable from the settings panel at any
+  time — mid-flight, mid-cinematic, mid-anything. English is now the default;
+  the first version shipped with the radio, the callsigns and the end screen in
+  Croatian only, which is charming for about four seconds if you do not read
+  Croatian. The starting language follows the browser's preference when we
+  speak it. Every string in the game goes through one table in `src/02-i18n.js`,
+  including the compass card, which is N/E/S/W, S/I/J/Z and N/E/S/O
+  respectively.
+- **A ground proximity warning system.** A radio-altimeter tick that speeds up
+  and rises in pitch as the ground comes up, **SINK RATE** when the descent is
+  too steep for the height, and **PULL UP** — the swept whoop — when the terrain
+  ahead is going to win. The terrain check looks along the flight path rather
+  than straight down, so ground rising to meet you trips it too. The vertical
+  speed readout goes amber and then red well before any of that, so there is a
+  silent warning before there is a loud one.
+- **The whole thing inhibits itself on a legal scoop run.** Five metres over the
+  sea at sixty metres a second is the job, and an alarm that cries wolf on every
+  fill is an alarm nobody hears when it counts.
+- **An impact you can feel.** Hitting the water or the karst now gets a
+  full-screen flash — white for the sea, fire for the rock — a camera shake that
+  decays rather than stopping, four layers of noise built for the surface you
+  hit, the engines dying, and the picture going out over a second and a half.
+  Then the results screen, not before.
+- **A hull slam** on a hard-but-survivable arrival, scaled by how hard: greasing
+  it on gives you nothing, dropping it on rattles the camera.
+- **Touch controls**, so it plays on a phone or a tablet. The stick floats — it
+  appears centred on wherever your thumb lands in the left half of the screen,
+  because you cannot see your own hand and will not put it where a picture of a
+  stick is. The throttle is a lever with an absolute position, not a pair of
+  +/- buttons. SCOOP and DROP are held. Level latches instead of being held,
+  because you have two thumbs and both are busy. Pixel ratio, vegetation density
+  and HUD layout all scale down; there is a "turn it sideways" screen in
+  portrait.
+- A **volume** slider, and `?touch` / `?notouch` to force the control scheme.
+
+### Changed
+
+- **The cinematic is entirely Šibenik now.** The detours through Zagreb in 1995
+  and Kherson in 2022 are gone. They made a fair point about the weapon and they
+  pulled the film away from the one place the game is about, twice.
+- **The dates were wrong, and now they are right.** The fire is the real one:
+  **6 August 2024**, reported at 12:52, the pine wood at **Rokići** above the
+  coast road; detonations from Homeland-War cluster submunitions — *zvončići*,
+  little bells — going off in the heat about twenty minutes later while the
+  crews worked; three and a half hectares; and **four Canadairs** and an Air
+  Tractor over the top of it. The last of those is why the game has always had
+  four aircraft in it, and nobody planned that.
+- **A tenth painted panel**, of the real fire, from a press photograph of that
+  afternoon: the flame front crowning along the ridge with a car park and a
+  crash barrier at the bottom of the frame.
+- The end screen tells you what you hit — the Adriatic and the karst get
+  different lines.
+
+### Fixed
+
+- **The intro still played slow on a slow machine.** The earlier fix swapped the
+  frame loop's clamped delta for the wall clock but kept accumulating a capped
+  per-frame step, so a machine dropping to 4 fps — which is what a software
+  renderer does while it cross-fades two 720p plates — still ran the film at a
+  third speed. The beat position is now the difference of two timestamps and
+  cannot drift at any frame rate.
+- The "today" beat handed off from its painting to a camera looking along flat
+  scrub. It now starts wide with the town across the channel.
+
 ## [1.0.0] — 2026-07-27
 
 First public release. Live at

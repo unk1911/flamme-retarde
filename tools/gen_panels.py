@@ -91,13 +91,22 @@ PANELS_SPEC = [
      "a tattered faded ribbon, weathered, half-buried in dry grass. Hard "
      "summer noon light. Nothing else in the frame. No people, no text."),
 
-    ("kherson", None,
-     "A wide flat sunflower plain under a vast pale grey sky, southern "
-     "Ukraine in late summer. Very high up, one rocket casing has opened and "
-     "a spreading grey cloud of tiny specks with thread-thin ribbons drifts "
-     "down over the fields. Empty road, distant poplars, a line of dust. "
-     "Cold, still, drained of colour — almost monochrome, only the dull gold "
-     "of the sunflowers. Deeply sad. No people, no explosions, no damage."),
+    # ("kherson", ...) was cut when the intro was refocused entirely onto
+    # Šibenik. The raw is still in refs/panels/ if it is ever wanted back; it
+    # is deliberately not built into build/payload any more.
+
+    ("rokici", "rokici-2024-PXL_060824_118634645-3.jpg",
+     "Repaint this photograph of the real wildfire in the style above. Keep "
+     "the composition exactly: a dense green aleppo-pine hillside filling the "
+     "middle of the frame, crowning orange flame breaking along the ridge "
+     "line, and enormous billowing smoke — white and grey on the left, heavy "
+     "charcoal-black on the right — rising into a hot pale sky. Below and in "
+     "front, at the very bottom of the frame, the ordinary edge of a town on "
+     "an August afternoon: a crash barrier, a road, a few parked cars. "
+     "Painted so the contrast is the whole point — a completely normal "
+     "Tuesday with the hillside above it going up. Remove all advertising, "
+     "all signage, all lettering and all recognisable faces; keep any figures "
+     "tiny, distant and anonymous. No text, no watermark."),
 
     ("today", "Pogled.na.sibenik.JPG",
      "Repaint this view of the Dalmatian stone town in the style "

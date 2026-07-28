@@ -56,7 +56,7 @@ async function loadWorld(onStage) {
   const N = meta.grid;
   world.grid = N;
 
-  onStage('unrolling the karst');
+  onStage('load.karst');
   const hp = await decodePNG(PAYLOAD.terrain_h);
   const n2 = N * N;
   const height = new Float32Array(n2);
@@ -70,7 +70,7 @@ async function loadWorld(onStage) {
   world.height = height;
   world.shore = shore;
 
-  onStage('sorting pine from limestone');
+  onStage('load.cover');
   const cp = await decodePNG(PAYLOAD.terrain_c);
   const cover = new Uint8Array(n2);
   const fuelJitter = new Uint8Array(n2);
@@ -85,7 +85,7 @@ async function loadWorld(onStage) {
   world.fuelJitter = fuelJitter;
   world.urban = urban;
 
-  onStage('reading the old town');
+  onStage('load.town');
   world.town = await inflateJSON(PAYLOAD.town_json);
   world.roads = await inflateJSON(PAYLOAD.roads_json);
   world.places = PAYLOAD.places;

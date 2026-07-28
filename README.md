@@ -33,14 +33,23 @@ is a real footprint.
 | `F` / left click | drop |
 | `shift` | flaps |
 | `C` | camera — chase, close, cockpit, wing |
-| `M` | settings — mouse sensitivity, stability assist, vegetation, FOV, exposure |
+| `M` | settings — language, stability assist, volume, vegetation, FOV, exposure |
 | `H` | hide the HUD |
 
 The autopilot is a *fly me to the job* button, not an autoplayer: it lines the
 aeroplane up on a scoop run or brings you in over the fire, and hands the scoop
 and the drop back to you. Any real stick input disengages it.
 
+**On a phone or a tablet**, drag anywhere on the left half to fly — the stick
+appears under your thumb wherever you put it — and the throttle is the lever on
+the right. `SCOOP` and `DROP` are held, not tapped. `LVL` latches. Landscape.
+
+**Languages: English, Croatian, French**, switchable in the settings panel at
+any time, including mid-flight. It starts in whichever of the three your
+browser asks for, and English otherwise.
+
 `?nointro` skips the cinematic. `?q=low|mid|high` forces a detail level.
+`?touch` / `?notouch` force the control scheme.
 
 ---
 
@@ -87,10 +96,18 @@ partials for the bomblets, and a convolution reverb whose impulse response is
 built at load time from a few discrete slap-backs off the hillsides plus a
 decaying noise tail.
 
-**The intro panels are painted.** Nine of them, generated with Gemini 2.5 Flash
+**The intro panels are painted.** Ten of them, generated with Gemini 2.5 Flash
 Image from the reference photographs, cross-fading over the live 3-D on a slow
 push, so the film cuts between painting and engine. `tools/gen_panels.py`
 regenerates them; the prompts are in the file.
+
+**Nothing warns you about the ground unless it should.** There is a real ground
+proximity system — a radio-altimeter tick that speeds up as the ground comes
+up, SINK RATE for a descent too steep for the height, and the swept PULL UP
+whoop when the terrain *ahead* is going to win rather than the terrain below.
+All of it inhibits itself the moment the scoop conditions are met, because being
+five metres over the sea is the job and an alarm you hear on every fill is an
+alarm you stop hearing.
 
 ![St James](docs/02-town.png)
 
@@ -144,8 +161,28 @@ Changes are tracked in [CHANGELOG.md](CHANGELOG.md).
 - [Three.js](https://threejs.org), MIT.
 - Intro panels generated with Google Gemini 2.5 Flash Image from reference photographs.
 
-The historical material in the intro is real. The M-87 Orkan strike on Zagreb of
-2 May 1995 and the submunitions Croatians called *jinglebells* are matters of
-record, as is the ICTY's finding on them, as is the continued use of the same
-class of weapon in Ukraine. The unexploded-ordnance fire in the hills above
-Šibenik is the reason this game exists.
+## What actually happened
+
+The fire in the intro is a real fire. On **6 August 2024**, reported at 12:52,
+the pine wood at **Rokići** above Šibenik went up in the afternoon heat, close
+to the coast road and to housing. Around twenty past one the hillside began
+detonating: Homeland-War cluster submunitions — the ones Croatia calls
+***zvončići***, little bells, for the sound they made coming down — cooking off
+in the fire, thirty years after they were dropped and never went off. The
+Adriatic Highway above Rokići was closed and the area lost power. Something
+under sixty firefighters with twenty-odd vehicles worked it from the ground,
+and **four Canadairs** and an Air Tractor worked it from the air. Three and a
+half hectares burned. Nobody was killed.
+
+The game takes two liberties with that, both on purpose. It moves the fire
+across the channel to the hills above **Jadrija**, because a fire the ground
+crews genuinely cannot reach is the only kind that *has* to be fought from the
+air, and that is the game. And the bomblet that lights it is the game's own.
+Everything else in the cinematic — the weapon, the name, the roughly one in
+twenty that never went off, the date, the place, the four aircraft — is a matter
+of record.
+
+Reporting: [morski.hr](https://www.morski.hr/zaustavljena-buktinja-u-sibeniku-izgorjelo-3-5-hektara-ostaju-gasiti-tri-zrakoplova/),
+[ŠibenikIN](https://www.sibenik.in/crna-kronika/pozar-i-dalje-aktivan-no-pod-kontrolom-je-vatrogasaca-izgorjela-je-povrsina-od-oko-3-5-hektara/),
+[Index.hr](https://index.hr/vijesti/clanak/iznad-sibenika-izbio-pozar-blizu-kuca-je-cuju-se-detonacije-moze-biti-opasno/2588456.aspx),
+[N1](https://n1info.hr/vijesti/pozar-sibenik-06082024/).

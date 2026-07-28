@@ -8,7 +8,10 @@ const canvas = $('stage-canvas');
 const renderer = new THREE.WebGLRenderer({
   canvas, antialias: true, powerPreference: 'high-performance', stencil: false,
 });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+// A phone reports a device pixel ratio of 3 and then cannot fill it: this is a
+// deferred-lit scene with a shadow cascade and twenty thousand instanced trees,
+// and rendering it at 3x is the difference between 60 fps and 12.
+renderer.setPixelRatio(Math.min(devicePixelRatio, IS_SMALL ? 1.25 : IS_TOUCH ? 1.6 : 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -53,7 +56,9 @@ addEventListener('keyup', (e) => keys.delete(e.code));
 addEventListener('blur', () => { keys.clear(); if (flight) flight.p.kb.set(0, 0); });
 
 canvas.addEventListener('click', () => {
-  if (state.phase === 'fly' && !pointerLocked) canvas.requestPointerLock();
+  // Never on a touchscreen: there is no pointer to lock, and asking for it on
+  // iOS throws up a permission bar over the top of the game.
+  if (!IS_TOUCH && state.phase === 'fly' && !pointerLocked) canvas.requestPointerLock();
 });
 document.addEventListener('pointerlockchange', () => {
   pointerLocked = document.pointerLockElement === canvas;
@@ -72,8 +77,8 @@ function readKeys(dt) {
   const p = flight.p;
   input.thrUp = keys.has('KeyW');
   input.thrDown = keys.has('KeyS');
-  input.scoop = keys.has('Space');
-  input.drop = keys.has('KeyF') || mouseDrop;
+  input.scoop = keys.has('Space') || TOUCH.scoop;
+  input.drop = keys.has('KeyF') || mouseDrop || TOUCH.drop;
   input.flaps = keys.has('ShiftLeft') || keys.has('ShiftRight');
   p.rudder = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
 
@@ -84,8 +89,9 @@ function readKeys(dt) {
   p.kb.x = damp(p.kb.x, kx, 9, dt);
   p.kb.y = damp(p.kb.y, ky, 9, dt);
 
-  // Z is the panic button: centre the stick and hold her level.
-  p.levelling = keys.has('KeyZ');
+  // Z is the panic button: centre the stick and hold her level. On a phone it
+  // latches instead of being held — you have only so many thumbs.
+  p.levelling = keys.has('KeyZ') || TOUCH.level;
   if (p.levelling) p.stick.multiplyScalar(Math.exp(-9 * dt));
 
   // The spring. Without this the stick keeps whatever you last pushed into it
@@ -130,7 +136,7 @@ function updateNavTarget(dt) {
         // Glide down onto it the way the wingmen do, rather than arriving high.
         alt: apFire[2] + Math.min(240, 52 + d * 0.16),
         mode: 'fire',
-        label: d < 700 ? 'over the fire — press F' : 'to the fire',
+        label: d < 700 ? (IS_TOUCH ? 'ap.overFireTouch' : 'ap.overFire') : 'ap.toFire',
       };
       return;
     }
@@ -218,8 +224,8 @@ function updateNavTarget(dt) {
     z: clamp(apRun.z + apRun.dz * carrot, -lim, lim),
     alt, along, cross,
     mode: onRun ? 'scoop' : 'toWater',
-    label: onRun ? 'on the water — hold SPACE'
-      : apOnRun ? 'on the approach' : 'lining up on the water',
+    label: onRun ? (IS_TOUCH ? 'ap.onWaterTouch' : 'ap.onWater')
+      : apOnRun ? 'ap.approach' : 'ap.lining',
   };
 }
 
@@ -227,8 +233,8 @@ function toggleAutopilot() {
   if (!flight || state.phase !== 'fly') return;
   flight.p.autopilot = !flight.p.autopilot;
   if (flight.p.autopilot) { apRun = null; apOnRun = false; apFire = null; apFireT = 0;
-    updateNavTarget(0.016); toast('autopilot engaged'); }
-  else { flight.p.apNote = ''; toast('autopilot off'); }
+    updateNavTarget(0.016); toast(T('ap.engaged')); }
+  else { flight.p.apNote = ''; toast(T('ap.off')); }
 }
 
 // ── camera modes ─────────────────────────────────────────────────────────────
@@ -281,12 +287,20 @@ function updateCamera(dt) {
   const upv = new THREE.Vector3(0, 1, 0).lerp(up, blend).normalize();
   camera.up.copy(upv);
   camera.lookAt(camAim);
+
+  // Shake goes on *after* the look-at, so it throws the camera about without
+  // swinging the aim point around with it — otherwise a hard bump reads as the
+  // world lurching rather than as the airframe being hit.
+  if (alerts) {
+    const s = alerts.shakeOffset(dt, U.uTime.value);
+    if (s) camera.position.add(s);
+  }
 }
 
 // ── the world ────────────────────────────────────────────────────────────────
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
-  trees, landmarks;
+  trees, landmarks, alerts;
 
 function setSun() {
   const a = sunAngles(state.hour);
@@ -308,7 +322,22 @@ function setSun() {
 
 const headingToYaw = (dx, dz) => Math.atan2(-dx, -dz);
 
+/**
+ * The two lines that name controls rather than concepts. They cannot be plain
+ * data-i18n attributes because which string is right depends on whether there
+ * is a keyboard attached, not only on the language.
+ */
+function paintDeviceText() {
+  $('hint').innerHTML = TK('veil.hint', 'veil.hintTouch');
+  $('panel-foot').textContent = TK('set.foot', 'set.footTouch');
+}
+onLangChange(paintDeviceText);
+
 async function boot() {
+  // Language first: everything after this point renders text.
+  applyLang();
+  paintDeviceText();
+
   // A painted plate behind the title, at low opacity under the gradient.
   const art = document.createElement('div');
   art.id = 'veil-art';
@@ -317,16 +346,21 @@ async function boot() {
 
   const bar = $('bar-fill');
   const stageEl = $('stage');
-  const step = async (pct, label) => {
+  // The stage line keeps its key, so switching language mid-load retranslates
+  // whatever it is currently saying instead of freezing in the old one.
+  let stageKey = 'load.warm';
+  onLangChange(() => { stageEl.textContent = T(stageKey); });
+  const step = async (pct, key) => {
     bar.style.width = pct + '%';
-    stageEl.textContent = label;
+    stageKey = key;
+    stageEl.textContent = T(key);
     await new Promise((r) => setTimeout(r, 16));
   };
 
-  await step(6, 'unpacking Šibenik');
-  await loadWorld((s) => { stageEl.textContent = s; });
+  await step(6, 'load.unpack');
+  await loadWorld((k) => { stageKey = k; stageEl.textContent = T(k); });
 
-  await step(34, 'the bura is the wrong wind for this');
+  await step(34, 'load.wind');
   // Lebić — the south-westerly. It is what pushes a fire off Jadrija and up
   // the peninsula toward the town, and it is why today is a bad day.
   state.windDir = -0.35;
@@ -335,44 +369,49 @@ async function boot() {
   U.uWindSpeed.value = state.windSpeed;
   setSun();
 
-  await step(44, 'raising the sky');
+  await step(44, 'load.sky');
   sky = buildSky(scene);
 
-  await step(52, 'lighting the cascade');
+  await step(52, 'load.cascade');
   shadow = buildShadow(renderer);
 
-  await step(60, 'laying the karst');
+  await step(60, 'load.terrain');
   terrain = buildTerrain(scene);
 
-  await step(70, 'filling the Adriatic');
+  await step(70, 'load.sea');
   sea = buildSea(scene);
 
-  await step(74, 'setting the stone of St James');
+  await step(74, 'load.stone');
   resolveLandmarks();
   landmarks = await buildLandmarks(scene);
 
-  await step(78, 'raising the old town');
+  await step(78, 'load.city');
   city = buildCity(scene);
 
-  await step(82, 'counting the fuel');
+  await step(82, 'load.fuel');
   fire = buildFire(scene);
 
-  await step(85, 'planting the maquis');
+  await step(85, 'load.maquis');
   trees = buildTrees(scene, fire);
+  // A phone gets half the forest by default. Only as a *default* — the slider
+  // still goes to the top, and anything already chosen is restored over this
+  // by buildPanel().
+  if (IS_SMALL) trees.setDensity(0.5);
 
-  await step(88, 'rolling out the Canadair');
+  await step(88, 'load.plane');
   plane = buildCanadair();
   scene.add(plane.root);
   waterfx = buildWaterFX(scene);
   flight = buildFlight(plane, fire);
 
-  await step(92, 'briefing the other three');
+  await step(92, 'load.brief');
   wingmen = buildWingmen(scene, fire, (who, text) => radio(who, text));
 
-  await step(95, 'spooling the turboprops');
+  await step(95, 'load.engines');
   audio = buildAudio();
+  alerts = buildAlerts(audio);
 
-  await step(97, 'threading the projector');
+  await step(97, 'load.projector');
   intro = buildIntro(scene, camera, {
     fire, audio, plane, flight,
     setGrade: (g) => {
@@ -389,16 +428,15 @@ async function boot() {
 
   startMission();
 
-  await step(100, 'ready');
+  await step(100, 'load.ready');
   $('enter').hidden = false;
   $('hint').hidden = false;
-  stageEl.textContent = 'four aircraft, one afternoon';
 }
 
 // ── mission ──────────────────────────────────────────────────────────────────
 
 const mission = {
-  t: 0, radioQueue: [], radioTimer: 0, best: 0,
+  t: 0, radioQueue: [], radioTimer: 0, best: 0, radioNow: null,
 };
 
 function startMission() {
@@ -419,54 +457,91 @@ function startMission() {
   state.phase = 'intro';
 }
 
+/** Both arguments are i18n keys — the callsign and the line. */
 function radio(who, text, delay = 0) {
   mission.radioQueue.push({ who, text, delay });
 }
 
+function paintRadio(m) {
+  $('radio').innerHTML = m
+    ? `<div class="line"><span class="who">${T(m.who)}</span> &nbsp;${T(m.text)}</div>`
+    : '';
+}
+
 function updateRadio(dt) {
-  const el = $('radio');
   mission.radioTimer -= dt;
   if (mission.radioTimer <= 0 && mission.radioQueue.length) {
     const m = mission.radioQueue.shift();
-    el.innerHTML = `<div class="line"><span class="who">${m.who}</span> &nbsp;${m.text}</div>`;
+    mission.radioNow = m;
+    paintRadio(m);
     if (audio) audio.squelch();
-    mission.radioTimer = 3.6 + m.text.length * 0.035;
-  } else if (mission.radioTimer <= 0) {
-    el.innerHTML = '';
+    mission.radioTimer = 3.6 + T(m.text).length * 0.035;
+  } else if (mission.radioTimer <= 0 && mission.radioNow) {
+    mission.radioNow = null;
+    paintRadio(null);
   }
 }
+
+onLangChange(() => { if (mission.radioNow) paintRadio(mission.radioNow); });
 
 // ── settings ─────────────────────────────────────────────────────────────────
 
 const SETTINGS = [
-  { key: 'sens', label: 'mouse sensitivity', min: 0.25, max: 2.5, step: 0.05,
+  // Meaningless without a mouse, so it is not offered to a thumb.
+  { key: 'sens', label: 'set.sens', min: 0.25, max: 2.5, step: 0.05, desktopOnly: true,
     get: () => flight.p.sens, set: (v) => { flight.p.sens = v; },
     fmt: (v) => v.toFixed(2) + '×' },
-  { key: 'assist', label: 'stability assist', min: 0, max: 1, step: 0.05,
+  { key: 'assist', label: 'set.assist', min: 0, max: 1, step: 0.05,
     get: () => flight.p.assist, set: (v) => { flight.p.assist = v; },
     fmt: (v) => Math.round(v * 100) + '%' },
-  { key: 'trees', label: 'vegetation', min: 0, max: 1.6, step: 0.05,
+  { key: 'volume', label: 'set.volume', min: 0, max: 1, step: 0.05,
+    get: () => audio.getVolume(), set: (v) => audio.setVolume(v),
+    fmt: (v) => v <= 0.001 ? T('set.off') : Math.round(v * 100) + '%' },
+  { key: 'trees', label: 'set.trees', min: 0, max: 1.6, step: 0.05,
     get: () => trees.getDensity(), set: (v) => trees.setDensity(v),
-    fmt: (v) => v <= 0.001 ? 'off' : Math.round(v * 100) + '%' },
-  { key: 'fov', label: 'field of view', min: 45, max: 95, step: 1,
+    fmt: (v) => v <= 0.001 ? T('set.off') : Math.round(v * 100) + '%' },
+  { key: 'fov', label: 'set.fov', min: 45, max: 95, step: 1,
     get: () => camera.fov, set: (v) => { camera.fov = v; camera.updateProjectionMatrix(); },
     fmt: (v) => Math.round(v) + '°' },
-  { key: 'exposure', label: 'exposure', min: 0.55, max: 1.4, step: 0.02,
+  { key: 'exposure', label: 'set.exposure', min: 0.55, max: 1.4, step: 0.02,
     get: () => renderer.toneMappingExposure, set: (v) => { renderer.toneMappingExposure = v; },
     fmt: (v) => v.toFixed(2) },
 ];
+
+/** Rows are kept so the labels can be rewritten when the language changes. */
+const settingRows = [];
 
 function buildPanel() {
   const host = $('panel-rows');
   if (host._built) return;
   host._built = true;
-  for (const s of SETTINGS) {
+
+  // ── the language picker ─────────────────────────────────────────────────
+  const pick = $('lang-pick');
+  for (const l of LANGS) {
+    const b = document.createElement('button');
+    b.textContent = LANG_LABEL[l];
+    b.title = STRINGS[l]['lang.name'];
+    b.addEventListener('click', () => setLang(l));
+    pick.appendChild(b);
+  }
+  const paintPicker = () => {
+    [...pick.children].forEach((b, i) => b.classList.toggle('on', LANGS[i] === getLang()));
+  };
+  paintPicker();
+  onLangChange(paintPicker);
+
+  // ── the sliders ─────────────────────────────────────────────────────────
+  const shown = SETTINGS.filter((s) => !(s.desktopOnly && IS_TOUCH));
+  for (const s of shown) {
     const row = document.createElement('div');
     row.className = 'row';
-    row.innerHTML = `<label>${s.label}<b></b></label>`
+    row.innerHTML = '<label><span></span><b></b></label>'
       + `<input type="range" min="${s.min}" max="${s.max}" step="${s.step}">`;
+    const name = row.querySelector('span');
     const out = row.querySelector('b'), inp = row.querySelector('input');
     inp.value = s.get();
+    name.textContent = T(s.label);
     out.textContent = s.fmt(s.get());
     inp.addEventListener('input', () => {
       const v = parseFloat(inp.value);
@@ -475,20 +550,29 @@ function buildPanel() {
       try { localStorage.setItem('fr.' + s.key, String(v)); } catch (e) { /* private mode */ }
     });
     host.appendChild(row);
+    settingRows.push({ s, name, out, inp });
   }
   // Whatever you settled on last time is what you get this time.
-  for (const s of SETTINGS) {
+  for (const r of settingRows) {
     let v = null;
-    try { v = localStorage.getItem('fr.' + s.key); } catch (e) { /* ignore */ }
+    try { v = localStorage.getItem('fr.' + r.s.key); } catch (e) { /* ignore */ }
     if (v == null) continue;
     const n = parseFloat(v);
     if (Number.isFinite(n)) {
-      s.set(clamp(n, s.min, s.max));
-      const row = host.children[SETTINGS.indexOf(s)];
-      row.querySelector('input').value = n;
-      row.querySelector('b').textContent = s.fmt(n);
+      r.s.set(clamp(n, r.s.min, r.s.max));
+      r.inp.value = n;
+      r.out.textContent = r.s.fmt(n);
     }
   }
+
+  // Both the label and the *value* can be words — "off" is a translated
+  // string, not a number — so the whole row is repainted, not just the name.
+  onLangChange(() => {
+    for (const r of settingRows) {
+      r.name.textContent = T(r.s.label);
+      r.out.textContent = r.s.fmt(parseFloat(r.inp.value));
+    }
+  });
 }
 
 function togglePanel() {
@@ -497,7 +581,7 @@ function togglePanel() {
   const el = $('panel');
   el.hidden = !el.hidden;
   if (!el.hidden) document.exitPointerLock?.();
-  else if (state.phase === 'fly') canvas.requestPointerLock();
+  else if (!IS_TOUCH && state.phase === 'fly') canvas.requestPointerLock();
 }
 
 function toast(msg, kind = '') {
@@ -522,7 +606,18 @@ function updateHUD(dt) {
   const { fwd } = flight.axes();
   let hdg = Math.round((Math.atan2(fwd.x, -fwd.z) * 180 / Math.PI + 360)) % 360;
   $('i-hdg').textContent = String(hdg).padStart(3, '0');
-  $('i-vsi').textContent = (p.vel.y >= 0 ? '+' : '') + p.vel.y.toFixed(1);
+
+  // The vertical speed readout does double duty as the descent indicator: an
+  // arrow you cannot miss, and a colour that changes well before the GPWS has
+  // anything to say. Amber is "you are coming down"; red is "at this rate you
+  // are going to arrive".
+  const vs = p.vel.y;
+  const arrow = vs > 0.6 ? '▲ ' : vs < -0.6 ? '▼ ' : '';
+  $('i-vsi').textContent = arrow + (vs >= 0 ? '+' : '') + vs.toFixed(1);
+  const vsiEl = $('inst-vsi');
+  vsiEl.className = 'inst small'
+    + (vs < -3 && state.altAgl < 400 ? (vs < -8 || (state.altAgl < 90 && vs < -5)
+      ? ' hard' : ' down') : '');
 
   const pct = p.water / CONFIG.tankCapacity;
   $('tank-fill').style.height = (pct * 100) + '%';
@@ -530,11 +625,13 @@ function updateHUD(dt) {
 
   const hint = $('tank-hint');
   if (p.water >= CONFIG.tankCapacity - 1) {
-    hint.textContent = 'full — F to drop'; hint.className = 'ready';
+    hint.textContent = T('tank.full'); hint.className = 'ready';
   } else if (p.scoopValid) {
-    hint.textContent = 'hold SPACE'; hint.className = 'hot';
+    hint.textContent = TK('tank.hold', 'tank.holdTouch'); hint.className = 'hot';
   } else {
-    hint.textContent = p.scoopReason || 'SPACE to scoop'; hint.className = '';
+    hint.textContent = p.scoopReason ? T(p.scoopReason)
+      : TK('tank.prompt', 'tank.promptTouch');
+    hint.className = '';
   }
 
   $('g-clock').firstElementChild.textContent = formatClock(state.t);
@@ -547,25 +644,26 @@ function updateHUD(dt) {
   $('fb-city').style.width = (state.cityHealth * 100) + '%';
   $('fb-city-n').textContent = Math.round(state.cityHealth * 100) + '%';
 
-  // warnings
+  // warnings. Ground proximity is not here — it gets the middle of the screen
+  // to itself (see 56-alerts.js), because it is the only one you must act on.
   const w = [];
-  if (state.speed < FLIGHT.vStall * 1.05 && state.altAgl > 3) w.push('<span class="pulse">stall</span>');
-  if (state.altAgl < 25 && p.vel.y < -4) w.push('<span class="pulse">pull up</span>');
-  if (p.water > CONFIG.tankCapacity * 0.99 && !state.dropping) w.push('tank full');
+  if (state.speed < FLIGHT.vStall * 1.05 && state.altAgl > 3) {
+    w.push(`<span class="pulse">${T('warn.stall')}</span>`);
+  }
+  if (p.water > CONFIG.tankCapacity * 0.99 && !state.dropping) w.push(T('warn.tankFull'));
   $('warn').innerHTML = w.join(' &nbsp; ');
 
   $('ap').innerHTML = p.autopilot
-    ? `autopilot <span>${p.apNote}</span>`
-    : (p.levelling ? 'levelling' : '');
+    ? `${T('ap.label')} <span>${p.apNote ? T(p.apNote) : ''}</span>`
+    : (p.levelling ? T('ap.levelling') : '');
 
   $('reticle').classList.toggle('armed', p.water > 200 && state.altAgl < 260 && state.altAgl > 20);
 
   // wingmen
   if (wingmen) {
-    const LABEL = { toWater: 'to water', scoop: 'scooping', toFire: 'to fire', drop: 'dropping' };
     $('wingmen').innerHTML = wingmen.status().map((w) =>
       `<div class="w"><i class="dot ${w.phase === 'scoop' ? 'scoop' : w.phase === 'drop' ? 'drop' : ''}"></i>`
-      + `<span class="name">${w.call}</span>${LABEL[w.phase] || w.phase}`
+      + `<span class="name">${T(w.call)}</span>${T('wing.' + w.phase)}`
       + ` <span style="opacity:.55">${Math.round(w.water / CONFIG.tankCapacity * 100)}%</span></div>`
     ).join('');
   }
@@ -573,25 +671,38 @@ function updateHUD(dt) {
   // compass tape
   const tape = $('compass-tape');
   if (!tape._built) {
+    // Cardinal letters are language-specific: north is N, S and N again in
+    // English, Croatian and French, but east is E, I and E, so the whole set
+    // comes out of the string table as four characters.
+    const card = T('hud.compass');
     let h = '';
     for (let a = -180; a <= 540; a += 15) {
       const lbl = ((a % 360) + 360) % 360;
-      const txt = lbl % 90 === 0 ? ['N', 'E', 'S', 'W'][lbl / 90] : (lbl % 45 === 0 ? String(lbl) : '·');
+      const txt = lbl % 90 === 0 ? card[lbl / 90] : (lbl % 45 === 0 ? String(lbl) : '·');
       h += `<span style="width:46px">${txt}</span>`;
     }
     tape.innerHTML = h;
     tape._built = true;
   }
   tape.style.left = `calc(50% - ${(hdg + 180) / 15 * 46 + 23}px)`;
+
+  if (IS_TOUCH) paintTouchHUD();
 }
+
+// The compass is built once and cached, so it needs telling.
+onLangChange(() => {
+  const tape = $('compass-tape');
+  if (tape) tape._built = false;
+  if (state.phase === 'won' || state.phase === 'lost') redrawEnd();
+});
 
 /** Where the virtual stick is, drawn every frame — the HUD's 16 Hz is too
     coarse for something the hand is steering. */
 function updateStickHUD() {
   const p = flight.p;
   const el = $('stick');
-  const sx = clamp(p.stick.x + p.kb.x, -1, 1);
-  const sy = clamp(p.stick.y + p.kb.y, -1, 1);
+  const sx = clamp(p.stick.x + p.kb.x + p.tch.x, -1, 1);
+  const sy = clamp(p.stick.y + p.kb.y + p.tch.y, -1, 1);
   el.style.transform = `translate(${sx * 92}px, ${-sy * 78}px)`;
   const off = 1 - Math.min(1, Math.hypot(sx, sy) / FLIGHT.handsOffAt);
   el.className = p.autopilot ? 'auto' : (p.levelling || off > 0.45 ? 'hands' : '');
@@ -616,11 +727,18 @@ function updateMission(dt) {
   for (const ev of fire.events) {
     if (ev.kind === 'spot' && ev.city && state.t - spotWarned > 12) {
       spotWarned = state.t;
-      radio('OSMATRAČ', 'Iskra je preskočila kanal — gori kod grada!');
-      toast('spot fire near the old town', 'bad');
+      radio('call.lookout', 'radio.spot');
+      toast(T('toast.spot'), 'bad');
     }
   }
   fire.events.length = 0;
+
+  // The hull taking a hard one on the water — survivable, but it should knock
+  // the picture about and make a noise.
+  if (flight.p.slam < 0) {
+    alerts.thump(flight.p.slam);
+    flight.p.slam = 0;
+  }
 
   const burning = fire.burningCount();
   if (lastBurning > 25 && burning === 0) {
@@ -634,29 +752,45 @@ function updateMission(dt) {
     showEnd(false);
   }
   if (flight.p.crashed && state.phase === 'fly') {
-    state.phase = 'lost';
-    showEnd(false, true);
+    // Not straight to the results screen. Twelve tonnes stopping deserves two
+    // seconds of its own: the flash, the shake, the noise, the engines dying,
+    // and the picture going out. *Then* the numbers.
+    state.phase = 'crashing';
+    alerts.impact(flight.p.crashOnWater, flight.p.crashSpeed || state.speed);
+    $('hud').hidden = true;
+    $('touch').hidden = true;
+    document.exitPointerLock?.();
+    const onWater = flight.p.crashOnWater;
+    setTimeout(() => { state.phase = 'lost'; showEnd(false, true, onWater); }, 2400);
   }
 }
 
-function showEnd(won, crashed = false) {
+let endState = null;
+
+function redrawEnd() {
+  if (!endState) return;
+  const { won, crashed, onWater } = endState;
+  $('over-title').textContent = crashed ? T('over.crashed') : won ? T('over.won') : T('over.lost');
+  $('over-sub').textContent = crashed ? T(onWater ? 'over.crashedSub' : 'over.crashedLand')
+    : won ? T('over.wonSub') : T('over.lostSub');
+  $('over-stats').innerHTML = [
+    ['over.time', formatClock(state.t)],
+    ['over.dropped', groupNum(state.litresDropped) + ' l'],
+    ['over.onTarget',
+      Math.round(state.litresOnTarget / Math.max(1, state.litresDropped) * 100) + '%'],
+    ['over.burnt', Math.round(fire.burntArea()) + ' ha'],
+    ['over.intact', Math.round(state.cityHealth * 100) + '%'],
+    ['over.score', groupNum(state.score)],
+  ].map(([k, v]) => `<div><span>${T(k)}</span><b>${v}</b></div>`).join('');
+}
+
+function showEnd(won, crashed = false, onWater = false) {
   const el = $('over');
   el.hidden = false;
   el.className = won ? 'win' : 'lose';
-  $('over-title').textContent = crashed ? 'Pao si.' : won ? 'Vatra je ugašena.' : 'Grad gori.';
-  $('over-sub').textContent = crashed
-    ? 'The Adriatic is not a runway. The fire is still burning.'
-    : won
-      ? 'The last of it is out. Šibenik is still standing, and the stone of St James never felt the heat.'
-      : 'It got into the old town. Eight hundred years of it, and it went in an afternoon.';
-  $('over-stats').innerHTML = [
-    ['time', formatClock(state.t)],
-    ['dropped', groupNum(state.litresDropped) + ' l'],
-    ['on target', Math.round(state.litresOnTarget / Math.max(1, state.litresDropped) * 100) + '%'],
-    ['burnt', Math.round(fire.burntArea()) + ' ha'],
-    ['city intact', Math.round(state.cityHealth * 100) + '%'],
-    ['score', groupNum(state.score)],
-  ].map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
+  endState = { won, crashed, onWater };
+  redrawEnd();
+  $('touch').hidden = true;
   document.exitPointerLock?.();
 }
 
@@ -679,6 +813,17 @@ function frame() {
     readKeys(dt);
     flight.update(dt, input);
     updateMission(dt);
+    // Ground proximity, last, so it reads the state this frame ended in.
+    // The inhibit is the whole design: on a legal scoop run, being five metres
+    // over the sea is the job and nothing is allowed to shout about it.
+    alerts.update(dt, {
+      p: flight.p.pos,
+      speed: state.speed,
+      agl: state.altAgl,
+      vs: flight.p.vel.y,
+      fwd: flight.axes().fwd,
+      inhibit: flight.p.scoopValid || state.scooping || flight.p.onWater,
+    });
   }
   flight.pose(plane, dt);
   if (state.phase === 'intro') intro.update();
@@ -698,7 +843,8 @@ function frame() {
   trees.update(dt, camera.position);
   sea.update(camera);
   fire.update(dt);
-  if (state.phase === 'fly') wingmen.update(dt);
+  // The other three keep working while your wreck is still settling.
+  if (state.phase === 'fly' || state.phase === 'crashing') wingmen.update(dt);
   if (state.phase === 'intro') shadow.update(camera.position);
   waterfx.update(dt);
 
@@ -769,6 +915,7 @@ function beginFlight() {
   intro.finish();
   $('cine').hidden = true;
   $('hud').hidden = false;
+  if (IS_TOUCH) $('touch').hidden = false;
   state.phase = 'fly';
   state.t = 0;
   // If the intro was skipped before its last beat, the fire still has to exist.
@@ -780,17 +927,17 @@ function beginFlight() {
       fire.igniteNear(ix + Math.cos(a) * 70, iz + Math.sin(a) * 70, 0.85, 3);
     }
   }
-  radio('KRILO 1', 'Bomba je puknula iznad Jadrije. Idemo.');
+  radio('call.1', 'radio.start');
   camPos.copy(camera.position);
   camAim.copy(flight.p.pos);
-  setTimeout(() => canvas.requestPointerLock(), 250);
+  if (!IS_TOUCH) setTimeout(() => canvas.requestPointerLock(), 250);
 }
 
 $('cine-skip').addEventListener('click', beginFlight);
 
 frame();
 boot().catch((e) => {
-  $('stage').textContent = 'failed: ' + e.message;
+  $('stage').textContent = T('load.failed') + e.message;
   console.error(e);
 });
 
@@ -828,6 +975,27 @@ window.__fr = {
   }),
   key: (code, down = true) => dispatchEvent(
     new KeyboardEvent(down ? 'keydown' : 'keyup', { code })),
+  skipIntro: () => beginFlight(),
+  beat: (i) => intro.jump(i),
+  /** What the on-screen controls are doing, for the headless touch tests. */
+  touch: () => ({
+    ...TOUCH,
+    stick: flight ? [+flight.p.tch.x.toFixed(2), +flight.p.tch.y.toFixed(2)] : null,
+    thr: flight ? Math.round(flight.p.throttle * 100) : 0,
+    padOn: $('flypad').classList.contains('on'),
+    shown: !$('touch').hidden,
+  }),
+  lang: (l) => (l ? setLang(l) : getLang()),
+  /** What the ground-proximity system and the HUD are currently saying. */
+  warn: () => ({
+    gpws: $('gpws').textContent,
+    cls: $('gpws').className,
+    vsi: $('i-vsi').textContent,
+    vsiCls: $('inst-vsi').className,
+    tank: $('tank-hint').textContent,
+    ap: $('ap').textContent.trim(),
+    phase: state.phase,
+  }),
   setPos: (x, y, z) => flight.reset(x, z, 0, y),
   place: (x, y, z, yaw) => { flight.reset(x, z, yaw ?? 0, y); },
   cam: (i) => { camMode = i % CAMS.length; },

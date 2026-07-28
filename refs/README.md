@@ -2,7 +2,9 @@
 
 This directory holds the reference photographs the models and the intro panels
 were made from — the cathedral, the Jadrija lighthouse, St Michael's fortress,
-the old town, the harbour, and several photographs of Canadair CL-415s at work.
+the old town, the harbour, several photographs of Canadair CL-415s at work, and
+two press photographs of the Rokići fire of 6 August 2024 (credited to HVZ and
+to Hrvoje Jelavić / PIXSELL), which the `rokici` panel was painted from.
 
 **They are not in the repository.** They are other people's photographs —
 Wikimedia contributors, press and stock libraries — gathered locally to model

@@ -14,6 +14,10 @@ function buildAudio() {
   const nodes = {};
   let started = false;
   let noiseBuf = null;
+  // Once the aeroplane is in the water the engine beds stay down; update() has
+  // to know, or the very next frame ramps them all straight back up again.
+  let dead = false;
+  let masterVol = 0.85;
 
   /** One second of pink-ish noise, reused by every noise source in the scene. */
   function makeNoise(ac) {
@@ -175,7 +179,10 @@ function buildAudio() {
     })();
 
     // Fade the whole mix in rather than punching it on.
-    master.gain.setTargetAtTime(0.85, ctx.currentTime, 0.8);
+    master.gain.setTargetAtTime(masterVol, ctx.currentTime, 0.8);
+    // Safari and every mobile browser hand back a suspended context even when
+    // the call came from inside a gesture handler.
+    if (ctx.state === 'suspended') ctx.resume();
   }
 
   /** Short shaped noise burst — crackle, splash, squelch. */
@@ -336,6 +343,168 @@ function buildAudio() {
     }
   }
 
+  // ── ground proximity ───────────────────────────────────────────────────
+  // A real GPWS talks to you. There is no speech in this file and there is not
+  // going to be, so the three warnings are separated by *shape* instead: the
+  // radio altimeter is a single dry tick that speeds up, SINK RATE is a falling
+  // two-tone, and PULL UP is the swept whoop, which is the one sound in
+  // aviation nobody has to have explained to them.
+
+  /** One tick of the radio altimeter. Short, dry, and slightly unpleasant. */
+  function radalt(hz = 1100) {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'square';
+    o.frequency.value = hz;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = hz; bp.Q.value = 2.2;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.055, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.055);
+    o.connect(bp).connect(g).connect(master);
+    o.start(t); o.stop(t + 0.08);
+  }
+
+  /** SINK RATE: two blips, falling. Urgent, not yet frightening. */
+  function gpwsSink() {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    [[720, 0], [520, 0.16]].forEach(([hz, at]) => {
+      const o = ctx.createOscillator();
+      o.type = 'square';
+      o.frequency.value = hz;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 2400;
+      const g = ctx.createGain();
+      const t = t0 + at;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.085, t + 0.008);
+      g.gain.setValueAtTime(0.085, t + 0.10);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+      o.connect(lp).connect(g).connect(master);
+      o.start(t); o.stop(t + 0.18);
+    });
+  }
+
+  /** PULL UP: the whoop. Swept up, twice, and loud enough to be rude. */
+  function gpwsPullUp() {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    for (const at of [0, 0.30]) {
+      const t = t0 + at;
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(150, t);
+      o.frequency.exponentialRampToValueAtTime(620, t + 0.22);
+      // A moving formant over the sweep is what makes it read as a voice
+      // rather than as a synthesiser going up.
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.Q.value = 1.6;
+      bp.frequency.setValueAtTime(420, t);
+      bp.frequency.exponentialRampToValueAtTime(1500, t + 0.22);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.20, t + 0.03);
+      g.gain.setValueAtTime(0.20, t + 0.18);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+      o.connect(bp).connect(g).connect(master);
+      o.start(t); o.stop(t + 0.3);
+    }
+  }
+
+  // ── arriving ───────────────────────────────────────────────────────────
+
+  /** The hull slapping the water: felt through the airframe, then the spray. */
+  function hullSlam(hard = 1) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(120, t0);
+    o.frequency.exponentialRampToValueAtTime(42, t0 + 0.28);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.16 + hard * 0.30, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.45);
+    o.connect(g).connect(master);
+    o.start(t0); o.stop(t0 + 0.5);
+    burst({ freq: 2600, q: 0.5, dur: 0.30 + hard * 0.4, gain: 0.10 + hard * 0.22, sweep: 0.18 });
+    if (verbSend) { const w = ctx.createGain(); w.gain.value = 0.8; g.connect(w).connect(verbSend); }
+  }
+
+  /**
+   * Twelve tonnes stopping. Water and rock sound nothing alike: the sea is a
+   * enormous soft slap and then a long roar of spray, and the karst is a crack,
+   * a sub, and metal being pulled apart. Both end with the engines dying,
+   * because that is the part that tells you it is over.
+   */
+  function impact(onWater, speed) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const v = sat(speed / 110);
+
+    // The body of it.
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(onWater ? 140 : 190, t0);
+    o.frequency.exponentialRampToValueAtTime(onWater ? 30 : 24, t0 + (onWater ? 1.2 : 0.8));
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, t0);
+    og.gain.exponentialRampToValueAtTime(0.55 + v * 0.25, t0 + 0.014);
+    og.gain.exponentialRampToValueAtTime(0.0001, t0 + (onWater ? 1.9 : 1.5));
+    o.connect(og).connect(master);
+    o.start(t0); o.stop(t0 + 2.1);
+
+    if (onWater) {
+      // The slap, and then a long torn-up sea.
+      burst({ freq: 3400, q: 0.35, dur: 0.5, gain: 0.34, sweep: 0.12 });
+      burst({ freq: 900, q: 0.5, dur: 2.6, gain: 0.26, sweep: 0.22 });
+    } else {
+      // The case of it letting go, then stone, then the airframe.
+      burst({ freq: 5600, q: 0.5, dur: 0.10, gain: 0.32, sweep: 0.05 });
+      burst({ freq: 1500, q: 0.6, dur: 0.5, gain: 0.34, sweep: 0.08 });
+      burst({ freq: 2600, q: 1.4, dur: 2.2, gain: 0.13, sweep: 0.30 });
+      // Metal tearing: two sawtooths bending down against each other.
+      for (const f of [230, 317]) {
+        const m = ctx.createOscillator();
+        m.type = 'sawtooth';
+        m.frequency.setValueAtTime(f, t0 + 0.04);
+        m.frequency.exponentialRampToValueAtTime(f * 0.28, t0 + 1.1);
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 1600; lp.Q.value = 4;
+        const mg = ctx.createGain();
+        mg.gain.setValueAtTime(0.0001, t0 + 0.04);
+        mg.gain.exponentialRampToValueAtTime(0.10, t0 + 0.09);
+        mg.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.3);
+        m.connect(lp).connect(mg).connect(master);
+        m.start(t0 + 0.04); m.stop(t0 + 1.4);
+      }
+    }
+
+    // Hard into the valley — this is what makes it happen *somewhere*.
+    if (verbSend) { const w = ctx.createGain(); w.gain.value = 1.8; og.connect(w).connect(verbSend); }
+
+    kill(onWater ? 1.4 : 0.7);
+  }
+
+  /** Everything that loops, wound down. The silence afterwards is the point. */
+  function kill(fade = 1.0) {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const down = (param) => {
+      param.cancelScheduledValues(t);
+      param.setValueAtTime(param.value, t);
+      param.linearRampToValueAtTime(0.0001, t + fade);
+    };
+    for (const e of nodes.eng) down(e.g.gain);
+    for (const k of ['turbine', 'rumble', 'air', 'scoop', 'sea', 'fire']) {
+      if (nodes[k]) down(nodes[k].g.gain);
+    }
+    dead = true;
+  }
+
   // ── the score ──────────────────────────────────────────────────────────
   // Not music exactly: a bowed-string bed, synthesised additively, that sits
   // under the intro and does the emotional work the pictures cannot. Three
@@ -474,7 +643,7 @@ function buildAudio() {
   let stallT = 0, crackleT = 0;
 
   function update(dt, s) {
-    if (!ctx || ctx.state === 'suspended') return;
+    if (!ctx || ctx.state === 'suspended' || dead) return;
     const t = ctx.currentTime;
     const set = (param, v, tau = 0.08) => param.setTargetAtTime(v, t, tau);
 
@@ -529,10 +698,13 @@ function buildAudio() {
   }
 
   function setVolume(v) {
+    masterVol = v;
     if (master) master.gain.setTargetAtTime(v, ctx.currentTime, 0.1);
   }
+  const getVolume = () => masterVol;
 
-  return { start, update, squelch, dropWhoosh, splash, beep, setVolume,
+  return { start, update, squelch, dropWhoosh, splash, beep, setVolume, getVolume,
     jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas,
+    radalt, gpwsSink, gpwsPullUp, hullSlam, impact, kill,
     get ctx() { return ctx; } };
 }

@@ -29,6 +29,16 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* On a touchscreen every stray gesture is a bug: a two-finger pinch zooms the
+   HUD, a drag scroll-bounces the page out from under the canvas, and a long
+   press selects the caption text. All of it off. */
+html.touch, html.touch body {
+  touch-action: none; overscroll-behavior: none;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
 #stage-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
 button {
@@ -239,6 +249,16 @@ button {
 }
 .inst.small b { font-size: 1.15rem; }
 .inst.warn b { color: var(--blood); }
+
+/* The vertical-speed readout is the earliest warning in the game, and it is
+   silent: it goes amber the moment you are properly coming down and red when
+   the rate is one you would not want to arrive at. Long before anything
+   starts shouting, this has already changed colour. */
+#inst-vsi { transition: border-color .25s ease; }
+#inst-vsi.down b { color: var(--ember); }
+#inst-vsi.down { border-left-color: var(--ember); }
+#inst-vsi.hard b { color: var(--blood); animation: pulse .7s steps(2, end) infinite; }
+#inst-vsi.hard { border-left-color: var(--blood); }
 
 /* the tank ----------------------------------------------------------------- */
 
@@ -488,3 +508,272 @@ button {
   display: inline-block; margin-top: .35rem;
   color: var(--ember-hi); font-style: normal;
 }
+
+/* ────────────────────────────────── ground proximity, and arriving hard ── */
+
+/* The big one. Deliberately ugly and deliberately in the way — this is the
+   only element in the game allowed to sit in the middle of the screen, and it
+   earns it by only ever appearing when you are about to hit something. */
+#gpws {
+  position: absolute; left: 50%; top: 34%; transform: translateX(-50%);
+  font-family: var(--mono); font-weight: 700;
+  font-size: clamp(1.2rem, 4.2vw, 2.4rem); letter-spacing: .28em;
+  text-transform: uppercase; text-align: center; white-space: nowrap;
+  padding: .35rem .6rem .35rem .9rem;
+  border: 2px solid currentColor; border-radius: 2px;
+  background: rgba(6, 3, 2, .42);
+  opacity: 0; color: var(--ember);
+}
+#gpws.sink {
+  opacity: 1; color: var(--ember-hi);
+  animation: gpwsBlink 1.05s steps(2, end) infinite;
+}
+#gpws.pullUp {
+  opacity: 1; color: #ff3d20;
+  text-shadow: 0 0 26px rgba(255, 61, 32, .8);
+  animation: gpwsBlink .34s steps(2, end) infinite;
+}
+@keyframes gpwsBlink { 50% { opacity: .1; } }
+
+/* The room closing in. A vignette rather than a full-screen wash, so the
+   middle of the picture — where the ground is — stays readable. */
+#damage {
+  position: fixed; inset: 0; z-index: 35; pointer-events: none; opacity: 0;
+  transition: opacity .35s ease;
+  background: radial-gradient(ellipse 76% 70% at 50% 52%,
+    rgba(224, 65, 36, 0) 40%, rgba(224, 65, 36, .30) 76%, rgba(176, 22, 8, .88) 100%);
+}
+#damage.sink { opacity: .42; }
+#damage.pullUp { opacity: 1; animation: dmgPulse .42s ease-in-out infinite alternate; }
+@keyframes dmgPulse { from { opacity: .5; } to { opacity: 1; } }
+/* After the impact the picture goes out rather than flashing. */
+#damage.dead {
+  opacity: 1; transition: opacity 1.6s ease;
+  background: radial-gradient(ellipse 70% 64% at 50% 52%,
+    rgba(2, 4, 6, .25) 0%, rgba(2, 4, 6, .82) 68%, rgba(0, 0, 0, .97) 100%);
+}
+
+/* One frame of white sea or orange karst, then a long fade. */
+#flash {
+  position: fixed; inset: 0; z-index: 75; pointer-events: none;
+  opacity: 0; background: #fff;
+}
+
+/* ─────────────────────────────────────────────────── touch flight controls ── */
+
+#touch {
+  position: fixed; inset: 0; z-index: 45; pointer-events: none;
+  font-family: var(--mono); touch-action: none;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+           env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+#touch[hidden] { display: none; }
+#touch button {
+  pointer-events: auto; touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  font-family: var(--mono); letter-spacing: .16em; text-transform: uppercase;
+  color: var(--salt); background: rgba(6, 13, 17, .5);
+  border: 1px solid var(--edge); border-radius: 999px;
+  backdrop-filter: blur(6px);
+  transition: background .1s linear, color .1s linear, border-color .1s linear,
+              transform .1s ease;
+}
+#touch button.on { transform: scale(.94); }
+
+/* The floating stick. It has no home of its own — it appears centred on
+   wherever the thumb landed, which is the only arrangement that works when
+   you cannot see your own hand. */
+#flypad {
+  --pad: min(25vmin, 168px);
+  position: absolute; left: 0; top: 0;
+  width: var(--pad); height: var(--pad);
+  margin: calc(var(--pad) / -2) 0 0 calc(var(--pad) / -2);
+  border: 1px solid var(--edge); border-radius: 50%;
+  background: radial-gradient(circle, rgba(8, 16, 20, .40) 0%,
+    rgba(8, 16, 20, .12) 62%, rgba(8, 16, 20, 0) 100%);
+  opacity: 0; transition: opacity .16s ease; pointer-events: none;
+}
+#flypad.on { opacity: 1; }
+#flypad::after {
+  content: ''; position: absolute; inset: 38%;
+  border: 1px solid var(--edge); border-radius: 50%; opacity: .5;
+}
+#flyknob {
+  position: absolute; left: 50%; top: 50%;
+  width: 30%; height: 30%; margin: -15% 0 0 -15%;
+  border-radius: 50%; background: rgba(79, 210, 232, .30);
+  border: 1px solid var(--sea);
+  box-shadow: 0 0 20px rgba(79, 210, 232, .4);
+}
+
+/* The throttle is a lever, not a pair of buttons: an absolute position you can
+   set with one thumb and read without looking. */
+#thr {
+  position: absolute; right: .45rem; top: 50%; transform: translateY(-50%);
+  width: 2.9rem; text-align: center;
+  pointer-events: auto; touch-action: none;
+}
+#thr-track {
+  width: 1.9rem; height: min(34vh, 220px); margin: 0 auto .3rem;
+  border: 1px solid var(--edge); border-radius: 3px;
+  background: rgba(4, 10, 14, .55); position: relative; overflow: hidden;
+}
+#thr-fill {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 78%;
+  background: linear-gradient(180deg, var(--ember-hi), var(--blood));
+  opacity: .78; transition: height .06s linear;
+}
+#thr-fill::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px;
+  background: #fff3e0;
+}
+#thr b { display: block; font-size: .72rem; font-weight: 400; color: var(--salt); }
+#thr span {
+  display: block; font-size: .5rem; letter-spacing: .2em;
+  text-transform: uppercase; color: #6f8189;
+}
+
+#tbig {
+  position: absolute; right: 3.6rem; bottom: .8rem;
+  display: flex; gap: .6rem;
+}
+#tbig button {
+  width: 4.6rem; height: 4.6rem; font-size: .58rem; padding: 0;
+}
+#t-scoop.on { background: rgba(79, 210, 232, .3); border-color: var(--sea); color: var(--sea); }
+#t-drop.on  { background: rgba(255, 139, 61, .3); border-color: var(--ember); color: var(--ember-hi); }
+/* Armed rather than pressed: the tank has something in it and you are high
+   enough to use it. */
+#t-drop.armed { border-color: var(--ember); color: var(--ember-hi); }
+#t-scoop.armed { border-color: var(--sea); color: var(--sea); }
+
+#tmini {
+  position: absolute; left: .8rem; bottom: .8rem;
+  display: flex; gap: .45rem;
+}
+#tmini button { padding: .55rem .7rem; font-size: .52rem; }
+#tmini button.on { background: rgba(255, 208, 138, .26); border-color: var(--ember-hi);
+                   color: var(--ember-hi); }
+
+/* ───────────────────────────────────────────────────── the language picker ── */
+
+.row.lang { display: flex; align-items: center; justify-content: space-between; }
+#lang-pick { display: flex; gap: .3rem; }
+#lang-pick button {
+  padding: .28rem .55rem; font-family: var(--mono); font-size: .58rem;
+  letter-spacing: .12em; color: #9fb2b9;
+  border: 1px solid var(--edge); border-radius: 2px; background: none;
+  transition: color .15s, border-color .15s, background .15s;
+}
+#lang-pick button:hover { color: var(--salt); border-color: var(--salt); }
+#lang-pick button.on {
+  color: var(--ink); background: var(--sea); border-color: var(--sea);
+}
+
+/* ────────────────────────────────────────────────────── turn it sideways ── */
+
+#rotate { display: none; }
+@media (orientation: portrait) {
+  html.touch #rotate {
+    position: fixed; inset: 0; z-index: 95;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1.1rem; text-align: center; padding: 2rem;
+    background: radial-gradient(120% 90% at 50% 20%, #2a120a 0%, #12100e 46%, #070b0e 82%);
+  }
+  html.touch #rotate p {
+    margin: 0; font-size: 1.05rem; font-weight: 300; color: var(--salt);
+  }
+  html.touch #rotate small {
+    font-family: var(--mono); font-size: .6rem; letter-spacing: .2em;
+    text-transform: uppercase; color: #6d7f86;
+  }
+  .rot-icon {
+    width: 3.4rem; height: 5.4rem; border: 2px solid var(--ember-hi);
+    border-radius: 6px; opacity: .85;
+    animation: rotHint 2.4s ease-in-out infinite;
+  }
+  @keyframes rotHint {
+    0%, 30% { transform: rotate(0deg); }
+    60%, 100% { transform: rotate(-90deg); }
+  }
+}
+
+/* ──────────────────────────────────────────────── small screens generally ── */
+
+/* Everything here is about making room. On a phone in landscape there is about
+   390 px of height to work with, and the desktop HUD assumes three times that. */
+@media (max-width: 900px), (max-height: 560px) {
+  #top { padding: .5rem .7rem; gap: .8rem; }
+  .gauge { min-width: 3.2rem; }
+  .gauge b { font-size: 1rem; }
+  .gauge span { font-size: .45rem; letter-spacing: .16em; }
+  #firebar { width: min(18rem, 40vw); }
+  .fb-row { margin-bottom: .25rem; }
+  .fb-row label { width: 2.6rem; font-size: .46rem; }
+  .fb-row b { width: 3rem; font-size: .52rem; }
+
+  #left { left: .7rem; top: 46%; }
+  .inst { margin-bottom: .5rem; padding-left: .5rem; }
+  .inst b { font-size: 1.15rem; }
+  .inst span { font-size: .44rem; letter-spacing: .16em; margin-top: .1rem; }
+  .inst.small b { font-size: .8rem; }
+
+  #compass { top: 3.4rem; width: min(16rem, 44vw); }
+  #radio { bottom: 6.2rem; width: min(28rem, 68vw); font-size: .62rem; }
+  #wingmen { display: none; }
+  #reticle { width: 78px; height: 78px; }
+  #ap { top: 16%; font-size: .52rem; }
+  #warn { top: 21%; font-size: .66rem; }
+  #cine-skip { right: 1rem; bottom: 1rem; padding: .7rem 1.1rem; font-size: .58rem; }
+  #toast { bottom: 8vh; font-size: .58rem; padding: .5rem 1rem; }
+}
+
+/* With the touch controls up, the tank has to get out of the throttle's way
+   and the desktop stick readout is meaningless — you can see your own thumb. */
+html.touch #stick { display: none; }
+html.touch #right { right: 3.6rem; top: 42%; }
+html.touch #tank { width: 2.5rem; height: 6.4rem; }
+html.touch #tank-label b { font-size: .74rem; }
+html.touch #tank-label span { font-size: .4rem; }
+html.touch #tank-hint { font-size: .46rem; max-width: 5.6rem; letter-spacing: .1em; }
+html.touch #wingmen { display: none; }
+html.touch #panel {
+  right: 50%; transform: translate(50%, -50%);
+  width: min(20rem, 86vw); max-height: 84vh; overflow-y: auto;
+  touch-action: pan-y;                 /* the page is locked; this is not */
+}
+html.touch .row input[type=range] { height: 22px; }
+
+/* ── short viewports ───────────────────────────────────────────────────────
+   A phone held sideways is about 390 px tall, and the title screen was laid
+   out for a desktop: the eyebrow ran off the top and the Take off button
+   landed on top of the credit line. Everything below compacts it to fit, and
+   what still will not fit can be scrolled to rather than being unreachable. */
+
+@media (max-height: 560px) {
+  #veil {
+    justify-content: flex-start; padding: 1.1rem 1.2rem .8rem;
+    overflow-y: auto; touch-action: pan-y;
+  }
+  .veil-inner { max-width: 42rem; }
+  .eyebrow { font-size: .55rem; letter-spacing: .26em; margin-bottom: .5rem; }
+  #veil h1 { font-size: clamp(1.7rem, 5.6vw, 2.6rem); }
+  #veil h2 { font-size: .72rem; letter-spacing: .2em; margin-top: .35rem; }
+  .rule { margin: .75rem auto; }
+  .blurb { font-size: .8rem; line-height: 1.55; max-width: 32rem; }
+  .bar { margin-top: .9rem; }
+  #stage { margin-top: .5rem; font-size: .56rem; letter-spacing: .18em; }
+  #enter, #again { margin-top: .9rem; padding: .62rem 1.9rem; font-size: .68rem; }
+  .hint { margin-top: .7rem; font-size: .54rem; line-height: 1.7; }
+  /* Out of the corner and into the flow, so it cannot land on the button. */
+  .credit { position: static; margin-top: 1.1rem; font-size: .5rem; }
+
+  #over { padding: 1.2rem; overflow-y: auto; touch-action: pan-y;
+          align-items: flex-start; }
+  .over-inner { max-width: 30rem; padding: 1rem 0; }
+  #over h1 { font-size: clamp(1.5rem, 5vw, 2.2rem); }
+  #over p { margin-top: .7rem; font-size: .82rem; line-height: 1.55; }
+  #over-stats { margin-top: 1.1rem; font-size: .62rem; gap: 0 1.1rem; }
+  #over-stats div { padding: .32rem 0; }
+}
+

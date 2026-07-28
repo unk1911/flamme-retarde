@@ -1,15 +1,26 @@
 // -----------------------------------------------------------------------------
 // The intro.
 //
-// Everything here is drawn in engine. There is no archive footage and no
-// photographs: what happened at Zagreb in May 1995, and what is still happening
-// in Kherson, is not something to re-enact for entertainment. So the sequence
-// shows the *weapon* — a canister opening at a thousand metres and letting go
-// of two hundred and eighty-eight bomblets — and lets the captions carry the
-// rest. The Kherson beat is a black frame, a line of text and the same sound.
+// All of it is Šibenik now. Earlier versions took a detour through Zagreb in
+// 1995 and Kherson in 2022 to make a point about the weapon, and the point was
+// worth making, but it was somebody else's town twice over and it pulled the
+// film away from the one place the game is actually about. The whole sequence
+// runs Dalmatia → the war → what it left → 6 August 2024.
 //
-// Every historical claim in the captions is documented. The bomblet that starts
-// the fire above Jadrija is the game's own.
+// The 3-D is drawn in engine and the paintings are paintings; there is no
+// archive footage, because a real hillside going up with people underneath it
+// is not something to re-enact for entertainment.
+//
+// Every claim in the captions is documented, and the documentation is the fire
+// of 6 August 2024 at Rokići above Šibenik: reported at 12:52, three and a half
+// hectares of aleppo pine, the coast road closed, detonations from Homeland-War
+// cluster submunitions — "zvončići" — going off in the heat while the crews
+// worked, and four Canadairs and an Air Tractor over the top of it.
+//
+// Two liberties, both deliberate. The game moves the fire across the channel to
+// the hills above Jadrija, because a fire the ground crews genuinely cannot
+// reach is the only kind that has to be fought from the air, and that is the
+// game. And the bomblet that lights it is the game's own.
 // -----------------------------------------------------------------------------
 
 const INTRO = {
@@ -187,7 +198,7 @@ function buildIntro(scene, camera, deps) {
       grade: { sat: 0.06, con: 1.35, bright: 0.42, tint: 'rgba(20,32,54,0.55)' },
       from: V(ix - 320, ground + 120, iz + 260), to: V(ix - 180, ground + 96, iz + 180),
       lookFrom: V(ix, ground + 40, iz), lookTo: V(ix + 60, ground + 30, iz - 40),
-      text: 'Dalmatia. The war years.<br><em>Šibenik is shelled for three of them.</em>',
+      key: 'cine.war',
       plate: ['war', [1.04, 0, 0, 1.14, -2, -1.5], 9],
       on() {
         state.hour = 21.4;
@@ -199,8 +210,7 @@ function buildIntro(scene, camera, deps) {
       grade: { sat: 0.10, con: 1.30, bright: 0.50, tint: 'rgba(22,30,50,0.45)' },
       from: V(ix - 700, ground + 620, iz + 700), to: V(ix - 380, ground + 520, iz + 420),
       lookFrom: V(ix, ground + 900, iz), lookTo: V(ix, ground + 620, iz),
-      text: 'Zagreb, 2 May 1995. An M-87 Orkan opens a thousand metres up '
-          + 'and lets go of <em>288 bomblets</em>.',
+      key: 'cine.orkan',
       plate: ['orkan', [1.02, 0, 2, 1.13, 0, -3], 10],
       plateOut: 5.4,
       on() {
@@ -220,8 +230,7 @@ function buildIntro(scene, camera, deps) {
       grade: { sat: 0.12, con: 1.28, bright: 0.55, tint: 'rgba(24,28,44,0.40)' },
       from: V(ix - 240, ground + 210, iz + 300), to: V(ix - 140, ground + 120, iz + 190),
       lookFrom: V(ix, ground + 300, iz), lookTo: V(ix, ground + 60, iz),
-      text: 'In Croatia they were called <em>Jinglebell</em>, '
-          + 'for the sound they made coming down.',
+      key: 'cine.jingle',
       plate: ['jinglebell', [1.16, 2, 1, 1.02, -1, -1], 6],
       plateIn: 4.6,
       on() {
@@ -235,8 +244,7 @@ function buildIntro(scene, camera, deps) {
       grade: { sat: 0.14, con: 1.25, bright: 0.58, tint: 'rgba(26,26,38,0.38)' },
       from: V(ix - 60, ground + 26, iz + 70), to: V(ix - 22, ground + 9, iz + 30),
       lookFrom: V(ix, ground + 6, iz), lookTo: V(ix, ground + 1.5, iz),
-      text: 'The tribunal in The Hague called it a crime against humanity.<br>'
-          + '<em>About one in twenty never went off.</em>',
+      key: 'cine.duds',
       plate: ['karst', [1.02, -2, 0, 1.12, 2, -1], 7],
       plateIn: 2.2, plateOut: 7.6,
       on() {
@@ -249,8 +257,7 @@ function buildIntro(scene, camera, deps) {
       grade: { sat: 0.30, con: 1.15, bright: 0.78, tint: 'rgba(30,26,20,0.22)' },
       from: V(ix - 14, ground + 4.5, iz + 16), to: V(ix - 5, ground + 2.2, iz + 6),
       lookFrom: V(ix, ground + 0.6, iz), lookTo: V(ix, ground + 0.5, iz),
-      text: 'They stayed where they fell.<br>'
-          + '<em>Thirty summers of thyme and rockrose grew over them.</em>',
+      key: 'cine.summers',
       // No plate here on purpose: thirty years of sun racing over the real
       // karst is the best thing the 3-D does, and a painting would cover it.
       on() {
@@ -263,43 +270,31 @@ function buildIntro(scene, camera, deps) {
       out() { state.hour = CONFIG.startHour; setSun(); },
     },
     {
-      dur: 8,
-      grade: { sat: 0.0, con: 1.6, bright: 0.10, tint: 'rgba(0,0,0,0.86)' },
-      from: V(ix - 5, ground + 2.2, iz + 6), to: V(ix - 4, ground + 2.1, iz + 5),
-      lookFrom: V(ix, ground + 0.5, iz), lookTo: V(ix, ground + 0.5, iz),
-      text: 'Kherson, 2022. Russian forces open the same kind of canister '
-          + 'over the same kind of afternoon.<br><em>The sound has not changed.</em>',
-      plate: ['kherson', [1.03, 0, 0, 1.11, -1, 1], 9],
-      on() {
-        if (audio) {
-          audio.cicadas(false);
-          audio.jingle(2.4, 0.55);
-          audio.drone('lament', 0.13, 1.2);
-        }
-      },
-    },
-    {
-      dur: 8,
+      dur: 9,
       grade: { sat: 1.0, con: 1.0, bright: 1.0, tint: 'rgba(0,0,0,0)' },
-      from: V(ix - 26, ground + 8, iz + 26), to: V(ix - 12, ground + 4, iz + 12),
-      lookFrom: V(ix, ground + 0.6, iz), lookTo: V(ix, ground + 0.8, iz),
-      text: 'Šibenik. Today. Forty-one degrees, and the '
-          + '<em>lebić</em> blowing on shore.',
+      // The plate holds the first six seconds; when it lifts, the 3-D has to
+      // have something to say. Looking along the ground at the scrub does not
+      // — it reads as flat green nothing — so the shot starts wide with the
+      // town away across the channel and settles onto the patch of hillside
+      // the next beat is about.
+      from: V(ix - 90, ground + 34, iz + 105), to: V(ix - 16, ground + 6, iz + 18),
+      lookFrom: V(ix + 620, ground + 34, iz - 620), lookTo: V(ix, ground + 1, iz),
+      key: 'cine.today',
       plate: ['today', [1.14, -2, 2, 1.02, 1, -1], 9],
-      plateOut: 5.6,
+      plateOut: 5.8,
       on() {
         state.hour = CONFIG.startHour; setSun();
         if (audio) { audio.droneOff(2.4); audio.cicadas(true, 0.05); }
       },
     },
     {
-      dur: 7,
+      dur: 8,
       grade: { sat: 1.0, con: 1.05, bright: 1.05, tint: 'rgba(60,10,0,0.10)' },
       from: V(ix - 12, ground + 4, iz + 12), to: V(ix - 90, ground + 70, iz + 90),
       lookFrom: V(ix, ground + 0.8, iz), lookTo: V(ix, ground + 12, iz),
-      text: 'It has been lying in the sun since before you were born.',
+      key: 'cine.ignition',
       plate: ['ignition', [1.02, 0, 0, 1.10, 1, -2], 5],
-      plateOut: 3.4,
+      plateOut: 4.0,
       on() {
         // The one that starts it.
         fire.igniteNear(ix, iz, 1);
@@ -313,12 +308,27 @@ function buildIntro(scene, camera, deps) {
       },
     },
     {
+      // The real afternoon: the hillside going off while the crews work it.
+      dur: 9,
+      grade: { sat: 1.0, con: 1.08, bright: 0.98, tint: 'rgba(70,16,0,0.16)' },
+      from: V(ix - 90, ground + 70, iz + 90), to: V(ix - 300, ground + 150, iz + 320),
+      lookFrom: V(ix, ground + 12, iz), lookTo: V(ix, ground + 40, iz),
+      key: 'cine.ordnance',
+      plate: ['rokici', [1.03, -1, 1, 1.13, 2, -2], 10],
+      on() {
+        // It is still going off out there, at intervals, in the smoke.
+        if (audio) {
+          audio.drone('lament', 0.10, 2.5);
+          audio.shelling(8, 0.42);
+        }
+      },
+    },
+    {
       dur: 11,
       grade: { sat: 1.0, con: 1.0, bright: 1.0, tint: 'rgba(0,0,0,0)' },
-      from: V(ix - 90, ground + 70, iz + 90), to: V(ix - 1500, 1250, iz + 1600),
-      lookFrom: V(ix, ground + 12, iz), lookTo: V(ix + 500, 60, iz - 500),
-      text: 'Four aircraft. One afternoon.<br>'
-          + '<em>Be faster than it.</em>',
+      from: V(ix - 300, ground + 150, iz + 320), to: V(ix - 1500, 1250, iz + 1600),
+      lookFrom: V(ix, ground + 40, iz), lookTo: V(ix + 500, 60, iz - 500),
+      key: 'cine.launch',
       on() { if (audio) audio.drone('hope', 0.12, 4.0); },
       plate: ['canadair', [1.10, 3, 2, 1.00, -2, -1], 8],
       plateIn: 4.2,
@@ -335,12 +345,13 @@ function buildIntro(scene, camera, deps) {
     if (beat >= 0 && BEATS[beat].out) BEATS[beat].out();
     beat = i;
     t = 0;
+    beatMs = performance.now();
     if (i >= BEATS.length) { finish(); return; }
     const b = BEATS[i];
     _from.copy(b.from); _to.copy(b.to);
     _lf.copy(b.lookFrom); _lt.copy(b.lookTo);
     setGrade(b.grade);
-    caption(b.text);
+    caption(T(b.key));
     plateShown = false;
     plateDone = false;
     // A plate never outlives its beat: if this one comes in late, the cut
@@ -366,17 +377,33 @@ function buildIntro(scene, camera, deps) {
     if (onDone) onDone();
   }
 
+  // Changing language mid-film redraws the line that is on screen, rather than
+  // leaving the old one up until the cut.
+  onLangChange(() => {
+    if (running && beat >= 0 && BEATS[beat]) caption(T(BEATS[beat].key));
+  });
+
   function start(cb) {
-    onDone = cb; running = true; done = false; lastMs = 0;
+    onDone = cb; running = true; done = false; lastMs = 0; beatMs = performance.now();
     if (plateHost) plateHost.hidden = false;
     enter(0);
   }
 
-  // The intro runs on the wall clock, not on the frame loop's dt. The frame
-  // loop clamps dt to 50 ms so a stall cannot fling the aeroplane across the
-  // map — perfectly right for the simulation, and wrong here: on a machine
-  // rendering at 20 fps every beat played at a third speed.
+  // Two clocks, and they are not the same clock.
+  //
+  // The beat position `t` is measured from when the beat *started*, against the
+  // wall clock, and never accumulated. Accumulating a per-frame delta means
+  // every clamp on that delta silently steals time: the first version summed
+  // the frame loop's dt (capped at 50 ms) and a 20 fps machine played the whole
+  // film at a third speed. Capping at 200 ms instead only moved the threshold —
+  // a machine dropping to 4 fps, which is exactly what a software renderer does
+  // while it cross-fades two 1280x720 plates, still ran three times slow.
+  // Subtracting two timestamps cannot drift no matter how bad the frame rate is.
+  //
+  // `dt` is still needed for the bomblets and the flashes, which are a
+  // simulation and do want a sane upper bound on a single step.
   let lastMs = 0;
+  let beatMs = 0;
 
   function update() {
     if (!running) return;
@@ -384,7 +411,7 @@ function buildIntro(scene, camera, deps) {
     const now = performance.now();
     const dt = lastMs ? Math.min(0.2, (now - lastMs) / 1000) : 0;
     lastMs = now;
-    t += dt;
+    t = (now - beatMs) / 1000;
     // Ease so each beat settles rather than arriving at constant speed.
     const u = sat(t / b.dur);
     const e = u * u * (3 - 2 * u);
@@ -426,6 +453,12 @@ function buildIntro(scene, camera, deps) {
     if (t >= b.dur) enter(beat + 1);
   }
 
-  return { start, update, finish, isRunning: () => running,
-    totalLength: BEATS.reduce((s, b) => s + b.dur, 0) };
+  return {
+    start, update, finish, isRunning: () => running,
+    /** Cut straight to a beat — for the screenshot tool, which cannot sit
+        through eighty seconds of film for every frame it wants. */
+    jump: (i) => { if (running) enter(clamp(i, 0, BEATS.length - 1)); },
+    beats: BEATS.length,
+    totalLength: BEATS.reduce((s, b) => s + b.dur, 0),
+  };
 }

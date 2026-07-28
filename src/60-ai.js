@@ -23,7 +23,9 @@ const AI = {
   runLength: 1250,       // metres of water needed for a fill
 };
 
-const CALLSIGN = ['KRILO 2', 'KRILO 3', 'KRILO 4'];
+// i18n keys rather than names: the flight is Krilo in Croatian, Wing in English
+// and Aile in French, and it changes under you when the language does.
+const CALLSIGN = ['call.2', 'call.3', 'call.4'];
 
 /**
  * Find stretches of open water long enough to scoop along. Searched rather than
@@ -131,7 +133,7 @@ function buildWingmen(scene, fire, onRadio) {
         targetAlt = Math.min(AI.cruiseAlt, 40 + d * 0.12);
         if (d < 260) {
           setPhase(p, 'scoop');
-          if (p.chatter < 0) { onRadio(p.call, 'zahvaćam vodu.'); p.chatter = 26 + rng() * 22; }
+          if (p.chatter < 0) { onRadio(p.call, 'radio.scooping'); p.chatter = 26 + rng() * 22; }
         }
       } else if (p.phase === 'scoop') {
         const tx = p.run.x + p.run.dx * AI.runLength;
@@ -183,7 +185,7 @@ function buildWingmen(scene, fire, onRadio) {
             setPhase(p, 'drop');
             p.dropTimer = 1.5;
             p.hasTarget = false;
-            if (p.chatter < 0) { onRadio(p.call, 'izbacujem!'); p.chatter = 26 + rng() * 22; }
+            if (p.chatter < 0) { onRadio(p.call, 'radio.dropping'); p.chatter = 26 + rng() * 22; }
           }
           p.lastD = d;
         }

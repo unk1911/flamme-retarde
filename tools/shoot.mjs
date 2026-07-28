@@ -115,8 +115,15 @@ async function main() {
     });
   }
 
-  /** Drag a finger through a list of screen points. */
-  async function touchDrag(points, holdMs = 120) {
+  /**
+   * Drag a finger through a list of screen points.
+   *
+   * `keep` leaves the finger down at the end, so the next shot can photograph
+   * and probe a control that is *being held* — which for a flight stick or a
+   * hold-to-scoop button is the only state worth testing. Release it with a
+   * later shot carrying `"release": true`.
+   */
+  async function touchDrag(points, holdMs = 120, keep = false) {
     const pt = ([x, y]) => [{ x, y, radiusX: 12, radiusY: 12, force: 1 }];
     await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt(points[0]) });
     for (const p of points.slice(1)) {
@@ -124,8 +131,10 @@ async function main() {
       await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pt(p) });
     }
     await sleep(holdMs);
-    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    if (!keep) await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   }
+  const touchRelease = () =>
+    send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 
   const url = `${URL_BASE}?q=${quality}`;
   await send('Page.navigate', { url });
@@ -191,14 +200,23 @@ async function main() {
     if (shotSpec.cam != null) poses.push(`__fr.cam(${shotSpec.cam})`);
     if (shotSpec.js) poses.push(shotSpec.js);
     if (poses.length) await evalJs(`(() => { ${poses.join(';')}; return 1; })()`);
-    if (shotSpec.drag) await touchDrag(shotSpec.drag, shotSpec.dragHold ?? 140);
+    if (shotSpec.drag) {
+      await touchDrag(shotSpec.drag, shotSpec.dragHold ?? 140, !!shotSpec.keep);
+    }
+    if (shotSpec.release) await touchRelease();
 
     await sleep(Number(shotSpec.settle ?? opt('settle', 2200)));
 
-    const stats = await evalJs(`__fr.stats()`).catch(() => null);
+    // `probe` runs at capture time and is printed instead of the full stats
+    // dump — for checking one specific thing (what the GPWS is saying, what
+    // language the HUD is in) without wading through the aircraft telemetry.
+    const probe = shotSpec.probe
+      ? await evalJs(`JSON.stringify(${shotSpec.probe})`).catch((e) => 'probe failed: ' + e.message)
+      : null;
+    const stats = probe ? null : await evalJs(`__fr.stats()`).catch(() => null);
     const shot = await send('Page.captureScreenshot', { format: 'png' });
     writeFileSync(shotSpec.out, Buffer.from(shot.data, 'base64'));
-    console.log(`${shotSpec.out}  ${stats ? JSON.stringify(stats) : ''}`);
+    console.log(`${shotSpec.out}  ${probe ?? (stats ? JSON.stringify(stats) : '')}`);
   }
 
   const noise = /Autofill|DaemonVersion|UPower|external_pref|sandbox_linux|GetAndBlock|Fontconfig/;
