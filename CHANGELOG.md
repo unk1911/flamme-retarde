@@ -56,6 +56,35 @@ geodata pipeline.
   fires `pointerlockchange`, so pausing on lock loss stopped the game on the
   first frame of flight. Pause now triggers only on losing a lock that was held.
 
+### Added — depth
+
+- **Facades.** Thirteen thousand buildings had blank walls, which is most of why
+  a low pass read as painted card. Windows, doors, sills, lintels, shutters and
+  a string course at every floor line — all of it a fragment-shader test, not
+  one extra triangle, which is the only way a town this size can afford
+  openings. The wall carries facade coordinates in the one spare `vec2` the
+  shared material already had: metres along the facade, run cumulatively so a
+  wall OSM split into three nodes keeps a single window rhythm, and metres above
+  that building's *own* doorstep, so a house on a hillside gets its floors from
+  its own ground line. The wall height rides in the same float above 1000,
+  because a window must only be drawn where the whole storey it belongs to
+  exists — otherwise the roofline slices the top row in half. Gable ends and
+  parapets carry a sentinel and stay solid masonry.
+- **Limestone bounce on the walls.** With only a sky ambient term, every shaded
+  facade fell to near-black and swallowed its own windows. This coast is white
+  rock and the ground between the houses is the same rock, so a wall in shade is
+  lit from below by a very bright floor.
+- **The flat ground is no longer one flat colour.** Every existing terrain
+  feature — the karst ribs, the dry-stone walls — is a *slope* feature, pushed
+  by the rock mask, and so did nothing at all on the level ground where the
+  towns actually are. Three more scales of mottle, weighted the other way.
+- **Rounder, denser, further vegetation.** Trees were pentagonal in
+  cross-section, which is what made the hillside read as faceted from low down;
+  they are eight-sided now, with more rings through the canopy where the
+  silhouette shows. The draw radius went from 1 500 m to 2 200 m, because at
+  1 500 you could watch the hillside stop in level flight. A phone's default
+  density drops to compensate.
+
 - **The road network, which was in the payload all along.** 1 535 ways and
   320 km of it, baked since the first release, inflated at load, and never
   drawn. Ribbons are draped on the terrain — resampled to follow the ground,

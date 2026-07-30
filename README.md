@@ -71,6 +71,17 @@ raster, and gzipped JSON for the town. The browser decodes the PNG through a
 canvas and the JSON through `DecompressionStream`. Nothing is fetched at run
 time.
 
+**Every building has openings, and none of them are geometry.** Windows, doors,
+sills, lintels, shutters and a string course at each floor line are all
+fragment-shader tests — which is the only way thirteen thousand buildings can
+afford a facade. The wall carries two numbers in the one spare UV the shared
+material already had: metres along the frontage, run cumulatively so a wall that
+OSM happens to have split into three nodes keeps one window rhythm, and metres
+above that building's *own* doorstep, so a house on a hillside takes its floors
+from its own ground line rather than from sea level. The wall's height rides in
+the same float, because a window may only be drawn where the whole storey it
+belongs to actually exists — otherwise the roofline slices the top row in half.
+
 **The town is 13 343 real footprints, and OSM knows more about them than a
 height.** 2 456 carry a roof shape, and 82% of those are hipped — so the roofs
 are hipped, gabled, flat with a parapet, pyramidal, skillion and barrel as

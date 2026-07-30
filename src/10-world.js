@@ -161,6 +161,25 @@ void main(){
   float wall = smoothstep(0.86, 0.97, ridge2(p * 0.055 + 13.7, 2));
   base = mix(base, limestone * 1.06, wall * (1.0 - rock) * 0.5);
 
+  // ── the flat ground ─────────────────────────────────────────────────────
+  // Everything above is a slope feature: the ribs are pushed by the rock mask
+  // and do nothing where the land lies flat. So the flats — Jadrija's shore, the
+  // fields, the ground between the houses — came out as one unbroken colour,
+  // which is what made a low pass read as painted card rather than as a place.
+  // Real ground at this scale is mottled at three sizes at once.
+  // (Naming note: flat and patch are both reserved words in GLSL ES, and
+  // so is the backtick in this comment, which is inside a template literal.)
+  float lowland = 1.0 - rock;
+  float mottle = fbm2(p * 0.011 + 5.3, 2);            // ~90 m: grass into scrub
+  float stony  = fbm2(p * 0.047 + 31.7, 2);           // ~21 m: stone breaking out
+  base = mix(base, base * vec3(0.83, 0.90, 0.72),
+             lowland * smoothstep(0.40, 0.82, mottle) * 0.55);
+  base = mix(base, limestone * 0.90,
+             lowland * smoothstep(0.60, 0.94, stony) * 0.40);
+  // Two metres: gravel and thyme. Invisible from a thousand feet and the whole
+  // difference between ground and a coloured plane when you are down at fifty.
+  base *= 0.92 + 0.16 * fbm2(p * 0.62, 2);
+
   // Bleach the ground near the waterline — salt, shingle and glare.
   float shoreT = 1.0 - smoothstep(0.0, 0.055, cv.a);
   base = mix(base, vec3(0.86, 0.82, 0.72), shoreT * 0.5);

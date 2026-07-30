@@ -15,10 +15,12 @@
 
 const VEG = {
   tile: 512,
-  radius: 1500,          // beyond this there is nothing but the terrain colour
-  maxTiles: 160,
-  perTile: 1500,         // candidate samples per tile, before cover rejects them
-  budget: 22000,         // hard ceiling on live instances
+  // 1500 m put the edge of the vegetation inside the frame on any level flight:
+  // you could watch the hillside stop. 2200 pushes it into the haze instead.
+  radius: 2200,
+  maxTiles: 220,
+  perTile: 2100,         // candidate samples per tile, before cover rejects them
+  budget: 34000,         // hard ceiling on live instances
 };
 
 /**
@@ -72,14 +74,19 @@ function vegGeo(rings, seg, split, barkCol, leafCol) {
 
 function vegPrototypes() {
   const bark = [0.30, 0.23, 0.17];
-  const S = 5, B = 4;
+  // A pentagonal cross-section is what made the hillside read as faceted from
+  // low down. Eight sides is the point where a canopy stops having corners; a
+  // pine goes from 60 triangles to 96, and since the whole landscape is four
+  // instanced draws whatever the count, that is the entire cost.
+  const S = 8, B = 6;
 
   // Aleppo pine: bare leaning trunk, flat irregular umbrella. The shape that
   // reads as Dalmatia from a thousand feet.
   const pine = vegGeo([
     vegRing(0.00, 0.055, S), vegRing(0.26, 0.040, S), vegRing(0.48, 0.034, S),
-    vegRing(0.50, 0.34, S, 0.22), vegRing(0.70, 0.44, S, 0.20),
-    vegRing(0.88, 0.33, S, 0.18), vegRing(1.00, 0.09, S),
+    vegRing(0.50, 0.34, S, 0.22), vegRing(0.62, 0.42, S, 0.21),
+    vegRing(0.74, 0.45, S, 0.20), vegRing(0.86, 0.36, S, 0.19),
+    vegRing(0.95, 0.22, S, 0.16), vegRing(1.00, 0.06, S),
   ], S, 3, bark, [0.14, 0.24, 0.13]);
 
   // Cypress: the dark exclamation mark in every churchyard and windbreak.
@@ -92,8 +99,9 @@ function vegPrototypes() {
   // Olive: short, thick, gnarled, silver-green and much harder to set alight.
   const olive = vegGeo([
     vegRing(0.00, 0.14, S), vegRing(0.20, 0.10, S),
-    vegRing(0.30, 0.44, S, 0.24), vegRing(0.58, 0.56, S, 0.22),
-    vegRing(0.86, 0.40, S, 0.20), vegRing(1.00, 0.12, S),
+    vegRing(0.30, 0.44, S, 0.24), vegRing(0.46, 0.53, S, 0.23),
+    vegRing(0.62, 0.56, S, 0.22), vegRing(0.80, 0.47, S, 0.21),
+    vegRing(0.92, 0.32, S, 0.19), vegRing(1.00, 0.10, S),
   ], S, 2, [0.33, 0.29, 0.24], [0.36, 0.41, 0.30]);
 
   // Maquis: no trunk worth modelling, and the reason the whole coast goes up.

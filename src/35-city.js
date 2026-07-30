@@ -61,7 +61,7 @@ function principalAxis(pts, cx, cz) {
 }
 
 function buildCity(scene) {
-  const wallPos = [], wallNorm = [], wallCol = [];
+  const wallPos = [], wallNorm = [], wallCol = [], wallUv = [];
   const roofPos = [], roofNorm = [], roofCol = [];
   const rng = mulberry32(CONFIG.seed ^ 0x00c179);
 
@@ -78,7 +78,7 @@ function buildCity(scene) {
     [0.48, 0.28, 0.22],
   ];
 
-  const pushTri = (P, N, C, a, b, c, col) => {
+  const pushTri = (P, N, C, a, b, c, col, UV, uvs) => {
     const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
     const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
     let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
@@ -89,7 +89,34 @@ function buildCity(scene) {
       N.push(nx, ny, nz);
       C.push(col[0], col[1], col[2]);
     }
+    if (UV) for (const t of uvs) UV.push(t[0], t[1]);
   };
+
+  /**
+   * Facade coordinates, packed into the one spare vec2 the shared material
+   * already carries.
+   *
+   * `u` is metres along the facade, run cumulatively around the footprint so a
+   * long wall that OSM happens to have split into three nodes keeps one window
+   * rhythm instead of restarting at every vertex.
+   *
+   * `v` has to answer two questions — how far above this building's own
+   * doorstep a fragment is, and how tall the wall is — because a window must
+   * only be drawn where the whole storey it belongs to exists, or the roofline
+   * slices the top row of windows in half. Both fit in one float: the wall
+   * height in whole metres above 1000, the height above the doorstep below it.
+   * `up` is at most `h`, `h` is at most about 60, so the packed value stays
+   * under 60 000 where a 24-bit mantissa still resolves 4 mm.
+   *
+   * The +2 bias is because walls are sunk 1.2 m so nothing floats on a slope,
+   * so `up` starts *negative* and an unbiased pack would borrow from the
+   * height field and put the ground floor underground.
+   *
+   * A flat -1 is the sentinel for masonry with no openings in it — gable ends,
+   * parapets — and survives interpolation because all three corners carry it.
+   */
+  const fac = (h, up) => Math.floor(h) * 1000 + up + 2;
+  const PLAIN = -1;
 
   let built = 0;
   let tagged = 0;
@@ -135,13 +162,22 @@ function buildCity(scene) {
     const top = base + eave;
 
     // ── walls ──────────────────────────────────────────────────────────────
+    let run = 0;
     for (let i = 0; i < pts.length; i++) {
       const [x0, z0] = pts[i];
       const [x1, z1] = pts[(i + 1) % pts.length];
+      const u0 = run;
+      const u1 = run + Math.hypot(x1 - x0, z1 - z0);
+      run = u1;
+      // Heights are measured from the ground line, not from the sunk footing.
+      const wh = eave - 1.2;
+      const t = fac(wh, wh), b0 = fac(wh, -1.2);
       pushTri(wallPos, wallNorm, wallCol,
-        [x0, base, z0], [x1, base, z1], [x1, top, z1], wcol);
+        [x0, base, z0], [x1, base, z1], [x1, top, z1], wcol,
+        wallUv, [[u0, b0], [u1, b0], [u1, t]]);
       pushTri(wallPos, wallNorm, wallCol,
-        [x0, base, z0], [x1, top, z1], [x0, top, z0], wcol);
+        [x0, base, z0], [x1, top, z1], [x0, top, z0], wcol,
+        wallUv, [[u0, b0], [u1, t], [u0, t]]);
     }
 
     // ── roof ───────────────────────────────────────────────────────────────
@@ -180,7 +216,8 @@ function buildCity(scene) {
     // over everything it is handed.
     const tri = (a, c, d, col) => pushTri(roofPos, roofNorm, roofCol, a, c, d, col);
     const quad = (a, c, d, e, col) => { tri(a, c, d, col); tri(a, d, e, col); };
-    const mTri = (a, c, d) => pushTri(wallPos, wallNorm, wallCol, a, c, d, wcol);
+    const mTri = (a, c, d) => pushTri(wallPos, wallNorm, wallCol, a, c, d, wcol,
+      wallUv, [[0, PLAIN], [0, PLAIN], [0, PLAIN]]);
     const mQuad = (a, c, d, e) => { mTri(a, c, d); mTri(a, d, e); };
 
     const a1 = P(uMin, vMin, top), a2 = P(uMax, vMin, top);
@@ -245,11 +282,12 @@ function buildCity(scene) {
     built++;
   }
 
-  const mk = (pos, norm, col, mat) => {
+  const mk = (pos, norm, col, mat, uv) => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('normal', new THREE.Float32BufferAttribute(norm, 3));
     g.setAttribute('aVCol', new THREE.Float32BufferAttribute(col, 3));
+    if (uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e9);
     const m = new THREE.Mesh(g, mat);
     m.frustumCulled = false;
@@ -259,14 +297,92 @@ function buildCity(scene) {
 
   // Per-vertex colour, plus a pantile corrugation on the roofs that only shows
   // up when you get low — from 300 m it just reads as tone.
+  // Facades. Every opening here is a fragment-shader test against the packed
+  // coordinates `fac()` wrote — no extra geometry at all, which is the only
+  // reason thirteen thousand buildings can afford windows.
   const wallMat = solidMaterial(0xffffff, {
     spec: 0.05, specPower: 24,
     side: THREE.DoubleSide,
     body: `n = gl_FrontFacing ? n : -n;
-           base *= vVCol;
-           // string courses and shutters, suggested rather than drawn
-           float band = smoothstep(0.42, 0.5, fract(vWorld.y * 0.34));
-           base *= 0.94 + 0.10 * band;`,
+      base *= vVCol;
+
+      // Limestone bounce. This whole coast is white rock, the ground between
+      // the houses is the same rock, and a wall standing in shade is lit from
+      // below by a very bright floor. With only the sky term, every shaded
+      // facade fell to near-black — which is not what a Dalmatian town does at
+      // four in the afternoon in August, and it swallowed the windows whole.
+      float shade = 1.0 - max(dot(n, uSunDir), 0.0) * shadowAt(vWorld);
+      base *= 1.0 + 0.85 * shade * (1.0 - abs(n.y));
+
+      float packed = vUv.y;
+      // Gable ends and parapets are masonry: render, string course, no holes.
+      if (packed > -0.5) {
+        float wallH = floor(packed / 1000.0);
+        float up    = packed - wallH * 1000.0 - 2.0;
+        float along = vUv.x;
+
+        // One number per building, from the colour it was already given — the
+        // per-building jitter in that colour makes it effectively unique, so
+        // no two neighbours share a window rhythm or a shutter.
+        float seed = fract(vVCol.r * 91.7 + vVCol.g * 57.3 + vVCol.b * 27.1);
+        float storey = 3.02 + 0.30 * seed;
+        float bay    = 2.60 + 0.70 * fract(seed * 7.31);
+
+        float fl      = floor(up / storey);          // which floor
+        float inFloor = up - fl * storey;            // metres above its slab
+        float fx    = fract(along / bay + 0.5 + seed * 0.7);
+        float inBay = (fx - 0.5) * bay;
+
+        // Only where the whole storey fits under the eave: a half window cut
+        // off by the roofline is worse than a blank wall.
+        float room = step(storey * (fl + 1.0), wallH + 0.05);
+        float ground = step(fl, 0.5);
+
+        // Ground floor is a door or a shopfront — wider, taller, sill on the
+        // pavement. Everything above is a window with a sill and a lintel.
+        float wHalf = mix(0.52, 0.62, ground);
+        float sill  = mix(1.02, 0.06, ground);
+        float head  = sill + mix(1.38, 2.12, ground);
+
+        float inX = 1.0 - smoothstep(wHalf - 0.05, wHalf + 0.02, abs(inBay));
+        float inY = smoothstep(sill - 0.03, sill + 0.03, inFloor)
+                  * (1.0 - smoothstep(head - 0.03, head + 0.03, inFloor));
+        float hole = inX * inY * room;
+
+        // Glass: dark, and darker the more steeply you look into it, with the
+        // sky caught on it at a glancing angle. Reads as depth from the air,
+        // which is the whole point of putting holes in a wall you fly over.
+        vec3 look = normalize(vWorld - uCamPos);
+        float graze = 1.0 - abs(dot(look, n));
+        vec3 glass = mix(vec3(0.055, 0.062, 0.075), uZenith * 0.65,
+                         graze * graze * 0.75);
+        // A few are lit or have washing on the line; a few are shuttered fast.
+        float lit = step(0.965, fract(seed * 311.7 + fl * 17.3 + floor(along / bay) * 5.1));
+        glass = mix(glass, vec3(0.85, 0.74, 0.52), lit * 0.55);
+        base = mix(base, glass, hole * 0.94);
+
+        // Reveal: the wall is 40 cm of stone, so an opening has a shadow on
+        // its head and a bright sill under it.
+        float frame = inX * room
+          * (1.0 - smoothstep(0.0, 0.09, abs(inFloor - head)))
+          * (1.0 - hole);
+        base *= 1.0 - frame * 0.45;
+        float sillLip = inX * room
+          * (1.0 - smoothstep(0.0, 0.07, abs(inFloor - sill)));
+        base = mix(base, base * 1.22 + 0.04, sillLip * 0.6);
+
+        // Shutters, folded back against the render either side of the window.
+        // Dalmatian green, faded, and only on the upper floors.
+        float shutW = 1.0 - smoothstep(0.30, 0.40, abs(abs(inBay) - (wHalf + 0.20)));
+        float shut = shutW * inY * room * (1.0 - ground)
+                   * step(0.35, fract(seed * 53.1 + fl * 3.7));
+        base = mix(base, vec3(0.20, 0.29, 0.22) * (0.8 + 0.4 * seed), shut * 0.8);
+
+        // String course at every floor line, and the render itself is not flat.
+        float course = 1.0 - smoothstep(0.0, 0.12, inFloor);
+        base *= 1.0 + 0.07 * course;
+      }
+      base *= 0.95 + 0.10 * fbm2(vWorld.xz * 3.1 + vWorld.y * 0.7, 2);`,
   });
   const roofMat = solidMaterial(0xffffff, {
     spec: 0.10, specPower: 30,
@@ -279,7 +395,7 @@ function buildCity(scene) {
            base *= 0.92 + 0.16 * fbm2(vWorld.xz * 0.7, 2);`,
   });
 
-  const walls = mk(wallPos, wallNorm, wallCol, wallMat);
+  const walls = mk(wallPos, wallNorm, wallCol, wallMat, wallUv);
   const roofs = mk(roofPos, roofNorm, roofCol, roofMat);
 
   return {

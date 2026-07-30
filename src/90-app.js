@@ -426,10 +426,14 @@ async function boot() {
 
   await step(85, 'load.maquis');
   trees = buildTrees(scene, fire);
-  // A phone gets half the forest by default. Only as a *default* — the slider
-  // still goes to the top, and anything already chosen is restored over this
-  // by buildPanel().
-  if (IS_SMALL) trees.setDensity(0.5);
+  // A phone gets a third of the forest by default. Only as a *default* — the
+  // slider still goes to the top, and anything already chosen is restored over
+  // this by buildPanel().
+  //
+  // 0.35 rather than the old 0.5 because the budget and the radius both went
+  // up and a tree went from 60 triangles to 96: at 0.5 a phone would now be
+  // drawing nearly three times the vegetation it was tuned for.
+  if (IS_SMALL) trees.setDensity(0.35);
 
   await step(88, 'load.plane');
   plane = buildCanadair();
