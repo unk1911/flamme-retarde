@@ -26,6 +26,36 @@ geodata pipeline.
 
 ### Added
 
+- **Pause**, on `P` or `Esc`, and a `II` button on a touchscreen. `state.paused`
+  had been a field nobody read since the first release. It stops the frame loop
+  dead — no simulation, no `uTime`, not even a render, because the canvas
+  already holds the picture a pause is supposed to show. Three details make it
+  honest rather than decorative. The clock is read *before* the early return,
+  because `getDelta()` reports wall time since it was last read, so an interval
+  nobody reads comes back as one enormous `dt` and resuming would integrate
+  thirty seconds of flight in a single step, straight through whichever hill you
+  were over. Every held key, the mouse button and both touch pads are released,
+  so a pause taken mid-turn does not come back with full right rudder. And the
+  audio bed ducks to silence on a gain ramp rather than being torn down, because
+  `update()` is frozen too and every engine would otherwise drone on at whatever
+  gain it had when the world stopped.
+- **The game pauses itself when you are not there** — on tab switch, and on
+  losing a pointer lock it actually held. The settings panel is exempt, since it
+  drops the lock on purpose.
+- The pause card carries the live mission line — hectares alight and how much of
+  Šibenik is left — in whichever of the three languages is running, and repaints
+  if you change language while the world is stopped.
+
+### Fixed (input)
+
+- **Pointer-lock requests are no longer allowed to throw.** Chrome returns a
+  promise from `requestPointerLock()` and rejects it whenever the gesture that
+  asked has gone stale — which is every time, because the game asks at the end
+  of a thirty-second cinematic. It printed an unhandled rejection on an entirely
+  ordinary frame. This also had teeth once pause existed: a *failed* request
+  fires `pointerlockchange`, so pausing on lock loss stopped the game on the
+  first frame of flight. Pause now triggers only on losing a lock that was held.
+
 - **The road network, which was in the payload all along.** 1 535 ways and
   320 km of it, baked since the first release, inflated at load, and never
   drawn. Ribbons are draped on the terrain — resampled to follow the ground,

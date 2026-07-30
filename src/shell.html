@@ -111,6 +111,7 @@
     <button id="t-lvl" data-i18n="touch.lvl">LVL</button>
     <button id="t-cam" data-i18n="touch.cam">CAM</button>
     <button id="t-set" data-i18n="touch.set">SET</button>
+    <button id="t-pause" data-i18n="touch.pause">II</button>
   </div>
 </div>
 
@@ -131,6 +132,19 @@
     <p id="over-sub"></p>
     <div id="over-stats"></div>
     <button id="again" data-i18n="over.again">Fly again</button>
+  </div>
+</div>
+
+<!-- ────────────────────────────────────────────────────────────────── pause ── -->
+<!-- Sits *below* the settings panel on purpose, so the one thing you most want
+     to change while the world is stopped is still reachable. -->
+<div id="pause" hidden>
+  <div class="pause-inner">
+    <div class="eyebrow" data-i18n="pause.eyebrow">the fire is waiting</div>
+    <h1 data-i18n="pause.title">Paused</h1>
+    <p id="pause-sub"></p>
+    <button id="resume" data-i18n="pause.resume">Resume</button>
+    <p class="hint" data-i18n-html="pause.hint"></p>
   </div>
 </div>
 

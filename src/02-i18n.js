@@ -158,8 +158,16 @@ const STRINGS = {
     'set.exposure': 'exposure',
     'set.volume': 'volume',
     'set.off': 'off',
-    'set.foot': 'M closes this · Z levels · T autopilot',
+    'set.foot': 'M closes · Z levels · T autopilot · P pauses',
     'set.footTouch': 'tap SET to close',
+
+    // pause
+    'pause.eyebrow': 'the fire is waiting',
+    'pause.title': 'Paused',
+    'pause.alight': 'alight',
+    'pause.resume': 'Resume',
+    'pause.hint': '<kbd>P</kbd> or <kbd>Esc</kbd> to go back',
+    'pause.hintTouch': 'tap anywhere to go back',
 
     // touch controls
     'touch.scoop': 'SCOOP',
@@ -169,6 +177,7 @@ const STRINGS = {
     'touch.lvl': 'LVL',
     'touch.cam': 'CAM',
     'touch.set': 'SET',
+    'touch.pause': 'II',
     'touch.rotate': 'Turn your device sideways.',
     'touch.rotateSub': 'This one wants a horizon.',
 
@@ -318,8 +327,15 @@ const STRINGS = {
     'set.exposure': 'ekspozicija',
     'set.volume': 'glasnoća',
     'set.off': 'isključeno',
-    'set.foot': 'M zatvara · Z poravnava · T autopilot',
+    'set.foot': 'M zatvara · Z poravnava · T autopilot · P pauza',
     'set.footTouch': 'dodirni POST za zatvaranje',
+
+    'pause.eyebrow': 'vatra čeka',
+    'pause.title': 'Pauza',
+    'pause.alight': 'gori',
+    'pause.resume': 'Nastavi',
+    'pause.hint': '<kbd>P</kbd> ili <kbd>Esc</kbd> za povratak',
+    'pause.hintTouch': 'dodirni bilo gdje za povratak',
 
     'touch.scoop': 'ZAHVAT',
     'touch.drop': 'IZBACI',
@@ -328,6 +344,7 @@ const STRINGS = {
     'touch.lvl': 'RAV',
     'touch.cam': 'KAM',
     'touch.set': 'POST',
+    'touch.pause': 'II',
     'touch.rotate': 'Okreni uređaj vodoravno.',
     'touch.rotateSub': 'Ovome treba horizont.',
 
@@ -478,8 +495,15 @@ const STRINGS = {
     'set.exposure': 'exposition',
     'set.volume': 'volume',
     'set.off': 'désactivée',
-    'set.foot': 'M ferme · Z met à plat · T pilote auto',
+    'set.foot': 'M ferme · Z met à plat · T pilote auto · P pause',
     'set.footTouch': 'touchez RÉGL pour fermer',
+
+    'pause.eyebrow': 'le feu attend',
+    'pause.title': 'En pause',
+    'pause.alight': 'en feu',
+    'pause.resume': 'Reprendre',
+    'pause.hint': '<kbd>P</kbd> ou <kbd>Échap</kbd> pour revenir',
+    'pause.hintTouch': 'touchez n’importe où pour revenir',
 
     'touch.scoop': 'ÉCOPER',
     'touch.drop': 'LARGUER',
@@ -488,6 +512,7 @@ const STRINGS = {
     'touch.lvl': 'PLAT',
     'touch.cam': 'CAM',
     'touch.set': 'RÉGL',
+    'touch.pause': 'II',
     'touch.rotate': 'Tournez votre appareil.',
     'touch.rotateSub': 'Celui-ci veut un horizon.',
 

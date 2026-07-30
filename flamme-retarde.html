@@ -156,7 +156,7 @@ button {
   min-height: 1.2em;
 }
 
-#enter, #again {
+#enter, #again, #resume {
   margin-top: 2.2rem; padding: .85rem 2.6rem;
   font-family: var(--mono); font-size: .78rem;
   letter-spacing: .3em; text-transform: uppercase;
@@ -165,7 +165,7 @@ button {
   transition: transform .18s ease, box-shadow .25s ease, background .25s;
   box-shadow: 0 0 0 0 rgba(255, 139, 61, .55);
 }
-#enter:hover, #again:hover {
+#enter:hover, #again:hover, #resume:hover {
   background: #fff; transform: translateY(-1px);
   box-shadow: 0 10px 34px -8px rgba(255, 139, 61, .75);
 }
@@ -444,6 +444,38 @@ button {
 #over-stats span { color: #7f9198; letter-spacing: .12em; text-transform: uppercase;
   font-size: .58rem; align-self: center; }
 #over-stats b { font-weight: 400; color: var(--salt); }
+
+/* ────────────────────────────────────────────────────────────────── pause ── */
+/* z-index 68 puts this under the settings panel (70) and under the end screen
+   (80): stopping the world is not supposed to lock you out of the volume
+   slider, and a mission that ended while you were away should win. */
+
+#pause {
+  position: fixed; inset: 0; z-index: 68;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(5, 9, 12, .62); backdrop-filter: blur(9px);
+  text-align: center; padding: 6vh 6vw;
+  animation: pause-in .18s ease both;
+}
+#pause[hidden] { display: none; }
+@keyframes pause-in { from { opacity: 0; backdrop-filter: blur(0); } }
+.pause-inner { max-width: 30rem; }
+#pause h1 {
+  margin: 0; font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 200;
+  letter-spacing: .06em; color: var(--salt);
+}
+#pause-sub {
+  margin: 1rem 0 0; color: #92a4ab; line-height: 1.7; font-weight: 300;
+  font-size: .92rem; min-height: 1.7em;
+}
+#pause .hint kbd {
+  font-family: var(--mono); color: var(--stone);
+  border: 1px solid var(--edge); border-radius: 2px;
+  padding: .05rem .3rem; margin: 0 .1rem;
+}
+/* Reduced motion means *reduced*, not none — but a blur that fades in over a
+   frozen frame is exactly the kind of thing that should just be there. */
+@media (prefers-reduced-motion: reduce) { #pause { animation: none; } }
 
 /* ───────────────────────────────────────────────────── settings + toast ── */
 
@@ -890,6 +922,7 @@ html.touch .row input[type=range] { height: 22px; }
     <button id="t-lvl" data-i18n="touch.lvl">LVL</button>
     <button id="t-cam" data-i18n="touch.cam">CAM</button>
     <button id="t-set" data-i18n="touch.set">SET</button>
+    <button id="t-pause" data-i18n="touch.pause">II</button>
   </div>
 </div>
 
@@ -910,6 +943,19 @@ html.touch .row input[type=range] { height: 22px; }
     <p id="over-sub"></p>
     <div id="over-stats"></div>
     <button id="again" data-i18n="over.again">Fly again</button>
+  </div>
+</div>
+
+<!-- ────────────────────────────────────────────────────────────────── pause ── -->
+<!-- Sits *below* the settings panel on purpose, so the one thing you most want
+     to change while the world is stopped is still reachable. -->
+<div id="pause" hidden>
+  <div class="pause-inner">
+    <div class="eyebrow" data-i18n="pause.eyebrow">the fire is waiting</div>
+    <h1 data-i18n="pause.title">Paused</h1>
+    <p id="pause-sub"></p>
+    <button id="resume" data-i18n="pause.resume">Resume</button>
+    <p class="hint" data-i18n-html="pause.hint"></p>
   </div>
 </div>
 
@@ -1677,8 +1723,16 @@ const STRINGS = {
     'set.exposure': 'exposure',
     'set.volume': 'volume',
     'set.off': 'off',
-    'set.foot': 'M closes this · Z levels · T autopilot',
+    'set.foot': 'M closes · Z levels · T autopilot · P pauses',
     'set.footTouch': 'tap SET to close',
+
+    // pause
+    'pause.eyebrow': 'the fire is waiting',
+    'pause.title': 'Paused',
+    'pause.alight': 'alight',
+    'pause.resume': 'Resume',
+    'pause.hint': '<kbd>P</kbd> or <kbd>Esc</kbd> to go back',
+    'pause.hintTouch': 'tap anywhere to go back',
 
     // touch controls
     'touch.scoop': 'SCOOP',
@@ -1688,6 +1742,7 @@ const STRINGS = {
     'touch.lvl': 'LVL',
     'touch.cam': 'CAM',
     'touch.set': 'SET',
+    'touch.pause': 'II',
     'touch.rotate': 'Turn your device sideways.',
     'touch.rotateSub': 'This one wants a horizon.',
 
@@ -1837,8 +1892,15 @@ const STRINGS = {
     'set.exposure': 'ekspozicija',
     'set.volume': 'glasnoća',
     'set.off': 'isključeno',
-    'set.foot': 'M zatvara · Z poravnava · T autopilot',
+    'set.foot': 'M zatvara · Z poravnava · T autopilot · P pauza',
     'set.footTouch': 'dodirni POST za zatvaranje',
+
+    'pause.eyebrow': 'vatra čeka',
+    'pause.title': 'Pauza',
+    'pause.alight': 'gori',
+    'pause.resume': 'Nastavi',
+    'pause.hint': '<kbd>P</kbd> ili <kbd>Esc</kbd> za povratak',
+    'pause.hintTouch': 'dodirni bilo gdje za povratak',
 
     'touch.scoop': 'ZAHVAT',
     'touch.drop': 'IZBACI',
@@ -1847,6 +1909,7 @@ const STRINGS = {
     'touch.lvl': 'RAV',
     'touch.cam': 'KAM',
     'touch.set': 'POST',
+    'touch.pause': 'II',
     'touch.rotate': 'Okreni uređaj vodoravno.',
     'touch.rotateSub': 'Ovome treba horizont.',
 
@@ -1997,8 +2060,15 @@ const STRINGS = {
     'set.exposure': 'exposition',
     'set.volume': 'volume',
     'set.off': 'désactivée',
-    'set.foot': 'M ferme · Z met à plat · T pilote auto',
+    'set.foot': 'M ferme · Z met à plat · T pilote auto · P pause',
     'set.footTouch': 'touchez RÉGL pour fermer',
+
+    'pause.eyebrow': 'le feu attend',
+    'pause.title': 'En pause',
+    'pause.alight': 'en feu',
+    'pause.resume': 'Reprendre',
+    'pause.hint': '<kbd>P</kbd> ou <kbd>Échap</kbd> pour revenir',
+    'pause.hintTouch': 'touchez n’importe où pour revenir',
 
     'touch.scoop': 'ÉCOPER',
     'touch.drop': 'LARGUER',
@@ -2007,6 +2077,7 @@ const STRINGS = {
     'touch.lvl': 'PLAT',
     'touch.cam': 'CAM',
     'touch.set': 'RÉGL',
+    'touch.pause': 'II',
     'touch.rotate': 'Tournez votre appareil.',
     'touch.rotateSub': 'Celui-ci veut un horizon.',
 
@@ -8163,12 +8234,25 @@ function buildAudio() {
 
   function setVolume(v) {
     masterVol = v;
-    if (master) master.gain.setTargetAtTime(v, ctx.currentTime, 0.1);
+    if (master && !ducked) master.gain.setTargetAtTime(v, ctx.currentTime, 0.1);
   }
   const getVolume = () => masterVol;
 
+  // Pausing freezes update(), which means every bed keeps whatever gain it had
+  // when the world stopped — two turboprops droning over a still photograph.
+  // Duck the master instead of stopping the sources: the beds are running
+  // oscillators and noise loops, and tearing them down to build them again on
+  // resume costs more than a gain ramp and sounds worse.
+  let ducked = false;
+  function setPaused(on) {
+    if (!master || ducked === on) return;
+    ducked = on;
+    // Down fast enough to feel instant, back up slowly enough not to thump.
+    master.gain.setTargetAtTime(on ? 0.0001 : masterVol, ctx.currentTime, on ? 0.05 : 0.22);
+  }
+
   return { start, update, squelch, dropWhoosh, splash, beep, setVolume, getVolume,
-    jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas,
+    setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas,
     radalt, gpwsSink, gpwsPullUp, hullSlam, impact, kill,
     get ctx() { return ctx; } };
 }
@@ -8205,6 +8289,9 @@ addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  // A paused frame loop draws nothing, so the resized canvas would sit there
+  // stretched until you resumed. One frame costs nothing and keeps it honest.
+  if (state.paused) renderer.render(scene, camera);
 });
 
 // ── input ────────────────────────────────────────────────────────────────────
@@ -8216,8 +8303,22 @@ const input = {
 };
 let pointerLocked = false;
 
+/**
+ * Chrome hands back a promise here and rejects it whenever the gesture that
+ * asked has gone stale — which is routine, not exceptional. Left alone it
+ * prints an unhandled rejection on a perfectly ordinary frame.
+ */
+function grabPointer() {
+  try { canvas.requestPointerLock()?.catch?.(() => {}); } catch { /* older API */ }
+}
+
 addEventListener('keydown', (e) => {
   if (e.repeat) return;
+  if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); togglePause(); return; }
+  // While the world is stopped, only the settings answer. Cycling the camera or
+  // dropping the gear against a frozen simulation puts the picture and the
+  // state out of step, and the HUD is not being redrawn to tell you.
+  if (state.paused) { if (e.code === 'KeyM') togglePanel(); return; }
   keys.add(e.code);
   if (e.code === 'KeyC') cycleCamera();
   if (e.code === 'KeyH') $('hud').hidden = !$('hud').hidden;
@@ -8234,10 +8335,19 @@ addEventListener('blur', () => { keys.clear(); if (flight) flight.p.kb.set(0, 0)
 canvas.addEventListener('click', () => {
   // Never on a touchscreen: there is no pointer to lock, and asking for it on
   // iOS throws up a permission bar over the top of the game.
-  if (!IS_TOUCH && state.phase === 'fly' && !pointerLocked) canvas.requestPointerLock();
+  if (!IS_TOUCH && state.phase === 'fly' && !pointerLocked) grabPointer();
 });
 document.addEventListener('pointerlockchange', () => {
+  const had = pointerLocked;
   pointerLocked = document.pointerLockElement === canvas;
+  // Losing a lock we actually held means the player's attention went somewhere
+  // else — Escape, alt-tab, the OS taking the cursor back — so stop the world
+  // for them. A lock we never got is *not* a distraction: the browser refuses
+  // the request whenever the click that asked for it has gone stale, which is
+  // every time, because the ask comes at the end of a thirty-second cinematic.
+  // Pausing on that stopped the game on the first frame of flight.
+  // The settings panel drops the lock on purpose and is exempt.
+  if (had && !pointerLocked && $('panel').hidden) setPaused(true);
 });
 addEventListener('mousemove', (e) => {
   if (!pointerLocked) return;
@@ -8506,6 +8616,8 @@ const headingToYaw = (dx, dz) => Math.atan2(-dx, -dz);
 function paintDeviceText() {
   $('hint').innerHTML = TK('veil.hint', 'veil.hintTouch');
   $('panel-foot').textContent = TK('set.foot', 'set.footTouch');
+  $('pause').querySelector('.hint').innerHTML = TK('pause.hint', 'pause.hintTouch');
+  if (state.paused) paintPauseState();
 }
 onLangChange(paintDeviceText);
 
@@ -8765,8 +8877,55 @@ function togglePanel() {
   const el = $('panel');
   el.hidden = !el.hidden;
   if (!el.hidden) document.exitPointerLock?.();
-  else if (!IS_TOUCH && state.phase === 'fly') canvas.requestPointerLock();
+  else if (!IS_TOUCH && state.phase === 'fly') grabPointer();
 }
+
+// ── pause ────────────────────────────────────────────────────────────────────
+
+/** The line under the word: what, exactly, you walked away from. */
+function paintPauseState() {
+  if (!fire) return;
+  const ha = fire.burningCount() * (fire.cell * fire.cell) / 1e4;
+  $('pause-sub').textContent = (ha < 10 ? ha.toFixed(1) : Math.round(ha))
+    + ' ha ' + T('pause.alight') + ' · Šibenik ' + Math.round(state.cityHealth * 100) + '%';
+}
+
+function setPaused(on) {
+  // Only while there is a mission to stop. Pausing the loader would strand the
+  // world build, and the cinematic and the end screen have their own answer to
+  // "make it stop" — the skip button and the reload.
+  if (state.phase !== 'fly' && state.phase !== 'crashing') return;
+  if (state.paused === on) return;
+  state.paused = on;
+  $('pause').hidden = !on;
+  audio.setPaused(on);
+
+  if (on) {
+    paintPauseState();
+    // Nothing survives the pause held down. Coming back to full right rudder
+    // because that is what your hand was doing thirty seconds ago is the
+    // classic way a pause button loses an aeroplane.
+    keys.clear();
+    mouseDrop = false;
+    TOUCH.scoop = TOUCH.drop = false;
+    flight.p.kb.set(0, 0);
+    flight.p.stick.set(0, 0);
+    document.exitPointerLock?.();
+  } else if (!IS_TOUCH && $('panel').hidden) {
+    grabPointer();
+  }
+}
+
+const togglePause = () => setPaused(!state.paused);
+
+$('resume').addEventListener('click', () => setPaused(false));
+$('pause').addEventListener('click', (e) => { if (e.target.id === 'pause') setPaused(false); });
+
+// A backgrounded tab stops getting frames anyway; this only makes the stop
+// honest, so you do not come back to a city that burned down in another window.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) setPaused(true);
+});
 
 function toast(msg, kind = '') {
   const el = $('toast');
@@ -8989,7 +9148,15 @@ let lastFrameMs = 0;
 
 function frame() {
   requestAnimationFrame(frame);
+  // Read the clock even when paused, and read it before anything can bail out.
+  // getDelta() reports wall time since it was last read, so an interval that is
+  // never read comes back as one enormous dt — and a pause you sat through for
+  // thirty seconds would resume by integrating thirty seconds of flight in a
+  // single step, straight through whichever hill you were over.
   const dt = Math.min(0.05, clock.getDelta());
+  // Nothing else: not the sim, not uTime, not even the render. The canvas holds
+  // the last frame it drew, which is exactly the picture a pause should show.
+  if (state.paused) return;
   U.uTime.value += dt;
   if (!started) return;
 
@@ -9115,7 +9282,7 @@ function beginFlight() {
   radio('call.1', 'radio.start');
   camPos.copy(camera.position);
   camAim.copy(flight.p.pos);
-  if (!IS_TOUCH) setTimeout(() => canvas.requestPointerLock(), 250);
+  if (!IS_TOUCH) setTimeout(grabPointer, 250);
 }
 
 $('cine-skip').addEventListener('click', beginFlight);
@@ -9185,7 +9352,14 @@ window.__fr = {
     tank: $('tank-hint').textContent,
     ap: $('ap').textContent.trim(),
     phase: state.phase,
+    paused: state.paused,
   }),
+  /** Read the pause with no argument, set it with one. */
+  pause: (on) => {
+    if (on !== undefined) setPaused(on);
+    return { paused: state.paused, shown: !$('pause').hidden,
+      sub: $('pause-sub').textContent, t: +state.t.toFixed(2) };
+  },
   setPos: (x, y, z) => flight.reset(x, z, 0, y),
   place: (x, y, z, yaw) => { flight.reset(x, z, yaw ?? 0, y); },
   cam: (i) => { camMode = i % CAMS.length; },
@@ -9381,6 +9555,7 @@ function initTouch() {
   tap('t-ap', () => toggleAutopilot());
   tap('t-cam', () => cycleCamera());
   tap('t-set', () => togglePanel());
+  tap('t-pause', () => togglePause());
   tap('t-lvl', (el) => {
     TOUCH.level = !TOUCH.level;
     el.classList.toggle('on', TOUCH.level);

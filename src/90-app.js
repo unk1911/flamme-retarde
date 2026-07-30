@@ -29,6 +29,9 @@ addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  // A paused frame loop draws nothing, so the resized canvas would sit there
+  // stretched until you resumed. One frame costs nothing and keeps it honest.
+  if (state.paused) renderer.render(scene, camera);
 });
 
 // ── input ────────────────────────────────────────────────────────────────────
@@ -40,8 +43,22 @@ const input = {
 };
 let pointerLocked = false;
 
+/**
+ * Chrome hands back a promise here and rejects it whenever the gesture that
+ * asked has gone stale — which is routine, not exceptional. Left alone it
+ * prints an unhandled rejection on a perfectly ordinary frame.
+ */
+function grabPointer() {
+  try { canvas.requestPointerLock()?.catch?.(() => {}); } catch { /* older API */ }
+}
+
 addEventListener('keydown', (e) => {
   if (e.repeat) return;
+  if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); togglePause(); return; }
+  // While the world is stopped, only the settings answer. Cycling the camera or
+  // dropping the gear against a frozen simulation puts the picture and the
+  // state out of step, and the HUD is not being redrawn to tell you.
+  if (state.paused) { if (e.code === 'KeyM') togglePanel(); return; }
   keys.add(e.code);
   if (e.code === 'KeyC') cycleCamera();
   if (e.code === 'KeyH') $('hud').hidden = !$('hud').hidden;
@@ -58,10 +75,19 @@ addEventListener('blur', () => { keys.clear(); if (flight) flight.p.kb.set(0, 0)
 canvas.addEventListener('click', () => {
   // Never on a touchscreen: there is no pointer to lock, and asking for it on
   // iOS throws up a permission bar over the top of the game.
-  if (!IS_TOUCH && state.phase === 'fly' && !pointerLocked) canvas.requestPointerLock();
+  if (!IS_TOUCH && state.phase === 'fly' && !pointerLocked) grabPointer();
 });
 document.addEventListener('pointerlockchange', () => {
+  const had = pointerLocked;
   pointerLocked = document.pointerLockElement === canvas;
+  // Losing a lock we actually held means the player's attention went somewhere
+  // else — Escape, alt-tab, the OS taking the cursor back — so stop the world
+  // for them. A lock we never got is *not* a distraction: the browser refuses
+  // the request whenever the click that asked for it has gone stale, which is
+  // every time, because the ask comes at the end of a thirty-second cinematic.
+  // Pausing on that stopped the game on the first frame of flight.
+  // The settings panel drops the lock on purpose and is exempt.
+  if (had && !pointerLocked && $('panel').hidden) setPaused(true);
 });
 addEventListener('mousemove', (e) => {
   if (!pointerLocked) return;
@@ -330,6 +356,8 @@ const headingToYaw = (dx, dz) => Math.atan2(-dx, -dz);
 function paintDeviceText() {
   $('hint').innerHTML = TK('veil.hint', 'veil.hintTouch');
   $('panel-foot').textContent = TK('set.foot', 'set.footTouch');
+  $('pause').querySelector('.hint').innerHTML = TK('pause.hint', 'pause.hintTouch');
+  if (state.paused) paintPauseState();
 }
 onLangChange(paintDeviceText);
 
@@ -589,8 +617,55 @@ function togglePanel() {
   const el = $('panel');
   el.hidden = !el.hidden;
   if (!el.hidden) document.exitPointerLock?.();
-  else if (!IS_TOUCH && state.phase === 'fly') canvas.requestPointerLock();
+  else if (!IS_TOUCH && state.phase === 'fly') grabPointer();
 }
+
+// ── pause ────────────────────────────────────────────────────────────────────
+
+/** The line under the word: what, exactly, you walked away from. */
+function paintPauseState() {
+  if (!fire) return;
+  const ha = fire.burningCount() * (fire.cell * fire.cell) / 1e4;
+  $('pause-sub').textContent = (ha < 10 ? ha.toFixed(1) : Math.round(ha))
+    + ' ha ' + T('pause.alight') + ' · Šibenik ' + Math.round(state.cityHealth * 100) + '%';
+}
+
+function setPaused(on) {
+  // Only while there is a mission to stop. Pausing the loader would strand the
+  // world build, and the cinematic and the end screen have their own answer to
+  // "make it stop" — the skip button and the reload.
+  if (state.phase !== 'fly' && state.phase !== 'crashing') return;
+  if (state.paused === on) return;
+  state.paused = on;
+  $('pause').hidden = !on;
+  audio.setPaused(on);
+
+  if (on) {
+    paintPauseState();
+    // Nothing survives the pause held down. Coming back to full right rudder
+    // because that is what your hand was doing thirty seconds ago is the
+    // classic way a pause button loses an aeroplane.
+    keys.clear();
+    mouseDrop = false;
+    TOUCH.scoop = TOUCH.drop = false;
+    flight.p.kb.set(0, 0);
+    flight.p.stick.set(0, 0);
+    document.exitPointerLock?.();
+  } else if (!IS_TOUCH && $('panel').hidden) {
+    grabPointer();
+  }
+}
+
+const togglePause = () => setPaused(!state.paused);
+
+$('resume').addEventListener('click', () => setPaused(false));
+$('pause').addEventListener('click', (e) => { if (e.target.id === 'pause') setPaused(false); });
+
+// A backgrounded tab stops getting frames anyway; this only makes the stop
+// honest, so you do not come back to a city that burned down in another window.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) setPaused(true);
+});
 
 function toast(msg, kind = '') {
   const el = $('toast');
@@ -813,7 +888,15 @@ let lastFrameMs = 0;
 
 function frame() {
   requestAnimationFrame(frame);
+  // Read the clock even when paused, and read it before anything can bail out.
+  // getDelta() reports wall time since it was last read, so an interval that is
+  // never read comes back as one enormous dt — and a pause you sat through for
+  // thirty seconds would resume by integrating thirty seconds of flight in a
+  // single step, straight through whichever hill you were over.
   const dt = Math.min(0.05, clock.getDelta());
+  // Nothing else: not the sim, not uTime, not even the render. The canvas holds
+  // the last frame it drew, which is exactly the picture a pause should show.
+  if (state.paused) return;
   U.uTime.value += dt;
   if (!started) return;
 
@@ -939,7 +1022,7 @@ function beginFlight() {
   radio('call.1', 'radio.start');
   camPos.copy(camera.position);
   camAim.copy(flight.p.pos);
-  if (!IS_TOUCH) setTimeout(() => canvas.requestPointerLock(), 250);
+  if (!IS_TOUCH) setTimeout(grabPointer, 250);
 }
 
 $('cine-skip').addEventListener('click', beginFlight);
@@ -1009,7 +1092,14 @@ window.__fr = {
     tank: $('tank-hint').textContent,
     ap: $('ap').textContent.trim(),
     phase: state.phase,
+    paused: state.paused,
   }),
+  /** Read the pause with no argument, set it with one. */
+  pause: (on) => {
+    if (on !== undefined) setPaused(on);
+    return { paused: state.paused, shown: !$('pause').hidden,
+      sub: $('pause-sub').textContent, t: +state.t.toFixed(2) };
+  },
   setPos: (x, y, z) => flight.reset(x, z, 0, y),
   place: (x, y, z, yaw) => { flight.reset(x, z, yaw ?? 0, y); },
   cam: (i) => { camMode = i % CAMS.length; },

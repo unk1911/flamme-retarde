@@ -699,12 +699,25 @@ function buildAudio() {
 
   function setVolume(v) {
     masterVol = v;
-    if (master) master.gain.setTargetAtTime(v, ctx.currentTime, 0.1);
+    if (master && !ducked) master.gain.setTargetAtTime(v, ctx.currentTime, 0.1);
   }
   const getVolume = () => masterVol;
 
+  // Pausing freezes update(), which means every bed keeps whatever gain it had
+  // when the world stopped — two turboprops droning over a still photograph.
+  // Duck the master instead of stopping the sources: the beds are running
+  // oscillators and noise loops, and tearing them down to build them again on
+  // resume costs more than a gain ramp and sounds worse.
+  let ducked = false;
+  function setPaused(on) {
+    if (!master || ducked === on) return;
+    ducked = on;
+    // Down fast enough to feel instant, back up slowly enough not to thump.
+    master.gain.setTargetAtTime(on ? 0.0001 : masterVol, ctx.currentTime, on ? 0.05 : 0.22);
+  }
+
   return { start, update, squelch, dropWhoosh, splash, beep, setVolume, getVolume,
-    jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas,
+    setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas,
     radalt, gpwsSink, gpwsPullUp, hullSlam, impact, kill,
     get ctx() { return ctx; } };
 }

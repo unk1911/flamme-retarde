@@ -34,11 +34,18 @@ is a real footprint.
 | `shift` | flaps |
 | `C` | camera — chase, close, cockpit, wing |
 | `M` | settings — language, stability assist, volume, vegetation, traffic, FOV, exposure |
+| `P` / `Esc` | **pause** — the fire stops too |
 | `H` | hide the HUD |
 
 The autopilot is a *fly me to the job* button, not an autoplayer: it lines the
 aeroplane up on a scoop run or brings you in over the fire, and hands the scoop
 and the drop back to you. Any real stick input disengages it.
+
+Pause really is a pause: the simulation stops where it stood, the fire stops
+spreading, the engines duck to silence, and the clock does not collect the
+interval and hand it back as one enormous step when you return. It also pauses
+itself if you switch tabs or lose the pointer lock, so nothing burns down while
+you are somewhere else.
 
 **On a phone or a tablet**, drag anywhere on the left half to fly — the stick
 appears under your thumb wherever you put it — and the throttle is the lever on

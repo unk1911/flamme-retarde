@@ -169,6 +169,7 @@ function initTouch() {
   tap('t-ap', () => toggleAutopilot());
   tap('t-cam', () => cycleCamera());
   tap('t-set', () => togglePanel());
+  tap('t-pause', () => togglePause());
   tap('t-lvl', (el) => {
     TOUCH.level = !TOUCH.level;
     el.classList.toggle('on', TOUCH.level);

@@ -146,7 +146,7 @@ button {
   min-height: 1.2em;
 }
 
-#enter, #again {
+#enter, #again, #resume {
   margin-top: 2.2rem; padding: .85rem 2.6rem;
   font-family: var(--mono); font-size: .78rem;
   letter-spacing: .3em; text-transform: uppercase;
@@ -155,7 +155,7 @@ button {
   transition: transform .18s ease, box-shadow .25s ease, background .25s;
   box-shadow: 0 0 0 0 rgba(255, 139, 61, .55);
 }
-#enter:hover, #again:hover {
+#enter:hover, #again:hover, #resume:hover {
   background: #fff; transform: translateY(-1px);
   box-shadow: 0 10px 34px -8px rgba(255, 139, 61, .75);
 }
@@ -434,6 +434,38 @@ button {
 #over-stats span { color: #7f9198; letter-spacing: .12em; text-transform: uppercase;
   font-size: .58rem; align-self: center; }
 #over-stats b { font-weight: 400; color: var(--salt); }
+
+/* ────────────────────────────────────────────────────────────────── pause ── */
+/* z-index 68 puts this under the settings panel (70) and under the end screen
+   (80): stopping the world is not supposed to lock you out of the volume
+   slider, and a mission that ended while you were away should win. */
+
+#pause {
+  position: fixed; inset: 0; z-index: 68;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(5, 9, 12, .62); backdrop-filter: blur(9px);
+  text-align: center; padding: 6vh 6vw;
+  animation: pause-in .18s ease both;
+}
+#pause[hidden] { display: none; }
+@keyframes pause-in { from { opacity: 0; backdrop-filter: blur(0); } }
+.pause-inner { max-width: 30rem; }
+#pause h1 {
+  margin: 0; font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 200;
+  letter-spacing: .06em; color: var(--salt);
+}
+#pause-sub {
+  margin: 1rem 0 0; color: #92a4ab; line-height: 1.7; font-weight: 300;
+  font-size: .92rem; min-height: 1.7em;
+}
+#pause .hint kbd {
+  font-family: var(--mono); color: var(--stone);
+  border: 1px solid var(--edge); border-radius: 2px;
+  padding: .05rem .3rem; margin: 0 .1rem;
+}
+/* Reduced motion means *reduced*, not none — but a blur that fades in over a
+   frozen frame is exactly the kind of thing that should just be there. */
+@media (prefers-reduced-motion: reduce) { #pause { animation: none; } }
 
 /* ───────────────────────────────────────────────────── settings + toast ── */
 
