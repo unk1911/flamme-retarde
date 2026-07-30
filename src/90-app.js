@@ -326,7 +326,7 @@ function updateCamera(dt) {
 // ── the world ────────────────────────────────────────────────────────────────
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
-  trees, landmarks, alerts, roads, props;
+  trees, landmarks, alerts, roads, rail, props;
 
 function setSun() {
   const a = sunAngles(state.hour);
@@ -418,6 +418,7 @@ async function boot() {
 
   await step(80, 'load.streets');
   roads = buildRoads(scene);
+  rail = buildRail(scene);
   props = buildProps(scene, roads.lanes);
   if (IS_SMALL) props.setDensity(0.45);
 
@@ -937,6 +938,7 @@ function frame() {
   terrain.update(camera, frustum);
   trees.update(dt, camera.position);
   props.update(dt);
+  rail.update(dt);
   sea.update(camera);
   fire.update(dt);
   // The other three keep working while your wreck is still settling.
@@ -1050,6 +1052,8 @@ window.__fr = {
         pyramid: city.forms[3], skillion: city.forms[4], round: city.forms[5] },
     } : null,
     roads: roads ? { runs: roads.drawn, km: Math.round(roads.km), tris: roads.tris } : null,
+    rail: rail ? { ways: rail.ways, km: +rail.km.toFixed(1), cars: rail.cars,
+      lineKm: +rail.lineKm.toFixed(2), tris: Math.round(rail.tris) } : null,
     props: props ? props.counts : null,
     water: Math.round(flight ? flight.p.water : 0),
     wingmen: wingmen ? wingmen.debug() : null,
@@ -1124,5 +1128,6 @@ window.__fr = {
   },
   fire: () => fire,
   flight: () => flight,
+  train: () => (rail ? rail.trainPos() : null),
   scene, camera, renderer,
 };

@@ -33,6 +33,8 @@ TRIM = (0.13, 0.30, 0.20)          # the green shutters of every keeper's house
 DARKMETAL = (0.11, 0.12, 0.13)
 GOLD = (0.78, 0.62, 0.24)
 GLASS = (0.34, 0.44, 0.48)
+CONCRETE = (0.70, 0.69, 0.66)     # 1960s in-situ concrete, weathered pale
+ASPHALT = (0.16, 0.16, 0.17)
 
 
 # --------------------------------------------------------------------- scene --

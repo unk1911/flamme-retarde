@@ -56,6 +56,42 @@ geodata pipeline.
   fires `pointerlockchange`, so pausing on lock loss stopped the game on the
   first frame of flight. Pause now triggers only on losing a lock that was held.
 
+### Added — the bridge and the railway
+
+- **The Šibenik bridge, modelled in Blender.** A fifth landmark, and the first
+  one that is not a building: 390 m overall on a single reinforced-concrete arch
+  of 246 m clear span, deck 33 m above the Kanal svetog Ante, spandrel columns
+  off the arch, approach piers, abutments and a handrail. The dimensions are the
+  real ones and so is the position — OSM way 70310004 carries `bridge=yes` and
+  measures 389 m in the game's frame. Two small extensions to the landmark
+  system to place it: explicit coordinates instead of a name lookup, because a
+  span has two ends and no centroid worth naming, and an absolute height instead
+  of a ground offset, because the ground under mid-span is forty metres of
+  seabed.
+- **The railway.** `fetch_osm.py` never asked for one. It does now, and the
+  Knin–Šibenik line comes back: 44 ways, 24.6 km, four of running line, four of
+  branch, and the rest the spurs, sidings and yard that a terminus actually has.
+  Ballast is a draped ribbon; the rails are laterally shifted copies of each run
+  at 1 435 mm gauge, because through a curve a perpendicular offset is not the
+  same thing as a uv shift; the sleepers are a shader stripe on 600 mm centres.
+- **A train on it** — locomotive and three carriages, articulated along the arc
+  length of the longest running-line run so the set stays on the rails through
+  the curves rather than skating sideways, braking into each end and reversing
+  after a dwell.
+- `bake.py` now keeps the `bridge`, `layer` and `name` tags it was discarding.
+  28 of the 1 535 road spans are bridges.
+
+### Fixed — off the edge of the world
+
+- **Draped ways and vegetation ran past the boundary.** `bake.py` keeps 400 m of
+  margin outside the 13 km box, and `groundAt`/`coverAt` both clamp to the border
+  texel — so they hand back a height and a land cover for ground that is never
+  drawn. A road leaving the world carried on as a ribbon floating over the open
+  sea plane, and tiles beyond the edge planted forests on the water. The road
+  case had been there since the roads were first drawn; raising the vegetation
+  radius from 1 500 m to 2 200 m is what made the tree case visible from inside
+  the world. Both now stop at the edge.
+
 ### Added — depth
 
 - **Facades.** Thirteen thousand buildings had blank walls, which is most of why

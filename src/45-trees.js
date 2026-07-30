@@ -177,8 +177,16 @@ function buildTrees(scene, fire) {
     const ox = tx * T, oz = tz * T;
     const out = { pine: [], cypress: [], olive: [], bush: [], n: 0 };
 
+    // Nothing grows off the edge of the world. coverAt() and groundAt() both
+    // clamp to the border texel, so a tile beyond the boundary inherits whatever
+    // the last row of the map happened to say and plants a forest on the open
+    // sea plane where no terrain is drawn at all. Raising the draw radius from
+    // 1 500 m to 2 200 m is what made this visible from inside the world.
+    const EDGE = CONFIG.world / 2 - 20;
+
     for (let i = 0; i < VEG.perTile; i++) {
       const x = ox + rng() * T, z = oz + rng() * T;
+      if (Math.abs(x) > EDGE || Math.abs(z) > EDGE) continue;
       const c = coverAt(x, z);
       const table = GROWS[c];
       if (!table) continue;

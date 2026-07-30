@@ -24,6 +24,13 @@ const LANDMARKS = [
     clear: 55, name: 'tvrđava sv. Nikole' },
   { key: 'fort_mihovil_fr3d', place: 'tvrđava svetog mihovila', yaw: 0.38, sink: 5.0,
     clear: 48, name: 'tvrđava sv. Mihovila' },
+  // The one landmark that is not a place but a span. OSM way 70310004 carries
+  // bridge=yes and runs 389 m from (-1867, -3851) to (-1478, -3871), so it is
+  // positioned from those two ends rather than from a name in places.json —
+  // and it sits at *sea level*, because the ground under the middle of it is
+  // forty metres of seabed. `clear` keeps the extruded-box city off the deck.
+  { key: 'sibenski_most_fr3d', x: -1672.5, z: -3861, yaw: 0.0513, atY: 0,
+    clear: 40, name: 'Šibenski most' },
 ];
 
 /** Resolved once the world is loaded; the city generator reads it too. */
@@ -32,6 +39,10 @@ const landmarkSites = [];
 function resolveLandmarks() {
   landmarkSites.length = 0;
   for (const L of LANDMARKS) {
+    // Most of these are looked up by name in the OSM places index. The bridge
+    // gives its own coordinates, because a 390 m span has two ends and no
+    // centroid worth naming.
+    if (L.x != null) { landmarkSites.push({ ...L }); continue; }
     const p = placeNamed(L.place);
     if (!p) { console.warn('landmark not in OSM places:', L.place); continue; }
     landmarkSites.push({ ...L, x: p.x, z: p.z });
@@ -98,7 +109,11 @@ async function buildLandmarks(scene) {
       continue;
     }
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(site.x, groundAt(site.x, site.z) - site.sink, site.z);
+    // `atY` is an absolute height for anything that does not stand on the
+    // ground it is over — which so far is the bridge.
+    mesh.position.set(site.x,
+      site.atY != null ? site.atY : groundAt(site.x, site.z) - (site.sink || 0),
+      site.z);
     mesh.rotation.y = site.yaw;
     mesh.updateMatrixWorld();
     root.add(mesh);

@@ -6,7 +6,8 @@ Outputs land in build/payload/ and are inlined by build.py:
     terrain_h.png    2048²  R,G = 16-bit height, B = shore distance
     terrain_c.png    2048²  R = cover class, G = fuel jitter, B = urban density
     town.json.gz            building footprints in local metres, with heights
-    roads.json.gz           road polylines
+    roads.json.gz           road polylines, with bridge spans flagged
+    rail.json.gz            railway polylines
     places.json             named landmarks, in local metres
 
 The world is a 13 km square centred between Jadrija and the old town. The DEM
@@ -531,7 +532,56 @@ def build_roads(roads):
                 pts.append([round(x, 1), round(z, 1)])
         if len(pts) < 2:
             continue
-        out.append({"p": pts, "r": rank.get(el.get("tags", {}).get("highway"), 1)})
+        tags = el.get("tags", {})
+        rec = {"p": pts, "r": rank.get(tags.get("highway"), 1)}
+        # A bridge is the one kind of road that must NOT be draped on the ground
+        # beneath it: the runs that cross the channel are the Šibenik bridge and
+        # the Jadrija causeway, and the game used to cut them at the waterline
+        # rather than lay a road on the sea. With the tag we can build the deck.
+        if tags.get("bridge") in ("yes", "viaduct", "cantilever", "arch"):
+            rec["b"] = 1
+            try:
+                rec["ly"] = max(1, min(4, int(tags.get("layer", 1))))
+            except (TypeError, ValueError):
+                rec["ly"] = 1
+        name = tags.get("name")
+        if name:
+            rec["n"] = name
+        out.append(rec)
+    return out
+
+
+def build_rail(rail):
+    """
+    The Knin–Šibenik line. Running line and branch are rank 2; everything a
+    railway needs but nobody looks at — spurs, yards, sidings — is rank 1, so
+    the renderer can give the main line real rails and the yard a bare formation.
+    """
+    if not rail:
+        return []
+    out = []
+    for el in rail["elements"]:
+        g = el.get("geometry")
+        if not g or len(g) < 2:
+            continue
+        pts = []
+        for nd in g:
+            x, z = lonlat_to_game(nd["lon"], nd["lat"])
+            if -HALF - 400 < x < HALF + 400 and -HALF - 400 < z < HALF + 400:
+                pts.append([round(x, 1), round(z, 1)])
+        if len(pts) < 2:
+            continue
+        tags = el.get("tags", {})
+        running = tags.get("usage") in ("main", "branch") and not tags.get("service")
+        rec = {"p": pts, "r": 2 if running else 1}
+        if tags.get("bridge") in ("yes", "viaduct"):
+            rec["b"] = 1
+        if tags.get("tunnel"):
+            rec["t"] = 1
+        name = tags.get("name")
+        if name:
+            rec["n"] = name
+        out.append(rec)
     return out
 
 
@@ -619,10 +669,11 @@ def main():
     landcover = load_osm("landcover")
     buildings = load_osm("buildings")
     roads = load_osm("roads")
+    rail = load_osm("rail")
     landmarks = load_osm("landmarks")
     have = [n for n, v in [("coast", coast), ("landcover", landcover),
                            ("buildings", buildings), ("roads", roads),
-                           ("landmarks", landmarks)] if v]
+                           ("rail", rail), ("landmarks", landmarks)] if v]
     print(f"  OSM available: {', '.join(have) if have else 'none (procedural fallback)'}")
 
     print("  land / sea")
@@ -634,8 +685,11 @@ def main():
 
     town = build_town(buildings)
     road_list = build_roads(roads)
+    rail_list = build_rail(rail)
     places = build_places(landmarks)
-    print(f"  {len(town)} buildings, {len(road_list)} roads, {len(places)} places")
+    bridges = sum(1 for r in road_list if r.get("b"))
+    print(f"  {len(town)} buildings, {len(road_list)} roads ({bridges} bridge spans), "
+          f"{len(rail_list)} rail ways, {len(places)} places")
 
     # Urban density: how built-up each cell is, for ground colour and for how
     # stubbornly the fire refuses to cross a street.
@@ -670,7 +724,7 @@ def main():
     tc[..., 2] = np.clip(urban_a, 0, 255).astype(np.uint8)
     Image.fromarray(tc).save(OUT / "terrain_c.png", optimize=True)
 
-    for name, obj in [("town", town), ("roads", road_list)]:
+    for name, obj in [("town", town), ("roads", road_list), ("rail", rail_list)]:
         raw = json.dumps(obj, separators=(",", ":")).encode()
         (OUT / f"{name}.json.gz").write_bytes(gzip.compress(raw, 9))
     (OUT / "places.json").write_text(json.dumps(places, separators=(",", ":")))

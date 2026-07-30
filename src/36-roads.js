@@ -32,9 +32,14 @@ function drapeRuns(pts, step) {
   const runs = [];
   let run = [];
   const flush = () => { if (run.length >= 2) runs.push(run); run = []; };
+  // OSM ways run past the edge of the box and bake.py keeps 400 m of margin, but
+  // there is no terrain out there — groundAt() clamps to the edge texel and hands
+  // back a height for ground that is not drawn, so a way leaving the world used
+  // to carry on as a ribbon floating over the open sea plane.
+  const EDGE = CONFIG.world / 2 - 40;
 
   const emit = (x, z) => {
-    if (isSea(x, z)) { flush(); return; }
+    if (isSea(x, z) || Math.abs(x) > EDGE || Math.abs(z) > EDGE) { flush(); return; }
     run.push({ x, z, y: groundAt(x, z) + ROADS.lift });
   };
 

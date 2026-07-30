@@ -92,9 +92,20 @@ detached villa is hipped on all four sides. Tagged colours win over the
 palette.
 
 **The roads are the ones in the data**, 320 km of them, draped on the terrain
-and mitred through the bends. Water crossings are cut rather than laid flat on
-the sea, so the Šibenik bridge is a gap: a bridge deck is geometry, not a
-ribbon.
+and mitred through the bends. Water crossings are still cut rather than laid
+flat on the sea — a bridge deck is geometry, not a ribbon — and now the one
+crossing that matters is that geometry.
+
+**There is a railway, and something running on it.** The Knin–Šibenik line:
+single track, unelectrified, down the valley from Perković to a terminus on the
+waterfront, with the freight branch out to Ražine. 44 ways, 24.6 km, straight
+from Overpass. Ballast and shoulders are a draped ribbon like a road; the two
+rails are laterally shifted copies of the same run at 1 435 mm gauge, because
+through a curve the offset has to be perpendicular at every sample and that is
+not the same thing as sliding a texture sideways. The sleepers are a shader
+stripe on 600 mm centres. A four-car set works the longest stretch of running
+line, decelerating into each end, waiting, and going back — a terminus branch
+has nowhere else to be.
 
 **The traffic, the boats and the parasols are placed from the rasters**, not
 from OSM — cover says where the water is, the shore channel how far the
@@ -117,9 +128,19 @@ shrinks as its cell's fuel goes. Aleppo pine, cypress, olive and maquis scrub,
 generated per 512 m tile from a positional hash so a tree is always in the same
 place, repacked into four instance buffers.
 
-**The four landmarks are modelled in Blender** — St James' Cathedral, the
-fortress of St Nicholas, the fortress of St Michael, and the Jadrija lighthouse
-— and baked to a small binary blob (position, normal, colour, index) so there is
+**The five landmarks are modelled in Blender** — St James' Cathedral, the
+fortress of St Nicholas, the fortress of St Michael, the Jadrija lighthouse, and
+the **Šibenik bridge**: 390 m overall on a single concrete arch of 246 m with the
+deck 33 m above the Kanal svetog Ante, which is the clearance the channel needs
+for anything going up the Krka. It was one of the longest concrete arches in the
+world when it opened in 1966. The 390 m is not a guess — OSM way 70310004 is
+tagged `bridge=yes` and measures 389 m in the game's frame, which is exactly
+where it is placed. It is the one landmark positioned from coordinates rather
+than a name, because a span has two ends and no centroid worth naming, and the
+one placed at absolute height rather than on the ground, because the ground
+under the middle of it is forty metres of seabed.
+
+All five are baked to a small binary blob (position, normal, colour, index) so there is
 no glTF parser in the bundle. `tools/blender/landmarks.py` builds them
 procedurally with bmesh and leaves `build/landmarks.blend` behind for hand
 editing. Everything else — the aircraft, the town, the sea, the sky, the fire,

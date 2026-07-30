@@ -69,6 +69,17 @@ QUERIES = {
         );
         out geom;
     """,
+    # The Knin–Šibenik line, which runs down the valley and dead-ends at the
+    # station on the waterfront. Single track, and the only railway in the box.
+    # Yards and sidings come along because a terminus without them looks wrong
+    # from the air, but service track is ranked below running line.
+    "rail": f"""
+        [out:json][timeout:180];
+        (
+          way["railway"~"^(rail|light_rail|narrow_gauge)$"]({BBOX});
+        );
+        out geom;
+    """,
     "buildings": f"""
         [out:json][timeout:300];
         (

@@ -21,10 +21,12 @@ from pathlib import Path
 
 import bmesh  # type: ignore
 import bpy  # type: ignore
+from mathutils import Matrix, Vector  # type: ignore
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from frmesh import (  # noqa: E402
-    DARKMETAL, GLASS, GOLD, LEAD, STONE, STONE_DARK, TAU, TILE, TRIM, WHITE,
+    ASPHALT, CONCRETE, DARKMETAL, GLASS, GOLD, LEAD, STONE, STONE_DARK, TAU,
+    TILE, TRIM, WHITE,
     bevel, bm_arc_wall, bm_barrel, bm_box, bm_cylinder, bm_dome, bm_hip_roof,
     bm_prism, bm_ring, export, new_object, reset_scene,
 )
@@ -405,12 +407,137 @@ def fort_michael():
 
 
 # --------------------------------------------------------------------------- #
+#  Šibenski most                                                               #
+# --------------------------------------------------------------------------- #
+# The 1966 road bridge over the Kanal svetog Ante, carrying the D8 north out of
+# the city. 390 m overall on a single reinforced-concrete arch of 246 m — one of
+# the longest concrete arches in the world when it opened — with the deck 33 m
+# above the water, which is the clearance the channel needs for anything going
+# up the Krka.
+#
+# The 390 m is not a guess: OSM way 70310004 is tagged bridge=yes and measures
+# 389 m in the game's frame, which is where this gets placed.
+#
+# Local frame: +X along the deck, +Z up, origin at *sea level* mid-span — not on
+# the ground, because the ground here is 40 m of seabed.
+
+def sibenik_bridge():
+    parts = []
+
+    HALF_L = 195.0          # 390 m overall
+    ARCH_HALF = 123.0       # 246 m clear span
+    SPRING = 1.5            # arch springs just above the waterline
+    DECK_Z = 33.0           # deck surface above the sea
+    DECK_T = 1.55           # structural depth
+    SOFFIT = DECK_Z - DECK_T
+    RISE = SOFFIT - SPRING - 1.2
+    RIB_Y = 4.6             # twin ribs, centres either side of the centreline
+    RIB_W = 3.4
+    DECK_W = 11.6
+
+    def arch_z(x):
+        """Parabola. A real arch of this era is a catenary-ish curve, and over
+        246 m at this rise the two are within a few centimetres of each other."""
+        t = min(1.0, abs(x) / ARCH_HALF)
+        return SPRING + RISE * (1.0 - t * t)
+
+    # ── the arch: two ribs, chorded into segments that follow the curve ──────
+    SEG = 22
+    bm = bmesh.new()
+    for side in (-1, 1):
+        for i in range(SEG):
+            x0 = -ARCH_HALF + (2 * ARCH_HALF) * i / SEG
+            x1 = -ARCH_HALF + (2 * ARCH_HALF) * (i + 1) / SEG
+            z0, z1 = arch_z(x0), arch_z(x1)
+            cx, cz = (x0 + x1) * 0.5, (z0 + z1) * 0.5
+            seg_len = math.hypot(x1 - x0, z1 - z0)
+            # The rib deepens toward the springings, the way an arch of this
+            # kind actually does — thinnest at the crown where it carries least.
+            depth = 2.0 + 1.9 * (abs(cx) / ARCH_HALF) ** 2
+            ret = bmesh.ops.create_cube(bm, size=1.0)
+            vs = ret["verts"]
+            bmesh.ops.scale(bm, vec=Vector((seg_len * 1.02, RIB_W, depth)), verts=vs)
+            bmesh.ops.rotate(
+                bm, verts=vs, cent=(0, 0, 0),
+                matrix=Matrix.Rotation(math.atan2(z1 - z0, x1 - x0), 3, "Y").inverted())
+            bmesh.ops.translate(bm, verts=vs, vec=(cx, side * RIB_Y, cz))
+    arch = new_object(bm, "bridge_arch")
+    bevel(arch, 0.10)
+    parts.append((arch, CONCRETE))
+
+    # ── cross-bracing between the ribs, in the lower half where it is needed ─
+    bm = bmesh.new()
+    for i in range(1, 7):
+        x = -ARCH_HALF + (2 * ARCH_HALF) * i / 7
+        if abs(x) < 26:
+            continue
+        bm_box(bm, x, 0, arch_z(x) + 0.4, 2.2, RIB_Y * 2 - RIB_W, 1.5)
+    brace = new_object(bm, "bridge_bracing")
+    parts.append((brace, CONCRETE))
+
+    # ── spandrel columns, arch up to the deck soffit ─────────────────────────
+    bm = bmesh.new()
+    for i in range(-5, 6):
+        x = i * 20.5
+        if abs(x) > ARCH_HALF - 6:
+            continue
+        z0 = arch_z(x)
+        if SOFFIT - z0 < 1.0:
+            continue
+        for side in (-1, 1):
+            bm_box(bm, x, side * RIB_Y, (z0 + SOFFIT) * 0.5,
+                   1.5, 1.5, SOFFIT - z0)
+    # ── approach piers, off the abutments out to the ends, down to the rock ──
+    for x in (-165.0, -142.0, 142.0, 165.0):
+        for side in (-1, 1):
+            bm_box(bm, x, side * 3.4, SOFFIT * 0.5, 2.4, 2.4, SOFFIT)
+    cols = new_object(bm, "bridge_columns")
+    bevel(cols, 0.06)
+    parts.append((cols, CONCRETE))
+
+    # ── abutments: the arch has to land on something ─────────────────────────
+    bm = bmesh.new()
+    for side_x in (-1, 1):
+        bm_box(bm, side_x * (ARCH_HALF + 4.0), 0, SPRING - 1.0, 14.0, 15.0, 7.0)
+    abut = new_object(bm, "bridge_abutments")
+    parts.append((abut, STONE_DARK))
+
+    # ── the deck ─────────────────────────────────────────────────────────────
+    bm = bmesh.new()
+    bm_box(bm, 0, 0, DECK_Z - DECK_T * 0.5, HALF_L * 2, DECK_W, DECK_T)
+    # Edge cantilever, so the deck reads as a slab on beams and not as a plank.
+    for side in (-1, 1):
+        bm_box(bm, 0, side * (DECK_W * 0.5 + 0.5), DECK_Z - 0.45,
+               HALF_L * 2, 1.0, 0.55)
+    deck = new_object(bm, "bridge_deck")
+    parts.append((deck, ASPHALT))
+
+    # ── parapet and railing ──────────────────────────────────────────────────
+    bm = bmesh.new()
+    for side in (-1, 1):
+        y = side * (DECK_W * 0.5 + 0.85)
+        bm_box(bm, 0, y, DECK_Z + 0.35, HALF_L * 2, 0.34, 0.9)
+        # Handrail on stanchions. At the altitude this is seen from the rail is
+        # a line, but a bridge with no line along its edge reads as a ramp.
+        bm_box(bm, 0, y, DECK_Z + 1.35, HALF_L * 2, 0.14, 0.12)
+        n = 44
+        for i in range(n + 1):
+            bm_box(bm, -HALF_L + (2 * HALF_L) * i / n, y, DECK_Z + 0.95,
+                   0.12, 0.12, 1.0)
+    rail = new_object(bm, "bridge_rail")
+    parts.append((rail, DARKMETAL))
+
+    return parts
+
+
+# --------------------------------------------------------------------------- #
 
 BUILDS = [
     ("cathedral", cathedral, "katedrala svetog Jakova"),
     ("lighthouse", lighthouse, "Svjetionik Rt Jadrija"),
     ("fort_nikola", fort_nicholas, "Tvrđava svetog Nikole"),
     ("fort_mihovil", fort_michael, "Tvrđava svetog Mihovila"),
+    ("sibenski_most", sibenik_bridge, "Šibenski most"),
 ]
 
 

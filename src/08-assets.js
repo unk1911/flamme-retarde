@@ -18,6 +18,7 @@ const world = {
   coverTex: null,      // RGBA8 — nearest, sampled by the terrain fragment shader
   town: [],
   roads: [],
+  rail: [],
   places: [],
   meta: null,
 };
@@ -88,6 +89,9 @@ async function loadWorld(onStage) {
   onStage('load.town');
   world.town = await inflateJSON(PAYLOAD.town_json);
   world.roads = await inflateJSON(PAYLOAD.roads_json);
+  // The railway is small enough that a missing payload is not worth a branch
+  // anywhere downstream — an empty list draws nothing.
+  world.rail = PAYLOAD.rail_json ? await inflateJSON(PAYLOAD.rail_json) : [];
   world.places = PAYLOAD.places;
 
   // ── GPU copies ─────────────────────────────────────────────────────────
