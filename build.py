@@ -30,6 +30,15 @@ PAYLOAD = ROOT / "build" / "payload"
 OUT = ROOT / "flamme-retarde.html"
 DEPLOY = Path("/mnt/c/tmp/flamme-retarde")
 
+# The build stamp shown on the title screen, so a page can be identified at a
+# glance without diffing ten megabytes. Both are constants rather than
+# `git describe` and today's date, deliberately: an unchanged tree has to
+# rebuild byte-for-byte identically, because comparing checksums is how we
+# check that what is on the server is what is in the repo. Bump them together
+# when cutting a release, next to the CHANGELOG entry.
+VERSION = "1.2.0"
+BUILD_DATE = "2026-07-30"
+
 THREE_VERSION = "0.180.0"
 CDN = f"https://unpkg.com/three@{THREE_VERSION}/build"
 CORE, MAIN = "three.core.min.js", "three.module.min.js"
@@ -216,17 +225,21 @@ def main() -> None:
     payload = bundle_payload()
     print("assembling app")
     shell = (SRC / "shell.html").read_text()
+    shell = shell.replace("{{VERSION}}", VERSION).replace("{{BUILD_DATE}}", BUILD_DATE)
     css = (SRC / "styles.css").read_text()
     app = app_source()
     check_syntax(app)
 
     html = shell.replace("/*STYLES*/", css)
+    html = html.replace(
+        "/*BUILD*/", f'const BUILD = {{ v: "{VERSION}", date: "{BUILD_DATE}" }};'
+    )
     html = html.replace("/*THREE*/", three)
     html = html.replace("/*PAYLOAD*/", payload)
     html = html.replace("/*APP*/", app)
     OUT.write_text(html)
     size = OUT.stat().st_size / 1024 / 1024
-    print(f"wrote {OUT} ({size:.2f} MB)")
+    print(f"wrote {OUT} — v{VERSION} ({BUILD_DATE}), {size:.2f} MB")
 
     if DEPLOY.parent.exists():
         DEPLOY.mkdir(parents=True, exist_ok=True)

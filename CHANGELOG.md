@@ -8,7 +8,7 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
-## [Unreleased]
+## [1.2.0] — 2026-07-30
 
 ### Fixed
 
@@ -194,6 +194,22 @@ geodata pipeline.
   a person is one pixel and a parasol is six, and they say the same thing.
 - A **traffic and boats** density slider, and `roof:levels` now deepens a roof
   rather than being ignored.
+
+### Added — knowing which build you are looking at
+
+- **A build stamp**, top right of the title screen, in the settings panel, on
+  the console at boot, and as `<meta name="version">` in the first few hundred
+  bytes of the file — so a range request can identify a deployed page without
+  pulling ten megabytes. `window.__fr.stats().build` reports it too.
+- `VERSION` and `BUILD_DATE` in `build.py` are **constants, not `git describe`
+  and today's date**. That is the whole point: an unchanged tree has to rebuild
+  byte-for-byte identically, because comparing an md5 across local, server and
+  served body is how a deploy gets verified. A stamp that changed on every
+  build would destroy the property it exists to report on. Bump them with the
+  release entry.
+- The stamp sits on its own dark plate rather than straight on the render. The
+  top right corner is wherever the procedural sky happens to be brightest, and
+  the first attempt was unreadable against a dawn.
 
 ## [1.1.0] — 2026-07-28
 

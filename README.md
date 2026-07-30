@@ -185,6 +185,20 @@ python3 build.py          # concatenate src/, inline the payload, deploy
 `node --check` on the concatenated app before shipping it, and writes the single
 HTML file.
 
+`VERSION` and `BUILD_DATE` at the top of `build.py` are stamped into the page:
+top right of the title screen, at the foot of the settings panel, on the console
+at boot, and into a `<meta name="version">` near the top of the file — so a
+deployed page can be identified without downloading ten megabytes of it:
+
+```sh
+curl -sr 0-800 https://flamme-retarde.edeliverables.com/ | grep 'name="version"'
+```
+
+They are constants rather than `git describe` and today's date on purpose. An
+unchanged tree rebuilds byte-for-byte identically, which is what makes comparing
+checksums a real check that the server has what the repo has. Bump them by hand
+when cutting a release.
+
 To regenerate the world from scratch (needs network, and is slow):
 
 ```sh

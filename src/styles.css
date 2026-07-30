@@ -181,6 +181,24 @@ button {
 }
 .credit .src:hover { color: var(--sea); border-bottom-color: var(--sea); }
 
+/* The build stamp. Quiet enough to ignore while reading the title screen, but
+   selectable, because the first thing you do with a version number is copy it
+   into a message asking someone whether they are seeing the same one.
+   It sits on its own dark plate rather than straight on the render: the top
+   right corner is wherever the procedural sky happens to be brightest, and a
+   version number you cannot read on a dawn is not a version indicator. */
+#build {
+  position: absolute; top: 1.4rem; right: 1.5rem;
+  font-family: var(--mono); font-size: .56rem; letter-spacing: .16em;
+  display: flex; gap: .5rem; user-select: text;
+  color: #93a7ae; background: rgba(7, 11, 14, .42);
+  padding: .34rem .66rem; border-radius: 999px;
+  border: 1px solid rgba(79, 210, 232, .12);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+}
+#build b { color: var(--sea); font-weight: 400; }
+#build i { opacity: .4; font-style: normal; }
+
 /* ──────────────────────────────────────────────────────────────────── HUD ── */
 
 #hud {
@@ -799,6 +817,10 @@ html.touch .row input[type=range] { height: 22px; }
   .hint { margin-top: .7rem; font-size: .54rem; line-height: 1.7; }
   /* Out of the corner and into the flow, so it cannot land on the button. */
   .credit { position: static; margin-top: 1.1rem; font-size: .5rem; }
+  /* Same reason, and the date goes: on a 390 px-tall screen the version alone
+     is the part you were looking for. */
+  #build { top: .55rem; right: .7rem; font-size: .5rem; gap: .35rem; }
+  #build i, #build span { display: none; }
 
   #over { padding: 1.2rem; overflow-y: auto; touch-action: pan-y;
           align-items: flex-start; }

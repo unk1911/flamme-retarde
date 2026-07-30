@@ -355,7 +355,9 @@ const headingToYaw = (dx, dz) => Math.atan2(-dx, -dz);
  */
 function paintDeviceText() {
   $('hint').innerHTML = TK('veil.hint', 'veil.hintTouch');
-  $('panel-foot').textContent = TK('set.foot', 'set.footTouch');
+  // The settings panel is the only place the build stamp is still reachable
+  // once the title screen is gone, which is when you most want to check it.
+  $('panel-foot').textContent = TK('set.foot', 'set.footTouch') + ' · v' + BUILD.v;
   $('pause').querySelector('.hint').innerHTML = TK('pause.hint', 'pause.hintTouch');
   if (state.paused) paintPauseState();
 }
@@ -1034,6 +1036,9 @@ function beginFlight() {
 
 $('cine-skip').addEventListener('click', beginFlight);
 
+// Also on the console, where a bug report can be copied out of it.
+console.log(`Flamme Retardé v${BUILD.v} · built ${BUILD.date}`);
+
 frame();
 boot().catch((e) => {
   $('stage').textContent = T('load.failed') + e.message;
@@ -1042,7 +1047,9 @@ boot().catch((e) => {
 
 // A small handle for the screenshot tool.
 window.__fr = {
+  build: BUILD,
   stats: () => ({
+    build: BUILD.v + ' (' + BUILD.date + ')',
     fps: Math.round(state.fps), burning: fire ? fire.burningCount() : 0,
     tiles: terrain ? terrain.stats() : null,
     trees: trees ? trees.stats() : null,

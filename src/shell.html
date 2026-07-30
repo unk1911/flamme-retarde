@@ -8,6 +8,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Flamme Retardé — Canadair over Šibenik</title>
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
+<!-- Near the top of the file on purpose: a range request for the first few
+     hundred bytes is enough to tell which build a server is handing out. -->
+<meta name="version" content="{{VERSION}}">
+<meta name="build-date" content="{{BUILD_DATE}}">
 <style>/*STYLES*/</style>
 </head>
 <body>
@@ -24,6 +28,12 @@
     <div id="stage" data-i18n="load.warm">warming the engines</div>
     <button id="enter" hidden data-i18n="veil.enter">Take off</button>
     <p class="hint" id="hint" hidden></p>
+  </div>
+  <!-- Build stamp. Corner of the title screen, where it is out of the way but
+       always in the same place, so you can tell at a glance which build a
+       browser has actually loaded rather than trusting a cache. -->
+  <div id="build" title="Flamme Retardé {{VERSION}}, built {{BUILD_DATE}}">
+    <b>v{{VERSION}}</b><i>·</i><span>{{BUILD_DATE}}</span>
   </div>
   <footer class="credit">
     <span>eDeliverables (2026)</span><i>·</i>
@@ -176,6 +186,7 @@
 
 <canvas id="stage-canvas"></canvas>
 
+<script>/*BUILD*/</script>
 <script>/*THREE*/</script>
 <script>/*PAYLOAD*/</script>
 <script>/*APP*/</script>
