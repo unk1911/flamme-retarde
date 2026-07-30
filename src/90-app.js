@@ -326,7 +326,7 @@ function updateCamera(dt) {
 // ── the world ────────────────────────────────────────────────────────────────
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
-  trees, landmarks, alerts, roads, rail, props;
+  trees, landmarks, alerts, roads, rail, props, airfield;
 
 function setSun() {
   const a = sunAngles(state.hour);
@@ -417,6 +417,7 @@ async function boot() {
   city = buildCity(scene);
 
   await step(80, 'load.streets');
+  airfield = buildAirfield(scene);
   roads = buildRoads(scene);
   rail = buildRail(scene);
   props = buildProps(scene, roads.lanes);
@@ -1052,6 +1053,13 @@ window.__fr = {
         pyramid: city.forms[3], skillion: city.forms[4], round: city.forms[5] },
     } : null,
     roads: roads ? { runs: roads.drawn, km: Math.round(roads.km), tris: roads.tris } : null,
+    field: airfield && airfield.site ? {
+      at: [Math.round(airfield.site.x), Math.round(airfield.site.z)],
+      hdgDeg: Math.round(airfield.site.yaw * 180 / Math.PI),
+      slopePc: +(airfield.site.slope * 100).toFixed(2),
+      bumpM: +airfield.site.worst.toFixed(2),
+      objects: airfield.objects.length, tris: Math.round(airfield.tris),
+    } : null,
     rail: rail ? { ways: rail.ways, km: +rail.km.toFixed(1), cars: rail.cars,
       lineKm: +rail.lineKm.toFixed(2), tris: Math.round(rail.tris) } : null,
     props: props ? props.counts : null,
@@ -1129,5 +1137,10 @@ window.__fr = {
   fire: () => fire,
   flight: () => flight,
   train: () => (rail ? rail.trainPos() : null),
+  /** Runway geometry, so a test can put the aeroplane on an actual approach. */
+  field: () => (airfield && airfield.site ? {
+    centre: airfield.centre, apron: airfield.apron,
+    thresholds: airfield.thresholds, axis: airfield.axis,
+  } : null),
   scene, camera, renderer,
 };

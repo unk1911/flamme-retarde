@@ -56,6 +56,46 @@ geodata pipeline.
   fires `pointerlockchange`, so pausing on lock loss stopped the game on the
   first frame of flight. Pause now triggers only on losing a lock that was held.
 
+### Added — somewhere to land
+
+- **Aerodrom Rokići, a fictitious airfield on real ground.** There is no airport
+  at Šibenik; the nearest hard runway is Zadar or Split. So this one is invented,
+  but not invented *anywhere*: the site is searched for at load. 2 700 candidate
+  centres × 6 headings, fitting a least-squares line through the height profile
+  of each 1 100 m strip and scoring by how far the worst sample sits off it —
+  because a runway may be *sloped* (real ones are, up to about 2%) but may not be
+  bumpy, and those are two different measurements. The shoulders are checked too,
+  since a ridge running down the strip is flat along the centreline and useless.
+  It picks (−2100, −1600), heading 090, 0.84% down, worst bump 45 cm over
+  1 100 m. Runway, taxiway, apron, terminal, two hangars, tower, fuel farm and
+  fence hang off wherever that turns out to be. Markings — centreline, threshold
+  bars, touchdown zone, edge lines, rubber deposits — are a shader on the uv the
+  ribbon already carries.
+- **Landing.** Land was uniformly fatal below 1.4 m; a runway is now the one
+  piece of it this aeroplane may touch, and only with the gear actually down,
+  wings level, arriving rather than falling, and inside the centreline. Then it
+  rolls: rolling resistance, wheel brakes on `SPACE` — the scoop has nothing to
+  do on a runway and it is one fewer key to learn at the only moment you need it
+  — and nosewheel steering on the rudder whose authority falls off with speed.
+  Verified headless: touchdown at 139 km/h off the reported threshold, brakes,
+  stopped after 321 m of roll.
+- The 30 apron objects — drums, crates, a bowser, tugs, three light aircraft —
+  each carry their own fuel, heat and wetness. Nothing reads them yet; they are
+  the ground mission's targets.
+
+### Fixed — the invisible runway
+
+- **The whole airfield was wound face-down.** Runway-local axes are a fixed 90°
+  rotation, so (+along) × (+across) comes out as −Y: taking the corners in the
+  obvious order gave every paved surface a downward normal, and front-face
+  culling threw the lot away. The runway was there the entire time and you could
+  land on it — you just could not see it, and the aeroplane appeared to be parked
+  on grass.
+- **Threshold headings were in the wrong convention.** The flight model's forward
+  vector is `(-sin yaw, -cos yaw)`, not a compass bearing. The first version
+  handed back a bearing, which places the aeroplane facing down the runway it is
+  supposed to be rolling up — it flew the approach backwards.
+
 ### Added — the bridge and the railway
 
 - **The Šibenik bridge, modelled in Blender.** A fifth landmark, and the first

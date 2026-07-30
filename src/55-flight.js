@@ -17,6 +17,12 @@ const FLIGHT = {
   pitchRate: 0.52,
   yawRate: 0.42,
   gearDownSpeed: 62,
+  // Where the wheels put the hull when it is standing on them, and how hard it
+  // stops and steers once it is.
+  gearHeight: 2.05,
+  rollDrag: 1.6,           // m/s per second, free rolling
+  brakeDecel: 5.4,         // added while the brakes are on
+  steerRate: 0.55,         // rad/s of nosewheel authority at walking pace
 
   // ── the assists ─────────────────────────────────────────────────────────
   // The stick is virtual: mouse motion pushes it, and it springs back on its
@@ -47,6 +53,8 @@ function buildFlight(plane, fire) {
     propRpm: 0,
     crashed: false,
     onWater: false,
+    onGround: false,       // wheels on a runway
+    groundSteer: 0,
     scoopValid: false,
     scoopReason: '',      // an i18n key, not a sentence — see 02-i18n.js
     aoa: 0,
@@ -303,10 +311,43 @@ function buildFlight(plane, fire) {
     state.speed = speed;
     p.onWater = overSea && agl < 2.2;
 
-    if (agl < 1.4) {
+    // A runway is the one piece of land this aeroplane is allowed to touch, and
+    // only with the gear actually down. `onRunway` answers in runway-local
+    // coordinates, including how far off the centreline you are, because
+    // arriving in the grass beside it is not a landing.
+    const rw = (!overSea && p.gearOut > 0.85 && typeof airfield !== 'undefined'
+      && airfield && airfield.onRunway) ? airfield.onRunway(p.pos.x, p.pos.z) : null;
+
+    // Cleared every frame and set again only by the runway branch below, so
+    // lifting off cannot leave the aeroplane believing it is still rolling.
+    p.onGround = false;
+    if (agl < 1.4 || (rw && p.pos.y - rw.y < FLIGHT.gearHeight + 0.15)) {
       const vv = p.vel.y;
       const wingsLevel = Math.abs(bank) < 0.35;
-      if (overSea && vv > -5.5 && wingsLevel && speed < 125) {
+      if (rw && vv > -4.2 && wingsLevel && speed < 108 && rw.off < 0.92) {
+        // Touchdown and roll. Anything with real vertical speed in it still
+        // gets felt — 56-alerts.js turns p.slam into a bang and a shake.
+        if (!p.onGround && vv < -1.0 && p.slam > vv) p.slam = vv;
+        p.onGround = true;
+        p.pos.y = rw.y + FLIGHT.gearHeight;
+        p.vel.y = 0;
+        // Rolling resistance, plus the wheel brakes. SPACE is the scoop in the
+        // air and has nothing to do on a runway, so on the ground it is the
+        // brake — one fewer key to learn at the only moment you need it.
+        const brake = (input.scoop ? FLIGHT.brakeDecel : 0)
+          + (input.thrDown ? FLIGHT.brakeDecel * 0.4 : 0);
+        const decel = FLIGHT.rollDrag + brake;
+        const sp = p.vel.length();
+        if (sp > 0.05) p.vel.multiplyScalar(Math.max(0, sp - decel * dt) / sp);
+        // Nosewheel steering: the rudder turns the aeroplane on the ground, and
+        // the authority falls off with speed the way a real one does.
+        const steer = p.rudder * FLIGHT.steerRate * sat(1 - sp / 55) * (sp > 0.4 ? 1 : 0);
+        const c = Math.cos(steer * dt), sn = Math.sin(steer * dt);
+        const vx = p.vel.x * c - p.vel.z * sn;
+        const vz = p.vel.x * sn + p.vel.z * c;
+        p.vel.x = vx; p.vel.z = vz;
+        p.groundSteer = steer;
+      } else if (overSea && vv > -5.5 && wingsLevel && speed < 125) {
         // A controlled touch on the water: skim, don't sink. Anything with
         // real vertical speed in it still wants to be *felt* — see
         // 56-alerts.js, which turns this into a bang and a shake.
