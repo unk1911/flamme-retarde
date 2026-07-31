@@ -187,6 +187,7 @@ const STRINGS = {
     'set.volume': 'volume',
     'set.off': 'off',
     'set.foot': 'M closes · Z levels · T autopilot · P pauses · 0 skips to Rokići',
+    'set.footGround': 'M closes · WASD walks · arrows turn · SHIFT runs · SPACE opens the branch · E climbs back in',
     'set.footTouch': 'tap SET to close',
 
     // pause
@@ -387,6 +388,7 @@ const STRINGS = {
     'set.volume': 'glasnoća',
     'set.off': 'isključeno',
     'set.foot': 'M zatvara · Z poravnava · T autopilot · P pauza · 0 skok na Rokiće',
+    'set.footGround': 'M zatvara · WASD hod · strelice okret · SHIFT trk · RAZMAK mlaz · E natrag u avion',
     'set.footTouch': 'dodirni POST za zatvaranje',
 
     'pause.eyebrow': 'vatra čeka',
@@ -586,6 +588,7 @@ const STRINGS = {
     'set.volume': 'volume',
     'set.off': 'désactivée',
     'set.foot': 'M ferme · Z met à plat · T pilote auto · P pause · 0 saut vers Rokići',
+    'set.footGround': 'M ferme · WASD marche · flèches tournent · MAJ course · ESPACE ouvre la lance · E remonte à bord',
     'set.footTouch': 'touchez RÉGL pour fermer',
 
     'pause.eyebrow': 'le feu attend',

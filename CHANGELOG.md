@@ -8,6 +8,62 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.4.0] — 2026-07-31
+
+### Changed — the people on the apron
+
+- **The ground crew are modelled rather than assembled out of boxes.**
+  `tools/blender/firefighter.py` builds an aerodrome firefighter in Blender —
+  tapered limbs lofted from stacked superelliptical rings, two-segment arms and
+  legs with real elbows and knees, balls on the joints so nothing opens up when
+  they bend, a helmet with a brim and a nape flap and ear defenders, a line
+  pack, gloves, rigger boots, and reflective banding you can pick out from
+  behind at dusk. 4 280 triangles, 38 KB in the payload, one copy of the
+  geometry shared by all seven of them.
+- **`.fr3d` gains a version 2** carrying a parts table — name, parent, pivot,
+  vertex and index ranges — so a model can be a joint tree instead of one rigid
+  lump. There is still no skinning and still no glTF: eleven rigid pieces is
+  what somebody in heavy kit reads as anyway, and the reader is thirty lines.
+- **The walk cycle was wrong, not just crude.** Limbs rotated about the
+  *forward* axis, so the whole crew scissored sideways instead of striding.
+  Rebuilt on the new skeleton: hips swinging with the knee flexion phased one
+  cosine behind them, counter-swinging arms with elbow bend, torso lean and
+  counter-rotation against the pelvis, a bob at each footfall, and a head that
+  holds still while the body moves under it and turns to look at what is on
+  fire. Separate gaits for a panic run, a stop-drop-and-roll that actually
+  rolls, and a one-knee-down recovery.
+
+### Fixed
+
+- **Strafing was mirrored.** The ground mode used the negative of the right
+  vector, so `D` went left and `A` went right. And the arrow keys now **turn**
+  rather than strafe — an arrow labelled left should point you left.
+- **The wingmen froze in mid-air the moment you got out.** Their update was
+  gated on the flying phase, so all three hung motionless in the sky for the
+  whole ground mission. The fire does not stop for you getting out.
+- **The crew stopped dead once they reached the muster** and stood there
+  mid-stride for the rest of the mission: `idle` had no behaviour and no
+  animation attached to it. They now mill about, back away from anything that
+  catches near them, and stand with a sway, a breath and a head that tracks the
+  fire. Two separate bugs had to go with it — a `Math.min` that cancelled every
+  rest the moment it began, and a re-plan condition that fired on the very next
+  frame after arriving anywhere.
+- **The water did not read.** It was never weak — a tracked jet puts somebody
+  out in four seconds — but nothing on screen said whether it was landing.
+  Now: steam off anything hot the moment the jet reaches it, kit that visibly
+  darkens and goes glossy as it soaks, flames knocked back in proportion, a
+  soak ring on the reticle that closes as the target wets, someone alight
+  slowing as the water piles on, and a jet that fans out down its length
+  instead of being a hairline ray you had to thread through a running person.
+- The reticle now traces whether or not the branch is open, so it can tell you
+  what you are pointed at *before* you spend four hundred litres finding out.
+- `solidMaterial` accepted custom uniforms but never declared them in GLSL, so
+  passing any was a silent link failure and a black object. It takes a `decl`
+  now.
+- The no-airfield stub was missing `hose()`, which the frame loop reads every
+  frame to mix the audio — a failed airfield search was a TypeError sixty times
+  a second.
+
 ## [1.3.0] — 2026-07-31
 
 ### Added — Rokići, on foot

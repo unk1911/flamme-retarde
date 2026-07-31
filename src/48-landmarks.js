@@ -85,6 +85,81 @@ function readFR3D(buf) {
   return g;
 }
 
+/**
+ * Decode one .fr3d **v2** blob: the same vertex data, plus a table of rigid
+ * parts and the joint each one hangs off.
+ *
+ * There is no skinning here and there is deliberately no glTF. Eleven rigid
+ * pieces on a tree of pivots is what somebody in heavy kit reads as anyway, and
+ * it means the runtime is this function and a loop that makes Groups, rather
+ * than an importer, a skeleton solver and a skinned-mesh draw path.
+ *
+ * Every part's vertices sit in its own contiguous block with its own
+ * indices rebased to zero, so each piece takes a *view* on the shared arrays
+ * and one figure costs one copy of the model however many joints it has.
+ */
+function readFR3DRig(buf) {
+  const dv = new DataView(buf);
+  const magic = String.fromCharCode(dv.getUint8(0), dv.getUint8(1),
+    dv.getUint8(2), dv.getUint8(3));
+  if (magic !== 'FR3D') throw new Error('not an fr3d blob: ' + magic);
+  const version = dv.getUint32(4, true);
+  if (version !== 2) throw new Error('fr3d rig needs version 2, got ' + version);
+  const nv = dv.getUint32(8, true);
+  const ni = dv.getUint32(12, true);
+
+  let o = 40;
+  const n = dv.getUint32(o, true); o += 4;
+  const dec = new TextDecoder();
+  const table = [];
+  for (let i = 0; i < n; i++) {
+    const len = dv.getUint16(o, true); o += 2;
+    const name = dec.decode(new Uint8Array(buf, o, len)); o += len;
+    const parent = dv.getInt32(o, true);
+    const pivot = [dv.getFloat32(o + 4, true), dv.getFloat32(o + 8, true),
+      dv.getFloat32(o + 12, true)];
+    table.push({
+      name, parent, pivot,
+      vStart: dv.getUint32(o + 16, true), vCount: dv.getUint32(o + 20, true),
+      iStart: dv.getUint32(o + 24, true), iCount: dv.getUint32(o + 28, true),
+    });
+    o += 32;
+  }
+
+  // The parts table is variable-length, so the float blocks land on whatever
+  // offset it happens to end on — and a Float32Array view has to be 4-byte
+  // aligned. One copy each, once, at load.
+  const pos = new Float32Array(buf.slice(o, o + nv * 12)); o += nv * 12;
+  const nrm = new Float32Array(buf.slice(o, o + nv * 12)); o += nv * 12;
+  const col = new Uint8Array(buf, o, nv * 3); o += nv * 3;
+  const idx = new Uint32Array(buf.slice(o, o + ni * 4));
+
+  for (const p of table) {
+    const g = new THREE.BufferGeometry();
+    const v0 = p.vStart * 3, v1 = (p.vStart + p.vCount) * 3;
+    g.setAttribute('position', new THREE.BufferAttribute(pos.subarray(v0, v1), 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(nrm.subarray(v0, v1), 3));
+    g.setAttribute('aVCol', new THREE.BufferAttribute(col.subarray(v0, v1), 3, true));
+    g.setIndex(new THREE.BufferAttribute(
+      idx.subarray(p.iStart, p.iStart + p.iCount), 1));
+    g.computeBoundingSphere();
+    p.geo = g;
+  }
+  return { parts: table, tris: ni / 3 };
+}
+
+/** Pull one rigged model out of the inlined payload. Null if it is not there. */
+async function loadRig(key) {
+  const b64 = PAYLOAD[key];
+  if (!b64) { console.warn('no payload for rig', key); return null; }
+  try {
+    return readFR3DRig(await inflateBinary(b64));
+  } catch (e) {
+    console.warn('rig failed:', key, e.message);
+    return null;
+  }
+}
+
 async function buildLandmarks(scene) {
   const root = new THREE.Group();
   scene.add(root);

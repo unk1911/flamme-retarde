@@ -189,8 +189,20 @@ under the middle of it is forty metres of seabed.
 All five are baked to a small binary blob (position, normal, colour, index) so there is
 no glTF parser in the bundle. `tools/blender/landmarks.py` builds them
 procedurally with bmesh and leaves `build/landmarks.blend` behind for hand
-editing. Everything else — the aircraft, the town, the sea, the sky, the fire,
-the water — is generated in code.
+editing.
+
+**The sixth Blender model is a person.** `tools/blender/firefighter.py` builds
+the aerodrome ground crew you go in after on foot: limbs lofted from stacked
+superelliptical rings so a thigh tapers to a knee, two-segment arms and legs
+with balls on the joints, a helmet with a brim and a nape flap, a line pack,
+gloves and reflective banding. It exports a **version 2** blob that adds a
+parts table — name, parent, pivot, vertex and index ranges — so the runtime can
+hang it off a tree of eleven joints and animate it. There is still no skinning
+solver and still no glTF: somebody in heavy kit reads as rigid pieces anyway,
+and the reader is thirty lines.
+
+Everything else — the aircraft, the town, the sea, the sky, the fire, the
+water — is generated in code.
 
 **The sea** is a camera-centred grid with a radial exponential warp, so the
 triangles are dense at your feet and kilometres wide at the horizon, and the
@@ -253,10 +265,11 @@ python3 tools/fetch_osm.py     # Overpass: coastline, landcover, buildings, road
 python3 tools/bake.py          # -> build/payload
 ```
 
-To rebuild the landmarks (needs Blender 4.x on `PATH`):
+To rebuild the Blender models (needs Blender 4.x on `PATH`):
 
 ```sh
-blender --background --python tools/blender/landmarks.py
+blender --background --python tools/blender/landmarks.py    # the five buildings
+blender --background --python tools/blender/firefighter.py  # the ground crew
 ```
 
 To regenerate the intro panels (needs `GEMINI_API_KEY` and the reference

@@ -52,7 +52,15 @@ void main(){
 }
 `;
 
-function solidFragment(body = '') {
+/**
+ * @param body  GLSL run after the base colour is chosen, before it is lit
+ * @param decl  extra `uniform` declarations, for anything passed in
+ *              `opts.uniforms`. These have to be declared as well as supplied:
+ *              three.js will happily hand a ShaderMaterial a uniform the shader
+ *              never mentions, and the only symptom is a link failure and a
+ *              black object.
+ */
+function solidFragment(body = '', decl = '') {
   return /* glsl */ `
 precision highp float;
 
@@ -72,6 +80,8 @@ uniform vec3 uAmbSky;
 uniform vec3 uAmbGround;
 uniform float uAmbI;
 uniform float uNight;
+
+${decl}
 
 ${GLSL_NOISE}
 ${GLSL_TERRAIN}
@@ -113,6 +123,7 @@ void main(){
 /**
  * @param color   base colour
  * @param opts    spec / specPower / emissive / body (extra GLSL) / instanced
+ *                / uniforms + decl (extra uniforms, supplied *and* declared)
  */
 function solidMaterial(color, opts = {}) {
   const m = new THREE.ShaderMaterial({
@@ -129,7 +140,7 @@ function solidMaterial(color, opts = {}) {
       ...(opts.uniforms || {}),
     },
     vertexShader: SOLID_VERT,
-    fragmentShader: solidFragment(opts.body || ''),
+    fragmentShader: solidFragment(opts.body || '', opts.decl || ''),
     side: opts.side ?? THREE.FrontSide,
     transparent: !!opts.transparent,
     depthWrite: opts.depthWrite !== false,

@@ -394,6 +394,18 @@ html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
 #gh-reticle.crew path, #gh-reticle.crew circle { stroke: var(--ember-hi); }
 #gh-reticle.crew { opacity: 1; }
 
+/* The soak ring: water going in, drawn from the top clockwise. Listed after the
+   colour rules on purpose — it has the same specificity as `.crew circle` and
+   has to win, because a ring that turns ember stops reading as water. */
+#gh-reticle circle.soak {
+  stroke: var(--sea); stroke-width: 2.8; fill: none; opacity: 0;
+  stroke-linecap: round;
+  stroke-dasharray: 94.25; stroke-dashoffset: 94.25;
+  transform: rotate(-90deg); transform-origin: 0 0;
+  transition: stroke-dashoffset .12s linear, opacity .18s linear;
+}
+#gh-reticle.soaking circle.soak { opacity: .9; }
+
 #gh-hint {
   position: absolute; left: 50%; bottom: 8.5rem; transform: translateX(-50%);
   font-size: .62rem; letter-spacing: .2em; text-transform: uppercase;

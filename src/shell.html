@@ -122,6 +122,9 @@
   <svg id="gh-reticle" viewBox="-40 -40 80 80" aria-hidden="true">
     <path d="M-24 0 h11 M24 0 h-11 M0 -24 v11 M0 24 v-11" />
     <circle cx="0" cy="0" r="2.6" />
+    <!-- How wet whatever is under the crosshair already is. Closes as it
+         soaks, and is the only way to tell that the jet is landing. -->
+    <circle class="soak" id="gh-soak" cx="0" cy="0" r="15" />
   </svg>
 
   <div id="gh-hint"></div>

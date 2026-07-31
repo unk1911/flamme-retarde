@@ -378,7 +378,11 @@ function paintDeviceText() {
   $('hint').innerHTML = TK('veil.hint', 'veil.hintTouch');
   // The settings panel is the only place the build stamp is still reachable
   // once the title screen is gone, which is when you most want to check it.
-  $('panel-foot').textContent = TK('set.foot', 'set.footTouch') + ' · v' + BUILD.v;
+  // On foot, every control the flight version names is either meaningless or
+  // attached to an aeroplane you are standing next to.
+  $('panel-foot').textContent = (state.phase === 'ground'
+    ? TK('set.footGround', 'set.footTouch')
+    : TK('set.foot', 'set.footTouch')) + ' · v' + BUILD.v;
   $('pause').querySelector('.hint').innerHTML = TK('pause.hint', 'pause.hintTouch');
   if (state.paused) paintPauseState();
 }
@@ -450,7 +454,7 @@ async function boot() {
   fire = buildFire(scene);
   // After the fire, because the ground mission is downstream of it in every
   // sense: it does not exist until the front is close enough to throw embers.
-  ground = buildGround(scene, airfield);
+  ground = await buildGround(scene, airfield);
 
   await step(85, 'load.maquis');
   trees = buildTrees(scene, fire);
@@ -708,6 +712,7 @@ function toggleGround() {
       // whips the view across the apron.
       camPos.copy(camera.position);
       camAim.copy(flight.p.pos);
+      paintDeviceText();
       toast(T('toast.boarded'));
     }
     return;
@@ -717,6 +722,9 @@ function toggleGround() {
     $('ground-hud').hidden = false;
     if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = false; }
     if (!IS_TOUCH) grabPointer();
+    // The settings panel names a different set of controls on foot, and the
+    // phase has only just changed.
+    paintDeviceText();
     toast(T('toast.onFoot'));
   }
 }
@@ -923,6 +931,10 @@ let scoredLitres = 0, lastBurning = 0, spotWarned = 0;
 // holds water for a minute cannot hold it with a key.
 let debugJet = false;
 let ghAcc = 0;
+// Circumference of the soak ring in the reticle, r = 15 in its own viewBox.
+// Kept next to the code that sets the dash offset rather than only in the CSS,
+// because the two have to agree exactly or the ring never quite closes.
+const RETICLE_ARC = 2 * Math.PI * 15;
 
 /**
  * The ground HUD. Four numbers and a hint, because on foot you are looking at
@@ -958,6 +970,15 @@ function updateGroundHUD(dt) {
   const ret = $('gh-reticle').classList;
   ret.toggle('crew', g.aimKind === 'crew');
   ret.toggle('obj', g.aimKind === 'obj');
+  // How wet the thing under the crosshair already is, as a ring that closes.
+  // Without it the branch is a hose you point at a running person with no way
+  // of knowing whether any of it is landing until they either stop or go down,
+  // which is forty seconds of doing something and being told nothing.
+  ret.toggle('soaking', g.aimSoak >= 0);
+  if (g.aimSoak >= 0) {
+    $('gh-soak').style.strokeDashoffset =
+      (RETICLE_ARC * (1 - clamp(g.aimSoak, 0, 1))).toFixed(1);
+  }
 }
 
 function updateMission(dt) {
@@ -1126,8 +1147,12 @@ function frame() {
   sea.update(camera);
   fire.update(dt);
   ground.update(dt);
-  // The other three keep working while your wreck is still settling.
-  if (state.phase === 'fly' || state.phase === 'crashing') wingmen.update(dt);
+  // The other three keep working while your wreck is still settling — and while
+  // you are on foot. Gating this on the flying phase left all three of them
+  // hanging motionless in the sky for the whole ground mission, which is both
+  // the most obvious possible bug to see from the apron and a lie about what
+  // they are doing: the fire does not stop for you getting out.
+  if (state.phase !== 'intro') wingmen.update(dt);
   if (state.phase === 'intro') shadow.update(camera.position);
   waterfx.update(dt);
 
@@ -1326,6 +1351,10 @@ window.__fr = {
     crew: () => ground.crew.map((c) => ({
       mode: c.mode, burn: +c.burn.toFixed(2), wet: +c.wet.toFixed(2),
       at: [Math.round(c.x), Math.round(c.z)],
+      // What they are doing and why, which is the only way to tell a figure
+      // standing about on purpose from one that has stopped being updated.
+      spd: +(c.speed || 0).toFixed(2), wait: +c.wait.toFixed(1),
+      dest: c.dest ? c.dest.map(Math.round) : null,
     })),
     objects: () => airfield.objects.map((o) => ({
       kind: o.kind, burning: +o.burning.toFixed(2), heat: +o.heat.toFixed(2),
