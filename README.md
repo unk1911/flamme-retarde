@@ -66,14 +66,24 @@ Once the front is within spotting range of the airfield, Rokići starts taking
 embers and calls it in. Put the gear down, land on the runway, taxi to the apron
 and stop, and the game offers you the door.
 
+The aerodrome buildings are solid — the terminal, both hangars, the tower and
+the fuel farm, tested against the nose, the tail and both wingtips. Under
+22 m/s you scrape one and stop; above it you have hit a building. Nothing else
+in the world is solid: the town is thirteen thousand extruded OSM footprints
+whose heights were guessed from their outlines, and making those solid would
+turn every low pass over Šibenik into a crash on a building that was never
+really there.
+
 What is on the other side of it is a different game: a branch instead of six
 tonnes, a jet that reaches twenty metres instead of a drop that covers two
 hundred, four hundred litres at a time instead of six thousand, and a walk back
 to the aeroplane every forty-three seconds to refill off the tank. What burns is
 drums, crates, a fuel bowser, tugs, three light aircraft — and some of the ground
 crew, who are alight and running, which is what people do and is the worst
-possible thing to do. You soak them and they go down and they are safe. Be slow
-and they collapse; be slower and you lose them.
+possible thing to do. You soak them and they go down and they are safe — and
+then they get their breath back, stand up, turn round to whoever put them out
+with a hand raised, and jog off to the muster point. Be slow and they collapse;
+be slower and you lose them.
 
 None of it is scripted. Leave the airfield alone for three minutes and five
 objects and three of the seven crew are gone, whether or not you were ever
