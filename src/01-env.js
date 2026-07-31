@@ -32,4 +32,8 @@ if (IS_TOUCH) document.documentElement.classList.add('touch');
  * input loop in 90-app.js — declared up here so neither has to care which of
  * them the build concatenates first.
  */
-const TOUCH = { scoop: false, drop: false, level: false };
+// `g*` are the ground mode's: a walk vector, a run latch and the branch.
+const TOUCH = {
+  scoop: false, drop: false, level: false,
+  gx: 0, gy: 0, grun: false, gjet: false,
+};

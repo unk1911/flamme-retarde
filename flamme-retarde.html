@@ -10,8 +10,8 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.2.0">
-<meta name="build-date" content="2026-07-30">
+<meta name="version" content="1.3.0">
+<meta name="build-date" content="2026-07-31">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
    anything to do with the aircraft and the sea, and the fire (amber → ember red)
@@ -334,6 +334,87 @@ button {
 #reticle.armed path, #reticle.armed circle { stroke: var(--ember-hi); }
 #reticle.armed { opacity: .95; }
 
+/* ── on foot ────────────────────────────────────────────────────────────────
+   The ground HUD borrows the flight HUD's typography and none of its layout.
+   Standing on an apron you are looking at the world, so everything here sits
+   at the edges and the middle is left alone apart from the reticle. */
+
+#ground-prompt {
+  position: absolute; left: 50%; bottom: 22%; transform: translateX(-50%);
+  font-family: var(--mono); font-size: .72rem; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--salt); text-align: center;
+  background: rgba(7, 11, 14, .55); padding: .5rem 1.1rem; border-radius: 3px;
+  border: 1px solid rgba(79, 210, 232, .3);
+  pointer-events: auto; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+#ground-prompt b { color: var(--sea); font-weight: 400; }
+
+#ground-hud {
+  position: fixed; inset: 0; z-index: 40; pointer-events: none;
+  font-family: var(--mono); color: var(--salt);
+}
+#gh-top {
+  position: absolute; top: 1.1rem; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 2.4rem;
+}
+#gh-top .gauge { text-align: center; }
+#gh-top .gauge b {
+  display: block; font-size: 1.5rem; font-weight: 300; letter-spacing: .02em;
+}
+#gh-top .gauge span {
+  display: block; font-size: .5rem; letter-spacing: .22em;
+  text-transform: uppercase; color: #7f949c; margin-top: .1rem;
+}
+/* The one number that is a person rather than a thing. */
+#gh-top .gauge.urgent b { color: var(--ember-hi); }
+
+#gh-pack {
+  position: absolute; left: 1.6rem; bottom: 1.6rem; width: 13rem;
+}
+/* On a phone the bottom left corner belongs to the buttons, so the pack sits
+   above them rather than underneath them. */
+html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
+#gh-pack .gh-track {
+  height: 8px; background: rgba(255, 255, 255, .10);
+  border: 1px solid rgba(255, 255, 255, .16); border-radius: 2px; overflow: hidden;
+}
+#gh-pack .gh-track i {
+  display: block; height: 100%; width: 100%;
+  background: linear-gradient(90deg, var(--sea-dim), var(--sea));
+  transition: width .12s linear;
+}
+#gh-pack.low .gh-track i { background: linear-gradient(90deg, #7a3a1c, var(--ember-hi)); }
+#gh-pack .gh-read {
+  display: flex; align-items: baseline; gap: .4rem; margin-top: .35rem;
+}
+#gh-pack .gh-read b { font-size: 1.15rem; font-weight: 300; }
+#gh-pack .gh-read span,
+#gh-pack small {
+  font-size: .5rem; letter-spacing: .2em; text-transform: uppercase; color: #7f949c;
+}
+#gh-pack small { display: block; margin-top: .15rem; }
+
+#gh-reticle {
+  position: absolute; left: 50%; top: 50%; width: 84px; height: 84px;
+  transform: translate(-50%, -50%); opacity: .45;
+}
+#gh-reticle path, #gh-reticle circle {
+  stroke: var(--salt); stroke-width: 1.4; fill: none;
+}
+/* What the jet would land on if you opened it now: a thing, or a person. */
+#gh-reticle.obj path, #gh-reticle.obj circle { stroke: var(--sea); }
+#gh-reticle.obj { opacity: .85; }
+#gh-reticle.crew path, #gh-reticle.crew circle { stroke: var(--ember-hi); }
+#gh-reticle.crew { opacity: 1; }
+
+#gh-hint {
+  position: absolute; left: 50%; bottom: 8.5rem; transform: translateX(-50%);
+  font-size: .62rem; letter-spacing: .2em; text-transform: uppercase;
+  color: #9fb2b9; text-align: center;
+}
+#gh-hint.urgent { color: var(--ember-hi); }
+
 /* the virtual stick ---------------------------------------------------------
    Deltas from a locked pointer have no home of their own, so the stick has to
    be drawn or you are flying blind about your own inputs. */
@@ -625,14 +706,14 @@ button {
 
 /* ─────────────────────────────────────────────────── touch flight controls ── */
 
-#touch {
+#touch, #gtouch {
   position: fixed; inset: 0; z-index: 45; pointer-events: none;
   font-family: var(--mono); touch-action: none;
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
            env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
-#touch[hidden] { display: none; }
-#touch button {
+#touch[hidden], #gtouch[hidden] { display: none; }
+#touch button, #gtouch button {
   pointer-events: auto; touch-action: none;
   -webkit-tap-highlight-color: transparent;
   font-family: var(--mono); letter-spacing: .16em; text-transform: uppercase;
@@ -642,12 +723,12 @@ button {
   transition: background .1s linear, color .1s linear, border-color .1s linear,
               transform .1s ease;
 }
-#touch button.on { transform: scale(.94); }
+#touch button.on, #gtouch button.on { transform: scale(.94); }
 
 /* The floating stick. It has no home of its own — it appears centred on
    wherever the thumb landed, which is the only arrangement that works when
    you cannot see your own hand. */
-#flypad {
+#flypad, #walkpad {
   --pad: min(25vmin, 168px);
   position: absolute; left: 0; top: 0;
   width: var(--pad); height: var(--pad);
@@ -657,12 +738,12 @@ button {
     rgba(8, 16, 20, .12) 62%, rgba(8, 16, 20, 0) 100%);
   opacity: 0; transition: opacity .16s ease; pointer-events: none;
 }
-#flypad.on { opacity: 1; }
-#flypad::after {
+#flypad.on, #walkpad.on { opacity: 1; }
+#flypad::after, #walkpad::after {
   content: ''; position: absolute; inset: 38%;
   border: 1px solid var(--edge); border-radius: 50%; opacity: .5;
 }
-#flyknob {
+#flyknob, #walkknob {
   position: absolute; left: 50%; top: 50%;
   width: 30%; height: 30%; margin: -15% 0 0 -15%;
   border-radius: 50%; background: rgba(79, 210, 232, .30);
@@ -697,11 +778,11 @@ button {
   text-transform: uppercase; color: #6f8189;
 }
 
-#tbig {
+#tbig, #gbig {
   position: absolute; right: 3.6rem; bottom: .8rem;
   display: flex; gap: .6rem;
 }
-#tbig button {
+#tbig button, #gbig button {
   width: 4.6rem; height: 4.6rem; font-size: .58rem; padding: 0;
 }
 #t-scoop.on { background: rgba(79, 210, 232, .3); border-color: var(--sea); color: var(--sea); }
@@ -711,12 +792,12 @@ button {
 #t-drop.armed { border-color: var(--ember); color: var(--ember-hi); }
 #t-scoop.armed { border-color: var(--sea); color: var(--sea); }
 
-#tmini {
+#tmini, #gmini {
   position: absolute; left: .8rem; bottom: .8rem;
   display: flex; gap: .45rem;
 }
-#tmini button { padding: .55rem .7rem; font-size: .52rem; }
-#tmini button.on { background: rgba(255, 208, 138, .26); border-color: var(--ember-hi);
+#tmini button, #gmini button { padding: .55rem .7rem; font-size: .52rem; }
+#tmini button.on, #gmini button.on { background: rgba(255, 208, 138, .26); border-color: var(--ember-hi);
                    color: var(--ember-hi); }
 
 /* ───────────────────────────────────────────────────── the language picker ── */
@@ -865,8 +946,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.2.0, built 2026-07-30">
-    <b>v1.2.0</b><i>·</i><span>2026-07-30</span>
+  <div id="build" title="Flamme Retardé 1.3.0, built 2026-07-31">
+    <b>v1.3.0</b><i>·</i><span>2026-07-31</span>
   </div>
   <footer class="credit">
     <span>eDeliverables (2026)</span><i>·</i>
@@ -932,6 +1013,32 @@ html.touch .row input[type=range] { height: 22px; }
   <div id="radio"></div>
   <div id="wingmen"></div>
   <div id="compass"><div id="compass-tape"></div></div>
+  <!-- Only ever shown when getting out would actually work. -->
+  <div id="ground-prompt" hidden></div>
+</div>
+
+<!-- ───────────────────────────────────────────── on foot, at the airfield ── -->
+<!-- A separate HUD rather than a reconfigured one: nothing on the flight panel
+     means anything when you are standing on the apron with a branch. -->
+<div id="ground-hud" hidden>
+  <div id="gh-top">
+    <div class="gauge"><b id="gh-alight">0</b><span data-i18n="ground.alight">alight</span></div>
+    <div class="gauge urgent"><b id="gh-crew">0</b><span data-i18n="ground.crew">crew alight</span></div>
+    <div class="gauge"><b id="gh-saved">0</b><span data-i18n="ground.saved">brought out</span></div>
+  </div>
+
+  <div id="gh-pack">
+    <div class="gh-track"><i id="gh-fill"></i></div>
+    <div class="gh-read"><b id="gh-litres">400</b><span data-i18n="hud.litres">litres</span></div>
+    <small id="gh-reserve"></small>
+  </div>
+
+  <svg id="gh-reticle" viewBox="-40 -40 80 80" aria-hidden="true">
+    <path d="M-24 0 h11 M24 0 h-11 M0 -24 v11 M0 24 v-11" />
+    <circle cx="0" cy="0" r="2.6" />
+  </svg>
+
+  <div id="gh-hint"></div>
 </div>
 
 <!-- ───────────────────────────────────────────────── touch flight controls ── -->
@@ -955,6 +1062,23 @@ html.touch .row input[type=range] { height: 22px; }
     <button id="t-cam" data-i18n="touch.cam">CAM</button>
     <button id="t-set" data-i18n="touch.set">SET</button>
     <button id="t-pause" data-i18n="touch.pause">II</button>
+  </div>
+</div>
+
+<!-- ───────────────────────────────────────────── touch, on foot ── -->
+<!-- Same halves as in the air and the opposite meaning in both: the left thumb
+     walks instead of flying, and the right half of the screen is a head rather
+     than a set of buttons, because there is no pointer to lock on a phone. -->
+<div id="gtouch" hidden>
+  <div id="walkpad"><i id="walkknob"></i></div>
+  <div id="gbig">
+    <button id="t-jet" data-i18n="touch.jet">WATER</button>
+  </div>
+  <div id="gmini">
+    <button id="t-run" data-i18n="touch.run">RUN</button>
+    <button id="t-in" data-i18n="touch.in">IN</button>
+    <button id="t-gset" data-i18n="touch.set">SET</button>
+    <button id="t-gpause" data-i18n="touch.pause">II</button>
   </div>
 </div>
 
@@ -1019,7 +1143,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.2.0", date: "2026-07-30" };</script>
+<script>const BUILD = { v: "1.3.0", date: "2026-07-31" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -1595,7 +1719,11 @@ if (IS_TOUCH) document.documentElement.classList.add('touch');
  * input loop in 90-app.js — declared up here so neither has to care which of
  * them the build concatenates first.
  */
-const TOUCH = { scoop: false, drop: false, level: false };
+// `g*` are the ground mode's: a walk vector, a run latch and the branch.
+const TOUCH = {
+  scoop: false, drop: false, level: false,
+  gx: 0, gy: 0, grun: false, gjet: false,
+};
 
 // ==== 02-i18n.js ================================================
 // -----------------------------------------------------------------------------
@@ -1721,6 +1849,7 @@ const STRINGS = {
     'call.3': 'WING 3',
     'call.4': 'WING 4',
     'call.lookout': 'LOOKOUT',
+    'call.rokici': 'ROKIĆI',
 
     // radio
     'radio.start': 'The bomblet went off above Jadrija. Let\'s go.',
@@ -1728,6 +1857,30 @@ const STRINGS = {
     'radio.dropping': 'dropping!',
     'radio.spot': 'A spark has jumped the channel — it\'s alight by the town!',
     'toast.spot': 'spot fire near the old town',
+
+    // the airfield, and the ground rescue
+    'radio.rokiciSpot': 'Embers coming down on us here. We have no crew and no pump.',
+    'radio.rokiciBurning': 'It\'s on the apron. We have people alight — anyone, please.',
+    'radio.crewAlight': 'He\'s burning! Somebody get him down!',
+    'radio.crewSafe': 'He\'s out. He\'s out. Thank you.',
+    'radio.crewLost': 'We\'ve lost him. God.',
+    'toast.rokici': 'Rokići taking embers',
+    'toast.crewSafe': 'crew member out',
+    'toast.onFoot': 'on foot — hold the branch open',
+    'toast.boarded': 'back aboard',
+
+    'ground.alight': 'alight',
+    'ground.crew': 'crew burning',
+    'ground.saved': 'brought out',
+    'ground.reserve': '{n} l left in the aircraft',
+    'ground.filling': 'filling from the aircraft',
+    'ground.dry': 'pump dry — walk back to the aircraft',
+    'ground.dryTouch': 'pump dry — go back to the aircraft',
+    'ground.empty': 'the aircraft is dry too',
+    'ground.board': 'E to climb back in',
+    'ground.boardTouch': 'IN to climb back in',
+    'ground.disembark': '<b>E</b> to get out and fight it on foot',
+    'ground.disembarkTouch': '<b>OUT</b> to fight it on foot',
 
     // end screen
     'over.crashed': 'You went in.',
@@ -1744,6 +1897,8 @@ const STRINGS = {
     'over.onTarget': 'on target',
     'over.burnt': 'burnt',
     'over.intact': 'city intact',
+    'over.rescued': 'crew brought out',
+    'over.apron': 'apron saved',
     'over.score': 'score',
     'over.again': 'Fly again',
 
@@ -1770,6 +1925,10 @@ const STRINGS = {
     'pause.hintTouch': 'tap anywhere to go back',
 
     // touch controls
+    'touch.jet': 'WATER',
+    'touch.run': 'RUN',
+    'touch.in': 'IN',
+    'touch.out': 'OUT',
     'touch.scoop': 'SCOOP',
     'touch.drop': 'DROP',
     'touch.thr': 'thr',
@@ -1894,12 +2053,36 @@ const STRINGS = {
     'call.3': 'KRILO 3',
     'call.4': 'KRILO 4',
     'call.lookout': 'OSMATRAČ',
+    'call.rokici': 'ROKIĆI',
 
     'radio.start': 'Bomba je puknula iznad Jadrije. Idemo.',
     'radio.scooping': 'zahvaćam vodu.',
     'radio.dropping': 'izbacujem!',
     'radio.spot': 'Iskra je preskočila kanal — gori kod grada!',
     'toast.spot': 'novo žarište kraj starog grada',
+
+    'radio.rokiciSpot': 'Padaju nam žeravice. Nemamo posade ni pumpe.',
+    'radio.rokiciBurning': 'Gori na platformi. Ljudi gore — bilo tko, molim vas.',
+    'radio.crewAlight': 'Gori! Netko neka ga obori!',
+    'radio.crewSafe': 'Ugašen je. Ugašen je. Hvala vam.',
+    'radio.crewLost': 'Izgubili smo ga. Bože.',
+    'toast.rokici': 'na Rokiće padaju žeravice',
+    'toast.crewSafe': 'čovjek je ugašen',
+    'toast.onFoot': 'pješice — drži mlaznicu otvorenu',
+    'toast.boarded': 'natrag u avionu',
+
+    'ground.alight': 'gori',
+    'ground.crew': 'ljudi gore',
+    'ground.saved': 'izvučeno',
+    'ground.reserve': 'još {n} l u avionu',
+    'ground.filling': 'punim iz aviona',
+    'ground.dry': 'pumpa je prazna — vrati se do aviona',
+    'ground.dryTouch': 'pumpa je prazna — vrati se do aviona',
+    'ground.empty': 'i avion je prazan',
+    'ground.board': 'E za povratak u avion',
+    'ground.boardTouch': 'U za povratak u avion',
+    'ground.disembark': '<b>E</b> za izlazak i gašenje pješice',
+    'ground.disembarkTouch': '<b>VAN</b> za gašenje pješice',
 
     'over.crashed': 'Pao si.',
     'over.won': 'Vatra je ugašena.',
@@ -1914,6 +2097,8 @@ const STRINGS = {
     'over.onTarget': 'na cilju',
     'over.burnt': 'izgorjelo',
     'over.intact': 'grad očuvan',
+    'over.rescued': 'izvučeno ljudi',
+    'over.apron': 'spašeno na platformi',
     'over.score': 'bodovi',
     'over.again': 'Leti opet',
 
@@ -1937,6 +2122,10 @@ const STRINGS = {
     'pause.hint': '<kbd>P</kbd> ili <kbd>Esc</kbd> za povratak',
     'pause.hintTouch': 'dodirni bilo gdje za povratak',
 
+    'touch.jet': 'VODA',
+    'touch.run': 'TRČI',
+    'touch.in': 'U AVION',
+    'touch.out': 'VAN',
     'touch.scoop': 'ZAHVAT',
     'touch.drop': 'IZBACI',
     'touch.thr': 'gas',
@@ -2061,12 +2250,36 @@ const STRINGS = {
     'call.3': 'AILE 3',
     'call.4': 'AILE 4',
     'call.lookout': 'GUETTEUR',
+    'call.rokici': 'ROKIĆI',
 
     'radio.start': 'La bombette a sauté au-dessus de Jadrija. On y va.',
     'radio.scooping': 'je fais le plein.',
     'radio.dropping': 'je largue !',
     'radio.spot': 'Une braise a franchi le chenal — ça brûle près de la ville !',
     'toast.spot': 'départ de feu près de la vieille ville',
+
+    'radio.rokiciSpot': 'Des braises nous tombent dessus. Ni équipe ni pompe ici.',
+    'radio.rokiciBurning': 'Ça brûle sur l\'aire. Des hommes ont pris feu — n\'importe qui, pitié.',
+    'radio.crewAlight': 'Il brûle ! Que quelqu\'un le mette à terre !',
+    'radio.crewSafe': 'Il est éteint. Il est éteint. Merci.',
+    'radio.crewLost': 'On l\'a perdu. Mon Dieu.',
+    'toast.rokici': 'des braises tombent sur Rokići',
+    'toast.crewSafe': 'un homme éteint',
+    'toast.onFoot': 'à pied — garde la lance ouverte',
+    'toast.boarded': 'de retour à bord',
+
+    'ground.alight': 'en feu',
+    'ground.crew': 'hommes en feu',
+    'ground.saved': 'sortis',
+    'ground.reserve': 'encore {n} l dans l\'avion',
+    'ground.filling': 'remplissage depuis l\'avion',
+    'ground.dry': 'pompe à sec — retourne à l\'avion',
+    'ground.dryTouch': 'pompe à sec — retourne à l\'avion',
+    'ground.empty': 'l\'avion aussi est à sec',
+    'ground.board': 'E pour remonter à bord',
+    'ground.boardTouch': 'BORD pour remonter',
+    'ground.disembark': '<b>E</b> pour descendre et lutter à pied',
+    'ground.disembarkTouch': '<b>PIED</b> pour lutter à pied',
 
     'over.crashed': 'Vous êtes tombé.',
     'over.won': 'Le feu est éteint.',
@@ -2082,6 +2295,8 @@ const STRINGS = {
     'over.onTarget': 'au but',
     'over.burnt': 'brûlé',
     'over.intact': 'ville intacte',
+    'over.rescued': 'hommes sortis',
+    'over.apron': 'aire sauvée',
     'over.score': 'score',
     'over.again': 'Revoler',
 
@@ -2105,6 +2320,10 @@ const STRINGS = {
     'pause.hint': '<kbd>P</kbd> ou <kbd>Échap</kbd> pour revenir',
     'pause.hintTouch': 'touchez n’importe où pour revenir',
 
+    'touch.jet': 'EAU',
+    'touch.run': 'COURIR',
+    'touch.in': 'BORD',
+    'touch.out': 'PIED',
     'touch.scoop': 'ÉCOPER',
     'touch.drop': 'LARGUER',
     'touch.thr': 'gaz',
@@ -4138,7 +4357,7 @@ function propBuilder() {
     g.setAttribute('aVCol', new THREE.Float32BufferAttribute(col, 3));
     return g;
   };
-  return { tri, quad, box, geo };
+  return { tri, quad, box, geo, count: () => pos.length / 3 };
 }
 
 /** Local frame: +X forward, +Y up, +Z to starboard. About six metres long. */
@@ -4671,7 +4890,33 @@ function buildFlames(scene, max) {
     aParam.addUpdateRange(0, c * 4); aParam.needsUpdate = true;
   }
 
-  return { mesh, mat, update };
+  /**
+   * Drive the same pool from an explicit list rather than from the automaton.
+   * A burning drum is not a fifty-metre cell and has no business pretending to
+   * be one: the ground mode needs flames a metre and a half tall standing on a
+   * specific object, and this is the same shader at a different scale.
+   * Each item is `{x, y, z, size, v}`.
+   */
+  function paint(list) {
+    let c = 0;
+    for (const it of list) {
+      if (c >= max) break;
+      const s = seeds[c];
+      aPos.array[c * 3] = it.x;
+      aPos.array[c * 3 + 1] = it.y;
+      aPos.array[c * 3 + 2] = it.z;
+      aParam.array[c * 4] = it.size * (0.78 + s * 0.5);
+      aParam.array[c * 4 + 1] = s * 100;
+      aParam.array[c * 4 + 2] = it.v;
+      aParam.array[c * 4 + 3] = s * 62.8;
+      c++;
+    }
+    geo.instanceCount = c;
+    aPos.addUpdateRange(0, c * 3); aPos.needsUpdate = true;
+    aParam.addUpdateRange(0, c * 4); aParam.needsUpdate = true;
+  }
+
+  return { mesh, mat, update, paint };
 }
 
 // ------------------------------------------------------------------- smoke ---
@@ -5204,6 +5449,14 @@ function buildFire(scene) {
     const jn = world.grid;
     const j = world.fuelJitter[Math.round(jitterIdx.gz) * jn + Math.round(jitterIdx.gx)] / 255;
     fuel[i] = FUEL[c] * (0.72 + 0.56 * j);
+    // The aerodrome is invented; the land-cover raster underneath it still says
+    // scrub, and a cell is fifty metres square, so without this the fire walks
+    // straight across eleven hundred metres of asphalt as if it were maquis —
+    // which put the entire ground crew alight inside a minute and made the
+    // rescue unwinnable for a reason nobody could see. A runway is a firebreak.
+    // That is half of what a runway *is*.
+    if (typeof airfield !== 'undefined' && airfield && airfield.onPaved
+      && airfield.onPaved(x, z) != null) fuel[i] = 0;
     fuel0[i] = fuel[i];
     groundY[i] = groundAt(x, z);
     totalFuel += fuel[i];
@@ -5430,6 +5683,55 @@ function buildFire(scene) {
     return { onTarget, knocked };
   }
 
+  /**
+   * A handline, not an air drop: a few metres of ground, and about three times
+   * the effect per litre.
+   *
+   * That multiplier is not a favour to the player. Six tonnes released at ninety
+   * metres over a Dalmatian afternoon loses a large fraction to evaporation,
+   * drift and canopy interception before any of it reaches the fuel — which is
+   * the entire reason a fire is not actually put out from the air. Aircraft buy
+   * time; somebody standing in it with a branch is what puts it out.
+   */
+  function hose(x, z, litres) {
+    const R = 24;                    // reach of the jet, well inside one cell
+    const EFF = 3.0;
+    const ci = worldToCell(x, z);
+    const cgx = ci % N, cgz = (ci / N) | 0;
+    const rr = Math.ceil(R / cell) + 1;
+
+    // Weight by distance first, so pointing at a cell boundary wets both sides
+    // instead of dumping everything into whichever cell won the rounding.
+    const hits = [];
+    let wsum = 0;
+    for (let dz = -rr; dz <= rr; dz++) {
+      for (let dx = -rr; dx <= rr; dx++) {
+        const gx = cgx + dx, gz = cgz + dz;
+        if (gx < 0 || gx >= N || gz < 0 || gz >= N) continue;
+        const j = gz * N + gx;
+        const [wx2, wz2] = cellToWorld(j);
+        const w = 1 - Math.hypot(wx2 - x, wz2 - z) / (R + cell * 0.5);
+        if (w <= 0) continue;
+        hits.push(j, w); wsum += w;
+      }
+    }
+    if (wsum <= 0) return { onTarget: 0, knocked: 0 };
+
+    let onTarget = 0, knocked = 0;
+    for (let k = 0; k < hits.length; k += 2) {
+      const j = hits[k], share = litres * hits[k + 1] / wsum;
+      const soak = share * EFF / CONFIG.waterPerCell * RETAIN[coverOf[j]];
+      const before = inten[j];
+      wet[j] = Math.min(1, wet[j] + soak * 1.35);
+      if (stateArr[j] === FIRE.BURNING) {
+        inten[j] = Math.max(0, inten[j] - soak * 2.1);
+        onTarget += share;
+        if (before > 0.05 && inten[j] <= 0.03) knocked++;
+      }
+    }
+    return { onTarget, knocked };
+  }
+
   // ── the texture ──────────────────────────────────────────────────────────
   function upload() {
     for (let i = 0; i < n2; i++) {
@@ -5485,7 +5787,7 @@ function buildFire(scene) {
   }
 
   return {
-    update, ignite: igniteAt, igniteNear, drop, events,
+    update, ignite: igniteAt, igniteNear, drop, hose, events,
     burningCount: () => burning.size,
     burntArea: () => burntCount * cell * cell / 1e4,      // hectares
     totalArea: () => n2 * cell * cell / 1e4,
@@ -5734,6 +6036,11 @@ function buildTrees(scene, fire) {
     for (let i = 0; i < VEG.perTile; i++) {
       const x = ox + rng() * T, z = oz + rng() * T;
       if (Math.abs(x) > EDGE || Math.abs(z) > EDGE) continue;
+      // Not on the airfield. The land-cover raster has never heard of Rokići —
+      // it is a fictitious field dropped onto real scrub — so without this the
+      // apron grows cypresses and there is a pine through the runway.
+      if (typeof airfield !== 'undefined' && airfield && airfield.inField
+        && airfield.inField(x, z, 25)) continue;
       const c = coverAt(x, z);
       const table = GROWS[c];
       if (!table) continue;
@@ -6018,12 +6325,23 @@ function findAirfieldSite() {
  * the fire that lights them is read out of the same automaton the aeroplane has
  * been fighting from the air.
  */
+// `soak` is litres of water it takes to put one out, `life` is seconds it
+// survives while burning. A 200-litre drum of avgas is not put out with a bucket
+// and does not last long; a timber crate is the other way round.
+// `soak` is litres it takes to put one out and `life` is seconds it survives
+// while burning. The two are tuned against each other and against the branch's
+// 9.2 l/s: at a wetness decay of 0.030/s while alight, a crate goes out in five
+// seconds of sustained water, a drum in eight and a fuel bowser in fifteen, out
+// of a pack that holds forty-three seconds' worth. Get these wrong in the wrong
+// direction and an object is not merely hard, it is arithmetically impossible —
+// the first pass had a drum absorbing water more slowly than its own wetness
+// drained away, so no amount of water ever put one out.
 const BURNABLE = [
-  { kind: 'drum', w: 0.62, h: 0.9, fuel: 1.0, col: [0.62, 0.24, 0.14] },
-  { kind: 'crate', w: 1.3, h: 1.1, fuel: 0.8, col: [0.52, 0.40, 0.26] },
-  { kind: 'bowser', w: 2.4, h: 2.9, fuel: 1.0, col: [0.72, 0.70, 0.30] },
-  { kind: 'tug', w: 1.7, h: 1.5, fuel: 0.55, col: [0.28, 0.42, 0.30] },
-  { kind: 'cub', w: 9.0, h: 2.2, fuel: 0.7, col: [0.86, 0.84, 0.78] },
+  { kind: 'drum', w: 0.62, h: 0.9, fuel: 1.0, soak: 60, life: 70, col: [0.62, 0.24, 0.14] },
+  { kind: 'crate', w: 1.3, h: 1.1, fuel: 0.8, soak: 40, life: 105, col: [0.52, 0.40, 0.26] },
+  { kind: 'bowser', w: 2.4, h: 2.9, fuel: 1.0, soak: 95, life: 90, col: [0.72, 0.70, 0.30] },
+  { kind: 'tug', w: 1.7, h: 1.5, fuel: 0.55, soak: 65, life: 110, col: [0.28, 0.42, 0.30] },
+  { kind: 'cub', w: 9.0, h: 2.2, fuel: 0.7, soak: 85, life: 100, col: [0.86, 0.84, 0.78] },
 ];
 
 function buildAirfield(scene) {
@@ -6165,23 +6483,34 @@ function buildAirfield(scene) {
   };
 
   const AS = APRON_S + 12;                            // apron front edge
+
+  // Anything you should not be able to walk through, in runway-local
+  // coordinates: {t, s, half-along, half-across}. The ground mode pushes the
+  // player back out of these, so they are recorded as the structures are built
+  // rather than measured off them afterwards and left to drift apart.
+  const blockers = [];
+  const solid = (t, s, h, along, across, col, top) => {
+    lbox(t, s, h, along, across, col, top);
+    blockers.push({ t, s, a: along / 2, c: across / 2 });
+  };
+
   // Terminal: one storey, a glazed band, and a red pantile roof, because a
   // Dalmatian shed is a Dalmatian shed even when it is airside.
-  lbox(-46, AS + 34, 5.4, 40, 15, WALL, WALL);
+  solid(-46, AS + 34, 5.4, 40, 15, WALL, WALL);
   lbox(-46, AS + 34, 0.9, 42, 17, RED, RED);          // eaves course
   lbox(-46, AS + 26.6, 2.0, 36, 0.4, GLASSC);         // the glazing
   lbox(-46, AS + 34, 1.2, 41, 16, RED, RED);
   // Two hangars, open-fronted, with curved-looking roofs faked by three facets.
   for (const t of [22, 64]) {
-    lbox(t, AS + 30, 8.2, 34, 26, WALL, ROOF);
+    solid(t, AS + 30, 8.2, 34, 26, WALL, ROOF);
     lbox(t, AS + 16.6, 7.0, 30, 0.5, DARK);           // the door opening
   }
   // Control tower: a stalk and a cab with a visible lean on the glass.
-  lbox(-6, AS + 52, 13.0, 7, 7, WALL, WALL);
+  solid(-6, AS + 52, 13.0, 7, 7, WALL, WALL);
   lbox(-6, AS + 52, 3.1, 10, 10, GLASSC, ROOF);
   // Fuel farm, set well away from everything, which is the one thing about an
   // airfield layout that is not aesthetic.
-  for (let i = 0; i < 3; i++) lbox(102 + i * 11, AS + 58, 5.0, 8, 8, [0.76, 0.77, 0.78], ROOF);
+  for (let i = 0; i < 3; i++) solid(102 + i * 11, AS + 58, 5.0, 8, 8, [0.76, 0.77, 0.78], ROOF);
   // Windsock mast, and a segmented cone that will not move because nothing here
   // has an update loop — the wind direction it shows is the mission's.
   lbox(-halfL + 120, FIELD.width / 2 + 26, 7.0, 0.5, 0.5, DARK);
@@ -6200,12 +6529,124 @@ function buildAirfield(scene) {
   scene.add(buildings);
 
   // ── the things that burn ───────────────────────────────────────────────────
+  //
+  // These were data with no geometry at all, which was defensible for exactly as
+  // long as the only way to see them was from a thousand feet. On foot they are
+  // the whole game, so each one is built for real — and each one records the
+  // slice of the vertex buffer it owns, because the way it darkens as it chars
+  // and as it soaks is to have those vertices rewritten. That costs nothing at
+  // thirty objects and needs no uniform the shared material does not already
+  // declare, which the shared material would refuse to compile.
   const rng = mulberry32(CONFIG.seed ^ 0x00a12f);
   const objects = [];
+  const ob = propBuilder();
+  const DARKW = [0.10, 0.10, 0.11];
+
+  function shapeOf(spec, ox, oy, oz, fx, fz, rx, rz) {
+    /** object-local (along, up, across) -> world */
+    const L = (a, u, r) => [ox + fx * a + rx * r, oy + u, oz + fz * a + rz * r];
+    const box = (a, u, r, la, lu, lr, col, top) => {
+      const A = la / 2, U = lu / 2, R = lr / 2;
+      const v = [
+        L(a - A, u - U, r - R), L(a + A, u - U, r - R), L(a + A, u - U, r + R), L(a - A, u - U, r + R),
+        L(a - A, u + U, r - R), L(a + A, u + U, r - R), L(a + A, u + U, r + R), L(a - A, u + U, r + R),
+      ];
+      ob.quad(v[0], v[3], v[2], v[1], col);
+      ob.quad(v[4], v[5], v[6], v[7], top || col);
+      ob.quad(v[0], v[1], v[5], v[4], col);
+      ob.quad(v[1], v[2], v[6], v[5], col);
+      ob.quad(v[2], v[3], v[7], v[6], col);
+      ob.quad(v[3], v[0], v[4], v[7], col);
+    };
+    /** An eight-sided prism standing on end — a drum. */
+    const drum = (a, u, r, rad, h, col, top) => {
+      const K = 8;
+      const ring = (y) => Array.from({ length: K }, (_, i) => {
+        const th = (i / K) * TAU;
+        return L(a + Math.cos(th) * rad, y, r + Math.sin(th) * rad);
+      });
+      const lo = ring(u), hi = ring(u + h), c = L(a, u + h, r);
+      for (let i = 0; i < K; i++) {
+        const j = (i + 1) % K;
+        ob.quad(lo[i], lo[j], hi[j], hi[i], col);
+        ob.tri(hi[i], hi[j], c, top || col);
+      }
+    };
+    /** The same prism laid on its side along the object axis — a tanker barrel. */
+    const barrel = (a, u, r, rad, len, col) => {
+      const K = 8;
+      const ring = (aa) => Array.from({ length: K }, (_, i) => {
+        const th = (i / K) * TAU;
+        return L(aa, u + Math.cos(th) * rad, r + Math.sin(th) * rad);
+      });
+      const back = ring(a - len / 2), front = ring(a + len / 2);
+      const cb = L(a - len / 2, u, r), cf = L(a + len / 2, u, r);
+      for (let i = 0; i < K; i++) {
+        const j = (i + 1) % K;
+        ob.quad(back[i], back[j], front[j], front[i], col);
+        ob.tri(back[j], back[i], cb, col);
+        ob.tri(front[i], front[j], cf, col);
+      }
+    };
+
+    switch (spec.kind) {
+      case 'drum':
+        drum(0, 0, 0, 0.30, 0.88, spec.col, [0.50, 0.20, 0.12]);
+        drum(0, 0.24, 0, 0.325, 0.07, [0.42, 0.16, 0.09]);
+        drum(0, 0.57, 0, 0.325, 0.07, [0.42, 0.16, 0.09]);
+        break;
+      case 'crate':
+        box(0, 0.52, 0, 1.30, 1.04, 1.10, spec.col, [0.60, 0.47, 0.31]);
+        box(0, 1.07, 0, 1.36, 0.10, 1.16, [0.44, 0.33, 0.21]);
+        break;
+      case 'bowser':
+        box(0, 0.62, 0, 4.10, 0.44, 1.90, [0.24, 0.24, 0.25]);
+        barrel(-0.35, 1.42, 0, 0.76, 2.70, spec.col);
+        box(1.62, 1.28, 0, 1.20, 1.30, 1.72, spec.col, spec.col);
+        box(1.66, 1.74, 0, 1.10, 0.42, 1.60, [0.10, 0.14, 0.17]);
+        for (const a of [1.45, -1.25]) {
+          for (const r of [-0.92, 0.92]) box(a, 0.42, r, 0.78, 0.78, 0.26, DARKW);
+        }
+        break;
+      case 'tug':
+        box(0, 0.62, 0, 2.30, 0.66, 1.42, spec.col);
+        box(-0.25, 1.28, 0, 1.00, 0.72, 1.30, spec.col, spec.col);
+        box(-0.22, 1.32, 0, 1.02, 0.44, 1.34, [0.10, 0.14, 0.17]);
+        for (const a of [0.80, -0.85]) {
+          for (const r of [-0.70, 0.70]) box(a, 0.34, r, 0.62, 0.62, 0.22, DARKW);
+        }
+        break;
+      case 'cub': {
+        // A high-wing taildragger: nine metres of wing, seven of aeroplane, and
+        // the one object on this apron that reads as an aircraft from the hip.
+        const TRIM = [0.55, 0.16, 0.14];
+        box(1.90, 1.05, 0, 2.00, 0.95, 0.86, spec.col);
+        box(0.10, 1.02, 0, 1.80, 0.86, 0.78, spec.col);
+        box(-1.90, 0.98, 0, 2.20, 0.52, 0.42, spec.col);
+        box(1.35, 1.46, 0, 1.05, 0.40, 0.80, [0.10, 0.14, 0.17]);
+        box(2.95, 1.05, 0, 0.16, 0.74, 0.74, DARKW);
+        box(0, 1.86, 0, 1.45, 0.13, 9.00, spec.col, spec.col);
+        box(0, 1.84, 0, 1.52, 0.16, 0.58, TRIM, TRIM);
+        for (const r of [-1.7, 1.7]) box(0, 1.42, r, 0.14, 0.86, 0.10, spec.col);
+        box(-2.75, 1.62, 0, 1.10, 1.30, 0.12, spec.col);
+        box(-2.75, 1.02, 0, 0.85, 0.10, 3.00, spec.col, spec.col);
+        for (const r of [-0.95, 0.95]) box(1.55, 0.34, r, 0.62, 0.62, 0.20, DARKW);
+        box(-2.85, 0.20, 0, 0.30, 0.30, 0.14, DARKW);
+        break;
+      }
+    }
+  }
+
   const place = (spec, t, s, yawOff = 0) => {
     const p = P(t, s);
+    const ca = Math.cos(yawOff), sa = Math.sin(yawOff);
+    const fx = dx * ca + px * sa, fz = dz * ca + pz * sa;
+    const rx = -dx * sa + px * ca, rz = -dz * sa + pz * ca;
+    const v0 = ob.count();
+    shapeOf(spec, p[0], p[1], p[2], fx, fz, rx, rz);
     objects.push({
-      ...spec, x: p[0], y: p[1], z: p[2], yaw: yaw + yawOff,
+      ...spec, x: p[0], y: p[1], z: p[2], t, s, yaw: yaw + yawOff,
+      v0, v1: ob.count(),
       // Every one of these starts intact and dry. `heat` climbs when the fire
       // reaches it, `wet` climbs when you point a hose at it, and the two fight.
       burning: 0, heat: 0, wet: 0, out: false, spent: 0,
@@ -6214,16 +6655,50 @@ function buildAirfield(scene) {
   // Drums in two rows by the fuel farm, crates on the apron, vehicles parked
   // nose-in to the hangars, and three light aircraft on the line.
   for (let i = 0; i < 14; i++) {
-    place(BURNABLE[0], 96 + (i % 7) * 1.5, AS + 40 + Math.floor(i / 7) * 1.6);
+    place(BURNABLE[0], 92 + (i % 7) * 3.1, AS + 40 + Math.floor(i / 7) * 3.4);
   }
   for (let i = 0; i < 9; i++) {
-    place(BURNABLE[1], -20 + (i % 3) * 2.0 + rng() * 0.6, AS + 8 + Math.floor(i / 3) * 2.2);
+    place(BURNABLE[1], -22 + (i % 3) * 3.4 + rng() * 0.8, AS + 8 + Math.floor(i / 3) * 3.6);
   }
   place(BURNABLE[2], 4, AS + 10);
   place(BURNABLE[2], 88, AS + 44);
   place(BURNABLE[3], 30, AS + 12);
   place(BURNABLE[3], 58, AS + 12);
   for (let i = 0; i < 3; i++) place(BURNABLE[4], -60 + i * 16, AS + 9, 0.06 * (i - 1));
+
+  const objMesh = new THREE.Mesh(ob.geo(), solidMaterial(0xffffff, {
+    spec: 0.10, specPower: 30, side: THREE.DoubleSide,
+    body: 'n = gl_FrontFacing ? n : -n; base *= vVCol;',
+  }));
+  objMesh.frustumCulled = false;
+  scene.add(objMesh);
+
+  const objCol = objMesh.geometry.attributes.aVCol;
+  const objBase = Float32Array.from(objCol.array);     // the pristine colours
+  let objDirty = false;
+
+  /**
+   * Repaint one object from its state. Char and water both darken it, but they
+   * are not the same darkening: soot goes flat and stays, water goes deep and
+   * dries off, so the wet term is allowed to come back and the charred one is
+   * not. The whole attribute re-uploads at most once a frame and only when
+   * something actually changed — seventy kilobytes is not worth being clever
+   * about, but doing it sixty times a second for nothing would be.
+   */
+  function tint(o) {
+    const arr = objCol.array;
+    const char = 1 - 0.84 * o.spent;
+    const damp = 1 - 0.28 * sat(o.wet);
+    for (let i = o.v0 * 3; i < o.v1 * 3; i += 3) {
+      arr[i] = objBase[i] * char * damp;
+      arr[i + 1] = objBase[i + 1] * char * damp * (1 - 0.06 * o.spent);
+      arr[i + 2] = objBase[i + 2] * char * damp * (1 - 0.12 * o.spent);
+    }
+    objDirty = true;
+  }
+  const flushTint = () => {
+    if (objDirty) { objCol.needsUpdate = true; objDirty = false; }
+  };
 
   /**
    * Where on the runway, if anywhere. Returns runway-local coordinates plus how
@@ -6267,14 +6742,842 @@ function buildAirfield(scene) {
   ];
   const apronCentre = P(0, APRON_S + FIELD.apronD * 0.45);
 
+  /** World -> runway-local. The inverse of P(), which the ground mode lives in. */
+  const local = (x, z) => {
+    const ex = x - cx, ez = z - cz;
+    return [ex * dx + ez * dz, ex * px + ez * pz];
+  };
+
+  /**
+   * The fence line, which is what the ground mode is bounded by. A rescue at an
+   * airfield is a set-piece: the fence is the edge of the mission and there is
+   * nothing on the far side of it but eleven kilometres of karst.
+   */
+  const bounds = {
+    t0: -halfL - 36, t1: halfL + 36,
+    s0: -FIELD.width / 2 - 51, s1: APRON_S + FIELD.apronD + 20,
+  };
+
+  /**
+   * Where the ground crew are when it starts. Spread across the apron and the
+   * hangar mouths rather than clustered, so the first thirty seconds are a
+   * choice about who you reach first.
+   */
+  const crewSpots = [
+    P(-34, AS + 14), P(-8, AS + 20), P(14, AS + 13),
+    P(40, AS + 22), P(70, AS + 15), P(94, AS + 34), P(-56, AS + 26),
+  ];
+
+  /**
+   * Inside the wire, with an optional margin. Used to keep the vegetation off:
+   * the land-cover raster describes the real scrub that is really there, and has
+   * no idea an aerodrome was invented on top of it.
+   */
+  function inField(x, z, pad = 0) {
+    const [t, s] = local(x, z);
+    return t > bounds.t0 - pad && t < bounds.t1 + pad
+      && s > bounds.s0 - pad && s < bounds.s1 + pad;
+  }
+
+  /**
+   * Ground height anywhere on the field: the fitted pavement plane where there
+   * is pavement, the real terrain where there is not. Walking off the apron on
+   * to the grass has to step down, not fall through.
+   */
+  function walkY(x, z) {
+    const paved = onPaved(x, z);
+    return paved != null ? paved : Math.max(groundAt(x, z), 0);
+  }
+
   return {
-    site, onRunway, onPaved, objects, thresholds,
+    site, onRunway, onPaved, walkY, inField, objects, thresholds, blockers, crewSpots,
+    bounds, local, toWorld: P, planeY, tint, flushTint,
     centre: [cx, planeY(0), cz],
     apron: apronCentre,
     axis: { dx, dz, px, pz, yaw, halfL },
-    pavMesh, buildings,
+    pavMesh, buildings, objMesh,
     tris: pav.pos.length / 9
-      + buildings.geometry.attributes.position.count / 3,
+      + buildings.geometry.attributes.position.count / 3
+      + objMesh.geometry.attributes.position.count / 3,
+  };
+}
+
+// ==== 47-ground.js ==============================================
+// -----------------------------------------------------------------------------
+// Rokići, on foot.
+//
+// The aeroplane is the game. This is the twenty minutes at the other end of it,
+// and it is a different game on purpose: you have a branch instead of six tonnes,
+// a jet that reaches twenty metres instead of a drop that covers two hundred, and
+// four hundred litres at a time instead of six thousand. From the air a burning
+// fuel drum is not visible. From four metres away it is the only thing there is.
+//
+// Three decisions carry the whole mode:
+//
+//  1. **It is a set-piece, not an open world.** The mission is inside the wire.
+//     There are thirteen thousand buildings out there and not one of them has an
+//     interior, a door or a floor; walking to them would be walking to a facade.
+//     The fence is the edge of the mission and it is a real fence, drawn.
+//
+//  2. **The fire here is the same fire.** Nothing is scripted alight. The
+//     automaton that has been chasing you all game throws embers downwind, and
+//     an airfield chosen for being clear of the ignition point is not clear of
+//     spotting — a crown fire in Mediterranean maquis puts burning material a
+//     kilometre and more ahead of the front, which is precisely how these fires
+//     get around the people fighting them.
+//
+//  3. **The people are the point, and they are rescued, not shot.** Somebody
+//     whose clothing has caught runs, because that is what people do and it is
+//     the worst possible thing to do. You put them out. If you are slow they go
+//     down, and if you are slower than that you lose them, and the radio says so.
+//     There is nothing here you can aim at that you should not be aiming at.
+// -----------------------------------------------------------------------------
+
+const GROUND = {
+  eye: 1.66,
+  walk: 3.4,               // m/s — a fast walk in kit
+  run: 6.1,
+  accel: 30,
+  drag: 13,
+  girth: 0.55,             // how far you are pushed back out of a wall
+
+  // The trolley pump you drag off the aeroplane. Four hundred litres at nine a
+  // second is forty-three seconds of water, and then you are running back to the
+  // hull while everything you were winning against carries on burning. That
+  // round trip *is* the mode: an aeroplane carries six thousand litres and a
+  // person carries what a person can carry.
+  pack: 400,
+  flow: 9.2,               // litres per second out of the branch
+  refillRate: 300,
+  // Both mean "at the aeroplane", and both have to be larger than the distance
+  // you step out to — seventeen metres to port to clear a 28.6 m wing, plus
+  // seven aft to clear the propellers. Smaller, and getting out left you unable
+  // to turn round and get straight back in.
+  refillDist: 21,
+  boardDist: 21,
+
+  jetV: 23,                // m/s at the nozzle
+  jetSteps: 26,
+  jetDt: 0.045,
+
+  // Thirty litres puts a person out — about four seconds of the branch held on
+  // them. It is a small number next to a drum of avgas because a person is a
+  // small fire, and being generous here is right: the difficulty is reaching
+  // somebody who is running, not soaking them once you have.
+  crewSoak: 30,
+  crewDry: 0.05,           // wetness lost per second while still alight
+  crewBurn: 34,            // seconds alight before they go down
+  crewDown: 24,            // seconds down before it is too late
+
+  spotRange: 2600,         // how close the front comes before embers reach here
+  spotDelay: 9,            // seconds between the tower's call and the first flame
+};
+
+/** One box, scaled per part. Forty geometries for seven people is forty too many. */
+let UNIT_BOX = null;
+
+/**
+ * A ground crew figure: torso, head, helmet, two arms and two legs, the limbs on
+ * pivots at the joint so a gait is four rotations rather than four translations.
+ * Local forward is +X; width runs along Z.
+ */
+function makeFigure(mats) {
+  const root = new THREE.Group();
+  const part = (mat, d, h, w, x, y, z) => {
+    const m = new THREE.Mesh(UNIT_BOX, mat);
+    m.scale.set(d, h, w);
+    m.position.set(x, y, z);
+    return m;
+  };
+  const joint = (mat, d, h, w, y, z) => {
+    const g = new THREE.Group();
+    g.position.set(0, y, z);
+    g.add(part(mat, d, h, w, 0, -h / 2, 0));
+    root.add(g);
+    return g;
+  };
+  root.add(part(mats.tunic, 0.26, 0.58, 0.44, 0, 1.16, 0));
+  root.add(part(mats.trews, 0.26, 0.14, 0.36, 0, 0.85, 0));
+  root.add(part(mats.skin, 0.20, 0.22, 0.19, 0.01, 1.56, 0));
+  root.add(part(mats.helmet, 0.27, 0.12, 0.26, 0.01, 1.70, 0));
+  return {
+    root,
+    armL: joint(mats.tunic, 0.13, 0.56, 0.13, 1.38, -0.28),
+    armR: joint(mats.tunic, 0.13, 0.56, 0.13, 1.38, 0.28),
+    legL: joint(mats.trews, 0.16, 0.84, 0.17, 0.86, -0.11),
+    legR: joint(mats.trews, 0.16, 0.84, 0.17, 0.86, 0.11),
+  };
+}
+
+function buildGround(scene, field) {
+  // No site, no mode. The airfield search can fail on a world this rocky and the
+  // rest of the game has to carry on without noticing.
+  if (!field || !field.site) {
+    return {
+      ok: false, active: false, armed: false,
+      update() {}, enter() {}, leave() {}, pose() {},
+      canEnter: () => false, canBoard: () => false,
+      hud: () => null, stats: () => null, look() {}, reset() {},
+    };
+  }
+
+  UNIT_BOX = UNIT_BOX || new THREE.BoxGeometry(1, 1, 1);
+
+  const rng = mulberry32(CONFIG.seed ^ 0x6f00d1);
+  const objects = field.objects;
+  const flames = buildFlames(scene, 220);
+  const jetSpray = buildSprayPool(scene, 900, 7.5, 1.1);
+
+  // ── the crew ───────────────────────────────────────────────────────────────
+  const mats = {
+    tunic: solidMaterial(0xd87a1c, { spec: 0.05, specPower: 16 }),
+    trews: solidMaterial(0x2b3550, { spec: 0.05, specPower: 16 }),
+    skin: solidMaterial(0xc79a74, { spec: 0.06, specPower: 20 }),
+    helmet: solidMaterial(0xe8e6df, { spec: 0.22, specPower: 40 }),
+  };
+
+  // Where anybody not on fire walks to: in front of the terminal, off the apron
+  // and away from the fuel farm, which is where a muster point goes.
+  const MUSTER = (() => {
+    const [t, s] = field.local(field.apron[0], field.apron[2]);
+    return field.toWorld(t - 60, s - 34);
+  })();
+
+  const crew = field.crewSpots.map((p, i) => {
+    const fig = makeFigure(mats);
+    fig.root.position.set(p[0], p[1], p[2]);
+    fig.root.visible = false;                 // nobody is out there until it starts
+    scene.add(fig.root);
+    return {
+      fig, x: p[0], y: p[1], z: p[2],
+      hx: 1, hz: 0, vx: 0, vz: 0,
+      mode: 'idle',              // idle | walk | alight | down | safe | lost
+      burn: 0, wet: 0, timer: 0, gait: rng() * 6.28, seed: rng(), id: i,
+      shouted: false,
+    };
+  });
+
+  // ── the player ─────────────────────────────────────────────────────────────
+  const you = {
+    x: 0, y: 0, z: 0, yaw: 0, pitch: 0, vx: 0, vz: 0,
+    pack: GROUND.pack, spraying: false, jet: 0, refilling: false,
+    aim: [0, 0, 0], aimKind: null,
+  };
+
+  let active = false;
+  let armed = false;                 // has the spot fire been called
+  let seeded = false;                // have the first flames appeared
+  let armTimer = 0;
+  const tally = { saved: 0, lost: 0, rescued: 0, down: 0, litres: 0 };
+
+  // ── where you may stand ────────────────────────────────────────────────────
+  /**
+   * Push a point out of the buildings and back inside the wire. Runway-local
+   * throughout, because every structure on this field was laid out in those axes
+   * and converting each one to a world-space box would be inventing a second
+   * source of truth for the same rectangle.
+   */
+  function confine(x, z) {
+    const B = field.bounds;
+    let [t, s] = field.local(x, z);
+    t = clamp(t, B.t0, B.t1);
+    s = clamp(s, B.s0, B.s1);
+    for (const b of field.blockers) {
+      const dt = t - b.t, ds = s - b.s;
+      const ea = b.a + GROUND.girth, ec = b.c + GROUND.girth;
+      if (Math.abs(dt) >= ea || Math.abs(ds) >= ec) continue;
+      // Inside: leave by whichever face is nearest, which is what a wall does.
+      if (ea - Math.abs(dt) < ec - Math.abs(ds)) t = b.t + Math.sign(dt || 1) * ea;
+      else s = b.s + Math.sign(ds || 1) * ec;
+    }
+    const w = field.toWorld(t, s);
+    return [w[0], w[2]];
+  }
+
+  // ── the spot fire ──────────────────────────────────────────────────────────
+  /**
+   * Embers land. Two or three cells of grass just upwind of the apron go up, and
+   * one object catches directly — which is what actually happens, because an
+   * ember does not care that it landed on a drum rather than on scrub.
+   */
+  function seedSpotFire() {
+    seeded = true;
+    const [ax, , az] = field.apron;
+    // Upwind of the apron: the wind blows *toward* windDir, so back along it.
+    const wx = Math.cos(state.windDir), wz = Math.sin(state.windDir);
+    for (let i = 0; i < 3; i++) {
+      const d = 70 + i * 55;
+      fire.igniteNear(ax - wx * d + (rng() - 0.5) * 90, az - wz * d + (rng() - 0.5) * 90, 0.75);
+    }
+    // Two objects, of two different kinds and at opposite ends. Seeding the two
+    // farthest picked two drums out of the same row, which meant the fuel farm
+    // was always the fire and the rest of the apron was never in it.
+    const far = objects.slice().sort((a, b) =>
+      Math.hypot(b.x - ax, b.z - az) - Math.hypot(a.x - ax, a.z - az));
+    const first = far[0];
+    const second = far.find((o) => o.kind !== first.kind
+      && Math.hypot(o.x - first.x, o.z - first.z) > 40) || far[1];
+    first.heat = 1.05;
+    second.heat = 1.05;
+    // And two of the crew, who were closest to it.
+    const near = crew.slice().sort((a, b) =>
+      Math.hypot(a.x - ax + wx * 90, a.z - az + wz * 90)
+      - Math.hypot(b.x - ax + wx * 90, b.z - az + wz * 90));
+    for (const c of near.slice(0, 2)) if (c.mode === 'walk' || c.mode === 'idle') light(c);
+    radio('call.rokici', 'radio.rokiciBurning');
+  }
+
+  function light(c) {
+    if (c.mode === 'alight' || c.mode === 'down' || c.mode === 'lost') return;
+    c.mode = 'alight';
+    c.burn = 0;
+    c.wet = 0;
+    if (!c.shouted) { c.shouted = true; radio('call.rokici', 'radio.crewAlight'); }
+  }
+
+  /** The front is close enough to be throwing burning material this far. */
+  function frontDistance() {
+    const [ax, , az] = field.apron;
+    const nf = fire.nearestFire(ax, az);
+    return nf ? Math.hypot(nf[0] - ax, nf[1] - az) : Infinity;
+  }
+
+  // ── objects ────────────────────────────────────────────────────────────────
+  function updateObjects(dt) {
+    for (const o of objects) {
+      const wasBurning = o.burning > 0;
+      let dirty = false;
+
+      if (!o.out && o.spent < 1) {
+        // Heat arrives from the ground fire under it and from anything already
+        // alight within a few metres. The rates are deliberately slow. Radiant
+        // ignition is a minute-scale process, not a second-scale one: the first
+        // pass used numbers an order of magnitude too big and the entire apron —
+        // thirty objects and every one of the crew — went up in six seconds,
+        // which is not a mission, it is a cutscene.
+        let h = fire.intensityAt(o.x, o.z) * 0.10;
+        for (const n of objects) {
+          if (n === o || n.burning <= 0) continue;
+          const d = Math.hypot(n.x - o.x, n.z - o.z);
+          if (d < 6) h += n.burning * (1 - d / 6) * 0.030;
+        }
+        // The subtraction is the thing that cools: something warmed once and
+        // then left alone has to come back down, or the whole apron eventually
+        // ignites from a fire that went out ten minutes ago.
+        o.heat = clamp(o.heat + (h - 0.012) * dt, 0, 1.5);
+        if (o.heat > 1 && o.burning <= 0) o.burning = 0.35;
+      }
+
+      if (o.burning > 0) {
+        o.burning = Math.min(1, o.burning + dt * 0.5 * o.fuel);
+        const before = o.spent;
+        o.spent = Math.min(1, o.spent + dt / o.life);
+        if (Math.abs(o.spent - before) > 0.01) dirty = true;
+        // Water is losing while it is on, so the jet has to out-pace the flame —
+        // but only just. This has to stay well under flow/soak for every kind in
+        // BURNABLE, or that kind cannot be extinguished at all.
+        o.wet = Math.max(0, o.wet - dt * 0.030);
+        if (o.wet >= 1) {
+          o.burning = 0; o.heat = 0; o.out = true; dirty = true;
+          if (o.spent < 1) tally.saved++;
+        }
+        if (o.spent >= 1) { o.burning = 0; o.out = true; tally.lost++; dirty = true; }
+      } else {
+        o.wet = Math.max(0, o.wet - dt * 0.10);
+      }
+
+      if (dirty || (wasBurning !== o.burning > 0)) field.tint(o);
+    }
+    field.flushTint();
+  }
+
+  // ── crew ───────────────────────────────────────────────────────────────────
+  function updateCrew(dt) {
+    for (const c of crew) {
+      if (c.mode === 'lost') { poseFigure(c, dt); continue; }
+
+      // Catching. You have to be genuinely in it — standing in a burning cell,
+      // or within about three metres of something alight. Anything looser and
+      // the whole crew catches at once simply because the apron is small.
+      if (c.mode === 'idle' || c.mode === 'walk') {
+        let risk = fire.intensityAt(c.x, c.z) * 0.30;
+        for (const o of objects) {
+          if (o.burning <= 0) continue;
+          const d = Math.hypot(o.x - c.x, o.z - c.z);
+          if (d < 3.2) risk += o.burning * (1 - d / 3.2) * 0.22;
+        }
+        if (risk > 0.02 && rng() < risk * dt) light(c);
+      }
+
+      let speed = 0;
+      if (c.mode === 'alight') {
+        c.burn += dt / GROUND.crewBurn;
+        c.wet = Math.max(0, c.wet - dt * GROUND.crewDry);
+        // Running. It is the wrong thing to do and it is what happens: fanned
+        // flames burn harder, so the panic makes it worse, which is the whole
+        // reason somebody has to physically stop them.
+        // Slower than a sprint and constantly turning. Somebody whose clothes
+        // are alight is not running *to* anywhere, and if they simply outpaced
+        // you in a straight line there would be no rescue to make.
+        speed = 3.3 + Math.sin(c.gait * 0.7 + c.seed * 6) * 1.1;
+        const nf = fire.nearestFire(c.x, c.z);
+        let ax = -Math.sin(c.seed * 12 + state.t * 1.5);
+        let az = -Math.cos(c.seed * 12 + state.t * 1.5);
+        if (nf) {
+          const dx2 = c.x - nf[0], dz2 = c.z - nf[1];
+          const d = Math.hypot(dx2, dz2) || 1;
+          ax = ax * 0.45 + (dx2 / d) * 0.55;
+          az = az * 0.45 + (dz2 / d) * 0.55;
+        }
+        const m = Math.hypot(ax, az) || 1;
+        c.hx = ax / m; c.hz = az / m;
+        if (c.burn >= 1) { c.mode = 'down'; c.timer = 0; tally.down++; }
+      } else if (c.mode === 'down') {
+        c.timer += dt;
+        if (c.timer > GROUND.crewDown) {
+          c.mode = 'lost';
+          tally.lost++;
+          radio('call.rokici', 'radio.crewLost');
+        }
+      } else if (c.mode === 'walk') {
+        const dx2 = MUSTER[0] - c.x, dz2 = MUSTER[2] - c.z;
+        const d = Math.hypot(dx2, dz2);
+        if (d < 3) { c.mode = 'idle'; } else {
+          c.hx = dx2 / d; c.hz = dz2 / d;
+          speed = 1.6;
+        }
+      } else if (c.mode === 'safe') {
+        c.timer += dt;
+        if (c.timer > 7) { c.mode = 'walk'; }
+      }
+
+      if (speed > 0) {
+        const nx = c.x + c.hx * speed * dt;
+        const nz = c.z + c.hz * speed * dt;
+        const [px2, pz2] = confine(nx, nz);
+        // A wall turns them rather than stopping them dead — a person who has
+        // run into something keeps going along it.
+        if (Math.hypot(px2 - nx, pz2 - nz) > 0.05) {
+          const a = Math.atan2(c.hz, c.hx) + 1.1;
+          c.hx = Math.cos(a); c.hz = Math.sin(a);
+        }
+        c.x = px2; c.z = pz2;
+        c.gait += speed * dt * 2.6;
+      }
+      c.y = field.walkY(c.x, c.z);
+      poseFigure(c, dt);
+    }
+  }
+
+  function poseFigure(c, dt) {
+    const f = c.fig;
+    f.root.visible = armed;
+    f.root.position.set(c.x, c.y, c.z);
+    f.root.rotation.set(0, Math.atan2(-c.hz, c.hx), 0);
+
+    if (c.mode === 'down' || c.mode === 'lost') {
+      // Face down, which is what "stop, drop and roll" ends as. Rolled onto the
+      // side rather than flat, so the silhouette still reads as a person.
+      f.root.rotation.z = -Math.PI / 2 + 0.12;
+      f.root.position.y = c.y + 0.34;
+      f.armL.rotation.z = 0.5; f.armR.rotation.z = -0.5;
+      f.armL.rotation.x = 0.2; f.armR.rotation.x = -0.2;
+      f.legL.rotation.x = 0.35; f.legR.rotation.x = -0.15;
+      return;
+    }
+    f.root.rotation.z = 0;
+
+    if (c.mode === 'safe') {
+      // Down on one knee, head in hands. They are fine; they are not fine yet.
+      f.root.position.y = c.y - 0.36;
+      f.legL.rotation.x = 1.5; f.legR.rotation.x = -0.4;
+      f.armL.rotation.x = -1.5; f.armR.rotation.x = -1.5;
+      f.armL.rotation.z = 0.3; f.armR.rotation.z = -0.3;
+      return;
+    }
+
+    const swing = c.mode === 'alight' ? 1.25 : 0.55;
+    const s = Math.sin(c.gait), s2 = Math.cos(c.gait);
+    f.legL.rotation.x = s * swing;
+    f.legR.rotation.x = -s * swing;
+    if (c.mode === 'alight') {
+      // Arms up and flailing. Nothing about this is a run cycle.
+      f.armL.rotation.x = -2.3 + s2 * 0.5;
+      f.armR.rotation.x = -2.3 - s2 * 0.5;
+      f.armL.rotation.z = 0.6 + s * 0.3; f.armR.rotation.z = -0.6 - s * 0.3;
+      f.root.position.y = c.y + Math.abs(s) * 0.06;
+    } else {
+      f.armL.rotation.x = -s * swing * 0.8;
+      f.armR.rotation.x = s * swing * 0.8;
+      f.armL.rotation.z = 0.06; f.armR.rotation.z = -0.06;
+    }
+  }
+
+  // ── the jet ────────────────────────────────────────────────────────────────
+  /** Nozzle position and direction, in the flight model's yaw convention. */
+  function nozzle() {
+    const cp = Math.cos(you.pitch);
+    const dir = [-Math.sin(you.yaw) * cp, Math.sin(you.pitch), -Math.cos(you.yaw) * cp];
+    const right = [-Math.cos(you.yaw), 0, Math.sin(you.yaw)];
+    return {
+      dir,
+      p: [
+        you.x + dir[0] * 0.55 + right[0] * 0.22,
+        you.y + GROUND.eye - 0.22 + dir[1] * 0.55,
+        you.z + dir[2] * 0.55 + right[2] * 0.22,
+      ],
+    };
+  }
+
+  /**
+   * Walk the jet out under gravity and return what it lands on. A hose is not a
+   * ray: the whole skill in using one is knowing how much it droops, and a
+   * straight raycast would remove the only aiming problem the mode has.
+   */
+  /**
+   * Where along a step does it pass within `r` of a vertical axis at (cx, cz)?
+   *
+   * This has to be a *swept* test, not a point test at the end of the step. The
+   * jet advances 23 m/s × 45 ms ≈ one metre per step and a fuel drum is 0.6 m
+   * across: sampling only the step endpoints walks straight through it, which is
+   * exactly what happened — four hundred litres poured over a burning drum with
+   * the trace reporting a clean miss every frame and nothing ever going out.
+   */
+  function sweep(x0, z0, x1, z1, cx, cz, r) {
+    const dx = x1 - x0, dz = z1 - z0;
+    const L2 = dx * dx + dz * dz;
+    const t = L2 > 1e-9 ? clamp(((cx - x0) * dx + (cz - z0) * dz) / L2, 0, 1) : 0;
+    const px = x0 + dx * t, pz = z0 + dz * t;
+    return Math.hypot(px - cx, pz - cz) < r ? t : -1;
+  }
+
+  function traceJet() {
+    const { p, dir } = nozzle();
+    let x = p[0], y = p[1], z = p[2];
+    let vx = dir[0] * GROUND.jetV, vy = dir[1] * GROUND.jetV, vz = dir[2] * GROUND.jetV;
+    const dt = GROUND.jetDt;
+    for (let i = 0; i < GROUND.jetSteps; i++) {
+      const x0 = x, y0 = y, z0 = z;
+      vy -= 9.81 * dt;
+      x += vx * dt; y += vy * dt; z += vz * dt;
+
+      // Nearest hit *along the step*, so a jet grazing two things soaks the
+      // near one rather than whichever happened to be first in the array.
+      let bt = 2, hit = null;
+      for (const c of crew) {
+        if (c.mode === 'lost') continue;
+        const t = sweep(x0, z0, x, z, c.x, c.z, 0.85);
+        if (t < 0 || t >= bt) continue;
+        const yy = y0 + (y - y0) * t;
+        const h = c.mode === 'down' || c.mode === 'safe' ? 1.0 : 1.9;
+        if (yy > c.y + h || yy < c.y - 0.25) continue;
+        bt = t; hit = { crew: c };
+      }
+      for (const o of objects) {
+        const t = sweep(x0, z0, x, z, o.x, o.z, o.w * 0.55 + 0.45);
+        if (t < 0 || t >= bt) continue;
+        const yy = y0 + (y - y0) * t;
+        if (yy > o.y + o.h + 0.4 || yy < o.y - 0.3) continue;
+        bt = t; hit = { obj: o };
+      }
+      if (hit) {
+        return { x: x0 + (x - x0) * bt, y: y0 + (y - y0) * bt, z: z0 + (z - z0) * bt, ...hit };
+      }
+
+      const gy = field.walkY(x, z);
+      if (y <= gy) return { x, y: gy, z };
+    }
+    return { x, y, z, far: true };
+  }
+
+  function spray(dt) {
+    const hit = traceJet();
+    you.aim = [hit.x, hit.y, hit.z];
+    you.aimKind = hit.crew ? 'crew' : hit.obj ? 'obj' : hit.far ? null : 'ground';
+
+    const litres = Math.min(you.pack, GROUND.flow * dt);
+    you.pack -= litres;
+    tally.litres += litres;
+    if (litres <= 0) return;
+
+    if (hit.crew) {
+      const c = hit.crew;
+      c.wet += litres / GROUND.crewSoak;
+      if (c.wet >= 1 && (c.mode === 'alight' || c.mode === 'down')) {
+        c.mode = 'safe'; c.timer = 0; c.burn = 0;
+        tally.rescued++;
+        radio('call.rokici', 'radio.crewSafe');
+        toast(T('toast.crewSafe'), 'good');
+      }
+    } else if (hit.obj) {
+      hit.obj.wet += litres / hit.obj.soak;
+      hit.obj.heat = Math.max(0, hit.obj.heat - litres / hit.obj.soak * 0.8);
+    }
+    // Whatever the jet hit, the water still lands on the ground under it.
+    fire.hose(hit.x, hit.z, litres * (hit.crew || hit.obj ? 0.35 : 1));
+
+    // Droplets: a cone off the nozzle, thrown along the same vector the trace
+    // used, so what you see is what the trace computed and not a second opinion.
+    const { p, dir } = nozzle();
+    const n = Math.max(1, Math.round(60 * dt));
+    for (let i = 0; i < n; i++) {
+      const s = rng();
+      jetSpray.spawn(
+        p[0], p[1], p[2],
+        dir[0] * GROUND.jetV + (rng() - 0.5) * 2.6,
+        dir[1] * GROUND.jetV + (rng() - 0.5) * 2.0,
+        dir[2] * GROUND.jetV + (rng() - 0.5) * 2.6,
+        0.22 + s * 0.24, 0.80 + s * 0.45, 0.85,
+      );
+    }
+  }
+
+  // ── flames ─────────────────────────────────────────────────────────────────
+  const flameList = [];
+  function paintFlames() {
+    flameList.length = 0;
+    for (const o of objects) {
+      if (o.burning <= 0.02) continue;
+      // Scaled to the object, not to a fifty-metre cell of maquis. A burning
+      // light aircraft throws a flame two or three metres tall; the first pass
+      // borrowed the wildfire sizing and gave it ten.
+      flameList.push({
+        x: o.x, y: o.y + o.h * 0.30, z: o.z,
+        size: (0.9 + o.h * 0.8) * (0.72 + o.burning * 0.5), v: o.burning,
+      });
+    }
+    for (const c of crew) {
+      if (c.mode !== 'alight' && !(c.mode === 'down' && c.burn > 0)) continue;
+      const v = c.mode === 'down' ? 0.5 : 0.75;
+      flameList.push({ x: c.x, y: c.y + 0.62, z: c.z, size: 1.55, v });
+    }
+    flames.paint(flameList);
+  }
+
+  // ── movement ───────────────────────────────────────────────────────────────
+  function walk(dt) {
+    const fx = -Math.sin(you.yaw), fz = -Math.cos(you.yaw);
+    const rx = -Math.cos(you.yaw), rz = Math.sin(you.yaw);
+    let ix = 0, iz = 0;
+    if (keys.has('KeyW') || keys.has('ArrowUp')) iz += 1;
+    if (keys.has('KeyS') || keys.has('ArrowDown')) iz -= 1;
+    if (keys.has('KeyD') || keys.has('ArrowRight')) ix += 1;
+    if (keys.has('KeyA') || keys.has('ArrowLeft')) ix -= 1;
+    ix += TOUCH.gx || 0; iz += TOUCH.gy || 0;
+    const m = Math.hypot(ix, iz);
+    if (m > 1) { ix /= m; iz /= m; }
+
+    const top = (keys.has('ShiftLeft') || keys.has('ShiftRight') || TOUCH.grun)
+      ? GROUND.run : GROUND.walk;
+    const wx = (fx * iz + rx * ix) * top;
+    const wz = (fz * iz + rz * ix) * top;
+    you.vx = damp(you.vx, wx, m > 0.01 ? GROUND.accel / top : GROUND.drag, dt);
+    you.vz = damp(you.vz, wz, m > 0.01 ? GROUND.accel / top : GROUND.drag, dt);
+
+    const tx = you.x + you.vx * dt, tz = you.z + you.vz * dt;
+    const [nx, nz] = confine(tx, tz);
+    // Kill the velocity only if confine() actually moved us. The tolerance is
+    // for the world -> runway-local -> world round trip inside it, which is
+    // exact in theory and a few parts in 10^12 in practice.
+    if (Math.abs(nx - tx) > 1e-4) you.vx = 0;
+    if (Math.abs(nz - tz) > 1e-4) you.vz = 0;
+    you.x = nx; you.z = nz;
+    you.y = field.walkY(you.x, you.z);
+  }
+
+  const distToPlane = () =>
+    Math.hypot(you.x - flight.p.pos.x, you.z - flight.p.pos.z);
+
+  /**
+   * The nearest thing that is on fire, people first — the 0.4 bias means a
+   * person forty metres away outranks a crate ten metres away, which is the
+   * right priority and is not a judgement the player should have to make while
+   * one of them is screaming.
+   */
+  function nearestTrouble(only) {
+    let best = null, bd = Infinity;
+    const take = (x, y, z, d, bias) => {
+      if (d * bias < bd) { bd = d * bias; best = [x, y, z]; }
+    };
+    if (only !== 'obj') {
+      for (const c of crew) {
+        if (c.mode !== 'alight' && c.mode !== 'down') continue;
+        take(c.x, c.y + 1, c.z, Math.hypot(c.x - you.x, c.z - you.z), 0.4);
+      }
+    }
+    if (only !== 'crew') {
+      for (const o of objects) {
+        if (o.burning <= 0) continue;
+        take(o.x, o.y + o.h, o.z, Math.hypot(o.x - you.x, o.z - you.z), 1);
+      }
+    }
+    return best;
+  }
+
+  function refill(dt) {
+    if (you.pack >= GROUND.pack) return;
+    const take = Math.min(
+      GROUND.refillRate * dt, GROUND.pack - you.pack, flight.p.water);
+    you.pack += take;
+    flight.p.water -= take;
+    you.refilling = take > 0;
+  }
+
+  // ── the loop ───────────────────────────────────────────────────────────────
+  function update(dt) {
+    // The field burns whether or not anybody is standing in it. Leaving this
+    // gated on the ground phase would mean an airfield that only ever caught
+    // fire while you were watching, which is the kind of thing you can feel.
+    if (!armed) {
+      if (state.phase === 'fly' && state.t > 60 && frontDistance() < GROUND.spotRange) {
+        armed = true;
+        armTimer = 0;
+        for (const c of crew) { c.mode = 'walk'; c.fig.root.visible = true; }
+        radio('call.rokici', 'radio.rokiciSpot');
+        toast(T('toast.rokici'), 'bad');
+      }
+      return;
+    }
+    if (!seeded) {
+      armTimer += dt;
+      if (armTimer > GROUND.spotDelay) seedSpotFire();
+    }
+
+    updateObjects(dt);
+    updateCrew(dt);
+
+    you.refilling = false;
+    if (active) {
+      walk(dt);
+      const wants = you.spraying && you.pack > 0;
+      if (wants) spray(dt); else { you.aimKind = null; you.aim = [0, 0, 0]; }
+      you.jet = damp(you.jet, wants ? 1 : 0, 14, dt);
+      if (distToPlane() < GROUND.refillDist && !wants) refill(dt);
+    } else {
+      you.jet = 0;
+    }
+
+    paintFlames();
+    jetSpray.update(dt);
+  }
+
+  // ── in and out ─────────────────────────────────────────────────────────────
+  /** Stopped, on the paved surface, with the wheels down. */
+  function canEnter() {
+    if (!armed || state.phase !== 'fly') return false;
+    if (!flight.p.onGround) return false;
+    return flight.p.vel.length() < 1.6;
+  }
+  const canBoard = () => active && distToPlane() < GROUND.boardDist;
+
+  function enter() {
+    if (!canEnter()) return false;
+    const { fwd, right } = flight.axes();
+    // Off the port side and well aft: the wing is fourteen metres of half-span
+    // and the propellers are on the leading edge of it. Stepping out any closer
+    // puts the camera inside the aeroplane rather than beside it.
+    const sx = flight.p.pos.x - right.x * 17 - fwd.x * 7;
+    const sz = flight.p.pos.z - right.z * 17 - fwd.z * 7;
+    const [px2, pz2] = confine(sx, sz);
+    you.x = px2; you.z = pz2;
+    you.y = field.walkY(you.x, you.z);
+    you.vx = you.vz = 0;
+    you.pitch = 0;
+    // Facing the problem, not the aeroplane. You have just spent thirty seconds
+    // landing on a burning airfield; the first frame on foot should be of the
+    // fire, and there is no version of this where you get out and look at a
+    // fuselage.
+    const look = nearestTrouble() || field.apron;
+    you.yaw = Math.atan2(-(look[0] - you.x), -(look[2] - you.z));
+    you.spraying = false;
+    active = true;
+    state.phase = 'ground';
+    return true;
+  }
+
+  function leave() {
+    if (!canBoard()) return false;
+    active = false;
+    you.spraying = false;
+    state.phase = 'fly';
+    return true;
+  }
+
+  /** Mouse or thumb, in radians. Pitch is clamped so you cannot invert. */
+  function look(dx, dy) {
+    you.yaw -= dx;
+    you.pitch = clamp(you.pitch - dy, -1.35, 1.05);
+  }
+
+  function pose(camera) {
+    camera.position.set(you.x, you.y + GROUND.eye, you.z);
+    const cp = Math.cos(you.pitch);
+    camera.lookAt(
+      you.x - Math.sin(you.yaw) * cp,
+      you.y + GROUND.eye + Math.sin(you.pitch),
+      you.z - Math.cos(you.yaw) * cp,
+    );
+  }
+
+  const alight = () => {
+    let n = 0;
+    for (const o of objects) if (o.burning > 0) n++;
+    for (const c of crew) if (c.mode === 'alight' || c.mode === 'down') n++;
+    return n;
+  };
+
+  return {
+    ok: true,
+    get active() { return active; },
+    get armed() { return armed; },
+    update, enter, leave, canEnter, canBoard, look, pose, you, crew,
+    hose: () => you.jet,
+    hud: () => ({
+      pack: you.pack, packMax: GROUND.pack,
+      reserve: flight.p.water,
+      alight: alight(),
+      crewLeft: crew.filter((c) => c.mode === 'alight' || c.mode === 'down').length,
+      rescued: tally.rescued,
+      refilling: you.refilling,
+      nearPlane: distToPlane() < GROUND.refillDist,
+      canBoard: canBoard(),
+      aimKind: you.aimKind,
+    }),
+    stats: () => ({
+      armed, seeded, active,
+      alight: alight(),
+      objSaved: tally.saved, objLost: tally.lost,
+      rescued: tally.rescued, crewLost: crew.filter((c) => c.mode === 'lost').length,
+      crewOk: crew.filter((c) => c.mode === 'safe' || c.mode === 'walk'
+        || c.mode === 'idle').length,
+      pack: Math.round(you.pack), litres: Math.round(tally.litres),
+      at: [Math.round(you.x), Math.round(you.z)],
+    }),
+    /** For the screenshot tool: stand somewhere specific and look somewhere specific. */
+    put(x, z, yaw, pitch = 0) {
+      const [px2, pz2] = confine(x, z);
+      you.x = px2; you.z = pz2; you.y = field.walkY(px2, pz2);
+      you.yaw = yaw; you.pitch = pitch;
+    },
+    /** Stand eight metres off the nearest fire and point the branch at it. */
+    aimAt(kind) {
+      const t = nearestTrouble(kind);
+      if (!t) return false;
+      const a = Math.atan2(t[2] - you.z, t[0] - you.x);
+      const [px2, pz2] = confine(t[0] - Math.cos(a) * 8, t[2] - Math.sin(a) * 8);
+      you.x = px2; you.z = pz2; you.y = field.walkY(px2, pz2);
+      you.yaw = Math.atan2(-(t[0] - you.x), -(t[2] - you.z));
+      const d = Math.hypot(t[0] - you.x, t[2] - you.z);
+      // Aim a little high: the jet droops, and that is the point of it.
+      you.pitch = clamp(Math.atan2(t[1] - (you.y + GROUND.eye), d) + 0.10, -1.3, 1.0);
+      return true;
+    },
+    force() {
+      armed = true;
+      for (const c of crew) { c.mode = 'walk'; c.fig.root.visible = true; }
+      if (!seeded) seedSpotFire();
+    },
+    setSpray(on) { you.spraying = on; },
   };
 }
 
@@ -7170,8 +8473,20 @@ function buildFlight(plane, fire) {
     // only with the gear actually down. `onRunway` answers in runway-local
     // coordinates, including how far off the centreline you are, because
     // arriving in the grass beside it is not a landing.
-    const rw = (!overSea && p.gearOut > 0.85 && typeof airfield !== 'undefined'
-      && airfield && airfield.onRunway) ? airfield.onRunway(p.pos.x, p.pos.z) : null;
+    let rw = null;
+    if (!overSea && p.gearOut > 0.85 && typeof airfield !== 'undefined'
+      && airfield && airfield.onRunway) {
+      rw = airfield.onRunway(p.pos.x, p.pos.z);
+      // Once you are down and slow, the taxiway and the apron count too. A
+      // *landing* has to be on the runway and nothing here changes that — this
+      // only applies to an aeroplane that is already rolling. Without it, the
+      // wheels came off the world the instant you turned off the runway, and
+      // every reason to be on the ground at all is parked on the apron.
+      if (!rw && p.onGround && speed < 40) {
+        const py = airfield.onPaved(p.pos.x, p.pos.z);
+        if (py != null) rw = { t: 0, s: 0, y: py, off: 0, taxi: true };
+      }
+    }
 
     // Cleared every frame and set again only by the runway branch below, so
     // lifting off cannot leave the aeroplane believing it is still rolling.
@@ -8626,6 +9941,9 @@ function buildAudio() {
     nodes.scoop = loopNoise(0, 'bandpass', 2400, 0.55);
     // Sea state, heard only when low over the water.
     nodes.sea = loopNoise(0, 'bandpass', 620, 0.8);
+    // The branch, on the ground. Tighter and higher than the hull ploughing —
+    // a handline is a hiss, not a roar, and it is two feet from your head.
+    nodes.hose = loopNoise(0, 'bandpass', 3400, 1.6);
 
     // ── the fire ──────────────────────────────────────────────────────────
     // A big fire is felt more than heard: a low roar with a slow surge in it.
@@ -9133,6 +10451,8 @@ function buildAudio() {
     // ── water ─────────────────────────────────────────────────────────────
     set(nodes.scoop.g.gain, s.scooping ? 0.42 : 0.0, s.scooping ? 0.05 : 0.25);
     set(nodes.scoop.f.frequency, 1600 + s.speed * 12, 0.15);
+    // The branch. Opens fast and shuts fast, because a jet does.
+    set(nodes.hose.g.gain, (s.hose || 0) * 0.30, s.hose ? 0.04 : 0.10);
     // The sea itself, only once you are down in ground effect.
     const low = 1 - sat((s.alt - 8) / 90);
     set(nodes.sea.g.gain, s.overSea ? low * 0.10 : 0.0, 0.3);
@@ -9247,11 +10567,21 @@ addEventListener('keydown', (e) => {
   // state out of step, and the HUD is not being redrawn to tell you.
   if (state.paused) { if (e.code === 'KeyM') togglePanel(); return; }
   keys.add(e.code);
-  if (e.code === 'KeyC') cycleCamera();
+  if (e.code === 'KeyM') togglePanel();
   if (e.code === 'KeyH') $('hud').hidden = !$('hud').hidden;
+  // E is the door, both ways. It is the only control that means the same thing
+  // in both halves of the game, which is why it is not shared with anything.
+  if (e.code === 'KeyE') { e.preventDefault(); toggleGround(); }
+  if (state.phase === 'ground') {
+    // On foot the aeroplane's controls are all meaningless and several of them
+    // would quietly reconfigure an aircraft you are not sitting in.
+    if (['Space', 'KeyW', 'KeyS', 'KeyA', 'KeyD',
+         'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+    return;
+  }
+  if (e.code === 'KeyC') cycleCamera();
   if (e.code === 'KeyG') input.gear = !input.gear;
   if (e.code === 'KeyX') flight.p.stick.set(0, 0);
-  if (e.code === 'KeyM') togglePanel();
   if (e.code === 'KeyT') toggleAutopilot();
   if (['Space', 'KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyZ',
        'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
@@ -9262,7 +10592,8 @@ addEventListener('blur', () => { keys.clear(); if (flight) flight.p.kb.set(0, 0)
 canvas.addEventListener('click', () => {
   // Never on a touchscreen: there is no pointer to lock, and asking for it on
   // iOS throws up a permission bar over the top of the game.
-  if (!IS_TOUCH && state.phase === 'fly' && !pointerLocked) grabPointer();
+  if (!IS_TOUCH && (state.phase === 'fly' || state.phase === 'ground')
+    && !pointerLocked) grabPointer();
 });
 document.addEventListener('pointerlockchange', () => {
   const had = pointerLocked;
@@ -9278,6 +10609,13 @@ document.addEventListener('pointerlockchange', () => {
 });
 addEventListener('mousemove', (e) => {
   if (!pointerLocked) return;
+  // On foot the mouse is a head, not a stick: it moves the view directly and
+  // does not spring back. Same device, opposite contract.
+  if (state.phase === 'ground') {
+    const g = 0.0020 * flight.p.sens;
+    ground.look(e.movementX * g, e.movementY * g);
+    return;
+  }
   const s = 0.0022 * flight.p.sens;
   flight.p.stick.x = clamp(flight.p.stick.x + e.movementX * s, -1, 1);
   flight.p.stick.y = clamp(flight.p.stick.y - e.movementY * s, -1, 1);
@@ -9513,7 +10851,7 @@ function updateCamera(dt) {
 // ── the world ────────────────────────────────────────────────────────────────
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
-  trees, landmarks, alerts, roads, rail, props, airfield;
+  trees, landmarks, alerts, roads, rail, props, airfield, ground;
 
 function setSun() {
   const a = sunAngles(state.hour);
@@ -9614,6 +10952,9 @@ async function boot() {
 
   await step(82, 'load.fuel');
   fire = buildFire(scene);
+  // After the fire, because the ground mission is downstream of it in every
+  // sense: it does not exist until the front is close enough to throw embers.
+  ground = buildGround(scene, airfield);
 
   await step(85, 'load.maquis');
   trees = buildTrees(scene, fire);
@@ -9829,7 +11170,8 @@ function setPaused(on) {
   // Only while there is a mission to stop. Pausing the loader would strand the
   // world build, and the cinematic and the end screen have their own answer to
   // "make it stop" — the skip button and the reload.
-  if (state.phase !== 'fly' && state.phase !== 'crashing') return;
+  if (state.phase !== 'fly' && state.phase !== 'crashing'
+    && state.phase !== 'ground') return;
   if (state.paused === on) return;
   state.paused = on;
   $('pause').hidden = !on;
@@ -9852,6 +11194,44 @@ function setPaused(on) {
 }
 
 const togglePause = () => setPaused(!state.paused);
+
+/**
+ * The door. Getting out needs the aeroplane stopped on the pavement with the
+ * wheels down; getting back in needs you standing next to it. Both directions
+ * are the same key because from the player's side it is the same act.
+ */
+function toggleGround() {
+  if (!ground || !ground.ok || state.paused) return;
+  if (state.phase === 'ground') {
+    if (ground.leave()) {
+      $('ground-hud').hidden = true;
+      $('hud').hidden = false;
+      if (IS_TOUCH) { $('gtouch').hidden = true; $('touch').hidden = false; }
+      // The chase camera has been parked at the aeroplane this whole time as
+      // far as it knows. Start it where the eyes actually are, or boarding
+      // whips the view across the apron.
+      camPos.copy(camera.position);
+      camAim.copy(flight.p.pos);
+      toast(T('toast.boarded'));
+    }
+    return;
+  }
+  if (ground.enter()) {
+    $('hud').hidden = true;
+    $('ground-hud').hidden = false;
+    if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = false; }
+    if (!IS_TOUCH) grabPointer();
+    toast(T('toast.onFoot'));
+  }
+}
+
+// The prompt is also the button. On a phone there is nowhere left in the flight
+// controls to put a sixth one, and on a desktop clicking the thing that just
+// told you to press E is a reasonable thing to try.
+$('ground-prompt').addEventListener('click', (e) => {
+  e.preventDefault();
+  toggleGround();
+});
 
 $('resume').addEventListener('click', () => setPaused(false));
 $('pause').addEventListener('click', (e) => { if (e.target.id === 'pause') setPaused(false); });
@@ -9914,6 +11294,14 @@ function updateHUD(dt) {
 
   $('g-clock').firstElementChild.textContent = formatClock(state.t);
   $('g-score').firstElementChild.textContent = groupNum(state.score);
+
+  // The offer to get out. It appears only when it is actually true — stopped,
+  // on the pavement, with the field alight — so it never asks you to do
+  // something that would refuse.
+  const gp = $('ground-prompt');
+  const offer = !!(ground && ground.ok && ground.canEnter());
+  gp.hidden = !offer;
+  if (offer) gp.innerHTML = TK('ground.disembark', 'ground.disembarkTouch');
 
   const burntHa = fire.burntArea();
   const activeHa = fire.burningCount() * (fire.cell * fire.cell) / 1e4;
@@ -9990,6 +11378,48 @@ function updateStickHUD() {
 
 let scoredLitres = 0, lastBurning = 0, spotWarned = 0;
 
+// Held-branch override for the headless tests. A dispatched keydown is cleared
+// by the first blur, which a screenshot is enough to cause, so a test that
+// holds water for a minute cannot hold it with a key.
+let debugJet = false;
+let ghAcc = 0;
+
+/**
+ * The ground HUD. Four numbers and a hint, because on foot you are looking at
+ * the world and not at the instruments — anything you have to read is a thing
+ * you were not watching a burning person for.
+ */
+function updateGroundHUD(dt) {
+  ghAcc += dt;
+  if (ghAcc < 0.06) return;
+  ghAcc = 0;
+  const g = ground.hud();
+
+  $('gh-alight').textContent = g.alight;
+  $('gh-crew').textContent = g.crewLeft;
+  $('gh-saved').textContent = g.rescued;
+
+  const pct = g.packMax > 0 ? g.pack / g.packMax : 0;
+  $('gh-fill').style.width = (pct * 100) + '%';
+  $('gh-litres').textContent = Math.round(g.pack);
+  $('gh-reserve').textContent = T('ground.reserve').replace('{n}', groupNum(g.reserve));
+  $('gh-pack').className = pct < 0.18 ? 'low' : '';
+
+  let hint = '', urgent = false;
+  if (g.refilling) hint = T('ground.filling');
+  else if (g.pack < 1 && g.reserve < 1) { hint = T('ground.empty'); urgent = true; }
+  else if (g.pack < 1) { hint = TK('ground.dry', 'ground.dryTouch'); urgent = true; }
+  else if (g.canBoard) hint = TK('ground.board', 'ground.boardTouch');
+  $('gh-hint').textContent = hint;
+  $('gh-hint').className = urgent ? 'urgent' : '';
+
+  // classList, not className: on an SVG element className is a read-only
+  // SVGAnimatedString and assigning to it throws every frame.
+  const ret = $('gh-reticle').classList;
+  ret.toggle('crew', g.aimKind === 'crew');
+  ret.toggle('obj', g.aimKind === 'obj');
+}
+
 function updateMission(dt) {
   state.t += dt;
 
@@ -10025,7 +11455,9 @@ function updateMission(dt) {
   }
   lastBurning = Math.max(lastBurning, burning);
 
-  if (state.cityHealth < 0.55 && state.phase === 'fly') {
+  // Losable from the ground too. The town does not stop burning because you
+  // are standing on an apron forty kilometres of road away from it.
+  if (state.cityHealth < 0.55 && (state.phase === 'fly' || state.phase === 'ground')) {
     state.phase = 'lost';
     showEnd(false);
   }
@@ -10051,7 +11483,7 @@ function redrawEnd() {
   $('over-title').textContent = crashed ? T('over.crashed') : won ? T('over.won') : T('over.lost');
   $('over-sub').textContent = crashed ? T(onWater ? 'over.crashedSub' : 'over.crashedLand')
     : won ? T('over.wonSub') : T('over.lostSub');
-  $('over-stats').innerHTML = [
+  const rows = [
     ['over.time', formatClock(state.t)],
     ['over.dropped', groupNum(state.litresDropped) + ' l'],
     ['over.onTarget',
@@ -10059,7 +11491,16 @@ function redrawEnd() {
     ['over.burnt', Math.round(fire.burntArea()) + ' ha'],
     ['over.intact', Math.round(state.cityHealth * 100) + '%'],
     ['over.score', groupNum(state.score)],
-  ].map(([k, v]) => `<div><span>${T(k)}</span><b>${v}</b></div>`).join('');
+  ];
+  // The airfield only appears if it ever happened. A line reading "0 of 0" for
+  // a rescue nobody was offered is worse than no line.
+  const g = ground && ground.ok ? ground.stats() : null;
+  if (g && g.armed) {
+    rows.push(['over.rescued', `${g.rescued} / ${g.rescued + g.crewLost}`]);
+    rows.push(['over.apron', `${g.objSaved} / ${g.objSaved + g.objLost}`]);
+  }
+  $('over-stats').innerHTML = rows
+    .map(([k, v]) => `<div><span>${T(k)}</span><b>${v}</b></div>`).join('');
 }
 
 function showEnd(won, crashed = false, onWater = false) {
@@ -10069,6 +11510,8 @@ function showEnd(won, crashed = false, onWater = false) {
   endState = { won, crashed, onWater };
   redrawEnd();
   $('touch').hidden = true;
+  $('gtouch').hidden = true;
+  $('ground-hud').hidden = true;
   document.exitPointerLock?.();
 }
 
@@ -10095,6 +11538,13 @@ function frame() {
   U.uTime.value += dt;
   if (!started) return;
 
+  if (state.phase === 'ground') {
+    // The branch, on mouse or space. The aeroplane's own input is deliberately
+    // not read: it is parked, and nothing on foot should be moving its controls.
+    ground.setSpray(mouseDrop || keys.has('Space') || TOUCH.gjet || debugJet);
+    updateMission(dt);
+  }
+
   if (state.phase === 'fly') {
     readKeys(dt);
     flight.update(dt, input);
@@ -10118,7 +11568,11 @@ function frame() {
   state.gust = 0.5 + 0.5 * Math.sin(U.uTime.value * 0.11) * Math.sin(U.uTime.value * 0.043 + 2.1);
   U.uWindSpeed.value = state.windSpeed * (0.8 + 0.4 * state.gust);
 
-  if (state.phase !== 'intro') updateCamera(dt);
+  // On foot the camera *is* the player — no smoothing, no chase spring, no
+  // lerp. Every one of those is there to make an aeroplane readable from
+  // outside, and every one of them reads as motion sickness from inside a head.
+  if (state.phase === 'ground') ground.pose(camera);
+  else if (state.phase !== 'intro') updateCamera(dt);
   U.uCamPos.value.copy(camera.position);
 
   camera.updateMatrixWorld();
@@ -10131,6 +11585,7 @@ function frame() {
   rail.update(dt);
   sea.update(camera);
   fire.update(dt);
+  ground.update(dt);
   // The other three keep working while your wreck is still settling.
   if (state.phase === 'fly' || state.phase === 'crashing') wingmen.update(dt);
   if (state.phase === 'intro') shadow.update(camera.position);
@@ -10171,10 +11626,15 @@ function frame() {
     fireDist: nf ? Math.hypot(nf[0] - camera.position.x, nf[1] - camera.position.z) : 1e9,
     burning: fire.burningCount(),
     stall: state.speed < FLIGHT.vStall * 1.05 && state.altAgl > 3 && state.phase === 'fly',
+    hose: ground.hose(),
   });
 
-  updateStickHUD();
-  updateHUD(dt);
+  if (state.phase === 'ground') {
+    updateGroundHUD(dt);
+  } else {
+    updateStickHUD();
+    updateHUD(dt);
+  }
   updateRadio(dt);
 
   renderer.render(scene, camera);
@@ -10256,6 +11716,7 @@ window.__fr = {
     } : null,
     rail: rail ? { ways: rail.ways, km: +rail.km.toFixed(1), cars: rail.cars,
       lineKm: +rail.lineKm.toFixed(2), tris: Math.round(rail.tris) } : null,
+    ground: ground ? ground.stats() : null,
     props: props ? props.counts : null,
     water: Math.round(flight ? flight.p.water : 0),
     wingmen: wingmen ? wingmen.debug() : null,
@@ -10283,6 +11744,64 @@ window.__fr = {
   key: (code, down = true) => dispatchEvent(
     new KeyboardEvent(down ? 'keydown' : 'keyup', { code })),
   skipIntro: () => beginFlight(),
+  /**
+   * Drive the ground mission from a test without flying an approach first.
+   * `arm` lights the field, `foot` puts you out on it, `look`/`walk`/`jet` are
+   * the three things a player does once there.
+   */
+  ground: {
+    arm: () => ground.force(),
+    /** Park the aeroplane on the apron, stopped, wheels down. */
+    park: () => {
+      const a = airfield.apron;
+      const w = flight.p.water;
+      flight.reset(a[0], a[2], airfield.thresholds[0].yaw, 400);
+      flight.p.water = w;
+      flight.p.pos.set(a[0], a[1] + FLIGHT.gearHeight, a[2]);
+      flight.p.vel.set(0, 0, 0);
+      flight.p.onGround = true;
+      flight.p.gearOut = 1;
+      flight.p.throttle = 0;
+      // The gear animates toward input.gear every frame, so setting gearOut
+      // alone retracts it again within a second and the aeroplane falls through
+      // its own runway. In real play this is true because you pressed G.
+      input.gear = true;
+    },
+    foot: () => { ground.force(); flight.p.onGround = true; flight.p.vel.set(0, 0, 0); },
+    out: () => toggleGround(),
+    apron: () => airfield.apron,
+    put: (x, z, yaw, pitch) => ground.put(x, z, yaw, pitch),
+    look: (dx, dy) => ground.look(dx, dy),
+    jet: (on) => { debugJet = !!on; },
+    aimAt: (kind) => ground.aimAt(kind),
+    aim: () => ({ kind: ground.you.aimKind, at: ground.you.aim.map((v) => +v.toFixed(1)),
+      you: [+ground.you.x.toFixed(1), +ground.you.z.toFixed(1)],
+      yaw: +ground.you.yaw.toFixed(3), pitch: +ground.you.pitch.toFixed(3) }),
+    /**
+     * Step the ground mission without the aeroplane. fastForward() flies, which
+     * on a parked aircraft means taking off from the apron by itself; software
+     * GL runs at a few frames a second, so a real-time settle advances almost no
+     * simulation at all and every timed check here needs this instead.
+     */
+    tick: (secs) => {
+      const dt = 1 / 30;
+      for (let i = 0; i < Math.floor(secs / dt); i++) {
+        state.t += dt;
+        fire.update(dt);
+        ground.setSpray(mouseDrop || keys.has('Space') || TOUCH.gjet || debugJet);
+        ground.update(dt);
+      }
+      return ground.stats();
+    },
+    crew: () => ground.crew.map((c) => ({
+      mode: c.mode, burn: +c.burn.toFixed(2), wet: +c.wet.toFixed(2),
+      at: [Math.round(c.x), Math.round(c.z)],
+    })),
+    objects: () => airfield.objects.map((o) => ({
+      kind: o.kind, burning: +o.burning.toFixed(2), heat: +o.heat.toFixed(2),
+      wet: +o.wet.toFixed(2), spent: +o.spent.toFixed(2), out: o.out,
+    })),
+  },
   beat: (i) => intro.jump(i),
   /** What the on-screen controls are doing, for the headless touch tests. */
   touch: () => ({
@@ -10515,6 +12034,77 @@ function initTouch() {
   tap('t-lvl', (el) => {
     TOUCH.level = !TOUCH.level;
     el.classList.toggle('on', TOUCH.level);
+  });
+
+  // ── on foot ───────────────────────────────────────────────────────────────
+  // The same two halves as in the air, meaning the opposite thing in both. The
+  // left thumb walks. The right half of the screen is the head: there is no
+  // pointer to lock on a phone, so looking around has to be a drag, and it has
+  // to be *relative* — an absolute mapping would snap the view to wherever the
+  // thumb happened to land.
+
+  const walkPad = document.getElementById('walkpad');
+  const walkKnob = document.getElementById('walkknob');
+  let walkId = null, walkOx = 0, walkOy = 0;
+  let lookId = null, lookX = 0, lookY = 0;
+
+  function walkTo(dx, dy) {
+    const r = padRadius;
+    let x = clamp(dx / r, -1, 1);
+    let y = clamp(-dy / r, -1, 1);
+    if (Math.hypot(x, y) < 0.12) { x = 0; y = 0; }
+    TOUCH.gx = x; TOUCH.gy = y;
+    walkKnob.style.transform = `translate(${x * r * 0.6}px, ${-y * r * 0.6}px)`;
+  }
+
+  const gtouch = document.getElementById('gtouch');
+  gtouch.addEventListener('pointerdown', (e) => {
+    if (isControl(e.target)) return;
+    e.preventDefault();
+    if (e.clientX < innerWidth * 0.46 && walkId === null) {
+      walkId = e.pointerId;
+      walkOx = e.clientX; walkOy = e.clientY;
+      walkPad.style.left = `${walkOx}px`;
+      walkPad.style.top = `${walkOy}px`;
+      walkPad.classList.add('on');
+      gtouch.setPointerCapture(e.pointerId);
+      walkTo(0, 0);
+    } else if (lookId === null) {
+      lookId = e.pointerId;
+      lookX = e.clientX; lookY = e.clientY;
+      gtouch.setPointerCapture(e.pointerId);
+    }
+  }, { passive: false });
+
+  gtouch.addEventListener('pointermove', (e) => {
+    if (e.pointerId === walkId) {
+      walkTo(e.clientX - walkOx, e.clientY - walkOy);
+    } else if (e.pointerId === lookId) {
+      if (ground) ground.look((e.clientX - lookX) * 0.0060, (e.clientY - lookY) * 0.0060);
+      lookX = e.clientX; lookY = e.clientY;
+    }
+  }, { passive: false });
+
+  const endGround = (e) => {
+    if (e.pointerId === walkId) {
+      walkId = null;
+      TOUCH.gx = TOUCH.gy = 0;
+      walkPad.classList.remove('on');
+      walkKnob.style.transform = '';
+    } else if (e.pointerId === lookId) {
+      lookId = null;
+    }
+  };
+  gtouch.addEventListener('pointerup', endGround);
+  gtouch.addEventListener('pointercancel', endGround);
+
+  hold('t-jet', (v) => { TOUCH.gjet = v; });
+  tap('t-in', () => toggleGround());
+  tap('t-gset', () => togglePanel());
+  tap('t-gpause', () => togglePause());
+  tap('t-run', (el) => {
+    TOUCH.grun = !TOUCH.grun;
+    el.classList.toggle('on', TOUCH.grun);
   });
 
   measure();

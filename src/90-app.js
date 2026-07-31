@@ -60,11 +60,21 @@ addEventListener('keydown', (e) => {
   // state out of step, and the HUD is not being redrawn to tell you.
   if (state.paused) { if (e.code === 'KeyM') togglePanel(); return; }
   keys.add(e.code);
-  if (e.code === 'KeyC') cycleCamera();
+  if (e.code === 'KeyM') togglePanel();
   if (e.code === 'KeyH') $('hud').hidden = !$('hud').hidden;
+  // E is the door, both ways. It is the only control that means the same thing
+  // in both halves of the game, which is why it is not shared with anything.
+  if (e.code === 'KeyE') { e.preventDefault(); toggleGround(); }
+  if (state.phase === 'ground') {
+    // On foot the aeroplane's controls are all meaningless and several of them
+    // would quietly reconfigure an aircraft you are not sitting in.
+    if (['Space', 'KeyW', 'KeyS', 'KeyA', 'KeyD',
+         'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+    return;
+  }
+  if (e.code === 'KeyC') cycleCamera();
   if (e.code === 'KeyG') input.gear = !input.gear;
   if (e.code === 'KeyX') flight.p.stick.set(0, 0);
-  if (e.code === 'KeyM') togglePanel();
   if (e.code === 'KeyT') toggleAutopilot();
   if (['Space', 'KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyZ',
        'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
@@ -75,7 +85,8 @@ addEventListener('blur', () => { keys.clear(); if (flight) flight.p.kb.set(0, 0)
 canvas.addEventListener('click', () => {
   // Never on a touchscreen: there is no pointer to lock, and asking for it on
   // iOS throws up a permission bar over the top of the game.
-  if (!IS_TOUCH && state.phase === 'fly' && !pointerLocked) grabPointer();
+  if (!IS_TOUCH && (state.phase === 'fly' || state.phase === 'ground')
+    && !pointerLocked) grabPointer();
 });
 document.addEventListener('pointerlockchange', () => {
   const had = pointerLocked;
@@ -91,6 +102,13 @@ document.addEventListener('pointerlockchange', () => {
 });
 addEventListener('mousemove', (e) => {
   if (!pointerLocked) return;
+  // On foot the mouse is a head, not a stick: it moves the view directly and
+  // does not spring back. Same device, opposite contract.
+  if (state.phase === 'ground') {
+    const g = 0.0020 * flight.p.sens;
+    ground.look(e.movementX * g, e.movementY * g);
+    return;
+  }
   const s = 0.0022 * flight.p.sens;
   flight.p.stick.x = clamp(flight.p.stick.x + e.movementX * s, -1, 1);
   flight.p.stick.y = clamp(flight.p.stick.y - e.movementY * s, -1, 1);
@@ -326,7 +344,7 @@ function updateCamera(dt) {
 // ── the world ────────────────────────────────────────────────────────────────
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
-  trees, landmarks, alerts, roads, rail, props, airfield;
+  trees, landmarks, alerts, roads, rail, props, airfield, ground;
 
 function setSun() {
   const a = sunAngles(state.hour);
@@ -427,6 +445,9 @@ async function boot() {
 
   await step(82, 'load.fuel');
   fire = buildFire(scene);
+  // After the fire, because the ground mission is downstream of it in every
+  // sense: it does not exist until the front is close enough to throw embers.
+  ground = buildGround(scene, airfield);
 
   await step(85, 'load.maquis');
   trees = buildTrees(scene, fire);
@@ -642,7 +663,8 @@ function setPaused(on) {
   // Only while there is a mission to stop. Pausing the loader would strand the
   // world build, and the cinematic and the end screen have their own answer to
   // "make it stop" — the skip button and the reload.
-  if (state.phase !== 'fly' && state.phase !== 'crashing') return;
+  if (state.phase !== 'fly' && state.phase !== 'crashing'
+    && state.phase !== 'ground') return;
   if (state.paused === on) return;
   state.paused = on;
   $('pause').hidden = !on;
@@ -665,6 +687,44 @@ function setPaused(on) {
 }
 
 const togglePause = () => setPaused(!state.paused);
+
+/**
+ * The door. Getting out needs the aeroplane stopped on the pavement with the
+ * wheels down; getting back in needs you standing next to it. Both directions
+ * are the same key because from the player's side it is the same act.
+ */
+function toggleGround() {
+  if (!ground || !ground.ok || state.paused) return;
+  if (state.phase === 'ground') {
+    if (ground.leave()) {
+      $('ground-hud').hidden = true;
+      $('hud').hidden = false;
+      if (IS_TOUCH) { $('gtouch').hidden = true; $('touch').hidden = false; }
+      // The chase camera has been parked at the aeroplane this whole time as
+      // far as it knows. Start it where the eyes actually are, or boarding
+      // whips the view across the apron.
+      camPos.copy(camera.position);
+      camAim.copy(flight.p.pos);
+      toast(T('toast.boarded'));
+    }
+    return;
+  }
+  if (ground.enter()) {
+    $('hud').hidden = true;
+    $('ground-hud').hidden = false;
+    if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = false; }
+    if (!IS_TOUCH) grabPointer();
+    toast(T('toast.onFoot'));
+  }
+}
+
+// The prompt is also the button. On a phone there is nowhere left in the flight
+// controls to put a sixth one, and on a desktop clicking the thing that just
+// told you to press E is a reasonable thing to try.
+$('ground-prompt').addEventListener('click', (e) => {
+  e.preventDefault();
+  toggleGround();
+});
 
 $('resume').addEventListener('click', () => setPaused(false));
 $('pause').addEventListener('click', (e) => { if (e.target.id === 'pause') setPaused(false); });
@@ -727,6 +787,14 @@ function updateHUD(dt) {
 
   $('g-clock').firstElementChild.textContent = formatClock(state.t);
   $('g-score').firstElementChild.textContent = groupNum(state.score);
+
+  // The offer to get out. It appears only when it is actually true — stopped,
+  // on the pavement, with the field alight — so it never asks you to do
+  // something that would refuse.
+  const gp = $('ground-prompt');
+  const offer = !!(ground && ground.ok && ground.canEnter());
+  gp.hidden = !offer;
+  if (offer) gp.innerHTML = TK('ground.disembark', 'ground.disembarkTouch');
 
   const burntHa = fire.burntArea();
   const activeHa = fire.burningCount() * (fire.cell * fire.cell) / 1e4;
@@ -803,6 +871,48 @@ function updateStickHUD() {
 
 let scoredLitres = 0, lastBurning = 0, spotWarned = 0;
 
+// Held-branch override for the headless tests. A dispatched keydown is cleared
+// by the first blur, which a screenshot is enough to cause, so a test that
+// holds water for a minute cannot hold it with a key.
+let debugJet = false;
+let ghAcc = 0;
+
+/**
+ * The ground HUD. Four numbers and a hint, because on foot you are looking at
+ * the world and not at the instruments — anything you have to read is a thing
+ * you were not watching a burning person for.
+ */
+function updateGroundHUD(dt) {
+  ghAcc += dt;
+  if (ghAcc < 0.06) return;
+  ghAcc = 0;
+  const g = ground.hud();
+
+  $('gh-alight').textContent = g.alight;
+  $('gh-crew').textContent = g.crewLeft;
+  $('gh-saved').textContent = g.rescued;
+
+  const pct = g.packMax > 0 ? g.pack / g.packMax : 0;
+  $('gh-fill').style.width = (pct * 100) + '%';
+  $('gh-litres').textContent = Math.round(g.pack);
+  $('gh-reserve').textContent = T('ground.reserve').replace('{n}', groupNum(g.reserve));
+  $('gh-pack').className = pct < 0.18 ? 'low' : '';
+
+  let hint = '', urgent = false;
+  if (g.refilling) hint = T('ground.filling');
+  else if (g.pack < 1 && g.reserve < 1) { hint = T('ground.empty'); urgent = true; }
+  else if (g.pack < 1) { hint = TK('ground.dry', 'ground.dryTouch'); urgent = true; }
+  else if (g.canBoard) hint = TK('ground.board', 'ground.boardTouch');
+  $('gh-hint').textContent = hint;
+  $('gh-hint').className = urgent ? 'urgent' : '';
+
+  // classList, not className: on an SVG element className is a read-only
+  // SVGAnimatedString and assigning to it throws every frame.
+  const ret = $('gh-reticle').classList;
+  ret.toggle('crew', g.aimKind === 'crew');
+  ret.toggle('obj', g.aimKind === 'obj');
+}
+
 function updateMission(dt) {
   state.t += dt;
 
@@ -838,7 +948,9 @@ function updateMission(dt) {
   }
   lastBurning = Math.max(lastBurning, burning);
 
-  if (state.cityHealth < 0.55 && state.phase === 'fly') {
+  // Losable from the ground too. The town does not stop burning because you
+  // are standing on an apron forty kilometres of road away from it.
+  if (state.cityHealth < 0.55 && (state.phase === 'fly' || state.phase === 'ground')) {
     state.phase = 'lost';
     showEnd(false);
   }
@@ -864,7 +976,7 @@ function redrawEnd() {
   $('over-title').textContent = crashed ? T('over.crashed') : won ? T('over.won') : T('over.lost');
   $('over-sub').textContent = crashed ? T(onWater ? 'over.crashedSub' : 'over.crashedLand')
     : won ? T('over.wonSub') : T('over.lostSub');
-  $('over-stats').innerHTML = [
+  const rows = [
     ['over.time', formatClock(state.t)],
     ['over.dropped', groupNum(state.litresDropped) + ' l'],
     ['over.onTarget',
@@ -872,7 +984,16 @@ function redrawEnd() {
     ['over.burnt', Math.round(fire.burntArea()) + ' ha'],
     ['over.intact', Math.round(state.cityHealth * 100) + '%'],
     ['over.score', groupNum(state.score)],
-  ].map(([k, v]) => `<div><span>${T(k)}</span><b>${v}</b></div>`).join('');
+  ];
+  // The airfield only appears if it ever happened. A line reading "0 of 0" for
+  // a rescue nobody was offered is worse than no line.
+  const g = ground && ground.ok ? ground.stats() : null;
+  if (g && g.armed) {
+    rows.push(['over.rescued', `${g.rescued} / ${g.rescued + g.crewLost}`]);
+    rows.push(['over.apron', `${g.objSaved} / ${g.objSaved + g.objLost}`]);
+  }
+  $('over-stats').innerHTML = rows
+    .map(([k, v]) => `<div><span>${T(k)}</span><b>${v}</b></div>`).join('');
 }
 
 function showEnd(won, crashed = false, onWater = false) {
@@ -882,6 +1003,8 @@ function showEnd(won, crashed = false, onWater = false) {
   endState = { won, crashed, onWater };
   redrawEnd();
   $('touch').hidden = true;
+  $('gtouch').hidden = true;
+  $('ground-hud').hidden = true;
   document.exitPointerLock?.();
 }
 
@@ -908,6 +1031,13 @@ function frame() {
   U.uTime.value += dt;
   if (!started) return;
 
+  if (state.phase === 'ground') {
+    // The branch, on mouse or space. The aeroplane's own input is deliberately
+    // not read: it is parked, and nothing on foot should be moving its controls.
+    ground.setSpray(mouseDrop || keys.has('Space') || TOUCH.gjet || debugJet);
+    updateMission(dt);
+  }
+
   if (state.phase === 'fly') {
     readKeys(dt);
     flight.update(dt, input);
@@ -931,7 +1061,11 @@ function frame() {
   state.gust = 0.5 + 0.5 * Math.sin(U.uTime.value * 0.11) * Math.sin(U.uTime.value * 0.043 + 2.1);
   U.uWindSpeed.value = state.windSpeed * (0.8 + 0.4 * state.gust);
 
-  if (state.phase !== 'intro') updateCamera(dt);
+  // On foot the camera *is* the player — no smoothing, no chase spring, no
+  // lerp. Every one of those is there to make an aeroplane readable from
+  // outside, and every one of them reads as motion sickness from inside a head.
+  if (state.phase === 'ground') ground.pose(camera);
+  else if (state.phase !== 'intro') updateCamera(dt);
   U.uCamPos.value.copy(camera.position);
 
   camera.updateMatrixWorld();
@@ -944,6 +1078,7 @@ function frame() {
   rail.update(dt);
   sea.update(camera);
   fire.update(dt);
+  ground.update(dt);
   // The other three keep working while your wreck is still settling.
   if (state.phase === 'fly' || state.phase === 'crashing') wingmen.update(dt);
   if (state.phase === 'intro') shadow.update(camera.position);
@@ -984,10 +1119,15 @@ function frame() {
     fireDist: nf ? Math.hypot(nf[0] - camera.position.x, nf[1] - camera.position.z) : 1e9,
     burning: fire.burningCount(),
     stall: state.speed < FLIGHT.vStall * 1.05 && state.altAgl > 3 && state.phase === 'fly',
+    hose: ground.hose(),
   });
 
-  updateStickHUD();
-  updateHUD(dt);
+  if (state.phase === 'ground') {
+    updateGroundHUD(dt);
+  } else {
+    updateStickHUD();
+    updateHUD(dt);
+  }
   updateRadio(dt);
 
   renderer.render(scene, camera);
@@ -1069,6 +1209,7 @@ window.__fr = {
     } : null,
     rail: rail ? { ways: rail.ways, km: +rail.km.toFixed(1), cars: rail.cars,
       lineKm: +rail.lineKm.toFixed(2), tris: Math.round(rail.tris) } : null,
+    ground: ground ? ground.stats() : null,
     props: props ? props.counts : null,
     water: Math.round(flight ? flight.p.water : 0),
     wingmen: wingmen ? wingmen.debug() : null,
@@ -1096,6 +1237,64 @@ window.__fr = {
   key: (code, down = true) => dispatchEvent(
     new KeyboardEvent(down ? 'keydown' : 'keyup', { code })),
   skipIntro: () => beginFlight(),
+  /**
+   * Drive the ground mission from a test without flying an approach first.
+   * `arm` lights the field, `foot` puts you out on it, `look`/`walk`/`jet` are
+   * the three things a player does once there.
+   */
+  ground: {
+    arm: () => ground.force(),
+    /** Park the aeroplane on the apron, stopped, wheels down. */
+    park: () => {
+      const a = airfield.apron;
+      const w = flight.p.water;
+      flight.reset(a[0], a[2], airfield.thresholds[0].yaw, 400);
+      flight.p.water = w;
+      flight.p.pos.set(a[0], a[1] + FLIGHT.gearHeight, a[2]);
+      flight.p.vel.set(0, 0, 0);
+      flight.p.onGround = true;
+      flight.p.gearOut = 1;
+      flight.p.throttle = 0;
+      // The gear animates toward input.gear every frame, so setting gearOut
+      // alone retracts it again within a second and the aeroplane falls through
+      // its own runway. In real play this is true because you pressed G.
+      input.gear = true;
+    },
+    foot: () => { ground.force(); flight.p.onGround = true; flight.p.vel.set(0, 0, 0); },
+    out: () => toggleGround(),
+    apron: () => airfield.apron,
+    put: (x, z, yaw, pitch) => ground.put(x, z, yaw, pitch),
+    look: (dx, dy) => ground.look(dx, dy),
+    jet: (on) => { debugJet = !!on; },
+    aimAt: (kind) => ground.aimAt(kind),
+    aim: () => ({ kind: ground.you.aimKind, at: ground.you.aim.map((v) => +v.toFixed(1)),
+      you: [+ground.you.x.toFixed(1), +ground.you.z.toFixed(1)],
+      yaw: +ground.you.yaw.toFixed(3), pitch: +ground.you.pitch.toFixed(3) }),
+    /**
+     * Step the ground mission without the aeroplane. fastForward() flies, which
+     * on a parked aircraft means taking off from the apron by itself; software
+     * GL runs at a few frames a second, so a real-time settle advances almost no
+     * simulation at all and every timed check here needs this instead.
+     */
+    tick: (secs) => {
+      const dt = 1 / 30;
+      for (let i = 0; i < Math.floor(secs / dt); i++) {
+        state.t += dt;
+        fire.update(dt);
+        ground.setSpray(mouseDrop || keys.has('Space') || TOUCH.gjet || debugJet);
+        ground.update(dt);
+      }
+      return ground.stats();
+    },
+    crew: () => ground.crew.map((c) => ({
+      mode: c.mode, burn: +c.burn.toFixed(2), wet: +c.wet.toFixed(2),
+      at: [Math.round(c.x), Math.round(c.z)],
+    })),
+    objects: () => airfield.objects.map((o) => ({
+      kind: o.kind, burning: +o.burning.toFixed(2), heat: +o.heat.toFixed(2),
+      wet: +o.wet.toFixed(2), spent: +o.spent.toFixed(2), out: o.out,
+    })),
+  },
   beat: (i) => intro.jump(i),
   /** What the on-screen controls are doing, for the headless touch tests. */
   touch: () => ({

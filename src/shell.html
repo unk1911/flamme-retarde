@@ -99,6 +99,32 @@
   <div id="radio"></div>
   <div id="wingmen"></div>
   <div id="compass"><div id="compass-tape"></div></div>
+  <!-- Only ever shown when getting out would actually work. -->
+  <div id="ground-prompt" hidden></div>
+</div>
+
+<!-- ───────────────────────────────────────────── on foot, at the airfield ── -->
+<!-- A separate HUD rather than a reconfigured one: nothing on the flight panel
+     means anything when you are standing on the apron with a branch. -->
+<div id="ground-hud" hidden>
+  <div id="gh-top">
+    <div class="gauge"><b id="gh-alight">0</b><span data-i18n="ground.alight">alight</span></div>
+    <div class="gauge urgent"><b id="gh-crew">0</b><span data-i18n="ground.crew">crew alight</span></div>
+    <div class="gauge"><b id="gh-saved">0</b><span data-i18n="ground.saved">brought out</span></div>
+  </div>
+
+  <div id="gh-pack">
+    <div class="gh-track"><i id="gh-fill"></i></div>
+    <div class="gh-read"><b id="gh-litres">400</b><span data-i18n="hud.litres">litres</span></div>
+    <small id="gh-reserve"></small>
+  </div>
+
+  <svg id="gh-reticle" viewBox="-40 -40 80 80" aria-hidden="true">
+    <path d="M-24 0 h11 M24 0 h-11 M0 -24 v11 M0 24 v-11" />
+    <circle cx="0" cy="0" r="2.6" />
+  </svg>
+
+  <div id="gh-hint"></div>
 </div>
 
 <!-- ───────────────────────────────────────────────── touch flight controls ── -->
@@ -122,6 +148,23 @@
     <button id="t-cam" data-i18n="touch.cam">CAM</button>
     <button id="t-set" data-i18n="touch.set">SET</button>
     <button id="t-pause" data-i18n="touch.pause">II</button>
+  </div>
+</div>
+
+<!-- ───────────────────────────────────────────── touch, on foot ── -->
+<!-- Same halves as in the air and the opposite meaning in both: the left thumb
+     walks instead of flying, and the right half of the screen is a head rather
+     than a set of buttons, because there is no pointer to lock on a phone. -->
+<div id="gtouch" hidden>
+  <div id="walkpad"><i id="walkknob"></i></div>
+  <div id="gbig">
+    <button id="t-jet" data-i18n="touch.jet">WATER</button>
+  </div>
+  <div id="gmini">
+    <button id="t-run" data-i18n="touch.run">RUN</button>
+    <button id="t-in" data-i18n="touch.in">IN</button>
+    <button id="t-gset" data-i18n="touch.set">SET</button>
+    <button id="t-gpause" data-i18n="touch.pause">II</button>
   </div>
 </div>
 

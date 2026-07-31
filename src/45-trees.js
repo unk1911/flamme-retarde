@@ -187,6 +187,11 @@ function buildTrees(scene, fire) {
     for (let i = 0; i < VEG.perTile; i++) {
       const x = ox + rng() * T, z = oz + rng() * T;
       if (Math.abs(x) > EDGE || Math.abs(z) > EDGE) continue;
+      // Not on the airfield. The land-cover raster has never heard of Rokići —
+      // it is a fictitious field dropped onto real scrub — so without this the
+      // apron grows cypresses and there is a pine through the runway.
+      if (typeof airfield !== 'undefined' && airfield && airfield.inField
+        && airfield.inField(x, z, 25)) continue;
       const c = coverAt(x, z);
       const table = GROWS[c];
       if (!table) continue;

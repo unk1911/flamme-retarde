@@ -124,12 +124,23 @@ function findAirfieldSite() {
  * the fire that lights them is read out of the same automaton the aeroplane has
  * been fighting from the air.
  */
+// `soak` is litres of water it takes to put one out, `life` is seconds it
+// survives while burning. A 200-litre drum of avgas is not put out with a bucket
+// and does not last long; a timber crate is the other way round.
+// `soak` is litres it takes to put one out and `life` is seconds it survives
+// while burning. The two are tuned against each other and against the branch's
+// 9.2 l/s: at a wetness decay of 0.030/s while alight, a crate goes out in five
+// seconds of sustained water, a drum in eight and a fuel bowser in fifteen, out
+// of a pack that holds forty-three seconds' worth. Get these wrong in the wrong
+// direction and an object is not merely hard, it is arithmetically impossible —
+// the first pass had a drum absorbing water more slowly than its own wetness
+// drained away, so no amount of water ever put one out.
 const BURNABLE = [
-  { kind: 'drum', w: 0.62, h: 0.9, fuel: 1.0, col: [0.62, 0.24, 0.14] },
-  { kind: 'crate', w: 1.3, h: 1.1, fuel: 0.8, col: [0.52, 0.40, 0.26] },
-  { kind: 'bowser', w: 2.4, h: 2.9, fuel: 1.0, col: [0.72, 0.70, 0.30] },
-  { kind: 'tug', w: 1.7, h: 1.5, fuel: 0.55, col: [0.28, 0.42, 0.30] },
-  { kind: 'cub', w: 9.0, h: 2.2, fuel: 0.7, col: [0.86, 0.84, 0.78] },
+  { kind: 'drum', w: 0.62, h: 0.9, fuel: 1.0, soak: 60, life: 70, col: [0.62, 0.24, 0.14] },
+  { kind: 'crate', w: 1.3, h: 1.1, fuel: 0.8, soak: 40, life: 105, col: [0.52, 0.40, 0.26] },
+  { kind: 'bowser', w: 2.4, h: 2.9, fuel: 1.0, soak: 95, life: 90, col: [0.72, 0.70, 0.30] },
+  { kind: 'tug', w: 1.7, h: 1.5, fuel: 0.55, soak: 65, life: 110, col: [0.28, 0.42, 0.30] },
+  { kind: 'cub', w: 9.0, h: 2.2, fuel: 0.7, soak: 85, life: 100, col: [0.86, 0.84, 0.78] },
 ];
 
 function buildAirfield(scene) {
@@ -271,23 +282,34 @@ function buildAirfield(scene) {
   };
 
   const AS = APRON_S + 12;                            // apron front edge
+
+  // Anything you should not be able to walk through, in runway-local
+  // coordinates: {t, s, half-along, half-across}. The ground mode pushes the
+  // player back out of these, so they are recorded as the structures are built
+  // rather than measured off them afterwards and left to drift apart.
+  const blockers = [];
+  const solid = (t, s, h, along, across, col, top) => {
+    lbox(t, s, h, along, across, col, top);
+    blockers.push({ t, s, a: along / 2, c: across / 2 });
+  };
+
   // Terminal: one storey, a glazed band, and a red pantile roof, because a
   // Dalmatian shed is a Dalmatian shed even when it is airside.
-  lbox(-46, AS + 34, 5.4, 40, 15, WALL, WALL);
+  solid(-46, AS + 34, 5.4, 40, 15, WALL, WALL);
   lbox(-46, AS + 34, 0.9, 42, 17, RED, RED);          // eaves course
   lbox(-46, AS + 26.6, 2.0, 36, 0.4, GLASSC);         // the glazing
   lbox(-46, AS + 34, 1.2, 41, 16, RED, RED);
   // Two hangars, open-fronted, with curved-looking roofs faked by three facets.
   for (const t of [22, 64]) {
-    lbox(t, AS + 30, 8.2, 34, 26, WALL, ROOF);
+    solid(t, AS + 30, 8.2, 34, 26, WALL, ROOF);
     lbox(t, AS + 16.6, 7.0, 30, 0.5, DARK);           // the door opening
   }
   // Control tower: a stalk and a cab with a visible lean on the glass.
-  lbox(-6, AS + 52, 13.0, 7, 7, WALL, WALL);
+  solid(-6, AS + 52, 13.0, 7, 7, WALL, WALL);
   lbox(-6, AS + 52, 3.1, 10, 10, GLASSC, ROOF);
   // Fuel farm, set well away from everything, which is the one thing about an
   // airfield layout that is not aesthetic.
-  for (let i = 0; i < 3; i++) lbox(102 + i * 11, AS + 58, 5.0, 8, 8, [0.76, 0.77, 0.78], ROOF);
+  for (let i = 0; i < 3; i++) solid(102 + i * 11, AS + 58, 5.0, 8, 8, [0.76, 0.77, 0.78], ROOF);
   // Windsock mast, and a segmented cone that will not move because nothing here
   // has an update loop — the wind direction it shows is the mission's.
   lbox(-halfL + 120, FIELD.width / 2 + 26, 7.0, 0.5, 0.5, DARK);
@@ -306,12 +328,124 @@ function buildAirfield(scene) {
   scene.add(buildings);
 
   // ── the things that burn ───────────────────────────────────────────────────
+  //
+  // These were data with no geometry at all, which was defensible for exactly as
+  // long as the only way to see them was from a thousand feet. On foot they are
+  // the whole game, so each one is built for real — and each one records the
+  // slice of the vertex buffer it owns, because the way it darkens as it chars
+  // and as it soaks is to have those vertices rewritten. That costs nothing at
+  // thirty objects and needs no uniform the shared material does not already
+  // declare, which the shared material would refuse to compile.
   const rng = mulberry32(CONFIG.seed ^ 0x00a12f);
   const objects = [];
+  const ob = propBuilder();
+  const DARKW = [0.10, 0.10, 0.11];
+
+  function shapeOf(spec, ox, oy, oz, fx, fz, rx, rz) {
+    /** object-local (along, up, across) -> world */
+    const L = (a, u, r) => [ox + fx * a + rx * r, oy + u, oz + fz * a + rz * r];
+    const box = (a, u, r, la, lu, lr, col, top) => {
+      const A = la / 2, U = lu / 2, R = lr / 2;
+      const v = [
+        L(a - A, u - U, r - R), L(a + A, u - U, r - R), L(a + A, u - U, r + R), L(a - A, u - U, r + R),
+        L(a - A, u + U, r - R), L(a + A, u + U, r - R), L(a + A, u + U, r + R), L(a - A, u + U, r + R),
+      ];
+      ob.quad(v[0], v[3], v[2], v[1], col);
+      ob.quad(v[4], v[5], v[6], v[7], top || col);
+      ob.quad(v[0], v[1], v[5], v[4], col);
+      ob.quad(v[1], v[2], v[6], v[5], col);
+      ob.quad(v[2], v[3], v[7], v[6], col);
+      ob.quad(v[3], v[0], v[4], v[7], col);
+    };
+    /** An eight-sided prism standing on end — a drum. */
+    const drum = (a, u, r, rad, h, col, top) => {
+      const K = 8;
+      const ring = (y) => Array.from({ length: K }, (_, i) => {
+        const th = (i / K) * TAU;
+        return L(a + Math.cos(th) * rad, y, r + Math.sin(th) * rad);
+      });
+      const lo = ring(u), hi = ring(u + h), c = L(a, u + h, r);
+      for (let i = 0; i < K; i++) {
+        const j = (i + 1) % K;
+        ob.quad(lo[i], lo[j], hi[j], hi[i], col);
+        ob.tri(hi[i], hi[j], c, top || col);
+      }
+    };
+    /** The same prism laid on its side along the object axis — a tanker barrel. */
+    const barrel = (a, u, r, rad, len, col) => {
+      const K = 8;
+      const ring = (aa) => Array.from({ length: K }, (_, i) => {
+        const th = (i / K) * TAU;
+        return L(aa, u + Math.cos(th) * rad, r + Math.sin(th) * rad);
+      });
+      const back = ring(a - len / 2), front = ring(a + len / 2);
+      const cb = L(a - len / 2, u, r), cf = L(a + len / 2, u, r);
+      for (let i = 0; i < K; i++) {
+        const j = (i + 1) % K;
+        ob.quad(back[i], back[j], front[j], front[i], col);
+        ob.tri(back[j], back[i], cb, col);
+        ob.tri(front[i], front[j], cf, col);
+      }
+    };
+
+    switch (spec.kind) {
+      case 'drum':
+        drum(0, 0, 0, 0.30, 0.88, spec.col, [0.50, 0.20, 0.12]);
+        drum(0, 0.24, 0, 0.325, 0.07, [0.42, 0.16, 0.09]);
+        drum(0, 0.57, 0, 0.325, 0.07, [0.42, 0.16, 0.09]);
+        break;
+      case 'crate':
+        box(0, 0.52, 0, 1.30, 1.04, 1.10, spec.col, [0.60, 0.47, 0.31]);
+        box(0, 1.07, 0, 1.36, 0.10, 1.16, [0.44, 0.33, 0.21]);
+        break;
+      case 'bowser':
+        box(0, 0.62, 0, 4.10, 0.44, 1.90, [0.24, 0.24, 0.25]);
+        barrel(-0.35, 1.42, 0, 0.76, 2.70, spec.col);
+        box(1.62, 1.28, 0, 1.20, 1.30, 1.72, spec.col, spec.col);
+        box(1.66, 1.74, 0, 1.10, 0.42, 1.60, [0.10, 0.14, 0.17]);
+        for (const a of [1.45, -1.25]) {
+          for (const r of [-0.92, 0.92]) box(a, 0.42, r, 0.78, 0.78, 0.26, DARKW);
+        }
+        break;
+      case 'tug':
+        box(0, 0.62, 0, 2.30, 0.66, 1.42, spec.col);
+        box(-0.25, 1.28, 0, 1.00, 0.72, 1.30, spec.col, spec.col);
+        box(-0.22, 1.32, 0, 1.02, 0.44, 1.34, [0.10, 0.14, 0.17]);
+        for (const a of [0.80, -0.85]) {
+          for (const r of [-0.70, 0.70]) box(a, 0.34, r, 0.62, 0.62, 0.22, DARKW);
+        }
+        break;
+      case 'cub': {
+        // A high-wing taildragger: nine metres of wing, seven of aeroplane, and
+        // the one object on this apron that reads as an aircraft from the hip.
+        const TRIM = [0.55, 0.16, 0.14];
+        box(1.90, 1.05, 0, 2.00, 0.95, 0.86, spec.col);
+        box(0.10, 1.02, 0, 1.80, 0.86, 0.78, spec.col);
+        box(-1.90, 0.98, 0, 2.20, 0.52, 0.42, spec.col);
+        box(1.35, 1.46, 0, 1.05, 0.40, 0.80, [0.10, 0.14, 0.17]);
+        box(2.95, 1.05, 0, 0.16, 0.74, 0.74, DARKW);
+        box(0, 1.86, 0, 1.45, 0.13, 9.00, spec.col, spec.col);
+        box(0, 1.84, 0, 1.52, 0.16, 0.58, TRIM, TRIM);
+        for (const r of [-1.7, 1.7]) box(0, 1.42, r, 0.14, 0.86, 0.10, spec.col);
+        box(-2.75, 1.62, 0, 1.10, 1.30, 0.12, spec.col);
+        box(-2.75, 1.02, 0, 0.85, 0.10, 3.00, spec.col, spec.col);
+        for (const r of [-0.95, 0.95]) box(1.55, 0.34, r, 0.62, 0.62, 0.20, DARKW);
+        box(-2.85, 0.20, 0, 0.30, 0.30, 0.14, DARKW);
+        break;
+      }
+    }
+  }
+
   const place = (spec, t, s, yawOff = 0) => {
     const p = P(t, s);
+    const ca = Math.cos(yawOff), sa = Math.sin(yawOff);
+    const fx = dx * ca + px * sa, fz = dz * ca + pz * sa;
+    const rx = -dx * sa + px * ca, rz = -dz * sa + pz * ca;
+    const v0 = ob.count();
+    shapeOf(spec, p[0], p[1], p[2], fx, fz, rx, rz);
     objects.push({
-      ...spec, x: p[0], y: p[1], z: p[2], yaw: yaw + yawOff,
+      ...spec, x: p[0], y: p[1], z: p[2], t, s, yaw: yaw + yawOff,
+      v0, v1: ob.count(),
       // Every one of these starts intact and dry. `heat` climbs when the fire
       // reaches it, `wet` climbs when you point a hose at it, and the two fight.
       burning: 0, heat: 0, wet: 0, out: false, spent: 0,
@@ -320,16 +454,50 @@ function buildAirfield(scene) {
   // Drums in two rows by the fuel farm, crates on the apron, vehicles parked
   // nose-in to the hangars, and three light aircraft on the line.
   for (let i = 0; i < 14; i++) {
-    place(BURNABLE[0], 96 + (i % 7) * 1.5, AS + 40 + Math.floor(i / 7) * 1.6);
+    place(BURNABLE[0], 92 + (i % 7) * 3.1, AS + 40 + Math.floor(i / 7) * 3.4);
   }
   for (let i = 0; i < 9; i++) {
-    place(BURNABLE[1], -20 + (i % 3) * 2.0 + rng() * 0.6, AS + 8 + Math.floor(i / 3) * 2.2);
+    place(BURNABLE[1], -22 + (i % 3) * 3.4 + rng() * 0.8, AS + 8 + Math.floor(i / 3) * 3.6);
   }
   place(BURNABLE[2], 4, AS + 10);
   place(BURNABLE[2], 88, AS + 44);
   place(BURNABLE[3], 30, AS + 12);
   place(BURNABLE[3], 58, AS + 12);
   for (let i = 0; i < 3; i++) place(BURNABLE[4], -60 + i * 16, AS + 9, 0.06 * (i - 1));
+
+  const objMesh = new THREE.Mesh(ob.geo(), solidMaterial(0xffffff, {
+    spec: 0.10, specPower: 30, side: THREE.DoubleSide,
+    body: 'n = gl_FrontFacing ? n : -n; base *= vVCol;',
+  }));
+  objMesh.frustumCulled = false;
+  scene.add(objMesh);
+
+  const objCol = objMesh.geometry.attributes.aVCol;
+  const objBase = Float32Array.from(objCol.array);     // the pristine colours
+  let objDirty = false;
+
+  /**
+   * Repaint one object from its state. Char and water both darken it, but they
+   * are not the same darkening: soot goes flat and stays, water goes deep and
+   * dries off, so the wet term is allowed to come back and the charred one is
+   * not. The whole attribute re-uploads at most once a frame and only when
+   * something actually changed — seventy kilobytes is not worth being clever
+   * about, but doing it sixty times a second for nothing would be.
+   */
+  function tint(o) {
+    const arr = objCol.array;
+    const char = 1 - 0.84 * o.spent;
+    const damp = 1 - 0.28 * sat(o.wet);
+    for (let i = o.v0 * 3; i < o.v1 * 3; i += 3) {
+      arr[i] = objBase[i] * char * damp;
+      arr[i + 1] = objBase[i + 1] * char * damp * (1 - 0.06 * o.spent);
+      arr[i + 2] = objBase[i + 2] * char * damp * (1 - 0.12 * o.spent);
+    }
+    objDirty = true;
+  }
+  const flushTint = () => {
+    if (objDirty) { objCol.needsUpdate = true; objDirty = false; }
+  };
 
   /**
    * Where on the runway, if anywhere. Returns runway-local coordinates plus how
@@ -373,13 +541,62 @@ function buildAirfield(scene) {
   ];
   const apronCentre = P(0, APRON_S + FIELD.apronD * 0.45);
 
+  /** World -> runway-local. The inverse of P(), which the ground mode lives in. */
+  const local = (x, z) => {
+    const ex = x - cx, ez = z - cz;
+    return [ex * dx + ez * dz, ex * px + ez * pz];
+  };
+
+  /**
+   * The fence line, which is what the ground mode is bounded by. A rescue at an
+   * airfield is a set-piece: the fence is the edge of the mission and there is
+   * nothing on the far side of it but eleven kilometres of karst.
+   */
+  const bounds = {
+    t0: -halfL - 36, t1: halfL + 36,
+    s0: -FIELD.width / 2 - 51, s1: APRON_S + FIELD.apronD + 20,
+  };
+
+  /**
+   * Where the ground crew are when it starts. Spread across the apron and the
+   * hangar mouths rather than clustered, so the first thirty seconds are a
+   * choice about who you reach first.
+   */
+  const crewSpots = [
+    P(-34, AS + 14), P(-8, AS + 20), P(14, AS + 13),
+    P(40, AS + 22), P(70, AS + 15), P(94, AS + 34), P(-56, AS + 26),
+  ];
+
+  /**
+   * Inside the wire, with an optional margin. Used to keep the vegetation off:
+   * the land-cover raster describes the real scrub that is really there, and has
+   * no idea an aerodrome was invented on top of it.
+   */
+  function inField(x, z, pad = 0) {
+    const [t, s] = local(x, z);
+    return t > bounds.t0 - pad && t < bounds.t1 + pad
+      && s > bounds.s0 - pad && s < bounds.s1 + pad;
+  }
+
+  /**
+   * Ground height anywhere on the field: the fitted pavement plane where there
+   * is pavement, the real terrain where there is not. Walking off the apron on
+   * to the grass has to step down, not fall through.
+   */
+  function walkY(x, z) {
+    const paved = onPaved(x, z);
+    return paved != null ? paved : Math.max(groundAt(x, z), 0);
+  }
+
   return {
-    site, onRunway, onPaved, objects, thresholds,
+    site, onRunway, onPaved, walkY, inField, objects, thresholds, blockers, crewSpots,
+    bounds, local, toWorld: P, planeY, tint, flushTint,
     centre: [cx, planeY(0), cz],
     apron: apronCentre,
     axis: { dx, dz, px, pz, yaw, halfL },
-    pavMesh, buildings,
+    pavMesh, buildings, objMesh,
     tris: pav.pos.length / 9
-      + buildings.geometry.attributes.position.count / 3,
+      + buildings.geometry.attributes.position.count / 3
+      + objMesh.geometry.attributes.position.count / 3,
   };
 }

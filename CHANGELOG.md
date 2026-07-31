@@ -8,6 +8,74 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.3.0] — 2026-07-31
+
+### Added — Rokići, on foot
+
+- **The ground rescue.** Land at Rokići with the wheels down, stop, and you can
+  get out. The game becomes first-person: a branch instead of six tonnes, a jet
+  that reaches twenty metres instead of a drop that covers two hundred, and four
+  hundred litres at a time instead of six thousand. What you are putting out is
+  drums, crates, a fuel bowser, tugs and three light aircraft — and the ground
+  crew, some of whom are alight.
+- **The people are rescued, not shot.** Somebody whose clothing has caught runs,
+  because that is what people do and it is the worst possible thing to do. You
+  soak them and they go down and they are safe. If you are slow they collapse,
+  and if you are slower than that you lose them, and the radio says so. There is
+  nothing on this apron you can aim at that you should not be aiming at.
+- **Nothing here is scripted alight.** The airfield catches because the same
+  automaton that has been chasing you all game gets within spotting range and
+  starts throwing embers — a crown fire in Mediterranean maquis puts burning
+  material a kilometre and more ahead of the front, which is exactly how these
+  fires get around the people fighting them. Leave it alone for three minutes
+  and five objects and three of the seven crew are gone. It happens whether or
+  not you are there to watch.
+- **The water is the whole loop.** Four hundred litres at 9.2 l/s is forty-three
+  seconds of jet. Then you are walking back to the hull to refill off the tank
+  while everything you were winning against carries on burning. A crate takes
+  five seconds of sustained water, a drum eight, a fuel bowser fifteen.
+- The branch traces a **ballistic jet**, not a ray. How much it droops is the
+  only aiming problem the mode has, and a raycast would delete it.
+- The end screen gains two lines — crew brought out, and how much of the apron
+  survived — but only if the airfield ever caught. `0 of 0` for a rescue nobody
+  was offered is worse than no line at all.
+- Full **touch controls**: the left thumb walks, the right half of the screen is
+  a head, and WATER is held. Same two halves as in the air, meaning the opposite
+  thing in both. Strings in all three languages, as ever.
+
+### Fixed
+
+- **The runway is a firebreak now.** The land-cover raster describes the real
+  scrub that is really there and has never heard of the aerodrome invented on
+  top of it, and an automaton cell is fifty metres square — so the fire walked
+  straight across eleven hundred metres of asphalt as if it were maquis. That
+  put the entire ground crew alight inside a minute and made the rescue
+  unwinnable for a reason nobody could see. Paved cells now carry no fuel, which
+  is half of what a runway *is*.
+- **The apron was growing cypresses**, for the same reason and with the same
+  fix: the vegetation now stops at the wire.
+- **You can taxi.** The flight model only recognised the runway itself, so the
+  wheels came off the world the instant you turned off it — and everything worth
+  getting out for is parked on the apron. A landing still has to be on the
+  runway; an aeroplane already rolling below 40 m/s may now use the taxiway and
+  the apron too.
+- The burnable props had **no geometry at all**. That was defensible for exactly
+  as long as the only way to see them was from a thousand feet.
+
+### Fixed — numbers that could not work
+
+- **A drum could not be put out by any amount of water.** Its wetness drained
+  faster than the branch could deliver, so the target was not hard, it was
+  arithmetically impossible. Every `soak` in `BURNABLE` is now checked against
+  flow and decay together.
+- **The jet walked through its own targets.** It advances about a metre per
+  integration step and a fuel drum is 0.6 m across, so a point test at the step
+  endpoints reported a clean miss every frame. It is a swept test now.
+- **The first tuning pass set the whole apron alight in six seconds** — thirty
+  objects and all seven crew. Radiant ignition is a minute-scale process, not a
+  second-scale one; the rates were an order of magnitude too big, the drums were
+  stacked at 1.5 m centres, and both seed objects came out of the same row.
+
 ## [1.2.0] — 2026-07-30
 
 ### Fixed

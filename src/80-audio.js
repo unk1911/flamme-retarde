@@ -164,6 +164,9 @@ function buildAudio() {
     nodes.scoop = loopNoise(0, 'bandpass', 2400, 0.55);
     // Sea state, heard only when low over the water.
     nodes.sea = loopNoise(0, 'bandpass', 620, 0.8);
+    // The branch, on the ground. Tighter and higher than the hull ploughing —
+    // a handline is a hiss, not a roar, and it is two feet from your head.
+    nodes.hose = loopNoise(0, 'bandpass', 3400, 1.6);
 
     // ── the fire ──────────────────────────────────────────────────────────
     // A big fire is felt more than heard: a low roar with a slow surge in it.
@@ -671,6 +674,8 @@ function buildAudio() {
     // ── water ─────────────────────────────────────────────────────────────
     set(nodes.scoop.g.gain, s.scooping ? 0.42 : 0.0, s.scooping ? 0.05 : 0.25);
     set(nodes.scoop.f.frequency, 1600 + s.speed * 12, 0.15);
+    // The branch. Opens fast and shuts fast, because a jet does.
+    set(nodes.hose.g.gain, (s.hose || 0) * 0.30, s.hose ? 0.04 : 0.10);
     // The sea itself, only once you are down in ground effect.
     const low = 1 - sat((s.alt - 8) / 90);
     set(nodes.sea.g.gain, s.overSea ? low * 0.10 : 0.0, 0.3);

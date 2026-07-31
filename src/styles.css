@@ -320,6 +320,87 @@ button {
 #reticle.armed path, #reticle.armed circle { stroke: var(--ember-hi); }
 #reticle.armed { opacity: .95; }
 
+/* ── on foot ────────────────────────────────────────────────────────────────
+   The ground HUD borrows the flight HUD's typography and none of its layout.
+   Standing on an apron you are looking at the world, so everything here sits
+   at the edges and the middle is left alone apart from the reticle. */
+
+#ground-prompt {
+  position: absolute; left: 50%; bottom: 22%; transform: translateX(-50%);
+  font-family: var(--mono); font-size: .72rem; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--salt); text-align: center;
+  background: rgba(7, 11, 14, .55); padding: .5rem 1.1rem; border-radius: 3px;
+  border: 1px solid rgba(79, 210, 232, .3);
+  pointer-events: auto; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+#ground-prompt b { color: var(--sea); font-weight: 400; }
+
+#ground-hud {
+  position: fixed; inset: 0; z-index: 40; pointer-events: none;
+  font-family: var(--mono); color: var(--salt);
+}
+#gh-top {
+  position: absolute; top: 1.1rem; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 2.4rem;
+}
+#gh-top .gauge { text-align: center; }
+#gh-top .gauge b {
+  display: block; font-size: 1.5rem; font-weight: 300; letter-spacing: .02em;
+}
+#gh-top .gauge span {
+  display: block; font-size: .5rem; letter-spacing: .22em;
+  text-transform: uppercase; color: #7f949c; margin-top: .1rem;
+}
+/* The one number that is a person rather than a thing. */
+#gh-top .gauge.urgent b { color: var(--ember-hi); }
+
+#gh-pack {
+  position: absolute; left: 1.6rem; bottom: 1.6rem; width: 13rem;
+}
+/* On a phone the bottom left corner belongs to the buttons, so the pack sits
+   above them rather than underneath them. */
+html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
+#gh-pack .gh-track {
+  height: 8px; background: rgba(255, 255, 255, .10);
+  border: 1px solid rgba(255, 255, 255, .16); border-radius: 2px; overflow: hidden;
+}
+#gh-pack .gh-track i {
+  display: block; height: 100%; width: 100%;
+  background: linear-gradient(90deg, var(--sea-dim), var(--sea));
+  transition: width .12s linear;
+}
+#gh-pack.low .gh-track i { background: linear-gradient(90deg, #7a3a1c, var(--ember-hi)); }
+#gh-pack .gh-read {
+  display: flex; align-items: baseline; gap: .4rem; margin-top: .35rem;
+}
+#gh-pack .gh-read b { font-size: 1.15rem; font-weight: 300; }
+#gh-pack .gh-read span,
+#gh-pack small {
+  font-size: .5rem; letter-spacing: .2em; text-transform: uppercase; color: #7f949c;
+}
+#gh-pack small { display: block; margin-top: .15rem; }
+
+#gh-reticle {
+  position: absolute; left: 50%; top: 50%; width: 84px; height: 84px;
+  transform: translate(-50%, -50%); opacity: .45;
+}
+#gh-reticle path, #gh-reticle circle {
+  stroke: var(--salt); stroke-width: 1.4; fill: none;
+}
+/* What the jet would land on if you opened it now: a thing, or a person. */
+#gh-reticle.obj path, #gh-reticle.obj circle { stroke: var(--sea); }
+#gh-reticle.obj { opacity: .85; }
+#gh-reticle.crew path, #gh-reticle.crew circle { stroke: var(--ember-hi); }
+#gh-reticle.crew { opacity: 1; }
+
+#gh-hint {
+  position: absolute; left: 50%; bottom: 8.5rem; transform: translateX(-50%);
+  font-size: .62rem; letter-spacing: .2em; text-transform: uppercase;
+  color: #9fb2b9; text-align: center;
+}
+#gh-hint.urgent { color: var(--ember-hi); }
+
 /* the virtual stick ---------------------------------------------------------
    Deltas from a locked pointer have no home of their own, so the stick has to
    be drawn or you are flying blind about your own inputs. */
@@ -611,14 +692,14 @@ button {
 
 /* ─────────────────────────────────────────────────── touch flight controls ── */
 
-#touch {
+#touch, #gtouch {
   position: fixed; inset: 0; z-index: 45; pointer-events: none;
   font-family: var(--mono); touch-action: none;
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
            env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
-#touch[hidden] { display: none; }
-#touch button {
+#touch[hidden], #gtouch[hidden] { display: none; }
+#touch button, #gtouch button {
   pointer-events: auto; touch-action: none;
   -webkit-tap-highlight-color: transparent;
   font-family: var(--mono); letter-spacing: .16em; text-transform: uppercase;
@@ -628,12 +709,12 @@ button {
   transition: background .1s linear, color .1s linear, border-color .1s linear,
               transform .1s ease;
 }
-#touch button.on { transform: scale(.94); }
+#touch button.on, #gtouch button.on { transform: scale(.94); }
 
 /* The floating stick. It has no home of its own — it appears centred on
    wherever the thumb landed, which is the only arrangement that works when
    you cannot see your own hand. */
-#flypad {
+#flypad, #walkpad {
   --pad: min(25vmin, 168px);
   position: absolute; left: 0; top: 0;
   width: var(--pad); height: var(--pad);
@@ -643,12 +724,12 @@ button {
     rgba(8, 16, 20, .12) 62%, rgba(8, 16, 20, 0) 100%);
   opacity: 0; transition: opacity .16s ease; pointer-events: none;
 }
-#flypad.on { opacity: 1; }
-#flypad::after {
+#flypad.on, #walkpad.on { opacity: 1; }
+#flypad::after, #walkpad::after {
   content: ''; position: absolute; inset: 38%;
   border: 1px solid var(--edge); border-radius: 50%; opacity: .5;
 }
-#flyknob {
+#flyknob, #walkknob {
   position: absolute; left: 50%; top: 50%;
   width: 30%; height: 30%; margin: -15% 0 0 -15%;
   border-radius: 50%; background: rgba(79, 210, 232, .30);
@@ -683,11 +764,11 @@ button {
   text-transform: uppercase; color: #6f8189;
 }
 
-#tbig {
+#tbig, #gbig {
   position: absolute; right: 3.6rem; bottom: .8rem;
   display: flex; gap: .6rem;
 }
-#tbig button {
+#tbig button, #gbig button {
   width: 4.6rem; height: 4.6rem; font-size: .58rem; padding: 0;
 }
 #t-scoop.on { background: rgba(79, 210, 232, .3); border-color: var(--sea); color: var(--sea); }
@@ -697,12 +778,12 @@ button {
 #t-drop.armed { border-color: var(--ember); color: var(--ember-hi); }
 #t-scoop.armed { border-color: var(--sea); color: var(--sea); }
 
-#tmini {
+#tmini, #gmini {
   position: absolute; left: .8rem; bottom: .8rem;
   display: flex; gap: .45rem;
 }
-#tmini button { padding: .55rem .7rem; font-size: .52rem; }
-#tmini button.on { background: rgba(255, 208, 138, .26); border-color: var(--ember-hi);
+#tmini button, #gmini button { padding: .55rem .7rem; font-size: .52rem; }
+#tmini button.on, #gmini button.on { background: rgba(255, 208, 138, .26); border-color: var(--ember-hi);
                    color: var(--ember-hi); }
 
 /* ───────────────────────────────────────────────────── the language picker ── */

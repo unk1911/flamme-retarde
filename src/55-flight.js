@@ -315,8 +315,20 @@ function buildFlight(plane, fire) {
     // only with the gear actually down. `onRunway` answers in runway-local
     // coordinates, including how far off the centreline you are, because
     // arriving in the grass beside it is not a landing.
-    const rw = (!overSea && p.gearOut > 0.85 && typeof airfield !== 'undefined'
-      && airfield && airfield.onRunway) ? airfield.onRunway(p.pos.x, p.pos.z) : null;
+    let rw = null;
+    if (!overSea && p.gearOut > 0.85 && typeof airfield !== 'undefined'
+      && airfield && airfield.onRunway) {
+      rw = airfield.onRunway(p.pos.x, p.pos.z);
+      // Once you are down and slow, the taxiway and the apron count too. A
+      // *landing* has to be on the runway and nothing here changes that — this
+      // only applies to an aeroplane that is already rolling. Without it, the
+      // wheels came off the world the instant you turned off the runway, and
+      // every reason to be on the ground at all is parked on the apron.
+      if (!rw && p.onGround && speed < 40) {
+        const py = airfield.onPaved(p.pos.x, p.pos.z);
+        if (py != null) rw = { t: 0, s: 0, y: py, off: 0, taxi: true };
+      }
+    }
 
     // Cleared every frame and set again only by the runway branch below, so
     // lifting off cannot leave the aeroplane believing it is still rolling.

@@ -59,6 +59,14 @@ function buildFire(scene) {
     const jn = world.grid;
     const j = world.fuelJitter[Math.round(jitterIdx.gz) * jn + Math.round(jitterIdx.gx)] / 255;
     fuel[i] = FUEL[c] * (0.72 + 0.56 * j);
+    // The aerodrome is invented; the land-cover raster underneath it still says
+    // scrub, and a cell is fifty metres square, so without this the fire walks
+    // straight across eleven hundred metres of asphalt as if it were maquis —
+    // which put the entire ground crew alight inside a minute and made the
+    // rescue unwinnable for a reason nobody could see. A runway is a firebreak.
+    // That is half of what a runway *is*.
+    if (typeof airfield !== 'undefined' && airfield && airfield.onPaved
+      && airfield.onPaved(x, z) != null) fuel[i] = 0;
     fuel0[i] = fuel[i];
     groundY[i] = groundAt(x, z);
     totalFuel += fuel[i];
@@ -285,6 +293,55 @@ function buildFire(scene) {
     return { onTarget, knocked };
   }
 
+  /**
+   * A handline, not an air drop: a few metres of ground, and about three times
+   * the effect per litre.
+   *
+   * That multiplier is not a favour to the player. Six tonnes released at ninety
+   * metres over a Dalmatian afternoon loses a large fraction to evaporation,
+   * drift and canopy interception before any of it reaches the fuel — which is
+   * the entire reason a fire is not actually put out from the air. Aircraft buy
+   * time; somebody standing in it with a branch is what puts it out.
+   */
+  function hose(x, z, litres) {
+    const R = 24;                    // reach of the jet, well inside one cell
+    const EFF = 3.0;
+    const ci = worldToCell(x, z);
+    const cgx = ci % N, cgz = (ci / N) | 0;
+    const rr = Math.ceil(R / cell) + 1;
+
+    // Weight by distance first, so pointing at a cell boundary wets both sides
+    // instead of dumping everything into whichever cell won the rounding.
+    const hits = [];
+    let wsum = 0;
+    for (let dz = -rr; dz <= rr; dz++) {
+      for (let dx = -rr; dx <= rr; dx++) {
+        const gx = cgx + dx, gz = cgz + dz;
+        if (gx < 0 || gx >= N || gz < 0 || gz >= N) continue;
+        const j = gz * N + gx;
+        const [wx2, wz2] = cellToWorld(j);
+        const w = 1 - Math.hypot(wx2 - x, wz2 - z) / (R + cell * 0.5);
+        if (w <= 0) continue;
+        hits.push(j, w); wsum += w;
+      }
+    }
+    if (wsum <= 0) return { onTarget: 0, knocked: 0 };
+
+    let onTarget = 0, knocked = 0;
+    for (let k = 0; k < hits.length; k += 2) {
+      const j = hits[k], share = litres * hits[k + 1] / wsum;
+      const soak = share * EFF / CONFIG.waterPerCell * RETAIN[coverOf[j]];
+      const before = inten[j];
+      wet[j] = Math.min(1, wet[j] + soak * 1.35);
+      if (stateArr[j] === FIRE.BURNING) {
+        inten[j] = Math.max(0, inten[j] - soak * 2.1);
+        onTarget += share;
+        if (before > 0.05 && inten[j] <= 0.03) knocked++;
+      }
+    }
+    return { onTarget, knocked };
+  }
+
   // ── the texture ──────────────────────────────────────────────────────────
   function upload() {
     for (let i = 0; i < n2; i++) {
@@ -340,7 +397,7 @@ function buildFire(scene) {
   }
 
   return {
-    update, ignite: igniteAt, igniteNear, drop, events,
+    update, ignite: igniteAt, igniteNear, drop, hose, events,
     burningCount: () => burning.size,
     burntArea: () => burntCount * cell * cell / 1e4,      // hectares
     totalArea: () => n2 * cell * cell / 1e4,

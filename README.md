@@ -34,8 +34,20 @@ is a real footprint.
 | `shift` | flaps |
 | `C` | camera — chase, close, cockpit, wing |
 | `M` | settings — language, stability assist, volume, vegetation, traffic, FOV, exposure |
+| `G` | gear — you need it down to land at Rokići |
+| `E` | **get out** — on the ground at Rokići, with the field alight |
 | `P` / `Esc` | **pause** — the fire stops too |
 | `H` | hide the HUD |
+
+On foot at the airfield:
+
+| key | |
+|---|---|
+| mouse | look |
+| `W` `A` `S` `D` | walk |
+| `shift` | run |
+| `SPACE` / left click | **open the branch** |
+| `E` | climb back in — stand next to the aeroplane |
 
 The autopilot is a *fly me to the job* button, not an autoplayer: it lines the
 aeroplane up on a scoop run or brings you in over the fire, and hands the scoop
@@ -47,9 +59,30 @@ interval and hand it back as one enormous step when you return. It also pauses
 itself if you switch tabs or lose the pointer lock, so nothing burns down while
 you are somewhere else.
 
+### On foot
+
+Once the front is within spotting range of the airfield, Rokići starts taking
+embers and calls it in. Put the gear down, land on the runway, taxi to the apron
+and stop, and the game offers you the door.
+
+What is on the other side of it is a different game: a branch instead of six
+tonnes, a jet that reaches twenty metres instead of a drop that covers two
+hundred, four hundred litres at a time instead of six thousand, and a walk back
+to the aeroplane every forty-three seconds to refill off the tank. What burns is
+drums, crates, a fuel bowser, tugs, three light aircraft — and some of the ground
+crew, who are alight and running, which is what people do and is the worst
+possible thing to do. You soak them and they go down and they are safe. Be slow
+and they collapse; be slower and you lose them.
+
+None of it is scripted. Leave the airfield alone for three minutes and five
+objects and three of the seven crew are gone, whether or not you were ever
+there. The runway is a firebreak, because that is half of what a runway is.
+
 **On a phone or a tablet**, drag anywhere on the left half to fly — the stick
 appears under your thumb wherever you put it — and the throttle is the lever on
 the right. `SCOOP` and `DROP` are held, not tapped. `LVL` latches. Landscape.
+On foot it is the same two halves meaning the opposite thing in both: the left
+thumb walks, the right half of the screen is a head, and `WATER` is held.
 
 **Languages: English, Croatian, French**, switchable in the settings panel at
 any time, including mid-flight. It starts in whichever of the three your
@@ -91,14 +124,14 @@ footprint is, because a continuous terrace on a narrow plot is gabled where a
 detached villa is hipped on all four sides. Tagged colours win over the
 palette.
 
-**The roads are the ones in the data**, 320 km of them, draped on the terrain
+**The roads are the ones in the data**, 292 km of them, draped on the terrain
 and mitred through the bends. Water crossings are still cut rather than laid
 flat on the sea — a bridge deck is geometry, not a ribbon — and now the one
 crossing that matters is that geometry.
 
 **There is a railway, and something running on it.** The Knin–Šibenik line:
 single track, unelectrified, down the valley from Perković to a terminus on the
-waterfront, with the freight branch out to Ražine. 44 ways, 24.6 km, straight
+waterfront, with the freight branch out to Ražine. 44 ways, 24.3 km, straight
 from Overpass. Ballast and shoulders are a draped ribbon like a road; the two
 rails are laterally shifted copies of the same run at 1 435 mm gauge, because
 through a curve the offset has to be perpendicular at every sample and that is
@@ -111,8 +144,9 @@ has nowhere else to be.
 from OSM — cover says where the water is, the shore channel how far the
 waterline is, the urban channel where people are. They are there for scale: a
 four-metre car is the only object in the scene that reads as *small*. There are
-no people, because from a hundred metres a person is one pixel and a parasol is
-six, and they say the same thing.
+no people out there, because from a hundred metres a person is one pixel and a
+parasol is six, and they say the same thing. The only people in this game are
+the seven ground crew at Rokići, and you meet them from four metres away.
 
 **The fire is a cellular automaton on a 256² grid** that reads its fuel from the
 land cover — bare limestone is the natural firebreak, maquis is the reason the

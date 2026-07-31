@@ -62,7 +62,7 @@ function propBuilder() {
     g.setAttribute('aVCol', new THREE.Float32BufferAttribute(col, 3));
     return g;
   };
-  return { tri, quad, box, geo };
+  return { tri, quad, box, geo, count: () => pos.length / 3 };
 }
 
 /** Local frame: +X forward, +Y up, +Z to starboard. About six metres long. */

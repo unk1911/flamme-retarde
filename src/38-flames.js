@@ -150,7 +150,33 @@ function buildFlames(scene, max) {
     aParam.addUpdateRange(0, c * 4); aParam.needsUpdate = true;
   }
 
-  return { mesh, mat, update };
+  /**
+   * Drive the same pool from an explicit list rather than from the automaton.
+   * A burning drum is not a fifty-metre cell and has no business pretending to
+   * be one: the ground mode needs flames a metre and a half tall standing on a
+   * specific object, and this is the same shader at a different scale.
+   * Each item is `{x, y, z, size, v}`.
+   */
+  function paint(list) {
+    let c = 0;
+    for (const it of list) {
+      if (c >= max) break;
+      const s = seeds[c];
+      aPos.array[c * 3] = it.x;
+      aPos.array[c * 3 + 1] = it.y;
+      aPos.array[c * 3 + 2] = it.z;
+      aParam.array[c * 4] = it.size * (0.78 + s * 0.5);
+      aParam.array[c * 4 + 1] = s * 100;
+      aParam.array[c * 4 + 2] = it.v;
+      aParam.array[c * 4 + 3] = s * 62.8;
+      c++;
+    }
+    geo.instanceCount = c;
+    aPos.addUpdateRange(0, c * 3); aPos.needsUpdate = true;
+    aParam.addUpdateRange(0, c * 4); aParam.needsUpdate = true;
+  }
+
+  return { mesh, mat, update, paint };
 }
 
 // ------------------------------------------------------------------- smoke ---

@@ -175,6 +175,77 @@ function initTouch() {
     el.classList.toggle('on', TOUCH.level);
   });
 
+  // ── on foot ───────────────────────────────────────────────────────────────
+  // The same two halves as in the air, meaning the opposite thing in both. The
+  // left thumb walks. The right half of the screen is the head: there is no
+  // pointer to lock on a phone, so looking around has to be a drag, and it has
+  // to be *relative* — an absolute mapping would snap the view to wherever the
+  // thumb happened to land.
+
+  const walkPad = document.getElementById('walkpad');
+  const walkKnob = document.getElementById('walkknob');
+  let walkId = null, walkOx = 0, walkOy = 0;
+  let lookId = null, lookX = 0, lookY = 0;
+
+  function walkTo(dx, dy) {
+    const r = padRadius;
+    let x = clamp(dx / r, -1, 1);
+    let y = clamp(-dy / r, -1, 1);
+    if (Math.hypot(x, y) < 0.12) { x = 0; y = 0; }
+    TOUCH.gx = x; TOUCH.gy = y;
+    walkKnob.style.transform = `translate(${x * r * 0.6}px, ${-y * r * 0.6}px)`;
+  }
+
+  const gtouch = document.getElementById('gtouch');
+  gtouch.addEventListener('pointerdown', (e) => {
+    if (isControl(e.target)) return;
+    e.preventDefault();
+    if (e.clientX < innerWidth * 0.46 && walkId === null) {
+      walkId = e.pointerId;
+      walkOx = e.clientX; walkOy = e.clientY;
+      walkPad.style.left = `${walkOx}px`;
+      walkPad.style.top = `${walkOy}px`;
+      walkPad.classList.add('on');
+      gtouch.setPointerCapture(e.pointerId);
+      walkTo(0, 0);
+    } else if (lookId === null) {
+      lookId = e.pointerId;
+      lookX = e.clientX; lookY = e.clientY;
+      gtouch.setPointerCapture(e.pointerId);
+    }
+  }, { passive: false });
+
+  gtouch.addEventListener('pointermove', (e) => {
+    if (e.pointerId === walkId) {
+      walkTo(e.clientX - walkOx, e.clientY - walkOy);
+    } else if (e.pointerId === lookId) {
+      if (ground) ground.look((e.clientX - lookX) * 0.0060, (e.clientY - lookY) * 0.0060);
+      lookX = e.clientX; lookY = e.clientY;
+    }
+  }, { passive: false });
+
+  const endGround = (e) => {
+    if (e.pointerId === walkId) {
+      walkId = null;
+      TOUCH.gx = TOUCH.gy = 0;
+      walkPad.classList.remove('on');
+      walkKnob.style.transform = '';
+    } else if (e.pointerId === lookId) {
+      lookId = null;
+    }
+  };
+  gtouch.addEventListener('pointerup', endGround);
+  gtouch.addEventListener('pointercancel', endGround);
+
+  hold('t-jet', (v) => { TOUCH.gjet = v; });
+  tap('t-in', () => toggleGround());
+  tap('t-gset', () => togglePanel());
+  tap('t-gpause', () => togglePause());
+  tap('t-run', (el) => {
+    TOUCH.grun = !TOUCH.grun;
+    el.classList.toggle('on', TOUCH.grun);
+  });
+
   measure();
 }
 
