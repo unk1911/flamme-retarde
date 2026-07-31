@@ -12,6 +12,14 @@ geodata pipeline.
 
 ### Added — Rokići, on foot
 
+- **A back door on `0`**, and `?ground` as the link version of it for phones.
+  One key lights the field, parks the aeroplane on the apron and opens the door,
+  tank intact. The ground mission otherwise sits behind twenty minutes of
+  flying, a spot fire that has to find the airfield on its own, and a landing —
+  which is the right order for playing it and an absurd thing to ask of somebody
+  who wants to know whether it is any good. It is advertised in the settings
+  panel rather than hidden; there is no achievement here worth protecting.
+
 - **The ground rescue.** Land at Rokići with the wheels down, stop, and you can
   get out. The game becomes first-person: a branch instead of six tonnes, a jet
   that reaches twenty metres instead of a drop that covers two hundred, and four

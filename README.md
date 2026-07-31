@@ -36,6 +36,7 @@ is a real footprint.
 | `M` | settings — language, stability assist, volume, vegetation, traffic, FOV, exposure |
 | `G` | gear — you need it down to land at Rokići |
 | `E` | **get out** — on the ground at Rokići, with the field alight |
+| `0` | **skip straight to Rokići, on foot** — the back door, see below |
 | `P` / `Esc` | **pause** — the fire stops too |
 | `H` | hide the HUD |
 
@@ -78,6 +79,16 @@ None of it is scripted. Leave the airfield alone for three minutes and five
 objects and three of the seven crew are gone, whether or not you were ever
 there. The runway is a firebreak, because that is half of what a runway is.
 
+**Press `0` to skip the whole approach.** It lights the field, puts the
+aeroplane on the apron and opens the door, in one key — because the ground
+mission otherwise sits behind twenty minutes of flying, a spot fire that has to
+find the airfield on its own, and a landing, and that is a ridiculous thing to
+ask of somebody who just wants to see whether it is any good. Your tank comes
+with you. `E` gets you back in, and you can take off again from where you are
+parked. On a phone there is no `0` to press, so
+[**`?ground`**](https://flamme-retarde.edeliverables.com/?nointro&ground) does
+the same thing as a link.
+
 **On a phone or a tablet**, drag anywhere on the left half to fly — the stick
 appears under your thumb wherever you put it — and the throttle is the lever on
 the right. `SCOOP` and `DROP` are held, not tapped. `LVL` latches. Landscape.
@@ -88,8 +99,9 @@ thumb walks, the right half of the screen is a head, and `WATER` is held.
 any time, including mid-flight. It starts in whichever of the three your
 browser asks for, and English otherwise.
 
-`?nointro` skips the cinematic. `?q=low|mid|high` forces a detail level.
-`?touch` / `?notouch` force the control scheme.
+`?nointro` skips the cinematic. `?ground` starts you on foot at Rokići with the
+apron alight. `?q=low|mid|high` forces a detail level. `?touch` / `?notouch`
+force the control scheme.
 
 ---
 

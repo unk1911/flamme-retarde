@@ -55,6 +55,9 @@ function grabPointer() {
 addEventListener('keydown', (e) => {
   if (e.repeat) return;
   if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); togglePause(); return; }
+  // Ahead of the pause guard on purpose: pausing to read the hint and then
+  // pressing the key it told you about should work.
+  if (e.code === 'Digit0' || e.code === 'Numpad0') { e.preventDefault(); skipToGround(); return; }
   // While the world is stopped, only the settings answer. Cycling the camera or
   // dropping the gear against a frozen simulation puts the picture and the
   // state out of step, and the HUD is not being redrawn to tell you.
@@ -726,6 +729,50 @@ $('ground-prompt').addEventListener('click', (e) => {
   toggleGround();
 });
 
+/** Put the aeroplane on the apron, stopped, wheels down, tank untouched. */
+function parkAtApron() {
+  if (!airfield || !airfield.site) return false;
+  const a = airfield.apron;
+  // reset() empties the tank and firewalls the throttle, because it exists to
+  // start a mission. Keep the water: arriving at Rokići with a dry aeroplane
+  // means one pack of four hundred litres and then nothing at all.
+  const water = flight.p.water;
+  flight.reset(a[0], a[2], airfield.thresholds[0].yaw, 400);
+  flight.p.water = water;
+  flight.p.pos.set(a[0], a[1] + FLIGHT.gearHeight, a[2]);
+  flight.p.vel.set(0, 0, 0);
+  flight.p.onGround = true;
+  flight.p.gearOut = 1;
+  flight.p.throttle = 0;
+  // The gear animates toward input.gear every frame, so setting gearOut alone
+  // retracts it again within a second and the aeroplane falls through its own
+  // apron. In normal play this is true because you pressed G on the approach.
+  input.gear = true;
+  return true;
+}
+
+/**
+ * The back door, on `0`.
+ *
+ * The ground mission sits behind a twenty-minute flight, a spot fire that has to
+ * find the airfield on its own, and a landing — which is the right way round for
+ * playing it and a ridiculous thing to ask of somebody who just wants to see
+ * whether it is any good. This lights the field, puts the aeroplane on the apron
+ * and opens the door, in one key.
+ *
+ * It is not hidden. There is no achievement here to protect.
+ */
+function skipToGround() {
+  if (!ground || !ground.ok || !airfield || !airfield.site) return;
+  if (state.phase === 'ground') { toast(TK('ground.board', 'ground.boardTouch')); return; }
+  if (state.phase !== 'fly') return;
+  if (state.paused) setPaused(false);
+  ground.force();                 // arm the field and light it, now, not in a minute
+  if (!parkAtApron()) return;
+  toggleGround();
+  toast(T('toast.cheat'));
+}
+
 $('resume').addEventListener('click', () => setPaused(false));
 $('pause').addEventListener('click', (e) => { if (e.target.id === 'pause') setPaused(false); });
 
@@ -1172,6 +1219,9 @@ function beginFlight() {
   camPos.copy(camera.position);
   camAim.copy(flight.p.pos);
   if (!IS_TOUCH) setTimeout(grabPointer, 250);
+  // The same back door as `0`, as a link — which is the only version of it a
+  // phone can use, there being no keyboard to press it on.
+  if (location.search.includes('ground')) setTimeout(skipToGround, 60);
 }
 
 $('cine-skip').addEventListener('click', beginFlight);
@@ -1245,21 +1295,8 @@ window.__fr = {
   ground: {
     arm: () => ground.force(),
     /** Park the aeroplane on the apron, stopped, wheels down. */
-    park: () => {
-      const a = airfield.apron;
-      const w = flight.p.water;
-      flight.reset(a[0], a[2], airfield.thresholds[0].yaw, 400);
-      flight.p.water = w;
-      flight.p.pos.set(a[0], a[1] + FLIGHT.gearHeight, a[2]);
-      flight.p.vel.set(0, 0, 0);
-      flight.p.onGround = true;
-      flight.p.gearOut = 1;
-      flight.p.throttle = 0;
-      // The gear animates toward input.gear every frame, so setting gearOut
-      // alone retracts it again within a second and the aeroplane falls through
-      // its own runway. In real play this is true because you pressed G.
-      input.gear = true;
-    },
+    park: () => parkAtApron(),
+    skip: () => skipToGround(),
     foot: () => { ground.force(); flight.p.onGround = true; flight.p.vel.set(0, 0, 0); },
     out: () => toggleGround(),
     apron: () => airfield.apron,

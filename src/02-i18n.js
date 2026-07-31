@@ -139,6 +139,7 @@ const STRINGS = {
     'toast.rokici': 'Rokići taking embers',
     'toast.crewSafe': 'crew member out',
     'toast.onFoot': 'on foot — hold the branch open',
+    'toast.cheat': 'skipped to Rokići — the aeroplane is behind you',
     'toast.boarded': 'back aboard',
 
     'ground.alight': 'alight',
@@ -185,7 +186,7 @@ const STRINGS = {
     'set.exposure': 'exposure',
     'set.volume': 'volume',
     'set.off': 'off',
-    'set.foot': 'M closes · Z levels · T autopilot · P pauses',
+    'set.foot': 'M closes · Z levels · T autopilot · P pauses · 0 skips to Rokići',
     'set.footTouch': 'tap SET to close',
 
     // pause
@@ -341,6 +342,7 @@ const STRINGS = {
     'toast.rokici': 'na Rokiće padaju žeravice',
     'toast.crewSafe': 'čovjek je ugašen',
     'toast.onFoot': 'pješice — drži mlaznicu otvorenu',
+    'toast.cheat': 'skok na Rokiće — avion ti je iza leđa',
     'toast.boarded': 'natrag u avionu',
 
     'ground.alight': 'gori',
@@ -384,7 +386,7 @@ const STRINGS = {
     'set.exposure': 'ekspozicija',
     'set.volume': 'glasnoća',
     'set.off': 'isključeno',
-    'set.foot': 'M zatvara · Z poravnava · T autopilot · P pauza',
+    'set.foot': 'M zatvara · Z poravnava · T autopilot · P pauza · 0 skok na Rokiće',
     'set.footTouch': 'dodirni POST za zatvaranje',
 
     'pause.eyebrow': 'vatra čeka',
@@ -538,6 +540,7 @@ const STRINGS = {
     'toast.rokici': 'des braises tombent sur Rokići',
     'toast.crewSafe': 'un homme éteint',
     'toast.onFoot': 'à pied — garde la lance ouverte',
+    'toast.cheat': 'raccourci vers Rokići — l\'avion est derrière vous',
     'toast.boarded': 'de retour à bord',
 
     'ground.alight': 'en feu',
@@ -582,7 +585,7 @@ const STRINGS = {
     'set.exposure': 'exposition',
     'set.volume': 'volume',
     'set.off': 'désactivée',
-    'set.foot': 'M ferme · Z met à plat · T pilote auto · P pause',
+    'set.foot': 'M ferme · Z met à plat · T pilote auto · P pause · 0 saut vers Rokići',
     'set.footTouch': 'touchez RÉGL pour fermer',
 
     'pause.eyebrow': 'le feu attend',
