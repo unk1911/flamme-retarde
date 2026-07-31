@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.4.0">
+<meta name="version" content="1.5.0">
 <meta name="build-date" content="2026-07-31">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -958,8 +958,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.4.0, built 2026-07-31">
-    <b>v1.4.0</b><i>·</i><span>2026-07-31</span>
+  <div id="build" title="Flamme Retardé 1.5.0, built 2026-07-31">
+    <b>v1.5.0</b><i>·</i><span>2026-07-31</span>
   </div>
   <footer class="credit">
     <span>eDeliverables (2026)</span><i>·</i>
@@ -1158,7 +1158,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.4.0", date: "2026-07-31" };</script>
+<script>const BUILD = { v: "1.5.0", date: "2026-07-31" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -6517,14 +6517,14 @@ function buildAirfield(scene) {
 
   const AS = APRON_S + 12;                            // apron front edge
 
-  // Anything you should not be able to walk through, in runway-local
-  // coordinates: {t, s, half-along, half-across}. The ground mode pushes the
-  // player back out of these, so they are recorded as the structures are built
-  // rather than measured off them afterwards and left to drift apart.
+  // Anything you should not be able to walk — or taxi — through, in
+  // runway-local coordinates: {t, s, half-along, half-across, height}. Recorded
+  // as the structures are built rather than measured off them afterwards and
+  // left to drift apart.
   const blockers = [];
   const solid = (t, s, h, along, across, col, top) => {
     lbox(t, s, h, along, across, col, top);
-    blockers.push({ t, s, a: along / 2, c: across / 2 });
+    blockers.push({ t, s, a: along / 2, c: across / 2, h, y: planeY(t) });
   };
 
   // Terminal: one storey, a glazed band, and a red pantile roof, because a
@@ -6775,6 +6775,18 @@ function buildAirfield(scene) {
   ];
   const apronCentre = P(0, APRON_S + FIELD.apronD * 0.45);
 
+  // Where the aeroplane actually parks, which is *not* the apron centre: the
+  // centre is a reference point for the mission — where the spot fire is seeded
+  // upwind of, how far away the front is, where the muster is measured from —
+  // and it sits squarely in the mouth of the first hangar. A twenty-metre
+  // aeroplane put there has its nose five metres inside the building. Nothing
+  // ever noticed because nothing was solid.
+  //
+  // This is a stand: forward of the hangar line, on concrete out to both
+  // wingtips, and lined up on the taxiway mouth so leaving is a roll and a
+  // turn rather than a three-point turn between two burning crates.
+  const stand = P(-6, APRON_S + 17);
+
   /** World -> runway-local. The inverse of P(), which the ground mode lives in. */
   const local = (x, z) => {
     const ex = x - cx, ez = z - cz;
@@ -6813,6 +6825,40 @@ function buildAirfield(scene) {
   }
 
   /**
+   * Is this point inside a structure, and if so, which way is out?
+   *
+   * The ground mode has always pushed the player out of these; the aeroplane
+   * went straight through them, which is very obvious from the apron because
+   * the hangars are thirty metres from where you park. Returns the shortest
+   * push back into the open, in *world* metres, plus how deep in the point was
+   * — so a caller can tell scraping a wall from hitting one.
+   *
+   * `pad` is how much of the thing being tested hangs off the point.
+   */
+  function hitStructure(x, z, y, pad = 0) {
+    const [t, s] = local(x, z);
+    let best = null;
+    for (const b of blockers) {
+      if (y > b.y + b.h) continue;                     // clear over the roof
+      const dt = t - b.t, ds = s - b.s;
+      const ot = (b.a + pad) - Math.abs(dt);
+      const os = (b.c + pad) - Math.abs(ds);
+      if (ot <= 0 || os <= 0) continue;
+      const depth = Math.min(ot, os);
+      if (best && depth <= best.depth) continue;
+      // Out by the nearest face, which is what a wall does. Runway-local axes
+      // are not world axes, so the push has to be rotated back.
+      const pt = ot < os ? Math.sign(dt || 1) * ot : 0;
+      const ps = ot < os ? 0 : Math.sign(ds || 1) * os;
+      best = {
+        depth, top: b.y + b.h,
+        nx: pt * dx + ps * px, nz: pt * dz + ps * pz,
+      };
+    }
+    return best;
+  }
+
+  /**
    * Ground height anywhere on the field: the fitted pavement plane where there
    * is pavement, the real terrain where there is not. Walking off the apron on
    * to the grass has to step down, not fall through.
@@ -6823,10 +6869,11 @@ function buildAirfield(scene) {
   }
 
   return {
-    site, onRunway, onPaved, walkY, inField, objects, thresholds, blockers, crewSpots,
+    site, onRunway, onPaved, walkY, inField, objects, thresholds, blockers,
+    hitStructure, crewSpots,
     bounds, local, toWorld: P, planeY, tint, flushTint,
     centre: [cx, planeY(0), cz],
-    apron: apronCentre,
+    apron: apronCentre, stand,
     axis: { dx, dz, px, pz, yaw, halfL },
     pavMesh, buildings, objMesh,
     tris: pav.pos.length / 9
@@ -7277,7 +7324,26 @@ async function buildGround(scene, field) {
       } else if (c.mode === 'safe') {
         c.timer += dt;
         c.wet = Math.max(0, c.wet - dt * 0.045);
-        if (c.timer > 9) { c.mode = 'walk'; c.dest = musterFor(c); c.pace = 1.5; }
+        if (c.timer > 4.5) { c.mode = 'thanks'; c.timer = 0; }
+      } else if (c.mode === 'thanks') {
+        // On their feet, turned to whoever put them out, one arm up.
+        //
+        // Being alive again is the entire payoff of the mode and it was being
+        // thrown away: they knelt motionless for nine seconds, which from four
+        // metres away reads as a body and not as somebody getting their breath
+        // back. You want to see that it worked.
+        c.timer += dt;
+        c.wet = Math.max(0, c.wet - dt * 0.03);
+        const dx2 = you.x - c.x, dz2 = you.z - c.z;
+        const d = Math.hypot(dx2, dz2) || 1;
+        c.hx = dx2 / d; c.hz = dz2 / d;
+        c.look = 0;
+        if (c.timer > 3.0) {
+          c.mode = 'walk';
+          c.dest = musterFor(c);
+          c.pace = 2.7;              // and off at a jog, not a stroll
+          c.wait = 14;
+        }
       } else {
         // Not alight, so: get clear, stay clear, and keep having somewhere to
         // be. This used to walk them to a single muster point and then drop
@@ -7288,6 +7354,9 @@ async function buildGround(scene, field) {
         const [mx, mz] = musterFor(c);
         const threat = threatAt(c.x, c.z);
         c.wait -= dt;
+        // Kit dries. Somebody you soaked half an hour ago should not still be
+        // walking around black — the scorching stays, the water does not.
+        c.wet = Math.max(0, c.wet - dt * 0.022);
         // Re-plan when the clock says so — *not* when `dest` is null, which is
         // what standing still looks like and which therefore cancelled every
         // rest the instant it began: they arrived, cleared the destination,
@@ -7456,6 +7525,32 @@ async function buildGround(scene, field) {
     f.armRU.rotation.set(-0.20, 0, 0.86); f.armRL.rotation.z = 0.70;
   }
 
+  function poseThanks(c, f) {
+    // Standing up out of the kneel over the first beat, then an arm raised to
+    // whoever put them out. Not a salute — an acknowledgement, which is the
+    // thing people actually do, and the only moment in the mode where anybody
+    // looks at you.
+    const t = c.timer;
+    const rise = clamp(t / 0.7, 0, 1);
+    const up = rise * rise;
+    const back = 1 - rise;
+    const wave = Math.sin(t * 7.5);
+    const breath = 0.5 + 0.5 * Math.sin(t * 3.4);
+
+    f.pelvis.position.y = f.restY - back * 0.42;
+    f.legLU.rotation.z = back * 1.45 + 0.05;
+    f.legLL.rotation.z = -back * 1.42 - 0.09;
+    f.legRU.rotation.z = -back * 0.14 - 0.05;
+    f.legRL.rotation.z = -back * 1.42 - 0.07;
+    f.torso.rotation.set(breath * 0.05, 0, -0.40 * back - 0.02);
+
+    f.armRU.rotation.set(-SPLAY - 0.26 * up, 0, (2.45 + wave * 0.20) * up);
+    f.armRL.rotation.z = 0.30 + (0.35 + wave * 0.30) * up;
+    f.armLU.rotation.set(SPLAY + 0.30 * up, 0, 0.34 * up);
+    f.armLL.rotation.z = 0.24 + 0.80 * up;
+    f.head.rotation.set(0, 0, 0.12 - 0.24 * up);
+  }
+
   function poseAlight(c, f) {
     // Running with your clothing alight is not a run cycle. The arms come up
     // and stay up, the stride is short and uneven, the head goes back, and none
@@ -7523,6 +7618,7 @@ async function buildGround(scene, field) {
 
     if (c.mode === 'down' || c.mode === 'lost') poseDown(c, f);
     else if (c.mode === 'safe') poseSafe(c, f);
+    else if (c.mode === 'thanks') poseThanks(c, f);
     else if (c.mode === 'alight') poseAlight(c, f);
     else poseAfoot(c, f);
   }
@@ -7919,8 +8015,8 @@ async function buildGround(scene, field) {
       alight: alight(),
       objSaved: tally.saved, objLost: tally.lost,
       rescued: tally.rescued, crewLost: crew.filter((c) => c.mode === 'lost').length,
-      crewOk: crew.filter((c) => c.mode === 'safe' || c.mode === 'walk'
-        || c.mode === 'idle').length,
+      crewOk: crew.filter((c) => c.mode === 'safe' || c.mode === 'thanks'
+        || c.mode === 'walk' || c.mode === 'idle').length,
       pack: Math.round(you.pack), litres: Math.round(tally.litres),
       at: [Math.round(you.x), Math.round(you.z)],
     }),
@@ -8627,6 +8723,12 @@ const FLIGHT = {
   rollDrag: 1.6,           // m/s per second, free rolling
   brakeDecel: 5.4,         // added while the brakes are on
   steerRate: 0.55,         // rad/s of nosewheel authority at walking pace
+  span: 28.6,              // metres, wingtip to wingtip — a CL-415
+  // Below this you scrape a building and stop; above it you have hit one.
+  // Ending a mission because a taxi turn was two metres out is not a lesson,
+  // it is a reload; arriving at a hangar at ninety knots is a different act.
+  scrapeSpeed: 22,
+  scrapeDrag: 6.0,         // m/s per second lost while still leaning on it
 
   // ── the assists ─────────────────────────────────────────────────────────
   // The stick is virtual: mouse motion pushes it, and it springs back on its
@@ -8665,6 +8767,7 @@ function buildFlight(plane, fire) {
     gLoad: 1,
     lastDropDist: 0,
     slam: 0,              // vertical speed of the last hull contact, one-shot
+    scraping: false,      // in contact with a building *since last frame*
     crashSpeed: 0,
     crashOnWater: false,
 
@@ -8699,6 +8802,7 @@ function buildFlight(plane, fire) {
     p.kb.set(0, 0);
     p.tch.set(0, 0);
     p.slam = 0;
+    p.scraping = false;
     p.autopilot = false;
     p.levelling = false;
     p.apNote = '';
@@ -8905,6 +9009,72 @@ function buildFlight(plane, fire) {
 
     p.pos.addScaledVector(p.vel, dt);
     p.aoa = Math.asin(clamp(-p.vel.clone().normalize().dot(up), -1, 1));
+
+    // ── the aerodrome structures ──────────────────────────────────────────
+    // The only solid objects in the game. Not an oversight that the rest are
+    // not: the town is thirteen thousand extruded OSM footprints and making
+    // those solid would turn every low pass over Šibenik into a crash, on a
+    // building whose height was guessed from its footprint. The hangars are
+    // thirty metres from where you park, and taxiing through the terminal is
+    // the one collision every player is going to try.
+    if (typeof airfield !== 'undefined' && airfield && airfield.hitStructure) {
+      // An aeroplane is not a point. Nose, tail and both wingtips, because
+      // clipping a hangar with a wingtip is a real way to lose a Canadair and
+      // should not go unnoticed just because the fuselage went past.
+      const hs = FLIGHT.span * 0.5;
+      let worst = null;
+      for (const [ax, az] of [
+        [fwd.x * 9.5, fwd.z * 9.5], [-fwd.x * 10.5, -fwd.z * 10.5],
+        [right.x * hs, right.z * hs], [-right.x * hs, -right.z * hs],
+      ]) {
+        const h = airfield.hitStructure(
+          p.pos.x + ax, p.pos.z + az, p.pos.y - 1.6, 1.0);
+        if (h && (!worst || h.depth > worst.depth)) worst = h;
+      }
+      if (worst) {
+        if (speed > FLIGHT.scrapeSpeed) {
+          p.crashed = true;
+          p.crashSpeed = speed;
+          p.crashOnWater = false;
+        } else {
+          // Slow enough to be a scrape. Out along the shortest way out, and
+          // kill the part of the velocity going *into* the wall — which on its
+          // own is what stops you, and leaves the part running along it alone
+          // so you can still steer off the thing you are leaning on.
+          p.pos.x += worst.nx;
+          p.pos.z += worst.nz;
+          const n = Math.hypot(worst.nx, worst.nz) || 1;
+          const into = (p.vel.x * worst.nx + p.vel.z * worst.nz) / n;
+          if (into < 0) {
+            p.vel.x -= (worst.nx / n) * into;
+            p.vel.z -= (worst.nz / n) * into;
+          }
+          // Contact is a state, not an event, and the two want different
+          // things. Resting against a wall costs a little speed per second, so
+          // dragging a wingtip down a hangar is slow. Arriving at one is a
+          // bang, and it fires on the *transition* — scaled by how hard you
+          // came in, once. Doing either every frame is what glues an aeroplane
+          // to a building: half the velocity thirty times a second is nothing
+          // left, and the same thump thirty times a second is a drone.
+          if (!p.scraping) {
+            p.vel.multiplyScalar(0.5);
+            const bang = -Math.max(0.9, Math.abs(into) * 0.6);
+            if (p.slam > bang) p.slam = bang;
+          } else {
+            const sp = Math.hypot(p.vel.x, p.vel.z);
+            if (sp > 0.05) {
+              const k = Math.max(0, sp - FLIGHT.scrapeDrag * dt) / sp;
+              p.vel.x *= k; p.vel.z *= k;
+            }
+          }
+          p.scraping = true;
+        }
+      } else {
+        p.scraping = false;
+      }
+    } else {
+      p.scraping = false;
+    }
 
     // ── the ground, and the sea ───────────────────────────────────────────
     const gy = groundAt(p.pos.x, p.pos.z);
@@ -11693,7 +11863,7 @@ $('ground-prompt').addEventListener('click', (e) => {
 /** Put the aeroplane on the apron, stopped, wheels down, tank untouched. */
 function parkAtApron() {
   if (!airfield || !airfield.site) return false;
-  const a = airfield.apron;
+  const a = airfield.stand;
   // reset() empties the tank and firewalls the throttle, because it exists to
   // start a mission. Keep the water: arriving at Rokići with a dry aeroplane
   // means one pack of four hundred litres and then nothing at all.
@@ -12272,6 +12442,7 @@ window.__fr = {
    */
   ground: {
     arm: () => ground.force(),
+    raw: () => ground,
     /** Park the aeroplane on the apron, stopped, wheels down. */
     park: () => parkAtApron(),
     skip: () => skipToGround(),
@@ -12361,6 +12532,7 @@ window.__fr = {
   },
   fire: () => fire,
   flight: () => flight,
+  airfield: () => airfield,
   train: () => (rail ? rail.trainPos() : null),
   /** Runway geometry, so a test can put the aeroplane on an actual approach. */
   field: () => (airfield && airfield.site ? {

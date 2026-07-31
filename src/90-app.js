@@ -740,7 +740,7 @@ $('ground-prompt').addEventListener('click', (e) => {
 /** Put the aeroplane on the apron, stopped, wheels down, tank untouched. */
 function parkAtApron() {
   if (!airfield || !airfield.site) return false;
-  const a = airfield.apron;
+  const a = airfield.stand;
   // reset() empties the tank and firewalls the throttle, because it exists to
   // start a mission. Keep the water: arriving at Rokići with a dry aeroplane
   // means one pack of four hundred litres and then nothing at all.
@@ -1319,6 +1319,7 @@ window.__fr = {
    */
   ground: {
     arm: () => ground.force(),
+    raw: () => ground,
     /** Park the aeroplane on the apron, stopped, wheels down. */
     park: () => parkAtApron(),
     skip: () => skipToGround(),
@@ -1408,6 +1409,7 @@ window.__fr = {
   },
   fire: () => fire,
   flight: () => flight,
+  airfield: () => airfield,
   train: () => (rail ? rail.trainPos() : null),
   /** Runway geometry, so a test can put the aeroplane on an actual approach. */
   field: () => (airfield && airfield.site ? {

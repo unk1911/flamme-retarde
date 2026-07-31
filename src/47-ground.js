@@ -439,7 +439,26 @@ async function buildGround(scene, field) {
       } else if (c.mode === 'safe') {
         c.timer += dt;
         c.wet = Math.max(0, c.wet - dt * 0.045);
-        if (c.timer > 9) { c.mode = 'walk'; c.dest = musterFor(c); c.pace = 1.5; }
+        if (c.timer > 4.5) { c.mode = 'thanks'; c.timer = 0; }
+      } else if (c.mode === 'thanks') {
+        // On their feet, turned to whoever put them out, one arm up.
+        //
+        // Being alive again is the entire payoff of the mode and it was being
+        // thrown away: they knelt motionless for nine seconds, which from four
+        // metres away reads as a body and not as somebody getting their breath
+        // back. You want to see that it worked.
+        c.timer += dt;
+        c.wet = Math.max(0, c.wet - dt * 0.03);
+        const dx2 = you.x - c.x, dz2 = you.z - c.z;
+        const d = Math.hypot(dx2, dz2) || 1;
+        c.hx = dx2 / d; c.hz = dz2 / d;
+        c.look = 0;
+        if (c.timer > 3.0) {
+          c.mode = 'walk';
+          c.dest = musterFor(c);
+          c.pace = 2.7;              // and off at a jog, not a stroll
+          c.wait = 14;
+        }
       } else {
         // Not alight, so: get clear, stay clear, and keep having somewhere to
         // be. This used to walk them to a single muster point and then drop
@@ -450,6 +469,9 @@ async function buildGround(scene, field) {
         const [mx, mz] = musterFor(c);
         const threat = threatAt(c.x, c.z);
         c.wait -= dt;
+        // Kit dries. Somebody you soaked half an hour ago should not still be
+        // walking around black — the scorching stays, the water does not.
+        c.wet = Math.max(0, c.wet - dt * 0.022);
         // Re-plan when the clock says so — *not* when `dest` is null, which is
         // what standing still looks like and which therefore cancelled every
         // rest the instant it began: they arrived, cleared the destination,
@@ -618,6 +640,32 @@ async function buildGround(scene, field) {
     f.armRU.rotation.set(-0.20, 0, 0.86); f.armRL.rotation.z = 0.70;
   }
 
+  function poseThanks(c, f) {
+    // Standing up out of the kneel over the first beat, then an arm raised to
+    // whoever put them out. Not a salute — an acknowledgement, which is the
+    // thing people actually do, and the only moment in the mode where anybody
+    // looks at you.
+    const t = c.timer;
+    const rise = clamp(t / 0.7, 0, 1);
+    const up = rise * rise;
+    const back = 1 - rise;
+    const wave = Math.sin(t * 7.5);
+    const breath = 0.5 + 0.5 * Math.sin(t * 3.4);
+
+    f.pelvis.position.y = f.restY - back * 0.42;
+    f.legLU.rotation.z = back * 1.45 + 0.05;
+    f.legLL.rotation.z = -back * 1.42 - 0.09;
+    f.legRU.rotation.z = -back * 0.14 - 0.05;
+    f.legRL.rotation.z = -back * 1.42 - 0.07;
+    f.torso.rotation.set(breath * 0.05, 0, -0.40 * back - 0.02);
+
+    f.armRU.rotation.set(-SPLAY - 0.26 * up, 0, (2.45 + wave * 0.20) * up);
+    f.armRL.rotation.z = 0.30 + (0.35 + wave * 0.30) * up;
+    f.armLU.rotation.set(SPLAY + 0.30 * up, 0, 0.34 * up);
+    f.armLL.rotation.z = 0.24 + 0.80 * up;
+    f.head.rotation.set(0, 0, 0.12 - 0.24 * up);
+  }
+
   function poseAlight(c, f) {
     // Running with your clothing alight is not a run cycle. The arms come up
     // and stay up, the stride is short and uneven, the head goes back, and none
@@ -685,6 +733,7 @@ async function buildGround(scene, field) {
 
     if (c.mode === 'down' || c.mode === 'lost') poseDown(c, f);
     else if (c.mode === 'safe') poseSafe(c, f);
+    else if (c.mode === 'thanks') poseThanks(c, f);
     else if (c.mode === 'alight') poseAlight(c, f);
     else poseAfoot(c, f);
   }
@@ -1081,8 +1130,8 @@ async function buildGround(scene, field) {
       alight: alight(),
       objSaved: tally.saved, objLost: tally.lost,
       rescued: tally.rescued, crewLost: crew.filter((c) => c.mode === 'lost').length,
-      crewOk: crew.filter((c) => c.mode === 'safe' || c.mode === 'walk'
-        || c.mode === 'idle').length,
+      crewOk: crew.filter((c) => c.mode === 'safe' || c.mode === 'thanks'
+        || c.mode === 'walk' || c.mode === 'idle').length,
       pack: Math.round(you.pack), litres: Math.round(tally.litres),
       at: [Math.round(you.x), Math.round(you.z)],
     }),

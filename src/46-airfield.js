@@ -283,14 +283,14 @@ function buildAirfield(scene) {
 
   const AS = APRON_S + 12;                            // apron front edge
 
-  // Anything you should not be able to walk through, in runway-local
-  // coordinates: {t, s, half-along, half-across}. The ground mode pushes the
-  // player back out of these, so they are recorded as the structures are built
-  // rather than measured off them afterwards and left to drift apart.
+  // Anything you should not be able to walk — or taxi — through, in
+  // runway-local coordinates: {t, s, half-along, half-across, height}. Recorded
+  // as the structures are built rather than measured off them afterwards and
+  // left to drift apart.
   const blockers = [];
   const solid = (t, s, h, along, across, col, top) => {
     lbox(t, s, h, along, across, col, top);
-    blockers.push({ t, s, a: along / 2, c: across / 2 });
+    blockers.push({ t, s, a: along / 2, c: across / 2, h, y: planeY(t) });
   };
 
   // Terminal: one storey, a glazed band, and a red pantile roof, because a
@@ -541,6 +541,18 @@ function buildAirfield(scene) {
   ];
   const apronCentre = P(0, APRON_S + FIELD.apronD * 0.45);
 
+  // Where the aeroplane actually parks, which is *not* the apron centre: the
+  // centre is a reference point for the mission — where the spot fire is seeded
+  // upwind of, how far away the front is, where the muster is measured from —
+  // and it sits squarely in the mouth of the first hangar. A twenty-metre
+  // aeroplane put there has its nose five metres inside the building. Nothing
+  // ever noticed because nothing was solid.
+  //
+  // This is a stand: forward of the hangar line, on concrete out to both
+  // wingtips, and lined up on the taxiway mouth so leaving is a roll and a
+  // turn rather than a three-point turn between two burning crates.
+  const stand = P(-6, APRON_S + 17);
+
   /** World -> runway-local. The inverse of P(), which the ground mode lives in. */
   const local = (x, z) => {
     const ex = x - cx, ez = z - cz;
@@ -579,6 +591,40 @@ function buildAirfield(scene) {
   }
 
   /**
+   * Is this point inside a structure, and if so, which way is out?
+   *
+   * The ground mode has always pushed the player out of these; the aeroplane
+   * went straight through them, which is very obvious from the apron because
+   * the hangars are thirty metres from where you park. Returns the shortest
+   * push back into the open, in *world* metres, plus how deep in the point was
+   * — so a caller can tell scraping a wall from hitting one.
+   *
+   * `pad` is how much of the thing being tested hangs off the point.
+   */
+  function hitStructure(x, z, y, pad = 0) {
+    const [t, s] = local(x, z);
+    let best = null;
+    for (const b of blockers) {
+      if (y > b.y + b.h) continue;                     // clear over the roof
+      const dt = t - b.t, ds = s - b.s;
+      const ot = (b.a + pad) - Math.abs(dt);
+      const os = (b.c + pad) - Math.abs(ds);
+      if (ot <= 0 || os <= 0) continue;
+      const depth = Math.min(ot, os);
+      if (best && depth <= best.depth) continue;
+      // Out by the nearest face, which is what a wall does. Runway-local axes
+      // are not world axes, so the push has to be rotated back.
+      const pt = ot < os ? Math.sign(dt || 1) * ot : 0;
+      const ps = ot < os ? 0 : Math.sign(ds || 1) * os;
+      best = {
+        depth, top: b.y + b.h,
+        nx: pt * dx + ps * px, nz: pt * dz + ps * pz,
+      };
+    }
+    return best;
+  }
+
+  /**
    * Ground height anywhere on the field: the fitted pavement plane where there
    * is pavement, the real terrain where there is not. Walking off the apron on
    * to the grass has to step down, not fall through.
@@ -589,10 +635,11 @@ function buildAirfield(scene) {
   }
 
   return {
-    site, onRunway, onPaved, walkY, inField, objects, thresholds, blockers, crewSpots,
+    site, onRunway, onPaved, walkY, inField, objects, thresholds, blockers,
+    hitStructure, crewSpots,
     bounds, local, toWorld: P, planeY, tint, flushTint,
     centre: [cx, planeY(0), cz],
-    apron: apronCentre,
+    apron: apronCentre, stand,
     axis: { dx, dz, px, pz, yaw, halfL },
     pavMesh, buildings, objMesh,
     tris: pav.pos.length / 9

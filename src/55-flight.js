@@ -23,6 +23,12 @@ const FLIGHT = {
   rollDrag: 1.6,           // m/s per second, free rolling
   brakeDecel: 5.4,         // added while the brakes are on
   steerRate: 0.55,         // rad/s of nosewheel authority at walking pace
+  span: 28.6,              // metres, wingtip to wingtip — a CL-415
+  // Below this you scrape a building and stop; above it you have hit one.
+  // Ending a mission because a taxi turn was two metres out is not a lesson,
+  // it is a reload; arriving at a hangar at ninety knots is a different act.
+  scrapeSpeed: 22,
+  scrapeDrag: 6.0,         // m/s per second lost while still leaning on it
 
   // ── the assists ─────────────────────────────────────────────────────────
   // The stick is virtual: mouse motion pushes it, and it springs back on its
@@ -61,6 +67,7 @@ function buildFlight(plane, fire) {
     gLoad: 1,
     lastDropDist: 0,
     slam: 0,              // vertical speed of the last hull contact, one-shot
+    scraping: false,      // in contact with a building *since last frame*
     crashSpeed: 0,
     crashOnWater: false,
 
@@ -95,6 +102,7 @@ function buildFlight(plane, fire) {
     p.kb.set(0, 0);
     p.tch.set(0, 0);
     p.slam = 0;
+    p.scraping = false;
     p.autopilot = false;
     p.levelling = false;
     p.apNote = '';
@@ -301,6 +309,72 @@ function buildFlight(plane, fire) {
 
     p.pos.addScaledVector(p.vel, dt);
     p.aoa = Math.asin(clamp(-p.vel.clone().normalize().dot(up), -1, 1));
+
+    // ── the aerodrome structures ──────────────────────────────────────────
+    // The only solid objects in the game. Not an oversight that the rest are
+    // not: the town is thirteen thousand extruded OSM footprints and making
+    // those solid would turn every low pass over Šibenik into a crash, on a
+    // building whose height was guessed from its footprint. The hangars are
+    // thirty metres from where you park, and taxiing through the terminal is
+    // the one collision every player is going to try.
+    if (typeof airfield !== 'undefined' && airfield && airfield.hitStructure) {
+      // An aeroplane is not a point. Nose, tail and both wingtips, because
+      // clipping a hangar with a wingtip is a real way to lose a Canadair and
+      // should not go unnoticed just because the fuselage went past.
+      const hs = FLIGHT.span * 0.5;
+      let worst = null;
+      for (const [ax, az] of [
+        [fwd.x * 9.5, fwd.z * 9.5], [-fwd.x * 10.5, -fwd.z * 10.5],
+        [right.x * hs, right.z * hs], [-right.x * hs, -right.z * hs],
+      ]) {
+        const h = airfield.hitStructure(
+          p.pos.x + ax, p.pos.z + az, p.pos.y - 1.6, 1.0);
+        if (h && (!worst || h.depth > worst.depth)) worst = h;
+      }
+      if (worst) {
+        if (speed > FLIGHT.scrapeSpeed) {
+          p.crashed = true;
+          p.crashSpeed = speed;
+          p.crashOnWater = false;
+        } else {
+          // Slow enough to be a scrape. Out along the shortest way out, and
+          // kill the part of the velocity going *into* the wall — which on its
+          // own is what stops you, and leaves the part running along it alone
+          // so you can still steer off the thing you are leaning on.
+          p.pos.x += worst.nx;
+          p.pos.z += worst.nz;
+          const n = Math.hypot(worst.nx, worst.nz) || 1;
+          const into = (p.vel.x * worst.nx + p.vel.z * worst.nz) / n;
+          if (into < 0) {
+            p.vel.x -= (worst.nx / n) * into;
+            p.vel.z -= (worst.nz / n) * into;
+          }
+          // Contact is a state, not an event, and the two want different
+          // things. Resting against a wall costs a little speed per second, so
+          // dragging a wingtip down a hangar is slow. Arriving at one is a
+          // bang, and it fires on the *transition* — scaled by how hard you
+          // came in, once. Doing either every frame is what glues an aeroplane
+          // to a building: half the velocity thirty times a second is nothing
+          // left, and the same thump thirty times a second is a drone.
+          if (!p.scraping) {
+            p.vel.multiplyScalar(0.5);
+            const bang = -Math.max(0.9, Math.abs(into) * 0.6);
+            if (p.slam > bang) p.slam = bang;
+          } else {
+            const sp = Math.hypot(p.vel.x, p.vel.z);
+            if (sp > 0.05) {
+              const k = Math.max(0, sp - FLIGHT.scrapeDrag * dt) / sp;
+              p.vel.x *= k; p.vel.z *= k;
+            }
+          }
+          p.scraping = true;
+        }
+      } else {
+        p.scraping = false;
+      }
+    } else {
+      p.scraping = false;
+    }
 
     // ── the ground, and the sea ───────────────────────────────────────────
     const gy = groundAt(p.pos.x, p.pos.z);

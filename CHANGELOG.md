@@ -8,6 +8,44 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.5.0] — 2026-07-31
+
+### Added — the buildings are solid now
+
+- **The aeroplane collides with the aerodrome structures.** You could taxi
+  straight through a hangar. The terminal, both hangars, the control tower and
+  the fuel farm now stop you — they were already recorded as blockers for the
+  player on foot, so this is the same list, given a height and tested against
+  four points on the airframe: nose, tail and both wingtips. Clipping a hangar
+  with a wingtip is a real way to lose a Canadair and it should not go
+  unnoticed just because the fuselage went past.
+- **Below 22 m/s it is a scrape, above it you have hit a building.** Ending a
+  mission because a taxi turn was two metres out is not a lesson, it is a
+  reload. Slow contact pushes you out along the shortest way, cancels the part
+  of the velocity going *into* the wall — leaving the part running along it, so
+  you can still steer off the thing you are leaning on — and bangs once, on the
+  transition. Arriving at ninety knots is a different act and is scored as one.
+- Only the aerodrome is solid. The town is thirteen thousand extruded OSM
+  footprints whose heights were guessed from their outlines; making those solid
+  would turn every low pass over Šibenik into a crash on a building that was
+  never really there.
+
+### Fixed
+
+- **The aeroplane was parking inside a hangar.** `apron` is the *mission's*
+  reference point — where the spot fire is seeded upwind of, how far away the
+  front is, where the muster is measured from — and it sits squarely in the
+  mouth of the first hangar. Parking a twenty-metre aeroplane on it put the
+  nose five and a half metres inside the building. Nothing ever noticed,
+  because nothing was solid. There is now a separate `stand`: forward of the
+  hangar line, on concrete out to both wingtips, lined up on the taxiway mouth.
+- **Crew you put out went back to being alive.** They knelt motionless for nine
+  seconds, which from four metres away reads as a body rather than as somebody
+  getting their breath back — the entire payoff of the mode was being thrown
+  away. They now get their breath back for four and a half seconds, stand up,
+  turn to whoever put them out with a hand raised, and then jog off to the
+  muster point. You can see that it worked.
+
 ## [1.4.0] — 2026-07-31
 
 ### Changed — the people on the apron
