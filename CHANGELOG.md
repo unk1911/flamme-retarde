@@ -8,6 +8,48 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.8.2] — 2026-08-01
+
+### Fixed — the sea was a trap, and it always had been
+
+Put her on the water and she stopped being an aeroplane. Not a crash, not a
+flight: nose buried fifty degrees into the sea, full power, full boost, twelve
+metres a second, for ever, with no key that got you out of it. Both faults date
+from the first commit — the aerodrome landed before anyone got far enough down
+to find them.
+
+- **The stall guard dug the nose in and held it there.** Hands off below the
+  stall the stabiliser commands the nose *down* to trade height for speed, which
+  is right in the air and nonsense on a surface, where there is no height under
+  you to trade. Sat on the water it drove the nose down against its own attitude
+  limiter until she was fifty degrees down — which points better than half the
+  thrust straight into the sea, which is exactly what holds the speed below the
+  stall that started it. A closed loop with no way out of it. The guard now
+  knows the difference between being slow in the air and being slow on a
+  surface, and the hull holds her attitude the way the undercarriage does
+  ashore: roll washed out, twelve degrees of nose-up left free to rotate on, and
+  the nose kept out of the water.
+- **The hull drag made a water take-off arithmetically impossible.** One flat
+  rate at every speed, so terminal speed on the sea worked out at nineteen
+  metres a second empty and thirteen with a load — both a long way under the
+  forty-six she needs to fly. Once down you were down for good, whatever you
+  did with the throttle, and a scoop run with the probes actually in the water
+  stopped you dead in about two seconds. The hull knows about the step now: she
+  plows and drags a bow wave low down, and past thirty or so the wetted length
+  collapses and she goes. **A full load off glassy water is twenty-five seconds
+  and six hundred and seventy metres on the throttle alone, ten seconds and
+  three hundred and thirty with the overboost gate open** — she gets off the
+  water on power, not on patience.
+- **A scoop run on the surface can be flown now**, which is the manoeuvre the
+  aeroplane exists for: down on the water at 68 m/s, twelve seconds to take the
+  full 6 137 litres, six metres a second the poorer for it, and away. Hold `W`
+  past the stop through the run and you come off it *faster* than you went on.
+
+Arriving at the sea hard is unchanged and still fatal — flown into the water at
+34 m/s down she is written off exactly as before, and so is a landing 22 m off
+the runway centreline. Wheels-down behaviour on the runway is untouched: 182 m
+of roll and away.
+
 ## [1.8.1] — 2026-08-01
 
 ### Fixed — you could not take off, and here is why

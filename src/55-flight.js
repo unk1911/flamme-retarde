@@ -241,7 +241,15 @@ function buildFlight(plane, fire) {
       let ph = clamp(-nose * 1.9 - p.vel.y * 0.055, -1, 1);
       // Never let the stabiliser hold the nose up into a stall: below the
       // number it commands the nose *down* until the speed comes back.
-      if (speed < FLIGHT.vStall * 1.06) {
+      //
+      // In the air, that is. On a surface there is nothing underneath to trade
+      // for speed and the guard becomes a deadlock: sat on the water below the
+      // stall it drove the nose down against its own attitude limiter until she
+      // was fifty degrees down and stayed there, which points better than half
+      // the thrust into the sea, which is what holds the speed below the stall
+      // that started it. Full power, full boost, twelve metres a second, for
+      // ever — an aeroplane that has neither crashed nor got away.
+      if (speed < FLIGHT.vStall * 1.06 && !p.onWater && !p.onGround) {
         ph = Math.min(ph, clamp((speed - FLIGHT.vStall * 1.06) * 0.06, -0.7, 0));
       }
       pitch += ph * FLIGHT.autoPitch * hands;
@@ -519,8 +527,36 @@ function buildFlight(plane, fire) {
         if (vv < -1.6 && p.slam > vv) p.slam = vv;
         p.pos.y = surface + 1.4;
         p.vel.y = Math.max(p.vel.y, 0);
+        // The hull holds her attitude the way the undercarriage does ashore. A
+        // flying boat on the step sits a shade nose-up, and it cannot sit
+        // nose-down at all — you do not bury the nose in the sea and carry on.
+        // Softer than the wheels, because rotating off the water is a thing you
+        // still have to be allowed to do: twelve degrees of nose-up left free
+        // for exactly that, and the roll taken out so a float never digs in.
+        _fwd2.set(0, 0, -1).applyQuaternion(p.quat);
+        _eul.set(clamp(Math.asin(clamp(_fwd2.y, -1, 1)), -0.02, 0.22),
+          Math.atan2(-_fwd2.x, -_fwd2.z), 0);
+        _lvl.setFromEuler(_eul);
+        p.quat.slerp(_lvl, Math.min(1, dt * 3));
         // Hull drag — this is what makes you firewall the throttle to get off.
-        p.vel.multiplyScalar(1 - 0.55 * dt);
+        //
+        // A hull is not the same hole in the water at every speed. Plowing, she
+        // drags a bow wave nothing will beat; up on the step the wetted length
+        // collapses and the drag goes with it. One flat rate knew none of that
+        // and made the sea a trap — terminal speed on the water worked out at
+        // nineteen metres a second empty and thirteen with a load, both a long
+        // way under the forty-six she needs to fly. So the moment you touched
+        // down you were down for good, and a scoop run with the probes actually
+        // in the water stopped you dead in about two seconds.
+        //
+        // The hump is still there and still has to be worked through — twenty
+        // seconds and six hundred metres with a full load and no gate, and you
+        // can feel her come up on the step somewhere past thirty. Open the
+        // overboost and it is a quarter of that. Which is the aeroplane: she
+        // gets off the water on power, not on patience.
+        const sp = p.vel.length();
+        const step = sat((sp - 6) / 26);
+        p.vel.multiplyScalar(1 - (0.55 - 0.49 * step) * dt);
       } else {
         p.crashed = true;
         p.crashSpeed = speed;
