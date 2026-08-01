@@ -36,6 +36,7 @@ is a real footprint.
 | `M` | settings — language, stability assist, volume, vegetation, traffic, birds, FOV, exposure |
 | `G` | gear — you need it down to land at Rokići |
 | `E` | **get out** — on the ground at Rokići, with the field alight |
+| `J` | **e[J]ect** — the seat, the canopy, and the aeroplane is gone |
 | `0` | **skip straight to Rokići, on foot** — the back door, see below |
 | `P` / `Esc` | **pause** — the fire stops too |
 | `H` | hide the HUD |
@@ -50,6 +51,14 @@ On foot at the airfield:
 | `SPACE` / left click | **open the branch** |
 | `E` | climb back in — stand next to the aeroplane |
 
+Under the canopy:
+
+| key | |
+|---|---|
+| mouse | look — your head, not the canopy |
+| `A` `D` / `← →` | haul a riser and turn |
+| `SPACE` | **flare** — about two seconds of it, and no more |
+
 The autopilot is a *fly me to the job* button, not an autoplayer: it lines the
 aeroplane up on a scoop run or brings you in over the fire, and hands the scoop
 and the drop back to you. Any real stick input disengages it.
@@ -59,6 +68,35 @@ spreading, the engines duck to silence, and the clock does not collect the
 interval and hand it back as one enormous step when you return. It also pauses
 itself if you switch tabs or lose the pointer lock, so nothing burns down while
 you are somewhere else.
+
+### Getting out
+
+`J` fires the seat. There is no confirmation on it and there is not going to be
+one: half the point of the key is that it is available in the two seconds before
+the ridge arrives, and a dialogue box in those two seconds is the same as not
+having the key at all. The price is paid the other way — the aeroplane is gone
+the instant you press it, she rolls off and goes down with nobody in her, and
+the results screen says so.
+
+The sequence is the real one. You leave with the aeroplane's velocity and a kick
+up the rails, you are a falling body for the best part of a second, the canopy
+streams and inflates against whatever airspeed you brought with you — the
+opening shock is capped at six g, which is a hard one you walk away from — and
+then it is suddenly very quiet.
+
+Under the canopy you sink at five and a half metres a second and fly forward at
+six and a half. What decides where you land is the wind gradient: at six hundred
+metres the canopy sees most of the wind the fire is being fanned by and you are
+largely a passenger, and down in the friction layer the wind is a third of that
+and the canopy is the faster of the two. So you do not pick your field from
+height. You pick it from two hundred metres, and you spend the rest getting near
+it. Over Šibenik that matters, because two thirds of what you can drift over is
+the Adriatic, and a canopy in the water is a net with you under it.
+
+`SPACE` is the flare, and there are about two seconds of it. Hold it from the
+top and you have flown the canopy into a stall, the sink rate goes up rather
+than down, and you arrive at ten metres a second — which is a different way of
+losing than being too low, and the game says which one you managed.
 
 ### On foot
 

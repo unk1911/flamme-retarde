@@ -68,9 +68,14 @@ addEventListener('keydown', (e) => {
   // E is the door, both ways. It is the only control that means the same thing
   // in both halves of the game, which is why it is not shared with anything.
   if (e.code === 'KeyE') { e.preventDefault(); toggleGround(); }
-  if (state.phase === 'ground') {
-    // On foot the aeroplane's controls are all meaningless and several of them
-    // would quietly reconfigure an aircraft you are not sitting in.
+  // J for e[J]ect. Deliberately not next to anything: it is the one key in the
+  // game you cannot take back, and it should not be within reach of the fingers
+  // flying the approach.
+  if (e.code === 'KeyJ') { e.preventDefault(); baleOut(); }
+  if (state.phase === 'ground' || state.phase === 'chute') {
+    // On foot, or under a canopy, the aeroplane's controls are all meaningless
+    // and several of them would quietly reconfigure an aircraft you are not
+    // sitting in — or, by then, an aircraft that is a hole in a hillside.
     if (['Space', 'KeyW', 'KeyS', 'KeyA', 'KeyD',
          'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
     return;
@@ -88,8 +93,8 @@ addEventListener('blur', () => { keys.clear(); if (flight) flight.p.kb.set(0, 0)
 canvas.addEventListener('click', () => {
   // Never on a touchscreen: there is no pointer to lock, and asking for it on
   // iOS throws up a permission bar over the top of the game.
-  if (!IS_TOUCH && (state.phase === 'fly' || state.phase === 'ground')
-    && !pointerLocked) grabPointer();
+  if (!IS_TOUCH && (state.phase === 'fly' || state.phase === 'ground'
+    || state.phase === 'chute') && !pointerLocked) grabPointer();
 });
 document.addEventListener('pointerlockchange', () => {
   const had = pointerLocked;
@@ -110,6 +115,13 @@ addEventListener('mousemove', (e) => {
   if (state.phase === 'ground') {
     const g = 0.0020 * flight.p.sens;
     ground.look(e.movementX * g, e.movementY * g);
+    return;
+  }
+  // Same again under the canopy: the mouse is your head. What the canopy does
+  // is on the rudder keys, because pulling a riser is a hand, not a look.
+  if (state.phase === 'chute') {
+    const g = 0.0020 * flight.p.sens;
+    eject.look(e.movementX * g, e.movementY * g);
     return;
   }
   const s = 0.0022 * flight.p.sens;
@@ -347,7 +359,7 @@ function updateCamera(dt) {
 // ── the world ────────────────────────────────────────────────────────────────
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
-  trees, landmarks, alerts, roads, rail, props, airfield, ground, birds;
+  trees, landmarks, alerts, roads, rail, props, airfield, ground, birds, eject;
 /** You plus the three wingmen, as the birds see them. Built once, in boot(). */
 let birdFlush = [];
 
@@ -490,6 +502,7 @@ async function boot() {
   shadow.castTree(plane.root, { dynamic: true });
   waterfx = buildWaterFX(scene);
   flight = buildFlight(plane, fire);
+  eject = buildEject(scene, flight, chuteDown);
 
   await step(92, 'load.brief');
   wingmen = buildWingmen(scene, fire, (who, text) => radio(who, text));
@@ -696,7 +709,7 @@ function setPaused(on) {
   // world build, and the cinematic and the end screen have their own answer to
   // "make it stop" — the skip button and the reload.
   if (state.phase !== 'fly' && state.phase !== 'crashing'
-    && state.phase !== 'ground') return;
+    && state.phase !== 'ground' && state.phase !== 'chute') return;
   if (state.paused === on) return;
   state.paused = on;
   $('pause').hidden = !on;
@@ -804,6 +817,36 @@ function skipToGround() {
   if (!parkAtApron()) return;
   toggleGround();
   toast(T('toast.cheat'));
+}
+
+/**
+ * J — the seat.
+ *
+ * There is no confirmation on it and there is not going to be one. Half the
+ * point of the key is that it is available in the two seconds before the ridge
+ * arrives, and a dialogue box in those two seconds is the same as not having
+ * the key at all. The price is paid the other way: the aeroplane is gone the
+ * instant you press it, and she is gone whatever the reason was.
+ */
+function baleOut() {
+  if (!eject || state.paused || state.phase !== 'fly') return;
+  if (!eject.canFire()) { toast(T('toast.ejectNo'), 'bad'); return; }
+  const low = state.altAgl < EJECT.minSafe + Math.max(0, -flight.p.vel.y) * 1.6;
+  eject.fire();
+  $('hud').hidden = true;
+  $('touch').hidden = true;
+  $('chute-hud').hidden = false;
+  alerts.bump(2.2);
+  toast(T(low ? 'toast.ejectLow' : 'toast.eject'), 'bad');
+}
+
+/** And the arrival, whichever of the three it turned out to be. */
+function chuteDown(kind) {
+  if (state.phase !== 'chute') return;
+  state.phase = 'lost';
+  if (kind !== 'land') alerts.bump(kind === 'sea' ? 1.6 : 4.5);
+  else alerts.bump(1.1);
+  showEnd(false, false, kind === 'sea', kind);
 }
 
 $('resume').addEventListener('click', () => setPaused(false));
@@ -957,7 +1000,7 @@ function updateStickHUD() {
 
 // ── scoring & end ────────────────────────────────────────────────────────────
 
-let scoredLitres = 0, lastBurning = 0, spotWarned = 0;
+let scoredLitres = 0, lastBurning = 0, spotWarned = 0, planeGone = false;
 
 // Held-branch override for the headless tests. A dispatched keydown is cleared
 // by the first blur, which a screenshot is enough to cause, so a test that
@@ -974,6 +1017,26 @@ const RETICLE_ARC = 2 * Math.PI * 15;
  * the world and not at the instruments — anything you have to read is a thing
  * you were not watching a burning person for.
  */
+
+/**
+ * And the one under the canopy. Height, rate, and whether what is coming up is
+ * going to hold you — which on this map is the only question that matters,
+ * because two thirds of what you can drift over is the Adriatic.
+ */
+function updateChuteHUD() {
+  const el = $('chute-hud');
+  const s = eject.you;
+  const agl = Math.max(0, eject.agl());
+  const wet = isSea(s.pos.x, s.pos.z);
+  $('ch-alt').textContent = agl < 100 ? agl.toFixed(0) : Math.round(agl / 5) * 5;
+  $('ch-vs').textContent = Math.max(0, -s.vel.y).toFixed(1);
+  el.className = (agl < 60 ? 'close ' : '') + (wet ? 'wet' : '');
+  $('ch-hint').textContent = eject.phase === 'down' ? ''
+    : !eject.flying ? T('chute.wait')
+      : s.stalled ? T('chute.stalled')
+        : wet ? T('chute.water') : T('chute.steer');
+}
+
 function updateGroundHUD(dt) {
   ghAcc += dt;
   if (ghAcc < 0.06) return;
@@ -1051,9 +1114,20 @@ function updateMission(dt) {
 
   // Losable from the ground too. The town does not stop burning because you
   // are standing on an apron forty kilometres of road away from it.
-  if (state.cityHealth < 0.55 && (state.phase === 'fly' || state.phase === 'ground')) {
+  if (state.cityHealth < 0.55 && (state.phase === 'fly' || state.phase === 'ground'
+    || state.phase === 'chute')) {
     state.phase = 'lost';
     showEnd(false);
+  }
+  // What you paid for the key, arriving. She is a long way off by now, so this
+  // is a noise and a shove and not the end of anything — the end of it is
+  // whatever you are hanging under.
+  if (flight.p.crashed && state.phase === 'chute' && !planeGone) {
+    planeGone = true;
+    const d = flight.p.pos.distanceTo(eject.pos);
+    alerts.bump(3.0 * (1 - sat((d - 200) / 1400)));
+    audio.impact(flight.p.crashOnWater, flight.p.crashSpeed || 0);
+    toast(T('toast.planeGone'), 'bad');
   }
   if (flight.p.crashed && state.phase === 'fly') {
     // Not straight to the results screen. Twelve tonnes stopping deserves two
@@ -1073,10 +1147,18 @@ let endState = null;
 
 function redrawEnd() {
   if (!endState) return;
-  const { won, crashed, onWater } = endState;
-  $('over-title').textContent = crashed ? T('over.crashed') : won ? T('over.won') : T('over.lost');
-  $('over-sub').textContent = crashed ? T(onWater ? 'over.crashedSub' : 'over.crashedLand')
-    : won ? T('over.wonSub') : T('over.lostSub');
+  const { won, crashed, onWater, chute } = endState;
+  // Three ways down under silk, and they are not the same ending. Walking away
+  // from it is still a lost mission — the aeroplane is a hole in a hillside and
+  // the fire is still burning — but it is not the same as drowning under your
+  // own canopy in the channel, and the screen should not pretend it is.
+  const CH = { land: 'chute', sea: 'chuteSea', low: 'chuteHard', fast: 'chuteFast' };
+  const key = chute && CH[chute];
+  $('over-title').textContent = key ? T('over.' + key)
+    : crashed ? T('over.crashed') : won ? T('over.won') : T('over.lost');
+  $('over-sub').textContent = key ? T('over.' + key + 'Sub')
+    : crashed ? T(onWater ? 'over.crashedSub' : 'over.crashedLand')
+      : won ? T('over.wonSub') : T('over.lostSub');
   const rows = [
     ['over.time', formatClock(state.t)],
     ['over.dropped', groupNum(state.litresDropped) + ' l'],
@@ -1097,15 +1179,16 @@ function redrawEnd() {
     .map(([k, v]) => `<div><span>${T(k)}</span><b>${v}</b></div>`).join('');
 }
 
-function showEnd(won, crashed = false, onWater = false) {
+function showEnd(won, crashed = false, onWater = false, chute = null) {
   const el = $('over');
   el.hidden = false;
   el.className = won ? 'win' : 'lose';
-  endState = { won, crashed, onWater };
+  endState = { won, crashed, onWater, chute };
   redrawEnd();
   $('touch').hidden = true;
   $('gtouch').hidden = true;
   $('ground-hud').hidden = true;
+  $('chute-hud').hidden = true;
   document.exitPointerLock?.();
 }
 
@@ -1139,6 +1222,37 @@ function frame() {
     updateMission(dt);
   }
 
+  if (state.phase === 'chute') {
+    // Two things are happening at once and only one of them is you. The
+    // aeroplane is still being integrated — nobody is flying her, the throttles
+    // are winding back on their own, and she is on her way to whatever is
+    // underneath — and you are hanging under a canopy watching it happen.
+    input.thrUp = input.thrDown = input.scoop = input.drop = false;
+    flight.p.throttle = Math.max(0, flight.p.throttle - dt * 0.35);
+    // And she drops a wing. Left entirely alone with the stabiliser off she
+    // trims out into a shallow glide and flies on for minutes, which is a lie
+    // about what has happened: she is out of trim, there are six tonnes of
+    // water free to move in the tank, and one throttle is winding back before
+    // the other.
+    //
+    // Held to a *bank*, not to a roll rate. A steady deflection into a model
+    // this forgiving does not depart, it barrel-rolls — round and round, all
+    // the way down, which looks like an air display rather than an abandoned
+    // aeroplane. Sixty-odd degrees and left there is the picture: she goes over,
+    // turns away from you, and goes down, with nobody in her.
+    const away = sat((eject.since - 1.0) / 5);
+    const bank = Math.atan2(flight.axes().right.y, flight.axes().up.y);
+    flight.p.stick.x = clamp((bank + 1.15 * away) * 1.4, -1, 1);
+    flight.p.stick.y = 0;
+    flight.update(dt, input);
+    eject.update(dt, {
+      turn: (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0)
+        - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0),
+      flare: keys.has('Space'),
+    });
+    updateMission(dt);
+  }
+
   if (state.phase === 'fly') {
     readKeys(dt);
     flight.update(dt, input);
@@ -1166,6 +1280,7 @@ function frame() {
   // lerp. Every one of those is there to make an aeroplane readable from
   // outside, and every one of them reads as motion sickness from inside a head.
   if (state.phase === 'ground') ground.pose(camera);
+  else if (state.phase === 'chute' || eject.active) eject.pose(camera);
   else if (state.phase !== 'intro') updateCamera(dt);
   U.uCamPos.value.copy(camera.position);
 
@@ -1214,7 +1329,10 @@ function frame() {
     scoopSpray.emit(flight.p.pos, fwd, right, state.speed, dt);
   }
 
-  shadow.update(flight.p.pos);
+  // Centred on whoever the player currently is. Left on the aeroplane, a
+  // parachute descent watches an unshadowed hillside come up while the shadow
+  // map follows a wreck four kilometres away.
+  shadow.update(eject.active ? eject.pos : flight.p.pos);
   shadow.syncMoving();
   shadow.render(renderer);
 
@@ -1239,6 +1357,8 @@ function frame() {
 
   if (state.phase === 'ground') {
     updateGroundHUD(dt);
+  } else if (eject.active) {
+    updateChuteHUD();
   } else {
     updateStickHUD();
     updateHUD(dt);
@@ -1356,6 +1476,21 @@ window.__fr = {
   key: (code, down = true) => dispatchEvent(
     new KeyboardEvent(down ? 'keydown' : 'keyup', { code })),
   skipIntro: () => beginFlight(),
+  /**
+   * The seat, without a keyboard. Synthetic key events never reach the `keys`
+   * set from a headless driver, so a parachute test drives the canopy the same
+   * way a flight test drives the aeroplane: by stepping it itself.
+   */
+  chute: {
+    fire: () => baleOut(),
+    reset: () => { eject.reset(); state.phase = 'fly'; planeGone = false; },
+    raw: () => eject,
+    step: (dt, turn = 0, flare = false) => {
+      eject.update(dt, { turn, flare });
+      return eject.stats();
+    },
+    stats: () => eject.stats(),
+  },
   /**
    * The land itself, for anything that has to be sited against real ground
    * rather than dropped at a guessed height. Everything in the bundle shares one

@@ -1,0 +1,401 @@
+// -----------------------------------------------------------------------------
+// Getting out.
+//
+// A CL-415 has no ejection seat, and the crews who fly these fires have nothing
+// of the kind — this is the one place the game leaves the record behind on
+// purpose, because what it replaces is worse. What it does keep honest is the
+// cost. The aeroplane goes on without you, drops her nose, and goes in. Six
+// tonnes of water and a serviceable aircraft, to save one person, and the fire
+// does not care either way.
+//
+// The sequence is the real one. You leave with the aeroplane's velocity and a
+// kick up the rails; you are a falling body for the best part of a second; the
+// canopy streams and inflates against whatever airspeed you brought with you,
+// which is the part that hurts; and then it is suddenly very quiet and you have
+// about a minute to choose somewhere to put your feet.
+//
+// The one number that decides whether this is a survival option or a second way
+// of dying is height. Nothing here forbids a low ejection — it just does not
+// have time to work, and you arrive at whatever rate the arithmetic gives you.
+// -----------------------------------------------------------------------------
+
+const EJECT = {
+  seatKick: 13,          // m/s along the aeroplane's own up, off the rails
+  tumble: 0.85,          // s of being a falling body before the canopy streams
+  deploy: 1.15,          // s from streaming to fully inflated
+
+  // Drag over mass. A body face down settles at about 55 m/s, a canopy this
+  // size at about 5.5 — a hundredfold change in the space of a second, which is
+  // the whole reason a parachute works and the whole reason it hurts.
+  kBody: 0.0032,
+  kCanopy: 0.33,
+  // And the ceiling on it. Unclamped, opening at 90 m/s would pull twenty g and
+  // put the arithmetic somewhere no human goes. Six is a hard opening you feel
+  // and walk away from, which is the one this game is telling.
+  maxOpen: 62,           // m/s²
+
+  drive: 6.5,            // m/s the canopy flies forward at, full glide
+  turn: 0.62,            // rad/s hauling on a riser
+  turnSink: 0.28,        // extra sink, as a fraction, in a full turn
+  sink: 5.6,             // m/s down, hands off
+  flareSink: 0.42,       // what a held flare multiplies the sink by
+  flareDrive: 0.35,      // and the forward speed — a flare trades one for other
+  flareFor: 2.4,         // s of flare in the canopy before it gives up
+  flareBack: 0.4,        // and how fast that comes back, per second
+  stallSink: 1.75,       // and what holding it past that costs you
+
+  eye: 1.62,             // where your eyes are above your boots
+  radius: 5.6,           // canopy radius
+  riser: 6.4,            // eyes to the centre of the canopy
+  gores: 14,
+
+  // Down faster than this and you do not get up. Under a full canopy you never
+  // see it; the only way to reach it is to leave the aeroplane too low.
+  hurt: 8.5,
+  // Where the toast stops congratulating you and starts telling you that was
+  // close. Measured, not guessed: straight and level she survives from twenty
+  // metres, because the seat throws you up before it lets you fall. Going down
+  // at forty she needs fifty, which is what the rate term is for.
+  minSafe: 60,           // m AGL, plus 1.6 s of whatever rate you brought
+};
+
+/**
+ * The canopy: gores, a vent at the apex, and the lines. Built in a frame whose
+ * origin is the jumper's eyes, so the whole thing can be parked on the camera
+ * and swung about it like the pendulum it actually is.
+ */
+function chuteMesh() {
+  const G = EJECT.gores, R = 7, S = 4, rad = EJECT.radius;
+  const A0 = 0.17, A1 = 1.76;         // polar angle: apex vent to skirt
+  const pos = [], col = [], idx = [];
+  // Rescue orange and white, which is what a canopy you want found from the air
+  // is made of. Both pulled well down, because the sun is directly on the other
+  // side of the cloth and anything near full value clips to a flat sheet.
+  const white = new THREE.Color(0xcbd4da), orange = new THREE.Color(0xa8551e);
+
+  for (let g = 0; g < G; g++) {
+    const c = g % 2 ? orange : white;
+    const base = pos.length / 3;
+    for (let r = 0; r <= R; r++) {
+      const pol = A0 + (r / R) * (A1 - A0);
+      const y = Math.cos(pol) * rad * 0.84 + EJECT.riser;
+      for (let s = 0; s <= S; s++) {
+        const u = s / S;
+        // Fabric belled out between the seams, which is what makes a canopy
+        // read as cloth under load rather than as a bowl.
+        const rr = Math.sin(pol) * rad * (1 + 0.05 * Math.sin(Math.PI * u));
+        const a = (g + u) / G * TAU;
+        pos.push(Math.cos(a) * rr, y, Math.sin(a) * rr);
+        col.push(c.r, c.g, c.b);
+      }
+    }
+    for (let r = 0; r < R; r++) {
+      for (let s = 0; s < S; s++) {
+        const i = base + r * (S + 1) + s;
+        idx.push(i, i + 1, i + S + 2, i, i + S + 2, i + S + 1);
+      }
+    }
+  }
+
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aVCol', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+
+  const group = new THREE.Group();
+  // Both sides, and the normals deliberately *not* flipped for the back face.
+  // From underneath you are looking at the inside of a single layer of nylon
+  // with the August sun on the other side of it, so the face you can see is lit
+  // by a light that is behind it — which is exactly what leaving the outward
+  // normals alone gives you, and it is the whole look of the thing.
+  group.add(new THREE.Mesh(g, solidMaterial(0xffffff, {
+    side: THREE.DoubleSide, spec: 0.04, specPower: 8, emissive: 0.05,
+    body: 'base *= vVCol;',
+  })));
+
+  // The lines. One per seam, down to a confluence just above your head — a
+  // single pixel each, which is exactly what seven metres of cord looks like.
+  const lp = [];
+  const skirtR = Math.sin(A1) * rad, skirtY = Math.cos(A1) * rad * 0.84 + EJECT.riser;
+  for (let i = 0; i < G; i++) {
+    const a = i / G * TAU;
+    lp.push(Math.cos(a) * skirtR, skirtY, Math.sin(a) * skirtR, 0, 0.55, 0);
+  }
+  const lg = new THREE.BufferGeometry();
+  lg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3));
+  group.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({
+    color: 0x2a2724, transparent: true, opacity: 0.85, depthWrite: false,
+  })));
+
+  group.visible = false;
+  return group;
+}
+
+const _ejV = new THREE.Vector3();
+const _ejRel = new THREE.Vector3();
+const _ejEul = new THREE.Euler(0, 0, 0, 'ZYX');
+const _ejQ = new THREE.Quaternion();
+
+/**
+ * @param scene   to hang the canopy on
+ * @param flight  the aeroplane you are leaving
+ * @param onDown  called once with 'land' | 'sea' | 'hard' when you arrive
+ */
+function buildEject(scene, flight, onDown) {
+  const canopy = chuteMesh();
+  scene.add(canopy);
+
+  const you = {
+    pos: new THREE.Vector3(),
+    vel: new THREE.Vector3(),
+    yaw: 0,              // the canopy's heading — hauling a riser turns this
+    look: 0,             // and your head on top of it, because you can look about
+    pitch: 0,
+    flare: EJECT.flareFor,
+    stalled: false,      // held the toggles past the end of the flare
+    swing: 0,            // pendulum roll, radians
+    swingV: 0,
+    inflation: 0,
+    vs: 0,               // rate of descent at the moment you touched
+  };
+
+  let phase = 'stowed';  // stowed | out | deploy | flying | down
+  let t = 0;             // seconds since the seat fired
+  let spin = 0;          // how much tumble is left in the picture
+  let spinT = 0;
+  let peakG = 0;
+
+  const airborne = () => {
+    const p = flight.p;
+    return !p.crashed && !p.onGround && !p.onWater;
+  };
+
+  /** Can you get out right now? */
+  const canFire = () => phase === 'stowed' && state.phase === 'fly' && airborne();
+
+  function fire() {
+    if (!canFire()) return false;
+    const p = flight.p;
+    const { up } = flight.axes();
+    you.pos.copy(p.pos).addScaledVector(up, 1.4);
+    you.vel.copy(p.vel).addScaledVector(up, EJECT.seatKick);
+    you.yaw = Math.atan2(-p.vel.x, -p.vel.z);
+    you.look = 0;
+    you.pitch = 0;
+    you.flare = EJECT.flareFor;
+    you.stalled = false;
+    you.swing = you.swingV = 0;
+    you.inflation = 0;
+    you.vs = 0;
+    phase = 'out';
+    t = 0;
+    spin = 1;
+    spinT = 0;
+    peakG = 0;
+
+    // And the aeroplane is on her own. No stabiliser, no autopilot, no hands:
+    // whatever attitude she was in when you left is the attitude she keeps
+    // until the drag and the weight of six tonnes of water settle the argument.
+    p.assist = 0;
+    p.autopilot = false;
+    p.levelling = false;
+    p.stick.set(0, 0);
+    p.kb.set(0, 0);
+    p.tch.set(0, 0);
+    p.rudder = 0;
+    state.phase = 'chute';
+    return true;
+  }
+
+  /** Mouse or thumb: your head, not the canopy. Same contract as on foot. */
+  function look(dx, dy) {
+    you.look = clamp(you.look - dx, -2.4, 2.4);
+    you.pitch = clamp(you.pitch - dy, -1.30, 1.30);
+  }
+
+  // ── the descent ────────────────────────────────────────────────────────────
+  /**
+   * The wind gradient, and it is the whole shape of the descent.
+   *
+   * `state.windSpeed` is the surface gust the flame front is being fanned by,
+   * and a canopy does not see that number anywhere. High up it sees most of it
+   * and you are a passenger — six and a half metres a second of canopy against
+   * seven of wind, so you go where the wind is going and you may pick which
+   * part of downwind. Low down it is in the friction layer, the wind is a third
+   * of what it was, and the canopy is suddenly the faster of the two. Which is
+   * to say: you do not choose your field from six hundred metres. You choose it
+   * from two hundred, and until then you spend the height getting near it.
+   */
+  function windAt(agl, out) {
+    const f = (0.26 + 0.46 * sat(agl / 420)) * state.windSpeed;
+    out.set(Math.cos(state.windDir) * f, 0, Math.sin(state.windDir) * f);
+  }
+
+  function update(dt, ctl) {
+    if (phase === 'stowed' || phase === 'down') return;
+    t += dt;
+    spinT += dt;
+
+    const surface = isSea(you.pos.x, you.pos.z) ? 0 : groundAt(you.pos.x, you.pos.z);
+    const agl = you.pos.y - EJECT.eye - surface;
+    windAt(agl, _ejV);
+
+    if (phase === 'flying') {
+      // Under a canopy you are not integrating forces any more, you are riding
+      // a wing that has already found its trim. Steer it and it goes there.
+      const steer = clamp(ctl.turn || 0, -1, 1);
+      you.yaw += steer * EJECT.turn * dt;
+
+      // The toggles. There are about two seconds of lift in a canopy and not
+      // one more: hold them down past that and you have flown it into a stall,
+      // which on a parachute means the sink rate goes *up* and stays up until
+      // you let go and it has flown itself out again. Without that it is a free
+      // thirty per cent off the whole descent, held down from the top.
+      const pull = !!ctl.flare && !you.stalled;
+      you.flare = clamp(you.flare + (pull ? -dt : dt * EJECT.flareBack), 0, EJECT.flareFor);
+      if (pull && you.flare <= 0) you.stalled = true;
+      else if (you.stalled && !ctl.flare && you.flare > EJECT.flareFor * 0.6) you.stalled = false;
+      const fl = pull ? 1 : 0;
+
+      const sink = EJECT.sink * (1 - fl * (1 - EJECT.flareSink))
+        * (you.stalled ? EJECT.stallSink : 1)
+        * (1 + EJECT.turnSink * Math.abs(steer));
+      const drive = EJECT.drive * (1 - fl * (1 - EJECT.flareDrive));
+      _ejV.x += -Math.sin(you.yaw) * drive;
+      _ejV.z += -Math.cos(you.yaw) * drive;
+      _ejV.y = -sink;
+      // Not instantly: a canopy has mass hanging under it and it swings into a
+      // new heading over a second or so rather than snapping to it.
+      you.vel.lerp(_ejV, 1 - Math.exp(-2.4 * dt));
+
+      // The pendulum. Driven by the turn, and it rings a little on its own.
+      you.swingV += (-you.swing * 9.0 - you.swingV * 2.6 + steer * 3.4) * dt;
+      you.swing = clamp(you.swing + you.swingV * dt, -0.30, 0.30);
+    } else {
+      // Ballistic, with the drag ramping from a body to a canopy as the cloth
+      // takes air. Squared, because drag goes with area and area goes with the
+      // square of how far the mouth has opened.
+      const inf = phase === 'deploy' ? sat((t - EJECT.tumble) / EJECT.deploy) : 0;
+      you.inflation = inf;
+      you.vel.y -= 9.81 * dt;
+      _ejRel.copy(you.vel).sub(_ejV);
+      const sp = _ejRel.length();
+      if (sp > 0.01) {
+        const k = EJECT.kBody + (EJECT.kCanopy - EJECT.kBody) * inf * inf;
+        const a = Math.min(k * sp * sp, EJECT.maxOpen);
+        peakG = Math.max(peakG, a / 9.81);
+        you.vel.addScaledVector(_ejRel, -(a * dt) / sp);
+      }
+      if (phase === 'out' && t >= EJECT.tumble) phase = 'deploy';
+      if (phase === 'deploy' && inf >= 1) {
+        phase = 'flying';
+        you.inflation = 1;
+        // Facing where you were already going, so the canopy does not appear to
+        // snap round the instant it takes the load.
+        you.yaw = Math.atan2(-you.vel.x, -you.vel.z);
+        you.swingV = 0.9;
+      }
+      // The tumble bleeds out as the cloth takes hold, not on a timer.
+      spin = phase === 'out' ? 1 : Math.max(0, 1 - you.inflation * 1.25);
+    }
+
+    you.pos.addScaledVector(you.vel, dt);
+
+    // Arrival. Boots, not eyes — the eye height is what the camera rides at and
+    // what you land on is a metre and a half below it.
+    const gy = isSea(you.pos.x, you.pos.z) ? 0 : groundAt(you.pos.x, you.pos.z);
+    if (you.pos.y - EJECT.eye <= gy) {
+      you.pos.y = gy + EJECT.eye;
+      you.vs = -you.vel.y;
+      you.vel.set(0, 0, 0);
+      phase = 'down';
+      canopy.visible = false;
+      // Three ways to arrive badly and they are not the same mistake. Water is
+      // water. A canopy that never finished opening means you left it too late.
+      // A canopy that was open and still put you in at ten metres a second means
+      // you flew it into the ground, which is a different lesson entirely.
+      const wet = isSea(you.pos.x, you.pos.z);
+      if (onDown) {
+        onDown(wet ? 'sea'
+          : you.inflation < 1 ? 'low'
+            : you.vs > EJECT.hurt ? 'fast' : 'land');
+      }
+    }
+  }
+
+  // ── the picture ────────────────────────────────────────────────────────────
+  function pose(camera) {
+    if (phase === 'stowed') return;
+    camera.position.copy(you.pos);
+    camera.up.set(0, 1, 0);
+    const cp = Math.cos(you.pitch), hy = you.yaw + you.look;
+    camera.lookAt(
+      you.pos.x - Math.sin(hy) * cp,
+      you.pos.y + Math.sin(you.pitch),
+      you.pos.z - Math.cos(hy) * cp,
+    );
+    if (spin > 0.001) {
+      // Thrown about rather than spun: three incommensurate rates, all of them
+      // fading with the same envelope, so it settles instead of stopping.
+      _ejEul.set(
+        Math.sin(spinT * 3.1) * 1.35 * spin,
+        Math.sin(spinT * 1.7 + 0.9) * 0.75 * spin,
+        Math.sin(spinT * 2.2 + 2.3) * 2.40 * spin,
+      );
+      camera.quaternion.multiply(_ejQ.setFromEuler(_ejEul));
+    }
+
+    canopy.visible = phase === 'deploy' || phase === 'flying';
+    if (!canopy.visible) return;
+    // The canopy hangs off your risers, so it lives in your frame and swings
+    // about your shoulders — which is why it is parked on the eye point and
+    // rolled, rather than being placed in the world and chased.
+    canopy.position.copy(you.pos);
+    // Streaming first: a long thin thing that blossoms. One scale does both
+    // because a canopy really does grow out of its own diameter.
+    const s = phase === 'flying' ? 1 : 0.10 + 0.90 * you.inflation;
+    canopy.scale.set(s, phase === 'flying' ? 1 : 0.35 + 0.65 * you.inflation, s);
+    _ejEul.set(you.swing * 0.35, you.yaw, -you.swing);
+    canopy.quaternion.setFromEuler(_ejEul);
+  }
+
+  return {
+    get phase() { return phase; },
+    get active() { return phase !== 'stowed'; },
+    get flying() { return phase === 'flying'; },
+    get pos() { return you.pos; },
+    get since() { return t; },
+    you,
+    canFire, fire, look, update, pose,
+    /** Back in the seat. Only a test ever runs the sequence twice. */
+    reset() {
+      phase = 'stowed';
+      canopy.visible = false;
+      spin = 0; t = 0; peakG = 0;
+      you.vel.set(0, 0, 0);
+      you.inflation = 0;
+      you.stalled = false;
+      you.vs = 0;
+    },
+    /** m AGL, for the HUD and for deciding whether the canopy has a chance. */
+    agl: () => you.pos.y - EJECT.eye
+      - (isSea(you.pos.x, you.pos.z) ? 0 : groundAt(you.pos.x, you.pos.z)),
+    stats: () => ({
+      phase,
+      t: +t.toFixed(2),
+      inflation: +you.inflation.toFixed(2),
+      alt: +(you.pos.y - EJECT.eye
+        - (isSea(you.pos.x, you.pos.z) ? 0 : groundAt(you.pos.x, you.pos.z))).toFixed(1),
+      vs: +you.vel.y.toFixed(2),
+      spd: +you.vel.length().toFixed(1),
+      peakG: +peakG.toFixed(1),
+      flare: +you.flare.toFixed(2),
+      stalled: you.stalled ? 1 : 0,
+      yaw: +you.yaw.toFixed(3),
+      at: [Math.round(you.pos.x), Math.round(you.pos.z)],
+      sea: isSea(you.pos.x, you.pos.z) ? 1 : 0,
+      touchVs: +you.vs.toFixed(2),
+    }),
+  };
+}

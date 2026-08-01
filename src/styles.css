@@ -413,6 +413,30 @@ html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
 }
 #gh-hint.urgent { color: var(--ember-hi); }
 
+/* under the canopy ----------------------------------------------------------
+   Deliberately the thinnest readout in the game. You are hanging in a harness
+   with nothing but your own eyes, and the two numbers here are the two things
+   your own eyes would in fact be giving you. */
+
+#chute-hud {
+  position: absolute; left: 50%; bottom: 2.6rem; transform: translateX(-50%);
+  display: flex; gap: 3rem; text-align: center;
+}
+#chute-hud .gauge b {
+  display: block; font-size: 1.4rem; font-weight: 300; letter-spacing: .02em;
+}
+#chute-hud .gauge span {
+  display: block; font-size: .5rem; letter-spacing: .22em;
+  text-transform: uppercase; color: #7f949c; margin-top: .1rem;
+}
+#chute-hud.close .gauge b { color: var(--ember-hi); }
+#ch-hint {
+  position: absolute; left: 50%; bottom: -1.9rem; transform: translateX(-50%);
+  font-size: .62rem; letter-spacing: .2em; text-transform: uppercase;
+  color: #9fb2b9; white-space: nowrap;
+}
+#chute-hud.wet #ch-hint { color: var(--ember-hi); }
+
 /* the virtual stick ---------------------------------------------------------
    Deltas from a locked pointer have no home of their own, so the stick has to
    be drawn or you are flying blind about your own inputs. */

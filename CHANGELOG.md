@@ -8,6 +8,56 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.9.0] — 2026-08-01
+
+### Added — the seat, on `J`
+
+`J` fires it, at any height, at any speed, with nothing to confirm. Half the
+point of the key is that it is available in the two seconds before the ridge
+arrives, and a dialogue box in those two seconds is the same as not having the
+key at all. The price is paid the other way round: the aeroplane is gone the
+instant you press it.
+
+- **The sequence is the real one.** You leave with the aeroplane's velocity and
+  a kick up the rails, you are a falling body for the best part of a second, and
+  then the canopy streams and inflates against whatever airspeed you brought
+  with you. That last part is the one that hurts — the drag over mass goes up a
+  hundredfold in about a second, and the only reason it is survivable is that
+  the opening shock is capped at six g. Unclamped, leaving at ninety metres a
+  second would pull twenty, and the arithmetic would take you somewhere no
+  person goes.
+- **Where you land is decided by the wind gradient, not by you.** At six hundred
+  metres the canopy sees most of the wind the fire is being fanned by and you
+  are largely a passenger; down in the friction layer it is a third of that and
+  the canopy, at six and a half metres a second, is the faster of the two. So
+  you do not choose a field from height — you choose it from two hundred metres
+  and spend the rest of the descent getting near it. On this map that is the
+  whole game of it, because two thirds of what you can drift over is the
+  Adriatic, and a canopy in the water is a net with you underneath it.
+- **`SPACE` is the flare, and there are two seconds of it.** Hold it from the
+  top and you have flown the canopy into a stall: the sink rate goes *up*, and
+  it stays up until you let go and it has flown itself out again. Without that
+  it was a free thirty per cent off the whole descent, held down from the moment
+  it opened.
+- **Four ways to arrive, and the screen names the one you managed.** Down on
+  land and walking; into the channel; too low for the canopy to finish opening;
+  or flown into the ground at ten metres a second with the thing open above you.
+  They are not the same mistake and they do not get the same words.
+- **The aeroplane rolls off and goes down.** She is held to sixty-five degrees
+  of bank rather than to a roll rate, because a steady deflection into a model
+  this forgiving does not depart — it barrel-rolls, all the way down, which
+  reads as an air display rather than as six tonnes of water with nobody in it.
+
+Measured: straight and level the seat gets you down from twenty metres, because
+it throws you up before it lets you fall; going down at forty it wants fifty and
+does not get away with forty-five. A descent from three hundred metres takes
+fifty-six seconds. The canopy is fourteen gores with an apex vent, and it is
+overhead where you can see it.
+
+Not done yet, and next: landing on land still ends the mission rather than
+handing you to the on-foot mode where you touched down. There is no eject button
+on a touchscreen, so the key is keyboard-only for now.
+
 ## [1.8.2] — 2026-08-01
 
 ### Fixed — the sea was a trap, and it always had been
