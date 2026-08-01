@@ -49,9 +49,6 @@ const EJECT = {
   riser: 6.4,            // eyes to the centre of the canopy
   gores: 14,
 
-  // Down faster than this and you do not get up. Under a full canopy you never
-  // see it; the only way to reach it is to leave the aeroplane too low.
-  hurt: 8.5,
   // Where the toast stops congratulating you and starts telling you that was
   // close. Measured, not guessed: straight and level she survives from twenty
   // metres, because the seat throws you up before it lets you fall. Going down
@@ -149,8 +146,7 @@ function buildEject(scene, flight, onDown) {
   const you = {
     pos: new THREE.Vector3(),
     vel: new THREE.Vector3(),
-    yaw: 0,              // the canopy's heading — hauling a riser turns this
-    look: 0,             // and your head on top of it, because you can look about
+    yaw: 0,              // canopy and view together — see look() for why
     pitch: 0,
     flare: EJECT.flareFor,
     stalled: false,      // held the toggles past the end of the flare
@@ -181,7 +177,6 @@ function buildEject(scene, flight, onDown) {
     you.pos.copy(p.pos).addScaledVector(up, 1.4);
     you.vel.copy(p.vel).addScaledVector(up, EJECT.seatKick);
     you.yaw = Math.atan2(-p.vel.x, -p.vel.z);
-    you.look = 0;
     you.pitch = 0;
     you.flare = EJECT.flareFor;
     you.stalled = false;
@@ -208,9 +203,22 @@ function buildEject(scene, flight, onDown) {
     return true;
   }
 
-  /** Mouse or thumb: your head, not the canopy. Same contract as on foot. */
+  /**
+   * Mouse or thumb. Where you look is where the canopy goes.
+   *
+   * This started out as a head that turned independently of the canopy, the way
+   * a head actually does under a parachute, and it made the thing unflyable. You
+   * spend the whole descent looking around for somewhere to land, so the mouse
+   * is never still; the moment it moves, your view stops pointing along the
+   * heading the canopy is flying, and A and D are then steering a direction you
+   * have no way of seeing. Not a difficult control — an invisible one.
+   *
+   * So: yaw is one number. The lag that makes it feel like cloth rather than a
+   * spaceship is in the velocity, which takes about half a second to follow the
+   * heading round, not in hiding the heading from you.
+   */
   function look(dx, dy) {
-    you.look = clamp(you.look - dx, -2.4, 2.4);
+    you.yaw -= dx;
     you.pitch = clamp(you.pitch - dy, -1.30, 1.30);
   }
 
@@ -311,16 +319,15 @@ function buildEject(scene, flight, onDown) {
       you.vel.set(0, 0, 0);
       phase = 'down';
       canopy.visible = false;
-      // Three ways to arrive badly and they are not the same mistake. Water is
-      // water. A canopy that never finished opening means you left it too late.
-      // A canopy that was open and still put you in at ten metres a second means
-      // you flew it into the ground, which is a different lesson entirely.
+      // Under an open canopy you live. Full stop, and it is not a concession:
+      // a canopy that has taken air puts you down at five and a half metres a
+      // second, which is a heavy step off a wall, and the water is the August
+      // Adriatic four hundred metres off a beach with three other aircraft and
+      // a lookout who all watched you go — you are in a lifejacket and there is
+      // a boat. The only thing that can still kill you is leaving too low for
+      // the cloth to open at all, and the game says so before you press it.
       const wet = isSea(you.pos.x, you.pos.z);
-      if (onDown) {
-        onDown(wet ? 'sea'
-          : you.inflation < 1 ? 'low'
-            : you.vs > EJECT.hurt ? 'fast' : 'land');
-      }
+      if (onDown) onDown(you.inflation < 1 ? 'low' : wet ? 'sea' : 'land');
     }
   }
 
@@ -329,7 +336,7 @@ function buildEject(scene, flight, onDown) {
     if (phase === 'stowed') return;
     camera.position.copy(you.pos);
     camera.up.set(0, 1, 0);
-    const cp = Math.cos(you.pitch), hy = you.yaw + you.look;
+    const cp = Math.cos(you.pitch), hy = you.yaw;
     camera.lookAt(
       you.pos.x - Math.sin(hy) * cp,
       you.pos.y + Math.sin(you.pitch),

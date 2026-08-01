@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.9.0">
+<meta name="version" content="1.9.1">
 <meta name="build-date" content="2026-08-01">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -982,8 +982,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.9.0, built 2026-08-01">
-    <b>v1.9.0</b><i>·</i><span>2026-08-01</span>
+  <div id="build" title="Flamme Retardé 1.9.1, built 2026-08-01">
+    <b>v1.9.1</b><i>·</i><span>2026-08-01</span>
   </div>
   <footer class="credit">
     <span>eDeliverables (2026)</span><i>·</i>
@@ -1192,7 +1192,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.9.0", date: "2026-08-01" };</script>
+<script>const BUILD = { v: "1.9.1", date: "2026-08-01" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -1932,8 +1932,8 @@ const STRINGS = {
     'chute.agl': 'm below',
     'chute.vs': 'm/s down',
     'chute.wait': 'wait for it',
-    'chute.steer': 'A / D to steer · SPACE to flare',
-    'chute.water': 'water below — steer for land',
+    'chute.steer': 'look where you want to land — mouse or A / D',
+    'chute.water': 'water below — turn for land if you can',
     'chute.stalled': 'canopy stalled — let go',
     'toast.boarded': 'back aboard',
 
@@ -1963,15 +1963,13 @@ const STRINGS = {
     'over.chute': 'Down under silk.',
     'over.chuteSub': 'You walked away from it. Six tonnes of water and a '
       + 'serviceable aeroplane did not, and the fire is still burning.',
-    'over.chuteSea': 'Into the channel.',
-    'over.chuteSeaSub': 'A canopy in the water is a net, and you are under it. '
-      + 'The fire is still burning.',
+    'over.chuteSea': 'Fished out of the channel.',
+    'over.chuteSeaSub': 'Out of the water inside ten minutes — the lookout had '
+      + 'your position before you hit it. The aeroplane is gone and the fire is '
+      + 'still burning.',
     'over.chuteHard': 'Too low for it.',
     'over.chuteHardSub': 'The canopy never finished opening. That key needs '
       + 'height, and in a dive it needs rather a lot of it.',
-    'over.chuteFast': 'You flew it into the ground.',
-    'over.chuteFastSub': 'The canopy was open above you and you still arrived at '
-      + 'ten metres a second. That is what holding the flare from the top does.',
     'over.time': 'time',
     'over.dropped': 'dropped',
     'over.onTarget': 'on target',
@@ -2160,7 +2158,7 @@ const STRINGS = {
     'chute.agl': 'm ispod',
     'chute.vs': 'm/s dolje',
     'chute.wait': 'čekaj',
-    'chute.steer': 'A / D za skretanje · SPACE za kočenje',
+    'chute.steer': 'gledaj kamo želiš sletjeti — miš ili A / D',
     'chute.water': 'more ispod — skreni prema kopnu',
     'chute.stalled': 'kupola je u slomu — pusti',
     'toast.boarded': 'natrag u avionu',
@@ -2189,14 +2187,12 @@ const STRINGS = {
     'over.chute': 'Spustio si se na svili.',
     'over.chuteSub': 'Ti si prošao. Šest tona vode i ispravan avion nisu, a požar '
       + 'i dalje gori.',
-    'over.chuteSea': 'U kanal.',
-    'over.chuteSeaSub': 'Kupola u moru je mreža, a ti si ispod nje. Požar i dalje gori.',
+    'over.chuteSea': 'Izvučen iz kanala.',
+    'over.chuteSeaSub': 'Iz vode za manje od deset minuta — motritelj je imao '
+      + 'tvoju poziciju prije nego si pao. Aviona nema, a požar i dalje gori.',
     'over.chuteHard': 'Prenisko za to.',
     'over.chuteHardSub': 'Kupola se nije stigla otvoriti. Toj tipki treba visina, '
       + 'a u obrušavanju treba je poprilično.',
-    'over.chuteFast': 'Zabio si se u tlo.',
-    'over.chuteFastSub': 'Kupola je bila otvorena iznad tebe, a ti si svejedno '
-      + 'došao deset metara u sekundi. To ti napravi kočenje držano od vrha.',
     'over.time': 'vrijeme',
     'over.dropped': 'izbačeno',
     'over.onTarget': 'na cilju',
@@ -2382,7 +2378,7 @@ const STRINGS = {
     'chute.agl': 'm dessous',
     'chute.vs': 'm/s de chute',
     'chute.wait': 'attends',
-    'chute.steer': 'A / D pour virer · ESPACE pour freiner',
+    'chute.steer': 'regarde où tu veux te poser — souris ou A / D',
     'chute.water': 'de l\'eau dessous — vire vers la terre',
     'chute.stalled': 'voile décrochée — relâche',
     'toast.boarded': 'de retour à bord',
@@ -2412,15 +2408,13 @@ const STRINGS = {
     'over.chute': 'Posé sous la voile.',
     'over.chuteSub': 'Vous êtes indemne. Six tonnes d\'eau et un avion en état de '
       + 'vol ne le sont pas, et le feu brûle toujours.',
-    'over.chuteSea': 'Dans le chenal.',
-    'over.chuteSeaSub': 'Une voile dans l\'eau est un filet, et vous êtes dessous. '
-      + 'Le feu brûle toujours.',
+    'over.chuteSea': 'Repêché dans le chenal.',
+    'over.chuteSeaSub': 'Sorti de l\'eau en moins de dix minutes — le guetteur avait '
+      + 'votre position avant que vous ne touchiez. L\'avion est perdu et le feu '
+      + 'brûle toujours.',
     'over.chuteHard': 'Trop bas pour ça.',
     'over.chuteHardSub': 'La voile n\'a pas fini de s\'ouvrir. Cette touche demande '
       + 'de la hauteur, et en piqué elle en demande beaucoup.',
-    'over.chuteFast': 'Vous l\'avez posée dans le sol.',
-    'over.chuteFastSub': 'La voile était ouverte au-dessus de vous et vous arriviez '
-      + 'encore à dix mètres par seconde. Voilà ce que fait un freinage tenu depuis le haut.',
     'over.time': 'temps',
     'over.dropped': 'largué',
     'over.onTarget': 'au but',
@@ -10843,9 +10837,6 @@ const EJECT = {
   riser: 6.4,            // eyes to the centre of the canopy
   gores: 14,
 
-  // Down faster than this and you do not get up. Under a full canopy you never
-  // see it; the only way to reach it is to leave the aeroplane too low.
-  hurt: 8.5,
   // Where the toast stops congratulating you and starts telling you that was
   // close. Measured, not guessed: straight and level she survives from twenty
   // metres, because the seat throws you up before it lets you fall. Going down
@@ -10943,8 +10934,7 @@ function buildEject(scene, flight, onDown) {
   const you = {
     pos: new THREE.Vector3(),
     vel: new THREE.Vector3(),
-    yaw: 0,              // the canopy's heading — hauling a riser turns this
-    look: 0,             // and your head on top of it, because you can look about
+    yaw: 0,              // canopy and view together — see look() for why
     pitch: 0,
     flare: EJECT.flareFor,
     stalled: false,      // held the toggles past the end of the flare
@@ -10975,7 +10965,6 @@ function buildEject(scene, flight, onDown) {
     you.pos.copy(p.pos).addScaledVector(up, 1.4);
     you.vel.copy(p.vel).addScaledVector(up, EJECT.seatKick);
     you.yaw = Math.atan2(-p.vel.x, -p.vel.z);
-    you.look = 0;
     you.pitch = 0;
     you.flare = EJECT.flareFor;
     you.stalled = false;
@@ -11002,9 +10991,22 @@ function buildEject(scene, flight, onDown) {
     return true;
   }
 
-  /** Mouse or thumb: your head, not the canopy. Same contract as on foot. */
+  /**
+   * Mouse or thumb. Where you look is where the canopy goes.
+   *
+   * This started out as a head that turned independently of the canopy, the way
+   * a head actually does under a parachute, and it made the thing unflyable. You
+   * spend the whole descent looking around for somewhere to land, so the mouse
+   * is never still; the moment it moves, your view stops pointing along the
+   * heading the canopy is flying, and A and D are then steering a direction you
+   * have no way of seeing. Not a difficult control — an invisible one.
+   *
+   * So: yaw is one number. The lag that makes it feel like cloth rather than a
+   * spaceship is in the velocity, which takes about half a second to follow the
+   * heading round, not in hiding the heading from you.
+   */
   function look(dx, dy) {
-    you.look = clamp(you.look - dx, -2.4, 2.4);
+    you.yaw -= dx;
     you.pitch = clamp(you.pitch - dy, -1.30, 1.30);
   }
 
@@ -11105,16 +11107,15 @@ function buildEject(scene, flight, onDown) {
       you.vel.set(0, 0, 0);
       phase = 'down';
       canopy.visible = false;
-      // Three ways to arrive badly and they are not the same mistake. Water is
-      // water. A canopy that never finished opening means you left it too late.
-      // A canopy that was open and still put you in at ten metres a second means
-      // you flew it into the ground, which is a different lesson entirely.
+      // Under an open canopy you live. Full stop, and it is not a concession:
+      // a canopy that has taken air puts you down at five and a half metres a
+      // second, which is a heavy step off a wall, and the water is the August
+      // Adriatic four hundred metres off a beach with three other aircraft and
+      // a lookout who all watched you go — you are in a lifejacket and there is
+      // a boat. The only thing that can still kill you is leaving too low for
+      // the cloth to open at all, and the game says so before you press it.
       const wet = isSea(you.pos.x, you.pos.z);
-      if (onDown) {
-        onDown(wet ? 'sea'
-          : you.inflation < 1 ? 'low'
-            : you.vs > EJECT.hurt ? 'fast' : 'land');
-      }
+      if (onDown) onDown(you.inflation < 1 ? 'low' : wet ? 'sea' : 'land');
     }
   }
 
@@ -11123,7 +11124,7 @@ function buildEject(scene, flight, onDown) {
     if (phase === 'stowed') return;
     camera.position.copy(you.pos);
     camera.up.set(0, 1, 0);
-    const cp = Math.cos(you.pitch), hy = you.yaw + you.look;
+    const cp = Math.cos(you.pitch), hy = you.yaw;
     camera.lookAt(
       you.pos.x - Math.sin(hy) * cp,
       you.pos.y + Math.sin(you.pitch),
@@ -13994,6 +13995,10 @@ function updateChuteHUD() {
   $('ch-alt').textContent = agl < 100 ? agl.toFixed(0) : Math.round(agl / 5) * 5;
   $('ch-vs').textContent = Math.max(0, -s.vel.y).toFixed(1);
   el.className = (agl < 60 ? 'close ' : '') + (wet ? 'wet' : '');
+  // The hint used to advertise the flare as the landing technique. It is not
+  // one — an untouched canopy always puts you down safely, and the flare is a
+  // garnish you can stall if you sit on it. Telling somebody to press the one
+  // key that can only make things worse is how you get killed by a tooltip.
   $('ch-hint').textContent = eject.phase === 'down' ? ''
     : !eject.flying ? T('chute.wait')
       : s.stalled ? T('chute.stalled')
@@ -14111,11 +14116,12 @@ let endState = null;
 function redrawEnd() {
   if (!endState) return;
   const { won, crashed, onWater, chute } = endState;
-  // Three ways down under silk, and they are not the same ending. Walking away
-  // from it is still a lost mission — the aeroplane is a hole in a hillside and
-  // the fire is still burning — but it is not the same as drowning under your
-  // own canopy in the channel, and the screen should not pretend it is.
-  const CH = { land: 'chute', sea: 'chuteSea', low: 'chuteHard', fast: 'chuteFast' };
+  // Three ways down under silk, and they are not the same ending. Two of them
+  // you walk away from — the mission is still lost either way, because the
+  // aeroplane is a hole in a hillside and the fire is still burning, but being
+  // fished out of the channel is not the same as being killed by it and the
+  // screen should not say the same thing about both.
+  const CH = { land: 'chute', sea: 'chuteSea', low: 'chuteHard' };
   const key = chute && CH[chute];
   $('over-title').textContent = key ? T('over.' + key)
     : crashed ? T('over.crashed') : won ? T('over.won') : T('over.lost');

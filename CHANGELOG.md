@@ -8,6 +8,37 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.9.1] — 2026-08-01
+
+### Fixed — you were steering something you could not see
+
+The canopy flew a heading of its own and the camera looked along a *different*
+one, because the mouse moved a head and `A`/`D` moved the canopy. Under a
+parachute that is true to life and it is also the single worst thing you can do
+to somebody hanging under one: you spend the whole descent looking around for
+somewhere to land, so the mouse is never still, so your view is never pointing
+where you are going, so `A` and `D` steer a direction with nothing on screen to
+tell you what it is. It reads as controls that do not work, and it was reported
+as exactly that.
+
+- **Yaw is one number now.** Where you look is where the canopy goes, on the
+  mouse or on `A`/`D`. The lag that makes it cloth rather than a spaceship
+  stayed where it belongs, in the velocity: whip the view round and the flight
+  path takes a couple of seconds to follow it, which is what a canopy does.
+- **Once the canopy has taken air, you live.** Five and a half metres a second
+  is a heavy step off a wall, and coming down in the channel is the August
+  Adriatic a few hundred metres off a beach, with three other aircraft and a
+  lookout who all watched you go. You are in a lifejacket and there is a boat.
+  It loses you the mission — the aeroplane is still a hole in a hillside — but
+  it does not kill you, and the end screen no longer says it does. The only
+  thing that still does is leaving too low for the cloth to open at all.
+- **The flare stopped being a trap.** The hint under the canopy read
+  `SPACE to flare` as standing advice, and the flare had no upside whatsoever —
+  an untouched canopy already lands you safely — while holding it stalled the
+  canopy and put you down hard enough to be fatal. A tooltip recommending the
+  one key that can only hurt you. The hint now tells you the thing that matters
+  (look where you want to land), and the stall is merely undignified.
+
 ## [1.9.0] — 2026-08-01
 
 ### Added — the seat, on `J`

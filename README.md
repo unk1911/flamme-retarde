@@ -55,9 +55,9 @@ Under the canopy:
 
 | key | |
 |---|---|
-| mouse | look — your head, not the canopy |
-| `A` `D` / `← →` | haul a riser and turn |
-| `SPACE` | **flare** — about two seconds of it, and no more |
+| mouse | **steer** — where you look is where it goes |
+| `A` `D` / `← →` | the same, on the keyboard |
+| `SPACE` | flare — a garnish; you never need it |
 
 The autopilot is a *fly me to the job* button, not an autoplayer: it lines the
 aeroplane up on a scoop run or brings you in over the fire, and hands the scoop
@@ -93,10 +93,17 @@ height. You pick it from two hundred metres, and you spend the rest getting near
 it. Over Šibenik that matters, because two thirds of what you can drift over is
 the Adriatic, and a canopy in the water is a net with you under it.
 
-`SPACE` is the flare, and there are about two seconds of it. Hold it from the
-top and you have flown the canopy into a stall, the sink rate goes up rather
-than down, and you arrive at ten metres a second — which is a different way of
-losing than being too low, and the game says which one you managed.
+Once the canopy has taken air, you live. Five and a half metres a second is a
+heavy step off a wall, and the water is the August Adriatic a few hundred metres
+off a beach with three other aircraft and a lookout who all watched you go — you
+are in a lifejacket and there is a boat. Coming down in the channel loses you
+the mission, not your life. The one thing that still kills you is leaving too
+low for the cloth to open at all, and the toast says so as you go.
+
+`SPACE` is the flare and there are about two seconds of it. It is a garnish:
+you never need it, because an untouched canopy already puts you down safely.
+Sit on it and you stall the canopy and come down half again as fast, which is
+now merely undignified.
 
 ### On foot
 

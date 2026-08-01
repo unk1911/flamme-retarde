@@ -1031,6 +1031,10 @@ function updateChuteHUD() {
   $('ch-alt').textContent = agl < 100 ? agl.toFixed(0) : Math.round(agl / 5) * 5;
   $('ch-vs').textContent = Math.max(0, -s.vel.y).toFixed(1);
   el.className = (agl < 60 ? 'close ' : '') + (wet ? 'wet' : '');
+  // The hint used to advertise the flare as the landing technique. It is not
+  // one — an untouched canopy always puts you down safely, and the flare is a
+  // garnish you can stall if you sit on it. Telling somebody to press the one
+  // key that can only make things worse is how you get killed by a tooltip.
   $('ch-hint').textContent = eject.phase === 'down' ? ''
     : !eject.flying ? T('chute.wait')
       : s.stalled ? T('chute.stalled')
@@ -1148,11 +1152,12 @@ let endState = null;
 function redrawEnd() {
   if (!endState) return;
   const { won, crashed, onWater, chute } = endState;
-  // Three ways down under silk, and they are not the same ending. Walking away
-  // from it is still a lost mission — the aeroplane is a hole in a hillside and
-  // the fire is still burning — but it is not the same as drowning under your
-  // own canopy in the channel, and the screen should not pretend it is.
-  const CH = { land: 'chute', sea: 'chuteSea', low: 'chuteHard', fast: 'chuteFast' };
+  // Three ways down under silk, and they are not the same ending. Two of them
+  // you walk away from — the mission is still lost either way, because the
+  // aeroplane is a hole in a hillside and the fire is still burning, but being
+  // fished out of the channel is not the same as being killed by it and the
+  // screen should not say the same thing about both.
+  const CH = { land: 'chute', sea: 'chuteSea', low: 'chuteHard' };
   const key = chute && CH[chute];
   $('over-title').textContent = key ? T('over.' + key)
     : crashed ? T('over.crashed') : won ? T('over.won') : T('over.lost');

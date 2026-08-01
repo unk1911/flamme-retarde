@@ -148,8 +148,8 @@ const STRINGS = {
     'chute.agl': 'm below',
     'chute.vs': 'm/s down',
     'chute.wait': 'wait for it',
-    'chute.steer': 'A / D to steer · SPACE to flare',
-    'chute.water': 'water below — steer for land',
+    'chute.steer': 'look where you want to land — mouse or A / D',
+    'chute.water': 'water below — turn for land if you can',
     'chute.stalled': 'canopy stalled — let go',
     'toast.boarded': 'back aboard',
 
@@ -179,15 +179,13 @@ const STRINGS = {
     'over.chute': 'Down under silk.',
     'over.chuteSub': 'You walked away from it. Six tonnes of water and a '
       + 'serviceable aeroplane did not, and the fire is still burning.',
-    'over.chuteSea': 'Into the channel.',
-    'over.chuteSeaSub': 'A canopy in the water is a net, and you are under it. '
-      + 'The fire is still burning.',
+    'over.chuteSea': 'Fished out of the channel.',
+    'over.chuteSeaSub': 'Out of the water inside ten minutes — the lookout had '
+      + 'your position before you hit it. The aeroplane is gone and the fire is '
+      + 'still burning.',
     'over.chuteHard': 'Too low for it.',
     'over.chuteHardSub': 'The canopy never finished opening. That key needs '
       + 'height, and in a dive it needs rather a lot of it.',
-    'over.chuteFast': 'You flew it into the ground.',
-    'over.chuteFastSub': 'The canopy was open above you and you still arrived at '
-      + 'ten metres a second. That is what holding the flare from the top does.',
     'over.time': 'time',
     'over.dropped': 'dropped',
     'over.onTarget': 'on target',
@@ -376,7 +374,7 @@ const STRINGS = {
     'chute.agl': 'm ispod',
     'chute.vs': 'm/s dolje',
     'chute.wait': 'čekaj',
-    'chute.steer': 'A / D za skretanje · SPACE za kočenje',
+    'chute.steer': 'gledaj kamo želiš sletjeti — miš ili A / D',
     'chute.water': 'more ispod — skreni prema kopnu',
     'chute.stalled': 'kupola je u slomu — pusti',
     'toast.boarded': 'natrag u avionu',
@@ -405,14 +403,12 @@ const STRINGS = {
     'over.chute': 'Spustio si se na svili.',
     'over.chuteSub': 'Ti si prošao. Šest tona vode i ispravan avion nisu, a požar '
       + 'i dalje gori.',
-    'over.chuteSea': 'U kanal.',
-    'over.chuteSeaSub': 'Kupola u moru je mreža, a ti si ispod nje. Požar i dalje gori.',
+    'over.chuteSea': 'Izvučen iz kanala.',
+    'over.chuteSeaSub': 'Iz vode za manje od deset minuta — motritelj je imao '
+      + 'tvoju poziciju prije nego si pao. Aviona nema, a požar i dalje gori.',
     'over.chuteHard': 'Prenisko za to.',
     'over.chuteHardSub': 'Kupola se nije stigla otvoriti. Toj tipki treba visina, '
       + 'a u obrušavanju treba je poprilično.',
-    'over.chuteFast': 'Zabio si se u tlo.',
-    'over.chuteFastSub': 'Kupola je bila otvorena iznad tebe, a ti si svejedno '
-      + 'došao deset metara u sekundi. To ti napravi kočenje držano od vrha.',
     'over.time': 'vrijeme',
     'over.dropped': 'izbačeno',
     'over.onTarget': 'na cilju',
@@ -598,7 +594,7 @@ const STRINGS = {
     'chute.agl': 'm dessous',
     'chute.vs': 'm/s de chute',
     'chute.wait': 'attends',
-    'chute.steer': 'A / D pour virer · ESPACE pour freiner',
+    'chute.steer': 'regarde où tu veux te poser — souris ou A / D',
     'chute.water': 'de l\'eau dessous — vire vers la terre',
     'chute.stalled': 'voile décrochée — relâche',
     'toast.boarded': 'de retour à bord',
@@ -628,15 +624,13 @@ const STRINGS = {
     'over.chute': 'Posé sous la voile.',
     'over.chuteSub': 'Vous êtes indemne. Six tonnes d\'eau et un avion en état de '
       + 'vol ne le sont pas, et le feu brûle toujours.',
-    'over.chuteSea': 'Dans le chenal.',
-    'over.chuteSeaSub': 'Une voile dans l\'eau est un filet, et vous êtes dessous. '
-      + 'Le feu brûle toujours.',
+    'over.chuteSea': 'Repêché dans le chenal.',
+    'over.chuteSeaSub': 'Sorti de l\'eau en moins de dix minutes — le guetteur avait '
+      + 'votre position avant que vous ne touchiez. L\'avion est perdu et le feu '
+      + 'brûle toujours.',
     'over.chuteHard': 'Trop bas pour ça.',
     'over.chuteHardSub': 'La voile n\'a pas fini de s\'ouvrir. Cette touche demande '
       + 'de la hauteur, et en piqué elle en demande beaucoup.',
-    'over.chuteFast': 'Vous l\'avez posée dans le sol.',
-    'over.chuteFastSub': 'La voile était ouverte au-dessus de vous et vous arriviez '
-      + 'encore à dix mètres par seconde. Voilà ce que fait un freinage tenu depuis le haut.',
     'over.time': 'temps',
     'over.dropped': 'largué',
     'over.onTarget': 'au but',
