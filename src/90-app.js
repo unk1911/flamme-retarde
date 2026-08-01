@@ -843,9 +843,26 @@ function baleOut() {
 /** And the arrival, whichever of the three it turned out to be. */
 function chuteDown(kind) {
   if (state.phase !== 'chute') return;
+  // Down on your feet on dry land is not the end of anything. You are a pilot
+  // standing on a Dalmatian hillside with a pump on your back and a fire over
+  // the ridge — which is the whole reason the key exists, and which the game
+  // used to answer with a red screen that was indistinguishable from having
+  // been killed by it.
+  if (kind === 'land' && ground && ground.ok
+    && ground.retarget(localeAt(eject.pos.x, eject.pos.z, airfield))
+    && ground.dropIn(eject.pos.x, eject.pos.z, eject.you.yaw)) {
+    alerts.bump(1.1);
+    $('chute-hud').hidden = true;
+    $('hud').hidden = true;
+    $('ground-hud').hidden = false;
+    if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = false; }
+    if (!IS_TOUCH && !pointerLocked) grabPointer();
+    paintDeviceText();
+    toast(T('toast.walkedAway'));
+    return;
+  }
   state.phase = 'lost';
-  if (kind !== 'land') alerts.bump(kind === 'sea' ? 1.6 : 4.5);
-  else alerts.bump(1.1);
+  alerts.bump(kind === 'sea' ? 1.6 : 4.5);
   showEnd(false, false, kind === 'sea', kind);
 }
 
@@ -1047,6 +1064,13 @@ function updateGroundHUD(dt) {
   ghAcc = 0;
   const g = ground.hud();
 
+  // On a hillside you parachuted on to there is no aerodrome mission to count
+  // and no aeroplane to go back to, so the three gauges that tally it and the
+  // line that reads the tank both go away rather than sitting there at zero
+  // telling you about a tank that is at the bottom of a valley.
+  const alone = ground.stranded && g.alight === 0 && g.crewLeft === 0;
+  $('gh-top').hidden = alone;
+  $('gh-reserve').hidden = !!ground.stranded;
   $('gh-alight').textContent = g.alight;
   $('gh-crew').textContent = g.crewLeft;
   $('gh-saved').textContent = g.rescued;

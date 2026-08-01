@@ -413,6 +413,14 @@ html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
 }
 #gh-hint.urgent { color: var(--ember-hi); }
 
+/* And `hidden` has to actually hide. The user-agent rule for [hidden] is
+   display:none at zero specificity, so every layout rule in this block — the
+   flex on #gh-top, the block on the reserve line — silently outranks it. The
+   attribute then goes on reading in the DOM as though it had worked while the
+   element sits there in plain sight, which is exactly the shape of bug that
+   costs an hour. */
+#ground-hud [hidden] { display: none !important; }
+
 /* under the canopy ----------------------------------------------------------
    Deliberately the thinnest readout in the game. You are hanging in a harness
    with nothing but your own eyes, and the two numbers here are the two things

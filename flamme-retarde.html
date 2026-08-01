@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.9.1">
+<meta name="version" content="1.10.0">
 <meta name="build-date" content="2026-08-01">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -426,6 +426,14 @@ html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
   color: #9fb2b9; text-align: center;
 }
 #gh-hint.urgent { color: var(--ember-hi); }
+
+/* And `hidden` has to actually hide. The user-agent rule for [hidden] is
+   display:none at zero specificity, so every layout rule in this block — the
+   flex on #gh-top, the block on the reserve line — silently outranks it. The
+   attribute then goes on reading in the DOM as though it had worked while the
+   element sits there in plain sight, which is exactly the shape of bug that
+   costs an hour. */
+#ground-hud [hidden] { display: none !important; }
 
 /* under the canopy ----------------------------------------------------------
    Deliberately the thinnest readout in the game. You are hanging in a harness
@@ -982,8 +990,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.9.1, built 2026-08-01">
-    <b>v1.9.1</b><i>·</i><span>2026-08-01</span>
+  <div id="build" title="Flamme Retardé 1.10.0, built 2026-08-01">
+    <b>v1.10.0</b><i>·</i><span>2026-08-01</span>
   </div>
   <footer class="credit">
     <span>eDeliverables (2026)</span><i>·</i>
@@ -1192,7 +1200,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.9.1", date: "2026-08-01" };</script>
+<script>const BUILD = { v: "1.10.0", date: "2026-08-01" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -1929,6 +1937,7 @@ const STRINGS = {
     'toast.ejectLow': 'out, and far too low for it',
     'toast.ejectNo': 'not from here — you have to be flying',
     'toast.planeGone': 'she went in',
+    'toast.walkedAway': 'down, and on your feet — the fire is that way',
     'chute.agl': 'm below',
     'chute.vs': 'm/s down',
     'chute.wait': 'wait for it',
@@ -2155,6 +2164,7 @@ const STRINGS = {
     'toast.ejectLow': 'vani si, i daleko prenisko za to',
     'toast.ejectNo': 'ne odavde — moraš biti u zraku',
     'toast.planeGone': 'pala je',
+    'toast.walkedAway': 'dolje si, i na nogama — požar je onamo',
     'chute.agl': 'm ispod',
     'chute.vs': 'm/s dolje',
     'chute.wait': 'čekaj',
@@ -2375,6 +2385,7 @@ const STRINGS = {
     'toast.ejectLow': 'dehors, et bien trop bas pour ça',
     'toast.ejectNo': 'pas d\'ici — il faut être en vol',
     'toast.planeGone': 'elle est tombée',
+    'toast.walkedAway': 'au sol, et debout — le feu est par là',
     'chute.agl': 'm dessous',
     'chute.vs': 'm/s de chute',
     'chute.wait': 'attends',
@@ -8064,7 +8075,7 @@ async function buildGround(scene, field) {
   }
 
   const rng = mulberry32(CONFIG.seed ^ 0x6f00d1);
-  const objects = field.objects;
+  let objects = field.objects;
   const flames = buildFlames(scene, 220);
   const jetSpray = buildSprayPool(scene, 900, 7.5, 1.1);
   // Negative gravity, so it climbs. Steam off a person you have just hit is the
@@ -8082,7 +8093,7 @@ async function buildGround(scene, field) {
     return field.toWorld(t - 60, s - 34);
   })();
 
-  const crew = field.crewSpots.map((p, i) => {
+  const allCrew = field.crewSpots.map((p, i) => {
     const fig = makeFigure(rig, scene);
     fig.root.position.set(p[0], p[1], p[2]);
     fig.root.visible = false;                 // nobody is out there until it starts
@@ -8102,6 +8113,11 @@ async function buildGround(scene, field) {
       roll: 0, char: 0, spot: [Math.cos(a) * 4.4, Math.sin(a) * 4.4],
     };
   });
+  // Who is actually out there. The figures are built once, against the
+  // aerodrome, because that is the only place in the world with a crew in it —
+  // walking a hillside you came down on by parachute, this is empty and they
+  // are all hidden.
+  let crew = allCrew;
 
   // ── the player ─────────────────────────────────────────────────────────────
   const you = {
@@ -8111,6 +8127,7 @@ async function buildGround(scene, field) {
   };
 
   let active = false;
+  let stranded = false;              // walked in under a canopy, not out of a door
   let armed = false;                 // has the spot fire been called
   let seeded = false;                // have the first flames appeared
   let armTimer = 0;
@@ -8982,7 +8999,11 @@ async function buildGround(scene, field) {
     // The field burns whether or not anybody is standing in it. Leaving this
     // gated on the ground phase would mean an airfield that only ever caught
     // fire while you were watching, which is the kind of thing you can feel.
-    if (!armed) {
+    //
+    // Stranded skips the whole question: there is no field, nothing is going to
+    // catch, and this early return is what would otherwise stop your legs
+    // working on a hillside you have just parachuted on to.
+    if (!armed && !stranded) {
       if (state.phase === 'fly' && state.t > 60 && frontDistance() < GROUND.spotRange) {
         armed = true;
         armTimer = 0;
@@ -8992,7 +9013,7 @@ async function buildGround(scene, field) {
       }
       return;
     }
-    if (!seeded) {
+    if (armed && !seeded) {
       armTimer += dt;
       if (armTimer > GROUND.spotDelay) seedSpotFire();
     }
@@ -9018,7 +9039,7 @@ async function buildGround(scene, field) {
         : hit.obj ? hit.obj.burning > 0 : false;
       if (wants) spray(dt, hit);
       you.jet = damp(you.jet, wants ? 1 : 0, 14, dt);
-      if (distToPlane() < GROUND.refillDist && !wants) refill(dt);
+      if (!stranded && distToPlane() < GROUND.refillDist && !wants) refill(dt);
     } else {
       you.jet = 0;
       you.aimKind = null;
@@ -9037,10 +9058,14 @@ async function buildGround(scene, field) {
     if (!flight.p.onGround) return false;
     return flight.p.vel.length() < 1.6;
   }
-  const canBoard = () => active && distToPlane() < GROUND.boardDist;
+  // Not into a wreck. If you came down under a canopy the aeroplane is a
+  // column of smoke somewhere else, and being offered the door back into it —
+  // or a refill from its tank — is the game contradicting its own end screen.
+  const canBoard = () => active && !stranded && distToPlane() < GROUND.boardDist;
 
   function enter() {
     if (!canEnter()) return false;
+    stranded = false;
     const { fwd, right } = flight.axes();
     // Off the port side and well aft: the wing is fourteen metres of half-span
     // and the propellers are on the leading edge of it. Stepping out any closer
@@ -9061,6 +9086,49 @@ async function buildGround(scene, field) {
     const look = nearestTrouble() || field.apron;
     you.yaw = Math.atan2(-(look[0] - you.x), -(look[2] - you.z));
     you.spraying = false;
+    active = true;
+    state.phase = 'ground';
+    return true;
+  }
+
+  /**
+   * Point the whole mode at somewhere else and keep every bit of it — the
+   * movement, the branch, the camera, the collision. This is the trick the
+   * locale interface was for: `buildGround` never knew anything about an
+   * aerodrome except through these eleven members, so handing it eleven
+   * different ones puts you on a hillside instead, and nothing downstream
+   * notices.
+   */
+  function retarget(next) {
+    if (!next || !next.site) return false;
+    field = next;
+    objects = next.objects || [];
+    // Nobody is out here. The aerodrome's seven are built against the
+    // aerodrome's spots and cannot be relocated meaningfully, so they go away
+    // and come back if you are ever pointed at the field again.
+    const home = next.crewSpots && next.crewSpots.length;
+    crew = home ? allCrew : [];
+    if (!home) for (const c of allCrew) c.fig.root.visible = false;
+    return true;
+  }
+
+  /**
+   * Arrive on foot from under a canopy, wherever that turned out to be.
+   *
+   * Deliberately not enter(): that one is the door of a parked aeroplane and
+   * every number in it — seventeen metres to port to clear the wing, seven aft
+   * to clear the propellers, the way back in afterwards — assumes there is an
+   * aeroplane to step out of and back into. There is not. There is a hillside.
+   */
+  function dropIn(x, z, yaw) {
+    const [px, pz] = confine(x, z);
+    you.x = px; you.z = pz;
+    you.y = field.walkY(px, pz);
+    you.vx = you.vz = 0;
+    you.yaw = yaw;
+    you.pitch = 0;
+    you.spraying = false;
+    stranded = true;
     active = true;
     state.phase = 'ground';
     return true;
@@ -9101,7 +9169,10 @@ async function buildGround(scene, field) {
     ok: true,
     get active() { return active; },
     get armed() { return armed; },
-    update, enter, leave, canEnter, canBoard, look, pose, you, crew,
+    update, enter, leave, canEnter, canBoard, look, pose, you,
+    retarget, dropIn,
+    get stranded() { return stranded; },
+    get crew() { return crew; },
     hose: () => you.jet,
     hud: () => ({
       pack: you.pack, packMax: GROUND.pack,
@@ -9374,6 +9445,72 @@ async function buildLandmarks(scene) {
     stats: () => placed.map((p) => p.name),
     tris: placed.reduce((s, p) => s + p.tris, 0),
   };
+}
+
+// ==== 49-open.js ================================================
+// -----------------------------------------------------------------------------
+// Anywhere else.
+//
+// A canopy can come down anywhere in a hundred and sixty-nine square kilometres,
+// and almost none of that is an aerodrome. The alternative to answering for the
+// rest of it is a parachute that only works over one rectangle, which is worse
+// than not having the parachute — you would be spending an aeroplane to arrive
+// at a screen that says the game is over.
+//
+// So: the on-foot mode consumes a locale, eleven members and nothing else, and
+// this synthesises one around wherever you touched down. Bounds a kilometre and
+// a half across, heights straight off the DEM, no blockers, no objects, nobody
+// there. It costs almost nothing and it is the difference between a feature and
+// a trap.
+// -----------------------------------------------------------------------------
+
+const OPEN = {
+  reach: 780,          // m from the touchdown point you are allowed to walk
+};
+
+/**
+ * A locale for open country, centred on a point. Implements exactly the
+ * interface `buildGround` consumes — see `src/46-airfield.js` for the one it
+ * was written against.
+ *
+ * The local frame is world-axis-aligned and simply offset. An aerodrome's frame
+ * is rotated to its runway because every structure on it was laid out in those
+ * axes; a hillside has no axes, so inventing a rotation for it would be
+ * inventing a fact.
+ */
+function openLocale(x, z) {
+  const cx = Math.round(x), cz = Math.round(z);
+  const R = OPEN.reach;
+  // Never below the waterline. Walk to the edge of the Adriatic and you stand
+  // in the shallows rather than descending the seabed, which is what the DEM
+  // under the channel would otherwise have you doing.
+  const walkY = (wx, wz) => Math.max(groundAt(wx, wz), 0);
+  return {
+    site: { x: cx, z: cz },
+    bounds: { t0: -R, t1: R, s0: -R, s1: R },
+    blockers: [],
+    local: (wx, wz) => [wx - cx, wz - cz],
+    toWorld: (t, s) => [cx + t, walkY(cx + t, cz + s), cz + s],
+    walkY,
+    objects: [],
+    crewSpots: [],
+    apron: [cx, walkY(cx, cz), cz],
+    tint() { /* nothing here to char */ },
+    flushTint() {},
+  };
+}
+
+/**
+ * Which locale owns a point. Inside the aerodrome wire it is the aerodrome,
+ * with its buildings, its crew and its mission; anywhere else it is open
+ * country. Landing on the field by parachute and finding the hangars had become
+ * scenery would be the worse bug of the two.
+ */
+function localeAt(x, z, airfield) {
+  if (airfield && airfield.site && airfield.inField && airfield.inField(x, z)) {
+    return airfield;
+  }
+  return openLocale(x, z);
 }
 
 // ==== 50-plane.js ===============================================
@@ -13807,9 +13944,26 @@ function baleOut() {
 /** And the arrival, whichever of the three it turned out to be. */
 function chuteDown(kind) {
   if (state.phase !== 'chute') return;
+  // Down on your feet on dry land is not the end of anything. You are a pilot
+  // standing on a Dalmatian hillside with a pump on your back and a fire over
+  // the ridge — which is the whole reason the key exists, and which the game
+  // used to answer with a red screen that was indistinguishable from having
+  // been killed by it.
+  if (kind === 'land' && ground && ground.ok
+    && ground.retarget(localeAt(eject.pos.x, eject.pos.z, airfield))
+    && ground.dropIn(eject.pos.x, eject.pos.z, eject.you.yaw)) {
+    alerts.bump(1.1);
+    $('chute-hud').hidden = true;
+    $('hud').hidden = true;
+    $('ground-hud').hidden = false;
+    if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = false; }
+    if (!IS_TOUCH && !pointerLocked) grabPointer();
+    paintDeviceText();
+    toast(T('toast.walkedAway'));
+    return;
+  }
   state.phase = 'lost';
-  if (kind !== 'land') alerts.bump(kind === 'sea' ? 1.6 : 4.5);
-  else alerts.bump(1.1);
+  alerts.bump(kind === 'sea' ? 1.6 : 4.5);
   showEnd(false, false, kind === 'sea', kind);
 }
 
@@ -14011,6 +14165,13 @@ function updateGroundHUD(dt) {
   ghAcc = 0;
   const g = ground.hud();
 
+  // On a hillside you parachuted on to there is no aerodrome mission to count
+  // and no aeroplane to go back to, so the three gauges that tally it and the
+  // line that reads the tank both go away rather than sitting there at zero
+  // telling you about a tank that is at the bottom of a valley.
+  const alone = ground.stranded && g.alight === 0 && g.crewLeft === 0;
+  $('gh-top').hidden = alone;
+  $('gh-reserve').hidden = !!ground.stranded;
   $('gh-alight').textContent = g.alight;
   $('gh-crew').textContent = g.crewLeft;
   $('gh-saved').textContent = g.rescued;

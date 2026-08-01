@@ -186,7 +186,7 @@ async function buildGround(scene, field) {
   }
 
   const rng = mulberry32(CONFIG.seed ^ 0x6f00d1);
-  const objects = field.objects;
+  let objects = field.objects;
   const flames = buildFlames(scene, 220);
   const jetSpray = buildSprayPool(scene, 900, 7.5, 1.1);
   // Negative gravity, so it climbs. Steam off a person you have just hit is the
@@ -204,7 +204,7 @@ async function buildGround(scene, field) {
     return field.toWorld(t - 60, s - 34);
   })();
 
-  const crew = field.crewSpots.map((p, i) => {
+  const allCrew = field.crewSpots.map((p, i) => {
     const fig = makeFigure(rig, scene);
     fig.root.position.set(p[0], p[1], p[2]);
     fig.root.visible = false;                 // nobody is out there until it starts
@@ -224,6 +224,11 @@ async function buildGround(scene, field) {
       roll: 0, char: 0, spot: [Math.cos(a) * 4.4, Math.sin(a) * 4.4],
     };
   });
+  // Who is actually out there. The figures are built once, against the
+  // aerodrome, because that is the only place in the world with a crew in it —
+  // walking a hillside you came down on by parachute, this is empty and they
+  // are all hidden.
+  let crew = allCrew;
 
   // ── the player ─────────────────────────────────────────────────────────────
   const you = {
@@ -233,6 +238,7 @@ async function buildGround(scene, field) {
   };
 
   let active = false;
+  let stranded = false;              // walked in under a canopy, not out of a door
   let armed = false;                 // has the spot fire been called
   let seeded = false;                // have the first flames appeared
   let armTimer = 0;
@@ -1104,7 +1110,11 @@ async function buildGround(scene, field) {
     // The field burns whether or not anybody is standing in it. Leaving this
     // gated on the ground phase would mean an airfield that only ever caught
     // fire while you were watching, which is the kind of thing you can feel.
-    if (!armed) {
+    //
+    // Stranded skips the whole question: there is no field, nothing is going to
+    // catch, and this early return is what would otherwise stop your legs
+    // working on a hillside you have just parachuted on to.
+    if (!armed && !stranded) {
       if (state.phase === 'fly' && state.t > 60 && frontDistance() < GROUND.spotRange) {
         armed = true;
         armTimer = 0;
@@ -1114,7 +1124,7 @@ async function buildGround(scene, field) {
       }
       return;
     }
-    if (!seeded) {
+    if (armed && !seeded) {
       armTimer += dt;
       if (armTimer > GROUND.spotDelay) seedSpotFire();
     }
@@ -1140,7 +1150,7 @@ async function buildGround(scene, field) {
         : hit.obj ? hit.obj.burning > 0 : false;
       if (wants) spray(dt, hit);
       you.jet = damp(you.jet, wants ? 1 : 0, 14, dt);
-      if (distToPlane() < GROUND.refillDist && !wants) refill(dt);
+      if (!stranded && distToPlane() < GROUND.refillDist && !wants) refill(dt);
     } else {
       you.jet = 0;
       you.aimKind = null;
@@ -1159,10 +1169,14 @@ async function buildGround(scene, field) {
     if (!flight.p.onGround) return false;
     return flight.p.vel.length() < 1.6;
   }
-  const canBoard = () => active && distToPlane() < GROUND.boardDist;
+  // Not into a wreck. If you came down under a canopy the aeroplane is a
+  // column of smoke somewhere else, and being offered the door back into it —
+  // or a refill from its tank — is the game contradicting its own end screen.
+  const canBoard = () => active && !stranded && distToPlane() < GROUND.boardDist;
 
   function enter() {
     if (!canEnter()) return false;
+    stranded = false;
     const { fwd, right } = flight.axes();
     // Off the port side and well aft: the wing is fourteen metres of half-span
     // and the propellers are on the leading edge of it. Stepping out any closer
@@ -1183,6 +1197,49 @@ async function buildGround(scene, field) {
     const look = nearestTrouble() || field.apron;
     you.yaw = Math.atan2(-(look[0] - you.x), -(look[2] - you.z));
     you.spraying = false;
+    active = true;
+    state.phase = 'ground';
+    return true;
+  }
+
+  /**
+   * Point the whole mode at somewhere else and keep every bit of it — the
+   * movement, the branch, the camera, the collision. This is the trick the
+   * locale interface was for: `buildGround` never knew anything about an
+   * aerodrome except through these eleven members, so handing it eleven
+   * different ones puts you on a hillside instead, and nothing downstream
+   * notices.
+   */
+  function retarget(next) {
+    if (!next || !next.site) return false;
+    field = next;
+    objects = next.objects || [];
+    // Nobody is out here. The aerodrome's seven are built against the
+    // aerodrome's spots and cannot be relocated meaningfully, so they go away
+    // and come back if you are ever pointed at the field again.
+    const home = next.crewSpots && next.crewSpots.length;
+    crew = home ? allCrew : [];
+    if (!home) for (const c of allCrew) c.fig.root.visible = false;
+    return true;
+  }
+
+  /**
+   * Arrive on foot from under a canopy, wherever that turned out to be.
+   *
+   * Deliberately not enter(): that one is the door of a parked aeroplane and
+   * every number in it — seventeen metres to port to clear the wing, seven aft
+   * to clear the propellers, the way back in afterwards — assumes there is an
+   * aeroplane to step out of and back into. There is not. There is a hillside.
+   */
+  function dropIn(x, z, yaw) {
+    const [px, pz] = confine(x, z);
+    you.x = px; you.z = pz;
+    you.y = field.walkY(px, pz);
+    you.vx = you.vz = 0;
+    you.yaw = yaw;
+    you.pitch = 0;
+    you.spraying = false;
+    stranded = true;
     active = true;
     state.phase = 'ground';
     return true;
@@ -1223,7 +1280,10 @@ async function buildGround(scene, field) {
     ok: true,
     get active() { return active; },
     get armed() { return armed; },
-    update, enter, leave, canEnter, canBoard, look, pose, you, crew,
+    update, enter, leave, canEnter, canBoard, look, pose, you,
+    retarget, dropIn,
+    get stranded() { return stranded; },
+    get crew() { return crew; },
     hose: () => you.jet,
     hud: () => ({
       pack: you.pack, packMax: GROUND.pack,

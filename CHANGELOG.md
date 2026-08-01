@@ -8,6 +8,40 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.10.0] — 2026-08-01
+
+### Added — where you land is where you carry on
+
+Landing safely under a canopy ended the mission on a red screen. It was reported
+as "I do the J but I still die", which is the correct reading: a game that stops
+and goes red is a game that has killed you, whatever the text above it says.
+Touching down on dry ground now puts you on your feet on the spot and the
+mission carries on without your aeroplane.
+
+- **The on-foot mode can be pointed anywhere.** `buildGround` only ever knew
+  about the aerodrome through eleven members of a locale interface, which was
+  the entire reason that interface exists — so handing it eleven different ones
+  puts you on a hillside instead and the movement, the branch, the camera and
+  the collision all come along unchanged. Inside the wire at Rokići you get the
+  aerodrome, buildings solid, crew and mission and all. Anywhere else in the
+  hundred and sixty-nine square kilometres gets a locale synthesised around the
+  point you came down on: a kilometre and a half across, heights straight off
+  the DEM, no blockers, nobody there, and never below the waterline so walking
+  to the edge of the Adriatic puts you in the shallows rather than down the
+  seabed.
+- **Stranded is its own state.** No door back into an aeroplane that is a column
+  of smoke four kilometres away, no refill from a tank at the bottom of a
+  valley, and the three aerodrome gauges and the reserve line come off the HUD
+  rather than sitting there reading zero about equipment you no longer have.
+
+### Fixed
+
+- **`hidden` did not hide.** The user-agent rule for `[hidden]` is
+  `display: none` at zero specificity, so every layout rule in the ground HUD —
+  the flex on the gauge row, the block on the reserve line — silently outranked
+  it. The attribute read as set in the DOM and the element stayed in plain
+  sight.
+
 ## [1.9.1] — 2026-08-01
 
 ### Fixed — you were steering something you could not see

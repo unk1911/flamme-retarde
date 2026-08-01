@@ -93,6 +93,14 @@ height. You pick it from two hundred metres, and you spend the rest getting near
 it. Over Šibenik that matters, because two thirds of what you can drift over is
 the Adriatic, and a canopy in the water is a net with you under it.
 
+**Where you land is where you carry on.** Touch down on dry ground and the game
+puts you on your feet on the spot, first person, and the mission goes on without
+your aeroplane. Inside the wire at Rokići that is the aerodrome, buildings solid
+and crew and all; anywhere else in the hundred and sixty-nine square kilometres
+it synthesises a locale around wherever you came down — a kilometre and a half
+of open country, heights straight off the DEM. So you can put the thing down on
+the shoulder above Jadrija and walk to the water.
+
 Once the canopy has taken air, you live. Five and a half metres a second is a
 heavy step off a wall, and the water is the August Adriatic a few hundred metres
 off a beach with three other aircraft and a lookout who all watched you go — you
