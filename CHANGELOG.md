@@ -8,6 +8,43 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.8.0] — 2026-08-01
+
+### Changed — the aeroplanes on the line are aeroplanes
+
+- **The three light aircraft parked on the apron were fourteen axis-aligned
+  boxes each**, which was fine while the only way to see them was from a
+  thousand feet and stopped being fine the day you could walk up to one. They
+  are built properly now: a **lofted fuselage** that is fat at the cabin and
+  comes to nothing at the tailpost, a **wing with a real section** — seven
+  points, extruded across the span, tapering into a rounded tip with a degree
+  of dihedral — **fin and tailplane as thin plate** rather than 12 cm slabs of
+  solid something, **lift struts and undercarriage legs that run at an angle**,
+  glazing, a cowl, a spinner and a pitched two-blade prop.
+- **They sit nose-up**, which is the whole difference between a taildragger and
+  an aeroplane parked flat on the concrete like a bus. Done as a shear about
+  the main axle rather than a rotation, so anything vertical stays vertical —
+  at seven degrees the fin leaning back the extra twelve centimetres is not
+  something you can see, and it keeps the whole aeroplane on one cheap
+  transform.
+- **Three liveries**, because one spec placed three times is one aeroplane you
+  can see you have been shown three times, and that undoes the work of
+  modelling it properly.
+- **Round wheels on the bowser and the tug.** They were 62 and 78 cm cubes.
+- The whole thing stays inside the burnable vertex buffer, so all of it still
+  chars and blackens as the fire reaches it exactly as before, and the hose
+  reaches it over the same radius. Thirty objects on the field come to 6 032
+  triangles all told, which is nothing — the old cub was 168 triangles and
+  looked like 168 triangles, and most of what changed is where they go rather
+  than how many there are.
+
+### Added
+
+- `strut`, `wheel`, `loft` and `plate` helpers next to the existing `box`,
+  `drum` and `barrel`. The absence of the first three is why everything on this
+  apron was a box: there was no way to make a member run at an angle, a wheel
+  be round, or a body change section, so nothing did.
+
 ## [1.7.0] — 2026-08-01
 
 ### Added — the aeroplane is a real model now

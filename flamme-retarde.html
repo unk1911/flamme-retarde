@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.7.0">
+<meta name="version" content="1.8.0">
 <meta name="build-date" content="2026-08-01">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -958,8 +958,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.7.0, built 2026-08-01">
-    <b>v1.7.0</b><i>·</i><span>2026-08-01</span>
+  <div id="build" title="Flamme Retardé 1.8.0, built 2026-08-01">
+    <b>v1.8.0</b><i>·</i><span>2026-08-01</span>
   </div>
   <footer class="credit">
     <span>eDeliverables (2026)</span><i>·</i>
@@ -1158,7 +1158,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.7.0", date: "2026-08-01" };</script>
+<script>const BUILD = { v: "1.8.0", date: "2026-08-01" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -7258,10 +7258,19 @@ function buildAirfield(scene) {
   const objects = [];
   const ob = propBuilder();
   const DARKW = [0.10, 0.10, 0.11];
+  const HUB = [0.42, 0.42, 0.44];         // the light middle of a dark wheel
 
   function shapeOf(spec, ox, oy, oz, fx, fz, rx, rz) {
+    // How much the tail hangs below the nose, per metre aft of the main axle.
+    // A taildragger parks nose-up and this is the whole difference between one
+    // and an aeroplane sitting flat on the concrete like a bus. Shearing rather
+    // than rotating leaves anything vertical vertical — at seven degrees the fin
+    // leaning back the extra twelve centimetres is not a thing you can see.
+    let sit = 0, sitAt = 0;
     /** object-local (along, up, across) -> world */
-    const L = (a, u, r) => [ox + fx * a + rx * r, oy + u, oz + fz * a + rz * r];
+    const L = (a, u, r) => [
+      ox + fx * a + rx * r, oy + u + sit * (a - sitAt), oz + fz * a + rz * r,
+    ];
     const box = (a, u, r, la, lu, lr, col, top) => {
       const A = la / 2, U = lu / 2, R = lr / 2;
       const v = [
@@ -7305,6 +7314,105 @@ function buildAirfield(scene) {
         ob.tri(front[i], front[j], cf, col);
       }
     };
+    /**
+     * A prism swept between two object-local points, with its own cross-section.
+     *
+     * This is the helper the light aircraft was missing. Anything that runs at an
+     * angle — a lift strut, an undercarriage leg, a propeller blade — had to be
+     * an axis-aligned box before, and an axis-aligned box is exactly the thing
+     * that reads as a toy.
+     */
+    const strut = (p0, p1, w, t, col) => {
+      const d = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]];
+      const len = Math.hypot(d[0], d[1], d[2]) || 1;
+      const e = [d[0] / len, d[1] / len, d[2] / len];
+      const cross = (m, n) => [
+        m[1] * n[2] - m[2] * n[1], m[2] * n[0] - m[0] * n[2], m[0] * n[1] - m[1] * n[0],
+      ];
+      // Any reference not parallel to the run, or the cross product vanishes.
+      const ref = Math.abs(e[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
+      const c1 = cross(e, ref), l1 = Math.hypot(c1[0], c1[1], c1[2]) || 1;
+      const n1 = [c1[0] / l1, c1[1] / l1, c1[2] / l1];
+      const n2 = cross(e, n1);
+      const corner = (p, s1, s2) => L(
+        p[0] + n1[0] * s1 * w / 2 + n2[0] * s2 * t / 2,
+        p[1] + n1[1] * s1 * w / 2 + n2[1] * s2 * t / 2,
+        p[2] + n1[2] * s1 * w / 2 + n2[2] * s2 * t / 2,
+      );
+      const ends = [p0, p1].map((p) => [
+        corner(p, -1, -1), corner(p, 1, -1), corner(p, 1, 1), corner(p, -1, 1),
+      ]);
+      for (let i = 0; i < 4; i++) {
+        const j = (i + 1) % 4;
+        ob.quad(ends[0][i], ends[0][j], ends[1][j], ends[1][i], col);
+      }
+      ob.quad(ends[0][3], ends[0][2], ends[0][1], ends[0][0], col);
+      ob.quad(ends[1][0], ends[1][1], ends[1][2], ends[1][3], col);
+    };
+    /** A wheel: a prism turning about the across axis, so it can actually roll. */
+    const wheel = (a, u, r, rad, wid, col, hub) => {
+      const K = 10;
+      const ring = (rr) => Array.from({ length: K }, (_, i) => {
+        const th = (i / K) * TAU;
+        return L(a + Math.cos(th) * rad, u + Math.sin(th) * rad, rr);
+      });
+      const inner = ring(r - wid / 2), outer = ring(r + wid / 2);
+      const ci = L(a, u, r - wid / 2), co = L(a, u, r + wid / 2);
+      for (let i = 0; i < K; i++) {
+        const j = (i + 1) % K;
+        ob.quad(inner[i], inner[j], outer[j], outer[i], col);
+        ob.tri(inner[j], inner[i], ci, hub || col);
+        ob.tri(outer[i], outer[j], co, hub || col);
+      }
+    };
+    /**
+     * A body lofted through stations of [along, up, halfWidth, halfHeight].
+     *
+     * Eight sides, which at seven metres and from the apron is round. The point
+     * is that the section *changes* down the length — a fuselage is fat at the
+     * cabin and comes to nothing at the tailpost, and a stack of boxes cannot do
+     * that at any resolution.
+     */
+    const loft = (stations, col) => {
+      const K = 8;
+      const ring = (st) => Array.from({ length: K }, (_, i) => {
+        const th = (i / K) * TAU;
+        return L(st[0], st[1] + Math.sin(th) * st[3], Math.cos(th) * st[2]);
+      });
+      let prev = ring(stations[0]);
+      const nose = L(stations[0][0], stations[0][1], 0);
+      for (let i = 0; i < K; i++) ob.tri(prev[(i + 1) % K], prev[i], nose, col);
+      for (let s = 1; s < stations.length; s++) {
+        const cur = ring(stations[s]);
+        for (let i = 0; i < K; i++) {
+          const j = (i + 1) % K;
+          ob.quad(prev[i], prev[j], cur[j], cur[i], col);
+        }
+        prev = cur;
+      }
+      const end = stations[stations.length - 1];
+      const tail = L(end[0], end[1], 0);
+      for (let i = 0; i < K; i++) ob.tri(prev[i], prev[(i + 1) % K], tail, col);
+    };
+    /**
+     * A flat surface with an outline and a thickness — a fin, a tailplane.
+     *
+     * `pt` maps an outline point plus a signed offset into object-local space,
+     * which is the only thing that differs between one standing on edge and one
+     * lying flat, so both come out of the same eight lines.
+     */
+    const plate = (poly, thick, col, pt) => {
+      const n = poly.length;
+      const faces = [-1, 1].map((s) => poly.map((p) => pt(p, s * thick / 2)));
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        ob.quad(faces[0][i], faces[0][j], faces[1][j], faces[1][i], col);
+      }
+      for (let i = 1; i < n - 1; i++) {
+        ob.tri(faces[0][0], faces[0][i + 1], faces[0][i], col);
+        ob.tri(faces[1][0], faces[1][i], faces[1][i + 1], col);
+      }
+    };
 
     switch (spec.kind) {
       case 'drum':
@@ -7322,7 +7430,7 @@ function buildAirfield(scene) {
         box(1.62, 1.28, 0, 1.20, 1.30, 1.72, spec.col, spec.col);
         box(1.66, 1.74, 0, 1.10, 0.42, 1.60, [0.10, 0.14, 0.17]);
         for (const a of [1.45, -1.25]) {
-          for (const r of [-0.92, 0.92]) box(a, 0.42, r, 0.78, 0.78, 0.26, DARKW);
+          for (const r of [-0.92, 0.92]) wheel(a, 0.42, r, 0.39, 0.26, DARKW, HUB);
         }
         break;
       case 'tug':
@@ -7330,25 +7438,108 @@ function buildAirfield(scene) {
         box(-0.25, 1.28, 0, 1.00, 0.72, 1.30, spec.col, spec.col);
         box(-0.22, 1.32, 0, 1.02, 0.44, 1.34, [0.10, 0.14, 0.17]);
         for (const a of [0.80, -0.85]) {
-          for (const r of [-0.70, 0.70]) box(a, 0.34, r, 0.62, 0.62, 0.22, DARKW);
+          for (const r of [-0.70, 0.70]) wheel(a, 0.34, r, 0.31, 0.22, DARKW, HUB);
         }
         break;
       case 'cub': {
-        // A high-wing taildragger: nine metres of wing, seven of aeroplane, and
-        // the one object on this apron that reads as an aircraft from the hip.
-        const TRIM = [0.55, 0.16, 0.14];
-        box(1.90, 1.05, 0, 2.00, 0.95, 0.86, spec.col);
-        box(0.10, 1.02, 0, 1.80, 0.86, 0.78, spec.col);
-        box(-1.90, 0.98, 0, 2.20, 0.52, 0.42, spec.col);
-        box(1.35, 1.46, 0, 1.05, 0.40, 0.80, [0.10, 0.14, 0.17]);
-        box(2.95, 1.05, 0, 0.16, 0.74, 0.74, DARKW);
-        box(0, 1.86, 0, 1.45, 0.13, 9.00, spec.col, spec.col);
-        box(0, 1.84, 0, 1.52, 0.16, 0.58, TRIM, TRIM);
-        for (const r of [-1.7, 1.7]) box(0, 1.42, r, 0.14, 0.86, 0.10, spec.col);
-        box(-2.75, 1.62, 0, 1.10, 1.30, 0.12, spec.col);
-        box(-2.75, 1.02, 0, 0.85, 0.10, 3.00, spec.col, spec.col);
-        for (const r of [-0.95, 0.95]) box(1.55, 0.34, r, 0.62, 0.62, 0.20, DARKW);
-        box(-2.85, 0.20, 0, 0.30, 0.30, 0.14, DARKW);
+        // A high-wing taildragger: nine metres of wing, six and a half of
+        // aeroplane, and the one object on this apron that has to read as an
+        // aircraft from the hip — which fourteen axis-aligned boxes did not.
+        //
+        // What makes it read is the three things a box cannot have: a section
+        // that changes down the length, surfaces that are thin at the edges, and
+        // members that run at an angle. So the fuselage is lofted, the tail is
+        // plate, and the lift struts, the undercarriage and the blades are all
+        // swept prisms.
+        const TRIM = spec.trim || [0.55, 0.16, 0.14];
+        const GLASS = [0.11, 0.15, 0.18];
+        sit = 0.125; sitAt = 1.30;      // seven degrees, pivoting on the axle
+        //     along   up    halfW  halfH
+        loft([
+          [2.62, 1.07, 0.40, 0.42],       // firewall, behind the cowl
+          [1.95, 1.06, 0.45, 0.50],
+          [1.10, 1.04, 0.46, 0.53],       // cabin, the fattest part of it
+          [0.30, 1.01, 0.45, 0.51],
+          [-0.60, 0.99, 0.38, 0.43],
+          [-1.60, 0.98, 0.27, 0.30],
+          [-2.55, 1.00, 0.15, 0.18],
+          [-3.16, 1.02, 0.05, 0.07],      // tailpost
+        ], spec.col);
+        // Cowl and spinner. The cowl is its own short loft so it can be a
+        // different colour from the fabric behind it, which on every one of
+        // these aeroplanes it is.
+        loft([
+          [3.00, 1.07, 0.30, 0.31],
+          [2.86, 1.07, 0.40, 0.41],
+          [2.60, 1.07, 0.41, 0.43],
+        ], TRIM);
+        strut([3.16, 1.07, 0], [2.92, 1.07, 0], 0.30, 0.30, DARKW);
+        // Two blades, stopped vertical the way a parked one is, and pitched —
+        // a blade square to the disc is a plank and looks like one.
+        for (const s of [-1, 1]) {
+          strut([3.10, 1.07, 0], [3.10 + s * 0.06, 1.07 + s * 0.92, 0], 0.19, 0.035, DARKW);
+        }
+        // Cabin glazing, a whisker proud of the skin so it never z-fights: the
+        // long side windows a Cub is mostly made of, and the windscreen.
+        for (const s of [-1, 1]) {
+          plate([[1.55, 1.20], [1.45, 1.47], [0.35, 1.45], [0.36, 1.18]],
+            0.02, GLASS, (p, o) => L(p[0], p[1], s * 0.462 + o));
+        }
+        plate([[1.72, 1.20], [1.60, 1.56], [1.46, 1.56], [1.58, 1.18]],
+          0.86, GLASS, (p, o) => L(p[0], p[1], o));
+        // Wing: seven points of section extruded across the span, tapering into
+        // a rounded tip and with a degree or so of dihedral in it.
+        const SEC = [
+          [0.72, 0.000], [0.42, 0.095], [-0.05, 0.105], [-0.72, 0.012],
+          [-0.72, -0.012], [-0.05, -0.035], [0.42, -0.030],
+        ];
+        const RIB = [-4.50, -4.30, -2.20, -0.34, 0.34, 2.20, 4.30, 4.50];
+        const SCL = [0.40, 0.90, 1, 1, 1, 1, 0.90, 0.40];
+        const rib = (k) => SEC.map(([sa, su]) => L(
+          0.08 + sa * SCL[k],
+          1.86 + su * SCL[k] + Math.abs(RIB[k]) * 0.022,
+          RIB[k],
+        ));
+        let prev = rib(0);
+        for (let i = 1; i < SEC.length - 1; i++) ob.tri(prev[0], prev[i + 1], prev[i], spec.col);
+        for (let k = 1; k < RIB.length; k++) {
+          const cur = rib(k);
+          for (let i = 0; i < SEC.length; i++) {
+            const j = (i + 1) % SEC.length;
+            // The centre section only — a 68 cm band over the cabin, which is
+            // where a stripe goes. Run out to mid-span it was a black patch
+            // across a quarter of the wing.
+            ob.quad(prev[i], prev[j], cur[j], cur[i], k === 4 ? TRIM : spec.col);
+          }
+          prev = cur;
+        }
+        for (let i = 1; i < SEC.length - 1; i++) ob.tri(prev[0], prev[i], prev[i + 1], spec.col);
+        // Lift struts, a V each side from the bottom longeron out to mid-span.
+        for (const s of [-1, 1]) {
+          strut([0.62, 0.60, s * 0.34], [0.34, 1.80, s * 2.05], 0.13, 0.05, spec.col);
+          strut([0.62, 0.60, s * 0.34], [-0.48, 1.82, s * 2.05], 0.11, 0.05, spec.col);
+        }
+        // Fin and rudder, outlined rather than blocked out, and the tailplane
+        // lying flat — both 9 cm of fabric over tube, because that is what they
+        // are and a 12 cm slab of solid anything is not.
+        plate([[-2.34, 1.14], [-2.90, 1.98], [-3.14, 2.00], [-3.22, 1.06]],
+          0.09, spec.col, (p, o) => L(p[0], p[1], o));
+        plate([
+          [-2.22, 0], [-2.44, -1.50], [-3.02, -1.50],
+          [-3.14, 0], [-3.02, 1.50], [-2.44, 1.50],
+        ], 0.09, spec.col, (p, o) => L(p[0], 1.06 + o, p[1]));
+        // Undercarriage: a V leg and a drag brace to each axle, then wheels that
+        // are round. The old ones were 62 cm cubes.
+        for (const s of [-1, 1]) {
+          strut([1.42, 0.74, s * 0.20], [1.30, 0.36, s * 0.96], 0.09, 0.07, DARKW);
+          strut([0.55, 0.72, s * 0.20], [1.30, 0.36, s * 0.96], 0.08, 0.06, DARKW);
+          wheel(1.30, 0.36, s * 0.96, 0.32, 0.15, DARKW, HUB);
+        }
+        // The tailwheel leg is short because the tail is already down there. Its
+        // height is picked so the tyre meets the concrete *after* the sit is
+        // applied, which is 0.54 m of it at this station.
+        strut([-2.88, 0.86, 0], [-3.02, 0.69, 0], 0.07, 0.06, DARKW);
+        wheel(-3.02, 0.69, 0, 0.15, 0.09, DARKW);
         break;
       }
     }
@@ -7383,7 +7574,17 @@ function buildAirfield(scene) {
   place(BURNABLE[2], 88, AS + 44);
   place(BURNABLE[3], 30, AS + 12);
   place(BURNABLE[3], 58, AS + 12);
-  for (let i = 0; i < 3; i++) place(BURNABLE[4], -60 + i * 16, AS + 9, 0.06 * (i - 1));
+  // Three light aircraft on the line, and three liveries — one spec placed three
+  // times is one aeroplane you can see you have been shown three times, which is
+  // the giveaway that undoes the work of modelling it properly.
+  const LIVERY_CUB = [
+    { col: [0.88, 0.72, 0.16], trim: [0.14, 0.13, 0.12] },   // the Cub yellow
+    { col: [0.90, 0.90, 0.88], trim: [0.16, 0.30, 0.52] },
+    { col: [0.86, 0.84, 0.78], trim: [0.55, 0.16, 0.14] },
+  ];
+  for (let i = 0; i < 3; i++) {
+    place({ ...BURNABLE[4], ...LIVERY_CUB[i] }, -60 + i * 16, AS + 9, 0.06 * (i - 1));
+  }
 
   const objMesh = new THREE.Mesh(ob.geo(), solidMaterial(0xffffff, {
     spec: 0.10, specPower: 30, side: THREE.DoubleSide,
