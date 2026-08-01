@@ -8,6 +8,66 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.7.0] — 2026-08-01
+
+### Added — the aeroplane is a real model now
+
+- **The Canadair is built in Blender**: 29 116 triangles and 28 rig parts
+  against the 1 800 the hand-built one had. The hull is lofted through stations
+  with a chine and a proper step, the props are four-bladed with spinners, and
+  it has cabin windows, the cheatline, the chequy on the fin, tip floats,
+  chevron runs out to the red wingtips, and an undercarriage with legs instead
+  of sticks. **The tail is one assembly**, which closes the worst thing about
+  how it looked: fin, tailplane and elevator used to be four separate slabs at
+  hand-placed coordinates, and from the apron they read as detached.
+- Everything still moves. The exporter was written against the part names the
+  flight model already reached for — `aileronL`, `flapR`, `rudder`, `doorFL`,
+  `probeR`, `gear` — with every hinge laid out so the axis the code turns is
+  the axis the real one turns about, so ailerons, flaps, water doors, scoop
+  probes and the retracting undercarriage all animate off the new geometry with
+  no changes to `pose()`.
+- `buildCanadair()` branches on the loaded rig and keeps the procedural
+  airframe as the fallback, so a payload that fails to inflate still flies —
+  and **the wingmen get the new model for free**, which is three more of them.
+- **It casts a shadow.** That meant halving the depth slab and the bias with
+  it: at a metre and a half of bias, a parked aeroplane sitting two metres off
+  the apron had most of its own shadow inside the tolerance, and what landed
+  was a scatter of disconnected blocks where the wing and the fin happened to
+  clear it. Cruising high enough now puts the ground outside the far plane and
+  the shadow is simply not drawn, which is the right trade — at that height
+  nobody can see it, and the bias it cost to keep it was visible every time you
+  parked.
+
+### Added — the throttle has somewhere left to go
+
+- **`W` ran out of travel in under two seconds** and then did nothing however
+  long you held it, which is a plateau you can feel. Holding it at the stop now
+  walks an overboost gate open over a couple of seconds for half as much thrust
+  again, and lets it go in about one — so it costs a held key rather than being
+  free cruise. **508 km/h to 639.**
+- `vNever`, a constant nothing had read since the day it was written, is the
+  wall at the top: past it the drag goes quadratic in the overspeed, and there
+  is an overspeed warning on the HUD to go with the stall one.
+- Nothing that drives the throttle on its own — the autopilot, the hands-off
+  stall guard — touches the gate.
+
+### Fixed
+
+- **The stand was a trap.** Parked along the runway axis, the 28.6 m wing lay
+  across the only direction you could taxi in, so the first ten metres of any
+  departure swung a wingtip through the face of the first hangar and into a
+  scrape you could not steer out of — before you had done anything at all.
+  Parked square to the taxiway mouth instead, the wing lies across `t` where
+  the nearest structure is seventeen metres astern and leaving is a straight
+  roll with no turn in it. Verified rather than eyeballed: 300 m of departure
+  stepped at half a metre, nose, tail and both tips checked against every
+  structure, no contact anywhere.
+- A service vehicle that sat close enough to the tailplane to read as a near
+  miss was moved to the front of a hangar, where the thing is supposed to be.
+- A parked aeroplane showed you a **stall warning the entire time you were on
+  foot beside it** — the apron reads 5 m AGL once the gear has lifted the hull,
+  so the altitude guard on the warning never excluded it.
+
 ## [1.6.0] — 2026-08-01
 
 ### Added — there are birds now

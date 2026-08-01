@@ -25,7 +25,7 @@ is a real footprint.
 |---|---|
 | mouse | fly — the virtual stick springs back to centre on its own |
 | `↑ ↓ ← →` | fly, held — no spring, if you prefer a steady input |
-| `W` `S` | throttle |
+| `W` `S` | throttle — keep holding `W` past the stop for overboost |
 | `A` `D` | rudder |
 | `Z` | **hold to level the wings** — the panic button |
 | `T` | **autopilot** — flies you to the water, or to the fire, whichever the job is |
