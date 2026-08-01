@@ -23,6 +23,84 @@ const LIVERY = {
   tyre: 0x121315,
 };
 
+// The Blender airframe, once it has been loaded. Held at module scope because
+// buildCanadair() has two synchronous callers — the player's aeroplane and each
+// of the three wingmen — and threading a promise through both of them to load
+// the same 330 KB blob four times would be worse than a variable.
+let CANADAIR_RIG = null;
+
+/**
+ * Assemble the exported rig into the same {root, parts} the flight model poses.
+ *
+ * The .fr3d rig is a flat table of parts, parent before child, each holding its
+ * pivot relative to its parent and a view on the shared vertex arrays — so the
+ * hierarchy is one pass, and the whole aeroplane is one material. Colour is
+ * baked per vertex by the exporter; there are no textures and nothing here
+ * needs a second draw.
+ *
+ * The part names are not incidental. The Blender script authors `aileronL`,
+ * `flapR`, `rudder`, `doorFL`, `probeR` and the rest against exactly the names
+ * pose() reaches for, and every hinge is laid out so that the axis pose() turns
+ * is the axis the real one turns about, once (bx, by, bz) -> (bx, bz, -by) has
+ * been applied: a spanwise hinge lands on x, the fin's on y, a door's on z.
+ */
+function canadairFromRig(rig) {
+  const root = new THREE.Group();
+  const parts = {};
+  const joints = [];
+
+  const mat = solidMaterial(0xffffff, {
+    spec: 0.30, specPower: 60,
+    // Everything — yellow, the red tips, the cheatline, the chequy, the dark of
+    // the anti-glare panel and the tyres — arrives in the vertex colour.
+    body: 'base *= vVCol;',
+  });
+  const matGlass = solidMaterial(LIVERY.glass, { spec: 0.85, specPower: 180 });
+
+  for (const p of rig.parts) {
+    const g = new THREE.Group();
+    g.position.set(p.pivot[0], p.pivot[1], p.pivot[2]);
+    // Glazing is the one thing vertex colour cannot say, because what makes it
+    // glass is the highlight and not the tint.
+    g.add(new THREE.Mesh(p.geo, p.name === 'windscreen' ? matGlass : mat));
+    (p.parent < 0 ? root : joints[p.parent]).add(g);
+    joints.push(g);
+    parts[p.name] = g;
+  }
+
+  // ── the handful of things pose() wants in a different shape ───────────────
+  parts.props = [parts.propL, parts.propR].filter(Boolean);
+  parts.probes = [parts.probeL, parts.probeR].filter(Boolean);
+  parts.doors = [];
+  for (const [name, side] of [['doorFL', -1], ['doorAL', -1],
+    ['doorFR', 1], ['doorAR', 1]]) {
+    if (parts[name]) parts.doors.push({ mesh: parts[name], side });
+  }
+
+  // The blur disc stays a runtime object rather than exported geometry: it is
+  // an opacity that tracks rpm, not a shape, and it has to hang off the prop
+  // hub so that it goes wherever the nacelle went.
+  for (const [hub, key] of [[parts.propL, 'discL'], [parts.propR, 'discR']]) {
+    if (!hub) continue;
+    const disc = new THREE.Mesh(
+      new THREE.CircleGeometry(2.03, 32),
+      solidMaterial(0xb8bcc2, { spec: 0.1, transparent: true, depthWrite: false }),
+    );
+    disc.material.uniforms.uEmissive.value = 0.25;
+    disc.material.opacity = 0.0;
+    disc.position.z = -0.30;
+    disc.frustumCulled = false;
+    hub.add(disc);
+    parts[key] = disc;
+  }
+
+  if (parts.gear) parts.gear.visible = false;
+  // pose() drives `parts.wing` on nothing, but the ejection work and the shadow
+  // registration both want a handle on the airframe as a whole.
+  root.frustumCulled = false;
+  return { root, parts, materials: { mat, matGlass }, tris: rig.tris };
+}
+
 /** One hull station: rounded deck above a hard chine, V-bottom below it. */
 function hullRing(z, w, crown, keel, nUp = 22, nDown = 9) {
   const chine = keel + (0 - keel) * 0.72;
@@ -50,6 +128,12 @@ function hullRing(z, w, crown, keel, nUp = 22, nDown = 9) {
 }
 
 function buildCanadair() {
+  // The Blender airframe when it is there, the hand-built one when it is not.
+  // Keeping the procedural aeroplane alive is not sentiment: it is what draws
+  // if the payload fails to inflate, and it is the only version that can be
+  // read to find out what a part is *meant* to be.
+  if (CANADAIR_RIG) return canadairFromRig(CANADAIR_RIG);
+
   const root = new THREE.Group();
   const parts = {};
 

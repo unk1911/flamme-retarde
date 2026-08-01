@@ -301,7 +301,7 @@ function buildBirds(scene, fire) {
 
   // ── one bird ───────────────────────────────────────────────────────────────
 
-  function step(b, dt, planePos, roar) {
+  function step(b, dt, flushers, nFlush) {
     const sp = FLOCK[b.sp];
     const sea = isSea(b.x, b.z);
     const surf = sea ? 0 : groundAt(b.x, b.z);
@@ -317,14 +317,27 @@ function buildBirds(scene, fire) {
       if (ahead > heat) { heat = ahead; hx = ax; hz = az; }
     }
 
-    // The aeroplane. A parked or taxiing Canadair puts nothing up — it is the
+    // The aeroplanes. A parked or taxiing Canadair puts nothing up — it is the
     // noise and the closing speed that does it, not the shape.
-    const px = b.x - planePos.x, py = b.y - planePos.y, pz = b.z - planePos.z;
-    const pd = Math.hypot(px, py, pz);
-    const was = b.alarm;
-    if (roar > 0.05 && pd < BIRDS.flush) {
-      b.alarm = Math.max(b.alarm, roar * (1 - pd / BIRDS.flush));
+    //
+    // All four of them count, not just yours. A wingman coming off a scooping
+    // run puts the channel up exactly as you do, and seeing that happen to
+    // somebody else's aeroplane is what stops the reaction reading as a trick
+    // the world does for the player. The *strongest* threat wins rather than
+    // the nearest, because that is the one worth turning away from, and its
+    // bearing is what the flee heading below is taken from.
+    let px = 0, pz = 0, pd = Infinity, roar = 0, worst = 0;
+    for (let i = 0; i < nFlush; i++) {
+      const f = flushers[i];
+      const ax = b.x - f.pos.x, ay = b.y - f.pos.y, az = b.z - f.pos.z;
+      const d = Math.hypot(ax, ay, az);
+      if (d >= BIRDS.flush) continue;
+      const a = f.roar * (1 - d / BIRDS.flush);
+      if (a <= worst) continue;
+      worst = a; px = ax; pz = az; pd = d; roar = f.roar;
     }
+    const was = b.alarm;
+    if (worst > 0) b.alarm = Math.max(b.alarm, worst);
     if (heat > 0.03) b.alarm = Math.max(b.alarm, sat(heat * 2.5));
     // Whatever it was, it says so once, on the way up.
     if (was < 0.25 && b.alarm >= 0.25) cry(b, true);
@@ -405,7 +418,11 @@ function buildBirds(scene, fire) {
 
   // ── the frame ──────────────────────────────────────────────────────────────
 
-  function update(dt, camera, planePos) {
+  // Reused between frames: one entry per aeroplane loud enough to matter, so
+  // the per-frame cost of caring about four of them instead of one is nothing.
+  const flushers = [];
+
+  function update(dt, camera, aircraft) {
     if (density <= 0.001) {
       bodyL.geo.instanceCount = 0;
       wingL.geo.instanceCount = 0;
@@ -416,9 +433,17 @@ function buildBirds(scene, fire) {
     callBudget = Math.min(3, callBudget + dt * 1.6);
     camPos.copy(camera.position);
     camRight.setFromMatrixColumn(camera.matrixWorld, 0);
-    // How alarming the aeroplane currently is. Below about 90 km/h it is taxiing
+    // How alarming each aeroplane currently is. Below about 90 km/h it is taxiing
     // and the gulls on the apron at Rokići are famously unimpressed.
-    const roar = sat((state.speed - 25) / 45);
+    let nFlush = 0;
+    for (const a of aircraft) {
+      const r = sat((a.speed - 25) / 45);
+      if (r <= 0.05) continue;
+      const f = flushers[nFlush] || (flushers[nFlush] = { pos: null, roar: 0 });
+      f.pos = a.pos;
+      f.roar = r;
+      nFlush++;
+    }
 
     let nb = 0, nw = 0, moved = 0;
     for (const b of flock) {
@@ -431,7 +456,7 @@ function buildBirds(scene, fire) {
         moved++;
         if (!rehome(b)) continue;
       }
-      step(b, dt, planePos, roar);
+      step(b, dt, flushers, nFlush);
 
       const sp = FLOCK[b.sp];
       const len = sp.len * b.s;
@@ -477,6 +502,13 @@ function buildBirds(scene, fire) {
     update,
     getDensity: () => density,
     setDensity(v) { density = sat(v); setLive(); },
-    stats: () => ({ live, calls, of: flock.length }),
+    // `alarmed` is the only way from outside to tell a flock that is reacting
+    // from one that is merely being drawn, which is the whole claim this module
+    // makes and so the one thing a test has to be able to check.
+    stats: () => ({
+      live, calls, of: flock.length,
+      alarmed: flock.reduce((n, b) => n + (b.live && b.alarm > 0.05 ? 1 : 0), 0),
+      sitting: flock.reduce((n, b) => n + (b.live && b.sit ? 1 : 0), 0),
+    }),
   };
 }

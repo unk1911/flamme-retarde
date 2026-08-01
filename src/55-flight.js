@@ -12,7 +12,8 @@ const FLIGHT = {
   maxThrust: 10.5,        // m/s² at full power, empty
   dragK: 0.00042,
   vStall: 46,             // m/s where lift stops being enough
-  vNever: 145,
+  vNever: 175,            // m/s the airframe will not go past, however hard you push
+  overboost: 0.6,         // extra fraction of maxThrust with the gate fully open
   rollRate: 1.15,         // rad/s at full deflection
   pitchRate: 0.52,
   yawRate: 0.42,
@@ -47,6 +48,7 @@ function buildFlight(plane, fire) {
     vel: new THREE.Vector3(),
     quat: new THREE.Quaternion(),
     throttle: 0.78,
+    boost: 0,                        // 0..1 — how far into the overboost gate
     stick: new THREE.Vector2(),      // x roll, y pitch — mouse, self-centring
     kb: new THREE.Vector2(),         // the same, from the arrow keys — held
     tch: new THREE.Vector2(),        // and from a thumb on the glass — held
@@ -98,6 +100,7 @@ function buildFlight(plane, fire) {
     p.water = 0;
     p.crashed = false;
     p.throttle = 0.8;
+    p.boost = 0;
     p.stick.set(0, 0);
     p.kb.set(0, 0);
     p.tch.set(0, 0);
@@ -286,10 +289,15 @@ function buildFlight(plane, fire) {
     p.quat.normalize();
 
     // ── forces ────────────────────────────────────────────────────────────
-    const thrust = FLIGHT.maxThrust * p.throttle * massRatio;
+    const thrust = FLIGHT.maxThrust * (p.throttle + p.boost * FLIGHT.overboost) * massRatio;
     // Water in the tank is drag as well as weight; so are the probes.
     const dragArea = 1 + p.flaps * 0.55 + p.gearOut * 0.35 + p.probes * 0.9 + p.doors * 0.4;
-    const drag = FLIGHT.dragK * speed * speed * dragArea;
+    // vNever was a number nobody read for a long time. It is the ceiling now:
+    // past it drag climbs off the quadratic, so the boost runs into a wall a
+    // few metres per second the far side of it instead of running away. You can
+    // lean on VNE, you cannot sail through it.
+    const over = Math.max(0, speed - FLIGHT.vNever);
+    const drag = FLIGHT.dragK * speed * speed * dragArea + over * over * 0.02;
 
     p.vel.addScaledVector(fwd, (thrust - drag) * dt);
     p.vel.y -= 9.81 * dt;
@@ -516,11 +524,25 @@ function buildFlight(plane, fire) {
     // ── configuration ─────────────────────────────────────────────────────
     p.flaps = damp(p.flaps, input.flaps ? 1 : (wantScoop ? 0.55 : 0), 2.2, dt);
     p.gearOut = damp(p.gearOut, input.gear ? 1 : 0, 1.2, dt);
-    p.propRpm = damp(p.propRpm, 0.35 + p.throttle * 0.65, 2.5, dt);
+    p.propRpm = damp(p.propRpm, 0.35 + (p.throttle + p.boost * 0.5) * 0.65, 2.5, dt);
 
-    // throttle
-    if (input.thrUp) p.throttle = Math.min(1, p.throttle + dt * 0.55);
-    if (input.thrDown) p.throttle = Math.max(0, p.throttle - dt * 0.55);
+    // Throttle, and past the stop, the overboost gate.
+    //
+    // W used to run out of travel: a second and three quarters from idle to the
+    // stop, and then nothing, however long you held it. Which is a plateau you
+    // can feel — the aeroplane stops answering a key that is still down. So the
+    // lever has somewhere left to go. Holding W at the stop walks the gate open
+    // over two seconds for half as much thrust again; letting go closes it in
+    // one and a quarter, so it costs a held key rather than being free cruise,
+    // and nothing that sets the throttle on its own — the autopilot, the
+    // hands-off stall guard — ever touches it.
+    if (input.thrUp) {
+      p.throttle = Math.min(1, p.throttle + dt * 0.55);
+      if (p.throttle >= 1) p.boost = Math.min(1, p.boost + dt * 0.5);
+    } else {
+      if (input.thrDown) p.throttle = Math.max(0, p.throttle - dt * 0.55);
+      p.boost = Math.max(0, p.boost - dt * 0.8);
+    }
   }
 
   /** Push the visual model to match the physics. */

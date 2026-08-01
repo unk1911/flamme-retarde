@@ -44,7 +44,12 @@ const CONFIG = {
   fuselage: 19.82,
 
   // ── presentation ────────────────────────────────────────────────────────
-  shadowRadius: 900,
+  // 450 m across the cascade rather than 900: the map is 2048 square either way,
+  // so this halves the texel to 0.44 m, and what wants a sharp shadow is the
+  // aeroplane and whatever it is parked next to — both of which the cascade is
+  // centred on. At 900 the aircraft's own shadow on the apron was visibly
+  // stepped from eye height.
+  shadowRadius: 450,
   shadowRes: 2048,
   startHour: 14.33,
   hourPerSecond: 0.0,          // the light holds; this fight is not about dusk

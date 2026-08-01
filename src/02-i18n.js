@@ -91,6 +91,7 @@ const STRINGS = {
 
     // warnings
     'warn.stall': 'stall',
+    'warn.vne': 'overspeed',
     'warn.pullUp': 'pull up',
     'warn.sink': 'sink rate',
     'warn.terrain': 'terrain',
@@ -301,6 +302,7 @@ const STRINGS = {
     'scoop.noRun': 'nema slobodne staze',
 
     'warn.stall': 'slom uzgona',
+    'warn.vne': 'prekoračena brzina',
     'warn.pullUp': 'diži se',
     'warn.sink': 'brzina propadanja',
     'warn.terrain': 'teren',
@@ -501,6 +503,7 @@ const STRINGS = {
     'scoop.noRun': 'pas de plan d\'eau devant',
 
     'warn.stall': 'décrochage',
+    'warn.vne': 'survitesse',
     'warn.pullUp': 'remontez',
     'warn.sink': 'taux de chute',
     'warn.terrain': 'relief',

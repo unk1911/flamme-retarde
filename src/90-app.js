@@ -348,6 +348,8 @@ function updateCamera(dt) {
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
   trees, landmarks, alerts, roads, rail, props, airfield, ground, birds;
+/** You plus the three wingmen, as the birds see them. Built once, in boot(). */
+let birdFlush = [];
 
 function setSun() {
   const a = sunAngles(state.hour);
@@ -445,6 +447,11 @@ async function boot() {
 
   await step(80, 'load.streets');
   airfield = buildAirfield(scene);
+  // The aerodrome is the one place in the game you stand still and look at the
+  // ground, so it is the one place a missing shadow is obvious. Static casters:
+  // a hangar does not move.
+  shadow.cast(airfield.buildings);
+  shadow.cast(airfield.objMesh);
   roads = buildRoads(scene);
   rail = buildRail(scene);
   props = buildProps(scene, roads.lanes);
@@ -474,13 +481,22 @@ async function boot() {
   if (IS_SMALL) birds.setDensity(0.4);
 
   await step(88, 'load.plane');
+  // Once, before anything builds an aeroplane: the player's and all three
+  // wingmen's come out of the same table, and buildCanadair() falls back to the
+  // hand-built airframe on its own if this comes back null.
+  CANADAIR_RIG = await loadRig('canadair_fr3d');
   plane = buildCanadair();
   scene.add(plane.root);
+  shadow.castTree(plane.root, { dynamic: true });
   waterfx = buildWaterFX(scene);
   flight = buildFlight(plane, fire);
 
   await step(92, 'load.brief');
   wingmen = buildWingmen(scene, fire, (who, text) => radio(who, text));
+  // Slot 0 is you, refreshed every frame because the flight model owns that
+  // position; the wingmen are their own live objects and already carry `pos`
+  // and `speed`, so they go in by reference and stay current for free.
+  birdFlush = [{ pos: null, speed: 0 }, ...wingmen.planes];
 
   await step(95, 'load.engines');
   audio = buildAudio();
@@ -754,7 +770,7 @@ function parkAtApron() {
   // start a mission. Keep the water: arriving at Rokići with a dry aeroplane
   // means one pack of four hundred litres and then nothing at all.
   const water = flight.p.water;
-  flight.reset(a[0], a[2], airfield.thresholds[0].yaw, 400);
+  flight.reset(a[0], a[2], airfield.standYaw, 400);
   flight.p.water = water;
   flight.p.pos.set(a[0], a[1] + FLIGHT.gearHeight, a[2]);
   flight.p.vel.set(0, 0, 0);
@@ -870,10 +886,18 @@ function updateHUD(dt) {
   // warnings. Ground proximity is not here — it gets the middle of the screen
   // to itself (see 56-alerts.js), because it is the only one you must act on.
   const w = [];
-  if (state.speed < FLIGHT.vStall * 1.05 && state.altAgl > 3) {
+  // Not while she is standing on her wheels: the apron is 5 m AGL by the time
+  // the gear has lifted the hull, so a parked aeroplane was warning you about a
+  // stall the entire twenty minutes you were on foot beside it.
+  if (state.speed < FLIGHT.vStall * 1.05 && state.altAgl > 3 && !p.onGround) {
     w.push(`<span class="pulse">${T('warn.stall')}</span>`);
   }
   if (p.water > CONFIG.tankCapacity * 0.99 && !state.dropping) w.push(T('warn.tankFull'));
+  // The other end of the envelope. Only reachable with the overboost gate open,
+  // which is the point: holding W past the stop should have a number attached.
+  if (state.speed > FLIGHT.vNever * 0.97) {
+    w.push(`<span class="pulse">${T('warn.vne')}</span>`);
+  }
   $('warn').innerHTML = w.join(' &nbsp; ');
 
   $('ap').innerHTML = p.autopilot
@@ -1153,7 +1177,13 @@ function frame() {
   trees.update(dt, camera.position);
   // After camera.updateMatrixWorld() above, which this depends on: the calls are
   // panned by projecting each bird on to the camera's right axis.
-  birds.update(dt, camera, flight.p.pos);
+  //
+  // All four aeroplanes are handed over, not just yours — a wingman coming off
+  // the water puts the channel up the same way you do, and watching it happen to
+  // somebody else is what stops it reading as a trick done for the player.
+  birdFlush[0].pos = flight.p.pos;
+  birdFlush[0].speed = state.speed;
+  birds.update(dt, camera, birdFlush);
   props.update(dt);
   rail.update(dt);
   sea.update(camera);
@@ -1185,6 +1215,7 @@ function frame() {
   }
 
   shadow.update(flight.p.pos);
+  shadow.syncMoving();
   shadow.render(renderer);
 
   // The mix: your own engines dominate unless you are watching from outside,
@@ -1312,7 +1343,7 @@ window.__fr = {
     crashed: flight ? flight.p.crashed : false,
     ap: flight ? (flight.p.autopilot ? flight.p.apNote || 'on' : 'off') : null,
     scoop: flight ? (flight.p.scoopValid ? 'OK' : flight.p.scoopReason) : null,
-    thr: flight ? Math.round(flight.p.throttle * 100) : 0,
+    thr: flight ? Math.round((flight.p.throttle + flight.p.boost * FLIGHT.overboost) * 100) : 0,
     nav: flight && flight.p.navTarget ? {
       mode: flight.p.navTarget.mode,
       along: Math.round(flight.p.navTarget.along ?? 0),

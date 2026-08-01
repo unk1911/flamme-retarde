@@ -259,7 +259,9 @@ function paintTouchHUD() {
   const fill = document.getElementById('thr-fill');
   const num = document.getElementById('thr-n');
   fill.style.height = (p.throttle * 100).toFixed(0) + '%';
-  num.textContent = Math.round(p.throttle * 100);
+  // The lever only travels to the stop; the number carries on past it, so the
+  // overboost gate reads as 100 climbing to 150 rather than as nothing at all.
+  num.textContent = Math.round((p.throttle + p.boost * FLIGHT.overboost) * 100);
 
   document.getElementById('t-scoop').classList.toggle('armed', p.scoopValid);
   document.getElementById('t-drop').classList.toggle('armed',

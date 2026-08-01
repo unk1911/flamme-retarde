@@ -215,10 +215,16 @@ function buildAirfield(scene) {
       // the material is built does not need to be one of them.
       body: /* glsl */ `
         base *= vVCol;
-        base *= 0.90 + 0.20 * fbm2(vWorld.xz * 2.6, 2);
+        // Runway-local metres, worked out from the world position. Everything on
+        // this field is laid to the aerodrome's axes rather than the world's, and
+        // the axis is known when the material is built, so it costs two multiplies
+        // instead of a uniform.
+        float st = vWorld.x * ${dx.toFixed(6)} + vWorld.z * ${dz.toFixed(6)};
+        float ss = vWorld.x * ${px.toFixed(6)} + vWorld.z * ${pz.toFixed(6)};
         // vUv.y is metres along the runway, or a huge negative for anything
         // that is not runway — taxiway and apron carry no markings.
         if (vUv.y > -9000.0) {
+          base *= 0.90 + 0.20 * fbm2(vWorld.xz * 2.6, 2);
           float across = vUv.x * 2.0 - 1.0;
           float ax = abs(across);
           float t = vUv.y;
@@ -242,6 +248,30 @@ function buildAirfield(scene) {
           float rub = (1.0 - smoothstep(60.0, 200.0, endD)) * step(30.0, endD)
                     * (1.0 - smoothstep(0.5, 0.8, ax));
           base *= 1.0 - rub * 0.42;
+        } else {
+          // Apron and taxiway, which is where you stand for twenty minutes on
+          // foot and where the old single octave at 2.6 cycles/m fell apart: from
+          // eye height it was grey static, and from the air it was nothing at all.
+          // Concrete hardstanding is poured in bays, so that is what this is.
+          //
+          // Five-metre bays with sawn joints. Each bay gets its own tint because
+          // each one was poured on a different day out of a different truck, and
+          // that per-bay step is most of what makes concrete read as concrete.
+          vec2 bay = vec2(st, ss) / 5.0;
+          vec2 fb = fract(bay);
+          base *= 0.95 + 0.09 * h21(floor(bay));
+          // Two scales that survive being looked at: mottling at three metres,
+          // aggregate grain at five centimetres.
+          base *= 0.93 + 0.14 * fbm2(vec2(st, ss) * 0.34, 3);
+          base *= 0.97 + 0.06 * vnoise2(vec2(st, ss) * 19.0);
+          // The joints themselves, 8 cm of shadow — a sawn joint is a slot, and
+          // it is the one hard edge on an otherwise soft surface. Faded out from
+          // sixty metres, because an 8 cm feature seen down the length of an apron
+          // is narrower than a pixel and would crawl; concrete at that distance is
+          // a flat grey field anyway.
+          float edgeD = min(min(fb.x, 1.0 - fb.x), min(fb.y, 1.0 - fb.y));
+          float near = 1.0 - smoothstep(60.0, 240.0, length(vWorld - uCamPos));
+          base *= 1.0 - (1.0 - smoothstep(0.0, 0.016, edgeD)) * 0.30 * near;
         }
       `,
     }));
@@ -459,7 +489,9 @@ function buildAirfield(scene) {
   for (let i = 0; i < 9; i++) {
     place(BURNABLE[1], -22 + (i % 3) * 3.4 + rng() * 0.8, AS + 8 + Math.floor(i / 3) * 3.6);
   }
-  place(BURNABLE[2], 4, AS + 10);
+  // Nose-in to a hangar means in front of a hangar: t=4 was in front of the
+  // stand instead, close enough to the tailplane to look like a near miss.
+  place(BURNABLE[2], 14, AS + 12);
   place(BURNABLE[2], 88, AS + 44);
   place(BURNABLE[3], 30, AS + 12);
   place(BURNABLE[3], 58, AS + 12);
@@ -548,10 +580,23 @@ function buildAirfield(scene) {
   // aeroplane put there has its nose five metres inside the building. Nothing
   // ever noticed because nothing was solid.
   //
-  // This is a stand: forward of the hangar line, on concrete out to both
-  // wingtips, and lined up on the taxiway mouth so leaving is a roll and a
-  // turn rather than a three-point turn between two burning crates.
-  const stand = P(-6, APRON_S + 17);
+  // This is a stand, and the thing that makes it one is the *heading*. Parked
+  // along the runway axis the 28.6 m wing lies across the s axis, which is the
+  // axis you have to taxi down to reach the taxiway — so the first ten metres
+  // of any departure swung a wingtip through the face of the first hangar, and
+  // you were into a scrape you could not steer out of before you had done
+  // anything at all. Parking square to the taxiway mouth instead puts the wing
+  // *across* t, where the nearest structure is seventeen metres astern, and
+  // getting out is a straight roll onto the taxiway with no turn in it.
+  //
+  // s is far enough forward that both wingtips are clear of the hangar line and
+  // of the row of vehicles and crates on the front of the apron, and still far
+  // enough back that the nose is on concrete rather than out on the taxiway.
+  const stand = P(0, APRON_S + 12);
+  // Facing -s, i.e. back down the taxiway toward the runway. Same convention as
+  // the thresholds above: forward is (-sin yaw, -cos yaw), so wanting forward
+  // to be -(px, pz) means sin yaw = px and cos yaw = pz.
+  const standYaw = Math.atan2(px, pz);
 
   /** World -> runway-local. The inverse of P(), which the ground mode lives in. */
   const local = (x, z) => {
@@ -639,7 +684,7 @@ function buildAirfield(scene) {
     hitStructure, crewSpots,
     bounds, local, toWorld: P, planeY, tint, flushTint,
     centre: [cx, planeY(0), cz],
-    apron: apronCentre, stand,
+    apron: apronCentre, stand, standYaw,
     axis: { dx, dz, px, pz, yaw, halfL },
     pavMesh, buildings, objMesh,
     tris: pav.pos.length / 9
