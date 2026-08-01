@@ -85,6 +85,10 @@ function buildFlight(plane, fire) {
   const up = new THREE.Vector3();
   const right = new THREE.Vector3();
   const _q = new THREE.Quaternion();
+  const _yUp = new THREE.Vector3(0, 1, 0);
+  const _lvl = new THREE.Quaternion();
+  const _fwd2 = new THREE.Vector3();
+  const _eul = new THREE.Euler(0, 0, 0, 'YXZ');
 
   function axes() {
     fwd.set(0, 0, -1).applyQuaternion(p.quat);
@@ -401,14 +405,46 @@ function buildFlight(plane, fire) {
     if (!overSea && p.gearOut > 0.85 && typeof airfield !== 'undefined'
       && airfield && airfield.onRunway) {
       rw = airfield.onRunway(p.pos.x, p.pos.z);
-      // Once you are down and slow, the taxiway and the apron count too. A
+      // Once you are down and rolling, the taxiway and the apron count too. A
       // *landing* has to be on the runway and nothing here changes that — this
-      // only applies to an aeroplane that is already rolling. Without it, the
-      // wheels came off the world the instant you turned off the runway, and
-      // every reason to be on the ground at all is parked on the apron.
-      if (!rw && p.onGround && speed < 40) {
+      // needs the wheels already on the ground, which on an approach they are
+      // not. Without it, the wheels came off the world the instant you turned
+      // off the runway, and every reason to be on the ground at all is parked
+      // on the apron.
+      //
+      // Being *off the centreline* has to go the same way, and that one was
+      // fatal. The box onRunway() answers to is eight metres wider than the
+      // runway on each side, and anything past off = 0.92 is treated below as
+      // arriving in the grass, i.e. as an accident. Rolling out of the taxiway
+      // you cross that margin every single time — so the one manoeuvre the
+      // whole aerodrome exists for, taxi out and line up, was a guaranteed
+      // crash at walking pace. You could not leave the apron.
+      if (p.onGround && speed < 60 && (!rw || rw.off >= 0.92)) {
         const py = airfield.onPaved(p.pos.x, p.pos.z);
         if (py != null) rw = { t: 0, s: 0, y: py, off: 0, taxi: true };
+      }
+      // And running off the concrete altogether is a bumpy roll across the
+      // field, not a fireball. Putting a wheel on the grass beside the taxiway
+      // ended the mission on the spot, which for an aeroplane doing twenty
+      // knots is not a thing that happens to it. Only inside the aerodrome:
+      // everywhere else, touching the ground is still what it was.
+      //
+      // Deliberately *not* conditioned on already being on the ground. The
+      // concrete stands a metre or so proud of the field it was graded into, so
+      // rolling off the edge drops you — for one frame the wheels are on
+      // nothing, p.onGround goes false, and the fall that follows arrives with
+      // more than the 4.2 m/s the branch below is willing to call a landing. So
+      // the aeroplane blew up from driving slowly off a kerb. Below the stall
+      // speed and within three metres of the dirt you are not flying, whatever
+      // last frame thought.
+      // The pad is generous on purpose. The taxiway is sixty metres long and
+      // this aeroplane accelerates, so arriving at the runway faster than you
+      // meant to and needing another eighty metres to stop is the ordinary
+      // mistake, not an exotic one — and running out of aerodrome in the middle
+      // of it should leave you sitting in a field, not dead.
+      if (!rw && speed < 45 && agl < 3.0 && airfield.inField
+        && airfield.inField(p.pos.x, p.pos.z, 150)) {
+        rw = { t: 0, s: 0, y: gy, off: 0, taxi: true, rough: true };
       }
     }
 
@@ -418,27 +454,62 @@ function buildFlight(plane, fire) {
     if (agl < 1.4 || (rw && p.pos.y - rw.y < FLIGHT.gearHeight + 0.15)) {
       const vv = p.vel.y;
       const wingsLevel = Math.abs(bank) < 0.35;
-      if (rw && vv > -4.2 && wingsLevel && speed < 108 && rw.off < 0.92) {
+      // A drop off the edge of the concrete onto the field beside it is worth
+      // about 6 m/s by the time the wheels find the dirt, so a rough arrival is
+      // allowed to be rougher than a landing before it counts as one.
+      const vvOk = rw && rw.rough ? -7.5 : -4.2;
+      if (rw && vv > vvOk && wingsLevel && speed < 108 && rw.off < 0.92) {
         // Touchdown and roll. Anything with real vertical speed in it still
         // gets felt — 56-alerts.js turns p.slam into a bang and a shake.
         if (!p.onGround && vv < -1.0 && p.slam > vv) p.slam = vv;
         p.onGround = true;
         p.pos.y = rw.y + FLIGHT.gearHeight;
         p.vel.y = 0;
+        // The undercarriage holds her level, so on the ground the roll and the
+        // pitch are washed out and only the heading is kept. Without it, the
+        // yaw-roll coupling that makes her fly leans her a degree at a time
+        // while you steer, and at twenty degrees `wingsLevel` above goes false
+        // and the aeroplane is written off — taxiing, at walking pace, wings
+        // nowhere near anything. Two tenths of a second, so a landing with a
+        // wing down straightens up rather than snapping.
+        _fwd2.set(0, 0, -1).applyQuaternion(p.quat);
+        _eul.set(0, Math.atan2(-_fwd2.x, -_fwd2.z), 0);
+        _lvl.setFromEuler(_eul);
+        p.quat.slerp(_lvl, Math.min(1, dt * 5));
         // Rolling resistance, plus the wheel brakes. SPACE is the scoop in the
         // air and has nothing to do on a runway, so on the ground it is the
         // brake — one fewer key to learn at the only moment you need it.
         const brake = (input.scoop ? FLIGHT.brakeDecel : 0)
           + (input.thrDown ? FLIGHT.brakeDecel * 0.4 : 0);
-        const decel = FLIGHT.rollDrag + brake;
+        // Grass costs you: about three times the rolling drag of concrete, which
+        // is what makes running off it a thing you want to correct rather than a
+        // free second runway.
+        const decel = FLIGHT.rollDrag * (rw.rough ? 3.2 : 1) + brake;
         const sp = p.vel.length();
         if (sp > 0.05) p.vel.multiplyScalar(Math.max(0, sp - decel * dt) / sp);
         // Nosewheel steering: the rudder turns the aeroplane on the ground, and
         // the authority falls off with speed the way a real one does.
+        //
+        // It turns the *aeroplane*. What it did before was rotate the velocity
+        // vector and put the rate in p.groundSteer, which nothing anywhere ever
+        // read — so the nose went on pointing exactly where it had been, thrust
+        // kept hauling her back onto the heading she started with, and she
+        // could not be turned on the ground at all. About a degree a second of
+        // crab, and that only because the sideslip eventually told on her.
+        //
+        // Which means that from a stand parked square to the taxiway there was
+        // no way to line up on the runway and therefore no way to take off, and
+        // that is the whole of the bug: not the throttle, not the stand, not
+        // pulling up too early. You could not steer.
         const steer = p.rudder * FLIGHT.steerRate * sat(1 - sp / 55) * (sp > 0.4 ? 1 : 0);
+        _q.setFromAxisAngle(_yUp, steer * dt);
+        p.quat.multiply(_q);
+        // And the wheels take the velocity round with her, or she tracks off in
+        // the old direction while pointing somewhere new. Same sense as the yaw
+        // above, so the pedals mean on the concrete what they mean in the air.
         const c = Math.cos(steer * dt), sn = Math.sin(steer * dt);
-        const vx = p.vel.x * c - p.vel.z * sn;
-        const vz = p.vel.x * sn + p.vel.z * c;
+        const vx = p.vel.x * c + p.vel.z * sn;
+        const vz = -p.vel.x * sn + p.vel.z * c;
         p.vel.x = vx; p.vel.z = vz;
         p.groundSteer = steer;
       } else if (overSea && vv > -5.5 && wingsLevel && speed < 125) {

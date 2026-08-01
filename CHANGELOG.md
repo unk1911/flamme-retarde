@@ -8,6 +8,52 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.8.1] — 2026-08-01
+
+### Fixed — you could not take off, and here is why
+
+Three separate faults, all of them in the last twenty metres of ground under
+the wheels, and between them the aerodrome was a trap you could taxi into and
+not get out of.
+
+- **You could not steer on the ground.** The nosewheel steering rotated the
+  *velocity vector* and stashed the rate in `p.groundSteer`, which nothing
+  anywhere ever read. So the nose went on pointing exactly where it had been
+  pointing, thrust kept hauling her back onto the heading she started with, and
+  holding full rudder bought about a degree a second of crab — and that only
+  because the sideslip eventually told on her. It turns the aeroplane now, and
+  the wheels take the velocity round with it. This is the whole of the bug: not
+  the throttle, not the stand, not rotating too early. **The aeroplane could
+  not be turned, so from a stand parked square to the taxiway there was no way
+  to line up on the runway and no way to leave.**
+- **Rolling from the taxiway onto the runway was a guaranteed crash**, at any
+  speed, every time. The box the runway test answers to is eight metres wider
+  than the runway on each side, and anything past 92% of the half-width counts
+  as arriving in the grass, which is an accident. Coming off the taxiway you
+  cross that margin on the way to the centreline — so the one manoeuvre the
+  whole aerodrome exists for killed you at walking pace.
+- **Putting a wheel on the grass was fatal.** The concrete stands about a metre
+  proud of the field it was graded into, so running off the edge dropped you,
+  and the drop arrived faster than the 4.2 m/s the model is willing to call a
+  landing. Below the stall speed and within three metres of the dirt you are
+  not flying, whatever the last frame thought: it is a bumpy roll at three
+  times the rolling drag, out to a hundred and fifty metres past the aerodrome
+  boundary. Run out of taxiway now and you end up sitting in a field, which is
+  embarrassing and survivable, which is what it should have been.
+- **And she leaned over while taxiing.** Once the steering actually yawed the
+  airframe, the yaw-roll coupling that makes her fly started banking her a
+  degree at a time on the ground; at twenty degrees the touchdown test stops
+  calling it a landing and writes the aeroplane off. The undercarriage holds
+  her level now — roll and pitch are washed out over two tenths of a second and
+  only the heading is kept, which also straightens out a landing made with a
+  wing down.
+
+Verified end to end rather than by eye: off the stand, down the taxiway, hold
+short, turn on the spot to the runway heading and line up — no contact at any
+point. Off the threshold it is 179 m of roll, rotate at 52 m/s and away.
+Landings are unchanged where it matters: on the centreline she touches down and
+rolls to a stop, and 22 m off to the side is still an accident.
+
 ## [1.8.0] — 2026-08-01
 
 ### Changed — the aeroplanes on the line are aeroplanes
