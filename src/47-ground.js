@@ -35,6 +35,16 @@ const GROUND = {
   accel: 30,
   drag: 13,
   girth: 0.55,             // how far you are pushed back out of a wall
+  // And out of a person. The rig is 0.40 m across the shoulders with the arms
+  // hanging outside that, so 0.30 is honestly what one of them occupies and two
+  // of them keep 0.60 m between centres: close enough to hand something over,
+  // not close enough to stand inside each other. Deliberately less than `girth`,
+  // because a wall is a surface you must never be able to see through whereas a
+  // colleague is somebody you are allowed to be shoulder to shoulder with — and
+  // because it has to stay well inside the branch or being solid would stop you
+  // putting anybody out. The jet leaves the nozzle 0.55 m in front of you and
+  // catches anything within 0.62 m of its axis, so 0.60 is still point blank.
+  body: 0.30,
   turn: 2.1,               // rad/s on the arrow keys — about 120 degrees a second
 
   // The trolley pump you drag off the aeroplane. Four hundred litres at nine a
@@ -204,7 +214,7 @@ async function buildGround(scene, field) {
     return {
       fig, x: p[0], y: p[1], z: p[2],
       hx: 1, hz: 0, vx: 0, vz: 0,
-      mode: 'idle',              // idle | walk | alight | down | safe | lost
+      mode: 'idle',              // idle | walk | alight | down | safe | thanks | lost
       burn: 0, wet: 0, timer: 0, gait: rng() * 6.28, seed: rng(), id: i,
       shouted: false,
       // Where this one is heading and how long before they think of somewhere
@@ -250,6 +260,40 @@ async function buildGround(scene, field) {
     }
     const w = field.toWorld(t, s);
     return [w[0], w[2]];
+  }
+
+  /**
+   * Somebody prone is not an obstacle. A body on the ground is 0.35 m at the
+   * shoulder — that is knee height, you step over it — and making it solid would
+   * be wrong twice over: it would hold you off the one person you have to stand
+   * over to put out, and a body that went down against a hangar would become a
+   * wedge you could be pinned behind. Anybody on their feet, or on one knee
+   * getting their breath, is a metre of person and you go round.
+   */
+  const upright = (c) => c.mode !== 'down' && c.mode !== 'lost';
+
+  /**
+   * Push a point out of everybody who is upright. World space and recomputed
+   * every frame, because these are not buildings: a person walks, so they cannot
+   * live in `field.blockers`, which is a static list of axis-aligned boxes in the
+   * runway's own axes. A person is a circle rather than a box, so it is the
+   * radius that ejects you and not the nearest face — but it is the same idea and
+   * the same one pass that confine() makes over the buildings.
+   */
+  function unbody(x, z) {
+    const r = GROUND.body * 2;
+    for (const c of crew) {
+      if (!upright(c)) continue;
+      const dx = x - c.x, dz = z - c.z;
+      const d = Math.hypot(dx, dz);
+      if (d >= r) continue;
+      // Dead centre does happen — somebody alight runs at you and gets there —
+      // so leave the way you came in rather than dividing by zero.
+      const ux = d > 1e-3 ? dx / d : Math.sin(you.yaw);
+      const uz = d > 1e-3 ? dz / d : Math.cos(you.yaw);
+      x = c.x + ux * r; z = c.z + uz * r;
+    }
+    return [x, z];
   }
 
   // ── the spot fire ──────────────────────────────────────────────────────────
@@ -377,10 +421,62 @@ async function buildGround(scene, field) {
     return t;
   }
 
+  /** Move `c` out of a circle of radius `r` about (ox, oz), taking `k` of the
+   *  overlap, and keep them out of the walls while doing it. */
+  function shove(c, ox, oz, r, k) {
+    const dx = c.x - ox, dz = c.z - oz;
+    const d = Math.hypot(dx, dz);
+    if (d >= r) return;
+    // Two of them handed the same start would divide by zero, so break the tie
+    // off the seed: stable across reloads, and different for each of them.
+    const a = d > 1e-3 ? Math.atan2(dz, dx) : c.seed * TAU;
+    const push = (r - d) * k;
+    const [nx, nz] = confine(c.x + Math.cos(a) * push, c.z + Math.sin(a) * push);
+    c.x = nx; c.z = nz;
+  }
+
+  /**
+   * Nobody stands inside anybody else. The muster gives each of them their own
+   * offset to walk to, which spreads the destinations but does nothing about the
+   * walk there, and two figures interpenetrating is the fastest way for a crowd
+   * to stop reading as people.
+   *
+   * This is also the *only* thing that resolves a person against the player, and
+   * that asymmetry is the point. Being solid has to be able to block: cornering
+   * somebody whose kit is alight and standing in their way is a real rescue and
+   * it should work. But it must never shove the player into a wall or hold them
+   * there, and the cheapest guarantee of that is that the player's position is
+   * only ever changed by the player's own input. So you stop them; they do not
+   * move you.
+   *
+   * One pass over each other. Pushing A off B can leave A touching C, and at
+   * 0.6 m and thirty frames a second the next pass has it long before anybody
+   * could see it. The player is a second pass and comes last, because a pair
+   * settling between themselves can put one of them back inside you and there is
+   * nothing after this to take it out again.
+   */
+  function jostle() {
+    const r = GROUND.body * 2;
+    for (let i = 0; i < crew.length; i++) {
+      const a = crew[i];
+      if (!upright(a)) continue;
+      for (let k = i + 1; k < crew.length; k++) {
+        const b = crew[k];
+        if (!upright(b)) continue;
+        // Half the overlap each, both measured from where the other one was, or
+        // whichever of them is earlier in the array gets to keep its ground.
+        const ax = a.x, az = a.z;
+        shove(a, b.x, b.z, r, 0.5);
+        shove(b, ax, az, r, 0.5);
+      }
+    }
+    if (active) for (const c of crew) if (upright(c)) shove(c, you.x, you.z, r, 1);
+  }
+
   function updateCrew(dt) {
     for (const c of crew) {
       c.speed = 0;
-      if (c.mode === 'lost') { poseFigure(c); continue; }
+      if (c.mode === 'lost') continue;
 
       // Catching. You have to be genuinely in it — standing in a burning cell,
       // or within about three metres of something alight. Anything looser and
@@ -546,6 +642,12 @@ async function buildGround(scene, field) {
         c.gait += speed * dt * 2.9;
       }
       c.speed = speed;
+    }
+    // Everybody has moved; now nobody is standing in anybody. Posing is a
+    // separate pass because it reads the final position — pose in the same loop
+    // and whoever is jostled afterwards is drawn a frame behind where they are.
+    jostle();
+    for (const c of crew) {
       c.y = field.walkY(c.x, c.z);
       poseFigure(c);
     }
@@ -940,12 +1042,21 @@ async function buildGround(scene, field) {
     you.vz = damp(you.vz, wz, m > 0.01 ? GROUND.accel / top : GROUND.drag, dt);
 
     const tx = you.x + you.vx * dt, tz = you.z + you.vz * dt;
-    const [nx, nz] = confine(tx, tz);
-    // Kill the velocity only if confine() actually moved us. The tolerance is
-    // for the world -> runway-local -> world round trip inside it, which is
-    // exact in theory and a few parts in 10^12 in practice.
-    if (Math.abs(nx - tx) > 1e-4) you.vx = 0;
-    if (Math.abs(nz - tz) > 1e-4) you.vz = 0;
+    // People first, walls second, so that the wall has the last word. Somebody
+    // standing against a hangar can then hold you against it but never push you
+    // through it, and a hold is something you can always walk sideways out of.
+    const [bx, bz] = unbody(tx, tz);
+    const [nx, nz] = confine(bx, bz);
+    // Kill the velocity only if confine() actually moved us — measured against
+    // what confine() was given, not against where the step wanted to go, or a
+    // person would stop you dead as well. That is the other half of not being
+    // sticky: the push out of somebody is purely radial, so whatever part of
+    // your speed runs along them survives it and you slide round rather than
+    // grinding to a halt on a shoulder. The tolerance is for the world ->
+    // runway-local -> world round trip inside confine(), which is exact in
+    // theory and a few parts in 10^12 in practice.
+    if (Math.abs(nx - bx) > 1e-4) you.vx = 0;
+    if (Math.abs(nz - bz) > 1e-4) you.vz = 0;
     you.x = nx; you.z = nz;
     you.y = field.walkY(you.x, you.z);
   }
@@ -1058,7 +1169,9 @@ async function buildGround(scene, field) {
     // puts the camera inside the aeroplane rather than beside it.
     const sx = flight.p.pos.x - right.x * 17 - fwd.x * 7;
     const sz = flight.p.pos.z - right.z * 17 - fwd.z * 7;
-    const [px2, pz2] = confine(sx, sz);
+    // And not on top of whoever happened to be standing on that patch of apron.
+    const [bx, bz] = unbody(sx, sz);
+    const [px2, pz2] = confine(bx, bz);
     you.x = px2; you.z = pz2;
     you.y = field.walkY(you.x, you.z);
     you.vx = you.vz = 0;
@@ -1140,6 +1253,22 @@ async function buildGround(scene, field) {
       const [px2, pz2] = confine(x, z);
       you.x = px2; you.z = pz2; you.y = field.walkY(px2, pz2);
       you.yaw = yaw; you.pitch = pitch;
+    },
+    /**
+     * For the screenshot tool: the nearest person, and the separation being
+     * enforced against them. `d` below `min` means you are standing inside
+     * somebody, which is the whole thing this is here to catch; `min` of zero is
+     * somebody prone, whom you are supposed to be able to stand over.
+     */
+    nearestBody() {
+      let best = null;
+      for (const c of crew) {
+        const d = Math.hypot(c.x - you.x, c.z - you.z);
+        if (best && d >= best.d) continue;
+        best = { i: c.id, mode: c.mode, d: +d.toFixed(3),
+          min: upright(c) ? +(GROUND.body * 2).toFixed(3) : 0 };
+      }
+      return best;
     },
     /** Stand eight metres off the nearest fire and point the branch at it. */
     aimAt(kind) {

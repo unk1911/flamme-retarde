@@ -8,6 +8,62 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.6.0] — 2026-08-01
+
+### Added — there are birds now
+
+- **Gulls, swifts and hooded crows**, which on this coast in August is the
+  honest list and which could not be less alike. Yellow-legged gulls own the
+  channel and the harbour: they soar, they wheel, and a fit one goes the best
+  part of a minute between wingbeats — a third of them are sitting on the water
+  at any moment. Common swifts scream around the roofs of the old town at
+  chimney height, all flicker and no glide, and they are kept in close because
+  forty centimetres of bird at seven hundred metres is a wasted instance.
+  Hooded crows work the karst inland, beating steadily, going somewhere. Making
+  the three *move* differently is most of the value: what you would notice from
+  a boat is how often it flaps, how hard it banks, and how far off the deck it
+  lives.
+- **They react, which is the rest of the value.** A Canadair at ninety metres a
+  second puts everything within two hundred up off the water — the flush is
+  gated on airspeed, so a parked or taxiing aeroplane puts up nothing — and
+  nothing stays over a cell that is alight. Fire is sampled underfoot and a
+  hundred and twenty metres ahead, so a bird turns away from a front before it
+  reaches it rather than after. A bird that ignored both would be wallpaper.
+- **Calls, built the same way everything else in the mix is** — a swept tone
+  through a formant that tracks it, roughened by a square LFO, which is the
+  idiom the cicadas already use. A gull is a harsh falling cry with a deep rasp,
+  a swift a thin high scream, a crow the same rasp taken so low it becomes the
+  note. Panned by where the bird actually is and sent to the valley convolver,
+  because every one of these happens over water or bare limestone. Rate-limited
+  twice over — a bird that has just shouted shuts up for a few seconds, and no
+  more than a couple of calls a second get out at all. Twenty gulls deciding at
+  once is one gull played twenty times and it sounds exactly like that.
+- The whole flock is two instanced draws at any count: fifty-eight birds, a
+  hundred and seventy-four instances, about six thousand triangles. A bird is
+  one body instance and two wing instances, and the wings hinge because the
+  per-instance rotation is a full quaternion — so a wingbeat costs a couple of
+  quaternion multiplies on the CPU and nothing at all on the GPU. There is a
+  density slider next to vegetation and traffic, and zero really is off.
+
+### Added — people are solid
+
+- **You could walk straight through a burning firefighter.** The buildings were
+  made solid in 1.5.0 and the people were not, which meant the one thing in the
+  mode you are actually there for was the one thing you could pass through.
+  Anybody on their feet now stops you at sixty centimetres between centres.
+- **Anybody who is down does not**, and that is the point of doing this
+  properly rather than giving everyone a cylinder. A body on the ground is
+  thirty-five centimetres at the shoulder — knee height — and making it solid
+  would hold you off the one person you have to stand over to put out.
+- **You are never displaced by a person; only your own input moves you.** That
+  asymmetry is the design. It means a burning runner can be cornered and held —
+  they cannot pass through you, and sixty centimetres is point blank for the
+  branch — while making it impossible to be shoved into a wall or crushed by a
+  crowd. People are pushed out before walls are, so somebody standing against a
+  hangar can hold you against it but can never push you through it.
+- Crew also separate from each other now, which incidentally fixes them
+  stacking up on the muster point.
+
 ## [1.5.0] — 2026-07-31
 
 ### Added — the buildings are solid now

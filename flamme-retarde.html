@@ -10,8 +10,8 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.5.0">
-<meta name="build-date" content="2026-07-31">
+<meta name="version" content="1.6.0">
+<meta name="build-date" content="2026-08-01">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
    anything to do with the aircraft and the sea, and the fire (amber → ember red)
@@ -958,8 +958,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.5.0, built 2026-07-31">
-    <b>v1.5.0</b><i>·</i><span>2026-07-31</span>
+  <div id="build" title="Flamme Retardé 1.6.0, built 2026-08-01">
+    <b>v1.6.0</b><i>·</i><span>2026-08-01</span>
   </div>
   <footer class="credit">
     <span>eDeliverables (2026)</span><i>·</i>
@@ -1158,7 +1158,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.5.0", date: "2026-07-31" };</script>
+<script>const BUILD = { v: "1.6.0", date: "2026-08-01" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -1926,6 +1926,7 @@ const STRINGS = {
     'set.assist': 'stability assist',
     'set.trees': 'vegetation',
     'set.props': 'traffic and boats',
+    'set.birds': 'birds',
     'set.fov': 'field of view',
     'set.exposure': 'exposure',
     'set.volume': 'volume',
@@ -2127,6 +2128,7 @@ const STRINGS = {
     'set.assist': 'pomoć pri stabilizaciji',
     'set.trees': 'raslinje',
     'set.props': 'promet i brodice',
+    'set.birds': 'ptice',
     'set.fov': 'vidno polje',
     'set.exposure': 'ekspozicija',
     'set.volume': 'glasnoća',
@@ -2327,6 +2329,7 @@ const STRINGS = {
     'set.assist': 'aide au pilotage',
     'set.trees': 'végétation',
     'set.props': 'circulation et bateaux',
+    'set.birds': 'oiseaux',
     'set.fov': 'champ de vision',
     'set.exposure': 'exposition',
     'set.volume': 'volume',
@@ -5879,6 +5882,490 @@ function buildFire(scene) {
   };
 }
 
+// ==== 44-birds.js ===============================================
+// -----------------------------------------------------------------------------
+// Birds.
+//
+// Three species, because on this coast in August there are three and they could
+// not be less alike. Yellow-legged gulls (Larus michahellis) own the channel and
+// the harbour: they soar, they wheel, and a fit one will go the best part of a
+// minute between wingbeats. Common swifts scream around the roofs of the old
+// town at chimney height, all flicker and no glide worth the name. Hooded crows
+// work the karst inland, beating steadily, going somewhere.
+//
+// Making those three *move* differently is most of the value here, so they are
+// one integrator with three sets of numbers, and the numbers that differ are the
+// ones you would notice from a boat: how often it flaps, how hard it banks, and
+// how far off the deck it lives.
+//
+// They also react, which is the rest of the value. A Canadair at ninety metres a
+// second puts everything within two hundred up off the water, and nothing stays
+// over a cell that is alight. A bird that ignored both would be wallpaper.
+//
+// Cost: two instanced draws for the lot, at any count. A bird is one body
+// instance and two wing instances, and the wings hinge because the per-instance
+// rotation is a full quaternion — so a wingbeat is a couple of quaternion
+// multiplies on the CPU and nothing whatever on the GPU.
+// -----------------------------------------------------------------------------
+
+const BIRDS = {
+  // Birds exist in a ring this far around the camera and nowhere else. 750 m is
+  // where a gull stops being a bird and becomes one white pixel, and the whole
+  // population is recycled through that ring as you fly.
+  radius: 750,
+  rehome: 4,             // relocations per frame, at most — a hard cost ceiling
+  // Beyond this you would not hear one over two 2 380 hp turboprops anyway.
+  callDist: 430,
+  // How close the aeroplane has to come. Two hundred metres is about right for
+  // a low pass: the birds under the flight path go up, the rest carry on.
+  flush: 210,
+};
+
+/**
+ * Model axes are the aeroplane's, so nothing in this file has to think twice:
+ * -Z is the bill, +X is the right wingtip, +Y is up. Lengths in metres.
+ */
+const FLOCK = [
+  {
+    key: 'gull',
+    n: 20,
+    // 1.4 m across and 60 cm long: the biggest thing in this sky that is not an
+    // aeroplane, and the only bird here you will ever get a proper look at.
+    span: 1.40, len: 0.60, girth: 1.00, chord: 1.00,
+    body: [0.93, 0.93, 0.91],       // white, and it stays white
+    wing: [0.62, 0.65, 0.69],       // grey mantle; the black primaries are baked in
+    cruise: 11, flee: 19, climb: 3.0,
+    // It soars four times as long as it flaps, and that ratio *is* the species.
+    beat: 2.7, amp: 0.80, dihedral: 0.15,
+    burst: 1.7, glide: 6.5,
+    turn: 0.36, bank: 1.60,
+    wheel: 0.85, wheelRate: 0.06,   // the long slow arc a gull's track actually is
+    band: [8, 75], calm: 3.4,
+    ring: 1.00,                     // a gull is big enough to be worth drawing at 750 m
+    call: [11, 26],
+    rafts: 0.30,                    // this fraction of them are sitting on the water
+    where: (x, z) => isSea(x, z) || shoreAt(x, z) < 150,
+  },
+  {
+    key: 'swift',
+    n: 26,
+    // 42 cm across and 17 grams. Apus apus does everything on the wing, which is
+    // why there is no rafting here and no perching anywhere in this file.
+    span: 0.42, len: 0.17, girth: 0.86, chord: 0.52,
+    body: [0.21, 0.19, 0.18],
+    wing: [0.17, 0.16, 0.15],
+    cruise: 21, flee: 30, climb: 6.0,
+    // Eight beats a second, in bursts of half of one, and the pause between
+    // bursts is as much a part of the shape as the beat.
+    beat: 8.2, amp: 0.60, dihedral: -0.06,
+    burst: 0.5, glide: 0.7,
+    turn: 2.4, bank: 0.55,
+    wheel: 1.5, wheelRate: 0.55,
+    band: [12, 46], calm: 1.6,
+    // 42 cm of bird at 700 m is not a bird, it is a wasted instance. Keeping
+    // them in close is also honest: swifts scream *past* you.
+    ring: 0.42,
+    call: [6, 13],
+    rafts: 0,
+    where: (x, z) => !isSea(x, z) && urbanAt(x, z) > 0.32,
+  },
+  {
+    key: 'crow',
+    n: 12,
+    // Corvus cornix: ash-grey body, black hood and wings, and the only one of
+    // the three that flies in a straight line, because it is going somewhere.
+    span: 0.98, len: 0.47, girth: 1.12, chord: 1.25,
+    body: [0.53, 0.52, 0.51],
+    wing: [0.12, 0.12, 0.13],
+    cruise: 10, flee: 15, climb: 2.4,
+    beat: 3.4, amp: 0.95, dihedral: 0.02,
+    burst: 14, glide: 0.7,           // near enough continuous, and it looks like work
+    turn: 0.5, bank: 0.5,
+    wheel: 0.25, wheelRate: 0.09,
+    band: [14, 60], calm: 2.6,
+    ring: 0.75,
+    call: [14, 34],
+    rafts: 0,
+    where: (x, z) => !isSea(x, z) && urbanAt(x, z) < 0.5,
+  },
+];
+
+/**
+ * A wingbeat is not a sine. The downstroke is the work and the upstroke is a
+ * recovery, so the waveform is skewed: the bird spends longer coming up than it
+ * does going down, and the flick at the bottom is what the eye actually reads.
+ */
+const beatShape = (ph) => Math.sin(ph) - 0.26 * Math.sin(ph * 2);
+
+/** The yaw that flies you along (dx, dz), in the flight model's convention. */
+const headingTo = (dx, dz) => Math.atan2(-dx, -dz);
+
+/**
+ * The body: a six-sided spindle with a head bump and a tail fan, one unit long,
+ * so the per-instance scale is simply the bird's length. Vertex colour darkens
+ * the back and leaves the belly pale, which is the only marking visible from
+ * underneath and therefore the only one worth having.
+ */
+function birdBodyProto() {
+  const b = propBuilder();
+  const N = 6;
+  //          z     radius
+  const S = [
+    [-0.50, 0.015], [-0.43, 0.070], [-0.34, 0.082], [-0.24, 0.068],
+    [-0.04, 0.145], [0.20, 0.115], [0.40, 0.050], [0.50, 0.012],
+  ];
+  const P = (s, i) => {
+    const a = (i / N) * TAU + Math.PI / N;
+    return [Math.cos(a) * S[s][1], Math.sin(a) * S[s][1] * 0.85, S[s][0]];
+  };
+  // One colour per longitudinal strip: 1 underneath, 0 along the spine.
+  const strip = (i) => {
+    const a = ((i + 0.5) / N) * TAU + Math.PI / N;
+    const t = sat(0.5 - Math.sin(a) * 0.8);
+    return [lerp(0.40, 1.0, t), lerp(0.42, 1.0, t), lerp(0.46, 1.0, t)];
+  };
+  for (let s = 0; s < S.length - 1; s++) {
+    for (let i = 0; i < N; i++) {
+      b.quad(P(s, i), P(s, i + 1), P(s + 1, i + 1), P(s + 1, i), strip(i));
+    }
+  }
+  // The tail, flat and spread. A gull fans it and a swift forks it; at the size
+  // these are seen, one triangle is both.
+  b.tri([0, 0, 0.28], [-0.11, 0.004, 0.60], [0.11, 0.004, 0.60], [0.52, 0.53, 0.55]);
+  return b.geo();
+}
+
+/**
+ * One wing, root at the origin, tip at x = 1, chord along Z with the leading
+ * edge forward. A flat plate: the hinge supplies the dihedral and the camber
+ * would be mirrored the wrong way on the left wing anyway (see the pairing in
+ * update() — the left wing is the right one turned through π about the fore-aft
+ * axis, which is free, and only a flat plate survives it unnoticed).
+ *
+ * The last column is how black the feathers are. A yellow-legged gull's hand is
+ * jet, and that dark tip on a white wing is the single most recognisable thing
+ * about it from a distance.
+ */
+function birdWingProto() {
+  const b = propBuilder();
+  //      x      LE z    TE z   black
+  const W = [
+    [0.00, -0.10, 0.18, 0.00],
+    [0.32, -0.15, 0.13, 0.02],
+    [0.60, -0.13, 0.06, 0.10],
+    [0.80, -0.07, 0.01, 0.42],
+    [0.93, 0.01, -0.02, 0.80],
+    [1.00, 0.10, 0.07, 1.00],
+  ];
+  for (let i = 0; i < W.length - 1; i++) {
+    const a = W[i], c = W[i + 1];
+    const k = 1 - 0.84 * (a[3] + c[3]) * 0.5;
+    b.quad([a[0], 0, a[1]], [a[0], 0, a[2]], [c[0], 0, c[2]], [c[0], 0, c[1]],
+      [k, k, k * 1.02]);
+  }
+  return b.geo();
+}
+
+function buildBirds(scene, fire) {
+  const rnd = mulberry32(CONFIG.seed ^ 0x0b19d5);
+  const bodyL = propLayer(scene, birdBodyProto(),
+    FLOCK.reduce((a, s) => a + s.n, 0), { spec: 0.05, specPower: 14 });
+  const wingL = propLayer(scene, birdWingProto(),
+    FLOCK.reduce((a, s) => a + s.n, 0) * 2, { spec: 0.05, specPower: 14 });
+
+  const _e = new THREE.Euler();
+  const _qb = new THREE.Quaternion();
+  const _qw = new THREE.Quaternion();
+  const _qh = new THREE.Quaternion();
+  const _qt = new THREE.Quaternion();
+  const _v = new THREE.Vector3();
+  const _zA = new THREE.Vector3(0, 0, 1);
+  const _xA = new THREE.Vector3(1, 0, 0);
+  const camPos = new THREE.Vector3();
+  const camRight = new THREE.Vector3(1, 0, 0);
+
+  const put = (L, i, x, y, z, q, sx, sy, sz, col, tint) => {
+    L.aPos.array[i * 3] = x; L.aPos.array[i * 3 + 1] = y; L.aPos.array[i * 3 + 2] = z;
+    L.aRot.array[i * 4] = q.x; L.aRot.array[i * 4 + 1] = q.y;
+    L.aRot.array[i * 4 + 2] = q.z; L.aRot.array[i * 4 + 3] = q.w;
+    L.aScale.array[i * 3] = sx; L.aScale.array[i * 3 + 1] = sy;
+    L.aScale.array[i * 3 + 2] = sz;
+    L.aColor.array[i * 3] = col[0] * tint;
+    L.aColor.array[i * 3 + 1] = col[1] * tint;
+    L.aColor.array[i * 3 + 2] = col[2] * tint;
+  };
+
+  const flock = [];
+  for (let si = 0; si < FLOCK.length; si++) {
+    for (let i = 0; i < FLOCK[si].n; i++) {
+      flock.push({
+        sp: si, live: true, placed: false, wait: 0,
+        x: 0, y: 0, z: 0, yaw: rnd() * TAU, pitch: 0, roll: 0,
+        spd: FLOCK[si].cruise, alt: 0, sit: false,
+        // Individual size and tint. Fourteen identical gulls in a row is a
+        // texture; the same fourteen with a tenth either way is a flock.
+        s: 0.86 + rnd() * 0.30, tint: 0.88 + rnd() * 0.22,
+        ph: rnd() * TAU, flap: 0, on: false, duty: rnd() * 2,
+        base: rnd() * TAU, wp: rnd() * TAU, wr: 0.7 + rnd() * 0.6,
+        alarm: 0, callT: rnd() * 20, mute: 0,
+      });
+    }
+  }
+
+  let density = 1, tAcc = 0, live = 0, calls = 0, callBudget = 3;
+
+  function setLive() {
+    let i = 0;
+    for (let si = 0; si < FLOCK.length; si++) {
+      const keep = Math.round(FLOCK[si].n * sat(density));
+      for (let k = 0; k < FLOCK[si].n; k++) flock[i++].live = k < keep;
+    }
+  }
+
+  // ── where a bird would actually be ─────────────────────────────────────────
+
+  /**
+   * Drop a bird somewhere near the camera that its species would tolerate. Eight
+   * darts and then give up for a second or two — over the open karst there is no
+   * sea within a kilometre and the gulls simply have nowhere to go, which is the
+   * correct answer rather than a failure.
+   */
+  function rehome(b) {
+    const sp = FLOCK[b.sp];
+    for (let k = 0; k < 8; k++) {
+      const a = rnd() * TAU;
+      const r = BIRDS.radius * sp.ring * (0.45 + rnd() * 0.5);
+      const x = camPos.x + Math.cos(a) * r, z = camPos.z + Math.sin(a) * r;
+      if (Math.abs(x) > HALF - 60 || Math.abs(z) > HALF - 60) continue;
+      if (!sp.where(x, z)) continue;
+      // Nothing puts down over a cell that is alight, and nothing is respawned
+      // into one either — the fleeing is meant to be seen, not faked.
+      if (fire && fire.intensityAt(x, z) > 0.04) continue;
+
+      const sea = isSea(x, z);
+      const surf = sea ? 0 : groundAt(x, z);
+      b.x = x; b.z = z;
+      b.alt = sp.band[0] + rnd() * (sp.band[1] - sp.band[0]);
+      b.sit = sea && rnd() < sp.rafts;
+      b.y = b.sit ? 0 : surf + b.alt;
+      b.yaw = rnd() * TAU;
+      b.base = b.yaw;
+      b.spd = b.sit ? 0 : sp.cruise;
+      b.alarm = 0;
+      b.wait = 0;
+      b.placed = true;
+      return true;
+    }
+    b.wait = 1.5 + rnd() * 2.5;
+    b.placed = false;
+    return false;
+  }
+
+  // ── calling ────────────────────────────────────────────────────────────────
+
+  /**
+   * One call, if there is anyone near enough to hear it. Panned by where the
+   * bird actually is, and rate-limited twice over: a bird that has just shouted
+   * shuts up for a few seconds, and no more than a couple of calls a second get
+   * out at all. Twenty gulls all deciding at once is one gull played twenty
+   * times, and it sounds exactly like that.
+   */
+  function cry(b, alarm) {
+    if (!audio || state.phase === 'intro' || callBudget < 1 || b.mute > 0) return;
+    const dx = b.x - camPos.x, dy = b.y - camPos.y, dz = b.z - camPos.z;
+    const d = Math.hypot(dx, dy, dz);
+    if (d > BIRDS.callDist) return;
+    callBudget -= 1;
+    b.mute = 2.5 + rnd() * 2.5;
+    calls++;
+    const near = 1 - d / BIRDS.callDist;
+    const pan = (dx * camRight.x + dy * camRight.y + dz * camRight.z) / Math.max(d, 1);
+    audio.birdCall(FLOCK[b.sp].key, clamp(pan, -1, 1),
+      near * near * (alarm ? 1 : 0.7), alarm);
+  }
+
+  // ── one bird ───────────────────────────────────────────────────────────────
+
+  function step(b, dt, planePos, roar) {
+    const sp = FLOCK[b.sp];
+    const sea = isSea(b.x, b.z);
+    const surf = sea ? 0 : groundAt(b.x, b.z);
+    const fx = -Math.sin(b.yaw), fz = -Math.cos(b.yaw);
+
+    // Where it is, and where it will be in ten seconds. Sampling only the cell
+    // underneath is already too late by the time the answer comes back hot.
+    let heat = 0, hx = b.x, hz = b.z;
+    if (fire) {
+      heat = fire.intensityAt(b.x, b.z);
+      const ax = b.x + fx * 120, az = b.z + fz * 120;
+      const ahead = fire.intensityAt(ax, az);
+      if (ahead > heat) { heat = ahead; hx = ax; hz = az; }
+    }
+
+    // The aeroplane. A parked or taxiing Canadair puts nothing up — it is the
+    // noise and the closing speed that does it, not the shape.
+    const px = b.x - planePos.x, py = b.y - planePos.y, pz = b.z - planePos.z;
+    const pd = Math.hypot(px, py, pz);
+    const was = b.alarm;
+    if (roar > 0.05 && pd < BIRDS.flush) {
+      b.alarm = Math.max(b.alarm, roar * (1 - pd / BIRDS.flush));
+    }
+    if (heat > 0.03) b.alarm = Math.max(b.alarm, sat(heat * 2.5));
+    // Whatever it was, it says so once, on the way up.
+    if (was < 0.25 && b.alarm >= 0.25) cry(b, true);
+    if (b.alarm > 0) b.alarm = Math.max(0, b.alarm - dt / sp.calm);
+    if (b.mute > 0) b.mute -= dt;
+
+    if (b.sit) {
+      // Rafted on the swell, in the same fiction the boats use: sea level is
+      // zero here, so a gull sits on it and rocks.
+      b.y = Math.sin(tAcc * 0.9 + b.wp) * 0.13;
+      b.yaw += Math.sin(tAcc * 0.21 + b.wp) * dt * 0.3;
+      b.roll = Math.sin(tAcc * 0.7 + b.wp) * 0.05;
+      b.pitch = 0;
+      b.flap = damp(b.flap, 0, 8, dt);
+      // Up they go, shouting. This is the moment the sea stops being scenery.
+      if (b.alarm > 0.10 || heat > 0.02) {
+        b.sit = false;
+        b.spd = sp.cruise * 0.6;
+        b.on = true; b.duty = 2.5;
+        cry(b, true);
+      }
+      return;
+    }
+
+    // ── steering ─────────────────────────────────────────────────────────────
+    // The wander is a slow sine on the heading, which for a gull is a wheel and
+    // for a swift is a jink; alarm overrides it with somewhere to actually be.
+    let want = b.base + Math.sin(tAcc * sp.wheelRate * TAU * b.wr + b.wp) * sp.wheel;
+    // The height it is trying to hold, wandering slowly. A gull on a thermal off
+    // the karst gains and loses a third of its altitude without doing anything
+    // about it, and a bird pinned to one contour looks like it is on a wire.
+    let climb = (surf + b.alt * (1 + 0.35 * Math.sin(tAcc * 0.09 + b.wp)) - b.y) * 0.35;
+    if (heat > 0.03) {
+      want = headingTo(b.x - hx, b.z - hz);
+      climb = Math.max(climb, 3.5);
+    }
+    if (roar > 0.05 && pd < BIRDS.flush && pd > 1) {
+      want = headingTo(px, pz);
+      climb = Math.max(climb, sp.climb * 2.2);
+    }
+
+    const rate = sp.turn * (1 + b.alarm * 1.8);
+    const dyaw = clamp(angleDelta(b.yaw, want), -rate * dt, rate * dt);
+    b.yaw += dyaw;
+    b.base += dyaw * 0.25;              // the wander follows, slowly, rather than snapping back
+    // Birds bank *into* a turn, and a gull banks a great deal: the bank is how
+    // it turns, not decoration on top of the turn. Increasing yaw swings the
+    // nose to port and positive roll lifts the starboard wing, so the two have
+    // the same sign.
+    b.roll = damp(b.roll, clamp(dyaw / Math.max(dt, 1e-3) * sp.bank, -1.2, 1.2), 5, dt);
+
+    const vs = clamp(climb, -sp.climb, sp.climb * (1 + b.alarm * 1.5));
+    b.spd = damp(b.spd, lerp(sp.cruise, sp.flee, b.alarm), 1.6, dt);
+    // After the turn, not before it: a swift at 2.4 rad/s covers a noticeable
+    // arc in a frame and flying the old heading shows as a stutter.
+    b.x += -Math.sin(b.yaw) * b.spd * dt;
+    b.z += -Math.cos(b.yaw) * b.spd * dt;
+    b.y = clamp(b.y + vs * dt, surf + 1.5, surf + sp.band[1] * 1.6);
+    b.pitch = damp(b.pitch, clamp(vs / Math.max(b.spd, 2), -0.45, 0.45), 5, dt);
+
+    // ── the beat ─────────────────────────────────────────────────────────────
+    // Bursts, not a duty cycle you could set a watch by: a swift beats for half
+    // a second and glides for one, and never the same half-second twice.
+    b.duty -= dt;
+    if (b.duty <= 0) {
+      b.on = !b.on;
+      b.duty = (b.on ? sp.burst : sp.glide) * (0.55 + rnd() * 0.9);
+    }
+    b.flap = damp(b.flap, (b.on || b.alarm > 0.15) ? 1 : 0, 7, dt);
+    b.ph += sp.beat * TAU * dt * (1 + b.alarm * 0.45);
+
+    b.callT -= dt;
+    if (b.callT <= 0) {
+      b.callT = sp.call[0] + rnd() * sp.call[1];
+      cry(b, false);
+    }
+  }
+
+  // ── the frame ──────────────────────────────────────────────────────────────
+
+  function update(dt, camera, planePos) {
+    if (density <= 0.001) {
+      bodyL.geo.instanceCount = 0;
+      wingL.geo.instanceCount = 0;
+      live = 0;
+      return;
+    }
+    tAcc += dt;
+    callBudget = Math.min(3, callBudget + dt * 1.6);
+    camPos.copy(camera.position);
+    camRight.setFromMatrixColumn(camera.matrixWorld, 0);
+    // How alarming the aeroplane currently is. Below about 90 km/h it is taxiing
+    // and the gulls on the apron at Rokići are famously unimpressed.
+    const roar = sat((state.speed - 25) / 45);
+
+    let nb = 0, nw = 0, moved = 0;
+    for (const b of flock) {
+      if (!b.live) continue;
+      const R = BIRDS.radius * FLOCK[b.sp].ring;
+      const dx = b.x - camPos.x, dz = b.z - camPos.z;
+      if (!b.placed || dx * dx + dz * dz > R * R) {
+        b.wait -= dt;
+        if (b.wait > 0 || moved >= BIRDS.rehome) continue;
+        moved++;
+        if (!rehome(b)) continue;
+      }
+      step(b, dt, planePos, roar);
+
+      const sp = FLOCK[b.sp];
+      const len = sp.len * b.s;
+      _e.set(b.pitch, b.yaw, b.roll, 'YXZ');
+      _qb.setFromEuler(_e);
+      put(bodyL, nb++, b.x, b.y, b.z, _qb,
+        len * sp.girth, len * sp.girth, len, sp.body, b.tint);
+
+      // A sitting bird has its wings folded, which with one hinge means short
+      // and drooped. It is a cheat and it reads perfectly at fifty metres.
+      const amp = sp.amp * b.flap;
+      const fold = b.sit ? 0.32 : 1;
+      const hinge = b.sit ? -0.12 : sp.dihedral + amp * beatShape(b.ph);
+      // Feathering: the wing twists against the stroke, which is what turns a
+      // flapping board into something that is actually holding the bird up.
+      const twist = -0.42 * amp * Math.cos(b.ph);
+      const semi = sp.span * 0.5 * b.s * fold;
+      _v.set(0, len * 0.10, -len * 0.05).applyQuaternion(_qb);
+      for (const side of [1, -1]) {
+        // The left wing is the right one turned through π about the fore-aft
+        // axis: Rz(π - hinge) takes the prototype's +X tip out to port with the
+        // same dihedral, for the cost of one quaternion and no second geometry.
+        _qh.setFromAxisAngle(_zA, side > 0 ? hinge : Math.PI - hinge);
+        _qt.setFromAxisAngle(_xA, side * twist);
+        _qw.copy(_qb).multiply(_qh).multiply(_qt);
+        put(wingL, nw++, b.x + _v.x, b.y + _v.y, b.z + _v.z, _qw,
+          semi, 1, semi * sp.chord, sp.wing, b.tint);
+      }
+    }
+
+    live = nb;
+    bodyL.geo.instanceCount = nb;
+    wingL.geo.instanceCount = nw;
+    for (const L of [bodyL, wingL]) {
+      L.aPos.needsUpdate = true;
+      L.aRot.needsUpdate = true;
+      L.aScale.needsUpdate = true;
+      L.aColor.needsUpdate = true;
+    }
+  }
+
+  return {
+    update,
+    getDensity: () => density,
+    setDensity(v) { density = sat(v); setLive(); },
+    stats: () => ({ live, calls, of: flock.length }),
+  };
+}
+
 // ==== 45-trees.js ===============================================
 // -----------------------------------------------------------------------------
 // What actually burns.
@@ -6920,6 +7407,16 @@ const GROUND = {
   accel: 30,
   drag: 13,
   girth: 0.55,             // how far you are pushed back out of a wall
+  // And out of a person. The rig is 0.40 m across the shoulders with the arms
+  // hanging outside that, so 0.30 is honestly what one of them occupies and two
+  // of them keep 0.60 m between centres: close enough to hand something over,
+  // not close enough to stand inside each other. Deliberately less than `girth`,
+  // because a wall is a surface you must never be able to see through whereas a
+  // colleague is somebody you are allowed to be shoulder to shoulder with — and
+  // because it has to stay well inside the branch or being solid would stop you
+  // putting anybody out. The jet leaves the nozzle 0.55 m in front of you and
+  // catches anything within 0.62 m of its axis, so 0.60 is still point blank.
+  body: 0.30,
   turn: 2.1,               // rad/s on the arrow keys — about 120 degrees a second
 
   // The trolley pump you drag off the aeroplane. Four hundred litres at nine a
@@ -7089,7 +7586,7 @@ async function buildGround(scene, field) {
     return {
       fig, x: p[0], y: p[1], z: p[2],
       hx: 1, hz: 0, vx: 0, vz: 0,
-      mode: 'idle',              // idle | walk | alight | down | safe | lost
+      mode: 'idle',              // idle | walk | alight | down | safe | thanks | lost
       burn: 0, wet: 0, timer: 0, gait: rng() * 6.28, seed: rng(), id: i,
       shouted: false,
       // Where this one is heading and how long before they think of somewhere
@@ -7135,6 +7632,40 @@ async function buildGround(scene, field) {
     }
     const w = field.toWorld(t, s);
     return [w[0], w[2]];
+  }
+
+  /**
+   * Somebody prone is not an obstacle. A body on the ground is 0.35 m at the
+   * shoulder — that is knee height, you step over it — and making it solid would
+   * be wrong twice over: it would hold you off the one person you have to stand
+   * over to put out, and a body that went down against a hangar would become a
+   * wedge you could be pinned behind. Anybody on their feet, or on one knee
+   * getting their breath, is a metre of person and you go round.
+   */
+  const upright = (c) => c.mode !== 'down' && c.mode !== 'lost';
+
+  /**
+   * Push a point out of everybody who is upright. World space and recomputed
+   * every frame, because these are not buildings: a person walks, so they cannot
+   * live in `field.blockers`, which is a static list of axis-aligned boxes in the
+   * runway's own axes. A person is a circle rather than a box, so it is the
+   * radius that ejects you and not the nearest face — but it is the same idea and
+   * the same one pass that confine() makes over the buildings.
+   */
+  function unbody(x, z) {
+    const r = GROUND.body * 2;
+    for (const c of crew) {
+      if (!upright(c)) continue;
+      const dx = x - c.x, dz = z - c.z;
+      const d = Math.hypot(dx, dz);
+      if (d >= r) continue;
+      // Dead centre does happen — somebody alight runs at you and gets there —
+      // so leave the way you came in rather than dividing by zero.
+      const ux = d > 1e-3 ? dx / d : Math.sin(you.yaw);
+      const uz = d > 1e-3 ? dz / d : Math.cos(you.yaw);
+      x = c.x + ux * r; z = c.z + uz * r;
+    }
+    return [x, z];
   }
 
   // ── the spot fire ──────────────────────────────────────────────────────────
@@ -7262,10 +7793,62 @@ async function buildGround(scene, field) {
     return t;
   }
 
+  /** Move `c` out of a circle of radius `r` about (ox, oz), taking `k` of the
+   *  overlap, and keep them out of the walls while doing it. */
+  function shove(c, ox, oz, r, k) {
+    const dx = c.x - ox, dz = c.z - oz;
+    const d = Math.hypot(dx, dz);
+    if (d >= r) return;
+    // Two of them handed the same start would divide by zero, so break the tie
+    // off the seed: stable across reloads, and different for each of them.
+    const a = d > 1e-3 ? Math.atan2(dz, dx) : c.seed * TAU;
+    const push = (r - d) * k;
+    const [nx, nz] = confine(c.x + Math.cos(a) * push, c.z + Math.sin(a) * push);
+    c.x = nx; c.z = nz;
+  }
+
+  /**
+   * Nobody stands inside anybody else. The muster gives each of them their own
+   * offset to walk to, which spreads the destinations but does nothing about the
+   * walk there, and two figures interpenetrating is the fastest way for a crowd
+   * to stop reading as people.
+   *
+   * This is also the *only* thing that resolves a person against the player, and
+   * that asymmetry is the point. Being solid has to be able to block: cornering
+   * somebody whose kit is alight and standing in their way is a real rescue and
+   * it should work. But it must never shove the player into a wall or hold them
+   * there, and the cheapest guarantee of that is that the player's position is
+   * only ever changed by the player's own input. So you stop them; they do not
+   * move you.
+   *
+   * One pass over each other. Pushing A off B can leave A touching C, and at
+   * 0.6 m and thirty frames a second the next pass has it long before anybody
+   * could see it. The player is a second pass and comes last, because a pair
+   * settling between themselves can put one of them back inside you and there is
+   * nothing after this to take it out again.
+   */
+  function jostle() {
+    const r = GROUND.body * 2;
+    for (let i = 0; i < crew.length; i++) {
+      const a = crew[i];
+      if (!upright(a)) continue;
+      for (let k = i + 1; k < crew.length; k++) {
+        const b = crew[k];
+        if (!upright(b)) continue;
+        // Half the overlap each, both measured from where the other one was, or
+        // whichever of them is earlier in the array gets to keep its ground.
+        const ax = a.x, az = a.z;
+        shove(a, b.x, b.z, r, 0.5);
+        shove(b, ax, az, r, 0.5);
+      }
+    }
+    if (active) for (const c of crew) if (upright(c)) shove(c, you.x, you.z, r, 1);
+  }
+
   function updateCrew(dt) {
     for (const c of crew) {
       c.speed = 0;
-      if (c.mode === 'lost') { poseFigure(c); continue; }
+      if (c.mode === 'lost') continue;
 
       // Catching. You have to be genuinely in it — standing in a burning cell,
       // or within about three metres of something alight. Anything looser and
@@ -7431,6 +8014,12 @@ async function buildGround(scene, field) {
         c.gait += speed * dt * 2.9;
       }
       c.speed = speed;
+    }
+    // Everybody has moved; now nobody is standing in anybody. Posing is a
+    // separate pass because it reads the final position — pose in the same loop
+    // and whoever is jostled afterwards is drawn a frame behind where they are.
+    jostle();
+    for (const c of crew) {
       c.y = field.walkY(c.x, c.z);
       poseFigure(c);
     }
@@ -7825,12 +8414,21 @@ async function buildGround(scene, field) {
     you.vz = damp(you.vz, wz, m > 0.01 ? GROUND.accel / top : GROUND.drag, dt);
 
     const tx = you.x + you.vx * dt, tz = you.z + you.vz * dt;
-    const [nx, nz] = confine(tx, tz);
-    // Kill the velocity only if confine() actually moved us. The tolerance is
-    // for the world -> runway-local -> world round trip inside it, which is
-    // exact in theory and a few parts in 10^12 in practice.
-    if (Math.abs(nx - tx) > 1e-4) you.vx = 0;
-    if (Math.abs(nz - tz) > 1e-4) you.vz = 0;
+    // People first, walls second, so that the wall has the last word. Somebody
+    // standing against a hangar can then hold you against it but never push you
+    // through it, and a hold is something you can always walk sideways out of.
+    const [bx, bz] = unbody(tx, tz);
+    const [nx, nz] = confine(bx, bz);
+    // Kill the velocity only if confine() actually moved us — measured against
+    // what confine() was given, not against where the step wanted to go, or a
+    // person would stop you dead as well. That is the other half of not being
+    // sticky: the push out of somebody is purely radial, so whatever part of
+    // your speed runs along them survives it and you slide round rather than
+    // grinding to a halt on a shoulder. The tolerance is for the world ->
+    // runway-local -> world round trip inside confine(), which is exact in
+    // theory and a few parts in 10^12 in practice.
+    if (Math.abs(nx - bx) > 1e-4) you.vx = 0;
+    if (Math.abs(nz - bz) > 1e-4) you.vz = 0;
     you.x = nx; you.z = nz;
     you.y = field.walkY(you.x, you.z);
   }
@@ -7943,7 +8541,9 @@ async function buildGround(scene, field) {
     // puts the camera inside the aeroplane rather than beside it.
     const sx = flight.p.pos.x - right.x * 17 - fwd.x * 7;
     const sz = flight.p.pos.z - right.z * 17 - fwd.z * 7;
-    const [px2, pz2] = confine(sx, sz);
+    // And not on top of whoever happened to be standing on that patch of apron.
+    const [bx, bz] = unbody(sx, sz);
+    const [px2, pz2] = confine(bx, bz);
     you.x = px2; you.z = pz2;
     you.y = field.walkY(you.x, you.z);
     you.vx = you.vz = 0;
@@ -8025,6 +8625,22 @@ async function buildGround(scene, field) {
       const [px2, pz2] = confine(x, z);
       you.x = px2; you.z = pz2; you.y = field.walkY(px2, pz2);
       you.yaw = yaw; you.pitch = pitch;
+    },
+    /**
+     * For the screenshot tool: the nearest person, and the separation being
+     * enforced against them. `d` below `min` means you are standing inside
+     * somebody, which is the whole thing this is here to catch; `min` of zero is
+     * somebody prone, whom you are supposed to be able to stand over.
+     */
+    nearestBody() {
+      let best = null;
+      for (const c of crew) {
+        const d = Math.hypot(c.x - you.x, c.z - you.z);
+        if (best && d >= best.d) continue;
+        best = { i: c.id, mode: c.mode, d: +d.toFixed(3),
+          min: upright(c) ? +(GROUND.body * 2).toFixed(3) : 0 };
+      }
+      return best;
     },
     /** Stand eight metres off the nearest fire and point the branch at it. */
     aimAt(kind) {
@@ -10582,7 +11198,8 @@ function buildAudio() {
   }
 
   /** Short shaped noise burst — crackle, splash, squelch. */
-  function burst({ freq = 1400, q = 1.0, dur = 0.14, gain = 0.2, type = 'bandpass', sweep = 0 }) {
+  function burst({ freq = 1400, q = 1.0, dur = 0.14, gain = 0.2, type = 'bandpass', sweep = 0,
+    dest = null }) {
     if (!ctx) return;
     const src = ctx.createBufferSource();
     src.buffer = noiseBuf;
@@ -10596,7 +11213,7 @@ function buildAudio() {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(gain, t + Math.min(0.02, dur * 0.2));
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    src.connect(f).connect(g).connect(master);
+    src.connect(f).connect(g).connect(dest || master);
     src.start(t);
     src.stop(t + dur + 0.02);
   }
@@ -11036,6 +11653,101 @@ function buildAudio() {
     cicadaNodes = { src, g };
   }
 
+  /**
+   * One syllable of a bird: a swept tone through a formant that follows it,
+   * roughened by chopping the amplitude. The sweep is the shape of the call and
+   * the chop is its voice — and a tracking formant is what a throat does, where
+   * a fixed filter only sounds like a filter.
+   */
+  function syllable(at, { f0, f1, dur, amp, rasp = 0, raspHz = 60, form = 1.5,
+    q = 4, wave = 'sawtooth', dest }) {
+    const o = ctx.createOscillator();
+    o.type = wave;
+    o.frequency.setValueAtTime(f0, at);
+    o.frequency.exponentialRampToValueAtTime(f1, at + dur);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = q;
+    bp.frequency.setValueAtTime(f0 * form, at);
+    bp.frequency.exponentialRampToValueAtTime(f1 * form, at + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(amp, at + dur * 0.10);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    if (rasp) {
+      const lfo = ctx.createOscillator();
+      lfo.type = 'square'; lfo.frequency.value = raspHz;
+      const lg = ctx.createGain(); lg.gain.value = amp * rasp;
+      lfo.connect(lg).connect(g.gain);
+      lfo.start(at); lfo.stop(at + dur + 0.05);
+    }
+    o.connect(bp).connect(g).connect(dest);
+    o.start(at); o.stop(at + dur + 0.05);
+  }
+
+  /**
+   * The three birds. Nearly all the difference between them is how deeply the
+   * tone is chopped: a yellow-legged gull's long call is a harsh falling cry,
+   * and without the chop a swept sawtooth is a slide whistle. A swift has
+   * almost no rasp and lives an octave and a half higher, which is why it reads
+   * as *thin* rather than loud. A hooded crow is the gull's rasp taken so far
+   * down that the modulation stops being a texture and becomes the note.
+   *
+   * `gap` is the silence between syllables, so a series is `dur + gap` apart —
+   * the alarms are the same voice with the gaps taken out, which is exactly
+   * what a bird that wants you gone actually does.
+   */
+  const CALLS = {
+    gull: { f0: 1180, f1: 620, dur: 0.30, amp: 0.070, rasp: 0.55, raspHz: 62,
+      form: 1.5, q: 3.5, reps: [2, 3], gap: [0.10, 0.10],
+      alarm: { f0: 1450, f1: 900, dur: 0.13, reps: [4, 5], gap: [0.03, 0.03] } },
+    swift: { f0: 5200, f1: 3500, dur: 0.36, amp: 0.028, rasp: 0.22, raspHz: 155,
+      form: 1.05, q: 7, reps: [1, 2], gap: [0.16, 0.14], air: 5600,
+      alarm: { reps: [2, 3], gap: [0.08, 0.08] } },
+    crow: { f0: 470, f1: 340, dur: 0.26, amp: 0.055, rasp: 0.85, raspHz: 74,
+      form: 2.4, q: 2.6, reps: [2, 2], gap: [0.14, 0.16],
+      alarm: { dur: 0.18, reps: [3, 4], gap: [0.06, 0.06] } },
+  };
+
+  function birdCall(kind, pan = 0, gain = 1, alarm = false) {
+    if (!ctx || dead) return;
+    const c = CALLS[kind];
+    if (!c) return;
+    const v = alarm ? { ...c, ...c.alarm } : c;
+    // Every envelope below is an exponential ramp, and an exponential ramp to
+    // zero throws. A bird right on the edge of earshot arrives here with a gain
+    // of nothing at all, so it is floored once, here, rather than at nine nodes.
+    const g0 = clamp(gain, 0.02, 1);
+    const pn = ctx.createStereoPanner();
+    pn.pan.value = clamp(pan, -1, 1);
+    pn.connect(master);
+    // Every one of these happens over water or bare limestone. Dry, they sound
+    // like a bird in the room with you.
+    if (verbSend) {
+      const w = ctx.createGain(); w.gain.value = 0.30;
+      pn.connect(w).connect(verbSend);
+    }
+
+    const n = v.reps[0] + Math.floor(Math.random() * (v.reps[1] - v.reps[0] + 1));
+    let at = ctx.currentTime;
+    for (let i = 0; i < n; i++) {
+      // Each syllable a shade lower and quieter than the one before: a bird
+      // runs out of breath down a series rather than repeating itself.
+      const k = Math.pow(0.94, i);
+      const dur = v.dur * (0.85 + Math.random() * 0.3);
+      syllable(at, {
+        f0: v.f0 * k * (0.97 + Math.random() * 0.06), f1: v.f1 * k, dur,
+        amp: v.amp * g0 * Math.pow(0.84, i),
+        rasp: v.rasp, raspHz: v.raspHz * (0.9 + Math.random() * 0.2),
+        form: v.form, q: v.q, dest: pn,
+      });
+      // A swift's scream is half air, and no amount of oscillator gets there.
+      if (v.air) {
+        burst({ freq: v.air, q: 6, dur: dur * 0.8, gain: v.amp * g0 * 1.5, dest: pn });
+      }
+      at += dur + v.gap[0] + Math.random() * v.gap[1];
+    }
+  }
+
   let stallT = 0, crackleT = 0;
 
   function update(dt, s) {
@@ -11116,7 +11828,7 @@ function buildAudio() {
 
   return { start, update, squelch, dropWhoosh, splash, beep, setVolume, getVolume,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas,
-    radalt, gpwsSink, gpwsPullUp, hullSlam, impact, kill,
+    birdCall, radalt, gpwsSink, gpwsPullUp, hullSlam, impact, kill,
     get ctx() { return ctx; } };
 }
 
@@ -11470,7 +12182,7 @@ function updateCamera(dt) {
 // ── the world ────────────────────────────────────────────────────────────────
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
-  trees, landmarks, alerts, roads, rail, props, airfield, ground;
+  trees, landmarks, alerts, roads, rail, props, airfield, ground, birds;
 
 function setSun() {
   const a = sunAngles(state.hour);
@@ -11590,6 +12302,12 @@ async function boot() {
   // drawing nearly three times the vegetation it was tuned for.
   if (IS_SMALL) trees.setDensity(0.35);
 
+  // The birds go up with the maquis because they belong to it: gulls over the
+  // channel, swifts over the roofs, crows over the karst. They cost two draws
+  // for the whole flock, so a phone gets fewer of them rather than none.
+  birds = buildBirds(scene, fire);
+  if (IS_SMALL) birds.setDensity(0.4);
+
   await step(88, 'load.plane');
   plane = buildCanadair();
   scene.add(plane.root);
@@ -11694,6 +12412,9 @@ const SETTINGS = [
     fmt: (v) => v <= 0.001 ? T('set.off') : Math.round(v * 100) + '%' },
   { key: 'props', label: 'set.props', min: 0, max: 1, step: 0.05,
     get: () => props.getDensity(), set: (v) => props.setDensity(v),
+    fmt: (v) => v <= 0.001 ? T('set.off') : Math.round(v * 100) + '%' },
+  { key: 'birds', label: 'set.birds', min: 0, max: 1, step: 0.05,
+    get: () => birds.getDensity(), set: (v) => birds.setDensity(v),
     fmt: (v) => v <= 0.001 ? T('set.off') : Math.round(v * 100) + '%' },
   { key: 'fov', label: 'set.fov', min: 45, max: 95, step: 1,
     get: () => camera.fov, set: (v) => { camera.fov = v; camera.updateProjectionMatrix(); },
@@ -12265,6 +12986,9 @@ function frame() {
 
   terrain.update(camera, frustum);
   trees.update(dt, camera.position);
+  // After camera.updateMatrixWorld() above, which this depends on: the calls are
+  // panned by projecting each bird on to the camera's right axis.
+  birds.update(dt, camera, flight.p.pos);
   props.update(dt);
   rail.update(dt);
   sea.update(camera);
@@ -12409,6 +13133,7 @@ window.__fr = {
       lineKm: +rail.lineKm.toFixed(2), tris: Math.round(rail.tris) } : null,
     ground: ground ? ground.stats() : null,
     props: props ? props.counts : null,
+    birds: birds ? birds.stats() : null,
     water: Math.round(flight ? flight.p.water : 0),
     wingmen: wingmen ? wingmen.debug() : null,
     runs: wingmen ? wingmen.runCount() : 0,
@@ -12435,6 +13160,30 @@ window.__fr = {
   key: (code, down = true) => dispatchEvent(
     new KeyboardEvent(down ? 'keydown' : 'keyup', { code })),
   skipIntro: () => beginFlight(),
+  /**
+   * The land itself, for anything that has to be sited against real ground
+   * rather than dropped at a guessed height. Everything in the bundle shares one
+   * lexical scope and none of it is on `window`, so a test that wants to know
+   * whether a point is in the sea has no way to ask without this.
+   */
+  land: {
+    at: (x, z) => groundAt(x, z),
+    sea: (x, z) => isSea(x, z),
+    place: (name) => placeNamed(name),
+    /** A coarse height/sea grid, which is the only readable way to see a shore. */
+    grid: (x0, z0, step, nx, nz) => {
+      const rows = [];
+      for (let i = 0; i < nx; i++) {
+        const x = x0 + i * step, row = [];
+        for (let k = 0; k < nz; k++) {
+          const z = z0 + k * step;
+          row.push(isSea(x, z) ? '~~~' : String(Math.round(groundAt(x, z))).padStart(3));
+        }
+        rows.push(Math.round(x) + ' | ' + row.join(' '));
+      }
+      return rows;
+    },
+  },
   /**
    * Drive the ground mission from a test without flying an approach first.
    * `arm` lights the field, `foot` puts you out on it, `look`/`walk`/`jet` are

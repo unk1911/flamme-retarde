@@ -347,7 +347,7 @@ function updateCamera(dt) {
 // ── the world ────────────────────────────────────────────────────────────────
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
-  trees, landmarks, alerts, roads, rail, props, airfield, ground;
+  trees, landmarks, alerts, roads, rail, props, airfield, ground, birds;
 
 function setSun() {
   const a = sunAngles(state.hour);
@@ -467,6 +467,12 @@ async function boot() {
   // drawing nearly three times the vegetation it was tuned for.
   if (IS_SMALL) trees.setDensity(0.35);
 
+  // The birds go up with the maquis because they belong to it: gulls over the
+  // channel, swifts over the roofs, crows over the karst. They cost two draws
+  // for the whole flock, so a phone gets fewer of them rather than none.
+  birds = buildBirds(scene, fire);
+  if (IS_SMALL) birds.setDensity(0.4);
+
   await step(88, 'load.plane');
   plane = buildCanadair();
   scene.add(plane.root);
@@ -571,6 +577,9 @@ const SETTINGS = [
     fmt: (v) => v <= 0.001 ? T('set.off') : Math.round(v * 100) + '%' },
   { key: 'props', label: 'set.props', min: 0, max: 1, step: 0.05,
     get: () => props.getDensity(), set: (v) => props.setDensity(v),
+    fmt: (v) => v <= 0.001 ? T('set.off') : Math.round(v * 100) + '%' },
+  { key: 'birds', label: 'set.birds', min: 0, max: 1, step: 0.05,
+    get: () => birds.getDensity(), set: (v) => birds.setDensity(v),
     fmt: (v) => v <= 0.001 ? T('set.off') : Math.round(v * 100) + '%' },
   { key: 'fov', label: 'set.fov', min: 45, max: 95, step: 1,
     get: () => camera.fov, set: (v) => { camera.fov = v; camera.updateProjectionMatrix(); },
@@ -1142,6 +1151,9 @@ function frame() {
 
   terrain.update(camera, frustum);
   trees.update(dt, camera.position);
+  // After camera.updateMatrixWorld() above, which this depends on: the calls are
+  // panned by projecting each bird on to the camera's right axis.
+  birds.update(dt, camera, flight.p.pos);
   props.update(dt);
   rail.update(dt);
   sea.update(camera);
@@ -1286,6 +1298,7 @@ window.__fr = {
       lineKm: +rail.lineKm.toFixed(2), tris: Math.round(rail.tris) } : null,
     ground: ground ? ground.stats() : null,
     props: props ? props.counts : null,
+    birds: birds ? birds.stats() : null,
     water: Math.round(flight ? flight.p.water : 0),
     wingmen: wingmen ? wingmen.debug() : null,
     runs: wingmen ? wingmen.runCount() : 0,
@@ -1312,6 +1325,30 @@ window.__fr = {
   key: (code, down = true) => dispatchEvent(
     new KeyboardEvent(down ? 'keydown' : 'keyup', { code })),
   skipIntro: () => beginFlight(),
+  /**
+   * The land itself, for anything that has to be sited against real ground
+   * rather than dropped at a guessed height. Everything in the bundle shares one
+   * lexical scope and none of it is on `window`, so a test that wants to know
+   * whether a point is in the sea has no way to ask without this.
+   */
+  land: {
+    at: (x, z) => groundAt(x, z),
+    sea: (x, z) => isSea(x, z),
+    place: (name) => placeNamed(name),
+    /** A coarse height/sea grid, which is the only readable way to see a shore. */
+    grid: (x0, z0, step, nx, nz) => {
+      const rows = [];
+      for (let i = 0; i < nx; i++) {
+        const x = x0 + i * step, row = [];
+        for (let k = 0; k < nz; k++) {
+          const z = z0 + k * step;
+          row.push(isSea(x, z) ? '~~~' : String(Math.round(groundAt(x, z))).padStart(3));
+        }
+        rows.push(Math.round(x) + ' | ' + row.join(' '));
+      }
+      return rows;
+    },
+  },
   /**
    * Drive the ground mission from a test without flying an approach first.
    * `arm` lights the field, `foot` puts you out on it, `look`/`walk`/`jet` are

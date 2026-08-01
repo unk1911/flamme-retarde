@@ -189,7 +189,8 @@ function buildAudio() {
   }
 
   /** Short shaped noise burst — crackle, splash, squelch. */
-  function burst({ freq = 1400, q = 1.0, dur = 0.14, gain = 0.2, type = 'bandpass', sweep = 0 }) {
+  function burst({ freq = 1400, q = 1.0, dur = 0.14, gain = 0.2, type = 'bandpass', sweep = 0,
+    dest = null }) {
     if (!ctx) return;
     const src = ctx.createBufferSource();
     src.buffer = noiseBuf;
@@ -203,7 +204,7 @@ function buildAudio() {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(gain, t + Math.min(0.02, dur * 0.2));
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    src.connect(f).connect(g).connect(master);
+    src.connect(f).connect(g).connect(dest || master);
     src.start(t);
     src.stop(t + dur + 0.02);
   }
@@ -643,6 +644,101 @@ function buildAudio() {
     cicadaNodes = { src, g };
   }
 
+  /**
+   * One syllable of a bird: a swept tone through a formant that follows it,
+   * roughened by chopping the amplitude. The sweep is the shape of the call and
+   * the chop is its voice — and a tracking formant is what a throat does, where
+   * a fixed filter only sounds like a filter.
+   */
+  function syllable(at, { f0, f1, dur, amp, rasp = 0, raspHz = 60, form = 1.5,
+    q = 4, wave = 'sawtooth', dest }) {
+    const o = ctx.createOscillator();
+    o.type = wave;
+    o.frequency.setValueAtTime(f0, at);
+    o.frequency.exponentialRampToValueAtTime(f1, at + dur);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = q;
+    bp.frequency.setValueAtTime(f0 * form, at);
+    bp.frequency.exponentialRampToValueAtTime(f1 * form, at + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(amp, at + dur * 0.10);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    if (rasp) {
+      const lfo = ctx.createOscillator();
+      lfo.type = 'square'; lfo.frequency.value = raspHz;
+      const lg = ctx.createGain(); lg.gain.value = amp * rasp;
+      lfo.connect(lg).connect(g.gain);
+      lfo.start(at); lfo.stop(at + dur + 0.05);
+    }
+    o.connect(bp).connect(g).connect(dest);
+    o.start(at); o.stop(at + dur + 0.05);
+  }
+
+  /**
+   * The three birds. Nearly all the difference between them is how deeply the
+   * tone is chopped: a yellow-legged gull's long call is a harsh falling cry,
+   * and without the chop a swept sawtooth is a slide whistle. A swift has
+   * almost no rasp and lives an octave and a half higher, which is why it reads
+   * as *thin* rather than loud. A hooded crow is the gull's rasp taken so far
+   * down that the modulation stops being a texture and becomes the note.
+   *
+   * `gap` is the silence between syllables, so a series is `dur + gap` apart —
+   * the alarms are the same voice with the gaps taken out, which is exactly
+   * what a bird that wants you gone actually does.
+   */
+  const CALLS = {
+    gull: { f0: 1180, f1: 620, dur: 0.30, amp: 0.070, rasp: 0.55, raspHz: 62,
+      form: 1.5, q: 3.5, reps: [2, 3], gap: [0.10, 0.10],
+      alarm: { f0: 1450, f1: 900, dur: 0.13, reps: [4, 5], gap: [0.03, 0.03] } },
+    swift: { f0: 5200, f1: 3500, dur: 0.36, amp: 0.028, rasp: 0.22, raspHz: 155,
+      form: 1.05, q: 7, reps: [1, 2], gap: [0.16, 0.14], air: 5600,
+      alarm: { reps: [2, 3], gap: [0.08, 0.08] } },
+    crow: { f0: 470, f1: 340, dur: 0.26, amp: 0.055, rasp: 0.85, raspHz: 74,
+      form: 2.4, q: 2.6, reps: [2, 2], gap: [0.14, 0.16],
+      alarm: { dur: 0.18, reps: [3, 4], gap: [0.06, 0.06] } },
+  };
+
+  function birdCall(kind, pan = 0, gain = 1, alarm = false) {
+    if (!ctx || dead) return;
+    const c = CALLS[kind];
+    if (!c) return;
+    const v = alarm ? { ...c, ...c.alarm } : c;
+    // Every envelope below is an exponential ramp, and an exponential ramp to
+    // zero throws. A bird right on the edge of earshot arrives here with a gain
+    // of nothing at all, so it is floored once, here, rather than at nine nodes.
+    const g0 = clamp(gain, 0.02, 1);
+    const pn = ctx.createStereoPanner();
+    pn.pan.value = clamp(pan, -1, 1);
+    pn.connect(master);
+    // Every one of these happens over water or bare limestone. Dry, they sound
+    // like a bird in the room with you.
+    if (verbSend) {
+      const w = ctx.createGain(); w.gain.value = 0.30;
+      pn.connect(w).connect(verbSend);
+    }
+
+    const n = v.reps[0] + Math.floor(Math.random() * (v.reps[1] - v.reps[0] + 1));
+    let at = ctx.currentTime;
+    for (let i = 0; i < n; i++) {
+      // Each syllable a shade lower and quieter than the one before: a bird
+      // runs out of breath down a series rather than repeating itself.
+      const k = Math.pow(0.94, i);
+      const dur = v.dur * (0.85 + Math.random() * 0.3);
+      syllable(at, {
+        f0: v.f0 * k * (0.97 + Math.random() * 0.06), f1: v.f1 * k, dur,
+        amp: v.amp * g0 * Math.pow(0.84, i),
+        rasp: v.rasp, raspHz: v.raspHz * (0.9 + Math.random() * 0.2),
+        form: v.form, q: v.q, dest: pn,
+      });
+      // A swift's scream is half air, and no amount of oscillator gets there.
+      if (v.air) {
+        burst({ freq: v.air, q: 6, dur: dur * 0.8, gain: v.amp * g0 * 1.5, dest: pn });
+      }
+      at += dur + v.gap[0] + Math.random() * v.gap[1];
+    }
+  }
+
   let stallT = 0, crackleT = 0;
 
   function update(dt, s) {
@@ -723,6 +819,6 @@ function buildAudio() {
 
   return { start, update, squelch, dropWhoosh, splash, beep, setVolume, getVolume,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas,
-    radalt, gpwsSink, gpwsPullUp, hullSlam, impact, kill,
+    birdCall, radalt, gpwsSink, gpwsPullUp, hullSlam, impact, kill,
     get ctx() { return ctx; } };
 }

@@ -33,7 +33,7 @@ is a real footprint.
 | `F` / left click | drop |
 | `shift` | flaps |
 | `C` | camera — chase, close, cockpit, wing |
-| `M` | settings — language, stability assist, volume, vegetation, traffic, FOV, exposure |
+| `M` | settings — language, stability assist, volume, vegetation, traffic, birds, FOV, exposure |
 | `G` | gear — you need it down to land at Rokići |
 | `E` | **get out** — on the ground at Rokići, with the field alight |
 | `0` | **skip straight to Rokići, on foot** — the back door, see below |
@@ -73,6 +73,13 @@ in the world is solid: the town is thirteen thousand extruded OSM footprints
 whose heights were guessed from their outlines, and making those solid would
 turn every low pass over Šibenik into a crash on a building that was never
 really there.
+
+People are solid too, on foot. Anybody on their feet holds you off at sixty
+centimetres; anybody who is down does not, because a body on the ground is knee
+height and you have to be able to stand over the person you are putting out. You
+are never displaced by a person — only your own input moves you — so a burning
+runner can be cornered and held, and sixty centimetres is point blank for the
+branch, but a crowd can never shove you into a wall.
 
 What is on the other side of it is a different game: a branch instead of six
 tonnes, a jet that reaches twenty metres instead of a drop that covers two
@@ -183,6 +190,15 @@ standing in a burning cell is a tree standing in a burning cell — it chars and
 shrinks as its cell's fuel goes. Aleppo pine, cypress, olive and maquis scrub,
 generated per 512 m tile from a positional hash so a tree is always in the same
 place, repacked into four instance buffers.
+
+**There are gulls, swifts and hooded crows**, which on this coast in August is
+the honest list. They fly differently from one another in the ways you would
+notice from a boat — the gulls soar and wheel and a third of them are sitting on
+the water, the swifts flicker around the roofs of the old town, the crows beat
+steadily inland — and they react: a Canadair at ninety metres a second puts
+everything within two hundred up off the water, and nothing stays over a cell
+that is alight. Their calls are synthesised the same way the cicadas are and
+panned by where the bird actually is. The whole flock is two instanced draws.
 
 **The five landmarks are modelled in Blender** — St James' Cathedral, the
 fortress of St Nicholas, the fortress of St Michael, the Jadrija lighthouse, and
