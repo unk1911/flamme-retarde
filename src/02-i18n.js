@@ -53,6 +53,7 @@ const STRINGS = {
       + 'off in the August heat. The hillside above <b>Jadrija</b> is alight and '
       + 'the <i>lebić</i> is pushing it at the old town. You are one of four.',
     'veil.enter': 'Take off',
+    'veil.watch': 'Watch the intro',
     'veil.hint': 'mouse or arrows to fly &nbsp;·&nbsp; W/S throttle &nbsp;·&nbsp; '
       + 'SPACE scoops &nbsp;·&nbsp; F drops<br><b>Z</b> levels the wings '
       + '&nbsp;·&nbsp; <b>T</b> autopilot &nbsp;·&nbsp; <b>M</b> settings',
@@ -289,6 +290,7 @@ const STRINGS = {
       + 'kolovoškoj vrućini. Brdo iznad <b>Jadrije</b> gori, a <i>lebić</i> ga '
       + 'gura prema starom gradu. Ti si jedan od četvorice.',
     'veil.enter': 'Polijetanje',
+    'veil.watch': 'Pogledaj uvod',
     'veil.hint': 'miš ili strelice za let &nbsp;·&nbsp; W/S gas &nbsp;·&nbsp; '
       + 'SPACE zahvaća &nbsp;·&nbsp; F izbacuje<br><b>Z</b> poravnava krila '
       + '&nbsp;·&nbsp; <b>T</b> autopilot &nbsp;·&nbsp; <b>M</b> postavke',
@@ -510,6 +512,7 @@ const STRINGS = {
       + 'brûle, et le <i>lebić</i> la pousse vers la vieille ville. Vous êtes '
       + 'l\'un des quatre.',
     'veil.enter': 'Décollage',
+    'veil.watch': 'Voir l\'intro',
     'veil.hint': 'souris ou flèches pour voler &nbsp;·&nbsp; W/S gaz &nbsp;·&nbsp; '
       + 'ESPACE écope &nbsp;·&nbsp; F largue<br><b>Z</b> remet les ailes à plat '
       + '&nbsp;·&nbsp; <b>T</b> pilote auto &nbsp;·&nbsp; <b>M</b> réglages',

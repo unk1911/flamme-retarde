@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.12.0">
+<meta name="version" content="1.12.1">
 <meta name="build-date" content="2026-08-02">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -173,6 +173,18 @@ button {
   background: #fff; transform: translateY(-1px);
   box-shadow: 0 10px 34px -8px rgba(255, 139, 61, .75);
 }
+
+/* The second way in. Same shape as the take-off button and half its weight,
+   because it is the one you want on a second visit, not the one you want. */
+#watch {
+  display: block; margin: .9rem auto 0; padding: .5rem 1.6rem;
+  font-family: var(--mono); font-size: .62rem;
+  letter-spacing: .26em; text-transform: uppercase;
+  color: #7b8d94; background: none;
+  border: 1px solid rgba(123, 141, 148, .32); border-radius: 1px;
+  transition: color .2s ease, border-color .2s ease;
+}
+#watch:hover { color: var(--sea); border-color: var(--sea-dim); }
 
 .hint {
   margin-top: 1.4rem; font-family: var(--mono); font-size: .64rem;
@@ -953,6 +965,7 @@ html.touch .row input[type=range] { height: 22px; }
   .bar { margin-top: .9rem; }
   #stage { margin-top: .5rem; font-size: .56rem; letter-spacing: .18em; }
   #enter, #again { margin-top: .9rem; padding: .62rem 1.9rem; font-size: .68rem; }
+  #watch { margin-top: .55rem; padding: .42rem 1.2rem; font-size: .54rem; }
   .hint { margin-top: .7rem; font-size: .54rem; line-height: 1.7; }
   /* Out of the corner and into the flow, so it cannot land on the button. */
   .credit { position: static; margin-top: 1.1rem; font-size: .5rem; }
@@ -985,19 +998,26 @@ html.touch .row input[type=range] { height: 22px; }
     <div class="bar"><i id="bar-fill"></i></div>
     <div id="stage" data-i18n="load.warm">warming the engines</div>
     <button id="enter" hidden data-i18n="veil.enter">Take off</button>
+    <!-- Only appears once the cinematic has been seen: on a first visit "Take
+         off" plays it, so offering it twice would be noise. After that the
+         button goes straight to the aeroplane and this is how you get the
+         cinematic back. -->
+    <button id="watch" hidden data-i18n="veil.watch">Watch the intro</button>
     <p class="hint" id="hint" hidden></p>
   </div>
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.12.0, built 2026-08-02">
-    <b>v1.12.0</b><i>·</i><span>2026-08-02</span>
+  <div id="build" title="Flamme Retardé 1.12.1, built 2026-08-02">
+    <b>v1.12.1</b><i>·</i><span>2026-08-02</span>
   </div>
   <footer class="credit">
-    <span>eDeliverables (2026)</span><i>·</i>
+    <a class="src" href="https://edeliverables.com" target="_blank"
+       rel="noopener">eDeliverables (2026)</a><i>·</i>
     <span data-i18n-html="veil.credit"></span><i>·</i>
     <a class="src" href="https://github.com/unk1911/flamme-retarde" target="_blank" rel="noopener"
-       data-i18n-html="veil.src">source on GitHub &#8599;</a>
+       data-i18n-html="veil.src">source on GitHub &#8599;</a><i>·</i>
+    <a class="src" href="mailto:dolphin@edeliverables.com">dolphin@edeliverables.com</a>
   </footer>
 </div>
 
@@ -1200,7 +1220,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.12.0", date: "2026-08-02" };</script>
+<script>const BUILD = { v: "1.12.1", date: "2026-08-02" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -1860,6 +1880,7 @@ const STRINGS = {
       + 'off in the August heat. The hillside above <b>Jadrija</b> is alight and '
       + 'the <i>lebić</i> is pushing it at the old town. You are one of four.',
     'veil.enter': 'Take off',
+    'veil.watch': 'Watch the intro',
     'veil.hint': 'mouse or arrows to fly &nbsp;·&nbsp; W/S throttle &nbsp;·&nbsp; '
       + 'SPACE scoops &nbsp;·&nbsp; F drops<br><b>Z</b> levels the wings '
       + '&nbsp;·&nbsp; <b>T</b> autopilot &nbsp;·&nbsp; <b>M</b> settings',
@@ -2096,6 +2117,7 @@ const STRINGS = {
       + 'kolovoškoj vrućini. Brdo iznad <b>Jadrije</b> gori, a <i>lebić</i> ga '
       + 'gura prema starom gradu. Ti si jedan od četvorice.',
     'veil.enter': 'Polijetanje',
+    'veil.watch': 'Pogledaj uvod',
     'veil.hint': 'miš ili strelice za let &nbsp;·&nbsp; W/S gas &nbsp;·&nbsp; '
       + 'SPACE zahvaća &nbsp;·&nbsp; F izbacuje<br><b>Z</b> poravnava krila '
       + '&nbsp;·&nbsp; <b>T</b> autopilot &nbsp;·&nbsp; <b>M</b> postavke',
@@ -2317,6 +2339,7 @@ const STRINGS = {
       + 'brûle, et le <i>lebić</i> la pousse vers la vieille ville. Vous êtes '
       + 'l\'un des quatre.',
     'veil.enter': 'Décollage',
+    'veil.watch': 'Voir l\'intro',
     'veil.hint': 'souris ou flèches pour voler &nbsp;·&nbsp; W/S gaz &nbsp;·&nbsp; '
       + 'ESPACE écope &nbsp;·&nbsp; F largue<br><b>Z</b> remet les ailes à plat '
       + '&nbsp;·&nbsp; <b>T</b> pilote auto &nbsp;·&nbsp; <b>M</b> réglages',
@@ -14588,6 +14611,7 @@ async function boot() {
 
   await step(100, 'load.ready');
   $('enter').hidden = false;
+  $('watch').hidden = !introSeen();
   $('hint').hidden = false;
 }
 
@@ -15462,16 +15486,50 @@ function frame() {
   lastFrameMs = now;
 }
 
-$('enter').addEventListener('click', () => {
+// The cinematic is thirty seconds long and it is the same thirty seconds every
+// time. Worth watching once; an obstacle on the fourth attempt at the same
+// fire. So it is remembered: the first visit gets it off the take-off button,
+// and after that the button goes straight to the aeroplane and the cinematic
+// has its own, quieter one. Remembered in localStorage rather than for the tab,
+// because a second tab is not a second first impression.
+//
+// localStorage throws outright on file:// in Chrome and in some private modes,
+// which is exactly how this build is often opened, so neither call may be
+// trusted to return. Failing closed means the intro plays — the old behaviour.
+const SEEN_KEY = 'fr.introSeen';
+
+function introSeen() {
+  try { return localStorage.getItem(SEEN_KEY) === '1'; } catch (e) { return false; }
+}
+
+function markIntroSeen() {
+  try { localStorage.setItem(SEEN_KEY, '1'); } catch (e) { /* nothing to do */ }
+}
+
+function leaveVeil() {
   $('veil').classList.add('gone');
   started = true;
   audio.start();
   camPos.copy(flight.p.pos);
   camAim.copy(flight.p.pos);
+}
+
+$('enter').addEventListener('click', () => {
+  const seen = introSeen();
+  leaveVeil();
+  if (seen) beginFlight();
+  else playIntro();
+});
+
+$('watch').addEventListener('click', () => {
+  leaveVeil();
   playIntro();
 });
 
 function playIntro() {
+  // Skipping counts as having seen it. Someone who pressed skip is the last
+  // person who wants it again next time.
+  markIntroSeen();
   if (location.search.includes('nointro')) { beginFlight(); return; }
   $('cine').hidden = false;
   requestAnimationFrame(() => $('cine').classList.add('open'));

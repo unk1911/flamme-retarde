@@ -201,6 +201,12 @@ thumb walks, the right half of the screen is a head, and `WATER` is held.
 any time, including mid-flight. It starts in whichever of the three your
 browser asks for, and English otherwise.
 
+**The cinematic plays once.** The first time you open the game, **Take off**
+plays it, because that is what it is for. After that the button goes straight to
+the aeroplane and a **Watch the intro** button appears beside it, so a fourth
+attempt at the same fire is not a fourth viewing of the same thirty seconds.
+Remembered in `localStorage`; skipping it counts as having watched it.
+
 `?nointro` skips the cinematic. `?ground` starts you on foot at Rokići with the
 apron alight. `?q=low|mid|high` forces a detail level. `?touch` / `?notouch`
 force the control scheme.

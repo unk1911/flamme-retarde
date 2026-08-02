@@ -538,6 +538,7 @@ async function boot() {
 
   await step(100, 'load.ready');
   $('enter').hidden = false;
+  $('watch').hidden = !introSeen();
   $('hint').hidden = false;
 }
 
@@ -1412,16 +1413,50 @@ function frame() {
   lastFrameMs = now;
 }
 
-$('enter').addEventListener('click', () => {
+// The cinematic is thirty seconds long and it is the same thirty seconds every
+// time. Worth watching once; an obstacle on the fourth attempt at the same
+// fire. So it is remembered: the first visit gets it off the take-off button,
+// and after that the button goes straight to the aeroplane and the cinematic
+// has its own, quieter one. Remembered in localStorage rather than for the tab,
+// because a second tab is not a second first impression.
+//
+// localStorage throws outright on file:// in Chrome and in some private modes,
+// which is exactly how this build is often opened, so neither call may be
+// trusted to return. Failing closed means the intro plays — the old behaviour.
+const SEEN_KEY = 'fr.introSeen';
+
+function introSeen() {
+  try { return localStorage.getItem(SEEN_KEY) === '1'; } catch (e) { return false; }
+}
+
+function markIntroSeen() {
+  try { localStorage.setItem(SEEN_KEY, '1'); } catch (e) { /* nothing to do */ }
+}
+
+function leaveVeil() {
   $('veil').classList.add('gone');
   started = true;
   audio.start();
   camPos.copy(flight.p.pos);
   camAim.copy(flight.p.pos);
+}
+
+$('enter').addEventListener('click', () => {
+  const seen = introSeen();
+  leaveVeil();
+  if (seen) beginFlight();
+  else playIntro();
+});
+
+$('watch').addEventListener('click', () => {
+  leaveVeil();
   playIntro();
 });
 
 function playIntro() {
+  // Skipping counts as having seen it. Someone who pressed skip is the last
+  // person who wants it again next time.
+  markIntroSeen();
   if (location.search.includes('nointro')) { beginFlight(); return; }
   $('cine').hidden = false;
   requestAnimationFrame(() => $('cine').classList.add('open'));

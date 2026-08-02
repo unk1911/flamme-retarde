@@ -8,6 +8,26 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.12.1] — 2026-08-02
+
+### Changed — the cinematic is opt-in after the first time
+
+The intro is thirty seconds, and it is the same thirty seconds on the fourth
+attempt at the same fire. **Take off** now goes straight to the aeroplane once
+you have seen it, and a second, quieter **Watch the intro** button appears
+beside it for when you want it back.
+
+The first visit is unchanged: no button, and **Take off** plays the cinematic,
+because once is the point of it. It is remembered in `localStorage` rather than
+per tab — a second tab is not a second first impression — and skipping counts as
+having seen it. Storage that throws (`file://` in Chrome, some private modes)
+falls back to playing it, which is the old behaviour.
+
+### Added — a way to reach us from the title screen
+
+The footer credit is a link to [edeliverables.com](https://edeliverables.com),
+and there is a `dolphin@edeliverables.com` mail link next to the source link.
+
 ## [1.12.0] — 2026-08-02
 
 ### Added — the houses behind the promenade

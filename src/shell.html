@@ -27,6 +27,11 @@
     <div class="bar"><i id="bar-fill"></i></div>
     <div id="stage" data-i18n="load.warm">warming the engines</div>
     <button id="enter" hidden data-i18n="veil.enter">Take off</button>
+    <!-- Only appears once the cinematic has been seen: on a first visit "Take
+         off" plays it, so offering it twice would be noise. After that the
+         button goes straight to the aeroplane and this is how you get the
+         cinematic back. -->
+    <button id="watch" hidden data-i18n="veil.watch">Watch the intro</button>
     <p class="hint" id="hint" hidden></p>
   </div>
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
@@ -36,10 +41,12 @@
     <b>v{{VERSION}}</b><i>·</i><span>{{BUILD_DATE}}</span>
   </div>
   <footer class="credit">
-    <span>eDeliverables (2026)</span><i>·</i>
+    <a class="src" href="https://edeliverables.com" target="_blank"
+       rel="noopener">eDeliverables (2026)</a><i>·</i>
     <span data-i18n-html="veil.credit"></span><i>·</i>
     <a class="src" href="https://github.com/unk1911/flamme-retarde" target="_blank" rel="noopener"
-       data-i18n-html="veil.src">source on GitHub &#8599;</a>
+       data-i18n-html="veil.src">source on GitHub &#8599;</a><i>·</i>
+    <a class="src" href="mailto:dolphin@edeliverables.com">dolphin@edeliverables.com</a>
   </footer>
 </div>
 
