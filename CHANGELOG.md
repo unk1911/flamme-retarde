@@ -8,6 +8,56 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.12.0] — 2026-08-02
+
+### Added — the houses behind the promenade
+
+169 of the buildings at Jadrija are taken out of the town and built again from
+their own footprints. Same outlines, same heights, same roof pitch: nothing here
+invents a building that is not there.
+
+What the town builder draws is right for three hundred metres and wrong for two.
+The giveaway at eye height is not the window, it is that *nothing on the whole
+building projects* — no eave, no sill, no shutter, no plinth — so there is not
+one shadow anywhere on it and it reads as a photograph of a house rather than a
+house. So these get the things that stick out: a stone plinth, an overhanging
+pantile hip with a fascia under it, window surrounds with sills and jambs,
+shutters (two in five closed against the afternoon, which is what an August
+afternoon looks like), chimneys, air-conditioners, and a first-floor terrace with
+a railing on whichever side faces the water.
+
+They are solid, and you can walk out through the village to reach them — the
+locale now runs 135 m inland rather than 46. Every house is its own blocker.
+
+### Fixed
+
+- **Blockers can be turned.** The aerodrome never needed it, because everything
+  on it was laid out in runway axes. A village was laid out to its lanes, and a
+  house at 40° to the shore reduced to an axis-aligned box grows by half its
+  width in each direction — more than the gap to the next house, so the alleys
+  sealed. `confine` now rotates into a blocker's own frame and rotates the
+  correction back out.
+- **`local` and `toWorld` were not inverses.** `toWorld` builds a point from the
+  frame at an arc length — a station and its normal — while `local` projected on
+  to the chord between two stations, and the two disagree by the angle between
+  chord and interpolated normal. On the promenade that is centimetres. Ninety
+  metres inland, where the village is, it was 2.16 m: a walker held against a
+  wall was re-measured somewhere else the next frame. Newton on arc length lands
+  it in two iterations; mean round-trip error 0.34 m → 0.11.
+- **Being pushed out of one house pushed you into the next.** One resolution pass
+  is enough for ten hangars a wingspan apart and not for a hundred and seventy
+  houses four metres apart. Several passes now, stopping the moment one touches
+  nothing — and a guaranteed escape for the pathological case where leaving
+  either of two boxes always enters the other, which walks you out across the
+  locale to the street and then the beach, empty by construction. Standing on a
+  house centre and being ejected cleanly: 130/169 → 165/169. Walking into a
+  corner: 658/676 → 675/676.
+- **Windows were being built inside the walls.** Which of an edge's two
+  perpendiculars points outward depends on the winding of the footprint, and OSM
+  does not promise one. It is now decided per edge against the centroid. The
+  symptom was walls that had gone blank again with a few white dashes on them
+  where a 2 cm lip poked back out.
+
 ## [1.11.1] — 2026-08-02
 
 ### Fixed — open shade was nearly black

@@ -124,6 +124,12 @@ function buildCity(scene) {
   for (const b of world.town) {
     const pts = b.p;
     if (pts.length < 3) continue;
+    // Jadrija rebuilds the houses you can walk up to, with the eaves and sills
+    // and shutters this builder has no budget for across thirteen thousand of
+    // them. It claims them first, and they must not be drawn twice — two
+    // buildings on one footprint z-fight along every wall.
+    if (typeof jadrija !== 'undefined' && jadrija && jadrija.ownsBuilding
+      && jadrija.ownsBuilding(b)) continue;
 
     let cx = 0, cz = 0;
     for (const [x, z] of pts) { cx += x; cz += z; }

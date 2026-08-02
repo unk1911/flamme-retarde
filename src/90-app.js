@@ -455,6 +455,9 @@ async function boot() {
   landmarks = await buildLandmarks(scene);
 
   await step(78, 'load.city');
+  // Jadrija first: it claims the footprints it is going to rebuild in detail,
+  // and the town builder has to know about that before it draws them.
+  jadrija = buildJadrija(scene);
   city = buildCity(scene);
 
   await step(80, 'load.streets');
@@ -464,9 +467,6 @@ async function boot() {
   // a hangar does not move.
   shadow.cast(airfield.buildings);
   shadow.cast(airfield.objMesh);
-  // Jadrija before the roads, so the promenade is laid before anything is asked
-  // to route around it, and before the trees, which have to keep off it.
-  jadrija = buildJadrija(scene);
   if (jadrija) for (const m of jadrija.casters) shadow.cast(m);
   roads = buildRoads(scene);
   rail = buildRail(scene);
@@ -1487,8 +1487,8 @@ window.__fr = {
       objects: airfield.objects.length, tris: Math.round(airfield.tris),
     } : null,
     jadrija: jadrija ? {
-      shoreM: Math.round(jadrija.length), runs: jadrija.blockers.length,
-      tris: Math.round(jadrija.tris),
+      shoreM: Math.round(jadrija.length), houses: jadrija.houses,
+      blockers: jadrija.blockers.length, tris: Math.round(jadrija.tris),
       at: [Math.round(jadrija.site.x), Math.round(jadrija.site.z)],
     } : null,
     rail: rail ? { ways: rail.ways, km: +rail.km.toFixed(1), cars: rail.cars,

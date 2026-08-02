@@ -104,6 +104,18 @@ the shoulder above Jadrija and walk to the water.
 And on the Jadrija waterfront itself, you land in a place that was built to be
 stood in — see below.
 
+Once the canopy has taken air, you live. Five and a half metres a second is a
+heavy step off a wall, and the water is the August Adriatic a few hundred metres
+off a beach with three other aircraft and a lookout who all watched you go — you
+are in a lifejacket and there is a boat. Coming down in the channel loses you
+the mission, not your life. The one thing that still kills you is leaving too
+low for the cloth to open at all, and the toast says so as you go.
+
+`SPACE` is the flare and there are about two seconds of it. It is a garnish:
+you never need it, because an untouched canopy already puts you down safely.
+Sit on it and you stall the canopy and come down half again as fast, which is
+now merely undignified.
+
 ### Jadrija
 
 Four hundred metres of the real shore, hand-built rather than generated, because
@@ -119,24 +131,19 @@ them the *kabine*, the rows of little wooden changing huts that have stood on
 that shore since the 1920s and are a protected monument. They are joined side by
 side under one roofline with a door apiece, and no two are the same colour.
 
+Behind them the village: 169 real footprints, taken out of the town and built
+again with the things that stick out — a stone plinth, an overhanging pantile hip
+with a fascia under it, window surrounds with sills and jambs, shutters two in
+five of which are closed against the afternoon, chimneys, and a first-floor
+terrace on whichever side faces the water. Same outlines and heights OSM has;
+nothing invents a building that is not there.
+
 The whole resort is laid out in a frame that follows the water's edge — metres
 along the shore, metres inland — and that edge is traced from the sea mask when
 the world loads rather than typed in, so it cannot drift off the coast if the
 terrain is ever re-baked. It is the same shape of frame the aerodrome uses, which
-is what lets the on-foot mode walk here without knowing where "here" is. The huts
-are solid.
-
-Once the canopy has taken air, you live. Five and a half metres a second is a
-heavy step off a wall, and the water is the August Adriatic a few hundred metres
-off a beach with three other aircraft and a lookout who all watched you go — you
-are in a lifejacket and there is a boat. Coming down in the channel loses you
-the mission, not your life. The one thing that still kills you is leaving too
-low for the cloth to open at all, and the toast says so as you go.
-
-`SPACE` is the flare and there are about two seconds of it. It is a garnish:
-you never need it, because an untouched canopy already puts you down safely.
-Sit on it and you stall the canopy and come down half again as fast, which is
-now merely undignified.
+is what lets the on-foot mode walk here without knowing where "here" is. You can
+walk 135 m inland, and the huts and every house are solid.
 
 ### On foot
 

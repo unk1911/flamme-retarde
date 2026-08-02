@@ -251,18 +251,67 @@ async function buildGround(scene, field) {
    * and converting each one to a world-space box would be inventing a second
    * source of truth for the same rectangle.
    */
+  /** Is this locale point inside any structure? */
+  function inside(t, s) {
+    for (const b of field.blockers) {
+      const c = b.rot ? Math.cos(b.rot) : 1, sn = b.rot ? Math.sin(b.rot) : 0;
+      const dt0 = t - b.t, ds0 = s - b.s;
+      const dt = dt0 * c + ds0 * sn, ds = -dt0 * sn + ds0 * c;
+      if (Math.abs(dt) < b.a + GROUND.girth && Math.abs(ds) < b.c + GROUND.girth) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   function confine(x, z) {
     const B = field.bounds;
     let [t, s] = field.local(x, z);
     t = clamp(t, B.t0, B.t1);
     s = clamp(s, B.s0, B.s1);
-    for (const b of field.blockers) {
-      const dt = t - b.t, ds = s - b.s;
-      const ea = b.a + GROUND.girth, ec = b.c + GROUND.girth;
-      if (Math.abs(dt) >= ea || Math.abs(ds) >= ec) continue;
-      // Inside: leave by whichever face is nearest, which is what a wall does.
-      if (ea - Math.abs(dt) < ec - Math.abs(ds)) t = b.t + Math.sign(dt || 1) * ea;
-      else s = b.s + Math.sign(ds || 1) * ec;
+    // Several passes, because being pushed out of one blocker can push you into
+    // the next. On an aerodrome that never happened — ten structures, none of
+    // them within a wingspan of another — but a village is a hundred and seventy
+    // houses four metres apart, and one pass leaves you standing in a front room.
+    // It stops early the moment a pass touches nothing, which is the usual case:
+    // somebody walking into a wall overlaps exactly one box.
+    for (let pass = 0; pass < 8; pass++) {
+      let moved = false;
+      for (const b of field.blockers) {
+        // A blocker may carry its own rotation within the locale frame. The
+        // aerodrome never needs one — everything on it was laid out in runway
+        // axes — but a village was laid out to its lanes, and a house at 40° to
+        // the shore reduced to an axis-aligned box grows by half its width in
+        // each direction, which is enough to seal the alley beside it. Rotate
+        // in, clamp, rotate the correction back out.
+        const c = b.rot ? Math.cos(b.rot) : 1, sn = b.rot ? Math.sin(b.rot) : 0;
+        const dt0 = t - b.t, ds0 = s - b.s;
+        const dt = dt0 * c + ds0 * sn, ds = -dt0 * sn + ds0 * c;
+        const ea = b.a + GROUND.girth, ec = b.c + GROUND.girth;
+        if (Math.abs(dt) >= ea || Math.abs(ds) >= ec) continue;
+        // Inside: leave by whichever face is nearest, which is what a wall does.
+        let ot = dt, os = ds;
+        if (ea - Math.abs(dt) < ec - Math.abs(ds)) ot = Math.sign(dt || 1) * ea;
+        else os = Math.sign(ds || 1) * ec;
+        t = b.t + ot * c - os * sn;
+        s = b.s + ot * sn + os * c;
+        moved = true;
+      }
+      if (!moved) break;
+      t = clamp(t, B.t0, B.t1);
+      s = clamp(s, B.s0, B.s1);
+    }
+    // Last resort. Two boxes can be arranged so that leaving one by its nearest
+    // face always enters the other, and no number of passes gets you out — it is
+    // rare, it needs a parachute to land you inside a wall to reach it at all,
+    // and being stuck inside a house with no way out is the one failure here
+    // that is not survivable. So: if anything still contains you, walk out
+    // across the locale until nothing does. In a village laid out along a shore
+    // that direction is the street, and past the street the beach, which is
+    // empty by construction — so this always terminates somewhere you can stand.
+    if (inside(t, s)) {
+      const dir = s > (B.s0 + B.s1) * 0.5 ? -1 : 1;
+      for (let k = 0; k < 80 && inside(t, s); k++) s = clamp(s + dir, B.s0, B.s1);
     }
     const w = field.toWorld(t, s);
     return [w[0], w[2]];

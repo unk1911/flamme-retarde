@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.11.1">
+<meta name="version" content="1.12.0">
 <meta name="build-date" content="2026-08-02">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -990,8 +990,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.11.1, built 2026-08-02">
-    <b>v1.11.1</b><i>·</i><span>2026-08-02</span>
+  <div id="build" title="Flamme Retardé 1.12.0, built 2026-08-02">
+    <b>v1.12.0</b><i>·</i><span>2026-08-02</span>
   </div>
   <footer class="credit">
     <span>eDeliverables (2026)</span><i>·</i>
@@ -1200,7 +1200,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.11.1", date: "2026-08-02" };</script>
+<script>const BUILD = { v: "1.12.0", date: "2026-08-02" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -4116,6 +4116,12 @@ function buildCity(scene) {
   for (const b of world.town) {
     const pts = b.p;
     if (pts.length < 3) continue;
+    // Jadrija rebuilds the houses you can walk up to, with the eaves and sills
+    // and shutters this builder has no budget for across thirteen thousand of
+    // them. It claims them first, and they must not be drawn twice — two
+    // buildings on one footprint z-fight along every wall.
+    if (typeof jadrija !== 'undefined' && jadrija && jadrija.ownsBuilding
+      && jadrija.ownsBuilding(b)) continue;
 
     let cx = 0, cz = 0;
     for (const [x, z] of pts) { cx += x; cz += z; }
@@ -6208,7 +6214,7 @@ const JAD = {
   cabEave: 0.26,           // overhang
   plinth: 0.22,            // the concrete pad the rows stand on
 
-  reachIn: 46,             // how far inland you may walk before stage 2 exists
+  reachIn: 135,          // how far inland you may walk — out through the village
 };
 
 /**
@@ -6393,8 +6399,8 @@ function buildJadrija(scene) {
    * four uprights are taken from the frame at their own corners and the faces
    * are allowed to be a hair non-planar rather than being carefully unwarped.
    */
-  function boxTS(t0, t1, s0, s1, y0, y1, col, topCol) {
-    const A = W(t0, s0, y0), B = W(t1, s0, y0), C = W(t1, s1, y0), D = W(t0, s1, y0);
+  function boxIn(P, t0, t1, s0, s1, y0, y1, col, topCol) {
+    const A = P(t0, s0, y0), B = P(t1, s0, y0), C = P(t1, s1, y0), D = P(t0, s1, y0);
     const a = [A[0], y1, A[2]], q = [B[0], y1, B[2]];
     const c = [C[0], y1, C[2]], d = [D[0], y1, D[2]];
     b.quad(a, q, c, d, topCol || col);
@@ -6404,6 +6410,8 @@ function buildJadrija(scene) {
     b.quad(B, C, c, q, col);
     b.quad(D, A, a, d, col);
   }
+  const boxTS = (t0, t1, s0, s1, y0, y1, col, topCol) =>
+    boxIn(W, t0, t1, s0, s1, y0, y1, col, topCol);
 
   /** A strip of surface running the whole shore, between two inland offsets. */
   function ribbon(s0, s1, yOf, col) {
@@ -6652,6 +6660,230 @@ function buildJadrija(scene) {
     }
   }
 
+  // ── the village ────────────────────────────────────────────────────────────
+  /**
+   * The houses behind the promenade, rebuilt from their own footprints.
+   *
+   * These are real buildings — OpenStreetMap has 286 of them in this box — and
+   * the town builder already draws every one. What it draws is right for three
+   * hundred metres and wrong for two: an extruded outline, a pitched cap, and
+   * windows painted on by the facade shader as flat rectangles with no depth in
+   * them. At eye height the giveaway is not the window, it is that nothing on
+   * the whole building projects: no eave, no sill, no shutter, no plinth, so
+   * there is not one shadow anywhere on it and it reads as a photograph of a
+   * house rather than a house.
+   *
+   * So the ones you can get near are taken out of the town and built again with
+   * the things that stick out. Same footprints, same heights, same roof pitch —
+   * nothing here invents a building that is not there.
+   */
+  const HOUSE = {
+    reach: 125,          // how far inland a house is worth rebuilding
+    over: 0.42,          // eave overhang
+    win: 1.16,           // window width
+    winH: 1.42,
+    storey: 3.05,
+  };
+  const RENDER = [
+    [0.760, 0.726, 0.648], [0.800, 0.762, 0.672], [0.726, 0.688, 0.606],
+    [0.782, 0.730, 0.618], [0.742, 0.716, 0.664], [0.796, 0.740, 0.634],
+    [0.712, 0.692, 0.640],
+  ];
+  const TILE = [
+    [0.452, 0.238, 0.156], [0.505, 0.272, 0.176], [0.398, 0.212, 0.148],
+    [0.470, 0.286, 0.198], [0.428, 0.246, 0.180],
+  ];
+  const SHUT = [
+    [0.196, 0.268, 0.204], [0.235, 0.212, 0.168],
+    [0.180, 0.226, 0.262], [0.286, 0.252, 0.196],
+  ];
+  const SURR = [0.815, 0.795, 0.742];        // the painted surround round an opening
+  const PLINTH = [0.560, 0.540, 0.492];
+  const GLASS = [0.070, 0.082, 0.092];
+  const FASCIA = [0.640, 0.620, 0.575];
+
+  const vil = propBuilder();
+  const taken = new Set();
+  const houses = [];
+
+  /**
+   * One house. Walls follow the real polygon, because the silhouette is what you
+   * read at eye height; the roof and the plinth are built on the footprint's
+   * bounding box in its own principal axes, because a hip needs a rectangle and
+   * the overhang covers the difference on the handful that are L-shaped.
+   */
+  function detailHouse(poly, hTag, r) {
+    const n = poly.length;
+    let cx = 0, cz = 0;
+    for (const p of poly) { cx += p[0]; cz += p[1]; }
+    cx /= n; cz /= n;
+    const [ax, az] = principalAxis(poly, cx, cz);
+    // The cross product of these two has to come out +Y or every box built in
+    // this frame is inside out. (az, -ax) does; (-az, ax) does not.
+    const bx = az, bz = -ax;
+    const P = (u, v, y) => [cx + ax * u + bx * v, y, cz + az * u + bz * v];
+    let a0 = 1e9, a1 = -1e9, v0 = 1e9, v1 = -1e9, gLo = 1e9, gHi = -1e9;
+    for (const p of poly) {
+      const du = (p[0] - cx) * ax + (p[1] - cz) * az;
+      const dv = (p[0] - cx) * bx + (p[1] - cz) * bz;
+      a0 = Math.min(a0, du); a1 = Math.max(a1, du);
+      v0 = Math.min(v0, dv); v1 = Math.max(v1, dv);
+      const g = Math.max(groundAt(p[0], p[1]), 0);
+      gLo = Math.min(gLo, g); gHi = Math.max(gHi, g);
+    }
+    const base = gHi;
+    const sink = gLo - 1.6;                  // buried on the uphill side
+    const top = base + Math.max(hTag, 4.6);
+    const rise = Math.min((v1 - v0) * 0.26, 1.9);
+    const eave = top - rise;
+    const wall = RENDER[(r() * RENDER.length) | 0];
+    const tile = TILE[(r() * TILE.length) | 0];
+    const shut = SHUT[(r() * SHUT.length) | 0];
+
+    // Plinth: the footprint pushed out from its own centre. Scaling about the
+    // centroid rather than offsetting the edges is wrong by a few centimetres on
+    // a long thin plan and exactly right on a square one, which is what these are.
+    const swell = 1 + 0.16 / Math.max(2, Math.hypot(a1 - a0, v1 - v0) * 0.25);
+    for (let i = 0; i < n; i++) {
+      const p = poly[i], q = poly[(i + 1) % n];
+      const px = cx + (p[0] - cx) * swell, pz = cz + (p[1] - cz) * swell;
+      const qx = cx + (q[0] - cx) * swell, qz = cz + (q[1] - cz) * swell;
+      vil.quad([px, sink, pz], [qx, sink, qz],
+        [qx, base + 0.46, qz], [px, base + 0.46, pz], PLINTH);
+      // Wall above it, on the true outline.
+      vil.quad([p[0], base + 0.46, p[1]], [q[0], base + 0.46, q[1]],
+        [q[0], eave, q[1]], [p[0], eave, p[1]], wall);
+    }
+
+    // Openings, walked along each wall so a long face gets a rhythm and a short
+    // one gets one window rather than a squeezed pair.
+    const storeys = Math.max(1, Math.min(3, Math.floor((eave - base) / HOUSE.storey)));
+    for (let i = 0; i < n; i++) {
+      const p = poly[i], q = poly[(i + 1) % n];
+      const ex = q[0] - p[0], ez = q[1] - p[1];
+      const L = Math.hypot(ex, ez);
+      if (L < 2.4) continue;
+      const ux = ex / L, uz = ez / L;
+      // Outward normal of this edge. Which of the two perpendiculars is outward
+      // depends on the winding of the footprint, and OSM does not promise one —
+      // so it is decided per edge by asking which way points away from the
+      // centroid. Guessing put every sill, lintel and shutter *inside* the house
+      // on about half of them, and the only symptom was walls that had gone
+      // blank again with a few white dashes where a 2 cm lip poked back out.
+      let ox = uz, oz = -ux;
+      const mx = (p[0] + q[0]) * 0.5, mz = (p[1] + q[1]) * 0.5;
+      if ((mx - cx) * ox + (mz - cz) * oz < 0) { ox = -ox; oz = -oz; }
+      const E = (d, w, y) => [p[0] + ux * d + ox * w, y, p[1] + uz * d + oz * w];
+      const slots = Math.max(1, Math.floor((L - 1.4) / 2.65));
+      const gap = L / (slots + 1);
+      for (let k = 1; k <= slots; k++) {
+        const d = k * gap;
+        for (let st = 0; st < storeys; st++) {
+          const sill = base + 0.95 + st * HOUSE.storey;
+          if (sill + HOUSE.winH + 0.35 > eave) continue;
+          const hw = HOUSE.win / 2;
+          // Glass, barely proud of the render so it never z-fights it.
+          boxIn((d2, w, y) => E(d + d2, w, y),
+            -hw, hw, 0.015, 0.05, sill, sill + HOUSE.winH, GLASS);
+          // The sill is the piece that does the work: it is the only horizontal
+          // face on the whole wall, so it is the only thing that catches the sun
+          // and puts a line of shadow under itself.
+          boxIn((d2, w, y) => E(d + d2, w, y),
+            -hw - 0.14, hw + 0.14, -0.02, 0.17, sill - 0.11, sill, SURR);
+          boxIn((d2, w, y) => E(d + d2, w, y),
+            -hw - 0.12, hw + 0.12, -0.02, 0.10, sill + HOUSE.winH, sill + HOUSE.winH + 0.11,
+            SURR);
+          // Jambs, to close the surround. Four sides of relief round an opening
+          // is the whole difference between a window and a rectangle of paint.
+          for (const s of [-1, 1]) {
+            boxIn((d2, w, y) => E(d + d2, w, y),
+              s * hw, s * (hw + 0.12), -0.02, 0.09, sill, sill + HOUSE.winH, SURR);
+          }
+          const roll = r();
+          if (roll < 0.42) {
+            // Shut against the afternoon, which is most of them at this hour.
+            boxIn((d2, w, y) => E(d + d2, w, y),
+              -hw - 0.03, hw + 0.03, 0.05, 0.115, sill + 0.02, sill + HOUSE.winH - 0.02, shut);
+          } else if (roll < 0.86) {
+            for (const s of [-1, 1]) {
+              boxIn((d2, w, y) => E(d + d2, w, y),
+                s * hw, s * (hw + 0.56), 0.05, 0.115,
+                sill + 0.02, sill + HOUSE.winH - 0.02, shut);
+            }
+          }
+        }
+      }
+    }
+
+    // Roof: a hip on the bounding box, overhanging, with a fascia under the eave
+    // so there is a shadow line all the way round.
+    const A0 = a0 - HOUSE.over, A1 = a1 + HOUSE.over;
+    const V0 = v0 - HOUSE.over, V1 = v1 + HOUSE.over;
+    const hipIn = Math.min((V1 - V0) * 0.5, (A1 - A0) * 0.34);
+    const R0 = A0 + hipIn, R1 = A1 - hipIn, VM = (V0 + V1) * 0.5;
+    const Q = (u, v, y) => P(u, v, y);
+    vil.quad(Q(A0, V0, eave), Q(A1, V0, eave), Q(R1, VM, top), Q(R0, VM, top), tile);
+    vil.quad(Q(A1, V1, eave), Q(A0, V1, eave), Q(R0, VM, top), Q(R1, VM, top), tile);
+    vil.tri(Q(A0, V1, eave), Q(A0, V0, eave), Q(R0, VM, top), tile);
+    vil.tri(Q(A1, V0, eave), Q(A1, V1, eave), Q(R1, VM, top), tile);
+    boxIn(P, A0, A1, V0, V0 + 0.10, eave - 0.20, eave, FASCIA);
+    boxIn(P, A0, A1, V1 - 0.10, V1, eave - 0.20, eave, FASCIA);
+    boxIn(P, A0, A0 + 0.10, V0, V1, eave - 0.20, eave, FASCIA);
+    boxIn(P, A1 - 0.10, A1, V0, V1, eave - 0.20, eave, FASCIA);
+
+    // A chimney, and a satellite dish or an air-conditioner, because every one
+    // of these houses has been let out to somebody for the last thirty summers.
+    const chu = a0 + (a1 - a0) * (0.22 + r() * 0.56);
+    boxIn(P, chu - 0.28, chu + 0.28, VM - 0.28, VM + 0.28,
+      top - 0.4, top + 0.85, PLINTH, [0.22, 0.20, 0.19]);
+    if (r() < 0.62) {
+      const du = a0 + (a1 - a0) * r();
+      boxIn(P, du - 0.30, du + 0.30, v1 + 0.02, v1 + 0.28,
+        eave - 1.5, eave - 0.95, [0.78, 0.77, 0.74]);
+    }
+
+    // The terrace, on whichever long side faces the water, with a railing. It is
+    // the single most Dalmatian thing on the building and it is where everybody
+    // in the house actually is.
+    if (r() < 0.55 && eave - base > 5.2) {
+      const sea = jadSeaward(cx, cz, bx, bz) ? v1 : v0;
+      const out = sea === v1 ? 1 : -1;
+      const y = base + HOUSE.storey - 0.15;
+      const u0 = a0 + (a1 - a0) * 0.12, u1 = a0 + (a1 - a0) * 0.88;
+      boxIn(P, u0, u1, sea, sea + out * 1.7, y - 0.22, y, PLINTH, FASCIA);
+      const rail = sea + out * 1.62;
+      boxIn(P, u0, u1, rail - 0.05, rail + 0.05, y + 0.92, y + 1.02, FASCIA);
+      for (let k = 0; k <= 6; k++) {
+        const u = u0 + (u1 - u0) * (k / 6);
+        boxIn(P, u - 0.045, u + 0.045, rail - 0.04, rail + 0.04, y, y + 0.95, FASCIA);
+      }
+    }
+
+    houses.push({ cx, cz, ax, az, a: (a1 - a0) * 0.5 + 0.15, c: (v1 - v0) * 0.5 + 0.15 });
+  }
+
+  /** Does the local +v axis point out to sea? Used to face terraces the right way. */
+  function jadSeaward(cx, cz, bx, bz) {
+    const [, s] = local(cx, cz);
+    const [, s2] = local(cx + bx * 6, cz + bz * 6);
+    return s2 < s;
+  }
+
+  {
+    const hr = mulberry32(CONFIG.seed ^ 0x0ba5e1);
+    for (const bl of world.town) {
+      const poly = bl.p;
+      if (!poly || poly.length < 3 || poly.length > 12) continue;
+      let cx = 0, cz = 0;
+      for (const p of poly) { cx += p[0]; cz += p[1]; }
+      cx /= poly.length; cz /= poly.length;
+      const [t, s] = local(cx, cz);
+      if (t < -55 || t > LEN + 55 || s < -6 || s > HOUSE.reach) continue;
+      taken.add(bl);
+      detailHouse(poly, bl.h || 6, hr);
+    }
+  }
+
   const FACE = 'n = gl_FrontFacing ? n : -n; base *= vVCol;';
   const deckMesh = new THREE.Mesh(deck.geo(), solidMaterial(0xffffff, {
     spec: 0.07, specPower: 22, side: THREE.DoubleSide, body: FACE,
@@ -6659,7 +6891,12 @@ function buildJadrija(scene) {
   const upMesh = new THREE.Mesh(up.geo(), solidMaterial(0xffffff, {
     spec: 0.05, specPower: 14, side: THREE.DoubleSide, emissive: 0.22, body: FACE,
   }));
-  for (const m of [deckMesh, upMesh]) { m.frustumCulled = false; scene.add(m); }
+  // The village gets a bounce too but a much smaller one — a house forty metres
+  // inland is standing on limestone and a lane, not on the terrace.
+  const vilMesh = new THREE.Mesh(vil.geo(), solidMaterial(0xffffff, {
+    spec: 0.05, specPower: 16, side: THREE.DoubleSide, emissive: 0.07, body: FACE,
+  }));
+  for (const m of [deckMesh, upMesh, vilMesh]) { m.frustumCulled = false; scene.add(m); }
 
   // ── the locale ─────────────────────────────────────────────────────────────
   /**
@@ -6686,6 +6923,21 @@ function buildJadrija(scene) {
     } else if (best.i === ST.length - 2 && best.u >= 1) {
       const e = ST[ST.length - 1];
       t = e.t + (x - e.x) * e.ux + (z - e.z) * e.uz;
+    }
+    // The nearest segment is only a seed. `toWorld` builds a point from the
+    // frame at `t` — a station and its normal — whereas projecting onto the
+    // polyline measures against the chord between two stations, and those two
+    // disagree by the angle between the chord and the interpolated normal. On
+    // the promenade that is centimetres and invisible. Ninety metres inland,
+    // where the village is, the same angle came out as two metres: `local` and
+    // `toWorld` stopped being inverses, and a walker held against a wall by
+    // `confine` was re-measured somewhere else the next frame.
+    //
+    // Newton, on arc length. The along-shore residual is the step, because the
+    // curve is parameterised by its own length, and it lands in two.
+    for (let k = 0; k < 3; k++) {
+      const c = at(t);
+      t += (x - c.x) * c.ux + (z - c.z) * c.uz;
     }
     const st = at(t);
     return [t, (x - st.x) * st.nx + (z - st.z) * st.nz];
@@ -6723,6 +6975,18 @@ function buildJadrija(scene) {
     a: (r.t1 - r.t0) * 0.5, c: (r.s1 - r.s0) * 0.5,
     h: r.h, y: r.y,
   }));
+  // The houses were laid out to their lanes rather than to the shore, so each
+  // carries the angle between the two and `confine` turns into it. Reducing them
+  // to axis-aligned boxes instead grew a square house by half its width in each
+  // direction, which is more than the gap between two of them.
+  for (const hs of houses) {
+    const [t, s] = local(hs.cx, hs.cz);
+    const st = at(t);
+    blockers.push({
+      t, s, a: hs.a, c: hs.c, h: 8, y: 0,
+      rot: Math.atan2(hs.ax * st.nx + hs.az * st.nz, hs.ax * st.ux + hs.az * st.uz),
+    });
+  }
 
   const mid = at(LEN * 0.5);
   return {
@@ -6736,9 +7000,12 @@ function buildJadrija(scene) {
     apron: toWorld(gapAt, JAD.mid + 3),
     tint() { /* nothing here has caught yet */ },
     flushTint() {},
-    // Only the upright buffer casts. See the note where the buffers are made.
-    meshes: [deckMesh, upMesh], casters: [upMesh], length: LEN,
-    tris: (deck.count() + up.count()) / 3,
+    // Only what stands up casts. See the note where the buffers are made.
+    meshes: [deckMesh, upMesh, vilMesh], casters: [upMesh, vilMesh], length: LEN,
+    /** The town builder asks this so it does not draw these twice. */
+    ownsBuilding: (bl) => taken.has(bl),
+    houses: houses.length,
+    tris: (deck.count() + up.count() + vil.count()) / 3,
   };
 }
 
@@ -8768,18 +9035,67 @@ async function buildGround(scene, field) {
    * and converting each one to a world-space box would be inventing a second
    * source of truth for the same rectangle.
    */
+  /** Is this locale point inside any structure? */
+  function inside(t, s) {
+    for (const b of field.blockers) {
+      const c = b.rot ? Math.cos(b.rot) : 1, sn = b.rot ? Math.sin(b.rot) : 0;
+      const dt0 = t - b.t, ds0 = s - b.s;
+      const dt = dt0 * c + ds0 * sn, ds = -dt0 * sn + ds0 * c;
+      if (Math.abs(dt) < b.a + GROUND.girth && Math.abs(ds) < b.c + GROUND.girth) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   function confine(x, z) {
     const B = field.bounds;
     let [t, s] = field.local(x, z);
     t = clamp(t, B.t0, B.t1);
     s = clamp(s, B.s0, B.s1);
-    for (const b of field.blockers) {
-      const dt = t - b.t, ds = s - b.s;
-      const ea = b.a + GROUND.girth, ec = b.c + GROUND.girth;
-      if (Math.abs(dt) >= ea || Math.abs(ds) >= ec) continue;
-      // Inside: leave by whichever face is nearest, which is what a wall does.
-      if (ea - Math.abs(dt) < ec - Math.abs(ds)) t = b.t + Math.sign(dt || 1) * ea;
-      else s = b.s + Math.sign(ds || 1) * ec;
+    // Several passes, because being pushed out of one blocker can push you into
+    // the next. On an aerodrome that never happened — ten structures, none of
+    // them within a wingspan of another — but a village is a hundred and seventy
+    // houses four metres apart, and one pass leaves you standing in a front room.
+    // It stops early the moment a pass touches nothing, which is the usual case:
+    // somebody walking into a wall overlaps exactly one box.
+    for (let pass = 0; pass < 8; pass++) {
+      let moved = false;
+      for (const b of field.blockers) {
+        // A blocker may carry its own rotation within the locale frame. The
+        // aerodrome never needs one — everything on it was laid out in runway
+        // axes — but a village was laid out to its lanes, and a house at 40° to
+        // the shore reduced to an axis-aligned box grows by half its width in
+        // each direction, which is enough to seal the alley beside it. Rotate
+        // in, clamp, rotate the correction back out.
+        const c = b.rot ? Math.cos(b.rot) : 1, sn = b.rot ? Math.sin(b.rot) : 0;
+        const dt0 = t - b.t, ds0 = s - b.s;
+        const dt = dt0 * c + ds0 * sn, ds = -dt0 * sn + ds0 * c;
+        const ea = b.a + GROUND.girth, ec = b.c + GROUND.girth;
+        if (Math.abs(dt) >= ea || Math.abs(ds) >= ec) continue;
+        // Inside: leave by whichever face is nearest, which is what a wall does.
+        let ot = dt, os = ds;
+        if (ea - Math.abs(dt) < ec - Math.abs(ds)) ot = Math.sign(dt || 1) * ea;
+        else os = Math.sign(ds || 1) * ec;
+        t = b.t + ot * c - os * sn;
+        s = b.s + ot * sn + os * c;
+        moved = true;
+      }
+      if (!moved) break;
+      t = clamp(t, B.t0, B.t1);
+      s = clamp(s, B.s0, B.s1);
+    }
+    // Last resort. Two boxes can be arranged so that leaving one by its nearest
+    // face always enters the other, and no number of passes gets you out — it is
+    // rare, it needs a parachute to land you inside a wall to reach it at all,
+    // and being stuck inside a house with no way out is the one failure here
+    // that is not survivable. So: if anything still contains you, walk out
+    // across the locale until nothing does. In a village laid out along a shore
+    // that direction is the street, and past the street the beach, which is
+    // empty by construction — so this always terminates somewhere you can stand.
+    if (inside(t, s)) {
+      const dir = s > (B.s0 + B.s1) * 0.5 ? -1 : 1;
+      for (let k = 0; k < 80 && inside(t, s); k++) s = clamp(s + dir, B.s0, B.s1);
     }
     const w = field.toWorld(t, s);
     return [w[0], w[2]];
@@ -14189,6 +14505,9 @@ async function boot() {
   landmarks = await buildLandmarks(scene);
 
   await step(78, 'load.city');
+  // Jadrija first: it claims the footprints it is going to rebuild in detail,
+  // and the town builder has to know about that before it draws them.
+  jadrija = buildJadrija(scene);
   city = buildCity(scene);
 
   await step(80, 'load.streets');
@@ -14198,9 +14517,6 @@ async function boot() {
   // a hangar does not move.
   shadow.cast(airfield.buildings);
   shadow.cast(airfield.objMesh);
-  // Jadrija before the roads, so the promenade is laid before anything is asked
-  // to route around it, and before the trees, which have to keep off it.
-  jadrija = buildJadrija(scene);
   if (jadrija) for (const m of jadrija.casters) shadow.cast(m);
   roads = buildRoads(scene);
   rail = buildRail(scene);
@@ -15221,8 +15537,8 @@ window.__fr = {
       objects: airfield.objects.length, tris: Math.round(airfield.tris),
     } : null,
     jadrija: jadrija ? {
-      shoreM: Math.round(jadrija.length), runs: jadrija.blockers.length,
-      tris: Math.round(jadrija.tris),
+      shoreM: Math.round(jadrija.length), houses: jadrija.houses,
+      blockers: jadrija.blockers.length, tris: Math.round(jadrija.tris),
       at: [Math.round(jadrija.site.x), Math.round(jadrija.site.z)],
     } : null,
     rail: rail ? { ways: rail.ways, km: +rail.km.toFixed(1), cars: rail.cars,
