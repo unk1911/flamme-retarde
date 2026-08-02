@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.17.0">
+<meta name="version" content="1.18.0">
 <meta name="build-date" content="2026-08-02">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -1008,8 +1008,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.17.0, built 2026-08-02">
-    <b>v1.17.0</b><i>·</i><span>2026-08-02</span>
+  <div id="build" title="Flamme Retardé 1.18.0, built 2026-08-02">
+    <b>v1.18.0</b><i>·</i><span>2026-08-02</span>
   </div>
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
@@ -1226,7 +1226,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.17.0", date: "2026-08-02" };</script>
+<script>const BUILD = { v: "1.18.0", date: "2026-08-02" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -4146,6 +4146,7 @@ function buildCity(scene) {
   let built = 0;
   let tagged = 0;
   const forms = [0, 0, 0, 0, 0, 0];
+  const obbs = [];        // oriented footprints, for walking into
   for (const b of world.town) {
     const pts = b.p;
     if (pts.length < 3) continue;
@@ -4226,6 +4227,19 @@ function buildCity(scene) {
       if (v < vMin) vMin = v; if (v > vMax) vMax = v;
     }
     const shortAxis = vMax - vMin;
+
+    // The same oriented box, kept for collision. Every one of these is scenery
+    // you could walk straight through the moment you touch down anywhere that
+    // is not the aerodrome or Jadrija, because the locale synthesised for open
+    // country has no blockers at all. Taken here rather than recomputed later
+    // because the principal axis and the extents are already in hand, and taken
+    // *before* the eave overhang is added below — you are stopped by the wall,
+    // not by the gutter.
+    obbs.push({
+      x: cx + ax * (uMin + uMax) * 0.5 + bx * (vMin + vMax) * 0.5,
+      z: cz + az * (uMin + uMax) * 0.5 + bz * (vMin + vMax) * 0.5,
+      ax, az, hu: (uMax - uMin) * 0.5, hv: (vMax - vMin) * 0.5, h: eave,
+    });
     const shape = b.s != null ? b.s
       : guessRoof(shortAxis, urbanAt(cx, cz), rng());
     forms[shape]++;
@@ -4430,7 +4444,7 @@ function buildCity(scene) {
   const roofs = mk(roofPos, roofNorm, roofCol, roofMat);
 
   return {
-    walls, roofs, built, tagged, forms,
+    walls, roofs, built, tagged, forms, obbs,
     tris: (wallPos.length + roofPos.length) / 9,
   };
 }
@@ -6821,6 +6835,17 @@ function buildJadrija(scene) {
   const TRIM = [0.340, 0.300, 0.252];
 
   const runs = [];        // for the blockers, later
+  /**
+   * Everything standing on the concrete that you should not be able to walk
+   * through, collected as it is placed and folded into `blockers` at the end.
+   *
+   * Note `GROUND.girth` is 0.55 and gets added to every half-extent, so these
+   * are deliberately smaller than the thing they stand for — a figure at its
+   * true 0.25 m half-width would hold you off at 0.80 m from its centre, and
+   * the promenade pairs stand 0.7 m apart.
+   */
+  const furniture = [];
+  const solid = (t, s, a, c, h) => furniture.push({ t, s, a, c, h, y: 0 });
 
   /**
    * One run of joined huts: individual boxes so each can be its own colour, one
@@ -7032,6 +7057,9 @@ function buildJadrija(scene) {
       bar(t0, t1, slat((sF + sB) / 2, y + B.seatY - B.fall / 2 - 0.055,
         tilt + Math.PI / 2, B.depth + 0.06, 0.05), IRON);
     }
+    // Front of the seat to the back of the foot runner, which is the whole of
+    // what your shins would meet.
+    solid(t, (sF + sB + 0.10) / 2, half, (B.depth + 0.10) / 2, 0.9);
   }
 
   // ── the life in it ─────────────────────────────────────────────────────────
@@ -7399,6 +7427,9 @@ function buildJadrija(scene) {
     if (rng() < 0.62) {
       const s = 5.4 + rng() * 3.6;
       parasol(t, s, y, pick(SWIM));
+      // The pole only. The canopy is at 1.9 m and being stopped by shade you
+      // are walking under is worse than walking through it.
+      solid(t, s, 0.09, 0.09, 2.3);
       // Loungers point at the water, which is the one thing everybody here
       // agrees about.
       const n = 1 + (rng() < 0.55 ? 1 : 0);
@@ -7406,6 +7437,9 @@ function buildJadrija(scene) {
         const lt = t + (i - (n - 1) * 0.5) * 1.5;
         lounger(lt, s - 1.5, y, Math.PI, pick([[0.900, 0.890, 0.870],
           [0.240, 0.420, 0.560], [0.860, 0.560, 0.300]]));
+        // Turned through Math.PI, so its local −0.92…+0.87 lands seaward of the
+        // placement point rather than inland of it.
+        solid(lt, s - 1.5 + 0.025, 0.32, 0.895, 0.7);
         // Centred on the lounger, not 0.46 m seaward of it. The figure spans
         // local s −0.90…+0.98 and the lounger −0.92…+0.87, so at `s - 1.9` the
         // head hung half a metre off the end in mid-air — invisible while the
@@ -7448,6 +7482,19 @@ function buildJadrija(scene) {
   }
 
   for (const [t, s, y, a, pose, k] of bathers) person(t, s, y, a, pose, k);
+
+  // And the people. Only the ones you could walk into: `lie` is already covered
+  // by the lounger underneath it, and `wade` is standing in the sea at s = −0.9,
+  // which is nearly two metres outside the seaward bound.
+  //
+  // This reverses the note that used to sit on the tree blockers — that a
+  // parasol is stepped over and a person gets out of your way. That is true of
+  // a person who can move, and nobody on this beach can: what it produced was
+  // walking straight through them, which is worse than being held off.
+  for (const [t, s, , , pose, k] of bathers) {
+    if (pose === 'lie' || pose === 'wade') continue;
+    solid(t, s, 0.16 * k, 0.16 * k, 1.8 * k);
+  }
 
   // Dinghies: two alongside the jetty and a few on their own moorings off the
   // shelf. None of them is going anywhere — this is a bathing station, and the
@@ -7798,12 +7845,13 @@ function buildJadrija(scene) {
     a: (r.t1 - r.t0) * 0.5, c: (r.s1 - r.s0) * 0.5,
     h: r.h, y: r.y,
   }));
-  // The trees. A trunk is the one piece of the new scenery you can walk into
-  // rather than round: parasols and loungers you step over in life, and a person
-  // gets out of your way, but an olive does not. Squared off to the trunk, not
-  // to the crown — being stopped by foliage two metres over your head is worse
-  // than walking through it.
+  // The trees. Squared off to the trunk, not to the crown — being stopped by
+  // foliage two metres over your head is worse than walking through it.
   for (const [t, s, r, h] of greens) blockers.push({ t, s, a: r, c: r, h, y: 0 });
+
+  // The furniture and the people: benches, loungers, parasol poles and everyone
+  // standing or sitting on the concrete.
+  for (const f of furniture) blockers.push(f);
 
   // The houses were laid out to their lanes rather than to the shore, so each
   // carries the angle between the two and `confine` turns into it. Reducing them
@@ -10728,7 +10776,17 @@ async function buildGround(scene, field) {
     // standing against a hangar can then hold you against it but never push you
     // through it, and a hold is something you can always walk sideways out of.
     const [bx, bz] = unbody(tx, tz);
-    const [nx, nz] = confine(bx, bz);
+    let [nx, nz] = confine(bx, bz);
+    // The waterline, where the locale has one. Tried as two independent axes
+    // before being refused outright, so walking into the sea at an angle slides
+    // you along the beach instead of gluing you to the spot — the shoreline is
+    // a ragged thing and a hard stop on it feels like a bug even when it is
+    // doing exactly what it was asked to.
+    if (field.standable && !field.standable(nx, nz)) {
+      if (field.standable(nx, you.z)) nz = you.z;
+      else if (field.standable(you.x, nz)) nx = you.x;
+      else { nx = you.x; nz = you.z; }
+    }
     // Kill the velocity only if confine() actually moved us — measured against
     // what confine() was given, not against where the step wanted to go, or a
     // person would stop you dead as well. That is the other half of not being
@@ -11015,6 +11073,8 @@ async function buildGround(scene, field) {
     get armed() { return armed; },
     update, enter, leave, canEnter, canBoard, look, pose, you,
     retarget, dropIn,
+    /** Whichever locale currently owns you — for a test, and read-only. */
+    get field() { return field; },
     get stranded() { return stranded; },
     get crew() { return crew; },
     hose: () => you.jet,
@@ -11314,6 +11374,11 @@ async function buildLandmarks(scene) {
 
 const OPEN = {
   reach: 780,          // m from the touchdown point you are allowed to walk
+  // Buildings taken from the city's own footprints, nearest first. `confine`
+  // walks the whole list up to eight times a step, so this is a budget rather
+  // than a radius: land in the middle of the old town and the four hundred
+  // nearest houses are solid, which is a good deal further than you will get.
+  walls: 1200,
 };
 
 /**
@@ -11326,20 +11391,52 @@ const OPEN = {
  * axes; a hillside has no axes, so inventing a rotation for it would be
  * inventing a fact.
  */
-function openLocale(x, z) {
+function openLocale(x, z, city) {
   const cx = Math.round(x), cz = Math.round(z);
   const R = OPEN.reach;
-  // Never below the waterline. Walk to the edge of the Adriatic and you stand
-  // in the shallows rather than descending the seabed, which is what the DEM
-  // under the channel would otherwise have you doing.
+  // Never below the waterline — but this is now only a backstop for the last
+  // few centimetres at the tideline, because `standable` below stops you
+  // reaching the water at all. On its own it was the whole reason you could
+  // walk out across the channel: the DEM under the sea is negative, this
+  // clamped it to zero, and nothing anywhere said you may not stand there.
   const walkY = (wx, wz) => Math.max(groundAt(wx, wz), 0);
+
+  // The buildings. The locale frame here is world-axis-aligned and merely
+  // offset, so a footprint's principal axis is its rotation within the frame
+  // directly, and `confine` turns into it exactly as it does for the Jadrija
+  // houses laid out to their lanes.
+  const blockers = [];
+  if (city && city.obbs) {
+    const near = [];
+    for (const o of city.obbs) {
+      const dx = o.x - cx, dz = o.z - cz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < R * R) near.push([d2, o]);
+    }
+    near.sort((a, b) => a[0] - b[0]);
+    for (let i = 0; i < Math.min(near.length, OPEN.walls); i++) {
+      const o = near[i][1];
+      blockers.push({
+        t: o.x - cx, s: o.z - cz, a: o.hu, c: o.hv, h: o.h, y: 0,
+        rot: Math.atan2(o.az, o.ax),
+      });
+    }
+  }
+
   return {
     site: { x: cx, z: cz },
     bounds: { t0: -R, t1: R, s0: -R, s1: R },
-    blockers: [],
+    blockers,
     local: (wx, wz) => [wx - cx, wz - cz],
     toWorld: (t, s) => [cx + t, walkY(cx + t, cz + s), cz + s],
     walkY,
+    /**
+     * Where a person may put their feet. The bounds are a square and the
+     * blockers are boxes; a coastline is neither, so it needs its own test.
+     * Everywhere else on the map the shore is handled by a bound — Jadrija
+     * stops you 1.1 m short of the quay edge — and open country had nothing.
+     */
+    standable: (wx, wz) => !isSea(wx, wz),
     objects: [],
     crewSpots: [],
     apron: [cx, walkY(cx, cz), cz],
@@ -11358,12 +11455,12 @@ function openLocale(x, z) {
  * Order matters only in that the two hand-built places must both come before the
  * synthesised one. They are four kilometres apart and cannot both claim a point.
  */
-function localeAt(x, z, airfield, jadrija) {
+function localeAt(x, z, airfield, jadrija, city) {
   if (airfield && airfield.site && airfield.inField && airfield.inField(x, z)) {
     return airfield;
   }
   if (jadrija && jadrija.inField && jadrija.inField(x, z)) return jadrija;
-  return openLocale(x, z);
+  return openLocale(x, z, city);
 }
 
 // ==== 50-plane.js ===============================================
@@ -16130,7 +16227,7 @@ function chuteDown(kind) {
   // used to answer with a red screen that was indistinguishable from having
   // been killed by it.
   if (kind === 'land' && ground && ground.ok
-    && ground.retarget(localeAt(eject.pos.x, eject.pos.z, airfield, jadrija))
+    && ground.retarget(localeAt(eject.pos.x, eject.pos.z, airfield, jadrija, city))
     && ground.dropIn(eject.pos.x, eject.pos.z, eject.you.yaw)) {
     alerts.bump(1.1);
     $('chute-hud').hidden = true;
@@ -17038,6 +17135,18 @@ window.__fr = {
     out: () => toggleGround(),
     apron: () => airfield.apron,
     put: (x, z, yaw, pitch) => ground.put(x, z, yaw, pitch),
+    /**
+     * On foot anywhere at all, synthesising a locale for open country the same
+     * way a parachute landing does. `jad.stand` only reaches Jadrija, and the
+     * whole point of the open locale is that it is built around wherever you
+     * came down.
+     */
+    anywhere: (x, z, yaw = 0) => {
+      const loc = localeAt(x, z, airfield, jadrija, city);
+      ground.retarget(loc);
+      ground.dropIn(x, z, yaw);
+      return { kind: loc.kind || 'open', blockers: loc.blockers.length };
+    },
     look: (dx, dy) => ground.look(dx, dy),
     jet: (on) => { debugJet = !!on; },
     aimAt: (kind) => ground.aimAt(kind),

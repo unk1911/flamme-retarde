@@ -202,6 +202,21 @@ parked. On a phone there is no `0` to press, so
 [**`?ground`**](https://flamme-retarde.edeliverables.com/?nointro&ground) does
 the same thing as a link.
 
+**What stops you on foot** is not the same list as what stops the aeroplane.
+Walking, everything you can reach is solid: the houses and trees at Jadrija, and
+now the benches, loungers, parasol poles and everybody standing or sitting on
+the concrete. Land anywhere else by parachute and the locale synthesised around
+you takes its walls straight from the city's own footprints — every building
+within the 780 m you are allowed to walk, which in the densest part of the old
+town is a little over eight hundred of them.
+
+And you cannot walk on the sea. The open-country locale used to clamp your
+height to the waterline and say nothing about whether you might stand there, so
+you could set off across the channel; now the shoreline is a limit you slide
+along rather than a surface you cross. The trees at Jadrija are squared off to
+the trunk rather than the crown, on the grounds that being stopped by foliage
+two metres above your head is worse than walking through it.
+
 **On a phone or a tablet**, drag anywhere on the left half to fly — the stick
 appears under your thumb wherever you put it — and the throttle is the lever on
 the right. `SCOOP` and `DROP` are held, not tapped. `LVL` latches. Landscape.

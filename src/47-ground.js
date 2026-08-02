@@ -1110,7 +1110,17 @@ async function buildGround(scene, field) {
     // standing against a hangar can then hold you against it but never push you
     // through it, and a hold is something you can always walk sideways out of.
     const [bx, bz] = unbody(tx, tz);
-    const [nx, nz] = confine(bx, bz);
+    let [nx, nz] = confine(bx, bz);
+    // The waterline, where the locale has one. Tried as two independent axes
+    // before being refused outright, so walking into the sea at an angle slides
+    // you along the beach instead of gluing you to the spot — the shoreline is
+    // a ragged thing and a hard stop on it feels like a bug even when it is
+    // doing exactly what it was asked to.
+    if (field.standable && !field.standable(nx, nz)) {
+      if (field.standable(nx, you.z)) nz = you.z;
+      else if (field.standable(you.x, nz)) nx = you.x;
+      else { nx = you.x; nz = you.z; }
+    }
     // Kill the velocity only if confine() actually moved us — measured against
     // what confine() was given, not against where the step wanted to go, or a
     // person would stop you dead as well. That is the other half of not being
@@ -1397,6 +1407,8 @@ async function buildGround(scene, field) {
     get armed() { return armed; },
     update, enter, leave, canEnter, canBoard, look, pose, you,
     retarget, dropIn,
+    /** Whichever locale currently owns you — for a test, and read-only. */
+    get field() { return field; },
     get stranded() { return stranded; },
     get crew() { return crew; },
     hose: () => you.jet,

@@ -854,7 +854,7 @@ function chuteDown(kind) {
   // used to answer with a red screen that was indistinguishable from having
   // been killed by it.
   if (kind === 'land' && ground && ground.ok
-    && ground.retarget(localeAt(eject.pos.x, eject.pos.z, airfield, jadrija))
+    && ground.retarget(localeAt(eject.pos.x, eject.pos.z, airfield, jadrija, city))
     && ground.dropIn(eject.pos.x, eject.pos.z, eject.you.yaw)) {
     alerts.bump(1.1);
     $('chute-hud').hidden = true;
@@ -1762,6 +1762,18 @@ window.__fr = {
     out: () => toggleGround(),
     apron: () => airfield.apron,
     put: (x, z, yaw, pitch) => ground.put(x, z, yaw, pitch),
+    /**
+     * On foot anywhere at all, synthesising a locale for open country the same
+     * way a parachute landing does. `jad.stand` only reaches Jadrija, and the
+     * whole point of the open locale is that it is built around wherever you
+     * came down.
+     */
+    anywhere: (x, z, yaw = 0) => {
+      const loc = localeAt(x, z, airfield, jadrija, city);
+      ground.retarget(loc);
+      ground.dropIn(x, z, yaw);
+      return { kind: loc.kind || 'open', blockers: loc.blockers.length };
+    },
     look: (dx, dy) => ground.look(dx, dy),
     jet: (on) => { debugJet = !!on; },
     aimAt: (kind) => ground.aimAt(kind),

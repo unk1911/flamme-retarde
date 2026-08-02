@@ -121,6 +121,7 @@ function buildCity(scene) {
   let built = 0;
   let tagged = 0;
   const forms = [0, 0, 0, 0, 0, 0];
+  const obbs = [];        // oriented footprints, for walking into
   for (const b of world.town) {
     const pts = b.p;
     if (pts.length < 3) continue;
@@ -201,6 +202,19 @@ function buildCity(scene) {
       if (v < vMin) vMin = v; if (v > vMax) vMax = v;
     }
     const shortAxis = vMax - vMin;
+
+    // The same oriented box, kept for collision. Every one of these is scenery
+    // you could walk straight through the moment you touch down anywhere that
+    // is not the aerodrome or Jadrija, because the locale synthesised for open
+    // country has no blockers at all. Taken here rather than recomputed later
+    // because the principal axis and the extents are already in hand, and taken
+    // *before* the eave overhang is added below — you are stopped by the wall,
+    // not by the gutter.
+    obbs.push({
+      x: cx + ax * (uMin + uMax) * 0.5 + bx * (vMin + vMax) * 0.5,
+      z: cz + az * (uMin + uMax) * 0.5 + bz * (vMin + vMax) * 0.5,
+      ax, az, hu: (uMax - uMin) * 0.5, hv: (vMax - vMin) * 0.5, h: eave,
+    });
     const shape = b.s != null ? b.s
       : guessRoof(shortAxis, urbanAt(cx, cz), rng());
     forms[shape]++;
@@ -405,7 +419,7 @@ function buildCity(scene) {
   const roofs = mk(roofPos, roofNorm, roofCol, roofMat);
 
   return {
-    walls, roofs, built, tagged, forms,
+    walls, roofs, built, tagged, forms, obbs,
     tris: (wallPos.length + roofPos.length) / 9,
   };
 }

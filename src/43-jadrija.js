@@ -461,6 +461,17 @@ function buildJadrija(scene) {
   const TRIM = [0.340, 0.300, 0.252];
 
   const runs = [];        // for the blockers, later
+  /**
+   * Everything standing on the concrete that you should not be able to walk
+   * through, collected as it is placed and folded into `blockers` at the end.
+   *
+   * Note `GROUND.girth` is 0.55 and gets added to every half-extent, so these
+   * are deliberately smaller than the thing they stand for — a figure at its
+   * true 0.25 m half-width would hold you off at 0.80 m from its centre, and
+   * the promenade pairs stand 0.7 m apart.
+   */
+  const furniture = [];
+  const solid = (t, s, a, c, h) => furniture.push({ t, s, a, c, h, y: 0 });
 
   /**
    * One run of joined huts: individual boxes so each can be its own colour, one
@@ -672,6 +683,9 @@ function buildJadrija(scene) {
       bar(t0, t1, slat((sF + sB) / 2, y + B.seatY - B.fall / 2 - 0.055,
         tilt + Math.PI / 2, B.depth + 0.06, 0.05), IRON);
     }
+    // Front of the seat to the back of the foot runner, which is the whole of
+    // what your shins would meet.
+    solid(t, (sF + sB + 0.10) / 2, half, (B.depth + 0.10) / 2, 0.9);
   }
 
   // ── the life in it ─────────────────────────────────────────────────────────
@@ -1039,6 +1053,9 @@ function buildJadrija(scene) {
     if (rng() < 0.62) {
       const s = 5.4 + rng() * 3.6;
       parasol(t, s, y, pick(SWIM));
+      // The pole only. The canopy is at 1.9 m and being stopped by shade you
+      // are walking under is worse than walking through it.
+      solid(t, s, 0.09, 0.09, 2.3);
       // Loungers point at the water, which is the one thing everybody here
       // agrees about.
       const n = 1 + (rng() < 0.55 ? 1 : 0);
@@ -1046,6 +1063,9 @@ function buildJadrija(scene) {
         const lt = t + (i - (n - 1) * 0.5) * 1.5;
         lounger(lt, s - 1.5, y, Math.PI, pick([[0.900, 0.890, 0.870],
           [0.240, 0.420, 0.560], [0.860, 0.560, 0.300]]));
+        // Turned through Math.PI, so its local −0.92…+0.87 lands seaward of the
+        // placement point rather than inland of it.
+        solid(lt, s - 1.5 + 0.025, 0.32, 0.895, 0.7);
         // Centred on the lounger, not 0.46 m seaward of it. The figure spans
         // local s −0.90…+0.98 and the lounger −0.92…+0.87, so at `s - 1.9` the
         // head hung half a metre off the end in mid-air — invisible while the
@@ -1088,6 +1108,19 @@ function buildJadrija(scene) {
   }
 
   for (const [t, s, y, a, pose, k] of bathers) person(t, s, y, a, pose, k);
+
+  // And the people. Only the ones you could walk into: `lie` is already covered
+  // by the lounger underneath it, and `wade` is standing in the sea at s = −0.9,
+  // which is nearly two metres outside the seaward bound.
+  //
+  // This reverses the note that used to sit on the tree blockers — that a
+  // parasol is stepped over and a person gets out of your way. That is true of
+  // a person who can move, and nobody on this beach can: what it produced was
+  // walking straight through them, which is worse than being held off.
+  for (const [t, s, , , pose, k] of bathers) {
+    if (pose === 'lie' || pose === 'wade') continue;
+    solid(t, s, 0.16 * k, 0.16 * k, 1.8 * k);
+  }
 
   // Dinghies: two alongside the jetty and a few on their own moorings off the
   // shelf. None of them is going anywhere — this is a bathing station, and the
@@ -1438,12 +1471,13 @@ function buildJadrija(scene) {
     a: (r.t1 - r.t0) * 0.5, c: (r.s1 - r.s0) * 0.5,
     h: r.h, y: r.y,
   }));
-  // The trees. A trunk is the one piece of the new scenery you can walk into
-  // rather than round: parasols and loungers you step over in life, and a person
-  // gets out of your way, but an olive does not. Squared off to the trunk, not
-  // to the crown — being stopped by foliage two metres over your head is worse
-  // than walking through it.
+  // The trees. Squared off to the trunk, not to the crown — being stopped by
+  // foliage two metres over your head is worse than walking through it.
   for (const [t, s, r, h] of greens) blockers.push({ t, s, a: r, c: r, h, y: 0 });
+
+  // The furniture and the people: benches, loungers, parasol poles and everyone
+  // standing or sitting on the concrete.
+  for (const f of furniture) blockers.push(f);
 
   // The houses were laid out to their lanes rather than to the shore, so each
   // carries the angle between the two and `confine` turns into it. Reducing them

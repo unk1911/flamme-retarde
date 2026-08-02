@@ -16,6 +16,11 @@
 
 const OPEN = {
   reach: 780,          // m from the touchdown point you are allowed to walk
+  // Buildings taken from the city's own footprints, nearest first. `confine`
+  // walks the whole list up to eight times a step, so this is a budget rather
+  // than a radius: land in the middle of the old town and the four hundred
+  // nearest houses are solid, which is a good deal further than you will get.
+  walls: 1200,
 };
 
 /**
@@ -28,20 +33,52 @@ const OPEN = {
  * axes; a hillside has no axes, so inventing a rotation for it would be
  * inventing a fact.
  */
-function openLocale(x, z) {
+function openLocale(x, z, city) {
   const cx = Math.round(x), cz = Math.round(z);
   const R = OPEN.reach;
-  // Never below the waterline. Walk to the edge of the Adriatic and you stand
-  // in the shallows rather than descending the seabed, which is what the DEM
-  // under the channel would otherwise have you doing.
+  // Never below the waterline — but this is now only a backstop for the last
+  // few centimetres at the tideline, because `standable` below stops you
+  // reaching the water at all. On its own it was the whole reason you could
+  // walk out across the channel: the DEM under the sea is negative, this
+  // clamped it to zero, and nothing anywhere said you may not stand there.
   const walkY = (wx, wz) => Math.max(groundAt(wx, wz), 0);
+
+  // The buildings. The locale frame here is world-axis-aligned and merely
+  // offset, so a footprint's principal axis is its rotation within the frame
+  // directly, and `confine` turns into it exactly as it does for the Jadrija
+  // houses laid out to their lanes.
+  const blockers = [];
+  if (city && city.obbs) {
+    const near = [];
+    for (const o of city.obbs) {
+      const dx = o.x - cx, dz = o.z - cz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < R * R) near.push([d2, o]);
+    }
+    near.sort((a, b) => a[0] - b[0]);
+    for (let i = 0; i < Math.min(near.length, OPEN.walls); i++) {
+      const o = near[i][1];
+      blockers.push({
+        t: o.x - cx, s: o.z - cz, a: o.hu, c: o.hv, h: o.h, y: 0,
+        rot: Math.atan2(o.az, o.ax),
+      });
+    }
+  }
+
   return {
     site: { x: cx, z: cz },
     bounds: { t0: -R, t1: R, s0: -R, s1: R },
-    blockers: [],
+    blockers,
     local: (wx, wz) => [wx - cx, wz - cz],
     toWorld: (t, s) => [cx + t, walkY(cx + t, cz + s), cz + s],
     walkY,
+    /**
+     * Where a person may put their feet. The bounds are a square and the
+     * blockers are boxes; a coastline is neither, so it needs its own test.
+     * Everywhere else on the map the shore is handled by a bound — Jadrija
+     * stops you 1.1 m short of the quay edge — and open country had nothing.
+     */
+    standable: (wx, wz) => !isSea(wx, wz),
     objects: [],
     crewSpots: [],
     apron: [cx, walkY(cx, cz), cz],
@@ -60,10 +97,10 @@ function openLocale(x, z) {
  * Order matters only in that the two hand-built places must both come before the
  * synthesised one. They are four kilometres apart and cannot both claim a point.
  */
-function localeAt(x, z, airfield, jadrija) {
+function localeAt(x, z, airfield, jadrija, city) {
   if (airfield && airfield.site && airfield.inField && airfield.inField(x, z)) {
     return airfield;
   }
   if (jadrija && jadrija.inField && jadrija.inField(x, z)) return jadrija;
-  return openLocale(x, z);
+  return openLocale(x, z, city);
 }

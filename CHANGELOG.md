@@ -8,6 +8,50 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.18.0] — 2026-08-02
+
+### Fixed — you could walk through everything, and across the sea
+
+Three separate holes, and only one of them was where it looked.
+
+**The furniture at Jadrija.** The houses and the trees were already solid — 229
+blockers, and standing inside one pushes you out — but the benches, the
+loungers, the parasol poles and all ninety-one people were not. Now they are:
+366 blockers, and none of the seventy standing or sitting figures can be
+approached within 0.6 m of their centre. The ones lying on loungers are covered
+by the lounger, and the six in the water are two metres outside the seaward
+bound anyway.
+
+This reverses the note that used to sit on the tree blockers — that a parasol is
+stepped over and a person gets out of your way. True of a person who can move,
+and nobody on this beach can; what it actually produced was walking straight
+through them. `GROUND.girth` is 0.55 and is added to every half-extent, so a
+figure is registered at 0.16 rather than its true width, or the promenade pairs
+standing 0.7 m apart would merge into one wall.
+
+**Everywhere else.** Land by parachute outside the aerodrome or Jadrija and you
+got a synthesised locale with `blockers: []` — nothing in the world was solid,
+including thirteen thousand buildings. The city already computes an oriented
+bounding box per footprint to lay its roof ridges on, so those are kept now and
+the locale takes the nearest 1 200 as rotated blockers. In the densest part of
+the old town that is 824 buildings and covers the whole 780 m you can walk.
+Tested against 150 building centres: 150 pushed out, none left inside a wall.
+
+**The sea.** The open locale clamped your height to `max(groundAt, 0)` and said
+nothing whatever about whether you might stand there, so you could walk out
+across the channel — the Jesus bug. A coastline is neither a rectangle nor a
+box, so it needed its own test rather than a bound or a blocker: locales may now
+declare `standable(x, z)`, and `walk` tries the two axes independently before
+refusing a step, so walking into the water at an angle slides you along the
+beach instead of gluing you to the spot. Head-on you stop 9 cm short of it.
+
+Collision cost is not measurable: with all 824 blockers removed the same spot
+ran *slower* (11 fps against 13), which is frame-timing noise. The 15 fps on
+foot in the middle of Šibenik is the city rendering under software GL.
+
+Three of the 169 Jadrija houses can still leave you inside after `confine`,
+down from four. It takes landing a parachute on a house centre to reach.
+
 ## [1.17.0] — 2026-08-02
 
 ### Changed — the ninety-one people on the beach
