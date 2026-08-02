@@ -8,6 +8,37 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [Unreleased]
+
+### Changed — a canopy you can actually steer
+
+The parachute had steering on `A`/`D` and the arrow keys from the day it was
+written, and it may as well not have. The wind gradient hands you 6.84 m/s at
+six hundred metres and the canopy only flew at 6.5, so upwind your *ground*
+track was minus a third of a metre a second: not limited authority, none, and
+pointing the thing anywhere made no difference to where it ended up.
+
+Forward speed is now 9.5 m/s, which is what a steerable square of this size
+actually flies at, so the number is the more honest one as well as the playable
+one. The gradient still tells the same story about choosing your field late —
+2.75 m/s upwind at nine hundred metres, 5.5 down at a hundred and fifty.
+
+### Added — front risers, on the up arrow
+
+The other half of the arrow pad. `↑` pulls the leading edge down: half again
+the forward speed, twice the sink. Hands off she glides 1.70 and diving she
+glides 1.25, which is worse — and is exactly why you would. Into a headwind the
+*ground* glide goes the other way, 0.49 to 0.67, and downwind it inverts again,
+2.91 to 1.83, so the risers are a high-and-upwind tool and cost you height for
+nothing anywhere else. From nine hundred metres: 683 m upwind in 130 s diving,
+against 593 m in 210 s hands off.
+
+`↓` is the brakes, on the same key as the flare. The risers let go on their own
+in the last sixty metres, whatever your thumb is doing — partly because that is
+what happens, and partly because without it the dive is free: quicker, further,
+and arriving at twelve metres a second with nothing to pay, since an inflated
+canopy always puts you down alive.
+
 ## [1.14.0] — 2026-08-02
 
 ### Added — Jadrija, stage 3: the life in it

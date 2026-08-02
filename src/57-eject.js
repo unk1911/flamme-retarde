@@ -34,10 +34,28 @@ const EJECT = {
   // and walk away from, which is the one this game is telling.
   maxOpen: 62,           // m/s²
 
-  drive: 6.5,            // m/s the canopy flies forward at, full glide
-  turn: 0.62,            // rad/s hauling on a riser
+  // Forward speed, hands off. This used to be 6.5, and 6.5 was the reason the
+  // canopy felt like it had no controls at all: the wind gradient below hands
+  // you 6.84 m/s at six hundred metres, so upwind your *ground* track was minus
+  // a third of a metre a second. Not "limited authority" — none, and pointing
+  // the thing anywhere made no difference to where it went. A steerable square
+  // of this size really does fly at nine or ten, so this is the more honest
+  // number as well as the playable one, and the gradient still does the work:
+  // upwind you make 2.7 m/s up high and 7 down low, which is the same story
+  // about choosing your field late, told with the choice actually in it.
+  drive: 9.5,            // m/s the canopy flies forward at, full glide
+  turn: 0.80,            // rad/s hauling on a riser
   turnSink: 0.28,        // extra sink, as a fraction, in a full turn
   sink: 5.6,             // m/s down, hands off
+
+  // Front risers. Pull the leading edge down and the canopy stops gliding and
+  // starts descending at something: you go faster over the ground and you pay
+  // for every metre of it in height. Hands off she glides 1.70; diving she
+  // glides 1.25 — worse, and that is the point. Into a headwind the *ground*
+  // glide goes the other way, 0.48 to 0.67, which is precisely why anyone ever
+  // does this. Downwind it is the wrong tool and the arithmetic says so.
+  diveDrive: 1.55,       // what the risers multiply forward speed by
+  diveSink: 2.10,        // and what they multiply the sink by
   flareSink: 0.42,       // what a held flare multiplies the sink by
   flareDrive: 0.35,      // and the forward speed — a flare trades one for other
   flareFor: 2.4,         // s of flare in the canopy before it gives up
@@ -156,6 +174,7 @@ function buildEject(scene, flight, onDown) {
     yaw: 0,              // canopy and view together — see look() for why
     pitch: 0,
     flare: EJECT.flareFor,
+    dive: 0,             // how much front riser is in, 0..1
     stalled: false,      // held the toggles past the end of the flare
     swing: 0,            // pendulum roll, radians
     swingV: 0,
@@ -273,10 +292,26 @@ function buildEject(scene, flight, onDown) {
       else if (you.stalled && !ctl.flare && you.flare > EJECT.flareFor * 0.6) you.stalled = false;
       const fl = pull ? 1 : 0;
 
+      // The other end of the same axis. Brakes and risers are opposite hands and
+      // cannot both be on, so the flare wins — you are about to land.
+      //
+      // And the risers let go on their own in the last sixty metres, whatever
+      // your thumb is doing. Partly because that is what happens — you are not
+      // holding a front riser down through the flare, your hands are needed and
+      // the canopy is planing out anyway — and partly because without it the
+      // dive is a free lunch: quicker, further upwind, and arriving at twelve
+      // metres a second with nothing to pay, since an inflated canopy always
+      // puts you down alive. Take it away at the bottom and the dive goes back
+      // to being what it is, a way of spending height to reach something.
+      const dv = pull ? 0 : sat(ctl.dive || 0) * sat((agl - 25) / 35);
+      you.dive = dv;
+
       const sink = EJECT.sink * (1 - fl * (1 - EJECT.flareSink))
+        * (1 + dv * (EJECT.diveSink - 1))
         * (you.stalled ? EJECT.stallSink : 1)
         * (1 + EJECT.turnSink * Math.abs(steer));
-      const drive = EJECT.drive * (1 - fl * (1 - EJECT.flareDrive));
+      const drive = EJECT.drive * (1 - fl * (1 - EJECT.flareDrive))
+        * (1 + dv * (EJECT.diveDrive - 1));
       _ejV.x += -Math.sin(you.yaw) * drive;
       _ejV.z += -Math.cos(you.yaw) * drive;
       _ejV.y = -sink;
@@ -370,7 +405,10 @@ function buildEject(scene, flight, onDown) {
     // because a canopy really does grow out of its own diameter.
     const s = phase === 'flying' ? 1 : 0.10 + 0.90 * you.inflation;
     canopy.scale.set(s, phase === 'flying' ? 1 : 0.35 + 0.65 * you.inflation, s);
-    _ejEul.set(you.swing * 0.35, you.yaw, -you.swing);
+    // Front risers pull the nose of the canopy down and swing you out behind it,
+    // which is the only way you can see that you are diving — the ground is a
+    // long way off and does not visibly hurry.
+    _ejEul.set(you.swing * 0.35 - you.dive * 0.26, you.yaw, -you.swing);
     canopy.quaternion.setFromEuler(_ejEul);
   }
 
@@ -390,6 +428,7 @@ function buildEject(scene, flight, onDown) {
       you.vel.set(0, 0, 0);
       you.inflation = 0;
       you.stalled = false;
+      you.dive = 0;
       you.vs = 0;
     },
     /** m AGL, for the HUD and for deciding whether the canopy has a chance. */
@@ -405,6 +444,7 @@ function buildEject(scene, flight, onDown) {
       spd: +you.vel.length().toFixed(1),
       peakG: +peakG.toFixed(1),
       flare: +you.flare.toFixed(2),
+      dive: +you.dive.toFixed(2),
       stalled: you.stalled ? 1 : 0,
       yaw: +you.yaw.toFixed(3),
       at: [Math.round(you.pos.x), Math.round(you.pos.z)],

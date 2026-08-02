@@ -1338,7 +1338,11 @@ function frame() {
     eject.update(dt, {
       turn: (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0)
         - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0),
-      flare: keys.has('Space'),
+      // Up is the front risers and down is the brakes, which is the way round
+      // your hands actually go: push the nose down to reach, hold it off to
+      // stay up. Space keeps the flare on its own key for the landing.
+      dive: keys.has('ArrowUp') || keys.has('KeyW') ? 1 : 0,
+      flare: keys.has('Space') || keys.has('ArrowDown') || keys.has('KeyS'),
     });
     updateMission(dt);
   }
@@ -1650,8 +1654,8 @@ window.__fr = {
       plane.root.visible = true;
     },
     raw: () => eject,
-    step: (dt, turn = 0, flare = false) => {
-      eject.update(dt, { turn, flare });
+    step: (dt, turn = 0, flare = false, dive = 0) => {
+      eject.update(dt, { turn, flare, dive });
       return eject.stats();
     },
     stats: () => eject.stats(),
