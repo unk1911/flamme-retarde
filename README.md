@@ -421,6 +421,19 @@ Changes are tracked in [CHANGELOG.md](CHANGELOG.md).
 - Coastline, land cover, buildings, roads, landmarks: © OpenStreetMap contributors, [ODbL](https://www.openstreetmap.org/copyright).
 - [Three.js](https://threejs.org), MIT.
 - Intro panels generated with Google Gemini 2.5 Flash Image from reference photographs.
+- **The klapa**: [*Donje Selo, 12. susret klapa, 2018 (02)*](https://commons.wikimedia.org/wiki/File:Donje_Selo,_12._susret_klapa,_2018_(02).webm)
+  by Wikimedia Commons contributor **Draceane**, recorded at the twelfth *susret
+  klapa* at Donje Selo on Šolta on **11 August 2018**, licensed
+  [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+  *Changes made*: audio extracted from the video, trimmed to 0.3–47.0 s,
+  high-passed at 70 Hz, faded in and out, loudness-normalised to −16 LUFS, and
+  re-encoded as 56 kbps mono MP3. The adapted audio in `build/payload/klapa.mp3`
+  is offered under the same **CC BY-SA 4.0** licence. Distance attenuation and
+  filtering are applied live at runtime, not baked into the file.
+
+  This is the only recorded sound in the build. Every other noise the game
+  makes — engines, water, fire, cicadas, footsteps — is synthesised from
+  oscillators and noise at run time and owes nobody a credit.
 
 ## What actually happened
 

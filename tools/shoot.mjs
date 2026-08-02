@@ -26,6 +26,12 @@ const chrome = spawn('google-chrome', [
   '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
   '--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader',
   '--hide-scrollbars', '--mute-audio',
+  // Output stays muted, but the AudioContext has to actually run: without this
+  // Chrome holds it suspended until a user gesture that a headless driver never
+  // makes, its clock never advances, and every setTargetAtTime in the mix sits
+  // at its initial value — so an audio test reads zeros and passes for the
+  // wrong reason.
+  '--autoplay-policy=no-user-gesture-required',
   `--window-size=${W},${H}`,
   `--remote-debugging-port=${PORT}`,
   '--user-data-dir=/tmp/claude-chrome-profile-' + PORT,

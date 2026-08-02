@@ -687,6 +687,101 @@ function buildAudio() {
     }
   }
 
+  // ── the klapa ───────────────────────────────────────────────────────────────
+  /**
+   * The one recorded sound in the whole game. Everything else here is
+   * synthesised from noise and oscillators, which is the right way to build an
+   * engine or a fire and completely the wrong way to build four men singing.
+   *
+   * It is a real klapa, recorded at the twelfth susret klapa at Donje Selo on
+   * Šolta on the eleventh of August 2018 — forty kilometres down the same coast,
+   * eight days after the date this game is set on, near enough. CC BY-SA 4.0 by
+   * the Wikimedia Commons contributor Draceane; trimmed, high-passed and
+   * levelled here, and the credit is in the README and on the title screen.
+   *
+   * The clip is deliberately the dry, close one rather than a pre-muddied
+   * distant mix: the distance is applied live below, so that walking towards it
+   * opens the filter continuously instead of crossfading between two mixes.
+   */
+  const KLAPA = {
+    full: 90,            // m — inside this you are standing in the middle of it
+    fade: 1600,          // m — past this the channel has swallowed it
+    gain: 0.55,          // what it plays at, up close, on foot
+    inside: 0.40,        // and what an airframe with two turboprops leaves of it
+    lpNear: 9000,        // Hz — the filter wide open, next to the singers
+    lpFar: 750,          // and what a kilometre of sea over water leaves of it
+  };
+  let klapaBuf = null, klapaNodes = null, klapaTried = false;
+
+  /**
+   * Decoded once, lazily, on the first frame that wants it — which is the first
+   * frame Jadrija is within earshot, and never at all if you fly the whole
+   * sortie over the far side of the channel.
+   */
+  function klapaLoad() {
+    if (klapaTried || !ctx || typeof PAYLOAD === 'undefined' || !PAYLOAD.klapa) return;
+    klapaTried = true;
+    try {
+      const bin = atob(PAYLOAD.klapa);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      // The callback form as well as the promise: Safari resolved decodeAudioData
+      // by callback for years and still accepts both, and one silent failure
+      // here costs the whole feature.
+      ctx.decodeAudioData(bytes.buffer, (buf) => { klapaBuf = buf; },
+        () => { /* undecodable — the game is not worse without it */ });
+    } catch (e) { /* likewise */ }
+  }
+
+  /**
+   * @param d       metres from the listener to the middle of Jadrija, or null
+   *                for "nowhere near it", which stops the voices
+   * @param inside  true if the listener is in the aeroplane
+   */
+  function klapa(d, inside) {
+    if (!ctx || dead) return;
+    if (d == null || d > KLAPA.fade) {
+      if (klapaNodes) klapaNodes.g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.9);
+      return;
+    }
+    if (!klapaBuf) { klapaLoad(); return; }
+    const t0 = ctx.currentTime;
+    if (!klapaNodes) {
+      const src = ctx.createBufferSource();
+      src.buffer = klapaBuf;
+      src.loop = true;
+      // Both ends inside the recording rather than at its edges, so the seam
+      // lands in a breath between two phrases instead of on the fade.
+      src.loopStart = 0.8;
+      src.loopEnd = Math.max(2, klapaBuf.duration - 1.2);
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = KLAPA.lpFar; lp.Q.value = 0.4;
+      // Sea air takes the very bottom out too, and without this the voices
+      // arrive across a kilometre of water sounding like they are underneath it.
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 150;
+      const g = ctx.createGain();
+      g.gain.value = 0.0001;
+      src.connect(hp).connect(lp).connect(g).connect(master);
+      // And a send that is *heaviest* when you are furthest away, because at a
+      // kilometre what reaches you is mostly the hillside behind the resort
+      // rather than the singers.
+      let w = null;
+      if (verbSend) { w = ctx.createGain(); w.gain.value = 0.5; g.connect(w).connect(verbSend); }
+      src.start(t0, 0.8);
+      klapaNodes = { src, g, lp, w };
+    }
+    // 1 at the resort, 0 at the edge of earshot. Squared, so it is a presence
+    // over most of the channel and a wall of sound only when you are in it.
+    const t = sat((KLAPA.fade - d) / (KLAPA.fade - KLAPA.full));
+    const amp = (inside ? KLAPA.inside : KLAPA.gain) * t * t;
+    const n = klapaNodes;
+    n.g.gain.setTargetAtTime(Math.max(amp, 0.0001), t0, 0.45);
+    n.lp.frequency.setTargetAtTime(
+      KLAPA.lpFar + (KLAPA.lpNear - KLAPA.lpFar) * Math.pow(t, 1.6), t0, 0.5);
+    if (n.w) n.w.gain.setTargetAtTime(0.12 + 0.55 * (1 - t), t0, 0.5);
+  }
+
   /**
    * Cicadas. Thirty summers of them, and the sound of every August afternoon
    * on this coast — band-passed noise, amplitude-modulated at the wingbeat.
@@ -904,7 +999,18 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, beep, setVolume, getVolume,
-    setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas,
+    setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa,
+    /** For a test: did the one sample in the build decode, and what is it doing? */
+    klapaStats: () => ({
+      state: ctx ? ctx.state : 'no ctx',
+      tried: klapaTried,
+      loaded: !!klapaBuf,
+      secs: klapaBuf ? +klapaBuf.duration.toFixed(2) : 0,
+      rate: klapaBuf ? klapaBuf.sampleRate : 0,
+      playing: !!klapaNodes,
+      gain: klapaNodes ? +klapaNodes.g.gain.value.toFixed(4) : 0,
+      lp: klapaNodes ? Math.round(klapaNodes.lp.frequency.value) : 0,
+    }),
     birdCall, radalt, gpwsSink, gpwsPullUp, hullSlam, impact, kill,
     get ctx() { return ctx; } };
 }

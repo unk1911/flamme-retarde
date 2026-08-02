@@ -1435,6 +1435,22 @@ function frame() {
   const afoot = state.phase === 'ground' || state.phase === 'chute';
   if (afoot !== wasAfoot) { audio.cicadas(afoot, 0.05); wasAfoot = afoot; }
 
+  // And the klapa, off the terrace at Jadrija. Measured from the camera rather
+  // than from the aeroplane, which is the same point in every mode except the
+  // chase view and is the right one in that too: what you hear should follow
+  // where you are looking from, not where the airframe is.
+  //
+  // Deliberately audible from a long way out. On a still August afternoon four
+  // men singing outdoors carry a kilometre over flat water, and the whole point
+  // of the thing is that you pick it up as a suggestion somewhere over the
+  // channel and only work out what it is on the way in.
+  if (jadrija && state.phase !== 'intro') {
+    audio.klapa(
+      Math.hypot(camera.position.x - jadrija.site.x, camera.position.z - jadrija.site.z),
+      state.phase === 'fly',
+    );
+  }
+
   if (state.scooping) {
     const { fwd, right } = flight.axes();
     scoopSpray.emit(flight.p.pos, fwd, right, state.speed, dt);
@@ -1678,6 +1694,12 @@ window.__fr = {
    * lexical scope and none of it is on `window`, so a test that wants to know
    * whether a point is in the sea has no way to ask without this.
    */
+  audio: {
+    raw: () => audio,
+    klapa: () => audio.klapaStats(),
+    /** Step the klapa at a given range without flying there. */
+    at: (d, inside = false) => { audio.klapa(d, inside); return audio.klapaStats(); },
+  },
   land: {
     at: (x, z) => groundAt(x, z),
     sea: (x, z) => isSea(x, z),

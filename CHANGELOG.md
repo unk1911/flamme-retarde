@@ -8,7 +8,35 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
-## [Unreleased]
+## [1.15.0] — 2026-08-02
+
+### Added — a klapa on the terrace at Jadrija
+
+The first and only recorded sound in the build. Everything else the game makes
+is synthesised from oscillators and noise, which is the right way to build an
+engine or a fire and completely the wrong way to build four men singing.
+
+It is a real klapa: the twelfth *susret klapa* at Donje Selo on Šolta, forty
+kilometres down the same coast, recorded on 11 August 2018 by the Wikimedia
+Commons contributor **Draceane** and licensed CC BY-SA 4.0. Extracted from the
+video, trimmed to 47 s, high-passed, levelled, 56 kbps mono — 320 KB, about
+three per cent on the bundle. Credited on the title screen and in the README,
+with the changes listed, and the adapted audio stays BY-SA.
+
+The distance is applied live rather than baked, so walking towards it opens the
+filter continuously instead of crossfading two mixes: full at ninety metres and
+9 kHz wide open, down to 750 Hz and nothing at all by 1600 m, with the reverb
+send *heaviest* when you are furthest out — at a kilometre what reaches you is
+mostly the hillside behind the resort rather than the singers. Audible from the
+channel on purpose. Four men singing outdoors on a still August afternoon carry
+a kilometre over flat water, and the point is that you pick it up as a
+suggestion and only work out what it is on the way in. An airframe with two
+turboprops in it leaves you about forty per cent.
+
+Rejected on the way: the one Internet Archive hit, a Klapa Cambi album marked
+CC BY-NC-ND, carries `CD 001 HDS/BIEM` in its metadata — a commercially
+administered release with a third party's licence box ticked, not the rights
+holder's to give.
 
 ### Changed — a canopy you can actually steer
 
