@@ -8,6 +8,33 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.14.0] — 2026-08-02
+
+### Added — Jadrija, stage 3: the life in it
+
+The concrete was right and the place was empty, which is the atmosphere of an
+evacuation rather than of a bathing station on the sixth of August.
+
+Parasols with alternating panels and loungers on the middle terrace. Bathers
+sitting on the lowest step with their feet over the water — which is what that
+4.2 m shelf is for — some standing, some in to the knees, somebody halfway down
+every other ladder. Families on the promenade, in pairs, the way people come
+here. Dinghies alongside the jetty and on their own moorings off the shelf, open
+so they read as boats rather than as painted planks.
+
+Green, drawn for eye height instead of for three hundred metres. An Aleppo pine
+from underneath is a bare leaning trunk carrying nothing until well over your
+head and then a flat, broken umbrella with sky through it — not the cone the
+distance layer draws, which is a fir, and there are no firs on this coast. With
+olives forking low under a silver crown, oleander along the back of the walk
+because it takes salt and nothing eats it, and agave on the rough slope past the
+concrete, which is where it grows without being planted.
+
+None of it animates and none of it is simulated: at the two distances Jadrija is
+ever seen from, a still figure in a plausible pose reads as a person. The trunks
+are solid, so you walk round an olive rather than through it; parasols and people
+are not, because you step over one and the other gets out of your way.
+
 ## [1.13.0] — 2026-08-02
 
 ### Fixed — the aeroplane you jumped out of no longer hangs in the sky

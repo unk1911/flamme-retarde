@@ -138,6 +138,17 @@ five of which are closed against the afternoon, chimneys, and a first-floor
 terrace on whichever side faces the water. Same outlines and heights OSM has;
 nothing invents a building that is not there.
 
+And it is the sixth of August, so there are people on it. Parasols and loungers
+on the middle terrace, bathers sitting on the lowest step with their feet over
+the water, somebody halfway down a ladder, families on the promenade, dinghies on
+their moorings off the shelf. Behind the huts there are Aleppo pines drawn the
+way one looks from underneath rather than from three hundred metres — a bare
+leaning trunk and a flat broken umbrella you can see sky through — with olives,
+oleander along the back of the walk, and agave out on the rough slope where the
+concrete stops. Nothing here animates: at the two distances Jadrija is ever seen
+from, a still figure in a plausible pose is a person, and thirty of them are a
+beach.
+
 The whole resort is laid out in a frame that follows the water's edge — metres
 along the shore, metres inland — and that edge is traced from the sea mask when
 the world loads rather than typed in, so it cannot drift off the coast if the

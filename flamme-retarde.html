@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.13.0">
+<meta name="version" content="1.14.0">
 <meta name="build-date" content="2026-08-02">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -1008,8 +1008,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.13.0, built 2026-08-02">
-    <b>v1.13.0</b><i>·</i><span>2026-08-02</span>
+  <div id="build" title="Flamme Retardé 1.14.0, built 2026-08-02">
+    <b>v1.14.0</b><i>·</i><span>2026-08-02</span>
   </div>
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
@@ -1220,7 +1220,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.13.0", date: "2026-08-02" };</script>
+<script>const BUILD = { v: "1.14.0", date: "2026-08-02" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -6683,6 +6683,389 @@ function buildJadrija(scene) {
     }
   }
 
+  // ── the life in it ─────────────────────────────────────────────────────────
+  /**
+   * Everything up to here is the resort with nobody in it: correct concrete,
+   * correct huts, and the atmosphere of a place that has been evacuated. Which
+   * is wrong twice over — it is the sixth of August, it is a bathing station,
+   * and the whole point of the fire is that there are people under it.
+   *
+   * All of it is static geometry in the same buffer as the huts. Nothing here
+   * animates and nothing here is a simulation: at the distance you actually see
+   * Jadrija from — either three hundred metres up at a hundred and eighty knots,
+   * or standing on the promenade — a still figure in a plausible pose reads as a
+   * person, and thirty of them read as a beach. Animating them would cost the
+   * frame budget of the fire and buy a wobble nobody would look at twice.
+   */
+  const SKIN = [
+    [0.760, 0.585, 0.450], [0.690, 0.505, 0.375],
+    [0.845, 0.680, 0.560], [0.520, 0.370, 0.270],
+  ];
+  const SWIM = [
+    [0.780, 0.220, 0.240], [0.140, 0.300, 0.560], [0.930, 0.870, 0.300],
+    [0.900, 0.900, 0.910], [0.180, 0.480, 0.420], [0.850, 0.470, 0.620],
+  ];
+  const HAIR = [[0.120, 0.095, 0.080], [0.300, 0.200, 0.110], [0.560, 0.470, 0.360]];
+  const pick = (a) => a[Math.floor(rng() * a.length) % a.length];
+
+  /**
+   * A frame rotated within the shore's own (t, s) plane, so a figure can face
+   * any way without any of the code below knowing about world axes. Feeds
+   * straight into `boxIn`, which asks only for something that turns three
+   * numbers into a point.
+   */
+  const facing = (t0, s0, ang) => {
+    const c = Math.cos(ang), sn = Math.sin(ang);
+    return (dt, ds, y) => W(t0 + dt * c - ds * sn, s0 + dt * sn + ds * c, y);
+  };
+
+  /** A vertical n-sided prism. Poles, trunks, pot rims. */
+  function post(P, dt, ds, y0, y1, r, col, sides = 6) {
+    for (let i = 0; i < sides; i++) {
+      const a0 = (i / sides) * TAU, a1 = ((i + 1) / sides) * TAU;
+      const A = P(dt + Math.cos(a0) * r, ds + Math.sin(a0) * r, y0);
+      const B = P(dt + Math.cos(a1) * r, ds + Math.sin(a1) * r, y0);
+      b.quad(A, B, [B[0], y1, B[2]], [A[0], y1, A[2]], col);
+    }
+  }
+
+  /**
+   * A dome, cut off at `squash` of a hemisphere. Two rings of quads and a fan is
+   * enough — these are read as foliage and as shoulders, never as spheres, and a
+   * third ring doubles the triangle count for something nobody can see.
+   */
+  function dome(P, dt, ds, y0, h, r, col, sides = 7) {
+    const RINGS = [0, 0.45, 0.80];
+    for (let k = 0; k < RINGS.length - 1; k++) {
+      const p0 = RINGS[k] * Math.PI * 0.5, p1 = RINGS[k + 1] * Math.PI * 0.5;
+      const r0 = Math.cos(p0) * r, r1 = Math.cos(p1) * r;
+      const h0 = y0 + Math.sin(p0) * h, h1 = y0 + Math.sin(p1) * h;
+      for (let i = 0; i < sides; i++) {
+        const a0 = (i / sides) * TAU, a1 = ((i + 1) / sides) * TAU;
+        b.quad(
+          P(dt + Math.cos(a0) * r0, ds + Math.sin(a0) * r0, h0),
+          P(dt + Math.cos(a1) * r0, ds + Math.sin(a1) * r0, h0),
+          P(dt + Math.cos(a1) * r1, ds + Math.sin(a1) * r1, h1),
+          P(dt + Math.cos(a0) * r1, ds + Math.sin(a0) * r1, h1), col);
+      }
+    }
+    const rt = Math.cos(RINGS[2] * Math.PI * 0.5) * r;
+    const ht = y0 + Math.sin(RINGS[2] * Math.PI * 0.5) * h;
+    for (let i = 0; i < sides; i++) {
+      const a0 = (i / sides) * TAU, a1 = ((i + 1) / sides) * TAU;
+      b.tri(P(dt + Math.cos(a0) * rt, ds + Math.sin(a0) * rt, ht),
+        P(dt + Math.cos(a1) * rt, ds + Math.sin(a1) * rt, ht),
+        P(dt, ds, y0 + h), col);
+    }
+  }
+
+  /**
+   * A person.
+   *
+   * Boxes, and deliberately so — the crew rig in 47-ground.js is a jointed thing
+   * that walks, and it costs what a jointed thing that walks costs. Nobody on
+   * this shore is doing anything but standing, sitting or lying down.
+   *
+   * `pose` is the whole vocabulary: `stand`, `sit` (on a terrace edge, legs over
+   * the water), `lie` (on a lounger), `wade` (in to the knees, which is drawn by
+   * simply starting the legs below the waterline and letting the sea clip them).
+   */
+  function person(t, s, y, ang, pose = 'stand', scale = 1) {
+    const P = facing(t, s, ang);
+    const k = scale;
+    const skin = pick(SKIN), suit = pick(SWIM), hair = pick(HAIR);
+    // Half-widths. `hip` has to stay well under the ±0.105 the legs are set out
+    // at or the two boxes meet in the middle and there is no gap to see — which
+    // is exactly what the first version did, at 0.11 against 0.095.
+    const shin = 0.092 * k, hip = 0.068 * k;
+
+    if (pose === 'lie') {
+      // Flat on the back, feet seaward. The whole figure is a metre and three
+      // quarters of horizontal boxes, which at a metre off the ground is what
+      // a person on a lounger is from any angle you will ever see one here.
+      boxIn(P, -0.17 * k, 0.17 * k, -0.86 * k, 0.10 * k, y, y + 0.16 * k, skin);
+      boxIn(P, -0.20 * k, 0.20 * k, 0.10 * k, 0.62 * k, y, y + 0.20 * k, suit);
+      boxIn(P, -0.13 * k, 0.13 * k, 0.62 * k, 0.80 * k, y + 0.02 * k, y + 0.20 * k, skin);
+      boxIn(P, -0.10 * k, 0.10 * k, 0.80 * k, 0.98 * k, y + 0.04 * k, y + 0.22 * k, hair);
+      return;
+    }
+
+    // Everything upright shares a skeleton and differs only in where the knees
+    // are and how far the hips have dropped.
+    const sit = pose === 'sit';
+    const wade = pose === 'wade';
+    const drop = sit ? 0.44 * k : 0;
+    const foot = wade ? -0.55 * k : 0;      // in to the knees
+    const hipY = y - drop + (0.84 * k) + foot;
+
+    // Legs apart with daylight between them. Drawn at the same width as the hips
+    // and butted together, the whole figure came out as one slab from shoulder
+    // to floor and read as a painted board rather than as a person — the gap is
+    // what a silhouette needs, not the detail.
+    if (sit) {
+      // Thighs forward off the edge, shins hanging down the wall in front.
+      boxIn(P, -0.17 * k, 0.17 * k, -0.02 * k, 0.40 * k, hipY - 0.13 * k, hipY, skin);
+      for (const o of [-0.105 * k, 0.105 * k]) {
+        boxIn(P, o - hip, o + hip, 0.30 * k, 0.30 * k + 2 * hip,
+          hipY - 0.56 * k, hipY - 0.13 * k, skin);
+      }
+    } else {
+      for (const o of [-0.105 * k, 0.105 * k]) {
+        boxIn(P, o - hip, o + hip, -shin, shin, y + foot, hipY, skin);
+      }
+    }
+
+    const shY = hipY + 0.58 * k;
+    const half = 0.185 * k, deep = 0.105 * k;
+    // The suit sits *across* the hips rather than above them, so the colour
+    // break falls where a costume actually is and closes the top of both legs.
+    boxIn(P, -half, half, -deep, deep, hipY - 0.19 * k, hipY + 0.09 * k, suit);
+    boxIn(P, -half, half, -deep, deep, hipY + 0.09 * k, shY, skin);
+    // Arms just outside the ribs. At 0.26 they put the silhouette at 63 cm
+    // across, which is a doorway, not a swimmer.
+    for (const o of [-half - 0.045 * k, half + 0.045 * k]) {
+      boxIn(P, o - 0.042 * k, o + 0.042 * k, -0.055 * k, 0.055 * k,
+        shY - 0.58 * k, shY - 0.02 * k, skin);
+    }
+    boxIn(P, -0.055 * k, 0.055 * k, -0.048 * k, 0.048 * k, shY, shY + 0.06 * k, skin);
+    boxIn(P, -0.088 * k, 0.088 * k, -0.082 * k, 0.082 * k,
+      shY + 0.06 * k, shY + 0.25 * k, skin);
+    // The back and top of the head only. A fringe of hair over a box reads far
+    // better than a hair-coloured box does.
+    boxIn(P, -0.093 * k, 0.093 * k, -0.087 * k, 0.02 * k,
+      shY + 0.14 * k, shY + 0.27 * k, hair);
+  }
+
+  /** A parasol: a pole and a shallow eight-panel cone, tilted a few degrees. */
+  function parasol(t, s, y, col) {
+    const P = facing(t, s, rng() * TAU);
+    post(P, 0, 0, y, y + 2.06, 0.028, [0.560, 0.545, 0.520], 5);
+    const R = 1.15, tip = y + 2.24, rim = y + 1.86;
+    for (let i = 0; i < 8; i++) {
+      const a0 = (i / 8) * TAU, a1 = ((i + 1) / 8) * TAU;
+      // Alternating panels, which is what every hired parasol on this coast is,
+      // and the one detail that stops a field of them looking like mushrooms.
+      const c = i % 2 ? col : [0.930, 0.920, 0.895];
+      b.tri(P(0, 0, tip),
+        P(Math.cos(a0) * R, Math.sin(a0) * R, rim),
+        P(Math.cos(a1) * R, Math.sin(a1) * R, rim), c);
+      b.tri(P(Math.cos(a1) * R, Math.sin(a1) * R, rim),
+        P(Math.cos(a0) * R, Math.sin(a0) * R, rim),
+        P(0, 0, tip), c);
+    }
+  }
+
+  /** A lounger: a frame, a back raked up at one end, and four short legs. */
+  function lounger(t, s, y, ang, col) {
+    const P = facing(t, s, ang);
+    boxIn(P, -0.32, 0.32, -0.92, 0.36, y + 0.30, y + 0.36, col);
+    // The back, raised. Drawn as a stack of three thin slabs climbing away from
+    // the seat, because a genuinely raked quad here needs its own frame and this
+    // is a deckchair.
+    for (let i = 0; i < 3; i++) {
+      boxIn(P, -0.32, 0.32, 0.36 + i * 0.17, 0.53 + i * 0.17,
+        y + 0.36 + i * 0.13, y + 0.44 + i * 0.13, col);
+    }
+    for (const dt of [-0.26, 0.26]) {
+      for (const ds of [-0.80, 0.24]) {
+        boxIn(P, dt - 0.03, dt + 0.03, ds - 0.03, ds + 0.03,
+          y, y + 0.31, [0.720, 0.715, 0.700]);
+      }
+    }
+  }
+
+  /**
+   * An Aleppo pine at eye height.
+   *
+   * The land cover draws these by the hundred thousand and draws them right for
+   * three hundred metres: a billboard with a green top. Standing under one, what
+   * you actually see is a bare leaning trunk carrying almost nothing until well
+   * above your head, and then a flat, broken umbrella — the shade is in patches
+   * and the sky comes through it. That is the tree; the cone the distance layer
+   * draws is a fir, and there are no firs on this coast.
+   */
+  function pine(t, s, y, h) {
+    const P = facing(t, s, rng() * TAU);
+    const lean = (rng() - 0.5) * 0.9;
+    post(P, 0, 0, y, y + h * 0.34, 0.20, [0.330, 0.270, 0.215], 5);
+    post(P, lean * 0.3, 0, y + h * 0.32, y + h * 0.70, 0.15, [0.360, 0.295, 0.235], 5);
+    const cx = lean, top = y + h * 0.66;
+    for (let i = 0; i < 3; i++) {
+      const a = rng() * TAU, d = rng() * h * 0.20;
+      dome(P, cx + Math.cos(a) * d, Math.sin(a) * d,
+        top + i * h * 0.09, h * 0.16, h * (0.30 - i * 0.05),
+        i ? [0.180, 0.255, 0.140] : [0.145, 0.215, 0.120]);
+    }
+  }
+
+  /** An olive: a short trunk that forks low, and a silver-grey crown. */
+  function olive(t, s, y, h) {
+    const P = facing(t, s, rng() * TAU);
+    post(P, 0, 0, y, y + h * 0.36, 0.19, [0.400, 0.360, 0.300], 5);
+    for (const o of [-0.16, 0.18]) {
+      post(P, o, o * 0.4, y + h * 0.30, y + h * 0.58, 0.10, [0.420, 0.380, 0.315], 4);
+    }
+    for (const [dx, dz, r] of [[0, 0, 0.52], [-0.35, 0.25, 0.36], [0.34, -0.22, 0.34]]) {
+      dome(P, dx * h * 0.5, dz * h * 0.5, y + h * 0.52, h * 0.34, h * r,
+        [0.365, 0.410, 0.285]);
+    }
+  }
+
+  /** Oleander: a mound of dark leaf with the flowers sitting on top of it. */
+  function oleander(t, s, y, r) {
+    const P = facing(t, s, rng() * TAU);
+    dome(P, 0, 0, y, r * 1.25, r, [0.130, 0.235, 0.135]);
+    const flower = rng() < 0.5 ? [0.880, 0.480, 0.600] : [0.945, 0.930, 0.910];
+    for (let i = 0; i < 5; i++) {
+      const a = rng() * TAU, d = rng() * r * 0.72;
+      dome(P, Math.cos(a) * d, Math.sin(a) * d,
+        y + r * (0.72 + rng() * 0.42), r * 0.16, r * 0.20, flower, 5);
+    }
+  }
+
+  /** Agave: no trunk, no crown, just blades out of the ground in a rosette. */
+  function agave(t, s, y, r) {
+    const P = facing(t, s, rng() * TAU);
+    const n = 8;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU + rng() * 0.3;
+      const up2 = 0.55 + rng() * 0.75;
+      const c = Math.cos(a) * r, sn2 = Math.sin(a) * r;
+      const col = [0.400, 0.470, 0.360];
+      b.tri(P(-Math.sin(a) * r * 0.22, Math.cos(a) * r * 0.22, y),
+        P(Math.sin(a) * r * 0.22, -Math.cos(a) * r * 0.22, y),
+        P(c, sn2, y + r * up2), col);
+      b.tri(P(Math.sin(a) * r * 0.22, -Math.cos(a) * r * 0.22, y),
+        P(-Math.sin(a) * r * 0.22, Math.cos(a) * r * 0.22, y),
+        P(c, sn2, y + r * up2), col);
+    }
+  }
+
+  /**
+   * A dinghy, floating. Flat bottom, flared sides, two thwarts.
+   *
+   * Open, which is the whole of whether it reads as a boat. Capped across the
+   * top it is a lozenge — from the promenade it looked like a painted plank
+   * lying on the sea. So: an outer skin, a gunwale, and an inner skin down to a
+   * floor you can see, which costs six more quads and is the difference.
+   */
+  function dinghy(t, s, ang, col) {
+    const P = facing(t, s, ang);
+    const L = 1.70, Bm = 0.64;
+    // Waterline at 0. A dinghy this size floats with about a third of her
+    // freeboard under, which is what stops her sitting on the sea like a toy.
+    const keel = -0.26, rimY = 0.44, floor = 0.04;
+    const ring = (k, y) => [
+      [-Bm * 0.55 * k, -L], [Bm * 0.55 * k, -L], [Bm * k, 0],
+      [Bm * 0.72 * k, L * 0.92], [-Bm * 0.72 * k, L * 0.92], [-Bm * k, 0],
+    ].map(([a, c]) => P(a, c * (0.55 + 0.45 * k), y));
+    const low = ring(0.62, keel), top = ring(1, rimY), inn = ring(0.88, rimY);
+    const bed = ring(0.55, floor);
+    const WOOD = [0.700, 0.615, 0.480];
+    for (let i = 0; i < 6; i++) {
+      const j = (i + 1) % 6;
+      b.quad(low[i], low[j], top[j], top[i], col);            // outside
+      b.quad(top[j], top[i], inn[i], inn[j], [col[0] * 0.9, col[1] * 0.9, col[2] * 0.9]);
+      b.quad(inn[j], inn[i], bed[i], bed[j], WOOD);           // inside
+      b.tri(bed[i], bed[j], P(0, 0, floor), WOOD);            // and the floor
+    }
+    for (const ds of [-0.40, 0.50]) {
+      boxIn(P, -Bm * 0.72, Bm * 0.72, ds - 0.06, ds + 0.06,
+        rimY - 0.10, rimY - 0.03, [0.660, 0.600, 0.500]);
+    }
+  }
+
+  // ── and where all of it goes ───────────────────────────────────────────────
+  const bathers = [];
+
+  // The middle terrace is the shelf people actually lay their towels on: wide
+  // enough for a parasol and a pair of loungers, and one step above the water.
+  for (let t = 9; t < LEN - 9; t += 7.4 + rng() * 5.0) {
+    const st = at(t), y = st.mid;
+    if (Math.abs(t - gapAt) < 5) continue;                  // keep the jetty clear
+    if (rng() < 0.62) {
+      const s = 5.4 + rng() * 3.6;
+      parasol(t, s, y, pick(SWIM));
+      // Loungers point at the water, which is the one thing everybody here
+      // agrees about.
+      const n = 1 + (rng() < 0.55 ? 1 : 0);
+      for (let i = 0; i < n; i++) {
+        const lt = t + (i - (n - 1) * 0.5) * 1.5;
+        lounger(lt, s - 1.5, y, Math.PI, pick([[0.900, 0.890, 0.870],
+          [0.240, 0.420, 0.560], [0.860, 0.560, 0.300]]));
+        if (rng() < 0.5) bathers.push([lt, s - 1.9, y + 0.36, Math.PI, 'lie', 1]);
+      }
+    } else if (rng() < 0.5) {
+      bathers.push([t, 5.0 + rng() * 4.0, y, Math.PI + (rng() - 0.5) * 1.4, 'stand', 1]);
+    }
+  }
+
+  // Along the lowest platform: sitting on the edge with their feet over the
+  // water, which is what that step is for and the reason it is 4.2 m wide.
+  for (let t = 6; t < LEN - 6; t += 5.2 + rng() * 6.5) {
+    if (Math.abs(t - gapAt) < 4) continue;
+    const st = at(t), y = st.lip;
+    const r = rng();
+    if (r < 0.44) bathers.push([t, 1.25, y, Math.PI, 'sit', r < 0.10 ? 0.66 : 1]);
+    else if (r < 0.60) bathers.push([t, 2.2 + rng() * 1.4, y, rng() * TAU, 'stand', 1]);
+    else if (r < 0.70) bathers.push([t, -0.9, 0.0, Math.PI, 'wade', r < 0.655 ? 0.66 : 1]);
+  }
+
+  // The promenade: people who are not bathing at all — walking it, standing at
+  // the rail, waiting for the boat.
+  for (let t = 10; t < LEN - 10; t += 11 + rng() * 13) {
+    const st = at(t), y = st.deck;
+    bathers.push([t, JAD.mid + 1.6 + rng() * 6.0, y, rng() * TAU, 'stand', 1]);
+    // Two together, half the time. People come here in pairs.
+    if (rng() < 0.5) {
+      bathers.push([t + 0.7, JAD.mid + 2.2 + rng() * 5.0, y, rng() * TAU, 'stand',
+        rng() < 0.28 ? 0.68 : 1]);
+    }
+  }
+
+  // Somebody halfway down every other ladder, which is the one place on this
+  // shore where a still figure reads unambiguously as mid-movement.
+  for (let t = 22; t < LEN - 12; t += 88) {
+    const st = at(t);
+    bathers.push([t + 0.34, -0.28, st.lip - 0.95, 0, 'stand', 1]);
+  }
+
+  for (const [t, s, y, a, pose, k] of bathers) person(t, s, y, a, pose, k);
+
+  // Dinghies: two alongside the jetty and a few on their own moorings off the
+  // shelf. None of them is going anywhere — this is a bathing station, and the
+  // boats belong to whoever walked down to it.
+  dinghy(JET.t - JET.w - 0.9, -JET.out + 7, 0.1, [0.880, 0.870, 0.845]);
+  dinghy(JET.t + JET.w + 1.0, -JET.out + 15, -0.06, [0.230, 0.420, 0.620]);
+  for (let t = 14; t < LEN - 14; t += 26 + rng() * 40) {
+    if (Math.abs(t - gapAt) < 12) continue;
+    dinghy(t, -5.5 - rng() * 9, rng() * TAU,
+      pick([[0.880, 0.870, 0.845], [0.780, 0.250, 0.230], [0.240, 0.450, 0.640]]));
+  }
+
+  // Green. Pines and olives go behind the back row where there is soil and where
+  // they will not be standing in the middle of the promenade; oleander runs
+  // along the back of the walk, which is where every Dalmatian resort puts it
+  // because it takes salt and nothing eats it; agave on the rough slope past the
+  // concrete, which is exactly where it grows without being planted.
+  const greens = [];
+  for (let t = 5; t < LEN - 5; t += 6 + rng() * 9) {
+    const s = JAD.rowB + 2.6 + rng() * 5.0;
+    const st = at(t), y = surfaceY(t, s);
+    const r = rng();
+    if (r < 0.42) { pine(t, s, y, 7.5 + rng() * 4.5); greens.push([t, s, 0.55, 9]); }
+    else if (r < 0.72) { olive(t, s, y, 4.2 + rng() * 1.6); greens.push([t, s, 0.60, 5]); }
+    else oleander(t, s, y, 0.85 + rng() * 0.55);
+  }
+  for (let t = 8; t < LEN - 8; t += 4.5 + rng() * 5) {
+    if (Math.abs(t - gapAt) < 6) continue;
+    oleander(t, JAD.rowA - 1.15, at(t).deck, 0.62 + rng() * 0.42);
+  }
+  for (let t = 4; t < LEN - 4; t += 3.2 + rng() * 6) {
+    const s = JAD.back + 1.5 + rng() * 7;
+    agave(t, s, surfaceY(t, s), 0.55 + rng() * 0.55);
+  }
+
   // ── the village ────────────────────────────────────────────────────────────
   /**
    * The houses behind the promenade, rebuilt from their own footprints.
@@ -6998,6 +7381,13 @@ function buildJadrija(scene) {
     a: (r.t1 - r.t0) * 0.5, c: (r.s1 - r.s0) * 0.5,
     h: r.h, y: r.y,
   }));
+  // The trees. A trunk is the one piece of the new scenery you can walk into
+  // rather than round: parasols and loungers you step over in life, and a person
+  // gets out of your way, but an olive does not. Squared off to the trunk, not
+  // to the crown — being stopped by foliage two metres over your head is worse
+  // than walking through it.
+  for (const [t, s, r, h] of greens) blockers.push({ t, s, a: r, c: r, h, y: 0 });
+
   // The houses were laid out to their lanes rather than to the shore, so each
   // carries the angle between the two and `confine` turns into it. Reducing them
   // to axis-aligned boxes instead grew a square house by half its width in each
