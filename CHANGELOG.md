@@ -8,6 +8,34 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.19.0] — 2026-08-02
+
+### Changed — the loungers and the parasols
+
+Last of the eye-height pass, and both were the same fault in different clothes:
+a flat thing standing in for a curved one.
+
+**The lounger** was a slab seat, four posts, and a back made of three thin slabs
+climbing away from the seat in steps. The comment on that back said exactly why
+— *"a genuinely raked quad here needs its own frame"* — and it has one now, so
+the staircase is gone. The whole bed is one profile polyline from the foot to
+the top of the back, walked by arc length so the slats stay evenly spaced across
+the bend instead of bunching where it turns: sixteen slats with daylight between
+them, two side rails standing proud of them, and four legs splayed a little so
+it does not read as a table.
+
+**The parasol** was eight flat triangles from tip to rim, which is a cone. A
+canopy is not flat in either direction — along a rib it is domed, nearly level
+at the crown and steepening to the edge, and between ribs the cloth sags under
+its own weight, more the further out it goes. Those two curvatures are the whole
+thing: the sag puts a crease down every rib without a single rib being modelled,
+which is what tells you it is cloth over a frame rather than a mushroom. Plus a
+valance hanging a hand's width off the rim, a hub, and a proper foot on the
+pole. Drawn from both sides, since standing under one is most of what you do
+here.
+
+14 430 triangles across the whole beach for both.
+
 ## [1.18.0] — 2026-08-02
 
 ### Fixed — you could walk through everything, and across the sea

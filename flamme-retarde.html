@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.18.0">
+<meta name="version" content="1.19.0">
 <meta name="build-date" content="2026-08-02">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -1008,8 +1008,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.18.0, built 2026-08-02">
-    <b>v1.18.0</b><i>·</i><span>2026-08-02</span>
+  <div id="build" title="Flamme Retardé 1.19.0, built 2026-08-02">
+    <b>v1.19.0</b><i>·</i><span>2026-08-02</span>
   </div>
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
@@ -1226,7 +1226,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.18.0", date: "2026-08-02" };</script>
+<script>const BUILD = { v: "1.19.0", date: "2026-08-02" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -7278,39 +7278,118 @@ function buildJadrija(scene) {
   }
 
   /** A parasol: a pole and a shallow eight-panel cone, tilted a few degrees. */
+  /**
+   * A hired beach parasol.
+   *
+   * Eight flat triangles from the tip to the rim is a cone, and a cone is what
+   * it looked like. A canopy is not flat in either direction: along a rib it is
+   * domed, nearly level at the crown and steepening to the edge, and *between*
+   * ribs the cloth sags under its own weight. Those two curvatures are the
+   * whole thing — the sag puts a crease down every rib without a single rib
+   * being modelled, which is what tells you it is cloth over a frame.
+   *
+   * Everything is drawn from both sides. You spend most of your time on this
+   * beach underneath one.
+   */
   function parasol(t, s, y, col) {
     const P = facing(t, s, rng() * TAU);
-    post(P, 0, 0, y, y + 2.06, 0.028, [0.560, 0.545, 0.520], 5);
-    const R = 1.15, tip = y + 2.24, rim = y + 1.86;
+    const POLE = [0.560, 0.545, 0.520];
+    const WHITE = [0.930, 0.920, 0.895];
+    const R = 1.18, tip = y + 2.26, rim = y + 1.84;
+    post(P, 0, 0, y, y + 2.36, 0.030, POLE, 6);
+    post(P, 0, 0, y, y + 0.05, 0.17, [0.430, 0.425, 0.410], 8);   // the foot
+    post(P, 0, 0, y + 1.94, y + 2.02, 0.058, POLE, 6);            // the hub
+
+    // `u` runs out along a rib, `v` across a panel between two of them.
+    const SEG = 3, CRS = 2;
+    const pt3 = (a, u, v) => {
+      const r = R * u;
+      // Zero at both ribs, deepest mid-panel, and growing with radius because
+      // there is more unsupported cloth further out.
+      const sag = 0.085 * Math.sin(Math.PI * v) * u * u;
+      return P(Math.cos(a) * r, Math.sin(a) * r,
+        tip - (tip - rim) * Math.pow(u, 1.5) - sag);
+    };
     for (let i = 0; i < 8; i++) {
-      const a0 = (i / 8) * TAU, a1 = ((i + 1) / 8) * TAU;
       // Alternating panels, which is what every hired parasol on this coast is,
       // and the one detail that stops a field of them looking like mushrooms.
-      const c = i % 2 ? col : [0.930, 0.920, 0.895];
-      b.tri(P(0, 0, tip),
-        P(Math.cos(a0) * R, Math.sin(a0) * R, rim),
-        P(Math.cos(a1) * R, Math.sin(a1) * R, rim), c);
-      b.tri(P(Math.cos(a1) * R, Math.sin(a1) * R, rim),
-        P(Math.cos(a0) * R, Math.sin(a0) * R, rim),
-        P(0, 0, tip), c);
+      const c = i % 2 ? col : WHITE;
+      const a0 = (i / 8) * TAU, a1 = ((i + 1) / 8) * TAU;
+      for (let k = 0; k < CRS; k++) {
+        const v0 = k / CRS, v1 = (k + 1) / CRS;
+        const A0 = a0 + (a1 - a0) * v0, A1 = a0 + (a1 - a0) * v1;
+        for (let j = 0; j < SEG; j++) {
+          const u0 = j / SEG, u1 = (j + 1) / SEG;
+          const p00 = pt3(A0, u0, v0), p01 = pt3(A0, u1, v0);
+          const p11 = pt3(A1, u1, v1), p10 = pt3(A1, u0, v1);
+          b.quad(p00, p01, p11, p10, c);
+          b.quad(p10, p11, p01, p00, c);
+        }
+        // The valance: a hand's width of cloth hanging off the rim, which every
+        // one of these has and which is most of the silhouette from underneath.
+        const e0 = pt3(A0, 1, v0), e1 = pt3(A1, 1, v1);
+        const d0 = [e0[0], e0[1] - 0.12, e0[2]], d1 = [e1[0], e1[1] - 0.12, e1[2]];
+        b.quad(e0, d0, d1, e1, c);
+        b.quad(e1, d1, d0, e0, c);
+      }
     }
   }
 
   /** A lounger: a frame, a back raked up at one end, and four short legs. */
+  /**
+   * A sunlounger: slatted deck on a tubular frame, flat to the knee and raked
+   * from there to the head.
+   *
+   * The back used to be a staircase of three thin slabs, and the comment on it
+   * said why — "a genuinely raked quad here needs its own frame". It has one
+   * now. `frustumS` runs along the bed rather than up it, so the whole profile
+   * from the foot to the top of the back is one polyline and the slats simply
+   * follow it.
+   */
   function lounger(t, s, y, ang, col) {
     const P = facing(t, s, ang);
-    boxIn(P, -0.32, 0.32, -0.92, 0.36, y + 0.30, y + 0.36, col);
-    // The back, raised. Drawn as a stack of three thin slabs climbing away from
-    // the seat, because a genuinely raked quad here needs its own frame and this
-    // is a deckchair.
-    for (let i = 0; i < 3; i++) {
-      boxIn(P, -0.32, 0.32, 0.36 + i * 0.17, 0.53 + i * 0.17,
-        y + 0.36 + i * 0.13, y + 0.44 + i * 0.13, col);
+    const FRAME = [0.720, 0.715, 0.700];
+    // [inland offset, height above the concrete]. Flat from the foot to the
+    // knee, then up. The last two put the back at about 35° off the deck.
+    const PR = [[-0.92, 0.335], [-0.30, 0.352], [0.36, 0.360],
+      [0.60, 0.492], [0.86, 0.676]];
+
+    // Walk the profile by arc length so the slats stay evenly spaced across the
+    // bend instead of bunching where it turns.
+    const segLen = [];
+    let total = 0;
+    for (let i = 0; i < PR.length - 1; i++) {
+      const L = Math.hypot(PR[i + 1][0] - PR[i][0], PR[i + 1][1] - PR[i][1]);
+      segLen.push(L);
+      total += L;
     }
-    for (const dt of [-0.26, 0.26]) {
-      for (const ds of [-0.80, 0.24]) {
-        boxIn(P, dt - 0.03, dt + 0.03, ds - 0.03, ds + 0.03,
-          y, y + 0.31, [0.720, 0.715, 0.700]);
+    const along = (d) => {
+      let k = 0;
+      while (k < segLen.length - 1 && d > segLen[k]) { d -= segLen[k]; k++; }
+      const f = clamp(d / segLen[k], 0, 1);
+      return [PR[k][0] + (PR[k + 1][0] - PR[k][0]) * f,
+        PR[k][1] + (PR[k + 1][1] - PR[k][1]) * f];
+    };
+
+    // The slats. Daylight between them is the whole reason a lounger reads as
+    // furniture rather than as a painted plank on legs.
+    for (let d = 0.03; d < total - 0.04; d += 0.118) {
+      const [s0, y0] = along(d), [s1, y1] = along(Math.min(d + 0.076, total));
+      frustumS(P, s0, [0, y + y0 - 0.014, 0.285, 0.014],
+        s1, [0, y + y1 - 0.014, 0.285, 0.014], col);
+    }
+    // Side rails, carrying the slats and standing a little proud of them.
+    for (const o of [-0.30, 0.30]) {
+      for (let i = 0; i < PR.length - 1; i++) {
+        frustumS(P, PR[i][0], [o, y + PR[i][1] + 0.004, 0.026, 0.030],
+          PR[i + 1][0], [o, y + PR[i + 1][1] + 0.004, 0.026, 0.030], FRAME);
+      }
+    }
+    // Four legs, splayed a little so it does not read as a table.
+    for (const dt of [-0.27, 0.27]) {
+      for (const [ds, hy] of [[-0.78, 0.335], [0.22, 0.358]]) {
+        frustum(P, y, [dt * 1.10, ds * 1.06, 0.022, 0.022],
+          y + hy - 0.03, [dt, ds, 0.019, 0.019], FRAME);
       }
     }
   }
