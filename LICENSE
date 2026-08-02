@@ -1,0 +1,195 @@
+# Licence
+
+Flamme Retardé is not one work under one licence. It is a program that draws a
+real place, and the place came from somewhere. The code is mine; the terrain,
+the streets, the buildings and the singing are other people's, on terms I have
+to pass along intact. This file says which is which.
+
+    src/, tools/, build.py ................. MIT
+    Everything else I made ................. CC BY-SA 4.0
+    Three.js r0.180.0 ...................... MIT
+    OpenStreetMap-derived payload .......... ODbL 1.0 (+ attribution)
+    Terrain heightfield .................... public domain
+    build/payload/klapa.mp3 ................ CC BY-SA 4.0
+    build/payload/panel_*.webp,
+      refs/panels/*.png .................... see "The intro panels", below
+
+If you only want the short version: take the engine and do what you like with
+it; if you ship the *game*, or something built out of it, keep it open on the
+same terms and carry the credits.
+
+---
+
+## 1. The code — MIT
+
+Applies to `src/`, `tools/`, `build.py`, and the build machinery in `src/shell.html`
+and `src/styles.css`. These are the parts worth stealing — the terrain sampler,
+the propBuilder winding, the ground-collision solver, the synthesised audio
+graph — and they are yours with no strings beyond the notice.
+
+Where a source file carries writing rather than machinery, the writing is section
+2's and the code around it is section 1's. `src/02-i18n.js` is the clear case: the
+lookup is MIT, the three languages of prose inside it are CC BY-SA. Lift the
+mechanism freely; quote the script and you are attributing.
+
+Copyright (c) 2026 unk1911
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## 2. The game — CC BY-SA 4.0
+
+Copyright (c) 2026 unk1911, licensed under the
+Creative Commons Attribution-ShareAlike 4.0 International licence.
+Full text: https://creativecommons.org/licenses/by-sa/4.0/legalcode
+
+Applies to the authored content rather than the machinery:
+
+- the prose — `README.md`, `CHANGELOG.md`, the intro narration and every string
+  in `src/02-i18n.js`, in all three languages;
+- the hand-built worlds — the Jadrija layout, Aerodrom Rokići, the mission, and
+  the placement of everything in them;
+- the Blender models and their sources: `build/landmarks.blend`,
+  `build/firefighter.blend`, `tools/blender/*.py`, and the baked
+  `build/payload/*.fr3d.gz` (the cathedral, both forts, the Jadrija lighthouse,
+  the Šibenik bridge, the Canadair, the firefighter);
+- `docs/*.png`;
+- the assembled `flamme-retarde.html` as a whole.
+
+Share-alike here is deliberate and not merely inherited. The klapa arrives under
+BY-SA and I would rather the bundle match it outright than argue about whether a
+base64 blob inside an HTML file is a Collection or an Adaptation. It also seems
+the right answer for a thing built almost entirely out of open data and other
+people's generosity.
+
+**Attribution.** Credit *Flamme Retardé* by unk1911, link to
+https://github.com/unk1911/flamme-retarde, indicate changes, and keep the
+third-party notices in section 3.
+
+Note that the *facts* are not mine to license and I claim nothing over them.
+The Rokići fire of 6 August 2024, the *zvončići*, the casualty figures, the
+shape of the coast — those belong to the record and to the people they happened
+to. Section 2 covers how I wrote them down, not what happened.
+
+## 3. Third-party components
+
+These carry their own terms, which override sections 1 and 2 for the files
+named. All of them are redistributed here in compliance with those terms; none
+of them are mine to relicense.
+
+### Three.js r0.180.0 — MIT
+
+Copyright © 2010-2025 three.js authors. https://threejs.org
+
+Inlined into `flamme-retarde.html` by `build.py`, which stamps the MIT notice
+into the generated file above the bundled source. `vendor/` holds the download
+cache and is not committed.
+
+### OpenStreetMap — ODbL 1.0
+
+© OpenStreetMap contributors. https://www.openstreetmap.org/copyright
+
+Coastline, land cover, building footprints, roads, railways, place names and
+landmark positions come from OSM by way of `tools/fetch_osm.py` and
+`tools/bake.py`. The extracted, reprojected results are derivative databases and
+stay under the ODbL:
+
+    build/payload/town.json.gz      building footprints
+    build/payload/roads.json.gz     road network
+    build/payload/rail.json.gz      railway
+    build/payload/places.json       place names and positions
+
+`build/payload/terrain_c.png` is a land-cover raster rendered from the same
+data, and the running game is likewise a Produced Work: those may be under the
+licence in section 2, but only while the attribution above travels with them.
+It appears in `README.md`, in this file, and on the title screen, where the
+credit line reads *"terrain & town derived from OpenStreetMap & public elevation
+data"* (`veil.credit` in `src/02-i18n.js`).
+
+### Terrain heightfield — public domain
+
+`build/payload/terrain_h.png` is resampled from
+[AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (Terrarium
+encoding) via `tools/fetch_dem.py`. The underlying elevation for this tile comes
+from public-domain sources (SRTM and successors). The Terrain Tiles dataset
+aggregates several providers, some of which ask for attribution; the credit
+above covers it.
+
+### The klapa — CC BY-SA 4.0
+
+`build/payload/klapa.mp3` is adapted from
+[*Donje Selo, 12. susret klapa, 2018 (02)*](https://commons.wikimedia.org/wiki/File:Donje_Selo,_12._susret_klapa,_2018_(02).webm)
+by Wikimedia Commons contributor **Draceane**, recorded at the twelfth *susret
+klapa* at Donje Selo on Šolta on 11 August 2018, licensed
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+
+Changes made: audio extracted from the video, trimmed to 0.3–47.0 s, high-passed
+at 70 Hz, faded in and out, loudness-normalised to −16 LUFS, re-encoded as
+56 kbps mono MP3. The adapted audio is offered under the same CC BY-SA 4.0. The
+distance attenuation and filtering you hear are applied live at run time and are
+not baked into the file.
+
+This is the only recorded sound in the build. Everything else the game makes —
+engines, water, fire, cicadas, footsteps — is synthesised from oscillators and
+noise at run time and owes nobody a credit.
+
+### The intro panels — no grant offered
+
+`build/payload/panel_*.webp` and `refs/panels/*.png` were generated with Google
+Gemini 2.5 Flash Image from reference photographs, using `tools/gen_panels.py`.
+They are deliberately **excluded from section 2**, because I am not in a
+position to license them and would be lying if I pretended otherwise:
+
+- They are machine output. Whether that attracts copyright at all is unsettled,
+  and in at least some jurisdictions the answer is no.
+- They were painted from reference photographs that are not mine — Wikimedia
+  contributors, press and stock libraries. Those references are gitignored and
+  have never been in this repository; see `refs/README.md`. The `rokici` panel in
+  particular started from press photographs credited to **HVZ** and to
+  **Hrvoje Jelavić / PIXSELL**.
+
+They are included here as illustration for a non-commercial personal project. I
+make no claim to them and offer no warranty as to their status. If you are
+reusing this work — and especially if you are reusing it commercially — the
+right move is to regenerate them: `tools/gen_panels.py` names the reference each
+panel starts from, so you can substitute your own photographs, or drop the `ref`
+argument and have the panel painted from the prompt alone. Rebuilding without
+them costs a `python build.py`: `plate()` in `src/70-intro.js` returns early on a
+missing key, so the cinematic still runs — narration, timing and sound unchanged
+— over an empty stage.
+
+If you hold rights in one of the source photographs and want a panel gone, open
+an issue at https://github.com/unk1911/flamme-retarde/issues or write to
+dolphin@edeliverables.com and it will come out.
+
+---
+
+## Building a version with less in it
+
+Two of the components above have terms someone might want to be clear of. Both
+drop out cleanly, because the payload is a directory the build walks rather than
+a manifest it hard-codes:
+
+- **The klapa.** Delete `build/payload/klapa.mp3` and rebuild. `src/80-audio.js`
+  guards on `PAYLOAD.klapa` and silently does nothing without it; Jadrija just
+  gets quieter.
+- **The panels.** Delete `build/payload/panel_*.webp` and rebuild, or regenerate
+  them from your own references as above.
+
+Nothing else is optional. Remove the OSM payload and there is no Šibenik, which
+rather defeats the exercise.

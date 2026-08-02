@@ -430,6 +430,19 @@ Changes are tracked in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## Licence
+
+Two grants, because this is two things. The engine — `src/`, `tools/`, `build.py`
+— is **MIT**: take the terrain sampler, the collision solver, the synthesised
+audio graph, do what you like. The game itself — the prose, the worlds, the
+Blender models, the assembled `flamme-retarde.html` — is **CC BY-SA 4.0**, to
+match the klapa and the open data it is built out of.
+
+The third-party components below keep their own terms, and the intro panels are
+deliberately outside both grants — they are machine output painted from
+photographs that are not mine. [LICENSE](LICENSE) sets all of it out in full,
+including how to rebuild without the parts you may not want.
+
 ## Sources and credits
 
 - Terrain: [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (Terrarium), public domain.
