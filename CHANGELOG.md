@@ -8,6 +8,57 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.13.0] — 2026-08-02
+
+### Fixed — the aeroplane you jumped out of no longer hangs in the sky
+
+She was only being integrated while you were under the canopy, so the moment
+your boots touched down she froze in mid-air and stayed there, in plain view,
+for the rest of the mission. She is now flown wherever you are.
+
+And she goes down like an abandoned aeroplane rather than gliding off. Left with
+a dropped wing and the elevator alone she flew straight and level at cruise for
+the better part of a minute, because the lift model holds level flight for as
+long as the wings are near level; she now holds sixty-odd degrees of bank and
+twenty-five degrees of nose-down — a spiral, which is what actually happens —
+and is in the ground inside twenty seconds. Both attitudes wind in over about
+two seconds so she falls away rather than snapping over as you leave.
+
+On land she starts a fire where she goes in, along the line she was travelling.
+That is the price of the key, and it is meant to be one.
+
+### Changed — you can see the drop now
+
+The fire model wets an ellipse 190 m long and 46 m wide. The picture was
+fourteen droplets in a twelve-metre box, drawn only where the water landed — so
+pressing **F** did something enormous and showed you almost nothing.
+
+It is now drawn in two parts: a **column** off the hull, spawned with the
+aeroplane's own velocity and left to gravity so it traces the real arc down, and
+a **curtain** thrown up across the whole ellipse the fire model actually wets.
+Droplets are emitted per litre leaving the tank rather than per frame — the old
+way made the water denser the better your machine was — and each frame's worth
+is smeared back along the flight path, so at ninety metres a second it reads as
+a ribbon instead of a string of separate balls.
+
+The sound goes on for as long as the doors do. The whoosh is a second and a half
+and fires once, so a drop used to go quiet halfway through while six tonnes was
+still going over the side; there is now a sustained gush under it — a lowpassed
+roar for the mass and a broad band at 2.6 kHz for the spray, surging against the
+baffles — held until the doors shut.
+
+### Added — you can feel yourself walking
+
+On foot the camera was on rails: constant height, in silence. There is now a
+gait — the head drops as each boot lands, the weight goes side to side once per
+pair of steps, and a footstep sounds under it. Driven by distance covered rather
+than by a clock, so walking into a wall stops the steps, and the apron sounds
+like concrete where the hillside sounds like scrub.
+
+Cicadas, too. A Dalmatian hillside in August is one continuous shrill from every
+pine on it. The synthesis has been in the build since the cinematic and was only
+ever heard there; it now plays on foot and under the canopy.
+
 ## [1.12.1] — 2026-08-02
 
 ### Changed — the cinematic is opt-in after the first time

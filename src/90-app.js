@@ -1153,15 +1153,12 @@ function updateMission(dt) {
     showEnd(false);
   }
   // What you paid for the key, arriving. She is a long way off by now, so this
-  // is a noise and a shove and not the end of anything — the end of it is
-  // whatever you are hanging under.
-  if (flight.p.crashed && state.phase === 'chute' && !planeGone) {
-    planeGone = true;
-    const d = flight.p.pos.distanceTo(eject.pos);
-    alerts.bump(3.0 * (1 - sat((d - 200) / 1400)));
-    audio.impact(flight.p.crashOnWater, flight.p.crashSpeed || 0);
-    toast(T('toast.planeGone'), 'bad');
-  }
+  // is a noise and a shove and not the end of anything.
+  //
+  // Any phase, not just under the canopy: by the time she goes in you have very
+  // often already got your boots on the ground, and that used to be the one
+  // state in which nobody was watching for it.
+  if (flight.p.crashed && eject.active && !planeGone) derelictDown();
   if (flight.p.crashed && state.phase === 'fly') {
     // Not straight to the results screen. Twelve tonnes stopping deserves two
     // seconds of its own: the flash, the shake, the noise, the engines dying,
@@ -1228,11 +1225,84 @@ function showEnd(won, crashed = false, onWater = false, chute = null) {
 
 $('again').addEventListener('click', () => location.reload());
 
+// ── the aeroplane you left ───────────────────────────────────────────────────
+/**
+ * Nobody is flying her.
+ *
+ * The throttles wind back on their own, and with the stabiliser off she is out
+ * of trim with six tonnes of water free to move in the tank. What she does not
+ * do is glide: the first version of this dropped a wing and left the elevator
+ * alone, and the lift model holds level flight for as long as the wings are
+ * anywhere near level, so she flew straight on at cruise for the best part of a
+ * minute before the bank had built enough to bring her down. From under the
+ * canopy that reads as an aeroplane parked in the sky.
+ *
+ * So: a bank and a nose attitude, both held, both wound in over about two
+ * seconds so she falls away rather than snapping over the instant you leave.
+ * Sixty-odd degrees and twenty-five down is a spiral, which is what an
+ * abandoned aeroplane actually does and what puts her in the ground inside
+ * twenty seconds — long enough to watch, short enough to be an event.
+ *
+ * Both commands undo the flight model's squared stick response before handing
+ * it over, so the gains here mean what they say. Without that, the first two
+ * seconds of a ramp are squared down to nothing and the wind-in takes four
+ * times as long as it reads.
+ */
+function flyDerelict(dt) {
+  const p = flight.p;
+  if (p.crashed) return;
+  input.thrUp = input.thrDown = input.scoop = input.drop = false;
+  p.throttle = Math.max(0, p.throttle - dt * 0.35);
+
+  const away = sat((eject.since - 0.7) / 2.0);
+  const ax = flight.axes();
+  const bank = Math.atan2(ax.right.y, ax.up.y);
+  const nose = Math.asin(clamp(ax.fwd.y, -1, 1));
+  // Held to attitudes, not to rates. A steady deflection into a model this
+  // forgiving does not depart, it barrel-rolls — round and round, all the way
+  // down, which looks like an air display rather than a wreck in the making.
+  const preSq = (c) => Math.sign(c) * Math.sqrt(Math.abs(c));
+  p.stick.x = preSq(clamp((bank + DERELICT.bank * away) * 1.7, -1, 1));
+  p.stick.y = preSq(clamp((-DERELICT.nose * away - nose) * 1.7, -1, 1));
+  p.rudder = 0;
+  flight.update(dt, input);
+}
+
+/**
+ * And where she lands. Twelve tonnes and whatever is left in the tank, at two
+ * hundred knots, into a hillside that is already alight in three other places —
+ * so on land this starts a fourth. That is the price of the key, and it is
+ * meant to be one: you get to walk away, and the fire gets a new front.
+ *
+ * The airframe goes. There is no wreck model, and a clean Canadair parked on a
+ * burning hill would be a worse lie than an empty one; the fire and its smoke
+ * column are the marker, and they are visible from further off than any wreck
+ * would have been.
+ */
+function derelictDown() {
+  planeGone = true;
+  const d = flight.p.pos.distanceTo(eject.pos);
+  alerts.bump(3.0 * (1 - sat((d - 200) / 1400)));
+  audio.impact(flight.p.crashOnWater, flight.p.crashSpeed || 0);
+  toast(T('toast.planeGone'), 'bad');
+  if (!flight.p.crashOnWater && fire) {
+    fire.igniteNear(flight.p.pos.x, flight.p.pos.z, 1);
+    // Fuel, spread down the line she was travelling. One cell is a campfire;
+    // this wants to read as an aircraft going in.
+    const f = flight.axes().fwd;
+    for (let i = 1; i <= 4; i++) {
+      fire.igniteNear(flight.p.pos.x + f.x * i * 14, flight.p.pos.z + f.z * i * 14, 0.8);
+    }
+  }
+  plane.root.visible = false;
+}
+
 // ── frame ────────────────────────────────────────────────────────────────────
 
 const clock = new THREE.Clock();
 let started = false;
 let wasDropping = false;
+let wasAfoot = false;
 let lastFrameMs = 0;
 
 function frame() {
@@ -1253,32 +1323,18 @@ function frame() {
     // The branch, on mouse or space. The aeroplane's own input is deliberately
     // not read: it is parked, and nothing on foot should be moving its controls.
     ground.setSpray(mouseDrop || keys.has('Space') || TOUCH.gjet || debugJet);
+    // Unless she is not parked. Walking away from an aeroplane you jumped out of
+    // does not stop her flying — and it used to: the only place she was being
+    // integrated was the chute branch, so the moment the canopy touched down she
+    // froze in mid-air and hung there for the rest of the game, in plain view.
+    if (eject.active) flyDerelict(dt);
     updateMission(dt);
   }
 
   if (state.phase === 'chute') {
-    // Two things are happening at once and only one of them is you. The
-    // aeroplane is still being integrated — nobody is flying her, the throttles
-    // are winding back on their own, and she is on her way to whatever is
-    // underneath — and you are hanging under a canopy watching it happen.
-    input.thrUp = input.thrDown = input.scoop = input.drop = false;
-    flight.p.throttle = Math.max(0, flight.p.throttle - dt * 0.35);
-    // And she drops a wing. Left entirely alone with the stabiliser off she
-    // trims out into a shallow glide and flies on for minutes, which is a lie
-    // about what has happened: she is out of trim, there are six tonnes of
-    // water free to move in the tank, and one throttle is winding back before
-    // the other.
-    //
-    // Held to a *bank*, not to a roll rate. A steady deflection into a model
-    // this forgiving does not depart, it barrel-rolls — round and round, all
-    // the way down, which looks like an air display rather than an abandoned
-    // aeroplane. Sixty-odd degrees and left there is the picture: she goes over,
-    // turns away from you, and goes down, with nobody in her.
-    const away = sat((eject.since - 1.0) / 5);
-    const bank = Math.atan2(flight.axes().right.y, flight.axes().up.y);
-    flight.p.stick.x = clamp((bank + 1.15 * away) * 1.4, -1, 1);
-    flight.p.stick.y = 0;
-    flight.update(dt, input);
+    // Two things are happening at once and only one of them is you. You are
+    // hanging under a canopy watching the other one go in.
+    flyDerelict(dt);
     eject.update(dt, {
       turn: (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0)
         - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0),
@@ -1355,8 +1411,25 @@ function frame() {
     if (u && u.uCamRight) { u.uCamRight.value.copy(camRight); u.uCamUp.value.copy(camUp); }
   });
 
-  if (state.dropping && !wasDropping) audio.dropWhoosh();
+  // Only on the edge: setTargetAtTime every frame is a ramp that never gets
+  // anywhere, and re-arming it sixty times a second is audible as a stutter.
+  if (state.dropping !== wasDropping) {
+    if (state.dropping) audio.dropWhoosh();
+    audio.setGush(state.dropping);
+  }
   wasDropping = state.dropping;
+
+  // Cicadas, on foot. A Dalmatian hillside in August is not quiet — it is one
+  // continuous shrill from every pine on it, loud enough to talk over, and it
+  // is the first thing anybody who has been there remembers. The synthesis for
+  // it has been in the build since the cinematic and was only ever heard there,
+  // which left the one mode you actually stand still in silent.
+  //
+  // Under the canopy too: you can hear the hillside coming up at you a long
+  // time before you are on it, and that is most of what the last thirty seconds
+  // of a descent is.
+  const afoot = state.phase === 'ground' || state.phase === 'chute';
+  if (afoot !== wasAfoot) { audio.cicadas(afoot, 0.05); wasAfoot = afoot; }
 
   if (state.scooping) {
     const { fwd, right } = flight.axes();
@@ -1541,7 +1614,15 @@ window.__fr = {
       * 180 / Math.PI + 360)) % 360 : 0,
     bank: flight ? Math.round(Math.atan2(flight.axes().right.y, flight.axes().up.y)
       * 180 / Math.PI) : 0,
+    phase: state.phase,
+    planeShown: plane ? plane.root.visible : null,
     crashed: flight ? flight.p.crashed : false,
+    // What the stick is actually being told, and whether anything is helping.
+    // Both are invisible from outside and both have hidden a bug: an aeroplane
+    // that will not do what the code plainly commands is nearly always one of
+    // these two, and guessing at it from attitude alone costs an afternoon.
+    stick: flight ? [+flight.p.stick.x.toFixed(3), +flight.p.stick.y.toFixed(3)] : null,
+    assist: flight ? +flight.p.assist.toFixed(2) : null,
     ap: flight ? (flight.p.autopilot ? flight.p.apNote || 'on' : 'off') : null,
     scoop: flight ? (flight.p.scoopValid ? 'OK' : flight.p.scoopReason) : null,
     thr: flight ? Math.round((flight.p.throttle + flight.p.boost * FLIGHT.overboost) * 100) : 0,
@@ -1564,13 +1645,28 @@ window.__fr = {
    */
   chute: {
     fire: () => baleOut(),
-    reset: () => { eject.reset(); state.phase = 'fly'; planeGone = false; },
+    reset: () => {
+      eject.reset(); state.phase = 'fly'; planeGone = false;
+      plane.root.visible = true;
+    },
     raw: () => eject,
     step: (dt, turn = 0, flare = false) => {
       eject.update(dt, { turn, flare });
       return eject.stats();
     },
     stats: () => eject.stats(),
+    /**
+     * Put the abandoned aeroplane just above whatever is under her. The dive is
+     * eighteen seconds of real time and rather more than that headless with a
+     * hillside alight, and none of it is what a test of the *arrival* is for.
+     */
+    sink: (x, z) => {
+      const p = flight.p;
+      if (x !== undefined) { p.pos.x = x; p.pos.z = z; }
+      const sea = isSea(p.pos.x, p.pos.z);
+      p.pos.y = (sea ? 0 : groundAt(p.pos.x, p.pos.z)) + 6;
+      return { y: Math.round(p.pos.y), sea };
+    },
   },
   /**
    * The land itself, for anything that has to be sited against real ground

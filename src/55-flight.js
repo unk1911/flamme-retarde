@@ -624,7 +624,10 @@ function buildFlight(plane, fire) {
       const r = fire.drop(lx, lz, fwd.x / d, fwd.z / d, out);
       state.litresDropped += out;
       state.litresOnTarget += r.onTarget;
-      dropSplashes.emit(lx, lz, out, fwd);
+      // The aeroplane's own position and velocity as well as where it lands:
+      // the column comes off the hull and falls, and only the curtain is drawn
+      // at the far end.
+      dropSplashes.emit(lx, lz, out, fwd, p.pos, p.vel);
     }
     state.water = p.water;
 

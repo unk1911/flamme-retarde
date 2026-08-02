@@ -56,6 +56,13 @@ const EJECT = {
   minSafe: 60,           // m AGL, plus 1.6 s of whatever rate you brought
 };
 
+// The other half of the same event: what the aeroplane does once there is
+// nobody in her. Flown in 90-app.js, kept here because it is the same story.
+const DERELICT = {
+  bank: 1.15,            // rad she rolls away to, and stays at — 66°
+  nose: 0.44,            // rad she puts the nose down to — 25°
+};
+
 /**
  * The canopy: gores, a vent at the apex, and the lines. Built in a frame whose
  * origin is the jumper's eyes, so the whole thing can be parked on the camera

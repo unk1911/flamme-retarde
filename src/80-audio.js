@@ -230,13 +230,99 @@ function buildAudio() {
   }
 
   function dropWhoosh() {
-    // Six tonnes leaving the hull: a bright rush falling to a rumble.
+    // The doors. Six tonnes starting to leave the hull: a bright rush falling
+    // to a rumble. One shot, and only the opening — what follows it is below.
     burst({ freq: 3200, q: 0.4, dur: 1.1, gain: 0.30, sweep: 0.06 });
     burst({ freq: 700, q: 0.7, dur: 1.6, gain: 0.20, sweep: 0.15 });
   }
 
+  let gushNodes = null;
+  const GUSH = 0.34;
+
+  /**
+   * And the rest of it: water leaving the tank for as long as the doors are
+   * open, which on a full load is the better part of five seconds.
+   *
+   * The whoosh above is a second and a half and fires once, so the drop used to
+   * go quiet halfway through while six tonnes was still going over the side —
+   * an event with an opening and no body. This is the body: held for as long as
+   * the doors are, and let go over a quarter of a second when they shut.
+   *
+   * Two layers, because falling water is two sounds. A lowpassed roar is the
+   * mass of it, and a broad band up at 2.6k is the spray coming off — neither
+   * alone reads as water, and the roar on its own is just an engine. The wobble
+   * is what keeps it from being a hiss: water does not leave a tank at a
+   * constant rate, it surges against the baffles, and two slow sines beating
+   * against each other is that without needing a model of it.
+   */
+  function setGush(on) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    if (!gushNodes) {
+      if (!on) return;
+      const src = ctx.createBufferSource();
+      src.buffer = noiseBuf; src.loop = true;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 430; lp.Q.value = 0.8;
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 0.45;
+      const lg = ctx.createGain(); lg.gain.value = 1.0;
+      const bg = ctx.createGain(); bg.gain.value = 0.42;
+      // The surge sits on its own stage rather than on the gate, or the wobble
+      // goes on modulating a gain of zero and you can hear the tank breathing
+      // with the doors shut.
+      const wob = ctx.createGain();
+      wob.gain.value = 1.0;
+      for (const [rate, depth] of [[6.7, 0.20], [2.9, 0.13]]) {
+        const lfo = ctx.createOscillator();
+        lfo.type = 'sine'; lfo.frequency.value = rate;
+        const ag = ctx.createGain(); ag.gain.value = depth;
+        lfo.connect(ag).connect(wob.gain);
+        lfo.start(t0);
+      }
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      src.connect(lp).connect(lg).connect(wob);
+      src.connect(bp).connect(bg).connect(wob);
+      wob.connect(g).connect(master);
+      // Six tonnes hitting a hillside in a limestone valley comes back at you.
+      if (verbSend) { const w = ctx.createGain(); w.gain.value = 0.45; g.connect(w).connect(verbSend); }
+      src.start(t0);
+      gushNodes = { src, g };
+    }
+    gushNodes.g.gain.setTargetAtTime(on ? GUSH : 0.0001, t0, on ? 0.06 : 0.22);
+  }
+
   function splash() {
     burst({ freq: 2600, q: 0.5, dur: 0.35, gain: 0.16, sweep: 0.25 });
+  }
+
+  /**
+   * A boot arriving.
+   *
+   * Two sounds a handful of milliseconds apart, which is why one filtered burst
+   * never sounds like a footstep: the *weight* going into the ground, low and
+   * damped, and the *grit* under the sole, broadband and shorter still. The
+   * proportion between them is the surface — `hard` at 1 is the concrete apron,
+   * where the weight rings and the grit is a sharp scuff, and at 0 it is dry
+   * hillside, where the weight is a dull thud and the scrub takes twice as long
+   * to stop rustling.
+   *
+   * Every step is detuned a little and no two are the same length. Identical
+   * footsteps at a fixed interval stop reading as walking within about four of
+   * them and start reading as a machine.
+   */
+  function footstep(hard = 0.5, gain = 1) {
+    if (!ctx) return;
+    const v = 0.86 + Math.random() * 0.30;
+    burst({
+      freq: (108 + hard * 96) * v, q: 1.2, sweep: 0.55,
+      dur: 0.14 - hard * 0.05, gain: 0.085 * gain,
+    });
+    burst({
+      freq: (1400 + hard * 2700) * v, q: 0.55, sweep: 0.35,
+      dur: 0.09 - hard * 0.045, gain: (0.022 + 0.034 * hard) * gain,
+    });
   }
 
   /**
@@ -817,7 +903,7 @@ function buildAudio() {
     master.gain.setTargetAtTime(on ? 0.0001 : masterVol, ctx.currentTime, on ? 0.05 : 0.22);
   }
 
-  return { start, update, squelch, dropWhoosh, splash, beep, setVolume, getVolume,
+  return { start, update, squelch, dropWhoosh, setGush, footstep, splash, beep, setVolume, getVolume,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas,
     birdCall, radalt, gpwsSink, gpwsPullUp, hullSlam, impact, kill,
     get ctx() { return ctx; } };

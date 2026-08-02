@@ -131,19 +131,99 @@ let dropSplashes = null;
 let scoopSpray = null;
 
 function buildWaterFX(scene) {
-  const drops = buildSprayPool(scene, 1400, 9.0, 0.55);
+  const drops = buildSprayPool(scene, 3000, 9.0, 0.55);
   const spray = buildSprayPool(scene, 900, 11.0, 1.9);
 
+  // Litres of tank per droplet drawn. The doors pass 3400 l/s, so a full load is
+  // gone in under two seconds and this is about seven hundred of each kind over
+  // the whole drop — enough to be a sheet, few enough that three thousand
+  // billboards is a ceiling nothing reaches.
+  const PER_DROPLET = 9;
+  let owed = 0;
+
   dropSplashes = {
-    /** A tonne of water leaving the hull: a dense curtain that spreads as it falls. */
-    emit(x, z, litres, fwd) {
-      const n = Math.min(14, 2 + (litres / 90) | 0);
+    /**
+     * Six tonnes leaving the hull.
+     *
+     * This used to be fourteen droplets in a twelve-metre box around the point
+     * the water landed, and the fire model was meanwhile wetting an ellipse a
+     * hundred and ninety metres long and forty-six wide. The picture was off by
+     * two orders of magnitude in area and by the whole distance between the
+     * aeroplane and the ground: pressing F did something enormous to the fire
+     * and showed you almost nothing, which made the one action the game is
+     * about the hardest thing in it to see.
+     *
+     * So it is drawn in two parts, and neither of them is at the crosshair.
+     *
+     * The **column** is what you see from the cockpit: water leaving the belly
+     * with the aeroplane's own velocity, falling behind and below as she runs
+     * on. Nothing places it — it is spawned at the hull and left to gravity, so
+     * it traces the same arc the drop physics assumes and arrives, on its own,
+     * where the water is actually going. That is the confirmation the drop
+     * never had.
+     *
+     * The **curtain** is what it does when it gets there: thrown up off the
+     * ground across the whole ellipse the fire model wets, so the footprint you
+     * see is the footprint you get. Sampled with sqrt-of-uniform so the
+     * droplets fill the ellipse evenly instead of piling up in the middle.
+     */
+    emit(x, z, litres, fwd, from, vel) {
+      const d = Math.hypot(fwd.x, fwd.z) || 1;
+      const ux = fwd.x / d, uz = fwd.z / d;
+
+      // One droplet per PER_DROPLET litres actually leaving the tank, with the
+      // fraction carried over between frames — not a fixed count per frame.
+      // Per-frame was the first version of this and it is quietly wrong twice
+      // over: the water gets denser the better your machine is, and a drop that
+      // is throttled by the frame rate rather than by the tank goes on emitting
+      // long after the tank should have run dry.
+      owed += litres / PER_DROPLET;
+      const n = Math.floor(owed);
+      owed -= n;
+
+      // How long the doors have been open this frame, which at ninety metres a
+      // second is three metres of sky. Every droplet is pushed back along the
+      // path by a random part of it, so a frame's worth arrives as a length of
+      // ribbon rather than as one puff — without this the column is a string of
+      // discrete balls however many droplets are in it, and at any real speed
+      // the gaps between them are wider than the balls.
+      const step = litres / CONFIG.dropRate;
+
       for (let i = 0; i < n; i++) {
-        const s = drops.rng();
+        // ── leaving the hull ──────────────────────────────────────────────
+        let s = drops.rng();
+        const back = drops.rng() * step;
         drops.spawn(
-          x + (drops.rng() - 0.5) * 12, groundAt(x, z) + 2 + drops.rng() * 6, z + (drops.rng() - 0.5) * 12,
-          fwd.x * 14 + (drops.rng() - 0.5) * 9, -6 - s * 9, fwd.z * 14 + (drops.rng() - 0.5) * 9,
-          9 + s * 16, 1.6 + s * 1.6, 2.4,
+          from.x - vel.x * back + (drops.rng() - 0.5) * 7,
+          from.y - vel.y * back - 1.8,
+          from.z - vel.z * back + (drops.rng() - 0.5) * 7,
+          // Most of the aeroplane's speed, minus what the air has already taken
+          // off it — which is what makes the column trail rather than pace her.
+          vel.x * (0.80 + 0.12 * s) + (drops.rng() - 0.5) * 7,
+          vel.y - 2 - s * 7,
+          vel.z * (0.80 + 0.12 * s) + (drops.rng() - 0.5) * 7,
+          // Small at the hull and growing hard as it falls. Water leaving a tank
+          // is a jet that breaks up on the way down, not a cloud that is already
+          // fifty feet across at the doors — sized as one, six tonnes came out
+          // as a single white ball stuck to the belly.
+          1.5 + s * 3.5, 2.6 + s * 2.0, 3.2,
+        );
+
+        // ── and arriving ──────────────────────────────────────────────────
+        s = drops.rng();
+        const a = drops.rng() * TAU, rr = Math.sqrt(drops.rng());
+        const al = Math.cos(a) * rr * 92, ac = Math.sin(a) * rr * 22;
+        const px = x + ux * al - uz * ac;
+        const pz = z + uz * al + ux * ac;
+        const surf = isSea(px, pz) ? 0 : groundAt(px, pz);
+        drops.spawn(
+          px, surf + 2 + s * 5, pz,
+          // Out along the run and away from the centreline: six tonnes hitting a
+          // hillside does not go straight up, it sprays off down the slope.
+          ux * (5 + s * 11) - uz * ac * 0.30 + (drops.rng() - 0.5) * 7,
+          5 + s * 11,
+          uz * (5 + s * 11) + ux * ac * 0.30 + (drops.rng() - 0.5) * 7,
+          9 + s * 15, 1.4 + s * 1.1, 2.7,
         );
       }
     },

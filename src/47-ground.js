@@ -47,6 +47,14 @@ const GROUND = {
   body: 0.30,
   turn: 2.1,               // rad/s on the arrow keys — about 120 degrees a second
 
+  // The walk itself. Stride is one boot to the next, not heel to heel of the
+  // same boot: 0.78 m is an adult covering ground in kit, which at the 3.4 m/s
+  // above works out at about four and a half steps a second — brisk, which is
+  // what somebody walking towards a fire is.
+  stride: 0.78,
+  bobY: 0.055,             // m the head drops as each boot lands
+  bobX: 0.038,             // m it goes side to side, once per pair of steps
+
   // The trolley pump you drag off the aeroplane. Four hundred litres at nine a
   // second is forty-three seconds of water, and then you are running back to the
   // hull while everything you were winning against carries on burning. That
@@ -235,6 +243,7 @@ async function buildGround(scene, field) {
     x: 0, y: 0, z: 0, yaw: 0, pitch: 0, vx: 0, vz: 0,
     pack: GROUND.pack, spraying: false, jet: 0, refilling: false,
     aim: [0, 0, 0], aimKind: null, aimSoak: -1, aimHot: false,
+    gait: 0, bob: 0,                 // where you are in the stride, and how much of it shows
   };
 
   let active = false;
@@ -1112,8 +1121,52 @@ async function buildGround(scene, field) {
     // theory and a few parts in 10^12 in practice.
     if (Math.abs(nx - bx) > 1e-4) you.vx = 0;
     if (Math.abs(nz - bz) > 1e-4) you.vz = 0;
+    const moved = Math.hypot(nx - you.x, nz - you.z);
     you.x = nx; you.z = nz;
     you.y = field.walkY(you.x, you.z);
+    gait(moved, dt);
+  }
+
+  /**
+   * That you are walking.
+   *
+   * Without this the mode is a camera on rails: the view slides through the
+   * world at a constant height in total silence, which is the one thing that
+   * reads as *not being there* however good the scenery is. It is also the
+   * cheapest fix in the game — a phase, two sines and a noise burst.
+   *
+   * Driven by **distance, not time**. A gait belongs to the ground: walk into a
+   * wall and you stop taking steps, because you have stopped covering ground,
+   * and a clock-driven bob goes on trudging on the spot. It also means the pace
+   * follows the speed for nothing — running is the same stride taken oftener.
+   *
+   * The phase advances π per footfall, so `sin(gait)` is one cycle per *stride*
+   * (the weight going side to side, which happens once per pair of steps) and
+   * `sin(2·gait)` is one per *step* (the head dropping as each boot lands).
+   * Getting those two the same period is the classic mistake and it produces a
+   * hopping motion nobody walks with.
+   */
+  function gait(moved, dt) {
+    if (moved > 1e-4) {
+      const before = you.gait;
+      you.gait += (moved / GROUND.stride) * Math.PI;
+      // A footfall every time the phase crosses a multiple of π. Compared
+      // this way rather than by accumulating a counter, so a single enormous dt
+      // cannot silently swallow a step or fire fifty of them.
+      if (Math.floor(you.gait / Math.PI) !== Math.floor(before / Math.PI)) {
+        const sp = Math.hypot(you.vx, you.vz);
+        // The apron is the only paved thing you can stand on; everywhere else
+        // is limestone, scrub and pine needles.
+        const hard = field.onPaved && field.onPaved(you.x, you.z) ? 1 : 0.18;
+        audio.footstep(hard, 0.7 + sat(sp / GROUND.run) * 0.5);
+      }
+    }
+    // Amplitude follows the speed, so a slow shuffle is not the same picture as
+    // a run, and settles to nothing when you stop — the phase is left where it
+    // is rather than being wound back, so setting off again continues the
+    // stride you were in the middle of.
+    const sp = Math.hypot(you.vx, you.vz);
+    you.bob = damp(you.bob, sat(sp / GROUND.walk), 7, dt);
   }
 
   const distToPlane = () =>
@@ -1309,12 +1362,25 @@ async function buildGround(scene, field) {
   }
 
   function pose(camera) {
-    camera.position.set(you.x, you.y + GROUND.eye, you.z);
+    // The head, not the boots. Down as each boot lands, side to side once per
+    // pair of them — see gait(). The sway is applied along your own right, so
+    // it stays a weight shift however you are facing rather than drifting the
+    // view about in world axes.
+    const dy = -GROUND.bobY * you.bob * (1 - Math.cos(you.gait * 2)) * 0.5;
+    const sway = GROUND.bobX * you.bob * Math.sin(you.gait);
+    const rx = Math.cos(you.yaw), rz = -Math.sin(you.yaw);
+    const ex = you.x + rx * sway;
+    const ey = you.y + GROUND.eye + dy;
+    const ez = you.z + rz * sway;
+    camera.position.set(ex, ey, ez);
     const cp = Math.cos(you.pitch);
+    // Aimed from where the head actually is, or the bob would swing the whole
+    // world about a fixed look-at point and you would be looking round a room
+    // rather than walking through one.
     camera.lookAt(
-      you.x - Math.sin(you.yaw) * cp,
-      you.y + GROUND.eye + Math.sin(you.pitch),
-      you.z - Math.cos(you.yaw) * cp,
+      ex - Math.sin(you.yaw) * cp,
+      ey + Math.sin(you.pitch),
+      ez - Math.cos(you.yaw) * cp,
     );
   }
 
@@ -1356,6 +1422,10 @@ async function buildGround(scene, field) {
         || c.mode === 'walk' || c.mode === 'idle').length,
       pack: Math.round(you.pack), litres: Math.round(tally.litres),
       at: [Math.round(you.x), Math.round(you.z)],
+      // The walk, which is invisible from outside and is the whole of whether
+      // the mode feels like being somewhere.
+      gait: +you.gait.toFixed(2), bob: +you.bob.toFixed(3),
+      sp: +Math.hypot(you.vx, you.vz).toFixed(2),
     }),
     /** For the screenshot tool: stand somewhere specific and look somewhere specific. */
     put(x, z, yaw, pitch = 0) {
