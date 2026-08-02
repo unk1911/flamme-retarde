@@ -8,6 +8,51 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.17.0] — 2026-08-02
+
+### Changed — the ninety-one people on the beach
+
+Third of the eye-height pass. Everybody at Jadrija was nine rectangular prisms:
+square shoulders, slab arms hanging plumb against the ribs, a cube for a head,
+and legs of one thickness from hip to floor. A fair silhouette at three hundred
+metres and a shop dummy at two.
+
+What makes a low-poly body read as a body is not detail — it is that **nothing
+on it is the same width twice and nothing on it is vertical**. A thigh is half
+again a calf, shoulders are wider than a waist, an upper arm hangs a few degrees
+out from the body and the forearm comes back in. So the figure is now a chain of
+tapered segments between named joints: hip → knee → ankle → foot, four stations
+up the trunk, shoulder → elbow → wrist → hand, and a head in three — jaw,
+cranium, crown — because the head is the part everybody looks at and a cube on a
+neck is the single loudest way of saying "not a person".
+
+About 222 triangles a head against 108, and there are 91 of them — 53 standing,
+17 sitting, 15 on loungers, 6 in the water. 10 368 triangles across the whole
+beach, which is why these could simply be made better where the 2 120 cars
+needed a second model and a range test.
+
+### Fixed — the figures on the loungers were half-buried in them
+
+Two bugs, and the second had been there since the loungers went in.
+
+`frustum` stacks rectangles upwards, which is every limb on a standing body and
+nothing at all on a lying one. Building the lounger pose with it gave a stack of
+two-centimetre sheets lying flat in the deck. `frustumS` is the same primitive
+with the axis laid on its side.
+
+And the figure was placed 0.46 m seaward of the lounger it was on — it spans
+local *s* −0.90…+0.98 against the lounger's −0.92…+0.87 — so the head hung half a
+metre off the end in mid-air. Invisible while the body was four flat boxes,
+obvious the moment it had any depth. Centred now, and the upper body climbs the
+0.34 m of raised back instead of lying flat through it.
+
+### Added — `frustum` and `frustumS` in the Jadrija builder
+
+Tapered, leaning boxes: a rectangle joined to a different rectangle, up the *y*
+axis or along the *s* axis. Between them they are every limb on a body, and
+neither is expressible with `boxIn`, whose top face is always level and whose
+sides are always plumb.
+
 ## [1.16.0] — 2026-08-02
 
 ### Changed — the benches, and something to build the rest of them with

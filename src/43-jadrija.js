@@ -255,6 +255,54 @@ function buildJadrija(scene) {
     boxIn(W, t0, t1, s0, s1, y0, y1, col, topCol);
 
   /**
+   * A tapered, leaning box: a rectangle at `y0` joined to a different rectangle
+   * at `y1`. Each end is `[centre t, centre s, half t, half s]`, so the two may
+   * differ in both size and position — which between them is every limb on a
+   * body. A thigh is thicker at the hip than at the knee and does not hang
+   * plumb; `boxIn` can express neither, which is why everyone on this beach
+   * used to be assembled from nine rectangular prisms.
+   *
+   * Vertex order is `boxIn`'s, so the winding and the normals match everything
+   * else built on this shore.
+   */
+  /**
+   * `frustum` with the axis laid on its side: a rectangle at `s0` joined to one
+   * at `s1`, each given as `[centre t, centre y, half t, half y]`.
+   *
+   * Needed because `frustum` can only stack rectangles *upwards*, and a body on
+   * a lounger runs along the ground. Building one with `frustum` gives a stack
+   * of two-centimetre sheets lying in the deck, which is exactly what the first
+   * attempt produced and what it looked like.
+   */
+  function frustumS(P, s0, r0, s1, r1, col) {
+    const R = ([ct, cy, ht, hy], s) => [
+      P(ct - ht, s, cy - hy), P(ct - ht, s, cy + hy),
+      P(ct + ht, s, cy + hy), P(ct + ht, s, cy - hy),
+    ];
+    const A = R(r0, s0), B = R(r1, s1);
+    b.quad(B[0], B[1], B[2], B[3], col);
+    b.quad(A[3], A[2], A[1], A[0], col);
+    b.quad(A[0], A[1], B[1], B[0], col);
+    b.quad(A[2], A[3], B[3], B[2], col);
+    b.quad(A[1], A[2], B[2], B[1], col);
+    b.quad(A[3], A[0], B[0], B[3], col);
+  }
+
+  function frustum(P, y0, r0, y1, r1, col, topCol) {
+    const R = ([ct, cs, ht, hs], y) => [
+      P(ct - ht, cs - hs, y), P(ct + ht, cs - hs, y),
+      P(ct + ht, cs + hs, y), P(ct - ht, cs + hs, y),
+    ];
+    const A = R(r0, y0), B = R(r1, y1);
+    b.quad(B[0], B[1], B[2], B[3], topCol || col);
+    b.quad(A[3], A[2], A[1], A[0], col);
+    b.quad(A[0], A[1], B[1], B[0], col);
+    b.quad(A[2], A[3], B[3], B[2], col);
+    b.quad(A[1], A[2], B[2], B[1], col);
+    b.quad(A[3], A[0], B[0], B[3], col);
+  }
+
+  /**
    * A bar running along the shore whose cross-section is an arbitrary convex
    * quad in the (inland, up) plane, given as four `[s, y]` corners.
    *
@@ -713,70 +761,132 @@ function buildJadrija(scene) {
    * the water), `lie` (on a lounger), `wade` (in to the knees, which is drawn by
    * simply starting the legs below the waterline and letting the sea clip them).
    */
+  /**
+   * A figure, built from joints and tapered segments.
+   *
+   * The first version was nine rectangular prisms, which is a fair silhouette
+   * at three hundred metres and a shop dummy at two: square shoulders, slab
+   * arms hanging plumb against the ribs, a cube for a head, and legs of one
+   * thickness from hip to floor. What actually makes a low-poly body read as a
+   * body is not detail — it is that **nothing on it is the same width twice and
+   * nothing on it is vertical**. A thigh is half again a calf, shoulders are
+   * wider than a waist, an upper arm hangs a few degrees out from the body and
+   * the forearm comes back in.
+   *
+   * So everything below is a chain of `frustum` calls between named joints. It
+   * costs about 200 triangles a head against 108, and there are forty of them
+   * on the whole beach — which is why these can simply be better, where the
+   * 2 120 cars needed a second model and a range test.
+   */
   function person(t, s, y, ang, pose = 'stand', scale = 1) {
     const P = facing(t, s, ang);
     const k = scale;
     const skin = pick(SKIN), suit = pick(SWIM), hair = pick(HAIR);
-    // Half-widths. `hip` has to stay well under the ±0.105 the legs are set out
-    // at or the two boxes meet in the middle and there is no gap to see — which
-    // is exactly what the first version did, at 0.11 against 0.095.
-    const shin = 0.092 * k, hip = 0.068 * k;
+    // Everything is written in metres for a 1.72 m adult and scaled by k, so
+    // the numbers below can be read against a tape measure.
+    const K = (v) => v * k;
 
     if (pose === 'lie') {
-      // Flat on the back, feet seaward. The whole figure is a metre and three
-      // quarters of horizontal boxes, which at a metre off the ground is what
-      // a person on a lounger is from any angle you will ever see one here.
-      boxIn(P, -0.17 * k, 0.17 * k, -0.86 * k, 0.10 * k, y, y + 0.16 * k, skin);
-      boxIn(P, -0.20 * k, 0.20 * k, 0.10 * k, 0.62 * k, y, y + 0.20 * k, suit);
-      boxIn(P, -0.13 * k, 0.13 * k, 0.62 * k, 0.80 * k, y + 0.02 * k, y + 0.20 * k, skin);
-      boxIn(P, -0.10 * k, 0.10 * k, 0.80 * k, 0.98 * k, y + 0.04 * k, y + 0.22 * k, hair);
+      // Flat on the back, feet seaward, and lying down the body rather than up
+      // it: `s` runs from the soles at −0.90 to the crown at +0.96, and the
+      // taper that matters from the one angle you ever see a lounger from is
+      // the one along that axis. Absolute world heights here, not heights above
+      // the feet — there are no feet under this one.
+      // Stations run up the body: soles at −0.90, crown at +0.96. `cy` is the
+      // height of the *centre* of each section above the towel, so with a half
+      // height of 0.045 to 0.105 the whole figure lies on the deck rather than
+      // in it.
+      const L = (s0, r0, s1, r1, col) => frustumS(
+        P, K(s0), [K(r0[0]), y + K(r0[1]), K(r0[2]), K(r0[3])],
+        K(s1), [K(r1[0]), y + K(r1[1]), K(r1[2]), K(r1[3])], col);
+      L(-0.90, [0, 0.055, 0.072, 0.050], -0.76, [0, 0.062, 0.086, 0.056], skin);
+      L(-0.76, [0, 0.062, 0.086, 0.056], -0.34, [0, 0.078, 0.112, 0.072], skin);
+      L(-0.34, [0, 0.078, 0.112, 0.072], -0.06, [0, 0.092, 0.140, 0.088], skin);
+      L(-0.06, [0, 0.092, 0.140, 0.088], 0.26, [0, 0.100, 0.172, 0.098], suit);
+      // From the hips up the body rides the raised back of the lounger, which
+      // climbs 0.34 m over the last half-metre. Drawn flat, the head and
+      // shoulders end up buried inside the backrest slabs.
+      L(0.26, [0, 0.100, 0.172, 0.098], 0.54, [0, 0.150, 0.178, 0.102], skin);
+      L(0.54, [0, 0.150, 0.178, 0.102], 0.70, [0, 0.208, 0.182, 0.098], skin);
+      L(0.70, [0, 0.208, 0.182, 0.098], 0.76, [0, 0.240, 0.062, 0.058], skin);
+      L(0.76, [0, 0.240, 0.062, 0.058], 0.90, [0, 0.286, 0.086, 0.086], skin);
+      L(0.90, [0, 0.286, 0.086, 0.086], 0.96, [0, 0.296, 0.062, 0.066], skin);
+      L(0.86, [0, 0.344, 0.076, 0.042], 0.98, [0, 0.344, 0.058, 0.036], hair);
       return;
     }
 
-    // Everything upright shares a skeleton and differs only in where the knees
-    // are and how far the hips have dropped.
+    // Everything upright shares one skeleton and differs only in where the
+    // knees are and how far the hips have dropped.
     const sit = pose === 'sit';
     const wade = pose === 'wade';
-    const drop = sit ? 0.44 * k : 0;
-    const foot = wade ? -0.55 * k : 0;      // in to the knees
-    const hipY = y - drop + (0.84 * k) + foot;
+    const base = y - (wade ? 0.55 * k : 0);        // where the soles are
+    // From here on every number is metres above the soles, on a 1.72 m adult,
+    // so the figure can be read against a tape measure and `k` is applied once
+    // in one place. Getting this wrong — scaling a world height, or forgetting
+    // to add the base — silently drops everybody through the concrete.
+    const limb = (v0, r0, v1, r1, col) => frustum(
+      P, base + K(v0), [K(r0[0]), K(r0[1]), K(r0[2]), K(r0[3])],
+      base + K(v1), [K(r1[0]), K(r1[1]), K(r1[2]), K(r1[3])], col);
+    const hipV = 0.84 - (sit ? 0.44 : 0);
+    const shV = hipV + 0.58;
 
-    // Legs apart with daylight between them. Drawn at the same width as the hips
-    // and butted together, the whole figure came out as one slab from shoulder
-    // to floor and read as a painted board rather than as a person — the gap is
-    // what a silhouette needs, not the detail.
-    if (sit) {
-      // Thighs forward off the edge, shins hanging down the wall in front.
-      boxIn(P, -0.17 * k, 0.17 * k, -0.02 * k, 0.40 * k, hipY - 0.13 * k, hipY, skin);
-      for (const o of [-0.105 * k, 0.105 * k]) {
-        boxIn(P, o - hip, o + hip, 0.30 * k, 0.30 * k + 2 * hip,
-          hipY - 0.56 * k, hipY - 0.13 * k, skin);
-      }
-    } else {
-      for (const o of [-0.105 * k, 0.105 * k]) {
-        boxIn(P, o - hip, o + hip, -shin, shin, y + foot, hipY, skin);
+    // ── legs ─────────────────────────────────────────────────────────────────
+    // Set out at ±0.085 and never thicker than 0.075, so there is always
+    // daylight between them. Butted together the whole figure reads as one slab
+    // from shoulder to floor — a painted board rather than a person — and the
+    // gap is what a silhouette needs, not the detail.
+    for (const o of [-0.085, 0.085]) {
+      if (sit) {
+        // Thigh forward off the edge, shin hanging down the wall in front.
+        limb(hipV, [o, 0, 0.078, 0.086], hipV - 0.06, [o, 0.36, 0.062, 0.070], skin);
+        limb(hipV - 0.06, [o, 0.36, 0.062, 0.070],
+          hipV - 0.52, [o, 0.40, 0.048, 0.052], skin);
+        limb(hipV - 0.52, [o, 0.40, 0.048, 0.052],
+          hipV - 0.58, [o, 0.46, 0.046, 0.085], skin);
+      } else {
+        // Hip → knee → ankle → foot, thinning the whole way down, with the knee
+        // a touch forward of the line so the leg is not a post.
+        limb(hipV, [o, 0, 0.080, 0.088], 0.46, [o, 0.012, 0.058, 0.062], skin);
+        limb(0.46, [o, 0.012, 0.058, 0.062], 0.075, [o, 0, 0.043, 0.050], skin);
+        limb(0.075, [o, 0, 0.043, 0.050], 0, [o, -0.035, 0.046, 0.088], skin);
       }
     }
 
-    const shY = hipY + 0.58 * k;
-    const half = 0.185 * k, deep = 0.105 * k;
-    // The suit sits *across* the hips rather than above them, so the colour
-    // break falls where a costume actually is and closes the top of both legs.
-    boxIn(P, -half, half, -deep, deep, hipY - 0.19 * k, hipY + 0.09 * k, suit);
-    boxIn(P, -half, half, -deep, deep, hipY + 0.09 * k, shY, skin);
-    // Arms just outside the ribs. At 0.26 they put the silhouette at 63 cm
-    // across, which is a doorway, not a swimmer.
-    for (const o of [-half - 0.045 * k, half + 0.045 * k]) {
-      boxIn(P, o - 0.042 * k, o + 0.042 * k, -0.055 * k, 0.055 * k,
-        shY - 0.58 * k, shY - 0.02 * k, skin);
+    // ── trunk ────────────────────────────────────────────────────────────────
+    // Hips are wide, the waist comes in, the chest goes back out and the
+    // shoulders out again — four stations, and between them they are most of
+    // what tells you this is a person and not a bollard. The suit sits *across*
+    // the hips so the colour break falls where a costume actually is.
+    limb(hipV - 0.20, [0, 0, 0.150, 0.098], hipV + 0.08, [0, 0, 0.155, 0.100], suit);
+    limb(hipV + 0.08, [0, 0, 0.155, 0.100], hipV + 0.24, [0, 0, 0.132, 0.086], skin);
+    limb(hipV + 0.24, [0, 0, 0.132, 0.086], shV - 0.06, [0, 0.004, 0.178, 0.100], skin);
+    limb(shV - 0.06, [0, 0.004, 0.178, 0.100], shV, [0, 0, 0.168, 0.092], skin);
+
+    // ── arms ─────────────────────────────────────────────────────────────────
+    // Out at the shoulder, further out at the elbow, back in at the wrist, and
+    // tapering the whole way. Hung plumb at one thickness they read as planks
+    // stuck on the ribs, which is what they were.
+    for (const o of [-1, 1]) {
+      const sh = 0.186 * o, el = 0.212 * o, wr = 0.200 * o;
+      limb(shV - 0.02, [sh, 0, 0.046, 0.052], shV - 0.30, [el, 0.010, 0.038, 0.042], skin);
+      limb(shV - 0.30, [el, 0.010, 0.038, 0.042],
+        shV - 0.56, [wr, 0.020, 0.030, 0.034], skin);
+      // The hand: small, but a forearm stopping dead at the wrist is a stump.
+      limb(shV - 0.56, [wr, 0.020, 0.030, 0.034],
+        shV - 0.70, [wr, 0.024, 0.024, 0.040], skin);
     }
-    boxIn(P, -0.055 * k, 0.055 * k, -0.048 * k, 0.048 * k, shY, shY + 0.06 * k, skin);
-    boxIn(P, -0.088 * k, 0.088 * k, -0.082 * k, 0.082 * k,
-      shY + 0.06 * k, shY + 0.25 * k, skin);
+
+    // ── neck and head ────────────────────────────────────────────────────────
+    limb(shV, [0, 0, 0.052, 0.048], shV + 0.07, [0, 0.006, 0.046, 0.044], skin);
+    // Jaw → cranium → crown. Three stations rather than one box, because the
+    // head is the part everybody looks at and a cube on a neck is the single
+    // thing that says "not a person" loudest.
+    limb(shV + 0.07, [0, 0.006, 0.062, 0.066], shV + 0.15, [0, 0, 0.084, 0.088], skin);
+    limb(shV + 0.15, [0, 0, 0.084, 0.088], shV + 0.27, [0, -0.006, 0.064, 0.068], skin);
     // The back and top of the head only. A fringe of hair over a box reads far
     // better than a hair-coloured box does.
-    boxIn(P, -0.093 * k, 0.093 * k, -0.087 * k, 0.02 * k,
-      shY + 0.14 * k, shY + 0.27 * k, hair);
+    limb(shV + 0.13, [0, -0.032, 0.086, 0.058],
+      shV + 0.28, [0, -0.030, 0.066, 0.046], hair);
   }
 
   /** A parasol: a pole and a shallow eight-panel cone, tilted a few degrees. */
@@ -936,7 +1046,11 @@ function buildJadrija(scene) {
         const lt = t + (i - (n - 1) * 0.5) * 1.5;
         lounger(lt, s - 1.5, y, Math.PI, pick([[0.900, 0.890, 0.870],
           [0.240, 0.420, 0.560], [0.860, 0.560, 0.300]]));
-        if (rng() < 0.5) bathers.push([lt, s - 1.9, y + 0.36, Math.PI, 'lie', 1]);
+        // Centred on the lounger, not 0.46 m seaward of it. The figure spans
+        // local s −0.90…+0.98 and the lounger −0.92…+0.87, so at `s - 1.9` the
+        // head hung half a metre off the end in mid-air — invisible while the
+        // body was four flat boxes, obvious the moment it had any depth.
+        if (rng() < 0.5) bathers.push([lt, s - 1.45, y + 0.36, Math.PI, 'lie', 1]);
       }
     } else if (rng() < 0.5) {
       bathers.push([t, 5.0 + rng() * 4.0, y, Math.PI + (rng() - 0.5) * 1.4, 'stand', 1]);
@@ -1352,6 +1466,10 @@ function buildJadrija(scene) {
     // stopping them exactly at the drop would let the camera hang over it.
     bounds: { t0: 3, t1: LEN - 3, s0: 1.1, s1: JAD.reachIn },
     blockers, local, toWorld, walkY, inField,
+    // Where everybody ended up, as [t, s, y, angle, pose, scale]. Kept because
+    // a test needs somewhere to point the camera, and because whatever finally
+    // makes the furniture solid will need to know where the figures are.
+    people: bathers,
     objects: [], crewSpots: [],
     apron: toWorld(gapAt, JAD.mid + 3),
     tint() { /* nothing here has caught yet */ },
