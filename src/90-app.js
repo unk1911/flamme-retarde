@@ -1694,6 +1694,11 @@ window.__fr = {
    * lexical scope and none of it is on `window`, so a test that wants to know
    * whether a point is in the sea has no way to ask without this.
    */
+  props: {
+    raw: () => props,
+    /** Where the near-model cars actually are this frame, nearest first. */
+    nearCars: () => props.nearCarList(),
+  },
   audio: {
     raw: () => audio,
     klapa: () => audio.klapaStats(),

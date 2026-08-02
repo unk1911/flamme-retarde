@@ -25,6 +25,13 @@ const PROPS = {
   // 50 triangles each in a single instanced draw this is nearly free.
   cars: 420,
   parked: 1700,
+  // How many of those get the near model, and out to what range. Almost all of
+  // the two thousand are over the horizon or a pixel across; the handful you
+  // could actually walk up to is what this is for. Sized for a village lane
+  // with cars down both sides — overflow falls back to the far model, which is
+  // the right failure and is invisible at that range anyway.
+  carsNear: 56,
+  carNearM: 130,
   darts: 160000,         // random samples thrown at the map looking for shore
 };
 
@@ -114,6 +121,144 @@ function carProto() {
   return b.geo();
 }
 
+/**
+ * The same car, for when you are standing next to it.
+ *
+ * `carProto` is a brick with a smaller brick on it and four square wheels, and
+ * that is the correct answer two thousand times over at three hundred metres —
+ * it is 84 triangles and there are 2 120 of them. It is the wrong answer at two
+ * metres, which is a distance the game now has, so this is the near version and
+ * `update` hands out whichever one the range calls for.
+ *
+ * Built as two lofts rather than as boxes. A car is a section that changes
+ * along its length — it narrows at the sill, it is widest at the door handles,
+ * it tucks back in at the roof — and no arrangement of axis-aligned boxes has
+ * any of that. Each station is a hexagon in (y, z): sill, waist, shoulder.
+ */
+function carNearProto() {
+  const b = propBuilder();
+  const BODY = [1, 1, 1];                    // tinted per instance
+  const GLASS = [0.16, 0.19, 0.22];
+  const TYRE = [0.085, 0.085, 0.095];
+  const RIM = [0.60, 0.61, 0.63];
+  const LAMP = [0.88, 0.86, 0.78];
+  const TAIL = [0.52, 0.10, 0.09];
+  const TRIM = [0.22, 0.22, 0.23];
+
+  // [x, sill y, waist y, shoulder y, waist half-width, shoulder half-width]
+  // The sill is 0.90 of the waist, not 0.74. A car is very nearly as wide at
+  // the bottom of the door as at the handles — the tumblehome is almost all
+  // above the waist — and pulling the sill in makes the body a boat hull with
+  // the wheels hanging outside it.
+  const ring = ([x, yb, yw, yt, w, wt]) => [
+    [x, yb, w * 0.94], [x, yw, w], [x, yt, wt],
+    [x, yt, -wt], [x, yw, -w], [x, yb, -w * 0.94],
+  ];
+  /**
+   * Vertex order is the one `propBuilder.box` uses, so the winding — and so the
+   * normals — come out the same way round as every other prop in the scene.
+   * `col(edge, strip)` picks the colour; returning null drops the face, which
+   * is how the greenhouse loses the underside it would otherwise bury inside
+   * the body and z-fight against.
+   */
+  const loft = (st, col) => {
+    for (let i = 0; i < st.length - 1; i++) {
+      const A = ring(st[i]), B = ring(st[i + 1]);
+      for (let e = 0; e < 6; e++) {
+        const c = col(e, i);
+        if (!c) continue;
+        const f = (e + 1) % 6;
+        b.quad(A[f], B[f], B[e], A[e], c);
+      }
+    }
+  };
+  const cap = (st, front, col) => {
+    const A = ring(st);
+    const c = [st[0], (st[1] + st[3]) / 2, 0];
+    for (let e = 0; e < 6; e++) {
+      const f = (e + 1) % 6;
+      if (front) b.tri(c, A[e], A[f], col); else b.tri(c, A[f], A[e], col);
+    }
+  };
+
+  // The body, up to the belt line. Nose down, tail up, sills tucked under.
+  // The five stations either side of each axle are the wheel arches, and they
+  // are the difference between a car and a shoebox with wheels leaned against
+  // it. Without them the sill runs dead straight from bumper to bumper and the
+  // tyres hang off the outside of it — the body has to come *down around* the
+  // wheel and lift over it, or the eye reads them as separate objects.
+  const BSTN = [
+    [2.02, 0.46, 0.66, 0.80, 0.76, 0.66],
+    [1.78, 0.32, 0.64, 0.86, 0.85, 0.79],
+    [1.72, 0.30, 0.66, 0.90, 0.86, 0.81],
+    [1.52, 0.44, 0.68, 0.92, 0.87, 0.82],
+    [1.32, 0.57, 0.70, 0.94, 0.87, 0.83],   // crown of the front arch
+    [1.12, 0.44, 0.71, 0.96, 0.87, 0.84],
+    [0.92, 0.30, 0.72, 0.98, 0.87, 0.84],
+    [0.10, 0.29, 0.73, 1.02, 0.87, 0.84],
+    [-0.62, 0.29, 0.73, 1.02, 0.87, 0.84],
+    [-0.88, 0.30, 0.72, 1.01, 0.87, 0.84],
+    [-1.08, 0.44, 0.72, 1.01, 0.87, 0.83],
+    [-1.28, 0.57, 0.71, 1.00, 0.87, 0.83],  // and of the rear
+    [-1.48, 0.44, 0.71, 1.00, 0.87, 0.82],
+    [-1.68, 0.31, 0.70, 0.99, 0.86, 0.80],
+    [-1.94, 0.40, 0.66, 0.94, 0.82, 0.72],
+    [-2.06, 0.50, 0.64, 0.86, 0.74, 0.64],
+  ];
+  // Only the underside is unpainted. Colouring the lower flanks as well — which
+  // is what the first cut did — makes the bottom half of every car dark, and a
+  // small hatchback is painted right down to the sill.
+  loft(BSTN, (e) => (e === 5 ? TRIM : BODY));
+  cap(BSTN[0], true, BODY);
+  cap(BSTN[BSTN.length - 1], false, BODY);
+
+  // The greenhouse. First and last stations are flat on the belt line, so the
+  // loft between them *is* the windscreen and the backlight — no separate
+  // panel, and the rake is real rather than a dark stripe painted on a box.
+  const GSTN = [
+    [0.88, 0.99, 1.00, 1.01, 0.84, 0.80],
+    [0.20, 1.02, 1.25, 1.45, 0.83, 0.71],
+    [-0.58, 1.02, 1.28, 1.49, 0.83, 0.73],
+    [-1.08, 1.01, 1.24, 1.44, 0.82, 0.71],
+    [-1.68, 0.98, 0.99, 1.00, 0.79, 0.72],
+  ];
+  loft(GSTN, (e, i) => {
+    if (e === 5) return null;                        // buried in the body
+    if (e === 2) return (i === 0 || i === 3) ? GLASS : BODY;   // screen, roof, backlight
+    return GLASS;
+  });
+
+  // Wheels, ten-sided and sitting flush with the waist rather than 0.62 × 0.60
+  // boxes. Only the outer face is built: nothing ever sees the inside of an
+  // arch, and this is geometry that gets drawn a few dozen times a frame.
+  // Track 1.47, so the outer wall of the tyre sits at 0.83 — just inside the
+  // 0.87 waist and just inside the 0.78 sill, which is where a wheel actually
+  // lives. At ±0.78 they stood proud of the body and read as a tractor's.
+  const N = 10, R = 0.30, HW = 0.09, CY = 0.31, TRACK = 0.70;
+  for (const x of [1.32, -1.28]) {
+    for (const s of [1, -1]) {
+      const zo = s * (TRACK + HW), zi = s * (TRACK - HW);
+      const P = (a, z) => [x + Math.cos(a) * R, CY + Math.sin(a) * R, z];
+      const hub = [x, CY, zo];
+      for (let i = 0; i < N; i++) {
+        const a0 = (i / N) * TAU, a1 = ((i + 1) / N) * TAU;
+        b.quad(P(a1, zi), P(a0, zi), P(a0, zo), P(a1, zo), TYRE);
+        if (s > 0) b.tri(hub, P(a1, zo), P(a0, zo), RIM);
+        else b.tri(hub, P(a0, zo), P(a1, zo), RIM);
+      }
+    }
+  }
+
+  // Lamps and mirrors — small, but they are what tells you which end is which
+  // from behind, which is most of what you read a parked car by.
+  for (const s of [1, -1]) {
+    b.box(1.98, 0.76, s * 0.52, 0.10, 0.16, 0.34, LAMP);
+    b.box(-2.02, 0.82, s * 0.54, 0.10, 0.22, 0.30, TAIL);
+    b.box(0.58, 1.08, s * 0.92, 0.10, 0.10, 0.14, BODY);
+  }
+  return b.geo();
+}
+
 function parasolProto() {
   const b = propBuilder();
   const POLE = [0.55, 0.52, 0.48];
@@ -185,6 +330,7 @@ function buildProps(scene, lanes) {
     boat: propLayer(scene, boatProto(false), PROPS.boats, { spec: 0.22 }),
     yacht: propLayer(scene, boatProto(true), PROPS.boats, { spec: 0.22 }),
     car: propLayer(scene, carProto(), PROPS.cars + PROPS.parked, { spec: 0.34, specPower: 60 }),
+    carNear: propLayer(scene, carNearProto(), PROPS.carsNear, { spec: 0.34, specPower: 60 }),
     parasol: propLayer(scene, parasolProto(), PROPS.parasols, { spec: 0.05, specPower: 12 }),
   };
 
@@ -373,6 +519,7 @@ function buildProps(scene, lanes) {
   // ── per-frame ──────────────────────────────────────────────────────────────
   let tAcc = 0;
   let density = 1;
+  let carsNear = 0;         // how many got the near model this frame
 
   function update(dt) {
     tAcc += dt;
@@ -409,7 +556,13 @@ function buildProps(scene, lanes) {
       L.aScale.needsUpdate = L.aColor.needsUpdate = true;
     }
 
-    let nCar = 0;
+    // Cars, sorted into the two models by range as they are placed. The near
+    // one is 424 triangles against the far one's 84 — five times over, which is
+    // 24 000 at fifty-six instances and would be 900 000 across all 2 120. So
+    // the split is not a nicety; it is the only reason the near model can exist.
+    const cam = U.uCamPos.value;
+    const nearSq = PROPS.carNearM * PROPS.carNearM;
+    let nCar = 0, nNear = 0;
     for (let ci = 0; ci < nCarMax; ci++) {
       const c = cars[ci];
       if (c.moving) {
@@ -424,14 +577,20 @@ function buildProps(scene, lanes) {
       const sx = c.dir < 0 ? -p.hx : p.hx;
       const sz = c.dir < 0 ? -p.hz : p.hz;
       const nx = -sz, nz = sx;
-      put(layers.car, nCar++,
-        p.x + nx * off, p.y + 0.05, p.z + nz * off,
-        Math.atan2(sx, sz) - Math.PI / 2, 1, c.col);
+      const x = p.x + nx * off, z = p.z + nz * off;
+      const dx = x - cam.x, dz = z - cam.z;
+      const close = nNear < PROPS.carsNear && dx * dx + dz * dz < nearSq;
+      const L = close ? layers.carNear : layers.car;
+      put(L, close ? nNear++ : nCar++,
+        x, p.y + 0.05, z, Math.atan2(sx, sz) - Math.PI / 2, 1, c.col);
     }
     layers.car.geo.instanceCount = nCar;
-    for (const a of [layers.car.aPos, layers.car.aRot, layers.car.aScale, layers.car.aColor]) {
-      a.needsUpdate = true;
+    layers.carNear.geo.instanceCount = nNear;
+    for (const L of [layers.car, layers.carNear]) {
+      L.aPos.needsUpdate = L.aRot.needsUpdate = true;
+      L.aScale.needsUpdate = L.aColor.needsUpdate = true;
     }
+    carsNear = nNear;
   }
 
   update(0);
@@ -444,6 +603,15 @@ function buildProps(scene, lanes) {
       underway: boats.filter((b) => b.moving).length,
       cars: cars.length,
       lanes: lanes.length,
+      get carsNear() { return carsNear; },
+    },
+    /** For a test that wants to go and stand next to one. */
+    nearCarList() {
+      const a = layers.carNear.aPos.array, out = [];
+      for (let i = 0; i < carsNear; i++) {
+        out.push([+a[i * 3].toFixed(1), +a[i * 3 + 1].toFixed(1), +a[i * 3 + 2].toFixed(1)]);
+      }
+      return out;
     },
     getDensity: () => density,
     setDensity(v) {

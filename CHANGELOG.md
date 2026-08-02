@@ -30,6 +30,35 @@ variation, because timber left in this much sun does not weather all one shade
 and identical slats read as a printed texture. 1 872 triangles for all twelve of
 them.
 
+### Changed — the cars, and a near model to draw them with
+
+`carProto` is a brick with a smaller brick on it, a dark stripe painted where
+the glass goes, and four 0.62 × 0.60 m boxes for wheels. It is also 84 triangles
+and there are **2 120 of them**, so it is exactly right at three hundred metres
+and cannot simply be replaced: detailing it in place would put 900 000 triangles
+on the map to improve the dozen you can see.
+
+So there are two models now, and `update` hands out whichever the range calls
+for — near out to 130 m, 56 of them, everything else keeps the brick. Which is
+the same point made in the request: boxy is fine from the air, not with your
+face in it.
+
+The near one is built as two lofted hulls rather than boxes, because a car is a
+section that changes along its length and no arrangement of axis-aligned boxes
+has any of that. Sixteen stations along the body, each a hexagon in (y, z) —
+sill, waist, shoulder — with the five either side of each axle forming the wheel
+arches. The greenhouse is a second loft whose first and last stations lie flat
+on the belt line, so the skin between them *is* the windscreen and the
+backlight, raked, rather than a dark stripe on a box. Ten-sided wheels, outer
+face only. 424 triangles, five times the far model, 24 000 across all 56.
+
+Two things had to be corrected on the way, both visible only once it was
+standing in a street: the lower flanks were trim-coloured, which made the bottom
+half of every car dark and read as a boat hull — a small hatchback is painted
+right down to the sill — and the sill was pulled in to 0.74 of the waist when a
+real car is very nearly as wide at the bottom of the door as at the handles, so
+the wheels hung outside the body like a tractor's.
+
 ### Added — `bar`, `rect` and `slat` in the Jadrija builder
 
 The reason everything here was boxy is that `boxIn` structurally cannot be
