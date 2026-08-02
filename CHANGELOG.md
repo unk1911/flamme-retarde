@@ -8,6 +8,41 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.16.0] — unreleased
+
+### Changed — the benches, and something to build the rest of them with
+
+First of the eye-height detail pass. Boxes are the right answer at three
+hundred metres and the wrong one at arm's length, and there is now a mode where
+you stand next to this furniture.
+
+The bench was four boxes: a slab seat, a slab back, two rectangular legs. The
+back was the worst of it — a solid 1.7 × 0.56 m panel of flat colour at eye
+level with no gap in it, which reads as a hoarding rather than as a bench. What
+makes one legible up close is that you can see *through* it, and that nothing on
+it is plumb.
+
+So: five seat slats falling 35 mm to the back, four back slats leaning 17° away
+from the sea with daylight between them, and an end frame that is one bent piece
+of iron — a foot runner on the concrete, a slightly splayed front leg, and a
+rear leg carried on past the seat to become the back support. Per-board colour
+variation, because timber left in this much sun does not weather all one shade
+and identical slats read as a printed texture. 1 872 triangles for all twelve of
+them.
+
+### Added — `bar`, `rect` and `slat` in the Jadrija builder
+
+The reason everything here was boxy is that `boxIn` structurally cannot be
+anything else: it takes the four bottom corners from the shore frame and builds
+the top by copying them with `y1` substituted, so the top face is always level
+and the sides are always plumb. Fine for a hut, useless for anything raked.
+
+`bar` extrudes an arbitrary convex quad cross-section along the shore, walking
+`boxIn`'s vertex order corner for corner so the winding and the normals come out
+identical to every other solid on this coast. `rect` and `slat` are the two
+cross-sections worth naming — upright, and rotated in the (inland, up) plane.
+This is what the cars, the loungers and the rest get rebuilt with.
+
 ## [1.15.0] — 2026-08-02
 
 ### Added — a klapa on the terrace at Jadrija

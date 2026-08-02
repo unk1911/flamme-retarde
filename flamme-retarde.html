@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.15.0">
+<meta name="version" content="1.16.0">
 <meta name="build-date" content="2026-08-02">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -1008,8 +1008,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.15.0, built 2026-08-02">
-    <b>v1.15.0</b><i>·</i><span>2026-08-02</span>
+  <div id="build" title="Flamme Retardé 1.16.0, built 2026-08-02">
+    <b>v1.16.0</b><i>·</i><span>2026-08-02</span>
   </div>
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
@@ -1226,7 +1226,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.15.0", date: "2026-08-02" };</script>
+<script>const BUILD = { v: "1.16.0", date: "2026-08-02" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -6446,6 +6446,54 @@ function buildJadrija(scene) {
   const boxTS = (t0, t1, s0, s1, y0, y1, col, topCol) =>
     boxIn(W, t0, t1, s0, s1, y0, y1, col, topCol);
 
+  /**
+   * A bar running along the shore whose cross-section is an arbitrary convex
+   * quad in the (inland, up) plane, given as four `[s, y]` corners.
+   *
+   * `boxIn` cannot do this and structurally never could: it takes the four
+   * bottom corners from the frame and then builds the top by copying them with
+   * `y1` substituted, so the top face is always level and the sides are always
+   * plumb. That is right for a hut and useless for anything raked — a bench
+   * back, a seat that falls away, a sloped arm — which is why everything at eye
+   * height in here used to be a box stood on end.
+   *
+   * The vertex order is `boxIn`'s, corner for corner, so the winding and hence
+   * the normals come out identical to every other solid on this shore. Corners
+   * run (near, bottom) → (far, bottom) → (far, top) → (near, top) as seen along
+   * increasing `t`, which is the same cycle `boxIn` walks.
+   */
+  function bar(t0, t1, sec, col, topCol) {
+    const [P0, P1, P2, P3] = sec;
+    const A = W(t0, P0[0], P0[1]), B = W(t1, P0[0], P0[1]);
+    const D = W(t0, P1[0], P1[1]), C = W(t1, P1[0], P1[1]);
+    const d = W(t0, P2[0], P2[1]), c = W(t1, P2[0], P2[1]);
+    const a = W(t0, P3[0], P3[1]), q = W(t1, P3[0], P3[1]);
+    b.quad(a, q, c, d, topCol || col);
+    b.quad(D, C, B, A, col);
+    b.quad(A, B, q, a, col);
+    b.quad(C, D, d, c, col);
+    b.quad(B, C, c, q, col);
+    b.quad(D, A, a, d, col);
+  }
+
+  /** The commonest cross-section of all: an upright rectangle. */
+  const rect = (s0, s1, y0, y1) => [[s0, y0], [s1, y0], [s1, y1], [s0, y1]];
+
+  /**
+   * And a rectangle rotated in the (inland, up) plane — a slat lying at `ang`
+   * from vertical, `long` along its own length and `thick` across it, centred
+   * on `(cs, cy)`. The perpendicular is the axis turned the same way `rect`
+   * turns `(0,1)` into `(1,0)`, so a zero angle reproduces `rect` exactly.
+   */
+  function slat(cs, cy, ang, long, thick) {
+    const ax = [Math.sin(ang), Math.cos(ang)];
+    const nm = [ax[1], -ax[0]];
+    const hl = long / 2, ht = thick / 2;
+    const c = (i, j) => [cs + nm[0] * ht * i + ax[0] * hl * j,
+      cy + nm[1] * ht * i + ax[1] * hl * j];
+    return [c(-1, -1), c(1, -1), c(1, 1), c(-1, 1)];
+  }
+
   /** A strip of surface running the whole shore, between two inland offsets. */
   function ribbon(s0, s1, yOf, col) {
     for (let i = 0; i < ST.length - 1; i++) {
@@ -6681,15 +6729,92 @@ function buildJadrija(scene) {
   // Ladders, spaced so there is always one within sight of wherever you stand.
   for (let t = 22; t < LEN - 12; t += 44) ladder(t);
 
-  // Benches along the back of the promenade, facing the water.
+  // ── benches ────────────────────────────────────────────────────────────────
+  /**
+   * Along the back of the promenade, facing the water.
+   *
+   * These used to be four boxes — a slab seat, a slab back, two rectangular
+   * legs — and from three hundred metres up that is a bench. From a metre away
+   * it is a plank on two bricks, which is the distance you actually meet it at
+   * once there is a mode where you walk. The slab back was the worst of it: a
+   * solid 1.7 × 0.56 m panel of flat colour at eye level with no gap in it,
+   * which reads as a hoarding rather than as furniture.
+   *
+   * So: slats. What makes a bench legible up close is that you can see through
+   * it — daylight between the boards, the sea behind them — and that nothing on
+   * it is plumb. The seat falls away to the back, the back leans, and the end
+   * frame is one bent piece of iron rather than two posts.
+   */
+  const BENCH = {
+    len: 1.74,          // along the shore
+    seatY: 0.45,        // top of the seat at its front edge
+    fall: 0.035,        // and how much it drops by the back, so you sit *in* it
+    front: 2.42,        // inland offset of the front of the seat, from rowA
+    depth: 0.44,        // front of seat to the foot of the back
+    rake: 0.30,         // rad the back leans from vertical — 17°
+    backTop: 0.88,      // above the deck
+    seats: 5,           // slats in the seat
+    backs: 4,           // and in the back
+    slat: 0.072,
+    thick: 0.032,
+    iron: 0.042,        // the end frame, across the shore
+  };
   for (let t = 18; t < LEN - 10; t += 33) {
     const st = at(t), y = st.deck;
-    const TEAK = [0.520, 0.400, 0.280];
-    boxTS(t - 0.85, t + 0.85, JAD.rowA - 2.5, JAD.rowA - 1.85, y + 0.38, y + 0.46, TEAK);
-    boxTS(t - 0.85, t + 0.85, JAD.rowA - 1.95, JAD.rowA - 1.85, y + 0.46, y + 1.02, TEAK);
-    for (const o of [-0.72, 0.72]) {
-      boxTS(t + o - 0.06, t + o + 0.06, JAD.rowA - 2.45, JAD.rowA - 1.90,
-        y, y + 0.40, [0.240, 0.235, 0.225]);
+    const B = BENCH;
+    const sF = JAD.rowA - B.front;           // front of the seat, inland offset
+    const sB = sF + B.depth;                 // where the back springs from
+    const IRON = [0.196, 0.204, 0.196];      // weathered dark green, not black
+    const half = B.len / 2;
+
+    // The seat, falling 35 mm over its depth. Each slat is laid flat but the
+    // run of them is tilted, so the fall is in where they sit rather than in
+    // each board being a wedge — which is how a real one is built.
+    const tilt = Math.atan2(B.fall, B.depth);
+    for (let i = 0; i < B.seats; i++) {
+      const f = (i + 0.5) / B.seats;
+      const cs = sF + f * B.depth;
+      const cy = y + B.seatY - f * B.fall - B.thick / 2;
+      // A little colour per board. Timber left in this much sun does not come
+      // out of the weather all one shade, and identical slats read as a print.
+      const k = 0.94 + 0.12 * ((i * 7) % 5) / 4;
+      bar(t - half, t + half,
+        slat(cs, cy, tilt + Math.PI / 2, B.slat, B.thick),
+        [0.520 * k, 0.400 * k, 0.280 * k]);
+    }
+
+    // The back. Springs from just behind the seat and leans away from the sea.
+    const cr = Math.cos(B.rake), sr = Math.sin(B.rake);
+    const y0b = y + B.seatY - B.fall + 0.06;
+    const run = (y + B.backTop - y0b) / cr;    // length along the lean
+    for (let i = 0; i < B.backs; i++) {
+      const f = (i + 0.5) / B.backs;
+      const cs = sB - 0.04 + sr * run * f;
+      const cy = y0b + cr * run * f;
+      const k = 0.94 + 0.12 * ((i * 3) % 5) / 4;
+      bar(t - half, t + half, slat(cs, cy, B.rake, B.slat, B.thick),
+        [0.520 * k, 0.400 * k, 0.280 * k]);
+    }
+
+    // The end frames. One piece each: a foot on the ground, a front leg, and a
+    // rear leg that carries on past the seat to become the back support — which
+    // is what an iron bench end actually is, and why it needs no armrest to
+    // look finished.
+    for (const o of [-half + B.iron, half - B.iron]) {
+      const t0 = t + o - B.iron / 2, t1 = t + o + B.iron / 2;
+      // The foot: a runner front to back, so it stands on the concrete rather
+      // than balancing on two points.
+      bar(t0, t1, rect(sF + 0.02, sB + 0.10, y, y + 0.045), IRON);
+      // Front leg, very slightly splayed out toward the sea as it comes down.
+      bar(t0, t1, [[sF + 0.055, y + 0.03], [sF + 0.125, y + 0.03],
+        [sF + 0.105, y + B.seatY], [sF + 0.035, y + B.seatY]], IRON);
+      // Rear leg, carried on up into the back at the same lean.
+      const topS = sB - 0.04 + sr * run, topY = y + B.backTop;
+      bar(t0, t1, [[sB + 0.005, y + 0.03], [sB + 0.075, y + 0.03],
+        [topS + 0.038, topY], [topS - 0.032, topY]], IRON);
+      // And the rail the seat slats land on, tying the two legs together.
+      bar(t0, t1, slat((sF + sB) / 2, y + B.seatY - B.fall / 2 - 0.055,
+        tilt + Math.PI / 2, B.depth + 0.06, 0.05), IRON);
     }
   }
 
