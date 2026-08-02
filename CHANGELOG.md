@@ -8,6 +8,30 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.11.1] — 2026-08-02
+
+### Fixed — open shade was nearly black
+
+Measured on the Jadrija deck: sunlit concrete 143/255, the same concrete in
+shadow 21, a hut front 35. The scene-linear ratio behind that was defensible —
+about 7:1 sun to sky, against a real 8:1 for a horizontal surface at 62° — but
+ACES has a long toe, so a correct 7:1 arrived on screen as 35:1. That is not what
+a shadow on a white promenade looks like in August, and it was not local to
+Jadrija: the crates and the hangar at Rokići were just as black on their shaded
+sides. It had simply never been prominent, because until the parachute there was
+nowhere to stand in shade.
+
+`ambI` is the right knob rather than the exposure, because ambient is a sixth of
+a sunlit surface and all of a shaded one — so it lifts shade hard and leaves the
+sun alone. Raised across the daylight stops. `ambGround` went up with it on the
+two brightest: the lower half of the hemispheric model stands in for whatever is
+under you, and around this bay that is bare limestone karst and a very bright
+sea, not soil — and it is the half that lights a vertical surface, which is
+exactly what a wall with its back to the sun is lit by.
+
+Now: shadow 48, hut front 54, sunlit 160. Šibenik from 400 m is unchanged in
+character — no clipping, the pantile still reads.
+
 ## [1.11.0] — 2026-08-02
 
 ### Added — Jadrija, built to be stood in

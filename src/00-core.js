@@ -288,13 +288,28 @@ vec3 applyHaze(vec3 col, float dist, vec3 worldPos, vec3 sunDir, vec3 viewDir){
  * Palette stops keyed on sun elevation. Tuned for the Dalmatian coast in
  * August: a harder, whiter sun than an inland valley gets, a zenith that stays
  * saturated well past noon, and a horizon that bleaches out over the sea.
+ *
+ * `ambI` was raised across the daylight stops once there was a way to stand in
+ * shade. The scene-linear ratio between sun and sky was defensible — about 7:1,
+ * against a real 8:1 for a horizontal surface at this elevation — but ACES has a
+ * long toe, so a correct 7:1 arrived on screen as 35:1 and open shade measured
+ * 21/255 against sunlit concrete at 143. That is not what a shadow on a white
+ * promenade looks like in August. The sun term barely moves, because ambient is
+ * a sixth of a sunlit surface and all of a shaded one, which is exactly the
+ * property that makes this the right knob rather than the exposure.
+ *
+ * `ambGround` went up with it on the two daylight stops for a reason specific to
+ * here: the hemispheric model's lower half is standing in for whatever is under
+ * you, and around this bay that is bare limestone karst and a very bright sea,
+ * not soil. It is the half that lights a vertical surface, so it is what a wall
+ * with its back to the sun is actually lit by.
  */
 const SKY_STOPS = [
   {
     elev: 62,
     zenith: [0.129, 0.318, 0.671], horizon: [0.741, 0.831, 0.882],
     sun: [1.000, 0.984, 0.945], sunI: 3.35,
-    ambSky: [0.412, 0.545, 0.729], ambGround: [0.361, 0.345, 0.278], ambI: 0.56,
+    ambSky: [0.412, 0.545, 0.729], ambGround: [0.447, 0.424, 0.351], ambI: 1.25,
     hazeNear: [0.706, 0.788, 0.843], hazeFar: [0.796, 0.855, 0.894],
     density: 0.000072, night: 0.0,
   },
@@ -302,7 +317,7 @@ const SKY_STOPS = [
     elev: 36,
     zenith: [0.157, 0.361, 0.702], horizon: [0.784, 0.839, 0.867],
     sun: [1.000, 0.965, 0.886], sunI: 3.05,
-    ambSky: [0.404, 0.529, 0.706], ambGround: [0.353, 0.333, 0.263], ambI: 0.52,
+    ambSky: [0.404, 0.529, 0.706], ambGround: [0.435, 0.408, 0.331], ambI: 1.16,
     hazeNear: [0.729, 0.788, 0.827], hazeFar: [0.820, 0.855, 0.878],
     density: 0.000086, night: 0.0,
   },
@@ -310,7 +325,7 @@ const SKY_STOPS = [
     elev: 14,
     zenith: [0.196, 0.392, 0.686], horizon: [0.898, 0.808, 0.678],
     sun: [1.000, 0.882, 0.702], sunI: 2.70,
-    ambSky: [0.427, 0.510, 0.651], ambGround: [0.353, 0.310, 0.235], ambI: 0.48,
+    ambSky: [0.427, 0.510, 0.651], ambGround: [0.404, 0.353, 0.271], ambI: 1.02,
     hazeNear: [0.796, 0.792, 0.761], hazeFar: [0.890, 0.847, 0.769],
     density: 0.000112, night: 0.0,
   },
@@ -318,7 +333,7 @@ const SKY_STOPS = [
     elev: 3,
     zenith: [0.196, 0.333, 0.596], horizon: [0.949, 0.667, 0.443],
     sun: [1.000, 0.686, 0.408], sunI: 2.05,
-    ambSky: [0.404, 0.443, 0.580], ambGround: [0.341, 0.271, 0.196], ambI: 0.44,
+    ambSky: [0.404, 0.443, 0.580], ambGround: [0.365, 0.290, 0.212], ambI: 0.86,
     hazeNear: [0.812, 0.718, 0.655], hazeFar: [0.929, 0.737, 0.580],
     density: 0.000142, night: 0.03,
   },
@@ -326,7 +341,7 @@ const SKY_STOPS = [
     elev: -4,
     zenith: [0.145, 0.224, 0.463], horizon: [0.855, 0.435, 0.361],
     sun: [0.941, 0.451, 0.302], sunI: 0.55,
-    ambSky: [0.302, 0.329, 0.502], ambGround: [0.282, 0.208, 0.184], ambI: 0.38,
+    ambSky: [0.302, 0.329, 0.502], ambGround: [0.282, 0.208, 0.184], ambI: 0.62,
     hazeNear: [0.635, 0.510, 0.522], hazeFar: [0.784, 0.478, 0.416],
     density: 0.000165, night: 0.20,
   },
@@ -334,7 +349,7 @@ const SKY_STOPS = [
     elev: -12,
     zenith: [0.043, 0.071, 0.184], horizon: [0.192, 0.180, 0.286],
     sun: [0.282, 0.247, 0.333], sunI: 0.04,
-    ambSky: [0.110, 0.145, 0.271], ambGround: [0.094, 0.094, 0.129], ambI: 0.28,
+    ambSky: [0.110, 0.145, 0.271], ambGround: [0.094, 0.094, 0.129], ambI: 0.36,
     hazeNear: [0.184, 0.184, 0.263], hazeFar: [0.224, 0.208, 0.302],
     density: 0.000150, night: 0.85,
   },
