@@ -101,6 +101,31 @@ it synthesises a locale around wherever you came down — a kilometre and a half
 of open country, heights straight off the DEM. So you can put the thing down on
 the shoulder above Jadrija and walk to the water.
 
+And on the Jadrija waterfront itself, you land in a place that was built to be
+stood in — see below.
+
+### Jadrija
+
+Four hundred metres of the real shore, hand-built rather than generated, because
+the two are for different distances. Everything else here is authored to be flown
+over: from three hundred metres a roof is a coloured quadrilateral and that is
+the correct amount of roof. From 1.62 m it is a grey box with black rectangles
+painted on it.
+
+What makes Jadrija Jadrija is not its houses, it is its concrete. Three bathing
+terraces stepping down to a quay wall, ladders bolted into the coping, steps into
+the sea, a jetty out over the water for the taxi boat from Šibenik — and behind
+them the *kabine*, the rows of little wooden changing huts that have stood on
+that shore since the 1920s and are a protected monument. They are joined side by
+side under one roofline with a door apiece, and no two are the same colour.
+
+The whole resort is laid out in a frame that follows the water's edge — metres
+along the shore, metres inland — and that edge is traced from the sea mask when
+the world loads rather than typed in, so it cannot drift off the coast if the
+terrain is ever re-baked. It is the same shape of frame the aerodrome uses, which
+is what lets the on-foot mode walk here without knowing where "here" is. The huts
+are solid.
+
 Once the canopy has taken air, you live. Five and a half metres a second is a
 heavy step off a wall, and the water is the August Adriatic a few hundred metres
 off a beach with three other aircraft and a lookout who all watched you go — you

@@ -359,7 +359,7 @@ function updateCamera(dt) {
 // ── the world ────────────────────────────────────────────────────────────────
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
-  trees, landmarks, alerts, roads, rail, props, airfield, ground, birds, eject;
+  trees, landmarks, alerts, roads, rail, props, airfield, jadrija, ground, birds, eject;
 /** You plus the three wingmen, as the birds see them. Built once, in boot(). */
 let birdFlush = [];
 
@@ -464,6 +464,10 @@ async function boot() {
   // a hangar does not move.
   shadow.cast(airfield.buildings);
   shadow.cast(airfield.objMesh);
+  // Jadrija before the roads, so the promenade is laid before anything is asked
+  // to route around it, and before the trees, which have to keep off it.
+  jadrija = buildJadrija(scene);
+  if (jadrija) for (const m of jadrija.casters) shadow.cast(m);
   roads = buildRoads(scene);
   rail = buildRail(scene);
   props = buildProps(scene, roads.lanes);
@@ -849,7 +853,7 @@ function chuteDown(kind) {
   // used to answer with a red screen that was indistinguishable from having
   // been killed by it.
   if (kind === 'land' && ground && ground.ok
-    && ground.retarget(localeAt(eject.pos.x, eject.pos.z, airfield))
+    && ground.retarget(localeAt(eject.pos.x, eject.pos.z, airfield, jadrija))
     && ground.dropIn(eject.pos.x, eject.pos.z, eject.you.yaw)) {
     alerts.bump(1.1);
     $('chute-hud').hidden = true;
@@ -1361,7 +1365,15 @@ function frame() {
   // Centred on whoever the player currently is. Left on the aeroplane, a
   // parachute descent watches an unshadowed hillside come up while the shadow
   // map follows a wreck four kilometres away.
-  shadow.update(eject.active ? eject.pos : flight.p.pos);
+  //
+  // On foot it has to be the eye and not the aircraft, and for a worse reason
+  // than a missing shadow: outside the cascade `shadowAt` reads as *shadowed*,
+  // so walking away from your aeroplane draws a hard black line across the world
+  // at 450 m and everything past it goes out. That never showed while the only
+  // way on to your feet was climbing out of the door at Rokići — you were always
+  // standing next to the thing the map was centred on.
+  shadow.update(state.phase === 'ground' ? camera.position
+    : eject.active ? eject.pos : flight.p.pos);
   shadow.syncMoving();
   shadow.render(renderer);
 
@@ -1474,6 +1486,11 @@ window.__fr = {
       bumpM: +airfield.site.worst.toFixed(2),
       objects: airfield.objects.length, tris: Math.round(airfield.tris),
     } : null,
+    jadrija: jadrija ? {
+      shoreM: Math.round(jadrija.length), runs: jadrija.blockers.length,
+      tris: Math.round(jadrija.tris),
+      at: [Math.round(jadrija.site.x), Math.round(jadrija.site.z)],
+    } : null,
     rail: rail ? { ways: rail.ways, km: +rail.km.toFixed(1), cars: rail.cars,
       lineKm: +rail.lineKm.toFixed(2), tris: Math.round(rail.tris) } : null,
     ground: ground ? ground.stats() : null,
@@ -1542,6 +1559,30 @@ window.__fr = {
         rows.push(Math.round(x) + ' | ' + row.join(' '));
       }
       return rows;
+    },
+  },
+  /**
+   * Stand on the Jadrija promenade without flying there and jumping out. `t` is
+   * metres along the shore from the west end, `s` metres inland from the water,
+   * which is the frame the whole resort is laid out in — so a test can ask for
+   * "on the quay by the jetty" rather than for a pair of world coordinates that
+   * mean nothing and stop meaning it the moment the shore is re-traced.
+   */
+  jad: {
+    raw: () => jadrija,
+    stand: (t, s = 14, yaw = null) => {
+      if (!jadrija || !ground || !ground.ok) return null;
+      const w = jadrija.toWorld(t, s);
+      ground.retarget(jadrija);
+      const st = jadrija.local(w[0], w[2]);
+      ground.dropIn(w[0], w[2], yaw == null ? jadrija.site.yaw : yaw);
+      return { at: [+w[0].toFixed(1), +w[1].toFixed(2), +w[2].toFixed(1)],
+        ts: st.map((v) => +v.toFixed(1)) };
+    },
+    probe: (t, s) => {
+      const w = jadrija.toWorld(t, s);
+      return { w: w.map((v) => +v.toFixed(2)), back: jadrija.local(w[0], w[2])
+        .map((v) => +v.toFixed(2)), walkY: +jadrija.walkY(w[0], w[2]).toFixed(2) };
     },
   },
   /**

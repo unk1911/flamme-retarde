@@ -52,13 +52,18 @@ function openLocale(x, z) {
 
 /**
  * Which locale owns a point. Inside the aerodrome wire it is the aerodrome,
- * with its buildings, its crew and its mission; anywhere else it is open
- * country. Landing on the field by parachute and finding the hangars had become
- * scenery would be the worse bug of the two.
+ * with its buildings, its crew and its mission; on the Jadrija concrete it is
+ * Jadrija, with its terraces and its huts; anywhere else it is open country.
+ * Landing on the field by parachute and finding the hangars had become scenery
+ * would be the worse bug of the two.
+ *
+ * Order matters only in that the two hand-built places must both come before the
+ * synthesised one. They are four kilometres apart and cannot both claim a point.
  */
-function localeAt(x, z, airfield) {
+function localeAt(x, z, airfield, jadrija) {
   if (airfield && airfield.site && airfield.inField && airfield.inField(x, z)) {
     return airfield;
   }
+  if (jadrija && jadrija.inField && jadrija.inField(x, z)) return jadrija;
   return openLocale(x, z);
 }

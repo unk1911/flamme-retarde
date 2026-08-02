@@ -192,6 +192,13 @@ function buildTrees(scene, fire) {
       // apron grows cypresses and there is a pine through the runway.
       if (typeof airfield !== 'undefined' && airfield && airfield.inField
         && airfield.inField(x, z, 25)) continue;
+      // Nor on the Jadrija concrete, for the same reason and one more: that
+      // strip is the one place a tree is at eye height rather than under you,
+      // so a pine standing in the middle of a bathing terrace is not a detail
+      // you fly over and forgive. The pines that belong there are placed by
+      // hand, in their planters, with the rest of the resort.
+      if (typeof jadrija !== 'undefined' && jadrija && jadrija.inField
+        && jadrija.inField(x, z, 6)) continue;
       const c = coverAt(x, z);
       const table = GROWS[c];
       if (!table) continue;

@@ -172,6 +172,10 @@ function propLayer(scene, proto, cap, opts = {}) {
   return { geo, mesh, aPos, aRot, aScale, aColor };
 }
 
+/** Is this point on the Jadrija concrete? Guarded, because it is built later. */
+const jadOn = (x, z) => typeof jadrija !== 'undefined' && jadrija
+  && jadrija.inField && jadrija.inField(x, z);
+
 function buildProps(scene, lanes) {
   const rng = mulberry32(CONFIG.seed ^ 0x00c2a5);
   const _q = new THREE.Quaternion();
@@ -217,8 +221,18 @@ function buildProps(scene, lanes) {
     for (let k = 0; k < knot && parasols.length < PROPS.parasols; k++) {
       const px = x + (rng() - 0.5) * 16, pz = z + (rng() - 0.5) * 16;
       if (isSea(px, pz)) continue;
-      const py = groundAt(px, pz);
+      let py = groundAt(px, pz);
       if (py < 0.2 || py > 8) continue;
+      // Jadrija is the one shore that is not the shore any more: it is two
+      // metres of concrete standing on it. A parasol sited off the terrain there
+      // is a parasol buried to the canopy, so on the resort it stands on the
+      // deck — and only on the open terraces, because the strip behind them is
+      // solid huts and a beach umbrella through a roof is worse than none.
+      if (jadOn(px, pz)) {
+        const s = jadrija.local(px, pz)[1];
+        if (s > JAD.deck) continue;
+        py = jadrija.walkY(px, pz);
+      }
       parasols.push([px, py, pz, rng() * TAU, 0.85 + rng() * 0.35,
         k === 0 ? cl : PARASOL_COL[(rng() * PARASOL_COL.length) | 0]]);
     }

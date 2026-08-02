@@ -8,6 +8,67 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.11.0] — 2026-08-02
+
+### Added — Jadrija, built to be stood in
+
+Now that a canopy can put you down anywhere, somewhere had to be worth landing.
+Everything in this world is generated from data, which is the right way to build
+a coastline you fly over at three hundred metres and the wrong way to build
+somewhere you can walk: from eye height the procedural town is a grey box with
+black rectangles painted on it and the ground is a beige plane, because none of
+it was ever authored to be looked at from 1.62 m. So one place is authored.
+
+- **The waterfront.** Four hundred and eleven metres of the Jadrija shore, laid
+  out in a frame that follows the real water's edge — traced from `isSea` at load
+  time rather than typed in, so the promenade cannot drift off the coast if the
+  terrain is ever re-baked. Three bathing terraces stepping down to a quay wall,
+  ladders bolted into the coping, steps into the sea, lamps, benches, and a jetty
+  out over open water for the taxi boat from Šibenik.
+- **The kabine.** Twenty-eight runs of the wooden changing huts that have stood
+  on that shore since the 1920s and are a protected monument — joined side by
+  side under one roofline, a door apiece, and no two the same colour, because a
+  run of identical huts is a texture and what is actually there is a long stripe
+  of mismatched paint. There is nothing else like them in the bay.
+- **It is a locale, so you can walk it.** Same eleven members the aerodrome
+  implements. The huts are solid — they were laid out in shore coordinates, so
+  they are axis-aligned boxes in the frame `confine` already works in — and
+  coming down under silk anywhere on the concrete now hands you to Jadrija rather
+  than to the synthesised open country. Trees and parasols keep off it: the
+  parasols that do stand there stand on the deck rather than on the terrain two
+  metres below it, and none are allowed behind the promenade where the huts are.
+
+### Fixed
+
+- **Walking away from your aeroplane switched the world off.** The shadow cascade
+  was centred on the aircraft even on foot, and outside the cascade `shadowAt`
+  reads as *shadowed* — so a walker more than 450 m from their aeroplane dragged
+  a hard black line across the world with everything past it unlit. It never
+  showed while the only way on to your feet was climbing out of the door at
+  Rokići, because you were always standing next to the thing the map was centred
+  on. On foot it now follows the eye.
+- **Two calibration errors in the first cut of the resort**, both found by
+  measuring rather than squinting. The concrete was laid at 0.76 albedo against
+  an aerodrome apron of 0.42, so it clipped to flat white and took the bay joints
+  with it. And the terraces were hung off a single deck height at fixed drops,
+  which put the lowest platform at 0.78 m along a shore whose natural ground is
+  already at 1.4 m six metres in — the hillside came straight up through the
+  concrete and the promenade had a beach growing out of the middle of it. Each
+  level is now fitted to the highest ground it has to cover.
+- **The promenade shadowed itself.** Terraces are single quads with no thickness,
+  and registering them as shadow casters had them tested against their own depth:
+  chequered acne across the deck and a black stripe down the shore. Ground
+  receives and does not cast, which is why the aerodrome has always cast its
+  hangars and never its apron.
+
+### Known
+
+Open shade in this renderer is very dark — measured on the Jadrija deck, sunlit
+concrete comes out at 143/255 and the same concrete in shadow at 21. That is a
+global calibration, not something the resort introduced: the crates and the
+hangar at Rokići are just as black on their shaded sides. It was simply never
+prominent while nobody stood in shade.
+
 ## [1.10.0] — 2026-08-01
 
 ### Added — where you land is where you carry on
