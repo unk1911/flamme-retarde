@@ -8,6 +8,56 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.21.0] — 2026-08-03
+
+### Added — a near shadow cascade, so things touch the ground
+
+Nothing small in this game cast a shadow, and that — more than polygon count,
+more than texture — is what made the ground at Jadrija read as a diorama. The
+bench, the loungers, the parasol poles, the cars, and now ninety-two people were
+all *floating*: correctly lit, correctly shaped, and not attached to anything.
+
+The cascade was never the problem. It was 900 m across 2048 texels — 44 cm each,
+and with the PCF spread the softest thing it could draw was about two and a half
+metres wide. That is exactly right for a Canadair and cannot represent a bench
+leg at all. On top of which the only registered casters were the aerodrome
+buildings, the aerodrome objects and the Jadrija huts: the cars, the trees, the
+crowd and the ground crew were never in the map to begin with.
+
+So there are two cascades now.
+
+- **Far**, 900 m, follows the aircraft. Unchanged — same radius, same bias, same
+  spread, and verified frame-for-frame against the previous build.
+- **Near**, 110 m, follows the *camera*, at 5.4 cm a texel. Its slab is 520 m
+  deep rather than 1000, which is not a saving but the point: half the range is
+  twice the depth precision, and the bias that buys is what lets a shadow start
+  at somebody's feet instead of 35 cm away from them.
+
+They are crossfaded over the near cascade's outer tenth rather than switched, so
+there is no seam sweeping across the ground as you walk.
+
+Everything small is registered into the **near cascade only** — cars, boats,
+parasols, the bathers, the ground crew. Whatever a four-metre car writes into
+the far map is a speckle, and there are three thousand of them; a group that is
+switched off for the far pass costs one flag a frame. Trees cast into both: a
+pine is sixteen texels of the far map, which is coarse but a real shape, and a
+hillside of maquis with no shadow in it was the flattest thing in this world
+after the sea.
+
+The near map is halved to 1024 on a phone — still 10.7 cm a texel, still two
+orders of magnitude finer than the far cascade it exists to make up for.
+
+Measured on the promenade: open deck is *perfectly* flat at 173/255, and the
+contact shadows under the walkers bottom out at 71. At `startHour` the sun is
+near-overhead, so these are pools underfoot rather than long shadows — which is
+what midday in August actually looks like, and what the sixth of August was.
+
+### Fixed
+
+- `near` and `far` are reserved identifiers on some GLSL ES implementations, so
+  the near cascade's PCF result is named `nearLit`. It compiled fine here, which
+  is not evidence about anybody else's phone.
+
 ## [1.20.0] — 2026-08-03
 
 ### Changed — the people on the beach

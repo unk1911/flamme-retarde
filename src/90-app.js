@@ -472,12 +472,31 @@ async function boot() {
   rail = buildRail(scene);
   props = buildProps(scene, roads.lanes);
   if (IS_SMALL) props.setDensity(0.45);
+  // Cars, boats, parasols and everybody on the beach. Near cascade only — see
+  // the note on `nearOnly` in src/06-shadow.js — and instanced, because the
+  // depth pass has to reproduce SOLID_VERT's transform exactly or a shadow
+  // lands somewhere its object is not.
+  for (const k in props.layers) {
+    shadow.cast(props.layers[k].mesh, { instanced: true, near: true });
+  }
+  if (jadrija) {
+    for (const m of jadrija.crowd.meshes()) {
+      shadow.cast(m, { instanced: true, near: true });
+    }
+  }
 
   await step(82, 'load.fuel');
   fire = buildFire(scene);
   // After the fire, because the ground mission is downstream of it in every
   // sense: it does not exist until the front is close enough to throw embers.
   ground = await buildGround(scene, airfield);
+  // The ground crew, who had exactly the same problem as the bathers: eleven
+  // parts each, all of them moving, none of them attached to the apron. Dynamic
+  // because they walk, and near-only because a person is under four texels of
+  // the far map.
+  for (const c of ground.crew) {
+    if (c.fig) shadow.castTree(c.fig.root, { dynamic: true, near: true });
+  }
 
   await step(85, 'load.maquis');
   trees = buildTrees(scene, fire);
@@ -489,6 +508,10 @@ async function boot() {
   // up and a tree went from 60 triangles to 96: at 0.5 a phone would now be
   // drawing nearly three times the vegetation it was tuned for.
   if (IS_SMALL) trees.setDensity(0.35);
+  // Trees cast into both cascades. A pine is 7 to 13 m, which is sixteen
+  // texels of the far map — coarse, but a real shape, and a hillside of maquis
+  // with no shadow in it is the flattest thing in this world after the sea.
+  for (const k in trees.layers) shadow.cast(trees.layers[k].mesh, { instanced: true });
 
   // The birds go up with the maquis because they belong to it: gulls over the
   // channel, swifts over the roofs, crows over the karst. They cost two draws
@@ -1408,7 +1431,7 @@ function frame() {
   // the most obvious possible bug to see from the apron and a lie about what
   // they are doing: the fire does not stop for you getting out.
   if (state.phase !== 'intro') wingmen.update(dt);
-  if (state.phase === 'intro') shadow.update(camera.position);
+  if (state.phase === 'intro') shadow.update(camera.position, camera.position);
   waterfx.update(dt);
 
   // Billboard bases for every instanced sprite system.
@@ -1471,7 +1494,7 @@ function frame() {
   // way on to your feet was climbing out of the door at Rokići — you were always
   // standing next to the thing the map was centred on.
   shadow.update(state.phase === 'ground' ? camera.position
-    : eject.active ? eject.pos : flight.p.pos);
+    : eject.active ? eject.pos : flight.p.pos, camera.position);
   shadow.syncMoving();
   shadow.render(renderer);
 

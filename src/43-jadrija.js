@@ -1627,6 +1627,8 @@ async function buildJadrija(scene) {
       },
       /** Every figure, live, for a test that wants to know where they are. */
       all: () => Object.values(crowds).flatMap((c) => c.figures),
+      /** The instanced layers, so the near shadow cascade can occlude with them. */
+      meshes: () => Object.values(crowds).flatMap((c) => c.layers.map((L) => L.mesh)),
     },
     site: { x: mid.x + mid.nx * 16, z: mid.z + mid.nz * 16, yaw: Math.atan2(mid.ux, -mid.uz) },
     // Kept a metre off the quay edge: the bounds are what stops a walker, and

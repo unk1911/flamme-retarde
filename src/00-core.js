@@ -51,6 +51,15 @@ const CONFIG = {
   // stepped from eye height.
   shadowRadius: 450,
   shadowRes: 2048,
+  // The near cascade. 900 m across 2048 texels is 44 cm each, which is sized
+  // for a hangar and an aeroplane and cannot resolve anything smaller — a
+  // bench leg, a car, a person are all far under one texel, and with the PCF
+  // spread the softest thing that map can draw is about two and a half metres
+  // wide. That is why nothing at Jadrija touched the ground.
+  //
+  // 110 m across the same 2048 is 5.4 cm, which is a shadow under a chair.
+  shadowNearRadius: 55,
+  shadowNearRes: 2048,
   startHour: 14.33,
   hourPerSecond: 0.0,          // the light holds; this fight is not about dusk
 };
@@ -450,6 +459,9 @@ const U = {
   uShadowMap: { value: null },
   uShadowMat: { value: new THREE.Matrix4() },
   uShadowTexel: { value: 1 / CONFIG.shadowRes },
+  uShadowMapN: { value: null },
+  uShadowMatN: { value: new THREE.Matrix4() },
+  uShadowTexelN: { value: 1 / CONFIG.shadowNearRes },
   uCamPos: { value: new THREE.Vector3() },
 };
 
@@ -470,6 +482,8 @@ const shareTerrain = () => ({
 });
 const shareShadow = () => ({
   uShadowMap: U.uShadowMap, uShadowMat: U.uShadowMat, uShadowTexel: U.uShadowTexel,
+  uShadowMapN: U.uShadowMapN, uShadowMatN: U.uShadowMatN,
+  uShadowTexelN: U.uShadowTexelN,
 });
 
 // -------------------------------------------------------------- game state ---

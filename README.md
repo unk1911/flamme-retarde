@@ -364,6 +364,21 @@ you.
 Everything else — the aircraft, the town, the sea, the sky, the fire, the
 water — is generated in code.
 
+**Shadows** are two orthographic cascades, hand-rolled because three.js's own
+pass wants standard materials and every surface here is a custom shader. Depth
+is packed into RGBA8 so it works without float-render support, and each cascade
+snaps to its own texel grid so the edges do not crawl as you fly.
+
+The far one is 900 m across and follows the aircraft — 44 cm a texel, which
+draws an aeroplane and a hangar and is incapable of anything smaller. The near
+one is 110 m across and follows the *camera*, at 5.4 cm, and it is the reason
+anything you can walk up to is attached to the ground instead of hovering over
+it. The two are crossfaded rather than switched, or the boundary is a seam
+sweeping across the ground as you walk. Everything small — cars, boats,
+parasols, the bathers, the ground crew — is registered into the near cascade
+alone: what a car writes into the far map is a speckle, and there are three
+thousand of them.
+
 **The sea** is a camera-centred grid with a radial exponential warp, so the
 triangles are dense at your feet and kilometres wide at the horizon, and the
 noise detail is chosen per-pixel from `fwidth` rather than per-vertex.

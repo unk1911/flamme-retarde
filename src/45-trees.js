@@ -349,7 +349,7 @@ function buildTrees(scene, fire) {
   }
 
   return {
-    update,
+    update, layers,
     setDensity: (v) => { density = v; acc = 99; lastTx = 1e9; },
     getDensity: () => density,
     stats: () => ({ live, tiles: tiles.size }),
