@@ -118,7 +118,7 @@ function shoreStations(raw) {
   return ST;
 }
 
-function buildJadrija(scene) {
+async function buildJadrija(scene) {
   const raw = traceShore();
   if (raw.length < 8) return null;             // the coast moved; build nothing
   const ST = shoreStations(raw);
@@ -695,12 +695,23 @@ function buildJadrija(scene) {
    * is wrong twice over — it is the sixth of August, it is a bathing station,
    * and the whole point of the fire is that there are people under it.
    *
-   * All of it is static geometry in the same buffer as the huts. Nothing here
-   * animates and nothing here is a simulation: at the distance you actually see
-   * Jadrija from — either three hundred metres up at a hundred and eighty knots,
-   * or standing on the promenade — a still figure in a plausible pose reads as a
-   * person, and thirty of them read as a beach. Animating them would cost the
-   * frame budget of the fire and buy a wobble nobody would look at twice.
+   * The furniture — parasols, loungers, benches, dinghies — is static geometry
+   * in the same buffer as the huts, and that is right: nobody expects a sun
+   * lounger to move.
+   *
+   * The people are not. They used to be, and the argument for it was that at
+   * three hundred metres and a hundred and eighty knots a still figure in a
+   * plausible pose reads as a person. That is true, and it stopped being the
+   * only distance this place is seen from the day you could stand on the
+   * promenade. From 1.62 m a beach of statues does not read as a beach; it
+   * reads as an evacuation that everybody attended in their swimming costume.
+   *
+   * So the figures come out of the static buffer and into src/42-crowd.js:
+   * Blender-authored rigs — tools/blender/bather.py — instanced eleven parts at
+   * a time, walking the promenade on the same gait as the aerodrome crew. The
+   * cost is twenty-two draw calls and a hundred-odd matrix decompositions a
+   * frame, which is a fraction of what the fire spends and buys the one thing
+   * this whole file exists for.
    */
   const SKIN = [
     [0.760, 0.585, 0.450], [0.690, 0.505, 0.375],
@@ -792,117 +803,6 @@ function buildJadrija(scene) {
    * on the whole beach — which is why these can simply be better, where the
    * 2 120 cars needed a second model and a range test.
    */
-  function person(t, s, y, ang, pose = 'stand', scale = 1) {
-    const P = facing(t, s, ang);
-    const k = scale;
-    const skin = pick(SKIN), suit = pick(SWIM), hair = pick(HAIR);
-    // Everything is written in metres for a 1.72 m adult and scaled by k, so
-    // the numbers below can be read against a tape measure.
-    const K = (v) => v * k;
-
-    if (pose === 'lie') {
-      // Flat on the back, feet seaward, and lying down the body rather than up
-      // it: `s` runs from the soles at −0.90 to the crown at +0.96, and the
-      // taper that matters from the one angle you ever see a lounger from is
-      // the one along that axis. Absolute world heights here, not heights above
-      // the feet — there are no feet under this one.
-      // Stations run up the body: soles at −0.90, crown at +0.96. `cy` is the
-      // height of the *centre* of each section above the towel, so with a half
-      // height of 0.045 to 0.105 the whole figure lies on the deck rather than
-      // in it.
-      const L = (s0, r0, s1, r1, col) => frustumS(
-        P, K(s0), [K(r0[0]), y + K(r0[1]), K(r0[2]), K(r0[3])],
-        K(s1), [K(r1[0]), y + K(r1[1]), K(r1[2]), K(r1[3])], col);
-      L(-0.90, [0, 0.055, 0.072, 0.050], -0.76, [0, 0.062, 0.086, 0.056], skin);
-      L(-0.76, [0, 0.062, 0.086, 0.056], -0.34, [0, 0.078, 0.112, 0.072], skin);
-      L(-0.34, [0, 0.078, 0.112, 0.072], -0.06, [0, 0.092, 0.140, 0.088], skin);
-      L(-0.06, [0, 0.092, 0.140, 0.088], 0.26, [0, 0.100, 0.172, 0.098], suit);
-      // From the hips up the body rides the raised back of the lounger, which
-      // climbs 0.34 m over the last half-metre. Drawn flat, the head and
-      // shoulders end up buried inside the backrest slabs.
-      L(0.26, [0, 0.100, 0.172, 0.098], 0.54, [0, 0.150, 0.178, 0.102], skin);
-      L(0.54, [0, 0.150, 0.178, 0.102], 0.70, [0, 0.208, 0.182, 0.098], skin);
-      L(0.70, [0, 0.208, 0.182, 0.098], 0.76, [0, 0.240, 0.062, 0.058], skin);
-      L(0.76, [0, 0.240, 0.062, 0.058], 0.90, [0, 0.286, 0.086, 0.086], skin);
-      L(0.90, [0, 0.286, 0.086, 0.086], 0.96, [0, 0.296, 0.062, 0.066], skin);
-      L(0.86, [0, 0.344, 0.076, 0.042], 0.98, [0, 0.344, 0.058, 0.036], hair);
-      return;
-    }
-
-    // Everything upright shares one skeleton and differs only in where the
-    // knees are and how far the hips have dropped.
-    const sit = pose === 'sit';
-    const wade = pose === 'wade';
-    const base = y - (wade ? 0.55 * k : 0);        // where the soles are
-    // From here on every number is metres above the soles, on a 1.72 m adult,
-    // so the figure can be read against a tape measure and `k` is applied once
-    // in one place. Getting this wrong — scaling a world height, or forgetting
-    // to add the base — silently drops everybody through the concrete.
-    const limb = (v0, r0, v1, r1, col) => frustum(
-      P, base + K(v0), [K(r0[0]), K(r0[1]), K(r0[2]), K(r0[3])],
-      base + K(v1), [K(r1[0]), K(r1[1]), K(r1[2]), K(r1[3])], col);
-    const hipV = 0.84 - (sit ? 0.44 : 0);
-    const shV = hipV + 0.58;
-
-    // ── legs ─────────────────────────────────────────────────────────────────
-    // Set out at ±0.085 and never thicker than 0.075, so there is always
-    // daylight between them. Butted together the whole figure reads as one slab
-    // from shoulder to floor — a painted board rather than a person — and the
-    // gap is what a silhouette needs, not the detail.
-    for (const o of [-0.085, 0.085]) {
-      if (sit) {
-        // Thigh forward off the edge, shin hanging down the wall in front.
-        limb(hipV, [o, 0, 0.078, 0.086], hipV - 0.06, [o, 0.36, 0.062, 0.070], skin);
-        limb(hipV - 0.06, [o, 0.36, 0.062, 0.070],
-          hipV - 0.52, [o, 0.40, 0.048, 0.052], skin);
-        limb(hipV - 0.52, [o, 0.40, 0.048, 0.052],
-          hipV - 0.58, [o, 0.46, 0.046, 0.085], skin);
-      } else {
-        // Hip → knee → ankle → foot, thinning the whole way down, with the knee
-        // a touch forward of the line so the leg is not a post.
-        limb(hipV, [o, 0, 0.080, 0.088], 0.46, [o, 0.012, 0.058, 0.062], skin);
-        limb(0.46, [o, 0.012, 0.058, 0.062], 0.075, [o, 0, 0.043, 0.050], skin);
-        limb(0.075, [o, 0, 0.043, 0.050], 0, [o, -0.035, 0.046, 0.088], skin);
-      }
-    }
-
-    // ── trunk ────────────────────────────────────────────────────────────────
-    // Hips are wide, the waist comes in, the chest goes back out and the
-    // shoulders out again — four stations, and between them they are most of
-    // what tells you this is a person and not a bollard. The suit sits *across*
-    // the hips so the colour break falls where a costume actually is.
-    limb(hipV - 0.20, [0, 0, 0.150, 0.098], hipV + 0.08, [0, 0, 0.155, 0.100], suit);
-    limb(hipV + 0.08, [0, 0, 0.155, 0.100], hipV + 0.24, [0, 0, 0.132, 0.086], skin);
-    limb(hipV + 0.24, [0, 0, 0.132, 0.086], shV - 0.06, [0, 0.004, 0.178, 0.100], skin);
-    limb(shV - 0.06, [0, 0.004, 0.178, 0.100], shV, [0, 0, 0.168, 0.092], skin);
-
-    // ── arms ─────────────────────────────────────────────────────────────────
-    // Out at the shoulder, further out at the elbow, back in at the wrist, and
-    // tapering the whole way. Hung plumb at one thickness they read as planks
-    // stuck on the ribs, which is what they were.
-    for (const o of [-1, 1]) {
-      const sh = 0.186 * o, el = 0.212 * o, wr = 0.200 * o;
-      limb(shV - 0.02, [sh, 0, 0.046, 0.052], shV - 0.30, [el, 0.010, 0.038, 0.042], skin);
-      limb(shV - 0.30, [el, 0.010, 0.038, 0.042],
-        shV - 0.56, [wr, 0.020, 0.030, 0.034], skin);
-      // The hand: small, but a forearm stopping dead at the wrist is a stump.
-      limb(shV - 0.56, [wr, 0.020, 0.030, 0.034],
-        shV - 0.70, [wr, 0.024, 0.024, 0.040], skin);
-    }
-
-    // ── neck and head ────────────────────────────────────────────────────────
-    limb(shV, [0, 0, 0.052, 0.048], shV + 0.07, [0, 0.006, 0.046, 0.044], skin);
-    // Jaw → cranium → crown. Three stations rather than one box, because the
-    // head is the part everybody looks at and a cube on a neck is the single
-    // thing that says "not a person" loudest.
-    limb(shV + 0.07, [0, 0.006, 0.062, 0.066], shV + 0.15, [0, 0, 0.084, 0.088], skin);
-    limb(shV + 0.15, [0, 0, 0.084, 0.088], shV + 0.27, [0, -0.006, 0.064, 0.068], skin);
-    // The back and top of the head only. A fringe of hair over a box reads far
-    // better than a hair-coloured box does.
-    limb(shV + 0.13, [0, -0.032, 0.086, 0.058],
-      shV + 0.28, [0, -0.030, 0.066, 0.046], hair);
-  }
-
   /** A parasol: a pole and a shallow eight-panel cone, tilted a few degrees. */
   /**
    * A hired beach parasol.
@@ -1122,7 +1022,11 @@ function buildJadrija(scene) {
   }
 
   // ── and where all of it goes ───────────────────────────────────────────────
+  // `pose` is what they are doing; `beat` is the stretch of promenade a walker
+  // patrols, and is null for everybody who has settled somewhere.
   const bathers = [];
+  const B = (t, s, y, ang, pose, k = 1, beat = null) =>
+    bathers.push({ t, s, y, ang, pose, k, beat });
 
   // The middle terrace is the shelf people actually lay their towels on: wide
   // enough for a parasol and a pair of loungers, and one step above the water.
@@ -1149,10 +1053,13 @@ function buildJadrija(scene) {
         // local s −0.90…+0.98 and the lounger −0.92…+0.87, so at `s - 1.9` the
         // head hung half a metre off the end in mid-air — invisible while the
         // body was four flat boxes, obvious the moment it had any depth.
-        if (rng() < 0.5) bathers.push([lt, s - 1.45, y + 0.36, Math.PI, 'lie', 1]);
+        // Feet seaward, head inland. The rig lies down by tipping about its
+        // own root, so the anchor is the soles and `ang` points from the head
+        // towards the feet — see the `lie` case in src/42-crowd.js.
+        if (rng() < 0.5) B(lt, s - 2.30, y + 0.52, -Math.PI / 2, 'lie', 1);
       }
     } else if (rng() < 0.5) {
-      bathers.push([t, 5.0 + rng() * 4.0, y, Math.PI + (rng() - 0.5) * 1.4, 'stand', 1]);
+      B(t, 5.0 + rng() * 4.0, y, Math.PI + (rng() - 0.5) * 1.4, 'stand', 1);
     }
   }
 
@@ -1162,20 +1069,38 @@ function buildJadrija(scene) {
     if (Math.abs(t - gapAt) < 4) continue;
     const st = at(t), y = st.lip;
     const r = rng();
-    if (r < 0.44) bathers.push([t, 1.25, y, Math.PI, 'sit', r < 0.10 ? 0.66 : 1]);
-    else if (r < 0.60) bathers.push([t, 2.2 + rng() * 1.4, y, rng() * TAU, 'stand', 1]);
-    else if (r < 0.70) bathers.push([t, -0.9, 0.0, Math.PI, 'wade', r < 0.655 ? 0.66 : 1]);
+    // 0.55 m in, not 1.25: the thigh reaches about 0.43 m forward of the hip,
+    // so this is where the knee lands on the lip of the quay and the shins
+    // genuinely hang over the water rather than over more concrete.
+    if (r < 0.44) B(t, 0.55, y, Math.PI, 'sit', r < 0.10 ? 0.66 : 1);
+    else if (r < 0.60) B(t, 2.2 + rng() * 1.4, y, rng() * TAU, 'stand', 1);
+    else if (r < 0.70) B(t, -0.9, -0.55, Math.PI, 'wade', r < 0.655 ? 0.66 : 1);
   }
 
   // The promenade: people who are not bathing at all — walking it, standing at
-  // the rail, waiting for the boat.
+  // the rail, waiting for the boat. Most of these walk, and they are the reason
+  // any of this was worth doing: the deck is the one strip of Jadrija that runs
+  // unbroken for three hundred metres, so it is the one place a figure can go
+  // somewhere without immediately arriving.
   for (let t = 10; t < LEN - 10; t += 11 + rng() * 13) {
     const st = at(t), y = st.deck;
-    bathers.push([t, JAD.mid + 1.6 + rng() * 6.0, y, rng() * TAU, 'stand', 1]);
-    // Two together, half the time. People come here in pairs.
+    const lane = JAD.mid + 1.6 + rng() * 6.0;
+    if (rng() < 0.72) {
+      // A beat of 30–90 m, clamped inside the resort. Short beats read as
+      // pacing and long ones mean you never see the same person twice, and
+      // neither is what a promenade looks like.
+      const half = 15 + rng() * 30;
+      B(t, lane, y, 0, 'walk', 1,
+        { t0: Math.max(4, t - half), t1: Math.min(LEN - 4, t + half) });
+    } else {
+      B(t, lane, y, rng() * TAU, 'stand', 1);
+    }
+    // Two together, half the time. People come here in pairs — and a pair walks
+    // the same beat at the same speed, a metre apart, or it is not a pair.
     if (rng() < 0.5) {
-      bathers.push([t + 0.7, JAD.mid + 2.2 + rng() * 5.0, y, rng() * TAU, 'stand',
-        rng() < 0.28 ? 0.68 : 1]);
+      const last = bathers[bathers.length - 1];
+      B(t + 0.7, lane + 1.1, y, last.ang, last.pose,
+        rng() < 0.28 ? 0.68 : 1, last.beat && { ...last.beat });
     }
   }
 
@@ -1183,22 +1108,24 @@ function buildJadrija(scene) {
   // shore where a still figure reads unambiguously as mid-movement.
   for (let t = 22; t < LEN - 12; t += 88) {
     const st = at(t);
-    bathers.push([t + 0.34, -0.28, st.lip - 0.95, 0, 'stand', 1]);
+    B(t + 0.34, -0.28, st.lip - 0.95, 0, 'stand', 1);
   }
 
-  for (const [t, s, y, a, pose, k] of bathers) person(t, s, y, a, pose, k);
-
-  // And the people. Only the ones you could walk into: `lie` is already covered
-  // by the lounger underneath it, and `wade` is standing in the sea at s = −0.9,
-  // which is nearly two metres outside the seaward bound.
+  // And the people — but only the ones who have settled somewhere.
   //
-  // This reverses the note that used to sit on the tree blockers — that a
-  // parasol is stepped over and a person gets out of your way. That is true of
-  // a person who can move, and nobody on this beach can: what it produced was
-  // walking straight through them, which is worse than being held off.
-  for (const [t, s, , , pose, k] of bathers) {
-    if (pose === 'lie' || pose === 'wade') continue;
-    solid(t, s, 0.16 * k, 0.16 * k, 1.8 * k);
+  // This restores the note that used to sit on the tree blockers, that a
+  // parasol is stepped over and a person gets out of your way. It was reversed
+  // when nobody on this beach could move, because a figure you walk straight
+  // through is worse than one that holds you off. Now the ones on the deck do
+  // move, and they steer around you — see `avoid` in the update below — so a
+  // static box where one of them used to be standing would be a wall in the
+  // middle of the promenade with nobody in it.
+  //
+  // `lie` is already covered by the lounger underneath it, and `wade` is
+  // standing in the sea nearly two metres outside the seaward bound.
+  for (const b of bathers) {
+    if (b.pose === 'lie' || b.pose === 'wade' || b.beat) continue;
+    solid(b.t, b.s, 0.16 * b.k, 0.16 * b.k, 1.8 * b.k);
   }
 
   // Dinghies: two alongside the jetty and a few on their own moorings off the
@@ -1571,17 +1498,144 @@ function buildJadrija(scene) {
     });
   }
 
+  // ── the crowd ──────────────────────────────────────────────────────────────
+  /**
+   * Hand everybody placed above to the instanced rig renderer.
+   *
+   * Two rigs, because a man and a woman are different silhouettes and one mesh
+   * tinted twice is not a crowd. They share a joint tree bone for bone, so both
+   * are driven by the same `stride` and the split costs nothing but a second
+   * set of instanced layers.
+   *
+   * Height is per-instance rather than baked, which is also where the children
+   * come from: the same two meshes at 0.66.
+   */
+  const crowds = {};
+  for (const [sex, key] of [['m', 'bather_m_fr3d'], ['f', 'bather_f_fr3d']]) {
+    const rig = await loadRig(key);
+    if (rig) crowds[sex] = makeCrowd(scene, rig, bathers.length);
+  }
+
+  /**
+   * A yaw for the rig, from an angle in the shore's own (t, s) frame.
+   *
+   * The rig's forward is +X and a Three.js object with rotation.y = θ points
+   * its local +X at (cos θ, 0, −sin θ), hence the negated z. Everything above
+   * is written in (t, s) and this is the only place that has to know it is
+   * really a bearing on a coastline that runs 31° off the world axis.
+   */
+  const rigYaw = (t, ang) => {
+    const st = at(t);
+    const c = Math.cos(ang), sn = Math.sin(ang);
+    return Math.atan2(-(st.uz * c + st.nz * sn), st.ux * c + st.nx * sn);
+  };
+
+  const walkers = [];
+  for (const b of bathers) {
+    const C = crowds[rng() < 0.5 ? 'f' : 'm'] || crowds.m || crowds.f;
+    if (!C) break;
+    const p = toWorld(b.t, b.s);
+    const fg = {
+      mode: b.pose,
+      x: p[0], y: b.y, z: p[2], yaw: rigYaw(b.t, b.ang),
+      // The (t, s) shadow of the world position, kept for the walkers: it is
+      // far cheaper to advance a distance along the shore than to re-solve for
+      // one from world coordinates every frame.
+      t: b.t, lane: b.s, off: 0, beat: b.beat,
+      dir: rng() < 0.5 ? 1 : -1,
+      speed: CROWD.speed[0] + rng() * (CROWD.speed[1] - CROWD.speed[0]),
+      amp: 0.40 + rng() * 0.13,
+      gait: rng() * TAU,
+      // Staggered, but not by much. Seeded with the full pause length, two
+      // thirds of the promenade was standing still on the first frame you saw
+      // it, which is the exact impression this was built to get rid of.
+      wait: b.beat ? rng() * 2.2 : 0,
+      seed: rng(),
+      scale: b.k * (0.94 + rng() * 0.13),
+      skin: pick(SKIN), suit: pick(SWIM), hair: pick(HAIR),
+    };
+    C.figures.push(fg);
+    if (b.beat) walkers.push(fg);
+  }
+
+  function pause() {
+    return CROWD.pause[0] + rng() * (CROWD.pause[1] - CROWD.pause[0]);
+  }
+
+  let crowdT = 0;
+
+  /**
+   * Walk the walkers, then pose everybody.
+   *
+   * The randomness here runs at frame rate rather than at build, which is a
+   * deliberate exception to how the rest of this world is generated: a crowd
+   * that pauses in the same places every run is a machine, and nothing about
+   * where somebody stops for a moment on a promenade needs to survive a reload.
+   */
+  function updateCrowd(dt, cam) {
+    crowdT += dt;
+    // Where you are, in the frame everybody here is laid out in.
+    const [pt, ps] = local(cam.x, cam.z);
+
+    for (const w of walkers) {
+      if (w.wait > 0) {
+        w.wait -= dt;
+        w.mode = 'stand';
+      } else {
+        w.mode = 'walk';
+        w.t += w.speed * w.dir * dt;
+        if (w.t >= w.beat.t1) { w.t = w.beat.t1; w.dir = -1; w.wait = pause(); }
+        else if (w.t <= w.beat.t0) { w.t = w.beat.t0; w.dir = 1; w.wait = pause(); }
+        else if (rng() < dt * 0.04) w.wait = pause();
+        w.gait += w.speed * dt * 2.9;
+      }
+
+      // Step around you rather than through you. This is what pays for taking
+      // the walkers out of the blocker list: a figure that yields is better
+      // than a box that stops you, but only if it actually yields.
+      const here = w.lane + w.off;
+      if (Math.abs(w.t - pt) < 1.7 && Math.abs(here - ps) < CROWD.clear) {
+        w.off = clamp(w.off + (here >= ps ? 1 : -1) * dt * 1.7, -1.5, 1.5);
+      } else {
+        w.off -= w.off * Math.min(1, dt * 1.1);
+      }
+
+      const s = w.lane + w.off;
+      const p = toWorld(w.t, s);
+      w.x = p[0]; w.z = p[2];
+      w.y = surfaceY(w.t, s);
+      w.yaw = rigYaw(w.t, w.dir > 0 ? 0 : Math.PI);
+    }
+
+    for (const k in crowds) crowds[k].flush(crowdT, cam);
+  }
+
   const mid = at(LEN * 0.5);
+  // One pose before anything is drawn, so the first frame has people in it
+  // rather than a hundred figures stacked on the origin.
+  updateCrowd(0, { x: mid.x, y: 0, z: mid.z });
+
   return {
     kind: 'jadrija',
+    update: updateCrowd,
+    crowd: {
+      people: bathers.length,
+      walkers: walkers.length,
+      rigs: Object.keys(crowds),
+      get drawn() {
+        return Object.values(crowds).reduce((a, c) => a + c.drawn, 0);
+      },
+      /** Every figure, live, for a test that wants to know where they are. */
+      all: () => Object.values(crowds).flatMap((c) => c.figures),
+    },
     site: { x: mid.x + mid.nx * 16, z: mid.z + mid.nz * 16, yaw: Math.atan2(mid.ux, -mid.uz) },
     // Kept a metre off the quay edge: the bounds are what stops a walker, and
     // stopping them exactly at the drop would let the camera hang over it.
     bounds: { t0: 3, t1: LEN - 3, s0: 1.1, s1: JAD.reachIn },
     blockers, local, toWorld, walkY, inField,
-    // Where everybody ended up, as [t, s, y, angle, pose, scale]. Kept because
-    // a test needs somewhere to point the camera, and because whatever finally
-    // makes the furniture solid will need to know where the figures are.
+    // Where everybody started, as {t, s, y, ang, pose, k, beat}. Kept because a
+    // test needs somewhere to point the camera — but note this is the placement
+    // and not the live position: anyone with a `beat` has been walking since.
     people: bathers,
     objects: [], crewSpots: [],
     apron: toWorld(gapAt, JAD.mid + 3),

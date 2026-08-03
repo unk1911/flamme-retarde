@@ -457,7 +457,7 @@ async function boot() {
   await step(78, 'load.city');
   // Jadrija first: it claims the footprints it is going to rebuild in detail,
   // and the town builder has to know about that before it draws them.
-  jadrija = buildJadrija(scene);
+  jadrija = await buildJadrija(scene);
   city = buildCity(scene);
 
   await step(80, 'load.streets');
@@ -1394,6 +1394,10 @@ function frame() {
   birdFlush[0].speed = state.speed;
   birds.update(dt, camera, birdFlush);
   props.update(dt);
+  // The bathers. They pose off the camera rather than off the aeroplane: the
+  // whole point of them is what they look like from the promenade, and on foot
+  // the aeroplane is parked two kilometres away at Rokići.
+  if (jadrija) jadrija.update(dt, camera.position);
   rail.update(dt);
   sea.update(camera);
   fire.update(dt);
@@ -1618,6 +1622,9 @@ window.__fr = {
       shoreM: Math.round(jadrija.length), houses: jadrija.houses,
       blockers: jadrija.blockers.length, tris: Math.round(jadrija.tris),
       at: [Math.round(jadrija.site.x), Math.round(jadrija.site.z)],
+      people: jadrija.crowd.people, walkers: jadrija.crowd.walkers,
+      rigs: jadrija.crowd.rigs.join('+') || 'none',
+      posed: jadrija.crowd.drawn,
     } : null,
     rail: rail ? { ways: rail.ways, km: +rail.km.toFixed(1), cars: rail.cars,
       lineKm: +rail.lineKm.toFixed(2), tris: Math.round(rail.tris) } : null,

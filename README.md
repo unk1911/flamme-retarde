@@ -344,6 +344,23 @@ hang it off a tree of eleven joints and animate it. There is still no skinning
 solver and still no glTF: somebody in heavy kit reads as rigid pieces anyway,
 and the reader is thirty lines.
 
+**The seventh and eighth are the Jadrija bathers.** `tools/blender/bather.py`
+builds a man and a woman from the same code, differing in shoulder width, hip
+width, waist and whether there is a top — on the *same eleven joints under the
+same names* as the ground crew, which is what lets one walk cycle drive both
+casts. Height is not baked: the canonical figure is 1.70 m and the runtime
+scales per instance, which is also where the children come from.
+
+Their vertex colours are not colours. Skin is painted pure white, swimwear pure
+black and hair pure red — three markers the shader recognises and replaces per
+figure, so two meshes are a beach of different people instead of a rack of the
+same doll. `src/42-crowd.js` draws them as one instanced layer per rig part,
+posed off a single scratch skeleton that is re-posed for each figure and read
+out into the instance buffers: ninety-odd people for twenty-two draw calls and
+no per-figure Three.js objects at all. Twenty-seven of them walk the promenade,
+pause, turn at the end of their beat, and step around you rather than through
+you.
+
 Everything else — the aircraft, the town, the sea, the sky, the fire, the
 water — is generated in code.
 
@@ -413,7 +430,13 @@ To rebuild the Blender models (needs Blender 4.x on `PATH`):
 ```sh
 blender --background --python tools/blender/landmarks.py    # the five buildings
 blender --background --python tools/blender/firefighter.py  # the ground crew
+blender --background --python tools/blender/bather.py       # the Jadrija bathers
 ```
+
+Add `-- --preview` to `bather.py` for four turntable renders of each figure into
+`/tmp/bathers`. Worth it: the markers mean a bather looks nothing like itself in
+Blender's viewport, and the preview substitutes plausible colours so form can be
+judged.
 
 To regenerate the intro panels (needs `GEMINI_API_KEY` and the reference
 photographs, which are not in this repository — see `refs/README.md`):

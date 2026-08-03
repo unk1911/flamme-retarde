@@ -12,6 +12,12 @@ attribute vec3 aInstPos;
 attribute vec4 aInstRot;      // quaternion
 attribute vec3 aInstScale;
 attribute vec3 aInstColor;
+// Two more per-instance colours, supplied only by the crowd (src/42-crowd.js)
+// and left unset — and so read as black — by every other instanced layer. One
+// tint is not enough for a person: skin, swimwear and hair have to vary
+// independently or a beach reads as a rack of the same doll.
+attribute vec3 aInstSuit;
+attribute vec3 aInstHair;
 
 varying vec3 vWorld;
 varying vec3 vNormal;
@@ -19,6 +25,8 @@ varying vec3 vColor;
 varying vec2 vUv;
 varying vec3 vLocal;
 varying vec3 vVCol;
+varying vec3 vSuit;
+varying vec3 vHair;
 
 attribute vec3 aVCol;
 uniform float uInstanced;
@@ -38,11 +46,15 @@ void main(){
     p += aInstPos;
     n = qrot(aInstRot, n / max(aInstScale, vec3(1e-4)));
     vColor = aInstColor;
+    vSuit = aInstSuit;
+    vHair = aInstHair;
   } else {
     vec4 wp = modelMatrix * vec4(position, 1.0);
     p = wp.xyz;
     n = normalize(mat3(modelMatrix) * normal);
     vColor = vec3(1.0);
+    vSuit = vec3(0.0);
+    vHair = vec3(0.0);
   }
   vWorld = p;
   vNormal = normalize(n);
@@ -70,6 +82,8 @@ varying vec3 vColor;
 varying vec2 vUv;
 varying vec3 vLocal;
 varying vec3 vVCol;
+varying vec3 vSuit;
+varying vec3 vHair;
 
 uniform vec3 uBase;
 uniform float uSpecPower;

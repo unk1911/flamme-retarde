@@ -722,44 +722,12 @@ async function buildGround(scene, field) {
   // means a pose left over from `alight` bleeds into `safe` two seconds later,
   // and eleven assignments are cheaper than reasoning about which of them are
   // stale.
-
-  const SPLAY = 0.11;          // how far an arm hangs out from the body at rest
-
-  function rest(f) {
-    for (const j of f.joints) j.rotation.set(0, 0, 0);
-    f.pelvis.position.y = f.restY;
-    f.armLU.rotation.x = SPLAY;
-    f.armRU.rotation.x = -SPLAY;
-  }
-
-  /**
-   * A stride: hips, knees, shoulders and elbows off one phase angle.
-   *
-   * The knee is phased off the hip rather than given a curve of its own. It
-   * flexes hardest just after the foot leaves the ground and is straight at the
-   * moment it lands, which is one cosine away from the hip — and that single
-   * relationship is most of the difference between a walk and a pair of
-   * scissors. A knee also only bends one way, hence the negative sign and the
-   * squared term that keeps it there.
-   */
-  function stride(f, phase, amp, armAmp) {
-    for (const [up, lo, off] of [[f.legLU, f.legLL, 0], [f.legRU, f.legRL, Math.PI]]) {
-      const t = phase + off;
-      up.rotation.z = Math.sin(t) * amp;
-      const k = Math.max(0, Math.cos(t + 0.55));
-      lo.rotation.z = -(0.13 + 1.20 * k * k) * amp;
-    }
-    if (armAmp <= 0) return;
-    // Opposite the leg on the same side, which is what stops a walk looking
-    // like a march.
-    for (const [up, lo, off, side] of [[f.armLU, f.armLL, Math.PI, 1],
-      [f.armRU, f.armRL, 0, -1]]) {
-      const s = Math.sin(phase + off);
-      up.rotation.z = s * amp * armAmp;
-      up.rotation.x = side * SPLAY;
-      lo.rotation.z = (0.20 + 0.65 * Math.max(0, s)) * amp * armAmp * 1.5;
-    }
-  }
+  //
+  // `SPLAY`, `restPose` and `stride` used to live here, and now live in
+  // src/42-crowd.js, because the Jadrija bathers are the same eleven joints
+  // under the same names and there is no version of "two gaits, maintained
+  // separately" that ends well. The poses below are still this file's: they are
+  // about kit and fire and nobody on a beach needs them.
 
   function poseDown(c, f) {
     // Stop, drop and roll — the correct thing, and the thing almost nobody
@@ -889,7 +857,7 @@ async function buildGround(scene, field) {
     if (!armed) return;
     f.root.position.set(c.x, c.y, c.z);
     f.root.rotation.set(0, Math.atan2(-c.hz, c.hx), 0);
-    rest(f);
+    restPose(f);
 
     const u = f.mat.uniforms;
     u.uWet.value = clamp(c.wet, 0, 1);

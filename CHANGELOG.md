@@ -8,6 +8,64 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.20.0] — 2026-08-03
+
+### Changed — the people on the beach
+
+Everything else at Jadrija got the eye-height pass. The people did not, and they
+were the last thing still built the way the whole place used to be: stacked
+frustums written out by hand and baked into the same buffer as the concrete. A
+hundred-odd of them, each frozen at the moment of its own construction. The
+comment defending it argued that at three hundred metres a still figure in a
+plausible pose reads as a person — which is true, and stopped being the only
+distance this place is seen from the day you could stand on the promenade.
+
+They are now Blender-authored rigs on the same eleven joints as the aerodrome
+ground crew, and **they walk**.
+
+- **`tools/blender/bather.py`** — two figures, a man and a woman, built from the
+  same code with four numbers different between them: shoulder width, hip width,
+  waist, and whether there is a top. Same joint tree bone for bone as
+  `firefighter.py`, which is the whole point: one gait drives both casts.
+  Height is *not* baked — the canonical figure is 1.70 m and the runtime scales
+  per instance, which is also where the children come from.
+- **The marker palette.** Skin is painted pure white, swimwear pure black and
+  hair pure red, and none of those is a colour anybody wanted: they are three
+  questions the mesh asks of the instance. So two meshes are a beach of
+  different people rather than a rack of the same doll.
+- **`src/42-crowd.js`** — one instanced layer per rig part, posed off a single
+  scratch skeleton that is re-posed per figure and read out into the instance
+  buffers. Ninety-two people cost twenty-two draw calls and carry no per-figure
+  Three.js objects at all.
+- **Five poses**: walking, standing about, sitting on the lip with their legs
+  over the water, lying on a lounger, and standing in the shallows. Nothing is
+  ever quite still — weight shifts hip to hip while standing, and the head looks
+  around on a slower clock than the body so the two are never in step.
+- **Twenty-seven of them walk the promenade**, on beats of 30–90 m, pausing and
+  turning, and **stepping around you** rather than through you.
+
+### Changed — one gait, not two
+
+`SPLAY`, `rest` and `stride` moved out of the closure in `src/47-ground.js` and
+into `src/42-crowd.js` as shared top-level functions; `rest` is now `restPose`,
+since a bare `rest` at bundle scope was asking for it. No behaviour change to
+the ground crew — they are the same eleven joints and this is the same walk —
+but there is now one implementation of a stride instead of the two that the
+alternative would have grown.
+
+### Fixed
+
+- The bathers are out of the blocker list where they can move, restoring the
+  note that used to sit on the tree blockers: a person gets out of your way.
+  That was reversed when nobody on this beach could, because a figure you walk
+  straight through is worse than one that holds you off. They can now, so they
+  do — and a static box where a walker used to stand would have been a wall in
+  the middle of the promenade with nobody in it.
+- Seated figures sat 46 cm above the concrete with their legs straight out, and
+  were placed 1.25 m inland so the shins hung over more concrete rather than
+  over the water. Both fixed: the pelvis drop is measured off the standing hip
+  height, and they sit at 0.55 m where the knee lands on the lip of the quay.
+
 ## [1.19.0] — 2026-08-02
 
 ### Changed — the loungers and the parasols
