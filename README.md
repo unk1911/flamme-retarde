@@ -291,8 +291,9 @@ from OSM — cover says where the water is, the shore channel how far the
 waterline is, the urban channel where people are. They are there for scale: a
 four-metre car is the only object in the scene that reads as *small*. There are
 no people out there, because from a hundred metres a person is one pixel and a
-parasol is six, and they say the same thing. The only people in this game are
-the seven ground crew at Rokići, and you meet them from four metres away.
+parasol is six, and they say the same thing. The only people modelled are the
+ones you can walk up to — the seven ground crew at Rokići and the ninety-two
+bathers at Jadrija — and you meet both from four metres away.
 
 **The fire is a cellular automaton on a 256² grid** that reads its fuel from the
 land cover — bare limestone is the natural firebreak, maquis is the reason the
@@ -306,7 +307,12 @@ the whole mission is really about.
 standing in a burning cell is a tree standing in a burning cell — it chars and
 shrinks as its cell's fuel goes. Aleppo pine, cypress, olive and maquis scrub,
 generated per 512 m tile from a positional hash so a tree is always in the same
-place, repacked into four instance buffers.
+place, repacked into four instance buffers. There is no L-system and no
+imported model: a tree is a stack of rings lofted into a tube, and 356
+triangles is the entire flora of Šibenik. **[How a tree is
+drawn](docs/how-a-tree-is-drawn.pdf)** works through the whole of it — the ring
+equation and why its frequency is deliberately not an integer, the four species
+profiles, and the per-instance and per-frame terms.
 
 **There are gulls, swifts and hooded crows**, which on this coast in August is
 the honest list. They fly differently from one another in the ways you would
@@ -452,6 +458,18 @@ Add `-- --preview` to `bather.py` for four turntable renders of each figure into
 `/tmp/bathers`. Worth it: the markers mean a bather looks nothing like itself in
 Blender's viewport, and the preview substitutes plausible colours so form can be
 judged.
+
+To retypeset [the vegetation note](docs/how-a-tree-is-drawn.pdf) (needs Chrome
+or Chromium on `PATH` — it is MathML printed headless, there being no LaTeX in
+this toolchain):
+
+```sh
+python3 tools/gen_tree_doc.py              # -> docs/how-a-tree-is-drawn.pdf
+```
+
+Its figures are computed from the ring tables rather than drawn, so they follow
+a change to the profiles instead of quietly going stale. `--html-only` skips
+the render and writes the page beside the PDF.
 
 To regenerate the intro panels (needs `GEMINI_API_KEY` and the reference
 photographs, which are not in this repository — see `refs/README.md`):

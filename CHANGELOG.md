@@ -8,6 +8,35 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [Unreleased]
+
+### Added — `docs/how-a-tree-is-drawn.pdf`
+
+A three-page note on how the vegetation is generated, because "there is no
+L-system" is the kind of claim that needs the working shown. It covers the ring
+equation and why 2.37 is deliberately not an integer, the four species as ring
+tables, the loft, and the per-instance and per-frame terms.
+
+`tools/gen_tree_doc.py` typesets it. Nothing in the document is drawn by hand:
+the four silhouettes are the real profiles, the plan view is the actual output
+of `vegRing()` at *y* = 0.74, and the triangle counts are counted — pine 128,
+cypress 80, olive 112, maquis 36, and **356 triangles is the entire flora of
+Šibenik**. Change a profile in `src/45-trees.js` and the figures follow instead
+of quietly going stale. The comment at `45-trees.js:78` still says 96 triangles
+for a pine, which was true when the profile had seven rings; it has nine.
+
+There being no LaTeX in this toolchain, it is MathML printed through headless
+Chrome. Chrome implements MathML Core, which ignores `mtable`'s `columnalign`
+and drops display style inside table cells, so equations are laid out as a CSS
+grid of individual `<math>` elements instead.
+
+No change to `flamme-retarde.html` — the bundle is byte-identical to 1.21.0.
+
+### Fixed
+
+- README claimed the seven ground crew at Rokići were the only people in the
+  game. They have not been since 1.20.0 put ninety-two on the beach at Jadrija.
+
 ## [1.21.0] — 2026-08-03
 
 ### Added — a near shadow cascade, so things touch the ground
