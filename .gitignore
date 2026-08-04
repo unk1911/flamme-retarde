@@ -11,6 +11,15 @@ build/osm/
 build/*_preview.png
 build/barrier_debug.png
 
+# The MakeHuman base and the working blends it turns into. The small rigid-part
+# blends next to them *are* committed, but these two are 24 MB and 42 MB and are
+# rewritten by every full run of tools/blender/human_mh.py, which rebuilds them
+# from the .obj it fetches. What has to survive is the exported blob in
+# build/payload, and that is committed.
+build/mh_base.obj
+build/human.blend
+build/human_mh.blend
+
 # Screenshots and scratch output from tools/shoot.mjs
 shots/
 *.png

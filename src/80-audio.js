@@ -880,6 +880,66 @@ function buildAudio() {
       alarm: { dur: 0.18, reps: [3, 4], gap: [0.06, 0.06] } },
   };
 
+  /**
+   * The figure on the promenade, who does not talk.
+   *
+   * Deliberately not a voice. Everything here is one swept oscillator through
+   * one bandpass, which is the same machinery as the gulls above, and the reason
+   * it is not aimed anywhere near a human formant is that it cannot get there:
+   * a synthesised vowel that is 95% of the way to speech is not 95% as good, it
+   * is a person with something wrong with them. A cartoon chirp asks to be taken
+   * as a noise somebody is making rather than as a word, and that it can do
+   * honestly.
+   *
+   * The grammar is the sweep. Rising is delight and effort; the only falling one
+   * in the set is the landing, and it falls because it is a body arriving.
+   */
+  const SQUEAKS = {
+    // She has seen you: two rising chirps, the second higher.
+    wake: { f0: 340, f1: 980, dur: 0.15, amp: 0.055, rasp: 0.20, raspHz: 48,
+      form: 2.0, q: 3.2, reps: 2, gap: 0.10, step: 1.16 },
+    // On all fours, every couple of seconds — small, busy, close to the floor.
+    chirr: { f0: 520, f1: 700, dur: 0.09, amp: 0.032, rasp: 0.42, raspHz: 96,
+      form: 1.7, q: 4.5, reps: 3, gap: 0.055, step: 1.05 },
+    // The throw into the somersault.
+    hup: { f0: 560, f1: 1420, dur: 0.11, amp: 0.052, rasp: 0.12, raspHz: 40,
+      form: 1.6, q: 3.0, reps: 1, gap: 0, step: 1 },
+    // And the arrival. The one that comes down.
+    whump: { f0: 900, f1: 300, dur: 0.17, amp: 0.048, rasp: 0.30, raspHz: 58,
+      form: 1.9, q: 2.6, reps: 1, gap: 0, step: 1 },
+    // Skipping: a three-note run up, thrown in now and then rather than on
+    // every hop — a noise on every footfall stops being delight inside four
+    // seconds and becomes a smoke alarm.
+    trill: { f0: 640, f1: 860, dur: 0.075, amp: 0.040, rasp: 0.10, raspHz: 40,
+      form: 1.5, q: 4.0, reps: 3, gap: 0.045, step: 1.26 },
+  };
+
+  /** @param gain 0…1, so a caller can fall it off with distance. */
+  function squeak(kind, gain = 1, pan = 0) {
+    if (!ctx || dead) return;
+    const v = SQUEAKS[kind];
+    if (!v) return;
+    const g0 = clamp(gain, 0.02, 1);
+    const pn = ctx.createStereoPanner();
+    pn.pan.value = clamp(pan, -1, 1);
+    pn.connect(master);
+    if (verbSend) {
+      const w = ctx.createGain(); w.gain.value = 0.22;
+      pn.connect(w).connect(verbSend);
+    }
+    let at = ctx.currentTime;
+    for (let i = 0; i < v.reps; i++) {
+      const k = Math.pow(v.step, i);
+      const dur = v.dur * (0.9 + Math.random() * 0.2);
+      syllable(at, {
+        f0: v.f0 * k * (0.98 + Math.random() * 0.04), f1: v.f1 * k, dur,
+        amp: v.amp * g0, rasp: v.rasp, raspHz: v.raspHz,
+        form: v.form, q: v.q, wave: 'triangle', dest: pn,
+      });
+      at += dur + v.gap;
+    }
+  }
+
   function birdCall(kind, pan = 0, gain = 1, alarm = false) {
     if (!ctx || dead) return;
     const c = CALLS[kind];
@@ -1011,6 +1071,6 @@ function buildAudio() {
       gain: klapaNodes ? +klapaNodes.g.gain.value.toFixed(4) : 0,
       lp: klapaNodes ? Math.round(klapaNodes.lp.frequency.value) : 0,
     }),
-    birdCall, radalt, gpwsSink, gpwsPullUp, hullSlam, impact, kill,
+    birdCall, squeak, radalt, gpwsSink, gpwsPullUp, hullSlam, impact, kill,
     get ctx() { return ctx; } };
 }

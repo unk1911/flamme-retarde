@@ -28,22 +28,37 @@
 // -----------------------------------------------------------------------------
 
 const JAD = {
-  // The built stretch of shore, as world x. Beyond these the coast carries on
-  // and is left to the land cover, which is correct: the resort is a few hundred
-  // metres of frontage, not the whole peninsula.
-  from: -2372,
-  to: -2016,
+  // The built stretch of shore, as world x, centred on the `place=Jadrija` node
+  // at x −2214. Beyond these the coast carries on and is left to the land cover,
+  // which is correct: the resort is a couple of hundred metres of frontage, not
+  // the whole peninsula.
+  //
+  // It used to be −2372…−2016, which traced out 411 m of shore, and that was
+  // wrong by a factor of two. The measure of Jadrija is its kabine, and there
+  // are about a hundred of them: two rows of fifty at 2.15 m of frontage each is
+  // 107 m of hut per row, and with the alleys between the runs and the hole left
+  // for the jetty that wants roughly 190 m of shore to stand on. 411 m gave room
+  // for three hundred and twenty huts, and building three hundred and twenty of
+  // them is not a bigger Jadrija, it is a different and imaginary place — one
+  // you cross in a minute and a half at a dead run, past a wall of huts that
+  // never ends. The shore runs about 31° off the x axis here, so 164 m of x is
+  // the 191 m of frontage wanted.
+  from: -2296,
+  to: -2132,
   step: 6,                 // shore samples this far apart
   probe: [140, 640],       // z window to hunt the waterline in
 
-  // The cross-section, in metres inland from the water's edge.
-  lip: 4.2,                // the lowest bathing platform, the one you sit on
-  mid: 10.4,               // the middle terrace
-  deck: 19.6,              // the promenade proper
-  rowA: 22.4,              // seaward face of the front row of kabine
-  rowB: 30.2,              // and of the back row
-  back: 38.0,              // where the concrete stops
-  bleed: 9.0,              // and blends back into the hillside
+  // The cross-section, in metres inland from the water's edge. Trimmed with the
+  // frontage — the terraces are the identity of the place and are not cut hard,
+  // but 38 m of unbroken concrete between the sea and the huts was reading as an
+  // esplanade, and what is actually there is three steps and a walk.
+  lip: 3.6,                // the lowest bathing platform, the one you sit on
+  mid: 8.4,                // the middle terrace
+  deck: 15.2,              // the promenade proper
+  rowA: 17.2,              // seaward face of the front row of kabine
+  rowB: 24.0,              // and of the back row
+  back: 31.0,              // where the concrete stops
+  bleed: 8.0,              // and blends back into the hillside
 
   drop: 0.62,              // height of one terrace riser
   quay: 1.9,               // how far the quay wall carries on below the water
@@ -55,7 +70,18 @@ const JAD = {
   cabEave: 0.26,           // overhang
   plinth: 0.22,            // the concrete pad the rows stand on
 
-  reachIn: 135,          // how far inland you may walk — out through the village
+  // How far inland you may walk. This used to be 135 m, and 135 m of Srima is
+  // not a place you walk through, it is a place you are lost in: the houses are
+  // real OSM footprints at their real spacing, which on this peninsula means a
+  // median of 1.5 m between one wall and the next — 0.4 m of clearance once the
+  // 0.55 m you occupy is taken off. A flood fill says every square metre of it
+  // is in fact connected to the shore, so it was never sealed; it just cannot be
+  // *read* from eye height, because from down there a hundred and sixty-nine
+  // rendered houses are one continuous grey wall with the sea somewhere behind
+  // it. 68 m keeps the front lane, the one that faces the water and is the only
+  // one anybody at a bathing station has business on, and leaves the rest of the
+  // village to be looked at rather than walked into.
+  reachIn: 68,
 };
 
 /**
@@ -541,7 +567,10 @@ async function buildJadrija(scene) {
   for (const [front, phase] of [[JAD.rowA, 0], [JAD.rowB, JAD.cabW * 0.5]]) {
     let t = 8 + phase;
     while (t < LEN - 14) {
-      const n = 7 + Math.floor(rng() * 7);
+      // Five to ten. Seven to thirteen was right when the shore was 411 m long
+      // and is not now: the count that matters is the total, which wants to come
+      // out near the hundred huts that are really there.
+      const n = 5 + Math.floor(rng() * 6);
       const span = n * JAD.cabW;
       const clearOfGap = t + span < gapAt - 9 || t > gapAt + 9;
       if (clearOfGap) cabinRun(t, n, front, ROOFS[Math.floor(rng() * ROOFS.length)]);
@@ -1180,7 +1209,11 @@ async function buildJadrija(scene) {
    * nothing here invents a building that is not there.
    */
   const HOUSE = {
-    reach: 125,          // how far inland a house is worth rebuilding
+    // How far inland a house is worth rebuilding. A house is worth rebuilding
+    // when you can walk up to it, so this tracks `reachIn` and sits a little
+    // outside it — the far side of the lane you are standing in still has to
+    // have eaves on it.
+    reach: 78,
     over: 0.42,          // eave overhang
     win: 1.16,           // window width
     winH: 1.42,
@@ -1530,6 +1563,221 @@ async function buildJadrija(scene) {
     return Math.atan2(-(st.uz * c + st.nz * sn), st.ux * c + st.nx * sn);
   };
 
+  /**
+   * One figure from the new pipeline — tools/blender/human_mh.py.
+   *
+   * She started here as a frozen mesh with no bones at all, which was the right
+   * first step: scale, palette, lighting and placement are the cheap questions
+   * and they got answered before any of the skinning work was written. They
+   * came back clean — a 1.75 m figure measures 1.75 m against a bather standing
+   * next to her — so she is now the skinned one, twenty-eight bones deep, and
+   * the clips are the thing that gets iterated on rather than the mesh.
+   *
+   * Placed on the middle terrace a little east of the jetty, facing the water.
+   */
+  let testFigure = null;
+  let skinFig = null;
+  let show = null;
+  if (PAYLOAD.human_skin_fr3d) {
+    try {
+      skinFig = await loadSkin('human_skin_fr3d', {
+        spec: 0.09,
+        specPower: 24,
+        // Literal colours, as the landmarks do. The marker palette in
+        // 42-crowd.js is for figures the runtime recolours per instance, and
+        // there is exactly one of these.
+        body: 'base *= vVCol;',
+      });
+      if (!skinFig) throw new Error('no skinned figure');
+      const mesh = skinFig.mesh;
+      skinFig.play('idle', { fade: 0 });
+      const ft = LEN * 0.5 + 22, fs = JAD.mid + 1.4;
+      const p = toWorld(ft, fs);
+      mesh.position.set(p[0], p[1], p[2]);
+      mesh.rotation.y = rigYaw(ft, Math.PI * 0.5);   // looking out to sea
+      mesh.updateMatrixWorld();
+      scene.add(mesh);
+      testFigure = { mesh, fig: skinFig, tris: skinFig.tris, at: [ft, fs] };
+
+      // The survey pole that used to stand here is gone.
+      //
+      // It was a kilometre of red-and-white banding put up so that a 1.75 m
+      // figure — about one pixel from the circuit — could be found from the air
+      // at all while the skinning was being built. That job is done: she is no
+      // longer a statue you have to be told where to look for, she is the thing
+      // that happens when you walk up to her, and a 2.8 m mast standing 6 m away
+      // put a red wall straight through the middle of the performance.
+      show = {
+        phase: 'idle', t: ft, s: fs, ang: -Math.PI / 2, want: -Math.PI / 2,
+        tmr: 0, flips: 0, said: 0, home: [ft, fs],
+      };
+    } catch (e) {
+      console.warn('test figure failed:', e.message);
+    }
+  }
+
+  // ── the performance ────────────────────────────────────────────────────────
+  /**
+   * What she does when you walk up to her.
+   *
+   * Notice, down on all fours, crawl, up, three somersaults, and then skipping
+   * off along the promenade with you behind her — which is the sequence that was
+   * asked for, and every part of it is a clip authored in tools/blender/human_mh.py
+   * rather than anything this file knows how to draw. That is the whole point of
+   * having spent a session on skinning: this is a state machine over eight names
+   * and two numbers, and it is the first thing in the game that is *content*.
+   *
+   * Two things are deliberately not here. She does not blink, because there are
+   * no eyelid bones in the twenty-eight — that needs a trip back to Blender and
+   * a full pipeline run, not a clip. And she does not collide with anything: she
+   * performs on the strip of deck between the middle terrace and the front row
+   * of huts, which is clear by construction, and if a walker happens to be
+   * standing in it she goes through them. A figure doing a tucked front
+   * somersault while being pushed out of a parasol is worse than either.
+   *
+   * The distances are the load-bearing part. 17 m is about where you can tell
+   * she is a person rather than a shape, so it is where she is allowed to know
+   * you are coming; 46 m is far enough that giving up does not look like a sulk.
+   */
+  const SHOW = {
+    near: 17,           // she notices you inside this many metres
+    far: 46,            // and gives up if you get this far away
+    crawl: 0.95,        // m/s on all fours. One clip cycle is 1.1 s and covers
+                        // 1.05 m, which is what keeps her hands off the ice.
+    skip: 3.6,          // m/s skipping — 1.4 m a hop, which is a bound
+    hop: 2.1,           // m/s the somersault carries her while she is over
+    flips: 3,           // "a bunch of summersaults"
+    crawlFor: 4.6,      // seconds down on all fours
+    skipFor: 15,        // and skipping, before she comes home to her spot
+    lane: [JAD.mid + 1.0, JAD.rowA - 2.2],   // the strip of deck she performs on
+  };
+
+  /**
+   * Her mesh yaw, for a heading in the resort's own frame: 0 runs along +t and
+   * −PI/2 is the water.
+   *
+   * Half a turn, because `rigYaw` was written for the crowd rig — whose forward
+   * is +X — and hers is the other way round. The placement above turns her by
+   * hand for the same reason.
+   */
+  const faceYaw = (t, ang) => rigYaw(t, ang + Math.PI);
+
+  /** Advance her along her heading, kept on the deck and inside the resort. */
+  function showMove(v, dt) {
+    show.t = clamp(show.t + Math.cos(show.ang) * v * dt, 8, LEN - 8);
+    show.s = clamp(show.s + Math.sin(show.ang) * v * dt, SHOW.lane[0], SHOW.lane[1]);
+  }
+
+  /** A noise, quieter the further off you are. Silent from the aeroplane. */
+  function showSay(kind, d) {
+    if (!audio || state.phase === 'intro') return;
+    const g = 1 - clamp(d / 52, 0, 1);
+    if (g > 0.04) audio.squeak(kind, g * g);
+  }
+
+  function stepShow(dt, pt, ps) {
+    if (!show || !skinFig) return;
+    const f = skinFig, S = f.state;
+    const d = Math.hypot(show.t - pt, show.s - ps);
+    // A one-shot that has run off its end. `update` leaves `curT` past `dur`
+    // and `sample` clamps, so this stays true until something else is played.
+    const done = S.cur && !S.cur.loop && S.curT >= S.cur.dur;
+    show.tmr += dt;
+
+    const go = (phase, clip, fade = 0.22) => {
+      if (clip) f.play(clip, { fade });
+      show.phase = phase;
+      show.tmr = 0;
+      show.said = 0;
+    };
+
+    switch (show.phase) {
+      case 'idle':
+        show.want = -Math.PI / 2;                        // back to the water
+        // Three seconds of standing there first. Without it she comes home,
+        // notices you again on the same frame and goes straight back down on
+        // all fours, which is not delight, it is a stuck record.
+        if (show.tmr > 3 && d < SHOW.near) {
+          showSay('wake', d); go('notice', 'notice', 0.20);
+        }
+        break;
+
+      case 'notice':
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        if (done) go('down', 'kneel', 0.18);
+        break;
+
+      case 'down':
+        // Turn along the promenade, away from you: that is where she is going.
+        show.want = pt > show.t ? Math.PI : 0;
+        if (done) go('crawl', 'crawl', 0.22);
+        break;
+
+      case 'crawl':
+        showMove(SHOW.crawl, dt);
+        if (show.tmr - show.said > 1.7) { show.said = show.tmr; showSay('chirr', d); }
+        if (show.tmr > SHOW.crawlFor) go('up', 'getup', 0.18);
+        break;
+
+      case 'up':
+        if (done) { showSay('hup', d); go('flip', 'flip', 0.16); show.flips = 1; }
+        break;
+
+      case 'flip': {
+        // She travels through the middle of the somersault and not through the
+        // crouch at either end of it — the alternative is a figure sliding
+        // along the concrete while she is still standing on it.
+        const u = S.curT;
+        showMove(SHOW.hop * sat((u - 0.34) / 0.10) * sat((1.10 - u) / 0.12), dt);
+        if (u >= 0.98 && !show.said) { show.said = 1; showSay('whump', d); }
+        if (done) {
+          if (show.flips < SHOW.flips) {
+            // Restarting the clip rather than playing it: `play` refuses a clip
+            // that is already current, and this one ends on the pose it starts
+            // from, so a hard rewind is seamless.
+            show.flips++; S.curT = 0; show.said = 0; show.tmr = 0;
+            showSay('hup', d);
+          } else {
+            go('play', 'skip', 0.24);
+          }
+        }
+        break;
+      }
+
+      case 'play':
+        showMove(SHOW.skip, dt);
+        show.want = pt > show.t ? Math.PI : 0;
+        // Off the ends of the resort, which beats stopping dead at the bound.
+        if (show.t <= 10) show.want = 0;
+        else if (show.t >= LEN - 10) show.want = Math.PI;
+        if (show.tmr - show.said > 2.5) { show.said = show.tmr; showSay('trill', d); }
+        if (show.tmr > SHOW.skipFor || d > SHOW.far) go('home', 'skip', 0.20);
+        break;
+
+      case 'home': {
+        const dt0 = show.home[0] - show.t, ds0 = show.home[1] - show.s;
+        const dist = Math.hypot(dt0, ds0);
+        show.want = Math.atan2(ds0, dt0);
+        if (dist > 1.1) showMove(Math.min(SHOW.skip, dist * 1.7), dt);
+        else go('idle', 'idle', 0.4);
+        break;
+      }
+    }
+
+    // Turn towards `want` at a rate a person turns at, and never the long way
+    // round — the shore's frame wraps and a heading that crosses the wrap would
+    // otherwise spin her through a whole circle to move by a degree.
+    let e = show.want - show.ang;
+    while (e > Math.PI) e -= TAU;
+    while (e < -Math.PI) e += TAU;
+    show.ang += clamp(e, -3.0 * dt, 3.0 * dt);
+
+    const p = toWorld(show.t, show.s);
+    f.mesh.position.set(p[0], p[1], p[2]);
+    f.mesh.rotation.y = faceYaw(show.t, show.ang);
+    f.mesh.updateMatrixWorld();
+  }
+
   const walkers = [];
   for (const b of bathers) {
     const C = crowds[rng() < 0.5 ? 'f' : 'm'] || crowds.m || crowds.f;
@@ -1574,8 +1822,22 @@ async function buildJadrija(scene) {
    */
   function updateCrowd(dt, cam) {
     crowdT += dt;
+    // The one skinned figure here is posed on the CPU — twenty-eight bones,
+    // once a frame — so she is only worth doing when there is somebody near
+    // enough to tell. Past a quarter of a kilometre she is a couple of pixels
+    // and the palette she was left holding is as good as any other.
     // Where you are, in the frame everybody here is laid out in.
     const [pt, ps] = local(cam.x, cam.z);
+
+    if (skinFig) {
+      const dx = cam.x - skinFig.mesh.position.x, dz = cam.z - skinFig.mesh.position.z;
+      // Posed on the CPU — twenty-eight bones, once a frame — so she is only
+      // worth doing when there is somebody near enough to tell. Past a quarter
+      // of a kilometre she is a couple of pixels and the palette she was left
+      // holding is as good as any other. The performance is gated with her: at
+      // that range she is always idling anyway, because it only starts at 17 m.
+      if (dx * dx + dz * dz < 250 * 250) { skinFig.update(dt); stepShow(dt, pt, ps); }
+    }
 
     for (const w of walkers) {
       if (w.wait > 0) {
@@ -1648,6 +1910,29 @@ async function buildJadrija(scene) {
     /** The town builder asks this so it does not draw these twice. */
     ownsBuilding: (bl) => taken.has(bl),
     houses: houses.length,
+    testFigure: testFigure && { tris: testFigure.tris, at: testFigure.at,
+      bones: skinFig ? skinFig.bones.length : 0,
+      clips: skinFig ? skinFig.clips.join('+') : 'none',
+      playing: skinFig ? skinFig.playing() : 'none' },
+    /** The skinned figure, for the debug API and for whatever animates her. */
+    figure: skinFig,
+    /** Where the performance has got to. */
+    show: () => show && {
+      phase: show.phase, clip: skinFig ? skinFig.playing() : null,
+      t: +show.t.toFixed(1), s: +show.s.toFixed(1),
+      ang: +show.ang.toFixed(2), flips: show.flips,
+    },
+    /**
+     * Drive the promenade forward by hand.
+     *
+     * A headless browser throttles requestAnimationFrame to about one frame a
+     * second, so a test that waits for a two-second clip to finish waits for
+     * two frames of it. This is the only way to see a clip actually play from
+     * outside a real window.
+     */
+    step: (secs, cam) => {
+      for (let i = 0; i < Math.round(secs * 60); i++) updateCrowd(1 / 60, cam);
+    },
     tris: (deck.count() + up.count() + vil.count()) / 3,
   };
 }

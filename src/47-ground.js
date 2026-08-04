@@ -31,8 +31,19 @@
 const GROUND = {
   eye: 1.66,
   walk: 3.4,               // m/s — a fast walk in kit
-  run: 6.1,
-  accel: 30,
+  // Shift. 6.1 m/s was a real sprint in real kit and it was the wrong number:
+  // the places you are asked to cross on foot are four hundred metres of
+  // promenade and a kilometre of aerodrome, and a minute of holding a key in a
+  // straight line is not a game, it is a commute. 9.4 is frankly superhuman —
+  // it is world-record pace, in boots, carrying a pump — and it is what makes
+  // the distances read the way they are meant to.
+  run: 9.4,
+  // Divided by the top speed below, so the ramp is a fixed *fraction* of it per
+  // second rather than a fixed m/s²; raised with `run` to keep the time to
+  // speed at about a fifth of a second, which is the difference between a
+  // sprint that starts when you press the key and one that has to be argued
+  // into moving.
+  accel: 46,
   drag: 13,
   girth: 0.55,             // how far you are pushed back out of a wall
   // And out of a person. The rig is 0.40 m across the shoulders with the arms
@@ -273,11 +284,28 @@ async function buildGround(scene, field) {
     return false;
   }
 
+  /**
+   * Clamp a world point into the locale and out of its structures.
+   *
+   * Returns `[x, z, hit]`, and the third element is not a convenience — it is
+   * the only honest answer to "did this move me?". The obvious test is to
+   * compare what came back against what went in, and that is what walk() used
+   * to do; it works on an aerodrome, whose local/toWorld pair is one rigid
+   * rotation and exact to a part in 10^12, and it is quietly catastrophic at
+   * Jadrija, whose frame is a *traced shoreline*: `local()` projects on to a
+   * polyline and `toWorld()` walks back along it, and the round trip lands
+   * 15 mm away. Every frame. So every frame the comparison said "you hit
+   * something", velocity was reset to zero, and the fastest anybody could
+   * cross the promenade was one frame's worth of acceleration — 1.4 m/s, on a
+   * key that promises 6, with no wall anywhere near them.
+   */
   function confine(x, z) {
     const B = field.bounds;
     let [t, s] = field.local(x, z);
-    t = clamp(t, B.t0, B.t1);
-    s = clamp(s, B.s0, B.s1);
+    let hit = false;
+    const tc = clamp(t, B.t0, B.t1), sc = clamp(s, B.s0, B.s1);
+    if (tc !== t || sc !== s) hit = true;
+    t = tc; s = sc;
     // Several passes, because being pushed out of one blocker can push you into
     // the next. On an aerodrome that never happened — ten structures, none of
     // them within a wingspan of another — but a village is a hundred and seventy
@@ -307,6 +335,7 @@ async function buildGround(scene, field) {
         moved = true;
       }
       if (!moved) break;
+      hit = true;
       t = clamp(t, B.t0, B.t1);
       s = clamp(s, B.s0, B.s1);
     }
@@ -319,11 +348,12 @@ async function buildGround(scene, field) {
     // that direction is the street, and past the street the beach, which is
     // empty by construction — so this always terminates somewhere you can stand.
     if (inside(t, s)) {
+      hit = true;
       const dir = s > (B.s0 + B.s1) * 0.5 ? -1 : 1;
       for (let k = 0; k < 80 && inside(t, s); k++) s = clamp(s + dir, B.s0, B.s1);
     }
     const w = field.toWorld(t, s);
-    return [w[0], w[2]];
+    return [w[0], w[2], hit];
   }
 
   /**
@@ -1078,7 +1108,7 @@ async function buildGround(scene, field) {
     // standing against a hangar can then hold you against it but never push you
     // through it, and a hold is something you can always walk sideways out of.
     const [bx, bz] = unbody(tx, tz);
-    let [nx, nz] = confine(bx, bz);
+    let [nx, nz, hit] = confine(bx, bz);
     // The waterline, where the locale has one. Tried as two independent axes
     // before being refused outright, so walking into the sea at an angle slides
     // you along the beach instead of gluing you to the spot — the shoreline is
@@ -1088,17 +1118,28 @@ async function buildGround(scene, field) {
       if (field.standable(nx, you.z)) nz = you.z;
       else if (field.standable(you.x, nz)) nx = you.x;
       else { nx = you.x; nz = you.z; }
+      hit = true;
     }
-    // Kill the velocity only if confine() actually moved us — measured against
-    // what confine() was given, not against where the step wanted to go, or a
-    // person would stop you dead as well. That is the other half of not being
-    // sticky: the push out of somebody is purely radial, so whatever part of
-    // your speed runs along them survives it and you slide round rather than
-    // grinding to a halt on a shoulder. The tolerance is for the world ->
-    // runway-local -> world round trip inside confine(), which is exact in
-    // theory and a few parts in 10^12 in practice.
-    if (Math.abs(nx - bx) > 1e-4) you.vx = 0;
-    if (Math.abs(nz - bz) > 1e-4) you.vz = 0;
+    // Kill the velocity only if confine() actually clamped something — on its
+    // own say-so, never by comparing coordinates (see confine). It is measured
+    // against what confine() was *given*, not against where the step wanted to
+    // go, or a person would stop you dead as well: the push out of somebody is
+    // purely radial, so whatever part of your speed runs along them survives
+    // and you slide round rather than grinding to a halt on a shoulder.
+    //
+    // And only the component *into* the obstruction goes. Zeroing the whole
+    // vector makes a wall flypaper — you stop dead and have to back off and
+    // re-approach to get past it — whereas taking out the normal component
+    // leaves the tangent, which is a shoulder along a hangar wall.
+    if (hit) {
+      const cx = nx - bx, cz = nz - bz;
+      const cl = Math.hypot(cx, cz);
+      if (cl > 1e-6) {
+        const ux = cx / cl, uz = cz / cl;
+        const into = you.vx * ux + you.vz * uz;
+        if (into < 0) { you.vx -= ux * into; you.vz -= uz * into; }
+      } else { you.vx = 0; you.vz = 0; }
+    }
     const moved = Math.hypot(nx - you.x, nz - you.z);
     you.x = nx; you.z = nz;
     you.y = field.walkY(you.x, you.z);

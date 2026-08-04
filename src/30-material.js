@@ -36,10 +36,44 @@ vec3 qrot(vec4 q, vec3 v){
   return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
 }
 
+// Linear-blend skinning, compiled in only for the figures that carry a
+// skeleton (src/41-skin.js). It is behind an #ifdef rather than behind a
+// uniform because the bone palette is a uniform *array*: a branch would keep
+// eighty-four vec4s live in the vertex program of every tree, house and wave in
+// the game, and there are implementations where that alone will not link.
+#ifdef FR_SKIN
+attribute vec4 aBoneIdx;
+attribute vec4 aBoneWt;
+uniform vec4 uBones[FR_BONES * 3];
+
+// Three rows of a 3x4, unpacked into GLSL's column-major mat4.
+mat4 boneMat(int i){
+  vec4 a = uBones[i * 3], b = uBones[i * 3 + 1], c = uBones[i * 3 + 2];
+  return mat4(a.x, b.x, c.x, 0.0,
+              a.y, b.y, c.y, 0.0,
+              a.z, b.z, c.z, 0.0,
+              a.w, b.w, c.w, 1.0);
+}
+
+mat4 skinMat(){
+  return boneMat(int(aBoneIdx.x)) * aBoneWt.x
+       + boneMat(int(aBoneIdx.y)) * aBoneWt.y
+       + boneMat(int(aBoneIdx.z)) * aBoneWt.z
+       + boneMat(int(aBoneIdx.w)) * aBoneWt.w;
+}
+#endif
+
 void main(){
   vec3 p = position;
   vec3 n = normal;
   vLocal = position;
+#ifdef FR_SKIN
+  {
+    mat4 sm = skinMat();
+    p = (sm * vec4(position, 1.0)).xyz;
+    n = mat3(sm) * normal;
+  }
+#endif
   if (uInstanced > 0.5) {
     p *= aInstScale;
     p = qrot(aInstRot, p);
@@ -49,9 +83,12 @@ void main(){
     vSuit = aInstSuit;
     vHair = aInstHair;
   } else {
-    vec4 wp = modelMatrix * vec4(position, 1.0);
+    // p and n rather than position and normal: they are the same thing for
+    // everything in the game except a skinned figure, where they are the only
+    // place the pose exists.
+    vec4 wp = modelMatrix * vec4(p, 1.0);
     p = wp.xyz;
-    n = normalize(mat3(modelMatrix) * normal);
+    n = normalize(mat3(modelMatrix) * n);
     vColor = vec3(1.0);
     vSuit = vec3(0.0);
     vHair = vec3(0.0);
@@ -140,7 +177,10 @@ void main(){
  *                / uniforms + decl (extra uniforms, supplied *and* declared)
  */
 function solidMaterial(color, opts = {}) {
+  // Spread rather than set: three.js warns about a `defines` of undefined on
+  // every material in the game, and there are several hundred of them.
   const m = new THREE.ShaderMaterial({
+    ...(opts.defines ? { defines: opts.defines } : {}),
     uniforms: {
       ...shareLight(), ...shareHaze(), ...shareTerrain(), ...shareShadow(),
       uCamPos: U.uCamPos,

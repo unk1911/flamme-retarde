@@ -468,6 +468,10 @@ async function boot() {
   shadow.cast(airfield.buildings);
   shadow.cast(airfield.objMesh);
   if (jadrija) for (const m of jadrija.casters) shadow.cast(m);
+  // The skinned figure brings her own depth material, because her shape lives
+  // in a bone palette that the two shared ones know nothing about. Near
+  // cascade: she is 1.75 m and the far map cannot draw anything under two.
+  if (jadrija && jadrija.figure) jadrija.figure.cast(shadow);
   roads = buildRoads(scene);
   rail = buildRail(scene);
   props = buildProps(scene, roads.lanes);
@@ -1648,6 +1652,7 @@ window.__fr = {
       people: jadrija.crowd.people, walkers: jadrija.crowd.walkers,
       rigs: jadrija.crowd.rigs.join('+') || 'none',
       posed: jadrija.crowd.drawn,
+      testFigure: jadrija.testFigure || 'none',
     } : null,
     rail: rail ? { ways: rail.ways, km: +rail.km.toFixed(1), cars: rail.cars,
       lineKm: +rail.lineKm.toFixed(2), tris: Math.round(rail.tris) } : null,
@@ -1776,6 +1781,12 @@ window.__fr = {
       return { w: w.map((v) => +v.toFixed(2)), back: jadrija.local(w[0], w[2])
         .map((v) => +v.toFixed(2)), walkY: +jadrija.walkY(w[0], w[2]).toFixed(2) };
     },
+    /** The performance, and a way to run it in a window that will not animate. */
+    show: () => jadrija && jadrija.show(),
+    // `camera.position`, not `camPos`: the smoothed follow position is written
+    // once a frame by the render loop, and this exists precisely because the
+    // render loop is not running often enough to be trusted.
+    step: (secs) => { jadrija.step(secs, camera.position); return jadrija.show(); },
   },
   /**
    * Drive the ground mission from a test without flying an approach first.

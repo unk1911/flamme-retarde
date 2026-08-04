@@ -311,8 +311,14 @@ function buildShadow(renderer) {
    * scene to occlude with, so the map cleared to white and every surface in the
    * game decided it was in full sun.
    */
-  function cast(mesh, { dynamic = false, instanced = false, near = false } = {}) {
-    const proxy = new THREE.Mesh(mesh.geometry, instanced ? depthInst : depthPlain);
+  function cast(mesh, { dynamic = false, instanced = false, near = false,
+    material = null } = {}) {
+    // `material` is for casters whose vertex program the two shared depth
+    // materials cannot express — so far, the skinned figure in src/41-skin.js,
+    // whose shape exists only in a bone palette the depth pass has to be handed
+    // as well. Everything else shares one of the two and costs no memory.
+    const proxy = new THREE.Mesh(mesh.geometry,
+      material || (instanced ? depthInst : depthPlain));
     proxy.frustumCulled = false;
     proxy.matrixAutoUpdate = false;
     mesh.updateMatrixWorld(true);
