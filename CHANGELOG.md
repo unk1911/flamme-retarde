@@ -10,6 +10,127 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.23.0] — 2026-08-04
+
+### Fixed — the bind had never worked, and everything posed was the bind pose
+
+`skin()` in `tools/blender/human_mh.py` was one call to
+`parent_set(ARMATURE_AUTO)`. It created twenty-eight vertex groups containing
+**zero weights** and reported `FINISHED`. Blender's bone-heat solver wants a
+closed volume with a bone inside it, and this mesh is *sixty-six separate
+shells*: the body, two eyeballs, two lash strips, a tongue, and a full set of
+individually modelled teeth. Every loose shell is a block of the same linear
+system with no bone anywhere in it, the solve goes singular, and what comes back
+is a warning buried in stdout and an empty bind.
+
+The tell was in the preview renders the whole time: `mh_stride_hero.png` was
+byte-for-byte the same size as `mh_bind_hero.png`. Every posed render this
+pipeline ever made was the bind pose, and the blob that 1.20.0 shipped described
+as "frozen mid-stride" was a figure standing at attention.
+
+Three things fix it, and all three are needed:
+
+- Solve on the **body island alone**, found by a bmesh flood fill.
+  `bpy.ops.mesh.select_linked` insists the mesh is one shell; it is wrong, and
+  the flood fill is what to believe.
+- Solve at **export density**. 192,424 vertices fails; 13,002 succeeds in two
+  seconds. Weights lift back to the dense mesh through a KDTree, and the dedupe
+  key in the exporter includes the weight tuple so a seam across a joint is not
+  welded shut.
+- Hand the sixty-five loose shells **a bone each** — eyeballs to `eyeL`/`eyeR`
+  chosen by sphericity, because the lash strip wrapped around an eyeball wins on
+  proximity and is not an eyeball.
+
+`skin()` now exits non-zero rather than shipping an empty bind, which is the
+part that keeps this from happening again.
+
+### Added — `fr3d` v3, and `src/41-skin.js`
+
+Mesh, twenty-eight bones and clips baked to `int16` quaternions at 30 fps. The
+runtime reads it, solves the hierarchy at load, and plays clips with crossfade
+and one-shot chaining.
+
+The bone palette goes up as **84 `vec4` uniforms** rather than three.js's float
+texture: one figure does not need a texture unit, and 84 is inside the 128 that
+the oldest conforming WebGL is required to offer. Skinning itself is in the
+shared `SOLID_VERT` behind `#ifdef FR_SKIN` — behind an `#ifdef` and not a
+uniform, because a branch would keep eighty-four `vec4`s live in the vertex
+program of every tree, house and wave in the game. She is therefore lit by
+exactly the same three terms as the hillsides, and she brings her own depth
+material, so she casts a real shadow into the near cascade. The static figure
+never did.
+
+### Added — she comes alive when you walk up to her
+
+Eight clips where there were two: `idle`, `wave`, `notice`, `kneel`, `crawl`,
+`getup`, `flip`, `skip`. All eight are **491 KB gzipped**, against 470 KB for
+the two she was first skinned with — six clips for 21 KB, because a clip is
+quaternions.
+
+Inside 17 m she notices you and turns, goes down through a half-kneel onto all
+fours, crawls, gets up, turns **three tucked front somersaults** and skips off
+down the promenade until you are 46 m behind her or fifteen seconds have gone,
+then comes home. She covers about 25 m of Jadrija doing it. The sequencer is a
+state machine over eight names in `src/43-jadrija.js`; everything it plays is
+authored in Blender, which is the whole return on having done the skinning.
+
+The somersault carries its entire revolution on `pelvis` alone, as authored
+*degrees*: a quaternion track cannot hold more than half a turn between two keys
+— it always takes the short way round — so the turn has to exist as a number
+before it is baked. Hence the one thing in `human_mh.py` that looks like a typo
+and is not: the clip's last key holds `pelvis` at **−360**, not 0. Same
+attitude, same quaternion, and a key at 0 unwinds the whole revolution backwards
+in a fifth of a second.
+
+Two sign conventions are now written down there so nobody re-derives them. The
+expensive one: `ROLL_UP` gives an up-pointing bone local X = −Y_world and a
+down-pointing bone +Y_world, so cancelling a parent's rotation at a hip or a
+shoulder takes the **same** sign, not the opposite. Posed the way the intuition
+wants it, she folds into a bow — face down, all four limbs off her back.
+
+Five squeaks in `src/80-audio.js`, off the same swept-oscillator-through-one-
+bandpass machinery as the gulls, and deliberately nowhere near a human formant:
+a synthesised vowel that is 95% of the way to speech is not 95% as good, it is a
+person with something wrong with them. Rising is delight and effort; the only
+falling one in the set is the landing.
+
+### Changed — Jadrija is the size Jadrija is
+
+The village was never sealed. Those are real OSM footprints at their real
+spacing — a median of **1.5 m** from one wall to the next, 0.4 m of clearance
+once the 0.55 m you occupy comes off — and a flood fill over the walkable area
+at 1 m resolution says **99% of it already connected to the shore**. It cannot
+be *read* from eye height, which is a different complaint and the true one: from
+down there a hundred and sixty-nine rendered houses are one grey wall with the
+sea somewhere behind it. So the walk inland is cut from 135 m to 68 m and the
+map is left alone.
+
+The kabine were the real error. They are authored rather than mapped, so nothing
+held them to anything. Jadrija's protected complex is about **a hundred** huts;
+this was building three hundred and twenty, over 411 m of shore. Two rows of
+fifty at 2.15 m of frontage is 107 m of hut a row, which with the alleys and the
+hole left for the jetty wants roughly 190 m to stand on.
+
+| | before | 1.23.0 |
+|---|---|---|
+| shore frontage | 411 m | 189 m |
+| kabine | ~320 | 104 |
+| rebuilt houses | 169 | 51 |
+| collision boxes | 341 | 131 |
+| triangles | 192 781 | 68 701 |
+| people | 92 | 46 |
+| free ground, reachable from the shore | 63%, 99% | 80%, 100% |
+
+Everything except the kabine run length scaled itself, because the props, the
+crowd and the planting are all loops over the shore length.
+
+### Removed — the survey pole
+
+A kilometre of red-and-white banding, put up so that a 1.75 m figure — about one
+pixel from the circuit — could be found from the air at all while the skinning
+was being built. That job is over, and a 2.8 m mast standing six metres away put
+a red wall straight through the middle of the performance.
+
 ### Added — `docs/how-a-tree-is-drawn.pdf`
 
 A three-page note on how the vegetation is generated, because "there is no
@@ -30,12 +151,24 @@ Chrome. Chrome implements MathML Core, which ignores `mtable`'s `columnalign`
 and drops display style inside table cells, so equations are laid out as a CSS
 grid of individual `<math>` elements instead.
 
-No change to `flamme-retarde.html` — the bundle is byte-identical to 1.21.0.
+That note shipped no bundle change of its own; it is released here.
 
 ### Fixed
 
 - README claimed the seven ground crew at Rokići were the only people in the
   game. They have not been since 1.20.0 put ninety-two on the beach at Jadrija.
+
+### Known
+
+- **She does not blink.** There are no eyelid bones among the twenty-eight, so
+  it needs a trip back to Blender and a full pipeline run, not a clip.
+- She is topless and bald: the trunks cutter paints only below the waist and the
+  hair cap paints 8 111 vertices that read as scalp. Both predate this release
+  and both are now the most visible thing about her.
+- She does not collide with anything during the performance. She works the strip
+  of deck between the middle terrace and the front row of huts, which is clear
+  by construction, and being pushed out of a parasol mid-somersault would be
+  worse than passing through one.
 
 ## [1.21.0] — 2026-08-03
 
