@@ -1618,6 +1618,11 @@ async function buildJadrija(scene) {
         // `SHOW` is declared below this and would be in its dead zone here, and
         // nothing reads it before `showWander` has set it.
         wander: -Math.PI / 2, tick: 0, pace: 0, played: 0,
+        // The cartwheel: how far into a run of them she is, and the quarter
+        // turn that puts her shoulders across her course while she does them.
+        // `side` is a yaw offset on the mesh alone — it never touches `ang`, so
+        // she goes on travelling exactly where she was already going.
+        wheels: 0, side: 0,
       };
     } catch (e) {
       console.warn('test figure failed:', e.message);
@@ -1655,6 +1660,8 @@ async function buildJadrija(scene) {
     skip: 3.6,          // m/s skipping — 1.4 m a hop, which is a bound
     hop: 2.1,           // m/s the somersault carries her while she is over
     flips: 3,           // "a bunch of summersaults"
+    wheel: 1.9,         // m/s through a cartwheel — about 1.7 m of deck a turn
+    wheels: 3,          // and how many she strings together
     crawlFor: 4.6,      // seconds down on all fours
     playFor: 24,        // and larking about, before she comes home to her spot
     lane: [JAD.mid - 2.0, JAD.rowA - 1.8],   // the strip of deck she plays on
@@ -1667,6 +1674,7 @@ async function buildJadrija(scene) {
     crawlTurn: [0.9, 2.0], crawlSwing: 0.7,
     edge: 14,           // metres from the ends of the resort the push starts
     joy: 0.22,          // chance that a new heading comes with a somersault
+    spin: 0.16,         // and the chance it comes with a run of cartwheels
     say: [1.8, 4.2],    // seconds between noises while she is playing
   };
 
@@ -1822,8 +1830,18 @@ async function buildJadrija(scene) {
         show.tick -= dt;
         if (show.tick <= 0) {
           showWander(SHOW.turn, SHOW.swing);
-          if (Math.random() < SHOW.joy) {
+          const dice = Math.random();
+          if (dice < SHOW.joy) {
             showSay('hup', d); go('joy', 'flip', 0.16);
+            break;
+          }
+          if (dice < SHOW.joy + SHOW.spin) {
+            // Line her up along the promenade first. A cartwheel wants a
+            // straight run of five or six metres and the deck is only about
+            // four deep, so left to the wander she would be over the edge
+            // halfway through the second one.
+            show.wander = Math.cos(show.ang) > 0 ? 0 : Math.PI;
+            go('aim', 'skip', 0.20);
             break;
           }
         }
@@ -1836,6 +1854,40 @@ async function buildJadrija(scene) {
         }
         if (show.played > SHOW.playFor || d > SHOW.far) go('home', 'skip', 0.20);
         break;
+
+      case 'aim':
+        // Still skipping, but now down the promenade and turning her shoulders
+        // across it. The turn is on `side` and takes about six tenths of a
+        // second; she leaves when it has arrived, with a floor under that so
+        // she cannot go over straight out of a hard turn.
+        show.played += dt;
+        show.want = show.wander;
+        showMove(show.pace * 0.8, dt);
+        if (show.tmr > 0.75 && Math.abs(show.side + Math.PI / 2) < 0.06) {
+          show.wheels = 1; showSay('whee', d); go('wheel', 'cartwheel', 0.20);
+        }
+        break;
+
+      case 'wheel': {
+        // Same shape as the somersault above: travel through the middle of the
+        // turn and not through the stance at either end, and rewind rather than
+        // replay to chain them, because `play` refuses a clip already current
+        // and this one ends on the pose it starts from.
+        const w = S.curT;
+        show.played += dt;
+        showMove(SHOW.wheel * sat((w - 0.14) / 0.16) * sat((1.16 - w) / 0.20), dt);
+        if (done) {
+          if (show.wheels < SHOW.wheels) {
+            show.wheels++; S.curT = 0; show.said = 0; show.tmr = 0;
+            showSay('whee', d);
+          } else {
+            showWander(SHOW.turn, SHOW.swing);
+            showSay('trill', d);
+            go('play', 'skip', 0.26);
+          }
+        }
+        break;
+      }
 
       case 'joy':
         // One somersault in the middle of the wander, and straight back into
@@ -1866,9 +1918,20 @@ async function buildJadrija(scene) {
     while (e < -Math.PI) e += TAU;
     show.ang += clamp(e, -3.0 * dt, 3.0 * dt);
 
+    // And the quarter turn for a cartwheel, which is a separate thing from the
+    // heading and has to stay separate. A cartwheel travels along the line the
+    // body wheels over, and that line is ninety degrees off the way she is
+    // facing — so she turns her shoulders across her course rather than turning
+    // the course, holds it for the run, and gives it back afterwards. Rolled in
+    // at the same rate she turns at, so the quarter turn is something she does
+    // rather than something that happens to her.
+    const wantSide = show.phase === 'aim' || show.phase === 'wheel'
+      ? -Math.PI / 2 : 0;
+    show.side += clamp(wantSide - show.side, -2.6 * dt, 2.6 * dt);
+
     const p = toWorld(show.t, show.s);
     f.mesh.position.set(p[0], p[1], p[2]);
-    f.mesh.rotation.y = faceYaw(show.t, show.ang);
+    f.mesh.rotation.y = faceYaw(show.t, show.ang + show.side);
     f.mesh.updateMatrixWorld();
   }
 
@@ -2015,6 +2078,7 @@ async function buildJadrija(scene) {
       phase: show.phase, clip: skinFig ? skinFig.playing() : null,
       t: +show.t.toFixed(1), s: +show.s.toFixed(1),
       ang: +show.ang.toFixed(2), flips: show.flips,
+      wheels: show.wheels, side: +show.side.toFixed(2),
       pace: +show.pace.toFixed(2), played: +show.played.toFixed(1),
     },
     /** Where she is standing, so the back door can put you in front of her. */

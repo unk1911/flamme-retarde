@@ -1022,6 +1022,28 @@ def _bake_clip(rest, spec):
         blended = _lerp_pose(p0, p1, u)
 
         root = blended.get("@root", (0.0, 0.0, 0.0))
+        # A whole-body rotation about the fore-and-aft axis, in armature space
+        # rather than in any bone's space, applied to the root bone so that
+        # everything below it comes along. The cartwheel needs it and nothing
+        # else does.
+        #
+        # It cannot be authored on `pelvis` the way the somersault's pitch is.
+        # That works because the pelvis bone's local X happens to come out as
+        # world −Y exactly, so pelvis X is a clean pitch. Its local Z does not
+        # come out as world −X: the bone runs from the hip up to spine-4, which
+        # is twenty-seven degrees off vertical, and `align_roll` can only put
+        # local Z perpendicular to that. Rolling on it corkscrews her — the
+        # first cartwheel here did, and it read as a pinwheel with her hands a
+        # third of a metre clear of the deck all the way round.
+        #
+        # Pre-multiplying in armature space sidesteps the bone's frame
+        # entirely. The pivot lands on the hip for free: only the rotation of
+        # this matrix survives — `rt` below carries the root bone's position
+        # and is not touched by `W` — so the body turns about the root joint,
+        # which is where a cartwheel turns.
+        roll = blended.get("@roll", (0.0,))[0]
+        W = (Matrix.Rotation(math.radians(roll), 4, Vector((-1.0, 0.0, 0.0)))
+             if roll else None)
         quats = []
         for bi, (name, _parent, local_b, local_g) in enumerate(rest):
             rot = blended.get(name)
@@ -1030,6 +1052,8 @@ def _bake_clip(rest, spec):
                 m = CONV @ (local_b @ basis.to_4x4()) @ CONV_I
             else:
                 m = local_g
+            if W is not None and bi == 0:
+                m = CONV @ W @ CONV_I @ m
             q = m.to_quaternion()
             # Keep the sign continuous along the track. The runtime nlerps
             # between adjacent frames, and a quaternion that flips sign between
@@ -1049,6 +1073,129 @@ def _bake_clip(rest, spec):
             "frames": frames}
 
 
+TIPS = ("handL", "handR", "toeL", "toeR", "footL", "footR", "head")
+
+
+def _lowest(rig, blended):
+    """The lowest hand, foot or head of one blended pose, and which it is.
+
+    Reproduces exactly what the exporter composes: the bones take their authored
+    Eulers, the root joint is displaced by `@root`, and the whole body turns
+    about that joint by `@roll`.
+    """
+    root = Vector(blended.get("@root", (0.0, 0.0, 0.0)))
+    roll = blended.get("@roll", (0.0,))[0]
+    pose(rig, {k: v for k, v in blended.items() if not k.startswith("@")})
+    piv = rig.pose.bones[BONES[0][0]].head.copy()
+    R = Matrix.Rotation(math.radians(roll), 3, Vector((-1.0, 0.0, 0.0)))
+    low = {}
+    for b in TIPS:
+        if b in rig.pose.bones:
+            low[b] = (rig.matrix_world
+                      @ (R @ (rig.pose.bones[b].tail - piv) + piv + root)).z
+    who = min(low, key=low.get)
+    return who, low[who]
+
+
+def wheel_floor(rig, clear=0.004):
+    """Sit every cartwheel key on the deck, and solve for the hip height there.
+
+    The counter-rotations in `_wheel` cancel the roll on paper and do not cancel
+    it in the rig, for a reason worth writing down: the roll turns about the
+    midline, and her shoulder and hip joints are eleven to eighteen centimetres
+    either side of it. Sixty degrees over and the supporting hip has swung nine
+    centimetres *down*, taking the leg and the foot with it; two hundred and
+    forty degrees over, the supporting shoulder has swung the same distance up,
+    taking the planted hand off the floor. The two rotations have different
+    pivots, so they cannot cancel, and no choice of limb angle or hip height
+    derived from limb lengths can know about it. The first version of this
+    buried a toe seventeen centimetres into the concrete and floated a hand a
+    third of a metre over it, and looked, in stills, entirely correct.
+
+    So do not author the hip height at all — solve it. Pose the rig at each key,
+    find the lowest extremity, and move the key until it is exactly `clear` off
+    the deck. Both ways: a cartwheel is a hand-over-hand walk and something is
+    touching the ground for all of it, so a limb hanging in space is as wrong as
+    a limb through the concrete, and the earlier lift-only rule left her
+    hopping thirty-seven centimetres between the last hand and the first foot.
+
+    The `hip` term in `_wheel` still earns its place as the starting guess: the
+    closer it starts the less this has to move, and the less the interpolation
+    between two keys sags in the middle.
+
+    Recomputed from `_wheel` on every call rather than adjusted in place, so
+    running it twice does the same thing as running it once.
+    """
+    poses = [_wheel(i * 360.0 / WHEEL_KEYS) for i in range(WHEEL_KEYS + 1)]
+    solved = []
+    for p in poses:
+        _who, z = _lowest(rig, p)
+        solved.append(p["@root"][2] + clear - z)
+
+    # Then smooth the answer. Solved key by key it is not a curve, it is a
+    # staircase: the pass pins whichever limb is lowest, and on the two frames
+    # where that changes hands — literally — the hip height it asks for jumps as
+    # much as thirty centimetres between adjacent keys. Held exactly, her hips
+    # snap twice a wheel. Three passes of a quarter-half-quarter filter turns it
+    # back into something a body could do, at a cost of a centimetre or two of
+    # foot through concrete, which at five metres is nothing and a snapping
+    # pelvis never is. The ends are held: those two are standing on the deck.
+    for _pass in range(3):
+        smoothed = list(solved)
+        for i in range(1, len(solved) - 1):
+            smoothed[i] = 0.25 * solved[i - 1] + 0.5 * solved[i] + 0.25 * solved[i + 1]
+        solved = smoothed
+
+    worst = 0.0
+    for i, p in enumerate(poses):
+        root = list(p["@root"])
+        root[2] = solved[i]
+        p["@root"] = tuple(root)
+        _who, z = _lowest(rig, p)
+        worst = min(worst, z)
+        WHEEL[i] = (i * WHEEL_DUR / WHEEL_KEYS, p)
+    print("[mh] cartwheel: floor pass settled, deepest key %+.3f m" % worst)
+
+
+def clipcheck(rig, name):
+    """Per-frame ground clearance for one clip, printed.
+
+    Every clip in this file is authored as joint angles plus a hip height, and
+    nothing in that representation knows where the floor is. This walks the
+    baked frames, poses the rig at each one and reports how far the lowest
+    hand, foot or head sits above z = 0 — the deck she is standing on.
+
+    It exists because a pose that floats ten centimetres and a pose that saws
+    through the concrete render identically well as stills, from any angle, and
+    both are obvious the instant she moves. For the sagittal clips you can get
+    away with eyeballing it. For a cartwheel, where the support hands off
+    between four limbs and the hips rise fifteen centimetres in the middle, you
+    cannot.
+    """
+    spec = next(c for c in CLIPS if c["name"] == name)
+    keys, loop = spec["keys"], spec.get("loop", True)
+    dur = keys[-1][0]
+    nf = max(2, int(round(dur * SAMPLE_FPS)) + (0 if loop else 1))
+    print("[mh] %s: %d frames over %.2f s" % (name, nf, dur))
+    worst = 0.0
+    for f in range(nf):
+        t = (f / nf if loop else f / (nf - 1)) * dur
+        i = 0
+        while i < len(keys) - 2 and keys[i + 1][0] <= t:
+            i += 1
+        t0, p0 = keys[i]
+        t1, p1 = keys[i + 1]
+        u = 0.0 if t1 <= t0 else min(1.0, max(0.0, (t - t0) / (t1 - t0)))
+        u = u * u * (3.0 - 2.0 * u)
+        blended = _lerp_pose(p0, p1, u)
+        who, z = _lowest(rig, blended)
+        worst = min(worst, z)
+        print("  t=%5.2f  roll%+7.1f  hip%+.3f   lowest %-5s %+.3f"
+              % (t, blended.get("@roll", (0.0,))[0],
+                 blended.get("@root", (0.0, 0.0, 0.0))[2], who, z))
+    print("[mh] %s: deepest %+.3f m" % (name, worst))
+
+
 def export_skin(body, rig, path, clips, tris=26000):
     """Write the figure as a .fr3d **v3** blob: mesh, skeleton and clips.
 
@@ -1058,11 +1205,18 @@ def export_skin(body, rig, path, clips, tris=26000):
     quaternions — and from there the browser can put her in any pose the rig can
     reach, for about the same number of bytes as the one pose cost.
 
+    The cartwheel's floor pass runs here rather than at any of the four call
+    sites above it, because this is the one gate everything that ships goes
+    through, and a clip that has not had it is a clip with a foot in the
+    concrete. It is idempotent, and cheap next to the decimator below.
+
     The mesh is exported in the **bind** pose, so the rig has to be at rest when
     this runs or every vertex is deformed twice.
     """
     rest = _rest_locals(rig)
     bindex = {name: i for i, (name, _p, _l, _g) in enumerate(rest)}
+
+    wheel_floor(rig)
 
     # Duplicate the *object*, not the evaluated mesh.
     #
@@ -1509,6 +1663,168 @@ SKIP_LU = _skip(1, 0.13, 1.0)     # and airborne off it
 SKIP_R = _skip(-1, -0.04, 0.0)
 SKIP_RU = _skip(-1, 0.13, 1.0)
 
+# ── the cartwheel ───────────────────────────────────────────────────────────
+#
+# A wheel over her left hand, and like the somersault the whole revolution rides
+# on one channel of `pelvis` — Z this time rather than X. The bone table names
+# local Z as world −X for every up-or-down bone, and the pelvis points up, so
+# pelvis Z is the roll axis: the fore-and-aft line through her that a cartwheel
+# actually turns about. It runs 0 → +360 across the clip, positive going over
+# her left, and the somersault's rule about the last key applies here too — it
+# holds 360 rather than 0, because they are the same attitude and only one of
+# them keeps the interpolator turning the way she was already turning.
+#
+# Pelvis X and Y stay at zero the whole way through, deliberately. An XYZ Euler
+# with two hundred degrees in Z and anything at all in X is not a lean on a
+# roll, it is a third rotation nobody authored, and every bit of shaping this
+# needs is available on the spine and the limbs instead.
+#
+# The clip is otherwise stationary: it wheels on the spot, and the travel comes
+# from the game moving her along the line she is wheeling over. That line is
+# ninety degrees off the way she is facing — src/43-jadrija.js takes the quarter
+# turn at a skip before it plays this, and gives it back after.
+
+
+# Measured off the rest pose rather than guessed at, which is the only place
+# numbers like these can honestly come from. The surprise is the third one: her
+# arms are shorter than her legs, so the hips sit five centimetres *lower* in
+# the handstand than in the stance. Authored from intuition it went the other
+# way — up fifteen — and that one wrong sign is most of what had her wheeling
+# through the air with her hands half a metre clear of the deck.
+HIP_0 = 0.934     # standing hip height
+LEG_R = 0.919     # hip to the tip of the toe, leg straight
+ARM_R = 0.880     # hip to the palm, arms in line with the trunk overhead
+                  # (the hand bone's tail is the wrist; the palm is ~4 cm past)
+
+
+WHEEL_DUR = 1.32          # seconds for one wheel
+WHEEL_KEYS = 24           # segments; 15 degrees of roll each
+
+
+def _ease(x):
+    x = 0.0 if x < 0 else (1.0 if x > 1 else x)
+    return x * x * (3.0 - 2.0 * x)
+
+
+def _mirror(p):
+    """One attitude, reflected through her sagittal plane.
+
+    Which is exactly what the back half of a cartwheel is. Rolling from a
+    hundred and eighty round to three-sixty is the front half over again with
+    the right hand and the right foot doing what the left ones did, so it is
+    written once and reflected rather than tuned twice. The exit is then as good
+    as the entry by construction — and the exit is precisely where every earlier
+    version of this fell apart, because nothing was forcing the two to agree.
+
+    Signs: the sagittal channel X survives a left-right reflection untouched,
+    while Y and Z both flip, which is the same mirroring rule the rest of this
+    file uses when it writes a symmetric pose as `+n` on the left and `−n` on
+    the right.
+    """
+    out = {}
+    for k, v in p.items():
+        if k == "@roll":
+            out[k] = (-v[0] % 360.0,)
+        elif k == "@root":
+            out[k] = (v[0], -v[1], v[2])
+        elif k[-1] in "LR":
+            out[k[:-1] + ("R" if k[-1] == "L" else "L")] = (v[0], -v[1], -v[2])
+        else:
+            out[k] = (v[0], -v[1], -v[2])
+    return out
+
+
+def _wheel(deg):
+    """The attitude at `deg` degrees round, front half authored, back mirrored."""
+    if deg <= 180:
+        return _wheel_half(deg)
+    p = _mirror(_wheel_half(360.0 - deg))
+    # The roll is put back by hand rather than taken from the reflection, and
+    # this is the somersault's `−360` trap wearing the other hat: reflecting the
+    # front half's 0 gives 0, so the closing key held nothing instead of a whole
+    # turn, and the last twentieth of a second ran the entire wheel backwards.
+    # They are the same attitude. Only one of them is the same number.
+    p["@roll"] = (deg,)
+    return p
+
+
+def _wheel_half(deg):
+    """The front half of the wheel, as one function of how far round it is.
+
+    Written as a function rather than as six hand-authored keys for a reason
+    that only shows up in motion: `_bake_clip` eases *within* each key interval,
+    so the rate goes to zero at every key it passes through. That is what you
+    want for a wave and exactly what you do not want for a revolution — six keys
+    of it and she wheels over in six visible lurches. Sampling one continuous
+    function every thirty degrees puts the keys close enough together that the
+    per-segment ease disappears into a constant turn.
+
+    Two things are tracked across the roll and everything else follows them.
+
+    `hands` is how much of her weight is on her hands: nothing until she is two
+    thirds of the way to horizontal, all of it through the inverted middle,
+    back to nothing as the first foot arrives. It sets the hip height, because
+    her arms are shorter than her legs and the hips genuinely do sit four
+    centimetres lower in a handstand than in a stance.
+
+    The counter-rotations are what make it a cartwheel and not a pinwheel. Every
+    up-or-down bone in this rig shares its local Z with the world's fore-and-aft
+    axis, and the roll is about that same axis, so a support limb given the
+    negative of the roll on its own Z points exactly where it pointed before she
+    started going over: at the floor, while everything above it turns past. The
+    hands stay planted and the feet stay planted for free, with no IK anywhere.
+
+    The arms want `180 − deg` rather than `−deg`, because held overhead they
+    already point along the body's own up: at the handstand they want nothing at
+    all, and it is either side of it that they have work to do.
+    """
+    # The two hands are staggered, and that is not a detail. Symmetric arms mean
+    # neither hand is *the* support once she is past the handstand: both swing
+    # back overhead together, the floor pass has to drop her hips forty
+    # centimetres to keep one of them on the concrete, and she exits the wheel
+    # in a collapse. Real hands go down one at a time and leave one at a time —
+    # left plants at about eighty-five degrees and leaves at two hundred, right
+    # plants at a hundred and thirty and leaves at two-forty — and with that the
+    # weight is somewhere definite at every moment of the roll.
+    wl = _ease((deg - 84) / 30.0)
+    wr = _ease((deg - 126) / 30.0)
+    hands = max(wl, wr)
+    # The knee-bent transfer on the way down into the first hand, where she is
+    # lowest. The matching one on the way up off the last foot is the mirror of
+    # this and costs nothing to write.
+    dip = 0.055 * _ease(deg / 30.0) * (1.0 - _ease((deg - 44) / 34.0))
+    hip = LEG_R + (ARM_R - LEG_R) * hands - dip
+    # Folded to ±180 so a counter is always the short way round. The fold lands
+    # at 180, in the middle of the stretch where `1 - hands` is exactly zero, so
+    # the jump is multiplied out before it can reach a bone.
+    r = ((deg + 180) % 360) - 180
+    leg = -r * (1.0 - hands)
+    cl = (180 - deg) * wl
+    cr = (180 - deg) * wr
+    split = 12 + 36 * hands              # the straddle, widest inverted
+    bend = 14 * math.sin(math.radians(deg))
+    look = 4 + 10 * hands
+    lead = 8 * math.sin(math.radians(deg))
+    knee = 5 + 30 * (dip / 0.055)        # that bent knee, on whichever leg
+    return {
+        "@root": (0.0, 0.02, hip - HIP_0),
+        "@roll": (deg,),
+        "spine01": (0, 0, bend * 0.30), "spine02": (0, 0, bend * 0.34),
+        "spine03": (0, 0, bend * 0.24), "chest": (-2, 0, bend * 0.12),
+        "neck": (look * 0.45, 0, 0), "head": (look, 0, 0),
+        "clavicleL": (0, 0, 7), "clavicleR": (0, 0, -7),
+        "armUL": (-166, 0, cl + 10), "armLL": (-4, 0, 0), "handL": (-18, 0, 0),
+        "armUR": (-166, 0, -cr - 10), "armLR": (-4, 0, 0), "handR": (-18, 0, 0),
+        # The bend is on the left knee alone: it is the one under her on the way
+        # down, and the right one gets it back from the mirror on the way up.
+        "legUL": (-lead, 0, leg - split), "legLL": (knee, 0, 0), "footL": (-8, 0, 0),
+        "legUR": (lead, 0, leg + split), "legLR": (5, 0, 0), "footR": (-8, 0, 0),
+    }
+
+
+WHEEL = [(i * WHEEL_DUR / WHEEL_KEYS, _wheel(i * 360.0 / WHEEL_KEYS))
+         for i in range(WHEEL_KEYS + 1)]
+
 CLIPS = [
     {"name": "idle", "loop": True,
      "keys": [(0.0, IDLE_A), (2.3, IDLE_B), (4.6, IDLE_A)]},
@@ -1532,6 +1848,10 @@ CLIPS = [
     {"name": "skip", "loop": True,
      "keys": [(0.0, SKIP_L), (0.20, SKIP_LU), (0.40, SKIP_R), (0.60, SKIP_RU),
               (0.80, SKIP_L)]},
+    # One-shot, like the somersault and for the same reason: the game chains
+    # two or three of them by rewinding `curT`, which is cheaper than a loop
+    # and lets it stop after any whole number of wheels.
+    {"name": "cartwheel", "loop": False, "keys": WHEEL},
 ]
 
 
@@ -1659,6 +1979,19 @@ def main():
         print("[mh] rehaired %s" % BLEND)
         return
 
+    # No render and no export: opens the blend, walks the frames and prints.
+    # Seconds rather than minutes, which is what makes it usable as the inner
+    # loop while the numbers in a clip are still being argued with.
+    if "--clipcheck" in argv:
+        bpy.ops.wm.open_mainfile(filepath=str(BLEND))
+        rig = bpy.data.objects["rig"]
+        wheel_floor(rig)          # so the numbers below are the shipped numbers
+        for name in argv[argv.index("--clipcheck") + 1:]:
+            if name.startswith("-"):
+                break
+            clipcheck(rig, name)
+        return
+
     if "--reskin" in argv:
         bpy.ops.wm.open_mainfile(filepath=str(BLEND))
         body, rig = bpy.data.objects["human"], bpy.data.objects["rig"]
@@ -1667,9 +2000,12 @@ def main():
             if name.startswith("-") or name not in globals():
                 break
             pose(rig, globals()[name])
-            # Hero and side only. Front tells you almost nothing about a pose
-            # whose whole content is sagittal, and every view is 25 s of EEVEE.
-            render(name.lower(), ("hero", "side"))
+            # Hero, side and front. Front used to be left out — it tells you
+            # almost nothing about a pose whose whole content is sagittal, and
+            # every view is 25 s of EEVEE — but the cartwheel's whole content is
+            # frontal, and it is the only view that shows which way she is
+            # going over.
+            render(name.lower(), ("hero", "side", "front"))
         pose(rig, {})
         export_skin(body, rig, ROOT / "build" / "payload" / "human_skin.fr3d.gz",
                     CLIPS)

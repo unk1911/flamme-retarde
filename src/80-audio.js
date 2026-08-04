@@ -10,7 +10,7 @@
 
 function buildAudio() {
   let ctx = null;
-  let master = null, verb = null, verbSend = null, verbGain = null;
+  let master = null, verb = null, verbSend = null, verbGain = null, bed = null;
   const nodes = {};
   let started = false;
   let noiseBuf = null;
@@ -106,6 +106,24 @@ function buildAudio() {
     comp.attack.value = 0.006;
     comp.release.value = 0.22;
     master.connect(comp).connect(ctx.destination);
+
+    // ── the bed ───────────────────────────────────────────────────────────
+    // The two continuous sounds that stand still and fill the whole band at
+    // Jadrija — the klapa and the cicadas — go through here rather than
+    // straight to master, so that something small can duck them.
+    //
+    // This exists because of one bug that took two goes to understand. Her
+    // ćuk was firing correctly, at a level that measured fine on its own, and
+    // was inaudible: four men singing at 0.55 and a summer's worth of cicadas
+    // mask a quarter-second whistle completely, and the limiter downstream
+    // then does the rest, because a bed that is already holding the
+    // compressor down leaves a transient nothing to open into. Making her
+    // louder alone does not fix that — past a point it just pumps the whole
+    // mix on every chirp. Getting the bed out of her way for a fifth of a
+    // second does, and it is what a person at a desk would do.
+    bed = ctx.createGain();
+    bed.gain.value = 1;
+    bed.connect(master);
 
     // ── the valley ────────────────────────────────────────────────────────
     // A convolution bus with a hand-made impulse response: a few discrete
@@ -706,7 +724,11 @@ function buildAudio() {
   const KLAPA = {
     full: 90,            // m — inside this you are standing in the middle of it
     fade: 1600,          // m — past this the channel has swallowed it
-    gain: 0.55,          // what it plays at, up close, on foot
+    // What it plays at, up close, on foot. Down a couple of decibels from
+    // where it shipped: standing on the promenade it was the loudest thing in
+    // the game, which is true of a real klapa at ten metres and unhelpful when
+    // everything else happening on that promenade is quieter than singing.
+    gain: 0.44,
     inside: 0.40,        // and what an airframe with two turboprops leaves of it
     lpNear: 9000,        // Hz — the filter wide open, next to the singers
     lpFar: 750,          // and what a kilometre of sea over water leaves of it
@@ -762,7 +784,7 @@ function buildAudio() {
       hp.type = 'highpass'; hp.frequency.value = 150;
       const g = ctx.createGain();
       g.gain.value = 0.0001;
-      src.connect(hp).connect(lp).connect(g).connect(master);
+      src.connect(hp).connect(lp).connect(g).connect(bed);
       // And a send that is *heaviest* when you are furthest away, because at a
       // kilometre what reaches you is mostly the hillside behind the resort
       // rather than the singers.
@@ -820,7 +842,7 @@ function buildAudio() {
     }
     src.connect(bp).connect(g);
     src.connect(bp2).connect(g);
-    g.connect(master);
+    g.connect(bed);
     src.start(t0);
     cicadaNodes = { src, g };
   }
@@ -916,36 +938,55 @@ function buildAudio() {
    * to place it. Which is exactly why it can come out of her without asking to
    * be identified. She is not an owl. She is somebody who sounds like one.
    *
-   * These are two to three times as loud as they first shipped. At the original
-   * amplitudes every trigger fired correctly and not one of them could be heard
-   * over the cicadas — which is the same thing as not being there.
+   * These are loud. They started about a third of this and went up twice, and
+   * the second rise came with the realisation that level was never the whole
+   * problem: see `bed` above. Both halves were needed. A pure tone under four
+   * singers is not quiet, it is masked, and you cannot fix masking by turning
+   * the masked thing up — not before it starts sounding like it is being
+   * shouted through the wall of a beach bar.
    */
   const SQUEAKS = {
-    // The ćuk itself. Slow vibrato, a third of the note spent arriving, and the
-    // bandpass parked right on the fundamental so nothing else survives.
-    cuk: { f0: 1460, f1: 1330, dur: 0.23, amp: 0.150, rasp: 0, raspHz: 40,
-      form: 1.0, q: 9, wave: 'sine', attack: 0.32, vib: 0.010, vibHz: 11,
+    // The ćuk itself. Slow vibrato, and the bandpass parked right on the
+    // fundamental so nothing else survives. The onset used to take a third of
+    // the note, which is the softest possible way to arrive and therefore the
+    // easiest thing in the world to mask; it is a sixth now. Still not a click.
+    cuk: { f0: 1460, f1: 1330, dur: 0.23, amp: 0.260, rasp: 0, raspHz: 40,
+      form: 1.0, q: 9, wave: 'sine', attack: 0.16, vib: 0.010, vibHz: 11,
       reps: 1, gap: 0, step: 1 },
     // She has seen you: the same whistle twice, the second a tone up, which is
     // the ćuk being surprised rather than the ćuk keeping time.
-    wake: { f0: 1240, f1: 1500, dur: 0.17, amp: 0.150, rasp: 0.05, raspHz: 40,
-      form: 1.0, q: 8, wave: 'sine', attack: 0.22, vib: 0.014, vibHz: 13,
+    wake: { f0: 1240, f1: 1500, dur: 0.17, amp: 0.260, rasp: 0.05, raspHz: 40,
+      form: 1.0, q: 8, wave: 'sine', attack: 0.16, vib: 0.014, vibHz: 13,
       reps: 2, gap: 0.14, step: 1.15 },
     // On all fours, every couple of seconds — small, busy, close to the floor.
-    chirr: { f0: 520, f1: 720, dur: 0.085, amp: 0.095, rasp: 0.45, raspHz: 96,
+    chirr: { f0: 520, f1: 720, dur: 0.085, amp: 0.155, rasp: 0.45, raspHz: 96,
       form: 1.7, q: 4.5, wave: 'triangle', reps: 3, gap: 0.055, step: 1.05 },
     // The throw into the somersault.
-    hup: { f0: 600, f1: 1560, dur: 0.11, amp: 0.140, rasp: 0.12, raspHz: 40,
+    hup: { f0: 600, f1: 1560, dur: 0.11, amp: 0.235, rasp: 0.12, raspHz: 40,
       form: 1.6, q: 3.0, wave: 'triangle', reps: 1, gap: 0, step: 1 },
     // And the arrival. The one that comes down.
-    whump: { f0: 940, f1: 300, dur: 0.18, amp: 0.130, rasp: 0.32, raspHz: 58,
+    whump: { f0: 940, f1: 300, dur: 0.18, amp: 0.215, rasp: 0.32, raspHz: 58,
       form: 1.9, q: 2.6, wave: 'triangle', reps: 1, gap: 0, step: 1 },
     // Skipping: a four-note run up, thrown in now and then rather than on
     // every hop — a noise on every footfall stops being delight inside four
     // seconds and becomes a smoke alarm.
-    trill: { f0: 700, f1: 940, dur: 0.07, amp: 0.110, rasp: 0.08, raspHz: 40,
+    trill: { f0: 700, f1: 940, dur: 0.07, amp: 0.185, rasp: 0.08, raspHz: 40,
       form: 1.5, q: 4.0, wave: 'triangle', reps: 4, gap: 0.045, step: 1.22 },
+    // The cartwheel: one long rising glide across the whole revolution. `hup`
+    // is a throw and a cartwheel is not thrown — it is committed to, and then
+    // it takes as long as it takes.
+    whee: { f0: 620, f1: 1520, dur: 0.54, amp: 0.215, rasp: 0.10, raspHz: 44,
+      form: 1.5, q: 3.4, wave: 'triangle', attack: 0.12, vib: 0.012, vibHz: 9,
+      reps: 1, gap: 0, step: 1 },
   };
+
+  // How far down the klapa and the cicadas go while she is making a noise, at
+  // full level. Six decibels: enough that a quarter-second whistle has somewhere
+  // to be, and not so much that a run of chirps sets the whole beach breathing
+  // in and out. Scaled by her own gain below, so that a ćuk from forty metres
+  // away — which you are meant to only half hear — does not haul the singers
+  // down with it.
+  const BED_DUCK = 0.45;
 
   /** @param gain 0…1, so a caller can fall it off with distance. */
   function squeak(kind, gain = 1, pan = 0) {
@@ -957,10 +998,18 @@ function buildAudio() {
     pn.pan.value = clamp(pan, -1, 1);
     pn.connect(master);
     if (verbSend) {
-      const w = ctx.createGain(); w.gain.value = 0.22;
+      const w = ctx.createGain(); w.gain.value = 0.30;
       pn.connect(w).connect(verbSend);
     }
     let at = ctx.currentTime;
+    if (bed) {
+      // The whole utterance, not one syllable — the trill is four of them and
+      // ducking for the first would leave the other three under the singers.
+      const span = v.reps * v.dur + (v.reps - 1) * v.gap;
+      bed.gain.cancelScheduledValues(at);
+      bed.gain.setTargetAtTime(1 - (1 - BED_DUCK) * g0, at, 0.035);
+      bed.gain.setTargetAtTime(1, at + span + 0.10, 0.28);
+    }
     for (let i = 0; i < v.reps; i++) {
       const k = Math.pow(v.step, i);
       const dur = v.dur * (0.9 + Math.random() * 0.2);

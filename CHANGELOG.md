@@ -10,6 +10,92 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.25.0] — 2026-08-04
+
+### Added — cartwheels
+
+A ninth clip, `cartwheel`, and two states in `src/43-jadrija.js` to put it on:
+`aim`, which keeps her skipping while she turns her shoulders a quarter turn
+across her course, and `wheel`, which strings three of them together the way
+`flip` already strings somersaults. She goes over her left hand, covers about
+1.7 m a turn, and lines herself up along the promenade before starting —
+a cartwheel wants five or six metres of straight run and the deck is only four
+deep.
+
+Four things had to be got right, and each was wrong first.
+
+**The roll axis.** The somersault rides on `pelvis` X, which works because that
+bone's local X comes out as world −Y exactly. Its local Z is not world −X: the
+pelvis runs from the hip up to spine-4, twenty-seven degrees off vertical, and
+`align_roll` can only put local Z perpendicular to that. Rolling on it
+corkscrews her. So `_bake_clip` gained an `@roll` channel that pre-multiplies a
+rotation in *armature* space onto the root bone. The pivot lands on the hip for
+free, because only that matrix's rotation survives and the root translation
+beside it is untouched.
+
+**The counter-rotations.** Every up-or-down bone in the rig shares its local Z
+with the world's fore-and-aft axis, which is also the roll axis, and rotations
+about a common axis commute — so a support limb given the negative of the roll
+points where it pointed before she started going over: at the floor, while
+everything above it turns past. Hands stay planted and feet stay planted with no
+IK anywhere. Without it she is not doing a cartwheel, she is a pinwheel on a
+stick.
+
+**The hip height.** Which the counter-rotations then do *not* fix, because the
+roll turns about the midline and her hip and shoulder joints are eleven to
+eighteen centimetres either side of it: sixty degrees over, the supporting hip
+has swung nine centimetres down and taken the foot with it. No limb angle can
+know about that. So `wheel_floor()` solves it instead — pose the rig at each of
+the twenty-five keys, find the lowest hand, foot or head, and move the key until
+it is four millimetres off the deck — and then smooths the answer, because
+solved key by key it is a staircase that snaps her pelvis twice a wheel.
+
+**The back half**, which is the front half mirrored, and is now written that way
+rather than tuned twice. Every earlier attempt fell apart on the exit precisely
+because nothing forced the two to agree.
+
+### Added — `--clipcheck`, and numbers instead of opinions
+
+`blender --background --python tools/blender/human_mh.py -- --clipcheck
+cartwheel` walks a clip's baked frames and prints how far the lowest extremity
+sits above the deck, per frame. No render, a few seconds.
+
+It exists because the first cartwheel rendered beautifully from three angles
+while wheeling through the air with its hands half a metre clear of the
+concrete, and no still from any direction showed it. Every version after that
+was diagnosed in one table. The shipped clip is within a couple of centimetres
+of the deck for all of it bar one transfer frame, which brushes six centimetres
+under.
+
+### Changed — you can hear her now
+
+Her noises fired correctly and at a level that measured fine alone, and were
+inaudible, which is the same thing as not being there. Two causes, and only
+fixing both works.
+
+Masking. Four men singing at 0.55 and a summer of cicadas bury a quarter-second
+whistle, and no amount of turning the whistle up fixes that before it starts
+sounding shouted. So the klapa and the cicadas now run through a `bed` gain node
+that her voice ducks 6 dB for as long as she is talking — scaled by her own
+distance gain, so a ćuk from forty metres does not haul the singers down with
+it. It is what a person at a mixing desk would do.
+
+Level, as well: the `SQUEAKS` amplitudes are up about three quarters again, the
+ćuk's onset is a sixth of the note rather than a third — a soft onset is the
+easiest thing in the world to mask — and the klapa itself comes down a couple of
+decibels from a level at which it was, standing on the promenade, the loudest
+thing in the game.
+
+New voice `whee`: one long rising glide across the whole revolution. `hup` is a
+throw and a cartwheel is not thrown.
+
+### Known
+
+Unchanged from 1.24.0, and the cartwheel makes the third one more visible than
+it was: she does not blink; she still passes through parasols and bathers; and
+she is still topless, because the trunks cutter in `human_mh.py` paints only
+below the waist. Being upside down draws the eye to it.
+
 ## [1.24.0] — 2026-08-04
 
 ### Fixed — she was doing the whole performance backwards
