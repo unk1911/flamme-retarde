@@ -274,6 +274,101 @@ def smooth(body, levels):
 
 
 # --------------------------------------------------------------------------- #
+#  hair                                                                        #
+# --------------------------------------------------------------------------- #
+#
+# Everything else on this figure is painted rather than modelled — eyes, brows,
+# mouth, trunks are all vertex colour laid down through a cutter volume, which
+# is the whole reason a MakeHuman base with no textures can carry a face. Hair
+# is the one feature that cannot be done that way and be *long*, because paint
+# has nothing to sit on: dark colour over the skull is a crew cut however far
+# down the neck it is taken, and the silhouette is what reads at ten metres.
+#
+# So the scalp stays painted and the length is geometry — a knot at the back of
+# the crown and a tail hanging off it. Both are separate closed shells, which
+# means `skin()` picks them up in its loose-shell pass and hands each of them
+# whole to the `head` bone. That is also the honest rig for them: there is no
+# hair bone, so the tail is rigid to the skull and swings with it. Adding one
+# would cost a bone out of the palette and a keyframe in every clip, for a
+# figure who is 1.75 m of a 189 m promenade.
+#
+# All of it is in game space — +X forward, +Y her left, +Z up, metres — and the
+# numbers are off the base mesh: the back of her skull runs to x = −0.041, the
+# nape tucks in to −0.012, and the deepest part of her upper back is −0.055. The
+# tail clears all three.
+HAIR_KNOT = (-0.052, 0.0, 1.688, 0.043, 0.040, 0.038)
+HAIR_TAIL = [
+    (-0.062, 0.0, 1.690, 0.032),   # inside the knot, so the two read as one
+    (-0.082, 0.0, 1.652, 0.036),
+    (-0.094, 0.0, 1.596, 0.035),
+    (-0.098, 0.0, 1.530, 0.033),
+    (-0.096, 0.0, 1.464, 0.030),
+    (-0.090, 0.0, 1.404, 0.025),
+    (-0.084, 0.0, 1.352, 0.016),
+    (-0.080, 0.0, 1.318, 0.005),
+]
+
+
+def hair(body, J):
+    """Build the knot and the tail and join them into the body mesh.
+
+    Coloured here rather than by a cutter. `paint` only overwrites vertices a
+    cutter volume claims, and these sit outside every one of them — which is
+    correct, since a cutter big enough to catch the tail would also catch the
+    back of her neck and half a shoulder blade.
+
+    Idempotent by construction: `join` appends, so the hair is always the last
+    N vertices of the mesh and re-running this removes the previous set first.
+    That is what makes `--hair` a loop worth having rather than a thing that
+    grows a second ponytail every time the numbers are nudged.
+    """
+    old = body.get("hairN", 0)
+    if old:
+        bm = bmesh.new()
+        bm.from_mesh(body.data)
+        bm.verts.ensure_lookup_table()
+        bmesh.ops.delete(bm, geom=bm.verts[-old:], context="VERTS")
+        bm.to_mesh(body.data)
+        bm.free()
+        print("[mh] hair: dropped %d previous verts" % old)
+
+    vs, fs = ball(*HAIR_KNOT, rows=16, seg=20)
+    tv, tf = tube(HAIR_TAIL, seg=16)
+    off = len(vs)
+    vs += tv
+    fs += [[i + off for i in f] for f in tf]
+
+    me = bpy.data.meshes.new("hair")
+    me.from_pydata([tuple(v) for v in vs], [], fs)
+    me.validate()
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    a_m = me.color_attributes.new("mark", "FLOAT_COLOR", "POINT")
+    a_p = me.color_attributes.new("prev", "FLOAT_COLOR", "POINT")
+    for i in range(len(me.vertices)):
+        a_m.data[i].color = (*HAIR_M, 1.0)
+        a_p.data[i].color = (*HAIR_P, 1.0)
+    for p in me.polygons:
+        p.use_smooth = True
+
+    ob = bpy.data.objects.new("hair", me)
+    bpy.context.collection.objects.link(ob)
+    for o in bpy.context.view_layer.objects:
+        o.select_set(False)
+    ob.select_set(True)
+    body.select_set(True)
+    bpy.context.view_layer.objects.active = body
+    bpy.ops.object.join()
+    body["hairN"] = len(vs)
+    print("[mh] hair: %d verts, %d faces joined"
+          % (len(vs), len(fs)))
+    return body
+
+
+# --------------------------------------------------------------------------- #
 #  the skeleton                                                                #
 # --------------------------------------------------------------------------- #
 #
@@ -598,6 +693,50 @@ def ball(cx, cy, cz, rx, ry, rz, rows=12, seg=20):
     return vs, fs
 
 
+def tube(path, seg=14):
+    """A tapered closed tube through `path` = [(x, y, z, radius), ...].
+
+    Unlike `ball` this one does get rendered, so the rings are laid in the plane
+    normal to the local direction — a tube whose rings all sit in the same world
+    plane pinches to a ribbon wherever the path turns.
+
+    The frame is taken off world +Y, the figure's left. Every path here runs
+    down her back in the x–z plane, where +Y is exactly perpendicular and the
+    frame is stable; the degenerate case is checked for anyway because the cost
+    of being wrong is a tube inside out along one section and nothing else.
+    """
+    up = Vector((0.0, 1.0, 0.0))
+    pts = [Vector(p[:3]) for p in path]
+    rad = [p[3] for p in path]
+    vs, fs = [], []
+    for i, c in enumerate(pts):
+        d = (pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]).normalized()
+        u = d.cross(up)
+        if u.length < 1e-6:
+            u = d.cross(Vector((1.0, 0.0, 0.0)))
+        u.normalize()
+        v = d.cross(u).normalized()
+        for k in range(seg):
+            a = 2.0 * math.pi * k / seg
+            vs.append(c + (u * math.cos(a) + v * math.sin(a)) * rad[i])
+    for i in range(len(pts) - 1):
+        for k in range(seg):
+            j = (k + 1) % seg
+            fs.append([i * seg + k, i * seg + j,
+                       (i + 1) * seg + j, (i + 1) * seg + k])
+    # Both ends closed, on a point pushed a radius past the last ring so the tip
+    # is a cone rather than a flat disc seen edge-on.
+    lo, hi = len(vs), len(vs) + 1
+    vs.append(pts[0] - (pts[1] - pts[0]).normalized() * rad[0])
+    vs.append(pts[-1] + (pts[-1] - pts[-2]).normalized() * rad[-1])
+    n = (len(pts) - 1) * seg
+    for k in range(seg):
+        j = (k + 1) % seg
+        fs.append([lo, j, k])
+        fs.append([hi, n + k, n + j])
+    return vs, fs
+
+
 def cutters(J):
     """The paint volumes, each one closed, positioned off the joint markers.
 
@@ -654,9 +793,24 @@ def cutters(J):
 
     # Hair: a cap over the skull, cut at the brow. Unlike the others this one is
     # a solid the scalp sits inside, not a punch through it.
+    #
+    # Pushed forward 4 cm from where it first sat. It used to stop at x = 0.099
+    # and her forehead runs out to 0.145 at that height, so there were four and
+    # a half centimetres of bare scalp in front of the hairline — which from the
+    # promenade is not a high forehead, it is a bald woman.
     add("hair", HAIR_M, HAIR_P, 2,
-        (J["head"].x - 0.012, 0.0, head - 0.072),
-        (0.098, 0.092, 0.108), rows=16, seg=26)
+        (J["head"].x + 0.023, 0.0, head - 0.066),
+        (0.112, 0.092, 0.104), rows=16, seg=26)
+
+    # And the nape, as a second shell rather than by stretching the first.
+    # The cap has to stop at the brow and a single ellipsoid long enough to
+    # reach the hairline at the back reaches the eyebrows at the front. This one
+    # is behind the ears and below the crown, which is where the hair gathered
+    # into the knot actually lies — without it the modelled tail hangs off a
+    # shaved neck, which is a worse read than no tail at all.
+    add("nape", HAIR_M, HAIR_P, 2,
+        (J["head"].x - 0.090, 0.0, J["neck"].z + 0.058),
+        (0.105, 0.070, 0.085), rows=14, seg=22)
 
     # Swim shorts. Sized off the hip and knee markers so they follow the mesh
     # rather than being dialled in against it.
@@ -1388,6 +1542,11 @@ VIEWS = {
     "face": (2.0, 2.0, 1.612, 0.46, 900, 900),
     "head": (30.0, 5.0, 1.615, 0.52, 900, 900),
     "prof": (88.0, 2.0, 1.615, 0.50, 900, 900),
+    # Azimuth 0 is in front of her, since her forward is +X — so these two are
+    # the only views that show the back of the head, which is where all of the
+    # hair is.
+    "nape": (176.0, 6.0, 1.600, 0.60, 900, 900),
+    "rear": (156.0, 9.0, 1.150, 2.30, 760, 1120),
 }
 
 
@@ -1478,6 +1637,28 @@ def main():
         print("[mh] rebound %s" % BLEND)
         return
 
+    # Hair is geometry joined into a finished mesh, so it has to be followed by
+    # a re-bind (the new vertices have no groups) and a re-export. That is two
+    # of the three slow steps and none of the download, the subsurf or the
+    # renders, which is the difference between iterating on the shape of a
+    # ponytail and not iterating on it.
+    if "--hair" in argv:
+        bpy.ops.wm.open_mainfile(filepath=str(BLEND))
+        body, rig = bpy.data.objects["human"], bpy.data.objects["rig"]
+        J, _scale, _drop = read_joints(fetch())
+        hair(body, J)
+        skin(body, rig)
+        paint(body, cutters(J))
+        _material(body)
+        _lights()
+        pose(rig, {})
+        render("hair", ("nape", "prof", "rear"))
+        export_skin(body, rig, ROOT / "build" / "payload" / "human_skin.fr3d.gz",
+                    CLIPS)
+        bpy.ops.wm.save_as_mainfile(filepath=str(BLEND))
+        print("[mh] rehaired %s" % BLEND)
+        return
+
     if "--reskin" in argv:
         bpy.ops.wm.open_mainfile(filepath=str(BLEND))
         body, rig = bpy.data.objects["human"], bpy.data.objects["rig"]
@@ -1502,6 +1683,12 @@ def main():
     body = load(path, scale, drop)
     print("[mh] kept %d verts before smoothing" % len(body.data.vertices))
     smooth(body, levels)
+    # After the subsurf, deliberately. The hair is authored at the density it
+    # wants; run through smooth() it would be subdivided twice — once globally
+    # and again by the head pass, which takes everything above z = 1.46 — and
+    # arrive at a few thousand triangles for a ponytail, all of which the export
+    # decimator would then have to take back off the face.
+    hair(body, J)
     tris = sum(len(p.vertices) - 2 for p in body.data.polygons)
     print("[mh] mesh %d verts, %d faces, %d tris"
           % (len(body.data.vertices), len(body.data.polygons), tris))

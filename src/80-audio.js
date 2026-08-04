@@ -832,18 +832,33 @@ function buildAudio() {
    * a fixed filter only sounds like a filter.
    */
   function syllable(at, { f0, f1, dur, amp, rasp = 0, raspHz = 60, form = 1.5,
-    q = 4, wave = 'sawtooth', dest }) {
+    q = 4, wave = 'sawtooth', attack = 0.10, vib = 0, vibHz = 12, dest }) {
     const o = ctx.createOscillator();
     o.type = wave;
     o.frequency.setValueAtTime(f0, at);
     o.frequency.exponentialRampToValueAtTime(f1, at + dur);
+    // Vibrato *adds* to the ramp above rather than replacing it, which is what
+    // an AudioParam with both a schedule and a connection does — so a swept
+    // note keeps its sweep and gains a waver on top. Depth is a fraction of f0
+    // because a fixed number of hertz is a wide waver down low and none at all
+    // up where the whistles live.
+    if (vib) {
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sine'; lfo.frequency.value = vibHz;
+      const lg = ctx.createGain(); lg.gain.value = f0 * vib;
+      lfo.connect(lg).connect(o.frequency);
+      lfo.start(at); lfo.stop(at + dur + 0.05);
+    }
     const bp = ctx.createBiquadFilter();
     bp.type = 'bandpass'; bp.Q.value = q;
     bp.frequency.setValueAtTime(f0 * form, at);
     bp.frequency.exponentialRampToValueAtTime(f1 * form, at + dur);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, at);
-    g.gain.exponentialRampToValueAtTime(amp, at + dur * 0.10);
+    // `attack` is a fraction of the note. A bird's call snaps on and 10% is
+    // right for it; a whistled one is breathed into and needs a third of its
+    // length to arrive, or the onset clicks and it reads as a beep.
+    g.gain.exponentialRampToValueAtTime(amp, at + dur * attack);
     g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
     if (rasp) {
       const lfo = ctx.createOscillator();
@@ -893,25 +908,43 @@ function buildAudio() {
    *
    * The grammar is the sweep. Rising is delight and effort; the only falling one
    * in the set is the landing, and it falls because it is a body arriving.
+   *
+   * The centre of the set is `cuk` — the ćuk, *Otus scops*, the scops owl whose
+   * one-note whistle every Dalmatian summer night is measured out in. It is a
+   * pure tone a little under 1500 Hz with a soft onset and a slight fall, and
+   * it is the least birdlike bird call there is: no rasp, no overtones, nothing
+   * to place it. Which is exactly why it can come out of her without asking to
+   * be identified. She is not an owl. She is somebody who sounds like one.
+   *
+   * These are two to three times as loud as they first shipped. At the original
+   * amplitudes every trigger fired correctly and not one of them could be heard
+   * over the cicadas — which is the same thing as not being there.
    */
   const SQUEAKS = {
-    // She has seen you: two rising chirps, the second higher.
-    wake: { f0: 340, f1: 980, dur: 0.15, amp: 0.055, rasp: 0.20, raspHz: 48,
-      form: 2.0, q: 3.2, reps: 2, gap: 0.10, step: 1.16 },
+    // The ćuk itself. Slow vibrato, a third of the note spent arriving, and the
+    // bandpass parked right on the fundamental so nothing else survives.
+    cuk: { f0: 1460, f1: 1330, dur: 0.23, amp: 0.150, rasp: 0, raspHz: 40,
+      form: 1.0, q: 9, wave: 'sine', attack: 0.32, vib: 0.010, vibHz: 11,
+      reps: 1, gap: 0, step: 1 },
+    // She has seen you: the same whistle twice, the second a tone up, which is
+    // the ćuk being surprised rather than the ćuk keeping time.
+    wake: { f0: 1240, f1: 1500, dur: 0.17, amp: 0.150, rasp: 0.05, raspHz: 40,
+      form: 1.0, q: 8, wave: 'sine', attack: 0.22, vib: 0.014, vibHz: 13,
+      reps: 2, gap: 0.14, step: 1.15 },
     // On all fours, every couple of seconds — small, busy, close to the floor.
-    chirr: { f0: 520, f1: 700, dur: 0.09, amp: 0.032, rasp: 0.42, raspHz: 96,
-      form: 1.7, q: 4.5, reps: 3, gap: 0.055, step: 1.05 },
+    chirr: { f0: 520, f1: 720, dur: 0.085, amp: 0.095, rasp: 0.45, raspHz: 96,
+      form: 1.7, q: 4.5, wave: 'triangle', reps: 3, gap: 0.055, step: 1.05 },
     // The throw into the somersault.
-    hup: { f0: 560, f1: 1420, dur: 0.11, amp: 0.052, rasp: 0.12, raspHz: 40,
-      form: 1.6, q: 3.0, reps: 1, gap: 0, step: 1 },
+    hup: { f0: 600, f1: 1560, dur: 0.11, amp: 0.140, rasp: 0.12, raspHz: 40,
+      form: 1.6, q: 3.0, wave: 'triangle', reps: 1, gap: 0, step: 1 },
     // And the arrival. The one that comes down.
-    whump: { f0: 900, f1: 300, dur: 0.17, amp: 0.048, rasp: 0.30, raspHz: 58,
-      form: 1.9, q: 2.6, reps: 1, gap: 0, step: 1 },
-    // Skipping: a three-note run up, thrown in now and then rather than on
+    whump: { f0: 940, f1: 300, dur: 0.18, amp: 0.130, rasp: 0.32, raspHz: 58,
+      form: 1.9, q: 2.6, wave: 'triangle', reps: 1, gap: 0, step: 1 },
+    // Skipping: a four-note run up, thrown in now and then rather than on
     // every hop — a noise on every footfall stops being delight inside four
     // seconds and becomes a smoke alarm.
-    trill: { f0: 640, f1: 860, dur: 0.075, amp: 0.040, rasp: 0.10, raspHz: 40,
-      form: 1.5, q: 4.0, reps: 3, gap: 0.045, step: 1.26 },
+    trill: { f0: 700, f1: 940, dur: 0.07, amp: 0.110, rasp: 0.08, raspHz: 40,
+      form: 1.5, q: 4.0, wave: 'triangle', reps: 4, gap: 0.045, step: 1.22 },
   };
 
   /** @param gain 0…1, so a caller can fall it off with distance. */
@@ -934,7 +967,8 @@ function buildAudio() {
       syllable(at, {
         f0: v.f0 * k * (0.98 + Math.random() * 0.04), f1: v.f1 * k, dur,
         amp: v.amp * g0, rasp: v.rasp, raspHz: v.raspHz,
-        form: v.form, q: v.q, wave: 'triangle', dest: pn,
+        form: v.form, q: v.q, wave: v.wave || 'triangle',
+        attack: v.attack, vib: v.vib, vibHz: v.vibHz, dest: pn,
       });
       at += dur + v.gap;
     }

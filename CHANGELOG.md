@@ -10,6 +10,114 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.24.0] — 2026-08-04
+
+### Fixed — she was doing the whole performance backwards
+
+`faceYaw` in `src/43-jadrija.js` turned her a further half turn on top of
+`rigYaw`, on the belief that her rig faced the opposite way to the crowd rig's
++X. It does not. `tools/blender/human_mh.py` imports the MakeHuman base facing
+−Y and multiplies it by a fix-up matrix that maps −Y to +X, which is the same
+convention `tools/blender/bather.py` lands on — the two agreeing is the point of
+writing them that way. So her forward was +X all along, the half turn faced her
+down her own heading in reverse, and she travelled backwards through every clip
+that moves: the crawl and the skipping both.
+
+The static placement carried the same error with the comment `// looking out to
+sea` next to a figure looking inland at a row of huts.
+
+Both were found the same way: stand the headless camera nine metres to seaward
+and nine metres inland of her and look at the two pictures. She had her back to
+the water.
+
+### Added — the ćuk
+
+Her voice is rebuilt around *Otus scops*, the scops owl the Dalmatian summer
+night is measured out in — one pure tone a little under 1500 Hz, soft onset,
+slight fall, no rasp at all. It is the least identifiable bird call there is,
+which is exactly why it can come out of somebody who is not a bird.
+
+`syllable()` gained two options to get there: `attack`, because a whistle that
+snaps on at 10% of its length clicks and reads as a beep, and `vib`, a sine LFO
+into the oscillator's frequency that *adds* to the scheduled sweep rather than
+replacing it.
+
+She calls it on her own every four to six seconds while she is standing there,
+which is the point of it — you hear her before you can see what she is, and the
+walk towards the noise is how the whole encounter starts.
+
+**Everything she says is two to three times louder than it shipped.** The
+triggers were all firing correctly at 1.23.0 and not one of them could be heard
+over the cicadas, which is the same thing as not being there. The distance
+falloff was squared, too, so she was inaudible at fifteen metres — inside the
+range at which she notices you, meaning the first noise she ever made was
+already too quiet to hear. It is linear now.
+
+### Added — she wanders
+
+The skipping was a straight line along the promenade until a timer ran out. It
+is now a random walk: a new heading every half second to a second and a half,
+nudged off the last one rather than drawn fresh, at a speed redrawn each time —
+and about one turn in five comes with a somersault. Redrawing the heading
+outright is a fly in a jar; carrying it forward and nudging it is somebody
+enjoying themselves.
+
+The lane she plays on is nine metres of deck rather than five, she stays out for
+twenty-four seconds rather than fifteen, and the crawl wanders too, lazily. The
+edges of her ground **bend** the heading instead of clamping the position: a
+clamp is what makes a wandering figure grind along a wall, since it eats the
+across-shore half of every step and leaves her pointed into it.
+
+### Added — hair, and a ponytail
+
+Everything else on this figure is painted through a cutter volume, and hair is
+the one feature that cannot be done that way and be long: dark colour over a
+skull is a crew cut however far down the neck it is taken, because the
+silhouette is what reads at ten metres.
+
+So the scalp stays painted and the length is geometry — a knot at the back of
+the crown and a tapered tail hanging to mid-back, 432 vertices between them.
+Both are separate closed shells, which means `skin()` picks them up in the
+loose-shell pass it already had and hands each of them whole to the `head`
+bone. No new bone, no new keyframe in any clip; the tail is rigid to the skull
+and swings with it, which on all fours drops it forward over her shoulder and
+through the somersault throws it round with her.
+
+`tube()` is new next to `ball()` — a tapered closed tube whose rings are laid in
+the plane normal to the local direction, because rings that all sit in one world
+plane pinch to a ribbon wherever the path turns.
+
+The painted cap moved forward four centimetres at the same time. It stopped at
+x = 0.099 and her forehead runs out to 0.145 at that height, so there were four
+and a half centimetres of bare scalp in front of the hairline — which from the
+promenade is not a high forehead, it is a bald woman. A second painted shell
+covers the nape, because a modelled tail hanging off a shaved neck is a worse
+read than no tail at all.
+
+`--hair` is a new fast path: open the saved blend, drop the previous hair (it is
+always the last N vertices, since `join` appends), add it again, re-bind,
+re-paint, re-export. A hundred seconds instead of the full run, which is the
+difference between iterating on the shape of a ponytail and not iterating on it.
+
+### Added — `9`, the other back door
+
+`0` skips to Rokići. `9` skips to Jadrija, and deliberately not the same way:
+nothing is parked anywhere and the aeroplane does not follow you down. It is the
+parachute arrival with the parachute taken out, so it goes through `dropIn` —
+the same call `chuteDown` makes when you walk away from a landing — and leaves
+you stranded exactly as that does, because there is nowhere at Jadrija to put an
+aeroplane. `?jadrija` is the same door as a link, for a phone.
+
+It puts you sixteen metres up the promenade from her, facing her, which is just
+outside the distance at which she notices you. Walking the last few metres is
+the point; being dropped on top of her is not.
+
+### Known
+
+- She still does not blink — there are no eyelid bones among the twenty-eight.
+- She is still topless: the trunks cutter paints only below the waist.
+- She still passes through parasols and bathers during the performance.
+
 ## [1.23.0] — 2026-08-04
 
 ### Fixed — the bind had never worked, and everything posed was the bind pose

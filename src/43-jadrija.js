@@ -1594,7 +1594,7 @@ async function buildJadrija(scene) {
       const ft = LEN * 0.5 + 22, fs = JAD.mid + 1.4;
       const p = toWorld(ft, fs);
       mesh.position.set(p[0], p[1], p[2]);
-      mesh.rotation.y = rigYaw(ft, Math.PI * 0.5);   // looking out to sea
+      mesh.rotation.y = rigYaw(ft, -Math.PI * 0.5);  // looking out to sea
       mesh.updateMatrixWorld();
       scene.add(mesh);
       testFigure = { mesh, fig: skinFig, tris: skinFig.tris, at: [ft, fs] };
@@ -1610,6 +1610,14 @@ async function buildJadrija(scene) {
       show = {
         phase: 'idle', t: ft, s: fs, ang: -Math.PI / 2, want: -Math.PI / 2,
         tmr: 0, flips: 0, said: 0, home: [ft, fs],
+        // The wander: the heading the random walk is on, seconds until it is
+        // nudged again, the speed to take it at, and how long she has been
+        // playing — which is separate from `tmr` because a somersault in the
+        // middle of the wander resets one and must not reset the other.
+        // `pace` starts at nothing rather than at a sensible speed on purpose:
+        // `SHOW` is declared below this and would be in its dead zone here, and
+        // nothing reads it before `showWander` has set it.
+        wander: -Math.PI / 2, tick: 0, pace: 0, played: 0,
       };
     } catch (e) {
       console.warn('test figure failed:', e.message);
@@ -1648,19 +1656,31 @@ async function buildJadrija(scene) {
     hop: 2.1,           // m/s the somersault carries her while she is over
     flips: 3,           // "a bunch of summersaults"
     crawlFor: 4.6,      // seconds down on all fours
-    skipFor: 15,        // and skipping, before she comes home to her spot
-    lane: [JAD.mid + 1.0, JAD.rowA - 2.2],   // the strip of deck she performs on
+    playFor: 24,        // and larking about, before she comes home to her spot
+    lane: [JAD.mid - 2.0, JAD.rowA - 1.8],   // the strip of deck she plays on
+    // The wander. A new heading every `turn` seconds, `swing` radians off the
+    // last one, at a speed drawn fresh each time — which is a random walk with
+    // the corners rounded off, and the rounding is the whole trick. Redrawing
+    // the heading outright every second is a fly in a jar; carrying it forward
+    // and nudging it is somebody enjoying themselves.
+    turn: [0.55, 1.35], swing: 1.5, pace: [0.55, 1.35],
+    crawlTurn: [0.9, 2.0], crawlSwing: 0.7,
+    edge: 14,           // metres from the ends of the resort the push starts
+    joy: 0.22,          // chance that a new heading comes with a somersault
+    say: [1.8, 4.2],    // seconds between noises while she is playing
   };
 
   /**
    * Her mesh yaw, for a heading in the resort's own frame: 0 runs along +t and
    * −PI/2 is the water.
    *
-   * Half a turn, because `rigYaw` was written for the crowd rig — whose forward
-   * is +X — and hers is the other way round. The placement above turns her by
-   * hand for the same reason.
+   * No half turn. Her forward is +X, the same as the crowd rig's, because
+   * tools/blender/human_mh.py lands both of them there — MakeHuman imports
+   * facing −Y and the fix-up matrix maps that to +X. A stray half turn here is
+   * what had her crawling and skipping backwards: she travelled along her
+   * heading while facing the other way down it.
    */
-  const faceYaw = (t, ang) => rigYaw(t, ang + Math.PI);
+  const faceYaw = (t, ang) => rigYaw(t, ang);
 
   /** Advance her along her heading, kept on the deck and inside the resort. */
   function showMove(v, dt) {
@@ -1668,11 +1688,42 @@ async function buildJadrija(scene) {
     show.s = clamp(show.s + Math.sin(show.ang) * v * dt, SHOW.lane[0], SHOW.lane[1]);
   }
 
-  /** A noise, quieter the further off you are. Silent from the aeroplane. */
+  /**
+   * A wander heading bent away from the edges of her ground.
+   *
+   * Bent, not clamped. `showMove` clamps as a backstop and a clamp on its own
+   * is what makes wandering crowd figures grind along a wall — she arrives at
+   * the lane edge, the clamp eats the across-shore half of every step, and she
+   * slides down the line still pointed into it. Adding an outward term to the
+   * heading *vector* turns her instead, and it grows with the overshoot, so a
+   * metre inside the margin is a suggestion and a metre outside is a decision.
+   */
+  function showSteer(a) {
+    const push = (v, lo, hi) => (v < lo ? lo - v : v > hi ? hi - v : 0);
+    const x = Math.cos(a) + push(show.t, SHOW.edge, LEN - SHOW.edge) * 0.5;
+    const y = Math.sin(a) + push(show.s, SHOW.lane[0] + 1.6, SHOW.lane[1] - 1.6) * 1.2;
+    return Math.atan2(y, x);
+  }
+
+  /** Re-aim: a new heading off the current one, and a new speed to take it at. */
+  function showWander(turn, swing) {
+    show.tick = turn[0] + Math.random() * (turn[1] - turn[0]);
+    show.wander += (Math.random() * 2 - 1) * swing;
+    show.pace = SHOW.skip * (SHOW.pace[0] + Math.random()
+      * (SHOW.pace[1] - SHOW.pace[0]));
+  }
+
+  /**
+   * A noise, quieter the further off you are. Silent from the aeroplane.
+   *
+   * Linear in distance and not squared. Squared, she was inaudible at fifteen
+   * metres — which is inside the range at which she notices you, so the first
+   * thing she ever said was already too quiet to hear.
+   */
   function showSay(kind, d) {
     if (!audio || state.phase === 'intro') return;
-    const g = 1 - clamp(d / 52, 0, 1);
-    if (g > 0.04) audio.squeak(kind, g * g);
+    const g = clamp(1.15 - d / 46, 0, 1);
+    if (g > 0.04) audio.squeak(kind, g);
   }
 
   function stepShow(dt, pt, ps) {
@@ -1694,6 +1745,12 @@ async function buildJadrija(scene) {
     switch (show.phase) {
       case 'idle':
         show.want = -Math.PI / 2;                        // back to the water
+        // The ćuk, on her own, every few seconds — the one noise she makes when
+        // nothing is happening. It is what tells you there is something up
+        // there worth walking towards before you are close enough to see it.
+        if (show.tmr - show.said > 3.4 + Math.random() * 2.5) {
+          show.said = show.tmr; showSay('cuk', d);
+        }
         // Three seconds of standing there first. Without it she comes home,
         // notices you again on the same frame and goes straight back down on
         // all fours, which is not delight, it is a stuck record.
@@ -1710,10 +1767,19 @@ async function buildJadrija(scene) {
       case 'down':
         // Turn along the promenade, away from you: that is where she is going.
         show.want = pt > show.t ? Math.PI : 0;
-        if (done) go('crawl', 'crawl', 0.22);
+        if (done) {
+          show.wander = show.want;
+          showWander(SHOW.crawlTurn, SHOW.crawlSwing);
+          go('crawl', 'crawl', 0.22);
+        }
         break;
 
       case 'crawl':
+        // Wandering on all fours too, but lazily — a crawl that changes its
+        // mind as often as the skipping does looks like a dropped contact lens.
+        show.tick -= dt;
+        if (show.tick <= 0) showWander(SHOW.crawlTurn, SHOW.crawlSwing);
+        show.want = showSteer(show.wander);
         showMove(SHOW.crawl, dt);
         if (show.tmr - show.said > 1.7) { show.said = show.tmr; showSay('chirr', d); }
         if (show.tmr > SHOW.crawlFor) go('up', 'getup', 0.18);
@@ -1738,6 +1804,9 @@ async function buildJadrija(scene) {
             show.flips++; S.curT = 0; show.said = 0; show.tmr = 0;
             showSay('hup', d);
           } else {
+            show.wander = show.ang;
+            show.played = 0;
+            showWander(SHOW.turn, SHOW.swing);
             go('play', 'skip', 0.24);
           }
         }
@@ -1745,13 +1814,38 @@ async function buildJadrija(scene) {
       }
 
       case 'play':
-        showMove(SHOW.skip, dt);
-        show.want = pt > show.t ? Math.PI : 0;
-        // Off the ends of the resort, which beats stopping dead at the bound.
-        if (show.t <= 10) show.want = 0;
-        else if (show.t >= LEN - 10) show.want = Math.PI;
-        if (show.tmr - show.said > 2.5) { show.said = show.tmr; showSay('trill', d); }
-        if (show.tmr > SHOW.skipFor || d > SHOW.far) go('home', 'skip', 0.20);
+        // The larking about. A random walk in heading and speed, turned back
+        // by the edges of the deck rather than stopped by them, with a
+        // somersault thrown in whenever the dice say so — which is as close as
+        // a state machine gets to happy-go-lucky.
+        show.played += dt;
+        show.tick -= dt;
+        if (show.tick <= 0) {
+          showWander(SHOW.turn, SHOW.swing);
+          if (Math.random() < SHOW.joy) {
+            showSay('hup', d); go('joy', 'flip', 0.16);
+            break;
+          }
+        }
+        show.want = showSteer(show.wander);
+        showMove(show.pace, dt);
+        if (show.tmr - show.said > SHOW.say[0]
+          + Math.random() * (SHOW.say[1] - SHOW.say[0])) {
+          show.said = show.tmr;
+          showSay(Math.random() < 0.42 ? 'cuk' : 'trill', d);
+        }
+        if (show.played > SHOW.playFor || d > SHOW.far) go('home', 'skip', 0.20);
+        break;
+
+      case 'joy':
+        // One somersault in the middle of the wander, and straight back into
+        // it. `played` keeps running across this so a run of lucky rolls
+        // cannot leave her out here for ever.
+        show.played += dt;
+        showMove(SHOW.hop * sat((S.curT - 0.34) / 0.10)
+          * sat((1.10 - S.curT) / 0.12), dt);
+        if (S.curT >= 0.98 && !show.said) { show.said = 1; showSay('whump', d); }
+        if (done) { showWander(SHOW.turn, SHOW.swing); go('play', 'skip', 0.24); }
         break;
 
       case 'home': {
@@ -1921,7 +2015,10 @@ async function buildJadrija(scene) {
       phase: show.phase, clip: skinFig ? skinFig.playing() : null,
       t: +show.t.toFixed(1), s: +show.s.toFixed(1),
       ang: +show.ang.toFixed(2), flips: show.flips,
+      pace: +show.pace.toFixed(2), played: +show.played.toFixed(1),
     },
+    /** Where she is standing, so the back door can put you in front of her. */
+    figureAt: testFigure ? testFigure.at : null,
     /**
      * Drive the promenade forward by hand.
      *

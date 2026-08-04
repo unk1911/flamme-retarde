@@ -58,6 +58,7 @@ addEventListener('keydown', (e) => {
   // Ahead of the pause guard on purpose: pausing to read the hint and then
   // pressing the key it told you about should work.
   if (e.code === 'Digit0' || e.code === 'Numpad0') { e.preventDefault(); skipToGround(); return; }
+  if (e.code === 'Digit9' || e.code === 'Numpad9') { e.preventDefault(); skipToJadrija(); return; }
   // While the world is stopped, only the settings answer. Cycling the camera or
   // dropping the gear against a frozen simulation puts the picture and the
   // state out of step, and the HUD is not being redrawn to tell you.
@@ -852,6 +853,41 @@ function skipToGround() {
 }
 
 /**
+ * The other back door, on `9`.
+ *
+ * Jadrija is where the figure on the promenade is, and reaching her the honest
+ * way means flying out over the channel and taking the seat on J — a bale-out
+ * at the right place over a resort you cannot land at. So this is deliberately
+ * *not* the `0` door: nothing is parked anywhere and the aeroplane does not
+ * follow you down. It is the parachute arrival with the parachute taken out,
+ * which is why it goes through `dropIn` — the same call `chuteDown` makes when
+ * you walk away from a landing — and leaves you stranded exactly as that does.
+ *
+ * You are put sixteen metres up the promenade from her and facing her, which is
+ * just outside the distance at which she notices you. Walking the last few
+ * metres is the whole point; being dropped on top of her is not.
+ */
+function skipToJadrija() {
+  if (!ground || !ground.ok || !jadrija || !jadrija.figureAt) return;
+  if (state.phase === 'ground') { toast(TK('ground.board', 'ground.boardTouch')); return; }
+  if (state.phase !== 'fly') return;
+  if (state.paused) setPaused(false);
+  const [ft, fs] = jadrija.figureAt;
+  const w = jadrija.toWorld(ft + 16, fs - 1);
+  const her = jadrija.toWorld(ft, fs);
+  if (!ground.retarget(jadrija)) return;
+  if (!ground.dropIn(w[0], w[2],
+    Math.atan2(-(her[0] - w[0]), -(her[2] - w[2])))) return;
+  $('hud').hidden = true;
+  $('chute-hud').hidden = true;
+  $('ground-hud').hidden = false;
+  if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = false; }
+  if (!IS_TOUCH) grabPointer();
+  paintDeviceText();
+  toast(T('toast.cheatJad'));
+}
+
+/**
  * J — the seat.
  *
  * There is no confirmation on it and there is not going to be one. Half the
@@ -1609,7 +1645,8 @@ function beginFlight() {
   if (!IS_TOUCH) setTimeout(grabPointer, 250);
   // The same back door as `0`, as a link — which is the only version of it a
   // phone can use, there being no keyboard to press it on.
-  if (location.search.includes('ground')) setTimeout(skipToGround, 60);
+  if (location.search.includes('jadrija')) setTimeout(skipToJadrija, 60);
+  else if (location.search.includes('ground')) setTimeout(skipToGround, 60);
 }
 
 $('cine-skip').addEventListener('click', beginFlight);
