@@ -10,6 +10,90 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.32.0] — 2026-08-05
+
+### Changed — she skips like a skip now
+
+The skip clip had one contact per foot: land left, float, land right, float,
+evenly spaced. That is not a skip, it is a bound — a deer clearing a fence,
+twice a second, for four hundred metres of promenade. A skip puts *two* contacts
+on the same foot before it changes over: you step onto the left, you hop on that
+same left foot, and only then do you stride onto the right.
+
+That doubled beat is the whole difference between the two gaits, and it is why a
+skip sounds like a horse at a canter rather than a metronome — the step and its
+hop fall close together and the stride that follows is long, so the footfalls
+come da-dum ... da-dum ... rather than da ... da ... da. Hence the uneven key
+times, which are the load-bearing part rather than a detail: the two contacts of
+a half-cycle are at 0 and 0.34 and the next one is at 1.0, and every other number
+in the clip hangs off those three.
+
+There are now two floats to a half-cycle rather than one and they are
+deliberately different sizes — the hop is 5 cm, the stride that follows it is
+10.5 cm and is the part anybody is actually looking at. Measured hip trajectory
+across the cycle: −0.032, +0.021, −0.027, **+0.076**.
+
+Only the left-supporting half is authored; the right is that one reflected,
+which makes the two sides agree by construction. Continuity across the seam
+requires the arm swing to arrive at minus its starting value, and it does,
+because the arms have exactly reversed by then.
+
+Two things the rebuild turned up, both measured rather than reasoned:
+
+- **`skip_floor`**, a third floor solver alongside `wheel_floor` and
+  `dance_floor`. The float heights are authored as heights; the hip displacement
+  that puts a reaching foot on the concrete is not a number anybody can guess,
+  and the first pass guessed — a hop nine centimetres through the deck on one
+  beat and a step hanging seven above it on the next. It cannot use
+  `floor_poses`: that one wants every key on the ground and half of these are
+  meant to be in the air, and its smoothing pass would filter out the bounce,
+  which here *is* the staircase it exists to remove. Contacts now sit at 4 mm and
+  the worst point in the cycle is −9 mm, the best of the four clips.
+- **The ankle at a contact is not free.** Every bone in the leg turns about the
+  same world axis, so flexing the hip forward carries the foot with it and
+  pitches the sole toe-down by the same amount the thigh moved: a foot left at
+  zero on a leg reaching 22° forward is a foot driven 22° into the concrete, toe
+  first. Flat costs `ankle = hip + knee − 1.3`, measured across six poses.
+
+The arms were rebuilt too. The first pass swung the shoulders ±40 with the
+elbows folded 46° and the arms carried 34° out from the body, and the sum of
+those three was that neither hand ever got behind her hip — both stayed out in
+front at chest height for the whole cycle, palms down, like somebody carrying a
+tray of drinks through a crowd. Wider swing, straighter elbows, held closer in;
+the hands now travel 59 cm, front to behind the hip.
+
+### Changed — the moonwalk is slower
+
+It was 0.76 m/s and read as somebody with somewhere to be. The half-cycle went
+from 0.70 s to 1.00 s and the glide followed it down to 0.53.
+
+Both numbers or neither: the travel speed is not a free parameter, it is 34° of
+hip on a 0.90 m hip-to-toe divided by the half-cycle, and the game and the clip
+are locked together at that. Stretch the clip alone and the game goes on pushing
+her at the old rate, so the anchor foot — the one thing in a moonwalk that must
+not move — slides backwards out from under her. Measured in game: 6.2 s of it,
+3.2 m of deck, 0.515 m/s.
+
+### Added — a running order
+
+She now performs her whole repertoire in a fixed order the first time you walk up
+to her: notice, down on all fours, crawl, up, three somersaults, moonwalk,
+shimmy, cartwheels, and only then the free wander where the dice take over.
+
+Everything after the routine is a dice roll and that is the more natural way to
+build this, but a move that only comes up one time in twelve is a move you cannot
+judge, cannot show anybody, and cannot tell is broken. Doing all four once, in
+order, turns the repertoire into something you have seen rather than something
+you have been told about — and after that she is unpredictable again, which is
+the point of her.
+
+The three set pieces became `enterMoon`/`enterShimmy`/`enterWheels`, so the dice
+and the routine can both start one without either knowing what the other knows,
+and every one of them now ends by calling `showNext` rather than going back to
+`play` directly. A hoseful of water empties the queue: being soaked is the more
+interesting thing that just happened, and picking a rehearsed running order back
+up two states later would be a performer who had not noticed.
+
 ## [1.31.0] — 2026-08-05
 
 ### Added — she dances now

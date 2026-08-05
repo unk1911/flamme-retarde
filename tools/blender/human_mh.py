@@ -1439,6 +1439,61 @@ def dance_floor(rig, clear=0.004):
     print("[mh] moonwalk: floor pass settled, deepest key %+.3f m" % worst)
 
 
+def skip_floor(rig, clear=0.004):
+    """Put the skip's two contacts on the deck and lift its two floats off it.
+
+    Not `floor_poses`, and the difference is the whole point of the clip: that
+    one wants every key on the ground, and half of these are meant to be in the
+    air. Nor can it be smoothed the way that one is — the staircase in the hip
+    height *is* the bounce here, and filtering it out leaves a walk.
+
+    So: solve the contacts, run the baseline between them, and lift the floats
+    their authored rise above that line. The rise is what it looks like — how
+    far off the deck she takes her hips — and the daylight under the trailing
+    foot comes out larger, because a folded leg holds its toe up on its own.
+    Nothing is allowed below `clear`, and a float that would still scrape is
+    lifted until it does not: the authored rise is a floor, not a ceiling.
+    """
+    # Where each key's lowest extremity sits with the hips at nominal. The
+    # contacts are the keys with no rise on them.
+    nat = [_lowest(rig, p)[1] for _h, p in SKIP_HALF]
+    con = [i for i, k in enumerate(SKIP_KEYS) if k[1] == 0.0]
+    if len(con) != 2:
+        sys.exit("[mh] the skip wants exactly two contacts a half-cycle")
+    a, b = con
+    za, zb = clear - nat[a], clear - nat[b]
+
+    def base(h):
+        """The line the hips would run along if she never left the deck.
+
+        Between the two contacts of this half-cycle, and then on from the second
+        of them to the first contact of the next — which is this one's mirror,
+        so it is back at `za` again.
+        """
+        ha, hb = SKIP_KEYS[a][0], SKIP_KEYS[b][0]
+        if h <= hb:
+            return za + (zb - za) * (h - ha) / (hb - ha)
+        return zb + (za - zb) * (h - hb) / (1.0 + ha - hb)
+
+    hips = []
+    for i, (h, rise, *_rest) in enumerate(SKIP_KEYS):
+        z = base(h) + rise
+        # A float whose lowest foot would still scrape gets lifted until it
+        # does not. The authored rise is a floor, not a ceiling.
+        hips.append(max(z, clear - nat[i]))
+
+    for i, z in enumerate(hips):
+        for p in (SKIP_HALF[i][1],):
+            p["@root"] = (p["@root"][0], p["@root"][1], z)
+    # And rebuild the cycle around the corrected half, mirror and closing key
+    # included, since all three are the same dictionaries seen from elsewhere.
+    SKIP[:] = ([(h * SKIP_DUR / 2.0, p) for h, p in SKIP_HALF]
+               + [((1.0 + h) * SKIP_DUR / 2.0, _mirror(p)) for h, p in SKIP_HALF]
+               + [(SKIP_DUR, SKIP_HALF[0][1])])
+    print("[mh] skip: hips %s, contacts at %+.3f/%+.3f"
+          % (" ".join("%+.3f" % z for z in hips), za, zb))
+
+
 def clipcheck(rig, name):
     """Per-frame ground clearance for one clip, printed.
 
@@ -1500,6 +1555,7 @@ def export_skin(body, rig, path, clips, tris=26000):
 
     wheel_floor(rig)
     dance_floor(rig)
+    skip_floor(rig)
 
     # Duplicate the *object*, not the evaluated mesh.
     #
@@ -1909,42 +1965,158 @@ LAND = {
 
 SETTLE = dict(IDLE_A, pelvis=(-360, 0, -2.5))
 
+# ── shared pose helpers ────────────────────────────────────────────────────
+#
+# Both of these are used by nearly every clip below — the skip, the
+# cartwheel, the shimmy and the moonwalk all ease between keys, and all four
+# write one side of the body and reflect the other — so they sit above the
+# clips rather than inside whichever one happened to need them first.
+
+
+def _ease(x):
+    x = 0.0 if x < 0 else (1.0 if x > 1 else x)
+    return x * x * (3.0 - 2.0 * x)
+
+
+def _mirror(p):
+    """One attitude, reflected through her sagittal plane.
+
+    Which is exactly what the back half of a cartwheel is. Rolling from a
+    hundred and eighty round to three-sixty is the front half over again with
+    the right hand and the right foot doing what the left ones did, so it is
+    written once and reflected rather than tuned twice. The exit is then as good
+    as the entry by construction — and the exit is precisely where every earlier
+    version of this fell apart, because nothing was forcing the two to agree.
+
+    Signs: the sagittal channel X survives a left-right reflection untouched,
+    while Y and Z both flip, which is the same mirroring rule the rest of this
+    file uses when it writes a symmetric pose as `+n` on the left and `−n` on
+    the right.
+    """
+    out = {}
+    for k, v in p.items():
+        if k == "@roll":
+            out[k] = (-v[0] % 360.0,)
+        elif k == "@root":
+            out[k] = (v[0], -v[1], v[2])
+        elif k[-1] in "LR":
+            out[k[:-1] + ("R" if k[-1] == "L" else "L")] = (v[0], -v[1], -v[2])
+        else:
+            out[k] = (v[0], -v[1], -v[2])
+    return out
+
+
 # ── skipping ────────────────────────────────────────────────────────────────
 #
-# Two hops to the cycle, left then right, with the free knee up and the opposite
-# arm up with it. The bounce lives in `@root` — a skip that keeps its hips at a
-# constant height is a walk with the knees raised.
+# A step-hop, which is what a skip is and what this was not.
+#
+# The old clip had one contact per foot: land left, float, land right, float,
+# evenly spaced. That is a bound — a deer clearing a fence, twice a second, for
+# four hundred metres of promenade. A skip puts *two* contacts on the same foot
+# before it changes over: you step onto the left, you hop on that same left
+# foot, and only then do you stride onto the right. The doubled beat is the
+# whole difference between the two gaits, and it is what "like a horse" means:
+# the step and its hop fall close together and the stride that follows is long,
+# so the footfalls come da-dum ... da-dum ... rather than da ... da ... da.
+#
+# Which is why the key times below are uneven, and why that is the load-bearing
+# part rather than a detail. The two contacts of a half-cycle are at 0 and 0.34
+# and the next one is at 1.0; every other number here hangs off those three.
+# Spacing them evenly is precisely the mistake that made the old one a bound.
+#
+# The bounce lives in `@root`, as it did before — a skip that keeps its hips at
+# a constant height is a walk with the knees raised — but there are now two
+# floats to a half-cycle rather than one, and they are deliberately different
+# sizes. The hop is a small one, 5 cm; the stride that follows it is 10.5 cm and
+# is the part anybody watching is actually looking at.
+#
+# Those two are the only heights authored here, and they are heights *above the
+# deck*, not hip displacements. The hip displacement that puts a reaching foot
+# on the concrete is not a number anybody can guess: the first pass at this one
+# guessed, and got a hop nine centimetres through the deck on one beat and a
+# step hanging seven above it on the next. `skip_floor` solves it instead, the
+# way `wheel_floor` and `dance_floor` already do for the cartwheel and the
+# dances — the contacts are put on the deck and the floats are lifted off the
+# line between them.
+#
+# Only the left-supporting half is written. The right-supporting half is that
+# one reflected, which is what makes the two sides agree by construction and
+# what fixes the seam: continuity across it requires the arm swing to arrive at
+# minus its starting value, and it does, because the arms have exactly reversed
+# by then. See `_mirror`.
 
 
-def _skip(sgn, up, lift):
-    """One half-cycle. `sgn` +1 stands on the left foot, −1 on the right."""
-    s = sgn
+def _skip_pose(up, sup, fre, arm, lift):
+    """One key of the half-cycle that steps and hops on the left foot.
+
+    `up` is the body's height off nominal, and is written by `skip_floor` rather
+    than authored. `sup` and `fre` are (hip, knee, ankle) for the supporting leg
+    and the free one. `arm` is the left arm's swing, negative behind her and
+    positive in front. `lift` is how far both arms are carried out from the
+    body, which rises on the float.
+    """
     return {
         "@root": (0.0, 0.0, up),
-        "pelvis": (-4, 0, -5 * s),
-        "spine01": (-2, 0, 2 * s), "spine02": (-2, 0, 2 * s),
-        "spine03": (-3, 0, 1 * s),
-        "chest": (-5, 0, 0), "neck": (4, 0, 0), "head": (-3, -10 * s, 2),
+        "pelvis": (-4, 0, -5),
+        "spine01": (-2, 0, 2), "spine02": (-2, 0, 2), "spine03": (-3, 0, 1),
+        "chest": (-5, 0, 0), "neck": (4, 0, 0), "head": (-3, -10, 2),
         "clavicleL": (0, 0, 4), "clavicleR": (0, 0, -4),
-        # The arm opposite the raised knee comes up; the other swings back.
-        "armUL": (-52 * s, 0, 30 + 12 * s), "armLL": (-46, 0, 4),
-        "handL": (-8, 0, 0),
-        "armUR": (52 * s, 0, -30 + 12 * s), "armLR": (-46, 0, -4),
-        "handR": (-8, 0, 0),
-        # Stance leg nearly straight, free leg with the knee up.
-        "legUL": ((10 if s > 0 else -58 - lift * 40), 0, 4),
-        "legLL": ((8 if s > 0 else 84), 0, 0),
-        "footL": ((-10 if s > 0 else -24), 0, 0),
-        "legUR": ((-58 - lift * 40 if s > 0 else 10), 0, -4),
-        "legLR": ((84 if s > 0 else 8), 0, 0),
-        "footR": ((-24 if s > 0 else -10), 0, 0),
+        # Opposition, as in any gait: the arm across from the leg that is
+        # reaching forward goes forward with it, and the other one goes back.
+        #
+        # `back` is the word doing the work. The first pass swung the shoulders
+        # ±40 with the elbows folded 46° and the arms carried 34° out from the
+        # body, and the sum of those three was that neither hand ever got behind
+        # her hip — both stayed out in front at chest height for the whole cycle,
+        # palms down, like somebody carrying a tray of drinks through a crowd.
+        # Wider swing, straighter elbows, arms held closer in.
+        "armUL": (-arm, 0, 14 + lift), "armLL": (-34, 0, 4), "handL": (-8, 0, 0),
+        "armUR": (arm, 0, -14 - lift), "armLR": (-34, 0, -4), "handR": (-8, 0, 0),
+        "legUL": (sup[0], 0, 4), "legLL": (sup[1], 0, 0), "footL": (sup[2], 0, 0),
+        "legUR": (fre[0], 0, -4), "legLR": (fre[1], 0, 0), "footR": (fre[2], 0, 0),
     }
 
 
-SKIP_L = _skip(1, -0.04, 0.0)     # landing on the left
-SKIP_LU = _skip(1, 0.13, 1.0)     # and airborne off it
-SKIP_R = _skip(-1, -0.04, 0.0)
-SKIP_RU = _skip(-1, 0.13, 1.0)
+SKIP_DUR = 0.80           # one cycle: step-hop on the left, step-hop on the right
+
+# h is the fraction through the half-cycle. The three moments that matter are
+# the step contact at 0.00, the hop contact at 0.34 and the next step contact at
+# 1.00, which is the mirrored 0.00; the other two keys are the apexes of the two
+# floats between them.
+#
+# `rise` is metres of daylight under her lowest foot, so a contact is a zero and
+# nothing else in the table is. The legs at the contacts are near enough
+# straight, because that is what a leg does when it is holding a body up; the
+# folded ones are the airborne keys.
+#
+# The ankle at the two contacts is not free. Every bone in the leg turns about
+# the same world axis, so flexing the hip forward carries the shin and the foot
+# with it and pitches the sole toe-down by the same amount the thigh moved: a
+# foot left at zero on a leg reaching 22° forward is a foot driven 22° into the
+# concrete, toe first. Flat costs `ankle = hip + knee − 1.3`, measured across
+# six poses and good to a quarter of a degree over the range used here.
+#
+# It matters more than it sounds. `skip_floor` will happily solve a buried toe
+# by hoisting her entire body eight centimetres, silently, and what comes back
+# is a pogo stick rather than a bounce — which is exactly what the first pass at
+# this did. The airborne keys sit a little below flat, which is a pointed toe.
+SKIP_KEYS = [
+    #  h    rise    support leg     free leg      arm  lift
+    (0.00, 0.000, (-22, 6, -17), (24, 46, 48), -55, 4),    # the step lands flat
+    (0.19, 0.050, (-4, 22, 4), (-20, 78, 42), -30, 12),    # the hop, floating
+    (0.34, 0.000, (0, 12, 11), (-42, 96, 40), -6, 10),     # and landing again
+    (0.66, 0.105, (20, 44, 44), (-50, 82, 20), 34, 18),    # the long float
+    (0.85, 0.040, (24, 46, 48), (-36, 32, -10), 50, 10),   # reaching to land
+]
+
+SKIP_HALF = [(h, _skip_pose(0.0, *rest)) for h, _, *rest in SKIP_KEYS]
+SKIP = ([(h * SKIP_DUR / 2.0, p) for h, p in SKIP_HALF]
+        + [((1.0 + h) * SKIP_DUR / 2.0, _mirror(p)) for h, p in SKIP_HALF]
+        + [(SKIP_DUR, SKIP_HALF[0][1])])
+
+SKIP_STEP = SKIP_HALF[0][1]       # the three of them worth looking at on their
+SKIP_HOP = SKIP_HALF[1][1]        # own, for --reskin
+SKIP_AIR = SKIP_HALF[3][1]
 
 # ── the cartwheel ───────────────────────────────────────────────────────────
 #
@@ -2022,39 +2194,6 @@ WHEEL_KEYS = 24           # segments; 15 degrees of roll each
 WHEEL_REACH = (36.0, -14.0)
 WHEEL_ARM = -158.0        # shoulder, elbow and wrist sum to −180: straight up,
 WHEEL_WRIST = -18.0       # in line with the body, neither arched nor reaching
-
-
-def _ease(x):
-    x = 0.0 if x < 0 else (1.0 if x > 1 else x)
-    return x * x * (3.0 - 2.0 * x)
-
-
-def _mirror(p):
-    """One attitude, reflected through her sagittal plane.
-
-    Which is exactly what the back half of a cartwheel is. Rolling from a
-    hundred and eighty round to three-sixty is the front half over again with
-    the right hand and the right foot doing what the left ones did, so it is
-    written once and reflected rather than tuned twice. The exit is then as good
-    as the entry by construction — and the exit is precisely where every earlier
-    version of this fell apart, because nothing was forcing the two to agree.
-
-    Signs: the sagittal channel X survives a left-right reflection untouched,
-    while Y and Z both flip, which is the same mirroring rule the rest of this
-    file uses when it writes a symmetric pose as `+n` on the left and `−n` on
-    the right.
-    """
-    out = {}
-    for k, v in p.items():
-        if k == "@roll":
-            out[k] = (-v[0] % 360.0,)
-        elif k == "@root":
-            out[k] = (v[0], -v[1], v[2])
-        elif k[-1] in "LR":
-            out[k[:-1] + ("R" if k[-1] == "L" else "L")] = (v[0], -v[1], -v[2])
-        else:
-            out[k] = (v[0], -v[1], -v[2])
-    return out
 
 
 def _wheel(deg):
@@ -2224,9 +2363,17 @@ SHIMMY = [(i * SHIMMY_DUR / SHIMMY_KEYS, _shimmy_at(i / SHIMMY_KEYS))
 #
 # That same 34° is where the travel speed comes from, so the game and the clip
 # cannot drift apart: 34° of hip on a 0.90 m hip-to-toe is 0.53 m of deck, over
-# the 0.70 s half-cycle, which is 0.76 m/s. MOON_SPEED in src/43-jadrija.js is
-# that number and nothing else.
-MOON_DUR = 1.40
+# a half-cycle, and the half-cycle is MOON_DUR / 2. `moonPace` in
+# src/43-jadrija.js is that division and nothing else.
+#
+# Which is also the only honest way to make the move slower, and it was asked
+# for. Stretching the clip alone leaves the game pushing her along at the old
+# rate and the anchor foot — the one thing in a moonwalk that must not move —
+# starts sliding backwards out from under her, which is the failure this whole
+# section is built to avoid. Both numbers move or neither does. At 2.0 s the
+# glide is 0.53 m/s, down from the 0.76 that read as somebody in a hurry to get
+# to the other end of the promenade backwards.
+MOON_DUR = 2.00
 MOON_POP = -34.0           # plantarflexion in the popped foot: heel up, toe down
 MOON_SWEEP = 34.0          # hip degrees the anchor gives back over a half-cycle
 
@@ -2378,8 +2525,7 @@ CLIPS = [
               (0.56, _tuck(-118, 0.40)), (0.72, _tuck(-232, 0.47)),
               (0.88, _tuck(-318, 0.28)), (1.04, LAND), (1.40, SETTLE)]},
     {"name": "skip", "loop": True,
-     "keys": [(0.0, SKIP_L), (0.20, SKIP_LU), (0.40, SKIP_R), (0.60, SKIP_RU),
-              (0.80, SKIP_L)]},
+     "keys": SKIP},
     # One-shot, like the somersault and for the same reason: the game chains
     # two or three of them by rewinding `curT`, which is cheaper than a loop
     # and lets it stop after any whole number of wheels.
@@ -2576,6 +2722,7 @@ def main():
         rig = bpy.data.objects["rig"]
         wheel_floor(rig)          # so the numbers below are the shipped numbers
         dance_floor(rig)
+        skip_floor(rig)
         for name in argv[argv.index("--clipcheck") + 1:]:
             if name.startswith("-"):
                 break

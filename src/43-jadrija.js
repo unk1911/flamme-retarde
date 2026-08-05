@@ -1623,6 +1623,10 @@ async function buildJadrija(scene) {
         // `side` is a yaw offset on the mesh alone — it never touches `ang`, so
         // she goes on travelling exactly where she was already going.
         wheels: 0, side: 0,
+        // What is left of the opening routine. Filled when she gets up off the
+        // deck and emptied one number at a time; empty means the dice are back
+        // in charge.
+        queue: [],
         // The water: seconds of grace left on the last time the jet was on
         // her, how soaked she is, how long she stays interested afterwards,
         // and which way round she is currently sweeping.
@@ -1637,12 +1641,22 @@ async function buildJadrija(scene) {
   /**
    * What she does when you walk up to her.
    *
-   * Notice, down on all fours, crawl, up, three somersaults, and then skipping
-   * off along the promenade with you behind her — which is the sequence that was
-   * asked for, and every part of it is a clip authored in tools/blender/human_mh.py
-   * rather than anything this file knows how to draw. That is the whole point of
-   * having spent a session on skinning: this is a state machine over eight names
-   * and two numbers, and it is the first thing in the game that is *content*.
+   * Notice, down on all fours, crawl, up, three somersaults, and then her whole
+   * repertoire in a fixed order — moonwalk, shimmy, cartwheels — before she
+   * settles into skipping off along the promenade with you behind her. Every
+   * part of it is a clip authored in tools/blender/human_mh.py rather than
+   * anything this file knows how to draw. That is the whole point of having
+   * spent a session on skinning: this is a state machine over a dozen names and
+   * two numbers, and it is the first thing in the game that is *content*.
+   *
+   * The fixed order is `show.queue`, and it is worth saying why it exists,
+   * because everything after the routine is a dice roll and that is the more
+   * natural way to build this. A move that only ever comes up one time in
+   * twelve is a move you cannot judge, cannot show anybody, and cannot tell is
+   * broken. Doing all four once, in order, the first time you walk up to her
+   * turns the repertoire into something you have seen rather than something you
+   * have been told about — and after that the dice take over and she is
+   * unpredictable again, which is the point of her.
    *
    * Two things are deliberately not here. She does not blink, because there are
    * no eyelid bones in the twenty-eight — that needs a trip back to Blender and
@@ -1694,13 +1708,18 @@ async function buildJadrija(scene) {
     shimmy: 0.10,
     moon: 0.08,
     shimmyFor: 3.4,     // seconds of it, which is about eight reversals
-    moonFor: 4.6,
+    moonFor: 6.2,       // longer than it was, because it is slower than it was:
+                        // 3.3 m of deck either way, or four and a half strides
     // m/s of backward glide. Not a number that was chosen — it is 34° of hip on
-    // a 0.90 m hip-to-toe over a 0.70 s half-cycle, which is what the anchor
-    // foot in the clip gives back per stride. See MOON_SWEEP in
-    // tools/blender/human_mh.py; if that moves, this moves with it, or the one
-    // foot that is meant to be standing still starts sliding.
-    moonPace: 0.76,
+    // a 0.90 m hip-to-toe over a half-cycle, which is what the anchor foot in
+    // the clip gives back per stride, divided by MOON_DUR / 2. See MOON_SWEEP
+    // in tools/blender/human_mh.py; if either moves, this moves with it, or the
+    // one foot that is meant to be standing still starts sliding.
+    //
+    // Which is why slowing the move down was a change to the clip and not to
+    // this line. It was 0.76 and read as somebody with somewhere to be; the
+    // half-cycle went from 0.70 s to 1.00 s and this followed it down.
+    moonPace: 0.53,
     moonEdge: 10,       // m from the ends of the deck where the glide gives up
     say: [1.8, 4.2],    // seconds between noises while she is playing
     // ── the water ─────────────────────────────────────────────────────────
@@ -1899,6 +1918,48 @@ async function buildJadrija(scene) {
       show.said = 0;
     };
 
+    // The three set pieces, each with the setting-up its entry needs, so that
+    // the dice below and the routine above can both start one without either
+    // knowing what the other knows.
+    //
+    // Down the long axis of the promenade and away from you, for the cartwheel's
+    // reason and one of its own: the deck is four metres deep, so a glide taking
+    // the short way across is over the edge in two seconds — and the joke only
+    // works if she is going *away*.
+    const enterMoon = () => {
+      show.wander = show.t > pt ? 0 : Math.PI;
+      go('moon', 'moonwalk', 0.30);
+    };
+    const enterShimmy = () => {
+      showSay('whee', d);
+      go('shimmy', 'shimmy', 0.24);
+    };
+    // Lined up along the promenade first, and still skipping while she does it.
+    // A cartwheel wants a straight run of five or six metres and the deck is
+    // only about four deep, so pointed any other way she would be over the edge
+    // halfway through the second one.
+    const enterWheels = () => {
+      show.wander = Math.cos(show.ang) > 0 ? 0 : Math.PI;
+      go('aim', 'skip', 0.20);
+    };
+
+    /**
+     * The next number in the opening routine, or the wander once it is over.
+     *
+     * Every set piece ends by calling this rather than by going back to `play`
+     * directly, which is what lets the same three states serve both the fixed
+     * routine and the dice without knowing which one started them.
+     */
+    const showNext = () => {
+      const nxt = show.queue.shift();
+      if (nxt === 'moon') return enterMoon();
+      if (nxt === 'shimmy') return enterShimmy();
+      if (nxt === 'wheel') return enterWheels();
+      show.wander = show.ang;
+      showWander(SHOW.turn, SHOW.swing);
+      return go('play', 'skip', 0.24);
+    };
+
     // The jet, and its two clocks.
     //
     // `hit` is whether the water is on her *now*, and it is what `bask` watches
@@ -1919,6 +1980,11 @@ async function buildJadrija(scene) {
     if (show.owed > 0 && WETTABLE[show.phase]) {
       show.owed = 0;
       show.side = 0;
+      // And the routine is off. Being hosed is the more interesting thing that
+      // just happened, and picking a rehearsed running order back up two states
+      // later — after the basking and the orbit — would be a performer who had
+      // not noticed. She can always run it again the next time she notices you.
+      show.queue.length = 0;
       showSay('squee', d);
       go('bask', 'soak', 0.34);
     }
@@ -1970,7 +2036,15 @@ async function buildJadrija(scene) {
         break;
 
       case 'up':
-        if (done) { showSay('hup', d); go('flip', 'flip', 0.16); show.flips = 1; }
+        if (done) {
+          showSay('hup', d);
+          // Off the deck and straight into the routine. The somersaults stay
+          // where they have always been, at the front of it: they are what
+          // getting up *is* for her, and the three new numbers queue up behind.
+          show.queue = ['moon', 'shimmy', 'wheel'];
+          go('flip', 'flip', 0.16);
+          show.flips = 1;
+        }
         break;
 
       case 'flip': {
@@ -1988,10 +2062,8 @@ async function buildJadrija(scene) {
             show.flips++; S.curT = 0; show.said = 0; show.tmr = 0;
             showSay('hup', d);
           } else {
-            show.wander = show.ang;
             show.played = 0;
-            showWander(SHOW.turn, SHOW.swing);
-            go('play', 'skip', 0.24);
+            showNext();
           }
         }
         break;
@@ -2011,27 +2083,10 @@ async function buildJadrija(scene) {
             showSay('hup', d); go('joy', 'flip', 0.16);
             break;
           }
-          if (dice < SHOW.joy + SHOW.spin) {
-            // Line her up along the promenade first. A cartwheel wants a
-            // straight run of five or six metres and the deck is only about
-            // four deep, so left to the wander she would be over the edge
-            // halfway through the second one.
-            show.wander = Math.cos(show.ang) > 0 ? 0 : Math.PI;
-            go('aim', 'skip', 0.20);
-            break;
-          }
-          if (dice < SHOW.joy + SHOW.spin + SHOW.shimmy) {
-            showSay('whee', d);
-            go('shimmy', 'shimmy', 0.24);
-            break;
-          }
+          if (dice < SHOW.joy + SHOW.spin) { enterWheels(); break; }
+          if (dice < SHOW.joy + SHOW.spin + SHOW.shimmy) { enterShimmy(); break; }
           if (dice < SHOW.joy + SHOW.spin + SHOW.shimmy + SHOW.moon) {
-            // Down the long axis of the promenade and away from you, for the
-            // cartwheel's reason and one of its own. The deck is four metres
-            // deep, so a glide taking the short way across is over the edge in
-            // two seconds — and the joke only works if she is going *away*.
-            show.wander = show.t > pt ? 0 : Math.PI;
-            go('moon', 'moonwalk', 0.30);
+            enterMoon();
             break;
           }
         }
@@ -2074,9 +2129,8 @@ async function buildJadrija(scene) {
             show.wheels++; S.curT = 0; show.said = 0; show.tmr = 0;
             showSay('whee', d);
           } else {
-            showWander(SHOW.turn, SHOW.swing);
             showSay('trill', d);
-            go('play', 'skip', 0.26);
+            showNext();
           }
         }
         break;
@@ -2181,11 +2235,7 @@ async function buildJadrija(scene) {
           show.said = show.tmr;
           showSay(say1(CHAT), d);
         }
-        if (show.tmr > SHOW.shimmyFor || d > SHOW.far) {
-          show.wander = show.ang;
-          showWander(SHOW.turn, SHOW.swing);
-          go('play', 'skip', 0.24);
-        }
+        if (show.tmr > SHOW.shimmyFor || d > SHOW.far) showNext();
         break;
 
       case 'moon':
@@ -2214,10 +2264,7 @@ async function buildJadrija(scene) {
         // against the clamp she would glide on the spot for two seconds, which
         // is a moonwalk on a treadmill.
         if (show.tmr > SHOW.moonFor || d > SHOW.far
-          || show.t < SHOW.moonEdge || show.t > LEN - SHOW.moonEdge) {
-          showWander(SHOW.turn, SHOW.swing);
-          go('play', 'skip', 0.26);
-        }
+          || show.t < SHOW.moonEdge || show.t > LEN - SHOW.moonEdge) showNext();
         break;
 
       case 'home': {
