@@ -1767,9 +1767,23 @@ async function buildJadrija(scene) {
    * metres — which is inside the range at which she notices you, so the first
    * thing she ever said was already too quiet to hear.
    */
+  /**
+   * Distance first, and then how wet she is.
+   *
+   * The soaking already changed what she says and how she moves; it did not
+   * change how hard she said it, so the loudest thing that happens to her all
+   * game was being delivered at exactly the level of her idle chatter. `wet`
+   * is the right multiplier rather than the phase, because it rises the
+   * instant the jet lands and falls off over the ten seconds she takes to dry
+   * — so she is loudest while the water is actually on her and comes back down
+   * on her own, without a single extra piece of state to get out of step.
+   *
+   * The ceiling is 1.8 and `squeak` clamps there, which is where the maximum
+   * below comes from.
+   */
   function showSay(kind, d) {
     if (!audio || state.phase === 'intro') return;
-    const g = clamp(1.15 - d / 46, 0, 1);
+    const g = clamp(1.15 - d / 46, 0, 1) * (1 + (show ? show.wet : 0) * 0.75);
     if (g > 0.04) audio.squeak(kind, g);
   }
 
@@ -1814,6 +1828,13 @@ async function buildJadrija(scene) {
     show.hit = SHOW.grace;
     show.owed = SHOW.owed;
     show.lock = SHOW.lockFor;
+    // Straight to most of the way wet, rather than ramping there from nothing.
+    // Four hundred litres a minute does not soak anybody gradually, and the
+    // ramp had a side effect worth being rid of: `showSay` reads this to decide
+    // how loud she is, and her first yelp — the one that is a reaction to being
+    // hit, and the one that most wants to be loud — fired one frame in, when
+    // the ramp was still at 0.02 and it came out at the level of idle chatter.
+    show.wet = Math.max(show.wet, 0.55);
   }
 
   /**

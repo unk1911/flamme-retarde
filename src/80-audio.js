@@ -182,9 +182,34 @@ function buildAudio() {
     nodes.scoop = loopNoise(0, 'bandpass', 2400, 0.55);
     // Sea state, heard only when low over the water.
     nodes.sea = loopNoise(0, 'bandpass', 620, 0.8);
-    // The branch, on the ground. Tighter and higher than the hull ploughing —
-    // a handline is a hiss, not a roar, and it is two feet from your head.
-    nodes.hose = loopNoise(0, 'bandpass', 3400, 1.6);
+    // The branch, on the ground.
+    //
+    // "I press space and hear nothing" turned out not to be a missing sound at
+    // all — this node was wired, fed and sitting at its full gain the whole
+    // time. It just did not sound like water. A Q of 1.6 parked at 3400 Hz is
+    // about a third of an octave wide, and a third of an octave of white noise
+    // is not a jet leaving a nozzle, it is air leaving a tyre: thin, pitched,
+    // and the first thing the ear throws away when a klapa is singing over it.
+    //
+    // So: opened out to the better part of two octaves and brought down, with a
+    // lowpassed layer underneath carrying the mass. Neither half is water on
+    // its own — the top alone is a hiss and the bottom alone is the tank — and
+    // the pair of them together is the shhhhh.
+    nodes.hose = loopNoise(0, 'bandpass', 2600, 0.5);
+    nodes.hoseLo = loopNoise(0, 'lowpass', 640, 0.7);
+    // And it has to wander. A nozzle at eight bar in a pair of hands does not
+    // hold still, and noise through a filter that never moves stops being heard
+    // as water about two seconds into holding the trigger down — the same
+    // reason the tank gush has a wobble on it.
+    nodes.hoseLfo = (() => {
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sine'; lfo.frequency.value = 3.7;
+      const amt = ctx.createGain();
+      amt.gain.value = 520;
+      lfo.connect(amt).connect(nodes.hose.f.frequency);
+      lfo.start();
+      return lfo;
+    })();
 
     // ── the fire ──────────────────────────────────────────────────────────
     // A big fire is felt more than heard: a low roar with a slow surge in it.
@@ -597,6 +622,40 @@ function buildAudio() {
     kill(onWater ? 1.4 : 0.7);
   }
 
+  /**
+   * The charge under your boots.
+   *
+   * Neither detonate() nor impact() would do. Those are both something
+   * arriving, mixed to be heard across a valley, and they end by killing the
+   * engines because that is what tells you it is over. This one goes off at
+   * your feet and you are extremely not over: a crack, a short slam of sub,
+   * and then a second of air going past your ears on the way up. Nothing here
+   * touches kill(), which is the entire point of it being its own function.
+   */
+  function boom() {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    // The slam. Higher and much shorter than a crash — a metre of air moving
+    // very fast, not twelve tonnes stopping.
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(150, t0);
+    o.frequency.exponentialRampToValueAtTime(28, t0 + 0.55);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, t0);
+    og.gain.exponentialRampToValueAtTime(0.62, t0 + 0.010);
+    og.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.9);
+    o.connect(og).connect(master);
+    o.start(t0); o.stop(t0 + 1.0);
+    // The crack off the concrete, and the grit with it.
+    burst({ freq: 5200, q: 0.4, dur: 0.09, gain: 0.40, sweep: 0.06 });
+    burst({ freq: 1300, q: 0.5, dur: 0.45, gain: 0.30, sweep: 0.10 });
+    // And the climb. A long noise tail sweeping *down* through the band is the
+    // sound of you going away from where it happened.
+    burst({ freq: 900, q: 0.8, dur: 1.30, gain: 0.16, sweep: 0.22 });
+    if (verbSend) { const w = ctx.createGain(); w.gain.value = 1.5; og.connect(w).connect(verbSend); }
+  }
+
   /** Everything that loops, wound down. The silence afterwards is the point. */
   function kill(fade = 1.0) {
     if (!ctx) return;
@@ -724,19 +783,19 @@ function buildAudio() {
   const KLAPA = {
     full: 90,            // m — inside this you are standing in the middle of it
     fade: 1600,          // m — past this the channel has swallowed it
-    // What it plays at, up close, on foot. Halved again, and this is the third
-    // time it has come down: it shipped at 0.55, went to 0.44 when her voice
-    // turned out to be inaudible under it, and is 0.22 now. That is six
-    // decibels off the second figure and eight off the first, which sounds
-    // drastic written down and is not — a real klapa at ten metres genuinely
-    // is the loudest thing on a promenade, and the thing being modelled here
-    // is a game in which somebody else is the point.
+    // What it plays at, up close, on foot. Halved again, and this is the fourth
+    // time it has come down: 0.55 at first, 0.44 when her voice turned out to
+    // be inaudible under it, 0.22, and 0.11 now. That is fourteen decibels off
+    // where it started, which reads as drastic written down and is not — this
+    // is four men singing at the far end of a promenade you are walking down,
+    // and the thing being modelled is a game in which somebody else is the
+    // point. Asked for twice, which is the answer.
     //
-    // The distance law does the rest and is unchanged: this is still a wall of
-    // sound when you are standing in the middle of it, and still a suggestion
-    // across the channel. It is only no longer a wall you have to shout over.
-    gain: 0.22,
-    inside: 0.20,        // and what an airframe with two turboprops leaves of it
+    // The distance law does the rest and is unchanged: it still opens up as you
+    // walk into it and is still a suggestion across the channel. It is only no
+    // longer a thing everything else has to be mixed around.
+    gain: 0.11,
+    inside: 0.10,        // and what an airframe with two turboprops leaves of it
     lpNear: 9000,        // Hz — the filter wide open, next to the singers
     lpFar: 750,          // and what a kilometre of sea over water leaves of it
   };
@@ -1036,12 +1095,91 @@ function buildAudio() {
   // which you are meant to only half hear — does not haul the singers down.
   const BED_DUCK = 0.34;
 
-  /** @param gain 0…1, so a caller can fall it off with distance. */
+  /**
+   * The ćuk, from an actual ćuk.
+   *
+   * Three rounds of tuning the oscillator above never got there, and measuring
+   * a real recording finally said why: every one of them was wrong about the
+   * two things that matter. The synthesised call *falls* the whole way, 1460
+   * down to 1330, and arrives in a sixth of its length. A scops owl does
+   * neither. It sits at 1375 Hz and bends about 25 Hz up and then back down
+   * across the note — a shallow arch, not a slide — and it does not arrive at
+   * all, it *swells*, reaching full level halfway through and cutting off in
+   * the last fifty milliseconds. It is a note being leaned into and then
+   * dropped. That envelope is the whole character of the sound, and an attack
+   * parameter that only ever moves between "click" and "fade in" cannot make
+   * it, which is why turning it up kept making it worse: a wrong shape played
+   * louder is a wrong shape you can hear better.
+   *
+   * So it is a sample now — 0.38 s cut from a recording made on the spot, one
+   * call of the three, high-passed at 300 Hz, 24 kHz mono because the second
+   * harmonic is 38 dB down and there is nothing above 3 kHz to keep. 2.8 KB.
+   *
+   * `wake` is built from the same 2.8 KB rather than left on the oscillator.
+   * It is described as the same whistle twice with the second a tone up, which
+   * is exactly two of these at two playback rates — and had it stayed
+   * synthetic, the one call she makes on seeing you would be the one call that
+   * was not the same animal as the rest of her.
+   */
+  const SAMPLED = {
+    cuk: [[1.00, 0.00]],
+    wake: [[0.96, 0.00], [1.12, 0.26]],
+  };
+  let cukBuf = null, cukTried = false;
+
+  // Matched against the 0.400 the oscillator peaked at and then taken up a
+  // couple of decibels, because "still too quiet" was the other half of the
+  // complaint and the klapa coming down 6 dB only bought back what it had taken.
+  const CUK_LEVEL = 0.62;
+
+  /** Lazily, exactly like the klapa, and for the same reason. */
+  function cukLoad() {
+    if (cukTried || !ctx || typeof PAYLOAD === 'undefined' || !PAYLOAD.cuk) return;
+    cukTried = true;
+    try {
+      const bin = atob(PAYLOAD.cuk);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      ctx.decodeAudioData(bytes.buffer, (buf) => { cukBuf = buf; },
+        () => { /* undecodable — the oscillator below still answers */ });
+    } catch (e) { /* likewise */ }
+  }
+
+  /**
+   * @returns the length of the utterance, or 0 if there is no sample to play
+   *          and the caller should synthesise it after all.
+   */
+  function sampled(kind, g0, at, dest) {
+    const plan = SAMPLED[kind];
+    if (!plan) return 0;
+    cukLoad();
+    if (!cukBuf) return 0;
+    for (const [rate, delay] of plan) {
+      const src = ctx.createBufferSource();
+      src.buffer = cukBuf;
+      // No two calls out of one owl are the same note — the three in the
+      // recording sat at 1368, 1374 and 1382 Hz — so every one of these gets
+      // its own half-percent, on top of whatever the plan asked for.
+      src.playbackRate.value = rate * (0.995 + Math.random() * 0.01);
+      const g = ctx.createGain();
+      g.gain.value = CUK_LEVEL * g0;
+      src.connect(g).connect(dest);
+      src.start(at + delay);
+    }
+    const last = plan[plan.length - 1];
+    return last[1] + cukBuf.duration / last[0];
+  }
+
+  /**
+   * @param gain 0…1 normally, so a caller can fall it off with distance —
+   *             and up to 1.8, which is a caller saying she is soaked and
+   *             this one is meant to be over the top.
+   */
   function squeak(kind, gain = 1, pan = 0) {
     if (!ctx || dead) return;
     const v = SQUEAKS[kind];
     if (!v) return;
-    const g0 = clamp(gain, 0.02, 1);
+    const g0 = clamp(gain, 0.02, 1.8);
     const pn = ctx.createStereoPanner();
     pn.pan.value = clamp(pan, -1, 1);
     pn.connect(master);
@@ -1050,14 +1188,22 @@ function buildAudio() {
       pn.connect(w).connect(verbSend);
     }
     let at = ctx.currentTime;
+    // A real recording for the two voices that have one, the oscillators for
+    // the other eleven. Zero means the sample has not finished decoding yet —
+    // the first ćuk of the session is synthesised and nobody has ever noticed.
+    const samp = sampled(kind, g0, at, pn);
     if (bed) {
       // The whole utterance, not one syllable — the trill is four of them and
       // ducking for the first would leave the other three under the singers.
-      const span = v.reps * v.dur + (v.reps - 1) * v.gap;
+      const span = samp || v.reps * v.dur + (v.reps - 1) * v.gap;
       bed.gain.cancelScheduledValues(at);
-      bed.gain.setTargetAtTime(1 - (1 - BED_DUCK) * g0, at, 0.035);
+      // Clamped separately from `g0`, which now runs to 1.8: at anything over
+      // 1.5 this expression goes negative, and a negative gain is not a quiet
+      // klapa, it is the klapa with its phase flipped.
+      bed.gain.setTargetAtTime(1 - (1 - BED_DUCK) * clamp(g0, 0, 1), at, 0.035);
       bed.gain.setTargetAtTime(1, at + span + 0.10, 0.28);
     }
+    if (samp) return;
     for (let i = 0; i < v.reps; i++) {
       const k = Math.pow(v.step, i);
       const dur = v.dur * (0.9 + Math.random() * 0.2);
@@ -1114,9 +1260,30 @@ function buildAudio() {
   let stallT = 0, crackleT = 0;
 
   function update(dt, s) {
-    if (!ctx || ctx.state === 'suspended' || dead) return;
+    if (!ctx || ctx.state === 'suspended') return;
+    // `dead` means your aeroplane is over. It used to mean the mixer was
+    // switched off, and conflating those two is the whole of "the water only
+    // hisses if I arrive by the 9 key".
+    //
+    // Bale out with J and you land on your feet perfectly happily — but the
+    // aeroplane you left flies on for another ten or twenty seconds and then
+    // finds a hillside, and derelictDown() calls impact(), and impact() calls
+    // kill(), and kill() sets this. From that moment nothing continuous in the
+    // game is updated again for the rest of the session: not the fire you are
+    // standing next to, not the sea, and not the branch in your hands. The
+    // hose was never the thing that broke. It just happened to be the one you
+    // were holding when the mixer went.
+    //
+    // The silence after a crash is right when the crash was the end of you.
+    // It is wrong when you are two kilometres away watching the smoke.
+    if (dead && !s.afoot) return;
     const t = ctx.currentTime;
     const set = (param, v, tau = 0.08) => param.setTargetAtTime(v, t, tau);
+    // Which is not the same as letting her beds come back. Everything the
+    // aeroplane owns stays down once she is gone, whatever the state feed says
+    // about altitude and water — those describe a wreck now, and a wreck in the
+    // shallows would otherwise have the sea bed playing off its own altimeter.
+    const own = dead ? 0 : 1;
 
     // ── engines ───────────────────────────────────────────────────────────
     // Shaft speed barely moves on a turboprop — the power comes from blade
@@ -1127,10 +1294,10 @@ function buildAudio() {
       const e = nodes.eng[i];
       set(e.osc.frequency, 64 + rpm * 30 + i * 0.9, 0.15);
       set(e.lp.frequency, 260 + s.throttle * 900, 0.12);
-      set(e.g.gain, s.inside ? 0.30 : 0.20 * s.near, 0.12);
+      set(e.g.gain, own * (s.inside ? 0.30 : 0.20 * s.near), 0.12);
     }
     set(nodes.turbine.osc.frequency, 900 + s.throttle * 620, 0.15);
-    set(nodes.turbine.g.gain, (s.inside ? 0.028 : 0.016) * s.near, 0.12);
+    set(nodes.turbine.g.gain, own * (s.inside ? 0.028 : 0.016) * s.near, 0.12);
     // Scaled by `near`, like every other engine node, which it was not.
     //
     // This was the drum you could hear on the promenade at Jadrija. Three of
@@ -1139,7 +1306,7 @@ function buildAudio() {
     // resort with no aeroplane in it — and being the lowest, widest bed in the
     // mix, it was also the one you noticed. `near` is fed 0 when the airframe
     // is gone, so this now goes with it.
-    set(nodes.rumble.g.gain, (0.10 + s.throttle * 0.13) * s.near, 0.12);
+    set(nodes.rumble.g.gain, own * (0.10 + s.throttle * 0.13) * s.near, 0.12);
     set(nodes.rumble.f.frequency, 180 + s.throttle * 160, 0.2);
 
     // ── airflow ───────────────────────────────────────────────────────────
@@ -1148,17 +1315,22 @@ function buildAudio() {
     // it is nothing. The 0.03 floor is a cockpit floor and had no business
     // being a world floor.
     const q = sat(s.speed / 120);
-    set(nodes.air.g.gain, (0.03 + q * q * 0.16) * s.near, 0.15);
+    set(nodes.air.g.gain, own * (0.03 + q * q * 0.16) * s.near, 0.15);
     set(nodes.air.f.frequency, 500 + q * 1500, 0.2);
 
     // ── water ─────────────────────────────────────────────────────────────
-    set(nodes.scoop.g.gain, s.scooping ? 0.42 : 0.0, s.scooping ? 0.05 : 0.25);
+    set(nodes.scoop.g.gain, own * (s.scooping ? 0.42 : 0.0), s.scooping ? 0.05 : 0.25);
     set(nodes.scoop.f.frequency, 1600 + s.speed * 12, 0.15);
-    // The branch. Opens fast and shuts fast, because a jet does.
-    set(nodes.hose.g.gain, (s.hose || 0) * 0.30, s.hose ? 0.04 : 0.10);
+    // The branch. Opens fast and shuts fast, because a jet does. Half again the
+    // level it used to carry, and in two layers now: the promenade is where you
+    // do most of your spraying and it is also the one place with four singers
+    // and a hillside of cicadas on top of you.
+    const hz = s.hose || 0;
+    set(nodes.hose.g.gain, hz * 0.46, hz ? 0.04 : 0.10);
+    set(nodes.hoseLo.g.gain, hz * 0.15, hz ? 0.04 : 0.10);
     // The sea itself, only once you are down in ground effect.
     const low = 1 - sat((s.alt - 8) / 90);
-    set(nodes.sea.g.gain, s.overSea ? low * 0.10 : 0.0, 0.3);
+    set(nodes.sea.g.gain, own * (s.overSea ? low * 0.10 : 0.0), 0.3);
 
     // ── fire ──────────────────────────────────────────────────────────────
     // Rolls off with distance, and with how much is actually alight.
@@ -1203,6 +1375,14 @@ function buildAudio() {
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, beep, setVolume, getVolume,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa,
+    /** Likewise for the ćuk, which is the second sample in the build. */
+    cukStats: () => ({
+      tried: cukTried,
+      loaded: !!cukBuf,
+      secs: cukBuf ? +cukBuf.duration.toFixed(3) : 0,
+      rate: cukBuf ? cukBuf.sampleRate : 0,
+      hose: nodes.hose ? +nodes.hose.g.gain.value.toFixed(4) : -1,
+    }),
     /** For a test: did the one sample in the build decode, and what is it doing? */
     klapaStats: () => ({
       state: ctx ? ctx.state : 'no ctx',
@@ -1214,6 +1394,6 @@ function buildAudio() {
       gain: klapaNodes ? +klapaNodes.g.gain.value.toFixed(4) : 0,
       lp: klapaNodes ? Math.round(klapaNodes.lp.frequency.value) : 0,
     }),
-    birdCall, squeak, radalt, gpwsSink, gpwsPullUp, hullSlam, impact, kill,
+    birdCall, squeak, radalt, gpwsSink, gpwsPullUp, hullSlam, impact, boom, kill,
     get ctx() { return ctx; } };
 }

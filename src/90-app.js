@@ -73,6 +73,11 @@ addEventListener('keydown', (e) => {
   // game you cannot take back, and it should not be within reach of the fingers
   // flying the approach.
   if (e.code === 'KeyJ') { e.preventDefault(); baleOut(); }
+  // And SHIFT is the same idea from a standing start. Only on foot: in the air
+  // it is still the flaps, and under a canopy your hands are full.
+  if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && state.phase === 'ground') {
+    e.preventDefault(); launchOut(); return;
+  }
   if (state.phase === 'ground' || state.phase === 'chute') {
     // On foot, or under a canopy, the aeroplane's controls are all meaningless
     // and several of them would quietly reconfigure an aircraft you are not
@@ -934,6 +939,51 @@ function baleOut() {
   toast(T(low ? 'toast.ejectLow' : 'toast.eject'), 'bad');
 }
 
+/**
+ * SHIFT — the charge under your boots.
+ *
+ * There is a rope ladder in every world made of triangles, and this is ours.
+ * Terrain, a promenade deck, a hut and a hundred bathers all have to agree with
+ * each other about where the floor is, and now and again they do not: you find
+ * yourself standing under the concrete looking up at the underside of a
+ * platform with people walking about on top of it, and no amount of walking
+ * gets you back, because the way you got in was not a way that runs backwards.
+ *
+ * Rather than pretend that can never happen — which is a promise no geometry
+ * this size can keep — this is the answer to it happening. Fifty metres
+ * straight up off something loud, and then you are under the canopy, which is
+ * a set of controls the game already has and you already know, over terrain you
+ * can see all of and pick your spot on. It gets you out of a hole; it is also
+ * simply a very good way to look at Šibenik.
+ *
+ * The height is honest arithmetic and not a number that was typed: 34 m/s
+ * against gravity and the body drag in 57-eject.js tops out a shade over fifty.
+ */
+const LAUNCH = {
+  up: 34,          // m/s off the deck — about 52 m of apex once drag is in
+  hang: 2.4,       // s of climb before the cloth streams, so it fills at the top
+};
+// Whether you were stranded *before* the charge, so that landing again can put
+// you back exactly as it found you. See dropIn's `lost` argument.
+let launchedFrom = null;
+
+function launchOut() {
+  if (!ground || !ground.ok || !ground.active || state.paused) return;
+  if (!eject || eject.active) return;
+  launchedFrom = { stranded: ground.stranded };
+  const { x, y, z, yaw } = ground.you;
+  ground.bail();
+  eject.reset();
+  eject.launch(x, y, z, yaw, LAUNCH.up, LAUNCH.hang);
+  audio.boom();
+  alerts.bump(1.6);
+  $('ground-hud').hidden = true;
+  $('hud').hidden = true;
+  $('chute-hud').hidden = false;
+  if (IS_TOUCH) { $('gtouch').hidden = true; $('touch').hidden = true; }
+  toast(T('toast.launch'));
+}
+
 /** And the arrival, whichever of the three it turned out to be. */
 function chuteDown(kind) {
   if (state.phase !== 'chute') return;
@@ -942,9 +992,14 @@ function chuteDown(kind) {
   // the ridge — which is the whole reason the key exists, and which the game
   // used to answer with a red screen that was indistinguishable from having
   // been killed by it.
+  // Down off the escape charge is not the same event as down off a bale-out,
+  // and the only thing that tells them apart by the time we are here is whether
+  // launchOut() set this. Everything else about the descent is identical.
+  const from = launchedFrom;
+  launchedFrom = null;
   if (kind === 'land' && ground && ground.ok
     && ground.retarget(localeAt(eject.pos.x, eject.pos.z, airfield, jadrija, city))
-    && ground.dropIn(eject.pos.x, eject.pos.z, eject.you.yaw)) {
+    && ground.dropIn(eject.pos.x, eject.pos.z, eject.you.yaw, from ? from.stranded : true)) {
     alerts.bump(1.1);
     $('chute-hud').hidden = true;
     $('hud').hidden = true;
@@ -1339,6 +1394,12 @@ $('again').addEventListener('click', () => location.reload());
  */
 function flyDerelict(dt) {
   const p = flight.p;
+  // Nobody left her. The escape charge puts you under a canopy from a standing
+  // start, and the aeroplane it took you away from may well still be parked on
+  // the apron with her chocks in — so there is no derelict here to fly, and
+  // taking her controls would be the game flying an aircraft with a pilot in
+  // fifty metres of clear air above it.
+  if (launchedFrom) return;
   if (p.crashed) return;
   input.thrUp = input.thrDown = input.scoop = input.drop = false;
   p.throttle = Math.max(0, p.throttle - dt * 0.35);
@@ -1597,6 +1658,10 @@ function frame() {
     burning: fire.burningCount(),
     stall: state.speed < FLIGHT.vStall * 1.05 && state.altAgl > 3 && state.phase === 'fly',
     hose: ground.hose(),
+    // Standing in it. The mixer shuts down for good when the aeroplane hits
+    // something, which is right if that was the end of you and wrong if you
+    // walked away from it — see the note on `dead` in 80-audio.js.
+    afoot: state.phase === 'ground' || state.phase === 'chute',
   });
 
   if (state.phase === 'ground') {

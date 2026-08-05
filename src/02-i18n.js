@@ -145,6 +145,7 @@ const STRINGS = {
     'toast.cheat': 'skipped to Rokići — the aeroplane is behind you',
     'toast.cheatJad': 'skipped to Jadrija — she is up the promenade, and the aeroplane is gone',
     'toast.eject': 'out — wait for the canopy',
+    'toast.launch': 'fifty metres of clear air — pick your spot',
     'toast.ejectLow': 'out, and far too low for it',
     'toast.ejectNo': 'not from here — you have to be flying',
     'toast.planeGone': 'she went in',
@@ -214,7 +215,7 @@ const STRINGS = {
     'set.volume': 'volume',
     'set.off': 'off',
     'set.foot': 'M closes · Z levels · T autopilot · P pauses · 0 skips to Rokići · 9 to Jadrija',
-    'set.footGround': 'M closes · WASD walks · arrows turn · SHIFT runs · SPACE opens the branch · E climbs back in',
+    'set.footGround': 'M closes · WASD walks · arrows turn · Q runs · SPACE opens the branch · SHIFT launches you clear · E climbs back in',
     'set.footTouch': 'tap SET to close',
 
     // pause
@@ -376,6 +377,7 @@ const STRINGS = {
     'toast.cheat': 'skok na Rokiće — avion ti je iza leđa',
     'toast.cheatJad': 'skok na Jadriju — ona je gore uz rivu, a aviona više nema',
     'toast.eject': 'vani si — čekaj kupolu',
+    'toast.launch': 'pedeset metara čistog zraka — biraj mjesto',
     'toast.ejectLow': 'vani si, i daleko prenisko za to',
     'toast.ejectNo': 'ne odavde — moraš biti u zraku',
     'toast.planeGone': 'pala je',
@@ -441,7 +443,7 @@ const STRINGS = {
     'set.volume': 'glasnoća',
     'set.off': 'isključeno',
     'set.foot': 'M zatvara · Z poravnava · T autopilot · P pauza · 0 skok na Rokiće · 9 na Jadriju',
-    'set.footGround': 'M zatvara · WASD hod · strelice okret · SHIFT trk · RAZMAK mlaz · E natrag u avion',
+    'set.footGround': 'M zatvara · WASD hod · strelice okret · Q trk · RAZMAK mlaz · SHIFT te izbaci uvis · E natrag u avion',
     'set.footTouch': 'dodirni POST za zatvaranje',
 
     'pause.eyebrow': 'vatra čeka',
@@ -601,6 +603,7 @@ const STRINGS = {
     'toast.cheat': 'raccourci vers Rokići — l\'avion est derrière vous',
     'toast.cheatJad': 'raccourci vers Jadrija — elle est plus haut sur la promenade, et l\'avion n\'est plus là',
     'toast.eject': 'dehors — attends la voile',
+    'toast.launch': 'cinquante mètres d’air libre — choisis ton point',
     'toast.ejectLow': 'dehors, et bien trop bas pour ça',
     'toast.ejectNo': 'pas d\'ici — il faut être en vol',
     'toast.planeGone': 'elle est tombée',
@@ -668,7 +671,7 @@ const STRINGS = {
     'set.volume': 'volume',
     'set.off': 'désactivée',
     'set.foot': 'M ferme · Z met à plat · T pilote auto · P pause · 0 saut vers Rokići · 9 vers Jadrija',
-    'set.footGround': 'M ferme · WASD marche · flèches tournent · MAJ course · ESPACE ouvre la lance · E remonte à bord',
+    'set.footGround': 'M ferme · WASD marche · flèches tournent · Q course · ESPACE ouvre la lance · MAJ te propulse en l’air · E remonte à bord',
     'set.footTouch': 'touchez RÉGL pour fermer',
 
     'pause.eyebrow': 'le feu attend',

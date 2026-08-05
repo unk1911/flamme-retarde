@@ -10,6 +10,164 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.28.0] — 2026-08-05
+
+### Added — SHIFT, and fifty metres of clear air
+
+A charge under your boots, on foot. It throws you 52 m straight up off a bang,
+the canopy streams at the top of the climb, and you fly the same parachute you
+would have flown out of a bale-out down to anywhere you can see.
+
+It exists because a world this size cannot promise that terrain, a promenade
+deck, a hut and a hundred bathers will always agree about where the floor is.
+Now and again you end up somewhere you cannot walk out of — under a platform,
+on the wrong side of a step — and the honest answer to that is not a promise it
+will never happen, it is a way out when it does. It is also simply a very good
+way to look at Šibenik.
+
+Nothing about the descent is new code: the tumble, the cloth filling, the
+toggles, the wind gradient, the flare and the landing are the bale-out
+sequence, entered from a standing start instead of from an aeroplane. The
+canopy is timed to fill at the top rather than a second off the deck by
+starting the deployment clock 2.4 s in the past — measured apex 51.9 m at
+2.83 s, streaming at 3.0, fully inflated at 4.15, down at 5.6 m/s.
+
+Landing does not strand you the way a bale-out does. A bale-out means the
+aeroplane is gone; the charge means she is probably still parked eighty metres
+away, and making the way out of a hole cost you the aircraft would be worse
+than the hole.
+
+**The run key has moved to Q.** Shift cannot be both a thing you hold down for
+four hundred metres of promenade and a thing that puts you fifty metres in the
+air. Not Ctrl, which was the obvious choice and the wrong one: Ctrl+W closes
+the browser tab and no page is permitted to stop it, so "sprint forwards" would
+have been a chord that throws the game away.
+
+### Fixed — the water only hissed if you arrived by the 9 key
+
+Bale out with J, land on your feet, spray something: silence. Go to the same
+place with the 9 key and the same branch hisses correctly. The hose was never
+the difference.
+
+The aeroplane you left flies on for another ten or twenty seconds and then
+finds a hillside. That calls `impact()`, `impact()` calls `kill()`, and `kill()`
+set a flag that made the audio mixer's update return immediately — for the rest
+of the session. Not just the engines: the fire you were standing next to, the
+sea, and the branch in your hands. The flag meant "your aeroplane is over" and
+was being read as "the mixer is off".
+
+Now it means only what it says. Everything the aeroplane owns stays down once
+she is gone — including the sea bed, which would otherwise have started playing
+off a wreck's altimeter — and everything that belongs to the world you are
+standing in carries on. The silence after a crash is right when the crash was
+the end of you and wrong when you are two kilometres away watching the smoke.
+
+### Changed — the klapa, again
+
+0.22 to 0.11, and 0.20 to 0.10 in the cockpit. Fourteen decibels below where it
+shipped. Asked for twice, which is the answer.
+
+### Known — the promenade is terraced, and it does not look it
+
+Measured at Jadrija: the deck is three levels, 1.30 m at the water, 1.87 m in
+the middle and 2.97 m at the back. `confine()` already refuses to let you off
+any edge of it — clamped to t ∈ [3, 185.7] and s ≥ 1.1, so no reachable spot
+returns sea level — which means standing on the bottom terrace is standing on
+legitimate concrete, not underneath anything.
+
+It reads as a hole anyway, and the arithmetic says why: your eyes are 1.66 m up,
+so on the lowest level they sit at 2.96 m and the top deck is at 2.97. Your eye
+line is one centimetre under a floor with bathers walking about on it. Crossing
+between levels also happens in a single frame, because there is no riser
+modelled — 1.67 m of world arriving at once. Both want fixing in the geometry;
+SHIFT gets you out in the meantime.
+
+## [1.27.0] — 2026-08-05
+
+### Changed — the ćuk is a ćuk
+
+The scops owl call she is named for is a recording of one now, rather than an
+oscillator's fourth attempt at impersonating one.
+
+Measuring a real *Otus scops* against the synthesised call said why three
+rounds of tuning had not worked: both of the things that carry the sound were
+wrong, and neither of them was level.
+
+| | synthesised | measured, real bird |
+|---|---|---|
+| pitch | 1460 → 1330 Hz, falling throughout | 1336 → 1387 → 1324 Hz, a shallow arch |
+| envelope | full level a sixth of the way in | swells to full at the halfway point, cut off in the last 50 ms |
+| harmonics | one bandpassed sine | H2 −36 dB, H3 −62 dB — near enough a pure tone |
+
+The envelope is the whole character. A scops owl does not *arrive* on the note,
+it leans into it and then drops it, and an `attack` parameter whose entire
+range runs between "click" and "fade in" cannot make that shape. Which is why
+every previous fix made it worse: turning up a wrong shape produces a wrong
+shape you can hear more of.
+
+So it is a sample: 0.38 s, one call of three, high-passed at 300 Hz, 24 kHz
+mono because the second harmonic is 38 dB down and there is nothing above
+3 kHz worth keeping. **2.8 KB** in the payload, loaded lazily through the same
+path the klapa uses, with the oscillator left in place as the fallback for the
+first call of a session and for any browser that will not decode it.
+
+`wake` — the two-note version, the one she makes on seeing you — is built from
+the same 2.8 KB at two playback rates rather than left synthetic. It is
+described in the source as the same whistle twice with the second a tone up,
+which is exactly what two playback rates are; had it stayed on the oscillator,
+the one call she makes when she notices you would have been the only one that
+was not the same animal as the rest of her.
+
+Every call gets its own half-percent of detune. The three in the recording sat
+at 1368, 1374 and 1382 Hz, so a bird that repeats itself exactly is a sample,
+and a bird that does not is a bird.
+
+### Fixed — the hose that was already making a sound
+
+Pressing space on the promenade appeared to spray water in silence. It was not
+silent: the node existed, was wired, was fed, and measured **0.2998 of a
+possible 0.30** with the trigger held. It simply did not sound like water.
+
+A bandpass with a Q of 1.6 parked at 3400 Hz is about a third of an octave
+wide, and a third of an octave of white noise is not a jet leaving a nozzle —
+it is air leaving a tyre. Thin, pitched, and the first thing the ear discards
+when four singers and a hillside of cicadas are on top of it.
+
+Opened out to the better part of two octaves and brought down to 2600 Hz, with
+a lowpassed layer at 640 underneath carrying the mass. Neither half is water
+alone: the top on its own is a hiss and the bottom on its own is the tank. A
+slow LFO wanders the band, because a nozzle at eight bar in a pair of hands
+does not hold a pitch, and noise through a filter that never moves stops
+reading as water about two seconds into holding the trigger down. Level up by
+half again, in two layers, since the promenade is both where most of the
+spraying happens and the noisiest place on the map.
+
+Worth recording that the reported bug was "add a sound" and the actual bug was
+"the sound is wrong" — the fix was three lines from being a second hose
+layered over the first.
+
+### Changed — she is louder when she is wet
+
+The soaking changed what she says and how she moves but not how hard she said
+it, so the loudest thing that happens to her all game came out at exactly the
+level of her idle chatter.
+
+Her voice now scales with `wet` rather than with her phase, which is the right
+signal: it rises the moment the jet lands and falls off over the ten seconds
+she takes to dry, so she is loudest while the water is actually on her and
+comes back down by herself with no extra state to get out of step. Measured
+over six hundred frames of being hosed: mean gain **0.51 → 0.79**, peak
+**1.14**, drawn entirely from the wet vocabulary.
+
+`squeak`'s ceiling went from 1.0 to 1.8 to make room. The bed duck kept its own
+clamp at 1.0 — the expression behind it goes negative past about 1.5, and a
+negative gain is not a quieter klapa, it is the klapa with its phase inverted.
+
+Being hit now takes `wet` straight to 0.55 instead of ramping from zero. Four
+hundred litres a minute does not soak anybody gradually, and the ramp had a
+side effect: her first yelp, the one that *is* the reaction to being hit, fired
+one frame in while the ramp was still at 0.02, and came out as idle chatter.
+
 ## [1.26.0] — 2026-08-05
 
 ### Added — she likes being hosed

@@ -199,7 +199,7 @@ async function buildGround(scene, field) {
       update() {}, enter() {}, leave() {}, pose() {}, look() {}, reset() {},
       canEnter: () => false, canBoard: () => false,
       hud: () => null, stats: () => null, hose: () => 0,
-      you: {}, crew: [], force() {}, setSpray() {}, put() {},
+      you: {}, crew: [], force() {}, setSpray() {}, put() {}, bail: () => false,
       aimAt: () => false,
     };
   }
@@ -1137,8 +1137,16 @@ async function buildGround(scene, field) {
     const m = Math.hypot(ix, iz);
     if (m > 1) { ix /= m; iz /= m; }
 
-    const top = (keys.has('ShiftLeft') || keys.has('ShiftRight') || TOUCH.grun)
-      ? GROUND.run : GROUND.walk;
+    // Q, not Shift. Shift used to be the run and is now the charge under your
+    // boots — see launchOut() in 90-app.js — and those two cannot share a key:
+    // one is held down for four hundred metres of promenade and the other
+    // happens once and puts you fifty metres in the air. Sprinting is the one
+    // that moves, so sprinting is the one that moved.
+    //
+    // And Q rather than the obvious Ctrl, because Ctrl+W closes the browser
+    // tab and no page is allowed to stop it. "Sprint forwards" cannot be a
+    // chord that throws away the game.
+    const top = (keys.has('KeyQ') || TOUCH.grun) ? GROUND.run : GROUND.walk;
     const wx = (fx * iz + rx * ix) * top;
     const wz = (fz * iz + rz * ix) * top;
     you.vx = damp(you.vx, wx, m > 0.01 ? GROUND.accel / top : GROUND.drag, dt);
@@ -1393,7 +1401,7 @@ async function buildGround(scene, field) {
    * to clear the propellers, the way back in afterwards — assumes there is an
    * aeroplane to step out of and back into. There is not. There is a hillside.
    */
-  function dropIn(x, z, yaw) {
+  function dropIn(x, z, yaw, lost = true) {
     const [px, pz] = confine(x, z);
     you.x = px; you.z = pz;
     you.y = field.walkY(px, pz);
@@ -1401,9 +1409,32 @@ async function buildGround(scene, field) {
     you.yaw = yaw;
     you.pitch = 0;
     you.spraying = false;
-    stranded = true;
+    // Every original caller of this arrived because the aeroplane was gone, so
+    // the default is still that you are on your own out here. The exception is
+    // the escape charge: it puts you under a canopy and back down again without
+    // anything happening to an aircraft that may well still be parked eighty
+    // metres away, and stranding you for having used it would make the way out
+    // of a hole more expensive than the hole.
+    if (lost) stranded = true;
     active = true;
     state.phase = 'ground';
+    return true;
+  }
+
+  /**
+   * Out of the mode, but not into an aeroplane.
+   *
+   * `leave()` is the door of a parked Canadair and refuses unless there is one
+   * to climb into. This is the other exit — straight up, off a charge — so it
+   * asks nothing and sets no phase: 57-eject.js takes it from here and the
+   * canopy owns you until it puts you back down.
+   */
+  function bail() {
+    if (!active) return false;
+    active = false;
+    you.spraying = false;
+    you.vx = you.vz = 0;
+    you.jet = 0;
     return true;
   }
 
@@ -1455,7 +1486,7 @@ async function buildGround(scene, field) {
     ok: true,
     get active() { return active; },
     get armed() { return armed; },
-    update, enter, leave, canEnter, canBoard, look, pose, you,
+    update, enter, leave, bail, canEnter, canBoard, look, pose, you,
     retarget, dropIn, addGuest,
     /** Whichever locale currently owns you — for a test, and read-only. */
     get field() { return field; },

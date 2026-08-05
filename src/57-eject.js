@@ -230,6 +230,56 @@ function buildEject(scene, flight, onDown) {
   }
 
   /**
+   * The other way to end up under the canopy: straight up off your own feet.
+   *
+   * Deliberately not fire(). That one reads an aeroplane — her position, her
+   * velocity, her up axis — and then takes her controls away, and there is no
+   * aeroplane in this. There is a person standing on concrete who has just had
+   * something go off underneath them.
+   *
+   * Everything after the first frame is the same physics as a bale-out, which
+   * is the whole reason for doing it this way: the tumble, the canopy filling,
+   * the toggles, the wind, the flare, the landing and the hand-off back to the
+   * ground mode are all code that already works and has already been flown.
+   * This only has to supply a position and a very large upward velocity.
+   */
+  function launch(x, y, z, yaw, up, hang = 0) {
+    // Boots to eyes, plus a metre of clearance, and measured against the
+    // *terrain* as well as against whatever you were standing on. The arrival
+    // test at the bottom of update() is `pos.y - eye <= groundAt()`, so if you
+    // have somehow ended up below the terrain — which is the situation this
+    // whole key exists to answer — starting from where you were would land you
+    // again on the first frame and the charge would do nothing at all.
+    you.pos.set(x, Math.max(y, groundAt(x, z)) + EJECT.eye + 1.0, z);
+    // Purely vertical. A person going up off a standing start has no forward
+    // component worth modelling, and giving them one means the escape hatch
+    // quietly moves you somewhere while you are still working out what
+    // happened.
+    you.vel.set(0, up, 0);
+    you.yaw = yaw;
+    you.pitch = 0;
+    you.flare = EJECT.flareFor;
+    you.stalled = false;
+    you.swing = you.swingV = 0;
+    you.inflation = 0;
+    you.dive = 0;
+    you.vs = 0;
+    phase = 'out';
+    // Negative, and this is the whole trick for getting the canopy to open at
+    // the top rather than a second off the ground. `update()` streams the cloth
+    // at `t >= tumble` and has it full `deploy` seconds later; starting the
+    // clock `hang` seconds in the past moves both of those back by `hang`
+    // without touching a line of the sequence that already works. Set it to the
+    // climb and the canopy takes air just as you stop going up.
+    t = -hang;
+    spin = 1;
+    spinT = 0;
+    peakG = 0;
+    state.phase = 'chute';
+    return true;
+  }
+
+  /**
    * Mouse or thumb. Where you look is where the canopy goes.
    *
    * This started out as a head that turned independently of the canopy, the way
@@ -419,7 +469,7 @@ function buildEject(scene, flight, onDown) {
     get pos() { return you.pos; },
     get since() { return t; },
     you,
-    canFire, fire, look, update, pose,
+    canFire, fire, launch, look, update, pose,
     /** Back in the seat. Only a test ever runs the sequence twice. */
     reset() {
       phase = 'stowed';
