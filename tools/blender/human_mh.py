@@ -104,6 +104,11 @@ MOUTH_M, MOUTH_P = (0.300, 0.160, 0.145), (0.300, 0.160, 0.145)
 # ones read — and it is the one place on this figure where a couple of shades
 # is the whole difference between an eye and a hole.
 LASH_M, LASH_P = (0.5, 0.0, 0.0), (0.052, 0.040, 0.036)
+# Anklets. Literal on both channels — this is a colour, not one of the three
+# markers the runtime swaps per figure, and a warm gold is the one metal that
+# stays visible against every skin tone the crowd generator hands out. Silver
+# against a pale leg at fifteen metres is a leg.
+ANKLET_M, ANKLET_P = (0.860, 0.720, 0.400), (0.860, 0.720, 0.400)
 
 
 # --------------------------------------------------------------------------- #
@@ -312,21 +317,38 @@ HAIR_TAIL = [
     (-0.080, 0.0, 1.318, 0.005),
 ]
 
+# Anklets, one a side. Height and radii measured off the mesh rather than
+# authored: the ankle marker sits at z = 0.0756, and 35 mm above it the leg is a
+# clean 82 × 60 mm ellipse — low enough to be at her ankle and high enough to be
+# past the flare of the heel, which at the marker itself is still 114 mm across
+# and would want a ring you could get a fist through.
+#
+# The band goes to `foot`, which is the nearest bone head to it by some way —
+# the shin's bone starts at the knee, 36 cm up. That is also what a real anklet
+# does: it rests on the ankle bone itself, on the joint rather than above it,
+# and turns with the foot.
+ANKLET_Z = 0.035          # above the ankle marker
+ANKLET_R = (0.0455, 0.0345)   # fore-aft and lateral, ~4 mm proud of the skin
+ANKLET_WIRE = 0.0026      # a 5 mm band: a chain reads as nothing at this range
 
-def hair(body, J):
-    """Build the knot and the tail and join them into the body mesh.
+
+def extras(body, J):
+    """Build every piece of joined geometry and put it on the body in one pass.
+
+    The hair knot, the tail and the two anklets. They are one function and one
+    join because of how the idempotence works: `join` appends, so the added
+    geometry is always the *last* N vertices of the mesh, and re-running removes
+    the previous N first. That trick only survives while a single function owns
+    all of it. Two functions each deleting their own last N, joined in either
+    order, is a loop that eats the other one's work — add the anklets after the
+    hair and the next `--extras` deletes the anklets and calls them a ponytail.
 
     Coloured here rather than by a cutter. `paint` only overwrites vertices a
     cutter volume claims, and these sit outside every one of them — which is
     correct, since a cutter big enough to catch the tail would also catch the
     back of her neck and half a shoulder blade.
-
-    Idempotent by construction: `join` appends, so the hair is always the last
-    N vertices of the mesh and re-running this removes the previous set first.
-    That is what makes `--hair` a loop worth having rather than a thing that
-    grows a second ponytail every time the numbers are nudged.
     """
-    old = body.get("hairN", 0)
+    old = body.get("extraN", 0) or body.get("hairN", 0)
     if old:
         bm = bmesh.new()
         bm.from_mesh(body.data)
@@ -334,15 +356,28 @@ def hair(body, J):
         bmesh.ops.delete(bm, geom=bm.verts[-old:], context="VERTS")
         bm.to_mesh(body.data)
         bm.free()
-        print("[mh] hair: dropped %d previous verts" % old)
+        print("[mh] extras: dropped %d previous verts" % old)
 
+    # Each piece is its own closed shell, which is what `skin()` needs: its
+    # loose-shell pass hands a whole shell to one bone, and that is exactly the
+    # rig these want — a tail rigid to the skull, a band rigid to the shin.
     vs, fs = ball(*HAIR_KNOT, rows=16, seg=20)
-    tv, tf = tube(HAIR_TAIL, seg=16)
-    off = len(vs)
-    vs += tv
-    fs += [[i + off for i in f] for f in tf]
+    tint = [(HAIR_M, HAIR_P)] * len(vs)
 
-    me = bpy.data.meshes.new("hair")
+    def add_shell(sv, sf, mark, prev):
+        off = len(vs)
+        vs.extend(sv)
+        fs.extend([[i + off for i in f] for f in sf])
+        tint.extend([(mark, prev)] * len(sv))
+
+    add_shell(*tube(HAIR_TAIL, seg=16), HAIR_M, HAIR_P)
+    for s in (1, -1):
+        ank = J["%s-ankle" % ("l" if s > 0 else "r")]
+        add_shell(*ring((ank.x, ank.y, ank.z + ANKLET_Z),
+                        ANKLET_R[0], ANKLET_R[1], ANKLET_WIRE),
+                  ANKLET_M, ANKLET_P)
+
+    me = bpy.data.meshes.new("extras")
     me.from_pydata([tuple(v) for v in vs], [], fs)
     me.validate()
     bm = bmesh.new()
@@ -353,12 +388,13 @@ def hair(body, J):
     a_m = me.color_attributes.new("mark", "FLOAT_COLOR", "POINT")
     a_p = me.color_attributes.new("prev", "FLOAT_COLOR", "POINT")
     for i in range(len(me.vertices)):
-        a_m.data[i].color = (*HAIR_M, 1.0)
-        a_p.data[i].color = (*HAIR_P, 1.0)
+        mark, prev = tint[i]
+        a_m.data[i].color = (*mark, 1.0)
+        a_p.data[i].color = (*prev, 1.0)
     for p in me.polygons:
         p.use_smooth = True
 
-    ob = bpy.data.objects.new("hair", me)
+    ob = bpy.data.objects.new("extras", me)
     bpy.context.collection.objects.link(ob)
     for o in bpy.context.view_layer.objects:
         o.select_set(False)
@@ -366,8 +402,9 @@ def hair(body, J):
     body.select_set(True)
     bpy.context.view_layer.objects.active = body
     bpy.ops.object.join()
-    body["hairN"] = len(vs)
-    print("[mh] hair: %d verts, %d faces joined"
+    body["extraN"] = len(vs)
+    body["hairN"] = 0
+    print("[mh] extras: %d verts, %d faces joined (hair + 2 anklets)"
           % (len(vs), len(fs)))
     return body
 
@@ -665,6 +702,15 @@ def skin(body, rig):
         rs = [(body.data.vertices[i].co - c).length for i in vs]
         round_ = min(rs) / max(max(rs), 1e-9)
         pick = "head"
+        # `head` is the right default for every loose shell the base mesh has —
+        # teeth, tongue, eyeballs and lashes are all inside the skull, and so is
+        # the ponytail, which is why this was a default and not a decision. It
+        # became the wrong one the instant a loose shell existed below the neck:
+        # the first pair of anklets came back rigidly attached to her jaw, and
+        # the export was perfectly happy about it. Anything under the collarbone
+        # goes to the nearest bone instead.
+        if c.z < byname["neck"].head_local.z:
+            pick = min(byname, key=lambda n: (c - byname[n].head_local).length)
         for n in eyes:
             if n in byname and (c - byname[n].head_local).length < 0.03 and round_ > 0.5:
                 pick = n
@@ -798,6 +844,39 @@ def tube(path, seg=14):
         j = (k + 1) % seg
         fs.append([lo, j, k])
         fs.append([hi, n + k, n + j])
+    return vs, fs
+
+
+def ring(c, ra, rb, wire, seg=18, ring_seg=6):
+    """A closed elliptical ring about the vertical axis, centred on `c`.
+
+    `ra`/`rb` are the fore-aft and lateral radii of the ring itself and `wire`
+    is the thickness of the band. Elliptical rather than round because a leg is:
+    measured at the height this sits, the cross-section is 82 mm fore-and-aft
+    and 60 mm across, and a circular ring big enough to clear the wider way
+    stands a centimetre off the skin on the narrower one, which reads as a hoop
+    somebody has thrown at her.
+
+    Slightly generous on purpose, all the same. A ring that intersects the leg
+    shows skin through the metal and stops being an object; a ring floating
+    three or four millimetres off it is what an anklet does anyway.
+    """
+    vs, fs = [], []
+    for i in range(seg):
+        a = 2.0 * math.pi * i / seg
+        ca, sa = math.cos(a), math.sin(a)
+        for k in range(ring_seg):
+            b = 2.0 * math.pi * k / ring_seg
+            cb, sb = math.cos(b), math.sin(b)
+            vs.append((c[0] + ca * (ra + wire * cb),
+                       c[1] + sa * (rb + wire * cb),
+                       c[2] + wire * sb))
+    for i in range(seg):
+        i2 = (i + 1) % seg
+        for k in range(ring_seg):
+            k2 = (k + 1) % ring_seg
+            fs.append([i * ring_seg + k, i2 * ring_seg + k,
+                       i2 * ring_seg + k2, i * ring_seg + k2])
     return vs, fs
 
 
@@ -1289,19 +1368,37 @@ def wheel_floor(rig, clear=0.004):
     running it twice does the same thing as running it once.
     """
     poses = [_wheel(i * 360.0 / WHEEL_KEYS) for i in range(WHEEL_KEYS + 1)]
+    worst = floor_poses(rig, poses, clear)
+    for i, p in enumerate(poses):
+        WHEEL[i] = (i * WHEEL_DUR / WHEEL_KEYS, p)
+    print("[mh] cartwheel: floor pass settled, deepest key %+.3f m" % worst)
+
+
+def floor_poses(rig, poses, clear=0.004):
+    """Solve `@root` z for a list of poses so each one sits on the deck.
+
+    Lifted out of the cartwheel when the moonwalk turned out to need exactly the
+    same thing for exactly the same reason — the anchor leg's knee straightens
+    12° across the glide, which changes its length, and no hip height authored
+    as a constant can be right at both ends of that. It went ten centimetres
+    through the concrete in the middle and two and a half above it at the swap.
+
+    Modifies the poses in place and returns the deepest point left.
+    """
     solved = []
     for p in poses:
         _who, z = _lowest(rig, p)
-        solved.append(p["@root"][2] + clear - z)
+        solved.append(p.get("@root", (0.0, 0.0, 0.0))[2] + clear - z)
 
     # Then smooth the answer. Solved key by key it is not a curve, it is a
-    # staircase: the pass pins whichever limb is lowest, and on the two frames
-    # where that changes hands — literally — the hip height it asks for jumps as
-    # much as thirty centimetres between adjacent keys. Held exactly, her hips
-    # snap twice a wheel. Three passes of a quarter-half-quarter filter turns it
-    # back into something a body could do, at a cost of a centimetre or two of
-    # foot through concrete, which at five metres is nothing and a snapping
-    # pelvis never is. The ends are held: those two are standing on the deck.
+    # staircase: the pass pins whichever limb is lowest, and on the frames where
+    # that changes hands — literally, in the cartwheel — the hip height it asks
+    # for jumps as much as thirty centimetres between adjacent keys. Held
+    # exactly, her hips snap twice a wheel. Three passes of a
+    # quarter-half-quarter filter turns it back into something a body could do,
+    # at a cost of a centimetre or two of foot through concrete, which at five
+    # metres is nothing and a snapping pelvis never is. The ends are held: on
+    # both clips that uses this, those two are the same pose.
     for _pass in range(3):
         smoothed = list(solved)
         for i in range(1, len(solved) - 1):
@@ -1310,13 +1407,36 @@ def wheel_floor(rig, clear=0.004):
 
     worst = 0.0
     for i, p in enumerate(poses):
-        root = list(p["@root"])
+        root = list(p.get("@root", (0.0, 0.0, 0.0)))
         root[2] = solved[i]
         p["@root"] = tuple(root)
         _who, z = _lowest(rig, p)
         worst = min(worst, z)
-        WHEEL[i] = (i * WHEEL_DUR / WHEEL_KEYS, p)
-    print("[mh] cartwheel: floor pass settled, deepest key %+.3f m" % worst)
+    return worst
+
+
+def dance_floor(rig, clear=0.004):
+    """The same pass for the two dances, which have no roll and no hands down.
+
+    Both are sampled from a continuous function rather than hand-keyed, for the
+    reason `_wheel_half` gives: `_bake_clip` eases *within* every key interval,
+    so anything authored as four or five keys arrives as four or five lurches
+    with the rate going to zero between them. It also means the floor solve has
+    keys close enough together to be worth running — solved at five keys, the
+    moonwalk's deepest point sits in the middle of an interval where nothing was
+    measured.
+    """
+    poses = [_shimmy_at(i / SHIMMY_KEYS) for i in range(SHIMMY_KEYS + 1)]
+    worst = floor_poses(rig, poses, clear)
+    for i, p in enumerate(poses):
+        SHIMMY[i] = (i * SHIMMY_DUR / SHIMMY_KEYS, p)
+    print("[mh] shimmy: floor pass settled, deepest key %+.3f m" % worst)
+
+    poses = [_moon_at(i / MOON_KEYS) for i in range(MOON_KEYS + 1)]
+    worst = floor_poses(rig, poses, clear)
+    for i, p in enumerate(poses):
+        MOON[i] = (i * MOON_DUR / MOON_KEYS, p)
+    print("[mh] moonwalk: floor pass settled, deepest key %+.3f m" % worst)
 
 
 def clipcheck(rig, name):
@@ -1379,6 +1499,7 @@ def export_skin(body, rig, path, clips, tris=26000):
     bindex = {name: i for i, (name, _p, _l, _g) in enumerate(rest)}
 
     wheel_floor(rig)
+    dance_floor(rig)
 
     # Duplicate the *object*, not the evaluated mesh.
     #
@@ -1862,6 +1983,46 @@ ARM_R = 0.880     # hip to the palm, arms in line with the trunk overhead
 WHEEL_DUR = 1.32          # seconds for one wheel
 WHEEL_KEYS = 24           # segments; 15 degrees of roll each
 
+# How the arms are carried, which is the part of this that got reported rather
+# than measured — "her arms get criss-crossed over, and they almost arch too far
+# back". Both were true and both were a number in the pose below.
+#
+# REACH is how far apart the hands are held, in degrees at the shoulder, plus
+# how much that changes once her weight is on them. It used to be a flat ten,
+# and ten was not a spread at all: with the arms swung overhead, ten put the
+# wrists **twelve and a half centimetres the wrong side of each other**, on
+# eleven of the twenty-five keys — the whole upright approach and the whole
+# upright exit. Rendered from the front she is not holding her arms up, she is
+# clamping both hands over her own ears with her forearms crossed above her
+# skull. It is the first thing you see and it was in every wheel she has ever
+# turned.
+#
+# Thirty-six holds them 0.28 m apart going in and coming out, which is her own
+# shoulder width, which is where a cartwheel puts them. The −14 closes that to
+# 0.06 m through the inverted middle, and closing rather than opening is
+# deliberate: at the handstand the two hands are on the line one behind the
+# other, so laterally they belong close together, and it also keeps the planted
+# hand low — spreading the arms shortens their reach to the deck, and a hand
+# that cannot reach is a hand the floor pass leaves hanging in the air.
+#
+# The sign is not obvious and is worth stating, because it is the opposite of
+# what the idle pose implies. On an arm hanging at her side, +Z on the left
+# adducts — that is what IDLE_A's +29 is doing. On an arm already swung 160°
+# overhead, the Euler's X has carried the local frame round with it and the same
+# +Z *abducts*. Reading the idle sign across to here and flipping it, which is
+# the obvious move, gets you 33 cm of crossed wrists instead of 12.
+#
+# ARM and WRIST are the arch — "they almost arch too far back a bit", and they
+# did. −166 at the shoulder, −4 at the elbow and −18 at the wrist sum to −188:
+# eight degrees past straight overhead, which carried her hands 12 cm *behind*
+# her shoulders and bowed her back to keep up. The same three summing to −180
+# put the arms in line with the trunk. Worst-case arch across the wheel goes
+# from −0.123 m to −0.076 m; on the upright keys, where you actually see it,
+# from −0.12 to −0.03.
+WHEEL_REACH = (36.0, -14.0)
+WHEEL_ARM = -158.0        # shoulder, elbow and wrist sum to −180: straight up,
+WHEEL_WRIST = -18.0       # in line with the body, neither arched nor reaching
+
 
 def _ease(x):
     x = 0.0 if x < 0 else (1.0 if x > 1 else x)
@@ -1964,6 +2125,7 @@ def _wheel_half(deg):
     cl = (180 - deg) * wl
     cr = (180 - deg) * wr
     split = 12 + 36 * hands              # the straddle, widest inverted
+    reach = WHEEL_REACH[0] + WHEEL_REACH[1] * hands   # and the same for the arms
     bend = 14 * math.sin(math.radians(deg))
     look = 4 + 10 * hands
     lead = 8 * math.sin(math.radians(deg))
@@ -1975,8 +2137,10 @@ def _wheel_half(deg):
         "spine03": (0, 0, bend * 0.24), "chest": (-2, 0, bend * 0.12),
         "neck": (look * 0.45, 0, 0), "head": (look, 0, 0),
         "clavicleL": (0, 0, 7), "clavicleR": (0, 0, -7),
-        "armUL": (-166, 0, cl + 10), "armLL": (-4, 0, 0), "handL": (-18, 0, 0),
-        "armUR": (-166, 0, -cr - 10), "armLR": (-4, 0, 0), "handR": (-18, 0, 0),
+        "armUL": (WHEEL_ARM, 0, cl + reach), "armLL": (-4, 0, 0),
+        "handL": (WHEEL_WRIST, 0, 0),
+        "armUR": (WHEEL_ARM, 0, -cr - reach), "armLR": (-4, 0, 0),
+        "handR": (WHEEL_WRIST, 0, 0),
         # The bend is on the left knee alone: it is the one under her on the way
         # down, and the right one gets it back from the mirror on the way up.
         "legUL": (-lead, 0, leg - split), "legLL": (knee, 0, 0), "footL": (-8, 0, 0),
@@ -1986,6 +2150,155 @@ def _wheel_half(deg):
 
 WHEEL = [(i * WHEEL_DUR / WHEEL_KEYS, _wheel(i * 360.0 / WHEEL_KEYS))
          for i in range(WHEEL_KEYS + 1)]
+
+# ── the shimmy ──────────────────────────────────────────────────────────────
+#
+# "A shimmy shimmy yay dance move." A shimmy is one specific thing and it is not
+# a wiggle of the whole body: the shoulders alternate forward and back, fast,
+# and everything below the ribs stays where it is. Get the hips involved and it
+# stops being a shimmy and starts being a shake.
+#
+# So the entire move is a twist, spread up the spine and taken back out again at
+# the neck. Local Y is the twist on every up-or-down bone — it is the bone's own
+# axis — which makes this four numbers going up and two coming back down.
+#
+# The coming back down is the half that matters. Fourteen degrees of shoulder
+# swing with the head welded on top of it is somebody looking left and right;
+# the same fourteen degrees with the face held still is a shimmy, because the
+# stillness of the face is what tells you the shoulders are moving on purpose.
+# The neck and the head carry +7 each against the spine's −14 and net to zero.
+#
+# Arms up, elbows out, hands by the ribs. Arms hanging at her sides and the
+# shoulders have nothing to swing — the move becomes invisible from any distance
+# at which you would want to watch it.
+SHIMMY_DUR = 0.44          # a full there-and-back: about four reversals a second
+SHIMMY_KEYS = 8            # sampled, not keyed — see dance_floor()
+
+
+def _shimmy(s):
+    """Half the cycle. `s` +1 throws one shoulder forward, −1 the other."""
+    return {
+        "@root": (0.0, 0.020, -0.014),
+        # Two degrees of hip the other way and not one more. This is the line
+        # between a shimmy and a shake.
+        "pelvis": (-3, 3 * s, 0),
+        "spine01": (-2, -2 * s, 0), "spine02": (-2, -3 * s, 0),
+        "spine03": (-1, -4 * s, 0), "chest": (-3, -5 * s, 0),
+        "neck": (4, 7 * s, 0), "head": (-3, 7 * s, 1),
+        "clavicleL": (0, 0, 8), "clavicleR": (0, 0, -8),
+        "armUL": (-26, 0, -34), "armLL": (-84, 0, -12), "handL": (-10, 0, 0),
+        "armUR": (-26, 0, 34), "armLR": (-84, 0, 12), "handR": (-10, 0, 0),
+        # Knees soft and alternating a couple of degrees, so she is standing on
+        # them rather than bolted to the deck.
+        "legUL": (-5, 0, -4), "legLL": (9 + 4 * s, 0, 0), "footL": (-4, 0, 0),
+        "legUR": (-5, 0, 4), "legLR": (9 - 4 * s, 0, 0), "footR": (-4, 0, 0),
+    }
+
+
+def _shimmy_at(u):
+    """`u` 0..1 through one full there-and-back."""
+    return _shimmy(math.cos(2.0 * math.pi * u))
+
+
+SHIMMY_A = _shimmy(1)      # the two extremes, for --reskin previews
+SHIMMY_B = _shimmy(-1)
+SHIMMY = [(i * SHIMMY_DUR / SHIMMY_KEYS, _shimmy_at(i / SHIMMY_KEYS))
+          for i in range(SHIMMY_KEYS + 1)]
+
+
+# ── the moonwalk ────────────────────────────────────────────────────────────
+#
+# One foot flat on the deck and gliding, the other up on its toe and holding
+# still, and the two swapping over every seven tenths of a second while the body
+# travels backwards. That is the whole move, and getting it right turns entirely
+# on which foot is doing which.
+#
+# The popped foot is the anchor. It is planted — it does not move relative to
+# the *deck* — so relative to her body it has to travel forwards by exactly as
+# far as the body travels back, which is why its hip angle sweeps 34° while it
+# is nominally standing still. Author it as stationary in her own frame instead,
+# which is the obvious way round, and the anchor slides backwards with her: both
+# feet glide, nothing is planted, and the illusion the move is made of does not
+# happen. There is no walking here at all — only one foot sliding and one foot
+# waiting — and the eye reads walking anyway *because* something stays put.
+#
+# That same 34° is where the travel speed comes from, so the game and the clip
+# cannot drift apart: 34° of hip on a 0.90 m hip-to-toe is 0.53 m of deck, over
+# the 0.70 s half-cycle, which is 0.76 m/s. MOON_SPEED in src/43-jadrija.js is
+# that number and nothing else.
+MOON_DUR = 1.40
+MOON_POP = -34.0           # plantarflexion in the popped foot: heel up, toe down
+MOON_SWEEP = 34.0          # hip degrees the anchor gives back over a half-cycle
+
+
+def _mw_leg(tag, hip, knee, heel):
+    """One leg, with the ankle solved rather than authored.
+
+    Every bone in this chain turns about the same axis, so the pitch of the sole
+    is just hip + knee + ankle. Ask for the sole and let the ankle work out what
+    it has to be. Authored against the other two by hand it goes wrong the first
+    time either is nudged, and a moonwalk with a sole four degrees off the deck
+    is a moonwalk on ice — which is nearly the joke, but not quite.
+    """
+    sole = MOON_POP * heel
+    return {
+        "legU" + tag: (hip, 0, 0),
+        "legL" + tag: (knee, 0, 0),
+        "foot" + tag: (sole - hip - knee, 0, 0),
+        # And the toes lie flat under a popped heel instead of going through the
+        # concrete with it.
+        "toe" + tag: (-sole, 0, 0),
+    }
+
+
+# Of the 0.70 s half-cycle, this much is glide and the rest is the swap. The
+# glide is the long part because the glide is the part anybody is looking at.
+MOON_GLIDE = 0.66
+MOON_KEYS = 20             # sampled, not keyed — see dance_floor()
+
+
+def _moon_half(h):
+    """One half-cycle, `h` 0..1, with the left foot flat and gliding.
+
+    Two continuous ramps carry everything. `g` is how far through the glide she
+    is; `x` is how far through the swap that follows it. Nothing here is keyed
+    at a moment — every number is a function of those two, which is what lets
+    the whole clip be sampled finely enough for the floor pass to mean anything.
+    """
+    g = _ease(min(1.0, h / MOON_GLIDE))
+    x = _ease(max(0.0, (h - MOON_GLIDE) / (1.0 - MOON_GLIDE)))
+    # Which foot the weight is over, swapping across the transfer rather than
+    # flipping at it — a sign flip mid-clip is a snap you can see from the sea.
+    s = 1.0 - 2.0 * x
+    p = {
+        "@root": (0.0, 0.020, -0.026),
+        # Loose and low. This is not a march.
+        "pelvis": (-2, 0, 3 * s),
+        "spine01": (-3, 0, -1 * s), "spine02": (-3, 0, -1 * s),
+        "spine03": (-2, 0, 0), "chest": (-4, 0, 0),
+        "neck": (5, 0, 0), "head": (-4, 0, 0),
+        "clavicleL": (0, 0, 6), "clavicleR": (0, 0, -6),
+        "armUL": (-16 * s, 0, 20), "armLL": (-34, 0, 4), "handL": (-12, 0, 0),
+        "armUR": (16 * s, 0, -20), "armLR": (-34, 0, -4), "handR": (-12, 0, 0),
+    }
+    # The glider, from in front of her hips to behind them, sole flat the whole
+    # way — and popping its own heel at the end, ready to become the anchor.
+    p.update(_mw_leg("L", -20 + 38 * g - 4 * x, 3 + 9 * g + 14 * x, x))
+    # The anchor, giving back exactly the ground she covers so that it does not
+    # move, then dropping flat to take over the glide.
+    p.update(_mw_leg("R", 14 - MOON_SWEEP * g - 2 * x,
+                     26 - 12 * g - 11 * x, 1.0 - x))
+    return p
+
+
+def _moon_at(u):
+    """`u` 0..1 through the full cycle. The back half is the front, reflected."""
+    return _moon_half(u * 2.0) if u < 0.5 else _mirror(_moon_half(u * 2.0 - 1.0))
+
+
+MOON = [(i * MOON_DUR / MOON_KEYS, _moon_at(i / MOON_KEYS))
+        for i in range(MOON_KEYS + 1)]
+
 
 # ── soaked ──────────────────────────────────────────────────────────────────
 #
@@ -2076,6 +2389,12 @@ CLIPS = [
     # there.
     {"name": "soak", "loop": True,
      "keys": [(0.0, SOAK_A), (0.70, SOAK_B), (1.40, SOAK_A)]},
+    # Both of these loop and both are held for as long as the game feels like
+    # holding them, which is what makes them dances rather than tricks: the
+    # somersault and the cartwheel are events that end, these are things she is
+    # doing until she stops.
+    {"name": "shimmy", "loop": True, "keys": SHIMMY},
+    {"name": "moonwalk", "loop": True, "keys": MOON},
 ]
 
 
@@ -2090,6 +2409,10 @@ VIEWS = {
     # the only views that show the back of the head, which is where all of the
     # hair is.
     "nape": (176.0, 6.0, 1.600, 0.60, 900, 900),
+    # Both ankles at once, from a little above — which is roughly the angle you
+    # look down at somebody's feet from, and the only view in this table where
+    # anything below the knee is more than forty pixels tall.
+    "feet": (38.0, 16.0, 0.170, 1.60, 900, 700),
     "rear": (156.0, 9.0, 1.150, 2.30, 760, 1120),
 }
 
@@ -2181,26 +2504,29 @@ def main():
         print("[mh] rebound %s" % BLEND)
         return
 
-    # Hair is geometry joined into a finished mesh, so it has to be followed by
-    # a re-bind (the new vertices have no groups) and a re-export. That is two
-    # of the three slow steps and none of the download, the subsurf or the
-    # renders, which is the difference between iterating on the shape of a
-    # ponytail and not iterating on it.
-    if "--hair" in argv:
+    # The joined geometry — hair and anklets — is added to a finished mesh, so
+    # it has to be followed by a re-bind (the new vertices have no groups) and a
+    # re-export. That is two of the three slow steps and none of the download,
+    # the subsurf or the renders, which is the difference between iterating on
+    # the shape of a ponytail and not iterating on it.
+    #
+    # `--hair` still works and means the same thing. It was the name when hair
+    # was all there was, and it is in enough shell history to be worth keeping.
+    if "--extras" in argv or "--hair" in argv:
         bpy.ops.wm.open_mainfile(filepath=str(BLEND))
         body, rig = bpy.data.objects["human"], bpy.data.objects["rig"]
         J, _scale, _drop = read_joints(fetch())
-        hair(body, J)
+        extras(body, J)
         skin(body, rig)
         paint(body, cutters(J))
         _material(body)
         _lights()
         pose(rig, {})
-        render("hair", ("nape", "prof", "rear"))
+        render("extras", ("nape", "prof", "rear", "feet"))
         export_skin(body, rig, ROOT / "build" / "payload" / "human_skin.fr3d.gz",
                     CLIPS)
         bpy.ops.wm.save_as_mainfile(filepath=str(BLEND))
-        print("[mh] rehaired %s" % BLEND)
+        print("[mh] extras rebuilt in %s" % BLEND)
         return
 
     # The face, which is paint and weights and no geometry at all.
@@ -2249,6 +2575,7 @@ def main():
         bpy.ops.wm.open_mainfile(filepath=str(BLEND))
         rig = bpy.data.objects["rig"]
         wheel_floor(rig)          # so the numbers below are the shipped numbers
+        dance_floor(rig)
         for name in argv[argv.index("--clipcheck") + 1:]:
             if name.startswith("-"):
                 break
@@ -2287,7 +2614,7 @@ def main():
     # and again by the head pass, which takes everything above z = 1.46 — and
     # arrive at a few thousand triangles for a ponytail, all of which the export
     # decimator would then have to take back off the face.
-    hair(body, J)
+    extras(body, J)
     tris = sum(len(p.vertices) - 2 for p in body.data.polygons)
     print("[mh] mesh %d verts, %d faces, %d tris"
           % (len(body.data.vertices), len(body.data.polygons), tris))

@@ -33,7 +33,10 @@ if (IS_TOUCH) document.documentElement.classList.add('touch');
  * them the build concatenates first.
  */
 // `g*` are the ground mode's: a walk vector, a run latch and the branch.
+// `c*` are the canopy's: one stick, where x hauls a riser and y is the front
+// risers forward and the brakes back.
 const TOUCH = {
   scoop: false, drop: false, level: false,
   gx: 0, gy: 0, grun: false, gjet: false,
+  cx: 0, cy: 0,
 };

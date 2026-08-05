@@ -175,6 +175,15 @@
     <button id="t-set" data-i18n="touch.set">SET</button>
     <button id="t-pause" data-i18n="touch.pause">II</button>
   </div>
+  <!-- The three one-way doors — J, 9 and 0 on a keyboard. Their own row, set
+       back from the controls, because none of them is a control: each one ends
+       the flight you are in and none of them runs backwards. Two taps each;
+       see arm() in 91-touch.js for why they are not one. -->
+  <div id="tdoor">
+    <button id="t-bail" data-i18n="touch.bail">BAIL</button>
+    <button id="t-jad" data-i18n="touch.jad">JADRIJA</button>
+    <button id="t-rok" data-i18n="touch.rok">ROKIĆI</button>
+  </div>
 </div>
 
 <!-- ───────────────────────────────────────────── touch, on foot ── -->
@@ -188,9 +197,29 @@
   </div>
   <div id="gmini">
     <button id="t-run" data-i18n="touch.run">RUN</button>
+    <!-- U. One tap and no arming: this is the way out of being stuck under the
+         floor, and a way out you have to press twice is a worse one. -->
+    <button id="t-up" data-i18n="touch.up">UP</button>
     <button id="t-in" data-i18n="touch.in">IN</button>
     <button id="t-gset" data-i18n="touch.set">SET</button>
     <button id="t-gpause" data-i18n="touch.pause">II</button>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────── touch, under the canopy ── -->
+<!-- This layer did not exist until J and U grew buttons. It did not need to:
+     the only way to a parachute on a phone was a key nobody could press, so the
+     canopy was unreachable and therefore unsteerable in the same breath. Give
+     someone the seat and you owe them the risers.
+
+     One pad does all three controls, because on a real canopy your two hands do
+     all three: left and right haul a riser, forward is the front risers, back is
+     the brakes. The right half of the screen is your head, exactly as on foot. -->
+<div id="ctouch" hidden>
+  <div id="chutepad"><i id="chuteknob"></i></div>
+  <div id="cmini">
+    <button id="t-cset" data-i18n="touch.set">SET</button>
+    <button id="t-cpause" data-i18n="touch.pause">II</button>
   </div>
 </div>
 

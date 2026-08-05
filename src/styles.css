@@ -748,14 +748,14 @@ html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
 
 /* ─────────────────────────────────────────────────── touch flight controls ── */
 
-#touch, #gtouch {
+#touch, #gtouch, #ctouch {
   position: fixed; inset: 0; z-index: 45; pointer-events: none;
   font-family: var(--mono); touch-action: none;
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
            env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
-#touch[hidden], #gtouch[hidden] { display: none; }
-#touch button, #gtouch button {
+#touch[hidden], #gtouch[hidden], #ctouch[hidden] { display: none; }
+#touch button, #gtouch button, #ctouch button {
   pointer-events: auto; touch-action: none;
   -webkit-tap-highlight-color: transparent;
   font-family: var(--mono); letter-spacing: .16em; text-transform: uppercase;
@@ -765,12 +765,12 @@ html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
   transition: background .1s linear, color .1s linear, border-color .1s linear,
               transform .1s ease;
 }
-#touch button.on, #gtouch button.on { transform: scale(.94); }
+#touch button.on, #gtouch button.on, #ctouch button.on { transform: scale(.94); }
 
 /* The floating stick. It has no home of its own — it appears centred on
    wherever the thumb landed, which is the only arrangement that works when
    you cannot see your own hand. */
-#flypad, #walkpad {
+#flypad, #walkpad, #chutepad {
   --pad: min(25vmin, 168px);
   position: absolute; left: 0; top: 0;
   width: var(--pad); height: var(--pad);
@@ -780,12 +780,12 @@ html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
     rgba(8, 16, 20, .12) 62%, rgba(8, 16, 20, 0) 100%);
   opacity: 0; transition: opacity .16s ease; pointer-events: none;
 }
-#flypad.on, #walkpad.on { opacity: 1; }
-#flypad::after, #walkpad::after {
+#flypad.on, #walkpad.on, #chutepad.on { opacity: 1; }
+#flypad::after, #walkpad::after, #chutepad::after {
   content: ''; position: absolute; inset: 38%;
   border: 1px solid var(--edge); border-radius: 50%; opacity: .5;
 }
-#flyknob, #walkknob {
+#flyknob, #walkknob, #chuteknob {
   position: absolute; left: 50%; top: 50%;
   width: 30%; height: 30%; margin: -15% 0 0 -15%;
   border-radius: 50%; background: rgba(79, 210, 232, .30);
@@ -834,13 +834,29 @@ html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
 #t-drop.armed { border-color: var(--ember); color: var(--ember-hi); }
 #t-scoop.armed { border-color: var(--sea); color: var(--sea); }
 
-#tmini, #gmini {
+#tmini, #gmini, #cmini {
   position: absolute; left: .8rem; bottom: .8rem;
   display: flex; gap: .45rem;
 }
-#tmini button, #gmini button { padding: .55rem .7rem; font-size: .52rem; }
-#tmini button.on, #gmini button.on { background: rgba(255, 208, 138, .26); border-color: var(--ember-hi);
+#tmini button, #gmini button, #cmini button { padding: .55rem .7rem; font-size: .52rem; }
+#tmini button.on, #gmini button.on, #cmini button.on {
+                   background: rgba(255, 208, 138, .26); border-color: var(--ember-hi);
                    color: var(--ember-hi); }
+
+/* The one-way doors, on their own row above the controls and deliberately
+   quieter than them: smaller, dimmer, further from where a thumb lives. The
+   first tap arms one and it says so in ember; the second commits. */
+#tdoor {
+  position: absolute; left: .8rem; bottom: 3.1rem;
+  display: flex; gap: .4rem;
+}
+#tdoor button {
+  padding: .38rem .55rem; font-size: .44rem; opacity: .5;
+}
+#tdoor button.armed {
+  opacity: 1; background: rgba(224, 65, 36, .28);
+  border-color: var(--blood); color: #ffcdb8;
+}
 
 /* ───────────────────────────────────────────────────── the language picker ── */
 

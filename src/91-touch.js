@@ -48,6 +48,21 @@ function initTouch() {
   const isControl = (t) => t && t.closest
     && t.closest('button, input, a, #thr, #panel, #veil, #over, #rotate');
 
+  /**
+   * Claim a pointer, and do not care if it has already gone.
+   *
+   * setPointerCapture throws NotFoundError when the pointer it names is no
+   * longer active, which can happen between the event being queued and the
+   * handler running — and an exception thrown out of a pointerdown handler
+   * leaves the pad half-set-up: latched onto an id, drawn on screen, and never
+   * to be released, because the matching pointerup goes to the same dead id.
+   * The releases in this file have always been wrapped. The claims should be
+   * too, for the same reason.
+   */
+  const capture = (el, id) => {
+    try { el.setPointerCapture(id); } catch (err) { /* pointer already gone */ }
+  };
+
   function stickTo(dx, dy) {
     const r = padRadius;
     let x = clamp(dx / r, -1, 1);
@@ -163,6 +178,32 @@ function initTouch() {
     el.addEventListener('pointercancel', go);
   }
 
+  /**
+   * A button that has to be asked twice.
+   *
+   * On a keyboard, J has no confirmation and is not getting one: half the point
+   * of it is being available in the two seconds before the ridge arrives, and a
+   * dialogue box in those two seconds is the same as not having the key. The
+   * risk it is guarding against there is *hesitation*.
+   *
+   * On glass the risk is the opposite one. There is no travel, no edge to feel
+   * for, and your thumb is already down there working the stick; the way you
+   * lose the aeroplane is by brushing something, not by choosing it. So the
+   * first tap only arms — the button lights and says so — and the second, within
+   * `hold` seconds, commits. Two deliberate taps still take well under a second,
+   * which is inside the budget the keyboard key was protecting.
+   */
+  function arm(id, fn, hold = 2.5) {
+    const el = document.getElementById(id);
+    let timer = null;
+    const disarm = () => { clearTimeout(timer); timer = null; el.classList.remove('armed'); };
+    tap(id, () => {
+      if (timer) { disarm(); fn(); return; }
+      el.classList.add('armed');
+      timer = setTimeout(disarm, hold * 1000);
+    });
+  }
+
   hold('t-scoop', (v) => { TOUCH.scoop = v; });
   hold('t-drop', (v) => { TOUCH.drop = v; });
 
@@ -174,6 +215,14 @@ function initTouch() {
     TOUCH.level = !TOUCH.level;
     el.classList.toggle('on', TOUCH.level);
   });
+
+  // The one-way doors. A phone has no number row and no J, so without these
+  // three the seat and both back doors simply do not exist on a touchscreen —
+  // which is where the half of the game that happens on foot is hardest to
+  // reach and most worth reaching.
+  arm('t-bail', () => baleOut());
+  arm('t-jad', () => skipToJadrija());
+  arm('t-rok', () => skipToGround());
 
   // ── on foot ───────────────────────────────────────────────────────────────
   // The same two halves as in the air, meaning the opposite thing in both. The
@@ -206,12 +255,12 @@ function initTouch() {
       walkPad.style.left = `${walkOx}px`;
       walkPad.style.top = `${walkOy}px`;
       walkPad.classList.add('on');
-      gtouch.setPointerCapture(e.pointerId);
+      capture(gtouch, e.pointerId);
       walkTo(0, 0);
     } else if (lookId === null) {
       lookId = e.pointerId;
       lookX = e.clientX; lookY = e.clientY;
-      gtouch.setPointerCapture(e.pointerId);
+      capture(gtouch, e.pointerId);
     }
   }, { passive: false });
 
@@ -238,6 +287,7 @@ function initTouch() {
   gtouch.addEventListener('pointercancel', endGround);
 
   hold('t-jet', (v) => { TOUCH.gjet = v; });
+  tap('t-up', () => launchOut());
   tap('t-in', () => toggleGround());
   tap('t-gset', () => togglePanel());
   tap('t-gpause', () => togglePause());
@@ -245,6 +295,72 @@ function initTouch() {
     TOUCH.grun = !TOUCH.grun;
     el.classList.toggle('on', TOUCH.grun);
   });
+
+  // ── under the canopy ──────────────────────────────────────────────────────
+  // The same two halves once more. What is different is that one stick carries
+  // all three controls rather than two of them, which is not a compromise: on a
+  // real canopy your two hands do exactly this. Sideways hauls a riser. Forward
+  // is the front risers — faster, steeper, further upwind. Back is the brakes,
+  // and all the way back is the flare, which is why it is a threshold and not a
+  // proportion: a flare is a thing you commit to at ten metres, not a dial.
+
+  const chutePad = document.getElementById('chutepad');
+  const chuteKnob = document.getElementById('chuteknob');
+  let cId = null, cOx = 0, cOy = 0;
+  let cLookId = null, cLookX = 0, cLookY = 0;
+
+  function chuteTo(dx, dy) {
+    const r = padRadius;
+    let x = clamp(dx / r, -1, 1);
+    let y = clamp(-dy / r, -1, 1);
+    if (Math.hypot(x, y) < 0.12) { x = 0; y = 0; }
+    TOUCH.cx = x; TOUCH.cy = y;
+    chuteKnob.style.transform = `translate(${x * r * 0.6}px, ${-y * r * 0.6}px)`;
+  }
+
+  const ctouch = document.getElementById('ctouch');
+  ctouch.addEventListener('pointerdown', (e) => {
+    if (isControl(e.target)) return;
+    e.preventDefault();
+    if (e.clientX < innerWidth * 0.46 && cId === null) {
+      cId = e.pointerId;
+      cOx = e.clientX; cOy = e.clientY;
+      chutePad.style.left = `${cOx}px`;
+      chutePad.style.top = `${cOy}px`;
+      chutePad.classList.add('on');
+      capture(ctouch, e.pointerId);
+      chuteTo(0, 0);
+    } else if (cLookId === null) {
+      cLookId = e.pointerId;
+      cLookX = e.clientX; cLookY = e.clientY;
+      capture(ctouch, e.pointerId);
+    }
+  }, { passive: false });
+
+  ctouch.addEventListener('pointermove', (e) => {
+    if (e.pointerId === cId) {
+      chuteTo(e.clientX - cOx, e.clientY - cOy);
+    } else if (e.pointerId === cLookId) {
+      if (eject) eject.look((e.clientX - cLookX) * 0.0060, (e.clientY - cLookY) * 0.0060);
+      cLookX = e.clientX; cLookY = e.clientY;
+    }
+  }, { passive: false });
+
+  const endChute = (e) => {
+    if (e.pointerId === cId) {
+      cId = null;
+      TOUCH.cx = TOUCH.cy = 0;
+      chutePad.classList.remove('on');
+      chuteKnob.style.transform = '';
+    } else if (e.pointerId === cLookId) {
+      cLookId = null;
+    }
+  };
+  ctouch.addEventListener('pointerup', endChute);
+  ctouch.addEventListener('pointercancel', endChute);
+
+  tap('t-cset', () => togglePanel());
+  tap('t-cpause', () => togglePause());
 
   measure();
 }

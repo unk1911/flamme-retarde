@@ -1674,7 +1674,15 @@ async function buildJadrija(scene) {
     // the corners rounded off, and the rounding is the whole trick. Redrawing
     // the heading outright every second is a fly in a jar; carrying it forward
     // and nudging it is somebody enjoying themselves.
-    turn: [0.55, 1.35], swing: 1.5, pace: [0.55, 1.35],
+    // `pace` is a multiple of `skip`, not a speed — `skip` is the speed the
+    // clip is *authored* for and changing it would only unhook the feet from
+    // the deck, because showPace() scales the clip's clock by v / SHOW.skip.
+    // Slowing her down means drawing a smaller multiple, and the clip slows
+    // with it. She used to draw between 0.55 and 1.35, which peaked at
+    // 4.9 m/s — a flat sprint, on a promenade, for no reason. 0.42 to 0.92 is
+    // 1.5 to 3.3, which is an amble to a jog and reads as somebody enjoying an
+    // afternoon rather than somebody late for something.
+    turn: [0.55, 1.35], swing: 1.5, pace: [0.42, 0.92],
     crawlTurn: [0.9, 2.0], crawlSwing: 0.7,
     edge: 14,           // metres from the ends of the resort the push starts
     joy: 0.22,          // chance that a new heading comes with a somersault
@@ -2015,7 +2023,10 @@ async function buildJadrija(scene) {
         // she cannot go over straight out of a hard turn.
         show.played += dt;
         show.want = show.wander;
-        showMove(show.pace * 0.8, dt);
+        // showPace, not showMove: she is still playing the skip clip here, so
+        // the clock has to come down with the speed or the run-up into a
+        // cartwheel is the one bit of her wander where the feet still slide.
+        showPace(show.pace * 0.8, dt);
         if (show.tmr > 0.75 && Math.abs(show.side + Math.PI / 2) < 0.06) {
           show.wheels = 1; showSay('whee', d); go('wheel', 'cartwheel', 0.20);
         }
@@ -2102,7 +2113,7 @@ async function buildJadrija(scene) {
         show.want = showSteer(show.wander);
         // Slower the closer in she is, so a player who walks straight at her
         // gets sidestepped rather than run around.
-        showPace(SHOW.skip * clamp(0.42 + r / 9, 0.42, 1.0), dt);
+        showPace(SHOW.skip * clamp(0.40 + r / 12, 0.40, 0.82), dt);
         if (show.tmr - show.said > SHOW.say[0]
           + Math.random() * (SHOW.say[1] - SHOW.say[0])) {
           show.said = show.tmr;
@@ -2132,7 +2143,7 @@ async function buildJadrija(scene) {
         const dt0 = show.home[0] - show.t, ds0 = show.home[1] - show.s;
         const dist = Math.hypot(dt0, ds0);
         show.want = Math.atan2(ds0, dt0);
-        if (dist > 1.1) showMove(Math.min(SHOW.skip, dist * 1.7), dt);
+        if (dist > 1.1) showPace(Math.min(SHOW.skip * 0.85, dist * 1.7), dt);
         else go('idle', 'idle', 0.4);
         break;
       }

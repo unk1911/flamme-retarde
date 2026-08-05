@@ -73,11 +73,11 @@ addEventListener('keydown', (e) => {
   // game you cannot take back, and it should not be within reach of the fingers
   // flying the approach.
   if (e.code === 'KeyJ') { e.preventDefault(); baleOut(); }
-  // And SHIFT is the same idea from a standing start. Only on foot: in the air
-  // it is still the flaps, and under a canopy your hands are full.
-  if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && state.phase === 'ground') {
-    e.preventDefault(); launchOut(); return;
-  }
+  // And U is the same idea from a standing start — [U]p. Next door to J on the
+  // board, which is right: they are the same act, once with an aeroplane
+  // underneath you and once with a promenade. Only on foot; under a canopy you
+  // already have one, and in the seat J is the key that does this.
+  if (e.code === 'KeyU' && state.phase === 'ground') { e.preventDefault(); launchOut(); return; }
   if (state.phase === 'ground' || state.phase === 'chute') {
     // On foot, or under a canopy, the aeroplane's controls are all meaningless
     // and several of them would quietly reconfigure an aircraft you are not
@@ -935,12 +935,13 @@ function baleOut() {
   $('hud').hidden = true;
   $('touch').hidden = true;
   $('chute-hud').hidden = false;
+  if (IS_TOUCH) $('ctouch').hidden = false;
   alerts.bump(2.2);
   toast(T(low ? 'toast.ejectLow' : 'toast.eject'), 'bad');
 }
 
 /**
- * SHIFT — the charge under your boots.
+ * U — the charge under your boots.
  *
  * There is a rope ladder in every world made of triangles, and this is ours.
  * Terrain, a promenade deck, a hut and a hundred bathers all have to agree with
@@ -980,7 +981,7 @@ function launchOut() {
   $('ground-hud').hidden = true;
   $('hud').hidden = true;
   $('chute-hud').hidden = false;
-  if (IS_TOUCH) { $('gtouch').hidden = true; $('touch').hidden = true; }
+  if (IS_TOUCH) { $('gtouch').hidden = true; $('touch').hidden = true; $('ctouch').hidden = false; }
   toast(T('toast.launch'));
 }
 
@@ -1004,7 +1005,7 @@ function chuteDown(kind) {
     $('chute-hud').hidden = true;
     $('hud').hidden = true;
     $('ground-hud').hidden = false;
-    if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = false; }
+    if (IS_TOUCH) { $('touch').hidden = true; $('ctouch').hidden = true; $('gtouch').hidden = false; }
     if (!IS_TOUCH && !pointerLocked) grabPointer();
     paintDeviceText();
     toast(T('toast.walkedAway'));
@@ -1204,7 +1205,8 @@ function updateChuteHUD() {
   $('ch-hint').textContent = eject.phase === 'down' ? ''
     : !eject.flying ? T('chute.wait')
       : s.stalled ? T('chute.stalled')
-        : wet ? T('chute.water') : T('chute.steer');
+        : wet ? T('chute.water')
+          : T(IS_TOUCH ? 'chute.steerTouch' : 'chute.steer');
 }
 
 function updateGroundHUD(dt) {
@@ -1362,6 +1364,7 @@ function showEnd(won, crashed = false, onWater = false, chute = null) {
   redrawEnd();
   $('touch').hidden = true;
   $('gtouch').hidden = true;
+  $('ctouch').hidden = true;
   $('ground-hud').hidden = true;
   $('chute-hud').hidden = true;
   document.exitPointerLock?.();
@@ -1486,13 +1489,18 @@ function frame() {
     // hanging under a canopy watching the other one go in.
     flyDerelict(dt);
     eject.update(dt, {
-      turn: (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0)
-        - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0),
+      turn: clamp((keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0)
+        - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0) + TOUCH.cx, -1, 1),
       // Up is the front risers and down is the brakes, which is the way round
       // your hands actually go: push the nose down to reach, hold it off to
       // stay up. Space keeps the flare on its own key for the landing.
-      dive: keys.has('ArrowUp') || keys.has('KeyW') ? 1 : 0,
-      flare: keys.has('Space') || keys.has('ArrowDown') || keys.has('KeyS'),
+      //
+      // On glass all three are the one stick. Forward is proportional, because
+      // the risers are; back past two-thirds is the flare, because a flare is
+      // not — it is a thing you commit to at ten metres with both hands.
+      dive: keys.has('ArrowUp') || keys.has('KeyW') ? 1 : Math.max(0, TOUCH.cy),
+      flare: keys.has('Space') || keys.has('ArrowDown') || keys.has('KeyS')
+        || TOUCH.cy < -0.66,
     });
     updateMission(dt);
   }
@@ -1523,7 +1531,14 @@ function frame() {
   // On foot the camera *is* the player — no smoothing, no chase spring, no
   // lerp. Every one of those is there to make an aeroplane readable from
   // outside, and every one of them reads as motion sickness from inside a head.
-  if (state.phase === 'ground') ground.pose(camera);
+  // The screenshot override goes first, ahead of the phase. It used to live
+  // inside updateCamera(), which only the aeroplane reaches — so `__fr.look()`
+  // did nothing at all on foot or under a canopy, silently, and every attempt
+  // to photograph something at eye height came back as a picture of wherever
+  // the player happened to be standing. Those are the two modes you most want
+  // to aim a camera in.
+  if (camOverride) updateCamera(dt);
+  else if (state.phase === 'ground') ground.pose(camera);
   else if (state.phase === 'chute' || eject.active) eject.pose(camera);
   else if (state.phase !== 'intro') updateCamera(dt);
   U.uCamPos.value.copy(camera.position);

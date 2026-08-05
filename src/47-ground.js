@@ -1137,16 +1137,15 @@ async function buildGround(scene, field) {
     const m = Math.hypot(ix, iz);
     if (m > 1) { ix /= m; iz /= m; }
 
-    // Q, not Shift. Shift used to be the run and is now the charge under your
-    // boots — see launchOut() in 90-app.js — and those two cannot share a key:
-    // one is held down for four hundred metres of promenade and the other
-    // happens once and puts you fifty metres in the air. Sprinting is the one
-    // that moves, so sprinting is the one that moved.
+    // Shift, where it has always been and where a hand expects it. It briefly
+    // was not: when the escape charge arrived it took Shift and pushed the run
+    // onto Q, which was the wrong way round — the charge fires once in a
+    // session and the run is held down for four hundred metres of promenade,
+    // so the one that should have moved was the rare one. It did, to U.
     //
-    // And Q rather than the obvious Ctrl, because Ctrl+W closes the browser
-    // tab and no page is allowed to stop it. "Sprint forwards" cannot be a
-    // chord that throws away the game.
-    const top = (keys.has('KeyQ') || TOUCH.grun) ? GROUND.run : GROUND.walk;
+    // Q still runs. Nobody has to unlearn a key that costs a boolean to keep.
+    const top = (keys.has('ShiftLeft') || keys.has('ShiftRight') || keys.has('KeyQ')
+      || TOUCH.grun) ? GROUND.run : GROUND.walk;
     const wx = (fx * iz + rx * ix) * top;
     const wz = (fz * iz + rz * ix) * top;
     you.vx = damp(you.vx, wx, m > 0.01 ? GROUND.accel / top : GROUND.drag, dt);

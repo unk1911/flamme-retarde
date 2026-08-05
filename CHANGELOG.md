@@ -10,6 +10,193 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.30.0] — 2026-08-05
+
+### Added — anklets
+
+A thin gold band on each ankle, and geometry rather than paint. Everything that
+makes her *face* read at twenty metres on this figure is a vertex colour, and
+that is the right call for a mouth; it is the wrong one for jewellery, which is
+a silhouette and a highlight before it is a colour. Painted, an anklet is a tan
+line.
+
+Measured off the mesh rather than authored, like everything else here: the ankle
+marker sits at z = 0.0756 and 35 mm above it the leg is a clean 82 × 60 mm
+ellipse — low enough to be at her ankle, high enough to be past the flare of the
+heel, which at the marker itself is still 114 mm across and would want a ring
+you could get a fist through. The ring is elliptical to match, and deliberately
+about 4 mm generous: a ring that intersects the leg shows skin through the metal
+and stops being an object, while one floating a few millimetres off it is what
+an anklet does anyway. 192 triangles each.
+
+Gold rather than silver because the runtime hands this body a different skin
+tone per figure, and gold is the one metal that survives all of them.
+
+`hair()` is now `extras()` and owns every piece of joined geometry, because the
+idempotence depends on it: `join` appends, so the added geometry is always the
+last N vertices and re-running deletes the previous N first — a trick that only
+survives while one function owns all of it. Two functions each deleting their
+own last N would eat each other's work. `--hair` still works and still means the
+same thing.
+
+### Added — the shimmy and the moonwalk, baked but not yet danced
+
+Both clips are authored, floor-checked and in the blob. **Nothing triggers them
+yet** — the performance state machine in `src/43-jadrija.js` has not been taught
+to choose them, so in this build they are twelve clips where there were ten and
+four kilobytes of payload. They ship now because the alternative is a committed
+`human_mh.py` that does not produce the committed `human_skin.fr3d.gz`, and that
+is a worse thing to have in a repository than a clip nobody plays.
+
+The shimmy is a twist and only a twist: the shoulders alternate ±14° up the
+spine, the neck and head carry +7 each against it and net to zero, and the hips
+give two degrees back. The stillness of the face is what makes it read as a
+shimmy rather than as somebody looking left and right; get the hips involved and
+it becomes a shake.
+
+The moonwalk turns entirely on which foot is doing which. The popped foot is the
+anchor: it does not move relative to the *deck*, so relative to her body it has
+to travel forward by exactly as far as the body travels back, which is why its
+hip sweeps 34° while it is nominally standing still. Author it as stationary in
+her own frame — the obvious way round — and the anchor glides backwards with
+her, nothing is planted, and the illusion does not happen. There is no walking
+in a moonwalk at all, only one foot sliding and one foot waiting, and the eye
+reads walking anyway *because* something stays put. That same 34° is where the
+travel speed comes from, so the clip and the game cannot drift: 34° of hip on a
+0.90 m hip-to-toe is 0.53 m over a 0.70 s half-cycle, which is 0.76 m/s.
+
+The cartwheel's floor solve is now `floor_poses()` and both dances use it. The
+moonwalk needed it for the same reason the cartwheel did — the anchor leg's knee
+straightens 12° across the glide, so no constant hip height is right at both
+ends of it. Unsolved it went 10 cm through the concrete in the middle of the
+glide and 2.5 cm above it at the swap. Solved: shimmy 0.000 m, moonwalk
+−0.013 m, cartwheel unchanged at −0.051 m.
+
+Both are sampled from a continuous function rather than hand-keyed, for the
+reason the cartwheel already documents — `_bake_clip` eases *within* each key
+interval, so five keys arrive as five lurches. It also gives the floor pass keys
+close enough together to be worth running: solved at five, the moonwalk's
+deepest point sits in the middle of an interval where nothing was measured.
+
+### Fixed — two things that were only ever going to bite once
+
+**Every loose shell went to her skull.** `skin()` solves weights on the body
+shell and hands each loose shell whole to a single bone, defaulting to `head`.
+That was correct for every shell the base mesh has — teeth, tongue, eyeballs,
+lashes are all inside the skull, and so is the ponytail — and it stopped being
+correct the instant a loose shell existed below the neck. The first pair of
+anklets came back rigidly attached to her jaw and the export was perfectly happy
+about it. Shells under the collarbone now go to the nearest bone; nothing above
+it moved.
+
+**`__fr.look()` did nothing on foot or under a canopy.** The screenshot camera
+override lived inside `updateCamera()`, which only the aeroplane reaches — so
+every attempt to photograph something at eye height came back as a picture of
+wherever the player happened to be standing, silently and with no error. Those
+are the two modes you most want to aim a camera in. The override is checked
+ahead of the phase now.
+
+### Fixed — she was clamping her hands over her own head
+
+Reported as "her arms get criss-crossed over, and they almost arch too far back
+a bit". Both were true, both were one number in `_wheel_half`, and neither was a
+matter of taste — they measure.
+
+**The cross.** The hands were held apart by ten degrees at the shoulder, and ten
+degrees was not a spread at all: with the arms swung overhead it put her wrists
+**12.5 cm the wrong side of each other**, on eleven of the wheel's twenty-five
+keys — the entire upright approach and the entire upright exit. Rendered from
+the front she is not holding her arms up, she is clamping both hands over her
+ears with her forearms crossed above her skull, which is exactly what the
+screenshot showed. Thirty-six degrees holds them 0.28 m apart going in and
+coming out, which is her own shoulder width, and closes to 0.06 m through the
+inverted middle where the two hands belong close together on the line.
+
+The sign of it is worth recording because it is the opposite of what the rest of
+the file implies. On an arm hanging at her side, +Z on the left adducts — that
+is what the idle pose's +29 does. On an arm already swung 160° overhead the
+Euler's X has carried the local frame round with it and the same +Z *abducts*.
+Reading the idle sign across and flipping it, which is the obvious move, gets
+you 33 cm of crossed wrists instead of 12.
+
+**The arch.** −166 at the shoulder, −4 at the elbow and −18 at the wrist sum to
+−188 — eight degrees past straight overhead, carrying her hands 12 cm *behind*
+her shoulders and bowing her back to keep up. The same three summing to −180 put
+the arms in line with the trunk. Worst-case arch over the wheel goes from
+−0.123 m to −0.076; on the upright keys, where you see it, from −0.12 to −0.03.
+
+Ground contact is unchanged to a millimetre or two — deepest key −0.051 m
+against −0.054 before, hands within ±1.4 cm through their planted stretches.
+
+### Changed — she is not late for anything
+
+She wandered the promenade at up to 4.9 m/s, which is a flat sprint. The number
+that sets it is a multiple of the speed the skip clip is authored for, not a
+speed, so bringing it down brings the clip's clock down with it and the feet
+stay on the deck: 0.42 to 0.92 of nominal, which is 1.5 to 3.3 m/s. An amble to
+a jog. The orbit she sweeps around you came down with it.
+
+Two states were still calling `showMove` rather than `showPace` — the run-up
+into a cartwheel and the walk home to her spot — so those were the last two
+places where her feet slid regardless of the speed. They scale now like
+everything else.
+
+## [1.29.0] — 2026-08-05
+
+### Changed — the run key goes back where it was, and the charge moves to U
+
+1.28.0 put the escape charge on Shift and pushed the run onto Q. That was the
+wrong way round and it took one report to prove it: the charge fires once in a
+session, the run is held down for four hundred metres of promenade, and the key
+that should have moved was the rare one. So it did.
+
+**Shift runs again.** Q still runs too — nobody has to unlearn a key that costs
+a boolean to keep. **The charge is on U**, next door to J on the board, which is
+where it belongs: they are the same act, once with an aeroplane underneath you
+and once with a promenade.
+
+### Added — J, U, 9 and 0 on a touchscreen
+
+A phone has no number row and no J, so the seat and both back doors did not
+exist there at all. Which is backwards: the half of this game that happens on
+foot is the half a phone reaches least easily and the half most worth reaching.
+
+- **Under the flight controls, a row of three one-way doors**: BAIL (the seat),
+  JADRIJA and ROKIĆI (the two shortcuts). Quieter than the controls, set back
+  from them, and each armed by a first tap and committed by a second.
+
+  On a keyboard J has no confirmation and is not getting one — half the point of
+  it is being available in the two seconds before the ridge arrives, and the
+  risk it guards against there is hesitation. On glass the risk is the opposite:
+  no travel, no edge to feel for, your thumb already down there on the stick,
+  and the way you lose the aeroplane is by brushing something rather than by
+  choosing it. Two deliberate taps still fit inside the budget the keyboard key
+  was protecting.
+
+- **UP on the on-foot controls**, one tap and no arming. This is the way out of
+  being stuck under the floor, and a way out you have to press twice is a worse
+  one.
+
+### Added — controls under the canopy on a touchscreen
+
+Giving someone the seat on a phone means owing them the risers. There were none:
+the parachute had no touch layer, because until now no touchscreen could reach a
+parachute, so the two gaps had been hiding each other.
+
+One stick carries all three controls, which is not a compromise — on a real
+canopy your two hands do exactly this. Sideways hauls a riser. Forward is the
+front risers, proportional, because the risers are. Back past two-thirds is the
+flare, which is a threshold rather than a proportion because a flare is a thing
+you commit to at ten metres with both hands. The right half of the screen is
+your head, as it is on foot.
+
+### Fixed
+
+A pointer capture that could throw out of a `pointerdown` handler and leave a
+pad latched onto a dead pointer id — drawn on screen, never released, because
+the matching `pointerup` goes to the same dead id. The releases in that file had
+always been wrapped; the claims are now too.
+
 ## [1.28.0] — 2026-08-05
 
 ### Added — SHIFT, and fifty metres of clear air
