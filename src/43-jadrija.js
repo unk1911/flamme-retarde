@@ -1687,6 +1687,21 @@ async function buildJadrija(scene) {
     edge: 14,           // metres from the ends of the resort the push starts
     joy: 0.22,          // chance that a new heading comes with a somersault
     spin: 0.16,         // and the chance it comes with a run of cartwheels
+    // And the two dances. Lower odds than the acrobatics on purpose: a
+    // somersault is over in a second and a half and these are held for three or
+    // four, so equal odds would have her dancing most of the time she is not
+    // tumbling and wandering almost never.
+    shimmy: 0.10,
+    moon: 0.08,
+    shimmyFor: 3.4,     // seconds of it, which is about eight reversals
+    moonFor: 4.6,
+    // m/s of backward glide. Not a number that was chosen — it is 34° of hip on
+    // a 0.90 m hip-to-toe over a 0.70 s half-cycle, which is what the anchor
+    // foot in the clip gives back per stride. See MOON_SWEEP in
+    // tools/blender/human_mh.py; if that moves, this moves with it, or the one
+    // foot that is meant to be standing still starts sliding.
+    moonPace: 0.76,
+    moonEdge: 10,       // m from the ends of the deck where the glide gives up
     say: [1.8, 4.2],    // seconds between noises while she is playing
     // ── the water ─────────────────────────────────────────────────────────
     // How long the jet is remembered after it comes off her. Not zero: a hose
@@ -1860,7 +1875,7 @@ async function buildJadrija(scene) {
    * hosed and not noticing, and a scramble is much the better of the two.
    */
   const WETTABLE = { idle: 1, notice: 1, crawl: 1, play: 1, home: 1,
-    aim: 1, orbit: 1 };
+    aim: 1, orbit: 1, shimmy: 1, moon: 1 };
 
   function stepShow(dt, pt, ps) {
     if (!show || !skinFig) return;
@@ -2005,6 +2020,20 @@ async function buildJadrija(scene) {
             go('aim', 'skip', 0.20);
             break;
           }
+          if (dice < SHOW.joy + SHOW.spin + SHOW.shimmy) {
+            showSay('whee', d);
+            go('shimmy', 'shimmy', 0.24);
+            break;
+          }
+          if (dice < SHOW.joy + SHOW.spin + SHOW.shimmy + SHOW.moon) {
+            // Down the long axis of the promenade and away from you, for the
+            // cartwheel's reason and one of its own. The deck is four metres
+            // deep, so a glide taking the short way across is over the edge in
+            // two seconds — and the joke only works if she is going *away*.
+            show.wander = show.t > pt ? 0 : Math.PI;
+            go('moon', 'moonwalk', 0.30);
+            break;
+          }
         }
         show.want = showSteer(show.wander);
         showPace(show.pace, dt);
@@ -2139,6 +2168,58 @@ async function buildJadrija(scene) {
         if (done) { showWander(SHOW.turn, SHOW.swing); go('play', 'skip', 0.24); }
         break;
 
+      case 'shimmy':
+        // Standing still, and turned to face you, because a shimmy is a thing
+        // done *at* somebody. There is no showMove here and that is the point:
+        // the clip keeps both feet on the deck the whole way through, so any
+        // travel under it turns a dance straight back into a walk with the
+        // shoulders twitching.
+        show.played += dt;
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        if (show.tmr - show.said > SHOW.say[0] * 0.7
+          + Math.random() * (SHOW.say[1] - SHOW.say[0])) {
+          show.said = show.tmr;
+          showSay(say1(CHAT), d);
+        }
+        if (show.tmr > SHOW.shimmyFor || d > SHOW.far) {
+          show.wander = show.ang;
+          showWander(SHOW.turn, SHOW.swing);
+          go('play', 'skip', 0.24);
+        }
+        break;
+
+      case 'moon':
+        // Facing you and going the other way, which is the entire joke.
+        //
+        // It is two separate things and the split is what makes it work: the
+        // *heading* runs down the promenade away from you, and `side` — the
+        // offset between where she is going and where she is pointed — is held
+        // at a half turn, so she travels backwards along her own course with
+        // her face toward you. See the wantSide block below. The cartwheel uses
+        // the same machinery at a quarter turn.
+        //
+        // Nothing here plays with the clip's clock. The glide speed and the
+        // clip are locked together by MOON_SWEEP at the point the clip was
+        // authored, and scaling either on its own is how the anchor foot — the
+        // one thing in a moonwalk that must not move — starts sliding.
+        show.played += dt;
+        show.want = show.wander;
+        showMove(SHOW.moonPace, dt);
+        if (show.tmr - show.said > SHOW.say[0]
+          + Math.random() * (SHOW.say[1] - SHOW.say[0])) {
+          show.said = show.tmr;
+          showSay(say1(CHAT), d);
+        }
+        // The deck runs out, and `showMove` clamps rather than stops — held
+        // against the clamp she would glide on the spot for two seconds, which
+        // is a moonwalk on a treadmill.
+        if (show.tmr > SHOW.moonFor || d > SHOW.far
+          || show.t < SHOW.moonEdge || show.t > LEN - SHOW.moonEdge) {
+          showWander(SHOW.turn, SHOW.swing);
+          go('play', 'skip', 0.26);
+        }
+        break;
+
       case 'home': {
         const dt0 = show.home[0] - show.t, ds0 = show.home[1] - show.s;
         const dist = Math.hypot(dt0, ds0);
@@ -2182,8 +2263,13 @@ async function buildJadrija(scene) {
       while (show.side > Math.PI) show.side -= TAU;
       while (show.side < -Math.PI) show.side += TAU;
     } else {
+      // A quarter turn for the cartwheel, because a wheel travels along the
+      // line the body goes over and that line is ninety degrees off the way she
+      // is facing. A half turn for the moonwalk, because that one travels
+      // backwards. Both are fixed offsets held for the length of the move and
+      // given back afterwards, which is what this branch is for.
       const wantSide = show.phase === 'aim' || show.phase === 'wheel'
-        ? -Math.PI / 2 : 0;
+        ? -Math.PI / 2 : show.phase === 'moon' ? Math.PI : 0;
       show.side += clamp(wantSide - show.side, -2.6 * dt, 2.6 * dt);
     }
 

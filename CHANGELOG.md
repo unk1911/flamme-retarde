@@ -10,6 +10,50 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.31.0] — 2026-08-05
+
+### Added — she dances now
+
+The two clips 1.30.0 baked are wired into the performance. They come off the
+same dice as the somersault and the run of cartwheels, at lower odds than
+either: a somersault is over in a second and a half and these are held for three
+or four, so equal odds would have her dancing most of the time she was not
+tumbling and wandering almost never. 10% shimmy, 8% moonwalk.
+
+**The shimmy** turns her to face you and stops her dead. There is no travel
+under it at all, and that is the point rather than an omission: the clip keeps
+both feet on the deck the whole way through, so anything moving beneath it turns
+the dance back into a walk with the shoulders twitching. She holds it for 3.4 s
+— about eight reversals — and chatters through it.
+
+**The moonwalk** faces you and goes the other way, which is the entire joke. It
+is two separate things and the split is what makes it work: the *heading* runs
+down the long axis of the promenade away from you, and `side` — the offset
+between where she is going and where she is pointed — is held at a half turn, so
+she travels backwards along her own course with her face toward you. The
+cartwheel has used the same machinery at a quarter turn since it shipped; this
+is that mechanism with a different number in it.
+
+Down the long axis for the cartwheel's reason and one of its own: the deck is
+four metres deep, so a glide taking the short way across is over the edge in two
+seconds — and it only reads if she is going *away*. She gives up at 10 m from
+either end of the resort, because `showMove` clamps rather than stops and held
+against the clamp she would glide on the spot, which is a moonwalk on a
+treadmill.
+
+Nothing plays with the clip's clock. The glide speed and the clip were locked
+together by MOON_SWEEP when the clip was authored — 0.76 m/s, and the constant
+in `43-jadrija.js` says where it comes from — and scaling either on its own is
+how the anchor foot, the one thing in a moonwalk that must not move, starts
+sliding.
+
+Both are in `WETTABLE`, so a branch pointed at her mid-dance still gets the
+reaction it would have got mid-wander.
+
+Measured: 92 frames of moonwalk at 0.05 s, `side` settling to π within 1.2 s of
+entry and holding, and her promenade coordinate running 93.6 → 90.4 with the
+player at 132.4 — away, at 0.75 m/s against the 0.76 authored.
+
 ## [1.30.0] — 2026-08-05
 
 ### Added — anklets
