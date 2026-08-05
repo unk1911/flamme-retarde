@@ -940,11 +940,42 @@ async function buildGround(scene, field) {
     return Math.hypot(px - cx, pz - cz) < r ? t : -1;
   }
 
+  // ── guests ─────────────────────────────────────────────────────────────────
+  /**
+   * Somebody the jet can land on who is not on the strength.
+   *
+   * The crew are modelled in this file because putting them out is what the
+   * mode is *for*. The girl on the promenade at Jadrija is not: she belongs to
+   * 43-jadrija.js, which knows nothing about hoses, and the ground mode knows
+   * nothing about her. Something had to give, and the alternative to a hook
+   * here was that file re-walking this same parabola every frame to find out
+   * whether it had been pointed at her — the trace duplicated, and duplicated
+   * against a moving target, which is the version that goes quietly out of
+   * step and stays that way.
+   *
+   * A probe rather than a position: she moves, and a registration that has to
+   * be kept up to date is a registration that is one frame stale by design.
+   */
+  const guests = [];
+  /**
+   * @param probe  () => {x, y, z, r, h} | null — where she is now, or nothing
+   *               if she is not in the world / not near enough to care about
+   * @param onWet  (litres, hit) => void
+   */
+  function addGuest(probe, onWet) { guests.push({ probe, onWet }); }
+
   function traceJet() {
     const { p, dir } = nozzle();
     let x = p[0], y = p[1], z = p[2];
     let vx = dir[0] * GROUND.jetV, vy = dir[1] * GROUND.jetV, vz = dir[2] * GROUND.jetV;
     const dt = GROUND.jetDt;
+    // Snapshotted once, not per step: a probe is a live read and there are
+    // thirty-odd steps in a trace.
+    const gs = [];
+    for (const g of guests) {
+      const q = g.probe();
+      if (q) gs.push([g, q]);
+    }
     for (let i = 0; i < GROUND.jetSteps; i++) {
       const x0 = x, y0 = y, z0 = z;
       vy -= 9.81 * dt;
@@ -975,6 +1006,13 @@ async function buildGround(scene, field) {
         if (yy > o.y + o.h + 0.4 || yy < o.y - 0.3) continue;
         bt = t; hit = { obj: o };
       }
+      for (const [g, q] of gs) {
+        const t = sweep(x0, z0, x, z, q.x, q.z, q.r + fan);
+        if (t < 0 || t >= bt) continue;
+        const yy = y0 + (y - y0) * t;
+        if (yy > q.y + q.h || yy < q.y - 0.25) continue;
+        bt = t; hit = { guest: g };
+      }
       if (hit) {
         return { x: x0 + (x - x0) * bt, y: y0 + (y - y0) * bt, z: z0 + (z - z0) * bt, ...hit };
       }
@@ -1003,9 +1041,12 @@ async function buildGround(scene, field) {
     } else if (hit.obj) {
       hit.obj.wet += litres / hit.obj.soak;
       hit.obj.heat = Math.max(0, hit.obj.heat - litres / hit.obj.soak * 0.8);
+    } else if (hit.guest) {
+      hit.guest.onWet(litres, hit);
     }
     // Whatever the jet hit, the water still lands on the ground under it.
-    fire.hose(hit.x, hit.z, litres * (hit.crew || hit.obj ? 0.35 : 1));
+    fire.hose(hit.x, hit.z,
+      litres * (hit.crew || hit.obj || hit.guest ? 0.35 : 1));
 
     // Steam, off anything hot enough to make it. This is the fastest feedback
     // in the mode — it appears on the first frame the jet lands, well before a
@@ -1415,7 +1456,7 @@ async function buildGround(scene, field) {
     get active() { return active; },
     get armed() { return armed; },
     update, enter, leave, canEnter, canBoard, look, pose, you,
-    retarget, dropIn,
+    retarget, dropIn, addGuest,
     /** Whichever locale currently owns you — for a test, and read-only. */
     get field() { return field; },
     get stranded() { return stranded; },

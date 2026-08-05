@@ -100,6 +100,10 @@ PUPIL_M, PUPIL_P = (0.040, 0.035, 0.035), (0.040, 0.035, 0.035)
 TOOTH_M, TOOTH_P = (0.880, 0.868, 0.836), (0.880, 0.868, 0.836)
 TONGUE_M, TONGUE_P = (0.520, 0.280, 0.268), (0.520, 0.280, 0.268)
 MOUTH_M, MOUTH_P = (0.300, 0.160, 0.145), (0.300, 0.160, 0.145)
+# Lashes. Darker than the hair rather than the same as it, which is how real
+# ones read — and it is the one place on this figure where a couple of shades
+# is the whole difference between an eye and a hole.
+LASH_M, LASH_P = (0.5, 0.0, 0.0), (0.052, 0.040, 0.036)
 
 
 # --------------------------------------------------------------------------- #
@@ -194,7 +198,7 @@ def load(path, scale, drop):
                 and "eyelash" not in n:
             keep.append((ob, EYE_M, EYE_P))
         elif "eyelash" in n:
-            keep.append((ob, HAIR_M, HAIR_P))
+            keep.append((ob, LASH_M, LASH_P))
         elif n.endswith("-teeth"):
             keep.append((ob, TOOTH_M, TOOTH_P))
         elif n == "helper-tongue":
@@ -466,6 +470,64 @@ def islands(me):
     return lab, sizes
 
 
+def _trim_jaw(bm, dl, body, rig, gi):
+    """Cut the jaw bone back to a jaw.
+
+    Bone heat gives it most of the skull, and by its own lights it is not wrong
+    to: the bone runs from a pivot deep inside the head out to the point of the
+    chin, so measured the only way the solver can measure — distance through the
+    volume — the crown of the head really is nearer to the jaw than to anything
+    else. What comes back is a bone that drops the chin 49 mm at eighteen
+    degrees and takes 18 mm of skullcap down with it. That is not a mouth
+    opening. It is a head deflating, and it is why nothing has ever keyed this
+    bone: it has been in the palette since the rig was built and unusable since
+    the rig was built.
+
+    So it is cut by hand, on the two axes the mistake is actually on.
+
+    *Height.* A mandible is everything from under the chin up to the mouth. Above
+    the mouth it fades out over four centimetres rather than stopping, because a
+    real cheek does follow a jaw a little, and a hard edge across a face at the
+    density this mesh is at is a visible line.
+
+    *Depth.* And nothing behind the pivot. The jaw hinges just in front of the
+    ear; the nape, the neck and the back of the skull are on the other side of
+    that hinge and have no business moving with it. Faded over four centimetres
+    for the same reason.
+
+    Both bands are taken off the bone rather than typed in, so they follow the
+    figure if the base mesh is ever swapped. Nothing is redistributed: the
+    weight is simply removed, and `vertex_group_normalize_all` at the end of
+    `skin` hands what is left to whoever else was already there — which on this
+    part of the figure is `head`, which is the right answer.
+    """
+    if "jaw" not in gi or "jaw" not in rig.data.bones:
+        return
+    jb = rig.data.bones["jaw"]
+    piv, chin = jb.head_local, jb.tail_local
+    span = max(piv.z - chin.z, 1e-6)
+    z_full = chin.z + 0.55 * span          # the mouth line: the jaw owns this
+    z_gone = chin.z + 1.30 * span          # and has nothing left up here
+    x_gone = piv.x - 0.020                 # behind the hinge
+    x_full = piv.x + 0.020
+    k = gi["jaw"]
+    cut = 0
+    for i, v in enumerate(body.data.vertices):
+        d = bm.verts[i][dl]
+        w = d.get(k, 0.0)
+        if w <= 0.0:
+            continue
+        fz = (z_gone - v.co.z) / (z_gone - z_full)
+        fx = (v.co.x - x_gone) / (x_full - x_gone)
+        f = min(max(fz, 0.0), 1.0) * min(max(fx, 0.0), 1.0)
+        f = f * f * (3.0 - 2.0 * f)        # smoothstep, so the seam is not one
+        if f < 0.999:
+            d[k] = w * f
+            cut += 1
+    print("[mh] jaw trimmed on %d verts (z %.3f..%.3f, x behind %.3f)"
+          % (cut, z_full, z_gone, x_full))
+
+
 def skin(body, rig):
     """Weight the mesh to the skeleton.
 
@@ -610,6 +672,8 @@ def skin(body, rig):
         for i in vs:
             bm.verts[i][dl][gi[pick]] = 1.0
         weighted += len(vs)
+
+    _trim_jaw(bm, dl, body, rig, gi)
     bm.to_mesh(body.data)
     bm.free()
     print("[mh] weighted %d/%d verts; loose shells -> %s"
@@ -768,28 +832,126 @@ def cutters(J):
                     mark, prev, prio, lo, hi, name))
 
     head = J["head-2"].z
+
+    # ── how far forward a cutter has to reach ──────────────────────────────
+    #
+    # Every number below moved forward at once, and they were all wrong the same
+    # way, so it is worth writing down what the mistake was.
+    #
+    # The rule in this docstring — a cutter is a punch, it runs deep and crosses
+    # the surface steeply — is about the *back* of the cutter. It says nothing
+    # about the front, and the front is where these were all failing: the shape
+    # you get is the cutter's cross-section where the finished surface passes
+    # through it, and a cutter that stops short of the surface has no cross
+    # section there at all. It paints nothing, silently, and `paint` prints a
+    # tally that does not include it — a line that is missing rather than a line
+    # that is wrong, which is the hardest kind to notice.
+    #
+    # Measured off the mesh, the front of the figure at this height runs:
+    #
+    #     eyeball front pole   x = 0.1462     iris cutter reached  0.1458
+    #     brow ridge           x = 0.1511     brow cutter reached  0.1388
+    #     upper lip            x = 0.1681     mouth cutter reached 0.0824
+    #
+    # So the iris missed by four tenths of a millimetre, which is why she has a
+    # pupil and no iris — the pupil's needle happens to be 2 mm longer. The brow
+    # missed by 12 mm. And the mouth missed by 86 mm, because `J["mouth"]` is
+    # not on the mouth: it is MakeHuman's internal pivot, sitting inside the
+    # skull at the height of the *nose*. Twenty-nine vertices somewhere in the
+    # middle of her head have been the entire mouth since the figure shipped.
+    #
+    # None of that is visible in a render unless you go looking. A face with no
+    # mouth does not read as a face with something missing, it reads as a face
+    # slightly out of focus, and it survived a dozen contact sheets on that.
     for s, tag in ((1, "l"), (-1, "r")):
         e = J["%s-eye" % tag]
-        # Iris and pupil, punched forward through the eyeball.
+        # ── waist, not tip ──────────────────────────────────────────────
+        #
+        # Reaching the surface is necessary and it is not sufficient, which is
+        # the second half of the same lesson and cost a second render to learn.
+        # Move the iris needle forward until its front tip cleared the eyeball
+        # by 4.6 mm and she got an iris 3 mm across instead of 12 — because an
+        # ellipsoid's tip is a taper. At 90% of the way along a 45 mm semi-axis
+        # the cross-section is down to sqrt(1 - 0.9^2) = 44% of nominal, and
+        # what gets painted is the cross-section where the surface passes
+        # through, not the radius it was declared with.
+        #
+        # So these are centred so that their *waist* sits on the surface, not
+        # so that their tip clears it. The ellipsoid then runs 5 cm out in front
+        # of her face, through nothing at all, and the 5 cm behind it is the
+        # punch the docstring asks for. The declared radius is the painted
+        # radius, which is what makes these numbers mean anything.
         add("iris" + tag, IRIS_M, IRIS_P, 4,
-            (e.x - 0.030, e.y, e.z), (0.0450, 0.0060, 0.0060))
+            (0.1455, e.y, e.z), (0.0500, 0.0058, 0.0058))
         add("pupil" + tag, PUPIL_M, PUPIL_P, 5,
-            (e.x - 0.028, e.y, e.z), (0.0450, 0.0027, 0.0027))
+            (0.1455, e.y, e.z), (0.0500, 0.0026, 0.0026))
         # Brow, a little above and slightly outboard of the eye.
         add("brow" + tag, HAIR_M, HAIR_P, 3,
-            (e.x - 0.040, e.y * 1.06, e.z + 0.026),
+            (e.x - 0.020, e.y * 1.06, e.z + 0.026),
             (0.0480, 0.0250, 0.0055))
-
-    # The mouth line, as three separate shells so parity stays valid, with the
-    # corners set lower and further back than the middle. A dead-straight mouth
-    # is the one feature that makes a head read as a mannequin.
-    m = J["mouth"]
+        # The lash lines, along the top and the bottom of the aperture.
+        #
+        # She already *has* eyelashes: MakeHuman's lash strips come through the
+        # import as two of the kept helpers and are welded in with everything
+        # else. They are also half a millimetre of geometry going through a
+        # decimator that keeps one triangle in eight, which leaves a suggestion
+        # of a smudge — and the whole lesson of this file is that at the range
+        # she is actually looked at, a feature is a colour and not a shape. So
+        # the lashes get drawn the way the brows and the mouth are drawn, and
+        # the modelled strips are caught inside the same volume on the way past,
+        # which is what stops the lower ones rendering as a pale scalloped fringe
+        # under each eye.
+        #
+        # Both have to come *after* the iris and the pupil in this list. `paint`
+        # walks the coats in order and every hit overwrites, so list order is the
+        # priority whatever `prio` says — and a lash line's whole job is to sit
+        # over the top of the eyeball rather than under it.
+        # Waisted on the lid like the iris above, and the radii cut back to
+        # suit: the lower strip was still coming out pale because its front tip
+        # stopped a couple of millimetres short of the strip's own front, and
+        # what a light scalloped fringe under an eye reads as is not eyelashes.
+        add("lash" + tag, LASH_M, LASH_P, 6,
+            (0.1380, e.y, e.z + 0.0074), (0.0500, 0.0118, 0.0019))
+        add("lashlo" + tag, LASH_M, LASH_P, 6,
+            (0.1380, e.y, e.z - 0.0078), (0.0500, 0.0106, 0.0016))
+    # ── the mouth ──────────────────────────────────────────────────────────
+    #
+    # Placed off the chin, because `J["mouth"]` is unusable (see above) and the
+    # chin marker is a real landmark on a real surface. Measured down the
+    # midline, the profile from the nose to the chin goes
+    #
+    #     z 1.586  x 0.1762   nose tip
+    #     z 1.570  x 0.1645   subnasale, the bottom of the philtrum
+    #     z 1.559  x 0.1681   upper lip
+    #     z 1.551  x 0.1632   the crease between the lips   <- the mouth line
+    #     z 1.544  x 0.1638   lower lip
+    #     z 1.508  x 0.1509   the point of the chin
+    #
+    # and the crease is 43 mm above the chin marker, which is where this goes.
+    # A local minimum between two local maxima is what a closed mouth *is*, and
+    # it is a far better anchor than any joint in the file, because it is the
+    # feature rather than a pivot somebody chose for it.
+    #
+    # Three separate shells, so parity stays valid — see the docstring — with
+    # the corners set *higher* and further back than the middle. A dead-straight
+    # mouth is the one feature that makes a head read as a mannequin.
+    #
+    # The corners used to be 1.8 mm below the middle, which is a mouth at rest,
+    # and that was right while she was a figure standing on a promenade looking
+    # at the sea. She is not that any more — she notices you, goes down on all
+    # fours, somersaults, cartwheels, and now stands in a jet of water with her
+    # arms out — and a resting mouth over the top of all that reads as somebody
+    # enduring it. 3.2 mm above the middle is five millimetres of lift across a
+    # 55 mm mouth: a pleasant face, not a grin.
+    #
+    # The grin is the jaw bone's job and it only happens when she is being
+    # hosed. This is what her face does the rest of the time.
+    lip = J["jaw"].z + 0.043
     add("mouth0", MOUTH_M, MOUTH_P, 4,
-        (m.x - 0.030, 0.0, m.z), (0.0450, 0.0135, 0.0024))
+        (0.128, 0.0, lip), (0.0550, 0.0135, 0.0024))
     for s in (1, -1):
         add("mouth%d" % s, MOUTH_M, MOUTH_P, 4,
-            (m.x - 0.034, s * 0.0165, m.z - 0.0018),
-            (0.0450, 0.0110, 0.0022))
+            (0.124, s * 0.0165, lip + 0.0032), (0.0550, 0.0110, 0.0022))
 
     # Hair: a cap over the skull, cut at the brow. Unlike the others this one is
     # a solid the scalp sits inside, not a punch through it.
@@ -1825,6 +1987,63 @@ def _wheel_half(deg):
 WHEEL = [(i * WHEEL_DUR / WHEEL_KEYS, _wheel(i * 360.0 / WHEEL_KEYS))
          for i in range(WHEEL_KEYS + 1)]
 
+# ── soaked ──────────────────────────────────────────────────────────────────
+#
+# What she does when you point the branch at her.
+#
+# The brief was "spreads her arms and leans forward because she loves getting
+# soaked, and smiles", and the only part of that which needed thinking about is
+# the lean — because a lean is also what somebody does when they *hate* it.
+# Flinching from cold water is a lean away with a shoulder turned into it;
+# enjoying it is a lean in with the chest given to it. The two postures are
+# about fifty degrees apart and they are the whole difference between delight
+# and endurance, so the lean is the load-bearing angle here and the rest of the
+# pose is decoration on top of it.
+#
+# Twenty-six degrees forward, and taken at the hips and the waist together
+# rather than at either on its own: all of it at the pelvis is a bow, all of it
+# in the spine is a stoop. The head then comes *back* thirty-six degrees against
+# the trunk, which nets to about ten degrees of chin up — so she is leaning into
+# the jet and looking at you over the top of it at the same time. That is the
+# part that makes it read as something being done at somebody rather than
+# something being stood in.
+#
+# The arms go past horizontal. The MakeHuman base stands with the upper arms 40°
+# out, so the -52 here is 92° from vertical, and the torso being 26° forward
+# sweeps them forward by the same amount without a degree being spent on it —
+# which is why they are authored flat in her own frame and still arrive as an
+# embrace. Palms open, elbows barely bent, because a spread arm with a folded
+# elbow is a shrug.
+#
+# And nine degrees of jaw, which is the first clip in this file to key that bone
+# at all — see `_trim_jaw` for why it took until now.
+SOAK_A = {
+    "@root": (0.010, 0.020, 0.006),
+    "pelvis": (-12, 0, 0),
+    "spine01": (-5, 0, 0), "spine02": (-5, 0, 0), "spine03": (-4, 0, 0),
+    "chest": (-3, 0, 0), "neck": (16, 0, 0), "head": (20, -3, 0),
+    "jaw": (-9, 0, 0),
+    "clavicleL": (0, 0, 9), "clavicleR": (0, 0, -9),
+    "armUL": (0, 0, -52), "armLL": (-12, 0, -6), "handL": (-22, 0, 0),
+    "armUR": (0, 0, 52), "armLR": (-12, 0, 6), "handR": (-22, 0, 0),
+    "legUL": (-12, 0, -6), "legLL": (10, 0, 0), "footL": (-9, 0, 0),
+    "legUR": (-12, 0, 6), "legLR": (10, 0, 0), "footR": (-9, 0, 0),
+}
+
+# The same thing, a breath further into it: chest opened, arms up and wider,
+# mouth wider, and half a centimetre of rise. Slow — 1.4 s round the loop — so
+# it swells rather than bounces. A fast oscillation here reads as shivering,
+# which is the emotion this pose exists to not be.
+SOAK_B = dict(SOAK_A, **{
+    "@root": (0.012, 0.020, 0.012),
+    "chest": (-6, 0, 0), "neck": (18, 0, 0), "head": (22, 3, 0),
+    "jaw": (-13, 0, 0),
+    "clavicleL": (0, 0, 12), "clavicleR": (0, 0, -12),
+    "armUL": (-5, 0, -60), "armLL": (-16, 0, -6), "handL": (-26, 0, 0),
+    "armUR": (-5, 0, 60), "armLR": (-16, 0, 6), "handR": (-26, 0, 0),
+    "legLL": (7, 0, 0), "legLR": (7, 0, 0),
+})
+
 CLIPS = [
     {"name": "idle", "loop": True,
      "keys": [(0.0, IDLE_A), (2.3, IDLE_B), (4.6, IDLE_A)]},
@@ -1852,6 +2071,11 @@ CLIPS = [
     # two or three of them by rewinding `curT`, which is cheaper than a loop
     # and lets it stop after any whole number of wheels.
     {"name": "cartwheel", "loop": False, "keys": WHEEL},
+    # Looping, because it is a state and not an event: she holds it for as long
+    # as the water is on her, which is however long you feel like keeping it
+    # there.
+    {"name": "soak", "loop": True,
+     "keys": [(0.0, SOAK_A), (0.70, SOAK_B), (1.40, SOAK_A)]},
 ]
 
 
@@ -1977,6 +2201,45 @@ def main():
                     CLIPS)
         bpy.ops.wm.save_as_mainfile(filepath=str(BLEND))
         print("[mh] rehaired %s" % BLEND)
+        return
+
+    # The face, which is paint and weights and no geometry at all.
+    #
+    # Everything that makes a head read at twenty metres on this figure is a
+    # vertex colour laid down through a cutter — eyes, brows, lashes, mouth —
+    # and none of that survives a `--reskin`, because paint is baked into the
+    # blend and `--reskin` only re-poses and re-exports. A full run to move a
+    # mouth corner two millimetres is four minutes of download, subsurf and
+    # renders to reach a pass that takes forty seconds.
+    #
+    # The bind goes with it rather than getting a door of its own, because the
+    # two things that changed together here — a lash line and a jaw that can
+    # open without taking the skull with it — are one paint change and one
+    # weight change, and running half of that is how you end up looking at a
+    # render and drawing a conclusion about the wrong half.
+    if "--reface" in argv:
+        bpy.ops.wm.open_mainfile(filepath=str(BLEND))
+        body, rig = bpy.data.objects["human"], bpy.data.objects["rig"]
+        J, _scale, _drop = read_joints(fetch())
+        skin(body, rig)
+        paint(body, cutters(J))
+        _material(body)
+        _lights()
+        pose(rig, {})
+        render("face", ("face", "head", "prof"))
+        # The jaw on its own, so the head stays where the close cameras are
+        # pointed. The soaked pose leans 26° forward and takes her face clean
+        # out of a frame that is 130 mm across — the first attempt at this
+        # rendered her shoulder three times.
+        pose(rig, {"jaw": (-13, 0, 0)})
+        render("gape", ("face", "head", "prof"))
+        pose(rig, SOAK_B)
+        render("soak", ("hero", "side", "front"))
+        pose(rig, {})
+        export_skin(body, rig, ROOT / "build" / "payload" / "human_skin.fr3d.gz",
+                    CLIPS)
+        bpy.ops.wm.save_as_mainfile(filepath=str(BLEND))
+        print("[mh] refaced %s" % BLEND)
         return
 
     # No render and no export: opens the blend, walks the frames and prints.

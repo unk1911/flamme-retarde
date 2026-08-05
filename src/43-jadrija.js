@@ -1623,6 +1623,10 @@ async function buildJadrija(scene) {
         // `side` is a yaw offset on the mesh alone — it never touches `ang`, so
         // she goes on travelling exactly where she was already going.
         wheels: 0, side: 0,
+        // The water: seconds of grace left on the last time the jet was on
+        // her, how soaked she is, how long she stays interested afterwards,
+        // and which way round she is currently sweeping.
+        hit: 0, owed: 0, wet: 0, lock: 0, spin: 1, faceAng: 0,
       };
     } catch (e) {
       console.warn('test figure failed:', e.message);
@@ -1676,6 +1680,22 @@ async function buildJadrija(scene) {
     joy: 0.22,          // chance that a new heading comes with a somersault
     spin: 0.16,         // and the chance it comes with a run of cartwheels
     say: [1.8, 4.2],    // seconds between noises while she is playing
+    // ── the water ─────────────────────────────────────────────────────────
+    // How long the jet is remembered after it comes off her. Not zero: a hose
+    // is aimed by hand and by eye, it wanders a metre in and out of a target
+    // constantly, and reading the trace literally would have her standing up
+    // and sitting back down three times a second.
+    grace: 0.5,
+    owed: 2.0,          // and how long a reaction she has not been able to give
+                        // yet stays owed — long enough to outlast a somersault
+    hitR: 0.62,         // m — how wide a target she is to the jet
+    hitH: 1.85,         // and how tall
+    // And how long she stays interested afterwards. Half a minute is long
+    // enough to be a change in what she is doing rather than a twitch, and
+    // short enough that it is worth doing again.
+    lockFor: 32,
+    ring: 6.0,          // m — the radius she orbits you at
+    arc: [2.6, 5.6],    // seconds before she turns and sweeps back the other way
   };
 
   /**
@@ -1689,6 +1709,25 @@ async function buildJadrija(scene) {
    * heading while facing the other way down it.
    */
   const faceYaw = (t, ang) => rigYaw(t, ang);
+
+  /**
+   * Move her, and run the skip off the same number.
+   *
+   * The skip clip covers 1.4 m a hop and is authored to look right at 3.6 m/s;
+   * play it at any other speed and the feet slide, because nothing in the
+   * runtime matches a footfall to the ground. That has quietly been true since
+   * she started wandering — `play` draws a fresh pace between 0.55x and 1.35x
+   * of nominal every second or so — and it is much more visible in the orbit,
+   * where she is travelling sideways and both feet are in profile.
+   *
+   * The fix is one line and it should have been there all along: scale the
+   * clip's clock by the same factor as the distance. A skip at half speed is a
+   * skip that takes twice as long, which is what a slow skip *is*.
+   */
+  function showPace(v, dt) {
+    skinFig.state.speed = clamp(v / SHOW.skip, 0.4, 1.6);
+    showMove(v, dt);
+  }
 
   /** Advance her along her heading, kept on the deck and inside the resort. */
   function showMove(v, dt) {
@@ -1734,6 +1773,66 @@ async function buildJadrija(scene) {
     if (g > 0.04) audio.squeak(kind, g);
   }
 
+  /**
+   * The idle chatter, and the reason it is a list rather than a coin flip.
+   *
+   * The ćuk keeps the largest share on purpose — it is the one call that is
+   * *hers*, the thing you hear across the channel and walk towards, and a
+   * signature that comes up one time in eight stops being a signature. The rest
+   * are there so that the fifth minute on the promenade does not sound like the
+   * first. Weighted by hand and not evenly: `tick` and `burr` are the strangest
+   * two and are rationed accordingly.
+   */
+  const CHAT = ['cuk', 'cuk', 'cuk', 'trill', 'trill', 'peep', 'peep',
+    'warble', 'squee', 'burr', 'tick'];
+  const IDLE_CHAT = ['cuk', 'cuk', 'cuk', 'cuk', 'cuk', 'peep', 'warble'];
+  const WET_CHAT = ['squee', 'squee', 'trill', 'peep', 'warble'];
+  const say1 = (list) => list[(Math.random() * list.length) | 0];
+
+  // ── the water ───────────────────────────────────────────────────────────────
+  /**
+   * Where she is, for the jet to aim at — or nothing, if there is nothing to
+   * aim at yet. Read once per trace by 47-ground.js; see `addGuest` there.
+   */
+  function figureProbe() {
+    if (!show || !skinFig || !skinFig.mesh.visible) return null;
+    const p = toWorld(show.t, show.s);
+    return { x: p[0], y: p[1], z: p[2], r: SHOW.hitR, h: SHOW.hitH };
+  }
+
+  /**
+   * The jet is on her.
+   *
+   * Litres are ignored on purpose. This is not a fire and she is not a
+   * casualty: there is no quantity of water that finishes the job, and putting
+   * a soak meter on a child playing in a hose would be the game being a game
+   * about the one thing here that is not one. All that is recorded is *that*
+   * it is landing, and the clock that says how recently.
+   */
+  function figureWet(_litres) {
+    if (!show) return;
+    show.hit = SHOW.grace;
+    show.owed = SHOW.owed;
+    show.lock = SHOW.lockFor;
+  }
+
+  /**
+   * The phases she can be pulled out of by a hoseful of water.
+   *
+   * Not the acrobatics. A somersault and a cartwheel are both a body committed
+   * to an arc with its hands off the ground, and cutting to a standing pose
+   * halfway through one is a teleport — she would blink from upside down to
+   * upright, which is worse than a beat of not reacting. So she finishes what
+   * she was doing first, which is what a person would do anyway.
+   *
+   * The crawl *is* in the list, even though standing up out of it in a third of
+   * a second is a scramble rather than a stand. Four and a half seconds of
+   * crawling, then a getup, then three somersaults is fourteen seconds of being
+   * hosed and not noticing, and a scramble is much the better of the two.
+   */
+  const WETTABLE = { idle: 1, notice: 1, crawl: 1, play: 1, home: 1,
+    aim: 1, orbit: 1 };
+
   function stepShow(dt, pt, ps) {
     if (!show || !skinFig) return;
     const f = skinFig, S = f.state;
@@ -1744,11 +1843,41 @@ async function buildJadrija(scene) {
     show.tmr += dt;
 
     const go = (phase, clip, fade = 0.22) => {
+      // Back to nominal on every clip change. `showPace` below runs the skip
+      // off its own clock to keep her feet under her, and the somersault and
+      // the cartwheel are timed to the second against the distances they carry
+      // her — inheriting a rate from whatever she was doing before would put a
+      // slow-motion flip in the middle of a lazy wander.
+      S.speed = 1;
       if (clip) f.play(clip, { fade });
       show.phase = phase;
       show.tmr = 0;
       show.said = 0;
     };
+
+    // The jet, and its two clocks.
+    //
+    // `hit` is whether the water is on her *now*, and it is what `bask` watches
+    // to decide when to stop standing in it. Half a second, because a branch is
+    // aimed by hand and by eye and wanders in and out of a target constantly.
+    //
+    // `owed` is the reaction she has not had a chance to give yet, and it is a
+    // separate number because the first version did not have one: a squirt that
+    // landed during a somersault set `hit`, `hit` ran out inside the 1.4 s of
+    // the clip, and she came down and carried on as if nothing had happened.
+    // The comment above `WETTABLE` said she reacts at the end of the arc. She
+    // did not. Two seconds is long enough to cover a somersault and a getup,
+    // and short enough that water thrown at her a while ago stays thrown a
+    // while ago.
+    show.hit = Math.max(0, show.hit - dt);
+    show.owed = Math.max(0, show.owed - dt);
+    show.wet = clamp(show.wet + (show.hit > 0 ? dt * 1.1 : -dt * 0.09), 0, 1);
+    if (show.owed > 0 && WETTABLE[show.phase]) {
+      show.owed = 0;
+      show.side = 0;
+      showSay('squee', d);
+      go('bask', 'soak', 0.34);
+    }
 
     switch (show.phase) {
       case 'idle':
@@ -1757,7 +1886,7 @@ async function buildJadrija(scene) {
         // nothing is happening. It is what tells you there is something up
         // there worth walking towards before you are close enough to see it.
         if (show.tmr - show.said > 3.4 + Math.random() * 2.5) {
-          show.said = show.tmr; showSay('cuk', d);
+          show.said = show.tmr; showSay(say1(IDLE_CHAT), d);
         }
         // Three seconds of standing there first. Without it she comes home,
         // notices you again on the same frame and goes straight back down on
@@ -1789,7 +1918,10 @@ async function buildJadrija(scene) {
         if (show.tick <= 0) showWander(SHOW.crawlTurn, SHOW.crawlSwing);
         show.want = showSteer(show.wander);
         showMove(SHOW.crawl, dt);
-        if (show.tmr - show.said > 1.7) { show.said = show.tmr; showSay('chirr', d); }
+        if (show.tmr - show.said > 1.7) {
+          show.said = show.tmr;
+          showSay(Math.random() < 0.7 ? 'chirr' : 'tick', d);
+        }
         if (show.tmr > SHOW.crawlFor) go('up', 'getup', 0.18);
         break;
 
@@ -1846,11 +1978,11 @@ async function buildJadrija(scene) {
           }
         }
         show.want = showSteer(show.wander);
-        showMove(show.pace, dt);
+        showPace(show.pace, dt);
         if (show.tmr - show.said > SHOW.say[0]
           + Math.random() * (SHOW.say[1] - SHOW.say[0])) {
           show.said = show.tmr;
-          showSay(Math.random() < 0.42 ? 'cuk' : 'trill', d);
+          showSay(say1(CHAT), d);
         }
         if (show.played > SHOW.playFor || d > SHOW.far) go('home', 'skip', 0.20);
         break;
@@ -1889,6 +2021,81 @@ async function buildJadrija(scene) {
         break;
       }
 
+      case 'bask':
+        // Standing in it.
+        //
+        // She faces you rather than the jet, and those are the same direction
+        // because you are holding it. No movement at all: the pose has her
+        // leaning into the water with her arms out and her weight forward, and
+        // a figure drifting sideways in it would be somebody being pushed.
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        if (show.tmr - show.said > 1.0 + Math.random() * 1.2) {
+          show.said = show.tmr; showSay(say1(WET_CHAT), d);
+        }
+        // Off her for half a second, and she has had enough of standing still.
+        // The floor under `tmr` is what stops a jet that flickers across her
+        // from strobing the pose.
+        if (show.hit <= 0 && show.tmr > 0.9) {
+          show.spin = Math.random() < 0.5 ? 1 : -1;
+          show.tick = SHOW.arc[0] + Math.random() * (SHOW.arc[1] - SHOW.arc[0]);
+          showSay('trill', d);
+          go('orbit', 'skip', 0.30);
+        }
+        break;
+
+      case 'orbit': {
+        // Tidally locked, and the phrase is the brief's: she keeps one face
+        // turned to you the way the moon keeps one to the earth.
+        //
+        // Two headings, and the whole state is the difference between them.
+        // Where her feet go is a tangent to a circle round you, bent inward or
+        // outward by however far off the ring she is — which is what makes it
+        // *following* rather than circling, because when you walk away the ring
+        // walks with you and the radial term turns into a chase. Where her body
+        // points is straight at you, always, and that is the `side` offset at
+        // the bottom of this function.
+        //
+        // She sweeps rather than circles. A figure going round and round you at
+        // a steady rate is a planet or a shark; turning back every few seconds
+        // is somebody showing off, and it also keeps her in front of you where
+        // she can be seen instead of spending half of every lap behind your
+        // head.
+        show.played += dt;
+        show.lock -= dt;
+        show.tick -= dt;
+        if (show.tick <= 0) {
+          show.spin = -show.spin;
+          show.tick = SHOW.arc[0] + Math.random() * (SHOW.arc[1] - SHOW.arc[0]);
+          showSay(say1(WET_CHAT), d);
+        }
+        const rt = show.t - pt, rs = show.s - ps;
+        const r = Math.max(0.4, Math.hypot(rt, rs));
+        const bear = Math.atan2(rs, rt);          // from you to her
+        show.faceAng = bear + Math.PI;            // and so, from her to you
+        // Positive when she is inside the ring and wants to be further out.
+        const pull = clamp((SHOW.ring - r) / 2.4, -1, 1);
+        const tang = bear + show.spin * Math.PI / 2;
+        show.wander = Math.atan2(
+          Math.sin(tang) + Math.sin(bear) * pull * 1.3,
+          Math.cos(tang) + Math.cos(bear) * pull * 1.3);
+        show.want = showSteer(show.wander);
+        // Slower the closer in she is, so a player who walks straight at her
+        // gets sidestepped rather than run around.
+        showPace(SHOW.skip * clamp(0.42 + r / 9, 0.42, 1.0), dt);
+        if (show.tmr - show.said > SHOW.say[0]
+          + Math.random() * (SHOW.say[1] - SHOW.say[0])) {
+          show.said = show.tmr;
+          showSay(say1(CHAT), d);
+        }
+        if (show.lock <= 0 || d > SHOW.far) {
+          show.played = 0;
+          show.wander = show.ang;
+          showWander(SHOW.turn, SHOW.swing);
+          go('play', 'skip', 0.26);
+        }
+        break;
+      }
+
       case 'joy':
         // One somersault in the middle of the wander, and straight back into
         // it. `played` keeps running across this so a run of lucky rolls
@@ -1918,16 +2125,35 @@ async function buildJadrija(scene) {
     while (e < -Math.PI) e += TAU;
     show.ang += clamp(e, -3.0 * dt, 3.0 * dt);
 
-    // And the quarter turn for a cartwheel, which is a separate thing from the
-    // heading and has to stay separate. A cartwheel travels along the line the
-    // body wheels over, and that line is ninety degrees off the way she is
-    // facing — so she turns her shoulders across her course rather than turning
-    // the course, holds it for the run, and gives it back afterwards. Rolled in
-    // at the same rate she turns at, so the quarter turn is something she does
-    // rather than something that happens to her.
-    const wantSide = show.phase === 'aim' || show.phase === 'wheel'
-      ? -Math.PI / 2 : 0;
-    show.side += clamp(wantSide - show.side, -2.6 * dt, 2.6 * dt);
+    // And the offset between where she is going and where she is pointed.
+    //
+    // Two things use it and they want it driven differently.
+    //
+    // The cartwheel wants a fixed quarter turn: a wheel travels along the line
+    // the body goes over and that line is ninety degrees off the way she is
+    // facing, so she turns her shoulders across her course rather than turning
+    // the course, holds it for the run, and gives it back afterwards.
+    //
+    // The orbit wants the opposite — a fixed *heading*, not a fixed offset.
+    // There the thing that must stay put is her face, so what gets rate-limited
+    // is `ang + side`, the mesh yaw itself. Limit the offset instead and every
+    // time she reverses her sweep the heading swings 180° in about a second
+    // while the offset crawls after it, and she spends that second showing you
+    // her back — which is the one thing this whole phase exists never to do.
+    if (show.phase === 'orbit') {
+      let f2 = show.faceAng - show.ang - show.side;
+      while (f2 > Math.PI) f2 -= TAU;
+      while (f2 < -Math.PI) f2 += TAU;
+      show.side += clamp(f2, -3.4 * dt, 3.4 * dt);
+      // Wrapped, or it winds up by a whole turn every few reversals and the
+      // rate limit above starts unwinding it the long way round.
+      while (show.side > Math.PI) show.side -= TAU;
+      while (show.side < -Math.PI) show.side += TAU;
+    } else {
+      const wantSide = show.phase === 'aim' || show.phase === 'wheel'
+        ? -Math.PI / 2 : 0;
+      show.side += clamp(wantSide - show.side, -2.6 * dt, 2.6 * dt);
+    }
 
     const p = toWorld(show.t, show.s);
     f.mesh.position.set(p[0], p[1], p[2]);
@@ -2080,9 +2306,13 @@ async function buildJadrija(scene) {
       ang: +show.ang.toFixed(2), flips: show.flips,
       wheels: show.wheels, side: +show.side.toFixed(2),
       pace: +show.pace.toFixed(2), played: +show.played.toFixed(1),
+      wet: +show.wet.toFixed(2), lock: +show.lock.toFixed(1),
+      hit: +show.hit.toFixed(2), spin: show.spin,
     },
     /** Where she is standing, so the back door can put you in front of her. */
     figureAt: testFigure ? testFigure.at : null,
+    /** The two ends of the hose hook — 47-ground.js wires them together. */
+    figureProbe, figureWet,
     /**
      * Drive the promenade forward by hand.
      *

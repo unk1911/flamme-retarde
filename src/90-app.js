@@ -502,6 +502,14 @@ async function boot() {
   for (const c of ground.crew) {
     if (c.fig) shadow.castTree(c.fig.root, { dynamic: true, near: true });
   }
+  // And the one person in the world the branch can be pointed at who is not on
+  // the strength. Wired here rather than in either module because this is the
+  // only place that has both of them: 43-jadrija.js is built before the ground
+  // mode exists and knows nothing about hoses, and 47-ground.js knows nothing
+  // about her.
+  if (jadrija && jadrija.figureProbe) {
+    ground.addGuest(jadrija.figureProbe, jadrija.figureWet);
+  }
 
   await step(85, 'load.maquis');
   trees = buildTrees(scene, fire);
@@ -831,6 +839,24 @@ function parkAtApron() {
 }
 
 /**
+ * What to say when a back door is pressed and you are already through one.
+ *
+ * Both of them used to answer this with "E to climb back in", which is right at
+ * Rokići, where the aeroplane is thirty metres behind you with the door open,
+ * and a lie at Jadrija, where there is no aeroplane at all — you arrived by the
+ * same route as a bale-out and the airframe is gone. Being told to press a key
+ * that does nothing, by a game that put you where you are, is worse than being
+ * told nothing.
+ *
+ * `stranded` is the same flag `canBoard` reads, so the toast and the HUD hint
+ * cannot disagree.
+ */
+function afootToast() {
+  return ground.stranded ? T('ground.noPlane')
+    : TK('ground.board', 'ground.boardTouch');
+}
+
+/**
  * The back door, on `0`.
  *
  * The ground mission sits behind a twenty-minute flight, a spot fire that has to
@@ -843,7 +869,7 @@ function parkAtApron() {
  */
 function skipToGround() {
   if (!ground || !ground.ok || !airfield || !airfield.site) return;
-  if (state.phase === 'ground') { toast(TK('ground.board', 'ground.boardTouch')); return; }
+  if (state.phase === 'ground') { toast(afootToast()); return; }
   if (state.phase !== 'fly') return;
   if (state.paused) setPaused(false);
   ground.force();                 // arm the field and light it, now, not in a minute
@@ -869,7 +895,7 @@ function skipToGround() {
  */
 function skipToJadrija() {
   if (!ground || !ground.ok || !jadrija || !jadrija.figureAt) return;
-  if (state.phase === 'ground') { toast(TK('ground.board', 'ground.boardTouch')); return; }
+  if (state.phase === 'ground') { toast(afootToast()); return; }
   if (state.phase !== 'fly') return;
   if (state.paused) setPaused(false);
   const [ft, fs] = jadrija.figureAt;
@@ -1541,13 +1567,29 @@ function frame() {
   // The mix: your own engines dominate unless you are watching from outside,
   // in which case the nearest wingman gets a say too.
   const nearestAI = wingmen ? wingmen.nearest(camera.position) : 1e9;
-  const own = 1 - sat((camera.position.distanceTo(flight.p.pos) - 20) / 400);
+  // Your own aeroplane, and whether there is one.
+  //
+  // Stranded means you walked in under a canopy or through one of the back
+  // doors, and in both cases the airframe is not a thing over there that you
+  // are standing away from — it is gone, or it never came. `flight.p` goes on
+  // existing regardless and its position is wherever the model left it, which
+  // at Jadrija is close enough across the channel to score a healthy `own` and
+  // put two turboprops over a promenade with nothing on it. Zeroed here rather
+  // than in the mixer so the wingmen keep their say: a Canadair going over
+  // while you stand on the beach is exactly what you should hear.
+  const gone = ground.stranded || eject.active;
+  const own = gone ? 0
+    : 1 - sat((camera.position.distanceTo(flight.p.pos) - 20) / 400);
   const nf = fire.nearestFire(camera.position.x, camera.position.z);
   audio.update(dt, {
     throttle: flight.p.throttle,
     speed: state.speed,
     alt: state.altAgl,
-    inside: CAMS[camMode] === 'cockpit',
+    // And the cockpit mix only while you are in the cockpit. `camMode` is
+    // remembered across a bale-out, so leaving this on the camera alone meant
+    // that whether the promenade had engines drumming over it depended on
+    // which view you happened to have been flying in.
+    inside: CAMS[camMode] === 'cockpit' && state.phase === 'fly',
     near: Math.max(own, 0.55 * (1 - sat((nearestAI - 40) / 700))),
     scooping: state.scooping,
     overSea: isSea(flight.p.pos.x, flight.p.pos.z),

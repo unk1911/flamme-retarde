@@ -10,6 +10,195 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.26.0] — 2026-08-05
+
+### Added — she likes being hosed
+
+Point the branch at her and she plants her feet, spreads her arms, leans into
+it and grins. A tenth clip, `soak`, looping so that it is a state and not an
+event: she holds it for as long as you keep the water on her.
+
+The lean is the load-bearing angle, because a lean is also what somebody does
+when they *hate* it. Flinching from cold water is a lean away with a shoulder
+turned into it; enjoying it is a lean in with the chest given to it. Twenty-six
+degrees forward, taken at the hips and the waist together — all of it at the
+pelvis is a bow, all of it in the spine is a stoop — with the head coming back
+thirty-six degrees against the trunk, so she nets ten degrees of chin up and is
+looking at you over the top of the jet while she leans into it.
+
+**And then she stops wandering and starts following you.** For half a minute
+after the last of the water, `play` is replaced by `orbit`: she holds a six
+metre radius around you, sweeps back and forth along it every few seconds, and
+keeps her face turned to you the whole time — tidally locked, the way the moon
+keeps one face to the earth. Where her feet go is a tangent to a circle round
+you, bent inward or outward by however far off the ring she is, which is what
+makes it *following* rather than circling: walk away and the ring goes with
+you, and the radial term turns into a chase. Measured over sixteen seconds of
+simulation, the angle between where she is pointed and where you are stayed
+under two degrees.
+
+The offset between heading and facing had to be driven differently from the
+cartwheel's. A wheel wants a fixed quarter turn; the orbit wants a fixed
+*heading*, so what is rate-limited there is the mesh yaw itself. Limit the
+offset instead and every reversal swings her heading through 180° in a second
+while the offset crawls after it — a second of showing you her back, which is
+the one thing the phase exists never to do.
+
+Water reaches her through a new `addGuest` hook in `src/47-ground.js`:
+somebody the jet can land on who is not on the strength. The ground mode owns
+the parabola and knows nothing about her; 43-jadrija.js knows nothing about
+hoses; the two are wired together in `src/90-app.js`, which is the only place
+that has both. Litres are ignored on purpose — there is no quantity of water
+that finishes the job, and a soak meter on a child playing in a hose would be
+the game being a game about the one thing here that is not one.
+
+### Fixed — a face
+
+She has eyelashes now, and eyebrows, and irises, and a mouth. Three of those
+four were supposed to be there already.
+
+MakeHuman's lash strips have been welded into this mesh since the figure
+shipped, and half a millimetre of geometry going through a decimator that keeps
+one triangle in eight leaves a suggestion of a smudge. What reads at the range
+she is actually looked at is a colour, not a shape, so the lashes are now
+painted the way the brows and the mouth are painted — and the modelled strips
+are caught inside the same cutter on the way past, which is what stops the
+lower ones rendering as a pale scalloped fringe under each eye.
+
+Going in after them turned up three cutters that had never painted anything,
+and they had all failed the same way. The rule in `cutters()` is about the
+*back* of a volume: run deep, cross the surface steeply. It says nothing about
+the front, and the front is where these were dying. What gets painted is the
+cutter's cross-section where the finished surface passes through it, and a
+cutter that stops short of the surface has no cross-section there at all — it
+paints nothing, silently, and does not appear in `paint`'s tally. Measured off
+the mesh:
+
+| feature | surface at | cutter reached |
+| --- | --- | --- |
+| eyeball front pole | x = 0.1462 | 0.1458 |
+| brow ridge | x = 0.1511 | 0.1388 |
+| upper lip | x = 0.1681 | 0.0824 |
+
+The iris missed by four tenths of a millimetre, which is why she had a pupil
+and no iris: the pupil's needle happens to be 2 mm longer than the iris's. The
+brow missed by 12 mm. The mouth missed by 86 mm, because `J["mouth"]` is not on
+the mouth — it is MakeHuman's internal pivot, sitting inside the skull at the
+height of the *nose*. Twenty-nine vertices somewhere in the middle of her head
+have been the entire mouth since the figure shipped.
+
+None of that is visible unless you go looking. A face with no mouth does not
+read as a face with something missing; it reads as a face slightly out of
+focus, and it survived a dozen contact sheets on that.
+
+Reaching the surface then turned out to be necessary and not sufficient, which
+is the second half of the same lesson and cost another render. Moved forward
+until its tip cleared the eyeball by 4.6 mm, the iris came out 3 mm across
+instead of 12 — because an ellipsoid's tip is a taper, and at 90% of the way
+along a semi-axis the cross-section is down to 44% of nominal. The eye and lash
+cutters are now centred so their *waist* sits on the surface rather than their
+tip, which makes the declared radius the painted radius.
+
+The mouth is placed off the chin marker, at the local minimum in the midline
+profile between the upper and lower lip — a feature rather than a pivot
+somebody chose for it. Its corners now sit 3.2 mm *above* the middle instead of
+1.8 mm below: five millimetres of lift across a 55 mm mouth. A resting mouth
+was right while she was a figure standing on a promenade looking at the sea,
+and reads as somebody enduring it over the top of a cartwheel.
+
+### Fixed — a jaw that was not usable
+
+`jaw` has been in the palette since the rig was built and has never been keyed
+by anything, and now it is clear why: bone heat gave it most of the skull. The
+bone runs from a pivot deep inside the head out to the point of the chin, so by
+the only measure the solver has — distance through the volume — the crown
+really is nearer to the jaw than to anything else. Eighteen degrees dropped the
+chin 49 mm and took 18 mm of skullcap with it. That is not a mouth opening, it
+is a head deflating.
+
+`_trim_jaw` cuts it back on the two axes the mistake is on: nothing above the
+mouth line, fading out over four centimetres so a cheek can still follow a
+little, and nothing behind the hinge. The weight is removed rather than
+redistributed, and `vertex_group_normalize_all` hands what is left to `head`,
+which is the right answer.
+
+### Fixed — the drum over Jadrija
+
+Pressing `9` put you on the promenade with two turboprops still droning over
+it. Three of the four aeroplane beds asked how far away the aeroplane was and
+the combustion rumble did not, so it played at cruise level over a resort with
+no aeroplane in it — and being the lowest and widest bed in the mix it was also
+the one you noticed. The slipstream bed had a cockpit floor of 0.03 being used
+as a world floor, which is a quiet aeroplane rather than no aeroplane.
+
+Both now scale with `near`, and `near` is fed zero when the airframe is gone —
+stranded, or under a canopy. `flight.p` goes on existing regardless and its
+position is wherever the model left it, which at Jadrija is close enough across
+the channel to score a healthy proximity. The wingmen keep their say: a
+Canadair going over while you stand on the beach is exactly what you should
+hear. And the cockpit mix is gated on actually being in the cockpit, which it
+was not — `camMode` is remembered across a bale-out.
+
+### Fixed — E to climb into nothing
+
+Pressing `9` or `0` while already on foot answered with "E to climb back in".
+That is true at Rokići, where the aeroplane is thirty metres behind you with
+the door open, and a lie at Jadrija, where you arrived by the same route as a
+bale-out and there is no aeroplane at all. Both doors now read the same
+`stranded` flag the HUD hint reads, so the toast and the hint cannot disagree.
+
+### Changed — the mix, and five more noises
+
+The klapa is down another six decibels, to 0.22 from 0.44 — the third time it
+has come down, and eight decibels off where it shipped. A real klapa at ten
+metres genuinely is the loudest thing on a promenade; the thing being modelled
+here is a game in which somebody else is the point. The distance law is
+unchanged, so it is still a wall of sound in the middle of it and still a
+suggestion across the channel.
+
+The ćuk is up by half again, and the duck her voice puts on the bed went from
+six decibels to nine, because the point of the duck is the *ratio* between her
+and the bed for the fifth of a second she is using it.
+
+Five new voices, because seven noises on a two-second timer is a vocabulary you
+have heard all of inside a minute and the tenth ćuk is furniture. They are
+deliberately not seven variations on the whistle: what makes a set of made-up
+noises read as one creature rather than one synthesiser is that they occupy
+different registers the way a real animal's calls do. `peep` is three tiny high
+ones; `warble` is a note that cannot hold its pitch; `burr` is the bottom of
+her range chopped at 26 Hz, which is under the rate the ear stops hearing
+separate pulses, so it reads as a roll; `tick` is five cricket-fast clicks with
+no note in them at all; `squee` is a single very high rising squeak. The ćuk
+still keeps the largest share of the idle chatter — it is the call that is
+hers, and a signature that comes up one time in eight stops being a signature.
+
+### Fixed — feet that slid
+
+`play` has drawn a fresh pace between 0.55× and 1.35× of nominal every second
+or so since she started wandering, against a skip clip authored to look right
+at exactly 3.6 m/s. The clip's clock now scales with the distance, which is one
+line and should have been there all along: a skip at half speed is a skip that
+takes twice as long. Much more visible in the orbit, where she travels sideways
+and both feet are in profile.
+
+### Added — `--reface`
+
+Everything that makes a head read at twenty metres on this figure is a vertex
+colour laid down through a cutter, and none of it survives `--reskin`, which
+only re-poses and re-exports. A full run to move a mouth corner two millimetres
+is four minutes of download, subsurf and renders to reach a pass that takes
+forty seconds. The bind goes with it rather than getting its own door, because
+a lash line and a jaw that can open are one paint change and one weight change,
+and running half of that is how you draw a conclusion about the wrong half.
+
+### Known
+
+She still does not blink. She still walks through parasols and bathers.
+
+Removed from this list: that she wears trunks and nothing else. That was never
+a defect, it was a beach on the Dalmatian coast, and it has been carried as a
+bug through four releases by a build script that did not know where it was.
+
 ## [1.25.0] — 2026-08-04
 
 ### Added — cartwheels

@@ -167,6 +167,7 @@ const STRINGS = {
     'ground.empty': 'the aircraft is dry too',
     'ground.board': 'E to climb back in',
     'ground.boardTouch': 'IN to climb back in',
+    'ground.noPlane': 'there is no aeroplane here — you are on foot now',
     'ground.disembark': '<b>E</b> to get out and fight it on foot',
     'ground.disembarkTouch': '<b>OUT</b> to fight it on foot',
 
@@ -397,6 +398,7 @@ const STRINGS = {
     'ground.empty': 'i avion je prazan',
     'ground.board': 'E za povratak u avion',
     'ground.boardTouch': 'U za povratak u avion',
+    'ground.noPlane': 'ovdje nema aviona — sad si pješice',
     'ground.disembark': '<b>E</b> za izlazak i gašenje pješice',
     'ground.disembarkTouch': '<b>VAN</b> za gašenje pješice',
 
@@ -621,6 +623,7 @@ const STRINGS = {
     'ground.empty': 'l\'avion aussi est à sec',
     'ground.board': 'E pour remonter à bord',
     'ground.boardTouch': 'BORD pour remonter',
+    'ground.noPlane': 'il n\'y a pas d\'avion ici — tu es à pied maintenant',
     'ground.disembark': '<b>E</b> pour descendre et lutter à pied',
     'ground.disembarkTouch': '<b>PIED</b> pour lutter à pied',
 

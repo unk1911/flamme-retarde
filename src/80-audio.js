@@ -724,12 +724,19 @@ function buildAudio() {
   const KLAPA = {
     full: 90,            // m — inside this you are standing in the middle of it
     fade: 1600,          // m — past this the channel has swallowed it
-    // What it plays at, up close, on foot. Down a couple of decibels from
-    // where it shipped: standing on the promenade it was the loudest thing in
-    // the game, which is true of a real klapa at ten metres and unhelpful when
-    // everything else happening on that promenade is quieter than singing.
-    gain: 0.44,
-    inside: 0.40,        // and what an airframe with two turboprops leaves of it
+    // What it plays at, up close, on foot. Halved again, and this is the third
+    // time it has come down: it shipped at 0.55, went to 0.44 when her voice
+    // turned out to be inaudible under it, and is 0.22 now. That is six
+    // decibels off the second figure and eight off the first, which sounds
+    // drastic written down and is not — a real klapa at ten metres genuinely
+    // is the loudest thing on a promenade, and the thing being modelled here
+    // is a game in which somebody else is the point.
+    //
+    // The distance law does the rest and is unchanged: this is still a wall of
+    // sound when you are standing in the middle of it, and still a suggestion
+    // across the channel. It is only no longer a wall you have to shout over.
+    gain: 0.22,
+    inside: 0.20,        // and what an airframe with two turboprops leaves of it
     lpNear: 9000,        // Hz — the filter wide open, next to the singers
     lpFar: 750,          // and what a kilometre of sea over water leaves of it
   };
@@ -950,43 +957,84 @@ function buildAudio() {
     // fundamental so nothing else survives. The onset used to take a third of
     // the note, which is the softest possible way to arrive and therefore the
     // easiest thing in the world to mask; it is a sixth now. Still not a click.
-    cuk: { f0: 1460, f1: 1330, dur: 0.23, amp: 0.260, rasp: 0, raspHz: 40,
+    cuk: { f0: 1460, f1: 1330, dur: 0.23, amp: 0.400, rasp: 0, raspHz: 40,
       form: 1.0, q: 9, wave: 'sine', attack: 0.16, vib: 0.010, vibHz: 11,
       reps: 1, gap: 0, step: 1 },
     // She has seen you: the same whistle twice, the second a tone up, which is
     // the ćuk being surprised rather than the ćuk keeping time.
-    wake: { f0: 1240, f1: 1500, dur: 0.17, amp: 0.260, rasp: 0.05, raspHz: 40,
+    wake: { f0: 1240, f1: 1500, dur: 0.17, amp: 0.385, rasp: 0.05, raspHz: 40,
       form: 1.0, q: 8, wave: 'sine', attack: 0.16, vib: 0.014, vibHz: 13,
       reps: 2, gap: 0.14, step: 1.15 },
     // On all fours, every couple of seconds — small, busy, close to the floor.
-    chirr: { f0: 520, f1: 720, dur: 0.085, amp: 0.155, rasp: 0.45, raspHz: 96,
+    chirr: { f0: 520, f1: 720, dur: 0.085, amp: 0.205, rasp: 0.45, raspHz: 96,
       form: 1.7, q: 4.5, wave: 'triangle', reps: 3, gap: 0.055, step: 1.05 },
     // The throw into the somersault.
-    hup: { f0: 600, f1: 1560, dur: 0.11, amp: 0.235, rasp: 0.12, raspHz: 40,
+    hup: { f0: 600, f1: 1560, dur: 0.11, amp: 0.310, rasp: 0.12, raspHz: 40,
       form: 1.6, q: 3.0, wave: 'triangle', reps: 1, gap: 0, step: 1 },
     // And the arrival. The one that comes down.
-    whump: { f0: 940, f1: 300, dur: 0.18, amp: 0.215, rasp: 0.32, raspHz: 58,
+    whump: { f0: 940, f1: 300, dur: 0.18, amp: 0.285, rasp: 0.32, raspHz: 58,
       form: 1.9, q: 2.6, wave: 'triangle', reps: 1, gap: 0, step: 1 },
     // Skipping: a four-note run up, thrown in now and then rather than on
     // every hop — a noise on every footfall stops being delight inside four
     // seconds and becomes a smoke alarm.
-    trill: { f0: 700, f1: 940, dur: 0.07, amp: 0.185, rasp: 0.08, raspHz: 40,
+    trill: { f0: 700, f1: 940, dur: 0.07, amp: 0.250, rasp: 0.08, raspHz: 40,
       form: 1.5, q: 4.0, wave: 'triangle', reps: 4, gap: 0.045, step: 1.22 },
     // The cartwheel: one long rising glide across the whole revolution. `hup`
     // is a throw and a cartwheel is not thrown — it is committed to, and then
     // it takes as long as it takes.
-    whee: { f0: 620, f1: 1520, dur: 0.54, amp: 0.215, rasp: 0.10, raspHz: 44,
+    whee: { f0: 620, f1: 1520, dur: 0.54, amp: 0.285, rasp: 0.10, raspHz: 44,
       form: 1.5, q: 3.4, wave: 'triangle', attack: 0.12, vib: 0.012, vibHz: 9,
       reps: 1, gap: 0, step: 1 },
+
+    // ── the odd ones ────────────────────────────────────────────────────────
+    // Five more, because seven noises on a two-second timer is a vocabulary you
+    // have heard all of inside a minute, and the tenth ćuk is furniture.
+    //
+    // They are deliberately not seven variations on the whistle. What makes a
+    // set of made-up noises read as one creature rather than one synthesiser is
+    // that they occupy different *registers* — something tiny and high, some-
+    // thing low and rolled, something that cannot hold a pitch — the way a
+    // real animal's calls do. Same throat, different things being done with it.
+
+    // Three tiny high ones, right at the top. Barely there, and the one she
+    // makes most often, which is why it is the quietest thing in the set.
+    peep: { f0: 2050, f1: 2350, dur: 0.055, amp: 0.230, rasp: 0.06, raspHz: 70,
+      form: 1.0, q: 7.5, wave: 'sine', attack: 0.20, reps: 3, gap: 0.042,
+      step: 1.07 },
+    // A note that cannot decide. Deep slow vibrato over a falling sweep — the
+    // waver is the whole content, so it is an order of magnitude deeper than
+    // the ćuk's and slow enough to count.
+    warble: { f0: 940, f1: 760, dur: 0.36, amp: 0.265, rasp: 0.05, raspHz: 40,
+      form: 1.3, q: 5.0, wave: 'sine', attack: 0.14, vib: 0.115, vibHz: 6.5,
+      reps: 1, gap: 0, step: 1 },
+    // The bottom of her range, rolled. `raspHz` down at 26 is under the rate
+    // the ear stops hearing separate pulses, so the chop reads as a roll rather
+    // than as a texture — a purr, or a pigeon, depending on your mood.
+    burr: { f0: 300, f1: 252, dur: 0.34, amp: 0.235, rasp: 0.92, raspHz: 26,
+      form: 2.2, q: 2.4, wave: 'triangle', attack: 0.18, reps: 2, gap: 0.09,
+      step: 0.94 },
+    // Five clicks, cricket-fast. `dur` is 22 ms and `attack` half of it, so
+    // there is no note here at all — it is an onset and a stop, which is what
+    // a click is. This is the one that does not sound like a bird.
+    tick: { f0: 1750, f1: 1620, dur: 0.022, amp: 0.215, rasp: 0.62, raspHz: 210,
+      form: 1.2, q: 6.0, wave: 'square', attack: 0.45, reps: 5, gap: 0.038,
+      step: 1.03 },
+    // And the top: a single very high rising squeak, over almost before it
+    // starts. Delight with nothing else in it.
+    squee: { f0: 1500, f1: 3150, dur: 0.13, amp: 0.250, rasp: 0.04, raspHz: 60,
+      form: 1.0, q: 6.5, wave: 'sine', attack: 0.16, reps: 1, gap: 0, step: 1 },
   };
 
   // How far down the klapa and the cicadas go while she is making a noise, at
-  // full level. Six decibels: enough that a quarter-second whistle has somewhere
-  // to be, and not so much that a run of chirps sets the whole beach breathing
-  // in and out. Scaled by her own gain below, so that a ćuk from forty metres
-  // away — which you are meant to only half hear — does not haul the singers
-  // down with it.
-  const BED_DUCK = 0.45;
+  // full level. Nine decibels now rather than six — the klapa came down by the
+  // same amount at the same time and this went with it, because the point of
+  // the duck is the *ratio* between her and the bed for the fifth of a second
+  // she is using, and holding the ratio while lowering both is what keeps the
+  // effect from turning into a hole in the mix.
+  //
+  // Still scaled by her own gain below, so that a ćuk from forty metres away —
+  // which you are meant to only half hear — does not haul the singers down.
+  const BED_DUCK = 0.34;
 
   /** @param gain 0…1, so a caller can fall it off with distance. */
   function squeak(kind, gain = 1, pan = 0) {
@@ -1083,12 +1131,24 @@ function buildAudio() {
     }
     set(nodes.turbine.osc.frequency, 900 + s.throttle * 620, 0.15);
     set(nodes.turbine.g.gain, (s.inside ? 0.028 : 0.016) * s.near, 0.12);
-    set(nodes.rumble.g.gain, 0.10 + s.throttle * 0.13, 0.12);
+    // Scaled by `near`, like every other engine node, which it was not.
+    //
+    // This was the drum you could hear on the promenade at Jadrija. Three of
+    // the four aeroplane beds asked how far away the aeroplane was and the
+    // combustion rumble did not, so it played at its cruise level over a
+    // resort with no aeroplane in it — and being the lowest, widest bed in the
+    // mix, it was also the one you noticed. `near` is fed 0 when the airframe
+    // is gone, so this now goes with it.
+    set(nodes.rumble.g.gain, (0.10 + s.throttle * 0.13) * s.near, 0.12);
     set(nodes.rumble.f.frequency, 180 + s.throttle * 160, 0.2);
 
     // ── airflow ───────────────────────────────────────────────────────────
+    // Likewise, and for a subtler reason: this is the slipstream over *your*
+    // airframe, so standing in a field it is not a quiet version of itself,
+    // it is nothing. The 0.03 floor is a cockpit floor and had no business
+    // being a world floor.
     const q = sat(s.speed / 120);
-    set(nodes.air.g.gain, 0.03 + q * q * 0.16, 0.15);
+    set(nodes.air.g.gain, (0.03 + q * q * 0.16) * s.near, 0.15);
     set(nodes.air.f.frequency, 500 + q * 1500, 0.2);
 
     // ── water ─────────────────────────────────────────────────────────────
