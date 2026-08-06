@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.33.0">
+<meta name="version" content="1.33.1">
 <meta name="build-date" content="2026-08-06">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -1024,8 +1024,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.33.0, built 2026-08-06">
-    <b>v1.33.0</b><i>·</i><span>2026-08-06</span>
+  <div id="build" title="Flamme Retardé 1.33.1, built 2026-08-06">
+    <b>v1.33.1</b><i>·</i><span>2026-08-06</span>
   </div>
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
@@ -1271,7 +1271,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.33.0", date: "2026-08-06" };</script>
+<script>const BUILD = { v: "1.33.1", date: "2026-08-06" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -18504,9 +18504,27 @@ function buildAudio() {
 
     // ── fire ──────────────────────────────────────────────────────────────
     // Rolls off with distance, and with how much is actually alight.
+    //
+    // Both of those used to be true only in the loosest sense, and the result
+    // was reported as "I press 9 and I can still hear the hum of the aeroplane
+    // from the promenade". It is not the aeroplane — measured on the beach at
+    // Jadrija, all four engine beds sit at exactly zero, because `own` is zero
+    // the moment you are stranded. It is this: eight burning cells eight
+    // hundred metres away, played at three quarters strength.
+    //
+    // Two things did that. The distance law was linear over 2.2 km, which is
+    // far too generous for something that goes as the square; and the size term
+    // had a floor of 0.10 against a range of 0.34, so a fire that was nearly
+    // out was within a couple of decibels of one that was taking a hillside.
+    // Squared, with the floor cut to almost nothing, a dying fire across a
+    // channel is 15 dB quieter and a big one at close range is where it was.
+    //
+    // And a low roar with a slow surge in it, heard at a fixed level from a
+    // beach with no flame anywhere in sight, is not identifiable as fire. Of
+    // course it sounds like an engine. There was nothing to see.
     const near = 1 - sat((s.fireDist - 200) / 2200);
     const size = sat(s.burning / 260);
-    const fg = near * (0.10 + size * 0.34);
+    const fg = near * near * (0.015 + size * 0.42);
     set(nodes.fire.g.gain, fg, 0.4);
     if (fg > 0.05) {
       crackleT -= dt;
@@ -18546,6 +18564,25 @@ function buildAudio() {
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, beep, setVolume, getVolume,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa,
     firestarter,
+    /**
+     * For a test: what every continuous bed is *actually* playing at.
+     *
+     * Every one of these is a gain that update() writes each frame off a state
+     * feed, and the failure mode they all share is silent: a bed that should be
+     * at nothing sits at 0.06 and you get "I can still hear the aeroplane from
+     * the promenade", which is a sentence with nine candidate causes and no way
+     * to tell them apart by listening.
+     */
+    beds: () => {
+      const g = (k) => (nodes[k] ? +nodes[k].g.gain.value.toFixed(4) : -1);
+      return {
+        eng: nodes.eng ? +nodes.eng[0].g.gain.value.toFixed(4) : -1,
+        turbine: g('turbine'), rumble: g('rumble'), air: g('air'),
+        scoop: g('scoop'), sea: g('sea'), fire: g('fire'),
+        hose: g('hose'), hoseLo: g('hoseLo'),
+        dead, master: master ? +master.gain.value.toFixed(3) : -1,
+      };
+    },
     /** For a test: is the beat running, and where in the two bars is it? */
     fireStats: () => ({
       on: fireOn,
@@ -19582,6 +19619,20 @@ function chuteDown(kind) {
   if (kind === 'land' && ground && ground.ok
     && ground.retarget(localeAt(eject.pos.x, eject.pos.z, airfield, jadrija, city))
     && ground.dropIn(eject.pos.x, eject.pos.z, eject.you.yaw, from ? from.stranded : true)) {
+    // Back in the seat, and this is the whole of "U works exactly once".
+    //
+    // The canopy ends its descent in `down` rather than `stowed`, which is
+    // right — `down` is a state you are in, standing on a hillside with cloth
+    // around your ankles, and the frame after landing still has to know that is
+    // what just happened. What nothing did was ever leave it. `eject.active` is
+    // `phase !== 'stowed'`, so from the first landing onwards it was true for
+    // the rest of the session, and `launchOut` is guarded on exactly that. The
+    // reset was there, one line inside `launchOut`, on the far side of the test
+    // that could no longer be reached.
+    //
+    // It belongs here instead: the moment the ground mode has you is the moment
+    // the parachute is over, whichever way you got under it.
+    eject.reset();
     alerts.bump(1.1);
     $('chute-hud').hidden = true;
     $('hud').hidden = true;
@@ -20479,6 +20530,7 @@ window.__fr = {
     klapa: () => audio.klapaStats(),
     /** Step the klapa at a given range without flying there. */
     at: (d, inside = false) => { audio.klapa(d, inside); return audio.klapaStats(); },
+    beds: () => audio.beds(),
     fire: () => audio.fireStats(),
     /** The beat on its own, without having to soak her for sixteen seconds. */
     beat: (g = 1) => { audio.firestarter(g); return audio.fireStats(); },
@@ -20672,6 +20724,13 @@ window.__fr = {
 //     finger. On a phone you have two thumbs and both are busy, so the panic
 //     button has to stay on when you let go of it.
 //
+//  4. Sticks listen on the window; only buttons listen on themselves. All three
+//     overlays are full-screen and `pointer-events: none`, because they sit on
+//     top of the readouts and have to let a touch through to them — so an
+//     overlay never receives a pointerdown, and a stick bound to one is a
+//     control that silently does not exist. The gate is `state.phase`, not what
+//     the touch happened to land on.
+//
 // Everything is Pointer Events with explicit capture, so a thumb that slides
 // off a button still releases it and two thumbs never get confused for one.
 // -----------------------------------------------------------------------------
@@ -20699,9 +20758,16 @@ function initTouch() {
 
   // ── the floating stick ────────────────────────────────────────────────────
 
-  /** Anything that is already a control handles its own touches. */
+  /**
+   * Anything that is already a control handles its own touches.
+   *
+   * `#ground-prompt` is in here because it is a div that listens for clicks —
+   * the "press E to board" line is also the button on a phone, since there was
+   * nowhere left in the flight controls to put a sixth one. Without it, tapping
+   * it would board the aeroplane *and* plant a walk stick under your thumb.
+   */
   const isControl = (t) => t && t.closest
-    && t.closest('button, input, a, #thr, #panel, #veil, #over, #rotate');
+    && t.closest('button, input, a, #thr, #panel, #veil, #over, #rotate, #ground-prompt');
 
   /**
    * Claim a pointer, and do not care if it has already gone.
@@ -20714,8 +20780,9 @@ function initTouch() {
    * The releases in this file have always been wrapped. The claims should be
    * too, for the same reason.
    */
-  const capture = (el, id) => {
-    try { el.setPointerCapture(id); } catch (err) { /* pointer already gone */ }
+  const capture = (id) => {
+    try { document.documentElement.setPointerCapture(id); }
+    catch (err) { /* pointer already gone */ }
   };
 
   function stickTo(dx, dy) {
@@ -20900,9 +20967,27 @@ function initTouch() {
     walkKnob.style.transform = `translate(${x * r * 0.6}px, ${-y * r * 0.6}px)`;
   }
 
-  const gtouch = document.getElementById('gtouch');
-  gtouch.addEventListener('pointerdown', (e) => {
-    if (isControl(e.target)) return;
+  /**
+   * On the window, and not on `#gtouch`.
+   *
+   * This is the whole of "I can get to Jadrija on my phone and then I am stuck
+   * sitting in one spot". `#gtouch` is `pointer-events: none` and always was —
+   * it has to be, because it is a full-screen overlay at z-index 45 sitting on
+   * top of the readouts and the board-the-aeroplane prompt, and the only things
+   * in it that are meant to swallow a touch are its own buttons, which set
+   * `pointer-events: auto` for themselves. So the buttons worked. Everything
+   * else — the walk stick, the whole right half of the screen that is your head
+   * — was listening on an element that by construction never receives a
+   * pointerdown, and there is no way to tell from the outside, because five
+   * buttons light up and respond and only the two invisible controls are gone.
+   *
+   * The flight stick has been on the window since the day it was written, which
+   * is why it never had this. All three modes work the same way now, and none
+   * of them changes what a touch hits: the gate is the phase, not the geometry.
+   */
+  addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;
+    if (state.phase !== 'ground' || isControl(e.target)) return;
     e.preventDefault();
     if (e.clientX < innerWidth * 0.46 && walkId === null) {
       walkId = e.pointerId;
@@ -20910,19 +20995,21 @@ function initTouch() {
       walkPad.style.left = `${walkOx}px`;
       walkPad.style.top = `${walkOy}px`;
       walkPad.classList.add('on');
-      capture(gtouch, e.pointerId);
+      capture(e.pointerId);
       walkTo(0, 0);
     } else if (lookId === null) {
       lookId = e.pointerId;
       lookX = e.clientX; lookY = e.clientY;
-      capture(gtouch, e.pointerId);
+      capture(e.pointerId);
     }
   }, { passive: false });
 
-  gtouch.addEventListener('pointermove', (e) => {
+  addEventListener('pointermove', (e) => {
     if (e.pointerId === walkId) {
+      e.preventDefault();
       walkTo(e.clientX - walkOx, e.clientY - walkOy);
     } else if (e.pointerId === lookId) {
+      e.preventDefault();
       if (ground) ground.look((e.clientX - lookX) * 0.0060, (e.clientY - lookY) * 0.0060);
       lookX = e.clientX; lookY = e.clientY;
     }
@@ -20938,8 +21025,13 @@ function initTouch() {
       lookId = null;
     }
   };
-  gtouch.addEventListener('pointerup', endGround);
-  gtouch.addEventListener('pointercancel', endGround);
+  addEventListener('pointerup', endGround);
+  addEventListener('pointercancel', endGround);
+  // Boarding the aeroplane, or being killed, with a thumb still down.
+  addEventListener('blur', () => {
+    if (walkId !== null) endGround({ pointerId: walkId });
+    if (lookId !== null) endGround({ pointerId: lookId });
+  });
 
   hold('t-jet', (v) => { TOUCH.gjet = v; });
   tap('t-up', () => launchOut());
@@ -20973,9 +21065,12 @@ function initTouch() {
     chuteKnob.style.transform = `translate(${x * r * 0.6}px, ${-y * r * 0.6}px)`;
   }
 
-  const ctouch = document.getElementById('ctouch');
-  ctouch.addEventListener('pointerdown', (e) => {
-    if (isControl(e.target)) return;
+  // On the window, for the reason above — and this one had the same fault and
+  // was very much harder to notice, because the canopy flies itself well enough
+  // that a descent with no input at all still lands you somewhere.
+  addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;
+    if (state.phase !== 'chute' || isControl(e.target)) return;
     e.preventDefault();
     if (e.clientX < innerWidth * 0.46 && cId === null) {
       cId = e.pointerId;
@@ -20983,19 +21078,21 @@ function initTouch() {
       chutePad.style.left = `${cOx}px`;
       chutePad.style.top = `${cOy}px`;
       chutePad.classList.add('on');
-      capture(ctouch, e.pointerId);
+      capture(e.pointerId);
       chuteTo(0, 0);
     } else if (cLookId === null) {
       cLookId = e.pointerId;
       cLookX = e.clientX; cLookY = e.clientY;
-      capture(ctouch, e.pointerId);
+      capture(e.pointerId);
     }
   }, { passive: false });
 
-  ctouch.addEventListener('pointermove', (e) => {
+  addEventListener('pointermove', (e) => {
     if (e.pointerId === cId) {
+      e.preventDefault();
       chuteTo(e.clientX - cOx, e.clientY - cOy);
     } else if (e.pointerId === cLookId) {
+      e.preventDefault();
       if (eject) eject.look((e.clientX - cLookX) * 0.0060, (e.clientY - cLookY) * 0.0060);
       cLookX = e.clientX; cLookY = e.clientY;
     }
@@ -21011,8 +21108,12 @@ function initTouch() {
       cLookId = null;
     }
   };
-  ctouch.addEventListener('pointerup', endChute);
-  ctouch.addEventListener('pointercancel', endChute);
+  addEventListener('pointerup', endChute);
+  addEventListener('pointercancel', endChute);
+  addEventListener('blur', () => {
+    if (cId !== null) endChute({ pointerId: cId });
+    if (cLookId !== null) endChute({ pointerId: cLookId });
+  });
 
   tap('t-cset', () => togglePanel());
   tap('t-cpause', () => togglePause());

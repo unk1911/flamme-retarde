@@ -1677,9 +1677,27 @@ function buildAudio() {
 
     // ── fire ──────────────────────────────────────────────────────────────
     // Rolls off with distance, and with how much is actually alight.
+    //
+    // Both of those used to be true only in the loosest sense, and the result
+    // was reported as "I press 9 and I can still hear the hum of the aeroplane
+    // from the promenade". It is not the aeroplane — measured on the beach at
+    // Jadrija, all four engine beds sit at exactly zero, because `own` is zero
+    // the moment you are stranded. It is this: eight burning cells eight
+    // hundred metres away, played at three quarters strength.
+    //
+    // Two things did that. The distance law was linear over 2.2 km, which is
+    // far too generous for something that goes as the square; and the size term
+    // had a floor of 0.10 against a range of 0.34, so a fire that was nearly
+    // out was within a couple of decibels of one that was taking a hillside.
+    // Squared, with the floor cut to almost nothing, a dying fire across a
+    // channel is 15 dB quieter and a big one at close range is where it was.
+    //
+    // And a low roar with a slow surge in it, heard at a fixed level from a
+    // beach with no flame anywhere in sight, is not identifiable as fire. Of
+    // course it sounds like an engine. There was nothing to see.
     const near = 1 - sat((s.fireDist - 200) / 2200);
     const size = sat(s.burning / 260);
-    const fg = near * (0.10 + size * 0.34);
+    const fg = near * near * (0.015 + size * 0.42);
     set(nodes.fire.g.gain, fg, 0.4);
     if (fg > 0.05) {
       crackleT -= dt;
@@ -1719,6 +1737,25 @@ function buildAudio() {
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, beep, setVolume, getVolume,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa,
     firestarter,
+    /**
+     * For a test: what every continuous bed is *actually* playing at.
+     *
+     * Every one of these is a gain that update() writes each frame off a state
+     * feed, and the failure mode they all share is silent: a bed that should be
+     * at nothing sits at 0.06 and you get "I can still hear the aeroplane from
+     * the promenade", which is a sentence with nine candidate causes and no way
+     * to tell them apart by listening.
+     */
+    beds: () => {
+      const g = (k) => (nodes[k] ? +nodes[k].g.gain.value.toFixed(4) : -1);
+      return {
+        eng: nodes.eng ? +nodes.eng[0].g.gain.value.toFixed(4) : -1,
+        turbine: g('turbine'), rumble: g('rumble'), air: g('air'),
+        scoop: g('scoop'), sea: g('sea'), fire: g('fire'),
+        hose: g('hose'), hoseLo: g('hoseLo'),
+        dead, master: master ? +master.gain.value.toFixed(3) : -1,
+      };
+    },
     /** For a test: is the beat running, and where in the two bars is it? */
     fireStats: () => ({
       on: fireOn,

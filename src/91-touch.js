@@ -17,6 +17,13 @@
 //     finger. On a phone you have two thumbs and both are busy, so the panic
 //     button has to stay on when you let go of it.
 //
+//  4. Sticks listen on the window; only buttons listen on themselves. All three
+//     overlays are full-screen and `pointer-events: none`, because they sit on
+//     top of the readouts and have to let a touch through to them — so an
+//     overlay never receives a pointerdown, and a stick bound to one is a
+//     control that silently does not exist. The gate is `state.phase`, not what
+//     the touch happened to land on.
+//
 // Everything is Pointer Events with explicit capture, so a thumb that slides
 // off a button still releases it and two thumbs never get confused for one.
 // -----------------------------------------------------------------------------
@@ -44,9 +51,16 @@ function initTouch() {
 
   // ── the floating stick ────────────────────────────────────────────────────
 
-  /** Anything that is already a control handles its own touches. */
+  /**
+   * Anything that is already a control handles its own touches.
+   *
+   * `#ground-prompt` is in here because it is a div that listens for clicks —
+   * the "press E to board" line is also the button on a phone, since there was
+   * nowhere left in the flight controls to put a sixth one. Without it, tapping
+   * it would board the aeroplane *and* plant a walk stick under your thumb.
+   */
   const isControl = (t) => t && t.closest
-    && t.closest('button, input, a, #thr, #panel, #veil, #over, #rotate');
+    && t.closest('button, input, a, #thr, #panel, #veil, #over, #rotate, #ground-prompt');
 
   /**
    * Claim a pointer, and do not care if it has already gone.
@@ -59,8 +73,9 @@ function initTouch() {
    * The releases in this file have always been wrapped. The claims should be
    * too, for the same reason.
    */
-  const capture = (el, id) => {
-    try { el.setPointerCapture(id); } catch (err) { /* pointer already gone */ }
+  const capture = (id) => {
+    try { document.documentElement.setPointerCapture(id); }
+    catch (err) { /* pointer already gone */ }
   };
 
   function stickTo(dx, dy) {
@@ -245,9 +260,27 @@ function initTouch() {
     walkKnob.style.transform = `translate(${x * r * 0.6}px, ${-y * r * 0.6}px)`;
   }
 
-  const gtouch = document.getElementById('gtouch');
-  gtouch.addEventListener('pointerdown', (e) => {
-    if (isControl(e.target)) return;
+  /**
+   * On the window, and not on `#gtouch`.
+   *
+   * This is the whole of "I can get to Jadrija on my phone and then I am stuck
+   * sitting in one spot". `#gtouch` is `pointer-events: none` and always was —
+   * it has to be, because it is a full-screen overlay at z-index 45 sitting on
+   * top of the readouts and the board-the-aeroplane prompt, and the only things
+   * in it that are meant to swallow a touch are its own buttons, which set
+   * `pointer-events: auto` for themselves. So the buttons worked. Everything
+   * else — the walk stick, the whole right half of the screen that is your head
+   * — was listening on an element that by construction never receives a
+   * pointerdown, and there is no way to tell from the outside, because five
+   * buttons light up and respond and only the two invisible controls are gone.
+   *
+   * The flight stick has been on the window since the day it was written, which
+   * is why it never had this. All three modes work the same way now, and none
+   * of them changes what a touch hits: the gate is the phase, not the geometry.
+   */
+  addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;
+    if (state.phase !== 'ground' || isControl(e.target)) return;
     e.preventDefault();
     if (e.clientX < innerWidth * 0.46 && walkId === null) {
       walkId = e.pointerId;
@@ -255,19 +288,21 @@ function initTouch() {
       walkPad.style.left = `${walkOx}px`;
       walkPad.style.top = `${walkOy}px`;
       walkPad.classList.add('on');
-      capture(gtouch, e.pointerId);
+      capture(e.pointerId);
       walkTo(0, 0);
     } else if (lookId === null) {
       lookId = e.pointerId;
       lookX = e.clientX; lookY = e.clientY;
-      capture(gtouch, e.pointerId);
+      capture(e.pointerId);
     }
   }, { passive: false });
 
-  gtouch.addEventListener('pointermove', (e) => {
+  addEventListener('pointermove', (e) => {
     if (e.pointerId === walkId) {
+      e.preventDefault();
       walkTo(e.clientX - walkOx, e.clientY - walkOy);
     } else if (e.pointerId === lookId) {
+      e.preventDefault();
       if (ground) ground.look((e.clientX - lookX) * 0.0060, (e.clientY - lookY) * 0.0060);
       lookX = e.clientX; lookY = e.clientY;
     }
@@ -283,8 +318,13 @@ function initTouch() {
       lookId = null;
     }
   };
-  gtouch.addEventListener('pointerup', endGround);
-  gtouch.addEventListener('pointercancel', endGround);
+  addEventListener('pointerup', endGround);
+  addEventListener('pointercancel', endGround);
+  // Boarding the aeroplane, or being killed, with a thumb still down.
+  addEventListener('blur', () => {
+    if (walkId !== null) endGround({ pointerId: walkId });
+    if (lookId !== null) endGround({ pointerId: lookId });
+  });
 
   hold('t-jet', (v) => { TOUCH.gjet = v; });
   tap('t-up', () => launchOut());
@@ -318,9 +358,12 @@ function initTouch() {
     chuteKnob.style.transform = `translate(${x * r * 0.6}px, ${-y * r * 0.6}px)`;
   }
 
-  const ctouch = document.getElementById('ctouch');
-  ctouch.addEventListener('pointerdown', (e) => {
-    if (isControl(e.target)) return;
+  // On the window, for the reason above — and this one had the same fault and
+  // was very much harder to notice, because the canopy flies itself well enough
+  // that a descent with no input at all still lands you somewhere.
+  addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;
+    if (state.phase !== 'chute' || isControl(e.target)) return;
     e.preventDefault();
     if (e.clientX < innerWidth * 0.46 && cId === null) {
       cId = e.pointerId;
@@ -328,19 +371,21 @@ function initTouch() {
       chutePad.style.left = `${cOx}px`;
       chutePad.style.top = `${cOy}px`;
       chutePad.classList.add('on');
-      capture(ctouch, e.pointerId);
+      capture(e.pointerId);
       chuteTo(0, 0);
     } else if (cLookId === null) {
       cLookId = e.pointerId;
       cLookX = e.clientX; cLookY = e.clientY;
-      capture(ctouch, e.pointerId);
+      capture(e.pointerId);
     }
   }, { passive: false });
 
-  ctouch.addEventListener('pointermove', (e) => {
+  addEventListener('pointermove', (e) => {
     if (e.pointerId === cId) {
+      e.preventDefault();
       chuteTo(e.clientX - cOx, e.clientY - cOy);
     } else if (e.pointerId === cLookId) {
+      e.preventDefault();
       if (eject) eject.look((e.clientX - cLookX) * 0.0060, (e.clientY - cLookY) * 0.0060);
       cLookX = e.clientX; cLookY = e.clientY;
     }
@@ -356,8 +401,12 @@ function initTouch() {
       cLookId = null;
     }
   };
-  ctouch.addEventListener('pointerup', endChute);
-  ctouch.addEventListener('pointercancel', endChute);
+  addEventListener('pointerup', endChute);
+  addEventListener('pointercancel', endChute);
+  addEventListener('blur', () => {
+    if (cId !== null) endChute({ pointerId: cId });
+    if (cLookId !== null) endChute({ pointerId: cLookId });
+  });
 
   tap('t-cset', () => togglePanel());
   tap('t-cpause', () => togglePause());

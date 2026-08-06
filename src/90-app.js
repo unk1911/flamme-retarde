@@ -1001,6 +1001,20 @@ function chuteDown(kind) {
   if (kind === 'land' && ground && ground.ok
     && ground.retarget(localeAt(eject.pos.x, eject.pos.z, airfield, jadrija, city))
     && ground.dropIn(eject.pos.x, eject.pos.z, eject.you.yaw, from ? from.stranded : true)) {
+    // Back in the seat, and this is the whole of "U works exactly once".
+    //
+    // The canopy ends its descent in `down` rather than `stowed`, which is
+    // right — `down` is a state you are in, standing on a hillside with cloth
+    // around your ankles, and the frame after landing still has to know that is
+    // what just happened. What nothing did was ever leave it. `eject.active` is
+    // `phase !== 'stowed'`, so from the first landing onwards it was true for
+    // the rest of the session, and `launchOut` is guarded on exactly that. The
+    // reset was there, one line inside `launchOut`, on the far side of the test
+    // that could no longer be reached.
+    //
+    // It belongs here instead: the moment the ground mode has you is the moment
+    // the parachute is over, whichever way you got under it.
+    eject.reset();
     alerts.bump(1.1);
     $('chute-hud').hidden = true;
     $('hud').hidden = true;
@@ -1898,6 +1912,7 @@ window.__fr = {
     klapa: () => audio.klapaStats(),
     /** Step the klapa at a given range without flying there. */
     at: (d, inside = false) => { audio.klapa(d, inside); return audio.klapaStats(); },
+    beds: () => audio.beds(),
     fire: () => audio.fireStats(),
     /** The beat on its own, without having to soak her for sixteen seconds. */
     beat: (g = 1) => { audio.firestarter(g); return audio.fireStats(); },

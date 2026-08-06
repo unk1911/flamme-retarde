@@ -10,6 +10,74 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.33.1] — 2026-08-06
+
+### Fixed — on a phone, on foot, you could not move
+
+Reported as "I can click on Jadrija to land there, but then there's no controls
+to move around — I'm stuck just sitting in one spot", and that is exactly what
+it was.
+
+`#gtouch` is a full-screen overlay and is `pointer-events: none`, because it
+sits on top of the ground readouts and the board-the-aeroplane prompt and has to
+let a touch through to them; only its own buttons set `pointer-events: auto` for
+themselves. The walk stick and the whole right half of the screen that is your
+head were bound to that overlay — an element that by construction never receives
+a `pointerdown`. So five buttons lit up and answered and the two invisible
+controls did nothing, which is about the worst possible shape for a bug to have,
+because everything you can see works.
+
+The flight stick has listened on the window since the day it was written, which
+is why it never had this. All three overlays do now, gated on `state.phase`
+rather than on where the touch landed, and the file's header comment carries the
+rule as a fourth numbered decision so the next one is written the same way.
+
+The canopy had it too, and was much harder to notice: a descent with no input at
+all still lands you somewhere.
+
+Verified against the built page under touch emulation, and against the previous
+build as a control — where the pad never appears, your position never changes
+and your heading never changes, through the same drags.
+
+### Fixed — U worked exactly once
+
+The canopy ends its descent in `down` rather than `stowed`, which is right:
+`down` is a state you are in, standing on a hillside with cloth around your
+ankles. What nothing did was ever leave it. `eject.active` is `phase !==
+'stowed'`, so from the first landing onwards it stayed true for the rest of the
+session — and `launchOut` is guarded on exactly that. The reset existed, one
+line inside `launchOut`, on the far side of the test that could no longer be
+reached. It now happens where it belongs: the moment the ground mode has you,
+the parachute is over.
+
+Three launches back to back, verified.
+
+### Fixed — the hum on the promenade
+
+Reported as leftover aeroplane noise at Jadrija. It is not the aeroplane:
+measured on the beach, all four engine beds sit at exactly zero, because `own`
+goes to zero the moment you are stranded. It was the **fire** bed, playing at
+three quarters strength for eight burning cells eight hundred metres away.
+
+Two things did that. The distance law was linear over 2.2 km, which is far too
+generous for something that falls off as the square; and the size term had a
+floor of 0.10 against a range of 0.34, so a fire that was nearly out was within
+a couple of decibels of one taking a hillside. Squared, with the floor cut to
+0.015, that reading drops from 0.081 to 0.015 — fifteen decibels — and a big
+fire at close range is left where it was.
+
+And it is worth saying why it was mistaken for an engine: a low roar with a slow
+surge in it, at a fixed level, heard from a beach with no flame anywhere in
+sight. Of course it sounds like a motor. There was nothing to see.
+
+### Added — `__fr.audio.beds()`
+
+What every continuous bed is *actually* playing at, in one object. Every one of
+them is a gain that `update()` writes each frame off a state feed, and they all
+share a silent failure mode: a bed that should be at nothing sits at 0.06, and
+you get a bug report with nine candidate causes and no way to tell them apart by
+listening. This is how the one above was found in a single shot.
+
 ## [1.33.0] — 2026-08-06
 
 ### Added — the firestarter
