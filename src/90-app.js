@@ -1898,6 +1898,9 @@ window.__fr = {
     klapa: () => audio.klapaStats(),
     /** Step the klapa at a given range without flying there. */
     at: (d, inside = false) => { audio.klapa(d, inside); return audio.klapaStats(); },
+    fire: () => audio.fireStats(),
+    /** The beat on its own, without having to soak her for sixteen seconds. */
+    beat: (g = 1) => { audio.firestarter(g); return audio.fireStats(); },
   },
   land: {
     at: (x, z) => groundAt(x, z),
@@ -1946,6 +1949,8 @@ window.__fr = {
     // once a frame by the render loop, and this exists precisely because the
     // render loop is not running often enough to be trusted.
     step: (secs) => { jadrija.step(secs, camera.position); return jadrija.show(); },
+    /** Fill her soak meter, so the turn starts on the next frame she is stepped. */
+    flare: () => { jadrija.flare(); return jadrija.show(); },
   },
   /**
    * Drive the ground mission from a test without flying an approach first.

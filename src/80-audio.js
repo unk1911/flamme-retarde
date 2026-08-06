@@ -10,7 +10,7 @@
 
 function buildAudio() {
   let ctx = null;
-  let master = null, verb = null, verbSend = null, verbGain = null, bed = null;
+  let master = null, verb = null, verbSend = null, verbGain = null, bed = null, bedDuck = null;
   const nodes = {};
   let started = false;
   let noiseBuf = null;
@@ -121,9 +121,18 @@ function buildAudio() {
     // louder alone does not fix that — past a point it just pumps the whole
     // mix on every chirp. Getting the bed out of her way for a fifth of a
     // second does, and it is what a person at a desk would do.
+    //
+    // Two stages and not one, because there are now two things that want the
+    // bed out of the way and they want it for different lengths of time. Her
+    // squeaks take `bed` for a fifth of a second at a time and write to it with
+    // `cancelScheduledValues`; the music below holds `bedDuck` down for half a
+    // minute. Sharing one node, whichever spoke last would win, and the klapa
+    // would come back up under the beat every time she made a noise.
     bed = ctx.createGain();
     bed.gain.value = 1;
-    bed.connect(master);
+    bedDuck = ctx.createGain();
+    bedDuck.gain.value = 1;
+    bed.connect(bedDuck).connect(master);
 
     // ── the valley ────────────────────────────────────────────────────────
     // A convolution bus with a hand-made impulse response: a few discrete
@@ -231,19 +240,26 @@ function buildAudio() {
     if (ctx.state === 'suspended') ctx.resume();
   }
 
-  /** Short shaped noise burst — crackle, splash, squelch. */
+  /**
+   * Short shaped noise burst — crackle, splash, squelch.
+   *
+   * `at` is an absolute context time and defaults to now, which is what every
+   * caller but one wants: these are reactions to something that has just
+   * happened. The exception is the music below, which is scheduled a fifth of a
+   * second ahead of the clock and cannot use a function that means "now".
+   */
   function burst({ freq = 1400, q = 1.0, dur = 0.14, gain = 0.2, type = 'bandpass', sweep = 0,
-    dest = null }) {
+    dest = null, at = 0 }) {
     if (!ctx) return;
+    const t = at || ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = noiseBuf;
     src.loop = true;
     const f = ctx.createBiquadFilter();
     f.type = type; f.frequency.value = freq; f.Q.value = q;
     if (sweep) f.frequency.exponentialRampToValueAtTime(
-      Math.max(60, freq * sweep), ctx.currentTime + dur);
+      Math.max(60, freq * sweep), t + dur);
     const g = ctx.createGain();
-    const t = ctx.currentTime;
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(gain, t + Math.min(0.02, dur * 0.2));
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
@@ -764,6 +780,327 @@ function buildAudio() {
     }
   }
 
+  // ── the firestarter ─────────────────────────────────────────────────────────
+  /**
+   * The one piece of music in the game with a tempo, and the only thing in this
+   * file that is scheduled rather than triggered.
+   *
+   * Everything else here is a reaction: something happens, a function runs, a
+   * node starts at `ctx.currentTime`. A beat cannot be built that way. Frames
+   * arrive when the GPU is finished and not before, and a kick drum placed on
+   * the frame that noticed it was due is a kick drum up to twenty milliseconds
+   * late, which is audible, and late by a *different* amount every bar, which
+   * is the difference between a drummer and a drunk. So this one has a
+   * look-ahead: `update` walks a clock a third of a second in front of the
+   * audio context and hands the notes to the scheduler early, and the frame
+   * rate stops being able to touch the timing.
+   *
+   * ── the tempo ──
+   *
+   * `beat` is 0.43 s, which is 139.5 bpm, which is not a number anybody chose.
+   * `FIRE_DUR` in tools/blender/human_mh.py is 0.86 s for two stamps, because
+   * that is the tempo the routine is danced at; a beat is half of it. So her
+   * boot lands on the beat — not approximately, and not for the first few bars.
+   * Both clocks are real time and the two constants are exact halves of each
+   * other, so they are still together thirty seconds in. The `flare` clip is
+   * 1.10 s and the beat drops on the frame it ends, which is the frame the
+   * stamping starts.
+   *
+   * Note what is *not* on beat three. Both bars leave step 8 empty — no kick,
+   * no snare, one hat — and that is the hole her third stamp goes in. It is the
+   * one beat in the bar where what you hear is a boot on a concrete deck.
+   *
+   * ── what it is ──
+   *
+   * Big beat, of the specific 1996 kind: a breakbeat that stomps rather than
+   * shuffles, a bass that is more distortion than note, and one shriek every
+   * two bars. The bass is E, and the two notes that are not E are the minor
+   * third and the tritone above it — the tritone is the whole character of the
+   * thing, and it is there in bar two where the riff turns nasty.
+   *
+   * There is no voice in it. There is a very famous shouted syllable in the
+   * record this is in the manner of, and the same argument that keeps her
+   * talking in owl noises applies to it twice over: see `SQUEAKS`.
+   */
+  const FIRE = {
+    beat: 0.43,          // s — 139.5 bpm; half of FIRE_DUR in human_mh.py
+    lead: 1.10,          // s — the length of the `flare` clip, so the beat drops
+    root: 41.203,        // E1, and everything below is semitones off it
+    gain: 0.50,
+    duck: 0.86,          // how far under the beat the klapa and the cicadas go
+  };
+
+  // One sixteenth per character, sixteen to the bar, two bars. `x` is a hit and
+  // `-` on the hats is the open one.
+  //              1 e + a 2 e + a 3 e + a 4 e + a
+  const FIRE_K = 'x..x..x...x.....' + 'x..x..x...x..x..';
+  const FIRE_S = '....x.......x...' + '....x.......x.x.';
+  const FIRE_H = 'x.x.x.x-x.x.x.x.' + 'x.x.x.x-x.x.x.x-';
+  // And the riff, one character per sixteenth, `.` a rest. The digits are
+  // semitones off E as written; `a` and `c` are the ten and the twelve that do
+  // not fit in a column.
+  const FIRE_B = '0..0.0..0.0..0.3' + '0..0.0..0.0..665';
+  const FIRE_N = { 0: 0, 3: 3, 5: 5, 6: 6, 7: 7, a: 10, c: 12 };
+  const FIRE_STEPS = 32;
+
+  let fireBus = null, fireCurve = null;
+  let fireOn = false, fireHold = 0, fireAt = 0, fireStep = 0, fireLevel = 0;
+
+  const fireHz = (semi) => FIRE.root * Math.pow(2, semi / 12);
+
+  function fireInit() {
+    if (fireBus) return;
+    fireBus = ctx.createGain();
+    fireBus.gain.value = 0.0001;
+    fireBus.connect(master);
+    // A soft clipper for the bass, and the reason the bass has one at all: a
+    // sawtooth through a resonant filter is a synthesiser, and a sawtooth
+    // through a resonant filter through a tanh is a fuzz pedal. The curve is
+    // built once and shared; the node is not, because a WaveShaper feeding
+    // sixteen note gains would feed every note into every other note's
+    // envelope.
+    const n = 1024;
+    fireCurve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1;
+      fireCurve[i] = Math.tanh(x * 5.5) / Math.tanh(5.5);
+    }
+  }
+
+  function fireKick(at, amp) {
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    // A drop of nearly two octaves in eighty milliseconds. That sweep *is* the
+    // kick — a sine at 45 Hz on its own is a hum with an envelope on it.
+    o.frequency.setValueAtTime(168, at);
+    o.frequency.exponentialRampToValueAtTime(43, at + 0.08);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(amp, at + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.26);
+    o.connect(g).connect(fireBus);
+    o.start(at); o.stop(at + 0.30);
+    // The beater on the skin, which is what makes it audible on a laptop.
+    burst({ at, freq: 2400, q: 0.9, dur: 0.018, gain: amp * 0.30, dest: fireBus });
+  }
+
+  function fireSnare(at, amp) {
+    // Two things again: the shell, which is a short tuned thump, and the wires
+    // underneath, which are the noise. Either alone is a different instrument.
+    const o = ctx.createOscillator();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(240, at);
+    o.frequency.exponentialRampToValueAtTime(155, at + 0.08);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(amp * 0.55, at + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.13);
+    o.connect(g).connect(fireBus);
+    o.start(at); o.stop(at + 0.16);
+    burst({ at, freq: 1900, q: 0.55, dur: 0.17, gain: amp, sweep: 0.5, dest: fireBus });
+    // And the crack, which is a third layer and had to be. Pink noise through a
+    // bandpass at 1.9 kHz is a snare heard through a wall; the part that says
+    // *snare* lives at four and a half and there is 8 dB less of it in a 1/f
+    // source, so it needs asking for.
+    burst({ at, freq: 4600, q: 0.5, dur: 0.055, gain: amp * 0.75,
+      type: 'highpass', dest: fireBus });
+  }
+
+  // 5.2 kHz and not the 7.6 it started at, for the same reason as the snare's
+  // crack: the noise here is 1/f, so every octave up costs 3 dB of what there is
+  // to filter, and a hi-hat cornered above 7 kHz is a hiss rather than a tick.
+  function fireHat(at, amp, open) {
+    burst({ at, freq: 5200, q: 0.7, dur: open ? 0.15 : 0.032, gain: amp,
+      type: 'highpass', dest: fireBus });
+  }
+
+  /**
+   * One note of the riff: two detuned oscillators through a resonant lowpass
+   * that snaps open and shuts again, then the clipper. The filter envelope is
+   * the note — the pitch barely matters, which is the whole trick of a bassline
+   * like this one and the reason it survives being played on a phone speaker
+   * that cannot reproduce 41 Hz at all.
+   */
+  function fireBass(at, semi, dur, amp) {
+    const f0 = fireHz(semi);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.Q.value = 9;
+    // Wide open and closing to almost shut. It started a third as wide, on the
+    // theory that a bass belongs at the bottom, and measured 20 dB down by 1 kHz
+    // — which is a sub, not a riff. This is a fuzz pedal: most of what you hear
+    // is the harmonics the clipper puts back, and there has to be something
+    // above the fundamental for it to work on.
+    lp.frequency.setValueAtTime(Math.min(5600, f0 * 30), at);
+    lp.frequency.exponentialRampToValueAtTime(Math.max(130, f0 * 3.2), at + dur * 0.95);
+    const ws = ctx.createWaveShaper();
+    ws.curve = fireCurve; ws.oversample = '2x';
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(amp, at + 0.005);
+    g.gain.setValueAtTime(amp, at + dur * 0.65);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    for (const [wave, det, lvl] of [['sawtooth', -8, 1.0], ['square', 9, 0.5]]) {
+      const o = ctx.createOscillator();
+      o.type = wave;
+      o.frequency.value = f0;
+      o.detune.value = det;
+      const og = ctx.createGain(); og.gain.value = lvl;
+      o.connect(og).connect(lp);
+      o.start(at); o.stop(at + dur + 0.04);
+    }
+    lp.connect(ws).connect(g).connect(fireBus);
+  }
+
+  /**
+   * The shriek, once every two bars.
+   *
+   * A sawtooth bent up a tritone and dropped again, through a bandpass with a Q
+   * of twenty that follows it about a fifth behind — a formant chasing a note
+   * is what turns a synthesiser sweep into something being *made* to make that
+   * sound. This is the only part of the kit that goes to the valley, because it
+   * is the only one long enough for a tail to be anything but mud.
+   */
+  function fireWail(at, semi, dur, amp) {
+    const f0 = fireHz(semi);
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(f0, at);
+    o.frequency.exponentialRampToValueAtTime(f0 * 1.4142, at + dur * 0.30);
+    o.frequency.exponentialRampToValueAtTime(f0 * 0.94, at + dur);
+    const lfo = ctx.createOscillator();
+    lfo.type = 'sine'; lfo.frequency.value = 6.5;
+    const lg = ctx.createGain(); lg.gain.value = f0 * 0.03;
+    lfo.connect(lg).connect(o.frequency);
+    lfo.start(at); lfo.stop(at + dur + 0.05);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = 20;
+    bp.frequency.setValueAtTime(f0 * 1.5, at);
+    bp.frequency.exponentialRampToValueAtTime(f0 * 4.2, at + dur * 0.42);
+    bp.frequency.exponentialRampToValueAtTime(f0 * 1.2, at + dur);
+    const ws = ctx.createWaveShaper();
+    ws.curve = fireCurve; ws.oversample = '2x';
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(amp, at + 0.05);
+    g.gain.setValueAtTime(amp, at + dur * 0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.connect(bp).connect(ws).connect(g).connect(fireBus);
+    o.start(at); o.stop(at + dur + 0.05);
+    if (verbSend) { const w = ctx.createGain(); w.gain.value = 0.34; g.connect(w).connect(verbSend); }
+  }
+
+  /**
+   * The 1.10 s before the beat, under the `flare` clip: noise climbing three
+   * and a half octaves with a sub swelling beneath it. It is the oldest trick
+   * in dance music and it does one job, which is to make the downbeat land like
+   * something that was always coming.
+   */
+  function fireRiser(at, dur) {
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuf; src.loop = true;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = 2.6;
+    bp.frequency.setValueAtTime(240, at);
+    bp.frequency.exponentialRampToValueAtTime(7200, at + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(0.40, at + dur * 0.94);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur + 0.09);
+    src.connect(bp).connect(g).connect(fireBus);
+    src.start(at); src.stop(at + dur + 0.2);
+
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(fireHz(-12), at);
+    o.frequency.exponentialRampToValueAtTime(fireHz(0), at + dur);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, at);
+    og.gain.exponentialRampToValueAtTime(0.26, at + dur * 0.9);
+    og.gain.exponentialRampToValueAtTime(0.0001, at + dur + 0.05);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 260; lp.Q.value = 2;
+    o.connect(lp).connect(og).connect(fireBus);
+    o.start(at); o.stop(at + dur + 0.1);
+  }
+
+  /** One sixteenth of the two-bar pattern. */
+  function fireBeat(at, i) {
+    if (FIRE_K[i] === 'x') fireKick(at, i % 16 === 0 ? 0.55 : 0.44);
+    if (FIRE_S[i] === 'x') fireSnare(at, i === 29 ? 0.20 : 0.34);
+    const h = FIRE_H[i];
+    // Accented on the beat and shut off it, which is the whole of a hi-hat
+    // sounding played rather than sequenced.
+    if (h === 'x' || h === '-') fireHat(at, (i % 4 === 0 ? 0.20 : 0.11), h === '-');
+    const b = FIRE_B[i];
+    if (b !== '.') fireBass(at, FIRE_N[b], FIRE.beat * 0.30, 0.30);
+    // Beat three of the second bar, so it screams across the bar line and lands
+    // on the next downbeat rather than politely inside its own.
+    if (i === 24) fireWail(at, 24, FIRE.beat * 2.6, 0.15);
+  }
+
+  /**
+   * Poked every frame the routine is running, with 0…1 for how close you are.
+   *
+   * A watchdog rather than a switch, and deliberately: there are five ways out
+   * of that sequence — doused, timed out, walked away from, the figure culled
+   * at 250 m, the whole ground mode left — and exactly one of them is a place
+   * anybody would remember to write `stop()`. Stop feeding it and it stops.
+   */
+  function firestarter(gain) {
+    if (!ctx || ctx.state === 'suspended') return;
+    fireHold = 0.35;
+    fireLevel = clamp(gain, 0, 1);
+    if (fireOn) return;
+    fireOn = true;
+    fireInit();
+    const t = ctx.currentTime;
+    fireBus.gain.cancelScheduledValues(t);
+    fireBus.gain.setValueAtTime(0.0001, t);
+    fireBus.gain.exponentialRampToValueAtTime(FIRE.gain * fireLevel, t + 0.10);
+    fireRiser(t, FIRE.lead);
+    // The crash on the downbeat, and it is the one place a long bright noise
+    // tail is right: it covers the seam between the riser and the first bar.
+    burst({ at: t + FIRE.lead, freq: 5200, q: 0.4, dur: 1.5, gain: 0.14,
+      type: 'highpass', dest: fireBus });
+    fireAt = t + FIRE.lead;
+    fireStep = 0;
+  }
+
+  function fireStop() {
+    fireOn = false;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    if (fireBus) {
+      fireBus.gain.cancelScheduledValues(t);
+      fireBus.gain.setValueAtTime(Math.max(0.0001, fireBus.gain.value), t);
+      fireBus.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+    }
+    if (bedDuck) bedDuck.gain.setTargetAtTime(1, t, 1.1);
+  }
+
+  function fireTick(dt) {
+    if (!fireOn || !ctx) return;
+    const t = ctx.currentTime;
+    fireHold -= dt;
+    if (fireHold <= 0) { fireStop(); return; }
+    fireBus.gain.setTargetAtTime(FIRE.gain * fireLevel, t, 0.18);
+    if (bedDuck) bedDuck.gain.setTargetAtTime(1 - FIRE.duck * fireLevel, t, 0.30);
+    const step = FIRE.beat / 4;
+    // Frames the game dropped are notes that are now in the past, and a note
+    // scheduled in the past does not get skipped, it plays immediately — so a
+    // half-second hitch would come back as five sixteenths arriving together.
+    // Walk past them instead, a sixteenth at a time, so that the pattern picks
+    // up on the step it would have been on rather than restarting the bar. That
+    // distinction is the whole reason `fireStep` counts up forever instead of
+    // being taken modulo here: the grid is absolute and the bar line survives.
+    while (fireAt < t) { fireAt += step; fireStep++; }
+    while (fireAt < t + 0.32) {
+      fireBeat(fireAt, fireStep % FIRE_STEPS);
+      fireAt += step;
+      fireStep++;
+    }
+  }
+
   // ── the klapa ───────────────────────────────────────────────────────────────
   /**
    * The one recorded sound in the whole game. Everything else here is
@@ -783,19 +1120,21 @@ function buildAudio() {
   const KLAPA = {
     full: 90,            // m — inside this you are standing in the middle of it
     fade: 1600,          // m — past this the channel has swallowed it
-    // What it plays at, up close, on foot. Halved again, and this is the fourth
+    // What it plays at, up close, on foot. Halved again, and this is the fifth
     // time it has come down: 0.55 at first, 0.44 when her voice turned out to
-    // be inaudible under it, 0.22, and 0.11 now. That is fourteen decibels off
-    // where it started, which reads as drastic written down and is not — this
-    // is four men singing at the far end of a promenade you are walking down,
-    // and the thing being modelled is a game in which somebody else is the
-    // point. Asked for twice, which is the answer.
+    // be inaudible under it, 0.22, 0.11, and 0.055 now. That is twenty decibels
+    // off where it started, which reads as drastic written down and is not —
+    // this is four men singing at the far end of a promenade you are walking
+    // down, and the thing being modelled is a game in which somebody else is
+    // the point. Asked for three times, which is the answer; there is no
+    // argument left to make about the level of a thing the player keeps saying
+    // is too loud.
     //
     // The distance law does the rest and is unchanged: it still opens up as you
     // walk into it and is still a suggestion across the channel. It is only no
     // longer a thing everything else has to be mixed around.
-    gain: 0.11,
-    inside: 0.10,        // and what an airframe with two turboprops leaves of it
+    gain: 0.055,
+    inside: 0.05,        // and what an airframe with two turboprops leaves of it
     lpNear: 9000,        // Hz — the filter wide open, next to the singers
     lpFar: 750,          // and what a kilometre of sea over water leaves of it
   };
@@ -1261,6 +1600,10 @@ function buildAudio() {
 
   function update(dt, s) {
     if (!ctx || ctx.state === 'suspended') return;
+    // Above the `dead` gate below on purpose. That gate means *your aeroplane*
+    // is over, and it has nothing to say about whether somebody on a promenade
+    // two kilometres away is dancing.
+    fireTick(dt);
     // `dead` means your aeroplane is over. It used to mean the mixer was
     // switched off, and conflating those two is the whole of "the water only
     // hisses if I arrive by the 9 key".
@@ -1375,6 +1718,16 @@ function buildAudio() {
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, beep, setVolume, getVolume,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa,
+    firestarter,
+    /** For a test: is the beat running, and where in the two bars is it? */
+    fireStats: () => ({
+      on: fireOn,
+      level: +fireLevel.toFixed(3),
+      step: fireStep,
+      bars: +(fireStep / 16).toFixed(2),
+      gain: fireBus ? +fireBus.gain.value.toFixed(4) : 0,
+      bed: bedDuck ? +bedDuck.gain.value.toFixed(3) : 1,
+    }),
     /** Likewise for the ćuk, which is the second sample in the build. */
     cukStats: () => ({
       tried: cukTried,

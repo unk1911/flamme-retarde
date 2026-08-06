@@ -1374,7 +1374,7 @@ def wheel_floor(rig, clear=0.004):
     print("[mh] cartwheel: floor pass settled, deepest key %+.3f m" % worst)
 
 
-def floor_poses(rig, poses, clear=0.004):
+def floor_poses(rig, poses, clear=0.004, passes=3):
     """Solve `@root` z for a list of poses so each one sits on the deck.
 
     Lifted out of the cartwheel when the moonwalk turned out to need exactly the
@@ -1399,7 +1399,13 @@ def floor_poses(rig, poses, clear=0.004):
     # at a cost of a centimetre or two of foot through concrete, which at five
     # metres is nothing and a snapping pelvis never is. The ends are held: on
     # both clips that uses this, those two are the same pose.
-    for _pass in range(3):
+    #
+    # `passes=0` turns it off, and the two one-shots in the firestarter want
+    # that. The filter is there because a *sampled* clip's staircase is an
+    # artefact of solving frame by frame; on five hand-placed keys two tenths of
+    # a second apart the staircase is the animation — she crouches and her hips
+    # go down — and smoothing it is smoothing away the pose.
+    for _pass in range(passes):
         smoothed = list(solved)
         for i in range(1, len(solved) - 1):
             smoothed[i] = 0.25 * solved[i - 1] + 0.5 * solved[i] + 0.25 * solved[i + 1]
@@ -1437,6 +1443,37 @@ def dance_floor(rig, clear=0.004):
     for i, p in enumerate(poses):
         MOON[i] = (i * MOON_DUR / MOON_KEYS, p)
     print("[mh] moonwalk: floor pass settled, deepest key %+.3f m" % worst)
+
+
+def fire_floor(rig, clear=0.004):
+    """The floor pass for the turn: one sampled loop and two hand-keyed one-shots.
+
+    None of the three is filtered, which is the opposite of what the two dances
+    want and worth saying why. The filter is there for clips where the support
+    hands between limbs — the cartwheel, where it changes four times a turn —
+    because the solve jumps when it does and the jump is an artefact. This is a
+    march: one foot is down at all times, both are down at the two footfalls,
+    and at those two frames the legs are the same length, so there is no
+    handover to smooth. What the filter *would* remove is the bounce, which is
+    two keys wide and is the only reason the hips move at all. It took it from
+    four centimetres to two the first time round.
+
+    All three end (and `cast` also begins) on `_fire_at(0)`, which is a separate
+    dict each time it is called and therefore solved separately three times. It
+    lands on the same number three times because it is the same pose, and that
+    is what lets the game cut between them without her hips stepping.
+    """
+    poses = [_fire_at(i / FIRE_KEYS) for i in range(FIRE_KEYS + 1)]
+    worst = floor_poses(rig, poses, clear, passes=0)
+    for i, p in enumerate(poses):
+        FIRE[i] = (i * FIRE_DUR / FIRE_KEYS, p)
+    lo = min(p["@root"][2] for p in poses)
+    hi = max(p["@root"][2] for p in poses)
+    print("[mh] firestarter: deepest %+.3f m, hips travel %.3f m" % (worst, hi - lo))
+
+    for name, clip in (("flare", FLARE), ("cast", CAST)):
+        worst = floor_poses(rig, [p for _t, p in clip], clear, passes=0)
+        print("[mh] %s: deepest %+.3f m" % (name, worst))
 
 
 def skip_floor(rig, clear=0.004):
@@ -1556,6 +1593,7 @@ def export_skin(body, rig, path, clips, tris=26000):
     wheel_floor(rig)
     dance_floor(rig)
     skip_floor(rig)
+    fire_floor(rig)
 
     # Duplicate the *object*, not the evaluated mesh.
     #
@@ -2504,6 +2542,363 @@ SOAK_B = dict(SOAK_A, **{
     "legLL": (7, 0, 0), "legLR": (7, 0, 0),
 })
 
+# ── the firestarter ─────────────────────────────────────────────────────────
+#
+# "If we spray her with water for too long, she at some point switches into a
+# Prodigy Firestarter routine." Which makes this the one clip in the file that
+# is not something a child on a Dalmatian promenade would actually do, and it
+# had to be built by working backwards from what survives the trip.
+#
+# The reference is a man in a tunnel in 1996, and almost none of what makes that
+# performance work gets through: no face at this range, no hair to speak of, no
+# camera cuts, no tunnel. What survives is the silhouette, and the silhouette is
+# three things and their timing.
+#
+#   the hunch    chest dropped and shoulders rolled forward, so the outline goes
+#                from a person standing to a person coiled
+#   the chin     thrust up and out *against* the hunch — this is the single
+#                angle that separates a threat from a slouch, and it is why the
+#                neck and head carry +50° between them against a −34° back
+#   the elbows   high, wide, and never in the same place twice
+#
+# And 140 to the minute, one stamp a beat, which is where FIRE_DUR comes from.
+# Slower is a haka. Faster and the legs stop being legs.
+#
+# Two things are deliberately not authored.
+#
+# The stamp is not a sine wave. A leg that rises and falls smoothly is a march;
+# a stamp is planted for most of its cycle, snaps up, and comes down harder than
+# it went up. `_stomp` is that asymmetry, and it is the whole difference between
+# the two readings.
+#
+# And the bounce is not written down anywhere, because it cannot be: the floor
+# pass overwrites `@root` from the lowest tip and would throw away any hip
+# height authored here. It comes out of the *supporting* knee instead — sixteen
+# extra degrees of flexion on the frame the other foot lands, bled off over the
+# next quarter cycle. Her hips drop because her standing leg absorbs, which is
+# where the drop comes from in a real one, and the floor pass then finds it on
+# its own.
+
+FIRE_DUR = 0.86            # two stamps, at about a hundred and forty a minute
+FIRE_KEYS = 16             # sampled, not keyed — see dance_floor()
+
+# The pelvis's share of the hunch, and it is nearly nothing on purpose.
+#
+# The first pass put twelve degrees here and twenty-two in the back, on the same
+# reasoning the `soak` pose uses — all of it at the pelvis is a bow, all of it in
+# the spine is a stoop, so split it. That is right for a lean and wrong for this,
+# and the side view said so immediately: thirty-four degrees of forward *tilt*
+# with a straight back is a sprinter in the blocks, which is an athlete, which is
+# the opposite of coiled. A hunch is a rounded upper back over hips that are
+# still under her. So the pelvis stays where it is and the whole forty degrees
+# goes into the spine, weighted toward the top of it.
+FIRE_PELVIS = 2.0
+
+
+def _flat(hip, knee, pel=FIRE_PELVIS):
+    """The ankle angle that puts the sole flat on the deck.
+
+    Measured, not derived, and general in all three. The naive model — that the
+    sole's pitch is the sum of the angles down the leg — is wrong for this rig,
+    because the foot does not carry the same roll as the bones above it (see
+    FLAT), so a degree at the ankle is not worth a degree at the hip. Bisected
+    against the exported rig at eighteen stances over three pelvis angles, the
+    answer is a straight line, good to half a degree across the range anything
+    here uses.
+
+    The skip's own constant of −1.3 is this same line at its pelvis of −4, which
+    is worth knowing and not worth rewriting: those numbers are baked, verified,
+    and sitting four millimetres off the deck.
+    """
+    return hip + knee - pel - 5.35
+
+
+def _stomp(ph):
+    """How far a leg is lifted: 0 planted, 1 knee at the top. `ph` 0 is landing.
+
+    Planted for exactly half the cycle, which is what makes this a march and not
+    a jump — with a stance any shorter than half there is a window twice a cycle
+    with neither foot on the deck, and the floor pass answers that by putting
+    the lower of the two airborne feet on the ground, which is not a fix.
+
+    The other half is snap, hang, slam: up in sixteen hundredths, held at the
+    top for twice that, and down in fourteen. The hang is the part that reads. A
+    knee that rises and falls without stopping is a march; a knee that gets to
+    the top and *waits* there is somebody making a point with it.
+    """
+    ph = ph % 1.0
+    if ph < 0.50:
+        return 0.0
+    if ph < 0.66:
+        return _ease((ph - 0.50) / 0.16)
+    if ph < 0.86:
+        return 1.0
+    return 1.0 - _ease((ph - 0.86) / 0.14)
+
+
+def _sink(ph):
+    """How far the standing leg has folded under the landing. This is the bounce.
+
+    Nothing at the moment the foot arrives, all of it a tenth of a second later,
+    and gone again by mid-stance — so her weight arrives, drops through the leg
+    and comes back up, twice a cycle, just behind each footfall.
+
+    The first version of this peaked *on* the landing frame and produced nine
+    millimetres of hip travel over the whole clip, which is a figure standing
+    still while its legs move. Two things were wrong with it. At the instant of
+    a footfall both feet are down and the floor pass pins whichever leg is
+    longer, so bending only the one that just landed changes nothing; and a knee
+    bent on its own barely shortens a leg at all, because the thigh and the shin
+    swing away from vertical in opposite directions and the cosines very nearly
+    cancel. The hip has to go with the knee. It does, below.
+    """
+    ph = ph % 1.0
+    if ph < 0.12:
+        return _ease(ph / 0.12)
+    if ph < 0.40:
+        return 1.0 - _ease((ph - 0.12) / 0.28)
+    return 0.0
+
+
+def _snap(ph, ramp=0.16):
+    """A square wave on [0, 1) with its edges eased over `ramp`.
+
+    Up for the first half and down for the second. The arms run off this rather
+    than off a cosine for the same reason the legs run off `_stomp`: a cosine
+    spends all its time in transit and none at either end, and an arm that is
+    always moving and never *placed* is a wave, not a jab.
+    """
+    ph = ph % 1.0
+    if ph < 0.5:
+        return _ease(ph / ramp) if ph < ramp else 1.0
+    q = ph - 0.5
+    return 1.0 - (_ease(q / ramp) if q < ramp else 1.0)
+
+
+FIRE_HIP, FIRE_KNEE = -24.0, 14.0        # the stance at its longest: thigh 22°
+                                         # forward of vertical and shin 8°,
+                                         # which is a body over the balls of its
+                                         # feet rather than sat back on them
+FIRE_SINK = (-12.0, 18.0)                # and what the bounce takes off it —
+                                         # thigh to 34° and shin to 2°, worth
+                                         # about three centimetres of hip
+FIRE_HIP_UP, FIRE_KNEE_UP = -82.0, 95.0  # the drive, knee to about waist height
+FIRE_TOE = 26.0           # how far the toe drops once the foot is off the deck
+
+
+def _fire_leg(ph):
+    """(hip, knee, ankle) for one leg, `ph` its own phase with 0 the landing."""
+    k, s = _stomp(ph), _sink(ph)
+    down = (FIRE_HIP + FIRE_SINK[0] * s, FIRE_KNEE + FIRE_SINK[1] * s)
+    hip = down[0] + (FIRE_HIP_UP - down[0]) * k
+    knee = down[1] + (FIRE_KNEE_UP - down[1]) * k
+    # Flat while it is down; toe dropped once it is off, because a knee driven
+    # to the waist with the foot left level is somebody testing bathwater.
+    return hip, knee, _flat(hip, knee) - FIRE_TOE * k
+
+
+def _fire_at(u):
+    """One frame of the loop. `u` 0..1; the left foot lands at 0.
+
+    The arms are contralateral, which is the one piece of ordinary human wiring
+    left in the move: the elbow that flies is the one across from the knee that
+    drives, because that is what a body does with its arms when its legs do
+    that, and taking it out makes her look like a wind-up toy rather than
+    somebody committing.
+    """
+    lo = _fire_leg(u)
+    ro = _fire_leg(u + 0.5)
+    # `qL` is 1 with the left elbow up and out, 0 with the left forearm folded
+    # across her. The right is its complement, so the two arms are never in the
+    # same place and the scissor is a scissor.
+    qL = _snap(u + 0.5)
+    qR = 1.0 - qL
+    tw = qR - qL              # +1 with the right arm up: the trunk twists left
+
+    def arm(q, s):
+        """One arm. `q` is 0 with the fist cocked in at the chest and 1 with the
+        whole arm thrown out wide at shoulder height. `s` is +1 on the left.
+
+        This is not the shape the first pass went for. That one wanted the
+        goalpost — elbow high and wide, forearm hanging down — which is the
+        actual Flint arm and which this rig will not make without internally
+        rotating the upper arm first: the elbow hinges in whatever plane the
+        shoulder leaves it in, so a hundred degrees of fold on an arm abducted
+        past horizontal puts her hand behind her own ear, and that is exactly
+        where it went. Wide and low is the other half of the same performance,
+        it needs no twist to get right, and it is still legible at thirty metres
+        — which the goalpost, being mostly a silhouette detail, would not be.
+        """
+        return {
+            "armU": (-18.0 + 6.0 * q, 0.0, s * (26.0 - 82.0 * q)),
+            "armL": (-84.0 + 56.0 * q, 0.0, s * (-8.0 - 6.0 * q)),
+            "hand": (-26.0 - 4.0 * q, 0.0, s * 10.0 * q),
+        }
+
+    L, R = arm(qL, 1.0), arm(qR, -1.0)
+    p = {
+        "@root": (0.0, 0.0, 0.0),
+        "pelvis": (FIRE_PELVIS, 3.0 * tw, 0.0),
+        # Forty degrees of flexion, but stacked at the top of the spine rather
+        # than spread evenly down it. Spread evenly it is a lean, and a lean
+        # with a straight back is a sprinter in the blocks; two degrees at the
+        # waist and seventeen at the chest is the same forty as a *curve*, and
+        # the curve is the whole read.
+        "spine01": (-2.0, -2.0 * tw, 0.0), "spine02": (-7.0, -4.0 * tw, 0.0),
+        "spine03": (-14.0, -6.0 * tw, 0.0), "chest": (-17.0, -9.0 * tw, 0.0),
+        # The chin. Forty-four degrees between the two of them against a −40°
+        # back, which nets to about four of face *up* out of a body folded well
+        # forward — so she is looking at you from under it rather than at the
+        # sky, which is where fifty-two degrees put her. The yaw is a quarter
+        # cycle behind the shoulders, so the head arrives after the twist rather
+        # than with it, and that lag is what makes it a snap.
+        "neck": (26.0, 8.0 * tw, 0.0),
+        "head": (18.0, 16.0 * (2.0 * _snap(u + 0.25) - 1.0), -7.0 * tw),
+        "jaw": (-13.0, 0.0, 0.0),
+        # Rolled forward and held there, which is the other half of a hunch: a
+        # rounded back with the shoulders still square on top of it is a person
+        # with backache.
+        "clavicleL": (0.0, 0.0, 10.0 + 9.0 * qL),
+        "clavicleR": (0.0, 0.0, -10.0 - 9.0 * qR),
+        "legUL": (lo[0], 0.0, -4.0), "legLL": (lo[1], 0.0, 0.0),
+        "footL": (lo[2], 0.0, 0.0),
+        "legUR": (ro[0], 0.0, 4.0), "legLR": (ro[1], 0.0, 0.0),
+        "footR": (ro[2], 0.0, 0.0),
+    }
+    for tag, side in (("L", L), ("R", R)):
+        for b, v in side.items():
+            p[b + tag] = v
+    return p
+
+
+FIRE = [(i * FIRE_DUR / FIRE_KEYS, _fire_at(i / FIRE_KEYS))
+        for i in range(FIRE_KEYS + 1)]
+
+FIRE_LAND = _fire_at(0.0)        # the three worth a still, for --reskin
+FIRE_DRIVE = _fire_at(0.32)
+FIRE_HALF = _fire_at(0.5)
+
+
+# The throw.
+#
+# A separate one-shot rather than a beat inside the loop, and the reason is
+# balance rather than animation: the game has to be able to choose how often she
+# throws, because the whole point of the sequence is that you can get on top of
+# it with the branch. A fireball welded to the dance fires at whatever tempo the
+# dance happens to be, and the tempo of the dance is not a difficulty knob.
+#
+# Right-handed, over the top, and the wind-up is the half of it that matters. A
+# throw with no load in it reads as a shove; the coil is what tells you
+# something left her hand hard.
+FIRE_CAST_AT = 0.46       # seconds in, where it leaves her — 43-jadrija.js
+                          # spawns the ball off this and nothing else
+
+FIRE_COCK = dict(_fire_at(0.0), **{
+    # Twisted open to the right and stacked over the back foot, chest turned
+    # away from where it is going. Both feet stay down: a step into it would
+    # travel her, and she is throwing from a spot.
+    "pelvis": (6.0, -16.0, 0.0),
+    "spine01": (-4.0, -8.0, 0.0), "spine02": (-5.0, -10.0, 0.0),
+    "spine03": (-4.0, -12.0, 0.0), "chest": (-2.0, -14.0, 0.0),
+    "neck": (18.0, 10.0, 0.0), "head": (12.0, 22.0, -6.0), "jaw": (-16.0, 0.0, 0.0),
+    "clavicleL": (0.0, 0.0, 4.0), "clavicleR": (0.0, 0.0, -14.0),
+    # The right hand back and above the shoulder, elbow leading. The left is out
+    # in front, pointed where it is going, which is what a body uses the off arm
+    # for and also what tells the player where to look.
+    #
+    # Abduction is +Z on the *right* and −Z on the left — the two sides mirror in
+    # sign, which is the rule everywhere in this file and which the first version
+    # of this pose broke. A right shoulder written −84 is not eighty-four degrees
+    # of arm thrown out behind her, it is eighty-four degrees of arm folded
+    # across her own back, and that is where it went: the throwing arm vanished
+    # for the whole wind-up and the clip read as a girl pointing at something.
+    "armUR": (40.0, 0.0, 74.0), "armLR": (-92.0, 0.0, 22.0), "handR": (-14.0, 0.0, 0.0),
+    "armUL": (-58.0, 0.0, -18.0), "armLL": (-16.0, 0.0, -6.0), "handL": (-16.0, 0.0, 0.0),
+    "legUL": (-14.0, 0.0, -4.0), "legLL": (14.0, 0.0, 0.0),
+    "footL": (_flat(-14.0, 14.0, 6.0), 0.0, 0.0),
+    "legUR": (-30.0, 0.0, 4.0), "legLR": (34.0, 0.0, 0.0),
+    "footR": (_flat(-30.0, 34.0, 6.0), 0.0, 0.0),
+})
+
+FIRE_THROW = dict(_fire_at(0.0), **{
+    # And through it. The trunk unwinds a full thirty degrees the other way, the
+    # arm comes over the top, and the head goes with it — everything that was
+    # cocked is now spent, which is the only way a throw ever reads.
+    "pelvis": (0.0, 14.0, 0.0),
+    "spine01": (-8.0, 7.0, 0.0), "spine02": (-13.0, 9.0, 0.0),
+    "spine03": (-14.0, 11.0, 0.0), "chest": (-12.0, 13.0, 0.0),
+    "neck": (24.0, -8.0, 0.0), "head": (16.0, -14.0, 5.0), "jaw": (-20.0, 0.0, 0.0),
+    "clavicleL": (0.0, 0.0, 14.0), "clavicleR": (0.0, 0.0, -6.0),
+    "armUR": (-100.0, 0.0, 26.0), "armLR": (-18.0, 0.0, -6.0), "handR": (-34.0, 0.0, 0.0),
+    "armUL": (30.0, 0.0, 18.0), "armLL": (-40.0, 0.0, -8.0), "handL": (-10.0, 0.0, 0.0),
+    "legUL": (-34.0, 0.0, -4.0), "legLL": (30.0, 0.0, 0.0),
+    "footL": (_flat(-34.0, 30.0, 0.0), 0.0, 0.0),
+    "legUR": (-16.0, 0.0, 4.0), "legLR": (16.0, 0.0, 0.0),
+    "footR": (_flat(-16.0, 16.0, 0.0), 0.0, 0.0),
+})
+
+FIRE_AFTER = dict(FIRE_THROW, **{
+    # A tenth of a second later, with the arm carried on down across her body.
+    "armUR": (-44.0, 0.0, -20.0), "armLR": (-56.0, 0.0, -18.0), "handR": (-24.0, 0.0, 0.0),
+    "armUL": (16.0, 0.0, 24.0), "armLL": (-56.0, 0.0, -14.0),
+    "chest": (-8.0, 6.0, 0.0), "head": (22.0, -6.0, 2.0),
+})
+
+CAST = [(0.00, _fire_at(0.0)), (0.20, FIRE_COCK), (0.34, FIRE_COCK),
+        (FIRE_CAST_AT, FIRE_THROW), (0.58, FIRE_AFTER), (0.78, _fire_at(0.0))]
+
+
+# And the turn itself: the moment she stops being a nine-year-old in a hose and
+# starts being whatever this is.
+#
+# It is a gather and a fling, in that order, and the gather is what sells it —
+# an arch with nothing before it is a stretch. She drops into a crouch with her
+# arms pulled in over about a quarter of a second, holds for nothing at all, and
+# then throws the whole thing open: head back past the vertical, arms flung down
+# and behind her, mouth wide. Then down into the hunch, which is where the loop
+# picks her up.
+FIRE_GATHER = {
+    "@root": (0.0, 0.0, 0.0),
+    "pelvis": (-4.0, 0.0, 0.0),
+    "spine01": (-12.0, 0.0, 0.0), "spine02": (-15.0, 0.0, 0.0),
+    "spine03": (-14.0, 0.0, 0.0), "chest": (-12.0, 0.0, 0.0),
+    "neck": (8.0, 0.0, 0.0), "head": (-16.0, 0.0, 0.0), "jaw": (-4.0, 0.0, 0.0),
+    "clavicleL": (0.0, 0.0, 14.0), "clavicleR": (0.0, 0.0, -14.0),
+    "armUL": (-46.0, 0.0, 30.0), "armLL": (-118.0, 0.0, -6.0), "handL": (-30.0, 0.0, 0.0),
+    "armUR": (-46.0, 0.0, -30.0), "armLR": (-118.0, 0.0, 6.0), "handR": (-30.0, 0.0, 0.0),
+    "legUL": (-34.0, 0.0, -4.0), "legLL": (40.0, 0.0, 0.0),
+    "footL": (_flat(-34.0, 40.0, -4.0), 0.0, 0.0),
+    "legUR": (-34.0, 0.0, 4.0), "legLR": (40.0, 0.0, 0.0),
+    "footR": (_flat(-34.0, 40.0, -4.0), 0.0, 0.0),
+}
+
+FIRE_OPEN = {
+    "@root": (0.0, 0.0, 0.0),
+    # Everything the gather folded, thrown open. Twelve degrees of *backward*
+    # lean through the spine, which is the only pose in this file that goes that
+    # way, and it is the one frame the whole sequence is remembered by.
+    "pelvis": (8.0, 0.0, 0.0),
+    "spine01": (5.0, 0.0, 0.0), "spine02": (6.0, 0.0, 0.0),
+    "spine03": (6.0, 0.0, 0.0), "chest": (7.0, 0.0, 0.0),
+    "neck": (22.0, 0.0, 0.0), "head": (26.0, 0.0, 0.0), "jaw": (-22.0, 0.0, 0.0),
+    "clavicleL": (0.0, 0.0, -8.0), "clavicleR": (0.0, 0.0, 8.0),
+    # Down and behind, palms back — the shape somebody makes when something
+    # comes out of them rather than when they reach for something.
+    "armUL": (46.0, 0.0, -34.0), "armLL": (-10.0, 0.0, -4.0), "handL": (-34.0, 0.0, 0.0),
+    "armUR": (46.0, 0.0, 34.0), "armLR": (-10.0, 0.0, 4.0), "handR": (-34.0, 0.0, 0.0),
+    "legUL": (-8.0, 0.0, -5.0), "legLL": (8.0, 0.0, 0.0),
+    "footL": (_flat(-8.0, 8.0, 8.0), 0.0, 0.0),
+    "legUR": (-8.0, 0.0, 5.0), "legLR": (8.0, 0.0, 0.0),
+    "footR": (_flat(-8.0, 8.0, 8.0), 0.0, 0.0),
+}
+
+# A *copy* of SOAK_A, not SOAK_A. The floor pass writes `@root` into the poses
+# it is given, in place, and handing it the same dict the `soak` clip is built
+# from would solve one clip's ground clearance into another one's key.
+FLARE = [(0.00, dict(SOAK_A)), (0.26, FIRE_GATHER), (0.52, FIRE_OPEN),
+         (0.78, FIRE_OPEN), (1.10, _fire_at(0.0))]
+
+
 CLIPS = [
     {"name": "idle", "loop": True,
      "keys": [(0.0, IDLE_A), (2.3, IDLE_B), (4.6, IDLE_A)]},
@@ -2541,6 +2936,13 @@ CLIPS = [
     # doing until she stops.
     {"name": "shimmy", "loop": True, "keys": SHIMMY},
     {"name": "moonwalk", "loop": True, "keys": MOON},
+    # And the turn. Three clips rather than one because they are three different
+    # kinds of thing: `flare` happens to her once, `firestarter` is what she is
+    # until something stops it, and `cast` is an event the game fires off inside
+    # that state whenever it decides she should throw.
+    {"name": "flare", "loop": False, "keys": FLARE},
+    {"name": "firestarter", "loop": True, "keys": FIRE},
+    {"name": "cast", "loop": False, "keys": CAST},
 ]
 
 
@@ -2723,6 +3125,7 @@ def main():
         wheel_floor(rig)          # so the numbers below are the shipped numbers
         dance_floor(rig)
         skip_floor(rig)
+        fire_floor(rig)
         for name in argv[argv.index("--clipcheck") + 1:]:
             if name.startswith("-"):
                 break

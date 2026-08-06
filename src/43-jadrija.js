@@ -1631,6 +1631,12 @@ async function buildJadrija(scene) {
         // her, how soaked she is, how long she stays interested afterwards,
         // and which way round she is currently sweeping.
         hit: 0, owed: 0, wet: 0, lock: 0, spin: 1, faceAng: 0,
+        // And the turn. `soak` is the one number in here that is a *total*
+        // rather than a state — how many seconds of jet she has taken, over
+        // the whole session, forgotten only very slowly. `burn` is how much of
+        // the routine is left once it has started, and `cast` is the count
+        // down to the next fireball.
+        soak: 0, burn: 0, cast: 0,
       };
     } catch (e) {
       console.warn('test figure failed:', e.message);
@@ -1657,6 +1663,18 @@ async function buildJadrija(scene) {
    * turns the repertoire into something you have seen rather than something you
    * have been told about — and after that the dice take over and she is
    * unpredictable again, which is the point of her.
+   *
+   * And then there is the turn, which is the one thing on the promenade that is
+   * not a trick she is doing for you. Point the branch at her for long enough —
+   * sixteen seconds of it actually landing, which is over a third of the pack —
+   * and she stops being delighted about it: she gathers, throws herself open,
+   * and comes up doing a routine that is not hers, alight, throwing fire down
+   * the deck. Everything it lights is a real burning object on the ground
+   * mode's own list, so the branch puts them out, the tally counts them, and the
+   * ones you leave count against you.
+   *
+   * It is the only loop in the game that the player starts on purpose and then
+   * has to close. Everything else here is weather.
    *
    * Two things are deliberately not here. She does not blink, because there are
    * no eyelid bones in the twenty-eight — that needs a trip back to Blender and
@@ -1738,6 +1756,50 @@ async function buildJadrija(scene) {
     lockFor: 32,
     ring: 6.0,          // m — the radius she orbits you at
     arc: [2.6, 5.6],    // seconds before she turns and sweeps back the other way
+    // ── the turn ──────────────────────────────────────────────────────────
+    // "If we spray her with water for too long she at some point switches into
+    // a Prodigy Firestarter routine and starts casting fireballs."
+    //
+    // Sixteen seconds of jet actually landing on her, and it is worth being
+    // precise about what that means, because the note above `figureWet` says in
+    // as many words that litres are ignored and that a soak meter on a child
+    // playing in a hose would be the game being a game about the one thing here
+    // that is not one. That note still stands and this does not contradict it.
+    // What is metered here is not damage and there is no state she is being
+    // driven toward — nothing is filling up, and hosing her is not *for*
+    // anything. It is a clock on how long you have been doing one thing, and
+    // what it buys is a different thing to look at. The pack holds forty-three
+    // seconds of water, so this is well over a third of it aimed at a girl on
+    // purpose, which is not something anybody does by accident.
+    soakFor: 16,
+    // A minute is a set piece and ten seconds is a twitch. Twenty-six is long
+    // enough to light four or five patches of deck and put you properly behind.
+    blazeFor: 26,
+    // And five with the branch on her ends it, which is the loop closing: the
+    // water started this and the water is what stops it. Not instant, because
+    // instant would mean the whole sequence could be cancelled by a player who
+    // happened to still be holding the trigger when it began.
+    douseFor: 5,
+    castEvery: [1.4, 2.5],   // seconds between fireballs
+    castAt: 0.46,       // s into the `cast` clip where it leaves her hand. This
+                        // is FIRE_CAST_AT in tools/blender/human_mh.py and it
+                        // has to move with it or the ball appears out of a hand
+                        // that has already finished throwing.
+    // Metres down the deck they land. Sixteen was too far: she throws along the
+    // line she is facing, that line is at you, and anything past about a dozen
+    // metres came down level with the camera or behind it — so the fire you
+    // were meant to go and deal with was the one you could not see.
+    ballRange: [4, 13],
+    // Radians of arc she scatters them over, and it is wide on purpose. She
+    // throws along the line she is facing and the line she is facing is at
+    // *you*, so a tight spread puts every ball at your feet or over your head —
+    // which reads as being shot at rather than as a promenade catching light.
+    // A hundred and forty degrees lays them out along the deck either side of
+    // you, where they can be seen and got to.
+    ballSpread: 2.4,
+    fires: 7,           // most patches alight at once. A cap and not a budget:
+                        // seven is already more than the branch can hold, and
+                        // without one a routine you ignore lays down thirteen.
   };
 
   /**
@@ -1843,6 +1905,7 @@ async function buildJadrija(scene) {
     'warble', 'squee', 'burr', 'tick'];
   const IDLE_CHAT = ['cuk', 'cuk', 'cuk', 'cuk', 'cuk', 'peep', 'warble'];
   const WET_CHAT = ['squee', 'squee', 'trill', 'peep', 'warble'];
+  const FIRE_CHAT = ['squee', 'squee', 'tick', 'peep'];
   const say1 = (list) => list[(Math.random() * list.length) | 0];
 
   // ── the water ───────────────────────────────────────────────────────────────
@@ -1879,6 +1942,148 @@ async function buildJadrija(scene) {
     show.wet = Math.max(show.wet, 0.55);
   }
 
+  // ── the fireballs ───────────────────────────────────────────────────────────
+  //
+  // Two lists and they belong to two different owners, which is the whole design
+  // of this bit.
+  //
+  // `balls` are in flight and are ours: a position, a velocity and gravity, and
+  // they are drawn by handing 47-ground.js a few extra flames through `flames()`
+  // below. `fires` are what they turn into when they land, and those are handed
+  // over completely — they go out as this locale's `objects`, which is the same
+  // list the aerodrome fills with fuel drums and burning aeroplanes, and from
+  // that moment the ground mode owns them entirely. It spreads heat between
+  // them, grows them, draws them, lets the branch put them out, counts the ones
+  // you save and the ones you lose, and stops the fire catching your own
+  // clothes if you stand in one.
+  //
+  // Nothing here reimplements any of that. The alternative was a second little
+  // fire model living on the promenade that would have had to be kept in step
+  // with the real one for ever, and the cost of not writing it is one field on
+  // an object literal.
+  const balls = [];
+  const fires = [];
+  const ballFx = [];
+
+  /**
+   * Where the ball leaves her hand, in the resort's own frame.
+   *
+   * Half a metre in front of her and a fifth of one to the side, at the height
+   * her right hand is at on the release frame of the clip. Read off the pose
+   * rather than off the skeleton on purpose: asking the rig for a bone's world
+   * position means walking the whole chain a second time, once a throw, to place
+   * something that is a metre of glowing air.
+   */
+  function castFrom() {
+    const a = show.ang + show.side;
+    const ct = Math.cos(a), st = Math.sin(a);
+    const t = show.t + ct * 0.52 + st * 0.20;
+    const s = show.s + st * 0.52 - ct * 0.20;
+    return [t, s, walkY(t, s) + 1.42];
+  }
+
+  /** One fireball, thrown down the deck in front of her. */
+  function throwBall() {
+    const [t0, s0, y0] = castFrom();
+    const a = show.ang + show.side + (Math.random() - 0.5) * SHOW.ballSpread;
+    const R = SHOW.ballRange[0]
+      + Math.random() * (SHOW.ballRange[1] - SHOW.ballRange[0]);
+    // Clamped to the deck rather than aimed at it. The clamp bends the throw a
+    // little when she is near an end, which is better than the alternative:
+    // fireballs landing in the sea, where there is nothing to catch and nothing
+    // for you to do about it.
+    const t1 = clamp(show.t + Math.cos(a) * R, 4, LEN - 4);
+    const s1 = clamp(show.s + Math.sin(a) * R, SHOW.lane[0], SHOW.lane[1]);
+    // Time of flight from the range, so a short throw is a fast flat one and a
+    // long throw hangs. Solved for the vertical speed that gets there — which is
+    // what makes it land where it was aimed instead of wherever the arc happened
+    // to put it.
+    const T = clamp(Math.hypot(t1 - t0, s1 - s0) / 11, 0.55, 1.9);
+    const y1 = walkY(t1, s1);
+    balls.push({
+      t: t0, s: s0, y: y0,
+      vt: (t1 - t0) / T, vs: (s1 - s0) / T,
+      vy: (y1 - y0) / T + 0.5 * 9.81 * T,
+      age: 0, life: T + 0.5,
+    });
+  }
+
+  /**
+   * A ball has come down. Light the deck where it landed.
+   *
+   * The dead ones are swept first rather than on a timer, because `out` is set
+   * by the ground mode and this is the only place that has any reason to care.
+   */
+  function light(t, s) {
+    for (let i = fires.length - 1; i >= 0; i--) if (fires[i].out) fires.splice(i, 1);
+    if (fires.length >= SHOW.fires) return;
+    const p = toWorld(t, s);
+    fires.push({
+      // `h` is what the ground mode scales the flame off, and 1.0 drew the same
+      // two metres of fire it gives a burning fuel drum. This is a fireball that
+      // landed on concrete — what catches is a parasol, a lounger, a towel — so
+      // 0.6, which comes out at about the size of somebody whose kit is alight.
+      kind: 'blaze', w: 1.2, h: 0.6, x: p[0], y: p[1], z: p[2],
+      // `soak` is the litres it takes to put out and has to stay well under
+      // flow times life or the thing cannot be extinguished at all — twenty-six
+      // is under three seconds of the branch held on it. `life` is how long it
+      // burns if you do not: half a minute, and then it counts against you.
+      fuel: 0.55, soak: 26, life: 30, col: [0.86, 0.42, 0.16],
+      // Already alight. Everything else on this list starts cold and catches
+      // from something; this one arrived on fire.
+      burning: 0.4, heat: 1.02, wet: 0, out: false, spent: 0,
+    });
+  }
+
+  function stepBalls(dt) {
+    for (let i = balls.length - 1; i >= 0; i--) {
+      const b = balls[i];
+      b.age += dt;
+      b.t += b.vt * dt;
+      b.s += b.vs * dt;
+      b.vy -= 9.81 * dt;
+      b.y += b.vy * dt;
+      if (b.y <= walkY(b.t, b.s) + 0.04 || b.age > b.life) {
+        balls.splice(i, 1);
+        light(b.t, b.s);
+      }
+    }
+  }
+
+  /**
+   * The flames 47-ground.js should draw for us that are not `objects`: every
+   * ball still in the air, and her.
+   *
+   * Her being alight is the whole point of the sequence, and it is three small
+   * flames rather than one big one. One was tried first, at about the size the
+   * ground mode gives a member of the crew whose kit has caught, and it came
+   * out a six-metre column standing exactly where she was: the routine was
+   * behind it, which is the one thing this must not do. Three — hips and both
+   * shoulders — read as a person alight instead of as a bonfire, and leave her
+   * visible through the middle of it.
+   *
+   * They fade with `burn` rather than snapping off, so putting her out visibly
+   * wins before it finishes winning.
+   */
+  const ON_FIRE = [[0.0, 0.92, 1.15], [-0.20, 1.34, 0.74], [0.20, 1.34, 0.74]];
+
+  function fieldFlames() {
+    ballFx.length = 0;
+    if (!show) return ballFx;
+    for (const b of balls) {
+      const p = toWorld(b.t, b.s);
+      ballFx.push({ x: p[0], y: b.y, z: p[2], size: 1.1, v: 0.95 });
+    }
+    if (show.burn > 0) {
+      const q = 0.45 + 0.55 * show.burn;
+      for (const [off, up, sz] of ON_FIRE) {
+        const p = toWorld(show.t + off, show.s);
+        ballFx.push({ x: p[0], y: p[1] + up, z: p[2], size: sz * q, v: 0.45 + 0.4 * q });
+      }
+    }
+    return ballFx;
+  }
+
   /**
    * The phases she can be pulled out of by a hoseful of water.
    *
@@ -1895,6 +2100,26 @@ async function buildJadrija(scene) {
    */
   const WETTABLE = { idle: 1, notice: 1, crawl: 1, play: 1, home: 1,
     aim: 1, orbit: 1, shimmy: 1, moon: 1 };
+
+  /**
+   * And the phases the *turn* cannot start from.
+   *
+   * A shorter list than WETTABLE's complement, and deliberately: standing up out
+   * of the crawl to react to a squirt of water is one thing, but there is no
+   * phase this is not worth interrupting except the ones where interrupting is
+   * physically a teleport. So: the two airborne moves, the getting up and down,
+   * and the three that make up the turn itself. Everything else — including
+   * `bask`, which is where she will nearly always be when the meter runs out,
+   * because standing in the jet is how the meter fills — goes straight over.
+   */
+  const HELD = { down: 1, up: 1, flip: 1, joy: 1, wheel: 1,
+    flare: 1, blaze: 1, cast: 1 };
+
+  // And the three of those that have a beat under them. `flare` is in it
+  // because the riser is the point of the riser: the music starts a second and
+  // a tenth before the first kick, under the clip where she throws herself
+  // open, and the downbeat lands on the frame the stamping starts.
+  const MUSIC = { flare: 1, blaze: 1, cast: 1 };
 
   function stepShow(dt, pt, ps) {
     if (!show || !skinFig) return;
@@ -1977,6 +2202,29 @@ async function buildJadrija(scene) {
     show.hit = Math.max(0, show.hit - dt);
     show.owed = Math.max(0, show.owed - dt);
     show.wet = clamp(show.wet + (show.hit > 0 ? dt * 1.1 : -dt * 0.09), 0, 1);
+
+    // The third clock, and the slow one. It counts up only while the jet is
+    // genuinely on her and comes back down at an eighth of the rate, so a
+    // sixteen-second fill takes over two minutes to forget — which means it
+    // survives you wandering off to refill the pack and does not survive you
+    // forgetting about her for the rest of the mission.
+    //
+    // Full, it latches: it stops counting either way and waits for a phase it
+    // is allowed to interrupt. Without the latch it never fires at all, which
+    // is what it did — the meter hit the cap on one frame and the decay took it
+    // a fiftieth of a second below the threshold on the next, so the test that
+    // reads it was never once true on a frame that mattered.
+    if (show.soak < SHOW.soakFor) {
+      show.soak = clamp(show.soak + (show.hit > 0 ? dt : -dt * 0.12),
+        0, SHOW.soakFor);
+    } else if (!HELD[show.phase]) {
+      show.soak = 0;
+      show.queue.length = 0;
+      show.side = 0;
+      showSay('squee', d);
+      go('flare', 'flare', 0.30);
+      return;
+    }
     if (show.owed > 0 && WETTABLE[show.phase]) {
       show.owed = 0;
       show.side = 0;
@@ -1987,6 +2235,22 @@ async function buildJadrija(scene) {
       show.queue.length = 0;
       showSay('squee', d);
       go('bask', 'soak', 0.34);
+    }
+
+    // The needle drop, and it is fed rather than switched on. `audio` keeps a
+    // third of a second of watchdog and stops the moment nobody is asking for
+    // it, so every way out of the turn — doused, timed out, walked away from,
+    // culled at 250 m by the gate in `updateCrowd`, the ground mode left
+    // altogether — takes the music with it without any of them knowing there is
+    // music. Which matters, because only one of those five is somewhere a
+    // person would think to write the stop.
+    //
+    // Rolled off with distance on the same shape as her voice and over three
+    // times the range: gone by about a hundred and forty metres, which is the
+    // far end of the promenade. It is a needle drop and not a PA, but it is
+    // *hers*, and hearing it from across the channel would make it the game's.
+    if (audio && MUSIC[show.phase] && state.phase !== 'intro') {
+      audio.firestarter(clamp(1.3 - d / 110, 0, 1));
     }
 
     switch (show.phase) {
@@ -2267,6 +2531,79 @@ async function buildJadrija(scene) {
           || show.t < SHOW.moonEdge || show.t > LEN - SHOW.moonEdge) showNext();
         break;
 
+      // ── the turn ─────────────────────────────────────────────────────────
+      case 'flare':
+        // A second and a tenth, uninterruptible, facing you. Nothing moves her
+        // through it: the clip is a gather and a fling on the spot, and a
+        // figure sliding sideways through the one beat the whole sequence is
+        // remembered by would undo it.
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        if (done) {
+          show.burn = 1;
+          show.cast = 0.7;
+          // On the downbeat, and the one call in the set that is half a second
+          // long and rises the whole way — it comes up under the crash while
+          // she does, which is the entire moment.
+          showSay('whee', d);
+          go('blaze', 'firestarter', 0.20);
+        }
+        break;
+
+      case 'blaze':
+        // Stamping on the spot and turned to face you, for the shimmy's reason:
+        // it is a thing done *at* somebody, and the clip keeps a foot on the
+        // deck the whole way through, so any travel under it turns the stamp
+        // back into a march.
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        show.burn = Math.max(0, show.burn
+          - dt / (show.hit > 0 ? SHOW.douseFor : SHOW.blazeFor));
+        show.cast -= dt;
+        if (show.burn <= 0) {
+          // Out. Straight back into the wander rather than into anything
+          // sheepish, and `soak` is already spent, so doing it again means
+          // filling the meter again from nothing.
+          show.burn = 0;
+          show.played = 0;
+          show.wander = show.ang;
+          showWander(SHOW.turn, SHOW.swing);
+          showSay(show.hit > 0 ? 'squee' : 'trill', d);
+          go('play', 'skip', 0.36);
+          break;
+        }
+        // Not while she is being hosed. A figure throwing fire out of a jet of
+        // water is the two halves of this arguing with each other, and the one
+        // that should win is the branch — otherwise there is no answer to the
+        // sequence except waiting it out.
+        if (show.cast <= 0 && show.hit <= 0) go('cast', 'cast', 0.14);
+        if (show.tmr - show.said > 1.1 + Math.random() * 1.3) {
+          // High ones only, and this used to be `burr`. A rolled note at 300 Hz
+          // is a lovely sound and there is now a distorted bass sitting on E1
+          // with everything up to about 400 Hz to itself — she was not quiet
+          // under it, she was gone. The three below all live above 1.4 kHz,
+          // where the only other thing is the hi-hat.
+          show.said = show.tmr; showSay(say1(FIRE_CHAT), d);
+        }
+        break;
+
+      case 'cast':
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        show.burn = Math.max(0, show.burn
+          - dt / (show.hit > 0 ? SHOW.douseFor : SHOW.blazeFor));
+        // `said` is the one-shot latch here rather than a chat timer — the
+        // release is a single frame of a clip and it has to fire exactly once,
+        // and this is the same trick the somersault uses for its landing thump.
+        if (!show.said && S.curT >= SHOW.castAt) {
+          show.said = 1;
+          throwBall();
+          showSay('tick', d);
+        }
+        if (done) {
+          show.cast = SHOW.castEvery[0]
+            + Math.random() * (SHOW.castEvery[1] - SHOW.castEvery[0]);
+          go('blaze', 'firestarter', 0.16);
+        }
+        break;
+
       case 'home': {
         const dt0 = show.home[0] - show.t, ds0 = show.home[1] - show.s;
         const dist = Math.hypot(dt0, ds0);
@@ -2386,6 +2723,10 @@ async function buildJadrija(scene) {
       // that range she is always idling anyway, because it only starts at 17 m.
       if (dx * dx + dz * dz < 250 * 250) { skinFig.update(dt); stepShow(dt, pt, ps); }
     }
+    // Outside the range gate above, because a ball that is already in the air
+    // when you turn and run has to come down and light something whether or not
+    // she is still close enough to be posed.
+    if (balls.length) stepBalls(dt);
 
     for (const w of walkers) {
       if (w.wait > 0) {
@@ -2449,9 +2790,14 @@ async function buildJadrija(scene) {
     // test needs somewhere to point the camera — but note this is the placement
     // and not the live position: anyone with a `beat` has been walking since.
     people: bathers,
-    objects: [], crewSpots: [],
+    // Live, and by reference: 47-ground.js takes this array once, on retarget,
+    // and reads it every frame from then on. Anything pushed into it is
+    // something that is on fire on the promenade — see the fireballs above.
+    objects: fires, crewSpots: [],
+    /** The flames that are not `objects`: her, and whatever is still in the air. */
+    flames: fieldFlames,
     apron: toWorld(gapAt, JAD.mid + 3),
-    tint() { /* nothing here has caught yet */ },
+    tint() { /* concrete does not scorch, and the huts are not hers to burn */ },
     flushTint() {},
     // Only what stands up casts. See the note where the buffers are made.
     meshes: [deckMesh, upMesh, vilMesh], casters: [upMesh, vilMesh], length: LEN,
@@ -2473,7 +2819,16 @@ async function buildJadrija(scene) {
       pace: +show.pace.toFixed(2), played: +show.played.toFixed(1),
       wet: +show.wet.toFixed(2), lock: +show.lock.toFixed(1),
       hit: +show.hit.toFixed(2), spin: show.spin,
+      soak: +show.soak.toFixed(1), burn: +show.burn.toFixed(2),
+      balls: balls.length, fires: fires.filter((f) => f.burning > 0).length,
     },
+    /**
+     * Fill the soak meter by hand, so the turn can be seen without standing
+     * there with the branch on her for sixteen seconds — which is exactly as
+     * long headless as it is in a real window, and is sixteen seconds every
+     * time a number in the sequence moves.
+     */
+    flare: () => { if (show) show.soak = SHOW.soakFor; },
     /** Where she is standing, so the back door can put you in front of her. */
     figureAt: testFigure ? testFigure.at : null,
     /** The two ends of the hose hook — 47-ground.js wires them together. */

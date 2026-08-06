@@ -10,6 +10,149 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.33.0] — 2026-08-06
+
+### Added — the firestarter
+
+Point the branch at the girl on the promenade for sixteen seconds and she stops
+being delighted about it.
+
+She gathers, throws herself open — head back past the vertical, arms flung down
+behind her, the one frame in this game that goes that way — and comes up alight,
+hunched, stamping, throwing fire down the deck. It lasts twenty-six seconds if
+you leave her to it and five if you turn the branch back on her, which is the
+loop closing: the water started this and the water is the only thing that ends
+it.
+
+Three new clips out of `tools/blender/human_mh.py`, taking her from twelve to
+fifteen and the payload from 498 to 509 KB.
+
+**`firestarter`**, 0.86 s, looping — two stamps at about a hundred and forty to
+the minute. The reference is a man in a tunnel in 1996 and almost none of what
+makes that performance work survives being put on a 1.75 m figure seen from
+eight metres. What survives is the silhouette: a rounded upper back, a chin
+thrust up *against* it, and elbows that are never in the same place twice. The
+forty degrees of spine flexion are stacked at the top rather than spread down —
+spread evenly it is a lean, and a lean with a straight back is a sprinter in the
+blocks, which is an athlete, which is the opposite of coiled.
+
+The stamp is not a sine wave. Planted for exactly half its cycle, up in sixteen
+hundredths, *held* at the top for twice that, and down in fourteen. The hang is
+the part that reads: a knee that rises and falls without stopping is a march; a
+knee that gets to the top and waits there is somebody making a point with it.
+
+Her hips travel 5.1 cm over the cycle and none of it is authored — it comes out
+of the standing leg folding under each landing and the floor solver finding it.
+The first version peaked on the landing frame and produced nine millimetres,
+because at the instant of a footfall both feet are down and the solver pins
+whichever leg is longer, and because a knee bent on its own barely shortens a
+leg at all — the thigh and the shin swing away from vertical in opposite
+directions and the cosines very nearly cancel. The hip has to go with the knee.
+
+**`cast`**, 0.78 s, one-shot — the throw. Separate from the loop for a reason
+that is about balance rather than animation: a fireball welded to the dance
+fires at whatever tempo the dance happens to be, and the tempo of the dance is
+not a difficulty knob.
+
+**`flare`**, 1.10 s, one-shot — the turn itself. A gather and a fling, and the
+gather is what sells it. An arch with nothing before it is a stretch.
+
+### Added — things on fire at Jadrija
+
+The fireballs are thrown on a solved arc to a point on the deck and what they
+land in is a **real burning object** on the ground mode's own list — the same
+list the aerodrome fills with fuel drums and burning aeroplanes. Nothing here
+reimplements any of it: the ground mode spreads heat between them, grows them,
+draws them, lets the branch put them out, counts the saved and the lost, and
+sets your own clothes alight if you stand in one. The cost of not writing a
+second little fire model that would have had to be kept in step with the real
+one for ever was one field on an object literal.
+
+Which also means the ones you leave to burn out count against you on the same
+tally as a fuel bowser at Rokići. That is fair. You did this.
+
+Capped at seven alight at once — a cap and not a budget, since seven is already
+more than the branch can hold, and without one a routine you ignore lays down
+thirteen.
+
+### Added — a beat under it
+
+The routine has music now, and it is the only thing in `src/80-audio.js` with a
+tempo. Big beat, of the specific 1996 kind: a breakbeat that stomps rather than
+shuffles, a bass that is more distortion than note, a shriek every two bars, and
+a 1.10 s riser under the `flare` clip so the downbeat lands like something that
+was always coming. It is in E, and the two notes that are not E are the minor
+third and the tritone above it.
+
+There is no voice in it. There is a very famous shouted syllable in the record
+this is in the manner of, and the argument that keeps her talking in owl noises
+applies to it twice over.
+
+**It is scheduled, not triggered.** Everything else in that file is a reaction —
+something happens, a node starts at `ctx.currentTime`. A beat cannot be built
+that way: frames arrive when the GPU is finished, so a kick placed on the frame
+that noticed it was due is up to twenty milliseconds late and late by a
+*different* amount every bar, which is the difference between a drummer and a
+drunk. `update` now walks a clock a third of a second in front of the audio
+context and hands notes over early, and the frame rate stops being able to touch
+the timing. Dropped frames are walked past a sixteenth at a time rather than
+flushed, so a hitch loses notes instead of firing five of them at once, and the
+bar line survives it.
+
+**The tempo is not a number anybody chose.** A beat is 0.43 s — exactly half of
+the `FIRE_DUR` the routine was danced at, months before there was any music. So
+her boot lands on the beat, and because both clocks are real time and the two
+constants are exact halves, they are still together thirty seconds in. The beat
+drops on the frame the `flare` clip ends, which is the frame the stamping
+starts. Note what is *not* on beat three: both bars leave that sixteenth empty —
+no kick, no snare, one hat — and that is the hole her third stamp goes in.
+
+It is fed rather than switched on, with a third of a second of watchdog. There
+are five ways out of that sequence — doused, timed out, walked away from, culled
+at 250 m by the range gate in `updateCrowd`, the ground mode left altogether —
+and exactly one of them is somewhere a person would remember to write the stop.
+
+The klapa and the cicadas duck 86% under it, on a second gain stage below `bed`
+rather than on `bed` itself: her squeaks take that node for a fifth of a second
+at a time and write to it with `cancelScheduledValues`, so sharing one node
+would bring the singers back up under the beat every time she made a noise.
+
+Her chatter during the blaze moved off `burr`. A rolled note at 300 Hz is a
+lovely sound and there is now a distorted bass sitting on E1 with everything
+below 400 Hz to itself — she was not quiet under it, she was gone.
+
+### Changed — the klapa is quieter again
+
+`KLAPA.gain` 0.11 → **0.055**, and inside the airframe 0.10 → 0.05. Fifth time
+it has come down, and twenty decibels off where it started. Asked for three
+times; there is no argument left to make about the level of a thing the player
+keeps saying is too loud. The distance law is untouched.
+
+### Changed — `floor_poses` can be told not to smooth
+
+The three-pass quarter-half-quarter filter is there for clips where the support
+hands between limbs, because the solve jumps when it does and the jump is an
+artefact. A stamp is a march: one foot is down at all times and both are down at
+the two footfalls, where the legs are the same length, so there is no handover
+to smooth — and what the filter *would* remove is the bounce, which is two keys
+wide and is the only reason the hips move at all. It took it from five
+centimetres to two.
+
+### Fixed — abduction mirrors in sign, and the wind-up did not
+
+The `cast` clip's throwing shoulder was authored with the left arm's sign. A
+right shoulder written −84 is not eighty-four degrees of arm thrown out behind
+her, it is eighty-four degrees of arm folded across her own back: the throwing
+arm vanished for the entire wind-up and the clip read as a girl pointing at
+something.
+
+### Fixed — the soak meter could never fire
+
+It filled to its cap and was tested on the next frame, by which time the decay
+had taken it a fiftieth of a second below the threshold. The test that reads it
+was never once true on a frame that mattered. It now latches at full and waits
+for a phase it is allowed to interrupt.
+
 ## [1.32.0] — 2026-08-05
 
 ### Changed — she skips like a skip now

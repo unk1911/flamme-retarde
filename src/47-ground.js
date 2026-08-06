@@ -1107,6 +1107,11 @@ async function buildGround(scene, field) {
         x: c.x, y: c.y + 0.62, z: c.z, size: 1.55 * (0.42 + 0.58 * q), v,
       });
     }
+    // And anything the locale wants drawn that is neither an object nor a
+    // member of the crew. Jadrija uses it for a fireball still in the air and
+    // for the girl who threw it, both of which move every frame and so cannot
+    // be `objects` — those are fixed to a spot by everything that reads them.
+    if (field.flames) for (const f of field.flames()) flameList.push(f);
     flames.paint(flameList);
   }
 
