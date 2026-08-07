@@ -1583,6 +1583,7 @@ async function buildJadrija(scene) {
       skinFig = await loadSkin('human_skin_fr3d', {
         spec: 0.09,
         specPower: 24,
+        face: true,
         // Literal colours, as the landmarks do. The marker palette in
         // 42-crowd.js is for figures the runtime recolours per instance, and
         // there is exactly one of these.
@@ -1676,9 +1677,7 @@ async function buildJadrija(scene) {
    * It is the only loop in the game that the player starts on purpose and then
    * has to close. Everything else here is weather.
    *
-   * Two things are deliberately not here. She does not blink, because there are
-   * no eyelid bones in the twenty-eight — that needs a trip back to Blender and
-   * a full pipeline run, not a clip. And she does not collide with anything: she
+   * One thing is deliberately not here: she does not collide with anything. She
    * performs on the strip of deck between the middle terrace and the front row
    * of huts, which is clear by construction, and if a walker happens to be
    * standing in it she goes through them. A figure doing a tucked front
@@ -2121,6 +2120,24 @@ async function buildJadrija(scene) {
   // open, and the downbeat lands on the frame the stamping starts.
   const MUSIC = { flare: 1, blaze: 1, cast: 1 };
 
+  /**
+   * And how pleased she is, per phase, which is the only thing driving her face.
+   *
+   * A default of 0.30 rather than 0: the paint already gives her a mouth whose
+   * corners sit above its middle, on the argument that a resting mouth over the
+   * top of everything she does reads as somebody enduring it, and this is the
+   * same argument one step further on. She is at the beach.
+   *
+   * The three that are not on this table are the turn — `flare`, `blaze` and
+   * `cast` — and they are handled below rather than here, because what her face
+   * does there is not a smaller smile. It is a different face.
+   */
+  const SMILE = {
+    idle: 0.30, notice: 0.62, down: 0.55, crawl: 0.50, up: 0.72,
+    flip: 0.85, play: 0.55, aim: 0.70, wheel: 0.85, bask: 1.00,
+    orbit: 0.80, joy: 1.00, shimmy: 0.90, moon: 0.75, home: 0.45,
+  };
+
   function stepShow(dt, pt, ps) {
     if (!show || !skinFig) return;
     const f = skinFig, S = f.state;
@@ -2251,6 +2268,30 @@ async function buildJadrija(scene) {
     // *hers*, and hearing it from across the channel would make it the game's.
     if (audio && MUSIC[show.phase] && state.phase !== 'intro') {
       audio.firestarter(clamp(1.3 - d / 110, 0, 1));
+    }
+
+    // Her face. Two numbers, and everything they are made of is already here.
+    //
+    // The water is worth a third of a smile on its own — she is delighted by the
+    // jet and the whole `bask` state exists to say so — and it is added rather
+    // than tabled because it happens on top of whatever she was doing.
+    //
+    // And then the turn, where both numbers go the other way. She is not doing
+    // this one for you: the smile goes out entirely, and `rate` drops to a tenth
+    // so that the blinking all but stops. A face that keeps blinking politely
+    // through it is a face that is still being pleasant, and the whole point of
+    // the turn is that she has stopped.
+    //
+    // And her arms, which are the other half of the same idea. The flames are
+    // not a costume she is wearing when you find her — they arrive with the
+    // turn and climb her over about a second, which is the length of the riser,
+    // and they go out again when the turn does.
+    if (f.face) {
+      const turn = !!MUSIC[show.phase];
+      f.face.smile = turn ? 0
+        : clamp((SMILE[show.phase] ?? 0.4) + show.wet * 0.32, 0, 1);
+      f.face.rate = turn ? 0.1 : 1;
+      f.face.ink = turn ? 1 : 0;
     }
 
     switch (show.phase) {
@@ -2721,7 +2762,14 @@ async function buildJadrija(scene) {
       // of a kilometre she is a couple of pixels and the palette she was left
       // holding is as good as any other. The performance is gated with her: at
       // that range she is always idling anyway, because it only starts at 17 m.
-      if (dx * dx + dz * dz < 250 * 250) { skinFig.update(dt); stepShow(dt, pt, ps); }
+      if (dx * dx + dz * dz < 250 * 250) {
+        skinFig.update(dt);
+        // A blink is two hundred milliseconds and a lash line is one pixel
+        // wide, so this is gated a good deal harder than the pose is. Inside
+        // 40 m is about where a face stops being a smudge.
+        if (dx * dx + dz * dz < 40 * 40) skinFig.faceTick(dt);
+        stepShow(dt, pt, ps);
+      }
     }
     // Outside the range gate above, because a ball that is already in the air
     // when you turn and run has to come down and light something whether or not
@@ -2829,6 +2877,34 @@ async function buildJadrija(scene) {
      * time a number in the sequence moves.
      */
     flare: () => { if (show) show.soak = SHOW.soakFor; },
+    /**
+     * Her face, held still.
+     *
+     * A blink is a fifth of a second and headless the page runs at about one
+     * frame a second, so the only way to look at one is to stop it where it is.
+     * Setting `blink` also takes `rate` to zero, which is what keeps the tick
+     * from scheduling another one over the top of the screenshot.
+     */
+    face: (o = {}) => {
+      if (!skinFig || !skinFig.face) return null;
+      const u = skinFig.uFace;
+      if (o.blink != null) { u.uBlink.value = o.blink; skinFig.face.rate = 0; }
+      if (o.smile != null) { u.uSmile.value = o.smile; skinFig.face.smile = o.smile; }
+      if (o.rate != null) skinFig.face.rate = o.rate;
+      if (o.ink != null) { u.uInk.value = o.ink; skinFig.face.ink = o.ink; }
+      const a = skinFig.face.anchors;
+      const r3 = (v) => [+v.x.toFixed(4), +v.y.toFixed(4), +v.z.toFixed(4)];
+      return {
+        blink: +u.uBlink.value.toFixed(3), smile: +u.uSmile.value.toFixed(3),
+        ink: +u.uInk.value.toFixed(3),
+        want: +skinFig.face.smile.toFixed(2), rate: skinFig.face.rate,
+        eye: r3(u.uEye.value), rad: +a.rad.toFixed(4),
+        lip: a.corner ? r3(u.uLip.value) : null,
+        lid: r3(u.uLidCol.value), lash: r3(u.uLashCol.value),
+        armB: a.armB, armY: a.armY && a.armY.map((v) => +v.toFixed(3)),
+        balls: a.balls, mouth: a.mouth, arm: a.arm,
+      };
+    },
     /** Where she is standing, so the back door can put you in front of her. */
     figureAt: testFigure ? testFigure.at : null,
     /** The two ends of the hose hook — 47-ground.js wires them together. */

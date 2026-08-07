@@ -189,6 +189,256 @@ function qnlerp(out, o, a, i, b, j, u) {
   out[o] = x / l; out[o + 1] = y / l; out[o + 2] = z / l; out[o + 3] = w / l;
 }
 
+// ── the face ─────────────────────────────────────────────────────────────────
+//
+// A blink and a smile, and neither of them is a bone.
+//
+// The obvious way to do both is in Blender: four eyelid bones and two at the
+// corners of the mouth, a re-bind, a re-export. It was the plan for a while and
+// it is the wrong plan. An eyelid is not a joint — there is no lid geometry on
+// this figure at all, only the continuous skin that runs from the brow to the
+// cheek — so a lid bone means hand-painting weights onto a strip of face two
+// vertices wide and hoping the bone-heat solve does not take the eyebrow with
+// it. And a mouth corner bone moves the corner, which is the *smaller* half of
+// a smile; the rest of it is that the eye closes a little and the cheek comes
+// up, which is skin again.
+//
+// The thing that actually makes this figure's head read at the distance she is
+// looked at is not shape, it is paint (see the cutters in human_mh.py). So:
+//
+//   the blink is drawn      — the lid is a colour that runs down the eyeball,
+//                             with the lash line carried on its leading edge
+//   the smile is displaced  — the corner of the mouth is pushed up and back in
+//                             the bind pose, before the skin matrix, which
+//                             takes the painted lip line and the cheek with it
+//
+// Nothing here costs a bone, a byte of payload or a keyframe, and both work in
+// every clip she has, including the ones that put her upside down.
+//
+// Every number below is measured off the mesh at load rather than typed. The
+// anchors move if the face is ever re-modelled, and a face whose eye is 3 mm
+// from where the shader thinks it is looks like a stroke.
+
+/** How the blink runs. Seconds, and a human's are quicker than people guess. */
+const BLINK = {
+  shut: 0.075,        // s to close
+  open: 0.145,        // and about twice that to open again
+  gap: 2.2,           // the shortest wait between them
+  spread: 5.0,        // plus this much of a dice roll
+  again: 0.22,        // and this often it comes straight back for a second one
+};
+
+/**
+ * Find the eyes, the mouth and the upper arms in a decoded blob.
+ *
+ * The eyeballs are the only thing on her that is rigidly weighted to a bone of
+ * its own — `skin()` hands each loose shell to one bone and the eyes are the
+ * two round ones — so they can be found without knowing a single colour. The
+ * mouth cannot: it is paint on the same skin as everything around it, and the
+ * only thing that separates it is the palette entry `MOUTH_P` in human_mh.py.
+ * That is a constant shared across a language boundary and it is checked below
+ * rather than trusted; too few vertices and the smile turns itself off.
+ */
+function faceAnchors(data) {
+  const g = data.geo;
+  const pos = g.attributes.position.array;
+  const col = g.attributes.aVCol.array;
+  const bi = g.attributes.aBoneIdx.array;
+  const bw = g.attributes.aBoneWt.array;
+  const nv = data.nv;
+  const P = (i, k) => pos[i * 3 + k];
+
+  // The two sides are folded onto one another throughout — the mesh is
+  // symmetric and the paint pass depends on that being true, so the face is one
+  // anchor and a sign rather than two of everything.
+  const fold = (i) => [P(i, 0), P(i, 1), Math.abs(P(i, 2))];
+  const mean = (list) => {
+    const c = [0, 0, 0];
+    for (const p of list) { c[0] += p[0]; c[1] += p[1]; c[2] += p[2]; }
+    return c.map((x) => x / list.length);
+  };
+
+  // The lid takes the colour of the skin around it, which is the colour most of
+  // her is: 70% of the vertices carry it.
+  const tally = new Map();
+  for (let i = 0; i < nv; i++) {
+    const k = (col[i * 3] << 16) | (col[i * 3 + 1] << 8) | col[i * 3 + 2];
+    tally.set(k, (tally.get(k) || 0) + 1);
+  }
+  let skin = 0, best = 0;
+  for (const [k, n] of tally) if (n > best) { best = n; skin = k; }
+  const rgb = (k) => [(k >> 16) / 255, ((k >> 8) & 255) / 255, (k & 255) / 255];
+
+  const eyeBones = [];
+  data.bones.forEach((b, i) => { if (/^eye/.test(b.name)) eyeBones.push(i); });
+  const ball = [];
+  let darkest = 0xffffff, dl = 1e9;
+  for (let i = 0; i < nv; i++) {
+    if (bw[i * 4] !== 255 || !eyeBones.includes(bi[i * 4])) continue;
+    ball.push(fold(i));
+    const r = col[i * 3], gr = col[i * 3 + 1], b = col[i * 3 + 2];
+    const l = 0.299 * r + 0.587 * gr + 0.114 * b;
+    if (l < dl) { dl = l; darkest = (r << 16) | (gr << 8) | b; }
+  }
+  if (ball.length < 24) return null;
+  const eye = mean(ball);
+  let rad = 0;
+  for (const p of ball) {
+    rad += Math.hypot(p[0] - eye[0], p[1] - eye[1], p[2] - eye[2]);
+  }
+  rad /= ball.length;
+
+  // The mouth. `lip` throws away everything more than 20 mm behind the front of
+  // the painted band, because the cutter that laid it down punches five
+  // centimetres into her head and the inside of a mouth is not a landmark.
+  const MOUTH = 77 << 16 | 41 << 8 | 37;      // MOUTH_P, quantised
+  const mouth = [];
+  for (let i = 0; i < nv; i++) {
+    const k = (col[i * 3] << 16) | (col[i * 3 + 1] << 8) | col[i * 3 + 2];
+    if (k === MOUTH) mouth.push(fold(i));
+  }
+  let corner = null;
+  if (mouth.length >= 24) {
+    const xm = Math.max(...mouth.map((p) => p[0]));
+    const lip = mouth.filter((p) => p[0] > xm - 0.020);
+    const zm = Math.max(...lip.map((p) => p[2]));
+    const out = lip.filter((p) => p[2] > zm * 0.72);
+    if (out.length >= 4) corner = mean(out);
+  }
+
+  // The upper arms, for the ink. Only which bones they are: where they are comes
+  // off the rest skeleton in `skinnedFigure`, because an arm's axis is its bone
+  // and nothing else on this mesh is.
+  const armB = [];
+  data.bones.forEach((b, i) => { if (/^armU/.test(b.name)) armB.push(i); });
+
+  return {
+    eye, rad, corner, armB,
+    lid: rgb(skin),
+    lash: rgb(darkest),
+    balls: ball.length, mouth: mouth.length,
+  };
+}
+
+/**
+ * Where the lid is drawn, and how far the corner of the mouth travels.
+ *
+ * The ellipsoid is the aperture and a little more: tall enough to take in both
+ * painted lash lines (the upper one tops out 9.3 mm above the eye's centre) and
+ * short of the brow, which starts 20.5 mm above it and must not be wiped by a
+ * blink. Its depth is generous because everything behind the front of the
+ * eyeball is inside her head and cannot be seen anyway.
+ */
+const FACE = {
+  eyeR: [0.022, 0.0125, 0.0155],   // m, in the folded bind frame
+  shut: 0.60,                      // where the lids meet, as a fraction of eyeR.y
+  line: 0.0016,                    // half-width of the lash line on the lid
+  lipR: [0.020, 0.016, 0.020],     // how far a corner's lift reaches
+  lift: [-0.0016, 0.0080, 0.0016], // and where it takes it: back, up, out
+  squint: 0.18,                    // how far a full smile closes the eyes
+  // The tongues run nearly the length of the upper arm — 21 cm from her elbow
+  // to her shoulder — because anything shorter is a black sleeve with a ragged
+  // top rather than fire. It is the *gaps* between the tongues that read as
+  // flames, and a gap has to be long enough to be a gap.
+  lick: 0.20,                      // m — how long the tongues of the ink are
+  hot: [0.55, 0.12, 0.02],         // the leading edge of a flame
+  ash: [0.10, 0.042, 0.034],       // and what it is behind the edge
+};
+
+const FACE_DECL = /* glsl */ `
+uniform float uBlink;
+uniform float uSmile;
+uniform vec3 uEye;
+uniform vec3 uEyeR;
+uniform vec3 uLidCol;
+uniform vec3 uLashCol;
+uniform vec3 uLip;
+uniform vec3 uLipR;
+uniform vec3 uLift;
+uniform float uInk;
+uniform vec2 uArmB;
+uniform vec4 uArmC;
+uniform vec2 uArmY;
+varying float vArm;
+
+// How much of a vertex belongs to an upper arm. Declared out here because the
+// vertex body is spliced into main() and cannot carry a function of its own,
+// and it costs the fragment program nothing to have it and not call it.
+float armWt(float i, float w){
+  return (abs(i - uArmB.x) < 0.5 || abs(i - uArmB.y) < 0.5) ? w : 0.0;
+}
+`;
+
+// Runs on the bind pose, before the skin matrix. A smile is the only thing on
+// this figure that changes her shape rather than her attitude.
+const FACE_VERT = /* glsl */ `
+  {
+    vec3 f = vec3(p.x, p.y, abs(p.z));
+    float w = 1.0 - smoothstep(0.25, 1.0, length((f - uLip) / uLipR));
+    p += uSmile * w * vec3(uLift.x, uLift.y, uLift.z * sign(p.z));
+    vArm = armWt(aBoneIdx.x, aBoneWt.x) + armWt(aBoneIdx.y, aBoneWt.y)
+         + armWt(aBoneIdx.z, aBoneWt.z) + armWt(aBoneIdx.w, aBoneWt.w);
+  }
+`;
+
+// And this runs on every fragment of her, which is why it is one ellipsoid test
+// and gets out again. `vLocal` is the *undisplaced* bind position, so the eye
+// the shader is looking for stays where it was put whatever the smile is doing
+// forty millimetres below it.
+const FACE_FRAG = /* glsl */ `
+  {
+    vec3 f = vec3(vLocal.x, vLocal.y, abs(vLocal.z));
+    float k = 1.0 - smoothstep(0.80, 1.0, length((f - uEye) / uEyeR));
+    if (k > 0.0) {
+      float lid = mix(uEye.y + uEyeR.y, uEye.y - uEyeR.y * ${FACE.shut}, uBlink);
+      base = mix(base, uLidCol, k * smoothstep(lid - 0.0008, lid + 0.0008, f.y));
+      float line = 1.0 - smoothstep(0.0, ${FACE.line}, abs(f.y - lid));
+      base = mix(base, uLashCol, k * line * uBlink);
+    }
+
+    // ── the ink ──────────────────────────────────────────────────────────
+    //
+    // Flames up both upper arms, and they arrive with the turn rather than
+    // being on her: uInk is what carries the flame front from her elbow to her
+    // shoulder, so the tattoo climbs her over the second the riser takes.
+    //
+    // Wrapped round the arm by the angle about its own axis, and sampled across
+    // it *only* — the height a tongue reaches is a function of the angle and of
+    // nothing else. Both of those took a while to arrive at.
+    //
+    // The axis has to be the bone. The obvious thing is the centroid of the
+    // arm's vertices, and that puts the pole on the skin somewhere in the
+    // middle, because an arm is not a cylinder standing on end: it hangs out at
+    // the shoulder and comes back in at the elbow, and the mean of the whole
+    // limb is not inside it at every height. Every tongue of flame then
+    // converges into that one point like water down a plughole. Shoulder joint
+    // to elbow joint is inside the meat by construction.
+    //
+    // And letting the noise drift even slightly with height turns the tongues
+    // into a leopard, because y < edge(a, y) has closed islands in it and
+    // y < edge(a) cannot.
+    float armK = smoothstep(0.25, 0.60, vArm);
+    if (uInk > 0.0 && armK > 0.0) {
+      vec2 axis = mix(uArmC.xy, uArmC.zw,
+                      clamp((f.y - uArmY.x) / max(uArmY.y - uArmY.x, 1e-4), 0.0, 1.0));
+      float ang = atan(f.z - axis.y, f.x - axis.x);
+      float lick = 0.64 * fbm2(vec2(ang * 3.2, 0.0), 3)
+                 + 0.36 * vnoise2(vec2(ang * 8.0, 11.0));
+      // Both octaves come back bunched around a half — that is what noise does
+      // — and a boundary that only ever moves through the middle third of its
+      // range is a wavy line. The contrast curve is what turns it into tongues
+      // with sky between them.
+      lick = smoothstep(0.28, 0.80, lick);
+      float front = mix(uArmY.x - 0.03, uArmY.y + 0.01, uInk);
+      float edge = front - ${FACE.lick} * (1.0 - lick);
+      float ink = smoothstep(edge + 0.005, edge - 0.005, f.y) * armK;
+      vec3 inkCol = mix(vec3(${FACE.hot.join(', ')}), vec3(${FACE.ash.join(', ')}),
+                     smoothstep(0.0, 0.070, edge - f.y));
+      base = mix(base, inkCol, ink);
+    }
+  }
+`;
+
 /**
  * Wrap a decoded v3 blob into something that can be posed.
  *
@@ -201,10 +451,38 @@ function skinnedFigure(data, opts = {}) {
   const nb = data.bones.length;
   const uBones = { value: new Float32Array(nb * 12) };
 
+  // `opts.face` asks for a face and does not promise one: `faceAnchors` returns
+  // null if it cannot find the eyeballs, and drops the smile on its own if the
+  // mouth is not where the palette says. A figure with no face is the figure
+  // that shipped yesterday, which is a perfectly good failure.
+  const anchors = opts.face ? faceAnchors(data) : null;
+  const V = (a) => ({ value: new THREE.Vector3(a[0], a[1], a[2]) });
+  const uFace = anchors ? {
+    uBlink: { value: 0 },
+    uSmile: { value: 0 },
+    uEye: V(anchors.eye),
+    uEyeR: V(FACE.eyeR),
+    uLidCol: V(anchors.lid),
+    uLashCol: V(anchors.lash),
+    uLip: V(anchors.corner || [0, -99, 0]),
+    uLipR: V(FACE.lipR),
+    uLift: V(anchors.corner ? FACE.lift : [0, 0, 0]),
+    uInk: { value: 0 },
+    // Two bone numbers, an axis and a span. If the arms could not be found the
+    // bone numbers are −1, which nothing matches, and the ink never draws.
+    // Filled from the rest skeleton below, once there is one.
+    uArmB: { value: new THREE.Vector2(-1, -1) },
+    uArmC: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uArmY: { value: new THREE.Vector2(0, 1) },
+  } : {};
+
   const mat = solidMaterial(0xffffff, {
     ...opts,
     defines: { FR_SKIN: '', FR_BONES: nb },
-    uniforms: { uBones, ...(opts.uniforms || {}) },
+    uniforms: { uBones, ...uFace, ...(opts.uniforms || {}) },
+    decl: (opts.decl || '') + (anchors ? FACE_DECL : ''),
+    vert: anchors ? FACE_VERT : (opts.vert || ''),
+    body: (opts.body || '') + (anchors ? FACE_FRAG : ''),
   });
   const mesh = new THREE.Mesh(data.geo, mat);
 
@@ -234,6 +512,23 @@ function skinnedFigure(data, opts = {}) {
     invQ[i * 4 + 3] = bindQ[i * 4 + 3];
     qrotv(invT, i * 3, invQ, i * 4, bindT, i * 3);
     invT[i * 3] *= -1; invT[i * 3 + 1] *= -1; invT[i * 3 + 2] *= -1;
+  }
+
+  // Where the ink is wrapped: the upper arm's own bone, shoulder joint to
+  // elbow joint, with her two sides folded on to one. `bindT` is the rest
+  // skeleton in figure space, which is the same space the shader's `vLocal` is
+  // in, so these go straight into a uniform with nothing to convert.
+  if (anchors && anchors.armB.length === 2) {
+    const up = anchors.armB[0];
+    const low = data.bones.findIndex((b) => b.parent === up);
+    if (low >= 0) {
+      const at = (i) => [bindT[i * 3], bindT[i * 3 + 1], Math.abs(bindT[i * 3 + 2])];
+      const S = at(up), E = at(low);
+      uFace.uArmB.value.set(anchors.armB[0], anchors.armB[1]);
+      uFace.uArmC.value.set(E[0], E[2], S[0], S[2]);
+      uFace.uArmY.value.set(E[1], S[1]);
+      anchors.armY = [E[1], S[1]];
+    }
   }
 
   // Scratch, allocated once.
@@ -357,6 +652,65 @@ function skinnedFigure(data, opts = {}) {
     }
   }
 
+  // ── the face, over time ────────────────────────────────────────────────
+  //
+  // The blink belongs here rather than wherever she happens to be standing:
+  // it is not a decision anybody makes and nothing on the promenade should have
+  // to remember to ask for it. The smile is the opposite — that is a mood, so
+  // it is a number the caller sets and this only eases towards it.
+  const bl = { wait: 1.2 + Math.random() * BLINK.spread, at: -1, again: false };
+  const face = anchors ? {
+    smile: 0,          // what the caller wants, 0..1
+    ink: 0,            // and how far the flames have climbed her arms
+    rate: 1,           // blinks a second, scaled. Staring is `rate = 0`.
+    anchors,
+  } : null;
+
+  // A smile narrows the eyes, and that is most of why one reads from across a
+  // promenade. The mouth is 55 mm of dark line on a head that is a hundred
+  // pixels tall from where she is actually looked at; the eyes are the highest
+  // contrast thing on her, so a fifth of a lid is worth more than the whole
+  // corner lift below it. They share the uniform, and the blink wins.
+  const setBlink = (v) => {
+    uFace.uBlink.value = Math.max(v, uFace.uSmile.value * FACE.squint);
+  };
+
+  function faceTick(dt) {
+    if (!face) return;
+    uFace.uSmile.value = damp(uFace.uSmile.value, sat(face.smile), 7, dt);
+    // Slower than the smile on purpose. A smile is a face changing its mind; the
+    // ink is a flame front going up an arm, and it wants the second and a bit
+    // that the riser under the turn takes.
+    uFace.uInk.value = damp(uFace.uInk.value, sat(face.ink), 2.6, dt);
+
+    if (bl.at < 0) {
+      // A rate of nothing is not a very long wait, it is no blinking at all —
+      // and it leaves the uniform alone, which is what lets the screenshot door
+      // hold a half-closed eye still for a second and a half.
+      if (face.rate <= 0) return;
+      bl.wait -= dt * face.rate;
+      if (bl.wait > 0) { setBlink(0); return; }
+      bl.at = 0;
+    }
+    bl.at += dt;
+    let v;
+    if (bl.at < BLINK.shut) v = bl.at / BLINK.shut;
+    else if (bl.at < BLINK.shut + BLINK.open) v = 1 - (bl.at - BLINK.shut) / BLINK.open;
+    else {
+      v = 0;
+      bl.at = -1;
+      // A second blink follows the first by less than a wait, which is what
+      // makes a double read as one gesture rather than as two events. The dice
+      // are only rolled on the way into a full wait, so a double never turns
+      // into a triple.
+      if (bl.again) { bl.wait = 0.09; bl.again = false; } else {
+        bl.wait = BLINK.gap + Math.random() * BLINK.spread;
+        bl.again = Math.random() < BLINK.again;
+      }
+    }
+    setBlink(v * v * (3 - 2 * v));
+  }
+
   /** Register with the shadow pass, sharing this figure's bone palette. */
   function cast(shadow, o = {}) {
     return shadow.cast(mesh, {
@@ -369,7 +723,7 @@ function skinnedFigure(data, opts = {}) {
   return {
     mesh, material: mat, bones: data.bones, uBones, cast,
     clips: Object.keys(data.clips), tris: data.tris, nv: data.nv,
-    play, update, state: st,
+    play, update, state: st, face, faceTick, uFace,
     playing: () => (st.cur ? st.cur.name : null),
   };
 }

@@ -1966,6 +1966,8 @@ window.__fr = {
     step: (secs) => { jadrija.step(secs, camera.position); return jadrija.show(); },
     /** Fill her soak meter, so the turn starts on the next frame she is stepped. */
     flare: () => { jadrija.flare(); return jadrija.show(); },
+    /** Her blink and her smile, held still — see `face` in 43-jadrija.js. */
+    face: (o) => jadrija.face(o),
   },
   /**
    * Drive the ground mission from a test without flying an approach first.
@@ -2060,7 +2062,14 @@ window.__fr = {
   place: (x, y, z, yaw) => { flight.reset(x, z, yaw ?? 0, y); },
   cam: (i) => { camMode = i % CAMS.length; },
   look: (px, py, pz, tx, ty, tz) => { camOverride = [px, py, pz, tx, ty, tz]; },
-  free: () => { camOverride = null; },
+  free: () => { camOverride = null; camera.fov = 58; camera.updateProjectionMatrix(); },
+  /**
+   * A long lens, for photographing something small.
+   *
+   * The near plane is 1.2 m — it has to be, with 42 km behind it — so a face
+   * cannot be approached, only zoomed in on. `free()` puts it back.
+   */
+  fov: (deg) => { camera.fov = deg; camera.updateProjectionMatrix(); },
   /** Advance the simulation `secs` with no rendering — for headless testing. */
   fastForward: (secs) => {
     const dt = 1 / 30;

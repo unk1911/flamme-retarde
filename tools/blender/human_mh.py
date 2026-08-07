@@ -331,6 +331,35 @@ ANKLET_Z = 0.035          # above the ankle marker
 ANKLET_R = (0.0455, 0.0345)   # fore-aft and lateral, ~4 mm proud of the skin
 ANKLET_WIRE = 0.0026      # a 5 mm band: a chain reads as nothing at this range
 
+# A septum ring, and it is the only piece of her above the neck that is a shape
+# rather than a colour. That is not a change of mind about the argument in
+# `cutters` — a nose ring is exactly the case that argument does not cover. It
+# is not a marking on the skin, it is an object hanging off the front of a face
+# in silhouette against whatever is behind her, and paint has nothing to sit on
+# for the half of it that is in mid-air.
+#
+# Placed on the midline profile that `cutters` measures for the mouth:
+#
+#     z 1.586  x 0.1762   nose tip
+#     z 1.570  x 0.1645   subnasale, the bottom of the philtrum
+#     z 1.551  x 0.1632   the crease between the lips
+#
+# The hoop lies in the frontal plane, so every point on it is at the same x and
+# that one number decides whether it is jewellery or a swallowed coin. The first
+# attempt put it at x = 0.1585, reading "just behind the nose tip" off the table
+# above — but those x values are the *surface*, and the philtrum between the
+# subnasale and the lip runs at 0.164 to 0.168. The whole ring came out 6 mm
+# inside her face and the payload carried thirty-seven gold vertices nobody
+# could see. It goes in front of that surface and behind the tip: x = 0.170 is
+# 4 mm clear of the philtrum at the bottom of the hoop and still inside the nose
+# at the top of it, which is where a piercing goes through.
+#
+# The hair cap is the one cutter near enough to matter — it is a solid, and it
+# would paint a gold ring brown — but it stops at x = 0.155 and this is past it.
+SEPTUM = (0.1700, 1.5735)     # x and z of the centre, on the midline
+SEPTUM_R = 0.0068             # a 14 mm hoop
+SEPTUM_WIRE = 0.0013          # thick enough to survive the decimator
+
 
 def extras(body, J):
     """Build every piece of joined geometry and put it on the body in one pass.
@@ -377,6 +406,18 @@ def extras(body, J):
                         ANKLET_R[0], ANKLET_R[1], ANKLET_WIRE),
                   ANKLET_M, ANKLET_P)
 
+    # `ring` builds about the vertical axis, which is what an anklet wants. A
+    # septum ring hangs in the frontal plane instead: the piercing runs from one
+    # nostril to the other and the hoop loops round the free bottom edge of the
+    # septum, so it is a circle you see whole from in front and edge-on from the
+    # side. Cycling the coordinates x,y,z -> z,x,y turns one into the other; it
+    # is a rotation and not a mirror, so the winding — and with it every face
+    # normal — comes through unchanged.
+    rv, rf = ring((0.0, 0.0, 0.0), SEPTUM_R, SEPTUM_R, SEPTUM_WIRE,
+                  seg=16, ring_seg=5)
+    add_shell([(SEPTUM[0] + v[2], v[0], SEPTUM[1] + v[1]) for v in rv], rf,
+              ANKLET_M, ANKLET_P)
+
     me = bpy.data.meshes.new("extras")
     me.from_pydata([tuple(v) for v in vs], [], fs)
     me.validate()
@@ -404,7 +445,7 @@ def extras(body, J):
     bpy.ops.object.join()
     body["extraN"] = len(vs)
     body["hairN"] = 0
-    print("[mh] extras: %d verts, %d faces joined (hair + 2 anklets)"
+    print("[mh] extras: %d verts, %d faces joined (hair + 2 anklets + septum)"
           % (len(vs), len(fs)))
     return body
 

@@ -7,7 +7,19 @@
 // chosen and before it is lit.
 // -----------------------------------------------------------------------------
 
-const SOLID_VERT = /* glsl */ `
+/**
+ * The shared vertex program.
+ *
+ * @param body  GLSL run on the *bind* pose, before anything is done to it —
+ *              before the skinning, before the instance transform. It gets `p`,
+ *              which starts as `position` and is what everything downstream
+ *              reads. This is the only place a figure can be reshaped rather
+ *              than posed: the skin matrix is built from bones and there is no
+ *              bone for a cheek.
+ * @param decl  extra uniform and varying declarations, as `solidFragment`'s.
+ */
+function solidVertex(body = '', decl = '') {
+  return /* glsl */ `
 attribute vec3 aInstPos;
 attribute vec4 aInstRot;      // quaternion
 attribute vec3 aInstScale;
@@ -31,6 +43,8 @@ varying vec3 vHair;
 attribute vec3 aVCol;
 uniform float uInstanced;
 uniform float uHasVCol;
+
+${decl}
 
 vec3 qrot(vec4 q, vec3 v){
   return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
@@ -67,10 +81,15 @@ void main(){
   vec3 p = position;
   vec3 n = normal;
   vLocal = position;
+
+  ${body}
+
 #ifdef FR_SKIN
   {
     mat4 sm = skinMat();
-    p = (sm * vec4(position, 1.0)).xyz;
+    // p, not position: the body above has already had its say, and on the one
+    // figure that uses it that say is the shape of her face.
+    p = (sm * vec4(p, 1.0)).xyz;
     n = mat3(sm) * normal;
   }
 #endif
@@ -100,6 +119,7 @@ void main(){
   gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
 }
 `;
+}
 
 /**
  * @param body  GLSL run after the base colour is chosen, before it is lit
@@ -193,7 +213,7 @@ function solidMaterial(color, opts = {}) {
       uHasVCol: { value: opts.vcol === false ? 0 : 1 },
       ...(opts.uniforms || {}),
     },
-    vertexShader: SOLID_VERT,
+    vertexShader: solidVertex(opts.vert || '', opts.decl || ''),
     fragmentShader: solidFragment(opts.body || '', opts.decl || ''),
     side: opts.side ?? THREE.FrontSide,
     transparent: !!opts.transparent,

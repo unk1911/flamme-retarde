@@ -10,6 +10,83 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.34.0] — 2026-08-07
+
+### Added — she blinks, and she smiles
+
+The obvious way to do both is in Blender: four eyelid bones and two at the
+corners of her mouth, a re-bind, a re-export. That was the plan for a while and
+it was the wrong plan. An eyelid is not a joint — there is no lid geometry on
+this figure at all, only the continuous skin that runs from her brow to her
+cheek — so a lid bone means hand-painting weights onto a strip of face two
+vertices wide and hoping the bone-heat solve does not take the eyebrow with it.
+And a mouth-corner bone moves the corner, which is the *smaller* half of a
+smile; the rest of it is that the eye closes a little and the cheek comes up,
+which is skin again.
+
+What actually makes this head read at the distance she is looked at is not
+shape, it is paint. So:
+
+- **The blink is drawn.** A lid runs down the eyeball as a colour, carrying the
+  lash line on its leading edge, inside an ellipsoid that takes in both painted
+  lash lines and stops short of the brow. Two hundred milliseconds, a wait of
+  two to seven seconds, and about one in five comes straight back for a second
+  one, which is what makes a double read as one gesture rather than two events.
+- **The smile is displaced.** The corner of her mouth is pushed up, back and out
+  in the *bind* pose, before the skin matrix — so the painted lip line and the
+  cheek go with it, and it works in every clip she has including the ones that
+  put her upside down. A full smile also closes her eyes a fifth of the way,
+  which is most of why one reads from across a promenade: her mouth is 55 mm of
+  dark line on a head a hundred pixels tall, and her eyes are the highest
+  contrast thing on her.
+
+Neither costs a bone, a byte of payload or a keyframe. Every anchor — where the
+eyes are, how big they are, what colour a lid and a lash line should be, where
+the corner of the mouth is — is measured off the mesh at load rather than typed,
+so they follow the face if it is ever re-modelled.
+
+How pleased she is comes off a table over her phases, plus a third of a smile
+for being hosed, which is added rather than tabled because it happens on top of
+whatever she was already doing.
+
+### Added — a nose ring
+
+A gold septum hoop, 14 mm, built in `extras()` next to the anklets — the same
+pass, real geometry, rigid to her skull, no runtime cost. It is the only piece
+of her above the neck that is a shape rather than a colour, and that is not a
+change of mind about the paint argument: a nose ring is the case that argument
+does not cover, because half of it is in mid-air with nothing to sit on.
+
+The first attempt put it 6 mm inside her face. The profile table those numbers
+came from is the *surface*, and the philtrum runs 5 mm in front of where the
+hoop was hung.
+
+### Added — the flames, when she turns
+
+Point the branch at her for long enough and the turn starts; now the ink starts
+with it. Flames climb both upper arms from her elbow to her shoulder over about
+a second — the length of the riser under the music — and go out again when the
+turn does. Tongues of ink with hot leading edges, two octaves of noise wrapped
+round the angle about her own arm bone.
+
+Her face goes with them: the smile goes out entirely and her blink rate drops to
+a tenth. A face that keeps blinking politely through it is a face that is still
+being pleasant, and the whole point of the turn is that she has stopped.
+
+### Changed — the shared material takes a vertex snippet
+
+`solidVertex(body, decl)`, mirroring `solidFragment`, so a material can reshape
+its geometry in the bind pose and not only recolour its fragments. One call
+site, and the skinning block now reads `p` rather than `position` so that
+whatever the body did survives it.
+
+### Added — `__fr.jad.face()` and `__fr.fov()`
+
+The first holds a blink or a smile still, because a blink is a fifth of a second
+and a headless page runs at about a frame a second. The second is a long lens:
+the near plane is 1.2 m, and with 42 km behind it that is not negotiable, so a
+face cannot be approached — only zoomed in on.
+
 ## [1.33.1] — 2026-08-06
 
 ### Fixed — on a phone, on foot, you could not move
