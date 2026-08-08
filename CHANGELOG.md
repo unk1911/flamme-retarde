@@ -10,6 +10,75 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.36.0] — 2026-08-08
+
+### Added — the heart
+
+A two-handed love sign, and it is made over her head rather than at her sternum,
+which is where a person makes it. Two reasons, and neither is taste.
+
+Her rig has 28 bones and the hand end of an arm is `hand` plus `thumb` — one
+thumb a side and nothing else. There is no index finger and no pinky, so the ASL
+sign and the one-handed finger heart are both out: there is nothing to lift. The
+two-handed heart does not need them, because its lobes are limbs.
+
+And the first cut, made at the chest where it belongs, was invisible: two
+skin-coloured hands enclosing a skin-coloured hole in front of a skin-coloured
+ribcage, under flat vertex colours and the softest shading in the renderer.
+Every edge carrying the gesture was skin meeting skin. Made with the arms — up
+and out to the elbows, down and in to the hands, her face framed in the top of
+it — the shape is 60 cm of silhouette against the sky, and it reads from the far
+end of the promenade, which is where she is looked at from.
+
+Six render passes to land the angles, and the useful part is where the elbow
+bend lives. On an arm hanging down it is `armL`'s X. On an arm held overhead it
+is not: local axes are named off the rest skeleton, the parent has rolled the
+whole frame 130-odd degrees about the fore-aft axis to get up there, and X now
+swings the forearm at the camera instead of across the midline. Two intermediate
+attempts had her surrendering and clutching her own throat. `--reskin` grew a
+`--views` flag and VIEWS grew a `hands` camera, because paying 25 s of EEVEE for
+a hero shot to find out whether two thumbs are touching is 25 s on a part of the
+frame nobody was going to look at.
+
+### Added — the note, and the first texture in this project
+
+She holds up a card. It says one of `herro!`, `what's up, duck?` or `meaw!`,
+picked on the way into the pose.
+
+Everything else here is vertex colours, because a colour per vertex costs nothing
+to author and nothing to sample. Text is the one thing that argument breaks on: a
+legible glyph is a hard edge, and a hard edge on a decimated mesh is either a
+thousand triangles a letter or it is a texture. So the card is a 2D canvas drawn
+once per string, on a quad two triangles big, parented to her mesh — which means
+it goes where she goes through the crossfade, the yaw easing and the shore's
+curved frame without knowing any of them exist.
+
+It hangs off her actual hands. `skinnedFigure` now returns `boneAt(i, out)` and
+`boneIndex(name)`, which read the plain world transform the bone pass already
+computes on its way to the skinning matrix — the uniform holds `world * bind⁻¹`,
+which is only good for moving vertices that were authored in the bind pose, and a
+card never was. So the pose in `human_mh.py` decides how she holds it, the card
+sizes itself to the gap and hangs below her wrists, and if that pose moves the
+card moves with it.
+
+The three lines are not in `02-i18n.js`, deliberately. Everything in that file is
+the *game* talking and should arrive in the player's language. This is her, using
+words for the first time — everything else she has ever said is a squeak nobody
+translates either — and "herro" is a joke that only exists in one language.
+
+### Removed — the moonwalk clip
+
+Out of the payload now, not just out of her repertoire. Still authored in
+`tools/blender/human_mh.py`, still solved by `dance_floor`; what was taken away
+is the one line that exported it.
+
+### Changed
+
+- The opening routine is shimmy → heart → note → cartwheels, so all four are
+  things you have seen rather than things you have been told about.
+- `__fr.jad.cue(...names)` puts numbers at the front of her running order, which
+  is how a screenshot stops waiting on the dice.
+
 ## [1.35.0] — 2026-08-08
 
 ### Changed — nothing she does starts or stops on a frame boundary

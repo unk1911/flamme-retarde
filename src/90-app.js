@@ -2017,6 +2017,8 @@ window.__fr = {
     flare: () => { jadrija.flare(); return jadrija.show(); },
     /** Her blink and her smile, held still — see `face` in 43-jadrija.js. */
     face: (o) => jadrija.face(o),
+    /** Put a number at the front of her running order. */
+    cue: (...n) => jadrija.cue(...n),
   },
   /**
    * Drive the ground mission from a test without flying an approach first.

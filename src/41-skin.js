@@ -725,6 +725,22 @@ function skinnedFigure(data, opts = {}) {
     clips: Object.keys(data.clips), tris: data.tris, nv: data.nv,
     play, update, state: st, face, faceTick, uFace,
     playing: () => (st.cur ? st.cur.name : null),
+    /**
+     * Where a bone's head has got to this frame, in figure space.
+     *
+     * Not the skinning matrix, which is what the uniform holds: that is
+     * `world * bind⁻¹` and it is only good for moving vertices that were
+     * authored in the bind pose. Something that was never in the bind pose —
+     * a card in her hands — wants the plain world transform, and the pass
+     * above has already computed it on the way to the other one.
+     *
+     * Figure space, so a caller that parents to `mesh` needs no conversion.
+     */
+    boneAt: (i, out) => {
+      out.set(worldT[i * 3], worldT[i * 3 + 1], worldT[i * 3 + 2]);
+      return out;
+    },
+    boneIndex: (name) => data.bones.findIndex((b) => b.name === name),
   };
 }
 

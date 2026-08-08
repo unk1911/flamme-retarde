@@ -1578,6 +1578,115 @@ async function buildJadrija(scene) {
   let testFigure = null;
   let skinFig = null;
   let show = null;
+  let banner = null;
+
+  // ── the note ───────────────────────────────────────────────────────────────
+  /**
+   * What she writes on it.
+   *
+   * Not in 02-i18n.js, and that is a decision rather than an oversight. Every
+   * string in that file is the *game* talking — a HUD label, a key hint, a
+   * wingman on the radio — and all of it should arrive in the language the
+   * player picked. This is not the game talking, it is her, and it is the first
+   * time she has used words at all: everything else she has ever said is a
+   * squeak out of 80-audio.js, which nobody translates either. "Herro" is also a
+   * joke that only exists in one language, and a French build that solemnly
+   * corrected it to "Bonjour" would have translated away the whole content.
+   */
+  const NOTES = ['herro!', "what's up, duck?", 'meaw!'];
+
+  /**
+   * Her card, and the first texture in this project.
+   *
+   * Everything else here is vertex colours — the whole figure, the whole town —
+   * because a colour per vertex costs nothing to author and nothing to sample.
+   * Text is the one thing that argument breaks on: a legible glyph is a hard
+   * edge, and a hard edge on a decimated mesh is either a thousand triangles
+   * per letter or it is a texture. So it is a canvas, drawn once per string and
+   * uploaded, on a quad two triangles big.
+   *
+   * The quad is a child of her mesh rather than a thing in the scene, so it goes
+   * where she goes for free — including through the crossfade, the yaw easing
+   * and the shore's curved frame, none of which it has to know about. All it
+   * does per frame is sit between her two hands, and it reads those out of the
+   * bone pass rather than being told where they are: the pose in
+   * tools/blender/human_mh.py decides how she holds it, and if that pose moves,
+   * the card moves with it and nothing here has to be told.
+   */
+  function makeBanner(fig) {
+    const cv = document.createElement('canvas');
+    cv.width = 512; cv.height = 288;
+    const g = cv.getContext('2d');
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+
+    const write = (text) => {
+      g.fillStyle = '#f4efe2';                    // sun-bleached card
+      g.fillRect(0, 0, cv.width, cv.height);
+      g.strokeStyle = '#cdc3ad';
+      g.lineWidth = 6;
+      g.strokeRect(3, 3, cv.width - 6, cv.height - 6);
+      g.fillStyle = '#26333d';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      // Shrunk to fit rather than wrapped: these are three or four words, and a
+      // line break in the middle of "what's up, duck?" is a worse picture than
+      // a slightly smaller one.
+      let px = 96;
+      do {
+        g.font = `700 ${px}px "Trebuchet MS", "Segoe UI", sans-serif`;
+        px -= 4;
+      } while (px > 28 && g.measureText(text).width > cv.width - 64);
+      g.fillText(text, cv.width / 2, cv.height / 2 + 4);
+      tex.needsUpdate = true;
+    };
+    write(NOTES[0]);
+
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+    // PlaneGeometry faces +Z and her forward is +X, so a quarter turn puts the
+    // writing where somebody standing in front of her can read it.
+    mesh.rotation.y = Math.PI / 2;
+    mesh.frustumCulled = false;
+    mesh.visible = false;
+    fig.mesh.add(mesh);
+
+    const hl = fig.boneIndex('handL'), hr = fig.boneIndex('handR');
+    const a = new THREE.Vector3(), b = new THREE.Vector3();
+
+    return {
+      mesh,
+      say: write,
+      pick: () => write(NOTES[(Math.random() * NOTES.length) | 0]),
+      /**
+       * Sit it between her hands.
+       *
+       * Sized off how far apart they are rather than fixed, so the card is
+       * whatever the pose is holding — and clamped at both ends, because the
+       * crossfade into the pose starts from wherever she was and an unclamped
+       * card grows from nothing over a third of a second, which reads as a bug
+       * rather than as a fade.
+       *
+       * And hung *below* the wrists rather than centred between them. Centred
+       * put it across her mouth: her hands come up to about chin height in the
+       * pose, and a card whose middle is at her hands is a card whose top is at
+       * her nose. Below them she is holding it by its top corners, which is
+       * where a person holds up a sign, and her face stays clear above it.
+       */
+      place: () => {
+        if (hl < 0 || hr < 0) return;
+        fig.boneAt(hl, a); fig.boneAt(hr, b);
+        const w = clamp(a.distanceTo(b) * 0.95, 0.24, 0.32);
+        mesh.scale.set(w, w * (288 / 512), 1);
+        mesh.position.set(
+          (a.x + b.x) * 0.5 + 0.07,       // clear of her palms, toward you
+          (a.y + b.y) * 0.5 - 0.11,
+          (a.z + b.z) * 0.5);
+      },
+    };
+  }
   if (PAYLOAD.human_skin_fr3d) {
     try {
       skinFig = await loadSkin('human_skin_fr3d', {
@@ -1598,6 +1707,7 @@ async function buildJadrija(scene) {
       mesh.rotation.y = rigYaw(ft, -Math.PI * 0.5);  // looking out to sea
       mesh.updateMatrixWorld();
       scene.add(mesh);
+      banner = makeBanner(skinFig);
       testFigure = { mesh, fig: skinFig, tris: skinFig.tris, at: [ft, fs] };
 
       // The survey pole that used to stand here is gone.
@@ -1653,8 +1763,8 @@ async function buildJadrija(scene) {
    * What she does when you walk up to her.
    *
    * Notice, down on all fours, crawl, up, three somersaults, and then the rest
-   * of her repertoire in a fixed order — the shimmy, then the cartwheels —
-   * before she settles into larking about the promenade with you behind. Every
+   * of her repertoire in a fixed order — the shimmy, the heart, the note, the
+   * cartwheels — before she settles into larking about with you behind. Every
    * part of it is a clip authored in tools/blender/human_mh.py rather than
    * anything this file knows how to draw. That is the whole point of having
    * spent a session on skinning: this is a state machine over a dozen names and
@@ -1747,8 +1857,14 @@ async function buildJadrija(scene) {
     // roll and a clip resampled to sixteen keys cannot hold that. The clip is
     // still in tools/blender/human_mh.py and comes out of the payload with the
     // next Blender run. The shimmy takes its share of the dice.
-    shimmy: 0.16,
+    shimmy: 0.12,
     shimmyFor: 3.4,     // seconds of it, which is about eight reversals
+    // And the two she does with her hands. Held longer than the shimmy because
+    // both of them are things you are meant to *read* — a gesture you have to
+    // recognise and a card you have to actually finish — and three seconds is
+    // not long enough to walk round to the front of somebody and take it in.
+    heart: 0.09, heartFor: 4.6,
+    note: 0.09, noteFor: 5.4,
     say: [1.8, 4.2],    // seconds between noises while she is playing
     // ── the water ─────────────────────────────────────────────────────────
     // How long the jet is remembered after it comes off her. Not zero: a hose
@@ -2142,7 +2258,7 @@ async function buildJadrija(scene) {
    * hosed and not noticing, and a scramble is much the better of the two.
    */
   const WETTABLE = { idle: 1, notice: 1, crawl: 1, play: 1, home: 1,
-    aim: 1, orbit: 1, shimmy: 1 };
+    aim: 1, orbit: 1, shimmy: 1, heart: 1, note: 1 };
 
   /**
    * And the phases the *turn* cannot start from.
@@ -2180,6 +2296,9 @@ async function buildJadrija(scene) {
     idle: 0.30, notice: 0.62, down: 0.55, crawl: 0.50, up: 0.72,
     flip: 0.85, play: 0.55, aim: 0.70, wheel: 0.85, bask: 1.00,
     orbit: 0.80, joy: 1.00, shimmy: 0.90, home: 0.45,
+    // Both of the hand ones are the widest she has. A heart made with a
+    // straight face is a threat.
+    heart: 1.00, note: 0.95,
   };
 
   function stepShow(dt, pt, ps) {
@@ -2211,6 +2330,18 @@ async function buildJadrija(scene) {
       showSay('whee', d);
       go('shimmy', 'shimmy', 0.32);
     };
+    // Both of these are done *at* somebody, so both turn to face you and
+    // neither travels. The card picks its line on the way in rather than on the
+    // way out, so that the one you are reading is the one she chose for you.
+    const enterHeart = () => {
+      showSay('trill', d);
+      go('heart', 'heart', 0.36);
+    };
+    const enterNote = () => {
+      if (banner) banner.pick();
+      showSay('whee', d);
+      go('note', 'note', 0.36);
+    };
     // Lined up along the promenade first, and still skipping while she does it.
     // A cartwheel wants a straight run of five or six metres and the deck is
     // only about four deep, so pointed any other way she would be over the edge
@@ -2230,6 +2361,8 @@ async function buildJadrija(scene) {
     const showNext = () => {
       const nxt = show.queue.shift();
       if (nxt === 'shimmy') return enterShimmy();
+      if (nxt === 'heart') return enterHeart();
+      if (nxt === 'note') return enterNote();
       if (nxt === 'wheel') return enterWheels();
       show.wander = show.ang;
       showWander(SHOW.turn, SHOW.swing);
@@ -2328,6 +2461,14 @@ async function buildJadrija(scene) {
       f.face.ink = turn ? 1 : 0;
     }
 
+    // And the card, which is only ever up during the one phase that holds it.
+    // Placed before the matrix update at the bottom of this function, because
+    // it is a child of her mesh and that call is what pushes it to the GPU.
+    if (banner) {
+      banner.mesh.visible = show.phase === 'note';
+      if (banner.mesh.visible) banner.place();
+    }
+
     switch (show.phase) {
       case 'idle':
         show.want = -Math.PI / 2;                        // back to the water
@@ -2380,7 +2521,7 @@ async function buildJadrija(scene) {
           // Off the deck and straight into the routine. The somersaults stay
           // where they have always been, at the front of it: they are what
           // getting up *is* for her, and the three new numbers queue up behind.
-          show.queue = ['shimmy', 'wheel'];
+          show.queue = ['shimmy', 'heart', 'note', 'wheel'];
           go('flip', 'flip', 0.18);
           show.flips = 1;
         }
@@ -2424,6 +2565,12 @@ async function buildJadrija(scene) {
           }
           if (dice < SHOW.joy + SHOW.spin) { enterWheels(); break; }
           if (dice < SHOW.joy + SHOW.spin + SHOW.shimmy) { enterShimmy(); break; }
+          if (dice < SHOW.joy + SHOW.spin + SHOW.shimmy + SHOW.heart) {
+            enterHeart(); break;
+          }
+          if (dice < SHOW.joy + SHOW.spin + SHOW.shimmy + SHOW.heart + SHOW.note) {
+            enterNote(); break;
+          }
         }
         show.want = showSteer(show.wander);
         showPace(show.pace, dt);
@@ -2571,6 +2718,21 @@ async function buildJadrija(scene) {
           showSay(say1(CHAT), d);
         }
         if (show.tmr > SHOW.shimmyFor || d > SHOW.far) showNext();
+        break;
+
+      case 'heart':
+      case 'note':
+        // Standing still and turned to you, for the shimmy's reason and one
+        // more of their own: both of these are aimed. A heart pointed at the
+        // sea is a heart for the sea, and a card you are behind is a card you
+        // cannot read.
+        show.played += dt;
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        if (show.tmr - show.said > 1.4 + Math.random() * 1.6) {
+          show.said = show.tmr; showSay(say1(CHAT), d);
+        }
+        if (show.tmr > (show.phase === 'heart' ? SHOW.heartFor : SHOW.noteFor)
+          || d > SHOW.far) showNext();
         break;
 
       // ── the turn ─────────────────────────────────────────────────────────
@@ -2881,6 +3043,15 @@ async function buildJadrija(scene) {
      * time a number in the sequence moves.
      */
     flare: () => { if (show) show.soak = SHOW.soakFor; },
+    /**
+     * Queue a number, so a screenshot does not have to wait on the dice.
+     *
+     * The queue is the routine's own mechanism and it is emptied one name at a
+     * time by `showNext`, so putting a name on the front of it is exactly what
+     * the routine does — no phase is forced and nothing is entered from a state
+     * that would be a teleport out of.
+     */
+    cue: (...names) => { if (show) show.queue.unshift(...names); return show && show.queue.slice(); },
     /**
      * Her face, held still.
      *

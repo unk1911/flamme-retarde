@@ -2940,6 +2940,82 @@ FLARE = [(0.00, dict(SOAK_A)), (0.26, FIRE_GATHER), (0.52, FIRE_OPEN),
          (0.78, FIRE_OPEN), (1.10, _fire_at(0.0))]
 
 
+# ── the heart, and the note ─────────────────────────────────────────────────
+#
+# Two poses she makes with her hands in front of her, and the reason they are
+# poses rather than props is the same reason her smile is paint: what she has to
+# work with is 28 bones, and the hand end of one arm is `hand` plus `thumb`.
+# There is no index finger and no pinky, so the ASL sign and the one-handed
+# finger heart are both out — there is nothing to lift.
+#
+# The two-handed heart does not need them. Its lobes are the *hands*, turned in
+# and tipped toward each other, and its point is the two thumbs coming down to
+# meet; every one of those is a bone she has. It also reads at a distance, which
+# the finger heart would not: it is 25 cm of silhouette rather than 3 cm of
+# knuckle, and this is a game played from further away than arm's length.
+#
+# Both are built on IDLE_A rather than from nothing, which is what keeps her feet
+# out of the deck: the legs, the contrapposto and the solved `@root` all come
+# along, and the pose is only the half of her above the ribs. No floor pass.
+# Over her head, and that is not a stylistic preference — it is the only place
+# on this figure where the shape has anything to be a shape *against*.
+#
+# The first cut made it at the sternum, where a person actually makes it, and it
+# was unreadable: two skin-coloured hands enclosing a skin-coloured hole in front
+# of a skin-coloured ribcage, under flat vertex colours and the softest shading
+# in the renderer. Every edge that carries the gesture was skin meeting skin.
+# Held up, the hole is full of sky, the arms carry the two lobes at 60 cm rather
+# than the fingers carrying them at 6, and it reads from the far end of the
+# promenade — which is where she is looked at from.
+#
+# Note where the elbow bend lives. On an arm hanging down, flexion is armL's X.
+# On an arm held overhead it is armL's **Z**: local X and Z are named off the
+# rest skeleton, the parent has rolled the whole frame 160° about the fore-aft
+# axis to get up there, and X now swings the forearm at the camera instead of
+# across the midline. The first attempt used X and she stood there with both
+# arms straight up, palms out, surrendering.
+HEART_A = dict(IDLE_A, **{
+    "clavicleL": (0, 0, 16), "clavicleR": (0, 0, -16),
+    "armUL": (-10, -70, -134), "armLL": (-74, 0, 0), "handL": (-10, 0, 0),
+    "armUR": (-10, 70, 134), "armLR": (-74, 0, 0), "handR": (-10, 0, 0),
+    # And the point of the heart, which is the only thing here the thumbs have
+    # ever been asked to do.
+    "thumbL": (0, 0, 34), "thumbR": (0, 0, -34),
+    "chest": (-4, 0, 0), "neck": (8, 0, 0), "head": (4, 0, 0),
+})
+
+# The breath, and a shade more of it than the idle takes: she is holding
+# something up, so the sway is in her shoulders rather than her hips.
+HEART_B = dict(HEART_A, **{
+    "clavicleL": (0, 0, 18), "clavicleR": (0, 0, -18),
+    "armUL": (-12, -70, -139), "armUR": (-12, 70, 139),
+    "armLL": (-78, 0, 0), "armLR": (-78, 0, 0),
+    "chest": (-6, 0, 0), "neck": (10, 0, 0), "head": (2, 4, 1),
+})
+
+# And holding a note up, which is a different shape entirely: hands apart rather
+# than together, forearms level, at about the height of her own chin so the card
+# does not cover her face. Nothing here has to be accurate — 43-jadrija.js hangs
+# the card off wherever the two hand bones actually end up, so the pose decides
+# how big the note is rather than the other way round.
+NOTE_A = dict(IDLE_A, **{
+    "clavicleL": (0, 0, 7), "clavicleR": (0, 0, -7),
+    # The flexion lives in the shoulder rather than the elbow, which is what
+    # puts the hands out in *front* of her instead of up beside her ears. The
+    # first cut had it the other way round and she held the card against her own
+    # collarbones, where it would have been drawn inside her chest.
+    "armUL": (-46, 14, 24), "armLL": (-52, 0, -8), "handL": (-6, 0, 0),
+    "armUR": (-46, -14, -24), "armLR": (-52, 0, 8), "handR": (-6, 0, 0),
+    "chest": (-2, 0, 0), "neck": (4, 0, 0), "head": (2, 0, 0),
+})
+
+NOTE_B = dict(NOTE_A, **{
+    "clavicleL": (0, 0, 8), "clavicleR": (0, 0, -8),
+    "armUL": (-49, 14, 23), "armUR": (-49, -14, -23),
+    "chest": (-4, 0, 0), "neck": (6, 0, 0), "head": (0, -4, 1),
+})
+
+
 CLIPS = [
     {"name": "idle", "loop": True,
      "keys": [(0.0, IDLE_A), (2.3, IDLE_B), (4.6, IDLE_A)]},
@@ -2976,7 +3052,19 @@ CLIPS = [
     # somersault and the cartwheel are events that end, these are things she is
     # doing until she stops.
     {"name": "shimmy", "loop": True, "keys": SHIMMY},
-    {"name": "moonwalk", "loop": True, "keys": MOON},
+    # `moonwalk` was here and is not any more. The move is still authored above,
+    # MOON and all, and `dance_floor` still solves it — what was taken out is the
+    # one line that put it in the payload. It was the only thing in the
+    # repertoire that had to be sold by an illusion rather than by a pose, and a
+    # glide is sold or it is not: the anchor foot has to be still to the degree,
+    # and a rig with no toe roll running a clip resampled to sixteen keys cannot
+    # hold that. Putting it back is this line.
+    # And the two she makes with her hands, which are held for as long as the
+    # game feels like holding them, so both loop for the shimmy's reason.
+    {"name": "heart", "loop": True,
+     "keys": [(0.0, HEART_A), (1.5, HEART_B), (3.0, HEART_A)]},
+    {"name": "note", "loop": True,
+     "keys": [(0.0, NOTE_A), (1.7, NOTE_B), (3.4, NOTE_A)]},
     # And the turn. Three clips rather than one because they are three different
     # kinds of thing: `flare` happens to her once, `firestarter` is what she is
     # until something stops it, and `cast` is an event the game fires off inside
@@ -2991,6 +3079,10 @@ VIEWS = {
     "front": (0.0, 4.0, 0.95, 4.2, 760, 1120),
     "side": (90.0, 4.0, 0.95, 4.2, 760, 1120),
     "hero": (34.0, 8.0, 0.95, 3.9, 760, 1120),
+    # Chest and hands, close. Everything she does with her hands in front of her
+    # — the heart, the note — is 30 cm of pose on a 1.7 m figure, and "front" at
+    # 4.2 m renders it about forty pixels across.
+    "hands": (6.0, 8.0, 1.34, 1.35, 900, 900),
     "face": (2.0, 2.0, 1.612, 0.46, 900, 900),
     "head": (30.0, 5.0, 1.615, 0.52, 900, 900),
     "prof": (88.0, 2.0, 1.615, 0.50, 900, 900),
@@ -3177,6 +3269,19 @@ def main():
         bpy.ops.wm.open_mainfile(filepath=str(BLEND))
         body, rig = bpy.data.objects["human"], bpy.data.objects["rig"]
         _lights()
+        # Which cameras. The default three answer a whole-body pose; a pair of
+        # hands in front of a sternum wants "hands", and paying 25 s of EEVEE
+        # for a hero shot to find out whether two thumbs are touching is 25 s
+        # spent on a part of the frame nobody is going to look at.
+        views = ("hero", "side", "front")
+        if "--views" in argv:
+            picked = []
+            for n in argv[argv.index("--views") + 1:]:
+                if n.startswith("-") or n not in VIEWS:
+                    break
+                picked.append(n)
+            if picked:
+                views = tuple(picked)
         for name in argv[argv.index("--reskin") + 1:]:
             if name.startswith("-") or name not in globals():
                 break
@@ -3186,7 +3291,7 @@ def main():
             # every view is 25 s of EEVEE — but the cartwheel's whole content is
             # frontal, and it is the only view that shows which way she is
             # going over.
-            render(name.lower(), ("hero", "side", "front"))
+            render(name.lower(), views)
         pose(rig, {})
         export_skin(body, rig, ROOT / "build" / "payload" / "human_skin.fr3d.gz",
                     CLIPS)
