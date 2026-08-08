@@ -109,6 +109,12 @@ LASH_M, LASH_P = (0.5, 0.0, 0.0), (0.052, 0.040, 0.036)
 # stays visible against every skin tone the crowd generator hands out. Silver
 # against a pale leg at fifteen metres is a leg.
 ANKLET_M, ANKLET_P = (0.860, 0.720, 0.400), (0.860, 0.720, 0.400)
+# Areolae. Literal on both channels for the anklets' reason. Well short of
+# MOUTH_P, which is the other rose on this figure and is a *line* — a mouth can
+# afford to be four shades under the skin because it is 2 mm wide and needs to
+# survive being 55 mm long at twenty metres. This is a 28 mm disc on a chest and
+# the same contrast would read as a wound.
+AREOLA_M, AREOLA_P = (0.455, 0.288, 0.268), (0.455, 0.288, 0.268)
 
 
 # --------------------------------------------------------------------------- #
@@ -1072,6 +1078,23 @@ def cutters(J):
     for s in (1, -1):
         add("mouth%d" % s, MOUTH_M, MOUTH_P, 4,
             (0.124, s * 0.0165, lip + 0.0032), (0.0550, 0.0110, 0.0022))
+
+    # Areolae, and the only thing worth writing down is where they are.
+    #
+    # There is no joint marker for a breast, so the position was measured off
+    # the mesh rather than typed: scan the band the breast occupies and take the
+    # row where x peaks. That matters, because the naive search — the
+    # forward-most vertex anywhere on the chest — lands at y = 0.023, which is
+    # the *sternum*. At most heights on this figure the midline is further
+    # forward than the breast is, so the apex is a local maximum and not a
+    # global one. Measured: x 0.1677, y ±0.0770, z 1.2531.
+    #
+    # Punches, per the rule at the top: 5.5 cm deep against a 1.9 cm waist, so
+    # the front tip clears the surface by 1.5 cm and the cross-section where the
+    # skin actually passes through is about 28 mm across.
+    for s in (1, -1):
+        add("areola%d" % s, AREOLA_M, AREOLA_P, 3,
+            (0.128, s * 0.0770, 1.2531), (0.0550, 0.0190, 0.0190))
 
     # Hair: a cap over the skull, cut at the brow. Unlike the others this one is
     # a solid the scalp sits inside, not a punch through it.
@@ -2957,39 +2980,43 @@ FLARE = [(0.00, dict(SOAK_A)), (0.26, FIRE_GATHER), (0.52, FIRE_OPEN),
 # Both are built on IDLE_A rather than from nothing, which is what keeps her feet
 # out of the deck: the legs, the contrapposto and the solved `@root` all come
 # along, and the pose is only the half of her above the ribs. No floor pass.
-# Over her head, and that is not a stylistic preference — it is the only place
-# on this figure where the shape has anything to be a shape *against*.
+# At her sternum, where a person makes it.
+
+# It went over her head first, on an argument about contrast that turned out to
+# be an argument about the wrong thing. The reasoning was sound as far as it
+# went: a heart made at the chest is skin-coloured hands round a skin-coloured
+# hole in front of a skin-coloured ribcage, and the version held up against the
+# sky had a silhouette that carried at fifty metres. What it missed is that a
+# silhouette is not the only thing a body has. Both arms hauled up and folded
+# back over the skull is not a shape anybody makes, and it read as a contortion
+# — which is worse than an illegible gesture, because the thing it legibly says
+# is that something has gone wrong with her shoulders.
 #
-# The first cut made it at the sternum, where a person actually makes it, and it
-# was unreadable: two skin-coloured hands enclosing a skin-coloured hole in front
-# of a skin-coloured ribcage, under flat vertex colours and the softest shading
-# in the renderer. Every edge that carries the gesture was skin meeting skin.
-# Held up, the hole is full of sky, the arms carry the two lobes at 60 cm rather
-# than the fingers carrying them at 6, and it reads from the far end of the
-# promenade — which is where she is looked at from.
+# So: elbows down at the ribs, forearms angled up and in, hands meeting in front
+# of the sternum. Fifteen centimetres of shape rather than sixty, which does not
+# read from across the promenade — and that is the right trade now, because
+# there is a long lens on Z and a card for the far distance. This one is for
+# when you have walked up to her.
 #
-# Note where the elbow bend lives. On an arm hanging down, flexion is armL's X.
-# On an arm held overhead it is armL's **Z**: local X and Z are named off the
-# rest skeleton, the parent has rolled the whole frame 160° about the fore-aft
-# axis to get up there, and X now swings the forearm at the camera instead of
-# across the midline. The first attempt used X and she stood there with both
-# arms straight up, palms out, surrendering.
+# The Y term on the upper arm is what brings the hands to the middle, and it is
+# how an arm reaches its own sternum: the shoulder *rotates*, it does not swing.
+# Swinging it puts the elbows in the next parasol.
 HEART_A = dict(IDLE_A, **{
-    "clavicleL": (0, 0, 16), "clavicleR": (0, 0, -16),
-    "armUL": (-10, -70, -134), "armLL": (-74, 0, 0), "handL": (-10, 0, 0),
-    "armUR": (-10, 70, 134), "armLR": (-74, 0, 0), "handR": (-10, 0, 0),
+    "clavicleL": (0, 0, 4), "clavicleR": (0, 0, -4),
+    "armUL": (-18, 16, 26), "armLL": (-86, 0, 8), "handL": (74, 0, 13),
+    "armUR": (-18, -16, -26), "armLR": (-86, 0, -8), "handR": (74, 0, -13),
     # And the point of the heart, which is the only thing here the thumbs have
     # ever been asked to do.
-    "thumbL": (0, 0, 34), "thumbR": (0, 0, -34),
-    "chest": (-4, 0, 0), "neck": (8, 0, 0), "head": (4, 0, 0),
+    "thumbL": (0, 0, 30), "thumbR": (0, 0, -30),
+    "chest": (-2, 0, 0), "neck": (4, 0, 0), "head": (-4, 0, 1),
 })
 
 # The breath, and a shade more of it than the idle takes: she is holding
 # something up, so the sway is in her shoulders rather than her hips.
 HEART_B = dict(HEART_A, **{
-    "clavicleL": (0, 0, 18), "clavicleR": (0, 0, -18),
-    "armUL": (-12, -70, -139), "armUR": (-12, 70, 139),
-    "armLL": (-78, 0, 0), "armLR": (-78, 0, 0),
+    "clavicleL": (0, 0, 6), "clavicleR": (0, 0, -6),
+    "armUL": (-21, 16, 25), "armUR": (-21, -16, -25),
+    "armLL": (-89, 0, 8), "armLR": (-89, 0, -8),
     "chest": (-6, 0, 0), "neck": (10, 0, 0), "head": (2, 4, 1),
 })
 

@@ -10,6 +10,54 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.37.0] — 2026-08-08
+
+### Fixed — the heart is back at her chest
+
+The overhead version shipped in 1.36.0 was wrong and the reasoning behind it was
+wrong in an instructive way. The argument was about contrast — a heart made at
+the sternum is skin-coloured hands round a skin-coloured hole in front of a
+skin-coloured ribcage, and held against the sky the silhouette carried at fifty
+metres. That part was true. What it missed is that a silhouette is not the only
+thing a body has. Both arms hauled up and folded back over the skull is not a
+shape anybody makes, and it read as a contortion — which is worse than an
+illegible gesture, because the thing it legibly says is that something has gone
+wrong with her shoulders.
+
+So it is where a person makes it: elbows down at the ribs, forearms angled up and
+in, thumb edges forming the two lobes and the index fingers meeting at the point.
+Fifteen centimetres of shape rather than sixty, which does not read from across
+the promenade — and that is the right trade now that there is a long lens on Z
+and a card for the far distance. This one is for when you have walked up to her.
+
+It is also the ceiling of the rig. Her hand is `hand` plus `thumb` and the
+fingers are one rigid splayed fan that cannot curl, so the lower fingers hang
+below the shape and dilute it. Beyond this needs finger bones — there is room for
+about fourteen more in the 128-vec4 palette — or a heart drawn on the card, where
+the machinery already reads perfectly at any distance.
+
+### Added — areolae
+
+There was no joint marker for a breast, so the position came off the mesh rather
+than out of a guess, and the naive search is wrong in a way worth recording: the
+forward-most vertex on the chest sits at y = 0.023, which is the *sternum*. At
+most heights on this figure the midline is further forward than the breast is, so
+the apex is a local maximum and not a global one. Scanned row by row it is
+x 0.1677, y ±0.0770, z 1.2531.
+
+Painted through a punch 5.5 cm deep against a 1.9 cm waist, per the rule at the
+top of `cutters()`, which leaves a 28 mm disc where the skin passes through —
+171 vertices a side before decimation, about the same as an eyebrow, so it
+survives. `AREOLA_P` sits well short of `MOUTH_P`: a mouth can afford four shades
+under the skin because it is a 2 mm line that has to survive being 55 mm long at
+twenty metres, and the same contrast on a 28 mm disc reads as a wound.
+
+### Changed
+
+- `--reskin` now takes `--views`, and `VIEWS` gained a `hands` camera — 25 s of
+  EEVEE on a hero shot to find out whether two thumbs are touching is 25 s spent
+  on a part of the frame nobody was going to look at.
+
 ## [1.36.0] — 2026-08-08
 
 ### Added — the heart
