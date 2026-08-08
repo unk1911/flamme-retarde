@@ -10,6 +10,67 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.35.0] — 2026-08-08
+
+### Changed — nothing she does starts or stops on a frame boundary
+
+Three places where a number was believed on the frame it arrived.
+
+Her **yaw** was `ang += clamp(err, ±3 dt)`, which is a bang-bang controller: the
+frame a new heading is drawn she is already turning at the full three radians a
+second, and the frame she arrives she is not turning at all. Both ends are a
+corner, and a corner in a heading does not read as a bump — it reads as a figure
+being *steered*. It is now a rate proportional to the error, itself damped
+toward that ask: `turnP` against `turnEase` sits the pair at about 0.7 of
+critical, so she leans into a turn, overshoots it by a hair and settles inside a
+second. All three of the turns go through it — the heading, the shoulders-across
+offset the cartwheel holds, and the orbit's whole yaw.
+
+Her **speed** was drawn fresh by `showWander` every second or so and taken up
+entire. An amble became a jog between two frames, and because `showPace` hangs
+the clip's clock off the same number, the animation stepped with her. It now
+eases over about a third of a second, which is what a person takes.
+
+And the **crossfades** between clips, everywhere the transition is not timed
+against something: 0.18 → 0.28 into the kneel, 0.24 → 0.36 back into the wander,
+0.20 → 0.32 for the walk home, 0.4 → 0.5 into the idle, and the same again for
+the one-shot fallback in `41-skin.js`. The somersault and the cartwheel keep
+their short ones — those launch on a frame and a long fade would delay the
+launch pose.
+
+### Removed — the moonwalk
+
+Taken out, not shelved behind a zero. It was the one move in her repertoire that
+had to be sold by an illusion rather than by a pose, and a glide is sold or it is
+not: the anchor foot has to be *still*, to the degree, and a rig with no toe roll
+running a clip resampled to sixteen keys cannot hold that. The shimmy takes its
+share of the dice (0.10 → 0.16) and the opening routine is now two numbers rather
+than three. The clip is still authored in `tools/blender/human_mh.py` and leaves
+the payload with the next Blender run.
+
+### Added — the long lens, held on Z
+
+The near plane is 1.2 m and has to be roughly there, because the far plane is
+42 km and a depth buffer has 24 bits: the precision is set by the ratio of the
+two, and dropping the near plane to see a face starts a fight between the ridges
+across the channel. So you cannot walk up to her. Inside 1.2 m she is not close,
+she is gone — the plane cuts the head off and you look through her at the sea.
+
+Which is the problem a telephoto lens exists to solve, and it solves it here for
+the reason it does on a beach: change the angle the thing subtends instead. Held
+on **Z** on foot, or the new **LOOK** button on glass, the field of view eases
+from the setting to 11° — geometrically, because that is what a zoom is. Look
+sensitivity comes down with it, on both the mouse and the thumb: a head turns at
+the same rate in the world either way, but at 11° that is five times the pixels.
+
+From 1.9 m it puts her head across the frame with nothing clipped.
+
+- The `fov` slider now reads and writes `baseFov`, so opening the settings with
+  Z held does not jump it to 11 and save that as your taste.
+- `__fr.lens()` reports zoom, live angle and base; `__fr.jad.show()` gained `vel`
+  and `rate`, which are where the easing has got to as against what was asked
+  for.
+
 ## [1.34.0] — 2026-08-07
 
 ### Added — she blinks, and she smiles

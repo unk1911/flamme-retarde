@@ -25,6 +25,45 @@ camera.position.set(0, 600, 0);
 const frustum = new THREE.Frustum();
 const _pv = new THREE.Matrix4();
 
+/**
+ * The long lens, and why getting a closer look is a lens and not a step.
+ *
+ * The near plane is 1.2 m. It has to be roughly there: the far plane is 42 km,
+ * a depth buffer has 24 bits, and the precision you get is set by the *ratio* of
+ * the two — drop the near plane to 15 cm and the ridges across the channel start
+ * fighting with each other. So walking up to somebody's face does not work.
+ * Inside 1.2 m she is not close, she is gone: the near plane cuts the head off
+ * and you look straight through her at the sea.
+ *
+ * Which is exactly the problem a telephoto lens exists to solve, and it solves
+ * it here for the same reason it does on a beach: you cannot get closer to the
+ * thing, so you change the angle it subtends instead. Held, on Z, from about a
+ * metre and a half, 11° puts her face across three quarters of the frame — near
+ * enough to count eyelashes, which is now a thing there is a point in counting.
+ *
+ * Geometric rather than linear on the way in, because a lens is: halving the
+ * angle doubles the magnification, wherever you start from, so equal steps of
+ * `zoom` feel like equal steps of zoom. And the look sensitivity comes down with
+ * the angle in `mousemove` below — a head turns at the same rate in the world
+ * either way, but at 11° that is five times the pixels, and a view that whips is
+ * a view you cannot hold on a face.
+ */
+const LENS = { min: 11, ease: 5.5 };
+let baseFov = 58;
+let zoom = 0;
+
+function stepLens(dt) {
+  const want = state.phase === 'ground'
+    && (keys.has('KeyZ') || TOUCH.glook) ? 1 : 0;
+  zoom = damp(zoom, want, LENS.ease, dt);
+  if (zoom < 1e-4 && want === 0) zoom = 0;
+  const f = baseFov * Math.pow(LENS.min / baseFov, zoom);
+  if (Math.abs(f - camera.fov) > 1e-3) {
+    camera.fov = f;
+    camera.updateProjectionMatrix();
+  }
+}
+
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
@@ -119,7 +158,9 @@ addEventListener('mousemove', (e) => {
   // On foot the mouse is a head, not a stick: it moves the view directly and
   // does not spring back. Same device, opposite contract.
   if (state.phase === 'ground') {
-    const g = 0.0020 * flight.p.sens;
+    // Scaled by the lens. Radians per pixel is the thing a hand has learned,
+    // and it is the field of view that decides how many pixels a radian is.
+    const g = 0.0020 * flight.p.sens * (camera.fov / baseFov);
     ground.look(e.movementX * g, e.movementY * g);
     return;
   }
@@ -656,8 +697,12 @@ const SETTINGS = [
   { key: 'birds', label: 'set.birds', min: 0, max: 1, step: 0.05,
     get: () => birds.getDensity(), set: (v) => birds.setDensity(v),
     fmt: (v) => v <= 0.001 ? T('set.off') : Math.round(v * 100) + '%' },
+  // `baseFov` and not `camera.fov`: the lens sits on top of this, and reading
+  // the live angle back would have the slider jump to 11 the moment somebody
+  // opened the settings with Z held down — and then save that as their taste.
   { key: 'fov', label: 'set.fov', min: 45, max: 95, step: 1,
-    get: () => camera.fov, set: (v) => { camera.fov = v; camera.updateProjectionMatrix(); },
+    get: () => baseFov,
+    set: (v) => { baseFov = v; camera.fov = v; camera.updateProjectionMatrix(); },
     fmt: (v) => Math.round(v) + '°' },
   { key: 'exposure', label: 'set.exposure', min: 0.55, max: 1.4, step: 0.02,
     get: () => renderer.toneMappingExposure, set: (v) => { renderer.toneMappingExposure = v; },
@@ -1551,6 +1596,10 @@ function frame() {
   // to photograph something at eye height came back as a picture of wherever
   // the player happened to be standing. Those are the two modes you most want
   // to aim a camera in.
+  // Not under an override: `__fr.fov()` sets the angle by hand for a
+  // screenshot, and a lens easing back to the setting every frame would take it
+  // straight off again.
+  if (!camOverride) stepLens(dt);
   if (camOverride) updateCamera(dt);
   else if (state.phase === 'ground') ground.pose(camera);
   else if (state.phase === 'chute' || eject.active) eject.pose(camera);
@@ -2062,7 +2111,12 @@ window.__fr = {
   place: (x, y, z, yaw) => { flight.reset(x, z, yaw ?? 0, y); },
   cam: (i) => { camMode = i % CAMS.length; },
   look: (px, py, pz, tx, ty, tz) => { camOverride = [px, py, pz, tx, ty, tz]; },
-  free: () => { camOverride = null; camera.fov = 58; camera.updateProjectionMatrix(); },
+  free: () => {
+    camOverride = null;
+    zoom = 0;
+    camera.fov = baseFov;
+    camera.updateProjectionMatrix();
+  },
   /**
    * A long lens, for photographing something small.
    *
@@ -2070,6 +2124,8 @@ window.__fr = {
    * cannot be approached, only zoomed in on. `free()` puts it back.
    */
   fov: (deg) => { camera.fov = deg; camera.updateProjectionMatrix(); },
+  /** And the one Z drives, which is the same lens with a hand on it. */
+  lens: () => ({ zoom: +zoom.toFixed(3), fov: +camera.fov.toFixed(2), base: baseFov }),
   /** Advance the simulation `secs` with no rendering — for headless testing. */
   fastForward: (secs) => {
     const dt = 1 / 30;

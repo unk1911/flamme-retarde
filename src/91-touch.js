@@ -303,7 +303,10 @@ function initTouch() {
       walkTo(e.clientX - walkOx, e.clientY - walkOy);
     } else if (e.pointerId === lookId) {
       e.preventDefault();
-      if (ground) ground.look((e.clientX - lookX) * 0.0060, (e.clientY - lookY) * 0.0060);
+      // Down with the lens, for the reason in `stepLens`: a thumb has learned a
+      // number of degrees per centimetre of glass, not a number of radians.
+      const g = 0.0060 * (camera.fov / baseFov);
+      if (ground) ground.look((e.clientX - lookX) * g, (e.clientY - lookY) * g);
       lookX = e.clientX; lookY = e.clientY;
     }
   }, { passive: false });
@@ -327,6 +330,7 @@ function initTouch() {
   });
 
   hold('t-jet', (v) => { TOUCH.gjet = v; });
+  hold('t-look', (v) => { TOUCH.glook = v; });
   tap('t-up', () => launchOut());
   tap('t-in', () => toggleGround());
   tap('t-gset', () => togglePanel());

@@ -37,6 +37,6 @@ if (IS_TOUCH) document.documentElement.classList.add('touch');
 // risers forward and the brakes back.
 const TOUCH = {
   scoop: false, drop: false, level: false,
-  gx: 0, gy: 0, grun: false, gjet: false,
+  gx: 0, gy: 0, grun: false, gjet: false, glook: false,
   cx: 0, cy: 0,
 };

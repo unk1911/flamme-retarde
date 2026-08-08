@@ -1624,6 +1624,10 @@ async function buildJadrija(scene) {
         // `side` is a yaw offset on the mesh alone — it never touches `ang`, so
         // she goes on travelling exactly where she was already going.
         wheels: 0, side: 0,
+        // The three that carry momentum, so that nothing about how she moves
+        // starts or stops on a frame boundary: how fast she is going, and the
+        // two rates the yaw and the shoulder offset are turning at.
+        vel: 0, rate: 0, sideRate: 0,
         // What is left of the opening routine. Filled when she gets up off the
         // deck and emptied one number at a time; empty means the dice are back
         // in charge.
@@ -1648,9 +1652,9 @@ async function buildJadrija(scene) {
   /**
    * What she does when you walk up to her.
    *
-   * Notice, down on all fours, crawl, up, three somersaults, and then her whole
-   * repertoire in a fixed order — moonwalk, shimmy, cartwheels — before she
-   * settles into skipping off along the promenade with you behind her. Every
+   * Notice, down on all fours, crawl, up, three somersaults, and then the rest
+   * of her repertoire in a fixed order — the shimmy, then the cartwheels —
+   * before she settles into larking about the promenade with you behind. Every
    * part of it is a clip authored in tools/blender/human_mh.py rather than
    * anything this file knows how to draw. That is the whole point of having
    * spent a session on skinning: this is a state machine over a dozen names and
@@ -1715,29 +1719,36 @@ async function buildJadrija(scene) {
     // afternoon rather than somebody late for something.
     turn: [0.55, 1.35], swing: 1.5, pace: [0.42, 0.92],
     crawlTurn: [0.9, 2.0], crawlSwing: 0.7,
+    // How fast a drawn speed is taken up. `showWander` hands `showPace` a fresh
+    // number every second or so and it used to be believed on the frame it
+    // arrived, so an amble became a jog between two frames — and because the
+    // clip's clock is scaled off the same number, the *animation* stepped with
+    // it. A third of a second of getting there is what a person takes.
+    accel: 3.2,
+    // And the turn, which was the other corner. See `turnRate`.
+    turnP: 3.4,         // rad/s of yaw asked for per rad of heading error
+    turnEase: 7,        // and how fast that ask is taken up
+    turnMax: 3.0,       // rad/s, walking
+    sideMax: 2.6,       // and the same for the shoulders-across offset,
+    orbitMax: 3.4,      // except in the orbit, where it carries the whole yaw
     edge: 14,           // metres from the ends of the resort the push starts
     joy: 0.22,          // chance that a new heading comes with a somersault
     spin: 0.16,         // and the chance it comes with a run of cartwheels
-    // And the two dances. Lower odds than the acrobatics on purpose: a
-    // somersault is over in a second and a half and these are held for three or
-    // four, so equal odds would have her dancing most of the time she is not
-    // tumbling and wandering almost never.
-    shimmy: 0.10,
-    moon: 0.08,
-    shimmyFor: 3.4,     // seconds of it, which is about eight reversals
-    moonFor: 6.2,       // longer than it was, because it is slower than it was:
-                        // 3.3 m of deck either way, or four and a half strides
-    // m/s of backward glide. Not a number that was chosen — it is 34° of hip on
-    // a 0.90 m hip-to-toe over a half-cycle, which is what the anchor foot in
-    // the clip gives back per stride, divided by MOON_DUR / 2. See MOON_SWEEP
-    // in tools/blender/human_mh.py; if either moves, this moves with it, or the
-    // one foot that is meant to be standing still starts sliding.
+    // And the dance. Lower odds than the acrobatics on purpose: a somersault is
+    // over in a second and a half and this is held for three or four, so equal
+    // odds would have her dancing most of the time she is not tumbling and
+    // wandering almost never.
     //
-    // Which is why slowing the move down was a change to the clip and not to
-    // this line. It was 0.76 and read as somebody with somewhere to be; the
-    // half-cycle went from 0.70 s to 1.00 s and this followed it down.
-    moonPace: 0.53,
-    moonEdge: 10,       // m from the ends of the deck where the glide gives up
+    // There were two of these. The moonwalk is gone — not shelved behind a zero,
+    // taken out, because a move nobody wants to watch is not a move that wants
+    // an option flag. It was the one thing in the repertoire that had to be sold
+    // by the illusion rather than by the pose, and a glide is sold or it is not:
+    // the anchor foot has to be *still*, to the degree, and a rig with no toe
+    // roll and a clip resampled to sixteen keys cannot hold that. The clip is
+    // still in tools/blender/human_mh.py and comes out of the payload with the
+    // next Blender run. The shimmy takes its share of the dice.
+    shimmy: 0.16,
+    shimmyFor: 3.4,     // seconds of it, which is about eight reversals
     say: [1.8, 4.2],    // seconds between noises while she is playing
     // ── the water ─────────────────────────────────────────────────────────
     // How long the jet is remembered after it comes off her. Not zero: a hose
@@ -1826,10 +1837,43 @@ async function buildJadrija(scene) {
    * The fix is one line and it should have been there all along: scale the
    * clip's clock by the same factor as the distance. A skip at half speed is a
    * skip that takes twice as long, which is what a slow skip *is*.
+   *
+   * And the speed itself is eased into rather than stepped to. `showWander`
+   * draws a new pace every second or so and this took it on the frame it was
+   * drawn — so an amble became a jog between two frames, and because the line
+   * below hangs the clip's clock off the same number, the animation jumped with
+   * her. Nothing about that read as a decision; it read as a dropped frame.
    */
   function showPace(v, dt) {
-    skinFig.state.speed = clamp(v / SHOW.skip, 0.4, 1.6);
-    showMove(v, dt);
+    show.vel = damp(show.vel, v, SHOW.accel, dt);
+    skinFig.state.speed = clamp(show.vel / SHOW.skip, 0.4, 1.6);
+    showMove(show.vel, dt);
+  }
+
+  /**
+   * Turn an angle toward another one, the way a body turns rather than the way
+   * a servo does.
+   *
+   * All three of these used to be `ang += clamp(err, ±rate * dt)`, which is a
+   * bang-bang controller: the frame a new heading is drawn she is already
+   * turning at the full three radians a second, and the frame she arrives she is
+   * not turning at all. Both ends are a corner. It is the single most visible
+   * thing about how she moves, because it is on her *yaw* — a corner in a
+   * position is a bump and a corner in a heading is a figure being steered.
+   *
+   * So: ask for a rate proportional to the error, which takes the corner off the
+   * arrival on its own, and then damp the rate toward that ask, which takes it
+   * off the departure. `turnP` against `turnEase` puts the pair at about 0.7 of
+   * critical — a touch of overshoot, settling inside a second, which is a person
+   * turning round rather than a turret slewing.
+   *
+   * Returns the new rate. The caller adds `rate * dt` itself, because two of the
+   * three callers have to wrap the angle afterwards and one must not.
+   */
+  function turnRate(err, rate, max, dt) {
+    while (err > Math.PI) err -= TAU;
+    while (err < -Math.PI) err += TAU;
+    return damp(rate, clamp(err * SHOW.turnP, -max, max), SHOW.turnEase, dt);
   }
 
   /** Advance her along her heading, kept on the deck and inside the resort. */
@@ -2098,7 +2142,7 @@ async function buildJadrija(scene) {
    * hosed and not noticing, and a scramble is much the better of the two.
    */
   const WETTABLE = { idle: 1, notice: 1, crawl: 1, play: 1, home: 1,
-    aim: 1, orbit: 1, shimmy: 1, moon: 1 };
+    aim: 1, orbit: 1, shimmy: 1 };
 
   /**
    * And the phases the *turn* cannot start from.
@@ -2135,7 +2179,7 @@ async function buildJadrija(scene) {
   const SMILE = {
     idle: 0.30, notice: 0.62, down: 0.55, crawl: 0.50, up: 0.72,
     flip: 0.85, play: 0.55, aim: 0.70, wheel: 0.85, bask: 1.00,
-    orbit: 0.80, joy: 1.00, shimmy: 0.90, moon: 0.75, home: 0.45,
+    orbit: 0.80, joy: 1.00, shimmy: 0.90, home: 0.45,
   };
 
   function stepShow(dt, pt, ps) {
@@ -2147,7 +2191,7 @@ async function buildJadrija(scene) {
     const done = S.cur && !S.cur.loop && S.curT >= S.cur.dur;
     show.tmr += dt;
 
-    const go = (phase, clip, fade = 0.22) => {
+    const go = (phase, clip, fade = 0.30) => {
       // Back to nominal on every clip change. `showPace` below runs the skip
       // off its own clock to keep her feet under her, and the somersault and
       // the cartwheel are timed to the second against the distances they carry
@@ -2160,21 +2204,12 @@ async function buildJadrija(scene) {
       show.said = 0;
     };
 
-    // The three set pieces, each with the setting-up its entry needs, so that
-    // the dice below and the routine above can both start one without either
+    // The two set pieces, each with the setting-up its entry needs, so that the
+    // dice below and the routine above can both start one without either
     // knowing what the other knows.
-    //
-    // Down the long axis of the promenade and away from you, for the cartwheel's
-    // reason and one of its own: the deck is four metres deep, so a glide taking
-    // the short way across is over the edge in two seconds — and the joke only
-    // works if she is going *away*.
-    const enterMoon = () => {
-      show.wander = show.t > pt ? 0 : Math.PI;
-      go('moon', 'moonwalk', 0.30);
-    };
     const enterShimmy = () => {
       showSay('whee', d);
-      go('shimmy', 'shimmy', 0.24);
+      go('shimmy', 'shimmy', 0.32);
     };
     // Lined up along the promenade first, and still skipping while she does it.
     // A cartwheel wants a straight run of five or six metres and the deck is
@@ -2182,7 +2217,7 @@ async function buildJadrija(scene) {
     // halfway through the second one.
     const enterWheels = () => {
       show.wander = Math.cos(show.ang) > 0 ? 0 : Math.PI;
-      go('aim', 'skip', 0.20);
+      go('aim', 'skip', 0.30);
     };
 
     /**
@@ -2194,12 +2229,11 @@ async function buildJadrija(scene) {
      */
     const showNext = () => {
       const nxt = show.queue.shift();
-      if (nxt === 'moon') return enterMoon();
       if (nxt === 'shimmy') return enterShimmy();
       if (nxt === 'wheel') return enterWheels();
       show.wander = show.ang;
       showWander(SHOW.turn, SHOW.swing);
-      return go('play', 'skip', 0.24);
+      return go('play', 'skip', 0.36);
     };
 
     // The jet, and its two clocks.
@@ -2251,7 +2285,7 @@ async function buildJadrija(scene) {
       // not noticed. She can always run it again the next time she notices you.
       show.queue.length = 0;
       showSay('squee', d);
-      go('bask', 'soak', 0.34);
+      go('bask', 'soak', 0.40);
     }
 
     // The needle drop, and it is fed rather than switched on. `audio` keeps a
@@ -2307,13 +2341,13 @@ async function buildJadrija(scene) {
         // notices you again on the same frame and goes straight back down on
         // all fours, which is not delight, it is a stuck record.
         if (show.tmr > 3 && d < SHOW.near) {
-          showSay('wake', d); go('notice', 'notice', 0.20);
+          showSay('wake', d); go('notice', 'notice', 0.30);
         }
         break;
 
       case 'notice':
         show.want = Math.atan2(ps - show.s, pt - show.t);
-        if (done) go('down', 'kneel', 0.18);
+        if (done) go('down', 'kneel', 0.28);
         break;
 
       case 'down':
@@ -2322,7 +2356,7 @@ async function buildJadrija(scene) {
         if (done) {
           show.wander = show.want;
           showWander(SHOW.crawlTurn, SHOW.crawlSwing);
-          go('crawl', 'crawl', 0.22);
+          go('crawl', 'crawl', 0.32);
         }
         break;
 
@@ -2337,7 +2371,7 @@ async function buildJadrija(scene) {
           show.said = show.tmr;
           showSay(Math.random() < 0.7 ? 'chirr' : 'tick', d);
         }
-        if (show.tmr > SHOW.crawlFor) go('up', 'getup', 0.18);
+        if (show.tmr > SHOW.crawlFor) go('up', 'getup', 0.28);
         break;
 
       case 'up':
@@ -2346,8 +2380,8 @@ async function buildJadrija(scene) {
           // Off the deck and straight into the routine. The somersaults stay
           // where they have always been, at the front of it: they are what
           // getting up *is* for her, and the three new numbers queue up behind.
-          show.queue = ['moon', 'shimmy', 'wheel'];
-          go('flip', 'flip', 0.16);
+          show.queue = ['shimmy', 'wheel'];
+          go('flip', 'flip', 0.18);
           show.flips = 1;
         }
         break;
@@ -2385,15 +2419,11 @@ async function buildJadrija(scene) {
           showWander(SHOW.turn, SHOW.swing);
           const dice = Math.random();
           if (dice < SHOW.joy) {
-            showSay('hup', d); go('joy', 'flip', 0.16);
+            showSay('hup', d); go('joy', 'flip', 0.18);
             break;
           }
           if (dice < SHOW.joy + SHOW.spin) { enterWheels(); break; }
           if (dice < SHOW.joy + SHOW.spin + SHOW.shimmy) { enterShimmy(); break; }
-          if (dice < SHOW.joy + SHOW.spin + SHOW.shimmy + SHOW.moon) {
-            enterMoon();
-            break;
-          }
         }
         show.want = showSteer(show.wander);
         showPace(show.pace, dt);
@@ -2402,7 +2432,7 @@ async function buildJadrija(scene) {
           show.said = show.tmr;
           showSay(say1(CHAT), d);
         }
-        if (show.played > SHOW.playFor || d > SHOW.far) go('home', 'skip', 0.20);
+        if (show.played > SHOW.playFor || d > SHOW.far) go('home', 'skip', 0.32);
         break;
 
       case 'aim':
@@ -2459,7 +2489,7 @@ async function buildJadrija(scene) {
           show.spin = Math.random() < 0.5 ? 1 : -1;
           show.tick = SHOW.arc[0] + Math.random() * (SHOW.arc[1] - SHOW.arc[0]);
           showSay('trill', d);
-          go('orbit', 'skip', 0.30);
+          go('orbit', 'skip', 0.38);
         }
         break;
 
@@ -2511,7 +2541,7 @@ async function buildJadrija(scene) {
           show.played = 0;
           show.wander = show.ang;
           showWander(SHOW.turn, SHOW.swing);
-          go('play', 'skip', 0.26);
+          go('play', 'skip', 0.38);
         }
         break;
       }
@@ -2524,7 +2554,7 @@ async function buildJadrija(scene) {
         showMove(SHOW.hop * sat((S.curT - 0.34) / 0.10)
           * sat((1.10 - S.curT) / 0.12), dt);
         if (S.curT >= 0.98 && !show.said) { show.said = 1; showSay('whump', d); }
-        if (done) { showWander(SHOW.turn, SHOW.swing); go('play', 'skip', 0.24); }
+        if (done) { showWander(SHOW.turn, SHOW.swing); go('play', 'skip', 0.36); }
         break;
 
       case 'shimmy':
@@ -2541,35 +2571,6 @@ async function buildJadrija(scene) {
           showSay(say1(CHAT), d);
         }
         if (show.tmr > SHOW.shimmyFor || d > SHOW.far) showNext();
-        break;
-
-      case 'moon':
-        // Facing you and going the other way, which is the entire joke.
-        //
-        // It is two separate things and the split is what makes it work: the
-        // *heading* runs down the promenade away from you, and `side` — the
-        // offset between where she is going and where she is pointed — is held
-        // at a half turn, so she travels backwards along her own course with
-        // her face toward you. See the wantSide block below. The cartwheel uses
-        // the same machinery at a quarter turn.
-        //
-        // Nothing here plays with the clip's clock. The glide speed and the
-        // clip are locked together by MOON_SWEEP at the point the clip was
-        // authored, and scaling either on its own is how the anchor foot — the
-        // one thing in a moonwalk that must not move — starts sliding.
-        show.played += dt;
-        show.want = show.wander;
-        showMove(SHOW.moonPace, dt);
-        if (show.tmr - show.said > SHOW.say[0]
-          + Math.random() * (SHOW.say[1] - SHOW.say[0])) {
-          show.said = show.tmr;
-          showSay(say1(CHAT), d);
-        }
-        // The deck runs out, and `showMove` clamps rather than stops — held
-        // against the clamp she would glide on the spot for two seconds, which
-        // is a moonwalk on a treadmill.
-        if (show.tmr > SHOW.moonFor || d > SHOW.far
-          || show.t < SHOW.moonEdge || show.t > LEN - SHOW.moonEdge) showNext();
         break;
 
       // ── the turn ─────────────────────────────────────────────────────────
@@ -2650,18 +2651,17 @@ async function buildJadrija(scene) {
         const dist = Math.hypot(dt0, ds0);
         show.want = Math.atan2(ds0, dt0);
         if (dist > 1.1) showPace(Math.min(SHOW.skip * 0.85, dist * 1.7), dt);
-        else go('idle', 'idle', 0.4);
+        else go('idle', 'idle', 0.50);
         break;
       }
     }
 
     // Turn towards `want` at a rate a person turns at, and never the long way
     // round — the shore's frame wraps and a heading that crosses the wrap would
-    // otherwise spin her through a whole circle to move by a degree.
-    let e = show.want - show.ang;
-    while (e > Math.PI) e -= TAU;
-    while (e < -Math.PI) e += TAU;
-    show.ang += clamp(e, -3.0 * dt, 3.0 * dt);
+    // otherwise spin her through a whole circle to move by a degree. The wrap
+    // is inside `turnRate`, along with the easing that is the point of it.
+    show.rate = turnRate(show.want - show.ang, show.rate, SHOW.turnMax, dt);
+    show.ang += show.rate * dt;
 
     // And the offset between where she is going and where she is pointed.
     //
@@ -2679,10 +2679,9 @@ async function buildJadrija(scene) {
     // while the offset crawls after it, and she spends that second showing you
     // her back — which is the one thing this whole phase exists never to do.
     if (show.phase === 'orbit') {
-      let f2 = show.faceAng - show.ang - show.side;
-      while (f2 > Math.PI) f2 -= TAU;
-      while (f2 < -Math.PI) f2 += TAU;
-      show.side += clamp(f2, -3.4 * dt, 3.4 * dt);
+      show.sideRate = turnRate(show.faceAng - show.ang - show.side,
+        show.sideRate, SHOW.orbitMax, dt);
+      show.side += show.sideRate * dt;
       // Wrapped, or it winds up by a whole turn every few reversals and the
       // rate limit above starts unwinding it the long way round.
       while (show.side > Math.PI) show.side -= TAU;
@@ -2690,12 +2689,13 @@ async function buildJadrija(scene) {
     } else {
       // A quarter turn for the cartwheel, because a wheel travels along the
       // line the body goes over and that line is ninety degrees off the way she
-      // is facing. A half turn for the moonwalk, because that one travels
-      // backwards. Both are fixed offsets held for the length of the move and
-      // given back afterwards, which is what this branch is for.
+      // is facing. A fixed offset held for the length of the move and given
+      // back afterwards, which is what this branch is for.
       const wantSide = show.phase === 'aim' || show.phase === 'wheel'
-        ? -Math.PI / 2 : show.phase === 'moon' ? Math.PI : 0;
-      show.side += clamp(wantSide - show.side, -2.6 * dt, 2.6 * dt);
+        ? -Math.PI / 2 : 0;
+      show.sideRate = turnRate(wantSide - show.side, show.sideRate,
+        SHOW.sideMax, dt);
+      show.side += show.sideRate * dt;
     }
 
     const p = toWorld(show.t, show.s);
@@ -2865,6 +2865,10 @@ async function buildJadrija(scene) {
       ang: +show.ang.toFixed(2), flips: show.flips,
       wheels: show.wheels, side: +show.side.toFixed(2),
       pace: +show.pace.toFixed(2), played: +show.played.toFixed(1),
+      // What she is actually doing, as against what she has been asked for:
+      // `pace` and `want` are the ask, these two are where the easing has got
+      // to. A gap between them is the point of them.
+      vel: +show.vel.toFixed(2), rate: +show.rate.toFixed(2),
       wet: +show.wet.toFixed(2), lock: +show.lock.toFixed(1),
       hit: +show.hit.toFixed(2), spin: show.spin,
       soak: +show.soak.toFixed(1), burn: +show.burn.toFixed(2),

@@ -578,7 +578,7 @@ function skinnedFigure(data, opts = {}) {
    * @param fade   seconds to cross into it
    * @param next   clip to fall back to when a one-shot finishes
    */
-  function play(name, { fade = 0.25, next = null, from = 0 } = {}) {
+  function play(name, { fade = 0.30, next = null, from = 0 } = {}) {
     const clip = data.clips[name];
     if (!clip || clip === st.cur) return false;
     if (st.cur && fade > 0) {
@@ -597,7 +597,7 @@ function skinnedFigure(data, opts = {}) {
     if (!st.cur.loop && st.curT >= st.cur.dur && st.next) {
       const back = st.next;
       st.next = null;
-      play(back, { fade: 0.28 });
+      play(back, { fade: 0.34 });
       st.curT += step;
     }
 
