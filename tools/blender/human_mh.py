@@ -1072,12 +1072,39 @@ def cutters(J):
     #
     # The grin is the jaw bone's job and it only happens when she is being
     # hosed. This is what her face does the rest of the time.
+    # ── and why three shells was the wrong number ──────────────────────────
+    #
+    # Three of them is what made the shape awkward, and the awkwardness was not
+    # in any one of the numbers. A mouth is a curve, and three ellipsoids cannot
+    # be a curve: the middle one sat flat across 27 mm, the two corner ones sat
+    # flat across 22 mm each and 3.2 mm higher, and where they met there was a
+    # step. What you get from that is a lip line in three straight runs with two
+    # kinks in it, and since the corner shells overlap the middle one for half
+    # their length, the mouth is also visibly *taller* in the two places the
+    # kinks are. Nothing in the render says "the corner shell is 3.2 mm too
+    # high"; it says her mouth is a shape you cannot name.
+    #
+    # Nine shells on a parabola instead, with three things varying together
+    # along it, because all three are what a mouth actually does:
+    #
+    #   - it lifts towards the corners (`LIFT`), which is the pleasant face the
+    #     old note argues for and is kept;
+    #   - it runs *back* towards the corners (`BACK`), because a face is round
+    #     and a lip line that keeps its depth wraps out past the cheek;
+    #   - and it gets thinner towards the corners, which is the one the three
+    #     lumps could not do at all and the one that reads most as a mouth.
+    #
+    # Overlapping is fine here and only here: parity is a property of a single
+    # closed shell, and these are nine separate cutters tested independently,
+    # not nine halves of one volume.
     lip = J["jaw"].z + 0.043
-    add("mouth0", MOUTH_M, MOUTH_P, 4,
-        (0.128, 0.0, lip), (0.0550, 0.0135, 0.0024))
-    for s in (1, -1):
-        add("mouth%d" % s, MOUTH_M, MOUTH_P, 4,
-            (0.124, s * 0.0165, lip + 0.0032), (0.0550, 0.0110, 0.0022))
+    HALF, LIFT, BACK = 0.0215, 0.0026, 0.0105
+    for i in range(9):
+        f = i / 4.0 - 1.0                 # -1 at her right corner, +1 at her left
+        a = abs(f)
+        add("mouth%d" % i, MOUTH_M, MOUTH_P, 4,
+            (0.128 - BACK * a * a, f * HALF, lip + LIFT * a * a),
+            (0.0550, 0.0068 - 0.0034 * a ** 3, 0.0027 - 0.0014 * a ** 1.6))
 
     # Areolae, and the only thing worth writing down is where they are.
     #
@@ -1634,7 +1661,250 @@ def clipcheck(rig, name):
     print("[mh] %s: deepest %+.3f m" % (name, worst))
 
 
-def export_skin(body, rig, path, clips, tris=26000):
+# --------------------------------------------------------------------------- #
+#  nails                                                                       #
+# --------------------------------------------------------------------------- #
+#
+# Ten fingernails, and the only interesting thing about them is *when* they are
+# built. Everything else on this figure is painted — a colour per vertex laid
+# down through a cutter volume — and painting will not do here, for a reason
+# worth writing down because it bounds what this mesh can ever carry.
+#
+# Measured, not guessed: the shipped body is 13 521 vertices, of which 475 are
+# on one hand and 181 on that hand's distal phalanges. Four fingertips share
+# those 181, over a surface of roughly 800 mm² each, which works out at 4.4 mm
+# between one vertex and the next. A fingernail is about 9 mm long. So a painted
+# nail is *four vertices*, and four vertices will carry a colour and will not
+# carry a picture. Nothing about the cutter machinery is at fault; there simply
+# is not enough mesh there, and there cannot be — the decimator's job is to
+# spend triangles where the silhouette needs them, and a nail changes no
+# silhouette at all.
+#
+# So the nails are not painted onto the body, they are geometry laid on top of
+# it, and they are added *after* the decimator has run rather than before. That
+# ordering is the whole trick. Added before, a 9 mm plate is exactly what a
+# collapse decimator eats first: its edges are the shortest in the mesh and its
+# error is therefore the lowest, so it is the cheapest thing in the model to
+# delete. Added after, thirty vertices stay thirty vertices, and thirty
+# vertices across 9 mm is 1.8 mm of resolution — twice what the face has, and
+# enough to draw a flame on.
+#
+# They cost 300 vertices and 400 triangles on 13 521 and 26 000.
+
+# The flame, as a ramp from the cuticle to the free edge. Deliberately hot at
+# the top end: the material multiplies the lit surface by this, so a value that
+# looks right as a swatch comes out about a third darker on a finger held in
+# front of a body, and a flame that is not brighter than skin is a bruise.
+FLAME = (
+    (0.00, (0.22, 0.02, 0.05)),
+    (0.30, (0.62, 0.06, 0.04)),
+    (0.58, (0.94, 0.32, 0.03)),
+    (0.80, (1.00, 0.68, 0.10)),
+    (1.00, (1.00, 0.95, 0.72)),
+)
+
+# Nail geometry, in fractions of the distal phalanx it sits on rather than in
+# millimetres, so the little finger gets a little nail without a table.
+NAIL_ROWS, NAIL_COLS = 6, 5     # 7 x 6 = 42 verts, 60 triangles
+NAIL_FROM, NAIL_TO = 0.18, 0.94  # along the phalanx: cuticle to free edge
+NAIL_WIDE = 0.66                # half-width, as a fraction of the finger radius
+NAIL_DOME = 0.0009              # how proud of the skin the middle of it stands
+
+
+def _nail_outline(u, vn):
+    """The nail's plan shape, as a nudge to where along the finger a point sits.
+
+    The first cut of this was a plain grid and it rendered ten rectangles: two
+    straight edges, four square corners, and the unmistakable look of a sticker.
+    A nail has no straight edges at all — the cuticle is a shallow curve and the
+    free edge is a deeper one — so both ends are bowed by pulling the outer
+    columns back along the finger. Doing it here, rather than by moving vertices
+    afterwards, keeps the grid a grid: the flame is still addressed in (u, v)
+    and does not have to know the outline changed.
+    """
+    return (u
+            - 0.20 * u * u * vn ** 4          # bow the free edge back
+            + 0.13 * (1.0 - u) ** 2 * vn * vn)  # and the cuticle forward
+
+
+def _nail_width(u):
+    """Half-width along the nail: narrow at the cuticle, widest past halfway."""
+    return 1.0 - 0.44 * (1.0 - u) ** 2 - 0.16 * u ** 3
+
+
+def _flame(t):
+    t = max(0.0, min(1.0, t))
+    for i in range(len(FLAME) - 1):
+        t0, c0 = FLAME[i]
+        t1, c1 = FLAME[i + 1]
+        if t <= t1:
+            k = 0.0 if t1 <= t0 else (t - t0) / (t1 - t0)
+            return tuple(c0[j] + (c1[j] - c0[j]) * k for j in range(3))
+    return FLAME[-1][1]
+
+
+def _tongue(u, v, style):
+    """Where along the flame a point on the nail sits.
+
+    `u` runs 0 at the cuticle to 1 at the free edge and `v` runs -1 to 1 across.
+    Feeding `u` straight to the ramp gives ten identical nails with a flat
+    horizontal gradient, which is a manicure and not a flame. Bending it by `v`
+    is what makes a tongue: wherever this returns a bigger number the fire has
+    climbed further, so a term that peaks in the middle of the nail draws one
+    flame up the centre, and a term that peaks at both edges draws two.
+    """
+    a = abs(v)
+    if style == 0:
+        return u * (1.34 - 0.62 * a)            # one flame up the middle
+    if style == 1:
+        return u * (0.92 + 0.58 * a)            # two, one up each edge
+    if style == 2:
+        return u * (1.30 - 0.62 * (v * 0.5 + 0.5))   # a lick off one corner
+    return u * (1.12 - 0.26 * a * a)            # a broad, low flame
+
+# Which flame goes on which finger, thumb outwards. Mirrored on the right hand
+# so the two are a pair rather than a copy — this is the "various designs" of
+# the brief, and it is the whole of what varies: with thirty vertices a nail can
+# hold one flame each, not a scene.
+NAIL_STYLES = (0, 2, 0, 1, 3)
+
+
+def _finger_radius(src, base, axis, length):
+    """Half-thickness of a finger, measured off the mesh rather than assumed.
+
+    The nail has to sit *on* the finger: too shallow and it sinks inside, too
+    proud and it floats. Both failures are a millimetre wide, which is the whole
+    feature, so this is measured. The 70th percentile rather than the maximum,
+    because the maximum is whichever vertex belongs to the finger next door.
+    """
+    lat = []
+    for v in src.vertices:
+        d = v.co - base
+        along = d.dot(axis)
+        if 0.15 * length < along < 0.85 * length:
+            r = (d - axis * along).length
+            if r < 0.014:
+                lat.append(r)
+    if len(lat) < 6:
+        return 0.0045
+    lat.sort()
+    return lat[int(len(lat) * 0.70)]
+
+
+def nail_patches(J, src, bindex):
+    """Ten nails as (positions, normals, colours, bone), in Blender space.
+
+    Each is a curved grid wrapped onto the cylinder of its own fingertip, so it
+    follows the finger instead of hovering flat over it, and each is a single
+    outward-facing sheet: the material is `FrontSide` and the underside of a
+    nail is against the finger, so a closed shell would double the cost to hide
+    faces nothing can ever see.
+    """
+    pos, nrm, col, bone, tri = [], [], [], [], []
+    for side, s in ((1, "l"), (-1, "r")):
+        # The back of this hand: across the knuckles crossed with along the
+        # middle finger. The sign is settled by the thumb — it sits at lower |y|
+        # than the fingers do, the palm faces the thumb, so the dorsum is the
+        # side with the larger |y|.
+        across_hand = J["%s-finger-2-3" % s] - J["%s-finger-4-3" % s]
+        along_hand = J["%s-finger-3-4" % s] - J["%s-finger-3-1" % s]
+        dorsal = along_hand.cross(across_hand)
+        if dorsal.y * side < 0:
+            dorsal = -dorsal
+        dorsal.normalize()
+
+        for fi in (1, 2, 3, 4, 5):
+            m3 = J["%s-finger-%d-3" % (s, fi)]
+            m4 = J["%s-finger-%d-4" % (s, fi)]
+            d = m4 - m3
+            length = d.length
+            if length < 1e-4:
+                continue
+            axis = d.normalized()
+            # The nail normal is the hand's dorsum with any component along the
+            # finger taken out. For the four fingers that is a formality; for
+            # the thumb it is the whole calculation, since a thumb runs across
+            # the hand and its nail is the dorsum rotated most of a right angle.
+            n = dorsal - axis * dorsal.dot(axis)
+            if n.length < 1e-5:
+                continue
+            n.normalize()
+            # `n × axis` and not `axis × n`: the grid below runs +u then +v, so
+            # this is the choice that makes (u × v) come out along +n and the
+            # triangles face outwards. The other one builds ten nails that are
+            # invisible in the browser and perfectly fine in Blender, which does
+            # not cull backfaces.
+            across = n.cross(axis)
+            r = _finger_radius(src, m3, axis, length)
+            hw = NAIL_WIDE * r
+            style = NAIL_STYLES[fi - 1]
+            b = bindex["thumb" + ("L" if side > 0 else "R")] if fi == 1 \
+                else bindex["hand" + ("L" if side > 0 else "R")]
+
+            base = len(pos)
+            for i in range(NAIL_ROWS + 1):
+                u = i / NAIL_ROWS
+                w = hw * _nail_width(u)
+                for k in range(NAIL_COLS + 1):
+                    vn = -1.0 + 2.0 * k / NAIL_COLS
+                    uu = _nail_outline(u, vn)
+                    c = m3 + axis * (length
+                                     * (NAIL_FROM + (NAIL_TO - NAIL_FROM) * uu))
+                    off = w * vn
+                    # Height of the finger's own surface at this offset, so the
+                    # sheet is a section of the cylinder and not a flat card.
+                    h = math.sqrt(max(0.0, r * r - off * off))
+                    # Domed: proud in the middle, flush at the rim, so the edges
+                    # disappear into the finger instead of showing a lip.
+                    lift = NAIL_DOME * (1.0 - vn * vn)
+                    pos.append(c + across * off + n * (h + lift))
+                    nrm.append((across * off + n * h).normalized())
+                    col.append(_flame(_tongue(u, vn * side, style)))
+                    bone.append(b)
+            for i in range(NAIL_ROWS):
+                for k in range(NAIL_COLS):
+                    a0 = base + i * (NAIL_COLS + 1) + k
+                    b0 = a0 + 1
+                    c0 = a0 + (NAIL_COLS + 1)
+                    d0 = c0 + 1
+                    tri.append((a0, c0, d0))
+                    tri.append((a0, d0, b0))
+    return pos, nrm, col, bone, tri
+
+
+def nail_preview(J, body):
+    """The nails as a real object in the scene, so a render can show them.
+
+    Nothing exports this. It exists because the shipped nails are built inside
+    `export_skin`, straight into the output buffers, and are therefore invisible
+    to every camera in this file — which would leave the only way to look at a
+    flame being a full Blender run, a page build and a headless browser. It is
+    the same `nail_patches` call the exporter makes, so what this renders is
+    what ships, and it is rebuilt from scratch each time rather than updated.
+    """
+    old = bpy.data.objects.get("nails")
+    if old:
+        bpy.data.objects.remove(old, do_unlink=True)
+    zero = {"handL": 0, "handR": 0, "thumbL": 0, "thumbR": 0}
+    pos, nrm, col, _bone, tri = nail_patches(J, body.data, zero)
+    me = bpy.data.meshes.new("nails")
+    me.from_pydata([tuple(p) for p in pos], [], [list(t) for t in tri])
+    me.validate()
+    a_p = me.color_attributes.new("prev", "FLOAT_COLOR", "POINT")
+    a_m = me.color_attributes.new("mark", "FLOAT_COLOR", "POINT")
+    for i, c in enumerate(col):
+        a_p.data[i].color = (*c, 1.0)
+        a_m.data[i].color = (*c, 1.0)
+    for p in me.polygons:
+        p.use_smooth = True
+    ob = bpy.data.objects.new("nails", me)
+    bpy.context.collection.objects.link(ob)
+    if body.data.materials:
+        ob.data.materials.append(body.data.materials[0])
+    return ob
+
+
+def export_skin(body, rig, path, clips, tris=26000, J=None):
     """Write the figure as a .fr3d **v3** blob: mesh, skeleton and clips.
 
     v1 froze the armature into the vertices, which is why the promenade got a
@@ -1745,6 +2015,29 @@ def export_skin(body, rig, path, clips, tris=26000):
                 bidx.extend(wi)
                 bwgt.extend(ww)
             idx.append(j)
+
+    # ── the nails ──────────────────────────────────────────────────────────
+    # Appended straight to the buffers rather than joined to the mesh, because
+    # the mesh above has already been through the decimator and joining into it
+    # would mean either running the decimator again or teaching Blender's join
+    # about colour attributes and vertex groups it does not need to know about.
+    # These carry one bone at full weight, which is not an approximation: there
+    # are no finger bones, so a fingertip is rigid to its hand in every clip
+    # this figure has.
+    if J is None:
+        J, _js, _jd = read_joints(fetch())
+    npos, nnrm, ncol, nbone, ntri = nail_patches(J, src, bindex)
+    nail0 = len(pos) // 3
+    for k in range(len(npos)):
+        p, nv, c = npos[k], nnrm[k], ncol[k]
+        pos.extend((p.x, p.z, -p.y))
+        nrm.extend((nv.x, nv.z, -nv.y))
+        cols.extend(min(255, max(0, int(x * 255 + 0.5))) for x in c)
+        bidx.extend((nbone[k], 0, 0, 0))
+        bwgt.extend((255, 0, 0, 0))
+    for t in ntri:
+        idx.extend(nail0 + q for q in t)
+    print("[mh]   nails %d verts %d tris" % (len(npos), len(ntri)))
 
     baked = [_bake_clip(rest, c) for c in clips]
 
@@ -3110,6 +3403,14 @@ VIEWS = {
     # — the heart, the note — is 30 cm of pose on a 1.7 m figure, and "front" at
     # 4.2 m renders it about forty pixels across.
     "hands": (6.0, 8.0, 1.34, 1.35, 900, 900),
+    # The back of her left hand, close enough to count the nails.
+    #
+    # Every other entry in this table looks at the midline, which is right for a
+    # face and useless for a hand hanging half a metre out to the side, so this
+    # one carries its own (x, y) target — the two extra numbers on the end. The
+    # angle is not arbitrary either: it is 15° off the nail normal measured from
+    # the finger markers, because a nail seen edge-on is four pixels.
+    "nails": (58.0, 22.0, 1.005, 0.30, 900, 900, 0.283, 0.500),
     "face": (2.0, 2.0, 1.612, 0.46, 900, 900),
     "head": (30.0, 5.0, 1.615, 0.52, 900, 900),
     "prof": (88.0, 2.0, 1.615, 0.50, 900, 900),
@@ -3166,12 +3467,15 @@ def render(tag, names):
     bpy.context.collection.objects.link(cam)
     sc.camera = cam
     for name in names:
-        az, el, tz, rad, rx, ry = VIEWS[name]
+        v = VIEWS[name]
+        az, el, tz, rad, rx, ry = v[:6]
+        # Six numbers means the midline; eight carries its own (x, y) target.
+        tgt = Vector((v[6], v[7], tz)) if len(v) > 6 else Vector((0.0, 0.0, tz))
         a, e = math.radians(az), math.radians(el)
-        cam.location = (math.cos(a) * math.cos(e) * rad,
-                        math.sin(a) * math.cos(e) * rad,
-                        tz + math.sin(e) * rad)
-        d = Vector((0, 0, tz)) - cam.location
+        cam.location = tgt + Vector((math.cos(a) * math.cos(e) * rad,
+                                     math.sin(a) * math.cos(e) * rad,
+                                     math.sin(e) * rad))
+        d = tgt - cam.location
         cam.rotation_euler = d.to_track_quat("-Z", "Y").to_euler()
         sc.render.resolution_x, sc.render.resolution_y = rx, ry
         sc.render.filepath = "%s_%s_%s.png" % (PREVIEW, tag, name)
@@ -3260,7 +3564,8 @@ def main():
         _material(body)
         _lights()
         pose(rig, {})
-        render("face", ("face", "head", "prof"))
+        nail_preview(J, body)
+        render("face", ("face", "head", "prof", "nails"))
         # The jaw on its own, so the head stays where the close cameras are
         # pointed. The soaked pose leans 26° forward and takes her face clean
         # out of a frame that is 130 mm across — the first attempt at this
@@ -3274,6 +3579,21 @@ def main():
                     CLIPS)
         bpy.ops.wm.save_as_mainfile(filepath=str(BLEND))
         print("[mh] refaced %s" % BLEND)
+        return
+
+    # Just the nails: rebuild the preview object and take the one close render
+    # that shows them. No paint, no export, forty seconds — because a nail is
+    # 9 mm of a 1.7 m figure and getting the outline right is half a dozen
+    # looks, which through `--reface` would be half an hour of renders of a face
+    # that did not change.
+    if "--nails" in argv:
+        bpy.ops.wm.open_mainfile(filepath=str(BLEND))
+        body, rig = bpy.data.objects["human"], bpy.data.objects["rig"]
+        J, _scale, _drop = read_joints(fetch())
+        _lights()
+        pose(rig, {})
+        nail_preview(J, body)
+        render("nails", ("nails",))
         return
 
     # No render and no export: opens the blend, walks the frames and prints.

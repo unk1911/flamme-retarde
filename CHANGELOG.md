@@ -10,6 +10,72 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.39.0] — 2026-08-09
+
+### Added — ten nails, with a flame on each
+
+The interesting part is *when* they are built, and it is worth writing down
+because it bounds what this mesh can ever carry.
+
+Everything else on this figure is painted — a colour per vertex laid down
+through a cutter volume — and painting will not do here. Measured: the shipped
+body is 13 521 vertices, 475 of them on one hand and 181 on that hand's distal
+phalanges. Four fingertips share those 181 over about 800 mm² each, which is
+4.4 mm from one vertex to the next. A fingernail is 9 mm long. So a painted nail
+is **four vertices**, and four vertices will carry a colour and will not carry a
+picture. Nothing is wrong with the cutter machinery; there is not enough mesh
+there, and there cannot be — the decimator spends triangles where the silhouette
+needs them, and a nail changes no silhouette at all.
+
+So the nails are geometry laid on the body, and they are added **after** the
+decimator rather than before. That ordering is the whole trick. Added before, a
+9 mm plate is the first thing a collapse decimator eats: its edges are the
+shortest in the mesh, so its error is the lowest, so it is the cheapest thing in
+the model to delete. Added after, forty-two vertices stay forty-two vertices,
+which is 1.4 mm of resolution across a nail — twice what her face has.
+
+Cost: 420 vertices and 600 triangles, on 13 521 and 26 000.
+
+Each nail is a curved sheet wrapped onto the cylinder of its own fingertip,
+sized off a finger radius measured from the mesh rather than assumed, and bowed
+at both ends — the first cut was a plain grid and rendered ten rectangles with
+four square corners each, which is the unmistakable look of a sticker. The flame
+runs from a near-black red at the cuticle to white-hot at the free edge, bent
+sideways so it climbs as a tongue: a term that peaks in the middle of the nail
+draws one flame up the centre, a term that peaks at the edges draws two. Five
+designs, mirrored between the hands so the pair is a pair and not a copy. With
+forty-two vertices a nail holds one flame; it does not hold a scene.
+
+Two supporting bits: `VIEWS` entries may now carry their own (x, y) target — the
+other cameras all look at the midline, which is right for a face and useless for
+a hand hanging half a metre out to the side — and there is a `--nails` door that
+rebuilds the preview and takes one render in forty seconds, because getting an
+outline right is half a dozen looks and doing that through `--reface` is half an
+hour of re-rendering a face that did not change.
+
+### Fixed — her mouth was three lumps
+
+The awkwardness was not in any one number. A mouth is a curve and three
+ellipsoids cannot be a curve: the middle shell sat flat across 27 mm, the two
+corner shells sat flat across 22 mm each and 3.2 mm higher, and where they met
+there was a step. That is a lip line in three straight runs with two kinks in
+it — and because the corner shells overlapped the middle one for half their
+length, the mouth was also visibly taller at exactly the two places the kinks
+were. Nothing in a render says "the corner shell is 3.2 mm too high"; it says
+her mouth is a shape you cannot name.
+
+Nine shells on a parabola now, with three things varying together along it,
+because all three are what a mouth does: it lifts towards the corners (kept from
+before — a resting mouth over the top of everything else she does reads as
+somebody enduring it), it runs *back* towards the corners, because a face is
+round and a lip line that keeps its depth wraps out past the cheek, and it gets
+thinner towards the corners, which is the one three lumps could not do at all
+and the one that reads most as a mouth.
+
+Overlapping cutters are fine here and only here: parity is a property of a
+single closed shell, and these are nine separate volumes tested independently,
+not nine halves of one.
+
 ## [1.38.0] — 2026-08-09
 
 ### Changed — Jadrija is a Tuesday now, not an August Saturday
