@@ -1205,9 +1205,13 @@ def cutters(J):
     # shows is not the cutter, it is the halo the decimator smears past it.
     #
     # So: nothing. Between the tassels you can see her, which is what a fringe
-    # is. This is also the first thing the new `baseP` reset is good for — before
-    # it, deleting this cutter would have changed nothing at all, because the
-    # colour it last painted would simply have stayed on her forever.
+    # is.
+    #
+    # Deleting the entry is not on its own enough to get the colour off her, and
+    # the release that did it shipped believing otherwise. `paint` resets from
+    # `baseP`, and `baseP` had been seeded by snapshotting the figure while the
+    # lining was still painted on — so the lining *was* the base, and the reset
+    # restored it every run. See `--rebase`, which no longer snapshots.
     return out
 
 
@@ -3938,21 +3942,38 @@ def main():
     # rounds was settled from a headless browser screenshot, and the Blender
     # previews were overexposed by two stops and actively misleading about all
     # of them.
-    # One-off migration: give the existing blend the base colours that `paint`
-    # now resets from, and scrub the paint that had already been orphaned before
-    # they existed.
+    # Give the existing blend the base colours that `paint` resets from.
     #
-    # The clean way to seed them is a build from scratch, where every vertex's
-    # colour is known before a cutter has touched it. That is not the cheap way
-    # — it re-solves the weights, so everything about the figure moves a little
-    # — and the blend in hand is good. So the base is snapshotted from what is
-    # there, with one correction: any vertex still wearing a *retired* palette
-    # colour goes back to skin. Those are exactly the vertices the old bug
-    # stranded, and the colour is enough to find them because it is one no
-    # cutter in this file paints any more.
+    # ── the first version of this, and why it made things worse ──────────────
     #
-    # This is a migration and not a mechanism. Run once, then never again: from
-    # here on `paint` resets from the base and nothing can be stranded.
+    # It snapshotted `mark`/`prev` as they stood, correcting only vertices
+    # wearing a hand-maintained tuple of *retired* palette colours. That works
+    # exactly once, for the colours you remember to list. What it actually did
+    # was promote the paint that was on her at that moment to the status of
+    # ground truth: 406 vertices of the near-black scarf lining became the base,
+    # deleting the lining's cutter the next release changed nothing at all, and
+    # `paint` faithfully restored a dark patch across her hips on every run
+    # afterwards. A stranded colour had been turned into a permanent one, by the
+    # very pass whose docstring promises nothing can be stranded again.
+    #
+    # ── what the base actually is ────────────────────────────────────────────
+    #
+    # The figure with no cutters. Not "the figure as last painted, minus the
+    # mistakes I can name".
+    #
+    # On the body shell that is skin, flat, with no exceptions: every non-skin
+    # thing on her body — lips, areolae, brows, the lot — is drawn by a cutter
+    # in `cutters(J)` and redrawn from scratch on every run, so resetting the
+    # shell to skin loses nothing that is not immediately repainted. The loose
+    # shells are the exceptions and the only ones: the eyeballs, lashes, teeth
+    # and tongue arrive as their own objects, and the hair, anklets and septum
+    # are coloured in `extras`; no cutter touches any of them, so they keep what
+    # they have.
+    #
+    # That is the same split `skin` already makes — biggest island is the body,
+    # everything else is loose — and it needs no palette bookkeeping, so it
+    # cannot rot the way the retired-colour list rotted. Re-runnable by
+    # construction: run it whenever the reset looks untrustworthy.
     if "--rebase" in argv:
         bpy.ops.wm.open_mainfile(filepath=str(BLEND))
         body, rig = bpy.data.objects["human"], bpy.data.objects["rig"]
@@ -3967,22 +3988,22 @@ def main():
         a_p = me.color_attributes["prev"]
         a_bm = me.color_attributes["baseM"]
         a_bp = me.color_attributes["baseP"]
-        # Colours no cutter paints any more. `SUIT_P` is the blue swimsuit the
-        # hip scarf replaced; 137 vertices of it were still on her thighs.
-        retired = (SUIT_P,)
-        fixed = 0
+        lab, sizes = islands(me)
+        shell = max(range(len(sizes)), key=lambda i: sizes[i])
+        stripped = 0
         for i in range(len(me.vertices)):
-            c = tuple(a_p.data[i].color)[:3]
-            if any(all(abs(c[k] - r[k]) < 0.01 for k in range(3))
-                   for r in retired):
+            if lab[i] == shell:
+                c = tuple(a_p.data[i].color)[:3]
+                if any(abs(c[k] - SKIN_P[k]) > 0.004 for k in range(3)):
+                    stripped += 1
                 a_bm.data[i].color = (*SKIN_M, 1.0)
                 a_bp.data[i].color = (*SKIN_P, 1.0)
-                fixed += 1
             else:
                 a_bm.data[i].color = a_m.data[i].color
                 a_bp.data[i].color = a_p.data[i].color
-        print("[mh] rebase: %d verts, %d stranded verts returned to skin"
-              % (len(me.vertices), fixed))
+        print("[mh] rebase: body shell %d verts (%d were not skin, now are), "
+              "%d loose verts keep their colour"
+              % (sizes[shell], stripped, len(me.vertices) - sizes[shell]))
         paint(body, cutters(J))
         _material(body)
         pose(rig, {})

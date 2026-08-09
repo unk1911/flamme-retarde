@@ -10,6 +10,37 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.43.0] — 2026-08-09
+
+### Fixed
+
+- The painted patch across her hips is off her, for real this time. Three
+  releases claimed it and none of them checked; this one was found by decoding
+  the shipped blob, where 406 body vertices were still carrying the near-black
+  of the scarf lining, spreading down her thighs to well below the hem. At
+  game brightness against a blue sky a dark desaturated smear on skin reads as
+  spray paint, which is what it was called and what it was.
+
+  The reason it survived 1.41.0 and 1.42.0 is that 1.41.0 broke it. `paint`
+  resets every vertex from `baseM`/`baseP` before the cutters run, and
+  `--rebase` seeded those by *snapshotting the figure as it stood* — with the
+  lining painted on — correcting only vertices wearing a hand-listed tuple of
+  retired colours. So the lining became the base. Deleting its cutter in 1.42.0
+  changed nothing, and every run since had been restoring the patch on purpose.
+  A stranded colour had been promoted to a permanent one by the pass whose
+  docstring promises nothing can be stranded again.
+
+### Changed
+
+- `--rebase` no longer snapshots. The base is *the figure with no cutters*:
+  flat skin across the body shell, and their own colours for the loose shells
+  (eyeballs, lashes, teeth, tongue, hair, anklets, septum), which is the split
+  `skin` already makes and the exact set of things no cutter redraws. Every
+  non-skin feature on the body — lips, brows, areolae — is repainted from
+  `cutters(J)` on every run, so resetting the shell to skin loses nothing.
+  No palette bookkeeping, so nothing to forget to update, and re-runnable by
+  construction rather than a one-off migration.
+
 ## [1.42.0] — 2026-08-09
 
 ### Removed — the painted garment, all of it
