@@ -1185,31 +1185,29 @@ def cutters(J):
         (J["head"].x - 0.090, 0.0, J["neck"].z + 0.058),
         (0.105, 0.070, 0.085), rows=14, seg=22)
 
-    # What used to be swim shorts, and is now a lining.
+    # There is no painted garment on this figure any more, and that is the whole
+    # of the entry. She wears geometry (see `hip_scarf`) and nothing else.
     #
-    # As a garment this was one ellipsoid painting one flat blue shape across
-    # her hips, which is what a swimsuit looks like when it is a colour rather
-    # than a thing — no hem, no edge that follows a leg, nothing that reads as
-    # cloth from any distance at all. The garment is now real geometry (see
-    # `hip_scarf`), and all this has left to do is make sure no skin shows
-    # between the hem of the wrap and the tops of the tassels.
+    # The last version of this was a "lining" — the same ellipsoid, shrunk to sit
+    # inside the wrap and recoloured to the wrap's own near-black — whose job was
+    # to stop skin showing between the hem and the tops of the tassels. It was
+    # written with the note "if you can see this at all, something is wrong with
+    # the scarf", and you could see it, and the note was wrong about why.
     #
-    # So: the same volume, pulled in at the hem to sit inside the wrap rather
-    # than below it, and in the wrap's own near-black instead of blue. If you
-    # can see this at all, something is wrong with the scarf.
-    # Sized in absolute z rather than off the knee marker, because what it has
-    # to line up with is the wrap and not a leg: it runs from just inside the
-    # wrap's lowest top edge down to 3 cm below its hem, and no further. The
-    # top matters as much as the bottom: the wrap's top edge is 2 cm lower front
-    # and back than at the hips, so a lining that stops at a level 0.975 leaves
-    # three and a half centimetres of it showing above the cloth across the
-    # small of her back. Derived from
-    # the knee it reached z = 0.705, which is fourteen centimetres of dark paint
-    # down the front of both thighs — the very thing the wrap was built to get
-    # rid of, in a new colour.
-    hip = J["l-upper-leg"]
-    add("trunks", SCARF_DARK, SCARF_DARK, 2,
-        (hip.x, 0.0, 0.868), (0.180, 0.230, 0.072), rows=18, seg=28)
+    # A cutter has a sharp boundary. Painted colour does not: the export
+    # decimator collapses edges and *averages* the colours of the vertices it
+    # merges, so a boundary that is a clean line on the 218 000-vertex mesh
+    # arrives in the game as a gradient several centimetres wide. Every painted
+    # feature on her is soft at the edge for this reason, which is invisible on a
+    # mouth (the softness is smaller than the lip) and invisible on an areola,
+    # and is the entire appearance of a large flat patch: it reads as spray
+    # paint. Tucking the cutter under the cloth does not help, because what
+    # shows is not the cutter, it is the halo the decimator smears past it.
+    #
+    # So: nothing. Between the tassels you can see her, which is what a fringe
+    # is. This is also the first thing the new `baseP` reset is good for — before
+    # it, deleting this cutter would have changed nothing at all, because the
+    # colour it last painted would simply have stayed on her forever.
     return out
 
 

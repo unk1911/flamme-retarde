@@ -10,6 +10,35 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.42.0] — 2026-08-09
+
+### Removed — the painted garment, all of it
+
+1.41.0 took the *blue* off her and left the thing that actually looked like
+spray paint. The lining survived that release — the same ellipsoid, shrunk to
+sit inside the wrap and recoloured to the wrap's near-black — carrying the note
+"if you can see this at all, something is wrong with the scarf". You could see
+it. The note was wrong about why.
+
+A cutter has a sharp boundary; painted colour does not. The export decimator
+collapses edges and **averages** the colours of the vertices it merges, so a
+boundary that is a clean line on the 218 000-vertex mesh arrives in the game as
+a gradient several centimetres wide. Every painted feature on her is soft at the
+edge for this reason. On a mouth it is invisible, because the softness is
+smaller than the lip. On an areola it is invisible. On a large flat patch it is
+the entire appearance of the thing: it reads as an airbrush. Shrinking the
+cutter and tucking it under the cloth could never fix that, because what shows
+is not the cutter — it is the halo the decimator smears past it.
+
+So there is no painted garment on the figure at all now. She wears geometry and
+nothing else, and between the tassels you can see her, which is what a fringe
+is.
+
+This is also the first thing 1.41.0's `baseP` reset was good for: before it,
+deleting the cutter would have changed nothing whatsoever, because the colour it
+last painted would simply have stayed on her forever. `paint` now reports no
+`trunks` coat and the skin comes back.
+
 ## [1.41.0] — 2026-08-09
 
 ### Fixed — the blue swimsuit was still on her, and `paint` could never remove it
