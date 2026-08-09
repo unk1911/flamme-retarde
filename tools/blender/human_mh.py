@@ -1144,13 +1144,31 @@ def cutters(J):
         (J["head"].x - 0.090, 0.0, J["neck"].z + 0.058),
         (0.105, 0.070, 0.085), rows=14, seg=22)
 
-    # Swim shorts. Sized off the hip and knee markers so they follow the mesh
-    # rather than being dialled in against it.
-    hip, knee = J["l-upper-leg"], J["l-knee"]
-    hem = knee.z + (hip.z - knee.z) * 0.50
-    add("trunks", SUIT_M, SUIT_P, 2,
-        (hip.x, 0.0, (hip.z + hem) * 0.5 + 0.020),
-        (0.180, 0.230, (hip.z - hem) * 0.5 + 0.075), rows=18, seg=28)
+    # What used to be swim shorts, and is now a lining.
+    #
+    # As a garment this was one ellipsoid painting one flat blue shape across
+    # her hips, which is what a swimsuit looks like when it is a colour rather
+    # than a thing — no hem, no edge that follows a leg, nothing that reads as
+    # cloth from any distance at all. The garment is now real geometry (see
+    # `hip_scarf`), and all this has left to do is make sure no skin shows
+    # between the hem of the wrap and the tops of the tassels.
+    #
+    # So: the same volume, pulled in at the hem to sit inside the wrap rather
+    # than below it, and in the wrap's own near-black instead of blue. If you
+    # can see this at all, something is wrong with the scarf.
+    # Sized in absolute z rather than off the knee marker, because what it has
+    # to line up with is the wrap and not a leg: it runs from just inside the
+    # wrap's lowest top edge down to 3 cm below its hem, and no further. The
+    # top matters as much as the bottom: the wrap's top edge is 2 cm lower front
+    # and back than at the hips, so a lining that stops at a level 0.975 leaves
+    # three and a half centimetres of it showing above the cloth across the
+    # small of her back. Derived from
+    # the knee it reached z = 0.705, which is fourteen centimetres of dark paint
+    # down the front of both thighs — the very thing the wrap was built to get
+    # rid of, in a new colour.
+    hip = J["l-upper-leg"]
+    add("trunks", SCARF_DARK, SCARF_DARK, 2,
+        (hip.x, 0.0, 0.868), (0.180, 0.230, 0.072), rows=18, seg=28)
     return out
 
 
@@ -1872,7 +1890,268 @@ def nail_patches(J, src, bindex):
     return pos, nrm, col, bone, tri
 
 
-def nail_preview(J, body):
+# --------------------------------------------------------------------------- #
+#  the hip scarf, and a bracelet                                               #
+# --------------------------------------------------------------------------- #
+#
+# Both here for the nails' reason — they are laid on after the decimator, so
+# their resolution is chosen rather than survived. For the scarf that is not a
+# nicety: the whole point of the thing is that it is a *net*, and a net is a
+# pattern, and a pattern needs enough vertices to be a pattern. Run through the
+# collapse decimator at 6% a 315-vertex wrap comes out as nineteen vertices and
+# a smear.
+#
+# What it replaces is the `trunks` cutter — one ellipsoid painting one flat blue
+# shape across her hips, which is what a swimsuit looks like when it is a colour
+# rather than a garment. The cutter is still there but it is now a near-black
+# lining that the wrap sits over, sized smaller than the wrap: it exists so that
+# nothing shows through the gap between the hem and the top of the fringe, and
+# it is never the thing you are looking at.
+
+SCARF_TOP = 0.960         # z of the top edge, on the iliac crest
+SCARF_HEM = 0.828         # and of the hem, which is level with the crotch
+SCARF_SEG, SCARF_ROWS = 44, 6
+SCARF_GAP = 0.004         # how far off the skin it sits
+SCARF_DARK = (0.078, 0.073, 0.086)
+SCARF_LITE = (0.345, 0.330, 0.365)
+FRINGE_N = 2          # tassels per segment of the hem
+FRINGE_R = 0.0024
+SCARF_CX = 0.015          # the body's axis at hip height, off the pelvis marker
+
+
+def _profile(mesh, z0, z1, rows, bins, cx, rlim=0.30):
+    """The body's silhouette as max radius per (height, angle).
+
+    Measured off the mesh, because a hip is not a cylinder and a wrap that is
+    one stands 3 cm off her at the front and cuts into her at the sides. `rlim`
+    throws away the arms, which at hip height are 50 cm out and would otherwise
+    be the maximum at every angle they cover.
+    """
+    dz = (z1 - z0) / (rows - 1)
+    tau = math.pi * 2.0
+    tab = [[0.0] * bins for _ in range(rows)]
+    for v in mesh.vertices:
+        p = v.co
+        if p.z < z0 - dz or p.z > z1 + dz:
+            continue
+        dx, dy = p.x - cx, p.y
+        r = math.hypot(dx, dy)
+        if r > rlim:
+            continue
+        i = max(0, min(rows - 1, int(round((p.z - z0) / dz))))
+        b = int((math.atan2(dy, dx) % tau) / tau * bins) % bins
+        if r > tab[i][b]:
+            tab[i][b] = r
+    for row in tab:
+        seen = [x for x in row if x > 0]
+        fill = sum(seen) / len(seen) if seen else 0.18
+        for k in range(bins):
+            if row[k] <= 0:
+                row[k] = fill
+    return tab, z0, dz
+
+
+def _profile_at(prof, z, ang):
+    """Bilinear lookup into `_profile`'s table, wrapping in angle."""
+    tab, z0, dz = prof
+    rows, bins = len(tab), len(tab[0])
+    tau = math.pi * 2.0
+    f = max(0.0, min(rows - 1.001, (z - z0) / dz))
+    i0 = int(f)
+    ti = f - i0
+    g = (ang % tau) / tau * bins
+    b0 = int(g) % bins
+    tb = g - int(g)
+    b1 = (b0 + 1) % bins
+    lo = tab[i0][b0] * (1 - tb) + tab[i0][b1] * tb
+    hi = tab[i0 + 1][b0] * (1 - tb) + tab[i0 + 1][b1] * tb
+    return lo * (1 - ti) + hi * ti
+
+
+def _scarf_hem(a):
+    """Where the wrap stops, per angle. Low on her left hip, where it is tied."""
+    return SCARF_HEM - 0.032 * max(0.0, math.cos(a - math.pi * 0.5)) ** 2
+
+
+def _scarf_top(a):
+    """And where it starts. Not a level ring — that is the one thing that made
+    the first cut read as a stiff band clamped round her rather than as cloth.
+    Highest over the two hip bones and 2 cm lower front and back, which is where
+    a wrap sits when a person has actually tied one on."""
+    return SCARF_TOP - 0.020 * abs(math.cos(a))
+
+
+def _strand(top, along, length, r, colour, out):
+    """One tassel: a three-sided prism, capped at both ends.
+
+    Three sides rather than four because a strand is two millimetres across and
+    the difference is invisible, and capped because the material is `FrontSide`
+    and an open tube is a hole you can see up.
+    """
+    pos, nrm, col, tri = out
+    up = Vector((0.0, 0.0, 1.0))
+    u = along.cross(up)
+    if u.length < 1e-5:
+        u = Vector((1.0, 0.0, 0.0))
+    u.normalize()
+    w = along.cross(u).normalized()
+    base = len(pos)
+    for end in (0, 1):
+        c = top + along * (length * end)
+        for k in range(3):
+            a = math.pi * 2.0 * k / 3.0
+            d = u * math.cos(a) + w * math.sin(a)
+            pos.append(c + d * r)
+            nrm.append(d)
+            # The tip of a tassel catches the light; the root is in shadow
+            # against the wrap and is the same black as it.
+            col.append(colour if end == 0 else
+                       tuple(min(1.0, q * 1.9 + 0.06) for q in colour))
+    # Same handedness trap as the wrap: (u, w, along) is right-handed, so going
+    # round the ring the natural way and down the strand gives inward faces.
+    for k in range(3):
+        k2 = (k + 1) % 3
+        tri.append((base + k, base + 3 + k2, base + 3 + k))
+        tri.append((base + k, base + k2, base + 3 + k2))
+    tri.append((base + 0, base + 1, base + 2))          # cap at the root
+    tri.append((base + 5, base + 4, base + 3))          # and at the tip
+    return 6
+
+
+def hip_scarf(mesh, out):
+    """The wrap and its fringe. Everything rigid to the pelvis, which is right:
+    a hip scarf is tied to the hips and does not follow a knee."""
+    pos, nrm, col, tri = out
+    prof = _profile(mesh, 0.80, 0.98, 10, SCARF_SEG, SCARF_CX)
+    tau = math.pi * 2.0
+    made = 0
+
+    base = len(pos)
+    for i in range(SCARF_ROWS + 1):
+        rv = i / SCARF_ROWS
+        for k in range(SCARF_SEG + 1):
+            a = tau * (k % SCARF_SEG) / SCARF_SEG
+            top = _scarf_top(a)
+            z = top + (_scarf_hem(a) - top) * rv
+            # A shade more clearance at the hem than at the waist, so the free
+            # edge stands off the thigh instead of sinking into it.
+            r = _profile_at(prof, z, a) + SCARF_GAP + 0.004 * rv
+            d = Vector((math.cos(a), math.sin(a), 0.0))
+            pos.append(Vector((SCARF_CX, 0.0, z)) + d * r)
+            nrm.append(d)
+            # A checker laid on the *vertices* rather than the faces: every quad
+            # then has two light corners and two dark ones on its diagonals, and
+            # the interpolation across it turns that into a soft diamond weave.
+            # A face checker at this cell size would be a chessboard.
+            col.append(SCARF_LITE if (i + k) % 2 == 0 else SCARF_DARK)
+    # Wound the other way round from the obvious one. `k` runs anticlockwise
+    # seen from above and `i` runs *downwards*, so (along k) x (down) points at
+    # the body's axis, not away from it — the natural order builds the wrap
+    # inside out. It is not a subtle failure and it does not look like one: the
+    # material is `FrontSide`, so every near face is culled and what you see is
+    # the inside of the far half of the wrap, which reads as a smudge in roughly
+    # the right place and had me looking at the paint underneath for it.
+    for i in range(SCARF_ROWS):
+        for k in range(SCARF_SEG):
+            a0 = base + i * (SCARF_SEG + 1) + k
+            tri.append((a0, a0 + SCARF_SEG + 1, a0 + SCARF_SEG + 2))
+            tri.append((a0, a0 + SCARF_SEG + 2, a0 + 1))
+    made += (SCARF_ROWS + 1) * (SCARF_SEG + 1)
+
+    # The fringe, one strand per segment, longest where the wrap is tied — which
+    # is what makes a knot read without modelling one: a knot is a lump you have
+    # to get right, and a bundle of tassels twice as long as the rest says the
+    # same thing and cannot be got wrong.
+    for kk in range(SCARF_SEG * FRINGE_N):
+        k = kk / FRINGE_N
+        a = tau * k / SCARF_SEG
+        z = _scarf_hem(a)
+        r = _profile_at(prof, z, a) + SCARF_GAP + 0.004
+        d = Vector((math.cos(a), math.sin(a), 0.0))
+        top = Vector((SCARF_CX, 0.0, z)) + d * r
+        tie = max(0.0, math.cos(a - math.pi * 0.5)) ** 3
+        length = 0.046 + 0.070 * tie + 0.013 * math.sin(kk * 2.3)
+        # Hanging very slightly outward, because a thigh narrows on the way down
+        # and a strand dropped dead vertical from the widest part of a hip ends
+        # up inside it.
+        along = Vector((d.x * 0.10, d.y * 0.10, -1.0)).normalized()
+        made += _strand(top, along, length, FRINGE_R, SCARF_DARK, out)
+    return made
+
+
+def wrist_band(J, mesh, out):
+    """One bracelet, on her right wrist. Gold, like the anklets.
+
+    Built about the *forearm* axis rather than the vertical one `ring()` uses.
+    Her forearms in the rest pose run forward, outward and down all at once —
+    (0.72, 0.52, -0.46) — so a band built about world Z would sit on her wrist
+    at a 60° tilt, which is not a bracelet, it is a bracelet caught mid-fall.
+    """
+    pos, nrm, col, tri = out
+    elbow, wrist = J["r-elbow"], J["r-hand"]
+    axis = (wrist - elbow).normalized()
+    centre = wrist - axis * 0.022          # up the forearm, clear of the joint
+    lat = []
+    for v in mesh.vertices:
+        d = v.co - centre
+        if abs(d.dot(axis)) < 0.007 and d.length < 0.070:
+            lat.append((d - axis * d.dot(axis)).length)
+    lat.sort()
+    r = lat[int(len(lat) * 0.82)] if len(lat) > 8 else 0.026
+    print("[mh]   wrist band r %.4f from %d verts" % (r, len(lat)))
+    up = Vector((0.0, 0.0, 1.0))
+    u = axis.cross(up).normalized()
+    w = axis.cross(u).normalized()
+    seg, ring_seg, wire = 20, 6, 0.0032
+    tau = math.pi * 2.0
+    base = len(pos)
+    for i in range(seg):
+        a = tau * i / seg
+        d = u * math.cos(a) + w * math.sin(a)
+        c = centre + d * r
+        for k in range(ring_seg):
+            b = tau * k / ring_seg
+            n = (d * math.cos(b) + axis * math.sin(b)).normalized()
+            pos.append(c + n * wire)
+            nrm.append(n)
+            col.append(ANKLET_P)
+    for i in range(seg):
+        i2 = (i + 1) % seg
+        for k in range(ring_seg):
+            k2 = (k + 1) % ring_seg
+            a0 = base + i * ring_seg + k
+            b0 = base + i * ring_seg + k2
+            c0 = base + i2 * ring_seg + k
+            d0 = base + i2 * ring_seg + k2
+            tri.append((a0, c0, d0))
+            tri.append((a0, d0, b0))
+    return seg * ring_seg
+
+
+def post_geometry(J, src, mesh, bindex):
+    """Everything laid on after the decimator: ten nails, a wrap, a bracelet.
+
+    `src` is the decimated mesh — used only to measure a fingertip, where the
+    two differ by nothing that matters — and `mesh` is the full one, used where
+    a silhouette has to be traced properly.
+    """
+    pos, nrm, col, bone, tri = [], [], [], [], []
+    npos, nnrm, ncol, nbone, ntri = nail_patches(J, src, bindex)
+    pos += npos
+    nrm += nnrm
+    col += ncol
+    bone += nbone
+    tri += ntri
+
+    out = (pos, nrm, col, tri)
+    n = hip_scarf(mesh, out)
+    bone += [bindex["pelvis"]] * n
+    n = wrist_band(J, mesh, out)
+    bone += [bindex["armLR"]] * n
+    return pos, nrm, col, bone, tri
+
+
+def post_preview(J, body):
     """The nails as a real object in the scene, so a render can show them.
 
     Nothing exports this. It exists because the shipped nails are built inside
@@ -1885,8 +2164,9 @@ def nail_preview(J, body):
     old = bpy.data.objects.get("nails")
     if old:
         bpy.data.objects.remove(old, do_unlink=True)
-    zero = {"handL": 0, "handR": 0, "thumbL": 0, "thumbR": 0}
-    pos, nrm, col, _bone, tri = nail_patches(J, body.data, zero)
+    zero = {n: 0 for n in ("handL", "handR", "thumbL", "thumbR",
+                           "pelvis", "armLL", "armLR")}
+    pos, nrm, col, _bone, tri = post_geometry(J, body.data, body.data, zero)
     me = bpy.data.meshes.new("nails")
     me.from_pydata([tuple(p) for p in pos], [], [list(t) for t in tri])
     me.validate()
@@ -2026,8 +2306,8 @@ def export_skin(body, rig, path, clips, tris=26000, J=None):
     # this figure has.
     if J is None:
         J, _js, _jd = read_joints(fetch())
-    npos, nnrm, ncol, nbone, ntri = nail_patches(J, src, bindex)
-    nail0 = len(pos) // 3
+    npos, nnrm, ncol, nbone, ntri = post_geometry(J, src, body.data, bindex)
+    lay0 = len(pos) // 3
     for k in range(len(npos)):
         p, nv, c = npos[k], nnrm[k], ncol[k]
         pos.extend((p.x, p.z, -p.y))
@@ -2036,8 +2316,9 @@ def export_skin(body, rig, path, clips, tris=26000, J=None):
         bidx.extend((nbone[k], 0, 0, 0))
         bwgt.extend((255, 0, 0, 0))
     for t in ntri:
-        idx.extend(nail0 + q for q in t)
-    print("[mh]   nails %d verts %d tris" % (len(npos), len(ntri)))
+        idx.extend(lay0 + q for q in t)
+    print("[mh]   laid on %d verts %d tris (nails, wrap, band)"
+          % (len(npos), len(ntri)))
 
     baked = [_bake_clip(rest, c) for c in clips]
 
@@ -3411,6 +3692,9 @@ VIEWS = {
     # angle is not arbitrary either: it is 15° off the nail normal measured from
     # the finger markers, because a nail seen edge-on is four pixels.
     "nails": (58.0, 22.0, 1.005, 0.30, 900, 900, 0.283, 0.500),
+    # The wrap, from the front and from the side she ties it on.
+    "hips": (18.0, 6.0, 0.880, 1.55, 820, 900),
+    "hipside": (96.0, 5.0, 0.880, 1.55, 820, 900),
     "face": (2.0, 2.0, 1.612, 0.46, 900, 900),
     "head": (30.0, 5.0, 1.615, 0.52, 900, 900),
     "prof": (88.0, 2.0, 1.615, 0.50, 900, 900),
@@ -3555,6 +3839,31 @@ def main():
     # open without taking the skull with it — are one paint change and one
     # weight change, and running half of that is how you end up looking at a
     # render and drawing a conclusion about the wrong half.
+    # Paint and export, and not one pixel of render.
+    #
+    # `--reface` is ten EEVEE frames at thirty to sixty seconds each, which is
+    # five to nine minutes of a run whose useful work — re-weight, re-paint,
+    # re-export — is under a minute. That trade is right when the thing being
+    # changed is a face, because a face is only knowable from a render. It is
+    # exactly wrong when the change is a number that will be judged in the game
+    # instead: every colour and every millimetre settled here in the last few
+    # rounds was settled from a headless browser screenshot, and the Blender
+    # previews were overexposed by two stops and actively misleading about all
+    # of them.
+    if "--repaint" in argv:
+        bpy.ops.wm.open_mainfile(filepath=str(BLEND))
+        body, rig = bpy.data.objects["human"], bpy.data.objects["rig"]
+        J, _scale, _drop = read_joints(fetch())
+        skin(body, rig)
+        paint(body, cutters(J))
+        _material(body)
+        pose(rig, {})
+        export_skin(body, rig, ROOT / "build" / "payload" / "human_skin.fr3d.gz",
+                    CLIPS, J=J)
+        bpy.ops.wm.save_as_mainfile(filepath=str(BLEND))
+        print("[mh] repainted %s" % BLEND)
+        return
+
     if "--reface" in argv:
         bpy.ops.wm.open_mainfile(filepath=str(BLEND))
         body, rig = bpy.data.objects["human"], bpy.data.objects["rig"]
@@ -3564,7 +3873,7 @@ def main():
         _material(body)
         _lights()
         pose(rig, {})
-        nail_preview(J, body)
+        post_preview(J, body)
         render("face", ("face", "head", "prof", "nails"))
         # The jaw on its own, so the head stays where the close cameras are
         # pointed. The soaked pose leans 26° forward and takes her face clean
@@ -3581,19 +3890,19 @@ def main():
         print("[mh] refaced %s" % BLEND)
         return
 
-    # Just the nails: rebuild the preview object and take the one close render
-    # that shows them. No paint, no export, forty seconds — because a nail is
-    # 9 mm of a 1.7 m figure and getting the outline right is half a dozen
-    # looks, which through `--reface` would be half an hour of renders of a face
-    # that did not change.
-    if "--nails" in argv:
+    # Just the laid-on geometry — nails, wrap, bracelet: rebuild the preview
+    # object and take the three close renders that show them. No paint, no
+    # export, under a minute. These are all small features on a 1.7 m figure and
+    # getting one right is half a dozen looks, which through `--reface` would be
+    # half an hour of re-rendering a face that did not change.
+    if "--trinkets" in argv:
         bpy.ops.wm.open_mainfile(filepath=str(BLEND))
         body, rig = bpy.data.objects["human"], bpy.data.objects["rig"]
         J, _scale, _drop = read_joints(fetch())
         _lights()
         pose(rig, {})
-        nail_preview(J, body)
-        render("nails", ("nails",))
+        post_preview(J, body)
+        render("trinket", ("nails", "hips", "hipside"))
         return
 
     # No render and no export: opens the blend, walks the frames and prints.

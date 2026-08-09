@@ -10,6 +10,86 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.40.0] — 2026-08-09
+
+### Changed — the painted swimsuit is gone; she is wearing a hip scarf
+
+What was there was one ellipsoid painting one flat blue shape across her hips,
+which is what a swimsuit looks like when it is a colour rather than a garment:
+no hem, no edge that follows a leg, nothing that reads as cloth from any
+distance at all. It is now real geometry — a wrap and its fringe — laid on after
+the decimator for the nails' reason, and here that is not a nicety. The point of
+the thing is that it is a *net*, a net is a pattern, and a pattern needs enough
+vertices to be one. Through the collapse decimator at 6%, a 315-vertex wrap
+comes out as nineteen vertices and a smear.
+
+The wrap follows a silhouette **measured off the mesh** — max radius per height
+and angle, with the arms thrown out of the sample because at hip height they are
+50 cm out and would otherwise be the maximum at every angle they cover. A hip is
+not a cylinder, and a wrap that assumes one stands 3 cm off her at the front and
+cuts into her at the sides.
+
+Three things about it are worth keeping:
+
+- **The weave is a vertex checker, not a face checker.** Laid on the vertices,
+  every quad gets two light corners and two dark ones on its diagonals, and the
+  interpolation across it turns that into a soft diamond weave. A face checker
+  at this cell size would be a chessboard.
+- **The top edge is not a level ring.** That was the single thing making the
+  first cut read as a stiff band clamped round her: it is now 2 cm lower front
+  and back than over the two hip bones, which is where a wrap sits when somebody
+  has actually tied one on.
+- **There is no knot.** The fringe is simply twice as long where the wrap is
+  tied. A knot is a lump you have to get right; a bundle of long tassels says
+  the same thing and cannot be got wrong.
+
+The `trunks` cutter survives as a **lining** in the wrap's own near-black,
+sized in absolute z rather than off the knee marker — because what it has to
+line up with is the wrap, not a leg. Derived from the knee it reached z = 0.705,
+which is fourteen centimetres of dark paint down the front of both thighs: the
+very thing the wrap was built to get rid of, in a new colour. It now runs from
+just inside the top edge to 3 cm below the hem. If you can see it at all,
+something is wrong with the scarf.
+
+### Added — a bracelet on her right wrist
+
+Gold, like the anklets, and built about the *forearm* axis rather than the
+vertical one `ring()` uses. Her forearms in the rest pose run forward, outward
+and down all at once — (0.72, 0.52, −0.46) — so a band built about world Z sits
+on her wrist at a 60° tilt, which is not a bracelet, it is a bracelet caught
+mid-fall. The radius is measured off the mesh: 25.3 mm.
+
+### Fixed — the wrap and the tassels were inside out
+
+Worth writing down, because it is a failure that does not look like one. `k`
+runs anticlockwise seen from above and `i` runs downwards, so (along k) × (down)
+points at the body's axis rather than away from it, and the obvious triangle
+order builds the whole wrap inward-facing. The material is `FrontSide`, so every
+near face was culled and what showed was the *inside of the far half* — a smudge
+in roughly the right place, at roughly the right size, in the right colour. It
+took a hunt through the paint underneath before the geometry was suspected at
+all. The tassels had the identical bug for the identical reason: `(u, w, along)`
+is right-handed, so going round the ring the natural way and then down the
+strand gives inward faces.
+
+Total laid on after the decimator: 1383 vertices and 2072 triangles, on 13 521
+and 26 000.
+
+### Added — a `--repaint` door, because the loop was seven minutes long
+
+`--reface` is ten EEVEE frames at thirty to sixty seconds each: five to nine
+minutes of a run whose useful work — re-weight, re-paint, re-export — measures
+**fourteen seconds**. That trade is right when the thing being changed is a
+face, because a face is only knowable from a render. It was exactly wrong for
+everything in this release: every colour and every millimetre here was settled
+from a headless browser screenshot, and the Blender previews, overexposed by
+about two stops, were actively misleading about all of them — the nails looked
+like pastel stickers in Blender and like fire in the game.
+
+`--repaint` does skin, paint and export and not one pixel of render. There is
+also `--trinkets`, which rebuilds just the laid-on geometry and takes the three
+close renders that show it.
+
 ## [1.39.0] — 2026-08-09
 
 ### Added — ten nails, with a flame on each
