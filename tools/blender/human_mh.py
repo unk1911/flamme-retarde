@@ -1719,6 +1719,74 @@ def skip_floor(rig, clear=0.004):
           % (" ".join("%+.3f" % z for z in hips), za, zb))
 
 
+def walk_floor(rig, clear=0.004):
+    """Drop every walk key onto the deck, and measure what comes out.
+
+    The whole clip is solved and nothing in it is authored, which is the
+    opposite of the skip above and is the one structural difference between the
+    two gaits. A skip has two floats a half-cycle, so its hip height has to be
+    written down and the floats lifted off a baseline. A walk has no floats at
+    all — a foot is on the deck at every instant of it — so every key can simply
+    be set on the ground, and the hip height falls out of the leg geometry.
+
+    That is not a shortcut, it is where a walk's bounce comes from. The hips
+    ride highest at mid-stance, over a leg that is nearly straight, and lowest
+    at the footfall, where both legs are splayed and neither is at full length.
+    Authoring that number instead would be guessing at something the skeleton
+    already knows exactly.
+
+    `passes=0` for the same reason `fire_floor` uses it: the filter in
+    `floor_poses` exists for clips where the support changes hands and the solve
+    jumps when it does. Here it never changes hands mid-key — the stance foot is
+    the lowest thing at every one of the four — so the staircase in the hip
+    height is the animation, and smoothing it is smoothing away the bounce.
+
+    The step length is measured rather than assumed, because it is the number
+    the game needs and not one that can be read off the table. It is where the
+    two feet actually finish with 22 degrees at each hip, a stance knee bent
+    four, and a foot hanging off the end of the shin. src/43-jadrija.js scales
+    this clip's clock by how fast she is travelling, so an authored speed that
+    disagrees with the geometry is feet sliding along the concrete — which is
+    the one failure this gait cannot hide, because unlike the skip it never
+    leaves the ground for you to lose track over.
+    """
+    WALK_HALF[:] = [
+        (h,
+         _walk_pose(0.0,
+                    (sup[0], sup[1], _flat(sup[0], sup[1], WALK_PELVIS)),
+                    (fre[0], fre[1], _flat(fre[0], fre[1], WALK_PELVIS) - point),
+                    arm, sway))
+        for h, sup, fre, point, arm, sway in WALK_KEYS]
+
+    poses = [p for _h, p in WALK_HALF]
+    worst = floor_poses(rig, poses, clear, passes=0)
+    WALK[:] = ([(h * WALK_DUR / 2.0, p) for h, p in WALK_HALF]
+               + [((1.0 + h) * WALK_DUR / 2.0, _mirror(p)) for h, p in WALK_HALF]
+               + [(WALK_DUR, WALK_HALF[0][1])])
+
+    # Her actual hip height, not the root displacement the other floor passes
+    # print. Those two are not the same number and the difference is the whole
+    # bounce: `@root` is a *correction* applied after the pose, so a key whose
+    # leg is already long needs less of it, and reading the corrections as the
+    # bounce gets the sign backwards. Mid-stance has the smallest root
+    # displacement of the four and the highest hips of the four.
+    hips = []
+    for p in poses:
+        _who, _z = _lowest(rig, p)              # poses the rig at this key
+        hips.append((rig.matrix_world @ rig.pose.bones["pelvis"].head).z
+                    + p["@root"][2])
+    who, _z = _lowest(rig, WALK_HALF[0][1])     # leaves the rig at the footfall
+    tl = rig.matrix_world @ rig.pose.bones["footL"].tail
+    tr = rig.matrix_world @ rig.pose.bones["footR"].tail
+    step = abs(tl.x - tr.x)
+    print("[mh] walk: hips %s, %.1f cm of bounce, deepest %+.3f m"
+          % (" ".join("%.3f" % z for z in hips),
+             (max(hips) - min(hips)) * 100.0, worst))
+    print("[mh]   step %.3f m, so %.2f m/s at %.2f s a cycle; "
+          "lowest at the footfall is %s"
+          % (step, 2.0 * step / WALK_DUR, WALK_DUR, who))
+
+
 def clipcheck(rig, name):
     """Per-frame ground clearance for one clip, printed.
 
@@ -2286,6 +2354,7 @@ def export_skin(body, rig, path, clips, tris=26000, J=None):
     wheel_floor(rig)
     dance_floor(rig)
     skip_floor(rig)
+    walk_floor(rig)
     fire_floor(rig)
 
     # Duplicate the *object*, not the evaluated mesh.
@@ -2873,6 +2942,120 @@ SKIP_STEP = SKIP_HALF[0][1]       # the three of them worth looking at on their
 SKIP_HOP = SKIP_HALF[1][1]        # own, for --reskin
 SKIP_AIR = SKIP_HALF[3][1]
 
+# ── walking ─────────────────────────────────────────────────────────────────
+#
+# What she does when she is only going somewhere, which is nearly all of the
+# time she is moving at all.
+#
+# The skip above was her only gait for a dozen releases and it was reported as
+# the thing that reads badly. It is a good clip and that was never the
+# complaint. A step-hop is what a person does in a burst, on a good day, for
+# ten metres; playing it for the whole twenty-four seconds of larking about,
+# up and down four hundred metres of promenade, and again on the way home, and
+# again on the way over to you, turns a flourish into a tic. The fault was
+# never in the skip, it was in it being the only thing she knew.
+#
+# Written the same way — one half-cycle authored, the other its reflection, so
+# the two sides agree by construction and the seam closes on its own — and
+# solved a different way, for which see `walk_floor`.
+#
+# One thing about her feet decides most of the numbers below: there is no toe
+# bone on this rig. The foot is a plank hinged at the ankle, so there is no
+# heel-strike-and-roll to be had; a planted foot is flat or it is pivoting on a
+# corner. So the stance foot is flat for every key it carries her through, and
+# the ankle that does it is computed by `_flat` rather than typed, because a
+# sole left at zero on a leg reaching 22° forward is a sole driven 22° into the
+# concrete. The same trap the skip fell into, and the same way out of it.
+
+WALK_PELVIS = -2.0        # a gentler forward carry than the skip's -4
+WALK_DUR = 1.00           # one cycle: a step onto the left, a step onto the right
+
+
+def _walk_elbow(a):
+    """How far the elbow is folded for a swing of `a`, in degrees, negative.
+
+    Straight-ish behind her and folded in front, which is what an arm does and
+    is also the only way a hand gets behind a hip on a swing this small. `a`
+    runs -22 (that arm is back) to +22 (it is forward); the bend runs -8 to -30.
+    """
+    return -8.0 - 0.5 * (a + 22.0)
+
+
+def _walk_pose(up, sup, fre, arm, sway):
+    """One key of the half-cycle that stands on the left foot.
+
+    `sup` and `fre` are (hip, knee, ankle) for the planted leg and the swinging
+    one, `arm` is the left arm's swing — negative behind her, as in the skip —
+    and `sway` is the pelvis leaning toward the foot she is standing on. `up` is
+    written by `walk_floor` and never here.
+    """
+    return {
+        "@root": (0.0, 0.0, up),
+        # Nearly upright. The skip carries a lean because it is a gait with an
+        # airborne phase and she is going somewhere with intent; a walk on a
+        # promenade in August is not leaning at anything.
+        "pelvis": (WALK_PELVIS, 0, sway),
+        "spine01": (-1, 0, 0), "spine02": (-1, 0, 0), "spine03": (-1, 0, 0),
+        "chest": (-2, 0, 0), "neck": (3, 0, 0), "head": (-2, 0, 0),
+        "clavicleL": (0, 0, 3), "clavicleR": (0, 0, -3),
+        # Opposition again, at well under the skip's amplitude. The skip swings
+        # ±55 because it is throwing itself forward twice a second and the arms
+        # are part of the throw; hers here just hang and keep time.
+        #
+        # The elbow is not a constant, and the first pass at this walk made it
+        # one — 20° of flex on both arms at every key — which is the trap the
+        # skip's own comment three hundred lines up warns about and which I
+        # walked straight into anyway. A constant forward bend at the elbow is
+        # added to the shoulder's swing, so with 20° of it and only ±16 of
+        # swing neither hand ever got behind her hip: both stayed out in front
+        # at waist height, palms down, which is a woman carrying a tray of
+        # drinks rather than a woman walking.
+        #
+        # A real arm straightens as it goes back and folds as it comes forward,
+        # so `_walk_elbow` hangs the bend off the swing. It is written per side
+        # rather than shared because the two arms are half a cycle apart, and
+        # the mirror keeps them that way on its own: the left arm's value at the
+        # end of the half-cycle is the right arm's value at the start of it.
+        "armUL": (-arm, 0, 7), "armLL": (_walk_elbow(arm), 0, 3),
+        "handL": (-4, 0, 0),
+        "armUR": (arm, 0, -7), "armLR": (_walk_elbow(-arm), 0, -3),
+        "handR": (-4, 0, 0),
+        # And a narrower track than the skip's ±4: feet under the hips rather
+        # than out either side of them, which is what stops a walk waddling.
+        "legUL": (sup[0], 0, 2), "legLL": (sup[1], 0, 0), "footL": (sup[2], 0, 0),
+        "legUR": (fre[0], 0, -2), "legLR": (fre[1], 0, 0), "footR": (fre[2], 0, 0),
+    }
+
+
+# h is the fraction through the half-cycle, which is one step: the left foot
+# comes down at 0.00 and the right one at 1.00, and 1.00 is this table's 0.00
+# mirrored. Evenly spaced, unlike the skip's, and for the same reason the skip's
+# are not — a walk's footfalls *are* evenly spaced, and that regularity is the
+# whole difference between the two gaits.
+#
+# The left hip runs -22 → +22 across the step and the right one runs back the
+# other way, which is what makes 1.00 the mirror of 0.00 without anything having
+# to enforce it. Everything else hangs off that pair.
+#
+# `point` is how far below flat the *swinging* foot hangs, in degrees. It is
+# large at 0.00, which is the trailing foot pushing off with its heel already
+# up, falls away through the swing, and is nearly nothing by 0.75 because a foot
+# about to land is a foot coming back to flat. The planted foot has no entry
+# here: it is flat, always, and `walk_floor` computes it.
+WALK_KEYS = [
+    #  h    planted leg   swinging leg  point  arm  sway
+    (0.00, (-22, 4), (22, 10), 16, -22, 0),   # both down: she has just landed
+    (0.25, (-13, 9), (10, 42), 14, -12, 2),   # the trailing foot is off, folding
+    (0.50, (-1, 12), (-4, 60), 8, 0, 3),      # mid-stance, the knee at its top
+    (0.75, (12, 7), (-18, 34), -6, 12, 2),    # the shin swings out ahead of her
+]
+
+# Both filled by `walk_floor`, which is where the ankles are computed and the
+# hip heights solved. Empty until then, the way FIRE is — CLIPS below holds the
+# list itself, so filling it in place is enough.
+WALK_HALF = []
+WALK = []
+
 # ── the cartwheel ───────────────────────────────────────────────────────────
 #
 # A wheel over her left hand, and like the somersault the whole revolution rides
@@ -2892,7 +3075,7 @@ SKIP_AIR = SKIP_HALF[3][1]
 # The clip is otherwise stationary: it wheels on the spot, and the travel comes
 # from the game moving her along the line she is wheeling over. That line is
 # ninety degrees off the way she is facing — src/43-jadrija.js takes the quarter
-# turn at a skip before it plays this, and gives it back after.
+# turn at a walk before it plays this, and gives it back after.
 
 
 # Measured off the rest pose rather than guessed at, which is the only place
@@ -3716,8 +3899,14 @@ CLIPS = [
      "keys": [(0.00, IDLE_A), (0.24, CROUCH), (0.40, LAUNCH),
               (0.56, _tuck(-118, 0.40)), (0.72, _tuck(-232, 0.47)),
               (0.88, _tuck(-318, 0.28)), (1.04, LAND), (1.40, SETTLE)]},
-    {"name": "skip", "loop": True,
-     "keys": SKIP},
+    # Her gait. `skip` was here and is not any more, for the reason written out
+    # above the walk: it was a burst being asked to be a default, and it read as
+    # a tic because that is what a flourish becomes when it is the only one you
+    # have. The clip is still authored, `skip_floor` still solves it, and every
+    # number in it is still the verified one — what came out is the single line
+    # that put it in the payload, which is also what puts it back.
+    {"name": "walk", "loop": True,
+     "keys": WALK},
     # One-shot, like the somersault and for the same reason: the game chains
     # two or three of them by rewinding `curT`, which is cheaper than a loop
     # and lets it stop after any whole number of wheels.
@@ -4077,6 +4266,7 @@ def main():
         wheel_floor(rig)          # so the numbers below are the shipped numbers
         dance_floor(rig)
         skip_floor(rig)
+        walk_floor(rig)
         fire_floor(rig)
         for name in argv[argv.index("--clipcheck") + 1:]:
             if name.startswith("-"):

@@ -10,6 +10,78 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.44.0] — 2026-08-09
+
+### Added — she walks
+
+The skip was her only way of getting anywhere for a dozen releases and it was
+reported as the thing that reads badly. It is a good clip and that was never
+the complaint. A step-hop is what a person does in a burst, on a good day, for
+ten metres; playing it for the whole twenty-four seconds of larking about, up
+and down four hundred metres of promenade, and again on the way home, and again
+on the way over to you, turns a flourish into a tic. The fault was never in the
+skip, it was in it being the only thing she knew.
+
+- **The clip.** One second, thirty frames, four keys a half-cycle mirrored into
+  the other half so the two sides agree by construction and the seam closes on
+  its own — the same way the skip is written. Everything else about it is the
+  skip's opposite, because the two gaits are opposites: a skip has two floats a
+  half-cycle, so its hip height has to be authored and its floats lifted off a
+  solved baseline, and a walk has no floats at all. One foot is on the deck at
+  every instant of it, so every key is simply set on the ground and the hip
+  height falls out of the leg geometry — which is where a walk's bounce comes
+  from in the first place. Hips highest at mid-stance over a straight leg,
+  lowest at the footfall where both legs are splayed: 3.6 cm of it, solved, not
+  guessed. Nothing is more than a millimetre off the concrete at any frame.
+- **The arms are the part that had to be fixed twice.** The first pass gave both
+  elbows a constant 20° of flex against a ±16° swing, and a constant forward
+  bend adds to the shoulder, so neither hand ever got behind her hip: both
+  stayed out in front at waist height, palms down, like somebody carrying a tray
+  of drinks through a crowd. That is verbatim the trap the skip's own comment
+  three hundred lines up warns about, and it was walked into anyway. The elbow
+  now hangs off the swing — straight behind her, folded in front, which is what
+  an arm does and the only way a hand clears a hip on a swing this small.
+- **She is slower, and the clip is why.** 1.10 to 2.12 m/s, an amble to a brisk
+  walk. The old range topped out at 3.3, and it was only ever set that high
+  because the thing underneath was a skip and a slow skip looks silly. A walk
+  played at 2.4× does not read as hurrying, it reads as a film running fast, so
+  the honest ceiling is much lower. The orbit and the walk home were rescaled
+  with it: those numbers were fractions of a skip and would have read as
+  fractions of a walk, which is a dawdle rather than a sidestep.
+
+### Added — the temperature at Jadrija, on her card
+
+The card has held a live bitcoin price since it was built. It now also holds the
+air temperature at 43.708 N, 15.826 E — the lighthouse at the end of her own
+promenade — off a thermometer, now, while you are standing there.
+
+That is the whole point of it. Everything else in this program is August 2024
+played back: the fire, the sun angle, the wind off the Kornati, thirteen
+thousand footprints traced from a survey. The number on the card is the one
+place the playback touches the present day.
+
+It is built to exactly the discipline the price already had, which is now a
+table of two entries rather than one function: asked for once at load and on its
+own interval after, never in a frame, abandoned after six seconds, and every way
+it can fail — no network, no DNS, CORS, a rate limit, a `file://` origin, a
+shape of JSON nobody expected — landing in the same empty catch. A line that
+never arrives is simply not one of the things she might hold up. Offline is not
+a degraded mode with a hole in it, it is three notes instead of five.
+
+- Open-Meteo, because it is one hop, needs no key and sends
+  `Access-Control-Allow-Origin: *`. Ten minutes rather than the price's five:
+  it publishes on a quarter hour and the air over a beach does not move fast
+  enough to be worth asking more often than the source changes.
+- A line that has arrived is kept when a later poll fails. A temperature from
+  twenty minutes ago is still the temperature, and a card that blanks itself the
+  first time a request times out is worse at its one job.
+
+### Removed
+
+- `skip` is out of the payload. The clip is still authored, `skip_floor` still
+  solves it, and every number in it is still the verified one — what came out is
+  the single line that put it in the file, which is also what puts it back.
+
 ## [1.43.0] — 2026-08-09
 
 ### Fixed

@@ -1642,50 +1642,89 @@ async function buildJadrija(scene) {
    */
   const NOTES = ['herro!', "what's up, duck?", 'meaw!'];
 
-  // ── and the one line on it she did not make up ─────────────────────────────
+  // ── and the lines on it she did not make up ────────────────────────────────
   /**
-   * The bitcoin price, if there is an internet and it feels like answering.
+   * What the world outside says, if there is an internet and it feels like
+   * answering. A price, and the temperature on the beach she is standing on.
    *
-   * This is the first request this program has ever made. Everything else — the
+   * These are the only requests this program makes. Everything else — the
    * terrain, the land cover, thirteen thousand footprints, her mesh, her clips,
    * the whole twelve megabytes — is baked into the file, and the file opens off
-   * a memory stick with the wifi off. That property is worth more than a price
-   * on a card, so this is built so that losing the request costs nothing:
+   * a memory stick with the wifi off. That property is worth more than anything
+   * written on a card, so this is built so that losing a request costs nothing:
    *
-   *   - it is asked for once at load and once every five minutes after, never
-   *     in a frame and never on the way to drawing one;
-   *   - it is abandoned after six seconds, because a hung socket must not be
+   *   - each is asked for once at load and on its own interval after, never in
+   *     a frame and never on the way to drawing one;
+   *   - each is abandoned after six seconds, because a hung socket must not be
    *     something you can accumulate one of every five minutes;
-   *   - and every way it can fail — no network, no DNS, CORS, a rate limit, a
+   *   - and every way one can fail — no network, no DNS, CORS, a rate limit, a
    *     file:// origin, a shape of JSON nobody expected — lands in the same
-   *     empty catch and leaves `btcNote` null, which simply means the line is
-   *     not one of the things she might hold up. There is no error state, no
-   *     retry storm and no spinner; the card just says "meaw!" instead.
+   *     empty catch and leaves that line null, which simply means it is not one
+   *     of the things she might hold up. There is no error state, no retry
+   *     storm and no spinner; the card just says "meaw!" instead.
    *
-   * Coinbase's spot endpoint because it is one hop, needs no key, and sends
+   * A line that has arrived is kept when a later poll fails, deliberately. A
+   * temperature from twenty minutes ago is still the temperature; a card that
+   * blanks itself the first time a request times out is worse at its one job.
+   *
+   * The temperature is the whole point of the second one. The rest of this
+   * program is August 2024 played back — the fire, the sun angle, the wind off
+   * the Kornati — and the number on the card is Jadrija *now*, off a
+   * thermometer, at the coordinates she is standing on. It is the only place
+   * the two touch.
+   *
+   * Both endpoints are one hop, need no key, and send
    * `Access-Control-Allow-Origin: *`, which most of the alternatives do not.
    */
-  const BTC = {
-    url: 'https://api.coinbase.com/v2/prices/BTC-USD/spot',
-    every: 5 * 60 * 1000,
-    timeout: 6000,
-  };
-  let btcNote = null;
-
-  async function pollBtc() {
-    if (typeof fetch !== 'function' || navigator.onLine === false) return;
-    const ctl = new AbortController();
-    const bail = setTimeout(() => ctl.abort(), BTC.timeout);
-    try {
-      const r = await fetch(BTC.url, { signal: ctl.signal, cache: 'no-store' });
-      if (!r.ok) return;
-      const n = Number((await r.json()).data.amount);
+  const LIVE = [
+    {
+      key: 'btc',
+      url: 'https://api.coinbase.com/v2/prices/BTC-USD/spot',
+      every: 5 * 60 * 1000,
       // Kept only if it is a number and a plausible one. A price of NaN written
       // out in full on a card held up by a woman on a beach is a worse failure
       // than no card at all.
-      if (Number.isFinite(n) && n > 0) {
-        btcNote = 'btc: $' + Math.round(n).toLocaleString('en-US');
-      }
+      read: (j) => {
+        const n = Number(j.data.amount);
+        return Number.isFinite(n) && n > 0
+          ? 'btc: $' + Math.round(n).toLocaleString('en-US') : null;
+      },
+    },
+    {
+      key: 'air',
+      // 43.708 N, 15.826 E — the lighthouse at the end of her promenade, not
+      // the world origin in 00-core.js, which sits four kilometres east between
+      // here and the old town. Four kilometres is nothing to a weather model
+      // and the difference is the point: the card names Jadrija, so it should
+      // be Jadrija that was asked.
+      url: 'https://api.open-meteo.com/v1/forecast?latitude=43.708'
+        + '&longitude=15.826&current=temperature_2m',
+      // Ten minutes rather than five. Open-Meteo publishes on a quarter hour
+      // and the air over a beach does not move fast enough to be worth asking
+      // more often than the source changes.
+      every: 10 * 60 * 1000,
+      read: (j) => {
+        const c = Number(j.current.temperature_2m);
+        // Šibenik's record low is −16 and its record high is 39. The window is
+        // wide of both because the job here is to catch a null, a string or a
+        // sentinel like −999, not to second-guess a thermometer.
+        return Number.isFinite(c) && c > -40 && c < 60
+          ? 'jadrija: ' + Math.round(c) + '°C' : null;
+      },
+    },
+  ];
+  const LIVE_TIMEOUT = 6000;
+  const live = { btc: null, air: null };
+
+  async function poll(src) {
+    if (typeof fetch !== 'function' || navigator.onLine === false) return;
+    const ctl = new AbortController();
+    const bail = setTimeout(() => ctl.abort(), LIVE_TIMEOUT);
+    try {
+      const r = await fetch(src.url, { signal: ctl.signal, cache: 'no-store' });
+      if (!r.ok) return;
+      const note = src.read(await r.json());
+      if (note) live[src.key] = note;
     } catch { /* every failure is the same failure: she has nothing to report */ }
     finally { clearTimeout(bail); }
   }
@@ -1754,11 +1793,18 @@ async function buildJadrija(scene) {
     return {
       mesh,
       say: write,
-      // The price joins the pool when there is one and is simply absent when
-      // there is not, which is why it is concatenated here rather than kept as
-      // a slot in `NOTES` that holds a placeholder. There is no "btc: —".
+      // A live line joins the pool when there is one and is simply absent when
+      // there is not, which is why they are concatenated here rather than kept
+      // as slots in `NOTES` holding placeholders. There is no "btc: —".
+      //
+      // Which also means offline is not a degraded mode with a hole in it, it
+      // is three notes instead of five, and every one of the five is equally
+      // likely whenever it is up. With both lines answering she holds up
+      // something real two times in five, which is what "occasionally" is worth
+      // here: often enough to be noticed on a second visit, rare enough that it
+      // is still a surprise.
       pick: () => {
-        const pool = btcNote ? NOTES.concat(btcNote) : NOTES;
+        const pool = NOTES.concat(Object.values(live).filter(Boolean));
         write(pool[(Math.random() * pool.length) | 0]);
       },
       /**
@@ -1809,12 +1855,14 @@ async function buildJadrija(scene) {
       mesh.updateMatrixWorld();
       scene.add(mesh);
       banner = makeBanner(skinFig);
-      // Asked for once here and every five minutes after, for as long as the
-      // page is open. Started only now, next to the card it writes on: if there
-      // is no figure there is no card, and a price nobody can be shown is not
-      // worth a request.
-      pollBtc();
-      setInterval(pollBtc, BTC.every);
+      // Asked for once here and on their own intervals after, for as long as
+      // the page is open. Started only now, next to the card they write on: if
+      // there is no figure there is no card, and a number nobody can be shown
+      // is not worth a request.
+      for (const src of LIVE) {
+        poll(src);
+        setInterval(() => poll(src), src.every);
+      }
       testFigure = { mesh, fig: skinFig, tris: skinFig.tris, at: [ft, fs] };
 
       // The survey pole that used to stand here is gone.
@@ -1913,7 +1961,12 @@ async function buildJadrija(scene) {
     far: 46,            // and gives up if you get this far away
     crawl: 0.95,        // m/s on all fours. One clip cycle is 1.1 s and covers
                         // 1.05 m, which is what keeps her hands off the ice.
-    skip: 3.6,          // m/s skipping — 1.4 m a hop, which is a bound
+    // m/s walking, and it is a measured number rather than a chosen one:
+    // `walk_floor` in tools/blender/human_mh.py puts her feet 0.687 m apart at
+    // the footfall and the cycle is two of those in a second. Changing it here
+    // does not make her walk faster, it unhooks her feet from the deck — see
+    // `showPace`, which scales the clip's clock by v over this.
+    walk: 1.37,
     hop: 2.1,           // m/s the somersault carries her while she is over
     flips: 3,           // "a bunch of summersaults"
     wheel: 1.9,         // m/s through a cartwheel — about 1.7 m of deck a turn
@@ -1926,15 +1979,19 @@ async function buildJadrija(scene) {
     // the corners rounded off, and the rounding is the whole trick. Redrawing
     // the heading outright every second is a fly in a jar; carrying it forward
     // and nudging it is somebody enjoying themselves.
-    // `pace` is a multiple of `skip`, not a speed — `skip` is the speed the
-    // clip is *authored* for and changing it would only unhook the feet from
-    // the deck, because showPace() scales the clip's clock by v / SHOW.skip.
-    // Slowing her down means drawing a smaller multiple, and the clip slows
-    // with it. She used to draw between 0.55 and 1.35, which peaked at
-    // 4.9 m/s — a flat sprint, on a promenade, for no reason. 0.42 to 0.92 is
-    // 1.5 to 3.3, which is an amble to a jog and reads as somebody enjoying an
-    // afternoon rather than somebody late for something.
-    turn: [0.55, 1.35], swing: 1.5, pace: [0.42, 0.92],
+    // `pace` is a multiple of `walk`, not a speed — `walk` is the speed the
+    // clip is *authored* for and changing that would only unhook the feet from
+    // the deck. Slowing her down means drawing a smaller multiple, and the clip
+    // slows with it.
+    //
+    // 0.80 to 1.55 is 1.10 to 2.12 m/s. Those two ends are a dawdle and a good
+    // brisk walk, and there is nothing above them any more: the range used to
+    // top out at 3.3 m/s, which was a jog, and it was only ever set that high
+    // because the clip underneath was a skip and a slow skip looks silly. A
+    // walk played at 2.4x does not look like hurrying, it looks like a film
+    // running fast, so the honest ceiling is much lower than the old one and
+    // the clip is the reason.
+    turn: [0.55, 1.35], swing: 1.5, pace: [0.80, 1.55],
     crawlTurn: [0.9, 2.0], crawlSwing: 0.7,
     // How fast a drawn speed is taken up. `showWander` hands `showPace` a fresh
     // number every second or so and it used to be believed on the frame it
@@ -2042,24 +2099,27 @@ async function buildJadrija(scene) {
    * No half turn. Her forward is +X, the same as the crowd rig's, because
    * tools/blender/human_mh.py lands both of them there — MakeHuman imports
    * facing −Y and the fix-up matrix maps that to +X. A stray half turn here is
-   * what had her crawling and skipping backwards: she travelled along her
+   * what had her crawling and walking backwards: she travelled along her
    * heading while facing the other way down it.
    */
   const faceYaw = (t, ang) => rigYaw(t, ang);
 
   /**
-   * Move her, and run the skip off the same number.
+   * Move her, and run the gait off the same number.
    *
-   * The skip clip covers 1.4 m a hop and is authored to look right at 3.6 m/s;
-   * play it at any other speed and the feet slide, because nothing in the
-   * runtime matches a footfall to the ground. That has quietly been true since
-   * she started wandering — `play` draws a fresh pace between 0.55x and 1.35x
-   * of nominal every second or so — and it is much more visible in the orbit,
-   * where she is travelling sideways and both feet are in profile.
+   * The walk clip covers 0.687 m a step and is authored to look right at
+   * 1.37 m/s; play it at any other speed and the feet slide, because nothing in
+   * the runtime matches a footfall to the ground. That has quietly been true
+   * since she started wandering — `play` draws a fresh pace every second or so
+   * — and it is much more visible in the orbit, where she is travelling
+   * sideways and both feet are in profile. It is more visible again now that
+   * the clip is a walk: a skip is airborne for half of itself and you lose
+   * track of the contact, and a walk never leaves the ground for you to lose
+   * track over.
    *
    * The fix is one line and it should have been there all along: scale the
-   * clip's clock by the same factor as the distance. A skip at half speed is a
-   * skip that takes twice as long, which is what a slow skip *is*.
+   * clip's clock by the same factor as the distance. A gait at half speed is a
+   * gait that takes twice as long, which is what a slow walk *is*.
    *
    * And the speed itself is eased into rather than stepped to. `showWander`
    * draws a new pace every second or so and this took it on the frame it was
@@ -2069,7 +2129,7 @@ async function buildJadrija(scene) {
    */
   function showPace(v, dt) {
     show.vel = damp(show.vel, v, SHOW.accel, dt);
-    skinFig.state.speed = clamp(show.vel / SHOW.skip, 0.4, 1.6);
+    skinFig.state.speed = clamp(show.vel / SHOW.walk, 0.55, 1.75);
     showMove(show.vel, dt);
   }
 
@@ -2126,7 +2186,7 @@ async function buildJadrija(scene) {
   function showWander(turn, swing) {
     show.tick = turn[0] + Math.random() * (turn[1] - turn[0]);
     show.wander += (Math.random() * 2 - 1) * swing;
-    show.pace = SHOW.skip * (SHOW.pace[0] + Math.random()
+    show.pace = SHOW.walk * (SHOW.pace[0] + Math.random()
       * (SHOW.pace[1] - SHOW.pace[0]));
   }
 
@@ -2418,7 +2478,7 @@ async function buildJadrija(scene) {
     show.tmr += dt;
 
     const go = (phase, clip, fade = 0.30) => {
-      // Back to nominal on every clip change. `showPace` below runs the skip
+      // Back to nominal on every clip change. `showPace` below runs the walk
       // off its own clock to keep her feet under her, and the somersault and
       // the cartwheel are timed to the second against the distances they carry
       // her — inheriting a rate from whatever she was doing before would put a
@@ -2449,13 +2509,13 @@ async function buildJadrija(scene) {
       showSay('whee', d);
       go('note', 'note', 0.36);
     };
-    // Lined up along the promenade first, and still skipping while she does it.
+    // Lined up along the promenade first, and still walking while she does it.
     // A cartwheel wants a straight run of five or six metres and the deck is
     // only about four deep, so pointed any other way she would be over the edge
     // halfway through the second one.
     const enterWheels = () => {
       show.wander = Math.cos(show.ang) > 0 ? 0 : Math.PI;
-      go('aim', 'skip', 0.30);
+      go('aim', 'walk', 0.30);
     };
 
     /**
@@ -2473,7 +2533,7 @@ async function buildJadrija(scene) {
       if (nxt === 'wheel') return enterWheels();
       show.wander = show.ang;
       showWander(SHOW.turn, SHOW.swing);
-      return go('play', 'skip', 0.36);
+      return go('play', 'walk', 0.36);
     };
 
     // The jet, and its two clocks.
@@ -2610,7 +2670,7 @@ async function buildJadrija(scene) {
 
       case 'crawl':
         // Wandering on all fours too, but lazily — a crawl that changes its
-        // mind as often as the skipping does looks like a dropped contact lens.
+        // mind as often as the walking does looks like a dropped contact lens.
         show.tick -= dt;
         if (show.tick <= 0) showWander(SHOW.crawlTurn, SHOW.crawlSwing);
         show.want = showSteer(show.wander);
@@ -2686,17 +2746,17 @@ async function buildJadrija(scene) {
           show.said = show.tmr;
           showSay(say1(CHAT), d);
         }
-        if (show.played > SHOW.playFor || d > SHOW.far) go('home', 'skip', 0.32);
+        if (show.played > SHOW.playFor || d > SHOW.far) go('home', 'walk', 0.32);
         break;
 
       case 'aim':
-        // Still skipping, but now down the promenade and turning her shoulders
+        // Still walking, but now down the promenade and turning her shoulders
         // across it. The turn is on `side` and takes about six tenths of a
         // second; she leaves when it has arrived, with a floor under that so
         // she cannot go over straight out of a hard turn.
         show.played += dt;
         show.want = show.wander;
-        // showPace, not showMove: she is still playing the skip clip here, so
+        // showPace, not showMove: she is still playing the walk clip here, so
         // the clock has to come down with the speed or the run-up into a
         // cartwheel is the one bit of her wander where the feet still slide.
         showPace(show.pace * 0.8, dt);
@@ -2743,7 +2803,7 @@ async function buildJadrija(scene) {
           show.spin = Math.random() < 0.5 ? 1 : -1;
           show.tick = SHOW.arc[0] + Math.random() * (SHOW.arc[1] - SHOW.arc[0]);
           showSay('trill', d);
-          go('orbit', 'skip', 0.38);
+          go('orbit', 'walk', 0.38);
         }
         break;
 
@@ -2784,8 +2844,12 @@ async function buildJadrija(scene) {
           Math.cos(tang) + Math.cos(bear) * pull * 1.3);
         show.want = showSteer(show.wander);
         // Slower the closer in she is, so a player who walks straight at her
-        // gets sidestepped rather than run around.
-        showPace(SHOW.skip * clamp(0.40 + r / 12, 0.40, 0.82), dt);
+        // gets sidestepped rather than run around. Rescaled with the gait: the
+        // old multipliers were fractions of a skip and read as fractions of a
+        // walk, which had her circling you at half a metre a second — not
+        // sidestepping, dawdling. These are 1.15 to 1.90 m/s, which is the
+        // same ground covered as before at the same radii.
+        showPace(SHOW.walk * clamp(0.84 + r / 5.2, 0.84, 1.39), dt);
         if (show.tmr - show.said > SHOW.say[0]
           + Math.random() * (SHOW.say[1] - SHOW.say[0])) {
           show.said = show.tmr;
@@ -2795,7 +2859,7 @@ async function buildJadrija(scene) {
           show.played = 0;
           show.wander = show.ang;
           showWander(SHOW.turn, SHOW.swing);
-          go('play', 'skip', 0.38);
+          go('play', 'walk', 0.38);
         }
         break;
       }
@@ -2808,7 +2872,7 @@ async function buildJadrija(scene) {
         showMove(SHOW.hop * sat((S.curT - 0.34) / 0.10)
           * sat((1.10 - S.curT) / 0.12), dt);
         if (S.curT >= 0.98 && !show.said) { show.said = 1; showSay('whump', d); }
-        if (done) { showWander(SHOW.turn, SHOW.swing); go('play', 'skip', 0.36); }
+        if (done) { showWander(SHOW.turn, SHOW.swing); go('play', 'walk', 0.36); }
         break;
 
       case 'shimmy':
@@ -2878,7 +2942,7 @@ async function buildJadrija(scene) {
           show.wander = show.ang;
           showWander(SHOW.turn, SHOW.swing);
           showSay(show.hit > 0 ? 'squee' : 'trill', d);
-          go('play', 'skip', 0.36);
+          go('play', 'walk', 0.36);
           break;
         }
         // Not while she is being hosed. A figure throwing fire out of a jet of
@@ -2919,7 +2983,7 @@ async function buildJadrija(scene) {
         const dt0 = show.home[0] - show.t, ds0 = show.home[1] - show.s;
         const dist = Math.hypot(dt0, ds0);
         show.want = Math.atan2(ds0, dt0);
-        if (dist > 1.1) showPace(Math.min(SHOW.skip * 0.85, dist * 1.7), dt);
+        if (dist > 1.1) showPace(Math.min(SHOW.walk * 1.35, dist * 1.7), dt);
         else go('idle', 'idle', 0.50);
         break;
       }
@@ -3127,8 +3191,9 @@ async function buildJadrija(scene) {
       playing: skinFig ? skinFig.playing() : 'none' },
     /** The skinned figure, for the debug API and for whatever animates her. */
     figure: skinFig,
-    /** What the internet last said, or null. Read by a test, and by nothing else. */
-    btc: () => btcNote,
+    /** What the internet last said, or nulls. Read by a test, and by nothing else. */
+    btc: () => live.btc,
+    live: () => ({ ...live }),
     /** Where the performance has got to. */
     show: () => show && {
       phase: show.phase, clip: skinFig ? skinFig.playing() : null,
