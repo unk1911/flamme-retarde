@@ -10,6 +10,55 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.41.0] — 2026-08-09
+
+### Fixed — the blue swimsuit was still on her, and `paint` could never remove it
+
+I had twice explained this away as the wrap's shadow. It was not. Decoding the
+shipped blob and reading the numbers found 250 vertices of exactly
+`(0.114, 0.169, 0.290)` — `SUIT_P`, the old swimsuit blue — running seven
+centimetres below the hem of the scarf that replaced it.
+
+The reason it survived is the real bug, and it is a property of `paint` rather
+than of any cutter. Paint only ever **overwrites**: it walks the vertices, asks
+each cutter whether it owns this one, and writes if so. Nothing anywhere writes
+a vertex back. So a cutter that is made *smaller* — or recoloured, or deleted —
+leaves its old colour on every vertex it has stopped claiming, baked into the
+blend, for good. `SUIT_P` had stopped being referenced by any cutter in the
+file: grepping the source for that colour finds nothing at all, and the only
+place it still existed was the artifact.
+
+Fixed at the root. The figure now carries `baseM`/`baseP` — a per-vertex
+snapshot of the unpainted body — and `paint` resets from it before applying a
+single coat, so it is idempotent under a shrinking cutter. Two bases and not
+one, because `mark` and `prev` are different palettes; and per-vertex rather
+than one skin constant, because the eyeballs, lashes, teeth and tongue arrive as
+their own objects with their own colours and no cutter ever redraws them — a
+blanket reset to skin would give her skin-coloured eyes.
+
+Seeding them on the existing blend is a one-off `--rebase` door: snapshot what
+is there, except that any vertex still wearing a *retired* palette colour goes
+back to skin. Those are exactly the vertices the old bug stranded, and the
+colour identifies them because it is one nothing paints any more. A migration,
+not a mechanism — from here on nothing can be stranded.
+
+### Fixed — the from-scratch build had been broken since she got eyes
+
+`ARMATURE_NAME` parenting makes a vertex group per bone that something is
+weighted to, which is not the same set as every bone: the eye bones move an
+eyeball the heat solver never reaches, so on a clean build `gi["eyeL"]` is
+missing and the loose-shell pass — which hands each eyeball to its own eye bone
+by name — dies with a `KeyError`. Nobody had noticed because every run since the
+eyes were added went through `--reface`, `--reskin` or `--extras`, and all of
+those open a blend that already has the groups in it. Missing groups are now
+created rather than assumed.
+
+### Added — `--norender`
+
+`render()` becomes a no-op. A from-scratch rebuild takes eight EEVEE frames on
+its way past, and when the reason for the rebuild is the *export* those frames
+are five minutes of pictures nobody opens.
+
 ## [1.40.0] — 2026-08-09
 
 ### Changed — the painted swimsuit is gone; she is wearing a hip scarf

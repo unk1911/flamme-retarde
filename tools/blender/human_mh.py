@@ -236,14 +236,34 @@ def load(path, scale, drop):
     # Colour every piece before joining. Join keeps a colour attribute only
     # where all operands have one under the same name, and anything missing it
     # comes through black — which on a set of teeth is memorable.
+    # `baseM`/`baseP` are a third and fourth copy of these colours, and they are
+    # what make `paint`
+    # idempotent. See the note there: paint only ever overwrites, so a cutter
+    # that is made *smaller* leaves its old colour behind on every vertex it no
+    # longer claims, permanently and invisibly. This is the unpainted figure,
+    # kept so paint has something to reset to — and it has to be per-vertex
+    # rather than one skin constant, because the eyeballs, the lashes, the teeth
+    # and the tongue arrive as their own objects with their own colours and no
+    # cutter ever redraws them.
     for ob, mark, prev in keep:
         ob.matrix_world = M @ ob.matrix_world
         me = ob.data
-        a_m = me.color_attributes.new("mark", "FLOAT_COLOR", "POINT")
-        a_p = me.color_attributes.new("prev", "FLOAT_COLOR", "POINT")
+        for n in ("mark", "prev", "baseM", "baseP"):
+            me.color_attributes.new(n, "FLOAT_COLOR", "POINT")
+        # Fetched by name *after* all four exist, never held across a `new`.
+        # Creating a colour attribute reallocates the others, so a reference
+        # taken before the last one is created is stale — and it does not raise
+        # where you took it, it raises later as `index 0 out of range, size 0`.
+        # Two attributes happened to survive this; four do not.
+        a_m = me.color_attributes["mark"]
+        a_p = me.color_attributes["prev"]
+        a_bm = me.color_attributes["baseM"]
+        a_bp = me.color_attributes["baseP"]
         for i in range(len(me.vertices)):
             a_m.data[i].color = (*mark, 1.0)
             a_p.data[i].color = (*prev, 1.0)
+            a_bm.data[i].color = (*mark, 1.0)
+            a_bp.data[i].color = (*prev, 1.0)
 
     for ob in bpy.context.scene.objects:
         ob.select_set(False)
@@ -432,12 +452,22 @@ def extras(body, J):
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(me)
     bm.free()
-    a_m = me.color_attributes.new("mark", "FLOAT_COLOR", "POINT")
-    a_p = me.color_attributes.new("prev", "FLOAT_COLOR", "POINT")
+    for n in ("mark", "prev", "baseM", "baseP"):
+        me.color_attributes.new(n, "FLOAT_COLOR", "POINT")
+    a_m = me.color_attributes["mark"]
+    a_p = me.color_attributes["prev"]
+    # The bases too, and for these it matters more than anywhere else: they are
+    # outside every cutter, so if `paint`'s reset found no base on them it would
+    # have nothing to put back and the hair would come out whatever the default
+    # is. Join also drops any attribute the operands do not all share.
+    a_bm = me.color_attributes["baseM"]
+    a_bp = me.color_attributes["baseP"]
     for i in range(len(me.vertices)):
         mark, prev = tint[i]
         a_m.data[i].color = (*mark, 1.0)
         a_p.data[i].color = (*prev, 1.0)
+        a_bm.data[i].color = (*mark, 1.0)
+        a_bp.data[i].color = (*prev, 1.0)
     for p in me.polygons:
         p.use_smooth = True
 
@@ -707,6 +737,17 @@ def skin(body, rig):
     bpy.ops.object.parent_set(type="ARMATURE_NAME")
 
     gi = {g.name: g.index for g in body.vertex_groups}
+    # `ARMATURE_NAME` makes a vertex group per bone that something is weighted
+    # to, which is not the same set as "every bone": the eye bones move an
+    # eyeball that the heat solver never reaches, so on a from-scratch build
+    # `gi["eyeL"]` is missing and the loose-shell pass below — which hands each
+    # eyeball to its own eye bone by name — dies with a KeyError. It survived
+    # unnoticed for a long time because every run since the eyes were added went
+    # through `--reface` or `--reskin`, and those open a blend that already has
+    # the groups in it.
+    for b in rig.data.bones:
+        if b.name not in gi:
+            gi[b.name] = body.vertex_groups.new(name=b.name).index
     sg = {g.index: g.name for g in src.vertex_groups}
     sw = [[(gi[sg[g.group]], g.weight) for g in v.groups if g.weight > 0.0]
           for v in src.data.vertices]
@@ -1173,10 +1214,46 @@ def cutters(J):
 
 
 def paint(body, coats):
-    """Overwrite the joined colours wherever a cutter claims a vertex."""
+    """Reset to the unpainted figure, then overwrite wherever a cutter claims.
+
+    The reset is the whole of what this docstring is for, because leaving it out
+    cost a release. Paint only ever *overwrites*: it walks the vertices, asks
+    each cutter whether it owns this one, and writes if so. Nothing ever writes
+    a vertex back. So a cutter that gets **smaller** — or is recoloured, or
+    deleted outright — leaves its old colour on every vertex it has stopped
+    claiming, and there is no pass anywhere that would ever take it off again.
+
+    That is exactly what happened to the swimsuit. `SUIT_P` stopped being
+    referenced by any cutter in this file, and 137 vertices of (0.114, 0.169,
+    0.290) stayed baked into the blend and shipped in the blob, seven
+    centimetres below the hem of the scarf that was supposed to have replaced
+    it. Grepping the source for the colour finds nothing. The only way to see it
+    is to decode the exported mesh and look at the numbers, which is how it was
+    finally found — after it had been explained away twice as a shadow.
+
+    Resetting from per-vertex `baseM`/`baseP` rather than from one skin constant,
+    because the eyeballs, the lashes, the teeth and the tongue come in as their
+    own objects with their own colours, and the hair and the anklets are
+    coloured in `extras`; none of those is redrawn by any cutter, and a blanket
+    reset to skin would give her skin-coloured eyes.
+    """
     me = body.data
     a_m = me.color_attributes["mark"]
     a_p = me.color_attributes["prev"]
+    a_bm = me.color_attributes.get("baseM")
+    a_bp = me.color_attributes.get("baseP")
+    if a_bm is None or a_bp is None:
+        print("[mh]   WARNING no `base` colours — cannot reset, paint is "
+              "additive only. Rebuild from scratch to fix.")
+    else:
+        # Two of them, because `mark` and `prev` are different palettes: `mark`
+        # is the marker channel the crowd shader recolours per instance and
+        # `prev` is the literal colour that ships. Resetting both from one base
+        # would give her a white face on one channel or a skin-coloured eyeball
+        # on the other, depending which was kept.
+        for i in range(len(me.vertices)):
+            a_m.data[i].color = a_bm.data[i].color
+            a_p.data[i].color = a_bp.data[i].color
     dive = 0.0012
     hits = {}
     for i, v in enumerate(me.vertices):
@@ -3739,7 +3816,18 @@ def _lights():
     bpy.context.scene.world = w
 
 
+NO_RENDER = False
+
+
 def render(tag, names):
+    # A full rebuild is the only way to repopulate the base colours, and a full
+    # rebuild renders eight EEVEE frames on its way past. When the reason for
+    # the rebuild is the *export* — as it is when a paint bug has to be flushed
+    # out of the blend — those frames are five minutes of pictures nobody is
+    # going to open.
+    if NO_RENDER:
+        print("[mh] render %s: skipped (--norender)" % tag)
+        return
     sc = bpy.context.scene
     sc.render.engine = "BLENDER_EEVEE"
     sc.eevee.taa_render_samples = 64
@@ -3770,7 +3858,9 @@ def render(tag, names):
 # --------------------------------------------------------------------------- #
 
 def main():
+    global NO_RENDER
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+    NO_RENDER = "--norender" in argv
     levels = SUBSURF
     if "--sub" in argv:
         levels = int(argv[argv.index("--sub") + 1])
@@ -3850,6 +3940,60 @@ def main():
     # rounds was settled from a headless browser screenshot, and the Blender
     # previews were overexposed by two stops and actively misleading about all
     # of them.
+    # One-off migration: give the existing blend the base colours that `paint`
+    # now resets from, and scrub the paint that had already been orphaned before
+    # they existed.
+    #
+    # The clean way to seed them is a build from scratch, where every vertex's
+    # colour is known before a cutter has touched it. That is not the cheap way
+    # — it re-solves the weights, so everything about the figure moves a little
+    # — and the blend in hand is good. So the base is snapshotted from what is
+    # there, with one correction: any vertex still wearing a *retired* palette
+    # colour goes back to skin. Those are exactly the vertices the old bug
+    # stranded, and the colour is enough to find them because it is one no
+    # cutter in this file paints any more.
+    #
+    # This is a migration and not a mechanism. Run once, then never again: from
+    # here on `paint` resets from the base and nothing can be stranded.
+    if "--rebase" in argv:
+        bpy.ops.wm.open_mainfile(filepath=str(BLEND))
+        body, rig = bpy.data.objects["human"], bpy.data.objects["rig"]
+        J, _scale, _drop = read_joints(fetch())
+        me = body.data
+        for n in ("baseM", "baseP"):
+            if n in me.color_attributes:
+                me.color_attributes.remove(me.color_attributes[n])
+        for n in ("baseM", "baseP"):
+            me.color_attributes.new(n, "FLOAT_COLOR", "POINT")
+        a_m = me.color_attributes["mark"]
+        a_p = me.color_attributes["prev"]
+        a_bm = me.color_attributes["baseM"]
+        a_bp = me.color_attributes["baseP"]
+        # Colours no cutter paints any more. `SUIT_P` is the blue swimsuit the
+        # hip scarf replaced; 137 vertices of it were still on her thighs.
+        retired = (SUIT_P,)
+        fixed = 0
+        for i in range(len(me.vertices)):
+            c = tuple(a_p.data[i].color)[:3]
+            if any(all(abs(c[k] - r[k]) < 0.01 for k in range(3))
+                   for r in retired):
+                a_bm.data[i].color = (*SKIN_M, 1.0)
+                a_bp.data[i].color = (*SKIN_P, 1.0)
+                fixed += 1
+            else:
+                a_bm.data[i].color = a_m.data[i].color
+                a_bp.data[i].color = a_p.data[i].color
+        print("[mh] rebase: %d verts, %d stranded verts returned to skin"
+              % (len(me.vertices), fixed))
+        paint(body, cutters(J))
+        _material(body)
+        pose(rig, {})
+        export_skin(body, rig, ROOT / "build" / "payload" / "human_skin.fr3d.gz",
+                    CLIPS, J=J)
+        bpy.ops.wm.save_as_mainfile(filepath=str(BLEND))
+        print("[mh] rebased %s" % BLEND)
+        return
+
     if "--repaint" in argv:
         bpy.ops.wm.open_mainfile(filepath=str(BLEND))
         body, rig = bpy.data.objects["human"], bpy.data.objects["rig"]
