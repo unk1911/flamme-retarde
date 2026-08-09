@@ -81,7 +81,15 @@ const JAD = {
   // it. 68 m keeps the front lane, the one that faces the water and is the only
   // one anybody at a bathing station has business on, and leaves the rest of the
   // village to be looked at rather than walked into.
-  reachIn: 68,
+  //
+  // 68 m did not keep the front lane. It kept the front lane and three behind
+  // it, because the lanes here are 12 m apart, and the failure mode is not that
+  // you cannot get out — it is that you land in the middle of it and everything
+  // in every direction is a wall four metres away. The resort is 15 m of concrete
+  // and 9 m of huts; 38 m is that, plus the one lane of houses that faces it,
+  // plus a metre of doorstep. Past that is the town builder's job, seen from the
+  // deck rather than walked into.
+  reachIn: 38,
 };
 
 /**
@@ -1053,9 +1061,30 @@ async function buildJadrija(scene) {
   // ── and where all of it goes ───────────────────────────────────────────────
   // `pose` is what they are doing; `beat` is the stretch of promenade a walker
   // patrols, and is null for everybody who has settled somewhere.
+  //
+  // `TURNOUT` is how many of the people the layout asks for actually turn up.
+  // It sits on `B` rather than on the strides that call it, deliberately: the
+  // strides also place the parasols, the loungers and the ladders, and thinning
+  // the beach by walking the loop less often empties the furniture along with
+  // the people. Forty-six figures on 186 m of shore is one every four metres,
+  // which is a crowded August Saturday; the same layout at half strength is a
+  // Tuesday, and a Tuesday is what you can walk through.
+  //
+  // Rejecting inside `B` costs one draw of `rng` per candidate whether or not
+  // they appear, so the whole layout downstream shifts. That is fine — it is
+  // still the same seed and still the same beach every time — but it does mean
+  // this is not the old crowd with half of them deleted.
+  // (Not `CROWD` — that name is already the walkers' gait table 1800 lines down,
+  // and every file in src/ shares one lexical scope, so this shadowed it and the
+  // whole resort failed to build at 78%.)
+  const TURNOUT = 0.5;
   const bathers = [];
-  const B = (t, s, y, ang, pose, k = 1, beat = null) =>
-    bathers.push({ t, s, y, ang, pose, k, beat });
+  const B = (t, s, y, ang, pose, k = 1, beat = null) => {
+    if (rng() >= TURNOUT) return null;
+    const b = { t, s, y, ang, pose, k, beat };
+    bathers.push(b);
+    return b;
+  };
 
   // The middle terrace is the shelf people actually lay their towels on: wide
   // enough for a parasol and a pair of loungers, and one step above the water.
@@ -1111,25 +1140,43 @@ async function buildJadrija(scene) {
   // any of this was worth doing: the deck is the one strip of Jadrija that runs
   // unbroken for three hundred metres, so it is the one place a figure can go
   // somewhere without immediately arriving.
-  for (let t = 10; t < LEN - 10; t += 11 + rng() * 13) {
+  //
+  // The stride is shorter here, and the odds of walking rather than standing
+  // are higher, and both are only here. `TURNOUT` halves everybody, but the
+  // promenade started with the fewest to halve — ten candidates over 186 m —
+  // and the walkers are the whole reason this strip was built, so half of them
+  // is five, which is a resort that has closed. The two knobs do different
+  // jobs: the shorter stride puts the candidate count back, and the higher walk
+  // odds spend those candidates on walkers instead of on more people standing
+  // about, which is the thing there was already too much of. Fifteen walkers
+  // became seven and forty-six figures became twenty-two, which is the halving
+  // asked for, in the place where halving it is worth the least.
+  for (let t = 10; t < LEN - 10; t += 8 + rng() * 9) {
     const st = at(t), y = st.deck;
     const lane = JAD.mid + 1.6 + rng() * 6.0;
-    if (rng() < 0.72) {
+    let lead;
+    if (rng() < 0.84) {
       // A beat of 30–90 m, clamped inside the resort. Short beats read as
       // pacing and long ones mean you never see the same person twice, and
       // neither is what a promenade looks like.
       const half = 15 + rng() * 30;
-      B(t, lane, y, 0, 'walk', 1,
+      lead = B(t, lane, y, 0, 'walk', 1,
         { t0: Math.max(4, t - half), t1: Math.min(LEN - 4, t + half) });
     } else {
-      B(t, lane, y, rng() * TAU, 'stand', 1);
+      lead = B(t, lane, y, rng() * TAU, 'stand', 1);
     }
     // Two together, half the time. People come here in pairs — and a pair walks
     // the same beat at the same speed, a metre apart, or it is not a pair.
-    if (rng() < 0.5) {
-      const last = bathers[bathers.length - 1];
-      B(t + 0.7, lane + 1.1, y, last.ang, last.pose,
-        rng() < 0.28 ? 0.68 : 1, last.beat && { ...last.beat });
+    //
+    // Off the figure `B` handed back, not off the end of the array: with the
+    // crowd thinned, the person this one came with may not have turned up, and
+    // the last entry is then somebody forty metres away whose beat and heading
+    // this one would have copied. A pair standing apart is two people; a pair
+    // walking a beat neither of them is on is a bug you would have to watch for
+    // a minute to see.
+    if (lead && rng() < 0.5) {
+      B(t + 0.7, lane + 1.1, y, lead.ang, lead.pose,
+        rng() < 0.28 ? 0.68 : 1, lead.beat && { ...lead.beat });
     }
   }
 
@@ -1213,7 +1260,7 @@ async function buildJadrija(scene) {
     // when you can walk up to it, so this tracks `reachIn` and sits a little
     // outside it — the far side of the lane you are standing in still has to
     // have eaves on it.
-    reach: 78,
+    reach: 48,
     over: 0.42,          // eave overhang
     win: 1.16,           // window width
     winH: 1.42,
@@ -1595,6 +1642,54 @@ async function buildJadrija(scene) {
    */
   const NOTES = ['herro!', "what's up, duck?", 'meaw!'];
 
+  // ── and the one line on it she did not make up ─────────────────────────────
+  /**
+   * The bitcoin price, if there is an internet and it feels like answering.
+   *
+   * This is the first request this program has ever made. Everything else — the
+   * terrain, the land cover, thirteen thousand footprints, her mesh, her clips,
+   * the whole twelve megabytes — is baked into the file, and the file opens off
+   * a memory stick with the wifi off. That property is worth more than a price
+   * on a card, so this is built so that losing the request costs nothing:
+   *
+   *   - it is asked for once at load and once every five minutes after, never
+   *     in a frame and never on the way to drawing one;
+   *   - it is abandoned after six seconds, because a hung socket must not be
+   *     something you can accumulate one of every five minutes;
+   *   - and every way it can fail — no network, no DNS, CORS, a rate limit, a
+   *     file:// origin, a shape of JSON nobody expected — lands in the same
+   *     empty catch and leaves `btcNote` null, which simply means the line is
+   *     not one of the things she might hold up. There is no error state, no
+   *     retry storm and no spinner; the card just says "meaw!" instead.
+   *
+   * Coinbase's spot endpoint because it is one hop, needs no key, and sends
+   * `Access-Control-Allow-Origin: *`, which most of the alternatives do not.
+   */
+  const BTC = {
+    url: 'https://api.coinbase.com/v2/prices/BTC-USD/spot',
+    every: 5 * 60 * 1000,
+    timeout: 6000,
+  };
+  let btcNote = null;
+
+  async function pollBtc() {
+    if (typeof fetch !== 'function' || navigator.onLine === false) return;
+    const ctl = new AbortController();
+    const bail = setTimeout(() => ctl.abort(), BTC.timeout);
+    try {
+      const r = await fetch(BTC.url, { signal: ctl.signal, cache: 'no-store' });
+      if (!r.ok) return;
+      const n = Number((await r.json()).data.amount);
+      // Kept only if it is a number and a plausible one. A price of NaN written
+      // out in full on a card held up by a woman on a beach is a worse failure
+      // than no card at all.
+      if (Number.isFinite(n) && n > 0) {
+        btcNote = 'btc: $' + Math.round(n).toLocaleString('en-US');
+      }
+    } catch { /* every failure is the same failure: she has nothing to report */ }
+    finally { clearTimeout(bail); }
+  }
+
   /**
    * Her card, and the first texture in this project.
    *
@@ -1659,7 +1754,13 @@ async function buildJadrija(scene) {
     return {
       mesh,
       say: write,
-      pick: () => write(NOTES[(Math.random() * NOTES.length) | 0]),
+      // The price joins the pool when there is one and is simply absent when
+      // there is not, which is why it is concatenated here rather than kept as
+      // a slot in `NOTES` that holds a placeholder. There is no "btc: —".
+      pick: () => {
+        const pool = btcNote ? NOTES.concat(btcNote) : NOTES;
+        write(pool[(Math.random() * pool.length) | 0]);
+      },
       /**
        * Sit it between her hands.
        *
@@ -1708,6 +1809,12 @@ async function buildJadrija(scene) {
       mesh.updateMatrixWorld();
       scene.add(mesh);
       banner = makeBanner(skinFig);
+      // Asked for once here and every five minutes after, for as long as the
+      // page is open. Started only now, next to the card it writes on: if there
+      // is no figure there is no card, and a price nobody can be shown is not
+      // worth a request.
+      pollBtc();
+      setInterval(pollBtc, BTC.every);
       testFigure = { mesh, fig: skinFig, tris: skinFig.tris, at: [ft, fs] };
 
       // The survey pole that used to stand here is gone.
@@ -3020,6 +3127,8 @@ async function buildJadrija(scene) {
       playing: skinFig ? skinFig.playing() : 'none' },
     /** The skinned figure, for the debug API and for whatever animates her. */
     figure: skinFig,
+    /** What the internet last said, or null. Read by a test, and by nothing else. */
+    btc: () => btcNote,
     /** Where the performance has got to. */
     show: () => show && {
       phase: show.phase, clip: skinFig ? skinFig.playing() : null,

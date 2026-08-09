@@ -10,6 +10,61 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.38.0] — 2026-08-09
+
+### Changed — Jadrija is a Tuesday now, not an August Saturday
+
+Three numbers, all of them measured before and after rather than eyeballed.
+
+**How far inland you may walk: 68 m → 38 m.** The note on the old number claimed
+68 m "keeps the front lane". It does not: the lanes on this peninsula are about
+twelve metres apart, so 68 m keeps the front lane and three behind it, and the
+failure mode was never that you could not get out — it is that you drop in among
+them and everything in every direction is a wall four metres away. The resort is
+15 m of concrete and 9 m of huts; 38 m is that, plus the one lane of houses that
+faces it, plus a doorstep. Everything past it is the town builder's job again,
+which is the right job for a house you look at from the deck.
+
+**Houses rebuilt in detail: 51 → 21.** `HOUSE.reach` follows `reachIn` and still
+sits a little outside it, so the far side of the lane you are standing in has
+eaves on it.
+
+**People: 46 → 22, of whom walkers 15 → 7.** The gate is one line in `B`, the
+function that makes a person, rather than on the strides that call it — because
+those strides also place the parasols, the loungers and the ladders, and thinning
+the beach by walking the loop less often empties the furniture along with the
+people. The promenade needed two knobs of its own: it started with the fewest to
+halve, so half of it was five walkers, which is a resort that has closed. A
+shorter stride puts the candidate count back and better walk odds (0.72 → 0.84)
+spend those candidates on walkers rather than on yet more people standing about.
+
+One real bug found on the way, worth writing down because the shape of it will
+recur: the new constant was first called `CROWD`, which is already the walkers'
+gait table 1800 lines further down the same file. Every file in `src/` shares one
+lexical scope, so it shadowed it and the resort failed to build at 78% with
+`Cannot read properties of undefined`. A name in this project is global whether
+or not it looks local.
+
+### Added — the price on her card
+
+Her card can now say `btc: $64,770`, and this is the first request this program
+has ever made. Everything else — terrain, land cover, thirteen thousand
+footprints, her mesh, her clips, twelve megabytes of it — is baked into the file,
+and the file opens off a memory stick with the wifi off. That property is worth
+more than a price on a card, so losing the request costs nothing:
+
+- asked for once at load and once every five minutes after, never in a frame;
+- abandoned after six seconds, so a hung socket is not something you can
+  accumulate one of every five minutes;
+- and every way it can fail — no network, no DNS, CORS, a rate limit, a `file://`
+  origin, an unexpected shape of JSON — lands in the same empty catch and leaves
+  the line simply absent from the pool of things she might hold up. There is no
+  error state, no retry storm, no spinner, and no `btc: —`. The card says
+  "meaw!" instead.
+
+Coinbase's spot endpoint, because it is one hop, needs no key, and sends
+`Access-Control-Allow-Origin: *`, which most of the alternatives do not.
+
 ## [1.37.0] — 2026-08-08
 
 ### Fixed — the heart is back at her chest
