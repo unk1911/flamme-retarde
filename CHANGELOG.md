@@ -10,6 +10,62 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.45.0] — 2026-08-09
+
+### Added — a dog on the promenade, and the price of a coin named after one
+
+A pug stands on the deck a few metres from her spot, and when you get within
+twenty-one metres a speech balloon comes up over it with the live DOGE price in
+it. That is the entire feature and the joke is the whole of the point.
+
+- **The first geometry in this game that was not authored for it.** Four
+  landmarks, an aeroplane, a woman, thirteen thousand footprints and a hundred
+  and sixty-nine square kilometres of karst are all built by something in
+  `tools/`, because every one of them is *specific* — that cathedral, that
+  channel, that fire. A dog on a beach is not specific, and the effort is better
+  spent on where it stands than on modelling one. It is Quaternius's **Pug**,
+  CC0, committed at `tools/blender/assets/pug.glb` so the build stays
+  reproducible without reaching out to a CDN, and credited in the README even
+  though CC0 asks for nothing.
+- **`tools/blender/dog.py`** is the conversion, and the conversion is where all
+  the decisions are. A foreign mesh always gets the same three things wrong:
+  which way is forward (this one faces −Y, measured off its Head and Hips bones
+  rather than eyeballed; the game's rigs face +X), how big it is (glTF carries
+  no unit — it arrives 2.66 units tall with its armature scaled 39.55), and
+  where the colour lives (two Blender materials, split along that seam into two
+  parts so they come out as vertex colours like everything else here).
+- **The balloon is her card's trick with two things changed.** Hers is a child
+  of her mesh and reads two bones a frame to sit between her hands, because the
+  pose decides how she holds it. Nothing holds this one, so it hangs at a fixed
+  height and turns to face you — about the vertical only, because a balloon that
+  tilted back as you climbed into an aeroplane would be the one thing in the
+  scene that knows where the camera is. It is only up when you are close: a
+  speech balloon visible from the circuit is a HUD element, and visible from six
+  metres it is a joke you walked into.
+- **The price is the dog's and not hers.** `LIVE` entries now carry a `card`
+  flag, and only the flagged ones go into the pool she draws from. A woman on a
+  beach holding up a card that says "doge" is a woman who has been handed
+  somebody else's joke.
+
+### Fixed
+
+- **The live requests no longer depend on her mesh loading.** Polling was
+  started inside the figure's own block, which quietly made the dog's line
+  contingent on a skinned human having decoded — two things with nothing to do
+  with each other. It now starts if there is either of them.
+- **The dog stands outside her lane.** She does not collide with anything, which
+  is deliberate and documented, so anything in the strip she performs on is
+  something she walks through. A bather she walks through is a shrug; a dog is a
+  fixed thing you are looking straight at when it happens. The lane's seaward
+  edge is now one named constant instead of two copies of the same literal.
+
+### Removed
+
+- 426 KB of dead payload. An accidental `--reexport` during the walk work wrote
+  an unused static human mesh into `build/payload/`, and `bundle_payload` inlines
+  everything it finds there, so it went into the file — the whole of an
+  unexplained 12.23 → 12.78 MB jump.
+
 ## [1.44.0] — 2026-08-09
 
 ### Added — she walks

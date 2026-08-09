@@ -1679,6 +1679,7 @@ async function buildJadrija(scene) {
   const LIVE = [
     {
       key: 'btc',
+      card: true,
       url: 'https://api.coinbase.com/v2/prices/BTC-USD/spot',
       every: 5 * 60 * 1000,
       // Kept only if it is a number and a plausible one. A price of NaN written
@@ -1691,7 +1692,26 @@ async function buildJadrija(scene) {
       },
     },
     {
+      // The dog's, not hers, which is what `card` is for: `card` entries go
+      // into the pool she draws from and this one does not. A woman on a beach
+      // holding up a card that says "doge" is a woman who has been handed
+      // somebody else's joke. The dog gets it, over the dog's own head, and it
+      // is the only thing the dog ever says.
+      key: 'doge',
+      card: false,
+      url: 'https://api.coinbase.com/v2/prices/DOGE-USD/spot',
+      every: 5 * 60 * 1000,
+      // Four decimals, because it is worth well under a dollar and rounding it
+      // the way the bitcoin line is rounded gives you "doge: $0", which is a
+      // joke about a different thing.
+      read: (j) => {
+        const n = Number(j.data.amount);
+        return Number.isFinite(n) && n > 0 ? 'doge: $' + n.toFixed(4) : null;
+      },
+    },
+    {
       key: 'air',
+      card: true,
       // 43.708 N, 15.826 E — the lighthouse at the end of her promenade, not
       // the world origin in 00-core.js, which sits four kilometres east between
       // here and the old town. Four kilometres is nothing to a weather model
@@ -1714,7 +1734,7 @@ async function buildJadrija(scene) {
     },
   ];
   const LIVE_TIMEOUT = 6000;
-  const live = { btc: null, air: null };
+  const live = { btc: null, doge: null, air: null };
 
   async function poll(src) {
     if (typeof fetch !== 'function' || navigator.onLine === false) return;
@@ -1727,6 +1747,23 @@ async function buildJadrija(scene) {
       if (note) live[src.key] = note;
     } catch { /* every failure is the same failure: she has nothing to report */ }
     finally { clearTimeout(bail); }
+  }
+
+  /**
+   * Set a font size that fits `text` into `room` pixels, and leave it set.
+   *
+   * Shrunk to fit rather than wrapped: these are three or four words, and a
+   * line break in the middle of "what's up, duck?" is a worse picture than a
+   * slightly smaller one. The floor matters as much as the fit — below about a
+   * third of the starting size the text is unreadable at the distance anyone
+   * stands at, and a card you cannot read is worse than a card that overflows.
+   */
+  function fitText(g, text, room, start, floor = 28) {
+    let px = start;
+    do {
+      g.font = `700 ${px}px "Trebuchet MS", "Segoe UI", sans-serif`;
+      px -= 4;
+    } while (px > floor && g.measureText(text).width > room);
   }
 
   /**
@@ -1764,14 +1801,7 @@ async function buildJadrija(scene) {
       g.fillStyle = '#26333d';
       g.textAlign = 'center';
       g.textBaseline = 'middle';
-      // Shrunk to fit rather than wrapped: these are three or four words, and a
-      // line break in the middle of "what's up, duck?" is a worse picture than
-      // a slightly smaller one.
-      let px = 96;
-      do {
-        g.font = `700 ${px}px "Trebuchet MS", "Segoe UI", sans-serif`;
-        px -= 4;
-      } while (px > 28 && g.measureText(text).width > cv.width - 64);
+      fitText(g, text, cv.width - 64, 96);
       g.fillText(text, cv.width / 2, cv.height / 2 + 4);
       tex.needsUpdate = true;
     };
@@ -1804,7 +1834,8 @@ async function buildJadrija(scene) {
       // here: often enough to be noticed on a second visit, rare enough that it
       // is still a surprise.
       pick: () => {
-        const pool = NOTES.concat(Object.values(live).filter(Boolean));
+        const pool = NOTES.concat(LIVE
+          .filter((s) => s.card).map((s) => live[s.key]).filter(Boolean));
         write(pool[(Math.random() * pool.length) | 0]);
       },
       /**
@@ -1855,14 +1886,6 @@ async function buildJadrija(scene) {
       mesh.updateMatrixWorld();
       scene.add(mesh);
       banner = makeBanner(skinFig);
-      // Asked for once here and on their own intervals after, for as long as
-      // the page is open. Started only now, next to the card they write on: if
-      // there is no figure there is no card, and a number nobody can be shown
-      // is not worth a request.
-      for (const src of LIVE) {
-        poll(src);
-        setInterval(() => poll(src), src.every);
-      }
       testFigure = { mesh, fig: skinFig, tris: skinFig.tris, at: [ft, fs] };
 
       // The survey pole that used to stand here is gone.
@@ -1911,6 +1934,167 @@ async function buildJadrija(scene) {
     } catch (e) {
       console.warn('test figure failed:', e.message);
     }
+  }
+
+  // ── the dog ────────────────────────────────────────────────────────────────
+  /**
+   * The seaward edge of the strip she performs on.
+   *
+   * Hoisted out of `SHOW` below, and only because two things now need it and
+   * one of them runs before `SHOW` exists. Keeping it as a literal in both
+   * places is how a dog ends up standing in her lane six months after somebody
+   * widens the lane and forgets there was a second copy of the number.
+   */
+  const SHOW_LANE0 = JAD.mid - 2.0;
+
+  /**
+   * A pug on the deck, and a balloon over it with the price of a coin named
+   * after a different dog.
+   *
+   * The only piece of geometry in this game that was not authored for it. Four
+   * buildings, an aeroplane, a woman, thirteen thousand houses and a hundred and
+   * sixty-nine square kilometres of karst are all built by something in tools/,
+   * because all of them are *specific* — that cathedral, that channel, that
+   * fire. A dog on a beach is not specific, and the effort is better spent on
+   * where it stands than on modelling one. See tools/blender/assets/README.md.
+   *
+   * It does not move, and that is a decision for this pass rather than a
+   * limitation of the mesh: the asset arrives with a 24-bone quadruped rig and
+   * an idle, and none of it is exported yet. A trot needs a floor pass for a
+   * gait with four contacts a cycle where hers has two, and shipping a rig
+   * nothing plays would put it in every download for nothing.
+   *
+   * So: a dog standing on the promenade, near enough her spot that you meet the
+   * two of them together, and **outside her lane**, which is why the position
+   * is written off `SHOW_LANE0` rather than off the middle of the deck. She
+   * does not collide with anything — that is deliberate and documented where
+   * the performance is — so anything standing in the strip she plays on is
+   * something she walks through. A bather she walks through is a shrug; a dog
+   * is a fixed thing you are looking straight at when it happens.
+   */
+  let dog = null;
+
+  /**
+   * The balloon, which is her card's trick with two things changed.
+   *
+   * Hers is a child of her mesh and reads two bones a frame to sit between her
+   * hands, because the pose decides how she holds it. Nothing holds this one:
+   * it is a thought over an animal that does not move, so it hangs at a fixed
+   * height and simply turns to face you. Billboarded, and only about the
+   * vertical — tilting a balloon back as you climb into an aeroplane would be
+   * the one thing in the scene that knows where the camera is.
+   *
+   * And it is only up when you are close. A speech balloon visible from the
+   * circuit is a HUD element; visible from six metres it is a joke you walked
+   * into, which is the whole of what it is for.
+   */
+  function makeBalloon() {
+    const cv = document.createElement('canvas');
+    cv.width = 512; cv.height = 256;
+    const g = cv.getContext('2d');
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+
+    const write = (text) => {
+      g.clearRect(0, 0, cv.width, cv.height);
+      // A rounded box with a tail pointing down at the animal thinking it.
+      const R = 34, W = cv.width - 16, H = 190;
+      g.fillStyle = '#fbfaf6';
+      g.strokeStyle = '#7d8894';
+      g.lineWidth = 5;
+      g.beginPath();
+      g.moveTo(8 + R, 10);
+      g.arcTo(8 + W, 10, 8 + W, 10 + H, R);
+      g.arcTo(8 + W, 10 + H, 8, 10 + H, R);
+      // The tail, cut into the bottom edge rather than drawn over it, so the
+      // stroke runs round the outside of the whole shape in one path.
+      g.lineTo(cv.width / 2 + 26, 10 + H);
+      g.lineTo(cv.width / 2 - 6, cv.height - 6);
+      g.lineTo(cv.width / 2 - 30, 10 + H);
+      g.arcTo(8, 10 + H, 8, 10, R);
+      g.arcTo(8, 10, 8 + W, 10, R);
+      g.closePath();
+      g.fill();
+      g.stroke();
+      g.fillStyle = '#2b3540';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      fitText(g, text, W - 56, 78, 26);
+      g.fillText(text, cv.width / 2, 10 + H / 2);
+      tex.needsUpdate = true;
+    };
+
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.46, 0.23),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true,
+        side: THREE.DoubleSide, depthWrite: false }));
+    mesh.frustumCulled = false;
+    mesh.visible = false;
+    mesh.renderOrder = 3;
+    return { mesh, say: write, said: null };
+  }
+
+  if (PAYLOAD.dog_fr3d) {
+    try {
+      const geo = readFR3D(await inflateBinary(PAYLOAD.dog_fr3d));
+      const mesh = new THREE.Mesh(geo, solidMaterial(0xffffff, {
+        spec: 0.05, specPower: 20, body: 'base *= vVCol;',
+      }));
+      const dt = LEN * 0.5 + 19.4, ds = SHOW_LANE0 - 0.8;
+      const p = toWorld(dt, ds);
+      mesh.position.set(p[0], p[1], p[2]);
+      // Facing back along the promenade, which from here is roughly at her:
+      // a dog on a beach is looking at whatever is most interesting, and on
+      // this deck that is either her or you, and she is closer.
+      mesh.rotation.y = rigYaw(dt, 0.35);
+      mesh.updateMatrixWorld();
+      scene.add(mesh);
+      const balloon = makeBalloon();
+      balloon.mesh.position.set(p[0], p[1] + 0.62, p[2]);
+      scene.add(balloon.mesh);
+      dog = { mesh, balloon, at: [dt, ds], tris: geo.index.count / 3 };
+    } catch (e) {
+      console.warn('dog failed:', e.message);
+    }
+  }
+
+  // Asked for once here and on their own intervals after, for as long as the
+  // page is open. Started here rather than at the top of the file because there
+  // has to be somebody to say them: no figure and no dog means no card and no
+  // balloon, and a number nobody can be shown is not worth a request. It used
+  // to sit inside the figure's own block, which quietly made the dog's line
+  // depend on her mesh having loaded — two things that have nothing to do with
+  // each other.
+  if (skinFig || dog) {
+    for (const src of LIVE) {
+      poll(src);
+      setInterval(() => poll(src), src.every);
+    }
+  }
+
+  /**
+   * Point the balloon at you, and take it down when you are not there.
+   *
+   * `DOG_NEAR` is a little further than the distance she notices you from, on
+   * purpose: the balloon should already be up by the time she starts her
+   * routine, or it reads as a reaction to the routine rather than as a dog that
+   * was standing there thinking about coins the whole time.
+   */
+  const DOG_NEAR = 21;
+
+  function stepDog(camPos) {
+    if (!dog) return;
+    const b = dog.balloon;
+    const d = Math.hypot(camPos.x - dog.mesh.position.x,
+      camPos.z - dog.mesh.position.z);
+    // No price, no balloon. The same rule her card follows: a line that never
+    // arrived is simply not one of the things anybody says.
+    b.mesh.visible = !!live.doge && d < DOG_NEAR;
+    if (!b.mesh.visible) return;
+    if (b.said !== live.doge) { b.said = live.doge; b.say(live.doge); }
+    b.mesh.rotation.y = Math.atan2(camPos.x - b.mesh.position.x,
+      camPos.z - b.mesh.position.z);
   }
 
   // ── the performance ────────────────────────────────────────────────────────
@@ -1973,7 +2157,7 @@ async function buildJadrija(scene) {
     wheels: 3,          // and how many she strings together
     crawlFor: 4.6,      // seconds down on all fours
     playFor: 24,        // and larking about, before she comes home to her spot
-    lane: [JAD.mid - 2.0, JAD.rowA - 1.8],   // the strip of deck she plays on
+    lane: [SHOW_LANE0, JAD.rowA - 1.8],      // the strip of deck she plays on
     // The wander. A new heading every `turn` seconds, `swing` radians off the
     // last one, at a speed drawn fresh each time — which is a random walk with
     // the corners rounded off, and the rounding is the whole trick. Redrawing
@@ -3088,6 +3272,11 @@ async function buildJadrija(scene) {
     // Where you are, in the frame everybody here is laid out in.
     const [pt, ps] = local(cam.x, cam.z);
 
+    // Cheap, and unconditional for that reason: two subtractions and a hypot
+    // against one distance, and a rotation only on the frames the balloon is
+    // actually up. It does not need the range gate the figure has.
+    stepDog(cam);
+
     if (skinFig) {
       const dx = cam.x - skinFig.mesh.position.x, dz = cam.z - skinFig.mesh.position.z;
       // Posed on the CPU — twenty-eight bones, once a frame — so she is only
@@ -3194,6 +3383,9 @@ async function buildJadrija(scene) {
     /** What the internet last said, or nulls. Read by a test, and by nothing else. */
     btc: () => live.btc,
     live: () => ({ ...live }),
+    /** The dog, and whether its balloon is up. */
+    dog: () => dog && { at: dog.at, tris: dog.tris,
+      says: dog.balloon.mesh.visible ? dog.balloon.said : null },
     /** Where the performance has got to. */
     show: () => show && {
       phase: show.phase, clip: skinFig ? skinFig.playing() : null,

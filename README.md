@@ -518,6 +518,20 @@ including how to rebuild without the parts you may not want.
   This is the only recorded sound in the build. Every other noise the game
   makes — engines, water, fire, cicadas, footsteps — is synthesised from
   oscillators and noise at run time and owes nobody a credit.
+- **The dog**: [*Pug*](https://poly.pizza/m/1gXKv15ik8) by
+  **[Quaternius](https://quaternius.com)**, dedicated to the public domain under
+  [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). The source
+  `.glb` is committed at `tools/blender/assets/pug.glb` and
+  `tools/blender/dog.py` turns it into `build/payload/dog.fr3d.gz` — turned onto
+  the game's +X, scaled to 36 cm at the ears, dropped onto z = 0 and split along
+  its material seam so its two colours become vertex colours like everything
+  else here. CC0 asks for no attribution; this is here anyway.
+
+  It is the only geometry in the game that was not authored for it. Everything
+  else — four landmarks, the aeroplane, the figure, thirteen thousand
+  footprints, a hundred and sixty-nine square kilometres of karst — is built by
+  something in `tools/`, because all of it is *specific*. A dog on a beach is
+  not specific.
 
 ## What actually happened
 
