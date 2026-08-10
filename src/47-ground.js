@@ -1124,8 +1124,37 @@ async function buildGround(scene, field) {
     //
     // `look()` subtracts, because moving the mouse right decreases yaw, so
     // turning right subtracts too.
+    //
+    // Scaled by the lens, the same way the mouse is in 90-app.js: radians per
+    // *second* is what a hand has learned on a key, and it is the field of view
+    // that decides how much of the frame a radian crosses. Wide open this is
+    // exactly what it always was — the factor is 1 — and at 11° it is a fifth of
+    // it, which is the difference between panning a scope and swinging it.
+    const lens = Math.pow(LENS.min / baseFov, zoom);
     const turn = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0);
-    if (turn) you.yaw -= turn * GROUND.turn * dt;
+    if (turn) you.yaw -= turn * GROUND.turn * lens * dt;
+
+    // And up and down tilt, but only through the lens.
+    //
+    // The four arrows are two different controls that happen to be adjacent,
+    // and they always were: left and right turn your head, up and down walk you
+    // forward and back. That asymmetry is invisible until you put a scope on
+    // it, and then it is the whole complaint — you can pan but you cannot look
+    // up, because up is a leg.
+    //
+    // So the pair hands over as the lens comes in, `zoom` to the tilt and
+    // `1 - zoom` to the walk below. A crossfade rather than a switch at some
+    // threshold, because the lens itself is eased over about a fifth of a
+    // second and a control that changed meaning part-way through that ease
+    // would be a control that stutters. Left and right are untouched: turning
+    // your head is the same verb at both ends and there is nothing to hand over.
+    const tilt = (keys.has('ArrowUp') ? 1 : 0) - (keys.has('ArrowDown') ? 1 : 0);
+    if (tilt && zoom > 0) {
+      // The same clamp `look()` uses, and for the same reason: past these you
+      // are looking at the sky through the back of your own neck.
+      you.pitch = clamp(you.pitch + tilt * GROUND.turn * lens * zoom * dt,
+        -1.35, 1.05);
+    }
 
     const fx = -Math.sin(you.yaw), fz = -Math.cos(you.yaw);
     // Right is forward rotated a quarter turn clockwise about the vertical:
@@ -1134,8 +1163,14 @@ async function buildGround(scene, field) {
     // sideways control in the mode was mirrored.
     const rx = Math.cos(you.yaw), rz = -Math.sin(you.yaw);
     let ix = 0, iz = 0;
-    if (keys.has('KeyW') || keys.has('ArrowUp')) iz += 1;
-    if (keys.has('KeyS') || keys.has('ArrowDown')) iz -= 1;
+    // W and S are always a leg. The arrows are a leg by however much the lens
+    // has not taken — see the tilt above — so at full zoom they stop walking
+    // you entirely, which is right: nobody walks anywhere while looking down a
+    // scope, and a step at 11° is a lurch across the whole frame.
+    if (keys.has('KeyW')) iz += 1;
+    if (keys.has('KeyS')) iz -= 1;
+    if (keys.has('ArrowUp')) iz += 1 - zoom;
+    if (keys.has('ArrowDown')) iz -= 1 - zoom;
     if (keys.has('KeyD')) ix += 1;
     if (keys.has('KeyA')) ix -= 1;
     ix += TOUCH.gx || 0; iz += TOUCH.gy || 0;

@@ -79,6 +79,20 @@ COLOURS = {
     "Brown": (0.032, 0.011, 0.007),
 }
 
+# Levels of Catmull-Clark before the split. The asset is 644 faces, which is a
+# sensible budget for something the size of a footstool seen from across a
+# promenade and not a sensible one for something you can crouch down next to —
+# and you can, because the balloon only comes up inside 21 m and the whole point
+# of it is to be read. One level takes it to 1 932 faces — 3 536 vertices across
+# the two colour parts — for a few KB in a 12 MB download.
+#
+# One and not two. Catmull-Clark does not add detail, it removes corners: the
+# limit surface is smoother than the cage everywhere, and on a stylised low-poly
+# animal the second level starts eating the very things that make it read as a
+# pug — the flat muzzle, the square jaw, the creases. Anything past this wants a
+# better cage, not more subdivision of this one.
+SUBDIV = 1
+
 
 def build():
     reset_scene()
@@ -122,6 +136,44 @@ def build():
     zs = [v.co.z for v in dog.data.vertices]
     print("[dog] scaled x%.4f  nose-to-tail %.3f m  wide %.3f m  tall %.3f m"
           % (k, max(xs) - min(xs), max(ys) - min(ys), max(zs) - min(zs)))
+
+    # Smooth, and subdivided. Applied here rather than left as a modifier
+    # because `bpy.ops.mesh.separate` below works on the cage and the exporter
+    # reads `data.vertices`, so an unapplied modifier is a modifier that ships
+    # as nothing at all. It goes *before* the split for the same reason it goes
+    # after the scaling: Catmull-Clark on two objects that used to share an edge
+    # pulls them apart along it, and the seam here runs right across the muzzle.
+    bpy.context.view_layer.objects.active = dog
+    dog.select_set(True)
+    if SUBDIV:
+        # Weld first, and this is not optional — it is the whole difference
+        # between a dog and a heap of pebbles.
+        #
+        # The asset is authored flat-shaded, which means every face carries its
+        # own copy of its corners and no two faces share an edge: 1 284 vertices
+        # for what is topologically about 320. Catmull-Clark works on edges, so
+        # on a mesh with no shared edges it does not smooth a surface, it rounds
+        # off each face separately and pulls the results apart — the first run
+        # of this came out as a Dalmatian made of loose brown lozenges with the
+        # sea visible between them. Merging by distance restores the topology
+        # the modelling had, and then the subdivision has something to hold on
+        # to. 1e-4 m is a tenth of a millimetre on a half-metre animal, well
+        # below any real feature and well above float noise from the scaling.
+        before_v = len(dog.data.vertices)
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.remove_doubles(threshold=1e-4)
+        bpy.ops.object.mode_set(mode="OBJECT")
+        print("[dog] welded %d -> %d verts" % (before_v, len(dog.data.vertices)))
+
+        before = len(dog.data.polygons)
+        m = dog.modifiers.new("sub", "SUBSURF")
+        m.levels = m.render_levels = SUBDIV
+        bpy.ops.object.modifier_apply(modifier=m.name)
+        print("[dog] subdivided %d -> %d faces at level %d"
+              % (before, len(dog.data.polygons), SUBDIV))
+    for p in dog.data.polygons:
+        p.use_smooth = True
 
     # Split along the material seam, which is where the colour boundary is, and
     # hand `export` one part per colour.

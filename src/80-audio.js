@@ -11,6 +11,7 @@
 function buildAudio() {
   let ctx = null;
   let master = null, verb = null, verbSend = null, verbGain = null, bed = null, bedDuck = null;
+  let slowLp = null;
   const nodes = {};
   let started = false;
   let noiseBuf = null;
@@ -105,7 +106,27 @@ function buildAudio() {
     comp.ratio.value = 6;
     comp.attack.value = 0.006;
     comp.release.value = 0.22;
-    master.connect(comp).connect(ctx.destination);
+    // And a filter across the whole mix for slow motion.
+    //
+    // The right way to slow a sound down is to play it slower, and there is no
+    // way to do that here: nothing in this file is a sample. Every voice is
+    // synthesised from oscillators and scheduled envelopes, so "half speed"
+    // would mean rewriting every generator to take a rate — twenty-odd of them,
+    // each with its own timing, and each a chance to get a landing thump or a
+    // rotor beat subtly wrong.
+    //
+    // So this does what films do for the same effect instead of what a tape
+    // machine does: it takes the top off and lets the mix go under water. That
+    // is not a substitute for pitching down, it is a different and older idiom
+    // for the same beat, and it is the one the ear reads as "time has gone
+    // strange" rather than as "the audio is broken". Wide open at 20 kHz it is
+    // inaudible and costs one biquad, so it sits in the chain always rather
+    // than being patched in and out.
+    slowLp = ctx.createBiquadFilter();
+    slowLp.type = "lowpass";
+    slowLp.frequency.value = 20000;
+    slowLp.Q.value = 0.4;
+    master.connect(slowLp).connect(comp).connect(ctx.destination);
 
     // ── the bed ───────────────────────────────────────────────────────────
     // The two continuous sounds that stand still and fill the whole band at
@@ -1734,9 +1755,27 @@ function buildAudio() {
     master.gain.setTargetAtTime(on ? 0.0001 : masterVol, ctx.currentTime, on ? 0.05 : 0.22);
   }
 
+  /**
+   * How far under water the mix is, 0 to 1. See the filter in `start`.
+   *
+   * Geometric between 20 kHz and 620 Hz, because pitch is: the ear hears equal
+   * ratios as equal steps, so a linear sweep of the corner spends most of its
+   * travel doing nothing audible and then falls off a cliff at the end. 620 Hz
+   * is below the top of a voice and above the bottom of one — everything keeps
+   * its body and loses its edge, which is the sound wanted.
+   *
+   * Set every frame, so it is a plain assignment rather than a ramp: a
+   * `setTargetAtTime` re-armed sixty times a second never arrives anywhere, and
+   * this is already being fed a value that has been eased by the caller.
+   */
+  function slowmo(k) {
+    if (!slowLp) return;
+    slowLp.frequency.value = 20000 * Math.pow(620 / 20000, clamp(k, 0, 1));
+  }
+
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, beep, setVolume, getVolume,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa,
-    firestarter,
+    firestarter, slowmo,
     /**
      * For a test: what every continuous bed is *actually* playing at.
      *

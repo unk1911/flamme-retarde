@@ -130,6 +130,14 @@ AREOLA_M, AREOLA_P = (0.455, 0.288, 0.268), (0.455, 0.288, 0.268)
 # tried at HAIR_P. If this ever looks washed out, that is the first thing to try
 # and the reason not to is only a guess.
 PUBIC_M, PUBIC_P = HAIR_M, (0.225, 0.163, 0.128)
+# And the perianal skin, which is a literal on both channels like the areolae:
+# it is pigment rather than hair, so it must not ride the crowd shader's hair
+# slot. Two and a half shades under the skin, between AREOLA_P and PUBIC_P and
+# for the reason both of those notes give — this is a patch on skin and not a
+# line, and the mistake available here is a wound rather than a washout. It also
+# sits at the bottom of a crevice that is already the darkest place on her, so
+# whatever it is worth it is worth less than the number says.
+ANUS_M, ANUS_P = (0.393, 0.262, 0.226), (0.393, 0.262, 0.226)
 
 
 # --------------------------------------------------------------------------- #
@@ -2359,12 +2367,111 @@ def wrist_band(J, mesh, out):
     return seg * ring_seg
 
 
+# Height of the centre. 0.845 was the first try and it sat about four
+# centimetres below where the cleft closes, which from behind reads as a mark on
+# the perineum rather than as the bottom of the crevice — a speck floating on
+# open skin. This is up in the valley, where the cheeks still have it between
+# them, so most angles occlude it and the ones that do not show it recessed and
+# in shadow. That is also the anatomy: on a standing figure seen square from
+# behind this is mostly *not* visible, and a version of it that always is would
+# be the wrong fix for the complaint.
+ANUS_Z = 0.857
+ANUS_R = 0.0094           # and its radius: a 19 mm disc
+ANUS_SINK = 0.0036        # how far the middle is drawn in behind the rim
+ANUS_LIFT = 0.0008        # and how far the rim stands off the skin
+ANUS_SEG = 14
+
+
+def perineum(mesh, out):
+    """The one feature on this figure that paint could not have done.
+
+    Everything else small and dark on her is a cutter — the areolae, the irises,
+    the mouth, the pubic hair — because a colour per vertex costs nothing and
+    the decimator's blurring is usually either harmless or, for hair, actually
+    wanted. That argument runs out here, and it runs out on a measurement rather
+    than on taste: a 19 mm disc at the bottom of the gluteal cleft contains
+    **three to eight vertices of the full 218 000-vertex body**, and the export
+    decimates by about eight. So the honest range is nought to one vertex, and
+    one vertex of paint on this mesh is not a small dark spot, it is a faint
+    brown cloud several centimetres across. The lower abdomen was already
+    fifteen times coarser than the chest and this is the floor of a crevice
+    inside it, which is the coarsest place on her.
+
+    So it is geometry, laid on after the decimator with the nails and the wrap,
+    and it is the mechanism the pubic hair's note named as the escalation.
+
+    A shallow dished disc: a rim on the skin and a centre drawn in behind it, so
+    the thing has a silhouette and shades itself rather than being a decal. It
+    is nine millimetres of relief on a 1.75 m figure, which is nothing — but it
+    is *nothing in the right shape*, and the crevice it sits in is the darkest
+    place on her anyway, so it needs to be modelled far less than it needs to
+    simply be there.
+
+    Where and which way it faces are both measured, not typed. The cleft floor
+    is the midline vertex least far back at a given height — the buttocks are
+    further out, so the valley is the maximum x of a negative-x band — and the
+    facing comes from how that floor moves over a centimetre and a half of
+    height. It comes out about 50° below horizontal, backward and down, which is
+    what the perineum does. Typing that number would have been typing a guess,
+    and it would have gone stale the first time anybody touched the body.
+    """
+    pos, nrm, col, tri = out
+    base = len(pos)
+
+    def floor_at(z):
+        band = [v.co for v in mesh.vertices
+                if abs(v.co.z - z) < 0.006 and abs(v.co.y) < 0.010 and v.co.x < 0.0]
+        return max(v.x for v in band) if band else None
+
+    lo, mid, hi = floor_at(ANUS_Z - 0.008), floor_at(ANUS_Z), floor_at(ANUS_Z + 0.008)
+    if mid is None or lo is None or hi is None:
+        print("[mh]   perineum: no cleft floor at z %.3f — skipped" % ANUS_Z)
+        return 0
+
+    # The surface tangent in the midline plane, and the outward normal from it.
+    # Outward is the one pointing away from her, which is the −x of the two.
+    tx, tz = hi - lo, 0.016
+    tl = math.hypot(tx, tz)
+    n = Vector((-tz / tl, 0.0, tx / tl))
+    if n.x > 0:
+        n = -n
+    # Two axes across the disc: one straight across her (y), one up the slope.
+    u = Vector((0.0, 1.0, 0.0))
+    w = n.cross(u).normalized()
+    centre = Vector((mid, 0.0, ANUS_Z)) + n * ANUS_LIFT
+
+    pos.append(centre - n * ANUS_SINK)
+    nrm.append(n)
+    col.append(ANUS_P)
+    for k in range(ANUS_SEG):
+        a = 2.0 * math.pi * k / ANUS_SEG
+        d = u * math.cos(a) + w * math.sin(a)
+        pos.append(centre + d * ANUS_R)
+        # Splayed outward from the axis, so the rim catches light as an edge
+        # rather than reading as a flat disc lying in a hole.
+        nrm.append((n * 0.55 + d * 0.83).normalized())
+        col.append(ANUS_P)
+    for k in range(ANUS_SEG):
+        tri.append((base, base + 1 + k, base + 1 + (k + 1) % ANUS_SEG))
+    print("[mh]   perineum r %.4f at x %.4f z %.3f, facing %.0f deg below level"
+          % (ANUS_R, mid, ANUS_Z, math.degrees(math.atan2(-n.z, -n.x))))
+    return ANUS_SEG + 1
+
+
 def post_geometry(J, src, mesh, bindex):
-    """Everything laid on after the decimator: ten nails, a wrap, a bracelet.
+    """Everything laid on after the decimator: ten nails, a bracelet, a wrap.
 
     `src` is the decimated mesh — used only to measure a fingertip, where the
     two differ by nothing that matters — and `mesh` is the full one, used where
     a silhouette has to be traced properly.
+
+    Returns one extra number: how many of the triangles at the **tail** are the
+    wrap. The order here is therefore load-bearing rather than cosmetic — the
+    wrap goes last so that the thing she can take off is one contiguous run at
+    the end of the index buffer, and hiding it in the browser is a draw range
+    ending early rather than a second draw call, a second material or a flag
+    tested per fragment. She sheds it when she catches fire; see `export_skin`
+    for how the number travels and src/43-jadrija.js for who asks.
     """
     pos, nrm, col, bone, tri = [], [], [], [], []
     npos, nnrm, ncol, nbone, ntri = nail_patches(J, src, bindex)
@@ -2375,11 +2482,19 @@ def post_geometry(J, src, mesh, bindex):
     tri += ntri
 
     out = (pos, nrm, col, tri)
-    n = hip_scarf(mesh, out)
-    bone += [bindex["pelvis"]] * n
     n = wrist_band(J, mesh, out)
     bone += [bindex["armLR"]] * n
-    return pos, nrm, col, bone, tri
+    # On the pelvis, like the wrap, and for a better reason than the wrap has:
+    # this sits between two masses that are driven by the *legs*, so binding it
+    # to either thigh would swing it out from between them the first time she
+    # took a step. The pelvis is the one bone it can belong to that keeps it in
+    # the middle of the thing it is in the middle of.
+    n = perineum(mesh, out)
+    bone += [bindex["pelvis"]] * n
+    kept = len(tri)
+    n = hip_scarf(mesh, out)
+    bone += [bindex["pelvis"]] * n
+    return pos, nrm, col, bone, tri, len(tri) - kept
 
 
 def post_preview(J, body):
@@ -2397,7 +2512,7 @@ def post_preview(J, body):
         bpy.data.objects.remove(old, do_unlink=True)
     zero = {n: 0 for n in ("handL", "handR", "thumbL", "thumbR",
                            "pelvis", "armLL", "armLR")}
-    pos, nrm, col, _bone, tri = post_geometry(J, body.data, body.data, zero)
+    pos, nrm, col, _bone, tri, _shed = post_geometry(J, body.data, body.data, zero)
     me = bpy.data.meshes.new("nails")
     me.from_pydata([tuple(p) for p in pos], [], [list(t) for t in tri])
     me.validate()
@@ -2416,7 +2531,7 @@ def post_preview(J, body):
 
 
 def export_skin(body, rig, path, clips, tris=26000, J=None):
-    """Write the figure as a .fr3d **v3** blob: mesh, skeleton and clips.
+    """Write the figure as a .fr3d **v4** blob: mesh, skeleton and clips.
 
     v1 froze the armature into the vertices, which is why the promenade got a
     statue. This carries the four bone influences per vertex that `skin()`
@@ -2538,7 +2653,7 @@ def export_skin(body, rig, path, clips, tris=26000, J=None):
     # this figure has.
     if J is None:
         J, _js, _jd = read_joints(fetch())
-    npos, nnrm, ncol, nbone, ntri = post_geometry(J, src, body.data, bindex)
+    npos, nnrm, ncol, nbone, ntri, nshed = post_geometry(J, src, body.data, bindex)
     lay0 = len(pos) // 3
     for k in range(len(npos)):
         p, nv, c = npos[k], nnrm[k], ncol[k]
@@ -2549,8 +2664,8 @@ def export_skin(body, rig, path, clips, tris=26000, J=None):
         bwgt.extend((255, 0, 0, 0))
     for t in ntri:
         idx.extend(lay0 + q for q in t)
-    print("[mh]   laid on %d verts %d tris (nails, wrap, band)"
-          % (len(npos), len(ntri)))
+    print("[mh]   laid on %d verts %d tris (nails, band, perineum, wrap) — wrap is %d"
+          % (len(npos), len(ntri), nshed))
 
     baked = [_bake_clip(rest, c) for c in clips]
 
@@ -2558,8 +2673,16 @@ def export_skin(body, rig, path, clips, tris=26000, J=None):
     import struct
     nv, ni = len(pos) // 3, len(idx)
     xs, ys, zs = pos[0::3], pos[1::3], pos[2::3]
-    parts = [struct.pack("<4sIII6f", b"FR3D", 3, nv, ni,
-                         min(xs), min(ys), min(zs), max(xs), max(ys), max(zs)),
+    # v4 adds one number to the header: how many indices at the end of the
+    # buffer are the wrap. Everything else is byte-for-byte v3. It is a header
+    # field rather than a table of named parts because there is exactly one
+    # removable thing on this figure and a general mechanism for it would be
+    # more format than the feature deserves — if a second garment ever wants
+    # taking off, *that* is when this becomes a table, and the version number
+    # is here so that day is a clean break rather than a guess.
+    parts = [struct.pack("<4sIII6fI", b"FR3D", 4, nv, ni,
+                         min(xs), min(ys), min(zs), max(xs), max(ys), max(zs),
+                         nshed * 3),
              struct.pack("<%df" % (nv * 3), *pos),
              struct.pack("<%df" % (nv * 3), *nrm),
              bytes(cols), bytes(bidx), bytes(bwgt)]
@@ -4155,6 +4278,14 @@ VIEWS = {
     # The wrap, from the front and from the side she ties it on.
     "hips": (18.0, 6.0, 0.880, 1.55, 820, 900),
     "hipside": (96.0, 5.0, 0.880, 1.55, 820, 900),
+    # There is deliberately no view here for the perineum, and it is worth
+    # saying why rather than leaving the gap to look like an oversight. Every
+    # camera in this table renders `post_preview`, which lays on the nails, the
+    # wrap *and* the perineum — and the wrap spans z 0.828 to 0.960, so it
+    # covers the thing completely. Blender cannot show this one at all. It is
+    # checked two other ways instead: by decoding the shipped blob for the
+    # fifteen vertices at full colour, and in the browser after the turn, which
+    # is the only state the game ever draws it in anyway.
     "face": (2.0, 2.0, 1.612, 0.46, 900, 900),
     "head": (30.0, 5.0, 1.615, 0.52, 900, 900),
     "prof": (88.0, 2.0, 1.615, 0.50, 900, 900),

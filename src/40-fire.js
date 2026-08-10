@@ -371,7 +371,23 @@ function buildFire(scene) {
   const smoke = buildSmoke(scene, FIRE.maxSmoke);
 
   let uploadAcc = 0;
-  function update(dt) {
+  /**
+   * `dt` spreads the fire; `vis` animates it.
+   *
+   * They are the same number except in slow motion, and that is the one case
+   * this split exists for. Everything else in the game can slow down freely,
+   * because slowing you and the thing you are fighting by the same factor
+   * changes nothing about who is winning — you also spray slower. The fire is
+   * the exception: it is the only process here that is not in a race with the
+   * player but with the clock, and `state.t` does not slow. Let the spread take
+   * `vis` and holding the zoom key becomes a way of pausing the fire while the
+   * mission timer runs, which is a cheat rather than a feature.
+   *
+   * So the cellular automaton and the smoke pall keep real time and only the
+   * flames and the smoke sprites — which are pictures of the fire and not the
+   * fire — go slow.
+   */
+  function update(dt, vis = dt) {
     acc += dt;
     let ticks = 0;
     while (acc >= CONFIG.fireStep && ticks < 4) {
@@ -392,8 +408,8 @@ function buildFire(scene) {
     U.uSmokeAmt.value = damp(U.uSmokeAmt.value,
       Math.min(0.85, burning.size / 420), 0.35, dt);
 
-    flames.update(dt, burning, inten, cellToWorld, groundY, cell);
-    smoke.update(dt, burning, inten, cellToWorld, groundY);
+    flames.update(vis, burning, inten, cellToWorld, groundY, cell);
+    smoke.update(vis, burning, inten, cellToWorld, groundY);
   }
 
   return {

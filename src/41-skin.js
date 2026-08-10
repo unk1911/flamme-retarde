@@ -37,11 +37,15 @@ function readFR3DSkin(buf) {
     dv.getUint8(2), dv.getUint8(3));
   if (magic !== 'FR3D') throw new Error('not an fr3d blob: ' + magic);
   const version = dv.getUint32(4, true);
-  if (version !== 3) throw new Error('fr3d skin needs version 3, got ' + version);
+  if (version !== 4) throw new Error('fr3d skin needs version 4, got ' + version);
   const nv = dv.getUint32(8, true);
   const ni = dv.getUint32(12, true);
+  // How many indices at the *end* of the buffer are the hip wrap — the one
+  // thing on this figure that comes off. The exporter puts it last precisely so
+  // that this is a number and not a list; see `post_geometry`.
+  const shed = dv.getUint32(40, true);
 
-  let o = 40;
+  let o = 44;
   const pos = new Float32Array(buf, o, nv * 3); o += nv * 12;
   const nrm = new Float32Array(buf, o, nv * 3); o += nv * 12;
   const col = new Uint8Array(buf, o, nv * 3); o += nv * 3;
@@ -111,7 +115,7 @@ function readFR3DSkin(buf) {
   // a somersault leaves it — and a figure that pops out of existence when she
   // reaches up is worse than one that is occasionally drawn off screen.
   g.boundingSphere.radius *= 1.9;
-  return { geo: g, bones, clips, nv, tris: ni / 3 };
+  return { geo: g, bones, clips, nv, tris: ni / 3, ni, shed };
 }
 
 /** Depth-only vertex program for a skinned caster. Position, and nothing else. */
@@ -719,9 +723,28 @@ function skinnedFigure(data, opts = {}) {
     });
   }
 
+  /**
+   * Put the wrap on, or take it off.
+   *
+   * The whole mechanism is one draw range, because the exporter went to the
+   * trouble of putting the wrap last. Off is "stop drawing before the tail";
+   * on is the default range back. No second mesh, no second material, no
+   * per-fragment test, and — the part that matters — the shadow pass gets it
+   * for free, since `cast` registers this same geometry under a depth-only
+   * material and a draw range belongs to the geometry rather than to either.
+   *
+   * She is a complete body underneath. The wrap has been laid-on geometry
+   * sitting four millimetres off the skin ever since the painted garment came
+   * off her in 1.43, so there is nothing behind it to be missing — which is the
+   * one thing that would have made this hard and was already paid for.
+   */
+  function wear(on) {
+    data.geo.setDrawRange(0, on ? Infinity : data.ni - data.shed);
+  }
+
   update(0);
   return {
-    mesh, material: mat, bones: data.bones, uBones, cast,
+    mesh, material: mat, bones: data.bones, uBones, cast, wear,
     clips: Object.keys(data.clips), tris: data.tris, nv: data.nv,
     play, update, state: st, face, faceTick, uFace,
     playing: () => (st.cur ? st.cur.name : null),

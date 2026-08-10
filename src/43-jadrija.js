@@ -1642,6 +1642,21 @@ async function buildJadrija(scene) {
    */
   const NOTES = ['herro!', "what's up, duck?", 'meaw!'];
 
+  // And the two she only holds up while she is alight. Not in `NOTES`, because
+  // a girl on a beach in the sun announcing she is a firestarter is a non
+  // sequitur, and the same card held up by a woman with flames climbing her
+  // arms while the deck burns behind her is the joke. It is the one thing here
+  // that is a quotation rather than something she thought of.
+  //
+  // Two cards rather than two lines on one card, which is what it was first.
+  // The card is 512 px wide and about 30 cm tall in the world, and the fitter
+  // has to shrink a twenty-two character line to fit across it — put two of
+  // those on the same card and each is half the height as well, which at four
+  // metres through a 30-degree lens is a grey smear. One line a card is twice
+  // the letter height for nothing, and it is better comic timing besides: the
+  // second card is a beat, and a beat is what makes the line land.
+  const FIRE_NOTES = ['i am a firestarter!', 'a twisted firestarter!'];
+
   // ── and the lines on it she did not make up ────────────────────────────────
   /**
    * What the world outside says, if there is an internet and it feels like
@@ -1701,12 +1716,21 @@ async function buildJadrija(scene) {
       card: false,
       url: 'https://api.coinbase.com/v2/prices/DOGE-USD/spot',
       every: 5 * 60 * 1000,
-      // Four decimals, because it is worth well under a dollar and rounding it
-      // the way the bitcoin line is rounded gives you "doge: $0", which is a
-      // joke about a different thing.
+      // Every decimal the exchange quotes, and not a fixed count. Rounding it
+      // the way the bitcoin line is rounded gives "doge: $0", which is a joke
+      // about a different thing — but a fixed four was the same mistake one
+      // step smaller, because it silently drops the fifth digit Coinbase
+      // actually publishes and pads with a zero on the days it does not. What
+      // the exchange sends is a decimal string it chose the precision of, so
+      // the honest thing is to print that string and add nothing: the balloon
+      // says what the exchange said. Clamped at eight so a bad day at the API
+      // cannot put forty characters on a speech bubble.
       read: (j) => {
-        const n = Number(j.data.amount);
-        return Number.isFinite(n) && n > 0 ? 'doge: $' + n.toFixed(4) : null;
+        const s = String(j.data.amount);
+        const n = Number(s);
+        if (!Number.isFinite(n) || n <= 0) return null;
+        const dp = (s.split('.')[1] || '').length;
+        return 'doge: $' + (dp > 8 ? n.toFixed(8) : s);
       },
     },
     {
@@ -1929,7 +1953,9 @@ async function buildJadrija(scene) {
         // the whole session, forgotten only very slowly. `burn` is how much of
         // the routine is left once it has started, and `cast` is the count
         // down to the next fireball.
-        soak: 0, burn: 0, cast: 0,
+        soak: 0, burn: 0, cast: 0, boast: 0,
+        // The one thing here that only ever goes one way. See the flare.
+        turned: 0,
       };
     } catch (e) {
       console.warn('test figure failed:', e.message);
@@ -2240,18 +2266,30 @@ async function buildJadrija(scene) {
     // "If we spray her with water for too long she at some point switches into
     // a Prodigy Firestarter routine and starts casting fireballs."
     //
-    // Sixteen seconds of jet actually landing on her, and it is worth being
-    // precise about what that means, because the note above `figureWet` says in
-    // as many words that litres are ignored and that a soak meter on a child
-    // playing in a hose would be the game being a game about the one thing here
-    // that is not one. That note still stands and this does not contradict it.
-    // What is metered here is not damage and there is no state she is being
+    // Five and a half seconds of jet actually landing on her, and it is worth
+    // being precise about what that means, because the note above `figureWet`
+    // says in as many words that litres are ignored and that a soak meter on a
+    // child playing in a hose would be the game being a game about the one thing
+    // here that is not one. That note still stands and this does not contradict
+    // it. What is metered here is not damage and there is no state she is being
     // driven toward — nothing is filling up, and hosing her is not *for*
     // anything. It is a clock on how long you have been doing one thing, and
-    // what it buys is a different thing to look at. The pack holds forty-three
-    // seconds of water, so this is well over a third of it aimed at a girl on
-    // purpose, which is not something anybody does by accident.
-    soakFor: 16,
+    // what it buys is a different thing to look at.
+    //
+    // It was sixteen, which at 9.2 litres a second is a hundred and fifty
+    // straight down the branch and, because the jet wanders off her constantly
+    // and the meter only counts the frames it is actually landing, nearer two
+    // hundred and fifty out of the pack in practice. That is well over half of
+    // a four-hundred-litre trolley spent on a joke, and the reasoning behind it
+    // — that the turn should cost enough that nobody reaches it by accident —
+    // was answering the wrong question. Nobody reaches it by accident at five
+    // seconds either: a jet held on one person for five continuous seconds is
+    // already unmistakably deliberate. What sixteen actually bought was that
+    // most players never saw the best thing on the promenade at all, and that
+    // the ones who did had no water left to fight the fire with afterwards.
+    // Fifty litres is an eighth of the pack, which is a price worth paying
+    // twice.
+    soakFor: 5.5,
     // A minute is a set piece and ten seconds is a twitch. Twenty-six is long
     // enough to light four or five patches of deck and put you properly behind.
     blazeFor: 26,
@@ -2261,6 +2299,16 @@ async function buildJadrija(scene) {
     // happened to still be holding the trigger when it began.
     douseFor: 5,
     castEvery: [1.4, 2.5],   // seconds between fireballs
+    // And between cards. The first is seeded at the far end of this at the
+    // moment she lights, so the fire comes first and the announcement comes
+    // after it — which is the right order for a boast — and a twenty-six second
+    // burn then gets two of them. Three would be a woman with a sign rather
+    // than a woman on fire.
+    boastEvery: [6, 11],
+    // Two cards at 2.2 s each. Long enough to read four words and take the
+    // second one as a punchline, short enough that she is a woman on fire who
+    // paused rather than a woman holding a sign.
+    boastFor: 4.4,
     castAt: 0.46,       // s into the `cast` clip where it leaves her hand. This
                         // is FIRE_CAST_AT in tools/blender/human_mh.py and it
                         // has to move with it or the ball appears out of a hand
@@ -2640,13 +2688,18 @@ async function buildJadrija(scene) {
    * because standing in the jet is how the meter fills — goes straight over.
    */
   const HELD = { down: 1, up: 1, flip: 1, joy: 1, wheel: 1,
-    flare: 1, blaze: 1, cast: 1 };
+    flare: 1, blaze: 1, cast: 1, boast: 1 };
 
   // And the three of those that have a beat under them. `flare` is in it
   // because the riser is the point of the riser: the music starts a second and
   // a tenth before the first kick, under the clip where she throws herself
   // open, and the downbeat lands on the frame the stamping starts.
-  const MUSIC = { flare: 1, blaze: 1, cast: 1 };
+  // `boast` is in it for both reasons at once: the beat must not stop while she
+  // holds the card up — a track that drops out for three seconds in the middle
+  // has ended, not paused — and the ink rides the same flag, so a firestarter
+  // showing you a sign that says she is one had better still have flames on her
+  // arms while she does it.
+  const MUSIC = { flare: 1, blaze: 1, cast: 1, boast: 1 };
 
   /**
    * And how pleased she is, per phase, which is the only thing driving her face.
@@ -2837,14 +2890,34 @@ async function buildJadrija(scene) {
       f.face.smile = turn ? 0
         : clamp((SMILE[show.phase] ?? 0.4) + show.wet * 0.32, 0, 1);
       f.face.rate = turn ? 0.1 : 1;
-      f.face.ink = turn ? 1 : 0;
+      // The ink stays. It arrives with the riser and it does not wash off —
+      // this is not make-up she is wearing for the number, it is what the
+      // number turned out to have been about. `uInk` is the flame front's
+      // height up her arms and the shader eases it, so `turned` simply holds
+      // the front at the top: the tongues keep licking, at rest, for the rest
+      // of the afternoon.
+      f.face.ink = turn || show.turned ? 1 : 0;
     }
 
-    // And the card, which is only ever up during the one phase that holds it.
+    // And the wrap, which she never puts back on.
+    //
+    // Derived every frame rather than switched by the events that bracket the
+    // turn, which is how it was written first and which stranded her: `blaze`
+    // owned the only line that put it back, and there are ways out of `blaze`
+    // that do not run it. The range gate in `updateCrowd` is the plain one —
+    // walk 250 m off mid-turn and `stepShow` stops being called at all, so the
+    // event never fires. An event that has to be paired with another event some
+    // unknown number of frames later is a state machine with a leak in it; a
+    // value read off the state it belongs to cannot leak. That argument is why
+    // this line is a line and not two calls, and it still holds now that the
+    // state it reads is a latch rather than a meter.
+    if (skinFig) skinFig.wear(!show.turned);
+
+    // And the card, which is only ever up during a phase that holds it.
     // Placed before the matrix update at the bottom of this function, because
     // it is a child of her mesh and that call is what pushes it to the GPU.
     if (banner) {
-      banner.mesh.visible = show.phase === 'note';
+      banner.mesh.visible = show.phase === 'note' || show.phase === 'boast';
       if (banner.mesh.visible) banner.place();
     }
 
@@ -3139,8 +3212,24 @@ async function buildJadrija(scene) {
         // remembered by would undo it.
         show.want = Math.atan2(ps - show.s, pt - show.t);
         if (done) {
+          // And the wrap goes with this, on the same frame as everything else.
+          // This one downbeat already carries the crash, the ink climbing her
+          // arms and the first stamp; putting the wrap on it too costs nothing
+          // and means the turn is one event rather than a sequence of small
+          // ones. Doing it as its own little beat afterwards would read as
+          // undressing, which is a different thing entirely from catching fire.
+          // See the line above the switch that actually does it.
           show.burn = 1;
           show.cast = 0.7;
+          show.boast = SHOW.boastEvery[1];
+          // And the latch. Everything else in this file is a meter that fills
+          // and empties — soak, burn, wet, owed — because everything else is a
+          // mood, and a mood passes. This one does not: the first flare is the
+          // hinge the whole promenade turns on, and after it she is a different
+          // thing wearing the same body. The wrap is gone for good and the ink
+          // does not wash off. She goes back to cartwheeling and holding up
+          // cards about the weather, and does all of it as a flamme fatale.
+          show.turned = 1;
           // On the downbeat, and the one call in the set that is half a second
           // long and rises the whole way — it comes up under the crash while
           // she does, which is the entire moment.
@@ -3173,7 +3262,18 @@ async function buildJadrija(scene) {
         // Not while she is being hosed. A figure throwing fire out of a jet of
         // water is the two halves of this arguing with each other, and the one
         // that should win is the branch — otherwise there is no answer to the
-        // sequence except waiting it out.
+        // sequence except waiting it out. Same for the card, which additionally
+        // is a joke, and a joke told by somebody being hosed is a sad joke.
+        show.boast -= dt;
+        if (show.boast <= 0 && show.hit <= 0 && banner) {
+          // Checked before the fireball rather than after, and it pushes the
+          // fireball back half a second on the way out — otherwise the two
+          // timers drift into each other and she lowers the card straight into
+          // a throw, which reads as her having been interrupted by herself.
+          banner.say(FIRE_NOTES[0]);
+          go('boast', 'note', 0.20);
+          break;
+        }
         if (show.cast <= 0 && show.hit <= 0) go('cast', 'cast', 0.14);
         if (show.tmr - show.said > 1.1 + Math.random() * 1.3) {
           // High ones only, and this used to be `burr`. A rolled note at 300 Hz
@@ -3182,6 +3282,38 @@ async function buildJadrija(scene) {
           // under it, she was gone. The three below all live above 1.4 kHz,
           // where the only other thing is the hi-hat.
           show.said = show.tmr; showSay(say1(FIRE_CHAT), d);
+        }
+        break;
+
+      // The card, mid-conflagration. It reuses the `note` clip whole, and that
+      // is the entire reason this is a phase of its own rather than a card hung
+      // off the stamping: `banner.place()` sizes and hangs the card off however
+      // far apart her hands are, so it will follow her through *any* pose — and
+      // through the blaze that means a sign wandering about at hip height while
+      // she stamps, and through the cast it means one leaving her hand with the
+      // fireball. The pose that holds a card up is the pose where she stops and
+      // holds a card up. Which is also the funnier version: she breaks off
+      // burning the place down for three seconds to make sure you have read it.
+      case 'boast':
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        show.burn = Math.max(0, show.burn
+          - dt / (show.hit > 0 ? SHOW.douseFor : SHOW.blazeFor));
+        // The turn of the card, halfway through, and `said` is the one-shot
+        // latch — the same trick the fireball's release uses, and for the same
+        // reason: it has to happen on exactly one frame and the clip is looping
+        // underneath it, so there is nothing else here to hang "once" on.
+        if (!show.said && show.tmr > SHOW.boastFor * 0.5) {
+          show.said = 1;
+          banner.say(FIRE_NOTES[1]);
+        }
+        if (show.tmr > SHOW.boastFor || show.burn <= 0 || show.hit > 0) {
+          show.boast = SHOW.boastEvery[0]
+            + Math.random() * (SHOW.boastEvery[1] - SHOW.boastEvery[0]);
+          show.cast = Math.max(show.cast, 0.5);
+          // Back to the stamp whatever the reason, including the fire being
+          // out — `blaze` owns the way out of the turn, and it owns it in one
+          // place, so there is exactly one line that puts her wrap back on.
+          go('blaze', 'firestarter', 0.20);
         }
         break;
 
@@ -3441,6 +3573,7 @@ async function buildJadrija(scene) {
       wet: +show.wet.toFixed(2), lock: +show.lock.toFixed(1),
       hit: +show.hit.toFixed(2), spin: show.spin,
       soak: +show.soak.toFixed(1), burn: +show.burn.toFixed(2),
+      turned: show.turned,
       balls: balls.length, fires: fires.filter((f) => f.burning > 0).length,
     },
     /**
@@ -3450,6 +3583,10 @@ async function buildJadrija(scene) {
      * time a number in the sequence moves.
      */
     flare: () => { if (show) show.soak = SHOW.soakFor; },
+    /** Bring the next card forward, so the boast is not a thirteen-second wait. */
+    boast: () => { if (show) show.boast = 0; },
+    /** The wrap, by hand, for looking at what is under it without a fire. */
+    wear: (on) => { if (skinFig) skinFig.wear(on !== false); },
     /**
      * Queue a number, so a screenshot does not have to wait on the dice.
      *

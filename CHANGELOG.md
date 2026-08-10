@@ -10,6 +10,271 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.47.0] — 2026-08-10
+
+### Added — a perineum, and the first feature paint could not have done
+
+Reported as missing from behind, and it was: the mesh is smooth there.
+
+**It is geometry rather than a cutter, and that was decided by a measurement.**
+Everything else small and dark on her is painted vertex colour — the areolae,
+the irises, the mouth, the pubic hair — because a colour per vertex costs
+nothing and the decimator's blurring is either harmless or, for hair, actually
+wanted. Here it runs out. A 19 mm disc at the bottom of the gluteal cleft
+contains **three to eight vertices of the full 218 000-vertex body**, and the
+export decimates by about eight, so the honest range is nought to one. One
+vertex of paint on this mesh is not a small dark spot; it is a faint brown cloud
+several centimetres across. The lower abdomen was already fifteen times coarser
+than the chest — that was 1.46's finding — and this is the floor of a crevice
+inside it, which makes it the coarsest place on her.
+
+So it is laid on after the decimator with the nails, the bracelet and the wrap,
+which is exactly the escalation the pubic hair's note named and left waiting.
+Fifteen vertices, twenty-eight triangles, and all fifteen arrive at full colour
+in the shipped blob — decoded to check, because the whole reason for choosing
+this route was that the other one does not survive.
+
+A shallow dished disc: a rim on the skin and a centre drawn in behind it, so it
+has a silhouette and shades itself instead of being a decal. Nine millimetres of
+relief on a 1.75 m figure is nothing — but it is nothing *in the right shape*,
+and it sits at the bottom of the darkest crevice on her, so it needs to be
+modelled far less than it needs to simply be there.
+
+**Where it goes and which way it faces are both measured.** The cleft floor is
+the midline vertex least far back at a given height — the buttocks are further
+out, so the valley is the *maximum* x of a negative-x band — and the facing comes
+from how that floor moves over a centimetre and a half of height. It comes out
+50° below horizontal, backward and down, which is what the perineum does.
+Typing that number would have been typing a guess, and it would have gone stale
+the first time anybody touched the body.
+
+The first placement was 12 mm low and read as a speck floating on open skin
+below where the cleft closes. It is up in the valley now, where the cheeks still
+have it between them — so most angles occlude it and the rest show it recessed
+and in shadow. That is also the anatomy: square on from behind, on a standing
+figure, this is mostly not visible, and a version that always was would be the
+wrong fix for the complaint.
+
+`VIEWS` gains **`rear`** — behind and 16° *below*. Every existing camera in that
+table sits at or above eye height, and from there this is the top of a buttock
+and nothing else, so it could not be judged without a view that could see it.
+
+### Fixed — up and down do nothing through the lens
+
+Reported as "LEFT/RIGHT worked great but UP/DOWN do not work", and they were
+both working exactly as written — which is the point. The four arrows have
+always been *two different controls that happen to be adjacent*: left and right
+turn your head, up and down walk you forward and back. That asymmetry is
+invisible right up until you put a scope on it, and then it is the whole
+complaint. You can pan but you cannot look up, because up is a leg.
+
+The pair now hands over as the lens comes in: `zoom` to the tilt, `1 - zoom` to
+the walk. A crossfade rather than a switch at some threshold, because the lens
+is eased over about a fifth of a second and a control that changed meaning
+part-way through that ease would be a control that stutters. At full zoom the
+arrows stop walking you entirely, which is right — nobody walks anywhere down a
+scope, and a step at 11° is a lurch across the whole frame. W and S are always a
+leg, and left and right are untouched, because turning your head is the same
+verb at both ends and there is nothing to hand over.
+
+Both arrows are now **scaled by the lens the same way the mouse already was**.
+Wide open the factor is 1 and nothing has changed; at 11° it is a fifth, which
+is the difference between panning a scope and swinging it.
+
+### Changed — the turn costs fifty litres, not two hundred and fifty
+
+`soakFor` was sixteen seconds of jet actually landing on her. At 9.2 litres a
+second that is a hundred and fifty straight down the branch, and because the
+jet wanders off her constantly and the meter only counts the frames it is
+landing, nearer two hundred and fifty out of the pack in practice — well over
+half of a four-hundred-litre trolley spent on a joke.
+
+The reasoning behind sixteen was that the turn should cost enough that nobody
+reaches it by accident, and that was answering the wrong question: nobody
+reaches it by accident at five seconds either, because a jet held on one person
+for five continuous seconds is already unmistakably deliberate. What sixteen
+actually bought was that most players never saw the best thing on the promenade,
+and the ones who did had no water left to fight the fire with afterwards. It is
+5.5 now — about fifty litres, an eighth of the pack, a price worth paying twice.
+
+### Added — slow motion on the long lens
+
+Hold `Z` and the world goes to a third speed with the angle. No key of its own,
+and there should not be one: a long lens is already the gesture for *I am
+looking at that* — you have given up walking, turning quickly and most of your
+view to hold on one thing — and slow motion says the same sentence in the other
+language. On the same key they arrive together and leave together, eased by the
+one number `zoom` already eases, and there is nothing to learn.
+
+**It is one multiplication, because there is one delta.** `frame()` now keeps
+two: `real` is wall time and `dt` is world time. Almost everything wants the
+second — her clips, the birds, the trees, the sea, the hose, your own walk.
+Three things want the first, and those three are the whole design:
+
+- **The lens itself**, which is nearly a paradox: the lens is what causes the
+  slowing, so easing it on slowed time means the deeper it gets the slower it
+  gets deeper. It would still arrive, but three times as late, and the thing you
+  pressed the key for would come in like a hydraulic door.
+- **The mission clock**, so `state.t` and the score keep honest time.
+- **The fire's spread.** Everything else can slow freely, because slowing you
+  and the thing you are fighting by the same factor changes nothing about who is
+  winning — you spray slower too. The fire is the exception: it is the only
+  process here racing the clock rather than racing you, and if it slowed, `Z`
+  would be a button that pauses the fire while the timer runs. So `fire.update`
+  takes two deltas now — wall time to the cellular automaton, world time to the
+  flame and smoke sprites, which are pictures of the fire and not the fire.
+
+**0.35 and not something more dramatic.** Past about a third a flame stops
+reading as fire and becomes a slowly waving orange flag, and her clips —
+authored at a real person's tempo — start to look like a body being dragged.
+
+**The sound goes under water rather than down in pitch, and that is a choice
+made under a constraint.** The right way to slow a sound is to play it slower,
+and there is no way to do that here: nothing in this game is a sample. Every
+voice is synthesised from oscillators and scheduled envelopes, so "half speed"
+means rewriting twenty-odd generators to take a rate, each with its own timing
+and each a fresh chance to get a landing thump or a rotor beat subtly wrong.
+So the mix gets a lowpass across the master instead, swept 20 kHz to 620 Hz —
+geometrically, because pitch is, and a linear sweep of a corner frequency spends
+most of its travel doing nothing and then falls off a cliff. That is not a
+substitute for pitching down; it is a different and older idiom for the same
+beat, and it is the one the ear reads as *time has gone strange* rather than as
+*the audio is broken*. Wide open it is inaudible and costs one biquad, so it
+lives in the chain always.
+
+### Changed — the turn is permanent, and she is a flamme fatale after it
+
+The wrap does not come back and the ink does not wash off. The first flare is
+the hinge the whole promenade turns on: before it she is a girl larking about on
+a beach, and after it she is a different thing wearing the same body. She still
+cartwheels, still makes the heart, still holds up a card about the weather in
+Jadrija — and does all of it with flames up her arms and nothing on.
+
+Everything else in `stepShow` is a meter that fills and empties — `soak`,
+`burn`, `wet`, `owed` — because everything else is a mood, and a mood passes.
+`turned` is the one value in the file that only ever goes one way.
+
+The previous release had it reversible, on the argument that a state one event
+sets and nothing clears is a state you cannot leave without reloading the page.
+That argument is sound and it was answering the wrong question: it is a reason
+to be careful with accidental latches, not a reason to refuse a deliberate one.
+A turning point you can undo by waiting is not a turning point.
+
+### Added — she sheds the wrap when she catches fire, and holds up a sign about it
+
+Both on the same downbeat as everything else the turn already does. The flare's
+last frame carries the crash, the first stamp, the ink climbing her arms, and
+now the wrap going. Doing the wrap as its own little beat afterwards would read
+as undressing, which is a different thing entirely from catching fire.
+
+She keeps it off for the whole burn and puts it back when the fire goes out.
+Not permanent: a state that one event sets and nothing clears is a state you
+cannot leave without reloading the page, and she runs this again in another
+minute.
+
+**The wrap is derived from `burn` every frame, not switched by two events.**
+Which is how it was written first, and it stranded her: `blaze` owned the only
+line that put the wrap back, and there are ways out of `blaze` that never run
+it. The plain one is the range gate in `updateCrowd` — walk 250 m off mid-turn
+and `stepShow` stops being called at all, so the pairing event never fires and
+she is still holding the wrap off when you come back. An event that has to be
+matched by another event an unknown number of frames later is a state machine
+with a leak in it; a value read off the state it belongs to cannot leak. `burn`
+goes to 1 on the flare's downbeat and decays to 0 however the fire ends — timed
+out, doused, or ended by a branch nobody has written yet — and the wrap now
+follows it for free in all three.
+
+**The mechanism is a draw range, and the exporter is what makes that possible.**
+`post_geometry` in tools/blender/human_mh.py lays three things on after the
+decimator — nails, a bracelet, a wrap — and the order is now load-bearing: the
+wrap goes **last**, so the removable thing is one contiguous run at the end of
+the index buffer and hiding it is `setDrawRange(0, ni - shed)`. No second mesh,
+no second material, no per-fragment test. The shadow pass gets it for free,
+because `cast` registers the same geometry under a depth-only material and a
+draw range belongs to the geometry rather than to either material.
+
+**`.fr3d` is v4**, which is v3 plus one `uint32` in the header: how many indices
+at the tail are the wrap. A header field rather than a table of named parts,
+because there is exactly one removable thing on this figure and a general
+mechanism would be more format than the feature deserves. If a second garment
+ever wants taking off, *that* is when it becomes a table — and the version
+number is here so that day is a clean break rather than a guess.
+
+**Nothing had to be modelled for this.** She is a complete body under the wrap
+and has been since the painted garment came off her in 1.43; the wrap is laid-on
+geometry sitting four millimetres off the skin. The one thing that would have
+made this hard was already paid for by a decision made for other reasons three
+releases ago. It also gives 1.46's pubic hair somewhere to be seen: it was
+authored to show under the hem in a cartwheel, and this is the first thing in
+the game that puts it in plain view.
+
+### Added — the card, mid-conflagration
+
+`i am a firestarter! / a twisted firestarter!`, twice in a twenty-six second
+burn, seeded so the fire comes first and the announcement comes after it —
+which is the right order for a boast.
+
+**It is a phase of its own rather than a card hung off the stamping.** The
+banner sizes and hangs itself off however far apart her hands are, so it follows
+her through *any* pose — and through the blaze that means a sign wandering about
+at hip height while she stamps, and through the cast it means one leaving her
+hand with the fireball. The pose that holds a card up is the pose where she
+stops and holds a card up. Which is also the funnier version: she breaks off
+burning the place down for three seconds to make sure you have read it.
+
+`boast` joins `MUSIC` for two reasons at once — the beat must not drop out for
+three seconds in the middle, and the ink rides the same flag, so a firestarter
+showing you a sign saying she is one still has flames on her arms while she does
+it. It joins `HELD` for a duller reason that is a real bug otherwise: without
+it, being hosed while the card is up could fill the soak meter and start a
+*second* flare on top of the fire already burning.
+
+**Two cards, one line each**, turned over halfway through. The first cut put
+both lines on one card and it was a grey smear: the card is 512 px wide and
+about 30 cm tall in the world, the fitter already has to shrink a twenty-two
+character line to get it across, and two of those are each half the height as
+well. One line a card is twice the letter height for nothing — and it is better
+comic timing besides, because the second card is a beat and the beat is what
+makes the line land.
+
+It is the one thing she holds up that is a quotation rather than something she
+thought of, and it is not in `NOTES`: a girl on a beach in the sun announcing
+she is a firestarter is a non sequitur. The same card held by a woman with
+flames up her arms while the deck burns behind her is the joke.
+
+### Changed — the dog is smoother, and says what the exchange said
+
+**One level of Catmull-Clark on the pug**, 644 faces to 1 932. It stands where
+you can crouch next to it — the balloon only comes up inside 21 m, and the whole
+point of the balloon is to be read — so the budget that suited it as scenery
+does not suit it as a thing you look at.
+
+**It has to be welded first, and that is the whole job.** The asset is authored
+flat-shaded: every face carries its own copy of its corners and no two faces
+share an edge, 1 284 vertices for what is topologically 324. Catmull-Clark works
+on edges, so on a mesh with no shared edges it does not smooth a surface — it
+rounds each face off separately and pulls the results apart. The first run came
+out as a heap of loose brown lozenges with the sea visible between them.
+Merging by distance restores the topology the modelling had and then the
+subdivision has something to hold on to. The welded, subdivided, smooth-shaded
+dog is **56 KB against the old 83 KB**: three times the faces and two thirds the
+bytes, because 960 of the old vertices were duplicates of each other.
+
+One level and not two. Catmull-Clark does not add detail, it removes corners,
+and the second level starts eating the things that make it read as a pug — the
+flat muzzle, the square jaw. Past this wants a better cage, not more subdivision
+of this one.
+
+**And the DOGE line prints what Coinbase sent, to whatever precision Coinbase
+sent it.** It was `toFixed(4)`, which was the right instinct — rounding it like
+the bitcoin line gives `doge: $0`, a joke about a different thing — carried one
+step too few. Coinbase quotes this to five or six places and moves between them
+day to day; a fixed four silently dropped the digits it did send and padded a
+zero on the days it did not. What arrives is a decimal string the exchange chose
+the precision of, so the balloon now says exactly that string and adds nothing,
+clamped at eight places so a bad day at the API cannot put forty characters on a
+speech bubble.
+
 ## [1.46.0] — 2026-08-09
 
 ### Fixed — the drone on the promenade, third time and this time by removal

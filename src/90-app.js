@@ -52,6 +52,23 @@ const LENS = { min: 11, ease: 5.5 };
 let baseFov = 58;
 let zoom = 0;
 
+/**
+ * How far down time goes at full zoom, and why it hangs off the lens.
+ *
+ * There is no key for this and there should not be. A long lens is already the
+ * gesture for "I am looking at that" — you have given up walking, turning
+ * quickly and most of your view to hold on one thing — and slow motion says the
+ * same sentence in the other language. Putting them on the same key means they
+ * arrive together and leave together, eased by the one number `zoom` already
+ * eases, and there is nothing to learn.
+ *
+ * 0.35 rather than something more dramatic. Past about a third the fire stops
+ * reading as fire — a flame at a fifth speed is a slowly waving orange flag —
+ * and her clips, which are authored at a real person's tempo, start to look
+ * like a body being dragged rather than one moving.
+ */
+const SLOW = 0.35;
+
 function stepLens(dt) {
   const want = state.phase === 'ground'
     && (keys.has('KeyZ') || TOUCH.glook) ? 1 : 0;
@@ -1524,10 +1541,25 @@ function frame() {
   // never read comes back as one enormous dt — and a pause you sat through for
   // thirty seconds would resume by integrating thirty seconds of flight in a
   // single step, straight through whichever hill you were over.
-  const dt = Math.min(0.05, clock.getDelta());
+  const real = Math.min(0.05, clock.getDelta());
   // Nothing else: not the sim, not uTime, not even the render. The canvas holds
   // the last frame it drew, which is exactly the picture a pause should show.
   if (state.paused) return;
+
+  // Slow motion, and it is one multiplication because there is one delta.
+  //
+  // `dt` from here down is world time and `real` is wall time, and almost
+  // everything wants the first: her clips, the birds, the trees, the water, the
+  // hose, your own walk. Three things want the second, each for its own reason,
+  // and they are the whole of the design here — see `stepLens`, `updateMission`
+  // and `fire.update` below.
+  //
+  // `zoom` is last frame's value, because `stepLens` runs near the bottom of
+  // this function. One frame of lag on a number that takes about a fifth of a
+  // second to travel is not a thing anybody can see, and the alternative —
+  // hoisting the lens up here — would put the camera's easing ahead of the
+  // simulation it is easing over.
+  const dt = real * (1 - (1 - SLOW) * zoom);
   U.uTime.value += dt;
   if (!started) return;
 
@@ -1540,7 +1572,7 @@ function frame() {
     // integrated was the chute branch, so the moment the canopy touched down she
     // froze in mid-air and hung there for the rest of the game, in plain view.
     if (eject.active) flyDerelict(dt);
-    updateMission(dt);
+    updateMission(real);
   }
 
   if (state.phase === 'chute') {
@@ -1561,13 +1593,13 @@ function frame() {
       flare: keys.has('Space') || keys.has('ArrowDown') || keys.has('KeyS')
         || TOUCH.cy < -0.66,
     });
-    updateMission(dt);
+    updateMission(real);
   }
 
   if (state.phase === 'fly') {
     readKeys(dt);
     flight.update(dt, input);
-    updateMission(dt);
+    updateMission(real);
     // Ground proximity, last, so it reads the state this frame ended in.
     // The inhibit is the whole design: on a legal scoop run, being five metres
     // over the sea is the job and nothing is allowed to shout about it.
@@ -1599,7 +1631,18 @@ function frame() {
   // Not under an override: `__fr.fov()` sets the angle by hand for a
   // screenshot, and a lens easing back to the setting every frame would take it
   // straight off again.
-  if (!camOverride) stepLens(dt);
+  // Wall time, not world time, and this one is nearly a paradox: the lens is
+  // what causes the slowing, so easing it on slowed time would mean the deeper
+  // it got the slower it got deeper. It would still arrive — the easing is
+  // exponential and 0.35 of it still converges — but it would take three times
+  // as long to finish, and the thing you pressed the key for would come in like
+  // a hydraulic door.
+  if (!camOverride) stepLens(real);
+  // And the mix goes under water with it. There is nothing to slow down in
+  // there — every voice in this game is synthesised rather than played — so
+  // this takes the top off instead, which is the older idiom for the same beat
+  // and the one the ear reads as strangeness rather than as breakage.
+  if (audio) audio.slowmo(zoom);
   if (camOverride) updateCamera(dt);
   else if (state.phase === 'ground') ground.pose(camera);
   else if (state.phase === 'chute' || eject.active) eject.pose(camera);
@@ -1628,7 +1671,11 @@ function frame() {
   if (jadrija) jadrija.update(dt, camera.position);
   rail.update(dt);
   sea.update(camera);
-  fire.update(dt);
+  // Wall time to spread, world time to burn. The only process in the game that
+  // is racing the clock rather than racing you — see the note on `update` in
+  // src/40-fire.js for why letting it slow would be a cheat and letting
+  // everything else slow is not.
+  fire.update(real, dt);
   ground.update(dt);
   // The other three keep working while your wreck is still settling — and while
   // you are on foot. Gating this on the flying phase left all three of them
@@ -2147,7 +2194,9 @@ window.__fr = {
    */
   fov: (deg) => { camera.fov = deg; camera.updateProjectionMatrix(); },
   /** And the one Z drives, which is the same lens with a hand on it. */
-  lens: () => ({ zoom: +zoom.toFixed(3), fov: +camera.fov.toFixed(2), base: baseFov }),
+  lens: () => ({ zoom: +zoom.toFixed(3), fov: +camera.fov.toFixed(2), base: baseFov,
+    // What one second of wall time is worth in world time right now.
+    slow: +(1 - (1 - SLOW) * zoom).toFixed(3) }),
   /** Advance the simulation `secs` with no rendering — for headless testing. */
   fastForward: (secs) => {
     const dt = 1 / 30;
