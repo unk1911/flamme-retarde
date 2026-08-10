@@ -10,6 +10,88 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.49.0] — 2026-08-11
+
+### Added — the dog walks, and shakes the water off when you hose him
+
+He had a skeleton and one clip to play on it, which is a dog standing on a deck
+breathing. He has a trot and a shake now, both authored in
+`tools/blender/dog.py`, and a small stretch of promenade he keeps to: he stands
+a while, picks somewhere else eleven metres of deck can take him, turns, goes,
+stands again. Point the branch at him and he braces, shakes himself dry with his
+ears going, and forgets wherever it was he had been headed. Hold the jet on him
+and he does it again.
+
+**The gait is solved, not posed.** Each paw is given a path in metres — straight
+back at the travel speed for the half-cycle it is down, a Hermite arc forward for
+the half it is up — and a two-link solver reads off the shoulder, elbow and paw
+angles that put it there. So `SPEED` is not a look-and-see number: it is the
+speed the deck actually moves under him, `dog.py` prints it, and
+`src/43-jadrija.js` divides by it to pick a playback rate. There is nowhere for
+the legs and the ground to drift apart.
+
+The swing is a Hermite rather than an ease for the same reason. Both ends of it
+have to *match the ground speed*, and a swing eased to zero velocity is a paw
+that stops dead the instant it lands and then drags for the rest of the step —
+the sliding you were trying to avoid, arriving at the one moment it is most
+visible.
+
+**The paws had to be re-parented.** They arrive as children of `root`, which is
+the right rig for an IK walk — foot placement in root space — and the wrong one
+for this format, which cannot translate any bone but the root. A paw on the root
+can only spin on the spot, and the eighty-one vertices of each are weighted to
+the foot bones and not to the shins, so all four would have stayed on the deck
+while the legs walked off. Each now hangs off its own shin. The rest pose does
+not move: every foot's head already sat directly under its shin's, so this
+changes the tree and not the animal.
+
+**He turns on the spot before he goes anywhere**, which is not how anything else
+in this game moves and is forced by the gait. Steering while trotting arcs the
+body sideways under legs that are stepping straight forward, and that slides
+every one of them. Turning while idle scuffs nothing, because a standing dog's
+feet are not pretending to be anywhere.
+
+The one thing the solved gait costs is a crouch. The forelimb arrives 99.7%
+extended — 162.8 mm shoulder to paw against a 164.4 mm reach — so at rest there
+is essentially no stride available before the solver runs out of leg. He is
+carried 25 mm lower moving than standing, which buys the reach back and is what
+a walking dog looks like next to a standing one anyway. `dog.py` prints how close
+each leg comes to full extension over the cycle, because past 100% the target is
+silently clamped and what you get is a dog on ice: worst case is 92%.
+
+The shake leaves `Body` alone on purpose. All four legs hang off it, so rolling
+it rolls them, and a dog that shakes its feet off the deck is levitating. The
+wave runs through the trunk instead — head first, neck and shoulders a beat
+behind, hips most of a half-cycle late — so the two ends of him turn opposite
+ways for most of every cycle, which is the entire read.
+
+### Added — `bake_poses`, and the space a foreign rig has to be posed in
+
+`frskin.py` grew the second half of what it needs: hand-authored pose
+dictionaries, smoothstepped between keys, alongside the Blender-action sampler
+it already had. Clips arrive two ways, and a walk that is *about* something is
+never in the pack.
+
+It takes rotations in **armature space**, where `human_mh.py`'s `_bake_clip`
+takes them bone-local. Hers is right for her — that file builds her rig, runs
+every bone through `align_roll`, and `spine3: (0, 0, -14)` means fourteen degrees
+of a named thing. None of it is true of a rig somebody else authored: the dog's
+bones are zero-length points carrying whatever roll came through glTF, with
+`Shoulders` 133° off `root` and `Hips` 92° the other way. Authoring a trot in
+that is authoring a trot in twenty-four coordinate systems. Conjugating into the
+parent's rest frame costs one line and lets all four legs mean the same axis.
+
+### Added — the dog is a second guest for the water
+
+`ground.addGuest(dogProbe, dogWet)`, next to the pair she was already registered
+with. He is hittable exactly as long as he exists, and what he does about it is
+his own business. Litres are ignored, the same as for her: there is no quantity
+of water that finishes the job.
+
+`__fr.jad.raw().wet()` hoses him from the console and `.walk()` sends him off
+without waiting out his stand, because neither is worth putting the aeroplane
+down and walking over for.
+
 ## [1.48.0] — 2026-08-10
 
 ### Added — the dog has a skeleton, and stands there breathing

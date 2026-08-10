@@ -572,6 +572,10 @@ async function boot() {
   // about her.
   if (jadrija && jadrija.figureProbe) {
     ground.addGuest(jadrija.figureProbe, jadrija.figureWet);
+    // The dog is a second guest and not a special case of the first. He is
+    // hittable for exactly as long as he exists — `dogProbe` returns null when
+    // he does not — and what he does about it is his own business.
+    ground.addGuest(jadrija.dogProbe, jadrija.dogWet);
   }
 
   await step(85, 'load.maquis');

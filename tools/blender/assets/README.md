@@ -30,4 +30,13 @@ is exactly the sort of thing that is obvious now and forgotten in a year.
 first pass shipped the mesh only; the armature is used now, and the dog is
 skinned — 24 bones, the same v4 format the figure uses. Of the two actions in
 the file only `Idle` is shipped: see the note in `dog.py` on why `Jump` cannot
-survive a clip format that carries rotation and a root translation.
+survive a clip format that carries rotation and a root translation. The trot and
+the shake are authored in that file rather than imported, because no pack has
+them for this animal and because a walk nobody solved against the ground is a
+walk that slides.
+
+`dog.py` also re-parents the four paws onto the shins above them. That is a
+change to somebody else's rig and it is not a criticism of it: the paws hang off
+`root` because this armature was built for IK, where foot placement belongs in
+root space, and `Jump` uses exactly that. It is simply not the rig this format
+can play.

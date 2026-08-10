@@ -1984,21 +1984,45 @@ async function buildJadrija(scene) {
    * fire. A dog on a beach is not specific, and the effort is better spent on
    * where it stands than on modelling one. See tools/blender/assets/README.md.
    *
-   * It does not move, and that is a decision for this pass rather than a
-   * limitation of the mesh: the asset arrives with a 24-bone quadruped rig and
-   * an idle, and none of it is exported yet. A trot needs a floor pass for a
-   * gait with four contacts a cycle where hers has two, and shipping a rig
-   * nothing plays would put it in every download for nothing.
-   *
-   * So: a dog standing on the promenade, near enough her spot that you meet the
-   * two of them together, and **outside her lane**, which is why the position
-   * is written off `SHOW_LANE0` rather than off the middle of the deck. She
-   * does not collide with anything — that is deliberate and documented where
-   * the performance is — so anything standing in the strip she plays on is
-   * something she walks through. A bather she walks through is a shrug; a dog
-   * is a fixed thing you are looking straight at when it happens.
+   * He keeps to a short stretch of deck near her spot, so that you meet the two
+   * of them together, and to a line **outside her lane**, which is why his
+   * position is written off `SHOW_LANE0` rather than off the middle of the
+   * deck. She does not collide with anything — that is deliberate and
+   * documented where the performance is — so anything standing in the strip she
+   * plays on is something she walks through. A bather she walks through is a
+   * shrug; a dog you are looking straight at is not.
    */
   let dog = null;
+
+  /**
+   * The stretch, the speed, and the size of him.
+   *
+   * `trot` is not a tuning number. The clip is solved in
+   * tools/blender/dog.py against a paw that stays nailed to the deck while it
+   * is down, and 0.93 m/s is the speed that makes that true — the file prints
+   * it. Everything below divides by it to get a playback rate, so his legs and
+   * the ground agree at whatever pace he happens to be going. Change the trot
+   * there and this number changes with it or he moonwalks.
+   *
+   * The stretch is deliberately eleven metres and not the whole promenade. He
+   * is a dog on a beach, not a patrol: far enough that he is somewhere
+   * different when you look back, near enough that he is still part of the
+   * scene you found him in. It also keeps him on concrete that her performance
+   * already guarantees is clear, so he needs no blocker test of his own.
+   */
+  const DOG = {
+    trot: 0.93,
+    lane: SHOW_LANE0 - 0.8,
+    t0: LEN * 0.5 + 14.4,
+    t1: LEN * 0.5 + 25.4,
+    turn: 2.6,                  // rad/s, turning on the spot
+    stand: [2.6, 9.0],          // how long he stays put, seconds
+    hitR: 0.36, hitH: 0.44,     // what the jet has to land on
+    // How long a hoseful is remembered. Longer than the shake, so that holding
+    // the jet on him gets a second one rather than one and a wet dog standing
+    // there — and short enough that he stops when you stop.
+    soak: 1.4,
+  };
 
   /**
    * The balloon, which is her card's trick with two things changed.
@@ -2074,19 +2098,23 @@ async function buildJadrija(scene) {
       if (!fig) throw new Error('no skinned dog');
       fig.play('idle', { fade: 0 });
       const mesh = fig.mesh;
-      const dt = LEN * 0.5 + 19.4, ds = SHOW_LANE0 - 0.8;
-      const p = toWorld(dt, ds);
+      const dt = (DOG.t0 + DOG.t1) * 0.5;
+      const p = toWorld(dt, DOG.lane);
       mesh.position.set(p[0], p[1], p[2]);
       // Facing back along the promenade, which from here is roughly at her:
       // a dog on a beach is looking at whatever is most interesting, and on
       // this deck that is either her or you, and she is closer.
-      mesh.rotation.y = rigYaw(dt, 0.35);
+      mesh.rotation.y = rigYaw(dt, Math.PI);
       mesh.updateMatrixWorld();
       scene.add(mesh);
       const balloon = makeBalloon();
       balloon.mesh.position.set(p[0], p[1] + 0.62, p[2]);
       scene.add(balloon.mesh);
-      dog = { mesh, balloon, fig, at: [dt, ds], tris: fig.tris };
+      dog = {
+        mesh, balloon, fig, at: [dt, DOG.lane], tris: fig.tris,
+        mode: 'stand', dir: -1, timer: 3.0, tgt: dt,
+        yaw: mesh.rotation.y, soak: 0,
+      };
     } catch (e) {
       console.warn('dog failed:', e.message);
     }
@@ -2116,6 +2144,118 @@ async function buildJadrija(scene) {
    */
   const DOG_NEAR = 21;
 
+  /**
+   * Where he is going, what he is playing, and which way he is pointing.
+   *
+   * Three modes and no more: `stand`, `walk`, `shake`. The interesting one is
+   * `walk`, and the interesting thing about it is that he **turns on the spot
+   * before he goes anywhere**. The alternative — steering while trotting — is
+   * what most things in this game do, and it is wrong here for a reason the
+   * gait makes unavoidable: the trot is solved for a paw that does not slide,
+   * and a body arcing sideways under legs that are stepping straight forward
+   * slides every one of them. Turning while idle scuffs nothing, because a
+   * standing dog's feet are not pretending to be anywhere.
+   *
+   * `speed` is set from the same number every frame he moves, so the pace and
+   * the legs cannot drift apart. There is nowhere to get them out of step.
+   */
+  function moveDog(dt) {
+    const s = dog;
+    s.soak = Math.max(0, s.soak - dt);
+
+    if (s.mode === 'shake') {
+      s.timer -= dt;
+      if (s.timer > 0) return;
+      // Still being hosed when he finishes: go again. That is the whole of the
+      // reward for keeping the jet on him, and it is one branch.
+      if (s.soak > 0) { shakeDog(); return; }
+      s.mode = 'stand';
+      s.timer = DOG.stand[0] + Math.random() * (DOG.stand[1] - DOG.stand[0]);
+      return;
+    }
+
+    if (s.mode === 'stand') {
+      s.timer -= dt;
+      if (s.timer > 0) return;
+      // Somewhere else on his stretch, and at least three metres off, so that
+      // he never sets out on a walk too short to be one.
+      let want = DOG.t0 + Math.random() * (DOG.t1 - DOG.t0);
+      if (Math.abs(want - s.at[0]) < 3.0) {
+        want = s.at[0] < (DOG.t0 + DOG.t1) * 0.5 ? DOG.t1 : DOG.t0;
+      }
+      s.tgt = want;
+      s.dir = want > s.at[0] ? 1 : -1;
+      s.mode = 'walk';
+      return;
+    }
+
+    // walk. The heading he wants is along the shore in whichever direction the
+    // target is; `rigYaw` turns that into a bearing on a coastline that is not
+    // straight, so this stays right as he crosses a bend.
+    const want = rigYaw(s.at[0], s.dir > 0 ? 0 : Math.PI);
+    let err = want - s.yaw;
+    while (err > Math.PI) err -= Math.PI * 2;
+    while (err < -Math.PI) err += Math.PI * 2;
+    const step = Math.min(Math.abs(err), DOG.turn * dt) * Math.sign(err);
+    s.yaw += step;
+
+    if (Math.abs(err) > 0.28) {
+      // Still coming round. Standing, not trotting: see above.
+      s.fig.play('idle', { fade: 0.22 });
+      s.fig.state.speed = 1;
+      return;
+    }
+    s.fig.play('trot', { fade: 0.22 });
+    s.fig.state.speed = 1;
+    const gap = s.tgt - s.at[0];
+    if (Math.abs(gap) < 0.15) {
+      s.mode = 'stand';
+      s.timer = DOG.stand[0] + Math.random() * (DOG.stand[1] - DOG.stand[0]);
+      s.fig.play('idle', { fade: 0.30 });
+      return;
+    }
+    s.at[0] += Math.sign(gap) * Math.min(Math.abs(gap), DOG.trot * dt);
+  }
+
+  /**
+   * The jet is on him.
+   *
+   * He stops, braces and shakes it off, and the walk he was on is abandoned
+   * rather than resumed — a dog that shakes and then carries on to the exact
+   * spot it was headed for is a dog on rails. `next: 'idle'` hands the clip
+   * back on its own, so nothing here has to count frames; the timer is only for
+   * when he is allowed to decide something again, and it is read off the clip
+   * rather than written down, because the length of the shake lives in
+   * tools/blender/dog.py and has no business being in two files.
+   */
+  function shakeDog() {
+    dog.mode = 'shake';
+    dog.fig.play('shake', { fade: 0.10, next: 'idle' });
+    dog.fig.state.speed = 1;
+    dog.timer = (dog.fig.state.cur ? dog.fig.state.cur.dur : 1.6) + 0.30;
+  }
+
+  /**
+   * Litres are ignored, the same way they are for her and for the same reason.
+   *
+   * `soak` is set here and nowhere else. `shakeDog` deliberately does not touch
+   * it: it is called again from `moveDog` when a shake ends with the jet still
+   * on him, and a version that refreshed the memory of being hit every time it
+   * fired would have kept him shaking for ever off one hoseful.
+   */
+  function dogWet(_litres) {
+    if (!dog) return;
+    dog.soak = DOG.soak;
+    if (dog.mode !== 'shake') shakeDog();
+  }
+
+  /** Where he is, for the jet to aim at. Read once a trace by 47-ground.js. */
+  function dogProbe() {
+    if (!dog || !dog.mesh.visible) return null;
+    const p = toWorld(dog.at[0], dog.at[1]);
+    return { x: p[0], y: p[1], z: p[2], r: DOG.hitR, h: DOG.hitH };
+  }
+
   function stepDog(camPos, dt) {
     if (!dog) return;
     const b = dog.balloon;
@@ -2125,9 +2265,16 @@ async function buildJadrija(scene) {
     // twenty-four bones a frame buys nothing at a range where the whole animal
     // is a couple of pixels. Tighter than her 250 m, because the gate is really
     // about how far away a *pose* stops reading and he is a third her height.
-    // Out of range he simply stops where he was, which is a dog standing still
-    // — the failure this gate can have is the pose it was already holding.
-    if (d < 120) dog.fig.update(dt);
+    // Out of range he stops where he was, mid-stride, and stays there: a dog
+    // frozen at 120 m is a dog you cannot see is frozen.
+    if (d < 120) {
+      moveDog(dt);
+      dog.fig.update(dt);
+      const p = toWorld(dog.at[0], dog.at[1]);
+      dog.mesh.position.set(p[0], p[1], p[2]);
+      dog.mesh.rotation.y = dog.yaw;
+      b.mesh.position.set(p[0], p[1] + 0.62, p[2]);
+    }
     // No price, no balloon. The same rule her card follows: a line that never
     // arrived is simply not one of the things anybody says.
     b.mesh.visible = !!live.doge && d < DOG_NEAR;
@@ -3595,11 +3742,23 @@ async function buildJadrija(scene) {
         f.boneAt(i, v);
         pose += v.x + v.y + v.z;
       }
-      return { at: dog.at, tris: dog.tris,
+      return { at: [+dog.at[0].toFixed(2), +dog.at[1].toFixed(2)],
+        tris: dog.tris,
         bones: f.bones.length, clips: f.clips.join('+'), playing: f.playing(),
         pose: +pose.toFixed(5),
+        mode: dog.mode, tgt: +dog.tgt.toFixed(2),
+        timer: +dog.timer.toFixed(2), yaw: +dog.yaw.toFixed(3),
+        soak: +dog.soak.toFixed(2),
         says: dog.balloon.mesh.visible ? dog.balloon.said : null };
     },
+    /** Hose him, from the console, without having to fly the aeroplane. */
+    wet: () => { dogWet(1); return dog && dog.mode; },
+    /**
+     * Send him off now rather than waiting out his stand. Only a shortcut for
+     * looking at the gait: he picks the destination himself, the same way he
+     * would have in his own time.
+     */
+    walk: () => { if (dog && dog.mode === 'stand') dog.timer = 0; return !!dog; },
     /** Where the performance has got to. */
     show: () => show && {
       phase: show.phase, clip: skinFig ? skinFig.playing() : null,
@@ -3668,7 +3827,7 @@ async function buildJadrija(scene) {
     /** Where she is standing, so the back door can put you in front of her. */
     figureAt: testFigure ? testFigure.at : null,
     /** The two ends of the hose hook — 47-ground.js wires them together. */
-    figureProbe, figureWet,
+    figureProbe, figureWet, dogProbe, dogWet,
     /**
      * Drive the promenade forward by hand.
      *

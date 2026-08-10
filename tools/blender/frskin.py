@@ -18,34 +18,51 @@ authored action simply arrives at its rest offset instead, and the result is a
 limb that looks subtly disconnected rather than obviously broken. So
 `bake_action` measures it and says so, rather than leaving it to be noticed.
 
+── two ways in, because clips arrive two ways ────────────────────────────────
+
+`bake_action` samples a Blender action off the armature — for the clips a
+foreign asset arrives with. `bake_poses` samples hand-authored pose dictionaries
+— for the clips nobody made for us, which is every clip that has to be *about*
+something. They meet at `quant_q` and the blob writer.
+
+── on the space poses are authored in ────────────────────────────────────────
+
+`bake_poses` takes rotations in **armature space** — +X, +Y, +Z of the rig, not
+of the bone — applied about each bone's own head.
+
+`human_mh.py`'s `_bake_clip` takes them in each bone's local frame, and that is
+right for her: her rig is built by that file, every bone is run through
+`align_roll`, and a pose there reads `spine3: (0, 0, -14)` meaning fourteen
+degrees of a named thing. None of that is true of a rig somebody else authored.
+The dog's bones are zero-length points inheriting whatever roll came through
+glTF: `root` and `Body` share one frame, `Shoulders` is 133° off it, `Hips` 92°
+the other way, and the four paws sit in a third. Authoring a trot in that is
+authoring a trot in twenty-four different coordinate systems.
+
+So the rotation is conjugated into the parent's rest frame — `Pr⁻¹ R Pr`, which
+falls out of writing a rotation about the bone's head in armature space as a
+parent-relative matrix — and everything above can say "swing the shoulder
+twenty degrees back" and mean the same axis for all four legs.
+
 ── on the duplication with human_mh.py ───────────────────────────────────────
 
-`human_mh.py` has its own copies of `rest_locals`, `quant_q` and the blob
-writer, and its own `_bake_clip`, and they are not imported from here. That is
-deliberate for now and should not last.
-
-The reason is that the two bake *different things*. Hers samples authored pose
-dictionaries — `{bone: (rx, ry, rz)}` in degrees, keyed and smoothstepped —
-because every clip she has was written by hand in that file. `bake_action` here
-samples a Blender action off the armature, because the dog arrives with his
-already made. They share the quantisation and the blob layout and nothing else.
-
-What should happen is that this module grows `bake_poses` as well, hers calls
-it, and her copies go. The check that it worked is cheap and exact:
-`human_skin.fr3d.gz` is byte-identical before and after, because the build is
-deterministic. Doing it in the same change that first rigs the dog would mean
-touching a working 4 700-line figure to prove out a feature that is not proven
-yet, so it waits for the dog to stand up first.
+`human_mh.py` still has its own copies of `rest_locals`, `quant_q`, `_bake_clip`
+and the blob writer, and they are not imported from here. That is deliberate for
+now and should not last: the honest end state is `_bake_clip` becoming a `space`
+argument to `bake_poses` and her copies going. The check that it worked is cheap
+and exact — `human_skin.fr3d.gz` is byte-identical before and after, because the
+build is deterministic.
 """
 
 from __future__ import annotations
 
 import gzip
+import math
 import struct
 from pathlib import Path
 
 import bpy  # type: ignore
-from mathutils import Matrix, Quaternion  # type: ignore
+from mathutils import Euler, Matrix, Quaternion, Vector  # type: ignore
 
 # Blender is Z-up, three.js is Y-up: (bx, by, bz) -> (bx, bz, -by). The same
 # conversion frmesh.py's docstring names, as a matrix, because a skeleton has to
@@ -168,6 +185,92 @@ def bake_action(rig, action, name, loop=True, fps=SAMPLE_FPS, rest=None,
               % (name, len(lost),
                  ", ".join("%s %.1f mm" % (k, v * 1000) for k, v in worst)))
     return {"name": name, "dur": dur, "loop": loop, "frames": out}
+
+
+def _lerp_pose(a, b, u):
+    """Blend two keyframe pose dicts. Missing bones are the rest pose."""
+    out = {}
+    for k in set(a) | set(b):
+        pa, pb = a.get(k, None), b.get(k, None)
+        n = len(pa if pa is not None else pb)
+        pa = pa if pa is not None else (0.0,) * n
+        pb = pb if pb is not None else (0.0,) * n
+        out[k] = tuple(x + (y - x) * u for x, y in zip(pa, pb))
+    return out
+
+
+def arm_rots(rest):
+    """Each bone's rest orientation in armature space, parents first.
+
+    The conjugation `bake_poses` needs. `rest` is already ordered
+    parents-before-children, so one forward pass does it.
+    """
+    out = []
+    for _name, parent, local_b, _local_g in rest:
+        r = local_b.to_3x3()
+        out.append(out[parent] @ r if parent >= 0 else r)
+    return out
+
+
+def bake_poses(rest, keys, name, loop=True, fps=SAMPLE_FPS):
+    """Sample hand-authored poses into the clip format.
+
+    `keys` is `[(t_seconds, pose), ...]` with `t` starting at 0 and increasing;
+    a pose is `{bone_name: (rx, ry, rz) in degrees}` plus an optional
+    `"@root": (x, y, z)` translation in metres. Bones a pose does not mention
+    are at rest, and the axes are the armature's — see the module docstring for
+    why this one does not work in bone-local space the way `human_mh.py` does.
+
+    Keys are interpolated with a smoothstep rather than linearly, so that a
+    clip written as four poses a second does not change direction with a corner
+    on every one of them. Clips authored by sampling a continuous function get
+    a key per frame and never notice.
+    """
+    dur = keys[-1][0]
+    nf = max(2, int(round(dur * fps)) + (0 if loop else 1))
+    arot = arm_rots(rest)
+    frames, prev_q = [], {}
+
+    for f in range(nf):
+        t = (f / nf if loop else f / (nf - 1)) * dur
+        i = 0
+        while i < len(keys) - 2 and keys[i + 1][0] <= t:
+            i += 1
+        t0, p0 = keys[i]
+        t1, p1 = keys[i + 1]
+        u = 0.0 if t1 <= t0 else min(1.0, max(0.0, (t - t0) / (t1 - t0)))
+        blended = _lerp_pose(p0, p1, u * u * (3.0 - 2.0 * u))
+
+        quats = []
+        for bi, (bname, parent, local_b, local_g) in enumerate(rest):
+            rot = blended.get(bname)
+            if rot and any(rot):
+                # A rotation about this bone's head, written in armature axes,
+                # as a parent-relative matrix: conjugate it into the parent's
+                # rest frame and pre-multiply the rotation part only. The
+                # translation is the bone's rest offset and never moves —
+                # the format has nowhere to put a change to it anyway.
+                Pr = arot[parent] if parent >= 0 else Matrix.Identity(3)
+                R = Euler([math.radians(a) for a in rot], "XYZ").to_matrix()
+                m = (Matrix.Translation(local_b.translation)
+                     @ (Pr.inverted() @ R @ Pr).to_4x4()
+                     @ local_b.to_3x3().to_4x4())
+                m = CONV @ m @ CONV_I
+            else:
+                m = local_g
+            q = m.to_quaternion()
+            p = prev_q.get(bi)
+            if p and q.dot(p) < 0.0:
+                q = Quaternion((-q.w, -q.x, -q.y, -q.z))
+            prev_q[bi] = q
+            quats.append(quant_q(q))
+
+        # Authored in armature space, so it converts as a point.
+        rt = rest[0][3].translation + (CONV @ Vector(
+            blended.get("@root", (0.0, 0.0, 0.0))))
+        frames.append((tuple(rt), quats))
+
+    return {"name": name, "dur": dur, "loop": loop, "frames": frames}
 
 
 def rest_local_of(rig, bname):

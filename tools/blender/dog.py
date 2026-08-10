@@ -48,12 +48,21 @@ all of the work is here.
 
 Two things about this particular rig are worth knowing before touching it.
 
-**The feet are not on the legs.** `FrontFoot.R`, `BackFoot.L` and their pair are
-children of `root` — siblings of `Body`, not the ends of the leg chains. Posing
-a leg does not move its foot. It reads as a mistake and is not one: it puts foot
-placement in root space, where a walk cycle wants it, instead of at the end of
-an accumulating chain. The price is that nothing keeps the two in agreement, so
-a gait has to drive the legs and the feet and be right about both.
+**The feet were not on the legs, and now they are.** `FrontFoot.R`, `BackFoot.L`
+and their pair arrive as children of `root` — siblings of `Body`, not the ends
+of the leg chains — so posing a leg did not move its paw. In the rig as authored
+that is a reasonable choice: it puts foot placement in root space, which is
+where an IK walk cycle wants it, and the Jump action uses exactly that by
+keyframing translation on all four.
+
+It is not a reasonable choice *here*, because this format cannot translate any
+bone but the root. A paw parented to the root can therefore only spin on the
+spot, and the eighty-one vertices of each paw — they are weighted to the foot
+bones, not to the shins — would have stayed on the deck while the legs walked
+off. So `reparent_feet` hangs each paw off its own shin, where the rotations
+that do exist carry it. The rest pose does not move: each foot's head already
+sits directly under its shin's, so re-parenting changes the tree and not the
+animal.
 
 **The clip format carries rotation, and translation for the root only.** That is
 `frskin.py`'s constraint, not this file's, and it decides which of the two
@@ -61,14 +70,32 @@ shipped actions can be used. `Idle` animates translation on one bone, so it
 bakes losslessly. `Jump` animates it on nine, so most of what makes it a jump
 would arrive as a rest offset — a dog subtly coming apart rather than one
 obviously broken. `bake_action` measures the drop and prints it rather than
-leaving it to be noticed, and Jump is not shipped until it has been looked at.
+leaving it to be noticed, and Jump is not shipped.
 
-Chasing the jet, shaking off, and looking up at her are in no pack anyway, so
-they will be authored. That is the next pass and it goes here.
+── the gait ──────────────────────────────────────────────────────────────────
+
+`trot` and `shake` are authored here rather than imported, because no pack has
+them for this animal and because a walk that is not solved against the ground is
+a walk that slides.
+
+The trot is built backwards from that. Rather than posing the legs and hoping,
+each paw is given a **path in metres** — straight back at the travel speed while
+it is down, a Hermite arc forward while it is up — and a two-link solver reads
+off the shoulder, elbow and paw angles that put it there. Nothing about it is
+eyeballed, so `SPEED` below is not a tuning knob for how it looks: it is the
+speed the deck actually moves under him, and `src/43-jadrija.js` divides by it
+to pick a playback rate. Drive him at any other speed and he moonwalks.
+
+The one thing this costs is a crouch. The forelimb arrives 99.7% extended —
+shoulder to paw is 162.8 mm against a 164.4 mm reach — so at rest there is
+almost no stride available before the solver runs out of leg. `CROUCH` lowers
+him two and a half centimetres, which buys the reach back and is what a walking
+dog looks like anyway next to a standing one.
 """
 
 from __future__ import annotations
 
+import math
 import sys
 from pathlib import Path
 
@@ -77,8 +104,8 @@ from mathutils import Matrix  # type: ignore
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from frmesh import reset_scene  # noqa: E402
-from frskin import (MAX_INFLUENCES, bake_action, rest_locals,  # noqa: E402
-                    write_skin)
+from frskin import (MAX_INFLUENCES, bake_action, bake_poses,  # noqa: E402
+                    rest_locals, write_skin)
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC = Path(__file__).resolve().parent / "assets" / "pug.glb"
@@ -117,12 +144,50 @@ SUBDIV = 1
 # (action-name prefix, loops). The importer suffixes actions with the object
 # they came off, so these are prefixes rather than names.
 #
-# Idle only, for now. `Jump` is in the file and is not here: it animates
-# translation on nine bones and the clip format carries translation for the
-# root alone, so most of what makes it a jump would arrive as a rest offset.
-# `bake_action` prints exactly how much would be lost, which is the number to
-# look at before deciding whether to author the jump instead of importing it.
+# Idle only. `Jump` is in the file and is not here: it animates translation on
+# nine bones and the clip format carries translation for the root alone, so most
+# of what makes it a jump would arrive as a rest offset. `bake_action` prints
+# exactly how much would be lost, which is the number to look at before deciding
+# whether to author the jump instead of importing it.
 CLIPS = [("Armature|Idle", True)]
+
+# Each paw, onto the shin above it. See the docstring: the format cannot
+# translate anything but the root, so a paw parented to the root is a paw that
+# stays on the deck.
+FEET = {
+    "FrontFoot.R": "FrontLowLeg.R",
+    "FrontFoot.L": "FrontLowLeg.L",
+    "BackFoot.R": "BackLowLeg.R",
+    "BackFoot.L": "BackLowLeg.L",
+}
+
+# (upper bone, shin, paw, phase). A trot: diagonal pairs together, half a cycle
+# apart. Chosen over a four-beat walk because it is the gait a small dog spends
+# most of its moving life in, and because two beats is a shape you can read at
+# ten metres where four is a shuffle.
+LEGS = [
+    ("FrontUpLeg.L", "FrontLowLeg.L", "FrontFoot.L", 0.00),
+    ("BackUpLeg.R", "BackLowLeg.R", "BackFoot.R", 0.00),
+    ("FrontUpLeg.R", "FrontLowLeg.R", "FrontFoot.R", 0.50),
+    ("BackUpLeg.L", "BackLowLeg.L", "BackFoot.L", 0.50),
+]
+
+CYCLE = 0.30      # seconds for one full cycle: two footfalls a leg per second
+REACH = 0.070     # half the distance a planted paw travels, metres
+CROUCH = 0.025    # how much lower he carries himself moving than standing
+BOB = 0.006       # vertical, twice a cycle, highest at mid-stance
+LIFT = 0.032      # how far a paw clears the deck on the swing
+
+# Distance covered in one cycle, and so his speed over the ground. A planted paw
+# goes back by 2·REACH while it is down, which is half the cycle, so a full
+# cycle is 4·REACH of deck. 0.93 m/s — a purposeful small dog.
+SPEED = 4 * REACH / CYCLE
+
+# Fast clips are sampled at sixty rather than thirty. A 0.30 s cycle is nine
+# frames at the module default, and the runtime blends between frames linearly:
+# nine samples of a leg swinging through ninety degrees is a leg with visible
+# corners in it. Eighteen is not, and costs 1.7 KB before compression.
+FAST_FPS = 60
 
 
 def fix_actions(scale):
@@ -150,6 +215,209 @@ def fix_actions(scale):
                 kp.handle_left.y *= scale
                 kp.handle_right.y *= scale
     print("[dog] scaled %d location channels by %.3f" % (n, scale))
+
+
+def reparent_feet(rig):
+    """Hang each paw off the shin above it instead of off the root."""
+    for ob in bpy.context.selected_objects:
+        ob.select_set(False)
+    bpy.context.view_layer.objects.active = rig
+    rig.select_set(True)
+    bpy.ops.object.mode_set(mode="EDIT")
+    for foot, shin in FEET.items():
+        eb = rig.data.edit_bones[foot]
+        eb.parent = rig.data.edit_bones[shin]
+        # Not connected: connecting snaps the paw's head onto the shin's tail,
+        # and these are zero-length bones whose tails are a millimetre from
+        # their heads. It would move every paw up to the ankle.
+        eb.use_connect = False
+    bpy.ops.object.mode_set(mode="OBJECT")
+    rig.select_set(False)
+
+
+# ── the two-link solver ───────────────────────────────────────────────────────
+#
+# Everything below works in the sagittal plane — x forward, z up — and in one
+# angle convention: a rotation about +Y that takes straight-down onto the vector
+# given. That is the same +Y the poses are authored in, and it comes out of
+# `frskin.py`'s armature-space rule, so a positive angle swings a leg *back* for
+# all four legs regardless of what glTF did to their bone rolls.
+
+
+def _ang(dx, dz):
+    """The +Y rotation taking (0, 0, −1) onto (dx, dz)."""
+    return math.atan2(-dx, -dz)
+
+
+def leg_rest(rig, up, low, foot):
+    """One leg's rest geometry, as the solver wants it.
+
+    The knee sign is measured rather than assumed. A dog's elbow points forward
+    of the shoulder line and its hock points behind the hip, so the two ends of
+    the animal fold opposite ways, and hard-coding either one gives two legs
+    that bend backwards.
+    """
+    j = rig.data.bones[up].head_local
+    k = rig.data.bones[low].head_local
+    p = rig.data.bones[foot].head_local
+    a1 = _ang(k.x - j.x, k.z - j.z)
+    a2 = _ang(p.x - k.x, p.z - k.z)
+    base = _ang(p.x - j.x, p.z - j.z)
+    return {
+        "j": (j.x, j.z), "p": (p.x, p.z),
+        "l1": math.hypot(k.x - j.x, k.z - j.z),
+        "l2": math.hypot(p.x - k.x, p.z - k.z),
+        "a1": a1, "a2": a2,
+        "knee": 1.0 if a1 - base > 0 else -1.0,
+    }
+
+
+def solve(g, tx, tz):
+    """Degrees for (upper, shin, paw) putting the paw at (tx, tz).
+
+    The paw angle is the one that leaves it flat on the deck: the shin's world
+    pitch is `a2` and the paw simply undoes it. A paw that inherits the fold of
+    the leg above points at the sky at the top of the swing.
+    """
+    jx, jz = g["j"]
+    l1, l2 = g["l1"], g["l2"]
+    dx, dz = tx - jx, tz - jz
+    d = min(max(math.hypot(dx, dz), abs(l1 - l2) + 1e-4), (l1 + l2) * 0.999)
+    c = (d * d + l1 * l1 - l2 * l2) / (2.0 * d * l1)
+    a1 = _ang(dx, dz) + g["knee"] * math.acos(max(-1.0, min(1.0, c)))
+    kx, kz = jx - l1 * math.sin(a1), jz - l1 * math.cos(a1)
+    a2 = _ang(tx - kx, tz - kz)
+    deg = math.degrees
+    return (deg(a1 - g["a1"]),
+            deg((a2 - a1) - (g["a2"] - g["a1"])),
+            deg(g["a2"] - a2))
+
+
+def _hermite(u, p0, p1, m0, m1):
+    """Cubic through p0→p1 with the tangents given, u in [0, 1]."""
+    u2, u3 = u * u, u * u * u
+    return ((2 * u3 - 3 * u2 + 1) * p0 + (u3 - 2 * u2 + u) * m0
+            + (-2 * u3 + 3 * u2) * p1 + (u3 - u2) * m1)
+
+
+def paw_path(u, g, dz):
+    """Where one paw should be at phase `u` of its own cycle.
+
+    `u` = 0 is footfall. The first half is stance: the paw is nailed to the deck
+    and travels straight back at `SPEED`, which is the whole point of solving
+    this instead of posing it. The second half is the swing, and it is a Hermite
+    rather than an ease because both ends of it have to *match the ground speed*
+    — a swing that arrives with zero velocity is a paw that stops dead the
+    instant it lands and drags for the rest of the step.
+
+    `dz` is the root's vertical offset this frame. It is subtracted rather than
+    ignored because the solver works in the rig's own space and the root moves
+    the whole rig: the target has to be lowered by however much the body rose,
+    or the crouch and the bob both leak into the contact.
+    """
+    px, pz = g["p"]
+    if u < 0.5:
+        s = u / 0.5
+        return px + REACH - 2 * REACH * s, pz - dz
+    s = (u - 0.5) / 0.5
+    v = -2 * REACH          # metres per half-cycle, the speed of the deck
+    x = _hermite(s, px - REACH, px + REACH, v, v)
+    return x, pz - dz + LIFT * math.sin(math.pi * s)
+
+
+def trot_keys(geo, fps=FAST_FPS):
+    """The cycle, one key a frame, so nothing is left to the interpolator."""
+    n = int(round(CYCLE * fps))
+    keys = []
+    for f in range(n + 1):
+        ph = f / n
+        dz = -CROUCH - BOB * math.cos(4 * math.pi * ph)
+        p = {"@root": (0.0, 0.0, dz)}
+        for up, low, foot, off in LEGS:
+            d1, d2, d3 = solve(geo[up], *paw_path((ph + off) % 1.0, geo[up], dz))
+            p[up] = (0.0, d1, 0.0)
+            p[low] = (0.0, d2, 0.0)
+            p[foot] = (0.0, d3, 0.0)
+        # What the rest of him does about it. Small on purpose: the legs are
+        # solved and everything here is decoration, so anything big enough to
+        # notice on its own is big enough to fight them.
+        w, w2 = 2 * math.pi * ph, 4 * math.pi * ph
+        p["Shoulders"] = (2.6 * math.sin(w), 0.0, 0.0)
+        p["Hips"] = (-3.2 * math.sin(w), 0.0, 2.6 * math.sin(w))
+        p["Back"] = (0.0, 0.0, 2.2 * math.sin(w))
+        p["Neck"] = (0.0, -2.0 * math.cos(w2), 0.0)
+        p["Head"] = (0.0, 3.4 * math.cos(w2), 0.0)
+        keys.append((ph * CYCLE, p))
+    return keys
+
+
+# ── the shake ─────────────────────────────────────────────────────────────────
+#
+# A dog coming out of the water twists its trunk about the fore-and-aft axis
+# fast enough that the front and back halves are never in phase, and that
+# counter-rotation is the entire read. So the wave is authored explicitly: the
+# head starts it, the neck and shoulders follow a beat behind, and the hips
+# arrive most of a half-cycle late, which puts the two ends of the animal
+# turning opposite ways for most of every cycle.
+#
+# `Body` is deliberately not in it. The four legs hang off `Body`, so rolling it
+# rolls them, and a dog that shakes its feet off the deck is a dog levitating.
+# Leaving the trunk to pivot about a fixed middle is also just what happens: the
+# feet stay planted and the animal blurs above them.
+
+SHAKE = 1.55      # seconds, once
+SHAKE_HZ = 4.2
+
+# (bone, amplitude in degrees, phase lag in radians).
+SHAKE_WAVE = [
+    ("Head", 22.0, 1.05),
+    ("Neck", 15.0, 0.55),
+    ("Shoulders", 15.0, 0.0),
+    ("Back", 13.0, 1.70),
+    ("Hips", 19.0, 2.15),
+    ("Torso", 7.0, 2.40),
+]
+
+
+def _ramp(t, a, b):
+    u = min(1.0, max(0.0, (t - a) / (b - a)))
+    return u * u * (3.0 - 2.0 * u)
+
+
+def shake_keys(geo, fps=FAST_FPS):
+    """Brace, shake, settle. Sampled per frame like the trot, and for the same
+    reason: at 4.2 Hz a key every tenth of a second is a key every half turn."""
+    n = int(round(SHAKE * fps))
+    keys = []
+    for f in range(n + 1):
+        t = f * SHAKE / n
+        # Up at the front first, then the whole wave, then down. The brace and
+        # the recovery overlap the shake at both ends rather than butting on to
+        # it, so it starts as a flinch instead of as a switch being thrown.
+        env = _ramp(t, 0.14, 0.34) * (1.0 - _ramp(t, 1.12, 1.42))
+        crouch = CROUCH * 0.45 * (_ramp(t, 0.04, 0.22)
+                                  * (1.0 - _ramp(t, 1.20, 1.52)))
+        p = {"@root": (0.0, 0.0, -crouch)}
+
+        w = 2 * math.pi * SHAKE_HZ * t
+        for bone, amp, lag in SHAKE_WAVE:
+            p[bone] = (amp * env * math.sin(w - lag), 0.0, 0.0)
+        # The head also drops as he braces and comes back up at the end, and
+        # gets the one thing the roll cannot give it: a yaw, so the muzzle
+        # travels rather than just turning over.
+        p["Head"] = (p["Head"][0],
+                     -9.0 * _ramp(t, 0.02, 0.20) * (1.0 - _ramp(t, 1.15, 1.45)),
+                     7.0 * env * math.sin(w - 1.05 + 1.4))
+        # Braced: the legs go a little wider and a little straighter, which is
+        # what stops the whole animal falling over sideways doing this.
+        for up, low, foot, _off in LEGS:
+            side = 1.0 if up.endswith(".L") else -1.0
+            d1, d2, d3 = solve(geo[up], *paw_path(0.25, geo[up], -crouch))
+            p[up] = (side * 5.5 * env, d1, 0.0)
+            p[low] = (0.0, d2, 0.0)
+            p[foot] = (0.0, d3, 0.0)
+        keys.append((t, p))
+    return keys
 
 
 def build():
@@ -217,6 +485,7 @@ def build():
         d.transform(drop)
 
     fix_actions(rig_mw.to_scale().x * k)
+    reparent_feet(rig)
 
     xs = [v.co.x for v in dog.data.vertices]
     ys = [v.co.y for v in dog.data.vertices]
@@ -349,6 +618,29 @@ def build():
             continue
         baked.append(bake_action(rig, act, want.split("|")[-1].lower(),
                                  loop=loop, rest=rest))
+
+    geo = {up: leg_rest(rig, up, low, foot) for up, low, foot, _o in LEGS}
+    # How close the solver comes to running out of leg. This is the number that
+    # decides `REACH` and `CROUCH`, and it is printed because the failure is
+    # silent: past 100% the target is clamped, the paw stops where the leg ends
+    # and slides the rest of the way, and what you see is a dog on ice.
+    for name, g in sorted(geo.items()):
+        worst = max(math.hypot(x - g["j"][0], z - g["j"][1])
+                    for x, z in (paw_path(i / 120.0, g,
+                                          -CROUCH - BOB * math.cos(
+                                              4 * math.pi * i / 120.0))
+                                 for i in range(120)))
+        print("[dog]   %-13s upper %.1f  shin %.1f  reach %.1f mm  "
+              "worst %.1f mm (%.0f%%)"
+              % (name, g["l1"] * 1000, g["l2"] * 1000,
+                 (g["l1"] + g["l2"]) * 1000, worst * 1000,
+                 100 * worst / (g["l1"] + g["l2"])))
+    print("[dog] trot %.2f m/s over the ground, %.0f ms a cycle"
+          % (SPEED, CYCLE * 1000))
+    baked.append(bake_poses(rest, trot_keys(geo), "trot",
+                            loop=True, fps=FAST_FPS))
+    baked.append(bake_poses(rest, shake_keys(geo), "shake",
+                            loop=False, fps=FAST_FPS))
 
     OUT.mkdir(parents=True, exist_ok=True)
     write_skin(OUT / "dog.fr3d.gz", pos, nrm, cols, bidx, bwgt, idx,
