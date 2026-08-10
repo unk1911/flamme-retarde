@@ -10,6 +10,70 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.48.0] — 2026-08-10
+
+### Added — the dog has a skeleton, and stands there breathing
+
+He shipped as a statue: one frozen pose, the armature in the source file
+deliberately dropped on the grounds that a rig nothing plays is dead weight in a
+payload inlined into every download. Something plays it now. He is skinned —
+24 bones, the v4 format, `Idle` running — and the payload went 57 KB to 75 KB.
+
+The runtime cost of this was three lines, which was the surprise.
+`skinnedFigure` was written for her and turns out to be entirely general once
+`opts.face` is left off, so a 24-bone quadruped goes down the same path as a
+28-bone woman with nothing added. All of the work was in Blender.
+
+**The armature has to be unit-scaled by the time the exporter reads it**, and
+that is not a tidiness point. A clip frame stores a quaternion per bone and a
+translation for the root, and there is nowhere to put a scale — so the 39.55 the
+asset arrives with has to be baked into the bone data. Which then breaks the
+actions, quietly: a pose bone's `location` is in armature-object space and does
+not follow a transform applied to the bone data underneath it, so the skeleton
+becomes five metres of dog while the animation moving it is still authored in
+fortieths. The symptom is not a broken dog, it is a *still* one. `fix_actions`
+scales the location channels by the same factor, and the factor is printed.
+
+**Only `Idle` ships.** `Jump` is in the file and animates translation on nine
+bones; the format carries it for the root alone, so most of what makes it a jump
+would arrive as a rest offset — a dog subtly coming apart rather than one
+obviously broken. `bake_action` measures what it is about to drop and says so
+instead of leaving it to be noticed. On `Idle` that is one bone and 3.5 mm, which
+is the breathing bob on `Body`, and is 1% of the animal.
+
+The material split is gone. It existed because the v1 export takes a list of
+(object, colour) and has nowhere else to put them; the skinned blob carries a
+colour per vertex, so the seam across the muzzle is now one term in the dedupe
+key instead of two Blender objects — which also retires the reason the
+subdivision had to happen before the split.
+
+Two things about this rig are worth knowing before touching it, and are written
+down in `dog.py` rather than here. The feet are children of `root`, not ends of
+the leg chains, so posing a leg does not move its foot. And that is deliberate:
+it puts foot placement in root space, which is where a walk cycle wants it.
+
+### Added — a pose signature in the debug API, after the first one was useless
+
+`__fr.jad.raw().dog()` reports `pose`: every bone origin summed. A clip that is
+selected and a clip that is running look identical in a screenshot — `playing`
+says `idle` either way — so there has to be a number that moves.
+
+The first version watched the `Head` bone and read as dead solid three samples
+running, which sent me looking for a bug that was not there. Rotating a head
+does not move the head's own origin. The dog was breathing the whole time; a
+pixel diff against a control region of deck and sea, which came back at exactly
+zero, is what settled it. Whatever moves, the signature moves.
+
+### Added — `tools/blender/frskin.py`
+
+The generic half of skinned export: `rest_locals`, `quant_q`, `bake_action` and
+the v4 blob writer. `human_mh.py` keeps its own copies for now and the module
+docstring says why, says that it should not last, and names the check that makes
+converging safe — the build is deterministic, so `human_skin.fr3d.gz` is
+byte-identical before and after or the refactor was wrong. Doing it in the same
+change that first rigs the dog would have meant touching a working 4 700-line
+figure to prove out a feature that was not proven yet.
+
 ## [1.47.0] — 2026-08-10
 
 ### Added — a perineum, and the first feature paint could not have done

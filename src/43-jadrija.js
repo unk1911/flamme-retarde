@@ -2063,10 +2063,17 @@ async function buildJadrija(scene) {
 
   if (PAYLOAD.dog_fr3d) {
     try {
-      const geo = readFR3D(await inflateBinary(PAYLOAD.dog_fr3d));
-      const mesh = new THREE.Mesh(geo, solidMaterial(0xffffff, {
+      // Skinned, on the same path she is: `skinnedFigure` turns out to be
+      // entirely general once `opts.face` is left off, so the twenty-four bone
+      // quadruped costs the same three lines as the twenty-eight bone woman.
+      // No `face` — a pug has one, but it is four hundred vertices across and
+      // the eyelids the shader looks for are hers by name.
+      const fig = await loadSkin('dog_fr3d', {
         spec: 0.05, specPower: 20, body: 'base *= vVCol;',
-      }));
+      });
+      if (!fig) throw new Error('no skinned dog');
+      fig.play('idle', { fade: 0 });
+      const mesh = fig.mesh;
       const dt = LEN * 0.5 + 19.4, ds = SHOW_LANE0 - 0.8;
       const p = toWorld(dt, ds);
       mesh.position.set(p[0], p[1], p[2]);
@@ -2079,7 +2086,7 @@ async function buildJadrija(scene) {
       const balloon = makeBalloon();
       balloon.mesh.position.set(p[0], p[1] + 0.62, p[2]);
       scene.add(balloon.mesh);
-      dog = { mesh, balloon, at: [dt, ds], tris: geo.index.count / 3 };
+      dog = { mesh, balloon, fig, at: [dt, ds], tris: fig.tris };
     } catch (e) {
       console.warn('dog failed:', e.message);
     }
@@ -2109,11 +2116,18 @@ async function buildJadrija(scene) {
    */
   const DOG_NEAR = 21;
 
-  function stepDog(camPos) {
+  function stepDog(camPos, dt) {
     if (!dog) return;
     const b = dog.balloon;
     const d = Math.hypot(camPos.x - dog.mesh.position.x,
       camPos.z - dog.mesh.position.z);
+    // Posed on the CPU, so it is gated the way she is and for the same reason:
+    // twenty-four bones a frame buys nothing at a range where the whole animal
+    // is a couple of pixels. Tighter than her 250 m, because the gate is really
+    // about how far away a *pose* stops reading and he is a third her height.
+    // Out of range he simply stops where he was, which is a dog standing still
+    // — the failure this gate can have is the pose it was already holding.
+    if (d < 120) dog.fig.update(dt);
     // No price, no balloon. The same rule her card follows: a line that never
     // arrived is simply not one of the things anybody says.
     b.mesh.visible = !!live.doge && d < DOG_NEAR;
@@ -3445,10 +3459,11 @@ async function buildJadrija(scene) {
     // Where you are, in the frame everybody here is laid out in.
     const [pt, ps] = local(cam.x, cam.z);
 
-    // Cheap, and unconditional for that reason: two subtractions and a hypot
-    // against one distance, and a rotation only on the frames the balloon is
-    // actually up. It does not need the range gate the figure has.
-    stepDog(cam);
+    // Unconditional, and carries its own gate inside instead. The balloon work
+    // is two subtractions and a hypot and wants no gate at all; the pose is
+    // twenty-four bones and wants one, and the distance both of them turn on is
+    // the same number. Gating out here would mean measuring it twice.
+    stepDog(cam, dt);
 
     if (skinFig) {
       const dx = cam.x - skinFig.mesh.position.x, dz = cam.z - skinFig.mesh.position.z;
@@ -3557,8 +3572,34 @@ async function buildJadrija(scene) {
     btc: () => live.btc,
     live: () => ({ ...live }),
     /** The dog, and whether its balloon is up. */
-    dog: () => dog && { at: dog.at, tris: dog.tris,
-      says: dog.balloon.mesh.visible ? dog.balloon.said : null },
+    /**
+     * The dog, how his skeleton is standing, and whether his balloon is up.
+     *
+     * `pose` is every bone origin summed, in figure space, and it is here
+     * because a clip that is *selected* and a clip that is *running* look
+     * identical in a screenshot — `playing` says 'idle' either way. Sample it
+     * twice a second apart: if it does not move, the pose is frozen, which is
+     * what a bad bake, a missed `update` and a range gate that shut too early
+     * all look like from outside.
+     *
+     * Every bone and not one named bone, which was the first version of this
+     * and was useless. It watched `Head`, and rotating a head does not move
+     * the head's own origin — so it read as dead solid while the dog was quite
+     * visibly breathing. Whatever moves, this moves.
+     */
+    dog: () => {
+      if (!dog) return null;
+      const f = dog.fig, v = new THREE.Vector3();
+      let pose = 0;
+      for (let i = 0; i < f.bones.length; i++) {
+        f.boneAt(i, v);
+        pose += v.x + v.y + v.z;
+      }
+      return { at: dog.at, tris: dog.tris,
+        bones: f.bones.length, clips: f.clips.join('+'), playing: f.playing(),
+        pose: +pose.toFixed(5),
+        says: dog.balloon.mesh.visible ? dog.balloon.said : null };
+    },
     /** Where the performance has got to. */
     show: () => show && {
       phase: show.phase, clip: skinFig ? skinFig.playing() : null,

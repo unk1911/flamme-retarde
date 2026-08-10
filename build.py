@@ -36,7 +36,7 @@ DEPLOY = Path("/mnt/c/tmp/flamme-retarde")
 # rebuild byte-for-byte identically, because comparing checksums is how we
 # check that what is on the server is what is in the repo. Bump them together
 # when cutting a release, next to the CHANGELOG entry.
-VERSION = "1.47.0"
+VERSION = "1.48.0"
 BUILD_DATE = "2026-08-10"
 
 THREE_VERSION = "0.180.0"

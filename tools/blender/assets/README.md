@@ -27,4 +27,7 @@ the armature is the reason this model was chosen over better-looking ones, which
 is exactly the sort of thing that is obvious now and forgotten in a year.
 
 `tools/blender/dog.py` reads it and writes `build/payload/dog.fr3d.gz`. The
-first pass ships the mesh only; the armature is untouched and waiting.
+first pass shipped the mesh only; the armature is used now, and the dog is
+skinned — 24 bones, the same v4 format the figure uses. Of the two actions in
+the file only `Idle` is shipped: see the note in `dog.py` on why `Jump` cannot
+survive a clip format that carries rotation and a root translation.
