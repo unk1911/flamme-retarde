@@ -115,6 +115,21 @@ ANKLET_M, ANKLET_P = (0.860, 0.720, 0.400), (0.860, 0.720, 0.400)
 # survive being 55 mm long at twenty metres. This is a 28 mm disc on a chest and
 # the same contrast would read as a wound.
 AREOLA_M, AREOLA_P = (0.455, 0.288, 0.268), (0.455, 0.288, 0.268)
+# Pubic hair, and it takes the *hair* marker rather than a literal one, unlike
+# the two above. That is not tidiness: red is the slot the crowd shader swaps
+# for a per-instance hair colour, and a figure whose head hair is recoloured and
+# whose pubic hair is not would be wrong in exactly the way that shows. Only she
+# has this cutter today, so the marker channel does nothing yet; it will be
+# right the first time anybody else gets one.
+#
+# The literal is three shades up from HAIR_P rather than equal to it, and that
+# is a judgement rather than a measurement: her head hair is a mass with its own
+# shading and self-shadow and can afford to be nearly black, while this is a flat
+# patch a few centimetres across on lit skin, where AREOLA_P's note about
+# contrast applies — four shades under the skin reads as a wound. It has not been
+# tried at HAIR_P. If this ever looks washed out, that is the first thing to try
+# and the reason not to is only a guess.
+PUBIC_M, PUBIC_P = HAIR_M, (0.225, 0.163, 0.128)
 
 
 # --------------------------------------------------------------------------- #
@@ -1164,6 +1179,58 @@ def cutters(J):
         add("areola%d" % s, AREOLA_M, AREOLA_P, 3,
             (0.128, s * 0.0770, 1.2531), (0.0550, 0.0190, 0.0190))
 
+    # ── pubic hair ─────────────────────────────────────────────────────────
+    #
+    # Three cutters in a column rather than one, for the mouth's reason: the
+    # shape is the whole of what makes it read. One ellipse centred on the mons
+    # is a symmetric blob, and a symmetric dark blob there is a bruise. The
+    # thing is a wedge — broad across the top, tapering to nothing between the
+    # legs — and three overlapping discs of 60, 46 and 26 mm do that with three
+    # numbers. They overlap, which is allowed and only allowed here: parity is a
+    # property of one closed shell, and these are three separate cutters tested
+    # independently, exactly as the nine lumps of the mouth are.
+    #
+    # There is no joint marker for this, and `pelvis` (z 0.934) is a pivot
+    # inside her rather than a point on her, so the heights come off the mesh:
+    # the midline front surface runs x 0.1223 at z 0.86 to x 0.1441 at z 0.92,
+    # and the hip joints sit at z 0.909. The wedge is hung across that.
+    #
+    # ── and why it runs down to 0.823 rather than stopping at the mons ───────
+    #
+    # Because otherwise nobody would ever see it. The wrap is rigid to her
+    # pelvis — `hip_scarf` says so and is right to — and its front spans
+    # z 0.828 (SCARF_HEM) to 0.940 (SCARF_TOP less the 2 cm front dip). The
+    # whole mons sits inside that band, so no clip in the repertoire can expose
+    # it: the cloth goes where the hips go, cartwheel included. The only skin
+    # below her waist that is ever in view is what shows under the hem between
+    # the tassels, so the bottom two rows are the ones that do any work, and
+    # they are down there because that is where the gap is rather than because
+    # an ellipsoid wanted to be. It is not a compromise anatomically — pubic
+    # hair does run down — but the *reason* for those two rows is the hem.
+    #
+    # Each row's centre is put 40 mm behind the surface at its own height, which
+    # holds the fraction along the punch — and therefore the cross-section
+    # factor, 0.686 — the same for all three. That is what makes the declared
+    # radii below mean something: multiply by 0.686 and you have the painted
+    # size, per the waist-not-tip rule at the top of this function. Getting this
+    # wrong is how the iris came out 3 mm across instead of 12.
+    #
+    # Softness is *right* here, which is worth saying because it is the opposite
+    # of everything else this file has learned about the decimator. A garment
+    # needs a crisp hem and the averaging destroys it — that is the whole story
+    # of the painted wrap that had to be taken off her. Hair on skin has no hem.
+    # The few centimetres of gradient the export adds is the one place where the
+    # artefact is the feature.
+    PUBIC_BACK = 0.040        # how far behind the surface each row is centred
+    for i, (pz, surf, wide) in enumerate((
+            (0.913, 0.1405, 0.0437),      # the top of the wedge, 60 mm across
+            (0.891, 0.1364, 0.0335),      # 46 mm
+            (0.869, 0.1268, 0.0248),      # 34 mm
+            (0.846, 0.1150, 0.0190),      # 26 mm — the hem is at 0.828
+            (0.823, 0.1000, 0.0146))):    # 20 mm, and out
+        add("pubis%d" % i, PUBIC_M, PUBIC_P, 3,
+            (surf - PUBIC_BACK, 0.0, pz), (0.0550, wide, 0.0233))
+
     # Hair: a cap over the skull, cut at the brow. Unlike the others this one is
     # a solid the scalp sits inside, not a punch through it.
     #
@@ -1631,6 +1698,23 @@ def dance_floor(rig, clear=0.004):
     for i, p in enumerate(poses):
         MOON[i] = (i * MOON_DUR / MOON_KEYS, p)
     print("[mh] moonwalk: floor pass settled, deepest key %+.3f m" % worst)
+
+    # Built here as well as solved here, for the ordering reason written above
+    # TWERK: `_twerk` needs `_flat`, which is declared with the firestarter.
+    poses = [_twerk_at(i / TWERK_KEYS) for i in range(TWERK_KEYS + 1)]
+    worst = floor_poses(rig, poses, clear)
+    TWERK[:] = [(i * TWERK_DUR / TWERK_KEYS, p) for i, p in enumerate(poses)]
+    # The ankle spread is the check that the counter-rotation is right, not
+    # decoration: if the thigh and the shin are held still in the world while
+    # the pelvis rocks, the sole cannot be moving, so `_flat` has to come out
+    # very nearly constant across the cycle. A big number here means the hips
+    # are fighting the pelvis instead of going with it, and what you will see is
+    # her feet sawing through the deck.
+    ank = [p["footL"][0] for p in poses]
+    print("[mh] twerk: floor pass settled, deepest key %+.3f m, "
+          "hips %+.3f..%+.3f, ankle %.1f..%.1f deg"
+          % (worst, min(p["@root"][2] for p in poses),
+             max(p["@root"][2] for p in poses), min(ank), max(ank)))
 
 
 def fire_floor(rig, clear=0.004):
@@ -3282,6 +3366,113 @@ SHIMMY_B = _shimmy(-1)
 SHIMMY = [(i * SHIMMY_DUR / SHIMMY_KEYS, _shimmy_at(i / SHIMMY_KEYS))
           for i in range(SHIMMY_KEYS + 1)]
 
+# ── the twerk ───────────────────────────────────────────────────────────────
+#
+# The shimmy's opposite, and written next to it for that reason. A shimmy is a
+# twist that stops at the ribs and never reaches the hips; this is a pitch that
+# lives entirely in the hips and must not reach the shoulders. Both are sold by
+# what is *not* moving.
+#
+# Everything here happens on one channel: pelvis X, which is the fore-and-aft
+# pitch — the same channel the walk carries a constant −2 on. It rocks ±15° at
+# about two beats a second from a braced squat, knees bent and apart, both soles
+# down for all of it.
+#
+# ── the two counter-rotations, which are the whole clip ──────────────────────
+#
+# **The hips go with the pelvis, not against it.** That looks backwards written
+# down and it is forced by the rig. The thigh hangs off the pelvis, so pitching
+# the pelvis swings the whole leg with it, and a leg that swings is a foot that
+# leaves the deck. Holding the thigh still in the world means the hip's *local*
+# angle has to move by whatever the pelvis moved — and `_flat` says which way:
+# it is `hip + knee − pel − 5.35`, so pelvis and hip enter a limb's world pitch
+# with opposite signs, and keeping `hip − pel` constant is what keeps the thigh
+# where it is. The ankle then comes out very nearly constant on its own, which
+# is the check that this is right rather than a coincidence: if the thigh and
+# the shin are still, the sole cannot be moving.
+#
+# **The spine gives back exactly what the pelvis took.** Sum the pitch up the
+# chain — pelvis, three spine bones, chest — and that sum is where her shoulders
+# point. If it is left alone the shoulders rock with the hips and the whole
+# figure see-saws, which is not the move, it is a bow. So the spine carries
+# −15·s spread over four bones against the pelvis's +15·s, and the shoulders sit
+# still while everything below them works. That is the same trick the shimmy
+# plays at the neck, and for the same reason: the stillness is what makes the
+# motion read as deliberate.
+#
+# Sampled rather than keyed, like both other dances — `_bake_clip` eases within
+# every key interval, so five hand-placed keys arrive as five lurches with the
+# rate going to zero between them. Ten samples of a cosine is a rock.
+# ── how deep the squat has to be, which is not what it looks like on paper ──
+#
+# The first cut used a 48° knee and expected a squat. It got 8 cm, and the
+# render was a woman standing nearly straight with her hips twitching.
+#
+# The arithmetic is worth writing down because the intuition is badly wrong. A
+# knee angle folds the leg into a shallow V, and the hip drops by roughly
+# `2·L·(1 − cos(θ/2))` for segments of length L — so at 48° the two 0.46 m
+# halves give 2 × 0.46 × (1 − cos 24°) = 7.9 cm, which is exactly what the floor
+# pass reported. Half the knee angle does far less than half the work. To put
+# her hips 18 cm down the knee has to go to about 70°, and to get a proper deep
+# squat it is nearer 85° — at which point the ankle `_flat` asks for is 38° of
+# dorsiflexion, past what an ankle does and well past what this mesh looks
+# right at. 70° is the compromise and it is chosen from the ankle end, not the
+# knee end.
+TWERK_DUR = 0.52           # a full down-and-up: a shade under two a second
+TWERK_KEYS = 10            # sampled, not keyed — see dance_floor()
+TWERK_PEL = -6.0           # the pelvis's forward carry, before the rock
+TWERK_AMP = 13.0           # and how far it rocks either side of that
+TWERK_HIP = -40.0          # thigh flexion: the squat she does it from
+TWERK_KNEE = 56.0          # and the knee that goes with it — see above
+TWERK_TRACK = 13.0         # how far apart her feet are, in degrees at the hip
+
+
+def _twerk(s):
+    """One attitude of the rock. `s` +1 is tipped back, −1 is tucked under."""
+    pel = TWERK_PEL + TWERK_AMP * s
+    hip = TWERK_HIP + TWERK_AMP * s        # with the pelvis — see above
+    knee = TWERK_KNEE - 8.0 * s
+    ank = _flat(hip, knee, pel)
+    give = -TWERK_AMP * s                  # what the spine hands back
+    return {
+        "@root": (0.0, 0.0, 0.0),
+        "pelvis": (pel, 0, 0),
+        # Weighted toward the lower back, which is where a person actually
+        # hinges when they do this. All four together are the −36° of forward
+        # carry that puts her chest over her knees, plus the give.
+        "spine01": (-8 + give * 0.30, 0, 0), "spine02": (-9 + give * 0.30, 0, 0),
+        "spine03": (-8 + give * 0.25, 0, 0), "chest": (-5 + give * 0.15, 0, 0),
+        # And the head comes back up out of all of it. Thirty-eight degrees of
+        # forward carry with the head welded on top is somebody looking at the
+        # concrete; she is looking back over the deck, which is the difference
+        # between doing this and inspecting a paving slab.
+        "neck": (12, 0, 0), "head": (20, 0, -2),
+        "clavicleL": (0, 0, 6), "clavicleR": (0, 0, -6),
+        # Braced rather than posed. Hands on the knees is the picture everyone
+        # has, and this rig has no IK, so a hand aimed at a knee either hangs in
+        # the air beside it or goes through the thigh — and the thigh is moving.
+        # Out and back, elbows bent, clear of everything.
+        "armUL": (-20, 0, 34), "armLL": (-52, 0, 8), "handL": (-6, 0, 0),
+        "armUR": (-20, 0, -34), "armLR": (-52, 0, -8), "handR": (-6, 0, 0),
+        "legUL": (hip, 0, TWERK_TRACK), "legLL": (knee, 0, 0), "footL": (ank, 0, 0),
+        "legUR": (hip, 0, -TWERK_TRACK), "legLR": (knee, 0, 0), "footR": (ank, 0, 0),
+    }
+
+
+def _twerk_at(u):
+    """`u` 0..1 through one full down-and-up."""
+    return _twerk(math.cos(2.0 * math.pi * u))
+
+
+# Filled by `dance_floor`, which is where the hip height is solved. Empty until
+# then, the way WALK and FIRE are — CLIPS below holds the list itself.
+#
+# Nothing here is evaluated at import, unlike SHIMMY two dozen lines up, and it
+# cannot be: `_twerk` calls `_flat`, which is declared with the firestarter two
+# hundred lines below this. A module-level `_twerk(1)` for the preview extremes
+# would run before `_flat` exists and take the whole file down at import.
+TWERK = []
+
 
 # ── the moonwalk ────────────────────────────────────────────────────────────
 #
@@ -3921,6 +4112,7 @@ CLIPS = [
     # somersault and the cartwheel are events that end, these are things she is
     # doing until she stops.
     {"name": "shimmy", "loop": True, "keys": SHIMMY},
+    {"name": "twerk", "loop": True, "keys": TWERK},
     # `moonwalk` was here and is not any more. The move is still authored above,
     # MOON and all, and `dance_floor` still solves it — what was taken out is the
     # one line that put it in the payload. It was the only thing in the

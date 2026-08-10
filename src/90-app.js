@@ -1703,19 +1703,39 @@ function frame() {
   shadow.syncMoving();
   shadow.render(renderer);
 
-  // The mix: your own engines dominate unless you are watching from outside,
-  // in which case the nearest wingman gets a say too.
-  const nearestAI = wingmen ? wingmen.nearest(camera.position) : 1e9;
-  // Your own aeroplane, and whether there is one.
+  // The mix: your own engines, and only your own engines.
   //
-  // Stranded means you walked in under a canopy or through one of the back
-  // doors, and in both cases the airframe is not a thing over there that you
-  // are standing away from — it is gone, or it never came. `flight.p` goes on
-  // existing regardless and its position is wherever the model left it, which
-  // at Jadrija is close enough across the channel to score a healthy `own` and
-  // put two turboprops over a promenade with nothing on it. Zeroed here rather
-  // than in the mixer so the wingmen keep their say: a Canadair going over
-  // while you stand on the beach is exactly what you should hear.
+  // There used to be a second term here — `0.55 * (1 - sat((nearestAI - 40) /
+  // 700))` — folded in with a `Math.max` so that a wingman passing nearby could
+  // also open the engine beds. The intention was good and the mechanism was
+  // not, and it is the drone people kept reporting on the promenade.
+  //
+  // What made it wrong is what `near` feeds. It scales four beds and every one
+  // of them belongs to *your* aeroplane: two propellers at your shaft speed, a
+  // turbine at your throttle, the combustion rumble, and the slipstream over
+  // your airframe. Handing that a wingman's distance does not render a wingman.
+  // It renders your own aeroplane, at your own throttle setting, from wherever
+  // you happen to have left it — with no direction, no doppler and no pass-by,
+  // so it does not swell and fade as the aircraft goes over. It sits there.
+  //
+  // And it could only ever fire in exactly the case where it is most wrong.
+  // `own` is above 0.55 for anything within about 240 m, so the wingman term
+  // only wins when you are far from your own aeroplane — which is to say, on
+  // foot, which is to say, standing on a beach with a Canadair four kilometres
+  // away drumming in your ears. Flying, it changed nothing, because the chase
+  // camera is twenty metres off your own tail and `own` is already 1.
+  //
+  // A wingman going over *should* be audible, and this is not the way: that
+  // wants its own voice, positioned, with an envelope that arrives and leaves.
+  // Until there is one, silence on the promenade is the honest answer, and it
+  // is much closer to right than a stuck drone is.
+  //
+  // `gone` is the other half. Stranded means you walked in under a canopy or
+  // through one of the back doors, and in both cases the airframe is not a
+  // thing over there that you are standing away from — it is gone, or it never
+  // came. `flight.p` goes on existing regardless and its position is wherever
+  // the model left it, which at Jadrija is close enough across the channel to
+  // score a healthy `own` on its own.
   const gone = ground.stranded || eject.active;
   const own = gone ? 0
     : 1 - sat((camera.position.distanceTo(flight.p.pos) - 20) / 400);
@@ -1729,7 +1749,7 @@ function frame() {
     // that whether the promenade had engines drumming over it depended on
     // which view you happened to have been flying in.
     inside: CAMS[camMode] === 'cockpit' && state.phase === 'fly',
-    near: Math.max(own, 0.55 * (1 - sat((nearestAI - 40) / 700))),
+    near: own,
     scooping: state.scooping,
     overSea: isSea(flight.p.pos.x, flight.p.pos.z),
     fireDist: nf ? Math.hypot(nf[0] - camera.position.x, nf[1] - camera.position.z) : 1e9,

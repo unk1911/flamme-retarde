@@ -10,6 +10,146 @@ geodata pipeline.
 
 ## [Unreleased]
 
+## [1.46.0] — 2026-08-09
+
+### Fixed — the drone on the promenade, third time and this time by removal
+
+Reported as "why is there still that loud drone of the airplane in Jadrija
+mode". Two earlier releases went after this and both fixed something real —
+one bed that was not scaled by distance, and a fire roar that had no flame in
+sight — and both left the actual mechanism standing.
+
+It was one term in one line: `near` was `Math.max(own, 0.55 * (1 - sat(
+(nearestAI - 40) / 700)))`, so the nearest **wingman's** distance could open the
+engine beds. The intention was good — a Canadair going over while you stand on
+the beach ought to be audible — and the mechanism was wrong, because of what
+`near` actually feeds. It scales four beds and all four belong to *your*
+aeroplane: two propellers at your shaft speed, a turbine at your throttle, the
+combustion rumble and the slipstream over your airframe. Handing that somebody
+else's distance does not render somebody else's aeroplane. It renders yours, at
+your throttle, from wherever you parked it, with no direction, no doppler and no
+pass-by — so it never swells and fades. It sits there.
+
+And it could only ever fire in the case where it is most wrong. `own` is above
+0.55 for anything inside about 240 m, so the wingman term only won when you were
+far from your own aeroplane — which is to say on foot, which is to say standing
+on a beach with your Canadair four kilometres away drumming in your ears. In
+flight it changed nothing at all, because the chase camera is twenty metres off
+your own tail and `own` is already 1.
+
+`near` is now `own` and nothing else. Measured after: flying, eng 0.186 and
+rumble 0.190 as before; standing on the promenade, all four aeroplane beds at
+exactly 0.
+
+A wingman going over should be audible and this was never the way to do it. That
+wants its own voice, positioned, with an envelope that arrives and leaves. Until
+there is one, silence on the promenade is the honest answer and is much closer to
+right than a stuck drone.
+
+### Added — the twerk
+
+Written next to the shimmy because it is the shimmy's opposite. A shimmy is a
+twist that stops at the ribs and must never reach the hips; this is a pitch that
+lives in the hips and must never reach the shoulders. Both are sold by what is
+*not* moving.
+
+Everything is on one channel — pelvis X, the fore-and-aft pitch — rocking ±13°
+at about two beats a second from a braced squat, both soles down throughout. Two
+counter-rotations are the whole clip:
+
+- **The hips go with the pelvis, not against it.** That reads backwards and the
+  rig forces it: the thigh hangs off the pelvis, so pitching the pelvis swings
+  the leg and a leg that swings is a foot that leaves the deck. `_flat` is
+  `hip + knee − pel − 5.35`, so pelvis and hip enter a limb's world pitch with
+  opposite signs, and holding `hip − pel` constant is what holds the thigh
+  still. The ankle then falls out nearly constant on its own — which is the
+  check that this is right rather than a coincidence, and the floor pass prints
+  it: the spread is exactly the ±8° put into the knee and nothing else.
+- **The spine gives back exactly what the pelvis took**, spread over four bones,
+  so the shoulders sit still while everything below works.
+
+She faces *away*, which is not a joke the code is making — it is what the move
+is. Facing you she would be a woman doing a deep squat.
+
+**A knee angle folds much less than it looks like it will**, and the first cut
+got that badly wrong: 48° of knee gave 8 cm of hip drop and rendered as a woman
+standing nearly straight with her hips twitching. The drop is about
+`2·L·(1 − cos(θ/2))`, so half the angle does far less than half the work.
+
+**Known — the wrap does not survive this pose.** It is rigid to the pelvis,
+which is right for everything else she does, and past about 30° of hip flexion
+the glute geometry rotates out of it: the wrap ends up reading as though it has
+slid to her thighs. Three constraints fight here and only two can be satisfied
+at once — a flat-footed deep squat needs either a forward lean (which breaks the
+wrap) or extreme ankle dorsiflexion (46° at one point, past what an ankle does),
+and this rig has no toe joint, so lifting a heel is not available. Settled at a
+shallower squat: hips 9–14 cm down, ankle 8.7–24.6°, which is inside the ankle's
+range and as far from the wrap failure as the other two allow. It is softened,
+not fixed. Fixing it properly means weighting the wrap partly to the legs or
+reshaping it, in `hip_scarf`, and that touches every other clip.
+
+### Changed
+
+- The dice that pick her next number are a table rather than a chain of
+  `dice < a + b + c` tests. Five terms was at the edge of readable and the sixth
+  is where it tips: every line repeats the whole prefix, so inserting a number in
+  the middle means editing every line under it and a missed term is a move that
+  silently never comes up. The odds are unchanged.
+
+### Added — pubic hair
+
+Five cutters in a column rather than one, for the mouth's reason: the shape is
+the whole of what makes it read. A single ellipse centred on the mons is a
+symmetric blob, and a symmetric dark blob there is a bruise. The thing is a
+wedge — broad across the top, tapering out between the legs — and five
+overlapping discs of 60, 46, 34, 26 and 20 mm do that with five numbers.
+
+There is no joint marker for it and `pelvis` is a pivot inside her rather than a
+point on her, so the heights came off the mesh: the midline front surface runs
+x 0.1223 at z 0.86 to x 0.1441 at z 0.92, and the hip joints sit at z 0.909.
+Each row is centred 40 mm behind the surface *at its own height*, which holds
+the cross-section factor at 0.686 for all five — so the declared radii mean
+something, per the waist-not-tip rule. Getting that wrong is how the iris once
+came out 3 mm across instead of 12.
+
+**Softness is right here**, which is worth saying because it is the opposite of
+everything this file has learned about the export decimator. A garment needs a
+crisp hem and the colour averaging destroys it — that is the whole story of the
+painted wrap that had to be taken off her over three releases. Hair on skin has
+no hem. The few centimetres of gradient the decimator adds is the one place in
+this figure where the artefact is the feature.
+
+**It runs down to z 0.823 rather than stopping at the mons, and that is not
+anatomy, it is the hem.** The wrap is rigid to her pelvis — `hip_scarf` is right
+to make it so — and its front spans z 0.828 to 0.940. The entire mons is inside
+that band, so no clip in the repertoire can expose it: the cloth goes where the
+hips go, cartwheel included. The only skin below her waist ever in view is what
+shows under the hem between the tassels. The first cut of this stopped at the
+mons and would have been invisible in every frame the game can draw.
+
+Measured rather than assumed, at each step:
+
+- The lower abdomen is **15× coarser** than the chest — 48 body vertices in the
+  pubic band against 706 in the areola band. That is MakeHuman's topology, not
+  anything this project did.
+- The first attempt therefore survived export as **4 vertices** at full colour,
+  decoded straight out of the shipped blob. Extending the wedge downward took
+  the dense-mesh count from 27 to 98 and the exported count to **16, nine of
+  them below the hem** where they can actually be seen.
+- What it looks like in a cartwheel at 2.4 m is a faint darkening in the gap
+  between the tassels. That is what was asked for — "not exposed often, once in
+  a while" — and it is as far as painted vertex colour can go on a mesh this
+  coarse. If it wants to be more definite than that, the mechanism is laid-on
+  geometry appended after decimation, which is how the nails, the wrap and the
+  bracelet already survive intact.
+
+`PUBIC_M` is the **hair** marker rather than a literal, unlike the areolae and
+the anklets. Red is the slot the crowd shader swaps for a per-instance hair
+colour, and a figure whose head hair is recoloured and whose pubic hair is not
+would be wrong in exactly the way that shows. Only she has this cutter today, so
+the channel does nothing yet; it will be right the first time anybody else gets
+one.
+
 ## [1.45.0] — 2026-08-09
 
 ### Added — a dog on the promenade, and the price of a coin named after one

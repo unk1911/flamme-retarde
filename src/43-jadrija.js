@@ -2207,6 +2207,12 @@ async function buildJadrija(scene) {
     // next Blender run. The shimmy takes its share of the dice.
     shimmy: 0.12,
     shimmyFor: 3.4,     // seconds of it, which is about eight reversals
+    // And the other one, which is the shimmy's opposite in every way that
+    // matters: a twist that never reaches the hips against a pitch that lives
+    // in nothing else. Held a shade longer because the beat is slower — 0.52 s
+    // a cycle against the shimmy's 0.44 — so 3.8 s is about seven of them,
+    // which is the same *count* rather than the same clock.
+    twerk: 0.10, twerkFor: 3.8,
     // And the two she does with her hands. Held longer than the shimmy because
     // both of them are things you are meant to *read* — a gesture you have to
     // recognise and a card you have to actually finish — and three seconds is
@@ -2609,7 +2615,18 @@ async function buildJadrija(scene) {
    * hosed and not noticing, and a scramble is much the better of the two.
    */
   const WETTABLE = { idle: 1, notice: 1, crawl: 1, play: 1, home: 1,
-    aim: 1, orbit: 1, shimmy: 1, heart: 1, note: 1 };
+    aim: 1, orbit: 1, shimmy: 1, twerk: 1, heart: 1, note: 1 };
+
+  /**
+   * How long she holds each of the standing numbers.
+   *
+   * A map rather than `SHOW[phase + 'For']`, which is what this was for about a
+   * minute: a lookup built by string concatenation works right up until a phase
+   * is renamed and then fails by silently reading `undefined`, which compares
+   * false against every timer and leaves her dancing until you walk away.
+   */
+  const HOLD_FOR = { shimmy: 'shimmyFor', twerk: 'twerkFor',
+    heart: 'heartFor', note: 'noteFor' };
 
   /**
    * And the phases the *turn* cannot start from.
@@ -2647,6 +2664,9 @@ async function buildJadrija(scene) {
     idle: 0.30, notice: 0.62, down: 0.55, crawl: 0.50, up: 0.72,
     flip: 0.85, play: 0.55, aim: 0.70, wheel: 0.85, bask: 1.00,
     orbit: 0.80, joy: 1.00, shimmy: 0.90, home: 0.45,
+    // She is facing away for this one and you cannot see her face at all, so
+    // the number is about the two frames of the crossfade either side of it.
+    twerk: 0.95,
     // Both of the hand ones are the widest she has. A heart made with a
     // straight face is a threat.
     heart: 1.00, note: 0.95,
@@ -2681,6 +2701,13 @@ async function buildJadrija(scene) {
       showSay('whee', d);
       go('shimmy', 'shimmy', 0.32);
     };
+    // Longer fade than the shimmy's, because this one starts from a deep squat
+    // with the knees bent forty-eight degrees and the trunk carried thirty-six
+    // forward. A third of a second from standing to that is a collapse.
+    const enterTwerk = () => {
+      showSay('whee', d);
+      go('twerk', 'twerk', 0.44);
+    };
     // Both of these are done *at* somebody, so both turn to face you and
     // neither travels. The card picks its line on the way in rather than on the
     // way out, so that the one you are reading is the one she chose for you.
@@ -2712,6 +2739,7 @@ async function buildJadrija(scene) {
     const showNext = () => {
       const nxt = show.queue.shift();
       if (nxt === 'shimmy') return enterShimmy();
+      if (nxt === 'twerk') return enterTwerk();
       if (nxt === 'heart') return enterHeart();
       if (nxt === 'note') return enterNote();
       if (nxt === 'wheel') return enterWheels();
@@ -2872,7 +2900,7 @@ async function buildJadrija(scene) {
           // Off the deck and straight into the routine. The somersaults stay
           // where they have always been, at the front of it: they are what
           // getting up *is* for her, and the three new numbers queue up behind.
-          show.queue = ['shimmy', 'heart', 'note', 'wheel'];
+          show.queue = ['shimmy', 'twerk', 'heart', 'note', 'wheel'];
           go('flip', 'flip', 0.18);
           show.flips = 1;
         }
@@ -2909,19 +2937,26 @@ async function buildJadrija(scene) {
         show.tick -= dt;
         if (show.tick <= 0) {
           showWander(SHOW.turn, SHOW.swing);
+          // A table rather than a chain of `dice < a + b + c` tests, which is
+          // what this was. Five terms was already at the edge of readable and
+          // the sixth is where it tips: every line has to repeat the whole
+          // prefix, so adding a number in the middle means editing every line
+          // below it, and a missed term is a move that silently never comes up.
+          // The odds themselves are unchanged.
           const dice = Math.random();
-          if (dice < SHOW.joy) {
-            showSay('hup', d); go('joy', 'flip', 0.18);
-            break;
+          let cut = 0;
+          for (const [odds, enter] of [
+            [SHOW.joy, () => { showSay('hup', d); go('joy', 'flip', 0.18); }],
+            [SHOW.spin, enterWheels],
+            [SHOW.shimmy, enterShimmy],
+            [SHOW.twerk, enterTwerk],
+            [SHOW.heart, enterHeart],
+            [SHOW.note, enterNote],
+          ]) {
+            cut += odds;
+            if (dice < cut) { enter(); break; }
           }
-          if (dice < SHOW.joy + SHOW.spin) { enterWheels(); break; }
-          if (dice < SHOW.joy + SHOW.spin + SHOW.shimmy) { enterShimmy(); break; }
-          if (dice < SHOW.joy + SHOW.spin + SHOW.shimmy + SHOW.heart) {
-            enterHeart(); break;
-          }
-          if (dice < SHOW.joy + SHOW.spin + SHOW.shimmy + SHOW.heart + SHOW.note) {
-            enterNote(); break;
-          }
+          if (dice < cut) break;
         }
         show.want = showSteer(show.wander);
         showPace(show.pace, dt);
@@ -3060,19 +3095,25 @@ async function buildJadrija(scene) {
         break;
 
       case 'shimmy':
-        // Standing still, and turned to face you, because a shimmy is a thing
-        // done *at* somebody. There is no showMove here and that is the point:
-        // the clip keeps both feet on the deck the whole way through, so any
-        // travel under it turns a dance straight back into a walk with the
-        // shoulders twitching.
+      case 'twerk':
+        // Standing still, because both clips keep both feet on the deck the
+        // whole way through and any travel under them turns a dance straight
+        // back into a walk with something twitching.
+        //
+        // And turned *opposite* ways, which is the one thing the two do not
+        // share. A shimmy is done at somebody and points its shoulders at you.
+        // A twerk points the other end, and that is not a joke this code is
+        // making, it is what the move is: the whole thing happens behind her,
+        // and facing you she would be a woman doing a deep squat.
         show.played += dt;
-        show.want = Math.atan2(ps - show.s, pt - show.t);
+        show.want = Math.atan2(ps - show.s, pt - show.t)
+          + (show.phase === 'twerk' ? Math.PI : 0);
         if (show.tmr - show.said > SHOW.say[0] * 0.7
           + Math.random() * (SHOW.say[1] - SHOW.say[0])) {
           show.said = show.tmr;
           showSay(say1(CHAT), d);
         }
-        if (show.tmr > SHOW.shimmyFor || d > SHOW.far) showNext();
+        if (show.tmr > SHOW[HOLD_FOR[show.phase]] || d > SHOW.far) showNext();
         break;
 
       case 'heart':
