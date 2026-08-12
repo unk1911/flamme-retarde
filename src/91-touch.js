@@ -236,7 +236,16 @@ function initTouch() {
   // which is where the half of the game that happens on foot is hardest to
   // reach and most worth reaching.
   arm('t-bail', () => baleOut());
-  arm('t-jad', () => skipToJadrija());
+  // Jadrija is one tap, and it is the exception on purpose. The arming above is
+  // for the two doors you cannot come back through in a hurry: bailing out puts
+  // you under a canopy at whatever height you were, and Rokići drops you on a
+  // hillside that is alight. Jadrija drops you on a beach, and if you did not
+  // mean it you press the seat again and fly on. It is also the one of the
+  // three you take deliberately and often — it is how the whole second half of
+  // the game is reached — and making the thing you do every session cost two
+  // taps to guard against a brush you can undo is the wrong trade. J on a
+  // keyboard has always been one press; this is the phone catching up.
+  tap('t-jad', () => skipToJadrija());
   arm('t-rok', () => skipToGround());
 
   // ── on foot ───────────────────────────────────────────────────────────────

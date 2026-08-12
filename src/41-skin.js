@@ -18,10 +18,26 @@
 //
 // ── the palette ───────────────────────────────────────────────────────────────
 //
-// Bone matrices go up as a plain uniform array — 3 vec4 rows a bone, so 28
-// bones is 84 vec4s — rather than as the float texture three.js uses. One
-// figure does not need a texture unit, and 84 fits inside the 128 vec4s that
-// even the oldest conforming WebGL implementation has to offer.
+// Bone matrices go up as a float texture, one texel a row, 3 rows a bone — so
+// 28 bones is an 84 by 1 image resampled every frame. Which is what three.js
+// does and is not what this did: it used to be a plain `uniform vec4[84]`, on
+// the reasoning that one figure does not need a texture unit and 84 vec4s fit
+// inside the 128 that even the oldest conforming implementation offers.
+//
+// The reasoning was sound and the code was wrong, and it took a phone to say
+// so. A Snapdragon reported 256 vertex uniform vectors, linked the program
+// without a word of complaint, and then skinned her with a palette that was
+// right for the bones near the root and wrong for everything out at the limbs:
+// head, chest and hips in place, arms gone, legs a smear. Desktop GL had run it
+// correctly for months. The failing ingredient is *dynamic indexing of a
+// uniform array in a vertex program* — legal GLSL, rare in the wild, and
+// therefore the least exercised line in a mobile driver's compiler.
+//
+// A texture fetch is the opposite of rare: it is the path every skinned model
+// on the web takes, because it is the path three.js takes, so it is the one
+// path that is certainly tested on every GPU that ships. The cost is a texture
+// unit and 1.3 KB of upload a figure a frame. That is the whole price, and it
+// buys a figure that is the same shape on every machine.
 // -----------------------------------------------------------------------------
 
 /**
@@ -105,9 +121,14 @@ function readFR3DSkin(buf) {
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
   g.setAttribute('aVCol', new THREE.BufferAttribute(col, 3, true));
-  // Indices are *not* normalised — they are bone numbers, and 27 has to arrive
-  // in the shader as 27 and not as 27/255.
-  g.setAttribute('aBoneIdx', new THREE.BufferAttribute(bidx, 4, false));
+  // Bone numbers, and they go up *normalised* even though they are integers —
+  // the shader multiplies the 27/255 back out to 27. Which looks like a
+  // pointless round trip and is not. An unnormalised UNSIGNED_BYTE attribute is
+  // a rare enough thing on the web that it is the least exercised path in any
+  // mobile driver's vertex fetch, and a normalised one is the path every vertex
+  // colour in every scene on the internet takes. If a byte is going to survive
+  // the trip anywhere, it is here. See `addBone` in src/30-material.js.
+  g.setAttribute('aBoneIdx', new THREE.BufferAttribute(bidx, 4, true));
   g.setAttribute('aBoneWt', new THREE.BufferAttribute(bwgt, 4, true));
   g.setIndex(new THREE.BufferAttribute(idx, 1));
   g.computeBoundingSphere();
@@ -118,28 +139,41 @@ function readFR3DSkin(buf) {
   return { geo: g, bones, clips, nv, tris: ni / 3, ni, shed };
 }
 
-/** Depth-only vertex program for a skinned caster. Position, and nothing else. */
+/**
+ * Depth-only vertex program for a skinned caster. Position, and nothing else.
+ *
+ * The skinning is written the same way as the surface material's and for the
+ * same reason — see addBone in src/30-material.js. A shadow map drawn with a
+ * different arithmetic to the thing casting it is a figure whose shadow does
+ * not fit her, and this pass is the *more* likely of the two to be run on a
+ * driver that is short of registers, because it is the one that runs twice.
+ */
 function skinCasterVert(nb) {
   return /* glsl */ `
 attribute vec4 aBoneIdx;
 attribute vec4 aBoneWt;
-uniform vec4 uBones[${nb * 3}];
+uniform sampler2D uBones;
+uniform float uBoneRows;
 varying float vDepth;
 
-mat4 boneMat(int i){
-  vec4 a = uBones[i * 3], b = uBones[i * 3 + 1], c = uBones[i * 3 + 2];
-  return mat4(a.x, b.x, c.x, 0.0,
-              a.y, b.y, c.y, 0.0,
-              a.z, b.z, c.z, 0.0,
-              a.w, b.w, c.w, 1.0);
+vec4 boneRow(float i){
+  return texture2D(uBones, vec2((i + 0.5) / uBoneRows, 0.5));
+}
+
+void addBone(float bi, float w, vec4 hp, inout vec3 sp){
+  float i = min(floor(bi * 255.0 + 0.5), ${nb - 1}.0) * 3.0;
+  sp += w * vec3(dot(boneRow(i), hp), dot(boneRow(i + 1.0), hp),
+                 dot(boneRow(i + 2.0), hp));
 }
 
 void main(){
-  mat4 sm = boneMat(int(aBoneIdx.x)) * aBoneWt.x
-          + boneMat(int(aBoneIdx.y)) * aBoneWt.y
-          + boneMat(int(aBoneIdx.z)) * aBoneWt.z
-          + boneMat(int(aBoneIdx.w)) * aBoneWt.w;
-  vec3 p = (modelMatrix * sm * vec4(position, 1.0)).xyz;
+  vec4 hp = vec4(position, 1.0);
+  vec3 sp = vec3(0.0);
+  addBone(aBoneIdx.x, aBoneWt.x, hp, sp);
+  addBone(aBoneIdx.y, aBoneWt.y, hp, sp);
+  addBone(aBoneIdx.z, aBoneWt.z, hp, sp);
+  addBone(aBoneIdx.w, aBoneWt.w, hp, sp);
+  vec3 p = (modelMatrix * vec4(sp, 1.0)).xyz;
   gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
   vDepth = gl_Position.z / gl_Position.w * 0.5 + 0.5;
 }
@@ -368,8 +402,13 @@ varying float vArm;
 // How much of a vertex belongs to an upper arm. Declared out here because the
 // vertex body is spliced into main() and cannot carry a function of its own,
 // and it costs the fragment program nothing to have it and not call it.
+//
+// The attribute arrives normalised — a bone number over 255 — while uArmB
+// holds bone numbers, so the scale has to happen here. Miss
+// it and nothing matches, nothing is an arm, and the flames simply never light.
 float armWt(float i, float w){
-  return (abs(i - uArmB.x) < 0.5 || abs(i - uArmB.y) < 0.5) ? w : 0.0;
+  float b = floor(i * 255.0 + 0.5);
+  return (abs(b - uArmB.x) < 0.5 || abs(b - uArmB.y) < 0.5) ? w : 0.0;
 }
 `;
 
@@ -453,7 +492,18 @@ const FACE_FRAG = /* glsl */ `
  */
 function skinnedFigure(data, opts = {}) {
   const nb = data.bones.length;
-  const uBones = { value: new Float32Array(nb * 12) };
+  // Three RGBA texels a bone, in one row. Nearest on both filters and no
+  // mipmaps: this is a buffer that happens to be shaped like an image, and any
+  // filtering at all would blend one bone into the next.
+  const palette = new Float32Array(nb * 12);
+  const boneTex = new THREE.DataTexture(palette, nb * 3, 1,
+    THREE.RGBAFormat, THREE.FloatType);
+  boneTex.minFilter = THREE.NearestFilter;
+  boneTex.magFilter = THREE.NearestFilter;
+  boneTex.generateMipmaps = false;
+  boneTex.needsUpdate = true;
+  const uBones = { value: boneTex };
+  const uBoneRows = { value: nb * 3 };
 
   // `opts.face` asks for a face and does not promise one: `faceAnchors` returns
   // null if it cannot find the eyeballs, and drops the smile on its own if the
@@ -483,7 +533,7 @@ function skinnedFigure(data, opts = {}) {
   const mat = solidMaterial(0xffffff, {
     ...opts,
     defines: { FR_SKIN: '', FR_BONES: nb },
-    uniforms: { uBones, ...uFace, ...(opts.uniforms || {}) },
+    uniforms: { uBones, uBoneRows, ...uFace, ...(opts.uniforms || {}) },
     decl: (opts.decl || '') + (anchors ? FACE_DECL : ''),
     vert: anchors ? FACE_VERT : (opts.vert || ''),
     body: (opts.body || '') + (anchors ? FACE_FRAG : ''),
@@ -616,7 +666,7 @@ function skinnedFigure(data, opts = {}) {
       if (u >= 1) st.prev = null;
     }
 
-    const P = uBones.value;
+    const P = palette;
     for (let i = 0; i < nb; i++) {
       const p = data.bones[i].parent;
       // The root's translation is the clip's; everything below it hangs off the
@@ -654,6 +704,10 @@ function skinnedFigure(data, opts = {}) {
       P[o + 8] = xz - wy; P[o + 9] = yz + wx; P[o + 10] = 1 - (xx + yy);
       P[o + 11] = worldT[i * 3 + 2] + mixT[i * 3 + 2];
     }
+    // The palette is the texture's own backing array, so this is the whole of
+    // getting it to the GPU: 1.3 KB a frame, on a figure that is only stepped
+    // at all when somebody is inside 250 m of her.
+    boneTex.needsUpdate = true;
   }
 
   // ── the face, over time ────────────────────────────────────────────────
@@ -719,7 +773,7 @@ function skinnedFigure(data, opts = {}) {
   function cast(shadow, o = {}) {
     return shadow.cast(mesh, {
       near: o.near !== false, dynamic: true,
-      material: shadow.casterMaterial(skinCasterVert(nb), { uBones }),
+      material: shadow.casterMaterial(skinCasterVert(nb), { uBones, uBoneRows }),
     });
   }
 

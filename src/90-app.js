@@ -18,6 +18,74 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.92;
 renderer.setClearColor(0x87a8bd, 1);
 
+/**
+ * What this machine's GL will actually do, printed on the screen.
+ *
+ * `?gl` and nothing else, because the one class of bug this game has that
+ * cannot be reproduced from here is a driver's: a figure that renders
+ * perfectly on a desktop and comes apart on a phone is not a bug you can find
+ * by reading the shader, and a phone has no console to ask. The limits below
+ * are the ones a skinned figure can run out of, and the two lines under them
+ * are every shader error and exception the page has managed to raise — a
+ * program that failed to link says so here and nowhere else.
+ */
+function glReport() {
+  const gl = renderer.getContext();
+  const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+  const P = (s, k) => {
+    const f = gl.getShaderPrecisionFormat(gl[s], gl[k]);
+    return f ? f.precision : '?';
+  };
+  return {
+    build: BUILD.v + ' ' + BUILD.date,
+    gl: (typeof WebGL2RenderingContext !== 'undefined'
+      && gl instanceof WebGL2RenderingContext) ? 2 : 1,
+    gpu: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : 'masked',
+    vendor: dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : 'masked',
+    vertUniforms: gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS),
+    varyings: gl.getParameter(gl.MAX_VARYING_VECTORS),
+    attribs: gl.getParameter(gl.MAX_VERTEX_ATTRIBS),
+    vertTex: gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS),
+    texSize: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+    // Whether a vertex program can have full float precision at all. A driver
+    // that says 0 here gets mediump for everything, and mediump cannot hold a
+    // world 42 km wide.
+    vertHigh: P('VERTEX_SHADER', 'HIGH_FLOAT'),
+    fragHigh: P('FRAGMENT_SHADER', 'HIGH_FLOAT'),
+    depth: gl.getParameter(gl.DEPTH_BITS),
+    dpr: +devicePixelRatio.toFixed(2),
+    px: +renderer.getPixelRatio().toFixed(2),
+    screen: screen.width + 'x' + screen.height,
+    small: IS_SMALL, touch: IS_TOUCH,
+  };
+}
+
+if (QUERY.has('gl')) {
+  const pre = document.createElement('pre');
+  pre.style.cssText = 'position:fixed;left:0;top:0;z-index:9999;margin:0;'
+    + 'padding:6px 8px;background:#000c;color:#9f9;font:11px/1.35 monospace;'
+    + 'max-width:100vw;white-space:pre-wrap;pointer-events:none';
+  document.body.appendChild(pre);
+  const errs = [];
+  const paint = () => {
+    const r = glReport();
+    pre.textContent = Object.entries(r).map(([k, v]) => k + ': ' + v).join('\n')
+      + (errs.length ? '\n\nERRORS\n' + errs.slice(0, 6).join('\n') : '\n\nno errors');
+  };
+  const note = (s) => {
+    s = String(s).slice(0, 300);
+    if (!errs.includes(s)) errs.push(s);
+    paint();
+  };
+  addEventListener('error', (e) => note(e.message || e.error));
+  for (const k of ['error', 'warn']) {
+    const was = console[k].bind(console);
+    console[k] = (...a) => { was(...a); note(a.join(' ')); };
+  }
+  paint();
+  setInterval(paint, 2000);
+}
+
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 1.2, 42000);
 camera.position.set(0, 600, 0);
@@ -1536,6 +1604,12 @@ const clock = new THREE.Clock();
 let started = false;
 let wasDropping = false;
 let wasAfoot = false;
+// How far into the special kabina you are, smoothed. One number, because the
+// door has to move the light and the sound together or it is two effects that
+// happen to share a threshold.
+let indoors = 0;
+let inLatch = 0;
+let cicadaAt = 0;
 let lastFrameMs = 0;
 
 function frame() {
@@ -1716,7 +1790,33 @@ function frame() {
   // time before you are on it, and that is most of what the last thirty seconds
   // of a descent is.
   const afoot = state.phase === 'ground' || state.phase === 'chute';
+
+  // Indoors, in the one kabina that opens. A wooden box with a single door
+  // takes the singing off the terrace almost entirely and leaves the hillside
+  // coming through the boards, so the cicadas stay and go up rather than down —
+  // they are what quiet sounds like here, and a room with nothing in it at all
+  // would read as the sound having broken.
+  //
+  // Latched, not followed. Being indoors is a place you are or are not, and
+  // the first version — a ramp over the depth of the room — meant a player who
+  // stopped a stride past the door stood in half a room in half the light,
+  // with the singers half there. Schmitt: in at 0.62, out at 0.18, so the
+  // doorway itself is the whole of the crossing and standing in it does not
+  // flicker. What is left of the crossfade is the 0.3 s the light takes, which
+  // is an eye adapting and wants to stay.
+  const raw = afoot && jadrija && jadrija.kabina
+    ? jadrija.kabina.inside(camera.position.x, camera.position.z) : 0;
+  if (raw > 0.62) inLatch = 1; else if (raw < 0.18) inLatch = 0;
+  indoors += (inLatch - indoors) * Math.min(1, dt * 3.6);
   if (afoot !== wasAfoot) { audio.cicadas(afoot, 0.05); wasAfoot = afoot; }
+  else if (afoot && Math.abs(indoors - cicadaAt) > 0.02) {
+    cicadaAt = indoors;
+    audio.cicadas(true, 0.05 + 0.045 * indoors);
+  }
+  // The light. ACES over the whole frame rather than a lamp in the room,
+  // because there is no lamp in the room — that is the point of it — and what
+  // your eye actually does walking in off a white promenade is exactly this.
+  renderer.toneMappingExposure = 0.92 - 0.50 * indoors;
 
   // And the klapa, off the terrace at Jadrija. Measured from the camera rather
   // than from the aeroplane, which is the same point in every mode except the
@@ -1728,10 +1828,13 @@ function frame() {
   // of the thing is that you pick it up as a suggestion somewhere over the
   // channel and only work out what it is on the way in.
   if (jadrija && state.phase !== 'intro') {
-    audio.klapa(
-      Math.hypot(camera.position.x - jadrija.site.x, camera.position.z - jadrija.site.z),
-      state.phase === 'fly',
-    );
+    const d = Math.hypot(camera.position.x - jadrija.site.x,
+      camera.position.z - jadrija.site.z);
+    // Indoors the singers go away by being put back over the water: the same
+    // distance curve `klapa` already has, walked out to the edge of earshot.
+    // Cheaper than a second gain stage and, unlike one, it takes the top off
+    // them on the way — which is what a shut door does to four men singing.
+    audio.klapa(d + indoors * 2000, state.phase === 'fly');
   }
 
   if (state.scooping) {
@@ -1919,6 +2022,8 @@ boot().catch((e) => {
 // A small handle for the screenshot tool.
 window.__fr = {
   build: BUILD,
+  /** What this machine's GL will do. `?gl` puts the same thing on the screen. */
+  gl: () => glReport(),
   stats: () => ({
     build: BUILD.v + ' (' + BUILD.date + ')',
     fps: Math.round(state.fps), burning: fire ? fire.burningCount() : 0,
@@ -2090,6 +2195,24 @@ window.__fr = {
     face: (o) => jadrija.face(o),
     /** Put a number at the front of her running order. */
     cue: (...n) => jadrija.cue(...n),
+    /**
+     * Stand her somewhere, in the resort's own frame, and optionally start a
+     * phase there. The indoor sequence is half a minute of walking end to end,
+     * which is thirty seconds a test cannot spend and a headless page at two
+     * frames a second cannot finish at all.
+     */
+    put: (...a) => jadrija.putShow(...a),
+    bones: (...a) => jadrija.bones(...a),
+    /**
+     * How far into the special kabina the game thinks you are, 0 to 1 — the
+     * number the light and the klapa both hang off, which is the only way to
+     * tell a door that is not working from a room that is not dark enough.
+     */
+    indoors: () => ({ v: +indoors.toFixed(3),
+      exp: +renderer.toneMappingExposure.toFixed(3),
+      cam: [+camera.position.x.toFixed(1), +camera.position.z.toFixed(1)],
+      raw: jadrija && jadrija.kabina
+        ? +jadrija.kabina.inside(camera.position.x, camera.position.z).toFixed(3) : null }),
   },
   /**
    * Drive the ground mission from a test without flying an approach first.

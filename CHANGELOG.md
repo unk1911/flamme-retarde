@@ -8,7 +8,290 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
-## [Unreleased]
+## [1.50.0] — 2026-08-12
+
+### Added — one kabina opens
+
+The third door of the first front-row run past the jetty is not painted on. It
+goes back 5.4 m into the alley behind the row, under a lean-to hung off the run's
+rear eave, and you can walk into it. Everything else on this shore stays shut:
+there are a hundred of them, and a resort where every door opens is a resort
+nobody ever finds anything in.
+
+**How you find it is the sign.** A neon `OPEN →` with a girl on a pole, hung
+square out from the wall over the promenade the way every bar sign on this coast
+is hung — which is also the only way it can be read by somebody walking the row
+rather than standing in front of it. There is no room for it flat on the facade;
+the door frame stops 2 cm under the eave. It is drawn on a canvas rather than
+built out of tube geometry, because neon is not a shape, it is a shape and the
+halo around it: three passes a stroke, a wide dim bloom, a middle pass, and a
+near-white core, which is what a glass tube full of gas actually photographs
+like. It faces back down the row towards the jetty, because that is the side you
+arrive from and a mirrored OPEN is a sign for somebody who has already walked
+past it.
+
+**A doorway costs 1.10 m before anybody gets through it.** `confine` inflates
+every blocker by `GROUND.girth`, so a 0.9 m door — the width of a real one — is a
+wall, and the two neighbouring huts between them close another 1.10 m of it from
+outside. The opening is 1.45 m, the neighbours' blockers are pulled back where
+they meet it, and the room's own four walls hold you 0.22 m off instead of 0.55.
+Nothing else at Jadrija is built that way and nothing else at Jadrija is a room.
+
+**It is dark and it is quiet, and both are the point.** The klapa off the terrace
+goes away by being put back out over the water — the same distance curve the
+singers already have, walked to the edge of earshot, which takes the top off them
+on the way exactly like a shut door does. The cicadas stay and come *up*: a
+wooden box does nothing to a hillside, and they are what quiet sounds like here.
+The light comes down 30% of exposure over about a second, which is what your eye
+does walking in off a white promenade. All three follow one ramp, so the door is
+a crossfade in both directions rather than a line ruled across the doorstep.
+
+Also fixed on the way: the kabine stand on a 0.22 m pad that `walkY` knew nothing
+about, which never mattered while every one of them was shut.
+
+### Added — and something in it
+
+A cot, a 1960s television, a valve radio and a bottle of Pelješac on a tabouret.
+These are the only furniture in this game anybody is meant to look at closely:
+everything else on this shore is seen from three metres or from three hundred
+and is built accordingly, and a lounger being nine boxes is the right amount of
+lounger. These are seen from arm's length in a room 1.95 m across.
+
+So the two that have faces on them get canvases. A 1960s set's front panel and a
+valve radio's dial are *printed* objects — bezel, speaker grille, dial scale,
+knobs — and printing them is both cheaper and better than modelling a grille out
+of triangles. They are also the only light in here, which is why they are
+`MeshBasicMaterial`: a cathode ray tube and a dial lamp emit, they are not lit.
+Making the room dark was what bought this.
+
+**The set shows the BTC spot price**, fetched once when you walk in and again
+every 45 seconds you stay. This is the one place in the build that touches the
+network. It degrades to snow — which is what a set with no aerial signal does,
+and is the honest answer for a game whose whole disposition is that it opens off
+a memory stick with the wifi off. Nothing anywhere waits on the fetch, and a
+price is never invented: a plausible made-up number shown as though it came off
+an exchange is worse than showing nothing, because it is the one thing on that
+screen a player might act on.
+
+Only the cot and the television's stand hold you off. The tabouret and the radio
+table are 40 cm deep against a wall, and holding you off them costs more of a
+1.95 m walkway than walking into one costs in dignity.
+
+### Added — she follows you in
+
+Two new clips out of `tools/blender/human_mh.py`, taking her from seventeen to
+nineteen: `wine` and `untie`. Both are the same kind of thing and it is a kind
+she did not have — something a person does with their hands that is not a trick
+and is not for anybody. Everything else in her repertoire is performed. These
+are not, which is most of what makes the room feel like a different place from
+the promenade it is fifteen metres from.
+
+Walk in and she comes: out to the middle of the doorway, through it, round to
+the tabouret, picks the bottle up, drinks from it, sets it back, turns to face
+you, and — if she is still wearing the hip wrap — unties it and lets it go.
+
+Three waypoints and not one, because a straight line from the deck to the
+tabouret goes through a metre and a half of hut. She has never had collision
+and still does not; the doorway is threaded by putting the waypoints in it.
+
+**The trigger does not wait for her to finish what she is doing.** The door is
+a thing you had to find, and a performer who completes her cartwheel first
+before deciding to come is a performer who does not come — the phase she is in
+is a dice roll you cannot see. The one thing that outranks it is the turn.
+
+**The bottle is its own mesh** and hangs off `handR` while she has it, the way
+the card hangs off both hands. Through her matrix by hand rather than as a child
+of her mesh, because it has to be able to stand on a tabouret while she is forty
+metres away doing cartwheels. `held` is a ramp and not a switch: hand and
+tabouret are 40 cm apart at the grasp, and a bottle that teleports between them
+is a bottle nobody believes was picked up.
+
+**The wrap is not skinned and never was.** The game stops drawing the one she is
+wearing on the frame she reaches the tug and starts drawing a heap of cloth on
+the floor, which is the right way round for something that spends a second
+falling and the rest of the afternoon lying there. `shed` is a latch read every
+frame by the line that draws the wrap, for the same reason `turned` is: a value
+read off state cannot be stranded by an event that never fires.
+
+Also fixed: `showPace(0)` is the obvious way to stand still and is wrong in
+exactly one place. It goes through `showMove`, which clamps `s` into the strip
+of deck she performs on — so every frame she stood in the kabina she was quietly
+teleported back to the lane edge, and the whole indoor sequence played itself
+out on the promenade, four metres from the door, in front of everybody.
+
+### Fixed — the sign pointed away from its own door
+
+A sign hung square out from a wall is seen from both ends of the promenade, and
+a horizontal arrow is right for exactly one of them: mirror it and it points
+away from the door, do not mirror it and it points away from the door on the
+other side. There is no orientation of a sideways arrow that works, which took
+two builds to establish. It now hangs over the doorway and points down at it,
+because a vertical arrow is the same arrow in a mirror and every viewer on the
+deck is on its good side. It is two single-sided planes rather than one
+double-sided one, so the lettering can counter-mirror itself and still read.
+
+Also fixed: the inverted shell that lines the room was flush with the inward
+faces of the walls it lines, so the depth test picked between them per triangle
+and the August colour of the *outside* of the hut showed through the dark room
+in wedges that swam as you walked.
+
+### Fixed — you were half in the room and half on the promenade
+
+Being indoors was a ramp over the depth of the room: 0 at the face, 1 about
+1.3 m in. The idea was that a klapa fades and a pupil opens over a stride
+rather than on a line ruled across a doorstep, and the idea was wrong. What it
+produced was a player standing one pace inside a dark hut in two-thirds of the
+afternoon light with the singers two-thirds there — not a threshold crossed
+slowly but a threshold never crossed at all, and it read as the room not
+working.
+
+It is now a latch with a Schmitt trigger on it: in past 0.62, out below 0.18,
+so the doorway itself is the whole of the crossing and standing in it does not
+flicker between two worlds. The crossfade that survives is the 0.3 s the light
+takes, which is an eye adapting and is worth keeping.
+
+Latching it was not enough on its own, because the first latch was hung off a
+ramp that still ran 0.55 m in from the face — and a latch that needs 0.62 of
+that ramp fires 0.7 m past the doorstep. Measured from the player's own eye:
+standing at 0.7 m in, with the door behind your shoulders and the whole screen
+full of hut, television and radio and cot, the game still had you outdoors at
+full August exposure with the singers on. That is the half-in-half-out, and no
+amount of deepening the dip fixes a line drawn in the wrong place. The ramp is
+now the thickness of the front wall and nothing more: 0 while your eye is
+seaward of it, 1 once you have cleared it, so the flip lands 0.20 m past the
+face — one step over the doorstep — and the hysteresis band is the wall.
+
+The drop is deeper too —
+exposure 0.92 to 0.42 rather than 0.62 — because a room whose only window is
+the door you came in by is darker than that, and because the two things in
+there that emit rather than reflect, the television and the radio dial, only
+become the brightest objects in the room once the room is actually dark.
+
+### Fixed — the way she drank the wine
+
+Five attempts, four of them wrong in the same way, so the way this rig's arm
+works is worth writing down. `armLR` x is the elbow and it folds in whatever
+plane the shoulder has left it in, which with the arm at her side is
+*backwards* — shut the elbow and the hand goes up behind her ear. Abducting the
+shoulder (`armUR` z) to fix that only swings the whole arm out sideways and
+takes the hand with it. What actually turns the fold round to the front is
+`armUR` y, the twist of the humerus, at about −90°. Her hand now finishes
+0.14 m to her right, 0.05 m in front of her face and 0.18 m below it. It
+finished 0.26 m out to the side before, and a bottle aimed from there at her
+mouth crosses her cheekbone on the way, which is exactly what you saw.
+
+The bottle is no longer tipped by a fixed angle about a fixed axis either —
+that is how it ended up held out horizontally at her ear. It is aimed: her
+mouth is derived each frame from the head bone, the neck→head vector (so it
+tips back when she does) and her facing, and the bottle lies along the line
+from her hand to it. Where it sits along that line is a clamp rather than a
+formula, because hanging the lip on her mouth is only right while the gap
+happens to be a bottle long: the grip is pinned to the lower body of the
+bottle where a hand that means to drink actually goes, and any leftover is
+spent on the lip falling a centimetre short of her lips, which is the error
+nobody sees.
+
+And she was reaching for a bottle 0.60 m below her hand and 0.95 m from it.
+The tabouret was 0.46 m tall — a footstool with a wine bottle on it — so the
+bottle flew up to meet a hand that had never gone down. It is a 0.72 m side
+table now, she stands 0.46 m from it instead of 0.63 m, and the reach folds
+her forward from the spine and drops the shoulder rather than leaving her
+standing upright with an arm out.
+
+### Fixed — she came apart on a phone, and so did the dog
+
+Reported from an Android handset and invisible from every desktop: both skinned
+figures — her and the pug, and nothing else in the game — drew as scattered
+fragments. Her hair and face were in the right place, her arms, hips and legs
+were spread across the promenade, and the dog was a sliver under a speech
+balloon that was itself perfectly fine. Everything unskinned rendered normally.
+
+Which is the shape of the answer. The two figures share exactly one thing no
+other object in the game has: the linear-blend skinning in `solidVertex` and its
+copy in the shadow caster. Everything else about them differs.
+
+It took three builds to find which line, and the handset had to be asked
+directly — hence `?gl` below. It reported an Adreno 750 on WebGL 2, 256 vertex
+uniform vectors against the 120-odd this uses, 31 varyings against 9, high
+precision available in both stages, and **no shader errors at all**. So the
+program linked, ran, and was handed a palette it read wrongly: bones near the
+root correct, bones out at the limbs not. Head, chest and hips in place; arms
+gone, legs a smear.
+
+The palette was a `uniform vec4[84]`, indexed dynamically off a vertex
+attribute. That is legal GLSL, it is what the original code was written around,
+and it is rare enough in the wild to be the least exercised line in a mobile
+driver's compiler. It is a texture now — three RGBA texels a bone, one row,
+resampled each frame — which is what three.js itself does, which is why it is
+the one path that is certainly tested on every GPU that ships. A texture unit
+and 1.3 KB of upload a figure a frame is the whole price.
+
+Two things went with it and stay, because both are right on their own merits.
+The four `mat4` temporaries are gone — a bone is six dot products onto an
+accumulating `vec3` now, position dotted in with `w = 1` so the translation
+column applies and the normal with `w = 0` so only the rotation does, which is
+what `mat3(sm)` was doing the long way round. And bone indices travel as a
+*normalised* byte the shader scales back out to 27: a round trip to nowhere on
+paper, and the point of it is that an unnormalised `UNSIGNED_BYTE` attribute is
+the least trodden path in a driver's vertex fetch while a normalised one is the
+path every vertex colour on the web takes. There is not an integer left in the
+skinning.
+
+That last one had a sting in it. `armWt` — which decides whether a vertex
+belongs to an upper arm, and so where the flames go — compared the attribute
+against a bone *number*, and quietly matched nothing at all once the attribute
+became a fraction. The tattoos went out for one build. They are scaled now.
+
+### Fixed — the sign's own bracket stood in front of it
+
+The stay under the arm was a solid 0.53 by 0.44 m plate hung in the same plane
+as the panel, so it covered *Jadrija*, the left third of the OPEN box and most
+of the girl. The sign is hung now instead of propped: a mast down through the
+roof at the wall, an arm out over the promenade clear above the panel's top
+edge, and two short drop links to the panel. Nothing crosses the neon from any
+angle on the deck.
+
+### Fixed — the arrows steered the canopy backwards
+
+Yaw decreases to the right here: forward is (−sin y, −cos y) and right is
+(cos y, −sin y), so raising the angle swings the nose left. The mouse knows
+that, the walk on foot knows that, and the line that reads the arrow keys under
+a parachute had a plus sign in it. Left went right. It survived this long
+because a canopy is the one thing in the game with no second heading to check
+itself against — no runway, no promenade, nothing but sea — so being turned the
+wrong way reads as wind. The pendulum swings the other way with it now, or you
+would bank out of your own turn.
+
+### Fixed — JADRIJA took two taps
+
+The three one-way doors on the flight HUD are all armed buttons: the first tap
+lights them, the second commits, which is right for a control your thumb is
+already down there brushing past. It is right for two of them. Bailing out puts
+you under a canopy at whatever height you were and Rokići drops you on a
+hillside that is alight; Jadrija drops you on a beach, and if you did not mean
+it you press the seat again and fly on. It is also the one of the three you take
+deliberately and most often — it is how the second half of the game is reached.
+One tap now, which is what J on a keyboard has always been.
+
+### Removed — the oleander along the cabin doors
+
+A second run of it, at rowA − 1.15, one mound every four or five metres for the
+whole length of the front row. Real cabin rows on this coast have nothing
+planted along them — the doors open outward and the strip in front of them is
+the walk — and the mounds sat exactly where you stand to look at a door, so the
+row read as a hedge with kabine behind it. The green behind the back row, where
+there is soil for it, stays.
+
+### Added — `?gl`, because a phone has no console
+
+The one class of bug here that cannot be reproduced from a desktop is a
+driver's, and the machine that has it is the one machine with no way to ask.
+`?gl` prints what the GL will actually do — version, unmasked GPU and vendor,
+the vertex uniform, varying and attribute limits, whether high precision exists
+in either stage, the depth bits, the pixel ratio the page settled on — over the
+top of the game, along with every shader error and exception the page has
+raised. Screenshot it and there is nothing left to guess at. `__fr.gl()`
+returns the same object.
 
 ## [1.49.0] — 2026-08-11
 

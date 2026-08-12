@@ -1532,6 +1532,8 @@ async function buildGround(scene, field) {
     get stranded() { return stranded; },
     get crew() { return crew; },
     hose: () => you.jet,
+    /** Debug: where a step to (x, z) would actually put you, and whether it hit. */
+    confine: (x, z) => confine(x, z),
     hud: () => ({
       pack: you.pack, packMax: GROUND.pack,
       reserve: flight.p.water,

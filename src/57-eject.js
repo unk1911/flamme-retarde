@@ -328,8 +328,16 @@ function buildEject(scene, flight, onDown) {
     if (phase === 'flying') {
       // Under a canopy you are not integrating forces any more, you are riding
       // a wing that has already found its trim. Steer it and it goes there.
+      // `steer` is +1 for right, and yaw *decreases* to the right — forward is
+      // (−sin y, −cos y) and right is (cos y, −sin y), so raising the angle
+      // swings the nose to the left. This had a plus sign in it, which is the
+      // whole of "the arrows are backwards under the canopy": the mouse, the
+      // walk on foot and the aeroplane all take the same convention two lines
+      // apart (`look` does `yaw -= dx` immediately above), and the one control
+      // that did not was the one you cannot check against anything, because a
+      // canopy has no other heading to compare itself to.
       const steer = clamp(ctl.turn || 0, -1, 1);
-      you.yaw += steer * EJECT.turn * dt;
+      you.yaw -= steer * EJECT.turn * dt;
 
       // The toggles. There are about two seconds of lift in a canopy and not
       // one more: hold them down past that and you have flown it into a stall,
@@ -370,7 +378,8 @@ function buildEject(scene, flight, onDown) {
       you.vel.lerp(_ejV, 1 - Math.exp(-2.4 * dt));
 
       // The pendulum. Driven by the turn, and it rings a little on its own.
-      you.swingV += (-you.swing * 9.0 - you.swingV * 2.6 + steer * 3.4) * dt;
+      // And the pendulum goes with it, or you would bank out of the turn.
+      you.swingV += (-you.swing * 9.0 - you.swingV * 2.6 - steer * 3.4) * dt;
       you.swing = clamp(you.swing + you.swingV * dt, -0.30, 0.30);
     } else {
       // Ballistic, with the drag ramping from a body to a canopy as the cloth

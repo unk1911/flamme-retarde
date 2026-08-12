@@ -4193,6 +4193,97 @@ NOTE_B = dict(NOTE_A, **{
 })
 
 
+# ── the bottle, and the wrap ─────────────────────────────────────────────────
+# Two clips for the one room in this game with a door on it, and both of them
+# are the same kind of thing: something a person does with their hands that is
+# not a trick and is not for anybody. Everything else in this repertoire is
+# performed. These are not, which is most of what makes the room feel like a
+# different place from the promenade it is fifteen metres from.
+#
+# The bottle. She is standing beside the tabouret with it on her right, so this
+# is a shoulder that goes forward and an elbow that opens, and the lean is in
+# the spine rather than in the hip — she is picking a bottle up, not lifting a
+# crate. 43-jadrija.js hangs the bottle off wherever `handR` actually ends up,
+# the same way it hangs the card off both hands, so none of these angles has to
+# be accurate to a real bottle. What they have to be is a reach.
+WINE_REACH = dict(IDLE_A, **{
+    "spine02": (9, 0, 1.0), "spine03": (10, 0, 0.5),
+    "chest": (8, 0, 0), "neck": (-8, 0, 0), "head": (-16, -10, 1),
+    "clavicleR": (0, 0, -6),
+    "armUR": (16, -10, -20), "armLR": (-10, 0, -6), "handR": (-10, 0, -8),
+})
+
+# Closed on it. The elbow comes in a little as the hand takes the weight, which
+# is the whole of what makes a grasp read as a grasp rather than as a touch.
+WINE_HOLD = dict(WINE_REACH, **{
+    "armUR": (14, -8, -22), "armLR": (-22, 0, -6), "handR": (-16, 0, -6),
+})
+
+# Up. The elbow does most of it — a bottle comes to your mouth by folding your
+# arm — but not on its own, and that took five goes to learn. `armLR` x is the
+# fold and it folds in whatever plane the shoulder has left it in, which on
+# this rig, with the arm at her side, is backwards: shut the elbow and the hand
+# goes up behind her ear. What turns it round is `armUR` y, the twist of the
+# humerus, and it wants about −90°. Abducting the shoulder instead (z) only
+# takes the whole arm out sideways and the hand with it, which is what the
+# first four attempts did and why she kept drinking past her own shoulder.
+WINE_UP = dict(IDLE_A, **{
+    "spine03": (-1, 0, 0.5), "chest": (-2, 0, 0),
+    "neck": (7, 0, 0), "head": (6, -6, 1),
+    "clavicleR": (0, 0, -14),
+    "armUR": (-16, -80, 4), "armLR": (-104, 0, -12), "handR": (-2, 0, -16),
+    "armUL": (-8, 0, 27), "armLL": (-18, 0, 4),
+})
+
+# The swig. Head back, elbow high, and the trunk goes with the head — a neck
+# doing this on its own does not look like drinking, it looks like a fracture.
+#
+# Twice the head extension of the first attempt, and the twist above. Measured
+# rather than eyeballed, because a three-quarter render flattens exactly the
+# axis that was wrong: her hand now sits 0.14 m to her right, 0.05 m in front
+# of her face and 0.18 m below it, which is a hand holding something up to
+# drink out of. The first version put it 0.26 m out to the side, and a bottle
+# aimed from there at her mouth crosses her cheekbone.
+#
+# The bottle's own angle is not in here at all — 43-jadrija.js aims it from
+# the hand at the mouth — so what this pose has to get right is where the hand
+# and the mouth are, and the room between them for a bottle to be.
+WINE_SIP = dict(WINE_UP, **{
+    "spine03": (-6, 0, 0.5), "chest": (-9, 0, 0),
+    "neck": (18, 0, 0), "head": (25, -2, 1),
+    "clavicleR": (0, 0, -18),
+    "armUR": (-20, -90, 10), "armLR": (-130, 0, -12), "handR": (6, 0, -20),
+})
+
+# And the wrap. Both hands to the knot at her hip, a tug, and then away —
+# the hands drop rather than being put anywhere, because what she is doing is
+# letting go of it. The scarf itself is not skinned and never was: the game
+# stops drawing the one she is wearing on the frame this reaches the tug, and
+# starts drawing one on the floor. Which is the right way round for a thing
+# that spends four seconds falling and the rest of the afternoon lying there.
+UNTIE_A = dict(IDLE_A, **{
+    "spine03": (2, 0, 0.5), "chest": (2, 0, 0), "neck": (-3, 0, 0),
+    "head": (-13, -6, 1),
+    "clavicleL": (0, 0, 3), "clavicleR": (0, 0, -3),
+    "armUL": (-32, 10, 18), "armLL": (-64, 0, 6), "handL": (-16, 0, 10),
+    "armUR": (-32, -10, -18), "armLR": (-64, 0, -6), "handR": (-16, 0, -10),
+})
+
+UNTIE_B = dict(UNTIE_A, **{
+    "chest": (5, 0, 0), "head": (-17, -4, 1),
+    "armLL": (-76, 0, 6), "armLR": (-76, 0, -6),
+    "handL": (-26, 0, 16), "handR": (-26, 0, -16),
+})
+
+# Hands opening and coming away, and she straightens up as they go.
+UNTIE_C = dict(IDLE_A, **{
+    "clavicleL": (0, 0, 2), "clavicleR": (0, 0, -2),
+    "armUL": (-14, 6, 25), "armLL": (-26, 0, 4), "handL": (-2, 0, 8),
+    "armUR": (-14, -6, -25), "armLR": (-26, 0, -4), "handR": (-2, 0, -8),
+    "chest": (-2, 0, 0), "neck": (3, 0, 0), "head": (1, 2, 1),
+})
+
+
 CLIPS = [
     {"name": "idle", "loop": True,
      "keys": [(0.0, IDLE_A), (2.3, IDLE_B), (4.6, IDLE_A)]},
@@ -4253,6 +4344,17 @@ CLIPS = [
     # kinds of thing: `flare` happens to her once, `firestarter` is what she is
     # until something stops it, and `cast` is an event the game fires off inside
     # that state whenever it decides she should throw.
+    # The two indoor ones. Both one-shots and both slow — nothing in this room
+    # happens at the speed anything on the promenade happens at, and that is
+    # the point of the room.
+    {"name": "wine", "loop": False,
+     "keys": [(0.00, IDLE_A), (0.60, WINE_REACH), (1.00, WINE_HOLD),
+              (1.65, WINE_UP), (2.15, WINE_SIP), (2.95, WINE_SIP),
+              (3.35, WINE_UP), (3.95, WINE_HOLD), (4.30, WINE_REACH),
+              (4.95, IDLE_A)]},
+    {"name": "untie", "loop": False,
+     "keys": [(0.00, IDLE_A), (0.60, UNTIE_A), (1.05, UNTIE_B),
+              (1.35, UNTIE_B), (1.85, UNTIE_C), (2.55, IDLE_A)]},
     {"name": "flare", "loop": False, "keys": FLARE},
     {"name": "firestarter", "loop": True, "keys": FIRE},
     {"name": "cast", "loop": False, "keys": CAST},

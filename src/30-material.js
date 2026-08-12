@@ -58,22 +58,38 @@ vec3 qrot(vec4 q, vec3 v){
 #ifdef FR_SKIN
 attribute vec4 aBoneIdx;
 attribute vec4 aBoneWt;
-uniform vec4 uBones[FR_BONES * 3];
+uniform sampler2D uBones;
+uniform float uBoneRows;
 
-// Three rows of a 3x4, unpacked into GLSL's column-major mat4.
-mat4 boneMat(int i){
-  vec4 a = uBones[i * 3], b = uBones[i * 3 + 1], c = uBones[i * 3 + 2];
-  return mat4(a.x, b.x, c.x, 0.0,
-              a.y, b.y, c.y, 0.0,
-              a.z, b.z, c.z, 0.0,
-              a.w, b.w, c.w, 1.0);
+/** One row of one bone's 3x4, out of the palette texture. */
+vec4 boneRow(float i){
+  return texture2D(uBones, vec2((i + 0.5) / uBoneRows, 0.5));
 }
 
-mat4 skinMat(){
-  return boneMat(int(aBoneIdx.x)) * aBoneWt.x
-       + boneMat(int(aBoneIdx.y)) * aBoneWt.y
-       + boneMat(int(aBoneIdx.z)) * aBoneWt.z
-       + boneMat(int(aBoneIdx.w)) * aBoneWt.w;
+/**
+ * One bone's share of a vertex, accumulated as six dot products.
+ *
+ * The obvious way to write this — and the way it *was* written — is to unpack
+ * each bone's three rows into a mat4, weight the four matrices, add them, and
+ * multiply once. It is the same arithmetic and it reads better, and it wanted
+ * four mat4 temporaries plus three mat4 adds, which is sixteen live floats a
+ * bone against a mobile register file. A row of a 3x4 dotted with a homogeneous
+ * vertex is the same number for three floats of scratch: position goes in with
+ * w = 1 so the translation column applies, the normal with w = 0 so only the
+ * rotation does, which is what mat3(sm) was doing the long way round.
+ *
+ * There are no integers left in here on purpose. The index arrives normalised
+ * — 27 as 27/255 — and is scaled back out and floored to a float row number
+ * that goes straight into a texture coordinate. min() against the last row
+ * because a sampler will happily clamp but a limb thrown to the edge of the
+ * palette is still a limb in the wrong place, and it costs one instruction to
+ * make that impossible rather than merely unlikely.
+ */
+void addBone(float bi, float w, vec4 hp, vec4 hn, inout vec3 sp, inout vec3 sn){
+  float i = min(floor(bi * 255.0 + 0.5), float(FR_BONES) - 1.0) * 3.0;
+  vec4 a = boneRow(i), b = boneRow(i + 1.0), c = boneRow(i + 2.0);
+  sp += w * vec3(dot(a, hp), dot(b, hp), dot(c, hp));
+  sn += w * vec3(dot(a, hn), dot(b, hn), dot(c, hn));
 }
 #endif
 
@@ -86,11 +102,17 @@ void main(){
 
 #ifdef FR_SKIN
   {
-    mat4 sm = skinMat();
     // p, not position: the body above has already had its say, and on the one
     // figure that uses it that say is the shape of her face.
-    p = (sm * vec4(p, 1.0)).xyz;
-    n = mat3(sm) * normal;
+    vec4 hp = vec4(p, 1.0);
+    vec4 hn = vec4(normal, 0.0);
+    vec3 sp = vec3(0.0), sn = vec3(0.0);
+    addBone(aBoneIdx.x, aBoneWt.x, hp, hn, sp, sn);
+    addBone(aBoneIdx.y, aBoneWt.y, hp, hn, sp, sn);
+    addBone(aBoneIdx.z, aBoneWt.z, hp, hn, sp, sn);
+    addBone(aBoneIdx.w, aBoneWt.w, hp, hn, sp, sn);
+    p = sp;
+    n = sn;
   }
 #endif
   if (uInstanced > 0.5) {

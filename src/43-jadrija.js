@@ -494,6 +494,47 @@ async function buildJadrija(scene) {
   const ROOFS = [[0.385, 0.372, 0.350], [0.430, 0.252, 0.180], [0.345, 0.338, 0.326]];
   const TRIM = [0.340, 0.300, 0.252];
 
+  /**
+   * One of them is not a changing hut.
+   *
+   * Every other kabina on this shore is a solid box with a door painted on it,
+   * and that is right: there are a hundred of them, nobody has any business in
+   * anybody else's, and a resort where every door opens is a resort nobody ever
+   * finds anything in. So exactly one opens, it is the one with the sign over
+   * it, and it goes back five and a half metres into the alley behind the row
+   * — which is space the front row does not use and the back row does not want.
+   *
+   * `door` is the number everything else here is arranged around, and it is
+   * wide for a changing hut on purpose. `confine` inflates every blocker by
+   * `GROUND.girth`, so a doorway costs 1.10 m of clear width before anybody
+   * gets through it at all, and a 0.9 m door — the width of a real one — is a
+   * wall. The jambs are given back some of that inflation (see `SNUG`); the
+   * door is still 1.45 m, because a threshold you have to aim at is a threshold
+   * you conclude is shut.
+   */
+  const KAB = {
+    depth: 5.40,           // how far back it goes from the seaward face
+    door: 1.45,            // clear width of the opening
+    head: 1.98,            // and its head height above the floor
+    wall: 0.10,            // interior wall thickness
+    // Under the eave, which is at 2.18, and not over it. A ceiling higher than
+    // the wall it sits on is a 6 cm slot of August daylight running right round
+    // the top of a room whose whole job is to be dark.
+    ceil: 2.10,
+    step: 0.30,            // the doorstep, seaward of the face
+    // Where it is: the third door of the first front-row run past the jetty,
+    // so the way to find it is the way you already walk — out to the boat
+    // landing, then turn along the row.
+    nth: 2,
+  };
+  // Taken back off the special kabina's own walls. `GROUND.girth` is 0.55, and
+  // a room 1.95 m across with 0.55 held off each wall leaves an 0.85 m strip to
+  // stand in, which is not a room, it is a slot. Its walls hold you off 0.22 m
+  // instead — close enough to brush the boards, which is what a hut this size
+  // is supposed to feel like. Nothing outside this building is affected.
+  const SNUG = GROUND.girth - 0.22;
+  let special = null;
+
   const runs = [];        // for the blockers, later
   /**
    * Everything standing on the concrete that you should not be able to walk
@@ -527,9 +568,20 @@ async function buildJadrija(scene) {
     b = up;
     const eave = y0 + JAD.plinth + JAD.cabH;
     const ridge = eave + JAD.cabRise;
+    // Which hut in this run — if any — is the one that opens: the third door of
+    // the first front-row run past the jetty. Stated as an ordinal rather than
+    // as a position along the shore, because the runs are laid out by `rng` and
+    // a fixed `t` lands in the alley between two of them as often as not.
+    // Costs no draw of `rng` either way, so the rest of the beach comes out of
+    // the seed exactly as it did before there was a door in it anywhere.
+    const sk = front === JAD.rowA && !special && t0 > gapAt
+      ? Math.min(KAB.nth, n - 1) : -1;
     for (let k = 0; k < n; k++) {
       const a = t0 + k * JAD.cabW, c = a + JAD.cabW;
       const col = CAB[Math.floor(rng() * CAB.length)];
+      // Drawn after the colour is picked and not before, so the special one
+      // takes its own colour out of the same sequence its neighbours do.
+      if (k === sk) { kabina(a, c, front, y0, eave, ridge, col, roofCol); continue; }
       boxTS(a + 0.03, c - 0.03, front, back, y0 + JAD.plinth, eave, col);
       // Door: a frame proud of the face and a dark panel inside it, rather than
       // a black rectangle painted on the wall. Two boxes, and it is the
@@ -560,9 +612,152 @@ async function buildJadrija(scene) {
       boxTS(T - 0.05 * o, T + 0.05 * o, front, back,
         y0 + JAD.plinth, eave, [0.760, 0.745, 0.700]);
     }
-    runs.push({ t0: t0 - 0.5, t1: t1 + 0.5, s0: front - 0.55, s1: back + 0.45,
-      y: y0, h: ridge - y0 });
+    // The run is one blocker, except where a door was cut in it: then it is the
+    // huts either side of the special one, and the special one puts up its own
+    // walls. A single box over the lot would be a sign hung on a wall.
+    const h = ridge - y0;
+    if (sk < 0) {
+      runs.push({ t0: t0 - 0.5, t1: t1 + 0.5, s0: front - 0.55, s1: back + 0.45,
+        y: y0, h });
+    } else {
+      // Pulled back by `SNUG` where they meet the door, and only there. Left
+      // alone, each neighbour's blocker grows 0.55 m into the opening when
+      // `confine` inflates it, and the two of them between them close 1.10 m of
+      // a 1.45 m doorway from the outside — a door you can see through and
+      // cannot walk through, which is the worst of both.
+      const a = t0 + sk * JAD.cabW, c = a + JAD.cabW;
+      if (a > t0) {
+        runs.push({ t0: t0 - 0.5, t1: a - SNUG, s0: front - 0.55, s1: back + 0.45,
+          y: y0, h });
+      }
+      if (c < t1) {
+        runs.push({ t0: c + SNUG, t1: t1 + 0.5, s0: front - 0.55, s1: back + 0.45,
+          y: y0, h });
+      }
+    }
     b = deck;
+  }
+
+  /**
+   * A box you are inside: the same six quads as `boxIn` with every winding
+   * reversed, so the faces point in at you rather than out. A room is not a hut
+   * with the camera moved, and a hut seen from within is six invisible
+   * back-faces and a view of the sea through its own wall.
+   */
+  function roomTS(t0, t1, s0, s1, y0, y1, wallCol, floorCol, ceilCol, openFront) {
+    const A = W(t0, s0, y0), B = W(t1, s0, y0), C = W(t1, s1, y0), D = W(t0, s1, y0);
+    const a = [A[0], y1, A[2]], q = [B[0], y1, B[2]];
+    const c = [C[0], y1, C[2]], d = [D[0], y1, D[2]];
+    b.quad(d, c, q, a, ceilCol);
+    b.quad(A, B, C, D, floorCol);
+    if (!openFront) b.quad(a, q, B, A, wallCol);
+    b.quad(c, d, D, C, wallCol);
+    b.quad(q, c, C, B, wallCol);
+    b.quad(d, a, A, D, wallCol);
+  }
+  /** One inward-facing wall panel at `s`, wound to be seen from further in. */
+  const inFace = (t0, t1, y0, y1, s, col) =>
+    b.quad(W(t0, s, y1), W(t1, s, y1), W(t1, s, y0), W(t0, s, y0), col);
+
+  /**
+   * The one that opens.
+   *
+   * Built as walls rather than as a box, because the difference between a hut
+   * and a room is that a room has an inside — and the inside is drawn as a
+   * second, inverted shell inset by the wall thickness, so the boards you see
+   * from the cot are boards and not the back of the siding.
+   *
+   * It keeps its neighbours' facade exactly: same width, same plinth, same
+   * eave, same door frame proud of the face, same colour out of the same table.
+   * What it does not keep is the back wall — it runs 5.4 m into the alley,
+   * which is dead ground between the rows, under a lean-to hung off the run's
+   * rear eave. From the promenade the only thing wrong with it is the sign.
+   */
+  function kabina(a, c, front, y0, eave, ridge, col, roofCol) {
+    const floor = y0 + JAD.plinth;
+    const s1 = front + KAB.depth;
+    const dc = (a + c) * 0.5;
+    const dj = KAB.door * 0.5;
+    const wl = a + 0.03, wr = c - 0.03;      // the siding, flush with the row
+    const dark = [col[0] * 0.30, col[1] * 0.25, col[2] * 0.21];
+
+    // The pad carries on under the annex. In the deck buffer with the rest of
+    // the concrete, or it picks up the hut bounce and reads as a lit rectangle
+    // in the middle of the alley.
+    b = deck;
+    boxTS(wl - 0.13, wr + 0.13, front + JAD.cabD + 0.45, s1 + 0.30,
+      y0 - 0.4, floor, CONC[1], CONC[2]);
+    b = up;
+
+    const top = floor + KAB.ceil;
+    const w = KAB.wall;
+    // Sides, back, and the two jambs. The lintel closes the wall over the door.
+    boxTS(wl, wl + w, front, s1, floor, eave, col);
+    boxTS(wr - w, wr, front, s1, floor, eave, col);
+    boxTS(wl, wr, s1 - w, s1, floor, eave, col);
+    boxTS(wl, dc - dj, front, front + w, floor, eave, col);
+    boxTS(dc + dj, wr, front, front + w, floor, eave, col);
+    boxTS(dc - dj, dc + dj, front, front + w, floor + KAB.head, eave, col);
+    // And the frame, the one detail that says hut on every other door in the
+    // row. Three strips and not a panel: on every other hut the frame is filled
+    // in, because on every other hut what is inside it is a painted door. Fill
+    // this one and the only opening at Jadrija is boarded over.
+    for (const o of [-1, 1]) {
+      boxTS(dc + o * dj, dc + o * (dj + 0.10), front - 0.075, front - 0.005,
+        floor, floor + KAB.head + 0.10, TRIM);
+    }
+    boxTS(dc - dj - 0.10, dc + dj + 0.10, front - 0.075, front - 0.005,
+      floor + KAB.head, floor + KAB.head + 0.10, TRIM);
+
+    // Inside. Everything from here is seen only from within, and is dark
+    // because no light gets into a wooden box with one door in it — which is
+    // the whole reason this room is worth walking into on a white afternoon.
+    // Held 4 mm clear of the walls it lines. Flush, the shell's faces and the
+    // inward faces of the wall boxes are the same plane, and the depth test
+    // picks between them per triangle: what you get is not a dark room, it is
+    // a dark room with the *outside* colour showing through it in wedges that
+    // swim as you walk.
+    const IN = 0.004;
+    roomTS(wl + w + IN, wr - w - IN, front + w + IN, s1 - w - IN,
+      floor + 0.01, top - IN,
+      dark, [0.190, 0.158, 0.126], [0.052, 0.046, 0.042], true);
+    // The front wall from within, in three panels around the opening — because
+    // the sixth face of the shell is the one the door is in, and drawn whole it
+    // seals the only way into the only room at Jadrija. Which is exactly what it
+    // did: the doorway read as one more painted-on door and the room behind it
+    // was a rumour.
+    const fs = front + w + IN;
+    inFace(wl + w, dc - dj, floor, top, fs, dark);
+    inFace(dc + dj, wr - w, floor, top, fs, dark);
+    inFace(dc - dj, dc + dj, floor + KAB.head, top, fs, dark);
+    // And the reveals: slivers standing in the thickness of the opening, so the
+    // door is a hole through 10 cm of wall rather than a rectangle cut in paper.
+    for (const o of [-1, 1]) {
+      boxTS(dc + o * dj, dc + o * (dj + 0.014), front, fs, floor, floor + KAB.head, dark);
+    }
+    boxTS(dc - dj, dc + dj, front, fs, floor + KAB.head, floor + KAB.head + 0.014, dark);
+    // The ceiling is a slab and not a plane, so the lean-to overhead has
+    // something to sit on and the room does not open into the roof void.
+    boxTS(wl, wr, front, s1, top, top + 0.06, dark);
+
+    // The lean-to over the annex, hung off the run's rear eave. A shallower
+    // pitch than the roof it comes off, which is what a lean-to is.
+    const r0 = front + JAD.cabD + JAD.cabEave, r1 = s1 + 0.24;
+    const y1 = eave - 0.30;
+    b.quad(W(wl - 0.16, r0, eave), W(wr + 0.16, r0, eave),
+      W(wr + 0.16, r1, y1), W(wl - 0.16, r1, y1), roofCol);
+    b.quad(W(wl - 0.16, r1, y1 - 0.08), W(wr + 0.16, r1, y1 - 0.08),
+      W(wr + 0.16, r0, eave - 0.08), W(wl - 0.16, r0, eave - 0.08),
+      [0.145, 0.135, 0.125]);
+
+    special = {
+      t0: wl + w, t1: wr - w, s0: front + w, s1: s1 - w,
+      face: front, dc, dj, floor, top, y0, eave,
+      // Where you are standing when you are in it, for the audio and the light.
+      // A metre of the doorway is included on purpose: the room should have
+      // gone quiet by the time you are through the frame, not a stride later.
+      pad: 0.95,
+    };
   }
 
   /**
@@ -585,6 +780,157 @@ async function buildJadrija(scene) {
       t += span + 2.6 + rng() * 2.2;
     }
   }
+
+  /**
+   * The sign, which is the only thing wrong with the facade and is therefore the
+   * whole of how you find it.
+   *
+   * Drawn on a canvas rather than built out of tube geometry, because neon is
+   * not a shape, it is a shape and the halo around it — and a halo is what a
+   * canvas with `shadowBlur` gives you for nothing and what a hundred extruded
+   * cylinders give you never. Three passes a stroke: a wide dim bloom, a middle
+   * pass, then a near-white core, which is what a glass tube full of gas
+   * actually photographs like.
+   *
+   * It projects square out from the wall over the promenade, which is how every
+   * bar sign on this coast is hung and, more to the point, is the only way it
+   * can be read by somebody walking the row rather than standing in front of it.
+   * There is no room for it flat on the facade: the door frame stops 2 cm under
+   * the eave.
+   */
+  function neonSign(K) {
+    /**
+     * One face of it. `flip` mirrors the composition so the lettering can
+     * counter-mirror itself and still read from the far side.
+     *
+     * The arrow points DOWN, and that is the fix rather than a style. A sign
+     * hung square out from a wall is seen from both ends of the promenade, and
+     * a horizontal arrow is right for exactly one of them: mirror it and it
+     * points away from the door, do not mirror it and it points away from the
+     * door on the other side. There is no orientation of a sideways arrow that
+     * works, which is two builds' worth of finding out. A vertical one is the
+     * same arrow in a mirror, so it hangs over the doorway and points at it,
+     * and every viewer on the deck is on its good side.
+     */
+    const neonFace = (flip) => {
+      const cv = document.createElement('canvas');
+      cv.width = 460; cv.height = 400;
+      const g = cv.getContext('2d');
+
+      const tube = (path, col, w) => {
+        for (const [blur, lw, style] of [[26, w + 7, col], [12, w + 2, col],
+          [5, w * 0.42, '#fff6ee']]) {
+          g.save();
+          g.shadowBlur = blur; g.shadowColor = col;
+          g.strokeStyle = style; g.lineWidth = lw;
+          g.lineJoin = 'round'; g.lineCap = 'round';
+          g.beginPath(); path(); g.stroke();
+          g.restore();
+        }
+      };
+      // Drawn inside the mirror and immediately un-mirrored about its own
+      // anchor, which is how you get upright words in a reversed picture.
+      const glowText = (text, x, y, font, col) => {
+        g.save();
+        g.translate(x, y);
+        if (flip) g.scale(-1, 1);
+        g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle';
+        for (const [blur, style] of [[24, col], [10, col], [4, '#fff6ee']]) {
+          g.shadowBlur = blur; g.shadowColor = col; g.fillStyle = style;
+          g.fillText(text, 0, 0);
+        }
+        g.restore();
+      };
+
+      const RED = '#ff2d17', PINK = '#ff5f9e', GOLD = '#ffc11e';
+      g.clearRect(0, 0, cv.width, cv.height);
+      g.save();
+      if (flip) { g.translate(cv.width, 0); g.scale(-1, 1); }
+
+      glowText('Jadrija', 158, 32, 'italic 34px Georgia, serif', PINK);
+      // OPEN, in a box, over the arrow.
+      tube(() => {
+        g.moveTo(26, 62); g.lineTo(292, 62); g.lineTo(292, 140);
+        g.lineTo(26, 140); g.closePath();
+      }, RED, 8);
+      glowText('OPEN', 159, 102, 'bold 66px Helvetica, Arial, sans-serif', RED);
+
+      // The pole, and the girl on it. Six strokes and no more — a neon figure
+      // is a line drawing by construction, and the ones that read are the ones
+      // that gave up early.
+      tube(() => { g.moveTo(388, 30); g.lineTo(388, 318); }, GOLD, 7);
+      tube(() => {
+        g.moveTo(388, 96); g.bezierCurveTo(344, 92, 328, 122, 350, 142);
+        g.bezierCurveTo(376, 162, 340, 188, 322, 216);
+        g.moveTo(350, 142); g.bezierCurveTo(384, 152, 394, 188, 384, 230);
+        g.moveTo(384, 230); g.bezierCurveTo(428, 238, 432, 270, 406, 288);
+        g.moveTo(338, 118); g.lineTo(384, 104);
+      }, PINK, 6);
+      tube(() => {
+        g.moveTo(388, 318); g.bezierCurveTo(350, 288, 342, 322, 388, 344);
+        g.bezierCurveTo(434, 322, 426, 288, 388, 318);
+      }, GOLD, 6);
+
+      // And the arrow, straight down at the door it is bolted over.
+      tube(() => {
+        g.moveTo(159, 178); g.lineTo(159, 310);
+        g.moveTo(101, 256); g.lineTo(159, 314); g.lineTo(217, 256);
+      }, RED, 10);
+
+      g.restore();
+      const tex = new THREE.CanvasTexture(cv);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 8;
+      return tex;
+    };
+
+    // Over the middle of the doorway, standing proud of the roof, on an arm
+    // that runs back into the wall between the two faces.
+    const p = W(K.dc, K.face - 0.80, K.floor + 2.40);
+    const st = at(K.dc);
+    const faces = [];
+    for (const [flip, yaw] of [[false, Math.atan2(st.ux, st.uz)],
+      [true, Math.atan2(-st.ux, -st.uz)]]) {
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.86, 0.75),
+        new THREE.MeshBasicMaterial({ map: neonFace(flip), transparent: true,
+          side: THREE.FrontSide, depthWrite: false }));
+      mesh.position.set(p[0], p[1], p[2]);
+      mesh.rotation.y = yaw;
+      mesh.renderOrder = 2;
+      scene.add(mesh);
+      faces.push(mesh);
+    }
+    // The bracket, which has to hold the sign up without standing in front of
+    // it. The first one did exactly that: an arm along the top and a "stay"
+    // under it that was a solid 0.53 by 0.44 m plate, and since the panel hangs
+    // in the same plane as its own bracket the plate sat squarely over Jadrija,
+    // the left third of the OPEN box and most of the girl. A brace you can read
+    // the sign through is not a brace.
+    //
+    // So it is hung rather than propped: one arm clear above the panel's top
+    // edge, two short drop links down to it, and the only heavy piece is a
+    // backplate at the wall, which is inboard of the panel's inner edge and
+    // therefore in front of nothing. The panel is 0.86 by 0.75 centred 0.80 out
+    // from the face, so it runs face−1.23 to face−0.37 and tops out at
+    // floor + 2.775; every number below is measured off that.
+    const AR = K.floor + 2.84;                 // underside of the arm
+    boxTS(K.dc - 0.03, K.dc + 0.03, K.face - 1.30, K.face - 0.02,
+      AR, AR + 0.06, TRIM);
+    for (const s of [K.face - 1.20, K.face - 0.40]) {
+      boxTS(K.dc - 0.022, K.dc + 0.022, s - 0.04, s + 0.04,
+        K.floor + 2.74, AR + 0.01, TRIM);
+    }
+    // And a mast down through the roof at the arm's inner end. The arm clears
+    // the tiles by better than half a metre, so ending it at the wall line ends
+    // it in the sky: a sign has to be bolted to something you can see it bolted
+    // to. It goes ten centimetres past the eave, which the roof hides.
+    boxTS(K.dc - 0.055, K.dc + 0.055, K.face - 0.11, K.face - 0.02,
+      K.eave - 0.10, AR + 0.10, TRIM);
+    return faces;
+  }
+
+  if (special) special.sign = neonSign(special);
 
   // The steps belong to the ground — you walk down them — and are cut into the
   // terrace they come off, so they stay in the deck buffer where their concrete
@@ -1229,14 +1575,439 @@ async function buildJadrija(scene) {
     else if (r < 0.72) { olive(t, s, y, 4.2 + rng() * 1.6); greens.push([t, s, 0.60, 5]); }
     else oleander(t, s, y, 0.85 + rng() * 0.55);
   }
-  for (let t = 8; t < LEN - 8; t += 4.5 + rng() * 5) {
-    if (Math.abs(t - gapAt) < 6) continue;
-    oleander(t, JAD.rowA - 1.15, at(t).deck, 0.62 + rng() * 0.42);
-  }
+  // There used to be a second run of oleander tight against the front row's
+  // doors, at rowA − 1.15, one every four or five metres for the whole length.
+  // It came off. Real cabin rows on this coast have nothing planted along them
+  // — the doors open outward and the strip in front of them is the walk — and
+  // the mounds sat right where you stand to look at a door, so the row read as
+  // a hedge with kabine behind it rather than as a row of kabine. Green stays
+  // where there is soil for it: behind the back row, above.
   for (let t = 4; t < LEN - 4; t += 3.2 + rng() * 6) {
     const s = JAD.back + 1.5 + rng() * 7;
     agave(t, s, surfaceY(t, s), 0.55 + rng() * 0.55);
   }
+
+  // ── what is in the kabina ──────────────────────────────────────────────────
+  /**
+   * Four things, and they are the only furniture in this game anybody is meant
+   * to look at closely.
+   *
+   * Everything else on this shore is seen from three metres or from three
+   * hundred and is built accordingly — a lounger is nine boxes and a parasol is
+   * a cone, and that is the right amount of lounger. These are seen from
+   * arm's length in a room 1.95 m across, so the two that have faces on them
+   * get canvases: a 1960s set's front panel and a valve radio's dial are
+   * *printed* objects, and printing them is both cheaper and better than
+   * modelling a speaker grille out of triangles.
+   *
+   * The screen and the dial are the only light in here. That is why the room
+   * was made dark, and it is why they are `MeshBasicMaterial`: a cathode ray
+   * tube and a dial lamp emit, they are not lit.
+   */
+  const KIT = {
+    wood: [0.400, 0.255, 0.140], woodT: [0.470, 0.310, 0.175],
+    dark: [0.180, 0.115, 0.065],
+    steel: [0.290, 0.300, 0.315], chrome: [0.660, 0.680, 0.700],
+    tick: [0.700, 0.680, 0.615], sheet: [0.780, 0.760, 0.700],
+    rug: [0.330, 0.185, 0.190],
+    blue: [0.545, 0.650, 0.720], gold: [0.700, 0.575, 0.300],
+    glass: [0.050, 0.120, 0.062], cream: [0.850, 0.810, 0.690],
+    foil: [0.330, 0.075, 0.095],
+    // The wrap, off. `SCARF_DARK` and `SCARF_LITE` out of human_mh.py, split
+    // the difference — on the floor it is a heap and not a net, and there is
+    // no pattern left to be dark and light halves of.
+    wrap: [0.185, 0.176, 0.200],
+  };
+
+  /** The canvas on the front of the television. */
+  function tvPanel() {
+    const cv = document.createElement('canvas');
+    cv.width = 512; cv.height = 448;
+    const g = cv.getContext('2d');
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    // The tube, in canvas pixels. Everything else on the panel is furniture
+    // around it.
+    const SX = 34, SY = 26, SW = 444, SH = 304;
+
+    const round = (x, y, w, h, r) => {
+      g.beginPath();
+      g.moveTo(x + r, y);
+      g.arcTo(x + w, y, x + w, y + h, r);
+      g.arcTo(x + w, y + h, x, y + h, r);
+      g.arcTo(x, y + h, x, y, r);
+      g.arcTo(x, y, x + w, y, r);
+      g.closePath();
+    };
+
+    // Static. Real snow, drawn into an ImageData rather than faked with a few
+    // hundred rectangles — at this size the cheat is visible as a grid and the
+    // honest version is one pass over 130k pixels a sixth of a second.
+    const snow = g.createImageData(SW >> 1, SH >> 1);
+    const buf = document.createElement('canvas');
+    buf.width = snow.width; buf.height = snow.height;
+    const bg = buf.getContext('2d');
+    const hiss = (seed) => {
+      const d = snow.data;
+      let x = seed | 1;
+      for (let i = 0; i < d.length; i += 4) {
+        x ^= x << 13; x ^= x >>> 17; x ^= x << 5; x |= 0;
+        const v = 40 + ((x >>> 24) & 0xff) * 0.62;
+        d[i] = v; d[i + 1] = v * 1.02; d[i + 2] = v * 1.06; d[i + 3] = 255;
+      }
+      bg.putImageData(snow, 0, 0);
+      g.imageSmoothingEnabled = true;
+      g.drawImage(buf, SX, SY, SW, SH);
+    };
+
+    const draw = (price, seed) => {
+      // The cabinet's front, and the cream surround the tube sits in.
+      g.fillStyle = '#3a2513'; g.fillRect(0, 0, cv.width, cv.height);
+      g.fillStyle = '#d8cdb4';
+      round(SX - 16, SY - 16, SW + 32, SH + 32, 46); g.fill();
+      // The tube itself: a rounded rectangle, and the corners are the whole
+      // reason anybody knows what decade this is from.
+      g.save();
+      round(SX, SY, SW, SH, 62); g.clip();
+      g.fillStyle = '#0a1410'; g.fillRect(SX, SY, SW, SH);
+      if (price == null) {
+        hiss(seed);
+        g.fillStyle = 'rgba(230,240,235,0.30)';
+        g.font = 'bold 34px Helvetica, Arial, sans-serif';
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText('NO SIGNAL', SX + SW / 2, SY + SH / 2);
+      } else {
+        g.fillStyle = '#0d1f18'; g.fillRect(SX, SY, SW, SH);
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.shadowColor = '#79ffbe'; g.shadowBlur = 18;
+        g.fillStyle = '#9dffcf';
+        g.font = '30px Helvetica, Arial, sans-serif';
+        g.fillText('BTC / USD', SX + SW / 2, SY + 74);
+        g.font = 'bold 92px Helvetica, Arial, sans-serif';
+        g.fillText(price, SX + SW / 2, SY + 168);
+        g.font = '26px Helvetica, Arial, sans-serif';
+        g.fillStyle = 'rgba(157,255,207,0.62)';
+        g.fillText('J A D R I J A', SX + SW / 2, SY + 250);
+      }
+      // Scanlines and a little vignette, over whatever is underneath.
+      g.shadowBlur = 0;
+      g.fillStyle = 'rgba(0,0,0,0.20)';
+      for (let y = SY; y < SY + SH; y += 4) g.fillRect(SX, y, SW, 2);
+      g.restore();
+      // The speaker grille and the two knobs, which on the real thing live in a
+      // brass plate under the tube.
+      g.fillStyle = '#c9bda0';
+      round(SX + 74, SY + SH + 36, SW - 148, 62, 30); g.fill();
+      g.fillStyle = '#6d6047';
+      for (let i = 0; i < 9; i++) {
+        g.fillRect(SX + 96 + i * 26, SY + SH + 48, 9, 38);
+      }
+      for (const kx of [SX + 30, SX + SW - 30]) {
+        g.fillStyle = '#e6dcc2';
+        g.beginPath(); g.arc(kx, SY + SH + 67, 27, 0, TAU); g.fill();
+        g.fillStyle = '#8a7a5a';
+        g.beginPath(); g.arc(kx, SY + SH + 67, 9, 0, TAU); g.fill();
+      }
+      tex.needsUpdate = true;
+    };
+
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.46, 0.402),
+      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+    return { mesh, draw };
+  }
+
+  /** And the one on the front of the radio. Only the dial is alight. */
+  function radioPanel() {
+    const cv = document.createElement('canvas');
+    cv.width = 512; cv.height = 256;
+    const g = cv.getContext('2d');
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+
+    // `lit` is 0 for a dead set and 1 for a dial lamp that has warmed up. The
+    // tuning knob will move `f` in a later pass; the drawing already takes it.
+    const draw = (f = 0.30, lit = 0.55) => {
+      g.fillStyle = '#4d6b7e'; g.fillRect(0, 0, cv.width, cv.height);
+      // The grille: horizontal bars behind a gold surround, which is what the
+      // whole front of one of these is.
+      g.fillStyle = '#8a7238';
+      g.fillRect(18, 30, 250, 150);
+      g.fillStyle = '#2a2118';
+      g.fillRect(28, 40, 230, 130);
+      g.fillStyle = '#6b5c3e';
+      for (let i = 0; i < 11; i++) g.fillRect(34, 47 + i * 11, 218, 5);
+      // The dial. Amber behind glass, a scale in MHz, and a red pointer.
+      const dx = 288, dy = 30, dw = 206, dh = 92;
+      g.fillStyle = '#8a7238'; g.fillRect(dx - 8, dy - 8, dw + 16, dh + 16);
+      const glow = g.createLinearGradient(dx, dy, dx, dy + dh);
+      glow.addColorStop(0, `rgba(255,206,110,${0.30 + 0.55 * lit})`);
+      glow.addColorStop(1, `rgba(150,96,26,${0.25 + 0.45 * lit})`);
+      g.fillStyle = '#241a10'; g.fillRect(dx, dy, dw, dh);
+      g.fillStyle = glow; g.fillRect(dx, dy, dw, dh);
+      g.strokeStyle = `rgba(60,38,14,${0.55 + 0.3 * lit})`;
+      g.fillStyle = `rgba(52,32,12,${0.70 + 0.25 * lit})`;
+      g.font = '15px Helvetica, Arial, sans-serif';
+      g.textAlign = 'center';
+      for (let i = 0; i <= 10; i++) {
+        const x = dx + 12 + (dw - 24) * (i / 10);
+        const tall = i % 2 === 0;
+        g.lineWidth = tall ? 2 : 1;
+        g.beginPath(); g.moveTo(x, dy + dh - 10);
+        g.lineTo(x, dy + dh - (tall ? 30 : 22)); g.stroke();
+        if (tall) g.fillText(String(88 + i * 2), x, dy + 24);
+      }
+      g.strokeStyle = '#d8342a'; g.lineWidth = 3;
+      const px = dx + 12 + (dw - 24) * sat(f);
+      g.beginPath(); g.moveTo(px, dy + 4); g.lineTo(px, dy + dh - 4); g.stroke();
+      // Knobs: two big ones on the right, three small ones under the grille.
+      for (const [kx, ky, r] of [[400, 190, 40], [478, 196, 30]]) {
+        g.fillStyle = '#c9a758';
+        g.beginPath(); g.arc(kx, ky, r, 0, TAU); g.fill();
+        g.strokeStyle = '#5c4a20'; g.lineWidth = 4;
+        g.beginPath(); g.moveTo(kx, ky); g.lineTo(kx, ky - r + 6); g.stroke();
+      }
+      for (let i = 0; i < 3; i++) {
+        g.fillStyle = '#b99b52';
+        g.beginPath(); g.arc(52 + i * 44, 212, 15, 0, TAU); g.fill();
+      }
+      tex.needsUpdate = true;
+    };
+
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.30, 0.15),
+      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+    return { mesh, draw };
+  }
+
+  /**
+   * Stand the four of them up.
+   *
+   * Laid out against the two long walls with a walkway down the middle, which
+   * is not a style choice — it is the only layout a room 1.95 m wide has. Only
+   * the cot and the television's stand are blockers. The tabouret and the
+   * radio table are 40 cm deep against a wall and holding you off them costs
+   * more of the walkway than walking into one costs in dignity.
+   */
+  function kabinaKit(K) {
+    const f = K.floor, dc = K.dc;
+    const tv = tvPanel(), radio = radioPanel();
+
+    // ── the cot ──
+    const c0 = dc + 0.27, c1 = dc + 0.97, cs0 = 18.55, cs1 = 20.45;
+    for (const [t, s] of [[c0 + 0.06, cs0 + 0.07], [c1 - 0.06, cs0 + 0.07],
+      [c0 + 0.06, cs1 - 0.07], [c1 - 0.06, cs1 - 0.07]]) {
+      post(facing(t, s, 0), 0, 0, f, f + 0.30, 0.022, KIT.steel, 6);
+    }
+    boxTS(c0, c1, cs0, cs0 + 0.05, f + 0.28, f + 0.46, KIT.steel);
+    boxTS(c0, c1, cs1 - 0.05, cs1, f + 0.28, f + 0.40, KIT.steel);
+    boxTS(c0, c0 + 0.04, cs0, cs1, f + 0.28, f + 0.34, KIT.steel);
+    boxTS(c1 - 0.04, c1, cs0, cs1, f + 0.28, f + 0.34, KIT.steel);
+    // The mattress, tucked in top and bottom so it is not a slab.
+    const cm = (c0 + c1) * 0.5, cms = (cs0 + cs1) * 0.5;
+    frustum(W, f + 0.32, [cm, cms, 0.325, 0.900],
+      f + 0.36, [cm, cms, 0.343, 0.930], KIT.tick);
+    frustum(W, f + 0.36, [cm, cms, 0.343, 0.930],
+      f + 0.44, [cm, cms, 0.330, 0.912], KIT.tick, KIT.sheet);
+    // A pillow at the inland end and a blanket folded over the foot, because a
+    // bare mattress is a store room and this is somewhere somebody sleeps.
+    frustum(W, f + 0.44, [cm, cs1 - 0.30, 0.230, 0.160],
+      f + 0.53, [cm, cs1 - 0.31, 0.205, 0.135], KIT.sheet, KIT.sheet);
+    frustum(W, f + 0.43, [cm, cs0 + 0.36, 0.336, 0.290],
+      f + 0.50, [cm, cs0 + 0.35, 0.330, 0.275], KIT.rug, KIT.rug);
+    furniture.push({ t: cm, s: cms, a: 0.35 - SNUG, c: 0.95 - SNUG,
+      h: 0.5, y: f });
+
+    // ── the television, on its stand against the back wall ──
+    const vt = dc - 0.30, vs = 22.10;
+    for (const o of [[-0.31, -0.15], [0.31, -0.15], [-0.31, 0.15], [0.31, 0.15]]) {
+      post(facing(vt + o[0], vs + o[1], 0), 0, 0, f, f + 0.50, 0.028, KIT.dark, 5);
+    }
+    frustum(W, f + 0.50, [vt, vs, 0.380, 0.210],
+      f + 0.55, [vt, vs, 0.380, 0.210], KIT.wood, KIT.woodT);
+    boxTS(vt - 0.36, vt + 0.36, vs - 0.19, vs + 0.19, f + 0.16, f + 0.24, KIT.dark);
+    // The set. Splayed legs, a cabinet that tucks in at both ends, and the
+    // front is the canvas — see `tvPanel`.
+    const gy = f + 0.55;
+    for (const o of [[-0.19, -0.14], [0.19, -0.14], [-0.19, 0.14], [0.19, 0.14]]) {
+      frustum(W, gy, [vt + o[0], vs + o[1], 0.016, 0.016],
+        gy + 0.11, [vt + o[0] * 0.82, vs + o[1] * 0.82, 0.013, 0.013], KIT.dark);
+    }
+    frustum(W, gy + 0.10, [vt, vs, 0.222, 0.176],
+      gy + 0.15, [vt, vs, 0.248, 0.196], KIT.wood);
+    frustum(W, gy + 0.15, [vt, vs, 0.248, 0.196],
+      gy + 0.47, [vt, vs, 0.248, 0.196], KIT.wood);
+    frustum(W, gy + 0.47, [vt, vs, 0.248, 0.196],
+      gy + 0.52, [vt, vs, 0.220, 0.170], KIT.wood, KIT.woodT);
+    {
+      const p = W(vt, vs - 0.198, gy + 0.31);
+      tv.mesh.position.set(p[0], p[1], p[2]);
+      const st = at(vt);
+      tv.mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
+      scene.add(tv.mesh);
+    }
+    // Rabbit ears: a chromed base and two rods in a V, which is the one detail
+    // that dates the thing from across a dark room.
+    dome(facing(vt, vs, 0), 0, 0, gy + 0.52, 0.055, 0.075, KIT.chrome, 8);
+    for (const o of [-1, 1]) {
+      frustum(W, gy + 0.56, [vt + o * 0.02, vs, 0.008, 0.008],
+        gy + 1.02, [vt + o * 0.34, vs + 0.10, 0.005, 0.005], KIT.chrome);
+    }
+
+    // ── the tabouret, and the Pelješac on it ──
+    const bt = dc - 0.76, bs = 18.20;
+    for (const o of [[-0.11, -0.11], [0.11, -0.11], [-0.11, 0.11], [0.11, 0.11]]) {
+      frustum(W, f, [bt + o[0] * 1.34, bs + o[1] * 1.34, 0.016, 0.016],
+        f + 0.68, [bt + o[0], bs + o[1], 0.013, 0.013], KIT.dark);
+    }
+    post(facing(bt, bs, 0), 0, 0, f + 0.68, f + 0.72, 0.165, KIT.wood, 10);
+    dome(facing(bt, bs, 0), 0, 0, f + 0.72, 0.014, 0.165, KIT.woodT, 10);
+    // The bottle. A Dingač is a burgundy bottle — sloped shoulder, no punt you
+    // can see, dark glass — and the shoulder is the whole silhouette.
+    //
+    // Its own mesh and not part of the room, because it is the one object in
+    // here that moves: she picks it up. Built about its own base at the origin
+    // so that a position and a yaw are all it ever needs, which is what lets it
+    // sit on a tabouret one second and hang off a wrist the next.
+    const by = f + 0.73;
+    const bbuf = propBuilder();
+    const keep = b;
+    b = bbuf;
+    const O = (dt, ds, y) => [dt, y, ds];
+    post(O, 0, 0, 0, 0.155, 0.038, KIT.glass, 9);
+    post(O, 0, 0, 0.055, 0.125, 0.0392, KIT.cream, 9);
+    post(O, 0, 0, 0.112, 0.125, 0.0394, KIT.foil, 9);
+    frustum(O, 0.155, [0, 0, 0.038, 0.038], 0.225, [0, 0, 0.0145, 0.0145],
+      KIT.glass);
+    post(O, 0, 0, 0.225, 0.300, 0.0145, KIT.glass, 8);
+    post(O, 0, 0, 0.262, 0.306, 0.0158, KIT.foil, 8);
+    // And the wrap, once it is on the floor: four soft folds of cloth and no
+    // more. It is never skinned and never was — the game stops drawing the one
+    // she is wearing on the frame she reaches the tug and starts drawing this,
+    // which is the right way round for something that spends a second falling
+    // and the rest of the afternoon lying there.
+    const sbuf = propBuilder();
+    b = sbuf;
+    for (let i = 0; i < 4; i++) {
+      const a0 = i * 0.6 + 0.35, r0 = 0.17 - i * 0.022;
+      frustum(O, 0.004 + i * 0.011,
+        [Math.cos(a0) * 0.05, Math.sin(a0) * 0.05, r0, r0 * 0.62],
+        0.014 + i * 0.011,
+        [Math.cos(a0) * 0.06, Math.sin(a0) * 0.06, r0 * 0.86, r0 * 0.50],
+        KIT.wrap, KIT.wrap);
+    }
+    b = keep;
+    const inner = { spec: 0.05, specPower: 14, side: THREE.DoubleSide,
+      emissive: 0.22, body: 'n = gl_FrontFacing ? n : -n; base *= vVCol;' };
+    const bottle = new THREE.Mesh(bbuf.geo(), solidMaterial(0xffffff, inner));
+    const bp = W(bt, bs, by);
+    bottle.position.set(bp[0], bp[1], bp[2]);
+    scene.add(bottle);
+    const scarf = new THREE.Mesh(sbuf.geo(), solidMaterial(0xffffff, inner));
+    scarf.visible = false;
+    scene.add(scarf);
+
+    // ── the radio, on a small table by the head of the cot ──
+    const rt = dc - 0.75, rs = 19.62;
+    for (const o of [[-0.16, -0.12], [0.16, -0.12], [-0.16, 0.12], [0.16, 0.12]]) {
+      post(facing(rt + o[0], rs + o[1], 0), 0, 0, f, f + 0.58, 0.020, KIT.dark, 5);
+    }
+    frustum(W, f + 0.58, [rt, rs, 0.200, 0.160],
+      f + 0.62, [rt, rs, 0.200, 0.160], KIT.wood, KIT.woodT);
+    const ry = f + 0.62;
+    frustum(W, ry, [rt, rs, 0.150, 0.070], ry + 0.02, [rt, rs, 0.158, 0.076], KIT.gold);
+    frustum(W, ry + 0.02, [rt, rs, 0.158, 0.076],
+      ry + 0.17, [rt, rs, 0.158, 0.076], KIT.blue);
+    frustum(W, ry + 0.17, [rt, rs, 0.158, 0.076],
+      ry + 0.20, [rt, rs, 0.138, 0.060], KIT.blue, KIT.blue);
+    // The carry handle over the top, and the aerial, which on these folds down
+    // and is never folded down.
+    for (const o of [-1, 1]) {
+      frustum(W, ry + 0.19, [rt + o * 0.075, rs, 0.010, 0.010],
+        ry + 0.255, [rt + o * 0.062, rs, 0.009, 0.009], KIT.gold);
+    }
+    boxTS(rt - 0.072, rt + 0.072, rs - 0.009, rs + 0.009,
+      ry + 0.248, ry + 0.264, KIT.gold);
+    frustum(W, ry + 0.19, [rt - 0.140, rs + 0.02, 0.006, 0.006],
+      ry + 0.46, [rt - 0.170, rs + 0.05, 0.003, 0.003], KIT.chrome);
+    {
+      const p = W(rt, rs - 0.0765, ry + 0.095);
+      radio.mesh.position.set(p[0], p[1], p[2]);
+      const st = at(rt);
+      radio.mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
+      scene.add(radio.mesh);
+    }
+
+    radio.draw(0.30, 0.55);
+    tv.draw(null, 0x2545);
+    return {
+      tv, radio, bottle, scarf,
+      // Where the bottle lives when nobody is holding it, and where she has to
+      // stand to be able to reach it: 0.55 m off it, turned to face it, which
+      // is one pace and an arm.
+      rest: [bt, bs, by],
+      wine: [bt + 0.40, bs + 0.22, Math.atan2(-0.22, -0.40)],
+    };
+  }
+
+  /**
+   * The set is on, and what it is showing is whatever the network will admit
+   * to.
+   *
+   * One fetch when you walk in and another every `POLL` seconds you stay, and
+   * the failure case is not an error message — it is snow, which is what a set
+   * with no aerial signal does and is the honest answer to a game whose whole
+   * disposition is that it opens off a memory stick with the wifi off. So this
+   * is the one place in the build that touches the network, it degrades to
+   * something better than what it degrades from, and nothing anywhere waits on
+   * it.
+   *
+   * A price is never invented. Showing a plausible made-up number as though it
+   * came off an exchange is worse than showing nothing, because it is the one
+   * thing on this screen a player might act on.
+   */
+  const TVSET = { poll: 45, hiss: 0.16 };
+  let tvPrice = null, tvAsk = 0, tvHiss = 0, tvSeed = 1, tvBusy = false;
+
+  function tvFetch() {
+    if (tvBusy || typeof fetch !== 'function') return;
+    tvBusy = true;
+    fetch('https://api.coinbase.com/v2/prices/BTC-USD/spot', { mode: 'cors' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        const v = j && j.data && parseFloat(j.data.amount);
+        if (v > 0) {
+          tvPrice = '$' + Math.round(v).toLocaleString('en-US');
+          if (kit) kit.tv.draw(tvPrice, 0);
+        }
+      })
+      .catch(() => {})
+      .then(() => { tvBusy = false; });
+  }
+
+  let kit = null;
+  function stepKabina(pt, ps, dt) {
+    if (!kit || !special) return;
+    // Only while you are in the room, or near enough to see into it. A
+    // television redrawing a canvas six times a second on the far side of a
+    // shut door is a texture upload nobody is looking at.
+    const K = special;
+    if (pt < K.t0 - 3 || pt > K.t1 + 3 || ps < K.face - 4 || ps > K.s1 + 2) return;
+    tvAsk -= dt;
+    if (tvAsk <= 0) { tvAsk = TVSET.poll; tvFetch(); }
+    if (tvPrice != null) return;
+    tvHiss -= dt;
+    if (tvHiss <= 0) {
+      tvHiss = TVSET.hiss;
+      tvSeed = (tvSeed * 1103515245 + 12345) | 0;
+      kit.tv.draw(null, tvSeed);
+    }
+  }
+
+  if (special) kit = kabinaKit(special);
 
   // ── the village ────────────────────────────────────────────────────────────
   /**
@@ -1540,6 +2311,18 @@ async function buildJadrija(scene) {
     if (t < -5 || t > LEN + 5 || s < -3 || s > JAD.back + JAD.bleed) {
       return Math.max(groundAt(x, z), 0);
     }
+    // The kabine stand on a 0.22 m pad that `surfaceY` knows nothing about,
+    // which never mattered while every one of them was shut: you walk past a
+    // hut, not into it. Now one opens, and without this you cross the threshold
+    // with your feet a hand's breadth under its floor. Ramped over the width of
+    // the pad in front of the face rather than stepped, because a 22 cm pop on
+    // the doorstep reads as the floor giving way.
+    const K = special;
+    if (K && t > K.t0 - 0.30 && t < K.t1 + 0.30
+        && s > K.face - 0.55 && s < K.s1 + 0.10) {
+      const y = surfaceY(clamp(t, 0, LEN), s);
+      return y + (K.floor - y) * sat((s - (K.face - 0.55)) / 0.55);
+    }
     return surfaceY(clamp(t, 0, LEN), s);
   }
 
@@ -1564,6 +2347,25 @@ async function buildJadrija(scene) {
   // The furniture and the people: benches, loungers, parasol poles and everyone
   // standing or sitting on the concrete.
   for (const f of furniture) blockers.push(f);
+
+  // The special kabina's own four walls, with the doorway left out of the front
+  // one. Every half-extent has `SNUG` taken off it, so these hold you 0.22 m
+  // off instead of 0.55 — see the note on `SNUG`. Nothing else on this shore is
+  // built that way, and nothing else on this shore is a room.
+  if (special) {
+    const K = special, w = KAB.wall, h = KAB.ceil;
+    const wall = (t, s, a, c) => blockers.push({
+      t, s, a: a - SNUG, c: c - SNUG, h, y: K.y0 });
+    const sm = (K.face + K.s1) * 0.5, sh = (K.s1 - K.face) * 0.5;
+    const tm = (K.t0 + K.t1) * 0.5, th = (K.t1 - K.t0) * 0.5;
+    wall(K.t0 - w * 0.5, sm, w * 0.5, sh);
+    wall(K.t1 + w * 0.5, sm, w * 0.5, sh);
+    wall(tm, K.s1 + w * 0.5, th + w, w * 0.5);
+    for (const o of [-1, 1]) {
+      const j0 = o < 0 ? K.t0 : K.dc + K.dj, j1 = o < 0 ? K.dc - K.dj : K.t1;
+      wall((j0 + j1) * 0.5, K.face + w * 0.5, (j1 - j0) * 0.5, w * 0.5);
+    }
+  }
 
   // The houses were laid out to their lanes rather than to the shore, so each
   // carries the angle between the two and `confine` turns into it. Reducing them
@@ -1956,6 +2758,11 @@ async function buildJadrija(scene) {
         soak: 0, burn: 0, cast: 0, boast: 0,
         // The one thing here that only ever goes one way. See the flare.
         turned: 0,
+        // Indoors: which waypoint of the way in she is on, and whether the
+        // wrap has come off. `shed` is a latch for the same reason `turned` is
+        // — it is read every frame by the line that draws the wrap, and a
+        // value read off state cannot be stranded by an event that never fires.
+        leg: 0, shed: 0, held: 0,
       };
     } catch (e) {
       console.warn('test figure failed:', e.message);
@@ -2558,6 +3365,49 @@ async function buildJadrija(scene) {
     return damp(rate, clamp(err * SHOW.turnP, -max, max), SHOW.turnEase, dt);
   }
 
+  /**
+   * Walk her to a point, and never mind the lane.
+   *
+   * `showMove` clamps `s` into the strip of deck she performs on, which is
+   * exactly right for everything she does out there and is a wall across the
+   * doorway of the one place she can go indoors. This is the same integration
+   * with the clamp taken off and a target instead of a heading, and the
+   * distance it returns is what the caller uses to decide it has arrived.
+   *
+   * She still has no collision — see the note at the top of the performance —
+   * so the doorway is threaded by putting the waypoints in it rather than by
+   * pushing her out of anything. Which is also why there are three of them and
+   * not one: a straight line from the promenade to the tabouret goes through a
+   * metre and a half of hut.
+   */
+  function showTo(tt, ss, dt, mul = 1) {
+    const d0 = tt - show.t, d1 = ss - show.s;
+    const dist = Math.hypot(d0, d1);
+    show.want = Math.atan2(d1, d0);
+    const want = dist > 0.14
+      ? Math.min(SHOW.walk * mul, Math.max(0.45, dist * 1.8)) : 0;
+    show.vel = damp(show.vel, want, SHOW.accel, dt);
+    skinFig.state.speed = clamp(show.vel / SHOW.walk, 0.55, 1.75);
+    show.t += Math.cos(show.ang) * show.vel * dt;
+    show.s += Math.sin(show.ang) * show.vel * dt;
+    return dist;
+  }
+
+  /**
+   * Stand still, indoors.
+   *
+   * `showPace(0)` is the obvious way to do this and it is wrong in exactly one
+   * place: it goes through `showMove`, which clamps `s` into the strip of deck
+   * she performs on — so every frame she stood in the kabina she was quietly
+   * teleported back out to the lane edge and the whole indoor sequence played
+   * itself out on the promenade, four metres from the door, in front of
+   * everybody.
+   */
+  function showHold(dt) {
+    show.vel = damp(show.vel, 0, SHOW.accel, dt);
+    skinFig.state.speed = 1;
+  }
+
   /** Advance her along her heading, kept on the deck and inside the resort. */
   function showMove(v, dt) {
     show.t = clamp(show.t + Math.cos(show.ang) * v * dt, 8, LEN - 8);
@@ -2884,7 +3734,17 @@ async function buildJadrija(scene) {
     // Both of the hand ones are the widest she has. A heart made with a
     // straight face is a threat.
     heart: 1.00, note: 0.95,
+    // Indoors. Lower across the board than anything on the promenade, and that
+    // is the whole difference between the two places: out there every face she
+    // makes is aimed at somebody, and in here she is drinking somebody's wine
+    // in a room with the door open behind her.
+    come: 0.55, enter: 0.40, wine: 0.30, meet: 0.85, untie: 0.60,
+    dwell: 0.70, leave: 0.45,
   };
+
+  /** The indoor track, as a set, so the trigger can tell it is already on it. */
+  const KABIN = { come: 1, enter: 1, wine: 1, meet: 1, untie: 1,
+    dwell: 1, leave: 1 };
 
   function stepShow(dt, pt, ps) {
     if (!show || !skinFig) return;
@@ -2906,6 +3766,10 @@ async function buildJadrija(scene) {
       show.phase = phase;
       show.tmr = 0;
       show.said = 0;
+      // Let go of the bottle on the way out of anything that is not the drink.
+      // The turn can arrive in the middle of it, and a bottle still welded to a
+      // wrist through a cartwheel is the sort of thing that is funny once.
+      if (phase !== 'wine') show.held = 0;
     };
 
     // The two set pieces, each with the setting-up its entry needs, so that the
@@ -3072,7 +3936,7 @@ async function buildJadrija(scene) {
     // value read off the state it belongs to cannot leak. That argument is why
     // this line is a line and not two calls, and it still holds now that the
     // state it reads is a latch rather than a meter.
-    if (skinFig) skinFig.wear(!show.turned);
+    if (skinFig) skinFig.wear(!show.turned && !show.shed);
 
     // And the card, which is only ever up during a phase that holds it.
     // Placed before the matrix update at the bottom of this function, because
@@ -3082,7 +3946,109 @@ async function buildJadrija(scene) {
       if (banner.mesh.visible) banner.place();
     }
 
+    // ── the room ──────────────────────────────────────────────────────────
+    // She follows you in. Not "if she has noticed you" and not "if she is
+    // between numbers" — the door is a thing you had to find, and a performer
+    // who finishes her cartwheel first before deciding to come is a performer
+    // who does not come, because the phase she is in is a dice roll you cannot
+    // see. The one thing that outranks it is the turn: she is not doing
+    // anything for anybody once that has started, least of all following them
+    // indoors.
+    const K = special;
+    const inside = !!K && pt > K.t0 - 0.25 && pt < K.t1 + 0.25
+      && ps > K.face + 0.15 && ps < K.s1 + 0.2;
+    if (inside && !KABIN[show.phase] && !MUSIC[show.phase]
+        && show.phase !== 'flare' && !show.turned) {
+      show.leg = 0;
+      go('come', 'walk', 0.34);
+    }
+
     switch (show.phase) {
+      // ── in ──
+      // Three waypoints and not one, because a straight line from the deck to
+      // the tabouret goes through a metre and a half of hut. Out to the middle
+      // of the doorway, through it, and then round to the bottle.
+      case 'come': {
+        const legs = [[K.dc, K.face - 1.55], [K.dc, K.face + 0.55],
+          [kit.wine[0], kit.wine[1]]];
+        const g = legs[Math.min(show.leg, legs.length - 1)];
+        // Slower on the last leg. She is arriving somewhere small and dark, and
+        // walking into it at promenade pace reads as somebody who has come to
+        // fix the boiler.
+        const dist = showTo(g[0], g[1], dt, show.leg === 2 ? 0.72 : 1.05);
+        if (dist < (show.leg === 2 ? 0.20 : 0.40)) {
+          if (show.leg >= 2) { show.leg = 0; go('wine', 'wine', 0.42); }
+          else show.leg++;
+        }
+        break;
+      }
+
+      // The bottle. `held` is the window the clip has it off the table, and it
+      // is a ramp rather than a switch: the hand and the tabouret are 40 cm
+      // apart at the moment of the grasp and a bottle that teleports between
+      // them is a bottle nobody believes was ever picked up.
+      case 'wine': {
+        show.want = kit.wine[2];
+        showHold(dt);
+        const u = S.cur ? S.curT : 0;
+        show.held = sat((u - 0.82) / 0.30) * (1 - sat((u - 3.95) / 0.30));
+        if (done) go('meet', 'idle', 0.45);
+        break;
+      }
+
+      // Turned to face you, and that is all this one is. It exists because
+      // everything either side of it is something she is doing to an object,
+      // and without a beat between them she puts a bottle down and starts
+      // undoing her clothes in the same movement.
+      case 'meet':
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        showHold(dt);
+        if (show.tmr > 1.5) {
+          if (show.shed) go('dwell', 'idle', 0.40);
+          else go('untie', 'untie', 0.40);
+        }
+        break;
+
+      case 'untie': {
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        showHold(dt);
+        // On the tug, not on the end of the clip: the last second of it is her
+        // hands coming away from something that has already gone.
+        if (!show.shed && S.cur && S.curT > 1.28) {
+          show.shed = 1;
+          if (kit.scarf) {
+            const w = toWorld(show.t, show.s);
+            kit.scarf.position.set(w[0], w[1] + 0.005, w[2]);
+            kit.scarf.rotation.y = faceYaw(show.t, show.ang);
+            kit.scarf.visible = true;
+          }
+        }
+        if (done) go('dwell', 'idle', 0.45);
+        break;
+      }
+
+      // And she stays. Nothing else happens in here yet, which is why this
+      // phase does nothing but keep her pointed at you: the alternative is a
+      // dozen frames of her wandering off through a wall, and standing there
+      // is the honest end of what has been built.
+      case 'dwell':
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        showHold(dt);
+        if (!inside) go('leave', 'walk', 0.34);
+        break;
+
+      // Out through the door before she is allowed to head for her spot, or
+      // `home` walks her straight through the back of the row.
+      case 'leave': {
+        const legs = [[K.dc, K.face + 0.55], [K.dc, K.face - 1.9]];
+        const g = legs[Math.min(show.leg, 1)];
+        if (showTo(g[0], g[1], dt, 1.05) < 0.35) {
+          if (show.leg >= 1) { show.leg = 0; go('home', 'walk', 0.30); }
+          else show.leg++;
+        }
+        break;
+      }
+
       case 'idle':
         show.want = -Math.PI / 2;                        // back to the water
         // The ćuk, on her own, every few seconds — the one noise she makes when
@@ -3553,7 +4519,84 @@ async function buildJadrija(scene) {
     f.mesh.position.set(p[0], p[1], p[2]);
     f.mesh.rotation.y = faceYaw(show.t, show.ang + show.side);
     f.mesh.updateMatrixWorld();
+
+    // And the bottle, which is where her hand is or where she left it.
+    //
+    // After the matrix update, because that is what makes `boneAt` mean
+    // anything this frame, and through her matrix by hand, because unlike the
+    // card this is not a child of her mesh — it has to be able to stand on a
+    // tabouret while she is forty metres away doing cartwheels.
+    if (kit && kit.bottle) {
+      if (handR === null) {
+        handR = f.boneIndex('handR');
+        headB = f.boneIndex('head');
+        neckB = f.boneIndex('neck');
+      }
+      const r = kit.rest, w = toWorld(r[0], r[1]);
+      vPos.set(w[0], r[2], w[2]);
+      qAim.identity();
+      if (show.held > 0 && handR >= 0) {
+        f.boneAt(handR, vHand).applyMatrix4(f.mesh.matrixWorld);
+        // Upright in the hand: the grip is low on the body of the bottle,
+        // which is where you hold one you mean to drink out of rather than
+        // pour from. Not at the neck — that is a waiter.
+        vHold.copy(vHand);
+        vHold.y -= BOT.grip;
+        // And the swig, which is not a rotation. Aim it: the lip goes to her
+        // mouth and the bottle lies back along the line from her hand to it,
+        // so the tip is whatever the angle between the two happens to be that
+        // frame. A fixed tilt about a fixed axis is how you get a bottle held
+        // out sideways at somebody's ear, which is what this was.
+        const sip = sat((S.curT - 1.80) / 0.45) * (1 - sat((S.curT - 3.05) / 0.45));
+        if (sip > 0 && headB >= 0) {
+          f.boneAt(headB, vMouth).applyMatrix4(f.mesh.matrixWorld);
+          // Up the skull rather than up the world: `head` is the atlas and the
+          // mouth is a little above and in front of it, but which way "above"
+          // points is the whole question once she tips her head back to drink.
+          // The neck→head vector tips with her, so this follows the swig
+          // instead of aiming at where her mouth was before it started.
+          f.boneAt(neckB, vAx).applyMatrix4(f.mesh.matrixWorld);
+          vUp.subVectors(vMouth, vAx).normalize();
+          // −X is the way she faces: +Z is her right, and up × right is the
+          // nose. Checked against both hands rather than reasoned about,
+          // because a rig's idea of forward is not something to guess at.
+          vFwd.set(-1, 0, 0).transformDirection(f.mesh.matrixWorld);
+          vMouth.addScaledVector(vFwd, 0.055).addScaledVector(vUp, 0.085);
+          vAx.subVectors(vMouth, vHand);
+          const reach = vAx.length();
+          vAx.multiplyScalar(1 / reach);
+          qAim.setFromUnitVectors(UPV, vAx).slerp(qId, 1 - sip);
+          // How far up the bottle her hand ends up. Hanging the lip on her
+          // mouth and letting the rest fall where it may is right only while
+          // the gap happens to be a bottle long; outside that the choice is
+          // between a bottle through her teeth and one held by nothing. So
+          // the grip is what is fixed, clamped to the lower body where a hand
+          // that means to drink actually goes, and any leftover is spent on
+          // the lip falling a centimetre or two short of her lips — which is
+          // the error nobody sees.
+          const at = clamp(BOT.lip - reach, 0.03, 0.11);
+          vHold.lerp(vSip.copy(vHand).addScaledVector(vAx, -at), sip);
+        }
+        vPos.lerp(vHold, show.held);
+      }
+      kit.bottle.position.copy(vPos);
+      kit.bottle.quaternion.copy(qAim);
+    }
   }
+
+  // Looked up once, on the frame the bottle first needs it: `boneIndex` is a
+  // linear search over twenty-eight names and this runs every frame she is on
+  // screen. `null` and not −1, because −1 is what a miss returns.
+  let handR = null, headB = -1, neckB = -1;
+  // Where along its own axis the bottle is held, and where its lip is. Both
+  // read off the profile it is actually built to, up in `kabinaKit`.
+  const BOT = { grip: 0.115, lip: 0.300 };
+  const vHand = new THREE.Vector3(), vMouth = new THREE.Vector3();
+  const vHold = new THREE.Vector3(), vSip = new THREE.Vector3();
+  const vPos = new THREE.Vector3(), vAx = new THREE.Vector3();
+  const vFwd = new THREE.Vector3(), vUp = new THREE.Vector3();
+  const UPV = new THREE.Vector3(0, 1, 0);
+  const qAim = new THREE.Quaternion(), qId = new THREE.Quaternion();
 
   const walkers = [];
   for (const b of bathers) {
@@ -3611,6 +4654,7 @@ async function buildJadrija(scene) {
     // twenty-four bones and wants one, and the distance both of them turn on is
     // the same number. Gating out here would mean measuring it twice.
     stepDog(cam, dt);
+    stepKabina(pt, ps, dt);
 
     if (skinFig) {
       const dx = cam.x - skinFig.mesh.position.x, dz = cam.z - skinFig.mesh.position.z;
@@ -3691,6 +4735,85 @@ async function buildJadrija(scene) {
     // stopping them exactly at the drop would let the camera hang over it.
     bounds: { t0: 3, t1: LEN - 3, s0: 1.1, s1: JAD.reachIn },
     blockers, local, toWorld, walkY, inField,
+    /** Debug: put her at (t, s), and optionally straight into a phase. */
+    putShow: (t, s, phase, at, ang) => {
+      if (!show || !skinFig) return null;
+      show.t = t; show.s = s; show.vel = 0; show.rate = 0; show.leg = 0;
+      if (ang != null) { show.ang = ang; show.want = ang; }
+      if (phase) {
+        show.phase = phase; show.tmr = 0; show.held = 0;
+        skinFig.play({ wine: 'wine', untie: 'untie' }[phase] || 'idle',
+          { fade: 0 });
+      }
+      // And scrub, because a headless page runs its clock at a fraction of the
+      // wall clock and a five-second clip is not a thing a screenshot can wait
+      // out. Nothing in the game calls this with a fourth argument.
+      if (at != null && skinFig.state.cur) {
+        skinFig.state.curT = at;
+        skinFig.update(0);
+        // And the same window the phase itself computes, so a scrubbed frame
+        // has the bottle in her hand rather than waiting a tick that a
+        // headless clock may never give it.
+        if (show.phase === 'wine') {
+          show.held = sat((at - 0.82) / 0.30) * (1 - sat((at - 3.95) / 0.30));
+        }
+      }
+      stepShow(0, show.t, show.s + 2);
+      return { phase: show.phase, t: show.t, s: show.s, held: show.held,
+        bottle: kit && kit.bottle ? kit.bottle.position.toArray()
+          .map((v) => +v.toFixed(3)) : null,
+        curT: skinFig.state.cur ? skinFig.state.curT : null };
+    },
+    /** Debug: where named bones have got to this frame, in world metres. */
+    bones: (names) => {
+      if (!skinFig) return null;
+      const v = new THREE.Vector3(), out = {};
+      skinFig.mesh.updateMatrixWorld();
+      for (const n of names) {
+        if (n[0] === '@') {
+          v.set(n === '@x' ? 1 : 0, 0, n === '@z' ? 1 : 0)
+            .transformDirection(skinFig.mesh.matrixWorld);
+          out[n] = [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)];
+          continue;
+        }
+        const i = skinFig.boneIndex(n);
+        if (i < 0) { out[n] = null; continue; }
+        skinFig.boneAt(i, v);
+        v.applyMatrix4(skinFig.mesh.matrixWorld);
+        out[n] = [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)];
+      }
+      return out;
+    },
+    /**
+     * The one kabina that opens.
+     *
+     * `inside` is 0 to 1 across the thickness of the front wall and nothing
+     * more. The caller latches it, so what this has to say is only *where* the
+     * line is, and the line is the wall: 0 while your eye is still seaward of
+     * it, 1 by the time you have cleared it, which with the hysteresis puts
+     * the flip at about 0.20 m past the face — one step over the doorstep.
+     *
+     * It has been wrong twice, both times too deep, and the second time is
+     * the instructive one. Ramping from the face over 0.55 m sounds like the
+     * doorway and is not: the latch needs 0.62 of it, so the flip landed
+     * 0.7 m in, by which point the door is behind your shoulders and the
+     * whole screen is hut. Standing there in full afternoon light with the
+     * singers still on is exactly the half-in-half-out this was supposed to
+     * cure. A threshold you have already walked through is not a threshold.
+     */
+    kabina: special && {
+      inside: (x, z) => {
+        const [t, s] = local(x, z);
+        if (t < special.t0 - 0.25 || t > special.t1 + 0.25) return 0;
+        if (s < special.face - 0.30 || s > special.s1 + 0.25) return 0;
+        return sat((s - (special.face - 0.05)) / 0.40);
+      },
+      // Where in the resort's own frame it is, for anything that has to walk
+      // there — and for the tests, which otherwise have to find a door by eye.
+      at: [(special.t0 + special.t1) * 0.5, (special.face + special.s1) * 0.5],
+      door: [special.dc, special.face - 1.1],
+      face: special.face, back: special.s1, floor: special.floor,
+    },
     // Where everybody started, as {t, s, y, ang, pose, k, beat}. Kept because a
     // test needs somewhere to point the camera — but note this is the placement
     // and not the live position: anyone with a `beat` has been walking since.
@@ -3770,6 +4893,11 @@ async function buildJadrija(scene) {
       // `pace` and `want` are the ask, these two are where the easing has got
       // to. A gap between them is the point of them.
       vel: +show.vel.toFixed(2), rate: +show.rate.toFixed(2),
+      // Indoors: how far into the clip she is and whether the bottle is off
+      // the table. A pose that has not started and a pose that is not playing
+      // look identical from outside, and only one of them is a bug.
+      curT: skinFig && skinFig.state.cur ? +skinFig.state.curT.toFixed(2) : null,
+      held: +show.held.toFixed(2), leg: show.leg, shed: show.shed,
       wet: +show.wet.toFixed(2), lock: +show.lock.toFixed(1),
       hit: +show.hit.toFixed(2), spin: show.spin,
       soak: +show.soak.toFixed(1), burn: +show.burn.toFixed(2),
