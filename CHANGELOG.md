@@ -8,7 +8,7 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
-## [Unreleased]
+## [1.51.0] — 2026-08-12
 
 ### Fixed — the ceiling was in front of the near plane
 
