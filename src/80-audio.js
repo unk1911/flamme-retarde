@@ -1230,6 +1230,150 @@ function buildAudio() {
     if (n.w) n.w.gain.setTargetAtTime(0.12 + 0.55 * (1 - t), t0, 0.5);
   }
 
+  // ── the transistor set in the kabina ───────────────────────────────────────
+  /**
+   * A song out of a small speaker, and the only music in this game that is not
+   * four men from Šolta.
+   *
+   * Synthesised rather than sampled, which here is not the compromise it sounds
+   * like. What makes a set like this recognisable is almost none of it being
+   * the music: it is a 60 mm paper cone in a plastic box, so there is no bottom
+   * below about 350 Hz and no top above about 3 kHz, everything arrives a
+   * little squared off, and under all of it sits the hiss of a station that is
+   * forty kilometres away across a channel. All of that is filter and noise —
+   * put a real recording through it and you would hear a real recording with a
+   * telephone on it. Built out of oscillators, the band limit *is* the timbre.
+   *
+   * Three stations, because the tuning knob has to be worth turning. They are
+   * the three things actually coming out of the air over this coast in August:
+   * a klapa, a brass-and-accordion dance number, and something slow at the far
+   * end of the dial that is mostly carrier.
+   */
+  const DIAL = [
+    // [pointer 0..1, seconds a step, [semitones from A3, ...], sustain, timbre]
+    // A klapa in thirds. Slow, dorian-ish, and the melody is the lower voice —
+    // which is the thing that makes klapa sound like klapa and not like a choir.
+    { f: 0.22, step: 0.46, wave: 'triangle', hold: 0.92, third: 3,
+      notes: [0, 3, 5, 3, 0, -2, 0, null, 5, 7, 8, 7, 5, 3, 5, null] },
+    // Two-four, off the beat, and the seventh in the second bar is the whole
+    // reason it reads as this coast rather than as any other seaside.
+    { f: 0.53, step: 0.19, wave: 'square', hold: 0.55, third: 4,
+      notes: [12, null, 10, 12, 8, null, 7, 8, 5, null, 7, 8, 10, 8, 7, 5,
+        12, null, 15, 14, 12, 10, 8, 10, 7, null, 8, 7, 5, null, null, null] },
+    // The far end of the band: fewer notes, more air between them.
+    { f: 0.81, step: 0.62, wave: 'sine', hold: 1.20, third: 7,
+      notes: [7, null, 5, null, 3, 5, 3, null, 0, null, -4, null, 0, null, null, null] },
+  ];
+  const RADIO = {
+    near: 2.5,           // m — inside this you are standing over it
+    fade: 22,            // and past this the promenade has taken it
+    gain: 0.075,
+    hiss: 0.020,
+  };
+  let radioNodes = null, radioStep = 0, radioAt = 0, radioOn = false, radioBand = 0;
+
+  /** The set's own front end: hiss, band limit, and the gain the room hears. */
+  function radioRig() {
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 1150; bp.Q.value = 0.62;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 340;
+    const g = ctx.createGain();
+    g.gain.value = 0.0001;
+    bp.connect(hp).connect(g).connect(bed);
+    if (verbSend) { const w = ctx.createGain(); w.gain.value = 0.22; g.connect(w).connect(verbSend); }
+    // Station hiss, on its own path so it survives the gaps between notes —
+    // silence between phrases is the tell that a radio is a sound effect.
+    const ns = ctx.createBufferSource();
+    ns.buffer = noiseBuf; ns.loop = true;
+    const nf = ctx.createBiquadFilter();
+    nf.type = 'bandpass'; nf.frequency.value = 2100; nf.Q.value = 0.8;
+    const ng = ctx.createGain();
+    ng.gain.value = RADIO.hiss;
+    ns.connect(nf).connect(ng).connect(bp);
+    ns.start();
+    return { bp, hp, g, ng };
+  }
+
+  /** One note, two voices, out of a paper cone. */
+  function radioNote(bus, at, semi, dur, wave, third) {
+    // Off E4 rather than off A3. A 60 mm cone with a 340 Hz highpass in front
+    // of it throws most of an A3 away, and a tune whose root note is the one
+    // you cannot hear is a tune that sounds broken rather than small.
+    const f0 = 330 * Math.pow(2, semi / 12);
+    for (const [mul, amp] of [[1, 0.5], [Math.pow(2, third / 12), 0.30]]) {
+      const o = ctx.createOscillator();
+      o.type = wave;
+      o.frequency.value = f0 * mul;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(amp, at + 0.02);
+      g.gain.setValueAtTime(amp, at + dur * 0.55);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+      o.connect(g).connect(bus);
+      o.start(at);
+      o.stop(at + dur + 0.05);
+    }
+  }
+
+  /**
+   * @param on    is the set alight
+   * @param band  which station, indexing DIAL
+   * @param d     metres from the listener to it, or null for out of the room
+   */
+  function radioTune(on, band, d) {
+    if (!ctx || !bed) return;
+    if (!radioNodes) {
+      if (!on) return;
+      radioNodes = radioRig();
+      radioAt = ctx.currentTime;
+    }
+    const t0 = ctx.currentTime;
+    if (band !== radioBand) { radioBand = band; radioStep = 0; radioAt = t0 + 0.06; }
+    radioOn = on;
+    const amp = on && d != null
+      ? RADIO.gain * sat((RADIO.fade - d) / (RADIO.fade - RADIO.near))
+      : 0.0001;
+    radioNodes.g.gain.setTargetAtTime(Math.max(amp, 0.0001), t0, 0.10);
+    // Through a doorway and down a row of huts it loses its top before it loses
+    // its level, which is why you hear that there is a radio on before you hear
+    // what it is playing.
+    const t = d == null ? 0 : sat((RADIO.fade - d) / (RADIO.fade - RADIO.near));
+    radioNodes.bp.frequency.setTargetAtTime(620 + 700 * t, t0, 0.2);
+  }
+
+  /** The station click and the heterodyne squeal of the knob being turned. */
+  function radioClick(up) {
+    if (!ctx || !bed) return;
+    const t0 = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(up ? 900 : 2600, t0);
+    o.frequency.exponentialRampToValueAtTime(up ? 2800 : 700, t0 + 0.34);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.030, t0 + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.40);
+    o.connect(g).connect(bed);
+    o.start(t0); o.stop(t0 + 0.45);
+  }
+
+  /** Keep the sequencer a quarter of a second ahead of the speaker. */
+  function radioTick() {
+    if (!ctx || !radioNodes || !radioOn) return;
+    const D = DIAL[radioBand];
+    const now = ctx.currentTime;
+    if (radioAt < now) radioAt = now + 0.02;
+    while (radioAt < now + 0.25) {
+      const n = D.notes[radioStep % D.notes.length];
+      if (n != null) {
+        radioNote(radioNodes.bp, radioAt, n, D.step * D.hold, D.wave, D.third);
+      }
+      radioStep++;
+      radioAt += D.step;
+    }
+  }
+
   /**
    * Cicadas. Thirty summers of them, and the sound of every August afternoon
    * on this coast — band-passed noise, amplitude-modulated at the wingbeat.
@@ -1625,6 +1769,7 @@ function buildAudio() {
     // is over, and it has nothing to say about whether somebody on a promenade
     // two kilometres away is dancing.
     fireTick(dt);
+    radioTick();
     // `dead` means your aeroplane is over. It used to mean the mixer was
     // switched off, and conflating those two is the whole of "the water only
     // hisses if I arrive by the 9 key".
@@ -1775,7 +1920,9 @@ function buildAudio() {
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, beep, setVolume, getVolume,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa,
-    firestarter, slowmo,
+    firestarter, slowmo, radioTune, radioClick,
+    /** Where the pointer sits for each station, so the dial can be drawn. */
+    radioDial: () => DIAL.map((d) => d.f),
     /**
      * For a test: what every continuous bed is *actually* playing at.
      *

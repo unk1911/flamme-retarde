@@ -65,7 +65,12 @@ const JAD = {
 
   cabW: 2.15,              // one cabin's frontage
   cabD: 2.90,              // and its depth
-  cabH: 2.18,              // wall height at the eaves
+  // Wall height at the eaves. 2.18 was short by a quarter of a metre and it
+  // showed the moment the facade got a real door in it: a 1.98 m opening with a
+  // vent over it needs 2.4 m of wall, and at 2.18 there was nowhere to put the
+  // vent that was not through the roof. It is also why the row read as sheds —
+  // a kabina is a small building, not a low one.
+  cabH: 2.44,
   cabRise: 0.62,           // ridge above the eaves
   cabEave: 0.26,           // overhang
   plinth: 0.22,            // the concrete pad the rows stand on
@@ -482,15 +487,41 @@ async function buildJadrija(scene) {
   }
 
   // ── the kabine ─────────────────────────────────────────────────────────────
-  // Faded to what a century of salt and August does to paint. The rows are not
-  // uniform in life and must not be here: a run of identical huts is a texture,
-  // and what you actually see at Jadrija is one long stripe of mismatched
-  // colours under a single roofline.
+  //
+  // The wall is white and the doors are not.
+  //
+  // This had it exactly backwards for a while: every hut was a coloured box
+  // with a darker rectangle on the front, so the run read as a stripe of pastel
+  // sheds. It is not. A run of kabine is one long whitewashed masonry wall —
+  // limewash over rough render, patched and re-patched, grey at the bottom
+  // where the winter sea gets at it — with a row of doors cut into it, and the
+  // doors are the only colour in the thing. Yellow, orange, cobalt, bottle
+  // green, oxide red, one to a family, repainted whenever somebody gets round
+  // to it. That is the whole picture: white wall, coloured doors, and a vent
+  // slot over each one because a sealed box full of wet towels in August is a
+  // box nobody opens twice.
+  //
+  // So `CAB` is the *door* palette now, and it is saturated on purpose. These
+  // are the only strong colours anywhere on the promenade and they have to
+  // carry a hundred metres of white wall between them.
   const CAB = [
-    [0.855, 0.845, 0.795], [0.700, 0.760, 0.740], [0.795, 0.735, 0.585],
-    [0.610, 0.685, 0.730], [0.840, 0.780, 0.720], [0.690, 0.650, 0.570],
-    [0.775, 0.690, 0.630], [0.650, 0.710, 0.650], [0.880, 0.870, 0.845],
+    [0.855, 0.660, 0.115], [0.760, 0.290, 0.135], [0.150, 0.345, 0.660],
+    [0.155, 0.375, 0.235], [0.605, 0.155, 0.125], [0.415, 0.610, 0.725],
+    [0.130, 0.430, 0.425], [0.715, 0.510, 0.170], [0.235, 0.290, 0.360],
   ];
+  /**
+   * And the limewash. Barely different from each other — this is one wall, not
+   * nine — but not identical either: a hut gets re-rendered when its own owner
+   * gets round to it, so the patch is a shade off whatever is next to it and
+   * stays that way for twenty years. Picked off the bay index rather than out
+   * of `rng`, so adding it moves nothing else on the beach.
+   */
+  const WASH = [
+    [0.955, 0.945, 0.918], [0.925, 0.917, 0.893], [0.972, 0.962, 0.937],
+    [0.905, 0.900, 0.882], [0.940, 0.926, 0.895],
+  ];
+  const washAt = (k) => WASH[((k * 7 + ((k * k) >> 1)) % WASH.length + WASH.length)
+    % WASH.length];
   const ROOFS = [[0.385, 0.372, 0.350], [0.430, 0.252, 0.180], [0.345, 0.338, 0.326]];
   const TRIM = [0.340, 0.300, 0.252];
 
@@ -513,6 +544,21 @@ async function buildJadrija(scene) {
    * you conclude is shut.
    */
   const KAB = {
+    // Two bays of the row wide, and that is the fix for standing in it and
+    // feeling like a giant. One bay is 2.15 m, which leaves 1.89 m of interior
+    // and — once `confine` has held you 0.22 m off each wall and the cot has
+    // taken 0.70 m of the middle — a walkway 0.77 m across. Measured, not
+    // guessed: you were edging down a gap narrower than your own shoulders
+    // with your eye 1.62 m up in a 2.10 m box, which is not a room you are in,
+    // it is a wardrobe you are stuck in.
+    //
+    // Two bays is 4.30 m of frontage, 4.04 m of interior and a walkway of 2.78
+    // m with everything pushed out against the walls where it belongs. It also
+    // costs the row nothing it cannot afford: a hundred huts with one double
+    // unit in them is what every one of these rows actually looks like, and
+    // the one that is twice as wide being the one with the sign over it is a
+    // second, quieter way of finding the door.
+    bays: 2,
     depth: 5.40,           // how far back it goes from the seaward face
     door: 1.45,            // clear width of the opening
     head: 1.98,            // and its head height above the floor
@@ -549,6 +595,199 @@ async function buildJadrija(scene) {
   const solid = (t, s, a, c, h) => furniture.push({ t, s, a, c, h, y: 0 });
 
   /**
+   * How a hut is finished.
+   *
+   * Limewash over render, which is flat — and a flat white wall 350 m long is a
+   * slab. What actually breaks it up on the real thing is not relief, it is
+   * *tone*: the render is patched in rectangles a shade off their neighbours,
+   * and the bottom half-metre is grey with salt and shoe-black. Both are drawn
+   * as paint rather than as geometry standing proud, because 5 mm of proud
+   * render is invisible at any range that matters and the tone is not.
+   *
+   * Three boxes to a bay. The old board-and-batten took twelve and was wrong
+   * anyway: these are masonry.
+   */
+  const shade = (col, k) => [col[0] * k, col[1] * k, col[2] * k];
+  function plaster(a, front, floor, eave, col, k, dc, half) {
+    const c = a + JAD.cabW, h = (half || DOORW * 0.5) + 0.075;
+    // The skirt. Not a plinth and not a moulding — just the strip of wall that
+    // gets splashed, kicked and scrubbed, so it reads greyer and slightly warm.
+    boxTS(a, c, front - 0.006, front - 0.001,
+      floor, floor + 0.46, [col[0] * 0.900, col[1] * 0.908, col[2] * 0.908]);
+    // A patch of newer render, and the line where the last one stopped. Kept
+    // clear of the opening and kept *quiet*: at four per cent off its
+    // surroundings the first version read as sheets of paper taped to the wall.
+    // Rendering patches are a tone, not a poster. Sized and placed off the bay
+    // index rather than out of `rng`, so nothing here moves the beach.
+    const side = (k % 2) ? [dc + h, c - 0.06] : [a + 0.06, dc - h];
+    const w = Math.min(0.42 + 0.26 * ((k * 5) % 4) / 3, side[1] - side[0] - 0.04);
+    if (w > 0.20) {
+      const x = side[0] + ((k * 3) % 3) * 0.11;
+      const y = floor + 0.62 + 0.22 * ((k * 11) % 3);
+      boxTS(x, Math.min(x + w, side[1]), front - 0.010, front - 0.002,
+        y, y + 0.34 + 0.22 * ((k * 7) % 3), shade(col, k % 2 ? 1.014 : 0.985));
+    }
+    // And the shadow the eave throws down the wall, which on a white wall in
+    // August is the strongest line on the building. In two runs either side of
+    // the opening: drawn straight across it stands proud of the vent and puts a
+    // white bar through the one dark thing on the facade.
+    for (const [t0, t1] of [[a, dc - h], [dc + h, c]]) {
+      if (t1 - t0 > 0.02) {
+        boxTS(t0, t1, front - 0.008, front - 0.001, eave - 0.22, eave,
+          shade(col, 0.885));
+      }
+    }
+  }
+
+  /**
+   * A door, shut, in its hole.
+   *
+   * The thing that makes these read is that the door is *behind* the wall
+   * plane, not painted on it: the opening is a reveal 60 mm deep, the leaf
+   * hangs at the back of it, and what you actually see from down the row is a
+   * coloured rectangle with a hard shadow up one side of it. Two styles, both
+   * off the reference: louvred, which is most of them, and planked, which is
+   * the rest. Louvres are horizontal slats at alternating depth — `boxTS`
+   * cannot lean, and a slat that cannot lean has to sell itself on the shadow
+   * between it and the one below.
+   */
+  const DOORW = 0.90, DOORH = 1.98;
+  const REVEAL = 0.09;             // how deep the opening is cut into the render
+  function door(dc, front, floor, col, louvred) {
+    const h = DOORW * 0.5;
+    // No hole is cut here — `frontSkin` did that, and it is why any of this is
+    // visible at all. The first version of this drew the leaf at `front + 0.04`
+    // inside a wall that ran from `front` to the back of the hut, which is to
+    // say it drew a door in the middle of a solid block of masonry: what came
+    // out was a row of white walls with coloured picture frames on them.
+    const face = front + 0.045;
+    boxTS(dc - h + 0.012, dc + h - 0.012, face, face + 0.032,
+      floor + 0.010, floor + DOORH - 0.010, shade(col, 0.90));
+    // Stiles up both edges, standing a little proud of whatever fills between
+    // them. Every real one of these has them and they are what stops a louvred
+    // door reading as a radiator.
+    for (const o of [-1, 1]) {
+      boxTS(dc + o * (h - 0.012) - o * 0.075, dc + o * (h - 0.012),
+        face - 0.014, face + 0.032, floor + 0.010, floor + DOORH - 0.010, col);
+    }
+    if (louvred) {
+      const n = 12, y0 = floor + 0.08, y1 = floor + DOORH - 0.08;
+      const sp = (y1 - y0) / n;
+      for (let i = 0; i < n; i++) {
+        const y = y0 + i * sp;
+        // Alternating depth, and alternating tone with it: the near edge of a
+        // slat catches the sun and the throat under it does not.
+        boxTS(dc - h + 0.082, dc + h - 0.082, face - (i % 2 ? 0.019 : 0.009), face,
+          y + 0.004, y + sp - 0.010, shade(col, i % 2 ? 1.08 : 0.84));
+      }
+    } else {
+      // Planked: five boards up the leaf with a seam between each, and two
+      // ledges across them, which is how a door like this is actually made.
+      const n = 5, sp = (DOORW - 0.164) / n;
+      for (let i = 0; i < n; i++) {
+        const x = dc - h + 0.082 + i * sp;
+        boxTS(x + 0.006, x + sp - 0.006, face - 0.012, face,
+          floor + 0.045, floor + DOORH - 0.045, shade(col, i % 2 ? 1.05 : 0.95));
+      }
+      for (const y of [floor + 0.34, floor + DOORH - 0.42]) {
+        boxTS(dc - h + 0.075, dc + h - 0.075, face - 0.019, face - 0.010,
+          y, y + 0.105, shade(col, 1.10));
+      }
+    }
+  }
+
+  /**
+   * The architrave, and the reason the door is a hole and not a sticker: a band
+   * of paint on the render round the opening, in the door's own colour. Whoever
+   * painted the door had the tin open and did the frame with it. It is also the
+   * only thing tying the door to the vent above it.
+   */
+  function surround(dc, front, floor, col, half, head) {
+    const m = 0.055;
+    for (const o of [-1, 1]) {
+      boxTS(dc + o * half, dc + o * (half + m), front - 0.007, front - 0.001,
+        floor, head + m, shade(col, 0.92));
+    }
+    boxTS(dc - half - m, dc + half + m, front - 0.007, front - 0.001,
+      head, head + m, shade(col, 0.92));
+  }
+
+  /**
+   * The vent over the door. Every kabina on this shore has one and it is the
+   * detail that says *changing hut* rather than *shed*: a slot the width of the
+   * door, a painted frame round it, and a few bars across it. Behind the bars
+   * is the same nothing the door has behind it.
+   */
+  const VENTH = 0.235;
+  function vent(dc, front, y0, w, col) {
+    const h = w * 0.5, hh = VENTH;
+    // Frame: a lintel over and a sill under, in the door's colour.
+    for (const [a0, a1] of [[y0 - 0.045, y0], [y0 + hh, y0 + hh + 0.045]]) {
+      boxTS(dc - h - 0.045, dc + h + 0.045, front - 0.030, front - 0.001, a0, a1,
+        shade(col, 0.88));
+    }
+    for (const o of [-1, 1]) {
+      boxTS(dc + o * h, dc + o * (h + 0.045), front - 0.030, front - 0.001,
+        y0, y0 + hh, shade(col, 0.88));
+    }
+    // And the grille, which on half of them is chicken wire and on the other
+    // half is three bits of bar. Three bits of bar.
+    const GRILLE = [0.255, 0.245, 0.230];
+    for (let i = 1; i <= 3; i++) {
+      const x = dc - h + (w * i) / 4;
+      boxTS(x - 0.011, x + 0.011, front - 0.008, front + 0.012, y0, y0 + hh, GRILLE);
+    }
+  }
+
+  /**
+   * The seaward render, with the opening cut out of it.
+   *
+   * A hut is a solid box and you cannot recess anything into a solid box —
+   * whatever you draw inside it is inside it. So the body is set back by the
+   * depth of the reveal and the face is rebuilt as three panels around the
+   * hole, which costs two boxes a bay and buys the one thing the facade was
+   * missing: a door with a wall in front of its edges, throwing a hard shadow
+   * down one jamb all morning.
+   *
+   * The hole runs the full height of the joinery — door, transom rail and vent
+   * together — because that is one opening with a rail across it in every
+   * building of this kind, and because cutting two holes costs four more panels
+   * for a rail that is 120 mm tall.
+   */
+  const OPENH = 2.335;             // door, rail and vent, floor to head
+  function frontSkin(a, c, dc, front, floor, eave, wash) {
+    const h = DOORW * 0.5, y1 = floor + OPENH;
+    boxTS(a, dc - h, front, front + REVEAL, floor, eave, wash);
+    boxTS(dc + h, c, front, front + REVEAL, floor, eave, wash);
+    boxTS(dc - h, dc + h, front, front + REVEAL, y1, eave, wash);
+    // And the dark at the back of it. Behind this is the body of the hut, which
+    // is white, and a white rectangle behind a louvred door is a lightbox.
+    boxTS(dc - h - 0.02, dc + h + 0.02, front + REVEAL - 0.006, front + REVEAL,
+      floor, y1, [0.045, 0.041, 0.038]);
+  }
+
+  /**
+   * The ironmongery. Three boxes and a plate, and the reason a door in this row
+   * stops being a dark rectangle painted on a wall: hinges give it a side it
+   * opens from, and a hasp gives it an owner who locks it.
+   *
+   * `depth` is how far back in the reveal the leaf hangs, so the hardware lands
+   * on the door rather than floating in front of the wall.
+   */
+  function doorKit(dc, front, floor, half, depth) {
+    const IRON = [0.190, 0.178, 0.166];
+    const f = front + depth;
+    for (const y of [floor + 0.42, floor + 1.62]) {
+      boxTS(dc - half + 0.03, dc - half + 0.20, f - 0.021, f - 0.004, y, y + 0.075, IRON);
+    }
+    // Hasp and staple on the swinging side, at the height a hand finds it.
+    boxTS(dc + half - 0.20, dc + half - 0.05, f - 0.024, f - 0.004,
+      floor + 1.00, floor + 1.07, IRON);
+    boxTS(dc + half - 0.13, dc + half - 0.09, f - 0.061, f - 0.022,
+      floor + 0.99, floor + 1.09, IRON);
+  }
+
+  /**
    * One run of joined huts: individual boxes so each can be its own colour, one
    * continuous roof over the lot, and a door on every seaward face. Joined is
    * how they are built — a party wall each side and a gable only at the ends —
@@ -575,26 +814,43 @@ async function buildJadrija(scene) {
     // Costs no draw of `rng` either way, so the rest of the beach comes out of
     // the seed exactly as it did before there was a door in it anywhere.
     const sk = front === JAD.rowA && !special && t0 > gapAt
-      ? Math.min(KAB.nth, n - 1) : -1;
+      ? Math.min(KAB.nth, n - KAB.bays) : -1;
     for (let k = 0; k < n; k++) {
       const a = t0 + k * JAD.cabW, c = a + JAD.cabW;
       const col = CAB[Math.floor(rng() * CAB.length)];
+      const wash = washAt(k + (t0 | 0));
       // Drawn after the colour is picked and not before, so the special one
       // takes its own colour out of the same sequence its neighbours do.
-      if (k === sk) { kabina(a, c, front, y0, eave, ridge, col, roofCol); continue; }
-      boxTS(a + 0.03, c - 0.03, front, back, y0 + JAD.plinth, eave, col);
-      // Door: a frame proud of the face and a dark panel inside it, rather than
-      // a black rectangle painted on the wall. Two boxes, and it is the
-      // difference between a hut and a texture of a hut.
+      if (k === sk) {
+        // Two bays, not one — see the note on the width in `KAB`. The second
+        // bay's colour is still drawn and then thrown away, so everything
+        // downstream comes out of the seed exactly where it did when this hut
+        // was half the size: the beach behind it does not move because a room
+        // in front of it got bigger.
+        for (let i = 1; i < KAB.bays; i++) rng();
+        kabina(a, a + JAD.cabW * KAB.bays, front, y0, eave, ridge, col, wash, roofCol);
+        k += KAB.bays - 1;
+        continue;
+      }
+      // One wall, not n boxes with grooves between them. They touch: the party
+      // faces end up coincident inside the masonry where nothing can see them,
+      // and the alternative is a 30 mm black slot every 2.15 m down a wall that
+      // in life is continuous render from one end of the run to the other.
       const dc = (a + c) * 0.5;
-      boxTS(dc - 0.50, dc + 0.50, front - 0.075, front - 0.005,
-        y0 + JAD.plinth, y0 + JAD.plinth + 2.00, TRIM);
-      boxTS(dc - 0.42, dc + 0.42, front - 0.045, front - 0.020,
-        y0 + JAD.plinth + 0.04, y0 + JAD.plinth + 1.92,
-        [col[0] * 0.62, col[1] * 0.56, col[2] * 0.50]);
-      // A louvre over the door, because these things have to breathe.
-      boxTS(dc - 0.26, dc + 0.26, front - 0.06, front - 0.02,
-        eave - 0.30, eave - 0.13, TRIM);
+      const fl = y0 + JAD.plinth;
+      boxTS(a, c, front + REVEAL, back, fl, eave, wash);
+      frontSkin(a, c, dc, front, fl, eave, wash);
+      plaster(a, front, fl, eave, wash, k + (t0 | 0), dc);
+      // Louvred or planked, two thirds to one — off the bay index, not `rng`,
+      // so the beach behind it stays where the seed put it.
+      door(dc, front, fl, col, (k * 5 + (t0 | 0)) % 3 !== 0);
+      doorKit(dc, front, fl, DOORW * 0.5, 0.045);
+      // The rail between the door head and the vent, filling the last of the
+      // opening. Painted with the door, because it was.
+      boxTS(dc - DOORW * 0.5, dc + DOORW * 0.5, front + 0.010, front + REVEAL,
+        fl + DOORH, fl + OPENH - VENTH, shade(col, 0.86));
+      vent(dc, front, fl + OPENH - VENTH, DOORW - 0.06, col);
+      surround(dc, front, fl, col, DOORW * 0.5, fl + OPENH + 0.045);
     }
     // One roof: two slopes to a ridge running along the row, with an overhang
     // and a fascia under it so the eave has a shadow line.
@@ -625,7 +881,11 @@ async function buildJadrija(scene) {
       // `confine` inflates it, and the two of them between them close 1.10 m of
       // a 1.45 m doorway from the outside — a door you can see through and
       // cannot walk through, which is the worst of both.
-      const a = t0 + sk * JAD.cabW, c = a + JAD.cabW;
+      // Both bays of it — the hut is `KAB.bays` wide and the neighbour on the
+      // far side starts after the second one. Left at a single bay this ran a
+      // solid blocker up the middle of the room, and the right-hand half of a
+      // 4 m floor was a wall you could see across and not walk across.
+      const a = t0 + sk * JAD.cabW, c = a + JAD.cabW * KAB.bays;
       if (a > t0) {
         runs.push({ t0: t0 - 0.5, t1: a - SNUG, s0: front - 0.55, s1: back + 0.45,
           y: y0, h });
@@ -667,19 +927,20 @@ async function buildJadrija(scene) {
    * second, inverted shell inset by the wall thickness, so the boards you see
    * from the cot are boards and not the back of the siding.
    *
-   * It keeps its neighbours' facade exactly: same width, same plinth, same
-   * eave, same door frame proud of the face, same colour out of the same table.
-   * What it does not keep is the back wall — it runs 5.4 m into the alley,
-   * which is dead ground between the rows, under a lean-to hung off the run's
-   * rear eave. From the promenade the only thing wrong with it is the sign.
+   * It keeps its neighbours' facade exactly: same limewash, same plinth, same
+   * eave, same painted architrave round the opening, same vent over it, and its
+   * colour comes off the same table theirs does. What it does not keep is the
+   * back wall — it runs 5.4 m into the alley, which is dead ground between the
+   * rows, under a lean-to hung off the run's rear eave. From the promenade the
+   * only thing wrong with it is the sign and the fact that the door is missing.
    */
-  function kabina(a, c, front, y0, eave, ridge, col, roofCol) {
+  function kabina(a, c, front, y0, eave, ridge, col, wash, roofCol) {
     const floor = y0 + JAD.plinth;
     const s1 = front + KAB.depth;
     const dc = (a + c) * 0.5;
     const dj = KAB.door * 0.5;
-    const wl = a + 0.03, wr = c - 0.03;      // the siding, flush with the row
-    const dark = [col[0] * 0.30, col[1] * 0.25, col[2] * 0.21];
+    const wl = a, wr = c;                    // the render, continuous with the row
+    const dark = [wash[0] * 0.30, wash[1] * 0.25, wash[2] * 0.21];
 
     // The pad carries on under the annex. In the deck buffer with the rest of
     // the concrete, or it picks up the hut bounce and reads as a lit rectangle
@@ -692,22 +953,44 @@ async function buildJadrija(scene) {
     const top = floor + KAB.ceil;
     const w = KAB.wall;
     // Sides, back, and the two jambs. The lintel closes the wall over the door.
-    boxTS(wl, wl + w, front, s1, floor, eave, col);
-    boxTS(wr - w, wr, front, s1, floor, eave, col);
-    boxTS(wl, wr, s1 - w, s1, floor, eave, col);
-    boxTS(wl, dc - dj, front, front + w, floor, eave, col);
-    boxTS(dc + dj, wr, front, front + w, floor, eave, col);
-    boxTS(dc - dj, dc + dj, front, front + w, floor + KAB.head, eave, col);
-    // And the frame, the one detail that says hut on every other door in the
-    // row. Three strips and not a panel: on every other hut the frame is filled
-    // in, because on every other hut what is inside it is a painted door. Fill
-    // this one and the only opening at Jadrija is boarded over.
-    for (const o of [-1, 1]) {
-      boxTS(dc + o * dj, dc + o * (dj + 0.10), front - 0.075, front - 0.005,
-        floor, floor + KAB.head + 0.10, TRIM);
+    boxTS(wl, wl + w, front, s1, floor, eave, wash);
+    boxTS(wr - w, wr, front, s1, floor, eave, wash);
+    boxTS(wl, wr, s1 - w, s1, floor, eave, wash);
+    boxTS(wl, dc - dj, front, front + w, floor, eave, wash);
+    boxTS(dc + dj, wr, front, front + w, floor, eave, wash);
+    // Over the opening: the rail, then the vent's own hole, then the wall over
+    // it. Four panels rather than one, for the same reason the plain huts get
+    // three — a vent drawn on unbroken masonry is a grille in front of a white
+    // wall, which is a lightbox with bars on it.
+    const vh = KAB.door * 0.62 * 0.5;
+    const v0 = floor + OPENH - VENTH, v1 = floor + OPENH;
+    boxTS(dc - dj, dc + dj, front, front + w, floor + KAB.head, v0, wash);
+    boxTS(dc - dj, dc - vh, front, front + w, v0, v1, wash);
+    boxTS(dc + vh, dc + dj, front, front + w, v0, v1, wash);
+    boxTS(dc - dj, dc + dj, front, front + w, v1, eave, wash);
+    // The vent opens into the void over the ceiling, not into the room, so it
+    // needs its own back or it is a slot with the roof timbers behind it.
+    boxTS(dc - vh - 0.02, dc + vh + 0.02, front + w, front + w + 0.008, v0, v1,
+      [0.045, 0.041, 0.038]);
+    // Rendered and painted exactly like its neighbours, which is the whole
+    // trick: from fifty metres down the row this is a hut with its door taken
+    // off, not a set piece. The one thing that is not the same is that the
+    // architrave has nothing inside it.
+    //
+    // There used to be a shuttered window either side of the opening here, on
+    // the reasoning that a double kabina would have one. It would not. Every
+    // one of these on this shore is a blind box with a door and a vent in it —
+    // a window is somewhere for the beach to look in, which is the one thing a
+    // changing hut is for not having.
+    for (let i = 0; i < KAB.bays; i++) {
+      // Both bays measure their clear wall from the *hut's* opening, which is
+      // in the middle of the pair rather than in the middle of either — so on
+      // each bay one of the two clear runs comes out empty and is skipped.
+      plaster(a + i * JAD.cabW, front, floor, eave, wash, i * 3 + (a | 0), dc, dj);
     }
-    boxTS(dc - dj - 0.10, dc + dj + 0.10, front - 0.075, front - 0.005,
-      floor + KAB.head, floor + KAB.head + 0.10, TRIM);
+    doorKit(dc, front, floor, dj, 0.040);
+    vent(dc, front, floor + 2.10, KAB.door * 0.62, col);
+    surround(dc, front, floor, col, dj, floor + 2.38);
 
     // Inside. Everything from here is seen only from within, and is dark
     // because no light gets into a wooden box with one door in it — which is
@@ -750,8 +1033,40 @@ async function buildJadrija(scene) {
       W(wr + 0.16, r0, eave - 0.08), W(wl - 0.16, r0, eave - 0.08),
       [0.145, 0.135, 0.125]);
 
+    // ── what you cannot walk through ──────────────────────────────────────
+    //
+    // Published from here, as rectangles rather than as boxes, because the
+    // collision has to be the same shape as the room and the room is going to
+    // change shape again. Each entry is the region in (t, s) you must not be
+    // able to stand in; `blockers` takes `GROUND.girth` back off so that
+    // `confine` adds it again to the same answer.
+    //
+    // `HOLD` is how close the boards let you stand, and it is 0.22 rather than
+    // the 0.55 everything else on this shore holds you off at: a room 1.89 m
+    // across with half a metre held off each wall is not a room, it is a slot.
+    //
+    // `REACH` is the one that was missing and it is the whole of "I can walk
+    // through the back wall and end up on the other side of it". A wall 10 cm
+    // thick with 0.22 of hold-off either side is a barrier 0.54 m deep, and
+    // behind this one is the open alley: at six metres a second on a phone
+    // holding fifteen frames, one step is 0.40 m and two is straight through.
+    // The measurement was worse than that even at rest — the far side of the
+    // barrier sat at s 22.82 and the next thing behind it began at 22.90, so
+    // there was a seven-centimetre band you could simply stand in. Every wall
+    // now reaches three quarters of a metre into whatever is behind it, which
+    // for three of them is the solid hut next door and for the back one is a
+    // yard of alley nobody has any business standing in anyway.
+    const HOLD = 0.22, REACH = 0.75;
+    const T0 = wl + w, T1 = wr - w, S0 = front + w, S1 = s1 - w;
     special = {
-      t0: wl + w, t1: wr - w, s0: front + w, s1: s1 - w,
+      t0: T0, t1: T1, s0: S0, s1: S1,
+      shell: [
+        [wl - REACH, T0 + HOLD, front - HOLD, S1 + HOLD],   // left
+        [T1 - HOLD, wr + REACH, front - HOLD, S1 + HOLD],   // right
+        [wl - REACH, wr + REACH, S1 - HOLD, s1 + REACH],    // back
+        [wl - REACH, dc - dj, front - HOLD, S0 + HOLD],     // front, left of the door
+        [dc + dj, wr + REACH, front - HOLD, S0 + HOLD],     // front, right of it
+      ],
       face: front, dc, dj, floor, top, y0, eave,
       // Where you are standing when you are in it, for the audio and the light.
       // A metre of the doorway is included on purpose: the room should have
@@ -1787,17 +2102,23 @@ async function buildJadrija(scene) {
    * Stand the four of them up.
    *
    * Laid out against the two long walls with a walkway down the middle, which
-   * is not a style choice — it is the only layout a room 1.95 m wide has. Only
+   * is not a style choice — it is the only layout a long narrow room has. Only
    * the cot and the television's stand are blockers. The tabouret and the
    * radio table are 40 cm deep against a wall and holding you off them costs
    * more of the walkway than walking into one costs in dignity.
+   *
+   * Every piece is placed off `dc` and so moved outward on its own when the
+   * hut went to two bays. It had to: at one bay the cot sat 0.27 m from the
+   * middle of the floor, because there was no wall to put it against that was
+   * not already touching it. Now the walls are 2.02 m out and the furniture is
+   * on them, which is what leaves 2.78 m of clear floor down the centre.
    */
   function kabinaKit(K) {
     const f = K.floor, dc = K.dc;
     const tv = tvPanel(), radio = radioPanel();
 
     // ── the cot ──
-    const c0 = dc + 0.27, c1 = dc + 0.97, cs0 = 18.55, cs1 = 20.45;
+    const c0 = dc + 1.20, c1 = dc + 1.90, cs0 = 18.55, cs1 = 20.45;
     for (const [t, s] of [[c0 + 0.06, cs0 + 0.07], [c1 - 0.06, cs0 + 0.07],
       [c0 + 0.06, cs1 - 0.07], [c1 - 0.06, cs1 - 0.07]]) {
       post(facing(t, s, 0), 0, 0, f, f + 0.30, 0.022, KIT.steel, 6);
@@ -1822,7 +2143,7 @@ async function buildJadrija(scene) {
       h: 0.5, y: f });
 
     // ── the television, on its stand against the back wall ──
-    const vt = dc - 0.30, vs = 22.10;
+    const vt = dc - 1.10, vs = 22.10;
     for (const o of [[-0.31, -0.15], [0.31, -0.15], [-0.31, 0.15], [0.31, 0.15]]) {
       post(facing(vt + o[0], vs + o[1], 0), 0, 0, f, f + 0.50, 0.028, KIT.dark, 5);
     }
@@ -1858,7 +2179,7 @@ async function buildJadrija(scene) {
     }
 
     // ── the tabouret, and the Pelješac on it ──
-    const bt = dc - 0.76, bs = 18.20;
+    const bt = dc - 1.58, bs = 18.20;
     for (const o of [[-0.11, -0.11], [0.11, -0.11], [-0.11, 0.11], [0.11, 0.11]]) {
       frustum(W, f, [bt + o[0] * 1.34, bs + o[1] * 1.34, 0.016, 0.016],
         f + 0.68, [bt + o[0], bs + o[1], 0.013, 0.013], KIT.dark);
@@ -1910,8 +2231,8 @@ async function buildJadrija(scene) {
     scarf.visible = false;
     scene.add(scarf);
 
-    // ── the radio, on a small table by the head of the cot ──
-    const rt = dc - 0.75, rs = 19.62;
+    // ── the radio, on a small table against the near wall ──
+    const rt = dc - 1.66, rs = 19.90;
     for (const o of [[-0.16, -0.12], [0.16, -0.12], [-0.16, 0.12], [0.16, 0.12]]) {
       post(facing(rt + o[0], rs + o[1], 0), 0, 0, f, f + 0.58, 0.020, KIT.dark, 5);
     }
@@ -1941,10 +2262,14 @@ async function buildJadrija(scene) {
       scene.add(radio.mesh);
     }
 
-    radio.draw(0.30, 0.55);
+    radio.draw(0.30, 0.0);
     tv.draw(null, 0x2545);
     return {
       tv, radio, bottle, scarf,
+      // Where the set is, for the jet to knock the knob on. The table top plus
+      // a hand's width: aiming at a radio means aiming at the thing on the
+      // table, not at the table.
+      set: [rt, rs, ry + 0.02, 0.22, 0.26],
       // Where the bottle lives when nobody is holding it, and where she has to
       // stand to be able to reach it: 0.55 m off it, turned to face it, which
       // is one pace and an arm.
@@ -1989,12 +2314,72 @@ async function buildJadrija(scene) {
   }
 
   let kit = null;
+  /**
+   * The set on the little table, and what it takes to get it going.
+   *
+   * `band` is -1 for a dead radio and an index into the dial otherwise. Water
+   * is the switch. That is not a joke about Croatian wiring: this is a 1960s
+   * valve set that has been sitting in a shut wooden box for thirty summers,
+   * and the one interaction the room offers is a firefighting branch. Give the
+   * player a hose and one thing in the room worth pointing it at, and what they
+   * will do is point it — so the thing has to answer. Each further hit knocks
+   * the tuning knob round to the next station and the last one turns it off,
+   * which makes the knob worth turning more than once.
+   */
+  const SET = { band: -1, lit: 0, cool: 0, near: false };
+  // `audio` is a module-level binding in 90-app.js that is filled in after this
+  // file has already built the resort, so every call through it here is guarded.
+  // The mixer is also the one subsystem allowed to be absent entirely — a
+  // browser that will not give us an AudioContext still gets a beach.
+  const setDial = () => (audio && audio.radioDial ? audio.radioDial()
+    : [0.22, 0.53, 0.81]);
+
+  /**
+   * Where the radio is, for the jet — or nothing, if you are not in the room
+   * with it. The gate is the point: without it the parabola reaches straight
+   * through the seaward wall from the promenade and the one hidden thing at
+   * Jadrija turns itself on for somebody who never found the door.
+   */
+  function radioProbe() {
+    if (!kit || !special || !SET.near) return null;
+    const [rt, rs, ry, r, h] = kit.set;
+    const p = W(rt, rs, ry);
+    return { x: p[0], y: p[1], z: p[2], r, h };
+  }
+
+  /** The jet has found it. */
+  function radioWet() {
+    if (!kit || SET.cool > 0) return;
+    // A branch puts out four hundred litres a minute and `spray` calls this
+    // every frame it is on target, which without a latch is thirty station
+    // changes a second — a knob being spun, not a knob being knocked.
+    SET.cool = 0.85;
+    SET.band = SET.band + 1 >= setDial().length ? -1 : SET.band + 1;
+    if (audio) audio.radioClick(SET.band >= 0);
+  }
+
   function stepKabina(pt, ps, dt) {
     if (!kit || !special) return;
+    const K = special;
+    // Kept outside the near gate below, because a radio you can hear from the
+    // promenade is most of what makes anybody walk over and look through the
+    // door. Only the *aiming* is confined to the room.
+    const [rt, rs] = kit.set;
+    const dr = Math.hypot(pt - rt, ps - rs);
+    SET.near = pt > K.t0 - 1.0 && pt < K.t1 + 1.0
+      && ps > K.face - 0.6 && ps < K.s1 + 0.6;
+    SET.cool = Math.max(0, SET.cool - dt);
+    if (audio) audio.radioTune(SET.band >= 0, Math.max(0, SET.band), dr < 40 ? dr : null);
+    // The dial lamp takes a moment to come up and a moment to die, because a
+    // valve does.
+    const want = SET.band >= 0 ? 1 : 0;
+    if (Math.abs(SET.lit - want) > 0.002) {
+      SET.lit += (want - SET.lit) * Math.min(1, dt * 2.2);
+      kit.radio.draw(setDial()[Math.max(0, SET.band)], SET.lit);
+    }
     // Only while you are in the room, or near enough to see into it. A
     // television redrawing a canvas six times a second on the far side of a
     // shut door is a texture upload nobody is looking at.
-    const K = special;
     if (pt < K.t0 - 3 || pt > K.t1 + 3 || ps < K.face - 4 || ps > K.s1 + 2) return;
     tvAsk -= dt;
     if (tvAsk <= 0) { tvAsk = TVSET.poll; tvFetch(); }
@@ -2298,7 +2683,32 @@ async function buildJadrija(scene) {
 
   function toWorld(t, s) {
     const st = at(t);
-    return [st.x + st.nx * s, surfaceY(t, s), st.z + st.nz * s];
+    return [st.x + st.nx * s, standY(t, s), st.z + st.nz * s];
+  }
+
+  /**
+   * What you stand on at (t, s): the terraces, plus the one floor that is not
+   * one of them.
+   *
+   * The kabine stand on a 0.22 m pad that `surfaceY` knows nothing about, and
+   * for eighty shut huts that was free — you walk past a hut, not into it. One
+   * of them opens now, and everything placed by `toWorld` inside it was placed
+   * 22 cm low: her feet went through the floorboards to the ankle, which is
+   * exactly how deep the pad is.
+   *
+   * Ramped over the half-metre in front of the face rather than stepped,
+   * because a 22 cm pop on the doorstep reads as the floor giving way — and
+   * shared with `walkY` so that the floor she stands on and the floor you stand
+   * on are the same floor. They were not, and only one of them was right.
+   */
+  function standY(t, s) {
+    const y = surfaceY(clamp(t, 0, LEN), s);
+    const K = special;
+    if (K && t > K.t0 - 0.30 && t < K.t1 + 0.30
+        && s > K.face - 0.55 && s < K.s1 + 0.10) {
+      return y + (K.floor - y) * sat((s - (K.face - 0.55)) / 0.55);
+    }
+    return y;
   }
 
   /**
@@ -2311,19 +2721,7 @@ async function buildJadrija(scene) {
     if (t < -5 || t > LEN + 5 || s < -3 || s > JAD.back + JAD.bleed) {
       return Math.max(groundAt(x, z), 0);
     }
-    // The kabine stand on a 0.22 m pad that `surfaceY` knows nothing about,
-    // which never mattered while every one of them was shut: you walk past a
-    // hut, not into it. Now one opens, and without this you cross the threshold
-    // with your feet a hand's breadth under its floor. Ramped over the width of
-    // the pad in front of the face rather than stepped, because a 22 cm pop on
-    // the doorstep reads as the floor giving way.
-    const K = special;
-    if (K && t > K.t0 - 0.30 && t < K.t1 + 0.30
-        && s > K.face - 0.55 && s < K.s1 + 0.10) {
-      const y = surfaceY(clamp(t, 0, LEN), s);
-      return y + (K.floor - y) * sat((s - (K.face - 0.55)) / 0.55);
-    }
-    return surfaceY(clamp(t, 0, LEN), s);
+    return standY(t, s);
   }
 
   const inField = (x, z, pad = 0) => {
@@ -2348,22 +2746,16 @@ async function buildJadrija(scene) {
   // standing or sitting on the concrete.
   for (const f of furniture) blockers.push(f);
 
-  // The special kabina's own four walls, with the doorway left out of the front
-  // one. Every half-extent has `SNUG` taken off it, so these hold you 0.22 m
-  // off instead of 0.55 — see the note on `SNUG`. Nothing else on this shore is
-  // built that way, and nothing else on this shore is a room.
+  // The special kabina's own walls, as the room itself drew them — see `shell`
+  // in `kabina()`. Nothing else on this shore is built this way, and nothing
+  // else on this shore is a room.
   if (special) {
-    const K = special, w = KAB.wall, h = KAB.ceil;
-    const wall = (t, s, a, c) => blockers.push({
-      t, s, a: a - SNUG, c: c - SNUG, h, y: K.y0 });
-    const sm = (K.face + K.s1) * 0.5, sh = (K.s1 - K.face) * 0.5;
-    const tm = (K.t0 + K.t1) * 0.5, th = (K.t1 - K.t0) * 0.5;
-    wall(K.t0 - w * 0.5, sm, w * 0.5, sh);
-    wall(K.t1 + w * 0.5, sm, w * 0.5, sh);
-    wall(tm, K.s1 + w * 0.5, th + w, w * 0.5);
-    for (const o of [-1, 1]) {
-      const j0 = o < 0 ? K.t0 : K.dc + K.dj, j1 = o < 0 ? K.dc - K.dj : K.t1;
-      wall((j0 + j1) * 0.5, K.face + w * 0.5, (j1 - j0) * 0.5, w * 0.5);
+    for (const [t0, t1, s0, s1] of special.shell) {
+      blockers.push({
+        t: (t0 + t1) * 0.5, s: (s0 + s1) * 0.5,
+        a: (t1 - t0) * 0.5 - GROUND.girth, c: (s1 - s0) * 0.5 - GROUND.girth,
+        h: KAB.ceil, y: special.y0,
+      });
     }
   }
 
@@ -4813,6 +5205,12 @@ async function buildJadrija(scene) {
       at: [(special.t0 + special.t1) * 0.5, (special.face + special.s1) * 0.5],
       door: [special.dc, special.face - 1.1],
       face: special.face, back: special.s1, floor: special.floor,
+      // The doorway itself, and the two places the crossing puts you down:
+      // the middle of the floor with the room in front of you, and a stride
+      // out on the concrete with the row in front of you.
+      dc: special.dc, dj: special.dj,
+      standIn: [special.dc, special.face + 2.45],
+      standOut: [special.dc, special.face - 1.40],
     },
     // Where everybody started, as {t, s, y, ang, pose, k, beat}. Kept because a
     // test needs somewhere to point the camera — but note this is the placement
@@ -4955,7 +5353,13 @@ async function buildJadrija(scene) {
     /** Where she is standing, so the back door can put you in front of her. */
     figureAt: testFigure ? testFigure.at : null,
     /** The two ends of the hose hook — 47-ground.js wires them together. */
-    figureProbe, figureWet, dogProbe, dogWet,
+    figureProbe, figureWet, dogProbe, dogWet, radioProbe, radioWet,
+    /** The set on the table: where it is, what it is doing, and knock it on. */
+    radio: (knock) => {
+      if (knock) { SET.cool = 0; radioWet(); }
+      return { band: SET.band, lit: +SET.lit.toFixed(2), near: SET.near,
+        at: kit ? kit.set : null, probe: radioProbe() };
+    },
     /**
      * Drive the promenade forward by hand.
      *

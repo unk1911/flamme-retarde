@@ -259,25 +259,74 @@ function carNearProto() {
   return b.geo();
 }
 
+/**
+ * A parasol, built like one.
+ *
+ * The old one was eight flat triangles from a point down to an octagon — a
+ * cone, and it read as a cone: the silhouette was a straight line from tip to
+ * rim, the rim was a hard polygon, and nothing about it moved as you walked
+ * past. There are nine hundred of these along this shore and they are the
+ * skyline of the whole resort, so they are worth the triangles.
+ *
+ * What a real one is, and what this now has:
+ *
+ *   - **Ribs and fabric.** The canopy is sampled twice per gore — once on the
+ *     rib and once between two of them — and the between-rib samples hang
+ *     lower. That single fact is most of it: the fabric bags between the ribs,
+ *     so the surface is faceted the way stretched cloth is, and the rim comes
+ *     out scalloped instead of straight.
+ *   - **Droop.** Two rings rather than one, with the outer half falling away
+ *     faster than the inner. A parasol is not a cone, it is a curve that starts
+ *     shallow at the hub and turns down at the edge.
+ *   - **A valance.** The strip of cloth that hangs off the rim, swagged deeper
+ *     between the ribs than on them. It is the detail that reads as *parasol*
+ *     at fifty metres, and it is what the silhouette against the sea is made
+ *     of.
+ *   - **A hub, a finial and a six-sided pole**, because a four-sided pole seen
+ *     from the wrong 45° is two faces wide and looks like a plank.
+ *
+ * 110 triangles against the old twelve, instanced nine hundred times off one
+ * draw. The stripe stays: gores alternate light and less light, which under the
+ * per-instance colour is what makes a row of these read as a row rather than as
+ * one long awning.
+ */
 function parasolProto() {
   const b = propBuilder();
   const POLE = [0.55, 0.52, 0.48];
-  const SEG = 8, R = 1.35, y0 = 1.92, y1 = 2.34;
-  for (let i = 0; i < SEG; i++) {
-    const a0 = (i / SEG) * TAU, a1 = ((i + 1) / SEG) * TAU;
-    // Alternate panels, because a parasol is striped and the stripe is the
-    // only thing that makes it read as a parasol rather than a bush.
-    const cl = i % 2 ? [1, 1, 1] : [0.82, 0.82, 0.82];
-    b.tri([0, y1, 0],
-      [Math.cos(a0) * R, y0, Math.sin(a0) * R],
-      [Math.cos(a1) * R, y0, Math.sin(a1) * R], cl);
+  const HUB = [0.42, 0.40, 0.38];
+  const RIBS = 8, N = RIBS * 2, R = 1.35;
+  // Rib line: hub, mid-span, rim. And how far the cloth bags below it between
+  // two ribs at each of those — nothing at the hub, where it is clamped.
+  const RING = [[0.00, 2.34, 0.000], [0.55, 2.13, 0.030], [1.00, 1.86, 0.090]];
+  const VAL = [0.105, 0.215];            // valance drop on a rib, and between two
+  const ang = (j) => (j / N) * TAU;
+  // `j` even is a rib, `j` odd is the slack between two of them.
+  const P = (j, ring) => {
+    const [f, y, sag] = RING[ring];
+    return [Math.cos(ang(j)) * R * f, y - (j % 2 ? sag : 0), Math.sin(ang(j)) * R * f];
+  };
+  const gore = (j) => ((j >> 1) % 2 ? [1, 1, 1] : [0.845, 0.845, 0.845]);
+  for (let j = 0; j < N; j++) {
+    const k = (j + 1) % N, cl = gore(j);
+    b.tri([0, RING[0][1], 0], P(j, 1), P(k, 1), cl);
+    b.quad(P(j, 1), P(k, 1), P(k, 2), P(j, 2), cl);
+    // The valance, hung off the rim it follows. Deeper between the ribs, so the
+    // bottom edge swags where the rim already dips and the scallop doubles.
+    const d0 = VAL[j % 2], d1 = VAL[k % 2];
+    const r0 = P(j, 2), r1 = P(k, 2);
+    b.quad(r0, r1, [r1[0], r1[1] - d1, r1[2]], [r0[0], r0[1] - d0, r0[2]],
+      [cl[0] * 0.90, cl[1] * 0.90, cl[2] * 0.90]);
   }
-  for (let i = 0; i < 4; i++) {
-    const a0 = (i / 4) * TAU, a1 = ((i + 1) / 4) * TAU;
-    b.quad([Math.cos(a0) * 0.05, 0, Math.sin(a0) * 0.05],
-      [Math.cos(a1) * 0.05, 0, Math.sin(a1) * 0.05],
-      [Math.cos(a1) * 0.05, y0, Math.sin(a1) * 0.05],
-      [Math.cos(a0) * 0.05, y0, Math.sin(a0) * 0.05], POLE);
+  // Hub, finial, pole. The hub is what the ribs would be pinned to and the
+  // reason the apex is not a puncture in the cloth.
+  const ring = (j, r, y) => [Math.cos((j / 6) * TAU) * r, y, Math.sin((j / 6) * TAU) * r];
+  for (let j = 0; j < 6; j++) {
+    const k = (j + 1) % 6;
+    b.quad(ring(j, 0.072, 2.16), ring(k, 0.072, 2.16),
+      ring(k, 0.038, 2.31), ring(j, 0.038, 2.31), HUB);
+    b.tri([0, 2.42, 0], ring(j, 0.038, 2.31), ring(k, 0.038, 2.31), HUB);
+    b.quad(ring(j, 0.046, 0), ring(k, 0.046, 0),
+      ring(k, 0.046, 2.20), ring(j, 0.046, 2.20), POLE);
   }
   return b.geo();
 }

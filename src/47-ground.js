@@ -1440,6 +1440,24 @@ async function buildGround(scene, field) {
    * to clear the propellers, the way back in afterwards — assumes there is an
    * aeroplane to step out of and back into. There is not. There is a hillside.
    */
+  /**
+   * Put you somewhere without any of the rest of what `dropIn` means.
+   *
+   * `dropIn` is arriving: it flattens your pitch, drops the branch, and marks
+   * you stranded, all of which are right when the aeroplane has gone and wrong
+   * when you have simply walked through a door. This moves you and nothing
+   * else, so the crossing keeps the heading you walked in on — a cut that also
+   * turns you round is a cut that loses you.
+   */
+  function stepTo(x, z) {
+    if (!active) return false;
+    const [px, pz] = confine(x, z);
+    you.x = px; you.z = pz;
+    you.y = field.walkY(px, pz);
+    you.vx = you.vz = 0;
+    return true;
+  }
+
   function dropIn(x, z, yaw, lost = true) {
     const [px, pz] = confine(x, z);
     you.x = px; you.z = pz;
@@ -1526,7 +1544,7 @@ async function buildGround(scene, field) {
     get active() { return active; },
     get armed() { return armed; },
     update, enter, leave, bail, canEnter, canBoard, look, pose, you,
-    retarget, dropIn, addGuest,
+    retarget, dropIn, stepTo, addGuest,
     /** Whichever locale currently owns you — for a test, and read-only. */
     get field() { return field; },
     get stranded() { return stranded; },

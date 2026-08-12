@@ -142,7 +142,7 @@ async function main() {
   const touchRelease = () =>
     send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 
-  const url = `${URL_BASE}?q=${quality}`;
+  const url = `${URL_BASE}?q=${quality}&cb=${process.pid}`;
   await send('Page.navigate', { url });
 
   const evalJs = async (expr) => {

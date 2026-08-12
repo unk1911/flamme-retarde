@@ -8,6 +8,237 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [Unreleased]
+
+### Fixed — the ceiling was in front of the near plane
+
+You could stand in the middle of the kabina, look up, and see sky through the
+roof. Also sky through the back wall from close enough to it, and a room whose
+walls came and went depending on how near you were standing. The room was not
+leaking: `camera.near` is 1.2 m, which is the right front clip for an aeroplane
+doing 300 km/h and is nonsense for a person standing in a room. Your eye is
+1.66 m up on a floor with a 2.10 m ceiling over it, so the ceiling is 0.44 m
+away — well inside the near plane, thrown away before rasterisation, along with
+the roof behind it, leaving the sky. The same clip ate any wall you stood
+within 1.2 m of, which in a room 4 m across is most of the floor.
+
+Diagnosed by measurement rather than by reading: the ceiling triangles were
+confirmed present in the buffer (30 vertices, five quads, the shell exactly as
+`roomTS` draws it), the mesh confirmed `DoubleSide` and `frustumCulled = false`,
+and the camera confirmed 0.44 m below the ceiling — which left the projection as
+the only thing able to eat a surface that is present, double-sided, unculled and
+in front of you.
+
+The near plane now ramps to 0.06 m on `indoors`, the same 0 → 1 the exposure and
+the klapa already hang off. Ramped rather than switched on being afoot, because
+near/far is a ratio: dropping the near end twenty-fold costs twenty-fold the
+depth resolution at the far end, and at four kilometres that is the difference
+between a town and a town that flickers. Outdoors it stays where the aeroplane
+wants it. Indoors the far end is a doorway 1.45 m wide with the sea in it.
+
+### Fixed — her feet went through the floor
+
+`walkY` knew about the 0.22 m pad the kabine stand on. `toWorld` did not, and
+`toWorld` is what places her, the dog, the tabouret and the bottle — so
+everything the room contains was placed 22 cm low and she stood in it buried to
+the ankle. Both now go through one `standY`, ramped over the half-metre in front
+of the face so the doorstep does not pop. The floor she stands on and the floor
+you stand on are the same floor; they were not, and only one of them was right.
+
+### Changed — the wall is white and the doors are not
+
+The facade had it backwards. Every hut was a coloured box with a darker
+rectangle painted on the front, so a run read as a stripe of pastel sheds. A run
+of kabine is one long whitewashed wall — limewash over render, patched, grey at
+the bottom where the winter sea gets at it — with a row of doors cut into it,
+and the doors are the only colour in the thing.
+
+So `CAB` is the door palette now and it is saturated: yellow, orange, cobalt,
+bottle green, oxide red. The wall is limewash, varied a shade a bay off the bay
+index rather than out of `rng`, so the change moves nothing else on the beach.
+The board-and-batten went in the bin — those are masonry, not planking — and
+what replaces it is tone rather than relief: a scrubbed skirt at the bottom, one
+quiet patch of newer render, and the eave's shadow down the top of the wall.
+
+The doors are the work. Each opening is a real hole: the body of the hut is set
+back by the depth of the reveal and its face is rebuilt as three panels round
+the opening, which costs two boxes a bay and buys a door with a wall in front of
+its edges. The leaf hangs at the back of that reveal — louvred, twelve slats at
+alternating depth, or planked with two ledges, two to one — with stiles up both
+edges, hinges, a hasp, a painted architrave on the render round the opening, and
+a barred vent over the door with the same hole cut behind it. The wall went up
+to 2.44 m at the eave to fit all that: at 2.18 there was nowhere to put a vent
+that was not through the roof, and it is also why the row read as sheds.
+
+The shuttered windows are gone. A double kabina does not have one — a window is
+somewhere for the beach to look in, which is the one thing a changing hut is for
+not having. The one that opens keeps everything else its neighbours have, so
+from down the row it is a hut with its door taken off, not a set piece.
+
+Jadrija: 64,058 → 78,326 triangles.
+
+### Changed — the parasols have ribs
+
+Eight flat triangles from a point down to an octagon is a cone, and it read as
+one: a straight silhouette from tip to rim, a hard polygon edge, and nothing
+that moved as you walked past. There are nine hundred of them and they are the
+skyline of the resort.
+
+The canopy is now sampled twice per gore, once on a rib and once between two of
+them, and the between-rib samples hang lower — so the cloth bags the way
+stretched cloth does and the rim comes out scalloped instead of straight. Two
+rings rather than one, the outer half falling away faster, because a parasol is
+a curve and not a cone. A valance hangs off the rim, swagged deeper between the
+ribs than on them, which is what the silhouette against the sea is made of. A
+hub, a finial, and a six-sided pole — a four-sided pole seen from the wrong 45°
+is two faces wide and looks like a plank.
+
+110 triangles against the old twelve, still one instanced draw for all nine
+hundred. The stripe stays.
+
+
+### Added — the door is a cut
+
+You could always walk into the kabina. The doorway measures 1.45 m clear right
+through the wall and the floor behind it is 4.0 m across and 5.1 m deep with
+nothing in the middle of it — all of that swept with `confine()`, not assumed.
+What you could not do was *arrive*. You stepped over the sill and stood in the
+opening with a white promenade at your back and a dark room in front, half in
+and half out, and the room stayed a thing you were looking into rather than the
+place you were. That is not a collision problem, and making the room bigger did
+not fix it, which is the lesson of the last two passes at it.
+
+So crossing the threshold is a cut. The screen goes down over 0.20 s, you are
+set on the middle of the floor with the room in front of you and the doorway
+behind, the light and the mix snap to the room's, and it comes back up over
+0.52 s — roughly what an eye does walking in off white concrete, and why the
+fade up is more than twice the fade down. It works in both directions, and the
+way out is the way in: walk at the light.
+
+Your heading and your pitch survive it. A cut that also turns you round is a cut
+that loses you, and being lost is the one thing a room this small cannot
+recover from — so `stepTo` moves you and does nothing else, where `dropIn`
+would have flattened your pitch and marked you stranded for having used a door.
+
+Two things that only show up once it is running. The exposure is *held* at
+whatever the crossing set it to for the length of the dip: left on its usual
+0.3 s ramp, you come up out of the black and then watch the light change, which
+is watching the cut not have worked. And you are pinned in place for the whole
+of the dark, because nothing stops the keys while the screen is down and 0.8 s
+at six metres a second is four and a half metres of blind walking — which at
+the far end of a 5 m room is the back wall. Looking around still works, and
+wants to.
+
+### Changed — the kabine are boarded, not painted
+
+The row was a hundred flat rectangles of colour with a dark rectangle painted on
+each one. Now it is board-and-batten: twelve planks to a bay, at a pitch that
+runs unbroken from one hut to the next across a whole run, with a kick board
+under it and a frieze over it. The battens stand 16 mm proud *and* are tinted
+down 20%, and the tint is the half that does the work — at three metres 16 mm of
+side face is a third of a pixel and the shadow map cannot see it at all, so what
+makes planking read is the seam being darker, which is what a batten in full sun
+over a shadowed joint actually looks like.
+
+The doors got the ironmongery that makes a door a door rather than a dark
+rectangle: two hinges, a hasp and staple at the height a hand finds it, and
+three planks down the face — the door is half the facade and a flat panel there
+undid every board around it.
+
+And the one that opens got a shuttered window either side, which is the other
+half of why it is two bays wide. A 2.15 m facade has room for a door and nothing
+else; 4.30 m has room for what a real double kabina on this shore has. The
+shutters are closed, and that is not laziness — the room behind them is dark and
+dark is the entire point of walking into it off a white afternoon.
+
+Battens stop for a window and pick up again above and below it, rather than the
+whole column being skipped, because a window is 0.7 m of a 2.2 m wall and
+skipping the column for it leaves the panel under the sill — the biggest flat
+area on the hut — completely bare. They do not stop for a door: the frame stands
+75 mm proud and hides everything behind it.
+
+Jadrija goes from 37,334 triangles to 64,058.
+
+### Added — the radio plays, if you can get it to
+
+The transistor set on the table in the kabina works now. Water is the switch:
+put the branch on it and it comes on, and each further hit knocks the tuning
+knob round to the next of three stations before the fourth turns it off. It is a
+1960s valve set that has sat in a shut wooden box for thirty summers, the one
+interaction the room offers is a firefighting hose, and if you give somebody a
+hose and one thing worth pointing it at then the thing has to answer.
+
+The dial lamp comes up and dies over about half a second, because a valve does,
+and the pointer moves to the station.
+
+The music is synthesised rather than sampled, and here that is not a compromise.
+Almost none of what makes a set like this recognisable is the music: it is a
+60 mm paper cone in a plastic box, so there is nothing below 350 Hz, nothing
+above 3 kHz, everything is a little squared off, and under all of it sits the
+hiss of a transmitter forty kilometres away. All of that is filter and noise —
+put a real recording through it and you hear a real recording with a telephone
+on it, whereas built out of oscillators the band limit *is* the timbre. Three
+stations: a klapa in thirds, a two-four dance number, and something slow at the
+far end of the dial that is mostly carrier. It loses its top before it loses its
+level as you walk away, so from the promenade you hear that there is a radio on
+before you hear what it is playing.
+
+Aiming at it is gated on being in the room. Without that the jet's parabola
+reaches straight through the seaward wall and the one hidden thing at Jadrija
+turns itself on for somebody who never found the door.
+
+### Changed — the kabina is two bays wide, and you are not a giant in it
+
+Measured first, because "it feels small" is not a number and the fix has to be
+one. The walkable strip, swept with `confine()` across the room:
+
+| where | before | after |
+| --- | --- | --- |
+| by the door | 1.44 m | 3.60 m |
+| alongside the cot | **0.77 m** | 2.77 m |
+
+One bay is 2.15 m of frontage, which is 1.89 m of interior, which is 1.45 m
+once you are held 0.22 m off each wall, which is 0.77 m once the cot has taken
+0.70 m of the middle — and there was nowhere else for the cot to be, because
+there was no wall to put it against that was not already touching it. You were
+edging down a gap narrower than your own shoulders with your eye 1.62 m up in a
+2.10 m box. Not a room you are in; a wardrobe you are stuck in.
+
+It is two bays now: 4.30 m of frontage, 4.04 m of interior, and every piece of
+furniture out against a wall where it belongs — cot on one long wall, tabouret
+and the radio table on the other, television on the back one. All four were
+already placed off the door's centreline, so they moved out on their own.
+
+The row can afford it. A hundred huts with one double unit among them is what
+these rows actually look like, and the widest door being the one with the neon
+over it is a second and quieter way of finding it. The second bay's colour is
+still drawn from `rng` and thrown away, so nothing downstream of it on the
+beach moves because a room in front of it got bigger.
+
+One thing had to be told twice: the run's collision is split around the door so
+that the neighbours do not close it from outside, and that split still knew
+about one bay. Left alone it ran a solid blocker up the middle of the new floor
+— the right-hand half of a four-metre room was a wall you could see across and
+not walk across.
+
+### Fixed — you could walk out through the back of the kabina
+
+Measured rather than argued about, by tracing `confine()` straight back along
+the door centreline: the back wall stopped you at s 22.28 through 22.82, and
+then s 22.83 was simply free. A seven-centimetre band on the far side of the
+wall that you could stand in, with the open alley beyond it — and it did not
+even need the gap, because a wall 10 cm thick with 0.22 m of hold-off either
+side is a barrier 0.54 m deep, and one step at six metres a second on a phone
+holding fifteen frames is 0.40 m.
+
+The room now publishes its own collision instead of having it rebuilt from the
+same numbers a thousand lines away: `special.shell` is a list of the rectangles
+in (t, s) you must not be able to stand in, and every one of them reaches three
+quarters of a metre into whatever is behind it. For three walls that is the
+solid hut next door; for the back one it is a yard of alley nobody has business
+standing in. Re-traced: nothing free anywhere past the wall, and the room reads
+the same from inside.
+
 ## [1.50.0] — 2026-08-12
 
 ### Added — one kabina opens

@@ -644,6 +644,10 @@ async function boot() {
     // hittable for exactly as long as he exists — `dogProbe` returns null when
     // he does not — and what he does about it is his own business.
     ground.addGuest(jadrija.dogProbe, jadrija.dogWet);
+    // And the transistor set on the table in the kabina, which is a guest in
+    // the same sense: something in the world the jet can land on that the hose
+    // code has no business knowing anything else about.
+    ground.addGuest(jadrija.radioProbe, jadrija.radioWet);
   }
 
   await step(85, 'load.maquis');
@@ -1612,6 +1616,113 @@ let inLatch = 0;
 let cicadaAt = 0;
 let lastFrameMs = 0;
 
+/**
+ * The threshold.
+ *
+ * You can walk into the kabina perfectly well — the doorway measures 1.45 m
+ * clear from the face right through the wall, and the floor behind it is 4.0 m
+ * across and 5.1 m deep with nothing in the middle of it. What you cannot do is
+ * *arrive*. You step over the sill and you are standing in the opening with a
+ * white promenade at your back and a dark room in front, half in and half out,
+ * and the room never becomes the place you are — it stays a thing you are
+ * looking into. That is not a collision problem and no amount of making the
+ * room bigger fixes it, which is the lesson of the last two passes at it.
+ *
+ * So the door is a cut. Screen goes down over a fifth of a second, you are set
+ * on the middle of the floor with the room in front of you and the doorway
+ * behind, the light and the mix are snapped to the room's, and it comes back up
+ * over half a second — which is roughly what an eye does walking in off white
+ * concrete, and is why the fade up is more than twice the fade down.
+ *
+ * Your heading and your pitch survive it. A cut that also turns you round is a
+ * cut that loses you, and being lost is the one thing a room this small has no
+ * way to recover from.
+ *
+ * It works in both directions and the way out is the way in: walk at the light.
+ */
+const DIP = { down: 0.20, hold: 0.09, up: 0.52, cool: 0.45, sill: 0.34 };
+let dipPhase = 0;        // 0 idle, 1 going dark, 2 coming back
+let dipT = 0;
+let dipDo = null;
+let dipPin = null;
+let dipCool = 0;
+let inRoom = false;
+const dipEl = () => document.getElementById('dip');
+
+function crossThreshold(dt, afoot) {
+  const K = jadrija && jadrija.kabina;
+  dipCool = Math.max(0, dipCool - dt);
+
+  if (dipPhase) {
+    dipT += dt;
+    let a;
+    if (dipPhase === 1) {
+      a = Math.min(1, dipT / DIP.down);
+      if (dipT >= DIP.down + DIP.hold) {
+        // At the bottom, where nobody can see the seam.
+        if (dipDo) dipDo();
+        dipDo = null;
+        dipPhase = 2; dipT = 0; a = 1;
+      }
+    } else {
+      const u = Math.min(1, dipT / DIP.up);
+      // Squared, so it clears the last of the black quickly and then dwells
+      // near the light — which is the shape of an iris opening.
+      a = (1 - u) * (1 - u);
+      // Zeroed *here* and not on the next frame. Written as a fall-through it
+      // put one frame of full black on the screen at the end of every fade up,
+      // because ending the phase resets the clock the opacity is computed from
+      // and 1 - 0 is 1: a cut that finishes with a blink.
+      if (u >= 1) { dipPhase = 0; dipT = 0; dipCool = DIP.cool; a = 0; }
+    }
+    // Pinned for the whole of the dark. Nothing stops the keys while the
+    // screen is down, and 0.8 s at six metres a second is four and a half
+    // metres of walking you cannot see — which at the far end of a room 5 m
+    // deep is the back wall. Looking around still works, and wants to: coming
+    // up out of the black already turning is most of what makes it a place.
+    if (dipPin && ground && ground.ok) ground.stepTo(dipPin[0], dipPin[1]);
+    if (!dipPhase) dipPin = null;
+    const el = dipEl();
+    if (el) el.style.opacity = String(a);
+    return;
+  }
+
+  const el = dipEl();
+  if (el && el.style.opacity !== '0') el.style.opacity = '0';
+  if (!afoot || !K || !ground || !ground.ok || dipCool > 0) {
+    // Walking away from the resort, baling out, or dying in it all count as
+    // having left the room, or you come back to Jadrija already indoors.
+    if (!afoot) inRoom = false;
+    return;
+  }
+
+  const [t, s] = jadrija.local(camera.position.x, camera.position.z);
+  const sill = K.face + DIP.sill;
+  // The door's own width plus a hand either side. Outside that span the wall
+  // is solid, so anything crossing this line out there is a rounding error.
+  const inDoor = Math.abs(t - K.dc) < K.dj + 0.20;
+
+  if (!inRoom && inDoor && s > sill) {
+    inRoom = true;
+    dipStart(() => {
+      const w = jadrija.toWorld(K.standIn[0], K.standIn[1]);
+      dipPin = [w[0], w[2]];
+      ground.stepTo(w[0], w[2]);
+      inLatch = 1;
+    });
+  } else if (inRoom && s < sill - 0.06) {
+    inRoom = false;
+    dipStart(() => {
+      const w = jadrija.toWorld(K.standOut[0], K.standOut[1]);
+      dipPin = [w[0], w[2]];
+      ground.stepTo(w[0], w[2]);
+      inLatch = 0;
+    });
+  }
+}
+
+function dipStart(fn) { dipPhase = 1; dipT = 0; dipDo = fn; dipPin = null; }
+
 function frame() {
   requestAnimationFrame(frame);
   // Read the clock even when paused, and read it before anything can bail out.
@@ -1807,7 +1918,12 @@ function frame() {
   const raw = afoot && jadrija && jadrija.kabina
     ? jadrija.kabina.inside(camera.position.x, camera.position.z) : 0;
   if (raw > 0.62) inLatch = 1; else if (raw < 0.18) inLatch = 0;
-  indoors += (inLatch - indoors) * Math.min(1, dt * 3.6);
+  crossThreshold(dt, afoot);
+  // Held wherever the crossing put it while the screen is dark, so the light
+  // in the room is already the room's light when it comes back up. Watching a
+  // 0.3 s exposure ramp *after* a cut is watching the cut not have worked.
+  if (dipPhase) indoors = inLatch;
+  else indoors += (inLatch - indoors) * Math.min(1, dt * 3.6);
   if (afoot !== wasAfoot) { audio.cicadas(afoot, 0.05); wasAfoot = afoot; }
   else if (afoot && Math.abs(indoors - cicadaAt) > 0.02) {
     cicadaAt = indoors;
@@ -1817,6 +1933,26 @@ function frame() {
   // because there is no lamp in the room — that is the point of it — and what
   // your eye actually does walking in off a white promenade is exactly this.
   renderer.toneMappingExposure = 0.92 - 0.50 * indoors;
+  // And the near plane, which is the whole of "I can see the sky through the
+  // ceiling". 1.2 m is the right front clip for an aeroplane and is nonsense
+  // for a person: standing on the floor of the kabina your eye is 1.66 m up
+  // under a 2.10 m ceiling, so the ceiling is 0.44 m away and every one of its
+  // triangles is in front of the near plane and thrown away. What is behind it
+  // is the roof, also inside 1.2 m, also thrown away, and then the sky. The
+  // same clip ate any wall you stood within 1.2 m of, which in a room 4 m
+  // across is most of the floor — the room was not dark, it was full of holes.
+  //
+  // Ramped on `indoors` rather than switched on `afoot`, so the depth buffer
+  // only pays for it in the one place that needs it. Outdoors the near clip
+  // stays where the aeroplane wants it: near/far is 1.2/42000 and dropping the
+  // near end twenty-fold costs twenty-fold the depth resolution at the far end,
+  // which at four kilometres is the difference between a town and a town that
+  // flickers. Indoors the far end is a doorway 1.45 m wide with the sea in it.
+  const wantNear = 1.2 - 1.14 * indoors;
+  if (Math.abs(camera.near - wantNear) > 0.005) {
+    camera.near = wantNear;
+    camera.updateProjectionMatrix();
+  }
 
   // And the klapa, off the terrace at Jadrija. Measured from the camera rather
   // than from the aeroplane, which is the same point in every mode except the
@@ -2169,6 +2305,15 @@ window.__fr = {
    */
   jad: {
     raw: () => jadrija,
+    /** The threshold: where it thinks you are, and whether it is mid-cut. */
+    dip: () => {
+      const K = jadrija && jadrija.kabina;
+      if (!K) return null;
+      const [t, s] = jadrija.local(camera.position.x, camera.position.z);
+      return { inRoom, phase: dipPhase, cool: +dipCool.toFixed(2),
+        t: +t.toFixed(2), s: +s.toFixed(2), sill: +(K.face + DIP.sill).toFixed(2),
+        opacity: dipEl() ? dipEl().style.opacity : null };
+    },
     stand: (t, s = 14, yaw = null) => {
       if (!jadrija || !ground || !ground.ok) return null;
       const w = jadrija.toWorld(t, s);

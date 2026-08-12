@@ -533,6 +533,17 @@ html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
 
 /* ───────────────────────────────────────────────────────────── cinematic ── */
 
+/* The threshold dip: crossing into the kabina, and back out of it.
+   Above the HUD (45) and the panels (58) and below the settings panel (70),
+   because what is being crossed is the world and the numbers over it, and not
+   the menu you may have opened on top of both. Opacity is written every frame
+   from 90-app.js, so there is no transition here — a CSS transition and a
+   per-frame write fight, and the one that loses is the one you asked for. */
+#dip {
+  position: fixed; inset: 0; z-index: 62; pointer-events: none;
+  background: #000; opacity: 0;
+}
+
 #cine { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
 #cine[hidden] { display: none; }
 .cbar {
