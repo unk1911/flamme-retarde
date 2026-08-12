@@ -8,6 +8,56 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.53.0] — 2026-08-12
+
+### Changed — she pours the wine instead of drinking it
+
+There is a glass on the stool now, and what she does with the bottle is fill
+it. The drink is gone, and the reason it is gone is that it could not be made
+to work: 43-jadrija.js aims the bottle from her hand at a target, and when the
+target is her mouth, every centimetre the aim is out puts thirty centimetres of
+glass through her face. A mouth is a 3 cm target on a bone that is really the
+atlas, and it moves most in exactly the frames somebody tips their head back.
+The glass does not move and is not part of her, so the whole class of error
+goes away — the worst a bad frame can do now is pour two centimetres wide.
+
+Which is also a better thing to watch. Sixteen sides of stemware, wine that is
+not in it until she has poured it, and a stream that stands on the surface of
+what is already in the glass and reaches up to wherever the lip actually is —
+the honest way round, because gravity decides where wine goes.
+
+### Changed — a second and a half of water indoors, not five and a half
+
+The meter that gets you the turn on the promenade is the meter that got you the
+answer in the kabina, and they are not the same question. Five and a half
+seconds is the price of a set piece that costs a quarter of a trolley and puts
+a woman on fire in front of forty people. What happens in the room costs
+nothing and is between the two of you, and making somebody hold a jet on a
+person for five seconds to reach it is not a price, it is a wait.
+
+### Added — she comes to you on her knees
+
+Back off across the room while she is down there and she follows, at 0.40 m/s,
+on her knees, with her hands where they are. Only while you are still in the
+room: the way out of a kabina is one metre of doorway, and a woman shuffling
+after you out onto a public beach is a different game than the one this is.
+
+### Fixed — her hands are behind her back now
+
+They were behind her, and they were also out either side of her like a pair of
+wings, because 68° of shoulder extension with a straight elbow is the only way
+to get a hand behind a back if you have the sign of the adduction backwards.
+This is 64° of extension, 34° of adduction and 50° on the forearm, and it puts
+her wrists 0.19 m behind the pelvis and 0.04 m either side of the midline —
+all but touching, which is the pose.
+
+### Added — `--probe` in the Blender rig script
+
+Prints where named joints land, in metres, and renders nothing. Every wrong
+version of the pose above was wrong about which way a rotation goes, which is a
+question a coordinate answers in a second and a picture answers in five
+minutes. Two dozen candidates in the time one render takes.
+
 ## [1.52.0] — 2026-08-12
 
 ### Fixed — the doors stopped short of the ground

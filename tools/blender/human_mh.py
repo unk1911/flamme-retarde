@@ -2927,22 +2927,19 @@ LUNGE = {
 # the 0.45 m the root drops are the ones already solved for kneeling and not a
 # second attempt at them.
 #
-# The arms are the pose, and they are shoulder extension and very little else.
+# The arms are the pose, and every version of them that failed failed the same
+# way: it was wrong about which way a rotation goes, and it took a five-minute
+# render to find out. Positive X on the upper arm takes it behind her; the
+# obvious build is 25° of that plus 90° of elbow, and what it renders is a woman
+# holding her own hands in front of her chest, because flexing an elbow on an
+# untwisted humerus swings the forearm forward and 25° of extension cannot
+# out-run it. Adding humeral twist moved her hands from her chest to her chin.
+# Straightening the elbows and taking the shoulders to 68° put the hands behind
+# her at last and left the arms out either side like a pair of wings.
 #
-# Three goes at it, and the two that failed are worth the four lines. Positive X
-# on the upper arm takes it behind her — negative is forward, which is the sign
-# FOURS establishes reaching for the floor — and the obvious build is 25° of
-# that plus 90° of elbow. What that renders is a woman holding her own hands in
-# front of her chest: with the humerus untwisted, flexing an elbow swings the
-# forearm forward, and 25° of extension is nowhere near enough to out-run it.
-# The second go added the humeral twist, on the reasoning that internal rotation
-# is what turns the elbow's hinge round — WINE_UP uses the same axis externally
-# to get a bottle to a mouth — and it moved her hands from her chest to her chin.
-#
-# Take both arms further back than the first hold, with the elbows almost open:
-# the hands now sit visibly behind the waist rather than disappearing into her
-# flanks. The chest opens with them and the chin rises a little, so the held pose
-# reads as an intentional, smiling look upward rather than a slump.
+# What broke the loop was `--probe`, which prints where a wrist lands instead of
+# drawing it: two dozen candidates in the time one render takes, and the answer
+# fell out in three passes. See the note on the numbers below.
 KNEEL_BACK = dict(KNEEL, **{
     "pelvis": (-4, 0, 0),
     "spine01": (0, 0, 0), "spine02": (0, 0, 0), "spine03": (-6, 0, 0),
@@ -2950,8 +2947,22 @@ KNEEL_BACK = dict(KNEEL, **{
     # Shoulders rolled back, which is what the pose is doing to her chest and
     # is the whole difference between hands behind the back and hands hidden.
     "clavicleL": (0, 0, -8), "clavicleR": (0, 0, 8),
-    "armUL": (68, 0, 9), "armLL": (-15, 0, 17), "handL": (-13, 0, -13),
-    "armUR": (68, 0, -9), "armLR": (-15, 0, -17), "handR": (-13, 0, 13),
+    # Settled with `--probe` rather than with renders, and that is the whole
+    # story of these six numbers. Where a hand ends up is a question a
+    # coordinate answers in a second and a picture answers in five minutes, and
+    # every wrong version of this pose was wrong about which way a rotation
+    # goes. What the probe says about the shipped version: the wrists sit
+    # 0.19 m behind the pelvis, 0.04 m either side of the midline and level
+    # with the small of her back. Hands behind the back, all but touching.
+    #
+    # x is extension, and 64° of it is what puts them behind rather than beside
+    # her. z is the one that was backwards for three goes: on the left arm
+    # *positive* z brings it in to the body, and without 34° of that the hands
+    # end up 0.30 m apart with an arm out either side, which is a shrug. And
+    # the forearm's own z is what finishes the job — 50° of it takes the wrists
+    # the last hand's width to the midline.
+    "armUL": (64, 0, 34), "armLL": (-30, 0, 50), "handL": (-6, 0, -8),
+    "armUR": (64, 0, -34), "armLR": (-30, 0, -50), "handR": (-6, 0, 8),
 })
 
 # The same, a breath later. Everything here is small on purpose: she is holding
@@ -2961,8 +2972,37 @@ KNEEL_BACK_B = dict(KNEEL_BACK, **{
     "@root": (0.0, -0.018, -0.446),
     "spine01": (1, 0, 0), "spine02": (1, 0, 0), "spine03": (-8, 0, 0),
     "chest": (-13, 0, 0), "neck": (15, 0, 0), "head": (14, 5, 1),
-    "armUL": (71, 0, 8), "armUR": (71, 0, -8),
+    "armUL": (67, 0, 33), "armUR": (67, 0, -33),
 })
+
+
+# And the knee shuffle: the same pose, going somewhere.
+#
+# Everything above the hips is KNEEL_BACK and stays KNEEL_BACK — the arms do
+# not come out to balance, because the whole point of the thing is that they
+# stay where they are put. What moves is a knee at a time, with the pelvis
+# turning into each one and the spine turning back against it, which is what
+# stops a shuffle from reading as a statue sliding across a floor.
+#
+# The thigh that swings forward has to fold its shin further to keep the foot
+# off the floor it is being dragged over, and the trailing one opens out. The
+# root lifts four millimetres at each extreme because a body over one knee is
+# a body over one knee.
+def _knee(sg):
+    return dict(KNEEL_BACK, **{
+        "@root": (0.0, -0.02, -0.446),
+        "pelvis": (-4, 0, -6 * sg),
+        "spine01": (0, 0, 4 * sg), "spine02": (0, 0, 2 * sg),
+        "spine03": (-6, 0, 2 * sg),
+        "head": (12, -7 * sg, 1),
+        "legUL": (-8 - 18 * sg, 0, 5), "legLL": (82 + 12 * sg, 0, 0),
+        "legUR": (-8 + 18 * sg, 0, -5), "legLR": (82 - 12 * sg, 0, 0),
+    })
+
+
+KNEE_A = _knee(1)
+KNEE_B = _knee(-1)
+
 
 # ── the somersault ──────────────────────────────────────────────────────────
 #
@@ -4266,41 +4306,50 @@ WINE_HOLD = dict(WINE_REACH, **{
     "armUR": (14, -8, -22), "armLR": (-22, 0, -6), "handR": (-16, 0, -6),
 })
 
-# Up. The elbow does most of it — a bottle comes to your mouth by folding your
-# arm — but not on its own, and that took five goes to learn. `armLR` x is the
-# fold and it folds in whatever plane the shoulder has left it in, which on
-# this rig, with the arm at her side, is backwards: shut the elbow and the hand
-# goes up behind her ear. What turns it round is `armUR` y, the twist of the
-# humerus, and it wants about −90°. Abducting the shoulder instead (z) only
-# takes the whole arm out sideways and the hand with it, which is what the
-# first four attempts did and why she kept drinking past her own shoulder.
-WINE_UP = dict(IDLE_A, **{
-    "spine03": (-1, 0, 0.5), "chest": (-2, 0, 0),
-    "neck": (7, 0, 0), "head": (6, -6, 1),
-    "clavicleR": (0, 0, -14),
-    "armUR": (-16, -80, 4), "armLR": (-104, 0, -12), "handR": (-2, 0, -16),
-    "armUL": (-8, 0, 27), "armLL": (-18, 0, 4),
+# Lifted clear of the stool, upright, about hip height in front of her right
+# side. It is the beat between picking a bottle up and doing something with
+# it, and it is also what the pour comes back to before she puts it down.
+WINE_LIFT = dict(IDLE_A, **{
+    "spine02": (4, 0, 1.0), "spine03": (4, 0, 0.5), "chest": (3, 0, 0),
+    "neck": (-4, 0, 0), "head": (-12, -6, 1),
+    "clavicleR": (0, 0, -8),
+    "armUR": (-30, 0, -16), "armLR": (-58, 0, -10), "handR": (-10, 0, -8),
+    "armUL": (-8, 0, 27), "armLL": (-16, 0, 4),
 })
 
-# The swig. Head back, elbow high, and the trunk goes with the head — a neck
-# doing this on its own does not look like drinking, it looks like a fracture.
+# And the pour, which used to be a swig.
 #
-# Twice the head extension of the first attempt, and the twist above. Measured
-# rather than eyeballed, because a three-quarter render flattens exactly the
-# axis that was wrong: her hand now sits 0.14 m to her right, 0.05 m in front
-# of her face and 0.18 m below it, which is a hand holding something up to
-# drink out of. The first version put it 0.26 m out to the side, and a bottle
-# aimed from there at her mouth crosses her cheekbone.
+# She drank out of the bottle for two versions and it never once looked like
+# drinking. The reason is not in this file: 43-jadrija.js aims the bottle from
+# wherever her hand ends up at a target, and when the target is her mouth every
+# centimetre the aim is out lands 30 cm of glass somewhere on her face. A mouth
+# is a moving 3 cm target on a bone that is really the atlas, and it moves most
+# in exactly the frames a person tips their head back.
 #
-# The bottle's own angle is not in here at all — 43-jadrija.js aims it from
-# the hand at the mouth — so what this pose has to get right is where the hand
-# and the mouth are, and the room between them for a bottle to be.
-WINE_SIP = dict(WINE_UP, **{
-    "spine03": (-6, 0, 0.5), "chest": (-9, 0, 0),
-    "neck": (18, 0, 0), "head": (25, -2, 1),
-    "clavicleR": (0, 0, -18),
-    "armUR": (-20, -90, 10), "armLR": (-130, 0, -12), "handR": (6, 0, -20),
-})
+# The glass on the stool does not move, is not part of her, and is 0.34 m
+# straight out in front of where she stands. So the aim has a fixed target and
+# this pose only has to hold her hand somewhere above and behind it — a quarter
+# of a metre up, roughly on her own midline, which is where a hand goes when
+# the thing being poured into is on a stool by your knee.
+#
+# Which means the trunk does the work rather than the shoulder: she leans in
+# over it, and the head goes with the lean because a person pouring looks at
+# what they are pouring into.
+def _pour(u, e, z=-8, lean=-6):
+    return dict(WINE_LIFT, **{
+        "spine02": (lean, 0, 1.0), "spine03": (lean, 0, 0.5),
+        "chest": (lean * 0.7, 0, 0), "neck": (-6, 0, 0), "head": (-22, -4, 1),
+        "clavicleR": (0, 0, -12),
+        "armUR": (u, 0, z), "armLR": (e, 0, -16), "handR": (-14, 0, -12),
+    })
+
+
+# Where the wrist lands, per `--probe`, in metres off the floor she is standing
+# on: 0.36 in front of her, 0.29 out to her right, 1.08 up. `kabinaKit` puts
+# the glass and her standing mark where they have to be for that to be a pour —
+# the glass 0.30 ahead of her and a hand's width right, its rim 0.95 up — and
+# those numbers travel together. Move one and the bottle pours past the glass.
+WINE_POUR = _pour(-38, -18, -2, -12)
 
 # And the wrap. Both hands to the knot at her hip, a tug, and then away —
 # the hands drop rather than being put anywhere, because what she is doing is
@@ -4396,9 +4445,9 @@ CLIPS = [
     # the point of the room.
     {"name": "wine", "loop": False,
      "keys": [(0.00, IDLE_A), (0.60, WINE_REACH), (1.00, WINE_HOLD),
-              (1.65, WINE_UP), (2.15, WINE_SIP), (2.95, WINE_SIP),
-              (3.35, WINE_UP), (3.95, WINE_HOLD), (4.30, WINE_REACH),
-              (4.95, IDLE_A)]},
+              (1.55, WINE_LIFT), (2.05, WINE_POUR), (3.15, WINE_POUR),
+              (3.60, WINE_LIFT), (4.10, WINE_HOLD), (4.45, WINE_REACH),
+              (5.05, IDLE_A)]},
     {"name": "untie", "loop": False,
      "keys": [(0.00, IDLE_A), (0.60, UNTIE_A), (1.05, UNTIE_B),
               (1.35, UNTIE_B), (1.85, UNTIE_C), (2.55, IDLE_A)]},
@@ -4411,6 +4460,12 @@ CLIPS = [
               (1.55, KNEEL_BACK)]},
     {"name": "kept", "loop": True,
      "keys": [(0.0, KNEEL_BACK), (2.2, KNEEL_BACK_B), (4.4, KNEEL_BACK)]},
+    # And going somewhere on them, at 0.40 m/s — 1.2 s a cycle, two half
+    # strides, which is a knee and about 24 cm each. `SHOW.creep` in
+    # 43-jadrija.js is that number and the two have to move together or she
+    # skates.
+    {"name": "knees", "loop": True,
+     "keys": [(0.0, KNEE_A), (0.6, KNEE_B), (1.2, KNEE_A)]},
     {"name": "flare", "loop": False, "keys": FLARE},
     {"name": "firestarter", "loop": True, "keys": FIRE},
     {"name": "cast", "loop": False, "keys": CAST},
@@ -4736,6 +4791,30 @@ def main():
         pose(rig, {})
         post_preview(J, body)
         render("trinket", ("nails", "hips", "hipside"))
+        return
+
+    # Where the hands actually end up, in metres, and nothing else.
+    #
+    # A render is five minutes, so an argument about a shoulder settled by
+    # looking at renders is five minutes a guess — and the three that went into
+    # getting the hands behind her back were all of them arguments about which
+    # way a rotation goes, which is a question a number answers and a picture
+    # does not. −Y is in front of her, +Z is up, ±X is out to the sides.
+    if "--probe" in argv:
+        bpy.ops.wm.open_mainfile(filepath=str(BLEND))
+        rig = bpy.data.objects["rig"]
+        for name in argv[argv.index("--probe") + 1:]:
+            if name.startswith("-") or name not in globals():
+                break
+            pose(rig, globals()[name])
+            out = []
+            # Heads and not tails: a bone's head is the joint, and the joint is
+            # what 43-jadrija.js reads when it hangs a bottle off `handR`.
+            for bone in ("head", "chest", "pelvis", "footR", "handL", "handR"):
+                if bone in rig.pose.bones:
+                    v = rig.matrix_world @ rig.pose.bones[bone].head
+                    out.append("%s(%+.3f %+.3f %+.3f)" % (bone, v.x, v.y, v.z))
+            print("[mh] probe %-12s %s" % (name, "  ".join(out)))
         return
 
     # No render and no export: opens the blend, walks the frames and prints.

@@ -1984,6 +1984,11 @@ async function buildJadrija(scene) {
     blue: [0.545, 0.650, 0.720], gold: [0.700, 0.575, 0.300],
     glass: [0.050, 0.120, 0.062], cream: [0.850, 0.810, 0.690],
     foil: [0.330, 0.075, 0.095],
+    // The glass she pours into, and what goes in it. Nothing in this renderer
+    // is transparent, so a wine glass has to be a *bright* solid — an unlit
+    // pane of glass reads as a pane of glass by being the lightest thing on the
+    // table, not by being see-through.
+    crystal: [0.760, 0.800, 0.815], wine: [0.300, 0.045, 0.072],
     // The wrap, off. `SCARF_DARK` and `SCARF_LITE` out of human_mh.py, split
     // the difference — on the floor it is a heap and not a net, and there is
     // no pattern left to be dark and light halves of.
@@ -2272,6 +2277,38 @@ async function buildJadrija(scene) {
       [f + 0.721, 0.150], [f + 0.7225, 0.108], [f + 0.7215, 0.055],
       [f + 0.7200, 0.000],
     ], KIT.woodT, 16);
+    // ── the glass, on the near edge of the same stool ──
+    // On her side of the bottle and a hand's width off it: she stands at
+    // `wine`, which is out past +t and +s, so this is the thing between her and
+    // the bottle and the thing the bottle comes down over.
+    //
+    // 17 cm of stemware in two lathes — the vessel, and the wine — because the
+    // wine is the one part that is not there until she has poured it. Sixteen
+    // sides: this is 8 cm across and you look straight down into it from half a
+    // metre, which is where a twelve-sided rim shows its corners.
+    // These two numbers are not free. `WINE_POUR` in tools/blender/human_mh.py
+    // puts her wrist 0.36 m in front of her, 0.29 m out to her right and
+    // 1.08 m up, and this is where a glass has to be for the line from that
+    // wrist to it to be a bottle pouring rather than a bottle held over
+    // something: 0.30 m ahead of her standing mark, a hand's width to her
+    // right, on a stool 0.72 m high. Move the stool, the mark or the pose and
+    // the wine goes on the floor.
+    // The height of the seat, which both of the things standing on it need.
+    const by = f + 0.722;
+    const gt = bt + 0.085, gs = bs + 0.090;
+    lathe(W, gt, gs, [
+      [by + 0.000, 0.0000], [by + 0.000, 0.0380], [by + 0.005, 0.0380],
+      [by + 0.009, 0.0300], [by + 0.013, 0.0090],
+      [by + 0.020, 0.0058], [by + 0.074, 0.0053],
+      [by + 0.082, 0.0180], [by + 0.093, 0.0320], [by + 0.109, 0.0398],
+      [by + 0.130, 0.0425], [by + 0.152, 0.0398], [by + 0.168, 0.0350],
+      // and back down the inside, which exists because the material draws both
+      // faces and a bowl with no inside is a lump.
+      [by + 0.170, 0.0342], [by + 0.152, 0.0380], [by + 0.130, 0.0407],
+      [by + 0.109, 0.0380], [by + 0.093, 0.0302], [by + 0.083, 0.0160],
+      [by + 0.081, 0.0000],
+    ], KIT.crystal, 16);
+
     // The bottle. A Dingač is a burgundy bottle — sloped shoulder, no punt you
     // can see, dark glass — and the shoulder is the whole silhouette.
     //
@@ -2279,7 +2316,6 @@ async function buildJadrija(scene) {
     // here that moves: she picks it up. Built about its own base at the origin
     // so that a position and a yaw are all it ever needs, which is what lets it
     // sit on a tabouret one second and hang off a wrist the next.
-    const by = f + 0.722;
     const bbuf = propBuilder();
     const keep = b;
     b = bbuf;
@@ -2325,6 +2361,23 @@ async function buildJadrija(scene) {
         [Math.cos(a0) * 0.06, Math.sin(a0) * 0.06, r0 * 0.86, r0 * 0.50],
         KIT.wrap, KIT.wrap);
     }
+    // What ends up in the glass, and what gets it there. Both are their own
+    // meshes for the same reason the bottle is: they are not always there.
+    // The wine is a lid on the bowl rather than a filled bowl — you can only
+    // ever see its surface and the ring of it against the crystal — and it sits
+    // a fraction inside the glass so the two do not argue about the z-buffer.
+    const wbuf = propBuilder();
+    b = wbuf;
+    lathe(O, 0, 0, [
+      [0.0810, 0.0000], [0.0830, 0.0148], [0.0930, 0.0290],
+      [0.1090, 0.0368], [0.1220, 0.0380], [0.1220, 0.0000],
+    ], KIT.wine, 16);
+    // And the stream, built one metre long about its own base so that a scale
+    // and a position are all it needs. Six sides at 3 mm: it is on screen for
+    // about a second and it is 3 mm across.
+    const jbuf = propBuilder();
+    b = jbuf;
+    lathe(O, 0, 0, [[0, 0.0032], [1, 0.0028]], KIT.wine, 6);
     b = keep;
     const inner = { spec: 0.05, specPower: 14, side: THREE.DoubleSide,
       emissive: 0.22, body: 'n = gl_FrontFacing ? n : -n; base *= vVCol;' };
@@ -2335,6 +2388,14 @@ async function buildJadrija(scene) {
     const scarf = new THREE.Mesh(sbuf.geo(), solidMaterial(0xffffff, inner));
     scarf.visible = false;
     scene.add(scarf);
+    const poured = new THREE.Mesh(wbuf.geo(), solidMaterial(0xffffff, inner));
+    const gp = W(gt, gs, by);
+    poured.position.set(gp[0], gp[1], gp[2]);
+    poured.visible = false;
+    scene.add(poured);
+    const stream = new THREE.Mesh(jbuf.geo(), solidMaterial(0xffffff, inner));
+    stream.visible = false;
+    scene.add(stream);
 
     // ── the radio, on a small table against the near wall ──
     const rt = dc - 1.66, rs = 19.90;
@@ -2370,7 +2431,7 @@ async function buildJadrija(scene) {
     radio.draw(0.30, 0.0);
     tv.draw(null, 0x2545);
     return {
-      tv, radio, bottle, scarf,
+      tv, radio, bottle, scarf, poured, stream,
       // Where the set is, for the jet to knock the knob on. The table top plus
       // a hand's width: aiming at a radio means aiming at the thing on the
       // table, not at the table.
@@ -2383,7 +2444,14 @@ async function buildJadrija(scene) {
       // stand to be able to reach it: 0.55 m off it, turned to face it, which
       // is one pace and an arm.
       rest: [bt, bs, by],
-      wine: [bt + 0.40, bs + 0.22, Math.atan2(-0.22, -0.40)],
+      wine: [bt + 0.372, bs + 0.191, Math.atan2(-0.191, -0.372)],
+      // Where the neck of the bottle has to end up. Not the rim: a lip resting
+      // on the rim is a bottle being emptied by somebody who has never poured
+      // one, so this is six centimetres over it, and the stream covers the gap.
+      pourAt: [gt, gs, by + 0.230],
+      // And where the stream stops, which is the surface of what is already in
+      // the glass whether or not any of it is there yet.
+      cupAt: [gt, gs, by + 0.122],
     };
   }
 
@@ -3348,7 +3416,7 @@ async function buildJadrija(scene) {
         // wrap has come off. `shed` is a latch for the same reason `turned` is
         // — it is read every frame by the line that draws the wrap, and a
         // value read off state cannot be stranded by an event that never fires.
-        leg: 0, shed: 0, held: 0,
+        leg: 0, shed: 0, held: 0, pour: 0,
       };
     } catch (e) {
       console.warn('test figure failed:', e.message);
@@ -3844,6 +3912,11 @@ async function buildJadrija(scene) {
     // Fifty litres is an eighth of the pack, which is a price worth paying
     // twice.
     soakFor: 5.5,
+    // And a second and a half of it inside the kabina. See the note on the
+    // meter itself: in there the water is not buying a set piece, it is asking
+    // a question, and a question you have to hold for five seconds has been
+    // answered by the holding.
+    soakIn: 1.5,
     // A minute is a set piece and ten seconds is a twitch. Twenty-six is long
     // enough to light four or five patches of deck and put you properly behind.
     blazeFor: 26,
@@ -3868,6 +3941,15 @@ async function buildJadrija(scene) {
     // branch on her keeps her there — and eleven seconds after you stop is long
     // enough to walk round her and short enough that she is not furniture.
     keptFor: 11,
+    // And the knee shuffle, for when you back off across the room while she is
+    // down there. All three numbers are about a room four metres across: a pace
+    // that reads as knees and not as a walk, a gap that is far enough to be a
+    // retreat rather than a step back, and one close enough to be over. The
+    // stopping distance is the wide one on purpose — she is arriving at
+    // somebody on her knees, and arriving at their shoes is a different scene.
+    creep: 0.40,
+    creepFrom: 1.35,
+    creepTo: 0.80,
     castAt: 0.46,       // s into the `cast` clip where it leaves her hand. This
                         // is FIRE_CAST_AT in tools/blender/human_mh.py and it
                         // has to move with it or the ball appears out of a hand
@@ -3979,6 +4061,28 @@ async function buildJadrija(scene) {
       ? Math.min(SHOW.walk * mul, Math.max(0.45, dist * 1.8)) : 0;
     show.vel = damp(show.vel, want, SHOW.accel, dt);
     skinFig.state.speed = clamp(show.vel / SHOW.walk, 0.55, 1.75);
+    show.t += Math.cos(show.ang) * show.vel * dt;
+    show.s += Math.sin(show.ang) * show.vel * dt;
+    return dist;
+  }
+
+  /**
+   * The knee shuffle, which gets its own mover rather than borrowing `showTo`.
+   *
+   * Everything `showTo` does with speed is about a walk: a 0.45 m/s floor under
+   * the pace, so a walker crossing the last half metre never mimes, and a clip
+   * rate that follows the pace, so a stride covers the ground the stride looks
+   * like it covers. On knees both are wrong — the pace *is* below that floor,
+   * and the clip is authored to the pace rather than the other way round — so
+   * this moves her at one speed and plays it at one rate.
+   */
+  function showCreep(tt, ss, dt) {
+    const d0 = tt - show.t, d1 = ss - show.s;
+    const dist = Math.hypot(d0, d1);
+    show.want = Math.atan2(d1, d0);
+    show.vel = damp(show.vel, dist > SHOW.creepTo ? SHOW.creep : 0,
+      SHOW.accel * 0.6, dt);
+    skinFig.state.speed = 1;
     show.t += Math.cos(show.ang) * show.vel * dt;
     show.s += Math.sin(show.ang) * show.vel * dt;
     return dist;
@@ -4295,7 +4399,7 @@ async function buildJadrija(scene) {
     // for the identical reason the turn is: it is not a mood, it is a thing
     // that has happened, and the meter refilling underneath it would have her
     // going down onto her knees from a position she is already in.
-    submit: 1, kept: 1, rise: 1 };
+    submit: 1, kept: 1, rise: 1, creep: 1 };
 
   // And the three of those that have a beat under them. `flare` is in it
   // because the riser is the point of the riser: the music starts a second and
@@ -4340,7 +4444,7 @@ async function buildJadrija(scene) {
     // with the face of somebody who has decided to, and holds the widest smile
     // in the building at the bottom of it — which is the whole of why this is
     // not the promenade's answer to the same water. Out there she catches fire.
-    submit: 0.75, kept: 1.00, rise: 0.80,
+    submit: 0.75, kept: 1.00, rise: 0.80, creep: 0.95,
   };
 
   /** The indoor track, as a set, so the trigger can tell it is already on it. */
@@ -4370,7 +4474,7 @@ async function buildJadrija(scene) {
       // Let go of the bottle on the way out of anything that is not the drink.
       // The turn can arrive in the middle of it, and a bottle still welded to a
       // wrist through a cartwheel is the sort of thing that is funny once.
-      if (phase !== 'wine') show.held = 0;
+      if (phase !== 'wine') { show.held = 0; show.pour = 0; }
     };
 
     // The two set pieces, each with the setting-up its entry needs, so that the
@@ -4456,9 +4560,20 @@ async function buildJadrija(scene) {
     // is what it did — the meter hit the cap on one frame and the decay took it
     // a fiftieth of a second below the threshold on the next, so the test that
     // reads it was never once true on a frame that mattered.
-    if (show.soak < SHOW.soakFor) {
-      show.soak = clamp(show.soak + (show.hit > 0 ? dt : -dt * 0.12),
-        0, SHOW.soakFor);
+    //
+    // Indoors it is a fifth of that, and the two numbers are not the same
+    // number for the same reason the two answers are not the same answer. Five
+    // and a half seconds is the price of a set piece that costs you a quarter
+    // of a trolley and puts a woman on fire in front of you. What happens in
+    // the kabina costs nothing, is over in a second and a half, and is between
+    // the two of you: making somebody stand in a small room holding a jet on a
+    // person for five seconds to reach it is not a price, it is a wait.
+    const K0 = special;
+    const her = !!K0 && show.t > K0.t0 - 0.2 && show.t < K0.t1 + 0.2
+      && show.s > K0.face + 0.15 && show.s < K0.s1;
+    const full = her ? SHOW.soakIn : SHOW.soakFor;
+    if (show.soak < full) {
+      show.soak = clamp(show.soak + (show.hit > 0 ? dt : -dt * 0.12), 0, full);
     } else if (!HELD[show.phase]) {
       show.soak = 0;
       show.queue.length = 0;
@@ -4475,10 +4590,10 @@ async function buildJadrija(scene) {
       // Tested on her own position rather than on `KABIN`, because the
       // interesting case is precisely the one the phase table cannot see: she
       // can be hit standing in the doorway a second before the indoor track
-      // picks her up.
-      const K0 = special;
-      const her = !!K0 && show.t > K0.t0 - 0.2 && show.t < K0.t1 + 0.2
-        && show.s > K0.face + 0.15 && show.s < K0.s1;
+      // picks her up. Which is also why `her` is worked out above rather than
+      // here: the same test decides how long the meter is, so a woman standing
+      // in the doorway is on the short one and answers the water the way the
+      // room answers it.
       if (her) go('submit', 'submit', 0.30);
       else go('flare', 'flare', 0.30);
       return;
@@ -4582,7 +4697,7 @@ async function buildJadrija(scene) {
     // from *inside* the kabina, so without it this line fires on the very next
     // frame and walks her back to the doorway to start coming in again, out of
     // a pose she has just gone down into three feet away from you.
-    const OWN = { flare: 1, submit: 1, kept: 1, rise: 1 };
+    const OWN = { flare: 1, submit: 1, kept: 1, rise: 1, creep: 1 };
     if (inside && !KABIN[show.phase] && !MUSIC[show.phase]
         && !OWN[show.phase] && !show.turned) {
       show.leg = 0;
@@ -4617,7 +4732,13 @@ async function buildJadrija(scene) {
         show.want = kit.wine[2];
         showHold(dt);
         const u = S.cur ? S.curT : 0;
-        show.held = sat((u - 0.82) / 0.30) * (1 - sat((u - 3.95) / 0.30));
+        const wn = wineAt(u);
+        show.held = wn.held;
+        show.pour = wn.pour;
+        // And the glass is full from the middle of the pour on, and stays that
+        // way. Nobody drinks it and nothing empties it: she poured it for you
+        // and it is sitting there, which is the state this room is about.
+        if (u > 2.65 && kit.poured) kit.poured.visible = true;
         if (done) go('meet', 'idle', 0.45);
         break;
       }
@@ -4680,8 +4801,34 @@ async function buildJadrija(scene) {
         // pose — which is the version anybody who finds this will want, and
         // costs one term.
         if (show.hit > 0) show.tmr = 0;
-        else if (show.tmr > SHOW.keptFor) go('rise', 'getup', 0.35);
+        // Back off across the room and she comes after you rather than letting
+        // you watch from the door. Only while you are still in here: from a
+        // kabina the way out is one metre of doorway, and a woman shuffling
+        // after you on her knees out onto a public beach is a different game
+        // than the one this room is.
+        if (inside && Math.hypot(pt - show.t, ps - show.s) > SHOW.creepFrom) {
+          go('creep', 'knees', 0.35);
+        } else if (show.hit <= 0 && show.tmr > SHOW.keptFor) {
+          go('rise', 'getup', 0.35);
+        }
         break;
+
+      // On her knees, coming to you. `tmr` is held down the whole way, so the
+      // eleven seconds that get her up are eleven seconds of you standing still
+      // and not eleven seconds of her crossing a room.
+      case 'creep': {
+        show.tmr = 0;
+        if (!inside) { go('kept', 'kept', 0.35); break; }
+        const gap = showCreep(pt, ps, dt);
+        // Inside the walls, which nothing else in here has to bother with:
+        // every other indoor phase is either standing on a marked spot or
+        // walking a route somebody picked. This one is following you, and you
+        // can stand in a corner.
+        show.t = clamp(show.t, K.t0 + 0.40, K.t1 - 0.40);
+        show.s = clamp(show.s, K.face + 0.40, K.s1 - 0.40);
+        if (gap < SHOW.creepTo) go('kept', 'kept', 0.35);
+        break;
+      }
 
       // And back onto the indoor track, not the promenade's. `up` is the other
       // way out of a floor and it ends in a somersault, which in a room four
@@ -5181,90 +5328,98 @@ async function buildJadrija(scene) {
     // card this is not a child of her mesh — it has to be able to stand on a
     // tabouret while she is forty metres away doing cartwheels.
     if (kit && kit.bottle) {
-      if (handR === null) {
-        handR = f.boneIndex('handR');
-        headB = f.boneIndex('head');
-        neckB = f.boneIndex('neck');
-      }
+      if (handR === null) handR = f.boneIndex('handR');
       const r = kit.rest, w = toWorld(r[0], r[1]);
       vPos.set(w[0], r[2], w[2]);
       qAim.identity();
       if (show.held > 0 && handR >= 0) {
         f.boneAt(handR, vHand).applyMatrix4(f.mesh.matrixWorld);
-        // Upright in the hand: the grip is low on the body of the bottle,
-        // which is where you hold one you mean to drink out of rather than
-        // pour from. Not at the neck — that is a waiter.
+        // Upright in the hand: the grip is low on the body, which is where you
+        // hold a bottle you have just picked up. Not at the neck — that is a
+        // waiter.
         vHold.copy(vHand);
         vHold.y -= BOT.grip;
-        // And the swig, which is not a rotation. Aim it: the lip goes to her
-        // mouth and the bottle lies back along the line from her hand to it,
-        // so the tip is whatever the angle between the two happens to be that
-        // frame. A fixed tilt about a fixed axis is how you get a bottle held
-        // out sideways at somebody's ear, which is what this was.
-        const sip = sat((S.curT - 1.80) / 0.45) * (1 - sat((S.curT - 3.05) / 0.45));
-        if (sip > 0 && headB >= 0) {
-          f.boneAt(headB, vMouth).applyMatrix4(f.mesh.matrixWorld);
-          // Up the skull rather than up the world: `head` is the atlas and the
-          // mouth is a little above and in front of it, but which way "above"
-          // points is the whole question once she tips her head back to drink.
-          // The neck→head vector tips with her, so this follows the swig
-          // instead of aiming at where her mouth was before it started.
-          f.boneAt(neckB, vAx).applyMatrix4(f.mesh.matrixWorld);
-          vUp.subVectors(vMouth, vAx).normalize();
-          // −X is the way she faces: +Z is her right, and up × right is the
-          // nose. Checked against both hands rather than reasoned about,
-          // because a rig's idea of forward is not something to guess at.
-          vFwd.set(-1, 0, 0).transformDirection(f.mesh.matrixWorld);
-          // Measured against the rig rather than guessed at, which is what the
-          // first pair of numbers were. `head` is the atlas, 1.578 m up on a
-          // figure standing on a floor at 3.137 — the base of the skull, level
-          // with the jaw. A mouth is about 3 cm above that and 8 cm in front of
-          // it, and the old 8.5 cm up put the target at her cheekbone: the lip
-          // landed by her ear and the body of the bottle lay across her face,
-          // which is the "bottle inside her head" this is here to stop. Sitting
-          // it slightly proud of the lips also keeps 77 mm of glass off the
-          // skin, and nobody has ever seen the two-centimetre gap.
-          vMouth.addScaledVector(vFwd, 0.082).addScaledVector(vUp, 0.026);
+        // And the pour, which is not a rotation. Aim it: the lip goes to a
+        // fixed point six centimetres over the glass and the bottle lies back
+        // along the line from her hand to it, so the tilt is whatever the angle
+        // between the two happens to be that frame.
+        //
+        // This used to aim at her mouth, and a mouth is a hard target — it is
+        // 3 cm above a bone called `head` that is really the atlas, it moves
+        // when she tips her head back, and every centimetre the aim is out puts
+        // 30 cm of glass through her face. The glass on the stool does not move
+        // and is not part of her, so the whole class of error goes away: the
+        // worst a bad frame can do now is pour two centimetres wide.
+        if (show.pour > 0 && kit.pourAt) {
+          const g = kit.pourAt, gw = toWorld(g[0], g[1]);
+          vMouth.set(gw[0], g[2], gw[2]);
           vAx.subVectors(vMouth, vHand);
           const reach = vAx.length();
           vAx.multiplyScalar(1 / reach);
-          qAim.setFromUnitVectors(UPV, vAx).slerp(qId, 1 - sip);
-          // How far up the bottle her hand ends up. Hanging the lip on her
-          // mouth and letting the rest fall where it may is right only while
+          qAim.setFromUnitVectors(UPV, vAx).slerp(qId, 1 - show.pour);
+          // How far up the bottle her hand ends up. Hanging the lip on the
+          // target and letting the rest fall where it may is right only while
           // the gap happens to be a bottle long; outside that the choice is
-          // between a bottle through her teeth and one held by nothing. So
-          // the grip is what is fixed, clamped to the lower body where a hand
-          // that means to drink actually goes, and any leftover is spent on
-          // the lip falling a centimetre or two short of her lips — which is
+          // between a bottle through the stool and one held by nothing. So the
+          // grip is what is fixed, clamped to the body of the bottle where a
+          // hand pouring one actually goes, and any leftover is spent on the
+          // lip stopping short — which is a stream a centimetre longer and is
           // the error nobody sees.
-          // And the clamp opens up to the neck. The upper bound is what decides
-          // which way the error goes when her hand comes closer to her mouth
-          // than the bottle is long: at 0.11 the lip carries on past the target
-          // and into her face, which is the one direction the error must never
-          // take. A hand riding up to just under the shoulder of the bottle is
-          // what a person actually does tipping one back; 20 cm is that, and
-          // past it the residue is a lip a centimetre short of her lips.
           const at = clamp(BOT.lip - reach, 0.02, 0.20);
-          vHold.lerp(vSip.copy(vHand).addScaledVector(vAx, -at), sip);
+          vHold.lerp(vSip.copy(vHand).addScaledVector(vAx, -at), show.pour);
         }
         vPos.lerp(vHold, show.held);
       }
       kit.bottle.position.copy(vPos);
       kit.bottle.quaternion.copy(qAim);
+
+      // The stream. It is a cylinder standing on the wine in the glass and
+      // reaching up to wherever the lip actually is, which is the honest way
+      // round: gravity decides where wine goes, and if the lip is not over the
+      // glass then what you see is a stream leaning out of it, which is a thing
+      // to fix and not a thing to hide.
+      if (kit.stream) {
+        const on = show.pour > 0.6 && show.held > 0.9;
+        kit.stream.visible = on;
+        if (on) {
+          const c = kit.cupAt, cw = toWorld(c[0], c[1]);
+          vSip.set(0, BOT.lip, 0).applyQuaternion(qAim).add(vPos);
+          kit.stream.position.set(vSip.x, c[2], vSip.z);
+          kit.stream.scale.set(1, Math.max(0.01, vSip.y - c[2]), 1);
+          if (Math.abs(vSip.x - cw[0]) > 0.09 || Math.abs(vSip.z - cw[2]) > 0.09) {
+            kit.stream.visible = false;
+          }
+        }
+      }
     }
   }
 
   // Looked up once, on the frame the bottle first needs it: `boneIndex` is a
   // linear search over twenty-eight names and this runs every frame she is on
   // screen. `null` and not −1, because −1 is what a miss returns.
-  let handR = null, headB = -1, neckB = -1;
+  let handR = null;
   // Where along its own axis the bottle is held, and where its lip is. Both
   // read off the profile it is actually built to, up in `kabinaKit`.
   const BOT = { grip: 0.115, lip: 0.300 };
+
+  /**
+   * The two windows the `wine` clip drives, off one clock, because they are
+   * read from the phase and again from the debug scrub and two copies of them
+   * that have drifted apart is a bottle in her hand with no pour coming out of
+   * it. `held` is the ramp the bottle leaves the stool on and comes back to it
+   * on; `pour` is the tilt, and it is a ramp for the same reason — a bottle
+   * that goes from upright to pouring between two frames is a bottle nobody
+   * poured.
+   */
+  function wineAt(u) {
+    return {
+      held: sat((u - 0.85) / 0.28) * (1 - sat((u - 4.15) / 0.28)),
+      pour: sat((u - 1.75) / 0.35) * (1 - sat((u - 3.10) / 0.35)),
+    };
+  }
   const vHand = new THREE.Vector3(), vMouth = new THREE.Vector3();
   const vHold = new THREE.Vector3(), vSip = new THREE.Vector3();
   const vPos = new THREE.Vector3(), vAx = new THREE.Vector3();
-  const vFwd = new THREE.Vector3(), vUp = new THREE.Vector3();
   const UPV = new THREE.Vector3(0, 1, 0);
   const qAim = new THREE.Quaternion(), qId = new THREE.Quaternion();
 
@@ -5411,7 +5566,7 @@ async function buildJadrija(scene) {
       show.t = t; show.s = s; show.vel = 0; show.rate = 0; show.leg = 0;
       if (ang != null) { show.ang = ang; show.want = ang; }
       if (phase) {
-        show.phase = phase; show.tmr = 0; show.held = 0;
+        show.phase = phase; show.tmr = 0; show.held = 0; show.pour = 0;
         skinFig.play({ wine: 'wine', untie: 'untie' }[phase] || 'idle',
           { fade: 0 });
       }
@@ -5425,7 +5580,9 @@ async function buildJadrija(scene) {
         // has the bottle in her hand rather than waiting a tick that a
         // headless clock may never give it.
         if (show.phase === 'wine') {
-          show.held = sat((at - 0.82) / 0.30) * (1 - sat((at - 3.95) / 0.30));
+          const wn = wineAt(at);
+          show.held = wn.held;
+          show.pour = wn.pour;
         }
       }
       stepShow(0, show.t, show.s + 2);
