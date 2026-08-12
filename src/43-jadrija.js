@@ -56,8 +56,11 @@ const JAD = {
   mid: 8.4,                // the middle terrace
   deck: 15.2,              // the promenade proper
   rowA: 17.2,              // seaward face of the front row of kabine
-  rowB: 24.0,              // and of the back row
-  back: 31.0,              // where the concrete stops
+  // The open kabina projects 5.4 m behind the front row. At the old 24.0 m
+  // offset, its collision clearance met the back row's, sealing the lane at
+  // exactly the place the player is invited to enter. Keep 2 m clear there.
+  rowB: 26.1,              // seaward face of the back row
+  back: 33.1,              // where the concrete stops
   bleed: 8.0,              // and blends back into the hillside
 
   drop: 0.62,              // height of one terrace riser
@@ -1103,7 +1106,11 @@ async function buildJadrija(scene) {
       const span = n * JAD.cabW;
       const clearOfGap = t + span < gapAt - 9 || t > gapAt + 9;
       if (clearOfGap) cabinRun(t, n, front, ROOFS[Math.floor(rng() * ROOFS.length)]);
-      t += span + 2.6 + rng() * 2.2;
+      // A run's pad projects 0.5 m beyond each end and `confine` holds the
+      // walker 0.55 m off it. The old 2.6 m minimum left a 0.5 m pinch point
+      // once both runs' clearance was accounted for. Keep at least 2 m free so
+      // the alleys are routes through the kabine, not gaps to squeeze through.
+      t += span + 4.1 + rng() * 1.5;
     }
   }
 
@@ -4546,7 +4553,10 @@ async function buildJadrija(scene) {
     // value read off the state it belongs to cannot leak. That argument is why
     // this line is a line and not two calls, and it still holds now that the
     // state it reads is a latch rather than a meter.
-    if (skinFig) skinFig.wear(!show.turned && !show.shed);
+    if (skinFig) {
+      skinFig.wear(!show.turned && !show.shed);
+      skinFig.tattoo(!!show.shed);
+    }
 
     // And the card, which is only ever up during a phase that holds it.
     // Placed before the matrix update at the bottom of this function, because

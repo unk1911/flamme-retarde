@@ -1658,6 +1658,7 @@ let dipDo = null;
 let dipPin = null;
 let dipCool = 0;
 let inRoom = false;
+let roomStep = null;
 const dipEl = () => document.getElementById('dip');
 
 function crossThreshold(dt, afoot) {
@@ -1703,30 +1704,38 @@ function crossThreshold(dt, afoot) {
   if (!afoot || !K || !ground || !ground.ok || dipCool > 0) {
     // Walking away from the resort, baling out, or dying in it all count as
     // having left the room, or you come back to Jadrija already indoors.
-    if (!afoot) inRoom = false;
+    if (!afoot) { inRoom = false; roomStep = null; }
     return;
   }
 
   const [t, s] = jadrija.local(camera.position.x, camera.position.z);
-  const sill = K.face + DIP.sill;
-  // The door's own width plus a hand either side. Outside that span the wall
-  // is solid, so anything crossing this line out there is a rounding error.
-  const inDoor = Math.abs(t - K.dc) < K.dj + 0.20;
-
-  if (!inRoom && inDoor && s > sill) {
+  const prev = roomStep;
+  roomStep = [t, s];
+  // This has to be a crossing, not merely being somewhere behind the hut in
+  // the doorway's t span. Otherwise the alley behind it becomes an invisible
+  // entrance and running along the back wall cuts straight into the room. Test
+  // where the path crosses the threshold, not its endpoint: a diagonal or fast step
+  // can legitimately end past a jamb after passing through the open door.
+  const u = prev && s > prev[1] ? (K.face - prev[1]) / (s - prev[1]) : -1;
+  const tAtSill = prev ? prev[0] + (t - prev[0]) * u : 0;
+  const entered = prev && u >= 0 && u <= 1
+    && Math.abs(tAtSill - K.dc) < K.dj + 0.20;
+  if (!inRoom && entered) {
     inRoom = true;
     dipStart(() => {
       const w = jadrija.toWorld(K.standIn[0], K.standIn[1]);
       dipPin = [w[0], w[2]];
       ground.stepTo(w[0], w[2]);
+      roomStep = [K.standIn[0], K.standIn[1]];
       inLatch = 1;
     });
-  } else if (inRoom && s < sill - 0.06) {
+  } else if (inRoom && prev && prev[1] >= K.face && s < K.face) {
     inRoom = false;
     dipStart(() => {
       const w = jadrija.toWorld(K.standOut[0], K.standOut[1]);
       dipPin = [w[0], w[2]];
       ground.stepTo(w[0], w[2]);
+      roomStep = [K.standOut[0], K.standOut[1]];
       inLatch = 0;
     });
   }

@@ -381,6 +381,7 @@ const FACE = {
   lick: 0.20,                      // m — how long the tongues of the ink are
   hot: [0.55, 0.12, 0.02],         // the leading edge of a flame
   ash: [0.10, 0.042, 0.034],       // and what it is behind the edge
+  dolphin: [0.015, 0.105, 0.165],  // blue ink, dark enough to read on sunlit skin
 };
 
 const FACE_DECL = /* glsl */ `
@@ -397,7 +398,15 @@ uniform float uInk;
 uniform vec2 uArmB;
 uniform vec4 uArmC;
 uniform vec2 uArmY;
+uniform float uDolphin;
+uniform vec3 uAnkle;
 varying float vArm;
+
+float inkStroke(vec2 p, vec2 a, vec2 b, float r){
+  vec2 ab = b - a;
+  float h = clamp(dot(p - a, ab) / max(dot(ab, ab), 1e-4), 0.0, 1.0);
+  return 1.0 - smoothstep(r, r + 0.055, length(p - a - ab * h));
+}
 
 // How much of a vertex belongs to an upper arm. Declared out here because the
 // vertex body is spliced into main() and cannot carry a function of its own,
@@ -479,6 +488,28 @@ const FACE_FRAG = /* glsl */ `
                      smoothstep(0.0, 0.070, edge - f.y));
       base = mix(base, inkCol, ink);
     }
+
+    // The dolphins are linework on the outside of both ankles. They are drawn
+    // in bind space so they stay with the skin through every pose, and only
+    // arrive once the hip wrap has been dropped in the kabina.
+    if (uDolphin > 0.0) {
+      // Lifted 4 cm above the anklet so its silhouette is never mistaken for
+      // jewellery, and scaled for a mark that remains legible from a crouch.
+      vec2 q = (f.xy - (uAnkle.xy + vec2(0.0, 0.052))) / vec2(0.058, 0.064);
+      float dolphin = 0.0;
+      dolphin = max(dolphin, inkStroke(q, vec2(-0.68, -0.03), vec2(-0.18, 0.16), 0.075));
+      dolphin = max(dolphin, inkStroke(q, vec2(-0.18, 0.16), vec2(0.43, 0.03), 0.075));
+      dolphin = max(dolphin, inkStroke(q, vec2(0.38, 0.03), vec2(0.86, -0.06), 0.045));
+      dolphin = max(dolphin, inkStroke(q, vec2(-0.08, 0.14), vec2(0.12, 0.56), 0.042));
+      dolphin = max(dolphin, inkStroke(q, vec2(0.03, 0.10), vec2(0.30, -0.30), 0.040));
+      dolphin = max(dolphin, inkStroke(q, vec2(-0.66, -0.03), vec2(-1.03, 0.31), 0.047));
+      dolphin = max(dolphin, inkStroke(q, vec2(-0.66, -0.03), vec2(-1.03, -0.31), 0.047));
+      float frame = 1.0 - smoothstep(1.28, 1.48, length(q / vec2(1.0, 0.70)));
+      // Restrict it to the outside faces of the ankles. Without this it projects
+      // through the whole leg and reads as a bracelet from the front or back.
+      float outer = smoothstep(0.016, 0.026, f.z);
+      base = mix(base, vec3(${FACE.dolphin.join(', ')}), dolphin * frame * outer * uDolphin);
+    }
   }
 `;
 
@@ -528,6 +559,8 @@ function skinnedFigure(data, opts = {}) {
     uArmB: { value: new THREE.Vector2(-1, -1) },
     uArmC: { value: new THREE.Vector4(0, 0, 0, 0) },
     uArmY: { value: new THREE.Vector2(0, 1) },
+    uDolphin: { value: 0 },
+    uAnkle: V([0, -99, 0]),
   } : {};
 
   const mat = solidMaterial(0xffffff, {
@@ -582,6 +615,16 @@ function skinnedFigure(data, opts = {}) {
       uFace.uArmC.value.set(E[0], E[2], S[0], S[2]);
       uFace.uArmY.value.set(E[1], S[1]);
       anchors.armY = [E[1], S[1]];
+    }
+  }
+
+  // Both ankles are symmetric, so the shader folds their lateral coordinate on
+  // to one anchor. The foot bone starts at the ankle in this rig.
+  if (anchors) {
+    const foot = data.bones.findIndex((b) => /^foot[LR]$/.test(b.name));
+    if (foot >= 0) {
+      uFace.uAnkle.value.set(bindT[foot * 3], bindT[foot * 3 + 1],
+        Math.abs(bindT[foot * 3 + 2]));
     }
   }
 
@@ -720,6 +763,7 @@ function skinnedFigure(data, opts = {}) {
   const face = anchors ? {
     smile: 0,          // what the caller wants, 0..1
     ink: 0,            // and how far the flames have climbed her arms
+    dolphin: 0,        // the ankle ink is revealed with the dropped wrap
     rate: 1,           // blinks a second, scaled. Staring is `rate = 0`.
     anchors,
   } : null;
@@ -740,6 +784,7 @@ function skinnedFigure(data, opts = {}) {
     // ink is a flame front going up an arm, and it wants the second and a bit
     // that the riser under the turn takes.
     uFace.uInk.value = damp(uFace.uInk.value, sat(face.ink), 2.6, dt);
+    uFace.uDolphin.value = damp(uFace.uDolphin.value, sat(face.dolphin), 7, dt);
 
     if (bl.at < 0) {
       // A rate of nothing is not a very long wait, it is no blinking at all —
@@ -796,9 +841,13 @@ function skinnedFigure(data, opts = {}) {
     data.geo.setDrawRange(0, on ? Infinity : data.ni - data.shed);
   }
 
+  function tattoo(on) {
+    if (face) face.dolphin = on ? 1 : 0;
+  }
+
   update(0);
   return {
-    mesh, material: mat, bones: data.bones, uBones, cast, wear,
+    mesh, material: mat, bones: data.bones, uBones, cast, wear, tattoo,
     clips: Object.keys(data.clips), tris: data.tris, nv: data.nv,
     play, update, state: st, face, faceTick, uFace,
     playing: () => (st.cur ? st.cur.name : null),

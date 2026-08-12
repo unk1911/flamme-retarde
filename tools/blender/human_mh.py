@@ -2939,18 +2939,19 @@ LUNGE = {
 # is what turns the elbow's hinge round — WINE_UP uses the same axis externally
 # to get a bottle to a mouth — and it moved her hands from her chest to her chin.
 #
-# What works is the simple thing: take the whole arm back, 46°, and leave the
-# elbow nearly straight at 26°. The hands meet low, at the small of her back,
-# which is where they go.
+# Take both arms further back than the first hold, with the elbows almost open:
+# the hands now sit visibly behind the waist rather than disappearing into her
+# flanks. The chest opens with them and the chin rises a little, so the held pose
+# reads as an intentional, smiling look upward rather than a slump.
 KNEEL_BACK = dict(KNEEL, **{
     "pelvis": (-4, 0, 0),
-    "spine01": (1, 0, 0), "spine02": (1, 0, 0), "spine03": (-4, 0, 0),
-    "chest": (-7, 0, 0), "neck": (6, 0, 0), "head": (2, 0, 1),
+    "spine01": (0, 0, 0), "spine02": (0, 0, 0), "spine03": (-6, 0, 0),
+    "chest": (-11, 0, 0), "neck": (13, 0, 0), "head": (12, 0, 1),
     # Shoulders rolled back, which is what the pose is doing to her chest and
     # is the whole difference between hands behind the back and hands hidden.
     "clavicleL": (0, 0, -8), "clavicleR": (0, 0, 8),
-    "armUL": (46, 0, 6), "armLL": (-34, 0, 14), "handL": (-8, 0, -10),
-    "armUR": (46, 0, -6), "armLR": (-34, 0, -14), "handR": (-8, 0, 10),
+    "armUL": (68, 0, 9), "armLL": (-15, 0, 17), "handL": (-13, 0, -13),
+    "armUR": (68, 0, -9), "armLR": (-15, 0, -17), "handR": (-13, 0, 13),
 })
 
 # The same, a breath later. Everything here is small on purpose: she is holding
@@ -2958,9 +2959,9 @@ KNEEL_BACK = dict(KNEEL, **{
 # that does not is a mannequin.
 KNEEL_BACK_B = dict(KNEEL_BACK, **{
     "@root": (0.0, -0.018, -0.446),
-    "spine01": (2, 0, 0), "spine02": (2, 0, 0), "spine03": (-6, 0, 0),
-    "chest": (-9, 0, 0), "neck": (7, 0, 0), "head": (3, 5, 1),
-    "armUL": (48, 0, 5), "armUR": (48, 0, -5),
+    "spine01": (1, 0, 0), "spine02": (1, 0, 0), "spine03": (-8, 0, 0),
+    "chest": (-13, 0, 0), "neck": (15, 0, 0), "head": (14, 5, 1),
+    "armUL": (71, 0, 8), "armUR": (71, 0, -8),
 })
 
 # ── the somersault ──────────────────────────────────────────────────────────
