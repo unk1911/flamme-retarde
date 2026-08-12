@@ -2917,6 +2917,52 @@ LUNGE = {
     "legUR": (4, 0, -5), "legLR": (104, 0, 0), "footR": (-18, 0, 0),
 }
 
+# Up on her knees with her hands behind her back — what being hosed gets you
+# indoors, where the promenade's answer to it is a cartwheel and a handful of
+# fire. Same room, same water, different game: out there she is performing at a
+# beach, in here there is one other person in a four-metre room and she has
+# already poured you a glass.
+#
+# Built off KNEEL rather than off IDLE, so the legs, the shins folded back and
+# the 0.45 m the root drops are the ones already solved for kneeling and not a
+# second attempt at them.
+#
+# The arms are the pose, and they are shoulder extension and very little else.
+#
+# Three goes at it, and the two that failed are worth the four lines. Positive X
+# on the upper arm takes it behind her — negative is forward, which is the sign
+# FOURS establishes reaching for the floor — and the obvious build is 25° of
+# that plus 90° of elbow. What that renders is a woman holding her own hands in
+# front of her chest: with the humerus untwisted, flexing an elbow swings the
+# forearm forward, and 25° of extension is nowhere near enough to out-run it.
+# The second go added the humeral twist, on the reasoning that internal rotation
+# is what turns the elbow's hinge round — WINE_UP uses the same axis externally
+# to get a bottle to a mouth — and it moved her hands from her chest to her chin.
+#
+# What works is the simple thing: take the whole arm back, 46°, and leave the
+# elbow nearly straight at 26°. The hands meet low, at the small of her back,
+# which is where they go.
+KNEEL_BACK = dict(KNEEL, **{
+    "pelvis": (-4, 0, 0),
+    "spine01": (1, 0, 0), "spine02": (1, 0, 0), "spine03": (-4, 0, 0),
+    "chest": (-7, 0, 0), "neck": (6, 0, 0), "head": (2, 0, 1),
+    # Shoulders rolled back, which is what the pose is doing to her chest and
+    # is the whole difference between hands behind the back and hands hidden.
+    "clavicleL": (0, 0, -8), "clavicleR": (0, 0, 8),
+    "armUL": (46, 0, 6), "armLL": (-34, 0, 14), "handL": (-8, 0, -10),
+    "armUR": (46, 0, -6), "armLR": (-34, 0, -14), "handR": (-8, 0, 10),
+})
+
+# The same, a breath later. Everything here is small on purpose: she is holding
+# a position, and a held position that moves is a person, where a held position
+# that does not is a mannequin.
+KNEEL_BACK_B = dict(KNEEL_BACK, **{
+    "@root": (0.0, -0.018, -0.446),
+    "spine01": (2, 0, 0), "spine02": (2, 0, 0), "spine03": (-6, 0, 0),
+    "chest": (-9, 0, 0), "neck": (7, 0, 0), "head": (3, 5, 1),
+    "armUL": (48, 0, 5), "armUR": (48, 0, -5),
+})
+
 # ── the somersault ──────────────────────────────────────────────────────────
 #
 # One tucked front somersault, and the entire revolution is carried on `pelvis`
@@ -4355,6 +4401,15 @@ CLIPS = [
     {"name": "untie", "loop": False,
      "keys": [(0.00, IDLE_A), (0.60, UNTIE_A), (1.05, UNTIE_B),
               (1.35, UNTIE_B), (1.85, UNTIE_C), (2.55, IDLE_A)]},
+    # And the third indoor one, which is the room's answer to the hose. Two
+    # clips for the reason `flare` and `firestarter` are two: the way down
+    # happens to her once and takes a second and a half, and what she is at the
+    # bottom of it she stays until something else happens.
+    {"name": "submit", "loop": False,
+     "keys": [(0.00, IDLE_A), (0.55, LUNGE), (1.00, KNEEL),
+              (1.55, KNEEL_BACK)]},
+    {"name": "kept", "loop": True,
+     "keys": [(0.0, KNEEL_BACK), (2.2, KNEEL_BACK_B), (4.4, KNEEL_BACK)]},
     {"name": "flare", "loop": False, "keys": FLARE},
     {"name": "firestarter", "loop": True, "keys": FIRE},
     {"name": "cast", "loop": False, "keys": CAST},

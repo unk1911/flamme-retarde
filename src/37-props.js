@@ -398,6 +398,10 @@ function buildProps(scene, lanes) {
   // Anywhere the developed shoreline meets flat ground near the waterline. They
   // come in knots of three to seven, because nobody puts up one umbrella.
   const parasols = [];
+  // How many of them stand on the Jadrija deck, which is the only place any of
+  // this is at eye level. Reported because it is the number that decides both
+  // "too many umbrellas" and how many blockers the resort's `confine` carries.
+  let onDeck = 0;
   const PARASOL_COL = [
     [1.00, 1.00, 0.98], [0.95, 0.55, 0.30], [0.35, 0.55, 0.78],
     [0.90, 0.86, 0.55], [0.85, 0.35, 0.35], [0.45, 0.68, 0.60],
@@ -424,9 +428,22 @@ function buildProps(scene, lanes) {
       // deck — and only on the open terraces, because the strip behind them is
       // solid huts and a beach umbrella through a roof is worse than none.
       if (jadOn(px, pz)) {
-        const s = jadrija.local(px, pz)[1];
+        const [pt, s] = jadrija.local(px, pz);
         if (s > JAD.deck) continue;
+        // Half of them, and only here. Nine hundred parasols over sixty square
+        // kilometres is a coastline in August; the same density on the one
+        // twelve-metre strip you actually walk down is a forest you cannot see
+        // the kabine through. Thinned off the dart and knot indices rather than
+        // out of `rng`, because a draw taken here shifts every boat and every
+        // car placed after it.
+        if ((d + k) % 2) continue;
         py = jadrija.walkY(px, pz);
+        // And a parasol you can walk through is a poster of a parasol. The pole
+        // only — the canopy is at 2.2 m and being stopped by shade over your
+        // head is worse than walking through it, which is the same call the
+        // resort's own parasols make in src/43-jadrija.js.
+        jadrija.blockers.push({ t: pt, s, a: 0.09, c: 0.09, h: 2.3, y: 0 });
+        onDeck++;
       }
       parasols.push([px, py, pz, rng() * TAU, 0.85 + rng() * 0.35,
         k === 0 ? cl : PARASOL_COL[(rng() * PARASOL_COL.length) | 0]]);
@@ -648,6 +665,7 @@ function buildProps(scene, lanes) {
     update, layers,
     counts: {
       parasols: parasols.length,
+      parasolsOnDeck: onDeck,
       boats: boats.length,
       underway: boats.filter((b) => b.moving).length,
       cars: cars.length,

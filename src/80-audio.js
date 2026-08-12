@@ -11,6 +11,7 @@
 function buildAudio() {
   let ctx = null;
   let master = null, verb = null, verbSend = null, verbGain = null, bed = null, bedDuck = null;
+  let outBus = null, outLp = null;
   let slowLp = null;
   const nodes = {};
   let started = false;
@@ -154,6 +155,27 @@ function buildAudio() {
     bedDuck = ctx.createGain();
     bedDuck.gain.value = 1;
     bed.connect(bedDuck).connect(master);
+
+    // ── outdoors ──────────────────────────────────────────────────────────
+    // The two sounds on the bed that belong to the beach rather than to the
+    // player — the klapa off the terrace and the hillside of cicadas behind
+    // it — pass through here first, so that a shut door can take them away.
+    //
+    // A fourth stage rather than reusing the bed, because the transistor set
+    // on the table is also on the bed and it is the one thing in the game
+    // that gets *louder* when you walk indoors: ducking the bed for the room
+    // took the radio down with the cicadas, which is the room shutting out
+    // the only thing in it.
+    //
+    // A wall is not a fader. It takes the top off long before it takes the
+    // level — 100 mm of render and a shut wooden door leave you the body of a
+    // cicada chorus and none of its edge — so this is a gain *and* a lowpass,
+    // and the lowpass is the half that sells it.
+    outBus = ctx.createGain();
+    outBus.gain.value = 1;
+    outLp = ctx.createBiquadFilter();
+    outLp.type = 'lowpass'; outLp.frequency.value = 20000; outLp.Q.value = 0.4;
+    outBus.connect(outLp).connect(bed);
 
     // ── the valley ────────────────────────────────────────────────────────
     // A convolution bus with a hand-made impulse response: a few discrete
@@ -1210,7 +1232,7 @@ function buildAudio() {
       hp.type = 'highpass'; hp.frequency.value = 150;
       const g = ctx.createGain();
       g.gain.value = 0.0001;
-      src.connect(hp).connect(lp).connect(g).connect(bed);
+      src.connect(hp).connect(lp).connect(g).connect(outBus);
       // And a send that is *heaviest* when you are furthest away, because at a
       // kilometre what reaches you is mostly the hillside behind the resort
       // rather than the singers.
@@ -1375,6 +1397,22 @@ function buildAudio() {
   }
 
   /**
+   * How far inside the kabina the listener is, 0…1 — the same ramp the
+   * exposure and the near plane hang off.
+   *
+   * The cutoff falls geometrically rather than linearly, because hearing is:
+   * halfway through the door at a linear 10 kHz nothing has happened yet,
+   * where 4 kHz is audibly a door closing. Fast, too — 0.12 s, well inside the
+   * threshold cut, so the beach is already gone when the screen comes back up.
+   */
+  function room(v) {
+    if (!ctx || dead || !outBus) return;
+    const t = ctx.currentTime, x = sat(v);
+    outBus.gain.setTargetAtTime(1 - 0.86 * x, t, 0.12);
+    outLp.frequency.setTargetAtTime(20000 * Math.pow(900 / 20000, x), t, 0.12);
+  }
+
+  /**
    * Cicadas. Thirty summers of them, and the sound of every August afternoon
    * on this coast — band-passed noise, amplitude-modulated at the wingbeat.
    */
@@ -1412,7 +1450,7 @@ function buildAudio() {
     }
     src.connect(bp).connect(g);
     src.connect(bp2).connect(g);
-    g.connect(bed);
+    g.connect(outBus);
     src.start(t0);
     cicadaNodes = { src, g };
   }
@@ -1919,7 +1957,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, beep, setVolume, getVolume,
-    setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa,
+    setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa, room,
     firestarter, slowmo, radioTune, radioClick,
     /** Where the pointer sits for each station, so the dial can be drawn. */
     radioDial: () => DIAL.map((d) => d.f),

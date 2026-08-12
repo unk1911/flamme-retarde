@@ -648,6 +648,10 @@ async function boot() {
     // the same sense: something in the world the jet can land on that the hose
     // code has no business knowing anything else about.
     ground.addGuest(jadrija.radioProbe, jadrija.radioWet);
+    // And the television beside it, which answers the same way for the same
+    // reason: each hit knocks the knob round one channel, and the last position
+    // on the dial is the end of the band.
+    ground.addGuest(jadrija.tvProbe, jadrija.tvWet);
   }
 
   await step(85, 'load.maquis');
@@ -1421,7 +1425,7 @@ function updateMission(dt) {
 
   // Spot fires get called out — this is the only warning the city gets.
   for (const ev of fire.events) {
-    if (ev.kind === 'spot' && ev.city && state.t - spotWarned > 12) {
+    if (ev.kind === 'spot' && ev.city && !recess && state.t - spotWarned > 12) {
       spotWarned = state.t;
       radio('call.lookout', 'radio.spot');
       toast(T('toast.spot'), 'bad');
@@ -1436,8 +1440,11 @@ function updateMission(dt) {
     flight.p.slam = 0;
   }
 
+  // Not while you are at Jadrija: the fire is frozen down there, so this could
+  // only fire on a count that was already zero when you arrived, and an ending
+  // that lands on a beach is an ending nobody was watching for.
   const burning = fire.burningCount();
-  if (lastBurning > 25 && burning === 0) {
+  if (!recess && lastBurning > 25 && burning === 0) {
     state.phase = 'won';
     showEnd(true);
   }
@@ -1445,8 +1452,9 @@ function updateMission(dt) {
 
   // Losable from the ground too. The town does not stop burning because you
   // are standing on an apron forty kilometres of road away from it.
-  if (state.cityHealth < 0.55 && (state.phase === 'fly' || state.phase === 'ground'
-    || state.phase === 'chute')) {
+  if (!recess && state.cityHealth < 0.55
+    && (state.phase === 'fly' || state.phase === 'ground'
+      || state.phase === 'chute')) {
     state.phase = 'lost';
     showEnd(false);
   }
@@ -1614,6 +1622,9 @@ let wasAfoot = false;
 let indoors = 0;
 let inLatch = 0;
 let cicadaAt = 0;
+// True while you are on foot inside the Jadrija field, which is the one place
+// the mission is allowed to stop happening. Set at the top of `frame`.
+let recess = false;
 let lastFrameMs = 0;
 
 /**
@@ -1752,6 +1763,26 @@ function frame() {
   U.uTime.value += dt;
   if (!started) return;
 
+  // Jadrija is a recess, and while you are in it the fire waits.
+  //
+  // This contradicts, deliberately and only here, the rule two hundred lines
+  // down that the town does not stop burning because you got out of the
+  // aeroplane. That rule is right about Rokići: the apron is forty kilometres
+  // of road from the fire and you are still fighting it, still watching the
+  // wingmen work, still able to lose the town while you stand there. It is
+  // wrong about Jadrija, which is not the mission at a distance — it is a
+  // different game with a different subject, and the mission finishing without
+  // you while you are down there reads exactly as it reads: a verdict on
+  // something nobody in the frame is looking at. "The fire is out" arriving
+  // over a beach at four in the afternoon is not a reward, it is an interruption
+  // by a screen from another game.
+  //
+  // So the whole of it holds: no spread, no burn-out, no spot calls, no win and
+  // no loss. Walk back to the aeroplane and the fire is where you left it, which
+  // is also the only honest thing to do with a clock you have stopped.
+  recess = (state.phase === 'ground' || state.phase === 'chute') && !!jadrija
+    && jadrija.inField(camera.position.x, camera.position.z);
+
   if (state.phase === 'ground') {
     // The branch, on mouse or space. The aeroplane's own input is deliberately
     // not read: it is parked, and nothing on foot should be moving its controls.
@@ -1864,7 +1895,11 @@ function frame() {
   // is racing the clock rather than racing you — see the note on `update` in
   // src/40-fire.js for why letting it slow would be a cheat and letting
   // everything else slow is not.
-  fire.update(real, dt);
+  // Except at Jadrija — see `recess` at the top of this function. The events
+  // queue is drained rather than left to bank up, so that walking back out does
+  // not deliver twenty minutes of spot-fire calls in one frame.
+  if (recess) fire.events.length = 0;
+  else fire.update(real, dt);
   ground.update(dt);
   // The other three keep working while your wreck is still settling — and while
   // you are on foot. Gating this on the flying phase left all three of them
@@ -1925,10 +1960,17 @@ function frame() {
   if (dipPhase) indoors = inLatch;
   else indoors += (inLatch - indoors) * Math.min(1, dt * 3.6);
   if (afoot !== wasAfoot) { audio.cicadas(afoot, 0.05); wasAfoot = afoot; }
-  else if (afoot && Math.abs(indoors - cicadaAt) > 0.02) {
+  // The beach, shut out by the wall. This used to make the cicadas *louder*
+  // indoors on the theory that a quiet room is what you notice them in, and it
+  // was the wrong theory: a changing hut with a hillside of cicadas at full
+  // level in it is not a room you have walked into, it is a room somebody has
+  // taken the roof off. They go through a gain and a lowpass now — see `room`
+  // in src/80-audio.js — with the klapa on the same bus, and the radio on the
+  // table pointedly not, because it is the one sound in here that is in here.
+  if (afoot && Math.abs(indoors - cicadaAt) > 0.01) {
     cicadaAt = indoors;
-    audio.cicadas(true, 0.05 + 0.045 * indoors);
-  }
+    audio.room(indoors);
+  } else if (!afoot && cicadaAt !== 0) { cicadaAt = 0; audio.room(0); }
   // The light. ACES over the whole frame rather than a lamp in the room,
   // because there is no lamp in the room — that is the point of it — and what
   // your eye actually does walking in off a white promenade is exactly this.
@@ -2204,6 +2246,19 @@ window.__fr = {
     bank: flight ? Math.round(Math.atan2(flight.axes().right.y, flight.axes().up.y)
       * 180 / Math.PI) : 0,
     phase: state.phase,
+    // True while the mission is on hold because you are down at Jadrija — see
+    // `recess` in `frame`. Worth reporting: it is the one flag that makes the
+    // fire stop moving, and a fire that is not moving is otherwise a bug.
+    recess,
+    // And where the eye is in the resort's own frame, which is what decides it.
+    //
+    // Reported next to `recess` rather than left to be worked out, because the
+    // two disagreeing is the tell for a stale frame and not for a broken test:
+    // `recess` is written once a frame and a headless page runs rAF at about
+    // one frame a second, so a probe taken a tenth of a second after the camera
+    // is moved reads the flag from before the move. That cost an hour once.
+    camTS: jadrija ? jadrija.local(camera.position.x, camera.position.z)
+      .map((v) => +v.toFixed(1)) : null,
     planeShown: plane ? plane.root.visible : null,
     crashed: flight ? flight.p.crashed : false,
     // What the stick is actually being told, and whether anything is helping.

@@ -612,8 +612,19 @@ async function buildJadrija(scene) {
     const c = a + JAD.cabW, h = (half || DOORW * 0.5) + 0.075;
     // The skirt. Not a plinth and not a moulding — just the strip of wall that
     // gets splashed, kicked and scrubbed, so it reads greyer and slightly warm.
-    boxTS(a, c, front - 0.006, front - 0.001,
-      floor, floor + 0.46, [col[0] * 0.900, col[1] * 0.908, col[2] * 0.908]);
+    //
+    // In two runs either side of the opening, for the same reason as the eave
+    // band below and then some: this is drawn 6 mm *proud* of the wall face and
+    // the door leaf hangs 90 mm behind it, so a single band across the bay
+    // walled up the bottom half-metre of every door on the beach. The doors
+    // looked like they stopped short of the ground. They did not — they were
+    // behind the skirt.
+    const skirt = [col[0] * 0.900, col[1] * 0.908, col[2] * 0.908];
+    for (const [t0, t1] of [[a, dc - h], [dc + h, c]]) {
+      if (t1 - t0 > 0.02) {
+        boxTS(t0, t1, front - 0.006, front - 0.001, floor, floor + 0.46, skirt);
+      }
+    }
     // A patch of newer render, and the line where the last one stopped. Kept
     // clear of the opening and kept *quiet*: at four per cent off its
     // surroundings the first version read as sheets of paper taped to the wall.
@@ -1433,6 +1444,44 @@ async function buildJadrija(scene) {
     return (dt, ds, y) => W(t0 + dt * c - ds * sn, s0 + dt * sn + ds * c, y);
   };
 
+  /**
+   * A solid of revolution from a profile, which is what a bottle and a turned
+   * leg actually are.
+   *
+   * `post` is one radius from top to bottom and `frustum` — despite the name —
+   * has a *rectangular* cross-section, four faces and four corners. Stacking
+   * them was fine for everything at arm's length or further, and the two
+   * objects in this game you stand over and look straight down at are the
+   * bottle on the tabouret and the tabouret under it. On those the seams show:
+   * a burgundy shoulder built as one `frustum` is a four-sided pyramid, and
+   * from above it is unmistakably a pyramid.
+   *
+   * `prof` is a list of `[y, r]` rings, bottom to top, optionally `[y, r, dt,
+   * ds]` to lean the axis over — which is how a splayed leg gets built as one
+   * call rather than as a stack of cones nobody can line up. Rings of zero
+   * radius close the end; anything else is left open, so a caller can butt two
+   * lathes together without paying for two invisible caps.
+   */
+  function lathe(P, dt, ds, prof, col, sides = 14) {
+    const at = (k, i) => {
+      const [y, r, ot = 0, os = 0] = prof[k];
+      const a = (i % sides / sides) * TAU;
+      return P(dt + ot + Math.cos(a) * r, ds + os + Math.sin(a) * r, y);
+    };
+    for (let k = 0; k < prof.length - 1; k++) {
+      if (prof[k][1] <= 0 && prof[k + 1][1] <= 0) continue;
+      for (let i = 0; i < sides; i++) {
+        // A ring of zero radius is a point, and a quad with two coincident
+        // corners is a triangle with a degenerate one in it — flat shading
+        // reads the normal off the cross product, so the degenerate half comes
+        // out black. Emit the triangle instead.
+        if (prof[k][1] <= 0) b.tri(at(k, i), at(k + 1, i), at(k + 1, i + 1), col);
+        else if (prof[k + 1][1] <= 0) b.tri(at(k, i), at(k, i + 1), at(k + 1, i), col);
+        else b.quad(at(k, i), at(k, i + 1), at(k + 1, i + 1), at(k + 1, i), col);
+      }
+    }
+  }
+
   /** A vertical n-sided prism. Poles, trunks, pot rims. */
   function post(P, dt, ds, y0, y1, r, col, sides = 6) {
     for (let i = 0; i < sides; i++) {
@@ -1976,7 +2025,7 @@ async function buildJadrija(scene) {
       g.drawImage(buf, SX, SY, SW, SH);
     };
 
-    const draw = (price, seed) => {
+    const draw = (price, seed, label = 'BTC / USD') => {
       // The cabinet's front, and the cream surround the tube sits in.
       g.fillStyle = '#3a2513'; g.fillRect(0, 0, cv.width, cv.height);
       g.fillStyle = '#d8cdb4';
@@ -1999,8 +2048,11 @@ async function buildJadrija(scene) {
         g.shadowColor = '#79ffbe'; g.shadowBlur = 18;
         g.fillStyle = '#9dffcf';
         g.font = '30px Helvetica, Arial, sans-serif';
-        g.fillText('BTC / USD', SX + SW / 2, SY + 74);
-        g.font = 'bold 92px Helvetica, Arial, sans-serif';
+        g.fillText(label, SX + SW / 2, SY + 74);
+        // Sized to fit: DOGE at four decimal places is twice the string BTC is,
+        // and at 92 px it walks off both sides of a 444 px tube.
+        g.font = 'bold ' + (price.length > 8 ? 68 : 92)
+          + 'px Helvetica, Arial, sans-serif';
         g.fillText(price, SX + SW / 2, SY + 168);
         g.font = '26px Helvetica, Arial, sans-serif';
         g.fillStyle = 'rgba(157,255,207,0.62)';
@@ -2179,13 +2231,40 @@ async function buildJadrija(scene) {
     }
 
     // ── the tabouret, and the Pelješac on it ──
+    // Turned, because you look straight down at it from half a metre and a
+    // four-sided leg seen from directly above is four sides. Each leg is one
+    // `lathe` with the axis leaned over — a splay of 0.34 of the top spacing
+    // across 0.68 m — with the swell a turner leaves at the knee and the taper
+    // above it. Eight sides is enough at this size; the seat gets sixteen
+    // because its rim is the one circle in the room at eye level.
     const bt = dc - 1.58, bs = 18.20;
+    const LEG = [[0.000, 0.0140], [0.030, 0.0170], [0.072, 0.0146],
+      [0.250, 0.0184], [0.430, 0.0150], [0.610, 0.0134], [0.680, 0.0126]];
     for (const o of [[-0.11, -0.11], [0.11, -0.11], [-0.11, 0.11], [0.11, 0.11]]) {
-      frustum(W, f, [bt + o[0] * 1.34, bs + o[1] * 1.34, 0.016, 0.016],
-        f + 0.68, [bt + o[0], bs + o[1], 0.013, 0.013], KIT.dark);
+      lathe(W, bt + o[0] * 1.34, bs + o[1] * 1.34,
+        LEG.map(([h, r]) => [f + h, r, -0.34 * o[0] * (h / 0.68),
+          -0.34 * o[1] * (h / 0.68)]), KIT.dark, 8);
     }
-    post(facing(bt, bs, 0), 0, 0, f + 0.68, f + 0.72, 0.165, KIT.wood, 10);
-    dome(facing(bt, bs, 0), 0, 0, f + 0.72, 0.014, 0.165, KIT.woodT, 10);
+    // Stretchers. Four bars in a square a third of the way up, which is what
+    // stops a stool this light from racking — and, more to the point here, what
+    // the eye reads as a stool rather than as four sticks under a disc.
+    const q = 0.11 * (1.34 - 0.34 * (0.221 / 0.68));
+    for (const sg of [-1, 1]) {
+      frustum(W, f + 0.212, [bt, bs + sg * q, q, 0.009],
+        f + 0.230, [bt, bs + sg * q, q, 0.009], KIT.dark);
+      frustum(W, f + 0.212, [bt + sg * q, bs, 0.009, q],
+        f + 0.230, [bt + sg * q, bs, 0.009, q], KIT.dark);
+    }
+    // The seat: an underside, a rounded edge, and a top dished the two
+    // millimetres that thirty summers of people put into one.
+    lathe(W, bt, bs, [
+      [f + 0.658, 0.000], [f + 0.658, 0.148], [f + 0.664, 0.162],
+      [f + 0.702, 0.168], [f + 0.716, 0.162], [f + 0.721, 0.150],
+    ], KIT.wood, 16);
+    lathe(W, bt, bs, [
+      [f + 0.721, 0.150], [f + 0.7225, 0.108], [f + 0.7215, 0.055],
+      [f + 0.7200, 0.000],
+    ], KIT.woodT, 16);
     // The bottle. A Dingač is a burgundy bottle — sloped shoulder, no punt you
     // can see, dark glass — and the shoulder is the whole silhouette.
     //
@@ -2193,18 +2272,37 @@ async function buildJadrija(scene) {
     // here that moves: she picks it up. Built about its own base at the origin
     // so that a position and a yaw are all it ever needs, which is what lets it
     // sit on a tabouret one second and hang off a wrist the next.
-    const by = f + 0.73;
+    const by = f + 0.722;
     const bbuf = propBuilder();
     const keep = b;
     b = bbuf;
     const O = (dt, ds, y) => [dt, y, ds];
-    post(O, 0, 0, 0, 0.155, 0.038, KIT.glass, 9);
-    post(O, 0, 0, 0.055, 0.125, 0.0392, KIT.cream, 9);
-    post(O, 0, 0, 0.112, 0.125, 0.0394, KIT.foil, 9);
-    frustum(O, 0.155, [0, 0, 0.038, 0.038], 0.225, [0, 0, 0.0145, 0.0145],
-      KIT.glass);
-    post(O, 0, 0, 0.225, 0.300, 0.0145, KIT.glass, 8);
-    post(O, 0, 0, 0.262, 0.306, 0.0158, KIT.foil, 8);
+    // One profile, sixteen sides, and the shoulder sampled across five rings
+    // rather than being one straight cone. The shoulder is the whole silhouette
+    // of a burgundy bottle and it was a four-sided pyramid: `frustum` has a
+    // rectangular section, which nobody notices on a chair leg and everybody
+    // notices on the one object she holds up next to her face.
+    //
+    // Numbers off a real 0.75 l Dingač: 306 mm tall, 77 mm across the body, the
+    // shoulder falling over about 85 mm to an 29 mm neck, and a lip that stands
+    // proud of it. The mouth is left open — a bottle with a lid on it is a
+    // skittle.
+    lathe(O, 0, 0, [
+      [0.000, 0.0000], [0.000, 0.0300], [0.005, 0.0368], [0.014, 0.0385],
+      [0.146, 0.0385], [0.158, 0.0380], [0.171, 0.0364], [0.186, 0.0326],
+      [0.201, 0.0266], [0.215, 0.0203], [0.229, 0.0162], [0.243, 0.0146],
+      [0.286, 0.0144], [0.294, 0.0158], [0.303, 0.0160], [0.306, 0.0152],
+      [0.299, 0.0112],
+    ], KIT.glass, 16);
+    // The label, and the band across it. Half a millimetre proud, which is
+    // paper on glass and is also enough to keep it off the z-buffer's coin toss.
+    lathe(O, 0, 0, [[0.048, 0.0390], [0.128, 0.0390]], KIT.cream, 16);
+    lathe(O, 0, 0, [[0.112, 0.0393], [0.126, 0.0393]], KIT.foil, 16);
+    // The capsule over the neck, down to where it is cut.
+    lathe(O, 0, 0, [
+      [0.256, 0.0148], [0.260, 0.0152], [0.290, 0.0152], [0.294, 0.0166],
+      [0.303, 0.0168], [0.306, 0.0160], [0.300, 0.0118],
+    ], KIT.foil, 16);
     // And the wrap, once it is on the floor: four soft folds of cloth and no
     // more. It is never skinned and never was — the game stops drawing the one
     // she is wearing on the frame she reaches the tug and starts drawing this,
@@ -2270,6 +2368,10 @@ async function buildJadrija(scene) {
       // a hand's width: aiming at a radio means aiming at the thing on the
       // table, not at the table.
       set: [rt, rs, ry + 0.02, 0.22, 0.26],
+      // And where the tube is, for the same reason. A hair narrower than the
+      // cabinet, so that a jet clipping the corner of the wood does not count
+      // as changing the channel.
+      screen: [vt, vs - 0.10, gy + 0.31, 0.24, 0.40],
       // Where the bottle lives when nobody is holding it, and where she has to
       // stand to be able to reach it: 0.55 m off it, turned to face it, which
       // is one pace and an arm.
@@ -2295,22 +2397,99 @@ async function buildJadrija(scene) {
    * thing on this screen a player might act on.
    */
   const TVSET = { poll: 45, hiss: 0.16 };
-  let tvPrice = null, tvAsk = 0, tvHiss = 0, tvSeed = 1, tvBusy = false;
+  /**
+   * The channels, in the order the knob goes round: four tickers and then the
+   * gap at the end of the band.
+   *
+   * There is no fifth station to find, and that is the point of it. A knob you
+   * can turn is a knob worth turning twice, and a set that goes round to snow
+   * and then back to the beginning is what every television in every rented
+   * room on this coast has always done. The last position is deliberately the
+   * dead one rather than the best one: the reward for going all the way round
+   * is finding out where the end is.
+   *
+   * `dp` is decimal places, because DOGE at nought decimal places is `$0` and
+   * BTC at four is a number nobody can read across a dark room.
+   */
+  const TVCH = [
+    { k: 'BTC', pair: 'BTC-USD', dp: 0 },
+    { k: 'LTC', pair: 'LTC-USD', dp: 2 },
+    { k: 'ETH', pair: 'ETH-USD', dp: 0 },
+    { k: 'DOGE', pair: 'DOGE-USD', dp: 4 },
+    null,                                   // and the end of the band
+  ];
+  let tvAsk = 0, tvHiss = 0, tvSeed = 1, tvBusy = false;
+  // Which channel is on, and what each one last came back with. Cached per
+  // ticker rather than as one live price, so that going round the dial a second
+  // time puts the number straight back up instead of showing snow for however
+  // long Coinbase takes to answer.
+  let tvChan = 0;
+  let tvRoll = 0;                           // seconds of snow after a knock
+  let tvCool = 0;                           // and the latch on the knock itself
+  const tvSeen = {};
+
+  /** What the tube should be showing this instant, or null for snow. */
+  function tvNow() {
+    const c = TVCH[tvChan];
+    if (!c || tvRoll > 0) return null;
+    return tvSeen[c.pair] || null;
+  }
+
+  function tvPaint() {
+    if (!kit) return;
+    const c = TVCH[tvChan], p = tvNow();
+    kit.tv.draw(p, tvSeed, c ? c.k + ' / USD' : '');
+  }
 
   function tvFetch() {
-    if (tvBusy || typeof fetch !== 'function') return;
+    const c = TVCH[tvChan];
+    if (tvBusy || !c || typeof fetch !== 'function') return;
     tvBusy = true;
-    fetch('https://api.coinbase.com/v2/prices/BTC-USD/spot', { mode: 'cors' })
+    const want = c.pair;
+    fetch('https://api.coinbase.com/v2/prices/' + want + '/spot', { mode: 'cors' })
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
         const v = j && j.data && parseFloat(j.data.amount);
         if (v > 0) {
-          tvPrice = '$' + Math.round(v).toLocaleString('en-US');
-          if (kit) kit.tv.draw(tvPrice, 0);
+          const d = TVCH.find((q) => q && q.pair === want).dp;
+          tvSeen[want] = '$' + v.toLocaleString('en-US',
+            { minimumFractionDigits: d, maximumFractionDigits: d });
+          // Only if it is still the channel that is on: a slow answer for BTC
+          // must not paint itself over DOGE forty seconds after you turned the
+          // knob past it.
+          if (TVCH[tvChan] && TVCH[tvChan].pair === want) tvPaint();
         }
       })
       .catch(() => {})
       .then(() => { tvBusy = false; });
+  }
+
+  /**
+   * Where the tube is, for the jet — and only from inside the room, exactly as
+   * the radio is gated. See `radioProbe`.
+   */
+  function tvProbe() {
+    if (!kit || !special || !SET.near || !kit.screen) return null;
+    const [vt, vs, vy, r, h] = kit.screen;
+    const p = W(vt, vs, vy);
+    return { x: p[0], y: p[1], z: p[2], r, h };
+  }
+
+  /** The jet has found the television: the knob goes round one. */
+  function tvWet() {
+    if (!kit || tvCool > 0) return;
+    // The same latch the radio has, and for the same reason: `spray` calls this
+    // every frame it is on target, and four hundred litres a minute without one
+    // is not a channel change, it is a channel blur.
+    tvCool = 0.85;
+    tvChan = (tvChan + 1) % TVCH.length;
+    // Half a second of snow on the way in. Every valve set does this and it is
+    // the whole of why a channel change feels like one — without it the number
+    // simply becomes a different number and nothing has happened.
+    tvRoll = 0.42;
+    tvAsk = 0;
+    tvPaint();
+    if (audio) audio.radioClick(!!TVCH[tvChan]);
   }
 
   let kit = null;
@@ -2380,15 +2559,23 @@ async function buildJadrija(scene) {
     // Only while you are in the room, or near enough to see into it. A
     // television redrawing a canvas six times a second on the far side of a
     // shut door is a texture upload nobody is looking at.
+    tvCool = Math.max(0, tvCool - dt);
     if (pt < K.t0 - 3 || pt > K.t1 + 3 || ps < K.face - 4 || ps > K.s1 + 2) return;
     tvAsk -= dt;
     if (tvAsk <= 0) { tvAsk = TVSET.poll; tvFetch(); }
-    if (tvPrice != null) return;
+    // The snow after a knock, and the settle at the end of it. The settle is a
+    // repaint of one frame and has to happen even when the channel is showing a
+    // price — otherwise the roll never clears and the set stays on static.
+    if (tvRoll > 0) {
+      tvRoll -= dt;
+      if (tvRoll <= 0) { tvRoll = 0; tvPaint(); }
+    }
+    if (tvNow() != null) return;
     tvHiss -= dt;
     if (tvHiss <= 0) {
       tvHiss = TVSET.hiss;
       tvSeed = (tvSeed * 1103515245 + 12345) | 0;
-      kit.tv.draw(null, tvSeed);
+      tvPaint();
     }
   }
 
@@ -3669,6 +3856,11 @@ async function buildJadrija(scene) {
     // second one as a punchline, short enough that she is a woman on fire who
     // paused rather than a woman holding a sign.
     boastFor: 4.4,
+    // How long she stays down once the water is off her. Measured from the
+    // moment the jet stops, not from the moment she got there, so keeping the
+    // branch on her keeps her there — and eleven seconds after you stop is long
+    // enough to walk round her and short enough that she is not furniture.
+    keptFor: 11,
     castAt: 0.46,       // s into the `cast` clip where it leaves her hand. This
                         // is FIRE_CAST_AT in tools/blender/human_mh.py and it
                         // has to move with it or the ball appears out of a hand
@@ -4091,7 +4283,12 @@ async function buildJadrija(scene) {
    * because standing in the jet is how the meter fills — goes straight over.
    */
   const HELD = { down: 1, up: 1, flip: 1, joy: 1, wheel: 1,
-    flare: 1, blaze: 1, cast: 1, boast: 1 };
+    flare: 1, blaze: 1, cast: 1, boast: 1,
+    // And the indoor answer to the same meter — see `submit` below. It is held
+    // for the identical reason the turn is: it is not a mood, it is a thing
+    // that has happened, and the meter refilling underneath it would have her
+    // going down onto her knees from a position she is already in.
+    submit: 1, kept: 1, rise: 1 };
 
   // And the three of those that have a beat under them. `flare` is in it
   // because the riser is the point of the riser: the music starts a second and
@@ -4132,6 +4329,11 @@ async function buildJadrija(scene) {
     // in a room with the door open behind her.
     come: 0.55, enter: 0.40, wine: 0.30, meet: 0.85, untie: 0.60,
     dwell: 0.70, leave: 0.45,
+    // The one thing in the room the hose gets you. She goes down on the way in
+    // with the face of somebody who has decided to, and holds the widest smile
+    // in the building at the bottom of it — which is the whole of why this is
+    // not the promenade's answer to the same water. Out there she catches fire.
+    submit: 0.75, kept: 1.00, rise: 0.80,
   };
 
   /** The indoor track, as a set, so the trigger can tell it is already on it. */
@@ -4255,7 +4457,23 @@ async function buildJadrija(scene) {
       show.queue.length = 0;
       show.side = 0;
       showSay('squee', d);
-      go('flare', 'flare', 0.30);
+      // Indoors she does something else with it, and that is the point of the
+      // room. On the promenade being hosed in front of forty people is a dare
+      // and she answers it by catching fire; in a four-metre changing hut with
+      // the door shut and one other person in it, it is not a dare and there is
+      // nobody to answer it in front of. So she goes down onto her knees, puts
+      // her hands behind her back and smiles at you, and the flames stay
+      // outside where they belong.
+      //
+      // Tested on her own position rather than on `KABIN`, because the
+      // interesting case is precisely the one the phase table cannot see: she
+      // can be hit standing in the doorway a second before the indoor track
+      // picks her up.
+      const K0 = special;
+      const her = !!K0 && show.t > K0.t0 - 0.2 && show.t < K0.t1 + 0.2
+        && show.s > K0.face + 0.15 && show.s < K0.s1;
+      if (her) go('submit', 'submit', 0.30);
+      else go('flare', 'flare', 0.30);
       return;
     }
     if (show.owed > 0 && WETTABLE[show.phase]) {
@@ -4349,8 +4567,14 @@ async function buildJadrija(scene) {
     const K = special;
     const inside = !!K && pt > K.t0 - 0.25 && pt < K.t1 + 0.25
       && ps > K.face + 0.15 && ps < K.s1 + 0.2;
+    // `OWN` is everything that outranks the room: the turn, and the room's own
+    // answer to the hose. The second one is not optional — `submit` is entered
+    // from *inside* the kabina, so without it this line fires on the very next
+    // frame and walks her back to the doorway to start coming in again, out of
+    // a pose she has just gone down into three feet away from you.
+    const OWN = { flare: 1, submit: 1, kept: 1, rise: 1 };
     if (inside && !KABIN[show.phase] && !MUSIC[show.phase]
-        && show.phase !== 'flare' && !show.turned) {
+        && !OWN[show.phase] && !show.turned) {
       show.leg = 0;
       go('come', 'walk', 0.34);
     }
@@ -4427,6 +4651,34 @@ async function buildJadrija(scene) {
         show.want = Math.atan2(ps - show.s, pt - show.t);
         showHold(dt);
         if (!inside) go('leave', 'walk', 0.34);
+        break;
+
+      // ── the indoor answer to the hose ──
+      // Turned to face you the whole way down, because a person who has decided
+      // to do this does it at somebody. `want` is set every frame rather than
+      // once on entry: you can walk round her while it happens, and a figure
+      // that keeps facing the doorway you have left is a figure playing a clip.
+      case 'submit':
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        if (done) go('kept', 'kept', 0.30);
+        break;
+
+      case 'kept':
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        // Up again when the water has been off her a while. `hit` is the grace
+        // window the jet refreshes, so holding the branch on her holds the
+        // pose — which is the version anybody who finds this will want, and
+        // costs one term.
+        if (show.hit > 0) show.tmr = 0;
+        else if (show.tmr > SHOW.keptFor) go('rise', 'getup', 0.35);
+        break;
+
+      // And back onto the indoor track, not the promenade's. `up` is the other
+      // way out of a floor and it ends in a somersault, which in a room four
+      // metres across is a person going through a wall.
+      case 'rise':
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        if (done) go(inside ? 'dwell' : 'leave', inside ? 'idle' : 'walk', 0.40);
         break;
 
       // Out through the door before she is allowed to head for her spot, or
@@ -4953,7 +5205,16 @@ async function buildJadrija(scene) {
           // nose. Checked against both hands rather than reasoned about,
           // because a rig's idea of forward is not something to guess at.
           vFwd.set(-1, 0, 0).transformDirection(f.mesh.matrixWorld);
-          vMouth.addScaledVector(vFwd, 0.055).addScaledVector(vUp, 0.085);
+          // Measured against the rig rather than guessed at, which is what the
+          // first pair of numbers were. `head` is the atlas, 1.578 m up on a
+          // figure standing on a floor at 3.137 — the base of the skull, level
+          // with the jaw. A mouth is about 3 cm above that and 8 cm in front of
+          // it, and the old 8.5 cm up put the target at her cheekbone: the lip
+          // landed by her ear and the body of the bottle lay across her face,
+          // which is the "bottle inside her head" this is here to stop. Sitting
+          // it slightly proud of the lips also keeps 77 mm of glass off the
+          // skin, and nobody has ever seen the two-centimetre gap.
+          vMouth.addScaledVector(vFwd, 0.082).addScaledVector(vUp, 0.026);
           vAx.subVectors(vMouth, vHand);
           const reach = vAx.length();
           vAx.multiplyScalar(1 / reach);
@@ -4966,7 +5227,14 @@ async function buildJadrija(scene) {
           // that means to drink actually goes, and any leftover is spent on
           // the lip falling a centimetre or two short of her lips — which is
           // the error nobody sees.
-          const at = clamp(BOT.lip - reach, 0.03, 0.11);
+          // And the clamp opens up to the neck. The upper bound is what decides
+          // which way the error goes when her hand comes closer to her mouth
+          // than the bottle is long: at 0.11 the lip carries on past the target
+          // and into her face, which is the one direction the error must never
+          // take. A hand riding up to just under the shoulder of the bottle is
+          // what a person actually does tipping one back; 20 cm is that, and
+          // past it the residue is a lip a centimetre short of her lips.
+          const at = clamp(BOT.lip - reach, 0.02, 0.20);
           vHold.lerp(vSip.copy(vHand).addScaledVector(vAx, -at), sip);
         }
         vPos.lerp(vHold, show.held);
@@ -5354,11 +5622,20 @@ async function buildJadrija(scene) {
     figureAt: testFigure ? testFigure.at : null,
     /** The two ends of the hose hook — 47-ground.js wires them together. */
     figureProbe, figureWet, dogProbe, dogWet, radioProbe, radioWet,
+    tvProbe, tvWet,
     /** The set on the table: where it is, what it is doing, and knock it on. */
     radio: (knock) => {
       if (knock) { SET.cool = 0; radioWet(); }
       return { band: SET.band, lit: +SET.lit.toFixed(2), near: SET.near,
         at: kit ? kit.set : null, probe: radioProbe() };
+    },
+    /** The television: which channel, what it is showing, and turn the knob. */
+    tv: (knock) => {
+      if (knock) { tvCool = 0; tvWet(); }
+      const c = TVCH[tvChan];
+      return { chan: tvChan, of: TVCH.length, k: c ? c.k : 'static',
+        showing: tvNow(), roll: +tvRoll.toFixed(2), seen: { ...tvSeen },
+        at: kit ? kit.screen : null, probe: tvProbe() };
     },
     /**
      * Drive the promenade forward by hand.

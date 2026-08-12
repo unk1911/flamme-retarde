@@ -8,6 +8,133 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.52.0] — 2026-08-12
+
+### Fixed — the doors stopped short of the ground
+
+Every door on the beach was walled up for its bottom half-metre. The scrubbed
+skirt along the base of the render is drawn 6 mm *proud* of the wall face and
+the door leaf hangs 90 mm behind it, so a single band across the bay passed
+straight in front of the door and the door appeared to end where the skirt
+began. It did not end there — it was behind it. The skirt now runs in two
+lengths either side of the opening, which is what the eave shadow above it
+already does and for the same reason.
+
+### Changed — half the parasols on the deck, and you cannot walk through them
+
+Nine hundred parasols over sixty square kilometres of coastline is August. The
+same density on the one twelve-metre strip you actually walk down is a forest
+you cannot see the kabine through, so the resort's deck keeps half of them —
+thinned off the dart and knot indices rather than out of `rng`, because a draw
+taken there shifts every boat and every car placed after it.
+
+And each of the survivors now stops you. The pole only: the canopy is at 2.2 m
+and being stopped by shade over your head is worse than walking through it,
+which is the call the resort's own parasols already make. They go in as
+blockers on the resort's `confine`, which is the one thing in the game that
+already knows how to keep a person out of a box in shore-local coordinates.
+
+### Changed — a shut door takes the beach with it
+
+Walking into the kabina took the light down and the klapa with it, and left a
+hillside of cicadas at full level in a room with a shut door. Worse, it had
+been *raising* them, on the theory that a quiet room is where you notice them.
+
+The klapa and the cicadas now share a bus of their own, ahead of the one the
+music ducks, with a gain and a lowpass on it driven by the same `indoors` ramp
+as the exposure and the near plane. The lowpass is the half that sells it: a
+wall takes the top off long before it takes the level, and 900 Hz is about what
+100 mm of render and a wooden door leave of a cicada. The cutoff falls
+geometrically, because hearing does — halfway through the door a linear 10 kHz
+has not happened yet where 4 kHz is audibly a door closing.
+
+The transistor set on the table is pointedly *not* on that bus. It is the one
+sound in the room that is in the room, and ducking the bed wholesale — which is
+where the klapa and the cicadas used to sit — took the radio down with them.
+
+### Changed — the fire waits while you are at Jadrija
+
+The mission used to finish without you. You would be on a beach four kilometres
+away, in a different game with a different subject, and a screen would arrive to
+tell you the fire was out — a verdict on something nobody in the frame was
+looking at.
+
+So Jadrija is a recess: on foot inside the resort's field, the fire does not
+spread, does not burn out, does not call spot fires, and cannot win or lose the
+mission. Walk back to the aeroplane and it is where you left it. This
+deliberately contradicts the rule that the town does not stop burning because
+you got out — that rule is right about the aerodrome, which is the mission at a
+distance, and wrong about the one place that is not the mission at all.
+
+### Changed — the bottle and the tabouret are turned, not boxed
+
+`frustum`, despite the name, has a rectangular cross-section: four faces and
+four corners. That is invisible on anything at arm's length and unmissable on
+the two objects in this game you stand over and look straight down at. The
+burgundy shoulder — which is the whole silhouette of the bottle — was a
+four-sided pyramid, and the stool's legs were square sticks under a ten-sided
+disc.
+
+Both are solids of revolution now, off one new `lathe` that takes a profile of
+`[y, r]` rings and can lean its axis over, which is how a splayed leg gets built
+as one call instead of as a stack of cones nobody can line up. The bottle is
+sixteen sides on numbers off a real 0.75 l Dingač — 306 mm tall, 77 mm across,
+the shoulder falling over 85 mm to a 29 mm neck, a lip standing proud of it and
+an open mouth, because a bottle with a lid on it is a skittle. The tabouret gets
+turned legs with the swell a turner leaves at the knee, a square of stretchers a
+third of the way up, and a seat dished the two millimetres thirty summers put
+into one.
+
+### Fixed — the bottle went through her face
+
+The swig aims the lip at her mouth and lets the bottle lie back along the line
+from her hand to it, which is right, and it was aiming at the wrong point. `head`
+on this rig is the atlas — the base of the skull, level with the jaw — and the
+mouth was being taken as 8.5 cm above it, which is her cheekbone. The lip landed
+by her ear and 300 mm of glass lay across her face.
+
+Measured off the rig rather than guessed at: 3 cm above the atlas and 8 cm in
+front of it. And the clamp that decides where her hand sits on the bottle now
+opens to the neck, because its upper bound is what decides which way the error
+goes when her hand comes closer to her mouth than the bottle is long — at 11 cm
+the lip carried on past the target and into her face, which is the one direction
+that error must never take.
+
+### Added — the television has channels
+
+Each hit of the branch knocks the knob round one: BTC, LTC, ETH, DOGE, and then
+the end of the band, and round again. It is the radio's mechanism exactly —
+water is the switch, a latch stops four hundred litres a minute turning a knob
+thirty times a second, and the last position on the dial is the dead one rather
+than the best one, because the reward for going all the way round is finding out
+where the end is.
+
+Prices are cached per ticker, so a second lap puts the number straight back up
+instead of showing snow until Coinbase answers, and a slow answer for BTC cannot
+paint itself over DOGE forty seconds after you turned the knob past it. Half a
+second of real snow covers the change, which is what every valve set does and is
+the whole of why a channel change feels like one.
+
+### Added — she has an answer to the hose indoors
+
+On the promenade, being hosed in front of forty people is a dare, and she
+answers it by catching fire. In a four-metre changing hut with the door shut and
+one other person in it, it is not a dare and there is nobody to answer it in
+front of. So indoors the same soaked meter puts her down onto her knees with her
+hands behind her back, smiling at you, and the flames stay outside where they
+belong. She stays there while the water is on her and for eleven seconds after
+it stops, then gets up — back onto the indoor track and not the promenade's,
+which ends in a somersault, and a somersault in a room this size is a person
+going through a wall.
+
+Two new clips, `submit` and `kept`, on the same split as `flare` and
+`firestarter`: the way down happens once and takes a second and a half, and what
+she is at the bottom of it she stays. The pose took three rotations and not one
+— shoulder extension, elbow, and the humeral twist that turns the elbow's hinge
+round so that flexing it lays the forearms across the small of her back instead
+of folding her own hands in front of her chest, which is what the first two
+attempts rendered.
+
 ## [1.51.0] — 2026-08-12
 
 ### Fixed — the ceiling was in front of the near plane
