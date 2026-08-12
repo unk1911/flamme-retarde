@@ -8,6 +8,46 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.54.0] — 2026-08-12
+
+Tooling only. The game is byte-for-byte what 1.53.0 shipped apart from the
+version string in the corner.
+
+### Added — `tools/blender/blender.sh`, and preview renders got fourteen times faster
+
+EEVEE is a rasteriser and a rasteriser needs a GL context. There is no display
+under WSL, so Mesa was falling back to llvmpipe and drawing every preview frame
+on the CPU: 86 seconds for one 760×1120 pose render, which is four minutes of
+waiting for the three views that answer a question about an arm.
+
+WSL does expose the GPU. Not as `/dev/dri`, which is what everything looks for
+and is not there — as `/dev/dxg`, with Direct3D 12 over it, and Mesa ships a
+Gallium driver that speaks exactly that. Pointed at it, the same frame is six
+seconds. Two environment variables, which have to be set before the process
+starts, which is why they are in a shell wrapper and not in the Python.
+
+Checked against llvmpipe on the same pose: mean channel difference 0.001 out of
+255, and the largest difference anywhere in the frame is on an antialiased
+silhouette edge. It is the same picture. On a machine with no `/dev/dxg` the
+wrapper leaves the environment alone and Blender chooses for itself.
+
+What this did *not* turn out to need: a faster export path. The measurement
+that mattered was that `--reskin --norender` — open the blend, bake twenty-two
+clips, write the blob — is 7.9 seconds and always was. The whole five minutes
+was pictures.
+
+### Known — the clip bake is not deterministic
+
+Two consecutive `--reskin --norender` runs write blobs of identical length that
+differ in about 37% of their bytes. The `DECIMATE COLLAPSE` modifier does not
+collapse in a stable order, so the vertex count comes out the same and the
+positions do not. Nothing visible comes of it — every one of those blobs is a
+correct figure — but it means a bake dirties `build/payload/human_skin.fr3d.gz`
+in git whether or not a clip changed, and it means the plan to verify the
+`human_mh.py` → `frskin.py` convergence by producing a byte-identical blob
+cannot work as written. Whatever replaces that check has to compare geometry
+rather than bytes.
+
 ## [1.53.0] — 2026-08-12
 
 ### Changed — she pours the wine instead of drinking it

@@ -6,6 +6,27 @@
 Writes build/human_mh.blend and preview renders to /tmp/mh_*.png. The source
 mesh is cached at build/mh_base.obj and fetched on first run.
 
+── running it fast ────────────────────────────────────────────────────────────
+
+Use tools/blender/blender.sh in place of `blender` and every preview frame is
+six seconds instead of eighty-six, because it hands EEVEE the host GPU through
+Direct3D 12 rather than letting Mesa render it on the CPU. Same picture; see
+the note in that file.
+
+    tools/blender/blender.sh -b build/human_mh.blend \
+        -P tools/blender/human_mh.py -- --reskin KNEEL_BACK --views side
+
+Two of the flags below are worth knowing before reaching for a render at all,
+because between them they cover most of what a preview gets asked:
+
+    --norender      bake the clips and export the blob, draw nothing.  8 s
+    --probe POSE…   print where named joints land, in metres. Draw
+                    nothing at all.                                    1 s
+
+`--probe` exists because most arguments about a pose are arguments about which
+way a rotation goes, and a coordinate settles those. The one it was written for
+had already cost four renders and was still wrong.
+
 ── why this replaced the hand-built figure ─────────────────────────────────────
 
 tools/blender/human.py builds a person out of lofted rings and ellipsoids, welds
