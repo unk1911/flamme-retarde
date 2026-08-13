@@ -388,8 +388,68 @@ const FACE = {
   // a chin that has come loose.
   jawR: [0.050, 0.055, 0.045],     // m — the region the jaw drop reaches
   drop: [-0.0060, 0.0185, 0],      // and where it takes it: back and down
-  mawR: [0.026, 0.0115, 0.90],     // z is a fraction of the measured lip width
-  maw: [0.030, 0.014, 0.012],      // the colour inside a mouth, in sunlight
+  // What is inside a mouth, and it is not one colour. It was — a single very
+  // dark oval, 0.030/0.014/0.012, which is 3% grey — and in a shuttered kabina
+  // that is not a mouth, it is a hole punched through her head. The dark is
+  // right for the *throat*, and the throat is the one part of an open mouth you
+  // mostly cannot see: the near half of it is teeth and tongue, both of which
+  // are lighter than her skin is in that room. So three colours, laid inside
+  // one ellipsoid and keyed off where in it a fragment is.
+  //
+  // Warm, too. A mouth lit through a doorway is red before it is black, and a
+  // neutral dark oval reads as damage where a warm one reads as a shadow.
+  maw: [0.072, 0.024, 0.022],      // the throat, at the back of it
+  tooth: [0.780, 0.760, 0.720],    // TOOTH_P out of human_mh.py, a shade down
+  tongue: [0.360, 0.132, 0.128],   // and TONGUE_P, likewise
+  // The lips, which are paint and not shape. The mesh carries a 2 mm rose line
+  // along the crease and nothing else, which is exactly right for a face seen
+  // from twenty metres across a promenade and nothing like enough for one that
+  // fills the frame with its mouth open.
+  //
+  // Lips and opening now share one ellipsoid, and that is not tidiness — it is
+  // the only way the red survives. The maw is painted on the *bind* pose, and
+  // the skin it is painted over is her lower lip and her chin: opening her mouth
+  // does not reveal an interior, it stretches the chin down and the paint goes
+  // with it. So a lip band drawn at a fixed size is simply overrun, and she gets
+  // red above the hole and nothing below it. Drawn as a ring outside the hole in
+  // the same frame, both lips travel outwards as the hole grows, which is also
+  // what lips do.
+  //
+  // `lipsLift` is the one thing the ellipsoid cannot do for itself. The mouth
+  // line is a parabola, 3.2 mm higher at the corners than in the middle, which
+  // is what human_mh.py builds it as and what keeps her from reading as a
+  // mannequin; a band centred on a flat line sits low at the corners and high
+  // in the middle, which is a mouth drawn by somebody who has not looked at one.
+  lipsR: [0.026, 0.0098, 1.00],    // z is a fraction of the measured lip width
+  lipsLift: 0.0032,                // m the line rises, corner over centre
+  lipstick: [0.400, 0.052, 0.070],
+  // How far open a full gape is, as a multiple of that band: 1.05 puts a full
+  // gape at 21 mm by 45 mm, which is a mouth held open under a branch. It was
+  // 0.88 and the opening came out 12 by 27 — a mouth with a red ring round it
+  // twice the width of the hole, which reads as lipstick applied by somebody
+  // with their eyes shut rather than as an open mouth.
+  gapeR: 1.05,
+  // The lip band's inner edge is tied to the hole rather than set: `lipIn` is
+  // where it starts as a fraction of the opening, floored at the resting mouth,
+  // and `lipOut` is its width, which grows a little because a lip that is being
+  // stretched shows more of itself.
+  lipIn: 0.97,
+  lipOut: [0.47, 0.30],
+  // And the foam, once enough of the branch has gone in. Not white: foam is
+  // white the way snow is, which is to say it is whatever is lighting it, and
+  // the inside of a mouth is lit by nothing. `fill` stops short of the top on
+  // purpose — a mouth filled to the lip is a mouth with a white disc in it, and
+  // the tell that it is full of water rather than painted is the teeth still
+  // showing above the line.
+  //
+  // The level is *negative* at full, and that is not a mistake: n.y = 0 is the
+  // lip line, and everything you can see of the inside of her mouth is below it
+  // — the jaw drop stretches the 9 mm of skin under the crease over 27 mm of
+  // opening and leaves the millimetre above it where it was. So the top third
+  // of the ellipsoid is a sliver against the upper lip, and a level set anywhere
+  // positive is a mouth filled to the brim.
+  foam: [0.820, 0.790, 0.745],
+  fill: -0.45,
   // The tongues run nearly the length of the upper arm — 21 cm from her elbow
   // to her shoulder — because anything shorter is a black sleeve with a ragged
   // top rather than fire. It is the *gaps* between the tongues that read as
@@ -411,9 +471,10 @@ uniform vec3 uLip;
 uniform vec3 uLipR;
 uniform vec3 uLift;
 uniform float uGape;
+uniform float uFoam;
 uniform vec3 uLipC;
 uniform vec3 uJawR;
-uniform vec3 uMawR;
+uniform vec3 uLipsR;
 uniform float uInk;
 uniform vec2 uArmB;
 uniform vec4 uArmC;
@@ -478,16 +539,71 @@ const FACE_FRAG = /* glsl */ `
       base = mix(base, uLashCol, k * line * uBlink);
     }
 
-    // The inside of an open mouth. vLocal is the undisplaced bind position,
-    // so this oval is painted onto the skin *before* the jaw takes it down —
-    // which is the whole trick: the band of skin stretched across the opening
-    // is exactly the band that was carrying the dark, and it arrives already
-    // black. Grown a little with the gape so a mouth wide open is a wider hole
-    // and not the same hole further away from the nose.
-    if (uGape > 0.0) {
-      float mw = 1.0 - smoothstep(0.62, 1.0,
-        length((f - uLipC) / (uMawR * (0.80 + 0.35 * uGape))));
-      base = mix(base, vec3(${FACE.maw.join(', ')}), mw * uGape);
+    // Her mouth: a ring of colour and a hole in the middle of it, both measured
+    // in the same ellipsoid. vLocal is the undisplaced bind position, so all of
+    // this is painted onto the skin *before* the jaw takes it down — which is
+    // the whole trick: the band of skin that gets stretched across the opening
+    // is exactly the band that was carrying the dark, so it arrives dark.
+    {
+      // The lip line runs uphill toward the corners, so the frame it is measured
+      // in runs uphill with it. Squared, because a parabola is what the nine
+      // shells of the mouth cutter in human_mh.py are laid along.
+      float span = f.z / max(uLipsR.z, 1e-4);
+      vec3 lc = vec3(uLipC.x, uLipC.y + ${FACE.lipsLift} * span * span, uLipC.z);
+      vec3 q = (f - lc) / uLipsR;
+      float r = length(q);
+
+      // The lipstick. A filled ellipse at rest, and the hole is punched through
+      // the middle of it afterwards — which is why the inner edge is measured
+      // off the hole rather than set: a lip band whose edges are fixed is a lip
+      // band the opening eats from the inside, and it only has to be 2 mm out
+      // for her to have red above her mouth and none below it.
+      float k = ${FACE.gapeR} * uGape;
+      float li = max(0.55, k * ${FACE.lipIn});
+      base = mix(base, vec3(${FACE.lipstick.join(', ')}), 1.0 - smoothstep(
+        li, li + ${FACE.lipOut[0]} + ${FACE.lipOut[1]} * uGape, r));
+
+      if (k > 0.0) {
+        float mw = 1.0 - smoothstep(k * 0.62, k, r);
+        if (mw > 0.0) {
+          // Inside the hole, on its own scale: the unit ball is the opening,
+          // +y is toward her nose and −y is toward her chin.
+          vec3 n = q / k;
+          vec3 mouth = vec3(${FACE.maw.join(', ')});
+          // The tongue, lying in the floor of it and never quite reaching the
+          // corners — a tongue is narrow and a mouth is wide.
+          mouth = mix(mouth, vec3(${FACE.tongue.join(', ')}), 1.0 - smoothstep(
+            0.40, 1.05, length(vec3(n.x * 0.55, (n.y + 0.42) * 1.30, n.z * 1.20))));
+          // And the upper teeth, in a band under the lip — which is a band
+          // around n.y = 0 rather than at the top of the ellipsoid, for the same
+          // reason the foam level is negative. Cut off short of the corners:
+          // the back teeth are round the curve of the arch and are not lit by
+          // anything.
+          mouth = mix(mouth, vec3(${FACE.tooth.join(', ')}),
+            smoothstep(-0.20, 0.14, n.y) * (1.0 - smoothstep(0.42, 0.86, n.y))
+            * (1.0 - smoothstep(0.58, 0.98, abs(n.z))));
+
+          // The foam, which arrives late and fills from the bottom. The level is
+          // a plain line in n.y with the noise added to it rather than the other
+          // way round: froth is a *surface* that is lumpy, and multiplying the
+          // whole mask by noise gives you a mouthful of white spots instead.
+          //
+          // Sampled in n rather than in the bind position, and that is the
+          // difference between froth and combing. The jaw stretches 9 mm of skin
+          // over 27 mm of opening, so noise measured on the mesh arrives three
+          // times taller than it is wide — which on screen is a mouth full of
+          // vertical stripes. n is the opening's own frame and the 1.7 is its
+          // aspect, so a lump in it is a lump.
+          if (uFoam > 0.0) {
+            vec2 fn = vec2(n.z * 1.7, n.y);
+            float froth = 0.56 * vnoise2(fn * 7.0) + 0.44 * vnoise2(fn * 16.5);
+            float lvl = mix(-1.35, ${FACE.fill}, uFoam);
+            mouth = mix(mouth, vec3(${FACE.foam.join(', ')}) * (0.84 + 0.26 * froth),
+              smoothstep(lvl + 0.17 * froth, lvl - 0.10, n.y));
+          }
+          base = mix(base, mouth, mw);
+        }
+      }
     }
 
     // ── the ink ──────────────────────────────────────────────────────────
@@ -595,9 +711,10 @@ function skinnedFigure(data, opts = {}) {
     uLipR: V(FACE.lipR),
     uLift: V(anchors.corner ? FACE.lift : [0, 0, 0]),
     uGape: { value: 0 },
+    uFoam: { value: 0 },
     uLipC: V(anchors.lipC || [0, -99, 0]),
     uJawR: V(FACE.jawR),
-    uMawR: V([FACE.mawR[0], FACE.mawR[1], FACE.mawR[2] * anchors.lipW]),
+    uLipsR: V([FACE.lipsR[0], FACE.lipsR[1], FACE.lipsR[2] * anchors.lipW]),
     uInk: { value: 0 },
     // Two bone numbers, an axis and a span. If the arms could not be found the
     // bone numbers are −1, which nothing matches, and the ink never draws.
@@ -839,6 +956,7 @@ function skinnedFigure(data, opts = {}) {
   const face = anchors ? {
     smile: 0,          // what the caller wants, 0..1
     gape: 0,           // and how far her mouth is open
+    foam: 0,           // and how much of what went in it is still there
     ink: 0,            // and how far the flames have climbed her arms
     dolphin: 0,        // the ankle ink is revealed with the dropped wrap
     rate: 1,           // blinks a second, scaled. Staring is `rate = 0`.
@@ -861,6 +979,10 @@ function skinnedFigure(data, opts = {}) {
     // jaw easing down over half of one is a yawn, which is the opposite of what
     // anybody asks for it.
     uFace.uGape.value = damp(uFace.uGape.value, sat(face.gape), 13, dt);
+    // And slower again than the ink. Foam does not arrive, it collects, and the
+    // caller's own meter is already the slow part — this only takes the step out
+    // of the frame the jet first lands on.
+    uFace.uFoam.value = damp(uFace.uFoam.value, sat(face.foam), 3.4, dt);
     // Slower than the smile on purpose. A smile is a face changing its mind; the
     // ink is a flame front going up an arm, and it wants the second and a bit
     // that the riser under the turn takes.

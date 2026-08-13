@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.55.1">
+<meta name="version" content="1.56.0">
 <meta name="build-date" content="2026-08-13">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -1035,8 +1035,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.55.1, built 2026-08-13">
-    <b>v1.55.1</b><i>·</i><span>2026-08-13</span>
+  <div id="build" title="Flamme Retardé 1.56.0, built 2026-08-13">
+    <b>v1.56.0</b><i>·</i><span>2026-08-13</span>
   </div>
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
@@ -1288,7 +1288,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.55.1", date: "2026-08-13" };</script>
+<script>const BUILD = { v: "1.56.0", date: "2026-08-13" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -7161,8 +7161,68 @@ const FACE = {
   // a chin that has come loose.
   jawR: [0.050, 0.055, 0.045],     // m — the region the jaw drop reaches
   drop: [-0.0060, 0.0185, 0],      // and where it takes it: back and down
-  mawR: [0.026, 0.0115, 0.90],     // z is a fraction of the measured lip width
-  maw: [0.030, 0.014, 0.012],      // the colour inside a mouth, in sunlight
+  // What is inside a mouth, and it is not one colour. It was — a single very
+  // dark oval, 0.030/0.014/0.012, which is 3% grey — and in a shuttered kabina
+  // that is not a mouth, it is a hole punched through her head. The dark is
+  // right for the *throat*, and the throat is the one part of an open mouth you
+  // mostly cannot see: the near half of it is teeth and tongue, both of which
+  // are lighter than her skin is in that room. So three colours, laid inside
+  // one ellipsoid and keyed off where in it a fragment is.
+  //
+  // Warm, too. A mouth lit through a doorway is red before it is black, and a
+  // neutral dark oval reads as damage where a warm one reads as a shadow.
+  maw: [0.072, 0.024, 0.022],      // the throat, at the back of it
+  tooth: [0.780, 0.760, 0.720],    // TOOTH_P out of human_mh.py, a shade down
+  tongue: [0.360, 0.132, 0.128],   // and TONGUE_P, likewise
+  // The lips, which are paint and not shape. The mesh carries a 2 mm rose line
+  // along the crease and nothing else, which is exactly right for a face seen
+  // from twenty metres across a promenade and nothing like enough for one that
+  // fills the frame with its mouth open.
+  //
+  // Lips and opening now share one ellipsoid, and that is not tidiness — it is
+  // the only way the red survives. The maw is painted on the *bind* pose, and
+  // the skin it is painted over is her lower lip and her chin: opening her mouth
+  // does not reveal an interior, it stretches the chin down and the paint goes
+  // with it. So a lip band drawn at a fixed size is simply overrun, and she gets
+  // red above the hole and nothing below it. Drawn as a ring outside the hole in
+  // the same frame, both lips travel outwards as the hole grows, which is also
+  // what lips do.
+  //
+  // `lipsLift` is the one thing the ellipsoid cannot do for itself. The mouth
+  // line is a parabola, 3.2 mm higher at the corners than in the middle, which
+  // is what human_mh.py builds it as and what keeps her from reading as a
+  // mannequin; a band centred on a flat line sits low at the corners and high
+  // in the middle, which is a mouth drawn by somebody who has not looked at one.
+  lipsR: [0.026, 0.0098, 1.00],    // z is a fraction of the measured lip width
+  lipsLift: 0.0032,                // m the line rises, corner over centre
+  lipstick: [0.400, 0.052, 0.070],
+  // How far open a full gape is, as a multiple of that band: 1.05 puts a full
+  // gape at 21 mm by 45 mm, which is a mouth held open under a branch. It was
+  // 0.88 and the opening came out 12 by 27 — a mouth with a red ring round it
+  // twice the width of the hole, which reads as lipstick applied by somebody
+  // with their eyes shut rather than as an open mouth.
+  gapeR: 1.05,
+  // The lip band's inner edge is tied to the hole rather than set: `lipIn` is
+  // where it starts as a fraction of the opening, floored at the resting mouth,
+  // and `lipOut` is its width, which grows a little because a lip that is being
+  // stretched shows more of itself.
+  lipIn: 0.97,
+  lipOut: [0.47, 0.30],
+  // And the foam, once enough of the branch has gone in. Not white: foam is
+  // white the way snow is, which is to say it is whatever is lighting it, and
+  // the inside of a mouth is lit by nothing. `fill` stops short of the top on
+  // purpose — a mouth filled to the lip is a mouth with a white disc in it, and
+  // the tell that it is full of water rather than painted is the teeth still
+  // showing above the line.
+  //
+  // The level is *negative* at full, and that is not a mistake: n.y = 0 is the
+  // lip line, and everything you can see of the inside of her mouth is below it
+  // — the jaw drop stretches the 9 mm of skin under the crease over 27 mm of
+  // opening and leaves the millimetre above it where it was. So the top third
+  // of the ellipsoid is a sliver against the upper lip, and a level set anywhere
+  // positive is a mouth filled to the brim.
+  foam: [0.820, 0.790, 0.745],
+  fill: -0.45,
   // The tongues run nearly the length of the upper arm — 21 cm from her elbow
   // to her shoulder — because anything shorter is a black sleeve with a ragged
   // top rather than fire. It is the *gaps* between the tongues that read as
@@ -7184,9 +7244,10 @@ uniform vec3 uLip;
 uniform vec3 uLipR;
 uniform vec3 uLift;
 uniform float uGape;
+uniform float uFoam;
 uniform vec3 uLipC;
 uniform vec3 uJawR;
-uniform vec3 uMawR;
+uniform vec3 uLipsR;
 uniform float uInk;
 uniform vec2 uArmB;
 uniform vec4 uArmC;
@@ -7251,16 +7312,71 @@ const FACE_FRAG = /* glsl */ `
       base = mix(base, uLashCol, k * line * uBlink);
     }
 
-    // The inside of an open mouth. vLocal is the undisplaced bind position,
-    // so this oval is painted onto the skin *before* the jaw takes it down —
-    // which is the whole trick: the band of skin stretched across the opening
-    // is exactly the band that was carrying the dark, and it arrives already
-    // black. Grown a little with the gape so a mouth wide open is a wider hole
-    // and not the same hole further away from the nose.
-    if (uGape > 0.0) {
-      float mw = 1.0 - smoothstep(0.62, 1.0,
-        length((f - uLipC) / (uMawR * (0.80 + 0.35 * uGape))));
-      base = mix(base, vec3(${FACE.maw.join(', ')}), mw * uGape);
+    // Her mouth: a ring of colour and a hole in the middle of it, both measured
+    // in the same ellipsoid. vLocal is the undisplaced bind position, so all of
+    // this is painted onto the skin *before* the jaw takes it down — which is
+    // the whole trick: the band of skin that gets stretched across the opening
+    // is exactly the band that was carrying the dark, so it arrives dark.
+    {
+      // The lip line runs uphill toward the corners, so the frame it is measured
+      // in runs uphill with it. Squared, because a parabola is what the nine
+      // shells of the mouth cutter in human_mh.py are laid along.
+      float span = f.z / max(uLipsR.z, 1e-4);
+      vec3 lc = vec3(uLipC.x, uLipC.y + ${FACE.lipsLift} * span * span, uLipC.z);
+      vec3 q = (f - lc) / uLipsR;
+      float r = length(q);
+
+      // The lipstick. A filled ellipse at rest, and the hole is punched through
+      // the middle of it afterwards — which is why the inner edge is measured
+      // off the hole rather than set: a lip band whose edges are fixed is a lip
+      // band the opening eats from the inside, and it only has to be 2 mm out
+      // for her to have red above her mouth and none below it.
+      float k = ${FACE.gapeR} * uGape;
+      float li = max(0.55, k * ${FACE.lipIn});
+      base = mix(base, vec3(${FACE.lipstick.join(', ')}), 1.0 - smoothstep(
+        li, li + ${FACE.lipOut[0]} + ${FACE.lipOut[1]} * uGape, r));
+
+      if (k > 0.0) {
+        float mw = 1.0 - smoothstep(k * 0.62, k, r);
+        if (mw > 0.0) {
+          // Inside the hole, on its own scale: the unit ball is the opening,
+          // +y is toward her nose and −y is toward her chin.
+          vec3 n = q / k;
+          vec3 mouth = vec3(${FACE.maw.join(', ')});
+          // The tongue, lying in the floor of it and never quite reaching the
+          // corners — a tongue is narrow and a mouth is wide.
+          mouth = mix(mouth, vec3(${FACE.tongue.join(', ')}), 1.0 - smoothstep(
+            0.40, 1.05, length(vec3(n.x * 0.55, (n.y + 0.42) * 1.30, n.z * 1.20))));
+          // And the upper teeth, in a band under the lip — which is a band
+          // around n.y = 0 rather than at the top of the ellipsoid, for the same
+          // reason the foam level is negative. Cut off short of the corners:
+          // the back teeth are round the curve of the arch and are not lit by
+          // anything.
+          mouth = mix(mouth, vec3(${FACE.tooth.join(', ')}),
+            smoothstep(-0.20, 0.14, n.y) * (1.0 - smoothstep(0.42, 0.86, n.y))
+            * (1.0 - smoothstep(0.58, 0.98, abs(n.z))));
+
+          // The foam, which arrives late and fills from the bottom. The level is
+          // a plain line in n.y with the noise added to it rather than the other
+          // way round: froth is a *surface* that is lumpy, and multiplying the
+          // whole mask by noise gives you a mouthful of white spots instead.
+          //
+          // Sampled in n rather than in the bind position, and that is the
+          // difference between froth and combing. The jaw stretches 9 mm of skin
+          // over 27 mm of opening, so noise measured on the mesh arrives three
+          // times taller than it is wide — which on screen is a mouth full of
+          // vertical stripes. n is the opening's own frame and the 1.7 is its
+          // aspect, so a lump in it is a lump.
+          if (uFoam > 0.0) {
+            vec2 fn = vec2(n.z * 1.7, n.y);
+            float froth = 0.56 * vnoise2(fn * 7.0) + 0.44 * vnoise2(fn * 16.5);
+            float lvl = mix(-1.35, ${FACE.fill}, uFoam);
+            mouth = mix(mouth, vec3(${FACE.foam.join(', ')}) * (0.84 + 0.26 * froth),
+              smoothstep(lvl + 0.17 * froth, lvl - 0.10, n.y));
+          }
+          base = mix(base, mouth, mw);
+        }
+      }
     }
 
     // ── the ink ──────────────────────────────────────────────────────────
@@ -7368,9 +7484,10 @@ function skinnedFigure(data, opts = {}) {
     uLipR: V(FACE.lipR),
     uLift: V(anchors.corner ? FACE.lift : [0, 0, 0]),
     uGape: { value: 0 },
+    uFoam: { value: 0 },
     uLipC: V(anchors.lipC || [0, -99, 0]),
     uJawR: V(FACE.jawR),
-    uMawR: V([FACE.mawR[0], FACE.mawR[1], FACE.mawR[2] * anchors.lipW]),
+    uLipsR: V([FACE.lipsR[0], FACE.lipsR[1], FACE.lipsR[2] * anchors.lipW]),
     uInk: { value: 0 },
     // Two bone numbers, an axis and a span. If the arms could not be found the
     // bone numbers are −1, which nothing matches, and the ink never draws.
@@ -7612,6 +7729,7 @@ function skinnedFigure(data, opts = {}) {
   const face = anchors ? {
     smile: 0,          // what the caller wants, 0..1
     gape: 0,           // and how far her mouth is open
+    foam: 0,           // and how much of what went in it is still there
     ink: 0,            // and how far the flames have climbed her arms
     dolphin: 0,        // the ankle ink is revealed with the dropped wrap
     rate: 1,           // blinks a second, scaled. Staring is `rate = 0`.
@@ -7634,6 +7752,10 @@ function skinnedFigure(data, opts = {}) {
     // jaw easing down over half of one is a yawn, which is the opposite of what
     // anybody asks for it.
     uFace.uGape.value = damp(uFace.uGape.value, sat(face.gape), 13, dt);
+    // And slower again than the ink. Foam does not arrive, it collects, and the
+    // caller's own meter is already the slow part — this only takes the step out
+    // of the frame the jet first lands on.
+    uFace.uFoam.value = damp(uFace.uFoam.value, sat(face.foam), 3.4, dt);
     // Slower than the smile on purpose. A smile is a face changing its mind; the
     // ink is a flame front going up an arm, and it wants the second and a bit
     // that the riser under the turn takes.
@@ -8686,6 +8808,11 @@ async function buildJadrija(scene) {
   // is supposed to feel like. Nothing outside this building is affected.
   const SNUG = GROUND.girth - 0.22;
   let special = null;
+  // The blank end of the run that has the open kabina in it, kept as it is laid
+  // so the tourist board can be hung on it. It is the only large flat wall on
+  // this promenade with nothing on it: every other face in the resort is either
+  // a door, a vent or the back of a hut in an alley nobody walks down.
+  let gable = null;
 
   const runs = [];        // for the blockers, later
   /**
@@ -8985,6 +9112,13 @@ async function buildJadrija(scene) {
       boxTS(T - 0.05 * o, T + 0.05 * o, front, back,
         y0 + JAD.plinth, eave, [0.760, 0.745, 0.700]);
     }
+    // The far end of this run, if this is the run with the door in it. The far
+    // end and not the near one: the near one is four bays from the sign and the
+    // far one is the wall you are looking at while you walk the row towards it.
+    if (sk >= 0) {
+      gable = { t: T1 + 0.05, front, back, floor: y0 + JAD.plinth, eave };
+    }
+
     // The run is one blocker, except where a door was cut in it: then it is the
     // huts either side of the special one, and the special one puts up its own
     // walls. A single box over the lot would be a sign hung on a wall.
@@ -9367,6 +9501,66 @@ async function buildJadrija(scene) {
   }
 
   if (special) special.sign = neonSign(special);
+
+  /**
+   * The tourist board, on the blank end of that run.
+   *
+   * The map itself is `jadrijaMapTexture` in src/44-board.js, which knows about
+   * cartography and nothing about carpentry. This is the other half: a frame,
+   * four bolts and a quad, and the one number that connects them — the board's
+   * own world position, which is what the red tag on the map points at. Hang it
+   * somewhere else and the tag follows, because it is derived rather than drawn.
+   */
+  function mapBoard(gb) {
+    // Centred across the gable and set at reading height. The wall is 2.90 m of
+    // s and 2.44 m of it stands above the pad, so a 2.10 by 1.44 panel leaves
+    // 0.40 m of render either side and 0.30 m under the eave — which is the
+    // proportion every one of these boards is bolted up in, and is not an
+    // accident: any less margin and the frame fouls the fascia.
+    const sc = (gb.front + gb.back) * 0.5;
+    const yc = gb.floor + 1.42;
+    const wp = W(gb.t, sc, 0);
+    const panel = jadrijaMapTexture([wp[0], wp[2]]);
+    const h = 2.10 / panel.aspect;
+
+    // The frame first, in the huts' own buffer so it takes their light. Three
+    // pieces: a surround standing 30 mm off the wall, and a lip top and bottom,
+    // because a printed panel on this coast is always in an aluminium tray with
+    // a drip edge — without one the rain runs down the wall behind it and the
+    // render below goes green in a season.
+    b = up;
+    const half = 2.10 * 0.5, vhalf = h * 0.5, m = 0.055;
+    boxTS(gb.t - 0.005, gb.t + 0.035, sc - half - m, sc + half + m,
+      yc - vhalf - m, yc + vhalf + m, [0.415, 0.425, 0.440],
+      [0.300, 0.310, 0.325]);
+    for (const [y0, y1] of [[yc + vhalf + m, yc + vhalf + m + 0.030],
+      [yc - vhalf - m - 0.030, yc - vhalf - m]]) {
+      boxTS(gb.t - 0.005, gb.t + 0.060, sc - half - m, sc + half + m,
+        y0, y1, [0.500, 0.510, 0.520]);
+    }
+    b = deck;
+
+    // And the print, on a quad standing a whisker proud of the tray. Basic
+    // rather than lit, and that is a decision: this is the one surface in the
+    // resort whose whole job is to be *read*, and a laminated panel in August
+    // does not go the colour of the wall behind it — it glares. Ten centimetres
+    // of the eave's shadow crossing the legend would be correct and unreadable.
+    const st = at(gb.t);
+    const p = W(gb.t + 0.036, sc, yc);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.10, h),
+      new THREE.MeshBasicMaterial({ map: panel.tex, side: THREE.FrontSide }));
+    // PlaneGeometry looks down +z; the run's own +t is (ux, uz), which is the
+    // way the wall faces. Its local +x then lands on the inland normal, so the
+    // map's east edge is the one nearer the back row — which is why the canvas
+    // is laid out with north up and read from the promenade side.
+    mesh.position.set(p[0], p[1], p[2]);
+    mesh.rotation.y = Math.atan2(st.ux, st.uz);
+    scene.add(mesh);
+    return { mesh, at: [gb.t, sc], tex: panel.tex, aspect: panel.aspect,
+      houses: panel.houses, lanes: panel.lanes };
+  }
+  const board = gable ? mapBoard(gable) : null;
 
   // The steps belong to the ground — you walk down them — and are cut into the
   // terrace they come off, so they stay in the deck buffer where their concrete
@@ -11515,7 +11709,9 @@ async function buildJadrija(scene) {
         hit: 0, owed: 0, wet: 0, lock: 0, spin: 1, faceAng: 0,
         // Chin up and mouth open, for the one place the jet gets that: 0 or 1
         // eased, and it drives both at once because they are one gesture.
-        gape: 0,
+        // `fill` is the slow one under it — not whether the water is on her
+        // mouth but how long it has been.
+        gape: 0, fill: 0,
         // And the turn. `soak` is the one number in here that is a *total*
         // rather than a state — how many seconds of jet she has taken, over
         // the whole session, forgotten only very slowly. `burn` is how much of
@@ -12261,6 +12457,19 @@ async function buildJadrija(scene) {
     // that she is looking up at somebody standing over her rather than at their
     // knees, and short of the angle where a neck stops being a neck.
     chin: 0.52,
+    // And how the mouth answers a branch that is left on it. A mouth that is
+    // simply open is a pose; one that keeps opening is somebody taking it, and
+    // the difference costs one accumulator. `gulp` is seconds of unbroken water
+    // to reach the wide end of `open`, `spit` is how long it takes to forget —
+    // slower, because she is not going to have swallowed it in two seconds —
+    // and `froth` is how far up the fill the foam starts to collect, which is
+    // late on purpose. Foam that arrives with the first squirt is a face full of
+    // shaving cream; foam that arrives once she has been holding her mouth under
+    // it for four seconds is foam.
+    gulp: 5.0,
+    spit: 9.0,
+    open: [0.52, 0.46],
+    froth: 0.44,
     castAt: 0.46,       // s into the `cast` clip where it leaves her hand. This
                         // is FIRE_CAST_AT in tools/blender/human_mh.py and it
                         // has to move with it or the ball appears out of a hand
@@ -12993,8 +13202,21 @@ async function buildJadrija(scene) {
       // Up fast and down slowly. She is answering the water, and a chin that
       // falls as quickly as it rose reads as a flinch.
       show.gape = damp(show.gape, into, into ? 9 : 3.2, dt);
-      if (f.face) f.face.gape = show.gape * 0.94;
-      f.aim('head', 0, 0, 1, show.gape * SHOW.chin);
+      // And how long it has been going in, which is a different question from
+      // whether it is going in now — `gape` is the gesture and lets go with the
+      // jet; this is the tally and does not. Keeping them apart is what lets a
+      // mouth that opened once keep opening while you hold the branch on it.
+      show.fill = clamp(show.fill
+        + (into ? dt / SHOW.gulp : -dt / SHOW.spit), 0, 1);
+      if (f.face) {
+        f.face.gape = show.gape * (SHOW.open[0] + SHOW.open[1] * show.fill);
+        // Both gated on `gape` rather than on `fill` alone, so everything in
+        // her mouth leaves with her mouth. A closed mouth with foam painted on
+        // the inside of it is a closed mouth with a white line across it.
+        f.face.foam = show.gape
+          * sat((show.fill - SHOW.froth) / (1 - SHOW.froth));
+      }
+      f.aim('head', 0, 0, 1, show.gape * SHOW.chin * (0.86 + 0.20 * show.fill));
     }
 
     // And the wrap, which she never puts back on.
@@ -14152,11 +14374,22 @@ async function buildJadrija(scene) {
       if (o.smile != null) { u.uSmile.value = o.smile; skinFig.face.smile = o.smile; }
       if (o.rate != null) skinFig.face.rate = o.rate;
       if (o.ink != null) { u.uInk.value = o.ink; skinFig.face.ink = o.ink; }
+      // The mouth, held open by hand. `fill` is the driver and it is the one
+      // worth setting: it is a five-second accumulator, and headless the page
+      // runs at about a frame a second, so a test that wanted to see a mouthful
+      // of foam would otherwise have to hold a branch on her for three hundred
+      // frames. Setting it writes through to both halves at once, which is what
+      // the tick does anyway.
+      if (o.fill != null && show) show.fill = sat(o.fill);
+      if (o.gape != null) { u.uGape.value = o.gape; skinFig.face.gape = o.gape; }
+      if (o.foam != null) { u.uFoam.value = o.foam; skinFig.face.foam = o.foam; }
       const a = skinFig.face.anchors;
       const r3 = (v) => [+v.x.toFixed(4), +v.y.toFixed(4), +v.z.toFixed(4)];
       return {
         blink: +u.uBlink.value.toFixed(3), smile: +u.uSmile.value.toFixed(3),
         ink: +u.uInk.value.toFixed(3), gape: +u.uGape.value.toFixed(3),
+        foam: +u.uFoam.value.toFixed(3),
+        fill: show ? +show.fill.toFixed(3) : null,
         lipC: a.lipC ? r3(u.uLipC.value) : null,
         lipW: a.lipC ? +a.lipW.toFixed(4) : null,
         want: +skinFig.face.smile.toFixed(2), rate: skinFig.face.rate,
@@ -14196,6 +14429,19 @@ async function buildJadrija(scene) {
      */
     step: (secs, cam) => {
       for (let i = 0; i < Math.round(secs * 60); i++) updateCrowd(1 / 60, cam);
+    },
+    /** Debug: the tourist board, and what its map found to draw. */
+    board: () => board && {
+      at: board.at.map((v) => +v.toFixed(2)),
+      world: board.mesh.position.toArray().map((v) => +v.toFixed(1)),
+      size: [2.10, +(2.10 / board.aspect).toFixed(3)],
+      canvas: [board.tex.image.width, board.tex.image.height],
+      houses: board.houses, lanes: board.lanes,
+      // The canvas itself, so a screenshot can look at the print rather than at
+      // a photograph of the print. Two metres of wall at four metres' range is
+      // 300 px of a 1280 px frame, which is enough to say the map is there and
+      // nothing like enough to say the legend is legible.
+      el: board.tex.image,
     },
     tris: (deck.count() + up.count() + vil.count()) / 3,
   };
@@ -14715,6 +14961,567 @@ function buildBirds(scene, fire) {
       sitting: flock.reduce((n, b) => n + (b.live && b.sit ? 1 : 0), 0),
     }),
   };
+}
+
+// ==== 44-board.js ===============================================
+// -----------------------------------------------------------------------------
+// The tourist board at the end of the row.
+//
+// Every bathing station on this coast has one: a laminated panel bolted to the
+// first wall you meet, with the settlement drawn on it in cream and blue, the
+// houses as little red blocks, a scale bar, a compass, a legend of pictograms
+// nobody reads, and a red tag saying VI STE OVDJE over the spot you are standing
+// on. It is the one piece of scenery that tells you where you are.
+//
+// It is drawn rather than photographed, and drawn *from the world this game is
+// already standing on*: the coastline comes out of the same signed distance
+// field the terrain shades itself with, the houses are the same OpenStreetMap
+// footprints the city builder extrudes, the roads are the same 1 535 ways, and
+// the names are the same OSM place nodes the landmarks are sited from. So the
+// map is true in the only sense that matters here — walk to a corner of it and
+// the corner is there.
+//
+// The one thing it is not is a copy of the real sign. Šibenik's arms and the
+// tourist board's own mark belong to somebody; a lighthouse on a shield does
+// not.
+// -----------------------------------------------------------------------------
+
+const BOARD = {
+  // The window on the world, in metres, north up: +x is east and −z is north,
+  // which is what `lonlat_to_game` in tools/bake.py lays down.
+  //
+  // 1700 by 1170 is the settlement and its water and almost nothing else. It
+  // takes in the whole built spit from the hill behind Sićenica down to the
+  // lighthouse on Rt Jadrija, and it puts the resort a little right of centre
+  // where a bathing station belongs on its own map — near the middle, so the
+  // walk to either end of it is on the paper.
+  x0: -3150, x1: -1450,
+  z0: -420, z1: 750,
+  // 1.05 px to the metre, which is what the real boards run at: a six-metre
+  // house is six pixels, and six pixels is the smallest red block that still
+  // reads as a building rather than as noise. Half of it on a phone — the panel
+  // is 2.1 m wide and you are never further from it than the alley is deep, so
+  // the resolution that matters is the one you get standing in front of it.
+  w: 1792,
+
+  // ── the palette ──────────────────────────────────────────────────────────
+  // Cream land and a mid Adriatic blue, which is the whole look of a Croatian
+  // tourist board and is not an accident: the land is printed in the lightest
+  // ink that still takes red on top of it, and the sea is the only large area of
+  // saturated colour, so the coastline reads from ten metres away.
+  land: '#e9ebcc',
+  sea: '#3a86c6',
+  deep: '#2a6ba8',
+  shelf: '#66aed8',
+  surf: '#f4f6f2',
+  pine: '#4d8a43',
+  scrub: '#8aab68',
+  house: '#b34c30',
+  civic: '#8f5a2c',
+  road: '#e9b545',
+  lane: '#fbfbf7',
+  laneEdge: '#c6c3b4',
+  ink: '#20211c',
+  red: '#c0272d',
+};
+
+/**
+ * The map, on a canvas, as a texture.
+ *
+ * `here` is where the board itself stands, in world metres, and it is the only
+ * argument: everything else this needs is already in `world`.
+ */
+function jadrijaMapTexture(here) {
+  // Half of it on a phone, which is 2.8 MB of texture rather than 11. The panel
+  // is 2.1 m wide and you cannot stand further from it than the alley is deep,
+  // so what is lost is the second half of the street names — and a phone screen
+  // never had the pixels to show those anyway.
+  //
+  // Everything below is written in *design* pixels at the full width and the
+  // canvas is scaled once, which is the only way a layout with a hundred hard
+  // numbers in it survives being resized: halving `w` instead would leave the
+  // compass 78 px across on a map 896 px wide.
+  const K = IS_SMALL ? 0.5 : 1;
+  const W = BOARD.w;
+  const mx = BOARD.x1 - BOARD.x0, mz = BOARD.z1 - BOARD.z0;
+  const ppm = W / mx;
+  const H = Math.round(mz * ppm);
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(W * K); cv.height = Math.round(H * K);
+  const g = cv.getContext('2d');
+  const PX = (x) => (x - BOARD.x0) * ppm;
+  const PZ = (z) => (z - BOARD.z0) * ppm;
+  const inWin = (x, z, pad = 0) => x > BOARD.x0 - pad && x < BOARD.x1 + pad
+    && z > BOARD.z0 - pad && z < BOARD.z1 + pad;
+
+  // ── the ground ─────────────────────────────────────────────────────────────
+  //
+  // The coastline is the hard part and it is solved rather than traced. The
+  // cover raster is 12.7 m to the sample, so thresholding it directly gives a
+  // shore made of thirteen-pixel steps — a bitmap of a map. But every texel also
+  // carries `shore`, the distance to the waterline from whichever side it is on,
+  // and signing that by the cover class turns the pair into a signed distance
+  // field whose zero contour is the coast. Bilinearly interpolated, that contour
+  // is smooth at a fraction of a texel, which is the same trick the terrain
+  // shader plays and is why the two agree.
+  const N = world.grid;
+  const HALF_W = CONFIG.world / 2;
+  const sd = new Float32Array(N * N);
+  for (let i = 0; i < N * N; i++) {
+    const wet = world.cover[i] === COVER.SEA;
+    sd[i] = (wet ? -1 : 1) * (world.shore[i] / 255) * 400;
+  }
+  // Wooded, as a fraction rather than a class, for the same reason: a boundary
+  // between pine and rock that is interpolated is a boundary a cartographer
+  // could have drawn, and one that is thresholded is a staircase.
+  const wood = new Uint8Array(N * N);
+  const brush = new Uint8Array(N * N);
+  for (let i = 0; i < N * N; i++) {
+    const c = world.cover[i];
+    wood[i] = c === COVER.PINE ? 1 : 0;
+    brush[i] = (c === COVER.SCRUB || c === COVER.OLIVE || c === COVER.VINE) ? 1 : 0;
+  }
+
+  // The base raster is the one thing that is *not* in design pixels: putImageData
+  // ignores the transform, by specification, so it has to be laid out at the size
+  // the canvas actually is.
+  const RW = cv.width, RH = cv.height, rpm = ppm * K;
+  const img = g.createImageData(RW, RH);
+  const D = img.data;
+  const hex = (s) => [parseInt(s.slice(1, 3), 16), parseInt(s.slice(3, 5), 16),
+    parseInt(s.slice(5, 7), 16)];
+  const C = {
+    land: hex(BOARD.land), sea: hex(BOARD.sea),
+    deep: hex(BOARD.deep), shelf: hex(BOARD.shelf), surf: hex(BOARD.surf),
+    pine: hex(BOARD.pine), scrub: hex(BOARD.scrub),
+  };
+  const blend = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t,
+    a[2] + (b[2] - a[2]) * t];
+  // The bilinear fetch is written out rather than called through a closure per
+  // channel: this is two and a quarter million pixels and three fields, and the
+  // row terms — which are the same for every pixel in a row — come out of the
+  // inner loop entirely.
+  const gs = (N - 1) / CONFIG.world;
+  let o = 0;
+  for (let py = 0; py < RH; py++) {
+    const z = BOARD.z0 + (py + 0.5) / rpm;
+    const gz = clamp((z + HALF_W) * gs, 0, N - 1);
+    const z0 = gz | 0, z1 = Math.min(z0 + 1, N - 1), tz = gz - z0;
+    const r0 = z0 * N, r1 = z1 * N;
+    for (let px = 0; px < RW; px++, o += 4) {
+      const x = BOARD.x0 + (px + 0.5) / rpm;
+      const gx = clamp((x + HALF_W) * gs, 0, N - 1);
+      const x0 = gx | 0, x1 = Math.min(x0 + 1, N - 1), tx = gx - x0;
+      const w00 = (1 - tx) * (1 - tz), w10 = tx * (1 - tz);
+      const w01 = (1 - tx) * tz, w11 = tx * tz;
+      const i00 = r0 + x0, i10 = r0 + x1, i01 = r1 + x0, i11 = r1 + x1;
+      const d = sd[i00] * w00 + sd[i10] * w10 + sd[i01] * w01 + sd[i11] * w11;
+      let col;
+      if (d <= 0) {
+        // Water: a shelf near the shore and open blue past it. The shelf is not
+        // decoration — it is the only thing on a flat blue that says which of
+        // two bodies of water you are looking at is a bay.
+        col = blend(C.shelf, C.sea, sat((-d - 8) / 90));
+        col = blend(col, C.deep, sat((-d - 180) / 420));
+      } else {
+        const bv = brush[i00] * w00 + brush[i10] * w10
+                 + brush[i01] * w01 + brush[i11] * w11;
+        const wv = wood[i00] * w00 + wood[i10] * w10
+                 + wood[i01] * w01 + wood[i11] * w11;
+        col = blend(C.land, C.scrub, sat((bv - 0.34) * 2.2));
+        col = blend(col, C.pine, sat((wv - 0.34) * 2.2));
+        // The white rim every shore on a printed map has, which stands for
+        // beach where there is beach and for quay where there is not.
+        col = blend(col, C.surf, 1 - sat(d / 6));
+      }
+      D[o] = col[0]; D[o + 1] = col[1]; D[o + 2] = col[2]; D[o + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  // And from here on it is design pixels.
+  g.scale(K, K);
+
+  // ── the roads ──────────────────────────────────────────────────────────────
+  //
+  // Casing first for the whole network, then the fill for the whole network, or
+  // every junction is a road drawn over a road's outline. Twice through 1 535
+  // ways is nothing next to the two million pixels above.
+  const ways = [];
+  for (const way of world.roads) {
+    const pts = [];
+    for (const [x, z] of way.p) {
+      if (inWin(x, z, 120)) pts.push([PX(x), PZ(z)]);
+      else if (pts.length) { if (pts.length > 1) ways.push([way.r | 0, pts.slice()]); pts.length = 0; }
+    }
+    if (pts.length > 1) ways.push([way.r | 0, pts]);
+  }
+  const laneW = (r) => (r >= 3 ? 7.5 : r === 2 ? 5.5 : 3.6);
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  for (const pass of [0, 1]) {
+    for (const [r, pts] of ways) {
+      g.beginPath();
+      g.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
+      if (pass === 0) {
+        g.strokeStyle = r >= 2 ? '#a9822a' : BOARD.laneEdge;
+        g.lineWidth = laneW(r) + 2.2;
+      } else {
+        g.strokeStyle = r >= 2 ? BOARD.road : BOARD.lane;
+        g.lineWidth = laneW(r);
+      }
+      g.stroke();
+    }
+  }
+
+  // ── the houses ─────────────────────────────────────────────────────────────
+  //
+  // Real footprints, at their real shapes. This is the detail that makes a
+  // tourist map of a Dalmatian village look like one: the lanes are legible not
+  // because the roads are drawn but because there are three hundred little red
+  // rectangles either side of them, all slightly out of square.
+  let drawn = 0;
+  for (const b of world.town) {
+    const p = b.p;
+    let x = 0, z = 0;
+    for (const q of p) { x += q[0]; z += q[1]; }
+    if (!inWin(x / p.length, z / p.length, 30)) continue;
+    g.beginPath();
+    g.moveTo(PX(p[0][0]), PZ(p[0][1]));
+    for (let i = 1; i < p.length; i++) g.lineTo(PX(p[i][0]), PZ(p[i][1]));
+    g.closePath();
+    g.fillStyle = b.k === 1 ? BOARD.civic : BOARD.house;
+    g.fill();
+    drawn++;
+  }
+
+  // ── the resort ─────────────────────────────────────────────────────────────
+  //
+  // Which OSM does not have. The kabine are 2.15 m wide and were never mapped,
+  // and the promenade is a ribbon of concrete on a coastline that the raster
+  // calls shore — so the one place on this map you are certainly standing gets
+  // drawn from the numbers the resort is built from rather than from the
+  // payload. Two rows and the quay, and no more: the huts are 2 px on this
+  // scale and a hundred separate marks would be a smudge.
+  const shore = traceShore();
+  if (shore.length >= 8) {
+    const ST = shoreStations(shore);
+    const band = (s0, s1, style) => {
+      g.beginPath();
+      for (let i = 0; i < ST.length; i++) {
+        const st = ST[i];
+        g.lineTo(PX(st.x + st.nx * s0), PZ(st.z + st.nz * s0));
+      }
+      for (let i = ST.length - 1; i >= 0; i--) {
+        const st = ST[i];
+        g.lineTo(PX(st.x + st.nx * s1), PZ(st.z + st.nz * s1));
+      }
+      g.closePath();
+      g.fillStyle = style;
+      g.fill();
+    };
+    band(0, JAD.deck, '#f2f1e6');                       // the terraces
+    band(JAD.rowA, JAD.rowA + JAD.cabD, BOARD.house);   // the front row
+    band(JAD.rowB, JAD.rowB + JAD.cabD, BOARD.house);   // and the back
+  }
+
+  // ── the lettering ──────────────────────────────────────────────────────────
+  const halo = (text, x, y, font, col = BOARD.ink, ring = 'rgba(255,255,255,0.92)') => {
+    g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineJoin = 'round';
+    g.strokeStyle = ring; g.lineWidth = 5;
+    g.strokeText(text, x, y);
+    g.fillStyle = col; g.fillText(text, x, y);
+  };
+
+  // Street names, along the lane they belong to — which on this peninsula are
+  // Jadrija I to Jadrija X and are the whole address system of the place. One
+  // label a name, on its longest run inside the window, and only if that run is
+  // long enough to carry the word.
+  const named = new Map();
+  for (const way of world.roads) {
+    if (!way.n) continue;
+    for (let i = 0; i < way.p.length - 1; i++) {
+      const a = way.p[i], b = way.p[i + 1];
+      if (!inWin(a[0], a[1]) || !inWin(b[0], b[1])) continue;
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const prev = named.get(way.n);
+      if (!prev || len > prev.len) named.set(way.n, { len, a, b });
+    }
+  }
+  g.save();
+  for (const [name, run] of named) {
+    if (run.len < name.length * 9) continue;
+    const x = PX((run.a[0] + run.b[0]) * 0.5), y = PZ((run.a[1] + run.b[1]) * 0.5);
+    let ang = Math.atan2(PZ(run.b[1]) - PZ(run.a[1]), PX(run.b[0]) - PX(run.a[0]));
+    if (ang > Math.PI / 2) ang -= Math.PI;
+    if (ang < -Math.PI / 2) ang += Math.PI;
+    g.save();
+    g.translate(x, y); g.rotate(ang);
+    halo(name, 0, 0, '600 15px Helvetica, Arial, sans-serif', '#4a4a42');
+    g.restore();
+  }
+  g.restore();
+
+  // The places, from the same OSM nodes the landmarks are sited from. A dot and
+  // a name, and the dot matters: a name floating over a peninsula is a region,
+  // a name next to a mark is a thing.
+  const KIND = { place: 1, lighthouse: 1, peak: 1, fort: 1 };
+  for (const p of world.places) {
+    if (!KIND[p.k] || !inWin(p.x, p.z, -40)) continue;
+    const x = PX(p.x), y = PZ(p.z);
+    if (p.k !== 'place') {
+      g.beginPath(); g.arc(x, y, 5, 0, TAU);
+      g.fillStyle = BOARD.ink; g.fill();
+      g.beginPath(); g.arc(x, y, 2, 0, TAU);
+      g.fillStyle = '#fff'; g.fill();
+    }
+    const big = p.k === 'place';
+    halo(p.n, x, y - (big ? 0 : 16),
+      big ? '600 27px Georgia, serif' : '600 17px Helvetica, Arial, sans-serif');
+  }
+  // And the water, which OSM does not name as a node anywhere near here. The
+  // channel is the reason the town is where it is and the reason a Canadair has
+  // to come round rather than straight in, so it gets its name.
+  g.save();
+  g.translate(PX(-1727), PZ(671));
+  g.rotate(-0.55);
+  halo('Kanal sv. Ante', 0, 0, 'italic 30px Georgia, serif', '#eaf5fb',
+    'rgba(24,62,96,0.75)');
+  g.restore();
+
+  // ── the furniture ──────────────────────────────────────────────────────────
+  const round = (x, y, w, h, r) => {
+    g.beginPath();
+    g.moveTo(x + r, y);
+    g.arcTo(x + w, y, x + w, y + h, r);
+    g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r);
+    g.arcTo(x, y, x + w, y, r);
+    g.closePath();
+  };
+
+  // The cartouche. A shield with a lighthouse on it, which is a device and not
+  // an arms — see the note at the top of this file.
+  g.save();
+  g.translate(46, 40);
+  g.fillStyle = 'rgba(246,244,228,0.86)';
+  round(0, 0, 470, 232, 10); g.fill();
+  g.strokeStyle = '#b9b49c'; g.lineWidth = 3; g.stroke();
+  g.save();
+  g.translate(28, 26);
+  g.beginPath();
+  g.moveTo(0, 0); g.lineTo(76, 0); g.lineTo(76, 104);
+  g.bezierCurveTo(76, 148, 52, 168, 38, 178);
+  g.bezierCurveTo(24, 168, 0, 148, 0, 104);
+  g.closePath();
+  g.fillStyle = '#2f6ea8'; g.fill();
+  g.strokeStyle = '#8d6a2a'; g.lineWidth = 4; g.stroke();
+  g.fillStyle = '#f4f2e6';
+  g.beginPath();
+  g.moveTo(30, 44); g.lineTo(46, 44); g.lineTo(50, 128); g.lineTo(26, 128);
+  g.closePath(); g.fill();
+  g.fillStyle = '#c0272d';
+  g.fillRect(29, 66, 18, 12); g.fillRect(31, 96, 14, 12);
+  g.beginPath(); g.arc(38, 38, 11, 0, TAU); g.fillStyle = '#f6d24a'; g.fill();
+  g.fillStyle = '#2f6ea8';
+  g.beginPath(); g.moveTo(6, 146); g.quadraticCurveTo(22, 136, 38, 146);
+  g.quadraticCurveTo(54, 156, 70, 146); g.lineTo(70, 168);
+  g.bezierCurveTo(58, 176, 46, 180, 38, 182);
+  g.bezierCurveTo(30, 180, 18, 176, 6, 168); g.closePath();
+  g.fill();
+  g.restore();
+  g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  g.fillStyle = '#5c584a';
+  g.font = '600 25px Helvetica, Arial, sans-serif';
+  g.fillText('GRAD ŠIBENIK', 132, 66);
+  g.fillStyle = BOARD.ink;
+  g.font = 'bold 82px Georgia, serif';
+  g.fillText('Jadrija', 130, 150);
+  g.fillStyle = '#6c6858';
+  g.font = 'italic 22px Georgia, serif';
+  g.fillText('kupalište · od 1920-ih', 134, 190);
+  g.restore();
+
+  // Haloed, and heavily: the only place on this map with room for it is over
+  // the pine on the hill, and red on dark green is the one pairing that a
+  // printed panel cannot carry on its own.
+  g.lineWidth = 12;
+  halo('Dobrodošli!', W * 0.60, 74, 'bold 62px Helvetica, Arial, sans-serif',
+    BOARD.red, 'rgba(252,250,238,0.95)');
+  halo('Welcome!', W * 0.60, 142, 'bold 62px Helvetica, Arial, sans-serif',
+    BOARD.red, 'rgba(252,250,238,0.95)');
+
+  // The compass. Eight points, alternating light and dark halves, which is the
+  // one rose that survives being 120 px across.
+  g.save();
+  g.translate(150, H - 300);
+  const R = 78;
+  for (let i = 0; i < 8; i++) {
+    const a0 = i * Math.PI / 4 - Math.PI / 2;
+    const r = i % 2 ? R * 0.52 : R;
+    for (const side of [-1, 1]) {
+      g.beginPath();
+      g.moveTo(0, 0);
+      g.lineTo(Math.cos(a0) * r, Math.sin(a0) * r);
+      g.lineTo(Math.cos(a0 + side * Math.PI / 4) * R * 0.20,
+        Math.sin(a0 + side * Math.PI / 4) * R * 0.20);
+      g.closePath();
+      g.fillStyle = side > 0 ? '#f4f2e6' : '#2b3b4a';
+      g.fill();
+      g.strokeStyle = '#2b3b4a'; g.lineWidth = 1.6; g.stroke();
+    }
+  }
+  g.beginPath(); g.arc(0, 0, R * 0.16, 0, TAU);
+  g.fillStyle = '#c0272d'; g.fill();
+  halo('N', 0, -R - 22, 'bold 30px Georgia, serif', '#f4f2e6',
+    'rgba(20,44,66,0.80)');
+  g.restore();
+
+  // The scale bar. Two hundred metres in four bars, which is what the walk from
+  // the jetty to the far end of the row measures.
+  g.save();
+  g.translate(66, H - 150);
+  const unit = 50 * ppm;
+  for (let i = 0; i < 4; i++) {
+    g.fillStyle = i % 2 ? '#f4f2e6' : '#22303c';
+    g.fillRect(i * unit, 0, unit, 17);
+    g.strokeStyle = '#22303c'; g.lineWidth = 2;
+    g.strokeRect(i * unit, 0, unit, 17);
+  }
+  for (const m of [0, 100, 200]) {
+    halo(String(m), (m / 50) * unit, -18, '600 21px Helvetica, Arial, sans-serif',
+      '#f4f2e6', 'rgba(20,44,66,0.80)');
+  }
+  halo('m', 4 * unit + 36, -18, '600 21px Helvetica, Arial, sans-serif', '#f4f2e6',
+    'rgba(20,44,66,0.80)');
+  g.restore();
+
+  // The legend, and the glyphs in it are drawn rather than typed: an emoji is
+  // whatever font the machine happens to have, which on a texture is a picture
+  // you did not choose.
+  const glyph = {
+    parasol(c) {
+      c.beginPath(); c.moveTo(-13, -2);
+      c.quadraticCurveTo(0, -22, 13, -2); c.closePath();
+      c.fillStyle = '#c0272d'; c.fill();
+      c.strokeStyle = '#22303c'; c.lineWidth = 2.4;
+      c.beginPath(); c.moveTo(0, -2); c.lineTo(0, 15); c.stroke();
+    },
+    anchor(c) {
+      c.strokeStyle = '#22303c'; c.lineWidth = 2.6; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(0, -14); c.lineTo(0, 13); c.stroke();
+      c.beginPath(); c.moveTo(-9, -8); c.lineTo(9, -8); c.stroke();
+      c.beginPath(); c.arc(0, 3, 11, 0.35 * Math.PI, 0.65 * Math.PI); c.stroke();
+    },
+    cup(c) {
+      c.strokeStyle = '#22303c'; c.lineWidth = 2.4;
+      c.beginPath(); c.moveTo(-10, -8); c.lineTo(-8, 10); c.lineTo(8, 10);
+      c.lineTo(10, -8); c.closePath(); c.stroke();
+      c.beginPath(); c.arc(12, 0, 6, -1.2, 1.2); c.stroke();
+    },
+    ring(c) {
+      c.strokeStyle = '#c0272d'; c.lineWidth = 6;
+      c.beginPath(); c.arc(0, 1, 11, 0, TAU); c.stroke();
+      c.strokeStyle = '#f4f2e6'; c.lineWidth = 6; c.setLineDash([7, 7]);
+      c.beginPath(); c.arc(0, 1, 11, 0, TAU); c.stroke();
+      c.setLineDash([]);
+    },
+    wc(c) {
+      c.fillStyle = '#22303c'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.font = 'bold 22px Helvetica, Arial, sans-serif';
+      c.fillText('WC', 0, 1);
+    },
+    park(c) {
+      c.fillStyle = '#2f6ea8'; round(-13, -13, 26, 26, 4); c.fill();
+      c.fillStyle = '#f4f2e6'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.font = 'bold 22px Helvetica, Arial, sans-serif';
+      c.fillText('P', 0, 1);
+    },
+  };
+  const LEGEND = [
+    ['parasol', 'Plaža', 'Beach'],
+    ['anchor', 'Privez', 'Moorings'],
+    ['cup', 'Kafić', 'Café'],
+    ['ring', 'Spašavanje', 'Lifeguard'],
+    ['wc', 'Sanitarije', 'Toilets'],
+    ['park', 'Parkiralište', 'Parking'],
+  ];
+  g.save();
+  const LW = 1040, LH = 96, LX = 348, LY = H - LH - 34;
+  g.translate(LX, LY);
+  g.fillStyle = 'rgba(246,244,228,0.90)';
+  round(0, 0, LW, LH, 8); g.fill();
+  g.strokeStyle = '#b9b49c'; g.lineWidth = 2.5; g.stroke();
+  LEGEND.forEach(([kind, hr, en], i) => {
+    const cx = 28 + i * ((LW - 40) / LEGEND.length);
+    g.save(); g.translate(cx + 18, LH * 0.5); glyph[kind](g); g.restore();
+    g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+    g.fillStyle = BOARD.ink;
+    g.font = '600 19px Helvetica, Arial, sans-serif';
+    g.fillText(hr, cx + 40, LH * 0.5 - 3);
+    g.fillStyle = '#6c6858';
+    g.font = 'italic 17px Helvetica, Arial, sans-serif';
+    g.fillText(en, cx + 40, LH * 0.5 + 19);
+  });
+  g.restore();
+
+  // VI STE OVDJE. The whole reason a map is bolted to a wall rather than folded
+  // in a pocket, and the one mark on it that has to be exactly right: it is
+  // drawn at the board's own world position, so it moves if the board does.
+  const hx = PX(here[0]), hy = PZ(here[1]);
+  const tag = [hx + 210, hy + 148];
+  g.strokeStyle = BOARD.red; g.lineWidth = 3.5;
+  g.beginPath(); g.moveTo(hx, hy); g.lineTo(tag[0], tag[1]); g.stroke();
+  g.beginPath(); g.arc(hx, hy, 9, 0, TAU);
+  g.fillStyle = BOARD.red; g.fill();
+  g.strokeStyle = '#fff'; g.lineWidth = 3; g.stroke();
+  g.save();
+  g.translate(tag[0] - 8, tag[1] - 6);
+  g.fillStyle = BOARD.red;
+  round(0, 0, 268, 78, 8); g.fill();
+  g.strokeStyle = '#fff'; g.lineWidth = 3; g.stroke();
+  g.fillStyle = '#fff';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = 'bold 30px Helvetica, Arial, sans-serif';
+  g.fillText('VI STE OVDJE', 134, 26);
+  g.font = 'bold 25px Helvetica, Arial, sans-serif';
+  g.fillText('YOU ARE HERE', 134, 56);
+  g.restore();
+
+  // ── and twenty summers of it ───────────────────────────────────────────────
+  //
+  // A laminated panel on a south-facing wall in Dalmatia does not stay printed.
+  // Two things happen to it and both are cheap: the ink bleaches unevenly from
+  // whichever corner the afternoon gets at, and the surface collects scratches
+  // that are brighter than what is under them because they are scattering
+  // rather than transmitting.
+  const bleach = g.createLinearGradient(W, 0, W * 0.25, H);
+  bleach.addColorStop(0, 'rgba(255,252,236,0.30)');
+  bleach.addColorStop(0.45, 'rgba(255,252,236,0.10)');
+  bleach.addColorStop(1, 'rgba(255,252,236,0.00)');
+  g.fillStyle = bleach;
+  g.fillRect(0, 0, W, H);
+  const rnd = mulberry32(0x5ea51de);
+  g.strokeStyle = 'rgba(255,255,255,0.30)';
+  for (let i = 0; i < 26; i++) {
+    const x = rnd() * W, y = rnd() * H, a = (rnd() - 0.5) * 0.7 - 0.5;
+    const L = 40 + rnd() * 320;
+    g.lineWidth = 0.8 + rnd() * 1.4;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L);
+    g.stroke();
+  }
+  // And the frame the print sits in, so the edge of the paper is an edge.
+  g.strokeStyle = 'rgba(60,58,48,0.55)'; g.lineWidth = 6;
+  g.strokeRect(3, 3, W - 6, H - 6);
+
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  return { tex, aspect: W / H, houses: drawn, lanes: named.size };
 }
 
 // ==== 45-trees.js ===============================================

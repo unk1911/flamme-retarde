@@ -8,6 +8,67 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.56.0] — 2026-08-13
+
+### Added — the tourist board at the end of the row
+
+Every bathing station on this coast has one bolted to the first wall you meet,
+and now this one does: a 2.10 by 1.44 m laminated panel in an aluminium tray, on
+the blank gable at the far end of the run that has the open kabina in it — the
+wall you walk towards while the neon sign is still behind you.
+
+The map on it is drawn, at load, out of the world the game is already standing
+on. The coastline is the same signed distance field the terrain shades itself
+with, so it agrees with the shore you can see; the six hundred houses are the
+same OpenStreetMap footprints the city extrudes, at their real shapes; the lanes
+are the same ways the traffic drives, labelled *Jadrija IV*, *Jadrija V*,
+*Jadrija X* out of OSM's own names; and the places are the same nodes the
+landmarks are sited from. The kabine and the promenade are the one thing OSM
+does not have, so they are drawn from the numbers the resort is built out of.
+
+Which means the map is true in the only sense that matters on a wall: walk to a
+corner of it and the corner is there. VI STE OVDJE is drawn at the board's own
+world position, so it is not a mark somebody placed — move the board and the tag
+follows it.
+
+Cream land, Adriatic blue, red blocks, a compass rose, a 200 m scale bar and a
+bilingual legend, under twenty summers of bleach and scratches. Šibenik's arms
+and the tourist board's own mark belong to somebody, so the cartouche carries a
+lighthouse on a shield instead, and there is no URL on it.
+
+Half resolution on a phone: 2.8 MB of texture rather than 11.
+
+### Changed — her mouth is a mouth
+
+Reported as *too black*, and it was: the inside of an open mouth was one very
+dark oval at 3% grey, which in a shuttered kabina is not a mouth, it is a hole
+punched through her head.
+
+It is three colours now, laid in one ellipsoid and keyed off where in it a
+fragment is — a warm throat, a tongue in the floor of it, and the upper teeth in
+a band under the lip. And she has lipstick. The mesh carries a 2 mm rose line
+along the crease and nothing else, which is right for a face seen from twenty
+metres across a promenade and nothing like enough for one that fills the frame.
+
+Lips and opening share one ellipsoid, and that is not tidiness. The maw is
+painted on the *bind* pose: opening her mouth does not reveal an interior, it
+stretches her chin down and takes the paint with it. A lip band drawn at a fixed
+size is simply overrun — red above the hole and none below it. Drawn as a ring
+outside the hole in the same frame, both lips travel outward as it grows, which
+is also what lips do.
+
+### Added — and it keeps opening
+
+Hold the branch on her and her mouth goes on opening, from just over half to
+wide, over about five seconds — and once it has been in there a while the foam
+starts to collect, filling from the bottom with the teeth still showing above
+the line. It forgets slowly, at about half the rate it fills, because she is not
+going to have swallowed it in two seconds.
+
+`gape` is the gesture and lets go with the jet; the new `fill` is the tally and
+does not. Keeping them apart is the whole of what makes a mouth that opened once
+keep opening.
+
 ## [1.55.1] — 2026-08-13
 
 Two defects in what 1.55.0 shipped an hour ago.

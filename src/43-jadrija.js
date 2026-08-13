@@ -583,6 +583,11 @@ async function buildJadrija(scene) {
   // is supposed to feel like. Nothing outside this building is affected.
   const SNUG = GROUND.girth - 0.22;
   let special = null;
+  // The blank end of the run that has the open kabina in it, kept as it is laid
+  // so the tourist board can be hung on it. It is the only large flat wall on
+  // this promenade with nothing on it: every other face in the resort is either
+  // a door, a vent or the back of a hut in an alley nobody walks down.
+  let gable = null;
 
   const runs = [];        // for the blockers, later
   /**
@@ -882,6 +887,13 @@ async function buildJadrija(scene) {
       boxTS(T - 0.05 * o, T + 0.05 * o, front, back,
         y0 + JAD.plinth, eave, [0.760, 0.745, 0.700]);
     }
+    // The far end of this run, if this is the run with the door in it. The far
+    // end and not the near one: the near one is four bays from the sign and the
+    // far one is the wall you are looking at while you walk the row towards it.
+    if (sk >= 0) {
+      gable = { t: T1 + 0.05, front, back, floor: y0 + JAD.plinth, eave };
+    }
+
     // The run is one blocker, except where a door was cut in it: then it is the
     // huts either side of the special one, and the special one puts up its own
     // walls. A single box over the lot would be a sign hung on a wall.
@@ -1264,6 +1276,66 @@ async function buildJadrija(scene) {
   }
 
   if (special) special.sign = neonSign(special);
+
+  /**
+   * The tourist board, on the blank end of that run.
+   *
+   * The map itself is `jadrijaMapTexture` in src/44-board.js, which knows about
+   * cartography and nothing about carpentry. This is the other half: a frame,
+   * four bolts and a quad, and the one number that connects them — the board's
+   * own world position, which is what the red tag on the map points at. Hang it
+   * somewhere else and the tag follows, because it is derived rather than drawn.
+   */
+  function mapBoard(gb) {
+    // Centred across the gable and set at reading height. The wall is 2.90 m of
+    // s and 2.44 m of it stands above the pad, so a 2.10 by 1.44 panel leaves
+    // 0.40 m of render either side and 0.30 m under the eave — which is the
+    // proportion every one of these boards is bolted up in, and is not an
+    // accident: any less margin and the frame fouls the fascia.
+    const sc = (gb.front + gb.back) * 0.5;
+    const yc = gb.floor + 1.42;
+    const wp = W(gb.t, sc, 0);
+    const panel = jadrijaMapTexture([wp[0], wp[2]]);
+    const h = 2.10 / panel.aspect;
+
+    // The frame first, in the huts' own buffer so it takes their light. Three
+    // pieces: a surround standing 30 mm off the wall, and a lip top and bottom,
+    // because a printed panel on this coast is always in an aluminium tray with
+    // a drip edge — without one the rain runs down the wall behind it and the
+    // render below goes green in a season.
+    b = up;
+    const half = 2.10 * 0.5, vhalf = h * 0.5, m = 0.055;
+    boxTS(gb.t - 0.005, gb.t + 0.035, sc - half - m, sc + half + m,
+      yc - vhalf - m, yc + vhalf + m, [0.415, 0.425, 0.440],
+      [0.300, 0.310, 0.325]);
+    for (const [y0, y1] of [[yc + vhalf + m, yc + vhalf + m + 0.030],
+      [yc - vhalf - m - 0.030, yc - vhalf - m]]) {
+      boxTS(gb.t - 0.005, gb.t + 0.060, sc - half - m, sc + half + m,
+        y0, y1, [0.500, 0.510, 0.520]);
+    }
+    b = deck;
+
+    // And the print, on a quad standing a whisker proud of the tray. Basic
+    // rather than lit, and that is a decision: this is the one surface in the
+    // resort whose whole job is to be *read*, and a laminated panel in August
+    // does not go the colour of the wall behind it — it glares. Ten centimetres
+    // of the eave's shadow crossing the legend would be correct and unreadable.
+    const st = at(gb.t);
+    const p = W(gb.t + 0.036, sc, yc);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.10, h),
+      new THREE.MeshBasicMaterial({ map: panel.tex, side: THREE.FrontSide }));
+    // PlaneGeometry looks down +z; the run's own +t is (ux, uz), which is the
+    // way the wall faces. Its local +x then lands on the inland normal, so the
+    // map's east edge is the one nearer the back row — which is why the canvas
+    // is laid out with north up and read from the promenade side.
+    mesh.position.set(p[0], p[1], p[2]);
+    mesh.rotation.y = Math.atan2(st.ux, st.uz);
+    scene.add(mesh);
+    return { mesh, at: [gb.t, sc], tex: panel.tex, aspect: panel.aspect,
+      houses: panel.houses, lanes: panel.lanes };
+  }
+  const board = gable ? mapBoard(gable) : null;
 
   // The steps belong to the ground — you walk down them — and are cut into the
   // terrace they come off, so they stay in the deck buffer where their concrete
@@ -3412,7 +3484,9 @@ async function buildJadrija(scene) {
         hit: 0, owed: 0, wet: 0, lock: 0, spin: 1, faceAng: 0,
         // Chin up and mouth open, for the one place the jet gets that: 0 or 1
         // eased, and it drives both at once because they are one gesture.
-        gape: 0,
+        // `fill` is the slow one under it — not whether the water is on her
+        // mouth but how long it has been.
+        gape: 0, fill: 0,
         // And the turn. `soak` is the one number in here that is a *total*
         // rather than a state — how many seconds of jet she has taken, over
         // the whole session, forgotten only very slowly. `burn` is how much of
@@ -4158,6 +4232,19 @@ async function buildJadrija(scene) {
     // that she is looking up at somebody standing over her rather than at their
     // knees, and short of the angle where a neck stops being a neck.
     chin: 0.52,
+    // And how the mouth answers a branch that is left on it. A mouth that is
+    // simply open is a pose; one that keeps opening is somebody taking it, and
+    // the difference costs one accumulator. `gulp` is seconds of unbroken water
+    // to reach the wide end of `open`, `spit` is how long it takes to forget —
+    // slower, because she is not going to have swallowed it in two seconds —
+    // and `froth` is how far up the fill the foam starts to collect, which is
+    // late on purpose. Foam that arrives with the first squirt is a face full of
+    // shaving cream; foam that arrives once she has been holding her mouth under
+    // it for four seconds is foam.
+    gulp: 5.0,
+    spit: 9.0,
+    open: [0.52, 0.46],
+    froth: 0.44,
     castAt: 0.46,       // s into the `cast` clip where it leaves her hand. This
                         // is FIRE_CAST_AT in tools/blender/human_mh.py and it
                         // has to move with it or the ball appears out of a hand
@@ -4890,8 +4977,21 @@ async function buildJadrija(scene) {
       // Up fast and down slowly. She is answering the water, and a chin that
       // falls as quickly as it rose reads as a flinch.
       show.gape = damp(show.gape, into, into ? 9 : 3.2, dt);
-      if (f.face) f.face.gape = show.gape * 0.94;
-      f.aim('head', 0, 0, 1, show.gape * SHOW.chin);
+      // And how long it has been going in, which is a different question from
+      // whether it is going in now — `gape` is the gesture and lets go with the
+      // jet; this is the tally and does not. Keeping them apart is what lets a
+      // mouth that opened once keep opening while you hold the branch on it.
+      show.fill = clamp(show.fill
+        + (into ? dt / SHOW.gulp : -dt / SHOW.spit), 0, 1);
+      if (f.face) {
+        f.face.gape = show.gape * (SHOW.open[0] + SHOW.open[1] * show.fill);
+        // Both gated on `gape` rather than on `fill` alone, so everything in
+        // her mouth leaves with her mouth. A closed mouth with foam painted on
+        // the inside of it is a closed mouth with a white line across it.
+        f.face.foam = show.gape
+          * sat((show.fill - SHOW.froth) / (1 - SHOW.froth));
+      }
+      f.aim('head', 0, 0, 1, show.gape * SHOW.chin * (0.86 + 0.20 * show.fill));
     }
 
     // And the wrap, which she never puts back on.
@@ -6049,11 +6149,22 @@ async function buildJadrija(scene) {
       if (o.smile != null) { u.uSmile.value = o.smile; skinFig.face.smile = o.smile; }
       if (o.rate != null) skinFig.face.rate = o.rate;
       if (o.ink != null) { u.uInk.value = o.ink; skinFig.face.ink = o.ink; }
+      // The mouth, held open by hand. `fill` is the driver and it is the one
+      // worth setting: it is a five-second accumulator, and headless the page
+      // runs at about a frame a second, so a test that wanted to see a mouthful
+      // of foam would otherwise have to hold a branch on her for three hundred
+      // frames. Setting it writes through to both halves at once, which is what
+      // the tick does anyway.
+      if (o.fill != null && show) show.fill = sat(o.fill);
+      if (o.gape != null) { u.uGape.value = o.gape; skinFig.face.gape = o.gape; }
+      if (o.foam != null) { u.uFoam.value = o.foam; skinFig.face.foam = o.foam; }
       const a = skinFig.face.anchors;
       const r3 = (v) => [+v.x.toFixed(4), +v.y.toFixed(4), +v.z.toFixed(4)];
       return {
         blink: +u.uBlink.value.toFixed(3), smile: +u.uSmile.value.toFixed(3),
         ink: +u.uInk.value.toFixed(3), gape: +u.uGape.value.toFixed(3),
+        foam: +u.uFoam.value.toFixed(3),
+        fill: show ? +show.fill.toFixed(3) : null,
         lipC: a.lipC ? r3(u.uLipC.value) : null,
         lipW: a.lipC ? +a.lipW.toFixed(4) : null,
         want: +skinFig.face.smile.toFixed(2), rate: skinFig.face.rate,
@@ -6093,6 +6204,19 @@ async function buildJadrija(scene) {
      */
     step: (secs, cam) => {
       for (let i = 0; i < Math.round(secs * 60); i++) updateCrowd(1 / 60, cam);
+    },
+    /** Debug: the tourist board, and what its map found to draw. */
+    board: () => board && {
+      at: board.at.map((v) => +v.toFixed(2)),
+      world: board.mesh.position.toArray().map((v) => +v.toFixed(1)),
+      size: [2.10, +(2.10 / board.aspect).toFixed(3)],
+      canvas: [board.tex.image.width, board.tex.image.height],
+      houses: board.houses, lanes: board.lanes,
+      // The canvas itself, so a screenshot can look at the print rather than at
+      // a photograph of the print. Two metres of wall at four metres' range is
+      // 300 px of a 1280 px frame, which is enough to say the map is there and
+      // nothing like enough to say the legend is legible.
+      el: board.tex.image,
     },
     tris: (deck.count() + up.count() + vil.count()) / 3,
   };
