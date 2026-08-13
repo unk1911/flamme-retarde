@@ -112,7 +112,26 @@ float shadowAt(vec3 worldPos){
   // enough GLSL ES implementations that it is not worth finding out which ones
   // on somebody else's phone.
   float nearLit = pcf3(uShadowMapN, uvN, uShadowTexelN, 0.00016, 2.0);
-  return mix(lit, min(lit, nearLit), w);
+  // Where the near cascade reaches, it is the answer and not a second opinion.
+  //
+  // This was min() of the two, which sounds conservative and is the bug behind
+  // the checkerboard on the promenade. The far map is 0.44 m a texel with the
+  // PCF spread 2.6 texels wide, so its account of a kabina wall standing three
+  // metres away is a staircase of metre squares laid over ground the near map
+  // has at 5.4 cm and gets right — and min() hands the argument to whichever
+  // cascade is darker, which along every edge is the coarse one. The two
+  // disagreeing by a texel is also what put the dither on the white walls: a
+  // surface that is its own caster reads as lit in one map and shadowed in the
+  // other, and min() takes the shadow every time.
+  //
+  // Switching rather than combining is only safe because every caster in the
+  // far map is also in the near one — see the registrations in src/90-app.js,
+  // where the resort, the aerodrome, the trees and the aeroplane all go into
+  // the shared scene and only the small stuff is near-only. What it gives up is
+  // an occluder outside the near slab entirely: 55 m to the side of you, or
+  // 260 m up-sun. In a world whose terrain does not cast at all, that is a
+  // hangar or a pine and never a hillside.
+  return mix(lit, nearLit, w);
 }
 `;
 

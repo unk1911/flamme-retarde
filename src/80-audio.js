@@ -325,6 +325,35 @@ function buildAudio() {
     o.start(t); o.stop(t + dur + 0.02);
   }
 
+  /**
+   * A bead curtain, moving.
+   *
+   * Forty-five strings of printed plastic knocking together is not one sound,
+   * it is a scatter of very short, very bright, very sharp ones — so this is a
+   * handful of high-Q noise clicks thrown across two hundred milliseconds with
+   * their pitch and their timing both jittered. Regular spacing reads as a
+   * machine and identical pitches read as one object; a curtain is neither.
+   *
+   * `amp` is how hard it is moving and `d` is how far away you are. Called on a
+   * cooldown from src/43-jadrija.js while the strands are still swinging, which
+   * is what gives it the tail after somebody has walked through.
+   */
+  function rattle(amp = 1, d = 0) {
+    if (!ctx || amp <= 0.02) return;
+    const t0 = ctx.currentTime;
+    const far = Math.max(0.04, 1 - d / 24);
+    const n = 3 + Math.round(Math.min(1, amp) * 11);
+    for (let i = 0; i < n; i++) {
+      burst({
+        freq: 1900 + Math.random() * 2900,
+        q: 8 + Math.random() * 10,
+        dur: 0.024 + Math.random() * 0.030,
+        gain: 0.024 * amp * far * (0.35 + Math.random() * 0.9),
+        at: t0 + Math.random() * 0.20,
+      });
+    }
+  }
+
   /** The click and hiss either side of a radio call. */
   function squelch() {
     burst({ freq: 1800, q: 3.0, dur: 0.07, gain: 0.045, sweep: 0.5 });
@@ -1956,7 +1985,8 @@ function buildAudio() {
     slowLp.frequency.value = 20000 * Math.pow(620 / 20000, clamp(k, 0, 1));
   }
 
-  return { start, update, squelch, dropWhoosh, setGush, footstep, splash, beep, setVolume, getVolume,
+  return { start, update, squelch, dropWhoosh, setGush, footstep, splash, beep, rattle,
+    setVolume, getVolume,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa, room,
     firestarter, slowmo, radioTune, radioClick,
     /** Where the pointer sits for each station, so the dial can be drawn. */

@@ -8,6 +8,153 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.58.0] — 2026-08-13
+
+### Fixed — the last of the mascara, and the inside of her mouth
+
+1.57.0 wiped the socket and drew the brow in the shader, and the smears got
+much shorter without going away. What was left was a soft grey wedge a couple
+of centimetres across, sitting on the cheekbone under each eye — the reason it
+appeared after landing rather than on arrival is only that you have to get close
+enough to see it.
+
+It was the wipe's own exception. The socket is cleared inside an ellipsoid and
+then the eye itself is *kept*, because wiping the eye would wipe the lashes with
+it, and `keep` measured plain 3D distance from the eyeball's centre. But the
+centre of an eyeball is about a centimetre behind the skin, so the shell between
+1.06 and 1.34 radii does not stay on the eye at all: it leaves the socket
+sideways and lies down almost flat on the cheek, and everything under it was
+protected from the wipe. A grazing sphere, and the wedge was its footprint.
+
+Two days of hypotheses died on this — vertex paint, vertex normals, the shadow
+map, all replaced outright and the wedge survived all three. What found it was
+writing `sock` and `keep` into separate colour channels and reading the pixels:
+one shot, and the answer was that the wipe was not weak there, it was forbidden.
+`keep` now measures across the eye's own axes in `uEyeR.yz`, so it cannot graze,
+and reaches 2.4× less far below the centre than above — which is what an eye
+does, since there is lid above it and cheek below.
+
+The mouth at full gape was the other report, and the reference was a photograph:
+rose lips, one clean row of upper teeth, warm pink behind them, foam pooled on
+the tongue. What we had was a crimson ring around a white blob. Three things
+were wrong. The teeth were a band in the wrong place — twice, once a mouthguard
+filling two-thirds of the hole and once a sliver — and now sit just under the
+upper lip where they belong. The froth read cold and blue, which was not its
+albedo but the ambient hemisphere: the cavity's normal still pointed at the sky.
+It now points at the floor, which kills the sun term too, and the inside of a
+mouth should have neither. And the foam's noise was sampled in bind space, so
+the jaw dropping stretched it three times vertically into a row of fangs; a
+`comb` factor squares it back up.
+
+### Added — a poster over the tabouret
+
+*Sex on the Beach, USA 1998*, drawn to canvas: the red condensed title, the
+ingredients line, the watercolour hurricane glass with its sunrise gradient,
+umbrella, orange slice and two straws. It hangs on the left inner wall of the
+kabina at chest height, directly above the bottle of Pelješac and the glass.
+
+The frame is four bars and a hole, not a backing panel with a print on it. The
+first version was the latter, with the print standing 2 mm proud, and from a
+metre away half of it had sunk into its own border — 2 mm over a half-metre
+diagonal is 0.55° of tolerance, which no camera respects. The print now sits at
+mid-frame-depth with nothing behind it, and the title fits itself by measuring:
+headless Chrome and a Windows laptop do not have the same fonts.
+
+## [1.57.0] — 2026-08-13
+
+### Fixed — the checkerboard on the promenade, and the shadows on her face
+
+Two reports, one cause and one impostor.
+
+The chequered dither over the concrete, over the white walls and over her skin
+was the two shadow cascades disagreeing. `shadowAt` took the **darker** of them,
+which sounds conservative and is exactly wrong: the far map is 0.44 m a texel
+with the PCF spread 2.6 texels across, so its account of a kabina wall standing
+three metres away is a staircase of metre squares — laid over ground the near
+cascade has at 5.4 cm and gets right. `min()` hands the argument to whichever
+cascade is darker, and along every edge that is the coarse one. It now selects
+rather than combines, which is safe here because every caster in the far map is
+also in the near one; what it gives up is an occluder more than 55 m to the side
+of you or 260 m up-sun, and in a world whose terrain does not cast at all that is
+a hangar or a pine, never a hillside.
+
+The smears running from her eyes down her cheeks were **two** things, and the
+tell was that replacing the base colour of the whole socket with flat green left
+them there. Half was paint: every mark on this figure is a cutter in
+`human_mh.py` laying down vertex colour, and on a body decimated eightfold a mark
+is not a mark but its whole triangle fan — the file already measures that effect
+over `perineum` and calls it a faint brown cloud. Measured off the exported blob,
+the near-black vertices round each eye run from 6 mm under its centre to 12 mm
+over, and the fans carry that grey twice as far again. So the socket is wiped and
+the brow is drawn in the shader instead, the way the lips and the inside of the
+mouth already are: six millimetres of brow where there were thirty of smudge.
+
+The other half was shading, and no amount of recolouring touched it. MakeHuman's
+lower lid is a tight fold four or five vertex rows deep; keep one row in eight
+and it survives as a single crease whose normals point down and back, so a band
+a centimetre under each eye lights like the underside of a shelf. `easeSockets()`
+now eases those normals back toward the sphere a skull nearly is — once, at load,
+on the buffer, so the shadow caster gets it too — and only where a normal has
+already fallen more than about 40 degrees away from round, which is what keeps it
+off the parts of a face that are *meant* to turn away.
+
+### Changed — her mouth is not a clown's
+
+The first pass at the open mouth fixed a hole punched through her head and left
+something worse: a black interior behind a hard white bar of teeth, ringed in
+crimson half a chin wide. All three are the same mistake — reaching for contrast
+in a room that has none. The throat is warm now, the teeth are well down from
+white, the lipstick is rose instead of pillar-box and its band no longer grows
+faster than the opening it surrounds, and the gape itself is smaller.
+
+The froth also came out the colour of a cold tap, and warming the albedo could
+not fix it because the tint was never in the albedo: everything in this game
+carries a Blinn lobe and a little sky reflection, and the inside of a mouth is
+not a mirror. It is now specular-free, and it collects sooner and stops short of
+the lip line, so the teeth still show above it.
+
+### Added — the bead curtain in the doorway
+
+What actually hangs in a Dalmatian doorway in August, and it has a dolphin on it.
+Forty-five strands of printed tile across the 1.45 m opening, each a rigid
+pendulum hung off the head of the frame: two angles, an angular rate each, a
+spring that is gravity and a damper that is the string. Each strand pulls on the
+two beside it, so a shove in the middle runs outward as a wave and the whole
+thing settles together — that coupling is the difference between a curtain and
+forty independent pendulums.
+
+Walking through drives the strands you are touching toward *your* speed rather
+than adding an impulse per frame, which is both what contact does and the only
+way the result is the same at 15 fps and at 144. The design is drawn across the
+strands rather than on any one of them, so it comes apart into stripes as you
+pass and puts itself back together behind you. It clatters while it is moving,
+not when you cross it: forty-five strings of plastic is a scatter of very short,
+very bright, very sharp sounds with their pitch and their timing both jittered,
+and the tail after somebody has gone through is most of what the noise is for.
+
+It is 1 260 triangles and it is not a blocker, because the point of the thing is
+that you walk through it.
+
+### Changed — `tools/blender/blender.sh` picks the right graphics card
+
+The D3D12 path has been giving EEVEE a GPU since 1.54.0 and it was the wrong one.
+D3D12 enumerates every adapter Windows has and Mesa takes the first, which on a
+laptop with switchable graphics is the integrated one — so this has been quietly
+rendering on an Intel UHD with a 4090 sitting next to it. Measured on
+`--reskin KNEEL --views side`:
+
+| | total | the render |
+|---|---|---|
+| llvmpipe | 72.4 s | 66.2 s |
+| d3d12, Intel UHD | 13.1 s | 7.0 s |
+| d3d12, RTX 4090 | 8.2 s | 2.2 s |
+
+Same picture: 3 pixels out of 851 200 differ by more than 4/255, all of them on
+an antialiased silhouette. The run is no longer render-bound — what is left is
+eight seconds of opening a 50 MB blend and baking twenty-two clips, which is
+where the next lever is. The adapter name is a preference, so a box with no
+NVIDIA adapter falls back to the first one and is no worse off than before.
+
 ## [1.56.0] — 2026-08-13
 
 ### Added — the tourist board at the end of the row

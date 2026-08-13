@@ -357,11 +357,77 @@ function faceAnchors(data) {
   data.bones.forEach((b, i) => { if (/^armU/.test(b.name)) armB.push(i); });
 
   return {
-    eye, rad, corner, lipC, lipW, armB,
+    eye, rad, corner, lipC, lipW, armB, eyeBones,
     lid: rgb(skin),
     lash: rgb(darkest),
     balls: ball.length, mouth: mouth.length,
   };
+}
+
+/**
+ * Take the crease out of the eye sockets.
+ *
+ * There were two dark smears running from her eyes down her cheeks and only one
+ * of them was paint. The paint half is dealt with in FACE_FRAG — see the note on
+ * `sockR` in FACE. This is the other half, and it took replacing the base colour
+ * of the whole socket with flat green to find, because the green came out dark
+ * too: what is under each eye is not a mark, it is *shading*, and no amount of
+ * recolouring touches it.
+ *
+ * The cause is the decimator again. MakeHuman's lower lid is a tight fold four
+ * or five vertex rows deep; keep one row in eight of it and the fold survives as
+ * a single crease whose normals point down and back, into the ground rather than
+ * at the sky, so a band a centimetre under each eye lights as though it were the
+ * underside of a shelf. On the promenade at twenty metres that is invisible. In
+ * the kabina with her face filling the frame it is mascara that has run, which
+ * is what it was reported as.
+ *
+ * So the normals in the socket are eased back toward the direction the head
+ * would have if it were the sphere it nearly is: outward from a point about
+ * 85 mm behind the eyes, on the midline, which is where the middle of a skull
+ * is. Done once at load, on the buffer, so the shadow caster gets it too — it
+ * shares this geometry. The eyeballs are left exactly as they are: they are
+ * rigid shells of their own, they are round already, and they are the one thing
+ * in here whose normals were never in question.
+ */
+function easeSockets(data, anchors) {
+  const g = data.geo;
+  const pos = g.attributes.position.array;
+  const nrm = g.attributes.normal.array;
+  const bi = g.attributes.aBoneIdx.array;
+  const bw = g.attributes.aBoneWt.array;
+  const eyes = new Set(anchors.eyeBones);
+  const [ex, ey, ez] = anchors.eye;
+  const cx = ex - FACE.skull;
+  let n = 0;
+  for (let i = 0; i < data.nv; i++) {
+    if (bw[i * 4] === 255 && eyes.has(bi[i * 4])) continue;
+    const x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2];
+    const d = Math.hypot(x - ex, y - ey, Math.abs(z) - ez);
+    const t = clamp((FACE.ease[1] - d) / (FACE.ease[1] - FACE.ease[0]), 0, 1);
+    if (t <= 0) continue;
+    let w = t * t * (3 - 2 * t);
+    // Outward from the middle of the skull. On the midline in z, so the two
+    // sides come out mirrored without the folding this file does everywhere
+    // else — a normal has a sign and the fold throws it away.
+    let ox = x - cx, oy = y - ey, oz = z;
+    const ol = Math.hypot(ox, oy, oz) || 1;
+    ox /= ol; oy /= ol; oz /= ol;
+    // How far this vertex has already fallen away from round. A cheek is 0.98
+    // and wants nothing; the fold under the lid comes back around 0.2.
+    const d2 = nrm[i * 3] * ox + nrm[i * 3 + 1] * oy + nrm[i * 3 + 2] * oz;
+    const u = clamp((FACE.easeN[0] - d2) / (FACE.easeN[0] - FACE.easeN[1]), 0, 1);
+    w *= u * u * (3 - 2 * u);
+    if (w <= 0) continue;
+    let a = nrm[i * 3] + (ox - nrm[i * 3]) * w;
+    let b = nrm[i * 3 + 1] + (oy - nrm[i * 3 + 1]) * w;
+    let c = nrm[i * 3 + 2] + (oz - nrm[i * 3 + 2]) * w;
+    const l = Math.hypot(a, b, c) || 1;
+    nrm[i * 3] = a / l; nrm[i * 3 + 1] = b / l; nrm[i * 3 + 2] = c / l;
+    n++;
+  }
+  g.attributes.normal.needsUpdate = true;
+  return n;
 }
 
 /**
@@ -377,6 +443,81 @@ const FACE = {
   eyeR: [0.022, 0.0125, 0.0155],   // m, in the folded bind frame
   shut: 0.60,                      // where the lids meet, as a fraction of eyeR.y
   line: 0.0016,                    // half-width of the lash line on the lid
+  // ── the socket, and the cloud that has to come off it ────────────────────
+  //
+  // Every small dark thing on this figure is a cutter in human_mh.py laying
+  // down vertex colour, and on a body decimated about eightfold a mark is not
+  // a mark: one painted vertex is its whole triangle fan. That file measures
+  // the same effect in the note over `perineum` and calls it a faint brown
+  // cloud several centimetres across, and decides the perineum has to be
+  // geometry because of it. Nothing was ever done about the face, where the
+  // brow and the two lash lines cloud the same way — measured off the exported
+  // blob, the near-black vertices round each eye run from 6 mm under its centre
+  // to 12 mm over, and the fans they belong to carry that grey twice as far
+  // again. On a cheek it reads as mascara that has run, and it is worst in the
+  // kabina, where her face is the whole frame.
+  //
+  // So the cloud is wiped and the brow is drawn here instead, the way the lips
+  // and the inside of her mouth already are and for the same reason. `keepR`
+  // is the aperture that survives it: a slot, wide and short, holding the
+  // eyeball and the two modelled lash strips, all of which are dense shells of
+  // their own and are painted correctly. `sockR` is how far the cloud reaches
+  // and therefore how far the wipe runs — short of the hairline, which starts
+  // about 37 mm above the eye and is meant to be soft.
+  //
+  // The forward radii are large on all of these and that is not sloppiness. A
+  // cutter is a punch: it is deep on purpose so that it crosses the surface
+  // steeply, and what it draws is its silhouette. These are the same shapes
+  // read back as silhouettes, so the depth axis has to contribute nothing.
+  // What survives is measured off the eyeball itself rather than typed: the
+  // exporter hands one rigid shell per eye and `faceAnchors` already reduces it
+  // to a centre and a mean radius, so a sphere around it is the aperture plus
+  // the lid, in the units the figure is actually built in. Typed radii went
+  // wrong twice here for the reason the mouth's did — this is the bind pose and
+  // the head is not upright in it.
+  //
+  // And it is not a sphere, because the cloud is not centred. Measured off the
+  // exported blob a second time, after the first pass was reported as still
+  // there: the vertices carrying the brow's own colour run from 43 mm *under*
+  // the eye to 120 mm over it, and everything below the lid is a stray — the
+  // brow the shader draws lives between 20 and 32 mm up. Upward the wipe can
+  // never be long, because the hairline starts about 37 mm over the eye and the
+  // fringe is meant to be soft; downward it can be as long as it likes, because
+  // there is nothing on a cheek. So the vertical semi-axis is `sockDn` below
+  // the eye and `sockR.y` above it, and what a symmetric ellipsoid was leaving
+  // behind was the bottom two centimetres of the smear — which is the part
+  // anybody looks at.
+  keep: [0.55, 1.35],              // fractions of the lid ellipse, across it
+  keepDn: 2.40,                    // and how much less of it there is below
+  sockR: [0.060, 0.0330, 0.0320],
+  sockDn: 0.055,
+  // And the wipe is full over nearly all of it, which is the other half of why
+  // the first pass read as unchanged. At 0.50 the strength falls away from the
+  // halfway mark outwards, so the smear — which lives in the outer third of the
+  // socket, not the middle of it — was only ever getting a third of a wipe.
+  // Painting the region flat green showed it plainly: bright green over the
+  // lid, a dark green wedge under it, which is a wipe that has run out rather
+  // than a shadow. There is no cost to holding it at full: what it wipes to is
+  // the colour the cheek already is, so the edge is invisible wherever it lands.
+  sockIn: 0.86,
+  // And what easeSockets() needs. `skull` is how far behind the eyes the middle
+  // of a skull is; `ease` is the band around each eye it works in, full in to
+  // 20 mm and gone by 42, which reaches the fold under the lower lid and stops
+  // short of the nose. Inside that band the strength is not the radius but how
+  // far the normal has already fallen away from round: a vertex still facing
+  // out within 40 degrees is left alone, one past 75 is replaced outright. That
+  // is what keeps this off the parts of a face that are *meant* to turn away —
+  // the side of the nose, the corner of the lid — while taking the whole crease
+  // out, which a radius alone could not do without flattening her.
+  skull: 0.085,
+  ease: [0.020, 0.042],
+  easeN: [0.77, 0.26],
+  // The brow, off the cutter that painted it — `add("brow" + tag, …)` in
+  // human_mh.py — with the axes turned from Blender's frame into this one.
+  // Six millimetres of brow, which is a brow; what it replaces was thirty.
+  brow: [0.0262, 1.06],            // up from the eye, and the z of it scaled
+  browR: [0.100, 0.0060, 0.0250],
+  browCol: [0.128, 0.094, 0.070],  // HAIR_P, the colour the cutter used
   lipR: [0.020, 0.016, 0.020],     // how far a corner's lift reaches
   lift: [-0.0016, 0.0080, 0.0016], // and where it takes it: back, up, out
   squint: 0.18,                    // how far a full smile closes the eyes
@@ -398,9 +539,16 @@ const FACE = {
   //
   // Warm, too. A mouth lit through a doorway is red before it is black, and a
   // neutral dark oval reads as damage where a warm one reads as a shadow.
-  maw: [0.072, 0.024, 0.022],      // the throat, at the back of it
-  tooth: [0.780, 0.760, 0.720],    // TOOTH_P out of human_mh.py, a shade down
-  tongue: [0.360, 0.132, 0.128],   // and TONGUE_P, likewise
+  //
+  // Warmer again, and by a lot. The first pass at this fixed a hole punched in
+  // her head and left a *scary clown*, which is the report and is the right
+  // word for it: a black interior behind a hard white bar of teeth, ringed in
+  // crimson. Every one of those three is the same mistake — reaching for
+  // contrast in a room that has none. A mouth held open under a branch is
+  // mostly pink and mostly wet, and the teeth are the least of it.
+  maw: [0.205, 0.082, 0.078],      // the throat, at the back of it
+  tooth: [0.780, 0.748, 0.700],    // TOOTH_P out of human_mh.py, well down
+  tongue: [0.470, 0.215, 0.205],   // and TONGUE_P, likewise
   // The lips, which are paint and not shape. The mesh carries a 2 mm rose line
   // along the crease and nothing else, which is exactly right for a face seen
   // from twenty metres across a promenade and nothing like enough for one that
@@ -422,19 +570,22 @@ const FACE = {
   // in the middle, which is a mouth drawn by somebody who has not looked at one.
   lipsR: [0.026, 0.0098, 1.00],    // z is a fraction of the measured lip width
   lipsLift: 0.0032,                // m the line rises, corner over centre
-  lipstick: [0.400, 0.052, 0.070],
+  // Rose, not pillar-box. The old value was 0.40/0.05/0.07 — a crimson four
+  // times as saturated as any lip, which at a full gape spreads over half her
+  // chin because the band grows with the opening.
+  lipstick: [0.690, 0.330, 0.330],
   // How far open a full gape is, as a multiple of that band: 1.05 puts a full
   // gape at 21 mm by 45 mm, which is a mouth held open under a branch. It was
   // 0.88 and the opening came out 12 by 27 — a mouth with a red ring round it
   // twice the width of the hole, which reads as lipstick applied by somebody
   // with their eyes shut rather than as an open mouth.
-  gapeR: 1.05,
+  gapeR: 0.95,
   // The lip band's inner edge is tied to the hole rather than set: `lipIn` is
   // where it starts as a fraction of the opening, floored at the resting mouth,
   // and `lipOut` is its width, which grows a little because a lip that is being
   // stretched shows more of itself.
   lipIn: 0.97,
-  lipOut: [0.47, 0.30],
+  lipOut: [0.20, 0.05],
   // And the foam, once enough of the branch has gone in. Not white: foam is
   // white the way snow is, which is to say it is whatever is lighting it, and
   // the inside of a mouth is lit by nothing. `fill` stops short of the top on
@@ -448,8 +599,26 @@ const FACE = {
   // opening and leaves the millimetre above it where it was. So the top third
   // of the ellipsoid is a sliver against the upper lip, and a level set anywhere
   // positive is a mouth filled to the brim.
-  foam: [0.820, 0.790, 0.745],
-  fill: -0.45,
+  // Warm, and that is not a matter of taste. The room is lit by a blue
+  // hemisphere through one doorway and nothing else, so a neutral white in
+  // there comes out the colour of a cold tap — a mouthful of glacier. The
+  // measured fix is to bias the albedo the other way by about as much as the
+  // ambient is biased.
+  foam: [0.940, 0.905, 0.845],
+  // And it stops well short of the teeth. Filled to a sliver under the upper
+  // lip the mouth is a white disc with a red ring round it, which is the report
+  // and is fair: what reads as a mouthful of water is water with something
+  // above it to be a mouthful *of*. Two thirds of the way down leaves the whole
+  // upper row showing and puts the froth where it collects anyway, on the
+  // tongue and in the floor of the jaw.
+  fill: -0.30,
+  // How much finer the froth is drawn up the mouth than across it. The jaw
+  // stretches nine millimetres of skin over twenty-seven, so a lump measured in
+  // the bind pose arrives on screen three times taller than it is wide — a
+  // mouthful of vertical combing, which is what the fangs in the report were.
+  // The opening's own frame does not fix that on its own, because the frame is
+  // measured in the bind pose too.
+  comb: 2.60,
   // The tongues run nearly the length of the upper arm — 21 cm from her elbow
   // to her shoulder — because anything shorter is a black sleeve with a ragged
   // top rather than fire. It is the *gaps* between the tongues that read as
@@ -465,6 +634,8 @@ uniform float uBlink;
 uniform float uSmile;
 uniform vec3 uEye;
 uniform vec3 uEyeR;
+uniform vec3 uSockR;
+uniform vec3 uBrowR;
 uniform vec3 uLidCol;
 uniform vec3 uLashCol;
 uniform vec3 uLip;
@@ -531,6 +702,44 @@ const FACE_VERT = /* glsl */ `
 const FACE_FRAG = /* glsl */ `
   {
     vec3 f = vec3(vLocal.x, vLocal.y, abs(vLocal.z));
+
+    // Wipe first, then draw. The socket arrives from the bake clouded — see
+    // the note on keepR in FACE — so the grey comes off before anything is
+    // put back on top of it, and what goes back on is a brow and not a smudge.
+    // uLidCol is the modal colour of the whole figure, which 70% of her
+    // vertices carry and the cheek is part of, so the wipe is invisible where
+    // it stops.
+    vec3 sr = vec3(uSockR.x, f.y < uEye.y ? ${FACE.sockDn} : uSockR.y, uSockR.z);
+    float sock = 1.0 - smoothstep(${FACE.sockIn}, 1.0, length((f - uEye) / sr));
+    if (sock > 0.0) {
+      // Across the face, not through it — and that one word is the whole of why
+      // two passes at this changed nothing. The eyeball centre sits a centimetre
+      // behind the skin, so a sphere drawn round it does not cut the cheek, it
+      // *grazes* it: the shell between the two radii lies almost flat on the
+      // surface under the eye and holds a soft patch a couple of centimetres
+      // across, which is precisely the patch the smear is on. Painting the
+      // wipe region green showed the smear surviving inside it and sent two
+      // days after normals and shadow maps; painting sock and keep into
+      // separate channels found it in one shot — sock was 1.0 the whole way
+      // down and keep was 0.5, so the wipe was being blocked, not falling off.
+      // Measured down the eye's own axis it cannot graze anything, and what it
+      // protects is what it was always meant to: the eyeball and the two lash
+      // strips, seen from in front.
+      vec2 e = vec2(f.y - uEye.y, f.z - uEye.z) / uEyeR.yz;
+      // And it reaches further up than down, which is what an eye does. What is
+      // over the lid line is lashes and lid and reads as an eye; what is under
+      // it is cheek, and every millimetre of protection there is a millimetre
+      // of the smear kept. Symmetric, the aperture large enough to hold the
+      // lashes was large enough to hold the whole mark.
+      if (e.x < 0.0) e.x *= ${FACE.keepDn.toFixed(2)};
+      float keep = 1.0 - smoothstep(${FACE.keep[0].toFixed(3)},
+        ${FACE.keep[1].toFixed(3)}, length(e));
+      base = mix(base, uLidCol, sock * (1.0 - keep));
+      base = mix(base, vec3(${FACE.browCol.join(', ')}),
+        1.0 - smoothstep(0.60, 1.0, length((f - vec3(uEye.x,
+          uEye.y + ${FACE.brow[0]}, uEye.z * ${FACE.brow[1]})) / uBrowR)));
+    }
+
     float k = 1.0 - smoothstep(0.80, 1.0, length((f - uEye) / uEyeR));
     if (k > 0.0) {
       float lid = mix(uEye.y + uEyeR.y, uEye.y - uEyeR.y * ${FACE.shut}, uBlink);
@@ -568,20 +777,20 @@ const FACE_FRAG = /* glsl */ `
         if (mw > 0.0) {
           // Inside the hole, on its own scale: the unit ball is the opening,
           // +y is toward her nose and −y is toward her chin.
-          vec3 n = q / k;
+          vec3 o = q / k;
           vec3 mouth = vec3(${FACE.maw.join(', ')});
           // The tongue, lying in the floor of it and never quite reaching the
           // corners — a tongue is narrow and a mouth is wide.
           mouth = mix(mouth, vec3(${FACE.tongue.join(', ')}), 1.0 - smoothstep(
-            0.40, 1.05, length(vec3(n.x * 0.55, (n.y + 0.42) * 1.30, n.z * 1.20))));
+            0.40, 1.05, length(vec3(o.x * 0.55, (o.y + 0.24) * 1.30, o.z * 1.20))));
           // And the upper teeth, in a band under the lip — which is a band
           // around n.y = 0 rather than at the top of the ellipsoid, for the same
           // reason the foam level is negative. Cut off short of the corners:
           // the back teeth are round the curve of the arch and are not lit by
           // anything.
           mouth = mix(mouth, vec3(${FACE.tooth.join(', ')}),
-            smoothstep(-0.20, 0.14, n.y) * (1.0 - smoothstep(0.42, 0.86, n.y))
-            * (1.0 - smoothstep(0.58, 0.98, abs(n.z))));
+            smoothstep(-0.04, 0.18, o.y) * (1.0 - smoothstep(0.72, 1.00, o.y))
+            * (1.0 - smoothstep(0.58, 0.98, abs(o.z))));
 
           // The foam, which arrives late and fills from the bottom. The level is
           // a plain line in n.y with the noise added to it rather than the other
@@ -595,13 +804,30 @@ const FACE_FRAG = /* glsl */ `
           // vertical stripes. n is the opening's own frame and the 1.7 is its
           // aspect, so a lump in it is a lump.
           if (uFoam > 0.0) {
-            vec2 fn = vec2(n.z * 1.7, n.y);
+            vec2 fn = vec2(o.z * 1.7, o.y * ${FACE.comb.toFixed(2)});
             float froth = 0.56 * vnoise2(fn * 7.0) + 0.44 * vnoise2(fn * 16.5);
             float lvl = mix(-1.35, ${FACE.fill}, uFoam);
             mouth = mix(mouth, vec3(${FACE.foam.join(', ')}) * (0.84 + 0.26 * froth),
-              smoothstep(lvl + 0.17 * froth, lvl - 0.10, n.y));
+              smoothstep(lvl + 0.10 * froth, lvl - 0.12, o.y));
           }
           base = mix(base, mouth, mw);
+          // And a mouth is a cavity, so it is not looking at the sky. The
+          // ambient term reads the sky above the normal and the ground below
+          // it, and a surface inside a head that is still claiming to face
+          // forward collects the one thing in that room with any colour in it —
+          // a blue hemisphere through a doorway — which is why the froth kept
+          // coming out the colour of a cold tap however warm its albedo was.
+          // Turned to face the floor it takes the warm half of the same term,
+          // and it stops taking the sun as well, which is correct: nothing
+          // inside a mouth is in direct light.
+          n = normalize(mix(n, vec3(0.0, -1.0, 0.0), mw));
+          // And the inside of a mouth is not a mirror. Everything in this game
+          // carries a Blinn lobe and a little sky reflection, which on a wet
+          // white surface in a room lit by one blue hemisphere through one
+          // doorway is what turned the froth the colour of a cold tap. Warming
+          // the albedo helped and could not finish the job, because the tint
+          // was never in the albedo.
+          spec = mix(spec, 0.03, mw);
         }
       }
     }
@@ -699,12 +925,15 @@ function skinnedFigure(data, opts = {}) {
   // mouth is not where the palette says. A figure with no face is the figure
   // that shipped yesterday, which is a perfectly good failure.
   const anchors = opts.face ? faceAnchors(data) : null;
+  if (anchors) easeSockets(data, anchors);
   const V = (a) => ({ value: new THREE.Vector3(a[0], a[1], a[2]) });
   const uFace = anchors ? {
     uBlink: { value: 0 },
     uSmile: { value: 0 },
     uEye: V(anchors.eye),
     uEyeR: V(FACE.eyeR),
+    uSockR: V(FACE.sockR),
+    uBrowR: V(FACE.browR),
     uLidCol: V(anchors.lid),
     uLashCol: V(anchors.lash),
     uLip: V(anchors.corner || [0, -99, 0]),

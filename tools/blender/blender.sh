@@ -20,9 +20,25 @@
 # of 255, and the largest difference anywhere in the frame is on an antialiased
 # silhouette edge. It is the same picture.
 #
+# And then, on a laptop, it picks the wrong card. D3D12 enumerates every adapter
+# Windows has and Mesa takes the first, which on a machine with switchable
+# graphics is the integrated one — so this was quietly rendering on an Intel UHD
+# while a 4090 sat idle next to it. Measured on --reskin KNEEL --views side:
+#
+#     llvmpipe          72.4 s total,  66.2 s of it the render
+#     d3d12, Intel UHD  13.1 s total,   7.0 s
+#     d3d12, RTX 4090   10.4 s total,   2.4 s
+#
+# Same picture again — 3 pixels out of 851 200 differ by more than 4/255, all of
+# them on a silhouette. The total is no longer render-bound: what is left is
+# eight seconds of opening a 50 MB blend and baking twenty-two clips, which is
+# where the next lever is if anyone wants one.
+#
 # Everything degrades. On a box with no /dev/dxg — a real Linux machine, a CI
 # runner, a Mac — this leaves the environment alone and Blender chooses for
-# itself, which is what it was doing before.
+# itself, which is what it was doing before. The adapter name is a *preference*:
+# with no matching adapter Mesa falls back to the first one, so an all-Intel or
+# all-AMD box is no worse off than it was.
 #
 #     tools/blender/blender.sh -b build/human_mh.blend \
 #         -P tools/blender/human_mh.py -- --reskin KNEEL --views side
@@ -33,6 +49,10 @@ if [ -c /dev/dxg ] && [ -e /usr/lib/x86_64-linux-gnu/dri/d3d12_dri.so ]; then
   export GALLIUM_DRIVER=d3d12
   # libd3d12.so and libdxcore.so live here and nowhere on the default path.
   export LD_LIBRARY_PATH=/usr/lib/wsl/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+  # Substring match against the adapter description, so this is the discrete
+  # card on any of the three vendors without having to know which one is here.
+  : "${MESA_D3D12_DEFAULT_ADAPTER_NAME:=NVIDIA}"
+  export MESA_D3D12_DEFAULT_ADAPTER_NAME
 fi
 
 exec blender "$@"

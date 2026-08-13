@@ -1337,6 +1337,314 @@ async function buildJadrija(scene) {
   }
   const board = gable ? mapBoard(gable) : null;
 
+  // ── the bead curtain ───────────────────────────────────────────────────────
+  //
+  // What actually hangs in a Dalmatian doorway in August. The door is off its
+  // hinges from June to September and a curtain goes up in its place: it keeps
+  // the flies out, it lets the draught through, and it tells you somebody is in
+  // without anybody having to say so. This one is the tourist-shop kind — flat
+  // printed tiles on forty-odd strings, with a dolphin across them, which is
+  // sold on every second stall between here and Split.
+  //
+  // Every strand is a rigid pendulum hung off the head of the opening, and that
+  // is the whole model: two angles, an angular rate each, a spring that is
+  // gravity and a damper that is the string. What makes it read as a *curtain*
+  // rather than as forty independent pendulums is `link` — each strand pulls on
+  // the two beside it, so a shove in the middle runs outward as a wave and the
+  // whole thing settles together. Walking through drives the strands you are
+  // touching toward *your* speed rather than adding an impulse, which is the
+  // difference between parting a curtain and detonating one; it also makes the
+  // result the same at 15 fps and 144.
+  const BEAD = {
+    wide: 0.021,           // m, one strand across
+    drop: 1.90,            // m, how far it hangs from the head of the opening
+    seg: 14,               // segments down a strand, for the swing
+    rows: 76,              // tiles down a strand, for the canvas
+    px: 8,                 // and how many pixels each of those gets
+    swing: 1.05,           // rad, the furthest a strand will be thrown
+    spring: 24.0,          // rad/s² per rad of tilt — this is gravity
+    damp: 2.1,             // and this is the string
+    link: 12.0,            // how hard a strand pulls on the two beside it
+    reach: 0.36,           // m either side of you that a strand is pushed
+    grip: 16.0,            // how fast a strand you are touching takes your speed
+    push: 0.9,             // rad/s per m/s of you
+    // A doorway is a hole between a hot terrace and a cold room, so there is
+    // always a little air going through it. Small — this is what stops the
+    // thing reading as a painted board when nobody has touched it for a while.
+    stir: 0.020,
+    din: 0.55,             // rad/s of total movement that counts as a rattle
+  };
+
+  /**
+   * The printed face of it, one canvas for the whole curtain.
+   *
+   * Laid out so that strand `i` owns the column `[i/N, (i+1)/N]` of the image:
+   * the picture is not on any one string, it is *across* them, which is why a
+   * bead curtain with a design on it falls apart into stripes the moment
+   * anybody walks through and puts itself back together afterwards. That effect
+   * is free here and it is most of the reason to draw the design this way.
+   *
+   * The tiles are drawn last, over the top of the picture, as a seam every
+   * `px` rows plus a little shading within each one — light at the top edge,
+   * dark at the bottom — and a soft highlight down the middle of every strand,
+   * which is the one thing that stops flat tiles reading as flat tape.
+   */
+  function beadSkin(n) {
+    const cv = document.createElement('canvas');
+    const W = n * BEAD.px, H = BEAD.rows * BEAD.px;
+    cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+
+    // The sea, top to bottom: sky over haze over water over depth.
+    const sky = g.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0.00, '#dceaf4');
+    sky.addColorStop(0.26, '#a8d0e6');
+    sky.addColorStop(0.48, '#5aa3cf');
+    sky.addColorStop(0.78, '#2e77ad');
+    sky.addColorStop(1.00, '#1b5487');
+    g.fillStyle = sky;
+    g.fillRect(0, 0, W, H);
+
+    // A few bands of swell, so the water is not a gradient.
+    g.globalAlpha = 0.16;
+    for (let k = 0; k < 9; k++) {
+      const y = H * (0.52 + k * 0.052);
+      g.fillStyle = k & 1 ? '#ffffff' : '#0f3f6b';
+      g.fillRect(0, y, W, H * 0.012);
+    }
+    g.globalAlpha = 1;
+
+    // The dolphin, over the horizon and coming down. Drawn as one closed path
+    // in unit coordinates so the shape survives whatever the opening turns out
+    // to be — the curtain is sized off the doorway, not the other way round.
+    const X = (u) => u * W, Y = (v) => v * H;
+    g.beginPath();
+    g.moveTo(X(0.075), Y(0.545));                                  // the snout
+    g.bezierCurveTo(X(0.20), Y(0.415), X(0.40), Y(0.330), X(0.575), Y(0.352));
+    g.lineTo(X(0.640), Y(0.212));                                  // dorsal fin
+    g.lineTo(X(0.712), Y(0.372));
+    g.bezierCurveTo(X(0.81), Y(0.412), X(0.878), Y(0.474), X(0.902), Y(0.556));
+    g.lineTo(X(0.995), Y(0.466));                                  // the fluke
+    g.lineTo(X(0.955), Y(0.618));
+    g.lineTo(X(0.995), Y(0.736));
+    g.bezierCurveTo(X(0.855), Y(0.700), X(0.700), Y(0.632), X(0.545), Y(0.596));
+    g.lineTo(X(0.470), Y(0.790));                                  // pectoral
+    g.lineTo(X(0.398), Y(0.578));
+    g.bezierCurveTo(X(0.26), Y(0.578), X(0.145), Y(0.570), X(0.075), Y(0.545));
+    g.closePath();
+    g.fillStyle = '#1c4c78';
+    g.fill();
+
+    // The belly, which is what makes it a dolphin and not a shark: a pale
+    // crescent clipped to the body and set low in it.
+    g.save();
+    g.clip();
+    const pale = g.createLinearGradient(0, Y(0.40), 0, Y(0.74));
+    pale.addColorStop(0, 'rgba(255,255,255,0)');
+    pale.addColorStop(1, 'rgba(244,250,253,0.95)');
+    g.fillStyle = pale;
+    g.fillRect(0, Y(0.40), W, Y(0.40));
+    g.restore();
+
+    // The eye, three pixels of it, which at forty-five strands is one strand.
+    g.fillStyle = '#f2f7fa';
+    g.beginPath();
+    g.arc(X(0.195), Y(0.478), Math.max(2, W * 0.010), 0, 7);
+    g.fill();
+
+    // ── the tiles ────────────────────────────────────────────────────────────
+    // A seam every tile, and a gradient within each: this is the difference
+    // between a printed banner and forty strings of plastic.
+    const p = BEAD.px;
+    for (let r = 0; r < BEAD.rows; r++) {
+      const y = r * p;
+      const sh = g.createLinearGradient(0, y, 0, y + p);
+      sh.addColorStop(0.00, 'rgba(255,255,255,0.30)');
+      sh.addColorStop(0.35, 'rgba(255,255,255,0.04)');
+      sh.addColorStop(1.00, 'rgba(0,0,0,0.30)');
+      g.fillStyle = sh;
+      g.fillRect(0, y, W, p);
+      g.fillStyle = 'rgba(0,0,0,0.45)';
+      g.fillRect(0, y + p - 1, W, 1);
+    }
+    // And the round of each strand, across the columns.
+    for (let i = 0; i < n; i++) {
+      const x = i * p;
+      const rd = g.createLinearGradient(x, 0, x + p, 0);
+      rd.addColorStop(0.00, 'rgba(0,0,0,0.34)');
+      rd.addColorStop(0.34, 'rgba(255,255,255,0.20)');
+      rd.addColorStop(0.62, 'rgba(255,255,255,0.06)');
+      rd.addColorStop(1.00, 'rgba(0,0,0,0.34)');
+      g.fillStyle = rd;
+      g.fillRect(x, 0, p, H);
+    }
+
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.anisotropy = 4;
+    return tex;
+  }
+
+  /**
+   * Hang it, and give it back something that can be stepped.
+   *
+   * The whole curtain is one buffer geometry rewritten on the CPU each frame:
+   * forty-five strands of fifteen rows is 1 350 vertices, which is less than a
+   * single parasol and is not worth a shader. It is *not* a blocker and never
+   * will be — the point of the thing is that you walk through it.
+   */
+  function beadCurtain(K) {
+    const span = K.dj * 2;
+    const n = Math.max(8, Math.round(span / 0.032));
+    const gap = span / n;
+    const hw = BEAD.wide * 0.5;
+    const seg = BEAD.seg;
+    // One station for the whole curtain. The doorway is 1.45 m of a shore
+    // traced in 4 m steps, so the frame does not turn measurably across it and
+    // asking `at()` for it 765 times a frame would be 765 binary searches to
+    // arrive back at the same four numbers.
+    const st = at(K.dc);
+    // Just inside the head of the opening, and just inside the wall: this hangs
+    // off the frame, not off the render.
+    const yTop = K.floor + KAB.head - 0.035;
+    const sHang = K.face + 0.075;
+
+    const nv = n * (seg + 1) * 2;
+    const pos = new Float32Array(nv * 3);
+    const nrm = new Float32Array(nv * 3);
+    const uvs = new Float32Array(nv * 2);
+    const idx = new Uint16Array(n * seg * 6);
+    // Seaward, because that is the side anybody looks at it from and a 21 mm
+    // ribbon has no business claiming a normal of its own.
+    for (let v = 0; v < nv; v++) {
+      nrm[v * 3] = -st.nx; nrm[v * 3 + 1] = 0.16; nrm[v * 3 + 2] = -st.nz;
+    }
+    let k = 0;
+    for (let i = 0; i < n; i++) {
+      const u0 = i / n, u1 = (i + 1) / n;
+      for (let j = 0; j <= seg; j++) {
+        const v = (i * (seg + 1) + j) * 2;
+        uvs[v * 2] = u0; uvs[v * 2 + 1] = 1 - j / seg;
+        uvs[v * 2 + 2] = u1; uvs[v * 2 + 3] = 1 - j / seg;
+      }
+      for (let j = 0; j < seg; j++) {
+        const a = (i * (seg + 1) + j) * 2;
+        idx[k++] = a; idx[k++] = a + 1; idx[k++] = a + 3;
+        idx[k++] = a; idx[k++] = a + 3; idx[k++] = a + 2;
+      }
+    }
+
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.boundingSphere = new THREE.Sphere(
+      new THREE.Vector3(...pt(st, sHang, yTop - BEAD.drop * 0.5)), 2.6);
+
+    const mesh = new THREE.Mesh(g, solidMaterial(0xffffff, {
+      spec: 0.10,
+      // A good deal more bounce than the huts get, and it is not a fudge: this
+      // hangs in a doorway facing four metres of white concrete in full August
+      // sun, with its own back to the shade. Almost everything that lights it
+      // from the promenade side arrives off the terrace. At 0.16 it read as a
+      // navy screen; the thing you actually see in a doorway here is pale.
+      emissive: 0.40,
+      vcol: false,
+      side: THREE.DoubleSide,
+      decl: 'uniform sampler2D uBeadMap;',
+      body: 'base = texture2D(uBeadMap, vUv).rgb;',
+      uniforms: { uBeadMap: { value: beadSkin(n) } },
+    }));
+    mesh.frustumCulled = false;
+    scene.add(mesh);
+
+    const angS = new Float32Array(n);      // swing through the doorway
+    const angT = new Float32Array(n);      // and sideways along it
+    const velS = new Float32Array(n);
+    const velT = new Float32Array(n);
+    const tmp = new Float32Array(n);
+    let prevT = null, prevS = null, cool = 0, phase = 0;
+
+    function write() {
+      let o = 0;
+      for (let i = 0; i < n; i++) {
+        const t0 = K.dc - K.dj + gap * (i + 0.5);
+        const sa = Math.sin(angS[i]), ca = Math.cos(angS[i]);
+        const sb = Math.sin(angT[i]), cb = Math.cos(angT[i]);
+        for (let j = 0; j <= seg; j++) {
+          const L = BEAD.drop * (j / seg);
+          const bt = t0 + L * sb - K.dc, bs = sHang + L * sa;
+          const x = st.x + st.ux * bt + st.nx * bs;
+          const z = st.z + st.uz * bt + st.nz * bs;
+          const y = yTop - L * ca * cb;
+          pos[o] = x - st.ux * hw; pos[o + 1] = y; pos[o + 2] = z - st.uz * hw;
+          pos[o + 3] = x + st.ux * hw; pos[o + 4] = y; pos[o + 5] = z + st.uz * hw;
+          o += 6;
+        }
+      }
+      g.attributes.position.needsUpdate = true;
+    }
+    write();
+
+    /**
+     * @param t,s  where you are, in the resort's frame
+     * @param d    how far away you are, for the sound and for the gate
+     */
+    function step(t, s, d, dt) {
+      if (d > 26) { prevT = prevS = null; return 0; }
+      const h = Math.min(dt, 0.05);
+      const vs = prevS == null ? 0 : (s - prevS) / h;
+      const vt = prevT == null ? 0 : (t - prevT) / h;
+      prevT = t; prevS = s;
+      // Are you in the doorway at all. Half a metre either side of the strands,
+      // which is a shoulder and an arm.
+      const through = s > sHang - 0.55 && s < sHang + 0.55;
+      phase += h;
+      const air = BEAD.stir * Math.sin(phase * 1.7);
+      let din = 0;
+      for (let i = 0; i < n; i++) tmp[i] = angS[i];
+      for (let i = 0; i < n; i++) {
+        if (through) {
+          const t0 = K.dc - K.dj + gap * (i + 0.5);
+          const dd = Math.abs(t - t0);
+          if (dd < BEAD.reach) {
+            // Driven toward your speed while you are against it, rather than
+            // kicked once per frame — which is both what contact does and the
+            // only way the result does not depend on the frame rate.
+            const w = Math.min(1, (1 - dd / BEAD.reach) * 1.6) * Math.min(1, h * BEAD.grip);
+            velS[i] += (clamp(vs, -5, 5) * BEAD.push - velS[i]) * w;
+            velT[i] += (clamp(vt, -5, 5) * BEAD.push * 0.5 - velT[i]) * w;
+          }
+        }
+        const l = i > 0 ? tmp[i - 1] : tmp[i];
+        const r = i < n - 1 ? tmp[i + 1] : tmp[i];
+        velS[i] += (-BEAD.spring * Math.sin(angS[i] - air)
+          - BEAD.damp * velS[i] + BEAD.link * (l + r - 2 * tmp[i])) * h;
+        velT[i] += (-BEAD.spring * Math.sin(angT[i]) - BEAD.damp * velT[i]) * h;
+        angS[i] = clamp(angS[i] + velS[i] * h, -BEAD.swing, BEAD.swing);
+        angT[i] = clamp(angT[i] + velT[i] * h, -BEAD.swing * 0.4, BEAD.swing * 0.4);
+        din += Math.abs(velS[i]) + Math.abs(velT[i]);
+      }
+      din /= n;
+      write();
+      // The sound is the *movement*, not the crossing: a curtain someone has
+      // walked through goes on clattering for a couple of seconds after they
+      // have gone, and that tail is most of what the noise is for.
+      cool = Math.max(0, cool - h);
+      if (audio && din > BEAD.din && cool <= 0) {
+        audio.rattle(Math.min(1, din / 2.6), d);
+        cool = 0.16 + 0.22 * Math.random();
+      }
+      return din;
+    }
+
+    return { mesh, step, strands: n, gap, at: [K.dc, sHang],
+      swing: () => +Math.max(...Array.from(angS, Math.abs)).toFixed(3) };
+  }
+  const beads = special ? beadCurtain(special) : null;
+
   // The steps belong to the ground — you walk down them — and are cut into the
   // terrace they come off, so they stay in the deck buffer where their concrete
   // matches. Everything after this stands up.
@@ -2067,6 +2375,162 @@ async function buildJadrija(scene) {
     wrap: [0.185, 0.176, 0.200],
   };
 
+  /**
+   * The print on the wall over the tabouret.
+   *
+   * A bar poster, which is the one thing a room with a bottle of Pelješac and
+   * two glasses in it was missing — and it goes on the wall the bottle stands
+   * against, so it is behind the wine from wherever in the room you are looking
+   * at the wine from.
+   *
+   * Drawn rather than shipped. The alternative was a photograph, and a
+   * photograph of a poster is a JPEG somebody else owns; this is four hundred
+   * lines of canvas that costs the build nothing and is ours. It is also the
+   * only way to be sure of it in a room this dark: every value in here is
+   * chosen against the one lamp-free hemisphere that lights the place, not
+   * against a white page.
+   *
+   * The type is fitted rather than set. A headless Chrome and a Windows laptop
+   * do not have the same fonts, and a title that overruns its own paper is
+   * worse than a title a size down — so each line is measured and stepped down
+   * until it fits the margin it was given.
+   */
+  function posterSkin() {
+    const CW = 480, CH = 640;
+    const cv = document.createElement('canvas');
+    cv.width = CW; cv.height = CH;
+    const g = cv.getContext('2d');
+    const RED = '#e42d22';
+    const FACE = '"Arial Narrow", "Helvetica Neue", Arial, sans-serif';
+
+    const fit = (text, px, y, weight, margin) => {
+      let n = px;
+      for (;;) {
+        g.font = weight + ' ' + n + 'px ' + FACE;
+        if (n <= 7 || g.measureText(text).width <= CW - margin * 2) break;
+        n -= 1;
+      }
+      g.fillText(text, CW * 0.5, y);
+    };
+
+    // Paper, and the plate area on it. Not white: a poster is off-white, and
+    // white here would be the brightest thing in the room by a mile.
+    g.fillStyle = '#f7f2ea'; g.fillRect(0, 0, CW, CH);
+    g.textAlign = 'center';
+    g.fillStyle = RED;
+    fit('SEX ON THE BEACH', 66, 84, '900', 22);
+    fit('Ingredients: 1½ oz vodka, ¾ oz peach schnapps, '
+      + '1½ oz orange juice, 1½ oz cranberry juice', 15, 112, '700', 20);
+
+    const X0 = 30, Y0 = 128, X1 = CW - 30, Y1 = CH - 78;
+    g.fillStyle = '#efe6d6'; g.fillRect(X0, Y0, X1 - X0, Y1 - Y0);
+
+    // The wash behind the glass. Two blobs rather than one, because a
+    // watercolour is a wet edge over a dry one and a single radial gradient is
+    // an airbrush.
+    for (const [cx, cy, r, col] of [[236, 356, 178, '250, 186, 74'],
+      [300, 300, 132, '245, 148, 52'], [176, 430, 104, '243, 130, 96']]) {
+      const w = g.createRadialGradient(cx, cy, r * 0.15, cx, cy, r);
+      w.addColorStop(0, 'rgba(' + col + ', 0.80)');
+      w.addColorStop(0.72, 'rgba(' + col + ', 0.42)');
+      w.addColorStop(1, 'rgba(' + col + ', 0)');
+      g.fillStyle = w;
+      g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill();
+    }
+
+    // The straws, behind the glass so the rim cuts them off.
+    g.lineCap = 'round';
+    g.strokeStyle = '#2f9ad6'; g.lineWidth = 11;
+    g.beginPath(); g.moveTo(214, 300); g.lineTo(178, 176); g.stroke();
+    g.strokeStyle = '#f2b21e'; g.lineWidth = 11;
+    g.beginPath(); g.moveTo(236, 300); g.lineTo(250, 172); g.stroke();
+    g.strokeStyle = 'rgba(255, 255, 255, 0.85)'; g.lineWidth = 4;
+    for (let i = 0; i < 9; i++) {
+      const u = i / 9, v = u + 0.05;
+      g.beginPath();
+      g.moveTo(236 + 14 * u, 300 - 128 * u);
+      g.lineTo(236 + 14 * v + 5, 300 - 128 * v);
+      g.stroke();
+    }
+
+    // The umbrella: a canopy of alternating panels and a stick under it.
+    g.strokeStyle = '#cfd6da'; g.lineWidth = 5;
+    g.beginPath(); g.moveTo(372, 196); g.lineTo(398, 300); g.stroke();
+    for (let i = 0; i < 8; i++) {
+      const a0 = Math.PI + i * Math.PI / 8, a1 = a0 + Math.PI / 8;
+      g.fillStyle = i % 2 ? '#8e1720' : '#e0403a';
+      g.beginPath(); g.moveTo(372, 200);
+      g.lineTo(372 + Math.cos(a0) * 76, 200 + Math.sin(a0) * 34);
+      g.lineTo(372 + Math.cos(a1) * 76, 200 + Math.sin(a1) * 34);
+      g.closePath(); g.fill();
+    }
+
+    // The glass. One path for the bowl, filled with the drink itself — the
+    // sunrise, which is the whole reason anybody orders this.
+    const bowl = () => {
+      g.beginPath();
+      g.moveTo(190, 288);
+      g.bezierCurveTo(178, 372, 196, 440, 240, 440);
+      g.bezierCurveTo(284, 440, 302, 372, 290, 288);
+      g.closePath();
+    };
+    const drink = g.createLinearGradient(0, 288, 0, 440);
+    drink.addColorStop(0, '#f6a91d');
+    drink.addColorStop(0.42, '#f2701f');
+    drink.addColorStop(1, '#cf1a2b');
+    bowl(); g.fillStyle = drink; g.fill();
+    // The meniscus, and a highlight down the left of the bowl.
+    g.fillStyle = '#f8bb3a';
+    g.beginPath(); g.ellipse(240, 289, 50, 11, 0, 0, TAU); g.fill();
+    g.strokeStyle = 'rgba(255, 255, 255, 0.55)'; g.lineWidth = 6;
+    g.beginPath(); g.moveTo(200, 306); g.bezierCurveTo(192, 356, 200, 400, 216, 424);
+    g.stroke();
+    bowl(); g.strokeStyle = 'rgba(60, 40, 30, 0.55)'; g.lineWidth = 3; g.stroke();
+    // Stem and foot.
+    g.fillStyle = '#e8eef1';
+    g.fillRect(231, 440, 18, 46);
+    g.beginPath(); g.ellipse(240, 492, 48, 13, 0, 0, TAU); g.fill();
+    g.strokeStyle = 'rgba(60, 40, 30, 0.45)'; g.lineWidth = 3;
+    g.beginPath(); g.ellipse(240, 492, 48, 13, 0, 0, TAU); g.stroke();
+    g.beginPath(); g.ellipse(240, 486, 40, 9, 0, 0, TAU); g.stroke();
+
+    // The orange on the rim, half over the glass and half off it.
+    g.fillStyle = '#f6c46a';
+    g.beginPath(); g.arc(306, 282, 48, 0, TAU); g.fill();
+    g.fillStyle = '#f0603a';
+    g.beginPath(); g.arc(306, 282, 40, 0, TAU); g.fill();
+    g.strokeStyle = 'rgba(255, 240, 220, 0.9)'; g.lineWidth = 3;
+    for (let i = 0; i < 10; i++) {
+      const a = i * TAU / 10;
+      g.beginPath(); g.moveTo(306, 282);
+      g.lineTo(306 + Math.cos(a) * 39, 282 + Math.sin(a) * 39);
+      g.stroke();
+    }
+
+    // Splashes. Fixed, not random: this texture is built once and has to come
+    // out the same on every machine that builds it.
+    g.fillStyle = 'rgba(214, 34, 40, 0.85)';
+    for (const [x, y, r] of [[92, 470, 13], [128, 512, 7], [396, 452, 11],
+      [418, 500, 6], [76, 330, 6], [412, 372, 5], [180, 528, 5]]) {
+      g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+    }
+
+    // The footer rule, broken for the line of type that sits in it.
+    g.strokeStyle = RED; g.lineWidth = 4;
+    g.beginPath();
+    g.moveTo(36, CH - 44); g.lineTo(168, CH - 44);
+    g.moveTo(CW - 168, CH - 44); g.lineTo(CW - 36, CH - 44);
+    g.stroke();
+    g.fillStyle = RED;
+    fit('USA 1998', 30, CH - 34, '900', 180);
+
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.anisotropy = 8;
+    return tex;
+  }
+
   /** The canvas on the front of the television. */
   function tvPanel() {
     const cv = document.createElement('canvas');
@@ -2500,6 +2964,47 @@ async function buildJadrija(scene) {
       scene.add(radio.mesh);
     }
 
+    // ── the poster, on the wall the tabouret stands against ──
+    // Behind the bottle and the glass, which is the whole brief: the wall at
+    // `t0` is the one the stool is pushed up against, so anything hung on it
+    // at the stool's own `s` is behind the wine from anywhere you can stand.
+    // Six millimetres proud of the inner shell — the room's boards are already
+    // held four clear of the walls they line, and two more keeps the frame off
+    // the depth test's coin toss.
+    const pt = K.t0 + 0.006, ps = bs, py = f + 1.34;
+    const pw = 0.42, ph = 0.56, pb = 0.026, pd = 0.022;
+    // Four bars and a hole, not a panel with a print stuck on it. A backing
+    // board puts a second surface two millimetres behind the paper, and two
+    // millimetres over a half-metre diagonal is half a degree — so the first
+    // version of this buried half the poster in its own frame the moment the
+    // wall and the plane disagreed by less than a degree. With nothing behind
+    // it the paper hangs in the opening and the only thing it can argue with
+    // is the wall, a centimetre back.
+    const FRAME = [0.052, 0.048, 0.045];
+    const s0 = ps - pw * 0.5, s1 = ps + pw * 0.5;
+    const y0 = py - ph * 0.5, y1 = py + ph * 0.5;
+    boxTS(pt, pt + pd, s0 - pb, s1 + pb, y1, y1 + pb, FRAME);
+    boxTS(pt, pt + pd, s0 - pb, s1 + pb, y0 - pb, y0, FRAME);
+    boxTS(pt, pt + pd, s0 - pb, s0, y0, y1, FRAME);
+    boxTS(pt, pt + pd, s1, s1 + pb, y0, y1, FRAME);
+    const poster = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph),
+      solidMaterial(0xffffff, {
+        // Paper, so barely any specular — and emissive, for the same reason
+        // the curtain is: this room has one doorway and no lamp, and a print
+        // lit correctly for it is a print nobody will ever see.
+        spec: 0.03, emissive: 0.46, vcol: false, side: THREE.DoubleSide,
+        decl: 'uniform sampler2D uPosterMap;',
+        body: 'base = texture2D(uPosterMap, vUv).rgb;',
+        uniforms: { uPosterMap: { value: posterSkin() } },
+      }));
+    {
+      const p = W(pt + pd * 0.5, ps, py);
+      poster.position.set(p[0], p[1], p[2]);
+      const st = at(pt);
+      poster.rotation.y = Math.atan2(st.ux, st.uz);
+      scene.add(poster);
+    }
+
     radio.draw(0.30, 0.0);
     tv.draw(null, 0x2545);
     return {
@@ -2693,6 +3198,13 @@ async function buildJadrija(scene) {
   function stepKabina(pt, ps, dt) {
     if (!kit || !special) return;
     const K = special;
+    // Before the near gate, and with its own: the curtain is the one thing in
+    // this room you can hear and see from the promenade, and it is still moving
+    // for a second or two after you have gone through and stopped being near.
+    if (beads) {
+      beads.step(pt, ps,
+        Math.hypot(pt - K.dc, ps - (K.face + 0.075)), dt);
+    }
     // Kept outside the near gate below, because a radio you can hear from the
     // promenade is most of what makes anybody walk over and look through the
     // door. Only the *aiming* is confined to the room.
@@ -4244,7 +4756,7 @@ async function buildJadrija(scene) {
     gulp: 5.0,
     spit: 9.0,
     open: [0.52, 0.46],
-    froth: 0.44,
+    froth: 0.26,
     castAt: 0.46,       // s into the `cast` clip where it leaves her hand. This
                         // is FIRE_CAST_AT in tools/blender/human_mh.py and it
                         // has to move with it or the ball appears out of a hand
@@ -6206,6 +6718,17 @@ async function buildJadrija(scene) {
       for (let i = 0; i < Math.round(secs * 60); i++) updateCrowd(1 / 60, cam);
     },
     /** Debug: the tourist board, and what its map found to draw. */
+    beads: () => beads && {
+      strands: beads.strands, gap: +beads.gap.toFixed(4),
+      at: beads.at.map((v) => +v.toFixed(2)), swing: beads.swing(),
+      tris: beads.mesh.geometry.index.count / 3,
+      // Walk somebody through it without a camera. A headless page renders at
+      // about a frame a second and `camera.position` is written once a frame,
+      // so twenty steps of a crossing driven from a test all arrive at the same
+      // place and the curtain never moves. Nothing in the game calls this.
+      walk: (t, s, dt) => beads.step(t, s,
+        Math.hypot(t - beads.at[0], s - beads.at[1]), dt),
+    },
     board: () => board && {
       at: board.at.map((v) => +v.toFixed(2)),
       world: board.mesh.position.toArray().map((v) => +v.toFixed(1)),

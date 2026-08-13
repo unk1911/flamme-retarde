@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.56.0">
+<meta name="version" content="1.58.0">
 <meta name="build-date" content="2026-08-13">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -1035,8 +1035,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.56.0, built 2026-08-13">
-    <b>v1.56.0</b><i>·</i><span>2026-08-13</span>
+  <div id="build" title="Flamme Retardé 1.58.0, built 2026-08-13">
+    <b>v1.58.0</b><i>·</i><span>2026-08-13</span>
   </div>
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
@@ -1288,7 +1288,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.56.0", date: "2026-08-13" };</script>
+<script>const BUILD = { v: "1.58.0", date: "2026-08-13" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -2892,7 +2892,26 @@ float shadowAt(vec3 worldPos){
   // enough GLSL ES implementations that it is not worth finding out which ones
   // on somebody else's phone.
   float nearLit = pcf3(uShadowMapN, uvN, uShadowTexelN, 0.00016, 2.0);
-  return mix(lit, min(lit, nearLit), w);
+  // Where the near cascade reaches, it is the answer and not a second opinion.
+  //
+  // This was min() of the two, which sounds conservative and is the bug behind
+  // the checkerboard on the promenade. The far map is 0.44 m a texel with the
+  // PCF spread 2.6 texels wide, so its account of a kabina wall standing three
+  // metres away is a staircase of metre squares laid over ground the near map
+  // has at 5.4 cm and gets right — and min() hands the argument to whichever
+  // cascade is darker, which along every edge is the coarse one. The two
+  // disagreeing by a texel is also what put the dither on the white walls: a
+  // surface that is its own caster reads as lit in one map and shadowed in the
+  // other, and min() takes the shadow every time.
+  //
+  // Switching rather than combining is only safe because every caster in the
+  // far map is also in the near one — see the registrations in src/90-app.js,
+  // where the resort, the aerodrome, the trees and the aeroplane all go into
+  // the shared scene and only the small stuff is near-only. What it gives up is
+  // an occluder outside the near slab entirely: 55 m to the side of you, or
+  // 260 m up-sun. In a world whose terrain does not cast at all, that is a
+  // hangar or a pine and never a hillside.
+  return mix(lit, nearLit, w);
 }
 `;
 
@@ -7130,11 +7149,77 @@ function faceAnchors(data) {
   data.bones.forEach((b, i) => { if (/^armU/.test(b.name)) armB.push(i); });
 
   return {
-    eye, rad, corner, lipC, lipW, armB,
+    eye, rad, corner, lipC, lipW, armB, eyeBones,
     lid: rgb(skin),
     lash: rgb(darkest),
     balls: ball.length, mouth: mouth.length,
   };
+}
+
+/**
+ * Take the crease out of the eye sockets.
+ *
+ * There were two dark smears running from her eyes down her cheeks and only one
+ * of them was paint. The paint half is dealt with in FACE_FRAG — see the note on
+ * `sockR` in FACE. This is the other half, and it took replacing the base colour
+ * of the whole socket with flat green to find, because the green came out dark
+ * too: what is under each eye is not a mark, it is *shading*, and no amount of
+ * recolouring touches it.
+ *
+ * The cause is the decimator again. MakeHuman's lower lid is a tight fold four
+ * or five vertex rows deep; keep one row in eight of it and the fold survives as
+ * a single crease whose normals point down and back, into the ground rather than
+ * at the sky, so a band a centimetre under each eye lights as though it were the
+ * underside of a shelf. On the promenade at twenty metres that is invisible. In
+ * the kabina with her face filling the frame it is mascara that has run, which
+ * is what it was reported as.
+ *
+ * So the normals in the socket are eased back toward the direction the head
+ * would have if it were the sphere it nearly is: outward from a point about
+ * 85 mm behind the eyes, on the midline, which is where the middle of a skull
+ * is. Done once at load, on the buffer, so the shadow caster gets it too — it
+ * shares this geometry. The eyeballs are left exactly as they are: they are
+ * rigid shells of their own, they are round already, and they are the one thing
+ * in here whose normals were never in question.
+ */
+function easeSockets(data, anchors) {
+  const g = data.geo;
+  const pos = g.attributes.position.array;
+  const nrm = g.attributes.normal.array;
+  const bi = g.attributes.aBoneIdx.array;
+  const bw = g.attributes.aBoneWt.array;
+  const eyes = new Set(anchors.eyeBones);
+  const [ex, ey, ez] = anchors.eye;
+  const cx = ex - FACE.skull;
+  let n = 0;
+  for (let i = 0; i < data.nv; i++) {
+    if (bw[i * 4] === 255 && eyes.has(bi[i * 4])) continue;
+    const x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2];
+    const d = Math.hypot(x - ex, y - ey, Math.abs(z) - ez);
+    const t = clamp((FACE.ease[1] - d) / (FACE.ease[1] - FACE.ease[0]), 0, 1);
+    if (t <= 0) continue;
+    let w = t * t * (3 - 2 * t);
+    // Outward from the middle of the skull. On the midline in z, so the two
+    // sides come out mirrored without the folding this file does everywhere
+    // else — a normal has a sign and the fold throws it away.
+    let ox = x - cx, oy = y - ey, oz = z;
+    const ol = Math.hypot(ox, oy, oz) || 1;
+    ox /= ol; oy /= ol; oz /= ol;
+    // How far this vertex has already fallen away from round. A cheek is 0.98
+    // and wants nothing; the fold under the lid comes back around 0.2.
+    const d2 = nrm[i * 3] * ox + nrm[i * 3 + 1] * oy + nrm[i * 3 + 2] * oz;
+    const u = clamp((FACE.easeN[0] - d2) / (FACE.easeN[0] - FACE.easeN[1]), 0, 1);
+    w *= u * u * (3 - 2 * u);
+    if (w <= 0) continue;
+    let a = nrm[i * 3] + (ox - nrm[i * 3]) * w;
+    let b = nrm[i * 3 + 1] + (oy - nrm[i * 3 + 1]) * w;
+    let c = nrm[i * 3 + 2] + (oz - nrm[i * 3 + 2]) * w;
+    const l = Math.hypot(a, b, c) || 1;
+    nrm[i * 3] = a / l; nrm[i * 3 + 1] = b / l; nrm[i * 3 + 2] = c / l;
+    n++;
+  }
+  g.attributes.normal.needsUpdate = true;
+  return n;
 }
 
 /**
@@ -7150,6 +7235,81 @@ const FACE = {
   eyeR: [0.022, 0.0125, 0.0155],   // m, in the folded bind frame
   shut: 0.60,                      // where the lids meet, as a fraction of eyeR.y
   line: 0.0016,                    // half-width of the lash line on the lid
+  // ── the socket, and the cloud that has to come off it ────────────────────
+  //
+  // Every small dark thing on this figure is a cutter in human_mh.py laying
+  // down vertex colour, and on a body decimated about eightfold a mark is not
+  // a mark: one painted vertex is its whole triangle fan. That file measures
+  // the same effect in the note over `perineum` and calls it a faint brown
+  // cloud several centimetres across, and decides the perineum has to be
+  // geometry because of it. Nothing was ever done about the face, where the
+  // brow and the two lash lines cloud the same way — measured off the exported
+  // blob, the near-black vertices round each eye run from 6 mm under its centre
+  // to 12 mm over, and the fans they belong to carry that grey twice as far
+  // again. On a cheek it reads as mascara that has run, and it is worst in the
+  // kabina, where her face is the whole frame.
+  //
+  // So the cloud is wiped and the brow is drawn here instead, the way the lips
+  // and the inside of her mouth already are and for the same reason. `keepR`
+  // is the aperture that survives it: a slot, wide and short, holding the
+  // eyeball and the two modelled lash strips, all of which are dense shells of
+  // their own and are painted correctly. `sockR` is how far the cloud reaches
+  // and therefore how far the wipe runs — short of the hairline, which starts
+  // about 37 mm above the eye and is meant to be soft.
+  //
+  // The forward radii are large on all of these and that is not sloppiness. A
+  // cutter is a punch: it is deep on purpose so that it crosses the surface
+  // steeply, and what it draws is its silhouette. These are the same shapes
+  // read back as silhouettes, so the depth axis has to contribute nothing.
+  // What survives is measured off the eyeball itself rather than typed: the
+  // exporter hands one rigid shell per eye and `faceAnchors` already reduces it
+  // to a centre and a mean radius, so a sphere around it is the aperture plus
+  // the lid, in the units the figure is actually built in. Typed radii went
+  // wrong twice here for the reason the mouth's did — this is the bind pose and
+  // the head is not upright in it.
+  //
+  // And it is not a sphere, because the cloud is not centred. Measured off the
+  // exported blob a second time, after the first pass was reported as still
+  // there: the vertices carrying the brow's own colour run from 43 mm *under*
+  // the eye to 120 mm over it, and everything below the lid is a stray — the
+  // brow the shader draws lives between 20 and 32 mm up. Upward the wipe can
+  // never be long, because the hairline starts about 37 mm over the eye and the
+  // fringe is meant to be soft; downward it can be as long as it likes, because
+  // there is nothing on a cheek. So the vertical semi-axis is `sockDn` below
+  // the eye and `sockR.y` above it, and what a symmetric ellipsoid was leaving
+  // behind was the bottom two centimetres of the smear — which is the part
+  // anybody looks at.
+  keep: [0.55, 1.35],              // fractions of the lid ellipse, across it
+  keepDn: 2.40,                    // and how much less of it there is below
+  sockR: [0.060, 0.0330, 0.0320],
+  sockDn: 0.055,
+  // And the wipe is full over nearly all of it, which is the other half of why
+  // the first pass read as unchanged. At 0.50 the strength falls away from the
+  // halfway mark outwards, so the smear — which lives in the outer third of the
+  // socket, not the middle of it — was only ever getting a third of a wipe.
+  // Painting the region flat green showed it plainly: bright green over the
+  // lid, a dark green wedge under it, which is a wipe that has run out rather
+  // than a shadow. There is no cost to holding it at full: what it wipes to is
+  // the colour the cheek already is, so the edge is invisible wherever it lands.
+  sockIn: 0.86,
+  // And what easeSockets() needs. `skull` is how far behind the eyes the middle
+  // of a skull is; `ease` is the band around each eye it works in, full in to
+  // 20 mm and gone by 42, which reaches the fold under the lower lid and stops
+  // short of the nose. Inside that band the strength is not the radius but how
+  // far the normal has already fallen away from round: a vertex still facing
+  // out within 40 degrees is left alone, one past 75 is replaced outright. That
+  // is what keeps this off the parts of a face that are *meant* to turn away —
+  // the side of the nose, the corner of the lid — while taking the whole crease
+  // out, which a radius alone could not do without flattening her.
+  skull: 0.085,
+  ease: [0.020, 0.042],
+  easeN: [0.77, 0.26],
+  // The brow, off the cutter that painted it — `add("brow" + tag, …)` in
+  // human_mh.py — with the axes turned from Blender's frame into this one.
+  // Six millimetres of brow, which is a brow; what it replaces was thirty.
+  brow: [0.0262, 1.06],            // up from the eye, and the z of it scaled
+  browR: [0.100, 0.0060, 0.0250],
+  browCol: [0.128, 0.094, 0.070],  // HAIR_P, the colour the cutter used
   lipR: [0.020, 0.016, 0.020],     // how far a corner's lift reaches
   lift: [-0.0016, 0.0080, 0.0016], // and where it takes it: back, up, out
   squint: 0.18,                    // how far a full smile closes the eyes
@@ -7171,9 +7331,16 @@ const FACE = {
   //
   // Warm, too. A mouth lit through a doorway is red before it is black, and a
   // neutral dark oval reads as damage where a warm one reads as a shadow.
-  maw: [0.072, 0.024, 0.022],      // the throat, at the back of it
-  tooth: [0.780, 0.760, 0.720],    // TOOTH_P out of human_mh.py, a shade down
-  tongue: [0.360, 0.132, 0.128],   // and TONGUE_P, likewise
+  //
+  // Warmer again, and by a lot. The first pass at this fixed a hole punched in
+  // her head and left a *scary clown*, which is the report and is the right
+  // word for it: a black interior behind a hard white bar of teeth, ringed in
+  // crimson. Every one of those three is the same mistake — reaching for
+  // contrast in a room that has none. A mouth held open under a branch is
+  // mostly pink and mostly wet, and the teeth are the least of it.
+  maw: [0.205, 0.082, 0.078],      // the throat, at the back of it
+  tooth: [0.780, 0.748, 0.700],    // TOOTH_P out of human_mh.py, well down
+  tongue: [0.470, 0.215, 0.205],   // and TONGUE_P, likewise
   // The lips, which are paint and not shape. The mesh carries a 2 mm rose line
   // along the crease and nothing else, which is exactly right for a face seen
   // from twenty metres across a promenade and nothing like enough for one that
@@ -7195,19 +7362,22 @@ const FACE = {
   // in the middle, which is a mouth drawn by somebody who has not looked at one.
   lipsR: [0.026, 0.0098, 1.00],    // z is a fraction of the measured lip width
   lipsLift: 0.0032,                // m the line rises, corner over centre
-  lipstick: [0.400, 0.052, 0.070],
+  // Rose, not pillar-box. The old value was 0.40/0.05/0.07 — a crimson four
+  // times as saturated as any lip, which at a full gape spreads over half her
+  // chin because the band grows with the opening.
+  lipstick: [0.690, 0.330, 0.330],
   // How far open a full gape is, as a multiple of that band: 1.05 puts a full
   // gape at 21 mm by 45 mm, which is a mouth held open under a branch. It was
   // 0.88 and the opening came out 12 by 27 — a mouth with a red ring round it
   // twice the width of the hole, which reads as lipstick applied by somebody
   // with their eyes shut rather than as an open mouth.
-  gapeR: 1.05,
+  gapeR: 0.95,
   // The lip band's inner edge is tied to the hole rather than set: `lipIn` is
   // where it starts as a fraction of the opening, floored at the resting mouth,
   // and `lipOut` is its width, which grows a little because a lip that is being
   // stretched shows more of itself.
   lipIn: 0.97,
-  lipOut: [0.47, 0.30],
+  lipOut: [0.20, 0.05],
   // And the foam, once enough of the branch has gone in. Not white: foam is
   // white the way snow is, which is to say it is whatever is lighting it, and
   // the inside of a mouth is lit by nothing. `fill` stops short of the top on
@@ -7221,8 +7391,26 @@ const FACE = {
   // opening and leaves the millimetre above it where it was. So the top third
   // of the ellipsoid is a sliver against the upper lip, and a level set anywhere
   // positive is a mouth filled to the brim.
-  foam: [0.820, 0.790, 0.745],
-  fill: -0.45,
+  // Warm, and that is not a matter of taste. The room is lit by a blue
+  // hemisphere through one doorway and nothing else, so a neutral white in
+  // there comes out the colour of a cold tap — a mouthful of glacier. The
+  // measured fix is to bias the albedo the other way by about as much as the
+  // ambient is biased.
+  foam: [0.940, 0.905, 0.845],
+  // And it stops well short of the teeth. Filled to a sliver under the upper
+  // lip the mouth is a white disc with a red ring round it, which is the report
+  // and is fair: what reads as a mouthful of water is water with something
+  // above it to be a mouthful *of*. Two thirds of the way down leaves the whole
+  // upper row showing and puts the froth where it collects anyway, on the
+  // tongue and in the floor of the jaw.
+  fill: -0.30,
+  // How much finer the froth is drawn up the mouth than across it. The jaw
+  // stretches nine millimetres of skin over twenty-seven, so a lump measured in
+  // the bind pose arrives on screen three times taller than it is wide — a
+  // mouthful of vertical combing, which is what the fangs in the report were.
+  // The opening's own frame does not fix that on its own, because the frame is
+  // measured in the bind pose too.
+  comb: 2.60,
   // The tongues run nearly the length of the upper arm — 21 cm from her elbow
   // to her shoulder — because anything shorter is a black sleeve with a ragged
   // top rather than fire. It is the *gaps* between the tongues that read as
@@ -7238,6 +7426,8 @@ uniform float uBlink;
 uniform float uSmile;
 uniform vec3 uEye;
 uniform vec3 uEyeR;
+uniform vec3 uSockR;
+uniform vec3 uBrowR;
 uniform vec3 uLidCol;
 uniform vec3 uLashCol;
 uniform vec3 uLip;
@@ -7304,6 +7494,44 @@ const FACE_VERT = /* glsl */ `
 const FACE_FRAG = /* glsl */ `
   {
     vec3 f = vec3(vLocal.x, vLocal.y, abs(vLocal.z));
+
+    // Wipe first, then draw. The socket arrives from the bake clouded — see
+    // the note on keepR in FACE — so the grey comes off before anything is
+    // put back on top of it, and what goes back on is a brow and not a smudge.
+    // uLidCol is the modal colour of the whole figure, which 70% of her
+    // vertices carry and the cheek is part of, so the wipe is invisible where
+    // it stops.
+    vec3 sr = vec3(uSockR.x, f.y < uEye.y ? ${FACE.sockDn} : uSockR.y, uSockR.z);
+    float sock = 1.0 - smoothstep(${FACE.sockIn}, 1.0, length((f - uEye) / sr));
+    if (sock > 0.0) {
+      // Across the face, not through it — and that one word is the whole of why
+      // two passes at this changed nothing. The eyeball centre sits a centimetre
+      // behind the skin, so a sphere drawn round it does not cut the cheek, it
+      // *grazes* it: the shell between the two radii lies almost flat on the
+      // surface under the eye and holds a soft patch a couple of centimetres
+      // across, which is precisely the patch the smear is on. Painting the
+      // wipe region green showed the smear surviving inside it and sent two
+      // days after normals and shadow maps; painting sock and keep into
+      // separate channels found it in one shot — sock was 1.0 the whole way
+      // down and keep was 0.5, so the wipe was being blocked, not falling off.
+      // Measured down the eye's own axis it cannot graze anything, and what it
+      // protects is what it was always meant to: the eyeball and the two lash
+      // strips, seen from in front.
+      vec2 e = vec2(f.y - uEye.y, f.z - uEye.z) / uEyeR.yz;
+      // And it reaches further up than down, which is what an eye does. What is
+      // over the lid line is lashes and lid and reads as an eye; what is under
+      // it is cheek, and every millimetre of protection there is a millimetre
+      // of the smear kept. Symmetric, the aperture large enough to hold the
+      // lashes was large enough to hold the whole mark.
+      if (e.x < 0.0) e.x *= ${FACE.keepDn.toFixed(2)};
+      float keep = 1.0 - smoothstep(${FACE.keep[0].toFixed(3)},
+        ${FACE.keep[1].toFixed(3)}, length(e));
+      base = mix(base, uLidCol, sock * (1.0 - keep));
+      base = mix(base, vec3(${FACE.browCol.join(', ')}),
+        1.0 - smoothstep(0.60, 1.0, length((f - vec3(uEye.x,
+          uEye.y + ${FACE.brow[0]}, uEye.z * ${FACE.brow[1]})) / uBrowR)));
+    }
+
     float k = 1.0 - smoothstep(0.80, 1.0, length((f - uEye) / uEyeR));
     if (k > 0.0) {
       float lid = mix(uEye.y + uEyeR.y, uEye.y - uEyeR.y * ${FACE.shut}, uBlink);
@@ -7341,20 +7569,20 @@ const FACE_FRAG = /* glsl */ `
         if (mw > 0.0) {
           // Inside the hole, on its own scale: the unit ball is the opening,
           // +y is toward her nose and −y is toward her chin.
-          vec3 n = q / k;
+          vec3 o = q / k;
           vec3 mouth = vec3(${FACE.maw.join(', ')});
           // The tongue, lying in the floor of it and never quite reaching the
           // corners — a tongue is narrow and a mouth is wide.
           mouth = mix(mouth, vec3(${FACE.tongue.join(', ')}), 1.0 - smoothstep(
-            0.40, 1.05, length(vec3(n.x * 0.55, (n.y + 0.42) * 1.30, n.z * 1.20))));
+            0.40, 1.05, length(vec3(o.x * 0.55, (o.y + 0.24) * 1.30, o.z * 1.20))));
           // And the upper teeth, in a band under the lip — which is a band
           // around n.y = 0 rather than at the top of the ellipsoid, for the same
           // reason the foam level is negative. Cut off short of the corners:
           // the back teeth are round the curve of the arch and are not lit by
           // anything.
           mouth = mix(mouth, vec3(${FACE.tooth.join(', ')}),
-            smoothstep(-0.20, 0.14, n.y) * (1.0 - smoothstep(0.42, 0.86, n.y))
-            * (1.0 - smoothstep(0.58, 0.98, abs(n.z))));
+            smoothstep(-0.04, 0.18, o.y) * (1.0 - smoothstep(0.72, 1.00, o.y))
+            * (1.0 - smoothstep(0.58, 0.98, abs(o.z))));
 
           // The foam, which arrives late and fills from the bottom. The level is
           // a plain line in n.y with the noise added to it rather than the other
@@ -7368,13 +7596,30 @@ const FACE_FRAG = /* glsl */ `
           // vertical stripes. n is the opening's own frame and the 1.7 is its
           // aspect, so a lump in it is a lump.
           if (uFoam > 0.0) {
-            vec2 fn = vec2(n.z * 1.7, n.y);
+            vec2 fn = vec2(o.z * 1.7, o.y * ${FACE.comb.toFixed(2)});
             float froth = 0.56 * vnoise2(fn * 7.0) + 0.44 * vnoise2(fn * 16.5);
             float lvl = mix(-1.35, ${FACE.fill}, uFoam);
             mouth = mix(mouth, vec3(${FACE.foam.join(', ')}) * (0.84 + 0.26 * froth),
-              smoothstep(lvl + 0.17 * froth, lvl - 0.10, n.y));
+              smoothstep(lvl + 0.10 * froth, lvl - 0.12, o.y));
           }
           base = mix(base, mouth, mw);
+          // And a mouth is a cavity, so it is not looking at the sky. The
+          // ambient term reads the sky above the normal and the ground below
+          // it, and a surface inside a head that is still claiming to face
+          // forward collects the one thing in that room with any colour in it —
+          // a blue hemisphere through a doorway — which is why the froth kept
+          // coming out the colour of a cold tap however warm its albedo was.
+          // Turned to face the floor it takes the warm half of the same term,
+          // and it stops taking the sun as well, which is correct: nothing
+          // inside a mouth is in direct light.
+          n = normalize(mix(n, vec3(0.0, -1.0, 0.0), mw));
+          // And the inside of a mouth is not a mirror. Everything in this game
+          // carries a Blinn lobe and a little sky reflection, which on a wet
+          // white surface in a room lit by one blue hemisphere through one
+          // doorway is what turned the froth the colour of a cold tap. Warming
+          // the albedo helped and could not finish the job, because the tint
+          // was never in the albedo.
+          spec = mix(spec, 0.03, mw);
         }
       }
     }
@@ -7472,12 +7717,15 @@ function skinnedFigure(data, opts = {}) {
   // mouth is not where the palette says. A figure with no face is the figure
   // that shipped yesterday, which is a perfectly good failure.
   const anchors = opts.face ? faceAnchors(data) : null;
+  if (anchors) easeSockets(data, anchors);
   const V = (a) => ({ value: new THREE.Vector3(a[0], a[1], a[2]) });
   const uFace = anchors ? {
     uBlink: { value: 0 },
     uSmile: { value: 0 },
     uEye: V(anchors.eye),
     uEyeR: V(FACE.eyeR),
+    uSockR: V(FACE.sockR),
+    uBrowR: V(FACE.browR),
     uLidCol: V(anchors.lid),
     uLashCol: V(anchors.lash),
     uLip: V(anchors.corner || [0, -99, 0]),
@@ -9562,6 +9810,314 @@ async function buildJadrija(scene) {
   }
   const board = gable ? mapBoard(gable) : null;
 
+  // ── the bead curtain ───────────────────────────────────────────────────────
+  //
+  // What actually hangs in a Dalmatian doorway in August. The door is off its
+  // hinges from June to September and a curtain goes up in its place: it keeps
+  // the flies out, it lets the draught through, and it tells you somebody is in
+  // without anybody having to say so. This one is the tourist-shop kind — flat
+  // printed tiles on forty-odd strings, with a dolphin across them, which is
+  // sold on every second stall between here and Split.
+  //
+  // Every strand is a rigid pendulum hung off the head of the opening, and that
+  // is the whole model: two angles, an angular rate each, a spring that is
+  // gravity and a damper that is the string. What makes it read as a *curtain*
+  // rather than as forty independent pendulums is `link` — each strand pulls on
+  // the two beside it, so a shove in the middle runs outward as a wave and the
+  // whole thing settles together. Walking through drives the strands you are
+  // touching toward *your* speed rather than adding an impulse, which is the
+  // difference between parting a curtain and detonating one; it also makes the
+  // result the same at 15 fps and 144.
+  const BEAD = {
+    wide: 0.021,           // m, one strand across
+    drop: 1.90,            // m, how far it hangs from the head of the opening
+    seg: 14,               // segments down a strand, for the swing
+    rows: 76,              // tiles down a strand, for the canvas
+    px: 8,                 // and how many pixels each of those gets
+    swing: 1.05,           // rad, the furthest a strand will be thrown
+    spring: 24.0,          // rad/s² per rad of tilt — this is gravity
+    damp: 2.1,             // and this is the string
+    link: 12.0,            // how hard a strand pulls on the two beside it
+    reach: 0.36,           // m either side of you that a strand is pushed
+    grip: 16.0,            // how fast a strand you are touching takes your speed
+    push: 0.9,             // rad/s per m/s of you
+    // A doorway is a hole between a hot terrace and a cold room, so there is
+    // always a little air going through it. Small — this is what stops the
+    // thing reading as a painted board when nobody has touched it for a while.
+    stir: 0.020,
+    din: 0.55,             // rad/s of total movement that counts as a rattle
+  };
+
+  /**
+   * The printed face of it, one canvas for the whole curtain.
+   *
+   * Laid out so that strand `i` owns the column `[i/N, (i+1)/N]` of the image:
+   * the picture is not on any one string, it is *across* them, which is why a
+   * bead curtain with a design on it falls apart into stripes the moment
+   * anybody walks through and puts itself back together afterwards. That effect
+   * is free here and it is most of the reason to draw the design this way.
+   *
+   * The tiles are drawn last, over the top of the picture, as a seam every
+   * `px` rows plus a little shading within each one — light at the top edge,
+   * dark at the bottom — and a soft highlight down the middle of every strand,
+   * which is the one thing that stops flat tiles reading as flat tape.
+   */
+  function beadSkin(n) {
+    const cv = document.createElement('canvas');
+    const W = n * BEAD.px, H = BEAD.rows * BEAD.px;
+    cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+
+    // The sea, top to bottom: sky over haze over water over depth.
+    const sky = g.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0.00, '#dceaf4');
+    sky.addColorStop(0.26, '#a8d0e6');
+    sky.addColorStop(0.48, '#5aa3cf');
+    sky.addColorStop(0.78, '#2e77ad');
+    sky.addColorStop(1.00, '#1b5487');
+    g.fillStyle = sky;
+    g.fillRect(0, 0, W, H);
+
+    // A few bands of swell, so the water is not a gradient.
+    g.globalAlpha = 0.16;
+    for (let k = 0; k < 9; k++) {
+      const y = H * (0.52 + k * 0.052);
+      g.fillStyle = k & 1 ? '#ffffff' : '#0f3f6b';
+      g.fillRect(0, y, W, H * 0.012);
+    }
+    g.globalAlpha = 1;
+
+    // The dolphin, over the horizon and coming down. Drawn as one closed path
+    // in unit coordinates so the shape survives whatever the opening turns out
+    // to be — the curtain is sized off the doorway, not the other way round.
+    const X = (u) => u * W, Y = (v) => v * H;
+    g.beginPath();
+    g.moveTo(X(0.075), Y(0.545));                                  // the snout
+    g.bezierCurveTo(X(0.20), Y(0.415), X(0.40), Y(0.330), X(0.575), Y(0.352));
+    g.lineTo(X(0.640), Y(0.212));                                  // dorsal fin
+    g.lineTo(X(0.712), Y(0.372));
+    g.bezierCurveTo(X(0.81), Y(0.412), X(0.878), Y(0.474), X(0.902), Y(0.556));
+    g.lineTo(X(0.995), Y(0.466));                                  // the fluke
+    g.lineTo(X(0.955), Y(0.618));
+    g.lineTo(X(0.995), Y(0.736));
+    g.bezierCurveTo(X(0.855), Y(0.700), X(0.700), Y(0.632), X(0.545), Y(0.596));
+    g.lineTo(X(0.470), Y(0.790));                                  // pectoral
+    g.lineTo(X(0.398), Y(0.578));
+    g.bezierCurveTo(X(0.26), Y(0.578), X(0.145), Y(0.570), X(0.075), Y(0.545));
+    g.closePath();
+    g.fillStyle = '#1c4c78';
+    g.fill();
+
+    // The belly, which is what makes it a dolphin and not a shark: a pale
+    // crescent clipped to the body and set low in it.
+    g.save();
+    g.clip();
+    const pale = g.createLinearGradient(0, Y(0.40), 0, Y(0.74));
+    pale.addColorStop(0, 'rgba(255,255,255,0)');
+    pale.addColorStop(1, 'rgba(244,250,253,0.95)');
+    g.fillStyle = pale;
+    g.fillRect(0, Y(0.40), W, Y(0.40));
+    g.restore();
+
+    // The eye, three pixels of it, which at forty-five strands is one strand.
+    g.fillStyle = '#f2f7fa';
+    g.beginPath();
+    g.arc(X(0.195), Y(0.478), Math.max(2, W * 0.010), 0, 7);
+    g.fill();
+
+    // ── the tiles ────────────────────────────────────────────────────────────
+    // A seam every tile, and a gradient within each: this is the difference
+    // between a printed banner and forty strings of plastic.
+    const p = BEAD.px;
+    for (let r = 0; r < BEAD.rows; r++) {
+      const y = r * p;
+      const sh = g.createLinearGradient(0, y, 0, y + p);
+      sh.addColorStop(0.00, 'rgba(255,255,255,0.30)');
+      sh.addColorStop(0.35, 'rgba(255,255,255,0.04)');
+      sh.addColorStop(1.00, 'rgba(0,0,0,0.30)');
+      g.fillStyle = sh;
+      g.fillRect(0, y, W, p);
+      g.fillStyle = 'rgba(0,0,0,0.45)';
+      g.fillRect(0, y + p - 1, W, 1);
+    }
+    // And the round of each strand, across the columns.
+    for (let i = 0; i < n; i++) {
+      const x = i * p;
+      const rd = g.createLinearGradient(x, 0, x + p, 0);
+      rd.addColorStop(0.00, 'rgba(0,0,0,0.34)');
+      rd.addColorStop(0.34, 'rgba(255,255,255,0.20)');
+      rd.addColorStop(0.62, 'rgba(255,255,255,0.06)');
+      rd.addColorStop(1.00, 'rgba(0,0,0,0.34)');
+      g.fillStyle = rd;
+      g.fillRect(x, 0, p, H);
+    }
+
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.anisotropy = 4;
+    return tex;
+  }
+
+  /**
+   * Hang it, and give it back something that can be stepped.
+   *
+   * The whole curtain is one buffer geometry rewritten on the CPU each frame:
+   * forty-five strands of fifteen rows is 1 350 vertices, which is less than a
+   * single parasol and is not worth a shader. It is *not* a blocker and never
+   * will be — the point of the thing is that you walk through it.
+   */
+  function beadCurtain(K) {
+    const span = K.dj * 2;
+    const n = Math.max(8, Math.round(span / 0.032));
+    const gap = span / n;
+    const hw = BEAD.wide * 0.5;
+    const seg = BEAD.seg;
+    // One station for the whole curtain. The doorway is 1.45 m of a shore
+    // traced in 4 m steps, so the frame does not turn measurably across it and
+    // asking `at()` for it 765 times a frame would be 765 binary searches to
+    // arrive back at the same four numbers.
+    const st = at(K.dc);
+    // Just inside the head of the opening, and just inside the wall: this hangs
+    // off the frame, not off the render.
+    const yTop = K.floor + KAB.head - 0.035;
+    const sHang = K.face + 0.075;
+
+    const nv = n * (seg + 1) * 2;
+    const pos = new Float32Array(nv * 3);
+    const nrm = new Float32Array(nv * 3);
+    const uvs = new Float32Array(nv * 2);
+    const idx = new Uint16Array(n * seg * 6);
+    // Seaward, because that is the side anybody looks at it from and a 21 mm
+    // ribbon has no business claiming a normal of its own.
+    for (let v = 0; v < nv; v++) {
+      nrm[v * 3] = -st.nx; nrm[v * 3 + 1] = 0.16; nrm[v * 3 + 2] = -st.nz;
+    }
+    let k = 0;
+    for (let i = 0; i < n; i++) {
+      const u0 = i / n, u1 = (i + 1) / n;
+      for (let j = 0; j <= seg; j++) {
+        const v = (i * (seg + 1) + j) * 2;
+        uvs[v * 2] = u0; uvs[v * 2 + 1] = 1 - j / seg;
+        uvs[v * 2 + 2] = u1; uvs[v * 2 + 3] = 1 - j / seg;
+      }
+      for (let j = 0; j < seg; j++) {
+        const a = (i * (seg + 1) + j) * 2;
+        idx[k++] = a; idx[k++] = a + 1; idx[k++] = a + 3;
+        idx[k++] = a; idx[k++] = a + 3; idx[k++] = a + 2;
+      }
+    }
+
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.boundingSphere = new THREE.Sphere(
+      new THREE.Vector3(...pt(st, sHang, yTop - BEAD.drop * 0.5)), 2.6);
+
+    const mesh = new THREE.Mesh(g, solidMaterial(0xffffff, {
+      spec: 0.10,
+      // A good deal more bounce than the huts get, and it is not a fudge: this
+      // hangs in a doorway facing four metres of white concrete in full August
+      // sun, with its own back to the shade. Almost everything that lights it
+      // from the promenade side arrives off the terrace. At 0.16 it read as a
+      // navy screen; the thing you actually see in a doorway here is pale.
+      emissive: 0.40,
+      vcol: false,
+      side: THREE.DoubleSide,
+      decl: 'uniform sampler2D uBeadMap;',
+      body: 'base = texture2D(uBeadMap, vUv).rgb;',
+      uniforms: { uBeadMap: { value: beadSkin(n) } },
+    }));
+    mesh.frustumCulled = false;
+    scene.add(mesh);
+
+    const angS = new Float32Array(n);      // swing through the doorway
+    const angT = new Float32Array(n);      // and sideways along it
+    const velS = new Float32Array(n);
+    const velT = new Float32Array(n);
+    const tmp = new Float32Array(n);
+    let prevT = null, prevS = null, cool = 0, phase = 0;
+
+    function write() {
+      let o = 0;
+      for (let i = 0; i < n; i++) {
+        const t0 = K.dc - K.dj + gap * (i + 0.5);
+        const sa = Math.sin(angS[i]), ca = Math.cos(angS[i]);
+        const sb = Math.sin(angT[i]), cb = Math.cos(angT[i]);
+        for (let j = 0; j <= seg; j++) {
+          const L = BEAD.drop * (j / seg);
+          const bt = t0 + L * sb - K.dc, bs = sHang + L * sa;
+          const x = st.x + st.ux * bt + st.nx * bs;
+          const z = st.z + st.uz * bt + st.nz * bs;
+          const y = yTop - L * ca * cb;
+          pos[o] = x - st.ux * hw; pos[o + 1] = y; pos[o + 2] = z - st.uz * hw;
+          pos[o + 3] = x + st.ux * hw; pos[o + 4] = y; pos[o + 5] = z + st.uz * hw;
+          o += 6;
+        }
+      }
+      g.attributes.position.needsUpdate = true;
+    }
+    write();
+
+    /**
+     * @param t,s  where you are, in the resort's frame
+     * @param d    how far away you are, for the sound and for the gate
+     */
+    function step(t, s, d, dt) {
+      if (d > 26) { prevT = prevS = null; return 0; }
+      const h = Math.min(dt, 0.05);
+      const vs = prevS == null ? 0 : (s - prevS) / h;
+      const vt = prevT == null ? 0 : (t - prevT) / h;
+      prevT = t; prevS = s;
+      // Are you in the doorway at all. Half a metre either side of the strands,
+      // which is a shoulder and an arm.
+      const through = s > sHang - 0.55 && s < sHang + 0.55;
+      phase += h;
+      const air = BEAD.stir * Math.sin(phase * 1.7);
+      let din = 0;
+      for (let i = 0; i < n; i++) tmp[i] = angS[i];
+      for (let i = 0; i < n; i++) {
+        if (through) {
+          const t0 = K.dc - K.dj + gap * (i + 0.5);
+          const dd = Math.abs(t - t0);
+          if (dd < BEAD.reach) {
+            // Driven toward your speed while you are against it, rather than
+            // kicked once per frame — which is both what contact does and the
+            // only way the result does not depend on the frame rate.
+            const w = Math.min(1, (1 - dd / BEAD.reach) * 1.6) * Math.min(1, h * BEAD.grip);
+            velS[i] += (clamp(vs, -5, 5) * BEAD.push - velS[i]) * w;
+            velT[i] += (clamp(vt, -5, 5) * BEAD.push * 0.5 - velT[i]) * w;
+          }
+        }
+        const l = i > 0 ? tmp[i - 1] : tmp[i];
+        const r = i < n - 1 ? tmp[i + 1] : tmp[i];
+        velS[i] += (-BEAD.spring * Math.sin(angS[i] - air)
+          - BEAD.damp * velS[i] + BEAD.link * (l + r - 2 * tmp[i])) * h;
+        velT[i] += (-BEAD.spring * Math.sin(angT[i]) - BEAD.damp * velT[i]) * h;
+        angS[i] = clamp(angS[i] + velS[i] * h, -BEAD.swing, BEAD.swing);
+        angT[i] = clamp(angT[i] + velT[i] * h, -BEAD.swing * 0.4, BEAD.swing * 0.4);
+        din += Math.abs(velS[i]) + Math.abs(velT[i]);
+      }
+      din /= n;
+      write();
+      // The sound is the *movement*, not the crossing: a curtain someone has
+      // walked through goes on clattering for a couple of seconds after they
+      // have gone, and that tail is most of what the noise is for.
+      cool = Math.max(0, cool - h);
+      if (audio && din > BEAD.din && cool <= 0) {
+        audio.rattle(Math.min(1, din / 2.6), d);
+        cool = 0.16 + 0.22 * Math.random();
+      }
+      return din;
+    }
+
+    return { mesh, step, strands: n, gap, at: [K.dc, sHang],
+      swing: () => +Math.max(...Array.from(angS, Math.abs)).toFixed(3) };
+  }
+  const beads = special ? beadCurtain(special) : null;
+
   // The steps belong to the ground — you walk down them — and are cut into the
   // terrace they come off, so they stay in the deck buffer where their concrete
   // matches. Everything after this stands up.
@@ -10292,6 +10848,162 @@ async function buildJadrija(scene) {
     wrap: [0.185, 0.176, 0.200],
   };
 
+  /**
+   * The print on the wall over the tabouret.
+   *
+   * A bar poster, which is the one thing a room with a bottle of Pelješac and
+   * two glasses in it was missing — and it goes on the wall the bottle stands
+   * against, so it is behind the wine from wherever in the room you are looking
+   * at the wine from.
+   *
+   * Drawn rather than shipped. The alternative was a photograph, and a
+   * photograph of a poster is a JPEG somebody else owns; this is four hundred
+   * lines of canvas that costs the build nothing and is ours. It is also the
+   * only way to be sure of it in a room this dark: every value in here is
+   * chosen against the one lamp-free hemisphere that lights the place, not
+   * against a white page.
+   *
+   * The type is fitted rather than set. A headless Chrome and a Windows laptop
+   * do not have the same fonts, and a title that overruns its own paper is
+   * worse than a title a size down — so each line is measured and stepped down
+   * until it fits the margin it was given.
+   */
+  function posterSkin() {
+    const CW = 480, CH = 640;
+    const cv = document.createElement('canvas');
+    cv.width = CW; cv.height = CH;
+    const g = cv.getContext('2d');
+    const RED = '#e42d22';
+    const FACE = '"Arial Narrow", "Helvetica Neue", Arial, sans-serif';
+
+    const fit = (text, px, y, weight, margin) => {
+      let n = px;
+      for (;;) {
+        g.font = weight + ' ' + n + 'px ' + FACE;
+        if (n <= 7 || g.measureText(text).width <= CW - margin * 2) break;
+        n -= 1;
+      }
+      g.fillText(text, CW * 0.5, y);
+    };
+
+    // Paper, and the plate area on it. Not white: a poster is off-white, and
+    // white here would be the brightest thing in the room by a mile.
+    g.fillStyle = '#f7f2ea'; g.fillRect(0, 0, CW, CH);
+    g.textAlign = 'center';
+    g.fillStyle = RED;
+    fit('SEX ON THE BEACH', 66, 84, '900', 22);
+    fit('Ingredients: 1½ oz vodka, ¾ oz peach schnapps, '
+      + '1½ oz orange juice, 1½ oz cranberry juice', 15, 112, '700', 20);
+
+    const X0 = 30, Y0 = 128, X1 = CW - 30, Y1 = CH - 78;
+    g.fillStyle = '#efe6d6'; g.fillRect(X0, Y0, X1 - X0, Y1 - Y0);
+
+    // The wash behind the glass. Two blobs rather than one, because a
+    // watercolour is a wet edge over a dry one and a single radial gradient is
+    // an airbrush.
+    for (const [cx, cy, r, col] of [[236, 356, 178, '250, 186, 74'],
+      [300, 300, 132, '245, 148, 52'], [176, 430, 104, '243, 130, 96']]) {
+      const w = g.createRadialGradient(cx, cy, r * 0.15, cx, cy, r);
+      w.addColorStop(0, 'rgba(' + col + ', 0.80)');
+      w.addColorStop(0.72, 'rgba(' + col + ', 0.42)');
+      w.addColorStop(1, 'rgba(' + col + ', 0)');
+      g.fillStyle = w;
+      g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill();
+    }
+
+    // The straws, behind the glass so the rim cuts them off.
+    g.lineCap = 'round';
+    g.strokeStyle = '#2f9ad6'; g.lineWidth = 11;
+    g.beginPath(); g.moveTo(214, 300); g.lineTo(178, 176); g.stroke();
+    g.strokeStyle = '#f2b21e'; g.lineWidth = 11;
+    g.beginPath(); g.moveTo(236, 300); g.lineTo(250, 172); g.stroke();
+    g.strokeStyle = 'rgba(255, 255, 255, 0.85)'; g.lineWidth = 4;
+    for (let i = 0; i < 9; i++) {
+      const u = i / 9, v = u + 0.05;
+      g.beginPath();
+      g.moveTo(236 + 14 * u, 300 - 128 * u);
+      g.lineTo(236 + 14 * v + 5, 300 - 128 * v);
+      g.stroke();
+    }
+
+    // The umbrella: a canopy of alternating panels and a stick under it.
+    g.strokeStyle = '#cfd6da'; g.lineWidth = 5;
+    g.beginPath(); g.moveTo(372, 196); g.lineTo(398, 300); g.stroke();
+    for (let i = 0; i < 8; i++) {
+      const a0 = Math.PI + i * Math.PI / 8, a1 = a0 + Math.PI / 8;
+      g.fillStyle = i % 2 ? '#8e1720' : '#e0403a';
+      g.beginPath(); g.moveTo(372, 200);
+      g.lineTo(372 + Math.cos(a0) * 76, 200 + Math.sin(a0) * 34);
+      g.lineTo(372 + Math.cos(a1) * 76, 200 + Math.sin(a1) * 34);
+      g.closePath(); g.fill();
+    }
+
+    // The glass. One path for the bowl, filled with the drink itself — the
+    // sunrise, which is the whole reason anybody orders this.
+    const bowl = () => {
+      g.beginPath();
+      g.moveTo(190, 288);
+      g.bezierCurveTo(178, 372, 196, 440, 240, 440);
+      g.bezierCurveTo(284, 440, 302, 372, 290, 288);
+      g.closePath();
+    };
+    const drink = g.createLinearGradient(0, 288, 0, 440);
+    drink.addColorStop(0, '#f6a91d');
+    drink.addColorStop(0.42, '#f2701f');
+    drink.addColorStop(1, '#cf1a2b');
+    bowl(); g.fillStyle = drink; g.fill();
+    // The meniscus, and a highlight down the left of the bowl.
+    g.fillStyle = '#f8bb3a';
+    g.beginPath(); g.ellipse(240, 289, 50, 11, 0, 0, TAU); g.fill();
+    g.strokeStyle = 'rgba(255, 255, 255, 0.55)'; g.lineWidth = 6;
+    g.beginPath(); g.moveTo(200, 306); g.bezierCurveTo(192, 356, 200, 400, 216, 424);
+    g.stroke();
+    bowl(); g.strokeStyle = 'rgba(60, 40, 30, 0.55)'; g.lineWidth = 3; g.stroke();
+    // Stem and foot.
+    g.fillStyle = '#e8eef1';
+    g.fillRect(231, 440, 18, 46);
+    g.beginPath(); g.ellipse(240, 492, 48, 13, 0, 0, TAU); g.fill();
+    g.strokeStyle = 'rgba(60, 40, 30, 0.45)'; g.lineWidth = 3;
+    g.beginPath(); g.ellipse(240, 492, 48, 13, 0, 0, TAU); g.stroke();
+    g.beginPath(); g.ellipse(240, 486, 40, 9, 0, 0, TAU); g.stroke();
+
+    // The orange on the rim, half over the glass and half off it.
+    g.fillStyle = '#f6c46a';
+    g.beginPath(); g.arc(306, 282, 48, 0, TAU); g.fill();
+    g.fillStyle = '#f0603a';
+    g.beginPath(); g.arc(306, 282, 40, 0, TAU); g.fill();
+    g.strokeStyle = 'rgba(255, 240, 220, 0.9)'; g.lineWidth = 3;
+    for (let i = 0; i < 10; i++) {
+      const a = i * TAU / 10;
+      g.beginPath(); g.moveTo(306, 282);
+      g.lineTo(306 + Math.cos(a) * 39, 282 + Math.sin(a) * 39);
+      g.stroke();
+    }
+
+    // Splashes. Fixed, not random: this texture is built once and has to come
+    // out the same on every machine that builds it.
+    g.fillStyle = 'rgba(214, 34, 40, 0.85)';
+    for (const [x, y, r] of [[92, 470, 13], [128, 512, 7], [396, 452, 11],
+      [418, 500, 6], [76, 330, 6], [412, 372, 5], [180, 528, 5]]) {
+      g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+    }
+
+    // The footer rule, broken for the line of type that sits in it.
+    g.strokeStyle = RED; g.lineWidth = 4;
+    g.beginPath();
+    g.moveTo(36, CH - 44); g.lineTo(168, CH - 44);
+    g.moveTo(CW - 168, CH - 44); g.lineTo(CW - 36, CH - 44);
+    g.stroke();
+    g.fillStyle = RED;
+    fit('USA 1998', 30, CH - 34, '900', 180);
+
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.anisotropy = 8;
+    return tex;
+  }
+
   /** The canvas on the front of the television. */
   function tvPanel() {
     const cv = document.createElement('canvas');
@@ -10725,6 +11437,47 @@ async function buildJadrija(scene) {
       scene.add(radio.mesh);
     }
 
+    // ── the poster, on the wall the tabouret stands against ──
+    // Behind the bottle and the glass, which is the whole brief: the wall at
+    // `t0` is the one the stool is pushed up against, so anything hung on it
+    // at the stool's own `s` is behind the wine from anywhere you can stand.
+    // Six millimetres proud of the inner shell — the room's boards are already
+    // held four clear of the walls they line, and two more keeps the frame off
+    // the depth test's coin toss.
+    const pt = K.t0 + 0.006, ps = bs, py = f + 1.34;
+    const pw = 0.42, ph = 0.56, pb = 0.026, pd = 0.022;
+    // Four bars and a hole, not a panel with a print stuck on it. A backing
+    // board puts a second surface two millimetres behind the paper, and two
+    // millimetres over a half-metre diagonal is half a degree — so the first
+    // version of this buried half the poster in its own frame the moment the
+    // wall and the plane disagreed by less than a degree. With nothing behind
+    // it the paper hangs in the opening and the only thing it can argue with
+    // is the wall, a centimetre back.
+    const FRAME = [0.052, 0.048, 0.045];
+    const s0 = ps - pw * 0.5, s1 = ps + pw * 0.5;
+    const y0 = py - ph * 0.5, y1 = py + ph * 0.5;
+    boxTS(pt, pt + pd, s0 - pb, s1 + pb, y1, y1 + pb, FRAME);
+    boxTS(pt, pt + pd, s0 - pb, s1 + pb, y0 - pb, y0, FRAME);
+    boxTS(pt, pt + pd, s0 - pb, s0, y0, y1, FRAME);
+    boxTS(pt, pt + pd, s1, s1 + pb, y0, y1, FRAME);
+    const poster = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph),
+      solidMaterial(0xffffff, {
+        // Paper, so barely any specular — and emissive, for the same reason
+        // the curtain is: this room has one doorway and no lamp, and a print
+        // lit correctly for it is a print nobody will ever see.
+        spec: 0.03, emissive: 0.46, vcol: false, side: THREE.DoubleSide,
+        decl: 'uniform sampler2D uPosterMap;',
+        body: 'base = texture2D(uPosterMap, vUv).rgb;',
+        uniforms: { uPosterMap: { value: posterSkin() } },
+      }));
+    {
+      const p = W(pt + pd * 0.5, ps, py);
+      poster.position.set(p[0], p[1], p[2]);
+      const st = at(pt);
+      poster.rotation.y = Math.atan2(st.ux, st.uz);
+      scene.add(poster);
+    }
+
     radio.draw(0.30, 0.0);
     tv.draw(null, 0x2545);
     return {
@@ -10918,6 +11671,13 @@ async function buildJadrija(scene) {
   function stepKabina(pt, ps, dt) {
     if (!kit || !special) return;
     const K = special;
+    // Before the near gate, and with its own: the curtain is the one thing in
+    // this room you can hear and see from the promenade, and it is still moving
+    // for a second or two after you have gone through and stopped being near.
+    if (beads) {
+      beads.step(pt, ps,
+        Math.hypot(pt - K.dc, ps - (K.face + 0.075)), dt);
+    }
     // Kept outside the near gate below, because a radio you can hear from the
     // promenade is most of what makes anybody walk over and look through the
     // door. Only the *aiming* is confined to the room.
@@ -12469,7 +13229,7 @@ async function buildJadrija(scene) {
     gulp: 5.0,
     spit: 9.0,
     open: [0.52, 0.46],
-    froth: 0.44,
+    froth: 0.26,
     castAt: 0.46,       // s into the `cast` clip where it leaves her hand. This
                         // is FIRE_CAST_AT in tools/blender/human_mh.py and it
                         // has to move with it or the ball appears out of a hand
@@ -14431,6 +15191,17 @@ async function buildJadrija(scene) {
       for (let i = 0; i < Math.round(secs * 60); i++) updateCrowd(1 / 60, cam);
     },
     /** Debug: the tourist board, and what its map found to draw. */
+    beads: () => beads && {
+      strands: beads.strands, gap: +beads.gap.toFixed(4),
+      at: beads.at.map((v) => +v.toFixed(2)), swing: beads.swing(),
+      tris: beads.mesh.geometry.index.count / 3,
+      // Walk somebody through it without a camera. A headless page renders at
+      // about a frame a second and `camera.position` is written once a frame,
+      // so twenty steps of a crossing driven from a test all arrive at the same
+      // place and the curtain never moves. Nothing in the game calls this.
+      walk: (t, s, dt) => beads.step(t, s,
+        Math.hypot(t - beads.at[0], s - beads.at[1]), dt),
+    },
     board: () => board && {
       at: board.at.map((v) => +v.toFixed(2)),
       world: board.mesh.position.toArray().map((v) => +v.toFixed(1)),
@@ -22311,6 +23082,35 @@ function buildAudio() {
     o.start(t); o.stop(t + dur + 0.02);
   }
 
+  /**
+   * A bead curtain, moving.
+   *
+   * Forty-five strings of printed plastic knocking together is not one sound,
+   * it is a scatter of very short, very bright, very sharp ones — so this is a
+   * handful of high-Q noise clicks thrown across two hundred milliseconds with
+   * their pitch and their timing both jittered. Regular spacing reads as a
+   * machine and identical pitches read as one object; a curtain is neither.
+   *
+   * `amp` is how hard it is moving and `d` is how far away you are. Called on a
+   * cooldown from src/43-jadrija.js while the strands are still swinging, which
+   * is what gives it the tail after somebody has walked through.
+   */
+  function rattle(amp = 1, d = 0) {
+    if (!ctx || amp <= 0.02) return;
+    const t0 = ctx.currentTime;
+    const far = Math.max(0.04, 1 - d / 24);
+    const n = 3 + Math.round(Math.min(1, amp) * 11);
+    for (let i = 0; i < n; i++) {
+      burst({
+        freq: 1900 + Math.random() * 2900,
+        q: 8 + Math.random() * 10,
+        dur: 0.024 + Math.random() * 0.030,
+        gain: 0.024 * amp * far * (0.35 + Math.random() * 0.9),
+        at: t0 + Math.random() * 0.20,
+      });
+    }
+  }
+
   /** The click and hiss either side of a radio call. */
   function squelch() {
     burst({ freq: 1800, q: 3.0, dur: 0.07, gain: 0.045, sweep: 0.5 });
@@ -23942,7 +24742,8 @@ function buildAudio() {
     slowLp.frequency.value = 20000 * Math.pow(620 / 20000, clamp(k, 0, 1));
   }
 
-  return { start, update, squelch, dropWhoosh, setGush, footstep, splash, beep, setVolume, getVolume,
+  return { start, update, squelch, dropWhoosh, setGush, footstep, splash, beep, rattle,
+    setVolume, getVolume,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa, room,
     firestarter, slowmo, radioTune, radioClick,
     /** Where the pointer sits for each station, so the dial can be drawn. */
