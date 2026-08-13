@@ -3514,8 +3514,13 @@ async function buildJadrija(scene) {
     // `settle` is the compensation, not a slouch: pitching about the root lifts
     // the front of him by about six centimetres and his front paws have to come
     // back down onto something.
-    settle: 0.062,      // m the body drops, so the front paws stay on the tick
-    slump: 0.42,        // rad of nose-up pitch — the sit itself
+    // Measured off `joints` in the debug read rather than guessed, because the
+    // first pass at it put his rump 62 mm under the tick and a bedsheet cut him
+    // in half. The rear ends up 20 mm under, which a mattress swallows, and the
+    // front paws 10 mm over, which at this size is nothing — a pitch that puts
+    // both sets of paws on the same plane is a pitch too small to be a sit.
+    settle: 0.070,      // m the body drops, so the rear is only just under
+    slump: 0.34,        // rad of nose-up pitch — the sit itself
     fold: 0.55,         // rad the hind legs swing forward, under him
     curlIn: 1.9,        // 1/s, how fast the settle arrives
   };
@@ -5948,6 +5953,26 @@ async function buildJadrija(scene) {
         // Indoors: how far off the floor he is and how far through the sit.
         // A dog on the cot and a dog standing next to it differ by one number.
         lift: +dog.lift.toFixed(3), curl: +dog.curl.toFixed(2), leg: dog.leg,
+        // And where his corners have actually got to, in world metres. The sit
+        // is three rotations laid over a clip and the only way to know what
+        // that leaves below the mattress is to ask: a rump 11 cm under the tick
+        // is a dog cut in half by a bedsheet, and it shipped once.
+        joints: (() => {
+          const v = new THREE.Vector3(), o = {};
+          // The matrix, by hand: this is read between frames and the renderer
+          // is what normally refreshes it, so without this every joint comes
+          // back in whatever space the mesh was in one frame ago — which reads
+          // as a plausible set of numbers that do not move when the dog does.
+          dog.mesh.updateMatrixWorld(true);
+          for (const n of ['root', 'Hips', 'Body', 'Head', 'BackFoot.L',
+            'FrontFoot.L', 'Torso']) {
+            const i = f.boneIndex(n);
+            if (i < 0) continue;
+            f.boneAt(i, v).applyMatrix4(dog.mesh.matrixWorld);
+            o[n] = +v.y.toFixed(3);
+          }
+          return o;
+        })(),
         says: dog.balloon.mesh.visible ? dog.balloon.said : null };
     },
     /** Hose him, from the console, without having to fly the aeroplane. */

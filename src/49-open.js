@@ -101,6 +101,17 @@ function localeAt(x, z, airfield, jadrija, city) {
   if (airfield && airfield.site && airfield.inField && airfield.inField(x, z)) {
     return airfield;
   }
-  if (jadrija && jadrija.inField && jadrija.inField(x, z)) return jadrija;
+  // Padded, and the pad is not a fudge — it is the resort's own `walkY`, which
+  // answers for t in [-5, LEN+5] and hands back the terrain outside that. Asked
+  // without it, a canopy coming down two metres past the west end of the
+  // promenade fails `inField` by a hair, gets open country, and stands you on
+  // the DEM: 1.21 m, with the concrete you can see at 2.55 m. You land inside
+  // the deck and spend the rest of the visit looking at the underside of it.
+  //
+  // The two tests had drifted apart because they are about different things —
+  // `inField` is "is this the resort", used to keep pines out of the bathing
+  // terrace, and it is deliberately tight. What the locale wants is "can this
+  // place answer for the ground here", and that is a wider question.
+  if (jadrija && jadrija.inField && jadrija.inField(x, z, 5)) return jadrija;
   return openLocale(x, z, city);
 }

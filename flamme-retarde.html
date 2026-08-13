@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.55.0">
+<meta name="version" content="1.55.1">
 <meta name="build-date" content="2026-08-13">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -1035,8 +1035,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.55.0, built 2026-08-13">
-    <b>v1.55.0</b><i>·</i><span>2026-08-13</span>
+  <div id="build" title="Flamme Retardé 1.55.1, built 2026-08-13">
+    <b>v1.55.1</b><i>·</i><span>2026-08-13</span>
   </div>
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
@@ -1288,7 +1288,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.55.0", date: "2026-08-13" };</script>
+<script>const BUILD = { v: "1.55.1", date: "2026-08-13" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -11617,8 +11617,13 @@ async function buildJadrija(scene) {
     // `settle` is the compensation, not a slouch: pitching about the root lifts
     // the front of him by about six centimetres and his front paws have to come
     // back down onto something.
-    settle: 0.062,      // m the body drops, so the front paws stay on the tick
-    slump: 0.42,        // rad of nose-up pitch — the sit itself
+    // Measured off `joints` in the debug read rather than guessed, because the
+    // first pass at it put his rump 62 mm under the tick and a bedsheet cut him
+    // in half. The rear ends up 20 mm under, which a mattress swallows, and the
+    // front paws 10 mm over, which at this size is nothing — a pitch that puts
+    // both sets of paws on the same plane is a pitch too small to be a sit.
+    settle: 0.070,      // m the body drops, so the rear is only just under
+    slump: 0.34,        // rad of nose-up pitch — the sit itself
     fold: 0.55,         // rad the hind legs swing forward, under him
     curlIn: 1.9,        // 1/s, how fast the settle arrives
   };
@@ -14051,6 +14056,26 @@ async function buildJadrija(scene) {
         // Indoors: how far off the floor he is and how far through the sit.
         // A dog on the cot and a dog standing next to it differ by one number.
         lift: +dog.lift.toFixed(3), curl: +dog.curl.toFixed(2), leg: dog.leg,
+        // And where his corners have actually got to, in world metres. The sit
+        // is three rotations laid over a clip and the only way to know what
+        // that leaves below the mattress is to ask: a rump 11 cm under the tick
+        // is a dog cut in half by a bedsheet, and it shipped once.
+        joints: (() => {
+          const v = new THREE.Vector3(), o = {};
+          // The matrix, by hand: this is read between frames and the renderer
+          // is what normally refreshes it, so without this every joint comes
+          // back in whatever space the mesh was in one frame ago — which reads
+          // as a plausible set of numbers that do not move when the dog does.
+          dog.mesh.updateMatrixWorld(true);
+          for (const n of ['root', 'Hips', 'Body', 'Head', 'BackFoot.L',
+            'FrontFoot.L', 'Torso']) {
+            const i = f.boneIndex(n);
+            if (i < 0) continue;
+            f.boneAt(i, v).applyMatrix4(dog.mesh.matrixWorld);
+            o[n] = +v.y.toFixed(3);
+          }
+          return o;
+        })(),
         says: dog.balloon.mesh.visible ? dog.balloon.said : null };
     },
     /** Hose him, from the console, without having to fly the aeroplane. */
@@ -18188,7 +18213,18 @@ function localeAt(x, z, airfield, jadrija, city) {
   if (airfield && airfield.site && airfield.inField && airfield.inField(x, z)) {
     return airfield;
   }
-  if (jadrija && jadrija.inField && jadrija.inField(x, z)) return jadrija;
+  // Padded, and the pad is not a fudge — it is the resort's own `walkY`, which
+  // answers for t in [-5, LEN+5] and hands back the terrain outside that. Asked
+  // without it, a canopy coming down two metres past the west end of the
+  // promenade fails `inField` by a hair, gets open country, and stands you on
+  // the DEM: 1.21 m, with the concrete you can see at 2.55 m. You land inside
+  // the deck and spend the rest of the visit looking at the underside of it.
+  //
+  // The two tests had drifted apart because they are about different things —
+  // `inField` is "is this the resort", used to keep pines out of the bathing
+  // terrace, and it is deliberately tight. What the locale wants is "can this
+  // place answer for the ground here", and that is a wider question.
+  if (jadrija && jadrija.inField && jadrija.inField(x, z, 5)) return jadrija;
   return openLocale(x, z, city);
 }
 

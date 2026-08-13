@@ -8,6 +8,41 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.55.1] — 2026-08-13
+
+Two defects in what 1.55.0 shipped an hour ago.
+
+### Fixed — you could land inside the promenade
+
+A canopy coming down two metres past the west end of the Jadrija deck failed
+`inField` by a hair, was handed open country, and stood you on the DEM: 1.21 m,
+with the concrete you could see at 2.55 m. You spent the rest of the visit
+looking at the underside of the terrace, with the whole resort drawn correctly
+above your head.
+
+The two tests had drifted apart because they are about different things.
+`inField` is "is this the resort" — it keeps pines out of the bathing terrace
+and it is deliberately tight. What `localeAt` wants is "can this place answer
+for the ground here", which is the wider question, and the resort's own `walkY`
+already answers it for t in [-5, LEN+5]. The locale test is padded to match.
+
+Swept afterwards over the whole resort and 16 m of margin at 2 m spacing: no
+point left where the deck stands more than 35 cm above what the chosen locale
+thinks the ground is. There were 27.
+
+### Fixed — the dog was sitting in the mattress
+
+The sit put his rump 62 mm under the tick and the bedsheet cut him in half. The
+numbers came from a debug read that looked right and was not: `boneAt` is figure
+space and the matrix that converts it is refreshed by the renderer, so between
+frames every joint came back in the space the dog was in a frame ago — a
+plausible set of numbers that did not move when he did. It refreshes the matrix
+itself now, and the pitch and the drop were set from what it says afterwards.
+
+He sits 20 mm into the bedding at the rear and 10 mm over it at the front. A
+pitch that puts both sets of paws on one plane is a pitch too small to be a sit,
+and a mattress is the one surface that can swallow the difference.
+
 ## [1.55.0] — 2026-08-13
 
 ### Fixed — the jet stops where the water lands
