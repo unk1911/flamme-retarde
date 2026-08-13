@@ -10,8 +10,8 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.54.0">
-<meta name="build-date" content="2026-08-12">
+<meta name="version" content="1.55.0">
+<meta name="build-date" content="2026-08-13">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
    anything to do with the aircraft and the sea, and the fire (amber → ember red)
@@ -1035,8 +1035,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.54.0, built 2026-08-12">
-    <b>v1.54.0</b><i>·</i><span>2026-08-12</span>
+  <div id="build" title="Flamme Retardé 1.55.0, built 2026-08-13">
+    <b>v1.55.0</b><i>·</i><span>2026-08-13</span>
   </div>
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
@@ -1288,7 +1288,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.54.0", date: "2026-08-12" };</script>
+<script>const BUILD = { v: "1.55.0", date: "2026-08-13" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -7108,13 +7108,19 @@ function faceAnchors(data) {
     const k = (col[i * 3] << 16) | (col[i * 3 + 1] << 8) | col[i * 3 + 2];
     if (k === MOUTH) mouth.push(fold(i));
   }
-  let corner = null;
+  let corner = null, lipC = null, lipW = 0.025;
   if (mouth.length >= 24) {
     const xm = Math.max(...mouth.map((p) => p[0]));
     const lip = mouth.filter((p) => p[0] > xm - 0.020);
     const zm = Math.max(...lip.map((p) => p[2]));
     const out = lip.filter((p) => p[2] > zm * 0.72);
     if (out.length >= 4) corner = mean(out);
+    // And the middle of it, on the midline rather than at the mean of a band
+    // that has been folded onto one side — the corner lift wants a corner, the
+    // jaw wants the centre of the hinge it opens around.
+    const c = mean(lip);
+    lipC = [c[0], c[1], 0];
+    lipW = Math.max(zm, 0.012);
   }
 
   // The upper arms, for the ink. Only which bones they are: where they are comes
@@ -7124,7 +7130,7 @@ function faceAnchors(data) {
   data.bones.forEach((b, i) => { if (/^armU/.test(b.name)) armB.push(i); });
 
   return {
-    eye, rad, corner, armB,
+    eye, rad, corner, lipC, lipW, armB,
     lid: rgb(skin),
     lash: rgb(darkest),
     balls: ball.length, mouth: mouth.length,
@@ -7147,6 +7153,16 @@ const FACE = {
   lipR: [0.020, 0.016, 0.020],     // how far a corner's lift reaches
   lift: [-0.0016, 0.0080, 0.0016], // and where it takes it: back, up, out
   squint: 0.18,                    // how far a full smile closes the eyes
+  // An open mouth, by the same two halves as the smile: the jaw is displaced
+  // and the inside of it is painted. Everything below the lip line falls, over
+  // a region the size of a jaw, and the paint is a dark oval sitting across the
+  // lip line in the *bind* pose — so the skin the drop stretches over the
+  // opening carries the dark with it and the gap reads as a gap rather than as
+  // a chin that has come loose.
+  jawR: [0.050, 0.055, 0.045],     // m — the region the jaw drop reaches
+  drop: [-0.0060, 0.0185, 0],      // and where it takes it: back and down
+  mawR: [0.026, 0.0115, 0.90],     // z is a fraction of the measured lip width
+  maw: [0.030, 0.014, 0.012],      // the colour inside a mouth, in sunlight
   // The tongues run nearly the length of the upper arm — 21 cm from her elbow
   // to her shoulder — because anything shorter is a black sleeve with a ragged
   // top rather than fire. It is the *gaps* between the tongues that read as
@@ -7167,6 +7183,10 @@ uniform vec3 uLashCol;
 uniform vec3 uLip;
 uniform vec3 uLipR;
 uniform vec3 uLift;
+uniform float uGape;
+uniform vec3 uLipC;
+uniform vec3 uJawR;
+uniform vec3 uMawR;
 uniform float uInk;
 uniform vec2 uArmB;
 uniform vec4 uArmC;
@@ -7201,6 +7221,16 @@ const FACE_VERT = /* glsl */ `
     vec3 f = vec3(p.x, p.y, abs(p.z));
     float w = 1.0 - smoothstep(0.25, 1.0, length((f - uLip) / uLipR));
     p += uSmile * w * vec3(uLift.x, uLift.y, uLift.z * sign(p.z));
+
+    // The jaw. Gated below the lip line rather than faded through it: an
+    // ellipsoid centred on the mouth takes the upper lip down with the lower
+    // one by half as much again, and a mouth that opens by moving both lips the
+    // same way does not open at all.
+    if (uGape > 0.0) {
+      float jw = 1.0 - smoothstep(0.20, 1.0, length((f - uLipC) / uJawR));
+      jw *= smoothstep(0.0015, -0.0090, p.y - uLipC.y);
+      p += uGape * jw * vec3(${FACE.drop[0]}, -${FACE.drop[1]}, 0.0);
+    }
     vArm = armWt(aBoneIdx.x, aBoneWt.x) + armWt(aBoneIdx.y, aBoneWt.y)
          + armWt(aBoneIdx.z, aBoneWt.z) + armWt(aBoneIdx.w, aBoneWt.w);
   }
@@ -7219,6 +7249,18 @@ const FACE_FRAG = /* glsl */ `
       base = mix(base, uLidCol, k * smoothstep(lid - 0.0008, lid + 0.0008, f.y));
       float line = 1.0 - smoothstep(0.0, ${FACE.line}, abs(f.y - lid));
       base = mix(base, uLashCol, k * line * uBlink);
+    }
+
+    // The inside of an open mouth. vLocal is the undisplaced bind position,
+    // so this oval is painted onto the skin *before* the jaw takes it down —
+    // which is the whole trick: the band of skin stretched across the opening
+    // is exactly the band that was carrying the dark, and it arrives already
+    // black. Grown a little with the gape so a mouth wide open is a wider hole
+    // and not the same hole further away from the nose.
+    if (uGape > 0.0) {
+      float mw = 1.0 - smoothstep(0.62, 1.0,
+        length((f - uLipC) / (uMawR * (0.80 + 0.35 * uGape))));
+      base = mix(base, vec3(${FACE.maw.join(', ')}), mw * uGape);
     }
 
     // ── the ink ──────────────────────────────────────────────────────────
@@ -7325,6 +7367,10 @@ function skinnedFigure(data, opts = {}) {
     uLip: V(anchors.corner || [0, -99, 0]),
     uLipR: V(FACE.lipR),
     uLift: V(anchors.corner ? FACE.lift : [0, 0, 0]),
+    uGape: { value: 0 },
+    uLipC: V(anchors.lipC || [0, -99, 0]),
+    uJawR: V(FACE.jawR),
+    uMawR: V([FACE.mawR[0], FACE.mawR[1], FACE.mawR[2] * anchors.lipW]),
     uInk: { value: 0 },
     // Two bone numbers, an axis and a span. If the arms could not be found the
     // bone numbers are −1, which nothing matches, and the ink never draws.
@@ -7444,6 +7490,31 @@ function skinnedFigure(data, opts = {}) {
   };
 
   /**
+   * One extra rotation on one bone, laid over whatever the clip is doing.
+   *
+   * In *figure* space, not in the bone's own frame, and that is the whole point
+   * of it. A bone-local rotation needs to know which way the bone's axes happen
+   * to point, which is a fact about how the rig was built in Blender and is not
+   * recoverable from anything shipped in the blob — the paper trail on the
+   * kneeling arms is what asking that question three times looks like. Figure
+   * space is known: +x is the way she faces, +y is up. So "chin up" is a turn
+   * about z and there is nothing to measure.
+   *
+   * Applied after the clip and before the children, so the head takes her eyes
+   * with it, and about the bone's own head, so nothing moves that should not.
+   */
+  const aims = new Map();          // bone index -> [x,y,z,w], figure space
+  function aim(name, ax, ay, az, ang) {
+    const i = data.bones.findIndex((b) => b.name === name);
+    if (i < 0) return false;
+    if (!ang) { aims.delete(i); return true; }
+    const l = Math.hypot(ax, ay, az) || 1;
+    const h = ang * 0.5, k = Math.sin(h) / l;
+    aims.set(i, [ax * k, ay * k, az * k, Math.cos(h)]);
+    return true;
+  }
+
+  /**
    * @param name   clip to play
    * @param fade   seconds to cross into it
    * @param next   clip to fall back to when a one-shot finishes
@@ -7503,6 +7574,11 @@ function skinnedFigure(data, opts = {}) {
         worldT[i * 3 + 2] += worldT[p * 3 + 2];
       }
 
+      if (aims.size) {
+        const aq = aims.get(i);
+        if (aq) qmul(worldQ, i * 4, aq, 0, worldQ, i * 4);
+      }
+
       // skin = world * bind^-1, written straight out as three rows of a 3x4.
       const sq = i * 4;
       qmul(mixQ, sq, worldQ, sq, invQ, sq);
@@ -7535,6 +7611,7 @@ function skinnedFigure(data, opts = {}) {
   const bl = { wait: 1.2 + Math.random() * BLINK.spread, at: -1, again: false };
   const face = anchors ? {
     smile: 0,          // what the caller wants, 0..1
+    gape: 0,           // and how far her mouth is open
     ink: 0,            // and how far the flames have climbed her arms
     dolphin: 0,        // the ankle ink is revealed with the dropped wrap
     rate: 1,           // blinks a second, scaled. Staring is `rate = 0`.
@@ -7553,6 +7630,10 @@ function skinnedFigure(data, opts = {}) {
   function faceTick(dt) {
     if (!face) return;
     uFace.uSmile.value = damp(uFace.uSmile.value, sat(face.smile), 7, dt);
+    // Quicker than the smile. A mouth opens in about a tenth of a second and a
+    // jaw easing down over half of one is a yawn, which is the opposite of what
+    // anybody asks for it.
+    uFace.uGape.value = damp(uFace.uGape.value, sat(face.gape), 13, dt);
     // Slower than the smile on purpose. A smile is a face changing its mind; the
     // ink is a flame front going up an arm, and it wants the second and a bit
     // that the riser under the turn takes.
@@ -7622,7 +7703,7 @@ function skinnedFigure(data, opts = {}) {
   return {
     mesh, material: mat, bones: data.bones, uBones, cast, wear, tattoo,
     clips: Object.keys(data.clips), tris: data.tris, nv: data.nv,
-    play, update, state: st, face, faceTick, uFace,
+    play, update, state: st, face, faceTick, uFace, aim,
     playing: () => (st.cur ? st.cur.name : null),
     /**
      * Where a bone's head has got to this frame, in figure space.
@@ -10467,6 +10548,12 @@ async function buildJadrija(scene) {
       // is one pace and an arm.
       rest: [bt, bs, by],
       wine: [bt + 0.372, bs + 0.191, Math.atan2(-0.191, -0.372)],
+      // The cot, for the dog: where he lies on it, how high the mattress is,
+      // and where he stands on the floor to get up. Off `cm`/`cs0` rather than
+      // typed, because the furniture moved outward on its own when the hut went
+      // to two bays and this would have stayed where the hut used to be.
+      cot: [cm, cms - 0.10, f + 0.44],
+      cotFoot: [cm - 0.62, cms - 0.10],
       // Where the neck of the bottle has to end up. Not the rim: a lip resting
       // on the rim is a bottle being emptied by somebody who has never poured
       // one, so this is six centimetres over it, and the stream covers the gap.
@@ -11426,6 +11513,9 @@ async function buildJadrija(scene) {
         // her, how soaked she is, how long she stays interested afterwards,
         // and which way round she is currently sweeping.
         hit: 0, owed: 0, wet: 0, lock: 0, spin: 1, faceAng: 0,
+        // Chin up and mouth open, for the one place the jet gets that: 0 or 1
+        // eased, and it drives both at once because they are one gesture.
+        gape: 0,
         // And the turn. `soak` is the one number in here that is a *total*
         // rather than a state — how many seconds of jet she has taken, over
         // the whole session, forgotten only very slowly. `burn` is how much of
@@ -11505,6 +11595,32 @@ async function buildJadrija(scene) {
     // the jet on him gets a second one rather than one and a wet dog standing
     // there — and short enough that he stops when you stop.
     soak: 1.4,
+    // Indoors. He follows you in, gets up on the cot and settles there.
+    //
+    // The jump is short because a jump is: 0.38 s from a standing start to the
+    // top of a mattress 44 cm up is about right for a small dog and, more to
+    // the point, is over before you can look at it closely. It is played on the
+    // idle clip — there is no jump in tools/blender/dog.py and there does not
+    // need to be one, because what sells it is the arc and the fact that he is
+    // suddenly a foot and a half higher than he was.
+    hopFor: 0.38,
+    hopUp: 0.12,        // m of overshoot at the top of the arc
+    // And the settle, which is a sit.
+    //
+    // There is no sit in tools/blender/dog.py and this does not add one: a sit
+    // is a body pitched nose-up about the hips with the hind legs folded under
+    // it, and both of those are one rotation each, laid over the idle clip
+    // through `aim`. The rear ends up below the tick and stays there, which is
+    // the whole reason this works on a mattress and would not on a floor — a
+    // bed hides the half of a sit that is hardest to fake.
+    //
+    // `settle` is the compensation, not a slouch: pitching about the root lifts
+    // the front of him by about six centimetres and his front paws have to come
+    // back down onto something.
+    settle: 0.062,      // m the body drops, so the front paws stay on the tick
+    slump: 0.42,        // rad of nose-up pitch — the sit itself
+    fold: 0.55,         // rad the hind legs swing forward, under him
+    curlIn: 1.9,        // 1/s, how fast the settle arrives
   };
 
   /**
@@ -11597,6 +11713,10 @@ async function buildJadrija(scene) {
         mesh, balloon, fig, at: [dt, DOG.lane], tris: fig.tris,
         mode: 'stand', dir: -1, timer: 3.0, tgt: dt,
         yaw: mesh.rotation.y, soak: 0,
+        // Indoors: metres above whatever the ground says, how far through the
+        // settle he is, which leg of the route he is on, and where the jump
+        // started from.
+        lift: 0, curl: 0, leg: 0, from: [dt, DOG.lane], hopH: 0,
       };
     } catch (e) {
       console.warn('dog failed:', e.message);
@@ -11642,9 +11762,150 @@ async function buildJadrija(scene) {
    * `speed` is set from the same number every frame he moves, so the pace and
    * the legs cannot drift apart. There is nowhere to get them out of step.
    */
-  function moveDog(dt) {
+  /**
+   * Turn towards a mark in the resort's own frame, then trot at it.
+   *
+   * The along-shore walk below moves in `t` alone and can steer by picking one
+   * of two headings. Coming through a doorway cannot: the route bends twice and
+   * the second leg is straight up `s`. Same rule either way — he comes round on
+   * the spot first and only then puts a paw down, because the trot is solved
+   * for a paw that does not slide and a body arcing under legs stepping
+   * straight forward slides every one of them.
+   *
+   * Returns the gap left after this step, so a caller can ask "am I there yet".
+   */
+  function dogTo(gt, gs, dt, pace = 1) {
+    const s = dog;
+    const dtt = gt - s.at[0], dss = gs - s.at[1];
+    const gap = Math.hypot(dtt, dss);
+    if (gap < 1e-4) return 0;
+    const want = rigYaw(s.at[0], Math.atan2(dss, dtt));
+    let err = want - s.yaw;
+    while (err > Math.PI) err -= Math.PI * 2;
+    while (err < -Math.PI) err += Math.PI * 2;
+    s.yaw += Math.min(Math.abs(err), DOG.turn * dt) * Math.sign(err);
+    if (Math.abs(err) > 0.28) {
+      s.fig.play('idle', { fade: 0.22 });
+      s.fig.state.speed = 1;
+      return gap;
+    }
+    s.fig.play('trot', { fade: 0.22 });
+    s.fig.state.speed = pace;
+    const step = Math.min(gap, DOG.trot * pace * dt);
+    s.at[0] += (dtt / gap) * step;
+    s.at[1] += (dss / gap) * step;
+    return gap - step;
+  }
+
+  /** The four indoor modes, as a set, so the trigger can tell it is on one. */
+  const DOG_IN = { come: 1, hop: 1, rest: 1 };
+
+  function moveDog(dt, pt, ps) {
     const s = dog;
     s.soak = Math.max(0, s.soak - dt);
+
+    // ── the room ──
+    //
+    // He comes in after you, and this is the same test the performance uses
+    // because it is the same door. The two of them are what is on the other
+    // side of it: she comes in and pours a drink, and he gets up on the cot,
+    // which between them is the difference between a room with a bed in it and
+    // somewhere the pair of them live.
+    //
+    // Derived from where you are every frame rather than fired on a threshold,
+    // for the reason the wrap is: an event that has to be paired with another
+    // event some unknown number of frames later is a state machine with a leak
+    // in it, and walking out of a hut is exactly the sort of thing that
+    // happens between two frames.
+    const K = special;
+    const inRoom = !!K && !!kit && !!kit.cot
+      && pt > K.t0 - 0.25 && pt < K.t1 + 0.25
+      && ps > K.face + 0.15 && ps < K.s1 + 0.2;
+    if (inRoom && !DOG_IN[s.mode] && s.mode !== 'shake') {
+      s.mode = 'come'; s.leg = 0;
+    } else if (!inRoom && DOG_IN[s.mode]) {
+      // Out, from wherever he had got to. Off the cot first if he is on it —
+      // `out` walks, and a dog walking out of a hut two feet above the floor is
+      // the funniest bug this could have and still a bug.
+      s.mode = 'out'; s.leg = 0;
+    }
+
+    switch (s.mode) {
+      // Three marks, and for the reason hers has three: a straight line from
+      // the deck to the cot goes through a metre and a half of hut.
+      case 'come': {
+        const legs = [[K.dc, K.face - 1.30], [K.dc, K.face + 0.70],
+          [kit.cotFoot[0], kit.cotFoot[1]]];
+        const g = legs[Math.min(s.leg, 2)];
+        const last = s.leg >= 2;
+        if (dogTo(g[0], g[1], dt, last ? 0.8 : 1) < (last ? 0.16 : 0.34)) {
+          if (last) {
+            s.mode = 'hop'; s.timer = 0;
+            s.from = [s.at[0], s.at[1]];
+            s.hopH = kit.cot[2] - standY(kit.cot[0], kit.cot[1]);
+          } else s.leg++;
+        }
+        return;
+      }
+
+      // Up. An arc rather than a ramp: something that eases straight to the
+      // final height is a lift and not a jump, and the overshoot at the top is
+      // the whole of what makes it one.
+      case 'hop': {
+        s.timer += dt;
+        const u = Math.min(1, s.timer / DOG.hopFor);
+        s.at[0] = s.from[0] + (kit.cot[0] - s.from[0]) * u;
+        s.at[1] = s.from[1] + (kit.cot[1] - s.from[1]) * u;
+        s.lift = s.hopH * u * (2 - u) + Math.sin(Math.PI * u) * DOG.hopUp;
+        s.fig.play('idle', { fade: 0.10 });
+        s.fig.state.speed = 1;
+        if (u >= 1) { s.mode = 'rest'; s.lift = s.hopH; s.timer = 0; }
+        return;
+      }
+
+      // And he stays, facing the door, which is where you came in and where you
+      // will go out. `curl` is the settle and it eases rather than switching,
+      // so the last thing he does after landing is lie down.
+      case 'rest': {
+        const want = rigYaw(s.at[0], Math.atan2(K.face - s.at[1],
+          (K.dc - s.at[0]) * 0.4));
+        let err = want - s.yaw;
+        while (err > Math.PI) err -= Math.PI * 2;
+        while (err < -Math.PI) err += Math.PI * 2;
+        s.yaw += Math.min(Math.abs(err), DOG.turn * 0.5 * dt) * Math.sign(err);
+        s.fig.play('idle', { fade: 0.40 });
+        s.fig.state.speed = 1;
+        s.curl = Math.min(1, s.curl + dt * DOG.curlIn);
+        s.lift = s.hopH - DOG.settle * s.curl;
+        return;
+      }
+
+      // Down off the cot and back out through the door, and then the promenade
+      // takes him again — `stand` with no timer left picks his next walk on the
+      // next frame, from wherever he is standing, which is the whole reason
+      // that mode reads its position rather than remembering one.
+      case 'out': {
+        s.curl = Math.max(0, s.curl - dt * 3.0);
+        if (s.lift > 0.01) {
+          // Off the edge the way he got on, but downwards and quicker: a drop
+          // is not a jump run backwards.
+          s.lift = Math.max(0, s.lift - dt * 1.9);
+          dogTo(kit.cotFoot[0], kit.cotFoot[1], dt, 0.8);
+          return;
+        }
+        s.lift = 0;
+        const legs = [[K.dc, K.face + 0.70], [K.dc, K.face - 1.60],
+          [(DOG.t0 + DOG.t1) * 0.5, DOG.lane]];
+        const g = legs[Math.min(s.leg, 2)];
+        if (dogTo(g[0], g[1], dt, 1) < 0.34) {
+          if (s.leg >= 2) {
+            s.mode = 'stand'; s.timer = 0; s.at[1] = DOG.lane;
+          } else s.leg++;
+        }
+        return;
+      }
+      default: break;
+    }
 
     if (s.mode === 'shake') {
       s.timer -= dt;
@@ -11652,6 +11913,11 @@ async function buildJadrija(scene) {
       // Still being hosed when he finishes: go again. That is the whole of the
       // reward for keeping the jet on him, and it is one branch.
       if (s.soak > 0) { shakeDog(); return; }
+      // Back to whatever he was doing, and on the cot that is lying on it.
+      // Without this he lands in `stand`, the room trigger sees him not on an
+      // indoor mode and sends him to `come` — from a standing start two feet
+      // above the floor, which he then trots across.
+      if (s.lift > 0.01) { s.mode = 'rest'; return; }
       s.mode = 'stand';
       s.timer = DOG.stand[0] + Math.random() * (DOG.stand[1] - DOG.stand[0]);
       return;
@@ -11751,12 +12017,25 @@ async function buildJadrija(scene) {
     // Out of range he stops where he was, mid-stride, and stays there: a dog
     // frozen at 120 m is a dog you cannot see is frozen.
     if (d < 120) {
-      moveDog(dt);
+      const [pt, ps] = local(camPos.x, camPos.z);
+      moveDog(dt, pt, ps);
+      // The sit, laid over the idle clip: pitch the whole animal nose-up about
+      // his root, and swing the hind legs forward under him. `aim` is in figure
+      // space — +x is the way he faces and +y is up, which is knowable, unlike
+      // which way a bone imported from a glTF happens to point — so this is a
+      // back tipping whichever way he has turned to face.
+      dog.fig.aim('root', 0, 0, 1, dog.curl * DOG.slump);
+      dog.fig.aim('BackUpLeg.L', 0, 0, 1, dog.curl * DOG.fold);
+      dog.fig.aim('BackUpLeg.R', 0, 0, 1, dog.curl * DOG.fold);
       dog.fig.update(dt);
+      // `toWorld` reads `standY`, which already knows the kabina floor is not
+      // the deck — it steps up over the sill — so walking in needs nothing.
+      // `lift` is the cot on top of that.
       const p = toWorld(dog.at[0], dog.at[1]);
-      dog.mesh.position.set(p[0], p[1], p[2]);
+      const y = p[1] + dog.lift;
+      dog.mesh.position.set(p[0], y, p[2]);
       dog.mesh.rotation.y = dog.yaw;
-      b.mesh.position.set(p[0], p[1] + 0.62, p[2]);
+      b.mesh.position.set(p[0], y + 0.62, p[2]);
     }
     // No price, no balloon. The same rule her card follows: a line that never
     // arrived is simply not one of the things anybody says.
@@ -11972,6 +12251,11 @@ async function buildJadrija(scene) {
     creep: 0.40,
     creepFrom: 1.35,
     creepTo: 0.80,
+    // How far the chin comes up while the water is on her down there, in
+    // radians. Thirty degrees off whatever the clip had her head doing: enough
+    // that she is looking up at somebody standing over her rather than at their
+    // knees, and short of the angle where a neck stops being a neck.
+    chin: 0.52,
     castAt: 0.46,       // s into the `cast` clip where it leaves her hand. This
                         // is FIRE_CAST_AT in tools/blender/human_mh.py and it
                         // has to move with it or the ball appears out of a hand
@@ -12469,6 +12753,15 @@ async function buildJadrija(scene) {
     submit: 0.75, kept: 1.00, rise: 0.80, creep: 0.95,
   };
 
+  /**
+   * The three she is on her knees for, indoors.
+   *
+   * `submit` is on the way down and is in it anyway: the water is usually still
+   * on her while she goes, and a chin that waits for the clip to finish before
+   * coming up is a chin that comes up after the moment it was answering.
+   */
+  const KNEES = { submit: 1, kept: 1, creep: 1 };
+
   /** The indoor track, as a set, so the trigger can tell it is already on it. */
   const KABIN = { come: 1, enter: 1, wine: 1, meet: 1, untie: 1,
     dwell: 1, leave: 1 };
@@ -12678,6 +12971,27 @@ async function buildJadrija(scene) {
       f.face.ink = turn || show.turned ? 1 : 0;
     }
 
+    // ── the water in her face ─────────────────────────────────────────────
+    //
+    // Down on her knees indoors with the branch still on her: chin up, mouth
+    // open, into it. Both ride `hit`, which the jet refreshes and which decays
+    // over half a second, so this lasts exactly as long as you keep the water
+    // there and lets go the moment you stop — no phase, no timer, no clip.
+    //
+    // The lift is laid over whatever is playing rather than baked into a second
+    // `kept`: a held pose and a near-identical copy of it with the head in a
+    // different place is two clips that have to be kept in step forever. And it
+    // is in figure space, so it is a chin coming up whichever way she has
+    // turned to face you.
+    {
+      const into = KNEES[show.phase] && show.hit > 0 ? 1 : 0;
+      // Up fast and down slowly. She is answering the water, and a chin that
+      // falls as quickly as it rose reads as a flinch.
+      show.gape = damp(show.gape, into, into ? 9 : 3.2, dt);
+      if (f.face) f.face.gape = show.gape * 0.94;
+      f.aim('head', 0, 0, 1, show.gape * SHOW.chin);
+    }
+
     // And the wrap, which she never puts back on.
     //
     // Derived every frame rather than switched by the events that bracket the
@@ -12690,9 +13004,16 @@ async function buildJadrija(scene) {
     // value read off the state it belongs to cannot leak. That argument is why
     // this line is a line and not two calls, and it still holds now that the
     // state it reads is a latch rather than a meter.
+    //
+    // The ankle ink is not on that list and used to be: it arrived with the
+    // dropped wrap, on the argument that it was a thing the room revealed. It
+    // is not. A tattoo is not a costume change — it was on her when she walked
+    // down here this morning, and the version where you can only see it in one
+    // room is the version where it is a prop. Unconditional, from the first
+    // frame she exists.
     if (skinFig) {
       skinFig.wear(!show.turned && !show.shed);
-      skinFig.tattoo(!!show.shed);
+      skinFig.tattoo(true);
     }
 
     // And the card, which is only ever up during a phase that holds it.
@@ -13589,8 +13910,8 @@ async function buildJadrija(scene) {
       if (ang != null) { show.ang = ang; show.want = ang; }
       if (phase) {
         show.phase = phase; show.tmr = 0; show.held = 0; show.pour = 0;
-        skinFig.play({ wine: 'wine', untie: 'untie' }[phase] || 'idle',
-          { fade: 0 });
+        skinFig.play({ wine: 'wine', untie: 'untie', submit: 'submit',
+          kept: 'kept', creep: 'knees' }[phase] || 'idle', { fade: 0 });
       }
       // And scrub, because a headless page runs its clock at a fraction of the
       // wall clock and a five-second clip is not a thing a screenshot can wait
@@ -13727,6 +14048,9 @@ async function buildJadrija(scene) {
         mode: dog.mode, tgt: +dog.tgt.toFixed(2),
         timer: +dog.timer.toFixed(2), yaw: +dog.yaw.toFixed(3),
         soak: +dog.soak.toFixed(2),
+        // Indoors: how far off the floor he is and how far through the sit.
+        // A dog on the cot and a dog standing next to it differ by one number.
+        lift: +dog.lift.toFixed(3), curl: +dog.curl.toFixed(2), leg: dog.leg,
         says: dog.balloon.mesh.visible ? dog.balloon.said : null };
     },
     /** Hose him, from the console, without having to fly the aeroplane. */
@@ -13768,6 +14092,15 @@ async function buildJadrija(scene) {
     flare: () => { if (show) show.soak = SHOW.soakFor; },
     /** Bring the next card forward, so the boast is not a thirteen-second wait. */
     boast: () => { if (show) show.boast = 0; },
+    /**
+     * Hold the jet on her without a jet.
+     *
+     * `hit` is half a second of grace that the hose refreshes every frame, and
+     * headless a frame is about a second — so anything that reads it is off
+     * again before the shutter. A big number is the same code path with the
+     * water left on.
+     */
+    douse: (v = 99) => { if (show) show.hit = v; return show && show.hit; },
     /** The wrap, by hand, for looking at what is under it without a fire. */
     wear: (on) => { if (skinFig) skinFig.wear(on !== false); },
     /**
@@ -13798,7 +14131,9 @@ async function buildJadrija(scene) {
       const r3 = (v) => [+v.x.toFixed(4), +v.y.toFixed(4), +v.z.toFixed(4)];
       return {
         blink: +u.uBlink.value.toFixed(3), smile: +u.uSmile.value.toFixed(3),
-        ink: +u.uInk.value.toFixed(3),
+        ink: +u.uInk.value.toFixed(3), gape: +u.uGape.value.toFixed(3),
+        lipC: a.lipC ? r3(u.uLipC.value) : null,
+        lipW: a.lipC ? +a.lipW.toFixed(4) : null,
         want: +skinFig.face.smile.toFixed(2), rate: skinFig.face.rate,
         eye: r3(u.uEye.value), rad: +a.rad.toFixed(4),
         lip: a.corner ? r3(u.uLip.value) : null,
@@ -14381,6 +14716,21 @@ const VEG = {
   maxTiles: 220,
   perTile: 2100,         // candidate samples per tile, before cover rejects them
   budget: 34000,         // hard ceiling on live instances
+  // Where a tree stops being worth its polygons.
+  //
+  // The whole landscape has always been one model per species, and that model
+  // had to be cheap enough to draw thirty-four thousand times — which meant it
+  // had to be cheap at 2 km, which meant it was the same lofted lampshade at
+  // two metres. A pine you walk past on the way to the fire is not the same
+  // problem as a pine on a hillside in the haze, and it was being solved as if
+  // it were.
+  //
+  // Two models, then, and a distance. 300 m is where a 10 m tree is about
+  // fifteen pixels tall and there is nothing left to see: the swap is invisible
+  // and everything in the ring is a fraction of a percent of a circle 2.2 km
+  // across. Measured, on the hillside above Jadrija: about 500 of 20 000.
+  near: 300,
+  nearMax: 3000,         // and the ceiling on those, so the buffer is bounded
 };
 
 /**
@@ -14430,6 +14780,231 @@ function vegGeo(rings, seg, split, barkCol, leafCol) {
   }
   g.setAttribute('aVCol', new THREE.BufferAttribute(col, 3));
   return g;
+}
+
+// ── the close-up models ──────────────────────────────────────────────────────
+//
+// Same silhouette, same height, same overall radius — everything below is built
+// to the dimensions the far model already had, because a tree that changes size
+// as you approach is worse than a tree with corners on it. What changes is what
+// it is made of: a trunk that leans and bows, limbs that leave it and go
+// somewhere, and a canopy that is three to five separate clumps rather than one
+// surface of revolution. It is the gaps between the clumps that do the work,
+// exactly as the gaps between the tongues do it on the ink.
+
+/** Paint every vertex of a geometry one colour, ready to be merged. */
+function vegPaint(g, col) {
+  const n = g.attributes.position.count;
+  const c = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { c[i * 3] = col[0]; c[i * 3 + 1] = col[1]; c[i * 3 + 2] = col[2]; }
+  g.setAttribute('aVCol', new THREE.BufferAttribute(c, 3));
+  return g;
+}
+
+/** Concatenate painted parts into one geometry, which is one prototype. */
+function vegMerge(parts) {
+  let nv = 0, ni = 0;
+  for (const g of parts) { nv += g.attributes.position.count; ni += g.index.count; }
+  const pos = new Float32Array(nv * 3);
+  const nrm = new Float32Array(nv * 3);
+  const col = new Float32Array(nv * 3);
+  const idx = new Uint16Array(ni);
+  let vo = 0, io = 0;
+  for (const g of parts) {
+    const n = g.attributes.position.count;
+    pos.set(g.attributes.position.array, vo * 3);
+    nrm.set(g.attributes.normal.array, vo * 3);
+    col.set(g.attributes.aVCol.array, vo * 3);
+    const gi = g.index.array;
+    for (let i = 0; i < gi.length; i++) idx[io + i] = gi[i] + vo;
+    vo += n; io += gi.length;
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  out.setAttribute('aVCol', new THREE.BufferAttribute(col, 3));
+  out.setIndex(new THREE.BufferAttribute(idx, 1));
+  return out;
+}
+
+/**
+ * A clump of foliage: a closed blob with its radius knocked about.
+ *
+ * The poles are left as very small rings rather than as points. A ring of
+ * coincident vertices is a fan of zero-area triangles, and a zero-area triangle
+ * has no normal — `computeVertexNormals` hands back a NaN and the top of every
+ * tree comes out black. The material draws both sides, so the millimetre of
+ * hole this leaves instead cannot be seen from anywhere.
+ */
+function vegClump(c, r, seg, rows, jag, rnd) {
+  const ph = [];
+  for (let i = 0; i < seg; i++) ph.push(rnd() * TAU);
+  const rings = [];
+  for (let k = 0; k <= rows; k++) {
+    const v = k / rows;
+    const th = (v - 0.5) * Math.PI * 0.97;
+    const w = Math.cos(th), h = Math.sin(th);
+    const ring = [];
+    for (let i = 0; i < seg; i++) {
+      const a = (i / seg) * TAU;
+      const n = 1 + jag * (0.62 * Math.sin(a * 3 + ph[i])
+        + 0.38 * Math.sin(v * 5.3 + ph[(i + 3) % seg]));
+      ring.push(new THREE.Vector3(
+        c[0] + Math.cos(a) * r[0] * w * n,
+        c[1] + r[1] * h,
+        c[2] + Math.sin(a) * r[2] * w * n));
+    }
+    rings.push(ring);
+  }
+  return loft(rings, { closed: true, caps: false });
+}
+
+/** A limb: a tapered tube from one point to another, optionally bowed. */
+function vegLimb(p0, p1, r0, r1, seg, rows = 2, bow = 0) {
+  const dir = new THREE.Vector3(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]);
+  const L = dir.length() || 1e-4;
+  dir.multiplyScalar(1 / L);
+  const ref = Math.abs(dir.y) > 0.9 ? new THREE.Vector3(1, 0, 0)
+    : new THREE.Vector3(0, 1, 0);
+  const u = new THREE.Vector3().crossVectors(ref, dir).normalize();
+  const w = new THREE.Vector3().crossVectors(dir, u);
+  const rings = [];
+  for (let k = 0; k <= rows; k++) {
+    const t = k / rows;
+    const r = r0 + (r1 - r0) * t;
+    const c = new THREE.Vector3(p0[0], p0[1], p0[2]).addScaledVector(dir, L * t);
+    c.addScaledVector(u, bow * Math.sin(Math.PI * t));
+    const ring = [];
+    for (let i = 0; i < seg; i++) {
+      const a = (i / seg) * TAU;
+      const ca = Math.cos(a) * r, sa = Math.sin(a) * r;
+      ring.push(new THREE.Vector3(
+        c.x + u.x * ca + w.x * sa,
+        c.y + u.y * ca + w.y * sa,
+        c.z + u.z * ca + w.z * sa));
+    }
+    rings.push(ring);
+  }
+  return loft(rings, { closed: true, caps: false });
+}
+
+/**
+ * The four close-up species, in the same units and to the same dimensions as
+ * the four far ones: a height of 1 and a radius that stays inside what
+ * VEG_SIZE was written against.
+ *
+ * Seeded once and deterministically. These are four models, not four thousand
+ * — the variation between individual trees is the instance's own scale, yaw
+ * and tint, which is where it has always been.
+ */
+function vegNearPrototypes() {
+  const rnd = mulberry32(0x7ee5);
+  const bark = [0.30, 0.23, 0.17];
+  const ring = (a, r, y) => [Math.cos(a) * r, y, Math.sin(a) * r];
+
+  // Aleppo pine. A bare trunk that leans, three limbs that leave it near the
+  // top, and five flat clumps arranged into the umbrella the species is known
+  // for — wide, thin, and with sky through it.
+  //
+  // The vertical radii look absurd next to the horizontal ones and they are
+  // correct: an instance is scaled (w, h, w) and for a pine that is about
+  // (1.9, 10, 1.9), so the prototype is squashed by five to one on the way into
+  // the world. A clump built round comes out as a five-metre lozenge, which is
+  // how the first version of this turned an umbrella pine into a lollipop.
+  const pineParts = [
+    vegPaint(vegLimb([0, 0, 0], [0.055, 0.62, 0.03], 0.058, 0.028, 8, 4, 0.030), bark),
+  ];
+  const pineC = [
+    [0.00, 0.850, 0.00, 0.27, 0.105, 0.25],
+    [0.18, 0.760, 0.07, 0.23, 0.100, 0.22],
+    [-0.12, 0.785, 0.16, 0.22, 0.095, 0.21],
+    [-0.14, 0.835, -0.15, 0.21, 0.090, 0.20],
+    [0.07, 0.895, -0.09, 0.19, 0.085, 0.18],
+  ];
+  for (const [x, y, z, rx, ry, rz] of pineC) {
+    // Every clump but the crown is hung off a limb, so the canopy is carried
+    // rather than floating over a stick.
+    if (Math.hypot(x, z) > 0.05) {
+      pineParts.push(vegPaint(
+        vegLimb([0.05, 0.58, 0.026], [x * 0.85, y - ry * 0.6, z * 0.85],
+          0.022, 0.011, 5, 1), bark));
+    }
+    pineParts.push(vegPaint(vegClump([x, y, z], [rx, ry, rz], 9, 4, 0.24, rnd),
+      [0.14, 0.24, 0.13]));
+  }
+  const pine = vegMerge(pineParts);
+
+  // Cypress. One spindle, but a wavering one — the axis drifts, the section is
+  // twelve-sided and irregular, and four small clumps break the outline so it
+  // is not a lathe standing on end.
+  const cyPr = [[0.00, 0.045], [0.10, 0.072], [0.26, 0.098], [0.44, 0.106],
+    [0.62, 0.101], [0.78, 0.086], [0.90, 0.060], [0.97, 0.030], [1.00, 0.008]];
+  const cyRings = cyPr.map(([y, r]) => {
+    const dx = 0.016 * Math.sin(y * 4.1), dz = 0.013 * Math.sin(y * 3.3 + 1.7);
+    const out = [];
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * TAU;
+      const rr = r * (1 + 0.13 * Math.sin(i * 2.11 + y * 7.7));
+      const p = ring(a, rr, y);
+      out.push(new THREE.Vector3(p[0] + dx, p[1], p[2] + dz));
+    }
+    return out;
+  });
+  const cyParts = [vegPaint(loft(cyRings, { closed: true, caps: false }),
+    [0.09, 0.17, 0.11])];
+  for (let i = 0; i < 4; i++) {
+    const y = 0.26 + i * 0.19;
+    const a = rnd() * TAU;
+    cyParts.push(vegPaint(vegClump(ring(a, 0.062, y), [0.055, 0.075, 0.055],
+      7, 3, 0.30, rnd), [0.09, 0.17, 0.11]));
+  }
+  const cypress = vegMerge(cyParts);
+
+  // Olive. The trunk is short and thick and splits, which is the whole reason
+  // an olive reads as an olive from underneath, and the canopy is four lobes
+  // with light between them.
+  const olLimbs = [[0.26, 0.50, 0.30], [2.4, 0.56, -0.22], [4.4, 0.52, 0.10]];
+  const olParts = [
+    vegPaint(vegLimb([0, 0, 0], [0.012, 0.21, 0.008], 0.145, 0.105, 8, 2, 0.018), bark),
+  ];
+  for (const [a, y, lean] of olLimbs) {
+    const tip = ring(a, 0.20 + lean * 0.10, y);
+    olParts.push(vegPaint(
+      vegLimb([0.012, 0.20, 0.008], tip, 0.060, 0.030, 6, 2, 0.030),
+      [0.33, 0.29, 0.24]));
+  }
+  // An olive is squashed less on the way out — about 2.6 to 1 — so its lobes
+  // are nearer to round than the pine's, and they overlap into one mass with
+  // notches in it rather than into four separate balls.
+  const olC = [
+    [0.00, 0.66, 0.00, 0.30, 0.22, 0.28],
+    [0.24, 0.55, 0.16, 0.24, 0.190, 0.23],
+    [-0.22, 0.58, 0.18, 0.23, 0.185, 0.22],
+    [-0.04, 0.60, -0.26, 0.22, 0.180, 0.21],
+  ];
+  for (const [x, y, z, rx, ry, rz] of olC) {
+    olParts.push(vegPaint(vegClump([x, y, z], [rx, ry, rz], 9, 4, 0.26, rnd),
+      [0.36, 0.41, 0.30]));
+  }
+  const olive = vegMerge(olParts);
+
+  // Maquis. Four lobes and no trunk, which is what it is.
+  //
+  // Pushed apart and roughened harder than anything else here, because the
+  // first version of it was three concentric blobs and what that reads as, on
+  // open karst, at ten metres, is a boulder. Scrub is a tangle: the outline has
+  // to be broken in several places or the eye files it as stone.
+  const bushC = [
+    [0.00, 0.40, 0.00, 0.38, 0.40, 0.36],
+    [0.23, 0.27, 0.17, 0.28, 0.27, 0.27],
+    [-0.21, 0.29, -0.16, 0.27, 0.29, 0.26],
+    [0.05, 0.24, -0.25, 0.22, 0.24, 0.21],
+  ];
+  const bush = vegMerge(bushC.map(([x, y, z, rx, ry, rz]) =>
+    vegPaint(vegClump([x, y, z], [rx, ry, rz], 8, 4, 0.42, rnd),
+      [0.26, 0.30, 0.19])));
+
+  return { pine, cypress, olive, bush };
 }
 
 function vegPrototypes() {
@@ -14482,12 +15057,13 @@ const VEG_SIZE = {
 };
 
 function buildTrees(scene, fire) {
-  const protos = vegPrototypes();
+  const protos = { far: vegPrototypes(), near: vegNearPrototypes() };
   const T = VEG.tile;
 
   const layers = {};
-  for (const s of SPECIES) {
-    const src = protos[s];
+  for (const s of SPECIES) layers[s] = {};
+  for (const lod of ['near', 'far']) for (const s of SPECIES) {
+    const src = protos[lod][s];
     const geo = new THREE.InstancedBufferGeometry();
     geo.setAttribute('position', src.attributes.position);
     geo.setAttribute('normal', src.attributes.normal);
@@ -14497,7 +15073,7 @@ function buildTrees(scene, fire) {
     // nothing — culling is done per tile on the CPU.
     geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e9);
 
-    const cap = VEG.budget;
+    const cap = lod === 'near' ? VEG.nearMax : VEG.budget;
     const aPos = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
     const aRot = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4);
     const aScale = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
@@ -14522,7 +15098,7 @@ function buildTrees(scene, fire) {
     mesh.frustumCulled = false;
     mesh.renderOrder = 1;
     scene.add(mesh);
-    layers[s] = { geo, mesh, aPos, aRot, aScale, aColor, count: 0 };
+    layers[s][lod] = { geo, mesh, aPos, aRot, aScale, aColor, cap, count: 0 };
   }
 
   // ── tile generation ────────────────────────────────────────────────────────
@@ -14608,13 +15184,17 @@ function buildTrees(scene, fire) {
   // ── repacking ──────────────────────────────────────────────────────────────
 
   let density = 1;
-  let acc = 0, lastTx = 1e9, lastTz = 1e9, live = 0;
+  let acc = 0, lastTx = 1e9, lastTz = 1e9, live = 0, closeUp = 0;
   const _q = new THREE.Quaternion();
   const _up = new THREE.Vector3(0, 1, 0);
 
   function repack(camPos) {
-    const cursor = {};
-    for (const s of SPECIES) cursor[s] = 0;
+    // Two cursors a species now: which model an instance is written into is a
+    // function of its distance, and the species' share of the budget is the sum
+    // of the two — a tree close enough to be worth its polygons is still a tree.
+    const cursor = {}, used = {};
+    for (const s of SPECIES) { cursor[s] = { near: 0, far: 0 }; used[s] = 0; }
+    const nearR2 = VEG.near * VEG.near;
     const cap = Math.floor(VEG.budget * clamp(density, 0, 2));
     const R = VEG.radius * clamp(0.4 + density * 0.6, 0.4, 1.3);
     const R2 = R * R;
@@ -14631,15 +15211,22 @@ function buildTrees(scene, fire) {
 
         const tile = tileAt(tx, tz);
         for (const s of SPECIES) {
-          const L = layers[s];
           const list = tile[s];
           for (let i = 0; i < list.length; i++) {
-            const c = cursor[s];
-            if (c >= cap) break;
+            if (used[s] >= cap) break;
             const t = list[i];
             const dx = t.x - camPos.x, dz = t.z - camPos.z;
             const d2 = dx * dx + dz * dz;
             if (d2 > R2) continue;
+            // Close enough for the model with limbs on it, unless the ring is
+            // already full — in which case it falls back to the far one rather
+            // than being dropped, because a hole in the forest at 200 m is a
+            // worse answer to a full buffer than a simpler tree is.
+            const lod = d2 < nearR2 && cursor[s].near < layers[s].near.cap
+              ? 'near' : 'far';
+            const L = layers[s][lod];
+            const c = cursor[s][lod];
+            if (c >= L.cap) continue;
             // Shrink them into the ground over the last fifth of the radius.
             // A hard cutoff draws a visible ring of forest on the hillside and
             // the eye finds it immediately.
@@ -14673,17 +15260,19 @@ function buildTrees(scene, fire) {
             L.aColor.array[c * 3 + 1] = g;
             L.aColor.array[c * 3 + 2] = g * (1 - t.warm * 0.5);
 
-            cursor[s] = c + 1;
+            cursor[s][lod] = c + 1;
+            used[s]++;
           }
         }
       }
     }
 
-    live = 0;
-    for (const s of SPECIES) {
-      const L = layers[s];
-      L.count = cursor[s];
+    live = 0; closeUp = 0;
+    for (const s of SPECIES) for (const lod of ['near', 'far']) {
+      const L = layers[s][lod];
+      L.count = cursor[s][lod];
       live += L.count;
+      if (lod === 'near') closeUp += L.count;
       L.geo.instanceCount = L.count;
       L.aPos.needsUpdate = true;
       L.aRot.needsUpdate = true;
@@ -14695,7 +15284,9 @@ function buildTrees(scene, fire) {
 
   function update(dt, camPos) {
     if (density <= 0.001) {
-      for (const s of SPECIES) layers[s].mesh.visible = false;
+      for (const s of SPECIES) for (const lod of ['near', 'far']) {
+        layers[s][lod].mesh.visible = false;
+      }
       return;
     }
     acc += dt;
@@ -14712,7 +15303,10 @@ function buildTrees(scene, fire) {
     update, layers,
     setDensity: (v) => { density = v; acc = 99; lastTx = 1e9; },
     getDensity: () => density,
-    stats: () => ({ live, tiles: tiles.size }),
+    stats: () => ({ live, near: closeUp, tiles: tiles.size,
+      tris: SPECIES.reduce((n, s) => n
+        + layers[s].near.count * (protos.near[s].index.count / 3)
+        + layers[s].far.count * (protos.far[s].index.count / 3), 0) | 0 }),
   };
 }
 
@@ -15823,7 +16417,11 @@ async function buildGround(scene, field) {
   const rng = mulberry32(CONFIG.seed ^ 0x6f00d1);
   let objects = field.objects;
   const flames = buildFlames(scene, 220);
-  const jetSpray = buildSprayPool(scene, 900, 7.5, 1.1);
+  // Named because `spray` below has to solve the pool's own drag to find out
+  // where a droplet will be, and a drag constant that lives in two places is a
+  // cone that stops in the wrong spot the first time either one is touched.
+  const JET_DRAG = 1.1;
+  const jetSpray = buildSprayPool(scene, 900, 7.5, JET_DRAG);
   // Negative gravity, so it climbs. Steam off a person you have just hit is the
   // single clearest signal in the mode that the branch is on target — more
   // legible than the flame shrinking, because it happens on the first frame.
@@ -16683,8 +17281,22 @@ async function buildGround(scene, field) {
 
     // Droplets: a cone off the nozzle, thrown along the same vector the trace
     // used, so what you see is what the trace computed and not a second opinion.
+    //
+    // And it ends where the trace ended. A droplet is spawned with a life and
+    // nothing else to stop it, so it flies on through whatever the water landed
+    // on: outdoors that is a wisp carrying past a burning drum, and indoors, at
+    // a range of two metres, it is the entire cone hanging in the air *behind*
+    // the person being soaked. The pool's drag is exponential, so the distance
+    // covered by time t is (v/k)(1 − e^(−kt)) and this is that inverted.
     const { p, dir } = nozzle();
-    const n = Math.max(1, Math.round(60 * dt));
+    const reach = Math.hypot(hit.x - p[0], hit.y - p[1], hit.z - p[2]);
+    const span = Math.min(reach * JET_DRAG / GROUND.jetV, 0.92);
+    const tHit = -Math.log(1 - span) / JET_DRAG;
+    // A shorter flight is fewer droplets in the air at the same spawn rate, and
+    // a branch held on somebody a metre away must not thin out to nothing. The
+    // rate rises to keep about a third of a second of cone in front of you.
+    const dense = clamp(0.34 / Math.max(tHit, 0.04), 1, 3);
+    const n = Math.max(1, Math.round(60 * dt * dense));
     for (let i = 0; i < n; i++) {
       const s = rng();
       jetSpray.spawn(
@@ -16692,7 +17304,34 @@ async function buildGround(scene, field) {
         dir[0] * GROUND.jetV + (rng() - 0.5) * 2.6,
         dir[1] * GROUND.jetV + (rng() - 0.5) * 2.0,
         dir[2] * GROUND.jetV + (rng() - 0.5) * 2.6,
-        0.22 + s * 0.24, 0.80 + s * 0.45, 0.85,
+        // And scaled down with the range for the same reason the splash is:
+        // a droplet half a metre across is a droplet at twenty metres and a
+        // cloud bank at two.
+        (0.22 + s * 0.24) * clamp(0.30 + reach * 0.13, 0.42, 1),
+        Math.min(0.80 + s * 0.45, tHit * (0.86 + s * 0.30)), 0.85,
+      );
+    }
+
+    // And what comes off it. This is the half that reads as water arriving
+    // somewhere: the cone is thin, fast and over, and the thing you actually
+    // see hanging on a person is the splash. Thrown back into the hemisphere
+    // facing the nozzle, with enough lift to hang there for half a second.
+    //
+    // Small, and that is the whole of the tuning on it. These started at the
+    // cone's own size, which outdoors is nothing and in a hut four metres across
+    // is forty billboards a metre and a half wide with the camera standing
+    // inside them: the room went white. A splash is a fine mist. It is the
+    // number of them that has to read, never the size of one.
+    const nb = Math.max(1, Math.round(20 * dt * dense));
+    for (let i = 0; i < nb; i++) {
+      const s = rng();
+      const back = 1.1 + s * 2.4;
+      jetSpray.spawn(
+        hit.x - dir[0] * 0.09, hit.y - dir[1] * 0.09 + 0.04, hit.z - dir[2] * 0.09,
+        -dir[0] * back + (rng() - 0.5) * 2.8,
+        1.0 + rng() * 2.0,
+        -dir[2] * back + (rng() - 0.5) * 2.8,
+        0.085 + s * 0.13, 0.42 + s * 0.42, 1.3,
       );
     }
   }
@@ -23186,7 +23825,15 @@ async function boot() {
   // Trees cast into both cascades. A pine is 7 to 13 m, which is sixteen
   // texels of the far map — coarse, but a real shape, and a hillside of maquis
   // with no shadow in it is the flattest thing in this world after the sea.
-  for (const k in trees.layers) shadow.cast(trees.layers[k].mesh, { instanced: true });
+  // Two models a species since the close-up set arrived, so this is a layer of
+  // nesting deeper than it was. Both cast: the near one is the one you are
+  // standing under, and a tree whose shadow is the shape of a different tree is
+  // the sort of thing that is only ever noticed on foot.
+  for (const k in trees.layers) {
+    for (const lod in trees.layers[k]) {
+      shadow.cast(trees.layers[k][lod].mesh, { instanced: true });
+    }
+  }
 
   // The birds go up with the maquis because they belong to it: gulls over the
   // channel, swifts over the roofs, crows over the karst. They cost two draws

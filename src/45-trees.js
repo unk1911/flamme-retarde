@@ -21,6 +21,21 @@ const VEG = {
   maxTiles: 220,
   perTile: 2100,         // candidate samples per tile, before cover rejects them
   budget: 34000,         // hard ceiling on live instances
+  // Where a tree stops being worth its polygons.
+  //
+  // The whole landscape has always been one model per species, and that model
+  // had to be cheap enough to draw thirty-four thousand times — which meant it
+  // had to be cheap at 2 km, which meant it was the same lofted lampshade at
+  // two metres. A pine you walk past on the way to the fire is not the same
+  // problem as a pine on a hillside in the haze, and it was being solved as if
+  // it were.
+  //
+  // Two models, then, and a distance. 300 m is where a 10 m tree is about
+  // fifteen pixels tall and there is nothing left to see: the swap is invisible
+  // and everything in the ring is a fraction of a percent of a circle 2.2 km
+  // across. Measured, on the hillside above Jadrija: about 500 of 20 000.
+  near: 300,
+  nearMax: 3000,         // and the ceiling on those, so the buffer is bounded
 };
 
 /**
@@ -70,6 +85,231 @@ function vegGeo(rings, seg, split, barkCol, leafCol) {
   }
   g.setAttribute('aVCol', new THREE.BufferAttribute(col, 3));
   return g;
+}
+
+// ── the close-up models ──────────────────────────────────────────────────────
+//
+// Same silhouette, same height, same overall radius — everything below is built
+// to the dimensions the far model already had, because a tree that changes size
+// as you approach is worse than a tree with corners on it. What changes is what
+// it is made of: a trunk that leans and bows, limbs that leave it and go
+// somewhere, and a canopy that is three to five separate clumps rather than one
+// surface of revolution. It is the gaps between the clumps that do the work,
+// exactly as the gaps between the tongues do it on the ink.
+
+/** Paint every vertex of a geometry one colour, ready to be merged. */
+function vegPaint(g, col) {
+  const n = g.attributes.position.count;
+  const c = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { c[i * 3] = col[0]; c[i * 3 + 1] = col[1]; c[i * 3 + 2] = col[2]; }
+  g.setAttribute('aVCol', new THREE.BufferAttribute(c, 3));
+  return g;
+}
+
+/** Concatenate painted parts into one geometry, which is one prototype. */
+function vegMerge(parts) {
+  let nv = 0, ni = 0;
+  for (const g of parts) { nv += g.attributes.position.count; ni += g.index.count; }
+  const pos = new Float32Array(nv * 3);
+  const nrm = new Float32Array(nv * 3);
+  const col = new Float32Array(nv * 3);
+  const idx = new Uint16Array(ni);
+  let vo = 0, io = 0;
+  for (const g of parts) {
+    const n = g.attributes.position.count;
+    pos.set(g.attributes.position.array, vo * 3);
+    nrm.set(g.attributes.normal.array, vo * 3);
+    col.set(g.attributes.aVCol.array, vo * 3);
+    const gi = g.index.array;
+    for (let i = 0; i < gi.length; i++) idx[io + i] = gi[i] + vo;
+    vo += n; io += gi.length;
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  out.setAttribute('aVCol', new THREE.BufferAttribute(col, 3));
+  out.setIndex(new THREE.BufferAttribute(idx, 1));
+  return out;
+}
+
+/**
+ * A clump of foliage: a closed blob with its radius knocked about.
+ *
+ * The poles are left as very small rings rather than as points. A ring of
+ * coincident vertices is a fan of zero-area triangles, and a zero-area triangle
+ * has no normal — `computeVertexNormals` hands back a NaN and the top of every
+ * tree comes out black. The material draws both sides, so the millimetre of
+ * hole this leaves instead cannot be seen from anywhere.
+ */
+function vegClump(c, r, seg, rows, jag, rnd) {
+  const ph = [];
+  for (let i = 0; i < seg; i++) ph.push(rnd() * TAU);
+  const rings = [];
+  for (let k = 0; k <= rows; k++) {
+    const v = k / rows;
+    const th = (v - 0.5) * Math.PI * 0.97;
+    const w = Math.cos(th), h = Math.sin(th);
+    const ring = [];
+    for (let i = 0; i < seg; i++) {
+      const a = (i / seg) * TAU;
+      const n = 1 + jag * (0.62 * Math.sin(a * 3 + ph[i])
+        + 0.38 * Math.sin(v * 5.3 + ph[(i + 3) % seg]));
+      ring.push(new THREE.Vector3(
+        c[0] + Math.cos(a) * r[0] * w * n,
+        c[1] + r[1] * h,
+        c[2] + Math.sin(a) * r[2] * w * n));
+    }
+    rings.push(ring);
+  }
+  return loft(rings, { closed: true, caps: false });
+}
+
+/** A limb: a tapered tube from one point to another, optionally bowed. */
+function vegLimb(p0, p1, r0, r1, seg, rows = 2, bow = 0) {
+  const dir = new THREE.Vector3(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]);
+  const L = dir.length() || 1e-4;
+  dir.multiplyScalar(1 / L);
+  const ref = Math.abs(dir.y) > 0.9 ? new THREE.Vector3(1, 0, 0)
+    : new THREE.Vector3(0, 1, 0);
+  const u = new THREE.Vector3().crossVectors(ref, dir).normalize();
+  const w = new THREE.Vector3().crossVectors(dir, u);
+  const rings = [];
+  for (let k = 0; k <= rows; k++) {
+    const t = k / rows;
+    const r = r0 + (r1 - r0) * t;
+    const c = new THREE.Vector3(p0[0], p0[1], p0[2]).addScaledVector(dir, L * t);
+    c.addScaledVector(u, bow * Math.sin(Math.PI * t));
+    const ring = [];
+    for (let i = 0; i < seg; i++) {
+      const a = (i / seg) * TAU;
+      const ca = Math.cos(a) * r, sa = Math.sin(a) * r;
+      ring.push(new THREE.Vector3(
+        c.x + u.x * ca + w.x * sa,
+        c.y + u.y * ca + w.y * sa,
+        c.z + u.z * ca + w.z * sa));
+    }
+    rings.push(ring);
+  }
+  return loft(rings, { closed: true, caps: false });
+}
+
+/**
+ * The four close-up species, in the same units and to the same dimensions as
+ * the four far ones: a height of 1 and a radius that stays inside what
+ * VEG_SIZE was written against.
+ *
+ * Seeded once and deterministically. These are four models, not four thousand
+ * — the variation between individual trees is the instance's own scale, yaw
+ * and tint, which is where it has always been.
+ */
+function vegNearPrototypes() {
+  const rnd = mulberry32(0x7ee5);
+  const bark = [0.30, 0.23, 0.17];
+  const ring = (a, r, y) => [Math.cos(a) * r, y, Math.sin(a) * r];
+
+  // Aleppo pine. A bare trunk that leans, three limbs that leave it near the
+  // top, and five flat clumps arranged into the umbrella the species is known
+  // for — wide, thin, and with sky through it.
+  //
+  // The vertical radii look absurd next to the horizontal ones and they are
+  // correct: an instance is scaled (w, h, w) and for a pine that is about
+  // (1.9, 10, 1.9), so the prototype is squashed by five to one on the way into
+  // the world. A clump built round comes out as a five-metre lozenge, which is
+  // how the first version of this turned an umbrella pine into a lollipop.
+  const pineParts = [
+    vegPaint(vegLimb([0, 0, 0], [0.055, 0.62, 0.03], 0.058, 0.028, 8, 4, 0.030), bark),
+  ];
+  const pineC = [
+    [0.00, 0.850, 0.00, 0.27, 0.105, 0.25],
+    [0.18, 0.760, 0.07, 0.23, 0.100, 0.22],
+    [-0.12, 0.785, 0.16, 0.22, 0.095, 0.21],
+    [-0.14, 0.835, -0.15, 0.21, 0.090, 0.20],
+    [0.07, 0.895, -0.09, 0.19, 0.085, 0.18],
+  ];
+  for (const [x, y, z, rx, ry, rz] of pineC) {
+    // Every clump but the crown is hung off a limb, so the canopy is carried
+    // rather than floating over a stick.
+    if (Math.hypot(x, z) > 0.05) {
+      pineParts.push(vegPaint(
+        vegLimb([0.05, 0.58, 0.026], [x * 0.85, y - ry * 0.6, z * 0.85],
+          0.022, 0.011, 5, 1), bark));
+    }
+    pineParts.push(vegPaint(vegClump([x, y, z], [rx, ry, rz], 9, 4, 0.24, rnd),
+      [0.14, 0.24, 0.13]));
+  }
+  const pine = vegMerge(pineParts);
+
+  // Cypress. One spindle, but a wavering one — the axis drifts, the section is
+  // twelve-sided and irregular, and four small clumps break the outline so it
+  // is not a lathe standing on end.
+  const cyPr = [[0.00, 0.045], [0.10, 0.072], [0.26, 0.098], [0.44, 0.106],
+    [0.62, 0.101], [0.78, 0.086], [0.90, 0.060], [0.97, 0.030], [1.00, 0.008]];
+  const cyRings = cyPr.map(([y, r]) => {
+    const dx = 0.016 * Math.sin(y * 4.1), dz = 0.013 * Math.sin(y * 3.3 + 1.7);
+    const out = [];
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * TAU;
+      const rr = r * (1 + 0.13 * Math.sin(i * 2.11 + y * 7.7));
+      const p = ring(a, rr, y);
+      out.push(new THREE.Vector3(p[0] + dx, p[1], p[2] + dz));
+    }
+    return out;
+  });
+  const cyParts = [vegPaint(loft(cyRings, { closed: true, caps: false }),
+    [0.09, 0.17, 0.11])];
+  for (let i = 0; i < 4; i++) {
+    const y = 0.26 + i * 0.19;
+    const a = rnd() * TAU;
+    cyParts.push(vegPaint(vegClump(ring(a, 0.062, y), [0.055, 0.075, 0.055],
+      7, 3, 0.30, rnd), [0.09, 0.17, 0.11]));
+  }
+  const cypress = vegMerge(cyParts);
+
+  // Olive. The trunk is short and thick and splits, which is the whole reason
+  // an olive reads as an olive from underneath, and the canopy is four lobes
+  // with light between them.
+  const olLimbs = [[0.26, 0.50, 0.30], [2.4, 0.56, -0.22], [4.4, 0.52, 0.10]];
+  const olParts = [
+    vegPaint(vegLimb([0, 0, 0], [0.012, 0.21, 0.008], 0.145, 0.105, 8, 2, 0.018), bark),
+  ];
+  for (const [a, y, lean] of olLimbs) {
+    const tip = ring(a, 0.20 + lean * 0.10, y);
+    olParts.push(vegPaint(
+      vegLimb([0.012, 0.20, 0.008], tip, 0.060, 0.030, 6, 2, 0.030),
+      [0.33, 0.29, 0.24]));
+  }
+  // An olive is squashed less on the way out — about 2.6 to 1 — so its lobes
+  // are nearer to round than the pine's, and they overlap into one mass with
+  // notches in it rather than into four separate balls.
+  const olC = [
+    [0.00, 0.66, 0.00, 0.30, 0.22, 0.28],
+    [0.24, 0.55, 0.16, 0.24, 0.190, 0.23],
+    [-0.22, 0.58, 0.18, 0.23, 0.185, 0.22],
+    [-0.04, 0.60, -0.26, 0.22, 0.180, 0.21],
+  ];
+  for (const [x, y, z, rx, ry, rz] of olC) {
+    olParts.push(vegPaint(vegClump([x, y, z], [rx, ry, rz], 9, 4, 0.26, rnd),
+      [0.36, 0.41, 0.30]));
+  }
+  const olive = vegMerge(olParts);
+
+  // Maquis. Four lobes and no trunk, which is what it is.
+  //
+  // Pushed apart and roughened harder than anything else here, because the
+  // first version of it was three concentric blobs and what that reads as, on
+  // open karst, at ten metres, is a boulder. Scrub is a tangle: the outline has
+  // to be broken in several places or the eye files it as stone.
+  const bushC = [
+    [0.00, 0.40, 0.00, 0.38, 0.40, 0.36],
+    [0.23, 0.27, 0.17, 0.28, 0.27, 0.27],
+    [-0.21, 0.29, -0.16, 0.27, 0.29, 0.26],
+    [0.05, 0.24, -0.25, 0.22, 0.24, 0.21],
+  ];
+  const bush = vegMerge(bushC.map(([x, y, z, rx, ry, rz]) =>
+    vegPaint(vegClump([x, y, z], [rx, ry, rz], 8, 4, 0.42, rnd),
+      [0.26, 0.30, 0.19])));
+
+  return { pine, cypress, olive, bush };
 }
 
 function vegPrototypes() {
@@ -122,12 +362,13 @@ const VEG_SIZE = {
 };
 
 function buildTrees(scene, fire) {
-  const protos = vegPrototypes();
+  const protos = { far: vegPrototypes(), near: vegNearPrototypes() };
   const T = VEG.tile;
 
   const layers = {};
-  for (const s of SPECIES) {
-    const src = protos[s];
+  for (const s of SPECIES) layers[s] = {};
+  for (const lod of ['near', 'far']) for (const s of SPECIES) {
+    const src = protos[lod][s];
     const geo = new THREE.InstancedBufferGeometry();
     geo.setAttribute('position', src.attributes.position);
     geo.setAttribute('normal', src.attributes.normal);
@@ -137,7 +378,7 @@ function buildTrees(scene, fire) {
     // nothing — culling is done per tile on the CPU.
     geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e9);
 
-    const cap = VEG.budget;
+    const cap = lod === 'near' ? VEG.nearMax : VEG.budget;
     const aPos = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
     const aRot = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4);
     const aScale = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
@@ -162,7 +403,7 @@ function buildTrees(scene, fire) {
     mesh.frustumCulled = false;
     mesh.renderOrder = 1;
     scene.add(mesh);
-    layers[s] = { geo, mesh, aPos, aRot, aScale, aColor, count: 0 };
+    layers[s][lod] = { geo, mesh, aPos, aRot, aScale, aColor, cap, count: 0 };
   }
 
   // ── tile generation ────────────────────────────────────────────────────────
@@ -248,13 +489,17 @@ function buildTrees(scene, fire) {
   // ── repacking ──────────────────────────────────────────────────────────────
 
   let density = 1;
-  let acc = 0, lastTx = 1e9, lastTz = 1e9, live = 0;
+  let acc = 0, lastTx = 1e9, lastTz = 1e9, live = 0, closeUp = 0;
   const _q = new THREE.Quaternion();
   const _up = new THREE.Vector3(0, 1, 0);
 
   function repack(camPos) {
-    const cursor = {};
-    for (const s of SPECIES) cursor[s] = 0;
+    // Two cursors a species now: which model an instance is written into is a
+    // function of its distance, and the species' share of the budget is the sum
+    // of the two — a tree close enough to be worth its polygons is still a tree.
+    const cursor = {}, used = {};
+    for (const s of SPECIES) { cursor[s] = { near: 0, far: 0 }; used[s] = 0; }
+    const nearR2 = VEG.near * VEG.near;
     const cap = Math.floor(VEG.budget * clamp(density, 0, 2));
     const R = VEG.radius * clamp(0.4 + density * 0.6, 0.4, 1.3);
     const R2 = R * R;
@@ -271,15 +516,22 @@ function buildTrees(scene, fire) {
 
         const tile = tileAt(tx, tz);
         for (const s of SPECIES) {
-          const L = layers[s];
           const list = tile[s];
           for (let i = 0; i < list.length; i++) {
-            const c = cursor[s];
-            if (c >= cap) break;
+            if (used[s] >= cap) break;
             const t = list[i];
             const dx = t.x - camPos.x, dz = t.z - camPos.z;
             const d2 = dx * dx + dz * dz;
             if (d2 > R2) continue;
+            // Close enough for the model with limbs on it, unless the ring is
+            // already full — in which case it falls back to the far one rather
+            // than being dropped, because a hole in the forest at 200 m is a
+            // worse answer to a full buffer than a simpler tree is.
+            const lod = d2 < nearR2 && cursor[s].near < layers[s].near.cap
+              ? 'near' : 'far';
+            const L = layers[s][lod];
+            const c = cursor[s][lod];
+            if (c >= L.cap) continue;
             // Shrink them into the ground over the last fifth of the radius.
             // A hard cutoff draws a visible ring of forest on the hillside and
             // the eye finds it immediately.
@@ -313,17 +565,19 @@ function buildTrees(scene, fire) {
             L.aColor.array[c * 3 + 1] = g;
             L.aColor.array[c * 3 + 2] = g * (1 - t.warm * 0.5);
 
-            cursor[s] = c + 1;
+            cursor[s][lod] = c + 1;
+            used[s]++;
           }
         }
       }
     }
 
-    live = 0;
-    for (const s of SPECIES) {
-      const L = layers[s];
-      L.count = cursor[s];
+    live = 0; closeUp = 0;
+    for (const s of SPECIES) for (const lod of ['near', 'far']) {
+      const L = layers[s][lod];
+      L.count = cursor[s][lod];
       live += L.count;
+      if (lod === 'near') closeUp += L.count;
       L.geo.instanceCount = L.count;
       L.aPos.needsUpdate = true;
       L.aRot.needsUpdate = true;
@@ -335,7 +589,9 @@ function buildTrees(scene, fire) {
 
   function update(dt, camPos) {
     if (density <= 0.001) {
-      for (const s of SPECIES) layers[s].mesh.visible = false;
+      for (const s of SPECIES) for (const lod of ['near', 'far']) {
+        layers[s][lod].mesh.visible = false;
+      }
       return;
     }
     acc += dt;
@@ -352,6 +608,9 @@ function buildTrees(scene, fire) {
     update, layers,
     setDensity: (v) => { density = v; acc = 99; lastTx = 1e9; },
     getDensity: () => density,
-    stats: () => ({ live, tiles: tiles.size }),
+    stats: () => ({ live, near: closeUp, tiles: tiles.size,
+      tris: SPECIES.reduce((n, s) => n
+        + layers[s].near.count * (protos.near[s].index.count / 3)
+        + layers[s].far.count * (protos.far[s].index.count / 3), 0) | 0 }),
   };
 }

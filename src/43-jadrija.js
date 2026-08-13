@@ -2445,6 +2445,12 @@ async function buildJadrija(scene) {
       // is one pace and an arm.
       rest: [bt, bs, by],
       wine: [bt + 0.372, bs + 0.191, Math.atan2(-0.191, -0.372)],
+      // The cot, for the dog: where he lies on it, how high the mattress is,
+      // and where he stands on the floor to get up. Off `cm`/`cs0` rather than
+      // typed, because the furniture moved outward on its own when the hut went
+      // to two bays and this would have stayed where the hut used to be.
+      cot: [cm, cms - 0.10, f + 0.44],
+      cotFoot: [cm - 0.62, cms - 0.10],
       // Where the neck of the bottle has to end up. Not the rim: a lip resting
       // on the rim is a bottle being emptied by somebody who has never poured
       // one, so this is six centimetres over it, and the stream covers the gap.
@@ -3404,6 +3410,9 @@ async function buildJadrija(scene) {
         // her, how soaked she is, how long she stays interested afterwards,
         // and which way round she is currently sweeping.
         hit: 0, owed: 0, wet: 0, lock: 0, spin: 1, faceAng: 0,
+        // Chin up and mouth open, for the one place the jet gets that: 0 or 1
+        // eased, and it drives both at once because they are one gesture.
+        gape: 0,
         // And the turn. `soak` is the one number in here that is a *total*
         // rather than a state — how many seconds of jet she has taken, over
         // the whole session, forgotten only very slowly. `burn` is how much of
@@ -3483,6 +3492,32 @@ async function buildJadrija(scene) {
     // the jet on him gets a second one rather than one and a wet dog standing
     // there — and short enough that he stops when you stop.
     soak: 1.4,
+    // Indoors. He follows you in, gets up on the cot and settles there.
+    //
+    // The jump is short because a jump is: 0.38 s from a standing start to the
+    // top of a mattress 44 cm up is about right for a small dog and, more to
+    // the point, is over before you can look at it closely. It is played on the
+    // idle clip — there is no jump in tools/blender/dog.py and there does not
+    // need to be one, because what sells it is the arc and the fact that he is
+    // suddenly a foot and a half higher than he was.
+    hopFor: 0.38,
+    hopUp: 0.12,        // m of overshoot at the top of the arc
+    // And the settle, which is a sit.
+    //
+    // There is no sit in tools/blender/dog.py and this does not add one: a sit
+    // is a body pitched nose-up about the hips with the hind legs folded under
+    // it, and both of those are one rotation each, laid over the idle clip
+    // through `aim`. The rear ends up below the tick and stays there, which is
+    // the whole reason this works on a mattress and would not on a floor — a
+    // bed hides the half of a sit that is hardest to fake.
+    //
+    // `settle` is the compensation, not a slouch: pitching about the root lifts
+    // the front of him by about six centimetres and his front paws have to come
+    // back down onto something.
+    settle: 0.062,      // m the body drops, so the front paws stay on the tick
+    slump: 0.42,        // rad of nose-up pitch — the sit itself
+    fold: 0.55,         // rad the hind legs swing forward, under him
+    curlIn: 1.9,        // 1/s, how fast the settle arrives
   };
 
   /**
@@ -3575,6 +3610,10 @@ async function buildJadrija(scene) {
         mesh, balloon, fig, at: [dt, DOG.lane], tris: fig.tris,
         mode: 'stand', dir: -1, timer: 3.0, tgt: dt,
         yaw: mesh.rotation.y, soak: 0,
+        // Indoors: metres above whatever the ground says, how far through the
+        // settle he is, which leg of the route he is on, and where the jump
+        // started from.
+        lift: 0, curl: 0, leg: 0, from: [dt, DOG.lane], hopH: 0,
       };
     } catch (e) {
       console.warn('dog failed:', e.message);
@@ -3620,9 +3659,150 @@ async function buildJadrija(scene) {
    * `speed` is set from the same number every frame he moves, so the pace and
    * the legs cannot drift apart. There is nowhere to get them out of step.
    */
-  function moveDog(dt) {
+  /**
+   * Turn towards a mark in the resort's own frame, then trot at it.
+   *
+   * The along-shore walk below moves in `t` alone and can steer by picking one
+   * of two headings. Coming through a doorway cannot: the route bends twice and
+   * the second leg is straight up `s`. Same rule either way — he comes round on
+   * the spot first and only then puts a paw down, because the trot is solved
+   * for a paw that does not slide and a body arcing under legs stepping
+   * straight forward slides every one of them.
+   *
+   * Returns the gap left after this step, so a caller can ask "am I there yet".
+   */
+  function dogTo(gt, gs, dt, pace = 1) {
+    const s = dog;
+    const dtt = gt - s.at[0], dss = gs - s.at[1];
+    const gap = Math.hypot(dtt, dss);
+    if (gap < 1e-4) return 0;
+    const want = rigYaw(s.at[0], Math.atan2(dss, dtt));
+    let err = want - s.yaw;
+    while (err > Math.PI) err -= Math.PI * 2;
+    while (err < -Math.PI) err += Math.PI * 2;
+    s.yaw += Math.min(Math.abs(err), DOG.turn * dt) * Math.sign(err);
+    if (Math.abs(err) > 0.28) {
+      s.fig.play('idle', { fade: 0.22 });
+      s.fig.state.speed = 1;
+      return gap;
+    }
+    s.fig.play('trot', { fade: 0.22 });
+    s.fig.state.speed = pace;
+    const step = Math.min(gap, DOG.trot * pace * dt);
+    s.at[0] += (dtt / gap) * step;
+    s.at[1] += (dss / gap) * step;
+    return gap - step;
+  }
+
+  /** The four indoor modes, as a set, so the trigger can tell it is on one. */
+  const DOG_IN = { come: 1, hop: 1, rest: 1 };
+
+  function moveDog(dt, pt, ps) {
     const s = dog;
     s.soak = Math.max(0, s.soak - dt);
+
+    // ── the room ──
+    //
+    // He comes in after you, and this is the same test the performance uses
+    // because it is the same door. The two of them are what is on the other
+    // side of it: she comes in and pours a drink, and he gets up on the cot,
+    // which between them is the difference between a room with a bed in it and
+    // somewhere the pair of them live.
+    //
+    // Derived from where you are every frame rather than fired on a threshold,
+    // for the reason the wrap is: an event that has to be paired with another
+    // event some unknown number of frames later is a state machine with a leak
+    // in it, and walking out of a hut is exactly the sort of thing that
+    // happens between two frames.
+    const K = special;
+    const inRoom = !!K && !!kit && !!kit.cot
+      && pt > K.t0 - 0.25 && pt < K.t1 + 0.25
+      && ps > K.face + 0.15 && ps < K.s1 + 0.2;
+    if (inRoom && !DOG_IN[s.mode] && s.mode !== 'shake') {
+      s.mode = 'come'; s.leg = 0;
+    } else if (!inRoom && DOG_IN[s.mode]) {
+      // Out, from wherever he had got to. Off the cot first if he is on it —
+      // `out` walks, and a dog walking out of a hut two feet above the floor is
+      // the funniest bug this could have and still a bug.
+      s.mode = 'out'; s.leg = 0;
+    }
+
+    switch (s.mode) {
+      // Three marks, and for the reason hers has three: a straight line from
+      // the deck to the cot goes through a metre and a half of hut.
+      case 'come': {
+        const legs = [[K.dc, K.face - 1.30], [K.dc, K.face + 0.70],
+          [kit.cotFoot[0], kit.cotFoot[1]]];
+        const g = legs[Math.min(s.leg, 2)];
+        const last = s.leg >= 2;
+        if (dogTo(g[0], g[1], dt, last ? 0.8 : 1) < (last ? 0.16 : 0.34)) {
+          if (last) {
+            s.mode = 'hop'; s.timer = 0;
+            s.from = [s.at[0], s.at[1]];
+            s.hopH = kit.cot[2] - standY(kit.cot[0], kit.cot[1]);
+          } else s.leg++;
+        }
+        return;
+      }
+
+      // Up. An arc rather than a ramp: something that eases straight to the
+      // final height is a lift and not a jump, and the overshoot at the top is
+      // the whole of what makes it one.
+      case 'hop': {
+        s.timer += dt;
+        const u = Math.min(1, s.timer / DOG.hopFor);
+        s.at[0] = s.from[0] + (kit.cot[0] - s.from[0]) * u;
+        s.at[1] = s.from[1] + (kit.cot[1] - s.from[1]) * u;
+        s.lift = s.hopH * u * (2 - u) + Math.sin(Math.PI * u) * DOG.hopUp;
+        s.fig.play('idle', { fade: 0.10 });
+        s.fig.state.speed = 1;
+        if (u >= 1) { s.mode = 'rest'; s.lift = s.hopH; s.timer = 0; }
+        return;
+      }
+
+      // And he stays, facing the door, which is where you came in and where you
+      // will go out. `curl` is the settle and it eases rather than switching,
+      // so the last thing he does after landing is lie down.
+      case 'rest': {
+        const want = rigYaw(s.at[0], Math.atan2(K.face - s.at[1],
+          (K.dc - s.at[0]) * 0.4));
+        let err = want - s.yaw;
+        while (err > Math.PI) err -= Math.PI * 2;
+        while (err < -Math.PI) err += Math.PI * 2;
+        s.yaw += Math.min(Math.abs(err), DOG.turn * 0.5 * dt) * Math.sign(err);
+        s.fig.play('idle', { fade: 0.40 });
+        s.fig.state.speed = 1;
+        s.curl = Math.min(1, s.curl + dt * DOG.curlIn);
+        s.lift = s.hopH - DOG.settle * s.curl;
+        return;
+      }
+
+      // Down off the cot and back out through the door, and then the promenade
+      // takes him again — `stand` with no timer left picks his next walk on the
+      // next frame, from wherever he is standing, which is the whole reason
+      // that mode reads its position rather than remembering one.
+      case 'out': {
+        s.curl = Math.max(0, s.curl - dt * 3.0);
+        if (s.lift > 0.01) {
+          // Off the edge the way he got on, but downwards and quicker: a drop
+          // is not a jump run backwards.
+          s.lift = Math.max(0, s.lift - dt * 1.9);
+          dogTo(kit.cotFoot[0], kit.cotFoot[1], dt, 0.8);
+          return;
+        }
+        s.lift = 0;
+        const legs = [[K.dc, K.face + 0.70], [K.dc, K.face - 1.60],
+          [(DOG.t0 + DOG.t1) * 0.5, DOG.lane]];
+        const g = legs[Math.min(s.leg, 2)];
+        if (dogTo(g[0], g[1], dt, 1) < 0.34) {
+          if (s.leg >= 2) {
+            s.mode = 'stand'; s.timer = 0; s.at[1] = DOG.lane;
+          } else s.leg++;
+        }
+        return;
+      }
+      default: break;
+    }
 
     if (s.mode === 'shake') {
       s.timer -= dt;
@@ -3630,6 +3810,11 @@ async function buildJadrija(scene) {
       // Still being hosed when he finishes: go again. That is the whole of the
       // reward for keeping the jet on him, and it is one branch.
       if (s.soak > 0) { shakeDog(); return; }
+      // Back to whatever he was doing, and on the cot that is lying on it.
+      // Without this he lands in `stand`, the room trigger sees him not on an
+      // indoor mode and sends him to `come` — from a standing start two feet
+      // above the floor, which he then trots across.
+      if (s.lift > 0.01) { s.mode = 'rest'; return; }
       s.mode = 'stand';
       s.timer = DOG.stand[0] + Math.random() * (DOG.stand[1] - DOG.stand[0]);
       return;
@@ -3729,12 +3914,25 @@ async function buildJadrija(scene) {
     // Out of range he stops where he was, mid-stride, and stays there: a dog
     // frozen at 120 m is a dog you cannot see is frozen.
     if (d < 120) {
-      moveDog(dt);
+      const [pt, ps] = local(camPos.x, camPos.z);
+      moveDog(dt, pt, ps);
+      // The sit, laid over the idle clip: pitch the whole animal nose-up about
+      // his root, and swing the hind legs forward under him. `aim` is in figure
+      // space — +x is the way he faces and +y is up, which is knowable, unlike
+      // which way a bone imported from a glTF happens to point — so this is a
+      // back tipping whichever way he has turned to face.
+      dog.fig.aim('root', 0, 0, 1, dog.curl * DOG.slump);
+      dog.fig.aim('BackUpLeg.L', 0, 0, 1, dog.curl * DOG.fold);
+      dog.fig.aim('BackUpLeg.R', 0, 0, 1, dog.curl * DOG.fold);
       dog.fig.update(dt);
+      // `toWorld` reads `standY`, which already knows the kabina floor is not
+      // the deck — it steps up over the sill — so walking in needs nothing.
+      // `lift` is the cot on top of that.
       const p = toWorld(dog.at[0], dog.at[1]);
-      dog.mesh.position.set(p[0], p[1], p[2]);
+      const y = p[1] + dog.lift;
+      dog.mesh.position.set(p[0], y, p[2]);
       dog.mesh.rotation.y = dog.yaw;
-      b.mesh.position.set(p[0], p[1] + 0.62, p[2]);
+      b.mesh.position.set(p[0], y + 0.62, p[2]);
     }
     // No price, no balloon. The same rule her card follows: a line that never
     // arrived is simply not one of the things anybody says.
@@ -3950,6 +4148,11 @@ async function buildJadrija(scene) {
     creep: 0.40,
     creepFrom: 1.35,
     creepTo: 0.80,
+    // How far the chin comes up while the water is on her down there, in
+    // radians. Thirty degrees off whatever the clip had her head doing: enough
+    // that she is looking up at somebody standing over her rather than at their
+    // knees, and short of the angle where a neck stops being a neck.
+    chin: 0.52,
     castAt: 0.46,       // s into the `cast` clip where it leaves her hand. This
                         // is FIRE_CAST_AT in tools/blender/human_mh.py and it
                         // has to move with it or the ball appears out of a hand
@@ -4447,6 +4650,15 @@ async function buildJadrija(scene) {
     submit: 0.75, kept: 1.00, rise: 0.80, creep: 0.95,
   };
 
+  /**
+   * The three she is on her knees for, indoors.
+   *
+   * `submit` is on the way down and is in it anyway: the water is usually still
+   * on her while she goes, and a chin that waits for the clip to finish before
+   * coming up is a chin that comes up after the moment it was answering.
+   */
+  const KNEES = { submit: 1, kept: 1, creep: 1 };
+
   /** The indoor track, as a set, so the trigger can tell it is already on it. */
   const KABIN = { come: 1, enter: 1, wine: 1, meet: 1, untie: 1,
     dwell: 1, leave: 1 };
@@ -4656,6 +4868,27 @@ async function buildJadrija(scene) {
       f.face.ink = turn || show.turned ? 1 : 0;
     }
 
+    // ── the water in her face ─────────────────────────────────────────────
+    //
+    // Down on her knees indoors with the branch still on her: chin up, mouth
+    // open, into it. Both ride `hit`, which the jet refreshes and which decays
+    // over half a second, so this lasts exactly as long as you keep the water
+    // there and lets go the moment you stop — no phase, no timer, no clip.
+    //
+    // The lift is laid over whatever is playing rather than baked into a second
+    // `kept`: a held pose and a near-identical copy of it with the head in a
+    // different place is two clips that have to be kept in step forever. And it
+    // is in figure space, so it is a chin coming up whichever way she has
+    // turned to face you.
+    {
+      const into = KNEES[show.phase] && show.hit > 0 ? 1 : 0;
+      // Up fast and down slowly. She is answering the water, and a chin that
+      // falls as quickly as it rose reads as a flinch.
+      show.gape = damp(show.gape, into, into ? 9 : 3.2, dt);
+      if (f.face) f.face.gape = show.gape * 0.94;
+      f.aim('head', 0, 0, 1, show.gape * SHOW.chin);
+    }
+
     // And the wrap, which she never puts back on.
     //
     // Derived every frame rather than switched by the events that bracket the
@@ -4668,9 +4901,16 @@ async function buildJadrija(scene) {
     // value read off the state it belongs to cannot leak. That argument is why
     // this line is a line and not two calls, and it still holds now that the
     // state it reads is a latch rather than a meter.
+    //
+    // The ankle ink is not on that list and used to be: it arrived with the
+    // dropped wrap, on the argument that it was a thing the room revealed. It
+    // is not. A tattoo is not a costume change — it was on her when she walked
+    // down here this morning, and the version where you can only see it in one
+    // room is the version where it is a prop. Unconditional, from the first
+    // frame she exists.
     if (skinFig) {
       skinFig.wear(!show.turned && !show.shed);
-      skinFig.tattoo(!!show.shed);
+      skinFig.tattoo(true);
     }
 
     // And the card, which is only ever up during a phase that holds it.
@@ -5567,8 +5807,8 @@ async function buildJadrija(scene) {
       if (ang != null) { show.ang = ang; show.want = ang; }
       if (phase) {
         show.phase = phase; show.tmr = 0; show.held = 0; show.pour = 0;
-        skinFig.play({ wine: 'wine', untie: 'untie' }[phase] || 'idle',
-          { fade: 0 });
+        skinFig.play({ wine: 'wine', untie: 'untie', submit: 'submit',
+          kept: 'kept', creep: 'knees' }[phase] || 'idle', { fade: 0 });
       }
       // And scrub, because a headless page runs its clock at a fraction of the
       // wall clock and a five-second clip is not a thing a screenshot can wait
@@ -5705,6 +5945,9 @@ async function buildJadrija(scene) {
         mode: dog.mode, tgt: +dog.tgt.toFixed(2),
         timer: +dog.timer.toFixed(2), yaw: +dog.yaw.toFixed(3),
         soak: +dog.soak.toFixed(2),
+        // Indoors: how far off the floor he is and how far through the sit.
+        // A dog on the cot and a dog standing next to it differ by one number.
+        lift: +dog.lift.toFixed(3), curl: +dog.curl.toFixed(2), leg: dog.leg,
         says: dog.balloon.mesh.visible ? dog.balloon.said : null };
     },
     /** Hose him, from the console, without having to fly the aeroplane. */
@@ -5746,6 +5989,15 @@ async function buildJadrija(scene) {
     flare: () => { if (show) show.soak = SHOW.soakFor; },
     /** Bring the next card forward, so the boast is not a thirteen-second wait. */
     boast: () => { if (show) show.boast = 0; },
+    /**
+     * Hold the jet on her without a jet.
+     *
+     * `hit` is half a second of grace that the hose refreshes every frame, and
+     * headless a frame is about a second — so anything that reads it is off
+     * again before the shutter. A big number is the same code path with the
+     * water left on.
+     */
+    douse: (v = 99) => { if (show) show.hit = v; return show && show.hit; },
     /** The wrap, by hand, for looking at what is under it without a fire. */
     wear: (on) => { if (skinFig) skinFig.wear(on !== false); },
     /**
@@ -5776,7 +6028,9 @@ async function buildJadrija(scene) {
       const r3 = (v) => [+v.x.toFixed(4), +v.y.toFixed(4), +v.z.toFixed(4)];
       return {
         blink: +u.uBlink.value.toFixed(3), smile: +u.uSmile.value.toFixed(3),
-        ink: +u.uInk.value.toFixed(3),
+        ink: +u.uInk.value.toFixed(3), gape: +u.uGape.value.toFixed(3),
+        lipC: a.lipC ? r3(u.uLipC.value) : null,
+        lipW: a.lipC ? +a.lipW.toFixed(4) : null,
         want: +skinFig.face.smile.toFixed(2), rate: skinFig.face.rate,
         eye: r3(u.uEye.value), rad: +a.rad.toFixed(4),
         lip: a.corner ? r3(u.uLip.value) : null,

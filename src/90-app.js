@@ -667,7 +667,15 @@ async function boot() {
   // Trees cast into both cascades. A pine is 7 to 13 m, which is sixteen
   // texels of the far map — coarse, but a real shape, and a hillside of maquis
   // with no shadow in it is the flattest thing in this world after the sea.
-  for (const k in trees.layers) shadow.cast(trees.layers[k].mesh, { instanced: true });
+  // Two models a species since the close-up set arrived, so this is a layer of
+  // nesting deeper than it was. Both cast: the near one is the one you are
+  // standing under, and a tree whose shadow is the shape of a different tree is
+  // the sort of thing that is only ever noticed on foot.
+  for (const k in trees.layers) {
+    for (const lod in trees.layers[k]) {
+      shadow.cast(trees.layers[k][lod].mesh, { instanced: true });
+    }
+  }
 
   // The birds go up with the maquis because they belong to it: gulls over the
   // channel, swifts over the roofs, crows over the karst. They cost two draws

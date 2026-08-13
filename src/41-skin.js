@@ -335,13 +335,19 @@ function faceAnchors(data) {
     const k = (col[i * 3] << 16) | (col[i * 3 + 1] << 8) | col[i * 3 + 2];
     if (k === MOUTH) mouth.push(fold(i));
   }
-  let corner = null;
+  let corner = null, lipC = null, lipW = 0.025;
   if (mouth.length >= 24) {
     const xm = Math.max(...mouth.map((p) => p[0]));
     const lip = mouth.filter((p) => p[0] > xm - 0.020);
     const zm = Math.max(...lip.map((p) => p[2]));
     const out = lip.filter((p) => p[2] > zm * 0.72);
     if (out.length >= 4) corner = mean(out);
+    // And the middle of it, on the midline rather than at the mean of a band
+    // that has been folded onto one side — the corner lift wants a corner, the
+    // jaw wants the centre of the hinge it opens around.
+    const c = mean(lip);
+    lipC = [c[0], c[1], 0];
+    lipW = Math.max(zm, 0.012);
   }
 
   // The upper arms, for the ink. Only which bones they are: where they are comes
@@ -351,7 +357,7 @@ function faceAnchors(data) {
   data.bones.forEach((b, i) => { if (/^armU/.test(b.name)) armB.push(i); });
 
   return {
-    eye, rad, corner, armB,
+    eye, rad, corner, lipC, lipW, armB,
     lid: rgb(skin),
     lash: rgb(darkest),
     balls: ball.length, mouth: mouth.length,
@@ -374,6 +380,16 @@ const FACE = {
   lipR: [0.020, 0.016, 0.020],     // how far a corner's lift reaches
   lift: [-0.0016, 0.0080, 0.0016], // and where it takes it: back, up, out
   squint: 0.18,                    // how far a full smile closes the eyes
+  // An open mouth, by the same two halves as the smile: the jaw is displaced
+  // and the inside of it is painted. Everything below the lip line falls, over
+  // a region the size of a jaw, and the paint is a dark oval sitting across the
+  // lip line in the *bind* pose — so the skin the drop stretches over the
+  // opening carries the dark with it and the gap reads as a gap rather than as
+  // a chin that has come loose.
+  jawR: [0.050, 0.055, 0.045],     // m — the region the jaw drop reaches
+  drop: [-0.0060, 0.0185, 0],      // and where it takes it: back and down
+  mawR: [0.026, 0.0115, 0.90],     // z is a fraction of the measured lip width
+  maw: [0.030, 0.014, 0.012],      // the colour inside a mouth, in sunlight
   // The tongues run nearly the length of the upper arm — 21 cm from her elbow
   // to her shoulder — because anything shorter is a black sleeve with a ragged
   // top rather than fire. It is the *gaps* between the tongues that read as
@@ -394,6 +410,10 @@ uniform vec3 uLashCol;
 uniform vec3 uLip;
 uniform vec3 uLipR;
 uniform vec3 uLift;
+uniform float uGape;
+uniform vec3 uLipC;
+uniform vec3 uJawR;
+uniform vec3 uMawR;
 uniform float uInk;
 uniform vec2 uArmB;
 uniform vec4 uArmC;
@@ -428,6 +448,16 @@ const FACE_VERT = /* glsl */ `
     vec3 f = vec3(p.x, p.y, abs(p.z));
     float w = 1.0 - smoothstep(0.25, 1.0, length((f - uLip) / uLipR));
     p += uSmile * w * vec3(uLift.x, uLift.y, uLift.z * sign(p.z));
+
+    // The jaw. Gated below the lip line rather than faded through it: an
+    // ellipsoid centred on the mouth takes the upper lip down with the lower
+    // one by half as much again, and a mouth that opens by moving both lips the
+    // same way does not open at all.
+    if (uGape > 0.0) {
+      float jw = 1.0 - smoothstep(0.20, 1.0, length((f - uLipC) / uJawR));
+      jw *= smoothstep(0.0015, -0.0090, p.y - uLipC.y);
+      p += uGape * jw * vec3(${FACE.drop[0]}, -${FACE.drop[1]}, 0.0);
+    }
     vArm = armWt(aBoneIdx.x, aBoneWt.x) + armWt(aBoneIdx.y, aBoneWt.y)
          + armWt(aBoneIdx.z, aBoneWt.z) + armWt(aBoneIdx.w, aBoneWt.w);
   }
@@ -446,6 +476,18 @@ const FACE_FRAG = /* glsl */ `
       base = mix(base, uLidCol, k * smoothstep(lid - 0.0008, lid + 0.0008, f.y));
       float line = 1.0 - smoothstep(0.0, ${FACE.line}, abs(f.y - lid));
       base = mix(base, uLashCol, k * line * uBlink);
+    }
+
+    // The inside of an open mouth. vLocal is the undisplaced bind position,
+    // so this oval is painted onto the skin *before* the jaw takes it down —
+    // which is the whole trick: the band of skin stretched across the opening
+    // is exactly the band that was carrying the dark, and it arrives already
+    // black. Grown a little with the gape so a mouth wide open is a wider hole
+    // and not the same hole further away from the nose.
+    if (uGape > 0.0) {
+      float mw = 1.0 - smoothstep(0.62, 1.0,
+        length((f - uLipC) / (uMawR * (0.80 + 0.35 * uGape))));
+      base = mix(base, vec3(${FACE.maw.join(', ')}), mw * uGape);
     }
 
     // ── the ink ──────────────────────────────────────────────────────────
@@ -552,6 +594,10 @@ function skinnedFigure(data, opts = {}) {
     uLip: V(anchors.corner || [0, -99, 0]),
     uLipR: V(FACE.lipR),
     uLift: V(anchors.corner ? FACE.lift : [0, 0, 0]),
+    uGape: { value: 0 },
+    uLipC: V(anchors.lipC || [0, -99, 0]),
+    uJawR: V(FACE.jawR),
+    uMawR: V([FACE.mawR[0], FACE.mawR[1], FACE.mawR[2] * anchors.lipW]),
     uInk: { value: 0 },
     // Two bone numbers, an axis and a span. If the arms could not be found the
     // bone numbers are −1, which nothing matches, and the ink never draws.
@@ -671,6 +717,31 @@ function skinnedFigure(data, opts = {}) {
   };
 
   /**
+   * One extra rotation on one bone, laid over whatever the clip is doing.
+   *
+   * In *figure* space, not in the bone's own frame, and that is the whole point
+   * of it. A bone-local rotation needs to know which way the bone's axes happen
+   * to point, which is a fact about how the rig was built in Blender and is not
+   * recoverable from anything shipped in the blob — the paper trail on the
+   * kneeling arms is what asking that question three times looks like. Figure
+   * space is known: +x is the way she faces, +y is up. So "chin up" is a turn
+   * about z and there is nothing to measure.
+   *
+   * Applied after the clip and before the children, so the head takes her eyes
+   * with it, and about the bone's own head, so nothing moves that should not.
+   */
+  const aims = new Map();          // bone index -> [x,y,z,w], figure space
+  function aim(name, ax, ay, az, ang) {
+    const i = data.bones.findIndex((b) => b.name === name);
+    if (i < 0) return false;
+    if (!ang) { aims.delete(i); return true; }
+    const l = Math.hypot(ax, ay, az) || 1;
+    const h = ang * 0.5, k = Math.sin(h) / l;
+    aims.set(i, [ax * k, ay * k, az * k, Math.cos(h)]);
+    return true;
+  }
+
+  /**
    * @param name   clip to play
    * @param fade   seconds to cross into it
    * @param next   clip to fall back to when a one-shot finishes
@@ -730,6 +801,11 @@ function skinnedFigure(data, opts = {}) {
         worldT[i * 3 + 2] += worldT[p * 3 + 2];
       }
 
+      if (aims.size) {
+        const aq = aims.get(i);
+        if (aq) qmul(worldQ, i * 4, aq, 0, worldQ, i * 4);
+      }
+
       // skin = world * bind^-1, written straight out as three rows of a 3x4.
       const sq = i * 4;
       qmul(mixQ, sq, worldQ, sq, invQ, sq);
@@ -762,6 +838,7 @@ function skinnedFigure(data, opts = {}) {
   const bl = { wait: 1.2 + Math.random() * BLINK.spread, at: -1, again: false };
   const face = anchors ? {
     smile: 0,          // what the caller wants, 0..1
+    gape: 0,           // and how far her mouth is open
     ink: 0,            // and how far the flames have climbed her arms
     dolphin: 0,        // the ankle ink is revealed with the dropped wrap
     rate: 1,           // blinks a second, scaled. Staring is `rate = 0`.
@@ -780,6 +857,10 @@ function skinnedFigure(data, opts = {}) {
   function faceTick(dt) {
     if (!face) return;
     uFace.uSmile.value = damp(uFace.uSmile.value, sat(face.smile), 7, dt);
+    // Quicker than the smile. A mouth opens in about a tenth of a second and a
+    // jaw easing down over half of one is a yawn, which is the opposite of what
+    // anybody asks for it.
+    uFace.uGape.value = damp(uFace.uGape.value, sat(face.gape), 13, dt);
     // Slower than the smile on purpose. A smile is a face changing its mind; the
     // ink is a flame front going up an arm, and it wants the second and a bit
     // that the riser under the turn takes.
@@ -849,7 +930,7 @@ function skinnedFigure(data, opts = {}) {
   return {
     mesh, material: mat, bones: data.bones, uBones, cast, wear, tattoo,
     clips: Object.keys(data.clips), tris: data.tris, nv: data.nv,
-    play, update, state: st, face, faceTick, uFace,
+    play, update, state: st, face, faceTick, uFace, aim,
     playing: () => (st.cur ? st.cur.name : null),
     /**
      * Where a bone's head has got to this frame, in figure space.

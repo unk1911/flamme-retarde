@@ -207,7 +207,11 @@ async function buildGround(scene, field) {
   const rng = mulberry32(CONFIG.seed ^ 0x6f00d1);
   let objects = field.objects;
   const flames = buildFlames(scene, 220);
-  const jetSpray = buildSprayPool(scene, 900, 7.5, 1.1);
+  // Named because `spray` below has to solve the pool's own drag to find out
+  // where a droplet will be, and a drag constant that lives in two places is a
+  // cone that stops in the wrong spot the first time either one is touched.
+  const JET_DRAG = 1.1;
+  const jetSpray = buildSprayPool(scene, 900, 7.5, JET_DRAG);
   // Negative gravity, so it climbs. Steam off a person you have just hit is the
   // single clearest signal in the mode that the branch is on target — more
   // legible than the flame shrinking, because it happens on the first frame.
@@ -1067,8 +1071,22 @@ async function buildGround(scene, field) {
 
     // Droplets: a cone off the nozzle, thrown along the same vector the trace
     // used, so what you see is what the trace computed and not a second opinion.
+    //
+    // And it ends where the trace ended. A droplet is spawned with a life and
+    // nothing else to stop it, so it flies on through whatever the water landed
+    // on: outdoors that is a wisp carrying past a burning drum, and indoors, at
+    // a range of two metres, it is the entire cone hanging in the air *behind*
+    // the person being soaked. The pool's drag is exponential, so the distance
+    // covered by time t is (v/k)(1 − e^(−kt)) and this is that inverted.
     const { p, dir } = nozzle();
-    const n = Math.max(1, Math.round(60 * dt));
+    const reach = Math.hypot(hit.x - p[0], hit.y - p[1], hit.z - p[2]);
+    const span = Math.min(reach * JET_DRAG / GROUND.jetV, 0.92);
+    const tHit = -Math.log(1 - span) / JET_DRAG;
+    // A shorter flight is fewer droplets in the air at the same spawn rate, and
+    // a branch held on somebody a metre away must not thin out to nothing. The
+    // rate rises to keep about a third of a second of cone in front of you.
+    const dense = clamp(0.34 / Math.max(tHit, 0.04), 1, 3);
+    const n = Math.max(1, Math.round(60 * dt * dense));
     for (let i = 0; i < n; i++) {
       const s = rng();
       jetSpray.spawn(
@@ -1076,7 +1094,34 @@ async function buildGround(scene, field) {
         dir[0] * GROUND.jetV + (rng() - 0.5) * 2.6,
         dir[1] * GROUND.jetV + (rng() - 0.5) * 2.0,
         dir[2] * GROUND.jetV + (rng() - 0.5) * 2.6,
-        0.22 + s * 0.24, 0.80 + s * 0.45, 0.85,
+        // And scaled down with the range for the same reason the splash is:
+        // a droplet half a metre across is a droplet at twenty metres and a
+        // cloud bank at two.
+        (0.22 + s * 0.24) * clamp(0.30 + reach * 0.13, 0.42, 1),
+        Math.min(0.80 + s * 0.45, tHit * (0.86 + s * 0.30)), 0.85,
+      );
+    }
+
+    // And what comes off it. This is the half that reads as water arriving
+    // somewhere: the cone is thin, fast and over, and the thing you actually
+    // see hanging on a person is the splash. Thrown back into the hemisphere
+    // facing the nozzle, with enough lift to hang there for half a second.
+    //
+    // Small, and that is the whole of the tuning on it. These started at the
+    // cone's own size, which outdoors is nothing and in a hut four metres across
+    // is forty billboards a metre and a half wide with the camera standing
+    // inside them: the room went white. A splash is a fine mist. It is the
+    // number of them that has to read, never the size of one.
+    const nb = Math.max(1, Math.round(20 * dt * dense));
+    for (let i = 0; i < nb; i++) {
+      const s = rng();
+      const back = 1.1 + s * 2.4;
+      jetSpray.spawn(
+        hit.x - dir[0] * 0.09, hit.y - dir[1] * 0.09 + 0.04, hit.z - dir[2] * 0.09,
+        -dir[0] * back + (rng() - 0.5) * 2.8,
+        1.0 + rng() * 2.0,
+        -dir[2] * back + (rng() - 0.5) * 2.8,
+        0.085 + s * 0.13, 0.42 + s * 0.42, 1.3,
       );
     }
   }

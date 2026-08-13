@@ -8,6 +8,115 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.55.0] — 2026-08-13
+
+### Fixed — the jet stops where the water lands
+
+A droplet was spawned with a life and nothing else to end it, so the cone flew
+on through whatever the jet had just soaked. Outdoors that is a wisp carrying
+past a burning drum. Indoors, at a range of two metres, it is the whole spray
+hanging in the air *behind* the person being hit — which is what it looked
+like, because that is what it was.
+
+The pool's drag is exponential, so the distance covered by time *t* is
+(v/k)(1 − e^(−kt)); each droplet's life is now that, inverted, against the
+distance the trace already reported. Short range also raises the spawn rate, so
+a branch held on somebody a metre away does not thin out to six droplets, and
+scales the droplets down, because half a metre across is a droplet at twenty
+metres and a cloud bank at two.
+
+And the other half of it: a splash, thrown back off the surface into the
+hemisphere facing the nozzle. That is the part that reads as water arriving
+somewhere — the cone is thin, fast and over, and what you actually see hanging
+on a person is what came off them. It is a fine mist and there are a lot of it;
+sized like the cone instead, forty billboards a metre and a half wide turned a
+hut four metres across completely white.
+
+### Added — she takes it in the face
+
+On her knees indoors with the branch still on her, her chin comes up and her
+mouth opens. Both ride the same half-second of grace the jet refreshes, so it
+lasts exactly as long as you keep the water there and lets go the moment you
+stop — no phase, no timer, no second clip.
+
+The open mouth is built the way the smile and the blink are, which is to say
+without a bone: the jaw is displaced below the lip line in the bind pose, and
+the inside of the mouth is painted onto the skin *before* the drop stretches it
+over the opening, so the gap arrives already dark. The anchors are measured off
+the mesh at load like the rest of the face.
+
+The chin is one extra rotation laid over whatever clip is playing, in figure
+space rather than in the bone's own frame — figure space is knowable (+x is the
+way she faces, +y is up) and a bone's own axes are a fact about how the rig was
+built in Blender that nothing shipped in the blob can answer. The paper trail on
+the kneeling arms is what asking that question three times looks like.
+
+### Added — the dog comes in too
+
+He follows you through the door, walks round the end of the cot, jumps up onto
+it and sits there. Walk out and he gets down and goes back to his stretch of
+deck. Same test the performance uses, because it is the same door, and derived
+from where you are every frame rather than fired on a threshold — walking out of
+a hut is exactly the sort of thing that happens between two frames.
+
+Three marks on the way in, for the reason hers has three: a straight line from
+the deck to the cot goes through a metre and a half of hut. The jump is an arc
+with an overshoot rather than a ramp, because something that eases straight to
+the final height is a lift.
+
+The sit is not a clip. `tools/blender/dog.py` bakes idle, trot and shake and
+still does: a sit is a body pitched nose-up about the hips with the hind legs
+swung forward under it, which is three rotations laid over whatever is playing.
+His hindquarters end up below the tick and stay there, which is exactly why this
+works on a mattress and would not on a floor — a bed hides the half of a sit
+that is hardest to fake.
+
+### Added — one extra rotation on one bone, in figure space
+
+`skinnedFigure` grew an `aim(name, ax, ay, az, angle)`: a rotation applied to a
+bone after the clip and before its children, about the bone's own head. Both of
+the things above use it and neither could have been done with a clip.
+
+Figure space rather than the bone's own frame, and that is the whole point of
+it. A bone-local rotation needs to know which way that bone's axes happen to
+point, which is a fact about how a rig was built in Blender — or, for the dog,
+about how a glTF was authored by somebody else — and is not recoverable from
+anything in the shipped blob. Figure space is knowable: +x is the way they face
+and +y is up. So "chin up" and "nose up" are turns about z and there is nothing
+to measure.
+
+### Changed — the ankle dolphins are hers, not the room's
+
+They arrived with the dropped wrap, on the argument that they were something the
+kabina revealed. That was wrong. A tattoo is not a costume change: it was on her
+when she walked down here this morning, and ink you can only see in one room is
+a prop. She has them from the first frame she exists.
+
+### Changed — the trees have a close-up model
+
+The whole landscape was one model per species, and that model had to be cheap
+enough to draw thirty-four thousand times — so it had to be cheap at 2 km, so it
+was the same lofted lampshade at two metres. A pine you walk past on the way to
+a fire is not the same problem as a pine on a hillside in the haze, and it was
+being solved as though it were.
+
+There are two now, and a distance: inside 300 m a tree is a bowed leaning trunk
+with limbs leaving it and a canopy of three to five separate clumps, and it is
+the sky between the clumps that does the work. The olive's trunk splits, which
+is the whole reason an olive reads as an olive from underneath. The maquis is
+four lobes pushed apart and roughened hard, because three concentric blobs on
+open karst at ten metres reads as a boulder.
+
+Measured on the hillside above Jadrija: 1 561 of 45 965 instances are inside the
+ring, and the close-up models cost about 65 000 triangles on top of 2.5 million.
+The swap happens where a 10 m tree is fifteen pixels tall.
+
+One trap, recorded because it cost a round of screenshots: an instance is scaled
+(w, h, w) and for a pine that is about (1.9, 10, 1.9), so a clump built round in
+the prototype arrives in the world as a five-metre lozenge. The vertical radii
+in `vegNearPrototypes` look absurd next to the horizontal ones and they are
+correct.
+
 ## [1.54.0] — 2026-08-12
 
 Tooling only. The game is byte-for-byte what 1.53.0 shipped apart from the
