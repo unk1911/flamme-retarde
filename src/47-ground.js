@@ -1112,16 +1112,36 @@ async function buildGround(scene, field) {
     // is forty billboards a metre and a half wide with the camera standing
     // inside them: the room went white. A splash is a fine mist. It is the
     // number of them that has to read, never the size of one.
-    const nb = Math.max(1, Math.round(20 * dt * dense));
+    //
+    // And it gets out of the way when you are on top of it. `dense` above is
+    // deliberately *raised* at close range, because the cone is the jet and a
+    // jet that thins out at arm's length has stopped being one — but the splash
+    // is not the jet, it is what the jet is doing to somebody, and the whole
+    // point of standing this close is to watch that happen to their face. At a
+    // metre a 15 cm puff covers seventeen degrees of frame and sixty a second
+    // of them are a fog bank with the subject inside it: the effect erases the
+    // thing it is an effect *about*.
+    //
+    // Physically that is also what being here is. The cloud you see hanging on
+    // a person is seen from outside it; step into it and there is no wall in
+    // front of you, because you are the far side of the same wall. So the count
+    // and the size both come down as the range does, and the throw goes with
+    // them — a metre away the water is not bouncing back at you, it is running
+    // off a chin onto a collarbone, and that belongs to the shader on her skin
+    // and not to forty billboards in front of it.
+    const near = clamp((reach - 0.55) / 1.45, 0, 1);
+    const nb = Math.max(1, Math.round(20 * dt * dense * (0.16 + 0.84 * near)));
     for (let i = 0; i < nb; i++) {
       const s = rng();
-      const back = 1.1 + s * 2.4;
+      const back = (1.1 + s * 2.4) * (0.30 + 0.70 * near);
       jetSpray.spawn(
         hit.x - dir[0] * 0.09, hit.y - dir[1] * 0.09 + 0.04, hit.z - dir[2] * 0.09,
-        -dir[0] * back + (rng() - 0.5) * 2.8,
-        1.0 + rng() * 2.0,
-        -dir[2] * back + (rng() - 0.5) * 2.8,
-        0.085 + s * 0.13, 0.42 + s * 0.42, 1.3,
+        -dir[0] * back + (rng() - 0.5) * 2.8 * (0.34 + 0.66 * near),
+        // Up and over at range; at a hand's breadth it falls, which is the one
+        // direction water off a person reliably goes.
+        (1.0 + rng() * 2.0) * near - 0.55 * (1 - near),
+        -dir[2] * back + (rng() - 0.5) * 2.8 * (0.34 + 0.66 * near),
+        (0.085 + s * 0.13) * (0.40 + 0.60 * near), 0.42 + s * 0.42, 1.3,
       );
     }
   }

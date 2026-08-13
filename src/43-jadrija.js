@@ -588,6 +588,11 @@ async function buildJadrija(scene) {
   // this promenade with nothing on it: every other face in the resort is either
   // a door, a vent or the back of a hut in an alley nobody walks down.
   let gable = null;
+  // And the one at the other end of the same run, which the sign argument above
+  // gave up on and the gull gets: a mural is not a thing you walk towards to
+  // read, it is a thing you notice as you come round the corner of the block,
+  // and the near end is the corner you come round.
+  let nearGable = null;
 
   const runs = [];        // for the blockers, later
   /**
@@ -892,6 +897,12 @@ async function buildJadrija(scene) {
     // far one is the wall you are looking at while you walk the row towards it.
     if (sk >= 0) {
       gable = { t: T1 + 0.05, front, back, floor: y0 + JAD.plinth, eave };
+      // And the near one, which is the same wall at the other end of the same
+      // run and is the only other blank face on this promenade. It faces the
+      // other way down t, which is the whole of the difference: `o` is −1 here
+      // where it is +1 there, and everything hung on it needs the same sign.
+      nearGable = { t: T0 - 0.05, o: -1, front, back,
+        floor: y0 + JAD.plinth, eave };
     }
 
     // The run is one blocker, except where a door was cut in it: then it is the
@@ -1278,6 +1289,307 @@ async function buildJadrija(scene) {
   if (special) special.sign = neonSign(special);
 
   /**
+   * A yellow-legged gull, painted on a wall.
+   *
+   * The one on the real block is a fresco and not a poster, and every choice
+   * here follows from that. It is drawn on transparent ground rather than on a
+   * rectangle of its own colour, so what shows between the feathers is the
+   * render itself with the render's own light on it — a mural does not have a
+   * background, it has a wall. The blue behind the bird is a wash and not a
+   * panel: soft-edged, off-centre, and nowhere near the edges of the texture,
+   * because the moment it has a straight side it is a sign somebody bolted up.
+   *
+   * And it is painted badly on purpose. The strokes are laid down in two passes
+   * with the second offset and thinned, the whites are four different whites,
+   * and a scatter of the wall's own colour is dabbed back over the top at the
+   * end — which is what a fresco on lime render looks like after ten summers,
+   * and is the difference between this and clip art.
+   */
+  function gullMural() {
+    const W = 1024, H = 592;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+
+    // Rolled off a fixed table rather than Math.random, so the wall is the same
+    // wall every time the page loads. Everything else in this file that draws
+    // to a canvas is deterministic and this is not the one to break it in.
+    let seed = 20240806;
+    const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff)
+      / 0x7fffffff;
+
+    // ── the sky behind it ──────────────────────────────────────────────
+    // An ellipse of thin blue, sat high and left of the bird the way a
+    // brushful of wash lands when somebody is painting the sky in after the
+    // gull rather than before it — which, from the way it runs out under the
+    // near wingtip on the real one, is what happened.
+    g.save();
+    // Thin, and that is the correction and not the first guess. At 0.62 in the
+    // middle it came out a grey-blue oval a metre across with a bird sitting on
+    // it — a bruise on the wall, and the eye reads it as a stain long before it
+    // reads it as sky. A wash is a wash: you should have to be told it is there.
+    g.translate(W * 0.50, H * 0.40);
+    g.scale(1.16, 0.60);
+    const sky = g.createRadialGradient(-18, -10, 30, 0, 0, W * 0.46);
+    sky.addColorStop(0.00, 'rgba(156,180,196,0.34)');
+    sky.addColorStop(0.48, 'rgba(162,184,198,0.24)');
+    sky.addColorStop(0.80, 'rgba(168,188,200,0.10)');
+    sky.addColorStop(1.00, 'rgba(170,190,202,0)');
+    g.fillStyle = sky;
+    g.beginPath(); g.arc(0, 0, W * 0.46, 0, Math.PI * 2); g.fill();
+    g.restore();
+
+    const PALE = '#f2efe6';      // the bird, which is not white but limewash
+    const LIT = '#fbf9f3';       // and the top of a wing, which nearly is
+    const SHADE = '#c4c3bd';     // the underside, in the grey the render goes
+    const DEEP = '#9d9c96';
+    const DARK = '#37373a';      // the primaries
+    const SOOT = '#5a5a5e';
+    const YELL = '#cfa832';      // beak and feet
+    const shY = H * 0.44;        // where the wings leave the body
+
+    /**
+     * One wing. `d` is −1 for the far one and +1 for the near, and the whole
+     * thing is drawn in the mirror so the two are the same wing twice — which
+     * they are on the wall, near enough, and the tilt below is what stops that
+     * reading as a stencil.
+     */
+    function wing(d) {
+      g.save();
+      g.translate(W * 0.5, shY);
+      g.scale(d, 1);
+
+      // The membrane: out along the leading edge, round the wrist, and back
+      // along the trailing one. The tip finishes above the shoulder, because a
+      // gull holding a glide has its wings bowed up and this is the only line
+      // in the drawing that says so.
+      //
+      // Broad, and held broad most of the way out. The first pass tapered from
+      // the shoulder and what it drew was a blade — a gull's wing is deep at
+      // the arm and stays deep to the wrist, and only then goes to fingers.
+      // Half the width of the reference bird is in that flat middle section.
+      g.beginPath();
+      g.moveTo(-12, -46);
+      g.bezierCurveTo(-142, -94, -280, -98, -374, -62);
+      g.bezierCurveTo(-394, -52, -396, -26, -372, -18);
+      g.bezierCurveTo(-262, 28, -136, 58, -18, 50);
+      g.closePath();
+      g.fillStyle = PALE; g.fill();
+
+      // Grey along the underside of it, thrown from the trailing edge upward,
+      // which is where the light is not.
+      const uw = g.createLinearGradient(0, -62, 0, 56);
+      uw.addColorStop(0, 'rgba(255,255,255,0)');
+      uw.addColorStop(0.55, 'rgba(180,179,173,0.30)');
+      uw.addColorStop(1, 'rgba(150,149,143,0.70)');
+      g.fillStyle = uw; g.fill();
+
+      // The secondaries, as strokes across the trailing half rather than as
+      // shapes: a feather drawn as an outline is a leaf, and twenty of them is
+      // a fern. What reads as plumage is the *ends* of them, so only the ends
+      // are drawn.
+      g.lineCap = 'round';
+      for (let i = 0; i < 17; i++) {
+        const u = i / 16;
+        const x = -60 - u * 296;
+        const y0 = -22 - u * 28, y1 = 46 - u * 40;
+        g.beginPath();
+        g.moveTo(x, y1);
+        g.quadraticCurveTo(x + 14, (y0 + y1) * 0.5, x + 8, y0 + 12);
+        g.strokeStyle = i % 2 ? 'rgba(120,119,114,0.34)'
+          : 'rgba(146,145,140,0.22)';
+        g.lineWidth = 2.4 + rnd() * 1.6;
+        g.stroke();
+      }
+
+      // And the primaries, which are the black fingers and are most of what a
+      // gull is from below. Fanned back off the wrist, longest inboard, each
+      // one a lens rather than a stripe — a primary is wide at the base and
+      // comes to a point, and drawn as a stripe it reads as a comb.
+      // They also have to be *long*. At 128 px they were a black smudge on the
+      // end of each wing; the fingers on the wall are a good third of the span
+      // and the gaps between them are what tell you the bird is gliding.
+      for (let i = 0; i < 6; i++) {
+        const u = i / 5;
+        const len = 176 - u * 60;
+        const wd = 15.0 - u * 4.0;
+        g.save();
+        g.translate(-336 + u * 42, -50 + u * 58);
+        g.rotate(-0.34 + u * 0.86);
+        g.beginPath();
+        g.moveTo(0, 0);
+        g.quadraticCurveTo(-len * 0.55, -wd, -len, -1.5);
+        g.quadraticCurveTo(-len * 0.55, wd, 0, 0);
+        g.closePath();
+        g.fillStyle = i < 4 ? DARK : SOOT; g.fill();
+        g.restore();
+      }
+
+      // A dry-brush highlight along the leading edge, which is the only part of
+      // a wing seen from underneath that catches anything.
+      g.beginPath();
+      g.moveTo(-16, -44);
+      g.bezierCurveTo(-142, -90, -274, -94, -366, -60);
+      g.strokeStyle = 'rgba(252,250,244,0.85)';
+      g.lineWidth = 8; g.stroke();
+      g.restore();
+    }
+
+    // The far wing first, then the body, then the near one over the top of it,
+    // which is the whole of the depth in the picture.
+    g.save();
+    g.translate(W * 0.5, shY); g.rotate(-0.055); g.translate(-W * 0.5, -shY);
+    wing(-1);
+    g.restore();
+
+    // ── the tail and the feet ──────────────────────────────────────────
+    g.save();
+    g.translate(W * 0.5, shY);
+    g.beginPath();
+    g.moveTo(-30, 30);
+    g.bezierCurveTo(-46, 96, -40, 140, -20, 158);
+    g.bezierCurveTo(0, 168, 20, 168, 40, 156);
+    g.bezierCurveTo(58, 138, 62, 96, 44, 30);
+    g.closePath();
+    g.fillStyle = PALE; g.fill();
+    // Dark along the very end of it, and ragged, because the last centimetre of
+    // a gull's tail is where the fresco has worn as well as where the bird is
+    // dark, and the two are indistinguishable at this range.
+    // Only the last inch of it, and as separate feathers with render showing
+    // between them. Twenty-one pixels of half-height ran them into each other
+    // and the tail came out a solid black paddle with two yellow lines drawn on
+    // top of it — the tail on the wall is white with a dark fringe, and the
+    // fringe is fringe because you can see through it.
+    for (let i = 0; i < 7; i++) {
+      const u = i / 6, x = -20 + u * 60;
+      g.beginPath();
+      g.ellipse(x, 152 - Math.abs(u - 0.5) * 30, 7.5, 15, (u - 0.5) * 0.6,
+        0, Math.PI * 2);
+      g.fillStyle = i % 2 ? DARK : SOOT; g.fill();
+    }
+    g.restore();
+
+    // ── the body ───────────────────────────────────────────────────────
+    g.save();
+    g.translate(W * 0.5, shY);
+    g.beginPath();
+    g.moveTo(0, -128);
+    g.bezierCurveTo(38, -110, 54, -40, 50, 34);
+    g.bezierCurveTo(46, 76, 28, 98, 4, 100);
+    g.bezierCurveTo(-24, 98, -42, 74, -46, 32);
+    g.bezierCurveTo(-50, -40, -34, -110, 0, -128);
+    g.closePath();
+    g.fillStyle = LIT; g.fill();
+    // Down the near side of it, so the breast is round rather than a paddle.
+    const bs = g.createLinearGradient(-46, 0, 54, 0);
+    bs.addColorStop(0, 'rgba(150,149,143,0.42)');
+    bs.addColorStop(0.42, 'rgba(255,255,255,0)');
+    bs.addColorStop(0.86, 'rgba(163,162,156,0.36)');
+    g.fillStyle = bs; g.fill();
+
+    // The head, on a neck that is barely a neck: it is one line from the
+    // shoulder to the crown on a gliding gull and drawing a neck on it is what
+    // makes a painted bird look like a goose.
+    g.beginPath();
+    g.ellipse(6, -148, 34, 38, 0.10, 0, Math.PI * 2);
+    g.fillStyle = LIT; g.fill();
+    // Beak, up and out — the real one has its head turned across the wall and
+    // that turn is most of why the thing looks alive rather than pinned.
+    g.beginPath();
+    g.moveTo(30, -166);
+    g.quadraticCurveTo(74, -186, 96, -196);
+    g.quadraticCurveTo(76, -170, 34, -152);
+    g.closePath();
+    g.fillStyle = YELL; g.fill();
+    g.beginPath();
+    g.moveTo(32, -160);
+    g.quadraticCurveTo(66, -178, 92, -193);
+    g.strokeStyle = 'rgba(120,96,26,0.55)'; g.lineWidth = 2; g.stroke();
+    // And the eye, which is four pixels of a two-metre wall and is the
+    // difference between a bird and a shape.
+    g.beginPath(); g.arc(23, -160, 5.2, 0, Math.PI * 2);
+    g.fillStyle = '#2c2c2e'; g.fill();
+    g.restore();
+
+    // The feet, after the body and the tail so they hang in front of both.
+    // Tucked but not stowed, and clear of the tail's fringe: on the wall they
+    // dangle past it, which is what says the bird is coming down onto something
+    // rather than crossing over it.
+    g.save();
+    g.translate(W * 0.5, shY);
+    g.lineCap = 'round';
+    for (const o of [-1, 1]) {
+      g.beginPath();
+      g.moveTo(o * 12, 92);
+      g.quadraticCurveTo(o * 18, 138, o * 16, 176);
+      g.strokeStyle = YELL; g.lineWidth = 12; g.stroke();
+      g.beginPath();
+      g.moveTo(o * 12, 96);
+      g.quadraticCurveTo(o * 17, 134, o * 15, 168);
+      g.strokeStyle = 'rgba(232,206,120,0.65)'; g.lineWidth = 4; g.stroke();
+    }
+    g.restore();
+
+    // The near wing last, tilted the other way.
+    g.save();
+    g.translate(W * 0.5, shY); g.rotate(0.030); g.translate(-W * 0.5, -shY);
+    wing(1);
+    g.restore();
+
+    // ── ten summers ────────────────────────────────────────────────────
+    // Lime render is not a canvas: it is a coarse, sucking surface that takes
+    // the brush unevenly and then loses it in patches. Two hundred dabs of the
+    // wall's own cream, thrown at the bird and nothing else, and the paint
+    // stops being a decal.
+    g.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 260; i++) {
+      const x = W * 0.5 + (rnd() - 0.5) * W * 0.86;
+      const y = H * 0.44 + (rnd() - 0.5) * H * 0.78;
+      g.beginPath();
+      g.ellipse(x, y, 2 + rnd() * 9, 2 + rnd() * 6, rnd() * 3.1, 0,
+        Math.PI * 2);
+      g.fillStyle = `rgba(0,0,0,${0.10 + rnd() * 0.26})`;
+      g.fill();
+    }
+    g.globalCompositeOperation = 'source-over';
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.anisotropy = 8;
+    return tex;
+  }
+
+  /**
+   * And hanging it: a quad six millimetres off the render, lit like everything
+   * else and transparent everywhere the brush did not go.
+   *
+   * Six millimetres is not a frame, it is z-fighting clearance. The mural has
+   * no thickness and wants none — the moment it stands proud enough to cast an
+   * edge it is a board, and the whole point of the thing is that it is paint.
+   */
+  function endMural(gb) {
+    const sc = (gb.front + gb.back) * 0.5;
+    const mw = 1.90, mh = mw * 592 / 1024;
+    const yc = gb.floor + 1.46;
+    const st = at(gb.t);
+    const p = W(gb.t + 0.006 * gb.o, sc, yc);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(mw, mh),
+      solidMaterial(0xffffff, {
+        spec: 0.02, vcol: false, transparent: true, depthWrite: false,
+        decl: 'uniform sampler2D uMuralMap;',
+        body: 'vec4 mu = texture2D(uMuralMap, vUv);\nbase = mu.rgb;\nalpha = mu.a;',
+        uniforms: { uMuralMap: { value: gullMural() } },
+      }));
+    mesh.position.set(p[0], p[1], p[2]);
+    // This end faces back down t, which the board on the far gable does not —
+    // hence the sign. Get it wrong and the gull is painted on the inside.
+    mesh.rotation.y = Math.atan2(st.ux * gb.o, st.uz * gb.o);
+    scene.add(mesh);
+    return { mesh, at: [gb.t, sc] };
+  }
+
+  /**
    * The tourist board, on the blank end of that run.
    *
    * The map itself is `jadrijaMapTexture` in src/44-board.js, which knows about
@@ -1336,6 +1648,7 @@ async function buildJadrija(scene) {
       houses: panel.houses, lanes: panel.lanes };
   }
   const board = gable ? mapBoard(gable) : null;
+  const mural = nearGable ? endMural(nearGable) : null;
 
   // ── the bead curtain ───────────────────────────────────────────────────────
   //
@@ -5502,6 +5815,14 @@ async function buildJadrija(scene) {
         // the inside of it is a closed mouth with a white line across it.
         f.face.foam = show.gape
           * sat((show.fill - SHOW.froth) / (1 - SHOW.froth));
+        // And what is running down her, which is the third of these and the
+        // only one that is not about her mouth. `wet` is the meter that already
+        // exists — it goes most of the way up on the first squirt and comes
+        // down over a dozen seconds — and the heavy feeds in the shader are
+        // gated on `foam` anyway, so a woman who has been rained on gets a
+        // sheen and threads, and a woman who has been holding her mouth under
+        // the branch for ten seconds gets it coming out of the corners.
+        f.face.wet = show.wet;
       }
       f.aim('head', 0, 0, 1, show.gape * SHOW.chin * (0.86 + 0.20 * show.fill));
     }
@@ -6670,12 +6991,20 @@ async function buildJadrija(scene) {
       if (o.fill != null && show) show.fill = sat(o.fill);
       if (o.gape != null) { u.uGape.value = o.gape; skinFig.face.gape = o.gape; }
       if (o.foam != null) { u.uFoam.value = o.foam; skinFig.face.foam = o.foam; }
+      if (o.wet != null) {
+        u.uWet.value = sat(o.wet); skinFig.face.wet = sat(o.wet);
+        if (show) show.wet = sat(o.wet);
+      }
+      // The crawl, so a still frame can be taken part-way down a rivulet rather
+      // than always at whatever offset a frame a second happens to land on.
+      if (o.run != null) u.uRun.value = o.run;
       const a = skinFig.face.anchors;
       const r3 = (v) => [+v.x.toFixed(4), +v.y.toFixed(4), +v.z.toFixed(4)];
       return {
         blink: +u.uBlink.value.toFixed(3), smile: +u.uSmile.value.toFixed(3),
         ink: +u.uInk.value.toFixed(3), gape: +u.uGape.value.toFixed(3),
         foam: +u.uFoam.value.toFixed(3),
+        wet: +u.uWet.value.toFixed(3), run: +u.uRun.value.toFixed(2),
         fill: show ? +show.fill.toFixed(3) : null,
         lipC: a.lipC ? r3(u.uLipC.value) : null,
         lipW: a.lipC ? +a.lipW.toFixed(4) : null,
@@ -6717,6 +7046,9 @@ async function buildJadrija(scene) {
     step: (secs, cam) => {
       for (let i = 0; i < Math.round(secs * 60); i++) updateCrowd(1 / 60, cam);
     },
+    /** Debug: where the gull ended up, so a camera can be pointed at it. */
+    mural: () => mural && { at: mural.at.map((v) => +v.toFixed(2)),
+      p: mural.mesh.position.toArray().map((v) => +v.toFixed(2)) },
     /** Debug: the tourist board, and what its map found to draw. */
     beads: () => beads && {
       strands: beads.strands, gap: +beads.gap.toFixed(4),

@@ -619,6 +619,50 @@ const FACE = {
   // The opening's own frame does not fix that on its own, because the frame is
   // measured in the bind pose too.
   comb: 2.60,
+
+  // ── the water on her ────────────────────────────────────────────────────
+  //
+  // Measured off the exported blob: the eye sits at y = 1.6232 and the lip
+  // centre at 1.5516, the front of the head runs x = 0.16 at the brow and 0.176
+  // at the nose, and the back of it is at −0.12. So her axis is at about
+  // x = 0.02, which is what the front test is taken around — a plane in x would
+  // wet the temples and the ears at the same rate as the bridge of the nose.
+  //
+  // The band ends 21 cm under the lip line, on the top of the chest. Further
+  // than that is a body and not a face, and a body being hosed does not need
+  // rivulets drawn on it: the sheen is doing that job everywhere at once.
+  runTop: 0.058,                   // m over the eye where the sheet starts
+  runBot: 0.215,                   // and under the lip line where it runs out
+  runAxis: 0.020,                  // her own axis, for deciding what is front
+  // Rivulet spacing, in noise units a metre. Across is thirteen times down on
+  // purpose: that ratio *is* the effect. A field with the same scale on both
+  // axes is a leopard, and no amount of thresholding turns a leopard into
+  // water running downhill — a stream is a feature that is a centimetre wide
+  // and fifteen long, so the coordinate it is sampled in has to be.
+  //
+  // 62 across was the first pass and it was half this: at 1.6 cm a noise unit
+  // the neck is six units wide, the threshold that let the mouth feed through
+  // passed most of them, and what came out was a single white bar four fingers
+  // wide running dead straight from her chin to her sternum. A gloss stripe,
+  // not water. Narrower features and a bar that stays selective are the two
+  // halves of the same fix — what makes a rivulet legible is the dry skin
+  // beside it.
+  runAcross: 95.0,
+  runDown: 7.0,
+  // And they wander, over about a centimetre and a half, on a scale long
+  // enough that a stream leans across the width of a chin rather than
+  // wobbling. Perfectly vertical streams are the other half of why the first
+  // pass read as paint: nothing on a face is a plumb line, least of all the
+  // face — water crosses the jaw and goes round the tendon in the neck.
+  runWander: [9.0, 2.0, 1.7],
+  // And it crawls: 0.42 noise units a second over a scale of 7 to the metre is
+  // six centimetres a second, which is what water on skin does. Fast enough to
+  // be moving while you watch it and slow enough that it is not rain.
+  runSpeed: 0.42,
+  // Aerated water, which is what comes back out of a mouth — half a shade off
+  // the froth already in there, because it is the same froth.
+  runCol: [0.930, 0.900, 0.855],
+
   // The tongues run nearly the length of the upper arm — 21 cm from her elbow
   // to her shoulder — because anything shorter is a black sleeve with a ragged
   // top rather than fire. It is the *gaps* between the tongues that read as
@@ -643,6 +687,8 @@ uniform vec3 uLipR;
 uniform vec3 uLift;
 uniform float uGape;
 uniform float uFoam;
+uniform float uWet;
+uniform float uRun;
 uniform vec3 uLipC;
 uniform vec3 uJawR;
 uniform vec3 uLipsR;
@@ -746,6 +792,92 @@ const FACE_FRAG = /* glsl */ `
       base = mix(base, uLidCol, k * smoothstep(lid - 0.0008, lid + 0.0008, f.y));
       float line = 1.0 - smoothstep(0.0, ${FACE.line}, abs(f.y - lid));
       base = mix(base, uLashCol, k * line * uBlink);
+    }
+
+    // ── the water running off her ────────────────────────────────────────
+    //
+    // Drawn before the mouth and after the eyes, which is the only order that
+    // works: the lips and the hole have to close over the top of it, or a
+    // rivulet crossing the lip line paints itself across her teeth — and the
+    // eyeball has to be cut out of it, or the first thing the water does is
+    // fill her eyes in. That is what the (1.0 - k) is; k is the lid aperture
+    // six lines up.
+    //
+    // The whole figure gets the cheap half of being wet — darker, shinier —
+    // and only the band from the hairline to the collarbone gets streams. Wet
+    // skin is mostly a specular effect: what tells you somebody has been hosed
+    // is not that they are a different colour, it is that they have highlights
+    // where they had none.
+    base *= mix(1.0, 0.93, uWet);
+    spec = mix(spec, 0.46, uWet * 0.6);
+    if (uWet > 0.0) {
+      float rTop = uEye.y + ${FACE.runTop};
+      float rBot = uLipC.y - ${FACE.runBot};
+      float dn = rTop - f.y;
+      if (dn > 0.0 && f.y > rBot) {
+        // The front of her, by the angle about her own axis and not by a plane
+        // in x. The cosine falls off round the curve of the cheek the way the
+        // water does, and the back of her head is 28 cm behind the front of it
+        // in the same coordinate a plane would have had to pick a number in.
+        vec2 rad = vec2(f.x - ${FACE.runAxis}, f.z);
+        float front = smoothstep(0.30, 0.86, rad.x / max(length(rad), 1e-4));
+        // What this column of skin is carrying. A sheet off the whole face,
+        // plus two heavier feeds that only exist once there is a mouthful to
+        // come back out: the corners, and the point of the chin. Both gated
+        // below the lip line, because water does not run up.
+        float below = smoothstep(uLipC.y + 0.004, uLipC.y - 0.012, f.y);
+        float over = below * (uFoam * 0.75 + uGape * 0.30);
+        float supply = 0.44
+          + over * 0.95 * exp(-pow((f.z - uLipsR.z * 0.92) / 0.0105, 2.0))
+          + over * 0.65 * exp(-pow(f.z / 0.0110, 2.0));
+        // In at the hairline and out at the collarbone. What leaves a mouth is
+        // a mouthful and what reaches a chest is a trickle, so the far end is
+        // the long fade and the near one is only there to stop the sheet
+        // beginning on a hard line across her forehead.
+        float amt = clamp(supply * uWet * front
+          * smoothstep(0.0, 0.038, dn) * smoothstep(rBot, rBot + 0.085, f.y),
+          0.0, 1.0) * (1.0 - k);
+
+        // Signed z, deliberately. Everything else on this face is measured in
+        // abs(z) because a face is symmetric and its features are; water is
+        // not, and a mirrored rivulet down both cheeks at once is the one thing
+        // that would give the whole effect away.
+        float wob = vnoise2(vec2(vLocal.z * ${FACE.runWander[0].toFixed(1)},
+          dn * ${FACE.runWander[1].toFixed(1)})) - 0.5;
+        vec2 rn = vec2(vLocal.z * ${FACE.runAcross.toFixed(1)}
+                         + wob * ${FACE.runWander[2].toFixed(1)},
+                       dn * ${FACE.runDown.toFixed(1)} - uRun);
+        float col = 0.62 * vnoise2(rn) + 0.38 * vnoise2(rn * 2.7 + 11.0);
+        // More water is more streams, not one brighter one — so the supply
+        // lowers the bar a column has to clear rather than scaling what it
+        // gets. A face under a branch goes from a couple of threads to running
+        // all over, which is the difference between wet and gushing.
+        //
+        // It stays a bar, though. The first pass dropped it to 0.44 under the
+        // mouth, which on a field whose mean is 0.5 is not a threshold at all —
+        // over half the columns cleared it and they merged into one another.
+        // The range here passes about a third of them at full flow, which is
+        // enough to read as running all over her and still leaves gaps.
+        float lo = 0.80 - 0.24 * amt;
+        float streak = smoothstep(lo, lo + 0.10, col) * min(0.88, amt * 1.7);
+
+        // Barely darker, and that number is a scar. Wet skin *is* darker and
+        // the honest figure is nearer 0.85 — but the sheet is strongest where
+        // the supply is, the supply is gated on (1.0 - k) so it stops dead at
+        // the eyeball, and a soft dark ring that stops dead at the eyeball is
+        // the mascara that took two days to get rid of. Water on a face is a
+        // specular effect first and a tonal one a distant second; the highlight
+        // below is doing the work, and this is only here so the rivulets have
+        // something to sit in.
+        base *= mix(1.0, 0.94, amt);
+        spec = mix(spec, 0.62, amt);
+        base = mix(base, vec3(${FACE.runCol.join(', ')}) * (0.86 + 0.24 * col),
+          streak);
+        // And froth is not a mirror, the same as the froth in her mouth: the
+        // sheet under it is the shiny thing and the stream on top of it is the
+        // matt one, which is backwards until you remember it is full of air.
+        spec = mix(spec, 0.18, streak);
+      }
     }
 
     // Her mouth: a ring of colour and a hole in the middle of it, both measured
@@ -941,6 +1073,8 @@ function skinnedFigure(data, opts = {}) {
     uLift: V(anchors.corner ? FACE.lift : [0, 0, 0]),
     uGape: { value: 0 },
     uFoam: { value: 0 },
+    uWet: { value: 0 },
+    uRun: { value: 0 },
     uLipC: V(anchors.lipC || [0, -99, 0]),
     uJawR: V(FACE.jawR),
     uLipsR: V([FACE.lipsR[0], FACE.lipsR[1], FACE.lipsR[2] * anchors.lipW]),
@@ -1186,6 +1320,7 @@ function skinnedFigure(data, opts = {}) {
     smile: 0,          // what the caller wants, 0..1
     gape: 0,           // and how far her mouth is open
     foam: 0,           // and how much of what went in it is still there
+    wet: 0,            // and how much of it is running down her
     ink: 0,            // and how far the flames have climbed her arms
     dolphin: 0,        // the ankle ink is revealed with the dropped wrap
     rate: 1,           // blinks a second, scaled. Staring is `rate = 0`.
@@ -1212,6 +1347,18 @@ function skinnedFigure(data, opts = {}) {
     // caller's own meter is already the slow part — this only takes the step out
     // of the frame the jet first lands on.
     uFace.uFoam.value = damp(uFace.uFoam.value, sat(face.foam), 3.4, dt);
+    // Water arrives on a face in about a fifth of a second and the caller's own
+    // meter is already the slow half of this, so all this rate has to do is
+    // keep the first frame of a jet landing from being a step.
+    uFace.uWet.value = damp(uFace.uWet.value, sat(face.wet), 5.0, dt);
+    // And it crawls down her while it is there. Wrapped a long way short of the
+    // precision cliff — a float that has been counting since the title screen
+    // cannot resolve a tenth of a noise unit, and the rivulets would quantise
+    // into steps — and only advanced while there is water on her, so a figure
+    // nobody has sprayed is not paying for a moving texture.
+    if (uFace.uWet.value > 0.002) {
+      uFace.uRun.value = (uFace.uRun.value + dt * FACE.runSpeed) % 64;
+    }
     // Slower than the smile on purpose. A smile is a face changing its mind; the
     // ink is a flame front going up an arm, and it wants the second and a bit
     // that the riser under the turn takes.

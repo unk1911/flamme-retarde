@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.58.0">
+<meta name="version" content="1.59.0">
 <meta name="build-date" content="2026-08-13">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -1035,8 +1035,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.58.0, built 2026-08-13">
-    <b>v1.58.0</b><i>·</i><span>2026-08-13</span>
+  <div id="build" title="Flamme Retardé 1.59.0, built 2026-08-13">
+    <b>v1.59.0</b><i>·</i><span>2026-08-13</span>
   </div>
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
@@ -1288,7 +1288,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.58.0", date: "2026-08-13" };</script>
+<script>const BUILD = { v: "1.59.0", date: "2026-08-13" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -7411,6 +7411,50 @@ const FACE = {
   // The opening's own frame does not fix that on its own, because the frame is
   // measured in the bind pose too.
   comb: 2.60,
+
+  // ── the water on her ────────────────────────────────────────────────────
+  //
+  // Measured off the exported blob: the eye sits at y = 1.6232 and the lip
+  // centre at 1.5516, the front of the head runs x = 0.16 at the brow and 0.176
+  // at the nose, and the back of it is at −0.12. So her axis is at about
+  // x = 0.02, which is what the front test is taken around — a plane in x would
+  // wet the temples and the ears at the same rate as the bridge of the nose.
+  //
+  // The band ends 21 cm under the lip line, on the top of the chest. Further
+  // than that is a body and not a face, and a body being hosed does not need
+  // rivulets drawn on it: the sheen is doing that job everywhere at once.
+  runTop: 0.058,                   // m over the eye where the sheet starts
+  runBot: 0.215,                   // and under the lip line where it runs out
+  runAxis: 0.020,                  // her own axis, for deciding what is front
+  // Rivulet spacing, in noise units a metre. Across is thirteen times down on
+  // purpose: that ratio *is* the effect. A field with the same scale on both
+  // axes is a leopard, and no amount of thresholding turns a leopard into
+  // water running downhill — a stream is a feature that is a centimetre wide
+  // and fifteen long, so the coordinate it is sampled in has to be.
+  //
+  // 62 across was the first pass and it was half this: at 1.6 cm a noise unit
+  // the neck is six units wide, the threshold that let the mouth feed through
+  // passed most of them, and what came out was a single white bar four fingers
+  // wide running dead straight from her chin to her sternum. A gloss stripe,
+  // not water. Narrower features and a bar that stays selective are the two
+  // halves of the same fix — what makes a rivulet legible is the dry skin
+  // beside it.
+  runAcross: 95.0,
+  runDown: 7.0,
+  // And they wander, over about a centimetre and a half, on a scale long
+  // enough that a stream leans across the width of a chin rather than
+  // wobbling. Perfectly vertical streams are the other half of why the first
+  // pass read as paint: nothing on a face is a plumb line, least of all the
+  // face — water crosses the jaw and goes round the tendon in the neck.
+  runWander: [9.0, 2.0, 1.7],
+  // And it crawls: 0.42 noise units a second over a scale of 7 to the metre is
+  // six centimetres a second, which is what water on skin does. Fast enough to
+  // be moving while you watch it and slow enough that it is not rain.
+  runSpeed: 0.42,
+  // Aerated water, which is what comes back out of a mouth — half a shade off
+  // the froth already in there, because it is the same froth.
+  runCol: [0.930, 0.900, 0.855],
+
   // The tongues run nearly the length of the upper arm — 21 cm from her elbow
   // to her shoulder — because anything shorter is a black sleeve with a ragged
   // top rather than fire. It is the *gaps* between the tongues that read as
@@ -7435,6 +7479,8 @@ uniform vec3 uLipR;
 uniform vec3 uLift;
 uniform float uGape;
 uniform float uFoam;
+uniform float uWet;
+uniform float uRun;
 uniform vec3 uLipC;
 uniform vec3 uJawR;
 uniform vec3 uLipsR;
@@ -7538,6 +7584,92 @@ const FACE_FRAG = /* glsl */ `
       base = mix(base, uLidCol, k * smoothstep(lid - 0.0008, lid + 0.0008, f.y));
       float line = 1.0 - smoothstep(0.0, ${FACE.line}, abs(f.y - lid));
       base = mix(base, uLashCol, k * line * uBlink);
+    }
+
+    // ── the water running off her ────────────────────────────────────────
+    //
+    // Drawn before the mouth and after the eyes, which is the only order that
+    // works: the lips and the hole have to close over the top of it, or a
+    // rivulet crossing the lip line paints itself across her teeth — and the
+    // eyeball has to be cut out of it, or the first thing the water does is
+    // fill her eyes in. That is what the (1.0 - k) is; k is the lid aperture
+    // six lines up.
+    //
+    // The whole figure gets the cheap half of being wet — darker, shinier —
+    // and only the band from the hairline to the collarbone gets streams. Wet
+    // skin is mostly a specular effect: what tells you somebody has been hosed
+    // is not that they are a different colour, it is that they have highlights
+    // where they had none.
+    base *= mix(1.0, 0.93, uWet);
+    spec = mix(spec, 0.46, uWet * 0.6);
+    if (uWet > 0.0) {
+      float rTop = uEye.y + ${FACE.runTop};
+      float rBot = uLipC.y - ${FACE.runBot};
+      float dn = rTop - f.y;
+      if (dn > 0.0 && f.y > rBot) {
+        // The front of her, by the angle about her own axis and not by a plane
+        // in x. The cosine falls off round the curve of the cheek the way the
+        // water does, and the back of her head is 28 cm behind the front of it
+        // in the same coordinate a plane would have had to pick a number in.
+        vec2 rad = vec2(f.x - ${FACE.runAxis}, f.z);
+        float front = smoothstep(0.30, 0.86, rad.x / max(length(rad), 1e-4));
+        // What this column of skin is carrying. A sheet off the whole face,
+        // plus two heavier feeds that only exist once there is a mouthful to
+        // come back out: the corners, and the point of the chin. Both gated
+        // below the lip line, because water does not run up.
+        float below = smoothstep(uLipC.y + 0.004, uLipC.y - 0.012, f.y);
+        float over = below * (uFoam * 0.75 + uGape * 0.30);
+        float supply = 0.44
+          + over * 0.95 * exp(-pow((f.z - uLipsR.z * 0.92) / 0.0105, 2.0))
+          + over * 0.65 * exp(-pow(f.z / 0.0110, 2.0));
+        // In at the hairline and out at the collarbone. What leaves a mouth is
+        // a mouthful and what reaches a chest is a trickle, so the far end is
+        // the long fade and the near one is only there to stop the sheet
+        // beginning on a hard line across her forehead.
+        float amt = clamp(supply * uWet * front
+          * smoothstep(0.0, 0.038, dn) * smoothstep(rBot, rBot + 0.085, f.y),
+          0.0, 1.0) * (1.0 - k);
+
+        // Signed z, deliberately. Everything else on this face is measured in
+        // abs(z) because a face is symmetric and its features are; water is
+        // not, and a mirrored rivulet down both cheeks at once is the one thing
+        // that would give the whole effect away.
+        float wob = vnoise2(vec2(vLocal.z * ${FACE.runWander[0].toFixed(1)},
+          dn * ${FACE.runWander[1].toFixed(1)})) - 0.5;
+        vec2 rn = vec2(vLocal.z * ${FACE.runAcross.toFixed(1)}
+                         + wob * ${FACE.runWander[2].toFixed(1)},
+                       dn * ${FACE.runDown.toFixed(1)} - uRun);
+        float col = 0.62 * vnoise2(rn) + 0.38 * vnoise2(rn * 2.7 + 11.0);
+        // More water is more streams, not one brighter one — so the supply
+        // lowers the bar a column has to clear rather than scaling what it
+        // gets. A face under a branch goes from a couple of threads to running
+        // all over, which is the difference between wet and gushing.
+        //
+        // It stays a bar, though. The first pass dropped it to 0.44 under the
+        // mouth, which on a field whose mean is 0.5 is not a threshold at all —
+        // over half the columns cleared it and they merged into one another.
+        // The range here passes about a third of them at full flow, which is
+        // enough to read as running all over her and still leaves gaps.
+        float lo = 0.80 - 0.24 * amt;
+        float streak = smoothstep(lo, lo + 0.10, col) * min(0.88, amt * 1.7);
+
+        // Barely darker, and that number is a scar. Wet skin *is* darker and
+        // the honest figure is nearer 0.85 — but the sheet is strongest where
+        // the supply is, the supply is gated on (1.0 - k) so it stops dead at
+        // the eyeball, and a soft dark ring that stops dead at the eyeball is
+        // the mascara that took two days to get rid of. Water on a face is a
+        // specular effect first and a tonal one a distant second; the highlight
+        // below is doing the work, and this is only here so the rivulets have
+        // something to sit in.
+        base *= mix(1.0, 0.94, amt);
+        spec = mix(spec, 0.62, amt);
+        base = mix(base, vec3(${FACE.runCol.join(', ')}) * (0.86 + 0.24 * col),
+          streak);
+        // And froth is not a mirror, the same as the froth in her mouth: the
+        // sheet under it is the shiny thing and the stream on top of it is the
+        // matt one, which is backwards until you remember it is full of air.
+        spec = mix(spec, 0.18, streak);
+      }
     }
 
     // Her mouth: a ring of colour and a hole in the middle of it, both measured
@@ -7733,6 +7865,8 @@ function skinnedFigure(data, opts = {}) {
     uLift: V(anchors.corner ? FACE.lift : [0, 0, 0]),
     uGape: { value: 0 },
     uFoam: { value: 0 },
+    uWet: { value: 0 },
+    uRun: { value: 0 },
     uLipC: V(anchors.lipC || [0, -99, 0]),
     uJawR: V(FACE.jawR),
     uLipsR: V([FACE.lipsR[0], FACE.lipsR[1], FACE.lipsR[2] * anchors.lipW]),
@@ -7978,6 +8112,7 @@ function skinnedFigure(data, opts = {}) {
     smile: 0,          // what the caller wants, 0..1
     gape: 0,           // and how far her mouth is open
     foam: 0,           // and how much of what went in it is still there
+    wet: 0,            // and how much of it is running down her
     ink: 0,            // and how far the flames have climbed her arms
     dolphin: 0,        // the ankle ink is revealed with the dropped wrap
     rate: 1,           // blinks a second, scaled. Staring is `rate = 0`.
@@ -8004,6 +8139,18 @@ function skinnedFigure(data, opts = {}) {
     // caller's own meter is already the slow part — this only takes the step out
     // of the frame the jet first lands on.
     uFace.uFoam.value = damp(uFace.uFoam.value, sat(face.foam), 3.4, dt);
+    // Water arrives on a face in about a fifth of a second and the caller's own
+    // meter is already the slow half of this, so all this rate has to do is
+    // keep the first frame of a jet landing from being a step.
+    uFace.uWet.value = damp(uFace.uWet.value, sat(face.wet), 5.0, dt);
+    // And it crawls down her while it is there. Wrapped a long way short of the
+    // precision cliff — a float that has been counting since the title screen
+    // cannot resolve a tenth of a noise unit, and the rivulets would quantise
+    // into steps — and only advanced while there is water on her, so a figure
+    // nobody has sprayed is not paying for a moving texture.
+    if (uFace.uWet.value > 0.002) {
+      uFace.uRun.value = (uFace.uRun.value + dt * FACE.runSpeed) % 64;
+    }
     // Slower than the smile on purpose. A smile is a face changing its mind; the
     // ink is a flame front going up an arm, and it wants the second and a bit
     // that the riser under the turn takes.
@@ -9061,6 +9208,11 @@ async function buildJadrija(scene) {
   // this promenade with nothing on it: every other face in the resort is either
   // a door, a vent or the back of a hut in an alley nobody walks down.
   let gable = null;
+  // And the one at the other end of the same run, which the sign argument above
+  // gave up on and the gull gets: a mural is not a thing you walk towards to
+  // read, it is a thing you notice as you come round the corner of the block,
+  // and the near end is the corner you come round.
+  let nearGable = null;
 
   const runs = [];        // for the blockers, later
   /**
@@ -9365,6 +9517,12 @@ async function buildJadrija(scene) {
     // far one is the wall you are looking at while you walk the row towards it.
     if (sk >= 0) {
       gable = { t: T1 + 0.05, front, back, floor: y0 + JAD.plinth, eave };
+      // And the near one, which is the same wall at the other end of the same
+      // run and is the only other blank face on this promenade. It faces the
+      // other way down t, which is the whole of the difference: `o` is −1 here
+      // where it is +1 there, and everything hung on it needs the same sign.
+      nearGable = { t: T0 - 0.05, o: -1, front, back,
+        floor: y0 + JAD.plinth, eave };
     }
 
     // The run is one blocker, except where a door was cut in it: then it is the
@@ -9751,6 +9909,307 @@ async function buildJadrija(scene) {
   if (special) special.sign = neonSign(special);
 
   /**
+   * A yellow-legged gull, painted on a wall.
+   *
+   * The one on the real block is a fresco and not a poster, and every choice
+   * here follows from that. It is drawn on transparent ground rather than on a
+   * rectangle of its own colour, so what shows between the feathers is the
+   * render itself with the render's own light on it — a mural does not have a
+   * background, it has a wall. The blue behind the bird is a wash and not a
+   * panel: soft-edged, off-centre, and nowhere near the edges of the texture,
+   * because the moment it has a straight side it is a sign somebody bolted up.
+   *
+   * And it is painted badly on purpose. The strokes are laid down in two passes
+   * with the second offset and thinned, the whites are four different whites,
+   * and a scatter of the wall's own colour is dabbed back over the top at the
+   * end — which is what a fresco on lime render looks like after ten summers,
+   * and is the difference between this and clip art.
+   */
+  function gullMural() {
+    const W = 1024, H = 592;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+
+    // Rolled off a fixed table rather than Math.random, so the wall is the same
+    // wall every time the page loads. Everything else in this file that draws
+    // to a canvas is deterministic and this is not the one to break it in.
+    let seed = 20240806;
+    const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff)
+      / 0x7fffffff;
+
+    // ── the sky behind it ──────────────────────────────────────────────
+    // An ellipse of thin blue, sat high and left of the bird the way a
+    // brushful of wash lands when somebody is painting the sky in after the
+    // gull rather than before it — which, from the way it runs out under the
+    // near wingtip on the real one, is what happened.
+    g.save();
+    // Thin, and that is the correction and not the first guess. At 0.62 in the
+    // middle it came out a grey-blue oval a metre across with a bird sitting on
+    // it — a bruise on the wall, and the eye reads it as a stain long before it
+    // reads it as sky. A wash is a wash: you should have to be told it is there.
+    g.translate(W * 0.50, H * 0.40);
+    g.scale(1.16, 0.60);
+    const sky = g.createRadialGradient(-18, -10, 30, 0, 0, W * 0.46);
+    sky.addColorStop(0.00, 'rgba(156,180,196,0.34)');
+    sky.addColorStop(0.48, 'rgba(162,184,198,0.24)');
+    sky.addColorStop(0.80, 'rgba(168,188,200,0.10)');
+    sky.addColorStop(1.00, 'rgba(170,190,202,0)');
+    g.fillStyle = sky;
+    g.beginPath(); g.arc(0, 0, W * 0.46, 0, Math.PI * 2); g.fill();
+    g.restore();
+
+    const PALE = '#f2efe6';      // the bird, which is not white but limewash
+    const LIT = '#fbf9f3';       // and the top of a wing, which nearly is
+    const SHADE = '#c4c3bd';     // the underside, in the grey the render goes
+    const DEEP = '#9d9c96';
+    const DARK = '#37373a';      // the primaries
+    const SOOT = '#5a5a5e';
+    const YELL = '#cfa832';      // beak and feet
+    const shY = H * 0.44;        // where the wings leave the body
+
+    /**
+     * One wing. `d` is −1 for the far one and +1 for the near, and the whole
+     * thing is drawn in the mirror so the two are the same wing twice — which
+     * they are on the wall, near enough, and the tilt below is what stops that
+     * reading as a stencil.
+     */
+    function wing(d) {
+      g.save();
+      g.translate(W * 0.5, shY);
+      g.scale(d, 1);
+
+      // The membrane: out along the leading edge, round the wrist, and back
+      // along the trailing one. The tip finishes above the shoulder, because a
+      // gull holding a glide has its wings bowed up and this is the only line
+      // in the drawing that says so.
+      //
+      // Broad, and held broad most of the way out. The first pass tapered from
+      // the shoulder and what it drew was a blade — a gull's wing is deep at
+      // the arm and stays deep to the wrist, and only then goes to fingers.
+      // Half the width of the reference bird is in that flat middle section.
+      g.beginPath();
+      g.moveTo(-12, -46);
+      g.bezierCurveTo(-142, -94, -280, -98, -374, -62);
+      g.bezierCurveTo(-394, -52, -396, -26, -372, -18);
+      g.bezierCurveTo(-262, 28, -136, 58, -18, 50);
+      g.closePath();
+      g.fillStyle = PALE; g.fill();
+
+      // Grey along the underside of it, thrown from the trailing edge upward,
+      // which is where the light is not.
+      const uw = g.createLinearGradient(0, -62, 0, 56);
+      uw.addColorStop(0, 'rgba(255,255,255,0)');
+      uw.addColorStop(0.55, 'rgba(180,179,173,0.30)');
+      uw.addColorStop(1, 'rgba(150,149,143,0.70)');
+      g.fillStyle = uw; g.fill();
+
+      // The secondaries, as strokes across the trailing half rather than as
+      // shapes: a feather drawn as an outline is a leaf, and twenty of them is
+      // a fern. What reads as plumage is the *ends* of them, so only the ends
+      // are drawn.
+      g.lineCap = 'round';
+      for (let i = 0; i < 17; i++) {
+        const u = i / 16;
+        const x = -60 - u * 296;
+        const y0 = -22 - u * 28, y1 = 46 - u * 40;
+        g.beginPath();
+        g.moveTo(x, y1);
+        g.quadraticCurveTo(x + 14, (y0 + y1) * 0.5, x + 8, y0 + 12);
+        g.strokeStyle = i % 2 ? 'rgba(120,119,114,0.34)'
+          : 'rgba(146,145,140,0.22)';
+        g.lineWidth = 2.4 + rnd() * 1.6;
+        g.stroke();
+      }
+
+      // And the primaries, which are the black fingers and are most of what a
+      // gull is from below. Fanned back off the wrist, longest inboard, each
+      // one a lens rather than a stripe — a primary is wide at the base and
+      // comes to a point, and drawn as a stripe it reads as a comb.
+      // They also have to be *long*. At 128 px they were a black smudge on the
+      // end of each wing; the fingers on the wall are a good third of the span
+      // and the gaps between them are what tell you the bird is gliding.
+      for (let i = 0; i < 6; i++) {
+        const u = i / 5;
+        const len = 176 - u * 60;
+        const wd = 15.0 - u * 4.0;
+        g.save();
+        g.translate(-336 + u * 42, -50 + u * 58);
+        g.rotate(-0.34 + u * 0.86);
+        g.beginPath();
+        g.moveTo(0, 0);
+        g.quadraticCurveTo(-len * 0.55, -wd, -len, -1.5);
+        g.quadraticCurveTo(-len * 0.55, wd, 0, 0);
+        g.closePath();
+        g.fillStyle = i < 4 ? DARK : SOOT; g.fill();
+        g.restore();
+      }
+
+      // A dry-brush highlight along the leading edge, which is the only part of
+      // a wing seen from underneath that catches anything.
+      g.beginPath();
+      g.moveTo(-16, -44);
+      g.bezierCurveTo(-142, -90, -274, -94, -366, -60);
+      g.strokeStyle = 'rgba(252,250,244,0.85)';
+      g.lineWidth = 8; g.stroke();
+      g.restore();
+    }
+
+    // The far wing first, then the body, then the near one over the top of it,
+    // which is the whole of the depth in the picture.
+    g.save();
+    g.translate(W * 0.5, shY); g.rotate(-0.055); g.translate(-W * 0.5, -shY);
+    wing(-1);
+    g.restore();
+
+    // ── the tail and the feet ──────────────────────────────────────────
+    g.save();
+    g.translate(W * 0.5, shY);
+    g.beginPath();
+    g.moveTo(-30, 30);
+    g.bezierCurveTo(-46, 96, -40, 140, -20, 158);
+    g.bezierCurveTo(0, 168, 20, 168, 40, 156);
+    g.bezierCurveTo(58, 138, 62, 96, 44, 30);
+    g.closePath();
+    g.fillStyle = PALE; g.fill();
+    // Dark along the very end of it, and ragged, because the last centimetre of
+    // a gull's tail is where the fresco has worn as well as where the bird is
+    // dark, and the two are indistinguishable at this range.
+    // Only the last inch of it, and as separate feathers with render showing
+    // between them. Twenty-one pixels of half-height ran them into each other
+    // and the tail came out a solid black paddle with two yellow lines drawn on
+    // top of it — the tail on the wall is white with a dark fringe, and the
+    // fringe is fringe because you can see through it.
+    for (let i = 0; i < 7; i++) {
+      const u = i / 6, x = -20 + u * 60;
+      g.beginPath();
+      g.ellipse(x, 152 - Math.abs(u - 0.5) * 30, 7.5, 15, (u - 0.5) * 0.6,
+        0, Math.PI * 2);
+      g.fillStyle = i % 2 ? DARK : SOOT; g.fill();
+    }
+    g.restore();
+
+    // ── the body ───────────────────────────────────────────────────────
+    g.save();
+    g.translate(W * 0.5, shY);
+    g.beginPath();
+    g.moveTo(0, -128);
+    g.bezierCurveTo(38, -110, 54, -40, 50, 34);
+    g.bezierCurveTo(46, 76, 28, 98, 4, 100);
+    g.bezierCurveTo(-24, 98, -42, 74, -46, 32);
+    g.bezierCurveTo(-50, -40, -34, -110, 0, -128);
+    g.closePath();
+    g.fillStyle = LIT; g.fill();
+    // Down the near side of it, so the breast is round rather than a paddle.
+    const bs = g.createLinearGradient(-46, 0, 54, 0);
+    bs.addColorStop(0, 'rgba(150,149,143,0.42)');
+    bs.addColorStop(0.42, 'rgba(255,255,255,0)');
+    bs.addColorStop(0.86, 'rgba(163,162,156,0.36)');
+    g.fillStyle = bs; g.fill();
+
+    // The head, on a neck that is barely a neck: it is one line from the
+    // shoulder to the crown on a gliding gull and drawing a neck on it is what
+    // makes a painted bird look like a goose.
+    g.beginPath();
+    g.ellipse(6, -148, 34, 38, 0.10, 0, Math.PI * 2);
+    g.fillStyle = LIT; g.fill();
+    // Beak, up and out — the real one has its head turned across the wall and
+    // that turn is most of why the thing looks alive rather than pinned.
+    g.beginPath();
+    g.moveTo(30, -166);
+    g.quadraticCurveTo(74, -186, 96, -196);
+    g.quadraticCurveTo(76, -170, 34, -152);
+    g.closePath();
+    g.fillStyle = YELL; g.fill();
+    g.beginPath();
+    g.moveTo(32, -160);
+    g.quadraticCurveTo(66, -178, 92, -193);
+    g.strokeStyle = 'rgba(120,96,26,0.55)'; g.lineWidth = 2; g.stroke();
+    // And the eye, which is four pixels of a two-metre wall and is the
+    // difference between a bird and a shape.
+    g.beginPath(); g.arc(23, -160, 5.2, 0, Math.PI * 2);
+    g.fillStyle = '#2c2c2e'; g.fill();
+    g.restore();
+
+    // The feet, after the body and the tail so they hang in front of both.
+    // Tucked but not stowed, and clear of the tail's fringe: on the wall they
+    // dangle past it, which is what says the bird is coming down onto something
+    // rather than crossing over it.
+    g.save();
+    g.translate(W * 0.5, shY);
+    g.lineCap = 'round';
+    for (const o of [-1, 1]) {
+      g.beginPath();
+      g.moveTo(o * 12, 92);
+      g.quadraticCurveTo(o * 18, 138, o * 16, 176);
+      g.strokeStyle = YELL; g.lineWidth = 12; g.stroke();
+      g.beginPath();
+      g.moveTo(o * 12, 96);
+      g.quadraticCurveTo(o * 17, 134, o * 15, 168);
+      g.strokeStyle = 'rgba(232,206,120,0.65)'; g.lineWidth = 4; g.stroke();
+    }
+    g.restore();
+
+    // The near wing last, tilted the other way.
+    g.save();
+    g.translate(W * 0.5, shY); g.rotate(0.030); g.translate(-W * 0.5, -shY);
+    wing(1);
+    g.restore();
+
+    // ── ten summers ────────────────────────────────────────────────────
+    // Lime render is not a canvas: it is a coarse, sucking surface that takes
+    // the brush unevenly and then loses it in patches. Two hundred dabs of the
+    // wall's own cream, thrown at the bird and nothing else, and the paint
+    // stops being a decal.
+    g.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 260; i++) {
+      const x = W * 0.5 + (rnd() - 0.5) * W * 0.86;
+      const y = H * 0.44 + (rnd() - 0.5) * H * 0.78;
+      g.beginPath();
+      g.ellipse(x, y, 2 + rnd() * 9, 2 + rnd() * 6, rnd() * 3.1, 0,
+        Math.PI * 2);
+      g.fillStyle = `rgba(0,0,0,${0.10 + rnd() * 0.26})`;
+      g.fill();
+    }
+    g.globalCompositeOperation = 'source-over';
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.anisotropy = 8;
+    return tex;
+  }
+
+  /**
+   * And hanging it: a quad six millimetres off the render, lit like everything
+   * else and transparent everywhere the brush did not go.
+   *
+   * Six millimetres is not a frame, it is z-fighting clearance. The mural has
+   * no thickness and wants none — the moment it stands proud enough to cast an
+   * edge it is a board, and the whole point of the thing is that it is paint.
+   */
+  function endMural(gb) {
+    const sc = (gb.front + gb.back) * 0.5;
+    const mw = 1.90, mh = mw * 592 / 1024;
+    const yc = gb.floor + 1.46;
+    const st = at(gb.t);
+    const p = W(gb.t + 0.006 * gb.o, sc, yc);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(mw, mh),
+      solidMaterial(0xffffff, {
+        spec: 0.02, vcol: false, transparent: true, depthWrite: false,
+        decl: 'uniform sampler2D uMuralMap;',
+        body: 'vec4 mu = texture2D(uMuralMap, vUv);\nbase = mu.rgb;\nalpha = mu.a;',
+        uniforms: { uMuralMap: { value: gullMural() } },
+      }));
+    mesh.position.set(p[0], p[1], p[2]);
+    // This end faces back down t, which the board on the far gable does not —
+    // hence the sign. Get it wrong and the gull is painted on the inside.
+    mesh.rotation.y = Math.atan2(st.ux * gb.o, st.uz * gb.o);
+    scene.add(mesh);
+    return { mesh, at: [gb.t, sc] };
+  }
+
+  /**
    * The tourist board, on the blank end of that run.
    *
    * The map itself is `jadrijaMapTexture` in src/44-board.js, which knows about
@@ -9809,6 +10268,7 @@ async function buildJadrija(scene) {
       houses: panel.houses, lanes: panel.lanes };
   }
   const board = gable ? mapBoard(gable) : null;
+  const mural = nearGable ? endMural(nearGable) : null;
 
   // ── the bead curtain ───────────────────────────────────────────────────────
   //
@@ -13975,6 +14435,14 @@ async function buildJadrija(scene) {
         // the inside of it is a closed mouth with a white line across it.
         f.face.foam = show.gape
           * sat((show.fill - SHOW.froth) / (1 - SHOW.froth));
+        // And what is running down her, which is the third of these and the
+        // only one that is not about her mouth. `wet` is the meter that already
+        // exists — it goes most of the way up on the first squirt and comes
+        // down over a dozen seconds — and the heavy feeds in the shader are
+        // gated on `foam` anyway, so a woman who has been rained on gets a
+        // sheen and threads, and a woman who has been holding her mouth under
+        // the branch for ten seconds gets it coming out of the corners.
+        f.face.wet = show.wet;
       }
       f.aim('head', 0, 0, 1, show.gape * SHOW.chin * (0.86 + 0.20 * show.fill));
     }
@@ -15143,12 +15611,20 @@ async function buildJadrija(scene) {
       if (o.fill != null && show) show.fill = sat(o.fill);
       if (o.gape != null) { u.uGape.value = o.gape; skinFig.face.gape = o.gape; }
       if (o.foam != null) { u.uFoam.value = o.foam; skinFig.face.foam = o.foam; }
+      if (o.wet != null) {
+        u.uWet.value = sat(o.wet); skinFig.face.wet = sat(o.wet);
+        if (show) show.wet = sat(o.wet);
+      }
+      // The crawl, so a still frame can be taken part-way down a rivulet rather
+      // than always at whatever offset a frame a second happens to land on.
+      if (o.run != null) u.uRun.value = o.run;
       const a = skinFig.face.anchors;
       const r3 = (v) => [+v.x.toFixed(4), +v.y.toFixed(4), +v.z.toFixed(4)];
       return {
         blink: +u.uBlink.value.toFixed(3), smile: +u.uSmile.value.toFixed(3),
         ink: +u.uInk.value.toFixed(3), gape: +u.uGape.value.toFixed(3),
         foam: +u.uFoam.value.toFixed(3),
+        wet: +u.uWet.value.toFixed(3), run: +u.uRun.value.toFixed(2),
         fill: show ? +show.fill.toFixed(3) : null,
         lipC: a.lipC ? r3(u.uLipC.value) : null,
         lipW: a.lipC ? +a.lipW.toFixed(4) : null,
@@ -15190,6 +15666,9 @@ async function buildJadrija(scene) {
     step: (secs, cam) => {
       for (let i = 0; i < Math.round(secs * 60); i++) updateCrowd(1 / 60, cam);
     },
+    /** Debug: where the gull ended up, so a camera can be pointed at it. */
+    mural: () => mural && { at: mural.at.map((v) => +v.toFixed(2)),
+      p: mural.mesh.position.toArray().map((v) => +v.toFixed(2)) },
     /** Debug: the tourist board, and what its map found to draw. */
     beads: () => beads && {
       strands: beads.strands, gap: +beads.gap.toFixed(4),
@@ -18925,16 +19404,36 @@ async function buildGround(scene, field) {
     // is forty billboards a metre and a half wide with the camera standing
     // inside them: the room went white. A splash is a fine mist. It is the
     // number of them that has to read, never the size of one.
-    const nb = Math.max(1, Math.round(20 * dt * dense));
+    //
+    // And it gets out of the way when you are on top of it. `dense` above is
+    // deliberately *raised* at close range, because the cone is the jet and a
+    // jet that thins out at arm's length has stopped being one — but the splash
+    // is not the jet, it is what the jet is doing to somebody, and the whole
+    // point of standing this close is to watch that happen to their face. At a
+    // metre a 15 cm puff covers seventeen degrees of frame and sixty a second
+    // of them are a fog bank with the subject inside it: the effect erases the
+    // thing it is an effect *about*.
+    //
+    // Physically that is also what being here is. The cloud you see hanging on
+    // a person is seen from outside it; step into it and there is no wall in
+    // front of you, because you are the far side of the same wall. So the count
+    // and the size both come down as the range does, and the throw goes with
+    // them — a metre away the water is not bouncing back at you, it is running
+    // off a chin onto a collarbone, and that belongs to the shader on her skin
+    // and not to forty billboards in front of it.
+    const near = clamp((reach - 0.55) / 1.45, 0, 1);
+    const nb = Math.max(1, Math.round(20 * dt * dense * (0.16 + 0.84 * near)));
     for (let i = 0; i < nb; i++) {
       const s = rng();
-      const back = 1.1 + s * 2.4;
+      const back = (1.1 + s * 2.4) * (0.30 + 0.70 * near);
       jetSpray.spawn(
         hit.x - dir[0] * 0.09, hit.y - dir[1] * 0.09 + 0.04, hit.z - dir[2] * 0.09,
-        -dir[0] * back + (rng() - 0.5) * 2.8,
-        1.0 + rng() * 2.0,
-        -dir[2] * back + (rng() - 0.5) * 2.8,
-        0.085 + s * 0.13, 0.42 + s * 0.42, 1.3,
+        -dir[0] * back + (rng() - 0.5) * 2.8 * (0.34 + 0.66 * near),
+        // Up and over at range; at a hand's breadth it falls, which is the one
+        // direction water off a person reliably goes.
+        (1.0 + rng() * 2.0) * near - 0.55 * (1 - near),
+        -dir[2] * back + (rng() - 0.5) * 2.8 * (0.34 + 0.66 * near),
+        (0.085 + s * 0.13) * (0.40 + 0.60 * near), 0.42 + s * 0.42, 1.3,
       );
     }
   }

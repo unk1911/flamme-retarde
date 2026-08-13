@@ -8,6 +8,80 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.59.0] — 2026-08-13
+
+### Fixed — the branch at arm's length no longer erases what it is pointed at
+
+Holding the jet on somebody a metre away filled the frame with white. The
+report was that you could not see her face through it, and that is exactly
+right: the splash is spawned at the point the water lands, and at a metre a
+15 cm puff covers seventeen degrees of frame. Sixty a second of them, each
+living half a second, is a fog bank with the subject inside it — the effect
+erasing the thing it is an effect *about*.
+
+The density above it is deliberately *raised* at close range and stays raised,
+because that is the cone, and a jet that thins out at arm's length has stopped
+being one. The splash is not the jet. So its count, its size and its throw all
+come down with the range now, which is also what being there is: the cloud you
+see hanging on a person is seen from outside it, and standing in it there is no
+wall in front of you, because you are the far side of the same wall. At a hand's
+breadth the throw is downward rather than back at you, which is the one direction
+water off a person reliably goes.
+
+Nothing outdoors changes by a pixel — the fade is fully out by two metres, and
+you fight a fire from ten.
+
+### Added — she runs with it
+
+And what the splash stops drawing, her skin draws instead. Water going into an
+open mouth and coming back out of the corners, down the chin, onto the neck and
+the top of the chest, which is what a branch held on somebody actually does and
+is worth more than any number of billboards in front of it.
+
+The band runs from the hairline to the collarbone, on the front of her by the
+angle about her own axis rather than by a plane in x — a plane wets the temples
+and the ears at the same rate as the bridge of the nose. Each column of skin
+carries a supply: a sheet off the whole face, plus two heavier feeds gated on
+what is in her mouth and on being below the lip line, because water does not run
+up. More supply lowers the bar a column has to clear rather than brightening the
+column, so a face under a branch goes from a couple of threads to running all
+over — which is the difference between wet and gushing.
+
+Three numbers took two passes each. The streams are sampled thirteen times finer
+across than down, because that ratio *is* the effect and a field with the same
+scale on both axes is a leopard; at half this they merged into one white bar four
+fingers wide running from her chin to her sternum. They wander, because nothing
+on a face is a plumb line — water crosses a jaw and goes round a tendon. And the
+sheet barely darkens the skin at all, which is dishonest and deliberate: the
+honest figure is nearer 0.85, but the sheet is gated to stop dead at the eyeball
+and a soft dark ring that stops dead at the eyeball is precisely the mascara
+1.57.0 and 1.58.0 spent two days removing. Wet skin is a specular effect first
+and a tonal one a distant second.
+
+### Added — a gull on the end of the block
+
+The blank near end of the run — the wall the far gable's tourist board turned
+down, on the argument that you walk *towards* the far one. A mural is the other
+case: it is not read, it is noticed as you come round the corner of the block,
+and the near end is the corner you come round.
+
+Drawn on transparent ground rather than on a rectangle of its own colour, so
+what shows between the feathers is the render itself with the render's own light
+on it — a mural does not have a background, it has a wall. The blue behind the
+bird is a wash and not a panel, and it is thin: at the first opacity it was a
+grey-blue oval a metre across with a bird sitting on it, which the eye reads as a
+stain long before it reads it as sky.
+
+The bird took the same three corrections a painted bird always takes. The wings
+were blades, because they tapered from the shoulder — a gull's wing is deep at
+the arm and stays deep to the wrist, and only then goes to fingers. The
+primaries were a black smudge on each tip; they are a third of the span and the
+gaps between them are what say the bird is gliding. And the tail was a solid
+paddle with two yellow lines on it, because feathers 21 px thick ran into each
+other — a fringe is a fringe because you can see through it. Finished with 260
+dabs taken back out of it, which is what lime render does to paint over ten
+summers and is the difference between this and clip art.
+
 ## [1.58.0] — 2026-08-13
 
 ### Fixed — the last of the mascara, and the inside of her mouth
