@@ -10,8 +10,8 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.59.0">
-<meta name="build-date" content="2026-08-13">
+<meta name="version" content="1.60.0">
+<meta name="build-date" content="2026-08-14">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
    anything to do with the aircraft and the sea, and the fire (amber → ember red)
@@ -1035,8 +1035,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.59.0, built 2026-08-13">
-    <b>v1.59.0</b><i>·</i><span>2026-08-13</span>
+  <div id="build" title="Flamme Retardé 1.60.0, built 2026-08-14">
+    <b>v1.60.0</b><i>·</i><span>2026-08-14</span>
   </div>
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
@@ -1288,7 +1288,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.59.0", date: "2026-08-13" };</script>
+<script>const BUILD = { v: "1.60.0", date: "2026-08-14" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -7222,6 +7222,92 @@ function easeSockets(data, anchors) {
   return n;
 }
 
+// Her hair, quantised out of HAIR_P in human_mh.py the same way the mouth band
+// is quantised out of MOUTH_P. Named here rather than measured, because unlike
+// the lash colour — which is whatever the darkest vertex on an eyeball happens
+// to be — this one is a constant the exporter wrote and this file has to
+// recognise.
+const HAIR_VCOL = (33 << 16) | (24 << 8) | 18;
+
+/**
+ * Take the nape off the head bone.
+ *
+ * She was shipping a black wedge hanging off her sternum whenever her chin came
+ * up under the branch, and it was hair. Her cut reaches 25 cm below the head
+ * joint at the back — the nape falls to y = 1.31, and the joint is at 1.56 —
+ * and every one of those vertices is weighted 255/255 to `head`. That is a rigid
+ * flap a quarter of a metre long swinging about a pivot at the top of her neck:
+ * tip the head back thirty degrees and its tip travels 12 cm forward, which is
+ * further than the front of her chest is from the axis. So the hair comes out
+ * through her breastbone, dark side toward you, and reads as a hole.
+ *
+ * It shows up in the kabina because that is the one place anything asks for that
+ * much chin — but the flap is in the rig, not in the pose, and every clip that
+ * ever throws her head back inherits it. So it is fixed here, once, on the
+ * buffer: below the joint the hair is handed over to the head's parent in
+ * proportion to how far down it hangs, which is what hair lying on a neck
+ * actually does. Above the joint nothing is touched, so the cap on top of her
+ * head still turns with her head.
+ *
+ * Gated on the hair colour *and* on already having weight on `head`, and both
+ * halves are load-bearing. The colour alone catches the pubic hair, which takes
+ * the same marker on purpose (see human_mh.py) and is 70 cm below the joint —
+ * it would be handed to her neck and her whole crotch would follow her chin. The
+ * head weight alone catches her jaw and her chin, which are also below the joint
+ * and which must go on following her head exactly, or her mouth arrives late.
+ */
+function easeNape(data, bindT) {
+  const head = data.bones.findIndex((b) => b.name === 'head');
+  if (head < 0) return 0;
+  const up = data.bones[head].parent;
+  if (up < 0) return 0;
+
+  const g = data.geo;
+  const pos = g.attributes.position.array;
+  const col = g.attributes.aVCol.array;
+  const bi = g.attributes.aBoneIdx.array;
+  const bw = g.attributes.aBoneWt.array;
+  const y0 = bindT[head * 3 + 1];
+  let n = 0;
+
+  for (let i = 0; i < data.nv; i++) {
+    const k = (col[i * 3] << 16) | (col[i * 3 + 1] << 8) | col[i * 3 + 2];
+    if (k !== HAIR_VCOL) continue;
+    const drop = y0 - pos[i * 3 + 1];
+    if (drop <= FACE.nape[0]) continue;
+    let slot = -1;
+    for (let s = 0; s < 4; s++) if (bi[i * 4 + s] === head && bw[i * 4 + s]) slot = s;
+    if (slot < 0) continue;
+
+    const t = clamp((drop - FACE.nape[0]) / (FACE.nape[1] - FACE.nape[0]), 0, 1);
+    const move = Math.round(bw[i * 4 + slot] * t * t * (3 - 2 * t));
+    if (move <= 0) continue;
+    // Onto the parent if it is already in the palette, into a spare slot if
+    // there is one, and over the lightest of the four if there is not. The
+    // weights are a byte apiece and have to keep summing to 255, so the move is
+    // a transfer and never an addition.
+    let into = -1, spare = -1, least = 0;
+    for (let s = 0; s < 4; s++) {
+      if (bi[i * 4 + s] === up && bw[i * 4 + s]) into = s;
+      else if (!bw[i * 4 + s]) spare = s;
+      if (bw[i * 4 + s] < bw[i * 4 + least]) least = s;
+    }
+    if (into < 0) {
+      into = spare >= 0 ? spare : least;
+      if (into === slot) continue;
+      bw[i * 4 + slot] += bw[i * 4 + into];
+      bi[i * 4 + into] = up;
+      bw[i * 4 + into] = 0;
+    }
+    bw[i * 4 + slot] -= move;
+    bw[i * 4 + into] += move;
+    n++;
+  }
+  g.attributes.aBoneIdx.needsUpdate = true;
+  g.attributes.aBoneWt.needsUpdate = true;
+  return n;
+}
+
 /**
  * Where the lid is drawn, and how far the corner of the mouth travels.
  *
@@ -7412,6 +7498,14 @@ const FACE = {
   // measured in the bind pose too.
   comb: 2.60,
 
+  // How far below the head joint the hair stays rigid, and how far below it has
+  // been handed over completely — see easeNape. 3 cm of rigid is the back of the
+  // skull, which is head whatever else is; by 17 cm it is a fall of hair lying
+  // on a neck and belongs to the neck. Measured off the blob: the joint is at
+  // y = 1.56 and the lowest hair vertex at 1.313, so the far end of this leaves
+  // the last four centimetres of it fully on the parent.
+  nape: [0.030, 0.170],
+
   // ── the water on her ────────────────────────────────────────────────────
   //
   // Measured off the exported blob: the eye sits at y = 1.6232 and the lip
@@ -7439,7 +7533,7 @@ const FACE = {
   // not water. Narrower features and a bar that stays selective are the two
   // halves of the same fix — what makes a rivulet legible is the dry skin
   // beside it.
-  runAcross: 95.0,
+  runAcross: 68.0,
   runDown: 7.0,
   // And they wander, over about a centimetre and a half, on a scale long
   // enough that a stream leans across the width of a chin rather than
@@ -7453,7 +7547,35 @@ const FACE = {
   runSpeed: 0.42,
   // Aerated water, which is what comes back out of a mouth — half a shade off
   // the froth already in there, because it is the same froth.
-  runCol: [0.930, 0.900, 0.855],
+  runCol: [0.955, 0.930, 0.888],
+  // And the spill off her chin, which is the same water again and thicker, so
+  // it is brighter still. Warm for the reason the froth is warm: the room is
+  // lit by a blue hemisphere through one doorway, and a neutral white in there
+  // comes out the colour of a cold tap.
+  spillCol: [0.985, 0.962, 0.915],
+  // How much brighter than an honest albedo the two of them are drawn — see the
+  // note in the shader. A rivulet is a film and gets a little; the spill is a
+  // body of froth and gets the rest.
+  runLift: 1.22,
+  spillLift: 1.70,
+  // How far the longest tongue of it reaches below the lip line at full flow.
+  // 7.5 cm clears the chin — the point of it is 4 cm under the lip — and gets
+  // onto the top of the neck, which is where a mouthful that has been coming
+  // for ten seconds actually ends up. Shorter and it is a moustache.
+  spillLen: 0.115,
+  // Half-width at the lip in mouth-widths, and metres of spread per metre of
+  // fall. 1.20 leaves it just wider than the opening it came out of; 0.42 puts
+  // it across the whole point of the chin by the time it is under it and no
+  // wider than her neck by the time it is on that.
+  spillW: [1.70, 0.45],
+  // And how strong the film round the edge of it is. Not much: at half this the
+  // sheet has a hard edge and reads as paint, at twice it the whole chin is one
+  // white shape and the tongues stop being tongues.
+  spillWash: 0.42,
+  // Fingers of water, not threads: 34 noise units a metre is a feature about
+  // three centimetres across, which is a third of the width of a chin and is
+  // what a mouthful breaks into coming over a lip.
+  spillAcross: 34.0,
 
   // The tongues run nearly the length of the upper arm — 21 cm from her elbow
   // to her shoulder — because anything shorter is a black sleeve with a ragged
@@ -7619,9 +7741,19 @@ const FACE_FRAG = /* glsl */ `
         // below the lip line, because water does not run up.
         float below = smoothstep(uLipC.y + 0.004, uLipC.y - 0.012, f.y);
         float over = below * (uFoam * 0.75 + uGape * 0.30);
-        float supply = 0.44
-          + over * 0.95 * exp(-pow((f.z - uLipsR.z * 0.92) / 0.0105, 2.0))
-          + over * 0.65 * exp(-pow(f.z / 0.0110, 2.0));
+        // Both Gaussians written as t * t, and never as pow(t, 2.0). pow() of a
+        // negative base is undefined in GLSL — it is compiled as
+        // exp2(y * log2(x)) and the log of a negative number is a NaN — and the
+        // base of the first of these goes negative over the two centimetres
+        // either side of the midline, which is most of her chin. The NaN
+        // reached the albedo through amt and shipped as a black teardrop hanging
+        // off her sternum: it needed the mouth open, the water on, and z small
+        // all at once, so it never showed up in any of the shots that were
+        // taken of any of the three.
+        float dz = (f.z - uLipsR.z * 0.92) / 0.0105;
+        float cz = f.z / 0.0110;
+        float supply = 0.44 + over * 0.95 * exp(-dz * dz)
+                            + over * 0.65 * exp(-cz * cz);
         // In at the hairline and out at the collarbone. What leaves a mouth is
         // a mouthful and what reaches a chest is a trickle, so the far end is
         // the long fade and the near one is only there to stop the sheet
@@ -7650,8 +7782,8 @@ const FACE_FRAG = /* glsl */ `
         // over half the columns cleared it and they merged into one another.
         // The range here passes about a third of them at full flow, which is
         // enough to read as running all over her and still leaves gaps.
-        float lo = 0.80 - 0.24 * amt;
-        float streak = smoothstep(lo, lo + 0.10, col) * min(0.88, amt * 1.7);
+        float lo = 0.70 - 0.22 * amt;
+        float streak = smoothstep(lo, lo + 0.11, col) * min(1.0, amt * 2.2);
 
         // Barely darker, and that number is a scar. Wet skin *is* darker and
         // the honest figure is nearer 0.85 — but the sheet is strongest where
@@ -7663,12 +7795,77 @@ const FACE_FRAG = /* glsl */ `
         // something to sit in.
         base *= mix(1.0, 0.94, amt);
         spec = mix(spec, 0.62, amt);
-        base = mix(base, vec3(${FACE.runCol.join(', ')}) * (0.86 + 0.24 * col),
-          streak);
+        base = mix(base, vec3(${FACE.runCol.join(', ')})
+          * (0.86 + 0.24 * col) * ${FACE.runLift.toFixed(2)}, streak);
         // And froth is not a mirror, the same as the froth in her mouth: the
         // sheet under it is the shiny thing and the stream on top of it is the
         // matt one, which is backwards until you remember it is full of air.
         spec = mix(spec, 0.18, streak);
+
+        // ── and the spill ────────────────────────────────────────────────
+        //
+        // The rivulets above are what a rained-on face does. They are not what
+        // a mouth that has been held open under a branch for ten seconds does,
+        // and the report was fair: threads on a face read as a face somebody
+        // has splashed. A mouth that full overflows, and an overflow is a
+        // *sheet* — one body of white leaving the lip, mouth-wide at the top,
+        // spreading over the chin, ending in tongues of different lengths
+        // rather than on a line.
+        //
+        // So it is drawn as one, on top of the threads, and it is nearly
+        // opaque. The colour is the froth colour and that is not a
+        // coincidence: this is the same froth as the mouthful half a second
+        // later, and aerated water is white however clear the water was.
+        float gush = uFoam * uWet;
+        float lipDn = uLipC.y - f.y;
+        if (gush > 0.0 && lipDn > 0.0) {
+          // Mouth-wide where it leaves and wider as it falls, because a jaw is
+          // a ramp: what comes over the lip in two centimetres is across the
+          // whole point of the chin by the time it is under it.
+          float hw = uLipsR.z * ${FACE.spillW[0].toFixed(2)}
+                   + lipDn * ${FACE.spillW[1].toFixed(2)};
+          float across = 1.0 - smoothstep(hw * 0.45, hw, f.z);
+          // How far each column of it has got down her. Coarse across — these
+          // are fingers of water a centimetre or two wide, not the millimetre
+          // threads above — and crawling with uRun, so the bottom edge is a row
+          // of tongues that moves. A sheet with a fixed hem is a bib.
+          vec2 tn = vec2(vLocal.z * ${FACE.spillAcross.toFixed(1)}, -uRun * 0.55);
+          float tongue = 0.62 * vnoise2(tn) + 0.38 * vnoise2(tn * 2.3 + 5.0);
+          float reach = ${FACE.spillLen.toFixed(3)} * gush * (0.40 + 0.90 * tongue);
+          float sheet = across * front
+            * (1.0 - smoothstep(reach - 0.014, reach, lipDn));
+          // And a thinner wash either side of it, half as far down and twice as
+          // wide. Without this the sheet is a bib: a hard-edged white shape on
+          // dry skin, which is what a spill looks like when it is the only thing
+          // drawn. What is actually round a spill is skin with a film of the
+          // same stuff on it, and that film is what makes the sheet read as the
+          // deep part of one body of water rather than as an applied shape.
+          sheet = clamp(sheet + front * gush * ${FACE.spillWash.toFixed(2)}
+            * (1.0 - smoothstep(hw * 0.85, hw * 2.20, f.z))
+            * (1.0 - smoothstep(reach * 0.45, reach * 1.10, lipDn)), 0.0, 1.0);
+          if (sheet > 0.0) {
+            float lump = 0.80 + 0.34 * vnoise2(vec2(vLocal.z * 58.0,
+              lipDn * 24.0 - uRun * 0.9));
+            // Over one, and that is the whole reason this reads as milk in a
+            // room with no light in it. Froth is not a surface with an albedo,
+            // it is a couple of millimetres of scattering volume: light goes
+            // into it, bounces about between the bubbles and comes back out,
+            // and a lambertian term with a legal albedo cannot do that — under
+            // one blue hemisphere through one doorway it renders whatever
+            // white you give it as grey. The lift is the cheapest stand-in for
+            // the scattering and it is only ever on inside the kabina, because
+            // uFoam is only ever raised by a mouthful.
+            base = mix(base, vec3(${FACE.spillCol.join(', ')})
+              * lump * ${FACE.spillLift.toFixed(2)}, sheet * 0.96);
+            // Matt through the body of it and wet at the hem: the one part of a
+            // run of froth that is still a drop of water is the bead on the end
+            // of it, and that bead is most of what says the sheet is liquid and
+            // not paint.
+            spec = mix(spec, 0.10, sheet);
+            spec = mix(spec, 0.58,
+              sheet * smoothstep(reach - 0.013, reach - 0.003, lipDn));
+          }
+        }
       }
     }
 
@@ -7935,6 +8132,8 @@ function skinnedFigure(data, opts = {}) {
       anchors.armY = [E[1], S[1]];
     }
   }
+
+  easeNape(data, bindT);
 
   // Both ankles are symmetric, so the shader folds their lateral coordinate on
   // to one anchor. The foot bone starts at the ankle in this rig.

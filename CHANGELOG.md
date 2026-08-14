@@ -8,6 +8,68 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.60.0] — 2026-08-14
+
+### Fixed — the black wedge on her chest was her own hair
+
+Reported as "a weird black rhombus on her chest, that shouldn't be there", and
+it should not: it was the back of her haircut, hanging through her breastbone.
+
+Her cut reaches 25 cm below the head joint at the nape — the lowest hair vertex
+is at y = 1.313 and the joint is at 1.56 — and every one of those vertices is
+weighted 255/255 to `head`. That is a rigid flap a quarter of a metre long
+swinging about a pivot at the top of her neck. Tip the chin up thirty degrees
+under the branch and the tip of it travels 12 cm forward, which is further
+forward than the front of her chest, so the hair comes out through her sternum
+with its dark side toward you and reads as a hole in her.
+
+It took four wrong answers to find, and every one of them was a reasonable
+place to look: a spray particle (hidden the whole pool — still there), a
+NaN out of the runoff shader (real, fixed below, not this), the mouth cavity
+(the ellipsoid is 15 radii away), stretched geometry (the worst triangle on her
+is a 4 cm eyelid). What found it was rendering her albedo unlit, which showed a
+patch with a colour no lighting could have produced, and then a histogram of
+every dark vertex colour in the neck: 253 of them at (33, 24, 18), which is
+`HAIR_P` out of `human_mh.py`, quantised.
+
+Fixed in the rig rather than in the pose, because the flap is in the rig: below
+the head joint the hair is handed over to the head's parent in proportion to
+how far down it hangs, once, on the buffer at load. The cap on top of her head
+still turns with her head; the fall at the back now lies on her neck, which is
+what hair on a neck does. Every clip that throws her head back gets the fix,
+not just the one that was reported.
+
+### Fixed — a NaN in the runoff, found on the way past
+
+`pow(t, 2.0)` with a negative `t`. GLSL leaves that undefined and compiles it as
+`exp2(y * log2(x))`, and the log of a negative number is a NaN — and the base of
+one of the two Gaussians feeding the rivulets goes negative over the two
+centimetres either side of her midline, which is most of her chin. Written as
+`t * t`, which is what it always meant.
+
+### Changed — the spill
+
+"It has to be even more thick milky texture, in great abundance." Fair: what
+was there were threads, and threads are what a face that has been rained on
+does. A mouth that has been held open under a branch for ten seconds overflows,
+and an overflow is not threads, it is a *sheet* — mouth-wide where it leaves,
+spreading across the chin, ending in tongues of different lengths that crawl
+rather than in a line, with a film of the same stuff round the edge of it so it
+sits on her instead of being an applied shape.
+
+So there is one now, drawn over the top of the threads and near enough opaque,
+reaching 11 cm below the lip line at full flow, which clears the chin and gets
+onto the neck. The threads either side of it are half as wide again and pass
+half again as many columns.
+
+And all of it is drawn brighter than an honest albedo, which is the only reason
+it reads as milk in a room lit by one blue hemisphere through one doorway.
+Froth is not a surface, it is two millimetres of scattering volume — light goes
+into it, bounces about between the bubbles and comes back out — and a lambertian
+term with a legal albedo renders whatever white you give it as grey. Gated on
+the mouthful, so it is only ever on inside the kabina; the promenade still gets
+the sheen and the threads and nothing else.
+
 ## [1.59.0] — 2026-08-13
 
 ### Fixed — the branch at arm's length no longer erases what it is pointed at
