@@ -8,6 +8,61 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.61.0] — 2026-08-15
+
+### Added — the vikendica at Jadrija
+
+One real house, and the first building in this game with an inside.
+
+It is the family's holiday house on the lane behind the back row of kabine,
+and it is here for two reasons that pull the same way. The on-foot mode has
+thirteen thousand buildings in it and every one of them is a facade; walking
+to any of them is walking to a painted box. And there is a renovation to
+decide — the permit allows sixty centimetres of new wall height and nothing
+else — and the only honest way to know what sixty centimetres buys is to
+stand under it.
+
+So the roof is a switch. `V` from the air puts you inside the front door;
+`V` again, standing in there, swaps the 23° gable that is on it now for the
+raised one: wall head up sixty centimetres to +6.15, re-pitched at 25°, and a
+mezzanine deck across the north two thirds at +2.55. Everything below the
+wall head is the same geometry under either, which is the whole point. You
+are meant to be standing in the same room and looking up.
+
+The answer, for the record, is better than expected, and it turns on which
+way the ridge runs. It runs the short way, so it crosses 7.73 m rather than
+6.78. A deck at +2.55 leaves 2.39 m clear underneath — a centimetre less than
+what is there today — and 2.50 m under the ridge above it, still 1.5 m two
+metres either side. That is a room you stand up in and not a crawl space.
+
+Built in `tools/blender/vikendica.py` and baked to three blobs plus a plan
+sidecar: shell, the roof as it stands, and the loft. The sidecar is what makes
+it walkable — room rectangles, wall blockers and door anchors, written by the
+file that built the walls so there is one source of truth for where they are.
+The walls join the same blocker list as the kabine, in the same locale axes,
+which is why the house is placed square to the shore rather than to its lane.
+The outside stair is a ramp between the ground and +2.90 — seventeen risers of
+seventeen, which is where the floor level comes from and not the other way
+round.
+
+### Fixed
+
+- An OSM footprint stands exactly where the vikendica does, so the generated
+  grey box was through the middle of the living room, with a blocker that
+  ejected anybody put inside it. Generated houses within 7.5 m of the modelled
+  one are skipped now.
+- Jadrija's walkable bounds stopped at 38 m inland, which is short of the foot
+  of the stair. They now reach whatever the house needs.
+
+### Note on the drawings
+
+The first version of this model was built from photographs and a walk-through
+video, and was wrong in nearly every structural way: an invented hall, a hip
+roof, a balcony on the wrong side and the stair on the wrong face. The actual
+1:100 drawings turned up afterwards and the house was rebuilt from them —
+678 × 773 external, 20 cm walls, the bedroom half set back 70 cm on the west,
+a 220-deep terrace across the whole south face, and the stair on the east.
+
 ## [1.60.0] — 2026-08-14
 
 ### Fixed — the black wedge on her chest was her own hair

@@ -161,6 +161,10 @@ function shoreStations(raw) {
 }
 
 async function buildJadrija(scene) {
+  // The one building on this shore you can go inside. Built near the end,
+  // once the shore frame exists; declared here because walkY asks it for the
+  // floor and walkY is a hundred lines further up than the build.
+  let vik = null;
   const raw = traceShore();
   if (raw.length < 8) return null;             // the coast moved; build nothing
   const ST = shoreStations(raw);
@@ -3620,6 +3624,14 @@ async function buildJadrija(scene) {
     let cx = 0, cz = 0;
     for (const p of poly) { cx += p[0]; cz += p[1]; }
     cx /= n; cz /= n;
+    // The vikendica stands on this lane, and one of the footprints out of OSM
+    // stands exactly where it does — a generated grey box through the middle of
+    // the living room, and a blocker with it that ejects you the moment you are
+    // put inside. Whichever is real, the modelled one wins.
+    {
+      const [ht, hs] = local(cx, cz);
+      if (Math.hypot(ht - VIK.t, hs - VIK.s) < 7.5) return;
+    }
     const [ax, az] = principalAxis(poly, cx, cz);
     // The cross product of these two has to come out +Y or every box built in
     // this frame is inside out. (az, -ax) does; (-az, ax) does not.
@@ -3883,6 +3895,12 @@ async function buildJadrija(scene) {
    */
   function walkY(x, z) {
     const [t, s] = local(x, z);
+    // The vikendica first: its upper floor is 2.9 m over the ground it
+    // stands on, and the flight up the outside is a ramp between the two.
+    if (vik) {
+      const f = vik.floorAt(t, s);
+      if (f != null) return f;
+    }
     if (t < -5 || t > LEN + 5 || s < -3 || s > JAD.back + JAD.bleed) {
       return Math.max(groundAt(x, z), 0);
     }
@@ -3936,6 +3954,13 @@ async function buildJadrija(scene) {
       rot: Math.atan2(hs.ax * st.nx + hs.az * st.nz, hs.ax * st.ux + hs.az * st.uz),
     });
   }
+
+  // ── the vikendica ──────────────────────────────────────────────────────────
+  // Behind the back row, in the trees. Its walls join the same blocker list
+  // as the kabine, in the same locale axes, because it was placed with its
+  // own +X along the shore precisely so that they could.
+  vik = await buildVikendica(scene, { toWorld, local });
+  if (vik) for (const b of vik.blockers()) blockers.push(b);
 
   // ── the crowd ──────────────────────────────────────────────────────────────
   /**
@@ -6736,8 +6761,12 @@ async function buildJadrija(scene) {
     site: { x: mid.x + mid.nx * 16, z: mid.z + mid.nz * 16, yaw: Math.atan2(mid.ux, -mid.uz) },
     // Kept a metre off the quay edge: the bounds are what stops a walker, and
     // stopping them exactly at the drop would let the camera hang over it.
-    bounds: { t0: 3, t1: LEN - 3, s0: 1.1, s1: JAD.reachIn },
-    blockers, local, toWorld, walkY, inField,
+    // Inland far enough to reach the vikendica's stair. Past JAD.back the
+    // concrete has stopped and walkY falls through to the terrain, which is
+    // the hillside the house is standing on.
+    bounds: { t0: 3, t1: LEN - 3, s0: 1.1,
+      s1: Math.max(JAD.reachIn, VIK.s + 7.6) },
+    blockers, local, toWorld, walkY, inField, vik,
     /** Debug: put her at (t, s), and optionally straight into a phase. */
     putShow: (t, s, phase, at, ang) => {
       if (!show || !skinFig) return null;

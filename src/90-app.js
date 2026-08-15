@@ -183,6 +183,10 @@ addEventListener('keydown', (e) => {
   // pressing the key it told you about should work.
   if (e.code === 'Digit0' || e.code === 'Numpad0') { e.preventDefault(); skipToGround(); return; }
   if (e.code === 'Digit9' || e.code === 'Numpad9') { e.preventDefault(); skipToJadrija(); return; }
+  // V for the vikendica, and pressed again in there for the other roof. Like
+  // 9 it is ahead of the pause guard, because reading the hint and then
+  // pressing the key it names should work.
+  if (e.code === 'KeyV') { e.preventDefault(); skipToVikendica(); return; }
   // While the world is stopped, only the settings answer. Cycling the camera or
   // dropping the gear against a frozen simulation puts the picture and the
   // state out of step, and the HUD is not being redrawn to tell you.
@@ -1066,6 +1070,49 @@ function skipToJadrija() {
   if (!IS_TOUCH) grabPointer();
   paintDeviceText();
   toast(T('toast.cheatJad'));
+}
+
+/**
+ * V — the vikendica.
+ *
+ * A ladder to the one room in this game that is worth standing in, until the
+ * walk up to it exists. Pressed from the air it is the same trick as 9: retarget
+ * the walking mode on to Jadrija and drop you in, except that the drop is on to
+ * a floor 2.9 m above the hillside rather than on to the promenade. Pressed
+ * again, once you are already in there, it swaps the roof — which is the whole
+ * reason the house was modelled, and the comparison is worth a keystroke.
+ */
+function skipToVikendica() {
+  if (!ground || !ground.ok || !jadrija || !jadrija.vik) return;
+  const vik = jadrija.vik;
+  if (state.paused) setPaused(false);
+
+  // Already inside: the key becomes the roof switch. "Inside" is generous on
+  // purpose — anywhere on the floor plate, terrace included, because comparing
+  // the two roofs from the terrace is a fair thing to want.
+  if (state.phase === 'ground') {
+    const [t, s] = jadrija.local(ground.you.x, ground.you.z);
+    if (vik.floorAt(t, s) != null) {
+      const now = vik.roof(vik.roofNow === 'loft' ? 'now' : 'loft');
+      toast(T(now === 'loft' ? 'toast.vikLoft' : 'toast.vikNow'));
+      return;
+    }
+  }
+  if (state.phase !== 'fly' && state.phase !== 'ground') return;
+
+  const p = vik.anchor('doorIn');
+  const look = vik.anchor('living');
+  if (!p || !look) return;
+  const yaw = Math.atan2(-(look[0] - p[0]), -(look[2] - p[2]));
+  if (!ground.retarget(jadrija)) return;
+  if (!ground.dropIn(p[0], p[2], yaw)) return;
+  $('hud').hidden = true;
+  $('chute-hud').hidden = true;
+  $('ground-hud').hidden = false;
+  if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = false; }
+  if (!IS_TOUCH) grabPointer();
+  paintDeviceText();
+  toast(T('toast.cheatVik'));
 }
 
 /**
@@ -2436,6 +2483,36 @@ window.__fr = {
    * `arm` lights the field, `foot` puts you out on it, `look`/`walk`/`jet` are
    * the three things a player does once there.
    */
+  /**
+   * The vikendica. `stand('doorOut')` puts you on foot at one of the sidecar's
+   * anchors — stairFoot, stairHead, doorOut, doorIn, living, terrace, loftTop —
+   * and `roof('loft')` swaps the pantile gable for the raised one and its
+   * mezzanine without touching anything below the wall head.
+   */
+  vik: {
+    raw: () => jadrija && jadrija.vik,
+    stats: () => (jadrija && jadrija.vik ? jadrija.vik.stats() : null),
+    roof: (which) => (jadrija && jadrija.vik ? jadrija.vik.roof(which) : null),
+    anchors: () => (jadrija && jadrija.vik
+      ? Object.keys(jadrija.vik.plan.anchors) : []),
+    /** On foot at a named anchor, looking at the middle of the big room. */
+    stand: (name = 'doorOut', yaw = null) => {
+      const v = jadrija && jadrija.vik;
+      if (!v) return null;
+      const p = v.anchor(name);
+      if (!p) return null;
+      const look = v.anchor('living');
+      const a = yaw != null ? yaw
+        : Math.atan2(-(look[0] - p[0]), -(look[2] - p[2]));
+      // `dropIn`, not `force`: force() arms the spot fire, which wants an
+      // aerodrome behind it and throws at Jadrija.
+      ground.retarget(jadrija);
+      ground.dropIn(p[0], p[2], a);
+      ground.put(p[0], p[2], a, 0);
+      return { at: p.map((n) => +n.toFixed(2)), yaw: +a.toFixed(3) };
+    },
+  },
+
   ground: {
     arm: () => ground.force(),
     raw: () => ground,
