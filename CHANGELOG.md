@@ -8,6 +8,45 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.67.0] — 2026-08-16
+
+### Fixed — the laptop could not reach the model at all
+
+Signing in at the terminal failed before it got anywhere near the password.
+`abliterated.edeliverables.com` is the far end of an ngrok tunnel to the GPU
+box, which makes it a different origin from the game, and the browser refused
+the cross-site `POST /auth/password` outright — no `Access-Control-Allow-Origin`
+on the reply, so `Failed to fetch`, so `no route to
+abliterated.edeliverables.com` on the glass. Adding the header would not have
+been enough either: the session cookie that comes back has to survive a
+cross-site round trip, and it does not.
+
+So the deployed site now reverse-proxies the service under `/abl`, and the
+browser only ever sees one origin. `CRT.host` is that path rather than the
+tunnel's own name, the fetches ask for `same-origin` credentials, and the
+sign-in posts with `redirect: 'manual'` — the service answers with a bare
+`/login`, which through the proxy would point back at this site, and the cookie
+is on the 302 itself so there is nothing worth following. Off the deployed host
+`CRT.host` is `null` and the terminal says so instead of failing at the network.
+
+### Changed — and a turn there is two calls, not one
+
+`pickEndpoint` went looking for a single endpoint that takes a string and gives
+back an answer. There is no such endpoint on that app. A turn is `_add_user`,
+which appends what you typed and opens an empty slot after it, and then `_bot`,
+which fills the slot and streams while it does. Both are published several
+times over — `_bot`, `_bot_1`, `_bot_2`, one set per tab the app was built with
+— so the plainest name of each wins, by name and never by index.
+
+The whole conversation goes back up on each turn, which is what gives the thing
+on the other end its memory, and what comes back replaces what we had, so a
+tool call it made along the way is part of what it sees next time. `_bot` also
+wants the system prompt and the sampling settings, which are ours to set now:
+the terminal tells it where it is, and the chip on the frame is what turns the
+web search and the clock and the shell on and off. The reply is read out of
+Gradio's messages format rather than guessed at by walking the payload, and
+the folded thought messages a tool call leaves behind are dropped.
+
 ## [1.66.0] — 2026-08-16
 
 ### Fixed — the bathroom had no door and no window

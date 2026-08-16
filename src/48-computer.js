@@ -21,31 +21,45 @@
 // Re-drawing the web app inside the game would read as a screenshot. A terminal
 // reads as a machine.
 //
-// And it only works from the deployed build. The service allows
-// `https://flamme-retarde.edeliverables.com` by name and sends its session
-// cookie with `SameSite=Lax` — which is fine between two hosts under
-// `edeliverables.com`, because same-*site* is the registrable domain and not the
-// origin, and is nothing at all from a `file://` copy. Opened off the disk the
-// laptop still opens, still clatters, and says so on the screen.
+// And it only works from the deployed build. The service sits on the far end of
+// a tunnel at `abliterated.edeliverables.com`, which is a different origin: a
+// fetch to it from the game dies at CORS before it ever reaches the sign-in, and
+// the session cookie it hands back would not have survived the trip anyway. So
+// the deployed site reverse-proxies it under `/abl`, and the browser only ever
+// sees one origin. Off that host — a `file://` copy, a local server — there is
+// no proxy and nothing to talk to; the laptop still opens, still clatters, and
+// says so on the screen.
 // -----------------------------------------------------------------------------
 
 const CRT = {
-  host: 'https://abliterated.edeliverables.com',
+  // Where the service is from the browser's point of view: the proxy on this
+  // site, not the tunnel's own name. Anywhere else there is no proxy, and
+  // `null` is how the rest of this file knows to say so.
+  host: /(^|\.)edeliverables\.com$/.test(location.hostname) ? '/abl' : null,
   // How long the camera takes to sit down, and to stand back up.
   sit: 1.15,
   rise: 0.75,
   // Where the terminal thinks it is. Sent as the first line of context so the
   // model knows why it is being asked about the weather in Šibenik.
   greet: 'ottakyo · deckard-40b · tools: web + clock + shell',
+  // What the model is told it is, before the player types anything. Short on
+  // purpose. It is a real model with a real shell on a real machine, and the
+  // less of a costume we put on it the more the answers are its own.
+  prompt: 'You are answering on a terminal in a flat in Dalmatia, in a game '
+    + 'about the Canadair firefighting aircraft over Šibenik. The person typing '
+    + 'is at a laptop in a vikendica at Jadrija while a fire burns across the '
+    + 'channel. Keep it short and plain: the screen is small and green. You '
+    + 'have a shell, a clock and web search — use them instead of guessing, and '
+    + 'say what you ran.',
 };
 
 const computer = (() => {
   let ready = false;
   let active = false;
   let user = null;
-  let endpoint = null;         // the Gradio endpoint we decided is the chat one
+  let endpoint = null;         // the two endpoints that between them make a turn
   let busy = false;
-  const history = [];
+  let chat = [];               // the conversation, in the app's own shape
 
   const el = {};
   const grab = () => {
@@ -89,141 +103,140 @@ const computer = (() => {
   // ── the wire ───────────────────────────────────────────────────────────────
   /** Are we signed in? The cheapest question the service will answer. */
   async function whoami() {
+    if (!CRT.host) return null;
     try {
       const r = await fetch(CRT.host + '/gradio_api/info',
-        { credentials: 'include', cache: 'no-store' });
+        { credentials: 'same-origin', cache: 'no-store' });
       if (!r.ok) return null;
       return await r.json();
     } catch { return null; }
   }
 
+  /** Why there is nothing on the other end, when there is nothing. */
+  const offOrigin = () => 'no line out of here — the model answers through '
+    + 'flamme-retarde.edeliverables.com and nowhere else.';
+
   /**
    * Sign in, by posting the same form the login page posts.
    *
-   * The service answers a good password with a 302 to `/` and a session cookie,
-   * and a bad one with a 302 to `/login?e=bad`. Both are 302s and `fetch` will
-   * follow either, so the redirect is not the answer — asking a second question
-   * afterwards is. `/gradio_api/info` is 401 without the cookie and 200 with it,
-   * which is unambiguous, and it hands back the endpoint list we need next
-   * anyway.
+   * The service answers a good password with a 302 and a session cookie, and a
+   * bad one with a 302 to `/login?e=bad`. Both are 302s, so the redirect is not
+   * the answer — asking a second question afterwards is. `/gradio_api/info` is
+   * 401 without the cookie and 200 with it, which is unambiguous, and it hands
+   * back the endpoint list we need next anyway.
+   *
+   * `redirect: 'manual'` because the Location it sends is a bare `/login`,
+   * which through the proxy points at this site rather than at the service.
+   * The cookie is on the 302 itself; there is nothing worth following.
    */
   async function signIn(u, p) {
+    if (!CRT.host) throw new Error(offOrigin());
     const body = new URLSearchParams({ username: u, password: p });
     try {
       await fetch(CRT.host + '/auth/password', {
         method: 'POST',
-        credentials: 'include',
+        credentials: 'same-origin',
+        redirect: 'manual',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body,
       });
     } catch (e) {
-      throw new Error('no route to ' + CRT.host.replace(/^https?:\/\//, '')
-        + ' (' + e.message + ')');
+      throw new Error('no route to the model (' + e.message + ')');
     }
-    const info = await whoami();
-    if (!info) return null;
-    return info;
+    return whoami();
   }
 
   /**
-   * Which of the app's endpoints is the chat.
+   * Which endpoints are the chat. Plural, because a turn there is two calls.
    *
-   * Not hard-coded, because it is a Gradio app and its function indices move
-   * every time somebody adds a button to it. The rule is the shape of the
-   * signature rather than the name: one endpoint that takes a string and gives
-   * back something. A name containing "chat" or "submit" wins a tie.
+   * `_add_user` takes what you typed and gives back the conversation with your
+   * line on the end of it and an empty slot after that; `_bot` fills the slot,
+   * streaming. The app publishes several of each — `_bot`, `_bot_1`, `_bot_2`,
+   * one set per tab it was built with — and they are the same function, so the
+   * plainest name of each will do. By name rather than by index, because the
+   * indices move every time somebody adds a button.
    */
-  function pickEndpoint(info) {
-    const score = (n, d) => {
-      const ins = (d && (d.parameters || d.inputs)) || [];
-      const outs = (d && (d.returns || d.outputs)) || [];
-      let s2 = 0;
-      if (ins.length && /str/i.test(JSON.stringify(ins[0]))) s2 += 3;
-      if (ins.length === 1) s2 += 1;
-      if (outs.length) s2 += 1;
-      if (/chat|send|submit|message|ask|respond/i.test(n)) s2 += 4;
-      if (/clear|undo|retry|reset|like|stop|new|theme|logout|upload|record/i.test(n)) s2 -= 8;
-      return s2;
-    };
-    const best = (obj, kind) => {
-      const keys = Object.keys(obj || {});
-      if (!keys.length) return null;
-      keys.sort((a, b) => score(b, obj[b]) - score(a, obj[a]));
-      return score(keys[0], obj[keys[0]]) > 0
-        ? { kind, key: keys[0] } : null;
-    };
-    return best(info && info.named_endpoints, 'named')
-        || best(info && info.unnamed_endpoints, 'index');
+  function pickEndpoints(info) {
+    const named = Object.keys((info && info.named_endpoints) || {});
+    const first = (re) => named.filter((k) => re.test(k)).sort()[0] || null;
+    const add = first(/^\/_add_user(_\d+)?$/);
+    const bot = first(/^\/_bot(_\d+)?$/);
+    return add && bot ? { add, bot } : null;
   }
 
   /**
-   * Say something, and read the answer back off the event stream.
+   * Say something, and read the answer back as it is written.
    *
-   * Gradio's external contract is two calls: POST the arguments and get an
-   * event id, then GET that id as server-sent events. The stream carries the
-   * whole output each time rather than a delta, so the last complete frame
-   * wins — which also means a dropped middle frame costs nothing.
+   * The whole conversation goes back up on every turn — that, and not anything
+   * we keep here, is what gives the thing on the other end its memory. What
+   * comes back replaces what we had, so a tool call it made along the way is
+   * part of the history it sees next time.
    */
   async function ask(text, onChunk) {
     if (!endpoint) throw new Error('no chat endpoint on that app');
-    return endpoint.kind === 'named'
-      ? askNamed(text, onChunk) : askQueue(text, onChunk);
-  }
-
-  /** The documented external route, for an app whose author set `api_name`. */
-  async function askNamed(text, onChunk) {
-    const url = CRT.host + '/gradio_api/call' + endpoint.key;
-    const r = await fetch(url, {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: [text] }),
-    });
-    if (!r.ok) throw new Error('call ' + r.status);
-    const { event_id: id } = await r.json();
-    const s2 = await fetch(url + '/' + id, { credentials: 'include' });
-    return drain(s2, onChunk);
+    const opened = await call(endpoint.add,
+      { message: { text, files: [] }, history: chat },
+      [{ text, files: [] }, chat], () => {});
+    if (Array.isArray(opened) && opened.length > 1
+        && Array.isArray(opened[1])) chat = opened[1];
+    const args = {
+      history: chat,
+      system_prompt: CRT.prompt,
+      temperature: 0.5,
+      top_p: 1.0,
+      max_tokens: 0,
+      use_tools: el.chip.classList.contains('on'),
+      think: false,
+    };
+    const done = await call(endpoint.bot, args, [
+      args.history, args.system_prompt, args.temperature, args.top_p,
+      args.max_tokens, args.use_tools, args.think,
+    ], (frame) => { const t = reply(frame); if (t) onChunk(t); });
+    if (Array.isArray(done) && Array.isArray(done[0])) chat = done[0];
+    return reply(done);
   }
 
   /**
-   * The queue, for an app whose events have no names — which is most of them.
+   * One call: post the arguments, then read the result off the event stream.
    *
-   * Gradio only publishes `/gradio_api/call/<name>` for listeners whose author
-   * passed `api_name=`, and a Blocks app assembled the ordinary way passes it
-   * for nothing. What every one of them does have is the queue the browser
-   * itself uses: post the arguments with a session hash, then hold one event
-   * stream open for that hash and read the results off it. It is the same wire
-   * the real page uses, which is the argument for it — if the page works, this
-   * works.
+   * Gradio moved the POST to `/call/v2/<name>`, which takes the arguments by
+   * name, and left the old `/call/<name>`, which takes them in order, where it
+   * was. Which of the two an app answers depends on the version it was built
+   * against, so we ask the new one and fall back — and the GET that reads the
+   * stream is the same address on both.
    */
-  async function askQueue(text, onChunk) {
-    const hash = 'fr' + Math.random().toString(36).slice(2, 12);
-    const stream = fetch(CRT.host + '/gradio_api/queue/data?session_hash=' + hash,
-      { credentials: 'include' });
-    const r = await fetch(CRT.host + '/gradio_api/queue/join', {
-      method: 'POST', credentials: 'include',
+  async function call(name, named, ordered, onFrame) {
+    const base = CRT.host + '/gradio_api/call';
+    const post = (url, payload) => fetch(url, {
+      method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        data: [text], event_data: null, fn_index: Number(endpoint.key),
-        trigger_id: null, session_hash: hash,
-      }),
+      body: JSON.stringify(payload),
     });
-    if (!r.ok) throw new Error('join ' + r.status);
-    return drain(await stream, onChunk);
+    let r = await post(base + '/v2' + name, named);
+    if (r.status === 404 || r.status === 422) {
+      r = await post(base + name, { data: ordered });
+    }
+    if (!r.ok) throw new Error(name.slice(2) + ' ' + r.status);
+    const { event_id: id } = await r.json();
+    const s2 = await fetch(base + name + '/' + id,
+      { credentials: 'same-origin' });
+    return drain(s2, onFrame);
   }
 
   /**
    * Read server-sent events off a response until it ends.
    *
-   * Shared by both transports because both speak the same stream. Gradio sends
-   * the whole output every time rather than a delta, so the newest complete
-   * frame simply replaces the last one — which is also why a dropped frame in
-   * the middle costs nothing.
+   * Two shapes arrive on this wire. The REST route sends the output list bare;
+   * the queue wraps it in an envelope with a `msg`. Either way Gradio sends the
+   * whole output every time rather than a delta, so the newest frame simply
+   * replaces the last one — which is also why a dropped frame in the middle
+   * costs nothing.
    */
-  async function drain(s2, onChunk) {
+  async function drain(s2, onFrame) {
     if (!s2 || !s2.ok || !s2.body) throw new Error('stream ' + (s2 ? s2.status : '?'));
     const rd = s2.body.getReader();
     const dec = new TextDecoder();
-    let buf = '', out = '';
+    let buf = '', last = null;
     for (;;) {
       const { value, done } = await rd.read();
       if (done) break;
@@ -235,43 +248,48 @@ const computer = (() => {
         if (!line) continue;
         let payload;
         try { payload = JSON.parse(line.slice(5).trim()); } catch { continue; }
-        if (payload && payload.msg === 'close_stream') { rd.cancel(); return out; }
-        if (payload && payload.msg && !/process_(generating|completed)/.test(payload.msg)) {
-          continue;
+        let out = null;
+        if (Array.isArray(payload)) {
+          out = payload;
+        } else if (payload && typeof payload === 'object') {
+          if (payload.msg === 'close_stream') { rd.cancel(); return last; }
+          if (payload.msg && !/process_(generating|completed)/.test(payload.msg)) {
+            continue;
+          }
+          out = payload.output
+            ? (payload.output.data || payload.output) : null;
         }
-        const flat = flatten(payload && payload.output ? payload.output : payload);
-        if (flat && flat !== out) { out = flat; onChunk(out); }
+        if (out != null) { last = out; onFrame(out); }
       }
     }
-    return out;
+    return last;
   }
 
   /**
-   * Get the assistant's text out of whatever shape Gradio handed back.
+   * The assistant's line, out of the conversation the app hands back.
    *
-   * A chatbot component returns pairs, a messages-format one returns objects
-   * with a role, a plain textbox returns a string, and all three arrive wrapped
-   * in the output array. Rather than commit to one, walk it and take the last
-   * piece of text that is not the thing we just said.
+   * `_bot` returns the history and a scrap of statistics HTML. The history is
+   * Gradio's messages format, where a message's content is a list of parts, and
+   * a turn that used a tool leaves several messages behind: the thoughts, which
+   * carry a title and are drawn as a folded accordion on the web app, and then
+   * the answer. Take everything after the last thing we said, drop the folded
+   * ones, and join what is left.
    */
-  function flatten(p) {
-    const seen = [];
-    const walk = (v, depth) => {
-      if (depth > 6 || v == null) return;
-      if (typeof v === 'string') { seen.push(v); return; }
-      if (Array.isArray(v)) { for (const x of v) walk(x, depth + 1); return; }
-      if (typeof v === 'object') {
-        if (typeof v.content === 'string') { seen.push(v.content); return; }
-        if (typeof v.text === 'string') { seen.push(v.text); return; }
-        for (const k of Object.keys(v)) walk(v[k], depth + 1);
-      }
+  function reply(out) {
+    const h = Array.isArray(out) ? out[0] : null;
+    if (!Array.isArray(h)) return '';
+    let from = h.length;
+    while (from > 0 && h[from - 1] && h[from - 1].role !== 'user') from--;
+    const text = (m) => {
+      const c = m && m.content;
+      if (typeof c === 'string') return c;
+      if (!Array.isArray(c)) return '';
+      return c.filter((x) => x && typeof x.text === 'string')
+        .map((x) => x.text).join('');
     };
-    walk(p, 0);
-    for (let i = seen.length - 1; i >= 0; i--) {
-      const s = seen[i].trim();
-      if (s && s !== history[history.length - 1]) return seen[i];
-    }
-    return seen.length ? seen[seen.length - 1] : '';
+    return h.slice(from)
+      .filter((m) => m && m.role !== 'user' && !(m.metadata && m.metadata.title))
+      .map(text).filter(Boolean).join('\n').trim();
   }
 
   // ── wiring ─────────────────────────────────────────────────────────────────
@@ -297,7 +315,8 @@ const computer = (() => {
           el.err.textContent = 'rejected — check the user and the password';
         } else {
           user = el.user.value.trim();
-          endpoint = pickEndpoint(info);
+          endpoint = pickEndpoints(info);
+          chat = [];
           el.pass.value = '';
           el.login.hidden = true;
           el.row.hidden = false;
@@ -312,10 +331,7 @@ const computer = (() => {
           el.in.focus();
         }
       } catch (err) {
-        el.err.textContent = location.protocol === 'file:'
-          ? 'running off the disk — the service only answers the deployed '
-            + 'origin. open flamme-retarde.edeliverables.com.'
-          : String(err.message);
+        el.err.textContent = String(err.message);
       }
       busy = false;
     });
@@ -347,7 +363,6 @@ const computer = (() => {
     el.in.value = '';
     el.in.style.height = 'auto';
     put('u', '> ' + text);
-    history.push(text);
     const out = put('m', '…');
     try {
       const got = await ask(text, (partial) => {
@@ -394,8 +409,8 @@ const computer = (() => {
     close,
     /** For a test: talk to it without a keyboard. */
     say: (t) => { wire(); el.in.value = t; return send(); },
-    stats: () => ({ active, user, endpoint: endpoint && endpoint.kind + ':'
-      + endpoint.key, lines: history.length,
-      origin: location.origin }),
+    stats: () => ({ active, user, host: CRT.host,
+      endpoint: endpoint && endpoint.add + ' + ' + endpoint.bot,
+      turns: chat.length, origin: location.origin }),
   };
 })();
