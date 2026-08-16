@@ -19,6 +19,39 @@ const ROADS = {
 };
 
 /**
+ * The one place on this coast that has no cars in it.
+ *
+ * OSM tags the strip behind Jadrija's terraces as a road, and the road layer
+ * duly draped a 5 m carriageway down it and the prop layer duly parked on it.
+ * It is not a road. It is the walk between the huts and the water, and putting
+ * traffic on it is the single loudest wrong note in the whole locale — the
+ * place is a bathing station you arrive at by boat or on foot, and the only
+ * vehicles that ever reach it stop at the top of the lane by the pier.
+ *
+ * A capsule about the traced frontage rather than a circle about its middle:
+ * the shore runs 31° off the x axis and a circle wide enough to cover both ends
+ * would reach 60 m further inland than anything needs to. 62 m out from the
+ * line covers the terraces, both rows of kabine, and the first lane behind
+ * them, and leaves the rest of Srima's network alone — the village is meant to
+ * be seen from the air with its streets in it.
+ *
+ * The two ends are `toWorld(0, 0)` and `toWorld(LEN, 0)` off the traced shore,
+ * written here as constants because the road layer is built long before the
+ * locale exists and a road that appears when you fly to Jadrija is worse than
+ * one that was never drawn.
+ */
+const JAD_QUIET = { x0: -2296, z0: 260.4, x1: -2134, z1: 355.6, r: 62 };
+
+function nearJadrija(x, z, extra = 0) {
+  const ex = JAD_QUIET.x1 - JAD_QUIET.x0, ez = JAD_QUIET.z1 - JAD_QUIET.z0;
+  const L2 = ex * ex + ez * ez;
+  const u = clamp(((x - JAD_QUIET.x0) * ex + (z - JAD_QUIET.z0) * ez) / L2, 0, 1);
+  const dx = x - (JAD_QUIET.x0 + ex * u), dz = z - (JAD_QUIET.z0 + ez * u);
+  const r = JAD_QUIET.r + extra;
+  return dx * dx + dz * dz < r * r;
+}
+
+/**
  * Resample a polyline so no step is longer than `step`, dropping any run that
  * crosses water.
  *
@@ -112,8 +145,11 @@ function buildRoads(scene) {
         R.push([p.x + nx * halfW, p.y, p.z + nz * halfW, along]);
       }
       metres += along;
-      // Long enough to be worth putting a car on.
-      if (along > 55) lanes.push({ run, cum, len: along, rank });
+      // Long enough to be worth putting a car on — and not in Jadrija, where a
+      // wider berth than the tarmac gets: a car parked 70 m up the lane is
+      // still a car you can see from the promenade.
+      const quiet = run.some((p) => nearJadrija(p.x, p.z, 45));
+      if (along > 55 && !quiet) lanes.push({ run, cum, len: along, rank });
 
       // uv.x runs 0..1 across the ribbon, uv.y is metres along it.
       const vert = (p, u) => {
@@ -127,6 +163,11 @@ function buildRoads(scene) {
       };
       for (let i = 0; i < run.length - 1; i++) {
         const l0 = L[i], r0 = R[i], l1 = L[i + 1], r1 = R[i + 1];
+        // Per quad rather than per way, so a lane that runs down into Jadrija
+        // stops at the edge of the quiet zone instead of vanishing whole.
+        const mx = (run[i].x + run[i + 1].x) * 0.5;
+        const mz = (run[i].z + run[i + 1].z) * 0.5;
+        if (nearJadrija(mx, mz)) continue;
         // Two triangles, wound so the face points up.
         vert(l0, 0); vert(r0, 1); vert(r1, 1);
         vert(l0, 0); vert(r1, 1); vert(l1, 0);

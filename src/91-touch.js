@@ -246,6 +246,11 @@ function initTouch() {
   // taps to guard against a brush you can undo is the wrong trade. J on a
   // keyboard has always been one press; this is the phone catching up.
   tap('t-jad', () => skipToJadrija());
+  // And the vikendica, for the same reason and on the same terms: one tap,
+  // because it is a place you go to look at something and come back from, not a
+  // door that shuts behind you. It plays the walk up rather than dropping you
+  // on the floor, so a phone gets the arrival and not just the destination.
+  tap('t-vik', () => skipToVikendica());
   arm('t-rok', () => skipToGround());
 
   // ── on foot ───────────────────────────────────────────────────────────────
@@ -342,6 +347,10 @@ function initTouch() {
   hold('t-look', (v) => { TOUCH.glook = v; });
   tap('t-up', () => launchOut());
   tap('t-in', () => toggleGround());
+  // On foot this is V again, and V already means both things: outside the house
+  // it walks you up to it, inside it swaps the roof. One button, and the label
+  // says which — see `updateGroundHUD`.
+  tap('t-roof', () => skipToVikendica());
   tap('t-gset', () => togglePanel());
   tap('t-gpause', () => togglePause());
   tap('t-run', (el) => {

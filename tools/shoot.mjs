@@ -142,7 +142,12 @@ async function main() {
   const touchRelease = () =>
     send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 
-  const url = `${URL_BASE}?q=${quality}&cb=${process.pid}`;
+  // Keep whatever query --url already carried. It used to append `?q=…`
+  // unconditionally, which turns `page.html?touch` into `page.html?touch?q=low`
+  // — a single parameter named "touch?q", so `?touch` and every other flag you
+  // tried to pass silently did nothing.
+  const sep = URL_BASE.includes('?') ? '&' : '?';
+  const url = `${URL_BASE}${sep}q=${quality}&cb=${process.pid}`;
   await send('Page.navigate', { url });
 
   const evalJs = async (expr) => {

@@ -98,6 +98,17 @@ const JAD = {
   // plus a metre of doorstep. Past that is the town builder's job, seen from the
   // deck rather than walked into.
   reachIn: 38,
+
+  // Where the rows begin, measured from the western end of the frontage.
+  //
+  // It was 8, which put kabine along the whole 189 m, and that is not how the
+  // aerial reads: the huts are packed round the jetty and the eastern spit, and
+  // the western end is beach — bathers, a few pines, and the first row of houses
+  // looking straight out at the channel. Starting at 52 gives that back, and it
+  // is what makes room for the vikendica to stand where a first-row house
+  // stands. It costs about a fifth of the huts, which still leaves the eighty
+  // that carry the row.
+  rowFrom: 52,
 };
 
 /**
@@ -1124,7 +1135,7 @@ async function buildJadrija(scene) {
    */
   const gapAt = LEN * 0.5;
   for (const [front, phase] of [[JAD.rowA, 0], [JAD.rowB, JAD.cabW * 0.5]]) {
-    let t = 8 + phase;
+    let t = JAD.rowFrom + phase;
     while (t < LEN - 14) {
       // Five to ten. Seven to thirteen was right when the shore was 411 m long
       // and is not now: the count that matters is the total, which wants to come
@@ -2637,12 +2648,24 @@ async function buildJadrija(scene) {
   const greens = [];
   for (let t = 5; t < LEN - 5; t += 6 + rng() * 9) {
     const s = JAD.rowB + 2.6 + rng() * 5.0;
+    // Not through the vikendica, which stands out here now and is 6.8 by 7.7 of
+    // the strip these were planted along.
+    if (Math.hypot(t - VIK.t, s - VIK.s) < 8.5) continue;
     const st = at(t), y = surfaceY(t, s);
     const r = rng();
     if (r < 0.42) { pine(t, s, y, 7.5 + rng() * 4.5); greens.push([t, s, 0.55, 9]); }
     else if (r < 0.72) { olive(t, s, y, 4.2 + rng() * 1.6); greens.push([t, s, 0.60, 5]); }
     else oleander(t, s, y, 0.85 + rng() * 0.55);
   }
+  // Two pines beside the vikendica's terrace — the only thing that is allowed
+  // to be in that view, and the thing that is in it in life. Beside and not in
+  // front: at ±8 m along the shore they frame the water rather than stand in it.
+  for (const dt of [-8.2, 8.6]) {
+    const t = VIK.t + dt, s = VIK.s - 3.4 + (dt > 0 ? 1.1 : 0);
+    pine(t, s, surfaceY(t, s), 8.4 + rng() * 2.2);
+    greens.push([t, s, 0.55, 9]);
+  }
+
   // There used to be a second run of oleander tight against the front row's
   // doors, at rowA − 1.15, one every four or five metres for the whole length.
   // It came off. Real cabin rows on this coast have nothing planted along them
@@ -3793,7 +3816,22 @@ async function buildJadrija(scene) {
       for (const p of poly) { cx += p[0]; cz += p[1]; }
       cx /= poly.length; cz /= poly.length;
       const [t, s] = local(cx, cz);
-      if (t < -55 || t > LEN + 55 || s < -6 || s > HOUSE.reach) continue;
+      if (t < -80 || t > LEN + 80 || s < -6 || s > 130) continue;
+      // Thinning.
+      //
+      // OSM has 286 footprints in this box and the aerial does not. Some of
+      // that is real — the mapper has traced every shed, terrace roof and lean-
+      // to as its own building — and some of it is that a footprint drawn at
+      // full height is a house whether it is one or not. Whatever the cause,
+      // what you see standing on the promenade is a solid grey mass where the
+      // photograph shows separate houses with gaps and olive between them.
+      //
+      // So a bit under half of them come out, deterministically, and they come
+      // out of the town builder too rather than being merely undrawn here: the
+      // gap is the point. Nothing near the water is thinned, because there is
+      // nothing there to thin — OSM maps nothing within 39 m of this shore.
+      if (hr() < 0.44) { taken.add(bl); continue; }
+      if (s > HOUSE.reach) continue;
       taken.add(bl);
       detailHouse(poly, bl.h || 6, hr);
     }
@@ -3893,12 +3931,15 @@ async function buildJadrija(scene) {
    * the terrain, or standing one step past the back wall would put you on an
    * invisible shelf at promenade height.
    */
-  function walkY(x, z) {
+  function walkY(x, z, yHint) {
     const [t, s] = local(x, z);
     // The vikendica first: its upper floor is 2.9 m over the ground it
-    // stands on, and the flight up the outside is a ramp between the two.
+    // stands on, the flight up the outside is a ramp between the two, and the
+    // mezzanine is a third floor over the second. `yHint` is where whoever is
+    // asking is standing now, which is the only thing that can tell the floor
+    // from the deck three metres above it.
     if (vik) {
-      const f = vik.floorAt(t, s);
+      const f = vik.floorAt(t, s, yHint);
       if (f != null) return f;
     }
     if (t < -5 || t > LEN + 5 || s < -3 || s > JAD.back + JAD.bleed) {
@@ -6767,6 +6808,11 @@ async function buildJadrija(scene) {
     bounds: { t0: 3, t1: LEN - 3, s0: 1.1,
       s1: Math.max(JAD.reachIn, VIK.s + 7.6) },
     blockers, local, toWorld, walkY, inField, vik,
+    /**
+     * Where you are a person rather than a clearance. See `GROUND.tight` — this
+     * is the only locale in the game with an inside to be inside of.
+     */
+    tightTS: (t, s) => !!(vik && vik.tight(t, s)),
     /** Debug: put her at (t, s), and optionally straight into a phase. */
     putShow: (t, s, phase, at, ang) => {
       if (!show || !skinFig) return null;

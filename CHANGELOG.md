@@ -8,6 +8,109 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.62.0] — 2026-08-16
+
+### Changed — the vikendica moves to the front row
+
+It stood on the lane behind the back row of kabine, which is behind a hundred
+huts. This is a first-row house — the whole reason it is worth modelling is
+that the balcony faces open water — so it has moved to the beach end of the
+frontage, at t 24, with the promenade in front of it and the channel beyond
+that. The jetty is a seventy-metre walk away.
+
+To make room, the kabine now start at t 52 instead of t 8. That is also what
+the aerial shows: the huts are packed round the jetty and the eastern spit and
+the western end is beach. It costs about a fifth of them.
+
+Two pines stand either side of the terrace, at ±8 m along the shore, which is
+the only thing allowed to be in that view and the thing that is in it in life.
+
+### Changed — no cars in Jadrija
+
+OSM tags the strip behind the terraces as a road, so the road layer draped a
+5 m carriageway down the seafront and the prop layer parked on it. It is not a
+road, it is the walk between the huts and the water. Every ribbon within 62 m
+of the traced frontage is now dropped — per quad, so a lane running down into
+the resort stops at the edge rather than vanishing whole — and no lane passing
+within 107 m gets traffic. Two cars are placed by hand at the top of the lane
+behind the kabine, which is where the two in the photograph are. The rest of
+Srima keeps its streets.
+
+And a bit under half the OSM footprints in a wide band round the resort come
+out, of the town builder as well as of the near-detail pass. Some of what OSM
+has here is real and some is every shed and terrace roof traced as its own
+building; either way what you saw from the promenade was a solid grey mass
+where the photograph has separate houses with gaps between them.
+
+### Added — the walk up, and the stairs that go with it
+
+**V** now plays the arrival rather than teleporting: six legs along the
+promenade, up the outside flight, across the landing and in through the front
+door, ending in the middle of the floor with the terrace and the channel in
+front of you. Press V again to cut it short. V once you are inside still swaps
+the roof.
+
+Both staircases are walkable. The outside flight is a ramp between the
+promenade and +2.90 and the mezzanine's ladder-stair is a ramp between +2.90
+and the deck at +5.45, and which of the two floors you are on is decided by
+where you are standing rather than by where you are — without that, walking
+under the mezzanine puts you on top of it.
+
+### Added — the house on a phone
+
+V is a key, and a phone has no keys, so both halves of it are now buttons.
+
+- **VIKENDICA** joins BAIL / JADRIJA / ROKIĆI in the one-way-door row. One tap,
+  on the same terms as Jadrija: it is a place you go to look at something and
+  come back from, not a door that shuts behind you. It plays the walk up, so a
+  phone gets the arrival and not just the destination.
+- **HOUSE / ROOF** on the on-foot row is the same key doing its two jobs, and
+  the label says which one: outside the house it walks you there, on the floor
+  plate it swaps the roof and lights up while the raised one is on.
+- Any touch ends the walk-up early. Every touch layer is hidden while it runs —
+  that is what makes it a shot and not a walk with the controls drawn over it —
+  so without this there was no button on the screen to stop it with.
+
+### Fixed — you were a giant, and the house was in a hole
+
+`GROUND.girth` is 0.55 m, which is a clearance and not a body: outdoors it
+keeps the camera off a hangar wall and costs nothing, and indoors it makes you
+1.10 m across — too wide for a 0.90 m door, with 0.3 m of aisle between a sofa
+and a worktop. Inside the vikendica it is now 0.26, and the walking pace drops
+to 42% with it. The house's own blockers are no longer pre-shrunk to
+compensate; they are the walls.
+
+- The house sat 0.9 m low. Its base came off `groundAt`, which is the terrain
+  *under* the promenade, and 0.9 m of made ground is what the promenade is. The
+  foot of its stair was in a pit.
+- The outside flight arrived *in* the doorway: the last thing between the
+  promenade and the front door was a 17 cm step with no floor to stand on while
+  you crossed it. The landing now covers the opening, and the walkable surfaces
+  of the house and the stair overlap rather than leaving a 7 cm slot you fell
+  2.9 m through.
+- The mezzanine stair's bottom two treads were buried in the south wall and its
+  foot was outside the building.
+
+### Changed — glass, ceilings, and a fish
+
+- **The glazing is drawn through.** It goes out as its own blob and is drawn
+  with a transparent material. Thirteen square metres of this house is glass
+  and the point of standing in it is the water on the other side; baked in with
+  the walls the terrace doors read as a boarded-up opening.
+- **Ceilings are no longer tan.** A downward-facing surface collected the warm
+  ground-bounce ambient, which is right outdoors and wrong under a white
+  ceiling with the sea outside. Downward normals now sample the sky term.
+- **The mounted TV between the two bedroom doors is gone**, and the fish clock
+  is on that wall: cut ply, pale blue with darker fins and stripes, coral
+  numbers, black hands at ten past ten and one round eye. It is the only object
+  in the flat anybody has ever remarked on.
+
+### Fixed — tools
+
+`shoot.mjs` appended `?q=…` to the URL unconditionally, so `page.html?touch`
+became `page.html?touch?q=low` — one parameter named `touch?q`, and every flag
+you tried to pass by hand silently did nothing.
+
 ## [1.61.0] — 2026-08-15
 
 ### Added — the vikendica at Jadrija

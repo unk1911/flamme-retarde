@@ -582,6 +582,20 @@ function buildProps(scene, lanes) {
     }
   }
 
+  // Two, at the top of the lane behind the kabine, and that is every car in
+  // Jadrija. The road layer keeps its whole network out of the place (see
+  // `nearJadrija`), which leaves the resort with no lane to park on — so these
+  // are placed in world metres rather than picked off a run. Two is the number
+  // in the aerial and two is the number that makes the point: somebody drove
+  // here, and then everybody walked.
+  for (const [x, z, k] of [[-2168.2, 291.4, 0], [-2163.9, 293.9, 1]]) {
+    cars.unshift({
+      fixed: { x, y: Math.max(groundAt(x, z), 0), z, hx: 0.862, hz: 0.506 },
+      s: 0, dir: k ? -1 : 1, speed: 0, moving: false, offset: 0,
+      col: CAR_COL[k ? 3 : 0],
+    });
+  }
+
   // ── per-frame ──────────────────────────────────────────────────────────────
   let tAcc = 0;
   let density = 1;
@@ -636,7 +650,7 @@ function buildProps(scene, lanes) {
         if (c.s > c.lane.len) c.s -= c.lane.len;
         if (c.s < 0) c.s += c.lane.len;
       }
-      const p = onLane(c.lane, c.s);
+      const p = c.fixed || onLane(c.lane, c.s);
       // Croatia drives on the right, so a car sits half a lane to the right of
       // its direction of travel; a parked one sits out on the verge.
       const off = c.moving ? ROADS.width[c.lane.rank] * 0.24 : c.offset;

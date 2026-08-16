@@ -201,7 +201,15 @@ ST_W = 1.10
 ST_N = 17
 ST_RISE = 0.17
 ST_GO = 0.25
-ST_TOP = (D_ENTRY[0] + D_ENTRY[1]) / 2 + 0.30    # the landing, at the door
+# The top tread, which stops just short of the door — so the landing, which
+# runs from here northward, is what is under the opening.
+#
+# It used to be the door's centreline plus 30 cm, which put the head of the
+# flight *in* the doorway: the last thing between the promenade and the front
+# door was a 17 cm step with no floor to stand on while you crossed it. It read
+# fine in a render and it was a hole you fell 2.9 m through the moment anybody
+# tried to walk in.
+ST_TOP = D_ENTRY[0] - 0.06
 ST_BOT = ST_TOP - ST_GO * (ST_N - 1)
 
 # The renovation.
@@ -1083,6 +1091,133 @@ def _lay_disc(kit, colour, cx, cy, cz, r, t):
         v.co = (cx + x, cy + z, cz + y)
 
 
+def _plate(kit, colour, poly, y0, y1, bev=0.003):
+    """A flat shape on a wall: a closed (x, z) polygon extruded along y.
+
+    Everything else in this house is a box because everything else in this house
+    *is* a box. A fish is not, and the one thing on these walls that anybody has
+    ever remarked on is a fish, so there is one general-purpose silhouette
+    primitive and this is it.
+
+    The winding is forced rather than trusted. A face's normal is the cross
+    product of its first two edges, and getting it backwards on a plate this
+    thin does not look like a reversed normal — it looks like the object is
+    simply not there, because you are seeing its inside from outside. So the
+    polygon is turned anticlockwise here whatever order it arrives in, and the
+    side quads are wound `front, back, back, front`, which is the order that
+    puts their normals outward and is the opposite of the one that reads right.
+    """
+    area = sum(poly[i][0] * poly[(i + 1) % len(poly)][1]
+               - poly[(i + 1) % len(poly)][0] * poly[i][1]
+               for i in range(len(poly)))
+    if area < 0:
+        poly = list(reversed(poly))
+    bm = kit.bm(colour, bev)
+    lo = [bm.verts.new((x, y0, z)) for x, z in poly]
+    hi = [bm.verts.new((x, y1, z)) for x, z in poly]
+    bm.verts.ensure_lookup_table()
+    n = len(poly)
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((lo[i], hi[i], hi[j], lo[j]))
+    bm.faces.new(tuple(lo))
+    bm.faces.new(tuple(reversed(hi)))
+
+
+FISH_BODY = (0.46, 0.75, 0.88)
+FISH_FIN = (0.13, 0.47, 0.72)
+FISH_NUM = (0.95, 0.53, 0.47)
+
+
+def fish_clock(kit, cx, cz, wall, r=0.178):
+    """The fish.
+
+    A cut and painted ply fish with a quartz movement through the middle of it,
+    pale blue with darker blue fins and stripes, coral numbers and black hands,
+    and one round eye with a white highlight in it. It hangs on the spine wall
+    between the two bedroom doors and it is, by a distance, the most-photographed
+    object in the flat.
+
+    `r` is the body's semi-major axis, so the whole fish including its tail is
+    about 3.3 r long — 0.50 m at the default, which is a wall clock and not a
+    decoration. Built out of convex pieces that overlap rather than as one
+    concave outline: a fish is a body, a snout, two fins and a forked tail, and
+    five convex plates that intersect are five plates that triangulate, where
+    one twenty-eight-point concave ngon is a coin toss.
+    """
+    face = wall - 0.016            # the front of the ply, into the room
+    P = lambda poly, col, y0, y1, bev=0.003: _plate(  # noqa: E731
+        kit, col, [(cx + px * r, cz + pz * r) for px, pz in poly], y0, y1, bev)
+
+    # Fins and tail first and a hair deeper, so the body reads as sitting on
+    # top of them the way the paint does.
+    fin_face = face + 0.004
+    P([(-0.02, 1.44), (-0.32, 0.74), (0.38, 0.70)], FISH_FIN, fin_face, wall)
+    P([(-0.10, -1.38), (-0.36, -0.72), (0.28, -0.76)], FISH_FIN, fin_face, wall)
+    # The tail in three: the peduncle that carries it off the body, then the two
+    # lobes of the fan. Two lobes alone leave a wedge of bare wall between the
+    # body and the fork, which reads as a fish that has come apart.
+    P([(0.55, 0.38), (1.30, 0.15), (1.30, -0.15), (0.55, -0.38)],
+      FISH_FIN, fin_face, wall)
+    P([(1.18, 0.12), (1.82, 0.94), (1.62, 0.02)], FISH_FIN, fin_face, wall)
+    P([(1.18, -0.12), (1.82, -0.94), (1.62, 0.02)], FISH_FIN, fin_face, wall)
+
+    body = [(math.cos(TAU * i / 30), 0.86 * math.sin(TAU * i / 30))
+            for i in range(30)]
+    P(body, FISH_BODY, face, wall, bev=0.005)
+    P([(-0.80, 0.42), (-0.80, -0.40), (-1.60, -0.04)], FISH_BODY, face, wall,
+      bev=0.005)
+    # The mouth: a notch of the darker blue at the tip of the snout.
+    P([(-1.58, -0.05), (-1.16, 0.10), (-1.14, -0.20)], FISH_FIN,
+      face - 0.002, face + 0.004)
+
+    # Four stripes, each a tapered crescent leaning back the way they do on the
+    # real one. Kept inside |x| < 0.77 at the top and bottom, which is where the
+    # ellipse is at z = ±0.55 — a stripe that runs off the fish is a stripe that
+    # floats on the wall beside it.
+    for k in range(4):
+        x0 = -0.46 + k * 0.36
+        P([(x0 - 0.05, 0.54), (x0 + 0.07, 0.56), (x0 + 0.30, -0.52),
+           (x0 + 0.18, -0.56)], FISH_FIN, face - 0.002, face + 0.004)
+
+    # The eye, and the highlight in it that makes it an eye rather than a hole.
+    _lay_disc(kit, FISH_FIN, cx - 0.60 * r, face - 0.004, cz + 0.36 * r,
+              0.23 * r, 0.010)
+    _lay_disc(kit, (0.97, 0.97, 0.95), cx - 0.54 * r, face - 0.008,
+              cz + 0.42 * r, 0.11 * r, 0.010)
+
+    # Twelve coral numbers on a 0.62 r circle, about the movement rather than
+    # about the body: the spindle is forward of centre because the tail is
+    # behind it, and the numbers go round the spindle.
+    mx, mz = cx + 0.12 * r, cz
+    for h in range(12):
+        a = TAU * (h / 12.0)
+        w = 0.014 if h % 3 == 0 else 0.011
+        px = mx + math.sin(a) * 0.62 * r
+        pz = mz + math.cos(a) * 0.62 * r
+        kit.span(FISH_NUM, px - w, px + w, face - 0.008, face - 0.001,
+                 pz - w * 1.25, pz + w * 1.25, bev=0.002)
+
+    # Hands at ten past ten, which is how every clock in every photograph of a
+    # clock is set, for the good reason that it is the one position where
+    # neither hand is behind the other and neither is over a number. Rectangles
+    # turned about the spindle, because a hand is a plate and not a box.
+    #
+    # Zero points at twelve and the angle runs anticlockwise, so ten o'clock is
+    # +60° and ten past is −60°.
+    def hand(ang, length, half, col=BLACK):
+        c, s = math.cos(ang), math.sin(ang)
+        pts = [(-half, -half * 1.6), (half, -half * 1.6), (half, length),
+               (-half, length)]
+        P([((mx - cx) / r + (px * c - pz * s) / r,
+            (mz - cz) / r + (px * s + pz * c) / r) for px, pz in pts],
+          col, face - 0.014, face - 0.008, bev=0.002)
+
+    hand(math.radians(60.0), 0.062, 0.010)       # hours, at ten
+    hand(math.radians(-60.0), 0.088, 0.007)      # minutes, at ten past
+    _lay_disc(kit, BLACK, mx, face - 0.016, mz, 0.016, 0.008)
+
+
 def living(kit):
     """Dnevni boravak, blagovaonica and the way in, all one room of 23.76 m².
 
@@ -1480,15 +1615,19 @@ def laptop(kit, cx, cy, z):
 
 
 def pictures(kit):
-    """The sunset over the channel, the little blue underwater photograph, the
-    framed certificate and the blue wooden fish. They go on the spine under the
-    bedrooms, which is the one long stretch of wall in the big room that has
-    nothing standing against it."""
+    """The fish clock, the little blue underwater photograph and the framed
+    certificate. They go on the spine under the bedrooms, which is the one long
+    stretch of wall in the big room that has nothing standing against it.
+
+    There used to be a framed sunset over the channel here as well — 80 by 42,
+    dark brown, hung between the two bedroom doors. In a photograph of a real
+    wall that is a picture. In this shader, which has no texture in it, it is an
+    80 by 42 dark rectangle mounted on a wall at eye height between two rooms,
+    and there is exactly one thing that is, so it read as a television. It is
+    gone and the fish has the wall.
+    """
     y = BY0 - 0.005
-    kit.span((0.62, 0.28, 0.16), -0.35, 0.45, y - 0.025, y,
-             F2 + 1.52, F2 + 1.94, bev=0.006)
-    kit.span((0.18, 0.10, 0.08), -0.38, 0.48, y, y + 0.008,
-             F2 + 1.49, F2 + 1.97, bev=0.004)
+    fish_clock(kit, 0.05, F2 + 1.76, y)
     kit.span((0.20, 0.45, 0.62), 1.62, 2.06, y - 0.025, y,
              F2 + 1.58, F2 + 1.86, bev=0.004)
     kit.span(WHITEGOODS, 2.35, 2.62, y - 0.010, y, F2 + 1.55, F2 + 1.90,
@@ -1498,9 +1637,9 @@ def pictures(kit):
     for i in range(3):
         bm_ball(kit.bm((0.70, 0.66, 0.58), 0.004), 0.69 + i * 0.14,
                 y - 0.085, F2 + 1.69, 0.038, 0.038, 0.030, rows=5, seg=10)
-    # And the blue wooden fish, high over the east bedroom door.
-    kit.span((0.20, 0.62, 0.78), 0.66, 0.99, y - 0.023, y,
-             F2 + 2.16, F2 + 2.30, bev=0.010)
+    # The flat blue plaque that used to be up over the east bedroom door came
+    # off with the picture. It was a stand-in for the fish, and the fish is on
+    # the wall now.
 
 
 def ceiling_light(kit, cx, cy, dome=False, sun=False, z=None):
@@ -1731,7 +1870,13 @@ def loft_stair(kit):
     n = 14
     rise = (DECK - F2) / n
     go = 0.20
-    y_top = LOFT_Y - 0.10
+    # The head of the flight, 15 cm shy of the deck's open edge — so the bottom
+    # of it lands at −3.65, which is 1.5 cm inside the room. At LOFT_Y − 0.10 it
+    # landed at −3.90, and the inner face of the south wall is at −3.665: the
+    # bottom two treads were buried in the wall and the foot of the stair was
+    # outside the building. You could not get on to it, which is a hard thing to
+    # see in a render of a staircase that otherwise looks perfectly normal.
+    y_top = LOFT_Y + 0.15
     x = IX1 - 0.52
     for i in range(1, n + 1):
         y = y_top - (n - i) * go
@@ -1935,8 +2080,11 @@ def _prev_material(colour):
     return m
 
 
-def render_shots(kits, prefix, res=(1400, 900), samples=64):
-    """Render every named shot. `kits` is {name: [(object, colour), ...]}."""
+def render_shots(kits, prefix, only=None, res=(1400, 900), samples=64):
+    """Render the named shots. `kits` is {name: [(object, colour), ...]}.
+
+    `only` is a comma-separated list of shot names, because rendering all
+    twenty-odd takes four minutes and checking one change does not."""
     for parts in kits.values():
         for ob, colour in parts:
             ob.data.materials.clear()
@@ -1988,7 +2136,10 @@ def render_shots(kits, prefix, res=(1400, 900), samples=64):
     sc.collection.objects.link(cam)
     sc.camera = cam
 
+    want = set(only.split(",")) if only else None
     for name, (frm, to, lens, use) in SHOTS.items():
+        if want and name not in want:
+            continue
         for k, parts in kits.items():
             for ob, _ in parts:
                 ob.hide_render = k not in use
@@ -2038,6 +2189,19 @@ def main():
         fn(kit)
         parts = kit.parts()
         kits[name] = parts
+        # Glazing goes out as its own blob so the runtime can draw it with a
+        # transparent material.
+        #
+        # This house has thirteen square metres of glass in it and the point of
+        # standing in it is the water on the other side. Baked in with the rest
+        # it is a mid-grey panel and the terrace doors read as a boarded-up
+        # opening — which turns the one room the whole model exists to judge
+        # into a box with a picture of a wall where the view is.
+        glass = [p for p in parts if p[1] == GLASS]
+        parts = [p for p in parts if p[1] != GLASS]
+        if glass:
+            export(glass, OUT / ("vikendica_%s_glass.fr3d.gz" % name),
+                   "the glazing, drawn transparent")
         coll = bpy.data.collections.new(name)
         bpy.context.scene.collection.children.link(coll)
         for ob, _ in parts:
@@ -2053,8 +2217,9 @@ def main():
 
     if "--shots" in argv:
         where = argv[argv.index("--shots") + 1]
+        only = argv[argv.index("--only") + 1] if "--only" in argv else None
         print("rendering shots to %s_*.png" % where)
-        render_shots(kits, where)
+        render_shots(kits, where, only)
 
     BLEND.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND))

@@ -46,6 +46,26 @@ const GROUND = {
   accel: 46,
   drag: 13,
   girth: 0.55,             // how far you are pushed back out of a wall
+  // Indoors, that same number makes you a giant.
+  //
+  // 0.55 is a *clearance*, not a body: it holds you a comfortable half metre
+  // off a hangar wall so the camera never grazes the render, and outdoors there
+  // is nothing it costs. Inside a 50 m² flat it costs everything. It makes you
+  // 1.10 m across, which does not fit through a 0.90 m door and leaves 0.3 m of
+  // usable aisle between a sofa and a worktop — so the rooms read as a doll's
+  // house with somebody enormous shuffling round them, and the one thing the
+  // vikendica is here to answer (does this space work?) cannot be answered at
+  // all. 0.26 is a person: 0.52 across the shoulders, which walks through a
+  // door the way a person walks through a door.
+  //
+  // It applies where the locale says it should and nowhere else. See
+  // `field.tightTS`.
+  tight: 0.26,
+  // And you do not stride at 3.4 m/s across your own living room. At 0.42 that
+  // is a bit over 1.4 m/s, which crosses the big room in four seconds instead
+  // of one and a half — the difference between looking at a room and being able
+  // to stop in front of something.
+  indoorPace: 0.42,
   // And out of a person. The rig is 0.40 m across the shoulders with the arms
   // hanging outside that, so 0.30 is honestly what one of them occupies and two
   // of them keep 0.60 m between centres: close enough to hand something over,
@@ -275,13 +295,25 @@ async function buildGround(scene, field) {
    * and converting each one to a world-space box would be inventing a second
    * source of truth for the same rectangle.
    */
+  /**
+   * How much room you take up at this locale point.
+   *
+   * One number everywhere was fine while every wall in the game was a hangar.
+   * A locale that has an interior in it says so, and inside one you are a person
+   * rather than a clearance — see `GROUND.tight`.
+   */
+  const girthAt = (t, s) =>
+    (field.tightTS && field.tightTS(t, s) ? GROUND.tight : GROUND.girth);
+
   /** Is this locale point inside any structure? */
   function inside(t, s) {
+    const g = girthAt(t, s);
     for (const b of field.blockers) {
+      if (b.off) continue;
       const c = b.rot ? Math.cos(b.rot) : 1, sn = b.rot ? Math.sin(b.rot) : 0;
       const dt0 = t - b.t, ds0 = s - b.s;
       const dt = dt0 * c + ds0 * sn, ds = -dt0 * sn + ds0 * c;
-      if (Math.abs(dt) < b.a + GROUND.girth && Math.abs(ds) < b.c + GROUND.girth) {
+      if (Math.abs(dt) < b.a + g && Math.abs(ds) < b.c + g) {
         return true;
       }
     }
@@ -303,7 +335,7 @@ async function buildGround(scene, field) {
    * cross the promenade was one frame's worth of acceleration — 1.4 m/s, on a
    * key that promises 6, with no wall anywhere near them.
    */
-  function confine(x, z) {
+  function confine(x, z, y) {
     const B = field.bounds;
     let [t, s] = field.local(x, z);
     let hit = false;
@@ -316,9 +348,19 @@ async function buildGround(scene, field) {
     // houses four metres apart, and one pass leaves you standing in a front room.
     // It stops early the moment a pass touches nothing, which is the usual case:
     // somebody walking into a wall overlaps exactly one box.
+    const g = girthAt(t, s);
     for (let pass = 0; pass < 8; pass++) {
       let moved = false;
       for (const b of field.blockers) {
+        // A blocker that is not there at the moment — the mezzanine's gallery
+        // rail while the mezzanine is not built, which is otherwise a length of
+        // invisible fence across the middle of the living room.
+        if (b.off) continue;
+        // Or one that is only there at one level: the same rail, which stops
+        // you on the deck and must not stop you on the floor underneath it.
+        // No height given means the caller is not on a building, so a banded
+        // blocker does not apply to them at all.
+        if (b.y0 != null && (y == null || y < b.y0 || y > b.y1)) continue;
         // A blocker may carry its own rotation within the locale frame. The
         // aerodrome never needs one — everything on it was laid out in runway
         // axes — but a village was laid out to its lanes, and a house at 40° to
@@ -328,7 +370,7 @@ async function buildGround(scene, field) {
         const c = b.rot ? Math.cos(b.rot) : 1, sn = b.rot ? Math.sin(b.rot) : 0;
         const dt0 = t - b.t, ds0 = s - b.s;
         const dt = dt0 * c + ds0 * sn, ds = -dt0 * sn + ds0 * c;
-        const ea = b.a + GROUND.girth, ec = b.c + GROUND.girth;
+        const ea = b.a + g, ec = b.c + g;
         if (Math.abs(dt) >= ea || Math.abs(ds) >= ec) continue;
         // Inside: leave by whichever face is nearest, which is what a wall does.
         let ot = dt, os = ds;
@@ -1249,8 +1291,14 @@ async function buildGround(scene, field) {
     // so the one that should have moved was the rare one. It did, to U.
     //
     // Q still runs. Nobody has to unlearn a key that costs a boolean to keep.
-    const top = (keys.has('ShiftLeft') || keys.has('ShiftRight') || keys.has('KeyQ')
+    let top = (keys.has('ShiftLeft') || keys.has('ShiftRight') || keys.has('KeyQ')
       || TOUCH.grun) ? GROUND.run : GROUND.walk;
+    // Indoors you walk, and you walk slowly. A 4 m room crossed in a second is
+    // a room you cannot look at. See `GROUND.indoorPace`.
+    if (field.tightTS) {
+      const [ct, cs] = field.local(you.x, you.z);
+      if (field.tightTS(ct, cs)) top *= GROUND.indoorPace;
+    }
     const wx = (fx * iz + rx * ix) * top;
     const wz = (fz * iz + rz * ix) * top;
     you.vx = damp(you.vx, wx, m > 0.01 ? GROUND.accel / top : GROUND.drag, dt);
@@ -1261,7 +1309,7 @@ async function buildGround(scene, field) {
     // standing against a hangar can then hold you against it but never push you
     // through it, and a hold is something you can always walk sideways out of.
     const [bx, bz] = unbody(tx, tz);
-    let [nx, nz, hit] = confine(bx, bz);
+    let [nx, nz, hit] = confine(bx, bz, you.y);
     // The waterline, where the locale has one. Tried as two independent axes
     // before being refused outright, so walking into the sea at an angle slides
     // you along the beach instead of gluing you to the spot — the shoreline is
@@ -1295,7 +1343,7 @@ async function buildGround(scene, field) {
     }
     const moved = Math.hypot(nx - you.x, nz - you.z);
     you.x = nx; you.z = nz;
-    you.y = field.walkY(you.x, you.z);
+    you.y = field.walkY(you.x, you.z, you.y);
     gait(moved, dt);
   }
 

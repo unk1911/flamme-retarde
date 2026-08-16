@@ -1072,40 +1072,97 @@ function skipToJadrija() {
   toast(T('toast.cheatJad'));
 }
 
+// ── the way in ───────────────────────────────────────────────────────────────
 /**
- * V — the vikendica.
+ * The walk up to the vikendica, as a shot rather than as a teleport.
  *
- * A ladder to the one room in this game that is worth standing in, until the
- * walk up to it exists. Pressed from the air it is the same trick as 9: retarget
- * the walking mode on to Jadrija and drop you in, except that the drop is on to
- * a floor 2.9 m above the hillside rather than on to the promenade. Pressed
- * again, once you are already in there, it swaps the roof — which is the whole
- * reason the house was modelled, and the comparison is worth a keystroke.
+ * Six legs along the promenade, up the outside flight, across the landing and
+ * in through the front door, in the resort's own (t, s) frame with the height
+ * written out separately — because the whole point of the sequence is the
+ * height: the floor of this house is 2.9 m over the concrete and seventeen
+ * risers is the reason it is 2.9 and not 3. A camera that arrives at the door
+ * without having climbed to it has not told you anything.
+ *
+ * `at` is where the eye is, `look` is what it is on, `dur` is how long the leg
+ * takes, and the pair is interpolated with a smoothstep so each leg eases out of
+ * the last one instead of snapping. The last leg's `at` and `look` are also
+ * where you are standing and what you are facing when it hands back control:
+ * the cut ends on the shot, not near it.
  */
-function skipToVikendica() {
-  if (!ground || !ground.ok || !jadrija || !jadrija.vik) return;
-  const vik = jadrija.vik;
-  if (state.paused) setPaused(false);
+const VIK_WALK = [
+  // Along the promenade from the east, with the house coming up on your left
+  // and the water on your right.
+  { at: [33.5, 15.4, 1.76], look: [26.0, 21.0, 3.20], dur: 2.6 },
+  // At the foot of the flight, looking up it. This is the shot the whole thing
+  // exists for — a first-row house is a house you look *up* at from the walk.
+  { at: [28.8, 19.4, 1.72], look: [28.1, 25.6, 4.30], dur: 1.8 },
+  // Up. Two legs, because a single easing over 2.9 m of rise reads as a lift.
+  { at: [28.1, 22.3, 2.96], look: [28.1, 26.0, 4.50], dur: 1.7 },
+  { at: [28.1, 25.0, 4.56], look: [27.0, 25.3, 4.30], dur: 1.6 },
+  // Through the door, and the room opens out to the left.
+  { at: [26.4, 25.2, 4.56], look: [23.6, 24.0, 4.30], dur: 1.7 },
+  // And stop where you would stop: in the middle of the floor with the terrace
+  // and the channel in front of you.
+  { at: [25.30, 24.10, 4.56], look: [25.10, 15.50, 4.20], dur: 1.9 },
+];
 
-  // Already inside: the key becomes the roof switch. "Inside" is generous on
-  // purpose — anywhere on the floor plate, terrace included, because comparing
-  // the two roofs from the terrace is a fair thing to want.
-  if (state.phase === 'ground') {
-    const [t, s] = jadrija.local(ground.you.x, ground.you.z);
-    if (vik.floorAt(t, s) != null) {
-      const now = vik.roof(vik.roofNow === 'loft' ? 'now' : 'loft');
-      toast(T(now === 'loft' ? 'toast.vikLoft' : 'toast.vikNow'));
-      return;
-    }
+let vikWalk = null;
+
+// A way out of it that does not need a keyboard. Every touch layer is hidden
+// while the sequence runs — that is what makes it a shot rather than a walk
+// with the controls drawn over it — so on a phone there would otherwise be no
+// button to press and eleven seconds is a long time when you have seen it.
+// Any touch, anywhere, ends it and leaves you standing where it was going.
+addEventListener('pointerdown', () => { if (vikWalk) endVikWalk(); });
+
+/** Start the sequence. Returns false if the locale is not up yet. */
+function startVikWalk() {
+  if (!jadrija || !jadrija.vik || !ground || !ground.ok) return false;
+  const p = jadrija.toWorld(VIK_WALK[0].at[0], VIK_WALK[0].at[1]);
+  if (!ground.retarget(jadrija)) return false;
+  if (!ground.dropIn(p[0], p[2], 0)) return false;
+  vikWalk = { leg: 0, u: 0 };
+  $('hud').hidden = true;
+  $('chute-hud').hidden = true;
+  $('ground-hud').hidden = true;
+  if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = true; }
+  return true;
+}
+
+/**
+ * One frame of it. Driven by wall time and not world time: the lens slow-motion
+ * has nothing to do with a walk up a staircase, and a sequence that stretched
+ * because somebody was holding the zoom would be a bug nobody could describe.
+ */
+function stepVikWalk(dt) {
+  if (!vikWalk) return;
+  const base = jadrija.vik.base;
+  const K = VIK_WALK;
+  vikWalk.u += dt / K[vikWalk.leg].dur;
+  while (vikWalk.u >= 1 && vikWalk.leg < K.length - 1) {
+    vikWalk.u -= 1; vikWalk.leg += 1;
   }
-  if (state.phase !== 'fly' && state.phase !== 'ground') return;
+  if (vikWalk.leg >= K.length - 1 && vikWalk.u >= 1) { endVikWalk(); return; }
+  const a = K[vikWalk.leg], b = K[Math.min(vikWalk.leg + 1, K.length - 1)];
+  const f = vikWalk.u * vikWalk.u * (3 - 2 * vikWalk.u);
+  const pt = (key) => {
+    const t = lerp(a[key][0], b[key][0], f), s = lerp(a[key][1], b[key][1], f);
+    const w = jadrija.toWorld(t, s);
+    return [w[0], base + lerp(a[key][2], b[key][2], f), w[2]];
+  };
+  const eye = pt('at');
+  const aim = pt('look');
+  camOverride = [eye[0], eye[1], eye[2], aim[0], aim[1], aim[2]];
+}
 
-  const p = vik.anchor('doorIn');
-  const look = vik.anchor('living');
-  if (!p || !look) return;
-  const yaw = Math.atan2(-(look[0] - p[0]), -(look[2] - p[2]));
-  if (!ground.retarget(jadrija)) return;
-  if (!ground.dropIn(p[0], p[2], yaw)) return;
+/** Put the walker where the last frame of the shot was, and give the keys back. */
+function endVikWalk() {
+  vikWalk = null;
+  camOverride = null;
+  const last = VIK_WALK[VIK_WALK.length - 1];
+  const p = jadrija.toWorld(last.at[0], last.at[1]);
+  const q = jadrija.toWorld(last.look[0], last.look[1]);
+  ground.put(p[0], p[2], Math.atan2(-(q[0] - p[0]), -(q[2] - p[2])), -0.06);
   $('hud').hidden = true;
   $('chute-hud').hidden = true;
   $('ground-hud').hidden = false;
@@ -1113,6 +1170,40 @@ function skipToVikendica() {
   if (!IS_TOUCH) grabPointer();
   paintDeviceText();
   toast(T('toast.cheatVik'));
+}
+
+/**
+ * V — the vikendica.
+ *
+ * Pressed from the air, or from anywhere at Jadrija that is not the house
+ * itself, it plays the walk up: along the promenade, up the outside flight and
+ * in through the door. Pressed again once you are in there it swaps the roof —
+ * which is the whole reason the house was modelled, and the comparison is worth
+ * a keystroke.
+ *
+ * The walk can be cut short by pressing V again, which is not a courtesy: this
+ * is a debug door as much as a piece of cinema, and eleven seconds is a long
+ * time when you are checking whether a wall is in the right place.
+ */
+function skipToVikendica() {
+  if (!ground || !ground.ok || !jadrija || !jadrija.vik) return;
+  const vik = jadrija.vik;
+  if (state.paused) setPaused(false);
+  if (vikWalk) { endVikWalk(); return; }
+
+  // Already inside: the key becomes the roof switch. "Inside" is generous on
+  // purpose — anywhere on the floor plate, terrace included, because comparing
+  // the two roofs from the terrace is a fair thing to want.
+  if (state.phase === 'ground') {
+    const [t, s] = jadrija.local(ground.you.x, ground.you.z);
+    if (vik.floorAt(t, s, ground.you.y) != null) {
+      const now = vik.roof(vik.roofNow === 'loft' ? 'now' : 'loft');
+      toast(T(now === 'loft' ? 'toast.vikLoft' : 'toast.vikNow'));
+      return;
+    }
+  }
+  if (state.phase !== 'fly' && state.phase !== 'ground') return;
+  startVikWalk();
 }
 
 /**
@@ -1450,6 +1541,23 @@ function updateGroundHUD(dt) {
   else if (g.canBoard) hint = TK('ground.board', 'ground.boardTouch');
   $('gh-hint').textContent = hint;
   $('gh-hint').className = urgent ? 'urgent' : '';
+
+  // The house button says which of its two jobs it is about to do. Standing on
+  // the floor plate — terrace included, because comparing the two roofs from
+  // the terrace is a fair thing to want — it is the roof switch and lights up
+  // when the raised one is on; anywhere else it is the way there.
+  if (IS_TOUCH && jadrija && jadrija.vik) {
+    const vik = jadrija.vik;
+    const [vt, vs] = jadrija.local(ground.you.x, ground.you.z);
+    const inHouse = vik.floorAt(vt, vs, ground.you.y) != null;
+    const el = $('t-roof');
+    const key = inHouse ? 'touch.roof' : 'touch.vik';
+    if (el.dataset.i18n !== key) {
+      el.dataset.i18n = key;
+      el.textContent = T(key);
+    }
+    el.classList.toggle('on', inHouse && vik.roofNow === 'loft');
+  }
 
   // classList, not className: on an SVG element className is a read-only
   // SVGAnimatedString and assigning to it throws every frame.
@@ -1921,6 +2029,7 @@ function frame() {
   // exponential and 0.35 of it still converges — but it would take three times
   // as long to finish, and the thing you pressed the key for would come in like
   // a hydraulic door.
+  if (vikWalk) stepVikWalk(real);
   if (!camOverride) stepLens(real);
   // And the mix goes under water with it. There is nothing to slow down in
   // there — every voice in this game is synthesised rather than played — so
@@ -2510,6 +2619,20 @@ window.__fr = {
       ground.dropIn(p[0], p[2], a);
       ground.put(p[0], p[2], a, 0);
       return { at: p.map((n) => +n.toFixed(2)), yaw: +a.toFixed(3) };
+    },
+    /**
+     * Start the walk-up and run it forward by `secs`.
+     *
+     * The sequence is driven by wall time and this page runs at about one frame
+     * a second under software GL, with `real` clamped to 0.05 — so eleven
+     * seconds of settling advances half a second of it and a screenshot of the
+     * cut is a screenshot of its first leg. Same reason `ground.tick` exists.
+     */
+    cut: (secs = 0) => {
+      if (!vikWalk && !startVikWalk()) return 'no locale';
+      const dt = 1 / 30;
+      for (let i = 0; i < Math.round(secs / dt) && vikWalk; i++) stepVikWalk(dt);
+      return vikWalk ? { leg: vikWalk.leg, u: +vikWalk.u.toFixed(2) } : 'done';
     },
   },
 
