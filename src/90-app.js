@@ -190,7 +190,16 @@ addEventListener('keydown', (e) => {
     }
     return;
   }
-  if (comp) { e.preventDefault(); if (e.code === 'Escape') skipToComputer(); return; }
+  if (comp) {
+    e.preventDefault();
+    if (e.code !== 'Escape') return;
+    // Belt and braces: anything that manages to pause the world mid-move — an
+    // alt-tab on the way down into the chair — would otherwise freeze the state
+    // machine with no way out, because this is the only key it listens to.
+    if (state.paused) setPaused(false);
+    skipToComputer();
+    return;
+  }
   if (e.code === 'KeyO') { e.preventDefault(); skipToComputer(); return; }
   if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); togglePause(); return; }
   // Ahead of the pause guard on purpose: pausing to read the hint and then
@@ -254,7 +263,13 @@ document.addEventListener('pointerlockchange', () => {
   // every time, because the ask comes at the end of a thirty-second cinematic.
   // Pausing on that stopped the game on the first frame of flight.
   // The settings panel drops the lock on purpose and is exempt.
-  if (had && !pointerLocked && $('panel').hidden) setPaused(true);
+  // The settings panel drops the lock on purpose and is exempt. So is sitting
+  // down at the laptop, which drops it on purpose too — and pausing on that was
+  // a deadlock rather than a nuisance: the pause returns before `stepComputer`,
+  // so the camera froze halfway into its move, the terminal never opened, and
+  // the only key the computer state machine listens to is one the paused game
+  // could not act on. O put you in a Paused screen you could not leave.
+  if (had && !pointerLocked && $('panel').hidden && !comp) setPaused(true);
 });
 addEventListener('mousemove', (e) => {
   if (!pointerLocked) return;
@@ -1286,11 +1301,21 @@ function endComputer() {
  * worth more than being told. It is also the only thing in the game you are
  * *supposed* to point four hundred litres at that is not on fire.
  *
- * Half a metre of tolerance around the hinge, which is generous: `you.aim` is
- * where the jet actually lands and a jet is not a laser, and a player who has
- * decided to soak a laptop should not have to be accurate about it.
+ * Measured against where the branch is *pointed*, not against `you.aim`. That
+ * was the first cut and it never once fired: `you.aim` is where the jet trace
+ * stops, and the trace stops on the *terrain* — which indoors on the upper
+ * floor is a metre under the floorboards, so the aim point was always out on
+ * the hillside somewhere through the west wall, tens of metres from a laptop
+ * two metres in front of your face. Nothing about the laptop was wrong; the
+ * question was.
+ *
+ * So: is the laptop within four metres and within a hand's width of the line
+ * the water is going down. 42 cm off that line at two metres is about 12°,
+ * which is generous, and it should be — a jet is not a laser and somebody who
+ * has decided to hose a laptop should not have to be accurate about it.
  */
 let sprayHeld = 0;
+const sprayDir = new THREE.Vector3();
 function checkLaptopSpray() {
   if (state.phase !== 'ground' || !ground || !ground.you || !jadrija) {
     sprayHeld = 0; return;
@@ -1299,11 +1324,16 @@ function checkLaptopSpray() {
   if (!you.spraying || you.jet < 0.4) { sprayHeld = 0; return; }
   const p = compAt('at');
   if (!p) { sprayHeld = 0; return; }
-  const d = Math.hypot(you.aim[0] - p[0], you.aim[1] - p[1] - 0.10,
-    you.aim[2] - p[2]);
+  camera.getWorldDirection(sprayDir);
+  const e = camera.position;
+  const vx = p[0] - e.x, vy = p[1] - e.y, vz = p[2] - e.z;
+  const along = vx * sprayDir.x + vy * sprayDir.y + vz * sprayDir.z;
+  if (along < 0.30 || along > 4.0) { sprayHeld = 0; return; }
+  const off = Math.hypot(vx - sprayDir.x * along, vy - sprayDir.y * along,
+    vz - sprayDir.z * along);
   // Held, not touched. A jet that sweeps across the desk on its way to
   // something else should not sit you down.
-  sprayHeld = d < 0.52 ? sprayHeld + 1 : 0;
+  sprayHeld = off < 0.42 ? sprayHeld + 1 : 0;
   if (sprayHeld > 24) { sprayHeld = 0; ground.setSpray(false); skipToComputer(); }
 }
 
@@ -2821,6 +2851,15 @@ window.__fr = {
       return comp ? comp.phase : null;
     },
     say: (t) => computer.say(t),
+    /**
+     * Hose the laptop from wherever you are standing, as the frame loop would.
+     * `checkLaptopSpray` runs once a frame and a headless page runs about one
+     * of those a second, so testing this by waiting is testing nothing.
+     */
+    spray: () => {
+      for (let i = 0; i < 60 && !comp; i++) checkLaptopSpray();
+      return { phase: comp ? comp.phase : null, held: sprayHeld };
+    },
     stats: () => ({ ...computer.stats(), phase: comp ? comp.phase : null }),
   },
   vik: {

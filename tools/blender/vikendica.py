@@ -188,7 +188,7 @@ W_S4_N = (-1.64, -0.44, 1.00, 2.05)          # north wall of the west bedroom
 W_S4_W = (1.60, 2.50, 1.00, 2.05)            # and its window on to the west
 W_S3_E = (1.70, 2.90, 1.00, 2.05)            # east wall of the east bedroom
 W_KIT_W = (-3.30, -2.10, 1.00, 2.05)         # the west wall of the big room
-W_BATH_W = (-0.60, 0.00, 1.40, 2.05)         # the bathroom, high and small
+W_BATH_W = (-0.24, 0.36, 1.40, 2.05)         # the bathroom, high, over the WC
 W_N = (1.60, 2.30, 1.00, 2.05)               # the one window on the north wall
 
 # The terrace: the full width of the house, 220 deep, on the south.
@@ -411,11 +411,46 @@ def _face_span(axis, at, a0, a1, z0, z1, d0, d1):
     return (at + d0, at + d1, a0, a1, z0, z1)
 
 
+def _rects_minus(rects, holes):
+    """Axis-aligned rectangle difference, in (a0, a1, z0, z1).
+
+    Rectangles in, rectangles out — nothing clever, and it does not need to be:
+    a wall has one door in it and maybe a window, and both are boxes."""
+    out = list(rects)
+    for h in holes:
+        nxt = []
+        for (a0, a1, z0, z1) in out:
+            if h[1] <= a0 or h[0] >= a1 or h[3] <= z0 or h[2] >= z1:
+                nxt.append((a0, a1, z0, z1))
+                continue
+            if h[0] > a0:
+                nxt.append((a0, h[0], z0, z1))
+            if h[1] < a1:
+                nxt.append((h[1], a1, z0, z1))
+            m0, m1 = max(a0, h[0]), min(a1, h[1])
+            if h[2] > z0:
+                nxt.append((m0, m1, z0, h[2]))
+            if h[3] < z1:
+                nxt.append((m0, m1, h[3], z1))
+        out = nxt
+    return [r for r in out if r[1] - r[0] > 0.004 and r[3] - r[2] > 0.004]
+
+
 def tiled_face(kit, axis, at, a0, a1, z0, z1, face=1, size=0.20,
-               colour=TILE_WALL, accent=TILE_DEEP, accent_p=0.05, depth=0.010):
-    """The one that actually works. `axis` names the axis the wall *runs* along."""
-    s = _face_span(axis, at, a0, a1, z0, z1, -face * 0.005, face * 0.004)
-    kit.span(GROUT, *s, bev=0)
+               colour=TILE_WALL, accent=TILE_DEEP, accent_p=0.05, depth=0.010,
+               holes=()):
+    """The one that actually works. `axis` names the axis the wall *runs* along.
+
+    `holes` is the thing this went years without and needed from the first day
+    it was used. A tiled face lays a solid grout slab and then tiles on top of
+    it, and the slab took no account of the openings in the wall behind it — so
+    the bathroom door was a flat 0.56-grey panel seen from the living room and a
+    tiled wall seen from the bathroom, which is to say the bathroom had no door
+    and nobody in it could get out. The window over the WC was bricked up the
+    same way, in the one room in the flat with a single small window in it."""
+    for (b0, b1, c0, c1) in _rects_minus([(a0, a1, z0, z1)], holes):
+        kit.span(GROUT, *_face_span(axis, at, b0, b1, c0, c1,
+                                    -face * 0.005, face * 0.004), bev=0)
     tones = _shades(colour, n=3, lo=0.97, hi=1.02)
     na = max(1, int(round((a1 - a0) / size)))
     nz = max(1, int(round((z1 - z0) / size)))
@@ -425,10 +460,11 @@ def tiled_face(kit, axis, at, a0, a1, z0, z1, face=1, size=0.20,
         for j in range(nz):
             c = (accent if accent and RNG.random() < accent_p
                  else tones[RNG.randrange(len(tones))])
-            kit.span(c, *_face_span(axis, at,
-                                    a0 + i * sa + g, a0 + (i + 1) * sa - g,
-                                    z0 + j * sz + g, z0 + (j + 1) * sz - g,
-                                    0.0, face * depth), bev=0.0015)
+            cell = (a0 + i * sa + g, a0 + (i + 1) * sa - g,
+                    z0 + j * sz + g, z0 + (j + 1) * sz - g)
+            for (b0, b1, c0, c1) in _rects_minus([cell], holes):
+                kit.span(c, *_face_span(axis, at, b0, b1, c0, c1,
+                                        0.0, face * depth), bev=0.0015)
 
 
 # ------------------------------------------------------------------ openings --
@@ -1081,73 +1117,116 @@ def kitchen(kit):
 
 
 def bathroom(kit):
-    """Two thirty-five by one sixty-five, a box in the north-west corner of the
-    big room, with the WC and the shower against the west wall."""
-    x0, x1, y0, y1 = ROOMS["bath"]
-    for axis, at, a0, a1, face in (("x", y0 + 0.01, x0, x1, 1),
-                                   ("x", y1 - 0.01, x0, x1, -1),
-                                   ("y", x0 + 0.01, y0, y1, 1),
-                                   ("y", x1 - 0.01, y0, y1, -1)):
-        tiled_face(kit, axis, at, a0, a1, F2 + 0.02, F2 + 2.05, face=face,
-                   size=0.175, accent=TILE_DEEP, accent_p=0.045)
+    """Two forty-five by one sixty-five, a box in the north-west corner of the
+    big room. Door in the east wall hard against the north side, window high in
+    the west wall at the far end, and everything in it at that far end: shower
+    in the south-west corner, WC against the west wall under the window, basin
+    round the corner on the north wall beside it.
 
-    # Shower in the north-west corner, under the high window.
-    sx, sy = x0 + 0.02, y1 - 0.88
-    kit.span(WHITEGOODS, sx, sx + 0.84, sy, y1 - 0.02, F2 + 0.02, F2 + 0.14,
-             bev=0.012)
-    kit.span((0.86, 0.87, 0.88), sx + 0.04, sx + 0.80, sy + 0.06, y1 - 0.06,
+    That is what the photograph shows and it is not what this used to draw,
+    which had the shower and the WC swapped and the basin and a washing machine
+    strung along the south wall like a galley kitchen — so the room you walked
+    into was a corridor with things down one side of it, and the far end, which
+    is the whole room in life, was empty."""
+    x0, x1, y0, y1 = ROOMS["bath"]
+    d0, d1 = D_BATH[0] - 0.02, D_BATH[1] + 0.02
+    w0, w1 = W_BATH_W[0] - 0.02, W_BATH_W[1] + 0.02
+    for axis, at, a0, a1, face, holes in (
+            ("x", y0 + 0.01, x0, x1, 1, ()),
+            ("x", y1 - 0.01, x0, x1, -1, ()),
+            # 5 cm proud of the room line and not 1, because the west wall is
+            # the outside wall and it already carries a 4 cm skin of plaster on
+            # the inside of it. A tiled face 1 cm in sat 3 cm *inside* that
+            # skin, so the whole far end of the room drew as bare grey plaster
+            # with the tiling buried in it — which is the other half of why
+            # nobody noticed the window behind it had been bricked up.
+            ("y", x0 + 0.055, y0, y1, 1,
+             ((w0, w1, F2 + W_BATH_W[2] - 0.02, F2 + W_BATH_W[3] + 0.05),)),
+            ("y", x1 - 0.01, y0, y1, -1,
+             ((d0, d1, F2 - 0.05, F2 + D_BATH[3] + 0.02),))):
+        tiled_face(kit, axis, at, a0, a1, F2 + 0.02, F2 + 2.05, face=face,
+                   size=0.175, accent=TILE_DEEP, accent_p=0.045, holes=holes)
+
+    # Shower in the south-west corner — the far left as you come in, which is
+    # where the curtain rail and the mixer are in the picture.
+    sx, sy = x0 + 0.07, y0 + 0.02
+    sy1 = sy + 0.84
+    kit.span(WHITEGOODS, sx, sx + 0.86, sy, sy1, F2 + 0.02, F2 + 0.14, bev=0.012)
+    kit.span((0.86, 0.87, 0.88), sx + 0.04, sx + 0.82, sy + 0.06, sy1 - 0.06,
              F2 + 0.10, F2 + 0.125, bev=0.004)
-    kit.span(CHROME, sx + 0.04, sx + 0.10, y1 - 0.18, y1 - 0.12,
+    kit.span(CHROME, sx + 0.04, sx + 0.10, sy + 0.12, sy + 0.18,
              F2 + 1.05, F2 + 1.20, bev=0.004)
-    bm_cylinder(kit.bm(CHROME, 0.003), sx + 0.07, y1 - 0.15,
+    bm_cylinder(kit.bm(CHROME, 0.003), sx + 0.07, sy + 0.15,
                 F2 + 1.20, F2 + 1.92, 0.014, 0.014, seg=8)
-    kit.span(CHROME, sx, sx + 0.86, sy - 0.02, sy + 0.02, F2 + 1.94, F2 + 1.97,
+    kit.span(CHROME, sx, sx + 0.88, sy1 - 0.02, sy1 + 0.02, F2 + 1.94, F2 + 1.97,
              bev=0.004)
-    curtain(kit, "x", sy + 0.03, sx + 0.54, sx + 0.86, F2 + 0.16, F2 + 1.94,
+    curtain(kit, "x", sy1 - 0.03, sx + 0.50, sx + 0.88, F2 + 0.16, F2 + 1.94,
             colour=(0.35, 0.70, 0.80), amp=0.03)
 
-    # WC against the west wall, basin beside it, all on the same drain run.
-    ty = y0 + 0.42
-    kit.span(WHITEGOODS, x0 + 0.02, x0 + 0.30, ty - 0.19, ty + 0.19,
+    # WC against the west wall, directly under the window, with the shower on
+    # one side of it and the basin round the corner on the other.
+    ty = y0 + 1.09
+    kit.span(WHITEGOODS, x0 + 0.07, x0 + 0.35, ty - 0.19, ty + 0.19,
              F2 + 0.02, F2 + 0.42, bev=0.03)
-    kit.span(WHITEGOODS, x0 + 0.06, x0 + 0.44, ty - 0.20, ty + 0.20,
+    kit.span(WHITEGOODS, x0 + 0.11, x0 + 0.49, ty - 0.20, ty + 0.20,
              F2 + 0.36, F2 + 0.44, bev=0.05)
-    kit.span((0.84, 0.84, 0.83), x0 + 0.07, x0 + 0.43, ty - 0.19, ty + 0.19,
+    kit.span((0.84, 0.84, 0.83), x0 + 0.12, x0 + 0.48, ty - 0.19, ty + 0.19,
              F2 + 0.44, F2 + 0.465, bev=0.02)
-    kit.span(WHITEGOODS, x0 + 0.02, x0 + 0.20, ty - 0.20, ty + 0.20,
+    kit.span(WHITEGOODS, x0 + 0.07, x0 + 0.25, ty - 0.20, ty + 0.20,
              F2 + 0.42, F2 + 0.86, bev=0.02)
+    # The sill under the window is a shelf, and in the photograph it has four
+    # bottles on it.
+    kit.span(TILE_WALL, x0 + 0.07, x0 + 0.21, W_BATH_W[0], W_BATH_W[1],
+             F2 + 1.36, F2 + 1.40, bev=0.006)
+    for i, (c, h) in enumerate(((( 0.86, 0.30, 0.22), 0.17),
+                                ((0.24, 0.52, 0.34), 0.20),
+                                ((0.90, 0.86, 0.30), 0.13))):
+        bm_cylinder(kit.bm(c, 0.004), x0 + 0.13,
+                    W_BATH_W[0] + 0.12 + i * 0.17,
+                    F2 + 1.40, F2 + 1.40 + h, 0.025, 0.022, seg=8)
 
-    vx = x0 + 1.12
-    kit.span(WHITEGOODS, vx, vx + 0.56, y0 + 0.02, y0 + 0.42, F2 + 0.04,
+    # Basin on the north wall in the far corner, mirror over it.
+    vx = x0 + 0.58
+    kit.span(WHITEGOODS, vx, vx + 0.56, y1 - 0.42, y1 - 0.02, F2 + 0.04,
              F2 + 0.78, bev=0.006)
-    kit.span(WHITEGOODS, vx - 0.04, vx + 0.62, y0, y0 + 0.48, F2 + 0.78,
+    kit.span(WHITEGOODS, vx - 0.04, vx + 0.62, y1 - 0.48, y1, F2 + 0.78,
              F2 + 0.86, bev=0.03)
-    kit.span((0.88, 0.89, 0.90), vx + 0.04, vx + 0.54, y0 + 0.06, y0 + 0.42,
+    kit.span((0.88, 0.89, 0.90), vx + 0.04, vx + 0.54, y1 - 0.42, y1 - 0.06,
              F2 + 0.80, F2 + 0.845, bev=0.02)
-    kit.span(CHROME, vx + 0.26, vx + 0.32, y0 + 0.06, y0 + 0.12,
+    kit.span(CHROME, vx + 0.26, vx + 0.32, y1 - 0.12, y1 - 0.06,
              F2 + 0.86, F2 + 1.06, bev=0.004)
-    kit.span(CHROME, vx + 0.26, vx + 0.32, y0 + 0.12, y0 + 0.26,
+    kit.span(CHROME, vx + 0.26, vx + 0.32, y1 - 0.26, y1 - 0.12,
              F2 + 1.02, F2 + 1.06, bev=0.004)
-    kit.span((0.72, 0.78, 0.80), vx - 0.02, vx + 0.58, y0 + 0.012, y0 + 0.03,
+    kit.span((0.72, 0.78, 0.80), vx - 0.02, vx + 0.58, y1 - 0.03, y1 - 0.012,
              F2 + 1.20, F2 + 1.84, bev=0.004)
-    kit.span(CHROME, vx - 0.06, vx + 0.62, y0 + 0.02, y0 + 0.20,
+    kit.span(CHROME, vx - 0.06, vx + 0.62, y1 - 0.20, y1 - 0.02,
              F2 + 1.16, F2 + 1.19, bev=0.004)
 
-    wx = x1 - 0.64
-    kit.span(WHITEGOODS, wx, wx + 0.58, y0 + 0.02, y0 + 0.60, F2 + 0.02,
-             F2 + 0.87, bev=0.008)
-    _lay_disc(kit, DARKMETAL, wx + 0.29, y0 + 0.015, F2 + 0.46, 0.19, 0.03)
-    _lay_disc(kit, (0.55, 0.60, 0.62), wx + 0.29, y0 + 0.00, F2 + 0.46,
-              0.150, 0.02)
-    kit.span((0.82, 0.82, 0.81), wx + 0.02, wx + 0.56, y0 + 0.00, y0 + 0.02,
+    # The white unit that stands against the north wall halfway down the room,
+    # and the towel rail in front of it.
+    wx = x0 + 1.30
+    kit.span(WHITEGOODS, wx, wx + 0.58, y1 - 0.44, y1 - 0.02, F2 + 0.02,
+             F2 + 0.86, bev=0.008)
+    kit.span((0.82, 0.82, 0.81), wx + 0.02, wx + 0.56, y1 - 0.46, y1 - 0.44,
              F2 + 0.74, F2 + 0.84, bev=0.004)
-    kit.span(WHITEGOODS, x1 - 0.50, x1 - 0.04, y1 - 0.28, y1 - 0.04,
-             F2 + 1.42, F2 + 2.02, bev=0.010)
-    for c in (x1 - 0.42, x1 - 0.28, x1 - 0.14):
-        bm_cylinder(kit.bm(CHROME, 0.002), c, y1 - 0.16, F2 + 1.30, F2 + 1.42,
-                    0.014, 0.014, seg=8)
-    bm_cylinder(kit.bm((0.80, 0.15, 0.14), 0.006), x1 - 0.28, y0 + 0.80,
-                F2 + 0.02, F2 + 0.30, 0.16, 0.19, seg=14)
+    kit.span((0.86, 0.87, 0.88), wx - 0.02, wx + 0.60, y1 - 0.47, y1,
+             F2 + 0.86, F2 + 0.90, bev=0.008)
+    for c in (wx + 0.10, wx + 0.48):
+        bm_cylinder(kit.bm(CHROME, 0.002), c, y1 - 0.06, F2 + 1.10, F2 + 1.24,
+                    0.012, 0.012, seg=8)
+    kit.span(CHROME, wx + 0.08, wx + 0.50, y1 - 0.09, y1 - 0.03,
+             F2 + 1.22, F2 + 1.25, bev=0.004)
+    kit.span((0.42, 0.72, 0.46), wx + 0.12, wx + 0.30, y1 - 0.11, y1 - 0.04,
+             F2 + 0.86, F2 + 1.23, bev=0.006)
+    kit.span((0.90, 0.90, 0.88), wx + 0.32, wx + 0.48, y1 - 0.11, y1 - 0.04,
+             F2 + 0.90, F2 + 1.23, bev=0.006)
+
+    # And the floor of it is not clear, because nobody's is: a bucket by the
+    # shower and a bottle of something pink beside the unit.
+    bm_cylinder(kit.bm((0.20, 0.55, 0.52), 0.006), x0 + 0.40, y0 + 1.02,
+                F2 + 0.02, F2 + 0.26, 0.14, 0.17, seg=14)
+    bm_cylinder(kit.bm((0.88, 0.34, 0.56), 0.004), wx + 0.30, y1 - 0.62,
+                F2 + 0.02, F2 + 0.28, 0.045, 0.045, seg=10)
     ceiling_light(kit, (x0 + x1) / 2, (y0 + y1) / 2, dome=True)
 
 
@@ -2114,7 +2193,11 @@ def roof_loft(kit):
            tones=((0.480, 0.352, 0.212), (0.520, 0.386, 0.232),
                   (0.442, 0.318, 0.190), (0.500, 0.368, 0.222)))
 
-    gallery_rail(kit, [(IX0, LOFT_Y), (IX1, LOFT_Y)])
+    # The rail stops short of the stair. It used to run the whole open edge,
+    # which put a length of balustrade straight across the head of the flight —
+    # you climbed twelve treads into a fence. The gap is the stairwell and every
+    # real gallery has one; the flight has its own guard up the open side.
+    gallery_rail(kit, [(IX0, LOFT_Y), (IX1 - 1.16, LOFT_Y)])
     loft_stair(kit)
 
     # A bed each side of the ridge, where the headroom actually is, because the

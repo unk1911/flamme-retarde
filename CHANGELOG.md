@@ -8,6 +8,92 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.66.0] — 2026-08-16
+
+### Fixed — the bathroom had no door and no window
+
+`tiled_face` lays a solid grout slab and tiles on top of it, and it took no
+account of the openings in the wall behind it. So the bathroom door was a flat
+grey panel seen from the living room and a tiled wall seen from the bathroom —
+which is to say the bathroom had no door, and anybody standing in it was walled
+in. The window over the WC was bricked up the same way, in the one room in the
+flat that has a single small window in it.
+
+And the west wall of it was never tiled at all. That wall is the *outside* wall
+and it already carries a 4 cm skin of plaster on the inside; the tiled face went
+1 cm off the room line, which is 3 cm inside the plaster. The whole far end of
+the room drew as bare grey render with the tiling buried in it — which is the
+other half of why nobody noticed the window had gone.
+
+Three things and one cause, and the room is not claustrophobic now because it is
+not a sealed grey box now.
+
+### Changed — and everything in it was in the wrong place
+
+The photograph is unambiguous: shower in the far corner on the left, WC against
+the far wall under the window, basin round the corner on the right beside it,
+white unit and towel rail halfway down the right-hand wall, and the near half of
+the floor empty. What was drawn had the shower and the WC on the wrong sides of
+each other and the basin and a washing machine strung along the left wall like a
+galley kitchen — so the room you walked into was a corridor with things down one
+side of it and the far end, which is the whole room in life, was bare.
+
+The window moved 36 cm north with the WC, because a window over a shower is a
+window in the wrong place.
+
+### Fixed — you could not walk on the mezzanine
+
+The wall blockers ran from the ground to six metres up. That is fine until there
+is a floor over them: the deck is 15 cm above the ceiling of the storey below,
+so the whole north two thirds of it was fenced off by bedroom partitions that
+are not there — you climbed twelve treads and could not reach either bed.
+
+Blockers take a `ceil` now: solid on the storey they belong to and at grade
+outside the house, gone above it. The mezzanine gets its own three walls and its
+own rail instead, which it needs anyway — the storey below is set back 70 cm on
+the west and the deck is not, so nothing underneath it describes its edges.
+
+### Fixed — and the gallery rail ran across the top of the stair
+
+It was drawn along the whole open edge. The flight arrives at the east end of
+that edge, so the last thing at the top of a ladder-stair was a length of
+balustrade. The blocker already had the stairwell gap in it; only the drawn rail
+did not, which is the worse way round — a fence you can see and walk through
+teaches you to distrust every other fence in the building.
+
+### Fixed — your head above the roof, third time, and it was never your head
+
+Both the indoors test and the near-clip test stopped at floor + 3.6 m. That is a
+sensible lid on a 2.40 m storey and it is 1.4 m *below* the mezzanine's own
+ridge, so standing on the deck you counted as outside by both: the room stopped
+being dimmed, and the front clip went back to 1.2 m in a space where the roof is
+within a metre of your eye almost everywhere. The roof was being thrown away by
+the near plane and the sky was behind it. Nobody's head was anywhere. Both tests
+now stop at the ridge of whichever roof is on.
+
+The stoop works up there and always did — 0.76 m of eye at the north end, which
+is the model answering the question it exists to answer.
+
+### Fixed — O opened a Paused screen you could not leave
+
+Sitting down at the laptop drops the pointer lock on purpose, and losing a
+pointer lock pauses the game. The pause returns from the frame before
+`stepComputer` runs, so the camera froze halfway into the move, the terminal
+never opened, and the only key the computer state machine listens to was one a
+paused game could not act on. O is exempt now, the same way the settings panel
+already was, and Escape unpauses on its way out as a backstop.
+
+### Fixed — spraying the laptop did nothing
+
+It asked whether `you.aim` was near the laptop, and `you.aim` is where the jet
+trace *stops* — which is on the terrain, and indoors on the upper floor the
+terrain is a metre under the floorboards. The aim point was always somewhere out
+on the hillside through the west wall, tens of metres from a machine two metres
+in front of your face. Nothing about the laptop was wrong; the question was. It
+asks whether the laptop is within four metres of you and within 42 cm of the
+line the water is going down, which at two metres is about 12° and is as
+forgiving as it should be.
+
 ## [1.65.0] — 2026-08-16
 
 ### Added — the laptop, and the thing on the other end of it

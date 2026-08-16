@@ -325,7 +325,7 @@ async function buildVikendica(scene, field) {
   // The gallery rail's blocker, kept by reference so switching roofs can switch
   // it on and off. `field.blockers` is handed to the ground mode once and read
   // every frame from then on, so a blocker that changes has to change in place.
-  let loftRail = null;
+  let loftOnly = [];
 
   /**
    * The height of the floor under a point, or null if this point is not on the
@@ -428,9 +428,24 @@ async function buildVikendica(scene, field) {
    * and shuts the singing out, and neither of those is true standing on a
    * staircase in the sun.
    */
+  /**
+   * The top of the building as it currently stands — the ridge of whichever
+   * roof is on, plus a little.
+   *
+   * Both of the tests below used to stop at floor + 3.6, which is a sensible
+   * lid on a 2.40 m storey and is 1.4 m below the mezzanine's own ridge. So
+   * standing on the deck you were *outside* by both of them: the room stopped
+   * being dimmed, and the near clip went back to 1.2 m in a space where the
+   * roof is within a metre of your eye almost everywhere. That is what "my head
+   * is above the roof up there" was. Nobody's head was anywhere: the roof was
+   * being thrown away by the front clip and the sky was behind it.
+   */
+  const roofTop = () => base + (parts.loft && parts.loft.visible
+    ? plan.loftRidge : plan.ridge) + 0.35;
+
   function hull(t, s, y, pad = 2.2) {
     const [x, z] = toHouse(t, s);
-    if (y != null && (y < base - 0.3 || y > base + VIK.floor + 3.6)) return 0;
+    if (y != null && (y < base - 0.3 || y > roofTop())) return 0;
     const O = plan.outer;
     const dx = Math.max(O.x0 - x, x - O.x1, 0);
     const dz = Math.max(O.z0 - z, z - O.z1, 0);
@@ -464,8 +479,7 @@ async function buildVikendica(scene, field) {
   function indoorsAt(t, s, y) {
     const [x, z] = toHouse(t, s);
     if (!inRect(x, z, plan.outer)) return 0;
-    if (y != null && (y < base + VIK.floor - 0.6
-                      || y > base + VIK.floor + 3.4)) return 0;
+    if (y != null && (y < base + VIK.floor - 0.6 || y > roofTop())) return 0;
     return 1;
   }
 
@@ -501,7 +515,14 @@ async function buildVikendica(scene, field) {
       out.push(b);
       return b;
     };
-    for (const b of plan.blockers) push(b);
+    // The walls of the upper storey, and only of the upper storey. They used to
+    // run from the ground to six metres up, which is fine until there is a
+    // mezzanine over them: the deck is 15 cm above their ceiling and the whole
+    // north half of it was fenced off by the bedroom partitions underneath —
+    // you climbed the ladder-stair and could not walk to the beds. `ceil` keeps
+    // them solid on the floor they belong to and at grade outside the house,
+    // and lets the deck be a deck.
+    for (const b of plan.blockers) push(b, { ceil: base + VIK.deck - 0.15 });
     // The terrace's three open edges — its railing, which is a real railing and
     // has to stop you the way the drawn one would. Without them the terrace is
     // a floor at +2.90 you can walk off, and worse, walk on to from the lane.
@@ -515,10 +536,22 @@ async function buildVikendica(scene, field) {
            z0: VIK.landing.z0, z1: VIK.stair.z1 + 0.5 });
     push({ x0: VIK.landing.x0, x1: VIK.landing.x1,
            z0: VIK.landing.z0 - 0.08, z1: VIK.landing.z0 });
-    // The gallery rail, which is there only when the mezzanine is.
-    loftRail = push(
-      { x0: VIK.loftDeck.x0, x1: VIK.loftStair.x0, z0: 1.14, z1: 1.26 },
-      { off: true, y0: base + VIK.deck - 1.1, y1: base + VIK.deck + 2.4 });
+    // The mezzanine's own three sides and its gallery rail, which are there
+    // only when the mezzanine is. Its own, because the deck runs the full
+    // footprint — the storey below is set back 70 cm on the west and the deck
+    // is not — so nothing underneath it describes its edges.
+    const D = VIK.loftDeck;
+    const lvl = { off: true, y0: base + VIK.deck - 0.60,
+      y1: base + VIK.deck + 2.70 };
+    loftOnly = [
+      push({ x0: D.x0 - 0.12, x1: D.x0, z0: D.z0 - 0.12, z1: D.z1 }, lvl),
+      push({ x0: D.x1, x1: D.x1 + 0.12, z0: D.z0 - 0.12, z1: D.z1 }, lvl),
+      push({ x0: D.x0 - 0.12, x1: D.x1 + 0.12, z0: D.z0 - 0.12, z1: D.z0 }, lvl),
+      // The rail. The gap at the east end is the stairwell — same gap the drawn
+      // balustrade has, because a fence you can see through and cannot pass is
+      // worse than either.
+      push({ x0: D.x0, x1: VIK.loftStair.x0, z0: 1.14, z1: 1.26 }, lvl),
+    ];
     return out;
   }
 
@@ -538,7 +571,7 @@ async function buildVikendica(scene, field) {
       for (const k of ['loft', 'loft_glass', 'loft_sheer']) {
         if (parts[k]) parts[k].visible = which === 'loft';
       }
-      if (loftRail) loftRail.off = which !== 'loft';
+      for (const b of loftOnly) b.off = which !== 'loft';
       return which;
     },
     get roofNow() { return parts.loft && parts.loft.visible ? 'loft' : 'now'; },

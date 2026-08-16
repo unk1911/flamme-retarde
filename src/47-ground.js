@@ -387,6 +387,13 @@ async function buildGround(scene, field) {
         // No height given means the caller is not on a building, so a banded
         // blocker does not apply to them at all.
         if (b.y0 != null && (y == null || y < b.y0 || y > b.y1)) continue;
+        // Or one with a top and no bottom: a wall of the storey below, which
+        // has to stop you on that storey and at ground level outside it, and
+        // must not still be standing there when you are on the mezzanine deck
+        // fifteen centimetres above its ceiling. Unlike `y0`, no height given
+        // means the blocker applies — a crew member walking the field is not
+        // on a building, and the walls of the house should still be walls.
+        if (b.ceil != null && y != null && y > b.ceil) continue;
         // A blocker may carry its own rotation within the locale frame. The
         // aerodrome never needs one — everything on it was laid out in runway
         // axes — but a village was laid out to its lanes, and a house at 40° to
