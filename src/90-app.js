@@ -178,6 +178,20 @@ function grabPointer() {
 
 addEventListener('keydown', (e) => {
   if (e.repeat) return;
+  // At the laptop the keyboard belongs to the laptop. Every letter in here is a
+  // letter somebody is typing into a prompt, and W A S D would otherwise be
+  // four steps across the living room taken by a camera that is not being drawn
+  // — you would stand up somewhere else than you sat down. Escape is the way
+  // out, which is what Escape means everywhere else in this game too; O is the
+  // same key that got you here.
+  if (computer.active) {
+    if (e.code === 'Escape' || (e.code === 'KeyO' && e.target === document.body)) {
+      e.preventDefault(); skipToComputer();
+    }
+    return;
+  }
+  if (comp) { e.preventDefault(); if (e.code === 'Escape') skipToComputer(); return; }
+  if (e.code === 'KeyO') { e.preventDefault(); skipToComputer(); return; }
   if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); togglePause(); return; }
   // Ahead of the pause guard on purpose: pausing to read the hint and then
   // pressing the key it told you about should work.
@@ -1174,6 +1188,144 @@ function endVikWalk() {
   toast(T('toast.cheatVik'));
 }
 
+// ── the laptop ───────────────────────────────────────────────────────────────
+/**
+ * Sitting down at it, and getting up again.
+ *
+ * The same shape as the walk up to the house and for the same reason: the
+ * screen is a div, and a div that simply appears is a menu. What makes it a
+ * laptop on a table is the three seconds either side of it — the room swinging
+ * round, the chair arriving, the terrace going out of frame behind the glass —
+ * so the camera flies to the seat, holds there for as long as you are typing,
+ * and flies back to where you were standing when you get up.
+ *
+ * `back` is that spot. Losing it is the difference between standing up from a
+ * desk and being teleported to one.
+ */
+let comp = null;
+
+function compAt(name) {
+  const L = jadrija && jadrija.vik && jadrija.vik.plan.laptop;
+  return L ? jadrija.vik.at(L[name]) : null;
+}
+
+/** The eye, and what it is looking at, as one six-vector. */
+function camNow() {
+  const d = new THREE.Vector3();
+  camera.getWorldDirection(d);
+  const p = camera.position;
+  return [p.x, p.y, p.z, p.x + d.x * 2, p.y + d.y * 2, p.z + d.z * 2];
+}
+
+function startComputer() {
+  if (!jadrija || !jadrija.vik || !ground || !ground.ok) return false;
+  const seat = compAt('seat'), scr = compAt('screen');
+  if (!seat || !scr) return false;
+  if (state.paused) setPaused(false);
+  // Get on to your feet at Jadrija first if you are not already, so that
+  // standing up afterwards lands you in a mode that has a floor.
+  let back;
+  if (state.phase === 'ground' && jadrija.inField(ground.you.x, ground.you.z)) {
+    back = [ground.you.x, ground.you.z, ground.you.yaw, ground.you.pitch];
+  } else {
+    if (!ground.retarget(jadrija)) return false;
+    if (!ground.dropIn(seat[0], seat[2], 0)) return false;
+    back = [seat[0], seat[2], 0, -0.15];
+  }
+  const from = camNow();
+  // A seated eye, and the screen 40 cm in front of it.
+  const to = [seat[0], seat[1], seat[2], scr[0], scr[1], scr[2]];
+  comp = { phase: 'in', u: 0, from, to, back };
+  $('hud').hidden = true;
+  $('chute-hud').hidden = true;
+  $('ground-hud').hidden = true;
+  if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = true; }
+  if (document.pointerLockElement) document.exitPointerLock();
+  return true;
+}
+
+function stepComputer(dt) {
+  if (!comp) return;
+  const ease = (u) => u * u * (3 - 2 * u);
+  if (comp.phase === 'held') { camOverride = comp.to.slice(); return; }
+  comp.u += dt / (comp.phase === 'in' ? CRT.sit : CRT.rise);
+  const done = comp.u >= 1;
+  const f = ease(clamp(comp.u, 0, 1));
+  const a = comp.phase === 'in' ? comp.from : comp.to;
+  const b = comp.phase === 'in' ? comp.to : comp.from;
+  camOverride = a.map((v, i) => lerp(v, b[i], f));
+  if (!done) return;
+  if (comp.phase === 'in') {
+    comp.phase = 'held';
+    camOverride = comp.to.slice();
+    computer.open();
+  } else {
+    endComputer();
+  }
+}
+
+/** Stand up: put the walker back where they were and give the keys back. */
+function endComputer() {
+  if (!comp) return;
+  const back = comp.back;
+  comp = null;
+  camOverride = null;
+  computer.close();
+  ground.put(back[0], back[1], back[2], back[3]);
+  $('ground-hud').hidden = false;
+  if (IS_TOUCH) $('gtouch').hidden = false;
+  if (!IS_TOUCH) grabPointer();
+  paintDeviceText();
+}
+
+/**
+ * Put the branch on the laptop and it wakes up.
+ *
+ * A discovery rather than a keystroke — O is in the hint text and this is not,
+ * and finding out that the one machine in the flat responds to being hosed is
+ * worth more than being told. It is also the only thing in the game you are
+ * *supposed* to point four hundred litres at that is not on fire.
+ *
+ * Half a metre of tolerance around the hinge, which is generous: `you.aim` is
+ * where the jet actually lands and a jet is not a laser, and a player who has
+ * decided to soak a laptop should not have to be accurate about it.
+ */
+let sprayHeld = 0;
+function checkLaptopSpray() {
+  if (state.phase !== 'ground' || !ground || !ground.you || !jadrija) {
+    sprayHeld = 0; return;
+  }
+  const you = ground.you;
+  if (!you.spraying || you.jet < 0.4) { sprayHeld = 0; return; }
+  const p = compAt('at');
+  if (!p) { sprayHeld = 0; return; }
+  const d = Math.hypot(you.aim[0] - p[0], you.aim[1] - p[1] - 0.10,
+    you.aim[2] - p[2]);
+  // Held, not touched. A jet that sweeps across the desk on its way to
+  // something else should not sit you down.
+  sprayHeld = d < 0.52 ? sprayHeld + 1 : 0;
+  if (sprayHeld > 24) { sprayHeld = 0; ground.setSpray(false); skipToComputer(); }
+}
+
+/**
+ * O — the computer. Also what spraying the laptop does.
+ *
+ * Pressed at it, it stands you up again, which is the same key doing the same
+ * job in reverse and is the contract every other door in this game keeps.
+ */
+function skipToComputer() {
+  if (comp && comp.phase === 'out') return;
+  if (comp) {
+    // Get up: shut the glass first so the room is already there behind it as
+    // the camera pulls back, then fly home.
+    computer.close();
+    comp = { phase: 'out', u: 0, from: comp.from, back: comp.back,
+      to: camOverride ? camOverride.slice() : comp.to };
+    return;
+  }
+  if (!startComputer()) toast(T('toast.noComputer'));
+}
+
 /**
  * V — the vikendica.
  *
@@ -2044,6 +2196,8 @@ function frame() {
   // as long to finish, and the thing you pressed the key for would come in like
   // a hydraulic door.
   if (vikWalk) stepVikWalk(real);
+  if (comp) stepComputer(real);
+  else checkLaptopSpray();
   if (!camOverride) stepLens(real);
   // And the mix goes under water with it. There is nothing to slow down in
   // there — every voice in this game is synthesised rather than played — so
@@ -2655,6 +2809,20 @@ window.__fr = {
    * and `roof('loft')` swaps the pantile gable for the raised one and its
    * mezzanine without touching anything below the wall head.
    */
+  /**
+   * The laptop. `step` exists for the same reason `vik.cut` does: the sit-down
+   * is driven by wall time and a headless page runs its clock at about a frame
+   * a second, so a 1.15 s move takes twenty seconds of settle to finish.
+   */
+  pc: {
+    open: () => { skipToComputer(); return comp ? comp.phase : null; },
+    step: (secs) => {
+      for (let i = 0; i < Math.round(secs * 60); i++) stepComputer(1 / 60);
+      return comp ? comp.phase : null;
+    },
+    say: (t) => computer.say(t),
+    stats: () => ({ ...computer.stats(), phase: comp ? comp.phase : null }),
+  },
   vik: {
     raw: () => jadrija && jadrija.vik,
     stats: () => (jadrija && jadrija.vik ? jadrija.vik.stats() : null),

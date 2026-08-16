@@ -212,6 +212,11 @@
          Without this the mezzanine, which is the whole reason the house was
          modelled, exists only for people with a keyboard. -->
     <button id="t-roof" data-i18n="touch.vik">HOUSE</button>
+    <!-- O. Sit down at the laptop. Its own button rather than another job for
+         t-roof: the roof switch is a thing you do *in* the house and this is a
+         thing you do *at a desk*, and one button that meant three things by
+         context would need a paragraph on the screen to explain it. -->
+    <button id="t-pc" data-i18n="touch.pc">PC</button>
     <button id="t-gset" data-i18n="touch.set">SET</button>
     <button id="t-gpause" data-i18n="touch.pause">II</button>
   </div>
@@ -284,6 +289,43 @@
      the single frame of white or fire at the moment of arrival. -->
 <div id="damage"></div>
 <div id="flash"></div>
+
+<!-- ───────────────────────────────────────────────── the laptop, up close ──
+     The computer mode. Sprayed the laptop, or pressed O: the camera walks to
+     the chair and this comes up over the top of it. Everything in here is DOM
+     rather than a texture on the lid, because the one thing the whole feature
+     is for is *reading* — twelve point type on a 376 mm screen rendered into a
+     scene is a grey smear, and the same type in a div is type. -->
+<div id="crt" hidden>
+  <div id="crt-shell">
+    <div id="crt-bar">
+      <span id="crt-badge">ottakyo</span>
+      <span id="crt-sub" data-i18n="crt.sub">private model — running on a local GPU</span>
+      <span id="crt-who"></span>
+      <button id="crt-quit" data-i18n="crt.quit">ESC — STAND UP</button>
+    </div>
+    <div id="crt-glass">
+      <div id="crt-log"></div>
+      <form id="crt-login" autocomplete="off">
+        <p class="crt-l" data-i18n="crt.motd">ABLITERATED CENTRAL · TERMINAL 1 · SIGN IN</p>
+        <label class="crt-l"><span>user:</span><input id="crt-user" type="text"
+          autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+        <label class="crt-l"><span>pass:</span><input id="crt-pass" type="password"></label>
+        <p id="crt-err" class="crt-l"></p>
+        <button id="crt-go" type="submit" data-i18n="crt.signin">SIGN IN</button>
+      </form>
+      <div id="crt-row" hidden>
+        <span id="crt-ps1">&gt;</span>
+        <textarea id="crt-in" rows="1" autocapitalize="off" autocorrect="off"
+          spellcheck="false"></textarea>
+      </div>
+    </div>
+    <div id="crt-tools" hidden>
+      <span class="crt-chip on" id="crt-chip" data-i18n="crt.tools">🔌 Tools (web search + clock + shell)</span>
+    </div>
+    <div id="crt-scan"></div>
+  </div>
+</div>
 
 <div id="toast"></div>
 <div id="tint"></div>

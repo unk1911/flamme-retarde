@@ -996,3 +996,139 @@ html.touch .row input[type=range] { height: 22px; }
   #over-stats div { padding: .32rem 0; }
 }
 
+
+/* ── the laptop, up close ──────────────────────────────────────────────────
+   A green-phosphor terminal, which is a choice and not a default. The thing on
+   the other end of it is a 2026 language model with a shell on it; the thing
+   you are sitting at is a laptop in a flat in Dalmatia in the middle of a fire.
+   Rendering it as the ottakyo web app would be a browser inside a video game,
+   which reads as a screenshot. Rendering it as a terminal reads as a machine.
+
+   Sized in vmin so the glass is the same shape and the same fraction of the
+   screen on a 21:9 monitor and on a phone held sideways. */
+#crt {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at 50% 45%,
+              rgba(6, 20, 12, 0.82), rgba(2, 5, 4, 0.96) 72%);
+  opacity: 0; transition: opacity .28s ease;
+  font-family: var(--mono);
+  --ph:    #7df5a8;          /* phosphor */
+  --ph-lo: #3c8f5c;
+  --ph-hi: #cffde0;
+}
+#crt.on { opacity: 1; }
+#crt[hidden] { display: none; }
+
+#crt-shell {
+  position: relative;
+  width: min(92vw, 128vmin); height: min(84vh, 79vmin);
+  display: flex; flex-direction: column;
+  background: linear-gradient(#062015, #04140d 60%, #030e09);
+  border: 1px solid rgba(125, 245, 168, 0.20);
+  border-radius: .5rem;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.7), 0 2.2rem 5rem rgba(0,0,0,.7),
+              inset 0 0 6rem rgba(30, 120, 70, 0.10);
+  overflow: hidden;
+  /* The tube warms up. 180 ms of the picture arriving is most of why it feels
+     like switching a machine on rather than opening a dialog. */
+  transform: scaleY(.02); opacity: 0;
+  transition: transform .20s cubic-bezier(.2,.9,.3,1.4), opacity .12s ease;
+}
+#crt.on #crt-shell { transform: scaleY(1); opacity: 1; }
+
+#crt-bar {
+  display: flex; align-items: baseline; gap: .7rem;
+  padding: .5rem .8rem; flex: 0 0 auto;
+  border-bottom: 1px solid rgba(125, 245, 168, 0.16);
+  background: rgba(10, 40, 24, 0.5);
+  font-size: .62rem; letter-spacing: .06em;
+}
+#crt-badge { color: var(--ph-hi); font-weight: 700; letter-spacing: .18em; }
+#crt-sub { color: var(--ph-lo); }
+#crt-who { margin-left: auto; color: var(--ph-lo); }
+#crt-quit {
+  font-family: var(--mono); font-size: .56rem; letter-spacing: .10em;
+  color: var(--ph); background: rgba(125, 245, 168, 0.08);
+  border: 1px solid rgba(125, 245, 168, 0.28); border-radius: .2rem;
+  padding: .22rem .5rem; cursor: pointer;
+}
+#crt-quit:hover { background: rgba(125, 245, 168, 0.18); }
+
+#crt-glass {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column;
+  padding: .9rem 1.1rem; gap: .6rem;
+  color: var(--ph); font-size: .78rem; line-height: 1.6;
+  text-shadow: 0 0 .55rem rgba(125, 245, 168, 0.45);
+}
+#crt-log { flex: 1 1 auto; min-height: 0; overflow-y: auto; white-space: pre-wrap;
+           word-break: break-word; scrollbar-width: thin; }
+/* Before you have signed in there is nothing in it, and a scroller with nothing
+   in it still eats the whole glass — which pushed the sign-in form on to the
+   bottom edge of a screen that was otherwise empty. */
+#crt-log:empty { flex: 0 0 auto; }
+#crt-log .u { color: var(--ph-hi); }
+#crt-log .m { color: var(--ph); }
+#crt-log .s { color: var(--ph-lo); font-style: italic; }
+#crt-log .e { color: var(--ember); }
+#crt-log b { color: var(--ph-hi); font-weight: 700; }
+#crt-log .blk { margin-bottom: .75rem; }
+
+#crt-login { display: flex; flex-direction: column; gap: .5rem; margin: auto 0;
+             align-self: center; width: min(30rem, 100%); }
+.crt-l { margin: 0; letter-spacing: .06em; }
+#crt-login label { display: flex; align-items: center; gap: .6rem; }
+#crt-login label span { width: 4.2rem; color: var(--ph-lo); }
+#crt-login input {
+  flex: 1 1 auto; max-width: 22rem;
+  font-family: var(--mono); font-size: .74rem; color: var(--ph-hi);
+  background: rgba(125, 245, 168, 0.06); caret-color: var(--ph);
+  border: 1px solid rgba(125, 245, 168, 0.24); border-radius: .2rem;
+  padding: .3rem .5rem; outline: none;
+}
+#crt-login input:focus { border-color: rgba(125, 245, 168, 0.6);
+                         background: rgba(125, 245, 168, 0.11); }
+#crt-go {
+  align-self: flex-start; margin-top: .3rem;
+  font-family: var(--mono); font-size: .66rem; letter-spacing: .16em;
+  color: var(--ink); background: var(--ph); border: 0; border-radius: .2rem;
+  padding: .36rem 1.1rem; cursor: pointer;
+}
+#crt-err { color: var(--ember); min-height: 1.1em; font-size: .66rem; }
+
+#crt-row { display: flex; align-items: flex-start; gap: .55rem; flex: 0 0 auto;
+           border-top: 1px solid rgba(125, 245, 168, 0.16); padding-top: .55rem; }
+#crt-row[hidden] { display: none; }
+#crt-ps1 { color: var(--ph-hi); }
+#crt-in {
+  flex: 1 1 auto; resize: none; overflow: hidden;
+  font-family: var(--mono); font-size: .74rem; line-height: 1.5;
+  color: var(--ph-hi); background: none; caret-color: var(--ph);
+  border: 0; outline: none; padding: 0; max-height: 7rem;
+}
+
+#crt-tools { flex: 0 0 auto; padding: .45rem .9rem;
+             border-top: 1px solid rgba(125, 245, 168, 0.12); }
+#crt-tools[hidden] { display: none; }
+.crt-chip { font-size: .58rem; letter-spacing: .04em; color: var(--ph-lo);
+            border: 1px solid rgba(125, 245, 168, 0.20); border-radius: 1rem;
+            padding: .2rem .7rem; cursor: pointer; user-select: none; }
+.crt-chip.on { color: var(--ink); background: var(--ph); border-color: var(--ph); }
+
+/* Scanlines and the bloom over the top. `pointer-events: none` matters: this
+   sits over the input and would otherwise eat every click on it. */
+#crt-scan {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    repeating-linear-gradient(rgba(0,0,0,0) 0 2px, rgba(0,0,0,.14) 2px 3px),
+    radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 62%, rgba(0,0,0,.30));
+  mix-blend-mode: multiply;
+}
+
+@media (max-width: 700px) {
+  #crt-shell { width: 96vw; height: 88vh; }
+  #crt-glass { font-size: .68rem; padding: .7rem .8rem; }
+  #crt-bar { font-size: .55rem; gap: .5rem; }
+  #crt-sub { display: none; }
+}

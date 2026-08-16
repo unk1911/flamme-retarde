@@ -542,6 +542,11 @@ async function buildVikendica(scene, field) {
       return which;
     },
     get roofNow() { return parts.loft && parts.loft.visible ? 'loft' : 'now'; },
+    /** Any house-local three.js point, in world metres. */
+    at(p) {
+      const [wx, wz] = world(p[0], p[2]);
+      return [wx, base + p[1], wz];
+    },
     /** An anchor from the sidecar, in world metres. */
     anchor(name) {
       const a = plan.anchors[name];

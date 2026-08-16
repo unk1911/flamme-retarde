@@ -8,6 +8,78 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.65.0] — 2026-08-16
+
+### Added — the laptop, and the thing on the other end of it
+
+There is an Alienware 18 open on the plastic table by the terrace doors. Spray
+it, or press **O**, and the camera sits down in front of it: a green-phosphor
+terminal signed in to `abliterated.edeliverables.com` — a real language model on
+a real GPU, with a shell and a clock and web search behind it. Type `uptime` and
+the number that comes back is that machine's actual uptime.
+
+Three decisions worth writing down.
+
+**It is DOM, not a texture on the lid.** The whole point of the feature is
+*reading*, and twelve point type on a 376 mm screen rendered into a 3-D scene is
+a grey smear at any resolution anybody has. The 3-D part is the camera move; the
+screen is a div over the top of it.
+
+**It is a terminal rather than a copy of the ottakyo web app.** The thing on the
+other end is a 2026 model with tools; the thing you are sitting at is a laptop in
+a flat in Dalmatia in the middle of a fire. Redrawing the web app inside the game
+would read as a screenshot. A terminal reads as a machine.
+
+**Sitting down and standing up are camera moves.** A screen that simply appears
+is a menu. What makes it a laptop on a table is the second either side — the room
+swinging round, the chair arriving, the terrace going out of frame behind the
+glass — and standing up puts you back exactly where you were standing, which is
+the difference between getting up from a desk and being teleported off one.
+
+Spraying it is a discovery and not a keystroke: O is in the hint text and this
+is not, and the branch has to stay on it for about half a second, so a jet that
+sweeps the desk on its way somewhere else does not sit you down.
+
+The keyboard clatters — two bursts a keystroke, a hard tick for the cap arriving
+and a thock under it for the slider bottoming out, detuned a few per cent each
+time so thirty in a row is not a machine gun. And the beach goes quiet: 88% off
+the master while the glass is up, which is about eighteen decibels and is a
+closed door.
+
+**It only works from the deployed build.** The service allows
+`flamme-retarde.edeliverables.com` by name and sends a `SameSite=Lax` session
+cookie, which is fine between two hosts under `edeliverables.com` — same-*site*
+is the registrable domain, not the origin — and is nothing at all from a `file://`
+copy or a local server. Off the disk the laptop still opens, still clatters, and
+says so on the screen instead of failing silently.
+
+### Changed — the laptop is an actual laptop
+
+It was a 34 × 24 slab with a lighter slab leaning on it, which is what a laptop
+is from four metres away and nothing at all from the chair in front of it. It is
+an 18-inch machine now: rear thermal shelf, hex vent, six rows of per-key RGB
+with a spacebar, trackpad, and ALIENWARE across the chin in real letterforms.
+
+The wordmark needed a glyph routine — A, N, W and R all live or die on their
+diagonals, and a diagonal approximated by three axis-aligned boxes at 8 mm tall
+is a smudge. `_plate` takes any convex polygon, so a diagonal is a quad and costs
+the same as a bar.
+
+And the lid is *rotated* about its hinge now rather than sheared, which is what
+it was. A shear keeps every point at its own height and slides it back, so the
+screen and the panel it sits in got different slides because they started at
+different depths — the screen was not parallel to the lid it was in. Nobody sees
+that on a 34 cm laptop. Everybody would have seen it on a screen that fills the
+window.
+
+### Fixed — two things the wordmark found
+
+A word set along +x reads backwards to somebody standing at +y, which is where
+the only person who will ever look at this laptop is standing. And 17 mm keycaps
+with 1.8 mm between them fuse into eighteen tall coloured stripes at any angle a
+person actually sits at; 15.8 mm caps with 2.6 mm of dark well between them stay
+a keyboard.
+
 ## [1.64.0] — 2026-08-16
 
 ### Fixed — your head came out through the mezzanine roof

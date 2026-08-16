@@ -277,7 +277,7 @@ function buildAudio() {
     })();
 
     // Fade the whole mix in rather than punching it on.
-    master.gain.setTargetAtTime(masterVol, ctx.currentTime, 0.8);
+    master.gain.setTargetAtTime(masterWant(), ctx.currentTime, 0.8);
     // Safari and every mobile browser hand back a suspended context even when
     // the call came from inside a gesture handler.
     if (ctx.state === 'suspended') ctx.resume();
@@ -1948,9 +1948,56 @@ function buildAudio() {
     } else stallT = 0;
   }
 
+  /**
+   * How far the outside world is shut out, 0 to 1.
+   *
+   * Sitting down at the laptop the beach has to go away. Not off — you are
+   * still in a room on a terrace on an August afternoon and killing the mix
+   * dead would read as the game having crashed — but down far enough that the
+   * only thing with your attention is a screen 40 cm from your face, which is
+   * what a screen 40 cm from your face does. 0.88 of the level, which is about
+   * eighteen decibels and is a closed door.
+   *
+   * A separate factor from `masterVol` and from the pause duck, because all
+   * three want the master and none of them should clobber the others: the
+   * player's own volume setting has to survive being at the computer, and
+   * pausing while at the computer has to still be silent.
+   */
+  let muffle = 0;
+  const masterWant = () => masterVol * (1 - 0.88 * muffle);
+  function setMuffle(k) {
+    const v = clamp(k, 0, 1);
+    if (v === muffle) return;
+    muffle = v;
+    if (master && !ducked) master.gain.setTargetAtTime(masterWant(), ctx.currentTime, 0.28);
+  }
+
+  /**
+   * One key on a 1980s keyboard.
+   *
+   * Two bursts and nothing else: a hard high tick, which is the top of the
+   * keycap arriving at the plate, and a lower thock underneath it, which is the
+   * slider bottoming out in the housing. What makes it read as *old* is the
+   * ratio between them — a membrane keyboard is nearly all thock and a
+   * buckling-spring is nearly all tick, and the click everybody remembers sits
+   * about here. Detuned per stroke by a few per cent, because thirty identical
+   * clicks in a row is a machine gun.
+   *
+   * `heavy` is the return, the space bar and the big keys: lower, longer, and
+   * with more of the housing in it.
+   */
+  function keyClick(heavy = 0) {
+    if (!ctx) return;
+    const v = 0.90 + Math.random() * 0.22;
+    burst({ freq: (5200 - heavy * 1500) * v, q: 0.8, sweep: 0.5,
+      dur: 0.016 + heavy * 0.008, gain: (0.030 - heavy * 0.006) * v });
+    burst({ freq: (270 - heavy * 90) * v, q: 1.6, sweep: 0.62,
+      dur: 0.038 + heavy * 0.026, gain: (0.026 + heavy * 0.020) * v });
+  }
+
   function setVolume(v) {
     masterVol = v;
-    if (master && !ducked) master.gain.setTargetAtTime(v, ctx.currentTime, 0.1);
+    if (master && !ducked) master.gain.setTargetAtTime(masterWant(), ctx.currentTime, 0.1);
   }
   const getVolume = () => masterVol;
 
@@ -1964,7 +2011,7 @@ function buildAudio() {
     if (!master || ducked === on) return;
     ducked = on;
     // Down fast enough to feel instant, back up slowly enough not to thump.
-    master.gain.setTargetAtTime(on ? 0.0001 : masterVol, ctx.currentTime, on ? 0.05 : 0.22);
+    master.gain.setTargetAtTime(on ? 0.0001 : masterWant(), ctx.currentTime, on ? 0.05 : 0.22);
   }
 
   /**
@@ -1986,7 +2033,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, beep, rattle,
-    setVolume, getVolume,
+    setVolume, getVolume, setMuffle, keyClick,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa, room,
     firestarter, slowmo, radioTune, radioClick,
     /** Where the pointer sits for each station, so the dial can be drawn. */

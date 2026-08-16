@@ -1159,6 +1159,30 @@ def _lay_disc(kit, colour, cx, cy, cz, r, t):
         v.co = (cx + x, cy + z, cz + y)
 
 
+def _plate_bm(bm, poly, y0, y1):
+    """`_plate`, into a bmesh you already have.
+
+    Split out because the laptop lid is built flat and then *rotated* about its
+    hinge, and `kit.bm()` hands back a shared per-colour mesh with the whole
+    house already in it — there is no way to transform the last thing you put in
+    it. Anything that has to move after it is built needs its own bmesh.
+    """
+    area = sum(poly[i][0] * poly[(i + 1) % len(poly)][1]
+               - poly[(i + 1) % len(poly)][0] * poly[i][1]
+               for i in range(len(poly)))
+    if area < 0:
+        poly = list(reversed(poly))
+    lo = [bm.verts.new((x, y0, z)) for x, z in poly]
+    hi = [bm.verts.new((x, y1, z)) for x, z in poly]
+    bm.verts.ensure_lookup_table()
+    n = len(poly)
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((lo[i], hi[i], hi[j], lo[j]))
+    bm.faces.new(tuple(lo))
+    bm.faces.new(tuple(reversed(hi)))
+
+
 def _plate(kit, colour, poly, y0, y1, bev=0.003):
     """A flat shape on a wall: a closed (x, z) polygon extruded along y.
 
@@ -1175,21 +1199,7 @@ def _plate(kit, colour, poly, y0, y1, bev=0.003):
     side quads are wound `front, back, back, front`, which is the order that
     puts their normals outward and is the opposite of the one that reads right.
     """
-    area = sum(poly[i][0] * poly[(i + 1) % len(poly)][1]
-               - poly[(i + 1) % len(poly)][0] * poly[i][1]
-               for i in range(len(poly)))
-    if area < 0:
-        poly = list(reversed(poly))
-    bm = kit.bm(colour, bev)
-    lo = [bm.verts.new((x, y0, z)) for x, z in poly]
-    hi = [bm.verts.new((x, y1, z)) for x, z in poly]
-    bm.verts.ensure_lookup_table()
-    n = len(poly)
-    for i in range(n):
-        j = (i + 1) % n
-        bm.faces.new((lo[i], hi[i], hi[j], lo[j]))
-    bm.faces.new(tuple(lo))
-    bm.faces.new(tuple(reversed(hi)))
+    _plate_bm(kit.bm(colour, bev), poly, y0, y1)
 
 
 FISH_BODY = (0.46, 0.75, 0.88)
@@ -1350,8 +1360,8 @@ def living(kit):
     for dx, dy in ((0.95, -3.25), (0.95, -2.51), (1.69, -3.25), (1.69, -2.51)):
         kit.span(PLASTIC_W, dx, dx + 0.055, dy, dy + 0.055, F2, F2 + 0.70,
                  bev=0.005)
-    plastic_chair(kit, 1.35, -2.00, F2, yaw=-math.pi / 2 + 0.15)
-    laptop(kit, 1.35, -2.85, F2 + 0.74)
+    plastic_chair(kit, LAP_SEAT[0], LAP_SEAT[1], F2, yaw=-math.pi / 2 + 0.15)
+    laptop(kit, LAP_X, LAP_Y, F2 + 0.74)
 
     # TV on a low cabinet against the south wall, in the gap between the
     # terrace window and the terrace doors. On the east wall — where it was —
@@ -1681,30 +1691,240 @@ def kettle(kit, cx, cy, z):
              z + 0.22, bev=0.006)
 
 
-def laptop(kit, cx, cy, z):
+def _glyph(ch, t=0.20):
+    """One capital, as convex polygons in a unit cell.
+
+    Seven letters, because ALIENWARE needs seven. Stroke-built rather than
+    stepped: A, N, W and R all live or die on their diagonals, and a diagonal
+    approximated by three axis-aligned boxes at 8 mm tall is a smudge. `_plate`
+    takes any convex polygon, so a diagonal is a quad and costs the same as a
+    bar. `t` is the stroke width as a fraction of the cell.
+    """
+    h = t / 2
+    return {
+        "A": [[(0, 0), (t, 0), (0.5 + h, 1), (0.5 - h, 1)],
+              [(1, 0), (1 - t, 0), (0.5 - h, 1), (0.5 + h, 1)],
+              [(0.19, 0.30), (0.81, 0.30), (0.81, 0.30 + t * 0.85),
+               (0.19, 0.30 + t * 0.85)]],
+        "L": [[(0, 0), (t, 0), (t, 1), (0, 1)],
+              [(0, 0), (0.86, 0), (0.86, t * 0.85), (0, t * 0.85)]],
+        "I": [[(0.5 - h, 0), (0.5 + h, 0), (0.5 + h, 1), (0.5 - h, 1)]],
+        "E": [[(0, 0), (t, 0), (t, 1), (0, 1)],
+              [(0, 1 - t * 0.85), (0.84, 1 - t * 0.85), (0.84, 1), (0, 1)],
+              [(0, 0.5 - t * 0.42), (0.74, 0.5 - t * 0.42),
+               (0.74, 0.5 + t * 0.42), (0, 0.5 + t * 0.42)],
+              [(0, 0), (0.84, 0), (0.84, t * 0.85), (0, t * 0.85)]],
+        "N": [[(0, 0), (t, 0), (t, 1), (0, 1)],
+              [(1 - t, 0), (1, 0), (1, 1), (1 - t, 1)],
+              [(0, 1), (t * 1.25, 1), (1, 0), (1 - t * 1.25, 0)]],
+        "W": [[(0, 1), (t, 1), (0.25 + h, 0), (0.25 - h, 0)],
+              [(0.5, 1), (0.5 - t, 1), (0.25 - h, 0), (0.25 + h, 0)],
+              [(0.5, 1), (0.5 + t, 1), (0.75 + h, 0), (0.75 - h, 0)],
+              [(1, 1), (1 - t, 1), (0.75 - h, 0), (0.75 + h, 0)]],
+        "R": [[(0, 0), (t, 0), (t, 1), (0, 1)],
+              [(0, 1 - t * 0.85), (0.74, 1 - t * 0.85), (0.74, 1), (0, 1)],
+              [(0.74 - t, 0.50), (0.74, 0.50), (0.74, 1), (0.74 - t, 1)],
+              [(0, 0.50), (0.74, 0.50), (0.74, 0.50 + t * 0.85),
+               (0, 0.50 + t * 0.85)],
+              [(0.36, 0.55), (0.36 + t, 0.55), (1.0, 0), (1.0 - t, 0)]],
+    }.get(ch, [])
+
+
+def _word(bm, text, x0, z0, cw, ch, gap, y0, y1, t=0.20, flip=False):
+    """Set a word into `bm`, left to right, in the (x, z) plane.
+
+    `flip` mirrors it in x, which is not a nicety. A viewer standing at +y
+    looking toward −y has +x on their *left* — so a word set the natural way
+    along +x reads backwards to the only person who will ever look at it. The
+    laptop's badge faces its user; the badge is therefore set in −x.
+    """
+    x = x0
+    d = -1 if flip else 1
+    for c in text:
+        for poly in _glyph(c, t):
+            _plate_bm(bm, [(d * (x + px * cw), z0 + pz * ch) for px, pz in poly],
+                      y0, y1)
+        x += cw + gap
+    return x - gap - x0            # the width actually set
+
+
+# The laptop, on the white plastic table by the terrace doors.
+#
+# Laptop-local: +x across, −y to the back (the hinge), +z up; the person sits at
+# +y. Placed at LAP_YAW, which is the angle it was left at rather than square to
+# anything, because nobody puts a laptop down square to the table.
+LAP_X, LAP_Y = 1.35, -2.85
+LAP_YAW = 0.20
+LAP_W, LAP_D, LAP_H = 0.404, 0.322, 0.028   # an 18-inch machine, and it is one
+LID_H, LID_T = 0.272, 0.013
+LID_LEAN = math.radians(17.0)               # off vertical, leaning back
+SCR_U0, SCR_U1 = 0.030, 0.262               # up the lid: chin, then screen
+SCR_HW = 0.188                              # half the screen's width
+# Where you sit to use it: the plastic chair, and a seated eye rather than a
+# standing one.
+LAP_SEAT = (1.35, -2.00, F2 + 1.18)
+
+LAP_SHELL = (0.052, 0.055, 0.060)   # anodised near-black, very slightly blue
+LAP_DECK = (0.086, 0.090, 0.098)
+LAP_KEYWELL = (0.028, 0.030, 0.034)
+LAP_SCREEN = (0.040, 0.046, 0.062)
+LAP_MARK = (0.66, 0.69, 0.74)       # the wordmark: brushed, not white
+LAP_VENT = (0.020, 0.021, 0.024)
+
+
+def laptop(kit, cx, cy, z, yaw=LAP_YAW):
+    """One Alienware 18, open, off.
+
+    The old one was a 34 by 24 slab with a lighter slab leaning on it, which is
+    what a laptop is from four metres away and nothing at all from the chair in
+    front of it — and this one is about to be the thing the whole computer mode
+    hangs off, so it is worth building: a real chassis with a rear thermal
+    shelf, a hex vent, a lit keyboard, a trackpad, and the wordmark across the
+    chin.
+
+    The lid is built flat and rotated about its hinge rather than sheared, which
+    is what it was. A shear keeps every point at its own height and slides it
+    back, so a 27 cm lid leaning 17° came out 27 cm tall instead of 26 — and,
+    much worse, the screen and the panel it sits in got *different* slides
+    because they started at different depths, so the screen was not parallel to
+    the lid it was in. Nobody sees that in a 34 cm laptop. Everybody sees it on
+    a screen that fills the window.
+    """
+    c, s = math.cos(LID_LEAN), math.sin(LID_LEAN)
+    y_hinge, z_hinge = -LAP_D / 2 + 0.016, LAP_H
+
+    def lid_of(bm):
+        """(v, w, u) → laptop-local, turning the flat lid up about its hinge."""
+        for vv in bm.verts:
+            v, w, u = vv.co.x, vv.co.y, vv.co.z
+            vv.co = (v, y_hinge - u * s + w * c, z_hinge + u * c + w * s)
+
+    def emit(bm, colour, name, bev=0.0, lid=False):
+        if lid:
+            lid_of(bm)
+        ob = new_object(bm, name)
+        if bev:
+            bevel(ob, bev)
+        _place(ob, cx, cy, z, yaw)
+        kit.adopt(ob, colour)
+
+    # ── the deck ──────────────────────────────────────────────────────────────
     bm = bmesh.new()
-    bm_box(bm, 0, 0, 0.010, 0.34, 0.24, 0.020)
-    ob = new_object(bm, "laptop_base")
-    bevel(ob, 0.004)
-    _place(ob, cx, cy, z, 0.2)
-    kit.adopt(ob, (0.14, 0.15, 0.17))
+    bm_box(bm, 0, 0, LAP_H / 2, LAP_W, LAP_D, LAP_H)
+    # The thermal shelf that sticks out behind the hinge — the thing that makes
+    # one of these read as a gaming machine and not a ThinkPad.
+    bm_box(bm, 0, -LAP_D / 2 - 0.021, LAP_H / 2 - 0.002, LAP_W * 0.86, 0.048,
+           LAP_H - 0.006)
+    emit(bm, LAP_SHELL, "laptop_base", bev=0.0035)
+
+    # The keyboard well and the trackpad, milled into the deck.
     bm = bmesh.new()
-    vs = bm_box(bm, 0, -0.12, 0.11, 0.34, 0.012, 0.22)
-    for v in vs:
-        y, zz = v.co.y, v.co.z
-        v.co.y = y - (zz - 0.02) * 0.38
-    ob = new_object(bm, "laptop_lid")
-    bevel(ob, 0.004)
-    _place(ob, cx, cy, z, 0.2)
-    kit.adopt(ob, (0.12, 0.13, 0.15))
+    bm_box(bm, 0, -0.046, LAP_H - 0.002, 0.334, 0.120, 0.006)
+    emit(bm, LAP_KEYWELL, "laptop_well")
+
     bm = bmesh.new()
-    vs = bm_box(bm, 0, -0.118, 0.11, 0.30, 0.006, 0.19)
-    for v in vs:
-        y, zz = v.co.y, v.co.z
-        v.co.y = y - (zz - 0.02) * 0.38
-    ob = new_object(bm, "laptop_screen")
-    kit.adopt(ob, (0.30, 0.34, 0.44))
-    _place(ob, cx, cy, z, 0.2)
+    bm_box(bm, 0, 0.086, LAP_H + 0.0005, 0.126, 0.086, 0.003)
+    emit(bm, LAP_DECK, "laptop_trackpad", bev=0.002)
+
+    # ── the keys, lit ─────────────────────────────────────────────────────────
+    # Per-key RGB, which on the real one is a blue-to-violet wash across the
+    # deck with the function row picked out warm. Done as vertex colour on the
+    # cap rather than as light, because there is no light in this shader — and
+    # it is the right cheat anyway: what you see across a dark room is the caps
+    # glowing, not the deck lit.
+    #
+    # The gap does the work. At 1.8 mm between 17 mm caps the rows fuse the
+    # moment you look along the deck at any angle a person actually sits at, and
+    # a six-row keyboard renders as eighteen tall coloured stripes. 2.6 mm of
+    # dark well between 15.8 mm caps keeps the rows apart, and the colour has to
+    # vary down the deck as well as across it or the stripes come back on their
+    # own.
+    #
+    # Row 0 is the *back* row, which is where the function keys are, and the
+    # front row gets a spacebar — a keyboard without one is a grid.
+    rows, cols = 6, 18
+    kw, gapk = 0.0158, 0.0026
+    pitch = kw + gapk
+    x00 = -(cols * pitch - gapk) / 2 + kw / 2
+    y00 = -0.098 + kw / 2
+    for r in range(rows):
+        i = 0
+        while i < cols:
+            span = 1
+            if r == rows - 1 and i == 4:
+                span = 9                            # the spacebar
+            kx = x00 + (i + (span - 1) / 2) * pitch
+            ky = y00 + r * pitch
+            f = (i + span / 2) / cols
+            g = r / (rows - 1)
+            if r == 0:                              # the function row, warm
+                col = (0.30 + 0.34 * f, 0.62 - 0.12 * f, 0.14)
+            else:
+                col = (0.14 + 0.40 * f * (0.5 + 0.5 * g),
+                       0.18 + 0.16 * g,
+                       0.88 - 0.22 * f)
+            bm = bmesh.new()
+            bm_box(bm, kx, ky, LAP_H + 0.0020, kw + (span - 1) * pitch, kw,
+                   0.0040)
+            emit(bm, col, "key", bev=0.0007)
+            i += span
+
+    # ── the hex vent on the shelf ─────────────────────────────────────────────
+    for r in range(2):
+        for i in range(21):
+            hx = -0.166 + i * 0.0166 + (0.0083 if r else 0)
+            bm_cylinder(kit.bm(LAP_VENT, 0.0), cx + hx * math.cos(yaw)
+                        - (-LAP_D / 2 - 0.012 - r * 0.016) * math.sin(yaw),
+                        cy + hx * math.sin(yaw)
+                        + (-LAP_D / 2 - 0.012 - r * 0.016) * math.cos(yaw),
+                        z + LAP_H - 0.004, z + LAP_H - 0.001,
+                        0.0062, 0.0062, seg=6)
+
+    # ── the lid ───────────────────────────────────────────────────────────────
+    bm = bmesh.new()
+    bm_box(bm, 0, 0, LID_H / 2, LAP_W, LID_T, LID_H)
+    emit(bm, LAP_SHELL, "laptop_lid", bev=0.0035, lid=True)
+
+    bm = bmesh.new()
+    _plate_bm(bm, [(-SCR_HW, SCR_U0), (SCR_HW, SCR_U0),
+                   (SCR_HW, SCR_U1), (-SCR_HW, SCR_U1)],
+              LID_T / 2 - 0.001, LID_T / 2 + 0.0015)
+    emit(bm, LAP_SCREEN, "laptop_screen", lid=True)
+
+    # ALIENWARE across the chin, in thin wide-tracked caps. The tracking is the
+    # mark: set solid it is just a word, and at 6 mm a cell with 5 mm of air
+    # after it is what makes it read as the badge rather than as a label.
+    bm = bmesh.new()
+    cw, gh, gap = 0.0062, 0.0086, 0.0050
+    wide = 9 * cw + 8 * gap
+    _word(bm, "ALIENWARE", -wide / 2, (SCR_U0 - 0.024) + 0.007, cw, gh, gap,
+          LID_T / 2 + 0.0005, LID_T / 2 + 0.0016, t=0.18, flip=True)
+    emit(bm, LAP_MARK, "laptop_mark", lid=True)
+
+    # Four feet.
+    bm = bmesh.new()
+    for fx in (-0.156, 0.156):
+        for fy in (-0.128, 0.128):
+            bm_box(bm, fx, fy, 0.0015, 0.030, 0.016, 0.003)
+    emit(bm, LAP_VENT, "laptop_feet")
+
+
+def _laptop_screen_at():
+    """The screen's centre in three.js house metres, and its size.
+
+    Written out here so the sidecar and the geometry cannot disagree about where
+    the thing the whole computer mode points at actually is.
+    """
+    c, s = math.cos(LID_LEAN), math.sin(LID_LEAN)
+    u, w = (SCR_U0 + SCR_U1) / 2, LID_T / 2 + 0.001
+    ly = -LAP_D / 2 + 0.016 - u * s + w * c
+    lz = LAP_H + u * c + w * s
+    cy_, sy = math.cos(LAP_YAW), math.sin(LAP_YAW)
+    bx = LAP_X + 0.0 * cy_ - ly * sy
+    by = LAP_Y + 0.0 * sy + ly * cy_
+    bz = (F2 + 0.74) + lz
+    return ([round(bx, 4), round(bz, 4), round(-by, 4)],
+            round(SCR_HW * 2, 4), round(SCR_U1 - SCR_U0, 4))
 
 
 def pictures(kit):
@@ -2088,6 +2308,15 @@ def plan_json():
                    round(-(BY0 - 0.005 - 0.016 - 0.0245), 4)],
             "r": CLOCK_R,
         },
+        # The laptop, for the computer mode: what to spray at, where to sit, and
+        # where the screen is. Three.js metres relative to the house origin.
+        "laptop": (lambda scr: {
+            "at": [round(LAP_X, 3), round(F2 + 0.74, 3), round(-LAP_Y, 3)],
+            "yaw": round(LAP_YAW, 4),
+            "screen": scr[0], "w": scr[1], "h": scr[2],
+            "seat": [round(LAP_SEAT[0], 3), round(LAP_SEAT[2], 3),
+                     round(-LAP_SEAT[1], 3)],
+        })(_laptop_screen_at()),
         "rooms": rooms,
         "blockers": blockers,
         "anchors": {

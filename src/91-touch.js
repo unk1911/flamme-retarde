@@ -351,6 +351,7 @@ function initTouch() {
   // it walks you up to it, inside it swaps the roof. One button, and the label
   // says which — see `updateGroundHUD`.
   tap('t-roof', () => skipToVikendica());
+  tap('t-pc', () => skipToComputer());
   tap('t-gset', () => togglePanel());
   tap('t-gpause', () => togglePause());
   tap('t-run', (el) => {
