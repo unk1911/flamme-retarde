@@ -8,6 +8,157 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.64.0] — 2026-08-16
+
+### Fixed — your head came out through the mezzanine roof
+
+The deck is 2.55 m over the floor and the roof it sits under runs from 0.69 m of
+clear height at the north wall to 2.40 m at the ridge. A camera holding a 1.66 m
+eye walks up there and puts its head out through the tiles about a metre and a
+half short of the wall — which does not read as a rendering fault, it reads as
+being suddenly outside the building, and it throws away the one answer the
+raised roof is there to give.
+
+You stoop now. The eye tracks the underside of the slope, eased on the way and
+hard-capped in `pose()` so a teleport cannot arrive up there at full height, and
+where it runs out you are on your knees — which is not a failure state, it is
+the report. At 2.6 m off the ridge the eye sits at 1.09 m. That is what 60 cm of
+new wall buys at that end of the room, stated the only way a model can state it.
+
+### Fixed — every shutter in the house was shut
+
+`louvred()` has always said it drew a leaf "hooked flat back against the render"
+and it never did: the two leaves went at (a0, mid) and (mid, a1), which is the
+opening exactly. So the terrace window was a grey panel behind a grey curtain
+with nothing behind either, in a flat whose entire argument is the light and the
+water outside it, on an August afternoon, with the fire already burning. They
+hook back beside the opening now and the window has the channel in it.
+
+### Fixed — and the net curtains stopped the rest of it
+
+A sheer that stops light is not a sheer, it is a board. They go out as their own
+blob and are drawn through, denser than the glazing (0.44 against 0.26) and much
+flatter — almost no specular and a good deal of emissive, because a net is a
+diffuser and not a mirror, and it should carry the light it stands in front of.
+
+### Fixed — the kitchen tap
+
+It was at the front lip of a 63 cm worktop with its spout pointing back at the
+wall. Nothing plumbs that way and nothing looks like it. It comes out of the
+splashback now and reaches forward over the bowl — and the bowl is a bowl:
+one slab from end to end meant the sink was a box *inside* the counter, which
+nobody could see and nobody noticed while the tap was pointing the wrong way.
+Four pieces of worktop around a hole, a floor, four sides and a waste.
+
+### Changed — the armchair looks at the sea
+
+It was turned to +y against the bookshelf, so the one chair in the flat had a
+metre of paperbacks for a view, in the one room in the game with a channel
+outside it. Turned round and pulled in beside the sofa's east end, facing the
+terrace doors, which is the only reason to sit down in here. The low table goes
+south with the pair of them: two seats side by side want the table in front of
+them and not between them.
+
+### Changed — the fish smiles, and it is on Croatian time
+
+The one on the wall has a smile and it is most of why it is a cute clock rather
+than a fish-shaped clock. This had a triangular notch at the tip of the snout,
+which is a mouth. It is a drawn line now, from the tip back under the eye with a
+hook up at the end — one convex quad per segment, overrun at the joints, for the
+same reason the rest of the animal is five overlapping plates.
+
+And it reads Europe/Zagreb rather than whatever the machine under the player is
+set to. A clock on a Dalmatian wall showing Eastern time is a small thing that
+is wrong in exactly the way the rest of this model is trying not to be. Intl
+knows the CET/CEST rule; it is asked once and cached for ten minutes.
+
+## [1.63.0] — 2026-08-16
+
+### Fixed — you stopped moving and the world did not
+
+With nothing pressed and no velocity left, you drifted. Slowly, steadily, always
+the same way. `confine()` — which runs every frame and clamps you out of the
+walls — took your world position into the resort's `(t, s)` frame and converted
+it straight back, and that pair is not an identity: `local()` projects on to a
+traced shoreline and `toWorld()` walks back out along it, and near a bend the
+round trip lands about 15 mm away. Sixty times a second, in a direction set by
+the geometry rather than by anything you did.
+
+It now returns the input untouched when nothing clamped, and when something did
+it moves you by the *difference* of two `toWorld()` calls rather than by the
+reconstruction — so a shoulder held against a wall stops sliding along it too.
+Measured over eight seconds of simulation standing still: 0.0000 m, indoors and
+out. It was everywhere in the on-foot mode and it was worst in the one place
+with a wall close enough to measure against.
+
+### Fixed — the house you could see through
+
+The near clip is 1.2 m. That is the right front clip for an aeroplane over a
+42 km view and it is nonsense for somebody standing in a 4 m room, and the one
+place it dropped was the kabina — which was the only interior in the game when
+that was written. The vikendica inherited none of it. So standing in the middle
+of a modelled flat, every wall inside 1.2 m was thrown away and you could see
+the beach through the bedroom partition. Being in a house you can see out of is
+worse than not being able to go in at all, because it is the one thing the
+house exists to test.
+
+Three signals now, where there was one. Whether you are **in a room** latches
+the audio. How **dark** that room is drives the exposure, and it is 0.34 for
+the vikendica against 1.0 for the kabina: the kabina is a wooden box with one
+door and half a stop is what an eye does walking into it; this house has 13 m²
+of glass and white plaster on every wall, and stopped down the same amount it
+read as a cellar with a view. And how close you are to a **surface you must not
+see through** drives the clip — which is a wider question than being indoors,
+because the clip does not care which side of a wall you are standing on. Half
+way up the outside flight, 0.7 m off the east face, the wall went and you
+looked through the house at the furniture. The cut sequence's best shot was a
+shot of the sofa through a wall.
+
+That last one ramps linearly to zero 2.2 m off the shell, which makes
+near(d) = 0.06 + 0.518 d against a wall at d — under the diagonal everywhere
+outside 12 cm, and nothing gets within 12 cm of a wall. It is followed rather
+than eased, because an eased clip lags and a lagging clip is exactly the case
+the invariant is there to rule out. Outdoors and in the air the near plane is
+1.2 m as before, so the depth buffer pays for this in an 11 by 12 metre patch
+of Jadrija and nowhere else.
+
+### Changed — the outside stair starts at the corner of the house
+
+Both ends of that flight are fixed by something else: the head by the door it
+serves, the foot by the south face of the building, which is where the real one
+starts. So the going is a remainder and not a choice. At 25 cm it was, and the
+flight ran 1.15 m past the corner and out over open ground. It is 18.3 cm now —
+seventeen risers of 17 in 3.10 m of run, which is 43° and steep, and which is
+what 2.90 m of storey height in that much run has to be.
+
+And the ground-floor door under it is gone. There is no door on the east face
+at grade; there is render from the corner to the terrace. A door there opens
+into the underside of a staircase.
+
+### Changed — the mezzanine ladder has somewhere to land
+
+Fourteen treads over 2.60 m of run, and 2.60 m is the entire distance from the
+deck's open edge to the inner face of the south wall — so the bottom tread was
+1.5 cm off the terrace glass and you came down the last step of it into a
+window. Twelve treads at 18 cm buys 52 cm of floor at the foot, a place to
+arrive, for six degrees of pitch. 50° is a ladder-stair, which is what this is
+and what both reference photographs show.
+
+### Changed — the fish tells the time
+
+Smaller: 0.51 m against a 0.68 m gap between the two bedroom doors, where at
+0.61 m it filled the wall to within 3 cm a side and read as a mural. Centred on
+that gap, and centred as a *fish* rather than about its movement — the spindle
+sits 0.11 r west of the middle of the animal, because there is more tail behind
+it than snout in front.
+
+And it runs. The hands used to be baked into the ply at ten past ten, which is
+the right pose for a photograph of a clock and the wrong one for a clock in a
+room you can walk up to and stand in front of. Three meshes now, hung on the
+spindle from the plan sidecar and wound off the wall clock, with a coral second
+hand that sweeps rather than ticks — a quartz movement does tick, and a tick is
+one frame in sixty at any frame rate worth having.
+
 ## [1.62.0] — 2026-08-16
 
 ### Changed — the vikendica moves to the front row

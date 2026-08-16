@@ -66,6 +66,17 @@ const GROUND = {
   // of one and a half — the difference between looking at a room and being able
   // to stop in front of something.
   indoorPace: 0.42,
+  // How far down you will duck to stay under something.
+  //
+  // The mezzanine is the only place in the game with a ceiling you cannot stand
+  // under: 0.69 m of clear height at the north wall rising to 2.40 at the
+  // ridge. A camera that holds 1.66 m up there puts its head out through the
+  // tiles a metre and a half short of the wall — which does not read as a
+  // rendering fault, it reads as suddenly being outside the building, and it
+  // throws away the one answer the raised roof is there to give. Stoop instead:
+  // the eye tracks the underside, and where it runs out you are on your knees,
+  // which is exactly the report you wanted from that end of the room.
+  stoop: 0.52,
   // And out of a person. The rig is 0.40 m across the shoulders with the arms
   // hanging outside that, so 0.30 is honestly what one of them occupies and two
   // of them keep 0.60 m between centres: close enough to hand something over,
@@ -279,7 +290,21 @@ async function buildGround(scene, field) {
     pack: GROUND.pack, spraying: false, jet: 0, refilling: false,
     aim: [0, 0, 0], aimKind: null, aimSoak: -1, aimHot: false,
     gait: 0, bob: 0,                 // where you are in the stride, and how much of it shows
+    eye: GROUND.eye,                 // how tall you are standing right now — see `stoop`
   };
+
+  /**
+   * How high to carry the eye here: full height, or as much of it as the thing
+   * over your head leaves. Continuous in position, because the underside of a
+   * pitched roof is a ramp and a stoop that came on in steps would read as the
+   * camera stumbling.
+   */
+  function eyeAt(x, z, y) {
+    if (!field.headroom) return GROUND.eye;
+    const ceil = field.headroom(x, z, y);
+    if (ceil == null) return GROUND.eye;
+    return clamp(ceil - y - 0.10, GROUND.stoop, GROUND.eye);
+  }
 
   let active = false;
   let stranded = false;              // walked in under a canopy, not out of a door
@@ -338,6 +363,7 @@ async function buildGround(scene, field) {
   function confine(x, z, y) {
     const B = field.bounds;
     let [t, s] = field.local(x, z);
+    const t0 = t, s0 = s;
     let hit = false;
     const tc = clamp(t, B.t0, B.t1), sc = clamp(s, B.s0, B.s1);
     if (tc !== t || sc !== s) hit = true;
@@ -398,8 +424,36 @@ async function buildGround(scene, field) {
       const dir = s > (B.s0 + B.s1) * 0.5 ? -1 : 1;
       for (let k = 0; k < 80 && inside(t, s); k++) s = clamp(s + dir, B.s0, B.s1);
     }
-    const w = field.toWorld(t, s);
-    return [w[0], w[2], hit];
+    // Nothing touched you: give back exactly what came in.
+    //
+    // This is the fix for the standing drift, and it is the same 15 mm that the
+    // comment above is about, spent the other way round. `local()` projects on
+    // to the traced shoreline and `toWorld()` walks back out along it, and the
+    // pair is not an identity — near a bend it lands a centimetre and a half
+    // off, in a direction set by the geometry rather than by anything you did.
+    // Running that round trip unconditionally, every frame, means a player who
+    // has taken their hands off the keys is still being moved: a centimetre and
+    // a half sixty times a second, always the same way, and you slide across
+    // your own living room. Outdoors it is a slow creep across a promenade that
+    // reads as a bad mouse; in a 4 m room with a wall to measure against it is
+    // unmistakable and it is the thing that stops the room feeling like a room
+    // you are standing in.
+    //
+    // If nothing clamped and nothing pushed, the answer *is* the input — so
+    // return it, and the round trip is only paid for when it has something to
+    // say. Aerodromes never had this: their frame is one rigid rotation and the
+    // round trip is exact to a part in 10^12.
+    if (!hit) return [x, z, false];
+    // And when something *did* touch you, move by the correction rather than
+    // by the reconstruction — same reason. What confine() knows is a
+    // displacement in (t, s); converting the corrected station straight back to
+    // world bakes the round-trip error into the answer as well, so a shoulder
+    // held against a wall keeps sliding along it. The difference of two
+    // toWorld() calls one step apart cancels the error to first order and
+    // leaves the push.
+    const w0 = field.toWorld(t0, s0);
+    const w1 = field.toWorld(t, s);
+    return [x + w1[0] - w0[0], z + w1[2] - w0[2], hit];
   }
 
   /**
@@ -1344,6 +1398,10 @@ async function buildGround(scene, field) {
     const moved = Math.hypot(nx - you.x, nz - you.z);
     you.x = nx; you.z = nz;
     you.y = field.walkY(you.x, you.z, you.y);
+    // Eased, so ducking under the eaves is a movement and not a cut. The hard
+    // cap in pose() is what stops a teleport arriving on the deck at full
+    // height with its head outside.
+    you.eye = damp(you.eye, eyeAt(you.x, you.z, you.y), 9, dt);
     gait(moved, dt);
   }
 
@@ -1631,7 +1689,7 @@ async function buildGround(scene, field) {
     const sway = GROUND.bobX * you.bob * Math.sin(you.gait);
     const rx = Math.cos(you.yaw), rz = -Math.sin(you.yaw);
     const ex = you.x + rx * sway;
-    const ey = you.y + GROUND.eye + dy;
+    const ey = you.y + Math.min(you.eye, eyeAt(you.x, you.z, you.y)) + dy;
     const ez = you.z + rz * sway;
     camera.position.set(ex, ey, ez);
     const cp = Math.cos(you.pitch);

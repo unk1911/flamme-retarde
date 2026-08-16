@@ -53,8 +53,14 @@ const VIK = {
   // The mezzanine, when it is on: the deck, and the ladder-stair up to it.
   deck: 5.45,
 
-  // The outside stair: seventeen risers of 17 up the east face, sixteen goings
-  // of 25 along it, in house-local three.js metres. The landing is at the top
+  // The outside stair: seventeen risers of 17 up the east face, seventeen
+  // goings of 18.3 along it, in house-local three.js metres. Both ends of it
+  // are fixed by something else — the head by the door it serves, the foot by
+  // the south face of the house, which is where the real one starts — so the
+  // going is the remainder and not a choice. It was 25, which ran the flight a
+  // metre and a bit past the corner of the building and out over open ground.
+  //
+  // The landing is at the top
   // and it covers the doorway, which took a change in the Blender file to be
   // true: the flight used to arrive *in* the opening, so the last thing between
   // the promenade and the front door was an 18 cm step with nothing to stand on
@@ -64,12 +70,15 @@ const VIK = {
   // flight starts at 3.46, and that 7 cm of nothing was a slot the width of a
   // finger where the floor was neither the house's nor the stair's — so you
   // dropped 2.9 m through the doorstep. Surfaces that meet must overlap.
-  stair: { x0: 3.30, x1: 4.62, z0: 0.76, z1: 5.01 },
+  stair: { x0: 3.30, x1: 4.62, z0: 0.76, z1: 3.865 },
   landing: { x0: 3.30, x1: 4.62, z0: -0.42, z1: 0.80 },
 
-  // And the ladder-stair inside, up the east wall of the big room: fourteen
-  // treads, 2.55 m of rise in 2.60 of run.
-  loftStair: { x0: 2.20, x1: 3.15, z0: 1.02, z1: 3.80 },
+  // And the ladder-stair inside, up the east wall of the big room: twelve
+  // treads, 2.55 m of rise in 1.98 of run. It was fourteen over 2.60, and
+  // 2.60 m is the whole distance from the deck's open edge to the inner face of
+  // the south wall — so the bottom tread was 1.5 cm off the terrace glass and
+  // you came down the last step of it into a window.
+  loftStair: { x0: 2.20, x1: 3.15, z0: 0.90, z1: 3.14 },
   loftDeck: { x0: -3.19, x1: 3.19, z0: -3.665, z1: 1.20 },
 
   // A little emissive, and it is a cheat with a reason. The interior is lit by
@@ -154,25 +163,153 @@ async function buildVikendica(scene, field) {
     body: 'base *= vVCol;',
   });
 
+  // The net curtains, drawn through as well.
+  //
+  // A sheer that stops light is not a sheer, it is a board — and both of the
+  // ones that matter hang over the two brightest things in the flat: the
+  // kitchen window and the 140 opening on to the terrace. Baked in with the
+  // plaster they turned the west wall into a blank panel and the terrace into a
+  // shuttered room. Denser than the glazing (0.44 against 0.26) and flatter,
+  // because a net is a diffuser and not a mirror: almost no specular, and a
+  // good deal of emissive so it *carries* the light it is standing in front of
+  // rather than merely admitting it.
+  const sheerMat = solidMaterial(0xffffff, {
+    spec: 0.06, specPower: 12, emissive: 0.30,
+    opacity: 0.44, transparent: true, depthWrite: false,
+    body: 'base *= vVCol;',
+  });
+
   const parts = {};
+  const soft = (k) => k.endsWith('_glass') || k.endsWith('_sheer');
   for (const key of ['shell', 'roof', 'loft',
-                     'shell_glass', 'roof_glass', 'loft_glass']) {
+                     'shell_glass', 'roof_glass', 'loft_glass',
+                     'shell_sheer', 'roof_sheer', 'loft_sheer']) {
     const b64 = PAYLOAD['vikendica_' + key + '_fr3d'];
-    const glass = key.endsWith('_glass');
-    if (!b64) { if (!glass) console.warn('no vikendica payload:', key); continue; }
+    if (!b64) { if (!soft(key)) console.warn('no vikendica payload:', key); continue; }
     try {
       const geo = readFR3D(await inflateBinary(b64));
-      const mesh = new THREE.Mesh(geo, glass ? glassMat : mat);
-      mesh.castShadow = !glass;
+      const mesh = new THREE.Mesh(geo,
+        key.endsWith('_sheer') ? sheerMat : key.endsWith('_glass') ? glassMat : mat);
+      mesh.castShadow = !soft(key);
       mesh.receiveShadow = true;
-      if (glass) mesh.renderOrder = 3;
+      if (soft(key)) mesh.renderOrder = 3;
       root.add(mesh);
       parts[key] = mesh;
     } catch (e) {
       console.warn('vikendica failed:', key, e.message);
     }
   }
-  for (const k of ['loft', 'loft_glass']) if (parts[k]) parts[k].visible = false;
+  for (const k of ['loft', 'loft_glass', 'loft_sheer']) {
+    if (parts[k]) parts[k].visible = false;
+  }
+
+  // ── the fish's hands ───────────────────────────────────────────────────────
+  /**
+   * Three hands on the fish clock, turning, telling the actual time.
+   *
+   * They used to be baked into the ply at ten past ten, which is the right
+   * answer for a photograph of a clock and the wrong one for a clock in a room
+   * you are walking around: the pose that reads as "a clock" in a still reads as
+   * "a clock that has stopped" the moment you can stand in front of it and
+   * watch. A second hand sweeping is the cheapest possible proof that the room
+   * is running rather than being looked at, and it costs three boxes.
+   *
+   * Built here rather than exported because they move, and everything in the
+   * payload is one welded mesh per roof state. The spindle comes out of the plan
+   * sidecar so the geometry and the hands cannot drift apart.
+   *
+   * The plate lies in the house's own XY, which is the wall's plane, and turns
+   * about +Z, which is the wall's normal into the room. Blender's angles ran
+   * anticlockwise from twelve and three.js turns the same way about the same
+   * axis, so a clock — which runs the other way — is a negative angle.
+   */
+  const clockHands = [];
+  if (plan.clock) {
+    const [cx, cy, cz] = plan.clock.at;
+    const k = plan.clock.r / 0.178;    // the hand lengths were drawn at r 0.178
+    const hand = (len, half, depth, colour) => {
+      const g = new THREE.BoxGeometry(half * 2, len + half * 1.6, depth);
+      // Pivot at the spindle, with a stub of tail behind it — a hand is
+      // balanced on its arbor and does not begin at its own centre.
+      g.translate(0, (len - half * 1.6) * 0.5, 0);
+      const m = new THREE.Mesh(g, solidMaterial(colour, {
+        spec: 0.30, specPower: 40, emissive: VIK.glow, vcol: false,
+      }));
+      m.position.set(cx, cy, cz);
+      m.castShadow = false;
+      m.receiveShadow = false;
+      root.add(m);
+      clockHands.push(m);
+      return m;
+    };
+    // Hours, minutes, then the coral second hand a millimetre in front of both
+    // so it never disappears into one of them.
+    hand(0.062 * k, 0.0100 * k, 0.006, 0x101112);
+    hand(0.088 * k, 0.0070 * k, 0.006, 0x101112);
+    hand(0.094 * k, 0.0026 * k, 0.005, 0xd8503c).position.z = cz - 0.004;
+  }
+
+  /**
+   * How far Zagreb is ahead of UTC, in milliseconds.
+   *
+   * This clock hangs on a wall in Croatia. `new Date()` gives whatever the
+   * machine under the player is set to, which for anybody not in this time zone
+   * is a clock on a Dalmatian wall reading Eastern time — a small thing that is
+   * wrong in exactly the way the rest of the model is trying not to be.
+   *
+   * CET in winter, CEST in summer, and the changeover rule is not worth
+   * carrying: Intl knows it. Asked once and cached for ten minutes, which
+   * catches a changeover soon enough and keeps the per-frame path down to three
+   * multiplications. If the runtime has no time-zone data it falls back to the
+   * machine clock rather than to nothing.
+   */
+  const ZG = (() => {
+    try {
+      return new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Europe/Zagreb', hour12: false,
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+      });
+    } catch { return null; }
+  })();
+  let tzOff = 0, tzAt = -1e12;
+  function zagrebOffset(now) {
+    if (!ZG) return -new Date(now).getTimezoneOffset() * 60000;
+    if (now - tzAt < 600000) return tzOff;
+    tzAt = now;
+    try {
+      const p = {};
+      for (const q of ZG.formatToParts(new Date(now))) p[q.type] = q.value;
+      const wall = Date.UTC(+p.year, +p.month - 1, +p.day,
+        +p.hour % 24, +p.minute, +p.second);
+      // To the minute: the parts carry no milliseconds, so the raw difference
+      // is up to a second out and a second of error on a sweeping second hand
+      // is the one error you could see.
+      tzOff = Math.round((wall - now) / 60000) * 60000;
+    } catch { tzOff = 0; }
+    return tzOff;
+  }
+
+  /**
+   * Wind it. Off the wall clock in Zagreb — see above.
+   *
+   * The second hand sweeps rather than ticks. A quartz movement ticks and this
+   * one has a quartz movement in it, but a tick is one frame in sixty at any
+   * frame rate worth having and a sweep is the thing you can actually see
+   * moving out of the corner of your eye, which is the entire point of it.
+   */
+  function tickClock() {
+    if (!clockHands.length) return;
+    const now = Date.now();
+    const d = new Date(now + zagrebOffset(now));
+    const s = d.getUTCSeconds() + d.getUTCMilliseconds() / 1000;
+    const m = d.getUTCMinutes() + s / 60;
+    const h = (d.getUTCHours() % 12) + m / 60;
+    clockHands[0].rotation.z = -TAU * h / 12;
+    clockHands[1].rotation.z = -TAU * m / 60;
+    clockHands[2].rotation.z = -TAU * s / 60;
+  }
+  tickClock();
 
   // ── where you may stand ────────────────────────────────────────────────────
   /**
@@ -256,6 +393,83 @@ async function buildVikendica(scene, field) {
   }
 
   /**
+   * Under this roof, in this room — not on the terrace, not on the stair.
+   *
+   * Narrower than `tight` on purpose. `tight` is "treat me as a person here"
+   * and is generous, because being a person on the landing costs nothing. This
+   * is "there is a ceiling over me", and it drives the near clip: the camera
+   * fronts at 1.2 m, which is the right front clip for an aeroplane and is
+   * nonsense for somebody standing in a 4 m room — every wall inside 1.2 m is
+   * thrown away and you look through it at the sea. So it has to be true
+   * exactly where there are walls and false one step outside them, or a doorway
+   * becomes a place where the house flickers.
+   *
+   * Takes world y as well, because the terrace slab is the ground floor's
+   * ceiling and the room is the storey above it: the same (t, s) is inside at
+   * +2.90 and outside standing under the house.
+   */
+  /**
+   * How close you are to this house's skin, 1 at it and 0 at `pad` metres off.
+   *
+   * A second, wider answer, and it exists for one job: the near clip. Being
+   * *in* a room is the case everyone thinks of, but the front clip eats any
+   * surface inside 1.2 m whichever side of it you are standing — so halfway up
+   * the outside flight, 0.7 m off the east wall, the wall goes and you look
+   * through the house at the furniture. On the landing, on the terrace against
+   * the glass, in the cut sequence's own shot of the climb: same thing.
+   *
+   * `pad` is 2.2 and that is not a taste. The clip is ramped linearly on this
+   * value, so near(d) = 0.06 + 0.518 d, and the wall is at d: the ramp has to
+   * stay under the diagonal over the whole range or there is a band where it
+   * still clips. 2.2 clears it everywhere outside 12 cm, and nothing can get
+   * within 12 cm of a wall — `GROUND.tight` holds you off at 26.
+   *
+   * Deliberately *not* the same signal as `indoorsAt`. That one dims the room
+   * and shuts the singing out, and neither of those is true standing on a
+   * staircase in the sun.
+   */
+  function hull(t, s, y, pad = 2.2) {
+    const [x, z] = toHouse(t, s);
+    if (y != null && (y < base - 0.3 || y > base + VIK.floor + 3.6)) return 0;
+    const O = plan.outer;
+    const dx = Math.max(O.x0 - x, x - O.x1, 0);
+    const dz = Math.max(O.z0 - z, z - O.z1, 0);
+    return clamp(1 - Math.hypot(dx, dz) / pad, 0, 1);
+  }
+
+  /**
+   * The underside of the roof over a point, in world metres, or null where
+   * there is nothing low enough to matter.
+   *
+   * Only the mezzanine has this problem and it has it badly. The deck is at
+   * +2.55 over the floor and the new roof it sits under runs from 0.69 m of
+   * clear height at the north wall to 2.40 m at the ridge — so a camera holding
+   * a 1.66 m eye walks up there and its head goes out through the tiles about a
+   * metre and a half short of the wall. Which is not a rendering fault: it is
+   * the answer to the question the mezzanine is asking, delivered by putting
+   * you outside the building instead of making you stoop.
+   *
+   * The ridge runs along the house's X at z = 0, so the underside is a straight
+   * ramp in |z| off `loftRidge` at the sidecar's own pitch, less a soffit.
+   */
+  function headroom(t, s, y) {
+    if (!parts.loft || !parts.loft.visible) return null;
+    if (y == null || y < base + VIK.floor + 0.6) return null;
+    const [x, z] = toHouse(t, s);
+    if (!inRect(x, z, VIK.loftDeck) && !inRect(x, z, VIK.loftStair)) return null;
+    const rise = Math.tan(plan.loftPitch * Math.PI / 180);
+    return base + plan.loftRidge - Math.abs(z) * rise - 0.10;
+  }
+
+  function indoorsAt(t, s, y) {
+    const [x, z] = toHouse(t, s);
+    if (!inRect(x, z, plan.outer)) return 0;
+    if (y != null && (y < base + VIK.floor - 0.6
+                      || y > base + VIK.floor + 3.4)) return 0;
+    return 1;
+  }
+
+  /**
    * The walls, as boxes in the locale's own axes.
    *
    * Everything inside the house is already axis-aligned to the locale by the
@@ -315,13 +529,13 @@ async function buildVikendica(scene, field) {
 
   return {
     root, parts, plan, base, yaw,
-    floorAt, blockers, tight,
+    floorAt, blockers, tight, indoorsAt, hull, headroom, tick: tickClock,
     /** 'now' | 'loft' — which roof is on. The rooms below do not change. */
     roof(which) {
-      for (const k of ['roof', 'roof_glass']) {
+      for (const k of ['roof', 'roof_glass', 'roof_sheer']) {
         if (parts[k]) parts[k].visible = which !== 'loft';
       }
-      for (const k of ['loft', 'loft_glass']) {
+      for (const k of ['loft', 'loft_glass', 'loft_sheer']) {
         if (parts[k]) parts[k].visible = which === 'loft';
       }
       if (loftRail) loftRail.off = which !== 'loft';

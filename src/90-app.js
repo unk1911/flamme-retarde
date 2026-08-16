@@ -1092,12 +1092,14 @@ function skipToJadrija() {
 const VIK_WALK = [
   // Along the promenade from the east, with the house coming up on your left
   // and the water on your right.
-  { at: [33.5, 15.4, 1.76], look: [26.0, 21.0, 3.20], dur: 2.6 },
+  { at: [33.5, 15.4, 1.76], look: [26.5, 22.0, 3.20], dur: 2.6 },
   // At the foot of the flight, looking up it. This is the shot the whole thing
   // exists for — a first-row house is a house you look *up* at from the walk.
-  { at: [28.8, 19.4, 1.72], look: [28.1, 25.6, 4.30], dur: 1.8 },
+  // The foot moved: the flight now starts at the south face of the house, at
+  // s 21.54, where it used to run out to 20.39.
+  { at: [28.8, 20.5, 1.72], look: [28.1, 25.6, 4.30], dur: 1.8 },
   // Up. Two legs, because a single easing over 2.9 m of rise reads as a lift.
-  { at: [28.1, 22.3, 2.96], look: [28.1, 26.0, 4.50], dur: 1.7 },
+  { at: [28.1, 23.1, 3.12], look: [28.1, 26.0, 4.50], dur: 1.7 },
   { at: [28.1, 25.0, 4.56], look: [27.0, 25.3, 4.30], dur: 1.6 },
   // Through the door, and the room opens out to the left.
   { at: [26.4, 25.2, 4.56], look: [23.6, 24.0, 4.30], dur: 1.7 },
@@ -1785,6 +1787,18 @@ let wasAfoot = false;
 let indoors = 0;
 let inLatch = 0;
 let cicadaAt = 0;
+// How *dark* the room you are in is, which is a separate number from whether
+// you are in one. The kabina is a wooden box with a single door and stopping
+// down half a stop walking into it is what an eye does. The vikendica has
+// thirteen square metres of glass in two walls and white plaster on all of
+// them; stopped down the same amount it reads as a cellar with a view, which is
+// the opposite of the thing the model is for. Same latch, different weight.
+let roomDark = 0;
+let darkWant = 0;
+// And a third: how close the camera is to a surface it must not be able to see
+// through. Wider than either of the others, ramped rather than latched, and it
+// drives the near clip and nothing else — see `vik.hull`.
+let clipNear = 0;
 // True while you are on foot inside the Jadrija field, which is the one place
 // the mission is allowed to stop happening. Set at the top of `frame`.
 let recess = false;
@@ -2123,15 +2137,33 @@ function frame() {
   // doorway itself is the whole of the crossing and standing in it does not
   // flicker. What is left of the crossfade is the 0.3 s the light takes, which
   // is an eye adapting and wants to stay.
-  const raw = afoot && jadrija && jadrija.kabina
+  //
+  // Two rooms now. The kabina was the only interior in the game when this was
+  // written, and the vikendica quietly inherited none of it — so standing in
+  // the middle of a modelled flat the near clip was still 1.2 m and every wall
+  // inside that distance was thrown away. You could see the beach through the
+  // bedroom partition. Being *in* a house that you can see straight out of is
+  // worse than not being able to go in at all, because it is the one thing the
+  // house was built to test.
+  const kabIn = afoot && jadrija && jadrija.kabina
     ? jadrija.kabina.inside(camera.position.x, camera.position.z) : 0;
+  const vikIn = afoot && jadrija && jadrija.indoorsAt
+    ? jadrija.indoorsAt(camera.position.x, camera.position.y, camera.position.z)
+    : 0;
+  const raw = Math.max(kabIn, vikIn);
   if (raw > 0.62) inLatch = 1; else if (raw < 0.18) inLatch = 0;
+  // Which room it was, held while the latch is held so a doorway does not
+  // change the exposure on the way through it.
+  if (raw > 0.62) darkWant = vikIn > kabIn ? 0.34 : 1;
   crossThreshold(dt, afoot);
   // Held wherever the crossing put it while the screen is dark, so the light
   // in the room is already the room's light when it comes back up. Watching a
   // 0.3 s exposure ramp *after* a cut is watching the cut not have worked.
-  if (dipPhase) indoors = inLatch;
-  else indoors += (inLatch - indoors) * Math.min(1, dt * 3.6);
+  if (dipPhase) { indoors = inLatch; roomDark = inLatch * darkWant; }
+  else {
+    indoors += (inLatch - indoors) * Math.min(1, dt * 3.6);
+    roomDark += (inLatch * darkWant - roomDark) * Math.min(1, dt * 3.6);
+  }
   if (afoot !== wasAfoot) { audio.cicadas(afoot, 0.05); wasAfoot = afoot; }
   // The beach, shut out by the wall. This used to make the cicadas *louder*
   // indoors on the theory that a quiet room is what you notice them in, and it
@@ -2147,7 +2179,7 @@ function frame() {
   // The light. ACES over the whole frame rather than a lamp in the room,
   // because there is no lamp in the room — that is the point of it — and what
   // your eye actually does walking in off a white promenade is exactly this.
-  renderer.toneMappingExposure = 0.92 - 0.50 * indoors;
+  renderer.toneMappingExposure = 0.92 - 0.50 * roomDark;
   // And the near plane, which is the whole of "I can see the sky through the
   // ceiling". 1.2 m is the right front clip for an aeroplane and is nonsense
   // for a person: standing on the floor of the kabina your eye is 1.66 m up
@@ -2163,7 +2195,25 @@ function frame() {
   // near end twenty-fold costs twenty-fold the depth resolution at the far end,
   // which at four kilometres is the difference between a town and a town that
   // flickers. Indoors the far end is a doorway 1.45 m wide with the sea in it.
-  const wantNear = 1.2 - 1.14 * indoors;
+  //
+  // Off `clipNear`, which is the union of "in a room" and "up against the
+  // vikendica from either side". Inside 1.2 m the clip does not care which side
+  // of a wall you are standing on, and the cut sequence's own best shot — the
+  // climb, taken 0.7 m off the east face — was a shot of the furniture through
+  // the wall.
+  const hullNow = afoot && jadrija && jadrija.hullAt
+    ? jadrija.hullAt(camera.position.x, camera.position.y, camera.position.z)
+    : 0;
+  //
+  // Followed and not ramped, which is the opposite of everything else on this
+  // threshold. The whole guarantee is that the clip stays nearer than the
+  // nearest wall — hull() is chosen so the two curves never cross — and a lag
+  // is exactly what breaks it: walk at a wall faster than the ramp and for a
+  // tenth of a second the wall is inside the clip again. Nothing pops, because
+  // by that same guarantee there was never anything between the two positions
+  // of the plane to pop in.
+  clipNear = Math.max(indoors, hullNow);
+  const wantNear = 1.2 - 1.14 * clipNear;
   if (Math.abs(camera.near - wantNear) > 0.005) {
     camera.near = wantNear;
     camera.updateProjectionMatrix();
@@ -2582,10 +2632,17 @@ window.__fr = {
      * tell a door that is not working from a room that is not dark enough.
      */
     indoors: () => ({ v: +indoors.toFixed(3),
+      dark: +roomDark.toFixed(3),
       exp: +renderer.toneMappingExposure.toFixed(3),
+      // The near clip, which is what "I can see through that wall" actually is.
+      near: +camera.near.toFixed(3),
       cam: [+camera.position.x.toFixed(1), +camera.position.z.toFixed(1)],
-      raw: jadrija && jadrija.kabina
-        ? +jadrija.kabina.inside(camera.position.x, camera.position.z).toFixed(3) : null }),
+      kab: jadrija && jadrija.kabina
+        ? +jadrija.kabina.inside(camera.position.x, camera.position.z).toFixed(3) : null,
+      vik: jadrija && jadrija.indoorsAt
+        ? jadrija.indoorsAt(camera.position.x, camera.position.y,
+          camera.position.z) : null,
+      hull: +clipNear.toFixed(3) }),
   },
   /**
    * Drive the ground mission from a test without flying an approach first.

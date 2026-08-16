@@ -6777,6 +6777,8 @@ async function buildJadrija(scene) {
     }
 
     for (const k in crowds) crowds[k].flush(crowdT, cam);
+    // And the fish, which is three hands and a Date and is not worth a gate.
+    if (vik) vik.tick();
   }
 
   const mid = at(LEN * 0.5);
@@ -6813,6 +6815,28 @@ async function buildJadrija(scene) {
      * is the only locale in the game with an inside to be inside of.
      */
     tightTS: (t, s) => !!(vik && vik.tight(t, s)),
+    /**
+     * And where there is a ceiling over you, which is a different question and
+     * a narrower one — see `vik.indoorsAt`. Taken in world metres because the
+     * only caller has a camera and not a station.
+     */
+    indoorsAt: (x, y, z) => {
+      if (!vik) return 0;
+      const [t, s] = local(x, z);
+      return vik.indoorsAt(t, s, y);
+    },
+    /** What is over your head here, if anything is low enough to duck under. */
+    headroom: (x, z, y) => {
+      if (!vik) return null;
+      const [t, s] = local(x, z);
+      return vik.headroom(t, s, y);
+    },
+    /** And how close to its skin, either side of it — see `vik.hull`. */
+    hullAt: (x, y, z) => {
+      if (!vik) return 0;
+      const [t, s] = local(x, z);
+      return vik.hull(t, s, y);
+    },
     /** Debug: put her at (t, s), and optionally straight into a phase. */
     putShow: (t, s, phase, at, ang) => {
       if (!show || !skinFig) return null;

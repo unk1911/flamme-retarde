@@ -200,7 +200,6 @@ ST_X = X1 + 0.62           # centreline of the flight
 ST_W = 1.10
 ST_N = 17
 ST_RISE = 0.17
-ST_GO = 0.25
 # The top tread, which stops just short of the door — so the landing, which
 # runs from here northward, is what is under the opening.
 #
@@ -210,6 +209,21 @@ ST_GO = 0.25
 # fine in a render and it was a hole you fell 2.9 m through the moment anybody
 # tried to walk in.
 ST_TOP = D_ENTRY[0] - 0.06
+# And the foot, which is the corner of the house.
+#
+# The going is derived and not chosen. Both ends of this flight are fixed by
+# something else — the top by the door it serves, the foot by the south face,
+# which is where the real one starts — so the run is 3.10 m and the only free
+# number left is how it is divided. At 25 cm a going the flight was 4.25 m long
+# and stood a metre and a bit past the corner of the building, out over ground
+# that in the photograph is open.
+#
+# 18 cm of going under a 17 cm rise is 43°, and 2R+G is 0.52 against a
+# comfortable 0.63. That is a steep stair. It is also what 2.90 m of storey
+# height in 3.10 m of run has to be, and an external flight up the side of a
+# Dalmatian vikendica is a steep stair — the alternative is not a gentler one,
+# it is a longer one that is not where the drawings put it.
+ST_GO = (ST_TOP - Y0) / ST_N
 ST_BOT = ST_TOP - ST_GO * (ST_N - 1)
 
 # The renovation.
@@ -219,6 +233,21 @@ RIDGE = LOFT_HEAD + (Y1 - Y0) / 2 * math.tan(PITCH)
 DECK = F2 + 2.55                   # top of the mezzanine deck
 DECK_T = 0.16
 LOFT_Y = -1.20                     # its open edge, over the big room
+
+# The fish clock, on the spine wall between the two bedroom doors.
+#
+# The doors are D_S4 (−1.02…−0.17) and D_S3 (0.51…1.36), so the wall between
+# them is 68 cm of plaster centred on x = 0.17 and the fish has to sit in the
+# middle of it. It is not symmetrical about its own spindle — 1.60 r of snout
+# one way, 1.82 r of tail the other — so centring it means centring the *fish*
+# and not the movement, which is 0.11 r west of where the body is drawn.
+#
+# At r = 0.178 the whole animal was 0.61 m against a 0.68 m gap: it filled the
+# wall to within 3 cm a side and read as a mural. 0.150 makes it 0.51 m, with a
+# hand's width of plaster each side, which is a clock hung on a wall.
+CLOCK_R = 0.150
+CLOCK_X = 0.17 - 0.11 * CLOCK_R
+CLOCK_Z = F2 + 1.76
 
 
 # --------------------------------------------------------------------------- #
@@ -459,7 +488,15 @@ def window(kit, axis, at, hole, base, thick=EXT, shutters=True, curtain_c=SHEER)
                  at + out * (thick / 2 + 0.07), a0 - 0.06, a1 + 0.06,
                  z0 - 0.05, z0 + 0.01, bev=0.008)
     if shutters:
-        for side, (p, q) in enumerate(((a0, (a0 + a1) / 2), ((a0 + a1) / 2, a1))):
+        # Hooked back against the render, one leaf either side, which is what
+        # `louvred` has always said it was drawing and never was: the two leaves
+        # were placed at (a0, mid) and (mid, a1), which is the opening exactly —
+        # so every shutter in the house was shut. In a flat whose whole argument
+        # is the light and the water outside it, on an August afternoon, with
+        # the fire already burning. The terrace window in particular was a grey
+        # panel with a net curtain over it and nothing behind either.
+        w = (a1 - a0) / 2
+        for (p, q) in ((a0 - w, a0), (a1, a1 + w)):
             louvred(kit, axis, at + out * (thick / 2 + 0.10),
                     p, q, z0, z1, open_to=out)
     if curtain_c:
@@ -632,7 +669,11 @@ def shell(kit):
         "south": [(-2.60, -0.40, 0.30, 2.35), (0.60, 1.60, 1.10, 2.05)],
         "north": [(-0.40, 0.40, 1.10, 2.05)],
         "west": [(-2.40, -1.50, 1.10, 2.05), (0.60, 1.50, 1.10, 2.05)],
-        "east": [(-3.00, -1.60, 0.30, 2.35)],
+        # Nothing on the east. There was a door here, under the outside stair,
+        # and it is not on the building: the east face at ground level is blind
+        # render from the corner to the terrace, and a door there would open
+        # into the underside of a flight of steps.
+        "east": [],
     }
     for key, axis, at, a0, a1 in (
         ("south", "x", Y0 + EXT / 2, X0, X1),
@@ -929,8 +970,20 @@ def kitchen(kit):
     kit.span(KITCH_LO, run0, run1, y1 - 0.60, y1 - 0.02, F2 + 0.10, top - 0.04,
              bev=0.004)
     kit.span(PLINTH, run0, run1, y1 - 0.56, y1 - 0.06, F2, F2 + 0.10, bev=0.004)
-    kit.span(WORKTOP, run0 - 0.02, run1 + 0.02, y1 - 0.63, y1, top - 0.04, top,
-             bev=0.006)
+    # The worktop, with the sink cut out of it.
+    #
+    # It was one slab from end to end and the bowl was a box underneath it, so
+    # the bowl was inside the counter and invisible — which nobody noticed while
+    # the tap was over at the front edge pointing the wrong way, and which is
+    # unmissable the moment the tap is where a tap goes: a mixer reaching out
+    # over an unbroken white plane.
+    bx0, bx1 = run0 + 0.08, run0 + 0.58
+    by0, by1 = y1 - 0.54, y1 - 0.10
+    for a0, a1, b0, b1 in ((run0 - 0.02, bx0, y1 - 0.63, y1),
+                           (bx1, run1 + 0.02, y1 - 0.63, y1),
+                           (bx0, bx1, y1 - 0.63, by0),
+                           (bx0, bx1, by1, y1)):
+        kit.span(WORKTOP, a0, a1, b0, b1, top - 0.04, top, bev=0.006)
     for i in range(4):
         d = run0 + 0.10 + i * ((run1 - run0 - 0.20) / 4)
         kit.span(tuple(v * 0.92 for v in KITCH_LO), d, d + 0.006,
@@ -957,12 +1010,27 @@ def kitchen(kit):
         kit.span((0.86, 0.80, 0.72), c, c + 0.26, y1 - 0.32, y1 - 0.06,
                  F2 + 2.36, F2 + 2.36 + RNG.uniform(0.10, 0.22), bev=0.004)
 
+    # And the bowl itself, open at the top: a floor and four sides rather than a
+    # solid, because a sink is a hole.
     sx = run0 + 0.08
-    kit.span((0.72, 0.73, 0.74), sx, sx + 0.50, y1 - 0.54, y1 - 0.10,
-             top - 0.14, top - 0.005, bev=0.006)
-    kit.span(CHROME, sx + 0.22, sx + 0.28, y1 - 0.60, y1 - 0.56,
+    STEEL_S = (0.72, 0.73, 0.74)
+    kit.span(STEEL_S, bx0, bx1, by0, by1, top - 0.17, top - 0.152, bev=0.004)
+    for a0, a1, b0, b1 in ((bx0, bx0 + 0.018, by0, by1),
+                           (bx1 - 0.018, bx1, by0, by1),
+                           (bx0, bx1, by0, by0 + 0.018),
+                           (bx0, bx1, by1 - 0.018, by1)):
+        kit.span(STEEL_S, a0, a1, b0, b1, top - 0.17, top - 0.004, bev=0.003)
+    # The waste, dead centre of the bowl.
+    bm_cylinder(kit.bm(CHROME, 0.002), (bx0 + bx1) / 2, (by0 + by1) / 2,
+                top - 0.172, top - 0.160, 0.038, 0.038, seg=12)
+    # The tap, at the back of the worktop against the tiles, reaching forward
+    # over the basin. It was at y1 − 0.60, which is the *front* edge of a 63 cm
+    # worktop — a mixer standing on the lip with its spout pointing back at the
+    # wall. Nothing plumbs that way and nothing looks like it: a tap comes out
+    # of the splashback, because that is where the wall the pipes are in is.
+    kit.span(CHROME, sx + 0.22, sx + 0.28, y1 - 0.10, y1 - 0.06,
              top, top + 0.26, bev=0.004)
-    kit.span(CHROME, sx + 0.22, sx + 0.28, y1 - 0.56, y1 - 0.38,
+    kit.span(CHROME, sx + 0.22, sx + 0.28, y1 - 0.34, y1 - 0.08,
              top + 0.22, top + 0.26, bev=0.004)
 
     cx = run1 - 0.66
@@ -1129,12 +1197,13 @@ FISH_FIN = (0.13, 0.47, 0.72)
 FISH_NUM = (0.95, 0.53, 0.47)
 
 
-def fish_clock(kit, cx, cz, wall, r=0.178):
+def fish_clock(kit, cx, cz, wall, r=CLOCK_R):
     """The fish.
 
     A cut and painted ply fish with a quartz movement through the middle of it,
-    pale blue with darker blue fins and stripes, coral numbers and black hands,
-    and one round eye with a white highlight in it. It hangs on the spine wall
+    pale blue with darker blue fins and stripes, coral numbers and one round eye
+    with a white highlight in it. Its hands are hung at runtime — see the
+    `clock` block in the sidecar. It hangs on the spine wall
     between the two bedroom doors and it is, by a distance, the most-photographed
     object in the flat.
 
@@ -1167,9 +1236,36 @@ def fish_clock(kit, cx, cz, wall, r=0.178):
     P(body, FISH_BODY, face, wall, bev=0.005)
     P([(-0.80, 0.42), (-0.80, -0.40), (-1.60, -0.04)], FISH_BODY, face, wall,
       bev=0.005)
-    # The mouth: a notch of the darker blue at the tip of the snout.
-    P([(-1.58, -0.05), (-1.16, 0.10), (-1.14, -0.20)], FISH_FIN,
-      face - 0.002, face + 0.004)
+    # The smile.
+    #
+    # This was a triangular notch at the tip of the snout, which is a mouth and
+    # is not a smile, and on the one on the wall the smile is most of the point:
+    # it is a cute clock rather than a fish-shaped clock because of one drawn
+    # line. It starts at the tip, runs back and down under the eye and hooks up
+    # at the far end, so the concave side faces the sky.
+    #
+    # Emitted as one convex quad per segment rather than as a single curved
+    # ribbon, for the same reason the rest of the animal is five overlapping
+    # plates: a curve is not convex and a concave ngon is a triangulation you
+    # have to hope about. The joints overlap; at 1 cm of stroke the notch on the
+    # outside of each bend is a fraction of a millimetre.
+    smile = [(-1.52, -0.01), (-1.30, -0.18), (-1.05, -0.27),
+             (-0.83, -0.26), (-0.66, -0.14)]
+    for i in range(len(smile) - 1):
+        (ax, az), (bx, bz) = smile[i], smile[i + 1]
+        w0, w1 = 0.082 - 0.011 * i, 0.082 - 0.011 * (i + 1)
+        dx, dz = bx - ax, bz - az
+        L = math.hypot(dx, dz) or 1.0
+        ux, uz = dx / L, dz / L
+        nx, nz = -uz, ux
+        # Run each segment a little past both ends. Butted exactly, the outside
+        # of every bend opens a notch the width of the stroke and the smile
+        # reads as four separate dashes.
+        ax, az = ax - ux * w0, az - uz * w0
+        bx, bz = bx + ux * w1, bz + uz * w1
+        P([(ax + nx * w0, az + nz * w0), (bx + nx * w1, bz + nz * w1),
+           (bx - nx * w1, bz - nz * w1), (ax - nx * w0, az - nz * w0)],
+          FISH_FIN, face - 0.002, face + 0.004)
 
     # Four stripes, each a tapered crescent leaning back the way they do on the
     # real one. Kept inside |x| < 0.77 at the top and bottom, which is where the
@@ -1192,29 +1288,18 @@ def fish_clock(kit, cx, cz, wall, r=0.178):
     mx, mz = cx + 0.12 * r, cz
     for h in range(12):
         a = TAU * (h / 12.0)
-        w = 0.014 if h % 3 == 0 else 0.011
+        w = (0.014 if h % 3 == 0 else 0.011) * (r / 0.178)
         px = mx + math.sin(a) * 0.62 * r
         pz = mz + math.cos(a) * 0.62 * r
         kit.span(FISH_NUM, px - w, px + w, face - 0.008, face - 0.001,
                  pz - w * 1.25, pz + w * 1.25, bev=0.002)
 
-    # Hands at ten past ten, which is how every clock in every photograph of a
-    # clock is set, for the good reason that it is the one position where
-    # neither hand is behind the other and neither is over a number. Rectangles
-    # turned about the spindle, because a hand is a plate and not a box.
-    #
-    # Zero points at twelve and the angle runs anticlockwise, so ten o'clock is
-    # +60° and ten past is −60°.
-    def hand(ang, length, half, col=BLACK):
-        c, s = math.cos(ang), math.sin(ang)
-        pts = [(-half, -half * 1.6), (half, -half * 1.6), (half, length),
-               (-half, length)]
-        P([((mx - cx) / r + (px * c - pz * s) / r,
-            (mz - cz) / r + (px * s + pz * c) / r) for px, pz in pts],
-          col, face - 0.014, face - 0.008, bev=0.002)
-
-    hand(math.radians(60.0), 0.062, 0.010)       # hours, at ten
-    hand(math.radians(-60.0), 0.088, 0.007)      # minutes, at ten past
+    # The hands are not baked. They used to be, at ten past ten, which is how
+    # every clock in every photograph of a clock is set — and a clock stopped at
+    # ten past ten in a room you are walking around is a clock that has stopped.
+    # They are three meshes built at runtime off the wall clock, second hand
+    # included, from the spindle written into the sidecar below. All that is
+    # left here is the hub they turn on.
     _lay_disc(kit, BLACK, mx, face - 0.016, mz, 0.016, 0.008)
 
 
@@ -1232,10 +1317,18 @@ def living(kit):
     # clear between the front door and the terrace.
     sofa(kit, -0.30, -1.05, yaw=-math.pi / 2, length=1.28, depth=0.66,
          colour=SOFA_TAP, throw=RED_THROW)
-    # One armchair, pulled round to face the sofa across the low table.
-    low_chair(kit, 1.62, -1.05, yaw=math.pi / 2)
-    round_table(kit, 0.76, -1.05, F2, r=0.32, h=0.44)
-    kit.span((0.85, 0.85, 0.84), 0.71, 0.81, -1.09, -1.01, F2 + 0.44,
+    # The armchair beside the sofa, facing the same way it does.
+    #
+    # It was at 1.62 turned to +y, which put it against the bookshelf looking at
+    # the bookshelf — a chair whose whole view is a metre of paperbacks, in the
+    # one room in the game with a channel outside it. Turned to −y and pulled in
+    # beside the sofa's east end, so somebody sitting in it is looking out
+    # through the terrace doors, which is the only reason to sit down in here.
+    # The low table moves south with it: two seats side by side want the table
+    # in front of them and not between them.
+    low_chair(kit, 0.86, -1.05, yaw=-math.pi / 2)
+    round_table(kit, 0.55, -2.00, F2, r=0.32, h=0.44)
+    kit.span((0.85, 0.85, 0.84), 0.50, 0.60, -2.04, -1.96, F2 + 0.44,
              F2 + 0.52, bev=0.006)
 
     # The dining table in the south-west corner, under the terrace window.
@@ -1627,7 +1720,7 @@ def pictures(kit):
     gone and the fish has the wall.
     """
     y = BY0 - 0.005
-    fish_clock(kit, 0.05, F2 + 1.76, y)
+    fish_clock(kit, CLOCK_X, CLOCK_Z, y)
     kit.span((0.20, 0.45, 0.62), 1.62, 2.06, y - 0.025, y,
              F2 + 1.58, F2 + 1.86, bev=0.004)
     kit.span(WHITEGOODS, 2.35, 2.62, y - 0.010, y, F2 + 1.55, F2 + 1.90,
@@ -1861,21 +1954,30 @@ def gallery_rail(kit, pts):
 
 
 def loft_stair(kit):
-    """Fourteen treads on a folded steel stringer, up the east wall.
+    """Twelve treads on a folded steel stringer, up the east wall.
 
-    2.55 m of rise in 2.60 m of run is 44°, which is a ladder-stair and not a
+    2.55 m of rise in 1.98 m of run is 50°, which is a ladder-stair and not a
     staircase — and it is what both reference pictures show, because in a room
     this size a comfortable 32° flight is four metres long and eats the room it
-    is trying to serve."""
-    n = 14
+    is trying to serve.
+
+    It used to be fourteen treads over 2.60 m, and 2.60 m is the *entire*
+    distance from the deck's open edge to the inner face of the south wall. So
+    the bottom tread landed 1.5 cm off the glass: you came down the last step
+    into the terrace door, with nowhere to stand and nowhere to turn, which is
+    not a thing anybody would build. Two treads out and 2 cm off the going buys
+    52 cm of floor at the foot — a place to arrive — at the price of six degrees
+    of pitch, and six degrees is the cheaper thing to spend on a mezzanine
+    ladder."""
+    n = 12
     rise = (DECK - F2) / n
-    go = 0.20
+    go = 0.18
     # The head of the flight, 15 cm shy of the deck's open edge — so the bottom
-    # of it lands at −3.65, which is 1.5 cm inside the room. At LOFT_Y − 0.10 it
-    # landed at −3.90, and the inner face of the south wall is at −3.665: the
-    # bottom two treads were buried in the wall and the foot of the stair was
-    # outside the building. You could not get on to it, which is a hard thing to
-    # see in a render of a staircase that otherwise looks perfectly normal.
+    # of it lands at −3.03, clear of the south wall's inner face at −3.665. At
+    # LOFT_Y − 0.10 it landed at −3.90: the bottom two treads were buried in the
+    # wall and the foot of the stair was outside the building. You could not get
+    # on to it, which is a hard thing to see in a render of a staircase that
+    # otherwise looks perfectly normal.
     y_top = LOFT_Y + 0.15
     x = IX1 - 0.52
     for i in range(1, n + 1):
@@ -1975,6 +2077,17 @@ def plan_json():
         "pitch": round(math.degrees(PITCH_NOW), 1),
         "loftPitch": round(math.degrees(PITCH), 1),
         "outer": T(X0, X1, Y0, Y1),
+        # The fish's movement, in three.js metres relative to the house origin,
+        # so the runtime can hang three turning hands on it. `at` is the
+        # spindle: 0.12 r east of the body's centre, because the tail is behind
+        # it and the numbers go round the spindle rather than round the fish.
+        # The z is 2.45 cm proud of the ply front — clear of the 8 mm hub disc,
+        # which is the last thing baked into the mesh here.
+        "clock": {
+            "at": [round(CLOCK_X + 0.12 * CLOCK_R, 4), round(CLOCK_Z, 4),
+                   round(-(BY0 - 0.005 - 0.016 - 0.0245), 4)],
+            "r": CLOCK_R,
+        },
         "rooms": rooms,
         "blockers": blockers,
         "anchors": {
@@ -2197,11 +2310,19 @@ def main():
         # it is a mid-grey panel and the terrace doors read as a boarded-up
         # opening — which turns the one room the whole model exists to judge
         # into a box with a picture of a wall where the view is.
-        glass = [p for p in parts if p[1] == GLASS]
-        parts = [p for p in parts if p[1] != GLASS]
-        if glass:
-            export(glass, OUT / ("vikendica_%s_glass.fr3d.gz" % name),
-                   "the glazing, drawn transparent")
+        #
+        # The sheers go out the same way and for the same reason. A net curtain
+        # that stops light is not a net curtain, it is a board: the kitchen
+        # window and the terrace opening both read as shuttered from inside,
+        # with the brightest thing in the flat behind a flat grey sheet.
+        for tag, col, why in (
+            ("glass", GLASS, "the glazing, drawn transparent"),
+            ("sheer", SHEER, "the net curtains, drawn through"),
+        ):
+            sub = [p for p in parts if p[1] == col]
+            parts = [p for p in parts if p[1] != col]
+            if sub:
+                export(sub, OUT / ("vikendica_%s_%s.fr3d.gz" % (name, tag)), why)
         coll = bpy.data.collections.new(name)
         bpy.context.scene.collection.children.link(coll)
         for ob, _ in parts:
