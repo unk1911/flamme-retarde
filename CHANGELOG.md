@@ -8,6 +8,45 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.73.1] — 2026-08-17
+
+### Fixed
+
+- **You can no longer walk out of the bathroom through its north wall.** Back
+  away from the mirror and you arrived in the kitchen, and it survived two
+  previous fixes because the wall was never the problem. `confine()` pushes you
+  out of a blocker by leaving you *exactly on* its barrier face; `inside()` then
+  asked whether `|ds| < ec` about a number computed as `b.s + ec`, which
+  floating point does not always answer the way arithmetic does — and the
+  locale makes it worse, because a station that has been round `toWorld()` and
+  back through `local()` lands about 15 mm from where it started. So an
+  ordinary wall contact read as "still embedded", the last-resort escape hatch
+  fired, and it walked you a metre across the locale and out the other side.
+  Two changes: `inside()` now keeps a centimetre of slack, which is smaller
+  than any gap in the house and larger than both errors; and the hatch will
+  only walk you anywhere if you were *already* inside something before the
+  step. A step that ends somewhere the eight passes cannot resolve is now
+  refused outright, which is what a wall does.
+
+- **The bathroom floor was z-fighting with the slab under it, across the whole
+  storey.** The structural floor slab's top face was at exactly `F2`, and `F2`
+  is also where every tile top and floorboard in the house sits — one plane,
+  two surfaces. It went unseen for as long as it did because the living room
+  and kitchen are laid in a cream ceramic and the concrete is very nearly the
+  same colour, so the fight was two shades of one thing. The bathroom is
+  cobalt, and there it read as a blue-and-white chequer that changed as you
+  moved. The slab now stops 32 mm short and the finishes go on top of it, which
+  is what the terrace next door had always done.
+
+### Changed
+
+- **The bathroom floor is deeper and dry.** The wet-look reflector laid on the
+  tiles in 1.73.0 is gone — including its Fresnel branch, its uniforms and the
+  second render pass — and the tiles are re-baked in a deep cobalt with a
+  darker accent of their own instead of borrowing the walls'. The mirror over
+  the basin is untouched; `planarReflector` stays general, it just hangs once
+  now. The wall tiles were never reflective and still are not.
+
 ## [1.73.0] — 2026-08-17
 
 ### Fixed — the mezzanine, at the third attempt, for the right reason

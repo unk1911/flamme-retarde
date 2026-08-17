@@ -330,9 +330,27 @@ async function buildGround(scene, field) {
   const girthAt = (t, s) =>
     (field.tightTS && field.tightTS(t, s) ? GROUND.tight : GROUND.girth);
 
-  /** Is this locale point inside any structure? */
+  /**
+   * Is this locale point *properly* inside any structure?
+   *
+   * Properly, and the margin is the whole point. The push loop above leaves you
+   * standing exactly on a barrier face — that is what it is for — and asking
+   * "is |ds| < ec" about a number that was just computed as `b.s + ec` is
+   * asking floating point to agree with itself across two different
+   * expressions. It does not always, and the locale makes it worse: this
+   * frame's station comes back through `local()`, which projects on to a traced
+   * shoreline and lands about 15 mm from where `toWorld()` put you.
+   *
+   * So a hair inside a face reads as inside, the escape hatch fires, and it
+   * walks you a metre across the locale — which for somebody standing with
+   * their back against the bathroom's north wall means arriving in the kitchen.
+   * A centimetre of slack is smaller than any gap in the house and larger than
+   * both errors, and the hatch is then reserved for what it was written for.
+   */
+  const SLACK = 0.01;
+
   function inside(t, s, y) {
-    const g = girthAt(t, s);
+    const g = girthAt(t, s) - SLACK;
     for (const b of field.blockers) {
       if (b.off) continue;
       // The same two level rules the push loop keeps, and for a harder reason:
@@ -438,9 +456,19 @@ async function buildGround(scene, field) {
     // empty by construction — so this always terminates somewhere you can stand.
     if (inside(t, s, y)) {
       hit = true;
-      const dir = s > (B.s0 + B.s1) * 0.5 ? -1 : 1;
-      for (let k = 0; k < 80 && inside(t, s, y); k++) {
-        s = clamp(s + dir, B.s0, B.s1);
+      if (!inside(tc, sc, y)) {
+        // But only from a standing start inside something. You were somewhere
+        // legal a step ago, so you cannot have been *trapped* by a 3 cm step —
+        // the passes have merely run out of patience, and the honest answer to
+        // that is the one a wall gives: you do not move. Walking the locale
+        // from here would carry you through the wall you just walked into,
+        // which is the far worse failure and the one that kept coming back.
+        t = tc; s = sc;
+      } else {
+        const dir = s > (B.s0 + B.s1) * 0.5 ? -1 : 1;
+        for (let k = 0; k < 80 && inside(t, s, y); k++) {
+          s = clamp(s + dir, B.s0, B.s1);
+        }
       }
     }
     // Nothing touched you: give back exactly what came in.

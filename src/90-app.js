@@ -530,7 +530,7 @@ function updateCamera(dt) {
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
   trees, landmarks, alerts, roads, rail, props, airfield, jadrija, ground, birds, eject,
-  mirror, wet, you;
+  mirror, you;
 /** You plus the three wingmen, as the birds see them. Built once, in boot(). */
 let birdFlush = [];
 
@@ -632,13 +632,11 @@ async function boot() {
   // The one surface in the game that is a view rather than a colour. Costs a
   // dot product everywhere except stood in front of it — see `49-mirror.js`.
   if (jadrija && jadrija.vik) mirror = bathMirror(jadrija.vik);
-  if (jadrija && jadrija.vik) wet = bathFloor(jadrija.vik);
   // And the one thing that stands in it. Built whether or not the mirror is,
   // because the mirror is the only place it is ever drawn and a missing house
   // is not a reason to fail loading a body.
   you = await buildYou(scene);
   if (mirror && you) mirror.guests.push(you.mesh);
-  if (wet && you) wet.guests.push(you.mesh);
   city = buildCity(scene);
 
   await step(80, 'load.streets');
@@ -2606,7 +2604,6 @@ function frame() {
   if (you) you.tick(dt, camera);
   chuteAudio();
   if (mirror) mirror.update(renderer, scene, camera);
-  if (wet) wet.update(renderer, scene, camera);
   renderer.render(scene, camera);
   const now = performance.now();
   if (lastFrameMs) state.fps = damp(state.fps, 1000 / Math.max(1, now - lastFrameMs), 2, dt);
@@ -2864,7 +2861,6 @@ window.__fr = {
   jad: {
     raw: () => jadrija,
     mirror: () => (mirror ? mirror.stats() : null),
-    wet: () => (wet ? wet.stats() : null),
     you: () => (you ? you.stats() : null),
     youRaw: () => you,
     youShow: (v) => (you ? you.show(v) : null),

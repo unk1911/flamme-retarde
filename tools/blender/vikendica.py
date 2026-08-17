@@ -81,7 +81,7 @@ PLY = (0.800, 0.618, 0.372)         # the sliding doors, birch-faced
 WALNUT = (0.300, 0.170, 0.082)      # the wardrobe, the bed, the daybed frames
 BEECH = (0.660, 0.470, 0.280)
 
-TILE_FLOOR = (0.150, 0.270, 0.520)  # bathroom, cobalt
+TILE_FLOOR = (0.072, 0.132, 0.318)  # bathroom, deep cobalt
 TILE_DEEP = (0.085, 0.150, 0.330)   # the darker ones set into the walls
 TILE_WALL = (0.900, 0.898, 0.885)
 GROUT = (0.560, 0.556, 0.548)
@@ -726,8 +726,17 @@ def shell(kit):
                           colour=PINE)
             else:
                 window(kit, axis, at, h, GRADE, curtain_c=None)
+    # The structural slab, and its top is *not* at F2 — F2 is where the finish
+    # is. It used to be, and the top face of this and the top face of every
+    # tile and floorboard in the house were then the same plane, which is a
+    # z-fight across the whole storey. It went unseen for as long as it did
+    # because the living room and the kitchen are laid in a cream ceramic and
+    # CONCRETE is very nearly that colour, so the fight was two shades of the
+    # same thing. The bathroom is cobalt. There it read as a blue and white
+    # chequer that changed as you walked, which is not a floor anybody has.
+    # The terrace next door had always done this properly; now so does this.
     kit.span(CONCRETE, X0 - 0.05, X1 + 0.05, Y0 - 0.05, Y1 + 0.05,
-             F2 - 0.22, F2, bev=0.02)
+             F2 - 0.22, F2 - 0.032, bev=0.02)
 
     # ── the upper storey ────────────────────────────────────────────────────
     # The north half is set back 70 cm on the west, so the west face is two
@@ -787,8 +796,11 @@ def shell(kit):
         x0, x1, y0, y1 = ROOMS[name]
         planks(kit, x0 - 0.03, x1 + 0.03, y0 - 0.03, y1 + 0.03, F2)
     bx0, bx1, by0, by1 = ROOMS["bath"]
+    # The accent is its own colour rather than TILE_DEEP, which is set into the
+    # white walls and is now lighter than the floor rather than darker.
     floor_tiles(kit, bx0 - 0.03, bx1 + 0.03, by0 - 0.03, by1 + 0.03, F2,
-                size=0.20, colour=TILE_FLOOR, accent=TILE_DEEP, accent_p=0.04)
+                size=0.20, colour=TILE_FLOOR, accent=(0.042, 0.078, 0.198),
+                accent_p=0.04)
 
     sk = 0.075
     for name in ("living", "kitchen", "soba3", "soba4"):

@@ -1,5 +1,5 @@
 // -----------------------------------------------------------------------------
-// The mirror over the basin, and the wet look on the floor under it.
+// The mirror over the basin.
 //
 // Every other flat surface in the vikendica is baked into the shell mesh in
 // Blender, the mirror included: a pale blue-grey slab on the north wall of the
@@ -27,12 +27,10 @@
 // covered up. Without that you are looking at the tiles on the far side of the
 // wall you are stood at.
 //
-// None of that is specific to a mirror, which is why it is written once and
-// hung twice. The second one is laid flat on the floor tiles at a few per cent
-// and let up to a third at a grazing angle, which is what a glazed tile does:
-// look down at your feet and there is almost nothing, look across the room and
-// the far wall is in the floor. It is the same pass with a Fresnel term and an
-// alpha, and it is the cheapest thing in the room that says the tiles are wet.
+// It was written general enough to hang twice, and for a while it was: a second
+// one lay flat on the floor with a Fresnel alpha, so the tiles came up wet. It
+// is gone. The bathroom floor is cobalt and dry, which is what the room is, and
+// a reflection in it was answering a question nobody had asked.
 // -----------------------------------------------------------------------------
 
 const MIRROR = {
@@ -58,32 +56,13 @@ const MIRROR = {
   bias: 0.004,
 };
 
-const WETFLOOR = {
-  // Cheaper than the mirror on every axis, because it is never the thing you
-  // are looking at — it is the thing you notice at the bottom of the frame.
-  scale: 0.26,
-  range: 3.4,
-  // A floor is only worth drawing when you are looking down it rather than up
-  // off it, and the normal is vertical, so this is the other way round to the
-  // mirror's: skip once the eye has tipped above the horizontal.
-  facing: 0.55,
-  every: 3,
-  far: 26,
-  tint: [0.88, 0.91, 0.93],
-  // How much comes back face-on, and how much at a grazing angle. Glazed
-  // ceramic is a few per cent straight down and a great deal across the room,
-  // and that spread is the whole difference between a wet floor and a mirror
-  // somebody has dropped.
-  gloss: [0.045, 0.34],
-  bias: 0.004,
-};
 
 /**
  * One planar reflector: the quad, and the thing that keeps it up to date.
  *
- * `spec` is where it hangs and how it behaves — everything else here is the
- * method, which is the same whether the plane is a mirror on a wall or a
- * floor you are stood on.
+ * `spec` is where it hangs; `cfg` is how it behaves. There is one of each at
+ * the moment and the split is kept anyway, because the method is not about
+ * bathrooms and the next piece of glass in this game will want it.
  */
 function planarReflector(vik, spec) {
   const cfg = spec.cfg;
@@ -94,30 +73,17 @@ function planarReflector(vik, spec) {
     depthBuffer: true,
   });
 
-  // Glass is a mirror at every angle; a floor tile is not, and the difference
-  // is one Fresnel term. Face-on it hands back almost nothing and you see the
-  // tile; across the room it hands back a third and you see the room.
-  const glossy = !!cfg.gloss;
   const mat = new THREE.ShaderMaterial({
-    transparent: glossy,
-    depthWrite: !glossy,
     uniforms: {
       tGlass: { value: rt.texture },
       textureMatrix: { value: new THREE.Matrix4() },
       tint: { value: new THREE.Vector3(...cfg.tint) },
-      gloss: { value: new THREE.Vector2(...(cfg.gloss || [1, 1])) },
-      eye: { value: new THREE.Vector3() },
     },
     vertexShader: `
       uniform mat4 textureMatrix;
       varying vec4 vProj;
-      varying vec3 vWorld;
-      varying vec3 vNrm;
       void main() {
         vProj = textureMatrix * vec4(position, 1.0);
-        vec4 w = modelMatrix * vec4(position, 1.0);
-        vWorld = w.xyz;
-        vNrm = normalize(mat3(modelMatrix) * normal);
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
@@ -128,19 +94,10 @@ function planarReflector(vik, spec) {
     fragmentShader: `
       uniform sampler2D tGlass;
       uniform vec3 tint;
-      uniform vec2 gloss;
-      uniform vec3 eye;
       varying vec4 vProj;
-      varying vec3 vWorld;
-      varying vec3 vNrm;
       void main() {
         vec3 c = texture2DProj(tGlass, vProj).rgb * tint;
-        float a = 1.0;
-        ${glossy ? `
-        float f = 1.0 - abs(dot(normalize(eye - vWorld), normalize(vNrm)));
-        a = mix(gloss.x, gloss.y, f * f * f);
-        ` : ''}
-        gl_FragColor = vec4(c, a);
+        gl_FragColor = vec4(c, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }
@@ -149,7 +106,6 @@ function planarReflector(vik, spec) {
 
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(spec.w, spec.h), mat);
   mesh.position.set(spec.at[0], spec.at[1], spec.at[2]);
-  if (spec.rotX) mesh.rotation.x = spec.rotX;
   mesh.renderOrder = 2;
   mesh.frustumCulled = true;
   vik.root.add(mesh);
@@ -189,8 +145,6 @@ function planarReflector(vik, spec) {
 
     camera.getWorldDirection(look);
     if (look.dot(normal) > cfg.facing) return false;      // not looking at it
-
-    mat.uniforms.eye.value.copy(eye);
 
     // The eye, and what the eye is looking at, both put through the glass.
     view.reflect(normal).negate().add(here);
@@ -295,27 +249,3 @@ function bathMirror(vik) {
   });
 }
 
-/**
- * And lay one flat on the bathroom tiles, two millimetres up.
- *
- * Inset from the walls by a hand's width, because the quad has no thickness
- * and a floor that reaches into the skirting shows the room reflected out of
- * the join. Nothing else about it differs from the mirror except the angle it
- * hangs at and the fact that most of it is transparent.
- */
-function bathFloor(vik) {
-  const plan = vik.plan;
-  const b = plan.rooms && plan.rooms.bath;
-  if (!b || !vik.root) return null;
-
-  const x0 = b.x0 + 0.10, x1 = b.x1 - 0.10;
-  const z0 = b.z0 + 0.10, z1 = b.z1 - 0.10;
-
-  return planarReflector(vik, {
-    cfg: WETFLOOR,
-    w: x1 - x0,
-    h: z1 - z0,
-    at: [(x0 + x1) / 2, plan.floor + 0.002, (z0 + z1) / 2],
-    rotX: -Math.PI / 2,
-  });
-}
