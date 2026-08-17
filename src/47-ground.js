@@ -331,10 +331,20 @@ async function buildGround(scene, field) {
     (field.tightTS && field.tightTS(t, s) ? GROUND.tight : GROUND.girth);
 
   /** Is this locale point inside any structure? */
-  function inside(t, s) {
+  function inside(t, s, y) {
     const g = girthAt(t, s);
     for (const b of field.blockers) {
       if (b.off) continue;
+      // The same two level rules the push loop keeps, and for a harder reason:
+      // this one does not nudge you out of a wall, it *walks you across the
+      // locale* until nothing contains you. Leave the rules out and standing
+      // on the mezzanine counts as standing inside every bedroom partition on
+      // the storey below, so every step you take up there gets thrown a metre
+      // at a time towards the water. That is what "the stair is still broken"
+      // was: not the stair, and not the rails either — the escape hatch, which
+      // only ever fires when it is wrong.
+      if (b.y0 != null && (y == null || y < b.y0 || y > b.y1)) continue;
+      if (b.ceil != null && y != null && y > b.ceil) continue;
       const c = b.rot ? Math.cos(b.rot) : 1, sn = b.rot ? Math.sin(b.rot) : 0;
       const dt0 = t - b.t, ds0 = s - b.s;
       const dt = dt0 * c + ds0 * sn, ds = -dt0 * sn + ds0 * c;
@@ -426,10 +436,12 @@ async function buildGround(scene, field) {
     // across the locale until nothing does. In a village laid out along a shore
     // that direction is the street, and past the street the beach, which is
     // empty by construction — so this always terminates somewhere you can stand.
-    if (inside(t, s)) {
+    if (inside(t, s, y)) {
       hit = true;
       const dir = s > (B.s0 + B.s1) * 0.5 ? -1 : 1;
-      for (let k = 0; k < 80 && inside(t, s); k++) s = clamp(s + dir, B.s0, B.s1);
+      for (let k = 0; k < 80 && inside(t, s, y); k++) {
+        s = clamp(s + dir, B.s0, B.s1);
+      }
     }
     // Nothing touched you: give back exactly what came in.
     //
@@ -1728,8 +1740,16 @@ async function buildGround(scene, field) {
     get stranded() { return stranded; },
     get crew() { return crew; },
     hose: () => you.jet,
-    /** Debug: where a step to (x, z) would actually put you, and whether it hit. */
-    confine: (x, z) => confine(x, z),
+    /**
+     * Debug: where a step to (x, z) would actually put you, and whether it
+     * hit. `y` is which floor you are asking from and is not optional in any
+     * house with two of them — a banded blocker is skipped outright when it
+     * is missing, so a test that leaves it off cannot see the mezzanine rails
+     * at all and reports a landing you cannot reach as reachable.
+     */
+    confine: (x, z, y) => confine(x, z, y),
+    /** Debug: the floor under (x, z), from a floor you are standing on. */
+    walkY: (x, z, y) => field.walkY(x, z, y),
     hud: () => ({
       pack: you.pack, packMax: GROUND.pack,
       reserve: flight.p.water,

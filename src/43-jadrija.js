@@ -2677,11 +2677,17 @@ async function buildJadrija(scene) {
   // all pushed a thousand lines below this. So these are eyeballed off the
   // terrace edge and then looked at.
   //
-  // The two big ones are off to the sides. The pair near the middle are
+  // Clearing the slab is not the same as clearing the view, which is what the
+  // second attempt found out: a nine-metre pine standing 60 cm off the lip is
+  // not in front of the terrace, it is over it. These stand a good two metres
+  // further out again, far enough that the crowns are something you look at
+  // rather than something you are under.
+  //
+  // The two big ones are off to the sides. The three near the middle are
   // olives: four metres and open-crowned, so from the terrace you are looking
   // at the sea through a tree rather than at a tree.
-  for (const [dt, ds, tall] of [[-5.1, 6.7, 1], [5.3, 6.9, 1], [-2.6, 7.5, 0],
-                                [2.9, 7.7, 0], [0.4, 8.4, 0]]) {
+  for (const [dt, ds, tall] of [[-5.8, 9.0, 1], [6.0, 9.3, 1], [-3.0, 9.9, 0],
+                                [3.3, 10.1, 0], [0.4, 10.8, 0]]) {
     const t = VIK.t + dt, s = VIK.s - ds;
     const y = surfaceY(t, s);
     if (tall) {

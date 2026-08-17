@@ -8,6 +8,87 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.73.0] — 2026-08-17
+
+### Fixed — the mezzanine, at the third attempt, for the right reason
+
+Pressing V to build the mezzanine and then trying to walk anywhere on it threw
+you a metre at a time towards the water. Twice this was read as the stair, and
+twice it was fixed as the stair — the deck rail shortened, then the gallery
+rail's gap opened from 47 cm to 1.10 m — and twice it came back, because the
+stair was never the problem.
+
+`confine()` has a last-resort escape hatch. If anything still contains you
+after eight passes of pushing, it walks you across the locale a metre at a time
+until nothing does; it exists so that a parachute landing inside a wall is
+survivable. The push loop that precedes it knows about levels — a bedroom
+partition is solid on the floor it belongs to and gone once you are on the deck
+fifteen centimetres above its ceiling. `inside()`, the test the escape hatch
+runs on, did not. So standing on the mezzanine counted as standing inside every
+partition of the storey below, and every step up there was thrown.
+
+Found by flooding the deck at the player's own girth and printing the result as
+a map. What that showed was not a blocked stairwell but a deck cut into strips
+by walls that are not on it. `inside()` now takes the height and keeps the same
+two rules the push loop keeps; the deck maps as one open room from end to end,
+with a 90 cm gate into the stairwell, and the floor below is unchanged.
+
+### Fixed — she was standing at a right angle to you
+
+The rig's forward is +X — `rigYaw` in 43-jadrija.js is the one place that says
+so — and the mirror figure was yawed as though it were −Z, so the reflection
+was a profile. Her hair was laid out around the same wrong axis, which is why
+the fringe came out of the side of her head.
+
+### Changed — a dye job rather than a wig
+
+The rig arrives with hair on it: real geometry, over the skull and down past
+the nape, baked one exact brown. So the blue is now a colour swap in the
+fragment shader, matched on that colour and gated by height, and the eight
+cones are gone. What is built is a purple slouch beanie sat on the crown —
+measured off the rig at 16.3 cm above the head bone, which is at the base of
+the skull and is why the first one sat over her ears like headphones — and four
+flattened strands framing her face.
+
+She has a white vest, painted the same way: a mask over the torso rather than
+a garment modelled around it, so it cannot clip through the body it is on. Her
+arms hang 20 cm outboard of her trunk, which is what lets one test across the
+body tell a chest from a bicep.
+
+### Added — the bathroom tiles are wet
+
+The planar reflector is written once and hung twice now. The second one lies
+flat on the floor tiles with a Fresnel term: four per cent straight down, a
+third across the room, which is what glazed ceramic does. Every third frame at
+a quarter of the linear resolution, and only while you are in the room.
+
+### Added — off the balcony under a canopy
+
+ENTER, running, on anything raised on the vikendica's plinth. The same
+machinery as the escape charge at a fifth of the speed: 10.5 m/s off the rail,
+about five and a half metres of apex, and the canopy streams a sixth of a
+second after your feet leave and fills a shade after the top of the arc — which
+is the opposite of the charge, where the cloth is held back for two and a half
+seconds. Roughly four seconds of flight and you are down on the promenade.
+
+Two new sounds: the cloth taking air, which is a rush sweeping down through the
+band, a crack at line stretch and a long soft tail, because the quiet is the
+half of it that tells you it worked; and both boots on the dirt, which is short
+and dry because a landing that rings has taken you somewhere with a floor.
+
+### Changed — the dish is on the roof, where it actually is
+
+It was bracketed to the landing rail. It is bracketed to the roof verge above
+the top of the stairs, a metre down the slope from the ridge, with the cable
+running back down the gable wall to the balcony. Drawn into both roofs, so it
+goes up with the ridge when you build the mezzanine.
+
+### Changed — the trees stood too close
+
+Clearing the terrace slab is not the same as clearing the view: a nine-metre
+pine 60 cm off the seaward lip is not in front of the terrace, it is over it.
+They stand a good two metres further out again.
+
 ## [1.72.0] — 2026-08-16
 
 ### Added — there is somebody in the mirror now

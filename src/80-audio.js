@@ -744,6 +744,63 @@ function buildAudio() {
     if (verbSend) { const w = ctx.createGain(); w.gain.value = 1.5; og.connect(w).connect(verbSend); }
   }
 
+  /**
+   * The canopy taking air.
+   *
+   * Three things happen within a fifth of a second and none of them is a bang:
+   * the cloth streams off your back as a rush, it snaps taut as a crack, and
+   * then everything goes quiet except wind, because you have just lost most of
+   * your airspeed. So the rush sweeps *down* through the band, the crack sits
+   * on top of it, and the tail is long and soft — the quiet is the half of it
+   * that tells you it worked.
+   */
+  function canopy() {
+    if (!ctx) return;
+    // The cloth going out: broadband, sweeping down as it fills.
+    burst({ freq: 2600, q: 0.35, dur: 0.34, gain: 0.30, sweep: 0.55 });
+    // The snap at line stretch. Short, bright, and the only hard edge in it.
+    burst({ freq: 4200, q: 0.9, dur: 0.075, gain: 0.34, sweep: 0.30 });
+    burst({ freq: 780, q: 0.7, dur: 0.20, gain: 0.26, sweep: 0.25 });
+    // And the low thud of the harness taking your weight.
+    const t0 = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(120, t0 + 0.05);
+    o.frequency.exponentialRampToValueAtTime(46, t0 + 0.38);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, t0 + 0.05);
+    og.gain.exponentialRampToValueAtTime(0.34, t0 + 0.075);
+    og.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.60);
+    o.connect(og).connect(master);
+    o.start(t0); o.stop(t0 + 0.7);
+    // The wind after, which is what you are left with.
+    burst({ freq: 520, q: 1.1, dur: 1.60, gain: 0.085, sweep: 0.14 });
+  }
+
+  /**
+   * Both boots on the ground, which is a thump and a scuff and nothing else.
+   *
+   * Deliberately shorter and drier than anything else in here: a landing that
+   * rings has taken you somewhere with a floor, and this one is dirt.
+   */
+  function boots() {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(92, t0);
+    o.frequency.exponentialRampToValueAtTime(38, t0 + 0.16);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, t0);
+    og.gain.exponentialRampToValueAtTime(0.50, t0 + 0.008);
+    og.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.30);
+    o.connect(og).connect(master);
+    o.start(t0); o.stop(t0 + 0.34);
+    // Grit under the sole, and the second foot a moment behind the first.
+    burst({ freq: 2100, q: 0.5, dur: 0.10, gain: 0.24, sweep: 0.30 });
+    burst({ freq: 1400, q: 0.6, dur: 0.16, gain: 0.15, sweep: 0.22, at: t0 + 0.055 });
+  }
+
   /** Everything that loops, wound down. The silence afterwards is the point. */
   function kill(fade = 1.0) {
     if (!ctx) return;
@@ -2079,6 +2136,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, beep, rattle,
+    canopy, boots,
     setVolume, getVolume, setMuffle, keyClick, printTick,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa, room,
     firestarter, slowmo, radioTune, radioClick,

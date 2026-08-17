@@ -990,15 +990,17 @@ def outside_stair(kit):
     railing(kit, [(rx, ST_TOP), (rx, ST_TOP + 1.10)], F2 - 0.02, 1.04, bars=3)
     railing(kit, [(rx, ST_TOP + 1.10), (X1, ST_TOP + 1.10)], F2 - 0.02, 1.04,
             bars=3)
-    starlink(kit, rx, ST_TOP + 1.10, F2 - 0.02 + 1.04)
 
 
 def starlink(kit, px, py, top):
-    """The dish on the corner post at the top of the stairs.
+    """The dish on the roof, at the east verge above the top of the stairs.
 
-    A flat rectangle on a short arm, leaning back off the vertical, clamped to
-    the outside corner of the landing rail with a cable dropping down the post
-    behind it — which is how it is actually mounted on the house.
+    It was on the landing rail, which is where the arm and the panel were first
+    drawn and is not where it is: on the house it is bracketed to the roof
+    edge, a metre or so down the slope from the ridge, with the cable running
+    back down the gable wall to the balcony. `top` is the tile surface at that
+    point, so the same builder serves the roof as it stands and the roof over
+    the mezzanine, and the dish goes up with the ridge when you build one.
 
     It leans toward -y, which is the water: at this latitude the birds it wants
     are low in the southern sky, and a dish pointed at the hillside behind is
@@ -1018,18 +1020,23 @@ def starlink(kit, px, py, top):
             x, y, z = v.co
             v.co = (ox + x, oy + y * c - z * s, oz + y * s + z * c)
 
-    # The clamp on the post, and the cable down the back of it.
-    kit.span(black, px - 0.045, px + 0.045, py - 0.06, py + 0.06,
-             top - 0.14, top + 0.03, bev=0.005)
-    bm_cylinder(kit.bm(black, 0.002), px - 0.03, py + 0.05, F2 - 0.02, top - 0.10,
-                0.007, 0.007, seg=8)
+    # The bracket, lapped over the verge the way a roof mount is, and the short
+    # mast standing off it that everything else hangs on.
+    kit.span(black, px - 0.15, px + 0.26, py - 0.085, py + 0.085,
+             top - 0.19, top + 0.035, bev=0.006)
+    bm_cylinder(kit.bm(black, 0.002), px, py, top + 0.02, top + 0.30,
+                0.022, 0.022, seg=10)
+    # And the cable, down the gable wall to the landing, which is the half of
+    # the installation you actually walk past.
+    bm_cylinder(kit.bm(black, 0.002), X1 - EXT / 2 - 0.05, py + 0.02,
+                F2 + 0.30, top - 0.12, 0.007, 0.007, seg=8)
 
     for name, colour, box in (
-            ("starlink_arm", black, (0, 0, 0.15, 0.048, 0.048, 0.30)),
-            ("starlink_dish", pale, (0, 0, 0.545, 0.305, 0.026, 0.510))):
+            ("starlink_arm", black, (0, 0, 0.42, 0.048, 0.048, 0.28)),
+            ("starlink_dish", pale, (0, 0, 0.815, 0.305, 0.026, 0.510))):
         bm = bmesh.new()
         vs = bm_box(bm, box[0], box[1], box[2], box[3], box[4], box[5])
-        lean(bm, vs, px, py, top - 0.02)
+        lean(bm, vs, px, py, top + 0.26)
         ob = new_object(bm, name)
         bevel(ob, 0.010 if name.endswith("dish") else 0.004)
         kit.adopt(ob, colour)
@@ -1037,8 +1044,8 @@ def starlink(kit, px, py, top):
     # The back of the panel is the dark side, and it is the side you see from
     # the terrace, so it is worth the four triangles.
     bm = bmesh.new()
-    vs = bm_box(bm, 0, 0.016, 0.545, 0.290, 0.008, 0.492)
-    lean(bm, vs, px, py, top - 0.02)
+    vs = bm_box(bm, 0, 0.016, 0.815, 0.290, 0.008, 0.492)
+    lean(bm, vs, px, py, top + 0.26)
     ob = new_object(bm, "starlink_back")
     bevel(ob, 0.004)
     kit.adopt(ob, black)
@@ -2140,6 +2147,10 @@ def roof_now(kit):
     for y in (Y0 - ov, Y1 + ov):
         kit.span(WHITEGOODS, X0 - ov, X1 + ov, y - 0.03, y + 0.03,
                  HEAD - 0.10, HEAD + 0.02, bev=0.01)
+    # The dish, on the verge above the top of the stairs.
+    d = 0.85
+    starlink(kit, X1 + ov - 0.16, -d,
+             RIDGE_NOW + 0.14 - d * math.tan(PITCH_NOW))
 
 
 def _slope(kit, colour, sgn, ridge, pitch, d0, d1, thick, x0, x1, lift=0.0):
@@ -2230,6 +2241,9 @@ def roof_loft(kit):
     # Two roof lights: one over the gallery, one over the double height.
     rooflight(kit, -1.60, 1.70)
     rooflight(kit, 1.40, -2.30)
+    # And the dish, which goes up with the ridge.
+    d = 0.85
+    starlink(kit, X1 + ov - 0.16, -d, RIDGE + 0.16 - d * math.tan(PITCH))
 
     # ── the deck ────────────────────────────────────────────────────────────
     # Everything north of the living room's south third, so the ridge runs down

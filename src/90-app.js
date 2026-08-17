@@ -229,6 +229,11 @@ addEventListener('keydown', (e) => {
   // underneath you and once with a promenade. Only on foot; under a canopy you
   // already have one, and in the seat J is the key that does this.
   if (e.code === 'KeyU' && state.phase === 'ground') { e.preventDefault(); launchOut(); return; }
+  // And Enter is the small one: running at the balcony rail, off it, and down
+  // under the cloth on to the promenade. Same key you would hit anyway when
+  // you have decided to do something, and it declines quietly — standing still
+  // or standing on the beach it is not a jump, and nothing happens.
+  if (e.code === 'Enter' && state.phase === 'ground') { e.preventDefault(); hopOut(); return; }
   if (state.phase === 'ground' || state.phase === 'chute') {
     // On foot, or under a canopy, the aeroplane's controls are all meaningless
     // and several of them would quietly reconfigure an aircraft you are not
@@ -525,7 +530,7 @@ function updateCamera(dt) {
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
   trees, landmarks, alerts, roads, rail, props, airfield, jadrija, ground, birds, eject,
-  mirror, you;
+  mirror, wet, you;
 /** You plus the three wingmen, as the birds see them. Built once, in boot(). */
 let birdFlush = [];
 
@@ -627,11 +632,13 @@ async function boot() {
   // The one surface in the game that is a view rather than a colour. Costs a
   // dot product everywhere except stood in front of it — see `49-mirror.js`.
   if (jadrija && jadrija.vik) mirror = bathMirror(jadrija.vik);
+  if (jadrija && jadrija.vik) wet = bathFloor(jadrija.vik);
   // And the one thing that stands in it. Built whether or not the mirror is,
   // because the mirror is the only place it is ever drawn and a missing house
   // is not a reason to fail loading a body.
   you = await buildYou(scene);
   if (mirror && you) mirror.guests.push(you.mesh);
+  if (wet && you) wet.guests.push(you.mesh);
   city = buildCity(scene);
 
   await step(80, 'load.streets');
@@ -1466,6 +1473,73 @@ function launchOut() {
   toast(T('toast.launch'));
 }
 
+/**
+ * Enter — off the balcony rail, under a canopy, on to the promenade.
+ *
+ * The same machinery as the charge under your boots and a fifth of the speed:
+ * 9.6 m/s off the deck is about four and a half metres of apex, so from the
+ * terrace you top out around seven above the ground and the cloth streams as
+ * you stop going up. It is a hop rather than a flight — you are over the road
+ * and down in about eight seconds — and that is the point. Fifty metres is a
+ * way of looking at Šibenik; this is a way of getting off your own balcony.
+ *
+ * Gated on two things, both of which are what the ask was: you have to be
+ * moving, because it is a running jump and not a step off a ledge, and you
+ * have to be somewhere with a drop under it. The second test is the plinth of
+ * the vikendica rather than any general reading of the terrain — everything
+ * raised on this plot is part of that house, and the beach is not.
+ */
+const HOP = {
+  up: 10.5,        // m/s off the rail — about 5.6 m of apex
+  // Negative, where the charge's is positive, and for the opposite reason. The
+  // charge climbs for two and a half seconds and wants the cloth held back
+  // until the top; this is off a balcony, where the whole flight is four
+  // seconds and the canopy has to be out of the bag almost at once. `launch`
+  // sets the clock to -hang and streams at `tumble` (0.85 s), so -0.70 streams
+  // it a sixth of a second after your feet leave the rail and has it full,
+  // `deploy` later, a shade after the top of the arc — about seven metres over
+  // the promenade with a second and a half of glide left to pick your spot.
+  hang: -0.70,
+  minSp: 0.9,      // m/s: a running jump, not a step
+  minUp: 1.6,      // m above the plinth, which is the raised half of the house
+};
+
+function hopOut() {
+  if (!ground || !ground.ok || !ground.active || state.paused) return false;
+  if (!eject || eject.active) return false;
+  const v = jadrija && jadrija.vik;
+  if (!v) return false;
+  const { x, y, z, yaw, vx, vz } = ground.you;
+  if (y < v.base + HOP.minUp) return false;
+  if (Math.hypot(vx || 0, vz || 0) < HOP.minSp) return false;
+  launchedFrom = { stranded: ground.stranded };
+  ground.bail();
+  eject.reset();
+  eject.launch(x, y, z, yaw, HOP.up, HOP.hang);
+  alerts.bump(0.8);
+  $('ground-hud').hidden = true;
+  $('hud').hidden = true;
+  $('chute-hud').hidden = false;
+  if (IS_TOUCH) { $('gtouch').hidden = true; $('touch').hidden = true; $('ctouch').hidden = false; }
+  return true;
+}
+
+// Whether the cloth has been heard to open on this descent. The canopy fills
+// over about a second inside 57-eject.js and nothing in there makes a noise, so
+// the sound is hung off the number rather than off an event: watch inflation
+// cross, play it once, and clear it when the parachute is put away.
+let chuteHeard = false;
+
+/** Once a frame while under the canopy: the cloth, when it takes air. */
+function chuteAudio() {
+  if (!eject || !eject.active) { chuteHeard = false; return; }
+  if (chuteHeard) return;
+  const sh = eject.stats ? eject.stats() : null;
+  if (!sh || !(sh.inflation > 0.18)) return;
+  chuteHeard = true;
+  if (audio) audio.canopy();
+}
+
 /** And the arrival, whichever of the three it turned out to be. */
 function chuteDown(kind) {
   if (state.phase !== 'chute') return;
@@ -1496,6 +1570,9 @@ function chuteDown(kind) {
     // It belongs here instead: the moment the ground mode has you is the moment
     // the parachute is over, whichever way you got under it.
     eject.reset();
+    // Both boots on the dirt.
+    if (audio) audio.boots();
+    chuteHeard = false;
     alerts.bump(1.1);
     $('chute-hud').hidden = true;
     $('hud').hidden = true;
@@ -2527,7 +2604,9 @@ function frame() {
   // it renders into a target of its own, so the order that matters is that the
   // glass has something in it by the time the room it is hanging in is drawn.
   if (you) you.tick(dt, camera);
+  chuteAudio();
   if (mirror) mirror.update(renderer, scene, camera);
+  if (wet) wet.update(renderer, scene, camera);
   renderer.render(scene, camera);
   const now = performance.now();
   if (lastFrameMs) state.fps = damp(state.fps, 1000 / Math.max(1, now - lastFrameMs), 2, dt);
@@ -2785,7 +2864,9 @@ window.__fr = {
   jad: {
     raw: () => jadrija,
     mirror: () => (mirror ? mirror.stats() : null),
+    wet: () => (wet ? wet.stats() : null),
     you: () => (you ? you.stats() : null),
+    youRaw: () => you,
     youShow: (v) => (you ? you.show(v) : null),
     youFreeze: (v) => (you ? you.freeze(v) : null),
     /** The threshold: where it thinks you are, and whether it is mid-cut. */
@@ -2931,6 +3012,14 @@ window.__fr = {
     out: () => toggleGround(),
     apron: () => airfield.apron,
     put: (x, z, yaw, pitch) => ground.put(x, z, yaw, pitch),
+    /** Debug: the balcony jump, without having to be running when you ask. */
+    hop: (sp = 2.0) => {
+      if (ground && ground.you) { ground.you.vx = -Math.sin(ground.you.yaw) * sp;
+        ground.you.vz = -Math.cos(ground.you.yaw) * sp; }
+      return hopOut();
+    },
+    confine: (x, z, y) => ground.confine(x, z, y),
+    walkY: (x, z, y) => ground.walkY(x, z, y),
     /**
      * On foot anywhere at all, synthesising a locale for open country the same
      * way a parachute landing does. `jad.stand` only reaches Jadrija, and the
