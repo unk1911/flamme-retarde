@@ -2666,6 +2666,33 @@ async function buildJadrija(scene) {
     greens.push([t, s, 0.55, 9]);
   }
 
+  // And a few more out in front of the terrace, between the house and the
+  // water, which is where they were asked for.
+  //
+  // Past the seaward lip of the terrace, which is at z 6.07 — inside that and
+  // they grow up through the slab, which is where the first attempt put them.
+  // Beyond it there is no clearance anybody guarantees: the rule in this
+  // builder is only that no other *house* is placed within 7.5 m of the
+  // vikendica, and the blockers that would answer the question properly are
+  // all pushed a thousand lines below this. So these are eyeballed off the
+  // terrace edge and then looked at.
+  //
+  // The two big ones are off to the sides. The pair near the middle are
+  // olives: four metres and open-crowned, so from the terrace you are looking
+  // at the sea through a tree rather than at a tree.
+  for (const [dt, ds, tall] of [[-5.1, 6.7, 1], [5.3, 6.9, 1], [-2.6, 7.5, 0],
+                                [2.9, 7.7, 0], [0.4, 8.4, 0]]) {
+    const t = VIK.t + dt, s = VIK.s - ds;
+    const y = surfaceY(t, s);
+    if (tall) {
+      pine(t, s, y, 7.8 + rng() * 1.8);
+      greens.push([t, s, 0.55, 9]);
+    } else {
+      olive(t, s, y, 4.0 + rng() * 1.1);
+      greens.push([t, s, 0.60, 5]);
+    }
+  }
+
   // There used to be a second run of oleander tight against the front row's
   // doors, at rowA − 1.15, one every four or five metres for the whole length.
   // It came off. Real cabin rows on this coast have nothing planted along them

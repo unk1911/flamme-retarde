@@ -1989,10 +1989,56 @@ function buildAudio() {
   function keyClick(heavy = 0) {
     if (!ctx) return;
     const v = 0.90 + Math.random() * 0.22;
+    // Undo the muffle, which is the only time anybody hears this. The muffle
+    // is the world going quiet behind the laptop screen; the keyboard is under
+    // your hands and on the near side of it, so it comes back up by exactly
+    // what the master went down by and ends up where it was designed to sit.
+    const near = 1 / (1 - 0.88 * muffle);
     burst({ freq: (5200 - heavy * 1500) * v, q: 0.8, sweep: 0.5,
-      dur: 0.016 + heavy * 0.008, gain: (0.030 - heavy * 0.006) * v });
+      dur: 0.016 + heavy * 0.008, gain: (0.105 - heavy * 0.020) * v * near });
     burst({ freq: (270 - heavy * 90) * v, q: 1.6, sweep: 0.62,
-      dur: 0.038 + heavy * 0.026, gain: (0.026 + heavy * 0.020) * v });
+      dur: 0.038 + heavy * 0.026, gain: (0.090 + heavy * 0.060) * v * near });
+  }
+
+  /**
+   * One character arriving on a machine that prints.
+   *
+   * Thinner and higher than a keycap, because nothing here is being pressed:
+   * it is a head striking a ribbon, or a relay, or whatever the sound designer
+   * of a 1983 film decided a computer thinking sounds like. Two components
+   * again — the strike, and a little of the carriage it is mounted on — and the
+   * same lift over the muffle as the keyboard, since both are in the room.
+   *
+   * `heavy` is the occasional harder strike that stops thirty of these in a row
+   * from sounding like one long tone.
+   */
+  function printTick(heavy = 0) {
+    if (!ctx) return;
+    const v = 0.88 + Math.random() * 0.26;
+    const near = 1 / (1 - 0.88 * muffle);
+    burst({ freq: (3400 + heavy * 900) * v, q: 1.3, sweep: 0.55,
+      dur: 0.009 + heavy * 0.004, gain: (0.080 + heavy * 0.050) * v * near });
+    burst({ freq: (760 - heavy * 160) * v, q: 1.4, sweep: 0.7,
+      dur: 0.016 + heavy * 0.008, gain: (0.046 + heavy * 0.034) * v * near });
+    // Every so often, data rather than mechanism: a short square blip falling
+    // through half an octave. One in ten of these, which at the printing rate
+    // is two or three a second — enough to say a wire is being read and not so
+    // many that it turns into a tune.
+    if (heavy) {
+      const t = ctx.currentTime;
+      const f0 = 900 + Math.random() * 1500;
+      const o = ctx.createOscillator();
+      o.type = 'square';
+      o.frequency.setValueAtTime(f0, t);
+      o.frequency.exponentialRampToValueAtTime(f0 * 0.45, t + 0.05);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.026 * near, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+      o.connect(g).connect(master);
+      o.start(t);
+      o.stop(t + 0.06);
+    }
   }
 
   function setVolume(v) {
@@ -2033,7 +2079,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, beep, rattle,
-    setVolume, getVolume, setMuffle, keyClick,
+    setVolume, getVolume, setMuffle, keyClick, printTick,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa, room,
     firestarter, slowmo, radioTune, radioClick,
     /** Where the pointer sits for each station, so the dial can be drawn. */

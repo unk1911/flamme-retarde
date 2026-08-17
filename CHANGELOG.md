@@ -8,6 +8,191 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.72.0] — 2026-08-16
+
+### Added — there is somebody in the mirror now
+
+The game has been first person from the beginning, which meant the one thing it
+never had to decide was what you look like. A mirror decides it for you.
+
+She is the same skinned rig the figure at the far end of the beach is built on
+— twenty-eight bones, a face that blinks, the same idle — standing where you
+stand and facing where you face, and she is drawn in exactly one place: inside
+the reflection. `mirror.guests` is the whole mechanism, visible for the length
+of the reflection pass and hidden again before the room is drawn. She has to
+be, because she is standing in your head and the inside of a skull is not a
+view anybody wants.
+
+The beanie and the blue hair are built here rather than baked — a cut sphere,
+a rolled brim, and eight tapered locks, cones rather than boxes because a box
+the width of a lock of hair reads as a plank. Nothing in this project uses a
+three.js light, so they carry a two-line shader with the sun stuck to the
+camera, which in a mirror lit by one window is indistinguishable from anything
+more honest. A punk in a beanie with blue hair, which is a silhouette rather
+than a likeness of anybody real.
+
+Standing off to one side of a 60 cm mirror puts your reflection off its far
+edge, which is not a bug and is worth knowing before reporting one.
+
+### Added — trees in front of the house, toward the water
+
+Two pines already stood beside the terrace, placed to frame the water rather
+than stand in it. Five more now stand past the terrace's seaward lip: the big
+pair off to the sides, and three olives nearer the middle, four metres and
+open-crowned, so from the terrace you are looking at the sea through a tree
+rather than at a tree. The first attempt planted them at z 4.6 to 6.5, which is
+on the terrace slab.
+
+## [1.71.0] — 2026-08-16
+
+### Fixed — the mezzanine rail's gap was not where the rail's gap was
+
+1.70.1 was the right diagnosis and half the fix. A blocker's barrier ends a
+girth *beyond* its box, so setting the box to the drawn rail's end puts 43 cm
+of invisible fence across the opening you can see: you walk to the gap, stop on
+nothing, and conclude the stair is broken. The box now stops a girth short, so
+the passable opening and the drawn opening are the same opening. Measured at
+the rail line: 1.10 m, starting at x 2.05, which is where the balustrade ends.
+
+### Changed — the bathroom door is a metre wide
+
+It was 780 mm, and a body is 520 mm across, so there were 260 mm of latitude in
+approaching it — walk a hand's width wide of that and you slide along the
+partition to the first opening that will have you, which is the kitchen's. The
+room was never leaking; you were being funnelled. The door is now 1.00 m and
+the leaf parks further out of it, which leaves 500 mm of latitude.
+
+### Added — the Starlink dish on the landing rail
+
+On the corner post at the top of the stairs, where it is on the house: a flat
+panel on a short arm, leaning 36° off the vertical toward the water, with a
+cable dropping down the post behind it. It leans that way because at this
+latitude the birds are low in the southern sky, and a dish aimed at the
+hillside is the one thing that reads as wrong to anybody who owns one.
+
+## [1.70.1] — 2026-08-16
+
+### Fixed — the mezzanine stair had an invisible slot at the top of it
+
+With the mezzanine built you could climb to it and then not get back down: the
+way off the deck stopped you on nothing at the top step, and taking the
+mezzanine away again was the only way out of the house.
+
+A blocker is a wall plus your own girth, so it reaches 26 cm further into the
+room than it is drawn, and it reaches that far out of its own ends too. The
+gallery rail stops at the stairwell and the deck's east side ran the full depth
+of the deck, and those two invisible margins met across the head of the stair —
+leaving a gap of 0.47 m to find, unlit and unmarked, in a stairwell 0.95 m
+wide. Straight down the middle worked, which is why it worked at all, and every
+other approach was a wall.
+
+The east side now stops short of the stairwell. There was never a drop to fence
+off alongside the stair — that is what the stair is. The mouth measures 0.65 m
+at the rail line and the stair's full width below it.
+
+## [1.70.0] — 2026-08-16
+
+### Added — the mirror over the basin is a mirror
+
+It was a pale blue-grey slab baked into the shell mesh, which reads as a mirror
+from the doorway and stops reading as one the moment you walk up to it, because
+a mirror is not a colour. The slab stays and becomes the backing; a second
+surface sits a millimetre and a half in front of it with the room rendered into
+it — the ordinary planar method, the eye reflected through the plane of the
+glass and the result sampled projectively.
+
+Two things keep it cheap. It is a whole second view of the world, so it is only
+drawn when somebody is stood in front of it — within 3.6 m, on the right side
+of the glass, and looking at it — and then on every other frame at a third of
+the linear resolution. Its far plane is 45 m rather than the eye's kilometres,
+which is what stops a bathroom mirror putting the whole city and every tree in
+it through a second pass; the fov and the aspect have to match the eye, because
+the sampling is projective, but the depth range is ours. The near plane is
+leaned onto the glass itself so the wall the mirror is screwed to is clipped
+away rather than drawn and then covered up.
+
+Standing anywhere else in the game it costs one dot product.
+
+## [1.69.0] — 2026-08-16
+
+### Added — `/new` starts the conversation again
+
+Everything the model has of a conversation is what the terminal sends it, so
+forgetting is a local act: drop the history and the next turn goes up with
+nothing in front of it. `/new`, `/clear` and `/reset` all do it, and clear the
+glass while they are at it. `/help` lists them.
+
+The test is a whole word on a line of its own, so `/etc/passwd` stays a
+question about a file and not a command that failed.
+
+## [1.68.1] — 2026-08-16
+
+### Changed — the terminal is audible, and the prompt is the one the service uses
+
+The clicks and the printing were tuned at a level that would have been right in
+a quiet room and was nothing at all under the muffle: about three and a half
+times up for the keyboard, four and a half for the printer. The printer also
+got the thing that makes it read as a wire rather than a typewriter — one tick
+in seven is now a short square blip falling through half an octave, two or
+three a second at printing speed, data and not mechanism.
+
+The system prompt is the service's own, verbatim, with the date and the place
+filled in. `_bot` takes the prompt as an argument, so sending nothing would
+have meant sending the empty string rather than falling back to the default —
+there is no not-sending it. `{TODAY}` is substituted at the moment of asking
+and not at load, so a window left open overnight does not lie about the date.
+
+## [1.68.0] — 2026-08-16
+
+### Added — the machine sounds like it is doing something
+
+The terminal answered in silence, which for a green screen in 1983 is the one
+thing it must not do. Two states, one tick. Between pressing return and the
+first character there is nothing to look at, so it seeks: sparse, one every
+fifth of a second, a thing deciding. Then the text starts and it prints.
+
+The chatter is metered off how much has actually arrived rather than off a
+timer, so a fast answer clatters and a slow one taps — but not one tick per
+character, because characters arrive in frames of dozens and dozens of
+overlapping bursts inside one frame is a hiss and not a machine. The text goes
+into a budget and a steady twenty-four-a-second timer spends it six characters
+at a time, which is about the rate a dot-matrix head really moves. When the
+answer ends the seek stops dead and the printer runs out the last of what it
+owes rather than being cut off mid-word.
+
+`printTick` is thinner and higher than `keyClick`, because nothing is being
+pressed — it is a head striking a ribbon — and it takes the same lift over the
+muffle, since both of them are in the room with you.
+
+## [1.67.3] — 2026-08-16
+
+### Fixed — the keyboard under your hands was muffled along with the world
+
+Sitting down at the laptop sets a muffle that takes the master to 12%, which is
+the world going quiet behind the screen and is right. The key clicks went down
+with it, and they are quiet to begin with — a `0.030` burst at 12% is nothing —
+so the one keyboard in the game nobody could hear was the one being typed on.
+The click now comes back up by exactly what the master went down by: it is on
+the near side of the muffle, under your hands.
+
+## [1.67.2] — 2026-08-16
+
+### Fixed — tabbing away from the laptop threw a Paused card over it
+
+`visibilitychange` pauses the game when the tab goes to the background, which
+is right when you are flying and wrong when you are sat at the terminal reading
+a reply: nobody is flying anything, and the card lands over the screen you were
+in the middle of. Exempted the same way the pointer-lock pause already is.
+
+## [1.67.1] — 2026-08-16
+
+### Fixed — the sign-in form stayed on the glass after you were through it
+
+`#crt-login` carries a `display` of its own, which beats the user-agent rule
+for `[hidden]`, so setting `hidden` on it did nothing and the form sat over a
+terminal that was already signed in and working. `#crt-row` and `#crt-tools`
+were each told this when they were written; the form never was.
+
 ## [1.67.0] — 2026-08-16
 
 ### Fixed — the laptop could not reach the model at all

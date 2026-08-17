@@ -524,7 +524,8 @@ function updateCamera(dt) {
 // ── the world ────────────────────────────────────────────────────────────────
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
-  trees, landmarks, alerts, roads, rail, props, airfield, jadrija, ground, birds, eject;
+  trees, landmarks, alerts, roads, rail, props, airfield, jadrija, ground, birds, eject,
+  mirror, you;
 /** You plus the three wingmen, as the birds see them. Built once, in boot(). */
 let birdFlush = [];
 
@@ -623,6 +624,14 @@ async function boot() {
   // Jadrija first: it claims the footprints it is going to rebuild in detail,
   // and the town builder has to know about that before it draws them.
   jadrija = await buildJadrija(scene);
+  // The one surface in the game that is a view rather than a colour. Costs a
+  // dot product everywhere except stood in front of it — see `49-mirror.js`.
+  if (jadrija && jadrija.vik) mirror = bathMirror(jadrija.vik);
+  // And the one thing that stands in it. Built whether or not the mirror is,
+  // because the mirror is the only place it is ever drawn and a missing house
+  // is not a reason to fail loading a body.
+  you = await buildYou(scene);
+  if (mirror && you) mirror.guests.push(you.mesh);
   city = buildCity(scene);
 
   await step(80, 'load.streets');
@@ -1507,8 +1516,11 @@ $('pause').addEventListener('click', (e) => { if (e.target.id === 'pause') setPa
 
 // A backgrounded tab stops getting frames anyway; this only makes the stop
 // honest, so you do not come back to a city that burned down in another window.
+// Not while you are sat at the laptop, though: nobody is flying anything, the
+// fire is somebody else's problem for the minute, and a Paused card thrown over
+// a terminal you were reading is just something else to dismiss on the way back.
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) setPaused(true);
+  if (document.hidden && !comp) setPaused(true);
 });
 
 function toast(msg, kind = '') {
@@ -2511,6 +2523,11 @@ function frame() {
   }
   updateRadio(dt);
 
+  // Before the frame, not after: the reflection is of this frame's world, and
+  // it renders into a target of its own, so the order that matters is that the
+  // glass has something in it by the time the room it is hanging in is drawn.
+  if (you) you.tick(dt, camera);
+  if (mirror) mirror.update(renderer, scene, camera);
   renderer.render(scene, camera);
   const now = performance.now();
   if (lastFrameMs) state.fps = damp(state.fps, 1000 / Math.max(1, now - lastFrameMs), 2, dt);
@@ -2767,6 +2784,10 @@ window.__fr = {
    */
   jad: {
     raw: () => jadrija,
+    mirror: () => (mirror ? mirror.stats() : null),
+    you: () => (you ? you.stats() : null),
+    youShow: (v) => (you ? you.show(v) : null),
+    youFreeze: (v) => (you ? you.freeze(v) : null),
     /** The threshold: where it thinks you are, and whether it is mid-cut. */
     dip: () => {
       const K = jadrija && jadrija.kabina;

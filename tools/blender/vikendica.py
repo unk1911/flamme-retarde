@@ -182,7 +182,7 @@ D_TERR = (0.54, 2.74, 0.0, 2.10)             # south wall, the 220 opening
 W_TERR = (-2.34, -0.94, 1.00, 2.05)          # south wall, the 140 opening
 D_S4 = (-1.02, -0.17, 0.0, DOOR_H)           # both bedrooms open off the big room
 D_S3 = (0.51, 1.36, 0.0, DOOR_H)
-D_BATH = (-0.20, 0.58, 0.0, DOOR_H)          # in the bathroom's east wall
+D_BATH = (-0.40, 0.60, 0.0, DOOR_H)          # in the bathroom's east wall
 
 W_S4_N = (-1.64, -0.44, 1.00, 2.05)          # north wall of the west bedroom
 W_S4_W = (1.60, 2.50, 1.00, 2.05)            # and its window on to the west
@@ -802,7 +802,7 @@ def shell(kit):
     leaf_door(kit, "y", X1 - EXT / 2, D_ENTRY, glazed=True)
     slider(kit, "x", SPINE, D_S4, thick=INT * 2, slide=-1.0, open_frac=0.80)
     door_case(kit, "x", SPINE, D_S3, thick=INT * 2)
-    slider(kit, "y", BATH_E, D_BATH, thick=INT, slide=-1.0, open_frac=0.75)
+    slider(kit, "y", BATH_E, D_BATH, thick=INT, slide=-1.0, open_frac=0.88)
     terrace_doors(kit)
 
     # ── windows ─────────────────────────────────────────────────────────────
@@ -990,6 +990,58 @@ def outside_stair(kit):
     railing(kit, [(rx, ST_TOP), (rx, ST_TOP + 1.10)], F2 - 0.02, 1.04, bars=3)
     railing(kit, [(rx, ST_TOP + 1.10), (X1, ST_TOP + 1.10)], F2 - 0.02, 1.04,
             bars=3)
+    starlink(kit, rx, ST_TOP + 1.10, F2 - 0.02 + 1.04)
+
+
+def starlink(kit, px, py, top):
+    """The dish on the corner post at the top of the stairs.
+
+    A flat rectangle on a short arm, leaning back off the vertical, clamped to
+    the outside corner of the landing rail with a cable dropping down the post
+    behind it — which is how it is actually mounted on the house.
+
+    It leans toward -y, which is the water: at this latitude the birds it wants
+    are low in the southern sky, and a dish pointed at the hillside behind is
+    the one thing that would read as wrong to anybody who owns one.
+
+    Built as loose objects rather than into the colour buckets, because the arm
+    and the panel are both tilted and a bucket is shared — rotating one would
+    take the whole house with it.
+    """
+    black = (0.09, 0.09, 0.10)
+    pale = (0.87, 0.88, 0.88)
+    tilt = math.radians(36.0)
+
+    def lean(bm, verts, ox, oy, oz):
+        c, s = math.cos(tilt), math.sin(tilt)
+        for v in verts:
+            x, y, z = v.co
+            v.co = (ox + x, oy + y * c - z * s, oz + y * s + z * c)
+
+    # The clamp on the post, and the cable down the back of it.
+    kit.span(black, px - 0.045, px + 0.045, py - 0.06, py + 0.06,
+             top - 0.14, top + 0.03, bev=0.005)
+    bm_cylinder(kit.bm(black, 0.002), px - 0.03, py + 0.05, F2 - 0.02, top - 0.10,
+                0.007, 0.007, seg=8)
+
+    for name, colour, box in (
+            ("starlink_arm", black, (0, 0, 0.15, 0.048, 0.048, 0.30)),
+            ("starlink_dish", pale, (0, 0, 0.545, 0.305, 0.026, 0.510))):
+        bm = bmesh.new()
+        vs = bm_box(bm, box[0], box[1], box[2], box[3], box[4], box[5])
+        lean(bm, vs, px, py, top - 0.02)
+        ob = new_object(bm, name)
+        bevel(ob, 0.010 if name.endswith("dish") else 0.004)
+        kit.adopt(ob, colour)
+
+    # The back of the panel is the dark side, and it is the side you see from
+    # the terrace, so it is worth the four triangles.
+    bm = bmesh.new()
+    vs = bm_box(bm, 0, 0.016, 0.545, 0.290, 0.008, 0.492)
+    lean(bm, vs, px, py, top - 0.02)
+    ob = new_object(bm, "starlink_back")
+    bevel(ob, 0.004)
+    kit.adopt(ob, black)
 
 
 # --------------------------------------------------------------------------- #

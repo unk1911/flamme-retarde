@@ -1077,6 +1077,10 @@ html.touch .row input[type=range] { height: 22px; }
 
 #crt-login { display: flex; flex-direction: column; gap: .5rem; margin: auto 0;
              align-self: center; width: min(30rem, 100%); }
+/* A `display` of its own beats the user-agent rule for [hidden], so the form
+   has to be told, as #crt-row and #crt-tools already are. Without this it
+   stays on the glass after you are through it. */
+#crt-login[hidden] { display: none; }
 .crt-l { margin: 0; letter-spacing: .06em; }
 #crt-login label { display: flex; align-items: center; gap: .6rem; }
 #crt-login label span { width: 4.2rem; color: var(--ph-lo); }

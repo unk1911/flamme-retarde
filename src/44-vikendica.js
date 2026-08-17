@@ -545,12 +545,26 @@ async function buildVikendica(scene, field) {
       y1: base + VIK.deck + 2.70 };
     loftOnly = [
       push({ x0: D.x0 - 0.12, x1: D.x0, z0: D.z0 - 0.12, z1: D.z1 }, lvl),
-      push({ x0: D.x1, x1: D.x1 + 0.12, z0: D.z0 - 0.12, z1: D.z1 }, lvl),
+      // The east side stops short of the stairwell rather than running the full
+      // depth of the deck. It has to: a blocker is a wall plus your own girth,
+      // so this one reaches 26 cm further into the room than it looks, and the
+      // gallery rail reaches 26 cm out of its own end the same way. Run both to
+      // their drawn lengths and the two invisible margins meet across the head
+      // of the stair, leaving a slot half a metre wide to find in the dark. You
+      // could go down it — dead centre, at the second attempt — and every other
+      // approach stopped you on nothing at the top step. There is no drop to
+      // fence off alongside the stair anyway; that is what the stair is.
+      push({ x0: D.x1, x1: D.x1 + 0.12, z0: D.z0 - 0.12,
+             z1: VIK.loftStair.z0 - 0.10 }, lvl),
       push({ x0: D.x0 - 0.12, x1: D.x1 + 0.12, z0: D.z0 - 0.12, z1: D.z0 }, lvl),
-      // The rail. The gap at the east end is the stairwell — same gap the drawn
-      // balustrade has, because a fence you can see through and cannot pass is
-      // worse than either.
-      push({ x0: D.x0, x1: VIK.loftStair.x0, z0: 1.14, z1: 1.26 }, lvl),
+      // The rail, and its gap at the east end is the stairwell. The number is
+      // where the drawn balustrade stops, less a girth — because the barrier
+      // ends a girth *beyond* the box, and matching the box to the drawn rail
+      // instead puts 43 cm of invisible fence across the opening you can see.
+      // You walk to the gap, stop on nothing, and conclude the stair is broken,
+      // which is what happened. A fence you can see through and cannot pass is
+      // worse than either kind of fence.
+      push({ x0: D.x0, x1: D.x1 - 1.16 - 0.26, z0: 1.14, z1: 1.26 }, lvl),
     ];
     return out;
   }
