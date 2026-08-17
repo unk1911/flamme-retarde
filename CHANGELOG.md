@@ -8,6 +8,45 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.73.2] — 2026-08-17
+
+### Changed
+
+- **The lavatory is a lavatory.** It used to be five boxes: a stub, a slab, a
+  lid, a tank. From the doorway that reads as a WC and from a metre away it
+  reads as a filing cabinet, because the one thing a lavatory has that a box
+  does not is that every surface on it is a curve, and the shape of the curve
+  is the whole object. The pan is now a single loft of eleven superelliptical
+  rings that climbs the outside, rolls over the rim and comes back *down* the
+  inside to the water — one closed surface, an open bowl, the section swelling
+  and drifting forward as it rises the way a moulded ceramic does. The seat is
+  a separate oval band on two chrome hinge lugs, deliberately not concentric
+  with the pan because a seat is wider at the hinge than at the front. The
+  cistern sits down on the shelf at the back of the pan with its lid
+  overhanging it and two dual-flush buttons in the top, and there is a soil
+  spigot crossing the 5 cm the pan stands clear of the tiling, which is the
+  detail that says the thing is plumbed in rather than set down. The bathroom
+  shell goes from 114 440 to 115 424 triangles.
+
+### Removed
+
+- **The two things on the bathroom floor.** They were there on the principle
+  that nobody's bathroom floor is clear. One was a bucket, and it stood exactly
+  where the lavatory is, so what it actually read as was a teal drum sitting in
+  the pan. The other was a pink bottle alone in the middle of the open floor
+  with nothing near it, which is not clutter, it is litter. The cobalt is
+  better off bare.
+
+### Fixed
+
+- **A NaN in the klapa's distance stopped the whole render loop.** `klapa()`
+  gated on `d > KLAPA.fade` to decide "nowhere near it, stop the voices". NaN
+  fails that comparison, as it fails every comparison, so a non-finite distance
+  fell straight through to the gain ramp and handed `setTargetAtTime` a value
+  it throws on — inside the frame callback, which means no further frames. The
+  test is now `!(d <= KLAPA.fade)`, so NaN lands on the silent branch where it
+  belongs.
+
 ## [1.73.1] — 2026-08-17
 
 ### Fixed

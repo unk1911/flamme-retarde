@@ -45,8 +45,8 @@ import bpy  # type: ignore
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from frmesh import (  # noqa: E402
-    TAU, bevel, bm_ball, bm_box, bm_cylinder, bm_hip_roof, export, new_object,
-    reset_scene,
+    TAU, _ring_pts, bevel, bm_ball, bm_box, bm_cylinder, bm_hip_roof, bm_loft,
+    export, new_object, reset_scene,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -1187,6 +1187,90 @@ def kitchen(kit):
     ceiling_light(kit, (x0 + x1) / 2, y1 - 1.00)
 
 
+def _oval_band(bm, z0, z1, out, inn, seg=24, power=2.6):
+    """A closed flat ring with superelliptical inner and outer edges.
+
+    Four quad strips — outside, inside, top, bottom — which is a closed solid,
+    so the exporter's normal pass sorts the winding out. `out` and `inn` are
+    each `(rx, ry, ox, oy)`; they take separate centres because a lavatory seat
+    is not concentric, the back of it being wider than the front.
+    """
+    rows = []
+    for rx, ry, ox, oy in (out, inn):
+        pts = _ring_pts(rx, ry, seg, power)
+        rows.append([[bm.verts.new((ox + px, oy + py, z)) for px, py in pts]
+                     for z in (z0, z1)])
+    bm.verts.ensure_lookup_table()
+    (ob, ot), (ib, it) = rows
+    for i in range(seg):
+        k = (i + 1) % seg
+        bm.faces.new((ob[i], ob[k], ot[k], ot[i]))
+        bm.faces.new((ib[i], ib[k], it[k], it[i]))
+        bm.faces.new((ot[i], ot[k], it[k], it[i]))
+        bm.faces.new((ob[i], ob[k], ib[k], ib[i]))
+    return rows
+
+
+def _wc(kit, bx, ty):
+    """A close-coupled lavatory standing off the wall face at `bx`, centred on
+    `ty`, projecting into +X.
+
+    It used to be five boxes: a stub, a slab, a lid, a tank. From the doorway
+    that is a WC, and from a metre away it is a filing cabinet — because the
+    one thing a lavatory has that a box does not is that every surface on it is
+    a curve, and the shape of the curve is the whole object.
+
+    So the pan is a single loft of eleven superelliptical rings that climbs the
+    outside, rolls over the rim and comes back *down* the inside to the water.
+    One closed surface, an open bowl, and the section swells and drifts forward
+    as it rises the way a moulded ceramic does. The seat is a separate oval
+    band, not concentric with the pan, because it is wider at the hinge than at
+    the front.
+    """
+    # The pan. Rings are (z, rx, ry, ox, oy), bottom of the foot upward: the
+    # waist at 9 cm, the shoulder at 27, the rim at 41 — then two rings that
+    # roll over the lip, and four that descend into the bowl. The last is the
+    # water.
+    rings = [(F2 + 0.020, 0.114, 0.102, bx + 0.150, ty),
+             (F2 + 0.090, 0.100, 0.089, bx + 0.160, ty),
+             (F2 + 0.180, 0.110, 0.096, bx + 0.176, ty),
+             (F2 + 0.270, 0.136, 0.122, bx + 0.196, ty),
+             (F2 + 0.345, 0.172, 0.152, bx + 0.212, ty),
+             (F2 + 0.396, 0.192, 0.168, bx + 0.218, ty),
+             (F2 + 0.412, 0.190, 0.166, bx + 0.218, ty),
+             (F2 + 0.404, 0.170, 0.146, bx + 0.216, ty),
+             (F2 + 0.340, 0.152, 0.130, bx + 0.212, ty),
+             (F2 + 0.270, 0.112, 0.094, bx + 0.202, ty),
+             (F2 + 0.215, 0.062, 0.052, bx + 0.192, ty)]
+    bm_loft(kit.bm(WHITEGOODS, 0.004), rings, seg=20, power=2.5)
+
+    # The spigot into the wall behind it. The pan's foot stands 5 cm clear of
+    # the tiling, as a floor-standing pan does, and the soil pipe crosses that
+    # gap — which is the detail that tells you the thing is plumbed in and not
+    # just set down on the floor.
+    kit.span(WHITEGOODS, bx - 0.01, bx + 0.16, ty - 0.062, ty + 0.062,
+             F2 + 0.06, F2 + 0.28, bev=0.02)
+
+    # The seat, down, and the two hinge lugs at the back of it.
+    _oval_band(kit.bm((0.935, 0.932, 0.918), 0.004), F2 + 0.414, F2 + 0.446,
+               (0.188, 0.164, bx + 0.216, ty),
+               (0.126, 0.104, bx + 0.238, ty), seg=24, power=2.6)
+    for dy in (-0.058, 0.058):
+        kit.span(CHROME, bx + 0.030, bx + 0.070, ty + dy - 0.016,
+                 ty + dy + 0.016, F2 + 0.412, F2 + 0.452, bev=0.006)
+
+    # The cistern, close-coupled: it sits down on the shelf at the back of the
+    # pan rather than hanging on the wall, and its lid overhangs it all round.
+    kit.span(WHITEGOODS, bx, bx + 0.19, ty - 0.185, ty + 0.185,
+             F2 + 0.400, F2 + 0.860, bev=0.022)
+    kit.span(WHITEGOODS, bx - 0.008, bx + 0.204, ty - 0.196, ty + 0.196,
+             F2 + 0.860, F2 + 0.896, bev=0.014)
+    # Dual flush. Two buttons, and the big one is the far one.
+    for dy, r in ((-0.048, 0.030), (0.046, 0.022)):
+        bm_cylinder(kit.bm(CHROME, 0.003), bx + 0.098, ty + dy,
+                    F2 + 0.888, F2 + 0.908, r, r * 0.94, seg=12)
+
+
 def bathroom(kit):
     """Two forty-five by one sixty-five, a box in the north-west corner of the
     big room. Door in the east wall hard against the north side, window high in
@@ -1237,14 +1321,7 @@ def bathroom(kit):
     # WC against the west wall, directly under the window, with the shower on
     # one side of it and the basin round the corner on the other.
     ty = y0 + 1.09
-    kit.span(WHITEGOODS, x0 + 0.07, x0 + 0.35, ty - 0.19, ty + 0.19,
-             F2 + 0.02, F2 + 0.42, bev=0.03)
-    kit.span(WHITEGOODS, x0 + 0.11, x0 + 0.49, ty - 0.20, ty + 0.20,
-             F2 + 0.36, F2 + 0.44, bev=0.05)
-    kit.span((0.84, 0.84, 0.83), x0 + 0.12, x0 + 0.48, ty - 0.19, ty + 0.19,
-             F2 + 0.44, F2 + 0.465, bev=0.02)
-    kit.span(WHITEGOODS, x0 + 0.07, x0 + 0.25, ty - 0.20, ty + 0.20,
-             F2 + 0.42, F2 + 0.86, bev=0.02)
+    _wc(kit, x0 + 0.07, ty)
     # The sill under the window is a shelf, and in the photograph it has four
     # bottles on it.
     kit.span(TILE_WALL, x0 + 0.07, x0 + 0.21, W_BATH_W[0], W_BATH_W[1],
@@ -1292,12 +1369,12 @@ def bathroom(kit):
     kit.span((0.90, 0.90, 0.88), wx + 0.32, wx + 0.48, y1 - 0.11, y1 - 0.04,
              F2 + 0.90, F2 + 1.23, bev=0.006)
 
-    # And the floor of it is not clear, because nobody's is: a bucket by the
-    # shower and a bottle of something pink beside the unit.
-    bm_cylinder(kit.bm((0.20, 0.55, 0.52), 0.006), x0 + 0.40, y0 + 1.02,
-                F2 + 0.02, F2 + 0.26, 0.14, 0.17, seg=14)
-    bm_cylinder(kit.bm((0.88, 0.34, 0.56), 0.004), wx + 0.30, y1 - 0.62,
-                F2 + 0.02, F2 + 0.28, 0.045, 0.045, seg=10)
+    # There used to be two things on the floor, on the principle that nobody's
+    # bathroom floor is clear. One was a bucket, and it was standing exactly
+    # where the lavatory is, so it read as a teal drum sat in the pan. The
+    # other was a pink bottle in the middle of the open floor with nothing
+    # near it, which is not clutter, it is litter. The cobalt tiling is better
+    # off bare.
     ceiling_light(kit, (x0 + x1) / 2, (y0 + y1) / 2, dome=True)
 
 

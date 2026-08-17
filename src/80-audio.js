@@ -1296,7 +1296,12 @@ function buildAudio() {
    */
   function klapa(d, inside) {
     if (!ctx || dead) return;
-    if (d == null || d > KLAPA.fade) {
+    // `!(d <= fade)` rather than `d > fade`, because NaN fails both comparisons
+    // and would otherwise fall through to the gain ramp below — and a non-finite
+    // value handed to setTargetAtTime throws, inside the frame callback, which
+    // stops the render loop dead. Whatever produced the NaN, silence is the
+    // right answer to it.
+    if (d == null || !(d <= KLAPA.fade)) {
       if (klapaNodes) klapaNodes.g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.9);
       return;
     }
