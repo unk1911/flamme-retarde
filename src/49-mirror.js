@@ -237,7 +237,11 @@ function bathMirror(vik) {
   const b = plan.rooms && plan.rooms.bath;
   if (!b || !vik.root) return null;
 
-  const x0 = b.x0 + 0.56, x1 = b.x0 + 1.16;
+  // Tracks the baked glass in bathroom(): the vanity sits at x0 + 1.30 and the
+  // mirror is drawn from vx - 0.02 to vx + 0.58. Both moved east together when
+  // the basin and the washing machine swapped walls; a reflector left behind
+  // would be a rectangle of hall floating on bare tile.
+  const x0 = b.x0 + 1.28, x1 = b.x0 + 1.88;
   const y0 = plan.floor + 1.20, y1 = plan.floor + 1.84;
   const z = b.z0 + 0.0315;              // 1.5 mm proud of the baked slab
 

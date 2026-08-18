@@ -629,14 +629,21 @@ def _rot_x(verts, cx, cy, cz):
         v.co = (cx + x, cy + z, cz - y)
 
 
-def door_case(kit, axis, at, hole, base=F2, thick=INT, colour=PINE):
+def door_case(kit, axis, at, hole, base=F2, thick=INT, colour=PINE,
+              sides=(-1, 1)):
     """Pine architrave both sides of an opening — the detail that dates the
-    flat, and the warmest thing in every photograph."""
+    flat, and the warmest thing in every photograph.
+
+    Both sides is the default and is right for a door between two painted
+    rooms. It is wrong for a door into a tiled one: tile is set out to die into
+    the reveal, and nobody then screws a softwood strip over the tile they just
+    cut. `sides` takes the outward normals to keep — (1,) for the +axis side
+    only, which here means the hall."""
     a0, a1, z0, z1 = hole
     z0 += base
     z1 += base
     reveal(kit, axis, at, a0, a1, z0, z1, thick, colour=colour, bev=0.008)
-    for out in (-1, 1):
+    for out in sides:
         d0 = out * (thick / 2)
         d1 = out * (thick / 2 + 0.020)
         for p, q in ((a0 - 0.065, a0), (a1, a1 + 0.065)):
@@ -646,7 +653,8 @@ def door_case(kit, axis, at, hole, base=F2, thick=INT, colour=PINE):
                                      z1, z1 + 0.065, d0, d1), bev=0.004)
 
 
-def slider(kit, axis, at, hole, base=F2, thick=INT, slide=1.0, open_frac=1.0):
+def slider(kit, axis, at, hole, base=F2, thick=INT, slide=1.0,
+           open_frac=1.0, sides=(-1, 1)):
     """A flush ply leaf on an exposed top track, parked to one side.
 
     Two of the three internal doors here are these. They are hung outside the
@@ -655,7 +663,7 @@ def slider(kit, axis, at, hole, base=F2, thick=INT, slide=1.0, open_frac=1.0):
     a0, a1, z0, z1 = hole
     z0 += base
     z1 += base
-    door_case(kit, axis, at, hole, base, thick)
+    door_case(kit, axis, at, hole, base, thick, sides=sides)
     w = a1 - a0 + 0.09
     off = slide * (w * open_frac + 0.03)
     p0 = a0 - 0.045 + off
@@ -833,7 +841,9 @@ def shell(kit):
     leaf_door(kit, "y", X1 - EXT / 2, D_ENTRY, glazed=True)
     slider(kit, "x", SPINE, D_S4, thick=INT * 2, slide=-1.0, open_frac=0.80)
     door_case(kit, "x", SPINE, D_S3, thick=INT * 2)
-    slider(kit, "y", BATH_E, D_BATH, thick=INT, slide=-1.0, open_frac=0.88)
+    # Hall side only. The bathroom side of this opening is tile.
+    slider(kit, "y", BATH_E, D_BATH, thick=INT, slide=-1.0, open_frac=0.88,
+           sides=(1,))
     terrace_doors(kit)
 
     # ── windows ─────────────────────────────────────────────────────────────
@@ -1065,8 +1075,12 @@ def starlink(kit, px, py, top):
     bm_cylinder(kit.bm(black, 0.002), X1 - EXT / 2 - 0.05, py + 0.02,
                 F2 + 0.30, top - 0.12, 0.007, 0.007, seg=8)
 
+    # The arm used to start 28 cm up the lean, which is 28 cm above nothing:
+    # the mast stops at top + 0.30 and the arm began at roughly top + 0.49, so
+    # the dish hung in the air over a stub with a hand's width of sky between
+    # them. It now starts at the lean origin, where the mast is.
     for name, colour, box in (
-            ("starlink_arm", black, (0, 0, 0.42, 0.048, 0.048, 0.28)),
+            ("starlink_arm", black, (0, 0, 0.28, 0.048, 0.048, 0.56)),
             ("starlink_dish", pale, (0, 0, 0.815, 0.305, 0.026, 0.510))):
         bm = bmesh.new()
         vs = bm_box(bm, box[0], box[1], box[2], box[3], box[4], box[5])
@@ -1090,8 +1104,14 @@ def starlink(kit, px, py, top):
 # --------------------------------------------------------------------------- #
 
 def kitchen(kit):
-    """Along the south face of the bathroom box, exactly as drawn: sink at the
-    west end under the window, then the worktop, then the hob."""
+    """Along the south face of the bathroom box: three cupboard doors with the
+    sink centred over them, then the free-standing cooker at the east end.
+
+    The sink used to sit hard against the west return, which read as an
+    accident rather than a layout — the bowl was crammed into the corner with
+    a metre and a half of empty worktop beside it. It is now centred on the
+    cabinet run, meaning the part of the run you can actually see, which stops
+    where the cooker starts and not at the notional end of the carcass."""
     x0, x1, y0, y1 = ROOMS["kitchen"]
     top = F2 + 0.90
     run0, run1 = x0 + 0.02, x0 + 2.30
@@ -1106,7 +1126,10 @@ def kitchen(kit):
     # the tap was over at the front edge pointing the wrong way, and which is
     # unmissable the moment the tap is where a tap goes: a mixer reaching out
     # over an unbroken white plane.
-    bx0, bx1 = run0 + 0.08, run0 + 0.58
+    # Centred on the visible cabinetry (run0 to the cooker at run1 - 0.66),
+    # not on the carcass, whose last 66 cm is behind the cooker.
+    sink_c = (run0 + (run1 - 0.66)) / 2
+    bx0, bx1 = sink_c - 0.25, sink_c + 0.25
     by0, by1 = y1 - 0.54, y1 - 0.10
     for a0, a1, b0, b1 in ((run0 - 0.02, bx0, y1 - 0.63, y1),
                            (bx1, run1 + 0.02, y1 - 0.63, y1),
@@ -1141,7 +1164,7 @@ def kitchen(kit):
 
     # And the bowl itself, open at the top: a floor and four sides rather than a
     # solid, because a sink is a hole.
-    sx = run0 + 0.08
+    sx = bx0
     STEEL_S = (0.72, 0.73, 0.74)
     kit.span(STEEL_S, bx0, bx1, by0, by1, top - 0.17, top - 0.152, bev=0.004)
     for a0, a1, b0, b1 in ((bx0, bx0 + 0.018, by0, by1),
@@ -1340,9 +1363,9 @@ def _wc(kit, bx, ty):
 def bathroom(kit):
     """Two forty-five by one sixty-five, a box in the north-west corner of the
     big room. Door in the east wall hard against the north side, window high in
-    the west wall at the far end, and everything in it at that far end: shower
-    in the south-west corner, WC against the west wall under the window, basin
-    round the corner on the north wall beside it.
+    the west wall at the far end: shower in the south-west corner, WC against
+    the west wall under the window, basin round the corner in the middle of the
+    north wall, washing machine on the south wall by the door.
 
     That is what the photograph shows and it is not what this used to draw,
     which had the shower and the WC swapped and the basin and a washing machine
@@ -1399,8 +1422,12 @@ def bathroom(kit):
                     W_BATH_W[0] + 0.12 + i * 0.17,
                     F2 + 1.40, F2 + 1.40 + h, 0.025, 0.022, seg=8)
 
-    # Basin on the north wall in the far corner, mirror over it.
-    vx = x0 + 0.58
+    # Basin on the north wall, mirror over it. It used to be jammed into the
+    # far corner beside the WC with the washing machine sitting between it and
+    # the door — so you came in, squeezed past a white box, and washed your
+    # hands in the corner. The two have swapped: the basin takes the middle of
+    # the north wall, which is where you can stand in front of it.
+    vx = x0 + 1.30
     kit.span(WHITEGOODS, vx, vx + 0.56, y1 - 0.42, y1 - 0.02, F2 + 0.04,
              F2 + 0.78, bev=0.006)
     kit.span(WHITEGOODS, vx - 0.04, vx + 0.62, y1 - 0.48, y1, F2 + 0.78,
@@ -1416,23 +1443,27 @@ def bathroom(kit):
     kit.span(CHROME, vx - 0.06, vx + 0.62, y1 - 0.20, y1 - 0.02,
              F2 + 1.16, F2 + 1.19, bev=0.004)
 
-    # The white unit that stands against the north wall halfway down the room,
-    # and the towel rail in front of it.
-    wx = x0 + 1.30
-    kit.span(WHITEGOODS, wx, wx + 0.58, y1 - 0.44, y1 - 0.02, F2 + 0.02,
+    # The white unit, and the towel rail in front of it, against the south
+    # wall at the door end — the opposite wall, and the one run in this room
+    # with nothing else on it. It used to stand on the north wall between the
+    # basin and the door, which put a white box in the only place you could
+    # have stood to use the basin. Every `y1 - d` below now reads `y0 + d`:
+    # the same distance, measured off the other face.
+    wx = x1 - 0.72
+    kit.span(WHITEGOODS, wx, wx + 0.58, y0 + 0.02, y0 + 0.44, F2 + 0.02,
              F2 + 0.86, bev=0.008)
-    kit.span((0.82, 0.82, 0.81), wx + 0.02, wx + 0.56, y1 - 0.46, y1 - 0.44,
+    kit.span((0.82, 0.82, 0.81), wx + 0.02, wx + 0.56, y0 + 0.44, y0 + 0.46,
              F2 + 0.74, F2 + 0.84, bev=0.004)
-    kit.span((0.86, 0.87, 0.88), wx - 0.02, wx + 0.60, y1 - 0.47, y1,
+    kit.span((0.86, 0.87, 0.88), wx - 0.02, wx + 0.60, y0, y0 + 0.47,
              F2 + 0.86, F2 + 0.90, bev=0.008)
     for c in (wx + 0.10, wx + 0.48):
-        bm_cylinder(kit.bm(CHROME, 0.002), c, y1 - 0.06, F2 + 1.10, F2 + 1.24,
+        bm_cylinder(kit.bm(CHROME, 0.002), c, y0 + 0.06, F2 + 1.10, F2 + 1.24,
                     0.012, 0.012, seg=8)
-    kit.span(CHROME, wx + 0.08, wx + 0.50, y1 - 0.09, y1 - 0.03,
+    kit.span(CHROME, wx + 0.08, wx + 0.50, y0 + 0.03, y0 + 0.09,
              F2 + 1.22, F2 + 1.25, bev=0.004)
-    kit.span((0.42, 0.72, 0.46), wx + 0.12, wx + 0.30, y1 - 0.11, y1 - 0.04,
+    kit.span((0.42, 0.72, 0.46), wx + 0.12, wx + 0.30, y0 + 0.04, y0 + 0.11,
              F2 + 0.86, F2 + 1.23, bev=0.006)
-    kit.span((0.90, 0.90, 0.88), wx + 0.32, wx + 0.48, y1 - 0.11, y1 - 0.04,
+    kit.span((0.90, 0.90, 0.88), wx + 0.32, wx + 0.48, y0 + 0.04, y0 + 0.11,
              F2 + 0.90, F2 + 1.23, bev=0.006)
 
     # There used to be two things on the floor, on the principle that nobody's
@@ -1674,7 +1705,6 @@ def living(kit):
     for j in range(3):
         kit.span((0.86, 0.86, 0.85), -0.77, -0.15, y0 + 0.44, y0 + 0.455,
                  F2 + 0.06 + j * 0.25, F2 + 0.26 + j * 0.25, bev=0.006)
-    vacuum(kit, x1 - 0.42, -2.95, F2)
     kit.span(TEAL, 1.60, 2.60, -0.30, 0.50, F2 + 0.010, F2 + 0.022, bev=0.004)
     pictures(kit)
     ceiling_light(kit, 1.35, -0.55)
