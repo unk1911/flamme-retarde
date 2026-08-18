@@ -1805,10 +1805,20 @@ async function buildGround(scene, field) {
       gait: +you.gait.toFixed(2), bob: +you.bob.toFixed(3),
       sp: +Math.hypot(you.vx, you.vz).toFixed(2),
     }),
-    /** For the screenshot tool: stand somewhere specific and look somewhere specific. */
-    put(x, z, yaw, pitch = 0) {
+    /**
+     * For the screenshot tool: stand somewhere specific and look somewhere
+     * specific.
+     *
+     * `yHint` is which storey. Without it `walkY` is asked cold and answers
+     * with the highest floor it can find, which is right for a parachute and
+     * wrong for the vikendica now that there is a flat under the flat: every
+     * attempt to stand in the prizemlje put the camera in the room 2.90 m
+     * above it. Pass roughly the height you mean and the same step rule that
+     * governs walking picks the floor.
+     */
+    put(x, z, yaw, pitch = 0, yHint = null) {
       const [px2, pz2] = confine(x, z);
-      you.x = px2; you.z = pz2; you.y = field.walkY(px2, pz2);
+      you.x = px2; you.z = pz2; you.y = field.walkY(px2, pz2, yHint);
       you.yaw = yaw; you.pitch = pitch;
     },
     /**

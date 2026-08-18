@@ -82,6 +82,7 @@ WALNUT = (0.300, 0.170, 0.082)      # the wardrobe, the bed, the daybed frames
 BEECH = (0.660, 0.470, 0.280)
 
 TILE_FLOOR = (0.072, 0.132, 0.318)  # bathroom, deep cobalt
+TILE_HALL = (0.098, 0.116, 0.205)   # prizemlje: the 30 cm indigo, hall and kitchen
 TILE_DEEP = (0.085, 0.150, 0.330)   # the darker ones set into the walls
 # Wall tiling. It was 0.900, which is within a thousandth of the white of a
 # lavatory, and the two are not the same colour in any bathroom on earth: glazed
@@ -162,6 +163,7 @@ KNEE = 0.60                # what the renovation is allowed to add. All of it.
 
 EXT = 0.20
 INT = 0.10
+PW_KIT = 0.25            # the kitchen's south wall downstairs, the one thick one
 
 X0, X1 = -3.39, 3.39       # 678 across, the ridge direction
 Y0, Y1 = -3.865, 3.865     # 773 deep
@@ -209,6 +211,80 @@ W_BATH_W = (-0.24, 0.36, 1.40, 2.05)         # the bathroom, high, over the WC
 # windows on two walls when it has one, on the east, looking down the lane.
 # Neither W_S4_N above nor W_N was ever there; both are drawings of a house
 # with more openings in it than this one has.
+
+# --------------------------------------------------------------------------- #
+#  prizemlje — the storey below                                                #
+# --------------------------------------------------------------------------- #
+# Off TLOCRT PRIZEMLJA at 1:100. The paper has a fold running down the middle
+# of the drawing which shifts content by twelve to fifteen centimetres at that
+# scale, so nothing here was measured off pixels: the layout was solved from
+# the four printed dimension chains, each of which sums exactly to 678 or 773,
+# against the scheduled areas, and then corrected on 18 August against a print
+# marked up on site — red for doors, yellow for water, orange for the WC,
+# purple for the true window positions.
+#
+# Same origin and the same axes as the floor above. The two drawings share a
+# footprint, so a number here is directly comparable with the number in the
+# same place upstairs, and the west face steps 70 cm east at BY1 on both
+# storeys — which is the one independent check that the whole east-west
+# setting-out is right.
+
+# The drawing gives terrace 8 at minus twenty and calls the flat zero, which is
+# a level datum and not a height above anything. Outside, the runtime stands
+# this house on made ground: `base` in src/44-vikendica.js is the promenade
+# less VIK.sink, so the promenade surface sits at +0.10 in these coordinates. A
+# ground floor at 0.00 is therefore ten centimetres *under* the concrete you
+# walk in off, and every square metre of it renders as beach — which is exactly
+# what it did the first time it was drawn.
+#
+# Putting the flat at +0.30 puts terrace 8 at +0.10, flush with the promenade,
+# and the 20 cm the drawing asks for between the two becomes the step over the
+# threshold. The clear height falls out of the same section and is no longer a
+# guess: 2.68 to the slab soffit, less 0.30, is 2.38 — within two centimetres
+# of the storey above, which is what you would expect of one pour.
+P_FL = 0.30                  # finished floor of the flat
+P_CEIL = F2 - 0.22           # the underside of the slab above: 2.38 clear
+P_TER = P_FL - 0.20          # terrace 8, one step down, as the drawing says
+
+# Wall centrelines. The faces are the surveyed numbers; these are the middles.
+P_CROSS = -0.475             # the cross wall, full width, 20
+P_SPINE = 0.32               # north-south, 10, below the kitchen
+P_SPINE_N = 0.37             # ... and 20 where it divides the kitchen from 7
+P_BATH_E = -0.90             # the bathroom's east wall, 10
+P_KIT_S = 2.04               # the kitchen's south wall, 25 — the thick one
+P_TER_S = 2.075              # the rear terrace's south wall, 20
+
+P_ROOMS = {
+    "boravak": (IX0, P_SPINE - INT / 2, IY0, P_CROSS - EXT / 2),
+    # 2 is an L and is kept as two rectangles, for the same reason the big room
+    # upstairs is: floors, skirtings and blockers all want rectangles.
+    "kupS": (IX0, P_BATH_E - INT / 2, P_CROSS + EXT / 2, BY1),
+    "kupN": (NIX0, P_BATH_E - INT / 2, BY1, P_KIT_S - PW_KIT / 2),
+    "soba3d": (P_SPINE + INT / 2, IX1, IY0, P_CROSS - EXT / 2),
+    "soba4d": (P_SPINE + INT / 2, IX1, P_CROSS + EXT / 2, P_TER_S - EXT / 2),
+    "hodnik": (P_BATH_E + INT / 2, P_SPINE - INT / 2,
+               P_CROSS + EXT / 2, P_KIT_S - PW_KIT / 2),
+    "kuhinja": (NIX0, P_SPINE_N - EXT / 2, P_KIT_S + PW_KIT / 2, IY1),
+    "straga": (P_SPINE_N + EXT / 2, IX1, P_TER_S + EXT / 2, IY1),
+}
+
+# Openings, as (a0, a1, z0, z1) above the ground floor.
+PD_TERR = (-2.76, -0.56, 0.0, 2.10)      # south wall, 220 — and the front door
+# 85 clear, like every internal opening upstairs. The drawing reads 70 to 75 at
+# the scale it is printed at, which is a 70 leaf in an 85 structural opening —
+# and 85 is also what the walking model needs: it holds you 26 cm off a wall
+# face, so a 70 hole leaves 18 cm to thread and a doorway becomes a puzzle.
+PD_S3 = (-2.30, -1.45, 0.0, DOOR_H)      # 3 opens off the living room
+PD_S4 = (-0.375, 0.475, 0.0, DOOR_H)     # 4 off the hall
+PD_BATH = (-0.40, 0.45, 0.0, DOOR_H)     # 2 off the hall, and it slides
+PD_KIT = (-0.58, 0.27, 0.0, 2.10)        # 6 off the hall, 85 and open
+PD_HALL = (-0.60, 0.20, 0.0, 2.10)       # 5 into 1, open: the drawn door is out
+PD_TER7 = (2.20, 3.05, 0.0, DOOR_H)      # 6 out on to the rear terrace
+
+PW_S3_S = (1.44, 2.64, 1.00, 2.05)       # soba 3, south
+PW_S4_E = (0.23, 1.43, 1.00, 2.05)       # soba 4, east — purple, north of centre
+PW_KIT_N = (-1.64, -0.39, 1.20, 2.05)    # the kitchen, north, over the sink run
+PW_BATH_W = (-0.05, 0.45, 1.40, 2.05)    # the bathroom, west, over the WC
 
 # The terrace: the full width of the house, 220 deep, on the south.
 TER_Y0, TER_Y1 = Y0 - 2.20, Y0
@@ -721,49 +797,11 @@ def leaf_door(kit, axis, at, hole, base=F2, thick=EXT, colour=WHITEGOODS,
 # --------------------------------------------------------------------------- #
 
 def shell(kit):
-    # ── the storey below, closed ────────────────────────────────────────────
-    # There is a whole flat down there — TLOCRT PRIZEMLJA, 41.94 m², two more
-    # bedrooms and a second bathroom — and none of it is modelled yet. What is
-    # here is its outside: four rendered walls, the openings off the elevations
-    # and the terrace slab the upper terrace stands on.
-    kit.span(PLINTH, X0 - 0.06, X1 + 0.06, Y0 - 0.06, Y1 + 0.06,
-             GRADE - 0.35, GRADE + 0.25, bev=0.03)
-    ground = {
-        "south": [(-2.60, -0.40, 0.30, 2.35), (0.60, 1.60, 1.10, 2.05)],
-        "north": [(-0.40, 0.40, 1.10, 2.05)],
-        "west": [(-2.40, -1.50, 1.10, 2.05), (0.60, 1.50, 1.10, 2.05)],
-        # Nothing on the east. There was a door here, under the outside stair,
-        # and it is not on the building: the east face at ground level is blind
-        # render from the corner to the terrace, and a door there would open
-        # into the underside of a flight of steps.
-        "east": [],
-    }
-    for key, axis, at, a0, a1 in (
-        ("south", "x", Y0 + EXT / 2, X0, X1),
-        ("north", "x", Y1 - EXT / 2, X0, X1),
-        ("west", "y", X0 + EXT / 2, Y0, Y1),
-        ("east", "y", X1 - EXT / 2, Y0, Y1),
-    ):
-        hs = [(h[0], h[1], GRADE + h[2], GRADE + h[3]) for h in ground[key]]
-        wall(kit, RENDER, axis, at, a0, a1, EXT, GRADE + 0.20, F2 - 0.22,
-             holes=hs)
-        for h in ground[key]:
-            if h[3] - h[2] > 1.9:
-                leaf_door(kit, axis, at, h, base=GRADE, glazed=False,
-                          colour=PINE)
-            else:
-                window(kit, axis, at, h, GRADE, curtain_c=None)
-    # The structural slab, and its top is *not* at F2 — F2 is where the finish
-    # is. It used to be, and the top face of this and the top face of every
-    # tile and floorboard in the house were then the same plane, which is a
-    # z-fight across the whole storey. It went unseen for as long as it did
-    # because the living room and the kitchen are laid in a cream ceramic and
-    # CONCRETE is very nearly that colour, so the fight was two shades of the
-    # same thing. The bathroom is cobalt. There it read as a blue and white
-    # chequer that changed as you walked, which is not a floor anybody has.
-    # The terrace next door had always done this properly; now so does this.
-    kit.span(CONCRETE, X0 - 0.05, X1 + 0.05, Y0 - 0.05, Y1 + 0.05,
-             F2 - 0.22, F2 - 0.032, bev=0.02)
+    # ── the storey below ────────────────────────────────────────────────────
+    # There is a whole flat down there — TLOCRT PRIZEMLJA, 41.94 m² — and it
+    # was, for a long time, four rendered walls with the openings guessed off
+    # the elevations. It is drawn now. See `prizemlje`.
+    prizemlje(kit)
 
     # ── the upper storey ────────────────────────────────────────────────────
     # The north half is set back 70 cm on the west, so the west face is two
@@ -866,27 +904,159 @@ def shell(kit):
     bedroom_west(kit)
 
 
-def terrace_doors(kit):
+def prizemlje(kit):
+    """The storey below: 41.94 m², six rooms, a rear terrace and the front
+    door. Everything here is off TLOCRT PRIZEMLJA and the marked-up print.
+
+    It used to be a closed box with four invented openings punched in it, put
+    there so the elevations would not read as blind render. None of them was on
+    the building. The real ones are: a 220 opening on the south, which is how
+    you get in — there is no door to the lane at this level and never was —
+    a window each to soba 3 and soba 4, one over the kitchen sink, and one high
+    in the west wall over the WC.
+    """
+    # A base course round the foot of the walls, and a ring rather than the
+    # solid block it used to be. A block is invisible while the storey it is
+    # under is closed; the moment there is a floor in there it is a 25 cm kerb
+    # standing proud of it across all forty-two square metres.
+    for a0, a1, b0, b1 in ((X0 - 0.06, X1 + 0.06, Y0 - 0.06, Y0 + 0.20),
+                           (X0 - 0.06, X1 + 0.06, Y1 - 0.20, Y1 + 0.06),
+                           (X0 - 0.06, X0 + 0.20, Y0 + 0.20, Y1 - 0.20),
+                           (X1 - 0.20, X1 + 0.06, Y0 + 0.20, Y1 - 0.20)):
+        kit.span(PLINTH, a0, a1, b0, b1, GRADE - 0.35, P_FL - 0.04, bev=0.03)
+
+    # ── the outside walls, and the paint on the inside of them ──────────────
+    ext = {
+        "south": ("x", Y0 + EXT / 2, X0, X1, [PD_TERR, PW_S3_S]),
+        "north": ("x", Y1 - EXT / 2, NX0, X1, [PW_KIT_N]),
+        "westS": ("y", X0 + EXT / 2, Y0, BY1, [PW_BATH_W]),
+        "westN": ("y", NX0 + EXT / 2, BY0, Y1, []),
+        "east": ("y", X1 - EXT / 2, Y0, Y1, [PW_S4_E]),
+    }
+    for axis, at, a0, a1, holes in ext.values():
+        hs = [(h[0], h[1], P_FL + h[2], P_FL + h[3]) for h in holes]
+        wall(kit, RENDER, axis, at, a0, a1, EXT, P_FL - 0.02, P_CEIL, holes=hs)
+    wall(kit, RENDER, "x", BY1 - EXT / 2, X0, NX0 + EXT, EXT, P_FL - 0.02,
+         P_CEIL)
+
+    inner = {
+        "south": ("x", IY0 + 0.02, IX0 - 0.10, IX1 + 0.10, [PD_TERR, PW_S3_S]),
+        "north": ("x", IY1 - 0.02, NIX0 - 0.10, IX1 + 0.10, [PW_KIT_N]),
+        "westS": ("y", IX0 + 0.02, IY0 - 0.10, BY1, [PW_BATH_W]),
+        "westN": ("y", NIX0 + 0.02, BY0, IY1 + 0.10, []),
+        "east": ("y", IX1 - 0.02, IY0 - 0.10, IY1 + 0.10, [PW_S4_E]),
+    }
+    for axis, at, a0, a1, holes in inner.values():
+        hs = [(h[0] - 0.01, h[1] + 0.01, P_FL + h[2] - 0.01, P_FL + h[3] + 0.01)
+              for h in holes]
+        wall(kit, WALL, axis, at, a0, a1, 0.04, P_FL, P_CEIL, holes=hs,
+             bev=0.004)
+    wall(kit, WALL, "x", BY1 - 0.02, X0, NIX0, 0.04, P_FL, P_CEIL, bev=0.004)
+
+    # ── the partitions ──────────────────────────────────────────────────────
+    # The cross wall runs the full width with one opening in it, and the
+    # opening has no door: the drawn one is struck out on the marked-up print,
+    # so the hall runs straight into the living room.
+    wall(kit, WALL, "x", P_CROSS, IX0, IX1, EXT, P_FL, P_CEIL,
+         holes=[(PD_HALL[0], PD_HALL[1], P_FL + PD_HALL[2],
+                 P_FL + PD_HALL[3])])
+    # The spine, in two thicknesses. Ten below, where it only divides rooms;
+    # twenty at the top, where it is the wall between a room and the weather.
+    for a0, a1, holes in ((IY0, P_CROSS, [PD_S3]),
+                          (P_CROSS, P_KIT_S, [PD_S4])):
+        wall(kit, WALL, "y", P_SPINE, a0, a1, INT, P_FL, P_CEIL,
+             holes=[(h[0], h[1], P_FL + h[2], P_FL + h[3]) for h in holes])
+    wall(kit, RENDER, "y", P_SPINE_N, P_TER_S, IY1, EXT, P_FL, P_CEIL,
+         holes=[(PD_TER7[0], PD_TER7[1], P_FL + PD_TER7[2],
+                 P_FL + PD_TER7[3])])
+    wall(kit, WALL, "y", P_BATH_E, P_CROSS, P_KIT_S, INT, P_FL, P_CEIL,
+         holes=[(PD_BATH[0], PD_BATH[1], P_FL + PD_BATH[2],
+                 P_FL + PD_BATH[3])])
+    # The kitchen's south wall is the one thick partition in the flat, 25, and
+    # the 85 opening is at its east end where it meets the hall.
+    wall(kit, WALL, "x", P_KIT_S, NIX0, P_SPINE_N - EXT / 2, PW_KIT,
+         P_FL, P_CEIL,
+         holes=[(PD_KIT[0], PD_KIT[1], P_FL + PD_KIT[2], P_FL + PD_KIT[3])])
+    wall(kit, RENDER, "x", P_TER_S, P_SPINE_N - EXT / 2, IX1, EXT,
+         P_FL, P_CEIL)
+
+    # ── floors, and the ceiling ─────────────────────────────────────────────
+    # The slab, its top 2 cm below the finish for the same reason the one above
+    # it is: a floor and its slab in the same plane is a z-fight the width of
+    # the storey.
+    kit.span(CONCRETE, X0 - 0.05, X1 + 0.05, Y0 - 0.05, Y1 + 0.05,
+             P_FL - 0.30, P_FL - 0.02, bev=0.02)
+    for name in ("boravak", "soba3d", "soba4d"):
+        planks(kit, *P_ROOMS[name], P_FL)
+    for name in ("hodnik", "kuhinja"):
+        floor_tiles(kit, *P_ROOMS[name], P_FL, size=0.30, colour=TILE_HALL)
+    for name in ("kupS", "kupN"):
+        floor_tiles(kit, *P_ROOMS[name], P_FL, size=0.20, colour=TILE_FLOOR)
+    floor_tiles(kit, *P_ROOMS["straga"], P_FL, size=0.33, colour=TERRAZZO)
+    kit.span(CEIL, IX0, IX1, IY0, IY1, P_CEIL - 0.02, P_CEIL, bev=0.004)
+
+    # ── the openings, filled ────────────────────────────────────────────────
+    terrace_doors(kit, base=P_FL, hole=PD_TERR)
+    door_case(kit, "y", P_SPINE, PD_S3, base=P_FL, thick=INT)
+    door_case(kit, "y", P_SPINE, PD_S4, base=P_FL, thick=INT)
+    door_case(kit, "y", P_SPINE_N, PD_TER7, base=P_FL, thick=EXT)
+    door_case(kit, "x", P_KIT_S, PD_KIT, base=P_FL, thick=PW_KIT)
+    door_case(kit, "x", P_CROSS, PD_HALL, base=P_FL, thick=EXT)
+    # Bathroom to hall slides, exactly as it does on the floor above, and for
+    # the same reason: a 112 hall cannot take a leaf swinging into it.
+    slider(kit, "y", P_BATH_E, PD_BATH, base=P_FL, thick=INT, slide=-1.0,
+           open_frac=0.86, sides=(1,))
+
+    window(kit, "x", Y0 + EXT / 2, PW_S3_S, P_FL, curtain_c=SHEER)
+    window(kit, "x", Y1 - EXT / 2, PW_KIT_N, P_FL, curtain_c=SHEER)
+    window(kit, "y", X0 + EXT / 2, PW_BATH_W, P_FL, curtain_c=None)
+    window(kit, "y", X1 - EXT / 2, PW_S4_E, P_FL, curtain_c=SHEER)
+
+    # ── terrasa 8, at minus twenty ──────────────────────────────────────────
+    # The slab the upper terrace stands over. Its piers are already there and
+    # the drawing puts its finish one step below the flat, which is why the
+    # front door has a threshold and not a ramp.
+    kit.span(CONCRETE, X0, X1, TER_Y0, TER_Y1, P_TER - 0.22, P_TER - 0.02,
+             bev=0.02)
+    floor_tiles(kit, X0 + 0.02, X1 - 0.02, TER_Y0 + 0.02, TER_Y1, P_TER,
+                size=0.33, colour=TERRAZZO)
+
+    for name in ("boravak", "soba3d", "soba4d", "hodnik", "kuhinja"):
+        x0, x1, y0, y1 = P_ROOMS[name]
+        ceiling_light(kit, (x0 + x1) / 2, (y0 + y1) / 2, z=P_CEIL - 0.02)
+    x0, x1, y0, y1 = P_ROOMS["kupS"]
+    ceiling_light(kit, (x0 + x1) / 2, y1 - 0.30, dome=True, z=P_CEIL - 0.02)
+
+
+def terrace_doors(kit, base=F2, hole=None, shutters=True):
     """The 220 opening on to the terrace: two glazed leaves, and folded back
-    outside them the louvred shutters that make the room stripey at four."""
-    a0, a1, z0, z1 = D_TERR
+    outside them the louvred shutters that make the room stripey at four.
+
+    The same pair, twice: this is the terrace opening upstairs and it is also
+    the front door downstairs, which is the same detail 2.90 m lower and 3.30
+    further west. `base` is the floor it stands on, `hole` its opening."""
+    a0, a1, z0, z1 = hole if hole is not None else D_TERR
     at = Y0 + EXT / 2
-    reveal(kit, "x", at, a0, a1, F2 + z0, F2 + z1, EXT, colour=WALL, floor=F2)
+    reveal(kit, "x", at, a0, a1, base + z0, base + z1, EXT, colour=WALL,
+           floor=base)
     for p, q in ((a0, (a0 + a1) / 2), ((a0 + a1) / 2, a1)):
         f = 0.055
-        kit.span(PINE, p, p + f, at - 0.035, at + 0.035, F2, F2 + z1, bev=0.004)
-        kit.span(PINE, q - f, q, at - 0.035, at + 0.035, F2, F2 + z1, bev=0.004)
-        kit.span(PINE, p, q, at - 0.035, at + 0.035, F2 + z1 - f, F2 + z1,
+        kit.span(PINE, p, p + f, at - 0.035, at + 0.035, base, base + z1,
                  bev=0.004)
-        kit.span(PINE, p, q, at - 0.030, at + 0.030, F2 + 0.02, F2 + 0.16,
+        kit.span(PINE, q - f, q, at - 0.035, at + 0.035, base, base + z1,
+                 bev=0.004)
+        kit.span(PINE, p, q, at - 0.035, at + 0.035, base + z1 - f, base + z1,
+                 bev=0.004)
+        kit.span(PINE, p, q, at - 0.030, at + 0.030, base + 0.02, base + 0.16,
                  bev=0.004)
         kit.span(GLASS, p + f, q - f, at - 0.007, at + 0.007,
-                 F2 + 0.16, F2 + z1 - f, bev=0.001)
+                 base + 0.16, base + z1 - f, bev=0.001)
     kit.span(CHROME, (a0 + a1) / 2 - 0.06, (a0 + a1) / 2 + 0.06,
-             at - 0.070, at - 0.030, F2 + 1.02, F2 + 1.10, bev=0.004)
-    for p, q in ((a0 - 0.72, a0 - 0.02), (a1 + 0.02, a1 + 0.72)):
-        louvred(kit, "x", at - EXT / 2 - 0.10, p, q, F2 + 0.05, F2 + z1,
-                open_to=-1)
+             at - 0.070, at - 0.030, base + 1.02, base + 1.10, bev=0.004)
+    if shutters:
+        for p, q in ((a0 - 0.72, a0 - 0.02), (a1 + 0.02, a1 + 0.72)):
+            louvred(kit, "x", at - EXT / 2 - 0.10, p, q, base + 0.05,
+                    base + z1, open_to=-1)
 
 
 def chimney(kit, top=CHIMNEY):
@@ -1734,10 +1904,16 @@ def bedroom_east(kit):
 
 
 def bedroom_west(kit):
-    """Soba 4, 7.69 m², with the bed against the west wall under its one
-    window. No room in this flat has two."""
+    """Soba 4, 7.69 m², bed head to the north wall. No room in this flat has
+    two windows.
+
+    It used to run east-west with its head under the west window, which put the
+    only opening in the room directly over the pillows: you lay with the
+    shutter at your ear and the light across your face. Turned a quarter clock-
+    wise it heads the north wall instead, the window falls beside the bed where
+    a window belongs, and the walk from the door up the west side is clear."""
     x0, x1, y0, y1 = ROOMS["soba4"]
-    bed(kit, x0 + 1.10, y1 - 1.20, yaw=0.0, w=1.40, l=1.98)
+    bed(kit, x0 + 0.76, y1 - 1.05, yaw=-math.pi / 2, w=1.40, l=1.98)
     kit.span(WALNUT, x1 - 0.46, x1 - 0.06, y1 - 0.52, y1 - 0.12, F2, F2 + 0.52,
              bev=0.006)
     kit.span(WALNUT, x1 - 0.62, x1 - 0.04, y0 + 0.04, y0 + 0.62, F2, F2 + 1.90,
@@ -2590,37 +2766,56 @@ def plan_json():
         return {"x0": round(min(x0, x1), 3), "x1": round(max(x0, x1), 3),
                 "z0": round(-max(y0, y1), 3), "z1": round(-min(y0, y1), 3)}
 
-    blockers = []
+    # Two lists, because the two storeys are two sets of walls at two heights
+    # and a blocker that does not know which floor it is on fences off the
+    # other one. The runtime bands them by height.
+    blockers, blockersP = [], []
 
-    def solid(x0, x1, y0, y1):
+    def solid(out, x0, x1, y0, y1):
         if abs(x1 - x0) > 0.02 and abs(y1 - y0) > 0.02:
-            blockers.append(T(x0, x1, y0, y1))
+            out.append(T(x0, x1, y0, y1))
 
-    def band(axis, at, thick, a0, a1, gaps):
+    def band(out, axis, at, thick, a0, a1, gaps):
         cuts = [a0]
         for g in sorted(gaps, key=lambda h: h[0]):
             cuts += [g[0], g[1]]
         cuts.append(a1)
         for i in range(0, len(cuts) - 1, 2):
             if axis == "x":
-                solid(cuts[i], cuts[i + 1], at - thick / 2, at + thick / 2)
+                solid(out, cuts[i], cuts[i + 1], at - thick / 2, at + thick / 2)
             else:
-                solid(at - thick / 2, at + thick / 2, cuts[i], cuts[i + 1])
+                solid(out, at - thick / 2, at + thick / 2, cuts[i], cuts[i + 1])
 
-    band("x", Y0 + EXT / 2, EXT, X0, X1, [D_TERR])
-    band("x", Y1 - EXT / 2, EXT, NX0, X1, [])
-    band("y", X0 + EXT / 2, EXT, Y0, BY1, [])
-    band("y", NX0 + EXT / 2, EXT, BY0, Y1, [])
-    band("y", X1 - EXT / 2, EXT, Y0, Y1, [D_ENTRY])
-    band("x", BY1 - EXT / 2, EXT, X0, NX0 + EXT, [])
-    band("x", SPINE, INT * 2, NIX0, IX1, [D_S4, D_S3])
-    band("x", SPINE, INT * 2, IX0, NIX0, [])
-    band("y", W_MID, INT * 2, BY1, IY1, [])
-    band("y", BATH_E, INT, BATH_S, BY0, [D_BATH])
-    band("x", BATH_S, INT, IX0, BATH_E, [])
+    band(blockers, "x", Y0 + EXT / 2, EXT, X0, X1, [D_TERR])
+    band(blockers, "x", Y1 - EXT / 2, EXT, NX0, X1, [])
+    band(blockers, "y", X0 + EXT / 2, EXT, Y0, BY1, [])
+    band(blockers, "y", NX0 + EXT / 2, EXT, BY0, Y1, [])
+    band(blockers, "y", X1 - EXT / 2, EXT, Y0, Y1, [D_ENTRY])
+    band(blockers, "x", BY1 - EXT / 2, EXT, X0, NX0 + EXT, [])
+    band(blockers, "x", SPINE, INT * 2, NIX0, IX1, [D_S4, D_S3])
+    band(blockers, "x", SPINE, INT * 2, IX0, NIX0, [])
+    band(blockers, "y", W_MID, INT * 2, BY1, IY1, [])
+    band(blockers, "y", BATH_E, INT, BATH_S, BY0, [D_BATH])
+    band(blockers, "x", BATH_S, INT, IX0, BATH_E, [])
+
+    band(blockersP, "x", Y0 + EXT / 2, EXT, X0, X1, [PD_TERR])
+    band(blockersP, "x", Y1 - EXT / 2, EXT, NX0, X1, [])
+    band(blockersP, "y", X0 + EXT / 2, EXT, Y0, BY1, [])
+    band(blockersP, "y", NX0 + EXT / 2, EXT, BY0, Y1, [])
+    band(blockersP, "y", X1 - EXT / 2, EXT, Y0, Y1, [])
+    band(blockersP, "x", BY1 - EXT / 2, EXT, X0, NX0 + EXT, [])
+    band(blockersP, "x", P_CROSS, EXT, IX0, IX1, [PD_HALL])
+    band(blockersP, "y", P_SPINE, INT, IY0, P_CROSS, [PD_S3])
+    band(blockersP, "y", P_SPINE, INT, P_CROSS, P_KIT_S, [PD_S4])
+    band(blockersP, "y", P_SPINE_N, EXT, P_TER_S, IY1, [PD_TER7])
+    band(blockersP, "y", P_BATH_E, INT, P_CROSS, P_KIT_S, [PD_BATH])
+    band(blockersP, "x", P_KIT_S, PW_KIT, NIX0, P_SPINE_N - EXT / 2, [PD_KIT])
+    band(blockersP, "x", P_TER_S, EXT, P_SPINE_N - EXT / 2, IX1, [])
 
     rooms = {k: T(*v) for k, v in ROOMS.items()}
     rooms["terrace"] = T(X0, X1, TER_Y0, TER_Y1)
+    roomsP = {k: T(*v) for k, v in P_ROOMS.items()}
+    roomsP["terrace"] = T(X0, X1, TER_Y0, TER_Y1)
 
     return {
         "note": "Vikendica, Jadrija — gornji kat. Metres, three.js axes. "
@@ -2654,6 +2849,11 @@ def plan_json():
         })(_laptop_screen_at()),
         "rooms": rooms,
         "blockers": blockers,
+        # The storey below: its own floor level, its own rooms and its own
+        # walls, in the same axes and off the same origin.
+        "floorP": P_FL, "clearP": round(P_CEIL - P_FL, 3), "terP": P_TER,
+        "roomsP": roomsP,
+        "blockersP": blockersP,
         "anchors": {
             "stairFoot": [round(ST_X, 2), GRADE, round(-(ST_BOT - 0.9), 2)],
             "stairHead": [round(ST_X, 2), F2, round(-(ST_TOP + 0.55), 2)],
@@ -2664,6 +2864,11 @@ def plan_json():
             "living": [0.4, F2, 1.2],
             "terrace": [0.0, F2, round(-(TER_Y0 + TER_Y1) / 2, 2)],
             "loftTop": [round(IX1 - 0.55, 2), DECK, round(-(LOFT_Y + 0.5), 2)],
+            # Downstairs. `prizemlje` is the middle of the living room, `ulaz`
+            # is outside the front door on terrace 8.
+            "prizemlje": [-1.4, P_FL, round(-(-2.0), 2)],
+            "ulaz": [round((PD_TERR[0] + PD_TERR[1]) / 2, 2), P_TER,
+                     round(-(Y0 - 0.90), 2)],
         },
     }
 

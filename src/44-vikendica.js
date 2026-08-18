@@ -393,6 +393,12 @@ async function buildVikendica(scene, field) {
     if (inRect(x, z, VIK.landing)) offer(base + VIK.floor);
     if (inRect(x, z, plan.outer)) offer(base + VIK.floor);
     if (inRect(x, z, plan.rooms.terrace)) offer(base + VIK.floor);
+    // And the storey below, which is a floor at the same (x, z) 2.90 m down.
+    // Both are offered and `yHint` picks: there is no internal stair between
+    // them, so from inside one you can never be within a step of the other and
+    // the rule that got you here is the rule that keeps you here.
+    if (inRect(x, z, plan.outer)) offer(base + plan.floorP);
+    if (inRect(x, z, plan.rooms.terrace)) offer(base + plan.terP);
 
     if (parts.loft && parts.loft.visible) {
       if (inRect(x, z, VIK.loftDeck)) offer(base + VIK.deck);
@@ -507,7 +513,10 @@ async function buildVikendica(scene, field) {
   function indoorsAt(t, s, y) {
     const [x, z] = toHouse(t, s);
     if (!inRect(x, z, plan.outer)) return 0;
-    if (y != null && (y < base + VIK.floor - 0.6 || y > roofTop())) return 0;
+    // Down to the ground floor now, not down to the upper one. The lower bound
+    // used to be floor - 0.6, which put the whole prizemlje outside its own
+    // house: undimmed, singing, and clipped at 1.2 m in rooms 2.7 m across.
+    if (y != null && (y < base + plan.floorP - 0.6 || y > roofTop())) return 0;
     return 1;
   }
 
@@ -550,7 +559,15 @@ async function buildVikendica(scene, field) {
     // you climbed the ladder-stair and could not walk to the beds. `ceil` keeps
     // them solid on the floor they belong to and at grade outside the house,
     // and lets the deck be a deck.
-    for (const b of plan.blockers) push(b, { ceil: base + VIK.deck - 0.15 });
+    for (const b of plan.blockers) push(b, { ceil: base + VIK.deck - 0.15,
+      y0: base + VIK.floor - 0.60, y1: base + VIK.deck - 0.15 });
+    // And the walls of the storey below, which stop at their own ceiling. Both
+    // sets are banded: an unbanded wall is a wall on every floor at once, so
+    // downstairs you would be fenced in by the partitions of the flat above
+    // and upstairs by the ones below — and neither fence has anything drawn
+    // where it stands.
+    for (const b of plan.blockersP) push(b, {
+      y0: base + plan.floorP - 0.60, y1: base + plan.floorP + plan.clearP });
     // The terrace's three open edges — its railing, which is a real railing and
     // has to stop you the way the drawn one would. Without them the terrace is
     // a floor at +2.90 you can walk off, and worse, walk on to from the lane.

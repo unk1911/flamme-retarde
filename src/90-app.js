@@ -3007,7 +3007,7 @@ window.__fr = {
     foot: () => { ground.force(); flight.p.onGround = true; flight.p.vel.set(0, 0, 0); },
     out: () => toggleGround(),
     apron: () => airfield.apron,
-    put: (x, z, yaw, pitch) => ground.put(x, z, yaw, pitch),
+    put: (x, z, yaw, pitch, yHint) => ground.put(x, z, yaw, pitch, yHint),
     /** Debug: the balcony jump, without having to be running when you ask. */
     hop: (sp = 2.0) => {
       if (ground && ground.you) { ground.you.vx = -Math.sin(ground.you.yaw) * sp;
