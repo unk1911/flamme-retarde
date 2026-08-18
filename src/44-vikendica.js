@@ -571,10 +571,16 @@ async function buildVikendica(scene, field) {
     // The terrace's three open edges — its railing, which is a real railing and
     // has to stop you the way the drawn one would. Without them the terrace is
     // a floor at +2.90 you can walk off, and worse, walk on to from the lane.
+    //
+    // Banded to the upper storey, because the same three rectangles at grade
+    // are the edges of terrasa 8 — which has no railing, is flush with the
+    // promenade, and is the way to the front door. Unbanded, these three were
+    // an invisible fence round the only entrance to the flat.
     const T = plan.rooms.terrace;
-    push({ x0: T.x0, x1: T.x1, z0: T.z1 - 0.08, z1: T.z1 });
-    push({ x0: T.x0, x1: T.x0 + 0.08, z0: T.z0, z1: T.z1 });
-    push({ x0: T.x1 - 0.08, x1: T.x1, z0: T.z0, z1: T.z1 });
+    const rail = { y0: base + VIK.floor - 0.60, y1: base + VIK.floor + 2.20 };
+    push({ x0: T.x0, x1: T.x1, z0: T.z1 - 0.08, z1: T.z1 }, rail);
+    push({ x0: T.x0, x1: T.x0 + 0.08, z0: T.z0, z1: T.z1 }, rail);
+    push({ x0: T.x1 - 0.08, x1: T.x1, z0: T.z0, z1: T.z1 }, rail);
     // The open side of the flight and of the landing, so you go up it rather
     // than off it, and the rail across the head of the landing.
     push({ x0: VIK.stair.x1 - 0.06, x1: VIK.stair.x1,

@@ -106,6 +106,9 @@ function planarReflector(vik, spec) {
 
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(spec.w, spec.h), mat);
   mesh.position.set(spec.at[0], spec.at[1], spec.at[2]);
+  // The default plane faces +z, which suits a mirror on a north wall. One on
+  // a south wall faces the other way, and says so here.
+  if (spec.rotY) mesh.rotation.y = spec.rotY;
   mesh.renderOrder = 2;
   mesh.frustumCulled = true;
   vik.root.add(mesh);
@@ -253,3 +256,29 @@ function bathMirror(vik) {
   });
 }
 
+
+/**
+ * And the one downstairs, over the almond basin.
+ *
+ * Same reflector, hung the other way round: the prizemlje basin is on the
+ * south wall of its bathroom, so the quad faces -z and gets a half-turn. The
+ * numbers follow the baked sheet in `kupaonica()` — bx = -2.34, the glass from
+ * bx + 0.02 to bx + 0.58, its foot 1.06 over the floor.
+ */
+function bathMirrorP(vik) {
+  const plan = vik.plan;
+  const b = plan.roomsP && plan.roomsP.kupS;
+  if (!b || !vik.root) return null;
+
+  const x0 = -2.32, x1 = -1.76;
+  const y0 = plan.floorP + 1.06, y1 = plan.floorP + 1.70;
+  const z = b.z1 - 0.0315;              // 1.5 mm proud of the baked slab
+
+  return planarReflector(vik, {
+    cfg: MIRROR,
+    w: x1 - x0,
+    h: y1 - y0,
+    at: [(x0 + x1) / 2, (y0 + y1) / 2, z],
+    rotY: Math.PI,
+  });
+}

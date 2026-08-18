@@ -283,6 +283,11 @@ PD_BATH = (-0.40, 0.45, 0.0, DOOR_H)     # 2 off the hall, and it slides
 PD_KIT = (-0.58, 0.27, 0.0, 2.10)        # 6 off the hall, 85 and open
 PD_HALL = (-0.60, 0.20, 0.0, 2.10)       # 5 into 1, open: the drawn door is out
 PD_TER7 = (2.20, 3.05, 0.0, DOOR_H)      # 6 out on to the rear terrace
+# Terrace 7 is a terrace: hatched on the drawing exactly like 8, so its north
+# side is open to the yard between two 30 cm piers, under a 12 cm downstand.
+# Which is also the back way in — yard, loggia, kitchen — and the reason the
+# opening is here rather than a window: you are meant to walk through it.
+PT7_OPEN = (0.77, 2.99, 0.0, 2.26)
 
 PW_S3_S = (1.44, 2.64, 1.00, 2.05)       # soba 3, south
 PW_S4_E = (0.23, 1.43, 1.00, 2.05)       # soba 4, east — purple, north of centre
@@ -1042,7 +1047,9 @@ def kuhinja(kit):
     kit.span(PLINTH, x0 + 0.06, x0 + 0.58, wy0 + 0.04, wy1 - 0.04, P_FL,
              P_FL + 0.10, bev=0.004)
     ny0, ny1 = y1 - 0.62, y1 - 0.02
-    nx0, nx1 = x0 + 0.64, x0 + 2.06
+    # 1.42 and not 2.06: the run gave up a unit so the fridge could have the
+    # north-east corner — see below.
+    nx0, nx1 = x0 + 0.64, x0 + 1.42
     kit.span(CREAM, nx0, nx1, ny0, ny1, P_FL + 0.10, top - 0.04, bev=0.004)
     kit.span(PLINTH, nx0 + 0.04, nx1 - 0.04, ny0 + 0.04, ny1 - 0.04, P_FL,
              P_FL + 0.10, bev=0.004)
@@ -1081,8 +1088,8 @@ def kuhinja(kit):
                  d - 0.004, d + 0.004, P_FL + 0.12, top - 0.06, bev=0.001)
         kit.span(CHROME, x0 + 0.615, x0 + 0.628, d + 0.08, d + 0.30,
                  top - 0.16, top - 0.14, bev=0.002)
-    for i in range(3):
-        d = nx0 + 0.02 + i * ((nx1 - nx0) / 3)
+    for i in range(2):
+        d = nx0 + 0.02 + i * ((nx1 - nx0) / 2)
         kit.span(tuple(v * 0.92 for v in CREAM), d - 0.004, d + 0.004,
                  ny0 + 0.03, ny1, P_FL + 0.12, top - 0.06, bev=0.001)
         kit.span(CHROME, d + 0.10, d + 0.32, ny0 + 0.018, ny0 + 0.032,
@@ -1091,7 +1098,7 @@ def kuhinja(kit):
     # The splashback: 15 cm white tile, and only over the runs.
     tiled_face(kit, "y", x0 + 0.045, wy0 - 0.06, wy1 + 0.06, top, top + 0.58,
                face=1, size=0.15, colour=TILE_WALL, accent=None, accent_p=0)
-    tiled_face(kit, "x", y1 - 0.045, x0 + 0.60, nx1 + 0.30, top, top + 0.58,
+    tiled_face(kit, "x", y1 - 0.045, x0 + 0.60, nx1 + 0.70, top, top + 0.58,
                face=-1, size=0.15, colour=TILE_WALL, accent=None, accent_p=0,
                holes=((PW_KIT_N[0] - 0.03, PW_KIT_N[1] + 0.03,
                        P_FL + PW_KIT_N[2] - 0.04, P_FL + PW_KIT_N[3]),))
@@ -1111,16 +1118,18 @@ def kuhinja(kit):
     kit.span(CHROME, cx + 0.03, cx + 0.57, ny0 - 0.045, ny0,
              P_FL + 0.68, P_FL + 0.72, bev=0.004)
 
-    # And the fridge: small, white, top-freezer, in the corner by the opening.
-    fx = x1 - 0.66
-    kit.span(WHITEGOODS, fx, fx + 0.58, y0 + 0.04, y0 + 0.64, P_FL,
+    # And the fridge: small, white, top-freezer, north-east corner. It stood
+    # in the corner by the opening, which put it in your face the moment you
+    # stepped in from the hall — the one place in the room a fridge cannot be.
+    fx, fy1 = x1 - 0.62, y1 - 0.04
+    kit.span(WHITEGOODS, fx, fx + 0.58, fy1 - 0.60, fy1, P_FL,
              P_FL + 1.44, bev=0.008)
     kit.span(tuple(v * 0.96 for v in WHITEGOODS), fx + 0.02, fx + 0.56,
-             y0 + 0.64, y0 + 0.665, P_FL + 0.04, P_FL + 0.44, bev=0.004)
+             fy1 - 0.625, fy1 - 0.60, P_FL + 0.04, P_FL + 0.44, bev=0.004)
     kit.span(tuple(v * 0.96 for v in WHITEGOODS), fx + 0.02, fx + 0.56,
-             y0 + 0.64, y0 + 0.665, P_FL + 0.48, P_FL + 1.40, bev=0.004)
+             fy1 - 0.625, fy1 - 0.60, P_FL + 0.48, P_FL + 1.40, bev=0.004)
     for za in (P_FL + 0.16, P_FL + 0.60):
-        kit.span(WHITEGOODS, fx + 0.04, fx + 0.10, y0 + 0.665, y0 + 0.705,
+        kit.span(WHITEGOODS, fx + 0.04, fx + 0.10, fy1 - 0.665, fy1 - 0.625,
                  za, za + 0.22, bev=0.004)
 
     # A bare bulb on a flex, which is the light in here and always has been.
@@ -1166,8 +1175,12 @@ def kupaonica(kit):
     kit.span(YELLOW_W, sx0, sx1, sy0, ny1, P_CEIL - 0.03, P_CEIL - 0.02,
              bev=0.002)
 
-    # ── the WC, west wall, under the window ─────────────────────────────────
-    _wc(kit, sx0 + 0.07, 0.20, floor=P_FL, cistern="high")
+    # ── the WC, backed on the north step wall, facing down the room ─────────
+    # It stood under the west window, which is where the orange mark is — but
+    # the mark is the soil stack, not the pan, and a pan under a window is a
+    # pan you cannot open the window over. The step wall's south face carries
+    # it instead, high-level cistern and all.
+    _wc(kit, sx0 + 0.45, ny0 - 0.055, floor=P_FL, cistern="high", face="-y")
     # The sill is a shelf and there is always something on it.
     kit.span(TILE_WALL, sx0 + 0.07, sx0 + 0.20, PW_BATH_W[0], PW_BATH_W[1],
              P_FL + 1.38, P_FL + 1.42, bev=0.006)
@@ -1280,7 +1293,7 @@ def prizemlje(kit):
     # ── the outside walls, and the paint on the inside of them ──────────────
     ext = {
         "south": ("x", Y0 + EXT / 2, X0, X1, [PD_TERR, PW_S3_S]),
-        "north": ("x", Y1 - EXT / 2, NX0, X1, [PW_KIT_N]),
+        "north": ("x", Y1 - EXT / 2, NX0, X1, [PW_KIT_N, PT7_OPEN]),
         "westS": ("y", X0 + EXT / 2, Y0, BY1, [PW_BATH_W]),
         "westN": ("y", NX0 + EXT / 2, BY0, Y1, []),
         "east": ("y", X1 - EXT / 2, Y0, Y1, [PW_S4_E]),
@@ -1293,7 +1306,8 @@ def prizemlje(kit):
 
     inner = {
         "south": ("x", IY0 + 0.02, IX0 - 0.10, IX1 + 0.10, [PD_TERR, PW_S3_S]),
-        "north": ("x", IY1 - 0.02, NIX0 - 0.10, IX1 + 0.10, [PW_KIT_N]),
+        "north": ("x", IY1 - 0.02, NIX0 - 0.10, IX1 + 0.10,
+                  [PW_KIT_N, PT7_OPEN]),
         "westS": ("y", IX0 + 0.02, IY0 - 0.10, BY1, [PW_BATH_W]),
         "westN": ("y", NIX0 + 0.02, BY0, IY1 + 0.10, []),
         "east": ("y", IX1 - 0.02, IY0 - 0.10, IY1 + 0.10, [PW_S4_E]),
@@ -1351,18 +1365,30 @@ def prizemlje(kit):
     terrace_doors(kit, base=P_FL, hole=PD_TERR)
     door_case(kit, "y", P_SPINE, PD_S3, base=P_FL, thick=INT)
     door_case(kit, "y", P_SPINE, PD_S4, base=P_FL, thick=INT)
-    door_case(kit, "y", P_SPINE_N, PD_TER7, base=P_FL, thick=EXT)
+    # The terrace door is glazed, like every outside door on the house: an
+    # opening with nothing standing in it reads as a hole in the wall, and a
+    # door you can see the terrace through reads as a door.
+    leaf_door(kit, "y", P_SPINE_N, PD_TER7, base=P_FL, thick=EXT, glazed=True)
     door_case(kit, "x", P_KIT_S, PD_KIT, base=P_FL, thick=PW_KIT)
     door_case(kit, "x", P_CROSS, PD_HALL, base=P_FL, thick=EXT)
     # Bathroom to hall slides, exactly as it does on the floor above, and for
     # the same reason: a 112 hall cannot take a leaf swinging into it.
-    slider(kit, "y", P_BATH_E, PD_BATH, base=P_FL, thick=INT, slide=-1.0,
+    # slide=+1.0: parked south it overshot the end of the wall by 80 cm and
+    # hung in the living-room air; north of the opening there is 1.6 m of wall.
+    slider(kit, "y", P_BATH_E, PD_BATH, base=P_FL, thick=INT, slide=1.0,
            open_frac=0.86, sides=(1,))
 
     window(kit, "x", Y0 + EXT / 2, PW_S3_S, P_FL, curtain_c=SHEER)
     window(kit, "x", Y1 - EXT / 2, PW_KIT_N, P_FL, curtain_c=SHEER)
     window(kit, "y", X0 + EXT / 2, PW_BATH_W, P_FL, curtain_c=None)
     window(kit, "y", X1 - EXT / 2, PW_S4_E, P_FL, curtain_c=SHEER)
+    # Terrace 7's north side: reveals round the opening, and a long stone
+    # step outside it, because the loggia floor is thirty over the yard.
+    reveal(kit, "x", Y1 - EXT / 2, PT7_OPEN[0], PT7_OPEN[1],
+           P_FL + PT7_OPEN[2], P_FL + PT7_OPEN[3], EXT, colour=WALL,
+           floor=P_FL)
+    kit.span(PLINTH, PT7_OPEN[0] + 0.10, PT7_OPEN[1] - 0.10, Y1 + 0.06,
+             Y1 + 0.42, GRADE - 0.15, P_FL - 0.16, bev=0.02)
 
     # ── terrasa 8, at minus twenty ──────────────────────────────────────────
     # The slab the upper terrace stands over. Its piers are already there and
@@ -1385,17 +1411,55 @@ def prizemlje(kit):
     # centred 2 cm in, so the visible plaster stands 4 cm inside the nominal
     # line. A colour laid on the nominal line is a colour laid inside the wall.
     kx0, kx1, ky0, ky1 = P_ROOMS["kuhinja"]
-    for x0_, x1_, y0_, y1_ in ((kx0 + 0.040, kx0 + 0.052, ky0, ky1),
-                               # 0.052 and not 0.032: the north skin is
-                               # centred 2 cm in and is 4 cm thick, so the
-                               # plaster you see is at ky1 - 0.04.
-                               (kx0, kx1, ky1 - 0.052, ky1 - 0.040),
-                               (kx0, kx1, ky0 + 0.002, ky0 + 0.014),
-                               (kx1 - 0.014, kx1 - 0.002, ky0, ky1)):
-        kit.span(YELLOW_W, x0_, x1_, y0_, y1_, P_FL, P_CEIL - 0.02, bev=0.002)
+
+    # Paint goes round openings, not across them. These faces used to be four
+    # unbroken slabs, which filled the door from the hall, the door to terrace
+    # 7 and the kitchen window with flat colour — the doorway to soba 4 grew a
+    # terracotta door that would not open the same way.
+    def paint(mk, a0, a1, z0, z1, hole=None):
+        if hole is None:
+            mk(a0, a1, z0, z1)
+            return
+        h0, h1, hz0, hz1 = hole
+        if a0 < h0:
+            mk(a0, h0, z0, z1)
+        if h1 < a1:
+            mk(h1, a1, z0, z1)
+        if z0 < hz0 - 0.001:
+            mk(max(a0, h0), min(a1, h1), z0, hz0)
+        if hz1 < z1 - 0.001:
+            mk(max(a0, h0), min(a1, h1), hz1, z1)
+
+    def face_x(colour, x0_, x1_):
+        return lambda a0, a1, z0, z1: kit.span(colour, x0_, x1_, a0, a1,
+                                               z0, z1, bev=0.002)
+
+    def face_y(colour, y0_, y1_):
+        return lambda a0, a1, z0, z1: kit.span(colour, a0, a1, y0_, y1_,
+                                               z0, z1, bev=0.002)
+
+    zc = P_CEIL - 0.02
+    # West, unbroken. 0.052 and not 0.032 on this and the north face: the
+    # inner skin is centred 2 cm in and is 4 cm thick, so the plaster you see
+    # is 4 cm inside the nominal room line.
+    paint(face_x(YELLOW_W, kx0 + 0.040, kx0 + 0.052), ky0, ky1, P_FL, zc)
+    # North, round the window over the run.
+    paint(face_y(YELLOW_W, ky1 - 0.052, ky1 - 0.040), kx0, kx1, P_FL, zc,
+          hole=(PW_KIT_N[0] - 0.03, PW_KIT_N[1] + 0.03,
+                P_FL + PW_KIT_N[2] - 0.03, P_FL + PW_KIT_N[3] + 0.03))
+    # South, round the way in from the hall.
+    paint(face_y(YELLOW_W, ky0 + 0.002, ky0 + 0.014), kx0, kx1, P_FL, zc,
+          hole=(PD_KIT[0] - 0.03, PD_KIT[1] + 0.03, P_FL,
+                P_FL + PD_KIT[3] + 0.03))
+    # East, round the door on to terrace 7.
+    paint(face_x(YELLOW_W, kx1 - 0.014, kx1 - 0.002), ky0, ky1, P_FL, zc,
+          hole=(PD_TER7[0] - 0.03, PD_TER7[1] + 0.03, P_FL,
+                P_FL + PD_TER7[3] + 0.03))
     hx0, hx1, hy0, hy1 = P_ROOMS["hodnik"]
-    kit.span(TERRA_W, hx1 - 0.015, hx1 - 0.003, hy0, hy1, P_FL,
-             P_CEIL - 0.02, bev=0.002)
+    # And the terracotta, round the door to soba 4.
+    paint(face_x(TERRA_W, hx1 - 0.015, hx1 - 0.003), hy0, hy1, P_FL, zc,
+          hole=(PD_S4[0] - 0.03, PD_S4[1] + 0.03, P_FL,
+                P_FL + PD_S4[3] + 0.03))
 
     kuhinja(kit)
     kupaonica(kit)
@@ -1801,9 +1865,8 @@ def _oval_band(bm, z0, z1, out, inn, seg=24, power=2.6):
     return rows
 
 
-def _wc(kit, bx, ty, floor=F2, cistern="close"):
-    """A close-coupled lavatory standing off the wall face at `bx`, centred on
-    `ty`, projecting into +X.
+def _wc(kit, bx, ty, floor=F2, cistern="close", face="+x"):
+    """A lavatory backed on to the wall at `bx`, centred on `ty`.
 
     It used to be five boxes: a stub, a slab, a lid, a tank. From the doorway
     that is a WC, and from a metre away it is a filing cabinet — because the
@@ -1816,22 +1879,52 @@ def _wc(kit, bx, ty, floor=F2, cistern="close"):
     as it rises the way a moulded ceramic does. The seat is a separate oval
     band, not concentric with the pan, because it is wider at the hinge than at
     the front.
-    """
-    # The pan. Rings are (z, rx, ry, ox, oy), bottom of the foot upward: the
+
+    `face` is the way the pan projects off its wall: "+x" backs it on a west
+    wall with `bx` the wall line and `ty` the centre, "-y" hangs it on a north
+    wall with the roles swapped — `bx` the centre and `ty` the wall line. All
+    of the geometry is authored forward-and-lateral and mapped."""
+    if face == "+x":
+        P = lambda f, l: (bx + f, ty + l)
+        R = lambda rf, rl: (rf, rl)
+    else:
+        P = lambda f, l: (bx + l, ty - f)
+        R = lambda rf, rl: (rl, rf)
+
+    def SP(colour, f0, f1, l0, l1, z0, z1, bev=0.006):
+        xa, ya = P(f0, l0)
+        xb, yb = P(f1, l1)
+        kit.span(colour, min(xa, xb), max(xa, xb), min(ya, yb), max(ya, yb),
+                 z0, z1, bev=bev)
+
+    # How far the pan stands off its wall. The rings below were authored at a
+    # 41 cm projection against a 38 cm width, which is very nearly circular in
+    # plan — and a real floor-standing pan is 65 to 70 deep against 36 wide.
+    # At 41 the thing does not read as a short lavatory, it reads as a normal
+    # one with its back half buried in the tiling, which is exactly what it was
+    # reported as. Everything forward of the wall on the pan, the seat, the
+    # hinges and the spigot is stretched by this. The cistern is not: a cistern
+    # really is only 20 deep, and both of these sit on the wall line, so the
+    # close-coupled one still lands on the shelf at the back of the pan.
+    DEEP = 1.60
+
+    # The pan. Rings are (z, r_fwd, r_lat, fwd), bottom of the foot upward: the
     # waist at 9 cm, the shoulder at 27, the rim at 41 — then two rings that
     # roll over the lip, and four that descend into the bowl. The last is the
     # water.
-    rings = [(floor + 0.020, 0.114, 0.102, bx + 0.150, ty),
-             (floor + 0.090, 0.100, 0.089, bx + 0.160, ty),
-             (floor + 0.180, 0.110, 0.096, bx + 0.176, ty),
-             (floor + 0.270, 0.136, 0.122, bx + 0.196, ty),
-             (floor + 0.345, 0.172, 0.152, bx + 0.212, ty),
-             (floor + 0.396, 0.192, 0.168, bx + 0.218, ty),
-             (floor + 0.412, 0.190, 0.166, bx + 0.218, ty),
-             (floor + 0.404, 0.170, 0.146, bx + 0.216, ty),
-             (floor + 0.340, 0.152, 0.130, bx + 0.212, ty),
-             (floor + 0.270, 0.112, 0.094, bx + 0.202, ty),
-             (floor + 0.215, 0.062, 0.052, bx + 0.192, ty)]
+    rings = [(floor + z, *R(rf * DEEP, rl), *P(f * DEEP, 0))
+             for z, rf, rl, f in
+             ((0.020, 0.114, 0.102, 0.150),
+              (0.090, 0.100, 0.089, 0.160),
+              (0.180, 0.110, 0.096, 0.176),
+              (0.270, 0.136, 0.122, 0.196),
+              (0.345, 0.172, 0.152, 0.212),
+              (0.396, 0.192, 0.168, 0.218),
+              (0.412, 0.190, 0.166, 0.218),
+              (0.404, 0.170, 0.146, 0.216),
+              (0.340, 0.152, 0.130, 0.212),
+              (0.270, 0.112, 0.094, 0.202),
+              (0.215, 0.062, 0.052, 0.192))]
     bm_loft(kit.bm(PORCELAIN, 0.004), rings, seg=20, power=2.5)
 
     # The spigot into the wall behind it. The pan's foot stands 5 cm clear of
@@ -1839,27 +1932,28 @@ def _wc(kit, bx, ty, floor=F2, cistern="close"):
     # gap — which is the detail that tells you the thing is plumbed in and not
     # just set down on the floor.
     #
-    # It stops at bx + 0.08 and 22 cm up, and both numbers matter. The bowl's
-    # cavity at that height starts at bx + 0.13, and this box used to run to
-    # bx + 0.16 and 28 cm — so it came up through the bottom of the pan and sat
+    # It stops at +0.08 forward and 22 cm up, and both numbers matter. The
+    # bowl's cavity at that height starts at +0.13, and this box used to run to
+    # +0.16 and 28 cm — so it came up through the bottom of the pan and sat
     # in the water as a grey slab, which is what you actually saw when you
     # looked into the lavatory.
-    kit.span(PORCELAIN, bx - 0.01, bx + 0.08, ty - 0.062, ty + 0.062,
-             floor + 0.06, floor + 0.22, bev=0.02)
+    SP(PORCELAIN, -0.01, 0.08 * DEEP, -0.062, 0.062, floor + 0.06,
+       floor + 0.22, bev=0.02)
 
     # The water. The bowl is a cavity facing up and inward, so every face in it
     # is turned away from the window and reads as one grey hole; the trap being
     # full is both true and the thing that tells your eye how deep it goes.
-    bm_cylinder(kit.bm((0.760, 0.830, 0.870), 0.002), bx + 0.192, ty,
+    bm_cylinder(kit.bm((0.760, 0.830, 0.870), 0.002), *P(0.192 * DEEP, 0),
                 floor + 0.222, floor + 0.228, 0.056, 0.056, seg=18)
 
     # The seat, down, and the two hinge lugs at the back of it.
     _oval_band(kit.bm(PORCELAIN, 0.004), floor + 0.414, floor + 0.446,
-               (0.188, 0.164, bx + 0.216, ty),
-               (0.126, 0.104, bx + 0.238, ty), seg=24, power=2.6)
-    for dy in (-0.058, 0.058):
-        kit.span(CHROME, bx + 0.030, bx + 0.070, ty + dy - 0.016,
-                 ty + dy + 0.016, floor + 0.412, floor + 0.452, bev=0.006)
+               (*R(0.188 * DEEP, 0.164), *P(0.216 * DEEP, 0)),
+               (*R(0.126 * DEEP, 0.104), *P(0.238 * DEEP, 0)),
+               seg=24, power=2.6)
+    for dl in (-0.058, 0.058):
+        SP(CHROME, 0.030 * DEEP, 0.070 * DEEP, dl - 0.016, dl + 0.016,
+           floor + 0.412, floor + 0.452, bev=0.006)
 
     # The cistern. Two of them, because the two floors of this house are two
     # different decades: the flat upstairs has a close-coupled suite, and the
@@ -1867,26 +1961,28 @@ def _wc(kit, bx, ty, floor=F2, cistern="close"):
     # chromed flush pipe dropping to it, which is what the photographs show and
     # what everybody who has ever rented a Dalmatian ground floor remembers.
     if cistern != "close":
-        # 1.30 to the top of the tank and not the 1.86 a Victorian high-level
-        # cistern would take, because there is a window over this lavatory with
-        # its sill at 1.40 — so a cistern any higher is a cistern drawn inside
-        # the opening, which is what it was. Low-level, with the pipe showing.
-        top = floor + 1.30
-        kit.span((0.930, 0.910, 0.860), bx - 0.01, bx + 0.185,
-                 ty - 0.185, ty + 0.185, top - 0.36, top, bev=0.02)
-        kit.span((0.960, 0.945, 0.905), bx - 0.01, bx + 0.195,
-                 ty - 0.195, ty + 0.195, top, top + 0.035, bev=0.012)
+        # 1.80 to the top of the tank — a proper high-level cistern. It was
+        # capped at 1.30 when the pan stood under the west window, whose sill
+        # is at 1.40; on the north wall there is nothing over it but tile.
+        top = floor + 1.80
+        SP((0.930, 0.910, 0.860), -0.01, 0.185, -0.185, 0.185,
+           top - 0.36, top, bev=0.02)
+        SP((0.960, 0.945, 0.905), -0.01, 0.195, -0.195, 0.195,
+           top, top + 0.035, bev=0.012)
         # The pipe, and the lever and chain hanging off the near end.
-        bm_cylinder(kit.bm(CHROME, 0.002), bx + 0.085, ty,
-                    floor + 0.78, top - 0.36, 0.017, 0.017, seg=10)
-        kit.span(CHROME, bx + 0.055, bx + 0.115, ty - 0.024, ty + 0.024,
-                 floor + 0.74, floor + 0.80, bev=0.006)
-        kit.span(DARKMETAL, bx + 0.16, bx + 0.20, ty + 0.15, ty + 0.17,
-                 top - 0.34, top - 0.30, bev=0.004)
-        bm_cylinder(kit.bm(CHROME, 0.002), bx + 0.18, ty + 0.16,
+        # Down to the back of the pan, not to the lever: the pipe used to stop
+        # at 78, which is the height of the lever bracket and a third of a
+        # metre of clear air above the seat.
+        bm_cylinder(kit.bm(CHROME, 0.002), *P(0.085, 0),
+                    floor + 0.44, top - 0.36, 0.017, 0.017, seg=10)
+        SP(CHROME, 0.055, 0.115, -0.024, 0.024, floor + 0.74, floor + 0.80,
+           bev=0.006)
+        SP(DARKMETAL, 0.16, 0.20, 0.15, 0.17, top - 0.34, top - 0.30,
+           bev=0.004)
+        bm_cylinder(kit.bm(CHROME, 0.002), *P(0.18, 0.16),
                     top - 0.62, top - 0.30, 0.005, 0.005, seg=6)
-        kit.span(PORCELAIN, bx + 0.155, bx + 0.205, ty + 0.135, ty + 0.185,
-                 top - 0.70, top - 0.62, bev=0.02)
+        SP(PORCELAIN, 0.155, 0.205, 0.135, 0.185, top - 0.70, top - 0.62,
+           bev=0.02)
         return
 
     # The cistern, close-coupled: it sits down on the shelf at the back of the
@@ -1919,17 +2015,17 @@ def _wc(kit, bx, ty, floor=F2, cistern="close"):
     # There is no separate lid. The rolled top ends in a flat 12 by 27 panel,
     # which is the lid, and the buttons go in it.
     rings = []
-    for z, rx, ry in ((0.400, 0.100, 0.181), (0.445, 0.102, 0.183),
+    for z, rf, rl in ((0.400, 0.100, 0.181), (0.445, 0.102, 0.183),
                       (0.570, 0.099, 0.181), (0.690, 0.094, 0.177),
                       (0.748, 0.088, 0.171), (0.782, 0.076, 0.158),
                       (0.800, 0.058, 0.136)):
-        # The back stays on the wall line at `bx` as the section narrows, so
-        # everything the taper takes off comes off the front.
-        rings.append((floor + z, rx, ry, bx + rx, ty))
+        # The back stays on the wall line as the section narrows, so everything
+        # the taper takes off comes off the front.
+        rings.append((floor + z, *R(rf, rl), *P(rf, 0)))
     bm_loft(kit.bm(PORCELAIN, 0.005), rings, seg=28, power=2.6)
     # Dual flush, in the flat of the top. The big one is the far one.
-    for dy, r in ((-0.046, 0.029), (0.044, 0.021)):
-        bm_cylinder(kit.bm(CHROME, 0.003), bx + 0.058, ty + dy,
+    for dl, r in ((-0.046, 0.029), (0.044, 0.021)):
+        bm_cylinder(kit.bm(CHROME, 0.003), *P(0.058, dl),
                     floor + 0.798, floor + 0.818, r, r * 0.94, seg=12)
 
 
@@ -3202,7 +3298,7 @@ def plan_json():
     band(blockers, "x", BATH_S, INT, IX0, BATH_E, [])
 
     band(blockersP, "x", Y0 + EXT / 2, EXT, X0, X1, [PD_TERR])
-    band(blockersP, "x", Y1 - EXT / 2, EXT, NX0, X1, [])
+    band(blockersP, "x", Y1 - EXT / 2, EXT, NX0, X1, [PT7_OPEN])
     band(blockersP, "y", X0 + EXT / 2, EXT, Y0, BY1, [])
     band(blockersP, "y", NX0 + EXT / 2, EXT, BY0, Y1, [])
     band(blockersP, "y", X1 - EXT / 2, EXT, Y0, Y1, [])
