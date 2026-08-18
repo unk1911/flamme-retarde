@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.73.3">
+<meta name="version" content="1.74.0">
 <meta name="build-date" content="2026-08-18">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -1175,8 +1175,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.73.3, built 2026-08-18">
-    <b>v1.73.3</b><i>·</i><span>2026-08-18</span>
+  <div id="build" title="Flamme Retardé 1.74.0, built 2026-08-18">
+    <b>v1.74.0</b><i>·</i><span>2026-08-18</span>
   </div>
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
@@ -1477,7 +1477,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.73.3", date: "2026-08-18" };</script>
+<script>const BUILD = { v: "1.74.0", date: "2026-08-18" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -22714,12 +22714,17 @@ function localeAt(x, z, airfield, jadrija, city) {
 // anybody wants. `mirror.guests` is the whole mechanism: visible for the length
 // of the reflection pass and hidden again before the room is drawn.
 //
-// What makes her hers is a dye job and a hat. The rig already has hair — real
-// geometry, over the skull and down past the nape, baked one flat brown — so
-// the blue is a colour swap in the fragment shader rather than a wig, and the
-// beanie is two primitives on top. Blue hair and a knit cap is a punk from a
-// game about a girl in Oregon rather than anybody real, and is close enough to
-// the silhouette asked for to read at two metres in a bathroom mirror.
+// What makes her hers is almost entirely paint. The rig already has hair, and
+// arms, and a chest — so the blue is a colour swap in the fragment shader
+// rather than a wig, the vest is a mask over the trunk rather than a garment,
+// the skull on the front of it is drawn with algebra rather than sampled from
+// a texture this rig has no UVs for, and the sleeve down her right arm is
+// three noise fields. Paint cannot clip through the body it is on, cannot fall
+// out of a pose, and costs nothing in the payload.
+//
+// Two things are not paint, and both for the same reason: they leave her. The
+// beanie stands proud of the crown and the necklace hangs off the chest, and a
+// drawn one of either is a drawing on a scalp or a sternum.
 //
 // Nothing in this project uses a three.js light, so neither does this: the cap
 // carries a two-line shader with the sun stuck to the camera. In a mirror lit
@@ -22736,7 +22741,37 @@ const YOU = {
   // dark purple slouch beanie, and read as black it stops being hers.
   hair: [0.13, 0.45, 0.70],
   cap: [0.115, 0.070, 0.165],
-  vest: [0.95, 0.95, 0.94],
+  // The vest is not white. It is a washed-out sage-white, which is what a
+  // cotton tank that has been through a Dalmatian summer twenty times is, and
+  // it also stops the shirt blowing out to paper next to the porcelain.
+  vest: [0.885, 0.900, 0.860],
+  // And what is under it, showing at the scoop and over the shoulders.
+  under: [0.055, 0.058, 0.068],
+  // Pink through the blue. Not a tint over the whole head — three or four
+  // locks taken pink, which is what a highlight is.
+  pink: [0.560, 0.150, 0.330],
+  // The print. Bone, and the ink it is drawn in. Named `ivory` and not `bone`
+  // because `bone` on this object is already the head bone's bind position,
+  // three keys down, and the later key wins: the skull came out rendered in
+  // vec3(0.033, 1.586, -0.016), which is a bright green, and looked exactly
+  // like a deliberate choice until you read the object.
+  ivory: [0.700, 0.700, 0.688],
+  print: [0.115, 0.125, 0.138],
+  // The sleeve: old ink gone blue-black, red roses, green stems. Three colours
+  // is enough — at two metres in a mirror a sleeve is a dark arm with warm and
+  // cool inside it, and any more detail than that is detail nobody can see.
+  ink: [0.070, 0.082, 0.118],
+  rose: [0.360, 0.052, 0.058],
+  leaf: [0.120, 0.250, 0.118],
+  // The cord and the three spent cases on it.
+  cord: [0.045, 0.045, 0.052],
+  brass: [0.780, 0.580, 0.160],
+  // Which way her right arm is. The rig faces +X and up is +Y, so her right is
+  // +X × +Y = +Z. One number rather than a sed, because if the export ever
+  // mirrors the rig this is the only line that has to change and the sleeve is
+  // otherwise on the wrong arm in a way that is instantly obvious and easy to
+  // miss until somebody looks.
+  right: 1,
   // Head bone to crown, in metres, measured off the rig rather than guessed:
   // the bone sits at the base of the skull and the cap does not.
   crown: 0.163,
@@ -22776,6 +22811,38 @@ async function buildYou(scene) {
     spec: 0.09,
     specPower: 24,
     face: true,
+    // Declared out here because the body is spliced into main() and GLSL ES 1.0
+    // will not take a function inside a function. Everything below is used by
+    // the sleeve and the print and by nothing else on this figure.
+    decl: `
+      float youHash(vec3 p) {
+        return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123);
+      }
+      float youNoise(vec3 p) {
+        vec3 i = floor(p), f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        vec4 a = vec4(youHash(i), youHash(i + vec3(1.0, 0.0, 0.0)),
+                      youHash(i + vec3(0.0, 1.0, 0.0)),
+                      youHash(i + vec3(1.0, 1.0, 0.0)));
+        vec4 b = vec4(youHash(i + vec3(0.0, 0.0, 1.0)),
+                      youHash(i + vec3(1.0, 0.0, 1.0)),
+                      youHash(i + vec3(0.0, 1.0, 1.0)),
+                      youHash(i + vec3(1.0, 1.0, 1.0)));
+        vec4 m = mix(a, b, f.z);
+        vec2 n = mix(m.xz, m.yw, f.x);
+        return mix(n.x, n.y, f.y);
+      }
+      float youFbm(vec3 p) {
+        return 0.57 * youNoise(p)
+             + 0.30 * youNoise(p * 2.13 + 11.7)
+             + 0.13 * youNoise(p * 4.31 + 3.10);
+      }
+      // An ellipse with a soft edge, which is what almost everything in the
+      // print is made of.
+      float youBlob(vec2 p, vec2 c, vec2 r) {
+        return 1.0 - smoothstep(0.86, 1.0, length((p - c) / r));
+      }
+    `,
     body: `
       vec3 vcol = vVCol;
       {
@@ -22811,6 +22878,26 @@ async function buildYou(scene) {
         vcol = mix(vcol, vec3(${YOU.hair.map((n) => n.toFixed(3)).join(', ')}),
           dye);
 
+        // And the pink through it.
+        //
+        // On the angle round the skull and not on height, which is the whole
+        // difference between highlights and dip-dye: a lock that is pink is
+        // pink from root to tip, and the ones either side of it are not. Seven
+        // periods round the head puts four or five of them on the visible side
+        // at a lock's width each, which is what she has.
+        //
+        // Broken up by a little noise so the edges of each lock are not a
+        // curve. A hard-edged stripe of magenta on a blue bob reads as paint.
+        {
+          float lock = sin(atan(vLocal.z, vLocal.x - 0.033) * 6.0 + 0.9)
+            * 0.5 + 0.5;
+          lock = smoothstep(0.86, 0.995, lock)
+            * (0.55 + 0.45 * youNoise(vLocal * 52.0));
+          vcol = mix(vcol,
+            vec3(${YOU.pink.map((n) => n.toFixed(3)).join(', ')}),
+            dye * lock * 0.80);
+        }
+
         // And the white vest. Painted rather than modelled, for the same
         // reason the hair is dyed rather than built: the geometry for it is
         // already there and a garment that is a mask over the body it is on
@@ -22828,9 +22915,10 @@ async function buildYou(scene) {
         float front = smoothstep(0.020, 0.105, vLocal.x)
           * (1.0 - smoothstep(0.030, 0.105, abs(vLocal.z)));
         float neck = mix(1.450, 1.372, front);
-        float vest = trunk
+        float scoop = trunk
           * smoothstep(0.995, 1.020, vLocal.y)
           * (1.0 - smoothstep(neck, neck + 0.012, vLocal.y));
+        float vest = scoop;
         // Two straps over the shoulders, on a fixed height band rather than
         // one that follows the neckline — hang them off the scoop and the
         // scoop fills in behind them as a bib.
@@ -22842,6 +22930,147 @@ async function buildYou(scene) {
           * (1.0 - smoothstep(1.468, 1.486, vLocal.y)));
         vcol = mix(vcol, vec3(${YOU.vest.map((n) => n.toFixed(3)).join(', ')}),
           vest);
+
+        // What is under it, showing where the vest stops: a dark edge round
+        // the scoop, and a narrower dark strap inboard of each white one.
+        //
+        // The scoop edge is hung off the scoop term and deliberately not off
+        // the whole vest, which is the scoop and the straps together, because
+        // a 7 mm band in *height* lands on the top of a shoulder — which is a
+        // horizontal surface — as a patch several centimetres across. Which is
+        // also why it is cut off past 10 cm from the midline: the scoop's own
+        // edge runs out on to the same flat shoulder and put a black bar with
+        // square corners across each collarbone.
+        vcol = mix(vcol,
+          vec3(${YOU.under.map((n) => n.toFixed(3)).join(', ')}),
+          scoop * smoothstep(neck - 0.013, neck - 0.006, vLocal.y)
+            * (1.0 - smoothstep(0.082, 0.108, abs(vLocal.z))) * 0.92);
+        // There is a second dark strap inboard of each white one in the
+        // reference, and it is not here. It was, for one build: the straps are
+        // a band in height and the top of a shoulder is horizontal, so a strap
+        // narrowed in z and cut in y came out as a black rectangle with square
+        // corners lying across each collarbone. Two straps you cannot see is a
+        // better picture than two rectangles you can.
+
+        // ------------------------------------------------------------- print
+        //
+        // The skull.
+        //
+        // Drawn rather than sampled, because a texture would want a UV set
+        // this rig does not carry and a 256-square PNG in the payload for one
+        // shirt is a poor trade against forty lines of algebra. Everything
+        // below is in a plane on the front of her chest: P.x across, P.y up,
+        // both in metres, origin between the eye sockets.
+        //
+        // It is deliberately graphic rather than illustrative. In a mirror,
+        // three metres away, at a third of the canvas resolution, what carries
+        // is the silhouette — a spiked halo, a pale skull, two black holes and
+        // a ribbon under it. Anything finer than that is grey mush, so the
+        // detail that exists is the detail that survives.
+        {
+          vec2 P = vec2(vLocal.z, vLocal.y - 1.176);
+          float on = vest
+            * smoothstep(0.028, 0.060, vLocal.x)
+            * (1.0 - smoothstep(0.104, 0.132, abs(vLocal.z)));
+          vec3 pc = vec3(0.0);
+          float pa = 0.0;
+
+          // Nine rays out of the crown. The k below is the distance to the
+          // nearest ray axis, 0 on it and 1 between two, so a length that
+          // falls off with it is a triangle, with no trigonometric spike.
+          {
+            vec2 S = P - vec2(0.0, 0.004);
+            float k = abs(fract(atan(S.x, max(S.y, 0.0004)) / 0.3665 + 0.5)
+              - 0.5) * 2.0;
+            float len = 0.098 - 0.040 * k;
+            float m = (1.0 - smoothstep(len - 0.003, len, length(S)))
+              * step(-0.006, S.y);
+            pa = max(pa, m);
+            pc = mix(pc, vec3(${YOU.print.map((n) => n.toFixed(3)).join(', ')}),
+              m);
+          }
+
+          // Cranium and jaw, as two overlapping ellipses. A skull is a ball
+          // with a smaller ball hung off the bottom front of it and that is
+          // very nearly all a skull is at this size.
+          float sk = max(youBlob(P, vec2(0.0, 0.006), vec2(0.056, 0.049)),
+                         youBlob(P, vec2(0.0, -0.043), vec2(0.038, 0.035)));
+          pa = max(pa, sk);
+          pc = mix(pc, vec3(${YOU.ivory.map((n) => n.toFixed(3)).join(', ')}),
+            sk);
+
+          // The holes. Sockets mirrored on abs(P.x), the nasal aperture, and a
+          // tooth line made of gaps rather than teeth — the dark is the space
+          // between them, which is the only part of a mouth this size reads.
+          float teeth = (1.0 - smoothstep(0.027, 0.032, abs(P.x)))
+            * smoothstep(-0.057, -0.053, P.y)
+            * (1.0 - smoothstep(-0.035, -0.031, P.y))
+            * (1.0 - smoothstep(0.10, 0.36, abs(sin(P.x * 240.0))));
+          float dark = max(max(
+            youBlob(vec2(abs(P.x), P.y), vec2(0.022, 0.010),
+              vec2(0.0165, 0.0145)),
+            youBlob(P, vec2(0.0, -0.014), vec2(0.008, 0.013))), teeth);
+          pc = mix(pc, vec3(${YOU.print.map((n) => n.toFixed(3)).join(', ')}),
+            dark * sk);
+
+          // And the ribbon under it, with a script line in it. The same wave
+          // is added to both edges of the band so it curls as one ribbon
+          // rather than tapering.
+          float w = 0.006 * sin(P.x * 44.0);
+          float ban = (1.0 - smoothstep(0.058, 0.065, abs(P.x)))
+            * smoothstep(-0.101, -0.097, P.y + w)
+            * (1.0 - smoothstep(-0.079, -0.075, P.y + w));
+          pa = max(pa, ban);
+          pc = mix(pc, vec3(${YOU.print.map((n) => n.toFixed(3)).join(', ')}),
+            ban);
+          pc = mix(pc, vec3(0.880, 0.890, 0.865), ban
+            * (1.0 - smoothstep(0.0012, 0.0028, abs(P.y + w + 0.087
+                - 0.0034 * sin(P.x * 155.0))))
+            * (1.0 - smoothstep(0.044, 0.051, abs(P.x))));
+
+          vcol = mix(vcol, pc, pa * on);
+        }
+      }
+
+      // ------------------------------------------------------------- sleeve
+      //
+      // The right arm, from the deltoid to the knuckles.
+      //
+      // Three noise fields at three scales: one decides what is inked at all,
+      // one puts roses in it, one puts leaves between them. It is not a design
+      // — there is no drawing in here anybody could name — but a full sleeve
+      // seen at a distance *is* a dark arm with red and green inside it and a
+      // little bare skin left in the gaps, and that is what this is.
+      //
+      // Gated on side rather than on a bone weight because the paint has to
+      // stay on the arm when the arm moves, and vLocal is the bind pose: the
+      // ink is stuck to her skin, not to the space her arm happened to be in.
+      {
+        float side = vLocal.z * ${YOU.right.toFixed(1)};
+        float arm = smoothstep(0.180, 0.202, side)
+          * smoothstep(0.720, 0.790, vLocal.y)
+          * (1.0 - smoothstep(1.398, 1.452, vLocal.y));
+        if (arm > 0.002) {
+          float f = youFbm(vLocal * 30.0);
+          float g = youFbm(vLocal * 19.0 + 5.3);
+          float h = youFbm(vLocal * 44.0 + 17.1);
+          // Fill, and then the contours through it. The first pass had fill
+          // only and came out camouflage: soft-edged dark patches on a bare
+          // arm, which is a bruise. What makes ink look like ink is that it
+          // has a line round it, so the level set of a second field at a
+          // different scale is drawn as a 2 mm stroke and laid over the top.
+          float ink = smoothstep(0.360, 0.520, f);
+          float line = 1.0 - smoothstep(0.012, 0.032, abs(g - 0.520));
+          float rose = smoothstep(0.600, 0.700, g)
+            * smoothstep(0.400, 0.560, h);
+          float leaf = smoothstep(0.560, 0.660, h) * (1.0 - rose);
+          vec3 tat = vec3(${YOU.ink.map((n) => n.toFixed(3)).join(', ')});
+          tat = mix(tat, vec3(${YOU.rose.map((n) => n.toFixed(3)).join(', ')}),
+            rose * ink);
+          tat = mix(tat, vec3(${YOU.leaf.map((n) => n.toFixed(3)).join(', ')}),
+            leaf * ink);
+          vcol = mix(vcol, tat, arm * min(1.0, max(ink, line * 0.85)) * 0.93);
+        }
       }
       base *= vcol;
     `,
@@ -22857,8 +23086,11 @@ async function buildYou(scene) {
   // space, so the highlight follows the eye — which for a thing only ever seen
   // in a mirror, from one side, in one small room, is indistinguishable from
   // the real thing and costs two lines.
-  const shade = (rgb) => new THREE.ShaderMaterial({
-    uniforms: { tint: { value: new THREE.Vector3(...rgb) } },
+  const shade = (rgb, spec = 0, power = 34) => new THREE.ShaderMaterial({
+    uniforms: {
+      tint: { value: new THREE.Vector3(...rgb) },
+      hot: { value: new THREE.Vector2(spec, power) },
+    },
     vertexShader: `
       varying vec3 vN;
       void main() {
@@ -22868,11 +23100,18 @@ async function buildYou(scene) {
     `,
     fragmentShader: `
       uniform vec3 tint;
+      uniform vec2 hot;
       varying vec3 vN;
       void main() {
+        vec3 n = normalize(vN);
         float k = 0.52 + 0.48 * clamp(
-          dot(normalize(vN), normalize(vec3(0.32, 0.78, 0.54))), 0.0, 1.0);
-        gl_FragColor = vec4(tint * k, 1.0);
+          dot(n, normalize(vec3(0.32, 0.78, 0.54))), 0.0, 1.0);
+        // The eye is down −Z in view space, so the half vector between it and
+        // the fixed key is a constant and the highlight is one pow. Which is
+        // all brass needs to stop being orange plastic.
+        float s = hot.x * pow(clamp(
+          dot(n, normalize(vec3(0.32, 0.78, 1.54))), 0.0, 1.0), hot.y);
+        gl_FragColor = vec4(tint * k + s, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }
@@ -22880,6 +23119,59 @@ async function buildYou(scene) {
   });
 
   const capMat = shade(YOU.cap);
+
+  // The necklace: a long cord round her neck with three spent cases hanging
+  // off the bottom of it.
+  //
+  // This is the one thing on her that had to be geometry. The dye job, the
+  // vest, the print and the sleeve are all paint on skin she already has, and
+  // paint cannot leave the body — but a necklace is exactly the thing that
+  // does, hanging clear of the chest and catching a highlight off its own
+  // curvature, and a painted one is a drawing of a necklace on a sternum.
+  //
+  // A child of the figure and not of a bone. The hat needed the head bone
+  // because a head turns forty degrees to look at you; a chest in an idle
+  // moves a couple of millimetres, and a necklace that follows it exactly and
+  // one that does not are the same picture.
+  //
+  // The cord runs down from the nape, out round the collarbones, and meets
+  // itself at a point 12 cm proud of the spine at bust height. Seven control
+  // points and a Catmull-Rom through them, because the shape that matters is
+  // the drape and a drape is a curve.
+  const chain = new THREE.Group();
+  mesh.add(chain);
+  chain.add(new THREE.Mesh(new THREE.TubeGeometry(
+    new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.045, 1.495, -0.028),
+      new THREE.Vector3(0.030, 1.474, -0.070),
+      new THREE.Vector3(0.112, 1.404, -0.056),
+      new THREE.Vector3(0.148, 1.352, -0.026),
+      new THREE.Vector3(0.158, 1.322, 0.000),
+      new THREE.Vector3(0.148, 1.352, 0.026),
+      new THREE.Vector3(0.112, 1.404, 0.056),
+      new THREE.Vector3(0.030, 1.474, 0.070),
+      new THREE.Vector3(-0.045, 1.495, 0.028),
+    ]), 52, 0.0023, 5, false), shade(YOU.cord)));
+
+  // Three of them, fanned. 9 mm case, 5 mm mouth, tip down — a pistol round
+  // rather than a rifle one, which is what she wears and also what fits: a
+  // 7.62 at this scale is a finger hanging off her collarbone.
+  const brassMat = shade(YOU.brass, 0.42, 40);
+  for (let i = -1; i <= 1; i++) {
+    const shell = new THREE.Group();
+    shell.position.set(0.1565 - Math.abs(i) * 0.0035, 1.3185, i * 0.0115);
+    shell.rotation.x = -i * 0.20;
+    chain.add(shell);
+    const cse = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.0052, 0.0052, 0.0185, 10), brassMat);
+    cse.position.y = -0.0093;
+    shell.add(cse);
+    const tip = new THREE.Mesh(
+      new THREE.ConeGeometry(0.0052, 0.0098, 10), brassMat);
+    tip.position.y = -0.0234;
+    tip.rotation.x = Math.PI;
+    shell.add(tip);
+  }
 
   // Everything hangs off one group so the head bone only has to be read once a
   // frame and the whole lot inherits the body's yaw for free. The group sits at
