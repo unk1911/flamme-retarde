@@ -288,6 +288,12 @@ PD_TER7 = (2.20, 3.05, 0.0, DOOR_H)      # 6 out on to the rear terrace
 # Which is also the back way in — yard, loggia, kitchen — and the reason the
 # opening is here rather than a window: you are meant to walk through it.
 PT7_OPEN = (0.77, 2.99, 0.0, 2.26)
+# And its east side, which was a blind painted wall standing between the table
+# and the side passage. It is not there: terrace 7 is a corner loggia, open on
+# the north to the yard and on the east to the path that runs down the side of
+# the house, with a pier at each end of both openings and one downstand beam
+# carrying soba 4 across the corner.
+PT7_EAST = (2.36, 3.46, 0.0, 2.26)
 
 PW_S3_S = (1.44, 2.64, 1.00, 2.05)       # soba 3, south
 PW_S4_E = (0.23, 1.43, 1.00, 2.05)       # soba 4, east — purple, north of centre
@@ -906,6 +912,7 @@ def shell(kit):
     terrace(kit)
     outside_stair(kit)
     yard(kit)
+    front_yard(kit)
     bathroom(kit)
     kitchen(kit)
     living(kit)
@@ -1297,7 +1304,7 @@ def prizemlje(kit):
         "north": ("x", Y1 - EXT / 2, NX0, X1, [PW_KIT_N, PT7_OPEN]),
         "westS": ("y", X0 + EXT / 2, Y0, BY1, [PW_BATH_W]),
         "westN": ("y", NX0 + EXT / 2, BY0, Y1, []),
-        "east": ("y", X1 - EXT / 2, Y0, Y1, [PW_S4_E]),
+        "east": ("y", X1 - EXT / 2, Y0, Y1, [PW_S4_E, PT7_EAST]),
     }
     for axis, at, a0, a1, holes in ext.values():
         hs = [(h[0], h[1], P_FL + h[2], P_FL + h[3]) for h in holes]
@@ -1311,7 +1318,8 @@ def prizemlje(kit):
                   [PW_KIT_N, PT7_OPEN]),
         "westS": ("y", IX0 + 0.02, IY0 - 0.10, BY1, [PW_BATH_W]),
         "westN": ("y", NIX0 + 0.02, BY0, IY1 + 0.10, []),
-        "east": ("y", IX1 - 0.02, IY0 - 0.10, IY1 + 0.10, [PW_S4_E]),
+        "east": ("y", IX1 - 0.02, IY0 - 0.10, IY1 + 0.10,
+                 [PW_S4_E, PT7_EAST]),
     }
     for axis, at, a0, a1, holes in inner.values():
         hs = [(h[0] - 0.01, h[1] + 0.01, P_FL + h[2] - 0.01, P_FL + h[3] + 0.01)
@@ -1390,6 +1398,9 @@ def prizemlje(kit):
     # step outside it, because the loggia floor is thirty over the yard.
     reveal(kit, "x", Y1 - EXT / 2, PT7_OPEN[0], PT7_OPEN[1],
            P_FL + PT7_OPEN[2], P_FL + PT7_OPEN[3], EXT, colour=WALL,
+           floor=P_FL)
+    reveal(kit, "y", X1 - EXT / 2, PT7_EAST[0], PT7_EAST[1],
+           P_FL + PT7_EAST[2], P_FL + PT7_EAST[3], EXT, colour=WALL,
            floor=P_FL)
     kit.span(PLINTH, PT7_OPEN[0] + 0.10, PT7_OPEN[1] - 0.10, Y1 + 0.06,
              Y1 + 0.42, GRADE - 0.15, P_FL - 0.16, bev=0.02)
@@ -1735,7 +1746,8 @@ def starlink(kit, px, py, top):
 # to survive full sun.
 FLAG = (0.615, 0.588, 0.532)        # kamene ploče, warm grey limestone
 FLAG_J = (0.395, 0.378, 0.345)      # the mortar between them
-RUBBLE = (0.575, 0.545, 0.488)      # the laid stone of the retaining walls
+RUBBLE = (0.575, 0.545, 0.488)
+GRAVEL = (0.648, 0.618, 0.560)      # the stony forecourt, tuca off the spit      # the laid stone of the retaining walls
 EARTH = (0.470, 0.412, 0.330)       # what the retaining walls are retaining
 GATE_BLACK = (0.130, 0.140, 0.150)  # both gates on the plot, satin black
 WICKER = (0.505, 0.468, 0.412)      # the grey stacking rattan chairs
@@ -1743,12 +1755,27 @@ TUBE = (0.430, 0.442, 0.452)        # their frames, and the lounger's
 STRIPE = ((0.930, 0.938, 0.945), (0.180, 0.430, 0.700),
           (0.430, 0.700, 0.870), (0.070, 0.240, 0.520))
 
-# The yard. YD_Y1 is the gate line, and the two walls stand on the long sides.
+# The yard behind: paving between two retaining walls, and the side passage
+# down the east flank that joins it to the front. There is no gate back here.
+# The gate is at the front, where you arrive — the back of this plot runs into
+# the neighbour's ground and always has.
 YD_X0, YD_X1 = -0.30, 4.45
 YD_Y0 = Y1 + 0.06
 YD_Y1 = 6.45
-YD_GATE = (1.35, 2.53)             # the opening in the wall at the end
 YD_WALL = 0.45                     # how high the two retaining walls stand
+YD_SIDE = 1.80                     # how far south the side passage runs
+
+# The front. The house is a first-row house: the promenade is three and a half
+# metres off the lip of terrace 8, and between the two there is a walled
+# forecourt with a five-bar gate in it, a flagged path on the front door's own
+# axis, a raised bed either side of the path and gravel over the rest.
+FY_X0, FY_X1 = -3.55, 3.55
+FY_Y1 = TER_Y0 - 0.04              # the lip of terrace 8
+FY_Y0 = -9.95                      # the gate line, out on the promenade
+FY_Z = GRADE + 0.13                # three proud of the promenade it runs off
+FY_PATH = (-2.52, -0.80)           # the flagged path, on the front door
+FY_GATE = (-2.25, -1.07)           # and the opening in the end wall, on it too
+FY_KERB = 0.14
 
 
 def flagstones(kit, x0, x1, y0, y1, z, size=0.44, colour=FLAG, joint=FLAG_J,
@@ -1791,6 +1818,21 @@ def flagstones(kit, x0, x1, y0, y1, z, size=0.44, colour=FLAG, joint=FLAG_J,
                 poly.append((px + dx / d * inset, py + dy / d * inset))
             bm_prism(kit.bm(tones[RNG.randrange(len(tones))], 0.004), poly,
                      z - thick, z + (RNG.random() - 0.5) * 0.006)
+
+
+def gravel(kit, x0, x1, y0, y1, z, size=0.72, colour=GRAVEL):
+    """Loose stone, which is a floor and not a paving: no joints, no edges you
+    can see, only a sheet of it that changes tone every metre or so."""
+    nx = max(1, int(round((x1 - x0) / size)))
+    ny = max(1, int(round((y1 - y0) / size)))
+    sx, sy = (x1 - x0) / nx, (y1 - y0) / ny
+    tones = _shades(colour, n=5, lo=0.88, hi=1.12)
+    for i in range(nx):
+        for j in range(ny):
+            kit.span(tones[RNG.randrange(len(tones))],
+                     x0 + i * sx, x0 + (i + 1) * sx,
+                     y0 + j * sy, y0 + (j + 1) * sy,
+                     z - 0.06, z + (RNG.random() - 0.5) * 0.008, bev=0)
 
 
 def rubble_wall(kit, axis, at, a0, a1, z0, z1, thick=0.30, course=0.17):
@@ -1997,7 +2039,7 @@ def loggia(kit):
 
 
 def yard(kit):
-    """The paving, the two retaining walls and the gate at the end of it."""
+    """The paving behind, its two retaining walls, and the side passage."""
     # A slab first and the paving on it. The slab reaches well below grade
     # because what is under it out here is not a floor, it is whatever the
     # terrain does — the same reason the house stands on a 35 cm plinth.
@@ -2010,13 +2052,28 @@ def yard(kit):
     flagstones(kit, PT7_OPEN[0] + 0.10, PT7_OPEN[1] - 0.10, Y1 + 0.06,
                Y1 + 0.42, P_FL - 0.155, size=0.32)
 
+    # ── the side passage ────────────────────────────────────────────────────
+    # Down the east flank of the house, between the wall and the neighbour's
+    # ground, from the loggia's east opening round the corner into the yard.
+    # It is the walk in the photograph: flagstones running past the corner of
+    # the house with the concrete wall and the fig on your left.
+    kit.span(PLINTH, X1 + 0.02, YD_X1 + 0.30, YD_SIDE - 0.30, YD_Y0 + 0.10,
+             GRADE - 0.45, GRADE + 0.005, bev=0.02)
+    flagstones(kit, X1 + 0.06, YD_X1, YD_SIDE, YD_Y0, GRADE + 0.02)
+    # And its own step down out of the loggia, which stands 30 above it.
+    flagstones(kit, X1 + 0.06, X1 + 0.42, PT7_EAST[0] + 0.10,
+               PT7_EAST[1] - 0.10, P_FL - 0.155, size=0.32)
+    kit.span(PLINTH, X1 + 0.06, X1 + 0.44, PT7_EAST[0] + 0.08,
+             PT7_EAST[1] - 0.08, GRADE - 0.15, P_FL - 0.16, bev=0.02)
+
     # ── the two retaining walls ─────────────────────────────────────────────
     # East, board-marked concrete, holding up the neighbour's ground and the
-    # fig that grows out of it. The switch for the loggia light is on the
-    # inside face at the near end, where you can reach it off the step.
-    kit.span(CONCRETE, YD_X1, YD_X1 + 0.20, YD_Y0 - 0.10, YD_Y1,
+    # fig that grows out of it. It runs the whole length of the passage now,
+    # not just the yard. The switch for the loggia light is on the inside face
+    # where you can reach it off the step.
+    kit.span(CONCRETE, YD_X1, YD_X1 + 0.20, YD_SIDE - 0.30, YD_Y1,
              GRADE - 0.40, GRADE + YD_WALL, bev=0.015)
-    kit.span(EARTH, YD_X1 + 0.20, YD_X1 + 1.70, YD_Y0 - 0.10, YD_Y1,
+    kit.span(EARTH, YD_X1 + 0.20, YD_X1 + 1.70, YD_SIDE - 0.30, YD_Y1,
              GRADE - 0.40, GRADE + YD_WALL - 0.07, bev=0.02)
     kit.span(WHITEGOODS, YD_X1 - 0.014, YD_X1 + 0.002, 4.42, 4.60,
              GRADE + 0.19, GRADE + 0.37, bev=0.005)
@@ -2026,21 +2083,69 @@ def yard(kit):
                 GRADE - 0.30, GRADE + YD_WALL + 0.12, thick=0.32)
     kit.span(EARTH, YD_X0 - 1.80, YD_X0 - 0.30, YD_Y0 - 0.10, YD_Y1,
              GRADE - 0.30, GRADE + YD_WALL + 0.04, bev=0.02)
-
-    # ── the wall at the end, and the gate in it ─────────────────────────────
-    for a0, a1 in ((YD_X0 - 0.32, YD_GATE[0]), (YD_GATE[1], YD_X1 + 0.20)):
-        kit.span(RENDER, a0, a1, YD_Y1, YD_Y1 + 0.20,
-                 GRADE - 0.40, GRADE + 1.12, bev=0.02)
-        kit.span(CONCRETE, a0 - 0.02, a1 + 0.02, YD_Y1 - 0.02, YD_Y1 + 0.22,
-                 GRADE + 1.12, GRADE + 1.17, bev=0.01)
-    # Hung on the west jamb and standing open into the yard, at 100 degrees,
-    # which is where a gate ends up when nobody has shut it since May.
-    steel_gate(kit, YD_GATE[0] + 0.03, YD_Y1 + 0.02, GRADE + 0.10,
-               -math.pi / 2 - 0.17)
+    # The far end is the neighbour's ground and not a boundary you cross: one
+    # low rubble kerb with the bank behind it, and no gate. The gate is at the
+    # front of the house, which is where it is in the photographs.
+    rubble_wall(kit, "x", YD_Y1 + 0.10, YD_X0 - 0.32, YD_X1 + 0.20,
+                GRADE - 0.30, GRADE + 0.52, thick=0.34)
+    kit.span(EARTH, YD_X0 - 0.32, YD_X1 + 0.20, YD_Y1 + 0.27, YD_Y1 + 2.10,
+             GRADE - 0.30, GRADE + 0.44, bev=0.02)
 
     # The lounger, folded out on the paving east of the opening, which is the
     # only patch of this yard the sun reaches for any length of time.
     sun_lounger(kit, 3.62, 5.05, GRADE + 0.03, yaw=math.pi / 2 - 0.14)
+
+
+def front_yard(kit):
+    """The forecourt: the path, the two raised beds, the gravel and the gate.
+
+    This is the side you arrive on. The promenade runs past the end of it, the
+    gate stands in a rendered wall on that line, and the path goes straight
+    from the gate to the front door because the front door is what it is for.
+    """
+    kit.span(PLINTH, FY_X0 - 0.36, FY_X1 + 0.30, FY_Y0 - 0.30, FY_Y1 + 0.10,
+             GRADE - 0.55, FY_Z - 0.05, bev=0.02)
+    # Gravel over the whole forecourt first, and the flagged path laid on it.
+    # It is the stony ground of the photograph and not a lawn: nothing on this
+    # spit has ever been a lawn.
+    gravel(kit, FY_X0, FY_X1, FY_Y0, FY_Y1, FY_Z - 0.01)
+    flagstones(kit, FY_PATH[0], FY_PATH[1], FY_Y0 + 0.20, FY_Y1, FY_Z,
+               size=0.46)
+
+    # ── the two raised beds, kerbed ─────────────────────────────────────────
+    # West of the path it runs to the boundary wall; east of it the bed stops
+    # short and the rest is gravel, which is where you leave the car.
+    for bx0, bx1 in ((FY_X0, FY_PATH[0] - 0.22), (FY_PATH[1] + 0.22, 1.30)):
+        for a0, a1, b0, b1 in (
+                (bx0, bx1, FY_Y0 + 0.55, FY_Y0 + 0.55 + FY_KERB),
+                (bx0, bx1, FY_Y1 - 0.30 - FY_KERB, FY_Y1 - 0.30),
+                (bx0, bx0 + FY_KERB, FY_Y0 + 0.55, FY_Y1 - 0.30),
+                (bx1 - FY_KERB, bx1, FY_Y0 + 0.55, FY_Y1 - 0.30)):
+            kit.span(CONCRETE, a0, a1, b0, b1, FY_Z - 0.20, FY_Z + 0.34,
+                     bev=0.012)
+        kit.span(EARTH, bx0 + FY_KERB, bx1 - FY_KERB,
+                 FY_Y0 + 0.55 + FY_KERB, FY_Y1 - 0.30 - FY_KERB,
+                 FY_Z - 0.20, FY_Z + 0.27, bev=0.02)
+
+    # ── the boundary, laid rubble, down the west side ───────────────────────
+    rubble_wall(kit, "y", FY_X0 - 0.18, FY_Y0 - 0.10, FY_Y1 + 0.10,
+                GRADE - 0.40, FY_Z + 0.62, thick=0.34)
+    kit.span(EARTH, FY_X0 - 1.90, FY_X0 - 0.34, FY_Y0 - 0.10, FY_Y1 + 0.10,
+             GRADE - 0.40, FY_Z + 0.52, bev=0.02)
+    # And a low one down the east side, which is only a kerb against the lane.
+    rubble_wall(kit, "y", FY_X1 + 0.18, FY_Y0 - 0.10, FY_Y1 + 0.10,
+                GRADE - 0.40, FY_Z + 0.40, thick=0.32)
+
+    # ── the wall at the end, and the gate in it ─────────────────────────────
+    for a0, a1 in ((FY_X0 - 0.34, FY_GATE[0]), (FY_GATE[1], FY_X1 + 0.34)):
+        kit.span(RENDER, a0, a1, FY_Y0 - 0.20, FY_Y0,
+                 GRADE - 0.45, FY_Z + 1.12, bev=0.02)
+        kit.span(CONCRETE, a0 - 0.02, a1 + 0.02, FY_Y0 - 0.22, FY_Y0 + 0.02,
+                 FY_Z + 1.12, FY_Z + 1.17, bev=0.01)
+    # Hung on the west jamb and standing open into the forecourt, at 100
+    # degrees, which is where a gate ends up when nobody has shut it since May.
+    steel_gate(kit, FY_GATE[0] + 0.03, FY_Y0 - 0.02, FY_Z + 0.08,
+               math.pi / 2 + 0.17)
 
 
 # --------------------------------------------------------------------------- #
@@ -3636,7 +3741,7 @@ def plan_json():
     band(blockersP, "x", Y1 - EXT / 2, EXT, NX0, X1, [PT7_OPEN])
     band(blockersP, "y", X0 + EXT / 2, EXT, Y0, BY1, [])
     band(blockersP, "y", NX0 + EXT / 2, EXT, BY0, Y1, [])
-    band(blockersP, "y", X1 - EXT / 2, EXT, Y0, Y1, [])
+    band(blockersP, "y", X1 - EXT / 2, EXT, Y0, Y1, [PT7_EAST])
     band(blockersP, "x", BY1 - EXT / 2, EXT, X0, NX0 + EXT, [])
     band(blockersP, "x", P_CROSS, EXT, IX0, IX1, [PD_HALL])
     band(blockersP, "y", P_SPINE, INT, IY0, P_CROSS, [PD_S3])
@@ -3651,10 +3756,13 @@ def plan_json():
     # walk through is worse than no wall, and these are the only things out
     # there tall enough to stop anybody.
     blockersY = []
-    solid(blockersY, YD_X1, YD_X1 + 0.20, YD_Y0 - 0.10, YD_Y1)
+    solid(blockersY, YD_X1, YD_X1 + 0.20, YD_SIDE - 0.30, YD_Y1)
     solid(blockersY, YD_X0 - 0.32, YD_X0, YD_Y0 - 0.10, YD_Y1)
-    solid(blockersY, YD_X0 - 0.32, YD_GATE[0], YD_Y1, YD_Y1 + 0.20)
-    solid(blockersY, YD_GATE[1], YD_X1 + 0.20, YD_Y1, YD_Y1 + 0.20)
+    solid(blockersY, YD_X0 - 0.32, YD_X1 + 0.20, YD_Y1 - 0.07, YD_Y1 + 0.27)
+    solid(blockersY, FY_X0 - 0.35, FY_X0 - 0.01, FY_Y0 - 0.10, FY_Y1 + 0.10)
+    solid(blockersY, FY_X1 + 0.01, FY_X1 + 0.35, FY_Y0 - 0.10, FY_Y1 + 0.10)
+    solid(blockersY, FY_X0 - 0.34, FY_GATE[0], FY_Y0 - 0.20, FY_Y0)
+    solid(blockersY, FY_GATE[1], FY_X1 + 0.34, FY_Y0 - 0.20, FY_Y0)
 
     rooms = {k: T(*v) for k, v in ROOMS.items()}
     rooms["terrace"] = T(X0, X1, TER_Y0, TER_Y1)

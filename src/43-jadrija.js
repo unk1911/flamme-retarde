@@ -2782,11 +2782,19 @@ async function buildJadrija(scene) {
   // model's x, s is its s plus the model's y — because these belong to the
   // house and not to the shore, and the house is the thing they are measured
   // against in the photographs.
+  //
+  // The front is the other half of the same list: the two raised beds either
+  // side of the path are planted, because a kerbed bed with nothing in it is a
+  // trough. No pine went in with them: there are already two either side of
+  // the terrace and a third in the forecourt closed the house off from the
+  // water, which is the one view the house exists for.
   for (const [bx, by, kind, size] of [
     [0.10, 7.50, 'ole', 1.35], [4.85, 7.10, 'ole', 1.05],
     [-1.30, 5.60, 'ole', 0.95],
     [6.40, 8.10, 'pine', 10.5], [-3.20, 7.60, 'pine', 8.8],
     [5.60, 4.90, 'olive', 3.1],
+    [-3.14, -8.60, 'ole', 0.95], [-3.14, -6.95, 'olive', 2.1],
+    [0.36, -8.95, 'ole', 0.88], [0.36, -7.20, 'ole', 0.74],
   ]) {
     const t = VIK.t + bx, s2 = VIK.s + by, yy = surfaceY(t, s2);
     if (kind === 'pine') { pine(t, s2, yy, size); greens.push([t, s2, 0.55, 9]); }

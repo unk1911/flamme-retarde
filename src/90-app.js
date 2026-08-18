@@ -1614,6 +1614,32 @@ function wadeAshore() {
   return true;
 }
 
+/**
+ * The other way in: you walked off the front and kept going. Same handover as
+ * the canopy's, minus the canopy — and deliberately the same function on the
+ * way back out, so the shore is one door and not two.
+ */
+let wasUnder = false;
+
+function waadeIn(x, z) {
+  if (state.phase !== 'ground' || !swim) return false;
+  const y = ground.you;
+  if (!swim.enter(x, z, y.yaw, -0.4)) return false;
+  ground.bail();
+  state.phase = 'swim';
+  $('ground-hud').hidden = true;
+  $('hud').hidden = true;
+  $('chute-hud').hidden = true;
+  $('swim-hud').hidden = false;
+  if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = false; }
+  if (!IS_TOUCH && !pointerLocked) grabPointer();
+  if (audio) audio.plunge();
+  wasUnder = false;
+  paintDeviceText();
+  toast(T('toast.inTheWater'));
+  return true;
+}
+
 /** And the arrival, whichever of the three it turned out to be. */
 function chuteDown(kind) {
   if (state.phase !== 'chute') return;
@@ -1672,6 +1698,8 @@ function chuteDown(kind) {
     $('swim-hud').hidden = false;
     if (IS_TOUCH) { $('ctouch').hidden = true; $('touch').hidden = true; $('gtouch').hidden = false; }
     if (!IS_TOUCH && !pointerLocked) grabPointer();
+    if (audio) audio.plunge(1);
+    wasUnder = true;
     paintDeviceText();
     toast(T('toast.inTheWater'));
     return;
@@ -2348,6 +2376,11 @@ function frame() {
     // integrated was the chute branch, so the moment the canopy touched down she
     // froze in mid-air and hung there for the rest of the game, in plain view.
     if (eject.active) flyDerelict(dt);
+    // And if that walk was into the sea, it was a walk into the sea. The
+    // barrier at the waterline used to be the end of the world in that
+    // direction; now it is a doorway, and the far side of it has its own mode.
+    const wet = ground.wet && ground.wet();
+    if (wet) waadeIn(wet[0], wet[1]);
     updateMission(real);
   }
 
@@ -2385,6 +2418,17 @@ function frame() {
       down: keys.has('KeyC') || keys.has('ControlLeft'),
       up: keys.has('Space'),
     });
+    // Under and out from under. Both are events and neither is a state: the
+    // sound belongs to the moment the ears change what they are in, which is
+    // the one frame the flag flips. How hard you gasp is how badly you needed
+    // it — a duck under and up is nothing, twenty seconds down is a noise.
+    if (swim.submerged !== wasUnder) {
+      wasUnder = swim.submerged;
+      if (audio) {
+        if (wasUnder) audio.plunge(0.7);
+        else audio.gasp(clamp(1.35 - swim.breath, 0.45, 1.15));
+      }
+    }
     paintSwimHud();
     updateMission(real);
   }
@@ -3171,6 +3215,8 @@ window.__fr = {
     },
     confine: (x, z, y) => ground.confine(x, z, y),
     walkY: (x, z, y) => ground.walkY(x, z, y),
+    /** Debug: is the land cover at (x, z) water? The shoreline test. */
+    sea: (x, z) => isSea(x, z),
     /**
      * On foot anywhere at all, synthesising a locale for open country the same
      * way a parachute landing does. `jad.stand` only reaches Jadrija, and the
@@ -3202,8 +3248,12 @@ window.__fr = {
         fire.update(dt);
         ground.setSpray(mouseDrop || keys.has('Space') || TOUCH.gjet || debugJet);
         ground.update(dt);
+        // The shoreline handover, which the real frame loop does too. Without
+        // it a headless walk into the sea grinds along the barrier for ever.
+        const w = ground.wet && ground.wet();
+        if (w && waadeIn(w[0], w[1])) break;
       }
-      return ground.stats();
+      return state.phase === 'swim' ? swim.stats() : ground.stats();
     },
     crew: () => ground.crew.map((c) => ({
       mode: c.mode, burn: +c.burn.toFixed(2), wet: +c.wet.toFixed(2),

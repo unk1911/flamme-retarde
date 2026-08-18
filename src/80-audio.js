@@ -429,6 +429,118 @@ function buildAudio() {
   }
 
   /**
+   * Going under.
+   *
+   * Three things, and it is the order of them that makes it read as water
+   * rather than as noise: the surface breaking, which is broadband and dies in
+   * a fifth of a second; the head going below it, which is that same band being
+   * taken away by a low-pass sliding down two octaves; and then the bubbles,
+   * which are the only part anybody actually recognises.
+   *
+   * A bubble is not a noise burst. It is a short sine whose pitch *rises* as
+   * the bubble leaves the sound source and expands — that rise is the whole
+   * cue, and a bubble without it sounds like a marimba. So: thirty of them,
+   * each 20-60 ms, each sweeping up through a third to a fifth, scattered in
+   * time with the gaps getting longer as the train thins out.
+   */
+  function plunge(hard = 1) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    // The surface, breaking.
+    burst({ freq: 2200, q: 0.4, dur: 0.30 + 0.10 * hard, gain: 0.16 * hard,
+      sweep: 0.14, at: t0 });
+    burst({ freq: 420, q: 0.9, dur: 0.22, gain: 0.10 * hard, sweep: 0.35, at: t0 });
+    // The head going under it: the same band, closing.
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuf; src.loop = true;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(5200, t0); lp.Q.value = 0.7;
+    lp.frequency.exponentialRampToValueAtTime(320, t0 + 0.85);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.075 * hard, t0 + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.5);
+    src.connect(lp).connect(g).connect(master);
+    src.start(t0); src.stop(t0 + 1.6);
+    // The bubbles.
+    let at = t0 + 0.06;
+    for (let i = 0; i < 30 && at < t0 + 1.5; i++) {
+      const f = 240 + Math.random() * 900;
+      const d = 0.020 + Math.random() * 0.040;
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f, at);
+      o.frequency.exponentialRampToValueAtTime(f * (1.4 + Math.random()), at + d);
+      const bg = ctx.createGain();
+      bg.gain.setValueAtTime(0.0001, at);
+      bg.gain.exponentialRampToValueAtTime(0.030 * hard * (0.4 + Math.random() * 0.6),
+        at + d * 0.25);
+      bg.gain.exponentialRampToValueAtTime(0.0001, at + d);
+      o.connect(bg).connect(master);
+      o.start(at); o.stop(at + d + 0.01);
+      at += 0.012 + Math.random() * 0.055 * (1 + i * 0.09);
+    }
+  }
+
+  /**
+   * Coming up.
+   *
+   * The reverse splash first — and reverse is literal: a noise band whose gain
+   * *swells* into the moment the head clears instead of decaying away from it,
+   * which is the entire reason a surfacing sounds nothing like an entry. Then
+   * the break itself, then the water running off, then the breath.
+   *
+   * The gasp is two envelopes on one band: the intake, which is fast, high and
+   * unvoiced, and the tail of it, which is lower, longer and has a little
+   * amplitude wobble on it so it reads as a throat and not as a hiss.
+   */
+  function gasp(hard = 1) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const swell = 0.34;
+    // The swell in. Linear ramps, because an exponential rise from near-silence
+    // is inaudible for most of its length and this one has to be heard coming.
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuf; src.loop = true;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'lowpass'; bp.frequency.setValueAtTime(380, t0); bp.Q.value = 0.6;
+    bp.frequency.exponentialRampToValueAtTime(4800, t0 + swell);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(0.115 * hard, t0 + swell);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + swell + 0.16);
+    src.connect(bp).connect(g).connect(master);
+    src.start(t0); src.stop(t0 + swell + 0.2);
+    // The surface breaking over your head, and the water running off it.
+    burst({ freq: 2800, q: 0.4, dur: 0.26, gain: 0.15 * hard, sweep: 0.20,
+      at: t0 + swell });
+    burst({ freq: 6200, q: 0.6, dur: 0.55, gain: 0.055 * hard, sweep: 0.45,
+      at: t0 + swell + 0.05 });
+    // The breath. Starts a beat after the head is out, because it does.
+    const tb = t0 + swell + 0.09;
+    const air = ctx.createBufferSource();
+    air.buffer = noiseBuf; air.loop = true;
+    const f1 = ctx.createBiquadFilter();
+    f1.type = 'bandpass'; f1.Q.value = 1.1;
+    f1.frequency.setValueAtTime(680, tb);
+    f1.frequency.exponentialRampToValueAtTime(1750, tb + 0.11);
+    f1.frequency.exponentialRampToValueAtTime(540, tb + 0.52);
+    const ag = ctx.createGain();
+    ag.gain.setValueAtTime(0.0001, tb);
+    ag.gain.exponentialRampToValueAtTime(0.17 * hard, tb + 0.055);
+    ag.gain.exponentialRampToValueAtTime(0.045 * hard, tb + 0.22);
+    ag.gain.exponentialRampToValueAtTime(0.0001, tb + 0.60);
+    // The wobble, which is what stops it being a hiss.
+    const wob = ctx.createOscillator();
+    wob.type = 'sine'; wob.frequency.value = 14 + Math.random() * 5;
+    const wg = ctx.createGain(); wg.gain.value = 0.022 * hard;
+    wob.connect(wg).connect(ag.gain);
+    wob.start(tb); wob.stop(tb + 0.62);
+    air.connect(f1).connect(ag).connect(master);
+    air.start(tb); air.stop(tb + 0.65);
+  }
+
+  /**
    * A boot arriving.
    *
    * Two sounds a handful of milliseconds apart, which is why one filtered burst
@@ -2140,7 +2252,7 @@ function buildAudio() {
     slowLp.frequency.value = 20000 * Math.pow(620 / 20000, clamp(k, 0, 1));
   }
 
-  return { start, update, squelch, dropWhoosh, setGush, footstep, splash, beep, rattle,
+  return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, rattle,
     canopy, boots,
     setVolume, getVolume, setMuffle, keyClick, printTick,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa, room,

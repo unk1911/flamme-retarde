@@ -285,6 +285,10 @@ async function buildGround(scene, field) {
   let crew = allCrew;
 
   // ── the player ─────────────────────────────────────────────────────────────
+  // Set by `walk` on the frame a step into the water was refused, and read
+  // once by the caller, which owns the swim mode. Null on every other frame.
+  let wet = null;
+
   const you = {
     x: 0, y: 0, z: 0, yaw: 0, pitch: 0, vx: 0, vz: 0,
     pack: GROUND.pack, spraying: false, jet: 0, refilling: false,
@@ -1405,6 +1409,7 @@ async function buildGround(scene, field) {
     you.vx = damp(you.vx, wx, m > 0.01 ? GROUND.accel / top : GROUND.drag, dt);
     you.vz = damp(you.vz, wz, m > 0.01 ? GROUND.accel / top : GROUND.drag, dt);
 
+    wet = null;
     const tx = you.x + you.vx * dt, tz = you.z + you.vz * dt;
     // People first, walls second, so that the wall has the last word. Somebody
     // standing against a hangar can then hold you against it but never push you
@@ -1433,6 +1438,26 @@ async function buildGround(scene, field) {
     // vector makes a wall flypaper — you stop dead and have to back off and
     // re-approach to get past it — whereas taking out the normal component
     // leaves the tangent, which is a shoulder along a hangar wall.
+    // Walking into the sea is not walking into a wall. Every barrier that
+    // holds you off the water — Jadrija's bounds, open country's `standable` —
+    // exists because there was nowhere to go once you were in it. There is
+    // now. So when a step is refused and the thing a metre and a half further
+    // on is water, say so and let the caller take you swimming; the barrier
+    // stays for everybody who is merely walking along the front.
+    if (hit && !wet) {
+      // Off `wx, wz` — where the keys are asking to go — and not off velocity,
+      // which by the second frame against a barrier is zero and stays there.
+      // Marched rather than sampled at one distance: the barrier is a metre
+      // short of the quay and the quay is another two short of water, and the
+      // gap is different everywhere along a traced shoreline.
+      const sp = Math.hypot(wx, wz);
+      if (sp > 0.2) {
+        for (let d = 1.2; d <= 3.6; d += 0.6) {
+          const ax = you.x + (wx / sp) * d, az = you.z + (wz / sp) * d;
+          if (isSea(ax, az)) { wet = [ax, az]; break; }
+        }
+      }
+    }
     if (hit) {
       const cx = nx - bx, cz = nz - bz;
       const cl = Math.hypot(cx, cz);
@@ -1768,6 +1793,8 @@ async function buildGround(scene, field) {
     get stranded() { return stranded; },
     get crew() { return crew; },
     hose: () => you.jet,
+    /** Where you tried to walk into the sea this frame, or null. */
+    wet: () => wet,
     /**
      * Debug: where a step to (x, z) would actually put you, and whether it
      * hit. `y` is which floor you are asking from and is not optional in any
