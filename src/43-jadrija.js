@@ -2383,6 +2383,81 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * A puff of foliage: a knocked-about ellipsoid, lit as a smooth one.
+   *
+   * `dome` builds a hemisphere from three rings of seven sides and stops at
+   * 80 % of the way up. That is exactly right for a shoulder or a bollard and
+   * it is why the trees on this shore read as painted card: an Aleppo pine
+   * drawn as three squat heptagonal plates is three squat heptagonal plates.
+   *
+   * Two things make it a tree instead, and neither is more triangles.
+   *
+   * The first is the normal. The radius here is knocked about by `jag`, so the
+   * face normals report every dent and the canopy sparkles — the eye reads
+   * high-frequency lighting noise as *hard*, and a hard canopy is tin. What a
+   * real crown does is the opposite: a hundred thousand leaves average into one
+   * broad soft gradient with the detail far below anything you can resolve. So
+   * the normal handed to the shader is the one the *un-jagged* ellipsoid would
+   * have had at that point. The silhouette keeps every dent; the shading does
+   * not see them. It is the trick from douges.dev and it is most of the effect.
+   *
+   * The second is that gradient, which the vertex colours were always able to
+   * carry and never did: dark on the underside of the crown, sunlit on top,
+   * over a band that belongs to the whole tree and not to the single puff — or
+   * a canopy of six of these reads as a bag of separate balls rather than as
+   * one mass with a light side and a dark side.
+   */
+  function puff(P, dt, ds, cy, ry, r, dark, lite, band,
+                sides = 8, rows = 3, jag = 0.32, seed = 0) {
+    // The local frame's two horizontal axes, in world xz. Positions go through
+    // P so they follow the shore's curve; directions are rotated by this, once,
+    // because probing P a metre out along a curve is not a rotation.
+    const O = P(0, 0, 0), EX = P(1, 0, 0), EZ = P(0, 1, 0);
+    const ux = EX[0] - O[0], uz = EX[2] - O[2];
+    const vx = EZ[0] - O[0], vz = EZ[2] - O[2];
+    const ph = [];
+    for (let i = 0; i < sides; i++) ph.push((seed * 7 + i) * 2.3999632);
+    const lo = band[0], hi = band[1];
+    const grid = [];
+    for (let k = 0; k <= rows; k++) {
+      const v = k / rows;
+      const th = (v - 0.5) * Math.PI * 0.98;
+      const w = Math.cos(th), hgt = Math.sin(th);
+      const ring = [];
+      for (let i = 0; i < sides; i++) {
+        const a = (i / sides) * TAU;
+        const n = 1 + jag * (0.62 * Math.sin(a * 3 + ph[i])
+          + 0.38 * Math.sin(v * 5.3 + ph[(i + 3) % sides]));
+        const q = P(dt + Math.cos(a) * r * w * n, ds + Math.sin(a) * r * w * n, 0);
+        const yy = cy + ry * hgt * (1 + jag * 0.22 * Math.sin(a * 2 + ph[i]));
+        // The smooth ellipsoid's normal, taken to the world through the frame.
+        const lx = Math.cos(a) * w / r, lz = Math.sin(a) * w / r, ly = hgt / ry;
+        let nx = lx * ux + lz * vx, ny = ly, nz = lx * uz + lz * vz;
+        const L = Math.hypot(nx, ny, nz) || 1;
+        let g = (yy - lo) / (hi - lo || 1);
+        g = g < 0 ? 0 : g > 1 ? 1 : g;
+        g = g * g * (3 - 2 * g);
+        ring.push({
+          p: [q[0], yy, q[2]],
+          n: [nx / L, ny / L, nz / L],
+          c: [dark[0] + (lite[0] - dark[0]) * g,
+            dark[1] + (lite[1] - dark[1]) * g,
+            dark[2] + (lite[2] - dark[2]) * g],
+        });
+      }
+      grid.push(ring);
+    }
+    for (let k = 0; k < rows; k++) {
+      for (let i = 0; i < sides; i++) {
+        const j = (i + 1) % sides;
+        const A = grid[k][i], B = grid[k][j], C = grid[k + 1][j], D = grid[k + 1][i];
+        b.smooth(A.p, B.p, C.p, A.n, B.n, C.n, A.c, B.c, C.c);
+        b.smooth(A.p, C.p, D.p, A.n, C.n, D.n, A.c, C.c, D.c);
+      }
+    }
+  }
+
+  /**
    * An Aleppo pine at eye height.
    *
    * The land cover draws these by the hundred thousand and draws them right for
@@ -2395,14 +2470,28 @@ async function buildJadrija(scene) {
   function pine(t, s, y, h) {
     const P = facing(t, s, rng() * TAU);
     const lean = (rng() - 0.5) * 0.9;
-    post(P, 0, 0, y, y + h * 0.34, 0.20, [0.330, 0.270, 0.215], 5);
-    post(P, lean * 0.3, 0, y + h * 0.32, y + h * 0.70, 0.15, [0.360, 0.295, 0.235], 5);
-    const cx = lean, top = y + h * 0.66;
+    post(P, 0, 0, y, y + h * 0.34, 0.20, [0.330, 0.270, 0.215], 7);
+    post(P, lean * 0.3, 0, y + h * 0.32, y + h * 0.72, 0.15, [0.360, 0.295, 0.235], 7);
+    const cx = lean, top = y + h * 0.74;
+    // Three limbs leaving the trunk under the crown, so the umbrella is
+    // carried rather than balanced on the end of a stick.
     for (let i = 0; i < 3; i++) {
-      const a = rng() * TAU, d = rng() * h * 0.20;
-      dome(P, cx + Math.cos(a) * d, Math.sin(a) * d,
-        top + i * h * 0.09, h * 0.16, h * (0.30 - i * 0.05),
-        i ? [0.180, 0.255, 0.140] : [0.145, 0.215, 0.120]);
+      const a = (i / 3) * TAU + rng();
+      post(P, cx * 0.6 + Math.cos(a) * h * 0.09, Math.sin(a) * h * 0.09,
+        y + h * 0.66, top + h * 0.02, 0.075, [0.360, 0.295, 0.235], 5);
+    }
+    // Nine puffs on a shallow disc rather than three plates stacked on each
+    // other. An Aleppo pine is a broken ceiling; a ceiling needs holes, and a
+    // hole needs an edge on both sides of it.
+    const band = [top - h * 0.11, top + h * 0.15];
+    const DK = [0.118, 0.178, 0.100], LT = [0.250, 0.350, 0.195];
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * TAU + rng() * 0.55;
+      const d = (i ? 0.38 + rng() * 0.62 : 0) * h * 0.25;
+      const rr = h * (i ? 0.082 + rng() * 0.058 : 0.135);
+      puff(P, cx + Math.cos(a) * d, Math.sin(a) * d,
+        top + (rng() - 0.40) * h * 0.075, rr * 0.60, rr,
+        DK, LT, band, 9, 3, 0.46, i + 1);
     }
   }
 
@@ -2413,21 +2502,41 @@ async function buildJadrija(scene) {
     for (const o of [-0.16, 0.18]) {
       post(P, o, o * 0.4, y + h * 0.30, y + h * 0.58, 0.10, [0.420, 0.380, 0.315], 4);
     }
-    for (const [dx, dz, r] of [[0, 0, 0.52], [-0.35, 0.25, 0.36], [0.34, -0.22, 0.34]]) {
-      dome(P, dx * h * 0.5, dz * h * 0.5, y + h * 0.52, h * 0.34, h * r,
-        [0.365, 0.410, 0.285]);
+    // Five lobes with light between them, which is what makes an olive read as
+    // an olive: you can see the sky through the middle of one.
+    const band = [y + h * 0.40, y + h * 0.92];
+    const DK = [0.205, 0.240, 0.162], LT = [0.392, 0.448, 0.302];
+    const olC = [[0, 0, 0.33, 0.60], [-0.52, 0.38, 0.24, 0.50],
+      [0.50, -0.32, 0.23, 0.48], [0.26, 0.50, 0.21, 0.68],
+      [-0.32, -0.44, 0.20, 0.66]];
+    for (let i = 0; i < olC.length; i++) {
+      const [dx, dz, r, hy] = olC[i];
+      puff(P, dx * h * 0.5, dz * h * 0.5, y + h * hy, h * r * 0.74, h * r,
+        DK, LT, band, 10, 4, 0.44, i + 3);
     }
   }
 
   /** Oleander: a mound of dark leaf with the flowers sitting on top of it. */
   function oleander(t, s, y, r) {
     const P = facing(t, s, rng() * TAU);
-    dome(P, 0, 0, y, r * 1.25, r, [0.130, 0.235, 0.135]);
+    const band = [y, y + r * 1.9];
+    const DK = [0.098, 0.158, 0.094], LT = [0.220, 0.350, 0.208];
+    // A mound of four, because one dome the size of a whole shrub is a dome.
+    puff(P, 0, 0, y + r * 0.78, r * 0.86, r * 0.92, DK, LT, band, 8, 3, 0.32, 11);
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * TAU + rng();
+      puff(P, Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55,
+        y + r * (0.52 + rng() * 0.35), r * 0.52, r * 0.58,
+        DK, LT, band, 7, 3, 0.36, 13 + i);
+    }
+    // Oleander in August is more flower than leaf.
     const flower = rng() < 0.5 ? [0.880, 0.480, 0.600] : [0.945, 0.930, 0.910];
-    for (let i = 0; i < 5; i++) {
-      const a = rng() * TAU, d = rng() * r * 0.72;
-      dome(P, Math.cos(a) * d, Math.sin(a) * d,
-        y + r * (0.72 + rng() * 0.42), r * 0.16, r * 0.20, flower, 5);
+    const fdk = flower.map((v) => v * 0.62);
+    for (let i = 0; i < 9; i++) {
+      const a = rng() * TAU, d = rng() * r * 0.86;
+      puff(P, Math.cos(a) * d, Math.sin(a) * d,
+        y + r * (1.05 + rng() * 0.55), r * 0.13, r * 0.16,
+        fdk, flower, [y + r * 0.9, y + r * 1.8], 6, 2, 0.30, 17 + i);
     }
   }
 
@@ -2664,6 +2773,25 @@ async function buildJadrija(scene) {
     const t = VIK.t + dt, s = VIK.s - 3.4 + (dt > 0 ? 1.1 : 0);
     pine(t, s, surfaceY(t, s), 8.4 + rng() * 2.2);
     greens.push([t, s, 0.55, 9]);
+  }
+
+  // The back of the plot, which is the side everybody actually arrives on: a
+  // gate in a wall, an oleander either side of it in flower, a fig hanging
+  // over the east retaining wall and one big pine on the corner of the
+  // forecourt. Placed off the vikendica's own frame — t is its t plus the
+  // model's x, s is its s plus the model's y — because these belong to the
+  // house and not to the shore, and the house is the thing they are measured
+  // against in the photographs.
+  for (const [bx, by, kind, size] of [
+    [0.10, 7.50, 'ole', 1.35], [4.85, 7.10, 'ole', 1.05],
+    [-1.30, 5.60, 'ole', 0.95],
+    [6.40, 8.10, 'pine', 10.5], [-3.20, 7.60, 'pine', 8.8],
+    [5.60, 4.90, 'olive', 3.1],
+  ]) {
+    const t = VIK.t + bx, s2 = VIK.s + by, yy = surfaceY(t, s2);
+    if (kind === 'pine') { pine(t, s2, yy, size); greens.push([t, s2, 0.55, 9]); }
+    else if (kind === 'olive') { olive(t, s2, yy, size); greens.push([t, s2, 0.60, 4]); }
+    else oleander(t, s2, yy, size);
   }
 
   // And a few more out in front of the terrace, between the house and the

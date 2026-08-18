@@ -77,11 +77,31 @@ function vegRing(y, r, seg, jag = 0) {
 function vegGeo(rings, seg, split, barkCol, leafCol) {
   const g = loft(rings, { closed: true, caps: false });
   const n = g.attributes.position.count;
+  const pos = g.attributes.position.array;
   const col = new Float32Array(n * 3);
+  // The canopy takes the same shaded-under, sunlit-over gradient the close-up
+  // models do. It is the one thing that carries at two kilometres: a hillside
+  // of flat-green lampshades reads as painted card, and the same hillside with
+  // the undersides dropped to half reads as depth.
+  const [dk, lt] = vegShade(leafCol, 0.64, 1.22);
+  let ylo = Infinity, yhi = -Infinity;
+  for (let i = split * seg; i < n; i++) {
+    const y = pos[i * 3 + 1];
+    if (y < ylo) ylo = y;
+    if (y > yhi) yhi = y;
+  }
   for (let i = 0; i < n; i++) {
     const ring = Math.floor(i / seg);
-    const c = ring < split ? barkCol : leafCol;
-    col[i * 3] = c[0]; col[i * 3 + 1] = c[1]; col[i * 3 + 2] = c[2];
+    if (ring < split) {
+      col[i * 3] = barkCol[0]; col[i * 3 + 1] = barkCol[1];
+      col[i * 3 + 2] = barkCol[2];
+      continue;
+    }
+    let t = (pos[i * 3 + 1] - ylo) / (yhi - ylo || 1);
+    t = t * t * (3 - 2 * t);
+    col[i * 3] = dk[0] + (lt[0] - dk[0]) * t;
+    col[i * 3 + 1] = dk[1] + (lt[1] - dk[1]) * t;
+    col[i * 3 + 2] = dk[2] + (lt[2] - dk[2]) * t;
   }
   g.setAttribute('aVCol', new THREE.BufferAttribute(col, 3));
   return g;
@@ -164,6 +184,73 @@ function vegClump(c, r, seg, rows, jag, rnd) {
   return loft(rings, { closed: true, caps: false });
 }
 
+/**
+ * Foliage, lit as the soft mass it is meant to be rather than as the crumpled
+ * tin it is actually made of.
+ *
+ * Two things, and both of them are about the normal rather than the shape.
+ *
+ * A clump is an ellipsoid with its radius knocked about by `jag`, and
+ * `computeVertexNormals` faithfully reports every one of those dents. The
+ * result is a canopy that sparkles: neighbouring facets catch the sun at
+ * wildly different angles, the eye reads the high-frequency noise as *hard*,
+ * and a tree ends up looking like screwed-up foil painted green. What a real
+ * canopy does is the opposite — a hundred thousand leaves average out into one
+ * broad soft gradient, dark underneath and bright on top, with the individual
+ * detail far below the resolution of anything you can see from six metres.
+ *
+ * So the normal is thrown away and replaced by the one the *un-jagged*
+ * ellipsoid would have had at that point, which is what makes each puff light
+ * as a ball while its outline keeps every dent. That is the whole trick, and
+ * it is the one from douges.dev — the shape stays noisy, the lighting does
+ * not.
+ *
+ * The second half is the gradient. One flat green over a whole canopy has no
+ * inside: paint the underside of the mass a good deal darker than the top and
+ * the same geometry acquires depth, because now the clumps at the back of the
+ * crown are darker than the ones in front of them and the crown has a volume
+ * rather than a silhouette. It costs nothing — the vertex colours were already
+ * there, they were simply all the same number.
+ *
+ * `span` is the height band the gradient runs over, in prototype units, and it
+ * is the whole canopy's band and not the clump's: every clump has to be shaded
+ * as part of one crown or they read as a bag of separate balls.
+ */
+function vegPuff(g, c, r, span, dark, lite, blend = 0.86) {
+  const p = g.attributes.position.array;
+  const nrm = g.attributes.normal.array;
+  const n = g.attributes.position.count;
+  const col = new Float32Array(n * 3);
+  const ir = [1 / (r[0] * r[0]), 1 / (r[1] * r[1]), 1 / (r[2] * r[2])];
+  const lo = span[0], hi = span[1];
+  for (let i = 0; i < n; i++) {
+    const dx = p[i * 3] - c[0], dy = p[i * 3 + 1] - c[1], dz = p[i * 3 + 2] - c[2];
+    let ex = dx * ir[0], ey = dy * ir[1], ez = dz * ir[2];
+    const el = Math.hypot(ex, ey, ez) || 1e-6;
+    ex /= el; ey /= el; ez /= el;
+    let nx = nrm[i * 3] * (1 - blend) + ex * blend;
+    let ny = nrm[i * 3 + 1] * (1 - blend) + ey * blend;
+    let nz = nrm[i * 3 + 2] * (1 - blend) + ez * blend;
+    const nl = Math.hypot(nx, ny, nz) || 1e-6;
+    nrm[i * 3] = nx / nl; nrm[i * 3 + 1] = ny / nl; nrm[i * 3 + 2] = nz / nl;
+    let t = (p[i * 3 + 1] - lo) / (hi - lo || 1);
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    t = t * t * (3 - 2 * t);
+    col[i * 3] = dark[0] + (lite[0] - dark[0]) * t;
+    col[i * 3 + 1] = dark[1] + (lite[1] - dark[1]) * t;
+    col[i * 3 + 2] = dark[2] + (lite[2] - dark[2]) * t;
+  }
+  g.attributes.normal.needsUpdate = true;
+  g.setAttribute('aVCol', new THREE.BufferAttribute(col, 3));
+  return g;
+}
+
+/** The two ends of a leaf colour's gradient: shaded underside, sunlit top. */
+function vegShade(col, under = 0.60, over = 1.28) {
+  return [col.map((v) => v * under), col.map((v) => Math.min(1, v * over))];
+}
+
+
 /** A limb: a tapered tube from one point to another, optionally bowed. */
 function vegLimb(p0, p1, r0, r1, seg, rows = 2, bow = 0) {
   const dir = new THREE.Vector3(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]);
@@ -219,23 +306,36 @@ function vegNearPrototypes() {
   const pineParts = [
     vegPaint(vegLimb([0, 0, 0], [0.055, 0.62, 0.03], 0.058, 0.028, 8, 4, 0.030), bark),
   ];
+  //
+  // Eleven puffs and not five. Five is enough for the outline of an Aleppo
+  // pine and nowhere near enough for its texture: what you are standing under
+  // is a broken ceiling, and a hole needs an edge on both sides of it to read
+  // as a hole. Same envelope, same height — 40 cm of radius on the prototype
+  // either way — cut into more, smaller pieces.
   const pineC = [
-    [0.00, 0.850, 0.00, 0.27, 0.105, 0.25],
-    [0.18, 0.760, 0.07, 0.23, 0.100, 0.22],
-    [-0.12, 0.785, 0.16, 0.22, 0.095, 0.21],
-    [-0.14, 0.835, -0.15, 0.21, 0.090, 0.20],
-    [0.07, 0.895, -0.09, 0.19, 0.085, 0.18],
+    [0.000, 0.880, 0.000, 0.180, 0.080, 0.172],
+    [0.215, 0.812, 0.060, 0.150, 0.068, 0.144],
+    [-0.150, 0.828, 0.185, 0.146, 0.066, 0.140],
+    [-0.196, 0.856, -0.140, 0.142, 0.064, 0.138],
+    [0.088, 0.834, -0.215, 0.138, 0.062, 0.134],
+    [0.130, 0.902, 0.150, 0.126, 0.058, 0.122],
+    [-0.062, 0.914, -0.056, 0.118, 0.056, 0.114],
+    [0.288, 0.784, -0.075, 0.112, 0.052, 0.108],
+    [-0.276, 0.792, 0.048, 0.110, 0.050, 0.106],
+    [0.040, 0.778, 0.276, 0.114, 0.052, 0.110],
+    [-0.080, 0.770, -0.266, 0.108, 0.050, 0.104],
   ];
+  const [pineDk, pineLt] = vegShade([0.14, 0.24, 0.13]);
   for (const [x, y, z, rx, ry, rz] of pineC) {
     // Every clump but the crown is hung off a limb, so the canopy is carried
     // rather than floating over a stick.
     if (Math.hypot(x, z) > 0.05) {
       pineParts.push(vegPaint(
         vegLimb([0.05, 0.58, 0.026], [x * 0.85, y - ry * 0.6, z * 0.85],
-          0.022, 0.011, 5, 1), bark));
+          0.020, 0.010, 5, 1), bark));
     }
-    pineParts.push(vegPaint(vegClump([x, y, z], [rx, ry, rz], 9, 4, 0.24, rnd),
-      [0.14, 0.24, 0.13]));
+    pineParts.push(vegPuff(vegClump([x, y, z], [rx, ry, rz], 8, 3, 0.32, rnd),
+      [x, y, z], [rx, ry, rz], [0.70, 0.97], pineDk, pineLt));
   }
   const pine = vegMerge(pineParts);
 
@@ -255,13 +355,19 @@ function vegNearPrototypes() {
     }
     return out;
   });
-  const cyParts = [vegPaint(loft(cyRings, { closed: true, caps: false }),
-    [0.09, 0.17, 0.11])];
-  for (let i = 0; i < 4; i++) {
-    const y = 0.26 + i * 0.19;
+  const [cyDk, cyLt] = vegShade([0.09, 0.17, 0.11], 0.55, 1.40);
+  // The spindle keeps its own normals — it is a cone and a cone's normal is
+  // not radial — but it takes the gradient, which is what stops a cypress
+  // reading as one flat black slot cut out of the sky.
+  const cyParts = [vegPuff(loft(cyRings, { closed: true, caps: false }),
+    [0, 0.5, 0], [0.106, 0.5, 0.106], [0.0, 1.0], cyDk, cyLt, 0.22)];
+  for (let i = 0; i < 7; i++) {
+    const y = 0.20 + i * 0.115;
     const a = rnd() * TAU;
-    cyParts.push(vegPaint(vegClump(ring(a, 0.062, y), [0.055, 0.075, 0.055],
-      7, 3, 0.30, rnd), [0.09, 0.17, 0.11]));
+    const c = ring(a, 0.058 + rnd() * 0.020, y);
+    const r = [0.046, 0.062, 0.046];
+    cyParts.push(vegPuff(vegClump(c, r, 7, 3, 0.34, rnd), c, r,
+      [0.0, 1.0], cyDk, cyLt));
   }
   const cypress = vegMerge(cyParts);
 
@@ -282,14 +388,18 @@ function vegNearPrototypes() {
   // are nearer to round than the pine's, and they overlap into one mass with
   // notches in it rather than into four separate balls.
   const olC = [
-    [0.00, 0.66, 0.00, 0.30, 0.22, 0.28],
-    [0.24, 0.55, 0.16, 0.24, 0.190, 0.23],
-    [-0.22, 0.58, 0.18, 0.23, 0.185, 0.22],
-    [-0.04, 0.60, -0.26, 0.22, 0.180, 0.21],
+    [0.000, 0.680, 0.000, 0.235, 0.180, 0.225],
+    [0.245, 0.560, 0.165, 0.190, 0.150, 0.182],
+    [-0.225, 0.585, 0.180, 0.185, 0.146, 0.178],
+    [-0.045, 0.605, -0.265, 0.180, 0.142, 0.172],
+    [0.185, 0.700, -0.150, 0.165, 0.130, 0.158],
+    [-0.180, 0.720, -0.030, 0.155, 0.124, 0.150],
+    [0.055, 0.755, 0.185, 0.150, 0.120, 0.145],
   ];
+  const [olDk, olLt] = vegShade([0.36, 0.41, 0.30], 0.64, 1.20);
   for (const [x, y, z, rx, ry, rz] of olC) {
-    olParts.push(vegPaint(vegClump([x, y, z], [rx, ry, rz], 9, 4, 0.26, rnd),
-      [0.36, 0.41, 0.30]));
+    olParts.push(vegPuff(vegClump([x, y, z], [rx, ry, rz], 8, 3, 0.30, rnd),
+      [x, y, z], [rx, ry, rz], [0.38, 0.90], olDk, olLt));
   }
   const olive = vegMerge(olParts);
 
@@ -300,14 +410,18 @@ function vegNearPrototypes() {
   // open karst, at ten metres, is a boulder. Scrub is a tangle: the outline has
   // to be broken in several places or the eye files it as stone.
   const bushC = [
-    [0.00, 0.40, 0.00, 0.38, 0.40, 0.36],
-    [0.23, 0.27, 0.17, 0.28, 0.27, 0.27],
-    [-0.21, 0.29, -0.16, 0.27, 0.29, 0.26],
-    [0.05, 0.24, -0.25, 0.22, 0.24, 0.21],
+    [0.000, 0.420, 0.000, 0.300, 0.330, 0.285],
+    [0.240, 0.280, 0.180, 0.235, 0.235, 0.225],
+    [-0.215, 0.300, -0.165, 0.225, 0.250, 0.215],
+    [0.055, 0.245, -0.260, 0.190, 0.210, 0.182],
+    [-0.180, 0.260, 0.215, 0.185, 0.200, 0.178],
+    [0.170, 0.500, -0.090, 0.175, 0.185, 0.168],
+    [-0.095, 0.470, 0.155, 0.165, 0.175, 0.158],
   ];
+  const [buDk, buLt] = vegShade([0.26, 0.30, 0.19], 0.62, 1.24);
   const bush = vegMerge(bushC.map(([x, y, z, rx, ry, rz]) =>
-    vegPaint(vegClump([x, y, z], [rx, ry, rz], 8, 4, 0.42, rnd),
-      [0.26, 0.30, 0.19])));
+    vegPuff(vegClump([x, y, z], [rx, ry, rz], 8, 3, 0.44, rnd),
+      [x, y, z], [rx, ry, rz], [0.02, 0.72], buDk, buLt)));
 
   return { pine, cypress, olive, bush };
 }

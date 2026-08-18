@@ -50,6 +50,25 @@ function propBuilder() {
     }
   };
   const quad = (a, b, c, d, cl) => { tri(a, b, c, cl); tri(a, c, d, cl); };
+  /**
+   * A triangle that carries its own vertex normals and vertex colours.
+   *
+   * `tri` derives one flat normal from the winding, which is right for a wall
+   * and wrong for foliage: a canopy is a knocked-about ellipsoid and reporting
+   * every dent in it faithfully makes the thing sparkle like screwed-up foil.
+   * Give it the normal the *smooth* ellipsoid would have had and the outline
+   * keeps every dent while the shading goes soft, which is the whole of why a
+   * bush reads as a bush. The per-vertex colour comes along for the ride and
+   * pays for itself twice over: dark underneath, sunlit on top.
+   */
+  const smooth = (a, b, c, na, nb, nc, ca, cb, cc) => {
+    const P = [a, b, c], N = [na, nb, nc], C = [ca, cb, cc];
+    for (let i = 0; i < 3; i++) {
+      pos.push(P[i][0], P[i][1], P[i][2]);
+      norm.push(N[i][0], N[i][1], N[i][2]);
+      col.push(C[i][0], C[i][1], C[i][2]);
+    }
+  };
   const box = (cx, cy, cz, sx, sy, sz, cl, top) => {
     const x0 = cx - sx / 2, x1 = cx + sx / 2;
     const y0 = cy - sy / 2, y1 = cy + sy / 2;
@@ -69,7 +88,7 @@ function propBuilder() {
     g.setAttribute('aVCol', new THREE.Float32BufferAttribute(col, 3));
     return g;
   };
-  return { tri, quad, box, geo, count: () => pos.length / 3 };
+  return { tri, quad, smooth, box, geo, count: () => pos.length / 3 };
 }
 
 /** Local frame: +X forward, +Y up, +Z to starboard. About six metres long. */

@@ -568,6 +568,12 @@ async function buildVikendica(scene, field) {
     // where it stands.
     for (const b of plan.blockersP) push(b, {
       y0: base + plan.floorP - 0.60, y1: base + plan.floorP + plan.clearP });
+    // The yard behind, which is at grade and on neither storey: the two
+    // retaining walls and the wall the gate is in. Banded to grade for the
+    // same reason everything else here is — unbanded they would also be a
+    // fence across the terrace above them, which has no wall on that side.
+    for (const b of (plan.blockersY || [])) push(b, {
+      y0: base + plan.grade - 0.60, y1: base + plan.grade + 1.40 });
     // The terrace's three open edges — its railing, which is a real railing and
     // has to stop you the way the drawn one would. Without them the terrace is
     // a floor at +2.90 you can walk off, and worse, walk on to from the lane.

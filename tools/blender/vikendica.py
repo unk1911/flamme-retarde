@@ -46,7 +46,7 @@ import bpy  # type: ignore
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from frmesh import (  # noqa: E402
     TAU, _ring_pts, bevel, bm_ball, bm_box, bm_cylinder, bm_hip_roof, bm_loft,
-    export, new_object, reset_scene,
+    bm_prism, export, new_object, reset_scene,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -905,6 +905,7 @@ def shell(kit):
 
     terrace(kit)
     outside_stair(kit)
+    yard(kit)
     bathroom(kit)
     kitchen(kit)
     living(kit)
@@ -1358,7 +1359,10 @@ def prizemlje(kit):
         floor_tiles(kit, *P_ROOMS[name], P_FL, size=0.30, colour=TILE_HALL)
     for name in ("kupS", "kupN"):
         floor_tiles(kit, *P_ROOMS[name], P_FL, size=0.20, colour=TILE_FLOOR)
-    floor_tiles(kit, *P_ROOMS["straga"], P_FL, size=0.33, colour=TERRAZZO)
+    # Terrace 7 is paved in the same broken stone as the yard it opens on to,
+    # and the two run together: there is no threshold out there, only a step.
+    flagstones(kit, *P_ROOMS["straga"], P_FL)
+    loggia(kit)
     kit.span(CEIL, IX0, IX1, IY0, IY1, P_CEIL - 0.02, P_CEIL, bev=0.004)
 
     # ── the openings, filled ────────────────────────────────────────────────
@@ -1706,6 +1710,337 @@ def starlink(kit, px, py, top):
     ob = new_object(bm, "starlink_back")
     bevel(ob, 0.004)
     kit.adopt(ob, black)
+
+
+# --------------------------------------------------------------------------- #
+#  the yard behind, and terrace 7 in it                                        #
+# --------------------------------------------------------------------------- #
+# Terrace 7 is a loggia, and the loggia is where this house is actually used:
+# the table is out there from June to September, the back door is the door
+# everybody comes in by, and the floor is not the 33 cm terrazzo of terrace 8.
+# It is kamene ploče — irregular flat limestone bedded in mortar — and it runs
+# straight out of the loggia into the yard, over one step, without changing.
+#
+# North of the paving the ground is held up on both sides: board-marked
+# concrete on the east, where the switch for the loggia light is, and laid
+# rubble on the west. The yard ends at a rendered wall with a black steel gate
+# in it, and the same gate again is the one down at the water.
+
+# Paving and walling, and both are darker than they look in a photograph taken
+# at noon in August. A limestone slab that has been walked on for forty years
+# is a mid grey with a warm cast, not the white it photographs as — and the
+# shader here puts the sun back on top of the albedo, so a sampled highlight
+# comes out of it as chalk. Judged against the joints: what makes crazy paving
+# read as crazy paving is the dark line between the stones, and that line has
+# to survive full sun.
+FLAG = (0.615, 0.588, 0.532)        # kamene ploče, warm grey limestone
+FLAG_J = (0.395, 0.378, 0.345)      # the mortar between them
+RUBBLE = (0.575, 0.545, 0.488)      # the laid stone of the retaining walls
+EARTH = (0.470, 0.412, 0.330)       # what the retaining walls are retaining
+GATE_BLACK = (0.130, 0.140, 0.150)  # both gates on the plot, satin black
+WICKER = (0.505, 0.468, 0.412)      # the grey stacking rattan chairs
+TUBE = (0.430, 0.442, 0.452)        # their frames, and the lounger's
+STRIPE = ((0.930, 0.938, 0.945), (0.180, 0.430, 0.700),
+          (0.430, 0.700, 0.870), (0.070, 0.240, 0.520))
+
+# The yard. YD_Y1 is the gate line, and the two walls stand on the long sides.
+YD_X0, YD_X1 = -0.30, 4.45
+YD_Y0 = Y1 + 0.06
+YD_Y1 = 6.45
+YD_GATE = (1.35, 2.53)             # the opening in the wall at the end
+YD_WALL = 0.45                     # how high the two retaining walls stand
+
+
+def flagstones(kit, x0, x1, y0, y1, z, size=0.44, colour=FLAG, joint=FLAG_J,
+               thick=0.032, wobble=0.52, inset=0.019):
+    """Crazy paving: the corners of a grid are jittered, not the cells.
+
+    Move the cells and you get a grid with gaps in it; move the corners they
+    share and every stone stays a stone — four straight edges, no two of them
+    the same, each one shared exactly with its neighbour. Which is what a mason
+    laying broken slab actually produces, and the reason this reads as stone
+    where a 33 cm square reads as tile.
+
+    The boundary rows are pinned to the rectangle, so the paving still has a
+    straight edge where it dies into a wall.
+    """
+    nx = max(1, int(round((x1 - x0) / size)))
+    ny = max(1, int(round((y1 - y0) / size)))
+    sx, sy = (x1 - x0) / nx, (y1 - y0) / ny
+    corner = {}
+    for i in range(nx + 1):
+        for j in range(ny + 1):
+            px, py = x0 + i * sx, y0 + j * sy
+            if 0 < i < nx:
+                px += (RNG.random() - 0.5) * sx * wobble
+            if 0 < j < ny:
+                py += (RNG.random() - 0.5) * sy * wobble
+            corner[(i, j)] = (px, py)
+    kit.span(joint, x0, x1, y0, y1, z - 0.07, z - thick * 0.4, bev=0)
+    tones = _shades(colour, n=6, lo=0.82, hi=1.20)
+    for i in range(nx):
+        for j in range(ny):
+            quad = [corner[(i, j)], corner[(i + 1, j)],
+                    corner[(i + 1, j + 1)], corner[(i, j + 1)]]
+            cx = sum(p[0] for p in quad) / 4.0
+            cy = sum(p[1] for p in quad) / 4.0
+            poly = []
+            for px, py in quad:
+                dx, dy = cx - px, cy - py
+                d = math.hypot(dx, dy) or 1.0
+                poly.append((px + dx / d * inset, py + dy / d * inset))
+            bm_prism(kit.bm(tones[RNG.randrange(len(tones))], 0.004), poly,
+                     z - thick, z + (RNG.random() - 0.5) * 0.006)
+
+
+def rubble_wall(kit, axis, at, a0, a1, z0, z1, thick=0.30, course=0.17):
+    """Limestone off the plot, laid flat and pointed with whatever was going.
+
+    Every retaining wall in this village is this and nothing else. Courses of
+    stones of different lengths, with a mortar core behind them so the joints
+    do not read through to the sky.
+    """
+    if axis == "x":
+        kit.span(FLAG_J, a0, a1, at - thick * 0.34, at + thick * 0.34,
+                 z0, z1, bev=0.01)
+    else:
+        kit.span(FLAG_J, at - thick * 0.34, at + thick * 0.34, a0, a1,
+                 z0, z1, bev=0.01)
+    tones = _shades(RUBBLE, n=6, lo=0.78, hi=1.22)
+    z = z0
+    while z < z1 - 0.02:
+        h = min(course * (0.78 + RNG.random() * 0.52), z1 - z)
+        a = a0
+        while a < a1 - 0.05:
+            w = min(0.15 + RNG.random() * 0.30, a1 - a)
+            d = thick * (0.88 + RNG.random() * 0.18)
+            c = tones[RNG.randrange(len(tones))]
+            # Each stone finds its own bed and its own top within the course.
+            # Laid to one line top and bottom this is brickwork, and brickwork
+            # is the one thing a rubble wall never looks like.
+            lo = z + 0.006 + RNG.random() * 0.022
+            hi = min(z1, z + h - 0.006 - RNG.random() * 0.030)
+            if hi - lo < 0.045:
+                a += w
+                continue
+            if axis == "x":
+                kit.span(c, a + 0.012, a + w - 0.012, at - d / 2, at + d / 2,
+                         lo, hi, bev=0.016)
+            else:
+                kit.span(c, at - d / 2, at + d / 2, a + 0.012, a + w - 0.012,
+                         lo, hi, bev=0.016)
+            a += w
+        z += h
+
+
+def steel_gate(kit, hx, hy, z, yaw, w=1.16, h=1.06, bars=5):
+    """The gate: a flat frame with five horizontal bars in it, hung on one
+    stile and drawn standing open, because it always is."""
+    bm = bmesh.new()
+    t = 0.038
+    for sx in (t / 2, w - t / 2):
+        bm_box(bm, sx, 0, h / 2, t, 0.046, h)
+    for i in range(bars):
+        bm_box(bm, w / 2, 0, h * (i + 0.42) / bars, w - t * 2, 0.032, 0.026)
+    ob = new_object(bm, "gate")
+    bevel(ob, 0.005)
+    _place(ob, hx, hy, z, yaw)
+    kit.adopt(ob, GATE_BLACK)
+
+
+def patio_table(kit, cx, cy, z, yaw=0.0, w=1.12, d=0.70, h=0.72):
+    """The white plastic rectangle with the moulded top. The round one is
+    upstairs on terrace 8; this is the one the back of the house eats at."""
+    bm = bmesh.new()
+    bm_box(bm, 0, 0, h - 0.019, w, d, 0.038)
+    # The apron under the lip, which is what makes a moulded top read as
+    # moulded rather than as a 4 cm plank on four sticks.
+    bm_box(bm, 0, 0, h - 0.068, w - 0.075, d - 0.075, 0.062)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            bm_box(bm, sx * (w / 2 - 0.115), sy * (d / 2 - 0.10),
+                   (h - 0.11) / 2, 0.046, 0.046, h - 0.11)
+        bm_box(bm, sx * (w / 2 - 0.115), 0, 0.115, 0.052, d - 0.20, 0.042)
+    ob = new_object(bm, "patiotable")
+    bevel(ob, 0.008)
+    _place(ob, cx, cy, z, yaw)
+    kit.adopt(ob, PLASTIC_W)
+
+
+def wicker_chair(kit, cx, cy, z, yaw):
+    """The grey stacking rattan armchair. Four came with the house.
+
+    The weave is not modelled. At the distance you ever stand from one of these
+    what reads is a round-backed shell of one dull grey-brown, higher behind
+    than at the arms, on four thin steel legs — so that is what this is, and
+    the twelve boxes the shell is made of are the twelve the silhouette needs.
+    """
+    bm = bmesh.new()
+    S, R, T = 0.44, 0.255, 0.055
+    bm_box(bm, -0.01, 0, S - 0.025, 0.44, 0.44, 0.050)         # the seat
+    seg = 16
+
+    def at(i):
+        a = math.radians(44 + 272 * i / seg)                   # 0 is the front
+        ca, sa = math.cos(a), math.sin(a)
+        return ca, sa, (-0.015 + ca * R * 1.10, sa * R)
+
+    for i in range(seg):
+        ca0, sa0, p0 = at(i)
+        ca1, sa1, p1 = at(i + 1)
+        # A quad footprint per segment, sharing its edges with its neighbours,
+        # so the shell is one continuous band. Built as separate boxes it was a
+        # ring of loose lumps with daylight between them, which is what a
+        # stacking chair looks like from behind if you have taken it apart.
+        poly = [(p0[0] + ca0 * T, p0[1] + sa0 * T),
+                (p1[0] + ca1 * T, p1[1] + sa1 * T),
+                (p1[0] - ca1 * T, p1[1] - sa1 * T),
+                (p0[0] - ca0 * T, p0[1] - sa0 * T)]
+        # Low at the arms, full height behind: one cosine, not a step.
+        cm = math.cos(math.radians(44 + 272 * (i + 0.5) / seg))
+        hgt = 0.125 + 0.205 * max(0.0, -cm) ** 0.75
+        bm_prism(bm, poly, S + 0.008, S + 0.008 + hgt)
+    ob = new_object(bm, "wickershell")
+    bevel(ob, 0.010)
+    _place(ob, cx, cy, z, yaw)
+    kit.adopt(ob, WICKER)
+
+    frame = bmesh.new()
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            # Splayed, the way a stacking frame is: the feet stand wider than
+            # the seat or the chairs would not nest.
+            bm_box(frame, sx * 0.185, sy * 0.185, (S - 0.03) / 2,
+                   0.026, 0.026, S - 0.03)
+        bm_box(frame, sx * 0.185, 0, 0.055, 0.024, 0.37, 0.024)
+    ob = new_object(frame, "wickerframe")
+    bevel(ob, 0.004)
+    _place(ob, cx, cy, z, yaw)
+    kit.adopt(ob, TUBE)
+
+
+def sun_lounger(kit, cx, cy, z, yaw, l=1.86, w=0.58):
+    """The folding aluminium lounger with the blue striped sling, back up two
+    notches, which is the only way anybody ever leaves one."""
+    bed = bmesh.new()
+    n = 11
+    for i in range(n):
+        t = (i + 0.5) / n
+        # The last third is the backrest, hinged up about 32 degrees.
+        u = max(0.0, (t - 0.62) / 0.38)
+        x = -l / 2 + t * l
+        lift = u * (l * 0.38) * math.sin(math.radians(32))
+        bm_box(bed, x + u * 0.06, 0, 0.345 + lift,
+               l / n * 1.20, w, 0.030 + u * 0.004)
+    ob = new_object(bed, "lounger_sling")
+    bevel(ob, 0.004)
+    _place(ob, cx, cy, z, yaw)
+    # One object per stripe would be four meshes for a deck chair. The sling is
+    # one object in the palest of the four and the bands are drawn on it.
+    kit.adopt(ob, STRIPE[0])
+
+    band = bmesh.new()
+    for i in range(n):
+        t = (i + 0.5) / n
+        if i % 3 == 0:
+            continue
+        u = max(0.0, (t - 0.62) / 0.38)
+        x = -l / 2 + t * l
+        lift = u * (l * 0.38) * math.sin(math.radians(32))
+        bm_box(band, x + u * 0.06, 0, 0.354 + lift,
+               l / n * 1.02, w - 0.05, 0.026)
+    ob = new_object(band, "lounger_stripe")
+    bevel(ob, 0.003)
+    kit.adopt(ob, STRIPE[1])
+    _place(ob, cx, cy, z, yaw)
+
+    frame = bmesh.new()
+    for sy in (-1, 1):
+        bm_box(frame, 0.02, sy * (w / 2 + 0.012), 0.330, l * 0.66, 0.026, 0.026)
+        for sx in (-1, 1):
+            bm_box(frame, sx * l * 0.30, sy * (w / 2 + 0.012), 0.165,
+                   0.024, 0.024, 0.330)
+    ob = new_object(frame, "lounger_frame")
+    bevel(ob, 0.004)
+    _place(ob, cx, cy, z, yaw)
+    kit.adopt(ob, TUBE)
+
+
+def bulkhead(kit, cx, cy, z):
+    """The oval opal bulkhead over the back door. Every house on this shore has
+    one and they all have the same moth in them."""
+    kit.span(WHITEGOODS, cx - 0.085, cx + 0.085, cy - 0.058, cy + 0.058,
+             z - 0.022, z, bev=0.006)
+    bm_ball(kit.bm((0.945, 0.930, 0.880), 0.004), cx, cy, z - 0.022,
+            0.105, 0.072, 0.058, rows=4, seg=14, squash_bottom=0.22)
+
+
+def loggia(kit):
+    """Terrace 7 fitted out. Four square metres, and it is the room this house
+    is photographed in.
+
+    The table is against the east end rather than in the middle: the way in
+    from the yard is the whole north side and the kitchen door is the whole
+    west side, so the only place a 112 table can stand without standing in a
+    doorway is against the far wall.
+    """
+    z = P_FL
+    patio_table(kit, 2.06, 2.90, z, yaw=0.0)
+    # Three chairs, because there are three out there. The fourth is upstairs.
+    wicker_chair(kit, 1.72, 3.36, z, yaw=-math.pi / 2 - 0.12)
+    wicker_chair(kit, 2.44, 3.36, z, yaw=-math.pi / 2 + 0.10)
+    wicker_chair(kit, 2.86, 2.62, z, yaw=math.pi + 0.15)
+    # The ashtray, which is on that table in both photographs.
+    bm_cylinder(kit.bm(DARKMETAL, 0.004), 2.24, 2.98, z + 0.720, z + 0.744,
+                0.058, 0.066, seg=12)
+    bulkhead(kit, 0.86, 2.62, P_CEIL - 0.01)
+
+
+def yard(kit):
+    """The paving, the two retaining walls and the gate at the end of it."""
+    # A slab first and the paving on it. The slab reaches well below grade
+    # because what is under it out here is not a floor, it is whatever the
+    # terrain does — the same reason the house stands on a 35 cm plinth.
+    kit.span(PLINTH, YD_X0 - 0.10, YD_X1 + 0.30, YD_Y0 - 0.10, YD_Y1 + 0.30,
+             GRADE - 0.45, GRADE + 0.005, bev=0.02)
+    flagstones(kit, YD_X0, YD_X1, YD_Y0, YD_Y1, GRADE + 0.02)
+    # The step outside the loggia is already there in `prizemlje` — this is
+    # its tread, so the one thing you actually put a foot on is stone and not
+    # the render the step is cast in.
+    flagstones(kit, PT7_OPEN[0] + 0.10, PT7_OPEN[1] - 0.10, Y1 + 0.06,
+               Y1 + 0.42, P_FL - 0.155, size=0.32)
+
+    # ── the two retaining walls ─────────────────────────────────────────────
+    # East, board-marked concrete, holding up the neighbour's ground and the
+    # fig that grows out of it. The switch for the loggia light is on the
+    # inside face at the near end, where you can reach it off the step.
+    kit.span(CONCRETE, YD_X1, YD_X1 + 0.20, YD_Y0 - 0.10, YD_Y1,
+             GRADE - 0.40, GRADE + YD_WALL, bev=0.015)
+    kit.span(EARTH, YD_X1 + 0.20, YD_X1 + 1.70, YD_Y0 - 0.10, YD_Y1,
+             GRADE - 0.40, GRADE + YD_WALL - 0.07, bev=0.02)
+    kit.span(WHITEGOODS, YD_X1 - 0.014, YD_X1 + 0.002, 4.42, 4.60,
+             GRADE + 0.19, GRADE + 0.37, bev=0.005)
+    # West, laid rubble, which is what the older half of this plot is walled
+    # with. It stands a course higher than the concrete does.
+    rubble_wall(kit, "y", YD_X0 - 0.16, YD_Y0 - 0.10, YD_Y1,
+                GRADE - 0.30, GRADE + YD_WALL + 0.12, thick=0.32)
+    kit.span(EARTH, YD_X0 - 1.80, YD_X0 - 0.30, YD_Y0 - 0.10, YD_Y1,
+             GRADE - 0.30, GRADE + YD_WALL + 0.04, bev=0.02)
+
+    # ── the wall at the end, and the gate in it ─────────────────────────────
+    for a0, a1 in ((YD_X0 - 0.32, YD_GATE[0]), (YD_GATE[1], YD_X1 + 0.20)):
+        kit.span(RENDER, a0, a1, YD_Y1, YD_Y1 + 0.20,
+                 GRADE - 0.40, GRADE + 1.12, bev=0.02)
+        kit.span(CONCRETE, a0 - 0.02, a1 + 0.02, YD_Y1 - 0.02, YD_Y1 + 0.22,
+                 GRADE + 1.12, GRADE + 1.17, bev=0.01)
+    # Hung on the west jamb and standing open into the yard, at 100 degrees,
+    # which is where a gate ends up when nobody has shut it since May.
+    steel_gate(kit, YD_GATE[0] + 0.03, YD_Y1 + 0.02, GRADE + 0.10,
+               -math.pi / 2 - 0.17)
+
+    # The lounger, folded out on the paving east of the opening, which is the
+    # only patch of this yard the sun reaches for any length of time.
+    sun_lounger(kit, 3.62, 5.05, GRADE + 0.03, yaw=math.pi / 2 - 0.14)
 
 
 # --------------------------------------------------------------------------- #
@@ -3311,6 +3646,16 @@ def plan_json():
     band(blockersP, "x", P_KIT_S, PW_KIT, NIX0, P_SPINE_N - EXT / 2, [PD_KIT])
     band(blockersP, "x", P_TER_S, EXT, P_SPINE_N - EXT / 2, IX1, [])
 
+    # And the yard behind, which is at grade and belongs to neither storey: the
+    # two retaining walls and the wall the gate is in. A 45 cm wall you can
+    # walk through is worse than no wall, and these are the only things out
+    # there tall enough to stop anybody.
+    blockersY = []
+    solid(blockersY, YD_X1, YD_X1 + 0.20, YD_Y0 - 0.10, YD_Y1)
+    solid(blockersY, YD_X0 - 0.32, YD_X0, YD_Y0 - 0.10, YD_Y1)
+    solid(blockersY, YD_X0 - 0.32, YD_GATE[0], YD_Y1, YD_Y1 + 0.20)
+    solid(blockersY, YD_GATE[1], YD_X1 + 0.20, YD_Y1, YD_Y1 + 0.20)
+
     rooms = {k: T(*v) for k, v in ROOMS.items()}
     rooms["terrace"] = T(X0, X1, TER_Y0, TER_Y1)
     roomsP = {k: T(*v) for k, v in P_ROOMS.items()}
@@ -3353,6 +3698,7 @@ def plan_json():
         "floorP": P_FL, "clearP": round(P_CEIL - P_FL, 3), "terP": P_TER,
         "roomsP": roomsP,
         "blockersP": blockersP,
+        "blockersY": blockersY,
         "anchors": {
             "stairFoot": [round(ST_X, 2), GRADE, round(-(ST_BOT - 0.9), 2)],
             "stairHead": [round(ST_X, 2), F2, round(-(ST_TOP + 0.55), 2)],

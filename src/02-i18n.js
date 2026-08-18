@@ -183,6 +183,15 @@ const STRINGS = {
     'ground.disembark': '<b>E</b> to get out and fight it on foot',
     'ground.disembarkTouch': '<b>OUT</b> to fight it on foot',
 
+    // in the water
+    'swim.depth': 'm down',
+    'swim.breath': 'breath',
+    'swim.hint': '<b>W A S D</b> swim · <b>Shift</b> harder · <b>C</b> dive · <b>Space</b> up',
+    'swim.wade': '<b>E</b> to wade ashore',
+    'swim.spent': 'out of air — the jacket is taking you up',
+    'toast.inTheWater': 'In the water. Nobody drowns in a lifejacket — swim for the shore.',
+    'toast.ashore': 'Ashore, and dripping.',
+
     // end screen
     'over.crashed': 'You went in.',
     'over.won': 'The fire is out.',
@@ -437,6 +446,14 @@ const STRINGS = {
     'ground.disembark': '<b>E</b> za izlazak i gašenje pješice',
     'ground.disembarkTouch': '<b>VAN</b> za gašenje pješice',
 
+    'swim.depth': 'm dubine',
+    'swim.breath': 'dah',
+    'swim.hint': '<b>W A S D</b> plivaj · <b>Shift</b> jače · <b>C</b> roni · <b>Space</b> gore',
+    'swim.wade': '<b>E</b> za izlazak na obalu',
+    'swim.spent': 'nema zraka — prsluk te diže',
+    'toast.inTheWater': 'U moru si. S prslukom se ne utapa — plivaj prema obali.',
+    'toast.ashore': 'Na obali, mokar do kože.',
+
     'over.crashed': 'Pao si.',
     'over.won': 'Vatra je ugašena.',
     'over.lost': 'Grad gori.',
@@ -681,6 +698,14 @@ const STRINGS = {
     'ground.noPlane': 'il n\'y a pas d\'avion ici — tu es à pied maintenant',
     'ground.disembark': '<b>E</b> pour descendre et lutter à pied',
     'ground.disembarkTouch': '<b>PIED</b> pour lutter à pied',
+
+    'swim.depth': 'm de fond',
+    'swim.breath': 'souffle',
+    'swim.hint': '<b>W A S D</b> nager · <b>Shift</b> plus fort · <b>C</b> plonger · <b>Space</b> remonter',
+    'swim.wade': '<b>E</b> pour rejoindre le bord',
+    'swim.spent': "plus d'air — le gilet te remonte",
+    'toast.inTheWater': "À l'eau. On ne se noie pas avec un gilet — nage vers le bord.",
+    'toast.ashore': 'Au sec, et ruisselant.',
 
     'over.crashed': 'Vous êtes tombé.',
     'over.won': 'Le feu est éteint.',

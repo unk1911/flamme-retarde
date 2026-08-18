@@ -228,13 +228,15 @@ addEventListener('keydown', (e) => {
   // board, which is right: they are the same act, once with an aeroplane
   // underneath you and once with a promenade. Only on foot; under a canopy you
   // already have one, and in the seat J is the key that does this.
+  if (e.code === 'KeyE' && state.phase === 'swim') { e.preventDefault(); wadeAshore(); return; }
   if (e.code === 'KeyU' && state.phase === 'ground') { e.preventDefault(); launchOut(); return; }
   // And Enter is the small one: running at the balcony rail, off it, and down
   // under the cloth on to the promenade. Same key you would hit anyway when
   // you have decided to do something, and it declines quietly — standing still
   // or standing on the beach it is not a jump, and nothing happens.
   if (e.code === 'Enter' && state.phase === 'ground') { e.preventDefault(); hopOut(); return; }
-  if (state.phase === 'ground' || state.phase === 'chute') {
+  if (state.phase === 'ground' || state.phase === 'chute'
+    || state.phase === 'swim') {
     // On foot, or under a canopy, the aeroplane's controls are all meaningless
     // and several of them would quietly reconfigure an aircraft you are not
     // sitting in — or, by then, an aircraft that is a hole in a hillside.
@@ -256,7 +258,7 @@ canvas.addEventListener('click', () => {
   // Never on a touchscreen: there is no pointer to lock, and asking for it on
   // iOS throws up a permission bar over the top of the game.
   if (!IS_TOUCH && (state.phase === 'fly' || state.phase === 'ground'
-    || state.phase === 'chute') && !pointerLocked) grabPointer();
+    || state.phase === 'chute' || state.phase === 'swim') && !pointerLocked) grabPointer();
 });
 document.addEventListener('pointerlockchange', () => {
   const had = pointerLocked;
@@ -285,6 +287,13 @@ addEventListener('mousemove', (e) => {
     // and it is the field of view that decides how many pixels a radian is.
     const g = 0.0020 * flight.p.sens * (camera.fov / baseFov);
     ground.look(e.movementX * g, e.movementY * g);
+    return;
+  }
+  // And in the water, where it is a head again — a slower one, because the
+  // thing it is turning is lying down in a jacket.
+  if (state.phase === 'swim') {
+    const g = 0.0017 * flight.p.sens * (camera.fov / baseFov);
+    swim.look(e.movementX * g, e.movementY * g);
     return;
   }
   // Same again under the canopy: the mouse is your head. What the canopy does
@@ -530,7 +539,7 @@ function updateCamera(dt) {
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
   trees, landmarks, alerts, roads, rail, props, airfield, jadrija, ground, birds, eject,
-  mirror, mirrorP, you;
+  mirror, mirrorP, swim, you;
 /** You plus the three wingmen, as the birds see them. Built once, in boot(). */
 let birdFlush = [];
 
@@ -745,6 +754,7 @@ async function boot() {
   waterfx = buildWaterFX(scene);
   flight = buildFlight(plane, fire);
   eject = buildEject(scene, flight, chuteDown);
+  swim = buildSwim(sea);
 
   await step(92, 'load.brief');
   wingmen = buildWingmen(scene, fire, (who, text) => radio(who, text));
@@ -1542,6 +1552,68 @@ function chuteAudio() {
   if (audio) audio.canopy();
 }
 
+/**
+ * The two numbers, the wash, and the one hint.
+ *
+ * The wash is the whole picture and it is a `div`. It could have been a fog
+ * colour, and a fog colour would have been wrong twice over: it would have
+ * greened the sun and the sky along with the water, and it would have had to be
+ * put back on every path out of here. A layer over the top goes on and off in
+ * one line and never touches the render.
+ */
+function paintSwimHud() {
+  if (!swim || !swim.active) return;
+  const d = swim.depth;
+  $('sw-depth').textContent = d.toFixed(1);
+  const b = swim.breath;
+  const fill = $('sw-fill');
+  fill.style.width = (b * 100).toFixed(0) + '%';
+  fill.classList.toggle('low', b < 0.34);
+  $('sw-breath').hidden = !swim.submerged && b > 0.995;
+  $('sw-hint').innerHTML = swim.spent ? T('swim.spent')
+    : swim.canWade() ? T('swim.wade')
+      : T('swim.hint');
+  // Nothing below the waterline until your eyes are actually under it, and then
+  // it closes in over the first four metres and stops — past that it is as dark
+  // as it is going to get and the surface overhead is still the way out.
+  const u = $('under');
+  u.hidden = false;
+  u.classList.toggle('on', swim.submerged);
+  u.style.opacity = swim.submerged
+    ? (0.30 + 0.52 * Math.min(1, d / 5.0)).toFixed(3) : '0';
+}
+
+/**
+ * Out of the water and on to whatever the shore turned out to be.
+ *
+ * The same handover the canopy makes on dry land, and for the same reason: the
+ * walking model wants a locale before it wants a position, because everything
+ * it can answer is inside one.
+ */
+function wadeAshore() {
+  if (state.phase !== 'swim' || !swim.canWade()) return false;
+  const y = swim.you;
+  if (!ground || !ground.ok
+    || !ground.retarget(localeAt(y.x, y.z, airfield, jadrija, city))
+    || !ground.dropIn(y.x, y.z, y.yaw, true)) {
+    toast(T('ground.noPlane'));
+    return false;
+  }
+  swim.leave();
+  eject.reset();
+  state.phase = 'ground';
+  $('under').classList.remove('on');
+  $('under').hidden = true;
+  $('swim-hud').hidden = true;
+  $('ground-hud').hidden = false;
+  if (IS_TOUCH) { $('gtouch').hidden = false; }
+  if (!IS_TOUCH && !pointerLocked) grabPointer();
+  if (audio) audio.boots();
+  paintDeviceText();
+  toast(T('toast.ashore'));
+  return true;
+}
+
 /** And the arrival, whichever of the three it turned out to be. */
 function chuteDown(kind) {
   if (state.phase !== 'chute') return;
@@ -1583,6 +1655,25 @@ function chuteDown(kind) {
     if (!IS_TOUCH && !pointerLocked) grabPointer();
     paintDeviceText();
     toast(T('toast.walkedAway'));
+    return;
+  }
+  // In the water under an open canopy you are not lost, you are wet. The note
+  // that used to end the run here made the argument against itself: a
+  // lifejacket, four hundred metres of August Adriatic, three aircraft and a
+  // lookout. Cut the cloth away and swim — see src/59-swim.js.
+  if (kind === 'sea' && swim) {
+    swim.enter(eject.pos.x, eject.pos.z, eject.you.yaw, eject.you.vs || 0);
+    eject.reset();
+    state.phase = 'swim';
+    alerts.bump(1.4);
+    $('chute-hud').hidden = true;
+    $('hud').hidden = true;
+    $('ground-hud').hidden = true;
+    $('swim-hud').hidden = false;
+    if (IS_TOUCH) { $('ctouch').hidden = true; $('touch').hidden = true; $('gtouch').hidden = false; }
+    if (!IS_TOUCH && !pointerLocked) grabPointer();
+    paintDeviceText();
+    toast(T('toast.inTheWater'));
     return;
   }
   state.phase = 'lost';
@@ -1892,7 +1983,7 @@ function updateMission(dt) {
   // are standing on an apron forty kilometres of road away from it.
   if (!recess && state.cityHealth < 0.55
     && (state.phase === 'fly' || state.phase === 'ground'
-      || state.phase === 'chute')) {
+      || state.phase === 'chute' || state.phase === 'swim')) {
     state.phase = 'lost';
     showEnd(false);
   }
@@ -1955,6 +2046,12 @@ function redrawEnd() {
 }
 
 function showEnd(won, crashed = false, onWater = false, chute = null) {
+  // Whatever ended it, you are not in the water any more — and the sea is only
+  // drawn from both sides while somebody is under it.
+  if (swim && swim.active) swim.leave();
+  $('swim-hud').hidden = true;
+  $('under').hidden = true;
+  $('under').classList.remove('on');
   const el = $('over');
   el.hidden = false;
   el.className = won ? 'win' : 'lose';
@@ -2275,6 +2372,23 @@ function frame() {
     updateMission(real);
   }
 
+  if (state.phase === 'swim') {
+    // The aeroplane is still going in somewhere behind you, and you are still
+    // the only person watching it. Same as under the canopy.
+    if (eject.active) flyDerelict(dt);
+    swim.update(dt, {
+      fwd: (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0)
+        - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0) + TOUCH.gy,
+      side: (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0)
+        - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0) + TOUCH.gx,
+      sprint: keys.has('ShiftLeft') || keys.has('ShiftRight'),
+      down: keys.has('KeyC') || keys.has('ControlLeft'),
+      up: keys.has('Space'),
+    });
+    paintSwimHud();
+    updateMission(real);
+  }
+
   if (state.phase === 'fly') {
     readKeys(dt);
     flight.update(dt, input);
@@ -2327,6 +2441,7 @@ function frame() {
   if (audio) audio.slowmo(zoom);
   if (camOverride) updateCamera(dt);
   else if (state.phase === 'ground') ground.pose(camera);
+  else if (state.phase === 'swim') swim.pose(camera);
   else if (state.phase === 'chute' || eject.active) eject.pose(camera);
   else if (state.phase !== 'intro') updateCamera(dt);
   U.uCamPos.value.copy(camera.position);
@@ -2397,7 +2512,8 @@ function frame() {
   // Under the canopy too: you can hear the hillside coming up at you a long
   // time before you are on it, and that is most of what the last thirty seconds
   // of a descent is.
-  const afoot = state.phase === 'ground' || state.phase === 'chute';
+  const afoot = state.phase === 'ground' || state.phase === 'chute'
+    || state.phase === 'swim';
 
   // Indoors, in the one kabina that opens. A wooden box with a single door
   // takes the singing off the terrace almost entirely and leaves the hillside
@@ -2589,7 +2705,8 @@ function frame() {
     // Standing in it. The mixer shuts down for good when the aeroplane hits
     // something, which is right if that was the end of you and wrong if you
     // walked away from it — see the note on `dead` in 80-audio.js.
-    afoot: state.phase === 'ground' || state.phase === 'chute',
+    afoot: state.phase === 'ground' || state.phase === 'chute'
+      || state.phase === 'swim',
   });
 
   if (state.phase === 'ground') {
@@ -2738,6 +2855,7 @@ window.__fr = {
     rail: rail ? { ways: rail.ways, km: +rail.km.toFixed(1), cars: rail.cars,
       lineKm: +rail.lineKm.toFixed(2), tris: Math.round(rail.tris) } : null,
     ground: ground ? ground.stats() : null,
+    swim: swim && swim.active ? swim.stats() : null,
     props: props ? props.counts : null,
     birds: birds ? birds.stats() : null,
     water: Math.round(flight ? flight.p.water : 0),
@@ -2965,6 +3083,37 @@ window.__fr = {
       return { phase: comp ? comp.phase : null, held: sprayHeld };
     },
     stats: () => ({ ...computer.stats(), phase: comp ? comp.phase : null }),
+  },
+  /** The water. `dip` drops you in it wherever you name, for a look. */
+  swim: {
+    stats: () => (swim ? swim.stats() : null),
+    raw: () => swim,
+    dip: (x, z, yaw = 0, depth = 0.3) => {
+      if (!swim) return null;
+      swim.enter(x, z, yaw, 0);
+      swim.you.depth = depth;
+      swim.you.y = swim.surfaceAt(x, z) - depth;
+      state.phase = 'swim';
+      $('chute-hud').hidden = true;
+      $('hud').hidden = true;
+      $('ground-hud').hidden = true;
+      $('swim-hud').hidden = false;
+      paintSwimHud();
+      return swim.stats();
+    },
+    /** Point the head somewhere, in radians. */
+    aim: (yaw, pitch = 0) => {
+      if (!swim) return null;
+      swim.you.yaw = yaw;
+      swim.you.pitch = pitch;
+      return [yaw, pitch];
+    },
+    tick: (secs, dtStep = 1 / 30) => {
+      if (!swim || !swim.active) return null;
+      for (let t = 0; t < secs; t += dtStep) swim.update(dtStep, {});
+      paintSwimHud();
+      return swim.stats();
+    },
   },
   vik: {
     raw: () => jadrija && jadrija.vik,
