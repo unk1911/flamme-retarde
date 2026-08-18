@@ -179,17 +179,45 @@ async function buildVikendica(scene, field) {
     body: 'base *= vVCol;',
   });
 
+  // The sanitary ware, drawn brighter, and the reason is the one thing this
+  // shader cannot do.
+  //
+  // Ambient here is hemispheric: `mix(ground, sky, n.y * 0.5 + 0.5)`. An
+  // up-facing surface takes the whole sky, a vertical one takes half of it, and
+  // indoors the sun is shadowed out entirely — so a horizontal white surface in
+  // this bathroom renders past clipping and a vertical white surface beside it
+  // renders at 53 per cent. Measured, not guessed: the WC cistern came back
+  // (130,143,157) against an albedo of (247,248,249), and bluer than its own
+  // paint, which is sky and nothing else.
+  //
+  // That is fine for plaster and wrong for glazed ceramic, which in a small
+  // tiled room is one of the brightest things there is — it is sitting in the
+  // bounce off a white basin, a white bath and a white ceiling, and this shader
+  // has no bounce at all. `VIK.glow` is that admission already made once, at
+  // 0.14, for the whole house. Sanitary ware wants far more of it than plaster
+  // does, and it cannot have it while it shares a material with the walls.
+  //
+  // So it comes out of Blender in its own blob, the same way the glazing and
+  // the net curtains do, and gets its own emissive and a harder specular for
+  // the glaze. Nothing else in the house is PORCELAIN, so nothing else moves.
+  const wareMat = solidMaterial(0xffffff, {
+    spec: 0.11, specPower: 55, emissive: 0.46,
+    body: 'base *= vVCol;',
+  });
+
   const parts = {};
   const soft = (k) => k.endsWith('_glass') || k.endsWith('_sheer');
   for (const key of ['shell', 'roof', 'loft',
                      'shell_glass', 'roof_glass', 'loft_glass',
-                     'shell_sheer', 'roof_sheer', 'loft_sheer']) {
+                     'shell_sheer', 'roof_sheer', 'loft_sheer',
+                     'shell_ware']) {
     const b64 = PAYLOAD['vikendica_' + key + '_fr3d'];
     if (!b64) { if (!soft(key)) console.warn('no vikendica payload:', key); continue; }
     try {
       const geo = readFR3D(await inflateBinary(b64));
       const mesh = new THREE.Mesh(geo,
-        key.endsWith('_sheer') ? sheerMat : key.endsWith('_glass') ? glassMat : mat);
+        key.endsWith('_sheer') ? sheerMat : key.endsWith('_glass') ? glassMat
+          : key.endsWith('_ware') ? wareMat : mat);
       mesh.castShadow = !soft(key);
       mesh.receiveShadow = true;
       if (soft(key)) mesh.renderOrder = 3;

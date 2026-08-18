@@ -1644,6 +1644,33 @@ function skinnedFigure(data, opts = {}) {
       out.set(worldT[i * 3], worldT[i * 3 + 1], worldT[i * 3 + 2]);
       return out;
     },
+    /**
+     * How far a bone has turned away from the bind pose, as a quaternion.
+     *
+     * `boneAt` above is enough to *carry* something on a bone — a card in her
+     * hands, a hat on her head — only for as long as the bone does not rotate.
+     * The moment it does, an attachment placed at the bone's position and left
+     * in figure space slides off it: the head bone is at the base of the skull,
+     * so a hat is an offset from that point, and an offset that does not turn
+     * with the bone ends up beside the head rather than on it.
+     *
+     * `worldQ * bindQ⁻¹` and not `worldQ`, because the offsets a caller wrote
+     * were measured in the bind pose. This gives the *change* since then, so
+     * those numbers stay good and only the animation is added.
+     */
+    boneTurn: (i, out) => {
+      const o = i * 4;
+      // b⁻¹ is the conjugate; these are unit quaternions.
+      const ax = worldQ[o], ay = worldQ[o + 1], az = worldQ[o + 2],
+        aw = worldQ[o + 3];
+      const bx = -bindQ[o], by = -bindQ[o + 1], bz = -bindQ[o + 2],
+        bw = bindQ[o + 3];
+      out.set(aw * bx + ax * bw + ay * bz - az * by,
+        aw * by - ax * bz + ay * bw + az * bx,
+        aw * bz + ax * by - ay * bx + az * bw,
+        aw * bw - ax * bx - ay * by - az * bz);
+      return out;
+    },
     boneIndex: (name) => data.bones.findIndex((b) => b.name === name),
   };
 }

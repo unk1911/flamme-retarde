@@ -8,6 +8,136 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.73.3] — 2026-08-18
+
+The terminal gets its dials, and five things wrong with the upper floor of the
+vikendica get put right.
+
+### Added
+
+- **Slash commands in the laptop terminal.** The model on the other end has
+  always taken a system prompt, a temperature, a top-p, a token cap and a
+  thinking flag; all five were constants in the source and none of them were
+  reachable from the chair. Now:
+
+  | | |
+  |---|---|
+  | `/sys <text>` | replace the system prompt. Bare, it prints the one in force; `/sys reset` restores the default, `/sys off` sends none at all. `{TODAY}` is filled in as you send. |
+  | `/temp <0–2>` | how far it is allowed to wander. |
+  | `/topp <0–1>` | how far into the tail it may reach. |
+  | `/max <n>` | cap the answer in tokens; 0 is no cap. |
+  | `/think on\|off` | let it reason before it answers. |
+  | `/tools on\|off` | shell, clock and web search — the chip on the frame, from the keyboard. |
+  | `/set` | every dial as it stands, and the prompt in force. |
+  | `/copy` | the whole screen onto the clipboard. |
+  | `/new` | forget the conversation; the dials stay put. |
+  | `/help` | all of the above. |
+
+  The service is stateless — the entire history is posted on every turn — so
+  changing a dial is *retroactive*. Set `/sys` after ten minutes of talking and
+  the ten minutes behind you were always said to that prompt. `/help` says so.
+
+  Two rules keep this out of the way of ordinary typing: a command is a whole
+  word after the slash, so `/etc/passwd` is a question about a file; and an
+  unrecognised word is not an error, it goes to the model, so `/tmp is full` is
+  a sentence.
+
+### Fixed
+
+- **There was a grey slab sitting in the lavatory pan.** The soil-pipe stub
+  behind the WC ran to `bx + 0.16` and 28 cm up; the bowl's cavity at that
+  height starts at `bx + 0.13`. So the pipe came up through the bottom of the
+  pan and stood in the water, which is the first thing you saw when you looked
+  into it. It stops at `bx + 0.08` and 22 cm now, inside the ceramic where a
+  soil pipe belongs.
+- **The bowl is full.** Every face inside a lavatory is turned up and inward,
+  away from the one window in the room, so an empty one is a single grey hole
+  with no depth in it. There is a pale disc at 22.4 cm now, which is both what
+  a trap does and the thing that tells your eye how far down it goes.
+- **The lavatory read as a grey panel, and it took three passes to find out
+  why.** Not the colour, in the end, though the colour was wrong too:
+  `WHITEGOODS` and `TILE_WALL` were the same white to within a thousandth, so
+  sanitary ware now has its own `PORCELAIN`, cooler and whiter, and the wall
+  tile has come down six per cent. That helped and did not fix it. Nor did
+  rounding the cistern's corners.
+
+  What fixes it is measuring. Ambient in this renderer is hemispheric —
+  `mix(ground, sky, n.y * 0.5 + 0.5)` — and indoors the sun is shadowed out
+  entirely, so a horizontal white surface in that bathroom renders past
+  clipping and a vertical white surface beside it renders at 53 per cent. The
+  cistern front came back `(130,143,157)` against an albedo of `(247,248,249)`,
+  and *bluer than its own paint*: sky and nothing else. Every facet at that
+  angle takes that grey, which is why adding facets at that angle changed
+  nothing.
+
+  So the sanitary ware comes out of Blender in its own blob — the same way the
+  glazing and the net curtains already do — and gets its own material with a
+  far higher emissive and a harder specular for the glaze. That is the bounce
+  off a white basin and a white ceiling in a small tiled room, which this
+  shader has no notion of; `VIK.glow` at 0.14 is the same admission already
+  made once, for plaster. Nothing else in the house is `PORCELAIN`, so nothing
+  else moves.
+- **The cistern was a box.** It is a loft now, 40 cm on the shelf rather than
+  46 and 36 wide rather than 37.6, which is a real close-coupled cistern. The
+  front leans back 3.5 cm over its height and the last three rings pull in
+  hard, so across those five centimetres the top sweeps from vertical to
+  horizontal — one highlight, and the thing reads as glazed ceramic. There is
+  no separate lid; the rolled top ends in a flat 12 by 27 panel, which is the
+  lid, and the buttons go in it.
+- **The beanie was hanging off the back of her head**, and it took four passes
+  to work out why, because none of the first three measured anything.
+
+  Two real faults underneath it. `boneAt` gives a bone's position and nothing
+  else, so the hat was pinned to the head bone's *position* and left square to
+  the body — and the head bone is at the base of the skull, so everything on it
+  is an offset from that point. The moment she looked at anything, the cap
+  stayed where her face had been. There is a `boneTurn` now, `worldQ · bindQ⁻¹`,
+  the change since the bind pose, so offsets measured in bind stay good and
+  only the animation is added.
+
+  That fixed the swing and not the sit. The second fault is that the rig's hair
+  is a bob and the skull is *inside* it: a beanie sized to the skull sits within
+  the hair, the hair draws over its front, and what you see is a cap slipping
+  off the back of her head. It was a cap buried in it. Sizing it to swallow a
+  bob makes a bucket.
+
+  So the hair inside the cap's volume is discarded in the fragment shader,
+  which is what a game does with a scalp under a helmet, and the cap is a
+  solved ellipsoid rather than a chosen one — fitted to the head sliced every
+  2 cm off the rig, which turns out to be 27 cm front-to-back at brow height
+  and to lean forward as it rises, because the bob is swept. One set of numbers
+  in `YOU.hat` drives both the geometry and the shader test, so the hat and the
+  hole it makes cannot drift apart.
+- **The four locks of hair are gone.** `out` was 9.0 cm at the temple and 9.4
+  at the front; the head is 9.2 to the side and about 13 to the front, so every
+  one of them started inside the skull and came out through an ear or a cheek.
+  Pushing them clear does not save them either — at that size a flat cone
+  beside a face is a plastic card. The bob is the right shape anyway: Chloe's
+  hair is short, choppy and swept forward, which is what the rig has and what
+  the dye job makes blue.
+- **The curtain in soba 4 is a curtain.** It was teal — the colour of the one
+  in the photograph — but teal bakes into the opaque shell, so the only window
+  in the room was a painted board with the light behind it. It goes out as a
+  sheer now, like every other curtain in the flat, and you can see the beach
+  through it.
+
+### Removed
+
+- **The window on the north wall.** Soba 3 has one window, on the east, looking
+  down the lane. It had two, and the second was over the head of the double
+  bed in a wall that has never had an opening in it. `W_S4_N` next to it was
+  already drawn and never used; both are now comments saying so.
+- **The shelf of sea-urchin shells.** A beech plank with three of them on it,
+  hung on the spine wall — inside the soba 3 door opening, as it turned out, so
+  from the big room you were looking through a doorway at a board with three
+  grey balls floating on it. It was put there beside a framed sunset that came
+  down two versions ago, and without the sunset it was never a shelf of holiday
+  things. The wall between the bedroom doors is bare.
+
+### Changed
+
+- The upper-floor shell is 113 044 triangles, down from 115 424.
+
 ## [1.73.2] — 2026-08-17
 
 ### Changed

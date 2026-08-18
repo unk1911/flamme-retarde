@@ -54,6 +54,30 @@ const CRT = {
     + 'sibenik).',
 };
 
+/**
+ * The dials, as they stand right now.
+ *
+ * Separate from `CRT` because `CRT` is what the machine *is* — where it lives,
+ * how long the camera takes to sit down — and this is how it happens to be set
+ * at this moment. The slash commands move these and nothing else, and `/new`
+ * wipes the conversation and leaves them alone: forgetting the talk is not the
+ * same as putting the dials back.
+ *
+ * Every one of them goes up on every turn, which is the part that surprises
+ * people. The service is stateless — the whole history is posted each time —
+ * so changing the system prompt does not apply "from here on", it applies to
+ * the entire conversation retroactively, including the turns already on the
+ * glass. That is a feature and it is worth saying out loud, because it means
+ * you can talk to something for ten minutes and then change what it was.
+ */
+const DIALS = {
+  prompt: CRT.prompt,
+  temperature: 0.5,
+  top_p: 1.0,
+  max_tokens: 0,
+  think: false,
+};
+
 const computer = (() => {
   let ready = false;
   let active = false;
@@ -100,6 +124,13 @@ const computer = (() => {
   }
 
   const clear = () => { el.log.textContent = ''; };
+
+  // `{TODAY}` is filled in at the moment of asking rather than at load, so a
+  // window left open overnight does not lie about the date — and a hand-written
+  // system prompt gets the same treatment, because the placeholder is the only
+  // thing in here that knows what day it is.
+  const today = () => new Date().toLocaleDateString('en-GB',
+    { day: 'numeric', month: 'long', year: 'numeric' });
 
   // ── the wire ───────────────────────────────────────────────────────────────
   /** Are we signed in? The cheapest question the service will answer. */
@@ -182,14 +213,12 @@ const computer = (() => {
         && Array.isArray(opened[1])) chat = opened[1];
     const args = {
       history: chat,
-      system_prompt: CRT.prompt.replace('{TODAY}',
-        new Date().toLocaleDateString('en-GB',
-          { day: 'numeric', month: 'long', year: 'numeric' })),
-      temperature: 0.5,
-      top_p: 1.0,
-      max_tokens: 0,
+      system_prompt: DIALS.prompt.replace('{TODAY}', today()),
+      temperature: DIALS.temperature,
+      top_p: DIALS.top_p,
+      max_tokens: DIALS.max_tokens,
       use_tools: el.chip.classList.contains('on'),
-      think: false,
+      think: DIALS.think,
     };
     const done = await call(endpoint.bot, args, [
       args.history, args.system_prompt, args.temperature, args.top_p,
@@ -376,7 +405,8 @@ const computer = (() => {
           clear();
           put('s', CRT.greet);
           put('s', endpoint
-            ? 'ready. ask it something, or run a command. /help for the rest.'
+            ? 'ready. ask it something, or run a command — /sys, /temp and '
+              + 'the rest are on /help.'
             : 'signed in, but nothing on that app looks like a chat — '
               + 'the model cannot be reached from here.');
           el.in.focus();
@@ -408,33 +438,160 @@ const computer = (() => {
   }
 
   /**
-   * The handful of things the terminal answers itself.
+   * The things the terminal answers itself.
+   *
+   * Two rules hold this together. A command is a whole word after the slash,
+   * so `/etc/passwd` is a question about a file and not a command that failed;
+   * and an unrecognised word is not an error, it goes to the model, so `/tmp
+   * is full` is a sentence. Only the names on this list are ever swallowed.
    *
    * Everything the model has of the conversation is what we send it, so
    * forgetting is a local act: drop the history and the next turn goes up with
-   * nothing in front of it. Anything not on this list goes to the model, which
-   * is why the test is a whole word — `/etc/passwd` is a question about a file
-   * and not a command that failed.
+   * nothing in front of it. And by the same arithmetic, changing a dial is
+   * retroactive — see the note on DIALS.
    */
+  const HELP = [
+    ['/sys <text>', 'replace the system prompt. Bare, it prints the one in '
+      + 'force; `/sys reset` restores the default and `/sys off` sends none '
+      + 'at all. {TODAY} is filled in as you send.'],
+    ['/temp <0–2>', 'how far it is allowed to wander. 0 answers the same '
+      + 'question the same way twice.'],
+    ['/topp <0–1>', 'how far into the tail of the distribution it may reach.'],
+    ['/max <n>', 'cap the answer, in tokens. 0 is no cap.'],
+    ['/think on|off', 'let it reason before it answers.'],
+    ['/tools on|off', 'the shell, the clock and web search — the chip on the '
+      + 'frame, from the keyboard.'],
+    ['/set', 'every dial as it stands, and the prompt in force.'],
+    ['/copy', 'the whole screen onto the clipboard.'],
+    ['/new', 'forget the conversation. The dials stay where you left them.'],
+    ['/help', 'this.'],
+    ['esc', 'get up from the desk.'],
+  ];
+
+  // The numeric dials, and what each will accept. `/temp` and `/temperature`
+  // are the same command because nobody should have to remember which.
+  const KNOBS = {
+    temp: ['temperature', 0, 2], temperature: ['temperature', 0, 2],
+    topp: ['top_p', 0, 1], top_p: ['top_p', 0, 1], top: ['top_p', 0, 1],
+    max: ['max_tokens', 0, 131072], tokens: ['max_tokens', 0, 131072],
+    max_tokens: ['max_tokens', 0, 131072],
+  };
+
+  const asNum = (v, lo, hi) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n >= lo && n <= hi ? n : null;
+  };
+
+  const asFlag = (v) => (/^(on|1|yes|true)$/i.test(v) ? true
+    : /^(off|0|no|false)$/i.test(v) ? false : null);
+
   function local(text) {
-    const m = /^\/(\w+)\s*$/.exec(text);
+    // The argument is allowed to run over newlines, because a system prompt
+    // typed with shift-enter in it is still one command.
+    const m = /^\/([a-z_?]+)(?:[ \t]+([\s\S]*))?$/i.exec(text);
     if (!m) return false;
     const c = m[1].toLowerCase();
+    const arg = (m[2] || '').trim();
+    const echo = () => put('u', '> ' + text);
+
     if (c === 'new' || c === 'clear' || c === 'reset') {
       chat = [];
       hush();
       clear();
       put('s', CRT.greet);
-      put('s', 'new session — it has forgotten everything up to here.');
+      put('s', 'new session — it has forgotten everything up to here. The '
+        + 'dials are where you left them; /set to see them.');
       return true;
     }
+
     if (c === 'help' || c === '?') {
-      put('s', '/new — forget the conversation and start again  ·  '
-        + '/help — this  ·  esc — get up from the desk.  Anything else goes '
-        + 'to the model, which has a shell, a clock and web search when the '
-        + 'chip on the frame is lit.');
+      echo();
+      put('s', HELP.map(([k, why]) => k.padEnd(15) + why).join('\n'));
+      put('s', 'Anything that is not on that list goes to the model.');
       return true;
     }
+
+    if (c === 'sys' || c === 'system' || c === 'prompt') {
+      echo();
+      if (!arg) {
+        put('s', 'the system prompt in force'
+          + (DIALS.prompt === CRT.prompt ? ' (the default)' : '') + ':');
+        put('m', DIALS.prompt || '(none)');
+      } else if (/^(reset|default)$/i.test(arg)) {
+        DIALS.prompt = CRT.prompt;
+        put('s', 'system prompt back to the default.');
+      } else if (/^(off|none|empty)$/i.test(arg)) {
+        DIALS.prompt = '';
+        put('s', 'no system prompt at all now — whatever the service does '
+          + 'with an empty one is what you get.');
+      } else {
+        DIALS.prompt = arg;
+        put('s', 'system prompt set, ' + arg.length + ' characters. It goes '
+          + 'up with the next turn and with every turn after it — and since '
+          + 'the whole history is posted each time, it also rewrites what it '
+          + 'was for the turns already on this screen.');
+      }
+      return true;
+    }
+
+    const knob = KNOBS[c];
+    if (knob) {
+      echo();
+      const [key, lo, hi] = knob;
+      if (!arg) { put('s', key + ' is ' + DIALS[key]); return true; }
+      const n = asNum(arg, lo, hi);
+      if (n === null) {
+        put('e', key + ' wants a number from ' + lo + ' to ' + hi + '.');
+        return true;
+      }
+      DIALS[key] = key === 'max_tokens' ? Math.round(n) : n;
+      put('s', key + ' ' + DIALS[key]
+        + (key === 'max_tokens' && !DIALS[key] ? ' — no cap' : ''));
+      return true;
+    }
+
+    if (c === 'think' || c === 'tools' || c === 'tool') {
+      echo();
+      const isTools = c !== 'think';
+      const was = isTools ? el.chip.classList.contains('on') : DIALS.think;
+      // Bare `/tools` toggles, which is what a switch on a panel does.
+      const want = arg ? asFlag(arg) : !was;
+      if (want === null) { put('e', 'on or off.'); return true; }
+      if (isTools) el.chip.classList.toggle('on', want);
+      else DIALS.think = want;
+      put('s', (isTools ? 'tools ' : 'thinking ') + (want ? 'on' : 'off')
+        + (isTools && want ? ' — shell, clock and web search' : ''));
+      return true;
+    }
+
+    if (c === 'set' || c === 'dials') {
+      echo();
+      put('s', ['temperature ' + DIALS.temperature,
+        'top_p ' + DIALS.top_p,
+        'max_tokens ' + (DIALS.max_tokens || 'uncapped'),
+        'thinking ' + (DIALS.think ? 'on' : 'off'),
+        'tools ' + (el.chip.classList.contains('on') ? 'on' : 'off'),
+        chat.length + ' turns behind you'].join('  ·  '));
+      put('s', 'system prompt'
+        + (DIALS.prompt === CRT.prompt ? ' (the default)' : '') + ':');
+      put('m', DIALS.prompt || '(none)');
+      return true;
+    }
+
+    if (c === 'copy') {
+      // Read the glass before the echo goes on it, or the transcript ends
+      // with the command that copied it.
+      const all = Array.from(el.log.children)
+        .map((b) => b.textContent).join('\n\n');
+      echo();
+      const cb = navigator.clipboard;
+      (cb ? cb.writeText(all)
+        : Promise.reject(new Error('no clipboard on this browser')))
+        .then(() => put('s', all.length + ' characters on the clipboard.'),
+          (e) => put('e', 'the clipboard refused (' + e.message + ')'));
+      return true;
+    }
+
     return false;
   }
 
@@ -511,6 +668,11 @@ const computer = (() => {
     say: (t) => { wire(); el.in.value = t; return send(); },
     stats: () => ({ active, user, host: CRT.host,
       endpoint: endpoint && endpoint.add + ' + ' + endpoint.bot,
-      turns: chat.length, origin: location.origin }),
+      turns: chat.length, origin: location.origin,
+      dials: { temperature: DIALS.temperature, top_p: DIALS.top_p,
+        max_tokens: DIALS.max_tokens, think: DIALS.think,
+        tools: !!(el.chip && el.chip.classList.contains('on')),
+        prompt: DIALS.prompt.length,
+        custom: DIALS.prompt !== CRT.prompt } }),
   };
 })();

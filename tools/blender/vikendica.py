@@ -83,7 +83,13 @@ BEECH = (0.660, 0.470, 0.280)
 
 TILE_FLOOR = (0.072, 0.132, 0.318)  # bathroom, deep cobalt
 TILE_DEEP = (0.085, 0.150, 0.330)   # the darker ones set into the walls
-TILE_WALL = (0.900, 0.898, 0.885)
+# Wall tiling. It was 0.900, which is within a thousandth of the white of a
+# lavatory, and the two are not the same colour in any bathroom on earth: glazed
+# wall tile is a grey-white, sanitary ware is a blue-white, and the whole reason
+# a WC is legible standing against a tiled wall is that gap. Bringing this down
+# six per cent is what makes PORCELAIN read as an object rather than as a
+# rectangle of missing wall.
+TILE_WALL = (0.838, 0.841, 0.834)
 GROUT = (0.560, 0.556, 0.548)
 TERRAZZO = (0.800, 0.762, 0.685)    # the terrace, 33 cm non-slip
 
@@ -91,6 +97,15 @@ KITCH_UP = (0.470, 0.560, 0.650)    # wall cabinets, dusty blue
 KITCH_LO = (0.285, 0.330, 0.400)    # base units, slate
 WORKTOP = (0.780, 0.760, 0.720)
 WHITEGOODS = (0.905, 0.900, 0.885)
+# Sanitary ware, and not WHITEGOODS, which is the fridge and the washing
+# machine and — to within a thousandth — TILE_WALL as well. That collision did
+# not matter until something white stood *against* white tiling: the cistern is
+# a half-metre flat vertical face, the wall behind it is a flat vertical face,
+# both were the same grey once the light was off them, and the tank read as a
+# patch of missing wall rather than as a tank. Porcelain is whiter and cooler
+# than a glazed wall tile in life; here it also has to be whiter than one for
+# the object to exist at all.
+PORCELAIN = (0.968, 0.972, 0.978)
 FRIDGE_RED = (0.720, 0.105, 0.095)  # the tall one. Half the photographs.
 STEEL = (0.640, 0.650, 0.660)
 CHROME = (0.780, 0.790, 0.800)
@@ -189,7 +204,11 @@ W_S4_W = (1.60, 2.50, 1.00, 2.05)            # and its window on to the west
 W_S3_E = (1.70, 2.90, 1.00, 2.05)            # east wall of the east bedroom
 W_KIT_W = (-3.30, -2.10, 1.00, 2.05)         # the west wall of the big room
 W_BATH_W = (-0.24, 0.36, 1.40, 2.05)         # the bathroom, high, over the WC
-W_N = (1.60, 2.30, 1.00, 2.05)               # the one window on the north wall
+# There is no window on the north wall. There used to be a W_N here, 70 wide,
+# over the head of the double bed in soba 3 — which gave that one room two
+# windows on two walls when it has one, on the east, looking down the lane.
+# Neither W_S4_N above nor W_N was ever there; both are drawings of a house
+# with more openings in it than this one has.
 
 # The terrace: the full width of the house, 220 deep, on the south.
 TER_Y0, TER_Y1 = Y0 - 2.20, Y0
@@ -743,7 +762,7 @@ def shell(kit):
     # planes and the south, north and east are one each.
     ext = {
         "south": ("x", Y0 + EXT / 2, X0, X1, [D_TERR, W_TERR]),
-        "north": ("x", Y1 - EXT / 2, NX0, X1, [W_N]),
+        "north": ("x", Y1 - EXT / 2, NX0, X1, []),
         "westS": ("y", X0 + EXT / 2, Y0, BY1, [W_KIT_W, W_BATH_W]),
         "westN": ("y", NX0 + EXT / 2, BY0, Y1, [W_S4_W]),
         "east": ("y", X1 - EXT / 2, Y0, Y1, [D_ENTRY, W_S3_E]),
@@ -760,7 +779,7 @@ def shell(kit):
     # you see standing in the opening.
     inner = {
         "south": ("x", IY0 + 0.02, IX0 - 0.10, IX1 + 0.10, [D_TERR, W_TERR]),
-        "north": ("x", IY1 - 0.02, NIX0 - 0.10, IX1 + 0.10, [W_N]),
+        "north": ("x", IY1 - 0.02, NIX0 - 0.10, IX1 + 0.10, []),
         "westS": ("y", IX0 + 0.02, IY0 - 0.10, BY1, [W_KIT_W, W_BATH_W]),
         "westN": ("y", NIX0 + 0.02, BY0, IY1 + 0.10, [W_S4_W]),
         "east": ("y", IX1 - 0.02, IY0 - 0.10, IY1 + 0.10, [D_ENTRY, W_S3_E]),
@@ -819,10 +838,13 @@ def shell(kit):
 
     # ── windows ─────────────────────────────────────────────────────────────
     window(kit, "x", Y0 + EXT / 2, W_TERR, F2, curtain_c=SHEER)
-    window(kit, "x", Y1 - EXT / 2, W_N, F2, curtain_c=SHEER)
     window(kit, "y", X0 + EXT / 2, W_KIT_W, F2, curtain_c=SHEER)
     window(kit, "y", X0 + EXT / 2, W_BATH_W, F2, curtain_c=None)
-    window(kit, "y", NX0 + EXT / 2, W_S4_W, F2, curtain_c=TEAL)
+    # Sheer, like every other curtain in the flat. It was teal, which is the
+    # colour of the one in the photograph — but teal bakes into the opaque
+    # shell, and an opaque curtain across the only window in the room is a
+    # painted board where the light comes from.
+    window(kit, "y", NX0 + EXT / 2, W_S4_W, F2, curtain_c=SHEER)
     window(kit, "y", X1 - EXT / 2, W_S3_E, F2, curtain_c=SHEER)
 
     terrace(kit)
@@ -1242,17 +1264,29 @@ def _wc(kit, bx, ty):
              (F2 + 0.340, 0.152, 0.130, bx + 0.212, ty),
              (F2 + 0.270, 0.112, 0.094, bx + 0.202, ty),
              (F2 + 0.215, 0.062, 0.052, bx + 0.192, ty)]
-    bm_loft(kit.bm(WHITEGOODS, 0.004), rings, seg=20, power=2.5)
+    bm_loft(kit.bm(PORCELAIN, 0.004), rings, seg=20, power=2.5)
 
     # The spigot into the wall behind it. The pan's foot stands 5 cm clear of
     # the tiling, as a floor-standing pan does, and the soil pipe crosses that
     # gap — which is the detail that tells you the thing is plumbed in and not
     # just set down on the floor.
-    kit.span(WHITEGOODS, bx - 0.01, bx + 0.16, ty - 0.062, ty + 0.062,
-             F2 + 0.06, F2 + 0.28, bev=0.02)
+    #
+    # It stops at bx + 0.08 and 22 cm up, and both numbers matter. The bowl's
+    # cavity at that height starts at bx + 0.13, and this box used to run to
+    # bx + 0.16 and 28 cm — so it came up through the bottom of the pan and sat
+    # in the water as a grey slab, which is what you actually saw when you
+    # looked into the lavatory.
+    kit.span(PORCELAIN, bx - 0.01, bx + 0.08, ty - 0.062, ty + 0.062,
+             F2 + 0.06, F2 + 0.22, bev=0.02)
+
+    # The water. The bowl is a cavity facing up and inward, so every face in it
+    # is turned away from the window and reads as one grey hole; the trap being
+    # full is both true and the thing that tells your eye how deep it goes.
+    bm_cylinder(kit.bm((0.760, 0.830, 0.870), 0.002), bx + 0.192, ty,
+                F2 + 0.222, F2 + 0.228, 0.056, 0.056, seg=18)
 
     # The seat, down, and the two hinge lugs at the back of it.
-    _oval_band(kit.bm((0.935, 0.932, 0.918), 0.004), F2 + 0.414, F2 + 0.446,
+    _oval_band(kit.bm(PORCELAIN, 0.004), F2 + 0.414, F2 + 0.446,
                (0.188, 0.164, bx + 0.216, ty),
                (0.126, 0.104, bx + 0.238, ty), seg=24, power=2.6)
     for dy in (-0.058, 0.058):
@@ -1260,15 +1294,47 @@ def _wc(kit, bx, ty):
                  ty + dy + 0.016, F2 + 0.412, F2 + 0.452, bev=0.006)
 
     # The cistern, close-coupled: it sits down on the shelf at the back of the
-    # pan rather than hanging on the wall, and its lid overhangs it all round.
-    kit.span(WHITEGOODS, bx, bx + 0.19, ty - 0.185, ty + 0.185,
-             F2 + 0.400, F2 + 0.860, bev=0.022)
-    kit.span(WHITEGOODS, bx - 0.008, bx + 0.204, ty - 0.196, ty + 0.196,
-             F2 + 0.860, F2 + 0.896, bev=0.014)
-    # Dual flush. Two buttons, and the big one is the far one.
-    for dy, r in ((-0.048, 0.030), (0.046, 0.022)):
-        bm_cylinder(kit.bm(CHROME, 0.003), bx + 0.098, ty + dy,
-                    F2 + 0.888, F2 + 0.908, r, r * 0.94, seg=12)
+    # pan rather than hanging on the wall.
+    #
+    # This is the third shape it has had and the first one that works, so the
+    # reasoning is worth keeping.
+    #
+    # It was a box. Then it was a box with the corners taken off, which was no
+    # better, and the reason turns out to have nothing to do with its colour.
+    # Measured off the render, the front rendered at (130,143,157) against an
+    # albedo of (247,248,249) — 53 per cent, and *bluer* than the paint. That
+    # is sky and no sun: a half-metre vertical plane facing east, in a room
+    # whose one window is in the wall it stands against, next to counter tops
+    # that face up and blow out to white. Nothing about the value was wrong.
+    # The face was wrong. Any facet at that angle takes that grey, so adding
+    # facets at that angle — which is all the rounding did — adds nothing.
+    #
+    # So the top rolls over instead. The last three rings pull in hard, and
+    # across those five centimetres the surface sweeps from vertical to
+    # horizontal and runs from that same grey up to white. One highlight, and
+    # the thing reads as glazed ceramic rather than as a grey panel. The front
+    # also leans back 3.5 cm over its height, which is both what a moulded
+    # cistern does and a few more degrees of sky.
+    #
+    # And it is smaller: 40 cm on the shelf rather than 46, and 36 wide rather
+    # than 37.6, which is a real close-coupled cistern and a third less of the
+    # offending face.
+    #
+    # There is no separate lid. The rolled top ends in a flat 12 by 27 panel,
+    # which is the lid, and the buttons go in it.
+    rings = []
+    for z, rx, ry in ((0.400, 0.100, 0.181), (0.445, 0.102, 0.183),
+                      (0.570, 0.099, 0.181), (0.690, 0.094, 0.177),
+                      (0.748, 0.088, 0.171), (0.782, 0.076, 0.158),
+                      (0.800, 0.058, 0.136)):
+        # The back stays on the wall line at `bx` as the section narrows, so
+        # everything the taper takes off comes off the front.
+        rings.append((F2 + z, rx, ry, bx + rx, ty))
+    bm_loft(kit.bm(PORCELAIN, 0.005), rings, seg=28, power=2.6)
+    # Dual flush, in the flat of the top. The big one is the far one.
+    for dy, r in ((-0.046, 0.029), (0.044, 0.021)):
+        bm_cylinder(kit.bm(CHROME, 0.003), bx + 0.058, ty + dy,
+                    F2 + 0.798, F2 + 0.818, r, r * 0.94, seg=12)
 
 
 def bathroom(kit):
@@ -1638,8 +1704,8 @@ def bedroom_east(kit):
 
 
 def bedroom_west(kit):
-    """Soba 4, 7.69 m², with the bed against the west wall under its window and
-    a window on the north as well — the only room in the flat with two."""
+    """Soba 4, 7.69 m², with the bed against the west wall under its one
+    window. No room in this flat has two."""
     x0, x1, y0, y1 = ROOMS["soba4"]
     bed(kit, x0 + 1.10, y1 - 1.20, yaw=0.0, w=1.40, l=1.98)
     kit.span(WALNUT, x1 - 0.46, x1 - 0.06, y1 - 0.52, y1 - 0.12, F2, F2 + 0.52,
@@ -2172,11 +2238,12 @@ def pictures(kit):
              F2 + 1.58, F2 + 1.86, bev=0.004)
     kit.span(WHITEGOODS, 2.35, 2.62, y - 0.010, y, F2 + 1.55, F2 + 1.90,
              bev=0.003)
-    # The shelf with the sea-urchin shells on it, beside the sunset.
-    kit.span(BEECH, 0.62, 1.07, y - 0.17, y, F2 + 1.62, F2 + 1.65, bev=0.004)
-    for i in range(3):
-        bm_ball(kit.bm((0.70, 0.66, 0.58), 0.004), 0.69 + i * 0.14,
-                y - 0.085, F2 + 1.69, 0.038, 0.038, 0.030, rows=5, seg=10)
+    # There was a beech shelf here with three sea-urchin shells on it. It sat
+    # directly over the bathroom door, so from the big room you were looking
+    # through a doorway at a plank with three grey balls on it and no reason
+    # for either — the shells needed the sunset beside them to be a shelf of
+    # holiday things, and the sunset came down. Both gone.
+    #
     # The flat blue plaque that used to be up over the east bedroom door came
     # off with the picture. It was a stand-in for the fish, and the fish is on
     # the wall now.
@@ -2785,6 +2852,12 @@ def main():
         for tag, col, why in (
             ("glass", GLASS, "the glazing, drawn transparent"),
             ("sheer", SHEER, "the net curtains, drawn through"),
+            # And the sanitary ware, for the same kind of reason: it is the one
+            # white in the house that has to hold up as white on a vertical
+            # face in a room the sun never reaches. Split out so the runtime
+            # can give it the bounce this shader does not have. See the note on
+            # `wareMat` in src/44-vikendica.js.
+            ("ware", PORCELAIN, "the sanitary ware, drawn brighter"),
         ):
             sub = [p for p in parts if p[1] == col]
             parts = [p for p in parts if p[1] != col]
