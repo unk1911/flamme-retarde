@@ -291,6 +291,73 @@ vec3 applyHaze(vec3 col, float dist, vec3 worldPos, vec3 sunDir, vec3 viewDir){
 }
 `;
 
+/**
+ * The water column.
+ *
+ * Haze is one colour and one density and that is right for air, because air
+ * takes red, green and blue very nearly equally over the distances anybody can
+ * see through it. Water does not. It is a *filter*, and a violently selective
+ * one: a metre and a half of Adriatic halves the red and takes about eight per
+ * cent of the green, so at six metres a red swimsuit is brown, at ten it is
+ * black, and the reason everything down there is turquoise is not that anybody
+ * tinted it — it is that turquoise is the only light left.
+ *
+ * `uWaterK` is that, as a diffuse attenuation coefficient per metre per
+ * channel. The numbers come from Jerlov's optical water types, which are the
+ * standard oceanographic classification and have been since 1968: type I is
+ * the open Pacific, III the murkiest ocean, and 1C–9C the coastal series. The
+ * Adriatic off Šibenik in August is oligotrophic and very clear — a coastal 1C
+ * — and this is that: red 0.38, green 0.052, blue 0.072. Green carries
+ * furthest because there is enough dissolved matter here to beat blue, which
+ * is the whole difference between the Adriatic and the tropics; and green and
+ * blue are both low enough that the bottom is still there at twenty metres,
+ * which is the number that matters, because it is the one you can check by
+ * looking at any photograph taken off this coast.
+ *
+ * Two path lengths, and getting this wrong is the usual way underwater ends up
+ * looking like green fog. Light has to come *down* to the thing you are looking
+ * at, and then come *back* to your eye. So a rock ten metres down seen from
+ * eight metres away has travelled eighteen metres of water and not eight, and
+ * that is why a seabed goes blue-black with depth even when it is close enough
+ * to touch.
+ */
+const GLSL_WATER = /* glsl */ `
+uniform vec3 uWaterK;
+uniform vec3 uWaterFog;
+uniform float uCamDepth;
+
+/** How much of the eye-to-point segment is actually under the surface. */
+float waterPath(vec3 p, float dist){
+  float y0 = uCamPos.y, y1 = p.y;
+  if (y1 >= 0.0) return 0.0;
+  if (y0 <= 0.0) return dist;
+  return dist * (-y1) / max(y0 - y1, 1e-4);
+}
+
+/**
+ * col is what the surface would look like in air; dist is the eye-to-point
+ * distance and p the point, whose own depth is the downward path. (No
+ * backticks in here: this is inside a template literal and one would end it.)
+ */
+vec3 applyWater(vec3 col, float dist, vec3 p){
+  float wet = waterPath(p, dist);
+  if (wet <= 0.0) return col;
+  float down = max(0.0, -p.y);
+  // Down: what the light had left by the time it got there.
+  // 0.85 and not 1.0 because the sun is not overhead and, more to the point,
+  // a good deal of what lights the bottom got there by scattering rather than
+  // by falling straight down. A strictly vertical path over-darkens the
+  // shallows, which is how three metres of water ends up looking like ten.
+  col *= exp(-uWaterK * down * 0.85);
+  // Back: what survived the swim to the eye, and what scattered in on the way.
+  vec3 T = exp(-uWaterK * wet);
+  // The inscatter is itself lit through the column over the *viewer's* head,
+  // which is what makes going deep go dark rather than merely go blue.
+  vec3 fog = uWaterFog * exp(-uWaterK * max(0.0, uCamDepth) * 0.85);
+  return mix(fog, col, T);
+}
+`;
+
 // ------------------------------------------------------------- sun & sky -----
 
 /**
@@ -463,6 +530,11 @@ const U = {
   uShadowMatN: { value: new THREE.Matrix4() },
   uShadowTexelN: { value: 1 / CONFIG.shadowNearRes },
   uCamPos: { value: new THREE.Vector3() },
+
+  // the water column — see GLSL_WATER
+  uWaterK: { value: new THREE.Vector3(0.38, 0.052, 0.072) },
+  uWaterFog: { value: new THREE.Color(0.105, 0.375, 0.400) },
+  uCamDepth: { value: 0 },
 };
 
 /** Uniform bundles, spread into each material that needs them. */
@@ -479,6 +551,9 @@ const shareHaze = () => ({
 const shareTerrain = () => ({
   uTerrain: U.uTerrain, uFire: U.uFire, uWorldHalf: U.uWorldHalf,
   uHeightScale: U.uHeightScale, uHeightBias: U.uHeightBias,
+});
+const shareWater = () => ({
+  uWaterK: U.uWaterK, uWaterFog: U.uWaterFog, uCamDepth: U.uCamDepth,
 });
 const shareShadow = () => ({
   uShadowMap: U.uShadowMap, uShadowMat: U.uShadowMat, uShadowTexel: U.uShadowTexel,

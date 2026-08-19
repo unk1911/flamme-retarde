@@ -539,7 +539,7 @@ function updateCamera(dt) {
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
   trees, landmarks, alerts, roads, rail, props, airfield, jadrija, ground, birds, eject,
-  mirror, mirrorP, swim, you;
+  mirror, mirrorP, swim, under, you;
 /** You plus the three wingmen, as the birds see them. Built once, in boot(). */
 let birdFlush = [];
 
@@ -629,6 +629,7 @@ async function boot() {
 
   await step(70, 'load.sea');
   sea = buildSea(scene);
+  under = buildUnder(scene);
 
   await step(74, 'load.stone');
   resolveLandmarks();
@@ -965,8 +966,16 @@ function setPaused(on) {
   // Only while there is a mission to stop. Pausing the loader would strand the
   // world build, and the cinematic and the end screen have their own answer to
   // "make it stop" — the skip button and the reload.
+  //
+  // `swim` is on this list because it is a place you can be, and every place
+  // you can be in this game can be walked away from. It was missing for the
+  // simple reason that it was written after the list was: being in the water
+  // is the newest of the five, and the breath clock does not stop for a
+  // doorbell — which is the one mode where not being able to stop it actually
+  // costs you something.
   if (state.phase !== 'fly' && state.phase !== 'crashing'
-    && state.phase !== 'ground' && state.phase !== 'chute') return;
+    && state.phase !== 'ground' && state.phase !== 'chute'
+    && state.phase !== 'swim') return;
   if (state.paused === on) return;
   state.paused = on;
   $('pause').hidden = !on;
@@ -1574,13 +1583,13 @@ function paintSwimHud() {
     : swim.canWade() ? T('swim.wade')
       : T('swim.hint');
   // Nothing below the waterline until your eyes are actually under it, and then
-  // it closes in over the first four metres and stops — past that it is as dark
-  // as it is going to get and the surface overhead is still the way out.
+  // it closes in slowly and never far: this is the mask now, not the sea. The
+  // sea is drawn.
   const u = $('under');
   u.hidden = false;
   u.classList.toggle('on', swim.submerged);
   u.style.opacity = swim.submerged
-    ? (0.30 + 0.52 * Math.min(1, d / 5.0)).toFixed(3) : '0';
+    ? (0.16 + 0.44 * Math.min(1, d / 11.0)).toFixed(3) : '0';
 }
 
 /**
@@ -2489,6 +2498,13 @@ function frame() {
   else if (state.phase === 'chute' || eject.active) eject.pose(camera);
   else if (state.phase !== 'intro') updateCamera(dt);
   U.uCamPos.value.copy(camera.position);
+  // How deep the eye itself is, which is what dims the water rather than
+  // merely colouring it. Taken off the wave surface at your own position and
+  // not off zero, so a trough does not briefly surface you.
+  U.uCamDepth.value = state.phase === 'swim' && swim
+    ? Math.max(0, swim.surfaceAt(camera.position.x, camera.position.z)
+      - camera.position.y)
+    : Math.max(0, -camera.position.y);
 
   camera.updateMatrixWorld();
   _pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
@@ -2512,6 +2528,10 @@ function frame() {
   if (jadrija) jadrija.update(dt, camera.position);
   rail.update(dt);
   sea.update(camera);
+  // The water column, which only exists while somebody is inside it. Keyed on
+  // the eye rather than on the phase, so a bale-out that puts the camera under
+  // the surface for half a second gets it too.
+  under.update(camera, U.uCamDepth.value, U.uCamDepth.value > 0.02, renderer, dt);
   // Wall time to spread, world time to burn. The only process in the game that
   // is racing the clock rather than racing you — see the note on `update` in
   // src/40-fire.js for why letting it slow would be a cheat and letting
@@ -2900,6 +2920,7 @@ window.__fr = {
       lineKm: +rail.lineKm.toFixed(2), tris: Math.round(rail.tris) } : null,
     ground: ground ? ground.stats() : null,
     swim: swim && swim.active ? swim.stats() : null,
+    under: under ? under.stats() : null,
     props: props ? props.counts : null,
     birds: birds ? birds.stats() : null,
     water: Math.round(flight ? flight.p.water : 0),
@@ -3197,6 +3218,30 @@ window.__fr = {
     },
   },
 
+  /**
+   * Debug: take one layer out of the picture, which is the only way to find
+   * out which layer you are looking at. Underwater especially — down there
+   * every surface is some shade of the same green and a screenshot cannot
+   * tell you whether that is the bottom, the surface or nothing at all.
+   */
+  show: (what, on) => {
+    const m = {
+      sea: () => [sea.mesh],
+      terrain: () => terrain.levels.map((l) => l.mesh),
+      trees: () => SPECIES.flatMap((sp) => [trees.layers[sp].near.mesh,
+        trees.layers[sp].far.mesh]),
+      sky: () => [sky.mesh],
+    }[what];
+    if (!m) return Object.keys({ sea: 0, terrain: 0, trees: 0, sky: 0 });
+    const list = m();
+    for (const o of list) o.visible = !!on;
+    return list.length;
+  },
+  /** Debug: the vegetation, which is now grown from a spec and worth probing. */
+  veg: {
+    cost: () => trees.cost(),
+    nearest: (sp, x, z) => trees.nearest(sp, x, z),
+  },
   ground: {
     arm: () => ground.force(),
     raw: () => ground,

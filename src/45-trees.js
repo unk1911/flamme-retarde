@@ -34,7 +34,16 @@ const VEG = {
   // fifteen pixels tall and there is nothing left to see: the swap is invisible
   // and everything in the ring is a fraction of a percent of a circle 2.2 km
   // across. Measured, on the hillside above Jadrija: about 500 of 20 000.
-  near: 300,
+  //
+  // 300 became 190 when the close-up models were grown rather than placed. A
+  // grown pine is four times the triangles of the eleven blobs it replaced,
+  // and the ring is an area: 190 gives back six tenths of that, and it gives
+  // it back where nothing is lost. At 300 m a 10 m tree is fifteen pixels
+  // tall; at 190 it is twenty-four, and the far model — which also got the
+  // right crown width and the right trunk in this pass — is honest at both.
+  // Measured on the hill above Jadrija, where the near ring is fullest: the
+  // whole landscape came out lighter after this than it went in.
+  near: 190,
   nearMax: 3000,         // and the ceiling on those, so the buffer is bounded
 };
 
@@ -162,6 +171,13 @@ function vegMerge(parts) {
  * hole this leaves instead cannot be seen from anywhere.
  */
 function vegClump(c, r, seg, rows, jag, rnd) {
+  // `rows` is not a quality dial, it is a shape: the poles take a ring each
+  // and leave `rows - 1` for the body, so rows=3 is a barrel with two caps and
+  // rows=2 is a drum. That was invisible while a clump was 30 cm across and
+  // very visible indeed once the crowns were made their real size — the olive
+  // came out as a heap of hexagonal prisms. Anything you can see the sides of
+  // wants 4.
+
   const ph = [];
   for (let i = 0; i < seg; i++) ph.push(rnd() * TAU);
   const rings = [];
@@ -280,10 +296,289 @@ function vegLimb(p0, p1, r0, r1, seg, rows = 2, bow = 0) {
   return loft(rings, { closed: true, caps: false });
 }
 
+// ── growing one, instead of placing eleven ───────────────────────────────────
+//
+// Everything above this line places foliage by hand: a list of clump centres,
+// tuned by eye until the silhouette was right. It got us a long way and it has
+// a ceiling, which is that a hand-placed canopy has no *reason*. The clumps sit
+// where they sit; nothing carries them; the outline is whatever the list said.
+// Stand under one at four metres and it reads as a bunch of balloons on sticks,
+// because that is what it is.
+//
+// So the last three species below are grown rather than arranged, and the model
+// is Daniel Greenheck's ez-tree (MIT) — read, not imported. None of his code is
+// here: it is built for leaf billboards with alpha-tested textures, and this
+// whole game is solid vertex-coloured geometry in four instanced draws with not
+// one texture in it. What transfers is the *skeleton*, and four ideas in it:
+//
+//   · A branch is not a tube, it is a chain of short sections, each one
+//     stepping along its own orientation. Bends come free and cost nothing.
+//   · Gnarliness scales with 1/√radius, so a thin branch curls hard and a
+//     trunk barely wanders. One number, and it is the difference between a
+//     tree and a diagram of a tree.
+//   · A growth force rotates each section toward the light by strength/radius,
+//     so the trunk resists it and the twigs are dragged. That is what makes an
+//     Aleppo pine's umbrella happen rather than be sculpted.
+//   · Children are stratified: spread along the parent in equal slots with
+//     jitter, and given radial slots from a *shuffled* permutation so height
+//     and bearing decorrelate. He documents the bug this fixes and he is
+//     right — without it a conifer spirals its longest branches to one side.
+//
+// Two of his numbers are re-scaled because his trees are twenty metres tall in
+// world units and these are normalised to a height of one: gnarliness uses
+// √(r0/r) and force uses strength·r0/r, both of which are 1 at the trunk base,
+// so the spec's numbers mean radians per section on the trunk and can be read.
+//
+// The leaves are ours. Where he hangs a billboard, this hangs a `vegClump`,
+// which is the same puff the hand-placed canopies use — so a grown tree lights
+// exactly like the ones round the vikendica and nothing else in the pipeline
+// has to know the difference.
+
+/** Fisher-Yates, so a child's height slot says nothing about its bearing. */
+function vegShuffle(n, rnd) {
+  const a = [];
+  for (let i = 0; i < n; i++) a.push(i);
+  for (let k = n - 1; k > 0; k--) {
+    const j = Math.floor(rnd() * (k + 1));
+    const t = a[k]; a[k] = a[j]; a[j] = t;
+  }
+  return a;
+}
+
 /**
- * The four close-up species, in the same units and to the same dimensions as
- * the four far ones: a height of 1 and a radius that stays inside what
- * VEG_SIZE was written against.
+ * Grow a skeleton. Returns the branches as chains of sections — a point, an
+ * orientation and a radius each — and the places foliage is to hang.
+ *
+ * Breadth-first off a queue rather than by recursion, which is his structure
+ * and is the right one: every branch of a level is grown before any of the next
+ * begins, so a spec change at one level cannot silently reorder another level's
+ * draws on the seeded RNG.
+ */
+function vegGrow(spec, rnd) {
+  const UP = new THREE.Vector3(0, 1, 0);
+  const r0 = spec.radius;
+  const force = new THREE.Vector3().fromArray(spec.force || [0, 1, 0]).normalize();
+  const branches = [], tufts = [];
+  const queue = [{
+    p: new THREE.Vector3(0, 0, 0),
+    q: new THREE.Quaternion(),
+    len: spec.height,
+    r: spec.radius,
+    level: 0,
+  }];
+
+  const tmpQ = new THREE.Quaternion();
+  const axis = new THREE.Vector3();
+  const up = new THREE.Vector3();
+  const step = new THREE.Vector3();
+
+  while (queue.length) {
+    const b = queue.shift();
+    const lv = b.level;
+    const last = lv === spec.levels;
+    const nSec = spec.sections[lv];
+    const secLen = b.len / nSec;
+    const p = b.p.clone(), q = b.q.clone();
+    const sections = [];
+
+    for (let i = 0; i <= nSec; i++) {
+      const t = i / nSec;
+      // A branch that ends in foliage tapers to nothing; one that carries
+      // children keeps something at the tip for them to leave from.
+      let r = b.r * (1 - spec.taper[lv] * t);
+      if (last && i === nSec) r = b.r * 0.06;
+      sections.push({ p: p.clone(), q: q.clone(), r });
+      if (i === nSec) break;
+
+      step.set(0, secLen, 0).applyQuaternion(q);
+      p.add(step);
+
+      // Wander. Thin curls, thick does not.
+      const g = spec.gnarl[lv] * Math.sqrt(r0 / Math.max(r, 1e-4));
+      q.multiply(tmpQ.setFromAxisAngle(new THREE.Vector3(1, 0, 0),
+        (rnd() - 0.5) * 2 * g));
+      q.multiply(tmpQ.setFromAxisAngle(new THREE.Vector3(0, 0, 1),
+        (rnd() - 0.5) * 2 * g));
+
+      // And the light. Rotated about (branch up × force), so a section already
+      // pointing at the force is left alone instead of being shoved sideways
+      // by whatever direction the wander happened to leave it in.
+      up.set(0, 1, 0).applyQuaternion(q);
+      axis.crossVectors(up, force);
+      const sin = axis.length();
+      if (sin > 1e-6) {
+        axis.divideScalar(sin);
+        const full = Math.atan2(sin, up.dot(force));
+        const want = spec.strength[lv] * (r0 / Math.max(r, 1e-4));
+        q.premultiply(tmpQ.setFromAxisAngle(axis,
+          Math.max(-full, Math.min(full, want))));
+      }
+    }
+
+    branches.push({ sections, seg: spec.segments[lv] });
+
+    if (last) {
+      // Foliage along the last length of the last branch. `tuft` is where it
+      // starts and how many, and the count is what turns a lollipop into a
+      // spray: one puff at the tip is a bud, four down the length is a shoot.
+      const [tStart, tCount] = spec.tuft;
+      for (let i = 0; i < tCount; i++) {
+        const f = tStart + (i + 0.3 + rnd() * 0.4) / tCount * (1 - tStart);
+        const s = sections[Math.min(nSec, Math.floor(f * nSec))];
+        tufts.push({
+          c: [s.p.x, s.p.y, s.p.z],
+          // This one's share of the leaf size, and where it sits off its
+          // branch — both in units of its own radius, so they survive the fit.
+          k: 0.70 + rnd() * 0.60,
+          j: [(rnd() - 0.5) * spec.tuftJit, (rnd() - 0.5) * spec.tuftJit,
+            (rnd() - 0.5) * spec.tuftJit],
+        });
+      }
+      continue;
+    }
+
+    // Children, stratified up the parent and round it.
+    const n = spec.children[lv];
+    const startMin = spec.start[lv];
+    const slot = (1 - startMin) / n;
+    const bearing = vegShuffle(n, rnd);
+    const spin = rnd() * TAU;
+    for (let i = 0; i < n; i++) {
+      const at = startMin + (i + rnd()) * slot;
+      const si = Math.min(nSec, Math.floor(at * nSec));
+      const s = sections[si];
+      const a = spin + TAU * (bearing[i] + (rnd() - 0.5)) / n;
+      const cq = s.q.clone()
+        .multiply(tmpQ.setFromAxisAngle(new THREE.Vector3(0, 1, 0), a))
+        .multiply(tmpQ.setFromAxisAngle(new THREE.Vector3(1, 0, 0), spec.angle[lv]));
+      queue.push({
+        p: s.p.clone(),
+        q: cq,
+        // An evergreen's branches shorten as they go up it, which is the whole
+        // outline of a conifer and is one multiplication.
+        len: spec.length[lv] * (spec.evergreen ? 1 - at * spec.spire : 1),
+        r: s.r * spec.thin[lv],
+        level: lv + 1,
+      });
+    }
+  }
+  return { branches, tufts };
+}
+
+/** Skin one grown branch: a ring at every section, in that section's frame. */
+function vegSkin(branch) {
+  const rings = [];
+  const v = new THREE.Vector3();
+  for (const s of branch.sections) {
+    const ring = [];
+    for (let i = 0; i < branch.seg; i++) {
+      const a = (i / branch.seg) * TAU;
+      v.set(Math.cos(a) * s.r, 0, Math.sin(a) * s.r).applyQuaternion(s.q);
+      ring.push(new THREE.Vector3(s.p.x + v.x, s.p.y + v.y, s.p.z + v.z));
+    }
+    rings.push(ring);
+  }
+  return loft(rings, { closed: true, caps: false });
+}
+
+/**
+ * Fit a grown skeleton into the envelope the instancing was written against:
+ * standing on y=0, one unit tall, and reaching `radius` at its widest.
+ *
+ * Doing it here rather than in the spec is the difference between a spec you
+ * can read and a spec you have to solve. Nobody can say what trunk length and
+ * branch angle add up to a height of exactly one — and if they could, changing
+ * the branch angle would break it again. So the spec says what shape the tree
+ * is and this says how big it is, which is the only division of those two that
+ * survives editing.
+ *
+ * The scale is not uniform: height and spread are separate numbers because a
+ * cypress and an olive disagree about both. A branch's own cross-section takes
+ * only the horizontal factor, so a leaning limb's tube goes very slightly
+ * elliptical — at five centimetres of radius that is under a pixel, and the
+ * alternative is fitting one dimension and missing the other.
+ */
+function vegFit(sk, height, radius, bole, leaf, squash) {
+  let ylo = Infinity, yhi = -Infinity, rmax = 1e-6;
+  for (const b of sk.branches) {
+    for (const s of b.sections) {
+      if (s.p.y < ylo) ylo = s.p.y;
+      if (s.p.y > yhi) yhi = s.p.y;
+      const d = Math.hypot(s.p.x, s.p.z);
+      if (d > rmax) rmax = d;
+    }
+  }
+  // The wood is fitted a little inside the envelope and the foliage fills the
+  // rest, because the foliage is what defines the outline: a puff hanging off
+  // the outermost twig has to be inside the species' reach, not centred on it.
+  const sy = height * (1 - leaf * squash * 0.85) / Math.max(yhi - ylo, 1e-6);
+  const sxz = radius * (1 - leaf * 0.85) / rmax;
+  for (const b of sk.branches) {
+    for (const s of b.sections) {
+      s.p.set(s.p.x * sxz, (s.p.y - ylo) * sy, s.p.z * sxz);
+    }
+  }
+  // Leaf size as a fraction of the crown's own radius, which is a number you
+  // can hold against a photograph — a pine's tufts are a fifth of its crown, a
+  // maquis bush's are nearly half of it, and both of those are checkable. It
+  // was a pre-fit length before, in units nothing else in the file used, and
+  // that is how a puff on the olive ended up a metre and a half across.
+  for (const t of sk.tufts) {
+    const rx = leaf * radius * t.k;
+    t.rx = rx;
+    t.ry = rx * squash;
+    t.c = [t.c[0] * sxz + t.j[0] * rx,
+      (t.c[1] - ylo) * sy + t.j[1] * t.ry,
+      t.c[2] * sxz + t.j[2] * rx];
+  }
+  // And the wood, which is fitted separately and has to be. Widening a crown
+  // widens everything under it by the same factor, so the pine's trunk went
+  // from a lamp post to a chimney the moment the crown was made the right size
+  // — the two mistakes were one mistake, and correcting only the visible half
+  // would have left a ten-metre tree with three-quarters of a metre of bole.
+  // `bole` is the trunk radius the drawing wants, in the same units as the
+  // spread, so the diameter in the world is `2 · bole · wide` and is a number
+  // you can check against a real tree.
+  const rk = bole / Math.max(sk.branches[0].sections[0].r, 1e-9);
+  for (const b of sk.branches) for (const s of b.sections) s.r *= rk;
+  return sk;
+}
+
+/**
+ * Grow a species and hand back one merged, painted prototype: bark on the
+ * wood, and the crown's own gradient over every puff, banded across the whole
+ * canopy so it reads as one volume and not as a bag of separate balls.
+ *
+ * `squash` is a puff's height over its width in prototype units. Round in the
+ * world is about 0.8 for every species here — an instance is scaled (w, h, w)
+ * and each species' h/w now sits between 1.0 and 1.3 — so anything much under
+ * that is a deliberately flat puff, which is what an Aleppo pine's foliage is
+ * and what a cypress's very much is not.
+ */
+function vegGrown(spec, rnd, bark, leaf, shade) {
+  const sk = vegGrow(spec, rnd);
+  vegFit(sk, 1, spec.reach, spec.bole, spec.leaf, spec.squash);
+
+  const parts = sk.branches.map((b) => vegPaint(vegSkin(b), bark));
+  let lo = Infinity, hi = -Infinity;
+  for (const t of sk.tufts) {
+    if (t.c[1] - t.ry < lo) lo = t.c[1] - t.ry;
+    if (t.c[1] + t.ry > hi) hi = t.c[1] + t.ry;
+  }
+  const [dk, lt] = vegShade(leaf, shade[0], shade[1]);
+  for (const t of sk.tufts) {
+    const r = [t.rx, t.ry, t.rx];
+    parts.push(vegPuff(vegClump(t.c, r, spec.puffSeg, spec.puffRow, spec.puffJag, rnd),
+      t.c, r, [lo + (hi - lo) * 0.10, hi], dk, lt));
+  }
+  return vegMerge(parts);
+}
+
+/**
+ * The four close-up species, grown to the envelope the far models already had:
+ * standing on the ground, one unit tall, and reaching the same radius, because
+ * a tree that changes size or shape as you approach is worse than a tree with
+ * corners on it.
  *
  * Seeded once and deterministically. These are four models, not four thousand
  * — the variation between individual trees is the instance's own scale, yaw
@@ -292,136 +587,81 @@ function vegLimb(p0, p1, r0, r1, seg, rows = 2, bow = 0) {
 function vegNearPrototypes() {
   const rnd = mulberry32(0x7ee5);
   const bark = [0.30, 0.23, 0.17];
-  const ring = (a, r, y) => [Math.cos(a) * r, y, Math.sin(a) * r];
 
-  // Aleppo pine. A bare trunk that leans, three limbs that leave it near the
-  // top, and five flat clumps arranged into the umbrella the species is known
-  // for — wide, thin, and with sky through it.
+  // Aleppo pine. Long bare trunk, everything happening in the top third, and
+  // the umbrella made by the growth force rather than by hand: five limbs
+  // leave at sixty degrees and are then rotated back toward the light section
+  // by section, hardest where they are thinnest, which is exactly the shape.
+  // `spire` shortens them going up, so the crown is broad below and closes
+  // over, and the tufts sit along the last third of the last branches so the
+  // foliage is a spray at the ends and not a ball in the middle.
   //
-  // The vertical radii look absurd next to the horizontal ones and they are
-  // correct: an instance is scaled (w, h, w) and for a pine that is about
-  // (1.9, 10, 1.9), so the prototype is squashed by five to one on the way into
-  // the world. A clump built round comes out as a five-metre lozenge, which is
-  // how the first version of this turned an umbrella pine into a lollipop.
-  const pineParts = [
-    vegPaint(vegLimb([0, 0, 0], [0.055, 0.62, 0.03], 0.058, 0.028, 8, 4, 0.030), bark),
-  ];
-  //
-  // Eleven puffs and not five. Five is enough for the outline of an Aleppo
-  // pine and nowhere near enough for its texture: what you are standing under
-  // is a broken ceiling, and a hole needs an edge on both sides of it to read
-  // as a hole. Same envelope, same height — 40 cm of radius on the prototype
-  // either way — cut into more, smaller pieces.
-  const pineC = [
-    [0.000, 0.880, 0.000, 0.180, 0.080, 0.172],
-    [0.215, 0.812, 0.060, 0.150, 0.068, 0.144],
-    [-0.150, 0.828, 0.185, 0.146, 0.066, 0.140],
-    [-0.196, 0.856, -0.140, 0.142, 0.064, 0.138],
-    [0.088, 0.834, -0.215, 0.138, 0.062, 0.134],
-    [0.130, 0.902, 0.150, 0.126, 0.058, 0.122],
-    [-0.062, 0.914, -0.056, 0.118, 0.056, 0.114],
-    [0.288, 0.784, -0.075, 0.112, 0.052, 0.108],
-    [-0.276, 0.792, 0.048, 0.110, 0.050, 0.106],
-    [0.040, 0.778, 0.276, 0.114, 0.052, 0.110],
-    [-0.080, 0.770, -0.266, 0.108, 0.050, 0.104],
-  ];
-  const [pineDk, pineLt] = vegShade([0.14, 0.24, 0.13]);
-  for (const [x, y, z, rx, ry, rz] of pineC) {
-    // Every clump but the crown is hung off a limb, so the canopy is carried
-    // rather than floating over a stick.
-    if (Math.hypot(x, z) > 0.05) {
-      pineParts.push(vegPaint(
-        vegLimb([0.05, 0.58, 0.026], [x * 0.85, y - ry * 0.6, z * 0.85],
-          0.020, 0.010, 5, 1), bark));
-    }
-    pineParts.push(vegPuff(vegClump([x, y, z], [rx, ry, rz], 8, 3, 0.32, rnd),
-      [x, y, z], [rx, ry, rz], [0.70, 0.97], pineDk, pineLt));
-  }
-  const pine = vegMerge(pineParts);
+  // The trunk stops well short of the top and tapers almost to nothing, which
+  // is not a detail: the fit scales the tree by its tallest *section*, so a
+  // leader that outlives its branches becomes a bare spike standing out of the
+  // crown, and that is a telegraph pole with a bush tied to it. In a grown
+  // pine the top of the tree is made of branches. Here it is too.
+  const pine = vegGrown({
+    levels: 2, evergreen: true, spire: 0.42,
+    height: 0.66, radius: 0.055, reach: 0.45, bole: 0.023,
+    children: [6, 3], start: [0.42, 0.26],
+    angle: [1.16, 0.72], length: [0.42, 0.22], thin: [0.60, 0.58],
+    taper: [0.88, 0.58, 0.70], gnarl: [0.018, 0.048, 0.105],
+    strength: [0.0035, 0.013, 0.026], force: [0, 1, 0],
+    sections: [7, 5, 3], segments: [7, 5, 3],
+    tuft: [0.14, 3], tuftJit: 1.15, leaf: 0.18,
+    squash: 0.50, puffSeg: 6, puffRow: 4, puffJag: 0.44,
+  }, rnd, bark, [0.14, 0.24, 0.13], [0.60, 1.26]);
 
-  // Cypress. One spindle, but a wavering one — the axis drifts, the section is
-  // twelve-sided and irregular, and four small clumps break the outline so it
-  // is not a lathe standing on end.
-  const cyPr = [[0.00, 0.045], [0.10, 0.072], [0.26, 0.098], [0.44, 0.106],
-    [0.62, 0.101], [0.78, 0.086], [0.90, 0.060], [0.97, 0.030], [1.00, 0.008]];
-  const cyRings = cyPr.map(([y, r]) => {
-    const dx = 0.016 * Math.sin(y * 4.1), dz = 0.013 * Math.sin(y * 3.3 + 1.7);
-    const out = [];
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * TAU;
-      const rr = r * (1 + 0.13 * Math.sin(i * 2.11 + y * 7.7));
-      const p = ring(a, rr, y);
-      out.push(new THREE.Vector3(p[0] + dx, p[1], p[2] + dz));
-    }
-    return out;
-  });
-  const [cyDk, cyLt] = vegShade([0.09, 0.17, 0.11], 0.55, 1.40);
-  // The spindle keeps its own normals — it is a cone and a cone's normal is
-  // not radial — but it takes the gradient, which is what stops a cypress
-  // reading as one flat black slot cut out of the sky.
-  const cyParts = [vegPuff(loft(cyRings, { closed: true, caps: false }),
-    [0, 0.5, 0], [0.106, 0.5, 0.106], [0.0, 1.0], cyDk, cyLt, 0.22)];
-  for (let i = 0; i < 7; i++) {
-    const y = 0.20 + i * 0.115;
-    const a = rnd() * TAU;
-    const c = ring(a, 0.058 + rnd() * 0.020, y);
-    const r = [0.046, 0.062, 0.046];
-    cyParts.push(vegPuff(vegClump(c, r, 7, 3, 0.34, rnd), c, r,
-      [0.0, 1.0], cyDk, cyLt));
-  }
-  const cypress = vegMerge(cyParts);
+  // Cypress. A fastigiate tree is one whose branches are held almost against
+  // its own trunk, and that is one number here and not a shape: leave at
+  // fifteen degrees, then a growth force strong enough to pull every section
+  // back to vertical. The wander is left high so the column is not a lathe.
+  const cypress = vegGrown({
+    levels: 1, evergreen: true, spire: 0.72,
+    height: 0.94, radius: 0.030, reach: 0.105, bole: 0.010,
+    children: [16], start: [0.05],
+    angle: [0.30], length: [0.34], thin: [0.30],
+    taper: [0.80, 0.70], gnarl: [0.012, 0.075],
+    strength: [0.002, 0.055], force: [0, 1, 0],
+    sections: [9, 4], segments: [6, 4],
+    tuft: [0.05, 4], tuftJit: 1.30, leaf: 0.32,
+    squash: 0.90, puffSeg: 5, puffRow: 3, puffJag: 0.46,
+  }, rnd, bark, [0.09, 0.17, 0.11], [0.52, 1.42]);
 
-  // Olive. The trunk is short and thick and splits, which is the whole reason
-  // an olive reads as an olive from underneath, and the canopy is four lobes
-  // with light between them.
-  const olLimbs = [[0.26, 0.50, 0.30], [2.4, 0.56, -0.22], [4.4, 0.52, 0.10]];
-  const olParts = [
-    vegPaint(vegLimb([0, 0, 0], [0.012, 0.21, 0.008], 0.145, 0.105, 8, 2, 0.018), bark),
-  ];
-  for (const [a, y, lean] of olLimbs) {
-    const tip = ring(a, 0.20 + lean * 0.10, y);
-    olParts.push(vegPaint(
-      vegLimb([0.012, 0.20, 0.008], tip, 0.060, 0.030, 6, 2, 0.030),
-      [0.33, 0.29, 0.24]));
-  }
-  // An olive is squashed less on the way out — about 2.6 to 1 — so its lobes
-  // are nearer to round than the pine's, and they overlap into one mass with
-  // notches in it rather than into four separate balls.
-  const olC = [
-    [0.000, 0.680, 0.000, 0.235, 0.180, 0.225],
-    [0.245, 0.560, 0.165, 0.190, 0.150, 0.182],
-    [-0.225, 0.585, 0.180, 0.185, 0.146, 0.178],
-    [-0.045, 0.605, -0.265, 0.180, 0.142, 0.172],
-    [0.185, 0.700, -0.150, 0.165, 0.130, 0.158],
-    [-0.180, 0.720, -0.030, 0.155, 0.124, 0.150],
-    [0.055, 0.755, 0.185, 0.150, 0.120, 0.145],
-  ];
-  const [olDk, olLt] = vegShade([0.36, 0.41, 0.30], 0.64, 1.20);
-  for (const [x, y, z, rx, ry, rz] of olC) {
-    olParts.push(vegPuff(vegClump([x, y, z], [rx, ry, rz], 8, 3, 0.30, rnd),
-      [x, y, z], [rx, ry, rz], [0.38, 0.90], olDk, olLt));
-  }
-  const olive = vegMerge(olParts);
+  // Olive. Short thick trunk that divides low — three or four limbs off half a
+  // metre of bole is the whole silhouette of the species, and it is `start`
+  // low with `angle` wide and nothing else. No spire: an olive is broadest at
+  // the top, which is what happens when the force is weak and the branches
+  // keep the angle they left at.
+  const olive = vegGrown({
+    levels: 2, evergreen: false, spire: 0,
+    height: 0.30, radius: 0.115, reach: 0.56, bole: 0.064,
+    children: [4, 4], start: [0.30, 0.20],
+    angle: [0.62, 0.66], length: [0.52, 0.30], thin: [0.62, 0.55],
+    taper: [0.45, 0.55, 0.70], gnarl: [0.055, 0.075, 0.120],
+    strength: [0.004, 0.007, 0.012], force: [0, 1, 0],
+    sections: [4, 6, 3], segments: [8, 5, 4],
+    tuft: [0.10, 3], tuftJit: 1.15, leaf: 0.16,
+    squash: 0.80, puffSeg: 7, puffRow: 4, puffJag: 0.38,
+  }, rnd, [0.33, 0.29, 0.24], [0.36, 0.41, 0.30], [0.62, 1.22]);
 
-  // Maquis. Four lobes and no trunk, which is what it is.
-  //
-  // Pushed apart and roughened harder than anything else here, because the
-  // first version of it was three concentric blobs and what that reads as, on
-  // open karst, at ten metres, is a boulder. Scrub is a tangle: the outline has
-  // to be broken in several places or the eye files it as stone.
-  const bushC = [
-    [0.000, 0.420, 0.000, 0.300, 0.330, 0.285],
-    [0.240, 0.280, 0.180, 0.235, 0.235, 0.225],
-    [-0.215, 0.300, -0.165, 0.225, 0.250, 0.215],
-    [0.055, 0.245, -0.260, 0.190, 0.210, 0.182],
-    [-0.180, 0.260, 0.215, 0.185, 0.200, 0.178],
-    [0.170, 0.500, -0.090, 0.175, 0.185, 0.168],
-    [-0.095, 0.470, 0.155, 0.165, 0.175, 0.158],
-  ];
-  const [buDk, buLt] = vegShade([0.26, 0.30, 0.19], 0.62, 1.24);
-  const bush = vegMerge(bushC.map(([x, y, z, rx, ry, rz]) =>
-    vegPuff(vegClump([x, y, z], [rx, ry, rz], 8, 3, 0.44, rnd),
-      [x, y, z], [rx, ry, rz], [0.02, 0.72], buDk, buLt)));
+  // Maquis. No trunk worth the name — a stub, and everything from it. The
+  // gnarliness is the highest here of anything: scrub is a tangle, and the
+  // first version of this was three concentric blobs, which on open karst at
+  // ten metres reads as a boulder. The outline has to be broken in several
+  // places or the eye files it as stone.
+  const bush = vegGrown({
+    levels: 1, evergreen: false, spire: 0,
+    height: 0.10, radius: 0.055, reach: 0.58, bole: 0.050,
+    children: [7], start: [0.05],
+    angle: [0.86], length: [0.62], thin: [0.72],
+    taper: [0.35, 0.65], gnarl: [0.09, 0.190],
+    strength: [0.004, 0.010], force: [0, 1, 0],
+    sections: [3, 5], segments: [6, 4],
+    tuft: [0.16, 3], tuftJit: 1.00, leaf: 0.40,
+    squash: 0.88, puffSeg: 6, puffRow: 3, puffJag: 0.50,
+  }, rnd, bark, [0.26, 0.30, 0.19], [0.60, 1.26]);
 
   return { pine, cypress, olive, bush };
 }
@@ -436,23 +676,33 @@ function vegPrototypes() {
 
   // Aleppo pine: bare leaning trunk, flat irregular umbrella. The shape that
   // reads as Dalmatia from a thousand feet.
+  // The trunk radii here are the same correction VEG_SIZE got: they were
+  // written when a pine's `wide` was 1.9 and are read against 7.78, so every
+  // one of them is divided by about four. Both LODs have to agree about the
+  // wood as well as about the outline, or a tree changes girth at 300 m.
+  // And the crown is pushed up the trunk and flattened, which it could afford
+  // not to be while it was a metre and a half across and could afford it no
+  // longer at seven: a smooth dome on a stick is a mushroom, and a mushroom on
+  // a hillside of them is what makes a landscape read as a toy. Higher, flatter
+  // and with half again the irregularity — the far model is what almost every
+  // tree in the frame actually is, so it is worth the six rings it costs.
   const pine = vegGeo([
-    vegRing(0.00, 0.055, S), vegRing(0.26, 0.040, S), vegRing(0.48, 0.034, S),
-    vegRing(0.50, 0.34, S, 0.22), vegRing(0.62, 0.42, S, 0.21),
-    vegRing(0.74, 0.45, S, 0.20), vegRing(0.86, 0.36, S, 0.19),
-    vegRing(0.95, 0.22, S, 0.16), vegRing(1.00, 0.06, S),
+    vegRing(0.00, 0.023, S), vegRing(0.30, 0.018, S), vegRing(0.55, 0.015, S),
+    vegRing(0.57, 0.30, S, 0.34), vegRing(0.68, 0.43, S, 0.32),
+    vegRing(0.80, 0.45, S, 0.30), vegRing(0.90, 0.38, S, 0.28),
+    vegRing(0.97, 0.22, S, 0.24), vegRing(1.00, 0.06, S),
   ], S, 3, bark, [0.14, 0.24, 0.13]);
 
   // Cypress: the dark exclamation mark in every churchyard and windbreak.
   const cypress = vegGeo([
-    vegRing(0.00, 0.045, S), vegRing(0.10, 0.070, S),
+    vegRing(0.00, 0.017, S), vegRing(0.10, 0.070, S),
     vegRing(0.32, 0.105, S, 0.10), vegRing(0.66, 0.095, S, 0.10),
     vegRing(0.90, 0.060, S), vegRing(1.00, 0.010, S),
   ], S, 1, bark, [0.09, 0.17, 0.11]);
 
   // Olive: short, thick, gnarled, silver-green and much harder to set alight.
   const olive = vegGeo([
-    vegRing(0.00, 0.14, S), vegRing(0.20, 0.10, S),
+    vegRing(0.00, 0.064, S), vegRing(0.20, 0.050, S),
     vegRing(0.30, 0.44, S, 0.24), vegRing(0.46, 0.53, S, 0.23),
     vegRing(0.62, 0.56, S, 0.22), vegRing(0.80, 0.47, S, 0.21),
     vegRing(0.92, 0.32, S, 0.19), vegRing(1.00, 0.10, S),
@@ -467,12 +717,27 @@ function vegPrototypes() {
   return { pine, cypress, olive, bush };
 }
 
-/** Height range and canopy width per species, in metres. */
+/**
+ * Height range in metres, and then the width number — which was wrong, in the
+ * one way that is hard to see because it is wrong on every tree equally.
+ *
+ * An instance is scaled (w, h, w) and the third number here is w at the middle
+ * of the height range, so a species' canopy comes out `2 · reach · wide` wide,
+ * where `reach` is how far the prototype extends from its own axis. Nobody had
+ * ever multiplied that out: the pine's was 2 · 0.45 · 1.9, which is a crown a
+ * metre and seven across on a ten-metre tree. An Aleppo pine's crown is seven
+ * metres across. Every conifer on this coast has been a lamp post with a bud
+ * on it, and no amount of work on the model was ever going to fix that.
+ *
+ * So the numbers are now derived rather than dialled: the width in metres that
+ * the species actually has, divided by twice the prototype's reach. Both LODs
+ * are built to the same reach, which is what lets one number serve both.
+ */
 const VEG_SIZE = {
-  pine: [7, 13, 1.9],
-  cypress: [7, 14, 1.0],
-  olive: [3.4, 5.4, 1.7],
-  bush: [0.9, 2.2, 1.5],
+  pine: [7, 13, 7.78],           // 7.0 m of crown  ÷ 2 × 0.45
+  cypress: [7, 14, 9.05],        // 1.9 m           ÷ 2 × 0.105
+  olive: [3.4, 5.4, 4.29],       // 4.8 m           ÷ 2 × 0.56
+  bush: [0.9, 2.2, 1.47],        // 1.7 m           ÷ 2 × 0.58
 };
 
 function buildTrees(scene, fire) {
@@ -726,5 +991,25 @@ function buildTrees(scene, fire) {
       tris: SPECIES.reduce((n, s) => n
         + layers[s].near.count * (protos.near[s].index.count / 3)
         + layers[s].far.count * (protos.far[s].index.count / 3), 0) | 0 }),
+    /**
+     * Debug: what one of each species costs, near and far. The near models are
+     * grown and their cost is a consequence of a spec rather than of a list, so
+     * it is not something you can count by reading the source any more.
+     */
+    cost: () => Object.fromEntries(SPECIES.map((s) => [s,
+      [protos.near[s].index.count / 3, protos.far[s].index.count / 3]])),
+    /** Debug: the nearest planted tree of a species, for aiming a camera. */
+    nearest: (species, x, z) => {
+      let best = null, bd = Infinity;
+      for (const t of tiles.values()) {
+        for (const o of t[species] || []) {
+          const d = (o.x - x) ** 2 + (o.z - z) ** 2;
+          if (d < bd) { bd = d; best = o; }
+        }
+      }
+      return best && { x: +best.x.toFixed(1), y: +best.y.toFixed(1),
+        z: +best.z.toFixed(1), h: +best.h.toFixed(1), w: +best.w.toFixed(2),
+        d: +Math.sqrt(bd).toFixed(1) };
+    },
   };
 }

@@ -10,8 +10,8 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.78.0">
-<meta name="build-date" content="2026-08-18">
+<meta name="version" content="1.79.0">
+<meta name="build-date" content="2026-08-19">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
    anything to do with the aircraft and the sea, and the fire (amber → ember red)
@@ -1153,11 +1153,17 @@ html.touch .row input[type=range] { height: 22px; }
 
 
 /* ─────────────────────────────────────────────────────────── in the water ── */
-/* The wash. Everything the eye is told about being under water that is not
-   geometry is here: it goes green rather than blue because a metre of the
-   Adriatic over a white bed is green, it closes in with depth, and it never
-   goes fully opaque — you can always see the surface above you, which is the
-   whole reason it is not frightening. */
+/* The mask, and only the mask.
+   This used to be the entire underwater world: a radial gradient at eighty per
+   cent opacity, doing every job at once because there was nothing behind it to
+   do them. There is now — the water column is real, the bottom is real, the
+   surface has a Snell's window in it — and the same gradient was sitting on top
+   of all of it like a sheet of green perspex.
+   What is left is what a gradient is actually good for and a shader is not:
+   the darkening at the edge of vision that comes from looking through a mask,
+   which belongs to your face and not to the sea, so it is right that it does
+   not move with your head. It stays weak in the middle at every depth, because
+   the middle is where the world is. */
 #under {
   position: fixed;
   inset: 0;
@@ -1166,10 +1172,10 @@ html.touch .row input[type=range] { height: 22px; }
   opacity: 0;
   transition: opacity .18s linear;
   background:
-    radial-gradient(150% 120% at 50% 40%,
-      rgba(52, 148, 148, .58) 0%,
-      rgba(20, 96, 112, .82) 52%,
-      rgba(5, 34, 52, .97) 100%);
+    radial-gradient(135% 110% at 50% 44%,
+      rgba(30, 122, 128, 0) 0%,
+      rgba(14, 80, 96, .26) 58%,
+      rgba(3, 26, 44, .78) 100%);
 }
 #under.on { opacity: 1; }
 
@@ -1229,8 +1235,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.78.0, built 2026-08-18">
-    <b>v1.78.0</b><i>·</i><span>2026-08-18</span>
+  <div id="build" title="Flamme Retardé 1.79.0, built 2026-08-19">
+    <b>v1.79.0</b><i>·</i><span>2026-08-19</span>
   </div>
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
@@ -1543,7 +1549,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.78.0", date: "2026-08-18" };</script>
+<script>const BUILD = { v: "1.79.0", date: "2026-08-19" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -1904,6 +1910,73 @@ vec3 applyHaze(vec3 col, float dist, vec3 worldPos, vec3 sunDir, vec3 viewDir){
 }
 `;
 
+/**
+ * The water column.
+ *
+ * Haze is one colour and one density and that is right for air, because air
+ * takes red, green and blue very nearly equally over the distances anybody can
+ * see through it. Water does not. It is a *filter*, and a violently selective
+ * one: a metre and a half of Adriatic halves the red and takes about eight per
+ * cent of the green, so at six metres a red swimsuit is brown, at ten it is
+ * black, and the reason everything down there is turquoise is not that anybody
+ * tinted it — it is that turquoise is the only light left.
+ *
+ * `uWaterK` is that, as a diffuse attenuation coefficient per metre per
+ * channel. The numbers come from Jerlov's optical water types, which are the
+ * standard oceanographic classification and have been since 1968: type I is
+ * the open Pacific, III the murkiest ocean, and 1C–9C the coastal series. The
+ * Adriatic off Šibenik in August is oligotrophic and very clear — a coastal 1C
+ * — and this is that: red 0.38, green 0.052, blue 0.072. Green carries
+ * furthest because there is enough dissolved matter here to beat blue, which
+ * is the whole difference between the Adriatic and the tropics; and green and
+ * blue are both low enough that the bottom is still there at twenty metres,
+ * which is the number that matters, because it is the one you can check by
+ * looking at any photograph taken off this coast.
+ *
+ * Two path lengths, and getting this wrong is the usual way underwater ends up
+ * looking like green fog. Light has to come *down* to the thing you are looking
+ * at, and then come *back* to your eye. So a rock ten metres down seen from
+ * eight metres away has travelled eighteen metres of water and not eight, and
+ * that is why a seabed goes blue-black with depth even when it is close enough
+ * to touch.
+ */
+const GLSL_WATER = /* glsl */ `
+uniform vec3 uWaterK;
+uniform vec3 uWaterFog;
+uniform float uCamDepth;
+
+/** How much of the eye-to-point segment is actually under the surface. */
+float waterPath(vec3 p, float dist){
+  float y0 = uCamPos.y, y1 = p.y;
+  if (y1 >= 0.0) return 0.0;
+  if (y0 <= 0.0) return dist;
+  return dist * (-y1) / max(y0 - y1, 1e-4);
+}
+
+/**
+ * col is what the surface would look like in air; dist is the eye-to-point
+ * distance and p the point, whose own depth is the downward path. (No
+ * backticks in here: this is inside a template literal and one would end it.)
+ */
+vec3 applyWater(vec3 col, float dist, vec3 p){
+  float wet = waterPath(p, dist);
+  if (wet <= 0.0) return col;
+  float down = max(0.0, -p.y);
+  // Down: what the light had left by the time it got there.
+  // 0.85 and not 1.0 because the sun is not overhead and, more to the point,
+  // a good deal of what lights the bottom got there by scattering rather than
+  // by falling straight down. A strictly vertical path over-darkens the
+  // shallows, which is how three metres of water ends up looking like ten.
+  col *= exp(-uWaterK * down * 0.85);
+  // Back: what survived the swim to the eye, and what scattered in on the way.
+  vec3 T = exp(-uWaterK * wet);
+  // The inscatter is itself lit through the column over the *viewer's* head,
+  // which is what makes going deep go dark rather than merely go blue.
+  vec3 fog = uWaterFog * exp(-uWaterK * max(0.0, uCamDepth) * 0.85);
+  return mix(fog, col, T);
+}
+`;
+
 // ------------------------------------------------------------- sun & sky -----
 
 /**
@@ -2076,6 +2149,11 @@ const U = {
   uShadowMatN: { value: new THREE.Matrix4() },
   uShadowTexelN: { value: 1 / CONFIG.shadowNearRes },
   uCamPos: { value: new THREE.Vector3() },
+
+  // the water column — see GLSL_WATER
+  uWaterK: { value: new THREE.Vector3(0.38, 0.052, 0.072) },
+  uWaterFog: { value: new THREE.Color(0.105, 0.375, 0.400) },
+  uCamDepth: { value: 0 },
 };
 
 /** Uniform bundles, spread into each material that needs them. */
@@ -2092,6 +2170,9 @@ const shareHaze = () => ({
 const shareTerrain = () => ({
   uTerrain: U.uTerrain, uFire: U.uFire, uWorldHalf: U.uWorldHalf,
   uHeightScale: U.uHeightScale, uHeightBias: U.uHeightBias,
+});
+const shareWater = () => ({
+  uWaterK: U.uWaterK, uWaterFog: U.uWaterFog, uCamDepth: U.uCamDepth,
 });
 const shareShadow = () => ({
   uShadowMap: U.uShadowMap, uShadowMat: U.uShadowMat, uShadowTexel: U.uShadowTexel,
@@ -3798,6 +3879,7 @@ ${GLSL_NOISE}
 ${GLSL_TERRAIN}
 ${GLSL_SKY}
 ${GLSL_HAZE}
+${GLSL_WATER}
 ${GLSL_SHADOW}
 
 uniform vec3 uAmbSky;
@@ -3866,6 +3948,94 @@ void main(){
   float shoreT = 1.0 - smoothstep(0.0, 0.055, cv.a);
   base = mix(base, vec3(0.86, 0.82, 0.72), shoreT * 0.5);
 
+  // ── the seabed ──────────────────────────────────────────────────────────
+  // The ground does not stop at the waterline — it has always run straight on
+  // down, because it is one height field and there was never anywhere for it
+  // to stop. What it did stop doing was looking like anything: below zero the
+  // cover class is SEA and every one of those metres was painted a single flat
+  // blue, which from underneath is a fog bank with a horizon in it. The sea
+  // surface is opaque from above, so nobody ever saw it, and then somebody
+  // could swim.
+  //
+  // A Dalmatian bottom is four things and they sort themselves by depth and by
+  // slope, which is exactly what this shader already has to hand. Shell sand
+  // and broken shingle in the first few metres where the swell keeps it moving;
+  // posidonia — the meadow, the thing the whole Adriatic ecosystem stands on —
+  // from about two metres down to fifteen wherever it is flat enough to root;
+  // bare grazed limestone on anything steep; and out past the light, the fine
+  // grey mud that everything eventually settles into.
+  float wetD = max(0.0, -vWorld.y);
+  if (wetD > 0.0) {
+    vec3 shell = vec3(0.845, 0.815, 0.720);     // shell sand, nearly white
+    vec3 shingle = vec3(0.660, 0.645, 0.590);   // and where the swell sorts it
+    vec3 weed = vec3(0.150, 0.185, 0.105);      // posidonia, which is nearly black
+    vec3 silt = vec3(0.335, 0.345, 0.320);      // the mud out past the meadow
+
+    // The meadow. Patches with hard edges, because that is what a posidonia bed
+    // looks like: it grows to a boundary and stops, and between the beds there
+    // are winding lanes of clean sand that have their own name — intermattes.
+    //
+    // The scale is the whole of it. This was 0.0135 first, which is a feature
+    // every seventy metres, and a swimmer can see about twenty: every dive
+    // landed wholly inside one patch or wholly outside it, so the bottom came
+    // out as one flat colour and all the work above did nothing. A real
+    // Adriatic meadow breaks up at four or five metres, which is 0.2, and it
+    // does it at three scales at once.
+    // Three scales, because a swimmer three metres off the bottom can see about
+    // a five-metre circle of it and a swimmer at the surface can see fifty.
+    // One scale serves whichever of those it was tuned at and nothing else.
+    float mead = fbm2(p * 0.042 + 71.3, 3) * 0.50
+               + fbm2(p * 0.190 + 8.9, 2) * 0.30
+               + fbm2(p * 0.640 + 44.1, 2) * 0.20;
+    float lanes = ridge2(p * 0.088 + 4.1, 2);
+    // Narrow, so the edge of a bed is an edge. Posidonia grows to a front and
+    // stops dead — the boundary between meadow and clean sand is a step you
+    // can see from the surface, not a gradient.
+    float rooted = smoothstep(0.455, 0.525, mead)
+                 * (1.0 - smoothstep(0.50, 0.70, lanes));
+    // It needs light and it needs something to hold on to: nothing above the
+    // low-water mark, nothing past about fifteen metres here, nothing on a
+    // slope it would slide off.
+    rooted *= smoothstep(0.9, 2.6, wetD) * (1.0 - smoothstep(13.0, 19.0, wetD));
+    rooted *= 1.0 - smoothstep(0.12, 0.34, slope);
+
+    vec3 bed = mix(shell, shingle, smoothstep(1.5, 7.0, wetD));
+    bed = mix(bed, silt, smoothstep(14.0, 34.0, wetD));
+    // Bare rock wherever it is too steep to hold anything, which around here
+    // is most of it: this coast is drowned karst and the bottom is the same
+    // fluted limestone as the hill, only with nothing growing on it.
+    bed = mix(bed, limestone * 0.80, smoothstep(0.10, 0.40, slope) * 0.85);
+    // Boulders and outcrop. The bottom of a drowned karst coast is not a plain
+    // — it is the same broken limestone as the hill above it with the sand
+    // collected in the hollows between, and at swimming range the pale blocks
+    // standing out of the dark weed are most of what there is to look at.
+    float boul = ridge2(p * 0.145 + 27.3, 3) * 0.6 + ridge2(p * 0.52 + 61.0, 2) * 0.4;
+    float outcrop = smoothstep(0.46, 0.68, boul) * (1.0 - smoothstep(18.0, 30.0, wetD));
+    bed = mix(bed, limestone * (0.62 + 0.30 * fbm2(p * 0.9, 2)), outcrop * 0.80);
+    bed *= 0.80 + 0.40 * fbm2(p * 0.33 + 12.9, 3);
+    bed *= 0.84 + 0.32 * fbm2(p * 1.7 + 3.1, 2);
+    bed = mix(bed, weed * (0.70 + 0.6 * fbm2(p * 0.62, 3)),
+              rooted * (1.0 - outcrop) * 0.94);
+
+    base = mix(base, bed, smoothstep(0.0, 0.35, wetD));
+
+    // ── caustics ──────────────────────────────────────────────────────────
+    // The one thing everybody recognises, and it is not a texture: it is the
+    // sun refracted by the *surface*, so it belongs to world xz and to the
+    // swell that made it, not to the bottom it lands on. Two ridged layers
+    // drifting against each other at slightly different rates, sharpened hard,
+    // because a caustic is a caustic exactly where two wavefronts have folded
+    // and is nothing at all a centimetre either side.
+    float cw = uTime * 0.42;
+    float c1 = ridge2(p * 0.55 + vec2(cw, cw * 0.6), 2);
+    float c2 = ridge2(p * 0.81 - vec2(cw * 0.7, cw * 1.1) + 19.0, 2);
+    float caust = pow(max(c1 * c2, 0.0), 3.4) * 3.6;
+    // They only exist where the light does, they die out on a slope facing
+    // away from the sun, and they are strongest just under the surface.
+    caust *= (1.0 - smoothstep(1.0, 16.0, wetD)) * max(dot(n, uSunDir), 0.0);
+    base += vec3(0.75, 0.94, 0.86) * caust * 0.42 * smoothstep(0.0, 0.5, wetD);
+  }
+
   // ── fire ────────────────────────────────────────────────────────────────
   vec4 f = fireAt(vWorld.xz);
   float burning = f.r, scorch = 1.0 - f.g, wet = f.b;
@@ -3893,7 +4063,11 @@ void main(){
   col += vec3(1.0, 0.34, 0.08) * burning * 0.55;
 
   float dist = length(vWorld - uCamPos);
+  // Haze first, then the water: air is what the light crossed before it got to
+  // the surface, water is what it crossed after. Doing them in the other order
+  // would put a Mediterranean horizon-white over a seabed ten metres down.
   col = applyHaze(col, dist, vWorld, uSunDir, viewDir);
+  col = applyWater(col, dist, vWorld);
 
   gl_FragColor = vec4(col, 1.0);
 }
@@ -3903,6 +4077,7 @@ function buildTerrain(scene) {
   const size = CONFIG.world / TERRAIN.tiles;
   const uniforms = {
     ...shareLight(), ...shareHaze(), ...shareTerrain(), ...shareShadow(),
+    ...shareWater(),
     uCover: U.uCover,
     uCamPos: U.uCamPos,
     uSkirt: { value: TERRAIN.skirt },
@@ -4127,39 +4302,99 @@ varying float vFoamCrest;
 ${GLSL_TERRAIN}
 
 /**
- * Three Gerstner waves along the wind plus one across it. Amplitudes are the
- * Adriatic in a fresh breeze — this is a shallow, fetch-limited sea, so the
- * chop is short and steep rather than long and rolling.
+ * The sea state, as a Gerstner sum — and now an actual Gerstner sum.
+ *
+ * What was here was four sines displacing the lattice in y and nothing else,
+ * which is a swell and not a sea. The difference is one term. A real wave does
+ * not move water up and down, it moves it in circles: as the crest comes
+ * through, the water at the top is also moving *forward*, and the water in the
+ * trough is moving back. Feed that horizontal motion into the vertex and the
+ * lattice bunches up under the crests and stretches out in the troughs, and
+ * the sea stops being a corrugated sheet — crests go sharp and short, troughs
+ * go broad and flat, and that asymmetry is most of what your eye uses to tell
+ * water from a rippled surface.
+ *
+ * It also hands the foam over for free. A crest whitecaps when the surface is
+ * being compressed faster than the water can follow, and the compression is
+ * exactly the determinant of the horizontal map's Jacobian going negative. So
+ * instead of guessing at foam from the height, ask the arithmetic that is
+ * already here where the wave is folding, which is where it breaks.
+ *
+ * Six components rather than four. This is a shallow, fetch-limited sea — the
+ * Adriatic in a fresh maestral does not make Atlantic rollers — so the extra
+ * two go on a long low swell under everything and a short steep chop over it,
+ * and the spread widens as the wavelength drops, because the short waves are
+ * the ones the wind has just made and they are the ones going everywhere.
  */
-void gerstner(vec2 p, float t, out float h, out vec3 n, out float crest){
-  h = 0.0;
+void gerstner(vec2 p, float t, float cell, out vec3 disp, out vec3 n,
+              out float fold){
+  disp = vec3(0.0);
   vec3 acc = vec3(0.0, 1.0, 0.0);
-  crest = 0.0;
   vec2 w = normalize(uWind + vec2(1e-4));
+  vec2 across = vec2(-w.y, w.x);
   float amp = 0.34 * uWaveScale * (0.45 + 0.055 * uWindSpeed);
 
-  // dir, wavelength, amplitude scale, speed scale
-  const int N = 4;
+  const int N = 6;
   vec2 dirs[N];
-  dirs[0] = w;
-  dirs[1] = normalize(w + vec2(-w.y, w.x) * 0.42);
-  dirs[2] = normalize(w - vec2(-w.y, w.x) * 0.55);
-  dirs[3] = normalize(vec2(-w.y, w.x) + w * 0.25);
-  float lens[N]; lens[0] = 46.0; lens[1] = 23.0; lens[2] = 13.0; lens[3] = 7.5;
-  float amps[N]; amps[0] = 1.0;  amps[1] = 0.55; amps[2] = 0.30; amps[3] = 0.16;
+  dirs[0] = normalize(w + across * 0.10);
+  dirs[1] = w;
+  dirs[2] = normalize(w + across * 0.42);
+  dirs[3] = normalize(w - across * 0.58);
+  dirs[4] = normalize(w + across * 0.86);
+  dirs[5] = normalize(across + w * 0.25);
+  float lens[N];
+  lens[0] = 78.0; lens[1] = 46.0; lens[2] = 27.0;
+  lens[3] = 15.0; lens[4] = 8.5;  lens[5] = 4.6;
+  float amps[N];
+  amps[0] = 0.78; amps[1] = 1.0;  amps[2] = 0.60;
+  amps[3] = 0.34; amps[4] = 0.19; amps[5] = 0.105;
+  // Steepness. A Gerstner wave with Q·k·A above 1 turns itself inside out and
+  // the surface self-intersects, so the short steep ones get most of it and
+  // the long swell gets very little, which is also what the sea does.
+  float qs[N];
+  qs[0] = 0.35; qs[1] = 0.55; qs[2] = 0.72;
+  qs[3] = 0.85; qs[4] = 0.90; qs[5] = 0.90;
 
+  float jxx = 0.0, jzz = 0.0, jxz = 0.0;
   for (int i = 0; i < N; i++){
     float k = 6.2831853 / lens[i];
     float c = sqrt(9.81 / k);
-    float a = amp * amps[i];
-    float ph = dot(dirs[i], p) * k + t * c * k * 0.42;
-    float s = sin(ph), cs = cos(ph);
-    h += a * s;
-    acc.x -= dirs[i].x * k * a * cs;
-    acc.z -= dirs[i].y * k * a * cs;
-    if (i < 2) crest += a * k * s;
+    vec2 d = dirs[i];
+    // Nyquist, per component. The lattice is exponentially warped, so its
+    // spacing goes from a metre and a half under you to ten at a hundred and
+    // fifty metres out, and a wave shorter than twice the local spacing is not
+    // a wave any more — it is noise locked to the grid. Adding the 8.5 and 4.6
+    // metre components without this turned the entire middle distance into
+    // blue static, which is the same failure the detail normal already had to
+    // be taught about further down. Fade each one out as the cells overtake it
+    // and let the per-pixel ripple carry that scale instead.
+    float a0 = amp * amps[i];
+    float a = a0 * (1.0 - smoothstep(lens[i] * 0.22, lens[i] * 0.45, cell));
+    if (a < 1.0e-5) continue;
+    float ph = dot(d, p) * k + t * c * k * 0.42;
+    float sn = sin(ph), cs = cos(ph);
+    // Cap the steepness per component so the sum cannot fold the mesh even
+    // when the wind gets up: q·k·a is the number that has to stay under one.
+    float q = min(qs[i], 0.92 / max(k * a, 1e-4));
+
+    disp.y += a * sn;
+    disp.x += d.x * q * a * cs;
+    disp.z += d.y * q * a * cs;
+
+    acc.x -= d.x * k * a * cs;
+    acc.z -= d.y * k * a * cs;
+    acc.y -= q * k * a * sn;
+
+    float qka = q * k * a * sn;
+    jxx += d.x * d.x * qka;
+    jzz += d.y * d.y * qka;
+    jxz += d.x * d.y * qka;
   }
   n = normalize(acc);
+  // The determinant of the horizontal map. One where the water is undisturbed,
+  // falling toward zero where the crest is being crushed together, and it is
+  // the last of those that is a whitecap.
+  fold = (1.0 - jxx) * (1.0 - jzz) - jxz * jxz;
 }
 
 void main(){
@@ -4176,19 +4411,29 @@ void main(){
   vec2 warped = dir * (uNear * (exp(uK * m) - 1.0));
   vec2 wxz = uCenter + warped;
 
-  float h; vec3 n; float crest;
+  vec3 disp; vec3 n; float fold;
   // The shortest wave here is 7.5 m and the longest 46 m, and the lattice
   // spacing passes 6 m at about 100 m out. Carrying the Gerstner normal any
   // further than that samples the wave less than once a crest and the aliasing
   // shows up as fixed bands locked to the grid. Hand over to the per-pixel
   // detail normal instead.
+  // How wide a lattice cell is here: the derivative of that exponential, over
+  // the number of quads a side. Handed to the wave sum so it can drop the
+  // components this part of the mesh is too coarse to carry.
+  float cell = uNear * uK * exp(uK * m) / 160.0;
+  // 70..240 as before. The per-component cell fade above is what lets the
+  // short waves exist at all near the camera; this one is still needed for the
+  // long ones, which outlive their own sampling well before the horizon.
   float near = 1.0 - smoothstep(70.0, 240.0, length(warped));
-  gerstner(wxz, uTime, h, n, crest);
-  h *= near;
+  gerstner(wxz, uTime, cell, disp, n, fold);
+  disp *= near;
 
-  vWorld = vec3(wxz.x, h, wxz.y);
+  // The horizontal part goes into the world position, which is the whole point
+  // — and it means vWorld.xz is where this vertex actually *is*, so every
+  // lookup the fragment does off it stays honest.
+  vWorld = vec3(wxz.x + disp.x, disp.y, wxz.y + disp.z);
   vWaveN = normalize(mix(vec3(0.0, 1.0, 0.0), n, near));
-  vFoamCrest = crest * near;
+  vFoamCrest = (1.0 - mix(1.0, fold, near));
   gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0);
 }
 `;
@@ -4211,10 +4456,60 @@ ${GLSL_NOISE}
 ${GLSL_TERRAIN}
 ${GLSL_SKY}
 ${GLSL_HAZE}
+${GLSL_WATER}
+
+/**
+ * The surface from underneath, which is a different object from the surface.
+ *
+ * Above water you are looking at a mirror that is slightly transparent. Below
+ * it you are looking at a window that is mostly a mirror, and where the join
+ * is has a name: light leaving water for air cannot bend past 48.6 degrees, so
+ * the entire sky — horizon to horizon, all of it — arrives compressed into one
+ * bright circle overhead about ninety-seven degrees across, and everything
+ * outside that circle is the sea below you, reflected back down. That is
+ * Snell's window, it is the first thing anybody notices on their first dive,
+ * and it costs one refract().
+ *
+ * What was here instead was the top-side shader run on the back faces: sky
+ * reflections and sun glitter computed for a viewer who is not there, over an
+ * area that from below fills most of the screen at a grazing angle. The
+ * grazing angle is what turned it into a band of static — a pixel that covers
+ * four hundred metres of chop has no business being given a specular highlight.
+ */
+vec3 fromBelow(vec3 viewDir, vec3 n, float dist, float foam){
+  // Water to air, so the normal has to face the ray, which is going up.
+  vec3 rd = refract(viewDir, -n, 1.0 / 1.333);
+  vec3 col;
+  if (dot(rd, rd) < 1e-5) {
+    // Outside the window: total internal reflection. What is mirrored is the
+    // water column under you, so it is the fog colour and not the sky — and it
+    // gets darker toward the horizontal, because that is a longer look through
+    // more water at a dimmer thing.
+    col = uWaterFog * (0.42 + 0.30 * max(0.0, -viewDir.y));
+  } else {
+    col = skyColor(rd, false);
+    // The sun through the window, which is one soft blazing patch rather than
+    // the thousand-facet glitter it is from above: refraction has just thrown
+    // away most of the angular spread that made the glitter.
+    col += uSunColor * uSunI * pow(max(dot(rd, uSunDir), 0.0), 90.0) * 0.55;
+    // And the rim of the window, where the transmission is falling off a
+    // cliff — the bright ring everyone photographs.
+    float rim = pow(1.0 - abs(dot(viewDir, n)), 3.0);
+    col = mix(col, uWaterFog * 1.6, rim * 0.55);
+  }
+  // Foam is opaque from underneath: a broken crest is a raft of bubbles and
+  // you see the underside of it, lit through, not through it.
+  col = mix(col, uWaterFog * 1.30 + vec3(0.055), foam * 0.50);
+  // And then the water between it and you, same as everything else down here.
+  float down = max(0.0, uCamDepth);
+  vec3 T = exp(-uWaterK * dist);
+  return mix(uWaterFog * exp(-uWaterK * down * 0.85), col * exp(-uWaterK * down * 0.30), T);
+}
 
 void main(){
   vec3 viewDir = normalize(vWorld - uCamPos);
   float dist = length(vWorld - uCamPos);
+  bool below = !gl_FrontFacing;
 
   // ── detail normal ───────────────────────────────────────────────────────
   // Two scrolling octaves, faded out with distance so the far sea does not
@@ -4295,10 +4590,17 @@ void main(){
   float shoreT = 1.0 - smoothstep(0.0, 0.030, cv.a);
   float surf = smoothstep(0.35, 0.9, shoreT)
              * (0.55 + 0.45 * sin(vWorld.x * 0.16 + vWorld.z * 0.13 - uTime * 1.7));
-  float crest = smoothstep(0.55, 1.15, vFoamCrest) * (1.0 - far);
+  // Whitecap where the surface is folding, which is a threshold on a number
+  // that means something rather than on a height that does not.
+  float crest = smoothstep(0.34, 0.82, vFoamCrest) * (1.0 - far);
   float foamNoise = fbm2(vWorld.xz * 0.6 + uTime * 0.25, 3);
   float foam = clamp(surf * 0.9 + crest * 0.7, 0.0, 1.0) * smoothstep(0.25, 0.75, foamNoise + 0.28);
   col = mix(col, vec3(0.92, 0.96, 0.97), foam * 0.85);
+
+  if (below) {
+    gl_FragColor = vec4(fromBelow(viewDir, n, dist, foam), 1.0);
+    return;
+  }
 
   col = applyHaze(col, dist, vWorld, uSunDir, viewDir);
   gl_FragColor = vec4(col, 1.0);
@@ -4313,7 +4615,7 @@ function buildSea(scene) {
 
   const mat = new THREE.ShaderMaterial({
     uniforms: {
-      ...shareLight(), ...shareHaze(), ...shareTerrain(),
+      ...shareLight(), ...shareHaze(), ...shareTerrain(), ...shareWater(),
       uCover: U.uCover,
       uCamPos: U.uCamPos,
       uWind: U.uWind,
@@ -4343,6 +4645,644 @@ function buildSea(scene) {
   }
 
   return { mesh, mat, update };
+}
+
+// ==== 26-under.js ===============================================
+// -----------------------------------------------------------------------------
+// The volume.
+//
+// 25-sea.js draws the surface and 10-world.js draws the bottom, and between
+// them there was nothing at all — which is exactly what was wrong. Everything
+// anybody has ever noticed about being under water happens in the water and
+// not on either of its faces: the shafts coming down through the swell, the
+// dust hanging in them, the way the light gets colder and heavier as you go
+// down. Without those it is a green room with a floor.
+//
+// Two objects here and they are the two halves of one thing, because a shaft
+// of light under water and a caustic on the sand are the same phenomenon seen
+// end-on and side-on. The surface focuses the sun into sheets; where a sheet
+// lands on the bottom it is a caustic, and where it passes through the water it
+// is a shaft, and it is a shaft only because there is something in the water to
+// scatter off. So the motes and the shafts share their noise and their drift,
+// and if you find yourself editing one to match the other, edit both.
+//
+// Neither is drawn unless the eye is under the surface. Above it, both meshes
+// are invisible and cost nothing at all.
+// -----------------------------------------------------------------------------
+
+const UNDER = {
+  motes: 3200,
+  // The box the dust lives in, wrapped around the camera so it is always
+  // around you and never has to be culled or respawned. 22 m: past that the
+  // extinction has taken the grains anyway and they are wasted vertices.
+  box: 17,
+  drift: 0.13,          // m/s — the residual set, which is nearly nothing
+  rise: 0.045,          // and the slow upward crawl of the lighter half of it
+};
+
+const MOTE_VERT = /* glsl */ `
+precision highp float;
+
+attribute vec3 aSeed;      // position in the unit box, plus a phase in .z
+
+uniform vec3 uCamPos;
+uniform float uBox;
+uniform float uDrift;
+uniform float uRise;
+uniform float uPixel;      // half the drawing buffer height, for the point size
+
+varying float vFade;
+varying float vBright;
+
+${GLSL_TERRAIN}
+
+void main(){
+  // Wrap the box on to the camera in x and z, so the dust is always around you
+  // and never has to be culled or respawned.
+  vec3 p = aSeed * uBox;
+  p.x += uTime * uDrift * (0.6 + aSeed.z * 0.8);
+  p.z -= uTime * uDrift * (0.4 + aSeed.x * 0.5);
+  p.y += uTime * uRise * (0.3 + aSeed.y);
+  vec2 origin = uCamPos.xz - uBox * 0.5;
+  vec3 w = vec3(origin.x + mod(p.x - origin.x, uBox), 0.0,
+                origin.y + mod(p.z - origin.y, uBox));
+
+  // Vertically it is not a box, because the water is not one: it has a lid and
+  // it has a floor, and a grain of dust is only ever between them. Wrapping y
+  // the same way as x and z put half of them in the air and the other half
+  // inside the seabed, which is why the first version of this was invisible.
+  float top = min(-0.06, uCamPos.y + uBox * 0.5);
+  w.y = top - mod(top - p.y, uBox);
+  float bedY = heightAt(w.xz);
+  // Anything below the bottom is folded back to just above it, which is not a
+  // fudge: suspended matter is thickest in the first half metre over the sand,
+  // because that is where the swell keeps putting it back.
+  w.y = max(w.y, bedY + 0.08 + fract(aSeed.z * 37.1) * 0.55);
+  w.y = min(w.y, top);
+
+  float d = distance(w, uCamPos);
+  // Out at the edge of the box they go, and they go before they reach it —
+  // a grain that pops in at a hard boundary is more visible than the grain.
+  vFade = (1.0 - smoothstep(uBox * 0.30, uBox * 0.48, d))
+        * smoothstep(0.35, 1.4, d);
+  // Some of it is mineral and catches the light, most of it is not.
+  vBright = 0.35 + 0.9 * pow(fract(aSeed.x * 71.3 + aSeed.y * 13.7), 3.0);
+
+  vec4 mv = viewMatrix * vec4(w, 1.0);
+  gl_Position = projectionMatrix * mv;
+  gl_PointSize = clamp(uPixel * (0.010 + 0.016 * aSeed.z) / max(d, 0.3), 1.0, 9.0);
+}
+`;
+
+const MOTE_FRAG = /* glsl */ `
+precision highp float;
+
+uniform vec3 uTint;
+
+varying float vFade;
+varying float vBright;
+
+void main(){
+  vec2 d = gl_PointCoord - 0.5;
+  float r = dot(d, d) * 4.0;
+  if (r > 1.0) discard;
+  float a = (1.0 - r) * (1.0 - r) * vFade * vBright;
+  if (a < 0.004) discard;
+  gl_FragColor = vec4(uTint * a, a);
+}
+`;
+
+// ── the shafts ───────────────────────────────────────────────────────────────
+//
+// One full-screen triangle, additive, drawn last and depth-tested away by
+// nothing, which is right: a shaft is in front of whatever it crosses because
+// it is between that thing and your mask. What stops it glowing through a rock
+// two hundred metres off is that it has no reach — it is faded out by the same
+// water that everything else here is faded out by, and there is no light left
+// in it past about fifteen metres.
+
+const SHAFT_VERT = /* glsl */ `
+precision highp float;
+varying vec2 vNdc;
+void main(){
+  vNdc = position.xy;
+  gl_Position = vec4(position.xy, 0.999, 1.0);
+}
+`;
+
+const SHAFT_FRAG = /* glsl */ `
+precision highp float;
+
+uniform mat4 uInvVP;
+uniform float uStrength;
+uniform float uTime;
+uniform vec3 uCamPos;
+uniform vec3 uSunDir;
+uniform vec3 uSunColor;
+uniform float uSunI;
+
+varying vec2 vNdc;
+
+${GLSL_NOISE}
+${GLSL_WATER}
+
+void main(){
+  // The view ray, out of the inverse view-projection. One matrix and no
+  // geometry: the alternative is a cone of quads that has to be re-aimed at
+  // the sun every frame and is wrong at the edges of the field of view.
+  vec4 far = uInvVP * vec4(vNdc, 1.0, 1.0);
+  vec3 rd = normalize(far.xyz / far.w - uCamPos);
+
+  // How much water is in front of this ray. Capped, because there is no light
+  // left past twenty-odd metres and marching further is marching for nothing;
+  // and cut short where the ray leaves the water, because above the surface
+  // there is no shaft, there is only sky.
+  float span = 22.0;
+  if (rd.y > 1.0e-3) span = min(span, -uCamPos.y / rd.y);
+  if (span <= 0.05) discard;
+
+  // The sheet, marched.
+  //
+  // The first version of this sampled the surface once, where the ray came out
+  // of the water, and it was wrong in a way worth writing down: what you get
+  // is the caustic pattern painted flat across the screen — blobs, not beams.
+  // A shaft is not a thing on the surface, it is the *integral* along the line
+  // of sight of a sheet of light that is coming down at the sun's angle, and a
+  // beam appears exactly where the line of sight and the sheet stay together
+  // for a while. So march it, and at every step follow the sun back up to the
+  // surface to ask what the surface was doing where this light got in.
+  vec2 sxz = uSunDir.xz / max(uSunDir.y, 0.30);
+  float cw = uTime * 0.42;
+  float acc = 0.0;
+  const int N = 7;
+  for (int i = 0; i < N; i++) {
+    vec3 pos = uCamPos + rd * (span * (float(i) + 0.5) / float(N));
+    if (pos.y > -0.02) continue;
+    vec2 q = pos.xz + sxz * (-pos.y);
+    float c1 = ridge2(q * 0.55 + vec2(cw, cw * 0.6), 2);
+    float c2 = ridge2(q * 0.81 - vec2(cw * 0.7, cw * 1.1) + 19.0, 2);
+    // The same sharpening the bed's caustics get, because it is the same
+    // sheet: it is a caustic where it lands and a shaft where it does not.
+    acc += pow(max(c1 * c2, 0.0), 3.0) * exp(0.07 * pos.y);
+  }
+  acc *= span / float(N);
+
+  // Forward scattering: a shaft is only bright looking into it. Not zero
+  // across the beam, though — there is always some — or they blink out
+  // entirely the moment you turn your head, which nothing real does.
+  float al = max(dot(rd, uSunDir), 0.0);
+  acc *= 0.22 + 0.78 * pow(al, 2.6);
+
+  vec3 lit = exp(-uWaterK * max(0.0, uCamDepth) * 0.7);
+  vec3 col = uSunColor * uSunI * lit * acc * uStrength;
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+/**
+ * Everything that lives between the surface and the bottom.
+ *
+ * `update` is handed how deep the eye is and whether it is under at all, and
+ * that is the whole interface: both meshes are hidden the instant it is not,
+ * so a mission flown entirely in the air pays one visibility test a frame.
+ */
+function buildUnder(scene) {
+  // ── the dust ──────────────────────────────────────────────────────────────
+  const n = UNDER.motes;
+  const seed = new Float32Array(n * 3);
+  const rnd = mulberry32(0x5eab);
+  for (let i = 0; i < n; i++) {
+    seed[i * 3] = rnd();
+    seed[i * 3 + 1] = rnd();
+    seed[i * 3 + 2] = rnd();
+  }
+  const mg = new THREE.BufferGeometry();
+  // `position` is never read by the shader — the grain is placed from aSeed —
+  // but three.js wants one to compute a draw range from, so it is the same
+  // buffer under a second name rather than 2400 wasted vec3s.
+  mg.setAttribute('position', new THREE.BufferAttribute(seed, 3));
+  mg.setAttribute('aSeed', new THREE.BufferAttribute(seed, 3));
+  mg.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e9);
+
+  const mmat = new THREE.ShaderMaterial({
+    uniforms: {
+      ...shareTerrain(),
+      uCamPos: U.uCamPos,
+      uBox: { value: UNDER.box },
+      uDrift: { value: UNDER.drift },
+      uRise: { value: UNDER.rise },
+      uPixel: { value: 400 },
+      uTint: { value: new THREE.Color(0.62, 0.86, 0.84) },
+    },
+    vertexShader: MOTE_VERT,
+    fragmentShader: MOTE_FRAG,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const motes = new THREE.Points(mg, mmat);
+  motes.frustumCulled = false;
+  motes.renderOrder = 8;
+  motes.visible = false;
+  scene.add(motes);
+
+  // ── the shafts ────────────────────────────────────────────────────────────
+  const sg = new THREE.BufferGeometry();
+  sg.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -1, -1, 0, 3, -1, 0, -1, 3, 0,
+  ]), 3));
+  sg.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e9);
+
+  const smat = new THREE.ShaderMaterial({
+    uniforms: {
+      ...shareLight(), ...shareWater(),
+      uCamPos: U.uCamPos,
+      uInvVP: { value: new THREE.Matrix4() },
+      uStrength: { value: 0.105 },
+    },
+    vertexShader: SHAFT_VERT,
+    fragmentShader: SHAFT_FRAG,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const shafts = new THREE.Mesh(sg, smat);
+  shafts.frustumCulled = false;
+  shafts.renderOrder = 9;
+  shafts.visible = false;
+  scene.add(shafts);
+
+  const fish = buildFish(scene);
+
+  const _inv = new THREE.Matrix4();
+  const _size = new THREE.Vector2();
+
+  function update(camera, depth, on, renderer, dt) {
+    motes.visible = on;
+    shafts.visible = on;
+    // The fish keep swimming for a moment after you surface, because the
+    // handover back to walking is not instant and a shoal that vanishes the
+    // frame your head comes out is a shoal you saw vanish.
+    fish.update(dt || 0, camera.position, on, (x, z) => groundAt(x, z));
+    if (!on) return;
+    _inv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    smat.uniforms.uInvVP.value.copy(_inv).invert();
+    // The dust thins out with depth as the light that shows it does, and it
+    // thickens again in the first metre or two where the swell is stirring the
+    // bottom up. Nobody has ever seen clean water immediately under a beach.
+    mmat.uniforms.uTint.value.setRGB(
+      0.62 * Math.exp(-0.38 * depth * 0.5),
+      0.86 * Math.exp(-0.052 * depth * 0.5),
+      0.84 * Math.exp(-0.072 * depth * 0.5),
+    );
+    if (renderer) {
+      const h = renderer.getDrawingBufferSize(_size).y;
+      mmat.uniforms.uPixel.value = h * 0.5;
+    }
+  }
+
+  return { motes, shafts, fish, update, mmat, smat,
+    stats: () => ({ motes: UNDER.motes, fish: fish.count(),
+      shoals: fish.where() }) };
+}
+
+// ── what lives in it ─────────────────────────────────────────────────────────
+//
+// A sea with nothing in it is an aquarium nobody has stocked yet, and the
+// Adriatic off this shore is not empty: over the meadow there are clouds of
+// salpa and picarel a hand long, and out over the sand a few bigger fish
+// working on their own. That is two behaviours and it is worth having both,
+// because a shoal reads as weather and a single fish reads as an animal.
+//
+// The shoals are anchored in the world rather than to the camera. A shoal that
+// followed you would be a swarm; one that stays where it is and gets left
+// behind is a shoal. When one falls too far astern it is re-placed ahead of
+// you at a random bearing, which is the only cheat here and is invisible
+// because it happens beyond the range at which anything is visible at all.
+
+const FISH = {
+  shoals: 3,
+  per: 34,
+  loners: 6,
+  reach: 26,           // where a shoal is re-placed from, and where it dies
+  mill: 0.55,          // rad/s the shoal turns over within itself
+  cruise: 0.62,        // m/s a shoal makes good over the ground
+  beat: 5.4,           // tail beats a second, which is fast and is correct
+};
+
+/**
+ * One fish, nose down the +x axis, one unit long, painted with the
+ * countershading that every open-water fish in the world has: dark over,
+ * silver on the flank, white under. It is the whole of why a fish is hard to
+ * see from above and hard to see from below, and it is also the only reason a
+ * two-hundred-triangle lozenge reads as a fish at all.
+ */
+function fishGeometry() {
+  const rings = [];
+  // x from nose to the wrist of the tail, as (station, half-height, half-width)
+  const prof = [
+    [-0.50, 0.010, 0.008], [-0.42, 0.055, 0.030], [-0.30, 0.098, 0.048],
+    [-0.14, 0.118, 0.056], [0.02, 0.112, 0.052], [0.18, 0.092, 0.041],
+    [0.32, 0.062, 0.026], [0.40, 0.034, 0.013], [0.44, 0.020, 0.007],
+  ];
+  const seg = 8;
+  for (const [x, hy, hz] of prof) {
+    const ring = [];
+    for (let i = 0; i < seg; i++) {
+      const a = (i / seg) * TAU;
+      ring.push(new THREE.Vector3(x, Math.sin(a) * hy, Math.cos(a) * hz));
+    }
+    rings.push(ring);
+  }
+  const body = loft(rings, { closed: true, caps: false });
+
+  // The tail, which is a flat fork and not a tube: two triangles either side of
+  // the wrist, and the fork is what the eye actually recognises at ten metres.
+  const tail = new THREE.BufferGeometry();
+  const tv = new Float32Array([
+    0.44, 0.0, 0.0, 0.62, 0.150, 0.0, 0.56, 0.0, 0.0,
+    0.44, 0.0, 0.0, 0.56, 0.0, 0.0, 0.62, -0.150, 0.0,
+  ]);
+  tail.setAttribute('position', new THREE.BufferAttribute(tv, 3));
+  tail.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2, 3, 4, 5]), 1));
+  tail.computeVertexNormals();
+
+  // And a dorsal, for the same reason.
+  const fin = new THREE.BufferGeometry();
+  const fv = new Float32Array([
+    -0.16, 0.112, 0.0, 0.10, 0.088, 0.0, -0.04, 0.190, 0.0,
+  ]);
+  fin.setAttribute('position', new THREE.BufferAttribute(fv, 3));
+  fin.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2]), 1));
+  fin.computeVertexNormals();
+
+  const parts = [body, tail, fin];
+  let nv = 0, ni = 0;
+  for (const g of parts) { nv += g.attributes.position.count; ni += g.index.count; }
+  const pos = new Float32Array(nv * 3);
+  const nrm = new Float32Array(nv * 3);
+  const col = new Float32Array(nv * 3);
+  const idx = new Uint16Array(ni);
+  let vo = 0, io = 0;
+  for (const g of parts) {
+    const n = g.attributes.position.count;
+    pos.set(g.attributes.position.array, vo * 3);
+    nrm.set(g.attributes.normal.array, vo * 3);
+    for (let i = 0; i < n; i++) {
+      // Countershading, keyed on how high up the flank the vertex is.
+      const y = pos[(vo + i) * 3 + 1];
+      const t = Math.min(1, Math.max(0, (y + 0.12) / 0.24));
+      const dark = [0.115, 0.175, 0.185], silver = [0.72, 0.755, 0.735];
+      const pale = [0.90, 0.90, 0.87];
+      const lo = t < 0.5 ? pale : silver, hi = t < 0.5 ? silver : dark;
+      const f = t < 0.5 ? t * 2 : (t - 0.5) * 2;
+      col[(vo + i) * 3] = lo[0] + (hi[0] - lo[0]) * f;
+      col[(vo + i) * 3 + 1] = lo[1] + (hi[1] - lo[1]) * f;
+      col[(vo + i) * 3 + 2] = lo[2] + (hi[2] - lo[2]) * f;
+    }
+    const gi = g.index.array;
+    for (let i = 0; i < gi.length; i++) idx[io + i] = gi[i] + vo;
+    vo += n; io += gi.length;
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  out.setAttribute('aVCol', new THREE.BufferAttribute(col, 3));
+  out.setIndex(new THREE.BufferAttribute(idx, 1));
+  return out;
+}
+
+/**
+ * The fish, as one instanced draw.
+ *
+ * The tail beat is done in the vertex shader as a travelling wave down the
+ * body — amplitude rising toward the tail, which is how a fish actually swims
+ * and costs one sine. Doing it on the CPU would mean a mesh per fish.
+ */
+function buildFish(scene) {
+  const src = fishGeometry();
+  const cap = FISH.shoals * FISH.per + FISH.loners;
+
+  const geo = new THREE.InstancedBufferGeometry();
+  geo.setAttribute('position', src.attributes.position);
+  geo.setAttribute('normal', src.attributes.normal);
+  geo.setAttribute('aVCol', src.attributes.aVCol);
+  geo.setIndex(src.index);
+  geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e9);
+
+  const aPos = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
+  const aDir = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
+  const aBio = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
+  for (const [n, a] of [['aInstPos', aPos], ['aInstDir', aDir], ['aInstBio', aBio]]) {
+    a.setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute(n, a);
+  }
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      ...shareLight(), ...shareHaze(), ...shareWater(),
+      uCamPos: U.uCamPos,
+      uBeat: { value: FISH.beat },
+    },
+    side: THREE.DoubleSide,
+    // Its own shader rather than solidMaterial's, for one reason: a fish is
+    // the only thing in this game whose *shape* depends on where it is in its
+    // own cycle, and the shared vertex program has nowhere to put a per
+    // instance phase — its four instance attributes are all spoken for.
+    vertexShader: /* glsl */ `
+precision highp float;
+
+attribute vec3 aVCol;
+attribute vec3 aInstPos;
+attribute vec3 aInstDir;    // yaw, pitch, and how hard this one is working
+attribute vec3 aInstBio;    // length, phase, spare
+
+uniform float uTime;
+uniform float uBeat;
+
+varying vec3 vWorld;
+varying vec3 vNormal;
+varying vec3 vVCol;
+
+void main(){
+  vec3 p = position;
+  vec3 n = normal;
+
+  // The travelling wave. Amplitude goes as the cube of the station, so the
+  // nose barely moves and the wrist of the tail moves a great deal, which is
+  // the difference between swimming and waggling. The phase runs *backwards*
+  // down the body — the wave travels tail-ward, which is what pushes water
+  // astern and is why a fish goes forwards.
+  float st = clamp(p.x + 0.5, 0.0, 1.2);
+  float amp = st * st * st * 0.30 * aInstDir.z;
+  p.z += sin(uTime * uBeat + aInstBio.y - st * 3.1) * amp;
+
+  p *= aInstBio.x;
+  float cp = cos(aInstDir.y), sp = sin(aInstDir.y);
+  p = vec3(p.x * cp - p.y * sp, p.x * sp + p.y * cp, p.z);
+  n = vec3(n.x * cp - n.y * sp, n.x * sp + n.y * cp, n.z);
+  float cy = cos(aInstDir.x), sy = sin(aInstDir.x);
+  p = vec3(p.x * cy - p.z * sy, p.y, p.x * sy + p.z * cy);
+  n = vec3(n.x * cy - n.z * sy, n.y, n.x * sy + n.z * cy);
+  p += aInstPos;
+
+  vWorld = p;
+  vNormal = normalize(n);
+  vVCol = aVCol;
+  gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
+}
+`,
+    fragmentShader: /* glsl */ `
+precision highp float;
+
+uniform vec3 uAmbSky;
+uniform vec3 uAmbGround;
+uniform float uAmbI;
+uniform float uNight;
+
+varying vec3 vWorld;
+varying vec3 vNormal;
+varying vec3 vVCol;
+
+${GLSL_NOISE}
+${GLSL_SKY}
+${GLSL_HAZE}
+${GLSL_WATER}
+
+void main(){
+  vec3 n = normalize(vNormal);
+  n = gl_FrontFacing ? n : -n;
+  vec3 viewDir = normalize(vWorld - uCamPos);
+  vec3 base = vVCol;
+
+  vec3 col = base * uSunColor * uSunI * max(dot(n, uSunDir), 0.0) * INV_PI;
+  col += base * ambientAt(n, uAmbSky, uAmbGround, uAmbI) * INV_PI * 2.2;
+  // A flank is a mirror, and at the angle where it flashes it is the brightest
+  // thing down there. It is the whole reason you notice a shoal at all.
+  vec3 hv = normalize(uSunDir - viewDir);
+  col += uSunColor * pow(max(dot(n, hv), 0.0), 30.0) * 0.55;
+
+  float dist = length(vWorld - uCamPos);
+  col = applyHaze(col, dist, vWorld, uSunDir, viewDir);
+  col = applyWater(col, dist, vWorld);
+  gl_FragColor = vec4(col, 1.0);
+}
+`,
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 2;
+  mesh.visible = false;
+  scene.add(mesh);
+
+  const rnd = mulberry32(0x1c7a);
+  const shoals = [];
+  for (let i = 0; i < FISH.shoals; i++) {
+    shoals.push({ x: 0, z: 0, y: -3, hdg: rnd() * TAU, live: false,
+      spread: 1.6 + rnd() * 1.4, big: rnd() < 0.3 });
+  }
+  const fish = [];
+  for (let i = 0; i < FISH.shoals * FISH.per; i++) {
+    fish.push({
+      shoal: Math.floor(i / FISH.per),
+      // Where this one sits inside its shoal: a bearing, a radius and a lift,
+      // all of which it keeps, so the shoal has a shape rather than a cloud.
+      a: rnd() * TAU, r: Math.sqrt(rnd()), h: (rnd() - 0.5), sp: 0.7 + rnd() * 0.6,
+      len: 0.16 + rnd() * 0.09, phase: rnd() * TAU,
+    });
+  }
+  for (let i = 0; i < FISH.loners; i++) {
+    fish.push({
+      shoal: -1, a: rnd() * TAU, r: 0, h: 0, sp: 0.5 + rnd() * 0.5,
+      len: 0.34 + rnd() * 0.26, phase: rnd() * TAU,
+      x: 0, z: 0, y: -4, hdg: rnd() * TAU, live: false,
+    });
+  }
+
+  /** Put a wanderer somewhere ahead of the swimmer, out at the edge of sight. */
+  function place(o, cx, cz, bedFn) {
+    const a = rnd() * TAU;
+    const d = FISH.reach * (0.55 + rnd() * 0.4);
+    o.x = cx + Math.cos(a) * d;
+    o.z = cz + Math.sin(a) * d;
+    const bed = bedFn(o.x, o.z);
+    if (bed > -1.4) { o.live = false; return; }
+    // Fish are not evenly spread through the column: they hold station a little
+    // off the bottom, over the meadow, which is where the food is.
+    o.y = Math.max(bed + 0.6, Math.min(-0.9, bed + 0.8 + rnd() * 3.2));
+    o.hdg = rnd() * TAU;
+    o.live = true;
+  }
+
+  function update(dt, cam, on, bedFn) {
+    mesh.visible = on;
+    if (!on) return 0;
+    const cx = cam.x, cz = cam.z;
+    for (const s of shoals) {
+      if (!s.live || Math.hypot(s.x - cx, s.z - cz) > FISH.reach * 1.25) {
+        place(s, cx, cz, bedFn);
+        continue;
+      }
+      s.hdg += (Math.sin(U.uTime.value * 0.21 + s.spread * 3.7)) * dt * 0.5;
+      s.x += Math.cos(s.hdg) * FISH.cruise * dt;
+      s.z += Math.sin(s.hdg) * FISH.cruise * dt;
+      const bed = bedFn(s.x, s.z);
+      s.y = Math.max(bed + 0.7, Math.min(-0.8, s.y));
+    }
+    for (const o of fish) if (o.shoal < 0) {
+      if (!o.live || Math.hypot(o.x - cx, o.z - cz) > FISH.reach * 1.25) {
+        place(o, cx, cz, bedFn);
+        continue;
+      }
+      o.hdg += Math.sin(U.uTime.value * 0.17 + o.phase) * dt * 0.35;
+      o.x += Math.cos(o.hdg) * FISH.cruise * 0.8 * dt;
+      o.z += Math.sin(o.hdg) * FISH.cruise * 0.8 * dt;
+      o.y = Math.max(bedFn(o.x, o.z) + 0.6, Math.min(-0.9, o.y));
+    }
+
+    let c = 0;
+    const t = U.uTime.value;
+    for (const o of fish) {
+      let x, y, z, yaw, pitch, work;
+      if (o.shoal < 0) {
+        if (!o.live) continue;
+        x = o.x; y = o.y; z = o.z; yaw = o.hdg; pitch = 0; work = 0.75;
+      } else {
+        const s = shoals[o.shoal];
+        if (!s.live) continue;
+        // Milling: everybody goes round the shoal's own axis at their own rate,
+        // so the cloud turns over without anybody leaving it.
+        const a = o.a + t * FISH.mill * o.sp;
+        const rr = o.r * s.spread * (o.shoal % 2 ? 1.15 : 0.9);
+        x = s.x + Math.cos(a) * rr;
+        z = s.z + Math.sin(a) * rr;
+        y = s.y + o.h * s.spread * 0.55;
+        // Facing along the orbit, plus the shoal's own course.
+        yaw = a + Math.PI * 0.5;
+        pitch = Math.sin(t * 0.9 + o.phase) * 0.10;
+        work = 0.8 + 0.4 * Math.sin(t * 1.7 + o.phase);
+      }
+      if (y > -0.35) y = -0.35;
+      aPos.array[c * 3] = x; aPos.array[c * 3 + 1] = y; aPos.array[c * 3 + 2] = z;
+      aDir.array[c * 3] = -yaw; aDir.array[c * 3 + 1] = pitch;
+      aDir.array[c * 3 + 2] = work;
+      aBio.array[c * 3] = o.len * (o.shoal < 0 ? 3.4 : 2.6);
+      aBio.array[c * 3 + 1] = o.phase;
+      aBio.array[c * 3 + 2] = 1;
+      c++;
+    }
+    geo.instanceCount = c;
+    for (const a of [aPos, aDir, aBio]) { a.addUpdateRange(0, c * 3); a.needsUpdate = true; }
+    return c;
+  }
+
+  return { mesh, update, count: () => geo.instanceCount,
+    /** Debug: where the shoals are, so a camera can be pointed at one. */
+    where: () => shoals.filter((s) => s.live).map((s) => ({
+      at: [+s.x.toFixed(1), +s.y.toFixed(1), +s.z.toFixed(1)],
+      spread: +s.spread.toFixed(2) })) };
 }
 
 // ==== 30-material.js ============================================
@@ -4528,6 +5468,7 @@ ${GLSL_NOISE}
 ${GLSL_TERRAIN}
 ${GLSL_SKY}
 ${GLSL_HAZE}
+${GLSL_WATER}
 ${GLSL_SHADOW}
 
 void main(){
@@ -4555,7 +5496,14 @@ void main(){
 
   col += base * uEmissive;
 
-  col = applyHaze(col, length(vWorld - uCamPos), vWorld, uSunDir, viewDir);
+  float dist = length(vWorld - uCamPos);
+  col = applyHaze(col, dist, vWorld, uSunDir, viewDir);
+  // And the water, for whatever part of that distance was under it. Every
+  // solid thing in the game goes through here, so this is one line for the
+  // fish, a ditched aircraft, a swimmer's own hands and anything else that
+  // ever ends up below the surface — and it is free above it, where
+  // waterPath() returns zero on the first comparison it makes.
+  col = applyWater(col, dist, vWorld);
   gl_FragColor = vec4(col, alpha);
 }
 `;
@@ -4573,6 +5521,7 @@ function solidMaterial(color, opts = {}) {
     ...(opts.defines ? { defines: opts.defines } : {}),
     uniforms: {
       ...shareLight(), ...shareHaze(), ...shareTerrain(), ...shareShadow(),
+      ...shareWater(),
       uCamPos: U.uCamPos,
       uBase: { value: new THREE.Color(color) },
       uSpecPower: { value: opts.specPower ?? 42 },
@@ -18386,7 +19335,16 @@ const VEG = {
   // fifteen pixels tall and there is nothing left to see: the swap is invisible
   // and everything in the ring is a fraction of a percent of a circle 2.2 km
   // across. Measured, on the hillside above Jadrija: about 500 of 20 000.
-  near: 300,
+  //
+  // 300 became 190 when the close-up models were grown rather than placed. A
+  // grown pine is four times the triangles of the eleven blobs it replaced,
+  // and the ring is an area: 190 gives back six tenths of that, and it gives
+  // it back where nothing is lost. At 300 m a 10 m tree is fifteen pixels
+  // tall; at 190 it is twenty-four, and the far model — which also got the
+  // right crown width and the right trunk in this pass — is honest at both.
+  // Measured on the hill above Jadrija, where the near ring is fullest: the
+  // whole landscape came out lighter after this than it went in.
+  near: 190,
   nearMax: 3000,         // and the ceiling on those, so the buffer is bounded
 };
 
@@ -18514,6 +19472,13 @@ function vegMerge(parts) {
  * hole this leaves instead cannot be seen from anywhere.
  */
 function vegClump(c, r, seg, rows, jag, rnd) {
+  // `rows` is not a quality dial, it is a shape: the poles take a ring each
+  // and leave `rows - 1` for the body, so rows=3 is a barrel with two caps and
+  // rows=2 is a drum. That was invisible while a clump was 30 cm across and
+  // very visible indeed once the crowns were made their real size — the olive
+  // came out as a heap of hexagonal prisms. Anything you can see the sides of
+  // wants 4.
+
   const ph = [];
   for (let i = 0; i < seg; i++) ph.push(rnd() * TAU);
   const rings = [];
@@ -18632,10 +19597,289 @@ function vegLimb(p0, p1, r0, r1, seg, rows = 2, bow = 0) {
   return loft(rings, { closed: true, caps: false });
 }
 
+// ── growing one, instead of placing eleven ───────────────────────────────────
+//
+// Everything above this line places foliage by hand: a list of clump centres,
+// tuned by eye until the silhouette was right. It got us a long way and it has
+// a ceiling, which is that a hand-placed canopy has no *reason*. The clumps sit
+// where they sit; nothing carries them; the outline is whatever the list said.
+// Stand under one at four metres and it reads as a bunch of balloons on sticks,
+// because that is what it is.
+//
+// So the last three species below are grown rather than arranged, and the model
+// is Daniel Greenheck's ez-tree (MIT) — read, not imported. None of his code is
+// here: it is built for leaf billboards with alpha-tested textures, and this
+// whole game is solid vertex-coloured geometry in four instanced draws with not
+// one texture in it. What transfers is the *skeleton*, and four ideas in it:
+//
+//   · A branch is not a tube, it is a chain of short sections, each one
+//     stepping along its own orientation. Bends come free and cost nothing.
+//   · Gnarliness scales with 1/√radius, so a thin branch curls hard and a
+//     trunk barely wanders. One number, and it is the difference between a
+//     tree and a diagram of a tree.
+//   · A growth force rotates each section toward the light by strength/radius,
+//     so the trunk resists it and the twigs are dragged. That is what makes an
+//     Aleppo pine's umbrella happen rather than be sculpted.
+//   · Children are stratified: spread along the parent in equal slots with
+//     jitter, and given radial slots from a *shuffled* permutation so height
+//     and bearing decorrelate. He documents the bug this fixes and he is
+//     right — without it a conifer spirals its longest branches to one side.
+//
+// Two of his numbers are re-scaled because his trees are twenty metres tall in
+// world units and these are normalised to a height of one: gnarliness uses
+// √(r0/r) and force uses strength·r0/r, both of which are 1 at the trunk base,
+// so the spec's numbers mean radians per section on the trunk and can be read.
+//
+// The leaves are ours. Where he hangs a billboard, this hangs a `vegClump`,
+// which is the same puff the hand-placed canopies use — so a grown tree lights
+// exactly like the ones round the vikendica and nothing else in the pipeline
+// has to know the difference.
+
+/** Fisher-Yates, so a child's height slot says nothing about its bearing. */
+function vegShuffle(n, rnd) {
+  const a = [];
+  for (let i = 0; i < n; i++) a.push(i);
+  for (let k = n - 1; k > 0; k--) {
+    const j = Math.floor(rnd() * (k + 1));
+    const t = a[k]; a[k] = a[j]; a[j] = t;
+  }
+  return a;
+}
+
 /**
- * The four close-up species, in the same units and to the same dimensions as
- * the four far ones: a height of 1 and a radius that stays inside what
- * VEG_SIZE was written against.
+ * Grow a skeleton. Returns the branches as chains of sections — a point, an
+ * orientation and a radius each — and the places foliage is to hang.
+ *
+ * Breadth-first off a queue rather than by recursion, which is his structure
+ * and is the right one: every branch of a level is grown before any of the next
+ * begins, so a spec change at one level cannot silently reorder another level's
+ * draws on the seeded RNG.
+ */
+function vegGrow(spec, rnd) {
+  const UP = new THREE.Vector3(0, 1, 0);
+  const r0 = spec.radius;
+  const force = new THREE.Vector3().fromArray(spec.force || [0, 1, 0]).normalize();
+  const branches = [], tufts = [];
+  const queue = [{
+    p: new THREE.Vector3(0, 0, 0),
+    q: new THREE.Quaternion(),
+    len: spec.height,
+    r: spec.radius,
+    level: 0,
+  }];
+
+  const tmpQ = new THREE.Quaternion();
+  const axis = new THREE.Vector3();
+  const up = new THREE.Vector3();
+  const step = new THREE.Vector3();
+
+  while (queue.length) {
+    const b = queue.shift();
+    const lv = b.level;
+    const last = lv === spec.levels;
+    const nSec = spec.sections[lv];
+    const secLen = b.len / nSec;
+    const p = b.p.clone(), q = b.q.clone();
+    const sections = [];
+
+    for (let i = 0; i <= nSec; i++) {
+      const t = i / nSec;
+      // A branch that ends in foliage tapers to nothing; one that carries
+      // children keeps something at the tip for them to leave from.
+      let r = b.r * (1 - spec.taper[lv] * t);
+      if (last && i === nSec) r = b.r * 0.06;
+      sections.push({ p: p.clone(), q: q.clone(), r });
+      if (i === nSec) break;
+
+      step.set(0, secLen, 0).applyQuaternion(q);
+      p.add(step);
+
+      // Wander. Thin curls, thick does not.
+      const g = spec.gnarl[lv] * Math.sqrt(r0 / Math.max(r, 1e-4));
+      q.multiply(tmpQ.setFromAxisAngle(new THREE.Vector3(1, 0, 0),
+        (rnd() - 0.5) * 2 * g));
+      q.multiply(tmpQ.setFromAxisAngle(new THREE.Vector3(0, 0, 1),
+        (rnd() - 0.5) * 2 * g));
+
+      // And the light. Rotated about (branch up × force), so a section already
+      // pointing at the force is left alone instead of being shoved sideways
+      // by whatever direction the wander happened to leave it in.
+      up.set(0, 1, 0).applyQuaternion(q);
+      axis.crossVectors(up, force);
+      const sin = axis.length();
+      if (sin > 1e-6) {
+        axis.divideScalar(sin);
+        const full = Math.atan2(sin, up.dot(force));
+        const want = spec.strength[lv] * (r0 / Math.max(r, 1e-4));
+        q.premultiply(tmpQ.setFromAxisAngle(axis,
+          Math.max(-full, Math.min(full, want))));
+      }
+    }
+
+    branches.push({ sections, seg: spec.segments[lv] });
+
+    if (last) {
+      // Foliage along the last length of the last branch. `tuft` is where it
+      // starts and how many, and the count is what turns a lollipop into a
+      // spray: one puff at the tip is a bud, four down the length is a shoot.
+      const [tStart, tCount] = spec.tuft;
+      for (let i = 0; i < tCount; i++) {
+        const f = tStart + (i + 0.3 + rnd() * 0.4) / tCount * (1 - tStart);
+        const s = sections[Math.min(nSec, Math.floor(f * nSec))];
+        tufts.push({
+          c: [s.p.x, s.p.y, s.p.z],
+          // This one's share of the leaf size, and where it sits off its
+          // branch — both in units of its own radius, so they survive the fit.
+          k: 0.70 + rnd() * 0.60,
+          j: [(rnd() - 0.5) * spec.tuftJit, (rnd() - 0.5) * spec.tuftJit,
+            (rnd() - 0.5) * spec.tuftJit],
+        });
+      }
+      continue;
+    }
+
+    // Children, stratified up the parent and round it.
+    const n = spec.children[lv];
+    const startMin = spec.start[lv];
+    const slot = (1 - startMin) / n;
+    const bearing = vegShuffle(n, rnd);
+    const spin = rnd() * TAU;
+    for (let i = 0; i < n; i++) {
+      const at = startMin + (i + rnd()) * slot;
+      const si = Math.min(nSec, Math.floor(at * nSec));
+      const s = sections[si];
+      const a = spin + TAU * (bearing[i] + (rnd() - 0.5)) / n;
+      const cq = s.q.clone()
+        .multiply(tmpQ.setFromAxisAngle(new THREE.Vector3(0, 1, 0), a))
+        .multiply(tmpQ.setFromAxisAngle(new THREE.Vector3(1, 0, 0), spec.angle[lv]));
+      queue.push({
+        p: s.p.clone(),
+        q: cq,
+        // An evergreen's branches shorten as they go up it, which is the whole
+        // outline of a conifer and is one multiplication.
+        len: spec.length[lv] * (spec.evergreen ? 1 - at * spec.spire : 1),
+        r: s.r * spec.thin[lv],
+        level: lv + 1,
+      });
+    }
+  }
+  return { branches, tufts };
+}
+
+/** Skin one grown branch: a ring at every section, in that section's frame. */
+function vegSkin(branch) {
+  const rings = [];
+  const v = new THREE.Vector3();
+  for (const s of branch.sections) {
+    const ring = [];
+    for (let i = 0; i < branch.seg; i++) {
+      const a = (i / branch.seg) * TAU;
+      v.set(Math.cos(a) * s.r, 0, Math.sin(a) * s.r).applyQuaternion(s.q);
+      ring.push(new THREE.Vector3(s.p.x + v.x, s.p.y + v.y, s.p.z + v.z));
+    }
+    rings.push(ring);
+  }
+  return loft(rings, { closed: true, caps: false });
+}
+
+/**
+ * Fit a grown skeleton into the envelope the instancing was written against:
+ * standing on y=0, one unit tall, and reaching `radius` at its widest.
+ *
+ * Doing it here rather than in the spec is the difference between a spec you
+ * can read and a spec you have to solve. Nobody can say what trunk length and
+ * branch angle add up to a height of exactly one — and if they could, changing
+ * the branch angle would break it again. So the spec says what shape the tree
+ * is and this says how big it is, which is the only division of those two that
+ * survives editing.
+ *
+ * The scale is not uniform: height and spread are separate numbers because a
+ * cypress and an olive disagree about both. A branch's own cross-section takes
+ * only the horizontal factor, so a leaning limb's tube goes very slightly
+ * elliptical — at five centimetres of radius that is under a pixel, and the
+ * alternative is fitting one dimension and missing the other.
+ */
+function vegFit(sk, height, radius, bole, leaf, squash) {
+  let ylo = Infinity, yhi = -Infinity, rmax = 1e-6;
+  for (const b of sk.branches) {
+    for (const s of b.sections) {
+      if (s.p.y < ylo) ylo = s.p.y;
+      if (s.p.y > yhi) yhi = s.p.y;
+      const d = Math.hypot(s.p.x, s.p.z);
+      if (d > rmax) rmax = d;
+    }
+  }
+  // The wood is fitted a little inside the envelope and the foliage fills the
+  // rest, because the foliage is what defines the outline: a puff hanging off
+  // the outermost twig has to be inside the species' reach, not centred on it.
+  const sy = height * (1 - leaf * squash * 0.85) / Math.max(yhi - ylo, 1e-6);
+  const sxz = radius * (1 - leaf * 0.85) / rmax;
+  for (const b of sk.branches) {
+    for (const s of b.sections) {
+      s.p.set(s.p.x * sxz, (s.p.y - ylo) * sy, s.p.z * sxz);
+    }
+  }
+  // Leaf size as a fraction of the crown's own radius, which is a number you
+  // can hold against a photograph — a pine's tufts are a fifth of its crown, a
+  // maquis bush's are nearly half of it, and both of those are checkable. It
+  // was a pre-fit length before, in units nothing else in the file used, and
+  // that is how a puff on the olive ended up a metre and a half across.
+  for (const t of sk.tufts) {
+    const rx = leaf * radius * t.k;
+    t.rx = rx;
+    t.ry = rx * squash;
+    t.c = [t.c[0] * sxz + t.j[0] * rx,
+      (t.c[1] - ylo) * sy + t.j[1] * t.ry,
+      t.c[2] * sxz + t.j[2] * rx];
+  }
+  // And the wood, which is fitted separately and has to be. Widening a crown
+  // widens everything under it by the same factor, so the pine's trunk went
+  // from a lamp post to a chimney the moment the crown was made the right size
+  // — the two mistakes were one mistake, and correcting only the visible half
+  // would have left a ten-metre tree with three-quarters of a metre of bole.
+  // `bole` is the trunk radius the drawing wants, in the same units as the
+  // spread, so the diameter in the world is `2 · bole · wide` and is a number
+  // you can check against a real tree.
+  const rk = bole / Math.max(sk.branches[0].sections[0].r, 1e-9);
+  for (const b of sk.branches) for (const s of b.sections) s.r *= rk;
+  return sk;
+}
+
+/**
+ * Grow a species and hand back one merged, painted prototype: bark on the
+ * wood, and the crown's own gradient over every puff, banded across the whole
+ * canopy so it reads as one volume and not as a bag of separate balls.
+ *
+ * `squash` is a puff's height over its width in prototype units. Round in the
+ * world is about 0.8 for every species here — an instance is scaled (w, h, w)
+ * and each species' h/w now sits between 1.0 and 1.3 — so anything much under
+ * that is a deliberately flat puff, which is what an Aleppo pine's foliage is
+ * and what a cypress's very much is not.
+ */
+function vegGrown(spec, rnd, bark, leaf, shade) {
+  const sk = vegGrow(spec, rnd);
+  vegFit(sk, 1, spec.reach, spec.bole, spec.leaf, spec.squash);
+
+  const parts = sk.branches.map((b) => vegPaint(vegSkin(b), bark));
+  let lo = Infinity, hi = -Infinity;
+  for (const t of sk.tufts) {
+    if (t.c[1] - t.ry < lo) lo = t.c[1] - t.ry;
+    if (t.c[1] + t.ry > hi) hi = t.c[1] + t.ry;
+  }
+  const [dk, lt] = vegShade(leaf, shade[0], shade[1]);
+  for (const t of sk.tufts) {
+    const r = [t.rx, t.ry, t.rx];
+    parts.push(vegPuff(vegClump(t.c, r, spec.puffSeg, spec.puffRow, spec.puffJag, rnd),
+      t.c, r, [lo + (hi - lo) * 0.10, hi], dk, lt));
+  }
+  return vegMerge(parts);
+}
+
+/**
+ * The four close-up species, grown to the envelope the far models already had:
+ * standing on the ground, one unit tall, and reaching the same radius, because
+ * a tree that changes size or shape as you approach is worse than a tree with
+ * corners on it.
  *
  * Seeded once and deterministically. These are four models, not four thousand
  * — the variation between individual trees is the instance's own scale, yaw
@@ -18644,136 +19888,81 @@ function vegLimb(p0, p1, r0, r1, seg, rows = 2, bow = 0) {
 function vegNearPrototypes() {
   const rnd = mulberry32(0x7ee5);
   const bark = [0.30, 0.23, 0.17];
-  const ring = (a, r, y) => [Math.cos(a) * r, y, Math.sin(a) * r];
 
-  // Aleppo pine. A bare trunk that leans, three limbs that leave it near the
-  // top, and five flat clumps arranged into the umbrella the species is known
-  // for — wide, thin, and with sky through it.
+  // Aleppo pine. Long bare trunk, everything happening in the top third, and
+  // the umbrella made by the growth force rather than by hand: five limbs
+  // leave at sixty degrees and are then rotated back toward the light section
+  // by section, hardest where they are thinnest, which is exactly the shape.
+  // `spire` shortens them going up, so the crown is broad below and closes
+  // over, and the tufts sit along the last third of the last branches so the
+  // foliage is a spray at the ends and not a ball in the middle.
   //
-  // The vertical radii look absurd next to the horizontal ones and they are
-  // correct: an instance is scaled (w, h, w) and for a pine that is about
-  // (1.9, 10, 1.9), so the prototype is squashed by five to one on the way into
-  // the world. A clump built round comes out as a five-metre lozenge, which is
-  // how the first version of this turned an umbrella pine into a lollipop.
-  const pineParts = [
-    vegPaint(vegLimb([0, 0, 0], [0.055, 0.62, 0.03], 0.058, 0.028, 8, 4, 0.030), bark),
-  ];
-  //
-  // Eleven puffs and not five. Five is enough for the outline of an Aleppo
-  // pine and nowhere near enough for its texture: what you are standing under
-  // is a broken ceiling, and a hole needs an edge on both sides of it to read
-  // as a hole. Same envelope, same height — 40 cm of radius on the prototype
-  // either way — cut into more, smaller pieces.
-  const pineC = [
-    [0.000, 0.880, 0.000, 0.180, 0.080, 0.172],
-    [0.215, 0.812, 0.060, 0.150, 0.068, 0.144],
-    [-0.150, 0.828, 0.185, 0.146, 0.066, 0.140],
-    [-0.196, 0.856, -0.140, 0.142, 0.064, 0.138],
-    [0.088, 0.834, -0.215, 0.138, 0.062, 0.134],
-    [0.130, 0.902, 0.150, 0.126, 0.058, 0.122],
-    [-0.062, 0.914, -0.056, 0.118, 0.056, 0.114],
-    [0.288, 0.784, -0.075, 0.112, 0.052, 0.108],
-    [-0.276, 0.792, 0.048, 0.110, 0.050, 0.106],
-    [0.040, 0.778, 0.276, 0.114, 0.052, 0.110],
-    [-0.080, 0.770, -0.266, 0.108, 0.050, 0.104],
-  ];
-  const [pineDk, pineLt] = vegShade([0.14, 0.24, 0.13]);
-  for (const [x, y, z, rx, ry, rz] of pineC) {
-    // Every clump but the crown is hung off a limb, so the canopy is carried
-    // rather than floating over a stick.
-    if (Math.hypot(x, z) > 0.05) {
-      pineParts.push(vegPaint(
-        vegLimb([0.05, 0.58, 0.026], [x * 0.85, y - ry * 0.6, z * 0.85],
-          0.020, 0.010, 5, 1), bark));
-    }
-    pineParts.push(vegPuff(vegClump([x, y, z], [rx, ry, rz], 8, 3, 0.32, rnd),
-      [x, y, z], [rx, ry, rz], [0.70, 0.97], pineDk, pineLt));
-  }
-  const pine = vegMerge(pineParts);
+  // The trunk stops well short of the top and tapers almost to nothing, which
+  // is not a detail: the fit scales the tree by its tallest *section*, so a
+  // leader that outlives its branches becomes a bare spike standing out of the
+  // crown, and that is a telegraph pole with a bush tied to it. In a grown
+  // pine the top of the tree is made of branches. Here it is too.
+  const pine = vegGrown({
+    levels: 2, evergreen: true, spire: 0.42,
+    height: 0.66, radius: 0.055, reach: 0.45, bole: 0.023,
+    children: [6, 3], start: [0.42, 0.26],
+    angle: [1.16, 0.72], length: [0.42, 0.22], thin: [0.60, 0.58],
+    taper: [0.88, 0.58, 0.70], gnarl: [0.018, 0.048, 0.105],
+    strength: [0.0035, 0.013, 0.026], force: [0, 1, 0],
+    sections: [7, 5, 3], segments: [7, 5, 3],
+    tuft: [0.14, 3], tuftJit: 1.15, leaf: 0.18,
+    squash: 0.50, puffSeg: 6, puffRow: 4, puffJag: 0.44,
+  }, rnd, bark, [0.14, 0.24, 0.13], [0.60, 1.26]);
 
-  // Cypress. One spindle, but a wavering one — the axis drifts, the section is
-  // twelve-sided and irregular, and four small clumps break the outline so it
-  // is not a lathe standing on end.
-  const cyPr = [[0.00, 0.045], [0.10, 0.072], [0.26, 0.098], [0.44, 0.106],
-    [0.62, 0.101], [0.78, 0.086], [0.90, 0.060], [0.97, 0.030], [1.00, 0.008]];
-  const cyRings = cyPr.map(([y, r]) => {
-    const dx = 0.016 * Math.sin(y * 4.1), dz = 0.013 * Math.sin(y * 3.3 + 1.7);
-    const out = [];
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * TAU;
-      const rr = r * (1 + 0.13 * Math.sin(i * 2.11 + y * 7.7));
-      const p = ring(a, rr, y);
-      out.push(new THREE.Vector3(p[0] + dx, p[1], p[2] + dz));
-    }
-    return out;
-  });
-  const [cyDk, cyLt] = vegShade([0.09, 0.17, 0.11], 0.55, 1.40);
-  // The spindle keeps its own normals — it is a cone and a cone's normal is
-  // not radial — but it takes the gradient, which is what stops a cypress
-  // reading as one flat black slot cut out of the sky.
-  const cyParts = [vegPuff(loft(cyRings, { closed: true, caps: false }),
-    [0, 0.5, 0], [0.106, 0.5, 0.106], [0.0, 1.0], cyDk, cyLt, 0.22)];
-  for (let i = 0; i < 7; i++) {
-    const y = 0.20 + i * 0.115;
-    const a = rnd() * TAU;
-    const c = ring(a, 0.058 + rnd() * 0.020, y);
-    const r = [0.046, 0.062, 0.046];
-    cyParts.push(vegPuff(vegClump(c, r, 7, 3, 0.34, rnd), c, r,
-      [0.0, 1.0], cyDk, cyLt));
-  }
-  const cypress = vegMerge(cyParts);
+  // Cypress. A fastigiate tree is one whose branches are held almost against
+  // its own trunk, and that is one number here and not a shape: leave at
+  // fifteen degrees, then a growth force strong enough to pull every section
+  // back to vertical. The wander is left high so the column is not a lathe.
+  const cypress = vegGrown({
+    levels: 1, evergreen: true, spire: 0.72,
+    height: 0.94, radius: 0.030, reach: 0.105, bole: 0.010,
+    children: [16], start: [0.05],
+    angle: [0.30], length: [0.34], thin: [0.30],
+    taper: [0.80, 0.70], gnarl: [0.012, 0.075],
+    strength: [0.002, 0.055], force: [0, 1, 0],
+    sections: [9, 4], segments: [6, 4],
+    tuft: [0.05, 4], tuftJit: 1.30, leaf: 0.32,
+    squash: 0.90, puffSeg: 5, puffRow: 3, puffJag: 0.46,
+  }, rnd, bark, [0.09, 0.17, 0.11], [0.52, 1.42]);
 
-  // Olive. The trunk is short and thick and splits, which is the whole reason
-  // an olive reads as an olive from underneath, and the canopy is four lobes
-  // with light between them.
-  const olLimbs = [[0.26, 0.50, 0.30], [2.4, 0.56, -0.22], [4.4, 0.52, 0.10]];
-  const olParts = [
-    vegPaint(vegLimb([0, 0, 0], [0.012, 0.21, 0.008], 0.145, 0.105, 8, 2, 0.018), bark),
-  ];
-  for (const [a, y, lean] of olLimbs) {
-    const tip = ring(a, 0.20 + lean * 0.10, y);
-    olParts.push(vegPaint(
-      vegLimb([0.012, 0.20, 0.008], tip, 0.060, 0.030, 6, 2, 0.030),
-      [0.33, 0.29, 0.24]));
-  }
-  // An olive is squashed less on the way out — about 2.6 to 1 — so its lobes
-  // are nearer to round than the pine's, and they overlap into one mass with
-  // notches in it rather than into four separate balls.
-  const olC = [
-    [0.000, 0.680, 0.000, 0.235, 0.180, 0.225],
-    [0.245, 0.560, 0.165, 0.190, 0.150, 0.182],
-    [-0.225, 0.585, 0.180, 0.185, 0.146, 0.178],
-    [-0.045, 0.605, -0.265, 0.180, 0.142, 0.172],
-    [0.185, 0.700, -0.150, 0.165, 0.130, 0.158],
-    [-0.180, 0.720, -0.030, 0.155, 0.124, 0.150],
-    [0.055, 0.755, 0.185, 0.150, 0.120, 0.145],
-  ];
-  const [olDk, olLt] = vegShade([0.36, 0.41, 0.30], 0.64, 1.20);
-  for (const [x, y, z, rx, ry, rz] of olC) {
-    olParts.push(vegPuff(vegClump([x, y, z], [rx, ry, rz], 8, 3, 0.30, rnd),
-      [x, y, z], [rx, ry, rz], [0.38, 0.90], olDk, olLt));
-  }
-  const olive = vegMerge(olParts);
+  // Olive. Short thick trunk that divides low — three or four limbs off half a
+  // metre of bole is the whole silhouette of the species, and it is `start`
+  // low with `angle` wide and nothing else. No spire: an olive is broadest at
+  // the top, which is what happens when the force is weak and the branches
+  // keep the angle they left at.
+  const olive = vegGrown({
+    levels: 2, evergreen: false, spire: 0,
+    height: 0.30, radius: 0.115, reach: 0.56, bole: 0.064,
+    children: [4, 4], start: [0.30, 0.20],
+    angle: [0.62, 0.66], length: [0.52, 0.30], thin: [0.62, 0.55],
+    taper: [0.45, 0.55, 0.70], gnarl: [0.055, 0.075, 0.120],
+    strength: [0.004, 0.007, 0.012], force: [0, 1, 0],
+    sections: [4, 6, 3], segments: [8, 5, 4],
+    tuft: [0.10, 3], tuftJit: 1.15, leaf: 0.16,
+    squash: 0.80, puffSeg: 7, puffRow: 4, puffJag: 0.38,
+  }, rnd, [0.33, 0.29, 0.24], [0.36, 0.41, 0.30], [0.62, 1.22]);
 
-  // Maquis. Four lobes and no trunk, which is what it is.
-  //
-  // Pushed apart and roughened harder than anything else here, because the
-  // first version of it was three concentric blobs and what that reads as, on
-  // open karst, at ten metres, is a boulder. Scrub is a tangle: the outline has
-  // to be broken in several places or the eye files it as stone.
-  const bushC = [
-    [0.000, 0.420, 0.000, 0.300, 0.330, 0.285],
-    [0.240, 0.280, 0.180, 0.235, 0.235, 0.225],
-    [-0.215, 0.300, -0.165, 0.225, 0.250, 0.215],
-    [0.055, 0.245, -0.260, 0.190, 0.210, 0.182],
-    [-0.180, 0.260, 0.215, 0.185, 0.200, 0.178],
-    [0.170, 0.500, -0.090, 0.175, 0.185, 0.168],
-    [-0.095, 0.470, 0.155, 0.165, 0.175, 0.158],
-  ];
-  const [buDk, buLt] = vegShade([0.26, 0.30, 0.19], 0.62, 1.24);
-  const bush = vegMerge(bushC.map(([x, y, z, rx, ry, rz]) =>
-    vegPuff(vegClump([x, y, z], [rx, ry, rz], 8, 3, 0.44, rnd),
-      [x, y, z], [rx, ry, rz], [0.02, 0.72], buDk, buLt)));
+  // Maquis. No trunk worth the name — a stub, and everything from it. The
+  // gnarliness is the highest here of anything: scrub is a tangle, and the
+  // first version of this was three concentric blobs, which on open karst at
+  // ten metres reads as a boulder. The outline has to be broken in several
+  // places or the eye files it as stone.
+  const bush = vegGrown({
+    levels: 1, evergreen: false, spire: 0,
+    height: 0.10, radius: 0.055, reach: 0.58, bole: 0.050,
+    children: [7], start: [0.05],
+    angle: [0.86], length: [0.62], thin: [0.72],
+    taper: [0.35, 0.65], gnarl: [0.09, 0.190],
+    strength: [0.004, 0.010], force: [0, 1, 0],
+    sections: [3, 5], segments: [6, 4],
+    tuft: [0.16, 3], tuftJit: 1.00, leaf: 0.40,
+    squash: 0.88, puffSeg: 6, puffRow: 3, puffJag: 0.50,
+  }, rnd, bark, [0.26, 0.30, 0.19], [0.60, 1.26]);
 
   return { pine, cypress, olive, bush };
 }
@@ -18788,23 +19977,33 @@ function vegPrototypes() {
 
   // Aleppo pine: bare leaning trunk, flat irregular umbrella. The shape that
   // reads as Dalmatia from a thousand feet.
+  // The trunk radii here are the same correction VEG_SIZE got: they were
+  // written when a pine's `wide` was 1.9 and are read against 7.78, so every
+  // one of them is divided by about four. Both LODs have to agree about the
+  // wood as well as about the outline, or a tree changes girth at 300 m.
+  // And the crown is pushed up the trunk and flattened, which it could afford
+  // not to be while it was a metre and a half across and could afford it no
+  // longer at seven: a smooth dome on a stick is a mushroom, and a mushroom on
+  // a hillside of them is what makes a landscape read as a toy. Higher, flatter
+  // and with half again the irregularity — the far model is what almost every
+  // tree in the frame actually is, so it is worth the six rings it costs.
   const pine = vegGeo([
-    vegRing(0.00, 0.055, S), vegRing(0.26, 0.040, S), vegRing(0.48, 0.034, S),
-    vegRing(0.50, 0.34, S, 0.22), vegRing(0.62, 0.42, S, 0.21),
-    vegRing(0.74, 0.45, S, 0.20), vegRing(0.86, 0.36, S, 0.19),
-    vegRing(0.95, 0.22, S, 0.16), vegRing(1.00, 0.06, S),
+    vegRing(0.00, 0.023, S), vegRing(0.30, 0.018, S), vegRing(0.55, 0.015, S),
+    vegRing(0.57, 0.30, S, 0.34), vegRing(0.68, 0.43, S, 0.32),
+    vegRing(0.80, 0.45, S, 0.30), vegRing(0.90, 0.38, S, 0.28),
+    vegRing(0.97, 0.22, S, 0.24), vegRing(1.00, 0.06, S),
   ], S, 3, bark, [0.14, 0.24, 0.13]);
 
   // Cypress: the dark exclamation mark in every churchyard and windbreak.
   const cypress = vegGeo([
-    vegRing(0.00, 0.045, S), vegRing(0.10, 0.070, S),
+    vegRing(0.00, 0.017, S), vegRing(0.10, 0.070, S),
     vegRing(0.32, 0.105, S, 0.10), vegRing(0.66, 0.095, S, 0.10),
     vegRing(0.90, 0.060, S), vegRing(1.00, 0.010, S),
   ], S, 1, bark, [0.09, 0.17, 0.11]);
 
   // Olive: short, thick, gnarled, silver-green and much harder to set alight.
   const olive = vegGeo([
-    vegRing(0.00, 0.14, S), vegRing(0.20, 0.10, S),
+    vegRing(0.00, 0.064, S), vegRing(0.20, 0.050, S),
     vegRing(0.30, 0.44, S, 0.24), vegRing(0.46, 0.53, S, 0.23),
     vegRing(0.62, 0.56, S, 0.22), vegRing(0.80, 0.47, S, 0.21),
     vegRing(0.92, 0.32, S, 0.19), vegRing(1.00, 0.10, S),
@@ -18819,12 +20018,27 @@ function vegPrototypes() {
   return { pine, cypress, olive, bush };
 }
 
-/** Height range and canopy width per species, in metres. */
+/**
+ * Height range in metres, and then the width number — which was wrong, in the
+ * one way that is hard to see because it is wrong on every tree equally.
+ *
+ * An instance is scaled (w, h, w) and the third number here is w at the middle
+ * of the height range, so a species' canopy comes out `2 · reach · wide` wide,
+ * where `reach` is how far the prototype extends from its own axis. Nobody had
+ * ever multiplied that out: the pine's was 2 · 0.45 · 1.9, which is a crown a
+ * metre and seven across on a ten-metre tree. An Aleppo pine's crown is seven
+ * metres across. Every conifer on this coast has been a lamp post with a bud
+ * on it, and no amount of work on the model was ever going to fix that.
+ *
+ * So the numbers are now derived rather than dialled: the width in metres that
+ * the species actually has, divided by twice the prototype's reach. Both LODs
+ * are built to the same reach, which is what lets one number serve both.
+ */
 const VEG_SIZE = {
-  pine: [7, 13, 1.9],
-  cypress: [7, 14, 1.0],
-  olive: [3.4, 5.4, 1.7],
-  bush: [0.9, 2.2, 1.5],
+  pine: [7, 13, 7.78],           // 7.0 m of crown  ÷ 2 × 0.45
+  cypress: [7, 14, 9.05],        // 1.9 m           ÷ 2 × 0.105
+  olive: [3.4, 5.4, 4.29],       // 4.8 m           ÷ 2 × 0.56
+  bush: [0.9, 2.2, 1.47],        // 1.7 m           ÷ 2 × 0.58
 };
 
 function buildTrees(scene, fire) {
@@ -19078,6 +20292,26 @@ function buildTrees(scene, fire) {
       tris: SPECIES.reduce((n, s) => n
         + layers[s].near.count * (protos.near[s].index.count / 3)
         + layers[s].far.count * (protos.far[s].index.count / 3), 0) | 0 }),
+    /**
+     * Debug: what one of each species costs, near and far. The near models are
+     * grown and their cost is a consequence of a spec rather than of a list, so
+     * it is not something you can count by reading the source any more.
+     */
+    cost: () => Object.fromEntries(SPECIES.map((s) => [s,
+      [protos.near[s].index.count / 3, protos.far[s].index.count / 3]])),
+    /** Debug: the nearest planted tree of a species, for aiming a camera. */
+    nearest: (species, x, z) => {
+      let best = null, bd = Infinity;
+      for (const t of tiles.values()) {
+        for (const o of t[species] || []) {
+          const d = (o.x - x) ** 2 + (o.z - z) ** 2;
+          if (d < bd) { bd = d; best = o; }
+        }
+      }
+      return best && { x: +best.x.toFixed(1), y: +best.y.toFixed(1),
+        z: +best.z.toFixed(1), h: +best.h.toFixed(1), w: +best.w.toFixed(2),
+        d: +Math.sqrt(bd).toFixed(1) };
+    },
   };
 }
 
@@ -26022,11 +27256,38 @@ const SWIM = {
   strokeRoll: 0.045,
 };
 
-// The four waves of SEA_VERT's `gerstner`, on the CPU and to the same numbers.
-// Height only: the lattice is displaced in y alone, so a second copy of the
-// horizontal terms would be a second copy of nothing.
-const SWIM_LEN = [46.0, 23.0, 13.0, 7.5];
-const SWIM_AMP = [1.0, 0.55, 0.30, 0.16];
+// SEA_VERT's `gerstner`, on the CPU and to the same numbers — which is now a
+// harder promise to keep than it was, and worth keeping.
+//
+// It used to be four sines and height only, because the lattice was displaced
+// in y alone: ask for the height at (x, z) and you got it. The surface is a
+// real Gerstner sum now, so the vertex that ends up over (x, z) started
+// somewhere else, and "the height at (x, z)" is the solution of an equation
+// rather than a sum. Two fixed-point steps solve it to well inside a
+// centimetre at these steepnesses — walk back along the horizontal
+// displacement, sample again, repeat — and a centimetre is a tenth of what the
+// eye sits above the waterline, so nobody is going to ride the wrong sea.
+const SWIM_LEN = [78.0, 46.0, 27.0, 15.0, 8.5, 4.6];
+const SWIM_AMP = [0.78, 1.0, 0.60, 0.34, 0.19, 0.105];
+const SWIM_Q = [0.35, 0.55, 0.72, 0.85, 0.90, 0.90];
+const SWIM_SPREAD = [0.10, 0.0, 0.42, -0.58, 0.86, null];
+
+/** The six directions, rebuilt from the wind. Shared by both passes below. */
+function seaDirs() {
+  const w = U.uWind.value;
+  const L = Math.hypot(w.x, w.y) || 1;
+  const wx = w.x / L, wy = w.y / L;
+  const px = -wy, py = wx;                       // the across-wind unit
+  const out = [];
+  for (let i = 0; i < 6; i++) {
+    let dx, dy;
+    if (SWIM_SPREAD[i] === null) { dx = px + wx * 0.25; dy = py + wy * 0.25; }
+    else { dx = wx + px * SWIM_SPREAD[i]; dy = wy + py * SWIM_SPREAD[i]; }
+    const l = Math.hypot(dx, dy) || 1;
+    out.push([dx / l, dy / l]);
+  }
+  return out;
+}
 
 /**
  * The sea surface at a world point, in metres about zero.
@@ -26034,29 +27295,36 @@ const SWIM_AMP = [1.0, 0.55, 0.30, 0.16];
  * Called two or three times a frame — once for where your head is, once for
  * where you are about to put it — so it re-derives the wind basis every call
  * rather than caching a state that would then have to be invalidated when the
- * gust changes. Four sines is not worth a cache.
+ * gust changes. Eighteen sines is not worth a cache either.
  */
 function seaHeightAt(x, z) {
-  const w = U.uWind.value;
-  const L = Math.hypot(w.x, w.y) || 1;
-  const wx = w.x / L, wy = w.y / L;
-  const px = -wy, py = wx;                       // the across-wind unit
-  const dirs = [
-    [wx, wy],
-    [wx + px * 0.42, wy + py * 0.42],
-    [wx - px * 0.55, wy - py * 0.55],
-    [px + wx * 0.25, py + wy * 0.25],
-  ];
+  const dirs = seaDirs();
   const amp = 0.34 * SEA.waveScale * (0.45 + 0.055 * U.uWindSpeed.value);
   const t = U.uTime.value;
+  // Invert the horizontal map: find the undisplaced point whose displacement
+  // lands on (x, z), then take that point's height.
+  let ux = x, uz = z;
+  for (let it = 0; it < 2; it++) {
+    let dx = 0, dz = 0;
+    for (let i = 0; i < 6; i++) {
+      const d = dirs[i];
+      const k = (Math.PI * 2) / SWIM_LEN[i];
+      const c = Math.sqrt(9.81 / k);
+      const a = amp * SWIM_AMP[i];
+      const q = Math.min(SWIM_Q[i], 0.92 / Math.max(k * a, 1e-4));
+      const cs = Math.cos((d[0] * ux + d[1] * uz) * k + t * c * k * 0.42);
+      dx += d[0] * q * a * cs;
+      dz += d[1] * q * a * cs;
+    }
+    ux = x - dx; uz = z - dz;
+  }
   let h = 0;
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 6; i++) {
     const d = dirs[i];
-    const dl = Math.hypot(d[0], d[1]) || 1;
     const k = (Math.PI * 2) / SWIM_LEN[i];
     const c = Math.sqrt(9.81 / k);
     const a = amp * SWIM_AMP[i];
-    h += a * Math.sin(((d[0] / dl) * x + (d[1] / dl) * z) * k + t * c * k * 0.42);
+    h += a * Math.sin((d[0] * ux + d[1] * uz) * k + t * c * k * 0.42);
   }
   return h;
 }
@@ -29875,7 +31143,7 @@ function updateCamera(dt) {
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
   trees, landmarks, alerts, roads, rail, props, airfield, jadrija, ground, birds, eject,
-  mirror, mirrorP, swim, you;
+  mirror, mirrorP, swim, under, you;
 /** You plus the three wingmen, as the birds see them. Built once, in boot(). */
 let birdFlush = [];
 
@@ -29965,6 +31233,7 @@ async function boot() {
 
   await step(70, 'load.sea');
   sea = buildSea(scene);
+  under = buildUnder(scene);
 
   await step(74, 'load.stone');
   resolveLandmarks();
@@ -30301,8 +31570,16 @@ function setPaused(on) {
   // Only while there is a mission to stop. Pausing the loader would strand the
   // world build, and the cinematic and the end screen have their own answer to
   // "make it stop" — the skip button and the reload.
+  //
+  // `swim` is on this list because it is a place you can be, and every place
+  // you can be in this game can be walked away from. It was missing for the
+  // simple reason that it was written after the list was: being in the water
+  // is the newest of the five, and the breath clock does not stop for a
+  // doorbell — which is the one mode where not being able to stop it actually
+  // costs you something.
   if (state.phase !== 'fly' && state.phase !== 'crashing'
-    && state.phase !== 'ground' && state.phase !== 'chute') return;
+    && state.phase !== 'ground' && state.phase !== 'chute'
+    && state.phase !== 'swim') return;
   if (state.paused === on) return;
   state.paused = on;
   $('pause').hidden = !on;
@@ -30910,13 +32187,13 @@ function paintSwimHud() {
     : swim.canWade() ? T('swim.wade')
       : T('swim.hint');
   // Nothing below the waterline until your eyes are actually under it, and then
-  // it closes in over the first four metres and stops — past that it is as dark
-  // as it is going to get and the surface overhead is still the way out.
+  // it closes in slowly and never far: this is the mask now, not the sea. The
+  // sea is drawn.
   const u = $('under');
   u.hidden = false;
   u.classList.toggle('on', swim.submerged);
   u.style.opacity = swim.submerged
-    ? (0.30 + 0.52 * Math.min(1, d / 5.0)).toFixed(3) : '0';
+    ? (0.16 + 0.44 * Math.min(1, d / 11.0)).toFixed(3) : '0';
 }
 
 /**
@@ -31825,6 +33102,13 @@ function frame() {
   else if (state.phase === 'chute' || eject.active) eject.pose(camera);
   else if (state.phase !== 'intro') updateCamera(dt);
   U.uCamPos.value.copy(camera.position);
+  // How deep the eye itself is, which is what dims the water rather than
+  // merely colouring it. Taken off the wave surface at your own position and
+  // not off zero, so a trough does not briefly surface you.
+  U.uCamDepth.value = state.phase === 'swim' && swim
+    ? Math.max(0, swim.surfaceAt(camera.position.x, camera.position.z)
+      - camera.position.y)
+    : Math.max(0, -camera.position.y);
 
   camera.updateMatrixWorld();
   _pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
@@ -31848,6 +33132,10 @@ function frame() {
   if (jadrija) jadrija.update(dt, camera.position);
   rail.update(dt);
   sea.update(camera);
+  // The water column, which only exists while somebody is inside it. Keyed on
+  // the eye rather than on the phase, so a bale-out that puts the camera under
+  // the surface for half a second gets it too.
+  under.update(camera, U.uCamDepth.value, U.uCamDepth.value > 0.02, renderer, dt);
   // Wall time to spread, world time to burn. The only process in the game that
   // is racing the clock rather than racing you — see the note on `update` in
   // src/40-fire.js for why letting it slow would be a cheat and letting
@@ -32236,6 +33524,7 @@ window.__fr = {
       lineKm: +rail.lineKm.toFixed(2), tris: Math.round(rail.tris) } : null,
     ground: ground ? ground.stats() : null,
     swim: swim && swim.active ? swim.stats() : null,
+    under: under ? under.stats() : null,
     props: props ? props.counts : null,
     birds: birds ? birds.stats() : null,
     water: Math.round(flight ? flight.p.water : 0),
@@ -32533,6 +33822,30 @@ window.__fr = {
     },
   },
 
+  /**
+   * Debug: take one layer out of the picture, which is the only way to find
+   * out which layer you are looking at. Underwater especially — down there
+   * every surface is some shade of the same green and a screenshot cannot
+   * tell you whether that is the bottom, the surface or nothing at all.
+   */
+  show: (what, on) => {
+    const m = {
+      sea: () => [sea.mesh],
+      terrain: () => terrain.levels.map((l) => l.mesh),
+      trees: () => SPECIES.flatMap((sp) => [trees.layers[sp].near.mesh,
+        trees.layers[sp].far.mesh]),
+      sky: () => [sky.mesh],
+    }[what];
+    if (!m) return Object.keys({ sea: 0, terrain: 0, trees: 0, sky: 0 });
+    const list = m();
+    for (const o of list) o.visible = !!on;
+    return list.length;
+  },
+  /** Debug: the vegetation, which is now grown from a spec and worth probing. */
+  veg: {
+    cost: () => trees.cost(),
+    nearest: (sp, x, z) => trees.nearest(sp, x, z),
+  },
   ground: {
     arm: () => ground.force(),
     raw: () => ground,

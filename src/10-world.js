@@ -116,6 +116,7 @@ ${GLSL_NOISE}
 ${GLSL_TERRAIN}
 ${GLSL_SKY}
 ${GLSL_HAZE}
+${GLSL_WATER}
 ${GLSL_SHADOW}
 
 uniform vec3 uAmbSky;
@@ -184,6 +185,94 @@ void main(){
   float shoreT = 1.0 - smoothstep(0.0, 0.055, cv.a);
   base = mix(base, vec3(0.86, 0.82, 0.72), shoreT * 0.5);
 
+  // ── the seabed ──────────────────────────────────────────────────────────
+  // The ground does not stop at the waterline — it has always run straight on
+  // down, because it is one height field and there was never anywhere for it
+  // to stop. What it did stop doing was looking like anything: below zero the
+  // cover class is SEA and every one of those metres was painted a single flat
+  // blue, which from underneath is a fog bank with a horizon in it. The sea
+  // surface is opaque from above, so nobody ever saw it, and then somebody
+  // could swim.
+  //
+  // A Dalmatian bottom is four things and they sort themselves by depth and by
+  // slope, which is exactly what this shader already has to hand. Shell sand
+  // and broken shingle in the first few metres where the swell keeps it moving;
+  // posidonia — the meadow, the thing the whole Adriatic ecosystem stands on —
+  // from about two metres down to fifteen wherever it is flat enough to root;
+  // bare grazed limestone on anything steep; and out past the light, the fine
+  // grey mud that everything eventually settles into.
+  float wetD = max(0.0, -vWorld.y);
+  if (wetD > 0.0) {
+    vec3 shell = vec3(0.845, 0.815, 0.720);     // shell sand, nearly white
+    vec3 shingle = vec3(0.660, 0.645, 0.590);   // and where the swell sorts it
+    vec3 weed = vec3(0.150, 0.185, 0.105);      // posidonia, which is nearly black
+    vec3 silt = vec3(0.335, 0.345, 0.320);      // the mud out past the meadow
+
+    // The meadow. Patches with hard edges, because that is what a posidonia bed
+    // looks like: it grows to a boundary and stops, and between the beds there
+    // are winding lanes of clean sand that have their own name — intermattes.
+    //
+    // The scale is the whole of it. This was 0.0135 first, which is a feature
+    // every seventy metres, and a swimmer can see about twenty: every dive
+    // landed wholly inside one patch or wholly outside it, so the bottom came
+    // out as one flat colour and all the work above did nothing. A real
+    // Adriatic meadow breaks up at four or five metres, which is 0.2, and it
+    // does it at three scales at once.
+    // Three scales, because a swimmer three metres off the bottom can see about
+    // a five-metre circle of it and a swimmer at the surface can see fifty.
+    // One scale serves whichever of those it was tuned at and nothing else.
+    float mead = fbm2(p * 0.042 + 71.3, 3) * 0.50
+               + fbm2(p * 0.190 + 8.9, 2) * 0.30
+               + fbm2(p * 0.640 + 44.1, 2) * 0.20;
+    float lanes = ridge2(p * 0.088 + 4.1, 2);
+    // Narrow, so the edge of a bed is an edge. Posidonia grows to a front and
+    // stops dead — the boundary between meadow and clean sand is a step you
+    // can see from the surface, not a gradient.
+    float rooted = smoothstep(0.455, 0.525, mead)
+                 * (1.0 - smoothstep(0.50, 0.70, lanes));
+    // It needs light and it needs something to hold on to: nothing above the
+    // low-water mark, nothing past about fifteen metres here, nothing on a
+    // slope it would slide off.
+    rooted *= smoothstep(0.9, 2.6, wetD) * (1.0 - smoothstep(13.0, 19.0, wetD));
+    rooted *= 1.0 - smoothstep(0.12, 0.34, slope);
+
+    vec3 bed = mix(shell, shingle, smoothstep(1.5, 7.0, wetD));
+    bed = mix(bed, silt, smoothstep(14.0, 34.0, wetD));
+    // Bare rock wherever it is too steep to hold anything, which around here
+    // is most of it: this coast is drowned karst and the bottom is the same
+    // fluted limestone as the hill, only with nothing growing on it.
+    bed = mix(bed, limestone * 0.80, smoothstep(0.10, 0.40, slope) * 0.85);
+    // Boulders and outcrop. The bottom of a drowned karst coast is not a plain
+    // — it is the same broken limestone as the hill above it with the sand
+    // collected in the hollows between, and at swimming range the pale blocks
+    // standing out of the dark weed are most of what there is to look at.
+    float boul = ridge2(p * 0.145 + 27.3, 3) * 0.6 + ridge2(p * 0.52 + 61.0, 2) * 0.4;
+    float outcrop = smoothstep(0.46, 0.68, boul) * (1.0 - smoothstep(18.0, 30.0, wetD));
+    bed = mix(bed, limestone * (0.62 + 0.30 * fbm2(p * 0.9, 2)), outcrop * 0.80);
+    bed *= 0.80 + 0.40 * fbm2(p * 0.33 + 12.9, 3);
+    bed *= 0.84 + 0.32 * fbm2(p * 1.7 + 3.1, 2);
+    bed = mix(bed, weed * (0.70 + 0.6 * fbm2(p * 0.62, 3)),
+              rooted * (1.0 - outcrop) * 0.94);
+
+    base = mix(base, bed, smoothstep(0.0, 0.35, wetD));
+
+    // ── caustics ──────────────────────────────────────────────────────────
+    // The one thing everybody recognises, and it is not a texture: it is the
+    // sun refracted by the *surface*, so it belongs to world xz and to the
+    // swell that made it, not to the bottom it lands on. Two ridged layers
+    // drifting against each other at slightly different rates, sharpened hard,
+    // because a caustic is a caustic exactly where two wavefronts have folded
+    // and is nothing at all a centimetre either side.
+    float cw = uTime * 0.42;
+    float c1 = ridge2(p * 0.55 + vec2(cw, cw * 0.6), 2);
+    float c2 = ridge2(p * 0.81 - vec2(cw * 0.7, cw * 1.1) + 19.0, 2);
+    float caust = pow(max(c1 * c2, 0.0), 3.4) * 3.6;
+    // They only exist where the light does, they die out on a slope facing
+    // away from the sun, and they are strongest just under the surface.
+    caust *= (1.0 - smoothstep(1.0, 16.0, wetD)) * max(dot(n, uSunDir), 0.0);
+    base += vec3(0.75, 0.94, 0.86) * caust * 0.42 * smoothstep(0.0, 0.5, wetD);
+  }
+
   // ── fire ────────────────────────────────────────────────────────────────
   vec4 f = fireAt(vWorld.xz);
   float burning = f.r, scorch = 1.0 - f.g, wet = f.b;
@@ -211,7 +300,11 @@ void main(){
   col += vec3(1.0, 0.34, 0.08) * burning * 0.55;
 
   float dist = length(vWorld - uCamPos);
+  // Haze first, then the water: air is what the light crossed before it got to
+  // the surface, water is what it crossed after. Doing them in the other order
+  // would put a Mediterranean horizon-white over a seabed ten metres down.
   col = applyHaze(col, dist, vWorld, uSunDir, viewDir);
+  col = applyWater(col, dist, vWorld);
 
   gl_FragColor = vec4(col, 1.0);
 }
@@ -221,6 +314,7 @@ function buildTerrain(scene) {
   const size = CONFIG.world / TERRAIN.tiles;
   const uniforms = {
     ...shareLight(), ...shareHaze(), ...shareTerrain(), ...shareShadow(),
+    ...shareWater(),
     uCover: U.uCover,
     uCamPos: U.uCamPos,
     uSkirt: { value: TERRAIN.skirt },

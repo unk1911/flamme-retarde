@@ -180,6 +180,7 @@ ${GLSL_NOISE}
 ${GLSL_TERRAIN}
 ${GLSL_SKY}
 ${GLSL_HAZE}
+${GLSL_WATER}
 ${GLSL_SHADOW}
 
 void main(){
@@ -207,7 +208,14 @@ void main(){
 
   col += base * uEmissive;
 
-  col = applyHaze(col, length(vWorld - uCamPos), vWorld, uSunDir, viewDir);
+  float dist = length(vWorld - uCamPos);
+  col = applyHaze(col, dist, vWorld, uSunDir, viewDir);
+  // And the water, for whatever part of that distance was under it. Every
+  // solid thing in the game goes through here, so this is one line for the
+  // fish, a ditched aircraft, a swimmer's own hands and anything else that
+  // ever ends up below the surface — and it is free above it, where
+  // waterPath() returns zero on the first comparison it makes.
+  col = applyWater(col, dist, vWorld);
   gl_FragColor = vec4(col, alpha);
 }
 `;
@@ -225,6 +233,7 @@ function solidMaterial(color, opts = {}) {
     ...(opts.defines ? { defines: opts.defines } : {}),
     uniforms: {
       ...shareLight(), ...shareHaze(), ...shareTerrain(), ...shareShadow(),
+      ...shareWater(),
       uCamPos: U.uCamPos,
       uBase: { value: new THREE.Color(color) },
       uSpecPower: { value: opts.specPower ?? 42 },

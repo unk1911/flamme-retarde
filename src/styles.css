@@ -1139,11 +1139,17 @@ html.touch .row input[type=range] { height: 22px; }
 
 
 /* ─────────────────────────────────────────────────────────── in the water ── */
-/* The wash. Everything the eye is told about being under water that is not
-   geometry is here: it goes green rather than blue because a metre of the
-   Adriatic over a white bed is green, it closes in with depth, and it never
-   goes fully opaque — you can always see the surface above you, which is the
-   whole reason it is not frightening. */
+/* The mask, and only the mask.
+   This used to be the entire underwater world: a radial gradient at eighty per
+   cent opacity, doing every job at once because there was nothing behind it to
+   do them. There is now — the water column is real, the bottom is real, the
+   surface has a Snell's window in it — and the same gradient was sitting on top
+   of all of it like a sheet of green perspex.
+   What is left is what a gradient is actually good for and a shader is not:
+   the darkening at the edge of vision that comes from looking through a mask,
+   which belongs to your face and not to the sea, so it is right that it does
+   not move with your head. It stays weak in the middle at every depth, because
+   the middle is where the world is. */
 #under {
   position: fixed;
   inset: 0;
@@ -1152,10 +1158,10 @@ html.touch .row input[type=range] { height: 22px; }
   opacity: 0;
   transition: opacity .18s linear;
   background:
-    radial-gradient(150% 120% at 50% 40%,
-      rgba(52, 148, 148, .58) 0%,
-      rgba(20, 96, 112, .82) 52%,
-      rgba(5, 34, 52, .97) 100%);
+    radial-gradient(135% 110% at 50% 44%,
+      rgba(30, 122, 128, 0) 0%,
+      rgba(14, 80, 96, .26) 58%,
+      rgba(3, 26, 44, .78) 100%);
 }
 #under.on { opacity: 1; }
 

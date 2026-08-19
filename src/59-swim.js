@@ -70,11 +70,38 @@ const SWIM = {
   strokeRoll: 0.045,
 };
 
-// The four waves of SEA_VERT's `gerstner`, on the CPU and to the same numbers.
-// Height only: the lattice is displaced in y alone, so a second copy of the
-// horizontal terms would be a second copy of nothing.
-const SWIM_LEN = [46.0, 23.0, 13.0, 7.5];
-const SWIM_AMP = [1.0, 0.55, 0.30, 0.16];
+// SEA_VERT's `gerstner`, on the CPU and to the same numbers — which is now a
+// harder promise to keep than it was, and worth keeping.
+//
+// It used to be four sines and height only, because the lattice was displaced
+// in y alone: ask for the height at (x, z) and you got it. The surface is a
+// real Gerstner sum now, so the vertex that ends up over (x, z) started
+// somewhere else, and "the height at (x, z)" is the solution of an equation
+// rather than a sum. Two fixed-point steps solve it to well inside a
+// centimetre at these steepnesses — walk back along the horizontal
+// displacement, sample again, repeat — and a centimetre is a tenth of what the
+// eye sits above the waterline, so nobody is going to ride the wrong sea.
+const SWIM_LEN = [78.0, 46.0, 27.0, 15.0, 8.5, 4.6];
+const SWIM_AMP = [0.78, 1.0, 0.60, 0.34, 0.19, 0.105];
+const SWIM_Q = [0.35, 0.55, 0.72, 0.85, 0.90, 0.90];
+const SWIM_SPREAD = [0.10, 0.0, 0.42, -0.58, 0.86, null];
+
+/** The six directions, rebuilt from the wind. Shared by both passes below. */
+function seaDirs() {
+  const w = U.uWind.value;
+  const L = Math.hypot(w.x, w.y) || 1;
+  const wx = w.x / L, wy = w.y / L;
+  const px = -wy, py = wx;                       // the across-wind unit
+  const out = [];
+  for (let i = 0; i < 6; i++) {
+    let dx, dy;
+    if (SWIM_SPREAD[i] === null) { dx = px + wx * 0.25; dy = py + wy * 0.25; }
+    else { dx = wx + px * SWIM_SPREAD[i]; dy = wy + py * SWIM_SPREAD[i]; }
+    const l = Math.hypot(dx, dy) || 1;
+    out.push([dx / l, dy / l]);
+  }
+  return out;
+}
 
 /**
  * The sea surface at a world point, in metres about zero.
@@ -82,29 +109,36 @@ const SWIM_AMP = [1.0, 0.55, 0.30, 0.16];
  * Called two or three times a frame — once for where your head is, once for
  * where you are about to put it — so it re-derives the wind basis every call
  * rather than caching a state that would then have to be invalidated when the
- * gust changes. Four sines is not worth a cache.
+ * gust changes. Eighteen sines is not worth a cache either.
  */
 function seaHeightAt(x, z) {
-  const w = U.uWind.value;
-  const L = Math.hypot(w.x, w.y) || 1;
-  const wx = w.x / L, wy = w.y / L;
-  const px = -wy, py = wx;                       // the across-wind unit
-  const dirs = [
-    [wx, wy],
-    [wx + px * 0.42, wy + py * 0.42],
-    [wx - px * 0.55, wy - py * 0.55],
-    [px + wx * 0.25, py + wy * 0.25],
-  ];
+  const dirs = seaDirs();
   const amp = 0.34 * SEA.waveScale * (0.45 + 0.055 * U.uWindSpeed.value);
   const t = U.uTime.value;
+  // Invert the horizontal map: find the undisplaced point whose displacement
+  // lands on (x, z), then take that point's height.
+  let ux = x, uz = z;
+  for (let it = 0; it < 2; it++) {
+    let dx = 0, dz = 0;
+    for (let i = 0; i < 6; i++) {
+      const d = dirs[i];
+      const k = (Math.PI * 2) / SWIM_LEN[i];
+      const c = Math.sqrt(9.81 / k);
+      const a = amp * SWIM_AMP[i];
+      const q = Math.min(SWIM_Q[i], 0.92 / Math.max(k * a, 1e-4));
+      const cs = Math.cos((d[0] * ux + d[1] * uz) * k + t * c * k * 0.42);
+      dx += d[0] * q * a * cs;
+      dz += d[1] * q * a * cs;
+    }
+    ux = x - dx; uz = z - dz;
+  }
   let h = 0;
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 6; i++) {
     const d = dirs[i];
-    const dl = Math.hypot(d[0], d[1]) || 1;
     const k = (Math.PI * 2) / SWIM_LEN[i];
     const c = Math.sqrt(9.81 / k);
     const a = amp * SWIM_AMP[i];
-    h += a * Math.sin(((d[0] / dl) * x + (d[1] / dl) * z) * k + t * c * k * 0.42);
+    h += a * Math.sin((d[0] * ux + d[1] * uz) * k + t * c * k * 0.42);
   }
   return h;
 }
