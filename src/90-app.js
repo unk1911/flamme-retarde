@@ -539,7 +539,7 @@ function updateCamera(dt) {
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
   trees, landmarks, alerts, roads, rail, props, airfield, jadrija, ground, birds, eject,
-  mirror, mirrorP, swim, under, you;
+  mirror, mirrorP, swim, under, arms, kites, you;
 /** You plus the three wingmen, as the birds see them. Built once, in boot(). */
 let birdFlush = [];
 
@@ -756,6 +756,8 @@ async function boot() {
   flight = buildFlight(plane, fire);
   eject = buildEject(scene, flight, chuteDown);
   swim = buildSwim(sea);
+  arms = buildArms();
+  kites = buildKites(scene, jadrija);
 
   await step(92, 'load.brief');
   wingmen = buildWingmen(scene, fire, (who, text) => radio(who, text));
@@ -1579,9 +1581,11 @@ function paintSwimHud() {
   fill.style.width = (b * 100).toFixed(0) + '%';
   fill.classList.toggle('low', b < 0.34);
   $('sw-breath').hidden = !swim.submerged && b > 0.995;
+  const wade = swim.canWade();
   $('sw-hint').innerHTML = swim.spent ? T('swim.spent')
-    : swim.canWade() ? T('swim.wade')
-      : T('swim.hint');
+    : wade ? TK('swim.wade', 'swim.wadeTouch')
+      : TK('swim.hint', 'swim.hintTouch');
+  if (IS_TOUCH) paintSwimTouch(wade);
   // Nothing below the waterline until your eyes are actually under it, and then
   // it closes in slowly and never far: this is the mask now, not the sea. The
   // sea is drawn.
@@ -1615,7 +1619,7 @@ function wadeAshore() {
   $('under').hidden = true;
   $('swim-hud').hidden = true;
   $('ground-hud').hidden = false;
-  if (IS_TOUCH) { $('gtouch').hidden = false; }
+  if (IS_TOUCH) { $('stouch').hidden = true; $('gtouch').hidden = false; }
   if (!IS_TOUCH && !pointerLocked) grabPointer();
   if (audio) audio.boots();
   paintDeviceText();
@@ -1640,7 +1644,7 @@ function waadeIn(x, z) {
   $('hud').hidden = true;
   $('chute-hud').hidden = true;
   $('swim-hud').hidden = false;
-  if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = false; }
+  if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = true; $('stouch').hidden = false; }
   if (!IS_TOUCH && !pointerLocked) grabPointer();
   if (audio) audio.plunge();
   wasUnder = false;
@@ -1705,7 +1709,8 @@ function chuteDown(kind) {
     $('hud').hidden = true;
     $('ground-hud').hidden = true;
     $('swim-hud').hidden = false;
-    if (IS_TOUCH) { $('ctouch').hidden = true; $('touch').hidden = true; $('gtouch').hidden = false; }
+    if (IS_TOUCH) { $('ctouch').hidden = true; $('touch').hidden = true;
+      $('gtouch').hidden = true; $('stouch').hidden = false; }
     if (!IS_TOUCH && !pointerLocked) grabPointer();
     if (audio) audio.plunge(1);
     wasUnder = true;
@@ -2097,6 +2102,7 @@ function showEnd(won, crashed = false, onWater = false, chute = null) {
   $('touch').hidden = true;
   $('gtouch').hidden = true;
   $('ctouch').hidden = true;
+  $('stouch').hidden = true;
   $('ground-hud').hidden = true;
   $('chute-hud').hidden = true;
   document.exitPointerLock?.();
@@ -2418,14 +2424,17 @@ function frame() {
     // The aeroplane is still going in somewhere behind you, and you are still
     // the only person watching it. Same as under the canopy.
     if (eject.active) flyDerelict(dt);
+    // Keys and thumbs, added rather than switched between, exactly as the
+    // other three modes do it: a touchscreen laptop with a keyboard plugged
+    // into it is a real machine and neither half of it should win.
     swim.update(dt, {
       fwd: (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0)
-        - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0) + TOUCH.gy,
+        - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0) + TOUCH.sy,
       side: (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0)
-        - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0) + TOUCH.gx,
-      sprint: keys.has('ShiftLeft') || keys.has('ShiftRight'),
-      down: keys.has('KeyC') || keys.has('ControlLeft'),
-      up: keys.has('Space'),
+        - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0) + TOUCH.sx,
+      sprint: keys.has('ShiftLeft') || keys.has('ShiftRight') || TOUCH.sfast,
+      down: keys.has('KeyC') || keys.has('ControlLeft') || TOUCH.sdown,
+      up: keys.has('Space') || TOUCH.sup,
     });
     // Under and out from under. Both are events and neither is a state: the
     // sound belongs to the moment the ears change what they are in, which is
@@ -2505,6 +2514,16 @@ function frame() {
     ? Math.max(0, swim.surfaceAt(camera.position.x, camera.position.z)
       - camera.position.y)
     : Math.max(0, -camera.position.y);
+  // After the camera is posed and before anything reads its matrix: the arms
+  // hang off it, minus the roll. See src/60-arms.js.
+  //
+  // Gated on `swim.active` rather than on `state.phase`, which is the same
+  // question asked of the object that owns the answer: the swim model sets it
+  // when you enter the water and clears it when you leave, and there is nothing
+  // for the phase to disagree with it about.
+  if (arms) arms.update(dt, swim, camera);
+  // Somebody else's afternoon, in the same wind as the fire. 46-kite.js.
+  if (kites) kites.update(dt, camera);
 
   camera.updateMatrixWorld();
   _pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
@@ -2791,6 +2810,9 @@ function frame() {
   if (mirror) mirror.update(renderer, scene, camera);
   if (mirrorP) mirrorP.update(renderer, scene, camera);
   renderer.render(scene, camera);
+  // And your own arms over the top of it, on a near plane the world cannot
+  // afford. See src/60-arms.js.
+  if (arms) arms.render(renderer);
   const now = performance.now();
   if (lastFrameMs) state.fps = damp(state.fps, 1000 / Math.max(1, now - lastFrameMs), 2, dt);
   lastFrameMs = now;
@@ -2921,6 +2943,8 @@ window.__fr = {
     ground: ground ? ground.stats() : null,
     swim: swim && swim.active ? swim.stats() : null,
     under: under ? under.stats() : null,
+    arms: arms ? arms.stats() : null,
+    kites: kites ? kites.stats() : null,
     props: props ? props.counts : null,
     birds: birds ? birds.stats() : null,
     water: Math.round(flight ? flight.p.water : 0),
@@ -3163,6 +3187,8 @@ window.__fr = {
       $('hud').hidden = true;
       $('ground-hud').hidden = true;
       $('swim-hud').hidden = false;
+      if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = true;
+        $('ctouch').hidden = true; $('stouch').hidden = false; }
       paintSwimHud();
       return swim.stats();
     },
@@ -3374,6 +3400,8 @@ window.__fr = {
     return { t: state.t, burning: fire.burningCount(), burntHa: Math.round(fire.burntArea()),
       aiLitres: Math.round(wingmen.litres()), wingmen: wingmen.debug() };
   },
+  arms: () => arms,
+  kites: () => kites,
   fire: () => fire,
   flight: () => flight,
   airfield: () => airfield,

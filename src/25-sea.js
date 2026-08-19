@@ -256,7 +256,27 @@ void main(){
   float f2 = 1.0 / max(1.4, fw * 4.2);
   // Once a pixel genuinely covers many waves there is no detail left to show;
   // fade the perturbation out rather than letting it turn into noise.
-  float det = 1.0 - smoothstep(3.0, 30.0, fw);
+  //
+  // Thirty metres was far too generous, and this one fade is the whole of the
+  // sea's static. Measured on the same frame, blanking the detail normal took
+  // the high-frequency energy over open water from 25 to 6; nothing else in
+  // this shader moved it by more than a point. The ripples were the static.
+  //
+  // The reason is that their period is pinned to the *screen* — ten pixels,
+  // whatever the distance — so they never shrink and never band-limit; they
+  // are a fixed layer of grain over the picture that reshuffles whenever the
+  // camera moves. Close in that grain is the surface and it is exactly right.
+  // Far out it is the surface of nothing, and it was still at full strength a
+  // kilometre away. Tried and rejected: fewer octaves (worse — the central
+  // difference of a smoother field is larger), a longer period (worse — fewer
+  // ripples per pixel is not the problem), a real world-scale wavelength that
+  // fades per octave (worse — a 3.2 m ripple is four pixels across at a
+  // hundred metres, which is the same trap one step further out), and an
+  // analytic footprint instead of fwidth (worse, and fwidth was never at
+  // fault). What works is to stop drawing them sooner: 25 to 11.5, with the
+  // view from the waterline unchanged to two decimal places, which is the
+  // trade this wants — the ripples matter where you can see one.
+  float det = 1.0 - smoothstep(0.18, 1.6, fw);
   vec2 p1 = vWorld.xz * f1 + w * uTime * 1.1;
   vec2 p2 = vWorld.xz * f2 - w * uTime * 0.7;
   float e = 0.55;
@@ -274,8 +294,32 @@ void main(){
   // into banding all the way to the horizon.
   float far = smoothstep(1.2, 18.0, fw);
   n = normalize(mix(n, vec3(0.0, 1.0, 0.0), far * 0.88));
+  // And the twelve per cent that fade leaves behind is not nothing, because
+  // what is left is not a *small* wobble — it is the full swing of the wave
+  // normal, sampled at random, at twelve per cent weight. Measure how much the
+  // normal is actually moving inside this pixel and take the rest of it out.
+  // dFdx of the normal is the only honest answer to "what is this pixel
+  // hiding"; the footprint above is a guess at it from the geometry.
+  vec3 dnx = dFdx(n), dny = dFdy(n);
+  float varN = 0.15915494 * (dot(dnx, dnx) + dot(dny, dny));
+  n = normalize(mix(n, vec3(0.0, 1.0, 0.0), clamp(varN * 5.0, 0.0, 0.85)));
 
   // ── depth ───────────────────────────────────────────────────────────────
+  // The height map is a linear-filtered texture with no mip chain, and at a
+  // grazing angle a pixel's footprint is hundreds of metres of sea floor. So
+  // this read is not the depth under this pixel — it is one arbitrary sample
+  // out of everything under it, and the pixel next door gets a different one.
+  // That is the blue-and-cyan static the sea has had at low altitude all
+  // along, and it was never the sun glitter: it is the shallow-to-deep ramp
+  // being driven by a coin toss.
+  //
+  // There is no mip chain to reach for and building one for a height field
+  // that the terrain shader wants unfiltered would be the wrong trade. So stop
+  // claiming to know: once a pixel covers more sea than the shelf is wide, the
+  // honest answer is "open water", it is the same answer for every pixel out
+  // there, and a sea that is uniformly deep at two kilometres is what a sea
+  // looks like at two kilometres.
+  float unknown = smoothstep(4.0, 30.0, fw);
   float bed = heightAt(vWorld.xz);
   float depth = max(0.0, -bed);
   vec4 cv = texture2D(uCover, worldToUv(vWorld.xz));
@@ -288,9 +332,10 @@ void main(){
   float t1 = smoothstep(0.0, 6.5, depth);
   float t2 = smoothstep(4.0, 26.0, depth);
   vec3 body = mix(mix(shallow, mid, t1), deep, t2);
+  body = mix(body, deep, unknown);
 
   // The bottom shows through in the shallows, lit by caustics.
-  float seeBed = 1.0 - smoothstep(0.0, 9.0, depth);
+  float seeBed = (1.0 - smoothstep(0.0, 9.0, depth)) * (1.0 - unknown);
   float caust = fbm2(vWorld.xz * 0.42 + vec2(sin(uTime * 0.5), cos(uTime * 0.42)) * 0.8, 3);
   caust = pow(max(caust, 0.0), 2.2);
   body += vec3(0.55, 0.72, 0.62) * caust * seeBed * 0.34;
@@ -309,15 +354,45 @@ void main(){
   // ── sun glitter ─────────────────────────────────────────────────────────
   // Wide and dirty rather than a clean highlight: at this scale each glint is
   // thousands of facets, so the lobe has to be broad or it strobes.
+  //
+  // Broad is not enough on its own, and that is what was wrong with the sun
+  // path at low altitude. A pixel out there covers several lattice cells, so
+  // the normal that arrives in here is one *sample* of a normal that is
+  // swinging through tens of degrees inside that single pixel — and a narrow
+  // lobe fed a randomly sampled normal is the definition of a strobe. Moving
+  // the camera a centimetre resamples it and every glint jumps somewhere else.
+  //
+  // The fade above guesses at that from the footprint, and the footprint is
+  // the wrong question. What matters is not how much sea a pixel covers but
+  // how much the normal *varies* across what it covers, and the hardware will
+  // answer that for two instructions: the screen-space derivative of the
+  // normal is precisely the part of the surface this pixel is hiding. Turn it
+  // into extra roughness and widen the lobe by it — Kaplanyan's specular
+  // antialiasing, written in the Blinn-Phong exponent this shader happens to
+  // use — and the highlight resolves into what it should have been all along,
+  // a bright band that stays put while you fly along it.
+  //
+  // Then renormalise. A lobe that got twenty times wider without getting
+  // dimmer is twenty times the light, which is how a glitter fix usually ends
+  // up as a white smear on the horizon rather than a strobing one. The
+  // Blinn-Phong normalisation is (n+2)/8π, so the ratio of the two exponents
+  // is the whole correction and it costs a divide.
   vec3 hv = normalize(uSunDir - viewDir);
   float sharp = mix(220.0, 26.0, far);
-  float spec = pow(max(dot(n, hv), 0.0), sharp);
-  float broad = pow(max(dot(n, hv), 0.0), 18.0);
+  float lobe = 2.0 / (sharp + 2.0);                  // the exponent, as a width
+  float wide = min(1.0, lobe + min(2.0 * varN, 0.25));
+  float sharpAA = max(2.0 / wide - 2.0, 1.0);
+  float ndh = max(dot(n, hv), 0.0);
+  float spec = pow(ndh, sharpAA) * ((sharpAA + 2.0) / (sharp + 2.0));
+  float broad = pow(ndh, 18.0);
   col += uSunColor * uSunI * (spec * 2.4 * (1.0 - far * 0.55) + broad * 0.22);
 
   // ── foam ────────────────────────────────────────────────────────────────
   // Crest foam where the wave is steep, and a band along every shoreline.
-  float shoreT = 1.0 - smoothstep(0.0, 0.030, cv.a);
+  // Same coin toss, on a texture that is sampled *nearest*: the shore band has
+  // to go out with the depth or it draws surf a kilometre offshore, one pixel
+  // at a time.
+  float shoreT = (1.0 - smoothstep(0.0, 0.030, cv.a)) * (1.0 - unknown);
   float surf = smoothstep(0.35, 0.9, shoreT)
              * (0.55 + 0.45 * sin(vWorld.x * 0.16 + vWorld.z * 0.13 - uTime * 1.7));
   // Whitecap where the surface is folding, which is a threshold on a number

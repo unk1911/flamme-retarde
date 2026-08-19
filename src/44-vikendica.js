@@ -623,6 +623,35 @@ async function buildVikendica(scene, field) {
       // worse than either kind of fence.
       push({ x0: D.x0, x1: D.x1 - 1.16 - 0.26, z0: 1.14, z1: 1.26 }, lvl),
     ];
+    // And the open side of the ladder-stair itself, which the note above got
+    // wrong. "There is no drop to fence off alongside the stair" is true of its
+    // east side, where the wall is. Its west side is open into the room, and
+    // one sideways step off it puts you through a flight of stairs: measured at
+    // x = 2.18, two treads up, the floor under you goes from 5.57 to 5.01
+    // without a sound and you carry on walking across the living room. It is
+    // the same fall the terrace had before it got its railing, in a place
+    // nobody thinks to test because you climb a stair by walking *up* it.
+    //
+    // Not one box, because the flight rises 2.55 m in 2.24 and a full-height
+    // fence along it would also be a fence along the living room floor beside
+    // it. A real stair is only in your way where it is low enough to be: four
+    // segments, each banded to the treads it stands beside, so the bottom step
+    // stops you and the top of the flight is something you walk under. That is
+    // the stringer and the balustrade, which is what is drawn there.
+    {
+      const R = VIK.loftStair;
+      const seg = 4;
+      const run = (R.z1 - R.z0) / seg;
+      const rise = VIK.deck - VIK.floor;
+      for (let i = 0; i < seg; i++) {
+        const zHi = R.z1 - i * run;              // the low end: nearest the room
+        const zLo = R.z1 - (i + 1) * run;        // the high end: nearest the deck
+        const hLo = base + VIK.floor + rise * (R.z1 - zHi) / (R.z1 - R.z0);
+        const hHi = base + VIK.floor + rise * (R.z1 - zLo) / (R.z1 - R.z0);
+        loftOnly.push(push({ x0: R.x0 - 0.12, x1: R.x0, z0: zLo, z1: zHi },
+          { off: true, y0: hLo - 0.45, y1: hHi + 0.45 }));
+      }
+    }
     return out;
   }
 

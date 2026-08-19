@@ -431,8 +431,98 @@ function initTouch() {
     if (cLookId !== null) endChute({ pointerId: cLookId });
   });
 
-  tap('t-cset', () => togglePanel());
-  tap('t-cpause', () => togglePause());
+  // ── in the water ──────────────────────────────────────────────────────────
+  // The third and last of these, and the one that had to exist: bailing out
+  // over the channel is one tap on a phone, and what a thumb arrived to was a
+  // sea it could look at and not move in. The walk stick is gated on `ground`,
+  // so in `swim` there was no stick, no head, and nothing on screen except a
+  // set of buttons for walking that all did nothing. Floating, breathing,
+  // watching the shore stay exactly where it was.
+  //
+  // Left thumb swims, right half is the head — the same two halves as
+  // everywhere else. The difference is the third axis. On a keyboard C dives
+  // and Space rises; they are *held*, they are fighting a lifejacket that
+  // never stops pulling, and they are the only controls in the game whose
+  // whole job is to be sustained. So they are two big buttons where SCOOP and
+  // DROP live in the air, in reach of the same thumb, and not a second stick.
+
+  const swimPad = document.getElementById('swimpad');
+  const swimKnob = document.getElementById('swimknob');
+  let sId = null, sOx = 0, sOy = 0;
+  let sLookId = null, sLookX = 0, sLookY = 0;
+
+  function swimTo(dx, dy) {
+    const r = padRadius;
+    let x = clamp(dx / r, -1, 1);
+    let y = clamp(-dy / r, -1, 1);
+    if (Math.hypot(x, y) < 0.12) { x = 0; y = 0; }
+    TOUCH.sx = x; TOUCH.sy = y;
+    swimKnob.style.transform = `translate(${x * r * 0.6}px, ${-y * r * 0.6}px)`;
+  }
+
+  addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;
+    if (state.phase !== 'swim' || isControl(e.target)) return;
+    e.preventDefault();
+    if (e.clientX < innerWidth * 0.46 && sId === null) {
+      sId = e.pointerId;
+      sOx = e.clientX; sOy = e.clientY;
+      swimPad.style.left = `${sOx}px`;
+      swimPad.style.top = `${sOy}px`;
+      swimPad.classList.add('on');
+      capture(e.pointerId);
+      swimTo(0, 0);
+    } else if (sLookId === null) {
+      sLookId = e.pointerId;
+      sLookX = e.clientX; sLookY = e.clientY;
+      capture(e.pointerId);
+    }
+  }, { passive: false });
+
+  addEventListener('pointermove', (e) => {
+    if (e.pointerId === sId) {
+      e.preventDefault();
+      swimTo(e.clientX - sOx, e.clientY - sOy);
+    } else if (e.pointerId === sLookId) {
+      e.preventDefault();
+      // Slower than on foot, because `swim.look` is already slower than
+      // `ground.look` for its own reason — you are looking through a mask at a
+      // body that is lying down — and a thumb should feel that difference
+      // rather than have it cancelled out by a bigger gain.
+      if (swim) swim.look((e.clientX - sLookX) * 0.0050, (e.clientY - sLookY) * 0.0050);
+      sLookX = e.clientX; sLookY = e.clientY;
+    }
+  }, { passive: false });
+
+  const endSwim = (e) => {
+    if (e.pointerId === sId) {
+      sId = null;
+      TOUCH.sx = TOUCH.sy = 0;
+      swimPad.classList.remove('on');
+      swimKnob.style.transform = '';
+    } else if (e.pointerId === sLookId) {
+      sLookId = null;
+    }
+  };
+  addEventListener('pointerup', endSwim);
+  addEventListener('pointercancel', endSwim);
+  addEventListener('blur', () => {
+    if (sId !== null) endSwim({ pointerId: sId });
+    if (sLookId !== null) endSwim({ pointerId: sLookId });
+  });
+
+  hold('t-dive', (v) => { TOUCH.sdown = v; });
+  hold('t-rise', (v) => { TOUCH.sup = v; });
+  // Latched, unlike the two above and like RUN on foot: a sprint in the water
+  // is a thing you *are* doing for twenty seconds, and a thumb that has to
+  // stay on it is a thumb that is not on the stick.
+  tap('t-fast', (el) => {
+    TOUCH.sfast = !TOUCH.sfast;
+    el.classList.toggle('on', TOUCH.sfast);
+  });
+  tap('t-ashore', () => wadeAshore());
+  tap('t-sset', () => togglePanel());
+  tap('t-spause', () => togglePause());
 
   measure();
 }
@@ -455,6 +545,18 @@ function paintTouchHUD() {
   document.getElementById('t-drop').classList.toggle('armed',
     p.water > 200 && state.altAgl > 3);
   document.getElementById('t-ap').classList.toggle('on', p.autopilot);
+}
+
+/**
+ * And the one button in the water that is not always available.
+ *
+ * Called from `paintSwimHud`, which already knows the answer — `canWade` is
+ * what the hint line is written off. ASHORE stays dim until there is a bottom
+ * under your own feet, because a button that is always lit and only sometimes
+ * does anything teaches a thumb nothing.
+ */
+function paintSwimTouch(wade) {
+  document.getElementById('t-ashore').classList.toggle('armed', !!wade);
 }
 
 initTouch();

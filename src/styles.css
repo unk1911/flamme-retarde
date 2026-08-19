@@ -373,6 +373,10 @@ button {
 /* On a phone the bottom left corner belongs to the buttons, so the pack sits
    above them rather than underneath them. */
 html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
+/* The button row in the water lives where the swim hint was, so the hint goes
+   up above it. Same arrangement the ground HUD already makes for its pack
+   gauge, one line higher because the breath bar is two lines and not one. */
+html.touch #swim-hud { bottom: 7.4rem; }
 #gh-pack .gh-track {
   height: 8px; background: rgba(255, 255, 255, .10);
   border: 1px solid rgba(255, 255, 255, .16); border-radius: 2px; overflow: hidden;
@@ -759,14 +763,14 @@ html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
 
 /* ─────────────────────────────────────────────────── touch flight controls ── */
 
-#touch, #gtouch, #ctouch {
+#touch, #gtouch, #ctouch, #stouch {
   position: fixed; inset: 0; z-index: 45; pointer-events: none;
   font-family: var(--mono); touch-action: none;
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
            env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
-#touch[hidden], #gtouch[hidden], #ctouch[hidden] { display: none; }
-#touch button, #gtouch button, #ctouch button {
+#touch[hidden], #gtouch[hidden], #ctouch[hidden], #stouch[hidden] { display: none; }
+#touch button, #gtouch button, #ctouch button, #stouch button {
   pointer-events: auto; touch-action: none;
   -webkit-tap-highlight-color: transparent;
   font-family: var(--mono); letter-spacing: .16em; text-transform: uppercase;
@@ -776,12 +780,13 @@ html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
   transition: background .1s linear, color .1s linear, border-color .1s linear,
               transform .1s ease;
 }
-#touch button.on, #gtouch button.on, #ctouch button.on { transform: scale(.94); }
+#touch button.on, #gtouch button.on, #ctouch button.on,
+#stouch button.on { transform: scale(.94); }
 
 /* The floating stick. It has no home of its own — it appears centred on
    wherever the thumb landed, which is the only arrangement that works when
    you cannot see your own hand. */
-#flypad, #walkpad, #chutepad {
+#flypad, #walkpad, #chutepad, #swimpad {
   --pad: min(25vmin, 168px);
   position: absolute; left: 0; top: 0;
   width: var(--pad); height: var(--pad);
@@ -791,12 +796,12 @@ html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
     rgba(8, 16, 20, .12) 62%, rgba(8, 16, 20, 0) 100%);
   opacity: 0; transition: opacity .16s ease; pointer-events: none;
 }
-#flypad.on, #walkpad.on, #chutepad.on { opacity: 1; }
-#flypad::after, #walkpad::after, #chutepad::after {
+#flypad.on, #walkpad.on, #chutepad.on, #swimpad.on { opacity: 1; }
+#flypad::after, #walkpad::after, #chutepad::after, #swimpad::after {
   content: ''; position: absolute; inset: 38%;
   border: 1px solid var(--edge); border-radius: 50%; opacity: .5;
 }
-#flyknob, #walkknob, #chuteknob {
+#flyknob, #walkknob, #chuteknob, #swimknob {
   position: absolute; left: 50%; top: 50%;
   width: 30%; height: 30%; margin: -15% 0 0 -15%;
   border-radius: 50%; background: rgba(79, 210, 232, .30);
@@ -831,11 +836,11 @@ html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
   text-transform: uppercase; color: #6f8189;
 }
 
-#tbig, #gbig {
+#tbig, #gbig, #sbig {
   position: absolute; right: 3.6rem; bottom: .8rem;
   display: flex; gap: .6rem;
 }
-#tbig button, #gbig button {
+#tbig button, #gbig button, #sbig button {
   width: 4.6rem; height: 4.6rem; font-size: .58rem; padding: 0;
 }
 #t-scoop.on { background: rgba(79, 210, 232, .3); border-color: var(--sea); color: var(--sea); }
@@ -845,12 +850,13 @@ html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
 #t-drop.armed { border-color: var(--ember); color: var(--ember-hi); }
 #t-scoop.armed { border-color: var(--sea); color: var(--sea); }
 
-#tmini, #gmini, #cmini {
+#tmini, #gmini, #cmini, #smini {
   position: absolute; left: .8rem; bottom: .8rem;
   display: flex; gap: .45rem;
 }
-#tmini button, #gmini button, #cmini button { padding: .55rem .7rem; font-size: .52rem; }
-#tmini button.on, #gmini button.on, #cmini button.on {
+#tmini button, #gmini button, #cmini button,
+#smini button { padding: .55rem .7rem; font-size: .52rem; }
+#tmini button.on, #gmini button.on, #cmini button.on, #smini button.on {
                    background: rgba(255, 208, 138, .26); border-color: var(--ember-hi);
                    color: var(--ember-hi); }
 
@@ -867,6 +873,21 @@ html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
 #tdoor button.armed {
   opacity: 1; background: rgba(224, 65, 36, .28);
   border-color: var(--blood); color: #ffcdb8;
+}
+
+/* In the water. Cooler than the other three, because everything else on the
+   screen down here is: the wash is teal, the breath bar is teal, and an ember
+   button in the middle of it reads as a warning rather than a control.
+
+   ASHORE is dark until there is a bottom under you, and then it lights — the
+   same "armed" idea as the scoop, and for the same reason. A button that is
+   always available and only sometimes does something teaches nothing. */
+#t-dive.on { background: rgba(23, 96, 120, .42); border-color: var(--sea); color: var(--sea); }
+#t-rise.on { background: rgba(79, 210, 232, .28); border-color: var(--sea); color: #d6f6fc; }
+#t-ashore { opacity: .38; }
+#t-ashore.armed {
+  opacity: 1; background: rgba(224, 195, 138, .22);
+  border-color: var(--ember-hi); color: var(--ember-hi);
 }
 
 /* ───────────────────────────────────────────────────── the language picker ── */
@@ -1178,6 +1199,12 @@ html.touch .row input[type=range] { height: 22px; }
   pointer-events: none;
   text-shadow: 0 1px 3px rgba(0, 0, 0, .75);
 }
+/* `display: flex` beats the user agent's `[hidden] { display: none }`, so
+   without this line the breath bar and the depth readout sat over the middle
+   of the screen for the whole game — in the air, on the runway, in the house.
+   Everything else that hides itself in this file already carries the pair;
+   this one was written and never turned off. */
+#swim-hud[hidden] { display: none; }
 #sw-breath { display: flex; align-items: center; gap: .6em; }
 #sw-breath small { letter-spacing: .18em; text-transform: uppercase; opacity: .8; }
 .sw-track {

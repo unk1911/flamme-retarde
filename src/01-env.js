@@ -35,8 +35,11 @@ if (IS_TOUCH) document.documentElement.classList.add('touch');
 // `g*` are the ground mode's: a walk vector, a run latch and the branch.
 // `c*` are the canopy's: one stick, where x hauls a riser and y is the front
 // risers forward and the brakes back.
+// `s*` are the water's, and they are the ground's plus a third axis, because
+// in the sea up and down are controls you *hold* rather than a jump you press.
 const TOUCH = {
   scoop: false, drop: false, level: false,
   gx: 0, gy: 0, grun: false, gjet: false, glook: false,
   cx: 0, cy: 0,
+  sx: 0, sy: 0, sfast: false, sdown: false, sup: false,
 };
