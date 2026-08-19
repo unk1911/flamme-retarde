@@ -322,21 +322,50 @@ const FISH = {
 };
 
 /**
- * One fish, nose down the +x axis, one unit long, painted with the
- * countershading that every open-water fish in the world has: dark over,
- * silver on the flank, white under. It is the whole of why a fish is hard to
- * see from above and hard to see from below, and it is also the only reason a
- * two-hundred-triangle lozenge reads as a fish at all.
+ * One fish, nose down the +x axis, one unit long.
+ *
+ * The old one was a nine-station lathe with a two-triangle tail and a single
+ * triangle for a dorsal, and it was honestly reasoned: a fish at ten metres in
+ * green water is a silhouette, and a silhouette wants a fork and a fin and
+ * nothing else. What that reasoning missed is that a swimmer does not stay ten
+ * metres away. Shoals hold station and you drift into them, and at two metres
+ * a lozenge with a fork on it is a lozenge with a fork on it — no eye, no
+ * gill, no pectoral, and an eye is the first thing a person looks for on any
+ * animal at all.
+ *
+ * So: fourteen stations round eighteen sides, a head with a snout and a
+ * peduncle behind it, both eyes, the gill cover, a dorsal and an anal fin,
+ * paired pectorals and pelvics, and a properly forked caudal with a notch in
+ * it. About seven hundred triangles, drawn once and instanced a hundred and
+ * eight times, which is one draw call either way.
+ *
+ * The paint is countershading — dark over, silver on the flank, white under —
+ * which every open-water fish in the world has and which is the whole of why
+ * one is hard to see from above and hard to see from below. On top of that go
+ * the stripes: this is *Sarpa salpa*, the salpa, the fish that grazes the
+ * meadow this bottom is made of, and it carries ten or eleven thin gold lines
+ * the length of its flank. They are the reason you can name it from a boat.
  */
 function fishGeometry() {
-  const rings = [];
-  // x from nose to the wrist of the tail, as (station, half-height, half-width)
+  // [station x, half-height, half-width]
   const prof = [
-    [-0.50, 0.010, 0.008], [-0.42, 0.055, 0.030], [-0.30, 0.098, 0.048],
-    [-0.14, 0.118, 0.056], [0.02, 0.112, 0.052], [0.18, 0.092, 0.041],
-    [0.32, 0.062, 0.026], [0.40, 0.034, 0.013], [0.44, 0.020, 0.007],
+    [-0.500, 0.014, 0.010],   // snout
+    [-0.472, 0.048, 0.031],
+    [-0.432, 0.072, 0.045],
+    [-0.372, 0.096, 0.055],   // behind the eye
+    [-0.300, 0.111, 0.060],   // the gill cover, and the deepest part of the head
+    [-0.196, 0.122, 0.062],
+    [-0.078, 0.123, 0.059],
+    [0.042, 0.113, 0.052],
+    [0.152, 0.097, 0.043],
+    [0.250, 0.076, 0.033],
+    [0.330, 0.056, 0.023],
+    [0.390, 0.038, 0.015],
+    [0.432, 0.026, 0.0098],   // the caudal peduncle, which is a wrist
+    [0.458, 0.019, 0.0068],
   ];
-  const seg = 8;
+  const seg = 18;
+  const rings = [];
   for (const [x, hy, hz] of prof) {
     const ring = [];
     for (let i = 0; i < seg; i++) {
@@ -347,49 +376,154 @@ function fishGeometry() {
   }
   const body = loft(rings, { closed: true, caps: false });
 
-  // The tail, which is a flat fork and not a tube: two triangles either side of
-  // the wrist, and the fork is what the eye actually recognises at ten metres.
-  const tail = new THREE.BufferGeometry();
-  const tv = new Float32Array([
-    0.44, 0.0, 0.0, 0.62, 0.150, 0.0, 0.56, 0.0, 0.0,
-    0.44, 0.0, 0.0, 0.56, 0.0, 0.0, 0.62, -0.150, 0.0,
-  ]);
-  tail.setAttribute('position', new THREE.BufferAttribute(tv, 3));
-  tail.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2, 3, 4, 5]), 1));
-  tail.computeVertexNormals();
+  /** A fin: flat, because a fin is flat, and drawn from both sides anyway. */
+  const sheet = (pts, tri, cols) => {
+    const g = new THREE.BufferGeometry();
+    g.userData.cols = cols || null;
+    const v = new Float32Array(pts.length * 3);
+    pts.forEach((q, i) => { v[i * 3] = q[0]; v[i * 3 + 1] = q[1]; v[i * 3 + 2] = q[2] || 0; });
+    g.setAttribute('position', new THREE.BufferAttribute(v, 3));
+    const idx = tri || (() => {
+      const t = [];
+      for (let i = 1; i < pts.length - 1; i++) t.push(0, i, i + 1);
+      return t;
+    })();
+    g.setIndex(new THREE.BufferAttribute(new Uint16Array(idx), 1));
+    g.computeVertexNormals();
+    return g;
+  };
 
-  // And a dorsal, for the same reason.
-  const fin = new THREE.BufferGeometry();
-  const fv = new Float32Array([
-    -0.16, 0.112, 0.0, 0.10, 0.088, 0.0, -0.04, 0.190, 0.0,
-  ]);
-  fin.setAttribute('position', new THREE.BufferAttribute(fv, 3));
-  fin.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2]), 1));
-  fin.computeVertexNormals();
+  // The caudal, and it is the fork that carries the whole read at range: a
+  // notched crescent, not a wedge. Triangulated by hand because it is concave
+  // at the notch and a fan from the root would fill the notch in.
+  const tail = sheet([
+    [0.452, 0.000], [0.452, 0.024], [0.596, 0.148], [0.664, 0.166],
+    [0.548, 0.016], [0.664, -0.166], [0.596, -0.148], [0.452, -0.024],
+  ], [1, 2, 4, 2, 3, 4, 0, 1, 4, 0, 4, 7, 7, 4, 6, 4, 5, 6],
+  [[0.315, 0.350, 0.325], [0.315, 0.350, 0.325], [0.560, 0.590, 0.545],
+    [0.690, 0.710, 0.655], [0.400, 0.430, 0.400], [0.690, 0.710, 0.655],
+    [0.560, 0.590, 0.545], [0.315, 0.350, 0.325]]);
 
-  const parts = [body, tail, fin];
+  // Dorsal and anal. A sea bream's dorsal is one long low sail with the spiny
+  // half in front and the soft half behind, and the step between them is worth
+  // the two vertices it costs.
+  // A fin is a membrane on rays: dark and fleshy where it leaves the back,
+  // and thin enough at the edge to see the water through. Two colours a fin,
+  // root to tip, and that gradient is most of the difference between a fin and
+  // a piece of card glued to a fish.
+  const FR = [0.325, 0.360, 0.335], FT = [0.660, 0.685, 0.630];
+  const dorsal = sheet([
+    [-0.196, 0.116], [0.262, 0.080], [0.232, 0.134], [0.010, 0.172],
+    [-0.086, 0.166], [-0.150, 0.148],
+  ], null, [FR, FR, FT, FT, FT, FT]);
+  const anal = sheet([
+    [0.086, -0.102], [0.296, -0.058], [0.264, -0.106], [0.092, -0.138],
+  ], null, [FR, FR, FT, FT]);
+
+  const parts = [
+    { g: body, kind: 'body' },
+    { g: tail, kind: 'fin' },
+    { g: dorsal, kind: 'fin' },
+    { g: anal, kind: 'fin' },
+  ];
+
+  for (const sd of [1, -1]) {
+    // Pectorals, high on the flank just behind the gill and swept back, which
+    // is where a bream carries them and how it turns.
+    const pec = sheet([
+      [-0.262, 0.012, 0.052 * sd], [-0.256, -0.026, 0.048 * sd],
+      [-0.128, -0.074, 0.096 * sd], [-0.142, 0.002, 0.102 * sd],
+    ], null, [FR, FR, FT, FT]);
+    // Pelvics, underneath and smaller.
+    const pel = sheet([
+      [-0.176, -0.098, 0.026 * sd], [-0.094, -0.102, 0.020 * sd],
+      [-0.100, -0.150, 0.056 * sd],
+    ], null, [FR, FR, FT]);
+    parts.push({ g: pec, kind: 'fin' }, { g: pel, kind: 'fin' });
+
+    // The eye. Large, round and high on the head, which is what a bream's is,
+    // and the first thing anybody looks for on an animal. A disc rather than a
+    // ball: it sits flush in the socket, and a ball would need the socket cut
+    // for it. Three rings — pupil, iris, and the pale rim round the outside —
+    // and the middle of it pushed a millimetre proud so it catches the light
+    // the flat of the cheek does not.
+    const N = 12, R = 0.0255, ex = -0.392, ey = 0.049;
+    // The head's half-width at that station, so the eye sits on the cheek and
+    // not inside it or floating off it.
+    const hw = 0.0505;
+    const ev = [[ex, ey, (hw + 0.006) * sd]];
+    const eidx = [];
+    const bands = [[0.42, 0.004], [0.62, 0.001], [1.0, -0.0016]];
+    for (let b = 0; b < bands.length; b++) {
+      const [rr, out] = bands[b];
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * TAU;
+        ev.push([ex + Math.cos(a) * R * rr, ey + Math.sin(a) * R * rr,
+          (hw + 0.006 + out) * sd]);
+      }
+      const base = 1 + b * N, prev = base - N;
+      if (b === 0) {
+        for (let i = 0; i < N; i++) eidx.push(0, base + i, base + (i + 1) % N);
+      } else {
+        for (let i = 0; i < N; i++) {
+          const j = (i + 1) % N;
+          eidx.push(prev + i, base + i, base + j, prev + i, base + j, prev + j);
+        }
+      }
+    }
+    parts.push({ g: sheet(ev, eidx), kind: 'eye', R, ex, ey });
+  }
+
   let nv = 0, ni = 0;
-  for (const g of parts) { nv += g.attributes.position.count; ni += g.index.count; }
+  for (const q of parts) { nv += q.g.attributes.position.count; ni += q.g.index.count; }
   const pos = new Float32Array(nv * 3);
   const nrm = new Float32Array(nv * 3);
   const col = new Float32Array(nv * 3);
   const idx = new Uint16Array(ni);
+  const dark = [0.098, 0.155, 0.168], silver = [0.735, 0.770, 0.745];
+  const pale = [0.910, 0.905, 0.870], gold = [0.800, 0.620, 0.180];
+  const fin = [0.300, 0.335, 0.315];
   let vo = 0, io = 0;
-  for (const g of parts) {
+  for (const q of parts) {
+    const g = q.g;
     const n = g.attributes.position.count;
     pos.set(g.attributes.position.array, vo * 3);
     nrm.set(g.attributes.normal.array, vo * 3);
     for (let i = 0; i < n; i++) {
-      // Countershading, keyed on how high up the flank the vertex is.
-      const y = pos[(vo + i) * 3 + 1];
-      const t = Math.min(1, Math.max(0, (y + 0.12) / 0.24));
-      const dark = [0.115, 0.175, 0.185], silver = [0.72, 0.755, 0.735];
-      const pale = [0.90, 0.90, 0.87];
-      const lo = t < 0.5 ? pale : silver, hi = t < 0.5 ? silver : dark;
-      const f = t < 0.5 ? t * 2 : (t - 0.5) * 2;
-      col[(vo + i) * 3] = lo[0] + (hi[0] - lo[0]) * f;
-      col[(vo + i) * 3 + 1] = lo[1] + (hi[1] - lo[1]) * f;
-      col[(vo + i) * 3 + 2] = lo[2] + (hi[2] - lo[2]) * f;
+      const o = (vo + i) * 3;
+      const x = pos[o], y = pos[o + 1];
+      let c;
+      if (q.kind === 'fin') {
+        c = (g.userData.cols && g.userData.cols[i]) || fin;
+      } else if (q.kind === 'eye') {
+        const r = Math.hypot(x - q.ex, y - q.ey) / q.R;
+        // Pupil, iris, rim. A fish's iris is brass and its pupil is a hole.
+        c = r < 0.5 ? [0.026, 0.030, 0.036]
+          : r < 0.78 ? [0.560, 0.455, 0.180]
+            : [0.860, 0.860, 0.830];
+      } else {
+        // Countershading, keyed on how high up the flank the vertex is.
+        const t = Math.min(1, Math.max(0, (y + 0.123) / 0.246));
+        const lo = t < 0.5 ? pale : silver, hi = t < 0.5 ? silver : dark;
+        const f = t < 0.5 ? t * 2 : (t - 0.5) * 2;
+        c = [lo[0] + (hi[0] - lo[0]) * f, lo[1] + (hi[1] - lo[1]) * f,
+          lo[2] + (hi[2] - lo[2]) * f];
+        // The stripes. Ten and a half cycles from belly to back puts about
+        // eleven lines on the flank, which is what a salpa carries; they start
+        // behind the gill cover and they do not go below the lateral line.
+        const st = Math.pow(Math.max(0, Math.sin(t * Math.PI * 9.5)), 3.2)
+          * Math.min(1, Math.max(0, (t - 0.40) / 0.12))
+          * Math.min(1, Math.max(0, (x + 0.30) / 0.09));
+        c = [c[0] + (gold[0] - c[0]) * st,
+          c[1] + (gold[1] - c[1]) * st,
+          c[2] + (gold[2] - c[2]) * st];
+        // And the gill cover: a pale edge where the operculum overlaps the
+        // shoulder, which on a live fish is the brightest thing on the head.
+        const gl = Math.max(0, 1 - Math.abs(x + 0.298) / 0.020) * 0.34;
+        c = [c[0] + (0.95 - c[0]) * gl, c[1] + (0.96 - c[1]) * gl,
+          c[2] + (0.94 - c[2]) * gl];
+      }
+      col[o] = c[0]; col[o + 1] = c[1]; col[o + 2] = c[2];
     }
     const gi = g.index.array;
     for (let i = 0; i < gi.length; i++) idx[io + i] = gi[i] + vo;

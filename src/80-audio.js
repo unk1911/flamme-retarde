@@ -1668,9 +1668,22 @@ function buildAudio() {
   function applyOut(tau) {
     if (!ctx || dead || !outBus) return;
     const t = ctx.currentTime;
-    const x = Math.max(roomV, 0.55 * wetV + 0.45 * subV);
-    outBus.gain.setTargetAtTime(1 - 0.90 * x, t, tau);
-    outLp.frequency.setTargetAtTime(20000 * Math.pow(900 / 20000, x), t, tau);
+    // The beach and the sea are the same weighting they always were, but the
+    // wet term now carries nearly all of it. Standing in the shallows with your
+    // ears a hand above the surface you are not at a beach any more — the
+    // klapa is coming to you across water at a grazing angle, off a surface
+    // that reflects almost all of it back up the hill, and the half of every
+    // second your ears spend under takes the rest. It was audible here and it
+    // should not have been.
+    const x = Math.max(roomV, Math.min(1, 0.90 * wetV + 0.22 * subV));
+    // 18 dB down the moment you are in it, 32 down under it. That is a long
+    // way and it is meant to be: the point of the water is that the beach
+    // stops, and a beach you can still make out is a beach that never stopped.
+    outBus.gain.setTargetAtTime(1 - 0.975 * x, t, tau);
+    // And 460 Hz rather than 900, because what survives the surface is the
+    // bottom of the men's line and nothing above it — no consonants, no
+    // cicadas at all, which live at 4 kHz and are simply gone.
+    outLp.frequency.setTargetAtTime(20000 * Math.pow(460 / 20000, x), t, tau);
   }
 
   /**

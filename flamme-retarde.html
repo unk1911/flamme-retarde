@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.81.0">
+<meta name="version" content="1.82.0">
 <meta name="build-date" content="2026-08-19">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -1280,8 +1280,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.81.0, built 2026-08-19">
-    <b>v1.81.0</b><i>·</i><span>2026-08-19</span>
+  <div id="build" title="Flamme Retardé 1.82.0, built 2026-08-19">
+    <b>v1.82.0</b><i>·</i><span>2026-08-19</span>
   </div>
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
@@ -1624,7 +1624,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.81.0", date: "2026-08-19" };</script>
+<script>const BUILD = { v: "1.82.0", date: "2026-08-19" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -4085,6 +4085,12 @@ void main(){
   // bare grazed limestone on anything steep; and out past the light, the fine
   // grey mud that everything eventually settles into.
   float wetD = max(0.0, -vWorld.y);
+  // How far the fragment is, which the relief below needs and the haze needs
+  // again later. Fine detail has to be faded out with range or it aliases:
+  // a 33 cm ripple seen from twenty metres is well under a pixel, and what a
+  // sub-pixel corrugation does on screen is crawl.
+  float vdist = length(vWorld - uCamPos);
+  float nearby = 1.0 - smoothstep(7.0, 24.0, vdist);
   if (wetD > 0.0) {
     vec3 shell = vec3(0.845, 0.815, 0.720);     // shell sand, nearly white
     vec3 shingle = vec3(0.660, 0.645, 0.590);   // and where the swell sorts it
@@ -4139,6 +4145,73 @@ void main(){
 
     base = mix(base, bed, smoothstep(0.0, 0.35, wetD));
 
+    // ── relief ─────────────────────────────────────────────────────────────
+    // The bottom was a painting on a plate, and the plate is not negotiable:
+    // the DEM is one sample every 6.35 m and the finest terrain tile is a 5 m
+    // quad, so every triangle a swimmer can see is flat and stays flat as he
+    // moves over it. That is the whole of what was wrong with the seabed. No
+    // amount of colour fixes it, because the thing that is missing is not
+    // colour — it is the light moving.
+    //
+    // So the shading normal is perturbed from the same fields that painted it.
+    // Nothing here is geometry and nothing here costs a vertex; it is all paid
+    // in the fragment shader and only below the waterline, where the if this
+    // sits inside has already been taken.
+    //
+    // Reconstructed as a gradient rather than added to n directly: n came
+    // out of the height field as (-dh/dx, 1, -dh/dz) normalised, so dividing
+    // the horizontal components back out by n.y recovers the slope, the detail
+    // adds to it, and one normalize puts it back. The clamp on n.y is for the
+    // cliffs, where the recovered slope would otherwise run away.
+    vec2 dn = vec2(0.0);
+
+    // Sand ripples. The one thing everybody who has snorkelled over this coast
+    // remembers, and the only one nobody ever models: parallel corrugations a
+    // hand's breadth apart lying across the run of the swell, sharp-crested,
+    // and gone the moment the water is deep enough for the swell to stop
+    // reaching the bottom. They are on the clean sand and nowhere else — weed
+    // holds the sand still and rock has none to move.
+    float ripD = (1.0 - smoothstep(4.5, 11.0, wetD))
+               * smoothstep(0.15, 0.9, wetD)
+               * (1.0 - smoothstep(0.05, 0.20, slope))
+               * (1.0 - rooted) * (1.0 - outcrop) * nearby;
+    // Not a grating. The crest lines wander over a few metres and the spacing
+    // wanders with them, which is the difference between sand and corduroy.
+    vec2 rdir = normalize(vec2(0.62, 0.78));
+    float rk = 19.0 + 4.0 * fbm2(p * 0.035 + 12.1, 2);
+    float rph = dot(p, rdir) * rk + fbm2(p * 0.11 + 5.7, 2) * 5.2;
+    dn += rdir * cos(rph) * 0.155 * ripD;
+    // And the troughs are darker, because that is where the fine dark stuff
+    // ends up. Free, now that the phase is to hand.
+    base *= 1.0 + 0.065 * sin(rph) * ripD;
+
+    // Boulders. Central differences on the same ridged field the outcrop was
+    // cut from, at a third of a metre, which is about the size of the blocks.
+    // Four extra noise fetches and they are what turns the pale patches from
+    // stains into stones.
+    float eB = 0.34;
+    vec2 gb = vec2(
+      ridge2((p + vec2(eB, 0.0)) * 0.145 + 27.3, 2)
+        - ridge2((p - vec2(eB, 0.0)) * 0.145 + 27.3, 2),
+      ridge2((p + vec2(0.0, eB)) * 0.145 + 27.3, 2)
+        - ridge2((p - vec2(0.0, eB)) * 0.145 + 27.3, 2));
+    dn += gb * (0.85 / eB) * smoothstep(0.30, 0.62, boul)
+        * (1.0 - smoothstep(20.0, 32.0, wetD));
+
+    // And the meadow, which is not a lawn. Posidonia is a mat of leaf blades
+    // half a metre long lying over each other, and at swimming range what you
+    // see of it is a rough surface with the light broken up all over it — a
+    // flat dark green patch reads as a hole in the bottom rather than as the
+    // densest plant community in the Mediterranean.
+    float eW = 0.11;
+    vec2 gw = vec2(
+      vnoise2((p + vec2(eW, 0.0)) * 5.2) - vnoise2((p - vec2(eW, 0.0)) * 5.2),
+      vnoise2((p + vec2(0.0, eW)) * 5.2) - vnoise2((p - vec2(0.0, eW)) * 5.2));
+    dn += gw * (0.16 / eW) * rooted * nearby;
+
+    float ny = max(n.y, 0.28);
+    n = normalize(vec3(n.x / ny - dn.x, 1.0, n.z / ny - dn.y));
+
     // ── caustics ──────────────────────────────────────────────────────────
     // The one thing everybody recognises, and it is not a texture: it is the
     // sun refracted by the *surface*, so it belongs to world xz and to the
@@ -4182,7 +4255,7 @@ void main(){
   // Ground glow under an active flame front.
   col += vec3(1.0, 0.34, 0.08) * burning * 0.55;
 
-  float dist = length(vWorld - uCamPos);
+  float dist = vdist;
   // Haze first, then the water: air is what the light crossed before it got to
   // the surface, water is what it crossed after. Doing them in the other order
   // would put a Mediterranean horizon-white over a seabed ten metres down.
@@ -5167,21 +5240,50 @@ const FISH = {
 };
 
 /**
- * One fish, nose down the +x axis, one unit long, painted with the
- * countershading that every open-water fish in the world has: dark over,
- * silver on the flank, white under. It is the whole of why a fish is hard to
- * see from above and hard to see from below, and it is also the only reason a
- * two-hundred-triangle lozenge reads as a fish at all.
+ * One fish, nose down the +x axis, one unit long.
+ *
+ * The old one was a nine-station lathe with a two-triangle tail and a single
+ * triangle for a dorsal, and it was honestly reasoned: a fish at ten metres in
+ * green water is a silhouette, and a silhouette wants a fork and a fin and
+ * nothing else. What that reasoning missed is that a swimmer does not stay ten
+ * metres away. Shoals hold station and you drift into them, and at two metres
+ * a lozenge with a fork on it is a lozenge with a fork on it — no eye, no
+ * gill, no pectoral, and an eye is the first thing a person looks for on any
+ * animal at all.
+ *
+ * So: fourteen stations round eighteen sides, a head with a snout and a
+ * peduncle behind it, both eyes, the gill cover, a dorsal and an anal fin,
+ * paired pectorals and pelvics, and a properly forked caudal with a notch in
+ * it. About seven hundred triangles, drawn once and instanced a hundred and
+ * eight times, which is one draw call either way.
+ *
+ * The paint is countershading — dark over, silver on the flank, white under —
+ * which every open-water fish in the world has and which is the whole of why
+ * one is hard to see from above and hard to see from below. On top of that go
+ * the stripes: this is *Sarpa salpa*, the salpa, the fish that grazes the
+ * meadow this bottom is made of, and it carries ten or eleven thin gold lines
+ * the length of its flank. They are the reason you can name it from a boat.
  */
 function fishGeometry() {
-  const rings = [];
-  // x from nose to the wrist of the tail, as (station, half-height, half-width)
+  // [station x, half-height, half-width]
   const prof = [
-    [-0.50, 0.010, 0.008], [-0.42, 0.055, 0.030], [-0.30, 0.098, 0.048],
-    [-0.14, 0.118, 0.056], [0.02, 0.112, 0.052], [0.18, 0.092, 0.041],
-    [0.32, 0.062, 0.026], [0.40, 0.034, 0.013], [0.44, 0.020, 0.007],
+    [-0.500, 0.014, 0.010],   // snout
+    [-0.472, 0.048, 0.031],
+    [-0.432, 0.072, 0.045],
+    [-0.372, 0.096, 0.055],   // behind the eye
+    [-0.300, 0.111, 0.060],   // the gill cover, and the deepest part of the head
+    [-0.196, 0.122, 0.062],
+    [-0.078, 0.123, 0.059],
+    [0.042, 0.113, 0.052],
+    [0.152, 0.097, 0.043],
+    [0.250, 0.076, 0.033],
+    [0.330, 0.056, 0.023],
+    [0.390, 0.038, 0.015],
+    [0.432, 0.026, 0.0098],   // the caudal peduncle, which is a wrist
+    [0.458, 0.019, 0.0068],
   ];
-  const seg = 8;
+  const seg = 18;
+  const rings = [];
   for (const [x, hy, hz] of prof) {
     const ring = [];
     for (let i = 0; i < seg; i++) {
@@ -5192,49 +5294,154 @@ function fishGeometry() {
   }
   const body = loft(rings, { closed: true, caps: false });
 
-  // The tail, which is a flat fork and not a tube: two triangles either side of
-  // the wrist, and the fork is what the eye actually recognises at ten metres.
-  const tail = new THREE.BufferGeometry();
-  const tv = new Float32Array([
-    0.44, 0.0, 0.0, 0.62, 0.150, 0.0, 0.56, 0.0, 0.0,
-    0.44, 0.0, 0.0, 0.56, 0.0, 0.0, 0.62, -0.150, 0.0,
-  ]);
-  tail.setAttribute('position', new THREE.BufferAttribute(tv, 3));
-  tail.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2, 3, 4, 5]), 1));
-  tail.computeVertexNormals();
+  /** A fin: flat, because a fin is flat, and drawn from both sides anyway. */
+  const sheet = (pts, tri, cols) => {
+    const g = new THREE.BufferGeometry();
+    g.userData.cols = cols || null;
+    const v = new Float32Array(pts.length * 3);
+    pts.forEach((q, i) => { v[i * 3] = q[0]; v[i * 3 + 1] = q[1]; v[i * 3 + 2] = q[2] || 0; });
+    g.setAttribute('position', new THREE.BufferAttribute(v, 3));
+    const idx = tri || (() => {
+      const t = [];
+      for (let i = 1; i < pts.length - 1; i++) t.push(0, i, i + 1);
+      return t;
+    })();
+    g.setIndex(new THREE.BufferAttribute(new Uint16Array(idx), 1));
+    g.computeVertexNormals();
+    return g;
+  };
 
-  // And a dorsal, for the same reason.
-  const fin = new THREE.BufferGeometry();
-  const fv = new Float32Array([
-    -0.16, 0.112, 0.0, 0.10, 0.088, 0.0, -0.04, 0.190, 0.0,
-  ]);
-  fin.setAttribute('position', new THREE.BufferAttribute(fv, 3));
-  fin.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2]), 1));
-  fin.computeVertexNormals();
+  // The caudal, and it is the fork that carries the whole read at range: a
+  // notched crescent, not a wedge. Triangulated by hand because it is concave
+  // at the notch and a fan from the root would fill the notch in.
+  const tail = sheet([
+    [0.452, 0.000], [0.452, 0.024], [0.596, 0.148], [0.664, 0.166],
+    [0.548, 0.016], [0.664, -0.166], [0.596, -0.148], [0.452, -0.024],
+  ], [1, 2, 4, 2, 3, 4, 0, 1, 4, 0, 4, 7, 7, 4, 6, 4, 5, 6],
+  [[0.315, 0.350, 0.325], [0.315, 0.350, 0.325], [0.560, 0.590, 0.545],
+    [0.690, 0.710, 0.655], [0.400, 0.430, 0.400], [0.690, 0.710, 0.655],
+    [0.560, 0.590, 0.545], [0.315, 0.350, 0.325]]);
 
-  const parts = [body, tail, fin];
+  // Dorsal and anal. A sea bream's dorsal is one long low sail with the spiny
+  // half in front and the soft half behind, and the step between them is worth
+  // the two vertices it costs.
+  // A fin is a membrane on rays: dark and fleshy where it leaves the back,
+  // and thin enough at the edge to see the water through. Two colours a fin,
+  // root to tip, and that gradient is most of the difference between a fin and
+  // a piece of card glued to a fish.
+  const FR = [0.325, 0.360, 0.335], FT = [0.660, 0.685, 0.630];
+  const dorsal = sheet([
+    [-0.196, 0.116], [0.262, 0.080], [0.232, 0.134], [0.010, 0.172],
+    [-0.086, 0.166], [-0.150, 0.148],
+  ], null, [FR, FR, FT, FT, FT, FT]);
+  const anal = sheet([
+    [0.086, -0.102], [0.296, -0.058], [0.264, -0.106], [0.092, -0.138],
+  ], null, [FR, FR, FT, FT]);
+
+  const parts = [
+    { g: body, kind: 'body' },
+    { g: tail, kind: 'fin' },
+    { g: dorsal, kind: 'fin' },
+    { g: anal, kind: 'fin' },
+  ];
+
+  for (const sd of [1, -1]) {
+    // Pectorals, high on the flank just behind the gill and swept back, which
+    // is where a bream carries them and how it turns.
+    const pec = sheet([
+      [-0.262, 0.012, 0.052 * sd], [-0.256, -0.026, 0.048 * sd],
+      [-0.128, -0.074, 0.096 * sd], [-0.142, 0.002, 0.102 * sd],
+    ], null, [FR, FR, FT, FT]);
+    // Pelvics, underneath and smaller.
+    const pel = sheet([
+      [-0.176, -0.098, 0.026 * sd], [-0.094, -0.102, 0.020 * sd],
+      [-0.100, -0.150, 0.056 * sd],
+    ], null, [FR, FR, FT]);
+    parts.push({ g: pec, kind: 'fin' }, { g: pel, kind: 'fin' });
+
+    // The eye. Large, round and high on the head, which is what a bream's is,
+    // and the first thing anybody looks for on an animal. A disc rather than a
+    // ball: it sits flush in the socket, and a ball would need the socket cut
+    // for it. Three rings — pupil, iris, and the pale rim round the outside —
+    // and the middle of it pushed a millimetre proud so it catches the light
+    // the flat of the cheek does not.
+    const N = 12, R = 0.0255, ex = -0.392, ey = 0.049;
+    // The head's half-width at that station, so the eye sits on the cheek and
+    // not inside it or floating off it.
+    const hw = 0.0505;
+    const ev = [[ex, ey, (hw + 0.006) * sd]];
+    const eidx = [];
+    const bands = [[0.42, 0.004], [0.62, 0.001], [1.0, -0.0016]];
+    for (let b = 0; b < bands.length; b++) {
+      const [rr, out] = bands[b];
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * TAU;
+        ev.push([ex + Math.cos(a) * R * rr, ey + Math.sin(a) * R * rr,
+          (hw + 0.006 + out) * sd]);
+      }
+      const base = 1 + b * N, prev = base - N;
+      if (b === 0) {
+        for (let i = 0; i < N; i++) eidx.push(0, base + i, base + (i + 1) % N);
+      } else {
+        for (let i = 0; i < N; i++) {
+          const j = (i + 1) % N;
+          eidx.push(prev + i, base + i, base + j, prev + i, base + j, prev + j);
+        }
+      }
+    }
+    parts.push({ g: sheet(ev, eidx), kind: 'eye', R, ex, ey });
+  }
+
   let nv = 0, ni = 0;
-  for (const g of parts) { nv += g.attributes.position.count; ni += g.index.count; }
+  for (const q of parts) { nv += q.g.attributes.position.count; ni += q.g.index.count; }
   const pos = new Float32Array(nv * 3);
   const nrm = new Float32Array(nv * 3);
   const col = new Float32Array(nv * 3);
   const idx = new Uint16Array(ni);
+  const dark = [0.098, 0.155, 0.168], silver = [0.735, 0.770, 0.745];
+  const pale = [0.910, 0.905, 0.870], gold = [0.800, 0.620, 0.180];
+  const fin = [0.300, 0.335, 0.315];
   let vo = 0, io = 0;
-  for (const g of parts) {
+  for (const q of parts) {
+    const g = q.g;
     const n = g.attributes.position.count;
     pos.set(g.attributes.position.array, vo * 3);
     nrm.set(g.attributes.normal.array, vo * 3);
     for (let i = 0; i < n; i++) {
-      // Countershading, keyed on how high up the flank the vertex is.
-      const y = pos[(vo + i) * 3 + 1];
-      const t = Math.min(1, Math.max(0, (y + 0.12) / 0.24));
-      const dark = [0.115, 0.175, 0.185], silver = [0.72, 0.755, 0.735];
-      const pale = [0.90, 0.90, 0.87];
-      const lo = t < 0.5 ? pale : silver, hi = t < 0.5 ? silver : dark;
-      const f = t < 0.5 ? t * 2 : (t - 0.5) * 2;
-      col[(vo + i) * 3] = lo[0] + (hi[0] - lo[0]) * f;
-      col[(vo + i) * 3 + 1] = lo[1] + (hi[1] - lo[1]) * f;
-      col[(vo + i) * 3 + 2] = lo[2] + (hi[2] - lo[2]) * f;
+      const o = (vo + i) * 3;
+      const x = pos[o], y = pos[o + 1];
+      let c;
+      if (q.kind === 'fin') {
+        c = (g.userData.cols && g.userData.cols[i]) || fin;
+      } else if (q.kind === 'eye') {
+        const r = Math.hypot(x - q.ex, y - q.ey) / q.R;
+        // Pupil, iris, rim. A fish's iris is brass and its pupil is a hole.
+        c = r < 0.5 ? [0.026, 0.030, 0.036]
+          : r < 0.78 ? [0.560, 0.455, 0.180]
+            : [0.860, 0.860, 0.830];
+      } else {
+        // Countershading, keyed on how high up the flank the vertex is.
+        const t = Math.min(1, Math.max(0, (y + 0.123) / 0.246));
+        const lo = t < 0.5 ? pale : silver, hi = t < 0.5 ? silver : dark;
+        const f = t < 0.5 ? t * 2 : (t - 0.5) * 2;
+        c = [lo[0] + (hi[0] - lo[0]) * f, lo[1] + (hi[1] - lo[1]) * f,
+          lo[2] + (hi[2] - lo[2]) * f];
+        // The stripes. Ten and a half cycles from belly to back puts about
+        // eleven lines on the flank, which is what a salpa carries; they start
+        // behind the gill cover and they do not go below the lateral line.
+        const st = Math.pow(Math.max(0, Math.sin(t * Math.PI * 9.5)), 3.2)
+          * Math.min(1, Math.max(0, (t - 0.40) / 0.12))
+          * Math.min(1, Math.max(0, (x + 0.30) / 0.09));
+        c = [c[0] + (gold[0] - c[0]) * st,
+          c[1] + (gold[1] - c[1]) * st,
+          c[2] + (gold[2] - c[2]) * st];
+        // And the gill cover: a pale edge where the operculum overlaps the
+        // shoulder, which on a live fish is the brightest thing on the head.
+        const gl = Math.max(0, 1 - Math.abs(x + 0.298) / 0.020) * 0.34;
+        c = [c[0] + (0.95 - c[0]) * gl, c[1] + (0.96 - c[1]) * gl,
+          c[2] + (0.94 - c[2]) * gl];
+      }
+      col[o] = c[0]; col[o + 1] = c[1]; col[o + 2] = c[2];
     }
     const gi = g.index.array;
     for (let i = 0; i < gi.length; i++) idx[io + i] = gi[i] + vo;
@@ -28622,35 +28829,106 @@ const ARMS = {
   // with a pair of hands, for the same reason and by about the same amount.
   lift: 0.42,
 
-  upper: 0.295,        // m — humerus
-  fore: 0.265,         // radius/ulna
-  palm: 0.098,         // wrist to knuckle
+  // Measured off her, not guessed. `human_skin.fr3d` is the same rig the
+  // mirror figure is built on, and its rest skeleton says the humerus is
+  // 239 mm and the radius 238 mm, with a mean flesh radius running 55 mm at
+  // the deltoid to 37 mm at the elbow and 37 mm to 22 mm down the forearm.
+  // Everything below is those numbers. What the rig cannot give is the
+  // *surface* — see the note on `armHand` — but it can certainly give the
+  // proportions, and an arm that is hers by measurement is worth more than an
+  // arm that is anybody's by eye.
+  upper: 0.240,        // m — humerus
+  fore: 0.238,         // radius/ulna
+  palm: 0.092,         // wrist to knuckle; her hand is 171 mm end to end
 
-  // Silhouettes, not radii. The first version was two cones and a squashed
-  // third, and two cones is exactly what it looked like: an arm's outline is
-  // not monotonic anywhere along its length. The deltoid is the widest part of
-  // the upper arm and it is at the top; the forearm's widest part is a hand's
-  // breadth *below* the elbow and it runs to a wrist half that size. Getting
-  // those two bulges in is most of the difference between a limb and a pipe,
-  // and neither of them costs a triangle over the cone that was there.
+  // Silhouettes, not radii — and now tables rather than formulae, because an
+  // arm's outline is not any one curve. The first version was two cones; the
+  // second was a cone with a sine on it, which is a cone that breathes. Both
+  // read as plumbing for the same reason: a limb's width goes up and down
+  // several times along its length and every one of those reversals is a
+  // muscle you can name.
   //
-  // Elliptical, too. A forearm is a good bit deeper than it is wide seen from
-  // above and the other way round seen from the front; a round one catches the
-  // light evenly all the way along, which is the other half of why the cones
-  // read as plumbing.
-  upperProf: (t) => {
-    const w = 0.0570 - 0.0170 * t + 0.0052 * Math.sin(Math.PI * t);
-    return [w, w * 0.93];
-  },
-  foreProf: (t) => {
-    const w = 0.0452 - 0.0180 * t + 0.0068 * Math.sin(Math.PI * Math.pow(t, 0.65));
-    return [w, w * 0.80];
-  },
+  // Down the upper arm: the deltoid is the widest part and it is at the *top*,
+  // a third of the way down there is the biceps and triceps belly, then a long
+  // narrowing to the elbow — which widens again in the last two centimetres,
+  // because the humeral condyles are wider than the shaft above them and that
+  // little flare is most of what makes an elbow read as a joint rather than as
+  // a bend in a hose.
+  //
+  // Down the forearm: nothing at all at the elbow itself, then the flexor mass
+  // swelling to its maximum a hand's breadth below it, then two thirds of the
+  // limb's length spent tapering to a wrist barely half the width. The wrist
+  // is the giveaway. It is the one place on an arm where the section is
+  // emphatically not round — about 55 mm across and 40 mm through — and a
+  // round wrist is the single loudest wrong note in a first-person hand.
+  //
+  // Columns: t, half-width across X, depth ratio Z/X, squareness, bow.
+  //
+  // Squareness is the other thing the cones got wrong. A cross-section through
+  // a forearm is not an ellipse; it is a rounded triangle with the ulna making
+  // a flat along one side, and near the wrist it is nearly a rectangle. An
+  // ellipse catches the light in one even band all the way round, which is
+  // what plastic does. See `armSection`.
+  upperProf: armProfile([
+    [0.00, 0.0548, 1.00, 0.34, 0.0000],
+    [0.10, 0.0572, 1.00, 0.30, 0.0006],
+    [0.27, 0.0524, 1.05, 0.24, 0.0007],
+    [0.45, 0.0462, 1.07, 0.22, 0.0006],
+    [0.67, 0.0416, 1.00, 0.26, 0.0000],
+    [0.85, 0.0390, 0.90, 0.38, -0.0007],
+    [0.95, 0.0396, 0.80, 0.52, -0.0011],
+    [1.00, 0.0372, 0.78, 0.52, -0.0013],
+  ]),
+  foreProf: armProfile([
+    [0.00, 0.0374, 0.86, 0.48, 0.0000],
+    [0.09, 0.0428, 0.90, 0.38, 0.0013],
+    [0.23, 0.0440, 0.92, 0.32, 0.0018],
+    [0.43, 0.0378, 0.86, 0.32, 0.0016],
+    [0.63, 0.0306, 0.80, 0.36, 0.0009],
+    [0.81, 0.0259, 0.73, 0.44, 0.0002],
+    [0.93, 0.0234, 0.68, 0.54, -0.0004],
+    [1.00, 0.0225, 0.66, 0.58, -0.0005],
+  ]),
+  // The palm, with the arch in it. A hand held as a paddle is cupped: the
+  // knuckle row is a curve and the whole plate dishes toward the thumb, which
+  // is why a swimmer's hand holds water and a flat board does not.
+  // The thickness is the whole of it. A palm is 89 mm across and 22 mm
+  // through — a plate, and the ratio between those two numbers is the only
+  // reason a hand reads as a hand from the side. Written at half the width it
+  // came out a ball on the end of the wrist, which is what a first draft of a
+  // hand always is.
+  palmProf: armProfile([
+    [0.00, 0.0262, 0.70, 0.56, 0.0000],
+    [0.18, 0.0322, 0.55, 0.64, 0.0010],
+    [0.45, 0.0388, 0.40, 0.72, 0.0016],
+    [0.74, 0.0432, 0.30, 0.78, 0.0014],
+    [0.92, 0.0448, 0.26, 0.80, 0.0006],
+    [1.00, 0.0442, 0.25, 0.80, 0.0000],
+  ]),
+  // The thenar eminence — the muscle pad at the root of the thumb. It is the
+  // thickest part of a hand and it is the piece whose absence makes a modelled
+  // hand look like a glove with nothing in it.
+  thenarProf: armProfile([
+    [0.00, 0.0062, 1.00, 0.10, 0.0000],
+    [0.32, 0.0128, 0.80, 0.14, 0.0000],
+    [0.66, 0.0132, 0.74, 0.16, 0.0000],
+    [1.00, 0.0072, 0.66, 0.20, 0.0000],
+  ]),
 
-  // The hand, which is now a hand. See `armHand`.
-  finger: [0.0715, 0.0790, 0.0755, 0.0620],
-  fingerR: 0.0098,
-  thumb: 0.0640,
+  // Four fingers, index through little: length from the knuckle, and the
+  // radius of the proximal bone. Three bones each — see `armFinger`.
+  finger: [
+    [0.0706, 0.0096],
+    [0.0786, 0.0100],
+    [0.0737, 0.0094],
+    [0.0577, 0.0082],
+  ],
+  // The knuckle row, which is an arc and not a line: the index knuckle stands
+  // a few millimetres proud of the little one, and they are not all the same
+  // distance down the palm.
+  knuckle: [0.0042, 0.0060, 0.0028, -0.0044],
+  thumb: 0.0546,
+  thumbR: 0.0108,
 
   // A Dalmatian August, three weeks in. Albedo, so it sits below the colour it
   // arrives on screen as.
@@ -28701,22 +28979,90 @@ const ARM_SKIN = /* glsl */ `
 
   float atan_ = clamp(vLocal.z * -22.0, -1.0, 1.0) * 0.5 + 0.5;
   base *= mix(vec3(1.010, 0.995, 0.985), vec3(0.945, 0.885, 0.845), atan_);
-  base *= 1.0 + 0.05 * (vnoise2(vec2(vLocal.x + vLocal.z, vLocal.y) * 210.0) - 0.5);
+  // Grain, and it has to be *grain*. One octave of value noise on x+z is a
+  // lattice, and at this range a lattice on an arm reads as scales — which is
+  // what the first pass of this shipped. Two fields, crossed and at coprime
+  // rates so the beat between them never lines up, and half the amplitude.
+  base *= 1.0
+    + 0.030 * (vnoise2(vec2(vLocal.x * 1.7 + vLocal.z, vLocal.y) * 173.0) - 0.5)
+    + 0.022 * (vnoise2(vec2(vLocal.y * 1.3, vLocal.z - vLocal.x * 0.6) * 431.0) - 0.5);
 
   base = mix(base, vec3(0.760, 0.335, 0.250), afr * 0.26);
 `;
 
 /**
- * One tapered limb, hanging from the origin down −Y.
+ * A profile table, sampled smoothly.
  *
- * Down −Y because that is the direction a joint chain wants to be written in:
+ * Catmull-Rom through the knots rather than straight lines between them: the
+ * knots are where an anatomist would put a name, and the shape between two of
+ * them is a curve, not a chamfer. Sampled twenty-odd times down a limb it is
+ * the difference between an arm and a stack of cans.
+ *
+ * Returns [half-width, depth ratio, squareness, bow] at t.
+ */
+function armProfile(tab) {
+  const key = (i, c) => tab[Math.min(tab.length - 1, Math.max(0, i))][c] ?? 0;
+  return (t) => {
+    let i = 0;
+    while (i < tab.length - 2 && t > tab[i + 1][0]) i++;
+    const t0 = tab[i][0], t1 = tab[i + 1][0];
+    const u = t1 > t0 ? Math.min(1, Math.max(0, (t - t0) / (t1 - t0))) : 0;
+    const out = [];
+    for (let c = 1; c <= 4; c++) {
+      const p0 = key(i - 1, c), p1 = key(i, c);
+      const p2 = key(i + 1, c), p3 = key(i + 2, c);
+      out.push(0.5 * (2 * p1 + (p2 - p0) * u
+        + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u
+        + (3 * p1 - p0 - 3 * p2 + p3) * u * u * u));
+    }
+    return out;
+  };
+}
+
+/**
+ * One point on a cross-section.
+ *
+ * A superellipse, because a limb is not an ellipse anywhere along its length.
+ * `k` runs 0 for a true ellipse to about 0.8 for the wrist, which is nearly a
+ * rounded rectangle. The exponent is what puts the flats on the sides and the
+ * corners between them, and the flats are what let a highlight break into
+ * separate bands down the length of a forearm instead of running as one even
+ * stripe — which is the whole visual difference between skin and moulded PVC.
+ */
+function armSection(th, rx, rz, k) {
+  const n = 2 + 2.2 * Math.max(0, k);
+  const c = Math.cos(th), s = Math.sin(th);
+  const r = Math.pow(Math.pow(Math.abs(c), n) + Math.pow(Math.abs(s), n), -1 / n);
+  return [c * r * rx, s * r * rz];
+}
+
+/**
+ * One tapered limb, hanging from the origin down -Y.
+ *
+ * Down -Y because that is the direction a joint chain wants to be written in:
  * the shoulder is at the origin, the elbow is `len` below it, and every
  * rotation in the file is then a rotation of a thing that starts by hanging.
+ *
+ * The tessellation is not decoration. At forty centimetres from a 58-degree
+ * lens an arm is eight hundred pixels tall, and a twenty-four-sided lathe puts
+ * a visible flat every thirty pixels round its silhouette; worse, the sparse
+ * rows meant the profile table above would have been sampled at eight stations
+ * and every reversal in it rounded off to nothing. Thirty-six sides and
+ * twenty-two rows is about nine thousand triangles for the pair, which for the
+ * only object on the screen that is close enough to be judged as a *surface*
+ * is not extravagant — it is the minimum at which the silhouette stops being
+ * the thing you look at.
  */
 function armLimb(len, prof, opt = {}) {
-  const seg = opt.seg ?? 24, rows = opt.rows ?? 14, N = 6;
+  const seg = opt.seg ?? 36, rows = opt.rows ?? 22, N = opt.cap ?? 9;
+  // How far a cap stands proud, as a fraction of the radius it caps. A whole
+  // hemisphere is right on the end of a bone and badly wrong on the end of a
+  // palm: a palm is 45 mm across, so a full cap put a 36 mm dome on the
+  // knuckle line and the fingers grew out of the middle of it. That was the
+  // mitten. A palm ends in a flat with a rolled edge, and so does a knuckle.
+  const cT = opt.capTopS ?? 0.80, cB = opt.capBotS ?? 0.80;
   const st = [];
-  const [rx0, rz0] = prof(0), [rx1, rz1] = prof(1);
+  const p0 = prof(0), p1 = prof(1);
   // The caps are what fixed the joints. Two flat-ended cylinders meeting at a
   // bent elbow show you both of their end discs and the wedge of nothing
   // between them, and at forty centimetres from the lens that wedge is the
@@ -28725,25 +29071,30 @@ function armLimb(len, prof, opt = {}) {
   // blend shape and no joint sphere sitting proud of the limb it belongs to.
   if (opt.capTop !== false) {
     for (let i = N; i >= 1; i--) {
-      const a = (i / N) * Math.PI * 0.5, c = Math.max(Math.cos(a), 0.004);
-      st.push([rx0 * Math.sin(a) * 0.80, rx0 * c, rz0 * c]);
+      const a = (i / N) * Math.PI * 0.5, c = Math.max(Math.cos(a), 0.003);
+      st.push([p0[0] * Math.sin(a) * cT, p0[0] * c, p0[0] * p0[1] * c,
+        p0[2], p0[3]]);
     }
   }
   for (let j = 0; j <= rows; j++) {
-    const t = j / rows, r = prof(t);
-    st.push([-t * len, r[0], r[1]]);
+    const t = j / rows, p = prof(t);
+    st.push([-t * len, p[0], p[0] * p[1], p[2], p[3]]);
   }
   if (opt.capBot !== false) {
     for (let i = 1; i <= N; i++) {
-      const a = (i / N) * Math.PI * 0.5, c = Math.max(Math.cos(a), 0.004);
-      st.push([-len - rx1 * Math.sin(a) * 0.80, rx1 * c, rz1 * c]);
+      const a = (i / N) * Math.PI * 0.5, c = Math.max(Math.cos(a), 0.003);
+      st.push([-len - p1[0] * Math.sin(a) * cB, p1[0] * c, p1[0] * p1[1] * c,
+        p1[2], p1[3]]);
     }
   }
-  const rings = st.map(([y, rx, rz]) => {
+  const rings = st.map(([y, rx, rz, k, bow]) => {
     const ring = [];
     for (let i = 0; i < seg; i++) {
-      const th = (i / seg) * Math.PI * 2;
-      ring.push(new THREE.Vector3(Math.cos(th) * rx, y, Math.sin(th) * rz));
+      const [x, z] = armSection((i / seg) * Math.PI * 2, rx, rz, k);
+      // The bow. An arm is not a straight axis: the forearm carries a few
+      // millimetres of lateral bow and the upper arm the other way, and at
+      // this range a perfectly straight limb reads as machined.
+      ring.push(new THREE.Vector3(x + bow, y, z));
     }
     return ring;
   });
@@ -28751,59 +29102,102 @@ function armLimb(len, prof, opt = {}) {
 }
 
 /**
- * A hand: a palm, four fingers and a thumb, merged into one buffer.
+ * One finger: three bones, each with its own knuckle, curling as it goes.
  *
- * The old one was the limb builder run a third time with the cross-section
- * squashed — a lozenge, which is genuinely what a hand looks like from two
- * metres and genuinely does not from forty centimetres, where it is the
- * largest object on the screen for a third of every stroke. Fingers are five
- * more lathes and one draw call either way.
+ * A finger modelled as one taper is a cone with a fingernail's worth of
+ * ambition, and there were four of them side by side on the largest object in
+ * the frame — which is why the last hand read as a mitten. The joints are the
+ * information. Every knuckle is wider than the bone above and below it, the
+ * gaps between the bones are where a finger creases, and the curl accumulates
+ * so the tip comes round further than the base — the shape of a hand doing
+ * something rather than a hand being displayed.
+ */
+function armFinger(len, r, curl) {
+  const bone = [len * 0.45, len * 0.31, len * 0.24];
+  const out = [];
+  let m = new THREE.Matrix4();
+  for (let i = 0; i < 3; i++) {
+    const a = r * (1 - 0.11 * i), b = r * (1 - 0.11 * (i + 1));
+    const g = armLimb(bone[i], (t) => {
+      // A knuckle at the head of each bone and a smaller one at its foot: a
+      // finger is a string of beads and the beads are what you actually see.
+      const w = a + (b - a) * t
+        + r * 0.16 * Math.exp(-t * t * 34.0)
+        + r * 0.10 * Math.exp(-(1 - t) * (1 - t) * 40.0);
+      // The last bone ends in a pad, not a point. Second column is the depth
+      // *ratio*, like every other profile in this file.
+      return [w, 1.06 - 0.10 * t, 0.24, 0];
+    }, { seg: 14, rows: 7, cap: 6 });
+    out.push(g.applyMatrix4(m.clone()));
+    m = m.clone()
+      .multiply(new THREE.Matrix4().makeTranslation(0, -bone[i] * 0.94, 0))
+      .multiply(new THREE.Matrix4().makeRotationX(curl[i]));
+  }
+  return out;
+}
+
+/**
+ * A hand: a palm with an arch and a thumb pad, four three-boned fingers and a
+ * thumb, merged into one buffer.
  *
  * Not splayed, and not clamped shut. A crawl's hand is a paddle held with the
  * fingers just touching and very slightly cupped — water goes through a splayed
- * hand and a clenched one has no surface — so they lie together with a couple
- * of degrees of curl and the little finger trailing the others, which is the
+ * hand and a clenched one has no surface — so they lie together with a few
+ * degrees of curl and the little finger trailing the others, which is the
  * shape that says "this hand is doing something" rather than "this hand is
  * a model of a hand".
  */
 function armHand(side) {
   const parts = [];
   const P = ARMS.palm;
-  // The palm. Wider at the knuckles than at the wrist, and thin through —
-  // a hand is about 20 mm deep and 85 mm across and the ratio is the whole
-  // silhouette.
-  parts.push(armLimb(P, (t) => [0.0385 + 0.0105 * t, 0.0205 - 0.0035 * t],
-    { seg: 20, rows: 6 }));
+  parts.push(armLimb(P, ARMS.palmProf, {
+    seg: 30, rows: 14, cap: 8, capTopS: 0.42, capBotS: 0.16 }));
 
-  const R = ARMS.fingerR;
+  // The thumb pad, laid along the thumb side of the palm and rolled forward
+  // on to the palmar face where it actually sits.
+  const then = armLimb(P * 0.78, ARMS.thenarProf, {
+    seg: 18, rows: 9, cap: 6, capTopS: 0.5, capBotS: 0.5 });
+  then.applyMatrix4(new THREE.Matrix4()
+    .makeRotationZ(-0.15 * side)
+    .premultiply(new THREE.Matrix4().makeTranslation(-0.0206 * side, -0.0150, 0.0058)));
+  parts.push(then);
+
   for (let i = 0; i < 4; i++) {
-    const len = ARMS.finger[i];
-    // Knuckles across the head of the palm, index at −X through little at +X
+    const [len, r] = ARMS.finger[i];
+    // Knuckles across the head of the palm, index at -X through little at +X
     // on the left hand and mirrored by the parent's sign.
-    const x = (-1.5 + i) * 0.0232 * side;
-    const g = armLimb(len, (t) => {
-      const w = R * (1 - 0.22 * t);
-      return [w, w * 1.06];                 // fingers are deeper than they are wide
-    }, { seg: 12, rows: 5 });
-    // A little curl, and a little converge — the tips of a swimmer's fingers
-    // are closer together than the knuckles are.
-    const m = new THREE.Matrix4()
-      .makeRotationX(0.16)
-      .premultiply(new THREE.Matrix4().makeRotationZ(-x * 1.15))
-      .premultiply(new THREE.Matrix4().makeTranslation(x, -P + 0.004, 0.0015));
-    parts.push(g.applyMatrix4(m));
+    const x = (-1.5 + i) * 0.0228 * side;
+    // The little finger trails and curls further, which every hand does and
+    // no modelled hand ever does.
+    const lag = i === 3 ? 0.07 : 0;
+    for (const g of armFinger(len, r, [0.09 + lag, 0.19 + lag, 0.17])) {
+      parts.push(g.applyMatrix4(new THREE.Matrix4()
+        .makeRotationX(0.10)
+        .premultiply(new THREE.Matrix4().makeRotationZ(-x * 1.25))
+        .premultiply(new THREE.Matrix4().makeTranslation(
+          x, -P + ARMS.knuckle[i], 0.0022))));
+    }
   }
+
   // The thumb, off the side of the palm and a long way round the axis: held
-  // in against the index finger, which is where it is on a catch.
-  const th = armLimb(ARMS.thumb, (t) => {
-    const w = 0.0128 * (1 - 0.24 * t);
-    return [w, w * 0.92];
-  }, { seg: 12, rows: 4 });
-  th.applyMatrix4(new THREE.Matrix4()
-    .makeRotationZ(-0.62 * side)
-    .premultiply(new THREE.Matrix4().makeRotationX(0.34))
-    .premultiply(new THREE.Matrix4().makeTranslation(-0.0335 * side, -0.0300, 0.0035)));
-  parts.push(th);
+  // in against the index finger, which is where it is on a catch. Two bones,
+  // not three, because that is how many a thumb has.
+  const tb = [ARMS.thumb * 0.56, ARMS.thumb * 0.44];
+  let m = new THREE.Matrix4()
+    .makeRotationZ(-0.30 * side)
+    .premultiply(new THREE.Matrix4().makeRotationX(0.26))
+    .premultiply(new THREE.Matrix4().makeTranslation(-0.0250 * side, -0.0548, 0.0090));
+  for (let i = 0; i < 2; i++) {
+    const a = ARMS.thumbR * (1 - 0.16 * i), b = ARMS.thumbR * (1 - 0.16 * (i + 1));
+    const g = armLimb(tb[i], (t) => {
+      const w = a + (b - a) * t + ARMS.thumbR * 0.13 * Math.exp(-t * t * 30.0);
+      return [w, 0.94 - 0.06 * t, 0.26, 0];
+    }, { seg: 14, rows: 7, cap: 6 });
+    parts.push(g.applyMatrix4(m.clone()));
+    m = m.clone()
+      .multiply(new THREE.Matrix4().makeTranslation(0, -tb[i] * 0.94, 0))
+      .multiply(new THREE.Matrix4().makeRotationX(0.34));
+  }
   return kiteMerge(parts);
 }
 
@@ -31177,9 +31571,22 @@ function buildAudio() {
   function applyOut(tau) {
     if (!ctx || dead || !outBus) return;
     const t = ctx.currentTime;
-    const x = Math.max(roomV, 0.55 * wetV + 0.45 * subV);
-    outBus.gain.setTargetAtTime(1 - 0.90 * x, t, tau);
-    outLp.frequency.setTargetAtTime(20000 * Math.pow(900 / 20000, x), t, tau);
+    // The beach and the sea are the same weighting they always were, but the
+    // wet term now carries nearly all of it. Standing in the shallows with your
+    // ears a hand above the surface you are not at a beach any more — the
+    // klapa is coming to you across water at a grazing angle, off a surface
+    // that reflects almost all of it back up the hill, and the half of every
+    // second your ears spend under takes the rest. It was audible here and it
+    // should not have been.
+    const x = Math.max(roomV, Math.min(1, 0.90 * wetV + 0.22 * subV));
+    // 18 dB down the moment you are in it, 32 down under it. That is a long
+    // way and it is meant to be: the point of the water is that the beach
+    // stops, and a beach you can still make out is a beach that never stopped.
+    outBus.gain.setTargetAtTime(1 - 0.975 * x, t, tau);
+    // And 460 Hz rather than 900, because what survives the surface is the
+    // bottom of the men's line and nothing above it — no consonants, no
+    // cicadas at all, which live at 4 kHz and are simply gone.
+    outLp.frequency.setTargetAtTime(20000 * Math.pow(460 / 20000, x), t, tau);
   }
 
   /**
@@ -35143,9 +35550,14 @@ window.__fr = {
       swim.you.pitch = pitch;
       return [yaw, pitch];
     },
-    tick: (secs, dtStep = 1 / 30) => {
+    /**
+     * `ctl` is the same shape the mode's own input is — {fwd, side, sprint,
+     * up, down} — because the interesting poses are the ones you only reach
+     * by swimming, and a tick with nothing held only ever shows the scull.
+     */
+    tick: (secs, dtStep = 1 / 30, ctl = {}) => {
       if (!swim || !swim.active) return null;
-      for (let t = 0; t < secs; t += dtStep) swim.update(dtStep, {});
+      for (let t = 0; t < secs; t += dtStep) swim.update(dtStep, ctl);
       paintSwimHud();
       return swim.stats();
     },

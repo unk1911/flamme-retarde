@@ -202,6 +202,12 @@ void main(){
   // bare grazed limestone on anything steep; and out past the light, the fine
   // grey mud that everything eventually settles into.
   float wetD = max(0.0, -vWorld.y);
+  // How far the fragment is, which the relief below needs and the haze needs
+  // again later. Fine detail has to be faded out with range or it aliases:
+  // a 33 cm ripple seen from twenty metres is well under a pixel, and what a
+  // sub-pixel corrugation does on screen is crawl.
+  float vdist = length(vWorld - uCamPos);
+  float nearby = 1.0 - smoothstep(7.0, 24.0, vdist);
   if (wetD > 0.0) {
     vec3 shell = vec3(0.845, 0.815, 0.720);     // shell sand, nearly white
     vec3 shingle = vec3(0.660, 0.645, 0.590);   // and where the swell sorts it
@@ -256,6 +262,73 @@ void main(){
 
     base = mix(base, bed, smoothstep(0.0, 0.35, wetD));
 
+    // ── relief ─────────────────────────────────────────────────────────────
+    // The bottom was a painting on a plate, and the plate is not negotiable:
+    // the DEM is one sample every 6.35 m and the finest terrain tile is a 5 m
+    // quad, so every triangle a swimmer can see is flat and stays flat as he
+    // moves over it. That is the whole of what was wrong with the seabed. No
+    // amount of colour fixes it, because the thing that is missing is not
+    // colour — it is the light moving.
+    //
+    // So the shading normal is perturbed from the same fields that painted it.
+    // Nothing here is geometry and nothing here costs a vertex; it is all paid
+    // in the fragment shader and only below the waterline, where the if this
+    // sits inside has already been taken.
+    //
+    // Reconstructed as a gradient rather than added to n directly: n came
+    // out of the height field as (-dh/dx, 1, -dh/dz) normalised, so dividing
+    // the horizontal components back out by n.y recovers the slope, the detail
+    // adds to it, and one normalize puts it back. The clamp on n.y is for the
+    // cliffs, where the recovered slope would otherwise run away.
+    vec2 dn = vec2(0.0);
+
+    // Sand ripples. The one thing everybody who has snorkelled over this coast
+    // remembers, and the only one nobody ever models: parallel corrugations a
+    // hand's breadth apart lying across the run of the swell, sharp-crested,
+    // and gone the moment the water is deep enough for the swell to stop
+    // reaching the bottom. They are on the clean sand and nowhere else — weed
+    // holds the sand still and rock has none to move.
+    float ripD = (1.0 - smoothstep(4.5, 11.0, wetD))
+               * smoothstep(0.15, 0.9, wetD)
+               * (1.0 - smoothstep(0.05, 0.20, slope))
+               * (1.0 - rooted) * (1.0 - outcrop) * nearby;
+    // Not a grating. The crest lines wander over a few metres and the spacing
+    // wanders with them, which is the difference between sand and corduroy.
+    vec2 rdir = normalize(vec2(0.62, 0.78));
+    float rk = 19.0 + 4.0 * fbm2(p * 0.035 + 12.1, 2);
+    float rph = dot(p, rdir) * rk + fbm2(p * 0.11 + 5.7, 2) * 5.2;
+    dn += rdir * cos(rph) * 0.155 * ripD;
+    // And the troughs are darker, because that is where the fine dark stuff
+    // ends up. Free, now that the phase is to hand.
+    base *= 1.0 + 0.065 * sin(rph) * ripD;
+
+    // Boulders. Central differences on the same ridged field the outcrop was
+    // cut from, at a third of a metre, which is about the size of the blocks.
+    // Four extra noise fetches and they are what turns the pale patches from
+    // stains into stones.
+    float eB = 0.34;
+    vec2 gb = vec2(
+      ridge2((p + vec2(eB, 0.0)) * 0.145 + 27.3, 2)
+        - ridge2((p - vec2(eB, 0.0)) * 0.145 + 27.3, 2),
+      ridge2((p + vec2(0.0, eB)) * 0.145 + 27.3, 2)
+        - ridge2((p - vec2(0.0, eB)) * 0.145 + 27.3, 2));
+    dn += gb * (0.85 / eB) * smoothstep(0.30, 0.62, boul)
+        * (1.0 - smoothstep(20.0, 32.0, wetD));
+
+    // And the meadow, which is not a lawn. Posidonia is a mat of leaf blades
+    // half a metre long lying over each other, and at swimming range what you
+    // see of it is a rough surface with the light broken up all over it — a
+    // flat dark green patch reads as a hole in the bottom rather than as the
+    // densest plant community in the Mediterranean.
+    float eW = 0.11;
+    vec2 gw = vec2(
+      vnoise2((p + vec2(eW, 0.0)) * 5.2) - vnoise2((p - vec2(eW, 0.0)) * 5.2),
+      vnoise2((p + vec2(0.0, eW)) * 5.2) - vnoise2((p - vec2(0.0, eW)) * 5.2));
+    dn += gw * (0.16 / eW) * rooted * nearby;
+
+    float ny = max(n.y, 0.28);
+    n = normalize(vec3(n.x / ny - dn.x, 1.0, n.z / ny - dn.y));
+
     // ── caustics ──────────────────────────────────────────────────────────
     // The one thing everybody recognises, and it is not a texture: it is the
     // sun refracted by the *surface*, so it belongs to world xz and to the
@@ -299,7 +372,7 @@ void main(){
   // Ground glow under an active flame front.
   col += vec3(1.0, 0.34, 0.08) * burning * 0.55;
 
-  float dist = length(vWorld - uCamPos);
+  float dist = vdist;
   // Haze first, then the water: air is what the light crossed before it got to
   // the surface, water is what it crossed after. Doing them in the other order
   // would put a Mediterranean horizon-white over a seabed ten metres down.

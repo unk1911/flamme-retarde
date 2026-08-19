@@ -71,35 +71,106 @@ const ARMS = {
   // with a pair of hands, for the same reason and by about the same amount.
   lift: 0.42,
 
-  upper: 0.295,        // m — humerus
-  fore: 0.265,         // radius/ulna
-  palm: 0.098,         // wrist to knuckle
+  // Measured off her, not guessed. `human_skin.fr3d` is the same rig the
+  // mirror figure is built on, and its rest skeleton says the humerus is
+  // 239 mm and the radius 238 mm, with a mean flesh radius running 55 mm at
+  // the deltoid to 37 mm at the elbow and 37 mm to 22 mm down the forearm.
+  // Everything below is those numbers. What the rig cannot give is the
+  // *surface* — see the note on `armHand` — but it can certainly give the
+  // proportions, and an arm that is hers by measurement is worth more than an
+  // arm that is anybody's by eye.
+  upper: 0.240,        // m — humerus
+  fore: 0.238,         // radius/ulna
+  palm: 0.092,         // wrist to knuckle; her hand is 171 mm end to end
 
-  // Silhouettes, not radii. The first version was two cones and a squashed
-  // third, and two cones is exactly what it looked like: an arm's outline is
-  // not monotonic anywhere along its length. The deltoid is the widest part of
-  // the upper arm and it is at the top; the forearm's widest part is a hand's
-  // breadth *below* the elbow and it runs to a wrist half that size. Getting
-  // those two bulges in is most of the difference between a limb and a pipe,
-  // and neither of them costs a triangle over the cone that was there.
+  // Silhouettes, not radii — and now tables rather than formulae, because an
+  // arm's outline is not any one curve. The first version was two cones; the
+  // second was a cone with a sine on it, which is a cone that breathes. Both
+  // read as plumbing for the same reason: a limb's width goes up and down
+  // several times along its length and every one of those reversals is a
+  // muscle you can name.
   //
-  // Elliptical, too. A forearm is a good bit deeper than it is wide seen from
-  // above and the other way round seen from the front; a round one catches the
-  // light evenly all the way along, which is the other half of why the cones
-  // read as plumbing.
-  upperProf: (t) => {
-    const w = 0.0570 - 0.0170 * t + 0.0052 * Math.sin(Math.PI * t);
-    return [w, w * 0.93];
-  },
-  foreProf: (t) => {
-    const w = 0.0452 - 0.0180 * t + 0.0068 * Math.sin(Math.PI * Math.pow(t, 0.65));
-    return [w, w * 0.80];
-  },
+  // Down the upper arm: the deltoid is the widest part and it is at the *top*,
+  // a third of the way down there is the biceps and triceps belly, then a long
+  // narrowing to the elbow — which widens again in the last two centimetres,
+  // because the humeral condyles are wider than the shaft above them and that
+  // little flare is most of what makes an elbow read as a joint rather than as
+  // a bend in a hose.
+  //
+  // Down the forearm: nothing at all at the elbow itself, then the flexor mass
+  // swelling to its maximum a hand's breadth below it, then two thirds of the
+  // limb's length spent tapering to a wrist barely half the width. The wrist
+  // is the giveaway. It is the one place on an arm where the section is
+  // emphatically not round — about 55 mm across and 40 mm through — and a
+  // round wrist is the single loudest wrong note in a first-person hand.
+  //
+  // Columns: t, half-width across X, depth ratio Z/X, squareness, bow.
+  //
+  // Squareness is the other thing the cones got wrong. A cross-section through
+  // a forearm is not an ellipse; it is a rounded triangle with the ulna making
+  // a flat along one side, and near the wrist it is nearly a rectangle. An
+  // ellipse catches the light in one even band all the way round, which is
+  // what plastic does. See `armSection`.
+  upperProf: armProfile([
+    [0.00, 0.0548, 1.00, 0.34, 0.0000],
+    [0.10, 0.0572, 1.00, 0.30, 0.0006],
+    [0.27, 0.0524, 1.05, 0.24, 0.0007],
+    [0.45, 0.0462, 1.07, 0.22, 0.0006],
+    [0.67, 0.0416, 1.00, 0.26, 0.0000],
+    [0.85, 0.0390, 0.90, 0.38, -0.0007],
+    [0.95, 0.0396, 0.80, 0.52, -0.0011],
+    [1.00, 0.0372, 0.78, 0.52, -0.0013],
+  ]),
+  foreProf: armProfile([
+    [0.00, 0.0374, 0.86, 0.48, 0.0000],
+    [0.09, 0.0428, 0.90, 0.38, 0.0013],
+    [0.23, 0.0440, 0.92, 0.32, 0.0018],
+    [0.43, 0.0378, 0.86, 0.32, 0.0016],
+    [0.63, 0.0306, 0.80, 0.36, 0.0009],
+    [0.81, 0.0259, 0.73, 0.44, 0.0002],
+    [0.93, 0.0234, 0.68, 0.54, -0.0004],
+    [1.00, 0.0225, 0.66, 0.58, -0.0005],
+  ]),
+  // The palm, with the arch in it. A hand held as a paddle is cupped: the
+  // knuckle row is a curve and the whole plate dishes toward the thumb, which
+  // is why a swimmer's hand holds water and a flat board does not.
+  // The thickness is the whole of it. A palm is 89 mm across and 22 mm
+  // through — a plate, and the ratio between those two numbers is the only
+  // reason a hand reads as a hand from the side. Written at half the width it
+  // came out a ball on the end of the wrist, which is what a first draft of a
+  // hand always is.
+  palmProf: armProfile([
+    [0.00, 0.0262, 0.70, 0.56, 0.0000],
+    [0.18, 0.0322, 0.55, 0.64, 0.0010],
+    [0.45, 0.0388, 0.40, 0.72, 0.0016],
+    [0.74, 0.0432, 0.30, 0.78, 0.0014],
+    [0.92, 0.0448, 0.26, 0.80, 0.0006],
+    [1.00, 0.0442, 0.25, 0.80, 0.0000],
+  ]),
+  // The thenar eminence — the muscle pad at the root of the thumb. It is the
+  // thickest part of a hand and it is the piece whose absence makes a modelled
+  // hand look like a glove with nothing in it.
+  thenarProf: armProfile([
+    [0.00, 0.0062, 1.00, 0.10, 0.0000],
+    [0.32, 0.0128, 0.80, 0.14, 0.0000],
+    [0.66, 0.0132, 0.74, 0.16, 0.0000],
+    [1.00, 0.0072, 0.66, 0.20, 0.0000],
+  ]),
 
-  // The hand, which is now a hand. See `armHand`.
-  finger: [0.0715, 0.0790, 0.0755, 0.0620],
-  fingerR: 0.0098,
-  thumb: 0.0640,
+  // Four fingers, index through little: length from the knuckle, and the
+  // radius of the proximal bone. Three bones each — see `armFinger`.
+  finger: [
+    [0.0706, 0.0096],
+    [0.0786, 0.0100],
+    [0.0737, 0.0094],
+    [0.0577, 0.0082],
+  ],
+  // The knuckle row, which is an arc and not a line: the index knuckle stands
+  // a few millimetres proud of the little one, and they are not all the same
+  // distance down the palm.
+  knuckle: [0.0042, 0.0060, 0.0028, -0.0044],
+  thumb: 0.0546,
+  thumbR: 0.0108,
 
   // A Dalmatian August, three weeks in. Albedo, so it sits below the colour it
   // arrives on screen as.
@@ -150,22 +221,90 @@ const ARM_SKIN = /* glsl */ `
 
   float atan_ = clamp(vLocal.z * -22.0, -1.0, 1.0) * 0.5 + 0.5;
   base *= mix(vec3(1.010, 0.995, 0.985), vec3(0.945, 0.885, 0.845), atan_);
-  base *= 1.0 + 0.05 * (vnoise2(vec2(vLocal.x + vLocal.z, vLocal.y) * 210.0) - 0.5);
+  // Grain, and it has to be *grain*. One octave of value noise on x+z is a
+  // lattice, and at this range a lattice on an arm reads as scales — which is
+  // what the first pass of this shipped. Two fields, crossed and at coprime
+  // rates so the beat between them never lines up, and half the amplitude.
+  base *= 1.0
+    + 0.030 * (vnoise2(vec2(vLocal.x * 1.7 + vLocal.z, vLocal.y) * 173.0) - 0.5)
+    + 0.022 * (vnoise2(vec2(vLocal.y * 1.3, vLocal.z - vLocal.x * 0.6) * 431.0) - 0.5);
 
   base = mix(base, vec3(0.760, 0.335, 0.250), afr * 0.26);
 `;
 
 /**
- * One tapered limb, hanging from the origin down −Y.
+ * A profile table, sampled smoothly.
  *
- * Down −Y because that is the direction a joint chain wants to be written in:
+ * Catmull-Rom through the knots rather than straight lines between them: the
+ * knots are where an anatomist would put a name, and the shape between two of
+ * them is a curve, not a chamfer. Sampled twenty-odd times down a limb it is
+ * the difference between an arm and a stack of cans.
+ *
+ * Returns [half-width, depth ratio, squareness, bow] at t.
+ */
+function armProfile(tab) {
+  const key = (i, c) => tab[Math.min(tab.length - 1, Math.max(0, i))][c] ?? 0;
+  return (t) => {
+    let i = 0;
+    while (i < tab.length - 2 && t > tab[i + 1][0]) i++;
+    const t0 = tab[i][0], t1 = tab[i + 1][0];
+    const u = t1 > t0 ? Math.min(1, Math.max(0, (t - t0) / (t1 - t0))) : 0;
+    const out = [];
+    for (let c = 1; c <= 4; c++) {
+      const p0 = key(i - 1, c), p1 = key(i, c);
+      const p2 = key(i + 1, c), p3 = key(i + 2, c);
+      out.push(0.5 * (2 * p1 + (p2 - p0) * u
+        + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u
+        + (3 * p1 - p0 - 3 * p2 + p3) * u * u * u));
+    }
+    return out;
+  };
+}
+
+/**
+ * One point on a cross-section.
+ *
+ * A superellipse, because a limb is not an ellipse anywhere along its length.
+ * `k` runs 0 for a true ellipse to about 0.8 for the wrist, which is nearly a
+ * rounded rectangle. The exponent is what puts the flats on the sides and the
+ * corners between them, and the flats are what let a highlight break into
+ * separate bands down the length of a forearm instead of running as one even
+ * stripe — which is the whole visual difference between skin and moulded PVC.
+ */
+function armSection(th, rx, rz, k) {
+  const n = 2 + 2.2 * Math.max(0, k);
+  const c = Math.cos(th), s = Math.sin(th);
+  const r = Math.pow(Math.pow(Math.abs(c), n) + Math.pow(Math.abs(s), n), -1 / n);
+  return [c * r * rx, s * r * rz];
+}
+
+/**
+ * One tapered limb, hanging from the origin down -Y.
+ *
+ * Down -Y because that is the direction a joint chain wants to be written in:
  * the shoulder is at the origin, the elbow is `len` below it, and every
  * rotation in the file is then a rotation of a thing that starts by hanging.
+ *
+ * The tessellation is not decoration. At forty centimetres from a 58-degree
+ * lens an arm is eight hundred pixels tall, and a twenty-four-sided lathe puts
+ * a visible flat every thirty pixels round its silhouette; worse, the sparse
+ * rows meant the profile table above would have been sampled at eight stations
+ * and every reversal in it rounded off to nothing. Thirty-six sides and
+ * twenty-two rows is about nine thousand triangles for the pair, which for the
+ * only object on the screen that is close enough to be judged as a *surface*
+ * is not extravagant — it is the minimum at which the silhouette stops being
+ * the thing you look at.
  */
 function armLimb(len, prof, opt = {}) {
-  const seg = opt.seg ?? 24, rows = opt.rows ?? 14, N = 6;
+  const seg = opt.seg ?? 36, rows = opt.rows ?? 22, N = opt.cap ?? 9;
+  // How far a cap stands proud, as a fraction of the radius it caps. A whole
+  // hemisphere is right on the end of a bone and badly wrong on the end of a
+  // palm: a palm is 45 mm across, so a full cap put a 36 mm dome on the
+  // knuckle line and the fingers grew out of the middle of it. That was the
+  // mitten. A palm ends in a flat with a rolled edge, and so does a knuckle.
+  const cT = opt.capTopS ?? 0.80, cB = opt.capBotS ?? 0.80;
   const st = [];
-  const [rx0, rz0] = prof(0), [rx1, rz1] = prof(1);
+  const p0 = prof(0), p1 = prof(1);
   // The caps are what fixed the joints. Two flat-ended cylinders meeting at a
   // bent elbow show you both of their end discs and the wedge of nothing
   // between them, and at forty centimetres from the lens that wedge is the
@@ -174,25 +313,30 @@ function armLimb(len, prof, opt = {}) {
   // blend shape and no joint sphere sitting proud of the limb it belongs to.
   if (opt.capTop !== false) {
     for (let i = N; i >= 1; i--) {
-      const a = (i / N) * Math.PI * 0.5, c = Math.max(Math.cos(a), 0.004);
-      st.push([rx0 * Math.sin(a) * 0.80, rx0 * c, rz0 * c]);
+      const a = (i / N) * Math.PI * 0.5, c = Math.max(Math.cos(a), 0.003);
+      st.push([p0[0] * Math.sin(a) * cT, p0[0] * c, p0[0] * p0[1] * c,
+        p0[2], p0[3]]);
     }
   }
   for (let j = 0; j <= rows; j++) {
-    const t = j / rows, r = prof(t);
-    st.push([-t * len, r[0], r[1]]);
+    const t = j / rows, p = prof(t);
+    st.push([-t * len, p[0], p[0] * p[1], p[2], p[3]]);
   }
   if (opt.capBot !== false) {
     for (let i = 1; i <= N; i++) {
-      const a = (i / N) * Math.PI * 0.5, c = Math.max(Math.cos(a), 0.004);
-      st.push([-len - rx1 * Math.sin(a) * 0.80, rx1 * c, rz1 * c]);
+      const a = (i / N) * Math.PI * 0.5, c = Math.max(Math.cos(a), 0.003);
+      st.push([-len - p1[0] * Math.sin(a) * cB, p1[0] * c, p1[0] * p1[1] * c,
+        p1[2], p1[3]]);
     }
   }
-  const rings = st.map(([y, rx, rz]) => {
+  const rings = st.map(([y, rx, rz, k, bow]) => {
     const ring = [];
     for (let i = 0; i < seg; i++) {
-      const th = (i / seg) * Math.PI * 2;
-      ring.push(new THREE.Vector3(Math.cos(th) * rx, y, Math.sin(th) * rz));
+      const [x, z] = armSection((i / seg) * Math.PI * 2, rx, rz, k);
+      // The bow. An arm is not a straight axis: the forearm carries a few
+      // millimetres of lateral bow and the upper arm the other way, and at
+      // this range a perfectly straight limb reads as machined.
+      ring.push(new THREE.Vector3(x + bow, y, z));
     }
     return ring;
   });
@@ -200,59 +344,102 @@ function armLimb(len, prof, opt = {}) {
 }
 
 /**
- * A hand: a palm, four fingers and a thumb, merged into one buffer.
+ * One finger: three bones, each with its own knuckle, curling as it goes.
  *
- * The old one was the limb builder run a third time with the cross-section
- * squashed — a lozenge, which is genuinely what a hand looks like from two
- * metres and genuinely does not from forty centimetres, where it is the
- * largest object on the screen for a third of every stroke. Fingers are five
- * more lathes and one draw call either way.
+ * A finger modelled as one taper is a cone with a fingernail's worth of
+ * ambition, and there were four of them side by side on the largest object in
+ * the frame — which is why the last hand read as a mitten. The joints are the
+ * information. Every knuckle is wider than the bone above and below it, the
+ * gaps between the bones are where a finger creases, and the curl accumulates
+ * so the tip comes round further than the base — the shape of a hand doing
+ * something rather than a hand being displayed.
+ */
+function armFinger(len, r, curl) {
+  const bone = [len * 0.45, len * 0.31, len * 0.24];
+  const out = [];
+  let m = new THREE.Matrix4();
+  for (let i = 0; i < 3; i++) {
+    const a = r * (1 - 0.11 * i), b = r * (1 - 0.11 * (i + 1));
+    const g = armLimb(bone[i], (t) => {
+      // A knuckle at the head of each bone and a smaller one at its foot: a
+      // finger is a string of beads and the beads are what you actually see.
+      const w = a + (b - a) * t
+        + r * 0.16 * Math.exp(-t * t * 34.0)
+        + r * 0.10 * Math.exp(-(1 - t) * (1 - t) * 40.0);
+      // The last bone ends in a pad, not a point. Second column is the depth
+      // *ratio*, like every other profile in this file.
+      return [w, 1.06 - 0.10 * t, 0.24, 0];
+    }, { seg: 14, rows: 7, cap: 6 });
+    out.push(g.applyMatrix4(m.clone()));
+    m = m.clone()
+      .multiply(new THREE.Matrix4().makeTranslation(0, -bone[i] * 0.94, 0))
+      .multiply(new THREE.Matrix4().makeRotationX(curl[i]));
+  }
+  return out;
+}
+
+/**
+ * A hand: a palm with an arch and a thumb pad, four three-boned fingers and a
+ * thumb, merged into one buffer.
  *
  * Not splayed, and not clamped shut. A crawl's hand is a paddle held with the
  * fingers just touching and very slightly cupped — water goes through a splayed
- * hand and a clenched one has no surface — so they lie together with a couple
- * of degrees of curl and the little finger trailing the others, which is the
+ * hand and a clenched one has no surface — so they lie together with a few
+ * degrees of curl and the little finger trailing the others, which is the
  * shape that says "this hand is doing something" rather than "this hand is
  * a model of a hand".
  */
 function armHand(side) {
   const parts = [];
   const P = ARMS.palm;
-  // The palm. Wider at the knuckles than at the wrist, and thin through —
-  // a hand is about 20 mm deep and 85 mm across and the ratio is the whole
-  // silhouette.
-  parts.push(armLimb(P, (t) => [0.0385 + 0.0105 * t, 0.0205 - 0.0035 * t],
-    { seg: 20, rows: 6 }));
+  parts.push(armLimb(P, ARMS.palmProf, {
+    seg: 30, rows: 14, cap: 8, capTopS: 0.42, capBotS: 0.16 }));
 
-  const R = ARMS.fingerR;
+  // The thumb pad, laid along the thumb side of the palm and rolled forward
+  // on to the palmar face where it actually sits.
+  const then = armLimb(P * 0.78, ARMS.thenarProf, {
+    seg: 18, rows: 9, cap: 6, capTopS: 0.5, capBotS: 0.5 });
+  then.applyMatrix4(new THREE.Matrix4()
+    .makeRotationZ(-0.15 * side)
+    .premultiply(new THREE.Matrix4().makeTranslation(-0.0206 * side, -0.0150, 0.0058)));
+  parts.push(then);
+
   for (let i = 0; i < 4; i++) {
-    const len = ARMS.finger[i];
-    // Knuckles across the head of the palm, index at −X through little at +X
+    const [len, r] = ARMS.finger[i];
+    // Knuckles across the head of the palm, index at -X through little at +X
     // on the left hand and mirrored by the parent's sign.
-    const x = (-1.5 + i) * 0.0232 * side;
-    const g = armLimb(len, (t) => {
-      const w = R * (1 - 0.22 * t);
-      return [w, w * 1.06];                 // fingers are deeper than they are wide
-    }, { seg: 12, rows: 5 });
-    // A little curl, and a little converge — the tips of a swimmer's fingers
-    // are closer together than the knuckles are.
-    const m = new THREE.Matrix4()
-      .makeRotationX(0.16)
-      .premultiply(new THREE.Matrix4().makeRotationZ(-x * 1.15))
-      .premultiply(new THREE.Matrix4().makeTranslation(x, -P + 0.004, 0.0015));
-    parts.push(g.applyMatrix4(m));
+    const x = (-1.5 + i) * 0.0228 * side;
+    // The little finger trails and curls further, which every hand does and
+    // no modelled hand ever does.
+    const lag = i === 3 ? 0.07 : 0;
+    for (const g of armFinger(len, r, [0.09 + lag, 0.19 + lag, 0.17])) {
+      parts.push(g.applyMatrix4(new THREE.Matrix4()
+        .makeRotationX(0.10)
+        .premultiply(new THREE.Matrix4().makeRotationZ(-x * 1.25))
+        .premultiply(new THREE.Matrix4().makeTranslation(
+          x, -P + ARMS.knuckle[i], 0.0022))));
+    }
   }
+
   // The thumb, off the side of the palm and a long way round the axis: held
-  // in against the index finger, which is where it is on a catch.
-  const th = armLimb(ARMS.thumb, (t) => {
-    const w = 0.0128 * (1 - 0.24 * t);
-    return [w, w * 0.92];
-  }, { seg: 12, rows: 4 });
-  th.applyMatrix4(new THREE.Matrix4()
-    .makeRotationZ(-0.62 * side)
-    .premultiply(new THREE.Matrix4().makeRotationX(0.34))
-    .premultiply(new THREE.Matrix4().makeTranslation(-0.0335 * side, -0.0300, 0.0035)));
-  parts.push(th);
+  // in against the index finger, which is where it is on a catch. Two bones,
+  // not three, because that is how many a thumb has.
+  const tb = [ARMS.thumb * 0.56, ARMS.thumb * 0.44];
+  let m = new THREE.Matrix4()
+    .makeRotationZ(-0.30 * side)
+    .premultiply(new THREE.Matrix4().makeRotationX(0.26))
+    .premultiply(new THREE.Matrix4().makeTranslation(-0.0250 * side, -0.0548, 0.0090));
+  for (let i = 0; i < 2; i++) {
+    const a = ARMS.thumbR * (1 - 0.16 * i), b = ARMS.thumbR * (1 - 0.16 * (i + 1));
+    const g = armLimb(tb[i], (t) => {
+      const w = a + (b - a) * t + ARMS.thumbR * 0.13 * Math.exp(-t * t * 30.0);
+      return [w, 0.94 - 0.06 * t, 0.26, 0];
+    }, { seg: 14, rows: 7, cap: 6 });
+    parts.push(g.applyMatrix4(m.clone()));
+    m = m.clone()
+      .multiply(new THREE.Matrix4().makeTranslation(0, -tb[i] * 0.94, 0))
+      .multiply(new THREE.Matrix4().makeRotationX(0.34));
+  }
   return kiteMerge(parts);
 }
 

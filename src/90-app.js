@@ -3256,9 +3256,14 @@ window.__fr = {
       swim.you.pitch = pitch;
       return [yaw, pitch];
     },
-    tick: (secs, dtStep = 1 / 30) => {
+    /**
+     * `ctl` is the same shape the mode's own input is — {fwd, side, sprint,
+     * up, down} — because the interesting poses are the ones you only reach
+     * by swimming, and a tick with nothing held only ever shows the scull.
+     */
+    tick: (secs, dtStep = 1 / 30, ctl = {}) => {
       if (!swim || !swim.active) return null;
-      for (let t = 0; t < secs; t += dtStep) swim.update(dtStep, {});
+      for (let t = 0; t < secs; t += dtStep) swim.update(dtStep, ctl);
       paintSwimHud();
       return swim.stats();
     },
