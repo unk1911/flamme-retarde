@@ -42,6 +42,13 @@ const SWIM = {
 
   cruise: 1.15,        // m/s — a steady crawl in a jacket, which is slow
   sprint: 2.00,
+  // Turning on the arrow keys, rad/s. Swimming is not walking and the mouse
+  // is still the honest way to look, but a mode you can only steer with a
+  // mouse is a mode half the people who try it cannot steer at all: under
+  // water there is no ground to strafe against, so left and right meant
+  // sliding sideways, which does nothing you can see. Left and right now turn
+  // you, which is the thing that was missing.
+  turn: 1.45,
   accel: 2.4,
   drag: 1.7,
 
@@ -344,6 +351,9 @@ function buildSwim(sea) {
     // On the surface your face is in the water and your body is flat on it: you
     // go where you point and pitch has nothing to do with it, which is also
     // what stops "looking at the sky while you swim" from lifting you out.
+    // Steering, before anything is aimed by it.
+    if (ctl.turn) you.yaw -= clamp(ctl.turn, -1, 1) * SWIM.turn * dt;
+
     const f = clamp(ctl.fwd || 0, -1, 1);
     const sd = clamp(ctl.side || 0, -1, 1);
     const drive = you.spent ? 0

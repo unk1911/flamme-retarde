@@ -217,6 +217,9 @@ addEventListener('keydown', (e) => {
   // 9 it is ahead of the pause guard, because reading the hint and then
   // pressing the key it names should work.
   if (e.code === 'KeyV') { e.preventDefault(); skipToVikendica(); return; }
+  // R — the race. Ahead of the pause guard with the other three back doors,
+  // and for the same reason: it is a place to be taken to.
+  if (e.code === 'KeyR') { e.preventDefault(); startChase(); return; }
   // While the world is stopped, only the settings answer. Cycling the camera or
   // dropping the gear against a frozen simulation puts the picture and the
   // state out of step, and the HUD is not being redrawn to tell you.
@@ -585,7 +588,7 @@ function updateCamera(dt) {
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
   trees, landmarks, alerts, roads, rail, props, airfield, jadrija, ground, birds, eject,
-  mirror, mirrorP, swim, under, seabed, arms, kites, ride, you;
+  mirror, mirrorP, swim, under, seabed, arms, kites, ride, chase, you;
 /** You plus the three wingmen, as the birds see them. Built once, in boot(). */
 let birdFlush = [];
 
@@ -678,6 +681,7 @@ async function boot() {
   under = buildUnder(scene);
   seabed = buildBed(scene);
   ride = buildRide(scene);
+  chase = await buildChase(scene);
 
   await step(74, 'load.stone');
   resolveLandmarks();
@@ -1142,13 +1146,58 @@ function afootToast() {
  *
  * It is not hidden. There is no achievement here to protect.
  */
+/**
+ * Out of whichever water mode is running, without landing you anywhere.
+ *
+ * The three back doors — 0 for the apron, 9 for the terrace, V for the
+ * vikendica — were all written against `state.phase === 'fly'`, because when
+ * they were written the only other place you could be was in the seat. There
+ * are two more now and both of them are out in the channel, which is exactly
+ * where a way out is worth most: swimming four hundred metres back in to look
+ * at a kitchen is not a thing anybody should have to do twice.
+ *
+ * It leaves the mode and nothing else — the caller is about to put you
+ * somewhere, and a function that also decided where would be two answers to
+ * one question.
+ */
+function leaveWater() {
+  // Whatever else is going on, the race does not survive leaving the water.
+  if (chase && chase.active) { chase.stop(); chaseCut = null; }
+  $('chase-hud').hidden = true;
+  if (state.phase === 'swim') {
+    swim.leave();
+    $('swim-hud').hidden = true;
+    $('under').classList.remove('on');
+    $('under').hidden = true;
+    if (IS_TOUCH) $('stouch').hidden = true;
+    wasUnder = false;
+    return true;
+  }
+  if (state.phase === 'ride') {
+    ride.leave();
+    $('ride-hud').hidden = true;
+    if (IS_TOUCH) $('stouch').hidden = true;
+    return true;
+  }
+  return false;
+}
+
+/** True where a back door is allowed to fire from. */
+const inWater = () => state.phase === 'swim' || state.phase === 'ride';
+
 function skipToGround() {
   if (!ground || !ground.ok || !airfield || !airfield.site) return;
   if (state.phase === 'ground') { toast(afootToast()); return; }
-  if (state.phase !== 'fly') return;
+  if (state.phase !== 'fly' && !inWater()) return;
   if (state.paused) setPaused(false);
   ground.force();                 // arm the field and light it, now, not in a minute
   if (!parkAtApron()) return;
+  // Out of the sea first, or `toggleGround` would put you on the apron with a
+  // swim still running underneath it and a breath bar counting down.
+  if (inWater()) {
+    leaveWater();
+    state.phase = 'fly';
+  }
   toggleGround();
   toast(T('toast.cheat'));
 }
@@ -1171,8 +1220,9 @@ function skipToGround() {
 function skipToJadrija() {
   if (!ground || !ground.ok || !jadrija || !jadrija.figureAt) return;
   if (state.phase === 'ground') { toast(afootToast()); return; }
-  if (state.phase !== 'fly') return;
+  if (state.phase !== 'fly' && !inWater()) return;
   if (state.paused) setPaused(false);
+  leaveWater();
   const [ft, fs] = jadrija.figureAt;
   const w = jadrija.toWorld(ft + 16, fs - 1);
   const her = jadrija.toWorld(ft, fs);
@@ -1425,6 +1475,37 @@ function checkLaptopSpray() {
 }
 
 /**
+ * And the set on the cabinet, which answers the same way the one in the kabine
+ * does: hit it and the channel goes round.
+ *
+ * Same geometry as the laptop's, one latch shorter — a television is a metre
+ * across and you are not going to miss it, and the reward for hitting it is a
+ * channel and not a mode change, so it does not need to be sure you meant it.
+ * The 0.8 m radius is the set plus the cabinet under it, because water hitting
+ * the cabinet is water hitting the television as far as anybody watching is
+ * concerned.
+ */
+let tvHeld = 0;
+function checkTvSpray() {
+  const vik = jadrija && jadrija.vik;
+  if (state.phase !== 'ground' || !ground || !ground.you || !vik || !vik.tv) {
+    tvHeld = 0; return;
+  }
+  const you = ground.you;
+  if (!you.spraying || you.jet < 0.4) { tvHeld = 0; return; }
+  const p = vik.tv.at();
+  camera.getWorldDirection(sprayDir);
+  const e = camera.position;
+  const vx = p[0] - e.x, vy = p[1] - e.y, vz = p[2] - e.z;
+  const along = vx * sprayDir.x + vy * sprayDir.y + vz * sprayDir.z;
+  if (along < 0.30 || along > 5.0) { tvHeld = 0; return; }
+  const off = Math.hypot(vx - sprayDir.x * along, vy - sprayDir.y * along,
+    vz - sprayDir.z * along);
+  tvHeld = off < 0.55 ? tvHeld + 1 : 0;
+  if (tvHeld > 10) { tvHeld = 0; vik.tv.knock(); if (audio) audio.radioClick(true); }
+}
+
+/**
  * O — the computer. Also what spraying the laptop does.
  *
  * Pressed at it, it stands you up again, which is the same key doing the same
@@ -1473,8 +1554,126 @@ function skipToVikendica() {
       return;
     }
   }
-  if (state.phase !== 'fly' && state.phase !== 'ground') return;
+  if (state.phase !== 'fly' && state.phase !== 'ground' && !inWater()) return;
+  // Same as the other two: the walk-up is a camera shot and a swim left
+  // running under it would still be counting your breath.
+  if (inWater()) { leaveWater(); state.phase = 'fly'; }
   startVikWalk();
+}
+
+// ── the race out to the platform ─────────────────────────────────────────────
+/**
+ * R — she is already on the end of the jetty.
+ *
+ * A door rather than a discovery, which is the answer to "how does it start"
+ * that the other three cheats already gave: 0 is the apron, 9 is the terrace,
+ * V is the house and R is the swim.
+ *
+ * Pressed again it starts the race over rather than cancelling it, which is the
+ * one place this key differs from the other three. Written as a toggle it was a
+ * race you could stop by leaning on the key, and — worse — a second press
+ * arriving in the same frame as the first, which is a thing keyboards and test
+ * harnesses both do, left you in the water with the shot half run and nothing
+ * to chase. Restart is what "press R to go again" in the lost message means
+ * anyway; the way out of the water is the way out of the water.
+ *
+ * The shot before it is three legs, exactly as the walk up to the vikendica is,
+ * and it is here for the same reason: dropping straight into the water with a
+ * gap counter on the screen is a menu. What makes it a race is seeing the two
+ * ends of it — the jetty behind, the platform ahead, and her already between
+ * them — before anybody hands you the controls.
+ */
+let chaseCut = null;
+function startChase() {
+  if (!jadrija || !jadrija.swimRun || !swim || !chase || !ground || !ground.ok) {
+    return false;
+  }
+  if (state.paused) setPaused(false);
+  if (chase.active) { chase.stop(); chaseCut = null; }
+  const r = jadrija.swimRun;
+  leaveWater();
+  if (state.phase === 'ground') ground.bail();
+  eject.reset();
+  const yaw = Math.atan2(-(r.board[0] - r.start[0]), -(r.board[1] - r.start[1]));
+  if (!swim.enter(r.start[0], r.start[1], yaw, 0)) return false;
+  state.phase = 'swim';
+  $('hud').hidden = true;
+  $('chute-hud').hidden = true;
+  $('ground-hud').hidden = true;
+  $('ride-hud').hidden = true;
+  // Both HUDs stay off until the shot has finished. A breath bar and a gap
+  // counter over an establishing shot is the game telling you about a race you
+  // have not been shown yet.
+  $('swim-hud').hidden = true;
+  $('chase-hud').hidden = true;
+  if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = true;
+    $('ctouch').hidden = true; $('stouch').hidden = false; }
+  chase.start(r.start, r.board, (x, z) => swim.surfaceAt(x, z));
+  wasUnder = false;
+
+  // The shot. World metres, built from the two ends of the run so that moving
+  // the platform moves the camera with it.
+  const dx = r.board[0] - r.start[0], dz = r.board[1] - r.start[1];
+  const L = Math.hypot(dx, dz) || 1;
+  const ux = dx / L, uz = dz / L;          // down the course
+  const nx = -uz, nz = ux;                 // and across it
+  const P = (a, b, y) => [r.start[0] + ux * a + nx * b, y,
+    r.start[1] + uz * a + nz * b];
+  chaseCut = { u: 0, leg: 0, legs: [
+    // High and off to one side, with the whole course in frame: the jetty at
+    // the bottom of the picture, the platform at the top, her in between.
+    { at: P(-26, 24, r.jetty[1] + 15.5), look: P(52, 0, 0.2), dur: 2.3 },
+    // Down to the water at the jetty head, looking along her wake.
+    { at: P(-3.5, 3.2, r.jetty[1] + 1.2), look: P(28, 0, 0.1), dur: 1.9 },
+    // And into the swim, where the camera already is.
+    { at: P(0, 0, 0.24), look: P(40, 0, 0.1), dur: 1.0 },
+  ] };
+  paintChaseHud();
+  toast(T('chase.on'));
+  return true;
+}
+
+/** One frame of the shot. Wall time, same as the walk up to the house. */
+function stepChaseCut(dt) {
+  if (!chaseCut) return;
+  const K = chaseCut.legs;
+  chaseCut.u += dt / K[chaseCut.leg].dur;
+  while (chaseCut.u >= 1 && chaseCut.leg < K.length - 1) {
+    chaseCut.u -= 1; chaseCut.leg += 1;
+  }
+  if (chaseCut.leg >= K.length - 1 && chaseCut.u >= 1) {
+    chaseCut = null; camOverride = null;
+    $('swim-hud').hidden = false;
+    $('chase-hud').hidden = false;
+    paintChaseHud();
+    if (!IS_TOUCH && !pointerLocked) grabPointer();
+    return;
+  }
+  const a = K[chaseCut.leg], b = K[Math.min(chaseCut.leg + 1, K.length - 1)];
+  const f = chaseCut.u * chaseCut.u * (3 - 2 * chaseCut.u);
+  const m = (p, q) => [lerp(p[0], q[0], f), lerp(p[1], q[1], f), lerp(p[2], q[2], f)];
+  const eye = m(a.at, b.at), aim = m(a.look, b.look);
+  camOverride = [eye[0], eye[1], eye[2], aim[0], aim[1], aim[2]];
+}
+
+/** Put the race away. `won` only decides what gets said about it. */
+function endChase(won) {
+  if (chase) chase.stop();
+  chaseCut = null;
+  if (camOverride && state.phase === 'swim') camOverride = null;
+  $('chase-hud').hidden = true;
+  if (!won) toast(T('chase.lost'));
+}
+
+/** The gap, how far through she is, and whatever she is saying. */
+function paintChaseHud() {
+  if (!chase || !chase.active) return;
+  const talking = chase.phase === 'talk';
+  $('ch-gap').textContent = talking ? '' : Math.round(chase.gap);
+  $('ch-unit').textContent = talking ? '' : T('chase.behind');
+  $('ch-fill').style.width = (chase.through * 100).toFixed(1) + '%';
+  const n = chase.line;
+  $('ch-say').innerHTML = n ? T('chase.say' + n) : '';
 }
 
 /**
@@ -1689,12 +1888,54 @@ function paintSwimHud() {
  * walking model wants a locale before it wants a position, because everything
  * it can answer is inside one.
  */
+/**
+ * The nearest bit of land you could actually stand on, from a point in the sea.
+ *
+ * `canWade` answers a different question — is there a bottom under your own
+ * feet — and the answer to that is yes in chest-deep water a good fifteen
+ * metres out. Handing that position straight to the on-foot mode is what put
+ * you standing in the sea about half the time you pressed E, which is the
+ * complaint: E is meant to get you *ashore*, not merely out of the swim.
+ *
+ * So: walk outward, the way you are facing first and then round, and stop at
+ * the first place with real dry land under it and more dry land two metres
+ * past it — the second test is what stops you being landed on a waterline
+ * that the next wave is over. If there is genuinely nothing (a swim off a
+ * cliff, a channel with no beach on it) it takes the highest ground it found
+ * rather than failing, because a key that sometimes does nothing is worse than
+ * a key that does its best.
+ *
+ * Returns [x, z, yaw] — the heading is the way you walked out, so you come up
+ * the beach facing inland rather than back at the water you just left.
+ */
+function dryLand(x0, z0, yaw) {
+  const DRY = 0.45;          // metres above the waterline before it is a beach
+  let best = null, bestD = 1e9;
+  let fallback = null, fallbackH = -1e9;
+  for (let a = 0; a < 26; a++) {
+    const ang = yaw + (a === 0 ? 0 : (a % 2 ? 1 : -1) * Math.ceil(a / 2) * 0.25);
+    const dx = -Math.sin(ang), dz = -Math.cos(ang);
+    for (let d = 1.5; d <= 70; d += 1.5) {
+      const x = x0 + dx * d, z = z0 + dz * d;
+      const h = groundAt(x, z);
+      if (h > fallbackH) { fallbackH = h; fallback = [x, z, ang]; }
+      if (h < DRY || groundAt(x + dx * 2, z + dz * 2) < DRY) continue;
+      // A metre and a half further in again, so you land on the beach rather
+      // than on its edge.
+      if (d < bestD) { bestD = d; best = [x + dx * 1.5, z + dz * 1.5, ang]; }
+      break;
+    }
+  }
+  return best || fallback;
+}
+
 function wadeAshore() {
   if (state.phase !== 'swim' || !swim.canWade()) return false;
   const y = swim.you;
+  const spot = dryLand(y.x, y.z, y.yaw) || [y.x, y.z, y.yaw];
   if (!ground || !ground.ok
-    || !ground.retarget(localeAt(y.x, y.z, airfield, jadrija, city))
-    || !ground.dropIn(y.x, y.z, y.yaw, true)) {
+    || !ground.retarget(localeAt(spot[0], spot[1], airfield, jadrija, city))
+    || !ground.dropIn(spot[0], spot[1], spot[2], true)) {
     toast(T('ground.noPlane'));
     return false;
   }
@@ -2513,12 +2754,16 @@ function frame() {
   // second to travel is not a thing anybody can see, and the alternative —
   // hoisting the lens up here — would put the camera's easing ahead of the
   // simulation it is easing over.
-  // Slow motion rides the lens — see SLOW — but only on land. In the water
-  // the sea's own rhythm is the clock you are reading the mode by: the swell
-  // lifting you, the breath bar, how long a stroke takes. Halve all of that
-  // for as long as somebody holds Z and the game does not read as slowed, it
-  // reads as hung.
-  const dt = real * (1 - (1 - SLOW) * (state.phase === 'swim' ? 0 : zoom));
+  // Slow motion rides the lens — see SLOW — everywhere, water included.
+  //
+  // It used to stop at the waterline, on the argument that the sea's own
+  // rhythm is the clock you read the mode by and that slowing it would read
+  // as hung. That was the wrong call: Z is a scope, and the whole of what a
+  // scope is is that the world goes quiet and long while you are looking down
+  // it. Holding it under water is the same act for the same reason, and the
+  // swell going slow and the breath bar going slow with it is the point of
+  // pressing the key rather than a side effect of it.
+  const dt = real * (1 - (1 - SLOW) * zoom);
   U.uTime.value += dt;
   if (!started) return;
 
@@ -2587,12 +2832,20 @@ function frame() {
     // Keys and thumbs, added rather than switched between, exactly as the
     // other three modes do it: a touchscreen laptop with a keyboard plugged
     // into it is a real machine and neither half of it should win.
-    swim.update(dt, {
+    swim.update(dt, chaseCut ? {} : {
       fwd: (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0)
         - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0) + TOUCH.sy,
-      side: (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0)
-        - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0) + TOUCH.sx,
-      sprint: keys.has('ShiftLeft') || keys.has('ShiftRight') || TOUCH.sfast,
+      // A and D still strafe, because that is what they do in the other two
+      // modes and a key that means two things in two modes is worse than a
+      // key that means nothing. The arrows turn: under water there is no
+      // ground to push sideways off, so strafing was the one control in the
+      // mode that did nothing you could see, and left and right are the keys
+      // everybody reaches for to look round.
+      side: (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0) + TOUCH.sx,
+      turn: (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0),
+      // Q as well as shift, which is what the on-foot mode runs on.
+      sprint: keys.has('ShiftLeft') || keys.has('ShiftRight') || keys.has('KeyQ')
+        || TOUCH.sfast,
       down: keys.has('KeyC') || keys.has('ControlLeft') || TOUCH.sdown,
       up: keys.has('Space') || TOUCH.sup,
     });
@@ -2606,6 +2859,16 @@ function frame() {
         if (wasUnder) audio.plunge(0.7);
         else audio.gasp(clamp(1.35 - swim.breath, 0.45, 1.15));
       }
+    }
+    // And the race, if there is one. Frozen while the shot is running: she has
+    // a seven-metre lead and five seconds of camera, and letting her swim
+    // through the establishing shot would hand her twenty-five.
+    if (chase && chase.active && !chaseCut) {
+      const out = chase.update(dt, swim.you, (x, z) => swim.surfaceAt(x, z));
+      if (out === 'caught') { toast(T('chase.caught')); if (audio) audio.gasp(0.8); }
+      else if (out === 'lost') { $('ch-say').textContent = ''; }
+      else if (out === 'done') { endChase(true); }
+      paintChaseHud();
     }
     paintSwimHud();
     updateMission(real);
@@ -2675,14 +2938,15 @@ function frame() {
   // as long to finish, and the thing you pressed the key for would come in like
   // a hydraulic door.
   if (vikWalk) stepVikWalk(real);
+  if (chaseCut) stepChaseCut(real);
   if (comp) stepComputer(real);
-  else checkLaptopSpray();
+  else { checkLaptopSpray(); checkTvSpray(); }
   if (!camOverride) stepLens(real);
-  // And the mix goes under water with it. There is nothing to slow down in
-  // there — every voice in this game is synthesised rather than played — so
-  // this takes the top off instead, which is the older idiom for the same beat
-  // and the one the ear reads as strangeness rather than as breakage.
-  if (audio) audio.slowmo(state.phase === 'swim' ? 0 : zoom);
+  // And the mix goes with it, water included — the duck and the long tail are
+  // most of what makes the lens read as a scope rather than as a zoom, and
+  // under water there is a second filter on top of it already, so the two
+  // stack into something further off rather than fighting.
+  if (audio) audio.slowmo(zoom);
   if (camOverride) updateCamera(dt);
   else if (state.phase === 'ground') ground.pose(camera);
   else if (state.phase === 'ride') ride.pose(camera);
@@ -2692,6 +2956,7 @@ function frame() {
   // After the pose, because the rig hangs off where you ended up rather than
   // off where you were.
   if (state.phase === 'ride') ride.draw();
+  if (chase && chase.active) chase.draw(dt);
   U.uCamPos.value.copy(camera.position);
   // How deep the eye itself is, which is what dims the water rather than
   // merely colouring it. Taken off the wave surface at your own position and
@@ -2710,7 +2975,10 @@ function frame() {
   // One arm rig, two water modes. It works out which from what it is handed —
   // see the note on `update` in 60-arms.js.
   if (arms) {
-    arms.update(dt, state.phase === 'ride' ? ride : swim, camera);
+    // Not during the establishing shot: the camera is sixteen metres up and a
+    // pair of arms drawn over the top of it is a pair of arms in the sky.
+    arms.update(dt, chaseCut ? null : (state.phase === 'ride' ? ride : swim),
+      camera);
   }
   // Somebody else's afternoon, in the same wind as the fire. 46-kite.js.
   if (kites) kites.update(dt, camera);
@@ -2965,7 +3233,14 @@ function frame() {
     // distance curve `klapa` already has, walked out to the edge of earshot.
     // Cheaper than a second gain stage and, unlike one, it takes the top off
     // them on the way — which is what a shut door does to four men singing.
-    audio.klapa(d + indoors * 2000, state.phase === 'fly');
+    //
+    // And on a board they stay with you. A rider does ten metres a second and
+    // is a kilometre out inside two minutes, which put the whole of the kite
+    // mode in silence — and the kite mode is a Jadrija afternoon, not an
+    // expedition. Capped rather than pinned: it still opens all the way up
+    // when you carve back in along the terrace, it just stops going away.
+    const dk = state.phase === 'ride' ? Math.min(d, 400) : d;
+    audio.klapa(dk + indoors * 2000, state.phase === 'fly');
   }
 
   if (state.scooping) {
@@ -3288,6 +3563,7 @@ window.__fr = {
    * lexical scope and none of it is on `window`, so a test that wants to know
    * whether a point is in the sea has no way to ask without this.
    */
+  boats: (n = 8) => (props ? props.boatList(n) : null),
   props: {
     raw: () => props,
     /** Where the near-model cars actually are this frame, nearest first. */
@@ -3477,6 +3753,31 @@ window.__fr = {
         o.push([d, +ridePolar(d * Math.PI / 180).toFixed(3)]);
       }
       return o;
+    },
+  },
+  chase: {
+    stats: () => (chase ? chase.stats() : null),
+    raw: () => chase,
+    start: () => startChase(),
+    /** Skip the shot, for a test that wants the race and not the camera. */
+    go: () => {
+      startChase();
+      chaseCut = null; camOverride = null;
+      $('swim-hud').hidden = false; $('chase-hud').hidden = false;
+      paintChaseHud();
+      return chase.stats();
+    },
+    tick: (secs, dtStep = 1 / 30, ctl = {}) => {
+      if (!chase || !chase.active || !swim) return null;
+      let out = null;
+      for (let t = 0; t < secs; t += dtStep) {
+        swim.update(dtStep, ctl);
+        out = chase.update(dtStep, swim.you, (x, z) => swim.surfaceAt(x, z)) || out;
+      }
+      chase.draw(1 / 30);
+      paintChaseHud();
+      paintSwimHud();
+      return { ...chase.stats(), out };
     },
   },
   swim: {
@@ -3710,7 +4011,12 @@ window.__fr = {
     return { t: state.t, burning: fire.burningCount(), burntHa: Math.round(fire.burntArea()),
       aiLitres: Math.round(wingmen.litres()), wingmen: wingmen.debug() };
   },
-  arms: () => arms,
+  // Not the module — `JSON.stringify` of it walks the whole Three.js scene and
+  // has twice produced most of a gigabyte of output. Two readings instead.
+  arms: {
+    stats: () => (arms ? arms.stats() : null),
+    probe: () => (arms ? arms.probe() : null),
+  },
   kites: () => kites,
   fire: () => fire,
   flight: () => flight,

@@ -2266,9 +2266,13 @@ def kitchen(kit):
              F2 + 0.04, F2 + 1.16, bev=0.006)
     kit.span(FRIDGE_RED, fx + 0.02, fx + 0.60, fy + 0.64, fy + 0.68,
              F2 + 1.20, F2 + 1.84, bev=0.006)
-    kit.span(WHITEGOODS, fx + 0.04, fx + 0.10, fy + 0.68, fy + 0.72,
+    # The handles, on the hinge-away side — which is the +x edge of the doors
+    # and, standing in the room looking at it, the left. They were on the other
+    # edge, and on a fridge that is not a detail: the handle is the one thing
+    # that tells you which way the door opens, and it opened into the wall.
+    kit.span(WHITEGOODS, fx + 0.52, fx + 0.58, fy + 0.68, fy + 0.72,
              F2 + 0.80, F2 + 1.10, bev=0.004)
-    kit.span(WHITEGOODS, fx + 0.04, fx + 0.10, fy + 0.68, fy + 0.72,
+    kit.span(WHITEGOODS, fx + 0.52, fx + 0.58, fy + 0.68, fy + 0.72,
              F2 + 1.26, F2 + 1.56, bev=0.004)
     for _ in range(20):
         mx = fx + RNG.uniform(0.05, 0.55)
@@ -3379,10 +3383,13 @@ def pictures(kit):
     """
     y = BY0 - 0.005
     fish_clock(kit, CLOCK_X, CLOCK_Z, y)
-    kit.span((0.20, 0.45, 0.62), 1.62, 2.06, y - 0.025, y,
-             F2 + 1.58, F2 + 1.86, bev=0.004)
-    kit.span(WHITEGOODS, 2.35, 2.62, y - 0.010, y, F2 + 1.55, F2 + 1.90,
-             bev=0.003)
+    # There were two more rectangles along here, a blue landscape one and a
+    # white portrait one, and they were exactly what the sunset was: coloured
+    # rectangles on a wall standing in for pictures nobody could see. They are
+    # the two floor plans now — the drawings this whole model was measured off
+    # — and they are drawn at runtime from the plan sidecar rather than baked,
+    # because a picture of a plan that cannot be read is another rectangle.
+    # See `planSheet` in src/44-vikendica.js.
     # There was a beech shelf here with three sea-urchin shells on it. It sat
     # directly over the bathroom door, so from the big room you were looking
     # through a doorway at a plank with three grey balls on it and no reason

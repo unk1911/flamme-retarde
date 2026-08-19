@@ -156,6 +156,17 @@
   <div id="sw-hint"></div>
 </div>
 
+<!-- ──────────────────────────────────────────────────────────── the race ── -->
+<!-- Two numbers and a caption. The gap is the whole game while she is swimming
+     and the caption is the whole game once she has stopped, so they share a
+     slot rather than standing next to each other: at no point are both of them
+     the thing you are reading. -->
+<div id="chase-hud" hidden>
+  <div id="ch-track"><i id="ch-fill"></i></div>
+  <div class="gauge"><b id="ch-gap">0</b><span id="ch-unit"></span></div>
+  <div id="ch-say"></div>
+</div>
+
 <!-- ─────────────────────────────────────────────────────────── on a board ── -->
 <!-- Two things, and only two: how fast you are going, and where that heading
      sits against the wind. Speed is in knots because everybody on the water

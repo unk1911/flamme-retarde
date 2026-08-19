@@ -1286,3 +1286,49 @@ html.touch #ride-hud { bottom: 7.4rem; }
   padding: .18em .7em;
 }
 #sw-auto[hidden] { display: none; }
+
+/* ── the race out to the platform ──────────────────────────────────────────
+   Above the swim HUD rather than instead of it: the breath bar still matters
+   while you are chasing somebody, and a race that hid it would be a race you
+   lost to a mechanic you could not see. */
+#chase-hud {
+  position: fixed;
+  left: 50%;
+  bottom: 20vh;
+  transform: translateX(-50%);
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .45em;
+  pointer-events: none;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .75);
+}
+#chase-hud[hidden] { display: none; }
+/* How far through the swim *she* is, which is the clock: the race ends when
+   this fills, whatever the gap says. */
+#ch-track {
+  width: 34vmin; max-width: 320px; height: 4px;
+  border: 1px solid rgba(255, 255, 255, .34);
+  background: rgba(0, 0, 0, .35);
+}
+#ch-fill {
+  display: block; height: 100%; width: 0;
+  background: var(--ember-hi);
+  transition: width .16s linear;
+}
+#ch-gap { font-size: 1.35rem; font-weight: 300; }
+#ch-unit {
+  display: block;
+  font-size: .5rem; letter-spacing: .2em; text-transform: uppercase; color: #9fb3ba;
+}
+/* Her lines. Kept to one at a time and left-aligned nowhere — a subtitle that
+   moves about while somebody is talking is a subtitle you read twice. */
+#ch-say {
+  min-height: 1.4em;
+  max-width: 60vmin;
+  font-size: .95rem;
+  color: #eaf3f6;
+}
+html.touch #chase-hud { bottom: 23vh; }

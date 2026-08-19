@@ -40,12 +40,16 @@ const RIDE = {
   eye: 1.52,             // m — standing on a board, eyes above the water
   line: 24,              // same lines as everybody else's
 
-  // Speed. 17 m/s is 33 knots, which is a fast but entirely ordinary reach on
-  // a 12 m kite in nineteen knots of wind — a kitesurfer goes roughly twice
-  // the wind speed across it, and that surprises people who have only sailed.
-  top: 17.0,
-  accel: 1.15,           // how fast the board comes up to what the polar allows
-  slow: 2.2,             // and how fast it falls off it, which is much quicker
+  // Speed. 21 m/s is 41 knots, which is a properly quick reach and still an
+  // honest one — a kitesurfer goes roughly twice the wind speed across it,
+  // which surprises people who have only sailed, and the outright records are
+  // past fifty. It was 17 and the report on it was that the speed never gets
+  // high enough to really take off, which was true of the whole chain: the top
+  // was low, the board took two seconds to find it, and it fell off it faster
+  // than it found it, so an approach into a jump arrived slow.
+  top: 21.0,
+  accel: 1.55,           // how fast the board comes up to what the polar allows
+  slow: 1.60,            // and how fast it falls off it, which is still quicker
 
   // The no-go. Forty-three degrees either side of the eye of the wind, which
   // is about right for a twin-tip: a race board points higher, a beginner
@@ -103,11 +107,22 @@ const RIDE = {
   // float; diving it is coming down with speed to ride away on. Both of those
   // are things you actually do, and they are the whole of the control.
   sendAt: 1.12,          // rad — how high the kite must be to take you up
-  sendSp: 6.5,           // m/s — and how fast you must be going to matter
-  pop: [2.6, 0.44],      // base lift, plus this much per m/s of board speed
+  sendSp: 5.0,           // m/s — and how fast you must be going to matter
+  // Base lift, plus this much per m/s of board speed. At twenty metres a
+  // second with the bar in, that is eleven and a half up, which floats to
+  // about ten metres with the kite overhead — big air, and the number a
+  // competition boosts. It was 2.6/0.44 against a top of 17, which came out
+  // at five metres and read, correctly, as never quite leaving the water.
+  pop: [3.0, 0.48],
   gFloat: 6.2,           // m/s² with the kite overhead holding you
   gDive: 11.5,           // and with it flown forward, which is how you come down
-  land: [8.5, 13.5],     // vertical speed at which a landing costs you / ends you
+  // Vertical speed at which a landing costs you / ends you. Raised with the
+  // jump: coming down off ten metres on a floated kite is eleven metres a
+  // second, and a jump that is punished for being the jump you were asked to
+  // do is a jump nobody does twice. Dive the kite on the way down and it is
+  // fifteen, and that still hurts — which is the skill, and is the same one it
+  // is on the water.
+  land: [11.5, 17.0],
   reload: 0.9,           // s before the kite will take you up again
 
   bob: 0.055,            // m of chop under a board doing thirty knots
@@ -385,8 +400,12 @@ function buildRide(scene) {
     // A kite parked overhead pulls you up and not along, which is the whole
     // reason sending it is how you jump — and here it is why holding it up
     // costs you speed.
+    // A kite parked overhead pulls you up and not along — but the penalty has
+    // to start *above* the send, not at the resting angle, or the half second
+    // it takes to fly the kite to the top is a half second of braking and you
+    // arrive at your own jump slow. Which is exactly what used to happen.
     const drive = ridePolar(off) * power
-      * (0.35 + 0.65 * Math.cos(Math.max(0, you.elev - 0.5)));
+      * (0.35 + 0.65 * Math.cos(Math.max(0, you.elev - 1.15)));
     // Nothing drives you while you are off the water: you carry what you had.
     const target = you.air > 0 ? you.sp : RIDE.top * drive;
     const k = 1 - Math.exp(-(target > you.sp ? RIDE.accel : RIDE.slow) * dt);
@@ -426,7 +445,12 @@ function buildRide(scene) {
     const flat = Math.cos(you.elev) * RIDE.line;
     return out.set(
       you.x + (dx / l) * flat,
-      you.y + Math.sin(you.elev) * RIDE.line + 1.1,
+      // `air` as well as `y`: the lines are twenty-four metres of Dyneema and
+      // they do not get longer because you left the water. Without it the kite
+      // stayed where it was while you rose toward it, and eleven metres of air
+      // ate a third of the line — which draws as four slack ropes going
+      // nowhere at the exact moment you are looking at them.
+      you.y + you.air + Math.sin(you.elev) * RIDE.line + 1.1,
       you.z + (dz / l) * flat,
     );
   }

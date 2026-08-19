@@ -4401,6 +4401,101 @@ UNTIE_C = dict(IDLE_A, **{
 })
 
 
+# ── the swim ────────────────────────────────────────────────────────────────
+#
+# The only clip on this rig that is not authored standing up.
+#
+# It exists because of the chase out to the skakaonica — src/61-chase.js — and
+# the first attempt at that built a purpose-made swimmer out of scaled spheres
+# rather than using her, on the argument that what you see of somebody ten
+# metres ahead of you in the water is a back and two arms. That was true and it
+# was still the wrong call: she is the same person who is standing on the
+# terrace when you walk up to her, and a second, cruder version of her swimming
+# past is exactly the seam this project spends its time not having.
+#
+# So: prone. `pelvis` at −90 lays the whole figure out flat, face down, which is
+# the same trick `FOURS` uses to get her on to all fours; everything below is
+# then written relative to a body that is already horizontal, and the game lays
+# her on the water and leaves the clip alone.
+#
+# The arm angle is the whole clip. `armU` x runs from about −165 at the catch —
+# stretched out past her head — through −100 under the chest to −28 at the hip,
+# and then the recovery takes it back the way it came with `armU` z swung 60-odd
+# degrees out so the elbow comes over the top rather than dragging through her
+# own ribs. Not past −170: the Euler is nose-first and −180 is where it gimbals.
+SWIM_BASE = {
+    "@root": (0.000, 0.000, -0.86),
+    "pelvis": (-90, 0, 0),
+    "spine01": (2, 0, 0), "spine02": (2, 0, 0), "spine03": (1, 0, 0),
+    "chest": (2, 0, 0), "neck": (8, 0, 0), "head": (4, 0, 0),
+    "clavicleL": (0, 0, 5), "clavicleR": (0, 0, -5),
+    "legUL": (0, 0, 3), "legLL": (8, 0, 0), "footL": (-24, 0, 0),
+    "legUR": (0, 0, -3), "legLR": (8, 0, 0), "footR": (-24, 0, 0),
+}
+
+
+def _swim(roll, breath, L, R, kick):
+    """One key of the crawl.
+
+    `L` and `R` are (upper-arm pitch, upper-arm swing out, elbow, wrist), both
+    written with a *positive* swing and mirrored here, the way every other
+    two-sided pose in this file is. `kick` is the left leg's angle; the right
+    gets the opposite, because that is what a flutter is.
+    """
+    p = dict(SWIM_BASE)
+    p["pelvis"] = (-90, 0, roll)
+    p["spine01"] = (2, 0, roll * 0.35)
+    p["spine02"] = (2, 0, roll * 0.30)
+    p["chest"] = (2, 0, roll * 0.28)
+    p["neck"] = (8, breath * 0.35, 0)
+    p["head"] = (4, breath, roll * 0.20)
+    p["armUL"] = (L[0], 0, L[1]); p["armLL"] = (L[2], 0, 4)
+    p["handL"] = (L[3], 0, 0)
+    p["armUR"] = (R[0], 0, -R[1]); p["armLR"] = (R[2], 0, -4)
+    p["handR"] = (R[3], 0, 0)
+    # A knee is loose behind the hip on the down-beat and straight on the up,
+    # which is the lag that makes a flutter read as a kick rather than as a
+    # pair of scissors.
+    p["legUL"] = (kick, 0, 3); p["legLL"] = (max(0.0, kick) * 1.6 + 6, 0, 0)
+    p["legUR"] = (-kick, 0, -3); p["legLR"] = (max(0.0, -kick) * 1.6 + 6, 0, 0)
+    return p
+
+
+# Her right hand has just gone in and is stretched out ahead; her left is
+# finishing at the hip. Rolled on to the right, which is the side the pulling
+# arm is on.
+SWIM_A = _swim(-17, 0, L=(-28, 18, -22, -8), R=(-163, 8, -8, 0), kick=15)
+# Right hand under the chest with the elbow high; left coming over the top.
+SWIM_B = _swim(9, 0, L=(-112, 66, -80, -12), R=(-100, 12, -74, -8), kick=-15)
+# The mirror, and the breath: she takes it to the left, on the roll, which is
+# the only way anybody has ever taken one.
+SWIM_C = _swim(17, 54, L=(-163, 8, -8, 0), R=(-28, 18, -22, -8), kick=15)
+SWIM_D = _swim(-9, 12, L=(-100, 12, -74, -8), R=(-112, 66, -80, -12), kick=-15)
+
+# And treading water, for the ten seconds at the end of the race when she has
+# stopped and turned round. Upright — the body comes up to about forty degrees
+# off vertical — with the forearms sculling out in front and the legs doing the
+# slow circle everybody does without being taught it.
+TREAD_A = {
+    "@root": (0.000, 0.000, -0.30),
+    "pelvis": (-34, 0, 4),
+    "spine01": (4, 0, 0), "spine02": (4, 0, 0), "spine03": (2, 0, 0),
+    "chest": (3, 0, 0), "neck": (-14, 0, 0), "head": (-24, -6, 0),
+    "clavicleL": (0, 0, 6), "clavicleR": (0, 0, -6),
+    "armUL": (-64, 0, 30), "armLL": (-72, 0, 10), "handL": (-12, 0, 14),
+    "armUR": (-64, 0, -30), "armLR": (-72, 0, -10), "handR": (-12, 0, -14),
+    "legUL": (-58, 0, 16), "legLL": (66, 0, 0), "footL": (-14, 0, 0),
+    "legUR": (-30, 0, -12), "legLR": (94, 0, 0), "footR": (-14, 0, 0),
+}
+TREAD_B = dict(TREAD_A, **{
+    "pelvis": (-34, 0, -4),
+    "head": (-24, 6, 0),
+    "armUL": (-58, 0, 22), "armLL": (-58, 0, 6), "handL": (-6, 0, -10),
+    "armUR": (-58, 0, -22), "armLR": (-58, 0, -6), "handR": (-6, 0, 10),
+    "legUL": (-30, 0, 12), "legLL": (94, 0, 0),
+    "legUR": (-58, 0, -16), "legLR": (66, 0, 0),
+})
+
 CLIPS = [
     {"name": "idle", "loop": True,
      "keys": [(0.0, IDLE_A), (2.3, IDLE_B), (4.6, IDLE_A)]},
@@ -4429,6 +4524,14 @@ CLIPS = [
     # that put it in the payload, which is also what puts it back.
     {"name": "walk", "loop": True,
      "keys": WALK},
+    # The chase. 1.4 s a cycle is about 43 strokes a minute, which is a steady
+    # distance crawl rather than a sprint — she is swimming 85 m and she knows
+    # it. Looping, because it is the whole of what she does for a minute.
+    {"name": "swim", "loop": True,
+     "keys": [(0.00, SWIM_A), (0.35, SWIM_B), (0.70, SWIM_C),
+              (1.05, SWIM_D), (1.40, SWIM_A)]},
+    {"name": "tread", "loop": True,
+     "keys": [(0.0, TREAD_A), (0.95, TREAD_B), (1.90, TREAD_A)]},
     # One-shot, like the somersault and for the same reason: the game chains
     # two or three of them by rewinding `curT`, which is cheaper than a loop
     # and lets it stop after any whole number of wheels.

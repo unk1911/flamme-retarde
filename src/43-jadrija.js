@@ -2007,6 +2007,76 @@ async function buildJadrija(scene) {
     }
   }
 
+  // ── the skakaonica ─────────────────────────────────────────────────────────
+  /**
+   * The diving platform, fourteen metres off the head of the jetty.
+   *
+   * Every bathing beach on this coast has one and Jadrija's is the thing the
+   * whole shore is arranged around in August: a concrete slab on four piles
+   * with a board off the front, far enough out that the water under it is
+   * deep, near enough that somebody on the promenade can see who has climbed
+   * up and who has not.
+   *
+   * It is also the far end of the swim. The chase in src/61-chase.js starts at
+   * the jetty steps and finishes here, which is why it is placed off the
+   * jetty head rather than anywhere prettier: the two ends of the race have to
+   * be in the same shot from the start, or the first thing you do in a chase
+   * is look for what you are chasing toward.
+   */
+  //
+  // 108 m out, which is eighty-five past the head of the jetty. The first cut
+  // put it at 42 and the swim to it was sixteen metres — a race you win by
+  // pressing a key twice. Eighty-five metres at a decent crawl is a minute,
+  // which is a race; it is also about as far off this shore as anybody would
+  // moor something you are meant to climb on to.
+  const DIVE = { t: JET.t, s: -108.0, w: 2.1, top: at(JET.t).lip + 0.85 };
+  {
+    const D = DIVE, y = D.top;
+    // The slab, and a lip of darker concrete round it where the shuttering was.
+    boxTS(D.t - D.w, D.t + D.w, D.s - D.w, D.s + D.w, y - 0.34, y,
+      [0.735, 0.720, 0.678], CONC[2]);
+    // Four piles, straight down into it. They go well below any sea bed this
+    // close in, and nobody is ever going to see the bottom of one.
+    for (const dt of [-D.w + 0.42, D.w - 0.42]) {
+      for (const ds of [-D.w + 0.42, D.w - 0.42]) {
+        boxTS(D.t + dt - 0.20, D.t + dt + 0.20, D.s + ds - 0.20, D.s + ds + 0.20,
+          -18.0, y - 0.34, [0.404, 0.372, 0.334]);
+      }
+    }
+    // The board, off the shoreward face so you dive back toward the beach —
+    // which is how this one is built, because the deep water is behind it.
+    boxTS(D.t - 0.30, D.t + 0.30, D.s + D.w - 0.10, D.s + D.w + 2.30,
+      y + 0.50, y + 0.58, [0.780, 0.760, 0.700], [0.820, 0.800, 0.740]);
+    for (const ds of [D.w - 0.02, D.w + 1.20]) {
+      boxTS(D.t - 0.09, D.t + 0.09, D.s + ds - 0.09, D.s + ds + 0.09,
+        y, y + 0.50, [0.360, 0.352, 0.336]);
+    }
+    // A rail round three sides of the slab and a ladder down the seaward face,
+    // because a platform with no way back up it is a raft.
+    for (const [a0, a1, b0, b1] of [
+      [-D.w, D.w, -D.w, -D.w + 0.08],
+      [-D.w, -D.w + 0.08, -D.w, D.w],
+      [D.w - 0.08, D.w, -D.w, D.w],
+    ]) {
+      boxTS(D.t + a0, D.t + a1, D.s + b0, D.s + b1, y + 0.86, y + 0.94,
+        [0.700, 0.694, 0.672]);
+    }
+    for (const [dt, ds] of [[-D.w + 0.05, -D.w + 0.05], [D.w - 0.05, -D.w + 0.05],
+      [-D.w + 0.05, D.w - 0.05], [D.w - 0.05, D.w - 0.05]]) {
+      boxTS(D.t + dt - 0.045, D.t + dt + 0.045, D.s + ds - 0.045, D.s + ds + 0.045,
+        y, y + 0.94, [0.700, 0.694, 0.672]);
+    }
+    for (let k = 0; k < 5; k++) {
+      const yy = y - 0.30 - k * 0.42;
+      boxTS(D.t - 0.28, D.t + 0.28, D.s - D.w - 0.30, D.s - D.w - 0.16,
+        yy, yy + 0.055, [0.760, 0.755, 0.740]);
+    }
+    for (const dt of [-0.28, 0.20]) {
+      boxTS(D.t + dt, D.t + dt + 0.08, D.s - D.w - 0.30, D.s - D.w - 0.20,
+        y - 2.10, y + 0.70, [0.760, 0.755, 0.740]);
+    }
+  }
+
   // Lamps down the promenade. A post and a lantern; at this scale a lantern is
   // a box, and the post is what does the work of spacing the walk out.
   for (let t = 12; t < LEN - 8; t += 27) {
@@ -6971,6 +7041,21 @@ async function buildJadrija(scene) {
       meshes: () => Object.values(crowds).flatMap((c) => c.layers.map((L) => L.mesh)),
     },
     site: { x: mid.x + mid.nx * 16, z: mid.z + mid.nz * 16, yaw: Math.atan2(mid.ux, -mid.uz) },
+    /**
+     * The two ends of the swim, in world metres: the jetty head you push off
+     * from and the platform you are racing to. Exported rather than measured
+     * again in 61-chase.js so that moving either one moves the race with it.
+     */
+    swimRun: {
+      start: (() => { const p = W(JET.t + JET.w + 1.6, -JET.out + 3, 0);
+        return [p[0], p[2]]; })(),
+      board: (() => { const p = W(DIVE.t, DIVE.s + DIVE.w + 1.2, 0);
+        return [p[0], p[2]]; })(),
+      deck: (() => { const p = W(DIVE.t, DIVE.s, DIVE.top);
+        return [p[0], p[1], p[2]]; })(),
+      jetty: (() => { const p = W(JET.t, -JET.out + 3, at(JET.t).lip);
+        return [p[0], p[1], p[2]]; })(),
+    },
     // Kept a metre off the quay edge: the bounds are what stops a walker, and
     // stopping them exactly at the drop would let the camera hang over it.
     // Inland far enough to reach the vikendica's stair. Past JAD.back the

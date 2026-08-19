@@ -32,6 +32,13 @@ const PROPS = {
   // the right failure and is invisible at that range anyway.
   carsNear: 56,
   carNearM: 130,
+  // The same split for boats, and it matters more: the sea is where you swim
+  // and a moored boat is the only thing out there you can get within a metre
+  // of. Fewer of them, further out — there is never a marina's worth in one
+  // pocket of water, and 220 m is about as far as you can tell a hull from a
+  // shape on this screen.
+  boatsNear: 26,
+  boatNearM: 220,
   darts: 160000,         // random samples thrown at the map looking for shore
 };
 
@@ -121,6 +128,227 @@ function boatProto(cabin) {
   } else {
     b.box(-1.9, 0.78, 0, 0.5, 0.42, 0.9, [0.20, 0.21, 0.22]);    // outboard
   }
+  return b.geo();
+}
+
+/**
+ * The same boat, for when you are swimming past it.
+ *
+ * `boatProto` is four stations of flat plate with a flat deck on top and a
+ * box for an engine, and like `carProto` that is the right answer two hundred
+ * times over at a kilometre. It is the wrong answer from the water, which is a
+ * place the game now has: surfacing next to one, what you get is a wedge — two
+ * flat red panels meeting at a corner, a black panel under them and a straight
+ * line where the sheer should be. There is no boat in that shape anywhere.
+ *
+ * So this is the near version, lofted the way `carNearProto` is and for the
+ * same reason: a hull is a *section that changes along its length* and no
+ * arrangement of flat plates has any of it. Six stations, each a half-section
+ * of five points — keel, garboard, chine, topside, sheer — mirrored, with:
+ *
+ *   rocker,  so the keel is deepest amidships and lifts to the stem;
+ *   sheer,   so the gunwale sweeps down from a high bow and back up aft, which
+ *            is the single line that makes a boat read as a boat;
+ *   flare,   so the topsides lean outward and the deck is wider than the chine;
+ *   and deadrise, so there is a V under it rather than a raft.
+ *
+ * The antifouling comes free: everything below the chine is one colour and
+ * everything above it another, and because the chine follows the rocker the
+ * stripe follows the waterline without being told where the water is.
+ */
+function boatNearProto(cabin) {
+  const b = propBuilder();
+  const HULL = [0.92, 0.92, 0.89];        // tinted per instance
+  const BOOT = [0.15, 0.16, 0.18];        // antifouling, under the chine
+  const DECK = [0.76, 0.74, 0.70];
+  const SOLE = [0.52, 0.44, 0.34];        // the cockpit floor, which is ply
+  const TRIM = [0.24, 0.26, 0.29];
+  const GLASS = [0.22, 0.30, 0.34];
+  const RUB = [0.46, 0.47, 0.49];         // the rubbing strake
+
+  // [x, keel y, chine y, chine half-width, sheer y, sheer half-width]
+  const ST = [
+    [3.00, 0.06, 0.16, 0.05, 0.78, 0.09],
+    [2.36, -0.16, 0.00, 0.30, 0.68, 0.48],
+    [1.45, -0.28, -0.09, 0.60, 0.58, 0.86],
+    [0.25, -0.34, -0.15, 0.80, 0.52, 1.05],
+    [-1.05, -0.34, -0.17, 0.86, 0.50, 1.10],
+    [-2.20, -0.31, -0.16, 0.84, 0.51, 1.07],
+    [-3.00, -0.27, -0.15, 0.80, 0.55, 1.02],
+  ];
+  // ── the hull surface ────────────────────────────────────────────────────
+  //
+  // A grid rather than a loft of plates, and shaded smooth across it, which is
+  // the whole difference between a hull and a boat-shaped box. The first cut
+  // was five flat strakes a side with face normals and from the water it read
+  // as exactly what it was: two large grey planes with a crease between them.
+  // A hull has no creases below the rubbing strake.
+  //
+  // `t` runs 0 at the keel to 1 at the sheer; the exponents are what put a
+  // turn in the bilge — a steep V off the keel that rolls over near the chine
+  // and then stands up, with flare, to the gunwale.
+  const NS = 7;                              // samples per side, keel included
+  const pt = (st, s, t) => {
+    const [x, ky, cy, cw, sy, sw] = st;
+    if (t <= 0.62) {
+      const u = t / 0.62;
+      return [x, ky + (cy - ky) * Math.pow(u, 0.72), s * cw * Math.pow(u, 1.18)];
+    }
+    const u = (t - 0.62) / 0.38;
+    return [x, cy + (sy - cy) * Math.pow(u, 0.92),
+      s * (cw + (sw - cw) * Math.pow(u, 0.62))];
+  };
+  // The full section, port sheer round the keel to starboard sheer.
+  const N = NS * 2 - 1;
+  const tAt = (j) => Math.abs(j - (NS - 1)) / (NS - 1);
+  const sAt = (j) => (j < NS - 1 ? -1 : 1);
+  const G = ST.map((st) => {
+    const row = [];
+    for (let j = 0; j < N; j++) row.push(pt(st, sAt(j), tAt(j)));
+    return row;
+  });
+  // Normals by central difference on the grid: along the hull crossed with
+  // along the section. Four lines, and it is what the shading needs.
+  const sub = (p, q) => [p[0] - q[0], p[1] - q[1], p[2] - q[2]];
+  const GN = G.map((row, i) => row.map((_, j) => {
+    const u = sub(G[Math.min(G.length - 1, i + 1)][j], G[Math.max(0, i - 1)][j]);
+    const v = sub(row[Math.min(N - 1, j + 1)], row[Math.max(0, j - 1)]);
+    let n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2],
+      u[0] * v[1] - u[1] * v[0]];
+    const L = Math.hypot(n[0], n[1], n[2]) || 1;
+    n = [n[0] / L, n[1] / L, n[2] / L];
+    // x runs bow to stern down the array, so the cross comes out pointing in;
+    // outward is what a hull wants.
+    return [-n[0], -n[1], -n[2]];
+  }));
+  for (let i = 0; i < G.length - 1; i++) {
+    for (let j = 0; j < N - 1; j++) {
+      const A = G[i][j], B = G[i][j + 1], C = G[i + 1][j + 1], D = G[i + 1][j];
+      const na = GN[i][j], nb = GN[i][j + 1], nc = GN[i + 1][j + 1], nd = GN[i + 1][j];
+      // Under the chine is antifouling; over it is topside. The band follows
+      // the rocker for free, so it is a waterline without being told where the
+      // water is.
+      const col = tAt(j) < 0.60 && tAt(j + 1) < 0.62 ? BOOT : HULL;
+      b.smooth(A, B, C, na, nb, nc, col, col, col);
+      b.smooth(A, C, D, na, nc, nd, col, col, col);
+    }
+  }
+  // The transom, closing the back of it.
+  {
+    const row = G[G.length - 1], c = [row[0][0], 0.10, 0];
+    for (let j = 0; j < N - 1; j++) {
+      const col = tAt(j) < 0.60 ? BOOT : HULL;
+      b.tri(c, row[j], row[j + 1], col);
+    }
+  }
+  const half = (st, s) => {
+    const out = [];
+    for (let k = 0; k < NS; k++) out.push(pt(st, s, k / (NS - 1)));
+    return out;
+  };
+
+  // ── the deck ────────────────────────────────────────────────────────────
+  // A side deck 18 cm wide inboard of the sheer, then down the coaming to the
+  // sole. The foredeck is solid to the stem; the cockpit is the hole.
+  const IN = 0.19, SOLEY = 0.10;
+  const inner = (st, s) => {
+    const [x, , , , sy, sw] = st;
+    const w = Math.max(0, sw - IN);
+    return [x, sy - 0.02, s * w];
+  };
+  for (let i = 0; i < ST.length - 1; i++) {
+    for (const s of [1, -1]) {
+      const A = half(ST[i], s)[NS - 1], B = half(ST[i + 1], s)[NS - 1];
+      const Ai = inner(ST[i], s), Bi = inner(ST[i + 1], s);
+      if (s > 0) b.quad(A, Ai, Bi, B, DECK); else b.quad(B, Bi, Ai, A, DECK);
+      // and the coaming inside it, dropping to the sole
+      const Ad = [Ai[0], SOLEY, Ai[2]], Bd = [Bi[0], SOLEY, Bi[2]];
+      if (ST[i][0] > 1.2) continue;            // forward of this it is decked
+      if (s > 0) b.quad(Ai, Bi, Bd, Ad, TRIM); else b.quad(Ad, Bd, Bi, Ai, TRIM);
+    }
+    // The foredeck, solid across, forward of the cockpit.
+    if (ST[i][0] > 1.2) {
+      const Ap = half(ST[i], 1)[NS - 1], Am = half(ST[i], -1)[NS - 1];
+      const Bp = half(ST[i + 1], 1)[NS - 1], Bm = half(ST[i + 1], -1)[NS - 1];
+      b.quad(Ap, Am, Bm, Bp, DECK);
+    }
+  }
+  // The cockpit sole, one plate.
+  {
+    const a = inner(ST[2], 1), c = inner(ST[6], -1);
+    b.quad([a[0], SOLEY, a[2]], [a[0], SOLEY, -a[2]],
+      [c[0], SOLEY, c[2]], [c[0], SOLEY, -c[2]], SOLE);
+  }
+  // The rubbing strake: a band along the sheer, which is the line your eye
+  // actually follows down the side of a boat.
+  for (let i = 0; i < ST.length - 1; i++) {
+    for (const s of [1, -1]) {
+      const A = half(ST[i], s), B = half(ST[i + 1], s);
+      const As = A[NS - 1], Bs = B[NS - 1];
+      const Ao = [As[0], As[1] - 0.045, As[2] * 1.010];
+      const Bo = [Bs[0], Bs[1] - 0.045, Bs[2] * 1.010];
+      if (s > 0) b.quad(As, Ao, Bo, Bs, RUB);
+      else b.quad(Bs, Bo, Ao, As, RUB);
+    }
+  }
+
+  if (cabin) {
+    // A coachroof, lofted rather than boxed: it tapers forward and its top is
+    // crowned. Four stations is enough for something you see from the side.
+    const C = [
+      [1.72, 0.62, 1.16, 0.44],
+      [1.20, 0.60, 1.34, 0.62],
+      [0.10, 0.58, 1.40, 0.72],
+      [-0.72, 0.56, 1.34, 0.70],
+    ];
+    const cr = (st, s) => {
+      const [x, y0, y1, w] = st;
+      return [[x, y0, s * w], [x, y0 + (y1 - y0) * 0.68, s * w * 0.96],
+        [x, y1, s * w * 0.72], [x, y1 + 0.05, 0]];
+    };
+    for (let i = 0; i < C.length - 1; i++) {
+      for (const s of [1, -1]) {
+        const A = cr(C[i], s), B = cr(C[i + 1], s);
+        for (let k = 0; k < 3; k++) {
+          const col = k === 0 ? GLASS : k === 1 ? [0.90, 0.89, 0.86] : [0.86, 0.85, 0.82];
+          if (s > 0) b.quad(A[k], A[k + 1], B[k + 1], B[k], col);
+          else b.quad(B[k], B[k + 1], A[k + 1], A[k], col);
+        }
+      }
+    }
+    // The windscreen, raked, and the after bulkhead.
+    {
+      const A = cr(C[0], 1), M = cr(C[0], -1);
+      for (let k = 0; k < 3; k++) b.quad(M[k], M[k + 1], A[k + 1], A[k], GLASS);
+      const P = cr(C[C.length - 1], 1), Q = cr(C[C.length - 1], -1);
+      for (let k = 0; k < 3; k++) {
+        b.quad(P[k], P[k + 1], Q[k + 1], Q[k], [0.88, 0.87, 0.84]);
+      }
+    }
+  } else {
+    // An outboard on the transom: leg, cowling, cavitation plate and skeg.
+    // An outboard on the transom. Written at 46 by 40 by 42 it was a black
+    // wardrobe hanging off the back — a 40 hp cowling is about 65 cm tall and
+    // 40 across, and it is grey, not black: everything on a boat that lives
+    // outdoors in this sun is grey.
+    b.box(-3.20, 0.52, 0, 0.34, 0.42, 0.36, [0.40, 0.41, 0.43], [0.46, 0.47, 0.49]);
+    b.box(-3.22, 0.16, 0, 0.12, 0.42, 0.16, [0.44, 0.45, 0.47]);
+    b.box(-3.22, -0.06, 0, 0.28, 0.04, 0.28, [0.48, 0.49, 0.51]);
+    b.box(-3.22, -0.20, 0, 0.22, 0.26, 0.04, [0.44, 0.45, 0.47]);
+    // A console amidships, because an open boat this size has one.
+    b.box(0.42, 0.44, 0, 0.44, 0.68, 0.62, [0.88, 0.87, 0.84], [0.82, 0.81, 0.78]);
+    b.box(0.28, 0.86, 0, 0.05, 0.30, 0.58, GLASS);
+    // and a bench across the back of the cockpit
+    b.box(-2.05, 0.28, 0, 0.44, 0.24, 1.44, [0.86, 0.85, 0.82], [0.82, 0.81, 0.77]);
+  }
+  // Two fenders over the side, which every moored boat on this coast has.
+  for (const [fx, fs] of [[-0.60, 1], [-1.70, 1], [-1.15, -1]]) {
+    const w = 1.09;
+    b.box(fx, 0.34, fs * w, 0.20, 0.44, 0.20, [0.80, 0.79, 0.74]);
+  }
+  // A cleat and a short mast for the light, so the deck is not empty.
+  b.box(2.30, 0.74, 0, 0.16, 0.08, 0.22, TRIM);
+  b.box(-2.92, 0.94, 0, 0.04, 0.72, 0.04, [0.86, 0.85, 0.82]);
   return b.geo();
 }
 
@@ -397,6 +625,8 @@ function buildProps(scene, lanes) {
   const layers = {
     boat: propLayer(scene, boatProto(false), PROPS.boats, { spec: 0.22 }),
     yacht: propLayer(scene, boatProto(true), PROPS.boats, { spec: 0.22 }),
+    boatNear: propLayer(scene, boatNearProto(false), PROPS.boatsNear, { spec: 0.22 }),
+    yachtNear: propLayer(scene, boatNearProto(true), PROPS.boatsNear, { spec: 0.22 }),
     car: propLayer(scene, carProto(), PROPS.cars + PROPS.parked, { spec: 0.34, specPower: 60 }),
     carNear: propLayer(scene, carNearProto(), PROPS.carsNear, { spec: 0.34, specPower: 60 }),
     parasol: propLayer(scene, parasolProto(), PROPS.parasols, { spec: 0.05, specPower: 12 }),
@@ -619,13 +849,14 @@ function buildProps(scene, lanes) {
   let tAcc = 0;
   let density = 1;
   let carsNear = 0;         // how many got the near model this frame
+  let nearB = 0;            // and how many boats did
 
   function update(dt) {
     tAcc += dt;
     if (density <= 0) return;
     const nBoat = Math.round(boats.length * density);
     const nCarMax = Math.round(cars.length * density);
-    let nSmall = 0, nBig = 0;
+    let nSmall = 0, nBig = 0, nNearS = 0, nNearY = 0;
 
     for (let bi = 0; bi < nBoat; bi++) {
       const b = boats[bi];
@@ -643,14 +874,30 @@ function buildProps(scene, lanes) {
       const pitch = Math.sin(ph * 1.31 + 1.1) * 0.035;
       const yaw = -(b.moving ? b.yaw + (b.dir < 0 ? Math.PI : 0) : b.yaw)
         + Math.sin(ph * 0.4) * (b.moving ? 0.02 : 0.09);
-      const L = b.big ? layers.yacht : layers.boat;
-      const i = b.big ? nBig++ : nSmall++;
-      if (i >= PROPS.boats) continue;
+      // Near or far, exactly as the cars are sorted. `bCam` is read once
+      // outside the loop below; boats are placed before it, so it is taken
+      // here rather than reused.
+      const bx = b.x - U.uCamPos.value.x, bz = b.z - U.uCamPos.value.z;
+      // A counter each, because the two near layers are two draws with two
+      // instance buffers: one shared counter would leave every slot in the
+      // layer that did *not* get this boat holding last frame's transform and
+      // still inside the count, which draws a yacht wherever a dinghy was.
+      const room = (b.big ? nNearY : nNearS) < PROPS.boatsNear;
+      const near = room
+        && bx * bx + bz * bz < PROPS.boatNearM * PROPS.boatNearM;
+      const L = near ? (b.big ? layers.yachtNear : layers.boatNear)
+        : (b.big ? layers.yacht : layers.boat);
+      const i = near ? (b.big ? nNearY++ : nNearS++)
+        : (b.big ? nBig++ : nSmall++);
+      if (!near && i >= PROPS.boats) continue;
       put(L, i, b.x, heave - 0.08, b.z, yaw, b.scale, b.tint, pitch, roll);
     }
     layers.boat.geo.instanceCount = nSmall;
     layers.yacht.geo.instanceCount = nBig;
-    for (const L of [layers.boat, layers.yacht]) {
+    layers.boatNear.geo.instanceCount = nNearS;
+    layers.yachtNear.geo.instanceCount = nNearY;
+    nearB = nNearS + nNearY;
+    for (const L of [layers.boat, layers.yacht, layers.boatNear, layers.yachtNear]) {
       L.aPos.needsUpdate = L.aRot.needsUpdate = true;
       L.aScale.needsUpdate = L.aColor.needsUpdate = true;
     }
@@ -704,6 +951,14 @@ function buildProps(scene, lanes) {
       cars: cars.length,
       lanes: lanes.length,
       get carsNear() { return carsNear; },
+      get boatsNear() { return nearB; },
+    },
+    /** For a test that wants to go and swim up to one. */
+    boatList(n = 8) {
+      const cam = U.uCamPos.value;
+      return boats.map((b) => [b.x, b.z, b.big ? 1 : 0,
+        Math.round(Math.hypot(b.x - cam.x, b.z - cam.z))])
+        .sort((a, c) => a[3] - c[3]).slice(0, n);
     },
     /** For a test that wants to go and stand next to one. */
     nearCarList() {

@@ -277,6 +277,727 @@ async function buildVikendica(scene, field) {
     hand(0.094 * k, 0.0026 * k, 0.005, 0xd8503c).position.z = cz - 0.004;
   }
 
+  // ── the television ─────────────────────────────────────────────────────────
+  /**
+   * The set on the low cabinet, on, all day, with nobody watching it.
+   *
+   * It was a dark grey rectangle, which is what a television that is off is,
+   * and a television that is off in a room whose whole job is to feel lived in
+   * is a missed opportunity — the fan turns, the clock sweeps, and the biggest
+   * flat surface in the room did nothing.
+   *
+   * Two things it shows. The default is the business channel: a strip of
+   * market, a headline, a crawl, and a clock on Zagreb time, laid out the way
+   * every financial channel on earth lays it out because that layout is now
+   * what "news" looks like from across a room. Hose it with the branch and the
+   * channel goes round to the four crypto pages, one at a time, and then back
+   * to the news — the same knock-the-set-and-it-changes idea the valve set in
+   * the kabine has, one generation of television later.
+   *
+   * The prices are real. `api.coinbase.com` answers a plain GET with CORS
+   * open, which is the same endpoint the kabine's set already uses, so this
+   * costs one more request every three quarters of a minute and gets an actual
+   * number off an actual exchange. Off the network — a `file://` copy, a
+   * laptop on a boat — the fetch fails quietly and the walk below carries the
+   * page on its own, so the set is never blank and never wrong about being
+   * live: the LIVE lamp is lit by the last successful answer, not by hope.
+   *
+   * The headlines are this world's, not the wire's. A channel reading out
+   * invented quotes from real companies would be a lie with a Bloomberg
+   * typeface on it; a regional channel on the sixth of August, with a fire on
+   * the hill behind Šibenik and a Canadair working the channel, is the room
+   * being in the same afternoon as the rest of the game.
+   */
+  const TV = {
+    w: 768, h: 576,
+    fps: 18,
+    every: 45,          // s between price requests, one pair at a time
+    hold: 9.0,          // s a headline stays up
+  };
+  const tv = (() => {
+    const cv = document.createElement('canvas');
+    cv.width = TV.w; cv.height = TV.h;
+    const g = cv.getContext('2d');
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+
+    // Four crypto pages and the news, and the news is page 0 because it is
+    // what is on when nobody has touched it.
+    const PAGES = [
+      null,
+      { k: 'BTC', pair: 'BTC-USD', dp: 0, name: 'BITCOIN' },
+      { k: 'LTC', pair: 'LTC-USD', dp: 2, name: 'LITECOIN' },
+      { k: 'ETH', pair: 'ETH-USD', dp: 0, name: 'ETHEREUM' },
+      { k: 'DOGE', pair: 'DOGE-USD', dp: 4, name: 'DOGECOIN' },
+    ];
+    // The strip along the top. The four pairs are live; the rest walk, and are
+    // labelled as what they are — an index level with no source behind it is
+    // set dressing, so it is dressed as set dressing and put in small type.
+    const STRIP = [
+      { k: 'BTC', pair: 'BTC-USD', dp: 0, v: 96420, seed: 0.11 },
+      { k: 'ETH', pair: 'ETH-USD', dp: 0, v: 3480, seed: 0.31 },
+      { k: 'LTC', pair: 'LTC-USD', dp: 2, v: 118.4, seed: 0.53 },
+      { k: 'DOGE', pair: 'DOGE-USD', dp: 4, v: 0.2140, seed: 0.77 },
+      { k: 'CROBEX', dp: 2, v: 3184.6, seed: 0.19 },
+      { k: 'EUR/USD', dp: 4, v: 1.0842, seed: 0.61 },
+      { k: 'BRENT', dp: 2, v: 81.35, seed: 0.43 },
+    ];
+    for (const s of STRIP) { s.open = s.v; s.live = false; }
+
+    const HEAD = [
+      ['POŽAR IZNAD ŠIBENIKA', 'Kanaderi rade nad kanalom · vjetar u naletima do 45 km/h'],
+      ['ZATVORENA DRŽAVNA CESTA D8', 'Promet preusmjeren preko Vodica · odgode do dva sata'],
+      ['TURIZAM: KOLOVOZ REKORDAN', 'Noćenja na šibenskom području 6 % iznad prošlogodišnjih'],
+      ['VATROGASCI: 49 LJUDI NA TERENU', 'Dodatne postrojbe iz Zadra i Splita stižu poslijepodne'],
+      ['STRUJA: KRATKI PREKIDI', 'HEP najavljuje ograničenja na dalekovodu Šibenik–Drniš'],
+      ['MORE 26 °C, BURA NAVEČER', 'Upozorenje za male brodice na otvorenom moru'],
+      ['KUNA/EURO: DESET GODINA POSLIJE', 'Analiza: što je članstvo u eurozoni značilo za obalu'],
+      ['JADRIJA: SEZONA U PUNOM JEKU', 'Kabine iz 1922. i dalje najfotografiranije na Jadranu'],
+    ];
+    const CRAWL = 'ZRAČNE SNAGE: DVA KANADERA I JEDAN AIR TRACTOR NA POŽARIŠTU'
+      + '   ·   DHMZ: INDEKS OPASNOSTI OD POŽARA — VRLO VELIK'
+      + '   ·   TRAJEKT ŠIBENIK–ZLARIN PLOVI PO REDU'
+      + '   ·   HAK: POJAČAN PROMET NA ULAZU U GRAD'
+      + '   ·   BURZA: PROMET 4,1 MIL. EUR   ·   ';
+
+    let page = 0, wet = 0, t0 = 0, last = 0, ask = 0, busy = false, headI = 0;
+    let liveAt = 0;
+
+    /** One step of the walk, which is what keeps the numbers moving. */
+    function step(t) {
+      for (const s of STRIP) {
+        if (s.live) continue;
+        // Two sines at coprime rates, so it wanders rather than oscillates.
+        const d = Math.sin(t * 0.13 + s.seed * 19) * 0.6
+          + Math.sin(t * 0.041 + s.seed * 7) * 0.4;
+        s.v = s.open * (1 + d * 0.011);
+      }
+    }
+
+    function fetchOne() {
+      if (busy || typeof fetch !== 'function') return;
+      const s = STRIP[(ask++) % 4];       // the four that have an exchange
+      busy = true;
+      fetch('https://api.coinbase.com/v2/prices/' + s.pair + '/spot',
+        { mode: 'cors' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          const v = j && j.data && parseFloat(j.data.amount);
+          if (v > 0) {
+            if (!s.live) s.open = v;      // first real answer sets the day's open
+            s.v = v; s.live = true;
+            liveAt = Date.now();
+          }
+        })
+        .catch(() => {})
+        .then(() => { busy = false; });
+    }
+
+    const money = (v, dp) => '$' + v.toLocaleString('en-US',
+      { minimumFractionDigits: dp, maximumFractionDigits: dp });
+    const pct = (s) => ((s.v / s.open - 1) * 100);
+
+    const UP = '#26d07c', DOWN = '#ff5a52', AMBER = '#ffb020';
+    const face = (px, w) => `${w} ${px}px "Helvetica Neue",Arial,sans-serif`;
+
+    function drawStrip(y, t) {
+      g.fillStyle = '#111826';
+      g.fillRect(0, y, TV.w, 30);
+      const cw = TV.w / STRIP.length;
+      for (let i = 0; i < STRIP.length; i++) {
+        const s = STRIP[i], p = pct(s), x = i * cw + 8;
+        g.font = face(13, 'bold');
+        g.fillStyle = '#9fb0c8';
+        g.textAlign = 'left';
+        g.fillText(s.k, x, y + 13);
+        g.font = face(14, 'bold');
+        g.fillStyle = p >= 0 ? UP : DOWN;
+        g.fillText((p >= 0 ? '▲' : '▼') + ' ' + Math.abs(p).toFixed(2) + '%',
+          x, y + 26);
+        g.font = face(12, '');
+        g.fillStyle = '#e6edf6';
+        g.textAlign = 'right';
+        g.fillText(money(s.v, s.dp), x + cw - 14, y + 13);
+        if (i) {
+          g.strokeStyle = 'rgba(255,255,255,0.08)'; g.lineWidth = 1;
+          g.beginPath(); g.moveTo(i * cw, y + 4); g.lineTo(i * cw, y + 26); g.stroke();
+        }
+      }
+    }
+
+    function drawCrawl(t) {
+      const y = TV.h - 44;
+      g.fillStyle = AMBER;
+      g.fillRect(0, y, TV.w, 44);
+      g.fillStyle = '#12161d';
+      g.fillRect(0, y, 96, 44);
+      g.font = face(15, 'bold');
+      g.fillStyle = AMBER; g.textAlign = 'center';
+      g.fillText('UŽIVO', 48, y + 27);
+      g.save();
+      g.beginPath(); g.rect(96, y, TV.w - 96, 44); g.clip();
+      g.font = face(17, 'bold');
+      g.fillStyle = '#1a1206'; g.textAlign = 'left';
+      const w = g.measureText(CRAWL).width;
+      let x = 104 - ((t * 74) % w);
+      while (x < TV.w) { g.fillText(CRAWL, x, y + 28); x += w; }
+      g.restore();
+    }
+
+    /** Zagreb time, off the same offset the fish clock runs on. */
+    function clockText(now) {
+      const d = new Date(now + zagrebOffset(now));
+      const p = (n) => String(n).padStart(2, '0');
+      return p(d.getUTCHours()) + ':' + p(d.getUTCMinutes());
+    }
+
+    function drawNews(t, now) {
+      g.fillStyle = '#0a0e18';
+      g.fillRect(0, 0, TV.w, TV.h);
+      // The masthead.
+      g.fillStyle = AMBER;
+      g.fillRect(0, 0, TV.w, 46);
+      g.fillStyle = '#12161d';
+      g.font = face(24, 'bold'); g.textAlign = 'left';
+      g.fillText('POSLOVNI', 18, 32);
+      // Measured, not guessed at 138: the two words ran together into
+      // POSLOVNIKANAL, which is the kind of thing you only see on the wall.
+      const mw = g.measureText('POSLOVNI').width;
+      g.font = face(24, '');
+      g.fillText('KANAL', 18 + mw + 9, 32);
+      g.textAlign = 'right';
+      g.font = face(22, 'bold');
+      g.fillText(clockText(now), TV.w - 18, 32);
+
+      drawStrip(46, t);
+
+      // The headline, which is the biggest thing on the screen because on a
+      // channel like this it always is.
+      const h = HEAD[headI % HEAD.length];
+      g.fillStyle = '#e8eef7';
+      g.font = face(40, 'bold'); g.textAlign = 'left';
+      // Wrapped by hand, because two lines of 40 px is the whole design.
+      const words = h[0].split(' ');
+      let line = '', y = 168;
+      for (const wd of words) {
+        const test = line ? line + ' ' + wd : wd;
+        if (g.measureText(test).width > TV.w - 60 && line) {
+          g.fillText(line, 30, y); y += 46; line = wd;
+        } else line = test;
+      }
+      g.fillText(line, 30, y);
+      g.fillStyle = '#93a5bd';
+      g.font = face(20, '');
+      g.fillText(h[1], 30, y + 40);
+
+      // The red lamp, and it is honest: lit by an answer, not by intent.
+      const on = Date.now() - liveAt < 180000;
+      g.fillStyle = on ? '#ff3b30' : '#4a5568';
+      g.beginPath();
+      g.arc(40, TV.h - 118, 8 + (on ? Math.sin(t * 3.2) * 1.6 : 0), 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = on ? '#ff8078' : '#65718a';
+      g.font = face(15, 'bold'); g.textAlign = 'left';
+      g.fillText(on ? 'CIJENE UŽIVO' : 'CIJENE — NEMA VEZE', 58, TV.h - 112);
+
+      drawCrawl(t);
+    }
+
+    function drawQuote(c, t, now) {
+      const s = STRIP.find((q) => q.k === c.k);
+      g.fillStyle = '#070b12';
+      g.fillRect(0, 0, TV.w, TV.h);
+      g.fillStyle = '#111826';
+      g.fillRect(0, 0, TV.w, 46);
+      g.fillStyle = AMBER;
+      g.font = face(22, 'bold'); g.textAlign = 'left';
+      g.fillText(c.k + ' / USD', 18, 32);
+      g.fillStyle = '#7f8ea6';
+      g.font = face(18, '');
+      g.fillText(c.name, 168, 32);
+      g.textAlign = 'right'; g.fillStyle = '#e8eef7';
+      g.font = face(20, 'bold');
+      g.fillText(clockText(now), TV.w - 18, 32);
+
+      const p = pct(s);
+      g.textAlign = 'center';
+      g.fillStyle = '#f2f6fc';
+      g.font = face(96, 'bold');
+      g.fillText(money(s.v, c.dp), TV.w / 2, 250);
+      g.fillStyle = p >= 0 ? UP : DOWN;
+      g.font = face(38, 'bold');
+      g.fillText((p >= 0 ? '▲ +' : '▼ ') + p.toFixed(2) + '%', TV.w / 2, 306);
+
+      // A sparkline off the same walk that moves the number, so the shape and
+      // the figure are one thing rather than two.
+      g.strokeStyle = p >= 0 ? UP : DOWN;
+      g.lineWidth = 2.4;
+      g.beginPath();
+      for (let i = 0; i <= 120; i++) {
+        const tt = t - (120 - i) * 0.9;
+        const d = Math.sin(tt * 0.13 + s.seed * 19) * 0.6
+          + Math.sin(tt * 0.041 + s.seed * 7) * 0.4;
+        const x = 60 + i * (TV.w - 120) / 120;
+        const y = 430 - d * 52;
+        if (i) g.lineTo(x, y); else g.moveTo(x, y);
+      }
+      g.stroke();
+      g.fillStyle = '#5c6b84';
+      g.font = face(14, '');
+      g.textAlign = 'left';
+      g.fillText(s.live ? 'COINBASE SPOT' : 'BEZ VEZE — ZADNJE POZNATO', 60, 470);
+      drawCrawl(t);
+    }
+
+    function paint(now) {
+      const t = now / 1000;
+      step(t);
+      if (page === 0) drawNews(t, now); else drawQuote(PAGES[page], t, now);
+      tex.needsUpdate = true;
+    }
+
+    return {
+      tex,
+      /** Called every frame; paints at `TV.fps` and asks for a price rarely. */
+      tick() {
+        const now = Date.now();
+        if (!t0) { t0 = now; last = now - 1000; }
+        const t = now / 1000;
+        if (now - last < 1000 / TV.fps) return;
+        last = now;
+        if (wet > 0) wet -= 1 / TV.fps;
+        if (t - (this._ask || 0) > TV.every) { this._ask = t; fetchOne(); }
+        if (page === 0 && t - (this._head || 0) > TV.hold) {
+          this._head = t; headI++;
+        }
+        paint(now);
+      },
+      /** The jet has found the set: one round of the dial. */
+      knock() {
+        if (wet > 0) return false;
+        wet = 0.9;
+        page = (page + 1) % PAGES.length;
+        this._head = 0;
+        paint(Date.now());
+        return true;
+      },
+      page: () => page,
+      live: () => Date.now() - liveAt < 180000,
+    };
+  })();
+
+  {
+    // The panel, over the dark rectangle the payload bakes. Blender's y is
+    // three.js's −z, and the set faces the room, which is −z from this wall.
+    const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.535, 0.425),
+      new THREE.MeshBasicMaterial({ map: tv.tex }));
+    // The baked panel's front face is at 3.447 and the room is at *smaller* z,
+    // so the picture goes in front of it and not behind: at 3.451 it was
+    // inside the set, which draws as a set that is switched off.
+    scr.position.set(0.17, plan.floor + 0.955, 3.4425);
+    scr.rotation.y = Math.PI;
+    scr.castShadow = false; scr.receiveShadow = false;
+    root.add(scr);
+    tv.at = [0.17, plan.floor + 0.955, 3.40];
+  }
+
+  // ── the two drawings on the spine ──────────────────────────────────────────
+  /**
+   * A floor plan, drawn.
+   *
+   * There were two blank rectangles on this wall — a blue landscape one and a
+   * white portrait one — and they were the same failure the framed sunset was
+   * before them: a coloured rectangle at eye height standing in for a picture
+   * nobody can see. What should be on a wall in this particular house is not in
+   * doubt. The whole model was measured off a set of 1:100 drawings, `TLOCRT
+   * KATA` and `TLOCRT PRIZEMLJA`, and everything in the sidecar — the rooms,
+   * the wall runs, the outer envelope — is those drawings in numbers.
+   *
+   * So they are drawn back out. Not a scan: a scan is a photograph of a piece
+   * of paper and would go out of date the moment a wall moved, and it would
+   * also be somebody's building file on a public page. This is the model
+   * drawing itself, at 1:100, in the same layout as the original sheet, with
+   * the areas computed from the same rectangles the walls are built from. The
+   * schedule at the bottom comes out within a couple of per cent of the one on
+   * the real drawing — 3.89 m² for the bathroom against 3.89, 7.64 for the
+   * small bedroom against 7.69 — which is the model saying, in the one place
+   * you can check it, that it is the house.
+   *
+   * `rects` is the room table, `walls` the blocker list; both are in house
+   * metres, which are the drawing's own metres.
+   */
+  function planSheet(o) {
+    const W = o.wide ? 1120 : 760;
+    const H = o.wide ? 800 : 1030;
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+
+    // Paper. Warm, slightly uneven, and not white: the original is a folded
+    // photocopy that has been in a drawer since 2004.
+    g.fillStyle = '#efe9db';
+    g.fillRect(0, 0, W, H);
+    for (let i = 0; i < 420; i++) {
+      const x = Math.random() * W, y = Math.random() * H;
+      g.fillStyle = `rgba(120,112,92,${0.012 + Math.random() * 0.03})`;
+      g.fillRect(x, y, 1 + Math.random() * 26, 1 + Math.random() * 3);
+    }
+    // The fold down the middle of the sheet, which is on every one of them.
+    const fold = W * (o.wide ? 0.42 : 0.36);
+    const fg = g.createLinearGradient(fold - 14, 0, fold + 14, 0);
+    fg.addColorStop(0, 'rgba(120,110,88,0)');
+    fg.addColorStop(0.45, 'rgba(120,110,88,0.12)');
+    fg.addColorStop(0.55, 'rgba(255,252,244,0.35)');
+    fg.addColorStop(1, 'rgba(120,110,88,0)');
+    g.fillStyle = fg;
+    g.fillRect(fold - 14, 0, 28, H);
+
+    const INK = '#232019';
+    const FINE = 'rgba(35,32,25,0.72)';
+    const face = (px, w) => `${w} ${px}px "Arial Narrow","Helvetica Neue",Arial,sans-serif`;
+
+    // ── the frame the drawing sits in ────────────────────────────────────────
+    const top = o.wide ? 96 : 104;
+    // The schedule decides where the drawing stops, not the other way round:
+    // sized the other way the ground floor's eight rooms ran off the bottom of
+    // the sheet and the last two simply were not there.
+    const step = o.wide ? 27 : 31;
+    const bot = H - (o.schedule.length * step + (o.wide ? 104 : 124));
+    const left = 108, right = W - 66;
+
+    // The house, fitted to it. The terrace is part of the sheet — it is a
+    // fifth of the floor area and the reason the flat is worth having.
+    const b = { x0: o.outer.x0, x1: o.outer.x1, z0: o.outer.z0, z1: o.outer.z1 };
+    if (o.terrace) {
+      b.x0 = Math.min(b.x0, o.terrace.x0); b.x1 = Math.max(b.x1, o.terrace.x1);
+      b.z0 = Math.min(b.z0, o.terrace.z0); b.z1 = Math.max(b.z1, o.terrace.z1);
+    }
+    const pad = 0.35;
+    const sx = (right - left) / (b.x1 - b.x0 + pad * 2);
+    const sz = (bot - top) / (b.z1 - b.z0 + pad * 2);
+    const k = Math.min(sx, sz);
+    const ox = left + ((right - left) - (b.x1 - b.x0) * k) / 2 - b.x0 * k;
+    // North is up on an architect's plan and +z is south here, so z is flipped.
+    // +z is the sea side and the sea side is the bottom of the sheet, which is
+    // how the original is drawn — the terrace under the flat, the stair up the
+    // right-hand edge. So z is *not* flipped.
+    const oz = top + ((bot - top) - (b.z1 - b.z0) * k) / 2 - b.z0 * k;
+    const X = (x) => ox + x * k;
+    const Z = (z) => oz + z * k;
+
+    // ── the terrace, tiled ───────────────────────────────────────────────────
+    if (o.terrace) {
+      const t = o.terrace;
+      g.fillStyle = 'rgba(210,202,184,0.55)';
+      g.fillRect(X(t.x0), Z(t.z0), (t.x1 - t.x0) * k, (t.z1 - t.z0) * k);
+      g.strokeStyle = 'rgba(35,32,25,0.30)'; g.lineWidth = 1;
+      for (let x = t.x0; x <= t.x1 + 1e-6; x += 0.45) {
+        g.beginPath(); g.moveTo(X(x), Z(t.z0)); g.lineTo(X(x), Z(t.z1)); g.stroke();
+      }
+      for (let z = t.z0; z <= t.z1 + 1e-6; z += 0.45) {
+        g.beginPath(); g.moveTo(X(t.x0), Z(z)); g.lineTo(X(t.x1), Z(z)); g.stroke();
+      }
+      g.strokeStyle = INK; g.lineWidth = 2.2;
+      g.strokeRect(X(t.x0), Z(t.z0), (t.x1 - t.x0) * k, (t.z1 - t.z0) * k);
+    }
+
+    // ── the rooms, then the walls over them ──────────────────────────────────
+    for (const r of o.rects) {
+      g.fillStyle = 'rgba(255,253,247,0.60)';
+      g.fillRect(X(r.x0), Z(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k);
+      g.strokeStyle = FINE; g.lineWidth = 1.1;
+      g.strokeRect(X(r.x0), Z(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k);
+    }
+    // Poché — the walls in solid, which is the whole reading of a plan.
+    g.fillStyle = INK;
+    for (const w of o.walls) {
+      g.fillRect(X(w.x0), Z(w.z0), Math.max(2, (w.x1 - w.x0) * k),
+        Math.max(2, (w.z1 - w.z0) * k));
+    }
+
+    // ── the numbers in their circles ─────────────────────────────────────────
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (const r of o.rects) {
+      if (!r.n) continue;
+      const cx = X((r.x0 + r.x1) / 2), cy = Z((r.z0 + r.z1) / 2);
+      g.fillStyle = INK;
+      g.font = face(o.wide ? 26 : 30, 'bold');
+      g.fillText(String(r.n), cx, cy - 1);
+      g.font = face(o.wide ? 13 : 15, '');
+      g.fillStyle = 'rgba(35,32,25,0.70)';
+      g.fillText(r.area.toFixed(2) + ' m²', cx, cy + (o.wide ? 20 : 23));
+    }
+
+    // ── dimension strings ────────────────────────────────────────────────────
+    //
+    // In centimetres, which is how the original is written and how anybody in
+    // Croatia would read it off a wall.
+    const dim = (x0, y0, x1, y1, text, side) => {
+      g.strokeStyle = FINE; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+      for (const [px, py] of [[x0, y0], [x1, y1]]) {
+        g.beginPath();
+        g.moveTo(px - 4, py - 4); g.lineTo(px + 4, py + 4); g.stroke();
+      }
+      g.save();
+      g.translate((x0 + x1) / 2, (y0 + y1) / 2);
+      if (side === 'v') g.rotate(-Math.PI / 2);
+      g.fillStyle = INK; g.font = face(15, '');
+      g.textAlign = 'center'; g.textBaseline = 'bottom';
+      g.fillText(text, 0, -4);
+      g.restore();
+    };
+    const cm = (m) => String(Math.round(m * 100));
+    const yTop = Z(b.z0) - 30;
+    dim(X(o.outer.x0), yTop, X(o.outer.x1), yTop, cm(o.outer.x1 - o.outer.x0), 'h');
+    const xLeft = X(b.x0) - 40;
+    dim(xLeft, Z(o.outer.z0), xLeft, Z(o.outer.z1),
+      cm(o.outer.z1 - o.outer.z0), 'v');
+
+    // ── the title block ──────────────────────────────────────────────────────
+    g.textAlign = 'right'; g.textBaseline = 'alphabetic';
+    g.fillStyle = INK;
+    g.font = face(o.wide ? 34 : 32, 'bold');
+    g.fillText(o.title, W - 60, 58);
+    g.font = face(19, '');
+    g.fillText('M. 1 : 100', W - 60, 84);
+
+    // ── the schedule ─────────────────────────────────────────────────────────
+    let y = bot + 62;
+    g.font = face(o.wide ? 20 : 22, '');
+    let total = 0;
+    const base = o.wide ? 20 : 22;
+    const room = W - 300;
+    for (const r of o.schedule) {
+      const label = r.n + '. ' + r.name;
+      // The living room's name is four words long on the original too, and it
+      // is the one that runs into the area column. Set narrower rather than
+      // truncated: an abbreviated room name on a plan is a room you cannot
+      // identify, and the number beside it is the whole point of the line.
+      g.font = face(base, '');
+      let px = base;
+      while (px > 11 && g.measureText(label).width > room) {
+        px -= 1; g.font = face(px, '');
+      }
+      g.textAlign = 'left'; g.fillStyle = INK;
+      g.fillText(label, 74, y);
+      const wid = g.measureText(label).width;
+      g.font = face(base, '');
+      g.textAlign = 'right';
+      g.fillText('p = ' + r.area.toFixed(2) + ' m²', W - 74, y);
+      // The dotted leader, which is what makes a list a schedule.
+      g.strokeStyle = 'rgba(35,32,25,0.35)';
+      g.setLineDash([2, 5]); g.lineWidth = 1;
+      g.beginPath();
+      g.moveTo(78 + wid + 14, y - 5);
+      g.lineTo(W - 200, y - 5);
+      g.stroke();
+      g.setLineDash([]);
+      total += r.area;
+      y += step;
+    }
+    g.strokeStyle = INK; g.lineWidth = 1.6;
+    g.beginPath(); g.moveTo(W * 0.42, y - 18); g.lineTo(W - 74, y - 18); g.stroke();
+    y += 8;
+    g.font = face(o.wide ? 22 : 23, 'bold');
+    g.textAlign = 'right';
+    g.fillText('UKUPNO:', W * 0.62, y);
+    g.fillText('p = ' + total.toFixed(2) + ' m²', W - 74, y);
+
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    tex.generateMipmaps = true;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    return tex;
+  }
+
+  {
+    const area = (r) => (r.x1 - r.x0) * (r.z1 - r.z0);
+    const R = plan.rooms, P = plan.roomsP;
+    const num = (r, n) => ({ ...r, n, area: area(r) });
+
+    const kat = planSheet({
+      title: 'TLOCRT KATA',
+      outer: plan.outer,
+      terrace: R.terrace,
+      walls: plan.blockers,
+      rects: [num(R.living, 1), { ...R.kitchen, area: area(R.kitchen) },
+        num(R.bath, 2), num(R.soba3, 3), num(R.soba4, 4), num(R.terrace, 5)],
+      schedule: [
+        { n: 1, name: 'DNEVNI BORAVAK, KUHINJA I BLAGOVAONICA',
+          area: area(R.living) + area(R.kitchen) },
+        { n: 2, name: 'KUPAONICA', area: area(R.bath) },
+        { n: 3, name: 'SOBA', area: area(R.soba3) },
+        { n: 4, name: 'SOBA', area: area(R.soba4) },
+        { n: 5, name: 'TERASA', area: area(R.terrace) },
+      ],
+    });
+
+    const priz = planSheet({
+      wide: true,
+      title: 'TLOCRT PRIZEMLJA',
+      outer: plan.outer,
+      walls: plan.blockersP,
+      rects: [num(P.boravak, 1), num(P.kuhinja, 2), num(P.soba3d, 3),
+        num(P.soba4d, 4), num(P.straga, 5), num(P.hodnik, 6),
+        num(P.kupS, 7), num(P.kupN, 8)],
+      schedule: [
+        { n: 1, name: 'DNEVNI BORAVAK', area: area(P.boravak) },
+        { n: 2, name: 'KUHINJA', area: area(P.kuhinja) },
+        { n: 3, name: 'SOBA', area: area(P.soba3d) },
+        { n: 4, name: 'SOBA', area: area(P.soba4d) },
+        { n: 5, name: 'SOBA', area: area(P.straga) },
+        { n: 6, name: 'HODNIK', area: area(P.hodnik) },
+        { n: 7, name: 'KUPAONICA', area: area(P.kupS) },
+        { n: 8, name: 'KUPAONICA', area: area(P.kupN) },
+      ],
+    });
+
+    // On the spine, where the two rectangles were, and bigger than they were:
+    // a drawing you cannot read is a rectangle with lines on it.
+    //
+    // Blender's y is three.js's −z, and the wall face is at 0.630 in the plan's
+    // own frame — so the sheets face +z, which is into the big room.
+    const WALL = -0.622;
+    const hang = (tex, x0, x1, y0, y1) => {
+      const frameMat = solidMaterial(new THREE.Color(0.145, 0.130, 0.110), {
+        spec: 0.24, specPower: 40, emissive: VIK.glow, vcol: false,
+      });
+      const w = x1 - x0, h = y1 - y0, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+      const fr = new THREE.Mesh(
+        new THREE.BoxGeometry(w + 0.030, h + 0.030, 0.020), frameMat);
+      fr.position.set(cx, cy, WALL - 0.006);
+      root.add(fr);
+      const sheet = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+        new THREE.MeshBasicMaterial({ map: tex }));
+      sheet.position.set(cx, cy, WALL + 0.006);
+      root.add(sheet);
+      for (const m of [fr, sheet]) { m.castShadow = false; m.receiveShadow = false; }
+    };
+    hang(priz, 1.40, 1.96, 4.40, 4.80);
+    hang(kat, 2.10, 2.50, 4.32, 4.88);
+  }
+
+  // ── the fan ────────────────────────────────────────────────────────────────
+  /**
+   * A white pedestal fan beside the fridge, turning, all day.
+   *
+   * Same argument as the clock's hands, one room over: the thing that makes a
+   * room read as lived in rather than as photographed is that something in it
+   * is moving. The clock does it quietly at the far end; this does it loudly
+   * in the middle, and every flat in Dalmatia has one in August.
+   *
+   * Built here and not in Blender for the reason the hands are: the payload is
+   * one welded mesh per roof state, and a welded mesh cannot spin. That also
+   * gets the cage for free — three torus rings and eight spokes is four lines
+   * here and a small ordeal in bmesh.
+   *
+   * Local house metres. The wall the fridge stands against is +z, so the fan
+   * faces −z, which is into the room.
+   */
+  const fan = { blades: null, head: null };
+  {
+    const FAN = { x: -1.52, z: 3.28, r: 0.195 };
+    const white = solidMaterial(new THREE.Color(0.925, 0.920, 0.905), {
+      spec: 0.30, specPower: 44, emissive: VIK.glow, vcol: false,
+    });
+    const grey = solidMaterial(new THREE.Color(0.735, 0.735, 0.730), {
+      spec: 0.22, specPower: 30, emissive: VIK.glow, vcol: false,
+    });
+    // The blades are single sheets and a blade seen from behind is the same
+    // blade, so this one is drawn both ways round.
+    const vane = solidMaterial(new THREE.Color(0.760, 0.758, 0.750), {
+      spec: 0.26, specPower: 34, emissive: VIK.glow, vcol: false,
+      side: THREE.DoubleSide,
+    });
+    const g = new THREE.Group();
+    g.position.set(FAN.x, plan.floor, FAN.z);
+    root.add(g);
+
+    const put = (geo, mat, x, y, z) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(x, y, z);
+      m.castShadow = false; m.receiveShadow = false;
+      return m;
+    };
+    // Four splayed tube legs and a hub, which is what the base of one of these
+    // is — not a disc. The disc version read as a floor lamp.
+    for (let i = 0; i < 4; i++) {
+      const a = (i + 0.5) * Math.PI / 2;
+      const leg = put(new THREE.CylinderGeometry(0.011, 0.009, 0.30, 7),
+        white, Math.cos(a) * 0.15, 0.030, Math.sin(a) * 0.15);
+      leg.rotation.set(Math.sin(a) * 0.10, 0, -Math.cos(a) * 0.10);
+      g.add(leg);
+      g.add(put(new THREE.SphereGeometry(0.013, 6, 4), white,
+        Math.cos(a) * 0.295, 0.014, Math.sin(a) * 0.295));
+    }
+    g.add(put(new THREE.CylinderGeometry(0.052, 0.058, 0.055, 12), white,
+      0, 0.028, 0));
+    // The column, in two diameters, because it telescopes and the joint is the
+    // one detail that says which kind of fan this is.
+    g.add(put(new THREE.CylinderGeometry(0.026, 0.026, 0.56, 10), white,
+      0, 0.335, 0));
+    g.add(put(new THREE.CylinderGeometry(0.030, 0.030, 0.045, 10), grey,
+      0, 0.632, 0));
+    g.add(put(new THREE.CylinderGeometry(0.017, 0.017, 0.44, 8), grey,
+      0, 0.855, 0));
+
+    // The head, which oscillates.
+    const head = new THREE.Group();
+    head.position.set(0, 1.09, 0);
+    g.add(head);
+    fan.head = head;
+    // Motor housing, on the room side of the column.
+    const motor = put(new THREE.CylinderGeometry(0.048, 0.052, 0.145, 12),
+      white, 0, 0, -0.055);
+    motor.rotation.x = Math.PI / 2;
+    head.add(motor);
+    head.add(put(new THREE.BoxGeometry(0.036, 0.052, 0.030), grey,
+      0, 0.052, 0.006));   // the three speed buttons, as one block
+
+    // The cage: a ring front and back, two more on the face, and eight spokes
+    // between them. Thin enough to see the blades through, which is the point.
+    for (const [rr, zz] of [[FAN.r, -0.058], [FAN.r, -0.185]]) {
+      const t = put(new THREE.TorusGeometry(rr, 0.0055, 5, 30), white, 0, 0, zz);
+      head.add(t);
+    }
+    for (const rr of [FAN.r * 0.68, FAN.r * 0.36]) {
+      head.add(put(new THREE.TorusGeometry(rr, 0.0045, 5, 24), white, 0, 0, -0.183));
+    }
+    for (let i = 0; i < 12; i++) {
+      const a = i * Math.PI / 6;
+      const sp = put(new THREE.CylinderGeometry(0.0035, 0.0035, FAN.r * 2, 4),
+        white, 0, 0, -0.184);
+      sp.rotation.z = a;
+      head.add(sp);
+    }
+    head.add(put(new THREE.CylinderGeometry(0.030, 0.030, 0.016, 12), white,
+      0, 0, -0.190));
+
+    // And the blades. A sector of a disc with a twist on its own radius, which
+    // is what a moulded fan blade is; three of them, because three is what is
+    // in the photograph.
+    const blades = new THREE.Group();
+    blades.position.set(0, 0, -0.128);
+    head.add(blades);
+    fan.blades = blades;
+    for (let i = 0; i < 3; i++) {
+      const bg = new THREE.CircleGeometry(FAN.r * 0.86, 10, -0.60, 1.20);
+      // Rotate about the blade's own radius: a flat sector is a paddle and a
+      // pitched one is a fan.
+      bg.rotateX(0.34);
+      const b = new THREE.Mesh(bg, vane);
+      b.rotation.z = i * (Math.PI * 2 / 3);
+      b.castShadow = false; b.receiveShadow = false;
+      blades.add(b);
+    }
+    for (const m of blades.children) m.frustumCulled = false;
+    g.add(put(new THREE.CylinderGeometry(0.0035, 0.0035, 0.60, 4), grey,
+      0.02, 0.012, 0.30));    // the flex, trailing off toward the wall
+  }
+
   /**
    * How far Zagreb is ahead of UTC, in milliseconds.
    *
@@ -336,6 +1057,18 @@ async function buildVikendica(scene, field) {
     clockHands[0].rotation.z = -TAU * h / 12;
     clockHands[1].rotation.z = -TAU * m / 60;
     clockHands[2].rotation.z = -TAU * s / 60;
+    // And the fan, off the same clock. No dt here and none wanted: a wall
+    // clock is a perfectly good phase for something that never stops, and it
+    // means the blades are where they should be on the first frame rather than
+    // wherever a frame counter had got to.
+    tv.tick();
+    if (fan.blades) {
+      const t = now / 1000;
+      fan.blades.rotation.z = -t * 14.5;
+      // Oscillating, slowly, through about fifty degrees either side. This is
+      // the part you notice from across the room without looking at it.
+      fan.head.rotation.y = Math.sin(t * 0.22) * 0.88;
+    }
   }
   tickClock();
 
@@ -663,6 +1396,14 @@ async function buildVikendica(scene, field) {
   return {
     root, parts, plan, base, yaw,
     floorAt, blockers, tight, indoorsAt, hull, headroom, tick: tickClock,
+    /** The television: where it is in world metres, and the knock. */
+    tv: {
+      at: () => { const [wx, wz] = world(tv.at[0], tv.at[2]);
+        return [wx, base + tv.at[1], wz]; },
+      knock: () => tv.knock(),
+      page: () => tv.page(),
+      live: () => tv.live(),
+    },
     /** 'now' | 'loft' — which roof is on. The rooms below do not change. */
     roof(which) {
       for (const k of ['roof', 'roof_glass', 'roof_sheer']) {
