@@ -138,7 +138,13 @@ let zoom = 0;
 const SLOW = 0.35;
 
 function stepLens(dt) {
-  const want = state.phase === 'ground'
+  // And in the water, where the reason for it is the same one and stronger.
+  // Treading water your eye is eleven centimetres off the surface, which is
+  // the lowest viewpoint in the game and the one with the least in it: the
+  // fire is a smudge on a hill you cannot walk up, the Canadair is a speck,
+  // and the beach you are trying to reach is a line. There is nothing you can
+  // do about any of it except look, so let the looking be worth something.
+  const want = (state.phase === 'ground' || state.phase === 'swim')
     && (keys.has('KeyZ') || TOUCH.glook) ? 1 : 0;
   zoom = damp(zoom, want, LENS.ease, dt);
   if (zoom < 1e-4 && want === 0) zoom = 0;
@@ -235,6 +241,13 @@ addEventListener('keydown', (e) => {
   // you have decided to do something, and it declines quietly — standing still
   // or standing on the beach it is not a jump, and nothing happens.
   if (e.code === 'Enter' && state.phase === 'ground') { e.preventDefault(); hopOut(); return; }
+  // T is the autopilot in both seats. In the aeroplane it flies the job list;
+  // in the water there is one job and it swims you at it. Same key, same
+  // promise — somebody else has the controls until you take them back — which
+  // is worth more than a second key would have been.
+  if (e.code === 'KeyT' && state.phase === 'swim') {
+    e.preventDefault(); toggleSwimAuto(); return;
+  }
   if (state.phase === 'ground' || state.phase === 'chute'
     || state.phase === 'swim') {
     // On foot, or under a canopy, the aeroplane's controls are all meaningless
@@ -465,6 +478,21 @@ function updateNavTarget(dt) {
     label: onRun ? (IS_TOUCH ? 'ap.onWaterTouch' : 'ap.onWater')
       : apOnRun ? 'ap.approach' : 'ap.lining',
   };
+}
+
+/**
+ * The same thing in the water. The model owns the decision — it is the object
+ * that knows where the shore is and whether you are already standing on it —
+ * so this is the toast and nothing else.
+ */
+function toggleSwimAuto() {
+  if (!swim || !swim.active) return;
+  const on = swim.toggleAuto();
+  if (on) toast(T('swim.apOn'));
+  else if (swim.apNote === 'far') toast(T('swim.apFar'));
+  else if (swim.apNote === 'there') toast(T('swim.apThere'));
+  else toast(T('swim.apOff'));
+  paintSwimHud();
 }
 
 function toggleAutopilot() {
@@ -1582,10 +1610,16 @@ function paintSwimHud() {
   fill.classList.toggle('low', b < 0.34);
   $('sw-breath').hidden = !swim.submerged && b > 0.995;
   const wade = swim.canWade();
+  // Somebody else has the controls, and the one thing a light like this has to
+  // do is say so without being read: it is on or it is not there.
+  const ap = $('sw-auto');
+  ap.hidden = !swim.auto;
+  ap.textContent = swim.apNote === 'up' ? T('swim.apUp') : T('swim.auto');
   $('sw-hint').innerHTML = swim.spent ? T('swim.spent')
-    : wade ? TK('swim.wade', 'swim.wadeTouch')
-      : TK('swim.hint', 'swim.hintTouch');
-  if (IS_TOUCH) paintSwimTouch(wade);
+    : swim.auto ? T('swim.apHint')
+      : wade ? TK('swim.wade', 'swim.wadeTouch')
+        : TK('swim.hint', 'swim.hintTouch');
+  if (IS_TOUCH) paintSwimTouch(wade, swim.auto);
   // Nothing below the waterline until your eyes are actually under it, and then
   // it closes in slowly and never far: this is the mask now, not the sea. The
   // sea is drawn.
@@ -2200,6 +2234,7 @@ let wasAfoot = false;
 let indoors = 0;
 let inLatch = 0;
 let cicadaAt = 0;
+let waterAt = -1, wetAt = -1;
 // How *dark* the room you are in is, which is a separate number from whether
 // you are in one. The kabina is a wooden box with a single door and stopping
 // down half a stop walking into it is what an eye does. The vikendica has
@@ -2358,7 +2393,12 @@ function frame() {
   // second to travel is not a thing anybody can see, and the alternative —
   // hoisting the lens up here — would put the camera's easing ahead of the
   // simulation it is easing over.
-  const dt = real * (1 - (1 - SLOW) * zoom);
+  // Slow motion rides the lens — see SLOW — but only on land. In the water
+  // the sea's own rhythm is the clock you are reading the mode by: the swell
+  // lifting you, the breath bar, how long a stroke takes. Halve all of that
+  // for as long as somebody holds Z and the game does not read as slowed, it
+  // reads as hung.
+  const dt = real * (1 - (1 - SLOW) * (state.phase === 'swim' ? 0 : zoom));
   U.uTime.value += dt;
   if (!started) return;
 
@@ -2500,7 +2540,7 @@ function frame() {
   // there — every voice in this game is synthesised rather than played — so
   // this takes the top off instead, which is the older idiom for the same beat
   // and the one the ear reads as strangeness rather than as breakage.
-  if (audio) audio.slowmo(zoom);
+  if (audio) audio.slowmo(state.phase === 'swim' ? 0 : zoom);
   if (camOverride) updateCamera(dt);
   else if (state.phase === 'ground') ground.pose(camera);
   else if (state.phase === 'swim') swim.pose(camera);
@@ -2650,6 +2690,23 @@ function frame() {
     cicadaAt = indoors;
     audio.room(indoors);
   } else if (!afoot && cicadaAt !== 0) { cicadaAt = 0; audio.room(0); }
+  // And the sea shutting it out, which is the same idea one surface further
+  // out. Driven from here rather than from the swim block so that it is also
+  // driven on the frame you leave the water: a beach that stays muffled after
+  // you have walked out of the sea is worse than one that never muffled.
+  //
+  // 1.1 m for the full effect. That is not a long way down, and it is not
+  // meant to be — the change happens in the first hand's breadth and the rest
+  // is the tail of it. `sat` clamps, so surfacing above the waterline (`depth`
+  // goes negative floating on a swell) reads as zero rather than as noise.
+  if (audio) {
+    const wet = swim && swim.active;
+    const w = wet ? Math.min(1, Math.max(0, swim.depth) / 1.1) : 0;
+    if (Math.abs(w - waterAt) > 0.004 || (wet ? 1 : 0) !== wetAt) {
+      waterAt = w; wetAt = wet ? 1 : 0;
+      audio.water(w, wetAt);
+    }
+  }
   // The light. ACES over the whole frame rather than a lamp in the room,
   // because there is no lamp in the room — that is the point of it — and what
   // your eye actually does walking in off a white promenade is exactly this.

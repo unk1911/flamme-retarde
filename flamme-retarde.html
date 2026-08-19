@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.80.0">
+<meta name="version" content="1.81.0">
 <meta name="build-date" content="2026-08-19">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -898,6 +898,10 @@ html.touch #swim-hud { bottom: 7.4rem; }
    always available and only sometimes does something teaches nothing. */
 #t-dive.on { background: rgba(23, 96, 120, .42); border-color: var(--sea); color: var(--sea); }
 #t-rise.on { background: rgba(79, 210, 232, .28); border-color: var(--sea); color: #d6f6fc; }
+#t-sauto.on {
+  background: rgba(224, 195, 138, .22);
+  border-color: var(--ember-hi); color: var(--ember-hi);
+}
 #t-ashore { opacity: .38; }
 #t-ashore.armed {
   opacity: 1; background: rgba(224, 195, 138, .22);
@@ -1237,6 +1241,20 @@ html.touch .row input[type=range] { height: 22px; }
 }
 #sw-fill.low { background: #e8703c; }
 #sw-hint { min-height: 1.2em; opacity: .9; }
+/* The autopilot light. Not a colour of its own: the aeroplane's says AUTO in
+   the same warm amber and it is the same claim — the controls are somebody
+   else's until you take them back — so it borrows it rather than teaching a
+   second one. Letterspaced and small, because it is a lamp and not a sentence. */
+#sw-auto {
+  font-size: .62rem;
+  letter-spacing: .30em;
+  text-transform: uppercase;
+  color: var(--ember-hi);
+  border: 1px solid rgba(224, 195, 138, .45);
+  background: rgba(224, 195, 138, .12);
+  padding: .18em .7em;
+}
+#sw-auto[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -1262,8 +1280,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.80.0, built 2026-08-19">
-    <b>v1.80.0</b><i>·</i><span>2026-08-19</span>
+  <div id="build" title="Flamme Retardé 1.81.0, built 2026-08-19">
+    <b>v1.81.0</b><i>·</i><span>2026-08-19</span>
   </div>
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
@@ -1377,6 +1395,7 @@ html.touch .row input[type=range] { height: 22px; }
   <div class="gauge"><b id="sw-depth">0.0</b><span data-i18n="swim.depth">m down</span></div>
   <div id="sw-breath"><div class="sw-track"><i id="sw-fill"></i></div>
     <small data-i18n="swim.breath">breath</small></div>
+  <div id="sw-auto" hidden data-i18n="swim.auto">AUTO</div>
   <div id="sw-hint"></div>
 </div>
 
@@ -1498,6 +1517,7 @@ html.touch .row input[type=range] { height: 22px; }
   </div>
   <div id="smini">
     <button id="t-fast" data-i18n="touch.fast">FAST</button>
+    <button id="t-sauto" data-i18n="touch.auto">AUTO</button>
     <button id="t-ashore" data-i18n="touch.ashore">ASHORE</button>
     <button id="t-sset" data-i18n="touch.set">SET</button>
     <button id="t-spause" data-i18n="touch.pause">II</button>
@@ -1604,7 +1624,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.80.0", date: "2026-08-19" };</script>
+<script>const BUILD = { v: "1.81.0", date: "2026-08-19" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -2506,11 +2526,18 @@ const STRINGS = {
     // in the water
     'swim.depth': 'm down',
     'swim.breath': 'breath',
-    'swim.hint': '<b>W A S D</b> swim · <b>Shift</b> harder · <b>C</b> dive · <b>Space</b> up',
-    'swim.hintTouch': 'stick swims · <b>DIVE</b> and <b>UP</b> are held · <b>FAST</b> latches',
+    'swim.hint': '<b>W A S D</b> swim · <b>C</b> dive · <b>Space</b> up · <b>Z</b> look · <b>T</b> auto',
+    'swim.hintTouch': 'stick swims · <b>DIVE</b> and <b>UP</b> are held · <b>AUTO</b> swims you in',
     'swim.wade': '<b>E</b> to wade ashore',
     'swim.wadeTouch': '<b>ASHORE</b> — there is a bottom under you',
     'swim.spent': 'out of air — the jacket is taking you up',
+    'swim.auto': 'AUTO',
+    'swim.apUp': 'AUTO · SURFACING',
+    'swim.apHint': '<b>T</b> to take it back · <b>Z</b> to look',
+    'swim.apOn': 'Autopilot: swimming for the shore.',
+    'swim.apOff': 'Autopilot off — you have it.',
+    'swim.apFar': 'No shore within reach. You are on your own out here.',
+    'swim.apThere': 'You have a bottom under you — walk out.',
     'toast.inTheWater': 'In the water. Nobody drowns in a lifejacket — swim for the shore.',
     'toast.ashore': 'Ashore, and dripping.',
 
@@ -2589,6 +2616,7 @@ const STRINGS = {
     'touch.dive': 'DIVE',
     'touch.rise': 'UP',
     'touch.fast': 'FAST',
+    'touch.auto': 'AUTO',
     'touch.ashore': 'ASHORE',
     'touch.thr': 'thr',
     'touch.ap': 'AP',
@@ -2774,11 +2802,18 @@ const STRINGS = {
 
     'swim.depth': 'm dubine',
     'swim.breath': 'dah',
-    'swim.hint': '<b>W A S D</b> plivaj · <b>Shift</b> jače · <b>C</b> roni · <b>Space</b> gore',
-    'swim.hintTouch': 'palica pliva · <b>RONI</b> i <b>GORE</b> se drže · <b>BRŽE</b> ostaje',
+    'swim.hint': '<b>W A S D</b> plivaj · <b>C</b> roni · <b>Space</b> gore · <b>Z</b> pogled · <b>T</b> auto',
+    'swim.hintTouch': 'palica pliva · <b>RONI</b> i <b>GORE</b> se drže · <b>AUTO</b> te vodi',
     'swim.wade': '<b>E</b> za izlazak na obalu',
     'swim.wadeTouch': '<b>NA OBALU</b> — dno ti je pod nogama',
     'swim.spent': 'nema zraka — prsluk te diže',
+    'swim.auto': 'AUTO',
+    'swim.apUp': 'AUTO · IZRANJA',
+    'swim.apHint': '<b>T</b> da preuzmeš · <b>Z</b> za pogled',
+    'swim.apOn': 'Autopilot: pliva prema obali.',
+    'swim.apOff': 'Autopilot isključen — tvoje je.',
+    'swim.apFar': 'Nema obale u dohvatu. Ovdje si sam.',
+    'swim.apThere': 'Dno ti je pod nogama — izađi.',
     'toast.inTheWater': 'U moru si. S prslukom se ne utapa — plivaj prema obali.',
     'toast.ashore': 'Na obali, mokar do kože.',
 
@@ -2848,6 +2883,7 @@ const STRINGS = {
     'touch.dive': 'RONI',
     'touch.rise': 'GORE',
     'touch.fast': 'BRŽE',
+    'touch.auto': 'AUTO',
     'touch.ashore': 'NA OBALU',
     'touch.thr': 'gas',
     'touch.ap': 'AP',
@@ -3033,11 +3069,18 @@ const STRINGS = {
 
     'swim.depth': 'm de fond',
     'swim.breath': 'souffle',
-    'swim.hint': '<b>W A S D</b> nager · <b>Shift</b> plus fort · <b>C</b> plonger · <b>Space</b> remonter',
-    'swim.hintTouch': 'le stick nage · <b>PLONGER</b> et <b>MONTER</b> se tiennent · <b>VITE</b> se verrouille',
+    'swim.hint': '<b>W A S D</b> nager · <b>C</b> plonger · <b>Space</b> remonter · <b>Z</b> voir · <b>T</b> auto',
+    'swim.hintTouch': 'le stick nage · <b>PLONGER</b> et <b>MONTER</b> se tiennent · <b>AUTO</b> te ramène',
     'swim.wade': '<b>E</b> pour rejoindre le bord',
     'swim.wadeTouch': '<b>À TERRE</b> — tu as pied',
     'swim.spent': "plus d'air — le gilet te remonte",
+    'swim.auto': 'AUTO',
+    'swim.apUp': 'AUTO · REMONTÉE',
+    'swim.apHint': '<b>T</b> pour reprendre · <b>Z</b> pour regarder',
+    'swim.apOn': 'Pilote auto : nage vers le bord.',
+    'swim.apOff': 'Pilote auto coupé — à toi.',
+    'swim.apFar': "Aucun bord à portée. Ici tu es seul.",
+    'swim.apThere': 'Tu as pied — sors.',
     'toast.inTheWater': "À l'eau. On ne se noie pas avec un gilet — nage vers le bord.",
     'toast.ashore': 'Au sec, et ruisselant.',
 
@@ -3109,6 +3152,7 @@ const STRINGS = {
     'touch.dive': 'PLONGER',
     'touch.rise': 'MONTER',
     'touch.fast': 'VITE',
+    'touch.auto': 'AUTO',
     'touch.ashore': 'À TERRE',
     'touch.thr': 'gaz',
     'touch.ap': 'PA',
@@ -27940,6 +27984,10 @@ function buildSwim(sea) {
   let active = false;
   let deepest = 0;
   let sinceIn = 0;
+  let auto = false;
+  let apNote = '';
+  let apAim = 0;              // the heading the autopilot has settled on
+  let apT = 0;                // and how long since it last went looking
 
   const bedAt = (x, z) => Math.min(groundAt(x, z), -0.6);
 
@@ -27957,12 +28005,14 @@ function buildSwim(sea) {
     you.stroke = 0;
     deepest = you.depth;
     sinceIn = 0;
+    auto = false; apNote = '';
     if (sea) sea.mat.side = THREE.DoubleSide;
     return true;
   }
 
   function leave() {
     active = false;
+    auto = false; apNote = '';
     if (sea) sea.mat.side = THREE.FrontSide;
   }
 
@@ -27972,6 +28022,84 @@ function buildSwim(sea) {
     // that is lying down, and straight up is a real direction you want — the
     // surface is up there and it is the way out.
     you.pitch = clamp(you.pitch - dy, -1.45, 1.45);
+  }
+
+
+  /**
+   * The autopilot, which does the one thing there is to do in the water.
+   *
+   * In the aeroplane the autopilot has a job list — a tank to fill, a fire to
+   * drop on, a runway to find — and picking which one is most of the code. In
+   * the sea there is exactly one job and it is get out of the sea, so this is
+   * the whole of it: face the nearest shore, swim at it, and give the controls
+   * back the moment you can stand up.
+   *
+   * It steers down the shore distance field rather than at a point, because a
+   * point is wrong twice over here. The channel bends, so the nearest land as
+   * the crow flies is regularly across a headland you would have to swim
+   * through; and `shoreAt` is the same field the fire and the crowd already
+   * use, sampled on the same grid, so a heading that reduces it is a heading
+   * that actually reaches water's edge. Sixteen of them, thirty metres out,
+   * and the best one wins — which is gradient descent with enough of a look
+   * ahead not to walk into the one shoal that happens to point the wrong way.
+   *
+   * Re-picked every second and not every frame. A field sampled off a 255-step
+   * texture has steps in it, and a swimmer who re-solves on every frame sits on
+   * a step boundary and shakes his head at it for as long as you leave him.
+   */
+  const AP_LOOK = 30;
+  function apPick() {
+    const here = shoreAt(you.x, you.z);
+    let best = null, bestD = here;
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      const px = you.x - Math.sin(a) * AP_LOOK, pz = you.z - Math.cos(a) * AP_LOOK;
+      // Straight through a headland is not a swim. The mid point is enough of
+      // a check at thirty metres: a spit narrow enough to slip past both
+      // samples is narrow enough to swim round without noticing.
+      if (!isSea((you.x + px) * 0.5, (you.z + pz) * 0.5)) continue;
+      const d = shoreAt(px, pz);
+      if (d < bestD) { bestD = d; best = a; }
+    }
+    // Nothing improves: either you are already on the beach or the field has
+    // saturated, which at 400 m means there is no shore in it to steer at.
+    if (best === null) return here > 380 ? null : you.yaw;
+    return best;
+  }
+
+  function toggleAuto() {
+    if (!active) return false;
+    auto = !auto;
+    if (!auto) { apNote = ''; return false; }
+    // Already standing on it. Engaging here would engage and disengage on the
+    // same frame, and a light that blinks once is a control that looks broken.
+    if (canWade()) { auto = false; apNote = 'there'; return false; }
+    const a = apPick();
+    if (a === null) { auto = false; apNote = 'far'; return false; }
+    apAim = a; apT = 0; apNote = 'on';
+    return true;
+  }
+
+  /**
+   * What the autopilot is holding this frame, in place of your hands.
+   *
+   * It surfaces first. Everything below the waterline is on a clock — the
+   * breath bar — and an autopilot that swam you to the beach two metres under
+   * would be an autopilot that drowned you politely.
+   */
+  function apCtl(dt) {
+    apT += dt;
+    if (apT > 1.0) { apT = 0; const a = apPick(); if (a !== null) apAim = a; }
+    // Head round to the heading, at about the rate a person in a jacket turns.
+    let d = apAim - you.yaw;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    you.yaw += clamp(d, -1.3 * dt, 1.3 * dt);
+    // And level the head, which is what makes it read as somebody else driving.
+    you.pitch += clamp(-you.pitch, -1.1 * dt, 1.1 * dt);
+    const deep = you.depth > 0.35;
+    apNote = deep ? 'up' : 'on';
+    return { fwd: deep ? 0.35 : 1, side: 0, sprint: false, down: false, up: deep };
   }
 
   /**
@@ -27984,6 +28112,12 @@ function buildSwim(sea) {
   function update(dt, ctl) {
     if (!active) return;
     sinceIn += dt;
+    // Out of air the jacket has the controls, and so does the autopilot: it is
+    // already doing the only thing that helps, which is going up.
+    if (auto) {
+      ctl = apCtl(dt);
+      if (canWade()) { auto = false; apNote = 'there'; }
+    }
     const submerged = you.depth > SWIM.under;
 
     // ── breath ───────────────────────────────────────────────────────────────
@@ -28095,6 +28229,9 @@ function buildSwim(sea) {
     get depth() { return Math.max(0, you.depth); },
     get breath() { return you.breath; },
     get spent() { return you.spent; },
+    get auto() { return auto; },
+    get apNote() { return apNote; },
+    toggleAuto,
     enter, leave, look, update, pose, canWade,
     surfaceAt: seaHeightAt,
     stats: () => ({
@@ -28108,6 +28245,7 @@ function buildSwim(sea) {
       sp: +Math.hypot(you.vx, you.vz).toFixed(2),
       shore: Math.round(shoreAt(you.x, you.z)),
       wade: canWade() ? 1 : 0,
+      auto: auto ? (apNote || 'on') : 'off',
       t: +sinceIn.toFixed(1),
     }),
   };
@@ -28482,19 +28620,37 @@ const ARMS = {
   // So the shoulders are tipped back until the stroke rides in the bottom
   // third of the picture. It is the same cheat every first-person game makes
   // with a pair of hands, for the same reason and by about the same amount.
-  lift: 0.34,
+  lift: 0.42,
 
   upper: 0.295,        // m — humerus
   fore: 0.265,         // radius/ulna
-  hand: 0.185,
+  palm: 0.098,         // wrist to knuckle
 
-  rUpper: [0.052, 0.043],   // radii at each end of each piece
-  rFore: [0.043, 0.033],
-  rHand: [0.032, 0.040],
+  // Silhouettes, not radii. The first version was two cones and a squashed
+  // third, and two cones is exactly what it looked like: an arm's outline is
+  // not monotonic anywhere along its length. The deltoid is the widest part of
+  // the upper arm and it is at the top; the forearm's widest part is a hand's
+  // breadth *below* the elbow and it runs to a wrist half that size. Getting
+  // those two bulges in is most of the difference between a limb and a pipe,
+  // and neither of them costs a triangle over the cone that was there.
+  //
+  // Elliptical, too. A forearm is a good bit deeper than it is wide seen from
+  // above and the other way round seen from the front; a round one catches the
+  // light evenly all the way along, which is the other half of why the cones
+  // read as plumbing.
+  upperProf: (t) => {
+    const w = 0.0570 - 0.0170 * t + 0.0052 * Math.sin(Math.PI * t);
+    return [w, w * 0.93];
+  },
+  foreProf: (t) => {
+    const w = 0.0452 - 0.0180 * t + 0.0068 * Math.sin(Math.PI * Math.pow(t, 0.65));
+    return [w, w * 0.80];
+  },
 
-  // The hand is a paddle, not a bone: flat across the palm and thin through it.
-  handWide: 1.55,
-  handThin: 0.42,
+  // The hand, which is now a hand. See `armHand`.
+  finger: [0.0715, 0.0790, 0.0755, 0.0620],
+  fingerR: 0.0098,
+  thumb: 0.0640,
 
   // A Dalmatian August, three weeks in. Albedo, so it sits below the colour it
   // arrives on screen as.
@@ -28511,16 +28667,144 @@ const ARMS = {
 };
 
 /**
+ * Wet skin, forty centimetres from the lens.
+ *
+ * The geometry above was half of "the arms look rough"; this is the other
+ * half. A flat albedo with a broad plastic highlight on it is a mannequin's
+ * arm at any distance, and at this one there is nothing else in shot to
+ * distract from it. Three things, and each of them is one line:
+ *
+ * Wet. Skin straight out of the sea carries a film of water, and water is a
+ * dielectric with a very strong Fresnel: nearly matte face-on and close to a
+ * mirror at a grazing angle. That is why a wet arm has a bright rim along its
+ * whole silhouette and a dull middle, and it is the single strongest cue that
+ * the thing on screen has just come out of the water. `spec` here is the
+ * Fresnel curve rather than a number, so the same material is a dry-looking
+ * arm in the middle of the frame and a wet one round its edge — and the sky
+ * reflection `solidFragment` already adds is then blue on the rim, for free,
+ * which is what the Adriatic does to an arm.
+ *
+ * Translucent. Skin is not opaque. Light entering the far side of a forearm
+ * comes back out reddened, so the edge of a lit arm goes warm before it goes
+ * dark — the wrap term below, which is a fifty-year-old cheat and still the
+ * cheapest realistic thing you can do to a limb.
+ *
+ * And not one colour. Three weeks of a Dalmatian August is on the outside of
+ * an arm and not on the inside of it, and there is a fine grain over the whole
+ * of it. Keyed to `vLocal`, which is the bind pose, so both stay stuck to the
+ * arm while it strokes.
+ */
+const ARM_SKIN = /* glsl */ `
+  vec3 avd = normalize(vWorld - uCamPos);
+  float afr = pow(1.0 - abs(dot(n, avd)), 3.2);
+  spec = mix(0.09, 0.92, afr);
+
+  float atan_ = clamp(vLocal.z * -22.0, -1.0, 1.0) * 0.5 + 0.5;
+  base *= mix(vec3(1.010, 0.995, 0.985), vec3(0.945, 0.885, 0.845), atan_);
+  base *= 1.0 + 0.05 * (vnoise2(vec2(vLocal.x + vLocal.z, vLocal.y) * 210.0) - 0.5);
+
+  base = mix(base, vec3(0.760, 0.335, 0.250), afr * 0.26);
+`;
+
+/**
  * One tapered limb, hanging from the origin down −Y.
  *
  * Down −Y because that is the direction a joint chain wants to be written in:
  * the shoulder is at the origin, the elbow is `len` below it, and every
  * rotation in the file is then a rotation of a thing that starts by hanging.
  */
-function armLimb(r0, r1, len, seg = 12) {
-  const g = new THREE.CylinderGeometry(r0, r1, len, seg, 1, false);
-  g.translate(0, -len * 0.5, 0);
-  return g;
+function armLimb(len, prof, opt = {}) {
+  const seg = opt.seg ?? 24, rows = opt.rows ?? 14, N = 6;
+  const st = [];
+  const [rx0, rz0] = prof(0), [rx1, rz1] = prof(1);
+  // The caps are what fixed the joints. Two flat-ended cylinders meeting at a
+  // bent elbow show you both of their end discs and the wedge of nothing
+  // between them, and at forty centimetres from the lens that wedge is the
+  // first thing you see. Round both ends into half an ellipsoid and the pieces
+  // read as one arm through any bend the cycle asks for, with no skinning, no
+  // blend shape and no joint sphere sitting proud of the limb it belongs to.
+  if (opt.capTop !== false) {
+    for (let i = N; i >= 1; i--) {
+      const a = (i / N) * Math.PI * 0.5, c = Math.max(Math.cos(a), 0.004);
+      st.push([rx0 * Math.sin(a) * 0.80, rx0 * c, rz0 * c]);
+    }
+  }
+  for (let j = 0; j <= rows; j++) {
+    const t = j / rows, r = prof(t);
+    st.push([-t * len, r[0], r[1]]);
+  }
+  if (opt.capBot !== false) {
+    for (let i = 1; i <= N; i++) {
+      const a = (i / N) * Math.PI * 0.5, c = Math.max(Math.cos(a), 0.004);
+      st.push([-len - rx1 * Math.sin(a) * 0.80, rx1 * c, rz1 * c]);
+    }
+  }
+  const rings = st.map(([y, rx, rz]) => {
+    const ring = [];
+    for (let i = 0; i < seg; i++) {
+      const th = (i / seg) * Math.PI * 2;
+      ring.push(new THREE.Vector3(Math.cos(th) * rx, y, Math.sin(th) * rz));
+    }
+    return ring;
+  });
+  return loft(rings, { closed: true, caps: false });
+}
+
+/**
+ * A hand: a palm, four fingers and a thumb, merged into one buffer.
+ *
+ * The old one was the limb builder run a third time with the cross-section
+ * squashed — a lozenge, which is genuinely what a hand looks like from two
+ * metres and genuinely does not from forty centimetres, where it is the
+ * largest object on the screen for a third of every stroke. Fingers are five
+ * more lathes and one draw call either way.
+ *
+ * Not splayed, and not clamped shut. A crawl's hand is a paddle held with the
+ * fingers just touching and very slightly cupped — water goes through a splayed
+ * hand and a clenched one has no surface — so they lie together with a couple
+ * of degrees of curl and the little finger trailing the others, which is the
+ * shape that says "this hand is doing something" rather than "this hand is
+ * a model of a hand".
+ */
+function armHand(side) {
+  const parts = [];
+  const P = ARMS.palm;
+  // The palm. Wider at the knuckles than at the wrist, and thin through —
+  // a hand is about 20 mm deep and 85 mm across and the ratio is the whole
+  // silhouette.
+  parts.push(armLimb(P, (t) => [0.0385 + 0.0105 * t, 0.0205 - 0.0035 * t],
+    { seg: 20, rows: 6 }));
+
+  const R = ARMS.fingerR;
+  for (let i = 0; i < 4; i++) {
+    const len = ARMS.finger[i];
+    // Knuckles across the head of the palm, index at −X through little at +X
+    // on the left hand and mirrored by the parent's sign.
+    const x = (-1.5 + i) * 0.0232 * side;
+    const g = armLimb(len, (t) => {
+      const w = R * (1 - 0.22 * t);
+      return [w, w * 1.06];                 // fingers are deeper than they are wide
+    }, { seg: 12, rows: 5 });
+    // A little curl, and a little converge — the tips of a swimmer's fingers
+    // are closer together than the knuckles are.
+    const m = new THREE.Matrix4()
+      .makeRotationX(0.16)
+      .premultiply(new THREE.Matrix4().makeRotationZ(-x * 1.15))
+      .premultiply(new THREE.Matrix4().makeTranslation(x, -P + 0.004, 0.0015));
+    parts.push(g.applyMatrix4(m));
+  }
+  // The thumb, off the side of the palm and a long way round the axis: held
+  // in against the index finger, which is where it is on a catch.
+  const th = armLimb(ARMS.thumb, (t) => {
+    const w = 0.0128 * (1 - 0.24 * t);
+    return [w, w * 0.92];
+  }, { seg: 12, rows: 4 });
+  th.applyMatrix4(new THREE.Matrix4()
+    .makeRotationZ(-0.62 * side)
+    .premultiply(new THREE.Matrix4().makeRotationX(0.34))
+    .premultiply(new THREE.Matrix4().makeTranslation(-0.0335 * side, -0.0300, 0.0035)));
+  parts.push(th);
+  return kiteMerge(parts);
 }
 
 /**
@@ -28571,7 +28855,7 @@ function buildArms() {
     const inked = side > 0 && YOU.right > 0;
     const mat = solidMaterial(
       new THREE.Color(...ARMS.skin), {
-        spec: 0.16, specPower: 30, vcol: false,
+        spec: 0.10, specPower: 70, vcol: false,
         // The sleeve, and it is the same three fields as on the mirror figure
         // rather than a texture, for the same reason: this rig has no UVs and
         // ink on skin cannot be allowed to slide when the skin moves. vLocal is
@@ -28582,7 +28866,9 @@ function buildArms() {
         // the game. Old ink at arm's length is a dark arm with warm and cool
         // inside it — that is what 49-you.js says about the same sleeve at two
         // metres, and it is more true at forty centimetres, not less.
-        body: inked ? `
+        body: `
+          ${ARM_SKIN}
+        ` + (inked ? `
           vec3 q = vLocal * 7.0;
           float d = sin(q.y * 2.3 + sin(q.x * 3.1) * 1.7)
                   * 0.5 + 0.5;
@@ -28591,7 +28877,7 @@ function buildArms() {
           base = mix(base, uInk, s * 0.30);
           base = mix(base, vec3(0.330, 0.075, 0.075),
             smoothstep(0.72, 0.94, e) * 0.26);
-        ` : '',
+        ` : ''),
         uniforms: inked ? { uInk: { value: new THREE.Color(...ARMS.ink) } } : {},
         decl: inked ? 'uniform vec3 uInk;' : '',
       });
@@ -28599,19 +28885,23 @@ function buildArms() {
     const shoulder = new THREE.Group();
     shoulder.position.set(ARMS.shoulder[0] * side, ARMS.shoulder[1], ARMS.shoulder[2]);
     body.add(shoulder);
-    shoulder.add(new THREE.Mesh(armLimb(ARMS.rUpper[0], ARMS.rUpper[1], ARMS.upper), mat));
+    shoulder.add(new THREE.Mesh(armLimb(ARMS.upper, ARMS.upperProf), mat));
 
     const elbow = new THREE.Group();
     elbow.position.set(0, -ARMS.upper, 0);
     shoulder.add(elbow);
-    elbow.add(new THREE.Mesh(armLimb(ARMS.rFore[0], ARMS.rFore[1], ARMS.fore), mat));
+    elbow.add(new THREE.Mesh(armLimb(ARMS.fore, ARMS.foreProf), mat));
 
     const wrist = new THREE.Group();
     wrist.position.set(0, -ARMS.fore, 0);
     elbow.add(wrist);
-    const hand = new THREE.Mesh(armLimb(ARMS.rHand[0], ARMS.rHand[1], ARMS.hand, 10), mat);
-    hand.scale.set(ARMS.handWide, 1, ARMS.handThin);
-    wrist.add(hand);
+    // Built per side rather than mirrored with a negative scale, which would
+    // turn every triangle in the hand inside out against FrontSide. Only three
+    // numbers differ between the two — the knuckle offsets and where the thumb
+    // sits — and every piece hanging off them is a lathe, so a hand built with
+    // the sign flipped is a true mirror with the winding still the right way
+    // round.
+    wrist.add(new THREE.Mesh(armHand(side), mat));
 
     for (const m of [shoulder, elbow, wrist]) m.frustumCulled = false;
     sides.push({ side, shoulder, elbow, wrist });
@@ -28634,20 +28924,20 @@ function buildArms() {
     if (u < 0.55) {
       const p = ease(u / 0.55);
       // Forward and a little high at the catch, round to past the hip.
-      reach = mix(2.05, -0.22, p);
+      reach = mix(1.92, -0.26, p);
       // The high elbow: the arm bends most in the middle of the pull, where
       // the hand is under the chest and the forearm is nearly vertical. This
       // one angle is most of what separates a crawl from a windmill.
       elb = 0.22 + 1.55 * Math.sin(Math.PI * p);
       // Wide at the entry, in under the body, wide again at the hip.
-      out = 0.11 - 0.09 * Math.sin(Math.PI * p);
+      out = 0.14 - 0.10 * Math.sin(Math.PI * p);
       twist = mix(-0.35, 0.45, p);
     } else {
       const r = ease((u - 0.55) / 0.45);
-      reach = mix(-0.22, 2.05, r);
+      reach = mix(-0.26, 1.92, r);
       // Over the top, elbow leading — which is what a recovery is.
       elb = 0.22 + 1.20 * Math.sin(Math.PI * r);
-      out = 0.11 + 0.78 * Math.sin(Math.PI * r);
+      out = 0.14 + 0.52 * Math.sin(Math.PI * r);
       twist = mix(0.45, -0.35, r);
     }
     // Winding down is a fade toward the rest pose, not a slowing of the clock:
@@ -28660,7 +28950,7 @@ function buildArms() {
     // in front, palms moving: you can see your own hands the whole time, which
     // is the thing that makes floating feel like floating rather than like the
     // camera having been let go of.
-    const rest = { reach: 1.62, elb: 1.34, out: 0.30, twist: 0 };
+    const rest = { reach: 1.95, elb: 1.15, out: 0.26, twist: 0 };
     return {
       reach: mix(rest.reach, reach, amp),
       elb: mix(rest.elb, elb, amp),
@@ -29231,6 +29521,7 @@ function buildAudio() {
   let ctx = null;
   let master = null, verb = null, verbSend = null, verbGain = null, bed = null, bedDuck = null;
   let outBus = null, outLp = null;
+  let subG = null, subLp = null;
   let slowLp = null;
   const nodes = {};
   let started = false;
@@ -29346,7 +29637,25 @@ function buildAudio() {
     slowLp.type = "lowpass";
     slowLp.frequency.value = 20000;
     slowLp.Q.value = 0.4;
-    master.connect(slowLp).connect(comp).connect(ctx.destination);
+
+    // ── under the surface ─────────────────────────────────────────────────
+    // Everything, not just the beach. Air and water are so badly matched
+    // acoustically that only about a thousandth of the power in an airborne
+    // sound crosses the surface — roughly 30 dB gone the instant your ears go
+    // under, and the top of the band gone with it. That is why putting your
+    // head under at a noisy beach is the loudest silence there is.
+    //
+    // So this sits on the master rather than on the bed: the klapa, the
+    // cicadas, the Canadair overhead, the fire on the hill and the transistor
+    // set all go away together, because they are all on the wrong side of the
+    // same surface. What is left is the low end, which is genuinely what you
+    // hear down there — hulls, and the sea itself.
+    subG = ctx.createGain();
+    subG.gain.value = 1;
+    subLp = ctx.createBiquadFilter();
+    subLp.type = 'lowpass'; subLp.frequency.value = 20000; subLp.Q.value = 0.4;
+    master.connect(subG).connect(subLp).connect(slowLp).connect(comp)
+      .connect(ctx.destination);
 
     // ── the bed ───────────────────────────────────────────────────────────
     // The two continuous sounds that stand still and fill the whole band at
@@ -30828,16 +31137,56 @@ function buildAudio() {
    * threshold cut, so the beach is already gone when the screen comes back up.
    */
   function room(v) {
+    roomV = sat(v);
+    applyOut(0.12);
+  }
+
+  /**
+   * How far under you are, and how much of you is in the sea at all.
+   *
+   * `sub` is the head: 0 with your eyes clear of the water, 1 a metre or so
+   * down, and it takes the whole mix with it — see the sub bus above.
+   *
+   * `wet` is 0…1 for being in the water at all, and it only touches the beach.
+   * Treading water your ears are two centimetres above a surface that is
+   * moving, which means half of every second one of them is under; and the
+   * klapa is coming to you across the water at a grazing angle rather than
+   * down a hillside. Both of those take the top off it long before you dive.
+   * So the beach is already going before `sub` has done anything, which is
+   * exactly what it sounds like from out there.
+   */
+  function water(sub, wet) {
+    subV = sat(sub);
+    wetV = sat(wet);
+    if (!ctx || dead || !subG) return;
+    const t = ctx.currentTime;
+    // 26 dB down at full depth, and 380 Hz — a shade under the -30 dB the
+    // physics gives you, because a game that takes *everything* away has
+    // stopped being underwater and started being broken.
+    subG.gain.setTargetAtTime(1 - 0.95 * subV, t, 0.10);
+    subLp.frequency.setTargetAtTime(20000 * Math.pow(380 / 20000, subV), t, 0.10);
+    applyOut(0.25);
+  }
+
+  /**
+   * The one writer on the outdoor bus. The room and the sea both want it down
+   * and they are never both true, but they were two setTargetAtTime calls on
+   * the same AudioParam and that only works until they overlap for a frame —
+   * so they are held as values and combined here instead.
+   */
+  function applyOut(tau) {
     if (!ctx || dead || !outBus) return;
-    const t = ctx.currentTime, x = sat(v);
-    outBus.gain.setTargetAtTime(1 - 0.86 * x, t, 0.12);
-    outLp.frequency.setTargetAtTime(20000 * Math.pow(900 / 20000, x), t, 0.12);
+    const t = ctx.currentTime;
+    const x = Math.max(roomV, 0.55 * wetV + 0.45 * subV);
+    outBus.gain.setTargetAtTime(1 - 0.90 * x, t, tau);
+    outLp.frequency.setTargetAtTime(20000 * Math.pow(900 / 20000, x), t, tau);
   }
 
   /**
    * Cicadas. Thirty summers of them, and the sound of every August afternoon
    * on this coast — band-passed noise, amplitude-modulated at the wingbeat.
    */
+  let roomV = 0, subV = 0, wetV = 0;
   let cicadaNodes = null;
   function cicadas(on, gain = 0.055) {
     if (!ctx) return;
@@ -31474,7 +31823,7 @@ function buildAudio() {
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, rattle,
     canopy, boots,
     setVolume, getVolume, setMuffle, keyClick, printTick,
-    setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa, room,
+    setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa, room, water,
     firestarter, slowmo, radioTune, radioClick,
     /** Where the pointer sits for each station, so the dial can be drawn. */
     radioDial: () => DIAL.map((d) => d.f),
@@ -31494,6 +31843,12 @@ function buildAudio() {
         turbine: g('turbine'), rumble: g('rumble'), air: g('air'),
         scoop: g('scoop'), sea: g('sea'), fire: g('fire'),
         hose: g('hose'), hoseLo: g('hoseLo'),
+        // The two surfaces: a wall and the sea. Both are a gain and a lowpass
+        // and both fail the same silent way — see the note above.
+        out: outBus ? +outBus.gain.value.toFixed(3) : -1,
+        outHz: outLp ? Math.round(outLp.frequency.value) : -1,
+        sub: subG ? +subG.gain.value.toFixed(3) : -1,
+        subHz: subLp ? Math.round(subLp.frequency.value) : -1,
         dead, master: master ? +master.gain.value.toFixed(3) : -1,
       };
     },
@@ -31670,7 +32025,13 @@ let zoom = 0;
 const SLOW = 0.35;
 
 function stepLens(dt) {
-  const want = state.phase === 'ground'
+  // And in the water, where the reason for it is the same one and stronger.
+  // Treading water your eye is eleven centimetres off the surface, which is
+  // the lowest viewpoint in the game and the one with the least in it: the
+  // fire is a smudge on a hill you cannot walk up, the Canadair is a speck,
+  // and the beach you are trying to reach is a line. There is nothing you can
+  // do about any of it except look, so let the looking be worth something.
+  const want = (state.phase === 'ground' || state.phase === 'swim')
     && (keys.has('KeyZ') || TOUCH.glook) ? 1 : 0;
   zoom = damp(zoom, want, LENS.ease, dt);
   if (zoom < 1e-4 && want === 0) zoom = 0;
@@ -31767,6 +32128,13 @@ addEventListener('keydown', (e) => {
   // you have decided to do something, and it declines quietly — standing still
   // or standing on the beach it is not a jump, and nothing happens.
   if (e.code === 'Enter' && state.phase === 'ground') { e.preventDefault(); hopOut(); return; }
+  // T is the autopilot in both seats. In the aeroplane it flies the job list;
+  // in the water there is one job and it swims you at it. Same key, same
+  // promise — somebody else has the controls until you take them back — which
+  // is worth more than a second key would have been.
+  if (e.code === 'KeyT' && state.phase === 'swim') {
+    e.preventDefault(); toggleSwimAuto(); return;
+  }
   if (state.phase === 'ground' || state.phase === 'chute'
     || state.phase === 'swim') {
     // On foot, or under a canopy, the aeroplane's controls are all meaningless
@@ -31997,6 +32365,21 @@ function updateNavTarget(dt) {
     label: onRun ? (IS_TOUCH ? 'ap.onWaterTouch' : 'ap.onWater')
       : apOnRun ? 'ap.approach' : 'ap.lining',
   };
+}
+
+/**
+ * The same thing in the water. The model owns the decision — it is the object
+ * that knows where the shore is and whether you are already standing on it —
+ * so this is the toast and nothing else.
+ */
+function toggleSwimAuto() {
+  if (!swim || !swim.active) return;
+  const on = swim.toggleAuto();
+  if (on) toast(T('swim.apOn'));
+  else if (swim.apNote === 'far') toast(T('swim.apFar'));
+  else if (swim.apNote === 'there') toast(T('swim.apThere'));
+  else toast(T('swim.apOff'));
+  paintSwimHud();
 }
 
 function toggleAutopilot() {
@@ -33114,10 +33497,16 @@ function paintSwimHud() {
   fill.classList.toggle('low', b < 0.34);
   $('sw-breath').hidden = !swim.submerged && b > 0.995;
   const wade = swim.canWade();
+  // Somebody else has the controls, and the one thing a light like this has to
+  // do is say so without being read: it is on or it is not there.
+  const ap = $('sw-auto');
+  ap.hidden = !swim.auto;
+  ap.textContent = swim.apNote === 'up' ? T('swim.apUp') : T('swim.auto');
   $('sw-hint').innerHTML = swim.spent ? T('swim.spent')
-    : wade ? TK('swim.wade', 'swim.wadeTouch')
-      : TK('swim.hint', 'swim.hintTouch');
-  if (IS_TOUCH) paintSwimTouch(wade);
+    : swim.auto ? T('swim.apHint')
+      : wade ? TK('swim.wade', 'swim.wadeTouch')
+        : TK('swim.hint', 'swim.hintTouch');
+  if (IS_TOUCH) paintSwimTouch(wade, swim.auto);
   // Nothing below the waterline until your eyes are actually under it, and then
   // it closes in slowly and never far: this is the mask now, not the sea. The
   // sea is drawn.
@@ -33732,6 +34121,7 @@ let wasAfoot = false;
 let indoors = 0;
 let inLatch = 0;
 let cicadaAt = 0;
+let waterAt = -1, wetAt = -1;
 // How *dark* the room you are in is, which is a separate number from whether
 // you are in one. The kabina is a wooden box with a single door and stopping
 // down half a stop walking into it is what an eye does. The vikendica has
@@ -33890,7 +34280,12 @@ function frame() {
   // second to travel is not a thing anybody can see, and the alternative —
   // hoisting the lens up here — would put the camera's easing ahead of the
   // simulation it is easing over.
-  const dt = real * (1 - (1 - SLOW) * zoom);
+  // Slow motion rides the lens — see SLOW — but only on land. In the water
+  // the sea's own rhythm is the clock you are reading the mode by: the swell
+  // lifting you, the breath bar, how long a stroke takes. Halve all of that
+  // for as long as somebody holds Z and the game does not read as slowed, it
+  // reads as hung.
+  const dt = real * (1 - (1 - SLOW) * (state.phase === 'swim' ? 0 : zoom));
   U.uTime.value += dt;
   if (!started) return;
 
@@ -34032,7 +34427,7 @@ function frame() {
   // there — every voice in this game is synthesised rather than played — so
   // this takes the top off instead, which is the older idiom for the same beat
   // and the one the ear reads as strangeness rather than as breakage.
-  if (audio) audio.slowmo(zoom);
+  if (audio) audio.slowmo(state.phase === 'swim' ? 0 : zoom);
   if (camOverride) updateCamera(dt);
   else if (state.phase === 'ground') ground.pose(camera);
   else if (state.phase === 'swim') swim.pose(camera);
@@ -34182,6 +34577,23 @@ function frame() {
     cicadaAt = indoors;
     audio.room(indoors);
   } else if (!afoot && cicadaAt !== 0) { cicadaAt = 0; audio.room(0); }
+  // And the sea shutting it out, which is the same idea one surface further
+  // out. Driven from here rather than from the swim block so that it is also
+  // driven on the frame you leave the water: a beach that stays muffled after
+  // you have walked out of the sea is worse than one that never muffled.
+  //
+  // 1.1 m for the full effect. That is not a long way down, and it is not
+  // meant to be — the change happens in the first hand's breadth and the rest
+  // is the tail of it. `sat` clamps, so surfacing above the waterline (`depth`
+  // goes negative floating on a swell) reads as zero rather than as noise.
+  if (audio) {
+    const wet = swim && swim.active;
+    const w = wet ? Math.min(1, Math.max(0, swim.depth) / 1.1) : 0;
+    if (Math.abs(w - waterAt) > 0.004 || (wet ? 1 : 0) !== wetAt) {
+      waterAt = w; wetAt = wet ? 1 : 0;
+      audio.water(w, wetAt);
+    }
+  }
   // The light. ACES over the whole frame rather than a lamp in the room,
   // because there is no lamp in the room — that is the point of it — and what
   // your eye actually does walking in off a white promenade is exactly this.
@@ -35469,6 +35881,7 @@ function initTouch() {
     TOUCH.sfast = !TOUCH.sfast;
     el.classList.toggle('on', TOUCH.sfast);
   });
+  tap('t-sauto', () => toggleSwimAuto());
   tap('t-ashore', () => wadeAshore());
   tap('t-sset', () => togglePanel());
   tap('t-spause', () => togglePause());
@@ -35504,8 +35917,9 @@ function paintTouchHUD() {
  * under your own feet, because a button that is always lit and only sometimes
  * does anything teaches a thumb nothing.
  */
-function paintSwimTouch(wade) {
+function paintSwimTouch(wade, auto) {
   document.getElementById('t-ashore').classList.toggle('armed', !!wade);
+  document.getElementById('t-sauto').classList.toggle('on', !!auto);
 }
 
 initTouch();

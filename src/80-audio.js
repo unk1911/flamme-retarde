@@ -12,6 +12,7 @@ function buildAudio() {
   let ctx = null;
   let master = null, verb = null, verbSend = null, verbGain = null, bed = null, bedDuck = null;
   let outBus = null, outLp = null;
+  let subG = null, subLp = null;
   let slowLp = null;
   const nodes = {};
   let started = false;
@@ -127,7 +128,25 @@ function buildAudio() {
     slowLp.type = "lowpass";
     slowLp.frequency.value = 20000;
     slowLp.Q.value = 0.4;
-    master.connect(slowLp).connect(comp).connect(ctx.destination);
+
+    // ── under the surface ─────────────────────────────────────────────────
+    // Everything, not just the beach. Air and water are so badly matched
+    // acoustically that only about a thousandth of the power in an airborne
+    // sound crosses the surface — roughly 30 dB gone the instant your ears go
+    // under, and the top of the band gone with it. That is why putting your
+    // head under at a noisy beach is the loudest silence there is.
+    //
+    // So this sits on the master rather than on the bed: the klapa, the
+    // cicadas, the Canadair overhead, the fire on the hill and the transistor
+    // set all go away together, because they are all on the wrong side of the
+    // same surface. What is left is the low end, which is genuinely what you
+    // hear down there — hulls, and the sea itself.
+    subG = ctx.createGain();
+    subG.gain.value = 1;
+    subLp = ctx.createBiquadFilter();
+    subLp.type = 'lowpass'; subLp.frequency.value = 20000; subLp.Q.value = 0.4;
+    master.connect(subG).connect(subLp).connect(slowLp).connect(comp)
+      .connect(ctx.destination);
 
     // ── the bed ───────────────────────────────────────────────────────────
     // The two continuous sounds that stand still and fill the whole band at
@@ -1609,16 +1628,56 @@ function buildAudio() {
    * threshold cut, so the beach is already gone when the screen comes back up.
    */
   function room(v) {
+    roomV = sat(v);
+    applyOut(0.12);
+  }
+
+  /**
+   * How far under you are, and how much of you is in the sea at all.
+   *
+   * `sub` is the head: 0 with your eyes clear of the water, 1 a metre or so
+   * down, and it takes the whole mix with it — see the sub bus above.
+   *
+   * `wet` is 0…1 for being in the water at all, and it only touches the beach.
+   * Treading water your ears are two centimetres above a surface that is
+   * moving, which means half of every second one of them is under; and the
+   * klapa is coming to you across the water at a grazing angle rather than
+   * down a hillside. Both of those take the top off it long before you dive.
+   * So the beach is already going before `sub` has done anything, which is
+   * exactly what it sounds like from out there.
+   */
+  function water(sub, wet) {
+    subV = sat(sub);
+    wetV = sat(wet);
+    if (!ctx || dead || !subG) return;
+    const t = ctx.currentTime;
+    // 26 dB down at full depth, and 380 Hz — a shade under the -30 dB the
+    // physics gives you, because a game that takes *everything* away has
+    // stopped being underwater and started being broken.
+    subG.gain.setTargetAtTime(1 - 0.95 * subV, t, 0.10);
+    subLp.frequency.setTargetAtTime(20000 * Math.pow(380 / 20000, subV), t, 0.10);
+    applyOut(0.25);
+  }
+
+  /**
+   * The one writer on the outdoor bus. The room and the sea both want it down
+   * and they are never both true, but they were two setTargetAtTime calls on
+   * the same AudioParam and that only works until they overlap for a frame —
+   * so they are held as values and combined here instead.
+   */
+  function applyOut(tau) {
     if (!ctx || dead || !outBus) return;
-    const t = ctx.currentTime, x = sat(v);
-    outBus.gain.setTargetAtTime(1 - 0.86 * x, t, 0.12);
-    outLp.frequency.setTargetAtTime(20000 * Math.pow(900 / 20000, x), t, 0.12);
+    const t = ctx.currentTime;
+    const x = Math.max(roomV, 0.55 * wetV + 0.45 * subV);
+    outBus.gain.setTargetAtTime(1 - 0.90 * x, t, tau);
+    outLp.frequency.setTargetAtTime(20000 * Math.pow(900 / 20000, x), t, tau);
   }
 
   /**
    * Cicadas. Thirty summers of them, and the sound of every August afternoon
    * on this coast — band-passed noise, amplitude-modulated at the wingbeat.
    */
+  let roomV = 0, subV = 0, wetV = 0;
   let cicadaNodes = null;
   function cicadas(on, gain = 0.055) {
     if (!ctx) return;
@@ -2255,7 +2314,7 @@ function buildAudio() {
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, rattle,
     canopy, boots,
     setVolume, getVolume, setMuffle, keyClick, printTick,
-    setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa, room,
+    setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa, room, water,
     firestarter, slowmo, radioTune, radioClick,
     /** Where the pointer sits for each station, so the dial can be drawn. */
     radioDial: () => DIAL.map((d) => d.f),
@@ -2275,6 +2334,12 @@ function buildAudio() {
         turbine: g('turbine'), rumble: g('rumble'), air: g('air'),
         scoop: g('scoop'), sea: g('sea'), fire: g('fire'),
         hose: g('hose'), hoseLo: g('hoseLo'),
+        // The two surfaces: a wall and the sea. Both are a gain and a lowpass
+        // and both fail the same silent way — see the note above.
+        out: outBus ? +outBus.gain.value.toFixed(3) : -1,
+        outHz: outLp ? Math.round(outLp.frequency.value) : -1,
+        sub: subG ? +subG.gain.value.toFixed(3) : -1,
+        subHz: subLp ? Math.round(subLp.frequency.value) : -1,
         dead, master: master ? +master.gain.value.toFixed(3) : -1,
       };
     },

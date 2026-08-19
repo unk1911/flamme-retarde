@@ -69,19 +69,37 @@ const ARMS = {
   // So the shoulders are tipped back until the stroke rides in the bottom
   // third of the picture. It is the same cheat every first-person game makes
   // with a pair of hands, for the same reason and by about the same amount.
-  lift: 0.34,
+  lift: 0.42,
 
   upper: 0.295,        // m — humerus
   fore: 0.265,         // radius/ulna
-  hand: 0.185,
+  palm: 0.098,         // wrist to knuckle
 
-  rUpper: [0.052, 0.043],   // radii at each end of each piece
-  rFore: [0.043, 0.033],
-  rHand: [0.032, 0.040],
+  // Silhouettes, not radii. The first version was two cones and a squashed
+  // third, and two cones is exactly what it looked like: an arm's outline is
+  // not monotonic anywhere along its length. The deltoid is the widest part of
+  // the upper arm and it is at the top; the forearm's widest part is a hand's
+  // breadth *below* the elbow and it runs to a wrist half that size. Getting
+  // those two bulges in is most of the difference between a limb and a pipe,
+  // and neither of them costs a triangle over the cone that was there.
+  //
+  // Elliptical, too. A forearm is a good bit deeper than it is wide seen from
+  // above and the other way round seen from the front; a round one catches the
+  // light evenly all the way along, which is the other half of why the cones
+  // read as plumbing.
+  upperProf: (t) => {
+    const w = 0.0570 - 0.0170 * t + 0.0052 * Math.sin(Math.PI * t);
+    return [w, w * 0.93];
+  },
+  foreProf: (t) => {
+    const w = 0.0452 - 0.0180 * t + 0.0068 * Math.sin(Math.PI * Math.pow(t, 0.65));
+    return [w, w * 0.80];
+  },
 
-  // The hand is a paddle, not a bone: flat across the palm and thin through it.
-  handWide: 1.55,
-  handThin: 0.42,
+  // The hand, which is now a hand. See `armHand`.
+  finger: [0.0715, 0.0790, 0.0755, 0.0620],
+  fingerR: 0.0098,
+  thumb: 0.0640,
 
   // A Dalmatian August, three weeks in. Albedo, so it sits below the colour it
   // arrives on screen as.
@@ -98,16 +116,144 @@ const ARMS = {
 };
 
 /**
+ * Wet skin, forty centimetres from the lens.
+ *
+ * The geometry above was half of "the arms look rough"; this is the other
+ * half. A flat albedo with a broad plastic highlight on it is a mannequin's
+ * arm at any distance, and at this one there is nothing else in shot to
+ * distract from it. Three things, and each of them is one line:
+ *
+ * Wet. Skin straight out of the sea carries a film of water, and water is a
+ * dielectric with a very strong Fresnel: nearly matte face-on and close to a
+ * mirror at a grazing angle. That is why a wet arm has a bright rim along its
+ * whole silhouette and a dull middle, and it is the single strongest cue that
+ * the thing on screen has just come out of the water. `spec` here is the
+ * Fresnel curve rather than a number, so the same material is a dry-looking
+ * arm in the middle of the frame and a wet one round its edge — and the sky
+ * reflection `solidFragment` already adds is then blue on the rim, for free,
+ * which is what the Adriatic does to an arm.
+ *
+ * Translucent. Skin is not opaque. Light entering the far side of a forearm
+ * comes back out reddened, so the edge of a lit arm goes warm before it goes
+ * dark — the wrap term below, which is a fifty-year-old cheat and still the
+ * cheapest realistic thing you can do to a limb.
+ *
+ * And not one colour. Three weeks of a Dalmatian August is on the outside of
+ * an arm and not on the inside of it, and there is a fine grain over the whole
+ * of it. Keyed to `vLocal`, which is the bind pose, so both stay stuck to the
+ * arm while it strokes.
+ */
+const ARM_SKIN = /* glsl */ `
+  vec3 avd = normalize(vWorld - uCamPos);
+  float afr = pow(1.0 - abs(dot(n, avd)), 3.2);
+  spec = mix(0.09, 0.92, afr);
+
+  float atan_ = clamp(vLocal.z * -22.0, -1.0, 1.0) * 0.5 + 0.5;
+  base *= mix(vec3(1.010, 0.995, 0.985), vec3(0.945, 0.885, 0.845), atan_);
+  base *= 1.0 + 0.05 * (vnoise2(vec2(vLocal.x + vLocal.z, vLocal.y) * 210.0) - 0.5);
+
+  base = mix(base, vec3(0.760, 0.335, 0.250), afr * 0.26);
+`;
+
+/**
  * One tapered limb, hanging from the origin down −Y.
  *
  * Down −Y because that is the direction a joint chain wants to be written in:
  * the shoulder is at the origin, the elbow is `len` below it, and every
  * rotation in the file is then a rotation of a thing that starts by hanging.
  */
-function armLimb(r0, r1, len, seg = 12) {
-  const g = new THREE.CylinderGeometry(r0, r1, len, seg, 1, false);
-  g.translate(0, -len * 0.5, 0);
-  return g;
+function armLimb(len, prof, opt = {}) {
+  const seg = opt.seg ?? 24, rows = opt.rows ?? 14, N = 6;
+  const st = [];
+  const [rx0, rz0] = prof(0), [rx1, rz1] = prof(1);
+  // The caps are what fixed the joints. Two flat-ended cylinders meeting at a
+  // bent elbow show you both of their end discs and the wedge of nothing
+  // between them, and at forty centimetres from the lens that wedge is the
+  // first thing you see. Round both ends into half an ellipsoid and the pieces
+  // read as one arm through any bend the cycle asks for, with no skinning, no
+  // blend shape and no joint sphere sitting proud of the limb it belongs to.
+  if (opt.capTop !== false) {
+    for (let i = N; i >= 1; i--) {
+      const a = (i / N) * Math.PI * 0.5, c = Math.max(Math.cos(a), 0.004);
+      st.push([rx0 * Math.sin(a) * 0.80, rx0 * c, rz0 * c]);
+    }
+  }
+  for (let j = 0; j <= rows; j++) {
+    const t = j / rows, r = prof(t);
+    st.push([-t * len, r[0], r[1]]);
+  }
+  if (opt.capBot !== false) {
+    for (let i = 1; i <= N; i++) {
+      const a = (i / N) * Math.PI * 0.5, c = Math.max(Math.cos(a), 0.004);
+      st.push([-len - rx1 * Math.sin(a) * 0.80, rx1 * c, rz1 * c]);
+    }
+  }
+  const rings = st.map(([y, rx, rz]) => {
+    const ring = [];
+    for (let i = 0; i < seg; i++) {
+      const th = (i / seg) * Math.PI * 2;
+      ring.push(new THREE.Vector3(Math.cos(th) * rx, y, Math.sin(th) * rz));
+    }
+    return ring;
+  });
+  return loft(rings, { closed: true, caps: false });
+}
+
+/**
+ * A hand: a palm, four fingers and a thumb, merged into one buffer.
+ *
+ * The old one was the limb builder run a third time with the cross-section
+ * squashed — a lozenge, which is genuinely what a hand looks like from two
+ * metres and genuinely does not from forty centimetres, where it is the
+ * largest object on the screen for a third of every stroke. Fingers are five
+ * more lathes and one draw call either way.
+ *
+ * Not splayed, and not clamped shut. A crawl's hand is a paddle held with the
+ * fingers just touching and very slightly cupped — water goes through a splayed
+ * hand and a clenched one has no surface — so they lie together with a couple
+ * of degrees of curl and the little finger trailing the others, which is the
+ * shape that says "this hand is doing something" rather than "this hand is
+ * a model of a hand".
+ */
+function armHand(side) {
+  const parts = [];
+  const P = ARMS.palm;
+  // The palm. Wider at the knuckles than at the wrist, and thin through —
+  // a hand is about 20 mm deep and 85 mm across and the ratio is the whole
+  // silhouette.
+  parts.push(armLimb(P, (t) => [0.0385 + 0.0105 * t, 0.0205 - 0.0035 * t],
+    { seg: 20, rows: 6 }));
+
+  const R = ARMS.fingerR;
+  for (let i = 0; i < 4; i++) {
+    const len = ARMS.finger[i];
+    // Knuckles across the head of the palm, index at −X through little at +X
+    // on the left hand and mirrored by the parent's sign.
+    const x = (-1.5 + i) * 0.0232 * side;
+    const g = armLimb(len, (t) => {
+      const w = R * (1 - 0.22 * t);
+      return [w, w * 1.06];                 // fingers are deeper than they are wide
+    }, { seg: 12, rows: 5 });
+    // A little curl, and a little converge — the tips of a swimmer's fingers
+    // are closer together than the knuckles are.
+    const m = new THREE.Matrix4()
+      .makeRotationX(0.16)
+      .premultiply(new THREE.Matrix4().makeRotationZ(-x * 1.15))
+      .premultiply(new THREE.Matrix4().makeTranslation(x, -P + 0.004, 0.0015));
+    parts.push(g.applyMatrix4(m));
+  }
+  // The thumb, off the side of the palm and a long way round the axis: held
+  // in against the index finger, which is where it is on a catch.
+  const th = armLimb(ARMS.thumb, (t) => {
+    const w = 0.0128 * (1 - 0.24 * t);
+    return [w, w * 0.92];
+  }, { seg: 12, rows: 4 });
+  th.applyMatrix4(new THREE.Matrix4()
+    .makeRotationZ(-0.62 * side)
+    .premultiply(new THREE.Matrix4().makeRotationX(0.34))
+    .premultiply(new THREE.Matrix4().makeTranslation(-0.0335 * side, -0.0300, 0.0035)));
+  parts.push(th);
+  return kiteMerge(parts);
 }
 
 /**
@@ -158,7 +304,7 @@ function buildArms() {
     const inked = side > 0 && YOU.right > 0;
     const mat = solidMaterial(
       new THREE.Color(...ARMS.skin), {
-        spec: 0.16, specPower: 30, vcol: false,
+        spec: 0.10, specPower: 70, vcol: false,
         // The sleeve, and it is the same three fields as on the mirror figure
         // rather than a texture, for the same reason: this rig has no UVs and
         // ink on skin cannot be allowed to slide when the skin moves. vLocal is
@@ -169,7 +315,9 @@ function buildArms() {
         // the game. Old ink at arm's length is a dark arm with warm and cool
         // inside it — that is what 49-you.js says about the same sleeve at two
         // metres, and it is more true at forty centimetres, not less.
-        body: inked ? `
+        body: `
+          ${ARM_SKIN}
+        ` + (inked ? `
           vec3 q = vLocal * 7.0;
           float d = sin(q.y * 2.3 + sin(q.x * 3.1) * 1.7)
                   * 0.5 + 0.5;
@@ -178,7 +326,7 @@ function buildArms() {
           base = mix(base, uInk, s * 0.30);
           base = mix(base, vec3(0.330, 0.075, 0.075),
             smoothstep(0.72, 0.94, e) * 0.26);
-        ` : '',
+        ` : ''),
         uniforms: inked ? { uInk: { value: new THREE.Color(...ARMS.ink) } } : {},
         decl: inked ? 'uniform vec3 uInk;' : '',
       });
@@ -186,19 +334,23 @@ function buildArms() {
     const shoulder = new THREE.Group();
     shoulder.position.set(ARMS.shoulder[0] * side, ARMS.shoulder[1], ARMS.shoulder[2]);
     body.add(shoulder);
-    shoulder.add(new THREE.Mesh(armLimb(ARMS.rUpper[0], ARMS.rUpper[1], ARMS.upper), mat));
+    shoulder.add(new THREE.Mesh(armLimb(ARMS.upper, ARMS.upperProf), mat));
 
     const elbow = new THREE.Group();
     elbow.position.set(0, -ARMS.upper, 0);
     shoulder.add(elbow);
-    elbow.add(new THREE.Mesh(armLimb(ARMS.rFore[0], ARMS.rFore[1], ARMS.fore), mat));
+    elbow.add(new THREE.Mesh(armLimb(ARMS.fore, ARMS.foreProf), mat));
 
     const wrist = new THREE.Group();
     wrist.position.set(0, -ARMS.fore, 0);
     elbow.add(wrist);
-    const hand = new THREE.Mesh(armLimb(ARMS.rHand[0], ARMS.rHand[1], ARMS.hand, 10), mat);
-    hand.scale.set(ARMS.handWide, 1, ARMS.handThin);
-    wrist.add(hand);
+    // Built per side rather than mirrored with a negative scale, which would
+    // turn every triangle in the hand inside out against FrontSide. Only three
+    // numbers differ between the two — the knuckle offsets and where the thumb
+    // sits — and every piece hanging off them is a lathe, so a hand built with
+    // the sign flipped is a true mirror with the winding still the right way
+    // round.
+    wrist.add(new THREE.Mesh(armHand(side), mat));
 
     for (const m of [shoulder, elbow, wrist]) m.frustumCulled = false;
     sides.push({ side, shoulder, elbow, wrist });
@@ -221,20 +373,20 @@ function buildArms() {
     if (u < 0.55) {
       const p = ease(u / 0.55);
       // Forward and a little high at the catch, round to past the hip.
-      reach = mix(2.05, -0.22, p);
+      reach = mix(1.92, -0.26, p);
       // The high elbow: the arm bends most in the middle of the pull, where
       // the hand is under the chest and the forearm is nearly vertical. This
       // one angle is most of what separates a crawl from a windmill.
       elb = 0.22 + 1.55 * Math.sin(Math.PI * p);
       // Wide at the entry, in under the body, wide again at the hip.
-      out = 0.11 - 0.09 * Math.sin(Math.PI * p);
+      out = 0.14 - 0.10 * Math.sin(Math.PI * p);
       twist = mix(-0.35, 0.45, p);
     } else {
       const r = ease((u - 0.55) / 0.45);
-      reach = mix(-0.22, 2.05, r);
+      reach = mix(-0.26, 1.92, r);
       // Over the top, elbow leading — which is what a recovery is.
       elb = 0.22 + 1.20 * Math.sin(Math.PI * r);
-      out = 0.11 + 0.78 * Math.sin(Math.PI * r);
+      out = 0.14 + 0.52 * Math.sin(Math.PI * r);
       twist = mix(0.45, -0.35, r);
     }
     // Winding down is a fade toward the rest pose, not a slowing of the clock:
@@ -247,7 +399,7 @@ function buildArms() {
     // in front, palms moving: you can see your own hands the whole time, which
     // is the thing that makes floating feel like floating rather than like the
     // camera having been let go of.
-    const rest = { reach: 1.62, elb: 1.34, out: 0.30, twist: 0 };
+    const rest = { reach: 1.95, elb: 1.15, out: 0.26, twist: 0 };
     return {
       reach: mix(rest.reach, reach, amp),
       elb: mix(rest.elb, elb, amp),

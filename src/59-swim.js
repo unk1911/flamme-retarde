@@ -166,6 +166,10 @@ function buildSwim(sea) {
   let active = false;
   let deepest = 0;
   let sinceIn = 0;
+  let auto = false;
+  let apNote = '';
+  let apAim = 0;              // the heading the autopilot has settled on
+  let apT = 0;                // and how long since it last went looking
 
   const bedAt = (x, z) => Math.min(groundAt(x, z), -0.6);
 
@@ -183,12 +187,14 @@ function buildSwim(sea) {
     you.stroke = 0;
     deepest = you.depth;
     sinceIn = 0;
+    auto = false; apNote = '';
     if (sea) sea.mat.side = THREE.DoubleSide;
     return true;
   }
 
   function leave() {
     active = false;
+    auto = false; apNote = '';
     if (sea) sea.mat.side = THREE.FrontSide;
   }
 
@@ -198,6 +204,84 @@ function buildSwim(sea) {
     // that is lying down, and straight up is a real direction you want — the
     // surface is up there and it is the way out.
     you.pitch = clamp(you.pitch - dy, -1.45, 1.45);
+  }
+
+
+  /**
+   * The autopilot, which does the one thing there is to do in the water.
+   *
+   * In the aeroplane the autopilot has a job list — a tank to fill, a fire to
+   * drop on, a runway to find — and picking which one is most of the code. In
+   * the sea there is exactly one job and it is get out of the sea, so this is
+   * the whole of it: face the nearest shore, swim at it, and give the controls
+   * back the moment you can stand up.
+   *
+   * It steers down the shore distance field rather than at a point, because a
+   * point is wrong twice over here. The channel bends, so the nearest land as
+   * the crow flies is regularly across a headland you would have to swim
+   * through; and `shoreAt` is the same field the fire and the crowd already
+   * use, sampled on the same grid, so a heading that reduces it is a heading
+   * that actually reaches water's edge. Sixteen of them, thirty metres out,
+   * and the best one wins — which is gradient descent with enough of a look
+   * ahead not to walk into the one shoal that happens to point the wrong way.
+   *
+   * Re-picked every second and not every frame. A field sampled off a 255-step
+   * texture has steps in it, and a swimmer who re-solves on every frame sits on
+   * a step boundary and shakes his head at it for as long as you leave him.
+   */
+  const AP_LOOK = 30;
+  function apPick() {
+    const here = shoreAt(you.x, you.z);
+    let best = null, bestD = here;
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      const px = you.x - Math.sin(a) * AP_LOOK, pz = you.z - Math.cos(a) * AP_LOOK;
+      // Straight through a headland is not a swim. The mid point is enough of
+      // a check at thirty metres: a spit narrow enough to slip past both
+      // samples is narrow enough to swim round without noticing.
+      if (!isSea((you.x + px) * 0.5, (you.z + pz) * 0.5)) continue;
+      const d = shoreAt(px, pz);
+      if (d < bestD) { bestD = d; best = a; }
+    }
+    // Nothing improves: either you are already on the beach or the field has
+    // saturated, which at 400 m means there is no shore in it to steer at.
+    if (best === null) return here > 380 ? null : you.yaw;
+    return best;
+  }
+
+  function toggleAuto() {
+    if (!active) return false;
+    auto = !auto;
+    if (!auto) { apNote = ''; return false; }
+    // Already standing on it. Engaging here would engage and disengage on the
+    // same frame, and a light that blinks once is a control that looks broken.
+    if (canWade()) { auto = false; apNote = 'there'; return false; }
+    const a = apPick();
+    if (a === null) { auto = false; apNote = 'far'; return false; }
+    apAim = a; apT = 0; apNote = 'on';
+    return true;
+  }
+
+  /**
+   * What the autopilot is holding this frame, in place of your hands.
+   *
+   * It surfaces first. Everything below the waterline is on a clock — the
+   * breath bar — and an autopilot that swam you to the beach two metres under
+   * would be an autopilot that drowned you politely.
+   */
+  function apCtl(dt) {
+    apT += dt;
+    if (apT > 1.0) { apT = 0; const a = apPick(); if (a !== null) apAim = a; }
+    // Head round to the heading, at about the rate a person in a jacket turns.
+    let d = apAim - you.yaw;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    you.yaw += clamp(d, -1.3 * dt, 1.3 * dt);
+    // And level the head, which is what makes it read as somebody else driving.
+    you.pitch += clamp(-you.pitch, -1.1 * dt, 1.1 * dt);
+    const deep = you.depth > 0.35;
+    apNote = deep ? 'up' : 'on';
+    return { fwd: deep ? 0.35 : 1, side: 0, sprint: false, down: false, up: deep };
   }
 
   /**
@@ -210,6 +294,12 @@ function buildSwim(sea) {
   function update(dt, ctl) {
     if (!active) return;
     sinceIn += dt;
+    // Out of air the jacket has the controls, and so does the autopilot: it is
+    // already doing the only thing that helps, which is going up.
+    if (auto) {
+      ctl = apCtl(dt);
+      if (canWade()) { auto = false; apNote = 'there'; }
+    }
     const submerged = you.depth > SWIM.under;
 
     // ── breath ───────────────────────────────────────────────────────────────
@@ -321,6 +411,9 @@ function buildSwim(sea) {
     get depth() { return Math.max(0, you.depth); },
     get breath() { return you.breath; },
     get spent() { return you.spent; },
+    get auto() { return auto; },
+    get apNote() { return apNote; },
+    toggleAuto,
     enter, leave, look, update, pose, canWade,
     surfaceAt: seaHeightAt,
     stats: () => ({
@@ -334,6 +427,7 @@ function buildSwim(sea) {
       sp: +Math.hypot(you.vx, you.vz).toFixed(2),
       shore: Math.round(shoreAt(you.x, you.z)),
       wade: canWade() ? 1 : 0,
+      auto: auto ? (apNote || 'on') : 'off',
       t: +sinceIn.toFixed(1),
     }),
   };

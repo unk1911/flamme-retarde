@@ -884,6 +884,10 @@ html.touch #swim-hud { bottom: 7.4rem; }
    always available and only sometimes does something teaches nothing. */
 #t-dive.on { background: rgba(23, 96, 120, .42); border-color: var(--sea); color: var(--sea); }
 #t-rise.on { background: rgba(79, 210, 232, .28); border-color: var(--sea); color: #d6f6fc; }
+#t-sauto.on {
+  background: rgba(224, 195, 138, .22);
+  border-color: var(--ember-hi); color: var(--ember-hi);
+}
 #t-ashore { opacity: .38; }
 #t-ashore.armed {
   opacity: 1; background: rgba(224, 195, 138, .22);
@@ -1223,3 +1227,17 @@ html.touch .row input[type=range] { height: 22px; }
 }
 #sw-fill.low { background: #e8703c; }
 #sw-hint { min-height: 1.2em; opacity: .9; }
+/* The autopilot light. Not a colour of its own: the aeroplane's says AUTO in
+   the same warm amber and it is the same claim — the controls are somebody
+   else's until you take them back — so it borrows it rather than teaching a
+   second one. Letterspaced and small, because it is a lamp and not a sentence. */
+#sw-auto {
+  font-size: .62rem;
+  letter-spacing: .30em;
+  text-transform: uppercase;
+  color: var(--ember-hi);
+  border: 1px solid rgba(224, 195, 138, .45);
+  background: rgba(224, 195, 138, .12);
+  padding: .18em .7em;
+}
+#sw-auto[hidden] { display: none; }

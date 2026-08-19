@@ -520,6 +520,7 @@ function initTouch() {
     TOUCH.sfast = !TOUCH.sfast;
     el.classList.toggle('on', TOUCH.sfast);
   });
+  tap('t-sauto', () => toggleSwimAuto());
   tap('t-ashore', () => wadeAshore());
   tap('t-sset', () => togglePanel());
   tap('t-spause', () => togglePause());
@@ -555,8 +556,9 @@ function paintTouchHUD() {
  * under your own feet, because a button that is always lit and only sometimes
  * does anything teaches a thumb nothing.
  */
-function paintSwimTouch(wade) {
+function paintSwimTouch(wade, auto) {
   document.getElementById('t-ashore').classList.toggle('armed', !!wade);
+  document.getElementById('t-sauto').classList.toggle('on', !!auto);
 }
 
 initTouch();
