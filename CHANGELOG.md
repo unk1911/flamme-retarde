@@ -8,6 +8,837 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [Unreleased]
+
+### Fixed
+
+- **There was a doorframe standing in the bathroom, in front of the tiling.**
+  Soba 4's opening ran from x −1.02, and the big room only reaches the spine
+  from the bathroom's east face at −0.74 — so the west jamb, the architrave and
+  the west end of the head all stood *inside* the bathroom, with 18 cm of open
+  wall behind them that the tiled face happened to cover. `D_S4` is
+  `(-0.74, 0.11)` now, still 85 clear, and the architrave dies into the bathroom
+  wall's own thickness the way an architrave beside a return does. Two things
+  moved with it: soba 4's wardrobe is on the party wall to soba 3, because the
+  spine there is 95 cm long and the door takes 85 of it; and the fish clock is
+  `r 0.070` rather than `0.150`, because the pier between the two bedroom doors
+  is 27 cm of bare plaster now and was 68.
+- **The blue three-seater was standing in the upstairs kitchen.** `sofa()`
+  planted itself at `F2` with no way to say otherwise, so the one sofa
+  downstairs — the boravak's — was built a storey above the room it belongs to.
+  It takes a `floor` argument now.
+
+### Changed
+
+- **The fridge is modelled rather than blocked out.** It was five boxes. A
+  fridge door is a rounded rectangle in plan and in elevation and it is
+  *crowned* — proud in the middle, rolling back to a radius all the way round —
+  and that roll is the whole reason a white kitchen has a red thing in it that
+  reads as an object rather than a poster. Case and both doors are now
+  rounded-rectangle lofts with a true constant corner radius (`_round_rect` /
+  `_rr_loft`; a superellipse gives an *elliptical* corner, which on a door 59
+  wide and 111 tall reads as a pillow). Hung on them: bar handles on brackets
+  standing 4 cm off the leaf and sitting either side of the shadow gap, hinge
+  caps on the −x edge, a recessed plinth with the condenser grille in the front
+  of it, and a badge. The magnets moved on to the crowned face. The upper-floor
+  shell is 207 088 triangles, against 207 152 — the doorway that is no longer
+  drawn twice pays for the fridge.
+
+## [1.84.0] — 2026-08-19
+
+Sixteen things off one afternoon's list. Two of them were the same bug wearing
+different clothes, one turned out to already be done, and the last is a mode.
+
+### Added
+
+- **The race.** `R`, from anywhere. She is off the end of the jetty with a
+  seven-metre lead and there is a skakaonica eighty-five metres out — a concrete
+  slab on four piles with a board off the front, which every bathing beach on
+  this coast has. Her cruise is 1.34 m/s against your 1.15, so a steady crawl
+  loses the whole way; sprint is 1.69 through the water and catches her about
+  two thirds out. Inside four and a half metres she finds another fifth of a
+  knot, which is what anybody does when they hear you coming. Catch her and she
+  turns round, treads water and says three things, the last of which is why you
+  are here. It is not a phase: `state.phase` stays `swim` the whole way and the
+  race is a layer over the top — same water, same breath bar, same arms.
+- **And she is her.** The first cut built a swimmer out of scaled spheres on the
+  argument that what you see of somebody ten metres ahead of you is a back and
+  two arms. That was true and it was still the wrong call. She is
+  `human_skin.fr3d` — the same rig, skin, face and twenty-eight bones as the
+  figure on the terrace — running a `swim` clip authored for it in
+  `tools/blender/human_mh.py`. Prone off a −90° pelvis, the same trick `FOURS`
+  uses; the arm angle goes once round the circle per stroke and is monotonic,
+  because a stroke is. There is a `tread` for the ten seconds at the end.
+- **The floor plans are on the wall.** The two blank rectangles on the spine in
+  the loft. Not scans — drawn at 1:100 from the plan sidecar the walls are built
+  from, in the layout of the original sheet with the schedule at the bottom. The
+  model comes out within a couple of per cent of the drawing it was measured
+  off: 3.89 m² for the bathroom against 3.89, 7.64 for the small bedroom against
+  7.69. That is the model saying, in the one place you can check it, that it is
+  the house.
+- **The television is on.** A business channel with a market strip, a headline
+  and a crawl, and the crypto prices are real — `api.coinbase.com` answers a
+  plain GET with CORS open, which is the endpoint the kabine's valve set already
+  uses. Hose it with the branch and the channel goes round the four coins and
+  back to the news, one generation of television later than the
+  knock-the-set idea in the kabine. The LIVE lamp is lit by the last successful
+  answer rather than by hope.
+- **A pedestal fan beside the fridge, oscillating**, because the thing that
+  makes a room read as lived in is that something in it is moving.
+- **A near model for the boats.** `boatProto` is four stations of flat plate and
+  that is the right answer two hundred times over at a kilometre; from the water
+  it is a wedge. `boatNearProto` is 368 triangles against 50 — a hull grid
+  shaded smooth across the bilge, with rocker, sheer, flare and deadrise in it,
+  side decks, a coaming, a sole, a rubbing strake, fenders and an outboard that
+  is not a black wardrobe. 26 of them, inside 220 m.
+
+### Fixed
+
+- **The arms were on backwards. Literally.** `reachWrist` decomposed the
+  shoulder as an Euler pair and the swing-out came through with its sign
+  flipped, so the arm reached *across* the body instead of away from it. On the
+  kite bar that was two centimetres and nobody noticed; in the water it was the
+  report. The swim is a path now rather than a table of angles: seven keys
+  through a closed Catmull-Rom in the eye's own frame, solved with a two-link
+  closed form whose elbow is steered by a pole vector. The point of writing it
+  that way is that what has to be right about a first-person arm is where the
+  hand lands *in the picture*, and a chain of Eulers behind a 0.42 rad shoulder
+  lift sat between every number being tuned and the frame being looked at.
+  `__fr.arms.probe()` reports both hands as per cent across and down, so the
+  catch is at [69, 62] or it is not.
+- **The hands were not on the bar, and the wrists were twisted.** The solve used
+  to aim the wrist at the bar, which put the hand a palm's width beyond it; then
+  the middle of the palm, which laid the bar across the wrist with the fist
+  above it holding air. It aims at the hole a fist makes, and that offset is
+  *measured* — the hand is shut into a fist once at build time and asked where
+  the loop closed. And the twist is specified across the palm rather than as a
+  palm normal, because a gripping hand's palm faces nearly along its own forearm
+  and `atan2` of a vector that is nearly all Y swings wildly for a millimetre of
+  nothing. Miss at the grip: 25 mm → 0–1 mm.
+- **`E` put you back in the sea about half the time.** `canWade` answers a
+  different question — is there a bottom under your feet — and the answer to
+  that is yes in chest-deep water fifteen metres out. `dryLand` steps outward,
+  the way you are facing first and then round, and stops at the first place with
+  45 cm of dry land under it and more of it two metres past.
+- **The kite lines went slack at the top of a jump.** `kitePos` placed the kite
+  off `you.y` and ignored `you.air`, so eleven metres of air ate a third of
+  twenty-four metres of Dyneema and drew four ropes going nowhere at the exact
+  moment you are looking at them.
+- **The klapa cut out on a board.** A rider does ten metres a second and is a
+  kilometre out inside two minutes, which put the whole mode in silence. Capped
+  at 400 m while riding.
+- **The fridge handles were on the edge the doors hinge from,** so it opened
+  into the wall.
+
+### Changed
+
+- **Arrow keys turn in the water instead of strafing** — under water there is no
+  ground to push sideways off, and strafing was the one control in the mode that
+  did nothing you could see. `Q` sprints, the same key that runs on land. Turn
+  rate 1.45 rad/s.
+- **`Z` is a scope in the water too**, clock and mix both. It used to stop at the
+  waterline on the argument that the sea's rhythm is what you read the mode by;
+  that was wrong. A scope makes the world go quiet and long while you look down
+  it, and holding it under water is the same act.
+- **`0`, `9` and `V` work from the water and from a board.** All three were
+  written against `state.phase === 'fly'`, because when they were written the
+  only other place you could be was the seat.
+- **The kite goes properly.** Top 17 → 21 m/s, quicker to find it and slower to
+  fall off it, and the penalty for holding the kite overhead now starts *above*
+  the send angle instead of at the resting one — the half second it takes to fly
+  the kite up was a half second of braking, so you arrived at your own jump
+  slow. 33 kt cruise and a best jump of 5.4 m becomes 36 kt and 11.25 m.
+
+### Measured
+
+| | |
+|---|---|
+| hand miss on the bar | 25 mm → 0–1 mm |
+| kite cruise / best air | 33 kt / 5.4 m → 36 kt / 11.25 m |
+| kite line length in the air | 16.2 m of 23.3 → 23.3 m |
+| near boat | 50 tris → 368, 26 instances inside 220 m |
+| course | 16 m (first cut) → 82 m |
+| race at full sprint | caught at 65 % of the course |
+| `E` ashore | lands on ground ≥ 0.45 m above the waterline |
+| frame | 37 fps on the circuit, headless |
+
+### Notes
+
+- The hemispherical ambient asked for was already there — `ambientAt` in
+  `src/05-sky-common.js`, sky above and warm ground bounce below, driven by time
+  of day, applied in `solidMaterial`, the terrain, the sea and the underwater
+  shader. Nothing added; the lever is the `ambGround` values in `00-core.js`.
+- `R` restarts rather than toggles. Written as a toggle, a second press arriving
+  in the same frame as the first — which keyboards and test harnesses both do —
+  left you in the water with the shot half run and nothing to chase.
+- The swimmer wears the terrace figure's paint and not Chloe's. Chloe is
+  `49-you.js` and Chloe is *you*, down to the sleeve you can see on your own
+  forearm mid-stroke; whether the person you are chasing should be your double
+  is open.
+
+## [1.83.0] — 2026-08-19
+
+### Added
+
+- **Something on the bottom of the sea.** The seabed read flat and no amount of
+  shading was ever going to fix it — the last pass proved that by fixing
+  everything else. The terrain under it is a 6.35 m height texel drawn at a 5 m
+  quad, so at swimming range it is one triangle with a beautiful picture on it,
+  which is a floor with a rug. `src/27-bed.js` puts things on it: broken karst
+  limestone, a great deal of fist-sized rubble, and posidonia between the
+  blocks. Instanced, and placed by hash off a fixed world grid rather than
+  scattered around the camera — a fish may be re-placed behind you because a
+  fish that moves is a fish, but a rock that moves is the game admitting it.
+  67 boulders, 534 stones and 711 clumps inside the twenty-six metres you can
+  see through.
+- **You can ride a kite.** `46-kite.js` said plainly that nobody rides one yet;
+  `src/59-ride.js` is the other half — same wind, same water, same twelve-metre
+  kite, with you underneath it. `K` from the sand takes one out, `K` again puts
+  it down and you are swimming. The speed comes out of a polar and not out of a
+  key, because that is the whole of what kiting is: point too close and there is
+  nothing there, point dead downwind and you cannot outrun the air pushing you,
+  and in the band between you go twice the speed of the wind. The kite sits at
+  the edge of the window measured off the *apparent* wind, which is not a
+  refinement — it is the reason a kitesurfer's kite is in front of them.
+- **And it jumps.** There is no jump key because there is no jump: you send the
+  kite through the top of the window with speed under you and it takes you with
+  it, then holds you there. Overhead is float at 6.2 m/s²; flown forward it lets
+  you go at 11.5, which is how you come down with speed to ride away on. Land
+  flat from high enough and the sea takes the rest of it. Your own hands are on
+  the bar — the arms rig from the swim solves a two-link closed form to it, and
+  the bar and the near end of the lines are drawn in the arms' view model,
+  because a bar is 46 cm from your face.
+- **An underwater bed.** A wide low hiss with no direction in it, and your own
+  bubbles, to fill the hole the beach leaves when it goes.
+
+### Fixed
+
+- **Holding `C` sank you to about three metres and then, to anyone playing,
+  simply stopped.** Every part of it was working as written and the writing was
+  wrong: the jacket's lift saturates at 1.30 m/s, the kick was worth 1.36, and
+  six centimetres a second is a stalemate you cannot see. A person kicking down
+  beats a buoyancy aid — that is what kicking is for — and what should stop you
+  is the bottom or your own lungs. Flat 2.55 now: a net 1.25 m/s down, and it
+  stays 1.25 m/s down for as long as you hold it.
+- **Looking down threw away the bottom.** A swimmer was allowed within 45 cm of
+  the bed and the front clip sits at 1.2 m. The near plane comes in underwater
+  off how close the bed actually is, and the clearance went to 80 cm as well — a
+  face 45 cm off the sand has most of a swimmer already buried in it.
+- **The cicadas had no distance falloff at all.** Not a weak one: none. They
+  were a switch thrown on the frame you leave the aeroplane, at a fixed level,
+  wherever you were — so a kilometre out in the channel you had a hillside of
+  pines following you across open water at beach volume. Off the shore distance
+  field now, inverse 1.8 over 130 m.
+- **The beach's depth curve saturated at 1.1 m**, which has no answer to "I went
+  deeper and it did not get quieter". Depth is absorption and absorption is
+  `exp(−kd)`, so it is exponential: 17 dB at one metre, 34 at two, and by three
+  the beach is 60 dB under and not there.
+- **The fingers were welded at the catch pose**, which was right for one moment
+  of the stroke and wrong for the other nine tenths. Each digit is a joint chain
+  driven off the stroke phase — a flat paddle through the water and a hand that
+  falls open over the top, which is the most recognisable thing about watching
+  somebody swim. Staggered by finger, because four fingers curling on the same
+  frame are one paddle with lines drawn on it.
+
+### Measured
+
+| | |
+|---|---|
+| dive, before | 0.78 → 2.67 m in 14 s, asymptotic, stalled |
+| dive, after | 1.51 → 9.12 m in 7 s, then the bed at 9.24 |
+| beach bus by depth | 0.172 @ 0.5 m → 0.002 @ 9 m; lowpass 824 → 193 Hz |
+| cicadas | 0.0255 at 127 m of shore, 0.0058 at 400 m (was 0.05 everywhere) |
+| near plane | 1.2 → 0.448 riding |
+| ride | 31.5 kt on a reach, 25.4 downwind, 0.0 in the no-go; best jump 5.43 m |
+| frame | 40 fps on the beach, 26–45 in the water and on a board |
+
+### Notes
+
+- The grip is not finished. Both hands are on the bar and it reads as held, but
+  they sit slightly outboard of the grips and the fingers hang rather than fully
+  wrapping.
+- The gravel had to be lifted a flat 14 cm clear of the sampled bed: the height
+  it is placed against and the five-metre quad that gets drawn disagree by more
+  than a small stone is tall, and a proportional lift does not fix it because
+  the error does not get smaller when the stone does.
+
+## [1.82.0] — 2026-08-19
+
+Four corrections, and three of them are the same correction: something that was
+drawn well enough for the distance it used to be seen from, and is now seen from
+closer.
+
+### Changed
+
+- **The arms are measured off her, not guessed.** `human_skin.fr3d` is the rig
+  the mirror figure stands on, and its rest skeleton says the humerus is 239 mm
+  and the radius 238 mm, with a mean flesh radius of 55 mm at the deltoid, 37 at
+  the elbow and 22 at the wrist. They were 295, 265, 57, 42 and 26 — a taller
+  person than the one in the bathroom. The rig itself cannot supply the arms,
+  which is worth writing down because it is the obvious idea: the chain is
+  clavicle → armU → armL → hand → thumb, one bone for the whole hand, and a
+  connected-component test on the 1 017 vertices weighted to `handL` comes back
+  as a single blob from the wrist to the fingertips. MakeHuman's decimator fused
+  them. So: her proportions, a purpose-built surface — profile *tables* sampled
+  Catmull-Rom at twenty-two stations, because an arm's width goes up and down
+  several times along its length and every reversal is a muscle you can name;
+  and superelliptic cross-sections, because a forearm is a rounded triangle with
+  the ulna making a flat down one side.
+- **The hand.** A thin palm plate, 89 mm across and 22 mm through — the ratio
+  between those is the only reason a hand reads as a hand from the side — with a
+  thenar pad, four three-boned fingers with knuckles at every joint, and a
+  two-boned thumb lying along the index.
+- **The fish has an eye.** A nine-station lathe with a two-triangle fork was
+  honestly reasoned: a fish at ten metres in green water is a silhouette. What
+  it missed is that shoals hold station and you drift into them. Fourteen
+  stations round eighteen sides now, a snout and a peduncle, both eyes as three
+  rings domed a millimetre proud of the cheek, the gill cover, dorsal and anal
+  fins, paired pectorals and pelvics, and a forked caudal with a notch,
+  hand-triangulated because a fan from the root fills the notch in. And the
+  stripes: this is *Sarpa salpa*, which grazes the meadow the bottom is made of,
+  and it carries ten or eleven thin gold lines the length of its flank. About
+  700 triangles, instanced 108 times, one draw call either way.
+
+### Fixed
+
+- **The seabed read flat, and the complaint was the paint while the cause was
+  the geometry.** The DEM is one sample every 6.35 m and the finest terrain tile
+  is a 5 m quad, so every triangle a swimmer can see is flat and stays flat as
+  he moves over it. What is missing is not colour, it is the light moving. It
+  cannot be fixed with vertices, so the shading normal is perturbed from the
+  same fields that painted it, below the waterline only: sand ripples a hand's
+  breadth apart across the run of the swell, on clean sand and in the first
+  eleven metres only; boulder relief by central differences on the ridged field
+  the outcrop was cut from; and the meadow, which is a mat of half-metre blades
+  and was reading as a hole in the bottom. All faded out between 7 and 24 m,
+  because a sub-pixel corrugation crawls.
+- **The klapa was audible standing in the shallows and should not have been.**
+  Ears a hand above the surface is not a beach: the singing arrives across water
+  at a grazing angle off a surface that reflects nearly all of it back up the
+  hill, and half of every second one ear is under. −18.6 dB and 665 Hz at the
+  surface, against −6.0 dB and 3.6 kHz; −32.0 dB and 460 Hz at five metres.
+  460 rather than 900 because what survives is the bottom of the men's line and
+  nothing above it — the cicadas live at 4 kHz and are simply gone.
+- Two bugs found by shooting the arms: the palm's end cap was a full hemisphere,
+  so a 36 mm dome sat on the knuckle line and the fingers grew out of the middle
+  of it — that was the mitten — and the skin grain was one octave of value noise
+  on `x+z`, which is a lattice and at this range read as scales.
+
+### Added
+
+- `__fr.swim.tick(secs, dt, ctl)` takes controls. The interesting arm poses are
+  the ones you only reach by swimming, and a tick with nothing held only ever
+  shows the scull.
+
+## [1.81.0] — 2026-08-19
+
+Four corrections to the swim, all of them things the mode was missing rather
+than things it got wrong.
+
+### Added
+
+- **The sea shuts the world out.** Air and water are so badly matched
+  acoustically that about a thousandth of the power in an airborne sound crosses
+  the surface — roughly 30 dB the instant your ears go under, and the top of the
+  band with it. This sits on the master bus and takes the klapa, the cicadas,
+  the Canadair, the fire on the hill and the transistor set on the table all
+  together, because they are all on the wrong side of the same surface. A gain
+  and a lowpass, 26 dB and 380 Hz at full depth, the whole effect inside 1.1 m.
+  And the beach is already going before you dive: `water()` carries two numbers
+  — how far under your head is, and whether you are in the sea at all — and the
+  second one alone is worth half of it.
+- **`Z` in the water.** The same long lens as on foot, and the reason is
+  stronger here: treading water your eye is eleven centimetres off the surface,
+  which is the lowest viewpoint in the game and the one with the least in it.
+  There is nothing you can do about the fire except look at it. Slow motion does
+  not come with it — in the water the swell lifting you and the breath bar
+  draining are the clock you read the mode by, and halving them does not read as
+  slowed, it reads as hung.
+- **`T` in the water.** The aeroplane's autopilot has a job list and picking
+  which job is most of the code; in the sea there is one job, so this is the
+  whole of it — face the nearest shore, swim at it, give the controls back the
+  moment you can stand up. It steers down the shore distance field rather than
+  at a point, because the channel bends and the nearest land as the crow flies
+  is regularly across a headland you would have to swim through. Sixteen
+  headings, thirty metres out, best one wins, re-picked once a second because a
+  255-step field has steps in it. It surfaces first — an autopilot that swam you
+  to the beach two metres under would be one that drowned you politely.
+
+### Changed
+
+- **The arms were three cones with flat ends and a squashed cone for a hand,**
+  which is what they looked like. Now: lofted elliptical limbs with real
+  silhouettes (the deltoid is the widest part of an upper arm and it is at the
+  top; the forearm's widest part is a hand's breadth *below* the elbow);
+  hemispherical ends, which is what fixed the joints, because two flat-ended
+  cylinders at a bent elbow show you both end discs and the wedge of nothing
+  between them; a hand with a palm, four fingers and a thumb, held the way a
+  crawl holds one; and wet skin — Fresnel specular rather than a number, so it
+  is matte face-on and close to a mirror round the silhouette, which is the
+  single strongest cue that the thing on screen has just come out of the sea.
+  The cycle was retuned with it: the recovery used to carry the hand across the
+  top of the sky and the rest pose put both hands under the bottom edge, so a
+  swimmer who stopped had no arms.
+
+### Fixed
+
+- `room()` and `water()` want the same outdoor bus down for different reasons
+  and were two `setTargetAtTime` calls on one `AudioParam`, which works right up
+  until they overlap for a frame. They are held as values and combined in one
+  writer now.
+
+### Measured
+
+| | |
+|---|---|
+| audio | `water(0.019, 1)` on entry at 2 cm, `(1, 1)` at 1.4 m, `(0, 0)` on leaving |
+| autopilot | engaged 376 m out and 6 m down, surfaced, shore 376 → 325 → 97 → 14 |
+| lens | fov 58 → 38.9 mid-ramp in the water, slow 0.844 with `dt` untouched |
+
+## [1.80.0] — 2026-08-19
+
+### Fixed
+
+- **The static on the sea was never the sun glitter.** Blanking one term at a
+  time on the same frame found it in two minutes: the detail-normal ripples were
+  the whole artifact — 25.3 with them and 6.0 without, and nothing else in the
+  shader moved it by more than a point. Their period was pinned to ten screen
+  pixels, so they never shrank with distance and never band-limited: a fixed
+  layer of grain over the picture that reshuffles whenever the camera moves a
+  centimetre. Fading them out sooner takes it to 11.5 with the view from the
+  waterline unchanged to two decimal places. Tried and rejected, all measured,
+  all worse: fewer octaves (33.8 — the central difference of a smoother field is
+  larger), a longer period (22.5), real world-scale wavelengths fading per
+  octave (27.3), an analytic footprint instead of `fwidth` (27.5 — `fwidth` was
+  never at fault).
+- **The height map is a linear-filtered texture with no mip chain,** so at a
+  grazing angle the depth read is a coin toss between the shelf and the deep.
+  Past the point where a pixel covers more sea than the shelf is wide, the
+  answer is "open water" for every pixel out there.
+- **The sea was reachable on a touchscreen and unleaveable.** Bailing out over
+  the channel is one tap; the walk stick is gated on `ground`, so what a thumb
+  arrived to was a sea with a working pause button and no way to move. There is
+  a third control layer now: left thumb swims, right half is the head, up and
+  down are held buttons where SCOOP and DROP live in the air because down here
+  they are sustained and they are fighting a lifejacket that never stops
+  pulling. FAST latches; ASHORE is dark until there is a bottom under your feet.
+- **`#swim-hud` had `display: flex` and no `[hidden]` rule,** so the breath bar
+  and the depth readout have been sitting over the middle of the screen for the
+  whole game — in the air, on the runway, in the house.
+- **One step sideways off the ladder-stair went through a flight of stairs.**
+  Measured at x = 2.18, two treads up, the floor under you goes from 5.57 to
+  5.01 without a sound and you carry on walking across the living room. Fenced
+  in four segments, each banded to the treads it stands beside.
+
+### Added
+
+- **Your own arms, in the water.** The rig has twenty-two clips and none of them
+  is a swim, and that was right: a swim clip is a whole body, and the only place
+  a whole body is drawn is inside the bathroom mirror. There is no mirror in the
+  Adriatic. What the game can show you is what you can actually see while
+  swimming, which is your own two arms — three rigid pieces a side on a two-joint
+  chain, driven by angles rather than IK, winding down to a scull when you stop
+  and stopping dead when the air runs out. Her right arm carries the sleeve from
+  `49-you.js`. Drawn as a view model, because the world's near plane is 1.2 m and
+  an arm is thirty centimetres from your eye.
+- **Kitesurfers.** The lebić was chosen for the fire — it is the wind that pushes
+  a burn off Jadrija and up the peninsula toward the town, which is why today is
+  a bad day. Nine and a half metres a second is also nineteen knots, and nineteen
+  knots across the flat water inside a headland is the best afternoon of somebody
+  else's summer. Same wind. Seven of them, tacking, on leading-edge inflatables
+  with lines that reach a rider who is actually holding a bar — and when the tack
+  changes the kite crosses over, the board edges the other way and the rider
+  leans the other side of vertical.
+
+### Notes
+
+- Scenery, and nobody rides one yet.
+- The touch layer is verified in headless Chrome against `?touch`. It has never
+  been tested on a telephone.
+
+## [1.79.0] — 2026-08-19
+
+Four things, and two of them are the same mistake found twice.
+
+### Changed
+
+- **The trees are grown rather than placed.** Every close-up tree was a
+  hand-placed list of clump centres tuned by eye until the outline was right,
+  and the ceiling on that is that a hand-placed canopy has no reason: standing
+  under one at four metres it is a bunch of balloons on sticks. The model is
+  Daniel Greenheck's ez-tree, MIT, read rather than imported — none of his code
+  is here, because it is built for alpha-tested leaf billboards and this game is
+  solid vertex-coloured geometry in four instanced draws with not one texture in
+  it. Four ideas transfer: a branch is a chain of short sections each stepping
+  along its own orientation, so bends are free; gnarliness scales as
+  1/√radius, so a twig curls hard and a trunk barely wanders; a growth force
+  rotates each section toward the light by strength/radius, which is how an
+  Aleppo pine's umbrella happens rather than gets sculpted; and children are
+  stratified along the parent with their bearings drawn from a shuffled
+  permutation, without which a conifer spirals its longest branches to one side.
+- **Every conifer on this coast has been a lamp post with a bud on it since the
+  day they went in.** `VEG_SIZE`'s third number is the instance's horizontal
+  scale and a species' crown comes out 2 · reach · wide across; the pine's was
+  2 · 0.45 · 1.9 — a crown one metre seven across on a ten-metre tree, against
+  an Aleppo pine's seven metres. No amount of work on the model was ever going
+  to fix that. The numbers are derived now: the width the species has, over
+  twice the prototype's reach. Widening the crown widened the trunk by the same
+  factor, which is the same mistake wearing a hat, so the bole is fitted
+  separately in units where the diameter in the world is a number you can hold
+  against a real tree. Paid for by the near ring, 300 m → 190: 4.34 M triangles
+  on the hill above Jadrija against 4.00 M before, for a landscape that now
+  reads as Dalmatia.
+
+### Added
+
+- **A sea under the surface of the sea.** The entire underwater world was one
+  CSS radial gradient at eighty per cent opacity with nothing behind it.
+  `GLSL_WATER` is the column, and it is a filter rather than a fog: haze takes
+  red, green and blue about equally and water does not, which is why everything
+  down there is turquoise — turquoise is the only light left. The coefficients
+  are Jerlov's optical water types, the standard oceanographic classification
+  since 1968; the Adriatic off Šibenik in August is a clear coastal 1C, so red
+  0.38, green 0.052, blue 0.072 per metre. Two path lengths, and getting that
+  wrong is the usual way underwater ends up looking like green fog.
+- **The bottom, which was always drawn and never seen.** Shell sand and shingle
+  where the swell keeps it moving, posidonia from two metres to fifteen wherever
+  it is flat enough to root, bare grazed limestone on anything steep, silt out
+  past the light, and caustics over all of it. The meadow is three scales,
+  because a swimmer three metres off the bottom sees a five-metre circle and one
+  at the surface sees fifty.
+- **Snell's window.** Light leaving water cannot bend past 48.6°, so the whole
+  sky arrives compressed into one bright circle overhead and everything outside
+  it is the sea below you reflected back down. One `refract()`, and it also
+  removed a band of static: the top-side shader was being run on the back faces,
+  giving sun glitter to a viewer who is not there.
+- **`src/26-under.js`,** the volume between the two: shafts, marched — the first
+  attempt sampled the surface once where the ray left the water, which paints
+  the caustic pattern flat across the screen and gives blobs, not beams — and
+  3 200 grains of dust wrapped on the camera in x and z but anchored between the
+  surface and the bed in y, because the water has a lid and a floor. Plus fish:
+  three milling shoals and a few loners, countershaded, with the tail beat as a
+  travelling wave down the body in the vertex shader.
+- **Gerstner waves.** Four sines displacing the lattice in y is a swell and not a
+  sea. A real wave moves water in circles: as the crest passes, the water at the
+  top is also moving forward — feed that in and the lattice bunches under the
+  crests and stretches in the troughs, and that asymmetry is most of what the eye
+  uses to tell water from a rippled surface. It hands over the foam for free: a
+  crest breaks where the surface is being compressed faster than the water can
+  follow, which is the determinant of the horizontal map's Jacobian, so the
+  whitecaps are a threshold on a number that means something. Six components,
+  each faded against the local cell size, because the lattice is exponentially
+  warped and a wave shorter than twice the spacing is noise locked to the grid.
+- `__fr.show()` takes a layer out of the picture, which is the only way to find
+  out which layer you are looking at when every surface is a shade of the same
+  green; `__fr.veg.cost()`, `.nearest()`, `__fr.stats().under`.
+
+### Fixed
+
+- **The breath clock did not stop for a doorbell.** `setPaused` guards on the
+  phase and `swim` was not on the list — it was written after the list was.
+
+## [1.78.0] — 2026-08-18
+
+Four fixes off two screenshots and two sentences.
+
+### Fixed
+
+- **The white wall in the loggia was the house's east external wall,** standing
+  between the table and the side of the plot, and it is not there: terrace 7 is a
+  corner loggia, hatched open on the drawing on both its outside faces.
+  `PT7_EAST` goes through the render, the paint and the blocker band, with a pier
+  at each end and the same reveal the north opening has — and the ground it now
+  opens on to is a new flagged side passage down the east flank, which is the
+  walk in the photograph.
+- **The gate and the laid rubble were in the back yard.** They belong at the
+  front, which on this house is the side the balcony is on and the side the
+  promenade runs past. The back keeps its paving and its two retaining walls and
+  gains a low rubble kerb; the front gets the forecourt it always had — a flagged
+  path on the front door's own axis, a raised kerbed bed either side planted with
+  oleander and olive, gravel over the rest, a rubble boundary down the west side
+  and the rendered end wall with the five-bar gate standing open in it. No pine
+  went in with them: a third in the forecourt closed the house off from the
+  water, which is the one view the house exists for.
+
+### Changed
+
+- **Walking into the sea is not walking into a wall.** Every barrier that held
+  you off the water existed because there was nowhere to go once you were in it,
+  and since v1.77.0 there is. `walk` marches ahead of a refused step — off the
+  keys, not off velocity, which by the second frame against a barrier is zero —
+  and if the water is within three and a half metres it says so and `90-app`
+  hands you to the swim. The barrier stays for everybody merely walking along the
+  front.
+
+### Added
+
+- **Two sounds, synthesised rather than sampled,** because the whole game is one
+  file and the audio engine has never loaded an asset. `plunge` is the surface
+  breaking, then a low-pass closing over your head, then thirty bubbles each
+  sweeping *up* in pitch — the rise is the entire cue and a bubble without it is
+  a marimba. `gasp` is a reverse splash, and reverse is literal: the noise band
+  swells *into* the moment your head clears instead of decaying away from it.
+  How hard you gasp is how little breath you had left.
+
+## [1.77.0] — 2026-08-18
+
+Four things, and the last one is a place that did not exist.
+
+### Added
+
+- **The sea is somewhere you can be.** A canopy that put you in the sea used to
+  end the run, and the note that did it made the argument against itself: a
+  lifejacket, four hundred metres of August Adriatic, three other aircraft and a
+  lookout who all watched you go. Nothing about that is dying. It is a swim.
+  `src/59-swim.js` is its own place rather than a variation on being on foot —
+  the walking model lives in a locale's (t, s) frame because everything it can
+  answer is inside one, and out here there is no locale and there are no walls,
+  only a surface that moves, a seabed out of the height map, and a shoreline you
+  can see from the water, which is the one thing you can never see from the land.
+  `seaHeightAt` is SEA_VERT's four-wave Gerstner sum on the CPU to the same
+  numbers, so your eyes ride the real swell eleven centimetres over it. Breath is
+  the only clock out there: twenty-two seconds, and running it out does not kill
+  you — it takes the controls off you and floats you up, which is what a jacket
+  is for and a good deal more frightening than a number going red. `E` wades you
+  ashore where the bed is chest deep.
+- **The back terrace is paved in what it is paved in:** kamene ploče, irregular
+  flat limestone bedded in mortar. `flagstones()` jitters the *corners* of a grid
+  rather than the cells — move the cells and you get a grid with gaps in it, move
+  the corners they share and every stone stays a stone with four straight edges,
+  no two the same, each shared exactly with its neighbour. In it: the white
+  plastic table, three grey rattan stacking chairs, the ashtray that is on that
+  table in both photographs, and the oval opal bulkhead over the back door that
+  every house on this shore has. Round it: board-marked concrete retaining the
+  neighbour's ground on the east with the loggia switch on the inside face, laid
+  rubble on the west, and the striped lounger on the only patch of paving the sun
+  reaches for any length of time. All three walls are real — `blockersY` in the
+  sidecar, banded to grade. A 45 cm wall you can walk through is worse than no
+  wall.
+- **The approach.** An oleander each side of the gate and one more west, a fig
+  over the east wall, and a big pine on each corner of the forecourt, placed off
+  the vikendica's own frame because these belong to the house and not to the
+  shore.
+
+### Changed
+
+- **The trees, and neither change is more triangles.** The normal: a clump is an
+  ellipsoid with its radius knocked about, and `computeVertexNormals`
+  faithfully reports every dent — so neighbouring facets catch the sun at wildly
+  different angles, the eye reads the high-frequency noise as *hard*, and the
+  tree looks like screwed-up foil painted green. What the shader is handed now is
+  the normal the *un-jagged* ellipsoid would have had at that point: the
+  silhouette keeps every dent, the shading stops seeing them. And the gradient
+  the vertex colours were always able to carry and never did — dark on the
+  underside of a crown, sunlit on top, over a band belonging to the whole tree
+  and not to the single clump, or a canopy of nine reads as a bag of separate
+  balls. The far models take it too, which is what stops a hillside at two
+  kilometres reading as painted card. Then more, smaller pieces: the near pine
+  goes from five lozenges to eleven puffs, Jadrija's own from three squat plates
+  to nine on three limbs, the olive from four lobes to seven, and oleander in
+  August is now more flower than leaf.
+
+## [1.76.0] — 2026-08-18
+
+The shell went up in the last release; this is what is in it. Six rooms fitted
+out off the photographs and the marked-up print, and none of it matches the flat
+above — which is right, because they were fitted twenty years apart.
+
+### Added
+
+- **The prizemlje bathroom.** White gloss 20 tile floor to ceiling rather than a
+  border, a pale yellow ceiling, and a lavatory that is two objects and not one:
+  a floor-standing pan with a cream cistern hung off the wall behind it and the
+  flush pipe showing between them. `_wc` takes a floor and a cistern type now, so
+  the close-coupled suite upstairs and this one are the same pan with a different
+  tank. The quadrant shower goes in the narrow north arm, where the drawing put a
+  bath and the yellow mark puts water: a curved glass screen between two chrome
+  posts, not a curtain, because a quadrant tray with a straight curtain leaves
+  the corner of the room open. The basin is on a pedestal on the south wall with
+  an almond bowl and the mirror over it — a plain sheet with a black bar top and
+  bottom and a fluorescent tube on the upper one, the single most recognisable
+  thing in the room, and it is four boxes.
+- **The prizemlje kitchen.** Sink on the west return: the drawing puts it under
+  the north window, every photograph puts it on the return, and the marked-up
+  print settles it with a yellow hook. Cream gloss doors, a grey-brown worktop, a
+  15 cm white splashback over both runs, a free-standing cooker at the east end
+  of the north run, a small top-freezer fridge by the opening, and a bare bulb on
+  a flex in the middle of the room.
+- **The hall.** Terracotta polished plaster down the east side, the other wall in
+  this flat that is not the same blue-grey as everything else. Standing in the
+  hall you look down it, through the living room and out through the terrace
+  doors at the water, and the plaster is the whole length of the left of that
+  view.
+- **The living room and the bedrooms.** A blue three-seater, a pine table and
+  four chairs, white shelving on the spine and a split unit high on the west
+  wall. Doubles and wardrobes in both bedrooms.
+
+### Fixed
+
+- **The rail round the quadrant was twelve axis-aligned boxes stepped over the
+  corner,** which is a staircase and not a curve. `_arc_run` lays the same twelve
+  boxes turned to their own chords, and twelve chords are an arc.
+- **The cistern was at 1.86, which is where a high-level cistern goes,** and the
+  window over that lavatory has its sill at 1.40 — so the tank was drawn inside
+  the opening with the sky behind it. Low-level at 1.30 with the pipe run up to
+  it, which is what the photographs show anyway.
+- **Two of the four kitchen faces were painted into the wall.** The inner skin is
+  4 cm thick and centred 2 cm in, so the plaster you actually see stands 4 cm
+  inside the nominal room line, and a colour laid on that line is a colour laid
+  inside the wall.
+- **Two placement errors, both the same error.** The shelving went up across the
+  soba 3 doorway — a bookcase standing in a door. And soba 3's bed was headed to
+  the south wall, the wall with the window in it, so the one opening in the room
+  was over the pillows. That is the mistake soba 4 upstairs had until this
+  morning, made again eleven hours later in a different room.
+
+## [1.75.0] — 2026-08-18
+
+There is a whole flat under this house — TLOCRT PRIZEMLJA, 41.94 m², six rooms
+and a rear terrace — and for as long as the model has existed it has been four
+rendered walls with the openings guessed off the elevations. None of the four was
+on the building. It is drawn now.
+
+### Added
+
+- **The ground floor, solved rather than measured.** The paper has a fold running
+  down the middle of the drawing which shifts content by twelve to fifteen
+  centimetres at 1:100, so nothing here was measured off pixels. The layout comes
+  from the four printed dimension chains, each of which sums exactly to 678 or
+  773, against the scheduled areas — every room lands within five per cent of its
+  schedule and five of the eight within two — and then corrected against a print
+  marked up on site: red for doors, yellow for water, orange for the WC, purple
+  for the true window positions. Two independent checks fell out of it: the west
+  face steps 70 cm east at BY1 on both storeys, which is the whole east-west
+  setting-out confirmed twice; and the north elevation has no upper-floor
+  windows, which is the earlier deletion of `W_N` and `W_S4_N` confirmed by a
+  drawing nobody had read when it was made.
+- **The level, which was not a choice.** The drawing calls the flat zero and
+  terrace 8 minus twenty, which is a datum and not a height above anything.
+  Outside, the runtime stands this house on made ground and the promenade surface
+  is at +0.10 in the model's own coordinates — so a ground floor at 0.00 is ten
+  centimetres *under* the concrete you walk in off, and every square metre of it
+  renders as beach. It did exactly that, and the floor finishes were baked and
+  invisible for an hour while I looked for a bug that was not there. +0.30 puts
+  terrace 8 flush with the promenade and the 20 cm the drawing asks for becomes
+  the step over the threshold; the clear height then falls out of the section
+  rather than being assumed, 2.68 less 0.30 = 2.38, within two centimetres of the
+  storey above, which is what one pour gives you.
+- **What the marked-up print settled.** The sink is on the west wall of the
+  kitchen: the photographs were right and the drawing was wrong. The rear terrace
+  is reached through the kitchen and not off the hall. The shower is in the
+  narrow north arm of the bathroom L, where the drawing put a bath. Soba 4's
+  window is on the east wall, north of centre. The bathroom door slides. And the
+  door between the hall and the living room is struck out — the two run together,
+  undivided. You come in through the terrace doors and only through them: there
+  is no door to the lane at this level and there never was, and a door there
+  would open into the underside of a flight of steps.
+
+### Fixed
+
+- **Blockers are banded by height.** They were not, because there was only ever
+  one storey to be on — and unbanded, the partitions of each flat fence off the
+  other one, with nothing drawn where the fence stands.
+- **`ground.put` takes a storey hint.** Without one, `walkY` is asked cold and
+  answers with the highest floor it can find, which is right for a parachute and
+  wrong here: every attempt to stand in the prizemlje put the camera in the room
+  2.90 m above it.
+- **The plinth was a solid block** from −0.35 to +0.25 across the whole
+  footprint, which is invisible while the storey under it is closed and is a
+  25 cm kerb standing in the middle of every room the moment there is a floor in
+  there. It is a ring now, 20 cm wide, stopping 4 cm under the finish.
+- **Soba 4's bed upstairs is turned a quarter clockwise.** It ran east–west with
+  its head under the west window, which put the only opening in the room over the
+  pillows.
+
+### Notes
+
+- Openings are 85. The drawing reads 70 to 75, which is a 70 leaf in an 85
+  structural opening — and 85 is also what the walking model needs: it holds you
+  26 cm off a wall face, so a 70 hole leaves 18 cm to thread and a doorway stops
+  being a doorway.
+- Room 7 is built as drawn: walls all round, paved, one door from the kitchen.
+  The drawing hatches it like terrace 8 and then draws walls round it, so it is a
+  covered loggia until somebody says otherwise.
+
+## [1.74.1] — 2026-08-18
+
+Five things seen on screen and none of them defensible, all in the vikendica.
+
+### Fixed
+
+- **The kitchen sink was centred on the carcass.** The last 66 cm of the carcass
+  is behind the cooker, so centring on it put the bowl hard against the west
+  return with a metre and a half of empty worktop beside it — a sink shoved into
+  a corner for no reason anybody could see. It is centred on the run you can
+  actually see, which stops where the cooker starts, and lands over the middle
+  cupboard door. The mixer went with it.
+- **The Starlink dish hung in the air over a stub.** The mast stopped at
+  `top + 0.30` and the arm began 28 cm up the lean, which is roughly
+  `top + 0.49`, with a hand's width of sky between them — which is exactly how it
+  photographed. The arm starts at the lean origin now, where the mast is.
+- **The washing machine stood in the only square metre you could have used the
+  basin from.** The two have swapped: machine to the south wall at the door end,
+  which is the one run in the room with nothing else on it, and the basin out to
+  the middle of the north wall. Every `y1 − d` in the machine became `y0 + d` —
+  the same distance off the other face. The mirror had to go with it, because
+  `bathMirror` places a planar reflector over the baked glass by hand and a basin
+  that moves while the reflector does not leaves a rectangle of hallway floating
+  on bare tile.
+- **`door_case` drew architrave on both faces,** which is right for a door
+  between two painted rooms and wrong for a door into a tiled one: tile is set
+  out to die into the reveal and nobody then screws a softwood strip over the
+  tile they just cut around. It takes a `sides` argument, and the bathroom slider
+  passes the hall side only.
+
+### Removed
+
+- **The hoover in the middle of the living room floor.** It was put there because
+  it is in five of the twelve photographs — and it is in five of the twelve
+  photographs the way a pair of shoes is: it happened to be out. Drawn once and
+  never moved, it is furniture, and furniture that is a hoover reads as a
+  mistake. The builder stays in the file, unused.
+
+## [1.74.0] — 2026-08-18
+
+Chloe Price was recognisable at a glance and ours was not. The blue bob and the
+beanie were there, but the four things that actually carry her — the skull tee,
+the sleeve, the bullet necklace, the pink in the hair — were missing, and without
+them she read as a girl with dyed hair rather than as her.
+
+### Added
+
+- **Paint, not garments.** The skin shader already works in `vLocal`, the
+  undisplaced bind position, so anything drawn there sticks to the body through
+  every pose: it cannot clip, cannot fall out of a rig, and costs nothing in the
+  payload. The vest is a mask over the trunk, not a mesh. The skull on the front
+  of it is algebra — nine tapering rays, a cranium blob unioned with a jaw blob,
+  two sockets, a nasal triangle, a row of tooth gaps struck out of a band, and a
+  ribbon that sags on a sine — because this rig has no UVs to sample a texture
+  with. The sleeve is three noise fields at three scales: a fill, a contour taken
+  as the level set of the second field, and two colour masks that put roses and
+  leaves in the gaps.
+- **The two things that are not paint.** The beanie and the necklace leave the
+  body, and a drawn one of either is a drawing on a scalp or a sternum. So both
+  are geometry. The cord is a tube through nine points measured against the
+  actual chest surface — the first attempt ran at x 0.114 and was buried inside
+  her, so the mesh was probed for its maximum x at every height from 1.18 to 1.46
+  and the curve re-routed to 0.158 at the low point. Three brass casings hang off
+  it, each a cylinder and a cone, splayed by twenty milliradians so they read as
+  three and not as one thick one.
+
+### Fixed
+
+- **A band defined in height lands on the top of a shoulder as a black
+  rectangle,** because a shoulder is a horizontal surface and a height test
+  cannot tell it from a vertical one. That happened twice — once with a dark
+  strap painted inboard of each white strap, and again with the scoop trim. The
+  strap is gone; the trim is gated on `abs(z)` so it stops before the shoulder
+  flattens out.
+- **The skull rendered bright green for a while.** The print colour was added to
+  `YOU` as `bone`, and `bone` was already the head bone's bind position three
+  keys further down the same literal. The later key wins. It is called `ivory`
+  now.
+
 ## [1.73.3] — 2026-08-18
 
 The terminal gets its dials, and five things wrong with the upper floor of the

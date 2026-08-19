@@ -200,7 +200,15 @@ DOOR_H = 2.05
 D_ENTRY = (-0.70, 0.30, 0.0, DOOR_H)         # east wall, at the head of the stair
 D_TERR = (0.54, 2.74, 0.0, 2.10)             # south wall, the 220 opening
 W_TERR = (-2.34, -0.94, 1.00, 2.05)          # south wall, the 140 opening
-D_S4 = (-1.02, -0.17, 0.0, DOOR_H)           # both bedrooms open off the big room
+# Both bedrooms open off the big room, so both doors have to stand in the part
+# of the spine the big room can actually reach: from the bathroom's east face
+# at -0.74 eastward. This one used to start at -1.02, which is 18 cm *past*
+# that face — so its west jamb, its architrave and the west end of its head all
+# stood inside the bathroom, in front of the tiling, and the opening behind
+# them was a hole into a wall you cannot see through. Hard against -0.74 the
+# architrave dies into the bathroom wall's own thickness, which is where an
+# architrave beside a return goes.
+D_S4 = (-0.74, 0.11, 0.0, DOOR_H)
 D_S3 = (0.51, 1.36, 0.0, DOOR_H)
 D_BATH = (-0.40, 0.60, 0.0, DOOR_H)          # in the bathroom's east wall
 
@@ -345,17 +353,22 @@ LOFT_Y = -1.20                     # its open edge, over the big room
 
 # The fish clock, on the spine wall between the two bedroom doors.
 #
-# The doors are D_S4 (−1.02…−0.17) and D_S3 (0.51…1.36), so the wall between
-# them is 68 cm of plaster centred on x = 0.17 and the fish has to sit in the
-# middle of it. It is not symmetrical about its own spindle — 1.60 r of snout
-# one way, 1.82 r of tail the other — so centring it means centring the *fish*
-# and not the movement, which is 0.11 r west of where the body is drawn.
+# The doors are D_S4 (−0.74…0.11) and D_S3 (0.51…1.36) and each carries a 65 mm
+# architrave, so the bare plaster between them runs 0.175 to 0.445: 27 cm,
+# centred on x = 0.31. It used to be 68 cm, and it was 68 cm because the soba 4
+# door started 18 cm inside the bathroom — the pier is smaller now because the
+# doorway is finally in the room it opens off.
 #
-# At r = 0.178 the whole animal was 0.61 m against a 0.68 m gap: it filled the
-# wall to within 3 cm a side and read as a mural. 0.150 makes it 0.51 m, with a
-# hand's width of plaster each side, which is a clock hung on a wall.
-CLOCK_R = 0.150
-CLOCK_X = 0.17 - 0.11 * CLOCK_R
+# The fish is not symmetrical about its own spindle — 1.60 r of snout one way,
+# 1.82 r of tail the other — so centring it means centring the *fish* and not
+# the movement, which is 0.11 r west of where the body is drawn.
+#
+# The animal is 3.4 r across. At r = 0.150 that was 0.51 m and it no longer
+# fits; 0.070 makes it 0.24 m, with 16 mm of plaster each side. Small for this
+# house, and the right size for the wall it is on: a 24 cm clock in a kitchen
+# is a clock, and a 51 cm one on a 27 cm pier is a mural.
+CLOCK_R = 0.070
+CLOCK_X = 0.31 - 0.11 * CLOCK_R
 CLOCK_Z = F2 + 1.76
 
 
@@ -954,8 +967,11 @@ def boravak(kit):
     x0, x1, y0, y1 = P_ROOMS["boravak"]
     BLUE_S = (0.255, 0.330, 0.520)
 
+    # `floor=P_FL`, and not by accident: sofa() used to plant itself at F2 with
+    # no way to say otherwise, so this three-seater — the only one downstairs —
+    # was built one storey up and spent its life standing in the kitchen.
     sofa(kit, x0 + 1.10, y0 + 0.62, math.pi / 2, 2.02, BLUE_S,
-         throw=(0.780, 0.760, 0.700))
+         throw=(0.780, 0.760, 0.700), floor=P_FL)
     round_table(kit, x0 + 2.30, y0 + 1.90, P_FL, r=0.52, h=0.74)
     for i, (dx, dy, yaw) in enumerate(((-0.78, 0.0, 0.0), (0.78, 0.0, math.pi),
                                        (0.0, -0.78, math.pi / 2),
@@ -2260,29 +2276,161 @@ def kitchen(kit):
     # television, which is the order in the photograph. Absolute coordinates,
     # because it has ended up just outside the kitchen rectangle and the room
     # it is really in is the one big room anyway.
-    fx, fy = -0.88, IY0 + 0.02
-    kit.span(WHITEGOODS, fx, fx + 0.62, fy, fy + 0.64, F2, F2 + 1.86, bev=0.008)
-    kit.span(FRIDGE_RED, fx + 0.02, fx + 0.60, fy + 0.64, fy + 0.68,
-             F2 + 0.04, F2 + 1.16, bev=0.006)
-    kit.span(FRIDGE_RED, fx + 0.02, fx + 0.60, fy + 0.64, fy + 0.68,
-             F2 + 1.20, F2 + 1.84, bev=0.006)
-    # The handles, on the hinge-away side — which is the +x edge of the doors
-    # and, standing in the room looking at it, the left. They were on the other
-    # edge, and on a fridge that is not a detail: the handle is the one thing
-    # that tells you which way the door opens, and it opened into the wall.
-    kit.span(WHITEGOODS, fx + 0.52, fx + 0.58, fy + 0.68, fy + 0.72,
-             F2 + 0.80, F2 + 1.10, bev=0.004)
-    kit.span(WHITEGOODS, fx + 0.52, fx + 0.58, fy + 0.68, fy + 0.72,
-             F2 + 1.26, F2 + 1.56, bev=0.004)
-    for _ in range(20):
-        mx = fx + RNG.uniform(0.05, 0.55)
-        mz = F2 + RNG.uniform(0.55, 1.80)
-        c = RNG.choice([(0.9, 0.85, 0.3), (0.2, 0.4, 0.8), (0.9, 0.9, 0.88),
-                        (0.15, 0.55, 0.35), (0.85, 0.5, 0.2)])
-        kit.span(c, mx, mx + RNG.uniform(0.035, 0.065), fy + 0.68, fy + 0.688,
-                 mz, mz + RNG.uniform(0.035, 0.06), bev=0.002)
+    _fridge(kit, -0.88, IY0 + 0.02, F2)
 
     ceiling_light(kit, (x0 + x1) / 2, y1 - 1.00)
+
+
+# The two door heights, as fractions of the case: a top-freezer is roughly two
+# thirds fridge and one third freezer, and this one is measured off the
+# photographs at 1.11 and 0.64 in a case 1.86 tall.
+FR_W, FR_D, FR_H = 0.62, 0.64, 1.86
+FR_DOORS = ((0.045, 1.155), (1.205, 1.845))
+
+
+def _round_rect(hw, hh, r, per=7):
+    """A closed rounded rectangle as (x, y), anticlockwise from the right edge.
+
+    A superellipse is the cheap way to get this and it is the wrong one here: a
+    superellipse's corner is elliptical, so on a door 59 wide and 111 tall the
+    corners come out taller than they are wide and it reads as a pillow. This
+    is a true constant radius, which is what pressed steel actually has.
+    """
+    r = max(0.0005, min(r, hw - 0.001, hh - 0.001))
+    pts = []
+    for cx, cy, a0 in ((hw - r, hh - r, 0.0),
+                       (-(hw - r), hh - r, math.pi / 2),
+                       (-(hw - r), -(hh - r), math.pi),
+                       (hw - r, -(hh - r), 3 * math.pi / 2)):
+        for i in range(per + 1):
+            a = a0 + (math.pi / 2) * i / per
+            pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+    return pts
+
+
+def _rr_loft(bm, rings, per=7):
+    """Skin a stack of rounded rectangles along local Z.
+
+    `rings` is `[(z, hw, hh, r, ox, oy), ...]`. Every ring has the same point
+    count, so the strip between two of them is a plain quad grid.
+    """
+    grid = []
+    for z, hw, hh, r, ox, oy in rings:
+        grid.append([bm.verts.new((ox + px, oy + py, z))
+                     for px, py in _round_rect(hw, hh, r, per)])
+    bm.verts.ensure_lookup_table()
+    n = len(grid[0])
+    for j in range(len(grid) - 1):
+        for i in range(n):
+            k = (i + 1) % n
+            bm.faces.new((grid[j][i], grid[j][k], grid[j + 1][k], grid[j + 1][i]))
+    bm.faces.new(tuple(reversed(grid[0])))
+    bm.faces.new(tuple(grid[-1]))
+    return grid
+
+
+def _fridge(kit, fx, fy, floor):
+    """The tall red top-freezer on the terrace wall — five boxes, until now.
+
+    It is the one appliance in this flat that gets looked at from a metre away
+    and the one nobody walks past without seeing, so it is worth the triangles.
+    A fridge door is not a slab: it is a rounded rectangle in plan and in
+    elevation, it is *crowned* — proud at the middle, rolling back to a radius
+    all the way round — and the roll is the whole reason a white kitchen has a
+    red thing in it that reads as an object rather than a poster. So both doors
+    and the case are superelliptical lofts, and everything hung on them (bar
+    handles on brackets with daylight behind them, hinge caps, the plinth and
+    its grille) is modelled rather than drawn on.
+
+    Both doors are hinged on the −x edge, which is why the handles are on +x:
+    the handle is the one thing that tells you which way a door opens, and this
+    one has to open into the room and not into the wall.
+    """
+    W, D, H = FR_W, FR_D, FR_H
+    cx, cy = fx + W / 2, fy + D / 2
+    front = fy + 0.706                       # the crown of the doors
+    back = fy + 0.635                        # where they sit on the case
+
+    # The plinth, set back and dark, so the case reads as standing on feet
+    # rather than growing out of the floor — with the condenser grille in the
+    # front of it, which is the only vent on a fridge you ever see.
+    kit.span(DARKMETAL, fx + 0.035, fx + W - 0.035, fy + 0.08, fy + D - 0.02,
+             floor, floor + 0.070, bev=0.004)
+    for i in range(5):
+        z = floor + 0.014 + i * 0.011
+        kit.span((0.30, 0.31, 0.32), fx + 0.09, fx + W - 0.09,
+                 fy + 0.075, fy + 0.090, z, z + 0.006, bev=0.001)
+
+    # The case. Four rings: a chamfer off the bottom, the full section, and a
+    # chamfer off the top, which is what stops a white box being a white box
+    # where it meets the ceiling light.
+    _rr_loft(kit.bm(WHITEGOODS, 0.004), [
+        (floor + 0.062, W / 2 - 0.016, D / 2 - 0.016, 0.010, cx, cy),
+        (floor + 0.084, W / 2, D / 2, 0.026, cx, cy),
+        (floor + H - 0.022, W / 2, D / 2, 0.026, cx, cy),
+        (floor + H, W / 2 - 0.020, D / 2 - 0.020, 0.008, cx, cy),
+    ])
+
+    # The shadow gap between the doors, and the sealed face behind them.
+    kit.span(DARKMETAL, fx + 0.010, fx + W - 0.010, fy + D - 0.006, back + 0.004,
+             floor + FR_DOORS[0][1], floor + FR_DOORS[1][0], bev=0.003)
+
+    for k, (z0, z1) in enumerate(FR_DOORS):
+        z0 += floor
+        z1 += floor
+        hw, hh, R = 0.295, (z1 - z0) / 2, 0.028
+        # Along the depth: flat where it sits on the case, out to the full
+        # section, then the roll-over in three steps to a front face 2 cm
+        # inside the silhouette. That roll is the whole difference between a
+        # door and a painted rectangle.
+        grid = _rr_loft(kit.bm(FRIDGE_RED, 0.003), [
+            (back, hw - 0.006, hh - 0.006, R - 0.004, 0, 0),
+            (back + 0.008, hw, hh, R, 0, 0),
+            (front - 0.020, hw, hh, R, 0, 0),
+            (front - 0.009, hw - 0.004, hh - 0.004, R - 0.004, 0, 0),
+            (front - 0.003, hw - 0.010, hh - 0.010, R - 0.010, 0, 0),
+            (front, hw - 0.020, hh - 0.020, R - 0.018, 0, 0),
+        ])
+        # _rr_loft skins along its own +Z; _rot_x lays that down the world +Y,
+        # which is the way this door faces, and turns the ring's second
+        # half-width into height.
+        _rot_x([v for row in grid for v in row], cx, 0.0, (z0 + z1) / 2)
+
+        # Hinge caps on the −x edge, top and bottom of each leaf.
+        for zz in (z0 + 0.035, z1 - 0.035):
+            kit.span((0.80, 0.80, 0.79), fx + 0.012, fx + 0.052,
+                     back - 0.004, back + 0.030, zz - 0.024, zz + 0.024,
+                     bev=0.006)
+
+        # The handle: two brackets and a round bar standing 4 cm off the door.
+        # Both sit against the shadow gap — the fridge door's at the top of the
+        # leaf, the freezer's at the bottom of it — because that is where the
+        # hand goes on a top-freezer and because the pair then reads as a pair.
+        hx = fx + 0.545
+        h0, h1 = ((z1 - 0.36, z1 - 0.06) if k == 0 else (z0 + 0.06, z0 + 0.36))
+        for zz in (h0, h1):
+            kit.span(WHITEGOODS, hx - 0.024, hx + 0.024, front - 0.008,
+                     front + 0.044, zz - 0.018, zz + 0.018, bev=0.006)
+        bm_cylinder(kit.bm(CHROME, 0.003), hx, front + 0.040, h0, h1,
+                    0.011, 0.011, seg=12)
+
+    # The badge, high on the freezer door and away from the handle.
+    kit.span((0.86, 0.86, 0.85), fx + 0.13, fx + 0.27, front, front + 0.004,
+             floor + FR_DOORS[1][1] - 0.105, floor + FR_DOORS[1][1] - 0.079,
+             bev=0.002)
+
+    # And the magnets, on the crowned face rather than floating off the old
+    # flat one. Kept inside the roll-over, because a magnet on a radius is a
+    # magnet lying in mid-air.
+    for _ in range(20):
+        mx = fx + RNG.uniform(0.075, 0.46)
+        mz = floor + RNG.uniform(0.58, 1.76)
+        if floor + FR_DOORS[0][1] - 0.06 < mz < floor + FR_DOORS[1][0] + 0.02:
+            mz += 0.10
+        c = RNG.choice([(0.9, 0.85, 0.3), (0.2, 0.4, 0.8), (0.9, 0.9, 0.88),
+                        (0.15, 0.55, 0.35), (0.85, 0.5, 0.2)])
+        kit.span(c, mx, mx + RNG.uniform(0.035, 0.062), front, front + 0.009,
+                 mz, mz + RNG.uniform(0.035, 0.058), bev=0.002)
 
 
 def _oval_band(bm, z0, z1, out, inn, seg=24, power=2.6):
@@ -2859,10 +3007,15 @@ def bedroom_west(kit):
     bed(kit, x0 + 0.76, y1 - 1.05, yaw=-math.pi / 2, w=1.40, l=1.98)
     kit.span(WALNUT, x1 - 0.46, x1 - 0.06, y1 - 0.52, y1 - 0.12, F2, F2 + 0.52,
              bev=0.006)
-    kit.span(WALNUT, x1 - 0.62, x1 - 0.04, y0 + 0.04, y0 + 0.62, F2, F2 + 1.90,
+    # The single wardrobe stands on the party wall to soba 3 and not on the
+    # spine, which is where it was: the spine here is 95 cm long and the door
+    # takes 85 of it, so anything against it is standing in the doorway. On the
+    # east wall it is clear of the door, clear of the bed and clear of the
+    # sliding leaf, which parks west along the spine face.
+    kit.span(WALNUT, x1 - 0.58, x1 - 0.02, y0 + 0.22, y0 + 0.80, F2, F2 + 1.90,
              bev=0.008)
-    for c in (x1 - 0.30, x1 - 0.16):
-        kit.span(BEECH, c, c + 0.024, y0 + 0.62, y0 + 0.66, F2 + 1.00,
+    for c in (y0 + 0.36, y0 + 0.66):
+        kit.span(BEECH, x1 - 0.60, x1 - 0.56, c, c + 0.024, F2 + 1.00,
                  F2 + 1.14, bev=0.004)
     kit.span(LINEN, x0 + 0.30, x0 + 0.66, y0 + 0.30, y0 + 0.70, F2 + 0.44,
              F2 + 0.58, bev=0.02)
@@ -2871,7 +3024,7 @@ def bedroom_west(kit):
 
 # ------------------------------------------------------------------ furniture --
 
-def sofa(kit, cx, cy, yaw, length, colour, throw=None, depth=0.86):
+def sofa(kit, cx, cy, yaw, length, colour, throw=None, depth=0.86, floor=F2):
     """A two- or three-seater with a throw over it. Built along +X and rotated,
     because every soft thing in this flat is at a different angle to the walls."""
     bm = bmesh.new()
@@ -2882,7 +3035,7 @@ def sofa(kit, cx, cy, yaw, length, colour, throw=None, depth=0.86):
         bm_box(bm, s * (length / 2 - 0.09), 0.03, 0.44, 0.18, d - 0.10, 0.46)
     ob = new_object(bm, "sofa")
     bevel(ob, 0.045, segments=2)
-    _place(ob, cx, cy, F2, yaw)
+    _place(ob, cx, cy, floor, yaw)
     kit.adopt(ob, colour)
     if throw:
         bm = bmesh.new()
@@ -2890,7 +3043,7 @@ def sofa(kit, cx, cy, yaw, length, colour, throw=None, depth=0.86):
         bm_box(bm, 0, -d / 2 + 0.12, 0.62, length - 0.05, 0.13, 0.44)
         ob = new_object(bm, "throw")
         bevel(ob, 0.05, segments=2)
-        _place(ob, cx, cy, F2, yaw)
+        _place(ob, cx, cy, floor, yaw)
         kit.adopt(ob, throw)
     # Cushions along the back — the tapestry ones with the tiger on them.
     for i in range(3):
@@ -2899,7 +3052,7 @@ def sofa(kit, cx, cy, yaw, length, colour, throw=None, depth=0.86):
         bm_box(bm, t, -d / 2 + 0.26, 0.62, 0.38, 0.16, 0.36)
         ob = new_object(bm, "cushion")
         bevel(ob, 0.06, segments=2)
-        _place(ob, cx, cy, F2, yaw + RNG.uniform(-0.1, 0.1))
+        _place(ob, cx, cy, floor, yaw + RNG.uniform(-0.1, 0.1))
         kit.adopt(ob, RNG.choice([(0.62, 0.42, 0.24), (0.80, 0.74, 0.60),
                                   (0.42, 0.22, 0.18)]))
 
