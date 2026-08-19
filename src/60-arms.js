@@ -172,6 +172,26 @@ const ARMS = {
   thumb: 0.0546,
   thumbR: 0.0108,
 
+  // The bar, for the kite mode. 52 cm across, which is a small bar and the
+  // common one, and where it sits relative to the eye: out in front, down at
+  // the bottom of the chest, exactly where 59-ride.js puts its end of the
+  // lines so that the two halves of the rig meet.
+  barW: 0.52,
+  barAt: [0.0, -0.23, -0.46],
+
+  // How a hand is held, joint by joint, at the two ends of what a hand does.
+  //
+  // Flat is the paddle: five degrees at the knuckle and not much more down the
+  // finger, because a crawl's hand is very nearly a board and the little curl
+  // that is in it is the hand's own, not a grip. Loose is the recovery, and it
+  // is a long way from flat on purpose — a hand off the water carries no shape
+  // at all, and the number that looked right in a still frame looked like a
+  // hand being *held* open the moment it moved.
+  fingerFlat: [0.05, 0.09, 0.11],
+  fingerLoose: [0.42, 0.55, 0.40],
+  thumbFlat: [0.14, 0.30],
+  thumbLoose: [0.40, 0.46],
+
   // A Dalmatian August, three weeks in. Albedo, so it sits below the colour it
   // arrives on screen as.
   skin: [0.795, 0.620, 0.495],
@@ -354,93 +374,107 @@ function armLimb(len, prof, opt = {}) {
  * so the tip comes round further than the base — the shape of a hand doing
  * something rather than a hand being displayed.
  */
-function armFinger(len, r, curl) {
+function armFingerBones(len, r) {
   const bone = [len * 0.45, len * 0.31, len * 0.24];
-  const out = [];
-  let m = new THREE.Matrix4();
-  for (let i = 0; i < 3; i++) {
+  return bone.map((L, i) => {
     const a = r * (1 - 0.11 * i), b = r * (1 - 0.11 * (i + 1));
-    const g = armLimb(bone[i], (t) => {
-      // A knuckle at the head of each bone and a smaller one at its foot: a
-      // finger is a string of beads and the beads are what you actually see.
-      const w = a + (b - a) * t
-        + r * 0.16 * Math.exp(-t * t * 34.0)
-        + r * 0.10 * Math.exp(-(1 - t) * (1 - t) * 40.0);
-      // The last bone ends in a pad, not a point. Second column is the depth
-      // *ratio*, like every other profile in this file.
-      return [w, 1.06 - 0.10 * t, 0.24, 0];
-    }, { seg: 14, rows: 7, cap: 6 });
-    out.push(g.applyMatrix4(m.clone()));
-    m = m.clone()
-      .multiply(new THREE.Matrix4().makeTranslation(0, -bone[i] * 0.94, 0))
-      .multiply(new THREE.Matrix4().makeRotationX(curl[i]));
-  }
-  return out;
+    return {
+      len: L,
+      // Where the joint below it sits. Not at the tip: a knuckle is inside a
+      // finger, not on the end of one, and hinging at the tip leaves a gap you
+      // can see straight through every time the hand closes.
+      joint: -L * 0.94,
+      geo: armLimb(L, (t) => {
+        // A knuckle at the head of each bone and a smaller one at its foot: a
+        // finger is a string of beads and the beads are what you actually see.
+        const w = a + (b - a) * t
+          + r * 0.16 * Math.exp(-t * t * 34.0)
+          + r * 0.10 * Math.exp(-(1 - t) * (1 - t) * 40.0);
+        // The last bone ends in a pad, not a point. Second column is the depth
+        // *ratio*, like every other profile in this file.
+        return [w, 1.06 - 0.10 * t, 0.24, 0];
+      }, { seg: 14, rows: 7, cap: 6 }),
+    };
+  });
 }
 
 /**
  * A hand: a palm with an arch and a thumb pad, four three-boned fingers and a
- * thumb, merged into one buffer.
+ * thumb. The palm comes back as one buffer; the digits come back as chains.
  *
- * Not splayed, and not clamped shut. A crawl's hand is a paddle held with the
- * fingers just touching and very slightly cupped — water goes through a splayed
- * hand and a clenched one has no surface — so they lie together with a few
- * degrees of curl and the little finger trailing the others, which is the
- * shape that says "this hand is doing something" rather than "this hand is
- * a model of a hand".
+ * A crawl's hand is not one shape, and shipping it as one was the mistake in
+ * the last pass. Through the pull it is a paddle — fingers just touching and
+ * very slightly cupped, because water goes through a splayed hand and a
+ * clenched one has no surface. Through the recovery it is nothing at all: the
+ * hand hangs off the wrist and the fingers fall open, and that loose hand
+ * coming over the top is the single most recognisable thing about watching
+ * somebody swim. Welded at the catch pose it held the paddle for the whole
+ * cycle, which read as an arm with a glove on the end of it.
+ *
+ * So: bones, and the pose lives in `update` where the stroke phase is.
  */
 function armHand(side) {
-  const parts = [];
   const P = ARMS.palm;
-  parts.push(armLimb(P, ARMS.palmProf, {
+  const palm = [];
+  palm.push(armLimb(P, ARMS.palmProf, {
     seg: 30, rows: 14, cap: 8, capTopS: 0.42, capBotS: 0.16 }));
 
   // The thumb pad, laid along the thumb side of the palm and rolled forward
-  // on to the palmar face where it actually sits.
+  // on to the palmar face where it actually sits. It belongs to the palm and
+  // not to the thumb: a thenar does move when the thumb moves, but nothing
+  // like as far, and hanging it off the thumb's first joint would swing a
+  // quarter of the palm away every time the hand opened.
   const then = armLimb(P * 0.78, ARMS.thenarProf, {
     seg: 18, rows: 9, cap: 6, capTopS: 0.5, capBotS: 0.5 });
   then.applyMatrix4(new THREE.Matrix4()
     .makeRotationZ(-0.15 * side)
     .premultiply(new THREE.Matrix4().makeTranslation(-0.0206 * side, -0.0150, 0.0058)));
-  parts.push(then);
+  palm.push(then);
 
+  const digits = [];
   for (let i = 0; i < 4; i++) {
     const [len, r] = ARMS.finger[i];
     // Knuckles across the head of the palm, index at -X through little at +X
     // on the left hand and mirrored by the parent's sign.
     const x = (-1.5 + i) * 0.0228 * side;
-    // The little finger trails and curls further, which every hand does and
-    // no modelled hand ever does.
-    const lag = i === 3 ? 0.07 : 0;
-    for (const g of armFinger(len, r, [0.09 + lag, 0.19 + lag, 0.17])) {
-      parts.push(g.applyMatrix4(new THREE.Matrix4()
-        .makeRotationX(0.10)
-        .premultiply(new THREE.Matrix4().makeRotationZ(-x * 1.25))
-        .premultiply(new THREE.Matrix4().makeTranslation(
-          x, -P + ARMS.knuckle[i], 0.0022))));
-    }
+    digits.push({
+      kind: 'finger',
+      i,
+      pos: [x, -P + ARMS.knuckle[i], 0.0022],
+      // Pitch is down the finger and fan is across the palm, kept apart
+      // rather than baked into one matrix because the pose opens and closes
+      // the fan while the pitch stays where the knuckle put it.
+      pitch: 0.10,
+      fan: -x * 1.25,
+      bones: armFingerBones(len, r),
+    });
   }
 
-  // The thumb, off the side of the palm and a long way round the axis: held
-  // in against the index finger, which is where it is on a catch. Two bones,
-  // not three, because that is how many a thumb has.
+  // The thumb, off the side of the palm and a long way round the axis. Two
+  // bones, not three, because that is how many a thumb has. Where it is held
+  // is the pose's business now: in against the index for the catch, out and
+  // away when the hand lets go.
   const tb = [ARMS.thumb * 0.56, ARMS.thumb * 0.44];
-  let m = new THREE.Matrix4()
-    .makeRotationZ(-0.30 * side)
-    .premultiply(new THREE.Matrix4().makeRotationX(0.26))
-    .premultiply(new THREE.Matrix4().makeTranslation(-0.0250 * side, -0.0548, 0.0090));
-  for (let i = 0; i < 2; i++) {
-    const a = ARMS.thumbR * (1 - 0.16 * i), b = ARMS.thumbR * (1 - 0.16 * (i + 1));
-    const g = armLimb(tb[i], (t) => {
-      const w = a + (b - a) * t + ARMS.thumbR * 0.13 * Math.exp(-t * t * 30.0);
-      return [w, 0.94 - 0.06 * t, 0.26, 0];
-    }, { seg: 14, rows: 7, cap: 6 });
-    parts.push(g.applyMatrix4(m.clone()));
-    m = m.clone()
-      .multiply(new THREE.Matrix4().makeTranslation(0, -tb[i] * 0.94, 0))
-      .multiply(new THREE.Matrix4().makeRotationX(0.34));
-  }
-  return kiteMerge(parts);
+  digits.push({
+    kind: 'thumb',
+    i: 0,
+    pos: [-0.0250 * side, -0.0548, 0.0090],
+    pitch: 0.26,
+    fan: -0.30 * side,
+    bones: tb.map((L, i) => {
+      const a = ARMS.thumbR * (1 - 0.16 * i), b = ARMS.thumbR * (1 - 0.16 * (i + 1));
+      return {
+        len: L,
+        joint: -L * 0.94,
+        geo: armLimb(L, (t) => {
+          const w = a + (b - a) * t + ARMS.thumbR * 0.13 * Math.exp(-t * t * 30.0);
+          return [w, 0.94 - 0.06 * t, 0.26, 0];
+        }, { seg: 14, rows: 7, cap: 6 }),
+      };
+    }),
+  });
+
+  return { palm: kiteMerge(palm), digits };
 }
 
 /**
@@ -537,10 +571,87 @@ function buildArms() {
     // sits — and every piece hanging off them is a lathe, so a hand built with
     // the sign flipped is a true mirror with the winding still the right way
     // round.
-    wrist.add(new THREE.Mesh(armHand(side), mat));
+    const hand = armHand(side);
+    wrist.add(new THREE.Mesh(hand.palm, mat));
+
+    // Every joint a Group, every bone a mesh hanging off it. That is
+    // twenty-eight more draw calls across the two hands in a pass that had
+    // six, which sounds like a great deal until you notice what the pass is:
+    // two arms in an otherwise empty scene, drawn over a frame of three and a
+    // half million triangles. It costs about a fifth of a millisecond and it
+    // buys the one motion in the mode that everybody has felt from the inside.
+    const digits = [];
+    for (const d of hand.digits) {
+      const joints = [];
+      let parent = wrist;
+      for (let i = 0; i < d.bones.length; i++) {
+        const g = new THREE.Group();
+        if (i === 0) {
+          g.position.set(d.pos[0], d.pos[1], d.pos[2]);
+          // ZYX, so the fan happens in the plane of the palm and the pitch
+          // happens down the finger. The other way round, opening the hand
+          // tips every finger out of the palm as well as away from it.
+          g.rotation.order = 'ZYX';
+        } else {
+          g.position.set(0, d.bones[i - 1].joint, 0);
+        }
+        g.frustumCulled = false;
+        g.add(new THREE.Mesh(d.bones[i].geo, mat));
+        parent.add(g);
+        joints.push(g);
+        parent = g;
+      }
+      digits.push({ kind: d.kind, i: d.i, pitch: d.pitch, fan: d.fan, joints });
+    }
 
     for (const m of [shoulder, elbow, wrist]) m.frustumCulled = false;
-    sides.push({ side, shoulder, elbow, wrist });
+    sides.push({ side, shoulder, elbow, wrist, digits });
+  }
+
+  // ── and the bar, for the other water mode ─────────────────────────────────
+  //
+  // 59-ride.js draws the kite and the long lines in the world, and it cannot
+  // draw the near end of them: the front clip is at 1.2 m and a bar is two
+  // thirds of a metre from your face, so everything from your hands up to
+  // shoulder height is inside the clip and simply is not there. That left four
+  // white lines starting in mid-air over the water, which reads as a fault
+  // rather than as a rig.
+  //
+  // This scene is the answer, and it is already here for exactly this reason —
+  // a five-centimetre near plane. So the bar, the last two metres of each
+  // line, and the two hands holding it are drawn here, and the world's lines
+  // carry on from where these stop. The join is well above the bar and behind
+  // both hands, which is the one part of the frame nothing is looking at.
+  const rig = new THREE.Group();
+  rig.visible = false;
+  rig.frustumCulled = false;
+  root.add(rig);
+  {
+    const barMat = solidMaterial(new THREE.Color(0.10, 0.10, 0.12),
+      { spec: 0.35, specPower: 50, vcol: false });
+    const gripMat = solidMaterial(new THREE.Color(0.72, 0.16, 0.10),
+      { spec: 0.22, specPower: 26, vcol: false });
+    const bar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.0135, 0.0135, ARMS.barW, 10, 1), barMat);
+    bar.rotation.z = Math.PI / 2;
+    rig.add(bar);
+    // The grips, which are the only coloured part of a bar and the reason you
+    // can tell at a glance which way up it is.
+    for (const s2 of [-1, 1]) {
+      const g = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.0175, 0.0175, 0.125, 10, 1), gripMat);
+      g.rotation.z = Math.PI / 2;
+      g.position.x = s2 * ARMS.barW * 0.34;
+      rig.add(g);
+    }
+    // The centre line running down out of the bar to the harness, which is the
+    // part of a kite rig nobody draws and everybody has seen.
+    const cl = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.006, 0.006, 0.46, 5, 1),
+      solidMaterial(new THREE.Color(0.80, 0.78, 0.72), { spec: 0.1, vcol: false }));
+    cl.position.y = -0.23;
+    rig.add(cl);
+    for (const m of rig.children) m.frustumCulled = false;
   }
 
   const ease = (t) => t * t * (3 - 2 * t);
@@ -595,6 +706,25 @@ function buildArms() {
     };
   }
 
+  /**
+   * How loose the hand is at phase `u` — 0 a flat paddle, 1 a hand hanging.
+   *
+   * It lets go a little before the exit, because by then the hand is already
+   * off the water and holding a paddle after the paddle has stopped working is
+   * the glove again. Loosest with the elbow over the top. Gathered through the
+   * last fifth so the fingertips lead the hand in, which is what the entry of
+   * a crawl actually is — the hand goes in fingers first and the rest of the
+   * arm follows it through the same hole.
+   *
+   * Zero at both ends with zero slope, so the seam at the catch is not a place
+   * where anything visibly happens.
+   */
+  function grip(u) {
+    const rise = ease(Math.min(1, Math.max(0, (u - 0.46) / 0.16)));
+    const fall = ease(Math.min(1, Math.max(0, (u - 0.78) / 0.20)));
+    return rise - fall;
+  }
+
   const _q = new THREE.Quaternion();
   const _e = new THREE.Euler();
 
@@ -606,10 +736,117 @@ function buildArms() {
    * pitch are where you are looking, and the roll is the stroke, which belongs
    * to the head and not to the shoulders.
    */
-  function update(dt, swim, camera) {
-    const on = !!(swim && swim.active);
+  /**
+   * Both hands on a bar.
+   *
+   * The whole pose is one constraint — the hands are at two fixed points in
+   * front of you and the arms have to reach them — and it is the one pose in
+   * the game where an IK solve would genuinely have been simpler than angles.
+   * It is still angles, for the same reason the crawl is: the shoulder,
+   * forearm and hand lengths are known and fixed, so the two-link solve has a
+   * closed form and the closed form is four lines of trigonometry. Solving it
+   * every frame also means the arms follow the bar when the bar moves, which
+   * is what happens when you sheet in.
+   *
+   * `pull` is 0 for a bar held out at arm's length and 1 for a bar pulled in
+   * to the hip — which is the whole of the power control, and the reason you
+   * can see how hard you are working without a gauge.
+   */
+  // How far forward the shoulders come for the bar. The swim's shoulder
+  // offset is a *prone* one — 10 cm behind the eye, because a swimmer's head
+  // is ahead of their shoulders as well as above them — and on a board it is
+  // exactly wrong: it put the hands 58 cm from a 48 cm arm, so the solve
+  // clamped, the elbows locked straight, and both hands hung in the air a
+  // hand's breadth short of a bar they were supposed to be holding.
+  const RIDE_LEAN = 0.14;
+
+  function barPose(a, pull, t) {
+    const S = ARMS.shoulder;
+    // Where this hand has to be, in the shoulder's own frame.
+    let hx = a.side * (ARMS.barW * 0.34) - S[0] * a.side;
+    // Three centimetres above the bar, not on it: the fingers come off the
+    // knuckles and close *downward*, so a hand aimed at the bar itself hangs
+    // its fingers below it and a hand aimed a little over it closes round it.
+    let hy = (ARMS.barAt[1] + 0.055 * pull) - S[1] + 0.085;
+    let hz = (ARMS.barAt[2] + 0.12 * pull) - S[2] + RIDE_LEAN
+      + Math.sin(t * 1.7 + a.side) * 0.008;
+    // The solve puts the *wrist* where it is told, and a wrist is not what
+    // holds a bar — the hand carries on for another seventeen centimetres past
+    // it. Aimed at the bar itself, both hands came out a palm's length beyond
+    // it with the bar somewhere back inside the forearm. So the target is
+    // pulled back along the arm by a palm and a bit, and the hand that grows
+    // out of it lands on the bar instead of through it.
+    const raw = Math.hypot(hx, hy, hz) || 1e-4;
+    const back0 = ARMS.palm + 0.030;
+    const k0 = Math.max(0, (raw - back0) / raw);
+    hx *= k0; hy *= k0; hz *= k0;
+    const d = Math.min(raw - back0, (ARMS.upper + ARMS.fore) * 0.995);
+    // Two links, one closed form: the elbow angle straight out of the cosine
+    // rule, and the shoulder aimed at the hand and then backed off by the
+    // half-angle the bend costs.
+    const c = (ARMS.upper * ARMS.upper + ARMS.fore * ARMS.fore - d * d)
+      / (2 * ARMS.upper * ARMS.fore);
+    const elb = Math.PI - Math.acos(Math.min(1, Math.max(-1, c)));
+    const c2 = (ARMS.upper * ARMS.upper + d * d - ARMS.fore * ARMS.fore)
+      / (2 * ARMS.upper * Math.max(d, 1e-4));
+    const back = Math.acos(Math.min(1, Math.max(-1, c2)));
+    // Aim: the arm hangs down −Y, so pitch it forward by the angle the hand
+    // sits above straight-down, and swing it out by the angle it sits across.
+    const pitch = Math.atan2(-hz, -hy) + back;
+    const out = Math.atan2(hx * a.side, Math.hypot(hy, hz));
+    a.shoulder.rotation.set(pitch, 0, -out * a.side, 'XYZ');
+    a.elbow.rotation.set(-elb, 0, 0);
+    // Knuckles over the bar and thumbs under it, which is the only grip
+    // anybody uses and is what makes a held bar read as held.
+    //
+    // The angle that matters is the twist, and it took two passes to see it.
+    // The chain shoulder → elbow → wrist bends in one plane and has no
+    // pronation in it anywhere, so with the arm out in front the palm faces
+    // *up* no matter what the wrist is set to — which is why the first two
+    // attempts produced two hands held open under the bar like somebody
+    // waiting for change. A real forearm rotates about its own axis to turn
+    // the palm over, and that is one number: a rotation about the wrist's Y,
+    // which is the forearm's axis.
+    //
+    // Order XZY so the twist is innermost and happens in the forearm's frame.
+    // Any other order pronates about something that is not the forearm and
+    // takes the hand off the bar again.
+    a.wrist.rotation.set(0.06 + 0.12 * pull, a.side * 2.70, 0, 'XZY');
+    // And the fingers closed round it, which is what the joint chains were for.
+    for (const dg of a.digits) {
+      const thumb = dg.kind === 'thumb';
+      const flat = thumb ? ARMS.thumbFlat : ARMS.fingerFlat;
+      const loose = thumb ? ARMS.thumbLoose : ARMS.fingerLoose;
+      // Well past loose: a fist round a 27 mm bar is further shut than a hand
+      // that has merely stopped holding a shape, so this runs the same two
+      // tables off the end rather than adding a third.
+      const g = thumb ? 1.30 : 1.52;
+      for (let j = 0; j < dg.joints.length; j++) {
+        const cc = Math.min(1.45, mix(flat[j], loose[j], g));
+        if (j === 0) {
+          dg.joints[j].rotation.set(dg.pitch + cc, 0, dg.fan * 0.15);
+        } else {
+          dg.joints[j].rotation.x = cc;
+        }
+      }
+    }
+  }
+
+  /**
+   * `ctx` is whichever water mode is running. Both of them are two arms in
+   * front of a camera and nothing else in the game is, so they share the
+   * scene, the material, the geometry and the draw — and differ only in what
+   * the joints are told.
+   */
+  function update(dt, ctx, camera) {
+    const swim = ctx && ctx.active && ctx.you && ctx.you.stroke !== undefined
+      ? ctx : null;
+    const ride = ctx && ctx.active && !swim ? ctx : null;
+    const on = !!(swim || ride);
     root.visible = on;
+    rig.visible = !!ride;
     if (!on) return;
+    if (ride) return updateRide(dt, ride, camera);
 
     // The view-model camera is the real one, minus its reach. Copied every
     // frame rather than shared, because the field of view is a control here —
@@ -622,6 +859,7 @@ function buildArms() {
     cam.updateProjectionMatrix();
 
     const you = swim.you;
+    body.position.set(0, 0, 0);
     root.position.copy(camera.position);
     // Yaw and pitch, no roll. A prone swimmer's shoulders follow the head down
     // when it looks down — that is what makes a duck-dive read — but they do
@@ -644,7 +882,74 @@ function buildArms() {
       // The wrist leads the hand into the water and trails it out, which is
       // the only part of a stroke anybody can see the point of from inside it.
       a.wrist.rotation.set(c.twist * 0.8, 0, c.twist * 0.5 * a.side);
+
+      // And the hand on the end of it.
+      //
+      // Staggered, because four fingers that curl on the same frame are one
+      // paddle with lines drawn on it — which is exactly what the welded
+      // version looked like and exactly the complaint it earned. Each finger
+      // lags the one before by about a hundredth of a cycle, and the little
+      // finger travels a fifth further than the index, because a hand letting
+      // go does not let go all at once or evenly.
+      for (const d of a.digits) {
+        const thumb = d.kind === 'thumb';
+        const lag = thumb ? 0.03 : d.i * 0.012;
+        // The scull is what is left when there is no stroke: a floating hand
+        // is never still, it opens and closes very slightly the whole time,
+        // and a still one reads as a prop somebody is holding.
+        const s = amp * grip(((u - lag) % 1 + 1) % 1)
+          + (1 - amp) * (0.42 + 0.14 * Math.sin(u * Math.PI * 2 - d.i * 0.6));
+        const k = thumb ? 1 : 0.90 + 0.08 * d.i;
+        const flat = thumb ? ARMS.thumbFlat : ARMS.fingerFlat;
+        const loose = thumb ? ARMS.thumbLoose : ARMS.fingerLoose;
+        for (let j = 0; j < d.joints.length; j++) {
+          const c = mix(flat[j], loose[j], s) * k;
+          if (j === 0) {
+            // Together for the paddle, fanned when the hand is nothing.
+            d.joints[j].rotation.set(d.pitch + c, 0,
+              d.fan * mix(thumb ? 0.62 : 0.74, thumb ? 1.28 : 1.24, s));
+          } else {
+            d.joints[j].rotation.x = c;
+          }
+        }
+      }
     }
+  }
+
+  /**
+   * The same two arms, on a bar instead of in a stroke.
+   *
+   * The body does not roll here and the camera does — you counter-lean against
+   * the pull and your head stays a good deal squarer to the horizon than the
+   * board is — so this takes the heel back out of the shoulders exactly the
+   * way the swim takes the stroke roll out, and for the same reason.
+   */
+  function updateRide(dt, ride, camera) {
+    cam.fov = camera.fov;
+    cam.aspect = camera.aspect;
+    cam.position.copy(camera.position);
+    cam.quaternion.copy(camera.quaternion);
+    cam.updateProjectionMatrix();
+
+    const you = ride.you;
+    root.position.copy(camera.position);
+    // Yaw with the board and not with the head: turn to look at your kite and
+    // your arms stay on the bar, which is the entire point of the mode having
+    // a separate look in the first place.
+    // Yaw only. The camera already rolls with the edge — see `pose` in
+    // 59-ride.js — and rolling the shoulders as well rolled the bar twice, so
+    // it came out across the frame at twenty-five degrees instead of the nine
+    // the lean actually accounts for.
+    _e.set(0, you.yaw, 0, 'YXZ');
+    root.quaternion.setFromEuler(_e);
+    body.position.set(0, 0, -RIDE_LEAN);
+
+    rig.position.set(ARMS.barAt[0], ARMS.barAt[1] + 0.055 * you.pull,
+      ARMS.barAt[2] + 0.12 * you.pull);
+    rig.rotation.set(-0.24, 0, 0);
+
+    const pull = you.pull;
+    for (const a of sides) barPose(a, pull, you.t);
   }
 
   /**
@@ -668,10 +973,17 @@ function buildArms() {
     update, render,
     stats: () => ({
       on: root.visible ? 1 : 0,
-      // Two arms, three pieces each, and every piece is a lathe of six or
-      // seven sides — so this is a rounding error against a 3.4 M frame and
-      // the only reason to print it is to prove they are actually there.
-      pieces: sides.length * 3,
+      mode: rig.visible ? 'bar' : (root.visible ? 'swim' : 'off'),
+      // Two arms, three pieces each, plus fourteen finger and thumb bones a
+      // side — every one of them a lathe, so this is still a rounding error
+      // against a 3.4 M frame and the only reason to print it is to prove
+      // they are actually there.
+      pieces: sides.reduce((n, a) =>
+        n + 3 + a.digits.reduce((m, d) => m + d.joints.length, 0), 0),
+      // How open the near hand is right now, 0..1. The one number worth
+      // watching when this is wrong.
+      grip: sides.length
+        ? +sides[0].digits[0].joints[0].rotation.x.toFixed(3) : 0,
     }),
   };
 }

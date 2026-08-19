@@ -144,7 +144,8 @@ function stepLens(dt) {
   // fire is a smudge on a hill you cannot walk up, the Canadair is a speck,
   // and the beach you are trying to reach is a line. There is nothing you can
   // do about any of it except look, so let the looking be worth something.
-  const want = (state.phase === 'ground' || state.phase === 'swim')
+  const want = (state.phase === 'ground' || state.phase === 'swim'
+    || state.phase === 'ride')
     && (keys.has('KeyZ') || TOUCH.glook) ? 1 : 0;
   zoom = damp(zoom, want, LENS.ease, dt);
   if (zoom < 1e-4 && want === 0) zoom = 0;
@@ -234,6 +235,14 @@ addEventListener('keydown', (e) => {
   // board, which is right: they are the same act, once with an aeroplane
   // underneath you and once with a promenade. Only on foot; under a canopy you
   // already have one, and in the seat J is the key that does this.
+  // K is the kite, both ways, for the same reason E is the door both ways: one
+  // key, one idea, and you never have to remember which half of it you are in.
+  if (e.code === 'KeyK') {
+    e.preventDefault();
+    if (state.phase === 'ground') takeKite();
+    else if (state.phase === 'ride') dropKite();
+    return;
+  }
   if (e.code === 'KeyE' && state.phase === 'swim') { e.preventDefault(); wadeAshore(); return; }
   if (e.code === 'KeyU' && state.phase === 'ground') { e.preventDefault(); launchOut(); return; }
   // And Enter is the small one: running at the balcony rail, off it, and down
@@ -300,6 +309,15 @@ addEventListener('mousemove', (e) => {
     // and it is the field of view that decides how many pixels a radian is.
     const g = 0.0020 * flight.p.sens * (camera.fov / baseFov);
     ground.look(e.movementX * g, e.movementY * g);
+    return;
+  }
+  // On a board it is a head and nothing else. Steering is on the keys, which
+  // is not a compromise — see the note on `look` in 59-ride.js. The gain is
+  // the walking one rather than the swimming one, because you are standing up
+  // and the thing being turned is not lying down in a jacket.
+  if (state.phase === 'ride') {
+    const g = 0.0022 * flight.p.sens * (camera.fov / baseFov);
+    ride.look(e.movementX * g, e.movementY * g);
     return;
   }
   // And in the water, where it is a head again — a slower one, because the
@@ -567,7 +585,7 @@ function updateCamera(dt) {
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
   trees, landmarks, alerts, roads, rail, props, airfield, jadrija, ground, birds, eject,
-  mirror, mirrorP, swim, under, arms, kites, you;
+  mirror, mirrorP, swim, under, seabed, arms, kites, ride, you;
 /** You plus the three wingmen, as the birds see them. Built once, in boot(). */
 let birdFlush = [];
 
@@ -658,6 +676,8 @@ async function boot() {
   await step(70, 'load.sea');
   sea = buildSea(scene);
   under = buildUnder(scene);
+  seabed = buildBed(scene);
+  ride = buildRide(scene);
 
   await step(74, 'load.stone');
   resolveLandmarks();
@@ -1592,6 +1612,38 @@ function chuteAudio() {
 }
 
 /**
+ * Speed, and why.
+ *
+ * A speed on its own is a number that goes up and down for no reason anybody
+ * can see. The point of sail next to it is the reason, and it is the whole of
+ * what there is to learn here — the same power on the same water is thirty
+ * knots or nothing at all depending on one angle.
+ */
+function paintRideHud() {
+  if (!ride || !ride.active) return;
+  $('rd-kt').textContent = (ride.speed * 1.94384).toFixed(0);
+  const p = ride.point();
+  const el = $('rd-point');
+  // In the air the point of sail is not the thing you want to know, and there
+  // is exactly one thing that is. It takes the same slot rather than a new
+  // one, because a HUD that grows a line when something happens is a HUD that
+  // moves, and this one sits under a horizon that is already moving.
+  const air = ride.air;
+  if (air > 0.35) {
+    el.textContent = T('ride.air') + ' ' + air.toFixed(1) + ' m';
+    el.classList.remove('stall');
+    el.classList.add('air');
+  } else {
+    el.textContent = T('ride.' + p);
+    el.classList.toggle('stall', p === 'noGo');
+    el.classList.remove('air');
+  }
+  $('rd-hint').innerHTML = air > 0.35 ? T('ride.floating')
+    : p === 'noGo' ? T('ride.stalled')
+      : TK('ride.hint', 'ride.hintTouch');
+}
+
+/**
  * The two numbers, the wash, and the one hint.
  *
  * The wash is the whole picture and it is a `div`. It could have been a fog
@@ -1658,6 +1710,73 @@ function wadeAshore() {
   if (audio) audio.boots();
   paintDeviceText();
   toast(T('toast.ashore'));
+  return true;
+}
+
+/**
+ * Take one out.
+ *
+ * From the sand, which is where kites launch from, and it wants open water in
+ * front of you — so it walks out along the way you are facing looking for
+ * somewhere a board would actually go. If there is nothing there it says so
+ * and does nothing, which is the right answer on the wrong beach.
+ */
+function takeKite() {
+  if (state.phase !== 'ground' || !ride) return false;
+  const y = ground.you;
+  const fx = -Math.sin(y.yaw), fz = -Math.cos(y.yaw);
+  let got = null;
+  // Ahead first, because you are looking at the water you mean. Then a sweep,
+  // because nobody lines themselves up before pressing a key.
+  for (let a = 0; a <= 8 && !got; a++) {
+    const ang = (a === 0 ? 0 : (a % 2 ? 1 : -1) * Math.ceil(a / 2) * 0.42);
+    const c = Math.cos(ang), sn = Math.sin(ang);
+    const dx = fx * c - fz * sn, dz = fx * sn + fz * c;
+    for (let d = 12; d <= 70; d += 4) {
+      const x = y.x + dx * d, z = y.z + dz * d;
+      if (!isSea(x, z)) continue;
+      if (-groundAt(x, z) < 1.1) continue;
+      got = [x, z];
+      break;
+    }
+  }
+  if (!got || !ride.enter(got[0], got[1])) { toast(T('toast.noLaunch')); return false; }
+  ground.bail();
+  eject.reset();
+  state.phase = 'ride';
+  $('ground-hud').hidden = true;
+  $('hud').hidden = true;
+  $('chute-hud').hidden = true;
+  $('swim-hud').hidden = true;
+  $('ride-hud').hidden = false;
+  if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = true; $('stouch').hidden = false; }
+  if (!IS_TOUCH && !pointerLocked) grabPointer();
+  paintDeviceText();
+  toast(T('toast.onTheKite'));
+  return true;
+}
+
+/**
+ * And putting it down, which puts you in the sea.
+ *
+ * Not back on the beach. Letting go of a bar in the middle of the channel does
+ * not teleport anybody anywhere, and the swim mode is already the whole of
+ * what happens to a person in this water — so it is the one door out, and the
+ * shore is still reached the way the shore has always been reached.
+ */
+function dropKite(hard = false) {
+  if (state.phase !== 'ride' || !ride || !swim) return false;
+  const y = ride.you;
+  if (!swim.enter(y.x, y.z, y.yaw, -0.3)) return false;
+  ride.leave();
+  state.phase = 'swim';
+  $('ride-hud').hidden = true;
+  $('swim-hud').hidden = false;
+  if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = true; $('stouch').hidden = false; }
+  if (audio) audio.plunge(hard ? 1.15 : 0.8);
+  wasUnder = false;
+  paintDeviceText();
+  toast(T(hard ? 'toast.wipeout' : 'toast.offTheKite'));
   return true;
 }
 
@@ -2247,6 +2366,7 @@ let darkWant = 0;
 // through. Wider than either of the others, ramped rather than latched, and it
 // drives the near clip and nothing else — see `vik.hull`.
 let clipNear = 0;
+let cicadaGain = 0.05;
 // True while you are on foot inside the Jadrija field, which is the one place
 // the mission is allowed to stop happening. Set at the top of `frame`.
 let recess = false;
@@ -2491,6 +2611,28 @@ function frame() {
     updateMission(real);
   }
 
+  if (state.phase === 'ride') {
+    // The aeroplane is still going in somewhere behind you, same as under the
+    // canopy and in the water.
+    if (eject.active) flyDerelict(dt);
+    const out = ride.update(dt, {
+      fwd: (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0)
+        - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0) + TOUCH.sy,
+      side: (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0)
+        - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0) + TOUCH.sx,
+      sprint: keys.has('ShiftLeft') || keys.has('ShiftRight') || TOUCH.sfast,
+      down: keys.has('KeyC') || keys.has('ControlLeft') || TOUCH.sdown,
+      up: keys.has('Space') || TOUCH.sup,
+    });
+    // Off the end of the water. The mode does not argue about it — it puts you
+    // in the sea, which is where you would be.
+    // Off the end of the water, or down on your back from ten metres. Both
+    // put you in the sea, which is where they put you.
+    if (out) dropKite(out === 'wipeout');
+    else paintRideHud();
+    updateMission(real);
+  }
+
   if (state.phase === 'fly') {
     readKeys(dt);
     flight.update(dt, input);
@@ -2543,9 +2685,13 @@ function frame() {
   if (audio) audio.slowmo(state.phase === 'swim' ? 0 : zoom);
   if (camOverride) updateCamera(dt);
   else if (state.phase === 'ground') ground.pose(camera);
+  else if (state.phase === 'ride') ride.pose(camera);
   else if (state.phase === 'swim') swim.pose(camera);
   else if (state.phase === 'chute' || eject.active) eject.pose(camera);
   else if (state.phase !== 'intro') updateCamera(dt);
+  // After the pose, because the rig hangs off where you ended up rather than
+  // off where you were.
+  if (state.phase === 'ride') ride.draw();
   U.uCamPos.value.copy(camera.position);
   // How deep the eye itself is, which is what dims the water rather than
   // merely colouring it. Taken off the wave surface at your own position and
@@ -2561,7 +2707,11 @@ function frame() {
   // question asked of the object that owns the answer: the swim model sets it
   // when you enter the water and clears it when you leave, and there is nothing
   // for the phase to disagree with it about.
-  if (arms) arms.update(dt, swim, camera);
+  // One arm rig, two water modes. It works out which from what it is handed —
+  // see the note on `update` in 60-arms.js.
+  if (arms) {
+    arms.update(dt, state.phase === 'ride' ? ride : swim, camera);
+  }
   // Somebody else's afternoon, in the same wind as the fire. 46-kite.js.
   if (kites) kites.update(dt, camera);
 
@@ -2591,6 +2741,10 @@ function frame() {
   // the eye rather than on the phase, so a bale-out that puts the camera under
   // the surface for half a second gets it too.
   under.update(camera, U.uCamDepth.value, U.uCamDepth.value > 0.02, renderer, dt);
+  // Same gate as the dust: what is on the bottom is only ever seen from
+  // under the surface, and from above it the sea shader is what you are
+  // looking at rather than anything past it.
+  seabed.update(camera, U.uCamDepth.value > 0.02);
   // Wall time to spread, world time to burn. The only process in the game that
   // is racing the clock rather than racing you — see the note on `update` in
   // src/40-fire.js for why letting it slow would be a cheat and letting
@@ -2678,7 +2832,30 @@ function frame() {
     indoors += (inLatch - indoors) * Math.min(1, dt * 3.6);
     roomDark += (inLatch * darkWant - roomDark) * Math.min(1, dt * 3.6);
   }
-  if (afoot !== wasAfoot) { audio.cicadas(afoot, 0.05); wasAfoot = afoot; }
+  // The cicadas, and how far away they are — which until now was "never".
+  //
+  // They were a switch: on for the whole of being out of the aeroplane, at a
+  // fixed level, wherever you were. On the beach that is right and it is where
+  // it was written; a kilometre out in the channel it is a hillside of pines
+  // following you across open water at beach volume, which is what "the sound
+  // of cicadas is loud out deep at sea" is, and it is not something the depth
+  // curve could ever have fixed because the depth curve is about a surface and
+  // this is about a distance.
+  //
+  // So: off the shore distance field, the same one the swim autopilot steers
+  // down and the fire and the crowd already use. A hillside is a distributed
+  // source and falls off slower than a point — an inverse square would have
+  // them gone forty metres out, which is wrong the other way — so it is an
+  // inverse 1.8 power over a 130 m scale: full on the sand, half at 130 m,
+  // a twelfth at four hundred, and nothing at all by the time the far shore is
+  // the nearer one.
+  const cicD = afoot ? shoreAt(camera.position.x, camera.position.z) : 0;
+  const cicG = 0.05 / (1 + Math.pow(Math.max(0, cicD) / 130, 1.8));
+  if (afoot !== wasAfoot || (afoot && Math.abs(cicG - cicadaGain) > 0.0015)) {
+    cicadaGain = cicG;
+    audio.cicadas(afoot, cicG);
+    wasAfoot = afoot;
+  }
   // The beach, shut out by the wall. This used to make the cicadas *louder*
   // indoors on the theory that a quiet room is what you notice them in, and it
   // was the wrong theory: a changing hut with a hillside of cicadas at full
@@ -2701,7 +2878,10 @@ function frame() {
   // goes negative floating on a swell) reads as zero rather than as noise.
   if (audio) {
     const wet = swim && swim.active;
-    const w = wet ? Math.min(1, Math.max(0, swim.depth) / 1.1) : 0;
+    // Exponential, over about three metres rather than saturating at one.
+    // A ramp that was finished at 1.1 m is a ramp that answers "deeper" with
+    // "same", and deeper is the only thing the down key does.
+    const w = wet ? 1 - Math.exp(-Math.max(0, swim.depth) / 0.95) : 0;
     if (Math.abs(w - waterAt) > 0.004 || (wet ? 1 : 0) !== wetAt) {
       waterAt = w; wetAt = wet ? 1 : 0;
       audio.water(w, wetAt);
@@ -2743,7 +2923,26 @@ function frame() {
   // tenth of a second the wall is inside the clip again. Nothing pops, because
   // by that same guarantee there was never anything between the two positions
   // of the plane to pop in.
-  clipNear = Math.max(indoors, hullNow);
+  // The third surface you can put your face against is the bottom of the sea,
+  // and it was the one nobody had thought of. A swimmer is allowed within
+  // eighty centimetres of the bed and the front clip sits at 1.2 m, so looking
+  // down from there threw away every triangle of seabed under you and left the
+  // inside of the world showing through it — which is exactly what "I can see
+  // below the sea bed" is. Same treatment as a wall, off the same plane, and
+  // free: underwater the far end of the view is eighteen metres of green, so
+  // there is no far end left to spend depth precision on.
+  const bedNow = swim && swim.active
+    ? 1 - Math.min(1, Math.max(0, (swim.clearance - 0.7) / 1.7))
+    : 0;
+  // And a fourth: your own hands. A kite bar is 62 cm in front of your face
+  // and the four lines leave from it, so at the standing clip everything from
+  // the bar up to head height is inside the front plane and the lines arrive
+  // as four white poles that begin in mid-air. 0.38 m rather than the 0.06 a
+  // wall gets — the far end of this view is still four kilometres of town and
+  // does not want its depth thrown away, and 0.38 is all it takes to clear a
+  // pair of hands.
+  const rideNear = state.phase === 'ride' ? 0.72 : 0;
+  clipNear = Math.max(indoors, hullNow, bedNow, rideNear);
   const wantNear = 1.2 - 1.14 * clipNear;
   if (Math.abs(camera.near - wantNear) > 0.005) {
     camera.near = wantNear;
@@ -3000,6 +3199,8 @@ window.__fr = {
     ground: ground ? ground.stats() : null,
     swim: swim && swim.active ? swim.stats() : null,
     under: under ? under.stats() : null,
+    seabed: seabed ? seabed.stats() : null,
+    ride: ride && ride.active ? { ...ride.stats(), point: ride.point() } : null,
     arms: arms ? arms.stats() : null,
     kites: kites ? kites.stats() : null,
     props: props ? props.counts : null,
@@ -3231,6 +3432,53 @@ window.__fr = {
     stats: () => ({ ...computer.stats(), phase: comp ? comp.phase : null }),
   },
   /** The water. `dip` drops you in it wherever you name, for a look. */
+  /**
+   * The board. `on(x, z)` puts you on one at a point on the water without
+   * walking down a beach first, `tick` runs the mode's own clock, and `aim`
+   * turns the head — which here is genuinely not the same as turning the
+   * board, so both are exposed.
+   */
+  ride: {
+    stats: () => (ride ? { ...ride.stats(), point: ride.point() } : null),
+    raw: () => ride,
+    on: (x, z) => {
+      if (!ride || !ride.enter(x, z)) return null;
+      state.phase = 'ride';
+      $('chute-hud').hidden = true;
+      $('hud').hidden = true;
+      $('ground-hud').hidden = true;
+      $('swim-hud').hidden = true;
+      $('ride-hud').hidden = false;
+      paintRideHud();
+      return { ...ride.stats(), point: ride.point() };
+    },
+    /** Point the board itself, in radians, which a player cannot do directly. */
+    heading: (yaw) => {
+      if (!ride) return null;
+      ride.you.yaw = yaw;
+      return { ...ride.stats(), point: ride.point() };
+    },
+    aim: (look, pitch) => {
+      if (!ride) return null;
+      ride.you.look = look; ride.you.pitch = pitch;
+      return ride.stats();
+    },
+    tick: (secs, dtStep = 1 / 60, ctl = {}) => {
+      if (!ride || !ride.active) return null;
+      let out = null;
+      for (let t = 0; t < secs; t += dtStep) out = ride.update(dtStep, ctl) || out;
+      paintRideHud();
+      return { ...ride.stats(), point: ride.point(), out };
+    },
+    /** What the polar says about every heading, which is the whole model. */
+    polar: () => {
+      const o = [];
+      for (let d = 0; d <= 180; d += 15) {
+        o.push([d, +ridePolar(d * Math.PI / 180).toFixed(3)]);
+      }
+      return o;
+    },
+  },
   swim: {
     stats: () => (swim ? swim.stats() : null),
     raw: () => swim,

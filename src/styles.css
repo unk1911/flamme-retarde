@@ -1190,6 +1190,51 @@ html.touch .row input[type=range] { height: 22px; }
 }
 #under.on { opacity: 1; }
 
+/* On a board. Same furniture as the swim HUD — same place, same weight — so
+   the two water modes read as two doors in one building rather than as two
+   games. What is different is the middle line: the point of sail is a *state*
+   and it is the only thing on screen that changes colour, because "no go" is
+   not a reading, it is the answer to why nothing is happening. */
+#ride-hud {
+  position: fixed;
+  left: 50%;
+  bottom: 4.2vh;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .5em;
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .75);
+}
+#ride-hud[hidden] { display: none; }
+#rd-point {
+  font-size: .66rem;
+  letter-spacing: .30em;
+  text-transform: uppercase;
+  opacity: .92;
+  padding: .18em .7em;
+  border: 1px solid rgba(255, 255, 255, .28);
+}
+/* The one warning in the mode, and it borrows the aeroplane's amber for the
+   same reason the autopilot light does: it is already what this game means by
+   "this is not working and you can fix it". */
+#rd-point.stall {
+  color: var(--ember-hi);
+  border-color: rgba(224, 195, 138, .55);
+  background: rgba(224, 195, 138, .12);
+}
+/* And in the air, which is the only other state the mode has. Cool rather
+   than warm, because it is not a warning — it is the good thing happening. */
+#rd-point.air {
+  color: #cfeef2;
+  border-color: rgba(207, 238, 242, .55);
+  background: rgba(207, 238, 242, .12);
+}
+#rd-hint { min-height: 1.2em; opacity: .9; }
+html.touch #ride-hud { bottom: 7.4rem; }
+
 #swim-hud {
   position: fixed;
   left: 50%;

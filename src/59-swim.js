@@ -51,7 +51,28 @@ const SWIM = {
   // and why coming up is never the problem.
   rise: 1.30,
   dive: 1.60,
-  maxDepth: 24,
+
+  // And what a deliberate kick down is worth, which is emphatically not the
+  // same number.
+  //
+  // It used to be the dive figure for both, and that made holding the down key
+  // an argument the key lost. The jacket's lift saturates at 1.30 m/s, the
+  // kick was worth 1.36, and the difference between them is six centimetres a
+  // second — so you sank to about three metres over ten seconds and then, to
+  // anyone actually playing, simply stopped, hung there, and got floated back
+  // up when the breath ran out. Every part of that was working as written and
+  // the writing was wrong: a person kicking down beats a buoyancy aid, that is
+  // what kicking is for, and the thing that should stop you is the bottom or
+  // your own lungs and never a stalemate you cannot see.
+  //
+  // 2.55 against a lift of 1.30 is a net 1.25 m/s down and it stays 1.25 m/s
+  // down for as long as you hold it.
+  kick: 2.55,
+
+  // How far down it is allowed to go at all. Not a physical limit — the bed
+  // stops you long before this nearly everywhere — but the channel proper is
+  // forty metres in places and a cap of 24 was a lid you could feel.
+  maxDepth: 38,
 
   breath: 22,          // s under water before the jacket wins
   recover: 7,          // s on the surface to get all of it back
@@ -60,7 +81,14 @@ const SWIM = {
   // which is where anybody stops swimming and starts walking whether they
   // meant to or not.
   wade: 1.15,
-  bedClear: 0.45,      // and how close to it you may get before it stops you
+  // And how close to the bed you may get before it stops you. 45 cm was less
+  // than the world's own near plane, which is the whole of "I can see through
+  // the seabed": look down from there and every triangle of bottom is inside
+  // the front clip and thrown away, leaving you staring at the far side of
+  // nothing. The near plane comes in underwater now — see `clearance` — and
+  // this went up as well, because a face 45 cm off the sand has most of a
+  // swimmer already buried in it.
+  bedClear: 0.80,
 
   // The stroke. One cycle is a reach, a pull and a glide, and what you see of
   // it is the roll and the rise — the head goes up on the catch and down on
@@ -339,10 +367,13 @@ function buildSwim(sea) {
     // from, which is why looking at your own feet is how you get deep.
     let vy = SWIM.rise * (1 - Math.exp(-Math.max(0, you.depth) * 1.6));
     if (!you.spent) {
-      const push = (ctl.down ? 1 : 0) - (ctl.up ? 1 : 0);
       const aim = submerged ? -Math.sin(you.pitch) * Math.max(0, f) : 0;
-      vy -= SWIM.dive * (push * 0.85 + Math.max(0, -aim) * 0.9);
-      if (ctl.up) vy += SWIM.rise * 0.55;
+      // Held down is a flat kick and not a nudge against the lift — see the
+      // note on `kick`. Pointing down still adds to it, so looking at your own
+      // feet and swimming is still the fast way to the bottom.
+      if (ctl.down) vy -= SWIM.kick;
+      if (ctl.up) vy += SWIM.dive * 0.85 + SWIM.rise * 0.55;
+      vy -= SWIM.dive * Math.max(0, -aim) * 0.9;
     }
     you.vy += (vy - you.vy) * (1 - Math.exp(-3.0 * dt));
 
@@ -409,6 +440,12 @@ function buildSwim(sea) {
     /** True once your eyes are under, which is what the tint is hung off. */
     get submerged() { return active && you.depth > SWIM.under; },
     get depth() { return Math.max(0, you.depth); },
+    /**
+     * How far the eye is above the bed, in metres, or a big number when there
+     * is no swimming going on. The near plane is hung off this: the bottom is
+     * the only thing in the sea you can put your face against.
+     */
+    get clearance() { return active ? Math.max(0, you.y - bedAt(you.x, you.z)) : 99; },
     get breath() { return you.breath; },
     get spent() { return you.spent; },
     get auto() { return auto; },

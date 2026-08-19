@@ -1656,7 +1656,90 @@ function buildAudio() {
     // stopped being underwater and started being broken.
     subG.gain.setTargetAtTime(1 - 0.95 * subV, t, 0.10);
     subLp.frequency.setTargetAtTime(20000 * Math.pow(380 / 20000, subV), t, 0.10);
+    // And what fills the hole that leaves.
+    underBed(subV);
     applyOut(0.25);
+  }
+
+  /**
+   * What it sounds like down there, once everything up here has stopped.
+   *
+   * Shutting the world out properly leaves a hole. Take the beach 60 dB down
+   * and put the master through a 380 Hz lowpass at a twentieth of its level
+   * and three metres under is very nearly silence, and silence is not what
+   * being underwater sounds like — it is what a bug sounds like. Anyone who
+   * has actually put their head under knows the two things that are down
+   * there: a wide low hiss with no direction in it at all, which is the swell
+   * working the whole bottom at once, and your own bubbles.
+   *
+   * It hangs off `slowLp`, downstream of the surface muffle, because it is
+   * already on this side of the surface. Putting it on the master would have
+   * the sea attenuate the sea.
+   */
+  let underNodes = null, bubbleAt = 0, underV = 0;
+  function underBed(level) {
+    underV = sat(level);
+    if (!ctx || dead || !slowLp) return;
+    const t = ctx.currentTime;
+    if (!underNodes) {
+      if (underV < 0.01) return;
+      const src = ctx.createBufferSource();
+      src.buffer = noiseBuf; src.loop = true;
+      // 190 Hz and no resonance. Everything above it is the surface's and the
+      // surface is not here.
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 190; lp.Q.value = 0.5;
+      // And a shelf out of the very bottom, or it reads as a fault on the
+      // amplifier rather than as water.
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 42; hp.Q.value = 0.5;
+      const g = ctx.createGain();
+      g.gain.value = 0.0001;
+      // A slow swell on it, because the sea is not a level.
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sine'; lfo.frequency.value = 0.13;
+      const lg = ctx.createGain(); lg.gain.value = 0.03;
+      lfo.connect(lg).connect(g.gain);
+      lfo.start(t);
+      src.connect(lp).connect(hp).connect(g).connect(slowLp);
+      src.start(t);
+      underNodes = { src, g };
+    }
+    underNodes.g.gain.setTargetAtTime(0.075 * underV, t, 0.35);
+  }
+
+  /**
+   * Your own bubbles, one small train at a time.
+   *
+   * The same rising sine as the ditching plunge — a bubble's pitch goes *up*
+   * as it leaves and expands, and that rise is the entire cue — but three or
+   * four of them instead of thirty, every few seconds, and never quite on the
+   * same interval twice. Regular bubbles are a machine.
+   */
+  function bubbleTrain(dt) {
+    if (!ctx || dead || underV < 0.06) { return; }
+    bubbleAt -= dt;
+    if (bubbleAt > 0) return;
+    bubbleAt = 1.6 + Math.random() * 3.4;
+    const t0 = ctx.currentTime + 0.02;
+    let at = t0;
+    const n = 2 + (Math.random() * 4) | 0;
+    for (let i = 0; i < n; i++) {
+      const f = 260 + Math.random() * 820;
+      const d = 0.022 + Math.random() * 0.045;
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f, at);
+      o.frequency.exponentialRampToValueAtTime(f * (1.35 + Math.random()), at + d);
+      const bg = ctx.createGain();
+      bg.gain.setValueAtTime(0.0001, at);
+      bg.gain.exponentialRampToValueAtTime(
+        0.028 * underV * (0.35 + Math.random() * 0.65), at + d * 0.25);
+      bg.gain.exponentialRampToValueAtTime(0.0001, at + d);
+      o.connect(bg).connect(slowLp);
+      o.start(at); o.stop(at + d + 0.01);
+      at += 0.030 + Math.random() * 0.10;
+    }
   }
 
   /**
@@ -1675,15 +1758,28 @@ function buildAudio() {
     // that reflects almost all of it back up the hill, and the half of every
     // second your ears spend under takes the rest. It was audible here and it
     // should not have been.
-    const x = Math.max(roomV, Math.min(1, 0.90 * wetV + 0.22 * subV));
-    // 18 dB down the moment you are in it, 32 down under it. That is a long
-    // way and it is meant to be: the point of the water is that the beach
-    // stops, and a beach you can still make out is a beach that never stopped.
-    outBus.gain.setTargetAtTime(1 - 0.975 * x, t, tau);
-    // And 460 Hz rather than 900, because what survives the surface is the
-    // bottom of the men's line and nothing above it — no consonants, no
-    // cicadas at all, which live at 4 kHz and are simply gone.
-    outLp.frequency.setTargetAtTime(20000 * Math.pow(460 / 20000, x), t, tau);
+    // Two surfaces, and they were being added together as if they were one.
+    //
+    // The first is being in the water at all: your ears are at the waterline,
+    // half of every second one of them is under, and the klapa is arriving
+    // across the water at a grazing angle off a surface that reflects almost
+    // all of it back up the hill. That is worth 24 dB and it happens the
+    // moment you are in, before you have gone anywhere.
+    //
+    // The second is depth, and depth is *exponential* — it is absorption
+    // through a medium and absorption is always exp(-kd). Written as a ramp
+    // that saturated at 1.1 m it had no answer at all to "I went deeper and it
+    // did not get quieter", because a metre down there was nothing left to
+    // give and everything below that was the same. Now every metre takes
+    // another fixed fraction of what is left: 17 dB at one metre, 34 at two,
+    // and by three the hillside is 60 dB under the water and simply not there.
+    const x = Math.max(roomV, Math.min(1, 0.85 * wetV));
+    outBus.gain.setTargetAtTime(
+      (1 - 0.94 * x) * Math.pow(0.012, subV), t, tau);
+    // And what is left of it is the bottom of the men's line and nothing above
+    // it — no consonants, and no cicadas at all, which live at 5 kHz.
+    outLp.frequency.setTargetAtTime(
+      20000 * Math.pow(500 / 20000, x) * Math.pow(0.22, subV), t, tau);
   }
 
   /**
@@ -2083,6 +2179,7 @@ function buildAudio() {
     // two kilometres away is dancing.
     fireTick(dt);
     radioTick();
+    bubbleTrain(dt);
     // `dead` means your aeroplane is over. It used to mean the mixer was
     // switched off, and conflating those two is the whole of "the water only
     // hisses if I arrive by the 9 key".
@@ -2353,6 +2450,13 @@ function buildAudio() {
         outHz: outLp ? Math.round(outLp.frequency.value) : -1,
         sub: subG ? +subG.gain.value.toFixed(3) : -1,
         subHz: subLp ? Math.round(subLp.frequency.value) : -1,
+        under: underNodes ? +underNodes.g.gain.value.toFixed(4) : 0,
+        // The hillside, and how far away it is being told it is. This one is
+        // here because it failed the silent way for the whole of the project
+        // so far: it is not a bed update() writes, it is a switch somebody
+        // flips on the frame you leave the aeroplane, and a switch has no
+        // value to print and so nobody ever printed it.
+        cicada: cicadaNodes ? +cicadaNodes.g.gain.value.toFixed(4) : 0,
         dead, master: master ? +master.gain.value.toFixed(3) : -1,
       };
     },

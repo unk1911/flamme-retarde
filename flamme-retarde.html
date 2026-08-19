@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.82.0">
+<meta name="version" content="1.83.0">
 <meta name="build-date" content="2026-08-19">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -1204,6 +1204,51 @@ html.touch .row input[type=range] { height: 22px; }
 }
 #under.on { opacity: 1; }
 
+/* On a board. Same furniture as the swim HUD — same place, same weight — so
+   the two water modes read as two doors in one building rather than as two
+   games. What is different is the middle line: the point of sail is a *state*
+   and it is the only thing on screen that changes colour, because "no go" is
+   not a reading, it is the answer to why nothing is happening. */
+#ride-hud {
+  position: fixed;
+  left: 50%;
+  bottom: 4.2vh;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .5em;
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .75);
+}
+#ride-hud[hidden] { display: none; }
+#rd-point {
+  font-size: .66rem;
+  letter-spacing: .30em;
+  text-transform: uppercase;
+  opacity: .92;
+  padding: .18em .7em;
+  border: 1px solid rgba(255, 255, 255, .28);
+}
+/* The one warning in the mode, and it borrows the aeroplane's amber for the
+   same reason the autopilot light does: it is already what this game means by
+   "this is not working and you can fix it". */
+#rd-point.stall {
+  color: var(--ember-hi);
+  border-color: rgba(224, 195, 138, .55);
+  background: rgba(224, 195, 138, .12);
+}
+/* And in the air, which is the only other state the mode has. Cool rather
+   than warm, because it is not a warning — it is the good thing happening. */
+#rd-point.air {
+  color: #cfeef2;
+  border-color: rgba(207, 238, 242, .55);
+  background: rgba(207, 238, 242, .12);
+}
+#rd-hint { min-height: 1.2em; opacity: .9; }
+html.touch #ride-hud { bottom: 7.4rem; }
+
 #swim-hud {
   position: fixed;
   left: 50%;
@@ -1280,8 +1325,8 @@ html.touch .row input[type=range] { height: 22px; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.82.0, built 2026-08-19">
-    <b>v1.82.0</b><i>·</i><span>2026-08-19</span>
+  <div id="build" title="Flamme Retardé 1.83.0, built 2026-08-19">
+    <b>v1.83.0</b><i>·</i><span>2026-08-19</span>
   </div>
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
@@ -1397,6 +1442,18 @@ html.touch .row input[type=range] { height: 22px; }
     <small data-i18n="swim.breath">breath</small></div>
   <div id="sw-auto" hidden data-i18n="swim.auto">AUTO</div>
   <div id="sw-hint"></div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── on a board ── -->
+<!-- Two things, and only two: how fast you are going, and where that heading
+     sits against the wind. Speed is in knots because everybody on the water
+     counts in knots, and the point of sail is the whole game — it is the
+     number that says why you are going that fast, which a speed alone never
+     does. -->
+<div id="ride-hud" hidden>
+  <div class="gauge"><b id="rd-kt">0</b><span data-i18n="ride.kt">knots</span></div>
+  <div id="rd-point"></div>
+  <div id="rd-hint"></div>
 </div>
 
 <!-- ────────────────────────────────────────────────────── under the canopy ── -->
@@ -1624,7 +1681,7 @@ html.touch .row input[type=range] { height: 22px; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.82.0", date: "2026-08-19" };</script>
+<script>const BUILD = { v: "1.83.0", date: "2026-08-19" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -2524,6 +2581,22 @@ const STRINGS = {
     'ground.disembarkTouch': '<b>OUT</b> to fight it on foot',
 
     // in the water
+    // on a board
+    'ride.kt': 'knots',
+    'ride.noGo': 'NO GO',
+    'ride.upwind': 'UPWIND',
+    'ride.reach': 'REACH',
+    'ride.downwind': 'DOWNWIND',
+    'ride.hint': '<b>A D</b> steer · <b>Shift</b> power · <b>Space</b>/<b>C</b> fly the kite · <b>K</b> let go',
+    'ride.hintTouch': 'stick steers · <b>FAST</b> powers up · <b>UP</b> and <b>DIVE</b> fly the kite',
+    'ride.air': 'AIR',
+    'ride.floating': 'keep the kite up to hang · <b>C</b> to come down with speed',
+    'toast.wipeout': 'Landed flat from that height. The sea took the rest of it.',
+    'ride.sendHint': '<b>Space</b> with the kite up and speed under you is a jump',
+    'ride.stalled': 'too close to the wind — bear away',
+    'toast.onTheKite': 'You have the bar. Across the wind, never into it.',
+    'toast.offTheKite': 'Kite down. You are in the water.',
+    'toast.noLaunch': 'Nowhere to launch from here — you want open water in front of you.',
     'swim.depth': 'm down',
     'swim.breath': 'breath',
     'swim.hint': '<b>W A S D</b> swim · <b>C</b> dive · <b>Space</b> up · <b>Z</b> look · <b>T</b> auto',
@@ -2800,6 +2873,22 @@ const STRINGS = {
     'ground.disembark': '<b>E</b> za izlazak i gašenje pješice',
     'ground.disembarkTouch': '<b>VAN</b> za gašenje pješice',
 
+    // na dasci
+    'ride.kt': 'čvorova',
+    'ride.noGo': 'MRTVI KUT',
+    'ride.upwind': 'UZ VJETAR',
+    'ride.reach': 'BOČNO',
+    'ride.downwind': 'NIZ VJETAR',
+    'ride.hint': '<b>A D</b> upravljanje · <b>Shift</b> snaga · <b>Space</b>/<b>C</b> zmaj · <b>K</b> pusti',
+    'ride.hintTouch': 'palica upravlja · <b>BRZO</b> daje snagu · <b>GORE</b> i <b>DOLJE</b> lete zmaja',
+    'ride.air': 'ZRAK',
+    'ride.floating': 'drži zmaja gore da lebdiš · <b>C</b> za brz doskok',
+    'toast.wipeout': 'Doskok na ravno s te visine. Ostalo je uzelo more.',
+    'ride.sendHint': '<b>Space</b> sa zmajem gore i brzinom pod sobom je skok',
+    'ride.stalled': 'preblizu vjetru — otpadni',
+    'toast.onTheKite': 'Držiš šipku. Popreko na vjetar, nikad u njega.',
+    'toast.offTheKite': 'Zmaj je dolje. U moru si.',
+    'toast.noLaunch': 'Odavde se ne može krenuti — treba ti otvorena voda pred sobom.',
     'swim.depth': 'm dubine',
     'swim.breath': 'dah',
     'swim.hint': '<b>W A S D</b> plivaj · <b>C</b> roni · <b>Space</b> gore · <b>Z</b> pogled · <b>T</b> auto',
@@ -3067,6 +3156,22 @@ const STRINGS = {
     'ground.disembark': '<b>E</b> pour descendre et lutter à pied',
     'ground.disembarkTouch': '<b>PIED</b> pour lutter à pied',
 
+    // sur la planche
+    'ride.kt': 'nœuds',
+    'ride.noGo': 'VENT DEBOUT',
+    'ride.upwind': 'AU PRÈS',
+    'ride.reach': 'TRAVERS',
+    'ride.downwind': 'VENT ARRIÈRE',
+    'ride.hint': '<b>A D</b> diriger · <b>Shift</b> puissance · <b>Space</b>/<b>C</b> l\'aile · <b>K</b> lâcher',
+    'ride.hintTouch': 'le stick dirige · <b>VITE</b> donne la puissance · <b>HAUT</b> et <b>BAS</b> pilotent l\'aile',
+    'ride.air': 'AIR',
+    'ride.floating': 'garde l\'aile haute pour planer · <b>C</b> pour redescendre vite',
+    'toast.wipeout': 'Réception à plat de cette hauteur. La mer a pris le reste.',
+    'ride.sendHint': '<b>Space</b> avec l\'aile haute et de la vitesse, c\'est un saut',
+    'ride.stalled': 'trop près du vent — abats',
+    'toast.onTheKite': 'Tu tiens la barre. En travers du vent, jamais dedans.',
+    'toast.offTheKite': 'Aile à l\'eau. Tu nages.',
+    'toast.noLaunch': 'Impossible de partir d\'ici — il faut de l\'eau libre devant toi.',
     'swim.depth': 'm de fond',
     'swim.breath': 'souffle',
     'swim.hint': '<b>W A S D</b> nager · <b>C</b> plonger · <b>Space</b> remonter · <b>Z</b> voir · <b>T</b> auto',
@@ -5685,6 +5790,422 @@ void main(){
     where: () => shoals.filter((s) => s.live).map((s) => ({
       at: [+s.x.toFixed(1), +s.y.toFixed(1), +s.z.toFixed(1)],
       spread: +s.spread.toFixed(2) })) };
+}
+
+// ==== 27-bed.js =================================================
+// -----------------------------------------------------------------------------
+// What is actually on the bottom.
+//
+// The seabed had a problem that no amount of shading was ever going to fix,
+// and the last pass at it proved that by fixing everything else. It got ripple
+// marks, boulder relief, weed mottling and a normal that the light moves
+// across — and it still read flat, because every one of those is paint. The
+// terrain under it is a 6.35 m height texel drawn at a 5 m quad: at swimming
+// range that is one flat triangle underneath you, and a flat triangle with a
+// beautiful picture on it is a floor with a rug.
+//
+// You cannot displace your way out of it either. Getting geometric relief at
+// the scale a swimmer sees would mean a height field two orders of magnitude
+// finer over the whole 13 km world, which is not a seabed, it is a second
+// terrain system.
+//
+// So: put things on it. This is what actually makes a bottom read as a bottom,
+// and it is what is genuinely down there off Jadrija — bare karst limestone
+// broken into blocks, and between the blocks the posidonia, which is the thing
+// that makes the Adriatic the Adriatic. Neither of them is subtle and neither
+// of them is expensive: two hundred-odd lumps and three hundred-odd clumps,
+// instanced, inside the twenty metres you can see through.
+//
+// Placed by hash off a fixed world grid rather than scattered around the
+// camera, which is the one decision in here that matters. The fish may be
+// re-placed behind you because a fish that moves is a fish; a rock that moves
+// is the game admitting it. Look away from a boulder and back at it and it is
+// the same boulder, in the same place, at the same angle, because its position
+// is a function of the cell it is in and nothing else.
+// -----------------------------------------------------------------------------
+
+const BEDROCK = {
+  // How far out to populate. The extinction has everything by about eighteen
+  // metres, so twenty-six is a comfortable margin and the edge of the field is
+  // never a place you can watch things arrive at.
+  reach: 26,
+  cell: 3.0,           // m — one candidate of each kind per cell
+  // Stones. There are a great many more of these than there are boulders and
+  // that is not a stylistic choice — a limestone bottom is broken rock, and
+  // what it is mostly broken into is fist-sized. They are the layer that makes
+  // the bed stop being a surface: a hundred small solids with their own
+  // shadows, at the scale your eye uses to judge how far away a floor is.
+  gravelCap: 620,
+  // How far you may travel before the field is worked out again. Two metres of
+  // swimming at 1.15 m/s is under two seconds, and a rebuild is a few hundred
+  // height lookups — cheaper than one frame of the trees.
+  refresh: 2.0,
+  rockCap: 190,        // per variant
+  weedCap: 1150,
+  clump: 6,            // weed clumps per cell that grows any
+};
+
+/**
+ * A boulder.
+ *
+ * An icosahedron pushed about by three lobes of trigonometry and then squashed,
+ * because a rock on a seabed is wider than it is tall — it has been lying that
+ * way since the last ice age and the sea has taken the top off it. Kept
+ * non-indexed and re-normalled flat: karst breaks along bedding planes and
+ * comes apart in blocks, so faceted is not a compromise here, it is the shape.
+ *
+ * Three of them are built with different seeds. Instancing gives one geometry
+ * per draw, and one lump under every rotation in the world still reads as one
+ * lump repeated — the eye finds the silhouette long before it finds the
+ * colour. Three costs two extra draw calls and buys a beach.
+ */
+function bedBoulder(seed) {
+  // Two subdivisions rather than one. At one, a rock you can swim up to is
+  // eighty facets across a metre and a half and the facets are the first
+  // thing you see; karst is angular but it is not a d20.
+  const g = new THREE.IcosahedronGeometry(0.5, 2);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const l = Math.hypot(x, y, z) || 1;
+    const nx = x / l, ny = y / l, nz = z / l;
+    // Displacement is a function of the *direction* only, so the duplicated
+    // vertices a non-indexed polyhedron shares along every edge all move to
+    // the same place and the solid stays closed.
+    let r = 1
+      + 0.26 * Math.sin(nx * 3.1 + seed) * Math.cos(nz * 2.7 - seed * 1.7)
+      + 0.17 * Math.sin(ny * 4.3 - seed * 2.1)
+      + 0.11 * Math.sin((nx + nz) * 6.1 + seed * 3.3)
+      + 0.07 * Math.cos((ny - nx) * 8.7 + seed * 5.1);
+    // Flatter across the top and bottom than across the middle.
+    r *= 1 - 0.24 * ny * ny;
+    p.setXYZ(i, nx * r * 0.5, ny * r * 0.36, nz * r * 0.5);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+/**
+ * One clump of posidonia.
+ *
+ * Ribbon blades off a common root, each leaning a different way and arcing
+ * over as it goes up — a blade is not a spike, it is a strap that stands up
+ * because it is buoyant and lies over because it is long. Fourteen of them,
+ * which is about what one shoot carries, with the root end dark and half
+ * buried in its own litter and the tip end the pale olive that the light
+ * actually reaches.
+ *
+ * Vertex colour carries root-to-tip; the instance colour carries clump-to-
+ * clump, so a meadow is not one shade of anything.
+ */
+function bedWeed(seed) {
+  const S = 4, BL = 30;
+  const pos = [], col = [], idx = [];
+  let n = 0;
+  // Its own generator, so a clump is the same clump every time the file loads
+  // and the two builds of the same seed agree.
+  let st = seed * 9301 + 49297;
+  const rnd = () => ((st = (st * 9301 + 49297) % 233280) / 233280);
+
+  const ROOT = [0.116, 0.128, 0.070], TIP = [0.360, 0.430, 0.180];
+
+  for (let b = 0; b < BL; b++) {
+    const a = rnd() * Math.PI * 2;
+    const lean = 0.30 + rnd() * 0.70;
+    // Shorter and many more of them. The first pass ran to eighty centimetres
+    // on fourteen blades off a root the size of a coin, and eighty centimetres
+    // of anything at that spacing is not a meadow, it is a stand of bamboo —
+    // you could see the bottom between every blade. Posidonia off this coast
+    // is knee-high at most and grows in a mat you cannot see through.
+    const h = 0.17 + rnd() * 0.27;
+    const rr = Math.sqrt(rnd()) * 0.10;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    // Across the blade, square to the plane it bends in.
+    const wx = -sa, wz = ca;
+    let cx = rr * ca, cy = 0, cz = rr * sa, dir = 0;
+    const step = h / S;
+    const first = n;
+    for (let s = 0; s <= S; s++) {
+      const t = s / S;
+      const w = 0.0195 * (1 - 0.48 * t);
+      for (const sgn of [-1, 1]) {
+        pos.push(cx + wx * w * sgn, cy, cz + wz * w * sgn);
+        col.push(ROOT[0] + (TIP[0] - ROOT[0]) * t,
+          ROOT[1] + (TIP[1] - ROOT[1]) * t,
+          ROOT[2] + (TIP[2] - ROOT[2]) * t);
+        n++;
+      }
+      if (s < S) {
+        const o = first + s * 2;
+        idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2);
+      }
+      // Integrated rather than solved: the tangent turns by a fixed amount per
+      // station, which is a blade of constant stiffness and is why the arc
+      // tightens toward the tip instead of being a circle.
+      dir += lean / S;
+      cx += Math.sin(dir) * step * ca;
+      cz += Math.sin(dir) * step * sa;
+      cy += Math.cos(dir) * step;
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aVCol', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+/**
+ * A stable hash for a cell. Integer in, 0..1 out, and the same answer for the
+ * same cell for the lifetime of the world.
+ */
+function bedHash(i, j, k) {
+  let h = (i * 374761393 + j * 668265263 + k * 1442695041) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+function buildBed(scene) {
+  const uSway = { value: 0 };
+
+  const rockGeos = [bedBoulder(1.7), bedBoulder(4.9), bedBoulder(8.3)];
+  const rockMat = solidMaterial(new THREE.Color(1, 1, 1), {
+    instanced: true, vcol: false, spec: 0.05, specPower: 18,
+    // Karst underwater is not grey. It is pale where it is bare, and where it
+    // is not bare it is under a film of turf algae that goes brown-green and
+    // sits on the up-faces, because that is where the light is. So the tint is
+    // hung off the world normal rather than painted on: the top of every rock
+    // in the field darkens and the overhangs stay pale, which is most of what
+    // tells you a rock is a solid and not a decal.
+    body: `
+      float up = clamp(vNormal.y, 0.0, 1.0);
+      // Browner and a good deal lighter-handed than the first pass, which took
+      // pale limestone all the way to 0.46,0.56,0.36 and then had the water
+      // put another green over the top of that. The result was jade. Turf
+      // algae is a brown film, and the rock under it is meant to keep winning.
+      base = mix(base, base * vec3(0.60, 0.58, 0.40), up * up * 0.40);
+      base *= 0.88 + 0.24 * fract(sin(dot(floor(vWorld.xz * 3.0),
+        vec2(12.9898, 78.233))) * 43758.5453);
+    `,
+  });
+  const weedMat = solidMaterial(new THREE.Color(1, 1, 1), {
+    instanced: true, spec: 0.16, specPower: 30,
+    side: THREE.DoubleSide,
+    uniforms: { uSway },
+    decl: 'uniform float uSway;',
+    // The surge, and it is a surge and not a breeze. Weather moves air in
+    // gusts that travel; a swell moves the whole column back and forth
+    // together, so a meadow leans one way, stops, and leans the other, and
+    // every clump in sight does it at once. The phase offset off the instance
+    // position is small on purpose — enough that the field is not a single
+    // rigid object, not so much that it stops being one water.
+    vert: `
+      float hgt = clamp(p.y / 0.42, 0.0, 1.0);
+      float ph = dot(aInstPos.xz, vec2(0.021, 0.017));
+      float s = sin(uSway * 0.62 + ph) * 0.62 + sin(uSway * 0.37 + ph * 1.9) * 0.28;
+      // Quadratic in height, so the root stays where it is planted and the tip
+      // does all the travelling — which is what being anchored looks like.
+      p.x += s * hgt * hgt * 0.13;
+      p.z += s * 0.62 * hgt * hgt * 0.13;
+    `,
+    body: 'base *= vVCol;',
+  });
+
+  const layers = [];
+  const mk = (geo, mat, cap) => {
+    const g = new THREE.InstancedBufferGeometry();
+    for (const k of ['position', 'normal', 'aVCol']) {
+      if (geo.attributes[k]) g.setAttribute(k, geo.attributes[k]);
+    }
+    g.setIndex(geo.index);
+    // Never culled: the field is placed around the camera and the bounding
+    // sphere of an instanced geometry is the *source* geometry's, which for a
+    // half-metre rock is half a metre at the origin.
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e9);
+    const a = {
+      pos: new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3),
+      rot: new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4),
+      scl: new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3),
+      col: new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3),
+    };
+    for (const [n2, at] of [['aInstPos', a.pos], ['aInstRot', a.rot],
+      ['aInstScale', a.scl], ['aInstColor', a.col]]) {
+      at.setUsage(THREE.DynamicDrawUsage);
+      g.setAttribute(n2, at);
+    }
+    const mesh = new THREE.Mesh(g, mat);
+    mesh.frustumCulled = false;
+    mesh.visible = false;
+    mesh.renderOrder = -1;
+    scene.add(mesh);
+    const L = { geo: g, mesh, a, cap, n: 0 };
+    layers.push(L);
+    return L;
+  };
+
+  const rocks = rockGeos.map((g) => mk(g, rockMat, BEDROCK.rockCap));
+  // Twenty faces each and six hundred of them: twelve thousand triangles for
+  // the whole gravel field, which is four thousandths of one frame. There is
+  // no argument against having it.
+  const gravel = [0, 1, 2].map((i) =>
+    mk(new THREE.IcosahedronGeometry(0.5, 0),
+      rockMat, BEDROCK.gravelCap / 3 | 0));
+  const weed = mk(bedWeed(3.1), weedMat, BEDROCK.weedCap);
+
+  const _q = new THREE.Quaternion();
+  const _e = new THREE.Euler();
+
+  function put(L, x, y, z, qx, qy, qz, qw, sx, sy, sz, r, g, b) {
+    if (L.n >= L.cap) return;
+    const i = L.n++;
+    L.a.pos.array[i * 3] = x; L.a.pos.array[i * 3 + 1] = y;
+    L.a.pos.array[i * 3 + 2] = z;
+    L.a.rot.array[i * 4] = qx; L.a.rot.array[i * 4 + 1] = qy;
+    L.a.rot.array[i * 4 + 2] = qz; L.a.rot.array[i * 4 + 3] = qw;
+    L.a.scl.array[i * 3] = sx; L.a.scl.array[i * 3 + 1] = sy;
+    L.a.scl.array[i * 3 + 2] = sz;
+    L.a.col.array[i * 3] = r; L.a.col.array[i * 3 + 1] = g;
+    L.a.col.array[i * 3 + 2] = b;
+  }
+
+  let builtX = 1e9, builtZ = 1e9;
+
+  function rebuild(cx, cz) {
+    for (const L of layers) L.n = 0;
+    const C = BEDROCK.cell, R = BEDROCK.reach;
+    const i0 = Math.floor((cx - R) / C), i1 = Math.floor((cx + R) / C);
+    const j0 = Math.floor((cz - R) / C), j1 = Math.floor((cz + R) / C);
+    for (let i = i0; i <= i1; i++) {
+      for (let j = j0; j <= j1; j++) {
+        // Jittered off the lattice, or the whole bottom is a chessboard.
+        const px = (i + 0.5 + (bedHash(i, j, 1) - 0.5) * 0.9) * C;
+        const pz = (j + 0.5 + (bedHash(i, j, 2) - 0.5) * 0.9) * C;
+        if (Math.hypot(px - cx, pz - cz) > R) continue;
+        const bed = groundAt(px, pz);
+        // Nothing above the waterline and nothing in the wash: the first half
+        // metre is where the swell scours and it is bare sand there in life.
+        if (bed > -0.8) continue;
+
+        // Two samples rather than four. The bottom is smooth at this scale by
+        // construction — that is the whole complaint — so the gradient is
+        // worth having and worth having cheaply.
+        const sl = Math.hypot(groundAt(px + 1.5, pz) - bed,
+          groundAt(px, pz + 1.5) - bed) / 1.5;
+
+        // Where the meadow is. A coarse hash on nine-metre blocks, which is
+        // roughly the scale posidonia actually grows at — beds with sand
+        // channels between them, not a lawn.
+        const patch = bedHash(Math.floor(i / 3), Math.floor(j / 3), 7);
+        // Rock likes slope and likes the shallows; weed wants the flats and
+        // will not grow past the light, which off here is about fifteen metres.
+        const rocky = Math.min(1, sl * 2.6) * 0.55 + 0.22
+          + 0.30 * Math.max(0, 1 + bed / 9);
+        const grassy = (1 - Math.min(1, sl * 3.4))
+          * Math.max(0, Math.min(1, (-bed - 0.9) / 1.4))
+          * Math.max(0, Math.min(1, (16 + bed) / 5));
+
+        // Gravel first, and nearly everywhere. Four to twenty-five
+        // centimetres, which is the size range that reads as ground rather
+        // than as objects sitting on ground.
+        for (let k = 0; k < 3; k++) {
+          const hg = bedHash(i * 11 + k, j * 5, 20);
+          if (hg > 0.72) continue;
+          const gx = px + (bedHash(i, j * 9 + k, 21) - 0.5) * C;
+          const gz = pz + (bedHash(i * 5 + k, j, 22) - 0.5) * C;
+          const gb = groundAt(gx, gz);
+          if (gb > -0.6) continue;
+          const gs = 0.13 + 0.34 * hg * hg;
+          _e.set((bedHash(i + k, j, 23) - 0.5) * 1.4,
+            bedHash(i, j + k, 24) * Math.PI * 2,
+            (bedHash(i * 2, j + k, 25) - 0.5) * 1.4, 'YXZ');
+          _q.setFromEuler(_e);
+          // Sat proud, plus a flat six centimetres, which is the opposite of
+          // what a stone does and is right anyway. The height this is placed
+          // against is the sampled bed; what gets drawn is a five-metre quad
+          // cutting through it, and on any slope the two disagree by more than
+          // a small stone is tall — so the first pass placed six hundred
+          // stones and you could see none of them. The boulders never noticed
+          // because a boulder is bigger than the error. A proportional lift
+          // does not fix it either: the error does not get smaller when the
+          // stone does, which is the whole of why it eats the small ones.
+          const gp = 0.38 + 0.22 * bedHash(i * 3, j + k, 26);
+          put(gravel[(bedHash(i, j + k, 27) * 3) | 0],
+            gx, gb + gs * 0.34 + 0.14, gz, _q.x, _q.y, _q.z, _q.w,
+            gs * 1.25, gs * 0.68, gs * 1.10, gp, gp * 0.99, gp * 0.91);
+        }
+
+        if (bedHash(i, j, 3) < rocky * 0.72) {
+          const h4 = bedHash(i, j, 4), h5 = bedHash(i, j, 5);
+          const L = rocks[(bedHash(i, j, 9) * 3) | 0];
+          // Blocks, not pebbles: 0.35 m to about 2 m across, weighted small,
+          // because a bottom of uniformly big rocks is a quarry.
+          // 0.28 m to about 1.1 m, weighted small. The first pass went to two
+          // metres before the per-axis stretch and then to nearly three after
+          // it, and a three-metre boulder at arm's length is not a seabed, it
+          // is a wall you have swum into.
+          const s = 0.26 + 0.68 * h4 * h4;
+          _e.set((h5 - 0.5) * 0.7, bedHash(i, j, 6) * Math.PI * 2,
+            (bedHash(i, j, 8) - 0.5) * 0.7, 'YXZ');
+          _q.setFromEuler(_e);
+          // Sunk by a third. Every rock that has been there any length of time
+          // has silted in, and a rock resting exactly on a surface is the
+          // oldest tell in the business.
+          // Darker than it looks in air. Nine metres down there is a tenth of
+          // the surface light left and limestone at a tenth of the light is a
+          // grey-green solid, not the white it is on the shore — the first
+          // pass had them at 0.6 to 0.86 and they came out as jade cliffs.
+          const pale = 0.36 + 0.22 * bedHash(i, j, 10);
+          put(L, px, bed + s * 0.36 * 0.62 - s * 0.13, pz,
+            _q.x, _q.y, _q.z, _q.w,
+            s * (0.78 + 0.38 * h5), s * (0.62 + 0.42 * h4), s * (0.78 + 0.38 * h4),
+            pale, pale * 0.99, pale * 0.90);
+        }
+
+        if (patch > 0.24 && grassy > 0.04) {
+          for (let k = 0; k < BEDROCK.clump; k++) {
+            const hk = bedHash(i * 7 + k, j, 11);
+            if (hk > grassy * (patch - 0.15) * 3.1) continue;
+            const ox = (bedHash(i, j * 5 + k, 12) - 0.5) * C * 0.9;
+            const oz = (bedHash(i * 3 + k, j, 13) - 0.5) * C * 0.9;
+            const bx = px + ox, bz = pz + oz;
+            const by = groundAt(bx, bz);
+            if (by > -0.8) continue;
+            _e.set(0, bedHash(i + k, j, 14) * Math.PI * 2, 0, 'YXZ');
+            _q.setFromEuler(_e);
+            const sc = 0.72 + 0.55 * bedHash(i, j + k, 15);
+            const tint = 0.82 + 0.34 * bedHash(i * 2, j + k, 16);
+            put(weed, bx, by - 0.04, bz, _q.x, _q.y, _q.z, _q.w,
+              sc, sc * (0.85 + 0.4 * hk), sc,
+              tint, tint * 1.04, tint * 0.86);
+          }
+        }
+      }
+    }
+    for (const L of layers) {
+      L.geo.instanceCount = L.n;
+      for (const k of ['pos', 'rot', 'scl', 'col']) L.a[k].needsUpdate = true;
+    }
+    builtX = cx; builtZ = cz;
+  }
+
+  function update(camera, on) {
+    for (const L of layers) L.mesh.visible = on;
+    if (!on) return;
+    const cx = camera.position.x, cz = camera.position.z;
+    if (Math.hypot(cx - builtX, cz - builtZ) > BEDROCK.refresh) rebuild(cx, cz);
+    uSway.value = U.uTime.value;
+  }
+
+  return {
+    update,
+    stats: () => ({
+      rocks: rocks.reduce((n, L) => n + L.n, 0),
+      gravel: gravel.reduce((n, L) => n + L.n, 0),
+      weed: weed.n,
+      at: [Math.round(builtX), Math.round(builtZ)],
+    }),
+  };
 }
 
 // ==== 30-material.js ============================================
@@ -28022,6 +28543,588 @@ function buildWaterFX(scene) {
   };
 }
 
+// ==== 59-ride.js ================================================
+// -----------------------------------------------------------------------------
+// Riding one.
+//
+// 46-kite.js put seven of them in the channel and said plainly that nobody
+// rides one yet. This is the other half: the same wind, the same water, the
+// same twelve-metre kite, with you underneath it.
+//
+// The thing that makes kiting kiting — and the thing a game gets wrong the
+// moment it treats a kite as a throttle — is that you are not driving. You are
+// being pulled by something that is downwind of you, and everything you can do
+// is about the *angle* between where you want to go and where the pull is
+// coming from. Point too close to the wind and there is nothing there; point
+// dead downwind and you can never go faster than the air that is pushing you;
+// and in the wide band between those two you go a great deal faster than the
+// wind, which is the whole trick and the reason anybody does it.
+//
+// So the speed here comes out of a polar and not out of a key. Holding the
+// power in on a beam reach is thirty knots. Holding exactly the same power
+// pointed forty degrees off the eye of the wind is nothing at all, and the
+// only thing that changed was the heading. Learning that by feel in ten
+// seconds of steering is the mode.
+//
+// Three notes on what is here.
+//
+// The wind is `U.uWind`, the same lebić that is pushing the fire up the
+// peninsula, and it is not a separate number. That matters: the direction you
+// can go fastest is a fact about the day, and the day was chosen for the fire.
+// Turning to look at where the smoke is going tells you which way you can ride.
+//
+// You launch from the sand, which is where kites launch from. Not from the
+// water — a kite on the water is a kite you are relaunching, and that is a
+// skill and a minute of your life, neither of which belongs in a key press.
+//
+// And letting go puts you in the sea rather than back on the beach, because
+// that is what letting go does. The swim mode is already the whole of what
+// happens to a person in this water, so it is the one door out.
+// -----------------------------------------------------------------------------
+
+const RIDE = {
+  eye: 1.52,             // m — standing on a board, eyes above the water
+  line: 24,              // same lines as everybody else's
+
+  // Speed. 17 m/s is 33 knots, which is a fast but entirely ordinary reach on
+  // a 12 m kite in nineteen knots of wind — a kitesurfer goes roughly twice
+  // the wind speed across it, and that surprises people who have only sailed.
+  top: 17.0,
+  accel: 1.15,           // how fast the board comes up to what the polar allows
+  slow: 2.2,             // and how fast it falls off it, which is much quicker
+
+  // The no-go. Forty-three degrees either side of the eye of the wind, which
+  // is about right for a twin-tip: a race board points higher, a beginner
+  // points a great deal lower, and neither of those is who this is.
+  noGo: 0.75,            // rad in from straight upwind
+
+  turn: 1.55,            // rad/s of yaw at a standstill
+  turnFast: 0.42,        // and what is left of it at full speed
+  edgeRate: 3.2,         // how fast the board comes on to its edge
+
+  // The kite in its window. It sits downwind of you by definition — that is
+  // what a kite is — and the elevation is the one thing you hold: low and
+  // forward for drive, high overhead for a jump.
+  elev: [0.30, 1.45],    // rad above the horizon
+  elevRest: 0.52,
+  elevRate: 1.05,        // rad/s the kite can be moved through the window
+  // How far round the window the kite is flown, from dead downwind toward the
+  // way you are going.
+  //
+  // This is the number the first pass had badly wrong, and getting it wrong
+  // put the kite behind the rider where it could not be seen and could not
+  // have pulled them anywhere. A kite lives in the hemisphere downwind of you
+  // — the window — and dead downwind, at the middle of it, is where it has the
+  // most raw pull and does nothing at all except drag you backwards. What a
+  // rider actually does is fly it out to the *edge* of the window, ninety
+  // degrees off the wind axis, where there is much less pull and nearly all of
+  // what is left points along the way you want to go. 1.05 rad is a shade
+  // inside that edge, which is where the useful compromise is and is where
+  // everybody parks it.
+  window: 1.05,
+
+  // Where the bar is, off the eye: out in front and down, which is where your
+  // hands are. It matters more than it sounds — lines drawn from the eye
+  // itself come out of the camera as two white wedges filling a third of the
+  // frame, which is what the first pass did.
+  // Out in front and down, and the same two numbers 60-arms.js hangs the
+  // drawn bar off — see ARMS.barAt. The world half of the rig and the view
+  // model half have to agree about where your hands are or the lines leave
+  // from somewhere your hands are not.
+  bar: [0.46, -0.23],
+  barW: 0.52,            // m across, which is a small bar and the common one
+
+  // ── the jump ────────────────────────────────────────────────────────────
+  //
+  // A kite jump is not a leap. Nothing pushes off anything: you edge hard
+  // against the pull, send the kite up through the top of the window, and the
+  // kite takes you with it — and then it holds you there, which is why the
+  // hang time is absurd compared to anything else a person does. Ten seconds
+  // is a real number for a big one.
+  //
+  // So the two halves of it are both about the kite and neither is about a
+  // key. It goes up because the kite went up and you were going fast enough to
+  // have something to convert; it comes down slowly while the kite is still
+  // overhead and quickly the moment you fly it forward again. Holding it up is
+  // float; diving it is coming down with speed to ride away on. Both of those
+  // are things you actually do, and they are the whole of the control.
+  sendAt: 1.12,          // rad — how high the kite must be to take you up
+  sendSp: 6.5,           // m/s — and how fast you must be going to matter
+  pop: [2.6, 0.44],      // base lift, plus this much per m/s of board speed
+  gFloat: 6.2,           // m/s² with the kite overhead holding you
+  gDive: 11.5,           // and with it flown forward, which is how you come down
+  land: [8.5, 13.5],     // vertical speed at which a landing costs you / ends you
+  reload: 0.9,           // s before the kite will take you up again
+
+  bob: 0.055,            // m of chop under a board doing thirty knots
+  // How far the whole picture leans on to the edge. 0.30 was seventeen degrees
+  // and it looked like thirty, because the eye reads a tilted *horizon* and
+  // this one is tilted against a sea that is itself moving. A kitesurfer's head
+  // does not stay square to the board either — you counter-lean, and what is
+  // left over at the eye is much less than what the board is doing.
+  heel: 0.16,
+
+  // Where you may be. Kiting happens on flat water inside the headland; run it
+  // up a beach and you are off.
+  minDepth: 0.9,
+};
+
+/**
+ * The polar: how much of the top speed this heading is worth.
+ *
+ * `off` is the angle between where you are pointing and where the wind is
+ * going — 0 is dead downwind, π is straight into it.
+ *
+ * Dead downwind is slow, because you cannot outrun the thing pushing you.
+ * Everything from a broad reach to close-hauled is fast. Inside the no-go
+ * there is nothing, and the fall into it is quick rather than gradual, because
+ * that is what it feels like: the power does not fade, it goes.
+ */
+function ridePolar(off) {
+  const edge = Math.PI - RIDE.noGo;
+  if (off >= edge) {
+    return Math.max(0, 1 - (off - edge) / 0.30) * 0.22;
+  }
+  const t = off / edge;
+  // Peak on a beam reach — about seventy-five degrees off dead downwind,
+  // which is where a twin-tip is quickest and is not where a boat is.
+  return 0.30 + 0.70 * Math.sin(Math.PI * Math.pow(t, 1.15));
+}
+
+function buildRide(scene) {
+  const group = new THREE.Group();
+  group.visible = false;
+  scene.add(group);
+
+  const cloth = new THREE.Color(0.93, 0.30, 0.10);
+  const canopy = new THREE.Mesh(kiteCanopy(),
+    solidMaterial(cloth, { spec: 0.20, specPower: 22, vcol: false,
+      side: THREE.DoubleSide }));
+  const board = new THREE.Mesh(kiteBoard(),
+    solidMaterial(new THREE.Color(0.92, 0.90, 0.86),
+      { spec: 0.42, specPower: 60, vcol: false }));
+  const lineMat = solidMaterial(new THREE.Color(0.82, 0.84, 0.86),
+    { spec: 0.10, vcol: false });
+  // Four, not two, because that is how many a kite has and because from
+  // underneath it is the only place you ever see that. And 6 mm rather than
+  // the 3 cm the scenery kites use: that number was chosen so a line would
+  // survive being two hundred metres away, and the same number three quarters
+  // of a metre from your own eye is a mooring rope. What is far away here is
+  // the *far* end.
+  const lines = [];
+  for (let i = 0; i < 4; i++) {
+    const m = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.0040, 0.0040, 1, 3, 1, true), lineMat);
+    m.geometry.translate(0, -0.5, 0);
+    lines.push(m);
+    group.add(m);
+  }
+  // The wake, the same tapered ribbon the AI riders leave, because from your
+  // own board it is the thing that tells you you are moving at all — flat
+  // water gives the eye nothing else.
+  const wake = new THREE.Mesh((() => {
+    const g = new THREE.PlaneGeometry(1, 1, 1, 8);
+    g.rotateX(-Math.PI / 2);
+    return g;
+  })(), solidMaterial(new THREE.Color(0.94, 0.97, 0.98),
+    { spec: 0, emissive: 0.35, vcol: false, transparent: true,
+      opacity: 0.55, depthWrite: false }));
+  wake.renderOrder = 2;
+  group.add(canopy, board, wake);
+  for (const m of [group, canopy, board, wake, ...lines]) m.frustumCulled = false;
+
+  const you = {
+    x: 0, z: 0, y: 0,
+    yaw: 0,              // where the board points
+    look: 0, pitch: 0,   // and where you are looking, which is not the same
+    sp: 0,
+    edge: 0,             // which way the board is on its edge, -1..1
+    steer: 0,
+    elev: RIDE.elevRest, // the kite, in its window
+    side: 1,             // which side of the wind you are on
+    // How hard the bar is held in, 0..1. Read by 60-arms.js as well, because
+    // the arms have to pull it to the same place the lines leave from.
+    pull: 0,
+    air: 0,              // m above the water — 0 is on it
+    vy: 0,
+    since: 0,            // s since the last landing
+    best: 0,             // and the highest you have been, which is the score
+    t: 0,
+  };
+  let active = false;
+
+  const _a = new THREE.Vector3();
+  const _b = new THREE.Vector3();
+  const _m = new THREE.Matrix4();
+  const _up = new THREE.Vector3(0, 1, 0);
+
+  /** Which way the true wind is going, as a unit vector on the water. */
+  function windDir() {
+    const w = U.uWind.value;
+    const l = Math.hypot(w.x, w.y) || 1;
+    return [w.x / l, w.y / l];
+  }
+
+  /**
+   * The apparent wind, which is the one the kite is actually in.
+   *
+   * This is not a refinement, it is the reason a kitesurfer's kite is in front
+   * of them. Standing still, the kite sits straight downwind and you can only
+   * see it by turning your head. Doing twenty-five knots across nineteen knots
+   * of breeze, the air you are flying in comes from a long way forward of where
+   * the weather says it does — so the kite swings forward with it and ends up
+   * roughly where you are looking. Modelling it puts the kite in the picture
+   * for free and by the right mechanism, rather than by nudging an angle until
+   * the kite happened to be on screen.
+   *
+   * Wind minus your own velocity, normalised. The same subtraction a sailmaker
+   * draws and a cyclist feels.
+   */
+  function appDir() {
+    const [wx, wz] = windDir();
+    const sp = U.uWindSpeed ? U.uWindSpeed.value : 9.0;
+    const [hx, hz] = head(you.yaw);
+    const ax = wx * sp - hx * you.sp;
+    const az = wz * sp - hz * you.sp;
+    const l = Math.hypot(ax, az) || 1;
+    return [ax / l, az / l];
+  }
+
+  /** Where you are pointing. Same sign convention as the swim and the walk. */
+  function head(yaw) { return [-Math.sin(yaw), -Math.cos(yaw)]; }
+
+  function waterOk(x, z) {
+    return isSea(x, z) && -groundAt(x, z) > RIDE.minDepth;
+  }
+
+  /**
+   * Take one out.
+   *
+   * Pointed across the wind rather than wherever you happened to be facing,
+   * because that is what a launch is: you get the kite up, you put the board
+   * on, and the first thing that happens is that you go sideways. Starting a
+   * rider pointed into the eye of the wind would be starting them stopped, and
+   * a mode that begins by not working is a mode nobody finds out works.
+   */
+  function enter(x, z) {
+    if (!waterOk(x, z)) return false;
+    const [wx, wz] = windDir();
+    // Across the wind, on whichever tack keeps more water in front of you.
+    let best = null;
+    for (const s of [1, -1]) {
+      const ax = -wz * s, az = wx * s;
+      let run = 0;
+      for (; run < 300; run += 15) {
+        if (!waterOk(x + ax * (run + 15), z + az * (run + 15))) break;
+      }
+      if (!best || run > best.run) best = { run, s, ax, az };
+    }
+    if (!best || best.run < 45) return false;
+    you.x = x; you.z = z;
+    you.yaw = Math.atan2(-best.ax, -best.az);
+    you.look = 0;
+    // A touch down rather than a touch up. Looking up is where the kite is and
+    // looking down is where the water is, and the water is what you are
+    // actually reading at thirty knots — and it is also what puts your own
+    // hands in the bottom of the frame, which is most of what tells you you
+    // are holding something.
+    you.pitch = -0.17;
+    you.sp = 3.0;
+    you.edge = 0; you.steer = 0;
+    you.elev = RIDE.elevRest;
+    you.side = best.s;
+    you.air = 0; you.vy = 0; you.since = 9; you.best = 0;
+    you.t = 0;
+    active = true;
+    group.visible = true;
+    return true;
+  }
+
+  function leave() { active = false; group.visible = false; }
+
+  /**
+   * Looking about, which on a board is a separate thing from steering.
+   *
+   * On foot and in the water the mouse is the whole of where you are going.
+   * Here it is not: the board goes where the board is edged, and your head
+   * goes where you want it. That is not a concession to the controls, it is
+   * the position — you spend a lot of a reach looking up and behind at a kite
+   * that is not where you are pointing, and a camera welded to the board makes
+   * that impossible.
+   */
+  function look(dx, dy) {
+    if (!active) return;
+    you.look = clamp(you.look - dx, -2.2, 2.2);
+    you.pitch = clamp(you.pitch - dy, -1.2, 1.35);
+  }
+
+  /** `ctl` is { fwd, side, sprint, up, down } — the same shape as the rest. */
+  function update(dt, ctl = {}) {
+    if (!active) return;
+    you.t += dt;
+    const [wx, wz] = windDir();
+
+    // ── the kite, in its window ──────────────────────────────────────────────
+    // Up with the up key and down with the down key, and it does not snap: a
+    // kite is a slow object on twenty-four metres of line and the lag is most
+    // of why sending one is a skill.
+    const want = ctl.up ? RIDE.elev[1] : ctl.down ? RIDE.elev[0] : RIDE.elevRest;
+    you.elev += clamp(want - you.elev, -RIDE.elevRate * dt, RIDE.elevRate * dt);
+
+    // ── up, and down again ──────────────────────────────────────────────────
+    you.since += dt;
+    if (you.air <= 0 && you.vy <= 0) {
+      // On the water. The kite going through the top of the window with speed
+      // under you is the send, and it is the only way off the surface — there
+      // is no jump key, because there is no jump.
+      if (you.elev > RIDE.sendAt && you.sp > RIDE.sendSp
+        && you.since > RIDE.reload && ctl.up) {
+        you.vy = RIDE.pop[0] + RIDE.pop[1] * you.sp * (0.55 + 0.45 * you.pull);
+        you.air = 0.001;
+        you.since = 0;
+      } else {
+        you.air = 0; you.vy = 0;
+      }
+    }
+    if (you.air > 0) {
+      // Overhead holds you; flown forward it lets you go. Nothing else in the
+      // mode has this much authority over how it feels.
+      const g = you.elev > 0.95 ? RIDE.gFloat
+        : you.elev > 0.62 ? (RIDE.gFloat + RIDE.gDive) * 0.5 : RIDE.gDive;
+      you.vy -= g * dt;
+      you.air += you.vy * dt;
+      you.best = Math.max(you.best, you.air);
+      if (you.air <= 0) {
+        const hit = -you.vy;
+        you.air = 0; you.vy = 0; you.since = 0;
+        // Coming down flat and fast is the one way this mode hurts you, and it
+        // is the right one: everything about a kite jump is easy except the
+        // last two metres, and the fix for it is the same in the game as on the
+        // water — keep the kite up until you are down.
+        if (hit > RIDE.land[1]) return 'wipeout';
+        if (hit > RIDE.land[0]) you.sp *= 0.42;
+      }
+    }
+
+    // ── steering ────────────────────────────────────────────────────────────
+    // The board turns hard when it is slow and barely at all when it is not,
+    // which is true of everything that planes and is why a fast kitesurfer
+    // makes long turns and a slow one spins on the spot.
+    const s = clamp(ctl.side || 0, -1, 1);
+    you.steer += (s - you.steer) * Math.min(1, dt * 6);
+    const spN = Math.min(1, you.sp / RIDE.top);
+    you.yaw += you.steer * dt
+      * (RIDE.turn + (RIDE.turnFast - RIDE.turn) * spN);
+
+    // ── the polar ───────────────────────────────────────────────────────────
+    const [hx, hz] = head(you.yaw);
+    const dot = clamp(hx * wx + hz * wz, -1, 1);
+    const off = Math.acos(dot);
+    // Which side of the wind you are on. The sign of the cross product of the
+    // wind with your heading, and it is what puts the kite to one side of you
+    // and the board on the matching edge.
+    you.side = (wx * hz - wz * hx) >= 0 ? 1 : -1;
+
+    // The bar. Held in is full power; let it out and the kite depowers, which
+    // is what you do when it is too much and what a beginner does all day.
+    const power = ctl.fwd < 0 ? 0.34 : (ctl.sprint ? 1.0 : (ctl.fwd > 0 ? 0.86 : 0.62));
+    // A kite parked overhead pulls you up and not along, which is the whole
+    // reason sending it is how you jump — and here it is why holding it up
+    // costs you speed.
+    const drive = ridePolar(off) * power
+      * (0.35 + 0.65 * Math.cos(Math.max(0, you.elev - 0.5)));
+    // Nothing drives you while you are off the water: you carry what you had.
+    const target = you.air > 0 ? you.sp : RIDE.top * drive;
+    const k = 1 - Math.exp(-(target > you.sp ? RIDE.accel : RIDE.slow) * dt);
+    you.sp += (target - you.sp) * k;
+
+    // ── along the water ─────────────────────────────────────────────────────
+    const nx = you.x + hx * you.sp * dt;
+    const nz = you.z + hz * you.sp * dt;
+    if (waterOk(nx, nz) || you.air > 0.4) {
+      you.x = nx; you.z = nz;
+    } else {
+      // Run out of water and you stop, hard, and the mode hands you to the
+      // sea. Nothing here pretends to be a beach landing.
+      you.sp *= 0.2;
+      if (you.sp < 1.2) return 'aground';
+    }
+    you.y = seaHeightAt(you.x, you.z);
+
+    you.pull = Math.min(1, you.sp / 15.0);
+    // The edge follows the tack, and how hard depends on how hard you are
+    // being pulled: a rider on a rope stands *against* it.
+    const wantEdge = -you.side * Math.min(1, you.sp / (RIDE.top * 0.55));
+    you.edge += clamp(wantEdge - you.edge, -RIDE.edgeRate * dt, RIDE.edgeRate * dt);
+    return null;
+  }
+
+  /** Where the kite is, in world space. */
+  function kitePos(out) {
+    const [wx, wz] = appDir();
+    const [hx, hz] = head(you.yaw);
+    // Out toward the edge of the window, measured off the *apparent* wind
+    // rather than the true one. See `appDir` and the note on `window`.
+    const sw = RIDE.window;
+    const dx = wx * Math.cos(sw) + hx * Math.sin(sw);
+    const dz = wz * Math.cos(sw) + hz * Math.sin(sw);
+    const l = Math.hypot(dx, dz) || 1;
+    const flat = Math.cos(you.elev) * RIDE.line;
+    return out.set(
+      you.x + (dx / l) * flat,
+      you.y + Math.sin(you.elev) * RIDE.line + 1.1,
+      you.z + (dz / l) * flat,
+    );
+  }
+
+  const _c = new THREE.Vector3();
+  const _d = new THREE.Vector3();
+  const _dn = new THREE.Vector3(0, -1, 0);
+
+  /** Where the bar is in the world: out in front of the eye and below it. */
+  function barPos(out, eyeY) {
+    const [hx, hz] = head(you.yaw);
+    // Sheeting in brings the bar to you — the same 16 cm the arms travel in
+    // 60-arms.js. It used to be 26, and 26 put the bar at 42 cm from the eye
+    // at full power, which is inside the front clip: the lines came out of
+    // nothing and stopped in mid-air a third of the way up the frame, which
+    // looked like a rendering fault and was one.
+    const f = RIDE.bar[0] - 0.12 * you.pull;
+    return out.set(
+      you.x + hx * f,
+      eyeY + RIDE.bar[1] + 0.055 * you.pull,
+      you.z + hz * f,
+    );
+  }
+
+  /** Draw the rig. Called after pose(), because it hangs off where you are. */
+  function draw() {
+    if (!active) return;
+    const eyeY = you.y + RIDE.eye + you.air;
+    barPos(_b, eyeY);
+    kitePos(_a);
+    canopy.position.copy(_a);
+    _up.set(0, 1, 0);
+    _m.lookAt(_c.copy(_a).sub(_b).normalize(), _d.set(0, 0, 0), _up);
+    canopy.quaternion.setFromRotationMatrix(_m);
+    canopy.rotateX(-Math.PI / 2);
+
+    // Across the bar, so the four lines leave four different places rather
+    // than all leaving one — which is the only thing that tells you there is a
+    // bar there at all when the bar itself is inside the front clip.
+    const [hx, hz] = head(you.yaw);
+    const bx = -hz, bz = hx;
+    for (let i = 0; i < 4; i++) {
+      // Outer pair to the tips, inner pair a little in from them: the front
+      // lines and the back lines do not land in the same place on a kite.
+      const sg = i < 2 ? -1 : 1;
+      const tipX = sg * (i % 2 ? 3.5 : 2.6);
+      const tip = _c.set(tipX, 0, i % 2 ? 0 : -0.35)
+        .applyQuaternion(canopy.quaternion).add(canopy.position);
+      const off = (i % 2 ? 0.5 : -0.5) * RIDE.barW * sg;
+      _up.set(_b.x + bx * off, _b.y, _b.z + bz * off);
+      _d.copy(tip).sub(_up);
+      const len = _d.length() || 1;
+      _d.divideScalar(len);
+      // Started half a metre up the line rather than at the bar itself.
+      //
+      // The bar is 46 cm from your eye because that is as far as an arm
+      // reaches, and the front clip cannot come in that far without spending
+      // the depth precision the far shore needs. So the world draws the line
+      // from where it can, and the view model — which has a five-centimetre
+      // near plane and is drawn over the top — draws the bar and the two hands
+      // that hide the join. Nothing is missing; the seam is behind your own
+      // knuckles.
+      const skip = Math.min(0.55, len * 0.5);
+      _up.addScaledVector(_d, skip);
+      lines[i].position.copy(_up);
+      lines[i].scale.set(1, len - skip, 1);
+      lines[i].quaternion.setFromUnitVectors(_dn, _d);
+    }
+    _up.set(0, 1, 0);
+
+    board.position.set(you.x, you.y + 0.04 + you.air, you.z);
+    // Off the water the board comes up under you and the edge means nothing,
+    // so it flattens — which is also what a rider does, because you have to
+    // land it flat.
+    board.rotation.set(you.air > 0 ? -0.22 : 0, you.yaw,
+      you.edge * 0.62 * (you.air > 0 ? 0.35 : 1), 'YXZ');
+
+    const wk = you.air > 0.15 ? 0 : Math.min(1, you.sp / (RIDE.top * 0.5));
+    wake.visible = wk > 0.12;
+    wake.position.set(you.x - hx * 7.5 * wk, you.y + 0.06, you.z - hz * 7.5 * wk);
+    wake.rotation.set(0, you.yaw, 0);
+    wake.scale.set(1.4 + 1.2 * wk, 1, 15 * wk + 0.5);
+  }
+
+  /**
+   * The camera. Your eyes, over the board, leaning with it.
+   *
+   * The roll is the one number that makes this mode feel like anything. A
+   * kitesurfer on a hard edge has the whole world tipped fifteen or twenty
+   * degrees, and taking that out — which is what a camera bolted upright does
+   * — leaves a first-person mode that reads as a drone at head height.
+   */
+  function pose(camera) {
+    if (!active) return;
+    camera.up.set(0, 1, 0);
+    const chop = Math.sin(you.t * 7.3) * RIDE.bob
+      * Math.min(1, you.sp / (RIDE.top * 0.4));
+    const ey = you.y + RIDE.eye + you.air + chop * (you.air > 0 ? 0 : 1);
+    camera.position.set(you.x, ey, you.z);
+    const yaw = you.yaw + you.look;
+    const cp = Math.cos(you.pitch);
+    camera.lookAt(
+      you.x - Math.sin(yaw) * cp,
+      ey + Math.sin(you.pitch),
+      you.z - Math.cos(yaw) * cp,
+    );
+    camera.rotateZ(-you.edge * RIDE.heel);
+  }
+
+  return {
+    you,
+    get active() { return active; },
+    get speed() { return you.sp; },
+    get air() { return you.air; },
+    enter, leave, look, update, pose, draw,
+    /** For the HUD: where this heading sits against the wind. */
+    point: () => {
+      const [wx, wz] = windDir();
+      const [hx, hz] = head(you.yaw);
+      const off = Math.acos(clamp(hx * wx + hz * wz, -1, 1));
+      const edge = Math.PI - RIDE.noGo;
+      if (off >= edge) return 'noGo';
+      if (off > edge * 0.72) return 'upwind';
+      if (off > edge * 0.38) return 'reach';
+      return 'downwind';
+    },
+    stats: () => ({
+      on: active ? 1 : 0,
+      at: [Math.round(you.x), Math.round(you.z)],
+      kt: +(you.sp * 1.94384).toFixed(1),
+      sp: +you.sp.toFixed(2),
+      yawDeg: Math.round(you.yaw * 180 / Math.PI),
+      elev: +you.elev.toFixed(2),
+      edge: +you.edge.toFixed(2),
+      side: you.side,
+      air: +you.air.toFixed(2),
+      // Where the two ends of the rig actually are. Both of them are computed
+      // from the same yaw the board has and neither is where you are looking,
+      // so when the lines come out wrong these are the only two numbers that
+      // say which end is at fault.
+      bar: (() => { const v = new THREE.Vector3();
+        barPos(v, you.y + RIDE.eye + you.air);
+        return [+v.x.toFixed(2), +v.y.toFixed(2), +v.z.toFixed(2)]; })(),
+      kite: (() => { const v = new THREE.Vector3(); kitePos(v);
+        return [+v.x.toFixed(2), +v.y.toFixed(2), +v.z.toFixed(2)]; })(),
+      len: +(lines[0] ? lines[0].scale.y : 0).toFixed(2),
+      best: +you.best.toFixed(2),
+      point: null,
+    }),
+  };
+}
+
 // ==== 59-swim.js ================================================
 // -----------------------------------------------------------------------------
 // The water.
@@ -28076,7 +29179,28 @@ const SWIM = {
   // and why coming up is never the problem.
   rise: 1.30,
   dive: 1.60,
-  maxDepth: 24,
+
+  // And what a deliberate kick down is worth, which is emphatically not the
+  // same number.
+  //
+  // It used to be the dive figure for both, and that made holding the down key
+  // an argument the key lost. The jacket's lift saturates at 1.30 m/s, the
+  // kick was worth 1.36, and the difference between them is six centimetres a
+  // second — so you sank to about three metres over ten seconds and then, to
+  // anyone actually playing, simply stopped, hung there, and got floated back
+  // up when the breath ran out. Every part of that was working as written and
+  // the writing was wrong: a person kicking down beats a buoyancy aid, that is
+  // what kicking is for, and the thing that should stop you is the bottom or
+  // your own lungs and never a stalemate you cannot see.
+  //
+  // 2.55 against a lift of 1.30 is a net 1.25 m/s down and it stays 1.25 m/s
+  // down for as long as you hold it.
+  kick: 2.55,
+
+  // How far down it is allowed to go at all. Not a physical limit — the bed
+  // stops you long before this nearly everywhere — but the channel proper is
+  // forty metres in places and a cap of 24 was a lid you could feel.
+  maxDepth: 38,
 
   breath: 22,          // s under water before the jacket wins
   recover: 7,          // s on the surface to get all of it back
@@ -28085,7 +29209,14 @@ const SWIM = {
   // which is where anybody stops swimming and starts walking whether they
   // meant to or not.
   wade: 1.15,
-  bedClear: 0.45,      // and how close to it you may get before it stops you
+  // And how close to the bed you may get before it stops you. 45 cm was less
+  // than the world's own near plane, which is the whole of "I can see through
+  // the seabed": look down from there and every triangle of bottom is inside
+  // the front clip and thrown away, leaving you staring at the far side of
+  // nothing. The near plane comes in underwater now — see `clearance` — and
+  // this went up as well, because a face 45 cm off the sand has most of a
+  // swimmer already buried in it.
+  bedClear: 0.80,
 
   // The stroke. One cycle is a reach, a pull and a glide, and what you see of
   // it is the roll and the rise — the head goes up on the catch and down on
@@ -28364,10 +29495,13 @@ function buildSwim(sea) {
     // from, which is why looking at your own feet is how you get deep.
     let vy = SWIM.rise * (1 - Math.exp(-Math.max(0, you.depth) * 1.6));
     if (!you.spent) {
-      const push = (ctl.down ? 1 : 0) - (ctl.up ? 1 : 0);
       const aim = submerged ? -Math.sin(you.pitch) * Math.max(0, f) : 0;
-      vy -= SWIM.dive * (push * 0.85 + Math.max(0, -aim) * 0.9);
-      if (ctl.up) vy += SWIM.rise * 0.55;
+      // Held down is a flat kick and not a nudge against the lift — see the
+      // note on `kick`. Pointing down still adds to it, so looking at your own
+      // feet and swimming is still the fast way to the bottom.
+      if (ctl.down) vy -= SWIM.kick;
+      if (ctl.up) vy += SWIM.dive * 0.85 + SWIM.rise * 0.55;
+      vy -= SWIM.dive * Math.max(0, -aim) * 0.9;
     }
     you.vy += (vy - you.vy) * (1 - Math.exp(-3.0 * dt));
 
@@ -28434,6 +29568,12 @@ function buildSwim(sea) {
     /** True once your eyes are under, which is what the tint is hung off. */
     get submerged() { return active && you.depth > SWIM.under; },
     get depth() { return Math.max(0, you.depth); },
+    /**
+     * How far the eye is above the bed, in metres, or a big number when there
+     * is no swimming going on. The near plane is hung off this: the bottom is
+     * the only thing in the sea you can put your face against.
+     */
+    get clearance() { return active ? Math.max(0, you.y - bedAt(you.x, you.z)) : 99; },
     get breath() { return you.breath; },
     get spent() { return you.spent; },
     get auto() { return auto; },
@@ -28930,6 +30070,26 @@ const ARMS = {
   thumb: 0.0546,
   thumbR: 0.0108,
 
+  // The bar, for the kite mode. 52 cm across, which is a small bar and the
+  // common one, and where it sits relative to the eye: out in front, down at
+  // the bottom of the chest, exactly where 59-ride.js puts its end of the
+  // lines so that the two halves of the rig meet.
+  barW: 0.52,
+  barAt: [0.0, -0.23, -0.46],
+
+  // How a hand is held, joint by joint, at the two ends of what a hand does.
+  //
+  // Flat is the paddle: five degrees at the knuckle and not much more down the
+  // finger, because a crawl's hand is very nearly a board and the little curl
+  // that is in it is the hand's own, not a grip. Loose is the recovery, and it
+  // is a long way from flat on purpose — a hand off the water carries no shape
+  // at all, and the number that looked right in a still frame looked like a
+  // hand being *held* open the moment it moved.
+  fingerFlat: [0.05, 0.09, 0.11],
+  fingerLoose: [0.42, 0.55, 0.40],
+  thumbFlat: [0.14, 0.30],
+  thumbLoose: [0.40, 0.46],
+
   // A Dalmatian August, three weeks in. Albedo, so it sits below the colour it
   // arrives on screen as.
   skin: [0.795, 0.620, 0.495],
@@ -29112,93 +30272,107 @@ function armLimb(len, prof, opt = {}) {
  * so the tip comes round further than the base — the shape of a hand doing
  * something rather than a hand being displayed.
  */
-function armFinger(len, r, curl) {
+function armFingerBones(len, r) {
   const bone = [len * 0.45, len * 0.31, len * 0.24];
-  const out = [];
-  let m = new THREE.Matrix4();
-  for (let i = 0; i < 3; i++) {
+  return bone.map((L, i) => {
     const a = r * (1 - 0.11 * i), b = r * (1 - 0.11 * (i + 1));
-    const g = armLimb(bone[i], (t) => {
-      // A knuckle at the head of each bone and a smaller one at its foot: a
-      // finger is a string of beads and the beads are what you actually see.
-      const w = a + (b - a) * t
-        + r * 0.16 * Math.exp(-t * t * 34.0)
-        + r * 0.10 * Math.exp(-(1 - t) * (1 - t) * 40.0);
-      // The last bone ends in a pad, not a point. Second column is the depth
-      // *ratio*, like every other profile in this file.
-      return [w, 1.06 - 0.10 * t, 0.24, 0];
-    }, { seg: 14, rows: 7, cap: 6 });
-    out.push(g.applyMatrix4(m.clone()));
-    m = m.clone()
-      .multiply(new THREE.Matrix4().makeTranslation(0, -bone[i] * 0.94, 0))
-      .multiply(new THREE.Matrix4().makeRotationX(curl[i]));
-  }
-  return out;
+    return {
+      len: L,
+      // Where the joint below it sits. Not at the tip: a knuckle is inside a
+      // finger, not on the end of one, and hinging at the tip leaves a gap you
+      // can see straight through every time the hand closes.
+      joint: -L * 0.94,
+      geo: armLimb(L, (t) => {
+        // A knuckle at the head of each bone and a smaller one at its foot: a
+        // finger is a string of beads and the beads are what you actually see.
+        const w = a + (b - a) * t
+          + r * 0.16 * Math.exp(-t * t * 34.0)
+          + r * 0.10 * Math.exp(-(1 - t) * (1 - t) * 40.0);
+        // The last bone ends in a pad, not a point. Second column is the depth
+        // *ratio*, like every other profile in this file.
+        return [w, 1.06 - 0.10 * t, 0.24, 0];
+      }, { seg: 14, rows: 7, cap: 6 }),
+    };
+  });
 }
 
 /**
  * A hand: a palm with an arch and a thumb pad, four three-boned fingers and a
- * thumb, merged into one buffer.
+ * thumb. The palm comes back as one buffer; the digits come back as chains.
  *
- * Not splayed, and not clamped shut. A crawl's hand is a paddle held with the
- * fingers just touching and very slightly cupped — water goes through a splayed
- * hand and a clenched one has no surface — so they lie together with a few
- * degrees of curl and the little finger trailing the others, which is the
- * shape that says "this hand is doing something" rather than "this hand is
- * a model of a hand".
+ * A crawl's hand is not one shape, and shipping it as one was the mistake in
+ * the last pass. Through the pull it is a paddle — fingers just touching and
+ * very slightly cupped, because water goes through a splayed hand and a
+ * clenched one has no surface. Through the recovery it is nothing at all: the
+ * hand hangs off the wrist and the fingers fall open, and that loose hand
+ * coming over the top is the single most recognisable thing about watching
+ * somebody swim. Welded at the catch pose it held the paddle for the whole
+ * cycle, which read as an arm with a glove on the end of it.
+ *
+ * So: bones, and the pose lives in `update` where the stroke phase is.
  */
 function armHand(side) {
-  const parts = [];
   const P = ARMS.palm;
-  parts.push(armLimb(P, ARMS.palmProf, {
+  const palm = [];
+  palm.push(armLimb(P, ARMS.palmProf, {
     seg: 30, rows: 14, cap: 8, capTopS: 0.42, capBotS: 0.16 }));
 
   // The thumb pad, laid along the thumb side of the palm and rolled forward
-  // on to the palmar face where it actually sits.
+  // on to the palmar face where it actually sits. It belongs to the palm and
+  // not to the thumb: a thenar does move when the thumb moves, but nothing
+  // like as far, and hanging it off the thumb's first joint would swing a
+  // quarter of the palm away every time the hand opened.
   const then = armLimb(P * 0.78, ARMS.thenarProf, {
     seg: 18, rows: 9, cap: 6, capTopS: 0.5, capBotS: 0.5 });
   then.applyMatrix4(new THREE.Matrix4()
     .makeRotationZ(-0.15 * side)
     .premultiply(new THREE.Matrix4().makeTranslation(-0.0206 * side, -0.0150, 0.0058)));
-  parts.push(then);
+  palm.push(then);
 
+  const digits = [];
   for (let i = 0; i < 4; i++) {
     const [len, r] = ARMS.finger[i];
     // Knuckles across the head of the palm, index at -X through little at +X
     // on the left hand and mirrored by the parent's sign.
     const x = (-1.5 + i) * 0.0228 * side;
-    // The little finger trails and curls further, which every hand does and
-    // no modelled hand ever does.
-    const lag = i === 3 ? 0.07 : 0;
-    for (const g of armFinger(len, r, [0.09 + lag, 0.19 + lag, 0.17])) {
-      parts.push(g.applyMatrix4(new THREE.Matrix4()
-        .makeRotationX(0.10)
-        .premultiply(new THREE.Matrix4().makeRotationZ(-x * 1.25))
-        .premultiply(new THREE.Matrix4().makeTranslation(
-          x, -P + ARMS.knuckle[i], 0.0022))));
-    }
+    digits.push({
+      kind: 'finger',
+      i,
+      pos: [x, -P + ARMS.knuckle[i], 0.0022],
+      // Pitch is down the finger and fan is across the palm, kept apart
+      // rather than baked into one matrix because the pose opens and closes
+      // the fan while the pitch stays where the knuckle put it.
+      pitch: 0.10,
+      fan: -x * 1.25,
+      bones: armFingerBones(len, r),
+    });
   }
 
-  // The thumb, off the side of the palm and a long way round the axis: held
-  // in against the index finger, which is where it is on a catch. Two bones,
-  // not three, because that is how many a thumb has.
+  // The thumb, off the side of the palm and a long way round the axis. Two
+  // bones, not three, because that is how many a thumb has. Where it is held
+  // is the pose's business now: in against the index for the catch, out and
+  // away when the hand lets go.
   const tb = [ARMS.thumb * 0.56, ARMS.thumb * 0.44];
-  let m = new THREE.Matrix4()
-    .makeRotationZ(-0.30 * side)
-    .premultiply(new THREE.Matrix4().makeRotationX(0.26))
-    .premultiply(new THREE.Matrix4().makeTranslation(-0.0250 * side, -0.0548, 0.0090));
-  for (let i = 0; i < 2; i++) {
-    const a = ARMS.thumbR * (1 - 0.16 * i), b = ARMS.thumbR * (1 - 0.16 * (i + 1));
-    const g = armLimb(tb[i], (t) => {
-      const w = a + (b - a) * t + ARMS.thumbR * 0.13 * Math.exp(-t * t * 30.0);
-      return [w, 0.94 - 0.06 * t, 0.26, 0];
-    }, { seg: 14, rows: 7, cap: 6 });
-    parts.push(g.applyMatrix4(m.clone()));
-    m = m.clone()
-      .multiply(new THREE.Matrix4().makeTranslation(0, -tb[i] * 0.94, 0))
-      .multiply(new THREE.Matrix4().makeRotationX(0.34));
-  }
-  return kiteMerge(parts);
+  digits.push({
+    kind: 'thumb',
+    i: 0,
+    pos: [-0.0250 * side, -0.0548, 0.0090],
+    pitch: 0.26,
+    fan: -0.30 * side,
+    bones: tb.map((L, i) => {
+      const a = ARMS.thumbR * (1 - 0.16 * i), b = ARMS.thumbR * (1 - 0.16 * (i + 1));
+      return {
+        len: L,
+        joint: -L * 0.94,
+        geo: armLimb(L, (t) => {
+          const w = a + (b - a) * t + ARMS.thumbR * 0.13 * Math.exp(-t * t * 30.0);
+          return [w, 0.94 - 0.06 * t, 0.26, 0];
+        }, { seg: 14, rows: 7, cap: 6 }),
+      };
+    }),
+  });
+
+  return { palm: kiteMerge(palm), digits };
 }
 
 /**
@@ -29295,10 +30469,87 @@ function buildArms() {
     // sits — and every piece hanging off them is a lathe, so a hand built with
     // the sign flipped is a true mirror with the winding still the right way
     // round.
-    wrist.add(new THREE.Mesh(armHand(side), mat));
+    const hand = armHand(side);
+    wrist.add(new THREE.Mesh(hand.palm, mat));
+
+    // Every joint a Group, every bone a mesh hanging off it. That is
+    // twenty-eight more draw calls across the two hands in a pass that had
+    // six, which sounds like a great deal until you notice what the pass is:
+    // two arms in an otherwise empty scene, drawn over a frame of three and a
+    // half million triangles. It costs about a fifth of a millisecond and it
+    // buys the one motion in the mode that everybody has felt from the inside.
+    const digits = [];
+    for (const d of hand.digits) {
+      const joints = [];
+      let parent = wrist;
+      for (let i = 0; i < d.bones.length; i++) {
+        const g = new THREE.Group();
+        if (i === 0) {
+          g.position.set(d.pos[0], d.pos[1], d.pos[2]);
+          // ZYX, so the fan happens in the plane of the palm and the pitch
+          // happens down the finger. The other way round, opening the hand
+          // tips every finger out of the palm as well as away from it.
+          g.rotation.order = 'ZYX';
+        } else {
+          g.position.set(0, d.bones[i - 1].joint, 0);
+        }
+        g.frustumCulled = false;
+        g.add(new THREE.Mesh(d.bones[i].geo, mat));
+        parent.add(g);
+        joints.push(g);
+        parent = g;
+      }
+      digits.push({ kind: d.kind, i: d.i, pitch: d.pitch, fan: d.fan, joints });
+    }
 
     for (const m of [shoulder, elbow, wrist]) m.frustumCulled = false;
-    sides.push({ side, shoulder, elbow, wrist });
+    sides.push({ side, shoulder, elbow, wrist, digits });
+  }
+
+  // ── and the bar, for the other water mode ─────────────────────────────────
+  //
+  // 59-ride.js draws the kite and the long lines in the world, and it cannot
+  // draw the near end of them: the front clip is at 1.2 m and a bar is two
+  // thirds of a metre from your face, so everything from your hands up to
+  // shoulder height is inside the clip and simply is not there. That left four
+  // white lines starting in mid-air over the water, which reads as a fault
+  // rather than as a rig.
+  //
+  // This scene is the answer, and it is already here for exactly this reason —
+  // a five-centimetre near plane. So the bar, the last two metres of each
+  // line, and the two hands holding it are drawn here, and the world's lines
+  // carry on from where these stop. The join is well above the bar and behind
+  // both hands, which is the one part of the frame nothing is looking at.
+  const rig = new THREE.Group();
+  rig.visible = false;
+  rig.frustumCulled = false;
+  root.add(rig);
+  {
+    const barMat = solidMaterial(new THREE.Color(0.10, 0.10, 0.12),
+      { spec: 0.35, specPower: 50, vcol: false });
+    const gripMat = solidMaterial(new THREE.Color(0.72, 0.16, 0.10),
+      { spec: 0.22, specPower: 26, vcol: false });
+    const bar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.0135, 0.0135, ARMS.barW, 10, 1), barMat);
+    bar.rotation.z = Math.PI / 2;
+    rig.add(bar);
+    // The grips, which are the only coloured part of a bar and the reason you
+    // can tell at a glance which way up it is.
+    for (const s2 of [-1, 1]) {
+      const g = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.0175, 0.0175, 0.125, 10, 1), gripMat);
+      g.rotation.z = Math.PI / 2;
+      g.position.x = s2 * ARMS.barW * 0.34;
+      rig.add(g);
+    }
+    // The centre line running down out of the bar to the harness, which is the
+    // part of a kite rig nobody draws and everybody has seen.
+    const cl = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.006, 0.006, 0.46, 5, 1),
+      solidMaterial(new THREE.Color(0.80, 0.78, 0.72), { spec: 0.1, vcol: false }));
+    cl.position.y = -0.23;
+    rig.add(cl);
+    for (const m of rig.children) m.frustumCulled = false;
   }
 
   const ease = (t) => t * t * (3 - 2 * t);
@@ -29353,6 +30604,25 @@ function buildArms() {
     };
   }
 
+  /**
+   * How loose the hand is at phase `u` — 0 a flat paddle, 1 a hand hanging.
+   *
+   * It lets go a little before the exit, because by then the hand is already
+   * off the water and holding a paddle after the paddle has stopped working is
+   * the glove again. Loosest with the elbow over the top. Gathered through the
+   * last fifth so the fingertips lead the hand in, which is what the entry of
+   * a crawl actually is — the hand goes in fingers first and the rest of the
+   * arm follows it through the same hole.
+   *
+   * Zero at both ends with zero slope, so the seam at the catch is not a place
+   * where anything visibly happens.
+   */
+  function grip(u) {
+    const rise = ease(Math.min(1, Math.max(0, (u - 0.46) / 0.16)));
+    const fall = ease(Math.min(1, Math.max(0, (u - 0.78) / 0.20)));
+    return rise - fall;
+  }
+
   const _q = new THREE.Quaternion();
   const _e = new THREE.Euler();
 
@@ -29364,10 +30634,117 @@ function buildArms() {
    * pitch are where you are looking, and the roll is the stroke, which belongs
    * to the head and not to the shoulders.
    */
-  function update(dt, swim, camera) {
-    const on = !!(swim && swim.active);
+  /**
+   * Both hands on a bar.
+   *
+   * The whole pose is one constraint — the hands are at two fixed points in
+   * front of you and the arms have to reach them — and it is the one pose in
+   * the game where an IK solve would genuinely have been simpler than angles.
+   * It is still angles, for the same reason the crawl is: the shoulder,
+   * forearm and hand lengths are known and fixed, so the two-link solve has a
+   * closed form and the closed form is four lines of trigonometry. Solving it
+   * every frame also means the arms follow the bar when the bar moves, which
+   * is what happens when you sheet in.
+   *
+   * `pull` is 0 for a bar held out at arm's length and 1 for a bar pulled in
+   * to the hip — which is the whole of the power control, and the reason you
+   * can see how hard you are working without a gauge.
+   */
+  // How far forward the shoulders come for the bar. The swim's shoulder
+  // offset is a *prone* one — 10 cm behind the eye, because a swimmer's head
+  // is ahead of their shoulders as well as above them — and on a board it is
+  // exactly wrong: it put the hands 58 cm from a 48 cm arm, so the solve
+  // clamped, the elbows locked straight, and both hands hung in the air a
+  // hand's breadth short of a bar they were supposed to be holding.
+  const RIDE_LEAN = 0.14;
+
+  function barPose(a, pull, t) {
+    const S = ARMS.shoulder;
+    // Where this hand has to be, in the shoulder's own frame.
+    let hx = a.side * (ARMS.barW * 0.34) - S[0] * a.side;
+    // Three centimetres above the bar, not on it: the fingers come off the
+    // knuckles and close *downward*, so a hand aimed at the bar itself hangs
+    // its fingers below it and a hand aimed a little over it closes round it.
+    let hy = (ARMS.barAt[1] + 0.055 * pull) - S[1] + 0.085;
+    let hz = (ARMS.barAt[2] + 0.12 * pull) - S[2] + RIDE_LEAN
+      + Math.sin(t * 1.7 + a.side) * 0.008;
+    // The solve puts the *wrist* where it is told, and a wrist is not what
+    // holds a bar — the hand carries on for another seventeen centimetres past
+    // it. Aimed at the bar itself, both hands came out a palm's length beyond
+    // it with the bar somewhere back inside the forearm. So the target is
+    // pulled back along the arm by a palm and a bit, and the hand that grows
+    // out of it lands on the bar instead of through it.
+    const raw = Math.hypot(hx, hy, hz) || 1e-4;
+    const back0 = ARMS.palm + 0.030;
+    const k0 = Math.max(0, (raw - back0) / raw);
+    hx *= k0; hy *= k0; hz *= k0;
+    const d = Math.min(raw - back0, (ARMS.upper + ARMS.fore) * 0.995);
+    // Two links, one closed form: the elbow angle straight out of the cosine
+    // rule, and the shoulder aimed at the hand and then backed off by the
+    // half-angle the bend costs.
+    const c = (ARMS.upper * ARMS.upper + ARMS.fore * ARMS.fore - d * d)
+      / (2 * ARMS.upper * ARMS.fore);
+    const elb = Math.PI - Math.acos(Math.min(1, Math.max(-1, c)));
+    const c2 = (ARMS.upper * ARMS.upper + d * d - ARMS.fore * ARMS.fore)
+      / (2 * ARMS.upper * Math.max(d, 1e-4));
+    const back = Math.acos(Math.min(1, Math.max(-1, c2)));
+    // Aim: the arm hangs down −Y, so pitch it forward by the angle the hand
+    // sits above straight-down, and swing it out by the angle it sits across.
+    const pitch = Math.atan2(-hz, -hy) + back;
+    const out = Math.atan2(hx * a.side, Math.hypot(hy, hz));
+    a.shoulder.rotation.set(pitch, 0, -out * a.side, 'XYZ');
+    a.elbow.rotation.set(-elb, 0, 0);
+    // Knuckles over the bar and thumbs under it, which is the only grip
+    // anybody uses and is what makes a held bar read as held.
+    //
+    // The angle that matters is the twist, and it took two passes to see it.
+    // The chain shoulder → elbow → wrist bends in one plane and has no
+    // pronation in it anywhere, so with the arm out in front the palm faces
+    // *up* no matter what the wrist is set to — which is why the first two
+    // attempts produced two hands held open under the bar like somebody
+    // waiting for change. A real forearm rotates about its own axis to turn
+    // the palm over, and that is one number: a rotation about the wrist's Y,
+    // which is the forearm's axis.
+    //
+    // Order XZY so the twist is innermost and happens in the forearm's frame.
+    // Any other order pronates about something that is not the forearm and
+    // takes the hand off the bar again.
+    a.wrist.rotation.set(0.06 + 0.12 * pull, a.side * 2.70, 0, 'XZY');
+    // And the fingers closed round it, which is what the joint chains were for.
+    for (const dg of a.digits) {
+      const thumb = dg.kind === 'thumb';
+      const flat = thumb ? ARMS.thumbFlat : ARMS.fingerFlat;
+      const loose = thumb ? ARMS.thumbLoose : ARMS.fingerLoose;
+      // Well past loose: a fist round a 27 mm bar is further shut than a hand
+      // that has merely stopped holding a shape, so this runs the same two
+      // tables off the end rather than adding a third.
+      const g = thumb ? 1.30 : 1.52;
+      for (let j = 0; j < dg.joints.length; j++) {
+        const cc = Math.min(1.45, mix(flat[j], loose[j], g));
+        if (j === 0) {
+          dg.joints[j].rotation.set(dg.pitch + cc, 0, dg.fan * 0.15);
+        } else {
+          dg.joints[j].rotation.x = cc;
+        }
+      }
+    }
+  }
+
+  /**
+   * `ctx` is whichever water mode is running. Both of them are two arms in
+   * front of a camera and nothing else in the game is, so they share the
+   * scene, the material, the geometry and the draw — and differ only in what
+   * the joints are told.
+   */
+  function update(dt, ctx, camera) {
+    const swim = ctx && ctx.active && ctx.you && ctx.you.stroke !== undefined
+      ? ctx : null;
+    const ride = ctx && ctx.active && !swim ? ctx : null;
+    const on = !!(swim || ride);
     root.visible = on;
+    rig.visible = !!ride;
     if (!on) return;
+    if (ride) return updateRide(dt, ride, camera);
 
     // The view-model camera is the real one, minus its reach. Copied every
     // frame rather than shared, because the field of view is a control here —
@@ -29380,6 +30757,7 @@ function buildArms() {
     cam.updateProjectionMatrix();
 
     const you = swim.you;
+    body.position.set(0, 0, 0);
     root.position.copy(camera.position);
     // Yaw and pitch, no roll. A prone swimmer's shoulders follow the head down
     // when it looks down — that is what makes a duck-dive read — but they do
@@ -29402,7 +30780,74 @@ function buildArms() {
       // The wrist leads the hand into the water and trails it out, which is
       // the only part of a stroke anybody can see the point of from inside it.
       a.wrist.rotation.set(c.twist * 0.8, 0, c.twist * 0.5 * a.side);
+
+      // And the hand on the end of it.
+      //
+      // Staggered, because four fingers that curl on the same frame are one
+      // paddle with lines drawn on it — which is exactly what the welded
+      // version looked like and exactly the complaint it earned. Each finger
+      // lags the one before by about a hundredth of a cycle, and the little
+      // finger travels a fifth further than the index, because a hand letting
+      // go does not let go all at once or evenly.
+      for (const d of a.digits) {
+        const thumb = d.kind === 'thumb';
+        const lag = thumb ? 0.03 : d.i * 0.012;
+        // The scull is what is left when there is no stroke: a floating hand
+        // is never still, it opens and closes very slightly the whole time,
+        // and a still one reads as a prop somebody is holding.
+        const s = amp * grip(((u - lag) % 1 + 1) % 1)
+          + (1 - amp) * (0.42 + 0.14 * Math.sin(u * Math.PI * 2 - d.i * 0.6));
+        const k = thumb ? 1 : 0.90 + 0.08 * d.i;
+        const flat = thumb ? ARMS.thumbFlat : ARMS.fingerFlat;
+        const loose = thumb ? ARMS.thumbLoose : ARMS.fingerLoose;
+        for (let j = 0; j < d.joints.length; j++) {
+          const c = mix(flat[j], loose[j], s) * k;
+          if (j === 0) {
+            // Together for the paddle, fanned when the hand is nothing.
+            d.joints[j].rotation.set(d.pitch + c, 0,
+              d.fan * mix(thumb ? 0.62 : 0.74, thumb ? 1.28 : 1.24, s));
+          } else {
+            d.joints[j].rotation.x = c;
+          }
+        }
+      }
     }
+  }
+
+  /**
+   * The same two arms, on a bar instead of in a stroke.
+   *
+   * The body does not roll here and the camera does — you counter-lean against
+   * the pull and your head stays a good deal squarer to the horizon than the
+   * board is — so this takes the heel back out of the shoulders exactly the
+   * way the swim takes the stroke roll out, and for the same reason.
+   */
+  function updateRide(dt, ride, camera) {
+    cam.fov = camera.fov;
+    cam.aspect = camera.aspect;
+    cam.position.copy(camera.position);
+    cam.quaternion.copy(camera.quaternion);
+    cam.updateProjectionMatrix();
+
+    const you = ride.you;
+    root.position.copy(camera.position);
+    // Yaw with the board and not with the head: turn to look at your kite and
+    // your arms stay on the bar, which is the entire point of the mode having
+    // a separate look in the first place.
+    // Yaw only. The camera already rolls with the edge — see `pose` in
+    // 59-ride.js — and rolling the shoulders as well rolled the bar twice, so
+    // it came out across the frame at twenty-five degrees instead of the nine
+    // the lean actually accounts for.
+    _e.set(0, you.yaw, 0, 'YXZ');
+    root.quaternion.setFromEuler(_e);
+    body.position.set(0, 0, -RIDE_LEAN);
+
+    rig.position.set(ARMS.barAt[0], ARMS.barAt[1] + 0.055 * you.pull,
+      ARMS.barAt[2] + 0.12 * you.pull);
+    rig.rotation.set(-0.24, 0, 0);
+
+    const pull = you.pull;
+    for (const a of sides) barPose(a, pull, you.t);
   }
 
   /**
@@ -29426,10 +30871,17 @@ function buildArms() {
     update, render,
     stats: () => ({
       on: root.visible ? 1 : 0,
-      // Two arms, three pieces each, and every piece is a lathe of six or
-      // seven sides — so this is a rounding error against a 3.4 M frame and
-      // the only reason to print it is to prove they are actually there.
-      pieces: sides.length * 3,
+      mode: rig.visible ? 'bar' : (root.visible ? 'swim' : 'off'),
+      // Two arms, three pieces each, plus fourteen finger and thumb bones a
+      // side — every one of them a lathe, so this is still a rounding error
+      // against a 3.4 M frame and the only reason to print it is to prove
+      // they are actually there.
+      pieces: sides.reduce((n, a) =>
+        n + 3 + a.digits.reduce((m, d) => m + d.joints.length, 0), 0),
+      // How open the near hand is right now, 0..1. The one number worth
+      // watching when this is wrong.
+      grip: sides.length
+        ? +sides[0].digits[0].joints[0].rotation.x.toFixed(3) : 0,
     }),
   };
 }
@@ -31559,7 +33011,90 @@ function buildAudio() {
     // stopped being underwater and started being broken.
     subG.gain.setTargetAtTime(1 - 0.95 * subV, t, 0.10);
     subLp.frequency.setTargetAtTime(20000 * Math.pow(380 / 20000, subV), t, 0.10);
+    // And what fills the hole that leaves.
+    underBed(subV);
     applyOut(0.25);
+  }
+
+  /**
+   * What it sounds like down there, once everything up here has stopped.
+   *
+   * Shutting the world out properly leaves a hole. Take the beach 60 dB down
+   * and put the master through a 380 Hz lowpass at a twentieth of its level
+   * and three metres under is very nearly silence, and silence is not what
+   * being underwater sounds like — it is what a bug sounds like. Anyone who
+   * has actually put their head under knows the two things that are down
+   * there: a wide low hiss with no direction in it at all, which is the swell
+   * working the whole bottom at once, and your own bubbles.
+   *
+   * It hangs off `slowLp`, downstream of the surface muffle, because it is
+   * already on this side of the surface. Putting it on the master would have
+   * the sea attenuate the sea.
+   */
+  let underNodes = null, bubbleAt = 0, underV = 0;
+  function underBed(level) {
+    underV = sat(level);
+    if (!ctx || dead || !slowLp) return;
+    const t = ctx.currentTime;
+    if (!underNodes) {
+      if (underV < 0.01) return;
+      const src = ctx.createBufferSource();
+      src.buffer = noiseBuf; src.loop = true;
+      // 190 Hz and no resonance. Everything above it is the surface's and the
+      // surface is not here.
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 190; lp.Q.value = 0.5;
+      // And a shelf out of the very bottom, or it reads as a fault on the
+      // amplifier rather than as water.
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 42; hp.Q.value = 0.5;
+      const g = ctx.createGain();
+      g.gain.value = 0.0001;
+      // A slow swell on it, because the sea is not a level.
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sine'; lfo.frequency.value = 0.13;
+      const lg = ctx.createGain(); lg.gain.value = 0.03;
+      lfo.connect(lg).connect(g.gain);
+      lfo.start(t);
+      src.connect(lp).connect(hp).connect(g).connect(slowLp);
+      src.start(t);
+      underNodes = { src, g };
+    }
+    underNodes.g.gain.setTargetAtTime(0.075 * underV, t, 0.35);
+  }
+
+  /**
+   * Your own bubbles, one small train at a time.
+   *
+   * The same rising sine as the ditching plunge — a bubble's pitch goes *up*
+   * as it leaves and expands, and that rise is the entire cue — but three or
+   * four of them instead of thirty, every few seconds, and never quite on the
+   * same interval twice. Regular bubbles are a machine.
+   */
+  function bubbleTrain(dt) {
+    if (!ctx || dead || underV < 0.06) { return; }
+    bubbleAt -= dt;
+    if (bubbleAt > 0) return;
+    bubbleAt = 1.6 + Math.random() * 3.4;
+    const t0 = ctx.currentTime + 0.02;
+    let at = t0;
+    const n = 2 + (Math.random() * 4) | 0;
+    for (let i = 0; i < n; i++) {
+      const f = 260 + Math.random() * 820;
+      const d = 0.022 + Math.random() * 0.045;
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f, at);
+      o.frequency.exponentialRampToValueAtTime(f * (1.35 + Math.random()), at + d);
+      const bg = ctx.createGain();
+      bg.gain.setValueAtTime(0.0001, at);
+      bg.gain.exponentialRampToValueAtTime(
+        0.028 * underV * (0.35 + Math.random() * 0.65), at + d * 0.25);
+      bg.gain.exponentialRampToValueAtTime(0.0001, at + d);
+      o.connect(bg).connect(slowLp);
+      o.start(at); o.stop(at + d + 0.01);
+      at += 0.030 + Math.random() * 0.10;
+    }
   }
 
   /**
@@ -31578,15 +33113,28 @@ function buildAudio() {
     // that reflects almost all of it back up the hill, and the half of every
     // second your ears spend under takes the rest. It was audible here and it
     // should not have been.
-    const x = Math.max(roomV, Math.min(1, 0.90 * wetV + 0.22 * subV));
-    // 18 dB down the moment you are in it, 32 down under it. That is a long
-    // way and it is meant to be: the point of the water is that the beach
-    // stops, and a beach you can still make out is a beach that never stopped.
-    outBus.gain.setTargetAtTime(1 - 0.975 * x, t, tau);
-    // And 460 Hz rather than 900, because what survives the surface is the
-    // bottom of the men's line and nothing above it — no consonants, no
-    // cicadas at all, which live at 4 kHz and are simply gone.
-    outLp.frequency.setTargetAtTime(20000 * Math.pow(460 / 20000, x), t, tau);
+    // Two surfaces, and they were being added together as if they were one.
+    //
+    // The first is being in the water at all: your ears are at the waterline,
+    // half of every second one of them is under, and the klapa is arriving
+    // across the water at a grazing angle off a surface that reflects almost
+    // all of it back up the hill. That is worth 24 dB and it happens the
+    // moment you are in, before you have gone anywhere.
+    //
+    // The second is depth, and depth is *exponential* — it is absorption
+    // through a medium and absorption is always exp(-kd). Written as a ramp
+    // that saturated at 1.1 m it had no answer at all to "I went deeper and it
+    // did not get quieter", because a metre down there was nothing left to
+    // give and everything below that was the same. Now every metre takes
+    // another fixed fraction of what is left: 17 dB at one metre, 34 at two,
+    // and by three the hillside is 60 dB under the water and simply not there.
+    const x = Math.max(roomV, Math.min(1, 0.85 * wetV));
+    outBus.gain.setTargetAtTime(
+      (1 - 0.94 * x) * Math.pow(0.012, subV), t, tau);
+    // And what is left of it is the bottom of the men's line and nothing above
+    // it — no consonants, and no cicadas at all, which live at 5 kHz.
+    outLp.frequency.setTargetAtTime(
+      20000 * Math.pow(500 / 20000, x) * Math.pow(0.22, subV), t, tau);
   }
 
   /**
@@ -31986,6 +33534,7 @@ function buildAudio() {
     // two kilometres away is dancing.
     fireTick(dt);
     radioTick();
+    bubbleTrain(dt);
     // `dead` means your aeroplane is over. It used to mean the mixer was
     // switched off, and conflating those two is the whole of "the water only
     // hisses if I arrive by the 9 key".
@@ -32256,6 +33805,13 @@ function buildAudio() {
         outHz: outLp ? Math.round(outLp.frequency.value) : -1,
         sub: subG ? +subG.gain.value.toFixed(3) : -1,
         subHz: subLp ? Math.round(subLp.frequency.value) : -1,
+        under: underNodes ? +underNodes.g.gain.value.toFixed(4) : 0,
+        // The hillside, and how far away it is being told it is. This one is
+        // here because it failed the silent way for the whole of the project
+        // so far: it is not a bed update() writes, it is a switch somebody
+        // flips on the frame you leave the aeroplane, and a switch has no
+        // value to print and so nobody ever printed it.
+        cicada: cicadaNodes ? +cicadaNodes.g.gain.value.toFixed(4) : 0,
         dead, master: master ? +master.gain.value.toFixed(3) : -1,
       };
     },
@@ -32438,7 +33994,8 @@ function stepLens(dt) {
   // fire is a smudge on a hill you cannot walk up, the Canadair is a speck,
   // and the beach you are trying to reach is a line. There is nothing you can
   // do about any of it except look, so let the looking be worth something.
-  const want = (state.phase === 'ground' || state.phase === 'swim')
+  const want = (state.phase === 'ground' || state.phase === 'swim'
+    || state.phase === 'ride')
     && (keys.has('KeyZ') || TOUCH.glook) ? 1 : 0;
   zoom = damp(zoom, want, LENS.ease, dt);
   if (zoom < 1e-4 && want === 0) zoom = 0;
@@ -32528,6 +34085,14 @@ addEventListener('keydown', (e) => {
   // board, which is right: they are the same act, once with an aeroplane
   // underneath you and once with a promenade. Only on foot; under a canopy you
   // already have one, and in the seat J is the key that does this.
+  // K is the kite, both ways, for the same reason E is the door both ways: one
+  // key, one idea, and you never have to remember which half of it you are in.
+  if (e.code === 'KeyK') {
+    e.preventDefault();
+    if (state.phase === 'ground') takeKite();
+    else if (state.phase === 'ride') dropKite();
+    return;
+  }
   if (e.code === 'KeyE' && state.phase === 'swim') { e.preventDefault(); wadeAshore(); return; }
   if (e.code === 'KeyU' && state.phase === 'ground') { e.preventDefault(); launchOut(); return; }
   // And Enter is the small one: running at the balcony rail, off it, and down
@@ -32594,6 +34159,15 @@ addEventListener('mousemove', (e) => {
     // and it is the field of view that decides how many pixels a radian is.
     const g = 0.0020 * flight.p.sens * (camera.fov / baseFov);
     ground.look(e.movementX * g, e.movementY * g);
+    return;
+  }
+  // On a board it is a head and nothing else. Steering is on the keys, which
+  // is not a compromise — see the note on `look` in 59-ride.js. The gain is
+  // the walking one rather than the swimming one, because you are standing up
+  // and the thing being turned is not lying down in a jacket.
+  if (state.phase === 'ride') {
+    const g = 0.0022 * flight.p.sens * (camera.fov / baseFov);
+    ride.look(e.movementX * g, e.movementY * g);
     return;
   }
   // And in the water, where it is a head again — a slower one, because the
@@ -32861,7 +34435,7 @@ function updateCamera(dt) {
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
   trees, landmarks, alerts, roads, rail, props, airfield, jadrija, ground, birds, eject,
-  mirror, mirrorP, swim, under, arms, kites, you;
+  mirror, mirrorP, swim, under, seabed, arms, kites, ride, you;
 /** You plus the three wingmen, as the birds see them. Built once, in boot(). */
 let birdFlush = [];
 
@@ -32952,6 +34526,8 @@ async function boot() {
   await step(70, 'load.sea');
   sea = buildSea(scene);
   under = buildUnder(scene);
+  seabed = buildBed(scene);
+  ride = buildRide(scene);
 
   await step(74, 'load.stone');
   resolveLandmarks();
@@ -33886,6 +35462,38 @@ function chuteAudio() {
 }
 
 /**
+ * Speed, and why.
+ *
+ * A speed on its own is a number that goes up and down for no reason anybody
+ * can see. The point of sail next to it is the reason, and it is the whole of
+ * what there is to learn here — the same power on the same water is thirty
+ * knots or nothing at all depending on one angle.
+ */
+function paintRideHud() {
+  if (!ride || !ride.active) return;
+  $('rd-kt').textContent = (ride.speed * 1.94384).toFixed(0);
+  const p = ride.point();
+  const el = $('rd-point');
+  // In the air the point of sail is not the thing you want to know, and there
+  // is exactly one thing that is. It takes the same slot rather than a new
+  // one, because a HUD that grows a line when something happens is a HUD that
+  // moves, and this one sits under a horizon that is already moving.
+  const air = ride.air;
+  if (air > 0.35) {
+    el.textContent = T('ride.air') + ' ' + air.toFixed(1) + ' m';
+    el.classList.remove('stall');
+    el.classList.add('air');
+  } else {
+    el.textContent = T('ride.' + p);
+    el.classList.toggle('stall', p === 'noGo');
+    el.classList.remove('air');
+  }
+  $('rd-hint').innerHTML = air > 0.35 ? T('ride.floating')
+    : p === 'noGo' ? T('ride.stalled')
+      : TK('ride.hint', 'ride.hintTouch');
+}
+
+/**
  * The two numbers, the wash, and the one hint.
  *
  * The wash is the whole picture and it is a `div`. It could have been a fog
@@ -33952,6 +35560,73 @@ function wadeAshore() {
   if (audio) audio.boots();
   paintDeviceText();
   toast(T('toast.ashore'));
+  return true;
+}
+
+/**
+ * Take one out.
+ *
+ * From the sand, which is where kites launch from, and it wants open water in
+ * front of you — so it walks out along the way you are facing looking for
+ * somewhere a board would actually go. If there is nothing there it says so
+ * and does nothing, which is the right answer on the wrong beach.
+ */
+function takeKite() {
+  if (state.phase !== 'ground' || !ride) return false;
+  const y = ground.you;
+  const fx = -Math.sin(y.yaw), fz = -Math.cos(y.yaw);
+  let got = null;
+  // Ahead first, because you are looking at the water you mean. Then a sweep,
+  // because nobody lines themselves up before pressing a key.
+  for (let a = 0; a <= 8 && !got; a++) {
+    const ang = (a === 0 ? 0 : (a % 2 ? 1 : -1) * Math.ceil(a / 2) * 0.42);
+    const c = Math.cos(ang), sn = Math.sin(ang);
+    const dx = fx * c - fz * sn, dz = fx * sn + fz * c;
+    for (let d = 12; d <= 70; d += 4) {
+      const x = y.x + dx * d, z = y.z + dz * d;
+      if (!isSea(x, z)) continue;
+      if (-groundAt(x, z) < 1.1) continue;
+      got = [x, z];
+      break;
+    }
+  }
+  if (!got || !ride.enter(got[0], got[1])) { toast(T('toast.noLaunch')); return false; }
+  ground.bail();
+  eject.reset();
+  state.phase = 'ride';
+  $('ground-hud').hidden = true;
+  $('hud').hidden = true;
+  $('chute-hud').hidden = true;
+  $('swim-hud').hidden = true;
+  $('ride-hud').hidden = false;
+  if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = true; $('stouch').hidden = false; }
+  if (!IS_TOUCH && !pointerLocked) grabPointer();
+  paintDeviceText();
+  toast(T('toast.onTheKite'));
+  return true;
+}
+
+/**
+ * And putting it down, which puts you in the sea.
+ *
+ * Not back on the beach. Letting go of a bar in the middle of the channel does
+ * not teleport anybody anywhere, and the swim mode is already the whole of
+ * what happens to a person in this water — so it is the one door out, and the
+ * shore is still reached the way the shore has always been reached.
+ */
+function dropKite(hard = false) {
+  if (state.phase !== 'ride' || !ride || !swim) return false;
+  const y = ride.you;
+  if (!swim.enter(y.x, y.z, y.yaw, -0.3)) return false;
+  ride.leave();
+  state.phase = 'swim';
+  $('ride-hud').hidden = true;
+  $('swim-hud').hidden = false;
+  if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = true; $('stouch').hidden = false; }
+  if (audio) audio.plunge(hard ? 1.15 : 0.8);
+  wasUnder = false;
+  paintDeviceText();
+  toast(T(hard ? 'toast.wipeout' : 'toast.offTheKite'));
   return true;
 }
 
@@ -34541,6 +36216,7 @@ let darkWant = 0;
 // through. Wider than either of the others, ramped rather than latched, and it
 // drives the near clip and nothing else — see `vik.hull`.
 let clipNear = 0;
+let cicadaGain = 0.05;
 // True while you are on foot inside the Jadrija field, which is the one place
 // the mission is allowed to stop happening. Set at the top of `frame`.
 let recess = false;
@@ -34785,6 +36461,28 @@ function frame() {
     updateMission(real);
   }
 
+  if (state.phase === 'ride') {
+    // The aeroplane is still going in somewhere behind you, same as under the
+    // canopy and in the water.
+    if (eject.active) flyDerelict(dt);
+    const out = ride.update(dt, {
+      fwd: (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0)
+        - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0) + TOUCH.sy,
+      side: (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0)
+        - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0) + TOUCH.sx,
+      sprint: keys.has('ShiftLeft') || keys.has('ShiftRight') || TOUCH.sfast,
+      down: keys.has('KeyC') || keys.has('ControlLeft') || TOUCH.sdown,
+      up: keys.has('Space') || TOUCH.sup,
+    });
+    // Off the end of the water. The mode does not argue about it — it puts you
+    // in the sea, which is where you would be.
+    // Off the end of the water, or down on your back from ten metres. Both
+    // put you in the sea, which is where they put you.
+    if (out) dropKite(out === 'wipeout');
+    else paintRideHud();
+    updateMission(real);
+  }
+
   if (state.phase === 'fly') {
     readKeys(dt);
     flight.update(dt, input);
@@ -34837,9 +36535,13 @@ function frame() {
   if (audio) audio.slowmo(state.phase === 'swim' ? 0 : zoom);
   if (camOverride) updateCamera(dt);
   else if (state.phase === 'ground') ground.pose(camera);
+  else if (state.phase === 'ride') ride.pose(camera);
   else if (state.phase === 'swim') swim.pose(camera);
   else if (state.phase === 'chute' || eject.active) eject.pose(camera);
   else if (state.phase !== 'intro') updateCamera(dt);
+  // After the pose, because the rig hangs off where you ended up rather than
+  // off where you were.
+  if (state.phase === 'ride') ride.draw();
   U.uCamPos.value.copy(camera.position);
   // How deep the eye itself is, which is what dims the water rather than
   // merely colouring it. Taken off the wave surface at your own position and
@@ -34855,7 +36557,11 @@ function frame() {
   // question asked of the object that owns the answer: the swim model sets it
   // when you enter the water and clears it when you leave, and there is nothing
   // for the phase to disagree with it about.
-  if (arms) arms.update(dt, swim, camera);
+  // One arm rig, two water modes. It works out which from what it is handed —
+  // see the note on `update` in 60-arms.js.
+  if (arms) {
+    arms.update(dt, state.phase === 'ride' ? ride : swim, camera);
+  }
   // Somebody else's afternoon, in the same wind as the fire. 46-kite.js.
   if (kites) kites.update(dt, camera);
 
@@ -34885,6 +36591,10 @@ function frame() {
   // the eye rather than on the phase, so a bale-out that puts the camera under
   // the surface for half a second gets it too.
   under.update(camera, U.uCamDepth.value, U.uCamDepth.value > 0.02, renderer, dt);
+  // Same gate as the dust: what is on the bottom is only ever seen from
+  // under the surface, and from above it the sea shader is what you are
+  // looking at rather than anything past it.
+  seabed.update(camera, U.uCamDepth.value > 0.02);
   // Wall time to spread, world time to burn. The only process in the game that
   // is racing the clock rather than racing you — see the note on `update` in
   // src/40-fire.js for why letting it slow would be a cheat and letting
@@ -34972,7 +36682,30 @@ function frame() {
     indoors += (inLatch - indoors) * Math.min(1, dt * 3.6);
     roomDark += (inLatch * darkWant - roomDark) * Math.min(1, dt * 3.6);
   }
-  if (afoot !== wasAfoot) { audio.cicadas(afoot, 0.05); wasAfoot = afoot; }
+  // The cicadas, and how far away they are — which until now was "never".
+  //
+  // They were a switch: on for the whole of being out of the aeroplane, at a
+  // fixed level, wherever you were. On the beach that is right and it is where
+  // it was written; a kilometre out in the channel it is a hillside of pines
+  // following you across open water at beach volume, which is what "the sound
+  // of cicadas is loud out deep at sea" is, and it is not something the depth
+  // curve could ever have fixed because the depth curve is about a surface and
+  // this is about a distance.
+  //
+  // So: off the shore distance field, the same one the swim autopilot steers
+  // down and the fire and the crowd already use. A hillside is a distributed
+  // source and falls off slower than a point — an inverse square would have
+  // them gone forty metres out, which is wrong the other way — so it is an
+  // inverse 1.8 power over a 130 m scale: full on the sand, half at 130 m,
+  // a twelfth at four hundred, and nothing at all by the time the far shore is
+  // the nearer one.
+  const cicD = afoot ? shoreAt(camera.position.x, camera.position.z) : 0;
+  const cicG = 0.05 / (1 + Math.pow(Math.max(0, cicD) / 130, 1.8));
+  if (afoot !== wasAfoot || (afoot && Math.abs(cicG - cicadaGain) > 0.0015)) {
+    cicadaGain = cicG;
+    audio.cicadas(afoot, cicG);
+    wasAfoot = afoot;
+  }
   // The beach, shut out by the wall. This used to make the cicadas *louder*
   // indoors on the theory that a quiet room is what you notice them in, and it
   // was the wrong theory: a changing hut with a hillside of cicadas at full
@@ -34995,7 +36728,10 @@ function frame() {
   // goes negative floating on a swell) reads as zero rather than as noise.
   if (audio) {
     const wet = swim && swim.active;
-    const w = wet ? Math.min(1, Math.max(0, swim.depth) / 1.1) : 0;
+    // Exponential, over about three metres rather than saturating at one.
+    // A ramp that was finished at 1.1 m is a ramp that answers "deeper" with
+    // "same", and deeper is the only thing the down key does.
+    const w = wet ? 1 - Math.exp(-Math.max(0, swim.depth) / 0.95) : 0;
     if (Math.abs(w - waterAt) > 0.004 || (wet ? 1 : 0) !== wetAt) {
       waterAt = w; wetAt = wet ? 1 : 0;
       audio.water(w, wetAt);
@@ -35037,7 +36773,26 @@ function frame() {
   // tenth of a second the wall is inside the clip again. Nothing pops, because
   // by that same guarantee there was never anything between the two positions
   // of the plane to pop in.
-  clipNear = Math.max(indoors, hullNow);
+  // The third surface you can put your face against is the bottom of the sea,
+  // and it was the one nobody had thought of. A swimmer is allowed within
+  // eighty centimetres of the bed and the front clip sits at 1.2 m, so looking
+  // down from there threw away every triangle of seabed under you and left the
+  // inside of the world showing through it — which is exactly what "I can see
+  // below the sea bed" is. Same treatment as a wall, off the same plane, and
+  // free: underwater the far end of the view is eighteen metres of green, so
+  // there is no far end left to spend depth precision on.
+  const bedNow = swim && swim.active
+    ? 1 - Math.min(1, Math.max(0, (swim.clearance - 0.7) / 1.7))
+    : 0;
+  // And a fourth: your own hands. A kite bar is 62 cm in front of your face
+  // and the four lines leave from it, so at the standing clip everything from
+  // the bar up to head height is inside the front plane and the lines arrive
+  // as four white poles that begin in mid-air. 0.38 m rather than the 0.06 a
+  // wall gets — the far end of this view is still four kilometres of town and
+  // does not want its depth thrown away, and 0.38 is all it takes to clear a
+  // pair of hands.
+  const rideNear = state.phase === 'ride' ? 0.72 : 0;
+  clipNear = Math.max(indoors, hullNow, bedNow, rideNear);
   const wantNear = 1.2 - 1.14 * clipNear;
   if (Math.abs(camera.near - wantNear) > 0.005) {
     camera.near = wantNear;
@@ -35294,6 +37049,8 @@ window.__fr = {
     ground: ground ? ground.stats() : null,
     swim: swim && swim.active ? swim.stats() : null,
     under: under ? under.stats() : null,
+    seabed: seabed ? seabed.stats() : null,
+    ride: ride && ride.active ? { ...ride.stats(), point: ride.point() } : null,
     arms: arms ? arms.stats() : null,
     kites: kites ? kites.stats() : null,
     props: props ? props.counts : null,
@@ -35525,6 +37282,53 @@ window.__fr = {
     stats: () => ({ ...computer.stats(), phase: comp ? comp.phase : null }),
   },
   /** The water. `dip` drops you in it wherever you name, for a look. */
+  /**
+   * The board. `on(x, z)` puts you on one at a point on the water without
+   * walking down a beach first, `tick` runs the mode's own clock, and `aim`
+   * turns the head — which here is genuinely not the same as turning the
+   * board, so both are exposed.
+   */
+  ride: {
+    stats: () => (ride ? { ...ride.stats(), point: ride.point() } : null),
+    raw: () => ride,
+    on: (x, z) => {
+      if (!ride || !ride.enter(x, z)) return null;
+      state.phase = 'ride';
+      $('chute-hud').hidden = true;
+      $('hud').hidden = true;
+      $('ground-hud').hidden = true;
+      $('swim-hud').hidden = true;
+      $('ride-hud').hidden = false;
+      paintRideHud();
+      return { ...ride.stats(), point: ride.point() };
+    },
+    /** Point the board itself, in radians, which a player cannot do directly. */
+    heading: (yaw) => {
+      if (!ride) return null;
+      ride.you.yaw = yaw;
+      return { ...ride.stats(), point: ride.point() };
+    },
+    aim: (look, pitch) => {
+      if (!ride) return null;
+      ride.you.look = look; ride.you.pitch = pitch;
+      return ride.stats();
+    },
+    tick: (secs, dtStep = 1 / 60, ctl = {}) => {
+      if (!ride || !ride.active) return null;
+      let out = null;
+      for (let t = 0; t < secs; t += dtStep) out = ride.update(dtStep, ctl) || out;
+      paintRideHud();
+      return { ...ride.stats(), point: ride.point(), out };
+    },
+    /** What the polar says about every heading, which is the whole model. */
+    polar: () => {
+      const o = [];
+      for (let d = 0; d <= 180; d += 15) {
+        o.push([d, +ridePolar(d * Math.PI / 180).toFixed(3)]);
+      }
+      return o;
+    },
+  },
   swim: {
     stats: () => (swim ? swim.stats() : null),
     raw: () => swim,
