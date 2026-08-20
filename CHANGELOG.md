@@ -8,6 +8,70 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.87.0] — 2026-08-20
+
+Two numbers that had been argued about without being looked at. The shadow pass
+was costing more than the picture it was shading, and more than half of that was
+being spent over open water on a landscape that was nowhere near it. And the
+thinning rate at Jadrija had been raised twice on the same complaint while the
+box it applied to held under a third of the houses anybody was complaining
+about. Both were found by counting rather than by reasoning, and both are now
+reported by something you can query.
+
+### Changed
+
+- **Half the shadow bill on a phone, three ways.** Measured first: one frame
+  over the channel was 292 draw calls and 8.9 million triangles, and 5.35
+  million of those — 58 per cent, more than the picture itself — were the two
+  shadow cascades. SSAO was never the problem; it has been off on touch since
+  the day it landed.
+
+  1. *No far cascade on a phone.* It is 900 m across at 44 cm a texel, and what
+     it draws that the near one does not is an occluder more than 55 m to the
+     side of you. `?farshadow` puts it back.
+  2. *The live cascades redraw every other frame while flying.* The map and the
+     matrix that goes with it are held **together**, so what you get is not a
+     shadow sliding across the ground — it is the same shadow, one frame old.
+     At 300 km/h and 200 m up that is under three metres, seen from two
+     hundred. On foot it stays every frame, because there it would show.
+     `?shadowevery=1` turns it off.
+  3. *Over water the cascades stand down.* A shadow proxy is registered
+     `frustumCulled = false`, so the whole landscape went through both passes
+     whether or not any of it was within reach — including out in the middle of
+     the channel, where nothing is. Sea within 70 m of the eye and 120 m of air
+     under you drops the near cascade; sea for 460 m in eight directions drops
+     the far one down to the aeroplane alone, which is two draw calls and buys
+     the one shadow out there anybody watches: yours, crossing the water.
+     `?noshadowskip` disables the whole test so the claim can be measured.
+
+  | | before | after |
+  |---|---|---|
+  | channel, 220 m | 292 calls / 8.90 M tris | 154 / 3.60 M |
+  | open sea, 300 m | 275 / 3.43 M | 147 / 1.75 M |
+  | over the fire, 540 m | 299 / 4.09 M | 168 / 2.02 M |
+
+  Side by side from the air over Jadrija the two pictures are hard to tell
+  apart, which is the point: what came out was never reaching the screen.
+
+- **Half the houses at Jadrija — this time by fixing the right number.** The
+  thinning rate has been raised twice before, 0.44 then 0.72, and each time the
+  view barely moved. The census says why: the box the rate applied to held 142
+  of the peninsula's 436 footprints, and the other 294 were the city builder's
+  and had never been thinned at all. So a hundred and twenty houses came out of
+  a strip you can walk in twenty seconds while the hillside behind it stayed one
+  continuous roof.
+
+  The box now covers the peninsula — 300 m either end of the promenade and
+  340 m back off the water, which runs out to the neck; past the neck is
+  Zablaće and somebody else's houses. With the box right the rate comes *down*,
+  to 0.62, and that number is arithmetic rather than taste: what stood on the
+  headland was 40 out of the old box plus all 294 outside it, and half of 334 is
+  167. It leaves 166 — 124 plain and 34 built properly. From the air the
+  headland has lanes and olive between the houses instead of a solid roof.
+
+  `jadrija.census` now reports seen / thinned / plain / detailed, so the next
+  time this comes up the argument can be about a number somebody has looked at.
+
 ## [1.86.0] — 2026-08-20
 
 Five things off a bug report, and four of them are the same kind of mistake:

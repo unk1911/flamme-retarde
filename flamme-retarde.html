@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.86.0">
+<meta name="version" content="1.87.0">
 <meta name="build-date" content="2026-08-20">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -1428,8 +1428,8 @@ html.touch #chase-hud { bottom: 23vh; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.86.0, built 2026-08-20">
-    <b>v1.86.0</b><i>·</i><span>2026-08-20</span>
+  <div id="build" title="Flamme Retardé 1.87.0, built 2026-08-20">
+    <b>v1.87.0</b><i>·</i><span>2026-08-20</span>
   </div>
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
@@ -1806,7 +1806,7 @@ html.touch #chase-hud { bottom: 23vh; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.86.0", date: "2026-08-20" };</script>
+<script>const BUILD = { v: "1.87.0", date: "2026-08-20" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -2405,6 +2405,11 @@ const U = {
   uShadowMapN: { value: null },
   uShadowMatN: { value: new THREE.Matrix4() },
   uShadowTexelN: { value: 1 / CONFIG.shadowNearRes },
+  // Which cascades are live this frame, as (far, near). Not a quality dial —
+  // a switch. A cascade that is off is not drawn, not aimed, and not sampled,
+  // and the branch is on a uniform so the whole warp takes it together. See
+  // the three modes in 06-shadow.js.
+  uShadowOn: { value: new THREE.Vector2(1, 1) },
   uCamPos: { value: new THREE.Vector3() },
 
   // the water column — see GLSL_WATER
@@ -2434,7 +2439,7 @@ const shareWater = () => ({
 const shareShadow = () => ({
   uShadowMap: U.uShadowMap, uShadowMat: U.uShadowMat, uShadowTexel: U.uShadowTexel,
   uShadowMapN: U.uShadowMapN, uShadowMatN: U.uShadowMatN,
-  uShadowTexelN: U.uShadowTexelN,
+  uShadowTexelN: U.uShadowTexelN, uShadowOn: U.uShadowOn,
 });
 
 // -------------------------------------------------------------- game state ---
@@ -2517,6 +2522,46 @@ if (IS_TOUCH) document.documentElement.classList.add('touch');
 CONFIG.ao = QUERY.has('noao') ? 0
   : QUERY.has('ao') ? Math.max(0, Math.min(1, parseFloat(QUERY.get('ao')) || 0))
     : IS_TOUCH ? 0 : 0.58;
+
+/**
+ * The far shadow cascade: 900 m across, following the aeroplane, and the one
+ * that draws a hillside of pines shading the next hillside.
+ *
+ * A phone does not get it. Measured over the channel it is 38 draw calls and
+ * two and a half million triangles a frame — and the reason it costs that much
+ * over open water, where it has nothing to draw, is that a shadow proxy is
+ * registered `frustumCulled = false` and so goes through the pass whether it is
+ * in the cascade or not. What a phone keeps is the near cascade, 110 m across
+ * and following your eye, which is every shadow you are close enough to read.
+ *
+ * `?farshadow` and `?nofarshadow` force it either way.
+ */
+CONFIG.shadowFar = QUERY.has('nofarshadow') ? 0
+  : QUERY.has('farshadow') ? 1
+    : IS_SMALL ? 0 : 1;
+
+/**
+ * Whether the cascades are allowed to stand down over water at all — see
+ * `shadowMode` in 90-app.js. On by default everywhere, because what it drops
+ * is provably empty; `?noshadowskip` is here so the claim can be measured
+ * rather than believed.
+ */
+CONFIG.shadowSkip = QUERY.has('noshadowskip') ? 0 : 1;
+
+/**
+ * And how often the live cascades are redrawn while you are flying, in frames.
+ *
+ * Two on a phone. The map and the matrix that goes with it are held together,
+ * so what you get is not a shadow sliding across the ground — it is the same
+ * shadow, one frame old. At 300 km/h and 200 m up that is under three metres,
+ * seen from two hundred. On foot it stays at one: you are looking at a contact
+ * shadow half a metre from your boot, and there it would show.
+ *
+ * `?shadowevery=N` overrides, `?shadowevery=1` turns it off.
+ */
+CONFIG.shadowEvery = QUERY.has('shadowevery')
+  ? Math.max(1, Math.round(parseFloat(QUERY.get('shadowevery')) || 1))
+  : IS_SMALL ? 2 : 1;
 
 /**
  * Live state of the on-screen controls. Written by 91-touch.js, read by the
@@ -3663,6 +3708,12 @@ uniform float uShadowTexel;
 uniform sampler2D uShadowMapN;
 uniform mat4 uShadowMatN;
 uniform float uShadowTexelN;
+// (far, near). Zero means that cascade is not being drawn this frame, so its
+// map holds whatever was in it last time and must not be read. Skipping the
+// sample is also worth having on its own: nine texture fetches a pixel over a
+// full screen is real money on a phone, and over open water the answer is
+// always "lit" anyway.
+uniform vec2 uShadowOn;
 
 ${GLSL_PACK}
 
@@ -3699,7 +3750,8 @@ float shadowAt(vec3 worldPos){
   float lit = 1.0;
   // Outside the cascade there is nothing to occlude with — assume lit, and
   // fade the last few texels so the boundary never shows as a hard line.
-  if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0 && uv.z <= 1.0) {
+  if (uShadowOn.x > 0.5
+      && uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0 && uv.z <= 1.0) {
     float edge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
     // In metres, which is the only way to think about this. The slab is 1 km,
     // so 0.00035 is 35 cm — a little under one 0.44 m texel, which is the
@@ -3719,6 +3771,7 @@ float shadowAt(vec3 worldPos){
   }
 
   // ── near ──
+  if (uShadowOn.y < 0.5) return lit;
   vec4 spN = uShadowMatN * vec4(worldPos, 1.0);
   vec3 uvN = spN.xyz / spN.w * 0.5 + 0.5;
   if (uvN.x < 0.0 || uvN.x > 1.0 || uvN.y < 0.0 || uvN.y > 1.0 || uvN.z > 1.0) return lit;
@@ -3864,6 +3917,23 @@ function buildShadow(renderer) {
   nearOnly.matrixAutoUpdate = false;
   scene.add(nearOnly);
 
+  // The rest of the casters, split so that a pass can be handed a subset
+  // without walking the tree. `world` is the landscape — the resort, the
+  // aerodrome, the city, twenty thousand trees. `always` is whoever you are:
+  // the aeroplane and, on foot, you. The split exists for one case and it is
+  // the common one on a phone — flying over the middle of the channel, where
+  // `world` has nothing within 450 m of you and is still 38 draw calls and two
+  // and a half million triangles a frame, because a shadow proxy is registered
+  // with `frustumCulled = false` and is therefore drawn whether it is in the
+  // cascade or not. Over open water the far map wants the aeroplane and
+  // nothing else, and that is two draw calls.
+  const world = new THREE.Group();
+  world.matrixAutoUpdate = false;
+  scene.add(world);
+  const always = new THREE.Group();
+  always.matrixAutoUpdate = false;
+  scene.add(always);
+
   U.uShadowMap.value = target.texture;
   U.uShadowTexel.value = 1 / res;
   U.uShadowMapN.value = targetN.texture;
@@ -3871,6 +3941,11 @@ function buildShadow(renderer) {
 
   const _c = new THREE.Vector3();
   const _up = new THREE.Vector3(0, 1, 0);
+  const _focus = new THREE.Vector3();
+  const _nearAt = new THREE.Vector3();
+  let mode = 'both';
+  let stride = 1;
+  let tick = 0;
 
   /** Aim one cascade at a point, snapped to its own texel grid. */
   function aim(c, focus, radius, resolution, out) {
@@ -3899,18 +3974,79 @@ function buildShadow(renderer) {
    *               from where the aeroplane is.
    */
   function update(focus, nearAt) {
-    aim(cam, focus, R, res, U.uShadowMat);
-    aim(camN, nearAt || focus, RN, resN, U.uShadowMatN);
+    _focus.copy(focus);
+    _nearAt.copy(nearAt || focus);
+  }
+
+  /**
+   * What to draw, and how often.
+   *
+   * Three modes, and the names say what is in the far map rather than how good
+   * it looks:
+   *
+   *   'both'  — the far cascade over the landscape and the near one over the
+   *             camera. What a desktop does, and what a phone does on the
+   *             ground.
+   *   'near'  — no far cascade at all. The near one is 110 m across and follows
+   *             your eye, so what this gives up is an occluder further than
+   *             55 m to the side of you: a hillside of pines shading the next
+   *             hillside, and the aeroplane's own shadow once it is more than
+   *             about 250 m up. It keeps every shadow you are close enough to
+   *             read, for 122 draw calls instead of 160 and 2.85 million
+   *             triangles instead of 5.35.
+   *   'far'   — the far cascade as usual, no near one. For the channel: sea
+   *             under you and a shore a couple of hundred metres off, so the
+   *             far map still has that shore's pines in it and the near map —
+   *             55 m around your eye, 122 draw calls, 2.85 million triangles —
+   *             has nothing but water. The far shore keeps its shadows at 44 cm
+   *             a texel, which from up here is what you were seeing anyway.
+   *   'solo'  — the far cascade with the aeroplane in it and nothing else, and
+   *             no near cascade. For open water, where there is nothing within
+   *             half a kilometre that could cast on anything: two draw calls
+   *             buy the one shadow out there anybody can see, which is yours,
+   *             on the sea. It is also what a phone gets over the channel,
+   *             because a phone had no far cascade to lose in the first place.
+   *
+   * `every` is the second lever and it is orthogonal: draw the live cascades on
+   * one frame in n and hold both the map *and* its matrix in between, because a
+   * map aimed at this frame and drawn on the last one is a shadow sliding
+   * across the ground. Held together they are simply one frame stale, which at
+   * 300 km/h and 200 m up is under three metres of a shadow you are looking at
+   * from two hundred — and it halves the whole shadow bill.
+   */
+  function set(m, every = 1) {
+    mode = m;
+    // Never in solo: it is two draw calls already, and the one shadow it draws
+    // is the one the eye is actually following.
+    stride = m === 'solo' ? 1 : Math.max(1, Math.round(every));
   }
 
   function render(renderer) {
+    const farOn = mode !== 'near';
+    const nearOn = mode === 'both' || mode === 'near';
+    // Every frame, due or not: the shader has to know which maps are honest
+    // before it reads them, and a held frame is still a frame.
+    U.uShadowOn.value.set(farOn ? 1 : 0, nearOn ? 1 : 0);
+    if (tick++ % stride) return;
+
     const prevTarget = renderer.getRenderTarget();
     renderer.setClearColor(0xffffff, 1);
-    for (const [t, c, small] of [[target, cam, false], [targetN, camN, true]]) {
-      nearOnly.visible = small;
-      renderer.setRenderTarget(t);
+    always.visible = true;
+    if (farOn) {
+      aim(cam, _focus, R, res, U.uShadowMat);
+      nearOnly.visible = false;
+      world.visible = mode !== 'solo';
+      renderer.setRenderTarget(target);
       renderer.clear(true, true, false);
-      renderer.render(scene, c);
+      renderer.render(scene, cam);
+    }
+    if (nearOn) {
+      aim(camN, _nearAt, RN, resN, U.uShadowMatN);
+      nearOnly.visible = true;
+      world.visible = true;
+      renderer.setRenderTarget(targetN);
+      renderer.clear(true, true, false);
+      renderer.render(scene, camN);
     }
     renderer.setRenderTarget(prevTarget);
   }
@@ -3955,7 +4091,7 @@ function buildShadow(renderer) {
    * game decided it was in full sun.
    */
   function cast(mesh, { dynamic = false, instanced = false, near = false,
-    material = null } = {}) {
+    hero = false, material = null } = {}) {
     // `material` is for casters whose vertex program the two shared depth
     // materials cannot express — so far, the skinned figure in src/41-skin.js,
     // whose shape exists only in a bone palette the depth pass has to be handed
@@ -3967,7 +4103,10 @@ function buildShadow(renderer) {
     mesh.updateMatrixWorld(true);
     proxy.matrix.copy(mesh.matrixWorld);
     proxy.matrixWorldNeedsUpdate = true;
-    (near ? nearOnly : scene).add(proxy);
+    // `hero` is the aeroplane and whoever you are on foot — see the note on
+    // `always` above. It beats `near`, because the whole point of it is to be
+    // in the far map on the frames the far map holds nothing else.
+    (hero ? always : near ? nearOnly : world).add(proxy);
     if (dynamic) moving.push({ src: mesh, proxy });
     return proxy;
   }
@@ -3993,9 +4132,18 @@ function buildShadow(renderer) {
   }
 
   return {
-    target, cam, targetN, camN, scene, update, render, casterMaterial,
+    target, cam, targetN, camN, scene, update, render, set, casterMaterial,
     cast, castTree, syncMoving,
-    casters: () => scene.children.length,
+    casters: () => world.children.length + nearOnly.children.length
+      + always.children.length,
+    stats: () => ({
+      mode,
+      every: stride,
+      world: world.children.length,
+      near: nearOnly.children.length,
+      hero: always.children.length,
+      res: [res, resN],
+    }),
   };
 }
 
@@ -15532,6 +15680,7 @@ async function buildJadrija(scene) {
   const vil = propBuilder();
   const taken = new Set();
   const houses = [];
+  const census = { seen: 0, thin: 0, plain: 0, rich: 0 };
 
   /**
    * One house. Walls follow the real polygon, because the silhouette is what you
@@ -15880,6 +16029,12 @@ async function buildJadrija(scene) {
 
   {
     const hr = mulberry32(CONFIG.seed ^ 0x0ba5e1);
+    // Counted rather than guessed at. "Too many houses" is a judgement made
+    // from the promenade and the only way to answer it honestly is to know how
+    // many of the things are in the box, how many were thinned out of it, and
+    // how many of the survivors were near enough the water to be worth
+    // building properly. See `stats()`.
+    census.seen = census.thin = census.plain = census.rich = 0;
     for (const bl of world.town) {
       const poly = bl.p;
       if (!poly || poly.length < 3 || poly.length > 12) continue;
@@ -15887,7 +16042,21 @@ async function buildJadrija(scene) {
       for (const p of poly) { cx += p[0]; cz += p[1]; }
       cx /= poly.length; cz /= poly.length;
       const [t, s] = local(cx, cz);
-      if (t < -80 || t > LEN + 80 || s < -6 || s > 130) continue;
+      // The box the thinning is allowed to work in.
+      //
+      // It used to be the strip behind the beach — 80 m either end of the
+      // 189 m promenade and 130 m deep — and that is why halving the rate
+      // twice changed the view so little. Only 142 of the headland's
+      // footprints were ever inside it; the rest were the city builder's and
+      // had never been thinned at all, so 121 houses came out of a strip you
+      // can walk in twenty seconds while the hillside behind it stayed a solid
+      // roof. Fixing the rate was fixing the wrong number.
+      //
+      // Jadrija is a peninsula and this now covers it: 300 m either end and
+      // 340 m back off the water, which runs out to the neck. Past the neck is
+      // Zablaće and the road to Šibenik, and those are somebody else's houses.
+      if (t < -300 || t > LEN + 300 || s < -6 || s > 340) continue;
+      census.seen++;
       // Thinning.
       //
       // OSM has 286 footprints in this box and the aerial does not. Some of
@@ -15901,17 +16070,23 @@ async function buildJadrija(scene) {
       // out of the town builder too rather than being merely undrawn here: the
       // gap is the point. Nothing near the water is thinned, because there is
       // nothing there to thin — OSM maps nothing within 39 m of this shore.
-      // 0.44 was already most of the way there and it was not far enough. The
-      // reading from the promenade was still "way too many of them": OSM's 286
-      // footprints minus 44 per cent is a hundred and sixty houses standing on
-      // a headland that has, in the aerial, something like eighty. Half of
-      // what was left comes out again — 0.72 — and the ones that survive are
-      // built with a great deal more on them, which is the trade this is: the
-      // triangles that were paying for the second hundred houses now pay for
-      // roofs you can believe on the first eighty.
-      if (hr() < 0.72) { taken.add(bl); continue; }
-      if (s > HOUSE.reach) continue;
+      // The rate, over the box above.
+      //
+      // It has been raised twice before now — 0.44, then 0.72 — on the same
+      // report each time, and each time the view barely moved, because the box
+      // it applied to held 142 of the peninsula's 436 footprints and the other
+      // 294 were never in the argument. Widening the box is what makes the rate
+      // mean anything; with it wide, the rate can come back down.
+      //
+      // 0.62 is arithmetic and not taste. What stood on this headland before
+      // was 40 houses out of the old box plus all 294 outside it — 334. Half of
+      // 334 is 167, and 0.62 over 436 leaves 166. That is the halving that was
+      // asked for, measured against what was actually standing rather than
+      // against the number in the source line.
+      if (hr() < 0.62) { taken.add(bl); census.thin++; continue; }
+      if (s > HOUSE.reach) { census.plain++; continue; }
       taken.add(bl);
+      census.rich++;
       detailHouse(poly, bl.h || 6, hr);
     }
   }
@@ -19036,6 +19211,8 @@ async function buildJadrija(scene) {
     /** The town builder asks this so it does not draw these twice. */
     ownsBuilding: (bl) => taken.has(bl),
     houses: houses.length,
+    /** How the OSM footprints in this box were spent. See the thinning. */
+    get census() { return { ...census }; },
     testFigure: testFigure && { tris: testFigure.tris, at: testFigure.at,
       bones: skinFig ? skinFig.bones.length : 0,
       clips: skinFig ? skinFig.clips.join('+') : 'none',
@@ -38263,7 +38440,11 @@ async function boot() {
   CANADAIR_RIG = await loadRig('canadair_fr3d');
   plane = buildCanadair();
   scene.add(plane.root);
-  shadow.castTree(plane.root, { dynamic: true });
+  // `hero`: the aeroplane goes in the group that is drawn into the far cascade
+  // even on the frames nothing else is — see `always` in 06-shadow.js. Over
+  // open water it is the only thing out there that can cast on anything, and
+  // its shadow crossing the sea underneath you is the one people watch.
+  shadow.castTree(plane.root, { dynamic: true, hero: true });
   waterfx = buildWaterFX(scene);
   flight = buildFlight(plane, fire);
   eject = buildEject(scene, flight, chuteDown);
@@ -38683,6 +38864,62 @@ function leaveWater(was = state.phase) {
 /** True where a back door is allowed to fire from. */
 const inWater = () => state.phase === 'swim' || state.phase === 'ride'
   || state.phase === 'foil';
+
+// Two rings of eight bearings: one at the near cascade's reach, one at the far
+// cascade's. `shoreAt` saturates at 400 m, so on its own it can promise that
+// much clear in every direction and no more; the outer ring covers the band
+// between 400 and the far cascade's own 450. A rock small enough to sit
+// between two probes is a rock, and it is 44 cm to a texel out there.
+const _ring = (r) => [[r, 0], [-r, 0], [0, r], [0, -r],
+  [r * 0.71, r * 0.71], [-r * 0.71, r * 0.71],
+  [r * 0.71, -r * 0.71], [-r * 0.71, -r * 0.71]];
+const _SEA_NEAR = _ring(70);
+const _SEA_FAR = _ring(460);
+const _allSea = (x, z, ring) => {
+  if (!isSea(x, z)) return false;
+  for (const [dx, dz] of ring) if (!isSea(x + dx, z + dz)) return false;
+  return true;
+};
+
+/**
+ * Water under you and nothing on it — which is the one situation where the
+ * shadow pass draws the whole landscape into maps that have nothing in them.
+ *
+ * Two answers, because there are two cascades and they reach different
+ * distances. `near` means there is nothing but sea within 70 m of your eye,
+ * which is the near cascade's 55 m plus margin: over the channel that is true
+ * long before the shore is out of range of the far one. `far` means nothing
+ * within 460 m either, which off Jadrija means the open Adriatic.
+ *
+ * Tested on the camera and not the aeroplane because the near cascade is aimed
+ * at the eye, and every view in this game keeps the two within fifty metres of
+ * each other, so one position answers for both.
+ */
+function overWater() {
+  if (!CONFIG.shadowSkip || state.phase !== 'fly' || !world.cover) return null;
+  const p = camera.position;
+  // Below this your own shadow is still landing somewhere you can see the
+  // detail of, and the near cascade has boats in it.
+  if (p.y < 120) return null;
+  if (!_allSea(p.x, p.z, _SEA_NEAR)) return null;
+  return shoreAt(p.x, p.z) >= 395 && _allSea(p.x, p.z, _SEA_FAR)
+    ? 'far' : 'near';
+}
+
+/**
+ * Which cascades to draw this frame.
+ *
+ * Reads as a ladder from "everything" down to "your own shadow on the sea".
+ * The one line worth pausing on is the last: over water a phone gets `solo`
+ * rather than `near`, which is *more* than it had — a phone has no far cascade
+ * at all, so the far map is free to hold the aeroplane, and two draw calls buy
+ * back the shadow crossing the water underneath you.
+ */
+function shadowMode() {
+  const w = overWater();
+  if (!w) return CONFIG.shadowFar ? 'both' : 'near';
+  return w === 'far' || !CONFIG.shadowFar ? 'solo' : 'far';
+}
 
 function skipToGround() {
   if (!ground || !ground.ok || !airfield || !airfield.site) return;
@@ -40951,6 +41188,7 @@ function frame() {
   // at 450 m and everything past it goes out. That never showed while the only
   // way on to your feet was climbing out of the door at Rokići — you were always
   // standing next to the thing the map was centred on.
+  shadow.set(shadowMode(), state.phase === 'fly' ? CONFIG.shadowEvery : 1);
   shadow.update(state.phase === 'ground' ? camera.position
     : eject.active ? eject.pos : flight.p.pos, camera.position);
   shadow.syncMoving();
@@ -41163,6 +41401,7 @@ window.__fr = {
     } : null,
     jadrija: jadrija ? {
       shoreM: Math.round(jadrija.length), houses: jadrija.houses,
+      census: jadrija.census,
       blockers: jadrija.blockers.length, tris: Math.round(jadrija.tris),
       at: [Math.round(jadrija.site.x), Math.round(jadrija.site.z)],
       people: jadrija.crowd.people, walkers: jadrija.crowd.walkers,
@@ -41179,6 +41418,7 @@ window.__fr = {
     ride: ride && ride.active ? { ...ride.stats(), point: ride.point() } : null,
     arms: arms ? arms.stats() : null,
     mask: mask ? mask.stats() : null,
+    shadow: shadow ? shadow.stats() : null,
     ao: ao ? ao.stats() : null,
     foil: foil && foil.active ? foil.stats() : null,
     kites: kites ? kites.stats() : null,

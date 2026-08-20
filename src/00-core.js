@@ -529,6 +529,11 @@ const U = {
   uShadowMapN: { value: null },
   uShadowMatN: { value: new THREE.Matrix4() },
   uShadowTexelN: { value: 1 / CONFIG.shadowNearRes },
+  // Which cascades are live this frame, as (far, near). Not a quality dial —
+  // a switch. A cascade that is off is not drawn, not aimed, and not sampled,
+  // and the branch is on a uniform so the whole warp takes it together. See
+  // the three modes in 06-shadow.js.
+  uShadowOn: { value: new THREE.Vector2(1, 1) },
   uCamPos: { value: new THREE.Vector3() },
 
   // the water column — see GLSL_WATER
@@ -558,7 +563,7 @@ const shareWater = () => ({
 const shareShadow = () => ({
   uShadowMap: U.uShadowMap, uShadowMat: U.uShadowMat, uShadowTexel: U.uShadowTexel,
   uShadowMapN: U.uShadowMapN, uShadowMatN: U.uShadowMatN,
-  uShadowTexelN: U.uShadowTexelN,
+  uShadowTexelN: U.uShadowTexelN, uShadowOn: U.uShadowOn,
 });
 
 // -------------------------------------------------------------- game state ---

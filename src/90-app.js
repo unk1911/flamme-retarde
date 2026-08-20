@@ -839,7 +839,11 @@ async function boot() {
   CANADAIR_RIG = await loadRig('canadair_fr3d');
   plane = buildCanadair();
   scene.add(plane.root);
-  shadow.castTree(plane.root, { dynamic: true });
+  // `hero`: the aeroplane goes in the group that is drawn into the far cascade
+  // even on the frames nothing else is — see `always` in 06-shadow.js. Over
+  // open water it is the only thing out there that can cast on anything, and
+  // its shadow crossing the sea underneath you is the one people watch.
+  shadow.castTree(plane.root, { dynamic: true, hero: true });
   waterfx = buildWaterFX(scene);
   flight = buildFlight(plane, fire);
   eject = buildEject(scene, flight, chuteDown);
@@ -1259,6 +1263,62 @@ function leaveWater(was = state.phase) {
 /** True where a back door is allowed to fire from. */
 const inWater = () => state.phase === 'swim' || state.phase === 'ride'
   || state.phase === 'foil';
+
+// Two rings of eight bearings: one at the near cascade's reach, one at the far
+// cascade's. `shoreAt` saturates at 400 m, so on its own it can promise that
+// much clear in every direction and no more; the outer ring covers the band
+// between 400 and the far cascade's own 450. A rock small enough to sit
+// between two probes is a rock, and it is 44 cm to a texel out there.
+const _ring = (r) => [[r, 0], [-r, 0], [0, r], [0, -r],
+  [r * 0.71, r * 0.71], [-r * 0.71, r * 0.71],
+  [r * 0.71, -r * 0.71], [-r * 0.71, -r * 0.71]];
+const _SEA_NEAR = _ring(70);
+const _SEA_FAR = _ring(460);
+const _allSea = (x, z, ring) => {
+  if (!isSea(x, z)) return false;
+  for (const [dx, dz] of ring) if (!isSea(x + dx, z + dz)) return false;
+  return true;
+};
+
+/**
+ * Water under you and nothing on it — which is the one situation where the
+ * shadow pass draws the whole landscape into maps that have nothing in them.
+ *
+ * Two answers, because there are two cascades and they reach different
+ * distances. `near` means there is nothing but sea within 70 m of your eye,
+ * which is the near cascade's 55 m plus margin: over the channel that is true
+ * long before the shore is out of range of the far one. `far` means nothing
+ * within 460 m either, which off Jadrija means the open Adriatic.
+ *
+ * Tested on the camera and not the aeroplane because the near cascade is aimed
+ * at the eye, and every view in this game keeps the two within fifty metres of
+ * each other, so one position answers for both.
+ */
+function overWater() {
+  if (!CONFIG.shadowSkip || state.phase !== 'fly' || !world.cover) return null;
+  const p = camera.position;
+  // Below this your own shadow is still landing somewhere you can see the
+  // detail of, and the near cascade has boats in it.
+  if (p.y < 120) return null;
+  if (!_allSea(p.x, p.z, _SEA_NEAR)) return null;
+  return shoreAt(p.x, p.z) >= 395 && _allSea(p.x, p.z, _SEA_FAR)
+    ? 'far' : 'near';
+}
+
+/**
+ * Which cascades to draw this frame.
+ *
+ * Reads as a ladder from "everything" down to "your own shadow on the sea".
+ * The one line worth pausing on is the last: over water a phone gets `solo`
+ * rather than `near`, which is *more* than it had — a phone has no far cascade
+ * at all, so the far map is free to hold the aeroplane, and two draw calls buy
+ * back the shadow crossing the water underneath you.
+ */
+function shadowMode() {
+  const w = overWater();
+  if (!w) return CONFIG.shadowFar ? 'both' : 'near';
+  return w === 'far' || !CONFIG.shadowFar ? 'solo' : 'far';
+}
 
 function skipToGround() {
   if (!ground || !ground.ok || !airfield || !airfield.site) return;
@@ -3527,6 +3587,7 @@ function frame() {
   // at 450 m and everything past it goes out. That never showed while the only
   // way on to your feet was climbing out of the door at Rokići — you were always
   // standing next to the thing the map was centred on.
+  shadow.set(shadowMode(), state.phase === 'fly' ? CONFIG.shadowEvery : 1);
   shadow.update(state.phase === 'ground' ? camera.position
     : eject.active ? eject.pos : flight.p.pos, camera.position);
   shadow.syncMoving();
@@ -3739,6 +3800,7 @@ window.__fr = {
     } : null,
     jadrija: jadrija ? {
       shoreM: Math.round(jadrija.length), houses: jadrija.houses,
+      census: jadrija.census,
       blockers: jadrija.blockers.length, tris: Math.round(jadrija.tris),
       at: [Math.round(jadrija.site.x), Math.round(jadrija.site.z)],
       people: jadrija.crowd.people, walkers: jadrija.crowd.walkers,
@@ -3755,6 +3817,7 @@ window.__fr = {
     ride: ride && ride.active ? { ...ride.stats(), point: ride.point() } : null,
     arms: arms ? arms.stats() : null,
     mask: mask ? mask.stats() : null,
+    shadow: shadow ? shadow.stats() : null,
     ao: ao ? ao.stats() : null,
     foil: foil && foil.active ? foil.stats() : null,
     kites: kites ? kites.stats() : null,

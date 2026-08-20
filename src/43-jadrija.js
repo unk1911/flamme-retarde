@@ -3947,6 +3947,7 @@ async function buildJadrija(scene) {
   const vil = propBuilder();
   const taken = new Set();
   const houses = [];
+  const census = { seen: 0, thin: 0, plain: 0, rich: 0 };
 
   /**
    * One house. Walls follow the real polygon, because the silhouette is what you
@@ -4295,6 +4296,12 @@ async function buildJadrija(scene) {
 
   {
     const hr = mulberry32(CONFIG.seed ^ 0x0ba5e1);
+    // Counted rather than guessed at. "Too many houses" is a judgement made
+    // from the promenade and the only way to answer it honestly is to know how
+    // many of the things are in the box, how many were thinned out of it, and
+    // how many of the survivors were near enough the water to be worth
+    // building properly. See `stats()`.
+    census.seen = census.thin = census.plain = census.rich = 0;
     for (const bl of world.town) {
       const poly = bl.p;
       if (!poly || poly.length < 3 || poly.length > 12) continue;
@@ -4302,7 +4309,21 @@ async function buildJadrija(scene) {
       for (const p of poly) { cx += p[0]; cz += p[1]; }
       cx /= poly.length; cz /= poly.length;
       const [t, s] = local(cx, cz);
-      if (t < -80 || t > LEN + 80 || s < -6 || s > 130) continue;
+      // The box the thinning is allowed to work in.
+      //
+      // It used to be the strip behind the beach — 80 m either end of the
+      // 189 m promenade and 130 m deep — and that is why halving the rate
+      // twice changed the view so little. Only 142 of the headland's
+      // footprints were ever inside it; the rest were the city builder's and
+      // had never been thinned at all, so 121 houses came out of a strip you
+      // can walk in twenty seconds while the hillside behind it stayed a solid
+      // roof. Fixing the rate was fixing the wrong number.
+      //
+      // Jadrija is a peninsula and this now covers it: 300 m either end and
+      // 340 m back off the water, which runs out to the neck. Past the neck is
+      // Zablaće and the road to Šibenik, and those are somebody else's houses.
+      if (t < -300 || t > LEN + 300 || s < -6 || s > 340) continue;
+      census.seen++;
       // Thinning.
       //
       // OSM has 286 footprints in this box and the aerial does not. Some of
@@ -4316,17 +4337,23 @@ async function buildJadrija(scene) {
       // out of the town builder too rather than being merely undrawn here: the
       // gap is the point. Nothing near the water is thinned, because there is
       // nothing there to thin — OSM maps nothing within 39 m of this shore.
-      // 0.44 was already most of the way there and it was not far enough. The
-      // reading from the promenade was still "way too many of them": OSM's 286
-      // footprints minus 44 per cent is a hundred and sixty houses standing on
-      // a headland that has, in the aerial, something like eighty. Half of
-      // what was left comes out again — 0.72 — and the ones that survive are
-      // built with a great deal more on them, which is the trade this is: the
-      // triangles that were paying for the second hundred houses now pay for
-      // roofs you can believe on the first eighty.
-      if (hr() < 0.72) { taken.add(bl); continue; }
-      if (s > HOUSE.reach) continue;
+      // The rate, over the box above.
+      //
+      // It has been raised twice before now — 0.44, then 0.72 — on the same
+      // report each time, and each time the view barely moved, because the box
+      // it applied to held 142 of the peninsula's 436 footprints and the other
+      // 294 were never in the argument. Widening the box is what makes the rate
+      // mean anything; with it wide, the rate can come back down.
+      //
+      // 0.62 is arithmetic and not taste. What stood on this headland before
+      // was 40 houses out of the old box plus all 294 outside it — 334. Half of
+      // 334 is 167, and 0.62 over 436 leaves 166. That is the halving that was
+      // asked for, measured against what was actually standing rather than
+      // against the number in the source line.
+      if (hr() < 0.62) { taken.add(bl); census.thin++; continue; }
+      if (s > HOUSE.reach) { census.plain++; continue; }
       taken.add(bl);
+      census.rich++;
       detailHouse(poly, bl.h || 6, hr);
     }
   }
@@ -7451,6 +7478,8 @@ async function buildJadrija(scene) {
     /** The town builder asks this so it does not draw these twice. */
     ownsBuilding: (bl) => taken.has(bl),
     houses: houses.length,
+    /** How the OSM footprints in this box were spent. See the thinning. */
+    get census() { return { ...census }; },
     testFigure: testFigure && { tris: testFigure.tris, at: testFigure.at,
       bones: skinFig ? skinFig.bones.length : 0,
       clips: skinFig ? skinFig.clips.join('+') : 'none',

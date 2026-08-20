@@ -44,6 +44,46 @@ CONFIG.ao = QUERY.has('noao') ? 0
     : IS_TOUCH ? 0 : 0.58;
 
 /**
+ * The far shadow cascade: 900 m across, following the aeroplane, and the one
+ * that draws a hillside of pines shading the next hillside.
+ *
+ * A phone does not get it. Measured over the channel it is 38 draw calls and
+ * two and a half million triangles a frame — and the reason it costs that much
+ * over open water, where it has nothing to draw, is that a shadow proxy is
+ * registered `frustumCulled = false` and so goes through the pass whether it is
+ * in the cascade or not. What a phone keeps is the near cascade, 110 m across
+ * and following your eye, which is every shadow you are close enough to read.
+ *
+ * `?farshadow` and `?nofarshadow` force it either way.
+ */
+CONFIG.shadowFar = QUERY.has('nofarshadow') ? 0
+  : QUERY.has('farshadow') ? 1
+    : IS_SMALL ? 0 : 1;
+
+/**
+ * Whether the cascades are allowed to stand down over water at all — see
+ * `shadowMode` in 90-app.js. On by default everywhere, because what it drops
+ * is provably empty; `?noshadowskip` is here so the claim can be measured
+ * rather than believed.
+ */
+CONFIG.shadowSkip = QUERY.has('noshadowskip') ? 0 : 1;
+
+/**
+ * And how often the live cascades are redrawn while you are flying, in frames.
+ *
+ * Two on a phone. The map and the matrix that goes with it are held together,
+ * so what you get is not a shadow sliding across the ground — it is the same
+ * shadow, one frame old. At 300 km/h and 200 m up that is under three metres,
+ * seen from two hundred. On foot it stays at one: you are looking at a contact
+ * shadow half a metre from your boot, and there it would show.
+ *
+ * `?shadowevery=N` overrides, `?shadowevery=1` turns it off.
+ */
+CONFIG.shadowEvery = QUERY.has('shadowevery')
+  ? Math.max(1, Math.round(parseFloat(QUERY.get('shadowevery')) || 1))
+  : IS_SMALL ? 2 : 1;
+
+/**
  * Live state of the on-screen controls. Written by 91-touch.js, read by the
  * input loop in 90-app.js — declared up here so neither has to care which of
  * them the build concatenates first.

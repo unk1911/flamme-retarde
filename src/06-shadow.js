@@ -39,6 +39,12 @@ uniform float uShadowTexel;
 uniform sampler2D uShadowMapN;
 uniform mat4 uShadowMatN;
 uniform float uShadowTexelN;
+// (far, near). Zero means that cascade is not being drawn this frame, so its
+// map holds whatever was in it last time and must not be read. Skipping the
+// sample is also worth having on its own: nine texture fetches a pixel over a
+// full screen is real money on a phone, and over open water the answer is
+// always "lit" anyway.
+uniform vec2 uShadowOn;
 
 ${GLSL_PACK}
 
@@ -75,7 +81,8 @@ float shadowAt(vec3 worldPos){
   float lit = 1.0;
   // Outside the cascade there is nothing to occlude with — assume lit, and
   // fade the last few texels so the boundary never shows as a hard line.
-  if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0 && uv.z <= 1.0) {
+  if (uShadowOn.x > 0.5
+      && uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0 && uv.z <= 1.0) {
     float edge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
     // In metres, which is the only way to think about this. The slab is 1 km,
     // so 0.00035 is 35 cm — a little under one 0.44 m texel, which is the
@@ -95,6 +102,7 @@ float shadowAt(vec3 worldPos){
   }
 
   // ── near ──
+  if (uShadowOn.y < 0.5) return lit;
   vec4 spN = uShadowMatN * vec4(worldPos, 1.0);
   vec3 uvN = spN.xyz / spN.w * 0.5 + 0.5;
   if (uvN.x < 0.0 || uvN.x > 1.0 || uvN.y < 0.0 || uvN.y > 1.0 || uvN.z > 1.0) return lit;
@@ -240,6 +248,23 @@ function buildShadow(renderer) {
   nearOnly.matrixAutoUpdate = false;
   scene.add(nearOnly);
 
+  // The rest of the casters, split so that a pass can be handed a subset
+  // without walking the tree. `world` is the landscape — the resort, the
+  // aerodrome, the city, twenty thousand trees. `always` is whoever you are:
+  // the aeroplane and, on foot, you. The split exists for one case and it is
+  // the common one on a phone — flying over the middle of the channel, where
+  // `world` has nothing within 450 m of you and is still 38 draw calls and two
+  // and a half million triangles a frame, because a shadow proxy is registered
+  // with `frustumCulled = false` and is therefore drawn whether it is in the
+  // cascade or not. Over open water the far map wants the aeroplane and
+  // nothing else, and that is two draw calls.
+  const world = new THREE.Group();
+  world.matrixAutoUpdate = false;
+  scene.add(world);
+  const always = new THREE.Group();
+  always.matrixAutoUpdate = false;
+  scene.add(always);
+
   U.uShadowMap.value = target.texture;
   U.uShadowTexel.value = 1 / res;
   U.uShadowMapN.value = targetN.texture;
@@ -247,6 +272,11 @@ function buildShadow(renderer) {
 
   const _c = new THREE.Vector3();
   const _up = new THREE.Vector3(0, 1, 0);
+  const _focus = new THREE.Vector3();
+  const _nearAt = new THREE.Vector3();
+  let mode = 'both';
+  let stride = 1;
+  let tick = 0;
 
   /** Aim one cascade at a point, snapped to its own texel grid. */
   function aim(c, focus, radius, resolution, out) {
@@ -275,18 +305,79 @@ function buildShadow(renderer) {
    *               from where the aeroplane is.
    */
   function update(focus, nearAt) {
-    aim(cam, focus, R, res, U.uShadowMat);
-    aim(camN, nearAt || focus, RN, resN, U.uShadowMatN);
+    _focus.copy(focus);
+    _nearAt.copy(nearAt || focus);
+  }
+
+  /**
+   * What to draw, and how often.
+   *
+   * Three modes, and the names say what is in the far map rather than how good
+   * it looks:
+   *
+   *   'both'  — the far cascade over the landscape and the near one over the
+   *             camera. What a desktop does, and what a phone does on the
+   *             ground.
+   *   'near'  — no far cascade at all. The near one is 110 m across and follows
+   *             your eye, so what this gives up is an occluder further than
+   *             55 m to the side of you: a hillside of pines shading the next
+   *             hillside, and the aeroplane's own shadow once it is more than
+   *             about 250 m up. It keeps every shadow you are close enough to
+   *             read, for 122 draw calls instead of 160 and 2.85 million
+   *             triangles instead of 5.35.
+   *   'far'   — the far cascade as usual, no near one. For the channel: sea
+   *             under you and a shore a couple of hundred metres off, so the
+   *             far map still has that shore's pines in it and the near map —
+   *             55 m around your eye, 122 draw calls, 2.85 million triangles —
+   *             has nothing but water. The far shore keeps its shadows at 44 cm
+   *             a texel, which from up here is what you were seeing anyway.
+   *   'solo'  — the far cascade with the aeroplane in it and nothing else, and
+   *             no near cascade. For open water, where there is nothing within
+   *             half a kilometre that could cast on anything: two draw calls
+   *             buy the one shadow out there anybody can see, which is yours,
+   *             on the sea. It is also what a phone gets over the channel,
+   *             because a phone had no far cascade to lose in the first place.
+   *
+   * `every` is the second lever and it is orthogonal: draw the live cascades on
+   * one frame in n and hold both the map *and* its matrix in between, because a
+   * map aimed at this frame and drawn on the last one is a shadow sliding
+   * across the ground. Held together they are simply one frame stale, which at
+   * 300 km/h and 200 m up is under three metres of a shadow you are looking at
+   * from two hundred — and it halves the whole shadow bill.
+   */
+  function set(m, every = 1) {
+    mode = m;
+    // Never in solo: it is two draw calls already, and the one shadow it draws
+    // is the one the eye is actually following.
+    stride = m === 'solo' ? 1 : Math.max(1, Math.round(every));
   }
 
   function render(renderer) {
+    const farOn = mode !== 'near';
+    const nearOn = mode === 'both' || mode === 'near';
+    // Every frame, due or not: the shader has to know which maps are honest
+    // before it reads them, and a held frame is still a frame.
+    U.uShadowOn.value.set(farOn ? 1 : 0, nearOn ? 1 : 0);
+    if (tick++ % stride) return;
+
     const prevTarget = renderer.getRenderTarget();
     renderer.setClearColor(0xffffff, 1);
-    for (const [t, c, small] of [[target, cam, false], [targetN, camN, true]]) {
-      nearOnly.visible = small;
-      renderer.setRenderTarget(t);
+    always.visible = true;
+    if (farOn) {
+      aim(cam, _focus, R, res, U.uShadowMat);
+      nearOnly.visible = false;
+      world.visible = mode !== 'solo';
+      renderer.setRenderTarget(target);
       renderer.clear(true, true, false);
-      renderer.render(scene, c);
+      renderer.render(scene, cam);
+    }
+    if (nearOn) {
+      aim(camN, _nearAt, RN, resN, U.uShadowMatN);
+      nearOnly.visible = true;
+      world.visible = true;
+      renderer.setRenderTarget(targetN);
+      renderer.clear(true, true, false);
+      renderer.render(scene, camN);
     }
     renderer.setRenderTarget(prevTarget);
   }
@@ -331,7 +422,7 @@ function buildShadow(renderer) {
    * game decided it was in full sun.
    */
   function cast(mesh, { dynamic = false, instanced = false, near = false,
-    material = null } = {}) {
+    hero = false, material = null } = {}) {
     // `material` is for casters whose vertex program the two shared depth
     // materials cannot express — so far, the skinned figure in src/41-skin.js,
     // whose shape exists only in a bone palette the depth pass has to be handed
@@ -343,7 +434,10 @@ function buildShadow(renderer) {
     mesh.updateMatrixWorld(true);
     proxy.matrix.copy(mesh.matrixWorld);
     proxy.matrixWorldNeedsUpdate = true;
-    (near ? nearOnly : scene).add(proxy);
+    // `hero` is the aeroplane and whoever you are on foot — see the note on
+    // `always` above. It beats `near`, because the whole point of it is to be
+    // in the far map on the frames the far map holds nothing else.
+    (hero ? always : near ? nearOnly : world).add(proxy);
     if (dynamic) moving.push({ src: mesh, proxy });
     return proxy;
   }
@@ -369,8 +463,17 @@ function buildShadow(renderer) {
   }
 
   return {
-    target, cam, targetN, camN, scene, update, render, casterMaterial,
+    target, cam, targetN, camN, scene, update, render, set, casterMaterial,
     cast, castTree, syncMoving,
-    casters: () => scene.children.length,
+    casters: () => world.children.length + nearOnly.children.length
+      + always.children.length,
+    stats: () => ({
+      mode,
+      every: stride,
+      world: world.children.length,
+      near: nearOnly.children.length,
+      hero: always.children.length,
+      res: [res, resN],
+    }),
   };
 }
