@@ -534,6 +534,12 @@ const U = {
   // and the branch is on a uniform so the whole warp takes it together. See
   // the three modes in 06-shadow.js.
   uShadowOn: { value: new THREE.Vector2(1, 1) },
+  // The needle floor at Jadrija: (centre x, centre z, half-length along the
+  // shore, half-width across it), and the shore's own direction as (cos, sin).
+  // Written once by 43-jadrija.js when the locale is built; zero until then,
+  // and zero is off. See the note in TERRAIN_FRAG.
+  uLitter: { value: new THREE.Vector4(0, 0, 0, 0) },
+  uLitterAx: { value: new THREE.Vector2(1, 0) },
   uCamPos: { value: new THREE.Vector3() },
 
   // the water column — see GLSL_WATER

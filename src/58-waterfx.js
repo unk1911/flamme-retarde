@@ -129,6 +129,7 @@ function buildSprayPool(scene, max, gravity, drag) {
 
 let dropSplashes = null;
 let scoopSpray = null;
+let bodySplash = null;
 
 function buildWaterFX(scene) {
   const drops = buildSprayPool(scene, 3000, 9.0, 0.55);
@@ -247,6 +248,52 @@ function buildWaterFX(scene) {
       }
     },
     update: spray.update,
+  };
+
+  // ── somebody going in ──────────────────────────────────────────────────────
+  //
+  // A person hitting water from a jetty is not a drop and not a scoop, and the
+  // difference is the shape rather than the size. Six tonnes off an aeroplane
+  // is a curtain: wide, low, and mostly moving the way the aeroplane was. A
+  // body is a *crown* — the water it displaces has nowhere to go but up and
+  // out, so it leaves as a ring of heavy drops thrown almost vertically, with
+  // a fine spray off the top of that which hangs for a second after the ring
+  // has fallen back.
+  //
+  // Both parts here, and the ring is what sells it. Drawn off the same pool as
+  // the scoop, which already has the right particle: big, slow, and dying at
+  // the surface it came out of.
+  bodySplash = {
+    /**
+     * `hard` is how much of a body went in and how fast — 1 is somebody
+     * stepping off a ladder, 2 is a running dive off the end of a jetty.
+     */
+    at(x, y, z, hard = 1, fwd = 0, fx = 0, fz = 0) {
+      const n = Math.round(26 + 30 * hard);
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU + spray.rng() * 0.5;
+        const s = spray.rng();
+        // Out and up. The ring leans the way she was going, because the water
+        // she pushed out of the way was going that way too.
+        const out = (1.1 + s * 2.0) * hard;
+        const up = (2.6 + s * 3.4) * hard;
+        spray.spawn(
+          x + Math.cos(a) * 0.22, y + 0.05, z + Math.sin(a) * 0.22,
+          Math.cos(a) * out + fx * fwd, up, Math.sin(a) * out + fz * fwd,
+          0.16 + s * 0.30, 0.9 + s * 0.7, 2.6,
+        );
+      }
+      // And the mist off the top of it, which is what is still there when the
+      // ring has gone: small, slow, and thrown straight up.
+      for (let i = 0; i < 22; i++) {
+        const a = spray.rng() * TAU, s = spray.rng();
+        spray.spawn(
+          x + Math.cos(a) * s * 0.5, y + 0.25 + s * 0.4, z + Math.sin(a) * s * 0.5,
+          Math.cos(a) * s * 0.9, 1.4 + s * 2.2, Math.sin(a) * s * 0.9,
+          0.09 + s * 0.14, 1.3 + s * 0.9, 5.0,
+        );
+      }
+    },
   };
 
   return {

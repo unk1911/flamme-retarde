@@ -87,6 +87,33 @@ const YOU = {
   // see `rigYaw` in 43-jadrija.js, which is the one place that says so — and
   // the yaw below is built for that, so this wants to be zero.
   face: 0,
+
+  // ── the mask ──────────────────────────────────────────────────────────────
+  //
+  // She had one all along and you could never see it: 62-mask.js draws the
+  // inside of a dive mask as an overlay across the whole screen, which is
+  // exactly right when you are behind it and is nothing at all when the camera
+  // is not. So there is a second one, and this is the outside of it — worn on
+  // the head, in figure space, the same way the beanie is.
+  //
+  // Fitted to the rig rather than eyeballed, off the face anchors the skin
+  // exports: the eye sits at (0.131, 1.623, ±0.033) with a radius of 15 mm,
+  // and the skull's front face at brow height is x = 0.160. So a mask that
+  // seals round both eyes is about 15 cm across, 9 cm tall, and its glass
+  // stands a couple of centimetres proud of the cheek — which is what the
+  // numbers below are.
+  mask: {
+    lens: [0.150, 1.628, 0], lensR: [0.016, 0.036, 0.068],
+    skirt: [0.126, 1.626, 0], skirtR: [0.044, 0.048, 0.076],
+    strap: 0.102, strapT: 0.0090, strapAt: 1.639,
+  },
+  // Black silicone, and glass that is not clear. A dive mask photographs as a
+  // dark hole with one hard highlight on it — the lens is a mirror pointed at
+  // whatever is in front of her, and what is in front of her at Jadrija is
+  // sky. Rendered as a pale blue with a tight specular rather than as
+  // transparency, which would show the inside of her skull.
+  glass: [0.150, 0.230, 0.265],
+  rubber: [0.045, 0.048, 0.056],
 };
 
 /**
@@ -552,10 +579,69 @@ async function buildYou(scene) {
   // The bob is the right shape anyway. Chloe's hair is short, choppy and swept
   // forward, which is what the rig has and what the dye job makes blue.
   // Nothing needed adding to it.
+  // ── the dive mask ─────────────────────────────────────────────────────────
+  //
+  // Built the same way as the beanie and hung off the same head group, so it
+  // turns with the skull rather than with the shoulders. Three pieces, which
+  // is all a mask is at any distance you will ever see this one from: the
+  // skirt that seals to her face, the glass in front of it, and the strap
+  // round the back of her head.
+  //
+  // Hidden until somebody asks for it, and when it goes on the beanie comes
+  // off. Not a clipping dodge — the strap and the turn-up do overlap — but
+  // because nobody swims two hundred metres in a wool hat, and the hat coming
+  // off is the beat that says she is going in.
+  const M = YOU.mask;
+  const glassMat = shade(YOU.glass, 0.72, 60);
+  const rubMat = shade(YOU.rubber, 0.16, 26);
+  const mask = new THREE.Group();
+  mask.visible = false;
+  head.add(mask);
+
+  const fitted = (g, at3, r3v, mat) => {
+    const m = new THREE.Mesh(g, mat);
+    m.position.set(at3[0] - YOU.bone[0], at3[1] - YOU.bone[1], at3[2] - YOU.bone[2]);
+    m.scale.set(r3v[0], r3v[1], r3v[2]);
+    mask.add(m);
+    return m;
+  };
+  // Unit spheres, scaled: one geometry, three shapes, and the scale is the
+  // radii straight out of the table above.
+  const unit = new THREE.SphereGeometry(1, 20, 14);
+  fitted(unit, M.skirt, M.skirtR, rubMat);
+  fitted(unit, M.lens, M.lensR, glassMat);
+  // The strap, and it is two stubs rather than a band round her head.
+  //
+  // The band was tried first and it was the wrong instrument. A torus big
+  // enough to clear a skull that is 27 cm front to back stands proud of the
+  // temples by three or four centimetres, which at any distance you actually
+  // see this from reads as a halo rather than as elastic — and the part of it
+  // that would have made it read right, the part behind her head, is the part
+  // no camera in this game is ever behind. What is left is the two centimetres
+  // either side of the skirt where the strap leaves it, which is the only bit
+  // of a mask strap anybody looks at from the front anyway.
+  for (const sgn of [-1, 1]) {
+    const stub = new THREE.Mesh(unit, rubMat);
+    stub.position.set(M.skirt[0] - 0.030 - YOU.bone[0],
+      M.strapAt - YOU.bone[1], sgn * M.skirtR[2] * 0.86 - YOU.bone[2]);
+    stub.scale.set(0.030, 0.011, 0.016);
+    mask.add(stub);
+  }
+
   const hi = fig.boneIndex('head');
   const at = new THREE.Vector3();
   const turn = new THREE.Quaternion();
   const dir = new THREE.Vector3();
+
+  // Who is driving her.
+  //
+  // Null means the mirror does, which is what she was built for: stand where
+  // the camera is, face where it faces, and be visible for exactly the length
+  // of the reflection pass. Anything else means a script has taken her — the
+  // dive off the jetty, or the camera that swings round behind her in the
+  // water — and then her position, her heading and her attitude are all told
+  // to her rather than derived, and she is a real object in the real scene.
+  let drive = null;
 
   /** Stand her where you are standing, facing where you are facing. */
   let frozen = false;
@@ -577,6 +663,18 @@ async function buildYou(scene) {
       fig.boneTurn(hi, turn);
       head.quaternion.copy(turn);
     }
+    if (drive) {
+      mesh.position.set(drive.at[0], drive.at[1], drive.at[2]);
+      // YZX: yaw about world up first, then pitch about her own lateral axis,
+      // then roll about her own forward. Any other order and a swimmer who is
+      // both turning and going head-down comes out corkscrewed — the pitch has
+      // to happen in the frame the yaw left her in, which is what putting Y
+      // outermost means.
+      mesh.rotation.set(drive.roll || 0, drive.yaw + YOU.face,
+        drive.pitch || 0, 'YZX');
+      mesh.updateMatrixWorld();
+      return;
+    }
     if (frozen) return;
     camera.getWorldDirection(dir);
     mesh.position.set(camera.position.x,
@@ -596,6 +694,41 @@ async function buildYou(scene) {
     /** Debug: draw her in the room, and stop her following the camera. */
     show: (v) => { mesh.visible = !!v; return mesh.visible; },
     freeze: (v) => { frozen = !!v; return frozen; },
+    /**
+     * Take her off the camera and put her somewhere.
+     *
+     * `o` is { at: [x, y, z], yaw, pitch, roll, clip, mask, seen } and every
+     * field is optional after the first two. Pass null to hand her back to the
+     * mirror, which also hides her — a body that is left standing in the scene
+     * after the shot that wanted it is a body standing in the sea.
+     */
+    drive: (o) => {
+      if (!o) {
+        drive = null;
+        mesh.visible = false;
+        mask.visible = false;
+        hat.visible = true;
+        chain.visible = true;
+        return null;
+      }
+      drive = o;
+      mesh.visible = o.seen !== false;
+      if (o.mask != null) { mask.visible = !!o.mask; hat.visible = !o.mask; }
+      // The cord comes off in the water, and that is a fix and not a costume
+      // note: it is a child of the figure rather than of a bone, hung for a
+      // body that is standing up, and on a swimmer it sails out sideways from
+      // the sternum like a length of wire. Nobody swims two hundred metres in
+      // a necklace either.
+      chain.visible = !o.wet;
+      if (o.clip && fig.playing() !== o.clip) {
+        fig.play(o.clip, { fade: o.fade == null ? 0.20 : o.fade });
+      }
+      if (o.speed != null && fig.state) fig.state.speed = o.speed;
+      return drive;
+    },
+    /** Is a script holding her, and what is she doing? */
+    driven: () => (drive ? { clip: fig.playing(), mask: mask.visible,
+      at: drive.at.map((v) => +v.toFixed(2)) } : null),
     stats: () => ({ tris: fig.tris, head: hi,
       at: [+mesh.position.x.toFixed(1), +mesh.position.y.toFixed(2),
         +mesh.position.z.toFixed(1)],

@@ -45,6 +45,23 @@ const VEG = {
   // whole landscape came out lighter after this than it went in.
   near: 190,
   nearMax: 3000,         // and the ceiling on those, so the buffer is bounded
+  // What the ring is actually allowed to hold, as against what the buffer can.
+  // 420 grown trees is about 1.4 M triangles, which is a fifth of the frame and
+  // is what the close-up model is worth; the buffer stays at 3 000 because it
+  // is scaled by the density slider and a tablet at 1.4 may ask for more.
+  // See the feedback at the end of `repack`.
+  nearWant: 420,
+  // And how far in it may be pulled before the answer is "draw fewer trees"
+  // rather than "draw them simpler". At 45 m a 10 m pine is a hundred pixels
+  // tall and the far model is honest at that: it has the right crown width and
+  // the right trunk, which is what the near one buys back at ten.
+  nearMin: 45,
+  // Extra candidate samples over the Jadrija headland — see `makeTile`. 7 000
+  // on top of the 2 100 takes the whole tile to 0.035 darts a square metre,
+  // which at the wood's own 0.62 is a pine about every seven metres. The
+  // reference is one every five: the peninsula is where the game spends its
+  // time on foot, and a wood you can see the sea through is the point of it.
+  groveMore: 7000,
 };
 
 /**
@@ -797,6 +814,14 @@ function buildTrees(scene, fire) {
     const ox = tx * T, oz = tz * T;
     const out = { pine: [], cypress: [], olive: [], bush: [], n: 0 };
 
+    // Jadrija answers for its own headland — see `grove` in 43-jadrija.js. The
+    // peninsula is baked URBAN and GROWS[URBAN] is a cypress every twenty
+    // metres, which is a suburb; what is there is a pine wood with a village
+    // in it. `grove` is consulted per dart below, and the tile is asked once,
+    // up front, whether it is worth throwing the second handful at all.
+    const grove = typeof jadrija !== 'undefined' && jadrija && jadrija.grove
+      && jadrija.grove.tile(ox, oz, T) ? jadrija.grove : null;
+
     // Nothing grows off the edge of the world. coverAt() and groundAt() both
     // clamp to the border texel, so a tile beyond the boundary inherits whatever
     // the last row of the map happened to say and plants a forest on the open
@@ -804,7 +829,16 @@ function buildTrees(scene, fire) {
     // 1 500 m to 2 200 m is what made this visible from inside the world.
     const EDGE = CONFIG.world / 2 - 20;
 
-    for (let i = 0; i < VEG.perTile; i++) {
+    // A second handful over the headland, and it has to be a second handful
+    // rather than a bigger table, because a per-dart probability cannot exceed
+    // one: at 2 100 darts over a 512 m tile the closest any species can be
+    // planted is one every eleven metres, and the wood at Jadrija is one every
+    // five or six. The extra darts are the wood's alone — past the tile's own
+    // quota a point only plants if the headland claims it — so a tile that
+    // overlaps the peninsula by a corner does not also thicken the hillside
+    // behind it.
+    const darts = VEG.perTile + (grove ? VEG.groveMore : 0);
+    for (let i = 0; i < darts; i++) {
       const x = ox + rng() * T, z = oz + rng() * T;
       if (Math.abs(x) > EDGE || Math.abs(z) > EDGE) continue;
       // Not on the airfield. The land-cover raster has never heard of Rokići —
@@ -819,8 +853,8 @@ function buildTrees(scene, fire) {
       // hand, in their planters, with the rest of the resort.
       if (typeof jadrija !== 'undefined' && jadrija && jadrija.inField
         && jadrija.inField(x, z, 6)) continue;
-      const c = coverAt(x, z);
-      const table = GROWS[c];
+      const g = grove ? grove.at(x, z) : null;
+      const table = g || (i < VEG.perTile ? GROWS[coverAt(x, z)] : null);
       if (!table) continue;
 
       const r = rng();
@@ -869,6 +903,9 @@ function buildTrees(scene, fire) {
 
   let density = 1;
   let acc = 0, lastTx = 1e9, lastTz = 1e9, live = 0, closeUp = 0;
+  // How far the grown model reaches this frame, which is not a constant any
+  // more. See the note over VEG.nearWant.
+  let nearR = VEG.near;
   const _q = new THREE.Quaternion();
   const _up = new THREE.Vector3(0, 1, 0);
 
@@ -878,7 +915,7 @@ function buildTrees(scene, fire) {
     // of the two — a tree close enough to be worth its polygons is still a tree.
     const cursor = {}, used = {};
     for (const s of SPECIES) { cursor[s] = { near: 0, far: 0 }; used[s] = 0; }
-    const nearR2 = VEG.near * VEG.near;
+    const nearR2 = nearR * nearR;
     const cap = Math.floor(VEG.budget * clamp(density, 0, 2));
     const R = VEG.radius * clamp(0.4 + density * 0.6, 0.4, 1.3);
     const R2 = R * R;
@@ -964,6 +1001,36 @@ function buildTrees(scene, fire) {
       L.aColor.needsUpdate = true;
       L.mesh.visible = L.count > 0;
     }
+
+    // ── how far the grown model reaches ──────────────────────────────────
+    //
+    // A near pine is 3 314 triangles and a far one is 128, so the ring is the
+    // whole cost of the vegetation and a fixed radius cannot price it. On the
+    // hillside above Rokići 190 m holds about fifty trees and is free. In the
+    // wood at Jadrija the same 190 m holds three thousand, which is ten million
+    // triangles for one species — and that only became possible when the
+    // headland stopped being a suburb, so it has never had to be priced before.
+    //
+    // Capping the count alone would not do: which trees make the ring is
+    // whatever order the tiles happen to iterate in, so a hard cap leaves a
+    // far model at five metres and a grown one at a hundred and eighty. What
+    // has to stay true is *nearest first*, and the only test that gives that
+    // for free is the radius. So the radius is what moves: pull it in when the
+    // ring is over its allowance, let it back out when there is room, and let
+    // it pin at VEG.near wherever the country is open enough not to care.
+    //
+    // Solved rather than hunted. In a stand of anything the count inside the
+    // ring goes as the square of its radius, so sqrt(want / got) is the whole
+    // correction in one step and the loop is over in a repack or two — which
+    // matters, because a repack is four tenths of a second and walking in off
+    // the promenade must not cost eight seconds at seven million triangles.
+    //
+    // The step is clamped either way, and much tighter going out than coming
+    // in: overshooting inwards costs a few trees their limbs for half a
+    // second, overshooting outwards costs the frame.
+    const want = Math.max(60, VEG.nearWant * clamp(density, 0.15, 1.4));
+    nearR = clamp(nearR * clamp(Math.sqrt(want / Math.max(closeUp, 1)),
+      0.72, 1.06), VEG.nearMin, VEG.near);
   }
 
   function update(dt, camPos) {
@@ -996,6 +1063,32 @@ function buildTrees(scene, fire) {
      * grown and their cost is a consequence of a spec rather than of a list, so
      * it is not something you can count by reading the source any more.
      */
+    /** How far the grown model currently reaches — see the feedback in repack. */
+    nearR: () => +nearR.toFixed(1),
+    /**
+     * How wooded it is here, 0 to 1 — the fraction of a ring around (x, z)
+     * that grows something with a trunk on it.
+     *
+     * Not a count of trees: it asks the same tables `makeTile` asks, so it is
+     * a property of the *place* and not of whatever survived this frame's
+     * instance budget. Sampled on a ring rather than at a point because what
+     * it is for is a diffuse source — you are under a wood or you are not, and
+     * standing in a gap between two pines does not stop the cicadas.
+     */
+    canopyAt: (x, z, r = 22) => {
+      const grove = typeof jadrija !== 'undefined' && jadrija ? jadrija.grove : null;
+      let hit = 0;
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * TAU;
+        const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+        const table = (grove && grove.at(px, pz)) || GROWS[coverAt(px, pz)];
+        if (table && (table.pine || table.olive || table.cypress)) {
+          hit += Math.min(1, ((table.pine || 0) + (table.olive || 0)
+            + (table.cypress || 0)) * 2.2);
+        }
+      }
+      return clamp(hit / 6, 0, 1);
+    },
     cost: () => Object.fromEntries(SPECIES.map((s) => [s,
       [protos.near[s].index.count / 3, protos.far[s].index.count / 3]])),
     /** Debug: the nearest planted tree of a species, for aiming a camera. */

@@ -107,6 +107,7 @@ uniform float uBiasFar;
 uniform float uCut;
 uniform float uFade;
 uniform int uDbg;
+uniform float uDepthK;
 
 float viewZ(float d) {
   // The standard perspective un-projection of a [0,1] depth sample. Comes out
@@ -128,6 +129,32 @@ float hash(vec2 p) {
 
 void main() {
   float d = texture2D(tDepth, vUv).x;
+
+  // ── the depth AOV ─────────────────────────────────────────────────────────
+  //
+  // Not one of the debug ramps below, and it has to sit above both of the culls
+  // that follow rather than beside them, because it fails all three of their
+  // assumptions. This is a conditioning image for a diffusion pass that runs
+  // outside the game, and such an image has to be monotonic — uDbg == 2 is a
+  // fract() sawtooth, which a depth model reads as a striped wall — it has to
+  // survive past uCut, which is 26 m because that is as far as a contact
+  // shadow is legible and is nowhere near as far as a landscape, and its sky
+  // has to be black. The occlusion returns white for "nothing in the way";
+  // a depth ControlNet reads white as *near*, so shipping the sky white puts
+  // the horizon in the viewer's lap.
+  //
+  // Inverse depth, because that is what the models were trained on. MiDaS and
+  // everything after it emit disparity rather than metres, so a linear ramp
+  // over a kilometre of view distance would flatten every building on the
+  // promenade into the same black. uDepthK is the range at which the curve
+  // has fallen half way — 50 m by default, which is the depth of a street and
+  // therefore where the detail worth conditioning on actually is.
+  if (uDbg == 4) {
+    float far = d >= 0.9999 ? 1e9 : -viewPos(vUv, d).z;
+    fragColor = vec4(vec3(1.0 / (1.0 + far / uDepthK)), 1.0);
+    return;
+  }
+
   // The sky. Nothing occludes it and nothing it occludes is on this screen.
   if (d >= 0.9999) { fragColor = vec4(1.0); return; }
 
@@ -298,6 +325,7 @@ function buildAO(renderer) {
     uCut: { value: AO.far },
     uFade: { value: AO.fade },
     uDbg: { value: 0 },
+    uDepthK: { value: 50 },
   };
   const compUni = {
     tColor: { value: null },
@@ -414,7 +442,11 @@ function buildAO(renderer) {
      * three.js's own tone mapping, which is why the caller has to be told.
      */
     set: (v) => { strength = Math.max(0, Math.min(1, v)); },
-    dbg: (n, show) => { aoUni.uDbg.value = n | 0; compUni.uShow.value = show ? 1 : 0; },
+    dbg: (n, show, k) => {
+      aoUni.uDbg.value = n | 0;
+      compUni.uShow.value = show ? 1 : 0;
+      if (k) aoUni.uDepthK.value = k;
+    },
     stats: () => ({
       on: ok && strength > 0.001 ? 1 : 0,
       k: +strength.toFixed(2),

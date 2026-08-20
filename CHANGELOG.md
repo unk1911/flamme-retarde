@@ -8,6 +8,90 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.88.0] — 2026-08-20
+
+Somebody went and stood there.
+
+Two walks recorded on the peninsula on 20 August — through the pine wood, along
+the lanes, past the kabine and down to the shop — and the analysis of them is in
+`docs/jadrija-fieldwork.md`, because a place built from an aerial photograph and
+a place built from somebody's boots are not the same place and it turns out you
+can measure the difference.
+
+### Jadrija, against the footage
+
+- **The peninsula is a pine wood with a village in it**, and the engine grew
+  none of it. The cover raster bakes the headland `URBAN` — correctly; it *is*
+  built up, and the fuel model wants that — and `GROWS[URBAN]` is a cypress
+  every twenty metres. So the locale now answers the question for its own
+  ground: `grove` in `43-jadrija.js` says what grows on the headland, keeps out
+  of the footprints that survived the thinning, and `45-trees.js` throws a
+  second handful of darts over it. About five thousand pines, at the spacing
+  the photographs show rather than the spacing a per-dart probability can
+  express.
+- **The floor of it is dead needles, and it was blue.** Measured, the sunlit
+  litter is `rgb(181, 139, 105)`; measured, the engine was rendering
+  `rgb(160, 167, 171)` — bluer than it was red, against a reference 76 points
+  redder than blue. There is a needle floor in the terrain shader now, held off
+  the waterline and off the seabed, and it multiplies rather than mixes so the
+  karst ribs and the three scales of mottle survive it. It comes out
+  `rgb(183, 141, 108)`.
+- **The concrete was cold.** The terrace photographs at `rgb(160, 155, 145)`
+  and was rendering at `rgb(157, 165, 169)`. The albedo was already warm; a
+  horizontal slab here is lit by a very blue sky over half its hemisphere and
+  the ambient was winning. Now `rgb(160, 155, 146)`. The slab also stops a
+  stride behind the last hut, where it stops in life, instead of running on to
+  meet a needle floor at a hard grey line.
+- **The cicadas are a tone and they live in the trees.** The chorus measures
+  4 900–5 250 Hz with half power from 4 611 to 5 607 — a Q of about five, not
+  the 2.4 the synth had, which is two and a half kilohertz wide and reads as
+  hiss. And on the concrete at the water, thirty metres from the same pines,
+  the band is five decibels down: the old gain curve was distance-to-shore,
+  which gives the bathing terrace *full* volume — the one place on the headland
+  the recording says is quietest. They ride the canopy now.
+- **The near ring is solved rather than fixed.** A grown pine is 3 314
+  triangles against 128 for the far model, so a 190 m radius that held fifty
+  trees on a hillside holds three thousand in a wood — ten million triangles
+  for one species, which is why this had never had to be priced before. The
+  radius now converges on a triangle budget in a repack or two, nearest first,
+  and pins at 190 m wherever the country is open enough not to care.
+
+### The swim
+
+- **You can see yourself in the water.** `B` swings the camera round behind
+  you, and the body it finds is the same Chloe who has been standing in the
+  mirror since `49-you.js` — driven off the swim's own state instead of off the
+  camera. She has a dive mask now: the one in `62-mask.js` is the inside of it
+  and only exists when you are behind it. The beanie and the necklace come off
+  in the water.
+- **The race starts with two dives.** It used to open on a course with her
+  already seven metres out and already swimming, which is a fair model of what
+  you are chasing and a poor one of how it started. Now she is on the end of
+  the jetty; she goes, with a crown splash and the sound of it; the camera
+  picks you up over the shoulder as you run down the boards after her; and you
+  go in off the end with your own. The race begins when she hits the water,
+  four seconds in.
+
+### Also in this release
+
+- A **depth AOV** on the ambient-occlusion pass — `__fr.aoDbg(4, true, k)` —
+  which emits inverse depth with a black sky, above both of the culls that
+  follow it. It came out of an experiment in restyling frames through a
+  diffusion model; that experiment concluded the technique is not worth it,
+  but the AOV is a straightforward thing to have and costs nothing when it is
+  not asked for.
+
+### Fixed
+
+- **The white splotches.** The rivulets on her face are drawn at
+  `runCol × runLift` = 1.17, which is over one on every channel — deliberately,
+  because the room they were built for is lit by a blue hemisphere through one
+  doorway and a thread that only reaches its own albedo in there is invisible.
+  Outdoors at noon in August the same threads clip, and a clipped thread is a
+  white splotch. Being hosed on the promenade now leaves her wet — darker and
+  shining, which is what wet is — and the sheet and the spill stay in the
+  kabina where the scene is.
+
 ## [1.87.0] — 2026-08-20
 
 Two numbers that had been argued about without being looked at. The shadow pass

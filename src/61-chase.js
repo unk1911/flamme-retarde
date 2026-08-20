@@ -115,6 +115,8 @@ async function buildChase(scene) {
   })();
 
   const her = { x: 0, z: 0, y: 0, yaw: 0, u: 0, sp: 0, done: 0 };
+  /** Set while the shot is holding her on the jetty — see `poise`. */
+  let poised = null;
   let on = false;
   let phase = 'off';        // 'swim' | 'talk' | 'lost' | 'off'
   let t = 0, line = 0, gap = 0, best = 1e9;
@@ -149,6 +151,26 @@ async function buildChase(scene) {
 
   function stop() {
     on = false; phase = 'off'; root.visible = false;
+    poised = null;
+  }
+
+  /**
+   * Stand her somewhere, out of the race.
+   *
+   * The race used to begin with her already seven metres out and already
+   * swimming, which is a fair model of what you are chasing and a poor one of
+   * how it started: you arrive at a jetty somebody has just left. So now there
+   * is a beat before it in which she is a person standing on concrete, and
+   * this is the state she is in for the length of it — placed by the shot,
+   * upright, playing whatever it asks for, and not moving under her own power.
+   *
+   * `stop()` clears it, and `start()` overrides it, so there is no way to be
+   * both poised and racing.
+   */
+  function poise(x, y, z, yaw, clip = 'idle', pitch = 0) {
+    poised = { x, y, z, yaw, clip, pitch };
+    root.visible = true;
+    return poised;
   }
 
   /**
@@ -224,7 +246,20 @@ async function buildChase(scene) {
    * which is the only place in this file that has to know either convention.
    */
   function draw(dt) {
-    if (!on || !fig) return;
+    if (!fig) return;
+    // Poised beats racing, and it is drawn even when the race has not begun —
+    // that is the whole point of it. Upright, so the rig's floor is under her
+    // feet and there is no sinking to do: she is standing on a jetty.
+    if (poised) {
+      root.position.set(poised.x, poised.y, poised.z);
+      root.rotation.set(0, poised.yaw + Math.PI / 2, poised.pitch || 0, 'YZX');
+      if (fig.playing() !== poised.clip) fig.play(poised.clip, { fade: 0.25 });
+      fig.update(dt);
+      if (fig.faceTick) fig.faceTick(dt);
+      wake.visible = false;
+      return;
+    }
+    if (!on) return;
     const tread = phase !== 'swim';
     // How deep she floats, in metres below the surface.
     //
@@ -253,7 +288,8 @@ async function buildChase(scene) {
   }
 
   return {
-    root, her, fig, start, stop, update, draw,
+    root, her, fig, start, stop, update, draw, poise,
+    get poised() { return poised; },
     get active() { return on; },
     get phase() { return phase; },
     get gap() { return gap; },

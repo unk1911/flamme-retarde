@@ -810,6 +810,7 @@ uniform vec3 uLift;
 uniform float uGape;
 uniform float uFoam;
 uniform float uWet;
+uniform float uStreak;
 uniform float uRun;
 uniform vec3 uLipC;
 uniform vec3 uJawR;
@@ -991,7 +992,27 @@ const FACE_FRAG = /* glsl */ `
         // The range here passes about a third of them at full flow, which is
         // enough to read as running all over her and still leaves gaps.
         float lo = 0.70 - 0.22 * amt;
-        float streak = smoothstep(lo, lo + 0.11, col) * min(1.0, amt * 2.2);
+        // And then multiplied by how much of it is allowed to show, which is
+        // not a taste dial — it is the one number that makes this survive
+        // being carried outdoors.
+        //
+        // runCol * runLift is 1.17, 1.13, 1.08. That is over one on every
+        // channel, deliberately, because the room this was built in is lit by
+        // a blue hemisphere through one doorway and a rivulet that only ever
+        // reaches its own albedo in there is a grey thread. Outside, at noon
+        // in August, the sun is already putting the skin under it near the top
+        // of the range: the same threads clip, and a clipped thread is not a
+        // thread, it is a white splotch. It was reported as one.
+        //
+        // The honest fix would be to scale the lift by the light actually
+        // falling on her, which this shader does not have. The one that is
+        // true to the place is simpler: the sheet-and-spill is what a woman
+        // who has been holding her face under a branch looks like, and that
+        // happens in the kabina. On the promenade a jet that catches her makes
+        // her wet — darker, and shining, which is the pair of lines above this
+        // block and stays unconditional — and wet is all it makes her.
+        float streak = smoothstep(lo, lo + 0.11, col) * min(1.0, amt * 2.2)
+          * uStreak;
 
         // Barely darker, and that number is a scar. Wet skin *is* darker and
         // the honest figure is nearer 0.85 — but the sheet is strongest where
@@ -1024,7 +1045,7 @@ const FACE_FRAG = /* glsl */ `
         // opaque. The colour is the froth colour and that is not a
         // coincidence: this is the same froth as the mouthful half a second
         // later, and aerated water is white however clear the water was.
-        float gush = uFoam * uWet;
+        float gush = uFoam * uWet * uStreak;
         float lipDn = uLipC.y - f.y;
         if (gush > 0.0 && lipDn > 0.0) {
           // Mouth-wide where it leaves and wider as it falls, because a jaw is
@@ -1271,6 +1292,10 @@ function skinnedFigure(data, opts = {}) {
     uGape: { value: 0 },
     uFoam: { value: 0 },
     uWet: { value: 0 },
+    // How much of the water is allowed to be *seen* as water: the white
+    // rivulets and the spill off her chin, as opposed to the sheen. See the
+    // note over `streak` in the fragment.
+    uStreak: { value: 0 },
     uRun: { value: 0 },
     uLipC: V(anchors.lipC || [0, -99, 0]),
     uJawR: V(FACE.jawR),
@@ -1520,6 +1545,7 @@ function skinnedFigure(data, opts = {}) {
     gape: 0,           // and how far her mouth is open
     foam: 0,           // and how much of what went in it is still there
     wet: 0,            // and how much of it is running down her
+    streak: 0,         // and how much of that is drawn rather than only lit
     ink: 0,            // and how far the flames have climbed her arms
     dolphin: 0,        // the ankle ink is revealed with the dropped wrap
     rate: 1,           // blinks a second, scaled. Staring is `rate = 0`.
@@ -1550,6 +1576,10 @@ function skinnedFigure(data, opts = {}) {
     // meter is already the slow half of this, so all this rate has to do is
     // keep the first frame of a jet landing from being a step.
     uFace.uWet.value = damp(uFace.uWet.value, sat(face.wet), 5.0, dt);
+    // Slower than the water it gates. Crossing the doorway is a step function
+    // and the threads must not be: a second and a bit to fade up as she comes
+    // in under the roof, and the same to let go as she carries it back out.
+    uFace.uStreak.value = damp(uFace.uStreak.value, sat(face.streak), 1.6, dt);
     // And it crawls down her while it is there. Wrapped a long way short of the
     // precision cliff — a float that has been counting since the title screen
     // cannot resolve a tenth of a noise unit, and the rivulets would quantise

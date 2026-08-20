@@ -10,7 +10,7 @@
 <meta name="description" content="Fly a Canadair CL-415 over the real Šibenik. Scoop the Adriatic, drop on the fire, save the city.">
 <!-- Near the top of the file on purpose: a range request for the first few
      hundred bytes is enough to tell which build a server is handing out. -->
-<meta name="version" content="1.87.0">
+<meta name="version" content="1.88.0">
 <meta name="build-date" content="2026-08-20">
 <style>/* ── Flamme Retardé ──────────────────────────────────────────────────────────
    Two palettes at war with each other: the Adriatic (cyan, stone, salt) for
@@ -1428,8 +1428,8 @@ html.touch #chase-hud { bottom: 23vh; }
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
        browser has actually loaded rather than trusting a cache. -->
-  <div id="build" title="Flamme Retardé 1.87.0, built 2026-08-20">
-    <b>v1.87.0</b><i>·</i><span>2026-08-20</span>
+  <div id="build" title="Flamme Retardé 1.88.0, built 2026-08-20">
+    <b>v1.88.0</b><i>·</i><span>2026-08-20</span>
   </div>
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
@@ -1806,7 +1806,7 @@ html.touch #chase-hud { bottom: 23vh; }
 
 <canvas id="stage-canvas"></canvas>
 
-<script>const BUILD = { v: "1.87.0", date: "2026-08-20" };</script>
+<script>const BUILD = { v: "1.88.0", date: "2026-08-20" };</script>
 <script>/* Three.js r0.180.0 — MIT, (c) Three.js Authors. Inlined for offline use. */
 const __three_core = (() => {
 /**
@@ -2410,6 +2410,12 @@ const U = {
   // and the branch is on a uniform so the whole warp takes it together. See
   // the three modes in 06-shadow.js.
   uShadowOn: { value: new THREE.Vector2(1, 1) },
+  // The needle floor at Jadrija: (centre x, centre z, half-length along the
+  // shore, half-width across it), and the shore's own direction as (cos, sin).
+  // Written once by 43-jadrija.js when the locale is built; zero until then,
+  // and zero is off. See the note in TERRAIN_FRAG.
+  uLitter: { value: new THREE.Vector4(0, 0, 0, 0) },
+  uLitterAx: { value: new THREE.Vector2(1, 0) },
   uCamPos: { value: new THREE.Vector3() },
 
   // the water column — see GLSL_WATER
@@ -2811,6 +2817,8 @@ const STRINGS = {
     'swim.apOff': 'Autopilot off — you have it.',
     'swim.apFar': 'No shore within reach. You are on your own out here.',
     'swim.apThere': 'You have a bottom under you — walk out.',
+    'body.on': 'Round behind you. <b>B</b> to get back in your own eyes.',
+    'body.off': 'Back behind your eyes.',
     'chase.behind': 'metres behind',
     'chase.gone': 'she is gone',
     'chase.on': 'She is off the jetty — the platform is the finish. <b>Q</b> to sprint.',
@@ -3126,6 +3134,8 @@ const STRINGS = {
     'swim.apOff': 'Autopilot isključen — tvoje je.',
     'swim.apFar': 'Nema obale u dohvatu. Ovdje si sam.',
     'swim.apThere': 'Dno ti je pod nogama — izađi.',
+    'body.on': 'Kamera iza tebe. <b>B</b> za povratak u prvo lice.',
+    'body.off': 'Natrag u prvo lice.',
     'chase.behind': 'metara iza',
     'chase.gone': 'nema je',
     'chase.on': 'Skočila je s mola — skakaonica je cilj. <b>Q</b> za sprint.',
@@ -4469,6 +4479,8 @@ uniform vec3 uAmbSky;
 uniform vec3 uAmbGround;
 uniform float uAmbI;
 uniform float uNight;
+uniform vec4 uLitter;
+uniform vec2 uLitterAx;
 
 void main(){
   // ── normal, from the height field rather than from the mesh ─────────────
@@ -4530,6 +4542,36 @@ void main(){
   // Bleach the ground near the waterline — salt, shingle and glare.
   float shoreT = 1.0 - smoothstep(0.0, 0.055, cv.a);
   base = mix(base, vec3(0.86, 0.82, 0.72), shoreT * 0.5);
+
+  // ── the needle floor ────────────────────────────────────────────────────
+  //
+  // Jadrija's ground is not the colour of anywhere else on this map, and the
+  // cover map cannot say so: the peninsula is baked URBAN because it is built
+  // up, and URBAN is a warm grey that serves the whole of Sibenik. What is
+  // actually underfoot on that headland, everywhere the concrete and the
+  // tarmac are not, is dead Aleppo pine needles over limestone dust — a rust
+  // orange you can walk a kilometre on without seeing a blade of grass,
+  // because the wood is swept and nothing grows under a closed pine canopy in
+  // a Dalmatian August.
+  //
+  // Measured, not guessed. The reference frames put the sunlit floor at
+  // rgb(181, 139, 105) and the same ground in this renderer at rgb(180, 179,
+  // 160): the brightness was already right and the hue was not there at all.
+  // 1.00, 0.78, 0.63 is the ratio between them, which is why this multiplies
+  // rather than mixes — a mix to a flat colour would take the karst ribs, the
+  // three scales of mottle and the two-metre gravel with it, and those are the
+  // reason the ground is ground.
+  //
+  // Held off the water by the same shoreT the bleach uses, because the last
+  // few metres before the channel really are pale shingle and concrete, and
+  // off the seabed entirely, which is a different shader's argument below.
+  if (uLitter.z > 0.0 && klass != 0) {
+    vec2 d = vWorld.xz - uLitter.xy;
+    vec2 ts = vec2(dot(d, uLitterAx), dot(d, vec2(-uLitterAx.y, uLitterAx.x)));
+    float r = length(ts / uLitter.zw);
+    float litter = (1.0 - smoothstep(0.78, 1.0, r)) * (1.0 - shoreT);
+    base *= mix(vec3(1.0), vec3(1.00, 0.78, 0.63), litter);
+  }
 
   // ── the seabed ──────────────────────────────────────────────────────────
   // The ground does not stop at the waterline — it has always run straight on
@@ -4739,6 +4781,8 @@ function buildTerrain(scene) {
     uSkirt: { value: TERRAIN.skirt },
     uTexelWorld: { value: CONFIG.world / world.grid },
     uCoverColor: { value: COVER_COLOR.map((c) => new THREE.Color(c[0], c[1], c[2])) },
+    uLitter: U.uLitter,
+    uLitterAx: U.uLitterAx,
   };
 
   const levels = TERRAIN.lods.map((n) => {
@@ -10489,6 +10533,7 @@ uniform vec3 uLift;
 uniform float uGape;
 uniform float uFoam;
 uniform float uWet;
+uniform float uStreak;
 uniform float uRun;
 uniform vec3 uLipC;
 uniform vec3 uJawR;
@@ -10670,7 +10715,27 @@ const FACE_FRAG = /* glsl */ `
         // The range here passes about a third of them at full flow, which is
         // enough to read as running all over her and still leaves gaps.
         float lo = 0.70 - 0.22 * amt;
-        float streak = smoothstep(lo, lo + 0.11, col) * min(1.0, amt * 2.2);
+        // And then multiplied by how much of it is allowed to show, which is
+        // not a taste dial — it is the one number that makes this survive
+        // being carried outdoors.
+        //
+        // runCol * runLift is 1.17, 1.13, 1.08. That is over one on every
+        // channel, deliberately, because the room this was built in is lit by
+        // a blue hemisphere through one doorway and a rivulet that only ever
+        // reaches its own albedo in there is a grey thread. Outside, at noon
+        // in August, the sun is already putting the skin under it near the top
+        // of the range: the same threads clip, and a clipped thread is not a
+        // thread, it is a white splotch. It was reported as one.
+        //
+        // The honest fix would be to scale the lift by the light actually
+        // falling on her, which this shader does not have. The one that is
+        // true to the place is simpler: the sheet-and-spill is what a woman
+        // who has been holding her face under a branch looks like, and that
+        // happens in the kabina. On the promenade a jet that catches her makes
+        // her wet — darker, and shining, which is the pair of lines above this
+        // block and stays unconditional — and wet is all it makes her.
+        float streak = smoothstep(lo, lo + 0.11, col) * min(1.0, amt * 2.2)
+          * uStreak;
 
         // Barely darker, and that number is a scar. Wet skin *is* darker and
         // the honest figure is nearer 0.85 — but the sheet is strongest where
@@ -10703,7 +10768,7 @@ const FACE_FRAG = /* glsl */ `
         // opaque. The colour is the froth colour and that is not a
         // coincidence: this is the same froth as the mouthful half a second
         // later, and aerated water is white however clear the water was.
-        float gush = uFoam * uWet;
+        float gush = uFoam * uWet * uStreak;
         float lipDn = uLipC.y - f.y;
         if (gush > 0.0 && lipDn > 0.0) {
           // Mouth-wide where it leaves and wider as it falls, because a jaw is
@@ -10950,6 +11015,10 @@ function skinnedFigure(data, opts = {}) {
     uGape: { value: 0 },
     uFoam: { value: 0 },
     uWet: { value: 0 },
+    // How much of the water is allowed to be *seen* as water: the white
+    // rivulets and the spill off her chin, as opposed to the sheen. See the
+    // note over `streak` in the fragment.
+    uStreak: { value: 0 },
     uRun: { value: 0 },
     uLipC: V(anchors.lipC || [0, -99, 0]),
     uJawR: V(FACE.jawR),
@@ -11199,6 +11268,7 @@ function skinnedFigure(data, opts = {}) {
     gape: 0,           // and how far her mouth is open
     foam: 0,           // and how much of what went in it is still there
     wet: 0,            // and how much of it is running down her
+    streak: 0,         // and how much of that is drawn rather than only lit
     ink: 0,            // and how far the flames have climbed her arms
     dolphin: 0,        // the ankle ink is revealed with the dropped wrap
     rate: 1,           // blinks a second, scaled. Staring is `rate = 0`.
@@ -11229,6 +11299,10 @@ function skinnedFigure(data, opts = {}) {
     // meter is already the slow half of this, so all this rate has to do is
     // keep the first frame of a jet landing from being a step.
     uFace.uWet.value = damp(uFace.uWet.value, sat(face.wet), 5.0, dt);
+    // Slower than the water it gates. Crossing the doorway is a step function
+    // and the threads must not be: a second and a bit to fade up as she comes
+    // in under the roof, and the same to let go as she carries it back out.
+    uFace.uStreak.value = damp(uFace.uStreak.value, sat(face.streak), 1.6, dt);
     // And it crawls down her while it is there. Wrapped a long way short of the
     // precision cliff — a float that has been counting since the title screen
     // cannot resolve a tenth of a noise unit, and the rivulets would quantise
@@ -12173,18 +12247,46 @@ async function buildJadrija(scene) {
   // which is exactly what the first build of this did at 0.76. The aerodrome
   // apron is 0.42 and reads as concrete; Jadrija sits a little above it because
   // its aggregate is local limestone and it has ninety years of salt on it.
-  const CONC = [[0.470, 0.455, 0.424], [0.442, 0.428, 0.398], [0.498, 0.480, 0.446]];
-  const SALT = [0.330, 0.328, 0.312];        // the wet band at the waterline
-  const STONE = [0.386, 0.370, 0.340];       // the quay wall
+  //
+  // And warm, which took a photograph to settle. The albedo below has always
+  // been warm — R over B by 0.046 — and it was still coming out of the renderer
+  // *cool*, at rgb(157, 165, 169), because a horizontal slab on this shore is
+  // lit by a very blue sky over half its hemisphere and the ambient wins. The
+  // terrace in the reference frames is rgb(160, 155, 145). That is a 27-point
+  // error in the wrong direction across the largest surface in Jadrija, and it
+  // is what made the resort read as municipal paving rather than as ninety
+  // years of salt on local limestone aggregate. The ratio between the two
+  // measurements, 1.019 / 0.939 / 0.858, is applied here rather than to the
+  // light, because it is this concrete that is warm and not the afternoon.
+  const CONC = [[0.479, 0.427, 0.364], [0.450, 0.402, 0.341], [0.507, 0.451, 0.383]];
+  const SALT = [0.336, 0.308, 0.268];        // the wet band at the waterline
+  const STONE = [0.393, 0.347, 0.292];       // the quay wall
+  // Dead Aleppo needles over limestone dust, which is what the ground is
+  // everywhere behind the huts. Same measurement, the other way round: the
+  // reference floor is rgb(181, 139, 105) and this albedo is what this
+  // renderer needs to land there. See the needle floor in TERRAIN_FRAG, which
+  // is the same colour arrived at the same way — the seam between the resort's
+  // own ground and the terrain runs right through the wood and must not show.
+  const LITTER = [[0.542, 0.383, 0.263], [0.512, 0.362, 0.249],
+    [0.570, 0.404, 0.278]];
   const bay = (i) => CONC[i % 3];
   const bayIn = (i) => CONC[(i + 2) % 3];
+  const duff = (i) => LITTER[i % 3];
 
   // The three levels, seaward to inland, then the quay wall down into the water.
   ribbon(0, JAD.lip, lipOf, bay);
   riser(JAD.lip, lipOf, midOf, bayIn);
   ribbon(JAD.lip, JAD.mid, midOf, bayIn);
   riser(JAD.mid, midOf, (st) => st.deck, bay);
-  ribbon(JAD.mid, JAD.back, (st) => st.deck, bay);
+  // The promenade, and then the ground behind the back row, which is not
+  // promenade. The concrete on this shore stops a stride behind the last hut
+  // and everything past it is wood: needles, dust and pine. Running the slab
+  // all the way to `back` was what put a hard grey line across the reference
+  // view — the terrain beyond had gone to needle floor and the resort's own
+  // ground had not.
+  const walkTo = JAD.rowB + JAD.cabD + 1.2;
+  ribbon(JAD.mid, walkTo, (st) => st.deck, bay);
+  ribbon(walkTo, JAD.back, (st) => st.deck, duff);
   for (let i = 0; i < ST.length - 1; i++) {
     const a = ST[i], c = ST[i + 1];
     b.quad(pt(a, 0, -JAD.quay), pt(c, 0, -JAD.quay),
@@ -12198,7 +12300,7 @@ async function buildJadrija(scene) {
     const a = ST[i], c = ST[i + 1];
     const s0 = JAD.back, s1 = JAD.back + JAD.bleed;
     const ya = surfaceY(a.t, s1), yc = surfaceY(c.t, s1);
-    b.quad(pt(a, s0, a.deck), pt(c, s0, c.deck), pt(c, s1, yc), pt(a, s1, ya), bayIn(i));
+    b.quad(pt(a, s0, a.deck), pt(c, s0, c.deck), pt(c, s1, yc), pt(a, s1, ya), duff(i));
   }
   for (const [st, out] of [[ST[0], -1], [ST[ST.length - 1], 1]]) {
     const s0 = 0, s1 = JAD.back;
@@ -15681,6 +15783,8 @@ async function buildJadrija(scene) {
   const taken = new Set();
   const houses = [];
   const census = { seen: 0, thin: 0, plain: 0, rich: 0 };
+  /** Footprints that survived the thinning, for the wood to keep out of. */
+  const standing = [];
 
   /**
    * One house. Walls follow the real polygon, because the silhouette is what you
@@ -16084,12 +16188,151 @@ async function buildJadrija(scene) {
       // asked for, measured against what was actually standing rather than
       // against the number in the source line.
       if (hr() < 0.62) { taken.add(bl); census.thin++; continue; }
+      // A survivor. Whatever is drawn where it stands, nothing is planted
+      // there — see `grove` below, which needs this list and is the reason it
+      // is gathered here rather than derived again from `world.town`.
+      standing.push(poly);
       if (s > HOUSE.reach) { census.plain++; continue; }
       taken.add(bl);
       census.rich++;
       detailHouse(poly, bl.h || 6, hr);
     }
   }
+
+  // ── the wood the village stands in ─────────────────────────────────────────
+  //
+  // Jadrija is not a village with trees in it. It is an Aleppo pine wood with a
+  // village in it, and the difference is the whole character of the place: from
+  // anywhere on the peninsula you are under a broken ceiling of pine, standing
+  // on a floor of dead needles, looking at the channel through bare trunks.
+  //
+  // The cover map does not know this and cannot be made to. The peninsula is
+  // baked URBAN — correctly, because it *is* built up, and because URBAN is
+  // what the fuel model and the fire want it to be — and `GROWS[URBAN]` is a
+  // cypress every twenty metres, which is a suburb. So the wood is answered
+  // here, by the locale that owns the headland, and 45-trees.js asks.
+  //
+  // Everything else about a tree stays the tile system's job: the two LODs, the
+  // instance budget, the density slider a phone turns down, the shadow pass.
+  // This only says what grows.
+  const GROVE = {
+    // The peninsula, in the resort's own frame — the same box the thinning
+    // above works in, and for the same reason. Past the neck is Zablaće and
+    // somebody else's trees.
+    t0: -300, t1: 300, s0: -6, s1: 340,
+    // How close to a standing house is still its garden. Two metres of pad on
+    // the footprint's own bounding box: OSM traces the walls, and what is not
+    // wanted is a thirteen-metre pine coming up through a roof.
+    pad: 2.0,
+    // And the grid the footprints are bucketed into, so the test above is a
+    // constant-time lookup and not a scan of a hundred and sixty polygons per
+    // dart. 24 m is a little over the longest footprint on the headland.
+    cell: 24,
+  };
+
+  // And the colour of the ground it stands on. The terrain shader owns the
+  // pixels — see the needle floor in TERRAIN_FRAG — and all it needs is where
+  // the headland is: a centre, the shore's own direction, and how far the wood
+  // reaches along it and back off it. Written once, here, because this is the
+  // only thing in the game that knows.
+  {
+    const c = toWorld(LEN * 0.5, 130);
+    const a = toWorld(LEN * 0.5 + 40, 130);
+    const dx = a[0] - c[0], dz = a[2] - c[2];
+    const inv = 1 / Math.max(1e-6, Math.hypot(dx, dz));
+    U.uLitterAx.value.set(dx * inv, dz * inv);
+    U.uLitter.value.set(c[0], c[2], LEN * 0.5 + 300, 190);
+  }
+
+  const grove = (() => {
+    // Bucket every surviving footprint by its bounding box.
+    const grid = new Map();
+    const key = (i, k) => i * 65536 + k;
+    let n = 0;
+    for (const poly of standing) {
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (const p of poly) {
+        if (p[0] < x0) x0 = p[0];
+        if (p[0] > x1) x1 = p[0];
+        if (p[1] < z0) z0 = p[1];
+        if (p[1] > z1) z1 = p[1];
+      }
+      const box = [x0 - GROVE.pad, x1 + GROVE.pad, z0 - GROVE.pad, z1 + GROVE.pad];
+      for (let i = Math.floor(box[0] / GROVE.cell); i <= Math.floor(box[1] / GROVE.cell); i++) {
+        for (let k = Math.floor(box[2] / GROVE.cell); k <= Math.floor(box[3] / GROVE.cell); k++) {
+          const kk = key(i, k);
+          let list = grid.get(kk);
+          if (!list) grid.set(kk, list = []);
+          list.push(box);
+        }
+      }
+      n++;
+    }
+
+    /** Is (x, z) inside a standing house, or close enough to be its wall? */
+    function built(x, z) {
+      const list = grid.get(key(Math.floor(x / GROVE.cell), Math.floor(z / GROVE.cell)));
+      if (!list) return false;
+      for (const b of list) {
+        if (x > b[0] && x < b[1] && z > b[2] && z < b[3]) return true;
+      }
+      return false;
+    }
+
+    // The world box the peninsula occupies, so a 512 m vegetation tile can ask
+    // whether it is worth throwing the extra darts at all before it throws any.
+    // Walked rather than cornered: the shore is a polyline, so the four
+    // corners of the (t, s) box do not bound the world quad it maps to.
+    let bx0 = Infinity, bx1 = -Infinity, bz0 = Infinity, bz1 = -Infinity;
+    for (let t = GROVE.t0; t <= LEN + GROVE.t1; t += 20) {
+      for (const sv of [GROVE.s0, GROVE.s1 * 0.5, GROVE.s1]) {
+        const w = toWorld(t, sv);
+        if (w[0] < bx0) bx0 = w[0];
+        if (w[0] > bx1) bx1 = w[0];
+        if (w[2] < bz0) bz0 = w[2];
+        if (w[2] > bz1) bz1 = w[2];
+      }
+    }
+
+    // The two mixes, and they are read off the footage rather than invented.
+    // Near the water and through the village it is pine and almost nothing
+    // else — bare orange floor, trunks you see the sea through, no undergrowth
+    // whatever, which is what an Aleppo stand on limestone actually looks like
+    // once the summer has had it. Back towards the neck the pines give way to
+    // the olive terraces and the car park under them, so olive comes up and
+    // pine comes down.
+    //
+    // `bush` stays low everywhere and that is the correction that matters most.
+    // Maquis is what the hillside *behind* Jadrija is; the wood on the
+    // peninsula is swept — the needles are the only thing on the ground.
+    const WOOD = { pine: 0.62, olive: 0.05, bush: 0.03 };
+    const NECK = { pine: 0.30, olive: 0.34, bush: 0.06 };
+
+    return {
+      houses: n,
+      /** Does this vegetation tile touch the headland at all? */
+      tile: (ox, oz, T) => ox < bx1 && ox + T > bx0 && oz < bz1 && oz + T > bz0,
+      /**
+       * What grows at (x, z) — or null, which means "not mine, ask the cover
+       * map". Null is also the answer over the resort's own concrete, which is
+       * the one place on this shore a tree is at eye height rather than
+       * something you fly over.
+       */
+      at: (x, z) => {
+        // The world-space box first. `local` is a scan of thirty-odd shore
+        // stations and this is called nine thousand times per vegetation tile;
+        // two compares reject almost all of them before it ever runs.
+        if (x < bx0 || x > bx1 || z < bz0 || z > bz1) return null;
+        const [t, sv] = local(x, z);
+        if (t < GROVE.t0 || t > LEN + GROVE.t1 || sv < GROVE.s0 || sv > GROVE.s1) {
+          return null;
+        }
+        if (inField(x, z, 4)) return null;
+        if (built(x, z)) return null;
+        return sv > 180 ? NECK : WOOD;
+      },
+    };
+  })();
 
   const FACE = 'n = gl_FrontFacing ? n : -n; base *= vVCol;';
   const deckMesh = new THREE.Mesh(deck.geo(), solidMaterial(0xffffff, {
@@ -17412,6 +17655,21 @@ async function buildJadrija(scene) {
   };
 
   /**
+   * Is she under the roof of the one kabina that opens?
+   *
+   * Two things ask, and they used to ask separately: the soak meter, which is
+   * a fifth as long in there because what happens in the room is a question
+   * rather than a set piece, and — since the report — the water on her face.
+   * One test, so they can never disagree about which side of the doorway she
+   * is on.
+   */
+  function sheIsIn() {
+    const K0 = special;
+    return !!K0 && !!show && show.t > K0.t0 - 0.2 && show.t < K0.t1 + 0.2
+      && show.s > K0.face + 0.15 && show.s < K0.s1;
+  }
+
+  /**
    * Her mesh yaw, for a heading in the resort's own frame: 0 runs along +t and
    * −PI/2 is the water.
    *
@@ -18017,9 +18275,7 @@ async function buildJadrija(scene) {
     // the kabina costs nothing, is over in a second and a half, and is between
     // the two of you: making somebody stand in a small room holding a jet on a
     // person for five seconds to reach it is not a price, it is a wait.
-    const K0 = special;
-    const her = !!K0 && show.t > K0.t0 - 0.2 && show.t < K0.t1 + 0.2
-      && show.s > K0.face + 0.15 && show.s < K0.s1;
+    const her = sheIsIn();
     const full = her ? SHOW.soakIn : SHOW.soakFor;
     if (show.soak < full) {
       show.soak = clamp(show.soak + (show.hit > 0 ? dt : -dt * 0.12), 0, full);
@@ -18143,6 +18399,15 @@ async function buildJadrija(scene) {
         // sheen and threads, and a woman who has been holding her mouth under
         // the branch for ten seconds gets it coming out of the corners.
         f.face.wet = show.wet;
+        // And whether any of it is drawn as water rather than only as shine.
+        // Indoors, yes: that is the scene, in a room lit through one doorway
+        // where a rivulet has to be lifted above its own albedo to be seen at
+        // all. Out on the deck the same lift clips against a noon sun and the
+        // threads come out as white splotches on her forehead — which is what
+        // was reported, and is fair. Out there being hosed leaves her wet, and
+        // wet is the sheen and the darkening, both of which are unconditional
+        // in the shader.
+        f.face.streak = her ? 1 : 0;
       }
       f.aim('head', 0, 0, 1, show.gape * SHOW.chin * (0.86 + 0.20 * show.fill));
     }
@@ -19079,6 +19344,8 @@ async function buildJadrija(scene) {
     bounds: { t0: 3, t1: LEN - 3, s0: 1.1,
       s1: Math.max(JAD.reachIn, VIK.s + 7.6) },
     blockers, local, toWorld, walkY, inField, vik,
+    /** What grows on this headland — see the note over GROVE. Read by 45-trees.js. */
+    grove,
     /**
      * Where you are a person rather than a clearance. See `GROUND.tight` — this
      * is the only locale in the game with an inside to be inside of.
@@ -19303,6 +19570,9 @@ async function buildJadrija(scene) {
       curT: skinFig && skinFig.state.cur ? +skinFig.state.curT.toFixed(2) : null,
       held: +show.held.toFixed(2), leg: show.leg, shed: show.shed,
       wet: +show.wet.toFixed(2), lock: +show.lock.toFixed(1),
+      // Whether the water on her is drawn as water. See sheIsIn().
+      indoors: sheIsIn(), streak: skinFig && skinFig.face
+        ? +skinFig.face.streak.toFixed(2) : null,
       hit: +show.hit.toFixed(2), spin: show.spin,
       soak: +show.soak.toFixed(1), burn: +show.burn.toFixed(2),
       turned: show.turned,
@@ -22021,6 +22291,23 @@ const VEG = {
   // whole landscape came out lighter after this than it went in.
   near: 190,
   nearMax: 3000,         // and the ceiling on those, so the buffer is bounded
+  // What the ring is actually allowed to hold, as against what the buffer can.
+  // 420 grown trees is about 1.4 M triangles, which is a fifth of the frame and
+  // is what the close-up model is worth; the buffer stays at 3 000 because it
+  // is scaled by the density slider and a tablet at 1.4 may ask for more.
+  // See the feedback at the end of `repack`.
+  nearWant: 420,
+  // And how far in it may be pulled before the answer is "draw fewer trees"
+  // rather than "draw them simpler". At 45 m a 10 m pine is a hundred pixels
+  // tall and the far model is honest at that: it has the right crown width and
+  // the right trunk, which is what the near one buys back at ten.
+  nearMin: 45,
+  // Extra candidate samples over the Jadrija headland — see `makeTile`. 7 000
+  // on top of the 2 100 takes the whole tile to 0.035 darts a square metre,
+  // which at the wood's own 0.62 is a pine about every seven metres. The
+  // reference is one every five: the peninsula is where the game spends its
+  // time on foot, and a wood you can see the sea through is the point of it.
+  groveMore: 7000,
 };
 
 /**
@@ -22773,6 +23060,14 @@ function buildTrees(scene, fire) {
     const ox = tx * T, oz = tz * T;
     const out = { pine: [], cypress: [], olive: [], bush: [], n: 0 };
 
+    // Jadrija answers for its own headland — see `grove` in 43-jadrija.js. The
+    // peninsula is baked URBAN and GROWS[URBAN] is a cypress every twenty
+    // metres, which is a suburb; what is there is a pine wood with a village
+    // in it. `grove` is consulted per dart below, and the tile is asked once,
+    // up front, whether it is worth throwing the second handful at all.
+    const grove = typeof jadrija !== 'undefined' && jadrija && jadrija.grove
+      && jadrija.grove.tile(ox, oz, T) ? jadrija.grove : null;
+
     // Nothing grows off the edge of the world. coverAt() and groundAt() both
     // clamp to the border texel, so a tile beyond the boundary inherits whatever
     // the last row of the map happened to say and plants a forest on the open
@@ -22780,7 +23075,16 @@ function buildTrees(scene, fire) {
     // 1 500 m to 2 200 m is what made this visible from inside the world.
     const EDGE = CONFIG.world / 2 - 20;
 
-    for (let i = 0; i < VEG.perTile; i++) {
+    // A second handful over the headland, and it has to be a second handful
+    // rather than a bigger table, because a per-dart probability cannot exceed
+    // one: at 2 100 darts over a 512 m tile the closest any species can be
+    // planted is one every eleven metres, and the wood at Jadrija is one every
+    // five or six. The extra darts are the wood's alone — past the tile's own
+    // quota a point only plants if the headland claims it — so a tile that
+    // overlaps the peninsula by a corner does not also thicken the hillside
+    // behind it.
+    const darts = VEG.perTile + (grove ? VEG.groveMore : 0);
+    for (let i = 0; i < darts; i++) {
       const x = ox + rng() * T, z = oz + rng() * T;
       if (Math.abs(x) > EDGE || Math.abs(z) > EDGE) continue;
       // Not on the airfield. The land-cover raster has never heard of Rokići —
@@ -22795,8 +23099,8 @@ function buildTrees(scene, fire) {
       // hand, in their planters, with the rest of the resort.
       if (typeof jadrija !== 'undefined' && jadrija && jadrija.inField
         && jadrija.inField(x, z, 6)) continue;
-      const c = coverAt(x, z);
-      const table = GROWS[c];
+      const g = grove ? grove.at(x, z) : null;
+      const table = g || (i < VEG.perTile ? GROWS[coverAt(x, z)] : null);
       if (!table) continue;
 
       const r = rng();
@@ -22845,6 +23149,9 @@ function buildTrees(scene, fire) {
 
   let density = 1;
   let acc = 0, lastTx = 1e9, lastTz = 1e9, live = 0, closeUp = 0;
+  // How far the grown model reaches this frame, which is not a constant any
+  // more. See the note over VEG.nearWant.
+  let nearR = VEG.near;
   const _q = new THREE.Quaternion();
   const _up = new THREE.Vector3(0, 1, 0);
 
@@ -22854,7 +23161,7 @@ function buildTrees(scene, fire) {
     // of the two — a tree close enough to be worth its polygons is still a tree.
     const cursor = {}, used = {};
     for (const s of SPECIES) { cursor[s] = { near: 0, far: 0 }; used[s] = 0; }
-    const nearR2 = VEG.near * VEG.near;
+    const nearR2 = nearR * nearR;
     const cap = Math.floor(VEG.budget * clamp(density, 0, 2));
     const R = VEG.radius * clamp(0.4 + density * 0.6, 0.4, 1.3);
     const R2 = R * R;
@@ -22940,6 +23247,36 @@ function buildTrees(scene, fire) {
       L.aColor.needsUpdate = true;
       L.mesh.visible = L.count > 0;
     }
+
+    // ── how far the grown model reaches ──────────────────────────────────
+    //
+    // A near pine is 3 314 triangles and a far one is 128, so the ring is the
+    // whole cost of the vegetation and a fixed radius cannot price it. On the
+    // hillside above Rokići 190 m holds about fifty trees and is free. In the
+    // wood at Jadrija the same 190 m holds three thousand, which is ten million
+    // triangles for one species — and that only became possible when the
+    // headland stopped being a suburb, so it has never had to be priced before.
+    //
+    // Capping the count alone would not do: which trees make the ring is
+    // whatever order the tiles happen to iterate in, so a hard cap leaves a
+    // far model at five metres and a grown one at a hundred and eighty. What
+    // has to stay true is *nearest first*, and the only test that gives that
+    // for free is the radius. So the radius is what moves: pull it in when the
+    // ring is over its allowance, let it back out when there is room, and let
+    // it pin at VEG.near wherever the country is open enough not to care.
+    //
+    // Solved rather than hunted. In a stand of anything the count inside the
+    // ring goes as the square of its radius, so sqrt(want / got) is the whole
+    // correction in one step and the loop is over in a repack or two — which
+    // matters, because a repack is four tenths of a second and walking in off
+    // the promenade must not cost eight seconds at seven million triangles.
+    //
+    // The step is clamped either way, and much tighter going out than coming
+    // in: overshooting inwards costs a few trees their limbs for half a
+    // second, overshooting outwards costs the frame.
+    const want = Math.max(60, VEG.nearWant * clamp(density, 0.15, 1.4));
+    nearR = clamp(nearR * clamp(Math.sqrt(want / Math.max(closeUp, 1)),
+      0.72, 1.06), VEG.nearMin, VEG.near);
   }
 
   function update(dt, camPos) {
@@ -22972,6 +23309,32 @@ function buildTrees(scene, fire) {
      * grown and their cost is a consequence of a spec rather than of a list, so
      * it is not something you can count by reading the source any more.
      */
+    /** How far the grown model currently reaches — see the feedback in repack. */
+    nearR: () => +nearR.toFixed(1),
+    /**
+     * How wooded it is here, 0 to 1 — the fraction of a ring around (x, z)
+     * that grows something with a trunk on it.
+     *
+     * Not a count of trees: it asks the same tables `makeTile` asks, so it is
+     * a property of the *place* and not of whatever survived this frame's
+     * instance budget. Sampled on a ring rather than at a point because what
+     * it is for is a diffuse source — you are under a wood or you are not, and
+     * standing in a gap between two pines does not stop the cicadas.
+     */
+    canopyAt: (x, z, r = 22) => {
+      const grove = typeof jadrija !== 'undefined' && jadrija ? jadrija.grove : null;
+      let hit = 0;
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * TAU;
+        const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+        const table = (grove && grove.at(px, pz)) || GROWS[coverAt(px, pz)];
+        if (table && (table.pine || table.olive || table.cypress)) {
+          hit += Math.min(1, ((table.pine || 0) + (table.olive || 0)
+            + (table.cypress || 0)) * 2.2);
+        }
+      }
+      return clamp(hit / 6, 0, 1);
+    },
     cost: () => Object.fromEntries(SPECIES.map((s) => [s,
       [protos.near[s].index.count / 3, protos.far[s].index.count / 3]])),
     /** Debug: the nearest planted tree of a species, for aiming a camera. */
@@ -27583,6 +27946,33 @@ const YOU = {
   // see `rigYaw` in 43-jadrija.js, which is the one place that says so — and
   // the yaw below is built for that, so this wants to be zero.
   face: 0,
+
+  // ── the mask ──────────────────────────────────────────────────────────────
+  //
+  // She had one all along and you could never see it: 62-mask.js draws the
+  // inside of a dive mask as an overlay across the whole screen, which is
+  // exactly right when you are behind it and is nothing at all when the camera
+  // is not. So there is a second one, and this is the outside of it — worn on
+  // the head, in figure space, the same way the beanie is.
+  //
+  // Fitted to the rig rather than eyeballed, off the face anchors the skin
+  // exports: the eye sits at (0.131, 1.623, ±0.033) with a radius of 15 mm,
+  // and the skull's front face at brow height is x = 0.160. So a mask that
+  // seals round both eyes is about 15 cm across, 9 cm tall, and its glass
+  // stands a couple of centimetres proud of the cheek — which is what the
+  // numbers below are.
+  mask: {
+    lens: [0.150, 1.628, 0], lensR: [0.016, 0.036, 0.068],
+    skirt: [0.126, 1.626, 0], skirtR: [0.044, 0.048, 0.076],
+    strap: 0.102, strapT: 0.0090, strapAt: 1.639,
+  },
+  // Black silicone, and glass that is not clear. A dive mask photographs as a
+  // dark hole with one hard highlight on it — the lens is a mirror pointed at
+  // whatever is in front of her, and what is in front of her at Jadrija is
+  // sky. Rendered as a pale blue with a tight specular rather than as
+  // transparency, which would show the inside of her skull.
+  glass: [0.150, 0.230, 0.265],
+  rubber: [0.045, 0.048, 0.056],
 };
 
 /**
@@ -28048,10 +28438,69 @@ async function buildYou(scene) {
   // The bob is the right shape anyway. Chloe's hair is short, choppy and swept
   // forward, which is what the rig has and what the dye job makes blue.
   // Nothing needed adding to it.
+  // ── the dive mask ─────────────────────────────────────────────────────────
+  //
+  // Built the same way as the beanie and hung off the same head group, so it
+  // turns with the skull rather than with the shoulders. Three pieces, which
+  // is all a mask is at any distance you will ever see this one from: the
+  // skirt that seals to her face, the glass in front of it, and the strap
+  // round the back of her head.
+  //
+  // Hidden until somebody asks for it, and when it goes on the beanie comes
+  // off. Not a clipping dodge — the strap and the turn-up do overlap — but
+  // because nobody swims two hundred metres in a wool hat, and the hat coming
+  // off is the beat that says she is going in.
+  const M = YOU.mask;
+  const glassMat = shade(YOU.glass, 0.72, 60);
+  const rubMat = shade(YOU.rubber, 0.16, 26);
+  const mask = new THREE.Group();
+  mask.visible = false;
+  head.add(mask);
+
+  const fitted = (g, at3, r3v, mat) => {
+    const m = new THREE.Mesh(g, mat);
+    m.position.set(at3[0] - YOU.bone[0], at3[1] - YOU.bone[1], at3[2] - YOU.bone[2]);
+    m.scale.set(r3v[0], r3v[1], r3v[2]);
+    mask.add(m);
+    return m;
+  };
+  // Unit spheres, scaled: one geometry, three shapes, and the scale is the
+  // radii straight out of the table above.
+  const unit = new THREE.SphereGeometry(1, 20, 14);
+  fitted(unit, M.skirt, M.skirtR, rubMat);
+  fitted(unit, M.lens, M.lensR, glassMat);
+  // The strap, and it is two stubs rather than a band round her head.
+  //
+  // The band was tried first and it was the wrong instrument. A torus big
+  // enough to clear a skull that is 27 cm front to back stands proud of the
+  // temples by three or four centimetres, which at any distance you actually
+  // see this from reads as a halo rather than as elastic — and the part of it
+  // that would have made it read right, the part behind her head, is the part
+  // no camera in this game is ever behind. What is left is the two centimetres
+  // either side of the skirt where the strap leaves it, which is the only bit
+  // of a mask strap anybody looks at from the front anyway.
+  for (const sgn of [-1, 1]) {
+    const stub = new THREE.Mesh(unit, rubMat);
+    stub.position.set(M.skirt[0] - 0.030 - YOU.bone[0],
+      M.strapAt - YOU.bone[1], sgn * M.skirtR[2] * 0.86 - YOU.bone[2]);
+    stub.scale.set(0.030, 0.011, 0.016);
+    mask.add(stub);
+  }
+
   const hi = fig.boneIndex('head');
   const at = new THREE.Vector3();
   const turn = new THREE.Quaternion();
   const dir = new THREE.Vector3();
+
+  // Who is driving her.
+  //
+  // Null means the mirror does, which is what she was built for: stand where
+  // the camera is, face where it faces, and be visible for exactly the length
+  // of the reflection pass. Anything else means a script has taken her — the
+  // dive off the jetty, or the camera that swings round behind her in the
+  // water — and then her position, her heading and her attitude are all told
+  // to her rather than derived, and she is a real object in the real scene.
+  let drive = null;
 
   /** Stand her where you are standing, facing where you are facing. */
   let frozen = false;
@@ -28073,6 +28522,18 @@ async function buildYou(scene) {
       fig.boneTurn(hi, turn);
       head.quaternion.copy(turn);
     }
+    if (drive) {
+      mesh.position.set(drive.at[0], drive.at[1], drive.at[2]);
+      // YZX: yaw about world up first, then pitch about her own lateral axis,
+      // then roll about her own forward. Any other order and a swimmer who is
+      // both turning and going head-down comes out corkscrewed — the pitch has
+      // to happen in the frame the yaw left her in, which is what putting Y
+      // outermost means.
+      mesh.rotation.set(drive.roll || 0, drive.yaw + YOU.face,
+        drive.pitch || 0, 'YZX');
+      mesh.updateMatrixWorld();
+      return;
+    }
     if (frozen) return;
     camera.getWorldDirection(dir);
     mesh.position.set(camera.position.x,
@@ -28092,6 +28553,41 @@ async function buildYou(scene) {
     /** Debug: draw her in the room, and stop her following the camera. */
     show: (v) => { mesh.visible = !!v; return mesh.visible; },
     freeze: (v) => { frozen = !!v; return frozen; },
+    /**
+     * Take her off the camera and put her somewhere.
+     *
+     * `o` is { at: [x, y, z], yaw, pitch, roll, clip, mask, seen } and every
+     * field is optional after the first two. Pass null to hand her back to the
+     * mirror, which also hides her — a body that is left standing in the scene
+     * after the shot that wanted it is a body standing in the sea.
+     */
+    drive: (o) => {
+      if (!o) {
+        drive = null;
+        mesh.visible = false;
+        mask.visible = false;
+        hat.visible = true;
+        chain.visible = true;
+        return null;
+      }
+      drive = o;
+      mesh.visible = o.seen !== false;
+      if (o.mask != null) { mask.visible = !!o.mask; hat.visible = !o.mask; }
+      // The cord comes off in the water, and that is a fix and not a costume
+      // note: it is a child of the figure rather than of a bone, hung for a
+      // body that is standing up, and on a swimmer it sails out sideways from
+      // the sternum like a length of wire. Nobody swims two hundred metres in
+      // a necklace either.
+      chain.visible = !o.wet;
+      if (o.clip && fig.playing() !== o.clip) {
+        fig.play(o.clip, { fade: o.fade == null ? 0.20 : o.fade });
+      }
+      if (o.speed != null && fig.state) fig.state.speed = o.speed;
+      return drive;
+    },
+    /** Is a script holding her, and what is she doing? */
+    driven: () => (drive ? { clip: fig.playing(), mask: mask.visible,
+      at: drive.at.map((v) => +v.toFixed(2)) } : null),
     stats: () => ({ tris: fig.tris, head: hi,
       at: [+mesh.position.x.toFixed(1), +mesh.position.y.toFixed(2),
         +mesh.position.z.toFixed(1)],
@@ -30159,6 +30655,7 @@ function buildSprayPool(scene, max, gravity, drag) {
 
 let dropSplashes = null;
 let scoopSpray = null;
+let bodySplash = null;
 
 function buildWaterFX(scene) {
   const drops = buildSprayPool(scene, 3000, 9.0, 0.55);
@@ -30277,6 +30774,52 @@ function buildWaterFX(scene) {
       }
     },
     update: spray.update,
+  };
+
+  // ── somebody going in ──────────────────────────────────────────────────────
+  //
+  // A person hitting water from a jetty is not a drop and not a scoop, and the
+  // difference is the shape rather than the size. Six tonnes off an aeroplane
+  // is a curtain: wide, low, and mostly moving the way the aeroplane was. A
+  // body is a *crown* — the water it displaces has nowhere to go but up and
+  // out, so it leaves as a ring of heavy drops thrown almost vertically, with
+  // a fine spray off the top of that which hangs for a second after the ring
+  // has fallen back.
+  //
+  // Both parts here, and the ring is what sells it. Drawn off the same pool as
+  // the scoop, which already has the right particle: big, slow, and dying at
+  // the surface it came out of.
+  bodySplash = {
+    /**
+     * `hard` is how much of a body went in and how fast — 1 is somebody
+     * stepping off a ladder, 2 is a running dive off the end of a jetty.
+     */
+    at(x, y, z, hard = 1, fwd = 0, fx = 0, fz = 0) {
+      const n = Math.round(26 + 30 * hard);
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU + spray.rng() * 0.5;
+        const s = spray.rng();
+        // Out and up. The ring leans the way she was going, because the water
+        // she pushed out of the way was going that way too.
+        const out = (1.1 + s * 2.0) * hard;
+        const up = (2.6 + s * 3.4) * hard;
+        spray.spawn(
+          x + Math.cos(a) * 0.22, y + 0.05, z + Math.sin(a) * 0.22,
+          Math.cos(a) * out + fx * fwd, up, Math.sin(a) * out + fz * fwd,
+          0.16 + s * 0.30, 0.9 + s * 0.7, 2.6,
+        );
+      }
+      // And the mist off the top of it, which is what is still there when the
+      // ring has gone: small, slow, and thrown straight up.
+      for (let i = 0; i < 22; i++) {
+        const a = spray.rng() * TAU, s = spray.rng();
+        spray.spawn(
+          x + Math.cos(a) * s * 0.5, y + 0.25 + s * 0.4, z + Math.sin(a) * s * 0.5,
+          Math.cos(a) * s * 0.9, 1.4 + s * 2.2, Math.sin(a) * s * 0.9,
+          0.09 + s * 0.14, 1.3 + s * 0.9, 5.0,
+        );
+      }
+    },
   };
 
   return {
@@ -33462,6 +34005,8 @@ async function buildChase(scene) {
   })();
 
   const her = { x: 0, z: 0, y: 0, yaw: 0, u: 0, sp: 0, done: 0 };
+  /** Set while the shot is holding her on the jetty — see `poise`. */
+  let poised = null;
   let on = false;
   let phase = 'off';        // 'swim' | 'talk' | 'lost' | 'off'
   let t = 0, line = 0, gap = 0, best = 1e9;
@@ -33496,6 +34041,26 @@ async function buildChase(scene) {
 
   function stop() {
     on = false; phase = 'off'; root.visible = false;
+    poised = null;
+  }
+
+  /**
+   * Stand her somewhere, out of the race.
+   *
+   * The race used to begin with her already seven metres out and already
+   * swimming, which is a fair model of what you are chasing and a poor one of
+   * how it started: you arrive at a jetty somebody has just left. So now there
+   * is a beat before it in which she is a person standing on concrete, and
+   * this is the state she is in for the length of it — placed by the shot,
+   * upright, playing whatever it asks for, and not moving under her own power.
+   *
+   * `stop()` clears it, and `start()` overrides it, so there is no way to be
+   * both poised and racing.
+   */
+  function poise(x, y, z, yaw, clip = 'idle', pitch = 0) {
+    poised = { x, y, z, yaw, clip, pitch };
+    root.visible = true;
+    return poised;
   }
 
   /**
@@ -33571,7 +34136,20 @@ async function buildChase(scene) {
    * which is the only place in this file that has to know either convention.
    */
   function draw(dt) {
-    if (!on || !fig) return;
+    if (!fig) return;
+    // Poised beats racing, and it is drawn even when the race has not begun —
+    // that is the whole point of it. Upright, so the rig's floor is under her
+    // feet and there is no sinking to do: she is standing on a jetty.
+    if (poised) {
+      root.position.set(poised.x, poised.y, poised.z);
+      root.rotation.set(0, poised.yaw + Math.PI / 2, poised.pitch || 0, 'YZX');
+      if (fig.playing() !== poised.clip) fig.play(poised.clip, { fade: 0.25 });
+      fig.update(dt);
+      if (fig.faceTick) fig.faceTick(dt);
+      wake.visible = false;
+      return;
+    }
+    if (!on) return;
     const tread = phase !== 'swim';
     // How deep she floats, in metres below the surface.
     //
@@ -33600,7 +34178,8 @@ async function buildChase(scene) {
   }
 
   return {
-    root, her, fig, start, stop, update, draw,
+    root, her, fig, start, stop, update, draw, poise,
+    get poised() { return poised; },
     get active() { return on; },
     get phase() { return phase; },
     get gap() { return gap; },
@@ -36480,10 +37059,24 @@ function buildAudio() {
     if (cicadaNodes) { cicadaNodes.g.gain.setTargetAtTime(gain, t0, 1.2); return; }
     const src = ctx.createBufferSource();
     src.buffer = noiseBuf; src.loop = true;
+    // 5 100 Hz, and narrow.
+    //
+    // Both numbers are off a recording rather than off a memory of one. Two
+    // walks through the pines at Jadrija put the chorus at a carrier of
+    // 4 900 to 5 250 Hz with its half-power points at 4 611 and 5 607 — which
+    // is a Q of about five, not the 2.4 this had, and the difference is
+    // audible: at 2.4 the band is two and a half kilohertz wide and the thing
+    // reads as hiss with a bump in it. Cicada orni is a *tone*.
+    //
+    // The second band stays, because there is real energy up there and a pure
+    // 5 kHz band is a test signal, but it comes down to a third. On the
+    // recordings the 6–12 kHz octave runs eight to ten decibels under the
+    // carrier and for stretches of the second walk it is simply not there.
     const bp = ctx.createBiquadFilter();
-    bp.type = 'bandpass'; bp.frequency.value = 5200; bp.Q.value = 2.4;
+    bp.type = 'bandpass'; bp.frequency.value = 5100; bp.Q.value = 4.4;
     const bp2 = ctx.createBiquadFilter();
     bp2.type = 'bandpass'; bp2.frequency.value = 8400; bp2.Q.value = 3.0;
+    const bp2g = ctx.createGain(); bp2g.gain.value = 0.34;
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.setTargetAtTime(gain, t0, 1.6);
@@ -36497,7 +37090,7 @@ function buildAudio() {
       lfo.start(t0);
     }
     src.connect(bp).connect(g);
-    src.connect(bp2).connect(g);
+    src.connect(bp2).connect(bp2g).connect(g);
     g.connect(outBus);
     src.start(t0);
     cicadaNodes = { src, g };
@@ -37279,6 +37872,7 @@ uniform float uBiasFar;
 uniform float uCut;
 uniform float uFade;
 uniform int uDbg;
+uniform float uDepthK;
 
 float viewZ(float d) {
   // The standard perspective un-projection of a [0,1] depth sample. Comes out
@@ -37300,6 +37894,32 @@ float hash(vec2 p) {
 
 void main() {
   float d = texture2D(tDepth, vUv).x;
+
+  // ── the depth AOV ─────────────────────────────────────────────────────────
+  //
+  // Not one of the debug ramps below, and it has to sit above both of the culls
+  // that follow rather than beside them, because it fails all three of their
+  // assumptions. This is a conditioning image for a diffusion pass that runs
+  // outside the game, and such an image has to be monotonic — uDbg == 2 is a
+  // fract() sawtooth, which a depth model reads as a striped wall — it has to
+  // survive past uCut, which is 26 m because that is as far as a contact
+  // shadow is legible and is nowhere near as far as a landscape, and its sky
+  // has to be black. The occlusion returns white for "nothing in the way";
+  // a depth ControlNet reads white as *near*, so shipping the sky white puts
+  // the horizon in the viewer's lap.
+  //
+  // Inverse depth, because that is what the models were trained on. MiDaS and
+  // everything after it emit disparity rather than metres, so a linear ramp
+  // over a kilometre of view distance would flatten every building on the
+  // promenade into the same black. uDepthK is the range at which the curve
+  // has fallen half way — 50 m by default, which is the depth of a street and
+  // therefore where the detail worth conditioning on actually is.
+  if (uDbg == 4) {
+    float far = d >= 0.9999 ? 1e9 : -viewPos(vUv, d).z;
+    fragColor = vec4(vec3(1.0 / (1.0 + far / uDepthK)), 1.0);
+    return;
+  }
+
   // The sky. Nothing occludes it and nothing it occludes is on this screen.
   if (d >= 0.9999) { fragColor = vec4(1.0); return; }
 
@@ -37470,6 +38090,7 @@ function buildAO(renderer) {
     uCut: { value: AO.far },
     uFade: { value: AO.fade },
     uDbg: { value: 0 },
+    uDepthK: { value: 50 },
   };
   const compUni = {
     tColor: { value: null },
@@ -37586,7 +38207,11 @@ function buildAO(renderer) {
      * three.js's own tone mapping, which is why the caller has to be told.
      */
     set: (v) => { strength = Math.max(0, Math.min(1, v)); },
-    dbg: (n, show) => { aoUni.uDbg.value = n | 0; compUni.uShow.value = show ? 1 : 0; },
+    dbg: (n, show, k) => {
+      aoUni.uDbg.value = n | 0;
+      compUni.uShow.value = show ? 1 : 0;
+      if (k) aoUni.uDepthK.value = k;
+    },
     stats: () => ({
       on: ok && strength > 0.001 ? 1 : 0,
       k: +strength.toFixed(2),
@@ -37832,6 +38457,17 @@ addEventListener('keydown', (e) => {
   // R — the race. Ahead of the pause guard with the other three back doors,
   // and for the same reason: it is a place to be taken to.
   if (e.code === 'KeyR') { e.preventDefault(); startChase(); return; }
+  // B — round behind her, and back again. Only in the water: it is the only
+  // mode with a body to look at, and the only one where being outside your own
+  // eyes is not a bug. See `poseSwimBody`.
+  if (e.code === 'KeyB') {
+    e.preventDefault();
+    if (state.phase === 'swim') {
+      bodyCam = !bodyCam;
+      toast(T(bodyCam ? 'body.on' : 'body.off'));
+    }
+    return;
+  }
   // While the world is stopped, only the settings answer. Cycling the camera or
   // dropping the gear against a frozen simulation puts the picture and the
   // state out of step, and the HUD is not being redrawn to tell you.
@@ -38831,6 +39467,8 @@ function afootToast() {
 function leaveWater(was = state.phase) {
   // Whatever else is going on, the race does not survive leaving the water.
   if (chase && chase.active) { chase.stop(); chaseCut = null; }
+  if (you) you.drive(null);
+  bodyCam = false;
   $('chase-hud').hidden = true;
   // Whatever took you out, the mask comes off in the same frame — see the note
   // on `reset` in 62-mask.js. Ahead of the branches on purpose: it is cheap, it
@@ -39344,7 +39982,10 @@ function startChase() {
   $('chase-hud').hidden = true;
   if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = true;
     $('ctouch').hidden = true; $('stouch').hidden = false; }
-  chase.start(r.start, r.board, (x, z) => swim.surfaceAt(x, z));
+  // The race itself does not begin here any more. It begins when she hits the
+  // water, four seconds into the shot — see the `shedives` beat. Starting it
+  // up front is what made the old cut a title card over a race already in
+  // progress rather than the start of one.
   wasUnder = false;
 
   // The shot. World metres, built from the two ends of the run so that moving
@@ -39355,21 +39996,245 @@ function startChase() {
   const nx = -uz, nz = ux;                 // and across it
   const P = (a, b, y) => [r.start[0] + ux * a + nx * b, y,
     r.start[1] + uz * a + nz * b];
-  chaseCut = { u: 0, leg: 0, legs: [
-    // High and off to one side, with the whole course in frame: the jetty at
-    // the bottom of the picture, the platform at the top, her in between.
-    { at: P(-26, 24, r.jetty[1] + 15.5), look: P(52, 0, 0.2), dur: 2.3 },
-    // Down to the water at the jetty head, looking along her wake.
-    { at: P(-3.5, 3.2, r.jetty[1] + 1.2), look: P(28, 0, 0.1), dur: 1.9 },
-    // And into the swim, where the camera already is.
-    { at: P(0, 0, 0.24), look: P(40, 0, 0.1), dur: 1.0 },
-  ] };
+  // Where the run-up starts, which is back up the jetty and not on it: the
+  // resort's own frame is the only thing that knows which way the boards run,
+  // so the point is taken there and brought back out rather than guessed at
+  // from the two ends of the swim.
+  const [jt, js] = jadrija.local(r.jetty[0], r.jetty[2]);
+  const runFrom = jadrija.toWorld(jt, js + CUT.runUp);
+  const runTo = jadrija.toWorld(jt, js + 0.4);
+  const rdx = runTo[0] - runFrom[0], rdz = runTo[2] - runFrom[2];
+  const rL = Math.hypot(rdx, rdz) || 1;
+  // Her heading down the jetty, in the game's own convention: forward is
+  // (−sin yaw, −cos yaw), so this is the yaw that faces the water.
+  const runYaw = Math.atan2(-rdx / rL, -rdz / rL);
+  const deckY = r.jetty[1];
+
+  // The shot's own frame, and it is the *jetty's* and not the swim course's.
+  // Those two are not the same line — the course leaves from beside the jetty
+  // head and runs out to the platform, while the run-up and both dives happen
+  // along the boards — and building the cameras in the course frame is what
+  // pointed every one of them at open water with the action off the edge of it.
+  // `a` is metres seaward from the jetty head, `b` is metres to one side.
+  const jx = rdx / rL, jz = rdz / rL;
+  const J = (a, b, y) => [r.jetty[0] + jx * a - jz * b, y,
+    r.jetty[2] + jz * a + jx * b];
+
+  chaseCut = {
+    u: 0,
+    leg: 0,
+    // Everything the beats need that is not the camera. Held here rather than
+    // recomputed per frame, because a shot that is solved every frame is a
+    // shot that drifts when the frame rate does.
+    run: { from: runFrom, to: runTo, yaw: runYaw, y: deckY,
+      len: rL, ux: rdx / rL, uz: rdz / rL },
+    // Where she stands, and where the two of them go in. Her entry is the
+    // point the race starts from; yours is where the camera ends up.
+    hers: [r.start[0], r.start[1]],
+    fired: {},
+    legs: [
+      // 1. High, behind the run-up and off to one side: the boards leading
+      //    away, her standing on the end of them, and the platform out in the
+      //    channel past her shoulder. The whole race in one frame before
+      //    anybody moves.
+      { at: J(-19.5, 9.0, deckY + 5.4), look: J(1.5, 0, deckY + 0.7),
+        dur: CUT.wide, beat: 'stand' },
+      // 2. Down at the water off the end of the jetty, looking back up at her.
+      //    This is the only angle from which a dive is a dive rather than a
+      //    person disappearing downwards — you have to be below the thing
+      //    somebody is coming off.
+      { at: J(5.2, 3.5, deckY - 0.10), look: J(1.4, 0, deckY + 0.55),
+        dur: CUT.hers, beat: 'shedives' },
+      // 3. Beside the boards, low, while you come down them. The leg is here
+      //    for the interpolation either side of it — what actually points the
+      //    camera through this beat is the tracking in `stepCutBeat`, because
+      //    a fixed frame with somebody running across it is a shot of a jetty.
+      { at: J(-5.0, 4.2, deckY + 1.2), look: J(1.5, 0, deckY + 1.0),
+        dur: CUT.run, beat: 'run' },
+      // 4. And back in the water for your own, so she comes at the camera off
+      //    the end of the boards rather than away from it.
+      { at: J(5.0, 2.1, deckY + 1.10), look: J(2.4, 0, deckY + 0.25),
+        dur: CUT.yours, beat: 'youdive' },
+      // 5. Into the swim, where the camera already is.
+      { at: P(0, 0, 0.24), look: P(40, 0, 0.1), dur: CUT.settle, beat: 'swim' },
+    ],
+  };
+  // She is on the end of the jetty and has not gone yet — which is the one
+  // thing the old shot could not show, because the race began before it did.
+  if (chase.stop) chase.stop();
+  chase.poise(runTo[0], deckY, runTo[2], runYaw, 'idle');
+  // And you are on the boards behind her, with the mask already on: it is a
+  // race to a diving platform and you have been standing here watching her.
+  if (you) {
+    you.drive({ at: [runFrom[0], deckY, runFrom[2]], yaw: runYaw + Math.PI / 2,
+      clip: 'idle', mask: true, wet: true });
+  }
   paintChaseHud();
   toast(T('chase.on'));
   return true;
 }
 
-/** One frame of the shot. Wall time, same as the walk up to the house. */
+// -----------------------------------------------------------------------------
+// Looking at yourself in the water.
+//
+// Every mode in this game is behind your own eyes, and in three of them that is
+// the only place it could be: you are in a cockpit, under a canopy, or holding
+// a branch. The water is the one that is not. A swimmer is the most legible
+// thing a person can be from outside — the roll, the arm coming over, the wake
+// off the heels — and from inside it is a horizon that goes up and down.
+//
+// So B swings the camera round behind her, and the body it finds there is not a
+// new one: it is the same Chloe who has been standing in the mirror since
+// 49-you.js, driven off the swim's own state instead of off the camera. She
+// gets the mask on out here, because out here you can see it — the one in
+// 62-mask.js is the inside of the same object and only exists when you are
+// behind it.
+// -----------------------------------------------------------------------------
+
+const BODY = {
+  // How far back and how high the camera sits, in metres, and where it aims
+  // relative to her. Low and close: a swimmer seen from six metres up is a
+  // dot on a plane, and what is worth looking at here is at the surface.
+  back: 2.5, up: 0.72, ahead: 4.5, aim: 0.05,
+  // How deep she floats, prone and upright, in metres below the surface. Two
+  // numbers and not one, for the reason 61-chase.js sets out at length: the
+  // `swim` clip is authored lying down and the `tread` clip is authored
+  // standing, so the rig's own origin is at her waist in the first and under
+  // her feet in the second. One number for both stands her on the sea.
+  sink: 0.34,
+  sinkUp: 0.88,
+  // And how quickly the rig catches up with a camera that is being flung
+  // about. She is being told where to be rather than swimming there, so
+  // without this every flick of the mouse is a body teleporting.
+  ease: 9.0,
+};
+
+/** Third person in the water: off, or on with the mask down. */
+let bodyCam = false;
+const _bodyAt = new THREE.Vector3();
+let _bodyHas = false;
+
+/**
+ * Put her in the water under the camera, and — if the third person is on —
+ * put the camera behind her.
+ *
+ * Called after `swim.pose`, which has already put the camera at her eye. That
+ * ordering is the whole trick: the eye is the one point both cameras agree
+ * about, so the body is hung off the first person's answer and the second
+ * person is hung off the body. Nothing has to be solved twice.
+ */
+function poseSwimBody(dt) {
+  if (!you) return;
+  // The shot owns her while it is running, and it puts her on a jetty rather
+  // than in the water. Nothing here may touch that — including, in
+  // particular, the tidy-up below, which would otherwise take her off the
+  // boards on the first frame of the cut if the third person happened to be
+  // on when R was pressed.
+  if (chaseCut) return;
+  if (!bodyCam || !swim.active) {
+    if (_bodyHas) { you.drive(null); _bodyHas = false; }
+    return;
+  }
+  const w = swim.you;
+  const yaw = w.yaw;
+  // Her root, which is her eye taken back down the line she is facing: the
+  // swim clip is authored lying down, so the rig's own origin is between her
+  // feet and the head is a body-length forward of it along +X.
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  const prone = Math.hypot(w.vx, w.vz) > 0.25;
+  // Prone, her root is a body-length behind her eye along the line she is
+  // facing; upright it is straight under it.
+  const lead = prone ? 0.62 : 0.0;
+  const want = [w.x - fx * lead, w.y - (prone ? BODY.sink : BODY.sinkUp),
+    w.z - fz * lead];
+  if (!_bodyHas) { _bodyAt.set(want[0], want[1], want[2]); _bodyHas = true; }
+  const k = 1 - Math.exp(-BODY.ease * dt);
+  _bodyAt.x += (want[0] - _bodyAt.x) * k;
+  _bodyAt.y += (want[1] - _bodyAt.y) * k;
+  _bodyAt.z += (want[2] - _bodyAt.z) * k;
+
+  you.drive({
+    at: [_bodyAt.x, _bodyAt.y, _bodyAt.z],
+    yaw: yaw + Math.PI / 2,
+    pitch: prone ? w.pitch * 0.75 : 0,
+    clip: prone ? 'swim' : 'tread',
+    // The stroke goes at the speed you are going. The clip is authored for a
+    // cruise and played at one, so without this a sprint and a drift are the
+    // same arms — which is the one thing you can see from back here and cannot
+    // see from inside your own head.
+    speed: prone
+      ? clamp(Math.hypot(w.vx, w.vz) / 1.15, 0.55, 1.9) : 1,
+    mask: !!(mask && mask.on),
+    wet: true,
+  });
+
+  // And the camera, behind and a little over her. Aimed ahead of her rather
+  // than at her, so she sits low in the frame with the water she is going
+  // through in it — a camera pointed at a swimmer's back is a portrait.
+  camera.up.set(0, 1, 0);
+  camera.position.set(
+    w.x - fx * BODY.back, w.y + BODY.up, w.z - fz * BODY.back,
+  );
+  const cp = Math.cos(w.pitch);
+  camera.lookAt(w.x + fx * BODY.ahead * cp,
+    w.y + BODY.aim + Math.sin(w.pitch) * BODY.ahead,
+    w.z + fz * BODY.ahead * cp);
+}
+
+/**
+ * How long each beat of the shot lasts, and the two dives inside it.
+ *
+ * The whole thing is seven seconds, which is long for a cut you will see every
+ * time you press R and is the right length anyway: what it has to establish is
+ * a course, a person, a head start and the fact that you are chasing her, and
+ * the old five-second version established the first two.
+ */
+const CUT = {
+  wide: 2.2,        // the course, and her standing on the end of it
+  hers: 1.6,        // she goes
+  run: 1.7,         // and you go after her
+  yours: 1.2,       // off the end of the boards
+  settle: 0.8,      // and into the swim
+  // Where the run-up starts, in metres back up the jetty from its head. Eleven
+  // is about four strides, which is long enough to be a run and short enough
+  // that the boards do not run out from under her.
+  runUp: 11.0,
+  // Through the beat that owns it, where each dive leaves the deck and where
+  // it arrives. Both are fractions of that beat, not seconds, so retiming a
+  // beat does not silently move the splash off the water.
+  goAt: 0.34, inAt: 0.80,
+  // The arc. How high over the deck the apex is and how far past the edge she
+  // lands, in metres — a dive off a jetty is nearly all forward and barely up,
+  // which is the difference between a dive and a jump.
+  rise: 0.45, reach: 3.1,
+  // The over-the-shoulder while you run: back, up and to one side, in metres.
+  // Close enough that she fills a third of the frame and the boards go past
+  // underneath, which is what makes it a run rather than a dolly.
+  overBack: 2.9, overUp: 1.62, overSide: 0.85,
+  // And the same three for the dive itself, which is side on rather than over
+  // the shoulder: you cannot read somebody going over from behind them.
+  diveBack: 1.4, diveSide: 3.8, diveUp: 0.55,
+  // And how far over she goes on the way down, in radians.
+  //
+  // 0.9 is fifty degrees, which is a racing dive, and it is reached early
+  // rather than at the water. The first pass had it late — pitch as k squared
+  // — and the arithmetic was right and the picture was wrong: a parabola over
+  // three metres only drops a hand's breadth in its first half, so a body that
+  // has not turned over by then is a body lying flat in the air a foot above
+  // the boards, which is what it looked like. What tells you somebody has
+  // dived is the going-over, and the going-over happens off the end.
+  tip: 0.90,
+};
+
+/**
+ * One frame of the shot. Wall time, same as the walk up to the house.
+ *
+ * Two things move in it besides the camera, and each is owned by exactly one
+ * beat: she leaves the jetty in `shedives` and you leave it in `youdive`.
+ * Everything either of them does is a function of `u` through its own beat, so
+ * the sequence is re-enterable — press R again mid-dive and it starts over
+ * from the top with nobody left in mid-air.
+ */
 function stepChaseCut(dt) {
   if (!chaseCut) return;
   const K = chaseCut.legs;
@@ -39378,6 +40243,7 @@ function stepChaseCut(dt) {
     chaseCut.u -= 1; chaseCut.leg += 1;
   }
   if (chaseCut.leg >= K.length - 1 && chaseCut.u >= 1) {
+    if (you) you.drive(null);
     chaseCut = null; camOverride = null;
     $('swim-hud').hidden = false;
     $('chase-hud').hidden = false;
@@ -39390,11 +40256,151 @@ function stepChaseCut(dt) {
   const m = (p, q) => [lerp(p[0], q[0], f), lerp(p[1], q[1], f), lerp(p[2], q[2], f)];
   const eye = m(a.at, b.at), aim = m(a.look, b.look);
   camOverride = [eye[0], eye[1], eye[2], aim[0], aim[1], aim[2]];
+  stepCutBeat(a.beat, chaseCut.u, dt);
+}
+
+/** Fire something exactly once per run of the shot. */
+function cutOnce(name, fn) {
+  if (!chaseCut || chaseCut.fired[name]) return;
+  chaseCut.fired[name] = 1;
+  fn();
+}
+
+/**
+ * The arc off the end of the boards.
+ *
+ * `k` is 0 at the moment the feet leave and 1 at the moment the head goes in.
+ * Returns the world point and the pitch, which is the thing that makes it read
+ * as a dive: a body that travels a parabola without turning over is a sack.
+ */
+function cutArc(run, k, endY) {
+  const x = run.to[0] + run.ux * CUT.reach * k;
+  const z = run.to[2] + run.uz * CUT.reach * k;
+  // Up over the first third and down over the rest, which is what a shallow
+  // racing dive does — and the fall is the one that has to land on the water,
+  // so it is written from the two ends rather than from a gravity constant.
+  const y = run.y + CUT.rise * Math.sin(Math.PI * Math.min(1, k * 0.72))
+    - (run.y - endY) * k * k;
+  return { at: [x, y, z], pitch: -CUT.tip * Math.sqrt(k) };
+}
+
+/** What each beat of the shot is responsible for. */
+function stepCutBeat(beat, u, dt) {
+  const C = chaseCut;
+  const run = C.run;
+  const seaY = swim ? swim.surfaceAt(C.hers[0], C.hers[1]) : 0;
+
+  if (beat === 'stand') {
+    // Nobody moves. She is on the end looking at the platform and you are
+    // behind her on the boards, which is the picture the beat is for.
+    chase.poise(run.to[0], run.y, run.to[2], run.yaw, 'idle');
+    if (you) {
+      you.drive({ at: [run.from[0], run.y, run.from[2]],
+        yaw: run.yaw + Math.PI / 2, clip: 'idle', mask: true, wet: true });
+    }
+    return;
+  }
+
+  if (beat === 'shedives') {
+    if (u < CUT.goAt) {
+      chase.poise(run.to[0], run.y, run.to[2], run.yaw, 'idle');
+      return;
+    }
+    const k = Math.min(1, (u - CUT.goAt) / (CUT.inAt - CUT.goAt));
+    if (k < 1) {
+      const A = cutArc(run, k, seaY + 0.1);
+      chase.poise(A.at[0], A.at[1], A.at[2], run.yaw, 'swim', A.pitch);
+      return;
+    }
+    // In. This is where the race actually begins — see `startChase`.
+    cutOnce('herIn', () => {
+      const p = cutArc(run, 1, seaY + 0.1).at;
+      if (bodySplash) {
+        bodySplash.at(p[0], seaY, p[2], 1.9, 2.2, run.ux, run.uz);
+      }
+      if (audio) audio.plunge(1.6);
+      chase.stop();
+      chase.start(C.hers, jadrija.swimRun.board, (x, z) => swim.surfaceAt(x, z));
+    });
+    return;
+  }
+
+  if (beat === 'run') {
+    // Four strides down the boards. The walk clip covers 0.687 m a step and is
+    // authored for 1.37 m/s, so running it at 1.9 is the rig's own gait played
+    // fast rather than a stride length nothing supports — see the note on
+    // `pace` in 43-jadrija.js, which is the same problem and the same dodge.
+    if (!you) return;
+    const k = u * u * (3 - 2 * u);
+    const px = lerp(run.from[0], run.to[0], k);
+    const pz = lerp(run.from[2], run.to[2], k);
+    you.drive({
+      at: [px, run.y, pz],
+      yaw: run.yaw + Math.PI / 2, clip: 'walk', speed: 1.9, mask: true, wet: true,
+    });
+    // And the camera goes with her, over her left shoulder. Written here and
+    // not as a leg because a leg is two fixed points and what this beat is for
+    // is *her*: from a fixed frame a run down a jetty is a small figure
+    // crossing a large empty picture, and the one thing the sequence was asked
+    // to show is who is doing the running.
+    camOverride = [
+      px - run.ux * CUT.overBack - run.uz * CUT.overSide,
+      run.y + CUT.overUp,
+      pz - run.uz * CUT.overBack + run.ux * CUT.overSide,
+      px + run.ux * 2.2, run.y + 1.15, pz + run.uz * 2.2,
+    ];
+    return;
+  }
+
+  if (beat === 'youdive') {
+    if (!you) return;
+    if (u < CUT.goAt * 0.5) {
+      you.drive({ at: [run.to[0], run.y, run.to[2]], yaw: run.yaw + Math.PI / 2,
+        clip: 'walk', speed: 1.9, mask: true, wet: true });
+      return;
+    }
+    const k = Math.min(1, (u - CUT.goAt * 0.5) / (CUT.inAt - CUT.goAt * 0.5));
+    if (k < 1) {
+      const A = cutArc(run, k, seaY + 0.1);
+      you.drive({ at: A.at, yaw: run.yaw + Math.PI / 2, pitch: A.pitch,
+        clip: 'swim', speed: 1, mask: true, wet: true });
+      // Side on, and tracking. Same argument as the run: a dive is three
+      // metres of travel and a fixed frame either has her crossing a corner of
+      // it or misses her altogether, which is what two passes of moving the
+      // leg by hand actually produced. Hung off the arc itself, so it cannot.
+      camOverride = [
+        A.at[0] - run.ux * CUT.diveBack - run.uz * CUT.diveSide,
+        // Floored at the deck and not at the water. She falls a metre and a
+        // half through this beat and a camera that falls with her ends up
+        // inside the jetty it is standing beside, which is what it did: a grey
+        // slab across the frame with a pair of feet over the top of it.
+        Math.max(run.y + 0.45, A.at[1] + CUT.diveUp),
+        A.at[2] - run.uz * CUT.diveBack + run.ux * CUT.diveSide,
+        A.at[0], A.at[1] + 0.10, A.at[2],
+      ];
+      return;
+    }
+    cutOnce('youIn', () => {
+      const p = cutArc(run, 1, seaY + 0.1).at;
+      if (bodySplash) {
+        bodySplash.at(p[0], seaY, p[2], 1.6, 2.0, run.ux, run.uz);
+      }
+      if (audio) audio.plunge(1.3);
+      you.drive(null);
+    });
+    return;
+  }
+
+  if (beat === 'swim' && you) you.drive(null);
 }
 
 /** Put the race away. `won` only decides what gets said about it. */
 function endChase(won) {
   if (chase) chase.stop();
+  // Whatever the shot was holding, it is not holding it any more. Belt and
+  // braces: the cut clears her itself on the way out, and this is the path
+  // that does not go through the cut.
+  if (you) you.drive(null);
   chaseCut = null;
   if (camOverride && state.phase === 'swim') camOverride = null;
   $('chase-hud').hidden = true;
@@ -40872,14 +41878,14 @@ function frame() {
   else if (state.phase === 'ground') ground.pose(camera);
   else if (state.phase === 'ride') ride.pose(camera);
   else if (state.phase === 'foil') foil.pose(camera);
-  else if (state.phase === 'swim') swim.pose(camera);
+  else if (state.phase === 'swim') { swim.pose(camera); poseSwimBody(dt); }
   else if (state.phase === 'chute' || eject.active) eject.pose(camera);
   else if (state.phase !== 'intro') updateCamera(dt);
   // After the pose, because the rig hangs off where you ended up rather than
   // off where you were.
   if (state.phase === 'ride') ride.draw();
   if (state.phase === 'foil') foil.draw();
-  if (chase && chase.active) chase.draw(dt);
+  if (chase && (chase.active || chase.poised)) chase.draw(dt);
   U.uCamPos.value.copy(camera.position);
   // How deep the eye itself is, which is what dims the water rather than
   // merely colouring it. Taken off the wave surface at your own position and
@@ -40900,13 +41906,18 @@ function frame() {
   if (arms) {
     // Not during the establishing shot: the camera is sixteen metres up and a
     // pair of arms drawn over the top of it is a pair of arms in the sky.
-    arms.update(dt, chaseCut ? null : (state.phase === 'ride' ? ride : swim),
+    arms.update(dt, chaseCut || bodyCam ? null : (state.phase === 'ride' ? ride : swim),
       camera);
   }
   // And what took the swimming arms' place — see 62-mask.js. Same gate for the
   // same reason: a mask frame drawn over a shot taken from sixteen metres up
   // is a mask on the sky.
-  if (mask) mask.update(dt, chaseCut || state.phase !== 'swim' ? null : swim, camera);
+  // The mask overlay is the inside of the thing on her face, so it goes away
+  // the moment the camera is not behind it — but `mask.on` stays true, because
+  // she is still wearing it and the body out in the water is drawing it.
+  if (mask) {
+    mask.update(dt, chaseCut || state.phase !== 'swim' ? null : swim, camera);
+  }
   // Somebody else's afternoon, in the same wind as the fire. 46-kite.js.
   if (kites) kites.update(dt, camera);
 
@@ -41044,8 +42055,33 @@ function frame() {
   // inverse 1.8 power over a 130 m scale: full on the sand, half at 130 m,
   // a twelfth at four hundred, and nothing at all by the time the far shore is
   // the nearer one.
+  //
+  // And how many of them there are, which the shore distance gets backwards at
+  // exactly the place you spend most of your time.
+  //
+  // Measured, off two walks recorded on the peninsula. In the pine wood the
+  // chorus is the loudest thing on the recording: a narrow band centred on
+  // 5.1 kHz, half power from 4.6 to 5.6, and decorrelated between the two
+  // microphones to r = 0.08 — which is to say it is not coming from anywhere,
+  // it is the air. Two hundred metres away, standing on the concrete at the
+  // water with the wood thirty metres behind, the same band is five or six
+  // decibels down and the peak has slid to 3.6 kHz with the sides falling out
+  // of it, which is not cicadas at all any more; it is wavelets and voices.
+  //
+  // Shore distance cannot express that. The bathing terrace is *at* the shore,
+  // so the old curve gives it full gain — the one spot on the headland the
+  // recording says is quietest. What the difference actually tracks is whether
+  // there is a canopy over you, so that is what it is hung off now, with the
+  // distance curve kept for the case it was written for: a kilometre out in
+  // the channel, where there is neither.
+  //
+  // 0.45 at nothing and 1.0 under the trees is the five and a half decibels,
+  // near enough.
   const cicD = afoot ? shoreAt(camera.position.x, camera.position.z) : 0;
-  const cicG = 0.05 / (1 + Math.pow(Math.max(0, cicD) / 130, 1.8));
+  const cicW = afoot && trees && trees.canopyAt
+    ? trees.canopyAt(camera.position.x, camera.position.z) : 1;
+  const cicG = 0.05 * (0.45 + 0.55 * cicW)
+    / (1 + Math.pow(Math.max(0, cicD) / 130, 1.8));
   if (afoot !== wasAfoot || (afoot && Math.abs(cicG - cicadaGain) > 0.0015)) {
     cicadaGain = cicG;
     audio.cicadas(afoot, cicG);
@@ -41282,7 +42318,7 @@ function frame() {
   // that exists — and only in the water. The alpha it fades on its own is a
   // frame behind the phase, and one frame of a dive mask over the first frame
   // of a walk up to the vikendica is the whole of the complaint.
-  if (mask && state.phase === 'swim' && !chaseCut) mask.render(renderer);
+  if (mask && state.phase === 'swim' && !chaseCut && !bodyCam) mask.render(renderer);
   const now = performance.now();
   if (lastFrameMs) state.fps = damp(state.fps, 1000 / Math.max(1, now - lastFrameMs), 2, dt);
   lastFrameMs = now;
@@ -41526,6 +42562,9 @@ window.__fr = {
   land: {
     at: (x, z) => groundAt(x, z),
     sea: (x, z) => isSea(x, z),
+    /** The baked cover class, which is what decides what grows here. */
+    cover: (x, z) => coverAt(x, z),
+    shore: (x, z) => shoreAt(x, z),
     place: (name) => placeNamed(name),
     /** A coarse height/sea grid, which is the only readable way to see a shore. */
     grid: (x0, z0, step, nx, nz) => {
@@ -41706,10 +42745,44 @@ window.__fr = {
     /** Skip the shot, for a test that wants the race and not the camera. */
     go: () => {
       startChase();
+      if (you) you.drive(null);
       chaseCut = null; camOverride = null;
+      // Skipping the shot skips the beat that starts the race, so it has to be
+      // started here instead. Without this `go()` leaves you in the water with
+      // nobody to chase, which is exactly what the shot was rewritten to stop
+      // happening to a player.
+      if (chase && !chase.active && jadrija && jadrija.swimRun) {
+        chase.stop();
+        chase.start(jadrija.swimRun.start, jadrija.swimRun.board,
+          (x, z) => swim.surfaceAt(x, z));
+      }
       $('swim-hud').hidden = false; $('chase-hud').hidden = false;
       paintChaseHud();
       return chase.stats();
+    },
+    /**
+     * Run the shot forward by hand.
+     *
+     * The cut is driven by wall time and a headless page runs its clock at
+     * about a frame a second, so the seven seconds of it are eight frames and
+     * nothing can be caught in the middle of a dive. This steps it at 30 Hz
+     * and stops wherever it is told to, which is the only way to photograph an
+     * arc.
+     */
+    cut: (secs, dtStep = 1 / 30) => {
+      for (let t = 0; t < secs && chaseCut; t += dtStep) {
+        stepChaseCut(dtStep);
+        if (chase && (chase.active || chase.poised)) chase.draw(dtStep);
+        if (you) you.tick(dtStep, camera);
+        if (waterfx) waterfx.update(dtStep);
+      }
+      return chaseCut
+        ? { leg: chaseCut.leg, beat: chaseCut.legs[chaseCut.leg].beat,
+          u: +chaseCut.u.toFixed(2), fired: Object.keys(chaseCut.fired),
+          you: you ? you.driven() : null,
+          her: chase.poised ? 'poised' : (chase.active ? 'racing' : 'off') }
+        : { leg: -1, beat: 'done', you: you ? you.driven() : null,
+          her: chase.active ? 'racing' : 'off' };
     },
     tick: (secs, dtStep = 1 / 30, ctl = {}) => {
       if (!chase || !chase.active || !swim) return null;
@@ -41726,7 +42799,7 @@ window.__fr = {
   },
   maskRaw: () => mask,
   ao: (v) => { if (ao) ao.set(v); return ao ? ao.stats() : null; },
-  aoDbg: (n, show) => { if (ao) ao.dbg(n, show); },
+  aoDbg: (n, show, k) => { if (ao) ao.dbg(n, show, k); },
   foil: {
     stats: () => (foil ? foil.stats() : null),
     raw: () => foil,
@@ -41759,6 +42832,9 @@ window.__fr = {
   swim: {
     stats: () => (swim ? swim.stats() : null),
     raw: () => swim,
+    /** Third person, as the B key does it. See `poseSwimBody`. */
+    body: (v) => { bodyCam = v == null ? !bodyCam : !!v; return bodyCam; },
+    driven: () => (you ? you.driven() : null),
     dip: (x, z, yaw = 0, depth = 0.3) => {
       if (!swim) return null;
       swim.enter(x, z, yaw, 0);
@@ -41853,6 +42929,11 @@ window.__fr = {
   /** Debug: the vegetation, which is now grown from a spec and worth probing. */
   veg: {
     cost: () => trees.cost(),
+    /** How far the grown model reaches right now — it adapts. See repack. */
+    nearR: () => trees.nearR(),
+    /** How wooded it is where you are standing — what the cicadas ride on. */
+    canopy: (x, z) => trees.canopyAt(
+      x == null ? camera.position.x : x, z == null ? camera.position.z : z),
     nearest: (sp, x, z) => trees.nearest(sp, x, z),
   },
   ground: {

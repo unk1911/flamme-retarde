@@ -440,18 +440,46 @@ async function buildJadrija(scene) {
   // which is exactly what the first build of this did at 0.76. The aerodrome
   // apron is 0.42 and reads as concrete; Jadrija sits a little above it because
   // its aggregate is local limestone and it has ninety years of salt on it.
-  const CONC = [[0.470, 0.455, 0.424], [0.442, 0.428, 0.398], [0.498, 0.480, 0.446]];
-  const SALT = [0.330, 0.328, 0.312];        // the wet band at the waterline
-  const STONE = [0.386, 0.370, 0.340];       // the quay wall
+  //
+  // And warm, which took a photograph to settle. The albedo below has always
+  // been warm — R over B by 0.046 — and it was still coming out of the renderer
+  // *cool*, at rgb(157, 165, 169), because a horizontal slab on this shore is
+  // lit by a very blue sky over half its hemisphere and the ambient wins. The
+  // terrace in the reference frames is rgb(160, 155, 145). That is a 27-point
+  // error in the wrong direction across the largest surface in Jadrija, and it
+  // is what made the resort read as municipal paving rather than as ninety
+  // years of salt on local limestone aggregate. The ratio between the two
+  // measurements, 1.019 / 0.939 / 0.858, is applied here rather than to the
+  // light, because it is this concrete that is warm and not the afternoon.
+  const CONC = [[0.479, 0.427, 0.364], [0.450, 0.402, 0.341], [0.507, 0.451, 0.383]];
+  const SALT = [0.336, 0.308, 0.268];        // the wet band at the waterline
+  const STONE = [0.393, 0.347, 0.292];       // the quay wall
+  // Dead Aleppo needles over limestone dust, which is what the ground is
+  // everywhere behind the huts. Same measurement, the other way round: the
+  // reference floor is rgb(181, 139, 105) and this albedo is what this
+  // renderer needs to land there. See the needle floor in TERRAIN_FRAG, which
+  // is the same colour arrived at the same way — the seam between the resort's
+  // own ground and the terrain runs right through the wood and must not show.
+  const LITTER = [[0.542, 0.383, 0.263], [0.512, 0.362, 0.249],
+    [0.570, 0.404, 0.278]];
   const bay = (i) => CONC[i % 3];
   const bayIn = (i) => CONC[(i + 2) % 3];
+  const duff = (i) => LITTER[i % 3];
 
   // The three levels, seaward to inland, then the quay wall down into the water.
   ribbon(0, JAD.lip, lipOf, bay);
   riser(JAD.lip, lipOf, midOf, bayIn);
   ribbon(JAD.lip, JAD.mid, midOf, bayIn);
   riser(JAD.mid, midOf, (st) => st.deck, bay);
-  ribbon(JAD.mid, JAD.back, (st) => st.deck, bay);
+  // The promenade, and then the ground behind the back row, which is not
+  // promenade. The concrete on this shore stops a stride behind the last hut
+  // and everything past it is wood: needles, dust and pine. Running the slab
+  // all the way to `back` was what put a hard grey line across the reference
+  // view — the terrain beyond had gone to needle floor and the resort's own
+  // ground had not.
+  const walkTo = JAD.rowB + JAD.cabD + 1.2;
+  ribbon(JAD.mid, walkTo, (st) => st.deck, bay);
+  ribbon(walkTo, JAD.back, (st) => st.deck, duff);
   for (let i = 0; i < ST.length - 1; i++) {
     const a = ST[i], c = ST[i + 1];
     b.quad(pt(a, 0, -JAD.quay), pt(c, 0, -JAD.quay),
@@ -465,7 +493,7 @@ async function buildJadrija(scene) {
     const a = ST[i], c = ST[i + 1];
     const s0 = JAD.back, s1 = JAD.back + JAD.bleed;
     const ya = surfaceY(a.t, s1), yc = surfaceY(c.t, s1);
-    b.quad(pt(a, s0, a.deck), pt(c, s0, c.deck), pt(c, s1, yc), pt(a, s1, ya), bayIn(i));
+    b.quad(pt(a, s0, a.deck), pt(c, s0, c.deck), pt(c, s1, yc), pt(a, s1, ya), duff(i));
   }
   for (const [st, out] of [[ST[0], -1], [ST[ST.length - 1], 1]]) {
     const s0 = 0, s1 = JAD.back;
@@ -3948,6 +3976,8 @@ async function buildJadrija(scene) {
   const taken = new Set();
   const houses = [];
   const census = { seen: 0, thin: 0, plain: 0, rich: 0 };
+  /** Footprints that survived the thinning, for the wood to keep out of. */
+  const standing = [];
 
   /**
    * One house. Walls follow the real polygon, because the silhouette is what you
@@ -4351,12 +4381,151 @@ async function buildJadrija(scene) {
       // asked for, measured against what was actually standing rather than
       // against the number in the source line.
       if (hr() < 0.62) { taken.add(bl); census.thin++; continue; }
+      // A survivor. Whatever is drawn where it stands, nothing is planted
+      // there — see `grove` below, which needs this list and is the reason it
+      // is gathered here rather than derived again from `world.town`.
+      standing.push(poly);
       if (s > HOUSE.reach) { census.plain++; continue; }
       taken.add(bl);
       census.rich++;
       detailHouse(poly, bl.h || 6, hr);
     }
   }
+
+  // ── the wood the village stands in ─────────────────────────────────────────
+  //
+  // Jadrija is not a village with trees in it. It is an Aleppo pine wood with a
+  // village in it, and the difference is the whole character of the place: from
+  // anywhere on the peninsula you are under a broken ceiling of pine, standing
+  // on a floor of dead needles, looking at the channel through bare trunks.
+  //
+  // The cover map does not know this and cannot be made to. The peninsula is
+  // baked URBAN — correctly, because it *is* built up, and because URBAN is
+  // what the fuel model and the fire want it to be — and `GROWS[URBAN]` is a
+  // cypress every twenty metres, which is a suburb. So the wood is answered
+  // here, by the locale that owns the headland, and 45-trees.js asks.
+  //
+  // Everything else about a tree stays the tile system's job: the two LODs, the
+  // instance budget, the density slider a phone turns down, the shadow pass.
+  // This only says what grows.
+  const GROVE = {
+    // The peninsula, in the resort's own frame — the same box the thinning
+    // above works in, and for the same reason. Past the neck is Zablaće and
+    // somebody else's trees.
+    t0: -300, t1: 300, s0: -6, s1: 340,
+    // How close to a standing house is still its garden. Two metres of pad on
+    // the footprint's own bounding box: OSM traces the walls, and what is not
+    // wanted is a thirteen-metre pine coming up through a roof.
+    pad: 2.0,
+    // And the grid the footprints are bucketed into, so the test above is a
+    // constant-time lookup and not a scan of a hundred and sixty polygons per
+    // dart. 24 m is a little over the longest footprint on the headland.
+    cell: 24,
+  };
+
+  // And the colour of the ground it stands on. The terrain shader owns the
+  // pixels — see the needle floor in TERRAIN_FRAG — and all it needs is where
+  // the headland is: a centre, the shore's own direction, and how far the wood
+  // reaches along it and back off it. Written once, here, because this is the
+  // only thing in the game that knows.
+  {
+    const c = toWorld(LEN * 0.5, 130);
+    const a = toWorld(LEN * 0.5 + 40, 130);
+    const dx = a[0] - c[0], dz = a[2] - c[2];
+    const inv = 1 / Math.max(1e-6, Math.hypot(dx, dz));
+    U.uLitterAx.value.set(dx * inv, dz * inv);
+    U.uLitter.value.set(c[0], c[2], LEN * 0.5 + 300, 190);
+  }
+
+  const grove = (() => {
+    // Bucket every surviving footprint by its bounding box.
+    const grid = new Map();
+    const key = (i, k) => i * 65536 + k;
+    let n = 0;
+    for (const poly of standing) {
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (const p of poly) {
+        if (p[0] < x0) x0 = p[0];
+        if (p[0] > x1) x1 = p[0];
+        if (p[1] < z0) z0 = p[1];
+        if (p[1] > z1) z1 = p[1];
+      }
+      const box = [x0 - GROVE.pad, x1 + GROVE.pad, z0 - GROVE.pad, z1 + GROVE.pad];
+      for (let i = Math.floor(box[0] / GROVE.cell); i <= Math.floor(box[1] / GROVE.cell); i++) {
+        for (let k = Math.floor(box[2] / GROVE.cell); k <= Math.floor(box[3] / GROVE.cell); k++) {
+          const kk = key(i, k);
+          let list = grid.get(kk);
+          if (!list) grid.set(kk, list = []);
+          list.push(box);
+        }
+      }
+      n++;
+    }
+
+    /** Is (x, z) inside a standing house, or close enough to be its wall? */
+    function built(x, z) {
+      const list = grid.get(key(Math.floor(x / GROVE.cell), Math.floor(z / GROVE.cell)));
+      if (!list) return false;
+      for (const b of list) {
+        if (x > b[0] && x < b[1] && z > b[2] && z < b[3]) return true;
+      }
+      return false;
+    }
+
+    // The world box the peninsula occupies, so a 512 m vegetation tile can ask
+    // whether it is worth throwing the extra darts at all before it throws any.
+    // Walked rather than cornered: the shore is a polyline, so the four
+    // corners of the (t, s) box do not bound the world quad it maps to.
+    let bx0 = Infinity, bx1 = -Infinity, bz0 = Infinity, bz1 = -Infinity;
+    for (let t = GROVE.t0; t <= LEN + GROVE.t1; t += 20) {
+      for (const sv of [GROVE.s0, GROVE.s1 * 0.5, GROVE.s1]) {
+        const w = toWorld(t, sv);
+        if (w[0] < bx0) bx0 = w[0];
+        if (w[0] > bx1) bx1 = w[0];
+        if (w[2] < bz0) bz0 = w[2];
+        if (w[2] > bz1) bz1 = w[2];
+      }
+    }
+
+    // The two mixes, and they are read off the footage rather than invented.
+    // Near the water and through the village it is pine and almost nothing
+    // else — bare orange floor, trunks you see the sea through, no undergrowth
+    // whatever, which is what an Aleppo stand on limestone actually looks like
+    // once the summer has had it. Back towards the neck the pines give way to
+    // the olive terraces and the car park under them, so olive comes up and
+    // pine comes down.
+    //
+    // `bush` stays low everywhere and that is the correction that matters most.
+    // Maquis is what the hillside *behind* Jadrija is; the wood on the
+    // peninsula is swept — the needles are the only thing on the ground.
+    const WOOD = { pine: 0.62, olive: 0.05, bush: 0.03 };
+    const NECK = { pine: 0.30, olive: 0.34, bush: 0.06 };
+
+    return {
+      houses: n,
+      /** Does this vegetation tile touch the headland at all? */
+      tile: (ox, oz, T) => ox < bx1 && ox + T > bx0 && oz < bz1 && oz + T > bz0,
+      /**
+       * What grows at (x, z) — or null, which means "not mine, ask the cover
+       * map". Null is also the answer over the resort's own concrete, which is
+       * the one place on this shore a tree is at eye height rather than
+       * something you fly over.
+       */
+      at: (x, z) => {
+        // The world-space box first. `local` is a scan of thirty-odd shore
+        // stations and this is called nine thousand times per vegetation tile;
+        // two compares reject almost all of them before it ever runs.
+        if (x < bx0 || x > bx1 || z < bz0 || z > bz1) return null;
+        const [t, sv] = local(x, z);
+        if (t < GROVE.t0 || t > LEN + GROVE.t1 || sv < GROVE.s0 || sv > GROVE.s1) {
+          return null;
+        }
+        if (inField(x, z, 4)) return null;
+        if (built(x, z)) return null;
+        return sv > 180 ? NECK : WOOD;
+      },
+    };
+  })();
 
   const FACE = 'n = gl_FrontFacing ? n : -n; base *= vVCol;';
   const deckMesh = new THREE.Mesh(deck.geo(), solidMaterial(0xffffff, {
@@ -5679,6 +5848,21 @@ async function buildJadrija(scene) {
   };
 
   /**
+   * Is she under the roof of the one kabina that opens?
+   *
+   * Two things ask, and they used to ask separately: the soak meter, which is
+   * a fifth as long in there because what happens in the room is a question
+   * rather than a set piece, and — since the report — the water on her face.
+   * One test, so they can never disagree about which side of the doorway she
+   * is on.
+   */
+  function sheIsIn() {
+    const K0 = special;
+    return !!K0 && !!show && show.t > K0.t0 - 0.2 && show.t < K0.t1 + 0.2
+      && show.s > K0.face + 0.15 && show.s < K0.s1;
+  }
+
+  /**
    * Her mesh yaw, for a heading in the resort's own frame: 0 runs along +t and
    * −PI/2 is the water.
    *
@@ -6284,9 +6468,7 @@ async function buildJadrija(scene) {
     // the kabina costs nothing, is over in a second and a half, and is between
     // the two of you: making somebody stand in a small room holding a jet on a
     // person for five seconds to reach it is not a price, it is a wait.
-    const K0 = special;
-    const her = !!K0 && show.t > K0.t0 - 0.2 && show.t < K0.t1 + 0.2
-      && show.s > K0.face + 0.15 && show.s < K0.s1;
+    const her = sheIsIn();
     const full = her ? SHOW.soakIn : SHOW.soakFor;
     if (show.soak < full) {
       show.soak = clamp(show.soak + (show.hit > 0 ? dt : -dt * 0.12), 0, full);
@@ -6410,6 +6592,15 @@ async function buildJadrija(scene) {
         // sheen and threads, and a woman who has been holding her mouth under
         // the branch for ten seconds gets it coming out of the corners.
         f.face.wet = show.wet;
+        // And whether any of it is drawn as water rather than only as shine.
+        // Indoors, yes: that is the scene, in a room lit through one doorway
+        // where a rivulet has to be lifted above its own albedo to be seen at
+        // all. Out on the deck the same lift clips against a noon sun and the
+        // threads come out as white splotches on her forehead — which is what
+        // was reported, and is fair. Out there being hosed leaves her wet, and
+        // wet is the sheen and the darkening, both of which are unconditional
+        // in the shader.
+        f.face.streak = her ? 1 : 0;
       }
       f.aim('head', 0, 0, 1, show.gape * SHOW.chin * (0.86 + 0.20 * show.fill));
     }
@@ -7346,6 +7537,8 @@ async function buildJadrija(scene) {
     bounds: { t0: 3, t1: LEN - 3, s0: 1.1,
       s1: Math.max(JAD.reachIn, VIK.s + 7.6) },
     blockers, local, toWorld, walkY, inField, vik,
+    /** What grows on this headland — see the note over GROVE. Read by 45-trees.js. */
+    grove,
     /**
      * Where you are a person rather than a clearance. See `GROUND.tight` — this
      * is the only locale in the game with an inside to be inside of.
@@ -7570,6 +7763,9 @@ async function buildJadrija(scene) {
       curT: skinFig && skinFig.state.cur ? +skinFig.state.curT.toFixed(2) : null,
       held: +show.held.toFixed(2), leg: show.leg, shed: show.shed,
       wet: +show.wet.toFixed(2), lock: +show.lock.toFixed(1),
+      // Whether the water on her is drawn as water. See sheIsIn().
+      indoors: sheIsIn(), streak: skinFig && skinFig.face
+        ? +skinFig.face.streak.toFixed(2) : null,
       hit: +show.hit.toFixed(2), spin: show.spin,
       soak: +show.soak.toFixed(1), burn: +show.burn.toFixed(2),
       turned: show.turned,

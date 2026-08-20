@@ -231,6 +231,17 @@ addEventListener('keydown', (e) => {
   // R — the race. Ahead of the pause guard with the other three back doors,
   // and for the same reason: it is a place to be taken to.
   if (e.code === 'KeyR') { e.preventDefault(); startChase(); return; }
+  // B — round behind her, and back again. Only in the water: it is the only
+  // mode with a body to look at, and the only one where being outside your own
+  // eyes is not a bug. See `poseSwimBody`.
+  if (e.code === 'KeyB') {
+    e.preventDefault();
+    if (state.phase === 'swim') {
+      bodyCam = !bodyCam;
+      toast(T(bodyCam ? 'body.on' : 'body.off'));
+    }
+    return;
+  }
   // While the world is stopped, only the settings answer. Cycling the camera or
   // dropping the gear against a frozen simulation puts the picture and the
   // state out of step, and the HUD is not being redrawn to tell you.
@@ -1230,6 +1241,8 @@ function afootToast() {
 function leaveWater(was = state.phase) {
   // Whatever else is going on, the race does not survive leaving the water.
   if (chase && chase.active) { chase.stop(); chaseCut = null; }
+  if (you) you.drive(null);
+  bodyCam = false;
   $('chase-hud').hidden = true;
   // Whatever took you out, the mask comes off in the same frame — see the note
   // on `reset` in 62-mask.js. Ahead of the branches on purpose: it is cheap, it
@@ -1743,7 +1756,10 @@ function startChase() {
   $('chase-hud').hidden = true;
   if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = true;
     $('ctouch').hidden = true; $('stouch').hidden = false; }
-  chase.start(r.start, r.board, (x, z) => swim.surfaceAt(x, z));
+  // The race itself does not begin here any more. It begins when she hits the
+  // water, four seconds into the shot — see the `shedives` beat. Starting it
+  // up front is what made the old cut a title card over a race already in
+  // progress rather than the start of one.
   wasUnder = false;
 
   // The shot. World metres, built from the two ends of the run so that moving
@@ -1754,21 +1770,245 @@ function startChase() {
   const nx = -uz, nz = ux;                 // and across it
   const P = (a, b, y) => [r.start[0] + ux * a + nx * b, y,
     r.start[1] + uz * a + nz * b];
-  chaseCut = { u: 0, leg: 0, legs: [
-    // High and off to one side, with the whole course in frame: the jetty at
-    // the bottom of the picture, the platform at the top, her in between.
-    { at: P(-26, 24, r.jetty[1] + 15.5), look: P(52, 0, 0.2), dur: 2.3 },
-    // Down to the water at the jetty head, looking along her wake.
-    { at: P(-3.5, 3.2, r.jetty[1] + 1.2), look: P(28, 0, 0.1), dur: 1.9 },
-    // And into the swim, where the camera already is.
-    { at: P(0, 0, 0.24), look: P(40, 0, 0.1), dur: 1.0 },
-  ] };
+  // Where the run-up starts, which is back up the jetty and not on it: the
+  // resort's own frame is the only thing that knows which way the boards run,
+  // so the point is taken there and brought back out rather than guessed at
+  // from the two ends of the swim.
+  const [jt, js] = jadrija.local(r.jetty[0], r.jetty[2]);
+  const runFrom = jadrija.toWorld(jt, js + CUT.runUp);
+  const runTo = jadrija.toWorld(jt, js + 0.4);
+  const rdx = runTo[0] - runFrom[0], rdz = runTo[2] - runFrom[2];
+  const rL = Math.hypot(rdx, rdz) || 1;
+  // Her heading down the jetty, in the game's own convention: forward is
+  // (−sin yaw, −cos yaw), so this is the yaw that faces the water.
+  const runYaw = Math.atan2(-rdx / rL, -rdz / rL);
+  const deckY = r.jetty[1];
+
+  // The shot's own frame, and it is the *jetty's* and not the swim course's.
+  // Those two are not the same line — the course leaves from beside the jetty
+  // head and runs out to the platform, while the run-up and both dives happen
+  // along the boards — and building the cameras in the course frame is what
+  // pointed every one of them at open water with the action off the edge of it.
+  // `a` is metres seaward from the jetty head, `b` is metres to one side.
+  const jx = rdx / rL, jz = rdz / rL;
+  const J = (a, b, y) => [r.jetty[0] + jx * a - jz * b, y,
+    r.jetty[2] + jz * a + jx * b];
+
+  chaseCut = {
+    u: 0,
+    leg: 0,
+    // Everything the beats need that is not the camera. Held here rather than
+    // recomputed per frame, because a shot that is solved every frame is a
+    // shot that drifts when the frame rate does.
+    run: { from: runFrom, to: runTo, yaw: runYaw, y: deckY,
+      len: rL, ux: rdx / rL, uz: rdz / rL },
+    // Where she stands, and where the two of them go in. Her entry is the
+    // point the race starts from; yours is where the camera ends up.
+    hers: [r.start[0], r.start[1]],
+    fired: {},
+    legs: [
+      // 1. High, behind the run-up and off to one side: the boards leading
+      //    away, her standing on the end of them, and the platform out in the
+      //    channel past her shoulder. The whole race in one frame before
+      //    anybody moves.
+      { at: J(-19.5, 9.0, deckY + 5.4), look: J(1.5, 0, deckY + 0.7),
+        dur: CUT.wide, beat: 'stand' },
+      // 2. Down at the water off the end of the jetty, looking back up at her.
+      //    This is the only angle from which a dive is a dive rather than a
+      //    person disappearing downwards — you have to be below the thing
+      //    somebody is coming off.
+      { at: J(5.2, 3.5, deckY - 0.10), look: J(1.4, 0, deckY + 0.55),
+        dur: CUT.hers, beat: 'shedives' },
+      // 3. Beside the boards, low, while you come down them. The leg is here
+      //    for the interpolation either side of it — what actually points the
+      //    camera through this beat is the tracking in `stepCutBeat`, because
+      //    a fixed frame with somebody running across it is a shot of a jetty.
+      { at: J(-5.0, 4.2, deckY + 1.2), look: J(1.5, 0, deckY + 1.0),
+        dur: CUT.run, beat: 'run' },
+      // 4. And back in the water for your own, so she comes at the camera off
+      //    the end of the boards rather than away from it.
+      { at: J(5.0, 2.1, deckY + 1.10), look: J(2.4, 0, deckY + 0.25),
+        dur: CUT.yours, beat: 'youdive' },
+      // 5. Into the swim, where the camera already is.
+      { at: P(0, 0, 0.24), look: P(40, 0, 0.1), dur: CUT.settle, beat: 'swim' },
+    ],
+  };
+  // She is on the end of the jetty and has not gone yet — which is the one
+  // thing the old shot could not show, because the race began before it did.
+  if (chase.stop) chase.stop();
+  chase.poise(runTo[0], deckY, runTo[2], runYaw, 'idle');
+  // And you are on the boards behind her, with the mask already on: it is a
+  // race to a diving platform and you have been standing here watching her.
+  if (you) {
+    you.drive({ at: [runFrom[0], deckY, runFrom[2]], yaw: runYaw + Math.PI / 2,
+      clip: 'idle', mask: true, wet: true });
+  }
   paintChaseHud();
   toast(T('chase.on'));
   return true;
 }
 
-/** One frame of the shot. Wall time, same as the walk up to the house. */
+// -----------------------------------------------------------------------------
+// Looking at yourself in the water.
+//
+// Every mode in this game is behind your own eyes, and in three of them that is
+// the only place it could be: you are in a cockpit, under a canopy, or holding
+// a branch. The water is the one that is not. A swimmer is the most legible
+// thing a person can be from outside — the roll, the arm coming over, the wake
+// off the heels — and from inside it is a horizon that goes up and down.
+//
+// So B swings the camera round behind her, and the body it finds there is not a
+// new one: it is the same Chloe who has been standing in the mirror since
+// 49-you.js, driven off the swim's own state instead of off the camera. She
+// gets the mask on out here, because out here you can see it — the one in
+// 62-mask.js is the inside of the same object and only exists when you are
+// behind it.
+// -----------------------------------------------------------------------------
+
+const BODY = {
+  // How far back and how high the camera sits, in metres, and where it aims
+  // relative to her. Low and close: a swimmer seen from six metres up is a
+  // dot on a plane, and what is worth looking at here is at the surface.
+  back: 2.5, up: 0.72, ahead: 4.5, aim: 0.05,
+  // How deep she floats, prone and upright, in metres below the surface. Two
+  // numbers and not one, for the reason 61-chase.js sets out at length: the
+  // `swim` clip is authored lying down and the `tread` clip is authored
+  // standing, so the rig's own origin is at her waist in the first and under
+  // her feet in the second. One number for both stands her on the sea.
+  sink: 0.34,
+  sinkUp: 0.88,
+  // And how quickly the rig catches up with a camera that is being flung
+  // about. She is being told where to be rather than swimming there, so
+  // without this every flick of the mouse is a body teleporting.
+  ease: 9.0,
+};
+
+/** Third person in the water: off, or on with the mask down. */
+let bodyCam = false;
+const _bodyAt = new THREE.Vector3();
+let _bodyHas = false;
+
+/**
+ * Put her in the water under the camera, and — if the third person is on —
+ * put the camera behind her.
+ *
+ * Called after `swim.pose`, which has already put the camera at her eye. That
+ * ordering is the whole trick: the eye is the one point both cameras agree
+ * about, so the body is hung off the first person's answer and the second
+ * person is hung off the body. Nothing has to be solved twice.
+ */
+function poseSwimBody(dt) {
+  if (!you) return;
+  // The shot owns her while it is running, and it puts her on a jetty rather
+  // than in the water. Nothing here may touch that — including, in
+  // particular, the tidy-up below, which would otherwise take her off the
+  // boards on the first frame of the cut if the third person happened to be
+  // on when R was pressed.
+  if (chaseCut) return;
+  if (!bodyCam || !swim.active) {
+    if (_bodyHas) { you.drive(null); _bodyHas = false; }
+    return;
+  }
+  const w = swim.you;
+  const yaw = w.yaw;
+  // Her root, which is her eye taken back down the line she is facing: the
+  // swim clip is authored lying down, so the rig's own origin is between her
+  // feet and the head is a body-length forward of it along +X.
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  const prone = Math.hypot(w.vx, w.vz) > 0.25;
+  // Prone, her root is a body-length behind her eye along the line she is
+  // facing; upright it is straight under it.
+  const lead = prone ? 0.62 : 0.0;
+  const want = [w.x - fx * lead, w.y - (prone ? BODY.sink : BODY.sinkUp),
+    w.z - fz * lead];
+  if (!_bodyHas) { _bodyAt.set(want[0], want[1], want[2]); _bodyHas = true; }
+  const k = 1 - Math.exp(-BODY.ease * dt);
+  _bodyAt.x += (want[0] - _bodyAt.x) * k;
+  _bodyAt.y += (want[1] - _bodyAt.y) * k;
+  _bodyAt.z += (want[2] - _bodyAt.z) * k;
+
+  you.drive({
+    at: [_bodyAt.x, _bodyAt.y, _bodyAt.z],
+    yaw: yaw + Math.PI / 2,
+    pitch: prone ? w.pitch * 0.75 : 0,
+    clip: prone ? 'swim' : 'tread',
+    // The stroke goes at the speed you are going. The clip is authored for a
+    // cruise and played at one, so without this a sprint and a drift are the
+    // same arms — which is the one thing you can see from back here and cannot
+    // see from inside your own head.
+    speed: prone
+      ? clamp(Math.hypot(w.vx, w.vz) / 1.15, 0.55, 1.9) : 1,
+    mask: !!(mask && mask.on),
+    wet: true,
+  });
+
+  // And the camera, behind and a little over her. Aimed ahead of her rather
+  // than at her, so she sits low in the frame with the water she is going
+  // through in it — a camera pointed at a swimmer's back is a portrait.
+  camera.up.set(0, 1, 0);
+  camera.position.set(
+    w.x - fx * BODY.back, w.y + BODY.up, w.z - fz * BODY.back,
+  );
+  const cp = Math.cos(w.pitch);
+  camera.lookAt(w.x + fx * BODY.ahead * cp,
+    w.y + BODY.aim + Math.sin(w.pitch) * BODY.ahead,
+    w.z + fz * BODY.ahead * cp);
+}
+
+/**
+ * How long each beat of the shot lasts, and the two dives inside it.
+ *
+ * The whole thing is seven seconds, which is long for a cut you will see every
+ * time you press R and is the right length anyway: what it has to establish is
+ * a course, a person, a head start and the fact that you are chasing her, and
+ * the old five-second version established the first two.
+ */
+const CUT = {
+  wide: 2.2,        // the course, and her standing on the end of it
+  hers: 1.6,        // she goes
+  run: 1.7,         // and you go after her
+  yours: 1.2,       // off the end of the boards
+  settle: 0.8,      // and into the swim
+  // Where the run-up starts, in metres back up the jetty from its head. Eleven
+  // is about four strides, which is long enough to be a run and short enough
+  // that the boards do not run out from under her.
+  runUp: 11.0,
+  // Through the beat that owns it, where each dive leaves the deck and where
+  // it arrives. Both are fractions of that beat, not seconds, so retiming a
+  // beat does not silently move the splash off the water.
+  goAt: 0.34, inAt: 0.80,
+  // The arc. How high over the deck the apex is and how far past the edge she
+  // lands, in metres — a dive off a jetty is nearly all forward and barely up,
+  // which is the difference between a dive and a jump.
+  rise: 0.45, reach: 3.1,
+  // The over-the-shoulder while you run: back, up and to one side, in metres.
+  // Close enough that she fills a third of the frame and the boards go past
+  // underneath, which is what makes it a run rather than a dolly.
+  overBack: 2.9, overUp: 1.62, overSide: 0.85,
+  // And the same three for the dive itself, which is side on rather than over
+  // the shoulder: you cannot read somebody going over from behind them.
+  diveBack: 1.4, diveSide: 3.8, diveUp: 0.55,
+  // And how far over she goes on the way down, in radians.
+  //
+  // 0.9 is fifty degrees, which is a racing dive, and it is reached early
+  // rather than at the water. The first pass had it late — pitch as k squared
+  // — and the arithmetic was right and the picture was wrong: a parabola over
+  // three metres only drops a hand's breadth in its first half, so a body that
+  // has not turned over by then is a body lying flat in the air a foot above
+  // the boards, which is what it looked like. What tells you somebody has
+  // dived is the going-over, and the going-over happens off the end.
+  tip: 0.90,
+};
+
+/**
+ * One frame of the shot. Wall time, same as the walk up to the house.
+ *
+ * Two things move in it besides the camera, and each is owned by exactly one
+ * beat: she leaves the jetty in `shedives` and you leave it in `youdive`.
+ * Everything either of them does is a function of `u` through its own beat, so
+ * the sequence is re-enterable — press R again mid-dive and it starts over
+ * from the top with nobody left in mid-air.
+ */
 function stepChaseCut(dt) {
   if (!chaseCut) return;
   const K = chaseCut.legs;
@@ -1777,6 +2017,7 @@ function stepChaseCut(dt) {
     chaseCut.u -= 1; chaseCut.leg += 1;
   }
   if (chaseCut.leg >= K.length - 1 && chaseCut.u >= 1) {
+    if (you) you.drive(null);
     chaseCut = null; camOverride = null;
     $('swim-hud').hidden = false;
     $('chase-hud').hidden = false;
@@ -1789,11 +2030,151 @@ function stepChaseCut(dt) {
   const m = (p, q) => [lerp(p[0], q[0], f), lerp(p[1], q[1], f), lerp(p[2], q[2], f)];
   const eye = m(a.at, b.at), aim = m(a.look, b.look);
   camOverride = [eye[0], eye[1], eye[2], aim[0], aim[1], aim[2]];
+  stepCutBeat(a.beat, chaseCut.u, dt);
+}
+
+/** Fire something exactly once per run of the shot. */
+function cutOnce(name, fn) {
+  if (!chaseCut || chaseCut.fired[name]) return;
+  chaseCut.fired[name] = 1;
+  fn();
+}
+
+/**
+ * The arc off the end of the boards.
+ *
+ * `k` is 0 at the moment the feet leave and 1 at the moment the head goes in.
+ * Returns the world point and the pitch, which is the thing that makes it read
+ * as a dive: a body that travels a parabola without turning over is a sack.
+ */
+function cutArc(run, k, endY) {
+  const x = run.to[0] + run.ux * CUT.reach * k;
+  const z = run.to[2] + run.uz * CUT.reach * k;
+  // Up over the first third and down over the rest, which is what a shallow
+  // racing dive does — and the fall is the one that has to land on the water,
+  // so it is written from the two ends rather than from a gravity constant.
+  const y = run.y + CUT.rise * Math.sin(Math.PI * Math.min(1, k * 0.72))
+    - (run.y - endY) * k * k;
+  return { at: [x, y, z], pitch: -CUT.tip * Math.sqrt(k) };
+}
+
+/** What each beat of the shot is responsible for. */
+function stepCutBeat(beat, u, dt) {
+  const C = chaseCut;
+  const run = C.run;
+  const seaY = swim ? swim.surfaceAt(C.hers[0], C.hers[1]) : 0;
+
+  if (beat === 'stand') {
+    // Nobody moves. She is on the end looking at the platform and you are
+    // behind her on the boards, which is the picture the beat is for.
+    chase.poise(run.to[0], run.y, run.to[2], run.yaw, 'idle');
+    if (you) {
+      you.drive({ at: [run.from[0], run.y, run.from[2]],
+        yaw: run.yaw + Math.PI / 2, clip: 'idle', mask: true, wet: true });
+    }
+    return;
+  }
+
+  if (beat === 'shedives') {
+    if (u < CUT.goAt) {
+      chase.poise(run.to[0], run.y, run.to[2], run.yaw, 'idle');
+      return;
+    }
+    const k = Math.min(1, (u - CUT.goAt) / (CUT.inAt - CUT.goAt));
+    if (k < 1) {
+      const A = cutArc(run, k, seaY + 0.1);
+      chase.poise(A.at[0], A.at[1], A.at[2], run.yaw, 'swim', A.pitch);
+      return;
+    }
+    // In. This is where the race actually begins — see `startChase`.
+    cutOnce('herIn', () => {
+      const p = cutArc(run, 1, seaY + 0.1).at;
+      if (bodySplash) {
+        bodySplash.at(p[0], seaY, p[2], 1.9, 2.2, run.ux, run.uz);
+      }
+      if (audio) audio.plunge(1.6);
+      chase.stop();
+      chase.start(C.hers, jadrija.swimRun.board, (x, z) => swim.surfaceAt(x, z));
+    });
+    return;
+  }
+
+  if (beat === 'run') {
+    // Four strides down the boards. The walk clip covers 0.687 m a step and is
+    // authored for 1.37 m/s, so running it at 1.9 is the rig's own gait played
+    // fast rather than a stride length nothing supports — see the note on
+    // `pace` in 43-jadrija.js, which is the same problem and the same dodge.
+    if (!you) return;
+    const k = u * u * (3 - 2 * u);
+    const px = lerp(run.from[0], run.to[0], k);
+    const pz = lerp(run.from[2], run.to[2], k);
+    you.drive({
+      at: [px, run.y, pz],
+      yaw: run.yaw + Math.PI / 2, clip: 'walk', speed: 1.9, mask: true, wet: true,
+    });
+    // And the camera goes with her, over her left shoulder. Written here and
+    // not as a leg because a leg is two fixed points and what this beat is for
+    // is *her*: from a fixed frame a run down a jetty is a small figure
+    // crossing a large empty picture, and the one thing the sequence was asked
+    // to show is who is doing the running.
+    camOverride = [
+      px - run.ux * CUT.overBack - run.uz * CUT.overSide,
+      run.y + CUT.overUp,
+      pz - run.uz * CUT.overBack + run.ux * CUT.overSide,
+      px + run.ux * 2.2, run.y + 1.15, pz + run.uz * 2.2,
+    ];
+    return;
+  }
+
+  if (beat === 'youdive') {
+    if (!you) return;
+    if (u < CUT.goAt * 0.5) {
+      you.drive({ at: [run.to[0], run.y, run.to[2]], yaw: run.yaw + Math.PI / 2,
+        clip: 'walk', speed: 1.9, mask: true, wet: true });
+      return;
+    }
+    const k = Math.min(1, (u - CUT.goAt * 0.5) / (CUT.inAt - CUT.goAt * 0.5));
+    if (k < 1) {
+      const A = cutArc(run, k, seaY + 0.1);
+      you.drive({ at: A.at, yaw: run.yaw + Math.PI / 2, pitch: A.pitch,
+        clip: 'swim', speed: 1, mask: true, wet: true });
+      // Side on, and tracking. Same argument as the run: a dive is three
+      // metres of travel and a fixed frame either has her crossing a corner of
+      // it or misses her altogether, which is what two passes of moving the
+      // leg by hand actually produced. Hung off the arc itself, so it cannot.
+      camOverride = [
+        A.at[0] - run.ux * CUT.diveBack - run.uz * CUT.diveSide,
+        // Floored at the deck and not at the water. She falls a metre and a
+        // half through this beat and a camera that falls with her ends up
+        // inside the jetty it is standing beside, which is what it did: a grey
+        // slab across the frame with a pair of feet over the top of it.
+        Math.max(run.y + 0.45, A.at[1] + CUT.diveUp),
+        A.at[2] - run.uz * CUT.diveBack + run.ux * CUT.diveSide,
+        A.at[0], A.at[1] + 0.10, A.at[2],
+      ];
+      return;
+    }
+    cutOnce('youIn', () => {
+      const p = cutArc(run, 1, seaY + 0.1).at;
+      if (bodySplash) {
+        bodySplash.at(p[0], seaY, p[2], 1.6, 2.0, run.ux, run.uz);
+      }
+      if (audio) audio.plunge(1.3);
+      you.drive(null);
+    });
+    return;
+  }
+
+  if (beat === 'swim' && you) you.drive(null);
 }
 
 /** Put the race away. `won` only decides what gets said about it. */
 function endChase(won) {
   if (chase) chase.stop();
+  // Whatever the shot was holding, it is not holding it any more. Belt and
+  // braces: the cut clears her itself on the way out, and this is the path
+  // that does not go through the cut.
+  if (you) you.drive(null);
   chaseCut = null;
   if (camOverride && state.phase === 'swim') camOverride = null;
   $('chase-hud').hidden = true;
@@ -3271,14 +3652,14 @@ function frame() {
   else if (state.phase === 'ground') ground.pose(camera);
   else if (state.phase === 'ride') ride.pose(camera);
   else if (state.phase === 'foil') foil.pose(camera);
-  else if (state.phase === 'swim') swim.pose(camera);
+  else if (state.phase === 'swim') { swim.pose(camera); poseSwimBody(dt); }
   else if (state.phase === 'chute' || eject.active) eject.pose(camera);
   else if (state.phase !== 'intro') updateCamera(dt);
   // After the pose, because the rig hangs off where you ended up rather than
   // off where you were.
   if (state.phase === 'ride') ride.draw();
   if (state.phase === 'foil') foil.draw();
-  if (chase && chase.active) chase.draw(dt);
+  if (chase && (chase.active || chase.poised)) chase.draw(dt);
   U.uCamPos.value.copy(camera.position);
   // How deep the eye itself is, which is what dims the water rather than
   // merely colouring it. Taken off the wave surface at your own position and
@@ -3299,13 +3680,18 @@ function frame() {
   if (arms) {
     // Not during the establishing shot: the camera is sixteen metres up and a
     // pair of arms drawn over the top of it is a pair of arms in the sky.
-    arms.update(dt, chaseCut ? null : (state.phase === 'ride' ? ride : swim),
+    arms.update(dt, chaseCut || bodyCam ? null : (state.phase === 'ride' ? ride : swim),
       camera);
   }
   // And what took the swimming arms' place — see 62-mask.js. Same gate for the
   // same reason: a mask frame drawn over a shot taken from sixteen metres up
   // is a mask on the sky.
-  if (mask) mask.update(dt, chaseCut || state.phase !== 'swim' ? null : swim, camera);
+  // The mask overlay is the inside of the thing on her face, so it goes away
+  // the moment the camera is not behind it — but `mask.on` stays true, because
+  // she is still wearing it and the body out in the water is drawing it.
+  if (mask) {
+    mask.update(dt, chaseCut || state.phase !== 'swim' ? null : swim, camera);
+  }
   // Somebody else's afternoon, in the same wind as the fire. 46-kite.js.
   if (kites) kites.update(dt, camera);
 
@@ -3443,8 +3829,33 @@ function frame() {
   // inverse 1.8 power over a 130 m scale: full on the sand, half at 130 m,
   // a twelfth at four hundred, and nothing at all by the time the far shore is
   // the nearer one.
+  //
+  // And how many of them there are, which the shore distance gets backwards at
+  // exactly the place you spend most of your time.
+  //
+  // Measured, off two walks recorded on the peninsula. In the pine wood the
+  // chorus is the loudest thing on the recording: a narrow band centred on
+  // 5.1 kHz, half power from 4.6 to 5.6, and decorrelated between the two
+  // microphones to r = 0.08 — which is to say it is not coming from anywhere,
+  // it is the air. Two hundred metres away, standing on the concrete at the
+  // water with the wood thirty metres behind, the same band is five or six
+  // decibels down and the peak has slid to 3.6 kHz with the sides falling out
+  // of it, which is not cicadas at all any more; it is wavelets and voices.
+  //
+  // Shore distance cannot express that. The bathing terrace is *at* the shore,
+  // so the old curve gives it full gain — the one spot on the headland the
+  // recording says is quietest. What the difference actually tracks is whether
+  // there is a canopy over you, so that is what it is hung off now, with the
+  // distance curve kept for the case it was written for: a kilometre out in
+  // the channel, where there is neither.
+  //
+  // 0.45 at nothing and 1.0 under the trees is the five and a half decibels,
+  // near enough.
   const cicD = afoot ? shoreAt(camera.position.x, camera.position.z) : 0;
-  const cicG = 0.05 / (1 + Math.pow(Math.max(0, cicD) / 130, 1.8));
+  const cicW = afoot && trees && trees.canopyAt
+    ? trees.canopyAt(camera.position.x, camera.position.z) : 1;
+  const cicG = 0.05 * (0.45 + 0.55 * cicW)
+    / (1 + Math.pow(Math.max(0, cicD) / 130, 1.8));
   if (afoot !== wasAfoot || (afoot && Math.abs(cicG - cicadaGain) > 0.0015)) {
     cicadaGain = cicG;
     audio.cicadas(afoot, cicG);
@@ -3681,7 +4092,7 @@ function frame() {
   // that exists — and only in the water. The alpha it fades on its own is a
   // frame behind the phase, and one frame of a dive mask over the first frame
   // of a walk up to the vikendica is the whole of the complaint.
-  if (mask && state.phase === 'swim' && !chaseCut) mask.render(renderer);
+  if (mask && state.phase === 'swim' && !chaseCut && !bodyCam) mask.render(renderer);
   const now = performance.now();
   if (lastFrameMs) state.fps = damp(state.fps, 1000 / Math.max(1, now - lastFrameMs), 2, dt);
   lastFrameMs = now;
@@ -3925,6 +4336,9 @@ window.__fr = {
   land: {
     at: (x, z) => groundAt(x, z),
     sea: (x, z) => isSea(x, z),
+    /** The baked cover class, which is what decides what grows here. */
+    cover: (x, z) => coverAt(x, z),
+    shore: (x, z) => shoreAt(x, z),
     place: (name) => placeNamed(name),
     /** A coarse height/sea grid, which is the only readable way to see a shore. */
     grid: (x0, z0, step, nx, nz) => {
@@ -4105,10 +4519,44 @@ window.__fr = {
     /** Skip the shot, for a test that wants the race and not the camera. */
     go: () => {
       startChase();
+      if (you) you.drive(null);
       chaseCut = null; camOverride = null;
+      // Skipping the shot skips the beat that starts the race, so it has to be
+      // started here instead. Without this `go()` leaves you in the water with
+      // nobody to chase, which is exactly what the shot was rewritten to stop
+      // happening to a player.
+      if (chase && !chase.active && jadrija && jadrija.swimRun) {
+        chase.stop();
+        chase.start(jadrija.swimRun.start, jadrija.swimRun.board,
+          (x, z) => swim.surfaceAt(x, z));
+      }
       $('swim-hud').hidden = false; $('chase-hud').hidden = false;
       paintChaseHud();
       return chase.stats();
+    },
+    /**
+     * Run the shot forward by hand.
+     *
+     * The cut is driven by wall time and a headless page runs its clock at
+     * about a frame a second, so the seven seconds of it are eight frames and
+     * nothing can be caught in the middle of a dive. This steps it at 30 Hz
+     * and stops wherever it is told to, which is the only way to photograph an
+     * arc.
+     */
+    cut: (secs, dtStep = 1 / 30) => {
+      for (let t = 0; t < secs && chaseCut; t += dtStep) {
+        stepChaseCut(dtStep);
+        if (chase && (chase.active || chase.poised)) chase.draw(dtStep);
+        if (you) you.tick(dtStep, camera);
+        if (waterfx) waterfx.update(dtStep);
+      }
+      return chaseCut
+        ? { leg: chaseCut.leg, beat: chaseCut.legs[chaseCut.leg].beat,
+          u: +chaseCut.u.toFixed(2), fired: Object.keys(chaseCut.fired),
+          you: you ? you.driven() : null,
+          her: chase.poised ? 'poised' : (chase.active ? 'racing' : 'off') }
+        : { leg: -1, beat: 'done', you: you ? you.driven() : null,
+          her: chase.active ? 'racing' : 'off' };
     },
     tick: (secs, dtStep = 1 / 30, ctl = {}) => {
       if (!chase || !chase.active || !swim) return null;
@@ -4125,7 +4573,7 @@ window.__fr = {
   },
   maskRaw: () => mask,
   ao: (v) => { if (ao) ao.set(v); return ao ? ao.stats() : null; },
-  aoDbg: (n, show) => { if (ao) ao.dbg(n, show); },
+  aoDbg: (n, show, k) => { if (ao) ao.dbg(n, show, k); },
   foil: {
     stats: () => (foil ? foil.stats() : null),
     raw: () => foil,
@@ -4158,6 +4606,9 @@ window.__fr = {
   swim: {
     stats: () => (swim ? swim.stats() : null),
     raw: () => swim,
+    /** Third person, as the B key does it. See `poseSwimBody`. */
+    body: (v) => { bodyCam = v == null ? !bodyCam : !!v; return bodyCam; },
+    driven: () => (you ? you.driven() : null),
     dip: (x, z, yaw = 0, depth = 0.3) => {
       if (!swim) return null;
       swim.enter(x, z, yaw, 0);
@@ -4252,6 +4703,11 @@ window.__fr = {
   /** Debug: the vegetation, which is now grown from a spec and worth probing. */
   veg: {
     cost: () => trees.cost(),
+    /** How far the grown model reaches right now — it adapts. See repack. */
+    nearR: () => trees.nearR(),
+    /** How wooded it is where you are standing — what the cicadas ride on. */
+    canopy: (x, z) => trees.canopyAt(
+      x == null ? camera.position.x : x, z == null ? camera.position.z : z),
     nearest: (sp, x, z) => trees.nearest(sp, x, z),
   },
   ground: {

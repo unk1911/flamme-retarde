@@ -123,6 +123,8 @@ uniform vec3 uAmbSky;
 uniform vec3 uAmbGround;
 uniform float uAmbI;
 uniform float uNight;
+uniform vec4 uLitter;
+uniform vec2 uLitterAx;
 
 void main(){
   // ── normal, from the height field rather than from the mesh ─────────────
@@ -184,6 +186,36 @@ void main(){
   // Bleach the ground near the waterline — salt, shingle and glare.
   float shoreT = 1.0 - smoothstep(0.0, 0.055, cv.a);
   base = mix(base, vec3(0.86, 0.82, 0.72), shoreT * 0.5);
+
+  // ── the needle floor ────────────────────────────────────────────────────
+  //
+  // Jadrija's ground is not the colour of anywhere else on this map, and the
+  // cover map cannot say so: the peninsula is baked URBAN because it is built
+  // up, and URBAN is a warm grey that serves the whole of Sibenik. What is
+  // actually underfoot on that headland, everywhere the concrete and the
+  // tarmac are not, is dead Aleppo pine needles over limestone dust — a rust
+  // orange you can walk a kilometre on without seeing a blade of grass,
+  // because the wood is swept and nothing grows under a closed pine canopy in
+  // a Dalmatian August.
+  //
+  // Measured, not guessed. The reference frames put the sunlit floor at
+  // rgb(181, 139, 105) and the same ground in this renderer at rgb(180, 179,
+  // 160): the brightness was already right and the hue was not there at all.
+  // 1.00, 0.78, 0.63 is the ratio between them, which is why this multiplies
+  // rather than mixes — a mix to a flat colour would take the karst ribs, the
+  // three scales of mottle and the two-metre gravel with it, and those are the
+  // reason the ground is ground.
+  //
+  // Held off the water by the same shoreT the bleach uses, because the last
+  // few metres before the channel really are pale shingle and concrete, and
+  // off the seabed entirely, which is a different shader's argument below.
+  if (uLitter.z > 0.0 && klass != 0) {
+    vec2 d = vWorld.xz - uLitter.xy;
+    vec2 ts = vec2(dot(d, uLitterAx), dot(d, vec2(-uLitterAx.y, uLitterAx.x)));
+    float r = length(ts / uLitter.zw);
+    float litter = (1.0 - smoothstep(0.78, 1.0, r)) * (1.0 - shoreT);
+    base *= mix(vec3(1.0), vec3(1.00, 0.78, 0.63), litter);
+  }
 
   // ── the seabed ──────────────────────────────────────────────────────────
   // The ground does not stop at the waterline — it has always run straight on
@@ -393,6 +425,8 @@ function buildTerrain(scene) {
     uSkirt: { value: TERRAIN.skirt },
     uTexelWorld: { value: CONFIG.world / world.grid },
     uCoverColor: { value: COVER_COLOR.map((c) => new THREE.Color(c[0], c[1], c[2])) },
+    uLitter: U.uLitter,
+    uLitterAx: U.uLitterAx,
   };
 
   const levels = TERRAIN.lods.map((n) => {

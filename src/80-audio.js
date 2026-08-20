@@ -1803,10 +1803,24 @@ function buildAudio() {
     if (cicadaNodes) { cicadaNodes.g.gain.setTargetAtTime(gain, t0, 1.2); return; }
     const src = ctx.createBufferSource();
     src.buffer = noiseBuf; src.loop = true;
+    // 5 100 Hz, and narrow.
+    //
+    // Both numbers are off a recording rather than off a memory of one. Two
+    // walks through the pines at Jadrija put the chorus at a carrier of
+    // 4 900 to 5 250 Hz with its half-power points at 4 611 and 5 607 — which
+    // is a Q of about five, not the 2.4 this had, and the difference is
+    // audible: at 2.4 the band is two and a half kilohertz wide and the thing
+    // reads as hiss with a bump in it. Cicada orni is a *tone*.
+    //
+    // The second band stays, because there is real energy up there and a pure
+    // 5 kHz band is a test signal, but it comes down to a third. On the
+    // recordings the 6–12 kHz octave runs eight to ten decibels under the
+    // carrier and for stretches of the second walk it is simply not there.
     const bp = ctx.createBiquadFilter();
-    bp.type = 'bandpass'; bp.frequency.value = 5200; bp.Q.value = 2.4;
+    bp.type = 'bandpass'; bp.frequency.value = 5100; bp.Q.value = 4.4;
     const bp2 = ctx.createBiquadFilter();
     bp2.type = 'bandpass'; bp2.frequency.value = 8400; bp2.Q.value = 3.0;
+    const bp2g = ctx.createGain(); bp2g.gain.value = 0.34;
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.setTargetAtTime(gain, t0, 1.6);
@@ -1820,7 +1834,7 @@ function buildAudio() {
       lfo.start(t0);
     }
     src.connect(bp).connect(g);
-    src.connect(bp2).connect(g);
+    src.connect(bp2).connect(bp2g).connect(g);
     g.connect(outBus);
     src.start(t0);
     cicadaNodes = { src, g };
