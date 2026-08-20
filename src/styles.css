@@ -1235,6 +1235,63 @@ html.touch .row input[type=range] { height: 22px; }
 #rd-hint { min-height: 1.2em; opacity: .9; }
 html.touch #ride-hud { bottom: 7.4rem; }
 
+/* ── the eFoil ───────────────────────────────────────────────────────────── */
+/* Laid out exactly like the kite's, because they are the same thing seen from
+   the same place — a speed, a state and a hint, stacked under the middle of the
+   picture. The one piece the kite does not have is the trigger, and it is a bar
+   rather than a number: a throttle is a position your hand is in, and nobody
+   holding one is reading a percentage off it. */
+#foil-hud {
+  position: fixed;
+  left: 50%;
+  bottom: 4.2vh;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .5em;
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .75);
+}
+#foil-hud[hidden] { display: none; }
+#fo-thrbar {
+  width: 9.5rem;
+  height: .30rem;
+  border: 1px solid rgba(255, 255, 255, .30);
+  background: rgba(0, 0, 0, .25);
+}
+#fo-thr {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #cfeef2;
+  transition: width .10s linear;
+}
+#fo-state {
+  font-size: .66rem;
+  letter-spacing: .30em;
+  text-transform: uppercase;
+  opacity: .92;
+  padding: .18em .7em;
+  border: 1px solid rgba(255, 255, 255, .28);
+}
+/* Flying is the good thing happening and gets the kite's cool blue; up against
+   the top of the mast, and down on the hull after ventilating, are both the
+   thing you are about to lose it by and get the amber. */
+#fo-state.air {
+  color: #cfeef2;
+  border-color: rgba(207, 238, 242, .55);
+  background: rgba(207, 238, 242, .12);
+}
+#fo-state.stall {
+  color: var(--ember-hi);
+  border-color: rgba(224, 195, 138, .55);
+  background: rgba(224, 195, 138, .12);
+}
+#fo-hint { min-height: 1.2em; opacity: .9; }
+html.touch #foil-hud { bottom: 7.4rem; }
+
 #swim-hud {
   position: fixed;
   left: 50%;

@@ -113,16 +113,34 @@ const RIDE = {
   // about ten metres with the kite overhead — big air, and the number a
   // competition boosts. It was 2.6/0.44 against a top of 17, which came out
   // at five metres and read, correctly, as never quite leaving the water.
-  pop: [3.0, 0.48],
-  gFloat: 6.2,           // m/s² with the kite overhead holding you
+  //
+  // 3.0/0.48 was a thirteen-metre-a-second send off a twenty-one-metre-a-second
+  // reach, which apexes at about fourteen metres. That is a real big-air jump
+  // and it is not what this mode is for: this is the one place in the game
+  // where you leave the ground under your own steam and the report on it was
+  // that it should go *higher*. 4.2/0.80 is twenty-one metres a second off the
+  // same reach, which is forty metres up and four seconds of getting there.
+  pop: [4.2, 0.80],
+  gFloat: 5.4,           // m/s² with the kite overhead holding you
   gDive: 11.5,           // and with it flown forward, which is how you come down
+  // And how fast you may fall on each, which is the half of it that was
+  // missing and had to be once the jump got big.
+  //
+  // A kite overhead is a canopy: it does not merely slow you down, it settles
+  // you at a rate and holds you there, which is why a floated landing off
+  // fifteen metres is soft and why a floated landing off forty is *also*
+  // soft. Left as a plain acceleration, forty metres came down at twenty-nine
+  // metres a second and every big one you landed was a wipeout — the mode
+  // punishing you for doing the thing it just asked you to do.
+  vFloat: 7.5,
+  vDive: 18.0,
   // Vertical speed at which a landing costs you / ends you. Raised with the
   // jump: coming down off ten metres on a floated kite is eleven metres a
   // second, and a jump that is punished for being the jump you were asked to
   // do is a jump nobody does twice. Dive the kite on the way down and it is
   // fifteen, and that still hurts — which is the skill, and is the same one it
   // is on the water.
-  land: [11.5, 17.0],
+  land: [12.5, 20.0],
   reload: 0.9,           // s before the kite will take you up again
 
   bob: 0.055,            // m of chop under a board doing thirty knots
@@ -358,9 +376,11 @@ function buildRide(scene) {
     if (you.air > 0) {
       // Overhead holds you; flown forward it lets you go. Nothing else in the
       // mode has this much authority over how it feels.
-      const g = you.elev > 0.95 ? RIDE.gFloat
-        : you.elev > 0.62 ? (RIDE.gFloat + RIDE.gDive) * 0.5 : RIDE.gDive;
+      const fl = clamp((you.elev - 0.62) / 0.33, 0, 1);
+      const g = lerp(RIDE.gDive, RIDE.gFloat, fl);
+      const vMax = lerp(RIDE.vDive, RIDE.vFloat, fl);
       you.vy -= g * dt;
+      if (you.vy < -vMax) you.vy = -vMax;
       you.air += you.vy * dt;
       you.best = Math.max(you.best, you.air);
       if (you.air <= 0) {
@@ -382,7 +402,14 @@ function buildRide(scene) {
     const s = clamp(ctl.side || 0, -1, 1);
     you.steer += (s - you.steer) * Math.min(1, dt * 6);
     const spN = Math.min(1, you.sp / RIDE.top);
-    you.yaw += you.steer * dt
+    // Minus, and it was plus, which is why D went left.
+    //
+    // Every heading in this game is written forward = (-sin yaw, -cos yaw), and
+    // the derivative of that in yaw points at -x — so a *rising* yaw is a turn
+    // to the left. The swim has had the minus since it was written; this was
+    // the one steering model in the game that did not, and both the arrows and
+    // A/D came out mirrored because of it.
+    you.yaw -= you.steer * dt
       * (RIDE.turn + (RIDE.turnFast - RIDE.turn) * spN);
 
     // ── the polar ───────────────────────────────────────────────────────────

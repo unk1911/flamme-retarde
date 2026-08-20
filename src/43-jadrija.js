@@ -375,6 +375,10 @@ async function buildJadrija(scene) {
    * run (near, bottom) → (far, bottom) → (far, top) → (near, top) as seen along
    * increasing `t`, which is the same cycle `boxIn` walks.
    */
+  /** `frustum` in the shore frame, which is the only frame anything uses it in. */
+  const frustumTS = (y0, r0, y1, r1, col, topCol) =>
+    frustum(W, y0, r0, y1, r1, col, topCol);
+
   function bar(t0, t1, sec, col, topCol) {
     const [P0, P1, P2, P3] = sec;
     const A = W(t0, P0[0], P0[1]), B = W(t1, P0[0], P0[1]);
@@ -2029,51 +2033,117 @@ async function buildJadrija(scene) {
   // pressing a key twice. Eighty-five metres at a decent crawl is a minute,
   // which is a race; it is also about as far off this shore as anybody would
   // moor something you are meant to climb on to.
-  const DIVE = { t: JET.t, s: -108.0, w: 2.1, top: at(JET.t).lip + 0.85 };
+  const DIVE = { t: JET.t, s: -108.0, w: 2.1, top: at(JET.t).lip + 1.02 };
   {
     const D = DIVE, y = D.top;
-    // The slab, and a lip of darker concrete round it where the shuttering was.
-    boxTS(D.t - D.w, D.t + D.w, D.s - D.w, D.s + D.w, y - 0.34, y,
-      [0.735, 0.720, 0.678], CONC[2]);
-    // Four piles, straight down into it. They go well below any sea bed this
-    // close in, and nobody is ever going to see the bottom of one.
-    for (const dt of [-D.w + 0.42, D.w - 0.42]) {
-      for (const ds of [-D.w + 0.42, D.w - 0.42]) {
-        boxTS(D.t + dt - 0.20, D.t + dt + 0.20, D.s + ds - 0.20, D.s + ds + 0.20,
-          -18.0, y - 0.34, [0.404, 0.372, 0.334]);
+    // Built from the photograph, and the photograph says something quite
+    // different from what used to stand here.
+    //
+    // What was here was a slab on four piles with a handrail round three sides
+    // and a ladder down the fourth — which is a lido diving stage, and is not
+    // this one. Jadrija's is a lump of poured concrete: two masses side by
+    // side, the big one *flaring outward as it rises* out of the water like an
+    // upturned trough, the smaller one squarer and whiter and newer, and a
+    // single long plank laid across the top of both and cantilevered well past
+    // the end of them. There is no rail at all. The only ironwork on it is two
+    // pipes standing up out of the deck with their tops bent over, which is
+    // what you haul yourself up on and is the silhouette everybody on the
+    // promenade recognises it by from four hundred metres.
+    //
+    // Three colours, because the concrete is not one colour: the old mass has
+    // gone green with forty years of it, the newer block is still nearly
+    // white, and there is a dark tidal band round the bottom of both that is
+    // the single strongest thing telling you it is standing in the sea.
+    const OLD = [0.664, 0.694, 0.672];
+    const NEW = [0.786, 0.784, 0.756];
+    const WET = [0.352, 0.408, 0.396];
+    const PLANK = [0.744, 0.726, 0.668];
+    const PIPE = [0.796, 0.800, 0.792];
+
+    // ── the big mass ─────────────────────────────────────────────────────────
+    // Below the water it is a plain shaft — nobody sees it and the sea bed here
+    // is eight metres down. Above it, the flare, which is the whole shape.
+    frustumTS(-8.0, [D.t - 0.62, D.s, 1.02, 0.98],
+      -0.55, [D.t - 0.62, D.s, 1.02, 0.98], WET);
+    frustumTS(-0.55, [D.t - 0.62, D.s, 1.02, 0.98],
+      y - 0.26, [D.t - 0.62, D.s, 1.92, 1.34], OLD);
+    // The cap: a slab a little proud of the flare all round, which is where
+    // the shuttering stopped and is the one hard horizontal on the thing.
+    frustumTS(y - 0.26, [D.t - 0.62, D.s, 1.96, 1.38],
+      y, [D.t - 0.62, D.s, 1.98, 1.40], [0.712, 0.730, 0.702], CONC[2]);
+
+    // ── the smaller, newer block ─────────────────────────────────────────────
+    // Squarer, whiter, a hand lower, and set half a metre further out. In the
+    // photograph it reads as a separate pour that arrived later, which is what
+    // happens to every one of these on this coast.
+    frustumTS(-8.0, [D.t + 2.06, D.s - 0.16, 0.70, 0.74],
+      -0.50, [D.t + 2.06, D.s - 0.16, 0.70, 0.74], WET);
+    frustumTS(-0.50, [D.t + 2.06, D.s - 0.16, 0.70, 0.74],
+      y - 0.46, [D.t + 2.06, D.s - 0.16, 0.94, 0.92], NEW);
+    frustumTS(y - 0.46, [D.t + 2.06, D.s - 0.16, 0.96, 0.94],
+      y - 0.26, [D.t + 2.06, D.s - 0.16, 0.98, 0.96], [0.808, 0.806, 0.778],
+      [0.836, 0.834, 0.804]);
+
+    // A run of dark down the face of the big one, which is what forty years of
+    // wet feet coming up a ladder does to a wall and is most of why the thing
+    // does not read as a new casting.
+    for (const [ot, wt, sh] of [[-1.30, 0.30, 0.62], [-0.34, 0.19, 0.44],
+      [0.42, 0.24, 0.55]]) {
+      boxTS(D.t - 0.62 + ot - wt, D.t - 0.62 + ot + wt,
+        D.s - 1.36, D.s - 1.30, y - 0.26 - sh * 1.5, y - 0.26,
+        [0.520, 0.552, 0.532]);
+    }
+
+    // ── the board ────────────────────────────────────────────────────────────
+    // One plank, laid across both masses along the shore and running a long
+    // way past the small one. It is the thinnest thing out here and it is the
+    // thing you see first: a dark line against the channel with nothing under
+    // the far end of it.
+    bar(D.t - 2.42, D.t + 5.10,
+      [[D.s - 0.40, y + 0.015], [D.s + 0.40, y + 0.015],
+       [D.s + 0.40, y + 0.105], [D.s - 0.40, y + 0.105]], PLANK,
+      [0.796, 0.780, 0.722]);
+    // And the two bearers under it where it crosses each mass, which is what
+    // stops it reading as a decal on the top of the concrete.
+    for (const ot of [-0.62, 2.06]) {
+      boxTS(D.t + ot - 0.36, D.t + ot + 0.36, D.s - 0.30, D.s + 0.30,
+        y - 0.05, y + 0.015, [0.560, 0.548, 0.512]);
+    }
+
+    // ── the two pipes ────────────────────────────────────────────────────────
+    // The whole of the ironwork, and the silhouette. They stand out of the
+    // deck a little inboard of the shoreward edge, go up a metre and a bit,
+    // and then bend over toward the ladder — which is what your hands are
+    // reaching for when you come up it, and is why they lean that way and not
+    // some other.
+    for (const ot of [-1.28, -0.20]) {
+      const bt = D.t + ot, bs = D.s - 0.86;
+      const prof = [[y - 0.06, 0.036, 0, 0]];
+      for (let k = 0; k <= 5; k++) {
+        // A quarter of a circle of radius 0.30, walked in five steps: straight
+        // up to y+1.16 and then over, finishing horizontal and 30 cm shoreward.
+        const a = (k / 5) * (Math.PI / 2);
+        prof.push([y + 1.34 + Math.sin(a) * 0.30, 0.036,
+          0, -(1 - Math.cos(a)) * 0.30]);
       }
+      lathe(W, bt, bs, prof, PIPE, 8);
+      // The foot: a collar where it goes into the concrete, because a pipe
+      // that simply stops at a surface reads as sunk into mud.
+      post(W, bt, bs, y - 0.02, y + 0.07, 0.062, [0.612, 0.616, 0.606], 8);
     }
-    // The board, off the shoreward face so you dive back toward the beach —
-    // which is how this one is built, because the deep water is behind it.
-    boxTS(D.t - 0.30, D.t + 0.30, D.s + D.w - 0.10, D.s + D.w + 2.30,
-      y + 0.50, y + 0.58, [0.780, 0.760, 0.700], [0.820, 0.800, 0.740]);
-    for (const ds of [D.w - 0.02, D.w + 1.20]) {
-      boxTS(D.t - 0.09, D.t + 0.09, D.s + ds - 0.09, D.s + ds + 0.09,
-        y, y + 0.50, [0.360, 0.352, 0.336]);
+
+    // ── the ladder ───────────────────────────────────────────────────────────
+    // Down the shoreward face, under the pipes, which is where the two of them
+    // are bending to. Six rungs to the water and two more under it, because
+    // the last one you can see is never the last one there is.
+    for (const ot of [-1.28, -0.20]) {
+      boxTS(D.t + ot - 0.030, D.t + ot + 0.030,
+        D.s - 1.40, D.s - 1.33, y - 2.55, y - 0.10, PIPE);
     }
-    // A rail round three sides of the slab and a ladder down the seaward face,
-    // because a platform with no way back up it is a raft.
-    for (const [a0, a1, b0, b1] of [
-      [-D.w, D.w, -D.w, -D.w + 0.08],
-      [-D.w, -D.w + 0.08, -D.w, D.w],
-      [D.w - 0.08, D.w, -D.w, D.w],
-    ]) {
-      boxTS(D.t + a0, D.t + a1, D.s + b0, D.s + b1, y + 0.86, y + 0.94,
-        [0.700, 0.694, 0.672]);
-    }
-    for (const [dt, ds] of [[-D.w + 0.05, -D.w + 0.05], [D.w - 0.05, -D.w + 0.05],
-      [-D.w + 0.05, D.w - 0.05], [D.w - 0.05, D.w - 0.05]]) {
-      boxTS(D.t + dt - 0.045, D.t + dt + 0.045, D.s + ds - 0.045, D.s + ds + 0.045,
-        y, y + 0.94, [0.700, 0.694, 0.672]);
-    }
-    for (let k = 0; k < 5; k++) {
-      const yy = y - 0.30 - k * 0.42;
-      boxTS(D.t - 0.28, D.t + 0.28, D.s - D.w - 0.30, D.s - D.w - 0.16,
-        yy, yy + 0.055, [0.760, 0.755, 0.740]);
-    }
-    for (const dt of [-0.28, 0.20]) {
-      boxTS(D.t + dt, D.t + dt + 0.08, D.s - D.w - 0.30, D.s - D.w - 0.20,
-        y - 2.10, y + 0.70, [0.760, 0.755, 0.740]);
+    for (let k = 0; k < 8; k++) {
+      const yy = y - 0.34 - k * 0.30;
+      boxTS(D.t - 1.31, D.t - 0.17, D.s - 1.42, D.s - 1.35,
+        yy, yy + 0.036, PIPE);
     }
   }
 
@@ -3847,7 +3917,10 @@ async function buildJadrija(scene) {
     // when you can walk up to it, so this tracks `reachIn` and sits a little
     // outside it — the far side of the lane you are standing in still has to
     // have eaves on it.
-    reach: 48,
+    // 48 m, and now 64: with half as many of them left there is room to
+    // rebuild the far side of the second lane as well, and the far side of the
+    // second lane is most of what you see over the roofs of the first.
+    reach: 64,
     over: 0.42,          // eave overhang
     win: 1.16,           // window width
     winH: 1.42,
@@ -3881,6 +3954,55 @@ async function buildJadrija(scene) {
    * bounding box in its own principal axes, because a hip needs a rectangle and
    * the overhang covers the difference on the handful that are L-shaped.
    */
+  /**
+   * One slope of a roof, drawn as courses of tile rather than as one plane.
+   *
+   * `e0,e1` are the two ends of the eave and `r0,r1` the two ends of the ridge
+   * — pass the same point twice for `r0` and `r1` and you get a hip end, which
+   * is a triangle, without a second code path for it.
+   *
+   * Each course is lapped: proud at its lower edge, flush at its upper one, so
+   * the riser between one course and the next is a real face with a real
+   * normal and catches a real shadow. Seven of them is enough — the eighth is
+   * below the resolution of anything you can stand near.
+   */
+  function tiledSlope(e0, e1, r0, r1, col, riserCol, K = 7) {
+    const L = (a, q, t) => [a[0] + (q[0] - a[0]) * t, a[1] + (q[1] - a[1]) * t,
+      a[2] + (q[2] - a[2]) * t];
+    const up = (q, d) => [q[0], q[1] + d, q[2]];
+    const lap = 0.052;
+    for (let k = 0; k < K; k++) {
+      const t0 = k / K, t1 = (k + 1) / K;
+      const a0 = L(e0, r0, t0), a1 = L(e1, r1, t0);
+      const b0 = L(e0, r0, t1), b1 = L(e1, r1, t1);
+      // A hip end closes to a point, and the last band of one is a triangle.
+      const degen = Math.abs(b0[0] - b1[0]) < 1e-4 && Math.abs(b0[2] - b1[2]) < 1e-4;
+      if (degen) vil.tri(up(a0, lap), up(a1, lap), b0, col);
+      else vil.quad(up(a0, lap), up(a1, lap), b1, b0, col);
+      vil.quad(a0, a1, up(a1, lap), up(a0, lap), riserCol);
+    }
+  }
+
+  /**
+   * A ridge or hip cap: a shallow prism laid along a line, gable-side up.
+   *
+   * Written against world up rather than against the slope's own normal, which
+   * is wrong by the pitch angle and invisible at a hundred and ninety
+   * millimetres wide.
+   */
+  function capLine(p, q, w, h, col) {
+    const dx = q[0] - p[0], dz = q[2] - p[2];
+    const L = Math.hypot(dx, dz) || 1;
+    const ox = (dz / L) * w * 0.5, oz = (-dx / L) * w * 0.5;
+    const A = [p[0] - ox, p[1], p[2] - oz], B = [p[0] + ox, p[1], p[2] + oz];
+    const C = [q[0] + ox, q[1], q[2] + oz], D = [q[0] - ox, q[1], q[2] - oz];
+    const P0 = [p[0], p[1] + h, p[2]], Q0 = [q[0], q[1] + h, q[2]];
+    vil.quad(A, B, Q0, P0, col);
+    vil.quad(C, D, P0, Q0, col);
+    vil.tri(B, A, P0, col);
+    vil.tri(D, C, Q0, col);
+  }
+
   function detailHouse(poly, hTag, r) {
     const n = poly.length;
     let cx = 0, cz = 0;
@@ -3932,9 +4054,68 @@ async function buildJadrija(scene) {
         [q[0], eave, q[1]], [p[0], eave, p[1]], wall);
     }
 
+    // A string course between the ground floor and the first, on the houses
+    // that have two. It is a two-centimetre band of render and it is why a
+    // Dalmatian street front does not read as one flat sheet from the far side
+    // of a lane — the shadow under it cuts the wall in half.
+    const bands = Math.floor((eave - base) / HOUSE.storey);
+    if (bands >= 2 && r() < 0.72) {
+      const by = base + HOUSE.storey - 0.28;
+      for (let i = 0; i < n; i++) {
+        const p = poly[i], q = poly[(i + 1) % n];
+        let ox = (q[1] - p[1]), oz = -(q[0] - p[0]);
+        const Ln = Math.hypot(ox, oz) || 1; ox /= Ln; oz /= Ln;
+        const mx = (p[0] + q[0]) * 0.5, mz = (p[1] + q[1]) * 0.5;
+        if ((mx - cx) * ox + (mz - cz) * oz < 0) { ox = -ox; oz = -oz; }
+        const o = 0.075;
+        vil.quad([p[0] + ox * o, by, p[1] + oz * o], [q[0] + ox * o, by, q[1] + oz * o],
+          [q[0] + ox * o, by + 0.17, q[1] + oz * o], [p[0] + ox * o, by + 0.17, p[1] + oz * o],
+          SURR);
+        vil.quad([p[0], by + 0.17, p[1]], [q[0], by + 0.17, q[1]],
+          [q[0] + ox * o, by + 0.17, q[1] + oz * o], [p[0] + ox * o, by + 0.17, p[1] + oz * o],
+          SURR);
+      }
+    }
+
+    // Dressed corners, on about half of them. One pilaster of pale stone up
+    // each corner of the footprint: the cheapest thing on this whole list and
+    // the one that most reliably stops a house reading as an extruded outline,
+    // because it is the only vertical relief on the building.
+    if (r() < 0.52) {
+      for (let i = 0; i < n; i++) {
+        const p = poly[i];
+        const q = poly[(i + 1) % n], o = poly[(i + n - 1) % n];
+        // Skip the corners that are barely corners — an OSM footprint has
+        // plenty of 175-degree ones and a pilaster on a straight wall is a
+        // stripe.
+        const a1x = q[0] - p[0], a1z = q[1] - p[1];
+        const a2x = o[0] - p[0], a2z = o[1] - p[1];
+        const L1 = Math.hypot(a1x, a1z) || 1, L2 = Math.hypot(a2x, a2z) || 1;
+        if ((a1x * a2x + a1z * a2z) / (L1 * L2) < -0.90) continue;
+        const dx = (p[0] - cx), dz = (p[1] - cz);
+        const L = Math.hypot(dx, dz) || 1;
+        const px = p[0] + (dx / L) * 0.05, pz = p[1] + (dz / L) * 0.05;
+        boxIn((u, v, y) => [px + u, y, pz + v], -0.19, 0.19, -0.19, 0.19,
+          base + 0.46, eave - 0.02, SURR);
+      }
+    }
+
     // Openings, walked along each wall so a long face gets a rhythm and a short
     // one gets one window rather than a squeezed pair.
     const storeys = Math.max(1, Math.min(3, Math.floor((eave - base) / HOUSE.storey)));
+    // One of these openings is a door, and until now none of them was — which
+    // is a strange thing to be able to say about fourteen houses you can walk
+    // right up to. It goes on the longest wall, because that is the one facing
+    // the lane on nearly all of them, and it takes over whichever ground-floor
+    // slot is nearest the middle of it rather than being squeezed in beside
+    // them: a door between two windows is a door, a door under a window is a
+    // mistake.
+    let doorWall = -1, doorBest = 3.6;
+    for (let i = 0; i < n; i++) {
+      const p = poly[i], q = poly[(i + 1) % n];
+      const L = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      if (L > doorBest) { doorBest = L; doorWall = i; }
+    }
     for (let i = 0; i < n; i++) {
       const p = poly[i], q = poly[(i + 1) % n];
       const ex = q[0] - p[0], ez = q[1] - p[1];
@@ -3953,12 +4134,41 @@ async function buildJadrija(scene) {
       const E = (d, w, y) => [p[0] + ux * d + ox * w, y, p[1] + uz * d + oz * w];
       const slots = Math.max(1, Math.floor((L - 1.4) / 2.65));
       const gap = L / (slots + 1);
+      const doorSlot = i === doorWall ? Math.max(1, Math.round((slots + 1) / 2)) : -1;
       for (let k = 1; k <= slots; k++) {
         const d = k * gap;
         for (let st = 0; st < storeys; st++) {
           const sill = base + 0.95 + st * HOUSE.storey;
           if (sill + HOUSE.winH + 0.35 > eave) continue;
           const hw = HOUSE.win / 2;
+          if (st === 0 && k === doorSlot) {
+            // The door: a leaf set back in its own reveal, a painted surround
+            // round three sides of it, and a step. The step is the half of it
+            // that matters — it is the one thing on the whole building that
+            // meets the ground, and without it the wall simply stops at the
+            // lane like a sheet of card pushed into sand.
+            const dw = 0.52, dh = 2.10;
+            boxIn((d2, w, y) => E(d + d2, w, y),
+              -dw, dw, 0.02, 0.09, base + 0.10, base + 0.10 + dh,
+              [0.276, 0.226, 0.168]);
+            for (const sgn of [-1, 1]) {
+              boxIn((d2, w, y) => E(d + d2, w, y),
+                sgn * dw, sgn * (dw + 0.15), -0.02, 0.12,
+                base + 0.10, base + 0.24 + dh, SURR);
+            }
+            boxIn((d2, w, y) => E(d + d2, w, y),
+              -dw - 0.15, dw + 0.15, -0.02, 0.12,
+              base + 0.10 + dh, base + 0.24 + dh, SURR);
+            boxIn((d2, w, y) => E(d + d2, w, y),
+              -dw - 0.24, dw + 0.24, -0.02, 0.46, base - 0.20, base + 0.10,
+              PLINTH, SURR);
+            // And a handle, which is four faces and is the thing that tells
+            // you which way the door opens.
+            boxIn((d2, w, y) => E(d + d2, w, y),
+              dw - 0.16, dw - 0.10, 0.09, 0.145,
+              base + 1.02, base + 1.10, [0.520, 0.470, 0.300]);
+            continue;
+          }
           // Glass, barely proud of the render so it never z-fights it.
           boxIn((d2, w, y) => E(d + d2, w, y),
             -hw, hw, 0.015, 0.05, sill, sill + HOUSE.winH, GLASS);
@@ -3999,14 +4209,51 @@ async function buildJadrija(scene) {
     const hipIn = Math.min((V1 - V0) * 0.5, (A1 - A0) * 0.34);
     const R0 = A0 + hipIn, R1 = A1 - hipIn, VM = (V0 + V1) * 0.5;
     const Q = (u, v, y) => P(u, v, y);
-    vil.quad(Q(A0, V0, eave), Q(A1, V0, eave), Q(R1, VM, top), Q(R0, VM, top), tile);
-    vil.quad(Q(A1, V1, eave), Q(A0, V1, eave), Q(R0, VM, top), Q(R1, VM, top), tile);
-    vil.tri(Q(A0, V1, eave), Q(A0, V0, eave), Q(R0, VM, top), tile);
-    vil.tri(Q(A1, V0, eave), Q(A1, V1, eave), Q(R1, VM, top), tile);
+    // Four flat quads is what this used to be, and four flat quads is a roof
+    // you believe from an aeroplane and from nowhere else. What you actually
+    // read on a Dalmatian roof at fifteen metres is not its colour and not its
+    // pitch: it is that it is made of *courses*, each one lapped over the one
+    // below, so the whole slope is a stack of horizontal shadow lines running
+    // out to a capped ridge. That is what `tiledSlope` draws, and it is the
+    // single biggest thing on this pass.
+    const darker = [tile[0] * 0.72, tile[1] * 0.70, tile[2] * 0.70];
+    tiledSlope(Q(A0, V0, eave), Q(A1, V0, eave), Q(R0, VM, top), Q(R1, VM, top),
+      tile, darker);
+    tiledSlope(Q(A1, V1, eave), Q(A0, V1, eave), Q(R1, VM, top), Q(R0, VM, top),
+      tile, darker);
+    tiledSlope(Q(A0, V1, eave), Q(A0, V0, eave), Q(R0, VM, top), Q(R0, VM, top),
+      tile, darker);
+    tiledSlope(Q(A1, V0, eave), Q(A1, V1, eave), Q(R1, VM, top), Q(R1, VM, top),
+      tile, darker);
+    // The ridge and the four hips, capped. Half-round ridge tile is the piece
+    // that finishes every one of these roofs and it is the piece you see from
+    // furthest away, because it is the only bit of the building that is a line
+    // against the sky.
+    const cap = [tile[0] * 1.06, tile[1] * 1.04, tile[2] * 1.02];
+    capLine(Q(R0, VM, top), Q(R1, VM, top), 0.19, 0.10, cap);
+    capLine(Q(A0, V0, eave), Q(R0, VM, top), 0.17, 0.09, cap);
+    capLine(Q(A1, V0, eave), Q(R1, VM, top), 0.17, 0.09, cap);
+    capLine(Q(A0, V1, eave), Q(R0, VM, top), 0.17, 0.09, cap);
+    capLine(Q(A1, V1, eave), Q(R1, VM, top), 0.17, 0.09, cap);
     boxIn(P, A0, A1, V0, V0 + 0.10, eave - 0.20, eave, FASCIA);
     boxIn(P, A0, A1, V1 - 0.10, V1, eave - 0.20, eave, FASCIA);
     boxIn(P, A0, A0 + 0.10, V0, V1, eave - 0.20, eave, FASCIA);
     boxIn(P, A1 - 0.10, A1, V0, V1, eave - 0.20, eave, FASCIA);
+    // A gutter under two of them, and a pipe off one end of it. Half-round in
+    // life, a box here, and the reason it earns its four faces is that it is
+    // the one thing on the building that is *away* from the wall: it throws a
+    // hard line of shadow down the render all afternoon.
+    for (const [vv, out] of [[V0, -1], [V1, 1]]) {
+      boxIn(P, A0 + 0.06, A1 - 0.06, vv + out * 0.02, vv + out * 0.14,
+        eave - 0.30, eave - 0.19, [0.560, 0.556, 0.532]);
+    }
+    {
+      const du = r() < 0.5 ? A0 + 0.24 : A1 - 0.24;
+      const vv = r() < 0.5 ? V0 : V1;
+      boxIn(P, du - 0.055, du + 0.055,
+        vv + (vv === V0 ? -0.10 : 0.02), vv + (vv === V0 ? 0.02 : 0.10),
+        base, eave - 0.24, [0.560, 0.556, 0.532]);
+    }
 
     // A chimney, and a satellite dish or an air-conditioner, because every one
     // of these houses has been let out to somebody for the last thirty summers.
@@ -4069,7 +4316,15 @@ async function buildJadrija(scene) {
       // out of the town builder too rather than being merely undrawn here: the
       // gap is the point. Nothing near the water is thinned, because there is
       // nothing there to thin — OSM maps nothing within 39 m of this shore.
-      if (hr() < 0.44) { taken.add(bl); continue; }
+      // 0.44 was already most of the way there and it was not far enough. The
+      // reading from the promenade was still "way too many of them": OSM's 286
+      // footprints minus 44 per cent is a hundred and sixty houses standing on
+      // a headland that has, in the aerial, something like eighty. Half of
+      // what was left comes out again — 0.72 — and the ones that survive are
+      // built with a great deal more on them, which is the trade this is: the
+      // triangles that were paying for the second hundred houses now pay for
+      // roofs you can believe on the first eighty.
+      if (hr() < 0.72) { taken.add(bl); continue; }
       if (s > HOUSE.reach) continue;
       taken.add(bl);
       detailHouse(poly, bl.h || 6, hr);

@@ -988,7 +988,24 @@ function buildArms() {
     const swim = ctx && ctx.active && ctx.you && ctx.you.stroke !== undefined
       ? ctx : null;
     const ride = ctx && ctx.active && !swim ? ctx : null;
-    const on = !!(swim || ride);
+    // Not in the water. Everything below this line still works and none of it
+    // runs there any more.
+    //
+    // The verdict on the swim arms was that they were not working and were not
+    // going to, and it is worth being precise about what that means, because
+    // the code is staying: the *stroke* was the problem and not the arm. A
+    // crawl seen from inside your own head is two limbs crossing most of the
+    // frame twice a second, and at a 58-degree lens there is no version of
+    // that which does not read as flailing — the closer it gets to a real
+    // crawl the busier it looks, which is the opposite of how animation
+    // usually goes. What replaces it is what you actually notice in the sea,
+    // which is not your arms: it is the mask, and it is the bubbles. See
+    // 62-mask.js.
+    //
+    // The bar grip is untouched. Hands on a kite bar are the same rig doing
+    // the thing a first-person view is good at — holding still — and nobody
+    // complained about those.
+    const on = !!ride;
     root.visible = on;
     rig.visible = !!ride;
     if (!on) return;

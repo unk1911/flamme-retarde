@@ -28,6 +28,22 @@ const IS_SMALL = IS_TOUCH && Math.min(screen.width, screen.height) < 560;
 if (IS_TOUCH) document.documentElement.classList.add('touch');
 
 /**
+ * How strong the ambient occlusion starts out, before anybody touches the
+ * slider. See 89-ao.js.
+ *
+ * It lives here rather than in CONFIG's own block because it is a decision
+ * about the machine and not about the world, and the machine is what this file
+ * is for. A desktop gets it, a phone does not: the pass is three targets and a
+ * sixteen-tap loop, and the phones this runs on are already spending their
+ * whole budget on the shadow cascade and twenty thousand trees. `?ao=0.8` and
+ * `?noao` force it either way, and whatever the slider was left on last time
+ * beats both.
+ */
+CONFIG.ao = QUERY.has('noao') ? 0
+  : QUERY.has('ao') ? Math.max(0, Math.min(1, parseFloat(QUERY.get('ao')) || 0))
+    : IS_TOUCH ? 0 : 0.58;
+
+/**
  * Live state of the on-screen controls. Written by 91-touch.js, read by the
  * input loop in 90-app.js — declared up here so neither has to care which of
  * them the build concatenates first.

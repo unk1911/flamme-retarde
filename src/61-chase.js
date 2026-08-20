@@ -233,7 +233,15 @@ async function buildChase(scene) {
     // authored standing, so the rig's floor is under her *feet*, and treading
     // water puts the waterline at her shoulders. Written at −0.46 — the prone
     // figure's number with a bit off it — she stood on the sea.
-    const sink = tread ? 0.88 : -0.12;
+    // Prone she is *under* it, which is the correction this number exists to
+    // carry. −0.12 floated the rig twelve centimetres clear of the waterline
+    // and, the clip being authored lying down, that put a whole swimmer on top
+    // of the sea — the one thing nobody swimming has ever done. A front crawl
+    // sits the spine a hand's breadth under, the head down between the arms
+    // and only the roll bringing a shoulder through; 0.34 is that, and it is
+    // also what makes the wake read as coming off something rather than as
+    // being towed by it.
+    const sink = tread ? 0.88 : 0.34;
     root.position.set(her.x, her.y - sink, her.z);
     root.rotation.set(0, her.yaw + Math.PI / 2, 0);
     const want = tread ? 'tread' : 'swim';

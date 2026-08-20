@@ -8,7 +8,54 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
-## [Unreleased]
+## [1.85.0] — 2026-08-19
+
+Ten things off one list, and the two biggest of them are subtractions: the
+first-person crawl comes out of the water and half the houses come off the
+headland. What goes in where the arms were is a mask and a stream of bubbles;
+what goes in where the houses were is roofs you can believe. Plus a third
+thing to ride, a screen-space occlusion pass, and four control bugs — one of
+which had a warning light following you around for the rest of the game.
+
+### Added
+
+- **The eFoil.** A third thing to be on this water and the only one that does
+  not care what the wind is doing: `F` on the beach takes one out, `F` again
+  steps off it. It is a board with a battery in it, a mast under it and a wing
+  under that, and the whole mode is one number crossing another — the wing
+  starts to carry at 4.6 m/s and has all of you by 6.6, at which point the hull
+  leaves the water, the wave in front of it stops and so does the noise. Height
+  is a *control*: you trim it with Space and C up to 86 cm of mast, and the top
+  of that range is where the front wing gets close enough to the surface to
+  ventilate and drop you, which is a die roll and not a threshold because in
+  life it is a die roll. It turns by banking — a foil has no edge and no fin —
+  so the camera banks with it, properly, because with no wake and no board in
+  the picture the roll is the only thing telling you that you are turning. Top
+  speed 45 km/h. `src/59-foil.js`, `foil.*` strings in all three languages, and
+  a HUD with the throttle as a bar rather than a number.
+- **Screen-space ambient occlusion, on a slider.** Everything in this game is
+  lit by a sun and a flat ambient term, so a corner has always been exactly as
+  bright as a wall: nothing sits *in* anything. There is now a half-resolution
+  sixteen-tap occlusion pass between the scene and the canvas — `src/89-ao.js`
+  — and a "ambient occlusion" slider whose zero is genuinely off, scene straight
+  to the canvas and not a texel allocated. On by default on a desktop, off on a
+  phone; `?noao` and `?ao=0.8` force it.
+
+  Two things it turned out not to need and one it very much did. It does *not*
+  need to take over the tone mapping: three.js applies ACES and the sRGB
+  transfer on the way to a canvas and neither on the way to a render target, so
+  intercepting a frame normally means putting both back — but nothing in
+  `solidMaterial` ever included those chunks, so every solid surface in this
+  game has always written display-referred colour straight out. Settled by
+  rendering the same frame five ways and differencing them: a plain pass-through
+  came out at a mean absolute error of 7 on 0..255, and every version that
+  applied a transfer function was out by forty. What it does need is a
+  confidence weight on the reconstructed normal. The normal comes from two
+  screen-space derivatives of the reconstructed view position, and on a surface
+  seen almost edge-on — the beach running away to the horizon, a third of every
+  frame in this game — those two vectors are nearly parallel and their cross
+  product is whatever the last bit of the depth buffer felt like. Without the
+  weight the whole promenade came out as a staircase of hard-edged rectangles.
 
 ### Fixed
 
@@ -27,9 +74,87 @@ geodata pipeline.
   planted itself at `F2` with no way to say otherwise, so the one sofa
   downstairs — the boravak's — was built a storey above the room it belongs to.
   It takes a `floor` argument now.
+- **The kitesurf board steered backwards.** Every heading in this game is
+  written forward = `(-sin yaw, -cos yaw)`, whose derivative in yaw points at
+  −x, so a rising yaw is a turn to the *left*. The swim has had the minus sign
+  since it was written and this was the one steering model that did not, which
+  is why both the arrows and A/D came out mirrored.
+- **`E` in the water did nothing you could see.** The generic `E` — climb back
+  into the aeroplane — was tested first and had no `return` after it, so every
+  press out there boarded an aircraft you were four hundred metres from and
+  *then* fell through to the wade. And the wade itself only ever looked seventy
+  metres for dry land, which from the diving platform is two hundred short: it
+  found nothing, fell back on the highest sea bed within reach, and handed the
+  walk model a spot still under water. It now walks the shore distance field to
+  completion in one frame, puts you on the beach and flashes the picture once,
+  which is the difference between a cut and a bug.
+- **A PULL UP survived the ejection, the swim, the walk and the vikendica.**
+  The alert model's caption and red vignette are only cleared by the next frame
+  of `alerts.update`, and that only runs in the flying phase — so a warning that
+  was on the screen at the moment you hit `J` stayed there, redrawn by nothing
+  and cleared by nothing. `alerts.reset()` had existed since the module was
+  written and was called from precisely nowhere; it now fires on the one
+  transition edge, rather than in eleven copies in eleven back doors.
+- **The swim stayed `active` after you walked out of it.** `ground.dropIn()`
+  sets `state.phase` itself, before it returns — so `leaveWater()`, called after
+  it in the right order, found the phase already changed and silently did
+  nothing. `leaveWater(was)` is told which mode it is closing now.
+- **She was swimming on top of the sea.** The chase swimmer's prone float was
+  written at −0.12, twelve centimetres *clear* of the waterline, and the clip is
+  authored lying down. 0.34 puts the spine a hand's breadth under, which is
+  where a front crawl is.
 
 ### Changed
 
+- **The first-person crawl is gone; there is a mask and there are bubbles.**
+  The arms were not broken — a real stroke on a two-joint chain with a high
+  elbow and a hand that turned over on the recovery — and they were still the
+  wrong thing. A front crawl seen from inside your own head is two limbs
+  crossing most of the frame twice a second, and at a 58-degree lens there is no
+  version of that which does not read as flailing; the closer it got to a real
+  crawl the busier it looked. What replaces it is what you actually notice in
+  the sea: the inside edge of a dive mask, with the nose pocket biting into the
+  bottom of the picture and a hard bright line where the glass is bevelled, and
+  a trickle of air off your face that gets bigger as it rises. `src/62-mask.js`.
+  The mask is a shader rather than a painted overlay because it has to be the
+  right *shape* at every aspect ratio and never wider than the screen has room
+  for; the bubbles live in the world rather than in the view, and get their own
+  near pass at four centimetres because the world's front clip underwater sits
+  at about 90 cm and a bubble leaving your mouth is thirty from your eye — put
+  them in the world and every one is thrown away before it is rasterised, which
+  is exactly what happened. The bar grip in `60-arms.js` is untouched: hands on
+  a kite bar are the same rig doing the thing a first-person view is good at,
+  which is holding still.
+- **The skakaonica is the one that is actually out there.** What stood off the
+  jetty head was a slab on four piles with a rail round three sides — a lido
+  diving stage, and not this one. Jadrija's is poured concrete: two masses side
+  by side, the big one flaring outward as it rises out of the water like an
+  upturned trough, the smaller one squarer and whiter and newer, a single long
+  plank laid across both and cantilevered well past the end of them, and no rail
+  at all. The only ironwork on it is two pipes standing out of the deck with
+  their tops bent over toward the ladder, which is the silhouette everybody on
+  the promenade recognises it by from four hundred metres.
+- **Half the houses at Jadrija are gone and the survivors are built properly.**
+  The thinning was 0.44 and the reading from the promenade was still that there
+  were far too many of them: OSM's 286 footprints minus 44 per cent is a hundred
+  and sixty houses on a headland that has, in the aerial, something like eighty.
+  It is 0.72 now. The triangles that were paying for the second hundred houses
+  pay instead for what the remaining ones grew: roofs in *courses*, each lapped
+  over the one below so the slope is a stack of horizontal shadow lines rather
+  than one flat plane; capped ridges and hips; a gutter and a downpipe; a string
+  course between the storeys; dressed corners; and a front door with a reveal, a
+  surround, a handle and a step. The detail radius went from 48 m to 64 with the
+  room that freed up.
+- **A kite jump goes forty metres up.** 3.0/0.48 was a thirteen-metre-a-second
+  send off a twenty-one-metre-a-second reach, which apexes at fourteen — a real
+  big-air jump and not what this mode is for, since it is the one place in the
+  game you leave the ground under your own steam. 4.2/0.80 is twenty-one metres
+  a second and four seconds of getting there. The half that had to come with it
+  is a terminal descent rate: a kite overhead is a canopy and settles you at a
+  rate rather than merely slowing you down, and left as a plain acceleration
+  forty metres came down at twenty-nine metres a second and every big one you
+  landed was a wipeout — the mode punishing you for doing the thing it had just
+  asked you to do.
 - **The fridge is modelled rather than blocked out.** It was five boxes. A
   fridge door is a rounded rectangle in plan and in elevation and it is
   *crowned* — proud in the middle, rolling back to a radius all the way round —
