@@ -8,6 +8,68 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.91.0] — 2026-08-20
+
+Eight people who no longer walk like scarecrows, and who have faces.
+
+### Fixed
+
+- **Everybody walked with their arms held out.** The idle pose was written
+  against the fact that the MakeHuman base stands in an A-pose with the upper
+  arms 40° out from the body, and pulls them in 29° so a standing figure's
+  hands end up where a standing person's hands are. The walk was written
+  without it and pulls them in 7°, which leaves the upper arms 33° out through
+  the whole cycle — measured off the exported clip, shoulder to elbow. On one
+  figure doing one thing that is a stiff walk; on three of eight bathers
+  strolling a promenade it is a beach of scarecrows. The walk uses the idle's
+  number now: 8–16° out, against the idle's 10–13. Baye walks the same clip and
+  gets the same fix.
+
+- **Six of the eight bathers had black heads.** Every face on this figure is
+  painted through a cutter volume, and every one of those volumes was a number
+  in metres measured on Baye's skull. Hand the same numbers a 1.24 m girl and
+  the hair cap sits four centimetres in front of where her head is — far enough
+  forward that the ellipsoid contains the whole head instead of the top of it,
+  so her face came back the colour of hair. It does not read as a misplaced
+  cap; it reads as a mask, which is why it shipped.
+
+  The face is now measured onto whatever skull it is given: `human_mh.vault`
+  takes the braincase above the eye line, and `cutters` scales Baye's numbers
+  by it, anchored on the eye. Not on stature and not on the `head` joint —
+  heads vary far less than people do (a 1.24 m girl is 71 per cent of Baye's
+  height and 88 per cent of her skull depth), and the `head` joint runs seven
+  centimetres apart between two of these figures because it follows a forward
+  head posture. Baye herself is unchanged to within a third of a millimetre.
+
+- The extra head subdivision was gated on an absolute height — Baye's neck —
+  so the girl, whose whole head is below it, was painted at the base mesh's
+  8 mm resolution and the boy at nothing. It takes the neck joint now.
+
+- The areolae and the pubic wedge are off for the bathers. Both are written as
+  absolute heights on a 1.75 m figure and a chest does not map the way a
+  braincase does: the areola cutter was landing on the boy's jaw and the wedge
+  on the girl's sternum.
+
+- **The slim woman's swimsuit was invisible.** Near-white on light skin renders
+  within a few units of the skin under the same sun, so she read as bathing
+  with nothing on. It is red now. Black was tried first and is worse: painted
+  colour arrives with a three-to-four-centimetre gradient — the decimator
+  averages what it collapses — and how much that shows scales with the contrast
+  across it.
+
+- The two-piece briefs were 7 cm tall against 4 cm of fade at each edge, so
+  they had no solid middle and read as a smear. They run from the natural waist
+  to the top of the thigh now, which is 11 cm and is also what a brief is. The
+  trunks were never affected — they were 20 cm from the start. Doubling the
+  triangle budget to 14 000 was tried and changed nothing visible: the fade is a
+  fixed number of vertices, and the vertices got smaller with it.
+
+- The chest band's punches were each as wide as the gap to their neighbour, so
+  the union dipped to 81 per cent of its height between every pair — a scalloped
+  edge, seven times across a chest — and the outermost punch reached a full
+  radius past the measurement into the arm. Nine punches at two and a half times
+  the spacing, inset so the row ends where it says it does.
+
 ## [1.90.0] — 2026-08-20
 
 Eight people, and each of them is a person.

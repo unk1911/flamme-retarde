@@ -13,10 +13,10 @@ by *path*:
 
     J, scale, drop = read_joints(path)   # skeleton, from joint-* marker cubes
     body           = load(path, ...)     # import, drop the proxies, transform
-    smooth(body, 1)                      # Catmull-Clark, and more on the head
+    smooth(body, 1, above=...)           # Catmull-Clark, and more on the head
     rig            = armature(J)
     skin(body, rig)                      # weights
-    paint(body, cutters(J))              # eyes, brows, lashes, hair
+    paint(body, cutters(J, k=...))       # eyes, brows, lashes, hair
     export_skin(body, rig, out, clips)
 
 Hand it a *different* OBJ and every one of those adapts. That is the whole
@@ -32,6 +32,20 @@ retargeting anything. tools/blender/mh_morph.py writes those OBJs.
 for one canonical figure and wrong for a beach. So TARGET_H is set per figure
 here. It is a module global rather than an argument; assigning to it is ugly
 and is still better than forking the function.
+
+── faces ─────────────────────────────────────────────────────────────────────
+
+A skeleton adapts to a different body by itself. A *face* does not, and the
+first eight of these shipped with black heads because of it: every cutter in
+`cutters` is a number in metres measured on Baye's skull, and Baye's hair cap
+sits four centimetres in front of a 1.24 m girl's — far enough forward that the
+ellipsoid contains her whole head instead of the top of it. Her face came back
+the colour of hair.
+
+The fix is `human_mh.vault`, which measures the braincase of whatever figure it
+is handed, and the head frame it feeds `cutters`. That is a scale and not a
+retarget: nobody has to place eight sets of eyebrows. See SKULL in human_mh.py
+for why the frame is anchored on the eye and why the scales are not stature.
 
 ── size ──────────────────────────────────────────────────────────────────────
 
@@ -78,7 +92,20 @@ TRIS = 7000
 SUITS = {
     "girl_child":       ("two", (0.86, 0.31, 0.42), (0.80, 0.64, 0.53)),
     "boy_child":        ("trunks", (0.16, 0.36, 0.62), (0.72, 0.56, 0.42)),
-    "woman_young_slim": ("two", (0.92, 0.90, 0.86), (0.83, 0.68, 0.58)),
+    # Red, and it started out near-white. A near-white suit on light skin is not
+    # a pale suit at distance, it is no suit: rendered under the same sun the
+    # two colours land within a few units of each other and she reads as bathing
+    # with nothing on. Every other suit here is either dark or saturated, which
+    # is why this was the only one it happened to.
+    #
+    # Black was the obvious replacement and is the wrong one, which is worth a
+    # line because it is the same lesson the hip band already learned. Painted
+    # colour arrives with a gradient several centimetres wide — the decimator
+    # averages the vertices it merges — and how visible that gradient is scales
+    # with the *contrast* across it. Pink on light skin hides it. Black on light
+    # skin is 200 units of it, and what you get is not a black bikini, it is a
+    # smudge shaped roughly like one.
+    "woman_young_slim": ("two", (0.78, 0.16, 0.18), (0.83, 0.68, 0.58)),
     "woman_young_full": ("two", (0.88, 0.62, 0.14), (0.42, 0.29, 0.22)),
     "man_young_fit":    ("trunks", (0.11, 0.16, 0.28), (0.74, 0.56, 0.44)),
     "man_young_lean":   ("trunks", (0.18, 0.42, 0.36), (0.76, 0.62, 0.47)),
@@ -107,7 +134,7 @@ def _coat(name, mark, prev, prio, c, r, rows=12, seg=20):
             mark, prev, prio, lo, hi, name)
 
 
-def _band(name, suit, z, rz, halfY, deep, n=7):
+def _band(name, suit, z, rz, halfY, deep, n=9):
     """A belt of constant height, as a row of overlapping punches.
 
     Not one ellipsoid. An ellipsoid tight in z and as wide as the torso in y is
@@ -124,13 +151,27 @@ def _band(name, suit, z, rz, halfY, deep, n=7):
     neighbours. Their union has straight edges. They are separate coats and may
     overlap freely: `_inside` is a parity test per volume, and `paint` only
     ever overwrites.
+
+    How much they overlap is the whole of the tuning, and the first version had
+    it wrong in both directions at once. Each punch was as wide as the gap to
+    its neighbour, so halfway between two centres the union was down to 81 per
+    cent of its height — a scalloped edge, seven times across a chest — and the
+    outermost punch was centred *on* `halfY` and so reached a full radius past
+    it, into the arm.
+
+    Both come out of the same arithmetic. `ry` is 2.5 times the spacing, which
+    puts the dip between neighbours at 96 per cent instead of 81; and the
+    centres are inset by `ry`, so the row's outer edge lands exactly on `halfY`
+    and the caller's measurement means what it says.
     """
     out = []
-    step = (2.0 * halfY) / (n - 1)
+    ry = 2.5 * halfY / (n - 1)
+    span = max(0.0, halfY - ry)
+    step = (2.0 * span) / (n - 1)
     for i in range(n):
-        y = -halfY + i * step
+        y = -span + i * step
         out.append(_coat("%s-%d" % (name, i), MH.SUIT_M, suit, 6,
-                         (0.0, y, z), (deep, step * 0.85, rz),
+                         (0.0, y, z), (deep, ry, rz),
                          rows=12, seg=24))
     return out
 
@@ -162,10 +203,24 @@ def swimwear(J, kind, suit, h):
     deep = 0.5 * k
     hipY = J["l-upper-leg"].y * 1.85 + 0.02 * k
     out = []
+    # ── and why a brief is 11 cm and not 7 ──────────────────────────────
+    #
+    # Because paint arrives with a gradient. The decimator averages the colours
+    # of the vertices it collapses, which puts three or four centimetres of
+    # fade on every edge — and a garment 7 cm tall with 4 cm of fade top and
+    # bottom has no solid middle at all. It is gradient the whole way through,
+    # which is precisely what it looked like: a red smear across the hips.
+    #
+    # Doubling the triangle budget does not fix it and was tried: 7 000 to
+    # 14 000 changed nothing visible, because the fade is a fixed number of
+    # *vertices* and the vertices got smaller along with it. What fixes it is
+    # giving the garment a middle — so the brief runs from the natural waist to
+    # the top of the thigh, which is 11 cm and is also what a brief is. The
+    # trunks were never affected: they were 20 cm from the start.
     if kind == "trunks":
         top, bot = hip + 0.02 * k, leg - 0.17 * k
     else:
-        top, bot = hip + 0.035 * k, leg - 0.025 * k
+        top, bot = hip + 0.055 * k, leg - 0.045 * k
     out += _band("suit-hip", suit, (top + bot) / 2, (top - bot) / 2,
                  hipY, deep)
     if kind == "two":
@@ -173,7 +228,7 @@ def swimwear(J, kind, suit, h):
         # height on all four of the women, which is the usual 72 to 75 per cent
         # of stature — so it is used directly rather than as a fraction. Kept
         # inboard of the shoulder joint, which is where the arm starts.
-        out += _band("suit-band", suit, J["spine-1"].z + 0.005 * k, 0.048 * k,
+        out += _band("suit-band", suit, J["spine-1"].z + 0.005 * k, 0.062 * k,
                      J["l-shoulder"].y * 0.80, deep)
     return out
 
@@ -198,11 +253,23 @@ def one(name, height, obj):
     MH.TARGET_H = height
     MH.SKIN_P = skin_p
     J, scale, drop = MH.read_joints(obj)
+    # The head frame — see the note on faces above. Measured off this figure's
+    # own braincase and divided by Baye's, so it is (1, 1, 1) for her and lands
+    # between 0.72 and 1.12 on these eight. Heads are the part of a person that
+    # varies least: the 1.24 m girl is 71 per cent of Baye's stature and 88 per
+    # cent of her skull depth, which is exactly why scaling the face by height
+    # would have been the wrong fix.
+    k = tuple(a / b for a, b in zip(MH.vault(obj, J["l-eye"].z), MH.SKULL))
+    print("[bathers]   head frame  %.3f %.3f %.3f" % k)
     body = MH.load(obj, scale, drop)
-    MH.smooth(body, 1)
+    # `above` is the neck, not Baye's 1.46 — see `smooth`. The girl's whole head
+    # is below 1.46 and got no extra density at all, which is a face painted at
+    # the base mesh's 8 mm and the reason her eyes read as smudges.
+    MH.smooth(body, 1, above=J["neck"].z)
     rig = MH.armature(J)
     MH.skin(body, rig)
-    MH.paint(body, MH.cutters(J) + swimwear(J, kind, suit, height))
+    MH.paint(body, MH.cutters(J, k=k, torso=False)
+             + swimwear(J, kind, suit, height))
     out = OUT / ("bather_%s.fr3d.gz" % name)
     # `post=False`, and that is the difference between eight bathers and eight
     # copies of Baye. The lay-on pass adds her nails, her bracelet and her hip

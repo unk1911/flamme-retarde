@@ -100,6 +100,42 @@ URL = ("https://raw.githubusercontent.com/makehumancommunity/makehuman/"
 TARGET_H = 1.750          # metres, the canonical figure
 SUBSURF = 1               # smoothing passes over the base mesh
 HEAD_CUTS = 2             # extra subdivision on the head, for paint resolution
+
+# ── the head frame ────────────────────────────────────────────────────────── #
+#
+# Every face cutter in `cutters` is a number measured off *this* figure's skull,
+# and there is now more than one skull: tools/blender/bathers_mh.py runs the same
+# pipeline over eight morphed bodies from 1.24 m to 1.84 m. Written as absolute
+# metres those numbers are a face on one of them, and what the other seven got
+# was a hair cap four centimetres too far forward — an ellipsoid that swallowed
+# the whole head. Eight bathers shipped with black faces, and the reason it read
+# as a *shading* bug rather than a placement one is that a head uniformly the
+# colour of hair does not look like a misplaced cap. It looks like a mask.
+#
+# So the face numbers are Baye's, and they are mapped onto whatever skull they
+# are handed. The frame is three scales and one anchor:
+#
+#   anchor  `l-eye`, which every figure has and which is a point on the surface
+#           rather than a pivot inside the skull. `J["head"]` is the obvious
+#           choice and is the wrong one: it runs 0.017 on Baye and 0.091 on the
+#           old woman, because MakeHuman's head pivot follows a forward head
+#           posture. Anchoring on it moves the whole face 7 cm.
+#   kx, ky, kz  the vault's half-depth, half-width and height above the eyes,
+#           over Baye's own. Measured by `vault`, not derived from stature: a
+#           1.24 m girl is 71 per cent of Baye's height and 88 per cent of her
+#           skull depth, which is the whole reason a stature scale does not work
+#           here. Heads vary far less than people do.
+#
+# Round features (iris, pupil) take sqrt(ky*kz) rather than one or the other, so
+# they stay round on a skull that is short and wide.
+#
+# Measured, not rounded: with these exact values `vault(base) / SKULL` is
+# (1, 1, 1) and `fx` is the identity, so Baye comes out of `cutters` byte for
+# byte the figure she was before the frame existed. Round them to three places
+# and she moves by a fifth of a millimetre for no reason at all.
+SKULL_EYE_X = 0.130823            # Baye's eye, the frame's origin in x
+SKULL = (0.101115, 0.091592, 0.126810)   # her vault: half-depth, half-width,
+#                                          height above the eye line
 EXPORT_TRIS = 26000       # triangles in the shipped blob
 SOLVE_TRIS = 26000        # triangles the bone-heat solver is given (see skin)
 
@@ -215,6 +251,47 @@ def read_joints(path):
     return out, scale, drop
 
 
+def vault(path, eyez):
+    """Half-depth, half-width and height of the skull above the eyes.
+
+    The three numbers `cutters` scales its face by. Measured off the `body`
+    group of the OBJ rather than off the imported mesh, for the same reason
+    `read_joints` is: this is wanted as numbers, and the importer merges and
+    renames groups on the way in. The eyeballs and the lash strips arrive as
+    their own objects and would be inside the region — harmlessly, since neither
+    reaches past the forehead, but there is no reason to include them.
+
+    Above the eyes, and not the whole head, because that is the part that is a
+    *box*: below the eye line a face runs out into a nose and a chin, and those
+    are features rather than proportions. The vault is the braincase, and a hair
+    cap is a thing that sits on a braincase.
+
+    `TARGET_H` is baked in through `scale`, so this is in game metres and
+    directly comparable with `SKULL`.
+    """
+    verts, groups, cur = [], {}, None
+    for ln in path.read_text().splitlines():
+        if ln.startswith("v "):
+            a = ln.split()
+            verts.append((float(a[1]), float(a[2]), float(a[3])))
+        elif ln.startswith("g "):
+            cur = ln[2:].strip()
+        elif ln.startswith("f "):
+            g = groups.setdefault(cur, set())
+            for tok in ln.split()[1:]:
+                g.add(int(tok.split("/")[0]) - 1)
+    body = groups.get("body", set())
+    ys = [verts[i][1] for i in body]
+    scale = TARGET_H / (max(ys) - min(ys))
+    drop = -min(ys) * scale
+    v = [(verts[i][2] * scale, verts[i][0] * scale,
+          verts[i][1] * scale + drop) for i in body]
+    v = [p for p in v if p[2] > eyez]
+    return ((max(p[0] for p in v) - min(p[0] for p in v)) / 2.0,
+            max(abs(p[1]) for p in v),
+            max(p[2] for p in v) - eyez)
+
+
 def load(path, scale, drop):
     """Import, throw away the proxies, transform, and join what is left."""
     bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -321,7 +398,7 @@ def load(path, scale, drop):
     return body
 
 
-def smooth(body, levels):
+def smooth(body, levels, above=1.46):
     """Catmull-Clark over the base mesh, and extra density on the head.
 
     The base is 13 378 quads for a whole person, which is about 8 mm between
@@ -329,6 +406,13 @@ def smooth(body, levels):
     one vertex. One global level takes that to 4 mm and rounds off the faceting;
     the head then gets two more on its own, which buys about a millimetre where
     the eyes and mouth are without paying for it on the shins.
+
+    `above` is where the head starts, and it is an argument because 1.46 is
+    Baye's neck and nobody else's. On the 1.24 m girl it is nine centimetres
+    over the top of her skull, so she got no head density at all and her face
+    was painted at 8 mm resolution; on the 1.58 m woman it cuts through the
+    middle of her face and subdivides the top half of it only. Callers with a
+    skeleton in hand should pass `J["neck"].z`.
     """
     bpy.context.view_layer.objects.active = body
     if levels:
@@ -340,7 +424,7 @@ def smooth(body, levels):
     bm.from_mesh(body.data)
     edges = set()
     for f in bm.faces:
-        if f.calc_center_median().z > 1.46:
+        if f.calc_center_median().z > above:
             edges.update(f.edges)
     if edges:
         bmesh.ops.subdivide_edges(bm, edges=list(edges), cuts=HEAD_CUTS,
@@ -1012,7 +1096,7 @@ def ring(c, ra, rb, wire, seg=18, ring_seg=6):
     return vs, fs
 
 
-def cutters(J):
+def cutters(J, k=(1.0, 1.0, 1.0), torso=True):
     """The paint volumes, each one closed, positioned off the joint markers.
 
     Two rules govern every entry, and both were learned the hard way.
@@ -1031,6 +1115,13 @@ def cutters(J):
     cross section where the finished surface passes through it, so the shape
     wanted is its *silhouette* and the depth is only there to keep the edge
     sharp.
+
+    `k` is the head frame — see SKULL above. It is (1, 1, 1) for Baye, whose
+    skull every number below was measured on, and `vault(obj) / SKULL` for
+    anybody else. `torso` draws the areolae and the pubic wedge; the bathers
+    turn it off, because both are written as absolute heights off a 1.75 m
+    figure and there is no honest way to map a chest the way a skull maps. On a
+    1.24 m girl the wedge lands on her sternum.
     """
     out = []
 
@@ -1042,7 +1133,24 @@ def cutters(J):
                                          all_triangles=False),
                     mark, prev, prio, lo, hi, name))
 
-    head = J["head-2"].z
+    kx, ky, kz = k
+    # One scale for the round features, so an iris on a short wide skull is
+    # still a circle. Two would make it an ellipse of exactly the wrong
+    # proportions — tall where the head is short.
+    kf = math.sqrt(ky * kz)
+    E = J["l-eye"]
+
+    def fx(x):
+        """One of Baye's face x's, on this figure.
+
+        Anchored on the eye rather than on `head` or on the vault's centre: the
+        eye is a point on the surface, it is the landmark the face is built
+        around, and — checked on all eight bathers — it puts the hairline the
+        same fraction of the way down the skull on every one of them. The vault
+        centre does not: it is measured over the forehead as well, and the
+        forehead is exactly what varies.
+        """
+        return E.x + (x - SKULL_EYE_X) * kx
 
     # ── how far forward a cutter has to reach ──────────────────────────────
     #
@@ -1093,13 +1201,13 @@ def cutters(J):
         # punch the docstring asks for. The declared radius is the painted
         # radius, which is what makes these numbers mean anything.
         add("iris" + tag, IRIS_M, IRIS_P, 4,
-            (0.1455, e.y, e.z), (0.0500, 0.0058, 0.0058))
+            (fx(0.1455), e.y, e.z), (0.0500, 0.0058 * kf, 0.0058 * kf))
         add("pupil" + tag, PUPIL_M, PUPIL_P, 5,
-            (0.1455, e.y, e.z), (0.0500, 0.0026, 0.0026))
+            (fx(0.1455), e.y, e.z), (0.0500, 0.0026 * kf, 0.0026 * kf))
         # Brow, a little above and slightly outboard of the eye.
         add("brow" + tag, HAIR_M, HAIR_P, 3,
-            (e.x - 0.020, e.y * 1.06, e.z + 0.026),
-            (0.0480, 0.0250, 0.0055))
+            (e.x - 0.020 * kx, e.y * 1.06, e.z + 0.026 * kz),
+            (0.0480, 0.0250 * ky, 0.0055 * kz))
         # The lash lines, along the top and the bottom of the aperture.
         #
         # She already *has* eyelashes: MakeHuman's lash strips come through the
@@ -1122,9 +1230,11 @@ def cutters(J):
         # stopped a couple of millimetres short of the strip's own front, and
         # what a light scalloped fringe under an eye reads as is not eyelashes.
         add("lash" + tag, LASH_M, LASH_P, 6,
-            (0.1380, e.y, e.z + 0.0074), (0.0500, 0.0118, 0.0019))
+            (fx(0.1380), e.y, e.z + 0.0074 * kz),
+            (0.0500, 0.0118 * ky, 0.0019 * kz))
         add("lashlo" + tag, LASH_M, LASH_P, 6,
-            (0.1380, e.y, e.z - 0.0078), (0.0500, 0.0106, 0.0016))
+            (fx(0.1380), e.y, e.z - 0.0078 * kz),
+            (0.0500, 0.0106 * ky, 0.0016 * kz))
     # ── the mouth ──────────────────────────────────────────────────────────
     #
     # Placed off the chin, because `J["mouth"]` is unusable (see above) and the
@@ -1182,83 +1292,94 @@ def cutters(J):
     # Overlapping is fine here and only here: parity is a property of a single
     # closed shell, and these are nine separate cutters tested independently,
     # not nine halves of one volume.
-    lip = J["jaw"].z + 0.043
-    HALF, LIFT, BACK = 0.0215, 0.0026, 0.0105
+    lip = J["jaw"].z + 0.043 * kz
+    HALF, LIFT, BACK = 0.0215 * ky, 0.0026 * kz, 0.0105 * kx
     for i in range(9):
         f = i / 4.0 - 1.0                 # -1 at her right corner, +1 at her left
         a = abs(f)
         add("mouth%d" % i, MOUTH_M, MOUTH_P, 4,
-            (0.128 - BACK * a * a, f * HALF, lip + LIFT * a * a),
-            (0.0550, 0.0068 - 0.0034 * a ** 3, 0.0027 - 0.0014 * a ** 1.6))
+            (fx(0.128) - BACK * a * a, f * HALF, lip + LIFT * a * a),
+            (0.0550, (0.0068 - 0.0034 * a ** 3) * ky,
+             (0.0027 - 0.0014 * a ** 1.6) * kz))
 
-    # Areolae, and the only thing worth writing down is where they are.
-    #
-    # There is no joint marker for a breast, so the position was measured off
-    # the mesh rather than typed: scan the band the breast occupies and take the
-    # row where x peaks. That matters, because the naive search — the
-    # forward-most vertex anywhere on the chest — lands at y = 0.023, which is
-    # the *sternum*. At most heights on this figure the midline is further
-    # forward than the breast is, so the apex is a local maximum and not a
-    # global one. Measured: x 0.1677, y ±0.0770, z 1.2531.
-    #
-    # Punches, per the rule at the top: 5.5 cm deep against a 1.9 cm waist, so
-    # the front tip clears the surface by 1.5 cm and the cross-section where the
-    # skin actually passes through is about 28 mm across.
-    for s in (1, -1):
-        add("areola%d" % s, AREOLA_M, AREOLA_P, 3,
-            (0.128, s * 0.0770, 1.2531), (0.0550, 0.0190, 0.0190))
+    # Everything from here to the hair is written as an absolute height on
+    # a 1.75 m figure, and unlike the face there is nothing to map it with:
+    # a chest is not a box the way a braincase is, and `spine-1` lands on
+    # the bust on the women and nowhere useful on the girl. So the bathers
+    # switch it off rather than get it wrong — the areola cutter at
+    # z 1.2531 is on the 1.38 m boy's jaw, and the pubic wedge at z 0.87 is
+    # on the 1.24 m girl's sternum, both of them under a swimsuit that is
+    # sized off her own joints and lands in the right place. Nobody at three
+    # metres misses either one.
+    if torso:
+        # Areolae, and the only thing worth writing down is where they are.
+        #
+        # There is no joint marker for a breast, so the position was measured off
+        # the mesh rather than typed: scan the band the breast occupies and take the
+        # row where x peaks. That matters, because the naive search — the
+        # forward-most vertex anywhere on the chest — lands at y = 0.023, which is
+        # the *sternum*. At most heights on this figure the midline is further
+        # forward than the breast is, so the apex is a local maximum and not a
+        # global one. Measured: x 0.1677, y ±0.0770, z 1.2531.
+        #
+        # Punches, per the rule at the top: 5.5 cm deep against a 1.9 cm waist, so
+        # the front tip clears the surface by 1.5 cm and the cross-section where the
+        # skin actually passes through is about 28 mm across.
+        for s in (1, -1):
+            add("areola%d" % s, AREOLA_M, AREOLA_P, 3,
+                (0.128, s * 0.0770, 1.2531), (0.0550, 0.0190, 0.0190))
 
-    # ── pubic hair ─────────────────────────────────────────────────────────
-    #
-    # Three cutters in a column rather than one, for the mouth's reason: the
-    # shape is the whole of what makes it read. One ellipse centred on the mons
-    # is a symmetric blob, and a symmetric dark blob there is a bruise. The
-    # thing is a wedge — broad across the top, tapering to nothing between the
-    # legs — and three overlapping discs of 60, 46 and 26 mm do that with three
-    # numbers. They overlap, which is allowed and only allowed here: parity is a
-    # property of one closed shell, and these are three separate cutters tested
-    # independently, exactly as the nine lumps of the mouth are.
-    #
-    # There is no joint marker for this, and `pelvis` (z 0.934) is a pivot
-    # inside her rather than a point on her, so the heights come off the mesh:
-    # the midline front surface runs x 0.1223 at z 0.86 to x 0.1441 at z 0.92,
-    # and the hip joints sit at z 0.909. The wedge is hung across that.
-    #
-    # ── and why it runs down to 0.823 rather than stopping at the mons ───────
-    #
-    # Because otherwise nobody would ever see it. The wrap is rigid to her
-    # pelvis — `hip_scarf` says so and is right to — and its front spans
-    # z 0.828 (SCARF_HEM) to 0.940 (SCARF_TOP less the 2 cm front dip). The
-    # whole mons sits inside that band, so no clip in the repertoire can expose
-    # it: the cloth goes where the hips go, cartwheel included. The only skin
-    # below her waist that is ever in view is what shows under the hem between
-    # the tassels, so the bottom two rows are the ones that do any work, and
-    # they are down there because that is where the gap is rather than because
-    # an ellipsoid wanted to be. It is not a compromise anatomically — pubic
-    # hair does run down — but the *reason* for those two rows is the hem.
-    #
-    # Each row's centre is put 40 mm behind the surface at its own height, which
-    # holds the fraction along the punch — and therefore the cross-section
-    # factor, 0.686 — the same for all three. That is what makes the declared
-    # radii below mean something: multiply by 0.686 and you have the painted
-    # size, per the waist-not-tip rule at the top of this function. Getting this
-    # wrong is how the iris came out 3 mm across instead of 12.
-    #
-    # Softness is *right* here, which is worth saying because it is the opposite
-    # of everything else this file has learned about the decimator. A garment
-    # needs a crisp hem and the averaging destroys it — that is the whole story
-    # of the painted wrap that had to be taken off her. Hair on skin has no hem.
-    # The few centimetres of gradient the export adds is the one place where the
-    # artefact is the feature.
-    PUBIC_BACK = 0.040        # how far behind the surface each row is centred
-    for i, (pz, surf, wide) in enumerate((
-            (0.913, 0.1405, 0.0437),      # the top of the wedge, 60 mm across
-            (0.891, 0.1364, 0.0335),      # 46 mm
-            (0.869, 0.1268, 0.0248),      # 34 mm
-            (0.846, 0.1150, 0.0190),      # 26 mm — the hem is at 0.828
-            (0.823, 0.1000, 0.0146))):    # 20 mm, and out
-        add("pubis%d" % i, PUBIC_M, PUBIC_P, 3,
-            (surf - PUBIC_BACK, 0.0, pz), (0.0550, wide, 0.0233))
+        # ── pubic hair ─────────────────────────────────────────────────────────
+        #
+        # Three cutters in a column rather than one, for the mouth's reason: the
+        # shape is the whole of what makes it read. One ellipse centred on the mons
+        # is a symmetric blob, and a symmetric dark blob there is a bruise. The
+        # thing is a wedge — broad across the top, tapering to nothing between the
+        # legs — and three overlapping discs of 60, 46 and 26 mm do that with three
+        # numbers. They overlap, which is allowed and only allowed here: parity is a
+        # property of one closed shell, and these are three separate cutters tested
+        # independently, exactly as the nine lumps of the mouth are.
+        #
+        # There is no joint marker for this, and `pelvis` (z 0.934) is a pivot
+        # inside her rather than a point on her, so the heights come off the mesh:
+        # the midline front surface runs x 0.1223 at z 0.86 to x 0.1441 at z 0.92,
+        # and the hip joints sit at z 0.909. The wedge is hung across that.
+        #
+        # ── and why it runs down to 0.823 rather than stopping at the mons ───────
+        #
+        # Because otherwise nobody would ever see it. The wrap is rigid to her
+        # pelvis — `hip_scarf` says so and is right to — and its front spans
+        # z 0.828 (SCARF_HEM) to 0.940 (SCARF_TOP less the 2 cm front dip). The
+        # whole mons sits inside that band, so no clip in the repertoire can expose
+        # it: the cloth goes where the hips go, cartwheel included. The only skin
+        # below her waist that is ever in view is what shows under the hem between
+        # the tassels, so the bottom two rows are the ones that do any work, and
+        # they are down there because that is where the gap is rather than because
+        # an ellipsoid wanted to be. It is not a compromise anatomically — pubic
+        # hair does run down — but the *reason* for those two rows is the hem.
+        #
+        # Each row's centre is put 40 mm behind the surface at its own height, which
+        # holds the fraction along the punch — and therefore the cross-section
+        # factor, 0.686 — the same for all three. That is what makes the declared
+        # radii below mean something: multiply by 0.686 and you have the painted
+        # size, per the waist-not-tip rule at the top of this function. Getting this
+        # wrong is how the iris came out 3 mm across instead of 12.
+        #
+        # Softness is *right* here, which is worth saying because it is the opposite
+        # of everything else this file has learned about the decimator. A garment
+        # needs a crisp hem and the averaging destroys it — that is the whole story
+        # of the painted wrap that had to be taken off her. Hair on skin has no hem.
+        # The few centimetres of gradient the export adds is the one place where the
+        # artefact is the feature.
+        PUBIC_BACK = 0.040        # how far behind the surface each row is centred
+        for i, (pz, surf, wide) in enumerate((
+                (0.913, 0.1405, 0.0437),      # the top of the wedge, 60 mm across
+                (0.891, 0.1364, 0.0335),      # 46 mm
+                (0.869, 0.1268, 0.0248),      # 34 mm
+                (0.846, 0.1150, 0.0190),      # 26 mm — the hem is at 0.828
+                (0.823, 0.1000, 0.0146))):    # 20 mm, and out
+            add("pubis%d" % i, PUBIC_M, PUBIC_P, 3,
+                (surf - PUBIC_BACK, 0.0, pz), (0.0550, wide, 0.0233))
 
     # Hair: a cap over the skull, cut at the brow. Unlike the others this one is
     # a solid the scalp sits inside, not a punch through it.
@@ -1267,9 +1388,15 @@ def cutters(J):
     # and her forehead runs out to 0.145 at that height, so there were four and
     # a half centimetres of bare scalp in front of the hairline — which from the
     # promenade is not a high forehead, it is a bald woman.
+    #
+    # Off the eye in both axes now, not off `head` and `head-2`. Baye's crown
+    # marker sits 9 mm under the top of her skull and the girl's sits 20 mm
+    # under hers, so anchoring the cap's height on it drops the cap 13 mm on her
+    # and takes the hairline down over the eyes. `E.z + 0.052` is the same point
+    # on Baye — 1.675 either way — and holds on a skull that is not hers.
     add("hair", HAIR_M, HAIR_P, 2,
-        (J["head"].x + 0.023, 0.0, head - 0.066),
-        (0.112, 0.092, 0.104), rows=16, seg=26)
+        (fx(0.040), 0.0, E.z + 0.052 * kz),
+        (0.112 * kx, 0.092 * ky, 0.104 * kz), rows=16, seg=26)
 
     # And the nape, as a second shell rather than by stretching the first.
     # The cap has to stop at the brow and a single ellipsoid long enough to
@@ -1278,8 +1405,8 @@ def cutters(J):
     # into the knot actually lies — without it the modelled tail hangs off a
     # shaved neck, which is a worse read than no tail at all.
     add("nape", HAIR_M, HAIR_P, 2,
-        (J["head"].x - 0.090, 0.0, J["neck"].z + 0.058),
-        (0.105, 0.070, 0.085), rows=14, seg=22)
+        (fx(-0.073), 0.0, J["neck"].z + 0.058 * kz),
+        (0.105 * kx, 0.070 * ky, 0.085 * kz), rows=14, seg=22)
 
     # There is no painted garment on this figure any more, and that is the whole
     # of the entry. She wears geometry (see `hip_scarf`) and nothing else.
@@ -3342,9 +3469,25 @@ def _walk_pose(up, sup, fre, arm, sway):
         # rather than shared because the two arms are half a cycle apart, and
         # the mirror keeps them that way on its own: the left arm's value at the
         # end of the half-cycle is the right arm's value at the start of it.
-        "armUL": (-arm, 0, 7), "armLL": (_walk_elbow(arm), 0, 3),
+        #
+        # ── and 29 of adduction, not 7 ─────────────────────────────────
+        #
+        # The same number the idle uses, and for the same reason its own note
+        # gives: the MakeHuman base stands in an A-pose with the upper arms 40°
+        # out from the body, so anything short of about thirty leaves a figure
+        # walking with its arms held away from it. The idle was written with
+        # that in mind and this was not, and seven degrees of it left the upper
+        # arms 33° out through the whole cycle — measured off the exported
+        # clip, shoulder to elbow, not eyeballed. On one figure doing one thing
+        # that is a stiff walk. On three of eight bathers strolling a
+        # promenade it is a beach of scarecrows, which is what it was called
+        # when it was finally noticed.
+        #
+        # It is lateral only. The swing is `arm` on X and the elbow hangs off
+        # that, so pulling the shoulders in does not touch the gait.
+        "armUL": (-arm, 0, 29), "armLL": (_walk_elbow(arm), 0, 3),
         "handL": (-4, 0, 0),
-        "armUR": (arm, 0, -7), "armLR": (_walk_elbow(-arm), 0, -3),
+        "armUR": (arm, 0, -29), "armLR": (_walk_elbow(-arm), 0, -3),
         "handR": (-4, 0, 0),
         # And a narrower track than the skip's ±4: feet under the hips rather
         # than out either side of them, which is what stops a walk waddling.
