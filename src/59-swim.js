@@ -42,6 +42,21 @@ const SWIM = {
 
   cruise: 1.15,        // m/s — a steady crawl in a jacket, which is slow
   sprint: 2.00,
+  // A surge, per press of the sprint key, on top of the sprint.
+  //
+  // Holding Q was already worth 2.00 against her 1.34, which on paper is a
+  // race you win — and in the water it is a race you spend a minute winning,
+  // because she finds 1.56 the moment you are inside four and a half metres
+  // and the gap then closes at thirteen centimetres a second. That is not
+  // difficulty, it is waiting.
+  //
+  // So the key does something when you *hit* it, not only when you lean on it.
+  // Decays over about a second and a half and caps at three presses' worth, so
+  // a burst is a burst and cannot be held as a new cruise speed. It costs
+  // breath at the same rate the sprint does, which is what stops it being free.
+  surge: 0.62,
+  surgeMax: 1.75,
+  surgeFade: 1.5,      // seconds, the time constant it bleeds off over
   // Turning on the arrow keys, rad/s. Swimming is not walking and the mouse
   // is still the honest way to look, but a mode you can only steer with a
   // mouse is a mode half the people who try it cannot steer at all: under
@@ -196,6 +211,8 @@ function buildSwim(sea) {
     depth: 0,
     breath: 1,
     stroke: 0,
+    surge: 0,          // see `SWIM.surge`
+
     spent: false,      // out of air: the jacket has the controls until you surface
   };
   let active = false;
@@ -338,9 +355,20 @@ function buildSwim(sea) {
     const submerged = you.depth > SWIM.under;
 
     // ── breath ───────────────────────────────────────────────────────────────
-    if (submerged) {
+    //
+    // `ctl.held` suspends the clock, and it is the race that sets it, not the
+    // mask. The mask was the obvious hook and it is the wrong one: `mask.on` is
+    // simply "you are in the water" — it goes on the moment the swim starts and
+    // comes off when it ends — so hanging the breath off it would delete the
+    // one clock this mode has, everywhere, for ever. The race is a scripted
+    // sprint of a known length with a mask on your face, which is a place a
+    // game can reasonably say you have the air for it.
+    if (submerged && !ctl.held) {
       you.breath = Math.max(0, you.breath - dt / SWIM.breath);
       if (you.breath <= 0) you.spent = true;
+    } else if (submerged) {
+      // Held, but not recovering: surfacing is still what fills the lungs.
+      you.spent = false;
     } else {
       you.breath = Math.min(1, you.breath + dt / SWIM.recover);
       if (you.breath > 0.25) you.spent = false;
@@ -356,8 +384,10 @@ function buildSwim(sea) {
 
     const f = clamp(ctl.fwd || 0, -1, 1);
     const sd = clamp(ctl.side || 0, -1, 1);
+    you.surge = damp(you.surge, 0, 1 / SWIM.surgeFade, dt);
     const drive = you.spent ? 0
-      : (ctl.sprint ? SWIM.sprint : SWIM.cruise) * (f < 0 ? 0.55 : 1);
+      : ((ctl.sprint ? SWIM.sprint : SWIM.cruise) + you.surge)
+        * (f < 0 ? 0.55 : 1);
     const cp = submerged ? Math.cos(you.pitch) : 1;
     const fx = -Math.sin(you.yaw) * cp, fz = -Math.cos(you.yaw) * cp;
     const sx = Math.cos(you.yaw), sz = -Math.sin(you.yaw);
@@ -461,6 +491,20 @@ function buildSwim(sea) {
     get auto() { return auto; },
     get apNote() { return apNote; },
     toggleAuto,
+    /**
+     * One press of the sprint key, worth a burst. See `SWIM.surge`.
+     *
+     * Refused when you are out of air, for the same reason the drive is: the
+     * jacket has the controls at that point and the way out is up.
+     */
+    kick: () => {
+      if (!active || you.spent) return 0;
+      you.surge = Math.min(SWIM.surgeMax, you.surge + SWIM.surge);
+      // A stroke's worth of breath per surge, on top of what the sprint is
+      // already costing. Spamming it is meant to be expensive.
+      you.breath = Math.max(0, you.breath - 0.012);
+      return +you.surge.toFixed(2);
+    },
     enter, leave, look, update, pose, canWade,
     surfaceAt: seaHeightAt,
     stats: () => ({

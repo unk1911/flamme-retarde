@@ -7,6 +7,7 @@
 
 import { spawn } from 'node:child_process';
 import { writeFileSync, readFileSync } from 'node:fs';
+import { gpuLaunch, RENDERER_JS } from './gpu.mjs';
 
 const args = process.argv.slice(2);
 const out = args[0] || 'shot.png';
@@ -22,9 +23,14 @@ const URL_BASE = opt('url', 'http://127.0.0.1:8794/flamme-retarde.html');
 const quality = opt('q', 'low');
 const maxWait = Number(opt('wait', 150)) * 1000;
 
+// The card if this machine has one, SwiftShader if not — see tools/gpu.mjs.
+// `--gl gpu` and `--gl swiftshader` force it either way, which is how a
+// suspected rendering difference between the two gets settled.
+const GL = gpuLaunch(opt('gl', null));
+
 const chrome = spawn('google-chrome', [
   '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
-  '--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader',
+  ...GL.args,
   '--hide-scrollbars', '--mute-audio',
   // Output stays muted, but the AudioContext has to actually run: without this
   // Chrome holds it suspended until a user gesture that a headless driver never
@@ -36,7 +42,7 @@ const chrome = spawn('google-chrome', [
   `--remote-debugging-port=${PORT}`,
   '--user-data-dir=/tmp/claude-chrome-profile-' + PORT,
   'about:blank',
-], { stdio: ['ignore', 'ignore', 'pipe'] });
+], { stdio: ['ignore', 'ignore', 'pipe'], env: GL.env });
 
 const logs = [];
 chrome.stderr.on('data', (d) => logs.push(String(d)));
@@ -187,7 +193,8 @@ async function main() {
     await evalJs(`document.getElementById('enter').click()`);
     await sleep(400);
   }
-  console.log(`build ${buildSeconds.toFixed(1)}s`);
+  const renderer = await evalJs(RENDERER_JS).catch(() => '?');
+  console.log(`build ${buildSeconds.toFixed(1)}s · ${renderer}`);
 
   // A plan file shoots many viewpoints from one launch, which is the whole
   // point: the world takes longer to start Chrome than to generate.

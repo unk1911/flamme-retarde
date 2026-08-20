@@ -231,6 +231,16 @@ addEventListener('keydown', (e) => {
   // R — the race. Ahead of the pause guard with the other three back doors,
   // and for the same reason: it is a place to be taken to.
   if (e.code === 'KeyR') { e.preventDefault(); startChase(); return; }
+  // Q and Shift already hold the sprint on; this is the *press*, which is worth
+  // a burst on top of it. `e.repeat` is the whole of the guard — a held key
+  // autorepeats at thirty a second and would be an infinite surge.
+  if ((e.code === 'KeyQ' || e.code === 'ShiftLeft' || e.code === 'ShiftRight')
+    && !e.repeat && state.phase === 'swim' && swim && swim.active) {
+    swim.kick();
+    // No `return`: Q is also the run latch on foot and Shift is read as a held
+    // key elsewhere in this handler, and swallowing them here would be a
+    // surprise the next time somebody moves this block.
+  }
   // B — round behind her, and back again. Only in the water: it is the only
   // mode with a body to look at, and the only one where being outside your own
   // eyes is not a bug. See `poseSwimBody`.
@@ -1240,7 +1250,19 @@ function afootToast() {
  */
 function leaveWater(was = state.phase) {
   // Whatever else is going on, the race does not survive leaving the water.
-  if (chase && chase.active) { chase.stop(); chaseCut = null; }
+  //
+  // The cut is cleared unconditionally and the race only if it is running, and
+  // that asymmetry is the whole point: the two are not live at the same time.
+  // `startChase` puts the shot up *first* and starts the race from a beat two
+  // seconds into it, so for the length of the wide shot and her dive there is a
+  // `chaseCut` driving her and no `chase.active` at all. Clearing the cut only
+  // when the race was running — which is what this did — meant that a V or a 0
+  // pressed in that window tore down the swim and left the shot running: it
+  // re-drove her into the dive pose every frame, from inside the vikendica,
+  // and overwrote the walk-up's camera while it was at it. She turned up in the
+  // bathroom mirror mid-dive with the sea still playing.
+  if (chase && chase.active) chase.stop();
+  chaseCut = null;
   if (you) you.drive(null);
   bodyCam = false;
   $('chase-hud').hidden = true;
@@ -1784,8 +1806,18 @@ function startChase() {
   // so the point is taken there and brought back out rather than guessed at
   // from the two ends of the swim.
   const [jt, js] = jadrija.local(r.jetty[0], r.jetty[2]);
+  // Where the boards stop, and it has to be measured rather than assumed.
+  //
+  // `r.jetty` is not the end of the jetty — it is three metres back from it,
+  // because it is the mark somebody *stands* on. Taking off from there and
+  // reaching `CUT.reach` past it puts the entry at about 2.6 m short of the
+  // edge, which is to say on the concrete: both of them dived into the deck,
+  // she first and Chloe after her, and the splash went off in the middle of the
+  // boards. The run now ends at the last half metre of the jetty and the arc
+  // carries on from there over open water.
+  const jEnd = jadrija.local(r.jettyEnd[0], r.jettyEnd[2])[1];
   const runFrom = jadrija.toWorld(jt, js + CUT.runUp);
-  const runTo = jadrija.toWorld(jt, js + 0.4);
+  const runTo = jadrija.toWorld(jt, jEnd);
   const rdx = runTo[0] - runFrom[0], rdz = runTo[2] - runFrom[2];
   const rL = Math.hypot(rdx, rdz) || 1;
   // Her heading down the jetty, in the game's own convention: forward is
@@ -1873,6 +1905,15 @@ function startChase() {
 // 62-mask.js is the inside of the same object and only exists when you are
 // behind it.
 // -----------------------------------------------------------------------------
+
+/**
+ * How far under she and you ride during the race, in metres.
+ *
+ * Half a metre: deep enough that you are looking through water at somebody
+ * rather than at two heads in the chop, and shallow enough that the surface is
+ * still right there with the light coming through it.
+ */
+const RACE_DEEP = 0.5;
 
 const BODY = {
   // How far back and how high the camera sits, in metres, and where it aims
@@ -2178,8 +2219,8 @@ function stepCutBeat(beat, u, dt) {
 }
 
 /** Put the race away. `won` only decides what gets said about it. */
-function endChase(won) {
-  if (chase) chase.stop();
+function endChase(won, keep = false) {
+  if (chase && !keep) chase.stop();
   // Whatever the shot was holding, it is not holding it any more. Belt and
   // braces: the cut clears her itself on the way out, and this is the path
   // that does not go through the cut.
@@ -3516,7 +3557,9 @@ function frame() {
     // Keys and thumbs, added rather than switched between, exactly as the
     // other three modes do it: a touchscreen laptop with a keyboard plugged
     // into it is a real machine and neither half of it should win.
-    swim.update(dt, chaseCut ? {} : {
+    // Whether the race is on, which two of the controls below care about.
+    const racing = !!(chase && chase.active) || !!chaseCut;
+    swim.update(dt, chaseCut ? { held: true } : {
       fwd: (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0)
         - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0) + TOUCH.sy,
       // A and D still strafe, because that is what they do in the other two
@@ -3530,8 +3573,20 @@ function frame() {
       // Q as well as shift, which is what the on-foot mode runs on.
       sprint: keys.has('ShiftLeft') || keys.has('ShiftRight') || keys.has('KeyQ')
         || TOUCH.sfast,
-      down: keys.has('KeyC') || keys.has('ControlLeft') || TOUCH.sdown,
+      // Down, and during the race down on its own.
+      //
+      // Two people chasing each other along the surface is two heads in the
+      // chop; the same two a half metre under is a swim. So while the race is
+      // on the water takes you down to `RACE_DEEP` unless you are actively
+      // asking to come up — a nudge and not a lock: Space still works, and
+      // letting go of it simply sinks you back to where she is.
+      down: keys.has('KeyC') || keys.has('ControlLeft') || TOUCH.sdown
+        || (racing && !keys.has('Space') && !TOUCH.sup
+          && swim.depth < RACE_DEEP),
       up: keys.has('Space') || TOUCH.sup,
+      // And no breath clock while it runs — see the note in 59-swim.js for why
+      // this is the race and not the mask.
+      held: racing,
     });
     // Under and out from under. Both are events and neither is a state: the
     // sound belongs to the moment the ears change what they are in, which is
@@ -3551,7 +3606,12 @@ function frame() {
       const out = chase.update(dt, swim.you, (x, z) => swim.surfaceAt(x, z));
       if (out === 'caught') { toast(T('chase.caught')); if (audio) audio.gasp(0.8); }
       else if (out === 'lost') { $('ch-say').textContent = ''; }
-      else if (out === 'done') { endChase(true); }
+      // She has finished talking and is swimming back in. The race is over —
+      // the HUD goes, the keys are yours — but she is not: `keep` is what stops
+      // `endChase` calling `chase.stop()` and hiding her in the same frame she
+      // turns round. She goes when she reaches the jetty, which is 'home'.
+      else if (out === 'done') { endChase(true, true); }
+      else if (out === 'home') { endChase(true); }
       paintChaseHud();
     }
     paintSwimHud();

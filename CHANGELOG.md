@@ -8,6 +8,96 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.90.0] — 2026-08-20
+
+Eight people, and each of them is a person.
+
+### The bathers
+
+Jadrija's beach carried twenty-four figures cut from two meshes — a man and a
+woman, repainted. That reads as twenty-four box people however many colours
+they are wearing, and the fix is not more of them. There are eight now, and
+every one is a different body: two children, two people past sixty, a heavy
+man, a full-figured woman, a lean man, a slim woman, 1.24 m to 1.84 m.
+
+They come from the same MakeHuman base mesh the game's other figure is built
+from. MakeHuman does not ship a library of people — it ships one mesh and
+several hundred `.target` files, each a list of per-vertex deltas, all CC0. So
+a new body is a vector add on topology this project already rigs, weights,
+paints and animates, and it turns on one property of that mesh: the joint
+markers the skeleton is built from are themselves vertices of it. Morph the
+body and the skeleton moves with it. A 1.24 m girl gets a 1.24 m girl's
+skeleton and nobody has to say so.
+
+- `tools/blender/mh_morph.py` — the eight recipes, and the arithmetic that
+  applies them. No Blender: a target is a text file and the base is an OBJ, so
+  a body can be tried and thrown away in seconds instead of in a four-minute
+  bake.
+- `tools/blender/bathers_mh.py` — thirty lines of glue over the pipeline that
+  was already there, plus skin tone and painted swimwear per figure.
+- `makeSkinCrowd` in `42-crowd.js` — a drop-in for `makeCrowd` with the same
+  `figures` array and the same `flush(t, cam)`, so the promenade logic does not
+  know which of the two it is talking to. Falls back to the instanced pair if
+  the payloads are missing.
+
+Build goes 16.65 to 18.24 MB for it. The cast is cut *after* placement rather
+than by lowering the turnout, so the parasols and the loungers all stay: a
+bathing station with forty towels and eight bodies is a Tuesday afternoon, and
+one with eight towels is closed.
+
+### The race
+
+- **Both dives land in the water.** `swimRun.jetty` is the mark somebody
+  *stands* on, three metres back from the end of the boards — so a take-off
+  from there carrying 3.1 m put the entry two and a half metres short of the
+  edge. She dived into the concrete and Chloe dived in after her. There is a
+  `jettyEnd` now and the run goes to it.
+- **Q does something when you hit it.** Holding it was already worth 2.00 m/s
+  against her 1.34, which on paper is a race you win and in the water is a race
+  you spend a minute winning: she finds 1.56 the moment you are inside four and
+  a half metres, and the gap then closes at thirteen centimetres a second. Each
+  fresh press is now a surge, up to three of them, bleeding off over a second
+  and a half and costing breath.
+- **She stops evaporating at the platform.** Getting there first used to hand
+  her to the `lost` phase, which counts to 2.6 and hides her. She waits there
+  now, treading and watching you come in, and when she has said her piece she
+  swims back to the jetty with you — holding her pace off the gap rather than
+  running a second race.
+- **You both ride half a metre under.** Two people chasing each other along the
+  surface is two heads in the chop. The breath clock is suspended for the
+  length of it, gated on the race and not on the mask: `mask.on` is simply "you
+  are in the water", and hanging the clock off that would delete the mechanic
+  everywhere, for ever.
+
+### Fixed
+
+- **Cutting out of the R sequence early left Chloe in the water.** `leaveWater`
+  cleared the dive shot only when the race was already running — and the race
+  starts from a beat two seconds *into* the shot, so for the length of the wide
+  frame and her dive there is a cut driving her and no race at all. A V or a 0
+  pressed in that window tore down the swim and left the shot running: it
+  re-drove her into the dive pose every frame from inside the vikendica and
+  overwrote the walk-up's camera, so she turned up in the bathroom mirror
+  mid-dive with the sea still playing. The cut is cleared unconditionally now.
+- **The fan's legs and its flex were pins standing on the tiles.** Both were
+  cylinders that were never aimed: a three.js cylinder stands on its own Y
+  axis, so four legs tipped by a tenth of a radian are four posts, and a 60 cm
+  cable written as one is a 60 cm rod. Aimed from each end, they are a splayed
+  base and a cable lying on the floor.
+- **`export_skin` dressed everybody as Baye.** Passing `J=None` does not
+  decline the lay-on pass, it makes the pass fetch *her* joints off the neutral
+  base and hang her nails, her bracelet and her hip wrap on whatever figure it
+  was given, positioned by a skeleton that is not that figure's. The first
+  bathers came out in the same striped sarong, children and old men included.
+  There is a `post` flag now.
+
+### Filming
+
+- `tools/gpu.mjs`, shared by `shoot.mjs` and `record.mjs`: headless Chrome on
+  the host GPU under WSL. Four 1920x1080 shots across Jadrija now cost 32 s
+  cold, against over two minutes on SwiftShader, and the page runs at 48 fps
+  while doing it. `--gl gpu` / `--gl swiftshader` force either way.
+
 ## [1.89.0] — 2026-08-20
 
 The hands on the fish were never short. And the wood has a gate in it now.

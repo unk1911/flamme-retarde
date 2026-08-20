@@ -20,6 +20,13 @@ build/mh_base.obj
 build/human.blend
 build/human_mh.blend
 
+# The morph targets and the bodies they make, for the same reason and by the
+# same rule as the base above: 8 MB of .target files that tools/blender/
+# mh_morph.py fetches on demand, and 15 MB of .obj it writes from them in about
+# a second. What survives is build/payload/bather_*.fr3d.gz.
+build/mh_targets/
+build/mh_bodies/
+
 # Screenshots and scratch output from tools/shoot.mjs
 shots/
 *.png

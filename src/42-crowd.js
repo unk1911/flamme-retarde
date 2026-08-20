@@ -184,6 +184,108 @@ function crowdLayer(scene, proto, cap) {
  * drawing and knows nothing about where anybody is going, which is how the
  * promenade logic stays in 43-jadrija.js where it belongs.
  */
+/**
+ * The eight, in the order they are cast.
+ *
+ * Named here rather than in 43-jadrija.js because the names are the bake's —
+ * tools/blender/mh_morph.py holds the recipe for each, and the payload keys are
+ * these strings with `bather_` in front and `_fr3d` behind. The order is the
+ * casting order and it matters only in that it is stable: person three is
+ * person three every time the beach is built.
+ *
+ * Two children, two people past sixty, a heavy man, a full-figured woman, a
+ * lean man and a slim woman. Which is not a diversity checklist, it is what a
+ * Dalmatian bathing station has on it in August, and the thing the old crowd
+ * could not do at any number of instances.
+ */
+const BATHER_CAST = [
+  'woman_young_slim', 'man_old_heavy', 'girl_child', 'man_young_fit',
+  'woman_young_full', 'boy_child', 'woman_old', 'man_young_lean',
+];
+
+/**
+ * The same contract as `makeCrowd`, backed by one skinned figure per person.
+ *
+ * Two casts became three. The aerodrome crew are eleven rigid parts in a Group
+ * hierarchy, right for eight of them; the promenade walkers are those same
+ * eleven parts instanced, right for a hundred and twenty. This is the third
+ * answer and it is the opposite trade: eight people, each a *different* mesh
+ * with its own skeleton, its own build, its own height and its own skin, at
+ * seven thousand triangles apiece.
+ *
+ * It exists because the instanced crowd could never be more than two silhouettes
+ * repainted. A beach of twenty-four box people all cut from a man and a woman
+ * reads as a beach of twenty-four box people however many colours they are
+ * wearing — and the fix is not more of them. Eight who are actually different
+ * cost fewer triangles than twenty-four who are not, and they are made from the
+ * same MakeHuman base the game's other figure is built from, morphed: see
+ * tools/blender/mh_morph.py for the eight recipes and bathers_mh.py for the
+ * bake.
+ *
+ * `figs` are already-loaded skinned figures. Binding is by index and it has to
+ * be: a figure whose identity is reassigned per frame is a person who changes
+ * body when you walk past them.
+ *
+ * The `figures` array, the `flush(t, cam)` call and the distance cut are all
+ * `makeCrowd`'s, so the promenade logic in 43-jadrija.js does not know which of
+ * the two it is talking to.
+ */
+function makeSkinCrowd(scene, figs, cap) {
+  const figures = [];
+  let drawn = 0;
+  let last = -1;
+
+  // What each pose is called over here. The crowd's `mode` is a body position
+  // and a clip is a body position over time, so most of them land on `idle`:
+  // somebody standing in the shallows is somebody standing.
+  const CLIP = { stand: 'idle', wade: 'idle', walk: 'walk', sit: 'idle',
+    lie: 'idle', wait: 'idle' };
+
+  for (const f of figs) {
+    f.mesh.visible = false;
+    f.mesh.frustumCulled = false;
+    scene.add(f.mesh);
+  }
+
+  function flush(t, cam) {
+    // A delta, because these animate rather than being posed from absolute
+    // time. Clamped: the first frame after a locale builds is worth several
+    // seconds and would jump every clip to a random phase.
+    const dt = last < 0 ? 0 : Math.min(0.1, Math.max(0, t - last));
+    last = t;
+    let n = 0;
+    const maxSq = CROWD.poseM * CROWD.poseM;
+    const lim = Math.min(cap, figs.length, figures.length);
+    for (let i = 0; i < lim; i++) {
+      const fg = figures[i], f = figs[i];
+      const dx = fg.x - cam.x, dz = fg.z - cam.z;
+      if (dx * dx + dz * dz > maxSq) { f.mesh.visible = false; continue; }
+      const want = CLIP[fg.mode] || 'idle';
+      if (f.playing() !== want) f.play(want, { fade: 0.28 });
+      // The walk clip is authored at about 0.92 m/s; anybody strolling faster
+      // than that plays it faster rather than sliding.
+      if (f.state) {
+        f.state.speed = fg.mode === 'walk'
+          ? Math.max(0.7, Math.min(1.6, (fg.speed || 0.92) / 0.92)) : 1;
+      }
+      f.mesh.position.set(fg.x, fg.y, fg.z);
+      f.mesh.rotation.set(0, fg.yaw, 0);
+      f.mesh.updateMatrixWorld();
+      f.update(dt);
+      f.mesh.visible = true;
+      n++;
+    }
+    for (let i = lim; i < figs.length; i++) figs[i].mesh.visible = false;
+    drawn = n;
+  }
+
+  return {
+    figures, flush, layers: [],
+    tris: figs.reduce((a, f) => a + f.tris, 0),
+    get drawn() { return drawn; },
+  };
+}
+
 function makeCrowd(scene, rig, cap) {
   const layers = rig.parts.map((p) => crowdLayer(scene, p.geo, cap));
   const skel = rigSkeleton(rig);

@@ -46,7 +46,31 @@ const CHASE = {
   cut: 5.2,            // s of the shot before you get the keys
   talk: 10.5,          // s of her turning round, in three lines
   wake: 4.6,           // m of foam behind her
+  // The swim back in, once she has said her piece.
+  // How far under the surface she rides while the race is on.
+  //
+  // Matched to `RACE_DEEP` in 90-app.js, which is what pulls you down to meet
+  // her: the point of both numbers is that a chase between two heads bobbing
+  // in the chop is not a chase, and the same two swimmers a half metre under
+  // are. She comes back up for the talk, because a conversation happens at the
+  // surface.
+  deep: 0.5,
+  homeSp: 1.06,        // m/s — an easy return, not a second race
+  homeHold: 6.0,       // m — past this she is waiting for you rather than going
+  homeEase: 0.45,      // and how far she drops her pace while she waits
 };
+
+/**
+ * Turn her to face you, at `rate` radians a second. Shared by the two phases
+ * that do nothing else.
+ */
+function _turnTo(her, you, dt, rate) {
+  const aim = Math.atan2(-(you.x - her.x), -(you.z - her.z));
+  let d = aim - her.yaw;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return her.yaw + Math.max(-rate * dt, Math.min(rate * dt, d));
+}
 
 /**
  * The race.
@@ -206,7 +230,7 @@ async function buildChase(scene) {
       } else {
         her.done = Math.min(1, her.done + dt);
       }
-      her.y = surfaceY(her.x, her.z);
+      her.y = surfaceY(her.x, her.z) - CHASE.deep;
 
       if (gap <= CHASE.catchAt) {
         phase = 'talk'; t = 0;
@@ -215,7 +239,62 @@ async function buildChase(scene) {
         her.yaw = Math.atan2(-(you.x - her.x), -(you.z - her.z));
         return 'caught';
       }
-      if (gap > CHASE.lost || her.done >= 1) { phase = 'lost'; t = 0; return 'lost'; }
+      if (gap > CHASE.lost) { phase = 'lost'; t = 0; return 'lost'; }
+      // She has got there first, and getting there first is not leaving.
+      //
+      // This used to hand her to `lost`, which counts to 2.6 and hides her —
+      // so from the water it looked like she evaporated somewhere short of the
+      // platform, which is exactly what it was. She waits now, treading, and
+      // she waits as long as it takes: the platform is the finish, and a person
+      // at the finish of a race she has won does not swim off.
+      if (her.done >= 1) { phase = 'wait'; t = 0; return 'arrived'; }
+      return null;
+    }
+
+    if (phase === 'wait') {
+      // Treading at the platform, turning to watch you come in. The same scull
+      // and the same turn rate as `talk`, because it is the same thing she is
+      // doing — the difference is only that you have not arrived yet. Up at
+      // the surface: she has stopped swimming.
+      her.y = surfaceY(her.x, her.z);
+      her.u += dt * 0.22;
+      her.yaw = _turnTo(her, you, dt, 1.2);
+      if (gap <= CHASE.catchAt) { phase = 'talk'; t = 0; return 'caught'; }
+      if (gap > CHASE.lost) { phase = 'lost'; t = 0; return 'lost'; }
+      return null;
+    }
+
+    if (phase === 'home') {
+      // Back to the jetty, together.
+      //
+      // She holds a little ahead of you rather than running her own race: the
+      // point of the leg is that there are two of you in the water, and a
+      // swimmer who is fifty metres up the channel is one of you. So she takes
+      // her pace from the gap — easing off when you fall behind, picking it up
+      // when you are on her shoulder — and she is done when the jetty is close
+      // enough to climb out at.
+      const back = Math.hypot(startAt[0] - her.x, startAt[1] - her.z);
+      const want = CHASE.homeSp
+        * (gap > CHASE.homeHold ? CHASE.homeEase : 1.0);
+      her.sp += (want - her.sp) * Math.min(1, dt * 1.2);
+      if (back > 3.0) {
+        const aim = Math.atan2(-(startAt[0] - her.x), -(startAt[1] - her.z));
+        let d = aim - her.yaw;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        her.yaw += Math.max(-CHASE.turnRate * dt,
+          Math.min(CHASE.turnRate * dt, d));
+        her.x -= Math.sin(her.yaw) * her.sp * dt;
+        her.z -= Math.cos(her.yaw) * her.sp * dt;
+        her.u += dt * CHASE.strokeHz * 0.82;
+      } else {
+        stop();
+        return 'home';
+      }
+      // Half as deep on the way back as on the way out: an easy swim in, not a
+      // sprint, and she is talking to you over her shoulder.
+      her.y = surfaceY(her.x, her.z) - CHASE.deep * 0.5;
+      if (gap > CHASE.lost) { phase = 'lost'; t = 0; return 'lost'; }
       return null;
     }
 
@@ -224,12 +303,13 @@ async function buildChase(scene) {
       // Treading water: a slow scull rather than a stroke, and she keeps facing
       // you while you drift.
       her.u += dt * 0.22;
-      const aim = Math.atan2(-(you.x - her.x), -(you.z - her.z));
-      let d = aim - her.yaw;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
-      her.yaw += Math.max(-1.6 * dt, Math.min(1.6 * dt, d));
-      if (t > CHASE.talk) { stop(); return 'done'; }
+      her.yaw = _turnTo(her, you, dt, 1.6);
+      if (t > CHASE.talk) {
+        // Not `stop()`. She turns round and swims back in with you — see the
+        // `home` phase, and the note on it about why she does not simply go.
+        phase = 'home'; t = 0; her.sp = CHASE.homeSp * 0.4;
+        return 'done';
+      }
       return null;
     }
 

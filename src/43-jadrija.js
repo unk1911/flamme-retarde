@@ -2901,6 +2901,60 @@ async function buildJadrija(scene) {
   //
   // `lie` is already covered by the lounger underneath it, and `wade` is
   // standing in the sea nearly two metres outside the seaward bound.
+  // ── eight of them, and only eight ──────────────────────────────────────────
+  //
+  // The cast is cut here rather than at `B`, and that is the point: `TURNOUT`
+  // rejects a candidate before it is placed, so lowering it would empty the
+  // parasols and the loungers along with the people. A bathing station with
+  // forty towels and eight bodies is a Tuesday afternoon. One with eight towels
+  // is closed.
+  //
+  // Eight because each of them is now a whole person — its own mesh, its own
+  // skeleton, its own build — instead of one of two silhouettes repainted, and
+  // eight who are different beat twenty-four who are not for a fraction of the
+  // triangles. See `makeSkinCrowd` in 42-crowd.js.
+  //
+  // `lie` and `sit` go first because there is no clip for either: the bake in
+  // tools/blender/bathers_mh.py carries six, and lying down is not one of them.
+  // Their loungers stay, and an empty lounger on a beach is not a missing
+  // person, it is somebody who has gone in the water.
+  const CAST = 8;
+  {
+    // Three of the scripted ones, not all of them.
+    //
+    // There are exactly eight figures carrying a beat and every one of them is
+    // a promenade walker, so keeping the lot filled the cast before anybody on
+    // the sand was considered — which is how the second attempt produced eight
+    // walkers as well, for a completely different reason than the first. Three
+    // is enough that the scripted business still happens and leaves five places
+    // for people who are actually at the beach.
+    const BEATS = 3;
+    const keep = bathers.filter((b) => b.beat).slice(0, BEATS);
+    // Round-robin across the poses, not just along the shore.
+    //
+    // Spreading by position alone was the first attempt and it gave eight
+    // walkers: the promenade has more people on it than the sand does, so a
+    // pass that takes every nth figure takes the promenade eight times. What
+    // came out was a bathing station where nobody was bathing — eight strangers
+    // walking past forty empty towels.
+    const pool = ['stand', 'wade', 'walk'].map((mode) => {
+      const g = bathers.filter((b) => !b.beat && b.pose === mode);
+      // Within a pose, still spread along the shore, or the three who are
+      // standing are standing together.
+      return g.map((b, i) => [i * 9973 % Math.max(1, g.length), b])
+        .sort((a, c) => a[0] - c[0]).map((x) => x[1]);
+    });
+    for (let round = 0; keep.length < CAST && round < 40; round++) {
+      for (const g of pool) {
+        if (keep.length >= CAST) break;
+        const b = g.shift();
+        if (b) keep.push(b);
+      }
+    }
+    bathers.length = 0;
+    for (const b of keep.slice(0, CAST)) bathers.push(b);
+  }
+
   for (const b of bathers) {
     if (b.pose === 'lie' || b.pose === 'wade' || b.beat) continue;
     solid(b.t, b.s, 0.16 * b.k, 0.16 * b.k, 1.8 * b.k);
@@ -4706,9 +4760,32 @@ async function buildJadrija(scene) {
    * come from: the same two meshes at 0.66.
    */
   const crowds = {};
-  for (const [sex, key] of [['m', 'bather_m_fr3d'], ['f', 'bather_f_fr3d']]) {
-    const rig = await loadRig(key);
-    if (rig) crowds[sex] = makeCrowd(scene, rig, bathers.length);
+  {
+    // One mesh per person, in the order they were cast. Loaded in parallel —
+    // eight inflates and eight parses of 150 KB apiece is worth doing at once,
+    // and they are independent.
+    const figs = (await Promise.all(BATHER_CAST.map((name) => {
+      const key = 'bather_' + name + '_fr3d';
+      if (!PAYLOAD[key]) return Promise.resolve(null);
+      return loadSkin(key, {
+        spec: 0.09,
+        specPower: 24,
+        // Literal colours: skin tone and swimwear are baked per figure, which
+        // is what having eight blobs buys. The marker palette in 42-crowd.js
+        // is for a crowd that is two meshes wearing different paint.
+        body: 'base *= vVCol;',
+      });
+    }))).filter(Boolean);
+    if (figs.length) {
+      crowds.skin = makeSkinCrowd(scene, figs, bathers.length);
+    } else {
+      // No blobs — fall back to the instanced pair rather than to an empty
+      // beach. The old rigs are still in the payload and still work.
+      for (const [sex, key] of [['m', 'bather_m_fr3d'], ['f', 'bather_f_fr3d']]) {
+        const rig = await loadRig(key);
+        if (rig) crowds[sex] = makeCrowd(scene, rig, bathers.length);
+      }
+    }
   }
 
   /**
@@ -7381,7 +7458,7 @@ async function buildJadrija(scene) {
 
   const walkers = [];
   for (const b of bathers) {
-    const C = crowds[rng() < 0.5 ? 'f' : 'm'] || crowds.m || crowds.f;
+    const C = crowds.skin || crowds[rng() < 0.5 ? 'f' : 'm'] || crowds.m || crowds.f;
     if (!C) break;
     const p = toWorld(b.t, b.s);
     const fg = {
@@ -7527,6 +7604,16 @@ async function buildJadrija(scene) {
       deck: (() => { const p = W(DIVE.t, DIVE.s, DIVE.top);
         return [p[0], p[1], p[2]]; })(),
       jetty: (() => { const p = W(JET.t, -JET.out + 3, at(JET.t).lip);
+        return [p[0], p[1], p[2]]; })(),
+      /**
+       * Where the boards actually stop, half a metre in from the tip.
+       *
+       * `jetty` above is three metres back from it, because it is the mark
+       * somebody stands on rather than the end of the structure — and a dive
+       * that takes off from a standing mark and carries three metres lands on
+       * concrete. See the cutscene in 90-app.js.
+       */
+      jettyEnd: (() => { const p = W(JET.t, -JET.out + 0.5, at(JET.t).lip);
         return [p[0], p[1], p[2]]; })(),
     },
     // Kept a metre off the quay edge: the bounds are what stops a walker, and

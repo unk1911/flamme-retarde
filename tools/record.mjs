@@ -28,6 +28,7 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import { writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
+import { gpuLaunch, RENDERER_JS } from './gpu.mjs';
 
 const args = process.argv.slice(2);
 const opt = (name, dflt) => {
@@ -51,36 +52,15 @@ const START = Number(opt('start', 0));
 const LUFS = Number(opt('lufs', -18));
 let SECS = opt('secs', null) === null ? null : Number(opt('secs'));
 
-// The card, if this machine has one it will admit to.
-//
-// shoot.mjs renders on SwiftShader, which is fine for a still and hopeless for
-// three hundred of them: at 960x540 with the shadow cascades and six million
-// triangles of pine it is thirty seconds a frame, and a ten-second clip is
-// three hours. WSL does expose the host GPU — not as /dev/dri, which is what
-// everything looks for and what is missing here, but as /dev/dxg with Direct3D
-// 12 over it, and Mesa ships a Gallium driver that speaks exactly that. The
-// same two environment variables that tools/blender/blender.sh sets, plus
-// ANGLE pointed at native GL rather than at its own software backend, and
-// Chrome reports the discrete card and renders in well under a second.
-//
-// Everything degrades: with no /dev/dxg this leaves the environment alone,
-// ANGLE finds no native GL and falls back, and `--fallback` forces SwiftShader
-// outright if the driver is present but broken.
-const GPU = !flag('fallback') && existsSync('/dev/dxg')
-  && existsSync('/usr/lib/x86_64-linux-gnu/dri/d3d12_dri.so');
-const env = GPU ? {
-  ...process.env,
-  GALLIUM_DRIVER: 'd3d12',
-  LD_LIBRARY_PATH: '/usr/lib/wsl/lib'
-    + (process.env.LD_LIBRARY_PATH ? ':' + process.env.LD_LIBRARY_PATH : ''),
-  MESA_D3D12_DEFAULT_ADAPTER_NAME:
-    process.env.MESA_D3D12_DEFAULT_ADAPTER_NAME || 'NVIDIA',
-} : process.env;
+// The card if this machine has one, SwiftShader if not — see tools/gpu.mjs.
+// This matters more here than anywhere else in the repo: on SwiftShader a
+// 1920x1080 frame of this scene is thirty seconds, so a ten-second clip is
+// three hours. `--fallback` forces the software path.
+const GL = gpuLaunch(flag('fallback') ? 'swiftshader' : null);
 
 const chrome = spawn('google-chrome', [
   '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
-  ...(GPU ? ['--use-gl=angle', '--use-angle=gl']
-    : ['--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader']),
+  ...GL.args,
   '--hide-scrollbars',
   // Not muted, unlike shoot.mjs: the tap is a graph node and would probably
   // survive it, but there is nothing to gain by finding out — headless Chrome
@@ -91,7 +71,7 @@ const chrome = spawn('google-chrome', [
   `--remote-debugging-port=${PORT}`,
   '--user-data-dir=/tmp/claude-chrome-record-' + PORT,
   'about:blank',
-], { stdio: ['ignore', 'ignore', 'pipe'], env });
+], { stdio: ['ignore', 'ignore', 'pipe'], env: GL.env });
 
 const logs = [];
 chrome.stderr.on('data', (d) => logs.push(String(d)));
@@ -187,13 +167,7 @@ async function main() {
     console.error(consoleLines.slice(0, 30).join('\n'));
     process.exit(2);
   }
-  const gpu = await evalJs(`(() => {
-    const c = document.createElement('canvas');
-    const g = c.getContext('webgl2');
-    if (!g) return 'no webgl2';
-    const d = g.getExtension('WEBGL_debug_renderer_info');
-    return d ? g.getParameter(d.UNMASKED_RENDERER_WEBGL) : g.getParameter(g.RENDERER);
-  })()`).catch(() => '?');
+  const gpu = await evalJs(RENDERER_JS).catch(() => '?');
   console.log(`build ${((Date.now() - t0) / 1000).toFixed(1)}s · ${gpu}`);
 
   // The click is what starts the AudioContext as well as the game, so it has
@@ -250,10 +224,19 @@ async function main() {
     const len = __fr.vik.cutLen();
     __fr.vik.cutAt(0);
     const s0 = performance.now();
-    const iv = setInterval(() => {
+    // Kept on the window and cleared when the recorder stops, not only when it
+    // runs off the end of the shot. It used to stop itself at the end of the
+    // shot and nowhere else, which is fine when the whole shot is being
+    // filmed and
+    // quietly wrong when a shorter piece of it is: the picture pass begins
+    // while this is still ticking, and every frame it writes gets overwritten
+    // by wall time a few milliseconds later. What comes out is 81 frames of
+    // the sequence running at its own speed, in the wrong place, which looks
+    // enough like a cut that it takes a while to notice.
+    window.__cutIv = setInterval(() => {
       const t2 = (performance.now() - s0) / 1000;
       __fr.vik.cutAt(Math.min(t2, len - 0.001));
-      if (t2 > len) clearInterval(iv);
+      if (t2 > len) { clearInterval(window.__cutIv); window.__cutIv = null; }
     }, 16);
     mr.start();
     return mime;
@@ -261,6 +244,7 @@ async function main() {
   console.log(`  ${armed}`);
   await sleep(audioSecs * 1000);
   const b64 = await evalJs(`(async () => {
+    if (window.__cutIv) { clearInterval(window.__cutIv); window.__cutIv = null; }
     __recStop();
     for (let i = 0; i < 100 && !__rec.done; i++) await new Promise(r => setTimeout(r, 50));
     const blob = new Blob(__rec.chunks, { type: 'audio/webm' });

@@ -957,14 +957,29 @@ async function buildVikendica(scene, field) {
     };
     // Four splayed tube legs and a hub, which is what the base of one of these
     // is — not a disc. The disc version read as a floor lamp.
+    //
+    // Each leg is aimed from the hub at its own foot, and it has to be: a
+    // three.js cylinder stands on its own Y axis, so a leg 30 cm long tipped
+    // by a tenth of a radian is not a splayed foot, it is a post. That is what
+    // these were — four white pins standing upright on the tiles around the
+    // column, with four loose white feet on the floor beyond them and nothing
+    // joining the two. Built from its two endpoints instead, so the strut
+    // reaches wherever the foot is and lies at whatever angle that takes.
     for (let i = 0; i < 4; i++) {
       const a = (i + 0.5) * Math.PI / 2;
-      const leg = put(new THREE.CylinderGeometry(0.011, 0.009, 0.30, 7),
-        white, Math.cos(a) * 0.15, 0.030, Math.sin(a) * 0.15);
-      leg.rotation.set(Math.sin(a) * 0.10, 0, -Math.cos(a) * 0.10);
+      const ca = Math.cos(a), sa = Math.sin(a);
+      const hub = new THREE.Vector3(ca * 0.045, 0.046, sa * 0.045);
+      const toe = new THREE.Vector3(ca * 0.295, 0.016, sa * 0.295);
+      const mid = hub.clone().add(toe).multiplyScalar(0.5);
+      // Thin at the toe, thick at the hub, which is the way a pressed steel
+      // leg is drawn: the cylinder's +Y end is the one the aim points at.
+      const leg = put(new THREE.CylinderGeometry(0.009, 0.012,
+        hub.distanceTo(toe), 7), white, mid.x, mid.y, mid.z);
+      leg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0),
+        toe.clone().sub(hub).normalize());
       g.add(leg);
       g.add(put(new THREE.SphereGeometry(0.013, 6, 4), white,
-        Math.cos(a) * 0.295, 0.014, Math.sin(a) * 0.295));
+        toe.x, toe.y, toe.z));
     }
     g.add(put(new THREE.CylinderGeometry(0.052, 0.058, 0.055, 12), white,
       0, 0.028, 0));
@@ -1027,8 +1042,23 @@ async function buildVikendica(scene, field) {
       blades.add(b);
     }
     for (const m of blades.children) m.frustumCulled = false;
-    g.add(put(new THREE.CylinderGeometry(0.0035, 0.0035, 0.60, 4), grey,
-      0.02, 0.012, 0.30));    // the flex, trailing off toward the wall
+    // The flex, trailing off across the tiles toward the wall behind.
+    //
+    // The same trap the legs were in, in the same object and for the same
+    // reason: a three.js cylinder stands on its own Y axis, so a cable written
+    // as one and never aimed is not a cable, it is a 60 cm grey pin standing
+    // upright on the floor beside the fan. Aimed at where it is going, and
+    // resting its own radius above the tile rather than a centimetre over it.
+    {
+      const from = new THREE.Vector3(0.05, 0.0035, 0.07);
+      const to = new THREE.Vector3(-0.07, 0.0035, 0.44);
+      const mid = from.clone().add(to).multiplyScalar(0.5);
+      const flex = put(new THREE.CylinderGeometry(0.0035, 0.0035,
+        from.distanceTo(to), 6), grey, mid.x, mid.y, mid.z);
+      flex.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0),
+        to.clone().sub(from).normalize());
+      g.add(flex);
+    }
   }
 
   /**

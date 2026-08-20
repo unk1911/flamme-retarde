@@ -2551,7 +2551,7 @@ def post_preview(J, body):
     return ob
 
 
-def export_skin(body, rig, path, clips, tris=26000, J=None):
+def export_skin(body, rig, path, clips, tris=26000, J=None, post=True):
     """Write the figure as a .fr3d **v4** blob: mesh, skeleton and clips.
 
     v1 froze the armature into the vertices, which is why the promenade got a
@@ -2672,9 +2672,20 @@ def export_skin(body, rig, path, clips, tris=26000, J=None):
     # These carry one bone at full weight, which is not an approximation: there
     # are no finger bones, so a fingertip is rigid to its hand in every clip
     # this figure has.
-    if J is None:
-        J, _js, _jd = read_joints(fetch())
-    npos, nnrm, ncol, nbone, ntri, nshed = post_geometry(J, src, body.data, bindex)
+    #
+    # `post=False` skips the lot, and exists because `J=None` is not the same
+    # question. This used to fall back to *her* joints off the neutral base and
+    # lay her nails, her bracelet and her wrap on whatever figure it was given,
+    # positioned by a skeleton that was not that figure's — so the eight
+    # bathers in tools/blender/bathers_mh.py came out wearing the same striped
+    # sarong, children and old men included, hung off somebody else's hips.
+    npos = nnrm = ncol = nbone = ntri = ()
+    nshed = 0
+    if post:
+        if J is None:
+            J, _js, _jd = read_joints(fetch())
+        npos, nnrm, ncol, nbone, ntri, nshed = post_geometry(
+            J, src, body.data, bindex)
     lay0 = len(pos) // 3
     for k in range(len(npos)):
         p, nv, c = npos[k], nnrm[k], ncol[k]
