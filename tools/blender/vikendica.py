@@ -962,16 +962,17 @@ def boravak(kit):
     into it and it runs on into the hall at the far end without a door, which
     is what the red cross on the marked-up print means.
 
-    A blue patterned three-seater, a pine dining table and four chairs, a white
-    shelf recess in the east wall and a split unit high on the west."""
-    x0, x1, y0, y1 = P_ROOMS["boravak"]
-    BLUE_S = (0.255, 0.330, 0.520)
+    A pine dining table and four chairs, a white shelf recess in the east wall
+    and a split unit high on the west.
 
-    # `floor=P_FL`, and not by accident: sofa() used to plant itself at F2 with
-    # no way to say otherwise, so this three-seater — the only one downstairs —
-    # was built one storey up and spent its life standing in the kitchen.
-    sofa(kit, x0 + 1.10, y0 + 0.62, math.pi / 2, 2.02, BLUE_S,
-         throw=(0.780, 0.760, 0.700), floor=P_FL)
+    There was a blue patterned three-seater in here for one release. It came
+    from a photograph and it went in because sofa() had been planting itself a
+    storey up whatever it was told, so the fix that gave the function a `floor`
+    put the thing where the plan said it went. It was not asked for either way
+    and the room is a room you pass through on the way to the stair, so it is
+    out — the table is what the space is for."""
+    x0, x1, y0, y1 = P_ROOMS["boravak"]
+
     round_table(kit, x0 + 2.30, y0 + 1.90, P_FL, r=0.52, h=0.74)
     for i, (dx, dy, yaw) in enumerate(((-0.78, 0.0, 0.0), (0.78, 0.0, math.pi),
                                        (0.0, -0.78, math.pi / 2),
@@ -1126,6 +1127,45 @@ def kuhinja(kit):
                face=-1, size=0.15, colour=TILE_WALL, accent=None, accent_p=0,
                holes=((PW_KIT_N[0] - 0.03, PW_KIT_N[1] + 0.03,
                        P_FL + PW_KIT_N[2] - 0.04, P_FL + PW_KIT_N[3]),))
+
+    # The wall units over the sink. The room had base units, a worktop and a
+    # 58 cm splashback and then bare plaster all the way to the ceiling, which
+    # is not a fitted kitchen — it is the bottom half of one, and standing at
+    # the sink you were looking at a tiled strip with nothing over it.
+    #
+    # West wall only, and that is not a shortcut: the north run is under the
+    # window, whose head is at P_FL + 2.05 with 63 cm of wall left above it.
+    # A cupboard there would hang over the glass. Thirty centimetres above a
+    # window is where a curtain rail goes.
+    ux1 = x0 + 0.36
+    uz0, uz1 = top + 0.58, top + 1.22
+    kit.span(CREAM, x0 + 0.02, ux1, wy0, wy1, uz0, uz1, bev=0.005)
+    # Three doors across the 1.40 run, told apart the way the base units are:
+    # by the shadow gap between them and by the handle each one carries. On a
+    # wall unit the handle is along the bottom edge, because that is the edge
+    # you can reach.
+    for i in range(1, 3):
+        d = wy0 + i * ((wy1 - wy0) / 3)
+        kit.span(tuple(v * 0.92 for v in CREAM), x0 + 0.03, ux1 + 0.004,
+                 d - 0.004, d + 0.004, uz0 + 0.02, uz1 - 0.02, bev=0.001)
+    for i in range(3):
+        c = wy0 + (i + 0.5) * ((wy1 - wy0) / 3)
+        kit.span(CHROME, ux1, ux1 + 0.014, c - 0.13, c + 0.13,
+                 uz0 + 0.045, uz1 - 0.575, bev=0.002)
+    # A cornice proud of the doors, and under the carcass the strip light that
+    # is the only thing that lights the worktop once the bulb is behind you.
+    kit.span(CREAM, x0 + 0.02, ux1 + 0.024, wy0 - 0.012, wy1 + 0.012,
+             uz1, uz1 + 0.05, bev=0.008)
+    kit.span((0.94, 0.93, 0.90), ux1 - 0.11, ux1 - 0.02, wy0 + 0.06,
+             wy1 - 0.06, uz0 - 0.026, uz0, bev=0.004)
+    # And what lives on top of a wall unit in a house by the sea: two tins and
+    # a jar, out of reach and never moved.
+    for j, (b0, bw, bh, col) in enumerate((
+            (wy0 + 0.14, 0.13, 0.11, (0.72, 0.30, 0.20)),
+            (wy0 + 0.34, 0.10, 0.14, (0.86, 0.82, 0.70)),
+            (wy1 - 0.30, 0.12, 0.09, (0.30, 0.42, 0.34)))):
+        kit.span(col, x0 + 0.09, x0 + 0.09 + bw, b0, b0 + bw,
+                 uz1 + 0.05, uz1 + 0.05 + bh, bev=0.006)
 
     # The cooker at the east end of the north run, free-standing and white.
     cx = nx1 + 0.04

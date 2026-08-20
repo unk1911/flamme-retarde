@@ -34,8 +34,23 @@
 // -----------------------------------------------------------------------------
 
 const MIRROR = {
-  // Fraction of the canvas the reflection is rendered at, each way.
-  scale: 0.34,
+  // Fraction of the canvas the reflection is rendered at, each way — of the
+  // *drawing buffer*, not of the CSS box. Those two are the same thing only on
+  // a monitor at ratio 1. On a phone the buffer is 1.25 to 2 times the box each
+  // way, so a target sized off the box came out at a third of that again: the
+  // glass was being sampled at about a fifth of the pixels it covers, and the
+  // face in it broke into blocks. See `getDrawingBufferSize` below.
+  // A reflection is sampled projectively, which means the mirror reads the
+  // part of this target that it covers on screen and nothing else. The glass is
+  // maybe a quarter of the width and half the height, so a target at a third of
+  // the buffer left about 120 pixels doing the work of 480 — a face in blocks.
+  // At 1.0 it is one screen pixel per screen pixel, which is what a mirror is;
+  // the phone gives some of that back because it is also the machine that has
+  // to draw the room twice.
+  scale: IS_SMALL ? 0.66 : IS_TOUCH ? 0.78 : 1.0,
+  // And a ceiling, in pixels on the long side, so a 5K monitor does not put a
+  // second full pass of the room through for a mirror 60 cm across.
+  cap: 1600,
   // How close you have to be for it to be worth drawing at all, in metres, and
   // how far off square you are allowed to be looking.
   range: 3.6,
@@ -190,9 +205,12 @@ function planarReflector(vik, spec) {
     e[10] = clip.z + 1 - cfg.bias;
     e[14] = clip.w;
 
-    renderer.getSize(size);
-    const w = Math.max(2, Math.round(size.x * cfg.scale));
-    const h = Math.max(2, Math.round(size.y * cfg.scale));
+    // Device pixels, not CSS pixels. See the note on `scale`.
+    renderer.getDrawingBufferSize(size);
+    let w = size.x * cfg.scale, h = size.y * cfg.scale;
+    const k = Math.min(1, cfg.cap / Math.max(w, h, 1));
+    w = Math.max(2, Math.round(w * k));
+    h = Math.max(2, Math.round(h * k));
     if (w !== rtW || h !== rtH) { rt.setSize(w, h); rtW = w; rtH = h; }
 
     // Out of its own reflection, and no second shadow pass: the maps were

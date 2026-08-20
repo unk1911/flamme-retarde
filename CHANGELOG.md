@@ -8,6 +8,64 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.86.0] — 2026-08-20
+
+Five things off a bug report, and four of them are the same kind of mistake:
+something that was right in one frame of reference and wrong in the one it was
+actually used in. A mirror sized in CSS pixels for a canvas measured in device
+pixels. A mask faded on the frame loop by a key that leaves in one frame. A
+letter bound to a race that never asked what was being held down with it. And a
+sofa put where the plan said it went by a fix that never asked whether it
+belonged there at all.
+
+### Fixed
+
+- **Ctrl+R reloads the page again — and so does every other browser chord.**
+  The keydown handler called `preventDefault` on bare letters without ever
+  asking which modifiers were held with them, so binding R to the race took
+  Ctrl+R with it, and Ctrl+W, Ctrl+T, Cmd+R and the rest besides. Nothing in
+  this game is bound to a chord, so the whole class goes back to the browser in
+  one line at the top of the handler. Shift is deliberately not in it: it is a
+  modifier you hold *while* playing and it makes no browser shortcut on its own.
+
+- **The dive mask comes off when you leave the water.** It faded on its own,
+  once a frame, from inside the swim update — which is a frame behind the four
+  back doors, because they take the camera somewhere else in the same frame
+  they take you out of the sea. Press V mid-swim and the first frame of the
+  walk up to the vikendica was shot through a mask. `mask.reset()` now clears
+  the frame, the beads on the glass and the bubbles still on their way up, and
+  `leaveWater()` calls it on every path out; the overlay is also gated on the
+  swim phase at the draw, so there is no frame for it to survive into.
+
+- **The bathroom mirror is sharp.** Its render target was sized off the
+  renderer's CSS box and then taken to a third of that, while the canvas behind
+  it is 1.25 to 2 device pixels per CSS pixel — so the glass was sampled at
+  about a fifth of the pixels it covers, and worst on a phone, which is exactly
+  where the face in it broke into blocks. It is sized off the drawing buffer
+  now, at 1.0 of it on a desktop, 0.78 on a tablet and 0.66 on a phone, capped
+  at 1600 on the long side so a 5K monitor does not draw the room twice over
+  for a mirror 60 cm across. Geometry cost is unchanged — it is the same pass
+  at more pixels, still every other frame, still only within 3.6 m of the glass.
+
+### Changed
+
+- **The blue three-seater is out of the ground-floor living room.** It arrived
+  by accident and left by request: `sofa()` had been planting itself one storey
+  up whatever it was told, and the fix that gave it a `floor` argument put the
+  thing where the plan said it went rather than asking whether it belonged
+  there. The room is what you walk through on the way to the stair — the pine
+  table and its four chairs are what the space is for.
+
+- **Wall units over the ground-floor sink.** The kitchen had base units, a
+  worktop and a 58 cm splashback and then bare plaster to the ceiling, which is
+  the bottom half of a fitted kitchen. Three cream doors on the west run, a
+  handle along the bottom edge of each where you can reach it, a cornice proud
+  of the doors, the strip light underneath that is the only thing lighting the
+  worktop once the bulb is behind you, and two tins and a jar on top that are
+  never coming down. West wall only: the north run is under a window whose head
+  leaves 63 cm of wall, and 30 cm over a window is a curtain rail, not a
+  cupboard.
+
 ## [1.85.0] — 2026-08-19
 
 Ten things off one list, and the two biggest of them are subtractions: the

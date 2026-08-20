@@ -538,8 +538,40 @@ function buildMask(scene) {
     renderer.autoClear = auto;
   }
 
+  /**
+   * Off, now, and with nothing left over.
+   *
+   * `update` already clears the frame the moment it is handed a swim that is
+   * not running, which is enough on any path that keeps calling it. It is not
+   * enough on the paths that stop: the four back doors take the camera
+   * somewhere else in the same frame they take you out of the water, and a
+   * mask whose alpha is faded by a frame loop is a mask that is still on your
+   * face for that frame — the one frame the vikendica walk starts on.
+   *
+   * So the caller that ends a swim says so, and everything the mask is holding
+   * — the frame, the beads on the glass, and the air still on its way up from
+   * where you were — goes with it rather than ageing out over the next three
+   * seconds somewhere you are no longer standing.
+   */
+  function reset() {
+    on = false;
+    wet = 0;
+    uni.uAlpha.value = 0;
+    uni.uWet.value = 0;
+    puffT = 2.0;
+    wasUnder = false;
+    live = 0;
+    next = 0;
+    bubbles.visible = false;
+    for (let i = 0; i < N; i++) {
+      pos[i * 3 + 1] = -999; fade[i] = 0; age[i] = life[i];
+    }
+    geo.attributes.position.needsUpdate = true;
+    geo.attributes.aFade.needsUpdate = true;
+  }
+
   return {
-    stage, cam, bubbles, bubStage, bubCam, update, render,
+    stage, cam, bubbles, bubStage, bubCam, update, render, reset,
     get on() { return on; },
     stats: () => ({
       on: on ? 1 : 0,

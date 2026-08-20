@@ -185,6 +185,17 @@ function grabPointer() {
 
 addEventListener('keydown', (e) => {
   if (e.repeat) return;
+  // A chord belongs to the browser, not to the game. Every branch below this
+  // line is happy to call preventDefault on a bare letter, and R is a letter:
+  // start the race and Ctrl+R stops reloading the page, because the handler
+  // never asked which keys were being held down with it. The same swallow took
+  // Ctrl+W, Ctrl+T, Cmd+R and the rest with it. Nothing in this game is bound
+  // to a chord, so the whole class goes back to the browser here, once.
+  //
+  // Shift is deliberately not in the list: it is a modifier you hold *while*
+  // playing — run, in most games — and it never makes a browser shortcut on
+  // its own.
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
   // At the laptop the keyboard belongs to the laptop. Every letter in here is a
   // letter somebody is typing into a prompt, and W A S D would otherwise be
   // four steps across the living room taken by a camera that is not being drawn
@@ -1216,6 +1227,11 @@ function leaveWater(was = state.phase) {
   // Whatever else is going on, the race does not survive leaving the water.
   if (chase && chase.active) { chase.stop(); chaseCut = null; }
   $('chase-hud').hidden = true;
+  // Whatever took you out, the mask comes off in the same frame — see the note
+  // on `reset` in 62-mask.js. Ahead of the branches on purpose: it is cheap, it
+  // is idempotent, and putting it inside the swim branch would mean trusting
+  // `was` to be right about a thing you can see on your own face.
+  if (mask) mask.reset();
   if (was === 'swim') {
     swim.leave();
     $('swim-hud').hidden = true;
@@ -3601,8 +3617,10 @@ function frame() {
   // afford. See src/60-arms.js.
   if (arms) arms.render(renderer);
   // The mask goes on last of all, because it is the closest thing to your eye
-  // that exists.
-  if (mask) mask.render(renderer);
+  // that exists — and only in the water. The alpha it fades on its own is a
+  // frame behind the phase, and one frame of a dive mask over the first frame
+  // of a walk up to the vikendica is the whole of the complaint.
+  if (mask && state.phase === 'swim' && !chaseCut) mask.render(renderer);
   const now = performance.now();
   if (lastFrameMs) state.fps = damp(state.fps, 1000 / Math.max(1, now - lastFrameMs), 2, dt);
   lastFrameMs = now;
