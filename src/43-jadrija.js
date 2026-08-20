@@ -7531,11 +7531,34 @@ async function buildJadrija(scene) {
     },
     // Kept a metre off the quay edge: the bounds are what stops a walker, and
     // stopping them exactly at the drop would let the camera hang over it.
-    // Inland far enough to reach the vikendica's stair. Past JAD.back the
-    // concrete has stopped and walkY falls through to the terrain, which is
-    // the hillside the house is standing on.
-    bounds: { t0: 3, t1: LEN - 3, s0: 1.1,
-      s1: Math.max(JAD.reachIn, VIK.s + 7.6) },
+    //
+    // Inland it used to stop at `JAD.reachIn`, 38 m, which is about the
+    // vikendica's stair — drawn when there was nothing behind the house but
+    // bare karst, and left there after the wood went in. So the pine wood that
+    // the whole of last release was about was on the far side of an invisible
+    // wall you met four strides past the back of the huts. It goes to 300 m
+    // now, which is the width of the headland: past `JAD.back` the concrete
+    // has stopped and `walkY` falls through to the terrain, and the terrain
+    // out there is a hillside 1 to 7 m above the sea the whole way across,
+    // measured along four lines through the wood.
+    bounds: { t0: 3, t1: LEN - 3, s0: 1.1, s1: 300 },
+    /**
+     * And the far shore, which a box cannot describe.
+     *
+     * Three hundred metres inland is the *other* side of the peninsula on some
+     * lines through it and open ground on others, so the inland limit has to
+     * be the water rather than a number. Only asked past the concrete: on the
+     * bathing terrace `bounds` has already had the last word, and `walkY`
+     * there is the promenade slab rather than the ground under it.
+     *
+     * The threshold is 0.55 m and not zero because `walkY` clamps to sea level
+     * off the concrete — at exactly zero you would walk out on to the water.
+     */
+    standable: (x, z) => {
+      const [, s] = local(x, z);
+      if (s < JAD.reachIn) return true;
+      return walkY(x, z) > 0.55;
+    },
     blockers, local, toWorld, walkY, inField, vik,
     /** What grows on this headland — see the note over GROVE. Read by 45-trees.js. */
     grove,

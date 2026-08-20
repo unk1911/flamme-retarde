@@ -2776,9 +2776,9 @@ def bathroom(kit):
     ceiling_light(kit, (x0 + x1) / 2, (y0 + y1) / 2, dome=True)
 
 
-def _lay_disc(kit, colour, cx, cy, cz, r, t):
+def _lay_disc(kit, colour, cx, cy, cz, r, t, seg=18, bev=0.003):
     """A disc facing -Y — a washing-machine door, a wheel, a clock."""
-    vs = bm_cylinder(kit.bm(colour, 0.003), 0, 0, -t / 2, t / 2, r, r, seg=18)
+    vs = bm_cylinder(kit.bm(colour, bev), 0, 0, -t / 2, t / 2, r, r, seg=seg)
     for v in vs:
         x, y, z = v.co
         v.co = (cx + x, cy + z, cz + y)
@@ -2829,7 +2829,126 @@ def _plate(kit, colour, poly, y0, y1, bev=0.003):
 
 FISH_BODY = (0.46, 0.75, 0.88)
 FISH_FIN = (0.13, 0.47, 0.72)
+FISH_RAY = (0.09, 0.34, 0.56)
 FISH_NUM = (0.95, 0.53, 0.47)
+FISH_EYE = (0.97, 0.97, 0.95)
+FISH_PUPIL = (0.06, 0.09, 0.14)
+
+
+def _bez(p0, p1, p2, u):
+    """One point on a quadratic Bézier. The fish is drawn in these."""
+    v = 1.0 - u
+    return (v * v * p0[0] + 2 * v * u * p1[0] + u * u * p2[0],
+            v * v * p0[1] + 2 * v * u * p1[1] + u * u * p2[1])
+
+
+def _curve(p0, p1, p2, n):
+    return [_bez(p0, p1, p2, i / float(n)) for i in range(n + 1)]
+
+
+def _strip(bm, left, right, yf, yb):
+    """A ribbon solid: one welded surface, its back, and rails round the edge.
+
+    The first version of the new fins emitted one extruded quad per rib, which
+    is what `_plate` does and what the smile has always done — and at nine ribs
+    a fin came out corrugated, every rib a separate box with its own bevelled
+    edges, like a venetian blind. So the whole ribbon is one shell: the ribs
+    share their vertices, the bevel modifier sees a 6° crease between them and
+    leaves it alone, and only the outline of the fin gets a chamfer.
+
+    `left` and `right` are matched point lists; where they meet — at the tip of
+    every fin on this animal — the quad degenerates and is emitted as a
+    triangle rather than refused. `yf` and `yb` are per-point depths, because
+    the thing this is laid on is a dome and a constant depth sinks into it.
+
+    Winding is not reasoned about: the shell is closed, so bmesh is asked to
+    work the normals out afterwards.
+    """
+    n = len(left)
+    faces = []
+    fl, fr, bl, br = [], [], [], []
+    for i in range(n):
+        same = (abs(left[i][0] - right[i][0]) < 1e-6
+                and abs(left[i][1] - right[i][1]) < 1e-6)
+        fl.append(bm.verts.new((left[i][0], yf[i], left[i][1])))
+        bl.append(bm.verts.new((left[i][0], yb[i], left[i][1])))
+        fr.append(fl[-1] if same
+                  else bm.verts.new((right[i][0], yf[i], right[i][1])))
+        br.append(bl[-1] if same
+                  else bm.verts.new((right[i][0], yb[i], right[i][1])))
+    bm.verts.ensure_lookup_table()
+
+    def face(*vs):
+        out = []
+        for v in vs:
+            if v not in out:
+                out.append(v)
+        if len(out) >= 3:
+            try:
+                faces.append(bm.faces.new(out))
+            except ValueError:
+                pass
+
+    for i in range(n - 1):
+        face(fl[i], fr[i], fr[i + 1], fl[i + 1])
+        face(bl[i], br[i], br[i + 1], bl[i + 1])
+        face(fl[i], bl[i], bl[i + 1], fl[i + 1])
+        face(fr[i], br[i], br[i + 1], fr[i + 1])
+    face(fl[0], fr[0], br[0], bl[0])
+    face(fl[-1], fr[-1], br[-1], bl[-1])
+    if faces:
+        bmesh.ops.recalc_face_normals(bm, faces=faces)
+
+
+def _lens(bm, poly, y_back, y_face, dome, rings=5):
+    """A silhouette carved rather than cut: a shallow dome on the front of it.
+
+    The fish used to be five flat plates of ply and it read as five flat plates
+    of ply — a sticker on a wall, with one bevelled rim to catch the light and
+    nothing else on it at all. This is the same silhouette with a paraboloid
+    over the front, so the body has a highlight that moves when you move and
+    the paint on it has somewhere to sit.
+
+    Paraboloid rather than a hemisphere on purpose: the slope has to go to zero
+    at the rim, or the dome meets the side wall at a crease and the bevel
+    modifier turns the crease into a ring of facets — which is the artefact the
+    dome exists to get rid of.
+
+    The rings are scaled toward the centroid, so this wants a convex `poly`.
+    """
+    cx = sum(p[0] for p in poly) / len(poly)
+    cz = sum(p[1] for p in poly) / len(poly)
+    n = len(poly)
+    area = sum(poly[i][0] * poly[(i + 1) % n][1]
+               - poly[(i + 1) % n][0] * poly[i][1] for i in range(n))
+    if area < 0:
+        poly = list(reversed(poly))
+
+    shells = []
+    for k in range(rings):
+        s = 1.0 - k / float(rings)
+        y = y_face - dome * (1.0 - s * s)
+        shells.append([bm.verts.new((cx + (x - cx) * s, y, cz + (z - cz) * s))
+                       for x, z in poly])
+    apex = bm.verts.new((cx, y_face - dome, cz))
+    back = [bm.verts.new((x, y_back, z)) for x, z in poly]
+    bm.verts.ensure_lookup_table()
+
+    faces = []
+    for k in range(rings - 1):
+        lo, hi = shells[k], shells[k + 1]
+        for i in range(n):
+            j = (i + 1) % n
+            faces.append(bm.faces.new((lo[i], lo[j], hi[j], hi[i])))
+    last = shells[-1]
+    for i in range(n):
+        faces.append(bm.faces.new((last[i], last[(i + 1) % n], apex)))
+    rim = shells[0]
+    for i in range(n):
+        j = (i + 1) % n
+        faces.append(bm.faces.new((rim[i], back[i], back[j], rim[j])))
+    faces.append(bm.faces.new(tuple(back)))
+    bmesh.ops.recalc_face_normals(bm, faces=faces)
 
 
 def fish_clock(kit, cx, cz, wall, r=CLOCK_R):
@@ -2843,34 +2962,155 @@ def fish_clock(kit, cx, cz, wall, r=CLOCK_R):
     object in the flat.
 
     `r` is the body's semi-major axis, so the whole fish including its tail is
-    about 3.3 r long — 0.50 m at the default, which is a wall clock and not a
-    decoration. Built out of convex pieces that overlap rather than as one
-    concave outline: a fish is a body, a snout, two fins and a forked tail, and
-    five convex plates that intersect are five plates that triangulate, where
-    one twenty-eight-point concave ngon is a coin toss.
+    about 3.3 r long — 0.24 m at the default, which is a wall clock and not a
+    decoration.
+
+    It was five flat convex plates, and at 24 cm on a wall you walk past that is
+    a fish-shaped sticker: a thirty-sided body whose facets you can count, two
+    triangles for fins and two for a tail. What is here now is the same drawing
+    with the flatness taken out of it — a domed body and head in one piece, so
+    there is no seam across the gill and there is a highlight that moves; fins
+    and tail built as welded ribbons off a pair of Bézier edges, so they curve
+    and sweep the way a fin does; and the paint — stripes, gill, smile — laid
+    *on* the dome rather than into it, point by point, which is the only way a
+    decal stays put on a curved surface. About 3,000 triangles for the animal,
+    against 300, on the one object in this house anybody looks at twice.
     """
     face = wall - 0.016            # the front of the ply, into the room
-    P = lambda poly, col, y0, y1, bev=0.003: _plate(  # noqa: E731
-        kit, col, [(cx + px * r, cz + pz * r) for px, pz in poly], y0, y1, bev)
+    dome = 0.085 * r              # how far the middle of it stands proud
 
-    # Fins and tail first and a hair deeper, so the body reads as sitting on
-    # top of them the way the paint does.
+    # The outline of the body and head as one piece. Built first because every
+    # decal on the fish has to ask it how far out the dome is underneath.
+    #
+    # An ellipse with the −x side drawn out into a snout. It used to be an
+    # ellipse *and* a snout triangle, two plates butted at x = −0.80, and the
+    # butt joint ran straight down the cheek — a seam across the face of the
+    # one object in the house that has a face.
+    #
+    # The exponent is the whole argument. At 2.2 the stretch reaches halfway
+    # back along the body and the animal comes out a paper dart; at 3.4 it is a
+    # nose on a round head, which is what is drawn on the one on the wall.
+    body = []
+    for i in range(72):
+        a = TAU * i / 72.0
+        x, z = math.cos(a), 0.86 * math.sin(a)
+        n = max(0.0, -x) ** 3.4
+        body.append((x - 0.60 * n, z * (1.0 - 0.30 * n)))
+    bcx = sum(p[0] for p in body) / len(body)
+    bcz = sum(p[1] for p in body) / len(body)
+
+    def lift(px, pz):
+        """The dome's height above `face` at a point on the body, r units in.
+
+        Asked of the outline rather than of an ellipse, because `_lens` builds
+        its rings by scaling *that* toward its own centroid — and the two
+        disagree by more than the paint is thick. The first version used the
+        plain ellipse and the whole smile came out buried under the nose: at
+        x = −1.2 the ellipse says there is no body there at all and the stroke
+        was laid flat on `face`, a millimetre inside the snout it is drawn on.
+
+        The boundary is found by shooting the ray centroid→point at the
+        outline, so `s` is exactly the ring parameter `_lens` used.
+        """
+        dx, dz = px - bcx, pz - bcz
+        if abs(dx) < 1e-9 and abs(dz) < 1e-9:
+            return dome
+        tb = None
+        for i in range(len(body)):
+            ax, az = body[i]
+            ex, ez = body[(i + 1) % len(body)][0] - ax, \
+                body[(i + 1) % len(body)][1] - az
+            den = dx * ez - dz * ex
+            if abs(den) < 1e-12:
+                continue
+            t = ((ax - bcx) * ez - (az - bcz) * ex) / den
+            u = ((ax - bcx) * dz - (az - bcz) * dx) / den
+            if t > 1e-9 and -1e-9 <= u <= 1.0 + 1e-9 and (tb is None or t < tb):
+                tb = t
+        if not tb:
+            return 0.0
+        sv = min(1.0, 1.0 / tb)
+        return dome * (1.0 - sv * sv)
+
+    def W(poly):
+        return [(cx + px * r, cz + pz * r) for px, pz in poly]
+
+    def rails(pts, w0, w1):
+        """Two edges either side of a centreline, mitred at the joints.
+
+        The offset uses the mean of the two segment directions at each point
+        rather than one of them, which is what keeps a bend from opening a
+        notch on its outside — the old smile ran every segment past both ends
+        to hide exactly that.
+        """
+        n = len(pts)
+        left, right = [], []
+        for i, (px, pz) in enumerate(pts):
+            ax, az = pts[max(0, i - 1)]
+            bx, bz = pts[min(n - 1, i + 1)]
+            dx, dz = bx - ax, bz - az
+            L = math.hypot(dx, dz) or 1.0
+            nx, nz = -dz / L, dx / L
+            w = w0 + (w1 - w0) * (i / float(n - 1))
+            left.append((px + nx * w, pz + nz * w))
+            right.append((px - nx * w, pz - nz * w))
+        return left, right
+
+    def stroke(pts, w0, w1, col, bev=0.002, sink=0.0014, into=0.0035,
+               flat=None):
+        """A painted line: one welded ribbon, riding the surface under it."""
+        left, right = rails(pts, w0, w1)
+        yf, yb = [], []
+        for px, pz in pts:
+            y = flat if flat is not None else face - lift(px, pz)
+            yf.append(y - sink)
+            yb.append(y + into)
+        _strip(kit.bm(col, bev), W(left), W(right), yf, yb)
+
+    # ── fins and tail ─────────────────────────────────────────────────────────
+    # A hair deeper than the body, so the body reads as sitting on top of them
+    # the way the paint does.
     fin_face = face + 0.004
-    P([(-0.02, 1.44), (-0.32, 0.74), (0.38, 0.70)], FISH_FIN, fin_face, wall)
-    P([(-0.10, -1.38), (-0.36, -0.72), (0.28, -0.76)], FISH_FIN, fin_face, wall)
-    # The tail in three: the peduncle that carries it off the body, then the two
-    # lobes of the fan. Two lobes alone leave a wedge of bare wall between the
-    # body and the fork, which reads as a fish that has come apart.
-    P([(0.55, 0.38), (1.30, 0.15), (1.30, -0.15), (0.55, -0.38)],
-      FISH_FIN, fin_face, wall)
-    P([(1.18, 0.12), (1.82, 0.94), (1.62, 0.02)], FISH_FIN, fin_face, wall)
-    P([(1.18, -0.12), (1.82, -0.94), (1.62, 0.02)], FISH_FIN, fin_face, wall)
+    RIB = 10
 
-    body = [(math.cos(TAU * i / 30), 0.86 * math.sin(TAU * i / 30))
-            for i in range(30)]
-    P(body, FISH_BODY, face, wall, bev=0.005)
-    P([(-0.80, 0.42), (-0.80, -0.40), (-1.60, -0.04)], FISH_BODY, face, wall,
-      bev=0.005)
+    def blade(a0, a1, a2, b0, b1, b2, rays=()):
+        """One fin: a leading edge, a trailing edge, and optional ray lines."""
+        A = _curve(a0, a1, a2, RIB)
+        B = _curve(b0, b1, b2, RIB)
+        _strip(kit.bm(FISH_FIN, 0.003), W(A), W(B),
+               [fin_face] * len(A), [wall] * len(A))
+        for t, top in rays:
+            n = max(2, int(RIB * top))
+            pts = [((1 - t) * A[i][0] + t * B[i][0],
+                    (1 - t) * A[i][1] + t * B[i][1]) for i in range(n + 1)]
+            stroke(pts, 0.030, 0.014, FISH_RAY, bev=0.0012,
+                   sink=0.0012, into=0.002, flat=fin_face)
+
+    # Dorsal, swept back off the shoulder.
+    blade((-0.34, 0.70), (-0.30, 1.16), (0.04, 1.46),
+          (0.44, 0.68), (0.54, 1.08), (0.04, 1.46),
+          rays=((0.32, 0.72), (0.60, 0.80)))
+    # Anal, the same fin smaller and upside down.
+    blade((-0.34, -0.70), (-0.32, -1.04), (-0.06, -1.32),
+          (0.30, -0.72), (0.36, -1.04), (-0.06, -1.32),
+          rays=((0.34, 0.70),))
+
+    # The tail in three: the peduncle that carries it off the body, then the
+    # two lobes of the fan. Two lobes alone leave a wedge of bare wall between
+    # the body and the fork, which reads as a fish that has come apart.
+    _plate(kit, FISH_FIN, W([(0.55, 0.38), (1.06, 0.19), (1.30, 0.15),
+                             (1.30, -0.15), (1.06, -0.19), (0.55, -0.38)]),
+           fin_face, wall)
+    blade((1.16, 0.13), (1.34, 0.62), (1.86, 0.98),
+          (1.60, 0.02), (1.75, 0.44), (1.86, 0.98),
+          rays=((0.44, 0.86),))
+    blade((1.16, -0.13), (1.34, -0.62), (1.86, -0.98),
+          (1.60, 0.02), (1.75, -0.44), (1.86, -0.98),
+          rays=((0.44, 0.86),))
+
+    # ── the body and the head, one piece ──────────────────────────────────────
+    _lens(kit.bm(FISH_BODY, 0.005), W(body), wall, face, dome)
+
     # The smile.
     #
     # This was a triangular notch at the tip of the snout, which is a mouth and
@@ -2878,55 +3118,60 @@ def fish_clock(kit, cx, cz, wall, r=CLOCK_R):
     # it is a cute clock rather than a fish-shaped clock because of one drawn
     # line. It starts at the tip, runs back and down under the eye and hooks up
     # at the far end, so the concave side faces the sky.
-    #
-    # Emitted as one convex quad per segment rather than as a single curved
-    # ribbon, for the same reason the rest of the animal is five overlapping
-    # plates: a curve is not convex and a concave ngon is a triangulation you
-    # have to hope about. The joints overlap; at 1 cm of stroke the notch on the
-    # outside of each bend is a fraction of a millimetre.
-    smile = [(-1.52, -0.01), (-1.30, -0.18), (-1.05, -0.27),
-             (-0.83, -0.26), (-0.66, -0.14)]
-    for i in range(len(smile) - 1):
-        (ax, az), (bx, bz) = smile[i], smile[i + 1]
-        w0, w1 = 0.082 - 0.011 * i, 0.082 - 0.011 * (i + 1)
-        dx, dz = bx - ax, bz - az
-        L = math.hypot(dx, dz) or 1.0
-        ux, uz = dx / L, dz / L
-        nx, nz = -uz, ux
-        # Run each segment a little past both ends. Butted exactly, the outside
-        # of every bend opens a notch the width of the stroke and the smile
-        # reads as four separate dashes.
-        ax, az = ax - ux * w0, az - uz * w0
-        bx, bz = bx + ux * w1, bz + uz * w1
-        P([(ax + nx * w0, az + nz * w0), (bx + nx * w1, bz + nz * w1),
-           (bx - nx * w1, bz - nz * w1), (ax - nx * w0, az - nz * w0)],
-          FISH_FIN, face - 0.002, face + 0.004)
+    stroke([(-1.50, -0.02), (-1.34, -0.16), (-1.16, -0.26), (-0.97, -0.29),
+            (-0.80, -0.26), (-0.68, -0.17)], 0.075, 0.026, FISH_FIN)
+    # There were two more lines on the head for a while and both are gone. A
+    # gill, which is what the old butt joint between the snout plate and the
+    # body used to imply — drawn as a stroke it is a straight dark line from
+    # under the eye to the belly, and at 24 cm that is not a gill, it is a
+    # crack in the ply. And a pectoral fin on the flank, which is honest fish
+    # anatomy and which put a pale outlined blob across the four o'clock
+    # marker. The animal on the wall has neither, and the smile is the only
+    # line the head needs.
 
     # Four stripes, each a tapered crescent leaning back the way they do on the
-    # real one. Kept inside |x| < 0.77 at the top and bottom, which is where the
-    # ellipse is at z = ±0.55 — a stripe that runs off the fish is a stripe that
-    # floats on the wall beside it.
+    # real one. Clipped to the belly rather than to a fixed |x|: every sample is
+    # pulled inside the ellipse it is painted on, so a stripe ends where the
+    # fish does instead of floating on the wall beside it.
     for k in range(4):
-        x0 = -0.46 + k * 0.36
-        P([(x0 - 0.05, 0.54), (x0 + 0.07, 0.56), (x0 + 0.30, -0.52),
-           (x0 + 0.18, -0.56)], FISH_FIN, face - 0.002, face + 0.004)
+        x0 = -0.30 + k * 0.33
+        pts = []
+        for i in range(9):
+            u = i / 8.0
+            px = x0 + 0.28 * u + 0.09 * math.sin(math.pi * u)
+            pz = 0.64 - 1.28 * u
+            zm = 0.86 * math.sqrt(max(0.0, 1.0 - min(1.0, px * px))) * 0.92
+            pts.append((px, max(-zm, min(zm, pz))))
+        stroke(pts, 0.040, 0.016, FISH_FIN)
 
-    # The eye, and the highlight in it that makes it an eye rather than a hole.
-    _lay_disc(kit, FISH_FIN, cx - 0.60 * r, face - 0.004, cz + 0.36 * r,
-              0.23 * r, 0.010)
-    _lay_disc(kit, (0.97, 0.97, 0.95), cx - 0.54 * r, face - 0.008,
-              cz + 0.42 * r, 0.11 * r, 0.010)
+    # The eye. A white, a pupil and the catch-light in it, each a little proud
+    # of the last and all three lifted on to the dome, so the eye sits on the
+    # cheek instead of in it. There was a fourth, a dark ring round the white,
+    # and it disappeared: 3 mm of ring under a 3 mm bevel is all chamfer, which
+    # rendered as a bright wire hoop round the eye rather than as an outline.
+    ex, ez = -0.60, 0.34
+    ey = face - lift(ex, ez)
+    for ox, oz, rad, col, up, thick, seg, bev in (
+            (0.0, 0.0, 0.235, FISH_EYE, 0.005, 0.010, 30, 0.0015),
+            (0.0, 0.0, 0.125, FISH_PUPIL, 0.009, 0.008, 24, 0.0010),
+            (-0.055, 0.055, 0.045, FISH_EYE, 0.012, 0.006, 14, 0.0006)):
+        _lay_disc(kit, col, cx + (ex + ox) * r, ey - up, cz + (ez + oz) * r,
+                  rad * r, thick, seg=seg, bev=bev)
 
     # Twelve coral numbers on a 0.62 r circle, about the movement rather than
     # about the body: the spindle is forward of centre because the tail is
-    # behind it, and the numbers go round the spindle.
+    # behind it, and the numbers go round the spindle. Each is pushed out to
+    # its own point on the dome — a ring of markers set at one flat depth has
+    # the ones at three and nine standing off the paint and the one at twelve
+    # half swallowed.
     mx, mz = cx + 0.12 * r, cz
     for h in range(12):
         a = TAU * (h / 12.0)
         w = (0.014 if h % 3 == 0 else 0.011) * (r / 0.178)
         px = mx + math.sin(a) * 0.62 * r
         pz = mz + math.cos(a) * 0.62 * r
-        kit.span(FISH_NUM, px - w, px + w, face - 0.008, face - 0.001,
+        y = face - lift((px - cx) / r, (pz - cz) / r)
+        kit.span(FISH_NUM, px - w, px + w, y - 0.0075, y + 0.0005,
                  pz - w * 1.25, pz + w * 1.25, bev=0.002)
 
     # The hands are not baked. They used to be, at ten past ten, which is how
@@ -2934,8 +3179,14 @@ def fish_clock(kit, cx, cz, wall, r=CLOCK_R):
     # ten past ten in a room you are walking around is a clock that has stopped.
     # They are three meshes built at runtime off the wall clock, second hand
     # included, from the spindle written into the sidecar below. All that is
-    # left here is the hub they turn on.
-    _lay_disc(kit, BLACK, mx, face - 0.016, mz, 0.016, 0.008)
+    # left here is the boss they turn on.
+    #
+    # And the boss is 0.115 r, not the 16 mm it was. That number was drawn when
+    # the fish was 51 cm across; at 24 cm it was a 32 mm black disc on an 87 mm
+    # dial, which swallowed the whole of the hour hand and most of the minute —
+    # the hands were never short, they were buried. See src/44-vikendica.js.
+    _lay_disc(kit, BLACK, mx, face - lift(0.12, 0) - 0.012, mz,
+              0.115 * r, 0.010, seg=24)
 
 
 def living(kit):

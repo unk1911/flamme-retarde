@@ -8,6 +8,66 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.89.0] — 2026-08-20
+
+The hands on the fish were never short. And the wood has a gate in it now.
+
+### The fish
+
+The clock on the spine wall was five flat plates of painted ply with three
+boxes turning on it, and it read as a sticker. It is carved now: body and head
+in one domed piece, so there is no butt joint down the cheek and there is a
+highlight that moves when you move; fins and tail built as welded ribbons off a
+pair of Bézier edges, so they curve and sweep instead of being triangles; the
+paint — smile, stripes, markers — laid on the dome point by point rather than
+at one flat depth, which is the only way a decal stays on a curved surface. An
+eye with a pupil and a catch-light in it. About 3,000 triangles for the animal,
+against 300.
+
+Dropped again on the way: a gill line, which at 24 cm reads as a crack in the
+ply rather than as a gill, and a pectoral fin, which put a pale blob across the
+four o'clock marker. The one on the wall has neither.
+
+### Filming
+
+`tools/record.mjs` — the V cut, or any cut, as an .mp4 with sound, out of the
+same headless Chrome that `tools/shoot.mjs` takes stills in. Two passes,
+because the page cannot do both at once: the picture is filmed frame by frame
+with the sequence's clock frozen and scrubbed to n/fps (`__fr.vik.cutAt`), and
+the sound is taken separately in real time off the last node before the
+speakers (`audio.tap()`).
+
+Two things had to be true for it to be usable. The renderer had to find the
+GPU — WSL exposes the host card as `/dev/dxg` rather than `/dev/dri`, and the
+same two environment variables `blender.sh` already sets, with ANGLE pointed at
+native GL, take a 1920×1080 frame from 30 seconds on SwiftShader to 0.3. And
+the track had to be normalised: this mix is built so ambience sits under a
+Canadair, so the promenade with no aeroplane on it records at −38 LUFS, which
+is a faithful capture of something nobody would hear.
+
+### Fixed
+
+- **The clock's hands were buried, not short.** They looked snapped off, and
+  the reason was the boss rather than the hands: a 16 mm disc drawn when the
+  fish was 51 cm across, never scaled when it came down to 24 cm, so it was a
+  32 mm black hub on an 87 mm dial and it swallowed the whole of the hour hand
+  and most of the minute. The boss is a fraction of the dial now, and so are
+  the hands — the minute reaches the inside of the markers, the hour reaches
+  0.68 of the minute, the second overshoots. They are spades with a bevelled
+  edge rather than bars, so they catch a light against a dark dial.
+- **Every wingman water drop threw out of the frame loop.** `60-ai.js` called
+  `dropSplashes.emit` with four of its six arguments, so the column that comes
+  off the hull read `from.x` off `undefined` and the rest of that frame was
+  abandoned — since there have been wingmen, silently, because the next frame
+  starts again regardless and the console is not where anybody was looking.
+  Found by reading the log of a recording session.
+- **The pine wood was behind an invisible wall.** Jadrija's walkable box
+  stopped 38 m inland, which was drawn when there was nothing behind the huts
+  but bare karst and left there when the wood went in — so the whole of last
+  release's wood was four strides past a wall you could not see. It goes to
+  300 m now, the width of the headland, and where the headland runs out the
+  limit is the water rather than a number.
+
 ## [1.88.0] — 2026-08-20
 
 Somebody went and stood there.

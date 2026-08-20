@@ -1423,6 +1423,15 @@ const VIK_WALK = [
 ];
 
 let vikWalk = null;
+/**
+ * Wall time held off the walk-up, for `__fr.vik.cutAt`.
+ *
+ * A page rendering at one frame a second cannot film a shot that is driven by
+ * the clock — the clock is the thing that is wrong. So the recorder freezes it
+ * and scrubs the sequence to an absolute time before each capture, and this is
+ * the switch that stops the frame loop putting its own `real` back in.
+ */
+let vikHold = false;
 
 // A way out of it that does not need a keyboard. Every touch layer is hidden
 // while the sequence runs — that is what makes it a shot rather than a walk
@@ -3638,7 +3647,7 @@ function frame() {
   // exponential and 0.35 of it still converges — but it would take three times
   // as long to finish, and the thing you pressed the key for would come in like
   // a hydraulic door.
-  if (vikWalk) stepVikWalk(real);
+  if (vikWalk && !vikHold) stepVikWalk(real);
   if (chaseCut) stepChaseCut(real);
   if (comp) stepComputer(real);
   else { checkLaptopSpray(); checkTvSpray(); }
@@ -4678,6 +4687,35 @@ window.__fr = {
       const dt = 1 / 30;
       for (let i = 0; i < Math.round(secs / dt) && vikWalk; i++) stepVikWalk(dt);
       return vikWalk ? { leg: vikWalk.leg, u: +vikWalk.u.toFixed(2) } : 'done';
+    },
+    /** How long the whole shot runs, so a recorder can size itself off it. */
+    cutLen: () => VIK_WALK.reduce((a, k) => a + k.dur, 0),
+    /**
+     * Scrub the walk-up to an absolute time and hold it there.
+     *
+     * `cut()` above advances by a delta, which is right for a test that wants
+     * to be somewhere in the middle of the shot and wrong for filming it: the
+     * frame loop is still adding its own `real` between calls, so the errors
+     * accumulate and the frames come out unevenly spaced. This sets the time
+     * outright and takes the loop's hands off it, so frame *n* is always at
+     * exactly n/fps whatever the page manages to render at.
+     *
+     * `cutAt(null)` gives it back.
+     */
+    cutAt: (t) => {
+      if (t == null) { vikHold = false; return 'released'; }
+      if (!vikWalk && !startVikWalk()) return 'no locale';
+      vikHold = true;
+      vikWalk.leg = 0;
+      let rem = Math.max(0, t);
+      while (vikWalk.leg < VIK_WALK.length - 1
+        && rem >= VIK_WALK[vikWalk.leg].dur) {
+        rem -= VIK_WALK[vikWalk.leg].dur;
+        vikWalk.leg += 1;
+      }
+      vikWalk.u = Math.min(0.9999, rem / VIK_WALK[vikWalk.leg].dur);
+      stepVikWalk(0);
+      return { leg: vikWalk.leg, u: +vikWalk.u.toFixed(3) };
     },
   },
 

@@ -202,7 +202,14 @@ function buildWingmen(scene, fire, onRadio) {
           const lx = p.pos.x + fwdx * p.speed * fall;
           const lz = p.pos.z + fwdz * p.speed * fall;
           fire.drop(lx, lz, fwdx, fwdz, out);
-          dropSplashes.emit(lx, lz, out, { x: fwdx, z: fwdz });
+          // The aeroplane's own position and velocity as well as where the
+          // water lands — see the same call in 55-flight.js. Without them
+          // `emit` reads `from.x` off `undefined` and throws out of the frame
+          // loop, which it has been doing on every wingman drop: silently,
+          // because the console is not where anybody was looking and the next
+          // frame starts again regardless.
+          dropSplashes.emit(lx, lz, out, { x: fwdx, z: fwdz }, p.pos,
+            { x: fwdx * p.speed, y: 0, z: fwdz * p.speed });
         }
         if (p.water <= 0 || p.dropTimer <= -0.5) {
           setPhase(p, 'toWater');

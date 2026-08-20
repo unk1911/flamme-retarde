@@ -14,6 +14,7 @@ function buildAudio() {
   let outBus = null, outLp = null;
   let subG = null, subLp = null;
   let slowLp = null;
+  let outTap = null;      // the last node before the speakers — see `tap`
   const nodes = {};
   let started = false;
   let noiseBuf = null;
@@ -104,6 +105,7 @@ function buildAudio() {
     master.gain.value = 0.0;
     // A gentle limiter so a drop over a big fire cannot clip the mix.
     const comp = ctx.createDynamicsCompressor();
+    outTap = comp;
     comp.threshold.value = -14;
     comp.ratio.value = 6;
     comp.attack.value = 0.006;
@@ -2437,6 +2439,16 @@ function buildAudio() {
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, rattle,
     canopy, boots,
+    /**
+     * The last node before the speakers, and the context it lives in.
+     *
+     * For `tools/record.mjs`, and for nothing in the game. A cut is filmed
+     * frame by frame with the clock held still — which is the only way to get
+     * an even thirty a second out of a page that renders at one — and no
+     * recorder can follow a clock like that. So the sound is taken on a second
+     * pass, in real time, off this tap, and the two are muxed afterwards.
+     */
+    tap: () => (ctx ? { ctx, out: outTap } : null),
     setVolume, getVolume, setMuffle, keyClick, printTick,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa, room, water,
     firestarter, slowmo, radioTune, radioClick,

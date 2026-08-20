@@ -254,12 +254,42 @@ async function buildVikendica(scene, field) {
   const clockHands = [];
   if (plan.clock) {
     const [cx, cy, cz] = plan.clock.at;
-    const k = plan.clock.r / 0.178;    // the hand lengths were drawn at r 0.178
-    const hand = (len, half, depth, colour) => {
-      const g = new THREE.BoxGeometry(half * 2, len + half * 1.6, depth);
-      // Pivot at the spindle, with a stub of tail behind it — a hand is
-      // balanced on its arbor and does not begin at its own centre.
-      g.translate(0, (len - half * 1.6) * 0.5, 0);
+    const R = plan.clock.r;
+    /**
+     * One hand, as a spade rather than as a bar.
+     *
+     * Everything here is a fraction of the dial's own radius, which is the
+     * fix. The lengths used to be absolute numbers scaled off a 0.178 fish
+     * that no longer exists, and the boss they turn on was an absolute 16 mm
+     * disc that never shrank with the animal at all — so on the 24 cm clock
+     * that is actually on the wall the hour hand emerged 8 mm from a 32 mm
+     * black hub and read as snapped off. The numbers ride at 0.62 R, so the
+     * minute reaches the inside of the markers, the hour reaches 0.61 of the
+     * minute, and the second overshoots the markers the way a second hand
+     * does.
+     *
+     * The outline is drawn once, extruded, and given the same 0.4 mm bevel
+     * every other edge in this house has: a hand is the smallest thing in the
+     * room and a flat black bar with no catch-light on its edge disappears
+     * against a dark dial from two metres.
+     */
+    const hand = (len, w, tail, tailW, depth, colour) => {
+      const s = new THREE.Shape();
+      s.moveTo(-tailW, -tail);
+      s.lineTo(tailW, -tail);
+      s.lineTo(w, -tail * 0.15);
+      s.lineTo(w, len * 0.58);
+      s.lineTo(w * 0.42, len * 0.88);
+      s.lineTo(0, len);
+      s.lineTo(-w * 0.42, len * 0.88);
+      s.lineTo(-w, len * 0.58);
+      s.lineTo(-w, -tail * 0.15);
+      s.closePath();
+      const g = new THREE.ExtrudeGeometry(s, {
+        depth, bevelEnabled: true, bevelThickness: 0.0004,
+        bevelSize: 0.0004, bevelSegments: 1, curveSegments: 1,
+      });
+      g.translate(0, 0, -depth * 0.5);
       const m = new THREE.Mesh(g, solidMaterial(colour, {
         spec: 0.30, specPower: 40, emissive: VIK.glow, vcol: false,
       }));
@@ -270,11 +300,14 @@ async function buildVikendica(scene, field) {
       clockHands.push(m);
       return m;
     };
-    // Hours, minutes, then the coral second hand a millimetre in front of both
-    // so it never disappears into one of them.
-    hand(0.062 * k, 0.0100 * k, 0.006, 0x101112);
-    hand(0.088 * k, 0.0070 * k, 0.006, 0x101112);
-    hand(0.094 * k, 0.0026 * k, 0.005, 0xd8503c).position.z = cz - 0.004;
+    // Hours, minutes, then the coral second hand in front of both so it never
+    // disappears into one of them. The second hand is a needle with a real
+    // counterweight behind the arbor, because that tail is most of what says
+    // "second hand" at a glance.
+    hand(0.380 * R, 0.052 * R, 0.115 * R, 0.030 * R, 0.0040, 0x101112);
+    hand(0.560 * R, 0.036 * R, 0.130 * R, 0.024 * R, 0.0040, 0x101112);
+    hand(0.665 * R, 0.013 * R, 0.190 * R, 0.030 * R, 0.0028, 0xd8503c)
+      .position.z = cz - 0.0038;
   }
 
   // ── the television ─────────────────────────────────────────────────────────
