@@ -55,8 +55,22 @@ AP.add_argument("--outw", type=int, default=0)
 AP.add_argument("--pos", default=None, help="override the positive prompt")
 AP.add_argument("--ref", default=None,
                 help="photograph(s) of the real subject, comma-separated paths")
+AP.add_argument("--attn", default="sageattn",
+                choices=["sageattn", "sdpa", "flash_attn_2", "sageattn_3"],
+                help="sdpa when sageattention will not import on this box")
 AP.add_argument("--host", default="http://127.0.0.1:8188")
 A = AP.parse_args()
+
+# The VAE stride is 4 in time, so the sampler can only ever produce 4k+1 frames.
+# Ask for 75 and you get 73 — silently, nowhere in any log. That is not a
+# rounding annoyance, it is a hang: whatever polls for "75 files in the output
+# directory" waits forever for a frame the architecture cannot emit, and the
+# run reads as stalled at 73/75 when it has in fact been finished for minutes.
+# Round here, once, and say so, so the number downstream is the real one.
+_n = (A.n - 1) // 4 * 4 + 1
+if _n != A.n:
+    print(f"--n {A.n} is not 4k+1; using {_n} (the VAE cannot emit the rest)")
+    A.n = _n
 
 POS = ("photorealistic footage of a Dalmatian seaside holiday cabin interior "
        "and terrace in bright August afternoon light, real photographed video, "
@@ -104,7 +118,7 @@ node("vacesel", "WanVideoVACEModelSelect",
 node("model", "WanVideoModelLoader",
      {"model": "Wan2_1-T2V-14B_fp8_e4m3fn.safetensors",
       "base_precision": "bf16", "quantization": "fp8_e4m3fn",
-      "load_device": "offload_device", "attention_mode": "sageattn",
+      "load_device": "offload_device", "attention_mode": A.attn,
       # Only wire the block-swap node up when swapping is actually wanted.
       # Attaching it with blocks_to_swap=0 does not mean "no swap": the wrapper
       # calls block_swap(blocks_to_swap - 1) == block_swap(-1), and the guard

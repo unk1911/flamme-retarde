@@ -3,7 +3,7 @@
 
     tools/burst.py preflight                  # free; checks everything first
     tools/burst.py types                      # live capacity and prices
-    tools/burst.py up --yes                   # launch + bootstrap (~12 min)
+    tools/burst.py up --yes                   # launch + bootstrap (~5 min x86, ~12 ARM)
     tools/burst.py run ~/fr-video/entry/frames --n 49 --denoise 0.80 --tag _b1
     tools/burst.py status
     tools/burst.py down
@@ -36,16 +36,29 @@ Real Lambda prices, and note that a rented H100 left running is $79 a day:
     gpu_1x_a100_sxm4     40 GB   $1.99/hr   x86     no FP8 — fits, but Ampere
     gpu_1x_a10           24 GB   $1.29/hr   x86     not worth it, see below
 
-A10 is listed to be dismissed: 24 GB holds the 16.3 GB of weights with about
-7 GB left for latents and activations, so it *would* avoid block swap, but
-Ampere has no FP8 tensor cores and the fp8 checkpoint runs upcast. Expect
-under 2x the laptop for $1.29/hr. The A100s have the same no-FP8 problem with
-more room; they are the x86 fallback when both H100s are sold out.
+A10 is listed to be dismissed, and the arithmetic that dismissed it was wrong
+in an instructive way. 24 GB *sounds* like it holds the 16.3 GB of weights with
+room to spare, so it should avoid block swap — but the card reports 22.6 GB
+usable, and 6.3 GB does not hold a 20 670-token activation set. Measured: it
+needs --swap 20 at 480p and --swap 40 at 720p, which is the very PCIe tax the
+whole exercise exists to escape. Ampere also has no FP8 tensor cores, so the
+fp8 checkpoint runs upcast. Under 2x the laptop, for $1.29/hr. The A100s have
+the same no-FP8 problem with more room; they are the x86 fallback when both
+H100s are sold out.
 
 GH200 is the cost play and the trap. It is aarch64 — not the GPU, the CPU —
 so torch, sageattention, and every custom node's wheels have to exist for ARM.
-`burst-bootstrap.sh` handles it, and falls back to sdpa attention if
-sageattention will not build. First run on H100 PCIe; move once it works.
+Two ARM-only details, both of which cost a paid boot:
+
+  The ARM torch wheel does not pull `triton`, and sageattention needs it. Pip
+  reports success installing sageattention and `import sageattention` then
+  fails, so the probe has to be the import, not pip's exit status.
+
+  There is NO automatic fallback. Nothing in WanVideoWrapper notices a broken
+  sageattention and quietly picks sdpa — `attention_mode` is passed straight
+  through and it raises. So the bootstrap records what actually imports, `up`
+  reads that back, and `run` passes the answer to vacejob as --attn. A box
+  without sageattention now renders slower instead of not at all.
 
 ── the guardrail ──────────────────────────────────────────────────────────────
 
@@ -310,15 +323,22 @@ def cmd_up(a):
     iid = L.launch(name, region, os.environ["LAMBDA_SSH_KEY_NAME"],
                    f"flamme-burst-{int(time.time())}", user_data)
     say(f"launched {iid}; waiting for an address")
+    # Twenty minutes, not ten, and it says what it is waiting on. Lambda hands
+    # out an address in about ninety seconds most days and in rather more than
+    # ten minutes on a bad one — and the old ten-minute bound terminated a box
+    # that was merely slow, having already paid for the boot, then went and
+    # rented another one that had the same odds.
     ip = ""
-    for _ in range(60):
+    for i in range(120):
         d = L.get_instance(iid)
         ip = d.get("ip") or ""
         if ip and d.get("status") == "active":
             break
+        if i and i % 12 == 0:
+            say(f"  still {d.get('status') or 'pending'} at {i * 10 // 60} min")
         time.sleep(10)
     if not ip:
-        say("no address after 10 minutes — terminating so it does not bill")
+        say("no address after 20 minutes — terminating so it does not bill")
         L.terminate([iid])
         sys.exit(1)
 
@@ -364,6 +384,22 @@ def cmd_run(a):
     n_local = len(list(frames.glob("*.png")))
     say(f"{n_local} frames from {frames}")
 
+    # Same 4k+1 truth as vacejob.py, needed here too: this is the number the
+    # frame poll below waits for, and waiting for 75 when 73 is all the VAE can
+    # emit is a ten-minute hang that ends in a timeout on a finished job.
+    n = (a.n - 1) // 4 * 4 + 1
+    if n != a.n:
+        say(f"--n {a.n} rounded to {n} (4k+1)")
+
+    # Which attention actually imports on this box. The bootstrap wrote it;
+    # guessing sageattn on an ARM machine where it did not build is a crash at
+    # model load, ten minutes and two dollars in.
+    attn = a.attn
+    if not attn:
+        r = ssh(ip, "cat /home/ubuntu/job/attn 2>/dev/null || true", check=False)
+        attn = (r.stdout or "").strip() or "sageattn"
+        say(f"attention: {attn}")
+
     ssh(ip, "mkdir -p ~/job/frames ~/job/out")
     subprocess.run(
         ["rsync", "-az", "--delete", "-e", " ".join(ssh_base(ip)[:-1]),
@@ -404,14 +440,16 @@ def cmd_run(a):
                      "that port. Set BURST_PORT and retry.")
 
         cmd = [sys.executable, str(ROOT / "tools" / "vacejob.py"),
-               "--frames", "/home/ubuntu/job/frames", "--n", str(a.n),
+               "--frames", "/home/ubuntu/job/frames", "--n", str(n),
                "--w", str(a.w), "--h", str(a.h), "--tag", a.tag,
                "--steps", str(a.steps), "--denoise", str(a.denoise),
                "--sim2real", str(a.sim2real), "--vace", str(a.vace),
                "--seed", str(a.seed), "--swap", str(a.swap),
+               "--attn", attn,
                "--host", f"http://127.0.0.1:{PORT}"]
         if a.ctx:
-            cmd += ["--ctx", str(a.ctx), "--ctxover", str(a.ctxover)]
+            cmd += ["--ctx", str(a.ctx), "--ctxover", str(a.ctxover),
+                    "--ctxstride", str(a.ctxstride)]
         if a.upscale:
             cmd += ["--upscale", a.upscale, "--outw", str(a.outw)]
         if a.pos:
@@ -419,8 +457,9 @@ def cmd_run(a):
         say("queueing " + a.tag)
         subprocess.run(cmd, check=True)
 
-        want = a.n
+        want = n
         t0 = time.time()
+        timed_out = False
         while True:
             # `grep -c` prints 0 AND exits 1 when it matches nothing, so a
             # trailing `|| echo 0` fires as well and the reply is "0\n0".
@@ -431,8 +470,16 @@ def cmd_run(a):
             say(f"{done}/{want} frames · {(time.time() - t0) / 60:.1f} min")
             if done >= want:
                 break
+            # Timed out — but do NOT exit here. Whatever frames exist are the
+            # expensive part and they are still on a machine that is about to
+            # be terminated; the old code sys.exit()ed on this branch, above
+            # the rsync, and threw away a partial run that had already been
+            # paid for. Fall through, fetch what there is, and report short.
             if time.time() - t0 > a.timeout * 60:
-                sys.exit(f"gave up after {a.timeout} min — instance still up")
+                timed_out = True
+                say(f"gave up waiting after {a.timeout} min at {done}/{want} — "
+                    "fetching whatever finished")
+                break
             time.sleep(30)
     finally:
         tun.terminate()
@@ -444,10 +491,11 @@ def cmd_run(a):
          f"ubuntu@{ip}:ComfyUI/output/", str(out) + "/",
          "--include", f"vace{a.tag}_*", "--include", "*/", "--exclude", "*"],
         check=True)
+    got = len(list(out.glob(f"vace{a.tag}_*")))
     mins = (time.time() - st["launched"]) / 60
-    say(f"frames in {out} · ${st['price'] * mins / 60:.2f} spent so far")
+    say(f"{got} frames in {out} · ${st['price'] * mins / 60:.2f} spent so far")
     say("`tools/burst.py down` when you are finished — the meter is running")
-    return 0
+    return 2 if timed_out else 0
 
 
 def cmd_down(_a):
@@ -495,11 +543,19 @@ def main():
     r.add_argument("--seed", type=int, default=7731)
     r.add_argument("--ctx", type=int, default=0)
     r.add_argument("--ctxover", type=int, default=24)
+    r.add_argument("--ctxstride", type=int, default=4)
     r.add_argument("--upscale", default="RealESRGAN_x4plus.pth")
+    # ESRGAN is 40-45 per cent of the wall clock of every run, and at 720p it is
+    # no longer buying resolution — 1280x720 is already deliverable. Being able
+    # to switch it off is the difference between measuring the model and
+    # measuring the model plus a fixed upscaling tax.
+    r.add_argument("--no-upscale", dest="upscale", action="store_const",
+                   const="")
     r.add_argument("--outw", type=int, default=1920)
     r.add_argument("--pos", default=None)
     r.add_argument("--out", default=str(Path.home() / "fr-video" / "burst"))
     r.add_argument("--timeout", type=float, default=60)
+    r.add_argument("--attn", default="")
     # 0 is right for 80 GB and a guaranteed OOM on an A10: 22.6 GB usable does
     # not hold 16.3 GB of weights plus a 20 670-token activation set. Measured:
     # A10 needs 20 at 480p and 40 at 720p.

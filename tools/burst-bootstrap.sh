@@ -74,6 +74,13 @@ if [ "$ARCH" = "aarch64" ]; then
   log "torch for aarch64 (cu124)"
   sudo -u ubuntu $V/pip install -q torch torchvision torchaudio \
     --index-url https://download.pytorch.org/whl/cu124
+  # Explicit, because the aarch64 torch wheel does not depend on triton the way
+  # the x86 one does, and sageattention imports triton at *import* time. Without
+  # it, `pip install sageattention` succeeds and `import sageattention` raises —
+  # which is exactly the shape of failure the old best-effort probe could not
+  # see, since it only looked at pip's exit status.
+  log "triton for aarch64 (sageattention needs it at import)"
+  sudo -u ubuntu $V/pip install -q triton || log "  triton unavailable"
 else
   log "torch for x86_64 (cu121)"
   sudo -u ubuntu $V/pip install -q torch torchvision torchaudio \
@@ -108,7 +115,11 @@ clone_at() {   # clone_at <repo> <sha>
   sudo -u ubuntu git clone -q "https://github.com/$1.git" || return 1
   ( cd "$name" && sudo -u ubuntu git fetch -q --depth 1 origin "$2" \
       && sudo -u ubuntu git checkout -q FETCH_HEAD ) || log "  WARN $name not pinned"
-  log "  $name @ $(cd "$name" && git rev-parse --short HEAD)"
+  # `sudo -u ubuntu` on the rev-parse too. Without it root asks git about a
+  # ubuntu-owned repo, hits dubious-ownership, and the pin is logged as an
+  # empty string — so the one line that proves which commit is on the box
+  # silently proves nothing.
+  log "  $name @ $(cd "$name" && sudo -u ubuntu git rev-parse --short HEAD)"
 }
 clone_at kijai/ComfyUI-WanVideoWrapper 8479624614ec0d52e982bbbab633736fb1a15eef
 clone_at kijai/ComfyUI-KJNodes         f7eb33abc80a2aded1b46dff0dd14d07856a7d50
@@ -117,12 +128,27 @@ for d in */; do
   [ -f "$d/requirements.txt" ] && sudo -u ubuntu $V/pip install -q -r "$d/requirements.txt"
 done
 
-# sageattention is a 2-3x attention win and is the most likely thing to fail on
-# ARM, so it is best-effort and explicitly not fatal: WanVideoWrapper falls back
-# to sdpa, which is slower and correct. Better a slow render than a dead box
-# that already cost twelve minutes of boot.
+# sageattention is a 2-3x attention win and the most likely thing to fail on ARM.
+#
+# An earlier version of this file said it was safe to skip because
+# "WanVideoWrapper falls back to sdpa". It does not. `attention_mode` goes
+# straight from vacejob.py into the model loader and is used as given, so a box
+# with no sageattention does not render slowly — it raises at model load, ten
+# minutes and two dollars into an instance.
+#
+# And pip's exit status is not the test. On aarch64 the install reports success
+# and the import fails on missing triton. So: install, then actually import it,
+# and write the verdict where `burst.py run` can read it and pass --attn.
 log "sageattention (best effort)"
-sudo -u ubuntu $V/pip install -q sageattention || log "sageattention unavailable — sdpa it is"
+sudo -u ubuntu $V/pip install -q sageattention || log "  pip could not install it"
+sudo -u ubuntu mkdir -p /home/ubuntu/job
+if sudo -u ubuntu $V/python -c 'import sageattention' 2>/dev/null; then
+  echo sageattn | sudo -u ubuntu tee /home/ubuntu/job/attn >/dev/null
+  log "  sageattention imports — using sageattn"
+else
+  echo sdpa | sudo -u ubuntu tee /home/ubuntu/job/attn >/dev/null
+  log "  sageattention does NOT import — falling back to sdpa (slower)"
+fi
 
 # ---- 4. models ---------------------------------------------------------------
 # Pulled from HuggingFace by the instance, not pushed from the laptop: 38 GB up
