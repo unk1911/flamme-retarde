@@ -527,6 +527,48 @@ async function buildJadrija(scene) {
     }
   }
 
+  /**
+   * The same, but broken into irregular flags.
+   *
+   * The promenade is not one surface. Filmed along it: a band of poured,
+   * power-floated slab next to the water with saw-cut bays in it, and inland of
+   * that — under the trees, in front of the terraces — old crazy paving in
+   * irregular limestone flags with wide mortar joints between them. The seam
+   * between the two is dead straight and runs the length of the shore, which is
+   * the detail that makes it read as two campaigns of concrete rather than as
+   * one texture.
+   *
+   * The cut lines are jittered per station rather than per quad, and both quads
+   * either side of a station read the same cut, so the flags tile without gaps.
+   * A sine hash rather than `rng`, because this is drawn in the middle of the
+   * shore build and taking draws off that stream would move every parasol,
+   * bather and hut on the beach.
+   */
+  const jit = (i, k) => {
+    const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
+    return v - Math.floor(v);
+  };
+  function paving(s0, s1, yOf, cols, nS = 5, step = 2.2) {
+    // Subdivided along the shore as well as across it. The stations are six
+    // metres apart, so cutting only in `s` gives six-metre flags — which reads
+    // as decking, not as paving. `at()` interpolates a station anywhere, so the
+    // grid can be as fine as the stone actually is.
+    const cut = (i, k) => (k === 0 ? s0 : k === nS ? s1
+      : s0 + (s1 - s0) * (k / nS)
+        + (jit(i, k) - 0.5) * ((s1 - s0) / nS) * 0.66);
+    const n = Math.floor(LEN / step);
+    for (let i = 0; i < n; i++) {
+      const a = at(i * step), c = at((i + 1) * step);
+      for (let k = 0; k < nS; k++) {
+        const a0 = cut(i, k), a1 = cut(i, k + 1);
+        const c0 = cut(i + 1, k), c1 = cut(i + 1, k + 1);
+        b.quad(pt(a, a0, yOf(a)), pt(c, c0, yOf(c)),
+          pt(c, c1, yOf(c)), pt(a, a1, yOf(a)),
+          cols(i * 7 + k * 3 + ((jit(i, k) * 5) | 0)));
+      }
+    }
+  }
+
   /** The vertical face of a terrace, high side inland. */
   function riser(s, loOf, hiOf, col) {
     for (let i = 0; i < ST.length - 1; i++) {
@@ -559,6 +601,10 @@ async function buildJadrija(scene) {
   // measurements, 1.019 / 0.939 / 0.858, is applied here rather than to the
   // light, because it is this concrete that is warm and not the afternoon.
   const CONC = [[0.479, 0.427, 0.364], [0.450, 0.402, 0.341], [0.507, 0.451, 0.383]];
+  // The flags of the old promenade: warm pale limestone, five shades, measured
+  // off the paving in the walk-through where it runs into full afternoon sun.
+  const FLAG = [[0.545, 0.500, 0.408], [0.512, 0.470, 0.382], [0.578, 0.530, 0.432],
+    [0.498, 0.455, 0.372], [0.560, 0.512, 0.418]];
   const SALT = [0.336, 0.308, 0.268];        // the wet band at the waterline
   const STONE = [0.393, 0.347, 0.292];       // the quay wall
   // Dead Aleppo needles over limestone dust, which is what the ground is
@@ -589,7 +635,10 @@ async function buildJadrija(scene) {
   // looks down it — 6.0 m of it, which is what `rowB - rowA - cabD` already
   // says — and paving it was what carried the slab twelve metres too far.
   const walkTo = JAD.rowA + JAD.cabD + 1.0;
-  ribbon(JAD.mid, walkTo, (st) => st.deck, bay);
+  // Poured slab by the water, flags inland of it, and a straight seam between.
+  const PAVE = Math.min(walkTo - 1.5, JAD.mid + 7.5);
+  ribbon(JAD.mid, PAVE, (st) => st.deck, bay);
+  paving(PAVE, walkTo, (st) => st.deck, (i) => FLAG[i % FLAG.length], 5);
   ribbon(walkTo, JAD.back, (st) => st.deck, duff);
   for (let i = 0; i < ST.length - 1; i++) {
     const a = ST[i], c = ST[i + 1];
