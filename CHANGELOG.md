@@ -8,6 +8,39 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [Unreleased]
+
+### Added
+
+- **Burst mode** — `tools/burst.py` and `tools/burst-bootstrap.sh`: rent a
+  Lambda GPU for the minutes a photoreal restyle actually takes, then give it
+  back. The laptop's 4090 holds 5.4 GB of a 16.3 GB model and streams the other
+  11 GB across PCIe every forward pass, which is why it sustains ~50 TFLOPS
+  against a ~200 TFLOPS peak. On an 80 GB card the weights are simply resident.
+  The prize is not the speedup at 480p though — it is 720p, which on 16 GB is
+  not slow but impossible.
+
+  It reuses `ablit-central/bin/lambda_gpu.py` wholesale: fleet fallback,
+  capacity-churn retries, region preference and price caps are already right
+  there. What is new is the payload and one deliberate difference in the
+  guardrail — ablit-central's watchdog is a local process, which is correct for
+  a chat session someone is sitting in front of and wrong for an unattended
+  render. This laptop rebooted mid-job and took a three-hour run with it; had
+  that been a rented H100 it would have billed until morning. So the bootstrap's
+  first action, before anything that can hang, arms a `systemd-run --on-active`
+  timer that terminates the instance through the Lambda API from the box itself.
+
+- `tools/burst.py preflight` checks credentials, binaries, model URLs and live
+  capacity before anything is rented. It earned itself immediately: two of the
+  seven model URLs were 404s — the distill LoRA is at the repo root rather than
+  under `Lightx2v/` with its siblings, and the ditto LoRA is stored upstream
+  with its extension doubled, `...bf16.safetensors.safetensors`. Neither is
+  guessable, and both would otherwise have surfaced twelve minutes into a paid
+  boot.
+
+- `tools/vacejob.py`, which builds the VACE restyle graph and queues it. It had
+  been living in `/tmp` and a reboot destroyed it once already.
+
 ## [1.91.0] — 2026-08-20
 
 Eight people who no longer walk like scarecrows, and who have faces.
