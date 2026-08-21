@@ -8,6 +8,72 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [Unreleased]
+
+### Fixed
+
+- **The sampler cannot emit 75 frames, and said so nowhere.** The VAE's
+  temporal stride is 4, so the output count is always 4k+1 — ask for 75 and
+  the decode produces 73. Nothing logs the discrepancy, so the burst frame
+  poll waited for a 75th file that the architecture is incapable of writing,
+  and a run that had been finished for minutes read as hung at 73/75 until it
+  hit the timeout. Rounded in `tools/vacejob.py` (which prints the correction)
+  and again in `tools/burst.py`, which is the side that counts the files.
+
+- **There is no sdpa fallback, and the comment claiming one shipped in a tag.**
+  `tools/burst-bootstrap.sh` treated sageattention as best-effort on the
+  grounds that WanVideoWrapper would fall back. It does not — `attention_mode`
+  goes from `vacejob.py` into the model loader and is used as given, so a box
+  without sageattention does not render slowly, it raises at model load, ten
+  minutes and two dollars into a rented instance. On aarch64 that was the
+  normal case: the ARM torch wheel does not pull `triton`, sageattention
+  imports triton, and `pip install` reports success either way — so the probe
+  could not see it. Now: triton installed explicitly on ARM, the probe is the
+  import rather than pip's exit status, the verdict is written to the box, and
+  `burst.py run` reads it back and passes `--attn`. Verified on a live GH200,
+  which previously ran without it and now reports `sageattention imports`.
+
+- **A timeout threw away frames that had already been paid for.**
+  `cmd_run` called `sys.exit()` on the timeout branch, which sits above the
+  rsync-back — so a run that produced 60 of 73 frames returned none of them,
+  from a machine that was about to be terminated. It now fetches whatever
+  finished and reports short with exit code 2.
+
+- **`clone_at` logged an empty commit sha.** The `git rev-parse` ran as root
+  against a ubuntu-owned repository, hit dubious-ownership, and printed
+  nothing — so the one line proving which commit was on the box proved
+  nothing. It runs as `ubuntu` now.
+
+- **`up` terminated boxes for being slow.** The wait for an address was ten
+  minutes; both instances launched for this session's experiments took seven.
+  Twenty minutes now, and it logs what it is waiting on.
+
+### Added
+
+- **`tools/upscale.py`** — RealESRGAN and Lanczos over a directory of PNGs, on
+  whatever GPU is local. The upscaler was inside the sampler's workflow, which
+  made "how would this look without it" a question you could only answer by
+  renting the render again. Decode once, bring the native frames home, and
+  build every variant from those exact pixels. RRDBNet is reimplemented rather
+  than imported, because `realesrgan` pulls in basicsr and a torchvision
+  private API that moved; `load_state_dict(strict=True)` is the proof that the
+  architecture is right.
+
+- **`--no-upscale`** on `burst.py run`. ESRGAN is 40-45 per cent of the wall
+  clock of every run, and at 1280x720 it is no longer buying resolution.
+
+- **`--ref` on `burst.py run`** — reference photographs, rsynced to the box and
+  rewritten to box-side paths. `vacejob.py` has taken `ref_images` for a while;
+  there was no way to reach it from a burst.
+
+- **`tools/contact.py`** — the same frame from several runs, side by side with
+  labels burned in. Every restyle looks plausible on its own; the only useful
+  judgement is against another one.
+
+- **`tools/lab-assemble.sh`** — one frame directory to one mp4, with everything
+  except the frames held identical, so two of them differing means the frames
+  differed.
+
 ## [1.92.0] — 2026-08-21
 
 Keep what you just flew, and rent a supercomputer to make it look filmed.

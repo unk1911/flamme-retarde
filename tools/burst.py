@@ -400,6 +400,23 @@ def cmd_run(a):
         attn = (r.stdout or "").strip() or "sageattn"
         say(f"attention: {attn}")
 
+    # ref_images: the second conditioning channel. `input_frames` says where
+    # everything is, `ref_images` says what it is made of — and a photograph
+    # does not argue with the model's prior about Dalmatian holiday scenery,
+    # it replaces it. Worth its own upload.
+    refs_remote = ""
+    if a.ref:
+        local = [Path(r.strip()).expanduser() for r in a.ref.split(",") if r.strip()]
+        missing = [str(r) for r in local if not r.exists()]
+        if missing:
+            sys.exit("no such reference image(s): " + ", ".join(missing))
+        ssh(ip, "mkdir -p ~/job/refs")
+        subprocess.run(
+            ["rsync", "-az", "-e", " ".join(ssh_base(ip)[:-1])]
+            + [str(r) for r in local] + [f"ubuntu@{ip}:job/refs/"], check=True)
+        refs_remote = ",".join(f"/home/ubuntu/job/refs/{r.name}" for r in local)
+        say(f"refs: {refs_remote}")
+
     ssh(ip, "mkdir -p ~/job/frames ~/job/out")
     subprocess.run(
         ["rsync", "-az", "--delete", "-e", " ".join(ssh_base(ip)[:-1]),
@@ -454,6 +471,8 @@ def cmd_run(a):
             cmd += ["--upscale", a.upscale, "--outw", str(a.outw)]
         if a.pos:
             cmd += ["--pos", a.pos]
+        if refs_remote:
+            cmd += ["--ref", refs_remote]
         say("queueing " + a.tag)
         subprocess.run(cmd, check=True)
 
@@ -556,6 +575,10 @@ def main():
     r.add_argument("--out", default=str(Path.home() / "fr-video" / "burst"))
     r.add_argument("--timeout", type=float, default=60)
     r.add_argument("--attn", default="")
+    # Local paths, comma-separated. They get rsynced to the box and rewritten to
+    # box-side paths, because `ref_images` wants files the instance can open and
+    # the photographs live on the laptop.
+    r.add_argument("--ref", default="")
     # 0 is right for 80 GB and a guaranteed OOM on an A10: 22.6 GB usable does
     # not hold 16.3 GB of weights plus a 20 670-token activation set. Measured:
     # A10 needs 20 at 480p and 40 at 720p.
