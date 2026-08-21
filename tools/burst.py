@@ -434,9 +434,9 @@ def cmd_run(a):
     tun = subprocess.Popen(
         ssh_base(ip)[:-1]
         + ["-o", "ExitOnForwardFailure=yes", "-N",
-           "-L", f"{PORT}:127.0.0.1:8188", f"ubuntu@{ip}"],
+           "-L", f"{PORT}:127.0.0.1:{a.remote_port}", f"ubuntu@{ip}"],
         stdin=subprocess.DEVNULL)
-    say(f"tunnel :{PORT} -> {ip}:8188")
+    say(f"tunnel :{PORT} -> {ip}:{a.remote_port}")
     try:
         for _ in range(60):
             try:
@@ -453,11 +453,12 @@ def cmd_run(a):
         # checked rather than assumed: write a nonce on the box over SSH, then
         # read it back through the tunnel. Different machine, different answer.
         nonce = f"{ip}-{PORT}-{os.getpid()}"
+        nfile = f"burst-nonce-{PORT}.txt"
         ssh(ip, "mkdir -p ~/ComfyUI/input && printf '%s' "
-                + shlex.quote(nonce) + " > ~/ComfyUI/input/burst-nonce.txt")
+                + shlex.quote(nonce) + f" > ~/ComfyUI/input/{nfile}")
         try:
             got = urllib.request.urlopen(
-                f"http://127.0.0.1:{PORT}/view?filename=burst-nonce.txt"
+                f"http://127.0.0.1:{PORT}/view?filename={nfile}"
                 "&type=input", timeout=15).read().decode()
         except Exception as e:                            # noqa: BLE001
             got = f"<unreadable: {e}>"
@@ -589,6 +590,13 @@ def main():
     # box-side paths, because `ref_images` wants files the instance can open and
     # the photographs live on the laptop.
     r.add_argument("--ref", default="")
+    # Which ComfyUI on the box to talk to. One job pegs the SMs while it is
+    # sampling, but spends roughly two minutes in five loading the model,
+    # encoding text and decoding latents, and the GPU is idle for all of it.
+    # A second server lets one job's dead time overlap the other's sampling.
+    # 38 GB resident each, against 96 GB on a GH200.
+    r.add_argument("--remote-port", type=int,
+                   default=int(os.environ.get("BURST_REMOTE_PORT") or 8188))
     # 0 is right for 80 GB and a guaranteed OOM on an A10: 22.6 GB usable does
     # not hold 16.3 GB of weights plus a 20 670-token activation set. Measured:
     # A10 needs 20 at 480p and 40 at 720p.

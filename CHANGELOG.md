@@ -57,6 +57,25 @@ geodata pipeline.
 
 ### Added
 
+- **`tools/lab/`** — the matrix runner, the prompt set, and the variant builder,
+  which between them ran 33 restyles across two rented boxes for $7.02.
+  `matrix.sh` takes one line per experiment and re-sources the prompts each
+  iteration, reads its queue on fd 3, and survives any single experiment
+  failing; a queue that dies on its second line because the first one OOMed is
+  worse than useless, because the runs that would have answered the question
+  are the ones behind it.
+
+  `prompts.sh` is where the session's actual finding lives. The shipped clip was
+  restyled with a prompt describing a *cabin interior* while the frames showed
+  an aeroplane over the Adriatic, and at cfg 1.0 — where the distill LoRA makes
+  the negative prompt inert — the positive prompt is the only text steering
+  there is. Run at denoise 0.95 the mismatch is not subtle: the Canadair becomes
+  a small green toy sitting on a stone windowsill. Three lessons are written
+  into the file. Name the scene. Name the fire, or every restyle deletes it,
+  which every restyle had. And do not say "white limestone karst", because white
+  plus mountain reads as snow to the prior and August in Dalmatia does not have
+  any.
+
 - **`tools/upscale.py`** — RealESRGAN and Lanczos over a directory of PNGs, on
   whatever GPU is local. The upscaler was inside the sampler's workflow, which
   made "how would this look without it" a question you could only answer by
