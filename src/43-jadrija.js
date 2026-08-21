@@ -1854,6 +1854,87 @@ async function buildJadrija(scene) {
     post(W, t + 0.48, s + 0.44, y, y + 0.70, 0.035, [0.330, 0.334, 0.330], 6);
   }
 
+  /**
+   * A hundred years of Jadrija, printed on a board.
+   *
+   * The single most repeated image in the survey. It turns up three times
+   * independently — a PVC hoarding on galvanised legs beside the container
+   * kiosk, a panel standing on the plaza, and the end panels of the cabins at
+   * the west end, which are the only legible Jadrija signage in a hundred and
+   * thirty-two frames of the walk. Every one of them is the same idea: a grid
+   * of kabina doors in four colours, a big 100 whose zeroes are hut fronts, and
+   * "od 1922." underneath.
+   *
+   * It earns its triangles twice over, because the motif is *already* the thing
+   * this resort is built out of — eight hundred coloured doors in two rows —
+   * so the board reads as the place explaining itself.
+   */
+  function centenary(t, s, w, h, y, opts = {}) {
+    const DOOR = ['#cf3b2e', '#3f9a56', '#6cb2dd', '#e3b23c'];
+    const PX = 1024, C = document.createElement('canvas');
+    C.width = PX; C.height = Math.round(PX * h / w);
+    const g = C.getContext('2d');
+    g.fillStyle = opts.bg || '#efe6c4';
+    g.fillRect(0, 0, C.width, C.height);
+    // The door grid: four across, six down, rounded like the real openings.
+    const cols = 4, rows = 6;
+    const gw = C.width * 0.40, gh = C.height * 0.74;
+    const gx = C.width * 0.045, gy = (C.height - gh) * 0.5;
+    const cw = gw / cols, ch = gh / rows;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        g.fillStyle = DOOR[(r * cols + c + (r % 3)) % DOOR.length];
+        const x = gx + c * cw + cw * 0.10, yy = gy + r * ch + ch * 0.10;
+        const ww = cw * 0.80, hh = ch * 0.80, rr = Math.min(ww, hh) * 0.18;
+        g.beginPath();
+        g.moveTo(x + rr, yy);
+        g.arcTo(x + ww, yy, x + ww, yy + hh, rr);
+        g.arcTo(x + ww, yy + hh, x, yy + hh, rr);
+        g.arcTo(x, yy + hh, x, yy, rr);
+        g.arcTo(x, yy, x + ww, yy, rr);
+        g.closePath();
+        g.fill();
+      }
+    }
+    // And the words, to the right of the grid.
+    const tx = gx + gw + (C.width - gx - gw) * 0.48;
+    g.textAlign = 'center';
+    g.fillStyle = opts.fg || '#20364a';
+    g.font = `800 ${C.height * 0.46}px "Helvetica Neue", Arial, sans-serif`;
+    g.fillText(opts.big || '100', tx, C.height * 0.56);
+    g.font = `600 ${C.height * 0.15}px "Helvetica Neue", Arial, sans-serif`;
+    g.fillText('JADRIJA', tx, C.height * 0.75);
+    g.font = `400 ${C.height * 0.13}px "Helvetica Neue", Arial, sans-serif`;
+    g.fillText('od 1922.', tx, C.height * 0.91);
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    const st = at(t), p = W(t, s, y);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+    mesh.position.set(p[0], p[1], p[2]);
+    // Seaward, like the shop signs — and for the same reason `mapBoard`'s
+    // rotation is wrong here: that one is on a gable.
+    mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
+    scene.add(mesh);
+    // The box behind it, and the legs under it.
+    const back4 = b;
+    b = up;
+    boxTS(t - w * 0.5, t + w * 0.5, s + 0.03, s + 0.42,
+      y - h * 0.5, y + h * 0.5, [0.560, 0.540, 0.470], [0.600, 0.578, 0.505]);
+    if (opts.legs !== false) {
+      for (const o of [-w * 0.42, w * 0.42]) {
+        for (const ds of [0.08, 0.38]) {
+          post(W, t + o, s + ds, at(t).deck, y - h * 0.5 + 0.05, 0.035,
+            [0.520, 0.528, 0.522], 6);
+        }
+      }
+    }
+    b = back4;
+    runs.push({ t0: t - w * 0.5, t1: t + w * 0.5, s0: s - 0.05, s1: s + 0.45,
+      y: at(t).deck, h: y + h * 0.5 - at(t).deck });
+  }
+
   /** One business. Everything upright goes in `up`; pads stay in `deck`. */
   function shopfront(S) {
     const tc = (S.t0 + S.t1) * 0.5;
@@ -2022,6 +2103,12 @@ async function buildJadrija(scene) {
     b = deck;
   }
   for (const S of SHOPS) shopfront(S);
+  // The three placements, all photographed. The hoarding beside Maslina, the
+  // panel out on the plaza, and the pair at the west end by the cabins.
+  centenary(349, 33.2, 4.4, 2.2, at(349).deck + 1.35);
+  centenary(346, 6.0, 3.2, 1.8, at(346).deck + 1.25,
+    { bg: '#cfe4d8', fg: '#1d3b30', big: '100' });
+  centenary(212, 22.0, 2.6, 1.5, at(212).deck + 1.15, { bg: '#e8e2cc' });
 
   if (special) special.sign = neonSign(special);
 
