@@ -130,7 +130,21 @@ MODELS = [
      "RealESRGAN_x4plus.pth"),
 ]
 
-PORT = int(os.environ.get("BURST_PORT", "18188"))
+# Derived from BURST_STATE, not fixed, and this one cost a benchmark.
+#
+# With a hardcoded port, two concurrent bursts both forward 127.0.0.1:18188.
+# The second ssh prints "bind: Address already in use" to a pipe nobody reads
+# and keeps running — so the readiness probe against that port SUCCEEDS, against
+# the *other* instance's ComfyUI, and the job executes on the wrong GPU. The
+# frame poll then SSHes to the right box, sees nothing, and reports 0/N until it
+# times out: a silent ten-minute hang, a benchmark of a machine that was never
+# rented for it, and no error anywhere.
+#
+# Two defences: a port per state, and ExitOnForwardFailure below, so a collision
+# kills the tunnel instead of quietly borrowing somebody else's.
+_STATE_NAME = os.environ.get("BURST_STATE") or "burst"
+PORT = int(os.environ.get("BURST_PORT")
+           or 18188 + (sum(ord(c) for c in _STATE_NAME) % 300))
 
 
 # --------------------------------------------------------------------------- #
@@ -356,7 +370,10 @@ def cmd_run(a):
          str(frames) + "/", f"ubuntu@{ip}:job/frames/"], check=True)
 
     tun = subprocess.Popen(
-        ssh_base(ip)[:-1] + ["-N", "-L", f"{PORT}:127.0.0.1:8188", f"ubuntu@{ip}"])
+        ssh_base(ip)[:-1]
+        + ["-o", "ExitOnForwardFailure=yes", "-N",
+           "-L", f"{PORT}:127.0.0.1:8188", f"ubuntu@{ip}"])
+    say(f"tunnel :{PORT} -> {ip}:8188")
     try:
         for _ in range(60):
             try:
@@ -368,12 +385,30 @@ def cmd_run(a):
         else:
             sys.exit("ComfyUI never answered through the tunnel — `status`")
 
+        # And prove it is *our* ComfyUI. A port collision produces a tunnel that
+        # answers perfectly while pointing somewhere else, so identity has to be
+        # checked rather than assumed: write a nonce on the box over SSH, then
+        # read it back through the tunnel. Different machine, different answer.
+        nonce = f"{ip}-{PORT}-{os.getpid()}"
+        ssh(ip, "mkdir -p ~/ComfyUI/input && printf '%s' "
+                + shlex.quote(nonce) + " > ~/ComfyUI/input/burst-nonce.txt")
+        try:
+            got = urllib.request.urlopen(
+                f"http://127.0.0.1:{PORT}/view?filename=burst-nonce.txt"
+                "&type=input", timeout=15).read().decode()
+        except Exception as e:                            # noqa: BLE001
+            got = f"<unreadable: {e}>"
+        if got != nonce:
+            sys.exit(f"the tunnel on :{PORT} is NOT this instance "
+                     f"(expected {nonce!r}, got {got!r}) — another burst has "
+                     "that port. Set BURST_PORT and retry.")
+
         cmd = [sys.executable, str(ROOT / "tools" / "vacejob.py"),
                "--frames", "/home/ubuntu/job/frames", "--n", str(a.n),
                "--w", str(a.w), "--h", str(a.h), "--tag", a.tag,
                "--steps", str(a.steps), "--denoise", str(a.denoise),
                "--sim2real", str(a.sim2real), "--vace", str(a.vace),
-               "--seed", str(a.seed), "--swap", "0",
+               "--seed", str(a.seed), "--swap", str(a.swap),
                "--host", f"http://127.0.0.1:{PORT}"]
         if a.ctx:
             cmd += ["--ctx", str(a.ctx), "--ctxover", str(a.ctxover)]
@@ -465,6 +500,10 @@ def main():
     r.add_argument("--pos", default=None)
     r.add_argument("--out", default=str(Path.home() / "fr-video" / "burst"))
     r.add_argument("--timeout", type=float, default=60)
+    # 0 is right for 80 GB and a guaranteed OOM on an A10: 22.6 GB usable does
+    # not hold 16.3 GB of weights plus a 20 670-token activation set. Measured:
+    # A10 needs 20 at 480p and 40 at 720p.
+    r.add_argument("--swap", type=int, default=0)
     r.set_defaults(fn=cmd_run)
 
     a = p.parse_args()

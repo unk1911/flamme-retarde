@@ -118,6 +118,24 @@ geodata pipeline.
   *and* exits 1 when it matches nothing, so the `|| echo 0` fallback fired as
   well. Counts with `wc -l` now.
 
+- **A burst could render on somebody else's GPU.** The tunnel port was
+  hardcoded, so two concurrent bursts both forwarded `127.0.0.1:18188`. The
+  second `ssh` writes "bind: Address already in use" to a pipe nobody reads and
+  then keeps running as a perfectly healthy session, so the readiness probe
+  succeeded — against the *other* instance — and the job was queued to the wrong
+  machine, while the frame poll SSHed to the right one, saw nothing, and counted
+  0/N until it timed out. No error anywhere, and it cost a benchmark and the
+  first live test. Three defences now: the port is derived from `BURST_STATE`,
+  the tunnel carries `ExitOnForwardFailure=yes` so a collision kills it rather
+  than borrowing, and before anything is queued a nonce is written on the box
+  over SSH and read back through the tunnel — a machine that answers is not yet
+  the machine that was rented.
+
+- `burst run --swap` is a real flag. It was hardcoded to 0, which is right for
+  an 80 GB card and a guaranteed out-of-memory on the A10, whose 22.6 GB usable
+  does not hold 16.3 GB of weights plus the activations. Measured: the A10 wants
+  20 blocks swapped at 480p and 40 at 720p.
+
 ## [1.91.0] — 2026-08-20
 
 Eight people who no longer walk like scarecrows, and who have faces.
