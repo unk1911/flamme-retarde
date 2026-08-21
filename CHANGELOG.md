@@ -8,7 +8,9 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
-## [Unreleased]
+## [1.92.0] — 2026-08-21
+
+Keep what you just flew, and rent a supercomputer to make it look filmed.
 
 ### Added
 
