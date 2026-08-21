@@ -3679,6 +3679,68 @@ async function buildJadrija(scene) {
     }
   }
 
+  // ── street furniture ───────────────────────────────────────────────────────
+  // Three things the promenade has and this file did not: a bin, a shower and
+  // the concrete bench that is nothing like the timber one already here.
+  {
+    const back2 = b;
+    b = up;
+    const AGG = [0.470, 0.450, 0.412];        // pebble aggregate, washed
+    const STAIN = [0.560, 0.566, 0.560];      // the stainless collar
+    const COBALT = [0.075, 0.180, 0.470];     // the shower post
+    const MINT = [0.400, 0.600, 0.500];       // the privacy screen
+    const SLAT = [0.330, 0.190, 0.115];       // dark timber
+    const PLINTH = [0.560, 0.548, 0.522];     // precast, pale
+
+    // The bench on the promenade is not the backed timber one in the tree line.
+    // It is a six-metre precast plinth with two metres of slats inset flush at
+    // one end, and it reads as part of the paving rather than as a chair.
+    for (let t = JAD.beachTo + 24; t < LEN - 20; t += 61) {
+      if (!clearOfShops(t)) continue;
+      const y = at(t).deck, sb = JAD.mid + 2.6;
+      boxTS(t - 3.0, t + 3.0, sb - 0.30, sb + 0.30, y, y + 0.45, PLINTH,
+        shade(PLINTH, 1.06));
+      boxTS(t + 0.9, t + 2.9, sb - 0.27, sb + 0.27, y + 0.45, y + 0.49, SLAT,
+        shade(SLAT, 1.12));
+      runs.push({ t0: t - 3.0, t1: t + 3.0, s0: sb - 0.30, s1: sb + 0.30,
+        y, h: 0.49 });
+      // A bin within three metres of every bench, which is where they are.
+      const bt = t + 3.9;
+      post(W, bt, sb, y, y + 0.86, 0.25, AGG, 9);
+      post(W, bt, sb, y + 0.86, y + 0.94, 0.27, STAIN, 9);
+      post(W, bt, sb, y + 0.94, y + 0.99, 0.10, [0.480, 0.120, 0.110], 7);
+      runs.push({ t0: bt - 0.3, t1: bt + 0.3, s0: sb - 0.3, s1: sb + 0.3,
+        y, h: 0.99 });
+      clutter(t - 3.6, sb - 1.1, y, 2, (t | 0) * 13 + 5);
+    }
+
+    // Two beach showers. A cobalt post with two roses, and a mint screen beside
+    // it — both of them photographed, and both of them the only saturated
+    // colour on this stretch of concrete.
+    for (const t of [JAD.beachTo + 46, JAD.jetty + 96]) {
+      const y = at(t).deck, ss = JAD.mid + 1.0;
+      post(W, t, ss, y, y + 2.20, 0.055, COBALT, 8);
+      for (const hh of [1.40, 1.62]) {
+        boxTS(t - 0.045, t + 0.045, ss - 0.34, ss - 0.02, y + hh, y + hh + 0.05,
+          [0.640, 0.648, 0.640]);
+        post(W, t, ss - 0.34, y + hh - 0.09, y + hh, 0.055, [0.640, 0.648, 0.640], 7);
+      }
+      boxTS(t - 0.06, t + 0.06, ss - 0.10, ss + 0.10, y, y + 0.06, STAIN);
+      // The screen: a panel on two legs, a gooseneck over the top of it.
+      const st2 = t + 1.5;
+      boxTS(st2 - 0.80, st2 + 0.80, ss + 0.30, ss + 0.38, y + 0.30, y + 2.10,
+        MINT, shade(MINT, 1.08));
+      for (const o of [-0.72, 0.72]) {
+        post(W, st2 + o, ss + 0.34, y, y + 0.34, 0.045, STAIN, 6);
+      }
+      post(W, st2, ss + 0.34, y + 2.10, y + 2.24, 0.04, STAIN, 6);
+      boxTS(st2 - 0.04, st2 + 0.04, ss - 0.02, ss + 0.34, y + 2.20, y + 2.24, STAIN);
+      runs.push({ t0: st2 - 0.85, t1: st2 + 0.85, s0: ss + 0.26, s1: ss + 0.42,
+        y, h: 2.10 });
+    }
+    b = back2;
+  }
+
   // Somebody in the chairs, which had every table on the boardwalk laid and
   // nobody at any of them.
   //
