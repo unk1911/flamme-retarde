@@ -1621,20 +1621,41 @@ async function buildJadrija(scene) {
    * the same font stack the wall map already proves them on.
    */
   function shopSign(S, t, s, y, w, h) {
-    const PX = 512, C = document.createElement('canvas');
-    C.width = PX; C.height = Math.max(32, Math.round(PX * h / w));
+    // Sized off the HEIGHT, not the width, and this is the whole of why none of
+    // these could be read.
+    //
+    // It was a 512-wide canvas with the height derived from the aspect, so a
+    // 6.4 m by 0.38 m fascia got a canvas thirty pixels tall carrying a
+    // fifteen-pixel font, and that was then stretched across six metres of
+    // geometry. Every sign on the boardwalk was a fifteen-pixel word blown up
+    // forty times. Fixing the height at 128 and deriving the width instead
+    // gives about 320 texels a metre, which puts a 0.19 m capital at sixty
+    // pixels — readable from the promenade, which is the whole job.
+    const C = document.createElement('canvas');
+    C.height = 128;
+    C.width = Math.min(2048, Math.max(128, Math.round(128 * w / h)));
     const g = C.getContext('2d');
     g.fillStyle = S.bg || '#eeece6';
     g.fillRect(0, 0, C.width, C.height);
     g.fillStyle = S.fg || '#1a1a18';
     g.textAlign = 'center';
-    const big = S.sub ? C.height * 0.40 : C.height * 0.52;
-    g.font = `600 ${big}px "Helvetica Neue", Arial, sans-serif`;
-    g.fillText(S.name, C.width / 2, S.sub ? C.height * 0.46 : C.height * 0.68);
-    if (S.sub) {
-      g.font = `800 ${C.height * 0.42}px "Helvetica Neue", Arial, sans-serif`;
-      g.fillText(S.sub, C.width / 2, C.height * 0.92);
-    }
+    // Fitted both ways, which the first version was not: it only ever shrank.
+    //
+    // The canvas is now as wide as the board is long — 2048 px for a 6.4 m
+    // fascia — and a name set at a height-derived size lands in the middle of
+    // it at three hundred pixels, so "Slastičarnica" came out a metre wide on a
+    // six-metre sign with two and a half metres of blank either side. Solve for
+    // the size that fills the board instead, and let the height cap it.
+    const fit = (text, capPx, y) => {
+      g.font = `600 100px "Helvetica Neue", Arial, sans-serif`;
+      const at100 = g.measureText(text).width || 1;
+      const size = Math.min(capPx, 100 * (C.width * 0.88) / at100);
+      g.font = `600 ${size}px "Helvetica Neue", Arial, sans-serif`;
+      g.fillText(text, C.width / 2, y);
+    };
+    fit(S.name, S.sub ? C.height * 0.44 : C.height * 0.60,
+      S.sub ? C.height * 0.46 : C.height * 0.70);
+    if (S.sub) fit(S.sub, C.height * 0.46, C.height * 0.95);
     const tex = new THREE.CanvasTexture(C);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
@@ -1656,7 +1677,17 @@ async function buildJadrija(scene) {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
       new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
     mesh.position.set(p[0], p[1], p[2]);
-    mesh.rotation.y = Math.atan2(st.ux, st.uz) + Math.PI;
+    // Facing the sea, which is ninety degrees off what this was doing.
+    //
+    // The rotation was copied from `mapBoard`, and `mapBoard` is on a *gable* —
+    // an end wall, which faces along the shore, so `atan2(ux, uz)` is right for
+    // it. A shopfront faces across the shore. Every sign on the boardwalk was
+    // therefore mounted edge-on to the promenade and rendered as a hairline,
+    // which is why they read as missing rather than as wrong: there was nothing
+    // to see from any angle a walker ever stands at.
+    //
+    // The seaward direction is the inland normal turned round.
+    mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
     scene.add(mesh);
   }
 
