@@ -8,7 +8,9 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
-## [Unreleased]
+## [1.93.0] — 2026-08-21
+
+Thirty-three restyles to learn that the prompt was describing a room.
 
 ### Fixed
 
