@@ -204,8 +204,15 @@ def ssh_base(ip: str) -> list[str]:
 
 
 def ssh(ip: str, script: str, check=True) -> subprocess.CompletedProcess:
+    # stdin=DEVNULL is not defensive tidiness, it is the fix for a real bug.
+    # ssh reads its standard input and forwards it to the remote command, so an
+    # ssh called from inside a shell `while read` loop consumes the rest of the
+    # loop's input file. A matrix of eight experiments ran its first one and
+    # then reported that it had finished them all — the remaining seven lines
+    # were eaten by the readiness probe, and nothing anywhere errored.
     return subprocess.run(ssh_base(ip) + [script], text=True,
-                          capture_output=True, check=check)
+                          capture_output=True, check=check,
+                          stdin=subprocess.DEVNULL)
 
 
 def head_ok(url: str, timeout=20) -> tuple[bool, str]:
@@ -413,19 +420,22 @@ def cmd_run(a):
         ssh(ip, "mkdir -p ~/job/refs")
         subprocess.run(
             ["rsync", "-az", "-e", " ".join(ssh_base(ip)[:-1])]
-            + [str(r) for r in local] + [f"ubuntu@{ip}:job/refs/"], check=True)
+            + [str(r) for r in local] + [f"ubuntu@{ip}:job/refs/"], check=True,
+            stdin=subprocess.DEVNULL)
         refs_remote = ",".join(f"/home/ubuntu/job/refs/{r.name}" for r in local)
         say(f"refs: {refs_remote}")
 
     ssh(ip, "mkdir -p ~/job/frames ~/job/out")
     subprocess.run(
         ["rsync", "-az", "--delete", "-e", " ".join(ssh_base(ip)[:-1]),
-         str(frames) + "/", f"ubuntu@{ip}:job/frames/"], check=True)
+         str(frames) + "/", f"ubuntu@{ip}:job/frames/"], check=True,
+        stdin=subprocess.DEVNULL)
 
     tun = subprocess.Popen(
         ssh_base(ip)[:-1]
         + ["-o", "ExitOnForwardFailure=yes", "-N",
-           "-L", f"{PORT}:127.0.0.1:8188", f"ubuntu@{ip}"])
+           "-L", f"{PORT}:127.0.0.1:8188", f"ubuntu@{ip}"],
+        stdin=subprocess.DEVNULL)
     say(f"tunnel :{PORT} -> {ip}:8188")
     try:
         for _ in range(60):
@@ -509,7 +519,7 @@ def cmd_run(a):
         ["rsync", "-az", "-e", " ".join(ssh_base(ip)[:-1]),
          f"ubuntu@{ip}:ComfyUI/output/", str(out) + "/",
          "--include", f"vace{a.tag}_*", "--include", "*/", "--exclude", "*"],
-        check=True)
+        check=True, stdin=subprocess.DEVNULL)
     got = len(list(out.glob(f"vace{a.tag}_*")))
     mins = (time.time() - st["launched"]) / 60
     say(f"{got} frames in {out} · ${st['price'] * mins / 60:.2f} spent so far")

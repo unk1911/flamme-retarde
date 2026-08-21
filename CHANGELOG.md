@@ -12,6 +12,13 @@ geodata pipeline.
 
 ### Fixed
 
+- **`ssh` ate the experiment queue.** ssh forwards its own standard input to
+  the remote command, so an `ssh` called from inside a shell `while read` loop
+  consumes the rest of the loop's input file. A matrix of eight restyles ran
+  its first experiment and then announced it had finished all eight — the other
+  seven lines went into a readiness probe, and nothing errored anywhere. Every
+  `ssh` and `rsync` in `burst.py` now passes `stdin=DEVNULL`.
+
 - **The sampler cannot emit 75 frames, and said so nowhere.** The VAE's
   temporal stride is 4, so the output count is always 4k+1 — ask for 75 and
   the decode produces 73. Nothing logs the discrepancy, so the burst frame
