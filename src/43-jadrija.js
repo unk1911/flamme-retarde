@@ -3866,6 +3866,76 @@ async function buildJadrija(scene) {
     }
   }
 
+  // ── the armouring, and the boats on the bank ───────────────────────────────
+  // Where the poured concrete gives out and the shingle takes over, the bank is
+  // held with rough limestone blocks — 0.6 to 1.2 m, tipped rather than laid,
+  // with the gaps left open. It is the one place on this shore with no straight
+  // line in it, which is exactly why the join reads as a join and not as a
+  // change of paint.
+  {
+    const back7 = b;
+    b = up;
+    const ROCK = [[0.510, 0.478, 0.418], [0.548, 0.514, 0.448],
+      [0.472, 0.442, 0.386], [0.528, 0.492, 0.430]];
+    for (const [t0, t1] of [[JAD.beachTo - 16, JAD.beachTo + 14]]) {
+      // 0.62 m apart and a third of them dropped, so the blocks overlap and
+      // the gaps are uneven. Marching them along at an even pitch, all one
+      // size, gave a row of tidy grey cubes along the water — which is a kerb,
+      // not armouring. Tipped rock is dumped, not laid.
+      let k = 0;
+      for (let t = t0; t < t1; t += 0.62, k++) {
+        const j0 = jit(k, 31), j1 = jit(k, 32), j2 = jit(k, 33);
+        if (jit(k, 34) < 0.34) continue;
+        const sc = 0.55 + j2 * 1.15;
+        // Straddling the waterline, not tucked under the lip. The first cut put
+        // the tops at lip - 0.25 and the whole bank vanished behind the edge of
+        // the deck: correct for armouring that is doing its job and useless as
+        // a thing to look at. What the frames show is a tumble of rock standing
+        // proud of the water with the shingle running up between the blocks.
+        const ss = -0.9 + j0 * 3.4;
+        const y = at(t).lip - 0.85 - j1 * 0.55;
+        const w2 = (0.30 + j2 * 0.26) * sc, d2 = (0.28 + j0 * 0.30) * sc;
+        const h2 = (0.85 + j1 * 0.70) * sc;
+        // Each block turned on its own axis and tapering off-square, so no two
+        // present the same face. One `frustumS` per rock rather than a box:
+        // a box has four parallel sides and reads as masonry however it is
+        // coloured.
+        const ang = j1 * TAU;
+        const P2 = (dt, ds, yy) => {
+          const c = Math.cos(ang), sn = Math.sin(ang);
+          return W(t + dt * c - ds * sn, ss + dt * sn + ds * c, yy);
+        };
+        frustumS((dt, ds, yy) => P2(dt, ds, yy), -h2 * 0.5,
+          [0, y + h2 * 0.5, w2, d2],
+          h2 * 0.5, [(j2 - 0.5) * w2 * 0.7, y + h2 * 0.5 + (j0 - 0.5) * d2 * 0.6,
+            w2 * (0.42 + j0 * 0.34), d2 * (0.40 + j2 * 0.36)],
+          ROCK[((j2 * 89) | 0) % ROCK.length]);
+      }
+    }
+    // And the hire boats: kayaks and a pedalo, stacked on the bank at the top
+    // of the beach in red and yellow, which is the only place on this shore
+    // anything with a hull actually is.
+    {
+      const bt = JAD.beachTo - 26, bs = JAD.mid + 5.0;
+      const HULL = [[0.520, 0.120, 0.110], [0.700, 0.560, 0.110],
+        [0.140, 0.240, 0.480]];
+      for (let k = 0; k < 7; k++) {
+        const row = k % 3, tier = (k / 3) | 0;
+        const t = bt + row * 0.86 + tier * 0.30;
+        const y = surfaceY(t, bs) + 0.10 + tier * 0.34;
+        const c = HULL[(k + tier) % HULL.length];
+        // A kayak on its side: a long shallow wedge, nose tapered.
+        frustumS((dt, ds, yy) => W(t + dt, bs + ds, yy),
+          -1.90, [0, 0, 0.06, 0.05], 0.0, [0, 0, 0.33, 0.16], c);
+        frustumS((dt, ds, yy) => W(t + dt, bs + ds, yy),
+          0.0, [0, 0, 0.33, 0.16], 1.90, [0, 0, 0.07, 0.05], c);
+      }
+      runs.push({ t0: bt - 0.6, t1: bt + 2.4, s0: bs - 2.1, s1: bs + 2.1,
+        y: surfaceY(bt, bs), h: 1.1 });
+    }
+    b = back7;
+  }
+
   // ── what is parked in the wood ─────────────────────────────────────────────
   // Both walk-throughs film cars standing among the pines — nose-in, in loose
   // rows on the bare needle floor, with no marked bay anywhere. That is what
