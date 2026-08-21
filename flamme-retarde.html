@@ -13782,6 +13782,65 @@ async function buildJadrija(scene) {
     return out;
   }
 
+  /**
+   * What people leave on the concrete.
+   *
+   * There is nothing on the floor of this resort — grep the file for a towel or
+   * a sandal and you get comments. One photograph has flip-flops, slides, a
+   * child's sandals, a towel, a hi-vis top and a pair of goggles within two
+   * metres of a single lamp foot, and that is the ordinary state of a bathing
+   * station in August. It is also the cheapest thing in this file: four
+   * prototypes at forty triangles each, scattered where people actually stop —
+   * the foot of a ladder, the foot of a lamp, the edge of a towel.
+   */
+  function clutter(t, s, y, n, seed) {
+    // A local frame, rather than `facing`.
+    //
+    // `facing` is a `const` arrow declared four hundred lines below the two
+    // places this is called from, so reaching for it here is the temporal dead
+    // zone and the whole resort fails to build — with the only symptom being a
+    // page that never finishes loading. Six lines of the same arithmetic is
+    // cheaper than moving a declaration everything else already depends on.
+    const frame = (ct, cs, ang) => (dt, ds, yy) => {
+      const c = Math.cos(ang), sn = Math.sin(ang);
+      return W(ct + dt * c - ds * sn, cs + dt * sn + ds * c, yy);
+    };
+    const SAND = [[0.520, 0.180, 0.190], [0.130, 0.200, 0.400],
+      [0.700, 0.640, 0.180], [0.180, 0.190, 0.200], [0.820, 0.780, 0.740]];
+    const TOWEL = [[0.620, 0.180, 0.200], [0.180, 0.420, 0.620],
+      [0.780, 0.700, 0.220], [0.240, 0.520, 0.340]];
+    for (let k = 0; k < n; k++) {
+      const j0 = jit(seed + k, 1), j1 = jit(seed + k, 2), j2 = jit(seed + k, 3);
+      const ct = t + (j0 - 0.5) * 2.6, cs = s + (j1 - 0.5) * 2.0;
+      const a = j2 * TAU;
+      const kind = ((j2 * 97) | 0) % 4;
+      if (kind === 0 || kind === 1) {
+        // A sandal: a sole and a strap, and always a pair a little apart.
+        for (const o of [-0.09, 0.09]) {
+          const P = frame(ct + o * Math.cos(a), cs + o * Math.sin(a), a);
+          boxIn(P, -0.125, 0.125, -0.042, 0.042, y + 0.002, y + 0.026,
+            SAND[((j0 * 53) | 0) % SAND.length]);
+          boxIn(P, -0.02, 0.055, -0.045, 0.045, y + 0.026, y + 0.038,
+            SAND[((j1 * 31) | 0) % SAND.length]);
+        }
+      } else if (kind === 2) {
+        // A towel, dropped rather than laid: folded over on itself.
+        const P = frame(ct, cs, a);
+        boxIn(P, -0.34, 0.34, -0.22, 0.22, y + 0.002, y + 0.030,
+          TOWEL[((j0 * 71) | 0) % TOWEL.length]);
+        boxIn(P, -0.30, 0.10, -0.18, 0.18, y + 0.030, y + 0.052,
+          TOWEL[((j1 * 41) | 0) % TOWEL.length]);
+      } else {
+        // A bag, slumped, with a strap over it.
+        const P = frame(ct, cs, a);
+        boxIn(P, -0.20, 0.20, -0.13, 0.13, y + 0.002, y + 0.24,
+          SAND[((j1 * 67) | 0) % SAND.length]);
+        boxIn(P, -0.06, 0.06, -0.15, 0.15, y + 0.24, y + 0.28,
+          [0.140, 0.140, 0.145]);
+      }
+    }
+  }
+
   /** A moulded chair and a café table, which is all the terraces need. */
   function terraceSet(t, s, y, ang, col) {
     const seat = [0.230, 0.235, 0.240];
@@ -13904,8 +13963,12 @@ async function buildJadrija(scene) {
         [[S.s0 + 1.2, top + 0.10], [S.s1 - 1.2, top + 0.10],
           [S.s1 - 1.2, top + 0.62], [S.s0 + 1.2, top + 0.62]],
         S.roof, shade(S.roof, 1.14));
-      if (S.name) shopSign(S, (S.t0 + S.t1) * 0.5, S.s0 - 0.14, top - 0.52,
-        Math.min(5.6, (S.t1 - S.t0) * 0.70), 0.66);
+      // Not for a kiosk: those get the fascia board below, and drawing both
+      // put two names on Tisak and two on Maslina, twenty centimetres apart.
+      if (S.name && S.kind !== 'kiosk') {
+        shopSign(S, (S.t0 + S.t1) * 0.5, S.s0 - 0.14, top - 0.52,
+          Math.min(5.6, (S.t1 - S.t0) * 0.70), 0.66);
+      }
     }
     if (S.kind === 'kiosk' && S.name && !awn && !S.flag) {
       shopSign(S, (S.t0 + S.t1) * 0.5, S.s0 - 0.14, top - 0.28,
@@ -14863,6 +14926,7 @@ async function buildJadrija(scene) {
   for (let t = 12; t < LEN - 8; t += 27) {
     if (!clearOfShops(t)) continue;
     const st = at(t), y = st.deck, top = y + LAMP.post;
+    if (t > JAD.beachTo) clutter(t + 1.1, LAMP.s - 1.4, y, 3, (t | 0) * 7 + 1);
     boxTS(t - 0.075, t + 0.075, LAMP.s - 0.075, LAMP.s + 0.075, y, top,
       [0.190, 0.186, 0.178]);
     // The arm, cranked seaward over the promenade.
@@ -14886,6 +14950,12 @@ async function buildJadrija(scene) {
     if (t < JAD.beachTo + 8) continue;
     ladder(t);
     if (((t / 11) | 0) % 3 === 0) ladder(t + 1.4);
+    // And what got left at the top of it. The foot of a ladder is where people
+    // take things off, which is why it is the densest small mess on the shore.
+    if (jit(t | 0, 11) < 0.62) {
+      clutter(t + 0.4, JAD.lip + 0.9, at(t).lip, 2 + ((jit(t | 0, 12) * 3) | 0),
+        (t | 0) * 3);
+    }
   }
 
   // ── benches ────────────────────────────────────────────────────────────────
