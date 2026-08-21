@@ -3423,10 +3423,33 @@ async function buildJadrija(scene) {
   // (Not `CROWD` — that name is already the walkers' gait table 1800 lines down,
   // and every file in src/ shares one lexical scope, so this shadowed it and the
   // whole resort failed to build at 78%.)
-  const TURNOUT = 0.5;
+  // It was a flat 0.5, and a flat turnout is the one thing a beach never has.
+  //
+  // The survey is unambiguous about this: thirty people under one cafe canopy
+  // in seventeen metres of frontage, and two on sixty metres by fifty of open
+  // plaza sixty metres away. People at a bathing station are where the shade,
+  // the drink and the water are, and the ground between those is empty — so
+  // spreading them evenly reads as a stadium crowd rather than as an afternoon.
+  //
+  // Weighted two ways. Along the shore, a bump at every business and at the
+  // root of the mole. Across it, toward the water: the far side of the
+  // promenade is a place you walk through on the way to somewhere.
+  const ATTRACT = SHOPS.map((S) => (S.t0 + S.t1) * 0.5).concat([JAD.jetty]);
+  const TURNOUT = 0.5;                     // kept as the flat rate's old name
+  const turnoutAt = (t, s) => {
+    let w = 0.20;
+    for (const a of ATTRACT) {
+      const d = (t - a) / 26;
+      w = Math.max(w, 0.20 + 1.35 * Math.exp(-d * d));
+    }
+    // And a general lift over the bathing edge, so the water is never deserted
+    // even where there is nothing to buy.
+    const edge = 1 - sat((s - JAD.mid) / 18);
+    return Math.min(0.96, w * (0.52 + 0.74 * edge));
+  };
   const bathers = [];
   const B = (t, s, y, ang, pose, k = 1, beat = null) => {
-    if (rng() >= TURNOUT) return null;
+    if (rng() >= turnoutAt(t, s)) return null;
     const b = { t, s, y, ang, pose, k, beat };
     bathers.push(b);
     return b;
