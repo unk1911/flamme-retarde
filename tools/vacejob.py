@@ -84,7 +84,11 @@ node("t5", "LoadWanVideoT5TextEncoder",
 node("swap", "WanVideoBlockSwap",
      {"blocks_to_swap": A.swap, "offload_img_emb": True,
       "offload_txt_emb": True, "use_non_blocking": True,
-      "vace_blocks_to_swap": 8})
+      # Follows `--swap`, rather than being 8 whatever happens. Hardcoded, it
+      # kept 2.9 GB of VACE blocks on the CPU of an 80 GB H100 that had asked
+      # for no swapping at all — which does not break anything, it just quietly
+      # pays PCIe for nothing on exactly the machine rented to avoid that.
+      "vace_blocks_to_swap": 8 if A.swap else 0})
 
 # The two LoRAs, chained. lightx2v is the cfg-step distill — it is what makes
 # twelve steps enough — and ditto_sim2real is the one doing the actual job.

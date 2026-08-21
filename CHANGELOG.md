@@ -12,6 +12,47 @@ geodata pipeline.
 
 ### Added
 
+- **Recording what you played** — `L` arms a rolling ten-second buffer of the
+  canvas and `N` writes it out as a `.webm`. `tools/record.mjs` cannot do this
+  and never will: it films a cutscene by holding the sequence clock and
+  scrubbing it to *n*/fps before each frame, which is only possible because a
+  cut is a pure function of time. Gameplay is a function of the mouse, so the
+  only way to film it is to keep what was actually drawn.
+
+  The obvious ring buffer — one recorder, drop the chunks older than ten
+  seconds — produces a broken file, and quietly. A WebM stream is a header and
+  a Tracks declaration followed by clusters, so the first chunk can never be
+  dropped, and keeping it leaves a hole: measured on a test canvas, twenty-one
+  of thirty chunks kept and ffmpeg then decoding 325 frames across a
+  sixteen-second timeline for what should have been the last ten, because a
+  block's timecode is relative to a Cluster header that went out with the gap.
+  So nothing is ever cut. Two recorders share one capture stream, staggered by
+  ten seconds and recycled every twenty, and a save takes whichever has been
+  running longer, entire — an ordinary WebM file that Chrome wrote itself,
+  between ten and twenty seconds long, always ending at the key press.
+
+  The game's own mix comes with it, off the `audio.tap()` that was put there
+  for `record.mjs`, so a clip has sound without a second pass. The HUD does
+  not: what is captured is the canvas, and every HUD in this game is DOM over
+  the top of it.
+
+  Armed rather than always on. Vsync-locked it is free either way — 60.02 fps
+  armed and not armed, because 15.77 ms and 14.96 ms both fit inside 16.7 — and
+  those two figures are the cost, measured with the frame limiter off, standing
+  still at Jadrija, five alternating windows: 67.5 fps not armed against 63.4
+  armed, eight tenths of a millisecond a frame for both decks and the sound
+  together. Invisible where there is headroom and not free where there is not,
+  so nothing exists until `L`: no stream, no encoder, no interval, and not a
+  single branch in `frame()`.
+
+  `L` and `N` because they were what was left. The board had `I`, `L`, `N` and
+  `Y` free and nothing else.
+
+- `tools/clip.mjs` turns a captured `.webm` into `%05d.png` at 848x480 and
+  16 fps for `tools/vacejob.py --frames` — the last ten seconds of it, centre
+  cropped to the target aspect rather than squashed the six tenths of a percent
+  that 1280x720 into 848x480 costs, with the trimmed sound written alongside.
+
 - **Burst mode** — `tools/burst.py` and `tools/burst-bootstrap.sh`: rent a
   Lambda GPU for the minutes a photoreal restyle actually takes, then give it
   back. The laptop's 4090 holds 5.4 GB of a 16.3 GB model and streams the other
@@ -40,6 +81,42 @@ geodata pipeline.
 
 - `tools/vacejob.py`, which builds the VACE restyle graph and queues it. It had
   been living in `/tmp` and a reboot destroyed it once already.
+
+### Measured
+
+- **5.4x, end to end.** The same 181-frame restyle — denoise 0.85, seed 7731,
+  identical control frames and prompt — takes 3 686 s on the laptop's RTX 4090
+  and 686 s on a Lambda H100 PCIe, both timed as ComfyUI's own "Prompt executed
+  in", so decode and the ESRGAN pass are inside both numbers. The H100 figure is
+  pessimistic: it was still swapping 2.9 GB of VACE blocks, since fixed.
+
+  The whole session cost $2.09 for 38 minutes, and most of that was setup rather
+  than rendering. On a warm box a clip is about $0.60.
+
+### Fixed
+
+- Three things the first paid boot found, all now pinned in the bootstrap:
+  ComfyUI master pulls `comfy_kitchen`, whose custom op is annotated
+  `kernel_size: list[int]` — PEP 585 builtin generics, which
+  `torch.library.infer_schema` rejects on torch 2.5 *and* 2.6, crashlooping the
+  server with a ValueError naming neither ComfyUI nor the node. Latest
+  WanVideoWrapper imports `apply_rope1`, which only exists in master, so against
+  a pinned ComfyUI it fails to import and every `WanVideo*` node silently leaves
+  `/object_info` while the server starts up perfectly happily. And KJNodes was
+  never installed at all, which surfaces as the first queue being rejected for
+  `ImageResizeKJ`. All three now pin to the commits the laptop runs, and the
+  bootstrap asserts the six nodes the workflow needs are actually present.
+
+- H100 SXM5 is not worth the extra dollar an hour for this: one box sat at
+  `Fabric State: In Progress` for 24 minutes while NVSwitch failed to
+  initialise, so `cudaGetDeviceCount()` returned error 802 and torch saw no GPU
+  at all. PCIe has no NVSwitch and cannot fail that way. The bootstrap now waits
+  for `torch.cuda.is_available()` before starting ComfyUI and gives up after
+  five minutes rather than twenty-five.
+
+- `burst.py`'s poll loop parsed `"0\n0"` as a frame count: `grep -c` prints 0
+  *and* exits 1 when it matches nothing, so the `|| echo 0` fallback fired as
+  well. Counts with `wc -l` now.
 
 ## [1.91.0] — 2026-08-20
 

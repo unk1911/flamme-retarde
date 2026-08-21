@@ -56,8 +56,14 @@ apt-get install -y git python3-venv python3-pip aria2 ffmpeg build-essential || 
 
 # ---- 3. ComfyUI --------------------------------------------------------------
 cd /home/ubuntu
-sudo -u ubuntu git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git
+# Pinned, not master. Master pulls in `comfy_kitchen`, whose na3d custom op is
+# annotated `kernel_size: list[int]` — PEP 585 builtin generics, which
+# torch.library.infer_schema rejects on 2.5 AND 2.6 (it wants typing.List[int]).
+# ComfyUI then crashloops on import with a ValueError that names neither
+# ComfyUI nor the node. v0.3.41 is what the laptop runs and predates it.
+sudo -u ubuntu git clone https://github.com/comfyanonymous/ComfyUI.git
 cd ComfyUI
+sudo -u ubuntu git checkout -q v0.3.41
 sudo -u ubuntu python3 -m venv venv
 V=/home/ubuntu/ComfyUI/venv/bin
 sudo -u ubuntu $V/pip install -q --upgrade pip wheel
@@ -75,14 +81,38 @@ else
 fi
 sudo -u ubuntu $V/pip install -q -r requirements.txt
 
-# custom nodes: the wrapper that owns every WanVideo* node, and VHS for
-# VHS_LoadImagesPath. Pinned to nothing on purpose — the workflow is validated
-# against /object_info at queue time by vacejob.py, which fails loudly on a
-# renamed input rather than silently sampling the wrong thing.
+# ── custom nodes, pinned to the commits the laptop runs ────────────────────
+#
+# Three of them, and the first version of this file had one wrong and one
+# missing. Both cost a paid boot to find, so they are written down:
+#
+#   KJNodes was not here at all. It is not obvious that it is needed — nothing
+#   in the workflow is called "KJ" except `ImageResizeKJ`, which is the node
+#   that fits the control frames to the sampler's resolution. The queue is
+#   rejected with "Cannot execute because node ImageResizeKJ does not exist",
+#   twelve minutes and $1.26 into an instance.
+#
+#   And `--depth 1` of master is wrong for all three. Latest WanVideoWrapper
+#   imports `apply_rope1` from `comfy.ldm.flux.math`, which exists in ComfyUI
+#   master and not in the v0.3.41 this pins to — so the wrapper fails to import
+#   and every WanVideo* node silently vanishes from /object_info while ComfyUI
+#   itself starts up perfectly happily. A custom node that fails to import is a
+#   log line, not an error.
+#
+# So: the same commits the laptop has, fetched by sha. The pairing is what
+# matters — ComfyUI and its nodes move together, and any two halves from
+# different weeks are a coin toss.
 cd custom_nodes
-for r in kijai/ComfyUI-WanVideoWrapper Kosinkadink/ComfyUI-VideoHelperSuite; do
-  sudo -u ubuntu git clone --depth 1 "https://github.com/$r.git"
-done
+clone_at() {   # clone_at <repo> <sha>
+  local name=${1##*/}
+  sudo -u ubuntu git clone -q "https://github.com/$1.git" || return 1
+  ( cd "$name" && sudo -u ubuntu git fetch -q --depth 1 origin "$2" \
+      && sudo -u ubuntu git checkout -q FETCH_HEAD ) || log "  WARN $name not pinned"
+  log "  $name @ $(cd "$name" && git rev-parse --short HEAD)"
+}
+clone_at kijai/ComfyUI-WanVideoWrapper 8479624614ec0d52e982bbbab633736fb1a15eef
+clone_at kijai/ComfyUI-KJNodes         f7eb33abc80a2aded1b46dff0dd14d07856a7d50
+clone_at Kosinkadink/ComfyUI-VideoHelperSuite a7ce59e381934733bfae03b1be029756d6ce936d
 for d in */; do
   [ -f "$d/requirements.txt" ] && sudo -u ubuntu $V/pip install -q -r "$d/requirements.txt"
 done
@@ -137,5 +167,37 @@ Restart=on-failure
 WantedBy=multi-user.target
 EOS
 systemctl daemon-reload
+
+# Wait for CUDA before starting, because on an SXM box it is not ready when the
+# instance is. H100 SXM5 sits at `Fabric State: In Progress` while NVSwitch
+# initialises, and until it clears, cudaGetDeviceCount() returns error 802 and
+# torch reports no GPU at all. ComfyUI starting into that crashloops until
+# systemd gives up, and the failure names CUDA rather than the fabric. One box
+# never cleared it in 24 minutes and had to be scrapped — so this gives up after
+# five and says so, which is a cheaper way to learn the same thing.
+for i in $(seq 1 30); do
+  if sudo -u ubuntu $V/python -c 'import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)' 2>/dev/null; then
+    log "cuda ready after $((i*10))s"; break
+  fi
+  systemctl start nvidia-fabricmanager >/dev/null 2>&1
+  [ $i -eq 30 ] && log "WARNING cuda never came up — fabric stuck; scrap this box"
+  sleep 10
+done
+
 systemctl enable --now comfyui
 log "comfyui starting; bootstrap done"
+
+# One last check, because a missing custom node does not stop ComfyUI starting —
+# it just removes nodes from /object_info and turns the first queue into a 400.
+for i in $(seq 1 20); do
+  miss=$(curl -s http://127.0.0.1:8188/object_info 2>/dev/null | python3 -c '
+import json, sys
+try: d = json.load(sys.stdin)
+except Exception: sys.exit(1)
+need = ["WanVideoSampler", "WanVideoVACEEncode", "WanVideoModelLoader",
+        "ImageResizeKJ", "VHS_LoadImagesPath", "ImageUpscaleWithModel"]
+print(",".join(n for n in need if n not in d))' 2>/dev/null) && break
+  sleep 15
+done
+[ -z "${miss:-}" ] && log "all workflow nodes present" \
+                   || log "WARNING missing nodes: $miss"

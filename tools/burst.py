@@ -60,9 +60,11 @@ instance through the Lambda API from the box itself. It survives this laptop
 dying, the SSH tunnel dropping, and the operator going to bed. `--max-min`
 sets it; there is no way to launch without one.
 
-That does mean an API key sits on a rented machine. Use a second Lambda key
-scoped to this and nothing else, in BURST_API_KEY; the tool refuses to copy
-LAMBDA_API_KEY up.
+That does mean the Lambda API key sits on a rented machine, in cloud-init's
+user_data and so in /var/lib/cloud as well. Lambda keys are account-wide — they
+do not scope — so a second key would buy independent revocation and nothing
+else, which is not worth the ceremony of keeping two in sync. One key, and if a
+box is ever suspect, rotate it.
 """
 
 from __future__ import annotations
@@ -208,11 +210,8 @@ def cmd_preflight(_a):
          "LAMBDA_SSH_KEY_NAME")
     kf = os.environ.get("LAMBDA_SSH_KEY_FILE", "").strip()
     line(bool(kf) and Path(kf).exists(), "LAMBDA_SSH_KEY_FILE", kf or "unset")
-    sd = os.environ.get("BURST_API_KEY", "").strip()
-    line(bool(sd), "BURST_API_KEY (self-destruct)",
-         "set" if sd else "unset — instance cannot terminate itself")
-    if sd and sd == os.environ.get("LAMBDA_API_KEY", "").strip():
-        line(False, "BURST_API_KEY is separate", "same as LAMBDA_API_KEY — use a second key")
+    line(bool(os.environ.get("LAMBDA_API_KEY", "").strip()),
+         "key for self-destruct", "same key; goes onto the rented box")
 
     print("local")
     line(BOOTSTRAP.exists(), "tools/burst-bootstrap.sh")
@@ -271,15 +270,7 @@ def cmd_up(a):
     if not a.yes:
         sys.exit("refusing to launch without --yes (this rents a GPU by the hour)")
 
-    key = os.environ.get("BURST_API_KEY", "").strip()
-    if not key and not a.no_self_destruct:
-        sys.exit("BURST_API_KEY is not set, so the instance could not terminate "
-                 "itself if this laptop died. Set it (a SECOND Lambda key, "
-                 "scoped to this) or pass --no-self-destruct and accept that "
-                 "the only thing stopping the meter is you.")
-    if key and key == os.environ.get("LAMBDA_API_KEY", "").strip():
-        sys.exit("BURST_API_KEY must be a different key from LAMBDA_API_KEY — "
-                 "this one gets copied onto a rented machine")
+    key = os.environ.get("LAMBDA_API_KEY", "").strip()
 
     name, region, info = L.pick_from_fleet(
         FLEET, prefs=[r for r in os.environ.get("BURST_REGIONS", "").split(",") if r],
@@ -390,9 +381,12 @@ def cmd_run(a):
         want = a.n
         t0 = time.time()
         while True:
-            r = ssh(ip, f"ls ~/ComfyUI/output 2>/dev/null | grep -c 'vace{a.tag}_' "
-                        "|| echo 0", check=False)
-            done = int((r.stdout or "0").strip() or 0)
+            # `grep -c` prints 0 AND exits 1 when it matches nothing, so a
+            # trailing `|| echo 0` fires as well and the reply is "0\n0".
+            # Count with wc instead, which has one exit status and one line.
+            r = ssh(ip, f"ls ~/ComfyUI/output 2>/dev/null | grep 'vace{a.tag}_' "
+                        "| wc -l", check=False)
+            done = int((r.stdout or "0").strip().splitlines()[-1] or 0)
             say(f"{done}/{want} frames · {(time.time() - t0) / 60:.1f} min")
             if done >= want:
                 break
