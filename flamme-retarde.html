@@ -14104,6 +14104,37 @@ async function buildJadrija(scene) {
           k % 3 === 0 ? [0.190, 0.200, 0.210] : [0.560, 0.548, 0.512]);
       }
     }
+    // And the cafe's own parasols: cream, on a pebble-aggregate disc, one to a
+    // pair of tables. Furled and tied after five, which is how every frame shot
+    // at ten to six in the survey has them.
+    if (awn > 0) {
+      const fs = S.s0 - awn;
+      const furled = (CONFIG.hour || 14) > 17;
+      const CREAM = [0.560, 0.545, 0.508];
+      for (let k = 0; k < 2; k++) {
+        const t = S.t0 + 2.6 + k * ((S.t1 - S.t0 - 5.2) || 1);
+        const s2 = fs - 3.1;
+        const yy = at(t).deck;
+        // The ballast disc, which is what stops it being a pole in the ground.
+        post(W, t, s2, yy, yy + 0.10, 0.46, [0.470, 0.452, 0.418], 10);
+        post(W, t, s2, yy + 0.10, yy + 2.42, 0.035, [0.520, 0.512, 0.492], 6);
+        if (furled) {
+          // Tied: a long thin cone of cloth up the pole.
+          post(W, t, s2, yy + 0.95, yy + 2.62, 0.11, CREAM, 7);
+        } else {
+          for (let i = 0; i < 8; i++) {
+            const a0 = (i / 8) * TAU, a1 = ((i + 1) / 8) * TAU;
+            const R = 1.42;
+            b.quad(W(t, s2, yy + 2.42),
+              W(t + Math.cos(a0) * R, s2 + Math.sin(a0) * R, yy + 2.04),
+              W(t + Math.cos(a1) * R, s2 + Math.sin(a1) * R, yy + 2.04),
+              W(t, s2, yy + 2.42), i % 2 ? CREAM : shade(CREAM, 0.94));
+          }
+        }
+        runs.push({ t0: t - 0.5, t1: t + 0.5, s0: s2 - 0.5, s1: s2 + 0.5,
+          y: yy, h: 0.10 });
+      }
+    }
     void terraceSeats;
     runs.push({ t0: S.t0 - 0.1, t1: S.t1 + 0.1, s0: S.s0 - 0.1, s1: S.s1 + 0.1,
       y: y0, h: h + 0.1 });
@@ -15741,7 +15772,19 @@ async function buildJadrija(scene) {
   for (let t = 9; t < LEN - 9; t += 7.4 + rng() * 5.0) {
     const st = at(t), y = st.mid;
     if (Math.abs(t - gapAt) < 5) continue;                  // keep the jetty clear
-    if (rng() < 0.62) {
+    // Free-standing parasols belong on the sand, not on the concrete.
+    //
+    // In thirty-nine photographs and a hundred and thirty-two frames of the
+    // built stretch there is not one parasol standing on the promenade, the
+    // quay, the mole or the plaza — every single one belongs to a cafe
+    // terrace, cream, on a pebble-aggregate disc. What was here put a striped
+    // beach parasol every ten metres along a concrete bathing station.
+    //
+    // West of `beachTo` they stay, and deliberately: that is sand, no survey
+    // photograph reaches it, and a beach with nothing on it would be a
+    // different mistake made for the same reason. Absence of evidence is not a
+    // licence in either direction.
+    if (t < JAD.beachTo && rng() < 0.62) {
       const s = 5.4 + rng() * 3.6;
       parasol(t, s, y, pick(SWIM));
       // The pole only. The canopy is at 1.9 m and being stopped by shade you
