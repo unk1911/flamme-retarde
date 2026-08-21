@@ -13727,6 +13727,30 @@ async function buildJadrija(scene) {
     }
   }
 
+  /**
+   * Where the chairs of a terrace stand, in the resort's frame.
+   *
+   * Shared, because two passes a thousand lines apart both need it: the one
+   * that draws the furniture and the one that puts somebody in it. Derived
+   * twice, they drift, and what you get is a cafe where everybody is sitting
+   * half a metre to the left of a chair.
+   */
+  function terraceSeats(S) {
+    const out = [];
+    if (!S.awn) return out;
+    const fs = S.s0 - S.awn;
+    for (let k = 0; k < 4; k++) {
+      const t = S.t0 + 0.9 + k * ((S.t1 - S.t0 - 1.8) / 3);
+      const s = fs - 1.9 + (k % 2) * 0.5;
+      const ang = (k % 2) * 0.5 - 0.25;
+      for (const [dt, ds] of [[0, 0], [0.62, 0.10], [0.30, 0.74]]) {
+        out.push([t + dt * Math.cos(ang) - ds * Math.sin(ang),
+          s + dt * Math.sin(ang) + ds * Math.cos(ang), ang]);
+      }
+    }
+    return out;
+  }
+
   /** A moulded chair and a café table, which is all the terraces need. */
   function terraceSet(t, s, y, ang, col) {
     const seat = [0.230, 0.235, 0.240];
@@ -13829,8 +13853,12 @@ async function buildJadrija(scene) {
         [[fs - 0.02, top - 0.42], [fs + 0.10, top - 0.42],
           [fs + 0.10, top - 0.16], [fs - 0.02, top - 0.16]],
         shade(S.roof, 0.94));
+      // Stopping at top - 0.44 and not top - 0.20, which is what put a post
+      // straight through the middle of "Slastičarnica". The valance hangs from
+      // top - 0.42 down, and the name is on it: a prop that reaches into that
+      // band is a prop standing in front of the one thing the shop is called.
       for (let t = S.t0 - 0.2; t <= S.t1 + 0.21; t += (S.t1 - S.t0 + 0.4) / 3) {
-        post(W, t, fs + 0.20, y0, top - 0.20, 0.055, [0.560, 0.552, 0.530], 6);
+        post(W, t, fs + 0.20, y0, top - 0.44, 0.055, [0.560, 0.552, 0.530], 6);
       }
       if (S.name) shopSign(S, (S.t0 + S.t1) * 0.5, fs - 0.16, top - 0.30,
         Math.min(6.4, (S.t1 - S.t0) * 0.72), 0.38);
@@ -13901,6 +13929,7 @@ async function buildJadrija(scene) {
           k % 3 === 0 ? [0.190, 0.200, 0.210] : [0.560, 0.548, 0.512]);
       }
     }
+    void terraceSeats;
     runs.push({ t0: S.t0 - 0.1, t1: S.t1 + 0.1, s0: S.s0 - 0.1, s1: S.s1 + 0.1,
       y: y0, h: h + 0.1 });
     b = deck;
@@ -15553,6 +15582,25 @@ async function buildJadrija(scene) {
     if (lead && rng() < 0.5) {
       B(t + 0.7, lane + 1.1, y, lead.ang, lead.pose,
         rng() < 0.28 ? 0.68 : 1, lead.beat && { ...lead.beat });
+    }
+  }
+
+  // Somebody in the chairs, which had every table on the boardwalk laid and
+  // nobody at any of them.
+  //
+  // The bather generators walk the shore lanes and never go near a shop, so the
+  // terraces came out as furniture showrooms — and the Slasticarnica alone has
+  // thirty people at it in the survey. Placed off `terraceSeats`, the same list
+  // the chairs themselves are drawn from, so nobody sits half a metre to the
+  // left of one.
+  //
+  // Not every chair: a full terrace at four in the afternoon still has empty
+  // seats at the ends of it, and a cafe with every single chair taken reads as
+  // a stadium. Two in three, which is what the photographs show.
+  for (const S of SHOPS) {
+    for (const [t, s2, ang] of terraceSeats(S)) {
+      if (rng() < 0.34) continue;
+      B(t, s2, at(t).deck, ang + Math.PI * 0.5, 'sit', 1);
     }
   }
 
