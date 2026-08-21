@@ -105,7 +105,18 @@ node("model", "WanVideoModelLoader",
      {"model": "Wan2_1-T2V-14B_fp8_e4m3fn.safetensors",
       "base_precision": "bf16", "quantization": "fp8_e4m3fn",
       "load_device": "offload_device", "attention_mode": "sageattn",
-      "block_swap_args": ["swap", 0], "lora": ["lora2", 0],
+      # Only wire the block-swap node up when swapping is actually wanted.
+      # Attaching it with blocks_to_swap=0 does not mean "no swap": the wrapper
+      # calls block_swap(blocks_to_swap - 1) == block_swap(-1), and the guard
+      # that would rescue the VACE blocks reads
+      #     if blocks_to_swap != -1 and vace_blocks_to_swap == 0
+      # so at -1 it never fires, nothing ever moves the VACE blocks off the
+      # offload device, and the first forward dies in forward_vace with
+      # "Expected all tensors to be on the same device". Left out entirely, the
+      # sampler takes its plain `transformer.to(device)` path, which is what a
+      # card with room for the whole model wants anyway.
+      **({"block_swap_args": ["swap", 0]} if A.swap else {}),
+      "lora": ["lora2", 0],
       "vace_model": ["vacesel", 0]})
 
 node("txt", "WanVideoTextEncode",
