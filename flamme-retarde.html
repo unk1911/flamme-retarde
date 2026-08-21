@@ -4651,8 +4651,24 @@ void main(){
     vec2 d = vWorld.xz - uLitter.xy;
     vec2 ts = vec2(dot(d, uLitterAx), dot(d, vec2(-uLitterAx.y, uLitterAx.x)));
     float r = length(ts / uLitter.zw);
-    float litter = (1.0 - smoothstep(0.78, 1.0, r)) * (1.0 - shoreT);
-    base *= mix(vec3(1.0), vec3(1.00, 0.78, 0.63), litter);
+    // Softer at the rim than 0.78, which put a hard diagonal across the stand
+    // where the ellipse ran out — a seam nobody would read as a wood ending.
+    float litter = (1.0 - smoothstep(0.45, 1.0, r)) * (1.0 - shoreT);
+    // Multiplying was not enough, and the reason is the cover class underneath.
+    //
+    // A warm multiply over GRASS gives warm grass, so the pine stand came out
+    // as a green lawn on one side of the class boundary and needle floor on
+    // the other, with the join running diagonally through the trees. Under
+    // those crowns there is no grass at all — it is bare orange litter with
+    // cones on it, everywhere, in every frame of the walk through the wood.
+    //
+    // So take the luminance and re-colour it, rather than tinting the colour.
+    // That is what keeps the objection the multiply was written for: the karst
+    // ribs, the three scales of mottle and the two-metre gravel all live in the
+    // luminance and come through untouched. Only the hue is replaced.
+    float lum = dot(base, vec3(0.2126, 0.7152, 0.0722));
+    base = mix(base, lum * vec3(1.46, 1.06, 0.74), litter * 0.85);
+    base *= mix(vec3(1.0), vec3(1.00, 0.88, 0.78), litter);
   }
 
   // ── the seabed ──────────────────────────────────────────────────────────
