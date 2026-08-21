@@ -15873,6 +15873,74 @@ async function buildJadrija(scene) {
     }
   }
 
+  // ── what is parked in the wood ─────────────────────────────────────────────
+  // Both walk-throughs film cars standing among the pines — nose-in, in loose
+  // rows on the bare needle floor, with no marked bay anywhere. That is what
+  // the stand behind a Dalmatian bathing station is in August: half wood, half
+  // car park, and the game had a wood with nobody's car in it.
+  //
+  // Built here rather than borrowed from 37-props.js: `carNearProto` is drawn
+  // through an instanced prop layer owned by the town, and reaching into that
+  // from the resort would mean sharing a layer whose capacity is budgeted
+  // somewhere else entirely.
+  {
+    const back6 = b;
+    b = up;
+    const GLASS = [0.100, 0.125, 0.150];
+    const TYRE = [0.070, 0.070, 0.080];
+    const LAMP2 = [0.780, 0.760, 0.690];
+    const PAINT = [[0.700, 0.700, 0.695], [0.560, 0.570, 0.585],
+      [0.230, 0.235, 0.245], [0.115, 0.115, 0.125], [0.380, 0.130, 0.115],
+      [0.140, 0.200, 0.340], [0.480, 0.470, 0.430]];
+    let n = 0;
+    for (let t = JAD.beachTo - 40; t < LEN - 30; t += 5.6) {
+      if (!clearOfShops(t)) continue;
+      // Dense: the aerial shows the whole back of the wood given over to it in
+      // August, and one car every fourteen metres reads as a lay-by rather than
+      // as a car park.
+      const j = jit(t | 0, 21);
+      if (j > 0.74) continue;
+      // Inside 39 m of the water, and that is not a taste call: the note over
+      // the house thinning records that OSM maps nothing at all within 39 m of
+      // this shore, which makes it the one band where a car cannot end up
+      // parked in somebody's front room. The first cut put two rows at 37 and
+      // 50 and the second row stood inside the houses — invisible from the
+      // promenade and unmissable the moment the camera was in one.
+      const row = jit(t | 0, 22) < 0.5 ? 0 : 1;
+      const s0 = JAD.rowB + 5.4 + row * 5.6 + jit(t | 0, 23) * 1.4;
+      const y = surfaceY(t, s0 + 2.0);
+      const col = PAINT[((jit(t | 0, 24) * 97) | 0) % PAINT.length];
+      // Nose-in: the long axis runs inland, so `s` is the length of the car.
+      const P = (dt, ds, yy) => W(t + dt, s0 + ds, yy);
+      // Body, in two masses so it has a bonnet and a cabin.
+      boxIn(P, -0.86, 0.86, 0.10, 4.30, y + 0.34, y + 0.98, col, shade(col, 1.05));
+      boxIn(P, -0.80, 0.80, 1.05, 3.25, y + 0.98, y + 1.44,
+        shade(col, 0.94), shade(col, 1.02));
+      // Glass, inset a little all round so it reads as glazing and not paint.
+      boxIn(P, -0.74, 0.74, 1.12, 3.18, y + 1.00, y + 1.40, GLASS);
+      boxIn(P, -0.81, 0.81, 1.05, 3.25, y + 1.03, y + 1.37, shade(col, 0.90));
+      // Bumpers and lights.
+      boxIn(P, -0.84, 0.84, 0.02, 0.16, y + 0.42, y + 0.72, [0.180, 0.180, 0.190]);
+      boxIn(P, -0.84, 0.84, 4.24, 4.38, y + 0.42, y + 0.72, [0.180, 0.180, 0.190]);
+      for (const o of [-0.58, 0.58]) {
+        boxIn(P, o - 0.20, o + 0.20, 0.10, 0.20, y + 0.74, y + 0.92, LAMP2);
+        boxIn(P, o - 0.20, o + 0.20, 4.20, 4.30, y + 0.74, y + 0.90,
+          [0.420, 0.090, 0.080]);
+      }
+      // Wheels.
+      for (const [ot, os] of [[-0.80, 0.95], [0.80, 0.95], [-0.80, 3.45], [0.80, 3.45]]) {
+        boxIn(P, ot - 0.11, ot + 0.11, os - 0.32, os + 0.32, y, y + 0.62, TYRE);
+        boxIn(P, ot - 0.13, ot + 0.13, os - 0.19, os + 0.19,
+          y + 0.13, y + 0.49, [0.520, 0.528, 0.540]);
+      }
+      runs.push({ t0: t - 0.95, t1: t + 0.95, s0: s0 - 0.1, s1: s0 + 4.5,
+        y, h: 1.44 });
+      n++;
+    }
+    void n;
+    b = back6;
+  }
+
   // ── the wall along the back, and the playground behind it ─────────────────
   // Both from the approach lane, and both recurring: a low rendered wall capped
   // with dressed limestone blocks runs the length of it with planters standing
@@ -16189,7 +16257,10 @@ async function buildJadrija(scene) {
     if (!clearOfShops(t)) continue;
     for (let row = 0; row < 3; row++) {
       if (row && rng() < 0.28) continue;
-      const s = JAD.rowB + 2.6 + row * 10.5 + rng() * 9.5;
+      // Also held inside the 39 m band. Three rows at 10.5 m spacing reached
+      // s 59, which is well into the OSM footprints, and a pine growing up
+      // through a roof is the same bug as a car parked in a hall.
+      const s = JAD.rowB + 2.2 + row * 3.4 + rng() * 3.0;
       // Not through the vikendica, which stands out here now and is 6.8 by 7.7
       // of the strip these were planted along.
       if (Math.hypot(t - VIK.t, s - VIK.s) < 8.5) continue;
