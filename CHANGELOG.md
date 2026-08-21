@@ -8,6 +8,89 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.95.0] — 2026-08-21
+
+Everything built cleanly. Looking at it is what found the bugs.
+
+Eighteen passes over Jadrija against the August field survey and the two
+walk-through videos, which had not been read at all until this release.
+
+### Added
+
+- **Ten businesses on the boardwalk**, west to east between the mole and the
+  kabine, from one `SHOPS` table and one `shopfront()` builder: Pizzeria F2, a
+  thatched konoba, a green kiosk, beach bar MINI, Tisak, Caffee bar H2O,
+  Slastičarnica JADRIJA, a trampoline park, Maslina, and Caffe Trampulin. Four
+  of them have no legible sign in any photograph or frame and ship unnamed
+  rather than invented. Awnings, rafters, gutters, counters, mullions,
+  thresholds, condensers, downpipes, pots — and chairs and tables with people
+  in two of every three.
+- **The plaza**, 56 m by 34 m of power-floated concrete running out over deep
+  water with a hard square unrailed edge. The largest single surface at the
+  real Jadrija; this file had sea there. Walkable, and verified so.
+- **A pine wood** rather than a hedge: 30-40 m deep, three rows, four times the
+  density, stems bare to two thirds of their height, and every trunk leaning
+  the same way — out of each other's shade, toward the water.
+- **The west end is a beach.** Strand Jadrija is two hundred metres of sand and
+  shingle; the game was laying a quay, three terraces and steps along all of
+  it. The terraces flatten into one slope west of t 205 over a 34 m blend, so
+  the risers and the quay wall close to nothing on their own.
+- **Fifty cars parked in the wood**, a children's playground, the rendered wall
+  with dressed limestone coping that is in every frame looking inland, beach
+  showers, a precast plinth bench, pebble-aggregate bins, limestone rip-rap at
+  the shingle junction, hire kayaks, and the centenary boards — a grid of
+  kabina doors, 100, od 1922. — in their three photographed places.
+- **Litter on the concrete**: sandals in pairs, dropped towels, slumped bags at
+  every ladder and lamp foot. There had been nothing on the floor anywhere.
+- `tools/scene.mjs` films any scripted beat with CDP virtual time;
+  `tools/geotag.mjs` puts survey photographs into the resort's own frame.
+
+### Changed
+
+- **Eighty kabine were standing on the beach.** There is one run at Jadrija and
+  it is at the eastern end, from t 396 where OSM maps its changing rooms.
+- **The mole is where the aerial puts it**, `JAD.jetty: 258`, not at half the
+  shore length — and it is eleven metres across and poured solid, not a 4.8 m
+  catwalk on twelve piles for a taxi boat that never comes.
+- **Nobody was spread evenly any more.** `turnoutAt(t, s)` weights the crowd
+  with a bump at every business and a lift over the bathing edge: thirty people
+  under one canopy in the survey and two on sixty metres of open plaza.
+- Two promenade surfaces with a dead-straight seam — and the survey plan had
+  them the wrong way round; v_022 puts the crazy paving inland.
+- Parasols moved to the cafes they belong to and furled after five. Kept on the
+  unphotographed sand, because absence of evidence is not a licence either way.
+- U throws you 202 m instead of 50, integrated rather than typed.
+
+### Fixed
+
+- **The beach was empty for a reason no constant could express.** The instanced
+  rigs were wired as a *fallback* for a payload with no skinned blobs, so eight
+  meshes were the entire crowd; and only stand, wade and walk were eligible for
+  the cast, of which there were eighteen. `sit` and `lie` had been dropped
+  because the blobs have no clip for either — true of the blobs and not of the
+  instanced rig, which poses both properly. Eight people became eighty-four.
+- **Shop signs were mounted edge-on.** The rotation was copied from `mapBoard`,
+  which is on a gable and therefore faces along the shore; a shopfront faces
+  across it. Every sign drew as a hairline — which reads as absent geometry,
+  not as wrong, and sent two earlier fixes looking in the wrong place. Their
+  canvases were also thirty pixels tall, and the fitter only ever shrank.
+- **Nothing may be placed at s > 38.** OSM maps nothing within 39 m of this
+  shore, which makes that band the only one where a prop cannot land inside a
+  front room. The second row of cars and the third row of trees were both in
+  the footprints — invisible from the promenade, unmissable from a bedroom.
+- The wood's floor was a lawn: the litter term multiplied the cover class by a
+  warm tint, and a warm multiply over GRASS is warm grass. It re-colours the
+  luminance now, which keeps the ribs and the mottle the multiply protected.
+- `traceShore` could leave the coast it was following once carried east, and
+  reported a 915 m shore ending 428 m north with nothing raised anywhere.
+
+### Known
+
+- `menuWall()` renders nothing and is shipped switched off. It runs, reports the
+  right position and `visible`, logs no error, and neither its textured plane
+  nor a plain box drawn beside it appears — while the vitrine ten lines away in
+  the same function draws fine.
+
 ## [1.94.0] — 2026-08-21
 
 Eighty kabine were standing on the beach.
