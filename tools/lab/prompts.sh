@@ -53,3 +53,74 @@ forest, bare grey limestone ridges baked in August heat, dry golden scrub, \
 deep blue Adriatic sea, red-tiled roofs of a coastal town, filmed from a \
 helicopter, harsh midday sun, heat haze, real photographed news video, \
 film grain, 35mm, cinematic colour grade"
+
+# ── the three scripted beats, filmed by tools/scene.mjs ──────────────────────
+# One prompt per shot, which is the lesson of the 33-run matrix: at cfg 1.0 the
+# positive prompt is the whole of the text conditioning, so it has to describe
+# the picture that is actually in the control frames.
+
+# R — the race off the jetty at Jadrija.
+JETTY="photorealistic footage of a concrete jetty on a Dalmatian beach near \
+Sibenik, Croatia, in high summer, two young women in swimsuits standing on the \
+jetty, one diving into clear turquoise Adriatic water, a low green island \
+across the channel, small white boats moored, bare limestone and dry golden \
+scrub, bright August midday sun, real photographed holiday video, film grain, \
+35mm, cinematic colour grade"
+
+# The same beat shot as if from a drone, which the camera arc nearly is.
+JETTY2="photorealistic drone footage over a stone jetty on the Adriatic coast \
+near Sibenik, Croatia, crystal clear shallow turquoise water over pale sand, \
+two swimmers, moored wooden boats, a green island on the horizon, high summer, \
+harsh midday sun, real photographed aerial video, film grain, 35mm, cinematic \
+colour grade"
+
+# J — under the canopy, coming down over the fire.
+CHUTE="photorealistic aerial footage descending under a parachute over the \
+coast near Sibenik, Croatia, a forest fire burning on the far shore with \
+orange flames and thick brown smoke rising from burning pine forest, bare grey \
+limestone ridges baked in August heat, dry golden scrub, deep blue Adriatic \
+sea and islands, red-tiled roofs of a coastal town, harsh midday sun, heat \
+haze, real photographed news video, film grain, 35mm, cinematic colour grade"
+
+# The same, written for the wider turn where the sea fills the frame.
+CHUTE2="photorealistic skydiving GoPro footage high over the Dalmatian coast \
+near Sibenik, Croatia, deep blue Adriatic sea and green \
+islands far below, wildfire smoke drifting over dry limestone hills, red-tiled \
+coastal town, high summer, brilliant midday sun, real photographed video, \
+film grain, 35mm, cinematic colour grade"
+
+# O — the walk into the laptop on the upper floor of the vikendica.
+DESK="photorealistic footage of an Alienware gaming laptop open on a white \
+table in a bright Dalmatian seaside apartment, the camera moving slowly in \
+towards the screen, RGB backlit keyboard glowing, wide glass doors open onto a \
+terrace with the deep blue Adriatic and a green island behind, a television on \
+the right, white tiled floor, brilliant August afternoon light, real \
+photographed video, shallow depth of field, film grain, 35mm, cinematic \
+colour grade"
+
+DESK2="photorealistic close footage of a black gaming laptop with a glowing \
+RGB backlit keyboard standing open on a white table, bright sea light from \
+open terrace doors behind it, real aluminium and plastic surfaces, reflections \
+on the dark screen, a Croatian news channel on a television beside it, real \
+photographed video, shallow depth of field, film grain, 35mm, cinematic \
+colour grade"
+
+# The three things the branch does at Jadrija, filmed by tools/scene.mjs.
+BLAZE="photorealistic footage of a young woman standing on a concrete beach \
+promenade engulfed in bright orange flames, fire and sparks rising off her, a \
+row of whitewashed beach changing huts with coloured doors behind her, dry \
+golden scrub and pine, brilliant August midday sun on the Adriatic coast, real \
+photographed video, film grain, 35mm, cinematic colour grade"
+
+KABWINE="photorealistic footage inside a small dark whitewashed beach changing \
+hut on the Dalmatian coast, a young woman soaking wet standing on the concrete \
+floor, a bead curtain in the doorway behind her with brilliant sunlight and \
+blue Adriatic sea beyond, a folding bed against the wall, dust in the air, hard \
+shafts of light, real photographed video, shallow depth of field, film grain, \
+35mm, cinematic colour grade"
+
+KABTV="photorealistic footage inside a small dark whitewashed beach changing \
+hut, an old 1960s wooden valve television with rabbit-ear aerials glowing on a \
+small table, a vintage bakelite radio beside it, dim warm interior, dust in the \
+air, a bead curtain and bright sunlight at the door, real photographed video, \
+shallow depth of field, film grain, 35mm, moody cinematic colour grade"

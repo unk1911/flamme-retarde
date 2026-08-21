@@ -2533,14 +2533,42 @@ function paintSwimHud() {
 function dryLand(x0, z0, yaw) {
   const DRY = 0.45;          // metres above the waterline before it is a beach
   let best = null, bestD = 1e9;
+  // The fallback is the highest *sea bed* within reach and it is not land. It
+  // is returned separately, flagged, because the one caller used to take it as
+  // an answer — and a sea bed 0.15 m under the surface accepted as a beach is
+  // exactly what "E does nothing" looked like from the chair: you were put
+  // ashore on the water, and the shoreline handover in `ground.tick` noticed
+  // and put you straight back in. Nothing failed loudly enough to be seen.
   let fallback = null, fallbackH = -1e9;
+  // And the second tier, which is the difference between a beach and a coast.
+  //
+  // `DRY` is a height, and on much of this shore the height and the coastline
+  // disagree: the DEM is 12.7 m a sample against a rasterised cover mask, so
+  // there are flats where `isSea` has said land for sixty metres while
+  // `groundAt` is still reading 0.10. Measured at world (-1600, 700) — the
+  // north side of the channel — where the mask turns to land and the terrain
+  // does not rise above 0.10 m for another sixty metres inland. A height-only
+  // test finds no beach there at all and the search comes back empty, which is
+  // how E could fail two hundred metres off a coastline you can see.
+  //
+  // So: a real beach if there is one, and otherwise anywhere the game itself
+  // considers not-sea — which is the same test `waadeIn` uses to decide you
+  // have gone back in, and therefore the only one that will not bounce you
+  // straight out again.
+  let shore = null, shoreD = 1e9;
   for (let a = 0; a < 26; a++) {
     const ang = yaw + (a === 0 ? 0 : (a % 2 ? 1 : -1) * Math.ceil(a / 2) * 0.25);
     const dx = -Math.sin(ang), dz = -Math.cos(ang);
-    for (let d = 1.5; d <= 70; d += 1.5) {
+    // 160 m rather than 70. The old reach was written for somebody standing
+    // chest deep with the beach in front of them; it is now also the last leg
+    // of a two-hundred-metre walk in and has to cover a wide flat.
+    for (let d = 1.5; d <= 160; d += 1.5) {
       const x = x0 + dx * d, z = z0 + dz * d;
       const h = groundAt(x, z);
       if (h > fallbackH) { fallbackH = h; fallback = [x, z, ang]; }
+      if (!isSea(x, z) && !isSea(x + dx * 2, z + dz * 2) && d < shoreD) {
+        shoreD = d; shore = [x + dx * 1.5, z + dz * 1.5, ang];
+      }
       if (h < DRY || groundAt(x + dx * 2, z + dz * 2) < DRY) continue;
       // A metre and a half further in again, so you land on the beach rather
       // than on its edge.
@@ -2548,7 +2576,9 @@ function dryLand(x0, z0, yaw) {
       break;
     }
   }
-  return best || fallback;
+  if (best) return { at: best, dry: true };
+  if (shore) return { at: shore, dry: true };
+  return { at: fallback, dry: false };
 }
 
 /**
@@ -2569,10 +2599,42 @@ function dryLand(x0, z0, yaw) {
  */
 function shoreWalk(x0, z0, yaw) {
   let x = x0, z = z0, a = yaw;
-  for (let step = 0; step < 40; step++) {
+  // `shoreAt` saturates at 400 m — see 08-assets.js, it is a byte per sample
+  // over 400 — and out past that the field reads a flat 400 in every direction.
+  // Gradient descent on a flat field has nothing to descend: the sixteen probes
+  // all come back equal to the sample under your feet, `best` stays null, and
+  // the loop breaks on its first pass and returns the point it started from.
+  // So from the middle of the channel this walked nowhere, `dryLand` then found
+  // no beach within its seventy metres, and you were planted on open water.
+  //
+  // Get inside the field's range first, then descend it. Widening rings, and
+  // the *lowest* sample on the first ring that reads under saturation rather
+  // than the first one found — otherwise the direction taken is whichever way
+  // the loop happened to start, which in the channel is as often out to sea.
+  if (shoreAt(x, z) >= 395) {
+    let got = null;
+    for (let r = 300; r <= 7000 && !got; r *= 1.6) {
+      let bd = 395;
+      for (let i = 0; i < 24; i++) {
+        const ang = (i / 24) * Math.PI * 2;
+        const px = x - Math.sin(ang) * r, pz = z - Math.cos(ang) * r;
+        const d = shoreAt(px, pz);
+        if (d < bd) { bd = d; got = [px, pz, ang]; }
+      }
+    }
+    // Genuinely nowhere within seven kilometres. The world is thirteen across,
+    // so this is somebody who has swum off the edge of it, and the honest
+    // answer is to say so rather than to put them down on the sea.
+    if (!got) return null;
+    x = got[0]; z = got[1]; a = got[2];
+  }
+  for (let step = 0; step < 60; step++) {
     const here = shoreAt(x, z);
     if (here < 30) break;
-    const reach = Math.max(20, Math.min(60, here * 0.6));
+    // Was capped at 60 m a step, which is forty steps and 2.4 km — not enough
+    // from a ring point 4 km out. The cap is now the distance the field itself
+    // reports, which is the only number that knows how far there is to go.
+    const reach = Math.max(20, Math.min(240, here * 0.6));
     let best = null, bestD = here;
     for (let i = 0; i < 16; i++) {
       const ang = (i / 16) * Math.PI * 2;
@@ -2601,7 +2663,20 @@ function wadeAshore() {
   const y = swim.you;
   const far = !swim.canWade();
   const from = far ? shoreWalk(y.x, y.z, y.yaw) : [y.x, y.z, y.yaw];
-  const spot = dryLand(from[0], from[1], from[2]) || from;
+  // Three things in this sequence used to be unable to report a failure, and
+  // between them they are the whole of the complaint. `shoreWalk` returned the
+  // point it started from when the distance field was saturated; `dryLand`
+  // returned a sea bed when it found no beach; and `dropIn` cannot refuse
+  // anything — read it, it ends in `return true` and has no other exit. So the
+  // key fired, the search failed three times in silence, and the walk model was
+  // handed a spot under the surface. Every one of them is checked here now.
+  if (!from) { toast(T('toast.noShore')); return false; }
+  const land = dryLand(from[0], from[1], from[2]);
+  const spot = land.at;
+  if (!land.dry || !spot || isSea(spot[0], spot[1])) {
+    toast(T('toast.noShore'));
+    return false;
+  }
   if (!ground || !ground.ok
     || !ground.retarget(localeAt(spot[0], spot[1], airfield, jadrija, city))
     || !ground.dropIn(spot[0], spot[1], spot[2], true)) {

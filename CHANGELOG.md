@@ -8,6 +8,101 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.94.0] — 2026-08-21
+
+Eighty kabine were standing on the beach.
+
+### Changed
+
+- **The shore is 572 m, not 189.** Every GPS fix in the August field survey
+  converts to t 204–475 in the resort's own frame, and the modelled shore ended
+  at t 189: not overlapping, adjacent. The boardwalk and every business on it
+  stood on ground the game did not build. `JAD.to` moves from −2132 to −1846.
+  `tools/geotag.mjs` is the conversion — EXIF GPS to world metres by the same
+  projection `tools/bake.py` lays the DEM down with, then `jadrija.local()` for
+  t and s, asked of the running page because the shoreline is a traced polyline
+  and no hand arithmetic gets it right.
+- **The kabine are at the east end and nowhere else.** `rowFrom: 52` put eighty
+  of them along Strand Jadrija and through the middle of the businesses. The
+  aerial shows one run, from t 396, where OSM maps its three
+  `building=changing_rooms` polygons. `JAD.rows` states the windows explicitly,
+  so hut *count* is no longer a consequence of shore *length* — which is what
+  the comment above `JAD.from` has been asking for since it was written. 124
+  huts on 572 m, against the 348 the old rule would have produced.
+- **The mole is where the aerial puts it**, not at `LEN * 0.5`. `JAD.jetty: 258`
+  is the seam where the sand gives way to the concrete, west of Beach bar Mini
+  and east of Pizzeria F2. The race in `61-chase.js` follows it, and `gapAt`,
+  the dog's beat, the man looking out to sea, the pine wood's centre and the
+  reported site centre are all pinned to it rather than to half the shore.
+- **A third of the remaining houses come out**, 0.62 → 0.75 over the box: 170
+  standing on the headland becomes 113. Behind this shore is pine wood with
+  houses scattered in it, and the wood has to show through.
+- **The resort stopped standing on a sea wall it does not have.** The lowest
+  platform was 1.0–1.9 m over the water and is 0.45–0.60; the promenade was
+  2.3–3.4 and is capped at lip + 1.10. `JAD.drop` was 0.62 spent twice, which
+  built a second full-length riser that appears in no photograph; it is 0.22
+  spent once.
+- **The kabine are bare cement render with flat roofs.** Not one pitched kabina
+  roof in thirty-nine photographs or a hundred and thirty-two frames; `cabRise`
+  is 0 and `cabEave` 0.10, which leaves the 0.17 m coping that is there. And
+  the walls are not limewashed: measured at rgb(134, 126, 111) in full sun
+  against rgb(165, 153, 142) for the plaza concrete in the same frame, the
+  render is twenty per cent *darker* than the paving where `WASH` made it twice
+  as bright. The red pantile leaves `ROOFS` — the only pitched red roof in the
+  survey is on a restaurant.
+- **The mole is a mole.** Eleven metres across, forty-two out, poured solid to
+  the sea bed. What stood there was a 4.8 m catwalk on twelve piles with
+  bollards and a tyre fender, for a taxi boat that never comes: there is no
+  bollard, no fender and no moored hull anywhere in the survey, including one
+  frame that looks down the whole frontage at ten to six on an August evening.
+- **Ladders every 11 m in occasional pairs**, from four across the whole shore,
+  with the handrail arching over the coping and down the face instead of
+  returning inland like a lido's. Lamps 3.20 → 4.80 m on a cranked arm. The
+  diving board down to lip + 0.55; its distance does not move, because that is
+  a design decision and it sets the length of the race. No steps into the sea —
+  there are none. No moored dinghies — instead the swim line, white floats at
+  three-metre centres thirty-eight metres out with one orange marker on it.
+
+### Fixed
+
+- **E in the water did nothing, and it was three silent failures stacked.**
+  `shoreAt` saturates at 400 m, so past that the field reads a flat 400 in
+  every direction and `shoreWalk`'s gradient descent had nothing to descend —
+  it broke on its first pass and returned the point you were already at.
+  `dryLand` then found no beach within its seventy metres and returned its
+  fallback, the highest *sea bed* within reach, as if it were land. And
+  `dropIn` cannot refuse anything: it ends in `return true` and has no other
+  exit. So you were put ashore on the water, the shoreline handover in
+  `ground.tick` noticed and put you straight back in, and from the chair the
+  key had done nothing. `shoreWalk` now ring-searches its way into the field's
+  range before descending it, `dryLand` reports whether it found land or gave
+  up, and `wadeAshore` checks. A fourth one underneath: `dryLand` tested
+  terrain *height* while the coastline is a cover mask, so at world
+  (−1600, 700) — where the mask says land and the DEM reads 0.10 m for another
+  sixty metres — it found no beach two hundred metres off a coast you can see.
+  It now accepts anywhere the game itself calls not-sea, which is the same test
+  that decides you have gone back in. Fifty-two swim-exit positions checked,
+  including two outside the world.
+- **`traceShore` could leave the coast it was following.** Carried east along
+  the spit, the inlet on the north side comes into the probe window and is
+  found first, and because there is still sea at every station nothing
+  complains: `to: -1834` reported a 915 m shore ending 428 m north across the
+  headland. Each march now starts just behind where the last one finished, and
+  a step of more than `JAD.step * 12` in z rejects the trace. The threshold is
+  measured — the largest honest step on this shore is 38.1 m, where the spit
+  turns its tip — and the first value tried, 24 m, rejected the real coast and
+  built no resort at all.
+
+### Added
+
+- `tools/scene.mjs` — films any scripted beat, not just the vikendica walk-up,
+  by stopping the page's clock with CDP virtual time and advancing it exactly
+  1/fps a frame. `record.mjs` can only scrub `vik.cutAt`; the race, the
+  bale-out and the laptop are integrators with no `sceneAt(t)`. Pausing the
+  game looks like the same thing and is not — `state.paused` returns out of
+  `frame()` before `updateCamera()`, so the laptop scene films the flying view.
+- `tools/geotag.mjs` — survey photographs into the resort's own frame.
+
 ## [1.93.0] — 2026-08-21
 
 Thirty-three restyles to learn that the prompt was describing a room.

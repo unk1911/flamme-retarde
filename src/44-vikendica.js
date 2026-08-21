@@ -30,8 +30,9 @@ const VIK = {
   // — its whole reason for existing is that the balcony faces open water — so it
   // stands at the western end of the frontage, past where the rows now stop,
   // with the promenade in front of it and nothing between that and the channel.
-  // `t` runs south-east along the shore, so 24 is up the beach end and the
-  // jetty, at 94, is a seventy-metre walk away.
+  // `t` runs south-east along the shore, so 24 is up the beach end — the sand
+  // of Strand Jadrija, with the mole at 258 a long walk away down the beach and
+  // the kabine further still, past the businesses, from 396.
   //
   // Its own +X runs along +t and its terrace faces the sea. At s 25.4 the
   // terrace front lands at 19.3 m — two metres behind the seaward face the front

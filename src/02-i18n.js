@@ -240,6 +240,7 @@ const STRINGS = {
     'chase.say3': '«Idemo natrag. Netko će te trebati.» — Let\'s go back. Somebody is going to need you.',
     'toast.inTheWater': 'In the water. Nobody drowns in a lifejacket — swim for the shore.',
     'toast.ashore': 'Ashore, and dripping.',
+    'toast.noShore': 'No shore within reach — swim on, or use the autopilot.',
 
     // The gameplay recorder — src/92-clip.js. No <b> in the two toasts, unlike
     // most of the strings around here that name a key: `toast()` sets
@@ -571,6 +572,7 @@ const STRINGS = {
     'chase.say3': 'Idemo natrag. Netko će te trebati.',
     'toast.inTheWater': 'U moru si. S prslukom se ne utapa — plivaj prema obali.',
     'toast.ashore': 'Na obali, mokar do kože.',
+    'toast.noShore': 'Obala je predaleko — plivaj dalje ili uključi autopilota.',
 
     // the gameplay recorder — src/92-clip.js
     'clip.rec': 'snima',
@@ -887,6 +889,7 @@ const STRINGS = {
     'chase.say3': '«Idemo natrag. Netko će te trebati.» — On rentre. Quelqu\'un va avoir besoin de toi.',
     'toast.inTheWater': "À l'eau. On ne se noie pas avec un gilet — nage vers le bord.",
     'toast.ashore': 'Au sec, et ruisselant.',
+    'toast.noShore': 'Aucun rivage à portée — continuez à nager, ou passez en auto.',
 
     // the gameplay recorder — src/92-clip.js
     'clip.rec': 'rec',

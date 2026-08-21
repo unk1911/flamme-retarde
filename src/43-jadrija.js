@@ -44,9 +44,17 @@ const JAD = {
   // never ends. The shore runs about 31° off the x axis here, so 164 m of x is
   // the 191 m of frontage wanted.
   from: -2296,
-  to: -2132,
+  to: -1846,
   step: 6,                 // shore samples this far apart
-  probe: [140, 640],       // z window to hunt the waterline in
+  // The z window to hunt the waterline in, and how far back from the last
+  // station the hunt is allowed to start.
+  //
+  // 640 was enough for the 164 m of x the trace used to cover and is not enough
+  // now: by x -1816 the waterline is at z 616 and the next station would fall
+  // out of the window and be dropped. `follow` is the other half of the same
+  // problem and the more dangerous one — see `traceShore`.
+  probe: [140, 700],
+  follow: 60,
 
   // The cross-section, in metres inland from the water's edge. Trimmed with the
   // frontage — the terraces are the identity of the place and are not cut hard,
@@ -63,7 +71,10 @@ const JAD = {
   back: 33.1,              // where the concrete stops
   bleed: 8.0,              // and blends back into the hillside
 
-  drop: 0.62,              // height of one terrace riser
+  // Height of the one terrace riser. It was 0.62 and it was spent twice, which
+  // put 1.24 m of steps between the water and the promenade. The survey has one
+  // kerb in it, 0.15-0.20 m, photographed square on across 1480 px of frame.
+  drop: 0.22,
   quay: 1.9,               // how far the quay wall carries on below the water
 
   cabW: 2.15,              // one cabin's frontage
@@ -74,8 +85,15 @@ const JAD = {
   // vent that was not through the roof. It is also why the row read as sheds —
   // a kabina is a small building, not a low one.
   cabH: 2.44,
-  cabRise: 0.62,           // ridge above the eaves
-  cabEave: 0.26,           // overhang
+  // Ridge above the eaves, and the overhang.
+  //
+  // There is not one pitched kabina roof in thirty-nine photographs or a
+  // hundred and thirty-two frames. What is there is a flat slab with a coping
+  // 0.17 m thick projecting a hand's breadth past the render — 55 px against
+  // 660 px for a 2.05 m opening, straight on. A rise of zero collapses the two
+  // slopes onto each other and leaves exactly that slab.
+  cabRise: 0,
+  cabEave: 0.10,
   plinth: 0.22,            // the concrete pad the rows stand on
 
   // How far inland you may walk. This used to be 135 m, and 135 m of Srima is
@@ -108,7 +126,46 @@ const JAD = {
   // is what makes room for the vikendica to stand where a first-row house
   // stands. It costs about a fifth of the huts, which still leaves the eighty
   // that carry the row.
-  rowFrom: 52,
+  // Where the mole comes ashore, and the anchor half the resort is placed
+  // against.
+  //
+  // It was `LEN * 0.5` — 94.5 m on the 189 m shore, and therefore
+  // indistinguishable from a constant until the shore got longer, at which
+  // point the jetty, the dog's beat, the man looking out to sea, the pine
+  // wood's centre and the reported site centre all set off east together.
+  //
+  // 94 was also *invented*. Nothing in OSM constrains it: there is no pier,
+  // slipway or terminal anywhere in the window, and the field survey never
+  // photographed the mole with a landmark that fixed it. The aerial does fix
+  // it, and it is nowhere near 94: the mole runs out from the seam where the
+  // sand of Strand Jadrija gives way to the concrete, west of Beach bar Mini
+  // (t 279 by GPS) and east of Pizzeria F2 (t 246). 258 is that seam.
+  jetty: 258,
+
+  // Where the kabine stand, as explicit windows.
+  //
+  // This used to be `rowFrom: 52` and an implicit far end at `LEN - 14`, which
+  // meant hut *count* was a consequence of shore *length* and the two could not
+  // be argued about separately. The comment above `from` argues at length that
+  // three hundred and twenty huts is "a different and imaginary place" — and it
+  // is right, and it is entirely about count. Measured on the extended shore
+  // with the old rule: 348 huts and 267k triangles, worse than the number that
+  // comment was written to prevent.
+  //
+  // So the two are separated — and then the aerial said where they go, which no
+  // photograph in the survey could, because the walk never reached t 0-189.
+  //
+  // There is one run of kabine at Jadrija and it is at the eastern end. West of
+  // it, in order going west: the plaza, Slasticarnica Jadrija, Caffee bar H2O,
+  // Beach bar Mini, the mole, Pizzeria F2, and then the sand of Strand Jadrija
+  // all the way to the end. Not a hut on any of it. The old `rowFrom: 52` put
+  // eighty of them along that beach and through the middle of the businesses,
+  // which is the single largest thing this model had wrong about the place.
+  //
+  // 396 to 557 is where OSM maps its three `building=changing_rooms` polygons
+  // and where the aerial shows the runs, the parking between them, and the
+  // circled hut at the western end of the block that carries the gull.
+  rows: [[396, 557]],
 };
 
 /**
@@ -123,9 +180,22 @@ const JAD = {
 function traceShore() {
   const raw = [];
   const [z0, z1] = JAD.probe;
+  // Start each march just behind where the last one finished, rather than at
+  // the top of the window every time.
+  //
+  // This is not an optimisation. Marching from z0 finds the *first* water at
+  // this x, and over the western 164 m that is the only water there is — but
+  // carry the trace east along the spit and the inlet on the north side comes
+  // into the window and is found first. The line then leaves the coast it was
+  // following and crosses the headland, and because it is still finding sea at
+  // every station nothing anywhere complains. Measured: `to: -1834` reports a
+  // 915 m shore ending at world z 137 instead of 565 — 428 m north — and the
+  // only symptom is a resort built across a hillside.
+  let prev = -1;
   for (let x = JAD.from; x <= JAD.to + 0.01; x += JAD.step) {
+    const lo = prev < 0 ? z0 : Math.max(z0, prev - JAD.follow);
     let hit = -1;
-    for (let z = z0; z < z1; z += 3) if (isSea(x, z)) { hit = z; break; }
+    for (let z = lo; z < z1; z += 3) if (isSea(x, z)) { hit = z; break; }
     if (hit < 0) continue;
     let a = hit - 3, c = hit;
     for (let i = 0; i < 16; i++) {
@@ -133,6 +203,26 @@ function traceShore() {
       if (isSea(x, m)) c = m; else a = m;
     }
     raw.push([x, c]);
+    prev = c;
+  }
+  // And the second lock on the same door. `follow` keeps the march on the coast
+  // it was on; this notices if it ever leaves anyway. A real shoreline sampled
+  // every 6 m of x does not jump four sample steps in z between two stations —
+  // this one runs about 31 degrees off the x axis, so a step of 4 m is typical
+  // and 24 m is not a coast. The guard in `buildJadrija` catches a coast that
+  // vanished and has never been able to catch one that folded.
+  // And a tripwire, because `follow` above is the thing actually preventing the
+  // fold and a silent geometric assumption deserves an assertion next to it.
+  //
+  // The threshold is measured, not chosen. The largest honest step on this
+  // shore is 38.1 m in z across 6 m of x, at world x -1852, where the spit
+  // turns its tip and the waterline runs very nearly across the sampling
+  // direction. 24 m sounded generous and was not: it rejected the real coast,
+  // `buildJadrija` bailed, and there was no resort at all. 72 m clears the turn
+  // with room and is still an order of magnitude under a march that has jumped
+  // to a different body of water.
+  for (let i = 1; i < raw.length; i++) {
+    if (Math.abs(raw[i][1] - raw[i - 1][1]) > JAD.step * 12) return [];
   }
   // The DEM is 12.7 m per sample and the coast mask is a raster, so the traced
   // edge comes back with a metre or two of stair-stepping on it. A quay built to
@@ -201,9 +291,26 @@ async function buildJadrija(scene) {
     for (let s = 0.5; s <= JAD.lip; s += 1.0) hl = Math.max(hl, gAt(st, s));
     for (let s = JAD.lip; s <= JAD.mid; s += 1.0) hm = Math.max(hm, gAt(st, s));
     for (let s = JAD.mid; s <= JAD.back; s += 1.5) hd = Math.max(hd, gAt(st, s));
-    st.lip = Math.max(0.85, hl + 0.32);
-    st.mid = Math.max(st.lip + JAD.drop, hm + 0.32);
-    st.deck = Math.max(st.mid + JAD.drop, Math.min(hd + 0.26, 4.6));
+    // Fitted to the terrain, and then capped by what the place actually is.
+    //
+    // The floors under these numbers were guesses and they were all too high.
+    // Measured off the survey: a swimmer 1.75 m tall is 232 px against a
+    // deck-to-water face of 0.25 m in the same frame, and a hundred metres of
+    // bathing edge with no wall on it anywhere; the quay face reads 0.83 m
+    // (150 px against a 230 px man) and the jetty deck 0.72 m. So the lowest
+    // platform sits half a metre over the water, not two, and the promenade
+    // sits a metre over that rather than three and a half. What the old
+    // numbers built was a sea wall, and Jadrija does not have one — you step
+    // off the concrete into the water, which is the whole point of it.
+    st.lip = Math.max(0.45, hl + 0.22);
+    // No forced step between the lip and the middle terrace. There is one kerb
+    // on this shore and it is 0.15-0.20 m; `drop` used to be spent twice, which
+    // built a second full-length riser that appears in no photograph and in no
+    // frame of the walk-through. Where the ground is flat these two now come
+    // out level and the riser between them degenerates to nothing, which is
+    // what a single-step promenade looks like.
+    st.mid = Math.max(st.lip, hm + 0.22);
+    st.deck = Math.max(st.mid + JAD.drop, Math.min(hd + 0.26, st.lip + 1.10));
   }
   // Concrete poured in one campaign follows the hill but not every lump in it.
   // Smoothing can only ever lower a level below the ground it was fitted to, so
@@ -222,8 +329,8 @@ async function buildJadrija(scene) {
     for (let s = 0.5; s <= JAD.lip; s += 1.0) hl = Math.max(hl, gAt(st, s));
     for (let s = JAD.lip; s <= JAD.mid; s += 1.0) hm = Math.max(hm, gAt(st, s));
     for (let s = JAD.mid; s <= JAD.back; s += 1.5) hd = Math.max(hd, gAt(st, s));
-    st.lip = Math.max(st.lip, 0.85, hl + 0.30);
-    st.mid = Math.max(st.mid, st.lip + JAD.drop * 0.8, hm + 0.30);
+    st.lip = Math.max(st.lip, 0.45, hl + 0.20);
+    st.mid = Math.max(st.mid, st.lip, hm + 0.20);
     st.deck = Math.max(st.deck, st.mid + JAD.drop * 0.8, hd + 0.24);
   }
   const midOf = (st) => st.mid;
@@ -477,7 +584,11 @@ async function buildJadrija(scene) {
   // all the way to `back` was what put a hard grey line across the reference
   // view — the terrain beyond had gone to needle floor and the resort's own
   // ground had not.
-  const walkTo = JAD.rowB + JAD.cabD + 1.2;
+  // The concrete stops a stride behind the *front* row, not the back one. The
+  // alley between the two runs is a crushed-limestone track in every frame that
+  // looks down it — 6.0 m of it, which is what `rowB - rowA - cabD` already
+  // says — and paving it was what carried the slab twelve metres too far.
+  const walkTo = JAD.rowA + JAD.cabD + 1.0;
   ribbon(JAD.mid, walkTo, (st) => st.deck, bay);
   ribbon(walkTo, JAD.back, (st) => st.deck, duff);
   for (let i = 0; i < ST.length - 1; i++) {
@@ -526,13 +637,24 @@ async function buildJadrija(scene) {
   function ladder(t) {
     const st = at(t), lip = st.lip;
     const GALV = [0.60, 0.62, 0.63];
-    for (const s of [-0.28, 0.28]) {
-      boxTS(t + s - 0.035, t + s + 0.035, 0.30, 0.38, -1.05, lip + 0.92, GALV);
-      boxTS(t + s - 0.035, t + s + 0.035, 0.38, 0.90, lip + 0.84, lip + 0.92, GALV);
+    // The handrail arches *over* the coping and down the face, which is a
+    // different object from the one that was here.
+    //
+    // What was here returned inland along the deck, as a lido's does. Every
+    // ladder in the survey is an inverted U: bolted to the concrete 0.42 m
+    // back from the edge, up to 0.90 m, over the lip, and down the seaward face
+    // to a metre under the water. Rail height measured at 0.94 m — 125 px
+    // against a 232 px bather — so the 0.92 that was already here is right and
+    // is the one number in this function that does not move.
+    for (const o of [-0.28, 0.28]) {
+      const a = t + o - 0.035, c = t + o + 0.035;
+      boxTS(a, c, 0.38, 0.46, lip, lip + 0.90, GALV);          // inland leg
+      boxTS(a, c, -0.24, 0.46, lip + 0.82, lip + 0.90, GALV);  // over the coping
+      boxTS(a, c, -0.24, -0.16, -1.05, lip + 0.90, GALV);      // and down
     }
     for (let k = 0; k < 5; k++) {
       const y = lip + 0.30 - k * 0.36;
-      boxTS(t - 0.30, t + 0.30, 0.31, 0.37, y - 0.03, y + 0.03, GALV);
+      boxTS(t - 0.30, t + 0.30, -0.23, -0.17, y - 0.03, y + 0.03, GALV);
     }
   }
 
@@ -566,13 +688,24 @@ async function buildJadrija(scene) {
    * stays that way for twenty years. Picked off the bay index rather than out
    * of `rng`, so adding it moves nothing else on the beach.
    */
+  // And it is not limewash. That was the assumption and the photographs do not
+  // support it: what is on these walls is bare cement render, floated by hand,
+  // grey-brown and streaked. Measured in full afternoon sun it is rgb(134, 126,
+  // 111) against rgb(165, 153, 142) for the new concrete of the plaza in the
+  // same frame — the render is twenty per cent *darker* than the paving, where
+  // the old albedos here made it twice as bright. That one number is most of
+  // why the row read as a lido and not as ninety years of Adriatic weather.
   const WASH = [
-    [0.955, 0.945, 0.918], [0.925, 0.917, 0.893], [0.972, 0.962, 0.937],
-    [0.905, 0.900, 0.882], [0.940, 0.926, 0.895],
+    [0.400, 0.368, 0.312], [0.372, 0.342, 0.292], [0.428, 0.394, 0.334],
+    [0.386, 0.355, 0.302], [0.414, 0.381, 0.323],
   ];
   const washAt = (k) => WASH[((k * 7 + ((k * k) >> 1)) % WASH.length + WASH.length)
     % WASH.length];
-  const ROOFS = [[0.385, 0.372, 0.350], [0.430, 0.252, 0.180], [0.345, 0.338, 0.326]];
+  // Three greys. The red pantile that used to sit in the middle of this list
+  // belongs on Caffe Trampulin and on the pizzeria, and on nothing on this row:
+  // the only pitched red roof anywhere in the survey is on a restaurant.
+  const ROOFS = [[0.385, 0.372, 0.350], [0.352, 0.344, 0.330],
+    [0.345, 0.338, 0.326]];
   const TRIM = [0.340, 0.300, 0.252];
 
   /**
@@ -1165,10 +1298,11 @@ async function buildJadrija(scene) {
    * — a resort has a way through it to the water, and two unbroken 350 m walls
    * of hut would be a corridor rather than a place.
    */
-  const gapAt = LEN * 0.5;
+  const gapAt = JAD.jetty;
   for (const [front, phase] of [[JAD.rowA, 0], [JAD.rowB, JAD.cabW * 0.5]]) {
-    let t = JAD.rowFrom + phase;
-    while (t < LEN - 14) {
+   for (const [tA, tB] of JAD.rows) {
+    let t = tA + phase;
+    while (t < tB) {
       // Five to ten. Seven to thirteen was right when the shore was 411 m long
       // and is not now: the count that matters is the total, which wants to come
       // out near the hundred huts that are really there.
@@ -1182,6 +1316,7 @@ async function buildJadrija(scene) {
       // the alleys are routes through the kabine, not gaps to squeeze through.
       t += span + 4.1 + rng() * 1.5;
     }
+   }
   }
 
   /**
@@ -2008,7 +2143,12 @@ async function buildJadrija(scene) {
   // The steps belong to the ground — you walk down them — and are cut into the
   // terrace they come off, so they stay in the deck buffer where their concrete
   // matches. Everything after this stands up.
-  for (let t = 40; t < LEN - 20; t += 96) seaSteps(t);
+  // No steps into the sea. There are none anywhere in the survey — you get out
+  // of this water on a ladder, which is why there are now fifty of them — and
+  // the flight the photographs *do* show runs the other way, three shallow
+  // risers five metres wide dropping from the gravel down onto the promenade.
+  // That one is a builder rather than a number and belongs with the plaza.
+  void seaSteps;
   b = up;
 
   // ── the jetty, the lamps, the fittings ─────────────────────────────────────
@@ -2017,26 +2157,25 @@ async function buildJadrija(scene) {
    * gap in the rows, on piles, and it is the only thing here that stands over
    * open water — which makes it the thing you walk to the end of.
    */
-  const JET = { t: gapAt, out: 26, w: 2.4 };
+  // It is a mole, not a jetty: eleven metres across, forty-two out, and poured
+  // solid to the sea bed. There is not a pile under it.
+  //
+  // What stood here was a 4.8 m catwalk on twelve legs, which is a landing
+  // stage for a taxi boat — and no boat comes: there is no bollard, no fender
+  // and no moored hull anywhere in thirty-nine photographs or a hundred and
+  // thirty-two frames, and one of them looks down the whole frontage at ten to
+  // six on an August evening at empty water. What the photographs do show is
+  // twenty-odd people spread out *on* it, sunbathing, with 0.72 m of freeboard
+  // under them. So it is a place, not a fitting, and it is built like one.
+  const JET = { t: gapAt, out: 42, w: 5.5 };
   {
     const st = at(JET.t), lip = st.lip;
+    const top = Math.max(lip, 0.72);
     boxTS(JET.t - JET.w, JET.t + JET.w, -JET.out, 0.4,
-      lip - 0.42, lip, [0.720, 0.706, 0.664], CONC[2]);
-    for (let k = 0; k < 6; k++) {
-      const s = -2.5 - k * 4.3;
-      for (const o of [-JET.w + 0.4, JET.w - 0.4]) {
-        boxTS(JET.t + o - 0.17, JET.t + o + 0.17, s - 0.17, s + 0.17,
-          -2.2, lip - 0.4, [0.400, 0.360, 0.320]);
-      }
-    }
-    // Bollards, and a stack of tyres on the last pile, which is what everybody
-    // on this coast actually fenders a jetty with.
-    for (const s of [-JET.out + 2, -JET.out + 10, -2]) {
-      for (const o of [-JET.w + 0.5, JET.w - 0.5]) {
-        boxTS(JET.t + o - 0.13, JET.t + o + 0.13, s - 0.13, s + 0.13,
-          lip, lip + 0.52, [0.300, 0.290, 0.275], [0.360, 0.350, 0.330]);
-      }
-    }
+      -2.4, top, [0.720, 0.706, 0.664], CONC[2]);
+    // The armour at the head, which is the one thing on it that is not flat.
+    boxTS(JET.t - JET.w - 0.5, JET.t + JET.w + 0.5, -JET.out - 1.1, -JET.out,
+      -1.6, top - 0.30, STONE, CONC[1]);
   }
 
   // ── the skakaonica ─────────────────────────────────────────────────────────
@@ -2061,7 +2200,13 @@ async function buildJadrija(scene) {
   // pressing a key twice. Eighty-five metres at a decent crawl is a minute,
   // which is a race; it is also about as far off this shore as anybody would
   // moor something you are meant to climb on to.
-  const DIVE = { t: JET.t, s: -108.0, w: 2.1, top: at(JET.t).lip + 1.02 };
+  // `top` was lip + 1.02 and the photographs put the deck 1.2 m over the water
+  // against a 1.05 m handrail — 170 px to 140 px — which with the lip now where
+  // the survey puts it comes out at about half a metre of slab. `s` does not
+  // move: 108 m out is a stated design decision with its reasoning below, and
+  // it sets the length of the race in src/61-chase.js. Change the height, leave
+  // the distance, and stop calling the distance surveyed.
+  const DIVE = { t: JET.t, s: -108.0, w: 2.1, top: at(JET.t).lip + 0.55 };
   {
     const D = DIVE, y = D.top;
     // Built from the photograph, and the photograph says something quite
@@ -2177,16 +2322,35 @@ async function buildJadrija(scene) {
 
   // Lamps down the promenade. A post and a lantern; at this scale a lantern is
   // a box, and the post is what does the work of spacing the walk out.
+  // A 4.8 m column with a cranked arm, not a 3.2 m post with a box on it.
+  //
+  // The head reads at about 4.6 m against a 1.75 m bather in one frame and at
+  // 5.0-5.5 in another, and it is carried out over the walk on an arm rather
+  // than sitting on top of the post — which is most of why the old one looked
+  // like a bollard that had grown. The 27 m spacing was right and stays.
+  const LAMP = { post: 4.80, arm: 0.90, s: JAD.mid + 1.20 };
   for (let t = 12; t < LEN - 8; t += 27) {
-    const st = at(t), y = st.deck;
-    boxTS(t - 0.065, t + 0.065, JAD.mid + 1.13, JAD.mid + 1.26, y, y + 3.20,
+    const st = at(t), y = st.deck, top = y + LAMP.post;
+    boxTS(t - 0.075, t + 0.075, LAMP.s - 0.075, LAMP.s + 0.075, y, top,
       [0.190, 0.186, 0.178]);
-    boxTS(t - 0.155, t + 0.155, JAD.mid + 1.04, JAD.mid + 1.35, y + 3.20, y + 3.50,
+    // The arm, cranked seaward over the promenade.
+    boxTS(t - 0.045, t + 0.045, LAMP.s - LAMP.arm, LAMP.s, top - 0.09, top,
+      [0.190, 0.186, 0.178]);
+    boxTS(t - 0.11, t + 0.11, LAMP.s - LAMP.arm - 0.20, LAMP.s - LAMP.arm + 0.35,
+      top - 0.18, top - 0.09,
       [0.620, 0.612, 0.586], [0.215, 0.210, 0.202]);
   }
 
-  // Ladders, spaced so there is always one within sight of wherever you stand.
-  for (let t = 22; t < LEN - 12; t += 44) ladder(t);
+  // Ladders. Not "one within sight" — one every ten metres, in pairs.
+  //
+  // 44 m put four of them along the whole old shore. The survey counts four
+  // positions in 45 m of a single jetty flank, and photographs two of them
+  // 1.4 m apart; this is a bathing station and the ladders are how you get out
+  // of the water, so they are as dense as the people using them.
+  for (let t = 16; t < LEN - 10; t += 11) {
+    ladder(t);
+    if (((t / 11) | 0) % 3 === 0) ladder(t + 1.4);
+  }
 
   // ── benches ────────────────────────────────────────────────────────────────
   /**
@@ -2963,13 +3127,22 @@ async function buildJadrija(scene) {
   // Dinghies: two alongside the jetty and a few on their own moorings off the
   // shelf. None of them is going anywhere — this is a bathing station, and the
   // boats belong to whoever walked down to it.
-  dinghy(JET.t - JET.w - 0.9, -JET.out + 7, 0.1, [0.880, 0.870, 0.845]);
-  dinghy(JET.t + JET.w + 1.0, -JET.out + 15, -0.06, [0.230, 0.420, 0.620]);
-  for (let t = 14; t < LEN - 14; t += 26 + rng() * 40) {
-    if (Math.abs(t - gapAt) < 12) continue;
-    dinghy(t, -5.5 - rng() * 9, rng() * TAU,
-      pick([[0.880, 0.870, 0.845], [0.780, 0.250, 0.230], [0.240, 0.450, 0.640]]));
+  // None. They used to float five to fifteen metres off the bathing edge, which
+  // is the middle of the water everybody swims in, and the survey has no moored
+  // boat at Jadrija at all — not against the mole, not on the shelf, not in the
+  // frame that looks down the whole frontage. What is out there instead is the
+  // swim line: white floats on a rope at three-metre centres, thirty-eight
+  // metres out, with one orange marker on it. Anything with a hull goes beyond
+  // that or on the grass, and both are the boardwalk's job.
+  {
+    const FLOAT = [0.930, 0.925, 0.905], MARK = [0.870, 0.400, 0.130];
+    for (let t = 8; t < LEN - 8; t += 3.0) {
+      const c = Math.abs(t - DIVE.t) < 1.6 ? MARK : FLOAT;
+      const r = c === MARK ? 0.22 : 0.06;
+      boxTS(t - r, t + r, -38 - r, -38 + r, -r, r, c);
+    }
   }
+  void dinghy;
 
   // Green. Pines and olives go behind the back row where there is soil and where
   // they will not be standing in the middle of the promenade; oleander runs
@@ -4406,7 +4579,7 @@ async function buildJadrija(scene) {
       // Jadrija is a peninsula and this now covers it: 300 m either end and
       // 340 m back off the water, which runs out to the neck. Past the neck is
       // Zablaće and the road to Šibenik, and those are somebody else's houses.
-      if (t < -300 || t > LEN + 300 || s < -6 || s > 340) continue;
+      if (t < -300 || t > 700 || s < -6 || s > 340) continue;
       census.seen++;
       // Thinning.
       //
@@ -4429,12 +4602,19 @@ async function buildJadrija(scene) {
       // 294 were never in the argument. Widening the box is what makes the rate
       // mean anything; with it wide, the rate can come back down.
       //
-      // 0.62 is arithmetic and not taste. What stood on this headland before
+      // 0.62 was arithmetic and not taste. What stood on this headland before
       // was 40 houses out of the old box plus all 294 outside it — 334. Half of
       // 334 is 167, and 0.62 over 436 leaves 166. That is the halving that was
       // asked for, measured against what was actually standing rather than
       // against the number in the source line.
-      if (hr() < 0.62) { taken.add(bl); census.thin++; continue; }
+      //
+      // 0.75 is the same arithmetic run once more. Seen from the promenade the
+      // 166 still read as a solid wall of roof, so a third of them come out
+      // again: 0.38 of the box surviving becomes 0.38 x 0.67 = 0.25, which is a
+      // rate of 0.75. The aerial is the argument — behind this shore is pine
+      // wood with houses scattered *in* it, and the wood has to be able to show
+      // through.
+      if (hr() < 0.75) { taken.add(bl); census.thin++; continue; }
       // A survivor. Whatever is drawn where it stands, nothing is planted
       // there — see `grove` below, which needs this list and is the reason it
       // is gathered here rather than derived again from `world.town`.
@@ -4483,12 +4663,12 @@ async function buildJadrija(scene) {
   // reaches along it and back off it. Written once, here, because this is the
   // only thing in the game that knows.
   {
-    const c = toWorld(LEN * 0.5, 130);
-    const a = toWorld(LEN * 0.5 + 40, 130);
+    const c = toWorld(gapAt, 130);
+    const a = toWorld(gapAt + 40, 130);
     const dx = a[0] - c[0], dz = a[2] - c[2];
     const inv = 1 / Math.max(1e-6, Math.hypot(dx, dz));
     U.uLitterAx.value.set(dx * inv, dz * inv);
-    U.uLitter.value.set(c[0], c[2], LEN * 0.5 + 300, 190);
+    U.uLitter.value.set(c[0], c[2], gapAt + 300, 190);
   }
 
   const grove = (() => {
@@ -5095,7 +5275,7 @@ async function buildJadrija(scene) {
       if (!skinFig) throw new Error('no skinned figure');
       const mesh = skinFig.mesh;
       skinFig.play('idle', { fade: 0 });
-      const ft = LEN * 0.5 + 22, fs = JAD.mid + 1.4;
+      const ft = gapAt + 22, fs = JAD.mid + 1.4;
       const p = toWorld(ft, fs);
       mesh.position.set(p[0], p[1], p[2]);
       mesh.rotation.y = rigYaw(ft, -Math.PI * 0.5);  // looking out to sea
@@ -5215,8 +5395,8 @@ async function buildJadrija(scene) {
   const DOG = {
     trot: 0.93,
     lane: SHOW_LANE0 - 0.8,
-    t0: LEN * 0.5 + 14.4,
-    t1: LEN * 0.5 + 25.4,
+    t0: JAD.jetty + 14.4,
+    t1: JAD.jetty + 25.4,
     turn: 2.6,                  // rad/s, turning on the spot
     stand: [2.6, 9.0],          // how long he stays put, seconds
     hitR: 0.36, hitH: 0.44,     // what the jet has to land on
@@ -5741,6 +5921,16 @@ async function buildJadrija(scene) {
     crawlFor: 4.6,      // seconds down on all fours
     playFor: 24,        // and larking about, before she comes home to her spot
     lane: [SHOW_LANE0, JAD.rowA - 1.8],      // the strip of deck she plays on
+    // And the length of stage she has, which used to be the whole shore.
+    //
+    // `far: 46` is the distance at which she gives up on you, and it is tuned
+    // against a 189 m promenade where you are never more than a few seconds
+    // from her. On the 572 m shore she wandered out of her own encounter and it
+    // dissolved with nobody having gone anywhere. 86 m either side of the jetty
+    // is 8 to 180, which is what the old `8, LEN - 8` came to on the shore she
+    // was written for.
+    t0: Math.max(8, JAD.jetty - 86),
+    t1: JAD.jetty + 86,
     // The wander. A new heading every `turn` seconds, `swing` radians off the
     // last one, at a speed drawn fresh each time — which is a random walk with
     // the corners rounded off, and the rounding is the whole trick. Redrawing
@@ -6073,7 +6263,7 @@ async function buildJadrija(scene) {
 
   /** Advance her along her heading, kept on the deck and inside the resort. */
   function showMove(v, dt) {
-    show.t = clamp(show.t + Math.cos(show.ang) * v * dt, 8, LEN - 8);
+    show.t = clamp(show.t + Math.cos(show.ang) * v * dt, SHOW.t0, SHOW.t1);
     show.s = clamp(show.s + Math.sin(show.ang) * v * dt, SHOW.lane[0], SHOW.lane[1]);
   }
 
@@ -6230,7 +6420,7 @@ async function buildJadrija(scene) {
     // little when she is near an end, which is better than the alternative:
     // fireballs landing in the sea, where there is nothing to catch and nothing
     // for you to do about it.
-    const t1 = clamp(show.t + Math.cos(a) * R, 4, LEN - 4);
+    const t1 = clamp(show.t + Math.cos(a) * R, SHOW.t0 - 4, SHOW.t1 + 4);
     const s1 = clamp(show.s + Math.sin(a) * R, SHOW.lane[0], SHOW.lane[1]);
     // Time of flight from the range, so a short throw is a fast flat one and a
     // long throw hangs. Solved for the vertical speed that gets there — which is
@@ -7570,7 +7760,7 @@ async function buildJadrija(scene) {
     if (vik) vik.tick();
   }
 
-  const mid = at(LEN * 0.5);
+  const mid = at(gapAt);
   // One pose before anything is drawn, so the first frame has people in it
   // rather than a hundred figures stacked on the origin.
   updateCrowd(0, { x: mid.x, y: 0, z: mid.z });
