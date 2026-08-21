@@ -15873,6 +15873,91 @@ async function buildJadrija(scene) {
     }
   }
 
+  // ── the wall along the back, and the playground behind it ─────────────────
+  // Both from the approach lane, and both recurring: a low rendered wall capped
+  // with dressed limestone blocks runs the length of it with planters standing
+  // on the cap, and behind that a fenced children's playground on a pad of
+  // limestone gravel. The wall is the boundary element of the whole resort —
+  // it is in every frame that looks inland — and there was nothing here at all.
+  {
+    const back5 = b;
+    b = up;
+    const REND = [0.545, 0.522, 0.470];       // white render, sun-greyed
+    const CAP = [0.610, 0.578, 0.512];        // dressed limestone coping
+    const MESH = [0.115, 0.245, 0.150];       // dark green fence mesh
+    const GALV = [0.520, 0.528, 0.522];
+    const PLAY = [[0.720, 0.330, 0.090], [0.130, 0.320, 0.620],
+      [0.180, 0.470, 0.220], [0.640, 0.130, 0.130], [0.760, 0.640, 0.130]];
+    const ws = JAD.back + 3.2;
+    for (let t = JAD.beachTo - 30; t < LEN - 24; t += 2.4) {
+      if (!clearOfShops(t)) continue;
+      const y = surfaceY(t, ws);
+      boxTS(t, t + 2.34, ws - 0.16, ws + 0.16, y, y + 0.78, REND,
+        shade(REND, 1.04));
+      boxTS(t - 0.02, t + 2.36, ws - 0.22, ws + 0.22, y + 0.78, y + 0.92, CAP,
+        shade(CAP, 1.07));
+      // A planter on the cap every few bays, which is what they are for.
+      if (((t / 2.4) | 0) % 4 === 0) {
+        const pt2 = t + 1.17;
+        boxTS(pt2 - 0.28, pt2 + 0.28, ws - 0.26, ws + 0.26, y + 0.92, y + 1.28,
+          [0.470, 0.400, 0.330], [0.500, 0.428, 0.352]);
+        dome(W, pt2, ws, y + 1.28, 0.30, 0.30, [0.170, 0.330, 0.160], 6);
+      }
+    }
+    // The playground: a fenced pad with a frame, a slide and a swing on it.
+    {
+      const pt0 = JAD.beachTo - 22, pt1 = pt0 + 16;
+      const ps0 = ws + 2.0, ps1 = ps0 + 12;
+      const y = surfaceY((pt0 + pt1) * 0.5, (ps0 + ps1) * 0.5);
+      b = deck;
+      boxTS(pt0 - 0.4, pt1 + 0.4, ps0 - 0.4, ps1 + 0.4, y - 0.10, y + 0.02,
+        [0.560, 0.530, 0.470], [0.590, 0.558, 0.494]);
+      b = up;
+      // Mesh fence: posts and a stipple panel, two triangles a bay.
+      for (const [a, c, sA, sC] of [[pt0, pt1, ps0, ps0], [pt0, pt1, ps1, ps1],
+        [pt0, pt0, ps0, ps1], [pt1, pt1, ps0, ps1]]) {
+        const n = Math.max(2, Math.round(Math.hypot(c - a, sC - sA) / 2.5));
+        for (let i = 0; i <= n; i++) {
+          const u = i / n;
+          post(W, a + (c - a) * u, sA + (sC - sA) * u, y, y + 1.35, 0.035,
+            GALV, 6);
+        }
+        boxTS(Math.min(a, c) - 0.02, Math.max(a, c) + 0.02,
+          Math.min(sA, sC) - 0.02, Math.max(sA, sC) + 0.02,
+          y + 0.05, y + 1.30, MESH);
+      }
+      // The frame: four legs, a deck, a ladder and a slide off one side.
+      const ft = pt0 + 5.0, fs = ps0 + 5.0;
+      for (const [ot, os] of [[-1.1, -1.1], [1.1, -1.1], [-1.1, 1.1], [1.1, 1.1]]) {
+        post(W, ft + ot, fs + os, y, y + 1.90, 0.055, PLAY[1], 6);
+      }
+      boxTS(ft - 1.2, ft + 1.2, fs - 1.2, fs + 1.2, y + 1.16, y + 1.28,
+        PLAY[0], shade(PLAY[0], 1.08));
+      boxTS(ft - 1.2, ft + 1.2, fs - 1.2, fs + 1.2, y + 1.90, y + 2.06,
+        PLAY[3], shade(PLAY[3], 1.08));
+      // The slide, a raked plane from the deck down to the gravel.
+      b.quad(W(ft + 1.2, fs - 0.45, y + 1.16), W(ft + 1.2, fs + 0.45, y + 1.16),
+        W(ft + 4.2, fs + 0.45, y + 0.06), W(ft + 4.2, fs - 0.45, y + 0.06),
+        PLAY[4]);
+      // A swing frame beside it.
+      const st3 = pt0 + 11.0;
+      for (const o of [-1.6, 1.6]) {
+        post(W, st3 + o, fs - 1.0, y, y + 2.10, 0.05, PLAY[2], 6);
+        post(W, st3 + o, fs + 1.0, y, y + 2.10, 0.05, PLAY[2], 6);
+      }
+      boxTS(st3 - 1.7, st3 + 1.7, fs - 0.06, fs + 0.06, y + 2.04, y + 2.14,
+        PLAY[2]);
+      for (const o of [-0.8, 0.8]) {
+        boxTS(st3 + o - 0.03, st3 + o + 0.03, fs - 0.02, fs + 0.02,
+          y + 0.62, y + 2.04, [0.240, 0.240, 0.245]);
+        boxTS(st3 + o - 0.22, st3 + o + 0.22, fs - 0.13, fs + 0.13,
+          y + 0.56, y + 0.62, PLAY[3]);
+      }
+      runs.push({ t0: pt0, t1: pt1, s0: ps0, s1: ps1, y, h: 1.35 });
+    }
+    b = back5;
+  }
+
   // ── street furniture ───────────────────────────────────────────────────────
   // Three things the promenade has and this file did not: a bin, a shower and
   // the concrete bench that is nothing like the timber one already here.
