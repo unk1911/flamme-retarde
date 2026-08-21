@@ -12149,6 +12149,16 @@ const JAD = {
   // (t 279 by GPS) and east of Pizzeria F2 (t 246). 258 is that seam.
   jetty: 258,
 
+  // Where the built resort begins. West of this is Strand Jadrija: sand and
+  // pale shingle running into the water with no quay, no terraces and no steps
+  // — the aerial shows it plainly and so does the west end of the walk. The
+  // game laid poured concrete along the whole 572 m, which put a bathing
+  // station's engineering across two hundred metres of beach.
+  beachTo: 205,
+  // And how far it takes to become one: the two profiles are blended over this
+  // many metres so there is no line across the shore where one becomes other.
+  beachFade: 34,
+
   // Where the kabine stand, as explicit windows.
   //
   // This used to be `rowFrom: 52` and an implicit far end at `LEN - 14`, which
@@ -12310,6 +12320,8 @@ async function buildJadrija(scene) {
     // numbers built was a sea wall, and Jadrija does not have one — you step
     // off the concrete into the water, which is the whole point of it.
     st.lip = Math.max(0.45, hl + 0.22);
+    // Held for the beach blend below.
+    st.hl = hl;
     // No forced step between the lip and the middle terrace. There is one kerb
     // on this shore and it is 0.15-0.20 m; `drop` used to be spent twice, which
     // built a second full-length riser that appears in no photograph and in no
@@ -12340,6 +12352,20 @@ async function buildJadrija(scene) {
     st.mid = Math.max(st.mid, st.lip, hm + 0.20);
     st.deck = Math.max(st.deck, st.mid + JAD.drop * 0.8, hd + 0.24);
   }
+  // ── the beach end ──────────────────────────────────────────────────────────
+  // Flatten the three terraces into one slope west of `beachTo`, so the risers
+  // between them close to nothing and the quay wall goes with them. A beach is
+  // not a terrace with different paint on it; it is the absence of the steps.
+  for (const st of ST) {
+    if (st.t > JAD.beachTo) continue;
+    const k = 1 - sat((JAD.beachTo - st.t) / JAD.beachFade);   // 1 at the join
+    const flat = Math.max(0.28, (st.hl || 0) + 0.12);
+    st.lip = flat + (st.lip - flat) * k;
+    st.mid = Math.max(st.lip, flat + 0.10 + (st.mid - flat - 0.10) * k);
+    st.deck = Math.max(st.mid, flat + 0.30 + (st.deck - flat - 0.30) * k);
+    st.beach = 1 - k;
+  }
+
   const midOf = (st) => st.mid;
   const lipOf = (st) => st.lip;
 
@@ -12622,8 +12648,17 @@ async function buildJadrija(scene) {
   // own ground and the terrain runs right through the wood and must not show.
   const LITTER = [[0.542, 0.383, 0.263], [0.512, 0.362, 0.249],
     [0.570, 0.404, 0.278]];
-  const bay = (i) => CONC[i % 3];
-  const bayIn = (i) => CONC[(i + 2) % 3];
+  // Pale washed shingle: bigger and greyer than sand, which is what is actually
+  // on this beach — broken limestone rolled round by the swell, not silica.
+  const SHINGLE = [[0.560, 0.520, 0.442], [0.596, 0.556, 0.472],
+    [0.524, 0.488, 0.414], [0.578, 0.536, 0.454]];
+  // Blended per station rather than switched, so the concrete does not end on a
+  // line. `st.beach` is 1 out on the sand and 0 by the time the quay starts.
+  const mixc = (a, c, k) => [a[0] + (c[0] - a[0]) * k, a[1] + (c[1] - a[1]) * k,
+    a[2] + (c[2] - a[2]) * k];
+  const beachAt = (i) => (ST[Math.min(i, ST.length - 1)].beach || 0);
+  const bay = (i) => mixc(CONC[i % 3], SHINGLE[i % 4], beachAt(i));
+  const bayIn = (i) => mixc(CONC[(i + 2) % 3], SHINGLE[(i + 1) % 4], beachAt(i));
   const duff = (i) => LITTER[i % 3];
 
   // The three levels, seaward to inland, then the quay wall down into the water.
@@ -14785,6 +14820,10 @@ async function buildJadrija(scene) {
   // 1.4 m apart; this is a bathing station and the ladders are how you get out
   // of the water, so they are as dense as the people using them.
   for (let t = 16; t < LEN - 10; t += 11) {
+    // Not on the beach. A ladder is how you get out of water you cannot stand
+    // up in, bolted to a quay; where the shingle runs in you simply walk out,
+    // and there is not one in any frame of the west end.
+    if (t < JAD.beachTo + 8) continue;
     ladder(t);
     if (((t / 11) | 0) % 3 === 0) ladder(t + 1.4);
   }
