@@ -3181,18 +3181,28 @@ async function buildJadrija(scene) {
    * and the sky comes through it. That is the tree; the cone the distance layer
    * draws is a fir, and there are no firs on this coast.
    */
-  function pine(t, s, y, h) {
+  function pine(t, s, y, h, leanTo) {
+    // The trunk is the thing the wood is made of, and it was wrong in three
+    // ways at once. Filmed in the stand behind the promenade: the stems are
+    // bare to better than half their height and often two thirds, they are
+    // 0.30-0.60 m through rather than 0.40, and they *all lean the same way* —
+    // out of the shade of each other, towards the open water — at ten to
+    // twenty-five degrees. A uniform random lean is a wood nobody planted; a
+    // shared bias is a wood that grew somewhere.
     const P = facing(t, s, rng() * TAU);
-    const lean = (rng() - 0.5) * 0.9;
-    post(P, 0, 0, y, y + h * 0.34, 0.20, [0.330, 0.270, 0.215], 7);
-    post(P, lean * 0.3, 0, y + h * 0.32, y + h * 0.72, 0.15, [0.360, 0.295, 0.235], 7);
-    const cx = lean, top = y + h * 0.74;
+    const lean = leanTo == null ? (rng() - 0.5) * 0.9
+      : leanTo * (0.55 + rng() * 0.85);
+    const rad = 0.15 + rng() * 0.14;
+    post(P, 0, 0, y, y + h * 0.34, rad, [0.330, 0.270, 0.215], 7);
+    post(P, lean * 0.34, 0, y + h * 0.32, y + h * 0.76, rad * 0.74,
+      [0.360, 0.295, 0.235], 7);
+    const cx = lean, top = y + h * 0.78;
     // Three limbs leaving the trunk under the crown, so the umbrella is
     // carried rather than balanced on the end of a stick.
     for (let i = 0; i < 3; i++) {
       const a = (i / 3) * TAU + rng();
       post(P, cx * 0.6 + Math.cos(a) * h * 0.09, Math.sin(a) * h * 0.09,
-        y + h * 0.66, top + h * 0.02, 0.075, [0.360, 0.295, 0.235], 5);
+        y + h * 0.70, top + h * 0.02, 0.075, [0.360, 0.295, 0.235], 5);
     }
     // Nine puffs on a shallow disc rather than three plates stacked on each
     // other. An Aleppo pine is a broken ceiling; a ceiling needs holes, and a
@@ -3532,17 +3542,62 @@ async function buildJadrija(scene) {
   // because it takes salt and nothing eats it; agave on the rough slope past the
   // concrete, which is exactly where it grows without being planted.
   const greens = [];
-  for (let t = 5; t < LEN - 5; t += 6 + rng() * 9) {
+  // The stand behind the promenade, which the second walk-through films from
+  // the inside and which was, until now, a hedge.
+  //
+  // Four numbers, all of them wrong together. It was one tree every six to
+  // fifteen metres in a five-metre strip — a line of trees along the back of a
+  // beach. What is there is thirty to forty metres deep, open enough to walk
+  // through in any direction, and dense enough that the crowns close over you:
+  // no undergrowth at all, bare needle floor with cones on it, and the trunks
+  // going up like columns. Roughly one tree per fifty square metres, which is
+  // about four times what stood here.
+  //
+  // And the mix was wrong. The olive appears exactly twice as a tree in 260 m
+  // of promenade, both times inside a cafe's own lawn; the tree at the edge of
+  // the concrete is tamarisk. `olive()` is retuned rather than replaced —
+  // the shape is close and a second builder is a second thing to keep in step.
+  for (let t = 5; t < LEN - 5; t += 3.4 + rng() * 3.6) {
     if (!clearOfShops(t)) continue;
-    const s = JAD.rowB + 2.6 + rng() * 5.0;
-    // Not through the vikendica, which stands out here now and is 6.8 by 7.7 of
-    // the strip these were planted along.
-    if (Math.hypot(t - VIK.t, s - VIK.s) < 8.5) continue;
-    const st = at(t), y = surfaceY(t, s);
-    const r = rng();
-    if (r < 0.42) { pine(t, s, y, 7.5 + rng() * 4.5); greens.push([t, s, 0.55, 9]); }
-    else if (r < 0.72) { olive(t, s, y, 4.2 + rng() * 1.6); greens.push([t, s, 0.60, 5]); }
-    else oleander(t, s, y, 0.85 + rng() * 0.55);
+    for (let row = 0; row < 3; row++) {
+      if (row && rng() < 0.28) continue;
+      const s = JAD.rowB + 2.6 + row * 10.5 + rng() * 9.5;
+      // Not through the vikendica, which stands out here now and is 6.8 by 7.7
+      // of the strip these were planted along.
+      if (Math.hypot(t - VIK.t, s - VIK.s) < 8.5) continue;
+      const y = surfaceY(t, s);
+      const r = rng();
+      if (r < 0.72) {
+        // Leaning seaward — negative s is the water — by a shared bias.
+        pine(t, s, y, 9.0 + rng() * 5.5, -1);
+        greens.push([t, s, 0.42, 9]);
+      } else if (r < 0.86) {
+        olive(t, s, y, 3.8 + rng() * 1.8);
+        greens.push([t, s, 0.50, 5]);
+      } else {
+        oleander(t, s, y, 0.85 + rng() * 0.55);
+      }
+    }
+  }
+  // The young ones, staked in a gravel square cut through the concrete. Four
+  // photographs and two frames of the walk have these, continuing east as an
+  // avenue, and they are the one piece of planting on this shore that somebody
+  // is clearly still looking after.
+  for (let t = 26; t < LEN - 26; t += 34 + rng() * 22) {
+    if (!clearOfShops(t)) continue;
+    const s = JAD.mid + 2.2;
+    const y = surfaceY(t, s);
+    b = deck;
+    boxTS(t - 0.60, t + 0.60, s - 0.60, s + 0.60, y - 0.05, y + 0.02,
+      [0.470, 0.430, 0.360], [0.505, 0.462, 0.388]);
+    b = up;
+    pine(t, s, y, 4.2 + rng() * 0.8, -1);
+    for (let k = 0; k < 3; k++) {
+      const a = (k / 3) * TAU + 0.4;
+      post(facing(t, s, 0), Math.cos(a) * 0.45, Math.sin(a) * 0.45,
+        y, y + 2.5, 0.035, [0.620, 0.520, 0.360], 5);
+    }
+    greens.push([t, s, 0.30, 4]);
   }
   // Two pines beside the vikendica's terrace — the only thing that is allowed
   // to be in that view, and the thing that is in it in life. Beside and not in
