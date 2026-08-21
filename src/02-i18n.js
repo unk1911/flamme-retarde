@@ -241,6 +241,20 @@ const STRINGS = {
     'toast.inTheWater': 'In the water. Nobody drowns in a lifejacket — swim for the shore.',
     'toast.ashore': 'Ashore, and dripping.',
 
+    // The gameplay recorder — src/92-clip.js. No <b> in the two toasts, unlike
+    // most of the strings around here that name a key: `toast()` sets
+    // textContent, so markup in a toast is printed rather than rendered. (Two
+    // of the chase strings have it and do print it, which is a separate thing
+    // to fix or to stop writing.)
+    'clip.rec': 'rec',
+    'clip.keep': 'N keeps it',
+    'clip.on': 'Rolling. N keeps the last ten seconds · L stops.',
+    'clip.off': 'Recorder off.',
+    'clip.saved': 'Kept %s seconds · %m MB, in your downloads.',
+    'clip.empty': 'Nothing in the buffer yet — give it a second.',
+    'clip.cannot': 'This browser will not record the canvas.',
+    'clip.hint': 'Nothing is rolling. L arms the recorder.',
+
     // end screen
     'over.crashed': 'You went in.',
     'over.won': 'The fire is out.',
@@ -558,6 +572,16 @@ const STRINGS = {
     'toast.inTheWater': 'U moru si. S prslukom se ne utapa — plivaj prema obali.',
     'toast.ashore': 'Na obali, mokar do kože.',
 
+    // the gameplay recorder — src/92-clip.js
+    'clip.rec': 'snima',
+    'clip.keep': 'N sprema',
+    'clip.on': 'Snima. N sprema zadnjih deset sekundi · L gasi.',
+    'clip.off': 'Snimanje ugašeno.',
+    'clip.saved': 'Spremljeno %s s · %m MB, u preuzimanjima.',
+    'clip.empty': 'U međuspremniku još nema ništa — daj mu sekundu.',
+    'clip.cannot': 'Ovaj preglednik ne snima platno.',
+    'clip.hint': 'Ništa se ne snima. L pali snimanje.',
+
     'over.crashed': 'Pao si.',
     'over.won': 'Vatra je ugašena.',
     'over.lost': 'Grad gori.',
@@ -863,6 +887,16 @@ const STRINGS = {
     'chase.say3': '«Idemo natrag. Netko će te trebati.» — On rentre. Quelqu\'un va avoir besoin de toi.',
     'toast.inTheWater': "À l'eau. On ne se noie pas avec un gilet — nage vers le bord.",
     'toast.ashore': 'Au sec, et ruisselant.',
+
+    // the gameplay recorder — src/92-clip.js
+    'clip.rec': 'rec',
+    'clip.keep': 'N pour garder',
+    'clip.on': 'Ça tourne. N garde les dix dernières secondes · L arrête.',
+    'clip.off': 'Enregistreur arrêté.',
+    'clip.saved': '%s secondes gardées · %m Mo, dans vos téléchargements.',
+    'clip.empty': 'Rien dans le tampon pour l\'instant — laissez-lui une seconde.',
+    'clip.cannot': 'Ce navigateur n\'enregistre pas le canevas.',
+    'clip.hint': 'Rien ne tourne. L arme l\'enregistreur.',
 
     'over.crashed': 'Vous êtes tombé.',
     'over.won': 'Le feu est éteint.',

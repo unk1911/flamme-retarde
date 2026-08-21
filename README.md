@@ -40,6 +40,8 @@ is a real footprint.
 | `0` | **skip straight to Rokići, on foot** — the back door, see below |
 | `P` / `Esc` | **pause** — the fire stops too |
 | `H` | hide the HUD |
+| `L` | **record** — keeps a rolling buffer of the last ten seconds |
+| `N` | keep it — writes the buffer out as a `.webm`, and goes on recording |
 
 On foot at the airfield:
 
@@ -481,6 +483,30 @@ python3 tools/gen_panels.py
 `tools/shoot.mjs` drives a software-GL headless Chrome over CDP to capture
 frames, and `window.__fr` exposes hooks for it — including `fastForward(secs)`,
 which steps the simulation without rendering.
+
+### Recording what you played
+
+`tools/record.mjs` films the vikendica cutscene by holding its clock and
+scrubbing it frame by frame, which only works because a cutscene is a function
+of time. Gameplay is a function of the mouse, so it is recorded rather than
+reconstructed: `L` in the game arms a rolling buffer of the last ten seconds of
+the canvas — two `MediaRecorder`s staggered so that neither file is ever cut —
+and `N` drops what is in it into your downloads as a `.webm`, with the game's
+own sound in it, and keeps recording. There is a `REC` indicator in the bottom
+right corner whenever it is armed, because the failure this prevents is playing
+for twenty minutes with the buffer switched off.
+
+What it films is the canvas, so the HUD, the toasts and the indicator itself
+are never in the clip.
+
+```sh
+node tools/clip.mjs ~/Downloads/fr-clip-20260821-113044.webm --out frames
+```
+
+turns one of those into `frames/%05d.png` at 848x480 and 16 fps — the last ten
+seconds of it, centre-cropped to the target aspect rather than squashed to it —
+which is what `tools/vacejob.py --frames` wants. It writes the trimmed sound
+alongside as `frames-audio.m4a` and prints the two commands that come next.
 
 Changes are tracked in [CHANGELOG.md](CHANGELOG.md).
 

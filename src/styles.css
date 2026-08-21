@@ -676,6 +676,38 @@ html.touch #swim-hud { bottom: 7.4rem; }
 #toast.good { border-color: var(--sea); color: var(--sea); }
 #toast.bad  { border-color: var(--blood); color: var(--ember-hi); }
 
+/* ── the gameplay recorder ───────────────────────────────────────────────── */
+
+/* Bottom right, which is the one corner of the flying HUD that has nothing in
+   it: the instruments are down the left, the tank is on the right at half
+   height, the wingmen are bottom left and the radio is bottom centre. Quiet
+   enough to forget while playing and impossible to miss if you are looking for
+   it, which is the whole job — the failure this prevents is playing for twenty
+   minutes with the buffer switched off. */
+#clip-rec {
+  position: fixed; right: 1.6rem; bottom: 1.6rem; z-index: 60;
+  display: flex; align-items: center; gap: .5rem;
+  font-family: var(--mono); font-size: .58rem; letter-spacing: .22em;
+  text-transform: uppercase; color: var(--salt);
+  background: rgba(6, 12, 16, .55); border: 1px solid rgba(198, 58, 44, .38);
+  border-radius: 2px; padding: .36rem .7rem; pointer-events: none;
+}
+/* Load-bearing: `display: flex` above beats the browser's own
+   `[hidden] { display: none }`, so an element hidden in the markup shows
+   anyway unless this says so. */
+#clip-rec[hidden] { display: none; }
+#clip-rec i {
+  width: .4rem; height: .4rem; border-radius: 50%;
+  background: var(--blood); box-shadow: 0 0 6px rgba(198, 58, 44, .8);
+  animation: rec-pulse 1.7s ease-in-out infinite;
+}
+#clip-rec b { color: var(--salt); font-weight: 400; }
+#clip-rec em { color: var(--ember-hi); font-style: normal; letter-spacing: .12em; }
+#clip-rec span { color: #7f9198; letter-spacing: .14em; }
+
+@keyframes rec-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
+@media (prefers-reduced-motion: reduce) { #clip-rec i { animation: none; } }
+
 /* ── intro grade ─────────────────────────────────────────────────────────── */
 
 #stage-canvas { transition: filter 1.1s ease; }

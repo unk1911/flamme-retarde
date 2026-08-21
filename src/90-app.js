@@ -231,6 +231,27 @@ addEventListener('keydown', (e) => {
   // R — the race. Ahead of the pause guard with the other three back doors,
   // and for the same reason: it is a place to be taken to.
   if (e.code === 'KeyR') { e.preventDefault(); startChase(); return; }
+  // L and N — the gameplay recorder. L arms a rolling buffer of the last ten
+  // seconds of the canvas and N writes it out as a .webm. See src/92-clip.js.
+  //
+  // L and N because they were what was left. The board is nearly full: WASD,
+  // the arrows, Space, Shift and Q move you; C cycles the camera, E is the
+  // door, F the foil, G the gear, K the kite, J and U are the two ways out of
+  // an aeroplane, T the autopilot, X centres the stick, Z levels the wings, B
+  // the third-person camera, R the race, V the vikendica, O the laptop, M the
+  // settings, H the HUD, P and Escape the pause, and 0 and 9 the two back
+  // doors. That leaves I, L, N and Y, of which L for the rolling *loop* and N
+  // for keep-what-just-happened-*now* are the two that mean anything.
+  //
+  // Ahead of the pause guard, like the back doors above: the whole point of
+  // this is to keep something that has just happened, and the most natural
+  // thing in the world at that moment is to hit Escape first and think second.
+  if (e.code === 'KeyL') { e.preventDefault(); clipToggle(); return; }
+  if (e.code === 'KeyN') {
+    e.preventDefault();
+    if (clipArmed()) clipSave(); else toast(T('clip.hint'));
+    return;
+  }
   // Q and Shift already hold the sprint on; this is the *press*, which is worth
   // a burst on top of it. `e.repeat` is the whole of the guard — a held key
   // autorepeats at thirty a second and would be an infinite surge.
@@ -258,7 +279,16 @@ addEventListener('keydown', (e) => {
   if (state.paused) { if (e.code === 'KeyM') togglePanel(); return; }
   keys.add(e.code);
   if (e.code === 'KeyM') togglePanel();
-  if (e.code === 'KeyH') $('hud').hidden = !$('hud').hidden;
+  if (e.code === 'KeyH') {
+    $('hud').hidden = !$('hud').hidden;
+    // The recorder's indicator goes with it. It is not part of the flight HUD
+    // — it has to show on foot and in the water as well, so it lives outside
+    // #hud and keeps its own flag — but H means "furniture off the screen",
+    // and a pulsing red dot is furniture. Not that it could ever reach a clip:
+    // what is recorded is the canvas, and every HUD in this game is DOM over
+    // the top of it. See src/92-clip.js.
+    clipHush();
+  }
   // E is the door, both ways. It is the only control that means the same thing
   // in both halves of the game, which is why it is not shared with anything.
   if (e.code === 'KeyE') {
@@ -4349,6 +4379,22 @@ window.__fr = {
   }),
   key: (code, down = true) => dispatchEvent(
     new KeyboardEvent(down ? 'keydown' : 'keyup', { code })),
+  /**
+   * The gameplay recorder — src/92-clip.js.
+   *
+   * `grab` rather than `save` is what a headless test wants: `save` starts a
+   * download, and a download is a file dialog and a disk that a CDP driver has
+   * neither of unless it has been told to.
+   */
+  clip: {
+    arm: () => clipArm(),
+    disarm: () => clipDisarm(),
+    armed: () => clipArmed(),
+    /** Seconds in the bank — what N would write out right now. */
+    held: () => +clipHeld().toFixed(2),
+    save: () => clipSave(),
+    grab: () => clipGrab(),
+  },
   skipIntro: () => beginFlight(),
   /**
    * The seat, without a keyboard. Synthetic key events never reach the `keys`

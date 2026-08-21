@@ -82,7 +82,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ABLIT = Path(os.environ.get("ABLIT_CENTRAL", Path.home() / "ablit-central"))
-STATE = ROOT / "build" / "burst.json"
+# One file per instance, so several bursts can run at once. BURST_STATE names
+# it; the default is the single-instance case. Concurrency is not theoretical
+# here — comparing A10 against A100 against GH200 means three boxes billing
+# simultaneously, and one shared state file would have the third `up` overwrite
+# the second's instance id and strand it running.
+STATE = ROOT / "build" / (os.environ.get("BURST_STATE") or "burst") .replace("/", "_")
+STATE = STATE.with_suffix(".json")
 BOOTSTRAP = ROOT / "tools" / "burst-bootstrap.sh"
 
 sys.path.insert(0, str(ABLIT / "bin"))

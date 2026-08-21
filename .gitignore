@@ -46,3 +46,6 @@ refs/*
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Burst instance state — live rented-GPU ids, per BURST_STATE. Never tracked.
+build/*.json
