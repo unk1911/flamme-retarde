@@ -153,6 +153,22 @@ const chrome = spawn('google-chrome', [
 ], { stdio: ['ignore', 'ignore', 'pipe'], env: GL.env });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Kill the browser however this process ends.
+//
+// `chrome.kill()` at the bottom of the script only runs when the script gets to
+// the bottom of the script. A `timeout` that fires, a harness that cancels, or
+// a throw anywhere above leaves a headless Chrome running the game's render
+// loop at sixty frames a second on the GPU, with nothing attached to it and no
+// window to notice it by. Two of them accumulated to better than a core each
+// before anybody looked.
+const _bye = () => { try { chrome.kill('SIGKILL'); } catch { /* already gone */ } };
+process.on('exit', _bye);
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+  process.on(sig, () => { _bye(); process.exit(1); });
+}
+process.on('uncaughtException', (e) => { _bye(); console.error(e.message); process.exit(1); });
+
+
 async function endpoint() {
   for (let i = 0; i < 160; i++) {
     try {

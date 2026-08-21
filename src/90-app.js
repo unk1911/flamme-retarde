@@ -2311,12 +2311,24 @@ function baleOut() {
  * can see all of and pick your spot on. It gets you out of a hole; it is also
  * simply a very good way to look at Šibenik.
  *
- * The height is honest arithmetic and not a number that was typed: 34 m/s
- * against gravity and the body drag in 57-eject.js tops out a shade over fifty.
+ * The height is honest arithmetic and not a number that was typed, and it is
+ * measured rather than solved: body drag in 57-eject.js goes as the square of
+ * the speed, so the apex is a long way under v squared over 2g and gets further
+ * under it the harder you go. 34 m/s came out a shade over fifty metres, which
+ * is a fire escape. This is meant to be the other thing it is good for — a way
+ * to look at Šibenik — and fifty metres is not high enough to see over the
+ * headland you are standing on.
  */
 const LAUNCH = {
-  up: 34,          // m/s off the deck — about 52 m of apex once drag is in
-  hang: 2.4,       // s of climb before the cloth streams, so it fills at the top
+  // 90 m/s off the deck, integrating the same v' = -g - k v^2 the canopy code
+  // does: 202 m of apex, reached at 5.7 s, and 43 s of descent under the cloth.
+  // Four times the old fifty, which is the difference between getting out of a
+  // hole and being able to see the channel, the old town and the fire at once.
+  up: 90,
+  // And the climb, so the canopy streams at the top rather than on the way up.
+  // Not a taste number either: apex is at 5.7 s and the cloth streams `hang`
+  // plus EJECT.tumble (0.85 s) after the charge, so this is 5.7 - 0.85.
+  hang: 4.85,
 };
 // Whether you were stranded *before* the charge, so that landing again can put
 // you back exactly as it found you. See dropIn's `lost` argument.

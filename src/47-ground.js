@@ -397,7 +397,13 @@ async function buildGround(scene, field) {
     let [t, s] = field.local(x, z);
     const t0 = t, s0 = s;
     let hit = false;
-    const tc = clamp(t, B.t0, B.t1), sc = clamp(s, B.s0, B.s1);
+    // The seaward limit can vary along the shore, and at Jadrija it has to: the
+    // promenade stops at the water everywhere except where the mole runs out
+    // over it, and that is forty-two metres of walkable concrete on the far
+    // side of the line. A locale that has no such thing leaves `s0Of` off and
+    // gets the flat `s0` it always had.
+    const sMin = B.s0Of ? B.s0Of(t) : B.s0;
+    const tc = clamp(t, B.t0, B.t1), sc = clamp(s, sMin, B.s1);
     if (tc !== t || sc !== s) hit = true;
     t = tc; s = sc;
     // Several passes, because being pushed out of one blocker can push you into

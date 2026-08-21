@@ -30,14 +30,15 @@ const VIK = {
   // — its whole reason for existing is that the balcony faces open water — so it
   // stands at the western end of the frontage, past where the rows now stop,
   // with the promenade in front of it and nothing between that and the channel.
-  // `t` runs south-east along the shore, so 24 is up the beach end — the sand
-  // of Strand Jadrija, with the mole at 258 a long walk away down the beach and
-  // the kabine further still, past the businesses, from 396.
+  // `t` runs south-east along the shore. 232 is a stride west of the mole at
+  // 258, on the last of the open frontage before the boardwalk starts — which
+  // is where the real one stands and is a great deal more useful than the 24 it
+  // was at, three hundred metres up an empty beach from anything.
   //
   // Its own +X runs along +t and its terrace faces the sea. At s 25.4 the
   // terrace front lands at 19.3 m — two metres behind the seaward face the front
   // row used to occupy, which is exactly the line the real one stands on.
-  t: 24.0,
+  t: 232.0,
   s: 25.4,
 
   // The upper floor, off the drawings. Kept here as well as in the sidecar

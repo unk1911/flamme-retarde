@@ -1468,6 +1468,354 @@ async function buildJadrija(scene) {
     return faces;
   }
 
+
+  // ── the boardwalk ──────────────────────────────────────────────────────────
+  //
+  // Ten businesses, west to east, between the mole and the kabine. Every one of
+  // them is in the August 2026 field survey and every name below was read off a
+  // sign; the four with `name: null` had no legible sign in any of the thirty-
+  // nine photographs or the hundred and thirty-two frames, and they ship
+  // unnamed rather than invented. A parade where every unit is named reads as a
+  // shopping street, which this is not.
+  //
+  // `t0/t1` are along the shore and `s0/s1` inland, both in the resort's own
+  // frame, taken from the GPS of the photograph that shows each front and — for
+  // the pizzeria and Caffe Trampulin — from the OSM polygon, which for those two
+  // is better than the GPS because it is the building and not the photographer.
+  //
+  // Kinds, and what each is made of:
+  //   box     a body with a flat oversailing canopy on posts — the commonest
+  //   kiosk   a small body with a lean-to and a serving hatch
+  //   canopy  posts and a roof and no walls at all
+  //   fence   posts and rails and a stipple quad for the mesh
+  const SHOPS = [
+    { key: 'f2', kind: 'box', t0: 200, t1: 213, s0: 34, s1: 50, h: 2.6,
+      name: 'PIZZERIA', sub: 'F2', roof: [0.430, 0.252, 0.180],
+      body: [0.560, 0.535, 0.487], awn: 0, fg: '#b03024', bg: '#efeade' },
+    { key: 'konoba', kind: 'canopy', t0: 240, t1: 252, s0: 10, s1: 19, h: 2.7,
+      name: null, roof: [0.330, 0.285, 0.205], post: [0.055, 0.150, 0.115],
+      body: [0.075, 0.290, 0.250] },
+    { key: 'mini', kind: 'box', t0: 272, t1: 284, s0: 18, s1: 30, h: 2.45,
+      name: 'beach bar MINI', roof: [0.560, 0.535, 0.478],
+      body: [0.115, 0.360, 0.150], awn: 2.6, fg: '#1a1a18', bg: '#ded7c7',
+      plinth: [0.520, 0.430, 0.270] },
+    { key: 'kiosk', kind: 'kiosk', t0: 290, t1: 293, s0: 20, s1: 23, h: 2.4,
+      name: null, roof: [0.430, 0.252, 0.180], body: [0.130, 0.400, 0.130] },
+    { key: 'tisak', kind: 'kiosk', t0: 305.5, t1: 309, s0: 22, s1: 24.2, h: 2.7,
+      name: 'TISAK', roof: [0.470, 0.090, 0.070], body: [0.560, 0.535, 0.487],
+      fg: '#ffffff', bg: '#c8201c' },
+    { key: 'h2o', kind: 'box', t0: 312, t1: 325, s0: 22, s1: 32, h: 2.8,
+      name: 'Caffee bar H2O', roof: [0.470, 0.462, 0.440],
+      body: [0.045, 0.041, 0.038], awn: 3.0, fg: '#1c2b33', bg: '#e9eced',
+      pier: [0.430, 0.405, 0.360] },
+    { key: 'slast', kind: 'box', t0: 328, t1: 343, s0: 22, s1: 32, h: 2.95,
+      name: 'Slastičarnica', sub: 'JADRIJA', roof: [0.590, 0.578, 0.545],
+      body: [0.560, 0.535, 0.487], awn: 3.0, fg: '#a8221c', bg: '#eeece6',
+      vitrine: true },
+    { key: 'tramp', kind: 'fence', t0: 348, t1: 362, s0: 46, s1: 56, h: 2.2,
+      name: null, post: [0.330, 0.335, 0.325], body: [0.075, 0.185, 0.115],
+      rail: [0.640, 0.520, 0.060], skirt: [0.480, 0.055, 0.050] },
+    { key: 'maslina', kind: 'kiosk', t0: 352, t1: 358, s0: 28, s1: 30.5, h: 2.6,
+      name: 'Maslina', roof: [0.100, 0.108, 0.115], body: [0.075, 0.082, 0.088],
+      flag: [0.185, 0.075, 0.165], fg: '#f0e8f0', bg: '#4e2c48' },
+    { key: 'tramp2', kind: 'box', t0: 469, t1: 475, s0: 21, s1: 33, h: 2.55,
+      name: 'Caffe TRAMPULIN', roof: [0.430, 0.252, 0.180],
+      body: [0.560, 0.535, 0.487], awn: 3.2, fg: '#33302c', bg: '#e8e0cf',
+      pergola: [0.075, 0.230, 0.140], bench: [0.330, 0.145, 0.095] },
+  ];
+  // What the promenade's own loops have to keep out of. A lamp coming up
+  // through an awning and a bench standing inside a shop are the two failures
+  // this prevents, and both of them look like a bug rather than like furniture.
+  const clearOfShops = (t) => !SHOPS.some((S) => t > S.t0 - 2.5 && t < S.t1 + 2.5);
+
+  /**
+   * A painted sign, on a canvas.
+   *
+   * Basic rather than lit, for the same reason `mapBoard` is: the one job this
+   * surface has is to be read, and a fascia in August with the eave's shadow
+   * across half of it is correct and useless. Croatian diacritics come through
+   * the same font stack the wall map already proves them on.
+   */
+  function shopSign(S, t, s, y, w, h) {
+    const PX = 512, C = document.createElement('canvas');
+    C.width = PX; C.height = Math.max(32, Math.round(PX * h / w));
+    const g = C.getContext('2d');
+    g.fillStyle = S.bg || '#eeece6';
+    g.fillRect(0, 0, C.width, C.height);
+    g.fillStyle = S.fg || '#1a1a18';
+    g.textAlign = 'center';
+    const big = S.sub ? C.height * 0.40 : C.height * 0.52;
+    g.font = `600 ${big}px "Helvetica Neue", Arial, sans-serif`;
+    g.fillText(S.name, C.width / 2, S.sub ? C.height * 0.46 : C.height * 0.68);
+    if (S.sub) {
+      g.font = `800 ${C.height * 0.42}px "Helvetica Neue", Arial, sans-serif`;
+      g.fillText(S.sub, C.width / 2, C.height * 0.92);
+    }
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    // A board with a face on it, not a decal on a wall.
+    //
+    // The first version was a bare plane six centimetres proud of whatever it
+    // was mounted on, and the awning's gutter and rafters — added afterwards —
+    // sat in front of it. Nothing z-fought, which is the confusing part: the
+    // sign was simply behind a pipe. So the tray is drawn here, the face stands
+    // clear of the tray by two centimetres, and both are placed relative to the
+    // front of the sign rather than to the building, so nothing bolted on later
+    // can get between them.
+    const back = b;
+    b = up;
+    boxTS(t - w * 0.5 - 0.05, t + w * 0.5 + 0.05, s + 0.02, s + 0.10,
+      y - h * 0.5 - 0.04, y + h * 0.5 + 0.04, [0.300, 0.296, 0.288]);
+    b = back;
+    const st = at(t), p = W(t, s, y);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+    mesh.position.set(p[0], p[1], p[2]);
+    mesh.rotation.y = Math.atan2(st.ux, st.uz) + Math.PI;
+    scene.add(mesh);
+  }
+
+  /**
+   * The parts that make a frontage read as one, rather than as a box with a
+   * name on it.
+   *
+   * A shop at forty metres is a silhouette and a colour; at four metres it is
+   * an awning with rafters under it, a counter with something on it, a step, a
+   * downpipe and a condenser on the roof that somebody bolted there in 2009.
+   * None of it is individually worth modelling and all of it together is the
+   * difference — the promenade is walked at eye height, which is the one
+   * distance a plain extrusion cannot survive.
+   */
+  function shopKit(S, y0, top, fs) {
+    const body = S.body || [0.520, 0.492, 0.430];
+    const DARK = [0.045, 0.041, 0.038];
+    const STEEL = [0.480, 0.486, 0.480];
+    const oa = S.t0 + (S.t1 - S.t0) * 0.18, oc = S.t1 - (S.t1 - S.t0) * 0.18;
+    // Rafters under the canopy, and the gutter along its front edge.
+    if (fs != null) {
+      for (let t = S.t0 - 0.2; t <= S.t1 + 0.21; t += 1.15) {
+        boxTS(t - 0.035, t + 0.035, fs + 0.10, S.s0 - 0.05,
+          top - 0.22, top - 0.17, shade(S.roof, 0.82));
+      }
+      // Along the *top* of the canopy edge. Across its face is where the sign
+      // is, and a gutter there is a gutter over the name of the shop.
+      boxTS(S.t0 - 0.45, S.t1 + 0.45, fs - 0.06, fs + 0.06,
+        top + 0.02, top + 0.11, STEEL);
+      boxTS(S.t0 - 0.42, S.t0 - 0.34, fs - 0.05, fs + 0.05, y0, top + 0.02, STEEL);
+    }
+    // The serving counter, and the mullions standing in the opening.
+    boxTS(oa - 0.10, oc + 0.10, S.s0 - 0.34, S.s0 + 0.06, y0 + 0.98, y0 + 1.06,
+      shade(body, 0.72), shade(body, 0.92));
+    boxTS(oa, oc, S.s0 - 0.28, S.s0 - 0.02, y0 + 0.10, y0 + 0.98, shade(body, 0.62));
+    const nmul = Math.max(2, Math.round((oc - oa) / 1.5));
+    for (let k = 1; k < nmul; k++) {
+      const t = oa + (oc - oa) * (k / nmul);
+      boxTS(t - 0.035, t + 0.035, S.s0 - 0.03, S.s0 + 0.07, y0 + 1.06, top - 0.34,
+        shade(body, 0.78));
+    }
+    // The threshold, a boot-worn strip of a different concrete.
+    boxTS(S.t0 + 0.3, S.t1 - 0.3, S.s0 - 0.55, S.s0 - 0.05, y0, y0 + 0.06,
+      CONC[2], CONC[0]);
+    // What is on the roof: a condenser, a flue, and the strap over both.
+    boxTS(S.t1 - 1.9, S.t1 - 1.1, S.s1 - 1.3, S.s1 - 0.5, top + 0.02, top + 0.46,
+      STEEL, shade(STEEL, 0.86));
+    post(W, S.t0 + 1.1, S.s1 - 0.9, top, top + 0.72, 0.055, [0.320, 0.316, 0.305], 6);
+    // Two boards flanking the opening — menus, prices, a beer plaque. Panels
+    // rather than lettering: the survey could read three prices on the whole
+    // boardwalk and inventing the rest would be the one thing worth not doing.
+    for (const [t, w] of [[oa - 0.42, 0.34], [oc + 0.42, 0.30]]) {
+      boxTS(t - w * 0.5, t + w * 0.5, S.s0 - 0.05, S.s0 + 0.02,
+        y0 + 1.15, y0 + 1.85, DARK, shade(body, 0.9));
+    }
+    // A downpipe off the back corner and a pair of pots at the front ones.
+    post(W, S.t1 - 0.12, S.s1 - 0.10, y0, top, 0.045, STEEL, 5);
+    for (const t of [S.t0 + 0.35, S.t1 - 0.35]) {
+      post(W, t, S.s0 - 0.75, y0, y0 + 0.42, 0.24, [0.415, 0.300, 0.230], 7);
+      dome(W, t, S.s0 - 0.75, y0 + 0.42, 0.34, 0.26, [0.180, 0.330, 0.165], 6);
+    }
+  }
+
+  /** A moulded chair and a café table, which is all the terraces need. */
+  function terraceSet(t, s, y, ang, col) {
+    const seat = [0.230, 0.235, 0.240];
+    for (const [dt, ds] of [[0, 0], [0.62, 0.10], [0.30, 0.74]]) {
+      const ct = t + dt * Math.cos(ang) - ds * Math.sin(ang);
+      const cs = s + dt * Math.sin(ang) + ds * Math.cos(ang);
+      boxTS(ct - 0.24, ct + 0.24, cs - 0.23, cs + 0.23, y + 0.40, y + 0.46,
+        col || seat);
+      boxTS(ct - 0.24, ct + 0.24, cs + 0.17, cs + 0.23, y + 0.46, y + 0.86,
+        col || seat);
+      for (const [ot, os] of [[-0.19, -0.17], [0.19, -0.17], [-0.19, 0.17], [0.19, 0.17]]) {
+        boxTS(ct + ot - 0.022, ct + ot + 0.022, cs + os - 0.022, cs + os + 0.022,
+          y, y + 0.40, shade(col || seat, 0.8));
+      }
+    }
+    boxTS(t + 0.18, t + 0.78, s + 0.14, s + 0.74, y + 0.70, y + 0.75,
+      [0.520, 0.512, 0.492]);
+    post(W, t + 0.48, s + 0.44, y, y + 0.70, 0.035, [0.330, 0.334, 0.330], 6);
+  }
+
+  /** One business. Everything upright goes in `up`; pads stay in `deck`. */
+  function shopfront(S) {
+    const tc = (S.t0 + S.t1) * 0.5;
+    const y0 = at(tc).deck;
+    const body = S.body || [0.520, 0.492, 0.430];
+
+    // The pad, in the deck buffer so it does not pick up the upright bounce.
+    b = deck;
+    boxTS(S.t0 - 0.6, S.t1 + 0.6, S.s0 - (S.awn || 0) - 0.8, S.s1 + 0.4,
+      y0 - 0.35, y0 + 0.02, CONC[1], CONC[2]);
+    b = up;
+
+    if (S.kind === 'fence') {
+      // Chain-link with a padded top rail and a solid skirt. The mesh is one
+      // stippled quad and not geometry: two triangles a bay, and at forty
+      // metres — which is as close as anyone gets to it — indistinguishable.
+      for (let t = S.t0; t <= S.t1 + 0.01; t += 2.5) {
+        post(W, t, S.s0, y0, y0 + S.h, 0.05, S.post, 6);
+        post(W, t, S.s1, y0, y0 + S.h, 0.05, S.post, 6);
+      }
+      for (const s of [S.s0, S.s1]) {
+        boxTS(S.t0, S.t1, s - 0.06, s + 0.06, y0, y0 + 1.10, S.skirt);
+        boxTS(S.t0, S.t1, s - 0.07, s + 0.07, y0 + S.h - 0.09, y0 + S.h, S.rail);
+        boxTS(S.t0, S.t1, s - 0.02, s + 0.02, y0 + 1.10, y0 + S.h - 0.09, S.body);
+      }
+      runs.push({ t0: S.t0, t1: S.t1, s0: S.s0, s1: S.s1, y: y0, h: S.h });
+      b = deck;
+      return;
+    }
+
+    if (S.kind === 'canopy') {
+      // No walls. The reed roof sits on eight posts and there is a counter
+      // under one end of it — the best walk-in business on the boardwalk
+      // precisely because there is nothing to walk through.
+      for (let t = S.t0; t <= S.t1 + 0.01; t += 3.0) {
+        post(W, t, S.s0 + 0.4, y0, y0 + S.h, 0.075, S.post, 6);
+        post(W, t, S.s1 - 0.4, y0, y0 + S.h, 0.075, S.post, 6);
+      }
+      boxTS(S.t0 - 0.5, S.t1 + 0.5, S.s0 - 0.5, S.s1 + 0.5,
+        y0 + S.h, y0 + S.h + 0.28, S.roof, shade(S.roof, 1.12));
+      // The band of yellow roof panelling under the eave.
+      boxTS(S.t0 - 0.5, S.t1 + 0.5, S.s0 - 0.5, S.s0 - 0.32,
+        y0 + S.h - 0.16, y0 + S.h, [0.620, 0.545, 0.185]);
+      // The counter, an L round two sides, with its teal top.
+      boxTS(S.t0 + 1.2, S.t0 + 7.2, S.s1 - 1.4, S.s1 - 0.6, y0, y0 + 1.02, body);
+      boxTS(S.t0 + 1.1, S.t0 + 7.3, S.s1 - 1.5, S.s1 - 0.5,
+        y0 + 1.02, y0 + 1.08, shade(body, 1.2));
+      runs.push({ t0: S.t0 + 1.1, t1: S.t0 + 7.3, s0: S.s1 - 1.5, s1: S.s1 - 0.5,
+        y: y0, h: 1.08 });
+      // Only the counter blocks; the rest is a roof you walk under.
+      b = deck;
+      return;
+    }
+
+    const h = S.h, top = y0 + h;
+    const awn = S.awn || 0;
+    // The body.
+    boxTS(S.t0, S.t1, S.s0, S.s1, y0, top, body, shade(body, 0.9));
+    // The serving front: a dark backing panel behind the opening, which is the
+    // whole trick — a bright interior behind a shaded front reads as a lightbox
+    // and nothing else about the shop can recover from it.
+    const oa = S.t0 + (S.t1 - S.t0) * 0.18, oc = S.t1 - (S.t1 - S.t0) * 0.18;
+    boxTS(oa, oc, S.s0 - 0.02, S.s0 + 0.10, y0 + 0.95, top - 0.35,
+      [0.045, 0.041, 0.038]);
+    boxTS(oa, oc, S.s0 - 0.10, S.s0 + 0.04, y0 + 0.86, y0 + 0.98,
+      shade(body, 1.15));
+    if (S.plinth) boxTS(S.t0 - 0.1, S.t1 + 0.1, S.s0 - 0.1, S.s1 + 0.1,
+      y0, y0 + 0.50, S.plinth);
+    if (S.pier) for (const t of [S.t0 + 0.4, (S.t0 + S.t1) * 0.5, S.t1 - 0.4]) {
+      boxTS(t - 0.30, t + 0.30, S.s0 - 0.15, S.s0 + 0.35, y0, top, S.pier);
+    }
+    // The canopy, oversailing on slim posts, and its valance. `bar` is the one
+    // helper in this file that can rake a section; a flat box could not.
+    if (awn > 0) {
+      const fs = S.s0 - awn;
+      bar(S.t0 - 0.4, S.t1 + 0.4,
+        [[fs, top - 0.18], [S.s1, top - 0.06], [S.s1, top + 0.06], [fs, top - 0.06]],
+        S.roof, shade(S.roof, 1.10));
+      bar(S.t0 - 0.4, S.t1 + 0.4,
+        [[fs - 0.02, top - 0.42], [fs + 0.10, top - 0.42],
+          [fs + 0.10, top - 0.16], [fs - 0.02, top - 0.16]],
+        shade(S.roof, 0.94));
+      for (let t = S.t0 - 0.2; t <= S.t1 + 0.21; t += (S.t1 - S.t0 + 0.4) / 3) {
+        post(W, t, fs + 0.20, y0, top - 0.20, 0.055, [0.560, 0.552, 0.530], 6);
+      }
+      if (S.name) shopSign(S, (S.t0 + S.t1) * 0.5, fs - 0.16, top - 0.30,
+        Math.min(6.4, (S.t1 - S.t0) * 0.72), 0.38);
+    } else {
+      // A pitched roof and the name straight on the render, which is what the
+      // pizzeria and the café at the far end both have.
+      bar(S.t0 - 0.35, S.t1 + 0.35,
+        [[S.s0 - 0.35, top], [S.s1 + 0.35, top],
+          [S.s1 + 0.35, top + 0.10], [S.s0 - 0.35, top + 0.10]],
+        S.roof, shade(S.roof, 1.08));
+      bar(S.t0 - 0.35, S.t1 + 0.35,
+        [[S.s0 + 1.2, top + 0.10], [S.s1 - 1.2, top + 0.10],
+          [S.s1 - 1.2, top + 0.62], [S.s0 + 1.2, top + 0.62]],
+        S.roof, shade(S.roof, 1.14));
+      if (S.name) shopSign(S, (S.t0 + S.t1) * 0.5, S.s0 - 0.14, top - 0.52,
+        Math.min(5.6, (S.t1 - S.t0) * 0.70), 0.66);
+    }
+    if (S.kind === 'kiosk' && S.name && !awn && !S.flag) {
+      shopSign(S, (S.t0 + S.t1) * 0.5, S.s0 - 0.14, top - 0.28,
+        (S.t1 - S.t0) * 0.86, 0.40);
+    }
+    // The vitrine: a canted glass case with the flavours in it, which is the
+    // single most Jadrija-specific object on this boardwalk.
+    if (S.vitrine) {
+      const va = S.t0 + 2.0, vc = S.t0 + 9.0;
+      boxTS(va, vc, S.s0 - 1.5, S.s0 - 0.4, y0, y0 + 0.92, [0.300, 0.296, 0.288]);
+      const PANS = [[0.520, 0.500, 0.330], [0.610, 0.520, 0.220],
+        [0.470, 0.540, 0.320], [0.590, 0.420, 0.400], [0.230, 0.150, 0.105]];
+      for (let k = 0; k < 14; k++) {
+        const a = va + 0.15 + k * ((vc - va - 0.3) / 14);
+        boxTS(a + 0.02, a + ((vc - va - 0.3) / 14) - 0.02, S.s0 - 1.36, S.s0 - 0.56,
+          y0 + 0.92, y0 + 0.99, PANS[k % PANS.length]);
+      }
+      boxTS(va, vc, S.s0 - 1.5, S.s0 - 0.4, y0 + 1.02, y0 + 1.16,
+        [0.620, 0.640, 0.650]);
+      runs.push({ t0: va, t1: vc, s0: S.s0 - 1.5, s1: S.s0 - 0.4, y: y0, h: 1.16 });
+    }
+    // The pergola and the plank bench at Trampulin, which is exactly what the
+    // promenade benches are already built out of.
+    if (S.pergola) {
+      const fs = S.s0 - (S.awn || 3.0);
+      for (let t = S.t0; t <= S.t1 + 0.01; t += 3.0) {
+        post(W, t, fs + 0.3, y0, y0 + 2.4, 0.07, S.pergola, 6);
+      }
+      boxTS(S.t0 - 6, S.t1 + 6, fs - 0.35, fs - 0.05, y0 + 0.44, y0 + 0.50,
+        S.bench);
+      for (let t = S.t0 - 5; t <= S.t1 + 5; t += 1.8) {
+        boxTS(t - 0.04, t + 0.04, fs - 0.32, fs - 0.08, y0, y0 + 0.44,
+          [0.075, 0.230, 0.140]);
+      }
+    }
+    // The feather flag, which is all the branding Maslina has.
+    if (S.flag) {
+      const ft = S.t1 + 0.9;
+      post(W, ft, S.s0 - 0.6, y0, y0 + 3.1, 0.035, [0.500, 0.505, 0.500], 5);
+      boxTS(ft - 0.02, ft + 0.02, S.s0 - 1.35, S.s0 - 0.58, y0 + 0.9, y0 + 3.0,
+        S.flag);
+      if (S.name) shopSign(S, ft, S.s0 - 1.42, y0 + 2.0, 0.66, 1.8);
+    }
+    shopKit(S, y0, top, awn > 0 ? S.s0 - awn : null);
+    // Chairs and tables under the awning, four sets to a frontage. Every café
+    // in the survey has them and the game had not one chair on this shore.
+    if (awn > 0) {
+      const fs = S.s0 - awn;
+      for (let k = 0; k < 4; k++) {
+        const t = S.t0 + 0.9 + k * ((S.t1 - S.t0 - 1.8) / 3);
+        terraceSet(t, fs - 1.9 + (k % 2) * 0.5, y0, (k % 2) * 0.5 - 0.25,
+          k % 3 === 0 ? [0.190, 0.200, 0.210] : [0.560, 0.548, 0.512]);
+      }
+    }
+    runs.push({ t0: S.t0 - 0.1, t1: S.t1 + 0.1, s0: S.s0 - 0.1, s1: S.s1 + 0.1,
+      y: y0, h: h + 0.1 });
+    b = deck;
+  }
+  for (const S of SHOPS) shopfront(S);
+
   if (special) special.sign = neonSign(special);
 
   /**
@@ -2176,7 +2524,30 @@ async function buildJadrija(scene) {
     // The armour at the head, which is the one thing on it that is not flat.
     boxTS(JET.t - JET.w - 0.5, JET.t + JET.w + 0.5, -JET.out - 1.1, -JET.out,
       -1.6, top - 0.30, STONE, CONC[1]);
+    JET.top = top;
   }
+  // And the walk surface over it, which is a separate question from the
+  // geometry and was not answered when the mole was made solid: `walkY` falls
+  // through to the terrain for anything seaward of s = -3, and the terrain out
+  // there is the sea bed, so you walked off the concrete and into the water on
+  // a structure you could see under your feet. `bounds` said the same thing
+  // from the other side — a flat `s0` of 1.1 for the whole shore.
+  const onMoleT = (t) => t > JET.t - JET.w - 0.6 && t < JET.t + JET.w + 0.6;
+  // Two ranges, and they are deliberately different.
+  //
+  // `onMoleY` is where the mole's *deck* is, for `walkY`. `onMoleWalk` is where
+  // you are allowed to stand, and it has no seaward-facing upper bound at all,
+  // because the first version did and that was a hole you fell through.
+  //
+  // `standable` reads "below s = 1.0 is water" for the whole shore, and the
+  // mole exemption stopped at s = 0.6 — so between 0.6 and 1.0 there was a
+  // 0.4 m band, right at the root of the mole, where nothing was standable. A
+  // step into it registers as a refused step, and a refused step with sea a
+  // metre and a half ahead is the shoreline handover: you did not fall off the
+  // mole, you were put in the water on purpose, by the code that exists to stop
+  // you walking on it. Overlap the two ranges and the band cannot exist.
+  const onMoleY = (t, s) => onMoleT(t) && s > -JET.out - 1.2 && s < 0.45;
+  const onMoleWalk = (t, s) => onMoleT(t) && s > -JET.out - 1.2;
 
   // ── the skakaonica ─────────────────────────────────────────────────────────
   /**
@@ -2206,7 +2577,16 @@ async function buildJadrija(scene) {
   // move: 108 m out is a stated design decision with its reasoning below, and
   // it sets the length of the race in src/61-chase.js. Change the height, leave
   // the distance, and stop calling the distance surveyed.
-  const DIVE = { t: JET.t, s: -108.0, w: 2.1, top: at(JET.t).lip + 0.55 };
+  // Across from the kabine, forty metres out.
+  //
+  // It used to hang off the head of the mole because the two ends of the race
+  // had to be in one shot, and 108 m out was chosen to stop the swim being over
+  // in two keystrokes. The aerial puts it somewhere else entirely: off the
+  // eastern block, a short way off the concrete rather than a hundred metres
+  // into the channel. The race is longer for it, not shorter — 175 m from the
+  // mole head to the board instead of 66 — because the distance is now along
+  // the shore rather than straight out from it.
+  const DIVE = { t: 430, s: -40.0, w: 2.1, top: at(430).lip + 0.55 };
   {
     const D = DIVE, y = D.top;
     // Built from the photograph, and the photograph says something quite
@@ -2330,6 +2710,7 @@ async function buildJadrija(scene) {
   // like a bollard that had grown. The 27 m spacing was right and stays.
   const LAMP = { post: 4.80, arm: 0.90, s: JAD.mid + 1.20 };
   for (let t = 12; t < LEN - 8; t += 27) {
+    if (!clearOfShops(t)) continue;
     const st = at(t), y = st.deck, top = y + LAMP.post;
     boxTS(t - 0.075, t + 0.075, LAMP.s - 0.075, LAMP.s + 0.075, y, top,
       [0.190, 0.186, 0.178]);
@@ -2383,6 +2764,7 @@ async function buildJadrija(scene) {
     iron: 0.042,        // the end frame, across the shore
   };
   for (let t = 18; t < LEN - 10; t += 33) {
+    if (!clearOfShops(t)) continue;
     const st = at(t), y = st.deck;
     const B = BENCH;
     const sF = JAD.rowA - B.front;           // front of the seat, inland offset
@@ -3151,6 +3533,7 @@ async function buildJadrija(scene) {
   // concrete, which is exactly where it grows without being planted.
   const greens = [];
   for (let t = 5; t < LEN - 5; t += 6 + rng() * 9) {
+    if (!clearOfShops(t)) continue;
     const s = JAD.rowB + 2.6 + rng() * 5.0;
     // Not through the vikendica, which stands out here now and is 6.8 by 7.7 of
     // the strip these were planted along.
@@ -3238,6 +3621,7 @@ async function buildJadrija(scene) {
   // a hedge with kabine behind it rather than as a row of kabine. Green stays
   // where there is soil for it: behind the back row, above.
   for (let t = 4; t < LEN - 4; t += 3.2 + rng() * 6) {
+    if (!clearOfShops(t)) continue;
     const s = JAD.back + 1.5 + rng() * 7;
     agave(t, s, surfaceY(t, s), 0.55 + rng() * 0.55);
   }
@@ -4866,6 +5250,7 @@ async function buildJadrija(scene) {
       const f = vik.floorAt(t, s, yHint);
       if (f != null) return f;
     }
+    if (onMoleY(t, s)) return JET.top;
     if (t < -5 || t > LEN + 5 || s < -3 || s > JAD.back + JAD.bleed) {
       return Math.max(groundAt(x, z), 0);
     }
@@ -7818,7 +8203,8 @@ async function buildJadrija(scene) {
     // has stopped and `walkY` falls through to the terrain, and the terrain
     // out there is a hillside 1 to 7 m above the sea the whole way across,
     // measured along four lines through the wood.
-    bounds: { t0: 3, t1: LEN - 3, s0: 1.1, s1: 300 },
+    bounds: { t0: 3, t1: LEN - 3, s0: 1.1, s1: 300,
+      s0Of: (t) => (onMoleT(t) ? -JET.out - 0.9 : 1.1) },
     /**
      * And the far shore, which a box cannot describe.
      *
@@ -7832,7 +8218,9 @@ async function buildJadrija(scene) {
      * off the concrete — at exactly zero you would walk out on to the water.
      */
     standable: (x, z) => {
-      const [, s] = local(x, z);
+      const [t, s] = local(x, z);
+      if (onMoleWalk(t, s)) return true;
+      if (s < 1.0) return false;
       if (s < JAD.reachIn) return true;
       return walkY(x, z) > 0.55;
     },
