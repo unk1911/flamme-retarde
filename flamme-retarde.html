@@ -15569,7 +15569,21 @@ async function buildJadrija(scene) {
   // tools/blender/bathers_mh.py carries six, and lying down is not one of them.
   // Their loungers stay, and an empty lounger on a beach is not a missing
   // person, it is somebody who has gone in the water.
-  const CAST = 8;
+  // How many people are at Jadrija.
+  //
+  // Eight, on five hundred and seventy metres of shore, against a survey that
+  // counts thirty of them under one cafe canopy in seventeen metres of frontage
+  // and forty-eight in a single frame. Eight was never a judgement about the
+  // beach — it was the number of skinned meshes in BATHER_CAST, arriving as a
+  // constant. With the instanced tier back in play the constant can mean what
+  // it says.
+  //
+  // 84 over 572 m is about one person every seven metres, which is what the
+  // photographs support once the density is weighted toward the cafes and the
+  // bathing edge rather than spread flat.
+  const CAST = 84;
+  // Of those, how many are the good meshes. The rest are the instanced pair.
+  const SKIN_CAST = 8;
   {
     // Three of the scripted ones, not all of them.
     //
@@ -15588,7 +15602,20 @@ async function buildJadrija(scene) {
     // pass that takes every nth figure takes the promenade eight times. What
     // came out was a bathing station where nobody was bathing — eight strangers
     // walking past forty empty towels.
-    const pool = ['stand', 'wade', 'walk'].map((mode) => {
+    // `sit` and `lie` are back in, and they are the reason the beach was empty.
+    //
+    // They were dropped because the skinned blobs have no clip for either and
+    // land on `idle` — a person standing where they should be sitting. But the
+    // *instanced* rig poses both properly, with a measured pelvis drop and a
+    // whole-figure roll for the sunbather; read the `sit` and `lie` cases in
+    // 42-crowd.js. So the exclusion was never about the beach, it was about
+    // which tier drew them, and with two tiers it stops being a choice at all:
+    // they go to the instances, which is where they look right.
+    //
+    // This was also the cap that bound. Only stand, wade and walk were
+    // eligible, there were eighteen of those, and raising CAST past eighteen
+    // did nothing whatever.
+    const pool = ['stand', 'wade', 'walk', 'sit', 'lie'].map((mode) => {
       const g = bathers.filter((b) => !b.beat && b.pose === mode);
       // Within a pose, still spread along the shore, or the three who are
       // standing are standing together.
@@ -17491,15 +17518,20 @@ async function buildJadrija(scene) {
         body: 'base *= vVCol;',
       });
     }))).filter(Boolean);
-    if (figs.length) {
-      crowds.skin = makeSkinCrowd(scene, figs, bathers.length);
-    } else {
-      // No blobs — fall back to the instanced pair rather than to an empty
-      // beach. The old rigs are still in the payload and still work.
-      for (const [sex, key] of [['m', 'bather_m_fr3d'], ['f', 'bather_f_fr3d']]) {
-        const rig = await loadRig(key);
-        if (rig) crowds[sex] = makeCrowd(scene, rig, bathers.length);
-      }
+    if (figs.length) crowds.skin = makeSkinCrowd(scene, figs, bathers.length);
+    // And the instanced pair as well, which used to be the *fallback* for a
+    // payload with no blobs in it and is now the second tier of a crowd.
+    //
+    // `makeSkinCrowd` is one mesh per person and there are eight of them, so
+    // `CAST` could be raised to any number and eight people would turn up: the
+    // cap that binds is the length of BATHER_CAST, not the constant. That is
+    // the whole reason this shore has been empty. The instanced rigs carry a
+    // hundred and twenty at twenty-two draw calls — see the note over
+    // `makeCrowd` — so the answer is both: the blobs where you can see a face,
+    // the instances everywhere else.
+    for (const [sex, key] of [['m', 'bather_m_fr3d'], ['f', 'bather_f_fr3d']]) {
+      const rig = await loadRig(key);
+      if (rig) crowds[sex] = makeCrowd(scene, rig, bathers.length);
     }
   }
 
@@ -20182,8 +20214,17 @@ async function buildJadrija(scene) {
   const qAim = new THREE.Quaternion(), qId = new THREE.Quaternion();
 
   const walkers = [];
+  let cast = 0;
   for (const b of bathers) {
-    const C = crowds.skin || crowds[rng() < 0.5 ? 'f' : 'm'] || crowds.m || crowds.f;
+    // The first few get a mesh of their own; everybody else is an instance of
+    // one of two. Ordered by the cast pass above, which already put the
+    // scripted business and a spread of poses at the front.
+    // A blob only if there is one spare AND the pose is one a blob can hold.
+    const blobbable = b.pose !== 'sit' && b.pose !== 'lie';
+    const wantSkin = cast < SKIN_CAST && crowds.skin && blobbable;
+    const C = wantSkin ? crowds.skin
+      : (crowds[rng() < 0.5 ? 'f' : 'm'] || crowds.m || crowds.f || crowds.skin);
+    if (wantSkin) cast++;
     if (!C) break;
     const p = toWorld(b.t, b.s);
     const fg = {
