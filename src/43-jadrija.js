@@ -13606,10 +13606,6 @@ async function buildJadrija(scene) {
   // rather than a hundred figures stacked on the origin.
   updateCrowd(0, { x: mid.x, y: 0, z: mid.z });
 
-  // MERGE: delete this stub, the collider defines it
-  let onBump = null;
-  function setBumpHandler(fn) { onBump = fn; }
-
   // Registered here, at the end of the build, rather than beside `bumpReact`.
   // Everything in this file shares one lexical scope and runs top to bottom, so
   // a call to `setBumpHandler` written earlier than the collider's own
