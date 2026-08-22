@@ -4490,9 +4490,13 @@ async function buildJadrija(scene) {
      */
     function step(t, s, d, dt, y = null) {
       if (d > 26) { prevT = prevS = null; return 0; }
-      // In the doorway, vertically: under the head of the opening and not in
-      // the sea room below it. A walker's eye is 1.6 m up a 2.03 m opening.
-      const inHole = y == null || (y < yTop && y > yTop - 3.4);
+      // In the doorway, vertically. This is not a fit — it is a test for "on
+      // the ground here" against "over the top of the row", and the two are
+      // tens of metres apart, so it is drawn wide on purpose. A walker's eye is
+      // 1.62 m up a 1.98 m opening, and the ground in front of the kabine is
+      // not level with their floor; a gate cut close to the head of the opening
+      // would turn a slope of a foot into silence.
+      const inHole = y == null || (y < yTop + 1.2 && y > yTop - 3.4);
       const h = Math.min(dt, 0.05);
       const vs = prevS == null ? 0 : (s - prevS) / h;
       const vt = prevT == null ? 0 : (t - prevT) / h;
