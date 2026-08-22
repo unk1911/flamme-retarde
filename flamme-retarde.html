@@ -17793,6 +17793,79 @@ async function buildJadrija(scene) {
       }
     }
 
+
+    // ── moored off the beach ─────────────────────────────────────────────────
+    //
+    // b_031 films the west bay over the litter bins: a scatter of small open
+    // boats lying to their moorings thirty to sixty metres out, white hulls
+    // with a coloured sheer stripe, all of them lying the same way because the
+    // wind in this channel only comes from two directions.
+    //
+    // `dinghy` has been in this file since the first pass and has never once
+    // been called. The bay was empty water in front of a bathing station on a
+    // peninsula full of people who all own a boat.
+    b = up;
+    for (let i = 0; i < 11; i++) {
+      const t = 52 + i * 13.5 + jit(i, 400) * 6.0;
+      const s = -22 - jit(i, 401) * 34;
+      // Lying to the mooring, so they all point within a few degrees of each
+      // other — a bay where every boat lies a different way is a bay with no
+      // wind in it.
+      const ang = 1.24 + (jit(i, 402) - 0.5) * 0.42;
+      const HULL = [[0.760, 0.752, 0.730], [0.740, 0.735, 0.715],
+        [0.700, 0.700, 0.690], [0.560, 0.180, 0.150]];
+      const col = HULL[((jit(i, 403) * 97) | 0) % HULL.length];
+      dinghy(t, s, ang, col);
+      const P = facing(t, s, ang);
+      // The stripe along the sheer, which is the only thing you can read on a
+      // hull this size at this distance.
+      const STRIPE = jit(i, 404) < 0.5 ? [0.480, 0.120, 0.105]
+        : [0.130, 0.220, 0.400];
+      for (const o of [-0.60, 0.60]) {
+        boxIn(P, o - 0.05, o + 0.05, -1.55, 1.50, 0.30, 0.38, STRIPE);
+      }
+      // An outboard on the transom for two in three of them.
+      if (jit(i, 405) < 0.66) {
+        boxIn(P, -0.13, 0.13, 1.36, 1.62, 0.16, 0.62, [0.140, 0.140, 0.150],
+          [0.180, 0.180, 0.192]);
+        boxIn(P, -0.06, 0.06, 1.42, 1.56, -0.22, 0.16, [0.180, 0.180, 0.192]);
+      }
+      // And the buoy she is lying to, with the painter running to it.
+      const bt = t + Math.cos(ang + Math.PI) * 3.4;
+      const bs = s + Math.sin(ang + Math.PI) * 3.4;
+      const BUOY = jit(i, 406) < 0.5 ? [0.760, 0.330, 0.075]
+        : [0.740, 0.740, 0.730];
+      post(W, bt, bs, -0.10, 0.26, 0.17, BUOY, 8);
+      dome(W, bt, bs, 0.26, 0.14, 0.17, shade(BUOY, 1.10), 8);
+      const q = (u) => W(t + (bt - t) * u, s + (bs - s) * u, 0.16 - u * 0.10);
+      for (let k = 0; k < 5; k++) {
+        const p0 = q(k / 5), p1 = q((k + 1) / 5);
+        b.quad(p0, p1, [p1[0], p1[1] + 0.035, p1[2]],
+          [p0[0], p0[1] + 0.035, p0[2]], [0.660, 0.630, 0.560]);
+      }
+    }
+
+    // The pair of green bins on the bank, which b_031 opens on: two dark
+    // green plastic drums with hooded tops, hung side by side off one black
+    // steel post, standing in the needles at the top of the beach.
+    for (const bt of [128, 176, 198]) {
+      const bs = JAD.mid + 3.6;
+      const y = surfaceY(bt, bs);
+      post(W, bt, bs, y, y + 1.42, 0.055, [0.180, 0.180, 0.188], 6);
+      for (const o of [-0.34, 0.34]) {
+        const GRN = [0.115, 0.240, 0.130];
+        post(W, bt + o, bs, y + 0.30, y + 1.06, 0.28, GRN, 9);
+        // The hood, and the slot under it.
+        dome(W, bt + o, bs, y + 1.06, 0.22, 0.30, shade(GRN, 1.16), 9);
+        boxTS(bt + o - 0.20, bt + o + 0.20, bs - 0.31, bs - 0.26,
+          y + 0.92, y + 1.04, [0.055, 0.100, 0.062]);
+        // The bracket back to the post.
+        boxTS(bt + Math.min(o, 0), bt + Math.max(o, 0), bs - 0.04, bs + 0.04,
+          y + 0.78, y + 0.86, [0.180, 0.180, 0.188]);
+      }
+      clutter(bt + 0.9, bs - 0.8, y, 3, (bt | 0) * 11 + 5);
+    }
+
     // Bicycles at the gate. 174947 has four of them leaning on the barrier,
     // which is where every bicycle in Dalmatia is left.
     for (let i = 0; i < 4; i++) {
