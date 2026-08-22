@@ -43,6 +43,26 @@ const CHASE = {
   lost: 55,            // m behind and the race is over
   turnRate: 1.1,       // rad/s she comes round on to her line
   strokeHz: 0.72,      // her cycle, in strokes a second
+  // How far off her bearing she strays, and where she stops straying.
+  //
+  // The first cut used 0.42 rad on a 12 s cycle and measured 0.9 m of
+  // cross-track, which is a weave you have to be told about. The fix was not
+  // more angle. How far she actually gets off the line is her speed over the
+  // frequency times the angle — sp/w * A — so a period three times longer is
+  // three times the excursion for exactly the same heading offset, and the
+  // heading offset is the only thing that costs her anything. The drift term
+  // runs at 33 s now and she swings 2.5 m either side of the rhumb line.
+  //
+  // What the angle costs is the cosine of it, averaged: 0.25 rad RMS is 3.1%
+  // of speed made good, about 4.6 s over the whole swim. The race is that much
+  // easier to win now and it should be — the reason to sprint is that she is
+  // going somewhere you can cut the corner on. Against a straight line there
+  // is no corner and no reason.
+  wander: 0.52,
+  wanderOut: 25.0,     // m from the platform where she straightens up
+  // And her pace breathes. +/-7% on a 16.7 s cycle, which is enough to make the
+  // gap counter move on its own without being enough to read as a bug.
+  surge: 0.07,
   cut: 5.2,            // s of the shot before you get the keys
   talk: 10.5,          // s of her turning round, in three lines
   wake: 4.6,           // m of foam behind her
@@ -215,10 +235,37 @@ async function buildChase(scene) {
 
     if (phase === 'swim') {
       // On her feet and she knows it.
-      const want = gap < CHASE.tailAt ? CHASE.spTail : CHASE.sp;
+      const want = (gap < CHASE.tailAt ? CHASE.spTail : CHASE.sp)
+        * (1 + CHASE.surge * Math.sin(t * 0.377 + 2.1));
       her.sp += (want - her.sp) * Math.min(1, dt * 1.4);
       if (left > 2.0) {
-        const aim = Math.atan2(-dx, -dz);
+        // Her line is not a line.
+        //
+        // She swam dead at the platform, which is what a bearing does and not
+        // what a person does. Two hundred metres of open water with nothing to
+        // sight on but a raft, and nobody holds a course inside a few degrees:
+        // you drift off it, you pick your head up, you come back on, and then
+        // you do it again. Straight, the race was a gap counter with a body
+        // attached — you could read the outcome off the first ten seconds and
+        // nothing after that changed your mind.
+        //
+        // Three sines at periods that do not divide into one another, summed:
+        // 33 s is the drift and carries almost all of the excursion, 13.4 s is
+        // her picking her head up and correcting it, and 3.1 s is the fact that
+        // a stroke is not symmetrical and every swimmer yaws a little inside
+        // each cycle. Off her own clock rather than off `Math.random`, so that
+        // a run is a run and a test of a run is the same run — which is the
+        // same reason the beach is laid out off `jit`.
+        //
+        // It goes to nothing over the last twenty-five metres, and that is the
+        // finish rather than a softening: a wander that carried on into the
+        // platform would never satisfy `left > 2.0` and she would circle the
+        // raft she has just won at.
+        const wob = CHASE.wander * Math.min(1, left / CHASE.wanderOut)
+          * (Math.sin(t * 0.190 + 1.7) * 0.62
+            + Math.sin(t * 0.470) * 0.26
+            + Math.sin(t * 2.03 + 0.4) * 0.12);
+        const aim = Math.atan2(-dx, -dz) + wob;
         let d = aim - her.yaw;
         while (d > Math.PI) d -= Math.PI * 2;
         while (d < -Math.PI) d += Math.PI * 2;
@@ -384,6 +431,11 @@ async function buildChase(scene) {
       on: on ? 1 : 0, phase,
       gap: +gap.toFixed(1), best: +best.toFixed(1),
       at: [Math.round(her.x), Math.round(her.z)],
+      // Unrounded, because `at` is for reading and this is for measuring: a
+      // wander whose whole amplitude is a metre and a half does not survive
+      // being reported to the nearest metre.
+      pos: [+her.x.toFixed(3), +her.z.toFixed(3), +her.yaw.toFixed(4),
+        +her.sp.toFixed(3)],
       through: +(line > 0
         ? 1 - Math.hypot(target[0] - her.x, target[1] - her.z) / line : 0).toFixed(2),
       t: +t.toFixed(1),
