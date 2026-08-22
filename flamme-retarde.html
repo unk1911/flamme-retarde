@@ -13858,6 +13858,81 @@ async function buildJadrija(scene) {
 
   /** A moulded chair and a café table, which is all the terraces need. */
   /**
+   * What is on top of a shop.
+   *
+   * Filmed from the wood, which is uphill of the whole boardwalk, the roofs
+   * are the largest surface any of these buildings shows you — and every one
+   * of them was one flat white plane. A flat roof on this coast is never that:
+   * it is grey screed laid in bays with a kerb round the edge, a plastic water
+   * tank on a stand, a dish, an aerial, and the block somebody put on the
+   * cable so the bora would not take it.
+   */
+  function shopRoof(S, y0, top) {
+    const ry = top + 0.06;
+    const SCREED = [0.455, 0.448, 0.428];
+    const KERB = [0.520, 0.512, 0.488];
+    const a = S.t0 - 0.30, c = S.t1 + 0.30;
+    const s0 = (S.awn ? S.s0 - S.awn : S.s0) + 0.30, s1 = S.s1 + 0.30;
+    const key = S.t0 | 0;
+
+    // The screed, in bays, each one a shade off its neighbour — which is what
+    // a roof laid in a morning by two people with a bucket looks like.
+    for (let t = a; t < c; t += 1.9) {
+      const t1 = Math.min(t + 1.9, c);
+      for (let k = 0; k < 2; k++) {
+        const b0 = s0 + (s1 - s0) * (k / 2), b1 = s0 + (s1 - s0) * ((k + 1) / 2);
+        const g = 0.93 + 0.14 * ((jit(t | 0, 320 + k) * 5) | 0) / 4;
+        boxTS(t, t1, b0, b1, ry, ry + 0.02,
+          [SCREED[0] * g, SCREED[1] * g, SCREED[2] * g]);
+      }
+    }
+    // The kerb: a low upstand all the way round, which is the one line that
+    // tells you it is a roof and not a lid.
+    boxTS(a, c, s0, s0 + 0.16, ry, ry + 0.13, KERB, shade(KERB, 1.08));
+    boxTS(a, c, s1 - 0.16, s1, ry, ry + 0.13, KERB, shade(KERB, 1.08));
+    boxTS(a, a + 0.16, s0, s1, ry, ry + 0.13, KERB, shade(KERB, 1.08));
+    boxTS(c - 0.16, c, s0, s1, ry, ry + 0.13, KERB, shade(KERB, 1.08));
+
+    // The water tank, on its stand, with the pipe going down through the roof.
+    const wt = S.t0 + 1.9 + jit(key, 321) * 1.2, ws = S.s1 - 1.1;
+    for (const [ot, os] of [[-0.52, -0.52], [0.52, -0.52], [-0.52, 0.52], [0.52, 0.52]]) {
+      post(W, wt + ot, ws + os, ry, ry + 0.34, 0.05, [0.400, 0.406, 0.400], 5);
+    }
+    boxTS(wt - 0.62, wt + 0.62, ws - 0.62, ws + 0.62, ry + 0.30, ry + 0.38,
+      [0.360, 0.366, 0.360]);
+    const TANK = jit(key, 322) < 0.5 ? [0.140, 0.175, 0.230] : [0.115, 0.115, 0.125];
+    post(W, wt, ws, ry + 0.38, ry + 1.46, 0.56, TANK, 10);
+    post(W, wt, ws, ry + 1.46, ry + 1.58, 0.20, shade(TANK, 1.25), 8);
+    post(W, wt, ws + 0.60, ry + 0.10, ry + 0.44, 0.035, [0.520, 0.516, 0.500], 5);
+
+    // A dish on a short cranked post, pointed the way every dish on this coast
+    // is pointed, and an aerial beside it.
+    const dt = S.t1 - 1.5, ds = S.s1 - 0.9;
+    post(W, dt, ds, ry, ry + 0.86, 0.035, [0.420, 0.424, 0.420], 5);
+    post(W, dt, ds - 0.22, ry + 0.80, ry + 0.86, 0.035, [0.420, 0.424, 0.420], 5);
+    frustumTS(ry + 0.78, [dt, ds - 0.34, 0.30, 0.06],
+      ry + 0.96, [dt, ds - 0.44, 0.34, 0.10],
+      [0.680, 0.676, 0.660], [0.700, 0.696, 0.680]);
+    post(W, dt, ds - 0.46, ry + 0.86, ry + 0.92, 0.04, [0.300, 0.300, 0.310], 5);
+    post(W, dt - 0.8, ds, ry, ry + 1.70, 0.022, [0.360, 0.362, 0.360], 4);
+    for (let i = 0; i < 5; i++) {
+      boxTS(dt - 0.82, dt - 0.78, ds - 0.26 + i * 0.02, ds + 0.26 - i * 0.02,
+        ry + 1.10 + i * 0.13, ry + 1.13 + i * 0.13, [0.360, 0.362, 0.360]);
+    }
+
+    // And the blocks somebody put on the cable, because the bora takes
+    // anything that is only lying there.
+    for (let i = 0; i < 3; i++) {
+      const bt = S.t0 + 4.0 + i * 2.6;
+      if (bt > S.t1 - 0.6) break;
+      boxTS(bt - 0.20, bt + 0.20, s1 - 1.9, s1 - 1.5, ry, ry + 0.11,
+        [0.500, 0.492, 0.470], [0.530, 0.522, 0.498]);
+      boxTS(bt - 0.03, bt + 0.03, s1 - 1.9, s1 - 1.5, ry + 0.10, ry + 0.13,
+        [0.180, 0.180, 0.188]);
+    }
+  }
+
+  /**
    * The back of a shop, and the yard it stands in.
    *
    * Every box on this boardwalk was a rendered front with five blank faces
@@ -14632,6 +14707,7 @@ async function buildJadrija(scene) {
     if (S.kind === 'box' || (S.kind === 'kiosk' && S.t1 - S.t0 > 5)) {
       shopBack(S, y0, top);
     }
+    if (S.kind === 'box') shopRoof(S, y0, top);
     shopKit(S, y0, top, awn > 0 ? S.s0 - awn : null);
     shopExtras(S, y0, top);
     // Chairs and tables under the awning, four sets to a frontage. Every café
