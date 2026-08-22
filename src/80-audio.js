@@ -382,6 +382,47 @@ function buildAudio() {
     }
   }
 
+  /**
+   * Going *through* one.
+   *
+   * `rattle` above is the curtain moving, and the comment there is right that
+   * the movement is most of what the noise is for — but it was all of it, and a
+   * crossing with no attack read as nothing at all. What was missing is that
+   * the moment you part a bead curtain is not a scatter: a hundred strings
+   * leave the doorframe inside a tenth of a second, which the ear takes as one
+   * event, and it takes it as one event because of the bottom of it. Plastic on
+   * plastic a hundred times over has a body that a single string has not.
+   *
+   * So three things at once and all of them short. A low thump swept down,
+   * which is the mass of it; a wide bright band that is almost entirely attack,
+   * which is the face; and the same jittered high-Q clicks `rattle` uses,
+   * except packed into ninety milliseconds instead of thrown across two hundred
+   * — which is the whole difference between "somebody went through it" and "it
+   * is still moving". `rattle` then takes over on the cooldown and dies away,
+   * so the tail is unchanged and this is only the front of it.
+   *
+   * `d` here is measured across the doorway rather than to the player, because
+   * a crossing happens where the strands are: you are always at zero.
+   */
+  function beadShove(amp = 1, d = 0) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const far = Math.max(0.04, 1 - d / 24);
+    const a = clamp(amp, 0.25, 1);
+    burst({ freq: 300, q: 0.9, dur: 0.11, gain: 0.10 * a * far, sweep: 0.42 });
+    burst({ freq: 2500, q: 0.35, dur: 0.09, gain: 0.16 * a * far, sweep: 0.30 });
+    const n = 10 + Math.round(a * 14);
+    for (let i = 0; i < n; i++) {
+      burst({
+        freq: 1700 + Math.random() * 3300,
+        q: 7 + Math.random() * 12,
+        dur: 0.018 + Math.random() * 0.026,
+        gain: 0.055 * a * far * (0.4 + Math.random() * 1.0),
+        at: t0 + Math.random() * 0.09,
+      });
+    }
+  }
+
   /** The click and hiss either side of a radio call. */
   function squelch() {
     burst({ freq: 1800, q: 3.0, dur: 0.07, gain: 0.045, sweep: 0.5 });
@@ -2974,7 +3015,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, rattle,
-    canopy, boots,
+    beadShove, canopy, boots,
     /**
      * The last node before the speakers, and the context it lives in.
      *
