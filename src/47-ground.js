@@ -695,11 +695,24 @@ async function buildGround(scene, field) {
     // was always the fire and the rest of the apron was never in it.
     const far = objects.slice().sort((a, b) =>
       Math.hypot(b.x - ax, b.z - az) - Math.hypot(a.x - ax, a.z - az));
-    const first = far[0];
-    const second = far.find((o) => o.kind !== first.kind
-      && Math.hypot(o.x - first.x, o.z - first.z) > 40) || far[1];
-    first.heat = 1.05;
-    second.heat = 1.05;
+    // `objects` is reassigned on every locale change — `objects = next.objects
+    // || []` in `retarget` — so a locale with nothing burnable on it leaves
+    // this bare, and `far[0].heat` then throws inside `force()`, which is the
+    // call `0` makes. Reported three times on 22 Aug and not reproducible on
+    // either obvious path: cold start and `9` both seed cleanly. So this is a
+    // guard and a question, not a fix. If the warning ever prints, the locale
+    // it names is the thing to go and look at; the three ignitions above have
+    // already happened by here and the fire still starts without any of this.
+    if (!far.length) {
+      console.warn('ground: no objects to seed the spot fire on — locale "'
+        + (field && field.name ? field.name : '?') + '"');
+    } else {
+      const first = far[0];
+      const second = far.find((o) => o.kind !== first.kind
+        && Math.hypot(o.x - first.x, o.z - first.z) > 40) || far[1] || first;
+      first.heat = 1.05;
+      second.heat = 1.05;
+    }
     // And two of the crew, who were closest to it.
     const near = crew.slice().sort((a, b) =>
       Math.hypot(a.x - ax + wx * 90, a.z - az + wz * 90)

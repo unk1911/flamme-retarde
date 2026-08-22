@@ -124,10 +124,15 @@ opposite ends.
 
 ### Known
 
-- **`0` still throws**, every frame once it starts: `skipToGround` →
-  `ground.force()` → `seedSpotFire()` reads `far[0]`/`far[1]` unguarded at
-  `src/47-ground.js:614` and `objects` can be shorter than two. Reported by
-  three separate agents today. Next.
+- **The `0` crash is guarded, not explained.** `seedSpotFire` read `far[0]`
+  and `far[1]` with nothing between them and an empty `objects`, and `objects`
+  is reassigned on every locale change, so a locale with nothing burnable on it
+  crashed `force()` — the call `0` makes. Three agents reported it. It does not
+  reproduce: cold start and `9` both seed cleanly, and `seeded` is set before
+  anything that can throw, so the "every frame" in the earlier reports is wrong
+  on the face of the source. The guard warns with the locale's name instead of
+  throwing, and `far[1]` falls back to `far[0]` for the one-object case that
+  would have thrown next. If it ever prints, that name is the bug.
 - **The wine pour is half fixed.** The parenting and the reach are right; the
   pour pose still lays the bottle at 118.6° — past horizontal, across her body
   — with her hand on the punt. No bake is committed, so the shipped clip has
