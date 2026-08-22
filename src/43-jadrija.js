@@ -4248,12 +4248,15 @@ async function buildJadrija(scene) {
     // thing reading as a painted board when nobody has touched it for a while.
     stir: 0.020,
     // rad/s of mean movement that counts as a rattle. 0.55 was set by eye and
-    // it was above the sound: a 3.4 m/s crossing dead through the middle of the
-    // doorway peaks at 1.0 and one 0.7 m off centre peaks at 0.34, so half the
-    // ways through it made nothing, and the ways that did made four taps and
-    // stopped while the curtain was plainly still swinging. 0.30 is under the
-    // quiet half of a crossing and still well over the 0.05 that the draught
-    // alone ever reaches, which is what the number has to sit between.
+    // it sat too near the top of what a crossing makes. Measured through the
+    // solver: a walk at 3.4 m/s dead through the middle of the doorway peaks at
+    // 1.07, and one 0.7 m off centre — still inside the opening — peaks at
+    // 0.59. So the loudest thing the curtain ever does cleared the bar by a
+    // factor of two and everything either side of that cleared it by nothing,
+    // which came out as four taps and then silence while the strands were
+    // plainly still swinging. 0.30 is under the quiet half of a crossing and
+    // still six times the 0.04 the draught alone reaches, which is the gap the
+    // number has to sit in.
     din: 0.30,
   };
 
@@ -4493,8 +4496,9 @@ async function buildJadrija(scene) {
        * no sound of its own at all. Two things conspire in that. The tail is
        * driven off the mean angular rate across forty-five strands, and a
        * walker is a point 0.72 m wide against a doorway 1.45 m wide, so half
-       * the curtain never moves and the mean comes out at about a third of what
-       * the threshold wants. And the doorway is a *cut*: crossing the wall
+       * the curtain never moves and the mean is diluted by the half that does
+       * not — which is why the threshold above had to come down. And the
+       * doorway is a *cut*: crossing the wall
        * plane at s = K.face fades the screen and stands you at K.standIn, 2.4 m
        * inside — so on the way in you get within seven centimetres of the
        * strands and are then taken away from them, and the loud middle of the
