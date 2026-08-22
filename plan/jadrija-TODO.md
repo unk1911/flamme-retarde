@@ -14,9 +14,13 @@ times the same mistake has been made.
    band is the only place a prop cannot end up inside somebody's front room.
    Clamp the object's TAIL, not its origin: a car clamped at the nose still
    runs 4.3 m inland. [3]
-2. **`surfaceY` is the promenade deck for anything inside s 33.1.** West of the
-   businesses the hill is already above it, so anything placed on `surfaceY`
-   there is buried. Use `max(surfaceY(t,s), groundAt(x,z))`. [3]
+2. **~~`surfaceY` is the promenade deck inside s 33.1~~ — FIXED IN THE
+   FUNCTION, 22 Aug.** `lipOf`/`midOf`/`deckOf` are heights at a POINT now,
+   `max(terrace, groundAt(t,s) + 0.12)`, so the rule is enforced by the code
+   instead of by remembering it at every call site. It cost three builds before
+   that, and the last symptom was benches buried to the seat rail and bathers
+   neck deep in their own hill. Do not write the `max` by hand any more; if you
+   find somewhere that still needs it, the helper is wrong. [3]
 3. **Temporal dead zone.** A `const` declared at its build site is unreachable
    from any loop that runs earlier in the file — and everything is one lexical
    scope. Hoist keep-out boxes to the top. The only symptom is a page that
@@ -38,6 +42,23 @@ times the same mistake has been made.
    they come out as plain coloured squares.
 9. **A box takes the average of its two ends** over a curved shore, so long
    runs step and go ragged. Build them as quads per bay.
+9b. **THE SHORE FRAME IS NOT RIGID, AND THIS IS THE BIG ONE.** `W(t, s, y)` is
+   a PARALLEL OFFSET of the traced waterline: `st.x + st.nx * s`. Offsetting a
+   curve inland does not preserve length along it. Two points `s` metres in
+   from a shore of local radius `R` are only `(1 - s/R)` as far apart as their
+   feet on the water, and the normals all converge on a focus at `s = R`. It
+   squeezes `t` and leaves `s` alone, so **a rectangle in (t, s) is a trapezium
+   in the world**, and the further inland a thing sits the worse it gets.
+   Measured: this shore turns 46 degrees between t 360 and t 410, R about 49 m,
+   and at s 17.2 the t-scale collapses to **0.52**.
+   That is what made the openable kabina a tunnel — 4.04 m of room drawn as
+   2.70 at the front and 2.29 at the back, corners 85.0/90.3/88.8/95.8 — and
+   `bays: 1 -> 2` doubled every one of those errors, so widening the room to
+   fix the cramping made the skew twice as loud.
+   **Anything rigid and more than a couple of metres wide must be placed where
+   the frame is straight, or built on a frame of its own.** `squareRow()` does
+   the first. Nothing yet does the second, and the shut kabine on the bend are
+   still wedges because of it.
 10. **`puff()` takes the VERTICAL radius before the horizontal one.** Backwards
     turns a creeper into a row of Christmas trees.
 11. **`depthTest: false` makes a MeshBasicMaterial vanish** in this renderer.
@@ -179,6 +200,18 @@ as of this writing; the state of each is in the git log, not here.
       the yard. 1 800 tris. Shot from 1.62 m at six metres, at two metres and
       at one; the pan construction was found by PAINTING it (rule 5's method,
       below) after reasoning about it failed, again.
+
+- [ ] The shut kabine standing on the bend are still WEDGES: 2.15 m of
+      frontage drawn as 1.42 m at t 400 and 3.38 m at t 480 (rule 9b). Nobody
+      can get inside one, but the first run of the block reads visibly cramped
+      seen down the row. The honest fix is to build each run on a rigid frame
+      of its own — which is what a straight building on a curving promenade
+      actually is — rather than to keep choosing where to stand things.
+- [ ] Three bathers stand in the sea off the west beach holding nothing: the
+      "somebody halfway down every other ladder" loop puts figures at t 22 /
+      110 / 198 at s -0.28, but the ladder loop itself skips `t < beachTo + 8`,
+      so they are on ladders that are not there. Skipping them costs a
+      discarded `rng()` per skip (rule 4) or the whole beach moves.
 
 **Verify**
 - [ ] Knee-height close-up pass on the clutter — sandals, dropped towels,
