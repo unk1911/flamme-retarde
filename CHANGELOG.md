@@ -8,7 +8,7 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
-## [Unreleased]
+## [1.98.0] — 2026-08-22
 
 Four bugs from one playing pass, worked in parallel. Two of them turned out to
 be a single stale number each, in the sense that matters: a value that was
