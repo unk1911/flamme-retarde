@@ -138,4 +138,13 @@ over selected windows, envelope autocorrelation and L/R correlation.
 Things the footage shows that the engine does not yet have: the hedges and the
 gates along the lanes; the sawn-block benches; oleander in flower; lavender on
 the wall tops; the diving pontoon and the ladder as modelled objects; the new
-promenade plaza; the shop; and parked cars on the peninsula.
+promenade plaza; and the shop.
+
+Parked cars are no longer among them. The nose-in row under the olives is
+built: five body types read off `1000149595.mp4` and `1000149597.mp4` —
+supermini, small crossover, compact estate, small high-roof panel van, and one
+older squarer three-door — lofted in `tools/blender/cars.py` and placed by the
+loop in `src/43-jadrija.js`. The colour weighting comes off the same frames and
+is the part worth writing down: the row is overwhelmingly **white**, silver
+next, one or two dark cars in it, and red belongs to the old hatch, which is
+the only red thing in either walk-through.

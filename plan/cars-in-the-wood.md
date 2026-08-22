@@ -1,8 +1,38 @@
-# The cars in the wood — WIP handover
+# The cars in the wood
 
-Stood down before any code was written. Everything below is research, and the
-research is the expensive part: it is all here so the next pass starts at the
-decision rather than at the survey.
+**Built.** The first pass was stood down before any code was written and left
+the research below, which is the expensive part; the second pass executed it.
+What shipped is `tools/blender/cars.py`, ten blobs and a sidecar in
+`build/payload/`, `src/44-cars.js`, and the rewritten loop in
+`src/43-jadrija.js`. Fifty-two cars, five body types, 51 076 triangles drawn in
+ten instanced calls, 100 KB on the page, and the census unmoved.
+
+Everything below is kept as written, because it is the survey and the reasoning
+and neither of those went stale. Four things came out differently in the doing,
+and they are the ones worth knowing before touching this again:
+
+- **`propLayer` does not copy the index, and `readFR3D` is indexed.** Every
+  prototype that function was written for comes out of `propBuilder.geo()`, a
+  raw triangle soup with no index at all, so it copies position, normal and
+  aVCol and stops. Handing it an indexed geometry draws the vertex array three
+  at a time in storage order: what stands in the wood is a heap of flat shards
+  where a car should be. `src/44-cars.js` sets the index and says so.
+- **The van does not take a greenhouse.** Its roof *is* its body — the belt
+  line climbs the windscreen rake and stays up — so a greenhouse round it comes
+  out as a triangular side window and a cab roof fighting the box behind it.
+  Its screen is a `recolour` region of the body's own loft, which is flush by
+  construction and costs no triangles; only the two cab windows are panes.
+- **Bumpers are regions, not boxes.** A box across a rounded nose shows its own
+  square corners sticking out either side of the body. The same mechanism does
+  both.
+- **The roof classification threshold is 0.58, not 0.72.** At 0.72 the roof came
+  out as a white rectangle in the middle of a dark one, because the shoulder of
+  a superelliptical section is spread across two strips and leaving the outer
+  one as glass puts a 21 cm band of window along each side of the roof.
+
+The four before/after cameras and the measurements are in the report; the
+baseline was re-taken on v1.99.1 rather than trusted, and had moved from
+346 348 to 346 358 triangles as the note below predicted it might.
 
 ## The verdict on where the models come from: build them in Blender
 
