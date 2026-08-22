@@ -98,6 +98,34 @@ looks down on, which is the side the player actually walks in from.
 
 ### Fixed
 
+- **The one room you can walk into was a tapering tunnel with a sloping
+  ceiling**, and had been since 1.95.0 moved the kabine to the eastern end.
+  Nothing was wrong with the room: the spec still says 4.04 m by 5.30 m and
+  every wall is drawn where it says. What was wrong was the ground under it.
+  The whole resort is laid out in the shore's own (t, s) frame and drawn
+  through a *parallel offset* of the traced waterline — the point at (t, s) is
+  the shore at arc length t, pushed s metres inland along that station's
+  normal — and offsetting a curve inland does not preserve length along it.
+  Two points s metres in from a shore of local radius R are only (1 − s/R) as
+  far apart as their feet on the water are; the normals converge on a focus at
+  s = R and past that the frame folds. This shore turns 46° in the fifty metres
+  between t 360 and t 410, R about 49 m at the worst of it, and `JAD.rows` puts
+  the first run of kabine at t 396 — in the middle of it. The kabine stand
+  17.2 m in. Measured in the world, not inferred: the interior came out
+  **2.70 m wide at the door, 2.29 m at the back**, side walls 5.179 and 5.194,
+  diagonals 5.851 and 5.616, corners **85.1° / 90.4° / 88.8° / 95.8°**. Going
+  to two bays doubled every one of those errors — at one bay it was 1.21 m and
+  1.01 m, corners 87.0° / 90.7° / 88.3° / 93.9° — so the fix for "this room is
+  too narrow to stand in" made the skew twice as loud without touching the
+  cause. Nothing can be done about the corner; it is the tip of the spit and it
+  is where the place is. So the open hut is no longer put where the row happens
+  to begin: `squareRow` walks the row and puts it at the first run the frame
+  draws as a rectangle at the face and at the back wall both. The room now
+  measures **4.040 by 5.196, four corners at 90.00°, diagonals equal to four
+  decimal places**. The seed stream is untouched — same 297 416 triangles, same
+  twenty-seven houses, same eighty-nine bathers to four decimals — and the only
+  thing that moved is the door, from t 402 to t 427, along with its sign, its
+  tourist board and its gull.
 - **h2o was painted black.** Its `body` was `[0.045, 0.041, 0.038]` — the dark
   serving panel's colour pasted into the wall — so the largest object in the
   resort was a ten-metre slab with nothing drawn on it.
@@ -148,6 +176,17 @@ looks down on, which is the side the player actually walks in from.
   the terrace at deck + 1.77 all render from an oblique camera.
 - One thing did come out of that: **`depthTest: false` on a `MeshBasicMaterial`
   makes a mesh vanish completely in this renderer.**
+- **The kabine standing on the bend are still wedges.** The offset frame is a
+  property of the shore, not of the huts, and the fix above only moves the one
+  hut that has an inside. Measured at s 17.2, the frame draws 2.15 m of
+  frontage as 1.42 m at t 400 and as 3.38 m at t 480; the rest of the shore
+  runs 0.87 to 1.23. Nothing you can walk into stands on either of those, and
+  a hut on a bend being narrower at the back is what a hut on a bend is — but
+  a factor of two is not that, and the first run of the block is visibly
+  cramped seen down the row. Fixing it properly means either building each run
+  on a rigid frame of its own, which is what a straight building on a curving
+  promenade actually is, or smoothing the traced coastline far enough to take
+  the corner out, which would move the whole resort.
 
 ## [1.95.0] — 2026-08-21
 
