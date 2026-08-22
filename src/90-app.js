@@ -2736,8 +2736,18 @@ function shoreWalk(x0, z0, yaw) {
  * W. So it finds the shore, puts you on it and flashes the picture once, which
  * is the difference between a cut and a bug.
  */
+/**
+ * Why the last press of E did what it did.
+ *
+ * Ten reports of "E does not get me out of the water" were answered ten times
+ * by reading the code, and the code has three ways to fail and no way to say
+ * which one fired. So it says. `__fr.modes().wade` is the whole of it and the
+ * transition tests read it.
+ */
+let lastWade = null;
+
 function wadeAshore() {
-  if (state.phase !== 'swim') return false;
+  if (state.phase !== 'swim') { lastWade = { why: 'phase:' + state.phase }; return false; }
   const y = swim.you;
   const far = !swim.canWade();
   const from = far ? shoreWalk(y.x, y.z, y.yaw) : [y.x, y.z, y.yaw];
@@ -2748,19 +2758,23 @@ function wadeAshore() {
   // anything — read it, it ends in `return true` and has no other exit. So the
   // key fired, the search failed three times in silence, and the walk model was
   // handed a spot under the surface. Every one of them is checked here now.
-  if (!from) { toast(T('toast.noShore')); return false; }
+  if (!from) { lastWade = { why: 'shoreWalk', far }; toast(T('toast.noShore')); return false; }
   const land = dryLand(from[0], from[1], from[2]);
   const spot = land.at;
   if (!land.dry || !spot || isSea(spot[0], spot[1])) {
+    lastWade = { why: !spot ? 'dryLand:none' : !land.dry ? 'dryLand:wet' : 'dryLand:sea',
+      far, at: spot ? [Math.round(spot[0]), Math.round(spot[1])] : null };
     toast(T('toast.noShore'));
     return false;
   }
   if (!ground || !ground.ok
     || !ground.retarget(localeAt(spot[0], spot[1], airfield, jadrija, city))
     || !ground.dropIn(spot[0], spot[1], spot[2], true)) {
+    lastWade = { why: 'ground', far, at: [Math.round(spot[0]), Math.round(spot[1])] };
     toast(T('ground.noPlane'));
     return false;
   }
+  lastWade = { why: 'ok', far, at: [Math.round(spot[0]), Math.round(spot[1])] };
   // `leaveWater` rather than `swim.leave`, so the race and its HUD come off
   // with it. Leaving them running was survivable while E only fired chest deep
   // — you cannot be chest deep and racing — and is not now that it fires from
@@ -5113,6 +5127,37 @@ window.__fr = {
     ap: $('ap').textContent.trim(),
     phase: state.phase,
     paused: state.paused,
+  }),
+  /**
+   * The mode machine in one reading.
+   *
+   * Written for the transition tests, which have to be able to say "the swim
+   * HUD is still up over a shot of somebody else's staircase" without looking
+   * at a picture. Everything a mode leaves behind is in here: the phase, what
+   * each water mode thinks it is doing, which HUDs are on the screen, and what
+   * the shoreline handover is holding.
+   */
+  modes: () => ({
+    phase: state.phase,
+    swim: swim && swim.active ? 1 : 0,
+    mask: mask && mask.on ? 1 : 0,
+    ride: ride && ride.active ? 1 : 0,
+    foil: foil && foil.active ? 1 : 0,
+    // The one that has been lying to everybody: what `ground.wet()` is
+    // reporting right now, whether or not anybody has walked anywhere.
+    wet: ground && ground.wet ? ground.wet() : null,
+    vikWalk: vikWalk ? vikWalk.leg : -1,
+    cut: chaseCut ? 1 : 0,
+    cam: camOverride ? 1 : 0,
+    hud: ['hud', 'ground-hud', 'swim-hud', 'ride-hud', 'foil-hud', 'chase-hud',
+      'chute-hud', 'under', 'stouch']
+      .filter((id) => $(id) && !$(id).hidden),
+    at: [+camera.position.x.toFixed(1), +camera.position.y.toFixed(2),
+      +camera.position.z.toFixed(1)],
+    sea: +seaHeightAt(camera.position.x, camera.position.z).toFixed(2),
+    inSea: isSea(camera.position.x, camera.position.z) ? 1 : 0,
+    toast: $('toast').textContent,
+    wade: lastWade,
   }),
   /** Read the pause with no argument, set it with one. */
   pause: (on) => {
