@@ -66,8 +66,11 @@ days of guessing.
 ## OPEN
 
 **Build**
-- [ ] Gas bottles read as red boxes at 3 m — an 8-sided post at r 0.16 is not
-      round enough. Give them a shoulder and a valve.
+- [x] Gas bottles: turned with `lathe` instead of stacked posts — rolled foot,
+      barrel, hard shoulder, open guard collar with the valve inside it. Two
+      passes: the first was a wine bottle, because the barrel was half a metre
+      on a 0.30 m diameter and the shoulder eased over. A butane bottle is as
+      tall in the barrel as it is wide and the shoulder turns hard.
 - [ ] Ragged tarmac edge into the dust parking (b_076): the tarmac stops in a
       cracked, patched edge and cars stand nose-in on limestone dust beyond it.
 - [ ] Roadside street furniture (b_046): round blue no-stopping sign on a grey

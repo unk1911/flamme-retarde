@@ -2132,10 +2132,42 @@ async function buildJadrija(scene) {
       post(W, tn + o, back + 0.34, y0, y0 + 0.11, 0.055, [0.075, 0.075, 0.080], 6);
     }
     // Two gas bottles by the door, and the bar across them.
+    //
+    // They were an 8-sided post with a smaller post sat on top, and at three
+    // metres — which is where you pass them — an octagon at r 0.16 shows every
+    // corner and the pair read as two red boxes. A bottle is a cylinder and a
+    // shoulder, and the shoulder is most of the silhouette. `lathe` turns a
+    // profile, which is what this actually is: a rolled foot standing proud of
+    // the barrel, the barrel, the shoulder coming over, a neck, and the guard
+    // collar with the valve down inside it.
+    const GAS = [0.560, 0.180, 0.095];
     for (let i = 0; i < 2; i++) {
-      const tg = td - 0.72 - i * 0.36;
-      post(W, tg, back + 0.34, y0, y0 + 0.62, 0.16, [0.640, 0.230, 0.120], 8);
-      post(W, tg, back + 0.34, y0 + 0.62, y0 + 0.74, 0.09, [0.470, 0.170, 0.090], 7);
+      const tg = td - 0.72 - i * 0.36, gs = back + 0.34;
+      // SQUAT. The first turned version came out as a wine bottle: a barrel
+      // half a metre tall on a 0.30 m diameter, with the shoulder easing over
+      // across another 0.16. A 10 kg butane bottle is about as tall in the
+      // barrel as it is wide, and the shoulder turns HARD — that hard turn is
+      // what says gas bottle rather than flask.
+      lathe(W, tg, gs, [
+        [y0, 0.000], [y0, 0.142],
+        [y0 + 0.028, 0.158], [y0 + 0.070, 0.152],   // the rolled foot
+        [y0 + 0.340, 0.155], [y0 + 0.392, 0.150],
+        [y0 + 0.436, 0.128], [y0 + 0.472, 0.094],   // and over it comes
+        [y0 + 0.498, 0.058], [y0 + 0.512, 0.040],
+        [y0 + 0.545, 0.040],
+      ], GAS, 12);
+      // The guard collar. Open top and bottom and only a shade off the bottle,
+      // so it reads as a collar standing off the shoulder with the valve down
+      // inside it — at near-black it was a bottle cap.
+      lathe(W, tg, gs, [
+        [y0 + 0.470, 0.078], [y0 + 0.610, 0.082],
+        [y0 + 0.610, 0.064], [y0 + 0.470, 0.060],
+      ], shade(GAS, 0.86), 12);
+      // The valve, brass, down inside the collar where it belongs.
+      lathe(W, tg, gs, [
+        [y0 + 0.540, 0.026], [y0 + 0.575, 0.026],
+        [y0 + 0.588, 0.036], [y0 + 0.600, 0.019], [y0 + 0.600, 0.000],
+      ], [0.470, 0.395, 0.170], 8);
     }
     boxTS(td - 1.16, td - 0.56, back + 0.18, back + 0.22, y0 + 0.46, y0 + 0.52,
       STEEL);
