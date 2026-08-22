@@ -8,6 +8,147 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.96.0] — 2026-08-22
+
+Everything in this release was found by looking at the back of it.
+
+Fourteen more passes over Jadrija. The last release built the boardwalk from
+the front; this one is what is behind, above and beside it — the side the wood
+looks down on, which is the side the player actually walks in from.
+
+### Added
+
+- **A service yard behind every box shop.** Plinth course, eaves gutter with a
+  downpipe and splash pad at each end, a steel door with reveal, kick plate,
+  lever and worn step, meter cabinet and line box, a bracketed condenser with
+  a louvred face and its lagged pipe run, a vent hood and duct through the
+  roof, a grilled store window, five delivery crates, a wheelie bin and two
+  gas bottles with the bar across them.
+- **Something on every roof.** Grey screed laid in bays each a shade off its
+  neighbour, a kerb upstand all the way round, a plastic water tank on a
+  four-post stand with the pipe going down through the slab, a dish on a
+  cranked post, a five-element aerial, and the concrete blocks somebody put on
+  the cable so the bora would not take it.
+- **The lane wall** at s 29.2, which b_090 and a_160 both open on and a_030 has
+  again behind the houses: a low rendered wall with a dressed limestone coping
+  proud on both faces, a return at every end, terracotta planters standing on
+  the coping with oleander or agave in them, and ivy grown right over three
+  runs of it and hanging past the cap.
+- **The second lamp type** a_160 films: a 3 m post with a white sphere, built
+  as two `dome` calls with the lower one given a negative height.
+- **The worn dust track** at s 30.8-36.6 with white limestone chips through it,
+  which is what a_075 films the floor of the stand as.
+- **The playground**, t 157-176: artificial turf inside a dark green tubular
+  railing — top rail, bottom rail, uprights at a hand's width and a row of
+  welded loops along the foot, which is the standard municipal park railing —
+  with a climbing frame on four blue legs, a deck, orange guard rails, a red
+  pitched roof, a ladder, a red slide built as falling quads, monkey bars, a
+  swing frame with two seats on chains, and a yellow spring rider.
+- **The sanitary block**, t 347-357, photographed straight on: two masses with
+  the concrete slab oversailing the render by a hand's breadth on every side —
+  which is the whole silhouette, and without it the block is a shed. Lime
+  render gone salmon and grey, damp staining up from the ground, three dark
+  green louvred doors with reveals and frames and worn steps, a red fire
+  cabinet with two white H panels, a painted washing line with six garments on
+  a catenary, a vent grille in the return and the soil pipe on the back.
+- **The fish mural**, a fat yellow fish with a crown on its head, on the
+  block's wing beside a green door. Painted the way the gull is painted:
+  transparent ground, two passes with the second thinned and offset, and the
+  wall dabbed back over the top at the end.
+- **The trampoline park** rebuilt from the photograph — yellow tube, dark mesh,
+  a continuous red padded skirt, on limestone gravel among the pines, with
+  four beds and red and black plastic chairs outside it.
+- **Per-business detail.** Konoba: scarlet and lime bar stools with chrome legs
+  and foot rings, a limestone rubble base course under the counter, and the
+  pine that comes up through the terrace with its concrete collar. MINI: the
+  cantilever mast, the stack of three pebble-aggregate ballast slabs at its
+  foot, three yellow sling deckchairs, a timber planter on legs, a diagonal
+  lattice screen. Trampulin: diagonal braces at every canopy head and a yellow
+  ice-cream cart.
+- **The lane gate** at t 486: a banded red-and-white boom on two banded posts,
+  the round plate on its own post, and four bicycles leaning on it.
+- **Eleven boats moored** thirty to sixty metres off the west beach, all lying
+  within a few degrees of each other because the wind in this channel only
+  comes from two directions — with sheer stripes, an outboard on two in three,
+  and the buoy each is lying to with the painter running out to it. `dinghy()`
+  had been in the file since the first pass and had never once been called.
+- **Towels on bare concrete**, which is the commonest thing in the whole
+  survey and is not a lounger. Three panels each, at slightly different
+  heights and widths, so it lies on the slab like cloth. Somebody on four in
+  ten and a bag on the rest.
+- Pine cones under the stand, flags at the root of the mole in lifeguard
+  yellow and scarlet, and the paired green hooded bins b_031 opens on.
+
+### Changed
+
+- **The concrete is cracked.** 190 walked polylines and 26 made-good patches.
+  Walked and not cut: a crack turns a little at every step and turns more
+  where it has just turned, so the polyline carries momentum. A jittered
+  straight line reads as a seam. And the quads are the weathering halo rather
+  than the crack itself — at the honest 2-5 cm they were a pixel and a half at
+  fifteen metres and fell between the samples.
+- **The parasol stands in a wheel.** A car rim laid flat with exposed-aggregate
+  concrete poured into it, the pebbles proud of the steel. It is the standard
+  base on this coast and every one was a plain grey disc.
+- The box shops were 10-16 m deep and are now 5.0-7.2. The photograph of the
+  Slastičarnica has the pines standing directly behind its roof.
+- MINI's body was `[0.115, 0.360, 0.150]`, which painted all twelve metres of
+  it dark green and read as a hoarding. The photograph has pale render and
+  glass with the green in the joinery.
+
+### Fixed
+
+- **h2o was painted black.** Its `body` was `[0.045, 0.041, 0.038]` — the dark
+  serving panel's colour pasted into the wall — so the largest object in the
+  resort was a ten-metre slab with nothing drawn on it.
+- **The car row broke the s < 38 rule**, which is the third prop loop to do it.
+  `s0` is where the front bumper stands and the car is 4.3 m long inland of
+  it, so the second row ran out to 42.8, inside the OSM footprints. The clamp
+  was on the nose and the rule is about the tail.
+- **`f2` ran from s 34 to s 50**, breaking the same rule from the other end.
+- **The wood grew through all three compounds.** `grove` only knew about OSM
+  footprints, so nothing stopped a pine coming up through the middle of the
+  trampolines. The playground, the sanitary block and the park go into the
+  same keep-out grid, walked round their edges rather than cornered, because
+  the shore is a polyline and four corners do not bound the quad.
+- **Three cars were parked on the playground turf** with the swing frame over
+  them. The car loop starts at `beachTo - 40`, which is the middle of it.
+- **The playground turf went under the wood.** It was laid on `surfaceY`, which
+  returns the promenade deck for anything inside s 33.1; out at the west end
+  the hill has already come up by then.
+- **The fourth temporal-dead-zone failure in this file.** `PLAY` was declared
+  at the build site and the car loop and the tree loop both read it earlier,
+  so the whole resort threw and the only symptom was a page that never
+  finished loading.
+- Maslina's rear was the same void h2o's had been. Anything whose body
+  luminance is under 0.16 now gets a plain render skin on the back: a brand
+  colour is a front, not a building, and nobody paints the service side.
+- The centenary hoarding stood where the sanitary block was then built.
+- The wall's first gap test was `!clearOfShops(t)`, which took forty metres of
+  it out in one piece.
+- The trampoline enclosure had the right three colours in the wrong three
+  places and two sides instead of four; its beds were a slab of pad with the
+  mat buried under it rather than a ring.
+
+### Known
+
+- **Three business names are not on their buildings.** beach bar MINI, Caffee
+  bar H2O and Caffe TRAMPULIN have signs built with text on the texture — the
+  ink was measured at build time: 12 194, 11 771 and 15 075 dark pixels — and
+  the boards do not appear at all. Not blank, absent: the board is unlit, so
+  wherever one renders it is unmistakably bright. PIZZERIA F2 and Slastičarnica
+  JADRIJA read perfectly from identical code. Ruled out: the `sub` field, the
+  standoff, a second board on the wall behind, and the `pier`/`pergola`
+  correlation.
+- **`menuWall()` still renders nothing**, and it is the same failure. An
+  `onBeforeRender` hook on the mesh fires seventy times in a second and a half,
+  so three.js is submitting it. Ruled out: the texture, the scene graph, the
+  world position, the size, the tray in front of it, and the rotation. The same
+  mesh raised to deck + 4.6 renders in open sky, and five plain planes across
+  the terrace at deck + 1.77 all render from an oblique camera.
+- One thing did come out of that: **`depthTest: false` on a `MeshBasicMaterial`
+  makes a mesh vanish completely in this renderer.**
+
 ## [1.95.0] — 2026-08-21
 
 Everything built cleanly. Looking at it is what found the bugs.
