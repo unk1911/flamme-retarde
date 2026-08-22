@@ -2399,10 +2399,36 @@ async function buildJadrija(scene) {
         boxIn(P, ot - 0.022, ot + 0.022, os - 0.022, os + 0.022,
           y, y + 0.40, shade(col || seat, 0.8));
       }
+      // And the chair as a thing you cannot stand in.
+      //
+      // Reported 22 Aug: "near the gelato place, and elsewhere, i seem to be
+      // able to walk right through some of the tables". *Some* is the whole
+      // diagnosis. Nothing on any terrace on this boardwalk was ever a blocker
+      // — not one chair, not one table — and the only reason the terraces were
+      // not completely transparent is that two chairs in three have somebody in
+      // them and a seated bather *is* one, at `0.16 · k`. So you were stopped
+      // by the people and walked through the furniture they were sitting on.
+      //
+      // 0.20 rather than the chair's own 0.24, for the reason written over
+      // `furniture`: `GROUND.girth` adds 0.55 to every half-extent, and three
+      // chairs on a 0.72 m ring want the ring solid without the set reaching
+      // half a metre further into the gangway than its own arms do.
+      //
+      // Not rotated with the chair. At this size the difference between a
+      // 0.40 m square and the same square turned 30° is under four
+      // centimetres, and `rot` costs a sine and a cosine per blocker per pass
+      // on a list that is walked eight times a frame.
+      furniture.push({ t: ct, s: cs, a: 0.20, c: 0.20, h: 0.86, y });
     }
     boxTS(R.ct - 0.30, R.ct + 0.30, R.cs - 0.30, R.cs + 0.30, y + 0.70, y + 0.75,
       [0.520, 0.512, 0.492]);
     post(W, R.ct, R.cs, y, y + 0.70, 0.035, [0.330, 0.334, 0.330], 6);
+    // The table, which is a 0.60 m top on a single pedestal and the thing that
+    // was actually named in the report. `y` is the deck it stands on rather
+    // than the sea-level zero `solid()` writes, so the hop in `confine` — the
+    // one that gets a walker over a 0.49 m bench — measures this table from the
+    // terrace and not from the water.
+    furniture.push({ t: R.ct, s: R.cs, a: 0.28, c: 0.28, h: 0.75, y });
   }
 
   /**
@@ -3107,6 +3133,10 @@ async function buildJadrija(scene) {
           boxTS(t - 0.19, t + 0.19, s + 0.17, s + 0.21, y0 + 0.79, y0 + 1.10,
             shade(col, 0.92));
         }
+        // The counter behind them blocks and the stools did not, so the one
+        // business on this boardwalk with nothing to walk through had five
+        // scarlet and lime bar stools you walked through instead.
+        furniture.push({ t, s, a: 0.18, c: 0.18, h: 1.10, y: y0 });
       }
       // The concrete collar somebody poured round the pine that comes up
       // through this terrace. The tree itself is planted in `shopPlanting`,
@@ -3142,6 +3172,13 @@ async function buildJadrija(scene) {
           W(mt, ms + 2.6, y0 + 3.34),
           i % 2 ? [0.585, 0.570, 0.530] : [0.555, 0.540, 0.502]);
       }
+      // The ballast and the mast standing in it. Three metres of grey steel in
+      // the middle of the busiest terrace on the shore, and you walked through
+      // the lot of it. 0.70 against the bottom slab's own 0.78 — the stack
+      // steps in as it rises and 0.78 plus the girth would hold you off the top
+      // slab by a metre. `h` is the mast's, not the ballast's, because nobody
+      // hops a cantilever mast.
+      furniture.push({ t: mt, s: ms, a: 0.70, c: 0.70, h: 3.45, y: y0 });
       // The planter on legs. What grows in it is planted in `shopPlanting`,
       // and so are the yellow deckchairs.
       const pt = S.t0 + 6.4, ps = S.s0 - 3.6;
@@ -3152,6 +3189,9 @@ async function buildJadrija(scene) {
         TIMB, [0.300, 0.255, 0.190]);
       boxTS(pt - 0.66, pt + 0.66, ps - 0.25, ps + 0.25, y0 + 0.84, y0 + 0.88,
         [0.230, 0.330, 0.180]);
+      // A metre and a half of timber trough at hip height, and a planter is the
+      // one piece of café furniture that is there precisely to be walked round.
+      furniture.push({ t: pt, s: ps, a: 0.70, c: 0.28, h: 0.88, y: y0 });
       // And the diagonal timber lattice that screens the far end of it.
       for (let k = 0; k < 9; k++) {
         const a = S.t1 - 0.4 - k * 0.24;
@@ -3608,6 +3648,10 @@ async function buildJadrija(scene) {
       const fs = S.s0 - (S.awn || 3.0);
       for (let t = S.t0; t <= S.t1 + 0.01; t += 3.0) {
         post(W, t, fs + 0.3, y0, y0 + 2.4, 0.07, S.pergola, 6);
+        // Three metres apart, so blocking them leaves 1.7 m of gangway between
+        // any two — which is what the note over the beach parasols is about.
+        // A post is only a maze when it is the only way past.
+        furniture.push({ t, s: fs + 0.3, a: 0.09, c: 0.09, h: 2.4, y: y0 });
       }
       boxTS(S.t0 - 6, S.t1 + 6, fs - 0.35, fs - 0.05, y0 + 0.44, y0 + 0.50,
         S.bench);
@@ -3615,11 +3659,37 @@ async function buildJadrija(scene) {
         boxTS(t - 0.04, t + 0.04, fs - 0.32, fs - 0.08, y0, y0 + 0.44,
           [0.075, 0.230, 0.140]);
       }
+      // The plank bench, and only the six metres of it that are in front of
+      // the shop.
+      //
+      // It is drawn eighteen metres long — `t0 − 6` to `t1 + 6` — and the
+      // overshoot is not on open ground. The back row of huts here is a
+      // blocker 3.9 m deep at s 16.65…20.55 running from t 467.95 east, with
+      // one gap in it at t 465.2…467.2, and that gap is the way through from
+      // the promenade to everything behind the row. Blocking the whole plank
+      // put a bench across the doorway: measured on the walk map, s 17.2…18.0
+      // went from open to sealed and the gap stopped being a gap. So the
+      // collider stops at the frontage, where a bench outside a café actually
+      // is, and the tails stay walk-through.
+      //
+      // `h` of 0.50 is what makes even this safe: `confine` lets an airborne
+      // walker over anything they have cleared, so half a metre is a step up
+      // rather than a wall — walking into it stops you, hopping it does not.
+      //
+      // The overshoot itself is a drawing fault and is left alone here: from
+      // t 468 east the plank, its supports and the pergola posts are inside
+      // the hut row, which is the frontage's problem and not the collider's.
+      furniture.push({ t: (S.t0 + S.t1) * 0.5, s: fs - 0.20,
+        a: (S.t1 - S.t0) * 0.5 + 0.5, c: 0.15, h: 0.50, y: y0 });
     }
     // The feather flag, which is all the branding Maslina has.
     if (S.flag) {
       const ft = S.t1 + 0.9;
       post(W, ft, S.s0 - 0.6, y0, y0 + 3.1, 0.035, [0.500, 0.505, 0.500], 5);
+      // Three metres of pole standing on open ground beside the kiosk. Thin,
+      // and blocked anyway: everything else on this stretch stops you and a
+      // flagpole that does not is the one that reads as a bug.
+      furniture.push({ t: ft, s: S.s0 - 0.6, a: 0.05, c: 0.05, h: 3.1, y: y0 });
       boxTS(ft - 0.02, ft + 0.02, S.s0 - 1.35, S.s0 - 0.58, y0 + 0.9, y0 + 3.0,
         S.flag);
       if (S.name) shopSign(S, ft, S.s0 - 1.42, y0 + 2.0, 0.66, 1.8);
@@ -5892,6 +5962,11 @@ async function buildJadrija(scene) {
         post(W, t, ss - 0.34, y + hh - 0.09, y + hh, 0.055, [0.640, 0.648, 0.640], 7);
       }
       boxTS(t - 0.06, t + 0.06, ss - 0.10, ss + 0.10, y, y + 0.06, STAIN);
+      // The post itself, which was drawn and not blocked while the mint screen
+      // beside it was blocked — so the one saturated upright on three hundred
+      // metres of concrete was the one you could stand inside.
+      runs.push({ t0: t - 0.07, t1: t + 0.07, s0: ss - 0.07, s1: ss + 0.07,
+        y, h: 2.20 });
       // The screen: a panel on two legs, a gooseneck over the top of it.
       const st2 = t + 1.5;
       boxTS(st2 - 0.80, st2 + 0.80, ss + 0.30, ss + 0.38, y + 0.30, y + 2.10,
