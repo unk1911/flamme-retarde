@@ -14744,8 +14744,17 @@ async function buildJadrija(scene) {
         const t = S.t0 + 2.6 + k * ((S.t1 - S.t0 - 5.2) || 1);
         const s2 = fs - 3.1;
         const yy = at(t).deck;
-        // The ballast disc, which is what stops it being a pole in the ground.
-        post(W, t, s2, yy, yy + 0.10, 0.46, [0.470, 0.452, 0.418], 10);
+        // The ballast, and it is a WHEEL. b_181 catches one from two metres:
+        // a car rim laid flat with exposed-aggregate concrete poured into it,
+        // the pebbles standing proud of the steel and the rim rusting round
+        // them. It is the standard parasol base on this coast and it was a
+        // plain grey disc. The rim first, then the fill standing above it.
+        post(W, t, s2, yy, yy + 0.15, 0.44, [0.140, 0.128, 0.118], 12);
+        post(W, t, s2, yy + 0.02, yy + 0.19, 0.375, [0.520, 0.492, 0.442],
+          [0.548, 0.518, 0.466], 12);
+        dome(W, t, s2, yy + 0.19, 0.05, 0.375, [0.545, 0.516, 0.464], 12);
+        // The nut on the collar, which is the only bright thing on it.
+        post(W, t, s2, yy + 0.19, yy + 0.27, 0.075, [0.480, 0.472, 0.452], 6);
         post(W, t, s2, yy + 0.10, yy + 2.42, 0.035, [0.520, 0.512, 0.492], 6);
         if (furled) {
           // Tied: a long thin cone of cloth up the pole.
@@ -16167,7 +16176,11 @@ async function buildJadrija(scene) {
     const WHITE = [0.930, 0.920, 0.895];
     const R = 1.18, tip = y + 2.26, rim = y + 1.84;
     post(P, 0, 0, y, y + 2.36, 0.030, POLE, 6);
-    post(P, 0, 0, y, y + 0.05, 0.17, [0.430, 0.425, 0.410], 8);   // the foot
+    // The foot is the same wheel rim the terrace parasols stand in, poured
+    // full of exposed aggregate — see the note on the cafe ones.
+    post(P, 0, 0, y, y + 0.13, 0.38, [0.140, 0.128, 0.118], 10);
+    post(P, 0, 0, y + 0.02, y + 0.17, 0.325, [0.520, 0.492, 0.442],
+      [0.548, 0.518, 0.466], 10);
     post(P, 0, 0, y + 1.94, y + 2.02, 0.058, POLE, 6);            // the hub
 
     // `u` runs out along a rib, `v` across a panel between two of them.
@@ -17672,6 +17685,42 @@ async function buildJadrija(scene) {
         y + 0.34, y + 0.40, shade(POT, 1.12), shade(POT, 0.72));
       if (kind < 0.45) oleander(t, WALL.s, y + 0.36, 0.30 + jit(t | 0, 32) * 0.14);
       else agave(t, WALL.s, y + 0.38, 0.26 + jit(t | 0, 33) * 0.10);
+    }
+
+    // Ivy over the wall. b_181 has a whole green wall of it behind the
+    // Slasticarnica's terrace — creeper grown right over a rendered wall and
+    // hanging past the coping — and it is the only large soft mass anywhere on
+    // this side of the resort. Two runs, because a creeper is a plant and not
+    // a treatment: it is where somebody planted one and nowhere else.
+    for (const [ia, ic] of [[300.5, 311.0], [326.0, 339.0], [404.0, 413.5]]) {
+      const IDK = [0.062, 0.130, 0.058], ILT = [0.170, 0.320, 0.145];
+      // Stepped at 0.28 m with radii of 0.34-0.54, which is the whole of
+      // whether this reads as creeper or as a row of Christmas trees. The
+      // first cut stepped at 0.62 with r 0.24 and every puff stood alone: a
+      // creeper is one continuous mass with lumps in it, so the puffs have to
+      // overlap by more than half.
+      for (let t = ia; t < ic; t += 0.28) {
+        if (gap(t)) continue;
+        const y = yAt(t) + WALL.h + WALL.cap;
+        const k = (t * 11) | 0;
+        const r = 0.27 + jit(k, 34) * 0.15;
+        const P = facing(t, WALL.s - 0.04, 0);
+        // `puff` takes the VERTICAL radius before the horizontal one, and
+        // getting that round the wrong way is what turned the first two
+        // attempts into a row of Christmas trees: a creeper is flatter than it
+        // is wide by a factor of three, so ry is a third of r and not double.
+        puff(P, 0, (jit(k, 35) - 0.5) * 0.26, y + r * 0.10,
+          r * 0.40, r * 1.30, IDK, ILT, [y - 1.0, y + r * 0.6],
+          6, 2, 0.42, k);
+        // And down the seaward face, in two courses, which is the half you
+        // see from the promenade.
+        for (let d = 0; d < 2; d++) {
+          const drop = 0.24 + d * 0.30 + jit(k, 36 + d) * 0.18;
+          puff(P, (jit(k, 38 + d) - 0.5) * 0.30, -0.12, y - drop,
+            r * 0.40, r * 0.58, IDK, ILT, [y - 1.2, y + 0.2],
+            5, 2, 0.38, k + 3 + d);
+        }
+      }
     }
 
     // The other lamp. a_160 films two types and the game had only the tall
