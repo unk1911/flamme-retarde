@@ -2414,10 +2414,11 @@ async function buildJadrija(scene) {
       // chairs on a 0.72 m ring want the ring solid without the set reaching
       // half a metre further into the gangway than its own arms do.
       //
-      // Not rotated with the chair. At this size the difference between a
-      // 0.40 m square and the same square turned 30° is under four
-      // centimetres, and `rot` costs a sine and a cosine per blocker per pass
-      // on a list that is walked eight times a frame.
+      // Not rotated with the chair. A square of half-side `a` turned through θ
+      // reaches `a(|cos θ| + |sin θ|)` along the axes, so the most this one can
+      // be wrong by is 0.20(√2 − 1) = 8 cm at 45° — against a girth of 0.55 —
+      // and `rot` costs a sine and a cosine per blocker on a list `confine`
+      // walks up to eight times per call.
       furniture.push({ t: ct, s: cs, a: 0.20, c: 0.20, h: 0.86, y });
     }
     boxTS(R.ct - 0.30, R.ct + 0.30, R.cs - 0.30, R.cs + 0.30, y + 0.70, y + 0.75,
@@ -3659,8 +3660,8 @@ async function buildJadrija(scene) {
         boxTS(t - 0.04, t + 0.04, fs - 0.32, fs - 0.08, y0, y0 + 0.44,
           [0.075, 0.230, 0.140]);
       }
-      // The plank bench, and only the six metres of it that are in front of
-      // the shop.
+      // The plank bench, and only the seven metres of it that are across the
+      // shop's own frontage.
       //
       // It is drawn eighteen metres long — `t0 − 6` to `t1 + 6` — and the
       // overshoot is not on open ground. The back row of huts here is a

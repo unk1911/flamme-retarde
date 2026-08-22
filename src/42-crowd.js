@@ -560,9 +560,9 @@ function makeCrowd(scene, rig, cap) {
     //
     // It has to be applied *after* the switch and cannot live inside it. Four
     // of the six poses write `head.rotation.y` from their own clock, so a look
-    // set before the switch is a look four of them overwrite — which was the
-    // first cut, and standing in front of a bather who had just been shoved
-    // the head went on sweeping the horizon.
+    // set before the switch is a look four of them overwrite and what you get
+    // is a head that goes on sweeping the horizon while somebody stands in
+    // front of it.
     //
     // A blend rather than an assignment, because the idle head turn is the
     // thing that makes these people look alive and cutting it dead at the
