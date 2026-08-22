@@ -8572,7 +8572,18 @@ async function buildJadrija(scene) {
       if (!skinFig) throw new Error('no skinned figure');
       const mesh = skinFig.mesh;
       skinFig.play('idle', { fade: 0 });
-      const ft = gapAt + 22, fs = JAD.mid + 1.4;
+      // Beside the open kabina, not beside the jetty.
+      //
+      // She was at `gapAt + 22` — 22 m east of the mole — and that was right
+      // when the kabine were spread along the beach either side of it. The
+      // rows moved to t 396-557 and she did not, so she has been standing 122 m
+      // west of the nearest hut ever since, looking out to sea on an empty
+      // stretch of terrace. `[9]` drops you at her, so the cheat landed there
+      // too, and the dog's beat is anchored the same way and went with her.
+      //
+      // Written off the open kabina itself rather than off a number, so that
+      // wherever the door lands she is on the terrace in front of it.
+      const ft = (special ? special.dc + 2.5 : gapAt + 22), fs = JAD.mid + 1.4;
       const p = toWorld(ft, fs);
       mesh.position.set(p[0], p[1], p[2]);
       mesh.rotation.y = rigYaw(ft, -Math.PI * 0.5);  // looking out to sea
@@ -8692,8 +8703,12 @@ async function buildJadrija(scene) {
   const DOG = {
     trot: 0.93,
     lane: SHOW_LANE0 - 0.8,
-    t0: JAD.jetty + 14.4,
-    t1: JAD.jetty + 25.4,
+    // His beat straddles the open kabina's door, which is the whole of why he
+    // can follow you in and get up on the cot: it was anchored to the jetty
+    // and the kabine moved to t 396-557 without it, so he has been trotting up
+    // and down 120 m from the room he is supposed to settle in.
+    t0: (special ? special.dc - 5.5 : JAD.jetty + 14.4),
+    t1: (special ? special.dc + 5.5 : JAD.jetty + 25.4),
     turn: 2.6,                  // rad/s, turning on the spot
     stand: [2.6, 9.0],          // how long he stays put, seconds
     hitR: 0.36, hitH: 0.44,     // what the jet has to land on
