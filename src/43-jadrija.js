@@ -8440,12 +8440,19 @@ async function buildJadrija(scene) {
     // sides: this is 8 cm across and you look straight down into it from half a
     // metre, which is where a twelve-sided rim shows its corners.
     // These two numbers are not free. `WINE_POUR` in tools/blender/human_mh.py
-    // puts her wrist 0.36 m in front of her, 0.29 m out to her right and
-    // 1.08 m up, and this is where a glass has to be for the line from that
+    // puts her wrist 0.32 m in front of her, 0.09 m out to her right and
+    // 1.01 m up, and this is where a glass has to be for the line from that
     // wrist to it to be a bottle pouring rather than a bottle held over
     // something: 0.30 m ahead of her standing mark, a hand's width to her
     // right, on a stool 0.72 m high. Move the stool, the mark or the pose and
     // the wine goes on the floor.
+    //
+    // The wrist used to be at 0.36 / 0.29 / 1.08 and the pose that put it
+    // there held the bottle at 52° from vertical, which is nowhere near the
+    // 110° the line from that wrist to this glass wants — so the aim below
+    // swung it a right angle on every frame of the pour. It has been solved
+    // against this glass since, and reaches across her own midline to do it,
+    // which is why the second of those three numbers is now small.
     // The height of the seat, which both of the things standing on it need.
     const by = f + 0.722;
     const gt = bt + 0.085, gs = bs + 0.090;
@@ -12270,7 +12277,12 @@ async function buildJadrija(scene) {
         // And the glass is full from the middle of the pour on, and stays that
         // way. Nobody drinks it and nothing empties it: she poured it for you
         // and it is sitting there, which is the state this room is about.
-        if (u > 2.65 && kit.poured) kit.poured.visible = true;
+        //
+        // The middle is arithmetic, not a guess: `kit.stream` is drawn while
+        // `pour` is over 0.6, which off the ramps above is 2.35 s to 3.44 s,
+        // and this is halfway down that. Wine that appears before the stream
+        // does is wine somebody else poured.
+        if (u > 2.90 && kit.poured) kit.poured.visible = true;
         if (done) go('meet', 'idle', 0.45);
         break;
       }
@@ -13131,9 +13143,23 @@ async function buildJadrija(scene) {
    * poured.
    */
   function wineAt(u) {
+    // Key to key, in both directions, and that is the whole rule. Every one of
+    // these six numbers is a keyframe time out of the `wine` clip in
+    // tools/blender/human_mh.py, so a ramp never starts or stops in the middle
+    // of a movement:
+    //
+    //     1.05 hold -> 1.50 lift    the bottle comes off the stool
+    //     2.05 tip  -> 2.55 pour    the wrist rolls over and the wine starts
+    //     3.20 pourB -> 3.60 tip    it comes back up and stops
+    //     4.40 hold -> 4.60 reach   it is set down and the fingers open
+    //
+    // They used to end 0.35 s adrift of the keys either side, which put the
+    // whole of the aim correction inside a window where the pose was already
+    // moving — a bottle tipping itself while her wrist was still turning. Move
+    // a key up there and these move with it or the two argue.
     return {
-      held: sat((u - 0.85) / 0.28) * (1 - sat((u - 4.15) / 0.28)),
-      pour: sat((u - 1.75) / 0.35) * (1 - sat((u - 3.10) / 0.35)),
+      held: sat((u - 1.10) / 0.35) * (1 - sat((u - 4.40) / 0.30)),
+      pour: sat((u - 2.05) / 0.50) * (1 - sat((u - 3.20) / 0.40)),
     };
   }
   const vHand = new THREE.Vector3(), vMouth = new THREE.Vector3();

@@ -70,11 +70,26 @@ def frame(name, d):
     tilt = Vector((0, 0, 1)).angle(axis) * 180 / 3.14159265
     sh = rig.matrix_world @ rig.pose.bones['armUR'].head
     head = rig.matrix_world @ rig.pose.bones['head'].head
+    elb = rig.matrix_world @ rig.pose.bones['armLR'].head
     print('[pp] %-13s palm(%+.3f %+.3f %+.3f) tilt %5.1f  arm %.3f  '
           'take %.3f  pourgap %.3f  lipmiss %.3f  head(%+.3f %+.3f %+.3f)'
           % (name, *palm, tilt, (wrist - sh).length,
              (palm - BGRIP).length, (palm - POUR).length, (lip - POUR).length,
              *head))
+    # Second line: the things a pour is judged on that a palm alone does not
+    # say — where the shoulder and elbow actually are (a straight arm is the
+    # solver hitting its own reach cap, not a pose), where the bottle's foot
+    # ends up (it must not be inside her or inside the stool), and how far the
+    # pose's own axis is from the direction the runtime aim will demand. That
+    # last number is the whole bug: the runtime always hits the glass, so what
+    # you see is not the miss but the snap it takes to cover it.
+    want = (POUR - palm)
+    snap = want.angle(axis) * 180 / 3.14159265 if want.length > 1e-6 else 0.0
+    print('[pp]   %-11s sh(%+.3f %+.3f %+.3f) elb(%+.3f %+.3f %+.3f) '
+          'foot(%+.3f %+.3f %+.3f) fore %.3f  aimtilt %5.1f  snap %5.1f'
+          % ('', *sh, *elb, *foot, (wrist - elb).length,
+             Vector((0, 0, 1)).angle(want.normalized()) * 180 / 3.14159265
+             if want.length > 1e-6 else 0.0, snap))
 
 
 for name in argv:
