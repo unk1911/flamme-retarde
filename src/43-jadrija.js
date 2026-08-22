@@ -5558,7 +5558,16 @@ async function buildJadrija(scene) {
   {
     const REND = [0.615, 0.600, 0.568];
     const CAP = [0.545, 0.528, 0.482];
-    const yAt = (t) => surfaceY(t, WALL.s);
+    // The higher of the concrete and the hill, and this is the THIRD time this
+    // datum has bitten in this file — the playground turf went under the wood
+    // for exactly the same reason. `surfaceY` returns the promenade deck for
+    // anything inside s 33.1, and west of the businesses the hill has already
+    // come up by s 29.2, so a wall built on it is a wall buried in the bank.
+    const yAt = (t) => {
+      const st = at(t);
+      return Math.max(surfaceY(t, WALL.s),
+        groundAt(st.x + st.nx * WALL.s, st.z + st.nz * WALL.s));
+    };
     // Where it stops.
     //
     // Not "at every shop", which is what the first cut said and which took
@@ -5580,7 +5589,7 @@ async function buildJadrija(scene) {
       || (t > VIK.t - 12 && t < VIK.t + 12);
     const step = 2.4;
     let run0 = null;
-    for (let t = 214; t < LEN - 14 + step; t += step) {
+    for (let t = 300; t < LEN - 14 + step; t += step) {
       const t1 = Math.min(t + step, LEN - 14);
       const open = gap(t) || gap(t1) || t >= LEN - 14;
       if (!open) {
@@ -5664,10 +5673,68 @@ async function buildJadrija(scene) {
       b = back7;
     }
 
+    // ── and west of t 300 it is not a wall at all ────────────────────────
+    //
+    // b_061 films the approach lane straight up it, and what stands along the
+    // edge there is a RUN OF SHORT DRY-STONE PIERS: two metres of rubble
+    // limestone, a gap of a metre and a half, then the next one, each capped
+    // with its own dressed slab oversailing on both faces. Not render, and not
+    // continuous. 175447 has the smooth white rendered wall with the flat cap
+    // — but that is up by Maslina, three hundred metres east of here, and both
+    // are on this shore.
+    //
+    // So the run is rubble piers west of 300 and rendered wall east of it, and
+    // the join is where the businesses start, which is where the resort stops
+    // being an approach and starts being a promenade.
+    for (let t = 216; t < 299; t += 3.5) {
+      const a = t, c = t + 2.0;
+      if (gap(a) || gap(c)) continue;
+      const y0 = yAt(a), y1 = yAt(c);
+      const h = 0.82 + jit(t | 0, 60) * 0.10;
+      // The core, which is only ever seen through the gaps between the stones.
+      // Dark, because what shows between the stones is mortar in shadow and
+      // not more wall: at 0.47 the gaps read as the same surface and the whole
+      // pier came out a flat grey band.
+      const core = [0.330, 0.315, 0.288];
+      boxTS(a, c, WALL.s - 0.16, WALL.s + 0.16, y0 - 0.30,
+        Math.max(y0, y1) + h - 0.02, core, shade(core, 1.06));
+      // The rubble. Every stone turned on its own axis and none of them the
+      // same size — a course of identical blocks is masonry, and this is a
+      // field wall somebody built out of what was lying there.
+      for (let k = 0; k < 40; k++) {
+        const u = jit(t * 7 + k, 61);
+        const st2 = a + 0.10 + u * (c - a - 0.20);
+        const face = k % 2 ? WALL.s + 0.14 : WALL.s - 0.14;
+        // 0.055 m of relief is nothing at three metres. A rubble wall stands
+        // a hand's breadth proud of its own mortar.
+        const out = k % 2 ? 0.105 : -0.105;
+        const yy = y0 - 0.22 + jit(t * 7 + k, 62) * (h + 0.18);
+        const r = 0.105 + jit(t * 7 + k, 63) * 0.095;
+        const g = 0.78 + jit(t * 7 + k, 64) * 0.44;
+        // A frustum, not a box: a box has four parallel sides and reads as
+        // brick however it is coloured. Same lesson as the rip-rap.
+        frustumTS(yy, [st2, face + out * 0.30, r * 0.92, 0.075],
+          yy + r * 1.4, [st2 + (jit(t * 7 + k, 65) - 0.5) * 0.07,
+            face + out, r * 0.70, 0.085],
+          [0.575 * g, 0.556 * g, 0.508 * g],
+          [0.605 * g, 0.586 * g, 0.535 * g]);
+      }
+      // The dressed cap, oversailing both faces, which is the one straight
+      // line on the whole thing.
+      const cy = Math.max(y0, y1) + h;
+      boxTS(a - 0.08, c + 0.08, WALL.s - 0.29, WALL.s + 0.29, cy - 0.04,
+        cy + 0.11, [0.585, 0.566, 0.518], [0.625, 0.606, 0.556]);
+      runs.push({ t0: a, t1: c, s0: WALL.s - 0.32, s1: WALL.s + 0.32,
+        y: y0, h });
+    }
+
     // The planters. Terracotta, standing ON the coping, with something in
     // flower in them — which is the detail that makes it a wall somebody
     // maintains rather than a barrier somebody poured.
-    for (let t = 219; t < LEN - 18; t += 11.4) {
+    // East of 300 only: the piers on the approach are bare in b_061, and a
+    // planter standing in one of the gaps between them would be standing on
+    // nothing.
+    for (let t = 303; t < LEN - 18; t += 11.4) {
       if (gap(t)) continue;
       const y = yAt(t) + WALL.h + WALL.cap;
       const kind = jit(t | 0, 31);
