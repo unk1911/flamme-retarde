@@ -4419,7 +4419,23 @@ function frame() {
   // long: at the standing clip its nose is inside the front plane and the
   // board arrives as a shape that starts in mid-air.
   const rideNear = state.phase === 'ride' || state.phase === 'foil' ? 0.72 : 0;
-  clipNear = Math.max(indoors, hullNow, bedNow, rideNear);
+  // And a fifth, which is somebody else's face.
+  //
+  // People became solid on 22 Aug and the collider stops you with 0.54 m
+  // between centres — about 0.30 m of clear air to the surface of them. The
+  // standing clip is 1.2 m. So the person you have just walked into is wholly
+  // in front of the front plane and is not drawn: you get the head turn and
+  // the "excuuuuse me" out of a promenade with nobody on it. Two fixes landed
+  // in the same hour and neither could see the other.
+  //
+  // Handled here rather than by standing you further off, because the stand-off
+  // is the thing that was measured — it is what makes a bump read as a bump —
+  // and the front plane is free. Same ramp as a wall, so walking up to somebody
+  // and walking up to a doorframe pull the plane in the same way.
+  const faceD = state.phase === 'ground' && ground.nearBody ? ground.nearBody() : null;
+  const faceNow = faceD == null ? 0
+    : Math.min(1, Math.max(0, (1.2 - (faceD - 0.12)) / 1.14));
+  clipNear = Math.max(indoors, hullNow, bedNow, rideNear, faceNow);
   const wantNear = 1.2 - 1.14 * clipNear;
   if (Math.abs(camera.near - wantNear) > 0.005) {
     camera.near = wantNear;

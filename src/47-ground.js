@@ -611,6 +611,11 @@ async function buildGround(scene, field) {
    * clears 1.98, so you go over them; somebody on their feet is 1.78 and you
    * never will. See the column test in the loop.
    */
+  // How far out `nearBody` bothers to look. A little past the standing clip:
+  // beyond 1.4 m nobody can be inside a 1.2 m front plane, so there is nothing
+  // for the answer to change.
+  const NEAR_BODY = 1.4;
+
   function unbody(x, z, y) {
     const r = GROUND.body * 2;
     for (const c of crew) {
@@ -1983,6 +1988,37 @@ async function buildGround(scene, field) {
     get armed() { return armed; },
     update, enter, leave, bail, canEnter, canBoard, look, pose, you,
     retarget, dropIn, stepTo, addGuest,
+    /**
+     * How much clear air there is between your eye and the nearest person,
+     * in metres, or `null` when there is nobody within reach or no locale to
+     * ask. Negative is impossible: `unbody` has already pushed you out.
+     *
+     * This exists for the front clip plane and nothing else. The collider
+     * stops you with 0.54 m between centres, the standing clip sits at 1.2 m,
+     * and the arithmetic there is the whole bug: somebody you have just walked
+     * into is entirely in front of the near plane, so they vanish, and the
+     * head they turn towards you and the thing they say arrive from an empty
+     * promenade. Measured from the camera rather than from the walker because
+     * the near plane is a property of the view.
+     */
+    nearBody() {
+      if (!active || !field.bodies || !field.bodyList) return null;
+      const n = field.bodies(you.x, you.z, NEAR_BODY);
+      if (!n) return null;
+      const list = field.bodyList();
+      const eye = you.y + GROUND.eye;
+      let best = null;
+      for (let i = 0; i < n; i++) {
+        const b = list[i];
+        // Somebody whose column your eye is not level with is not in front of
+        // your face however close they are in plan — you are on the mole above
+        // them, or they are lying down at your feet.
+        if (b.top != null && (eye > b.top + 0.05 || eye < b.y0)) continue;
+        const d = Math.hypot(you.x - b.x, you.z - b.z) - b.r;
+        if (best === null || d < best) best = d;
+      }
+      return best;
+    },
     /**
      * Jump. Refused if you are already off the ground, so leaning on the key
      * is one hop and not a hover.
