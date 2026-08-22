@@ -5815,20 +5815,21 @@ async function buildJadrija(scene) {
   // the stand behind a Dalmatian bathing station is in August: half wood, half
   // car park, and the game had a wood with nobody's car in it.
   //
-  // Built here rather than borrowed from 37-props.js: `carNearProto` is drawn
-  // through an instanced prop layer owned by the town, and reaching into that
-  // from the resort would mean sharing a layer whose capacity is budgeted
-  // somewhere else entirely.
+  // What used to be here was fifteen `boxIn` calls apiece: two stacked cuboids
+  // for a body, an inset dark rectangle for glass, two bumper bars, four lamps
+  // and four wheels made of a black square with a grey square laid on it. One
+  // shape, repeated — and the complaint was not only that the shape was a box,
+  // it was that every car was the *same* box.
+  //
+  // What is left in this file is the part that is about the shore: which bands
+  // of `t` are clear, how far inland a car may stand, and where the playground
+  // railing is. The models are five lofted bodies baked by
+  // tools/blender/cars.py and drawn through the instanced prop layer — see
+  // src/44-cars.js, which also says why `propLayer` is reusable here while the
+  // town's own car *layer*, whose capacity is budgeted against the traffic on
+  // the coast road, still is not.
+  const carSites = [];
   {
-    const back6 = b;
-    b = up;
-    const GLASS = [0.100, 0.125, 0.150];
-    const TYRE = [0.070, 0.070, 0.080];
-    const LAMP2 = [0.780, 0.760, 0.690];
-    const PAINT = [[0.700, 0.700, 0.695], [0.560, 0.570, 0.585],
-      [0.230, 0.235, 0.245], [0.115, 0.115, 0.125], [0.380, 0.130, 0.115],
-      [0.140, 0.200, 0.340], [0.480, 0.470, 0.430]];
-    let n = 0;
     for (let t = JAD.beachTo - 40; t < LEN - 30; t += 4.0) {
       if (!clearOfShops(t)) continue;
       // Dense: the aerial shows the whole back of the wood given over to it in
@@ -5845,9 +5846,10 @@ async function buildJadrija(scene) {
       // parked in somebody's front room. The first cut put two rows at 37 and
       // 50 and the second row stood inside the houses — invisible from the
       // promenade and unmissable the moment the camera was in one.
-      // And the clamp was on the NOSE. `s0` is where the front bumper stands
-      // and the car is 4.3 m long *inland* of it, so the second row started at
-      // 37.1-38.5 and ended at 42.8 — inside the OSM footprints, which is the
+      // And the clamp is on the TAIL, not the nose. `s0` is where the front
+      // bumper stands and the whole car is *inland* of it, so when the clamp
+      // was on the nose the second row started at 37.1-38.5 and ended at 42.8
+      // — inside the OSM footprints, which is the
       // exact failure the 38 m rule was written down for. One nose-in row on
       // the lane's seaward side is what fits, and it fits with its tail at
       // 35.5 rather than with its nose there.
@@ -5857,37 +5859,32 @@ async function buildJadrija(scene) {
       if (t > PLAY.t0 - 3 && t < PLAY.t1 + 3) continue;
       if (t > SAN.t0 - 3 && t < SAN.t1 + 3) continue;
       const s0 = JAD.rowB + 5.0 + jit(t | 0, 23) * 1.4;
-      const y = surfaceY(t, s0 + 2.0);
-      const col = PAINT[((jit(t | 0, 24) * 97) | 0) % PAINT.length];
-      // Nose-in: the long axis runs inland, so `s` is the length of the car.
-      const P = (dt, ds, yy) => W(t + dt, s0 + ds, yy);
-      // Body, in two masses so it has a bonnet and a cabin.
-      boxIn(P, -0.86, 0.86, 0.10, 4.30, y + 0.34, y + 0.98, col, shade(col, 1.05));
-      boxIn(P, -0.80, 0.80, 1.05, 3.25, y + 0.98, y + 1.44,
-        shade(col, 0.94), shade(col, 1.02));
-      // Glass, inset a little all round so it reads as glazing and not paint.
-      boxIn(P, -0.74, 0.74, 1.12, 3.18, y + 1.00, y + 1.40, GLASS);
-      boxIn(P, -0.81, 0.81, 1.05, 3.25, y + 1.03, y + 1.37, shade(col, 0.90));
-      // Bumpers and lights.
-      boxIn(P, -0.84, 0.84, 0.02, 0.16, y + 0.42, y + 0.72, [0.180, 0.180, 0.190]);
-      boxIn(P, -0.84, 0.84, 4.24, 4.38, y + 0.42, y + 0.72, [0.180, 0.180, 0.190]);
-      for (const o of [-0.58, 0.58]) {
-        boxIn(P, o - 0.20, o + 0.20, 0.10, 0.20, y + 0.74, y + 0.92, LAMP2);
-        boxIn(P, o - 0.20, o + 0.20, 4.20, 4.30, y + 0.74, y + 0.90,
-          [0.420, 0.090, 0.080]);
-      }
-      // Wheels.
-      for (const [ot, os] of [[-0.80, 0.95], [0.80, 0.95], [-0.80, 3.45], [0.80, 3.45]]) {
-        boxIn(P, ot - 0.11, ot + 0.11, os - 0.32, os + 0.32, y, y + 0.62, TYRE);
-        boxIn(P, ot - 0.13, ot + 0.13, os - 0.19, os + 0.19,
-          y + 0.13, y + 0.49, [0.520, 0.528, 0.540]);
-      }
-      runs.push({ t0: t - 0.95, t1: t + 0.95, s0: s0 - 0.1, s1: s0 + 4.5,
-        y, h: 1.44 });
-      n++;
+      // Which of the five, off a *sixth* slot of the same sine hash. Nothing in
+      // this loop touches `rng`, so the model table in src/44-cars.js is free to
+      // grow or shrink without moving a single bather — see the note over `jit`.
+      const model = carModelFor(jit(t | 0, 25));
+      const size = carSize(model.key);
+      const len = size.x1 - size.x0;
+      // The longest of the five is 4.60 m, so the deepest tail this can produce
+      // is 32.50 + 4.60 = 37.10, which is still inside the 39 m band. That is
+      // the number to check against if a longer model is ever added.
+      const y = surfaceY(t, s0 + len * 0.5);
+      const tint = CAR_PAINT[model.paint[
+        ((jit(t | 0, 24) * 97) | 0) % model.paint.length]];
+      // The model's origin is the wheelbase centre and its +X is the nose, so
+      // the origin stands `x1` inland of where the front bumper is.
+      const st = at(t);
+      const inv = 1 / (Math.hypot(st.nx, st.nz) || 1);
+      const [x, , z] = W(t, s0 + size.x1, y);
+      // Seaward is `s` decreasing, so the nose has to look down −(nx, nz). A
+      // yaw of `a` sends the model's +X to (cos a, −sin a), which gives this.
+      // `at()` lerps its normals between stations, so they come back a hair
+      // short of unit length and want normalising before the atan2.
+      carSites.push({ x, y, z, model: model.key, tint,
+        yaw: Math.atan2(st.nz * inv, -st.nx * inv) });
+      runs.push({ t0: t - size.hw - 0.06, t1: t + size.hw + 0.06,
+        s0: s0 - 0.1, s1: s0 + len + 0.1, y, h: size.h });
     }
-    void n;
-    b = back6;
   }
 
   // ── the wall along the back, and the playground behind it ─────────────────
@@ -9668,6 +9665,13 @@ async function buildJadrija(scene) {
   // own +X along the shore precisely so that they could.
   vik = await buildVikendica(scene, { toWorld, local });
   if (vik) for (const b of vik.blockers()) blockers.push(b);
+
+  // ── the cars in the wood ───────────────────────────────────────────────────
+  // Placed by the loop far above, which is where the shore rules live; drawn
+  // here, because inflating five pairs of blobs is the async half of the job
+  // and this is where the async half of the resort happens. Their walk blockers
+  // went into `runs` at placement time and are already accounted for.
+  const cars = await buildJadrijaCars(scene, carSites);
 
   // ── the crowd ──────────────────────────────────────────────────────────────
   /**
@@ -14259,5 +14263,18 @@ async function buildJadrija(scene) {
       el: board.tex.image,
     },
     tris: (deck.count() + up.count() + vil.count()) / 3,
+    /**
+     * The car park: how many of each of the five, and what they cost to draw.
+     *
+     * `tris` here is not part of `jadrija.tris` above and must not be added to
+     * it. That one counts what is *baked* into the shore's three buffers; these
+     * are instanced, so the geometry is five pairs of blobs and this number is
+     * how many triangles the row puts through the pipe when all of it is in
+     * frame — which, being ten draw calls behind one bounding sphere, is very
+     * often none of them.
+     */
+    cars: { n: cars.count, tris: cars.tris, models: cars.counts },
+    /** For the shadow pass in src/90-app.js. */
+    carMeshes: cars.meshes(),
   };
 }

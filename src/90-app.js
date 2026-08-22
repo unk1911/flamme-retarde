@@ -848,6 +848,12 @@ async function boot() {
     for (const m of jadrija.crowd.meshes()) {
       shadow.cast(m, { instanced: true, near: true });
     }
+    // And the row parked in the wood. These used to be baked into `upMesh` and
+    // so cast into both cascades; instanced and near-only is the same deal the
+    // town's cars get, and a car is nine texels across in the far map.
+    for (const m of jadrija.carMeshes || []) {
+      shadow.cast(m, { instanced: true, near: true });
+    }
   }
 
   await step(82, 'load.fuel');
@@ -4703,6 +4709,10 @@ window.__fr = {
       people: jadrija.crowd.people, walkers: jadrija.crowd.walkers,
       rigs: jadrija.crowd.rigs.join('+') || 'none',
       posed: jadrija.crowd.drawn,
+      // The row in the wood: how many of each of the five, and what the whole
+      // car park costs to draw. Not part of `tris` above, which counts only
+      // what is baked into the shore's own buffers — these are instanced.
+      cars: jadrija.cars,
       testFigure: jadrija.testFigure || 'none',
     } : null,
     rail: rail ? { ways: rail.ways, km: +rail.km.toFixed(1), cars: rail.cars,
