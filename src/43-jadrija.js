@@ -1081,6 +1081,29 @@ async function buildJadrija(scene) {
    * how they are built — a party wall each side and a gable only at the ends —
    * and it is also why they survive: eighty huts is one long building.
    */
+  // Where the kabine must NOT stand.
+  //
+  // Caffe TRAMPULIN sits at t 469-475, s 21 to 26.6 with a 3.2 m awning in
+  // front of it. The kabine field runs t 396-557 in two rows whose seaward
+  // faces are at s 17.2 and s 26.1, three metres deep each — so the cafe was
+  // built in the ALLEY between the two rows, its awning reaching into the
+  // front row and its back wall into the back one.
+  //
+  // What hid it for two days is worth writing down: from the promenade the
+  // front row of huts simply stood across the cafe's fascia, so this was
+  // reported as a missing SIGN rather than as a buried building. A raycast
+  // from the camera to the board found the hut wall 0.15 m in front of it and
+  // named it by its vertex colour.
+  //
+  // Declared HERE, above the kabine, because the kabine are built first and
+  // `SHOPS` is a `const` five hundred lines further down. Reading it from
+  // `cabinRun` is the temporal-dead-zone failure this file has now had four
+  // times, and its only symptom is a page that never finishes loading. Keep
+  // these numbers in step with the `tramp2` entry by hand.
+  const EAST_CAFE = { t0: 467.6, t1: 476.4, s0: 16.6, s1: 27.2 };
+  const cafeBlocks = (a, c, front) => c > EAST_CAFE.t0 && a < EAST_CAFE.t1
+    && EAST_CAFE.s1 > front && EAST_CAFE.s0 < front + JAD.cabD;
+
   function cabinRun(t0, n, front, roofCol) {
     const back = front + JAD.cabD;
     const t1 = t0 + n * JAD.cabW;
@@ -1090,8 +1113,15 @@ async function buildJadrija(scene) {
     // would pick up the hut bounce and show as a bright rectangle in the middle
     // of the promenade.
     b = deck;
-    boxTS(t0 - 0.5, t1 + 0.5, front - 0.55, back + 0.45,
-      y0 - 0.4, y0 + JAD.plinth, CONC[1], CONC[2]);
+    // In up to two pieces, so the pad stops at the cafe instead of running
+    // under its floor.
+    for (const [pa, pc] of cafeBlocks(t0 - 0.5, t1 + 0.5, front)
+      ? [[t0 - 0.5, EAST_CAFE.t0], [EAST_CAFE.t1, t1 + 0.5]]
+      : [[t0 - 0.5, t1 + 0.5]]) {
+      if (pc - pa < 0.15) continue;
+      boxTS(pa, pc, front - 0.55, back + 0.45,
+        y0 - 0.4, y0 + JAD.plinth, CONC[1], CONC[2]);
+    }
     b = up;
     const eave = y0 + JAD.plinth + JAD.cabH;
     const ridge = eave + JAD.cabRise;
@@ -1107,6 +1137,12 @@ async function buildJadrija(scene) {
       const a = t0 + k * JAD.cabW, c = a + JAD.cabW;
       const col = CAB[Math.floor(rng() * CAB.length)];
       const wash = washAt(k + (t0 | 0));
+      // Not through the cafe. The colour above is drawn and then thrown away,
+      // exactly as the open kabina's second bay is, so every hut, bather and
+      // parasol downstream comes out of the seed where it already stood — the
+      // whole beach layout hangs off this stream and skipping a draw moves all
+      // of it.
+      if (k !== sk && cafeBlocks(a, c, front)) continue;
       // Drawn after the colour is picked and not before, so the special one
       // takes its own colour out of the same sequence its neighbours do.
       if (k === sk) {
