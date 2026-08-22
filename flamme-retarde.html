@@ -13685,13 +13685,28 @@ async function buildJadrija(scene) {
     // The first version was a bare plane six centimetres proud of whatever it
     // was mounted on, and the awning's gutter and rafters — added afterwards —
     // sat in front of it. Nothing z-fought, which is the confusing part: the
-    // sign was simply behind a pipe. So the tray is drawn here, the face stands
-    // clear of the tray by two centimetres, and both are placed relative to the
-    // front of the sign rather than to the building, so nothing bolted on later
-    // can get between them.
+    // sign was simply behind a pipe. So the tray is drawn here, and both are
+    // placed relative to the front of the sign rather than to the building, so
+    // nothing bolted on later can get between them.
+    //
+    // The tray stands 0.10 m behind the face, not 0.02, and that one number is
+    // the whole of why three of these were reported missing.
+    //
+    // The face is a plane at `s` and the tray's front was at `s + 0.02`. Two
+    // centimetres apart is fine at the origin; this shore is two kilometres
+    // out along x and z, and at that magnitude the depth buffer cannot
+    // separate them. So which one wins is decided by rounding, and it went the
+    // tray's way on beach bar MINI and Caffe TRAMPULIN and the face's way on
+    // H2O and the Slasticarnica — from identical code, which is exactly why it
+    // read as a mystery rather than as a bug. Nudging a board 0.15 m seaward
+    // at runtime makes it appear; 1.5 m was never needed, and it was never an
+    // awning, a parasol or a rafter in front of it.
+    //
+    // A sign box stands proud of its backing anyway. 0.10 m is both the fix
+    // and the right depth.
     const back = b;
     b = up;
-    boxTS(t - w * 0.5 - 0.05, t + w * 0.5 + 0.05, s + 0.02, s + 0.10,
+    boxTS(t - w * 0.5 - 0.05, t + w * 0.5 + 0.05, s + 0.10, s + 0.20,
       y - h * 0.5 - 0.04, y + h * 0.5 + 0.04, [0.300, 0.296, 0.288]);
     b = back;
     const st = at(t), p = W(t, s, y);
@@ -13709,6 +13724,10 @@ async function buildJadrija(scene) {
     //
     // The seaward direction is the inland normal turned round.
     mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
+    // Named, because three of these were declared missing on the evidence
+    // of position alone, and position alone cannot tell you which board it
+    // is. Every one of them is 6.4 by 0.46 and they stand in a row.
+    mesh.name = 'sign:' + (S.key || S.name);
     scene.add(mesh);
   }
 
@@ -14741,8 +14760,21 @@ async function buildJadrija(scene) {
       const furled = (CONFIG.hour || 14) > 17;
       const CREAM = [0.560, 0.545, 0.508];
       for (let k = 0; k < 2; k++) {
-        const t = S.t0 + 2.6 + k * ((S.t1 - S.t0 - 5.2) || 1);
-        const s2 = fs - 3.1;
+        // At the ENDS of the terrace, not straddling the middle of it.
+        //
+        // They stood at t0+2.6 and t1-2.6, which on a twelve-metre frontage is
+        // squarely in front of the door and squarely in front of the name.
+        // 175806 and b_106 both have them out at the corners with the middle
+        // of the terrace clear, which is where you would put them anyway: the
+        // middle is how people get in.
+        //
+        // This was briefly suspected of being why three signs would not show —
+        // a cream canopy at 2.4 m does hide a fascia at 2.1 m — and it is not.
+        // See the standoff note in `shopSign`: the cause was two centimetres
+        // of depth, and the boards read now with the parasols wherever they
+        // stand. This change is worth making on its own evidence.
+        const t = S.t0 + 1.3 + k * ((S.t1 - S.t0 - 2.6) || 1);
+        const s2 = fs - 3.6;
         const yy = at(t).deck;
         // The ballast, and it is a WHEEL. b_181 catches one from two metres:
         // a car rim laid flat with exposed-aggregate concrete poured into it,
