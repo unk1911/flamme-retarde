@@ -521,7 +521,7 @@ function initTouch() {
     el.classList.toggle('on', TOUCH.sfast);
   });
   tap('t-sauto', () => toggleSwimAuto());
-  tap('t-ashore', () => wadeAshore());
+  tap('t-ashore', () => goAshore());
   tap('t-sset', () => togglePanel());
   tap('t-spause', () => togglePause());
 
