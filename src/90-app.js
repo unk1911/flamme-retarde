@@ -1443,12 +1443,40 @@ function skipToGround() {
  * You are put sixteen metres up the promenade from her and facing her, which is
  * just outside the distance at which she notices you. Walking the last few
  * metres is the whole point; being dropped on top of her is not.
+ *
+ * It answers from everywhere, and that is the whole of what it is for.
+ *
+ * It used to answer from the seat and from the water and nowhere else, which
+ * made it useless in the two places somebody most wants it. Pressed during the
+ * walk up to the vikendica it hit the `state.phase === 'ground'` guard — the
+ * cut has already dropped you on the promenade, the phase is 'ground' by the
+ * time the first leg plays — and said "there is no aeroplane here", while the
+ * shot carried on running the camera up somebody else's staircase. Pressed
+ * during the race's establishing shot it did move the walker, correctly, four
+ * hundred metres up the shore, and left the camera on the end of the jetty: the
+ * cut had been torn down by `leaveWater` but `camOverride` still held its last
+ * frame, and nothing puts that back on its own. You were at Jadrija and could
+ * not see it.
+ *
+ * So: kill the walk-up outright rather than through `endVikWalk`, which would
+ * finish the shot by standing you in the middle of the living room — the thing
+ * you just pressed a key to get out of; give the camera back unconditionally;
+ * and let 'ground' and 'chute' through the door with the rest. On foot the
+ * refusal was never right anyway. `0` refuses on foot because it means "get
+ * into the aeroplane" and you are standing next to it; `9` means "be over
+ * there", and being on foot somewhere else is the reason to press it.
  */
 function skipToJadrija() {
   if (!ground || !ground.ok || !jadrija || !jadrija.figureAt) return;
-  if (state.phase === 'ground') { toast(afootToast()); return; }
-  if (state.phase !== 'fly' && !inWater()) return;
   if (state.paused) setPaused(false);
+  if (vikWalk) { vikWalk = null; vikHold = false; }
+  camOverride = null;
+  if (state.phase !== 'fly' && state.phase !== 'ground'
+    && state.phase !== 'chute' && !inWater()) return;
+  // Under a canopy there is a canopy, and it does not come with you. Harmless
+  // anywhere else — `reset` puts the seat back to 'stowed' and zeroes a
+  // descent that is not happening.
+  if (eject) eject.reset();
   leaveWater();
   const [ft, fs] = jadrija.figureAt;
   const w = jadrija.toWorld(ft + 16, fs - 1);

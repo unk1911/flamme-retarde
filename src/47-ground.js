@@ -31,12 +31,29 @@
 const GROUND = {
   eye: 1.66,
   // The hop. `hopV` is the launch speed and `hopG` the gravity that brings you
-  // back, so the apex is hopV^2 / 2g — 1.15 m, which clears the 0.49 m bench
-  // and the 0.99 m bin on the promenade with something to spare. It exists as
-  // an escape hatch as much as a move: the walker follows the ground exactly
-  // and has no way at all to get over a thing it has been pushed against.
-  hopV: 4.75,
-  hopG: 9.81,
+  // back, so the apex is hopV² / 2g. It exists as an escape hatch as much as a
+  // move: the walker follows the ground exactly and has no way at all to get
+  // over a thing it has been pushed against.
+  //
+  // 4.75 against real gravity was 1.15 m on paper and 1.11 m measured, and it
+  // was not enough. A bench at 0.49 and a bin at 0.99 it cleared; the things
+  // that actually trap you are waist-high and higher — the sawn stone along the
+  // boundary, the piers west of the businesses, a garden wall between two
+  // houses four metres apart — and against those an escape hatch that tops out
+  // a hand's breadth over a wheelie bin is no escape at all. 7.0 puts the apex
+  // at 2.04 m on paper and 1.98 m measured, which clears everything on this
+  // shore that is a wall rather than a building.
+  //
+  // And the gravity went up with it, which is the part worth explaining. Left
+  // at 9.81 a 7 m/s launch hangs for 1.43 s, and one and a half seconds off the
+  // ground is not a jump, it is a low-gravity level: you float, you steer in
+  // mid-air for a metre and a half of promenade, and you come down like a
+  // paratrooper. 12.0 is a fifth again heavier than the world and it buys the
+  // height back at 1.17 s of hang — a tenth of a second longer than the old
+  // 1.15 m hop, for twice the height. Up hard, over it, down. Nothing about
+  // this walker is a physics simulation; what it has to be is controllable.
+  hopV: 7.0,
+  hopG: 12.0,
   walk: 3.4,               // m/s — a fast walk in kit
   // Shift. 6.1 m/s was a real sprint in real kit and it was the wrong number:
   // the places you are asked to cross on foot are four hundred metres of
