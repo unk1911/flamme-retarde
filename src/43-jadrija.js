@@ -2612,8 +2612,21 @@ async function buildJadrija(scene) {
         post(W, t, fs + 0.20, y0, top - 0.44, 0.055, [0.560, 0.552, 0.530], 6);
       }
       if (S.menu) menuWall(S, y0, top);
-      else if (S.name) shopSign(S, (S.t0 + S.t1) * 0.5, fs - 0.16, top - 0.30,
-        Math.min(6.4, (S.t1 - S.t0) * 0.72), 0.38);
+      // Stood 0.40 m off the valance rather than 0.16, and 0.46 m deep
+      // rather than 0.38.
+      //
+      // Every canvas on this boardwalk has ink on it — measured, by counting
+      // dark pixels in the texture at build time: h2o 11 771, mini 12 194,
+      // Trampulin 15 075. And three of those five boards were not on the
+      // building. At 0.16 m the face sits inside the depth the awning edge,
+      // its gutter, its rafters and the scallop fascia all occupy, and which
+      // of them wins is decided by a centimetre. Slasticarnica read and the
+      // three beside it did not, with identical code and identical canvases.
+      // Stood 0.40 m off the valance rather than 0.16, and 0.46 m deep
+      // rather than 0.38 — which did not fix what it was meant to fix, but is
+      // the right depth for the board anyway.
+      else if (S.name) shopSign(S, (S.t0 + S.t1) * 0.5, fs - 0.40, top - 0.34,
+        Math.min(6.4, (S.t1 - S.t0) * 0.72), 0.46);
       // The scalloped fascia. The photograph has one on this awning whether or
       // not the name is up there with it.
       if (S.scallop || S.menu) {
