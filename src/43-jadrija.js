@@ -9621,6 +9621,43 @@ async function buildJadrija(scene) {
   // second card is a beat, and a beat is what makes the line land.
   const FIRE_NOTES = ['i am a firestarter!', 'a twisted firestarter!'];
 
+  // ── and the ones she only holds up somewhere ───────────────────────────────
+  /**
+   * A line a place.
+   *
+   * The three in `NOTES` are hers wherever she is standing, which is what makes
+   * them hers — "meaw!" is not about anything. These five are about where the
+   * two of you have got to, and they only come up there: walk her along the
+   * promenade and the card starts answering the buildings.
+   *
+   * Five, and only five, because there are exactly five places on this shore
+   * she can walk you to that the world actually contains — the shop, the huts,
+   * the mole, the house, and the water at the edge of her lane. A line about a
+   * sixth thing would be a line about somewhere that is not here.
+   *
+   * The register is the register of the three above it: lower case, a few
+   * words, slightly off, fond. `duck` is not a new joke, it is the one out of
+   * "what's up, duck?", which is the only word she has ever called anybody.
+   *
+   * And they are short on purpose, which is the whole reason the ice-cream one
+   * is two of them. `fitText` shrinks a line until it fits across 448 px and
+   * gives up at 28, and twenty-seven characters lands exactly on that floor:
+   * photographed from where anybody stands to read a card, it is a grey smear
+   * with a shape. The fix is the one the firestarter cards already use three
+   * hundred lines above — one line a card, and the second card is a beat —
+   * and it costs nothing but a pair. So the words are the words, and she holds
+   * them up one after the other.
+   *
+   * A two-element array is two cards; a string is one.
+   */
+  const PLACE_NOTES = {
+    slast: ['mayhaps', 'ice-cream for baye?'],
+    kabine: 'hut for baye?',
+    mole: 'race you, duck?',
+    vikendica: 'nice house, duck!',
+    water: 'sea is wet!',
+  };
+
   // ── and the lines on it she did not make up ────────────────────────────────
   /**
    * What the world outside says, if there is an internet and it feels like
@@ -9821,10 +9858,26 @@ async function buildJadrija(scene) {
       // something real two times in five, which is what "occasionally" is worth
       // here: often enough to be noticed on a second visit, rare enough that it
       // is still a surprise.
-      pick: () => {
+      /**
+       * `where` is a key into `PLACE_NOTES` or nothing.
+       *
+       * Two times in three she says the thing about the place, and the rest of
+       * the time she says one of her own — because a woman who comments on
+       * every building she passes is a tour guide, and the whole of her is that
+       * she is not one. Standing somewhere with nothing to say about it, the
+       * pool is exactly what it always was.
+       */
+      pick: (where) => {
+        const here = where && PLACE_NOTES[where];
+        if (here && Math.random() < 0.67) {
+          write(Array.isArray(here) ? here[0] : here);
+          return here;
+        }
         const pool = NOTES.concat(LIVE
           .filter((s) => s.card).map((s) => live[s.key]).filter(Boolean));
-        write(pool[(Math.random() * pool.length) | 0]);
+        const line = pool[(Math.random() * pool.length) | 0];
+        write(line);
+        return line;
       },
       /**
        * Sit it between her hands.
@@ -9915,6 +9968,33 @@ async function buildJadrija(scene) {
         // starts or stops on a frame boundary: how fast she is going, and the
         // two rates the yaw and the shoulder offset are turning at.
         vel: 0, rate: 0, sideRate: 0,
+        // And the difference between what she asked for and what she got.
+        // `vel` is the ask; `made` is the ground she actually covered, damped,
+        // measured across the whole frame at the bottom of `stepShow` so that
+        // it does not care which of the four movers ran. `stall` is how long
+        // `made` has been near nothing while a gait was playing, and `gait` is
+        // which travelling clip that is — the pair is the whole of what stops
+        // her walking on the spot.
+        made: 0, stall: 0, gait: null,
+        // How fast the gap between you is opening, damped, and what it was
+        // last frame. One frame of it is noise — she wanders two metres a
+        // second on her own — so what the routine reads is the rate.
+        away: 0, dWas: 0,
+        // The hop. How high off the deck she is, how fast that is changing,
+        // how long until she will take another one, and how far into the tuck
+        // she is — which is eased rather than switched, because a pair of
+        // knees that arrive at the chest on one frame is a glitch and not a
+        // jump.
+        air: 0, hopV: 0, hopIn: 0, tuck: 0, hold: 0,
+        // The second card, if the line she picked came as two, and whether it
+        // is up yet.
+        card2: null, card: 0,
+        // The stage she is allowed on, live. `SHOW.t0`/`t1` are the fence she
+        // has when nobody is with her; these are the fence she has now, and
+        // they slide to keep you inside them while you are on foot. Seeded at
+        // her own spot so that the very first frame cannot clamp her anywhere,
+        // which is the whole class of bug this pair exists to make impossible.
+        t0: ft, t1: ft,
         // What is left of the opening routine. Filled when she gets up off the
         // deck and emptied one number at a time; empty means the dice are back
         // in charge.
@@ -9957,6 +10037,28 @@ async function buildJadrija(scene) {
    * widens the lane and forgets there was a second copy of the number.
    */
   const SHOW_LANE0 = JAD.mid - 2.0;
+
+  /**
+   * The middle of the stage she performs on, and it is wherever she is
+   * standing.
+   *
+   * This used to be the mole. `SHOW.t0`/`t1` were written `JAD.jetty ± 86`
+   * back when she stood 22 m east of it, and when she moved to the terrace in
+   * front of the open kabina — t 429 — the stage did not go with her. Nothing
+   * complained, because nothing in the routine moves her until the crawl: she
+   * noticed you, went down on all fours, and on the first frame `showMove` ran
+   * she was clamped from t 429 to t 344 in a single step. Eighty-five metres
+   * west, in one frame, which from where you were standing is a woman who has
+   * gone. Everything after it then walked into the same wall from the other
+   * side — `home` aimed her at t 429, the clamp held her at 344, and she
+   * played a full-rate walk cycle at zero ground speed for as long as you
+   * cared to watch.
+   *
+   * So the stage is hung off her own spot. `testFigure.at` is set above this
+   * line, which is the whole reason this const is here and not a literal
+   * inside `SHOW`: a second copy of the number is what caused this.
+   */
+  const SHOW_MID = testFigure ? testFigure.at[0] : gapAt;
 
   /**
    * A pug on the deck, and a balloon over it with the price of a coin named
@@ -10533,11 +10635,14 @@ async function buildJadrija(scene) {
     // `far: 46` is the distance at which she gives up on you, and it is tuned
     // against a 189 m promenade where you are never more than a few seconds
     // from her. On the 572 m shore she wandered out of her own encounter and it
-    // dissolved with nobody having gone anywhere. 86 m either side of the jetty
-    // is 8 to 180, which is what the old `8, LEN - 8` came to on the shore she
-    // was written for.
-    t0: Math.max(8, JAD.jetty - 86),
-    t1: JAD.jetty + 86,
+    // dissolved with nobody having gone anywhere. 86 m either side of *her* is
+    // 8 to 180 on the shore she was written for, which is what the old
+    // `8, LEN - 8` came to there — and it is 343 to 515 on this one, because
+    // it is measured from `SHOW_MID` rather than from the mole. See the note
+    // on that const: the two numbers having drifted apart is what made her
+    // vanish.
+    t0: Math.max(8, SHOW_MID - 86),
+    t1: Math.min(LEN - 8, SHOW_MID + 86),
     // The wander. A new heading every `turn` seconds, `swing` radians off the
     // last one, at a speed drawn fresh each time — which is a random walk with
     // the corners rounded off, and the rounding is the whole trick. Redrawing
@@ -10569,7 +10674,108 @@ async function buildJadrija(scene) {
     turnMax: 3.0,       // rad/s, walking
     sideMax: 2.6,       // and the same for the shoulders-across offset,
     orbitMax: 3.4,      // except in the orbit, where it carries the whole yaw
-    edge: 14,           // metres from the ends of the resort the push starts
+    edge: 14,           // metres from the ends of her stage the push starts
+    // Walking on the spot, and where the line between that and walking is.
+    //
+    // A gait is sold by the ground going past, and a walk cycle played at full
+    // rate over nothing is the single loudest wrong thing a figure can do —
+    // which is what the report called it. So: below `stalled` metres a second
+    // of ground actually covered, for `stallFor` seconds together, the clip
+    // goes back to `idle` and she is a person standing still. The threshold is
+    // under half the slowest thing she ever asks for (0.45 m/s, the floor in
+    // `showTo`) so a genuine dawdle never trips it, and the hold is long
+    // enough to sit out the frame or two a somersault spends on the deck.
+    stalled: 0.18,
+    stallFor: 0.40,
+    // ── what is in her way ────────────────────────────────────────────────
+    // How far ahead she looks, and how wide she is to something she might
+    // walk into. `girth` is deliberately under `GROUND.girth` — 0.55, the
+    // number the blocker list is already padded by for a person you can push
+    // around — because nothing here pushes her out of anything. This is a
+    // heading being bent, and a bend that starts as early as a wall would have
+    // stopped her reads as a figure avoiding thin air.
+    look: 2.8,
+    girth: 0.42,
+    // And the smallest thing worth noticing at all, as a bounding radius. Under
+    // this are the bathers, at 0.16, and the parasol poles, at 0.09. She walks
+    // through people and always has — the note at the top of the performance
+    // says why, and a somersault interrupted by a lounger is worse than either
+    // — so the same test that keeps her out of the crowd's way keeps her from
+    // swerving at nine centimetres of aluminium.
+    seeR: 0.30,
+    // ── the hop ───────────────────────────────────────────────────────────
+    // 4.0 m/s off the deck against 10.5, which is a 0.76 m apex and 0.76 s in
+    // the air. The player's own hop is 7.0 against 12.0 and goes to 1.98 m:
+    // that is somebody clearing a wall, and this is somebody who has decided
+    // not to walk round a bench. Hers carries about 1.1 m of deck, which is a
+    // bench and a bin and nothing wider.
+    hopV: 4.0,
+    hopG: 10.5,
+    // The band of thing she will leave the ground for. A promenade bench is
+    // 0.90, a bin is 0.99, a lounger is 0.70 and the low wall in front of the
+    // Slastičarnica is 0.49; over that is a mast, a screen or a panel and she
+    // goes round it instead. The floor is there so that a 10 cm kerb is not an
+    // obstacle — it is a kerb.
+    hopUnder: 0.18,
+    hopOver: 0.99,
+    hopAt: 0.85,        // m short of it that she leaves the ground
+    hopLand: 1.5,       // and how much clear deck she wants on the far side
+    // How much deck the arc actually carries, which is what decides whether
+    // a thing is jumpable at all: 0.76 s in the air at about 1.85 m/s.
+    hopSpan: 1.4,
+    hopEvery: 2.2,      // s before she will take another one
+    // ── following you about ───────────────────────────────────────────────
+    // "If i start walking towards Slasticarnica, the NPC baye should loosely
+    // follow me in her Brownian motion."
+    //
+    // Loosely is the word the whole of this is built around, and it is why the
+    // tether is a term on the wander rather than a destination. `keep` is the
+    // distance she is content at — close enough to be with you, far enough that
+    // she is not underfoot while you are working a branch — and `band` is how
+    // far off that before the pull is at full strength. Between the two she is
+    // simply wandering, which is the model the swim's `wander` uses on the
+    // other side of the same problem: a body going somewhere with a random walk
+    // laid over it reads as a person, and a body being steered at a waypoint
+    // reads as a machine.
+    //
+    // `pull` is weighed against a unit heading vector, so at 0.9 the tether is
+    // very slightly the stronger of the two and the walk toward you is still
+    // three-quarters wander.
+    keep: 7.5,
+    band: 3.5,
+    pull: 0.9,
+    // And how much further than her own stage she will go to stay with you.
+    // Her stage is 86 m either side of her spot and that is the right fence for
+    // a woman larking about on her own; it is the wrong one for a woman walking
+    // the promenade with somebody, and the Slastičarnica is at t 328, which is
+    // fifteen metres past the western end of it. So the window slides to keep
+    // you inside it while you are on foot down here — see `show.t0`.
+    slack: 22,
+    // How far behind she will let you get before giving up, and how far away
+    // you have to be before walking off breaks off a number.
+    //
+    // `far` is 46 and stays 46, because it is the distance at which she gives
+    // up on somebody she has *noticed* — a person who wandered past. This is a
+    // different question: you are down here on the deck and she is with you,
+    // and seventy metres is a long way along a promenade. It has to be that
+    // wide because you walk at 3.4 m/s and the fastest her walk clip goes is
+    // 2.40 — see `chase` — so a player who sets off at a march opens a metre a
+    // second on her whatever she does, and at 46 she would give up on the way
+    // to the ice-cream shop every time.
+    lose: 70,
+    // And the set pieces. The shimmy, the twerk, the heart and the card are
+    // all done standing still and at somebody, and they are three to five
+    // seconds long — which is fifteen metres of you walking away. She notices
+    // and comes after you instead of finishing to an empty deck.
+    drop: 13,
+    // The pace she picks up at when she is behind, as a multiple of `walk`.
+    // 1.75 is the clip's own ceiling — the clamp in `showPace` is the same
+    // number — so this is her walking as fast as the walk goes, which is what
+    // anybody does when the person they are with has got ahead. Above it the
+    // clip stops reading as a walk and starts reading as a film running fast.
+    chase: 1.75,
+    tuck: 0.95,         // rad the knees come up at the top of it
+    tuckKnee: 1.20,     // and how far the heels fold back under her
     joy: 0.22,          // chance that a new heading comes with a somersault
     spin: 0.16,         // and the chance it comes with a run of cartwheels
     // And the dance. Lower odds than the acrobatics on purpose: a somersault is
@@ -10870,7 +11076,7 @@ async function buildJadrija(scene) {
 
   /** Advance her along her heading, kept on the deck and inside the resort. */
   function showMove(v, dt) {
-    show.t = clamp(show.t + Math.cos(show.ang) * v * dt, SHOW.t0, SHOW.t1);
+    show.t = clamp(show.t + Math.cos(show.ang) * v * dt, show.t0, show.t1);
     show.s = clamp(show.s + Math.sin(show.ang) * v * dt, SHOW.lane[0], SHOW.lane[1]);
   }
 
@@ -10884,10 +11090,196 @@ async function buildJadrija(scene) {
    * heading *vector* turns her instead, and it grows with the overshoot, so a
    * metre inside the margin is a suggestion and a metre outside is a decision.
    */
-  function showSteer(a) {
+  /**
+   * The nearest thing standing in her way along her current heading, or null.
+   *
+   * A bounding circle and not the box, and a sweep of the whole list rather
+   * than anything indexed. Both are on purpose. The circle because this is not
+   * a collision test — nothing in here pushes her out of anything, and the note
+   * at the top of the performance is emphatic about why — it is a heading being
+   * bent and a decision about whether to leave the ground, and neither wants to
+   * know which face of a bench it is looking at. The sweep because there are
+   * 564 blockers in the whole resort, she is only stepped at all inside 250 m,
+   * and a grid to save five microseconds a frame is a second copy of the beach
+   * layout to keep in step with the first.
+   *
+   * `gap` is metres from her to the near edge of it; `side` is which way it
+   * lies across her course, in the same perpendicular `showSteer` steers in.
+   */
+  function showAhead(reach, myY) {
+    const cx = Math.cos(show.ang), cz = Math.sin(show.ang);
+    let best = null;
+    for (const b of blockers) {
+      if (b.off) continue;
+      // One of these carries an array where a half-extent should be. It is not
+      // this function's to fix and every comparison below would quietly be
+      // false for ever, which is a bug that hides — so it is thrown out here.
+      if (!(b.a >= 0) || !(b.c >= 0) || !(b.h >= 0)) continue;
+      if (Math.hypot(b.a, b.c) < SHOW.seeR) continue;
+      // And things whose top is under her feet. `b.y` is the world height the
+      // blocker stands on — see `confine` in 47-ground.js, which reads the pair
+      // the same way — so a 10 cm lip on a terrace a metre below the deck she
+      // is walking on is not something to walk into.
+      if (b.y > 0 && myY != null && b.y + b.h < myY + 0.10) continue;
+      // Into the blocker's own axes, because some of them carry one: a house
+      // was laid out to its lane and the vikendica to its own frame, and an
+      // axis-aligned reading of either grows it by half its width.
+      const co = b.rot ? Math.cos(b.rot) : 1, sn = b.rot ? Math.sin(b.rot) : 0;
+      const dt0 = show.t - b.t, ds0 = show.s - b.s;
+      const px = dt0 * co + ds0 * sn, pz = -dt0 * sn + ds0 * co;
+      const hx = cx * co + cz * sn, hz = -cx * sn + cz * co;
+      // Two slabs against the line she is walking down. A bounding circle was
+      // the first cut of this and it is wrong by the length of the thing: a
+      // six-metre bench reads as a six-metre disc, so a wall twenty metres up
+      // the promenade came back as the nearest obstacle to somebody standing
+      // well clear of it. The extents carry her own girth, which is what makes
+      // this a test of whether *she* fits past rather than of whether a point
+      // does.
+      // `u1` starts unbounded rather than at `reach`. The search distance is a
+      // question about the near face — is this thing close enough to matter —
+      // and clamping the far one to it made `out` a lie: the hop looks 0.85 m
+      // ahead, so every obstacle came back 0.85 m deep, and a six-metre wall
+      // read as something she could clear.
+      let u0 = 0, u1 = Infinity, miss = false;
+      for (let k = 0; k < 2; k++) {
+        const pk = k ? pz : px, hk = k ? hz : hx;
+        const ek = (k ? b.c : b.a) + SHOW.girth;
+        if (Math.abs(hk) < 1e-6) {
+          if (Math.abs(pk) > ek) { miss = true; break; }
+          continue;
+        }
+        let a0 = (-ek - pk) / hk, a1 = (ek - pk) / hk;
+        if (a0 > a1) { const sw = a0; a0 = a1; a1 = sw; }
+        if (a0 > u0) u0 = a0;
+        if (a1 < u1) u1 = a1;
+      }
+      if (miss || u0 > u1 || u0 > reach) continue;
+      if (!best || u0 < best.gap) {
+        // Which way it lies across her course, so `showSteer` knows which side
+        // to go past. Dead ahead it is a coin, and the coin has to come down
+        // the same way every frame or she jinks — so the tie is broken off the
+        // blocker's own place along the shore rather than off a random.
+        let side = -(b.t - show.t) * cz + (b.s - show.s) * cx;
+        if (Math.abs(side) < 0.05) side = b.t > show.t ? 0.05 : -0.05;
+        best = { b, gap: u0, out: u1, side };
+      }
+    }
+    return best;
+  }
+
+  /**
+   * How high the arc goes, off the two constants that make it.
+   *
+   * A function and not a third constant next to them: `hopApex: 0.762` is a
+   * copy of v²/2g that goes stale the moment either of the other two is
+   * touched, and the tuck is read off it every frame she is in the air.
+   */
+  const hopApex = () => SHOW.hopV * SHOW.hopV / (2 * SHOW.hopG);
+
+  /**
+   * Over it rather than round it, which is three questions and not one.
+   *
+   * Low enough to clear — a bench is 0.90 and a mast is 4.0. Narrow enough to
+   * be *over* by the time she comes down: the arc carries 1.4 m of deck and
+   * anything deeper than that is a hop that lands on the thing it was clearing,
+   * which is what a six-metre low wall did until this line existed. And clear
+   * deck the other side.
+   *
+   * Everything this says no to, `showSteer` walks round instead. That is the
+   * whole of the decision, in one predicate, so the two answers can never
+   * disagree about the same obstacle.
+   */
+  const showOver = (o) => !!o && o.b.h >= SHOW.hopUnder && o.b.h <= SHOW.hopOver
+    && o.out - o.gap - SHOW.girth * 2 <= SHOW.hopSpan && showLands(o);
+
+  /**
+   * Clear deck on the far side of it, which is the other half of deciding to
+   * jump. A hop that lands in the next bench is worse than the walk round, and
+   * one that lands off the end of her stage is the vanishing all over again.
+   *
+   * `out` is where her line leaves the thing she is going over, so the landing
+   * is measured from its far face and not from her feet.
+   */
+  function showLands(o) {
+    const reach = o.out + SHOW.hopLand;
+    const t = show.t + Math.cos(show.ang) * reach;
+    const s = show.s + Math.sin(show.ang) * reach;
+    if (t < show.t0 || t > show.t1 || s < SHOW.lane[0] || s > SHOW.lane[1]) {
+      return false;
+    }
+    // Is there anything standing where she would come down?
+    //
+    // A point against the boxes rather than a ray, and that is the whole
+    // difference between this and `showAhead`. A ray from her feet to the
+    // landing spot passes through the thing she is jumping — it has to, that is
+    // what jumping it means — so a ray test can only ever say no. What she
+    // actually needs to know is whether the far side is deck, and the far side
+    // is one point.
+    for (const b of blockers) {
+      if (b.off || !(b.a >= 0) || !(b.c >= 0)) continue;
+      if (Math.hypot(b.a, b.c) < SHOW.seeR) continue;
+      const co = b.rot ? Math.cos(b.rot) : 1, sn = b.rot ? Math.sin(b.rot) : 0;
+      const d0 = t - b.t, d1 = s - b.s;
+      if (Math.abs(d0 * co + d1 * sn) < b.a + SHOW.girth
+        && Math.abs(-d0 * sn + d1 * co) < b.c + SHOW.girth) return false;
+    }
+    return true;
+  }
+
+  function showSteer(a, to) {
     const push = (v, lo, hi) => (v < lo ? lo - v : v > hi ? hi - v : 0);
-    const x = Math.cos(a) + push(show.t, SHOW.edge, LEN - SHOW.edge) * 0.5;
-    const y = Math.sin(a) + push(show.s, SHOW.lane[0] + 1.6, SHOW.lane[1] - 1.6) * 1.2;
+    // Off `SHOW.t0`/`t1` and not off the whole shore, which is the pair
+    // `showMove` actually clamps to. Written `SHOW.edge, LEN - SHOW.edge`,
+    // the bend was 14 m in from the ends of a 572 m promenade and the clamp
+    // was 86 m either side of the stage, so the term that is supposed to turn
+    // her round was never once non-zero anywhere she can walk: she arrived at
+    // her own end wall still pointed into it and ground along it. A margin
+    // that does not sit inside the wall it is guarding is not a margin.
+    let x = Math.cos(a) + push(show.t, show.t0 + SHOW.edge,
+      show.t1 - SHOW.edge) * 0.5;
+    let y = Math.sin(a) + push(show.s, SHOW.lane[0] + 1.6, SHOW.lane[1] - 1.6) * 1.2;
+    // And round whatever is standing there.
+    //
+    // A term on the heading and not a wall, for the same reason the edges are:
+    // a figure that walks at a mast until something stops her and then slides
+    // down it is the thing the report was about, and the answer to it is to
+    // turn earlier rather than to stop harder. It grows as she closes, so at
+    // the far end of her sight line it is a lean and at arm's length it is a
+    // decision — and it is pushed to whichever side of her course the obstacle
+    // is *not* on, so she goes past it rather than round the long way.
+    //
+    // Nothing she is about to hop is in here. A bench is not something to walk
+    // round, it is something to go over, and `showOver` is what tells the two
+    // apart — the same call the hop itself makes, so a thing she has decided
+    // to jump is never also a thing she is turning away from.
+    const o = showAhead(SHOW.look, null);
+    if (o && !showOver(o)) {
+      const k = clamp(1 - o.gap / SHOW.look, 0, 1) * 2.2;
+      const away = o.side > 0 ? -1 : 1;
+      x += -Math.sin(show.ang) * away * k;
+      y += Math.cos(show.ang) * away * k;
+    }
+    // And you, if she is coming with you.
+    //
+    // One term, on the same vector as the edges and the obstacles, which is
+    // the whole reason this reads as wandering rather than as being led: three
+    // suggestions and a random walk are summed and normalised, and none of them
+    // is a destination. Zero inside the band, so at a comfortable distance she
+    // is not following you at all — she is just somebody who happens to be
+    // where you are. Negative inside it, because a figure that closes to nought
+    // and stays there is a figure standing on your feet.
+    if (to) {
+      const dtp = to[0] - show.t, dsp = to[1] - show.s;
+      const r = Math.hypot(dtp, dsp) || 1;
+      // Clamped hard at the near end and loosely at the far one. Inside the
+      // band she drifts off you; at a band out she is coming with you and the
+      // wander is still most of the heading; twenty metres behind, the tether
+      // is two and a half times the wander and what is left of it is a wobble
+      // on a straight line. Which is what being left behind looks like.
+      const k = clamp((r - SHOW.keep) / SHOW.band, -1, 2.5) * SHOW.pull;
+      x += (dtp / r) * k;
+      y += (dsp / r) * k;
+    }
     return Math.atan2(y, x);
   }
 
@@ -10927,6 +11319,37 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * Where the two of you have got to, as a key into `PLACE_NOTES`, or null.
+   *
+   * Off her own position and not off yours, because it is her card and she is
+   * holding it up at where *she* is standing — and because the two are seven
+   * metres apart by construction while she is following you, which is inside
+   * every window here.
+   *
+   * `JET` and `VIK` are read in the body rather than baked into a table at the
+   * top of the file, and that is not tidiness: `VIK` is declared in
+   * 44-vikendica.js, which is concatenated after this one, so a const here that
+   * touched it would be a temporal dead zone and the only symptom would be a
+   * page that never finishes loading. Rule 3.
+   *
+   * Ordered, and the order is the point. The water wins over everything,
+   * because at the seaward edge of her lane she is standing at the sea whatever
+   * else is behind her; the kabine come last and want her actually up against
+   * the row, or the hut line would be the answer everywhere she lives.
+   */
+  function showPlace() {
+    const t = show.t, s = show.s;
+    if (s < SHOW.lane[0] + 1.1) return 'water';
+    if (Math.abs(t - JET.t) < 8) return 'mole';
+    if (t > 325 && t < 346) return 'slast';
+    if (Math.abs(t - VIK.t) < 10) return 'vikendica';
+    if (s > 13.5 && t > JAD.rows[0][0] - 4 && t < JAD.rows[0][1] + 4) {
+      return 'kabine';
+    }
+    return null;
+  }
+
+  /**
    * The idle chatter, and the reason it is a list rather than a coin flip.
    *
    * The ćuk keeps the largest share on purpose — it is the one call that is
@@ -10951,7 +11374,7 @@ async function buildJadrija(scene) {
   function figureProbe() {
     if (!show || !skinFig || !skinFig.mesh.visible) return null;
     const p = toWorld(show.t, show.s);
-    return { x: p[0], y: p[1], z: p[2], r: SHOW.hitR, h: SHOW.hitH };
+    return { x: p[0], y: p[1] + show.air, z: p[2], r: SHOW.hitR, h: SHOW.hitH };
   }
 
   /**
@@ -11221,6 +11644,23 @@ async function buildJadrija(scene) {
    */
   const KNEES = { submit: 1, kept: 1, creep: 1 };
 
+  /**
+   * The three she is allowed to leave the ground in.
+   *
+   * Everything else is either a clip that has both feet nailed to the deck for
+   * its own reasons — the dances, the card, the stamp — or a place where a
+   * woman suddenly hopping would be answering the wrong question: the room, the
+   * knees, and the turn. She larks about out on the promenade, and this is the
+   * list of the phases that *are* larking about.
+   *
+   * `aim` is not on it and was. It is the second of run-up into a cartwheel,
+   * so a hop taken there is still in the air when the wheel starts and her feet
+   * come over her head at the top of it — measured once at 1.20 m off the deck
+   * on a landing that should have been 0.08. Nothing catches that from inside
+   * the hop, because by then it is a perfectly good cartwheel.
+   */
+  const HOPPING = { play: 1, home: 1, orbit: 1 };
+
   /** The indoor track, as a set, so the trigger can tell it is already on it. */
   const KABIN = { come: 1, enter: 1, wine: 1, meet: 1, untie: 1,
     dwell: 1, leave: 1 };
@@ -11229,10 +11669,60 @@ async function buildJadrija(scene) {
     if (!show || !skinFig) return;
     const f = skinFig, S = f.state;
     const d = Math.hypot(show.t - pt, show.s - ps);
+    // Somebody is down here on the deck with her, near enough to be with. Both
+    // halves matter: `ground` is the only phase in the game where there is a
+    // person on the promenade at all — from the cockpit the camera is over the
+    // resort at three hundred knots and following it is not a thing a woman on
+    // a beach can do — and `far` is the distance at which she gives up on you.
+    const withYou = state.phase === 'ground' && d < SHOW.lose;
+    show.withYou = withYou ? 1 : 0;
+    // And whether you are going somewhere.
+    //
+    // On the *rate* the gap opens and not on the gap, which was the first cut
+    // and was wrong in the one place it most matters: `9` drops you sixteen
+    // metres from her, three past `drop`, so the opening routine — the whole
+    // showcase, all five numbers in a fixed order — cut itself short every
+    // single time before you had seen any of it. Standing back to watch is not
+    // walking away. 1.2 m/s is above anything her own wander can fake and well
+    // under the 3.4 you walk at.
+    if (dt > 0) {
+      show.away = damp(show.away, (d - show.dWas) / dt, 3, dt);
+      show.dWas = d;
+    }
+    const leaving = withYou && d > SHOW.drop && show.away > 1.2;
     // A one-shot that has run off its end. `update` leaves `curT` past `dur`
     // and `sample` clamps, so this stays true until something else is played.
     const done = S.cur && !S.cur.loop && S.curT >= S.cur.dur;
     show.tmr += dt;
+    // Where she was before anything in this function moved her. Taken here
+    // rather than inside the movers because there are four of them — `showMove`,
+    // `showTo`, `showCreep` and `showHold` — and the question "did she actually
+    // get anywhere" has one answer a frame, not four.
+    const wasT = show.t, wasS = show.s;
+
+    // ── how far she is allowed to go ──────────────────────────────────────
+    //
+    // `SHOW.t0`/`t1` are 86 m either side of her own spot and are the right
+    // fence for a woman larking about on her own. They are the wrong one for a
+    // woman walking the promenade with somebody: the Slastičarnica is at t 328
+    // and the western end of her stage is 343, so a walk to the ice-cream shop
+    // ran her into a wall fifteen metres short of it. While you are on foot
+    // down here the window slides to keep you inside it, and it gives back
+    // slowly rather than all at once.
+    //
+    // The two `Math.min`/`Math.max` against her own position are the load-
+    // bearing part and they are not an optimisation. A fence that can move past
+    // the person inside it teleports them — that is exactly what the old
+    // constant did, eighty-five metres in one frame — so this pair cannot: the
+    // window is always allowed to contain her, whatever else it is doing, and
+    // `home` is what brings her back inside it at walking pace.
+    {
+      const afoot = state.phase === 'ground';
+      const lo = afoot ? Math.min(SHOW.t0, pt - SHOW.slack) : SHOW.t0;
+      const hi = afoot ? Math.max(SHOW.t1, pt + SHOW.slack) : SHOW.t1;
+      show.t0 = Math.min(clamp(lo, 8, LEN - 8), show.t);
+      show.t1 = Math.max(clamp(hi, 8, LEN - 8), show.t);
+    }
 
     const go = (phase, clip, fade = 0.30) => {
       // Back to nominal on every clip change. `showPace` below runs the walk
@@ -11242,6 +11732,13 @@ async function buildJadrija(scene) {
       // slow-motion flip in the middle of a lazy wander.
       S.speed = 1;
       if (clip) f.play(clip, { fade });
+      // Which of the clips under her is a gait, so the tail of this function
+      // knows what to put back when she starts covering ground again. The
+      // somersault and the cartwheel are not on the list on purpose: both are
+      // authored to carry her a fixed distance and neither has a standing
+      // version to fall back to.
+      if (clip) show.gait = clip === 'walk' || clip === 'crawl' ? clip : null;
+      show.stall = 0;
       show.phase = phase;
       show.tmr = 0;
       show.said = 0;
@@ -11273,7 +11770,11 @@ async function buildJadrija(scene) {
       go('heart', 'heart', 0.36);
     };
     const enterNote = () => {
-      if (banner) banner.pick();
+      show.card2 = null; show.card = 0;
+      if (banner) {
+        const line = banner.pick(showPlace());
+        if (Array.isArray(line)) show.card2 = line[1];
+      }
       showSay('whee', d);
       go('note', 'note', 0.36);
     };
@@ -11519,6 +12020,19 @@ async function buildJadrija(scene) {
     // see. The one thing that outranks it is the turn: she is not doing
     // anything for anybody once that has started, least of all following them
     // indoors.
+    // And she does not finish a rehearsed running order to an empty deck.
+    //
+    // The opening routine — three somersaults and then the shimmy, the twerk,
+    // the heart, the card and the cartwheels — is twenty seconds long and most
+    // of it is done standing on one spot. You walk at 3.4 m/s. So a player who
+    // presses the key and sets off for the ice-cream shop was sixty-eight
+    // metres up the promenade by the time she finished performing at where he
+    // had been standing, and she gave up on him without ever having taken a
+    // step after him. Emptying the queue is the whole fix: everything in the
+    // routine ends by calling `showNext`, and `showNext` with nothing left goes
+    // to the wander — which is the state that follows you.
+    if (leaving && show.queue.length) show.queue.length = 0;
+
     const K = special;
     const inside = !!K && pt > K.t0 - 0.25 && pt < K.t1 + 0.25
       && ps > K.face + 0.15 && ps < K.s1 + 0.2;
@@ -11722,7 +12236,13 @@ async function buildJadrija(scene) {
           show.said = show.tmr;
           showSay(Math.random() < 0.7 ? 'chirr' : 'tick', d);
         }
-        if (show.tmr > SHOW.crawlFor) go('up', 'getup', 0.28);
+        // Four and a half seconds of it, or a second and a half if you have
+        // already walked off — the same argument as the queue above, one state
+        // earlier. Getting down on all fours is delight at somebody arriving;
+        // staying down there while they leave is not.
+        if (show.tmr > (leaving ? 1.5 : SHOW.crawlFor)) {
+          go('up', 'getup', 0.28);
+        }
         break;
 
       case 'up':
@@ -11745,7 +12265,7 @@ async function buildJadrija(scene) {
         showMove(SHOW.hop * sat((u - 0.34) / 0.10) * sat((1.10 - u) / 0.12), dt);
         if (u >= 0.98 && !show.said) { show.said = 1; showSay('whump', d); }
         if (done) {
-          if (show.flips < SHOW.flips) {
+          if (show.flips < SHOW.flips && !leaving) {
             // Restarting the clip rather than playing it: `play` refuses a clip
             // that is already current, and this one ends on the pose it starts
             // from, so a hard rewind is seamless.
@@ -11766,7 +12286,12 @@ async function buildJadrija(scene) {
         // a state machine gets to happy-go-lucky.
         show.played += dt;
         show.tick -= dt;
-        if (show.tick <= 0) {
+        // Not while she is in the air: the roll below can put her into a
+        // somersault or a run of cartwheels, and either of those started
+        // half a metre off the deck is a figure that has been interrupted by
+        // itself. The tick stays expired and comes up again on the frame she
+        // lands, which costs three quarters of a second once in a while.
+        if (show.tick <= 0 && show.air <= 0) {
           showWander(SHOW.turn, SHOW.swing);
           // A table rather than a chain of `dice < a + b + c` tests, which is
           // what this was. Five terms was already at the edge of readable and
@@ -11789,14 +12314,31 @@ async function buildJadrija(scene) {
           }
           if (dice < cut) break;
         }
-        show.want = showSteer(show.wander);
-        showPace(show.pace, dt);
+        // The tether, and it is only handed over while you are actually down
+        // here on foot. From the aeroplane, from under the water, from the
+        // parachute, there is nobody on the promenade to keep station on and
+        // she goes back to being a woman on a beach by herself.
+        show.want = showSteer(show.wander, withYou ? [pt, ps] : null);
+        // Her drawn pace normally, and the top of the walk when you have got
+        // away from her. `pace` is redrawn every second or so between 1.10 and
+        // 2.12 m/s and a dawdle drawn at the wrong moment is thirty metres of
+        // deck she never gets back.
+        showPace(withYou && d > SHOW.keep + SHOW.band
+          ? SHOW.walk * SHOW.chase : show.pace, dt);
         if (show.tmr - show.said > SHOW.say[0]
           + Math.random() * (SHOW.say[1] - SHOW.say[0])) {
           show.said = show.tmr;
           showSay(say1(CHAT), d);
         }
-        if (show.played > SHOW.playFor || d > SHOW.far) go('home', 'walk', 0.32);
+        // `playFor` is twenty-four seconds of larking about before she comes
+        // home to her spot, and it is right while you are standing watching
+        // her. It is wrong while you are walking: going home in the middle of
+        // following somebody is the thing that made the encounter dissolve on
+        // the long shore. So the clock only runs when she is on her own, and
+        // losing you past `far` still ends it either way.
+        if (!withYou && (show.played > SHOW.playFor || d > SHOW.far)) {
+          go('home', 'walk', 0.32);
+        }
         break;
 
       case 'aim':
@@ -11824,7 +12366,7 @@ async function buildJadrija(scene) {
         show.played += dt;
         showMove(SHOW.wheel * sat((w - 0.14) / 0.16) * sat((1.16 - w) / 0.20), dt);
         if (done) {
-          if (show.wheels < SHOW.wheels) {
+          if (show.wheels < SHOW.wheels && !leaving) {
             show.wheels++; S.curT = 0; show.said = 0; show.tmr = 0;
             showSay('whee', d);
           } else {
@@ -11944,7 +12486,8 @@ async function buildJadrija(scene) {
           show.said = show.tmr;
           showSay(say1(CHAT), d);
         }
-        if (show.tmr > SHOW[HOLD_FOR[show.phase]] || d > SHOW.far) showNext();
+        if (show.tmr > SHOW[HOLD_FOR[show.phase]] || leaving
+          || d > SHOW.far) showNext();
         break;
 
       case 'heart':
@@ -11955,11 +12498,19 @@ async function buildJadrija(scene) {
         // cannot read.
         show.played += dt;
         show.want = Math.atan2(ps - show.s, pt - show.t);
+        // And the turn of the card, for the lines that come as two. The same
+        // beat the firestarter pair takes and for the same reason: a punchline
+        // arrives on its own card or it is not a punchline. Early in the hold,
+        // because the second one is the one worth reading.
+        if (show.card2 && !show.card && show.tmr > SHOW.noteFor * 0.42) {
+          show.card = 1;
+          banner.say(show.card2);
+        }
         if (show.tmr - show.said > 1.4 + Math.random() * 1.6) {
           show.said = show.tmr; showSay(say1(CHAT), d);
         }
         if (show.tmr > (show.phase === 'heart' ? SHOW.heartFor : SHOW.noteFor)
-          || d > SHOW.far) showNext();
+          || leaving || d > SHOW.far) showNext();
         break;
 
       // ── the turn ─────────────────────────────────────────────────────────
@@ -12095,6 +12646,18 @@ async function buildJadrija(scene) {
         break;
 
       case 'home': {
+        // Unless there is somebody to be with, in which case her spot can wait.
+        // Every way out of a number ends here — the wander timing out, the
+        // fire going out, the walk out of the kabina — and each of them used to
+        // walk her away from a player standing three metres off. Being with you
+        // outranks being at her own place on the terrace.
+        if (withYou) {
+          show.played = 0;
+          show.wander = show.ang;
+          showWander(SHOW.turn, SHOW.swing);
+          go('play', 'walk', 0.34);
+          break;
+        }
         const dt0 = show.home[0] - show.t, ds0 = show.home[1] - show.s;
         const dist = Math.hypot(dt0, ds0);
         show.want = Math.atan2(ds0, dt0);
@@ -12102,6 +12665,96 @@ async function buildJadrija(scene) {
         else go('idle', 'idle', 0.50);
         break;
       }
+    }
+
+    // ── the gait against the ground ───────────────────────────────────────
+    //
+    // What she covered this frame, against what she asked for. They are the
+    // same number nearly all of the time and the whole value of this is the
+    // times they are not: a clamp, a doorway she is stood in, or a target she
+    // arrived at three seconds ago while the walk went on playing. A walk cycle
+    // at zero ground speed is the loudest wrong thing a figure can do, and it
+    // is invisible from inside the state machine, because every one of those
+    // states thinks it is walking.
+    //
+    // Damped rather than read raw: a somersault is on the deck for two frames
+    // at either end and a raw reading would strobe the clip.
+    if (dt > 0) {
+      show.made = damp(show.made,
+        Math.hypot(show.t - wasT, show.s - wasS) / dt, 8, dt);
+      show.stall = show.made < SHOW.stalled ? show.stall + dt : 0;
+    }
+    if (show.gait) {
+      const stuck = show.stall > SHOW.stallFor;
+      const want = stuck ? 'idle' : show.gait;
+      if (f.playing() !== want) f.play(want, { fade: 0.22 });
+      // And the clip's clock off the ground she covered rather than off the
+      // speed she was asking for, which is the same argument one step smaller:
+      // a walk half eaten by an obstacle is a walk whose feet are sliding.
+      S.speed = stuck || show.gait !== 'walk'
+        ? 1 : clamp(show.made / SHOW.walk, 0.55, 1.75);
+    }
+
+    // ── the hop ───────────────────────────────────────────────────────────
+    //
+    // "Perhaps give her the ability to jump over obstacles if she encounters
+    // them." Laid over whatever she is doing rather than made a phase of its
+    // own, which is the same argument as the chin coming up two hundred lines
+    // above: a phase would need an entry from and an exit back to every one of
+    // the four states she can be walking in, and each of those is a place for
+    // the routine to get stranded. This is a height and a tuck added to a woman
+    // who is still doing exactly what she was doing.
+    //
+    // She takes it when something low is in her way and there is deck on the
+    // far side of it, and `hopEvery` is what stops the promenade turning into a
+    // steeplechase: one bench is a lark, the same bench four times is a tic.
+    {
+      const airborne = show.air > 0 || show.hopV > 0;
+      // Held at a height by hand, for a camera. A hop is three quarters of a
+      // second and a headless page renders about one frame in that, so the one
+      // thing about it that has to be looked at rather than measured — which
+      // way the knees come up — cannot be photographed any other way.
+      if (show.hold > 0) {
+        show.air = show.hold;
+        show.hopV = 0;
+      } else if (airborne) {
+        show.hopV -= SHOW.hopG * dt;
+        show.air += show.hopV * dt;
+        if (show.air <= 0) {
+          show.air = 0; show.hopV = 0; show.hopIn = SHOW.hopEvery;
+          showSay('whump', d);
+        }
+      } else {
+        show.hopIn = Math.max(0, show.hopIn - dt);
+        // `made` and not `vel`: she has to be actually going somewhere. A
+        // standing jump at a bench two metres away is a woman with a tic.
+        if (show.hopIn <= 0 && HOPPING[show.phase] && show.made > 0.6) {
+          const o = showAhead(SHOW.hopAt, toWorld(show.t, show.s)[1]);
+          if (showOver(o)) {
+            show.hopV = SHOW.hopV;
+            showSay('hup', d);
+          }
+        }
+      }
+      // The tuck. Two aims a leg, in the rig's own sagittal axis: the hips
+      // bring the knees up and the knees fold the heels back under her, which
+      // is the whole shape of somebody clearing a bench. Cleared to nothing at
+      // the bottom rather than left at a millionth — `aim` treats zero as
+      // "forget this bone" and anything else as a rotation to carry for ever.
+      //
+      // Driven off the height of the arc and not off a flag, which is the
+      // difference between a hop and a stumble. Switched on at take-off and
+      // eased, the knees were still 0.58 of the way up when her feet met the
+      // deck: she landed folded. Read off `air` it is a triangle that is zero
+      // at both ends and one at the apex on its own, with no second clock to
+      // get out of step with the first — the knees come up as she rises and
+      // the legs are down again by the time there is anything to land on.
+      show.tuck = damp(show.tuck, sat(show.air / hopApex()), 16, dt);
+      const k = show.tuck < 0.01 ? 0 : show.tuck;
+      f.aim('legUL', 1, 0, 0, k * SHOW.tuck);
+      f.aim('legUR', 1, 0, 0, k * SHOW.tuck);
+      f.aim('legLL', 1, 0, 0, -k * SHOW.tuckKnee);
+      f.aim('legLR', 1, 0, 0, -k * SHOW.tuckKnee);
     }
 
     // Turn towards `want` at a rate a person turns at, and never the long way
@@ -12147,7 +12800,10 @@ async function buildJadrija(scene) {
     }
 
     const p = toWorld(show.t, show.s);
-    f.mesh.position.set(p[0], p[1], p[2]);
+    // `air` is the hop, and it is added here rather than inside `toWorld`
+    // because `toWorld` answers where the deck is and the deck has not moved.
+    // The card is a child of this mesh and goes up with her for free.
+    f.mesh.position.set(p[0], p[1] + show.air, p[2]);
     f.mesh.rotation.y = faceYaw(show.t, show.ang + show.side);
     f.mesh.updateMatrixWorld();
 
@@ -12526,7 +13182,8 @@ async function buildJadrija(scene) {
       if (phase) {
         show.phase = phase; show.tmr = 0; show.held = 0; show.pour = 0;
         skinFig.play({ wine: 'wine', untie: 'untie', submit: 'submit',
-          kept: 'kept', creep: 'knees' }[phase] || 'idle', { fade: 0 });
+          kept: 'kept', creep: 'knees', note: 'note', heart: 'heart',
+          shimmy: 'shimmy', twerk: 'twerk' }[phase] || 'idle', { fade: 0 });
       }
       // And scrub, because a headless page runs its clock at a fraction of the
       // wall clock and a five-second clip is not a thing a screenshot can wait
@@ -12709,6 +13366,22 @@ async function buildJadrija(scene) {
       // `pace` and `want` are the ask, these two are where the easing has got
       // to. A gap between them is the point of them.
       vel: +show.vel.toFixed(2), rate: +show.rate.toFixed(2),
+      // And the ground she actually covered, which is the ask with every
+      // clamp and every arrival taken out of it. `made` well under `vel` for
+      // more than a moment is a figure walking on the spot.
+      made: +show.made.toFixed(2), stall: +show.stall.toFixed(2),
+      gait: show.gait, withYou: show.withYou, away: +show.away.toFixed(2),
+      // The stage she is actually fenced to this frame, which slides with you.
+      stage: [+show.t0.toFixed(1), +show.t1.toFixed(1)],
+      base: [+SHOW.t0.toFixed(1), +SHOW.t1.toFixed(1)],
+      // The hop, and what she is over. `air` is height off the deck.
+      air: +show.air.toFixed(3), tuck: +show.tuck.toFixed(2),
+      ahead: (() => {
+        const o = showAhead(SHOW.look, toWorld(show.t, show.s)[1]);
+        return o ? { gap: +o.gap.toFixed(2), out: +o.out.toFixed(2),
+          h: +o.b.h.toFixed(2), side: +o.side.toFixed(2),
+          over: showOver(o), lands: showLands(o) } : null;
+      })(),
       // Indoors: how far into the clip she is and whether the bottle is off
       // the table. A pose that has not started and a pose that is not playing
       // look identical from outside, and only one of them is a bug.
@@ -12752,6 +13425,40 @@ async function buildJadrija(scene) {
      * that would be a teleport out of.
      */
     cue: (...names) => { if (show) show.queue.unshift(...names); return show && show.queue.slice(); },
+    /**
+     * Where she thinks the two of you are, and what she would hold up here.
+     *
+     * With no argument it asks the place test the game asks; with one it forces
+     * a key, so a card can be photographed without walking two hundred metres
+     * of promenade at one frame a second to reach the shop.
+     */
+    /** Debug: hold her at a height off the deck, or 0 to let her down. */
+    hop: (h) => {
+      if (!show) return null;
+      show.hold = h || 0;
+      show.tuck = sat(show.hold / hopApex());
+      return { hold: show.hold, tuck: +show.tuck.toFixed(2) };
+    },
+    note: (where, part) => {
+      if (!show || !banner) return null;
+      // Named, the place is forced and so is its line: the one-in-three that
+      // gives her back her own three notes is the game's, and a test that has
+      // to roll for the card it came to photograph is a test that fails a third
+      // of the time for no reason. With no argument it does exactly what the
+      // performance does.
+      const at = where === undefined ? showPlace() : where;
+      const said = where === undefined ? banner.pick(at)
+        : (PLACE_NOTES[at] || banner.pick(at));
+      // Two-card lines show the first; `part` asks for the other one, which is
+      // otherwise two and a quarter seconds into a phase a headless page runs
+      // at about a frame a second.
+      if (Array.isArray(said)) banner.say(said[part || 0]);
+      else if (where !== undefined) banner.say(said);
+      return { place: showPlace(), used: at,
+        said: Array.isArray(said)
+          ? (part != null ? said[part] : said.join(' / ')) : said,
+        t: +show.t.toFixed(1), s: +show.s.toFixed(1) };
+    },
     /**
      * Her face, held still.
      *
