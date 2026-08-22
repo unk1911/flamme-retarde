@@ -1601,8 +1601,8 @@ async function buildJadrija(scene) {
       body: [0.560, 0.535, 0.487], awn: 3.0, fg: '#a8221c', bg: '#eeece6',
       vitrine: true, cooler: true, scallop: true },
     { key: 'tramp', kind: 'fence', t0: 348, t1: 362, s0: 46, s1: 56, h: 2.2,
-      name: null, post: [0.330, 0.335, 0.325], body: [0.075, 0.185, 0.115],
-      rail: [0.640, 0.520, 0.060], skirt: [0.480, 0.055, 0.050] },
+      name: null, post: [0.640, 0.520, 0.060], body: [0.055, 0.075, 0.062],
+      rail: [0.660, 0.545, 0.075], skirt: [0.545, 0.075, 0.065] },
     { key: 'maslina', kind: 'kiosk', t0: 352, t1: 358, s0: 28, s1: 30.5, h: 2.6,
       name: 'Maslina', roof: [0.100, 0.108, 0.115], body: [0.075, 0.082, 0.088],
       flag: [0.185, 0.075, 0.165], fg: '#f0e8f0', bg: '#4e2c48' },
@@ -1624,6 +1624,7 @@ async function buildJadrija(scene) {
   // never finishes loading. See the note on `facing`.
   const PLAY = { t0: 157, t1: 176, s0: 28.9, s1: 37.4 };
   const SAN = { t0: 347.4, t1: 357.2, s0: 32.0, s1: 36.6 };
+  const TRAMP = { t0: 346.4, t1: 363.6, s0: 44.4, s1: 57.6 };
 
   /**
    * A painted sign, on a canvas.
@@ -2383,17 +2384,92 @@ async function buildJadrija(scene) {
     b = up;
 
     if (S.kind === 'fence') {
-      // Chain-link with a padded top rail and a solid skirt. The mesh is one
-      // stippled quad and not geometry: two triangles a bay, and at forty
-      // metres — which is as close as anyone gets to it — indistinguishable.
-      for (let t = S.t0; t <= S.t1 + 0.01; t += 2.5) {
-        post(W, t, S.s0, y0, y0 + S.h, 0.05, S.post, 6);
-        post(W, t, S.s1, y0, y0 + S.h, 0.05, S.post, 6);
+      // The trampoline park, and 175447 says what it is made of: a frame of
+      // YELLOW tube, dark mesh netting between, and a continuous red padded
+      // skirt round the foot of the whole thing. It stands on a pad of
+      // limestone gravel among the pines with red and black plastic chairs
+      // outside it, and there are four beds in it.
+      //
+      // The first cut was a grey chain-link fence with a yellow top rail and a
+      // red kicker — the right three colours in the wrong three places, and
+      // two sides instead of four, so from any angle but square on it read as
+      // a pair of hoardings standing in a wood.
+      const YEL = S.rail, MESH = S.body, RED = S.skirt;
+      const gravel = [0.545, 0.512, 0.452];
+      b = deck;
+      for (let t = S.t0 - 1.4; t < S.t1 + 1.4; t += 2.2) {
+        const t1 = Math.min(t + 2.2, S.t1 + 1.4);
+        const g = 0.93 + 0.14 * ((jit(t | 0, 300) * 5) | 0) / 4;
+        b.quad(W(t, S.s0 - 1.4, surfaceY(t, S.s0 - 1.4) + 0.04),
+          W(t1, S.s0 - 1.4, surfaceY(t1, S.s0 - 1.4) + 0.04),
+          W(t1, S.s1 + 1.4, surfaceY(t1, S.s1 + 1.4) + 0.04),
+          W(t, S.s1 + 1.4, surfaceY(t, S.s1 + 1.4) + 0.04),
+          [gravel[0] * g, gravel[1] * g, gravel[2] * g]);
       }
-      for (const s of [S.s0, S.s1]) {
-        boxTS(S.t0, S.t1, s - 0.06, s + 0.06, y0, y0 + 1.10, S.skirt);
-        boxTS(S.t0, S.t1, s - 0.07, s + 0.07, y0 + S.h - 0.09, y0 + S.h, S.rail);
-        boxTS(S.t0, S.t1, s - 0.02, s + 0.02, y0 + 1.10, y0 + S.h - 0.09, S.body);
+      b = up;
+      // Four sides, not two. Uprights, a top rail and a mid rail in tube, the
+      // mesh hung between them, and the red pad wrapping the bottom.
+      const side = (a, c, sc, along) => {
+        const P = (u, y) => (along ? W(u, sc, y) : W(sc, u, y));
+        const yAt = (u) => (along ? surfaceY(u, sc) : surfaceY(sc, u));
+        for (let u = a; u <= c + 0.01; u += 2.35) {
+          if (along) post(W, u, sc, yAt(u), yAt(u) + S.h + 0.10, 0.055, YEL, 6);
+          else post(W, sc, u, yAt(u), yAt(u) + S.h + 0.10, 0.055, YEL, 6);
+        }
+        for (let u = a; u < c; u += 1.1) {
+          const u1 = Math.min(u + 1.1, c);
+          const y = yAt(u), y1 = yAt(u1);
+          // The red pad, which is the loudest thing in the photograph.
+          b.quad(P(u, y), P(u1, y1), P(u1, y1 + 0.82), P(u, y + 0.82), RED);
+          b.quad(P(u1, y1), P(u, y), P(u, y + 0.82), P(u1, y1 + 0.82),
+            shade(RED, 0.90));
+          // The mesh: one dark quad a bay, which at the twenty metres this is
+          // ever seen from is indistinguishable from netting.
+          b.quad(P(u, y + 0.82), P(u1, y1 + 0.82), P(u1, y1 + S.h), P(u, y + S.h),
+            MESH);
+          b.quad(P(u1, y1 + 0.82), P(u, y + 0.82), P(u, y + S.h), P(u1, y1 + S.h),
+            shade(MESH, 1.10));
+          // Top rail and mid rail in tube.
+          for (const hy of [S.h, S.h * 0.62]) {
+            b.quad(P(u, y + hy - 0.05), P(u1, y1 + hy - 0.05),
+              P(u1, y1 + hy + 0.05), P(u, y + hy + 0.05), YEL);
+          }
+        }
+      };
+      side(S.t0, S.t1, S.s0, true);
+      side(S.t0, S.t1, S.s1, true);
+      side(S.s0, S.s1, S.t0, false);
+      side(S.s0, S.s1, S.t1, false);
+      // The beds. A black mat in a red pad ring, sunk a hand below the frame,
+      // four of them in a row — which is the whole reason anybody walks up
+      // here.
+      for (let k = 0; k < 4; k++) {
+        const bt = S.t0 + 2.0 + k * ((S.t1 - S.t0 - 4.0) / 3);
+        const bs = (S.s0 + S.s1) * 0.5;
+        const by = surfaceY(bt, bs);
+        // A RING of pad, not a slab of it. The first cut drew the pad as one
+        // 3.1 m box with the mat inside it, and a box has a top: every bed
+        // came out a plain red square with the black bed buried under it.
+        for (const [a, c, s0b, s1b] of [
+          [bt - 1.55, bt + 1.55, bs - 1.55, bs - 1.22],
+          [bt - 1.55, bt + 1.55, bs + 1.22, bs + 1.55],
+          [bt - 1.55, bt - 1.22, bs - 1.22, bs + 1.22],
+          [bt + 1.22, bt + 1.55, bs - 1.22, bs + 1.22]]) {
+          boxTS(a, c, s0b, s1b, by + 0.30, by + 0.44, RED, shade(RED, 1.14));
+        }
+        boxTS(bt - 1.24, bt + 1.24, bs - 1.24, bs + 1.24, by + 0.34, by + 0.39,
+          [0.075, 0.075, 0.082], [0.098, 0.098, 0.106]);
+        for (const [ot, os] of [[-1.45, -1.45], [1.45, -1.45],
+          [-1.45, 1.45], [1.45, 1.45]]) {
+          post(W, bt + ot, bs + os, by, by + 0.32, 0.045, YEL, 5);
+        }
+      }
+      // And the chairs outside it, red and black, which is where the parents
+      // are.
+      for (let k = 0; k < 5; k++) {
+        terraceSet(S.t0 + 1.6 + k * 2.9, S.s0 - 2.4, surfaceY(S.t0, S.s0 - 2.4),
+          (k % 2) * 0.6 - 0.3,
+          k % 2 ? [0.560, 0.135, 0.110] : [0.130, 0.130, 0.138]);
       }
       runs.push({ t0: S.t0, t1: S.t1, s0: S.s0, s1: S.s1, y: y0, h: S.h });
       b = deck;
@@ -7239,6 +7315,34 @@ async function buildJadrija(scene) {
         }
       }
       n++;
+    }
+
+    // And out of the three compounds, which are not OSM footprints and so are
+    // not in `standing`. A pine coming up through the trampoline park is the
+    // same bug as one coming up through a roof, and the aerial had one right
+    // in the middle of the beds.
+    for (const K of [PLAY, SAN, TRAMP]) {
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (let u = 0; u <= 1.001; u += 0.125) {
+        for (const [tt, ss] of [[K.t0 + (K.t1 - K.t0) * u, K.s0],
+          [K.t0 + (K.t1 - K.t0) * u, K.s1],
+          [K.t0, K.s0 + (K.s1 - K.s0) * u], [K.t1, K.s0 + (K.s1 - K.s0) * u]]) {
+          const w = toWorld(tt, ss);
+          if (w[0] < x0) x0 = w[0];
+          if (w[0] > x1) x1 = w[0];
+          if (w[2] < z0) z0 = w[2];
+          if (w[2] > z1) z1 = w[2];
+        }
+      }
+      const box = [x0 - 1.2, x1 + 1.2, z0 - 1.2, z1 + 1.2];
+      for (let i = Math.floor(box[0] / GROVE.cell); i <= Math.floor(box[1] / GROVE.cell); i++) {
+        for (let k = Math.floor(box[2] / GROVE.cell); k <= Math.floor(box[3] / GROVE.cell); k++) {
+          const kk = key(i, k);
+          let list = grid.get(kk);
+          if (!list) grid.set(kk, list = []);
+          list.push(box);
+        }
+      }
     }
 
     /** Is (x, z) inside a standing house, or close enough to be its wall? */
