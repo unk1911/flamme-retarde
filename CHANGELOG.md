@@ -8,6 +8,96 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.100.0] — 2026-08-22
+
+The two jobs that were parked against a usage ceiling earlier today, resumed and
+finished. Both had left their research committed, which is the only reason
+either could be picked up cold.
+
+### Added
+
+- **The cars are cars.** Five body types built in Blender rather than bought:
+  `supermini` 3.95 m, `crossover` 4.25 m with roof rails, `estate` 4.60 m with
+  a roofbox, `van` 4.40 m high-roof panel, `oldhatch` 3.66 m squarer three-door.
+  Bodies lofted from superelliptical rings along X with the sill rising at the
+  axles, so there are real wheel arches. Fifty-two of them under the pines —
+  17 / 15 / 9 / 6 / 5 — mostly white and silver with one dark blue and one red,
+  because that is what the footage of the car park under the olives shows: Rule
+  12 decided the models, not taste, and the marques that were guessed at
+  beforehand (Golfs, a Zastava) are not in the frames.
+
+  No library was used and nothing was downloaded. There is no glTF parser in
+  the bundle and there is not going to be one, so every shelf model would have
+  had to pass through Blender anyway; the shading path is one flat vertex colour
+  per object while every shelf car ships a texture atlas; and a `bmesh` car is
+  5–9 KB gzipped against 300 KB–2 MB. Reasoning in `plan/cars-in-the-wood.md`.
+
+  Two blobs per model — an all-white painted body and a trim blob at
+  `aInstColor` 1.0 for glass, tyres, rims, bumpers, lamps, plates and roof
+  furniture — because the instanced shader multiplies its tint into everything
+  and one blob would have turned the headlamps dark blue.
+
+  **+0.10 MB. Baked Jadrija triangles go DOWN**, 346 358 → 335 126, because
+  11 232 triangles of box came out; the cars draw as 51 076 in 10 instanced
+  calls. 58–61 fps, blockers 637, census unchanged. Every placement rule
+  survives: 4.0 m spacing, the `jit > 0.80` reject, `clearOfShops`/`PLAY`/`SAN`,
+  the clamp on the tail — the longest model's tail sits at 37.10 m, inside the
+  39 m band — and the headlights still face seaward.
+
+### Fixed
+
+- **The wine pour.** The third and last fault, after the parenting and the reach
+  went in at 1.99.0. `WINE_POUR` held the bottle at 52.1° from vertical while
+  the line from her palm to the glass was at 109.8°, so the runtime aim — a
+  safety net meant to do nothing when the pose is right — was applying **86.7°
+  of correction on every frame of the pour**. The bottle swung a right angle out
+  of her grip the moment `pour` ramped, lay across her body for a second, and
+  swung back. It missed as well: the lip sat 47 mm off the glass.
+
+  The constraint that was missing turned out not to be a palm target but **the
+  closest approach between the bottle and her own forearm**. A bottle is 77 mm
+  across, a forearm about 70, and the grip sits only 44 mm off the wrist, so an
+  axis lying along the forearm — parallel or anti-parallel — buries half the
+  bottle in her arm, and nothing else in the measurement can see it because a
+  bottle is a solid of revolution. Two azimuths that otherwise solved to the
+  millimetre were ruled out by it; one put the bottle's foot inside her sternum.
+
+  Now: snap 86.7° → **1.1°**, lip miss 47 mm → **0**, forearm gap 0.050 against
+  a rig baseline of 0.045 — no tighter to her arm than simply holding it is.
+  Twelve keys instead of nine, each at a direction change, tilt monotone both
+  ways, and **the hand moves 15 mm across all three pour keys**: it is a wrist
+  turning over, not a shoulder swinging.
+
+  A second fault found in the numbers and not in the report: `WINE_LIFT` parked
+  the bottle at her hip, 0.245 m out and 0.213 m back — 0.37 m of travel to
+  arrive 0.03 m from where it started.
+
+  Proved with `plan/wine-pour-wip/fr3dhash.py`: against the shipped 1.99.1
+  payload, 24 sections identical and 7 differ — `clip:wine` plus the six mesh
+  sections, which is the established decimator non-determinism. Bones identical,
+  the other 23 clips identical, the bathers untouched.
+
+- **Every contact sheet ever shot of this clip had an empty glass under a
+  running stream.** The debug scrubber mirrored `wineAt` but could not mirror a
+  bare `u > 2.65` living in the phase switch. `wineAt` gained `full` as a third
+  window and both paths read it.
+
+### Known
+
+- **The wine glass is drawn, visible, and cannot be seen.** The crystal is
+  `DoubleSide` with `emissive: 0.22` in front of an open-sea window, and the
+  bowl saturates to flat white before anything inside it gets a say. That is the
+  glass material's problem, not the pour's.
+- `propLayer` (`src/37-props.js:583`) silently drops the index — it copies
+  position, normal and `aVCol` only, which is right for every `propBuilder.geo()`
+  soup it was written for and wrong for anything out of `readFR3D`. The cars set
+  their own index in `src/44-cars.js` rather than change a path the town's seven
+  layers depend on. Worth fixing at source if anything else is ever fed an
+  indexed proto.
+- A shore-frame eye placed seaward of the car noses is standing inside a shop:
+  `s ≈ 26–31` is the back row of buildings. The row can only be shot from
+  inland, from along it, or from above.
+
 ## [1.99.1] — 2026-08-22
 
 ### Fixed
