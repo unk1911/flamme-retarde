@@ -8,6 +8,148 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.97.0] — 2026-08-22
+
+The release where the place got its own voice, and where three things that
+looked like objects turned out to be arithmetic.
+
+Everything below was found by Misha playing it rather than by anybody looking
+at it. That is the difference between this release and the last one.
+
+### Added
+
+- **Jadrija sounds like Jadrija.** The borrowed klapa is gone — clip, loader,
+  player, credit line, licence subsection and all — and in its place are five
+  clips cut from six field recordings Misha made on the spot in August: the
+  promenade as one bed, the hillside cicadas, the same hillside from *inside*
+  the pines, the sea working the concrete edge, and a boat passing out in the
+  channel every 50 to 135 seconds. Four of the five are sounds the game did not
+  have at all. The cicadas had been bandpassed noise, and the recording peaks
+  at 5 016 Hz — within 2 % of the carrier that was standing in for it.
+- **The beds morph by where you stand** rather than fading between separate
+  stages. The promenade cedes power to whichever end has you: the forest
+  recording ends 5 dB over it under the canopy and the pier recording 4.5 dB
+  over it at the water, where before the promenade was the loudest bed at both.
+  Driven off `shoreAt` and `canopyAt`, which the game already computed.
+- **Nothing repeats inside three minutes**, and the promenade not inside eight
+  and a half. The two short clips run on two playheads at ±2.3 % so the return
+  period is the product rather than the sum. `cicadas.mp3` got *shorter* on
+  purpose: the chorus is only in the first twelve seconds of that recording —
+  the 4.2–6.2 kHz band drops 15 dB at second twelve and never comes back.
+- **ENTER jumps.** The walker had no vertical dynamics at all; `you.y` was
+  re-read from `walkY` every tick. 7.0 m/s against 12.0 gravity measures
+  1.983 m at 1.17 s of hang. Twice the height of the first attempt for a tenth
+  of a second more airtime, because a second and a half off the ground is not
+  a jump, it is a low-gravity level.
+- **The top of the lane**, from b_046: a low rubble wall with a sawn cap across
+  the lane end and four squat concrete tubs plugging the gap in it — a car
+  cannot get through and a pushchair can. The no-stopping saltire on a
+  galvanised post, built face-on as one plane cut into non-overlapping pieces.
+  The capped return with limestone offcuts lying in the dust. And the rendered
+  garden wall with the square opening and the timber frame behind it.
+- **The Slastičarnica**, in detail, because a side-quest is coming: a 4 m case
+  with sixteen pans in two rows and thirteen named plaques, cup stacks, glass
+  coupes, the header vinyl, a tiled reveal, and the building as it actually is
+  — corrugated sheet with golden reed screening wired over the lane flank, not
+  the rendered box it had been. **1974** is on the board because it is painted
+  on the board.
+- **She wanders.** The swim out to the platform was a dead straight line, which
+  is what a bearing does and not what a person does. Three sines at periods
+  that do not divide into one another — 33 s of drift, 13.4 s of correction,
+  3.1 s of the yaw inside a stroke — measured at 3.84 m of cross-track on a
+  path 3.6 % longer than the rhumb line, with her pace breathing ±7 %.
+
+### Fixed
+
+- **The three missing business signs were two centimetres.** MINI, H2O and
+  TRAMPULIN had their sign face at `s` and their own tray at `s + 0.02`, and
+  two kilometres from the world origin the depth buffer cannot separate those,
+  so which one won was decided by rounding. Closes the largest Known in 1.96.0.
+  TRAMPULIN was never a sign fault at all: the café had been built in the alley
+  between the two kabine rows, with the front row standing across its fascia.
+- **The kabina was a tunnel, and the ceiling was never crooked.** `W(t, s, y)`
+  is a parallel offset of the traced waterline, and offsetting a curve inland
+  does not preserve length along it — two points `s` metres in from a shore of
+  local radius `R` are only `(1 − s/R)` as far apart as their feet at the
+  water. So a rectangle in the resort's own coordinates is a **trapezium in the
+  world**. This shore turns 46° between t 360 and t 410, R ≈ 49 m, and at the
+  kabine's s 17.2 the t-scale collapses to **0.52**. The one room you can walk
+  into was being drawn 4.04 m wide as 2.702 at the front and 2.285 at the back,
+  corners 85.0 / 90.3 / 88.8 / 95.8. It now measures 4.040 / 4.040 / 5.300 /
+  5.300 with both diagonals 6.664 and all four corners at 90.00. And `bays:
+  1 → 2` had doubled every one of those errors: widening the room was a fix for
+  the symptom and it made the skew twice as loud.
+- **The television's brown bar was the cabinet's own front face**, two
+  millimetres behind the picture plane. It had edges and a lit top face, so it
+  read as an object standing in the room and was hunted as one through four
+  rounds of inference, a nudge test and three raycasts. The tube stands 50 mm
+  proud with a moulded surround now, which is what one of these sets looks like
+  anyway.
+- **The west end was buried in its own hill.** The beach flattening fits the
+  whole 33 m cross-section to the ground under the seaward 4 m, so the deck was
+  pinned at the waterline while the hill climbed. Terrain stood up to **1.50 m
+  above** the surface everything was placed on: benches buried to the seat rail,
+  bathers neck deep. `lipOf`/`midOf`/`deckOf` are heights at a point now, so the
+  rule is enforced by the function instead of by remembering it. Worst case
+  across a 10×18 grid is +0.02 m.
+- **Nobody was standing still, and nobody was moving either.** The crowd was
+  animating — median displacement over three seconds was 26 mm, and 11 of 30
+  figures moved less than a centimetre. One shared clock, everything below the
+  neck moving 2–3°, and pure sinusoids with no event in them. Median is 59 mm
+  now, nothing under a centimetre, each figure on its own clock with a piece of
+  business every 25–50 s fixed by its seed.
+- **Everyone was standing in the pose the mesh was modelled in.** `IDLE_A` and
+  `IDLE_B` correct the arms by 29° — put there the last time somebody
+  complained about arms — and correct the legs by nothing at all, so the rest
+  thigh's 6.5° of splay and the shin's 9.3° stood in every frame. Ankles
+  0.331 m apart → 0.109. The hip correction is **not** the walk's 11°: at 11°
+  the ankles cross, because the curve has a minimum and the walk sits on the far
+  side of it.
+- **The walk was a bear's.** Same rest splay against 2° of correction, and
+  `_walk_elbow`'s sign was backwards — on that bone a more negative X swings
+  the hand *forward*, and the rest forearm is already 46° bent forward-and-out,
+  so the correction was adding to the A-pose. Ankles 0.36–0.40 m → 0.11–0.12;
+  the wrist now travels −0.13 → +0.27 m about the shoulder instead of never
+  going behind it at all.
+- **The café terrace was three faults stacked.** Chairs were axis-aligned with
+  their backs always inland, so two in three had their back to their own table;
+  the occupant was aimed at `ang + π/2`, which is at their own backrest; and
+  they were the instanced tier, whose only `sit` is authored for the quay lip,
+  so they sank into the paving. All 24 are skinned now, on chairs that face
+  their tables, in three poses.
+- **`9` answers from everywhere.** During the V walk-up the phase is already
+  `ground`, so it hit a guard and said "there is no aeroplane here" while the
+  cut carried on running the camera up somebody else's staircase. During `R` it
+  *did* move the walker and left the camera on the jetty — `leaveWater` tore the
+  cut down but `camOverride` still held its last frame.
+- **`E` did nothing on the kite or the foil.** `inWater()` counts `ride` and
+  `foil`, but only `swim` reached the wade.
+- **The invisible wall by the vikendica was a bench** — the promenade bench run
+  starts at t 229 and the house is at t 232, so the first bench on the whole
+  shore sat three metres off its steps, six metres of precast at 0.49 m, below
+  the crosshair.
+- **The V cut and the `[9]` landing** were still anchored to where the kabine
+  and the vikendica used to be, 122 m and 208 m away respectively.
+- **`menuWall()` renders nothing because nothing calls it.** Not a render fault:
+  no entry in `SHOPS` sets `menu`, so its one call site never fires. Closes the
+  second Known in 1.96.0. It also sits in `if (S.menu) menuWall(); else if
+  (S.name) shopSign();` with 26 lines of comment between the halves, so the
+  first shop to get a menu would silently lose its sign.
+
+### Known
+
+- **The kabine standing on the bend are still wedges**, unchanged from 1.96.0
+  and now explained: it is rule 9b, the offset frame, and it is a property of
+  the shore rather than of the huts. Nothing you can walk into stands on one.
+- **Three bathers stand in the sea off the west beach on ladders that are not
+  there.** The ladder loop skips `t < beachTo + 8`; the loop that puts somebody
+  halfway down every other ladder does not.
+- **The five audio levels were set by arithmetic off measured RMS**, not by ear.
+  They have been heard once and liked; they have not been mixed.
+- One field recording, `Voice 260811_213809.m4a`, is unshipped and unnamed. It
+  is 21:38, broadband 200–2000 Hz, with no cicada or cricket band. Naming it
+  would be inventing a night this game does not have.
+
 ## [1.96.0] — 2026-08-22
 
 Everything in this release was found by looking at the back of it.
