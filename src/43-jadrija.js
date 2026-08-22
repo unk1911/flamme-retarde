@@ -5520,6 +5520,158 @@ async function buildJadrija(scene) {
     }
   }
 
+  // ── towels, cones, flags, bicycles ─────────────────────────────────────────
+  //
+  // Four small things the survey keeps showing and the shore did not have.
+  // Placed off `jit` rather than `rng` for the reason `clutter` and `paving`
+  // are: this runs after the whole beach has been laid out and taking draws
+  // off that stream would move every bather, parasol and hut on it.
+  {
+    const back11 = b;
+
+    // A towel on bare concrete is the commonest thing in the whole survey.
+    // Not a lounger — a towel, laid straight on the slab, with somebody on it
+    // or their things on it, and it is what the middle terrace is for.
+    const TOWEL = [[0.600, 0.180, 0.160], [0.155, 0.330, 0.560],
+      [0.700, 0.640, 0.240], [0.720, 0.716, 0.690],
+      [0.190, 0.460, 0.350], [0.660, 0.400, 0.520]];
+    for (let t = JAD.beachTo + 5; t < LEN - 8; t += 4.6) {
+      const k = t | 0;
+      if (jit(k, 200) > 0.72) continue;
+      if (!clearOfShops(t) || onMoleT(t) || onPlazaT(t)) continue;
+      const s = 1.5 + jit(k, 201) * 5.4;
+      const y = surfaceY(t, s);
+      const ang = (jit(k, 202) - 0.5) * 0.5;
+      const col = TOWEL[((jit(k, 203) * 97) | 0) % TOWEL.length];
+      // Three panels at slightly different heights and widths, so it lies on
+      // the slab like cloth rather than like a mat somebody cut out.
+      b = deck;
+      for (let i = 0; i < 3; i++) {
+        const ds = -0.62 + i * 0.42;
+        const wob = (jit(k, 210 + i) - 0.5) * 0.10;
+        const P = facing(t, s, ang);
+        const q = (dt, ds2, yy) => P(dt, ds2, yy);
+        const hw = 0.34 + wob;
+        b.quad(q(-hw, ds, y + 0.012 + wob * 0.05),
+          q(hw, ds, y + 0.012 - wob * 0.05),
+          q(hw, ds + 0.44, y + 0.012 + wob * 0.04),
+          q(-hw, ds + 0.44, y + 0.012 - wob * 0.04),
+          i === 1 ? col : shade(col, 0.92));
+      }
+      b = up;
+      // And what is on it. Somebody on four out of ten, their bag on the rest.
+      if (jit(k, 204) < 0.42) {
+        B(t, s - 0.55, y + 0.06, -Math.PI / 2 + ang, 'lie', 1);
+      } else {
+        clutter(t + 0.5, s + 0.55, y, 2, k * 5 + 3);
+      }
+    }
+
+    // Under the pines: cones and the coarse litter that is not needles. The
+    // floor of that stand is the best reference photograph in the survey and
+    // it is not bare — it is orange-brown duff with cones and white limestone
+    // chips lying in it.
+    b = up;
+    for (let t = 8; t < LEN - 8; t += 1.9) {
+      const k = t | 0;
+      if (jit(k, 220) > 0.55) continue;
+      const s = JAD.rowB + 2.4 + jit(k, 221) * 10.5;
+      if (t > PLAY.t0 - 2 && t < PLAY.t1 + 2
+        && s > PLAY.s0 - 2 && s < PLAY.s1 + 2) continue;
+      if (t > SAN.t0 - 2 && t < SAN.t1 + 2
+        && s > SAN.s0 - 2 && s < SAN.s1 + 2) continue;
+      const y = surfaceY(t, s);
+      const n = 1 + ((jit(k, 222) * 3) | 0);
+      for (let i = 0; i < n; i++) {
+        const dt = (jit(k, 230 + i) - 0.5) * 1.6;
+        const ds = (jit(k, 240 + i) - 0.5) * 1.6;
+        const r = 0.036 + jit(k, 250 + i) * 0.022;
+        const g = 0.30 + jit(k, 260 + i) * 0.13;
+        // A cone is a stack, not a ball: wide at the base, tapering, and lying
+        // on its side as often as not.
+        frustumTS(y, [t + dt, s + ds, r * 1.15, r * 1.15],
+          y + r * 2.2, [t + dt, s + ds, r * 0.35, r * 0.35],
+          [g, g * 0.80, g * 0.52], [g * 1.1, g * 0.86, g * 0.56]);
+      }
+    }
+
+    // The flags on the quay column at the root of the mole. Lifeguard yellow
+    // and scarlet, the pair that is up on every frame of the survey, held out
+    // by the wind that is always across this channel.
+    {
+      const ft = JET.t - JET.w - 3.2, fs = JAD.mid + 1.2;
+      const y = surfaceY(ft, fs);
+      post(W, ft, fs, y, y + 0.14, 0.13, [0.300, 0.302, 0.298], 8);
+      post(W, ft, fs, y + 0.14, y + 5.40, 0.048, [0.560, 0.556, 0.540], 7);
+      const FLAG = [[0.720, 0.600, 0.090], [0.620, 0.115, 0.095]];
+      for (let f = 0; f < 2; f++) {
+        const y0f = y + 4.70 - f * 1.15;
+        // Six panels, each a little further out and a little lower, which is
+        // what a flag in a steady breeze does and what a single quad cannot.
+        for (let i = 0; i < 6; i++) {
+          const a0 = i / 6, a1 = (i + 1) / 6;
+          const w0 = 0.90 * a0, w1 = 0.90 * a1;
+          const sag = (u) => -Math.sin(u * 2.2) * 0.13;
+          b.quad(W(ft + 0.05, fs - w0, y0f + sag(a0)),
+            W(ft + 0.05, fs - w1, y0f + sag(a1)),
+            W(ft + 0.05, fs - w1, y0f - 0.58 + sag(a1) * 0.6),
+            W(ft + 0.05, fs - w0, y0f - 0.58 + sag(a0) * 0.6),
+            i % 2 ? FLAG[f] : shade(FLAG[f], 0.90));
+        }
+      }
+    }
+
+    // Bicycles at the gate. 174947 has four of them leaning on the barrier,
+    // which is where every bicycle in Dalmatia is left.
+    for (let i = 0; i < 4; i++) {
+      const bt = 484.2 + i * 0.62, bs = 27.6 + (i % 2) * 0.30;
+      const y = surfaceY(bt, bs);
+      const FR = [[0.560, 0.140, 0.115], [0.145, 0.230, 0.430],
+        [0.180, 0.180, 0.190], [0.520, 0.505, 0.470]][i];
+      const lean = 0.16;
+      const P = facing(bt, bs, Math.PI * 0.5);
+      // Two wheels, each a ring of short chords — a bicycle is legible from
+      // its wheels and from nothing else.
+      for (const wd of [-0.52, 0.52]) {
+        for (let j = 0; j < 12; j++) {
+          const a0 = (j / 12) * TAU, a1 = ((j + 1) / 12) * TAU;
+          const R = 0.33;
+          const p0 = P(wd + Math.cos(a0) * R * 0.18, lean * Math.cos(a0) * R,
+            y + 0.34 + Math.sin(a0) * R);
+          const p1 = P(wd + Math.cos(a1) * R * 0.18, lean * Math.cos(a1) * R,
+            y + 0.34 + Math.sin(a1) * R);
+          b.quad(p0, p1,
+            P(wd + Math.cos(a1) * R * 0.18 + 0.03, lean * Math.cos(a1) * R,
+              y + 0.34 + Math.sin(a1) * R),
+            P(wd + Math.cos(a0) * R * 0.18 + 0.03, lean * Math.cos(a0) * R,
+              y + 0.34 + Math.sin(a0) * R),
+            [0.120, 0.120, 0.128]);
+        }
+      }
+      // The frame: a down tube, a seat tube, a top tube and the bars.
+      const tube = (t0, y0t, t1, y1t, r) => {
+        const A = P(t0, 0, y + y0t), Bq = P(t1, 0, y + y1t);
+        const d = [Bq[0] - A[0], Bq[1] - A[1], Bq[2] - A[2]];
+        const L = Math.hypot(d[0], d[1], d[2]) || 1;
+        const n = [-d[2] / L * r, 0, d[0] / L * r];
+        b.quad([A[0] + n[0], A[1], A[2] + n[2]], [Bq[0] + n[0], Bq[1], Bq[2] + n[2]],
+          [Bq[0] - n[0], Bq[1], Bq[2] - n[2]], [A[0] - n[0], A[1], A[2] - n[2]], FR);
+        b.quad([A[0], A[1] + r, A[2]], [Bq[0], Bq[1] + r, Bq[2]],
+          [Bq[0], Bq[1] - r, Bq[2]], [A[0], A[1] - r, A[2]], shade(FR, 1.12));
+      };
+      tube(-0.52, 0.34, 0.10, 0.86, 0.022);
+      tube(0.52, 0.34, 0.10, 0.30, 0.022);
+      tube(0.10, 0.30, 0.10, 0.92, 0.020);
+      tube(0.10, 0.92, -0.52, 0.34, 0.020);
+      tube(-0.44, 0.92, 0.10, 0.86, 0.018);
+      boxTS(bt + 0.02, bt + 0.18, bs - 0.06, bs + 0.06, y + 0.90, y + 0.96,
+        [0.100, 0.100, 0.110]);
+      boxTS(bt - 0.50, bt - 0.38, bs - 0.16, bs + 0.16, y + 0.92, y + 0.96,
+        [0.100, 0.100, 0.110]);
+    }
+    b = back11;
+  }
+
   // The half of the shop extras that cannot run with the shops.
   //
   // `shopfront` is called at line 2600 and `pine`, `lounger` and `agave` are
