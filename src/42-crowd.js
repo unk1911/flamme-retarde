@@ -249,6 +249,23 @@ function makeSkinCrowd(scene, figs, cap) {
   const CLIP = { stand: 'idle', wade: 'idle', walk: 'walk', sit: 'idle',
     lie: 'idle', wait: 'idle' };
   const SEATED = ['sit', 'sitback', 'sittable'];
+  // What somebody standing about does that `idle` does not: a look off to one
+  // side and, less often, a wave. Both are one-shots in the bake and both are
+  // keyed from `IDLE_A` at either end — see BATHER_CLIPS in
+  // tools/blender/bathers_mh.py — so they drop into a loop of `idle` with
+  // nothing between them and it, which is exactly why they are the two that
+  // are usable here and `kneel` is not.
+  const BIZ = ['notice', 'notice', 'notice', 'wave'];
+  // How often, in metres, a figure is re-posed. Posing one of these is
+  // twenty-eight bones on the CPU and then a texture upload of the palette,
+  // and the upload is the expensive half — it is a driver call per figure per
+  // frame, which is what makes a skinned crowd cost what an instanced one does
+  // not. Measured on the promenade with forty-one of them: every frame for all
+  // of them is 26.2 ms, the ladder below is 19.0 ms, and eight of them at every
+  // frame — which is what this shore had — was 19.0 ms as well. So the whole
+  // difference between eight proper bathers and forty-one is the rate they are
+  // posed at, and past forty-five metres nobody can see the difference anyway.
+  const POSE_NEAR = 45, POSE_MID = 110;
 
   /**
    * Which clip this person should be playing.
@@ -271,31 +288,98 @@ function makeSkinCrowd(scene, figs, cap) {
     scene.add(f.mesh);
   }
 
+  /**
+   * Whether this figure is in the middle of doing something one-shot.
+   *
+   * The clip a person *should* be in and the clip they are *in* differ for two
+   * seconds every half minute or so, and without this test the line below would
+   * see `wave` where it wanted `idle` and cut the wave off on its first frame,
+   * every frame. A one-shot ends by itself — `update` plays the `next` it was
+   * given — so the only thing needed here is to leave it alone until it does.
+   */
+  const midBiz = (f) => !!(f.state && f.state.cur && !f.state.cur.loop);
+
+  let frame = 0;
+
   function flush(t, cam) {
     // A delta, because these animate rather than being posed from absolute
     // time. Clamped: the first frame after a locale builds is worth several
     // seconds and would jump every clip to a random phase.
     const dt = last < 0 ? 0 : Math.min(0.1, Math.max(0, t - last));
     last = t;
+    frame++;
     let n = 0;
     const maxSq = CROWD.poseM * CROWD.poseM;
+    const nearSq = POSE_NEAR * POSE_NEAR, midSq = POSE_MID * POSE_MID;
     const lim = Math.min(cap, figs.length, figures.length);
     for (let i = 0; i < lim; i++) {
       const fg = figures[i], f = figs[i];
       const dx = fg.x - cam.x, dz = fg.z - cam.z;
-      if (dx * dx + dz * dz > maxSq) { f.mesh.visible = false; continue; }
+      const d2 = dx * dx + dz * dz;
+      if (d2 > maxSq) { f.mesh.visible = false; continue; }
       const want = wantClip(fg, f);
-      if (f.playing() !== want) f.play(want, { fade: 0.28 });
+
+      // A piece of business, on this figure's own clock.
+      //
+      // Same argument as the instanced tier's `act`, and the same seed, for the
+      // same reason: a crowd that shares one clock breathes in and out as one
+      // animal. Here it can be a real clip rather than a hand-written pose, so
+      // it is one — and the gate is an *edge* rather than a window, because a
+      // one-shot is started once and then left to run.
+      //
+      // Nobody walking, and nobody sitting: the wave is keyed from a standing
+      // pose and playing it on somebody in a chair lifts them out of it.
+      if ((fg.mode === 'stand' || fg.mode === 'wade') && !midBiz(f)) {
+        const rate = 0.70 + fg.seed * 0.70;
+        const ph = t * 0.9 + fg.seed * 6.283;
+        const g = Math.sin(ph * 0.20 * rate + fg.seed * 5.1) > 0.94;
+        if (g && !fg.bizOn) {
+          f.play(BIZ[(fg.seed * BIZ.length * 7) % BIZ.length | 0],
+            { fade: 0.25, next: want });
+        }
+        fg.bizOn = g;
+      }
+
+      if (!midBiz(f) && f.playing() !== want) {
+        // `from` is the whole difference between a crowd and a chorus line. The
+        // eight blobs are cast round-robin, so the same person stands on this
+        // shore four or five times over, and four copies of one mesh starting
+        // one 4.6 s idle at t = 0 is four copies of one mesh. The clips that
+        // land here all loop, and `sample` takes the phase modulo the duration,
+        // so any number at all is a legal offset.
+        f.play(want, { fade: 0.28, from: fg.seed * 11.3 });
+      }
       // The walk clip is authored at about 0.92 m/s; anybody strolling faster
       // than that plays it faster rather than sliding.
+      //
+      // And everybody else runs their idle a few per cent off nominal, which is
+      // the cheapest half of not being a clone: two figures on the same phase
+      // offset would otherwise stay on it for as long as you watched them.
       if (f.state) {
         f.state.speed = fg.mode === 'walk'
-          ? Math.max(0.7, Math.min(1.6, (fg.speed || 0.92) / 0.92)) : 1;
+          ? Math.max(0.7, Math.min(1.6, (fg.speed || 0.92) / 0.92))
+          : 0.90 + fg.seed * 0.22;
       }
       f.mesh.position.set(fg.x, fg.y, fg.z);
       f.mesh.rotation.set(0, fg.yaw, 0);
+      // Stature. Set here and not once at bind time because a figure is bound
+      // by index and the index outlives any one person; and left at 1 for
+      // anybody in a chair, because the three seated clips are solved in metres
+      // against a 0.46 m seat and a sitter scaled by 6 per cent is a sitter
+      // 3 cm off their own chair. See `sit_clips` in bathers_mh.py.
+      f.mesh.scale.setScalar(fg.hscale || 1);
       f.mesh.updateMatrixWorld();
-      f.update(dt);
+
+      // The pose, at a rate that falls off with distance — see POSE_NEAR. The
+      // stagger by `i` is not cosmetic: without it every figure in a band
+      // re-poses on the same frame and the cost that was spread over three
+      // frames arrives on one of them, which is a stutter rather than a saving.
+      const every = d2 < nearSq ? 1 : d2 < midSq ? 3 : 8;
+      fg.lag = (fg.lag || 0) + dt;
+      if (every === 1 || (frame + i) % every === 0) {
+        f.update(fg.lag);
+        fg.lag = 0;
+      }
       f.mesh.visible = true;
       n++;
     }

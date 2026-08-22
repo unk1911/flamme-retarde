@@ -6012,7 +6012,7 @@ async function buildJadrija(scene) {
   // bathing edge rather than spread flat.
   const CAST = 84;
   // Of those, how many are the good meshes. The rest are the instanced pair.
-  const SKIN_CAST = 8;
+  const SKIN_CAST = 41;
   // And on top of those, the café terraces.
   //
   // Reported 22 Aug, of the tables: "replace those marionettes with our high
@@ -6040,16 +6040,31 @@ async function buildJadrija(scene) {
   // none of this is drawn: 60 fps at every one of them, before and after.
   const SKIN_SEATED = 24;
   {
-    // Three of the scripted ones, not all of them.
+    // The walkers, and how many of them survive the thinning.
     //
-    // There are exactly eight figures carrying a beat and every one of them is
-    // a promenade walker, so keeping the lot filled the cast before anybody on
-    // the sand was considered — which is how the second attempt produced eight
-    // walkers as well, for a completely different reason than the first. Three
-    // is enough that the scripted business still happens and leaves five places
-    // for people who are actually at the beach.
-    const BEATS = 3;
-    const keep = bathers.filter((b) => b.beat).slice(0, BEATS);
+    // This was three, and taken as `slice(0, 3)` off the front of the array.
+    // Both halves of that were wrong and the second half is the interesting
+    // one: `bathers` is in placement order, the promenade loop runs west to
+    // east from t = 10, and the western two hundred metres of this shore is
+    // sand. So the three survivors stood at t = 13, 57 and 105 — on the beach —
+    // and the built promenade, three hundred metres of unbroken deck that is
+    // the one strip of Jadrija a figure can walk along without immediately
+    // arriving, had nobody moving on it at all. Reported from a screenshot down
+    // it: figures "just kinda standin' around doing nuthin'".
+    //
+    // The other half is the pool below, which takes `!b.beat` — so every walker
+    // past the first three was not thinned, it was *deleted*, and the `walk`
+    // entry in that list has been matching nothing ever since.
+    //
+    // Twelve, spread over the whole shore by the same stride the pools use
+    // rather than taken off the front. It is a count of walkers and not a
+    // fraction, because what a promenade needs is a handful of people crossing
+    // it at any moment, and that number does not scale with how long it is.
+    const BEATS = 12;
+    const spread = (g) => g.map((b, i) => [i * 9973 % Math.max(1, g.length), b])
+      .sort((a, c) => a[0] - c[0]).map((x) => x[1]);
+    const beats = spread(bathers.filter((b) => b.beat));
+    const keep = beats.slice(0, BEATS);
     // Round-robin across the poses, not just along the shore.
     //
     // Spreading by position alone was the first attempt and it gave eight
@@ -6071,11 +6086,12 @@ async function buildJadrija(scene) {
     // eligible, there were eighteen of those, and raising CAST past eighteen
     // did nothing whatever.
     const pool = ['stand', 'wade', 'walk', 'sit', 'lie'].map((mode) => {
-      const g = bathers.filter((b) => !b.beat && b.pose === mode);
       // Within a pose, still spread along the shore, or the three who are
-      // standing are standing together.
-      return g.map((b, i) => [i * 9973 % Math.max(1, g.length), b])
-        .sort((a, c) => a[0] - c[0]).map((x) => x[1]);
+      // standing are standing together. `walk` now draws on the walkers `BEATS`
+      // did not take rather than on the empty set, which is what makes that
+      // entry mean anything.
+      if (mode === 'walk') return beats.slice(BEATS);
+      return spread(bathers.filter((b) => !b.beat && b.pose === mode));
     });
     for (let round = 0; keep.length < CAST && round < 40; round++) {
       for (const g of pool) {
@@ -12927,8 +12943,14 @@ async function buildJadrija(scene) {
     const blobbable = b.chair || (b.pose !== 'sit' && b.pose !== 'lie');
     const wantSkin = !!crowds.skin && blobbable
       && (b.chair ? seated < SKIN_SEATED : cast < SKIN_CAST);
+    // Drawn whether or not it is wanted. Rule 4: the `rng` stream is the beach,
+    // and a draw that happens only for the people who did *not* get a blob
+    // makes `SKIN_CAST` a knob that reshuffles every gait, every swimsuit and
+    // every height downstream of it every time it is touched. One discarded
+    // number a head buys the right to tune the cast without moving the crowd.
+    const sex = rng() < 0.5 ? 'f' : 'm';
     const C = wantSkin ? crowds.skin
-      : (crowds[rng() < 0.5 ? 'f' : 'm'] || crowds.m || crowds.f || crowds.skin);
+      : (crowds[sex] || crowds.m || crowds.f || crowds.skin);
     if (wantSkin) { if (b.chair) seated++; else cast++; }
     if (!C) break;
     const p = toWorld(b.t, b.s);
@@ -12952,9 +12974,28 @@ async function buildJadrija(scene) {
       // as nought and never asks, because it only looks at this for `sit`.
       seat: b.seat,
       seed: rng(),
-      scale: b.k * (0.94 + rng() * 0.13),
+      // The height jitter, off one draw and spent on both tiers below. It was
+      // 0.94 to 1.07, which on the instanced rig's canonical 1.70 m is 1.60 m
+      // to 1.82 m — twenty-two centimetres across a whole beach, and that is
+      // the reason a row of them reads as one figure stamped out. 0.92 to 1.08
+      // is 1.56 m to 1.84 m, and it is as far as this can be pushed on the
+      // blobs, which already stand between 1.24 m and 1.84 m before it is
+      // applied at all.
+      scale: b.k * (0.92 + rng() * 0.16),
       skin: pick(SKIN), suit: pick(SWIM), hair: pick(HAIR),
     };
+    // The same number again with the placement's child multiplier taken back
+    // out, because the two tiers mean different things by a height.
+    //
+    // `scale` multiplies the instanced rig, which is a canonical 1.70 m figure
+    // and nothing else, so `b.k` — the placement's note that this one is a
+    // child — belongs in it. A blob is already a specific person of a specific
+    // stature: BATHER_CAST holds a 1.24 m girl and a 1.84 m man. Putting the
+    // child multiplier on whichever of the eight happened to be bound here
+    // would give a 1.21 m adult, which is not a child, it is a dwarf. So the
+    // blobs get the jitter alone — and nothing at all if they are in a chair,
+    // for the reason in `flush`.
+    fg.hscale = b.chair ? 1 : fg.scale / b.k;
     C.figures.push(fg);
     if (b.beat) walkers.push(fg);
   }
