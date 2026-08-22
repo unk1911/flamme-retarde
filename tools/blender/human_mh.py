@@ -2934,6 +2934,102 @@ STRIDE = {
 # rig, the weights, the quaternion bake and the shader all agree with each other,
 # and every clip after this one is content rather than engineering.
 
+# ── the six numbers a standing figure needs, which are not the walk's six ──── #
+#
+# Same fault, third time, and this is the file it has always been in. The base
+# mesh is an A-pose, the A-pose is the widest attitude a body has, and every
+# clip is only ever the correction on top of it. The walk was fixed for this on
+# 22 Aug and the eight bathers' `idle` an hour later, in bathers_mh.py, because
+# this file was off limits that afternoon. It is not any more, so the numbers
+# live here, in the two poses, where every clip built on them picks them up.
+#
+# What was wrong, measured on the posed rig rather than eyeballed. `IDLE_A`
+# corrected the ARMS — 29° of adduction a side, put there the last time
+# somebody complained about arms — and corrected the LEGS by nothing at all, so
+# the rest thigh's 6.5° of splay and the rest shin's 9.3° stood in every idle
+# frame of the twenty-four clips. Before: **ankles 0.458 m apart, knees 0.333,
+# wrists 0.488, elbows 0.441**, each hand 7 cm outboard of its own shoulder and
+# 21 cm in front of it, elbows bent 60° and 57°. A person standing at ease has
+# their ankles 10 to 15 cm apart and their hands hanging just outside their
+# thighs. Forty-six centimetres of ankle is not a stance, it is a shop dummy.
+#
+# After: **ankles 0.109, knees 0.163, wrists 0.408, elbows 0.408**, hands 2.6
+# and 3.0 cm outboard of their own shoulders and 8.5 and 5.8 in front, elbows
+# bent 16° and 13°, soles 2.3° off flat.
+#
+# Axes, since the `--probe` docstring below has them backwards and cost an
+# hour: in this armature **+Y is her left-right axis and +X is in front of
+# her**. Every separation quoted above is |Δy| between two joint centres.
+
+# The hip, and the number the bathers' pass explicitly warned would not
+# transfer — so it was solved again here, and it came out at the walk's 11 and
+# not at their 6.5.
+#
+# The curve of ankle separation against hip adduction has a minimum in it,
+# because past the crossing the two ankles are on each other's side of the
+# midline and the distance grows again. Read a target off it without looking at
+# both sides and you land on the wrong side of the minimum. **Baye's crossing
+# is at 14.8°** — 0.022 m at 14, 0.001 at 14.8, back up to 0.036 at 16 — where
+# the 1.72 m bather's, measured on her own skeleton the same way, is at
+# **10.0**: 0.003 m there, and 0.026 at eleven with her ankles crossed. Nearly
+# five degrees of skeleton is the whole difference between the two files, and
+# it is why this is measured per rig and never copied. Eleven is the answer
+# here and it is the wrong answer there, and both are the same sentence about
+# hip width over leg length.
+#
+# Eleven puts her ankles 0.109 m apart with her knees 0.163 — knees a little
+# wider than ankles, which is the shape of a real stance — and it is 3.8° short
+# of her own crossing, with the ankle curve running 0.0293 m per degree there,
+# so a degree of drift either way is under 3 cm and nothing crosses. It is also
+# `WALK_TRACK` to the decimal, which is worth having for free: `go` in
+# 43-jadrija.js crossfades one clip into the next over 0.30 s by default, and
+# two clips that agree about where a hip is have nothing lateral to move
+# through it. She has walked out of a stand and stood out of a walk in front of
+# you all afternoon; now the hips do not step sideways while she does.
+STAND_TRACK = 11.0
+# The shin, doing what `WALK_SHANK` does and for the same reason: the base
+# mesh's tibia flares outward, the knee inherits the hip's adduction, and this
+# only has to take the last couple of degrees off. Worth 1.4 cm of ankle a
+# degree — 0.137 at nothing, 0.109 at two.
+STAND_SHANK = 2.0
+# And the sole, which gives back the roll the two above cost. Thirteen degrees
+# of hip and knee rolls the foot thirteen degrees, and a foot rolled thirteen
+# degrees is a woman standing on the insides of her feet.
+#
+# Twelve and not the walk's thirteen, and it is not a free choice: her idle is
+# a contrapposto, so the two feet do not start level and the SUM of the two
+# rolls is fixed at about -5° whatever this is set to. All this can do is share
+# it out. Twelve is where the two are equal, 2.3° off flat each; the walk's 13
+# gives 3.5 and 1.1, and the bathers' 8.5 gives 1.6 and 6.5.
+STAND_SOLE = 12.0
+# The shoulder. Twenty-nine was this pose's own and it is nearly right; at 33
+# the humerus hangs 6.5° out from vertical, which is where a relaxed standing
+# arm hangs, and a shade wider than the walk's 34 — a swinging arm is tucked
+# in a little, a hanging one is not. Not 35: that is the humerus at 4.5° and
+# the wrist inside the outline of the thigh, and the hands go into the wrap.
+STAND_ARM_IN = 33.0
+# The forearm. Four degrees of it was nothing — the rest forearm leaves the
+# elbow pointing out as well as forward, so the hands bowed out round the hips
+# and each wrist sat 7 cm outboard of its own shoulder. Eighteen brings the
+# wrists to 0.408 m apart, which on her is 1.6 to 2.1 cm outboard of the
+# surface of the thigh beside them: hands hanging just outside the thighs, with
+# the hand's own width taking up the rest of it. Not 22 — that is the wrist
+# joint 2 mm outside the thigh, and 2 mm is inside the hand.
+STAND_FORE_IN = 18.0
+# And the elbow, which is `_walk_elbow`'s hard-won note again: on this bone a
+# more negative X does not fold the elbow, it swings the hand further FORWARD,
+# and the rest forearm is already 46° bent forward-and-out. The two idle keys
+# carry -14 and -11 there, which ADDS to the A-pose instead of undoing it, and
+# is why her hands sat 21 cm in front of her shoulders with 60° in the elbow.
+#
+# Added to what each key authored rather than replacing it, so the three
+# degrees of arm swing between the two keys survives. Forty-four, not the
+# bathers' forty: forty on her leaves 20° and 17° in the elbows and the hands
+# 10 and 7 cm forward, forty-four lands 16° and 13° with 8.5 and 5.8 — which is
+# where the bathers' forty landed *them*. The right number is the result, not
+# the constant.
+STAND_ELBOW_UNDO = 44.0
+
 # Relaxed stand, weight on the left leg. A figure with both knees locked and both
 # arms straight down reads as a mannequin no matter how good the mesh is; the
 # whole difference is a couple of degrees of contrapposto.
@@ -2942,29 +3038,47 @@ STRIDE = {
 # A-pose with the upper arms 40° out from the body, so a couple of degrees of
 # idle offset leaves a figure holding her arms out like a scarecrow — which is
 # what the first pass shipped, and it read as a mannequin however much the ribs
-# were breathing. Twenty-nine degrees of adduction a side is what puts her hands
-# where a standing person's hands are. Sign: on the right arm +Z abducts, and
-# the two sides mirror.
+# were breathing. Sign: on the right arm +Z abducts, and the two sides mirror.
+#
+# Every lateral term below is one of the six constants above. What is written
+# out longhand is the sagittal half — the contrapposto, the breath, the head
+# turn — and that is deliberate: those are the pose, and the six are only the
+# A-pose being taken out from under it.
 IDLE_A = {
     "@root": (0.000, 0.020, -0.006),
     "pelvis": (0, 0, -2.5),
     "spine01": (0, 0, 1.0), "spine02": (0, 0, 1.0), "spine03": (-1, 0, 0.5),
     "chest": (-1.5, 0, 0), "neck": (2, 0, 0), "head": (-1, -3, 1),
-    "armUL": (-6, 0, 29), "armLL": (-14, 0, 4), "handL": (-4, 0, 0),
-    "armUR": (-4, 0, -29), "armLR": (-11, 0, -4), "handR": (-4, 0, 0),
-    "legLL": (1, 0, 0),
-    "legUR": (-4, 3, 0), "legLR": (7, 0, 0), "footR": (-3, 0, 0),
+    "armUL": (-6, 0, STAND_ARM_IN),
+    "armLL": (-14 + STAND_ELBOW_UNDO, 0, STAND_FORE_IN), "handL": (-4, 0, 0),
+    "armUR": (-4, 0, -STAND_ARM_IN),
+    "armLR": (-11 + STAND_ELBOW_UNDO, 0, -STAND_FORE_IN), "handR": (-4, 0, 0),
+    "legUL": (0, 0, STAND_TRACK), "legLL": (1, 0, STAND_SHANK),
+    "footL": (0, STAND_SOLE, 0),
+    "legUR": (-4, 3, -STAND_TRACK), "legLR": (7, 0, -STAND_SHANK),
+    "footR": (-3, -STAND_SOLE, 0),
 }
 
 # Same stance, breath in, head come round the other way.
+#
+# The two degrees the shoulders open on the breath are kept as two degrees off
+# `STAND_ARM_IN` rather than flattened to it — that swing is 3 cm at the wrist
+# over the 2.3 s between the keys, and it is most of what stops the loop
+# reading as a held photograph. Correcting the pose rather than rewriting it at
+# bake time is what makes keeping it possible.
 IDLE_B = {
     "@root": (0.004, 0.014, 0.000),
     "pelvis": (0, 0, -1.5),
     "spine01": (0, 0, 0.5), "spine02": (0, 0, 0.5), "spine03": (-2, 0, 0),
     "chest": (-3.0, 0, 0), "neck": (3, 0, 0), "head": (-2, 4, -1),
-    "armUL": (-3, 0, 27), "armLL": (-11, 0, 4), "handL": (-3, 0, 0),
-    "armUR": (-1, 0, -27), "armLR": (-8, 0, -4), "handR": (-3, 0, 0),
-    "legUR": (-3, 3, 0), "legLR": (6, 0, 0), "footR": (-3, 0, 0),
+    "armUL": (-3, 0, STAND_ARM_IN - 2),
+    "armLL": (-11 + STAND_ELBOW_UNDO, 0, STAND_FORE_IN), "handL": (-3, 0, 0),
+    "armUR": (-1, 0, -(STAND_ARM_IN - 2)),
+    "armLR": (-8 + STAND_ELBOW_UNDO, 0, -STAND_FORE_IN), "handR": (-3, 0, 0),
+    "legUL": (0, 0, STAND_TRACK), "legLL": (0, 0, STAND_SHANK),
+    "footL": (0, STAND_SOLE, 0),
+    "legUR": (-3, 3, -STAND_TRACK), "legLR": (6, 0, -STAND_SHANK),
+    "footR": (-3, -STAND_SOLE, 0),
 }
 
 # Right arm up. Big angles, on purpose: this one exists so that a single
@@ -2979,13 +3093,20 @@ WAVE_OUT = dict(WAVE_UP, **{"armLR": (-24, 34, 30), "handR": (0, 0, 12)})
 # She notices you. Head up and round, a breath in, shoulders back — the whole
 # thing is three quarters of a second and it is what turns a figure standing on
 # the promenade into somebody who has seen you coming.
+#
+# The four arm keys are the idle's plus the offsets she takes as she notices
+# you — four more degrees at the shoulder, twelve more at the elbow — and they
+# are written that way rather than as absolutes because they were absolutes
+# before and that is how this pose kept the A-pose after the idle had lost it.
 NOTICE = dict(IDLE_A, **{
     "@root": (0.000, 0.026, 0.010),
     "spine03": (-4, 0, 0.5), "chest": (-6, 0, 0), "neck": (7, 0, 0),
     "head": (4, 16, 1),
     "clavicleL": (0, 0, 5), "clavicleR": (0, 0, -5),
-    "armUL": (-14, 0, 33), "armLL": (-26, 0, 4),
-    "armUR": (-12, 0, -33), "armLR": (-23, 0, -4),
+    "armUL": (-14, 0, STAND_ARM_IN + 4),
+    "armLL": (-26 + STAND_ELBOW_UNDO, 0, STAND_FORE_IN),
+    "armUR": (-12, 0, -(STAND_ARM_IN + 4)),
+    "armLR": (-23 + STAND_ELBOW_UNDO, 0, -STAND_FORE_IN),
 })
 
 # ── on all fours ────────────────────────────────────────────────────────────
@@ -4560,7 +4681,12 @@ WINE_LIFT = dict(IDLE_A, **{
     "neck": (-4, 0, 0), "head": (-12, -6, 1),
     "clavicleR": (0, 0, -8),
     "armUR": (-30, 0, -16), "armLR": (-58, 0, -10), "handR": (-10, 0, -8),
-    "armUL": (-8, 0, 27), "armLL": (-16, 0, 4),
+    # The left arm is the one doing nothing, so it is the idle's arm with the
+    # two degrees of the lift's own lean on the shoulder. Absolutes here kept
+    # the A-pose in the one clip where she is standing still for five seconds
+    # with a bottle in the other hand and nothing else to look at.
+    "armUL": (-8, 0, STAND_ARM_IN - 2),
+    "armLL": (-16 + STAND_ELBOW_UNDO, 0, STAND_FORE_IN),
 })
 
 # And the pour, which used to be a swig.
@@ -4618,10 +4744,18 @@ UNTIE_B = dict(UNTIE_A, **{
 })
 
 # Hands opening and coming away, and she straightens up as they go.
+#
+# This is the last key before the clip returns to `IDLE_A`, so its arms are
+# written as offsets off the idle's for the same reason a landing approach is
+# flown at the runway's heading: it has seven tenths of a second to get there.
+# As absolutes it was 4.8 cm outboard of the shoulders with 72° in the elbow,
+# which is a fine shape on its own and a lurch when the next key is not.
 UNTIE_C = dict(IDLE_A, **{
     "clavicleL": (0, 0, 2), "clavicleR": (0, 0, -2),
-    "armUL": (-14, 6, 25), "armLL": (-26, 0, 4), "handL": (-2, 0, 8),
-    "armUR": (-14, -6, -25), "armLR": (-26, 0, -4), "handR": (-2, 0, -8),
+    "armUL": (-14, 6, STAND_ARM_IN - 4),
+    "armLL": (-26 + STAND_ELBOW_UNDO, 0, STAND_FORE_IN), "handL": (-2, 0, 8),
+    "armUR": (-14, -6, -(STAND_ARM_IN - 4)),
+    "armLR": (-26 + STAND_ELBOW_UNDO, 0, -STAND_FORE_IN), "handR": (-2, 0, -8),
     "chest": (-2, 0, 0), "neck": (3, 0, 0), "head": (1, 2, 1),
 })
 
@@ -5148,7 +5282,15 @@ def main():
     # looking at renders is five minutes a guess — and the three that went into
     # getting the hands behind her back were all of them arguments about which
     # way a rotation goes, which is a question a number answers and a picture
-    # does not. −Y is in front of her, +Z is up, ±X is out to the sides.
+    # does not.
+    #
+    # **+X is in front of her, +Y is her LEFT, +Z is up.** This said the
+    # opposite for a month — −Y in front and ±X out to the sides — and it is
+    # wrong twice over. Two independent checks, since a comment has now lied
+    # about it once: the rest pose puts both feet at y = ±0.231 and both hands
+    # at x = +0.185, and `kabinaKit` in src/43-jadrija.js quotes this probe's
+    # own output for `WINE_POUR` as 0.36 in front and 0.29 to her right, which
+    # is what comes out of this as x = +0.361, y = −0.285.
     if "--probe" in argv:
         bpy.ops.wm.open_mainfile(filepath=str(BLEND))
         rig = bpy.data.objects["rig"]
