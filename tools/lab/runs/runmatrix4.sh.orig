@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Run one box through a matrix of restyles, one line per experiment.
+#
+#   BURST_STATE=gh ~/fr-video/lab/runmatrix3.sh ~/fr-video/lab/gh.tsv
+#
+# Columns: tag  frames  n  w  h  denoise  vace  sim2real  steps  promptvar  [refs]
+#
+# The matrix is read on fd 3, not on stdin, and that is not style. ssh forwards
+# its own standard input to the remote command, so an ssh anywhere inside a
+# `while read` loop reading stdin swallows the rest of the loop's input. The
+# first version of this ran experiment one of eight and then announced it had
+# finished the matrix — the other seven lines went into a readiness probe.
+# burst.py now passes stdin=DEVNULL to every ssh, which is the real fix; this
+# is the second lock on the same door.
+#
+# Never `set -e`, either. A matrix exists to survive its own failures: one OOM
+# must not take the experiments queued behind it, which are the ones that were
+# going to answer the question.
+set -uo pipefail
+cd "$HOME/flamme-retarde"
+# Sourced per iteration, not once at startup. A prompt appended to prompts.sh
+# while a runner is going did not exist for that runner, and the queue either
+# died on it (before the guard) or skipped it (after).
+TSV="${1:?matrix tsv}"
+LAB="$HOME/fr-video/lab"
+LOG="$LAB/${BURST_STATE:-burst}.log"
+
+while IFS=$'\t' read -r tag frames n w h den vace s2r steps pv refs <&3; do
+  case "$tag" in ''|'#'*) continue ;; esac
+  . "$HOME/fr-video/lab/prompts.sh"
+  # Guarded, and this cost a queue. prompts.sh is sourced once when the runner
+  # starts, so a prompt appended to it afterwards does not exist in a runner
+  # already going — and under `set -u` the indirect expansion of an unset name
+  # does not skip the line, it kills the shell. The A100 queue stopped dead
+  # between two experiments with no error and no DONE.
+  prompt="${!pv:-}"
+  if [ -z "$prompt" ]; then
+    echo "[matrix] $tag: prompt '$pv' is not defined in prompts.sh — skipping" \
+      | tee -a "$LOG"; continue
+  fi
+  out="$LAB/$tag"
+  if [ "$(ls "$out"/*.png 2>/dev/null | wc -l)" -gt 0 ]; then
+    echo "[matrix] $tag already has frames — skipping" | tee -a "$LOG"; continue
+  fi
+  echo "=== $tag  den=$den vace=$vace s2r=$s2r steps=$steps ${w}x${h} n=$n $pv${refs:+ +refs}" \
+    | tee -a "$LOG"
+  t0=$SECONDS
+  python3 tools/burst.py run "$frames" --n "$n" --w "$w" --h "$h" \
+      --tag "_$tag" --steps "$steps" --denoise "$den" --vace "$vace" \
+      --sim2real "$s2r" --no-upscale --out "$out" --timeout 25 \
+      ${refs:+--ref "$refs"} \
+      --pos "$prompt" >> "$LOG" 2>&1 </dev/null
+  rc=$?
+  echo "[matrix] $tag rc=$rc  $(( (SECONDS-t0)/60 ))m$(( (SECONDS-t0)%60 ))s  $(ls "$out"/*.png 2>/dev/null | wc -l) frames" \
+    | tee -a "$LOG"
+done 3< "$TSV"
+echo "[matrix] DONE" | tee -a "$LOG"

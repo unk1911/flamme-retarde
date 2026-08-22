@@ -1,0 +1,274 @@
+=== S1  den=0.85 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 JETTY
+[burst] 73 frames from /home/unk1911/fr-video/scenes/chase
+[burst] attention: sageattn
+[burst] tunnel :18448 -> 192.222.50.152:8188
+[burst] queueing _S1
+queued fad6cc42-cd0e-4f9e-b5ea-567b6e8b88ab number 0
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/S1 · $0.40 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] S1 rc=0  5m54s  73 frames
+=== S2  den=0.85 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 CHUTE
+[burst] 73 frames from /home/unk1911/fr-video/scenes/chute
+[burst] attention: sageattn
+[burst] tunnel :18448 -> 192.222.50.152:8188
+[burst] queueing _S2
+queued b0c24f64-af20-4f9c-8d47-62b9957e4490 number 1
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/S2 · $0.65 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] S2 rc=0  6m31s  73 frames
+=== S3  den=0.85 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 DESK
+[burst] 73 frames from /home/unk1911/fr-video/scenes/pc
+[burst] attention: sageattn
+[burst] tunnel :18448 -> 192.222.50.152:8188
+[burst] queueing _S3
+queued 94ec24f0-65a9-49cf-8f48-431266962941 number 2
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/S3 · $0.89 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] S3 rc=0  6m19s  73 frames
+=== S4  den=0.85 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 CHUTE2
+[burst] 73 frames from /home/unk1911/fr-video/scenes/chuteturn
+[burst] attention: sageattn
+[burst] tunnel :18448 -> 192.222.50.152:8188
+[burst] queueing _S4
+queued 206ef8c0-e276-4a46-873a-df4850f8c8dd number 3
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.7 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/S4 · $1.13 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] S4 rc=0  6m27s  73 frames
+=== S5  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 JETTY
+[burst] 73 frames from /home/unk1911/fr-video/scenes/chase
+[burst] attention: sageattn
+[burst] tunnel :18448 -> 192.222.50.152:8188
+[burst] queueing _S5
+queued 555e9fe3-d635-47a6-8288-6cf7997e449d number 4
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/S5 · $1.42 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] S5 rc=0  7m25s  73 frames
+=== S6  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 CHUTE
+[burst] 73 frames from /home/unk1911/fr-video/scenes/chute
+[burst] attention: sageattn
+[burst] tunnel :18448 -> 192.222.50.152:8188
+[burst] queueing _S6
+queued f4817594-8bf7-4006-ab92-ab346b4f31ff number 5
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.7 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/S6 · $1.66 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] S6 rc=0  6m18s  73 frames
+=== S7  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 DESK2
+[burst] 73 frames from /home/unk1911/fr-video/scenes/pc
+[burst] attention: sageattn
+[burst] tunnel :18448 -> 192.222.50.152:8188
+[burst] queueing _S7
+queued 0ff21b1b-0b60-4791-b659-19809fc9ed42 number 6
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.7 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/S7 · $1.91 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] S7 rc=0  6m40s  73 frames
+=== S8  den=0.90 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 JETTY2
+[burst] 73 frames from /home/unk1911/fr-video/scenes/chase
+[burst] attention: sageattn
+[burst] tunnel :18448 -> 192.222.50.152:8188
+[burst] queueing _S8
+queued ba65061d-7a1a-4d82-87e1-8bcba4ecfaa3 number 7
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/S8 · $2.15 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] S8 rc=0  6m16s  73 frames
+=== S9  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 CHUTE
+[burst] 73 frames from /home/unk1911/fr-video/scenes/chuteturn
+[burst] attention: sageattn
+[burst] tunnel :18448 -> 192.222.50.152:8188
+[burst] queueing _S9
+queued fee04dfe-b0e5-4a54-8165-03ac047032ca number 8
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.7 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/S9 · $2.45 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] S9 rc=0  7m53s  73 frames
+[matrix] S10 already has frames — skipping
+[matrix] S11 already has frames — skipping
+[matrix] S12 already has frames — skipping
+=== K1  den=0.85 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 BLAZE
+[burst] 73 frames from /home/unk1911/fr-video/scenes/blaze
+[burst] attention: sageattn
+[burst] tunnel :18448 -> 192.222.50.152:8188
+[burst] queueing _K1
+queued d16d5a9b-bfcf-4341-bf24-525c2c244868 number 9
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.7 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/K1 · $2.66 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] K1 rc=0  5m28s  73 frames
+=== K2  den=0.85 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 KABWINE
+[burst] 73 frames from /home/unk1911/fr-video/scenes/wine
+[burst] attention: sageattn
+[burst] tunnel :18448 -> 192.222.50.152:8188
+[burst] queueing _K2
+queued 480c3b6f-14b7-4210-b6da-8f507f6474c7 number 10
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.1 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.7 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/K2 · $2.87 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] K2 rc=0  5m28s  73 frames
+=== K3  den=0.85 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 KABTV
+[burst] 73 frames from /home/unk1911/fr-video/scenes/kabina
+[burst] attention: sageattn
+[burst] tunnel :18448 -> 192.222.50.152:8188
+[burst] queueing _K3
+queued 191c02ef-de51-4b4a-9e27-35003d6558fb number 11
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/K3 · $3.11 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] K3 rc=0  6m20s  73 frames
+=== K4  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 BLAZE
+[burst] 73 frames from /home/unk1911/fr-video/scenes/blaze
+[burst] attention: sageattn
+[burst] tunnel :18448 -> 192.222.50.152:8188
+[burst] queueing _K4
+queued 563de93e-03aa-4ea9-b43e-94052aa4f29f number 12
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.7 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/K4 · $3.34 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] K4 rc=0  6m0s  73 frames
+=== K5  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 KABWINE
+[burst] 73 frames from /home/unk1911/fr-video/scenes/wine
+[burst] attention: sageattn
+[burst] tunnel :18448 -> 192.222.50.152:8188
+[burst] queueing _K5
+queued 1b95bb3c-c702-43eb-8a43-040326844c03 number 13
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.7 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/K5 · $3.55 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] K5 rc=0  5m31s  73 frames
+=== K6  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 KABTV
+[burst] 73 frames from /home/unk1911/fr-video/scenes/kabina
+[burst] attention: sageattn
+[burst] tunnel :18448 -> 192.222.50.152:8188
+[burst] queueing _K6
+queued ff390940-3a45-465f-b681-27191a9bb95d number 14
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.7 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/K6 · $3.77 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] K6 rc=0  5m51s  73 frames
+[matrix] DONE

@@ -1,0 +1,149 @@
+=== H1  den=0.85 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 FIRE +refs
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] refs: /home/ubuntu/job/refs/canadair-flying.jpg,/home/ubuntu/job/refs/Pogled.na.sibenik.JPG
+[burst] tunnel :18445 -> 192.222.51.1:8189
+[burst] queueing _H1
+queued 0810081d-c7ae-4f0b-94ba-5c481d9382f4 number 0
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 0/73 frames · 4.3 min
+[burst] 0/73 frames · 4.8 min
+[burst] 0/73 frames · 5.4 min
+[burst] 0/73 frames · 5.9 min
+[burst] 73/73 frames · 6.4 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/H1 · $2.68 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] H1 rc=0  7m40s  73 frames
+=== H2  den=0.75 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 FIRE +refs
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] refs: /home/ubuntu/job/refs/canadair-flying.jpg,/home/ubuntu/job/refs/Pogled.na.sibenik.JPG
+[burst] tunnel :18445 -> 192.222.51.1:8189
+[burst] queueing _H2
+queued 8bd2934d-bd33-4f3f-8a22-d77296db26c8 number 1
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 0/73 frames · 4.3 min
+[burst] 0/73 frames · 4.8 min
+[burst] 0/73 frames · 5.4 min
+[burst] 0/73 frames · 5.9 min
+[burst] 0/73 frames · 6.4 min
+[burst] 0/73 frames · 6.9 min
+[burst] 0/73 frames · 7.5 min
+[burst] 73/73 frames · 8.0 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/H2 · $3.03 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] H2 rc=0  9m11s  73 frames
+=== H3  den=0.95 vace=1.00 s2r=0.70 steps=12 1280x720 n=73 AERIAL +refs
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] refs: /home/ubuntu/job/refs/canadair-flying.jpg,/home/ubuntu/job/refs/Pogled.na.sibenik.JPG
+[burst] tunnel :18445 -> 192.222.51.1:8189
+[burst] queueing _H3
+queued fba20f0d-0357-46c9-ad35-fc734b9404a3 number 2
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 0/73 frames · 4.3 min
+[burst] 0/73 frames · 4.8 min
+[burst] 0/73 frames · 5.4 min
+[burst] 0/73 frames · 5.9 min
+[burst] 0/73 frames · 6.4 min
+[burst] 0/73 frames · 7.0 min
+[burst] 73/73 frames · 7.5 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/H3 · $3.37 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] H3 rc=0  9m0s  74 frames
+[matrix] H4 already has frames — skipping
+[matrix] H5 already has frames — skipping
+[matrix] DONE
+=== I1  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 FIRE2 +refs
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] refs: /home/ubuntu/job/refs/canadair-flying.jpg,/home/ubuntu/job/refs/Pogled.na.sibenik.JPG
+[burst] tunnel :18445 -> 192.222.51.1:8189
+[burst] queueing _I1
+queued ce6cd132-a36c-490b-aa86-cb3443e6dc68 number 3
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 0/73 frames · 4.3 min
+[burst] 0/73 frames · 4.8 min
+[burst] 0/73 frames · 5.3 min
+[burst] 0/73 frames · 5.9 min
+[burst] 0/73 frames · 6.4 min
+[burst] 0/73 frames · 6.9 min
+[burst] 0/73 frames · 7.5 min
+[burst] 0/73 frames · 8.0 min
+[burst] 73/73 frames · 8.5 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/I1 · $3.78 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] I1 rc=0  10m28s  73 frames
+=== I2  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 FIRE2
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] tunnel :18445 -> 192.222.51.1:8189
+[burst] queueing _I2
+queued 080efa1a-1fa6-4b4a-9223-c6af60530497 number 4
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.7 min
+[burst] 0/73 frames · 4.3 min
+[burst] 0/73 frames · 4.8 min
+[burst] 0/73 frames · 5.3 min
+[burst] 0/73 frames · 5.9 min
+[burst] 0/73 frames · 6.4 min
+[burst] 0/73 frames · 6.9 min
+[burst] 0/73 frames · 7.5 min
+[burst] 73/73 frames · 8.0 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/I2 · $4.12 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] I2 rc=0  9m4s  73 frames
+=== I3  den=0.90 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 FIRE2 +refs
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] refs: /home/ubuntu/job/refs/canadair-flying.jpg,/home/ubuntu/job/refs/Pogled.na.sibenik.JPG
+[burst] tunnel :18445 -> 192.222.51.1:8189
+[burst] queueing _I3
+queued e5c43e4e-0d0c-4e73-a7e1-75b60322bcef number 5
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/I3 · $4.31 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] I3 rc=0  4m52s  73 frames
+[matrix] DONE

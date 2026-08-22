@@ -1,0 +1,34 @@
+=== S1  den=0.85 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 JETTY
+[matrix] S1 rc=0  5m54s  73 frames
+=== S2  den=0.85 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 CHUTE
+[matrix] S2 rc=0  6m31s  73 frames
+=== S3  den=0.85 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 DESK
+[matrix] S3 rc=0  6m19s  73 frames
+=== S4  den=0.85 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 CHUTE2
+[matrix] S4 rc=0  6m27s  73 frames
+=== S5  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 JETTY
+[matrix] S5 rc=0  7m25s  73 frames
+=== S6  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 CHUTE
+[matrix] S6 rc=0  6m18s  73 frames
+=== S7  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 DESK2
+[matrix] S7 rc=0  6m40s  73 frames
+=== S8  den=0.90 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 JETTY2
+[matrix] S8 rc=0  6m16s  73 frames
+=== S9  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 CHUTE
+[matrix] S9 rc=0  7m53s  73 frames
+[matrix] S10 already has frames — skipping
+[matrix] S11 already has frames — skipping
+[matrix] S12 already has frames — skipping
+=== K1  den=0.85 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 BLAZE
+[matrix] K1 rc=0  5m28s  73 frames
+=== K2  den=0.85 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 KABWINE
+[matrix] K2 rc=0  5m28s  73 frames
+=== K3  den=0.85 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 KABTV
+[matrix] K3 rc=0  6m20s  73 frames
+=== K4  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 BLAZE
+[matrix] K4 rc=0  6m0s  73 frames
+=== K5  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 KABWINE
+[matrix] K5 rc=0  5m31s  73 frames
+=== K6  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 KABTV
+[matrix] K6 rc=0  5m51s  73 frames
+[matrix] DONE

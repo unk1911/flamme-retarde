@@ -1,0 +1,11 @@
+B1	/home/unk1911/fr-video/entry_720/frames	49	1280	720	0.95	1.00	0.85	12	INTERIOR
+B2	/home/unk1911/fr-video/live/frames	73	848	480	0.95	1.00	0.85	12	AERIAL
+B3	/home/unk1911/fr-video/entry_720/frames	49	1280	720	0.85	1.00	1.00	12	INTERIOR
+B4	/home/unk1911/fr-video/entry_hq/frames	49	848	480	0.95	1.00	0.85	12	INTERIOR
+B5	/home/unk1911/fr-video/live/frames	73	848	480	0.95	1.00	0.85	12	INTERIOR
+D1	/home/unk1911/fr-video/live/frames	73	848	480	0.90	1.00	0.85	12	FIRE	
+D2	/home/unk1911/fr-video/live/frames	73	848	480	0.80	1.00	0.85	12	FIRE	
+D3	/home/unk1911/fr-video/live/frames	73	848	480	0.70	1.00	0.85	12	FIRE	
+D4	/home/unk1911/fr-video/live/frames	73	848	480	0.95	1.00	0.85	12	FIRE	/home/unk1911/flamme-retarde/refs/canadair-flying.jpg
+E1	/home/unk1911/fr-video/entry_720/frames	49	1280	720	0.85	1.00	0.85	12	INTERIOR	
+E2	/home/unk1911/fr-video/entry_720/frames	49	1280	720	0.75	1.00	0.85	12	INTERIOR	

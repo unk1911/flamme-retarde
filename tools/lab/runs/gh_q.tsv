@@ -1,0 +1,17 @@
+A2	/home/unk1911/fr-video/live720/frames	73	1280	720	0.95	1.00	0.85	12	INTERIOR	
+C1	/home/unk1911/fr-video/live720/frames	73	1280	720	0.95	1.00	0.85	12	AERIAL	/home/unk1911/flamme-retarde/refs/canadair-flying.jpg
+A5	/home/unk1911/fr-video/live720/frames	73	1280	720	0.95	1.00	0.85	12	GRAIN	
+C2	/home/unk1911/fr-video/live720/frames	73	1280	720	0.95	1.00	0.85	12	AERIAL	/home/unk1911/flamme-retarde/refs/canadair-flying.jpg,/home/unk1911/flamme-retarde/refs/Pogled.na.sibenik.JPG
+A3	/home/unk1911/fr-video/live720/frames	73	1280	720	0.95	1.00	1.00	12	AERIAL	
+A4	/home/unk1911/fr-video/live720/frames	73	1280	720	0.85	1.00	0.85	12	AERIAL	
+C4	/home/unk1911/fr-video/live720/frames	73	1280	720	0.95	1.00	0.85	12	GRAIN	/home/unk1911/flamme-retarde/refs/canadair-flying-2.jpg
+A6	/home/unk1911/fr-video/live720/frames	73	1280	720	0.75	1.00	1.00	12	AERIAL	
+A7	/home/unk1911/fr-video/live720/frames	73	1280	720	0.95	1.00	0.85	20	AERIAL	
+A8	/home/unk1911/fr-video/live720/frames	73	1280	720	0.90	1.00	1.00	12	GRAIN	
+F1	/home/unk1911/fr-video/live720/frames	73	1280	720	0.95	1.00	0.85	12	FIRE	
+F2	/home/unk1911/fr-video/live720/frames	73	1280	720	0.95	1.00	0.85	12	FIRE	/home/unk1911/flamme-retarde/refs/canadair-flying.jpg
+F3	/home/unk1911/fr-video/live720/frames	73	1280	720	0.85	1.00	0.85	12	FIRE	
+F4	/home/unk1911/fr-video/live720/frames	73	1280	720	0.75	1.00	0.85	12	FIRE	
+G1	/home/unk1911/fr-video/live720/frames	73	1280	720	0.95	1.00	0.85	12	FIRE	/home/unk1911/flamme-retarde/refs/canadair-flying.jpg,/home/unk1911/flamme-retarde/refs/Pogled.na.sibenik.JPG
+G2	/home/unk1911/fr-video/live720/frames	73	1280	720	0.85	1.00	0.85	12	AERIAL	/home/unk1911/flamme-retarde/refs/canadair-flying.jpg,/home/unk1911/flamme-retarde/refs/Pogled.na.sibenik.JPG
+G3	/home/unk1911/fr-video/live720/frames	73	1280	720	0.95	1.00	1.00	12	AERIAL	/home/unk1911/flamme-retarde/refs/canadair-flying.jpg,/home/unk1911/flamme-retarde/refs/Pogled.na.sibenik.JPG

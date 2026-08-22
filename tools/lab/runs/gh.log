@@ -1,0 +1,372 @@
+[wait] gh ready after 0 min
+=== A1  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 AERIAL
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] tunnel :18395 -> 192.222.51.1:8188
+[burst] queueing _A1
+queued aa1afdad-004e-44e2-a741-63148b88060b number 0
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/A1 · $0.36 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] A1 rc=0  8m32s  73 frames
+[matrix] DONE
+=== A2  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 INTERIOR
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] tunnel :18395 -> 192.222.51.1:8188
+[burst] queueing _A2
+queued a87848e4-fea9-4bf8-91c1-44e1dd23230f number 1
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 73/73 frames · 3.8 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/A2 · $0.62 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] A2 rc=0  5m20s  73 frames
+=== C1  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 AERIAL +refs
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] refs: /home/ubuntu/job/refs/canadair-flying.jpg
+[burst] tunnel :18395 -> 192.222.51.1:8188
+[burst] queueing _C1
+queued a4017343-bc6a-4b40-884f-e08d6ed9d931 number 2
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/C1 · $0.83 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] C1 rc=0  5m26s  73 frames
+=== A5  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 GRAIN
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] tunnel :18395 -> 192.222.51.1:8188
+[burst] queueing _A5
+queued e1d99598-c4ae-4277-b82f-7d9367c42384 number 3
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 40/73 frames · 3.8 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/A5 · $1.05 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] A5 rc=0  5m42s  73 frames
+=== C2  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 AERIAL +refs
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] refs: /home/ubuntu/job/refs/canadair-flying.jpg,/home/ubuntu/job/refs/Pogled.na.sibenik.JPG
+[burst] tunnel :18395 -> 192.222.51.1:8188
+[burst] queueing _C2
+queued 371e8ca6-eeee-42fa-bcf6-664dca0d9f5e number 4
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/C2 · $1.24 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] C2 rc=0  5m4s  73 frames
+=== A3  den=0.95 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 AERIAL
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] tunnel :18395 -> 192.222.51.1:8188
+[burst] queueing _A3
+queued 2b64cba3-5aa5-4003-87c4-138ace64ddd3 number 5
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 7/73 frames · 3.8 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/A3 · $1.43 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] A3 rc=0  4m51s  73 frames
+=== A4  den=0.85 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 AERIAL
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] tunnel :18395 -> 192.222.51.1:8188
+[burst] queueing _A4
+queued f0276a95-7fb4-4d0f-abe6-f536fdfd733b number 6
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 70/73 frames · 3.8 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/A4 · $1.64 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] A4 rc=0  5m26s  73 frames
+=== C4  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 GRAIN +refs
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] refs: /home/ubuntu/job/refs/canadair-flying-2.jpg
+[burst] tunnel :18395 -> 192.222.51.1:8188
+[burst] queueing _C4
+queued 8b4247c9-8664-4111-9922-73b2c4ebc9b4 number 7
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[matrix] A2 already has frames — skipping
+[matrix] C1 already has frames — skipping
+[matrix] A5 already has frames — skipping
+[matrix] C2 already has frames — skipping
+[matrix] A3 already has frames — skipping
+[matrix] A4 already has frames — skipping
+=== C4  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 GRAIN +refs
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] refs: /home/ubuntu/job/refs/canadair-flying-2.jpg
+[burst] tunnel :18395 -> 192.222.51.1:8188
+bind [127.0.0.1]:18395: Address already in use
+channel_setup_fwd_listener_tcpip: cannot listen to port: 18395
+Could not request local forwarding.
+[burst] queueing _C4
+queued c5116d08-80ed-47d8-a13f-9d187bb140a4 number 8
+[burst] 73/73 frames · 0.0 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/C4 · $1.86 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] C4 rc=0  1m27s  73 frames
+=== A6  den=0.75 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 AERIAL
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] tunnel :18395 -> 192.222.51.1:8188
+bind [127.0.0.1]:18395: Address already in use
+channel_setup_fwd_listener_tcpip: cannot listen to port: 18395
+Could not request local forwarding.
+[burst] queueing _A6
+queued 366b4e14-75ab-4f48-bf15-4d589b449e0a number 9
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/A6 · $2.04 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] A6 rc=0  4m45s  73 frames
+[matrix] A7 already has frames — skipping
+[matrix] A8 already has frames — skipping
+=== F1  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 FIRE
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] tunnel :18395 -> 192.222.51.1:8188
+bind [127.0.0.1]:18395: Address already in use
+channel_setup_fwd_listener_tcpip: cannot listen to port: 18395
+Could not request local forwarding.
+[burst] queueing _F1
+queued e34e123c-f839-4528-ac46-dffc78efa654 number 10
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 50/73 frames · 3.8 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/F1 · $2.24 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] F1 rc=0  5m7s  73 frames
+=== F2  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 FIRE +refs
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] refs: /home/ubuntu/job/refs/canadair-flying.jpg
+[burst] tunnel :18395 -> 192.222.51.1:8188
+bind [127.0.0.1]:18395: Address already in use
+channel_setup_fwd_listener_tcpip: cannot listen to port: 18395
+Could not request local forwarding.
+[burst] queueing _F2
+queued 024b6c10-28d7-4164-9059-fa35b47ecd91 number 11
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.7 min
+[burst] 73/73 frames · 4.3 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/F2 · $2.48 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] F2 rc=0  6m26s  73 frames
+=== F3  den=0.85 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 FIRE
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] tunnel :18395 -> 192.222.51.1:8188
+bind [127.0.0.1]:18395: Address already in use
+channel_setup_fwd_listener_tcpip: cannot listen to port: 18395
+Could not request local forwarding.
+[burst] queueing _F3
+queued da6f42ed-f190-4ff0-8875-7f2462837891 number 12
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.7 min
+[burst] 0/73 frames · 4.3 min
+[burst] 0/73 frames · 4.8 min
+[burst] 0/73 frames · 5.4 min
+[burst] 0/73 frames · 5.9 min
+[burst] 73/73 frames · 6.4 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/F3 · $2.75 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] F3 rc=0  6m51s  73 frames
+=== F4  den=0.75 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 FIRE
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] tunnel :18395 -> 192.222.51.1:8188
+bind [127.0.0.1]:18395: Address already in use
+channel_setup_fwd_listener_tcpip: cannot listen to port: 18395
+Could not request local forwarding.
+[burst] queueing _F4
+queued 04235797-de6c-4d84-9292-7d2d106ffc3d number 13
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 0/73 frames · 4.3 min
+[burst] 0/73 frames · 4.8 min
+[burst] 0/73 frames · 5.4 min
+[burst] 0/73 frames · 5.9 min
+[burst] 0/73 frames · 6.4 min
+[burst] 0/73 frames · 7.0 min
+[burst] 73/73 frames · 7.5 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/F4 · $3.07 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] F4 rc=0  8m33s  73 frames
+=== G1  den=0.95 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 FIRE +refs
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] refs: /home/ubuntu/job/refs/canadair-flying.jpg,/home/ubuntu/job/refs/Pogled.na.sibenik.JPG
+[burst] tunnel :18395 -> 192.222.51.1:8188
+bind [127.0.0.1]:18395: Address already in use
+channel_setup_fwd_listener_tcpip: cannot listen to port: 18395
+Could not request local forwarding.
+[burst] queueing _G1
+queued 0ec2ab7f-0aab-4eb9-beaa-4c059a4fa1ec number 14
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 0/73 frames · 4.3 min
+[burst] 0/73 frames · 4.8 min
+[burst] 0/73 frames · 5.3 min
+[burst] 0/73 frames · 5.9 min
+[burst] 0/73 frames · 6.4 min
+[burst] 0/73 frames · 7.0 min
+[burst] 73/73 frames · 7.5 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/G1 · $3.38 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] G1 rc=0  8m2s  73 frames
+=== G2  den=0.85 vace=1.00 s2r=0.85 steps=12 1280x720 n=73 AERIAL +refs
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] refs: /home/ubuntu/job/refs/canadair-flying.jpg,/home/ubuntu/job/refs/Pogled.na.sibenik.JPG
+[burst] tunnel :18395 -> 192.222.51.1:8188
+bind [127.0.0.1]:18395: Address already in use
+channel_setup_fwd_listener_tcpip: cannot listen to port: 18395
+Could not request local forwarding.
+[burst] queueing _G2
+queued f17c4d9c-f2e2-4698-b89d-4a4464ad55fa number 15
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 0/73 frames · 4.3 min
+[burst] 0/73 frames · 4.8 min
+[burst] 0/73 frames · 5.3 min
+[burst] 0/73 frames · 5.9 min
+[burst] 0/73 frames · 6.4 min
+[burst] 0/73 frames · 6.9 min
+[burst] 0/73 frames · 7.5 min
+[burst] 0/73 frames · 8.0 min
+[burst] 73/73 frames · 8.5 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/G2 · $3.77 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] G2 rc=0  10m23s  73 frames
+=== G3  den=0.95 vace=1.00 s2r=1.00 steps=12 1280x720 n=73 AERIAL +refs
+[burst] 75 frames from /home/unk1911/fr-video/live720/frames
+[burst] attention: sageattn
+[burst] refs: /home/ubuntu/job/refs/canadair-flying.jpg,/home/ubuntu/job/refs/Pogled.na.sibenik.JPG
+[burst] tunnel :18395 -> 192.222.51.1:8188
+bind [127.0.0.1]:18395: Address already in use
+channel_setup_fwd_listener_tcpip: cannot listen to port: 18395
+Could not request local forwarding.
+[burst] queueing _G3
+queued b23cf94e-711d-4116-9943-c3ad17a69e6e number 16
+[burst] 0/73 frames · 0.0 min
+[burst] 0/73 frames · 0.6 min
+[burst] 0/73 frames · 1.1 min
+[burst] 0/73 frames · 1.6 min
+[burst] 0/73 frames · 2.2 min
+[burst] 0/73 frames · 2.7 min
+[burst] 0/73 frames · 3.2 min
+[burst] 0/73 frames · 3.8 min
+[burst] 0/73 frames · 4.3 min
+[burst] 0/73 frames · 4.8 min
+[burst] 0/73 frames · 5.4 min
+[burst] 0/73 frames · 5.9 min
+[burst] 0/73 frames · 6.4 min
+[burst] 0/73 frames · 6.9 min
+[burst] 0/73 frames · 7.5 min
+[burst] 0/73 frames · 8.0 min
+[burst] 73/73 frames · 8.5 min
+[burst] 73 frames in /home/unk1911/fr-video/lab/G3 · $4.13 spent so far
+[burst] `tools/burst.py down` when you are finished — the meter is running
+[matrix] G3 rc=0  9m12s  73 frames
+[matrix] DONE
+Timeout, server 192.222.51.1 not responding.
