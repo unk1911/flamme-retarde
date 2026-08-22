@@ -12277,12 +12277,7 @@ async function buildJadrija(scene) {
         // And the glass is full from the middle of the pour on, and stays that
         // way. Nobody drinks it and nothing empties it: she poured it for you
         // and it is sitting there, which is the state this room is about.
-        //
-        // The middle is arithmetic, not a guess: `kit.stream` is drawn while
-        // `pour` is over 0.6, which off the ramps above is 2.35 s to 3.44 s,
-        // and this is halfway down that. Wine that appears before the stream
-        // does is wine somebody else poured.
-        if (u > 2.90 && kit.poured) kit.poured.visible = true;
+        if (wn.full && kit.poured) kit.poured.visible = true;
         if (done) go('meet', 'idle', 0.45);
         break;
       }
@@ -13157,9 +13152,21 @@ async function buildJadrija(scene) {
     // whole of the aim correction inside a window where the pose was already
     // moving — a bottle tipping itself while her wrist was still turning. Move
     // a key up there and these move with it or the two argue.
+    //
+    // `full` is the third of them and it used to be a bare `u > 2.65` sitting
+    // in the phase's own switch. It is here now for the reason the other two
+    // are: the debug scrubber copies this function so that a headless
+    // screenshot has the bottle in her hand rather than waiting for a tick a
+    // headless clock may never give it — and it could not copy a number that
+    // was not in here, so every sheet ever shot of this clip had an empty
+    // glass under a running stream. The middle is arithmetic, not a guess:
+    // `kit.stream` is drawn while `pour` is over 0.6, which off the ramps
+    // above is 2.35 s to 3.44 s, and this is halfway down that. Wine that
+    // appears before the stream does is wine somebody else poured.
     return {
       held: sat((u - 1.10) / 0.35) * (1 - sat((u - 4.40) / 0.30)),
       pour: sat((u - 2.05) / 0.50) * (1 - sat((u - 3.20) / 0.40)),
+      full: u > 2.90,
     };
   }
   const vHand = new THREE.Vector3(), vMouth = new THREE.Vector3();
@@ -13917,6 +13924,12 @@ async function buildJadrija(scene) {
           const wn = wineAt(at);
           show.held = wn.held;
           show.pour = wn.pour;
+          // Assigned rather than latched, which is the one place this scrubber
+          // deliberately does not do what the phase does. In the game the wine
+          // stays because nobody drinks it; here the whole point is that `at`
+          // goes backwards as often as forwards, and a glass that stayed full
+          // would make every frame after the first sheet a lie.
+          if (kit && kit.poured) kit.poured.visible = !!wn.full;
         }
       }
       stepShow(0, show.t, show.s + 2);
