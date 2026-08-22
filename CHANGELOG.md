@@ -8,6 +8,26 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.99.1] — 2026-08-22
+
+### Fixed
+
+- **Nothing burnable is a warning with a name on it, not a crash.**
+  `seedSpotFire` took `far[0]` and `far[1]` straight off a sorted copy of
+  `objects`, which `retarget` reassigns on every locale change as
+  `next.objects || []`. A locale with nothing on it to burn therefore threw
+  inside `force()` — the call the `0` key makes — and three agents reported
+  hitting it.
+
+  It does not reproduce. Cold start and `9` both seed cleanly, and `seeded` is
+  set on the function's first line ahead of anything that can throw, so it could
+  never have fired every frame the way the reports said. This is a guard and a
+  question rather than a fix: it warns with the locale's name, which is the
+  thing to go and look at if it ever prints. `far[1]` now falls back to `far[0]`
+  as well — exactly one burnable object would have thrown on the next line down.
+  The three ignitions upwind of the apron happen before any of this, so the fire
+  starts either way.
+
 ## [1.99.0] — 2026-08-22
 
 Seven agents in parallel off `bff3996`, one branch each. Five landed complete,
@@ -124,15 +144,6 @@ opposite ends.
 
 ### Known
 
-- **The `0` crash is guarded, not explained.** `seedSpotFire` read `far[0]`
-  and `far[1]` with nothing between them and an empty `objects`, and `objects`
-  is reassigned on every locale change, so a locale with nothing burnable on it
-  crashed `force()` — the call `0` makes. Three agents reported it. It does not
-  reproduce: cold start and `9` both seed cleanly, and `seeded` is set before
-  anything that can throw, so the "every frame" in the earlier reports is wrong
-  on the face of the source. The guard warns with the locale's name instead of
-  throwing, and `far[1]` falls back to `far[0]` for the one-object case that
-  would have thrown next. If it ever prints, that name is the bug.
 - **The wine pour is half fixed.** The parenting and the reach are right; the
   pour pose still lays the bottle at 118.6° — past horizontal, across her body
   — with her hand on the punt. No bake is committed, so the shipped clip has
