@@ -233,7 +233,32 @@ def swimwear(J, kind, suit, h):
                      J["l-shoulder"].y * 0.80, deep)
     return out
 
-# ── standing about, with the A-pose taken out from under it ────────────────── #
+# ── standing about, re-tracked onto a different skeleton ───────────────────── #
+#
+# **This is no longer the correction. It is the difference between two of
+# them.** When this was written, human_mh.py was off limits and `IDLE_A` still
+# stood in the A-pose it was modelled in, so `_stand` was the whole fix and it
+# was applied to a pose that carried none of it. That file is not off limits
+# any more: `STAND_TRACK` and its five friends now live next to `IDLE_A` and
+# every key that comes through `MH.CLIPS` arrives already corrected, for Baye's
+# skeleton.
+#
+# Which is why this stayed rather than being deleted. Five of the six are
+# absolute — a leg's Z, a foot's Y, an upper and a lower arm's Z — so setting
+# them again is idempotent and simply re-solves them for a body that is not
+# hers. The sixth is not: `STAND_ELBOW_UNDO` is ADDED to whatever X the pose
+# authored, so applying it twice folds the elbow twice, and what goes on below
+# is the *difference* between the two files' numbers. Delete that subtraction
+# and every bather stands with 44° of undo on top of 40.
+#
+# The hip is the reason the rest of it is here at all. Baye's ankles cross at
+# 14.8° of adduction; the 1.72 m woman's cross at 10.0 — measured again on both
+# skeletons the same afternoon, and the note below guessed it was nearer 11.5.
+# So Baye's eleven is a comfortable stance on Baye and 2.6 cm of ankles the
+# wrong side of the crossing here. Five degrees of skeleton, and no amount of
+# care in one file can know about it.
+#
+# ── what it was, and how the six were found ────────────────────────────────
 #
 # Reported from the promenade, 22 Aug: "at least some of the bathers still have
 # that bear-pose, the A-pose, with spread legs and arms". It is the same fault
@@ -268,10 +293,12 @@ def swimwear(J, kind, suit, h):
 # both feet down and the ankles cross: measured, 3.1 cm apart at 11 degrees and
 # 8.7 at 13, because past the crossing the distance grows again. The curve has
 # a minimum in it and reading a target off it without looking at both sides is
-# how you land on the wrong side of it. 6.5 is on the near side and lands the
-# ankles at 10.9 cm with the knees a comfortable 6 cm wider, which is the shape
-# of a real stance: knees a little wider than ankles, both a little wider than
-# nothing.
+# how you land on the wrong side of it. (Re-measured on 22 Aug: that minimum is
+# at 10.0 degrees on this skeleton, not the 11-and-a-bit implied here. 6.5
+# stands; the guess about where the bottom of the curve sat did not.) 6.5 is on
+# the near side and lands the ankles at 10.9 cm with the knees a comfortable
+# 6 cm wider, which is the shape of a real stance: knees a little wider than
+# ankles, both a little wider than nothing.
 STAND_TRACK = 6.5
 # The shin, doing the same job the walk's `WALK_SHANK` does and for the same
 # reason: the base mesh's tibia flares outward and the knee's adduction is
@@ -282,11 +309,13 @@ STAND_SHANK = 2.0
 # knee added and this figure's hip and knee added less. Verified: 1.2 and 2.8
 # degrees off flat, against 2.3 and 6.3 at five degrees and 4.7 at twelve.
 STAND_SOLE = 8.5
-# The shoulder. Twenty-nine is `IDLE_A`'s and it is nearly right — it is the
-# number that was put there when this exact complaint was made about the arms —
-# but it leaves the wrists 6 cm outboard of where they want to be once the
-# forearm is fixed. Thirty-three, and not the walk's thirty-four: a standing
-# arm hangs a shade wider than a swinging one.
+# The shoulder. Twenty-nine was `IDLE_A`'s when this was written — the number
+# that was put there when this exact complaint was made about the arms — and it
+# left the wrists 6 cm outboard of where they want to be once the forearm was
+# fixed. Thirty-three, and not the walk's thirty-four: a standing arm hangs a
+# shade wider than a swinging one. `IDLE_A` now carries the same 33 for its own
+# reasons, so this one is currently a no-op and is kept anyway: it is a
+# different rig's answer that happens to agree, not the same answer.
 STAND_ARM_IN = 33.0
 # The forearm, and the one that reads worst when it is missing. `IDLE_A` has 4
 # degrees of it, which is nothing: the rest forearm leaves the elbow pointing
@@ -297,23 +326,31 @@ STAND_FORE_IN = 18.0
 # And the elbow, which is a straight loan from `_walk_elbow`'s hard-won note:
 # on this bone a more negative X does not fold the elbow, it swings the hand
 # further FORWARD, and the rest forearm is already 46 degrees bent
-# forward-and-out. `IDLE_A` keys -14 and -11 there, which adds to the A-pose
-# instead of undoing it and is why her hands sat 22 cm in front of her
-# shoulders. This is added to whatever the pose authored rather than replacing
-# it, so the two idle keys keep the three degrees of arm swing between them:
-# -14 becomes +26 and -11 becomes +29, and the elbow comes out bent 14 to 16
-# degrees with the wrist 6 to 9 cm forward of the shoulder, which is an arm
-# hanging by a side.
+# forward-and-out. `IDLE_A` used to key -14 and -11 there, which added to the
+# A-pose instead of undoing it and is why their hands sat 22 cm in front of
+# their shoulders.
+#
+# It keys +30 and +33 now, because human_mh.py has already added its own
+# `STAND_ELBOW_UNDO` of 44 — so what `_stand` applies is 40 minus 44, four
+# degrees the other way, and the arithmetic lands on exactly the -14 + 40 it
+# always did. Forty and not Baye's forty-four is measured and not stubborn:
+# on these eight it comes out at 14 to 16 degrees of elbow with the wrist 6 to
+# 9 cm forward of the shoulder, which is an arm hanging by a side, and
+# forty-four takes another four degrees out of an elbow that has not got them.
 STAND_ELBOW_UNDO = 40.0
 
 
 def _stand(p):
-    """One standing pose with the base mesh's splay taken out of it.
+    """One already-corrected standing pose, re-tracked onto this skeleton.
 
     Sagittal is left alone throughout — every X here is the pose's own, and the
     contrapposto, the breath and the head turn come through untouched. What is
     rewritten is only the six lateral numbers, so nothing in this can quietly
     change what the figure is *doing*, only how wide it does it.
+
+    The five absolutes are set outright and are therefore idempotent. The
+    elbow, which human_mh.py adds rather than sets, gets the difference between
+    the two files' undo and nothing else — see the note above.
     """
     def leg(name, sign, track):
         a = p.get(name, (0, 0, 0))
@@ -330,13 +367,24 @@ def _stand(p):
     for up, lo, sign in (("armUL", "armLL", 1), ("armUR", "armLR", -1)):
         a, b = p.get(up, (0, 0, 0)), p.get(lo, (0, 0, 0))
         q[up] = (a[0], a[1], sign * STAND_ARM_IN)
-        q[lo] = (b[0] + STAND_ELBOW_UNDO, b[1], sign * STAND_FORE_IN)
+        q[lo] = (b[0] + STAND_ELBOW_UNDO - MH.STAND_ELBOW_UNDO,
+                 b[1], sign * STAND_FORE_IN)
     return q
 
 
-def _stand_clip(c):
-    """The same, applied to every key of a clip built on the idle."""
-    return dict(c, keys=[(t, _stand(p)) for t, p in c["keys"]])
+def _stand_clip(c, which=None):
+    """The same, applied to the keys of a clip that are standing keys.
+
+    `which` is a tuple of key indices, or None for all of them. The half-kneel
+    clips need it: `kneel` starts on `IDLE_A` and `getup` ends on it, and the
+    rest of both is a body on all fours whose leg angles are the pose and not
+    the A-pose. Rewriting those the way a stance is rewritten puts six and a
+    half degrees of adduction into a kneel, which is a different animal.
+    """
+    n = len(c["keys"])
+    hit = set(range(n)) if which is None else {i % n for i in which}
+    return dict(c, keys=[(t, _stand(p) if i in hit else p)
+                         for i, (t, p) in enumerate(c["keys"])])
 
 
 # ── sitting in a chair ─────────────────────────────────────────────────────── #
@@ -740,9 +788,20 @@ BATHER_CLIPS = [c for c in MH.CLIPS
                 if c["name"] in ("idle", "walk", "wave", "notice",
                                  "kneel", "getup")]
 # The walk was fixed on 22 Aug and its six numbers are `WALK_TRACK` and
-# friends in human_mh.py; everything else on this list is built on `IDLE_A`
-# and still carries the A-pose, so it gets `_stand`.
-STAND_CLIPS = ("idle", "wave", "notice")
+# friends in human_mh.py. Everything else on this list is built on `IDLE_A`,
+# which now carries `STAND_TRACK` and friends — Baye's numbers, on Baye's
+# skeleton — so it gets `_stand` to re-track it onto this one.
+#
+# The value is which keys, because two of the five are not standing clips.
+# `kneel` starts on `IDLE_A` and goes to all fours, `getup` comes back off them
+# to it, and only those two keys are a stance; the ones in between are a body
+# on the floor. Before the fix landed in human_mh.py those two keys carried the
+# A-pose and were left alone here, which was wrong quietly. Left alone now they
+# would carry Baye's eleven degrees, which on this skeleton is 2.6 cm of
+# ankles the wrong side of the crossing — wrong loudly, and for a quarter of a
+# second at the top of a clip you watch somebody start.
+STAND_CLIPS = {"idle": None, "wave": None, "notice": None,
+               "kneel": (0,), "getup": (-1,)}
 
 
 def one(name, height, obj, check=False):
@@ -796,7 +855,8 @@ def one(name, height, obj, check=False):
     # man, identically. Swimwear belongs in paint here, which is the convention
     # tools/blender/bather.py already set and the only one that lets a suit be a
     # different colour on every figure.
-    clips = ([_stand_clip(c) if c["name"] in STAND_CLIPS else c
+    clips = ([_stand_clip(c, STAND_CLIPS[c["name"]])
+              if c["name"] in STAND_CLIPS else c
               for c in BATHER_CLIPS] + sit_clips(rig, J))
     _sit_report(rig, clips)
     MH.export_skin(body, rig, out, clips, tris=TRIS, post=False)
