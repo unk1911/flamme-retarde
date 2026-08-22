@@ -242,6 +242,19 @@ const STRINGS = {
     'toast.ashore': 'Ashore, and dripping.',
     'toast.noShore': 'No shore within reach — swim on, or use the autopilot.',
 
+    // Walking into somebody at Jadrija — the balloon in src/43-jadrija.js.
+    //
+    // Translated, and the note over `NOTES` in that file explains why that is
+    // not a contradiction. Her card is *her*: "herro" is a joke that only
+    // works in one language and a French build that solemnly corrected it to
+    // "Bonjour" would have translated away the whole content. This is not a
+    // character with a voice, it is a stranger on a beach reacting to you —
+    // the same thing `chase.say1` is, and that one is in here too. There is
+    // nothing English about being annoyed.
+    'bump.excuse': 'uhm... excuuuuse me!',
+    'bump.hey': 'hey — watch it!',
+    'bump.ow': 'ow!',
+
     // The gameplay recorder — src/92-clip.js. No <b> in the two toasts, unlike
     // most of the strings around here that name a key: `toast()` sets
     // textContent, so markup in a toast is printed rather than rendered. (Two
@@ -574,6 +587,12 @@ const STRINGS = {
     'toast.ashore': 'Na obali, mokar do kože.',
     'toast.noShore': 'Obala je predaleko — plivaj dalje ili uključi autopilota.',
 
+    // The one language on this beach where the line is not a translation. Every
+    // one of these people is standing on a Croatian bathing station.
+    'bump.excuse': 'ovaj... oprostiiiite!',
+    'bump.hey': 'hej — pazi malo!',
+    'bump.ow': 'joj!',
+
     // the gameplay recorder — src/92-clip.js
     'clip.rec': 'snima',
     'clip.keep': 'N sprema',
@@ -890,6 +909,10 @@ const STRINGS = {
     'toast.inTheWater': "À l'eau. On ne se noie pas avec un gilet — nage vers le bord.",
     'toast.ashore': 'Au sec, et ruisselant.',
     'toast.noShore': 'Aucun rivage à portée — continuez à nager, ou passez en auto.',
+
+    'bump.excuse': 'euh... pardooooon !',
+    'bump.hey': 'hé — attention !',
+    'bump.ow': 'aïe !',
 
     // the gameplay recorder — src/92-clip.js
     'clip.rec': 'rec',

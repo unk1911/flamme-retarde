@@ -295,6 +295,19 @@ function makeSkinCrowd(scene, figs, cap) {
       f.mesh.position.set(fg.x, fg.y, fg.z);
       f.mesh.rotation.set(0, fg.yaw, 0);
       f.mesh.updateMatrixWorld();
+      // The same head turn the instanced tier does in `pose`, and the same two
+      // numbers written from outside — see the note there. `aim` is in figure
+      // space, where +y is up, so an extra yaw about +y is exactly what
+      // `f.mesh.rotation.y` already means and no offset has to be measured.
+      //
+      // Only touched while it is happening or on the frame it stops. `aim`
+      // walks the bone list by name to find the head and there are twenty-eight
+      // of them, which is nothing once and is thirty-two lookups a frame if it
+      // is asked unconditionally for a crowd that is not being bumped.
+      if (fg.look || fg.aimed) {
+        f.aim('head', 0, 1, 0, fg.look ? fg.lookY * fg.look : 0);
+        fg.aimed = !!fg.look;
+      }
       f.update(dt);
       f.mesh.visible = true;
       n++;
@@ -536,6 +549,34 @@ function makeCrowd(scene, rig, cap) {
         }
         break;
       }
+    }
+
+    // ── the head of somebody you have just walked into ────────────────────────
+    //
+    // `fg.look` is a weight and `fg.lookY` the extra yaw the neck wants, both
+    // written from outside by whoever is driving the crowd — 43-jadrija.js
+    // aims it at you when you bump into one of these people. Nothing in here
+    // decides anything about it; this is the two lines that let it show.
+    //
+    // It has to be applied *after* the switch and cannot live inside it. Four
+    // of the six poses write `head.rotation.y` from their own clock, so a look
+    // set before the switch is a look four of them overwrite and what you get
+    // is a head that goes on sweeping the horizon while somebody stands in
+    // front of it.
+    //
+    // A blend rather than an assignment, because the idle head turn is the
+    // thing that makes these people look alive and cutting it dead at the
+    // moment somebody notices you is exactly backwards.
+    //
+    // The shoulders come with it, at a third. Nobody turns their head on a
+    // fixed torso, and the note in the standing case says as much about the
+    // idle sweep: the shoulders following is most of what makes a turn of the
+    // head read as attention rather than as a hinge.
+    if (fg.look) {
+      const w = fg.look;
+      skel.head.rotation.y = skel.head.rotation.y * (1 - w) + fg.lookY * w;
+      skel.torso.rotation.y = skel.torso.rotation.y * (1 - w)
+        + fg.lookY * 0.30 * w;
     }
 
     skel.root.position.set(fg.x, fg.y, fg.z);
