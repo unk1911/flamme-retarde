@@ -9907,6 +9907,14 @@ async function buildJadrija(scene) {
         // starts or stops on a frame boundary: how fast she is going, and the
         // two rates the yaw and the shoulder offset are turning at.
         vel: 0, rate: 0, sideRate: 0,
+        // And the difference between what she asked for and what she got.
+        // `vel` is the ask; `made` is the ground she actually covered, damped,
+        // measured across the whole frame at the bottom of `stepShow` so that
+        // it does not care which of the four movers ran. `stall` is how long
+        // `made` has been near nothing while a gait was playing, and `gait` is
+        // which travelling clip that is — the pair is the whole of what stops
+        // her walking on the spot.
+        made: 0, stall: 0, gait: null,
         // What is left of the opening routine. Filled when she gets up off the
         // deck and emptied one number at a time; empty means the dice are back
         // in charge.
@@ -9949,6 +9957,28 @@ async function buildJadrija(scene) {
    * widens the lane and forgets there was a second copy of the number.
    */
   const SHOW_LANE0 = JAD.mid - 2.0;
+
+  /**
+   * The middle of the stage she performs on, and it is wherever she is
+   * standing.
+   *
+   * This used to be the mole. `SHOW.t0`/`t1` were written `JAD.jetty ± 86`
+   * back when she stood 22 m east of it, and when she moved to the terrace in
+   * front of the open kabina — t 429 — the stage did not go with her. Nothing
+   * complained, because nothing in the routine moves her until the crawl: she
+   * noticed you, went down on all fours, and on the first frame `showMove` ran
+   * she was clamped from t 429 to t 344 in a single step. Eighty-five metres
+   * west, in one frame, which from where you were standing is a woman who has
+   * gone. Everything after it then walked into the same wall from the other
+   * side — `home` aimed her at t 429, the clamp held her at 344, and she
+   * played a full-rate walk cycle at zero ground speed for as long as you
+   * cared to watch.
+   *
+   * So the stage is hung off her own spot. `testFigure.at` is set above this
+   * line, which is the whole reason this const is here and not a literal
+   * inside `SHOW`: a second copy of the number is what caused this.
+   */
+  const SHOW_MID = testFigure ? testFigure.at[0] : gapAt;
 
   /**
    * A pug on the deck, and a balloon over it with the price of a coin named
@@ -10525,11 +10555,14 @@ async function buildJadrija(scene) {
     // `far: 46` is the distance at which she gives up on you, and it is tuned
     // against a 189 m promenade where you are never more than a few seconds
     // from her. On the 572 m shore she wandered out of her own encounter and it
-    // dissolved with nobody having gone anywhere. 86 m either side of the jetty
-    // is 8 to 180, which is what the old `8, LEN - 8` came to on the shore she
-    // was written for.
-    t0: Math.max(8, JAD.jetty - 86),
-    t1: JAD.jetty + 86,
+    // dissolved with nobody having gone anywhere. 86 m either side of *her* is
+    // 8 to 180 on the shore she was written for, which is what the old
+    // `8, LEN - 8` came to there — and it is 343 to 515 on this one, because
+    // it is measured from `SHOW_MID` rather than from the mole. See the note
+    // on that const: the two numbers having drifted apart is what made her
+    // vanish.
+    t0: Math.max(8, SHOW_MID - 86),
+    t1: Math.min(LEN - 8, SHOW_MID + 86),
     // The wander. A new heading every `turn` seconds, `swing` radians off the
     // last one, at a speed drawn fresh each time — which is a random walk with
     // the corners rounded off, and the rounding is the whole trick. Redrawing
@@ -10561,7 +10594,19 @@ async function buildJadrija(scene) {
     turnMax: 3.0,       // rad/s, walking
     sideMax: 2.6,       // and the same for the shoulders-across offset,
     orbitMax: 3.4,      // except in the orbit, where it carries the whole yaw
-    edge: 14,           // metres from the ends of the resort the push starts
+    edge: 14,           // metres from the ends of her stage the push starts
+    // Walking on the spot, and where the line between that and walking is.
+    //
+    // A gait is sold by the ground going past, and a walk cycle played at full
+    // rate over nothing is the single loudest wrong thing a figure can do —
+    // which is what the report called it. So: below `stalled` metres a second
+    // of ground actually covered, for `stallFor` seconds together, the clip
+    // goes back to `idle` and she is a person standing still. The threshold is
+    // under half the slowest thing she ever asks for (0.45 m/s, the floor in
+    // `showTo`) so a genuine dawdle never trips it, and the hold is long
+    // enough to sit out the frame or two a somersault spends on the deck.
+    stalled: 0.18,
+    stallFor: 0.40,
     joy: 0.22,          // chance that a new heading comes with a somersault
     spin: 0.16,         // and the chance it comes with a run of cartwheels
     // And the dance. Lower odds than the acrobatics on purpose: a somersault is
@@ -10878,7 +10923,15 @@ async function buildJadrija(scene) {
    */
   function showSteer(a) {
     const push = (v, lo, hi) => (v < lo ? lo - v : v > hi ? hi - v : 0);
-    const x = Math.cos(a) + push(show.t, SHOW.edge, LEN - SHOW.edge) * 0.5;
+    // Off `SHOW.t0`/`t1` and not off the whole shore, which is the pair
+    // `showMove` actually clamps to. Written `SHOW.edge, LEN - SHOW.edge`,
+    // the bend was 14 m in from the ends of a 572 m promenade and the clamp
+    // was 86 m either side of the stage, so the term that is supposed to turn
+    // her round was never once non-zero anywhere she can walk: she arrived at
+    // her own end wall still pointed into it and ground along it. A margin
+    // that does not sit inside the wall it is guarding is not a margin.
+    const x = Math.cos(a) + push(show.t, SHOW.t0 + SHOW.edge,
+      SHOW.t1 - SHOW.edge) * 0.5;
     const y = Math.sin(a) + push(show.s, SHOW.lane[0] + 1.6, SHOW.lane[1] - 1.6) * 1.2;
     return Math.atan2(y, x);
   }
@@ -11225,6 +11278,11 @@ async function buildJadrija(scene) {
     // and `sample` clamps, so this stays true until something else is played.
     const done = S.cur && !S.cur.loop && S.curT >= S.cur.dur;
     show.tmr += dt;
+    // Where she was before anything in this function moved her. Taken here
+    // rather than inside the movers because there are four of them — `showMove`,
+    // `showTo`, `showCreep` and `showHold` — and the question "did she actually
+    // get anywhere" has one answer a frame, not four.
+    const wasT = show.t, wasS = show.s;
 
     const go = (phase, clip, fade = 0.30) => {
       // Back to nominal on every clip change. `showPace` below runs the walk
@@ -11234,6 +11292,13 @@ async function buildJadrija(scene) {
       // slow-motion flip in the middle of a lazy wander.
       S.speed = 1;
       if (clip) f.play(clip, { fade });
+      // Which of the clips under her is a gait, so the tail of this function
+      // knows what to put back when she starts covering ground again. The
+      // somersault and the cartwheel are not on the list on purpose: both are
+      // authored to carry her a fixed distance and neither has a standing
+      // version to fall back to.
+      if (clip) show.gait = clip === 'walk' || clip === 'crawl' ? clip : null;
+      show.stall = 0;
       show.phase = phase;
       show.tmr = 0;
       show.said = 0;
@@ -12096,6 +12161,34 @@ async function buildJadrija(scene) {
       }
     }
 
+    // ── the gait against the ground ───────────────────────────────────────
+    //
+    // What she covered this frame, against what she asked for. They are the
+    // same number nearly all of the time and the whole value of this is the
+    // times they are not: a clamp, a doorway she is stood in, or a target she
+    // arrived at three seconds ago while the walk went on playing. A walk cycle
+    // at zero ground speed is the loudest wrong thing a figure can do, and it
+    // is invisible from inside the state machine, because every one of those
+    // states thinks it is walking.
+    //
+    // Damped rather than read raw: a somersault is on the deck for two frames
+    // at either end and a raw reading would strobe the clip.
+    if (dt > 0) {
+      show.made = damp(show.made,
+        Math.hypot(show.t - wasT, show.s - wasS) / dt, 8, dt);
+      show.stall = show.made < SHOW.stalled ? show.stall + dt : 0;
+    }
+    if (show.gait) {
+      const stuck = show.stall > SHOW.stallFor;
+      const want = stuck ? 'idle' : show.gait;
+      if (f.playing() !== want) f.play(want, { fade: 0.22 });
+      // And the clip's clock off the ground she covered rather than off the
+      // speed she was asking for, which is the same argument one step smaller:
+      // a walk half eaten by an obstacle is a walk whose feet are sliding.
+      S.speed = stuck || show.gait !== 'walk'
+        ? 1 : clamp(show.made / SHOW.walk, 0.55, 1.75);
+    }
+
     // Turn towards `want` at a rate a person turns at, and never the long way
     // round — the shore's frame wraps and a heading that crosses the wrap would
     // otherwise spin her through a whole circle to move by a degree. The wrap
@@ -12701,6 +12794,11 @@ async function buildJadrija(scene) {
       // `pace` and `want` are the ask, these two are where the easing has got
       // to. A gap between them is the point of them.
       vel: +show.vel.toFixed(2), rate: +show.rate.toFixed(2),
+      // And the ground she actually covered, which is the ask with every
+      // clamp and every arrival taken out of it. `made` well under `vel` for
+      // more than a moment is a figure walking on the spot.
+      made: +show.made.toFixed(2), stall: +show.stall.toFixed(2),
+      gait: show.gait, stage: [+SHOW.t0.toFixed(1), +SHOW.t1.toFixed(1)],
       // Indoors: how far into the clip she is and whether the bottle is off
       // the table. A pose that has not started and a pose that is not playing
       // look identical from outside, and only one of them is a bug.
