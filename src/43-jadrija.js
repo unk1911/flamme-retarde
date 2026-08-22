@@ -12984,6 +12984,208 @@ async function buildJadrija(scene) {
   const UPV = new THREE.Vector3(0, 1, 0);
   const qAim = new THREE.Quaternion(), qId = new THREE.Quaternion();
 
+  // ── "uhm... excuuuuse me!" ─────────────────────────────────────────────────
+  /**
+   * What somebody on this beach does when you walk into them.
+   *
+   * Reported 22 Aug, with the collider that makes it possible: "if i bump into
+   * the bathers, can u make it so they turn their head towards me and be like,
+   * 'uhm... excuuuuse me!'". This is that half of it. The contact itself is
+   * `onBump`, which the collider calls once per fresh touch.
+   *
+   * Three decisions in here and every one of them is about a crowd rather than
+   * about a person:
+   *
+   * **Everybody turns, not everybody speaks.** A head coming round is free,
+   * silent, and reads at fifteen metres; a caption is a thing you have to
+   * finish reading. So the turn is unconditional and the line is a habit — it
+   * hangs off `fg.seed`, the number this file already uses for "a person has
+   * habits", so the same woman always says something and the same man beside
+   * her never does. That is a crowd. A crowd where all of them say the same
+   * thing is worse than one that says nothing at all.
+   *
+   * **One caption at a time, and it is the balloon rather than a toast.** A
+   * toast is the game talking to the player — it is where the autopilot and
+   * the recorder live, it is fixed to the corner of the screen, and a bather
+   * three metres away is not a system message. The balloon is already in this
+   * file for the dog, it hangs in the world over whoever is thinking it, and
+   * it turns to face you. There is exactly one and it is made on the first
+   * bump: brushing past three people in a row is not three captions, it is one
+   * caption and three heads.
+   *
+   * **The line is translated.** Which the note over `NOTES` says her card is
+   * deliberately not — and the difference is the whole of that note. Her card
+   * is *her*, and "herro" is a joke that only exists in English. This is a
+   * stranger reacting to being shoved, which is the same kind of thing as
+   * `chase.say1` and lives in the same file. See `bump.*` in src/02-i18n.js.
+   */
+  const BUMP = {
+    turn: 0.34,        // s to get the head round — a turn, not a snap
+    hold: 2.30,        // s it stays there, which is also how long the line is up
+    back: 0.85,        // s letting it go again, slower than it came
+    reach: 1.05,       // rad, the most a neck does before a body has to follow
+    cool: 5.0,         // s before anybody on this beach says anything again
+    again: 14.0,       // s before the *same* person does
+    says: 0.55,        // the share of people who speak rather than only look
+    // How high over their own feet the balloon hangs. Standing, sitting in a
+    // chair on a terrace, and lying on a lounger — which is in here for
+    // completeness rather than because it happens, since a sunbather is behind
+    // the lounger's own collider and cannot be walked into.
+    high: { stand: 1.66, sit: 1.20, lie: 0.70 },
+  };
+  /**
+   * What gets said, and the weighting is the point.
+   *
+   * Half of everybody who speaks says the line that was asked for. The other
+   * two are there so that the second and third person you barge into are not
+   * the first one again — a crowd with one line in it is a crowd with a tape
+   * recorder in it.
+   */
+  const EXCUSE = ['bump.excuse', 'bump.excuse', 'bump.hey', 'bump.ow'];
+  const looking = [];        // the figures with a head part-way round
+  let bumpBalloon = null;    // made on the first bump and never again
+  let bumpSaid = null;       // { fg, t } while a line is up
+  let bumpCool = 0;
+  let bumpClock = 0;
+
+  /**
+   * Which figure was bumped.
+   *
+   * `idx` is the collider's index into its own list and this deliberately does
+   * not trust it as an index into anybody else's. There are up to three crowds
+   * on this shore — the skinned eight, the skinned two dozen in the chairs, and
+   * the two instanced rigs — kept in three separate `figures` arrays, so "the
+   * crowd" is not one list and the n'th person over there is somebody else's
+   * n'th person over here. The position is not ambiguous: contact happens at
+   * about 0.7 m, so the nearest figure within a metre and a half is the one
+   * that was touched whether `(t, s)` is where they are standing or where you
+   * are standing when you meet them.
+   */
+  function crowdAt(t, s) {
+    const w = toWorld(t, s);
+    let best = null, bd = 2.25;
+    for (const k in crowds) {
+      for (const fg of crowds[k].figures) {
+        const dx = fg.x - w[0], dz = fg.z - w[2];
+        const d = dx * dx + dz * dz;
+        if (d < bd) { bd = d; best = fg; }
+      }
+    }
+    return best;
+  }
+
+  /**
+   * The yaw the neck wants, in the frame `fg.yaw` is written in.
+   *
+   * `atan2(-dz, dx)` and not `atan2(dx, dz)`, and the difference is a right
+   * angle rather than a sign. This rig's forward is **+X** — see `rigYaw`
+   * above, which is the only other place in the file that has to know it — so
+   * an object at `rotation.y = θ` points its front at `(cos θ, −sin θ)` and the
+   * yaw that faces `(dx, dz)` is `atan2(−dz, dx)`. Written the Three.js way,
+   * which is the way the balloon's billboard below is written because a plane's
+   * front really is +Z, this came out ninety degrees off: photographed, the
+   * bather turned her head smartly to the side of whoever had just walked into
+   * her. It reads as a bug and not as an error of a right angle, which is why
+   * it is worth this paragraph.
+   */
+  function bumpAim(fg, cam) {
+    let e = Math.atan2(fg.z - cam.z, cam.x - fg.x) - fg.yaw;
+    while (e > Math.PI) e -= TAU;
+    while (e < -Math.PI) e += TAU;
+    return clamp(e, -BUMP.reach, BUMP.reach);
+  }
+
+  /**
+   * One fresh contact.
+   *
+   * `kind` is `'baye'` or `'bather'` and only the second is answered here, on
+   * purpose. She is not a bystander: her head is written every frame by the
+   * performance — `f.aim('head', …)` for the chin, and `aim` keeps one rotation
+   * per bone, so a look laid on her neck from out here would be deleted on the
+   * next frame by a chin that is currently zero. And she has a voice already,
+   * on a card, in her own register. Making her say "ow!" out of a speech
+   * balloon would be a second Baye. What she does when you walk into her
+   * belongs in `stepShow` with the rest of her, and it is not this.
+   */
+  function bumpReact(kind, idx, t, s) {
+    void idx;                       // see `crowdAt` — the position is the name
+    if (kind !== 'bather') return false;
+    const fg = crowdAt(t, s);
+    if (!fg || fg.mode === 'lie') return false;
+    // Arm the turn. Aimed on the next frame rather than here, because the
+    // collider is called from `confine` and has no camera to aim at — and a
+    // head that starts moving one frame late is a head nobody can time.
+    if (!fg.look) {
+      fg.lookT = 0; fg.look = 1e-4; fg.lookY = 0;
+      looking.push(fg);
+    } else if (fg.lookT > BUMP.turn) {
+      // Brushed again while still looking: hold, rather than start over. The
+      // alternative snaps the head back to the start of the turn every time
+      // you shuffle against somebody, which is a twitch and not a person.
+      fg.lookT = BUMP.turn;
+    }
+    // And the line, which is a good deal fussier than the turn.
+    if (bumpCool > 0) return true;
+    if (fg.seed >= BUMP.says) return true;
+    if (bumpClock - (fg.saidAt == null ? -1e3 : fg.saidAt) < BUMP.again) return true;
+    fg.saidAt = bumpClock;
+    bumpCool = BUMP.cool;
+    if (!bumpBalloon) {
+      bumpBalloon = makeBalloon();
+      // Half again the size the dog's is drawn at. The plane is authored for a
+      // pug's thought at 0.46 m across and read from a metre; this is a person
+      // speaking, it hangs at head height rather than at knee height, and it
+      // has to carry four words across a terrace. Scaled rather than re-cut,
+      // because the canvas is 512 px either way and the only thing that changes
+      // is how much world it covers.
+      bumpBalloon.mesh.scale.setScalar(1.45);
+      scene.add(bumpBalloon.mesh);
+    }
+    // Off the seed and not off a fresh `rng()`, so which line a person has is
+    // a fact about them rather than about the order you happen to meet them
+    // in. A different mixing from the `fg.seed < says` test above, or the
+    // people who speak would all have drawn the same line out of it.
+    const line = T(EXCUSE[((fg.seed * 7919) | 0) % EXCUSE.length]);
+    bumpBalloon.say(line);
+    bumpBalloon.said = line;
+    bumpSaid = { fg, t: 0 };
+    return true;
+  }
+
+  /** Advance every head that is part-way round, and the line over one of them. */
+  function stepBump(dt, cam) {
+    bumpClock += dt;
+    if (bumpCool > 0) bumpCool -= dt;
+    if (!looking.length && !bumpSaid) return;
+    for (let i = looking.length - 1; i >= 0; i--) {
+      const fg = looking[i];
+      fg.lookT += dt;
+      const u = fg.lookT;
+      // Out and back, eased at both ends. Linear in and linear out is a servo.
+      const k = u < BUMP.turn ? sat(u / BUMP.turn)
+        : u < BUMP.turn + BUMP.hold ? 1
+          : 1 - sat((u - BUMP.turn - BUMP.hold) / BUMP.back);
+      fg.look = k * k * (3 - 2 * k);
+      // Kept aimed while the head is out, so somebody who walks round in front
+      // of them while they are still looking is still what they are looking at.
+      if (u < BUMP.turn + BUMP.hold) fg.lookY = bumpAim(fg, cam);
+      if (fg.look <= 0) { fg.look = 0; looking.splice(i, 1); }
+    }
+    if (!bumpSaid) return;
+    const b = bumpBalloon, fg = bumpSaid.fg;
+    bumpSaid.t += dt;
+    if (bumpSaid.t > BUMP.turn + BUMP.hold) {
+      b.mesh.visible = false; bumpSaid = null; return;
+    }
+    const h = BUMP.high[fg.mode] || BUMP.high.stand;
+    b.mesh.position.set(fg.x, fg.y + h * (fg.scale || 1), fg.z);
+    b.mesh.visible = true;
+    // Billboarded about the vertical only, for the reason `makeBalloon` gives:
+    // a balloon that tilts back as you climb away is the one thing in the scene
+    // that knows where the camera is.
+    b.mesh.rotation.y = Math.atan2(cam.x - fg.x, cam.z - fg.z);
+  }
+
   const walkers = [];
   let cast = 0;
   let seated = 0;
@@ -13115,6 +13317,14 @@ async function buildJadrija(scene) {
       w.yaw = rigYaw(w.t, w.dir > 0 ? 0 : Math.PI);
     }
 
+    // Before the flush and after the walkers have moved, because both tiers
+    // read `fg.look` while they are posing and a walker's `x` and `z` are
+    // written just above. Unconditional, and it carries its own early-out: the
+    // clock it keeps is what "the same person, not again for fourteen seconds"
+    // is measured against, and a clock that only runs while somebody is being
+    // bumped is a clock that never gets to fourteen.
+    stepBump(dt, cam);
+
     for (const k in crowds) crowds[k].flush(crowdT, cam);
     // And the fish, which is three hands and a Date and is not worth a gate.
     if (vik) vik.tick();
@@ -13124,6 +13334,17 @@ async function buildJadrija(scene) {
   // One pose before anything is drawn, so the first frame has people in it
   // rather than a hundred figures stacked on the origin.
   updateCrowd(0, { x: mid.x, y: 0, z: mid.z });
+
+  // MERGE: delete this stub, the collider defines it
+  let onBump = null;
+  function setBumpHandler(fn) { onBump = fn; }
+
+  // Registered here, at the end of the build, rather than beside `bumpReact`.
+  // Everything in this file shares one lexical scope and runs top to bottom, so
+  // a call to `setBumpHandler` written earlier than the collider's own
+  // declaration of it is the temporal dead zone this file has taught itself
+  // about four times over — see the note on `facing`. Last is always safe.
+  setBumpHandler(bumpReact);
 
   return {
     kind: 'jadrija',
@@ -13137,6 +13358,25 @@ async function buildJadrija(scene) {
       },
       /** Every figure, live, for a test that wants to know where they are. */
       all: () => Object.values(crowds).flatMap((c) => c.figures),
+      /**
+       * Walk into somebody without walking into them.
+       *
+       * The reaction is a fifth of a second of turn on a head three metres
+       * away, and the only way to see it otherwise is to be standing in
+       * exactly the right place at exactly the right moment. Same arguments
+       * the collider passes: kind, its own index, and where.
+       */
+      bump: (kind, idx, t, s) => bumpReact(kind, idx, t, s),
+      /** Who is mid-turn, and what is over their head. */
+      looks: () => ({
+        looking: looking.map((fg) => ({
+          mode: fg.mode, look: +fg.look.toFixed(3), lookY: +fg.lookY.toFixed(3),
+          t: +fg.lookT.toFixed(2),
+        })),
+        said: bumpSaid && bumpBalloon && bumpBalloon.mesh.visible
+          ? bumpBalloon.said : null,
+        cool: +bumpCool.toFixed(2),
+      }),
       /** The instanced layers, so the near shadow cascade can occlude with them. */
       meshes: () => Object.values(crowds).flatMap((c) => c.layers.map((L) => L.mesh)),
     },
