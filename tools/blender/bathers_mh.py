@@ -58,6 +58,7 @@ different person rather than a repaint of the same two meshes.
 
 from __future__ import annotations
 
+import math
 import sys
 from pathlib import Path
 
@@ -232,18 +233,526 @@ def swimwear(J, kind, suit, h):
                      J["l-shoulder"].y * 0.80, deep)
     return out
 
+# ── standing about, with the A-pose taken out from under it ────────────────── #
+#
+# Reported from the promenade, 22 Aug: "at least some of the bathers still have
+# that bear-pose, the A-pose, with spread legs and arms". It is the same fault
+# the walk was fixed for that morning, in the clip the walk fix did not touch —
+# and it is the same fault the walk's own note names, which is worth restating
+# because it is the one thing about this pipeline that never stops being true:
+# **the base mesh is an A-pose, and every clip is only ever the correction on
+# top of it.** The rest thigh carries 6.5 degrees of abduction and the rest
+# shin another 9.3, and `IDLE_A` corrects neither. Its arms it does correct —
+# 29 degrees of adduction a side, put there for exactly this reason — and its
+# legs it leaves entirely alone.
+#
+# Measured on the posed rig of the 1.72 m woman, before: **ankles 33.1 cm
+# apart, knees 27.4, wrists 44.9, each hand 7 cm outboard of its own shoulder
+# and 22 cm in front of it.** A person standing at ease has their ankles 10 to
+# 15 cm apart and their hands hanging just outside their thighs. Thirty-three
+# centimetres of ankle is not a stance, it is a shop dummy, and the hands out
+# in front of the shoulders is the same "carrying a tray" the walk's elbow
+# note describes.
+#
+# After: **ankles 10.9, knees 17.7, wrists 33.9, hands 1 cm outboard of the
+# shoulder and 6 to 9 cm in front of it, elbows bent 14 to 16 degrees, soles
+# within 3 degrees of flat.**
+#
+# Six numbers again, and they are not the walk's six copied over — the walk was
+# solved for a limb in motion and these are for a limb that is still, and three
+# of the six came out different when they were measured here.
+#
+# Why the leg pair is 6.5 and not the walk's 11: the walk's number was fitted to
+# a *stride*, where the two legs are always half a cycle apart and the ankle
+# separation is read at the footfall. Put 11 degrees on a figure standing with
+# both feet down and the ankles cross: measured, 3.1 cm apart at 11 degrees and
+# 8.7 at 13, because past the crossing the distance grows again. The curve has
+# a minimum in it and reading a target off it without looking at both sides is
+# how you land on the wrong side of it. 6.5 is on the near side and lands the
+# ankles at 10.9 cm with the knees a comfortable 6 cm wider, which is the shape
+# of a real stance: knees a little wider than ankles, both a little wider than
+# nothing.
+STAND_TRACK = 6.5
+# The shin, doing the same job the walk's `WALK_SHANK` does and for the same
+# reason: the base mesh's tibia flares outward and the knee's adduction is
+# inherited, so this only has to take the last couple of degrees off.
+STAND_SHANK = 2.0
+# And the sole, which gives back the roll the two above cost. Eight and a half
+# rather than the walk's thirteen, because the roll is what the hip and the
+# knee added and this figure's hip and knee added less. Verified: 1.2 and 2.8
+# degrees off flat, against 2.3 and 6.3 at five degrees and 4.7 at twelve.
+STAND_SOLE = 8.5
+# The shoulder. Twenty-nine is `IDLE_A`'s and it is nearly right — it is the
+# number that was put there when this exact complaint was made about the arms —
+# but it leaves the wrists 6 cm outboard of where they want to be once the
+# forearm is fixed. Thirty-three, and not the walk's thirty-four: a standing
+# arm hangs a shade wider than a swinging one.
+STAND_ARM_IN = 33.0
+# The forearm, and the one that reads worst when it is missing. `IDLE_A` has 4
+# degrees of it, which is nothing: the rest forearm leaves the elbow pointing
+# out as well as forward, so the hands bow out round the hips. Eighteen brings
+# the wrists to 33.9 cm apart — just outside the thighs — and 1 cm outboard of
+# the shoulders rather than 7.
+STAND_FORE_IN = 18.0
+# And the elbow, which is a straight loan from `_walk_elbow`'s hard-won note:
+# on this bone a more negative X does not fold the elbow, it swings the hand
+# further FORWARD, and the rest forearm is already 46 degrees bent
+# forward-and-out. `IDLE_A` keys -14 and -11 there, which adds to the A-pose
+# instead of undoing it and is why her hands sat 22 cm in front of her
+# shoulders. This is added to whatever the pose authored rather than replacing
+# it, so the two idle keys keep the three degrees of arm swing between them:
+# -14 becomes +26 and -11 becomes +29, and the elbow comes out bent 14 to 16
+# degrees with the wrist 6 to 9 cm forward of the shoulder, which is an arm
+# hanging by a side.
+STAND_ELBOW_UNDO = 40.0
+
+
+def _stand(p):
+    """One standing pose with the base mesh's splay taken out of it.
+
+    Sagittal is left alone throughout — every X here is the pose's own, and the
+    contrapposto, the breath and the head turn come through untouched. What is
+    rewritten is only the six lateral numbers, so nothing in this can quietly
+    change what the figure is *doing*, only how wide it does it.
+    """
+    def leg(name, sign, track):
+        a = p.get(name, (0, 0, 0))
+        return (a[0], a[1], sign * track)
+
+    q = dict(p)
+    q["legUL"] = leg("legUL", 1, STAND_TRACK)
+    q["legUR"] = leg("legUR", -1, STAND_TRACK)
+    q["legLL"] = leg("legLL", 1, STAND_SHANK)
+    q["legLR"] = leg("legLR", -1, STAND_SHANK)
+    for nm, sign in (("footL", 1), ("footR", -1)):
+        a = p.get(nm, (0, 0, 0))
+        q[nm] = (a[0], sign * STAND_SOLE, a[2])
+    for up, lo, sign in (("armUL", "armLL", 1), ("armUR", "armLR", -1)):
+        a, b = p.get(up, (0, 0, 0)), p.get(lo, (0, 0, 0))
+        q[up] = (a[0], a[1], sign * STAND_ARM_IN)
+        q[lo] = (b[0] + STAND_ELBOW_UNDO, b[1], sign * STAND_FORE_IN)
+    return q
+
+
+def _stand_clip(c):
+    """The same, applied to every key of a clip built on the idle."""
+    return dict(c, keys=[(t, _stand(p)) for t, p in c["keys"]])
+
+
+# ── sitting in a chair ─────────────────────────────────────────────────────── #
+#
+# Reported the same afternoon, of the café terraces: "why they look so weird,
+# sitting backwards on those chairs in weird unnatural poses?" Three separate
+# faults, and only the third one is this file's.
+#
+# They faced the wrong way — see `terraceSeats` in src/43-jadrija.js, which now
+# hands the occupant the same heading it hands the chair. They sank into the
+# paving, because they were drawn by the instanced tier whose one `sit` pose is
+# authored for the edge of the quay: hips 14 cm above whatever they are placed
+# on, legs hanging, which is right on a slab and half a metre wrong on a chair.
+# And there was no seated clip in this bake at all, so the skinned tier could
+# not have them: `BATHER_CLIPS` carried six and none of them was sitting down.
+#
+# So this is the seated clip, in three variants, because a café terrace with
+# eight people all sitting identically is a waiting room.
+#
+# The chair. 0.46 is the top of the seat pad, read off `terraceSet` in
+# src/43-jadrija.js rather than chosen here, and it is the whole reason any of
+# the numbers below are solved rather than typed: a pose written as angles sits
+# a 1.24 m girl and a 1.84 m man at two different heights, and only one of them
+# can be on the seat.
+SEAT = 0.46
+# How far the hip joint rides above the seat it is on. Measured off the rig
+# rather than guessed would be better; 7.5 cm is the flesh between the joint
+# centre and the pad, and it holds close enough across all eight that the
+# difference is below the pad's own thickness.
+SEAT_HIP = 0.075
+# What the solved legs are aimed at, in metres, on the posed rig.
+#
+# All three are separations between joint centres and all three are read back
+# out after the solve and printed, so a figure the brackets could not satisfy
+# says so in the log instead of shipping.
+SIT_KNEES = 0.24          # knees a little apart: a person at a table, not a soldier
+SIT_ANKLES = 0.26         # feet just outside the knees
+SIT_FEET_FWD = 0.030      # and a touch in front of them, which is where feet rest
+# How far the chair stands from the middle of its table. Must match `SEAT_R` in
+# `seatRing`, src/43-jadrija.js — this is the only number in this file that is
+# a fact about the furniture rather than about the body, and it is here because
+# the elbows-on-the-table variant reaches for a table that is over there.
+SEAT_R = 0.72
+TABLE_TOP = 0.75          # `terraceSet` builds the top at y + 0.70 to y + 0.75
+TABLE_HALF = 0.30         # and 0.60 m square
+CHAIR_BACK = 0.86         # the top of the chair's back, same source
+
+
+def _sit_base(hipx, hipy, kneex, kneey, extra=None):
+    """The seated pose with its four solved leg numbers filled in.
+
+    Everything above the pelvis is the caller's. The pelvis itself is NOT
+    keyed by any of the three variants and that is deliberate: every leg hangs
+    off it, so a torso lean written there would move the feet, and the solve
+    below would have to run three times instead of once. A person leaning back
+    in a café chair leans with their spine anyway.
+    """
+    p = {
+        "@root": (0.0, 0.0, 0.0),
+        "spine01": (0, 0, 0), "spine02": (0, 0, 0), "spine03": (-1, 0, 0),
+        "chest": (-1.5, 0, 0), "neck": (2, 0, 0), "head": (-1, -3, 1),
+        "legUL": (hipx, hipy, 0), "legLL": (kneex, kneey, 0),
+        "footL": (0, STAND_SOLE * 0.4, 0),
+        "legUR": (hipx, -hipy, 0), "legLR": (kneex, -kneey, 0),
+        "footR": (0, -STAND_SOLE * 0.4, 0),
+        "armUL": (-6, 0, STAND_ARM_IN), "armLL": (26, 0, STAND_FORE_IN),
+        "armUR": (-4, 0, -STAND_ARM_IN), "armLR": (23, 0, -STAND_FORE_IN),
+    }
+    if extra:
+        p.update(extra)
+    return p
+
+
+def _sit_solve(rig, ankle_rest, quiet=False):
+    """Four leg angles and a hip drop, solved on this figure's own skeleton.
+
+    Bisection and not arithmetic, four times over, because the chain these
+    angles act on is not straight: the rest thigh is 6.5 degrees out and the
+    rest shin another 9.3, the knee carries a bend before anything is keyed,
+    and the pelvis is not level. Every closed form for this that was tried
+    came out a centimetre or two wrong on one figure and five on another, and
+    a centimetre is a foot through the paving.
+
+    Two of the four interact — the thigh angle sets how high the ankle is and
+    the knee angle sets how far forward it is, and each one moves the other's
+    answer — so they are alternated rather than solved once. Four rounds is
+    enough that the last one moves the ankle by under a millimetre.
+
+    Returns (hipx, hipy, kneex, kneey, drop) with `drop` in metres: the amount
+    `@root` has to come down to put the hip on the seat.
+    """
+    def at(hipx, hipy, kneex, kneey):
+        MH.pose(rig, _sit_base(hipx, hipy, kneex, kneey))
+        B = rig.pose.bones
+        hip = B["legUL"].head
+        return {
+            "hipZ": hip.z,
+            # Ankle relative to the hip, which is the frame the solve is in:
+            # the hip is going on the seat whatever happens, so where the foot
+            # lands is a difference and not a height.
+            "dz": B["footL"].head.z - hip.z,
+            "dx": B["footL"].head.x - B["legLL"].head.x,
+            "knees": abs(B["legLL"].head.y - B["legLR"].head.y),
+            "ankles": abs(B["footL"].head.y - B["footR"].head.y),
+        }
+
+    def solve(lo, hi, key, want, others):
+        """Bisect one angle against one measurement.
+
+        The direction is sampled rather than declared, and that is not
+        fastidiousness: three of these four measurements FALL as their angle
+        rises and one of them rises, the first cut of this had one of the four
+        the wrong way round, and a bisection told the wrong sign does not fail
+        — it walks quietly to the end of its bracket and reports a leg folded
+        under the chair. Two extra poses buy the whole class of that mistake.
+
+        A target outside the bracket saturates and says so, which is what the
+        1.24 m girl does at every chair in this resort: her shins do not reach
+        the paving and no thigh angle will make them.
+        """
+        a, bnd = at(*others(lo))[key], at(*others(hi))[key]
+        for _ in range(18):
+            mid = 0.5 * (lo + hi)
+            v = at(*others(mid))[key]
+            if (v < want) == (bnd > a):
+                lo = mid
+            else:
+                hi = mid
+        out = 0.5 * (lo + hi)
+        if not (min(a, bnd) < want < max(a, bnd)) and not quiet:
+            print("[bathers]   sit  %s wants %.3f, bracket holds %.3f..%.3f"
+                  % (key, want, min(a, bnd), max(a, bnd)))
+        return out
+
+    # The soles want to land where they stand: `ankle_rest` is this figure's
+    # own ankle height off the OBJ, so the pose is right for a 1.24 m girl and
+    # a 1.84 m man without either of them being measured by hand.
+    want_dz = ankle_rest - (SEAT + SEAT_HIP)
+    hipx, hipy, kneex, kneey = -84.0, 0.0, 84.0, 0.0
+    for _ in range(4):
+        # The thigh, against how far below the hip the ankle hangs. The lower
+        # bound is a thigh sloping fifteen degrees DOWN to the knee, which is
+        # what a 1.58 m woman on a 46 cm chair actually does and what the first
+        # bracket — stopping at 78 — would not let her: she came out with her
+        # heels five centimetres off the paving.
+        hipx = solve(-104.0, -68.0, "dz", want_dz,
+                     lambda a: (a, hipy, kneex, kneey))
+        # The shin, against how far in front of the knee the ankle is.
+        kneex = solve(60.0, 105.0, "dx", SIT_FEET_FWD,
+                      lambda a: (hipx, hipy, a, kneey))
+        # And the two lateral ones, which do not interact with the first pair
+        # at all — they swing the leg about axes the first pair does not use.
+        hipy = solve(-14.0, 14.0, "knees", SIT_KNEES,
+                     lambda a: (hipx, a, kneex, kneey))
+        kneey = solve(-16.0, 16.0, "ankles", SIT_ANKLES,
+                      lambda a: (hipx, hipy, kneex, a))
+    v = at(hipx, hipy, kneex, kneey)
+    # And the two children, whose shins do not reach and never will.
+    #
+    # The solve does the only thing it can with a target it cannot hit, which
+    # is to run to the end of its bracket — and the end of the bracket is a
+    # thigh raked steeply down, so the girl came out perched on the front lip
+    # of the chair with her feet still 16 cm short of the ground. A child on an
+    # adult chair does not perch. She sits back and lets her legs hang, which
+    # is a LEVEL thigh and a shin straight down, so that is what she is given
+    # the moment the floor is out of reach. Her feet dangle, which is the
+    # truthful answer and is also the charming one.
+    if v["dz"] > want_dz + 0.02:
+        hipx = -88.0
+        kneex = solve(60.0, 105.0, "dx", SIT_FEET_FWD,
+                      lambda a: (hipx, hipy, a, kneey))
+        v = at(hipx, hipy, kneex, kneey)
+        if not quiet:
+            print("[bathers]   sit  feet do not reach — hung level, %.0f mm up"
+                  % ((v["dz"] - want_dz) * 1000))
+    drop = v["hipZ"] - (SEAT + SEAT_HIP)
+    if not quiet:
+        print("[bathers]   sit  hip %.1f/%.1f knee %.1f/%.1f drop %.3f  "
+              "-> knees %.3f ankles %.3f fwd %.3f sole %.3f (want %.3f)"
+              % (hipx, hipy, kneex, kneey, drop, v["knees"], v["ankles"],
+                 v["dx"], v["dz"] + SEAT + SEAT_HIP, ankle_rest))
+    return hipx, hipy, kneex, kneey, drop
+
+
+def _arm_solve(rig, base, side, want, drop, out=None, quiet=False):
+    """The shoulder and elbow that put one wrist at `want` = (x, z), in metres.
+
+    Solved and not typed, for the reason the legs are: the same pair of angles
+    puts a 1.84 m man's hand on the table and a 1.24 m girl's hand in the air
+    forty centimetres short of it, and two of the three hand positions here are
+    facts about the FURNITURE — the top of the table, the edge of the seat —
+    rather than about the body.
+
+    Newton, and the first cut was two bisections alternated the way the legs
+    are. That works on the legs because the four measurements there are very
+    nearly independent — the thigh angle owns the height, the shin owns the
+    reach — and it does not work here at all: swinging the shoulder moves the
+    hand diagonally, so bisecting the height at a fixed elbow and then the reach
+    at a fixed shoulder walks along two sides of a triangle and converges on a
+    corner. Measured, it missed by 27 cm and put a hand through a rib.
+
+    A two-by-two numeric Jacobian costs three poses an iteration and lands
+    inside two millimetres in five. Out of reach it stops improving and the best
+    pair seen is kept, which is the right failure: what comes out is an arm
+    reaching, and the report prints how far short it fell.
+
+    `out` is the shoulder's abduction, which is the third thing an arm has and
+    is not solved — it is the difference between an arm hanging by a side and
+    an arm slung out over the back of a chair, and it is a choice rather than a
+    consequence. `drop` is the `@root` fall, added back because the target is in
+    the room's metres and the rig is posed in its own.
+    """
+    up, lo = "armU" + side, "armL" + side
+    sign = 1 if side == "L" else -1
+    ab = STAND_ARM_IN if out is None else out
+    wx, wz = want
+
+    def at(a, b):
+        p = dict(base)
+        p[up] = (a, 0, sign * ab)
+        p[lo] = (b, 0, sign * STAND_FORE_IN)
+        MH.pose(rig, p)
+        h = rig.pose.bones["hand" + side].head
+        return h.x, h.z - drop
+
+    def clamp(v, a, b):
+        return max(a, min(b, v))
+
+    # Two starts, because Newton finds a local answer and this surface has two
+    # of them: the elbow can be folded to reach a near target or swung to reach
+    # a far one, and which basin the iteration falls into is decided by where it
+    # started. Measured, one start left four of the sixteen arms in this file
+    # eight to twenty centimetres out and the other start fixed every one of
+    # them, so both are run and the better is kept. Nine iterations apiece and
+    # three poses an iteration is 54 poses for an arm, which is nothing next to
+    # being wrong.
+    h = 1.0
+    best, berr = (-10.0, 20.0), 1e9
+    for a0, b0 in ((-10.0, 20.0), (-45.0, 55.0)):
+        a, b = a0, b0
+        for _ in range(9):
+            x, z = at(a, b)
+            ex, ez = wx - x, wz - z
+            err = math.hypot(ex, ez)
+            if err < berr:
+                best, berr = (a, b), err
+            if err < 0.002:
+                break
+            xa, za = at(a + h, b)
+            xb, zb = at(a, b + h)
+            j = ((xa - x) / h, (xb - x) / h, (za - z) / h, (zb - z) / h)
+            det = j[0] * j[3] - j[1] * j[2]
+            if abs(det) < 1e-6:
+                break
+            a = clamp(a + clamp((ex * j[3] - j[1] * ez) / det, -30.0, 30.0),
+                      -100.0, 75.0)
+            b = clamp(b + clamp((j[0] * ez - ex * j[2]) / det, -30.0, 30.0),
+                      -70.0, 90.0)
+        if berr < 0.002:
+            break
+    a, b = best
+    if not quiet and berr > 0.03:
+        x, z = at(a, b)
+        print("[bathers]   arm%s wanted %.3f/%.3f, reached %.3f/%.3f"
+              % (side, wx, wz, x, z))
+    return (a, 0, sign * ab), (b, 0, sign * STAND_FORE_IN)
+
+
+def _hang(side, out, swing, elbow):
+    """An arm that is not reaching for anything, in angles rather than a target.
+
+    Not everything wants solving. A hand on a table is a fact about the table
+    and has to be solved for on eight different bodies; an arm hanging beside a
+    chair is a fact about the arm, and asking `_arm_solve` for it is asking a
+    two-degree-of-freedom sagittal solve to hit a point 20 cm below where a
+    short arm ends. What that produces is the solver's honest best — measured
+    on the heavy 1.71 m man, 21 cm high and out in front of him — where the
+    answer wanted was simply "let it hang".
+    """
+    sign = 1 if side == "L" else -1
+    return {"armU" + side: (swing, 0, sign * out),
+            "armL" + side: (elbow, 0, sign * STAND_FORE_IN)}
+
+
+def sit_clips(rig, J):
+    """The three seated clips, for this figure's own skeleton.
+
+    Three and not one because the complaint was as much about sameness as about
+    geometry, and three is what fits on a terrace: somebody sitting up with
+    their hands on their knees, somebody sprawled back with an arm over the
+    chair, and somebody with their elbows on the table talking to whoever is
+    opposite. They share the solved legs — the same feet on the same paving —
+    and differ from the ribs up.
+
+    Each one breathes between two keys on a four-second loop. That is short
+    enough that eight of them do not fall into step and long enough that
+    nothing on the terrace looks like it is being wound.
+    """
+    hipx, hipy, kneex, kneey, drop = _sit_solve(rig, J["l-ankle"].z)
+
+    def P(extra, dz=0.0):
+        p = _sit_base(hipx, hipy, kneex, kneey, extra)
+        p["@root"] = (0.0, 0.0, -(drop + dz))
+        return p
+
+    # Where the thigh runs, on this figure, with the legs already solved: the
+    # hand-on-the-knee target is a fact about her own leg and not a height.
+    MH.pose(rig, _sit_base(hipx, hipy, kneex, kneey))
+    B = rig.pose.bones
+    hipX, kneeX = B["legUL"].head.x, B["legLL"].head.x
+    # A hand rests about four tenths of the way down the thigh, and not at the
+    # knee: measured on the 1.58 m woman, the top of her own knee is 55 cm from
+    # her shoulder and her whole arm is 55, so a hand on the knee is an arm at
+    # full stretch. Which is a person bracing, not a person sitting.
+    thighX = hipX + 0.42 * (kneeX - hipX)
+    thighZ = SEAT + SEAT_HIP + 0.045               # on top of the thigh
+
+    def arms(torso, targets):
+        """One key's spine and head, with both arms solved on to `targets`."""
+        p = _sit_base(hipx, hipy, kneex, kneey, torso)
+        out = dict(torso)
+        for side, want in targets.items():
+            up, lo = _arm_solve(rig, p, side, want[:2], drop,
+                                out=want[2] if len(want) > 2 else None)
+            out["armU" + side], out["armL" + side] = up, lo
+        return out
+
+    # Upright: hands resting on the thighs, head come round a little. Note the
+    # arms are solved against the torso of THIS key and not of the rest pose —
+    # a shoulder that has leaned forward six degrees is six degrees of hand.
+    up_t = {"spine01": (-1, 0, 1), "spine02": (-1, 0, 1), "chest": (-2, 0, 0),
+            "head": (-2, -8, 1), "handL": (-8, 0, 0), "handR": (-8, 0, 0)}
+    up_a = arms(up_t, {"L": (thighX, thighZ), "R": (thighX - 0.03, thighZ)})
+    up_t2 = dict(up_t, **{"chest": (-4, 0, 0), "neck": (4, 0, 0),
+                          "head": (-1, 6, -1), "spine03": (-3, 0, 0)})
+    up_b = arms(up_t2, {"L": (thighX - 0.02, thighZ + 0.01),
+                        "R": (thighX - 0.06, thighZ + 0.01)})
+
+    # Sprawled back. The lean is in the spine and not in the pelvis, for the
+    # reason `_sit_base` gives.
+    #
+    # The right arm hangs down outside the chair with the elbow out, which is
+    # the second thing this variant was: it was an arm slung over the back of
+    # the chair, and that is not a pose these two angles can make. An arm over a
+    # chair back is mostly ABDUCTION and extension — the humerus goes out and
+    # behind — and the solve only has the swing and the elbow, with the third
+    # angle held at the 33 degrees of adduction a hanging arm wants. Asked for a
+    # hand 24 cm behind the shoulder and 86 up, it did the only thing it could
+    # and put the hand 15 cm in FRONT and 1.18 up, which is a woman signalling a
+    # bus. Fourteen degrees of abduction and a hand down by the seat edge is a
+    # sprawl the rig can actually make.
+    back_t = {"spine01": (5, 0, 1), "spine02": (5, 0, 1), "spine03": (4, 0, 0),
+              "chest": (3, 0, 0), "neck": (-4, 0, 0), "head": (-6, -14, 2),
+              "clavicleR": (0, 0, -6), "handL": (-6, 0, 0), "handR": (-2, 0, 0)}
+    back_a = arms(back_t, {"L": (thighX + 0.04, thighZ - 0.01)})
+    back_a.update(_hang("R", 14.0, -2, 20))
+    back_t2 = dict(back_t, **{"chest": (1, 0, 0), "neck": (-2, 0, 0),
+                              "head": (-5, -6, 1)})
+    back_b = arms(back_t2, {"L": (thighX + 0.01, thighZ)})
+    back_b.update(_hang("R", 14.0, 1, 23))
+
+    # Elbows on the table, and the head turned, because somebody with their
+    # elbows on a café table is talking to somebody. The table's near edge is
+    # `SEAT_R - TABLE_HALF` in front of the middle of the chair, so the hands go
+    # a hand's breadth past that on to the top of it — not to the middle of the
+    # table, which is 0.72 away and further than any of these eight can reach
+    # sitting back. If a figure cannot make even this, `_arm_solve` says so and
+    # what comes out is an arm reaching, which is the right failure.
+    reach = SEAT_R - TABLE_HALF + 0.10
+    tab_t = {"spine01": (-6, 0, 1), "spine02": (-6, -3, 1), "spine03": (-5, -3, 0),
+             "chest": (-4, -4, 0), "neck": (3, 0, 0), "head": (-2, 22, 2),
+             "clavicleL": (0, 0, 6), "clavicleR": (0, 0, -6),
+             "handL": (-14, 0, 0), "handR": (-14, 0, 0)}
+    tab_a = arms(tab_t, {"L": (reach, TABLE_TOP + 0.03, 24.0),
+                         "R": (reach - 0.04, TABLE_TOP + 0.03, 24.0)})
+    tab_t2 = dict(tab_t, **{"head": (-1, 14, 0), "chest": (-3, -3, 0)})
+    tab_b = arms(tab_t2, {"L": (reach - 0.03, TABLE_TOP + 0.04, 24.0),
+                          "R": (reach - 0.01, TABLE_TOP + 0.03, 24.0)})
+
+    return [
+        {"name": "sit", "loop": True,
+         "keys": [(0.0, P(up_a)), (2.0, P(up_b, 0.004)), (4.0, P(up_a))]},
+        {"name": "sitback", "loop": True,
+         "keys": [(0.0, P(back_a)), (2.2, P(back_b, 0.005)), (4.4, P(back_a))]},
+        {"name": "sittable", "loop": True,
+         "keys": [(0.0, P(tab_a)), (1.9, P(tab_b, 0.003)), (3.8, P(tab_a))]},
+    ]
+
+
 # What a person on a beach does. Baye carries twenty-four clips because she is
-# the one you follow; these carry six, and the six are shared by all eight
+# the one you follow; these carry nine, and the nine are shared by all eight
 # because a clip is a list of *rotations* and rotations transfer across
 # skeletons of different proportions. The girl's walk is the man's walk on the
 # girl's legs, which is right — a gait is a gait.
+#
+# The three seated ones are the exception that proves it: they are the only
+# clips in this file that are solved per figure rather than shared, because
+# sitting is the one thing a person does against a piece of furniture whose
+# height is fixed in metres. See `sit_clips`.
 BATHER_CLIPS = [c for c in MH.CLIPS
                 if c["name"] in ("idle", "walk", "wave", "notice",
                                  "kneel", "getup")]
+# The walk was fixed on 22 Aug and its six numbers are `WALK_TRACK` and
+# friends in human_mh.py; everything else on this list is built on `IDLE_A`
+# and still carries the A-pose, so it gets `_stand`.
+STAND_CLIPS = ("idle", "wave", "notice")
 
 
-def one(name, height, obj):
-    """Bake one figure, start to finish, in a fresh scene."""
+def one(name, height, obj, check=False):
+    """Bake one figure, start to finish, in a fresh scene.
+
+    `check` stops after the skeleton and the leg solve and prints what came
+    out, which is the whole of the seated geometry and costs three seconds
+    instead of two minutes. Everything below the solve — the mesh, the smooth,
+    the weights, the paint — has nothing to do with where the feet land.
+    """
     kind, suit, skin_p = SUITS[name]
     # Both are module globals in human_mh, and both are read at the moment they
     # matter rather than captured: TARGET_H inside `read_joints`, SKIN_P inside
@@ -259,6 +768,14 @@ def one(name, height, obj):
     # varies least: the 1.24 m girl is 71 per cent of Baye's stature and 88 per
     # cent of her skull depth, which is exactly why scaling the face by height
     # would have been the wrong fix.
+    if check:
+        # `MH.load` is what normally empties the scene, and the check path does
+        # not call it. Without this the second figure's armature is built next
+        # to the first one's and `bpy.data.objects["rig"]` is still the first.
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        rig = MH.armature(J)
+        _sit_report(rig, sit_clips(rig, J))
+        return None
     k = tuple(a / b for a, b in zip(MH.vault(obj, J["l-eye"].z), MH.SKULL))
     print("[bathers]   head frame  %.3f %.3f %.3f" % k)
     body = MH.load(obj, scale, drop)
@@ -279,13 +796,44 @@ def one(name, height, obj):
     # man, identically. Swimwear belongs in paint here, which is the convention
     # tools/blender/bather.py already set and the only one that lets a suit be a
     # different colour on every figure.
-    MH.export_skin(body, rig, out, BATHER_CLIPS, tris=TRIS, post=False)
+    clips = ([_stand_clip(c) if c["name"] in STAND_CLIPS else c
+              for c in BATHER_CLIPS] + sit_clips(rig, J))
+    _sit_report(rig, clips)
+    MH.export_skin(body, rig, out, clips, tris=TRIS, post=False)
     return out
+
+
+def _sit_report(rig, clips):
+    """Every seated key, measured on the rig, in one block of numbers.
+
+    The four solved angles are checked by the solve itself; this is the other
+    half — the keys the solve does not touch. A hand that has gone through the
+    table, a shoulder wound past its stop and a head turned into its own
+    collarbone all look fine in the numbers above and wrong the moment anybody
+    stands in front of them, and this is the cheap half of catching that: the
+    hand's height and its reach in front of the shoulder, per key.
+
+    Nothing here fails the bake. It prints, and the pass is done by looking.
+    """
+    for c in clips:
+        if not c["name"].startswith("sit"):
+            continue
+        for i, (t, p) in enumerate(c["keys"][:-1]):
+            MH.pose(rig, p)
+            B = rig.pose.bones
+            root = p.get("@root", (0, 0, 0))[2]
+            print("[bathers]   %-9s k%d  hip %.3f  hand %.3f/%.3f  "
+                  "reach %.3f  head %.3f"
+                  % (c["name"], i, B["legUL"].head.z + root,
+                     B["handL"].head.z + root, B["handR"].head.z + root,
+                     B["handL"].head.x - B["armUL"].head.x,
+                     B["head"].tail.z + root))
 
 
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     only = argv[argv.index("--only") + 1] if "--only" in argv else None
+    check = "--check" in argv
     OUT.mkdir(parents=True, exist_ok=True)
     for name, height, _recipe in mh_morph.BATHERS:
         if only and name != only:
@@ -295,8 +843,9 @@ def main():
             print("[bathers] no %s — run tools/blender/mh_morph.py first" % obj)
             continue
         print("[bathers] %s at %.2f m" % (name, height))
-        p = one(name, height, obj)
-        print("[bathers]   %s  %.0f KB" % (p.name, p.stat().st_size / 1024))
+        p = one(name, height, obj, check=check)
+        if p:
+            print("[bathers]   %s  %.0f KB" % (p.name, p.stat().st_size / 1024))
 
 
 if __name__ == "__main__":
