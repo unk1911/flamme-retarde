@@ -1698,9 +1698,15 @@ async function buildJadrija(scene) {
       name: 'Caffee bar H2O', roof: [0.470, 0.462, 0.440],
       body: [0.505, 0.528, 0.545], awn: 3.0, fg: '#1c2b33', bg: '#e9eced',
       pier: [0.430, 0.405, 0.360] },
+    // The fascia was red on cream and it is not: slasticarnica-behind-view
+    // catches the awning band square on from the lane and it is near-black
+    // lettering on white, "slastičarnica JADRIJA" in one line with the first
+    // word in lower case. The one line is kept as two here, because the board
+    // is 6.4 m by 0.46 m and a single line across it sets the name at half the
+    // cap height two lines give it — but the colours are the photograph's.
     { key: 'slast', kind: 'box', t0: 328, t1: 343, s0: 22, s1: 27.2, h: 2.95,
-      name: 'Slastičarnica', sub: 'JADRIJA', roof: [0.590, 0.578, 0.545],
-      body: [0.560, 0.535, 0.487], awn: 3.0, fg: '#a8221c', bg: '#eeece6',
+      name: 'slastičarnica', sub: 'JADRIJA', roof: [0.590, 0.578, 0.545],
+      body: [0.560, 0.535, 0.487], awn: 3.0, fg: '#26241f', bg: '#f4f2ee',
       vitrine: true, cooler: true, scallop: true },
     { key: 'tramp', kind: 'fence', t0: 348, t1: 362, s0: 46, s1: 56, h: 2.2,
       name: null, post: [0.640, 0.520, 0.060], body: [0.055, 0.075, 0.062],
@@ -2345,11 +2351,21 @@ async function buildJadrija(scene) {
   /**
    * The lit wall behind the counter.
    *
-   * The Slasticarnica's name is not on its awning. It is on a back-lit panel
-   * inside, in a row with the price boards and a strip of product light-boxes
-   * above them — which is how every kiosk of this kind on the coast is signed,
-   * and why the awning itself is plain white with a scalloped edge and nothing
-   * written on it anywhere.
+   * WRONG, and left standing with the correction rather than quietly edited,
+   * because this function is dead code — nothing in `SHOPS` sets `menu` — and
+   * the claim under it is what would be reached for if anything ever did.
+   *
+   * What it used to say was that the Slasticarnica's name is not on its awning
+   * but on a back-lit panel inside, in a row with the price boards and a strip
+   * of product light-boxes, and that the awning itself is plain white with a
+   * scalloped edge and nothing written on it anywhere. The 22 August 2026
+   * survey settles it: `slasticarnica-behind-view` catches the lane elevation
+   * square on and the awning fascia along that whole side reads
+   * "slastičarnica JADRIJA" — lower-case word, upper-case name, dark serif on
+   * white. The name IS on the awning. The scalloped edge is real and so is the
+   * white, and both are kept.
+   *
+   * The back-lit panel is a different frontage's and was read across.
    *
    * Only the three prices the survey could actually read go on the board.
    * Six back-lit panels were legible enough to place and only three of the
@@ -2432,6 +2448,464 @@ async function buildJadrija(scene) {
     mesh.position.set(p[0], p[1], p[2]);
     mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
     scene.add(mesh);
+  }
+
+  /**
+   * What is in the Slasticarnica's cabinet, read off the glass.
+   *
+   * Six photographs of 22 August 2026, three of them square on to the counter
+   * from about a metre. Sixteen pans in two rows: eight on a raised back step
+   * and eight in front of it. Eleven labels could be read outright; the other
+   * five are in the frame and illegible — one behind a reflection of the
+   * promenade, one with a hand across it, three simply too small — and they
+   * ship as pans with no plaque rather than as a guess. That is the same rule
+   * the four unnamed businesses on this shore already ship under.
+   *
+   * The plaques themselves are the shop's own: small black slates in a bright
+   * frame, white handwriting, clipped to the pan rim and standing up. They are
+   * drawn at about twice life size, because at 70 mm a plaque is four pixels
+   * from where a customer stands and the whole point of this counter is that
+   * it can be read.
+   *
+   * `col` is the body of the ice cream and `rib` the ribbon through it, which
+   * is what separates Cookies from Ljesnjak — both are cream with brown in
+   * them and the difference is entirely how much and how dark. Where `rib` is
+   * null the pan is one colour, which is what vanilla, pistachio, mango, green
+   * apple, watermelon and strawberry actually are in these frames.
+   */
+  const GELATO = {
+    // The back row, left to right as you face the counter.
+    back: [
+      { name: 'Čokolada', col: [0.545, 0.455, 0.365], rib: [0.175, 0.110, 0.075] },
+      { name: 'Vanilija', col: [0.790, 0.660, 0.235], rib: null },
+      { name: 'Stracciatella', col: [0.845, 0.830, 0.795], rib: [0.140, 0.105, 0.085] },
+      { name: 'Jogurt Šumsko voće', col: [0.830, 0.800, 0.775], rib: [0.500, 0.140, 0.175] },
+      // The plaque here is turned away and carries only a drawn device — a
+      // circle — where the others carry a word. Unnamed.
+      { name: null, col: [0.795, 0.745, 0.660], rib: [0.385, 0.250, 0.145] },
+      { name: 'Pistaccio', col: [0.660, 0.650, 0.340], rib: null },
+      { name: 'Kinder Bueno', col: [0.815, 0.745, 0.640], rib: [0.530, 0.360, 0.210] },
+      { name: 'Lješnjak', col: [0.755, 0.660, 0.530], rib: null },
+    ],
+    // The front row. Two of these are legible in one frame only and both were
+    // checked against the second: Lubenica has a watermelon slice drawn on the
+    // plaque beside the word, and Jagoda is the reddest pan in the case.
+    front: [
+      { name: 'Lubenica', col: [0.860, 0.490, 0.445], rib: null },
+      { name: 'Mango', col: [0.835, 0.755, 0.340], rib: null },
+      { name: 'Zelena Jabuka', col: [0.490, 0.680, 0.310], rib: null },
+      { name: null, col: [0.830, 0.775, 0.680], rib: [0.490, 0.330, 0.180] },
+      { name: 'Cookies', col: [0.810, 0.745, 0.640], rib: [0.180, 0.125, 0.095] },
+      // Pale blue, and the plaque is under the promenade's reflection in both
+      // frames that reach it. Blue ice cream on this coast is one of three
+      // things and naming it would be picking one.
+      { name: null, col: [0.530, 0.735, 0.795], rib: null },
+      { name: 'Jagoda', col: [0.795, 0.310, 0.275], rib: null },
+      { name: null, col: [0.830, 0.800, 0.735], rib: null },
+    ],
+  };
+
+  /**
+   * One flavour plaque, on a canvas.
+   *
+   * Opaque, and deliberately so. Rule 11: `depthWrite: false` on the
+   * transparent pass is unreliable in this renderer, and a row of labels
+   * painted as transparent gaps in one long strip is exactly the shape that
+   * rule bites. A plaque in life is a solid black slate, so each one ships as
+   * its own small opaque quad and there is nothing to sort.
+   *
+   * 256 by 112 over 0.24 by 0.105 m is about 1070 texels a metre, which puts a
+   * 60-pixel glyph at 47 mm of cap height — twenty-odd pixels on screen from
+   * where somebody orders. Sized to fit the plate rather than set at a fixed
+   * size, for the same reason `shopSign` is: "Stracciatella" and "Mango" are
+   * not the same word and a size that suits one loses the other off the edge.
+   */
+  function flavourPlaque(name) {
+    const C = document.createElement('canvas');
+    C.width = 256; C.height = 112;
+    const g = C.getContext('2d');
+    // The frame first, then the slate inside it. The plaques in the survey are
+    // black card in a bright pressed-metal surround and the surround is what
+    // catches the cabinet light, so it is the brightest thing on the counter.
+    g.fillStyle = '#c9ccce'; g.fillRect(0, 0, 256, 112);
+    g.fillStyle = '#15130f'; g.fillRect(7, 7, 242, 98);
+    g.fillStyle = '#f2f0ea';
+    g.textAlign = 'center';
+    // Two lines if the word is long enough that one line would set it small.
+    // "Jogurt Šumsko voće" is three words on the real plaque and one line of
+    // it here would be twenty pixels tall.
+    const words = name.split(' ');
+    // `setFont` and not `at`, because `at` in this file is the shore station
+    // accessor and shadowing it inside a canvas painter is a trap set for the
+    // next person who adds a line here.
+    const setFont = (px) => { g.font = `500 italic ${px}px "Helvetica Neue", Arial, sans-serif`; };
+    const fitOne = (text) => { setFont(100); return Math.min(76, 100 * 214 / (g.measureText(text).width || 1)); };
+    if (words.length > 1 && fitOne(name) < 44) {
+      // Break at the point that leaves the two halves most nearly equal, which
+      // for a three-word name is after the first word and not after the second.
+      let cut = 1, best = 1e9;
+      for (let k = 1; k < words.length; k++) {
+        const d = Math.abs(words.slice(0, k).join(' ').length - words.slice(k).join(' ').length);
+        if (d < best) { best = d; cut = k; }
+      }
+      const L = [words.slice(0, cut).join(' '), words.slice(cut).join(' ')];
+      const px = Math.min(46, fitOne(L[0]), fitOne(L[1]));
+      setFont(px);
+      g.fillText(L[0], 128, 50);
+      g.fillText(L[1], 128, 50 + px * 1.08);
+    } else {
+      const px = fitOne(name);
+      setFont(px);
+      g.fillText(name, 128, 56 + px * 0.36);
+    }
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    return tex;
+  }
+
+  /**
+   * The vinyl across the front of the cabinet.
+   *
+   * In life this is on the shop's window glass and the cabinet stands behind
+   * it; in this build the cabinet stands in the opening and there is no window
+   * pane, so the lettering goes on the cabinet's own front, which from the
+   * promenade is the same band of white in the same place. Every word on it is
+   * off the photographs and nothing has been added: a red heart with I above
+   * it and GELATO under it, "Fresh Gelato Every Day" in four short lines,
+   * "Slastičarnica 1974 Jadrija" in the middle, and "Gelato artigianale"
+   * running off the right-hand end.
+   *
+   * The middle block is the only serif on the whole boardwalk, which is what
+   * the real one is set in, and it is the one part of this sign that is
+   * genuinely the shop's identity rather than a slogan.
+   */
+  function caseVinyl(w, h) {
+    const C = document.createElement('canvas');
+    C.height = 256;
+    C.width = Math.min(2048, Math.round(256 * w / h));
+    const g = C.getContext('2d');
+    // `CW` and not `W`: `W` is this file's locale-to-world transform.
+    const CW = C.width, H = C.height;
+    g.fillStyle = '#f4f2ee'; g.fillRect(0, 0, CW, H);
+    g.fillStyle = '#171512';
+    g.textAlign = 'center';
+    const SANS = '"Helvetica Neue", Arial, sans-serif';
+    const SERIF = 'Georgia, "Times New Roman", serif';
+
+    // I ♥ GELATO. The heart is drawn rather than set, because the glyph is not
+    // in any font this page can rely on and a missing glyph is a tofu box in
+    // the middle of a shop sign.
+    g.font = `400 ${H * 0.15}px ${SANS}`;
+    g.fillText('I', CW * 0.062, H * 0.30);
+    const hx = CW * 0.062, hy = H * 0.44, hr = H * 0.15;
+    g.fillStyle = '#d8342c';
+    g.beginPath();
+    g.moveTo(hx, hy + hr * 1.15);
+    g.bezierCurveTo(hx - hr * 1.35, hy + hr * 0.20, hx - hr * 0.62, hy - hr * 0.72, hx, hy - hr * 0.10);
+    g.bezierCurveTo(hx + hr * 0.62, hy - hr * 0.72, hx + hr * 1.35, hy + hr * 0.20, hx, hy + hr * 1.15);
+    g.closePath(); g.fill();
+    g.fillStyle = '#171512';
+    g.font = `500 ${H * 0.145}px ${SANS}`;
+    g.fillText('GELATO', CW * 0.062, H * 0.92);
+
+    // Fresh / Gelato / Every / Day, which on the real sign is four lines in a
+    // marker hand stepping down to the right. Four lines here too, stepped,
+    // because two lines of it reads as a caption and four reads as a sign.
+    g.font = `400 ${H * 0.155}px ${SANS}`;
+    ['Fresh', 'Gelato', 'Every', 'Day'].forEach((s, i) => {
+      g.fillText(s, CW * (0.168 + i * 0.014), H * (0.26 + i * 0.215));
+    });
+
+    // The name. Sized off the board so it fills the middle third, and 1974
+    // between the two words, which is where it is.
+    const cx = CW * 0.505;
+    const fit = (text, font, cap, x, y) => {
+      g.font = `${font} 100px ${cap.f}`;
+      const size = Math.min(cap.px, 100 * cap.w / (g.measureText(text).width || 1));
+      g.font = `${font} ${size}px ${cap.f}`;
+      g.fillText(text, x, y);
+    };
+    fit('Slastičarnica', '400', { f: SERIF, px: H * 0.30, w: CW * 0.235 }, cx, H * 0.40);
+    fit('1974', '400', { f: SERIF, px: H * 0.16, w: CW * 0.07 }, cx, H * 0.62);
+    fit('Jadrija', '600', { f: SERIF, px: H * 0.34, w: CW * 0.185 }, cx, H * 0.93);
+
+    // And the Italian, off the right-hand end. On the real fascia it runs off
+    // the edge of the panel; here it stops at the edge, because a word cut in
+    // half by a mesh boundary reads as a bug and not as a photograph.
+    g.font = `400 italic ${H * 0.20}px ${SANS}`;
+    g.fillText('Gelato', CW * 0.855, H * 0.44);
+    g.font = `400 italic ${H * 0.185}px ${SANS}`;
+    g.fillText('artigianale', CW * 0.855, H * 0.78);
+
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    return tex;
+  }
+
+  /**
+   * A flat quad in the shore frame, facing the sea, with a texture on it.
+   *
+   * Named, because the first step of the method in `plan/jadrija-TODO.md` for
+   * finding a thing that will not render is to name the mesh, and sixteen
+   * identical black plaques in a row cannot be told apart by position.
+   */
+  function seaFacing(tex, t, s, y, w, h, name) {
+    const st = at(t), p = W(t, s, y);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+    mesh.position.set(p[0], p[1], p[2]);
+    mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
+    if (name) mesh.name = name;
+    scene.add(mesh);
+    return mesh;
+  }
+
+  /**
+   * The gelato counter, which is the whole reason anybody stops here.
+   *
+   * What was here before was a 7 m black slab with fourteen coloured chips
+   * along the top of it and a blue-grey lid — the right idea at forty metres
+   * and nothing at all at two, which is the only distance this object is ever
+   * looked at. The rebuild is off six photographs taken on the counter itself.
+   *
+   * The whole assembly is laid out from `S.s0` inland-outward and every layer
+   * is at least 0.10 m clear of the one in front of it, because rule 5 has
+   * three multi-hour hunts behind it and a case with a vinyl on its front, a
+   * glass over its top, sixteen pans and sixteen standing plaques is four
+   * fresh chances to make the same mistake:
+   *
+   *   s0−1.72  the nose rail           s0−1.40  the front pans
+   *   s0−1.70  the vinyl face          s0−1.16  the light strip
+   *   s0−1.66  its tray                s0−1.08  the back plaques
+   *   s0−1.60  the glass, at the foot  s0−0.96  the back pans
+   *   s0−1.52  the front plaques       s0−0.54  the cabinet back
+   *   s0−1.50  the cabinet front       s0−0.34  the shopKit counter
+   *   s0−1.46  the glass, at the head
+   *
+   * The plaques are the two entries out of order in that list, and on purpose:
+   * each stands 0.12 m in FRONT of the pans it labels and 0.14 m above their
+   * ice cream, which is where a clipped-on plaque is and also the only place
+   * one can be read from over the glass.
+   */
+  function gelatoCase(S, y0) {
+    // Warmer and lighter than the first cut, which came out blue. Stainless in
+    // the shade of an awning takes its colour from the sky over half its
+    // hemisphere and from the concrete over the other half, and setting it at a
+    // neutral 0.475 let the sky win: the whole cabinet photographed the colour
+    // of the sea behind it.
+    const STEEL = [0.505, 0.500, 0.486];
+    const BRIGHT = [0.645, 0.638, 0.622];
+    const WHITE = [0.700, 0.698, 0.688];
+    const DARK = [0.135, 0.135, 0.140];
+    const cm = (S.t0 + S.t1) * 0.5;
+    const ca = cm - 2.00, cc = cm + 2.00;       // the cabinet, four metres of it
+    const BAY = 0.40;                            // one pan and its gap
+    const t0Pan = cm - 1.60;                     // eight bays, centred
+
+    // The carcass, its recessed toe kick, and the stainless nose over the top
+    // of the vinyl. A cabinet on a promenade is white steel with a dark plinth
+    // that never gets cleaned, and the plinth being INSET is what stops the
+    // whole thing reading as a wardrobe.
+    boxTS(ca, cc, S.s0 - 1.50, S.s0 - 0.50, y0 + 0.12, y0 + 1.02, WHITE,
+      shade(WHITE, 1.06));
+    boxTS(ca + 0.07, cc - 0.07, S.s0 - 1.42, S.s0 - 0.50, y0, y0 + 0.12, DARK);
+    // The nose is 0.26 m of counter edge and no more. The first cut ran it the
+    // whole depth of the cabinet, from s0−1.72 to s0−0.50, which put a solid
+    // box from y0+1.02 to y0+1.10 straight over the pan deck at y0+1.06 — so
+    // the deck, the step and the bottom third of every pan were inside it and
+    // the counter read as one flat blue shelf with coloured wedges standing on
+    // it. A nose rail is an edge, not a lid.
+    boxTS(ca - 0.04, cc + 0.04, S.s0 - 1.72, S.s0 - 1.46, y0 + 1.02, y0 + 1.10,
+      STEEL, BRIGHT);
+
+    // The vinyl, on a tray of its own so that nothing bolted on afterwards can
+    // get between the two — the lesson `shopSign` records at length.
+    const vw = (cc - ca) - 0.24, vh = 0.82;
+    boxTS(ca + 0.08, cc - 0.08, S.s0 - 1.66, S.s0 - 1.54, y0 + 0.12, y0 + 1.02,
+      [0.300, 0.296, 0.288]);
+    seaFacing(caseVinyl(vw, vh), cm, S.s0 - 1.70, y0 + 0.57, vw, vh, 'slast:vinyl');
+
+    // The well the pans sit in, and the step that lifts the back row. The step
+    // is the reason both rows can be seen at once and it is in every photograph
+    // of a counter of this kind.
+    // Both darker than the cabinet, because everything in this well is in the
+    // shade of its own hood and the pans have to come off it.
+    boxTS(ca + 0.06, cc - 0.06, S.s0 - 1.44, S.s0 - 0.56, y0 + 1.02, y0 + 1.06,
+      shade(STEEL, 0.66), shade(STEEL, 0.74));
+    boxTS(ca + 0.06, cc - 0.06, S.s0 - 0.98, S.s0 - 0.56, y0 + 1.06, y0 + 1.18,
+      shade(STEEL, 0.70), shade(STEEL, 0.78));
+    // And the cabinet's own back, with the server's side behind it. Without it
+    // the pans stood against half a metre of the shop's render, lit and noisy,
+    // and every flavour in the case had a grey wall for a background.
+    boxTS(ca, cc, S.s0 - 0.54, S.s0 - 0.50, y0 + 1.02, y0 + 1.80,
+      shade(STEEL, 0.58), shade(STEEL, 0.66));
+
+    // The pans. A vaschetta is not a box: it is a shallow tray that flares
+    // outward to a rolled rim, and the ice cream in it is scraped into a mound
+    // that stands proud of the rim in the middle and falls away at the ends.
+    // Two frustums, and the second one is what makes a colour read as a
+    // substance rather than as paint.
+    const row = (list, sA, sB, yBase) => {
+      const cs = (sA + sB) * 0.5, hd = (sB - sA) * 0.5;
+      list.forEach((F, k) => {
+        const ct = t0Pan + k * BAY + BAY * 0.5;
+        // EVERY TOP FACE IN THIS STACK IS ENCLOSED BY THE SOLID ABOVE IT, and
+        // that is the construction rather than a nicety.
+        //
+        // `frustum` puts a full rectangular quad on top of whatever it draws —
+        // not a ring — and a horizontal quad standing out in front of the thing
+        // behind it, seen from a camera only a little above it, paints a band
+        // straight across that thing. The first cut had the pan 0.09 m deep
+        // with the ice cream starting at 0.045, so the pan's own rim quad ran
+        // out to `hd` while the gelato at that height was only hd·0.91, and
+        // every pan in the case came out with a hard salmon-grey bar across the
+        // middle of its colour. It read as a separate object standing in the
+        // cabinet, which is exactly what the brown bar on the kabina television
+        // read as, and it is exactly the same mistake: a face two millimetres
+        // out of the plane it was supposed to be behind.
+        //
+        // Painting the five pieces red, green, blue, yellow and cyan and taking
+        // ONE screenshot named it in a single frame. Rule 5's method works;
+        // reasoning about it does not, and it was tried first again anyway.
+        //
+        // So: the ice cream fills the pan to within two millimetres of the rim,
+        // and every stage above starts slightly LOWER and slightly WIDER than
+        // the one below it finishes, which buries the lower stage's top quad
+        // inside the upper stage's skirt. The only top face left showing on the
+        // whole assembly is the pan's own 2 mm rolled rim, which is what a rim
+        // is.
+        //
+        // Three stages and not one, while this is being rebuilt anyway: a
+        // single frustum from pan floor to crown is a straight edge all the way
+        // up and photographs as a lampshade. A scraped heap has a shoulder —
+        // nearly square to the rim, a break, then a much sharper fall to a
+        // small top — and the break is the whole silhouette.
+        frustumTS(yBase, [ct, cs, BAY * 0.420, hd * 0.90],
+          yBase + 0.075, [ct, cs, BAY * 0.470, hd * 1.00],
+          shade(STEEL, 0.62), shade(STEEL, 0.78));
+        frustumTS(yBase + 0.073, [ct, cs, BAY * 0.465, hd * 0.99],
+          yBase + 0.150, [ct, cs, BAY * 0.445, hd * 0.95],
+          F.col, shade(F.col, 1.04));
+        frustumTS(yBase + 0.146, [ct, cs, BAY * 0.450, hd * 0.96],
+          yBase + 0.212, [ct, cs, BAY * 0.330, hd * 0.76],
+          shade(F.col, 1.03), shade(F.col, 1.09));
+        // The crown takes the sauce where there is sauce. Dragging a scoop
+        // through a swirled pan brings the ribbon up and leaves it pooled on
+        // top, which is what every swirled pan in these frames looks like from
+        // standing height: the flank is nearly the body colour and the top is
+        // nearly the ribbon's.
+        //
+        // Three bars laid across the crown was the first try and they were
+        // three specks on a small flat top; turning them front-to-back made
+        // three specks the other way; and running them up the flank as narrow
+        // frustums put them INSIDE the mound, because a frustum 2 % narrower
+        // than the one it sits in is not on the surface, it is under it.
+        const crown = F.rib
+          ? [F.col[0] * 0.55 + F.rib[0] * 0.45, F.col[1] * 0.55 + F.rib[1] * 0.45,
+            F.col[2] * 0.55 + F.rib[2] * 0.45]
+          : shade(F.col, 1.06);
+        frustumTS(yBase + 0.206, [ct, cs, BAY * 0.345, hd * 0.79],
+          yBase + 0.252, [ct, cs, BAY * 0.160, hd * 0.38],
+          crown, shade(crown, 1.10));
+        // And three ridges of it standing out of the crown. Their feet are
+        // buried well inside the mound — nothing skims anything anywhere in
+        // this stack — and only the top third of each is ever drawn.
+        if (F.rib) {
+          for (let i = 0; i < 3; i++) {
+            const o = ((i - 1) * 0.10 + (jit(k, 620 + i) - 0.5) * 0.05) * BAY;
+            frustumTS(yBase + 0.190, [ct + o, cs, BAY * 0.055, hd * 0.32],
+              yBase + 0.276, [ct + o * 0.6, cs, BAY * 0.036, hd * 0.18],
+              F.rib, shade(F.rib, 1.22));
+          }
+        }
+      });
+    };
+    row(GELATO.front, S.s0 - 1.40, S.s0 - 1.02, y0 + 1.06);
+    row(GELATO.back, S.s0 - 0.96, S.s0 - 0.58, y0 + 1.18);
+
+    // The plaques, on their wire clips. Only the ones that could be read.
+    const plaques = (list, sPl, yPl, sClip, yClip) => {
+      list.forEach((F, k) => {
+        if (!F.name) return;
+        const ct = t0Pan + k * BAY + BAY * 0.5;
+        post(W, ct, sClip, yClip, yPl - 0.045, 0.006, [0.600, 0.606, 0.600], 4);
+        seaFacing(flavourPlaque(F.name), ct, sPl, yPl, 0.24, 0.105,
+          'slast:plaque:' + F.name);
+      });
+    };
+    // The clip stands 0.08 m in front of the pan it belongs to rather than the
+    // 0.02 the first cut had, which was a wire lying in the plane of the pan's
+    // own front face — rule 5, in a place nobody would think to look for it.
+    plaques(GELATO.front, S.s0 - 1.52, y0 + 1.34, S.s0 - 1.48, y0 + 1.20);
+    plaques(GELATO.back, S.s0 - 1.08, y0 + 1.48, S.s0 - 1.04, y0 + 1.32);
+
+    // The glass. Drawn as its four edges and nothing else, which is not a
+    // shortcut — a clean cabinet glass in these photographs is invisible
+    // except for the frame and the reflection, and a translucent quad in this
+    // builder is not translucent at all: it would be an opaque grey sheet over
+    // the one thing the shop is for. Two rails and two raked stiles.
+    // The pane leans from s0−1.60 at the counter to s0−1.46 at the top. It was
+    // s0−1.46 to s0−1.34, which put the bottom rail two centimetres over the
+    // front lip of the front row of pans and the front plaques two centimetres
+    // OUTSIDE the glass — plaques hanging in the street. The pane has to be
+    // forward of everything it covers, which for a canted cabinet front means
+    // forward of the pan rims at the bottom and forward of the plaques all the
+    // way up.
+    const GB = S.s0 - 1.60, GT = S.s0 - 1.46;     // the pane, bottom and top in s
+    // The foot channel sits at y0+1.02 to y0+1.08 and not at 1.10 to 1.16. At
+    // the higher figure it crossed the front row of pans at half the height of
+    // their ice cream — a pale bar straight through Lubenica and Mango, which
+    // read as a wash over the colour rather than as the frame it is. The glass
+    // in these photographs starts below the pan rim, in a channel in the
+    // counter top, and that is where it goes.
+    boxTS(ca - 0.03, cc + 0.03, GB, GB + 0.08, y0 + 1.02, y0 + 1.08, BRIGHT);
+    boxTS(ca - 0.03, cc + 0.03, GT, GT + 0.08, y0 + 1.58, y0 + 1.64, BRIGHT);
+    for (const [a, c] of [[ca - 0.03, ca + 0.01], [cc - 0.01, cc + 0.03]]) {
+      bar(a, c, [[GB, y0 + 1.02], [GB + 0.08, y0 + 1.02],
+        [GT + 0.08, y0 + 1.64], [GT, y0 + 1.64]], BRIGHT, shade(BRIGHT, 1.06));
+    }
+
+    // The hood, and the light under it. A cold cabinet is lit from inside its
+    // own soffit and that light is why the pans in the photographs are brighter
+    // than the concrete outside on a day when the concrete is in full sun.
+    bar(ca - 0.05, cc + 0.05,
+      [[S.s0 - 1.44, y0 + 1.76], [S.s0 - 0.46, y0 + 1.82],
+        [S.s0 - 0.46, y0 + 1.92], [S.s0 - 1.44, y0 + 1.86]],
+      WHITE, shade(WHITE, 1.10));
+    // Inland of the glass top rail, which it was standing inside: the rail
+    // occupies s0−1.34 to s0−1.26 and the strip started at s0−1.30, so eight
+    // centimetres of the two were the same solid.
+    boxTS(ca + 0.22, cc - 0.22, S.s0 - 1.16, S.s0 - 0.70, y0 + 1.60, y0 + 1.65,
+      [0.900, 0.880, 0.810], [0.930, 0.912, 0.845]);
+
+    // The cup stacks at the left-hand end, which are in three of the six frames
+    // and are the tallest thing inside the glass. Kraft board with a printed
+    // band round it, standing on the pan deck.
+    for (let i = 0; i < 2; i++) {
+      const ct = ca + 0.13 + i * 0.19, cs = S.s0 - 1.16 + i * 0.16;
+      post(W, ct, cs, y0 + 1.06, y0 + 1.38, 0.043, [0.640, 0.545, 0.400], 8);
+      for (let k = 0; k < 3; k++) {
+        boxTS(ct - 0.045, ct + 0.045, cs - 0.045, cs + 0.045,
+          y0 + 1.13 + k * 0.10, y0 + 1.15 + k * 0.10, [0.300, 0.420, 0.310]);
+      }
+    }
+    // And the glass coupes at the right-hand end, stacked upside down. Bottom
+    // of two frames, under the pans, and the only clear thing in the case.
+    for (let i = 0; i < 2; i++) {
+      const ct = cc - 0.14 - i * 0.20, cs = S.s0 - 1.18 + i * 0.18;
+      post(W, ct, cs, y0 + 1.06, y0 + 1.24, 0.072, [0.660, 0.700, 0.700], 8);
+      post(W, ct, cs, y0 + 1.24, y0 + 1.28, 0.086, [0.700, 0.740, 0.740], 8);
+    }
+    // There is wrapped stock at the back of the case in one frame — pale bags
+    // with something dark in them, behind and above the back row — and it is
+    // not built, because that frame is shot through two panes at an angle and
+    // what the bags contain, what shape they are and whether they are even in
+    // this cabinet cannot be settled from it. The shelf they would stand on is
+    // the cabinet back, which is drawn.
+
+    runs.push({ t0: ca, t1: cc, s0: S.s0 - 1.72, s1: S.s0 - 0.50, y: y0, h: 1.92 });
   }
 
   /** One business. Everything upright goes in `up`; pads stay in `deck`. */
@@ -2535,6 +3009,153 @@ async function buildJadrija(scene) {
           W(a, S.s0 - 0.33, y0 + 1.90), W(a + 0.10, S.s0 - 0.33, y0 + 1.90),
           shade(TIMB, 1.14));
       }
+      return;
+    }
+
+    if (S.key === 'slast') {
+      // 20260822_130939, shot upward from the counter, is the only frame in the
+      // whole survey that shows what the opening is cut into: large pale
+      // ceramic tiles with dark grout, cracked across two of them and stained
+      // along the bottom joint, and an aluminium roller-shutter track along the
+      // head with the shutter rolled up out of sight behind it. Every other
+      // shop on this boardwalk has a painted reveal and this one is tiled,
+      // which is why it is worth the fourteen boxes.
+      const oa = S.t0 + (S.t1 - S.t0) * 0.18, oc = S.t1 - (S.t1 - S.t0) * 0.18;
+      const TILE = [0.605, 0.595, 0.570];
+      const ALU = [0.545, 0.552, 0.556];
+      // s0−0.30 to s0−0.16, which is 0.12 clear of the dark serving panel at
+      // s0−0.02 and 0.13 clear of the two menu boards `shopKit` hangs at
+      // s0−0.05. Rule 5, and this assembly is close enough to both to have to
+      // say so out loud.
+      const fa = S.s0 - 0.30, fb = S.s0 - 0.16;
+      // The head: four tiles with the grout between them, running past each
+      // jamb by a tile's width, which is how a tiler finishes an opening.
+      for (let k = 0; k < 4; k++) {
+        const a = oa - 0.40 + k * ((oc - oa + 0.80) / 4);
+        const c = a + (oc - oa + 0.80) / 4 - 0.035;
+        // Every tile a shade off its neighbour. A tiled wall photographs as one
+        // colour and reads as one surface if it is drawn as one, and the grid
+        // is the whole of what makes it tile rather than render.
+        const g = 0.95 + 0.10 * jit(k, 611);
+        boxTS(a, c, fa, fb, top - 0.72, top - 0.44,
+          shade(TILE, g), shade(TILE, g * 1.05));
+      }
+      // The jambs, five tiles high each, down to the counter.
+      for (const [a, c] of [[oa - 0.40, oa - 0.06], [oc + 0.06, oc + 0.40]]) {
+        for (let k = 0; k < 5; k++) {
+          const g = 0.95 + 0.10 * jit(k, a | 0);
+          // The bottom course is greyer: it is the one that gets splashed and
+          // it is the one the photograph shows stained.
+          const w = k === 0 ? 0.86 : 1.0;
+          boxTS(a, c, fa, fb, y0 + 1.10 + k * 0.32, y0 + 1.38 + k * 0.32,
+            shade(TILE, g * w), shade(TILE, g * w * 1.05));
+        }
+      }
+      // The roller-shutter track and its box. Under the awning's underside by
+      // better than a hand's breadth at this inland offset, which was checked
+      // rather than assumed: the canopy section runs top−0.18 at its front edge
+      // to top−0.06 at the back, so at s0−0.2 it is at about top−0.14 and a box
+      // topping out at top−0.26 clears it.
+      boxTS(oa - 0.46, oc + 0.46, S.s0 - 0.34, S.s0 - 0.14, top - 0.44, top - 0.26,
+        ALU, shade(ALU, 1.10));
+      boxTS(oa - 0.46, oa - 0.38, S.s0 - 0.32, S.s0 - 0.16, y0 + 1.10, top - 0.44, ALU);
+      boxTS(oc + 0.38, oc + 0.46, S.s0 - 0.32, S.s0 - 0.16, y0 + 1.10, top - 0.44, ALU);
+
+      // The reed screen on the west flank.
+      //
+      // slasticarnica-behind-view has the whole of the shed's long wall clad in
+      // it under the awning — split cane, wired in courses, silvered off on the
+      // sunny half and still green in the shade. On this building the back is
+      // already the service yard `shopBack` dresses, so it goes on the west
+      // return, which is the elevation you walk past coming from the H2O bar
+      // and the only blank wall the shop had.
+      //
+      // Six courses with a gap between them rather than a mat with wires drawn
+      // on it: the wires in the photograph are dark lines with a shadow under
+      // each, and a 0.02 m batten standing proud of a panel is precisely the
+      // co-planar case rule 5 forbids. Gaps in y have no such problem, because
+      // the two faces never overlap on screen.
+      for (let k = 0; k < 6; k++) {
+        const g = 0.92 + 0.16 * jit(k, 612);
+        const REED = [0.560 * g, 0.470 * g, 0.320 * g];
+        // Buried a centimetre INTO the wall rather than stood off it. A 0.02 m
+        // gap between the screen's inner face and the render leaves a slot you
+        // can see daylight through from an oblique angle, and closing it by
+        // overlapping costs nothing: the inner face is inside solid geometry
+        // and is never drawn.
+        boxTS(S.t0 - 0.14, S.t0 + 0.01, S.s0 + 0.35, S.s0 + 4.45,
+          y0 + 0.10 + k * 0.36, y0 + 0.42 + k * 0.36, REED, shade(REED, 1.10));
+      }
+
+      // The corrugation, above the reed and round the top of that flank.
+      //
+      // This building is not rendered masonry. slasticarnica-behind-view has it
+      // as vertical corrugated sheet — chalky galvanised gone pale blue-grey —
+      // with the reed wired over the bottom two metres of the lane side and the
+      // sheet showing above it and along the parapet. `kind` stays `box`,
+      // because the SHOPS table is what makes ten businesses one system and
+      // forking it for this one would be the wrong trade for a flank; the sheet
+      // goes on as a skin over the part of the flank that is actually seen.
+      //
+      // Ten ribs, not thirty. A 0.075 m corrugation is honest and it is rule 6:
+      // at the ten metres this wall is read from it falls between samples and
+      // the whole flank shimmers. 0.40 m ribs are a lie that photographs.
+      const SHEET = [0.545, 0.560, 0.560];
+      for (let k = 0; k < 10; k++) {
+        const a = S.s0 + 0.35 + k * 0.41;
+        // Flush with the reed's own face and not a centimetre off it: the two
+        // meet edge to edge at y0+2.26 and an offset there is a hairline seam
+        // running the length of the wall.
+        boxTS(S.t0 - 0.14, S.t0 + 0.01, a, a + 0.36,
+          y0 + 2.26, top - 0.02, k % 2 ? SHEET : shade(SHEET, 0.90),
+          shade(SHEET, 1.06));
+      }
+      // And the flue: a square dark box on the roof with a hood on it, which is
+      // the one thing standing above this building's parapet in the photograph
+      // and reads from the whole lane.
+      const ft = S.t0 + 3.2, fs2 = S.s1 - 2.4;
+      // Started at top+0.04, which is two centimetres INSIDE the roof screed
+      // at top+0.06 to top+0.08. A flue whose base sits exactly on the screed
+      // is two horizontal faces in the same plane.
+      boxTS(ft - 0.24, ft + 0.24, fs2 - 0.24, fs2 + 0.24, top + 0.04, top + 0.86,
+        [0.215, 0.220, 0.225], [0.245, 0.250, 0.255]);
+      boxTS(ft - 0.30, ft + 0.30, fs2 - 0.30, fs2 + 0.30, top + 0.86, top + 0.96,
+        [0.260, 0.265, 0.270], [0.290, 0.295, 0.300]);
+
+      // What is standing in the yard behind it, which is the other half of
+      // slasticarnica-behind-view: the folded sun loungers leaning on the wall
+      // in a row, a white bucket beside them, and a delivery still shrink-
+      // wrapped on its pallet. `shopBack` already puts the crates, the bin and
+      // the bottles there; these three are this shop's own.
+      const yb = S.s1;
+      // West of the service door and east of the downpipe, which is the one
+      // stretch of that wall `shopBack` leaves empty — the crates go at
+      // t0 + 0.44·len, the bin next to them and the gas bottles just west of
+      // the door, and four loungers dropped on top of any of those is a pile.
+      for (let k = 0; k < 4; k++) {
+        const t = S.t0 + 0.9 + k * 0.34;
+        const lean = 0.34 + jit(k, 613) * 0.14;
+        const YEL = k % 2 ? [0.660, 0.560, 0.180] : [0.640, 0.610, 0.520];
+        // Head on the wall, foot kicked out. The section is a cycle round a
+        // 0.10 m slab: across the foot, up the inland face, across the head,
+        // back down the seaward one.
+        bar(t, t + 0.30, [[yb + 0.16 + lean, y0], [yb + 0.26 + lean, y0],
+          [yb + 0.26, y0 + 1.62], [yb + 0.16, y0 + 1.62]],
+        YEL, shade(YEL, 1.10));
+      }
+      const bt = S.t0 + 2.3;
+      post(W, bt, yb + 0.34, y0, y0 + 0.34, 0.16, [0.700, 0.698, 0.688], 8);
+      post(W, bt, yb + 0.34, y0 + 0.34, y0 + 0.38, 0.175, [0.640, 0.638, 0.630], 8);
+      // The pallet, and the load on it under a wrap that is not clear plastic
+      // in a photograph — it is white, because a hundred turns of stretch film
+      // is opaque.
+      const pt2 = S.t1 - 3.6;
+      for (const os of [0.22, 0.62, 1.02]) {
+        boxTS(pt2 - 0.56, pt2 + 0.56, yb + os - 0.06, yb + os + 0.06,
+          y0 + 0.02, y0 + 0.14, [0.480, 0.400, 0.290]);
+      }
+      boxTS(pt2 - 0.52, pt2 + 0.52, yb + 0.18, yb + 1.08, y0 + 0.14, y0 + 1.24,
+        [0.640, 0.645, 0.635], [0.680, 0.685, 0.675]);
       return;
     }
 
@@ -2824,20 +3445,10 @@ async function buildJadrija(scene) {
       runs.push({ t0: ct - 0.5, t1: ct + 0.5, s0: cs - 0.4, s1: cs + 0.4,
         y: y0, h: 1.94 });
     }
-    if (S.vitrine) {
-      const va = S.t0 + 2.0, vc = S.t0 + 9.0;
-      boxTS(va, vc, S.s0 - 1.5, S.s0 - 0.4, y0, y0 + 0.92, [0.300, 0.296, 0.288]);
-      const PANS = [[0.520, 0.500, 0.330], [0.610, 0.520, 0.220],
-        [0.470, 0.540, 0.320], [0.590, 0.420, 0.400], [0.230, 0.150, 0.105]];
-      for (let k = 0; k < 14; k++) {
-        const a = va + 0.15 + k * ((vc - va - 0.3) / 14);
-        boxTS(a + 0.02, a + ((vc - va - 0.3) / 14) - 0.02, S.s0 - 1.36, S.s0 - 0.56,
-          y0 + 0.92, y0 + 0.99, PANS[k % PANS.length]);
-      }
-      boxTS(va, vc, S.s0 - 1.5, S.s0 - 0.4, y0 + 1.02, y0 + 1.16,
-        [0.620, 0.640, 0.650]);
-      runs.push({ t0: va, t1: vc, s0: S.s0 - 1.5, s1: S.s0 - 0.4, y: y0, h: 1.16 });
-    }
+    // The gelato counter. Seven metres of black slab with fourteen coloured
+    // chips on it until the 22 August survey, which is what a shop looks like
+    // when nobody has ever stood in front of it.
+    if (S.vitrine) gelatoCase(S, y0);
     // The pergola and the plank bench at Trampulin, which is exactly what the
     // promenade benches are already built out of.
     if (S.pergola) {

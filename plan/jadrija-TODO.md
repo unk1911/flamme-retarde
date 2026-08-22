@@ -167,10 +167,18 @@ as of this writing; the state of each is in the git log, not here.
       the forest — not fade between separate stages.
 - [ ] She swims the R chase in a dead straight line. Wants a wandering track:
       zig-zags, changes of heading, still catchable.
-- [ ] Slasticarnica to a much higher level of detail than the rest of the
+- [x] Slasticarnica to a much higher level of detail than the rest of the
       parade, from `/mnt/c/tmp/refs/jadrija/survey/2/`. It is the setting of a
       coming ice-cream side-quest, so it has to be worth standing in front of.
       Invent no flavour, no price and no name the photographs do not show.
+      Built: `gelatoCase()` — sixteen pans in two rows, thirteen named plaques
+      and three deliberately blank, the "Slastičarnica 1974 Jadrija" vinyl, a
+      glass frame with no pane in it, cup stacks and coupes; plus a `slast`
+      branch in `shopExtras` for the tiled reveal, the roller-shutter track,
+      the reed screen and corrugated sheet on the west flank, the roof flue and
+      the yard. 1 800 tris. Shot from 1.62 m at six metres, at two metres and
+      at one; the pan construction was found by PAINTING it (rule 5's method,
+      below) after reasoning about it failed, again.
 
 **Verify**
 - [ ] Knee-height close-up pass on the clutter — sandals, dropped towels,
