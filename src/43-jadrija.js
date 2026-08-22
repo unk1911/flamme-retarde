@@ -1970,12 +1970,55 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * A table and the three chairs round it, in the resort's frame.
+   *
+   * Every chair is a bearing from the middle of its own table and a heading
+   * that looks back at it, and that is the whole of the fix reported on 22 Aug
+   * — "sitting backwards on those chairs in weird unnatural poses". Three
+   * separate things were wrong and this shape is what settles all three.
+   *
+   * The chairs were laid out at fixed offsets from the *set's* origin — (0,0),
+   * (0.62, 0.10) and (0.30, 0.74) — while the table was drawn, unrotated, at
+   * (0.48, 0.44). Measured off that: the second and third chairs stand 0.35 m
+   * from the middle of a table whose half-diagonal is 0.42, which is to say
+   * inside it. And every chair box is axis-aligned in (t, s) whatever the set's
+   * angle is, with its back on the inland side always — so the two seaward
+   * chairs had their backs to their own table and the occupant, aimed at
+   * `ang + PI/2`, was pointed inland at the back of their own chair.
+   *
+   * A ring fixes the lot at once and costs nothing: the furniture moves by
+   * centimetres, the chair count per frontage is still twelve, and — the point
+   * — `terraceSet` and the pass that seats people a thousand lines away now
+   * read the same three headings out of the same function. Derived twice, they
+   * drift, and what you get is a café where everybody is sitting half a metre
+   * to the left of a chair facing the wrong way.
+   *
+   * The three bearings are 120 degrees apart with the gap toward the shop, so
+   * the way in to the table is from the promenade, which is where people
+   * actually arrive from.
+   */
+  const SEAT_R = 0.72;                  // chair centre to table centre
+  function seatRing(t, s, ang) {
+    const c = Math.cos(ang), sn = Math.sin(ang);
+    // The middle of the table, where `terraceSet` has always drawn it.
+    const ct = t + 0.48 * c - 0.44 * sn;
+    const cs = s + 0.48 * sn + 0.44 * c;
+    const seats = [];
+    for (const b of [-1.30, 0.79, 2.88]) {
+      const a = ang + b;
+      seats.push([ct + Math.cos(a) * SEAT_R, cs + Math.sin(a) * SEAT_R,
+        a + Math.PI]);
+    }
+    return { ct, cs, seats };
+  }
+
+  /**
    * Where the chairs of a terrace stand, in the resort's frame.
    *
-   * Shared, because two passes a thousand lines apart both need it: the one
-   * that draws the furniture and the one that puts somebody in it. Derived
-   * twice, they drift, and what you get is a cafe where everybody is sitting
-   * half a metre to the left of a chair.
+   * `[t, s, face]` per chair, `face` being the heading the chair — and
+   * therefore whoever is in it — looks along. Shared, because two passes a
+   * thousand lines apart both need it: the one that draws the furniture and the
+   * one that puts somebody in it.
    */
   function terraceSeats(S) {
     const out = [];
@@ -1985,10 +2028,7 @@ async function buildJadrija(scene) {
       const t = S.t0 + 0.9 + k * ((S.t1 - S.t0 - 1.8) / 3);
       const s = fs - 1.9 + (k % 2) * 0.5;
       const ang = (k % 2) * 0.5 - 0.25;
-      for (const [dt, ds] of [[0, 0], [0.62, 0.10], [0.30, 0.74]]) {
-        out.push([t + dt * Math.cos(ang) - ds * Math.sin(ang),
-          s + dt * Math.sin(ang) + ds * Math.cos(ang), ang]);
-      }
+      for (const seat of seatRing(t, s, ang).seats) out.push(seat);
     }
     return out;
   }
@@ -2326,21 +2366,43 @@ async function buildJadrija(scene) {
 
   function terraceSet(t, s, y, ang, col) {
     const seat = [0.230, 0.235, 0.240];
-    for (const [dt, ds] of [[0, 0], [0.62, 0.10], [0.30, 0.74]]) {
-      const ct = t + dt * Math.cos(ang) - ds * Math.sin(ang);
-      const cs = s + dt * Math.sin(ang) + ds * Math.cos(ang);
-      boxTS(ct - 0.24, ct + 0.24, cs - 0.23, cs + 0.23, y + 0.40, y + 0.46,
-        col || seat);
-      boxTS(ct - 0.24, ct + 0.24, cs + 0.17, cs + 0.23, y + 0.46, y + 0.86,
-        col || seat);
+    const R = seatRing(t, s, ang);
+    for (const [ct, cs, face] of R.seats) {
+      // Each chair in its own frame, and that is the change. `boxTS` is
+      // axis-aligned in (t, s) and cannot be anything else, so a chair built
+      // with it has its back on the inland side whatever the set is doing —
+      // which is how a café ended up with half its chairs backed on to their
+      // own tables. `boxIn` takes a frame, so the local −s is the way the chair
+      // looks and the back goes behind the sitter by construction.
+      //
+      // The frame is written out here rather than borrowed from `facing`, for
+      // the reason `clutter` gives four hundred lines down: that arrow is a
+      // `const` declared below this, and reaching for it is the temporal dead
+      // zone and a page that never finishes loading.
+      //
+      // And it is `face` plus a right angle, which is not a fudge. The chair's
+      // own numbers are written in the axes it has always been written in —
+      // `dt` across the seat, `ds` fore-and-aft with the back at +0.17 — which
+      // is a chair whose forward is local −s. Turning that to look along `face`
+      // is the rotation that carries (0, −1) on to (cos, sin), and that is
+      // `face + PI/2`. Built with `face` alone the chair comes out square to
+      // the sitter: the seat's width runs front to back and the back panel
+      // stands up beside their left arm. Which is exactly what the first cut
+      // of this did, and it is worse than what it replaced, because at least
+      // the old one was consistently wrong.
+      const a = face + Math.PI * 0.5;
+      const c = Math.cos(a), sn = Math.sin(a);
+      const P = (dt, ds, yy) => W(ct + dt * c - ds * sn, cs + dt * sn + ds * c, yy);
+      boxIn(P, -0.24, 0.24, -0.23, 0.23, y + 0.40, y + 0.46, col || seat);
+      boxIn(P, -0.24, 0.24, 0.17, 0.23, y + 0.46, y + 0.86, col || seat);
       for (const [ot, os] of [[-0.19, -0.17], [0.19, -0.17], [-0.19, 0.17], [0.19, 0.17]]) {
-        boxTS(ct + ot - 0.022, ct + ot + 0.022, cs + os - 0.022, cs + os + 0.022,
+        boxIn(P, ot - 0.022, ot + 0.022, os - 0.022, os + 0.022,
           y, y + 0.40, shade(col || seat, 0.8));
       }
     }
-    boxTS(t + 0.18, t + 0.78, s + 0.14, s + 0.74, y + 0.70, y + 0.75,
+    boxTS(R.ct - 0.30, R.ct + 0.30, R.cs - 0.30, R.cs + 0.30, y + 0.70, y + 0.75,
       [0.520, 0.512, 0.492]);
-    post(W, t + 0.48, s + 0.44, y, y + 0.70, 0.035, [0.330, 0.334, 0.330], 6);
+    post(W, R.ct, R.cs, y, y + 0.70, 0.035, [0.330, 0.334, 0.330], 6);
   }
 
   /**
@@ -5857,10 +5919,33 @@ async function buildJadrija(scene) {
   // Not every chair: a full terrace at four in the afternoon still has empty
   // seats at the ends of it, and a cafe with every single chair taken reads as
   // a stadium. Two in three, which is what the photographs show.
+  //
+  // The heading is the chair's own, straight out of `terraceSeats`, and it used
+  // to be that heading turned through a right angle. Which is how the whole
+  // terrace came to be sitting sideways-on to its own furniture — see the note
+  // over `seatRing`, where the other half of that fault is.
+  //
+  // `chair` is a marker and a clip index in one. It marks the people the
+  // skinned tier is allowed to take (the seated clips are authored for a chair
+  // and are half a metre wrong on the lip of the quay, which is where every
+  // other `sit` in this file is), and it counts round the three of them so that
+  // a table with all three seats taken has one person sitting up, one sprawled
+  // back and one with their elbows on it.
+  //
+  // And seven centimetres back from the middle of the seat, which is not
+  // fussiness. The figure's origin is between its feet and its hip joint is two
+  // centimetres in front of that, so a figure placed on the middle of the pad
+  // has the back of its thighs over the middle and its backside a hand's
+  // breadth clear of the backrest — which reads, from the side, as somebody
+  // perched on the front edge about to get up. Seven takes the buttocks to
+  // within two centimetres of the back, where they belong.
+  let chair = 0;
   for (const S of SHOPS) {
-    for (const [t, s2, ang] of terraceSeats(S)) {
+    for (const [t, s2, face] of terraceSeats(S)) {
       if (rng() < 0.34) continue;
-      B(t, s2, at(t).deck, ang + Math.PI * 0.5, 'sit', 1);
+      const who = B(t - 0.07 * Math.cos(face), s2 - 0.07 * Math.sin(face),
+        at(t).deck, face, 'sit', 1);
+      if (who) { who.chair = true; who.seat = chair++; }
     }
   }
 
@@ -5915,6 +6000,32 @@ async function buildJadrija(scene) {
   const CAST = 84;
   // Of those, how many are the good meshes. The rest are the instanced pair.
   const SKIN_CAST = 8;
+  // And on top of those, the café terraces.
+  //
+  // Reported 22 Aug, of the tables: "replace those marionettes with our high
+  // level NPCs". The terrace is the one place on this shore a player walks
+  // right up to and stops — it is where the ice-cream side-quest is set — so it
+  // is exactly where the instanced tier's two repainted silhouettes are least
+  // affordable.
+  //
+  // Twenty-four is every chair that turns out occupied across the four
+  // frontages that have an awning, which is to say all of them rather than the
+  // nearest few. What that costs is measured rather than guessed.
+  //
+  // The static geometry does not move: 346 348 triangles before and after,
+  // because a chair turned to face its own table is the same eleven boxes it
+  // always was. What changes is what is submitted for the people — 8 skinned
+  // figures at 7 000 apiece becomes 32, so 56 k triangles a frame becomes 224 k
+  // and the whole resort goes from about 402 k to about 570 k. Twenty-four more
+  // draw calls and twenty-four more twenty-eight-bone skeletons posed on the
+  // CPU each frame go with them.
+  //
+  // The *memory* does not move either, and that is what makes this affordable:
+  // the eight blobs are parsed once and every figure made from a parse shares
+  // its geometry. See the load below. Measured on this machine, standing on the
+  // promenade in front of the two busiest terraces and again out west where
+  // none of this is drawn: 60 fps at every one of them, before and after.
+  const SKIN_SEATED = 24;
   {
     // Three of the scripted ones, not all of them.
     //
@@ -9363,22 +9474,55 @@ async function buildJadrija(scene) {
    */
   const crowds = {};
   {
-    // One mesh per person, in the order they were cast. Loaded in parallel —
-    // eight inflates and eight parses of 150 KB apiece is worth doing at once,
-    // and they are independent.
-    const figs = (await Promise.all(BATHER_CAST.map((name) => {
+    // Eight blobs, thirty-two people.
+    //
+    // `loadSkin` inflates, parses and then builds one figure out of what it
+    // parsed, which was right while there were eight of them and one apiece.
+    // The terraces want twenty-four more, and going back to `loadSkin`
+    // twenty-four more times would inflate and parse 150 KB of gzip each time
+    // for a mesh the game already has — three and a half megabytes of work, on
+    // the load path, to arrive at thirty-two copies of eight things.
+    //
+    // So the parse is separated from the figure. `skinnedFigure` takes what
+    // `readFR3DSkin` returned and hands back a Mesh over `data.geo`: call it
+    // twice on the same parse and the two share their geometry, their index
+    // buffer and their clip tracks, and differ in the only things that have to
+    // differ — the bone palette texture, the material's uniforms and where the
+    // clock is. Which is also why this cannot simply be `mesh.clone()`: the
+    // palette is a uniform, and two figures sharing one would be two people
+    // moving as one.
+    //
+    // Nothing here mutates the parse. The one thing in `skinnedFigure` that
+    // does is `wear()`, which sets a draw range on the shared geometry — and
+    // that is the sarong, which is a `post=True` bake and none of these are.
+    const SKINOPT = {
+      spec: 0.09,
+      specPower: 24,
+      // Literal colours: skin tone and swimwear are baked per figure, which
+      // is what having eight blobs buys. The marker palette in 42-crowd.js
+      // is for a crowd that is two meshes wearing different paint.
+      body: 'base *= vVCol;',
+    };
+    // Parsed in parallel — eight inflates of 150 KB apiece is worth doing at
+    // once, and they are independent.
+    const parsed = (await Promise.all(BATHER_CAST.map(async (name) => {
       const key = 'bather_' + name + '_fr3d';
-      if (!PAYLOAD[key]) return Promise.resolve(null);
-      return loadSkin(key, {
-        spec: 0.09,
-        specPower: 24,
-        // Literal colours: skin tone and swimwear are baked per figure, which
-        // is what having eight blobs buys. The marker palette in 42-crowd.js
-        // is for a crowd that is two meshes wearing different paint.
-        body: 'base *= vVCol;',
-      });
+      if (!PAYLOAD[key]) return null;
+      try {
+        return readFR3DSkin(await inflateBinary(PAYLOAD[key]));
+      } catch (e) {
+        console.warn('bather failed:', key, e.message);
+        return null;
+      }
     }))).filter(Boolean);
-    if (figs.length) crowds.skin = makeSkinCrowd(scene, figs, bathers.length);
+    // Round-robin over the eight, so the twenty-four on the terraces are the
+    // same eight people three times over rather than three of them eight times.
+    // They sit at four different cafés and no two of a kind share a table.
+    const figs = [];
+    for (let i = 0; parsed.length && i < SKIN_CAST + SKIN_SEATED; i++) {
+      figs.push(skinnedFigure(parsed[i % parsed.length], SKINOPT));
+    }
+    if (figs.length) crowds.skin = makeSkinCrowd(scene, figs, figs.length);
     // And the instanced pair as well, which used to be the *fallback* for a
     // payload with no blobs in it and is now the second tier of a crowd.
     //
@@ -12090,16 +12234,25 @@ async function buildJadrija(scene) {
 
   const walkers = [];
   let cast = 0;
+  let seated = 0;
   for (const b of bathers) {
     // The first few get a mesh of their own; everybody else is an instance of
     // one of two. Ordered by the cast pass above, which already put the
     // scripted business and a spread of poses at the front.
-    // A blob only if there is one spare AND the pose is one a blob can hold.
-    const blobbable = b.pose !== 'sit' && b.pose !== 'lie';
-    const wantSkin = cast < SKIN_CAST && crowds.skin && blobbable;
+    //
+    // A blob only if there is one spare AND the pose is one a blob can hold —
+    // and `sit` is now two different questions rather than one. A chair sitter
+    // can be a blob, because there are three seated clips in the bake authored
+    // for a 0.46 m seat. A sitter on the lip of the quay cannot: those play the
+    // instanced tier's `sit`, whose pelvis drop is measured for somebody sitting
+    // on the slab itself with their legs over the water, and the two are half a
+    // metre apart. There is no clip for `lie` at all.
+    const blobbable = b.chair || (b.pose !== 'sit' && b.pose !== 'lie');
+    const wantSkin = !!crowds.skin && blobbable
+      && (b.chair ? seated < SKIN_SEATED : cast < SKIN_CAST);
     const C = wantSkin ? crowds.skin
       : (crowds[rng() < 0.5 ? 'f' : 'm'] || crowds.m || crowds.f || crowds.skin);
-    if (wantSkin) cast++;
+    if (wantSkin) { if (b.chair) seated++; else cast++; }
     if (!C) break;
     const p = toWorld(b.t, b.s);
     const fg = {
@@ -12117,6 +12270,10 @@ async function buildJadrija(scene) {
       // thirds of the promenade was standing still on the first frame you saw
       // it, which is the exact impression this was built to get rid of.
       wait: b.beat ? rng() * 2.2 : 0,
+      // Which chair, and therefore which of the three seated clips. Undefined
+      // on everybody who is not in one, which `wantClip` in 42-crowd.js reads
+      // as nought and never asks, because it only looks at this for `sit`.
+      seat: b.seat,
       seed: rng(),
       scale: b.k * (0.94 + rng() * 0.13),
       skin: pick(SKIN), suit: pick(SWIM), hair: pick(HAIR),

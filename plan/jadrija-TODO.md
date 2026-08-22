@@ -175,6 +175,31 @@ as of this writing; the state of each is in the git log, not here.
       note below: painting the assembly found it in one screenshot.
 - [ ] Her walk is a bear's — stance too wide, arms too far off the body. Both
       arms and legs need to move through space like a person's.
+- [x] And so is the bathers' STAND, which the walk pass did not touch: "at
+      least some of the bathers still have that bear-pose, the A-pose, with
+      spread legs and arms". Same cause, one clip along — `IDLE_A` corrects the
+      arms by 29° and the legs by nothing at all, so the 6.5° of rest thigh
+      splay and 9.3° of rest shin stood untouched. Measured on the posed rig of
+      the 1.72 m woman, before: ankles 33.1 cm, knees 27.4, wrists 44.9, each
+      hand 7 cm outboard of its own shoulder and 22 in front of it. After:
+      ankles 10.9, knees 17.7, wrists 33.9, hands 1 cm out and 6 to 9 forward,
+      elbows bent 14-16°, soles within 3° of flat. Six constants, in
+      `_stand` in tools/blender/bathers_mh.py, and NOT the walk's six copied
+      over — three of them measured out different for a limb that is standing
+      still. The eight blobs re-baked.
+- [x] The people at the café tables: "sitting backwards on those chairs in
+      weird unnatural poses... replace those marionettes with our high level
+      NPCs". Three faults, one shape. The chairs were axis-aligned boxes with
+      the back always inland whatever the set's angle was, and two of every
+      three had their backs to their own table; the occupant was aimed at the
+      chair's angle plus a right angle, which pointed them at the backrest; and
+      they were drawn by the instanced tier, whose one `sit` is authored for
+      the lip of the quay — hips 14 cm above whatever they stand on — so they
+      sat half a metre into the paving. `seatRing` now gives the chair and the
+      sitter one heading each, three to a table at 120°, and there are three
+      seated clips in the bake with the legs solved per figure against a 0.46 m
+      seat. All 24 terrace occupants are the skinned tier. 60 fps standing in
+      front of it, against 60-61 before.
 - [ ] West of the businesses the ground comes up through everything: benches
       grown into it, bathers neck deep. Almost certainly rule 2 again, but
       MEASURE the four height functions on a grid before assuming.

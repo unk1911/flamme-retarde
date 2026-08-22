@@ -238,8 +238,32 @@ function makeSkinCrowd(scene, figs, cap) {
   // What each pose is called over here. The crowd's `mode` is a body position
   // and a clip is a body position over time, so most of them land on `idle`:
   // somebody standing in the shallows is somebody standing.
+  //
+  // `sit` is the one that does not, and it used to: it landed on `idle`, which
+  // is a person standing up where a person should be sitting down, and that is
+  // why the terraces were drawn by the instanced tier instead. There are three
+  // seated clips in the bake now — see `sit_clips` in tools/blender/bathers_mh.py
+  // — and which of the three a figure is in is `fg.seat`, set once where the
+  // crowd is placed and never afterwards, because a person who changes how
+  // they are sitting every time you look away is worse than a mannequin.
   const CLIP = { stand: 'idle', wade: 'idle', walk: 'walk', sit: 'idle',
     lie: 'idle', wait: 'idle' };
+  const SEATED = ['sit', 'sitback', 'sittable'];
+
+  /**
+   * Which clip this person should be playing.
+   *
+   * The `f.clips` test is not defensive coding for its own sake. The payload
+   * and the source are versioned separately — `build/payload/bather_*.fr3d.gz`
+   * is committed, not built — so a blob baked before the seated clips existed
+   * has to come out as a person standing rather than as a thrown exception.
+   */
+  function wantClip(fg, f) {
+    if (fg.mode !== 'sit') return CLIP[fg.mode] || 'idle';
+    const nm = SEATED[((fg.seat | 0) % SEATED.length + SEATED.length)
+      % SEATED.length];
+    return f.clips && f.clips.includes(nm) ? nm : 'idle';
+  }
 
   for (const f of figs) {
     f.mesh.visible = false;
@@ -260,7 +284,7 @@ function makeSkinCrowd(scene, figs, cap) {
       const fg = figures[i], f = figs[i];
       const dx = fg.x - cam.x, dz = fg.z - cam.z;
       if (dx * dx + dz * dz > maxSq) { f.mesh.visible = false; continue; }
-      const want = CLIP[fg.mode] || 'idle';
+      const want = wantClip(fg, f);
       if (f.playing() !== want) f.play(want, { fade: 0.28 });
       // The walk clip is authored at about 0.92 m/s; anybody strolling faster
       // than that plays it faster rather than sliding.
