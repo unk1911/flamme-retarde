@@ -1096,7 +1096,7 @@ def ring(c, ra, rb, wire, seg=18, ring_seg=6):
     return vs, fs
 
 
-def cutters(J, k=(1.0, 1.0, 1.0), torso=True):
+def cutters(J, k=(1.0, 1.0, 1.0), torso=True, tail=True):
     """The paint volumes, each one closed, positioned off the joint markers.
 
     Two rules govern every entry, and both were learned the hard way.
@@ -1122,6 +1122,10 @@ def cutters(J, k=(1.0, 1.0, 1.0), torso=True):
     turn it off, because both are written as absolute heights off a 1.75 m
     figure and there is no honest way to map a chest the way a skull maps. On a
     1.24 m girl the wedge lands on her sternum.
+
+    `tail` says this figure is wearing the modelled ponytail — see `extras`. It
+    is what the nape is for, and only she has it; see that cutter for why
+    nobody without a tail should be given one.
     """
     out = []
 
@@ -1404,9 +1408,25 @@ def cutters(J, k=(1.0, 1.0, 1.0), torso=True):
     # is behind the ears and below the crown, which is where the hair gathered
     # into the knot actually lies — without it the modelled tail hangs off a
     # shaved neck, which is a worse read than no tail at all.
-    add("nape", HAIR_M, HAIR_P, 2,
-        (fx(-0.073), 0.0, J["neck"].z + 0.058 * kz),
-        (0.105 * kx, 0.070 * ky, 0.085 * kz), rows=14, seg=22)
+    #
+    # It only goes on the figure that has the tail, and that is the whole of
+    # `tail`. This blob bottoms out 27 mm *below* the neck joint, which is what
+    # hair pulled back over a nape does and is four centimetres lower than any
+    # haircut ends — so on a figure with nothing gathered into a knot it is a
+    # stripe of near-black painted down a bare neck. The eight bathers shipped
+    # with one and it was the first thing anybody said about them: a dark wedge
+    # running from the hairline to the shoulder blades. Cutting it is not a
+    # loss, because a cap ending in the cap's own ellipse is a haircut, and what
+    # the nape was holding up was never there.
+    #
+    # It reads worse on them than the same paint does on her for the reason
+    # `perineum` sets out: paint is interpolated across whatever triangle it
+    # lands on, these are decimated to a quarter of her density, and the wedge
+    # that is three centimetres of gradient on Baye is ten on a child.
+    if tail:
+        add("nape", HAIR_M, HAIR_P, 2,
+            (fx(-0.073), 0.0, J["neck"].z + 0.058 * kz),
+            (0.105 * kx, 0.070 * ky, 0.085 * kz), rows=14, seg=22)
 
     # There is no painted garment on this figure any more, and that is the whole
     # of the entry. She wears geometry (see `hip_scarf`) and nothing else.
