@@ -17844,6 +17844,117 @@ async function buildJadrija(scene) {
 
 
 
+
+    // ── what is set into the quay, and what is out in front of it ────────────
+    //
+    // b_151 is the quay flank straight down. Three things in it the shore did
+    // not have.
+
+    // One: the mooring rings. A rusted iron eye lying in a pocket cast into
+    // the slab, flush with the walking surface so nothing catches on it. They
+    // are the only ironwork on the whole edge and they are every few metres of
+    // it, because this quay was a working quay before it was a bathing one.
+    b = deck;
+    for (let t = JAD.beachTo + 7; t < LEN - 6; t += 17.5) {
+      if (onMoleT(t) || onPlazaT(t)) continue;
+      const s = 0.62 + jit(t | 0, 600) * 0.22;
+      const y = surfaceY(t, s);
+      // The pocket: a shallow dish of shadow, which is what you actually see.
+      // Sized to the ring and not to the eye: at 0.60 by 0.52 the pocket read
+      // as a black square with a small ring lying in the middle of it.
+      b.quad(W(t - 0.22, s - 0.20, y + 0.004), W(t + 0.22, s - 0.20, y + 0.004),
+        W(t + 0.22, s + 0.20, y + 0.004), W(t - 0.22, s + 0.20, y + 0.004),
+        [0.268, 0.250, 0.228]);
+      b = up;
+      // The ring, eight chords of rusted iron lying in it.
+      const RUST = [0.230, 0.140, 0.092];
+      for (let i = 0; i < 8; i++) {
+        const a0 = (i / 8) * TAU, a1 = ((i + 1) / 8) * TAU;
+        const R = 0.175, w = 0.030;
+        const p = (a, rr, yy) => W(t + Math.cos(a) * rr, s + Math.sin(a) * rr, yy);
+        b.quad(p(a0, R - w, y + 0.012), p(a1, R - w, y + 0.012),
+          p(a1, R + w, y + 0.012), p(a0, R + w, y + 0.012),
+          i % 2 ? RUST : [0.280, 0.175, 0.110]);
+        b.quad(p(a1, R + w, y + 0.012), p(a0, R + w, y + 0.012),
+          p(a0, R + w, y - 0.020), p(a1, R + w, y - 0.020), [0.170, 0.105, 0.070]);
+      }
+      // And the staple it is shackled to, at the inland side of the pocket.
+      boxTS(t - 0.06, t + 0.06, s + 0.20, s + 0.28, y - 0.02, y + 0.05,
+        [0.200, 0.125, 0.085]);
+      b = deck;
+    }
+    b = up;
+
+    // Two: the line of floats marking the bathing water. It runs across the
+    // whole west bay in the frame, small dark buoys on a rope, and it is the
+    // one thing out there that tells you where the swimming stops and the
+    // boats start.
+    {
+      const s = -64;
+      let prev = null;
+      // Every 2.2 m, not every 7.4. A swim line reads as a dotted line because
+      // the floats are close enough to make one; at seven metres apart and
+      // seventy metres out each float is two pixels and there is no line.
+      for (let t = 24; t < 268; t += 2.2) {
+        const wob = (jit(t | 0, 610) - 0.5) * 2.6;
+        const st2 = s + wob;
+        const BUOY = ((t / 2.2) | 0) % 4 === 0 ? [0.760, 0.330, 0.075]
+          : [0.740, 0.735, 0.720];
+        post(W, t, st2, -0.10, 0.14, 0.135, BUOY, 6);
+        dome(W, t, st2, 0.14, 0.11, 0.135, shade(BUOY, 1.12), 6);
+        // The rope between them, riding just clear of the water.
+        if (prev) {
+          const [pt2, ps] = prev;
+          for (let k = 0; k < 2; k++) {
+            const u0 = k / 2, u1 = (k + 1) / 2;
+            const sag = (u) => 0.04 - Math.sin(u * Math.PI) * 0.05;
+            const q = (u) => W(pt2 + (t - pt2) * u, ps + (st2 - ps) * u, sag(u));
+            const a = q(u0), c = q(u1);
+            b.quad(a, c, [c[0], c[1] + 0.030, c[2]], [a[0], a[1] + 0.030, a[2]],
+              [0.700, 0.680, 0.630]);
+          }
+        }
+        prev = [t, st2];
+      }
+    }
+
+    // Three: the folded loungers. b_151 has them stacked and leaning against
+    // the wall at the top of the quay, which is where every one of them lives
+    // when it is not being sat on — and the game had them all deployed.
+    for (const [st3, ss3] of [[292, 4.6], [396, 4.2], [452, 5.0]]) {
+      const y = surfaceY(st3, ss3);
+      const P = facing(st3, ss3, 0.22);
+      for (let i = 0; i < 5; i++) {
+        const lean = 0.30 + i * 0.055;
+        const off = i * 0.085;
+        const g = 0.94 + 0.10 * (i % 3) / 2;
+        const FR = [0.760 * g, 0.752 * g, 0.732 * g];
+        // A folded lounger is a flat frame standing on its foot and leaning
+        // back: two rails, five slats and a foot, all in one plane.
+        const q = (u, v) => {
+          // u along the frame from the foot, v across it
+          const yy = y + Math.cos(lean) * u;
+          const ds = off + Math.sin(lean) * u;
+          return P(v, ds, yy);
+        };
+        for (const v of [-0.30, 0.30]) {
+          const a = q(0.02, v - 0.03), c = q(1.72, v - 0.03);
+          const a2 = q(0.02, v + 0.03), c2 = q(1.72, v + 0.03);
+          b.quad(a, c, c2, a2, FR);
+          b.quad([a[0], a[1] + 0.04, a[2]], [c[0], c[1] + 0.04, c[2]],
+            [c2[0], c2[1] + 0.04, c2[2]], [a2[0], a2[1] + 0.04, a2[2]],
+            [FR[0] * 1.08, FR[1] * 1.08, FR[2] * 1.08]);
+        }
+        for (let k = 0; k < 5; k++) {
+          const u = 0.20 + k * 0.34;
+          b.quad(q(u, -0.30), q(u + 0.20, -0.30), q(u + 0.20, 0.30), q(u, 0.30),
+            [FR[0] * 0.92, FR[1] * 0.92, FR[2] * 0.92]);
+        }
+      }
+      runs.push({ t0: st3 - 0.6, t1: st3 + 0.6, s0: ss3 - 0.6, s1: ss3 + 0.9,
+        y, h: 1.5 });
+    }
+
     // ── the concrete is cracked ──────────────────────────────────────────────
     //
     // b_121 is two thirds slab, straight down, and the slab is a map of it:
