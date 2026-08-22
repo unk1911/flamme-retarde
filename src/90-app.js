@@ -3497,7 +3497,7 @@ let darkWant = 0;
 // through. Wider than either of the others, ramped rather than latched, and it
 // drives the near clip and nothing else — see `vik.hull`.
 let clipNear = 0;
-let cicadaGain = 0.05;
+let cicadaGain = 0.05, cicadaWood = -1;
 // True while you are on foot inside the Jadrija field, which is the one place
 // the mission is allowed to stop happening. Set at the top of `frame`.
 let recess = false;
@@ -4108,8 +4108,20 @@ function frame() {
     ? trees.canopyAt(camera.position.x, camera.position.z) : 1;
   const cicG = 0.05 * (0.45 + 0.55 * cicW)
     / (1 + Math.pow(Math.max(0, cicD) / 130, 1.8));
-  if (afoot !== wasAfoot || (afoot && Math.abs(cicG - cicadaGain) > 0.0015)) {
+  // Sent on a change in either the weighting or the canopy, and the second
+  // condition is not redundant. Since the beds at Jadrija became one bed that
+  // is divided by where you are standing — see MORPH in src/80-audio.js — the
+  // canopy figure is no longer only the chorus's own crossfade, it is what
+  // decides how much of the promenade bed the pines are given. And the walk
+  // this exists for is the one walk on which the weighting does not move: from
+  // the water's edge up into the trees, canopy goes 0.36 to 1.0 while the
+  // distance term goes the other way by almost exactly as much, so `cicG`
+  // arrives at the far end within a thousandth of where it started and a
+  // gain-only test would send nothing at all for the whole climb.
+  if (afoot !== wasAfoot || (afoot && (Math.abs(cicG - cicadaGain) > 0.0015
+      || Math.abs(cicW - cicadaWood) > 0.02))) {
     cicadaGain = cicG;
+    cicadaWood = cicW;
     audio.cicadas(afoot, cicG, cicW);
     wasAfoot = afoot;
   }

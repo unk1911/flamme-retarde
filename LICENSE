@@ -69,7 +69,8 @@ Applies to the authored content rather than the machinery:
   the Šibenik bridge, the Canadair, the firefighter);
 - the field recordings and the clips cut from them —
   `build/payload/{shore,cicadas,wood,lapping,boat}.mp3`, recorded at Jadrija and
-  in the channel off Šibenik and trimmed, filtered and levelled by hand, and
+  in the channel off Šibenik and trimmed, filtered and levelled by
+  `tools/cut_field.py`, and
   `build/payload/cuk.mp3`, a scops owl recorded by the same hand elsewhere;
 - `docs/*.png`;
 - the assembled `flamme-retarde.html` as a whole.

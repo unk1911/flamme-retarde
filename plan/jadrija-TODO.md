@@ -111,12 +111,24 @@ days of guessing.
       passing in the channel every 50-135 s. Verified: all five decode, no
       console errors, 61 fps, the wood crossfade goes 0 -> 0.53 under the pines,
       the boat fires and runs 23 s.
-- [ ] The five audio levels were set by ARITHMETIC off measured RMS, not by ear.
-      Needs one listening pass. `SHORE.gain` 0.30, `CICADA.level` 3.2,
-      `LAP.gain` 0.20, `BOAT.gain` 0.085, `BOAT.every` 50-135 s. If the
-      promenade sounds muffled standing on it that is `SHORE.lpNear` (4 kHz),
-      held short of the cicada band so the two chorus clips do not double.
-      `shore.mp3` is 19 s and has voices in it, so events come round every 19 s.
+- [x] Heard, 22 Aug, and liked — except that it repeated. Misha: "after about
+      15 seconds it becomes repetitive... it would be cool if the audio kept
+      changing, so as u approach towards water in jadrija, then the
+      water-jadrija clip would be morphed into, and as u walk into magical
+      forest, it would morph into those sounds". Both done: the clips are recut
+      long (24.6 / 10.1 / 68.1 / 69.6 / 44.1 s against 19 / 14 / 9 / 14 / 10)
+      by `tools/cut_field.py`, the two that could not be made long are played on
+      two playheads 2.3 % apart so their period is minutes and not seconds, and
+      the three beds are now one bed divided by where you stand — see MORPH in
+      80-audio.js. The levels themselves were left where they were: what was
+      wrong with them was never how loud they were.
+- [ ] The five audio levels are still arithmetic, not judgement — `SHORE.gain`
+      0.30, `CICADA.level` 3.2 and its `lift` 1.2, `LAP.gain` 0.28, `BOAT.gain`
+      0.085. The morph holds the SUM within half a decibel of what was liked
+      everywhere on the promenade and takes it 1.3 dB down ninety metres into
+      the pines, which is a judgement and wants an ear on it. If the promenade
+      sounds muffled standing on it that is `SHORE.lpNear` (4 kHz), held short
+      of the cicada band so the two chorus clips do not double.
 - [ ] `Voice 260811_213809.m4a` is unidentified — 21:38, broadband 200-2000 Hz,
       no cicada or cricket band. Not shipped, because the game has no night and
       naming it would be inventing one. Ask Misha what it is.

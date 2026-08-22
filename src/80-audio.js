@@ -1392,29 +1392,61 @@ function buildAudio() {
    * same lesson the ćuk taught, and it cost the same three rounds to learn.
    *
    * So there are five clips, cut from recordings made on the spot at Jadrija in
-   * August, 421 KB of mono MP3 in the payload:
+   * August by `tools/cut_field.py`, 2.3 MB of mono MP3 in the payload:
    *
-   *     shore     19.0 s  22 050 Hz  56 kbps  the promenade, whole
-   *     cicadas   14.0 s  24 000 Hz  56 kbps  the chorus off the hillside
-   *     wood       9.0 s  24 000 Hz  56 kbps  the same chorus from inside it
-   *     lapping   14.0 s  22 050 Hz  48 kbps  the sea against the stone edge
-   *     boat      10.0 s  16 000 Hz  40 kbps  an engine out in the channel
+   *     shore     24.5 s  22 050 Hz  96 kbps  the promenade, 13 Aug
+   *     cicadas   10.0 s  24 000 Hz  96 kbps  the hillside, 12 Aug
+   *     wood      68.0 s  24 000 Hz  96 kbps  inside the pines, 17 Aug
+   *     lapping   69.5 s  22 050 Hz  96 kbps  the pier, 16 Aug
+   *     boat      44.0 s  16 000 Hz  64 kbps  the channel off Sibenik, 17 Aug
    *
    * All five are high-passed, because a 117 Hz rumble is the loudest single
    * thing in three of the six source files and it is not the sound of anywhere;
-   * the two choruses are low-passed at 10 kHz as well and levelled to the same
-   * RMS so they can crossfade without a step. That is the whole of what was
-   * done to them. No fades, no distance, no weather baked in: everything you
-   * hear of range and walls and water is applied live below, so walking towards
-   * a thing opens it continuously instead of crossfading between a near mix and
-   * a far one.
+   * the two choruses are high-passed hard enough to take the footfall of the
+   * walk they were recorded on with them, low-passed at 10 kHz, and levelled to
+   * the same RMS so they can crossfade without a step. That is the whole of
+   * what was done to them. No fades, no distance, no weather baked in:
+   * everything you hear of range and walls and water is applied live below, so
+   * walking towards a thing opens it continuously instead of crossfading
+   * between a near mix and a far one.
    *
-   * Each was chosen by searching its source for the window whose two ends match
+   * ── length, which is the thing that was wrong ──
+   *
+   * The first cut of these ran nine to nineteen seconds and it was heard as a
+   * loop inside a minute, which is the correct verdict and not a fussy one. A
+   * bed does not give itself away at the join — noise has no join — it gives
+   * itself away by having a *period*. The same laugh at the same remove every
+   * nineteen seconds is the one thing that does not happen in a real place, and
+   * once the ear has the interval it cannot put it down again.
+   *
+   * So each window is now as long as its source honestly gives. The promenade
+   * recording is 27.6 s end to end and 24.5 of that is the bed; the pier and
+   * the walk through the pines are a minute and more each. Where the source
+   * will not give a long one, it will not: the hillside chorus is in the first
+   * twelve seconds of that recording and the other twenty-nine have no chorus
+   * in them at all — the 4.2 to 6.2 kHz band falls 15 dB at second twelve and
+   * never comes back — so that clip is ten seconds and there is no honest way
+   * to make it more.
+   *
+   * What makes up the shortfall is playheads rather than tape. The two short
+   * clips are each played twice at once, from spread starting points and at
+   * rates 2.3 % either side of one, so what returns is not the clip but the
+   * *pair*, and the pair returns when the two have walked a whole loop apart
+   * from each other. Ten seconds becomes three and a quarter minutes; the
+   * promenade's twenty-four and a half becomes eight and a half. It costs two
+   * buffer sources and it works because a detune of a fortieth is a fortieth of
+   * a semitone below anything anybody hears as pitch in a crowd, and because
+   * two copies of a hillside of insects is a hillside of insects.
+   *
+   * Each window was chosen by searching its source for the two ends that match
    * best in level and in spectrum, so that the loop seam is inaudible. That
    * measure — not a crossfade — is what a bed with no beat in it needs: what
    * gives a loop away is a step in level, and nobody can hear a discontinuity
-   * in noise they could not have predicted anyway. The worst of the five
-   * matches to within half a decibel and the best to within a hundredth.
+   * in noise they could not have predicted anyway. All five match to within a
+   * tenth of a decibel in level; in colour the worst of them is 3.3 dB, which
+   * sounds bad and is not — two 0.35 s blocks picked at random out of that same
+   * promenade recording differ by 4.7 dB, so the seam is a quieter change of
+   * colour than the recording makes on its own every third of a second.
    */
 
   /**
@@ -1443,6 +1475,114 @@ function buildAudio() {
       // here costs the whole feature.
       ctx.decodeAudioData(bytes.buffer, keep, () => { /* undecodable */ });
     } catch (e) { /* likewise */ }
+  }
+
+  /**
+   * One clip on more than one playhead at once.
+   *
+   * The trick the two short beds are held together with — see the note on
+   * length above. `n` copies of the same buffer, started at points spread
+   * evenly round the loop and running at rates spread evenly either side of
+   * one, all into `dest` at 1/sqrt(n) each so that `n` uncorrelated copies of
+   * the same noise come out at the level one of them went in at.
+   *
+   * The starting points are spread deliberately and not left to chance,
+   * because two playheads that happen to land within half a second of each
+   * other are not two crowds, they are one crowd through a comb filter; the
+   * jitter inside each slot is there so it is not the same phase relationship
+   * every session, and the detune is what walks them apart again afterwards.
+   *
+   * Detune has to be applied as a rate and not as a delay because it is the
+   * rate that makes the period long: two playheads at the same rate come round
+   * together for ever, however far apart they start.
+   */
+  function voices(buf, n, detune, dest, t0) {
+    const out = [];
+    const span = Math.max(0.001, buf.duration - 1.0);
+    for (let i = 0; i < n; i++) {
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      // Both ends inside the clip rather than at its edges. Half a second is
+      // far more than an MP3 decoder's leading padding, which is a couple of
+      // dozen milliseconds, and it is also the inset the seam was measured at —
+      // so the loop lands where it was chosen to land however many samples of
+      // silence the decoder decided to hand back first.
+      src.loopStart = 0.5;
+      src.loopEnd = Math.max(1, buf.duration - 0.5);
+      if (n > 1) src.playbackRate.value = 1 + detune * (2 * i / (n - 1) - 1);
+      const g = ctx.createGain();
+      g.gain.value = 1 / Math.sqrt(n);
+      src.connect(g).connect(dest);
+      src.start(t0, 0.5 + span * (i + Math.random() * 0.6) / n);
+      out.push(src);
+    }
+    return out;
+  }
+
+  // ── where you are, and what that does to the mix ────────────────────────────
+  /**
+   * The three beds at Jadrija are one bed with three ends.
+   *
+   * What was here before was three gain stages that did not know about each
+   * other: the promenade at full level everywhere inside the resort, the sea
+   * added on top of it near the edge, the hillside added on top of both. Each
+   * one was right on its own and the three together were wrong in a way that is
+   * easy to say once you have heard it — walking to the water made Jadrija
+   * *louder* and never made it *different*, and walking into the pines did the
+   * same thing with a different clip. Nothing ever became anything else.
+   *
+   * A place does not work like that. Standing on the concrete with the sea half
+   * a metre under your feet, the sea is not a thing added to the promenade, it
+   * is what the promenade has turned into: the crowd is still there and it has
+   * gone behind the water. Fifteen paces into the pines the same crowd is
+   * behind the trees instead, and the trees are the whole of what you can hear.
+   *
+   * So position now sets the *division* of the bed and not just the level of
+   * each part of it. Two numbers do it, both of which the game already had:
+   *
+   *   `near`  how close the waterline is, off `shoreAt` — a distance transform
+   *           of the entire coast, so the edge is the edge wherever you stand
+   *           on it and not only in front of the resort.
+   *   `cnp`   how much canopy is over you, off `canopyAt`.
+   *
+   * `wood` is canopy times *not* being at the water, which matters: the pines
+   * come down to within a few metres of the concrete at the east end and
+   * `canopyAt` reads 0.36 to 0.50 standing on the promenade there. Without that
+   * factor the deep-wood recording would be half up while you are looking at
+   * the sea, which is precisely the thing this is meant to stop.
+   *
+   * The promenade then gives up a share of its *power* — not its amplitude,
+   * because these are uncorrelated noise beds and it is the powers that add —
+   * and the bed that took it is louder by what it took. So the sum stays where
+   * it was set and only the balance travels, which is the whole point: the
+   * levels in here have been listened to and liked, and what was wrong with
+   * them was never how loud they were.
+   */
+  const MORPH = {
+    full: 7,             // m from the water's edge — standing over it
+    fade: 70,            // and where it stops being part of where you are
+    // How much of the promenade's power each end takes when it has all of you.
+    // 0.62 leaves the crowd 2.5 dB under the sea at the edge where it used to
+    // be 3.5 dB over it — six decibels of swing, which is a move and not a
+    // wobble — and 0.80 leaves it 7 dB down under the canopy, which is about
+    // what ninety metres of pine does to a couple of hundred people.
+    water: 0.62,
+    wood: 0.80,
+    // And what the chorus gets back for it. The wood clip has to come up by
+    // more than the promenade goes down, because it is the only bed left when
+    // you are properly in the trees and the sum has to land where it was.
+    lift: 1.2,
+  };
+  // Where the last frame said you were. `null` is "nobody is on their feet",
+  // which is also what the aeroplane looks like from here, and it reads as open
+  // ground: no cede, no canopy, the promenade bed exactly as it always was.
+  let placeD = null, placeCan = 0;
+
+  function placeWeights() {
+    if (placeD == null) return { water: 0, wood: 0 };
+    const near = sat((MORPH.fade - placeD) / (MORPH.fade - MORPH.full));
+    return { water: near, wood: sat(placeCan) * (1 - near) };
   }
 
   // ── the promenade ───────────────────────────────────────────────────────────
@@ -1486,6 +1626,11 @@ function buildAudio() {
     inside: 0.27,        // and what an airframe with two turboprops leaves of it
     lpNear: 4000,        // Hz — the filter as far open as it goes, on the spot
     lpFar: 750,          // and what a kilometre of sea over water leaves of it
+    // The clip is 24.5 s, which is all the recording there is, so this is the
+    // bed that most needs the second playhead. 2.3 % puts the pair's own period
+    // at eight and a half minutes.
+    voices: 2,
+    detune: 0.023,
   };
   let shoreBuf = null, shoreNodes = null;
 
@@ -1508,33 +1653,30 @@ function buildAudio() {
     if (!shoreBuf) { sampleLoad('shore', (b) => { shoreBuf = b; }); return; }
     const t0 = ctx.currentTime;
     if (!shoreNodes) {
-      const src = ctx.createBufferSource();
-      src.buffer = shoreBuf;
-      src.loop = true;
-      // Both ends inside the clip rather than at its edges. Half a second is
-      // far more than an MP3 decoder's leading padding, which is a couple of
-      // dozen milliseconds, and it is also the inset the seam was measured at —
-      // so the loop lands where it was chosen to land however many samples of
-      // silence the decoder decided to hand back first.
-      src.loopStart = 0.5;
-      src.loopEnd = Math.max(1, shoreBuf.duration - 0.5);
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass'; lp.frequency.value = SHORE.lpFar; lp.Q.value = 0.4;
       const g = ctx.createGain();
       g.gain.value = 0.0001;
-      src.connect(lp).connect(g).connect(outBus);
+      const srcs = voices(shoreBuf, SHORE.voices, SHORE.detune, lp, t0);
+      lp.connect(g).connect(outBus);
       // And a send that is *heaviest* when you are furthest away, because at a
       // kilometre what reaches you is mostly the hillside behind the resort
       // rather than the people on it.
       let w = null;
       if (verbSend) { w = ctx.createGain(); w.gain.value = 0.5; g.connect(w).connect(verbSend); }
-      src.start(t0, 0.5);
-      shoreNodes = { src, g, lp, w };
+      shoreNodes = { srcs, g, lp, w };
     }
     // 1 at the resort, 0 at the edge of earshot. Squared, so it is a presence
     // over most of the channel and the whole world only when you are in it.
     const t = sat((SHORE.fade - d) / (SHORE.fade - SHORE.full));
-    const amp = (inside ? SHORE.inside : SHORE.gain) * t * t;
+    // And then what is left of it once the sea and the pines have taken their
+    // share — see MORPH. In amplitude that is a square root, because what is
+    // being divided is power. `cede` is zero anywhere that is neither at the
+    // water nor under a canopy, and zero out in the channel where there is no
+    // position at all, so the factor is 1 and the bed is what it always was.
+    const m = placeWeights();
+    const cede = MORPH.water * m.water + MORPH.wood * m.wood;
+    const amp = (inside ? SHORE.inside : SHORE.gain) * t * t * Math.sqrt(1 - cede);
     const n = shoreNodes;
     n.g.gain.setTargetAtTime(Math.max(amp, 0.0001), t0, 0.45);
     n.lp.frequency.setTargetAtTime(
@@ -1563,37 +1705,54 @@ function buildAudio() {
    * away — which is right, because a shut door is exactly what it is: a hundred
    * millimetres of render leaves you the body of it and none of its edge, and
    * the edge is all this is.
+   *
+   * And it stops when you swim, which is not an oversight and has one visible
+   * consequence now that this call is also what tells the morph where you are.
+   * Wading off the concrete, the position goes to null, the promenade stops
+   * ceding and comes back up four decibels over about half a second as the sea
+   * against the edge goes away. That is the right way round: you have just put
+   * the edge behind you and the whole resort is open across the water at your
+   * ear. It is a swell and not a step, and it is the only place in the game
+   * where the morph resets rather than travels.
    */
   const LAP = {
-    full: 7,             // m from the water's edge — standing over it
-    fade: 70,            // and where it stops being part of where you are
-    // lapping.mp3 sits at −24.0 dBFS RMS, so this is about −38 dBFS at the
-    // edge: level with the promenade bed rather than under it, because at four
-    // metres it genuinely is.
-    gain: 0.20,
+    full: MORPH.full,    // the same two numbers the morph divides the bed on,
+    fade: MORPH.fade,    // because "how near the water is" has one answer
+    // lapping.mp3 sits at −24.0 dBFS RMS, so this is about −35 dBFS at the
+    // edge. It was 0.20 and level with the promenade; it is 0.28 and over it,
+    // because the promenade now steps back by 0.62 of its power when you are
+    // standing on the edge and the sum of the two has to land where it was.
+    // 0.30² + 0.20² was 0.130; 0.30²(1 − 0.62) + 0.28² is 0.121, which is two
+    // tenths of a decibel and is the point — the balance moved, the level did
+    // not.
+    gain: 0.28,
   };
   let lapBuf = null, lapNodes = null;
 
   /** @param d metres to the water's edge, or null for "not on your feet". */
   function lapping(d) {
     if (!ctx) return;
-    if (d == null || !(d <= LAP.fade)) {
+    // Recorded before the range test and not after it, because this is where
+    // the morph learns where you are and the answer "three hundred metres from
+    // any water" is as much a position as "on the edge of it". Only a caller
+    // that has nobody on their feet passes null, and that is the one case that
+    // means "do not morph anything".
+    placeD = d == null || !(d >= 0) ? null : d;
+    if (placeD == null || !(placeD <= LAP.fade)) {
       if (lapNodes) lapNodes.g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.7);
       return;
     }
     if (!lapBuf) { sampleLoad('lapping', (b) => { lapBuf = b; }); return; }
     const t0 = ctx.currentTime;
     if (!lapNodes) {
-      const src = ctx.createBufferSource();
-      src.buffer = lapBuf;
-      src.loop = true;
-      src.loopStart = 0.5;
-      src.loopEnd = Math.max(1, lapBuf.duration - 0.5);
       const g = ctx.createGain();
       g.gain.value = 0.0001;
-      src.connect(g).connect(outBus);
-      src.start(t0, 0.5);
-      lapNodes = { src, g };
+      g.connect(outBus);
+      // One playhead. The clip is 69.5 s — the whole of the pier recording bar
+      // its two ends — and a bed with a period longer than a minute does not
+      // need help having one.
+      const srcs = voices(lapBuf, 1, 0, g, t0);
+      lapNodes = { srcs, g };
     }
     // Linear in distance and not squared. This is a line source — the whole
     // frontage and forty-two metres of mole, all of it working at once — and a
@@ -1663,7 +1822,9 @@ function buildAudio() {
     // remarkable thing. Read off that gain rather than off a distance of its
     // own because there is only one right answer to "is the player at the
     // water" and it should only be computed once. 0.03 of 0.30 is about
-    // eleven hundred metres out.
+    // eleven hundred metres out, and the morph cannot walk the bed past this
+    // gate from inside the resort: the deepest cede leaves it at 0.134, which
+    // is four times the threshold.
     if (!afoot || !shoreNodes || shoreNodes.g.gain.value < 0.03) {
       // And the next one comes twenty seconds after you step back out, rather
       // than at once — arriving on the frame the mode changes reads as a thing
@@ -2037,11 +2198,9 @@ function buildAudio() {
    * it — a different recording, not a louder one, and no filter turns the
    * first into the second.
    *
-   * Crossfaded on how much canopy is over you, in square root and not in
-   * proportion, because these are two uncorrelated noise beds: their powers
-   * add where their amplitudes do not, and a linear crossfade between them
-   * sags three decibels in the middle. Which is exactly where you are standing
-   * when you walk into the trees.
+   * Crossfaded on how much canopy is over you and how far from the water you
+   * are — see `chorusLevel`, and MORPH above it, which is where that pair of
+   * numbers is worked out for all three beds at once.
    *
    * The bandpassed noise this replaces is still here underneath and still gets
    * used — see `synthCicadas` — because the chorus has to be there on the frame
@@ -2056,9 +2215,19 @@ function buildAudio() {
     // used to sit. Measured, not judged; it wants an ear.
     level: 3.2,
     fade: 0.8,           // s — how fast the wood comes in as you walk into it
+    // The hillside clip is ten seconds and there is no more of it in the
+    // recording — see the note on length at the top. So it is played twice at
+    // once, which puts the pair's period at three and a half minutes. The wood
+    // clip is 68 s and needs one playhead and no help.
+    voices: 2,
+    detune: 0.023,
   };
   let cicadaBuf = null, woodBuf = null;
   let cicadaNodes = null;
+  // The last weighting the frame loop asked for, kept because the level this
+  // bed actually plays at is that weighting times what the morph has just
+  // handed it, and the two arrive from different callers on different clocks.
+  let cicAsk = 0.055;
 
   /** Wind one set of nodes down and let go of it. */
   function cicadaStop(t0, tau) {
@@ -2079,19 +2248,17 @@ function buildAudio() {
     g.connect(outBus);
     const srcs = [], mix = [];
     for (const buf of [cicadaBuf, woodBuf]) {
-      const src = ctx.createBufferSource();
-      src.buffer = buf;
-      src.loop = true;
-      src.loopStart = 0.5;
-      src.loopEnd = Math.max(1, buf.duration - 0.5);
       const cg = ctx.createGain();
       cg.gain.value = 0.0001;
-      src.connect(cg).connect(g);
-      // Started at a different place in each clip every session. Both loops are
-      // short and the pair of them would otherwise come round together on the
-      // same beat for as long as the game is open.
-      src.start(t0, 0.5 + Math.random() * (buf.duration - 1.5));
-      srcs.push(src); mix.push(cg);
+      cg.connect(g);
+      // One playhead for anything over twenty seconds and two for anything
+      // under, which is the hillside clip and only the hillside clip. Started
+      // at a different place every session either way, so that the two clips
+      // do not come round together on the same beat for as long as the game is
+      // open.
+      const n = buf.duration < 20 ? CICADA.voices : 1;
+      for (const src of voices(buf, n, CICADA.detune, cg, t0)) srcs.push(src);
+      mix.push(cg);
     }
     return { real: true, g, srcs, openG: mix[0], woodG: mix[1] };
   }
@@ -2140,6 +2307,53 @@ function buildAudio() {
   }
 
   /**
+   * What the chorus is actually playing at, which is two things multiplied.
+   *
+   * The frame loop's weighting is distance and canopy — how much hillside there
+   * is to hear. The morph's is how much of the bed the hillside has been given,
+   * which is the power the promenade put down when you walked in under the
+   * trees. Written from `shore` every frame as well as from here, because this
+   * one is only called when the weighting moves and the position moves without
+   * it: the two cancel almost exactly on the walk from the water's edge up into
+   * the pines, and a bed that is only updated when its input changes is a bed
+   * that never updates on the one walk it exists for.
+   */
+  function chorusLevel(t0) {
+    // The handover from the oscillators to the recordings, which lives here
+    // rather than in `cicadas` because `cicadas` is called on a change and this
+    // is not a change, it is a decode finishing on some other clock. Step out
+    // of the aeroplane on to the promenade and stand still: the frame you land
+    // on has no buffers yet and gets the synthesised chorus, the buffers arrive
+    // half a second later, and — since the weighting behind that call is flat
+    // to a thousandth anywhere you are not walking — nothing ever asked again.
+    // Half a second of fade is long enough not to be a click and short enough
+    // that nobody hears which of the two hillsides they were standing under.
+    if (cicadaNodes && !cicadaNodes.real && cicadaBuf && woodBuf) {
+      cicadaStop(t0, 0.5);
+      cicadaNodes = realCicadas(t0);
+    }
+    const n = cicadaNodes;
+    if (!n) return;
+    const k = placeWeights().wood;
+    n.g.gain.setTargetAtTime(Math.max(
+      n.real ? cicAsk * CICADA.level * (1 + MORPH.lift * k) : cicAsk, 0.0001), t0, 1.2);
+    if (!n.real) return;
+    // And the crossfade between the two hillsides, on the same weight and on
+    // the same clock. In square root and not in proportion, because these are
+    // two uncorrelated noise beds: their powers add where their amplitudes do
+    // not, and a linear crossfade between them sags three decibels in the
+    // middle — which is exactly where you are standing when you walk into the
+    // trees.
+    //
+    // The morph's weight and not the raw canopy, so that the pines at the east
+    // end — which come down to within a few metres of the concrete and read
+    // 0.36 overhead where you are looking at the sea — do not put the deep-wood
+    // recording half up at the water's edge.
+    n.openG.gain.setTargetAtTime(Math.max(Math.sqrt(1 - k), 0.0001), t0, CICADA.fade);
+    n.woodG.gain.setTargetAtTime(Math.max(Math.sqrt(k), 0.0001), t0, CICADA.fade);
+  }
+
+  /**
    * @param on    whether there is a hillside within earshot at all
    * @param gain  the caller's distance-and-canopy weighting, ~0…0.05
    * @param wood  how much canopy is over the listener, 0…1
@@ -2148,22 +2362,15 @@ function buildAudio() {
     if (!ctx) return;
     const t0 = ctx.currentTime;
     if (!on) { cicadaStop(t0, 0.9); return; }
+    placeCan = wood;
+    cicAsk = gain;
     sampleLoad('cicadas', (b) => { cicadaBuf = b; });
     sampleLoad('wood', (b) => { woodBuf = b; });
     const have = !!(cicadaBuf && woodBuf);
-    // Half a second is long enough not to be a click and short enough that
-    // nobody hears which of the two hillsides they are standing under. It only
-    // ever happens once, a beat or two after the first frame on foot.
-    if (cicadaNodes && !cicadaNodes.real && have) cicadaStop(t0, 0.5);
     if (!cicadaNodes) cicadaNodes = have ? realCicadas(t0) : synthCicadas(t0, gain);
-    const n = cicadaNodes;
-    n.g.gain.setTargetAtTime(Math.max((n.real ? gain * CICADA.level : gain), 0.0001),
-      t0, 1.2);
-    if (n.real) {
-      const k = sat(wood);
-      n.openG.gain.setTargetAtTime(Math.max(Math.sqrt(1 - k), 0.0001), t0, CICADA.fade);
-      n.woodG.gain.setTargetAtTime(Math.max(Math.sqrt(k), 0.0001), t0, CICADA.fade);
-    }
+    // Which also does the swap to the recordings if the decode has landed since
+    // the last time anybody asked — see the note on it.
+    chorusLevel(t0);
   }
 
   /**
@@ -2517,6 +2724,14 @@ function buildAudio() {
     // Likewise above the gate, and for the same reason: a boat in the channel
     // is nobody's aeroplane's business.
     boatTick(dt, !!s.afoot);
+    // And the hillside, which needs a clock of its own for two reasons. It has
+    // to be able to swap the oscillators for the recordings on the frame the
+    // decode lands rather than on the frame somebody happens to walk, and the
+    // level it plays at is now half the frame loop's weighting and half where
+    // you are standing — which moves when the weighting does not. Cheap: one
+    // read of two numbers and two setTargetAtTime with the same target as last
+    // frame, which the graph does nothing with.
+    if (cicadaNodes) chorusLevel(ctx.currentTime);
     // `dead` means your aeroplane is over. It used to mean the mixer was
     // switched off, and conflating those two is the whole of "the water only
     // hisses if I arrive by the 9 key".
@@ -2840,15 +3055,43 @@ function buildAudio() {
       tried: [...sampleTried],
       loaded: { shore: !!shoreBuf, cicadas: !!cicadaBuf, wood: !!woodBuf,
         lapping: !!lapBuf, boat: !!boatBuf },
-      secs: shoreBuf ? +shoreBuf.duration.toFixed(2) : 0,
+      // How long each of the five actually came back as, because the whole of
+      // this pass was about length and a build that quietly shipped the old
+      // short clips would look identical from every other number in here.
+      secs: {
+        shore: shoreBuf ? +shoreBuf.duration.toFixed(2) : 0,
+        cicadas: cicadaBuf ? +cicadaBuf.duration.toFixed(2) : 0,
+        wood: woodBuf ? +woodBuf.duration.toFixed(2) : 0,
+        lapping: lapBuf ? +lapBuf.duration.toFixed(2) : 0,
+        boat: boatBuf ? +boatBuf.duration.toFixed(2) : 0,
+      },
       rate: shoreBuf ? shoreBuf.sampleRate : 0,
+      // How many playheads are up, which is what makes the periods long.
+      heads: (shoreNodes ? shoreNodes.srcs.length : 0)
+        + (cicadaNodes && cicadaNodes.real ? cicadaNodes.srcs.length : 0)
+        + (lapNodes ? lapNodes.srcs.length : 0),
       playing: !!shoreNodes,
       gain: shoreNodes ? +shoreNodes.g.gain.value.toFixed(4) : 0,
       lp: shoreNodes ? Math.round(shoreNodes.lp.frequency.value) : 0,
       lap: lapNodes ? +lapNodes.g.gain.value.toFixed(4) : 0,
+      // Where the morph thinks you are and what it is doing about it — the one
+      // place the whole positional crossfade can be read off. `cede` is the
+      // share of its power the promenade has handed over; `open` and `wood` on
+      // the chorus are the two ends of its crossfade, in amplitude.
+      place: (() => {
+        const m = placeWeights();
+        return {
+          d: placeD == null ? null : +placeD.toFixed(1),
+          canopy: +placeCan.toFixed(3),
+          water: +m.water.toFixed(3),
+          wood: +m.wood.toFixed(3),
+          cede: +(MORPH.water * m.water + MORPH.wood * m.wood).toFixed(3),
+        };
+      })(),
       cicada: cicadaNodes ? {
         real: cicadaNodes.real,
         gain: +cicadaNodes.g.gain.value.toFixed(4),
+        open: cicadaNodes.real ? +cicadaNodes.openG.gain.value.toFixed(3) : 0,
         wood: cicadaNodes.real ? +cicadaNodes.woodG.gain.value.toFixed(3) : 0,
       } : null,
       boatIn: +boatAt.toFixed(1),

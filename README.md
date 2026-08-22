@@ -532,24 +532,36 @@ including how to rebuild without the parts you may not want.
 - [Three.js](https://threejs.org), MIT.
 - Intro panels generated with Google Gemini 2.5 Flash Image from reference photographs.
 - **The ambience**: recorded at Jadrija in **August 2026**, mine, no third-party
-  terms. Six field recordings became five mono clips in the payload:
+  terms. Six field recordings became five mono clips in the payload, cut by
+  [`tools/cut_field.py`](tools/cut_field.py):
 
   | clip | source | s | rate | kbps | KB |
   |---|---|---|---|---|---|
-  | `shore.mp3` | the promenade, 13 Aug | 19.0 | 22 050 | 56 | 131 |
-  | `cicadas.mp3` | the hillside, 12 Aug | 14.0 | 24 000 | 56 | 96 |
-  | `wood.mp3` | inside the pines, 17 Aug | 9.0 | 24 000 | 56 | 62 |
-  | `lapping.mp3` | the pier, 16 Aug | 14.0 | 22 050 | 48 | 83 |
-  | `boat.mp3` | a boat off Šibenik, 17 Aug | 10.0 | 16 000 | 40 | 49 |
+  | `shore.mp3` | the promenade, 13 Aug | 24.6 | 22 050 | 96 | 288 |
+  | `cicadas.mp3` | the hillside, 12 Aug | 10.1 | 24 000 | 96 | 118 |
+  | `wood.mp3` | inside the pines, 17 Aug | 68.1 | 24 000 | 96 | 798 |
+  | `lapping.mp3` | the pier, 16 Aug | 69.6 | 22 050 | 96 | 816 |
+  | `boat.mp3` | a boat off Šibenik, 17 Aug | 44.1 | 16 000 | 64 | 345 |
 
   *Changes made*: each trimmed to the window whose two ends match best in level
-  and in spectrum, so the loop seam is inaudible; high-passed (150 Hz for the
-  shore and the pier, 2 kHz for the two choruses, 28 Hz for the boat) to take
-  out a 117 Hz rumble that is the loudest single thing in three of the six
-  sources; the two choruses low-passed at 10 kHz and levelled to the same
-  −25.2 dBFS RMS so they crossfade without a step; nothing taken past −1 dBFS
+  and in spectrum, so the loop seam is inaudible; high-passed (180 Hz for the
+  promenade and the pier, 1.9 and 2.4 kHz for the two choruses, 45 Hz for the
+  boat) to take out a 117 Hz rumble that is the loudest single thing in three of
+  the six sources, and in the choruses the footfall of the walk they were
+  recorded on; the two choruses low-passed at 10.5 kHz and levelled to the same
+  −25.2 dBFS RMS so they crossfade without a step; nothing taken past −0.6 dBFS
   peak. Distance, weather, walls and Doppler are applied live at run time and
   none of it is baked into the files.
+
+  Each window is as long as its source honestly gives, because a bed gives
+  itself away by having a period and not by having a join. The promenade
+  recording is 27.6 s end to end and 24.6 of it is here; the pier and the walk
+  through the pines run over a minute each. The hillside chorus is the exception
+  and cannot be helped: it is in the first twelve seconds of that recording and
+  the other twenty-nine have no chorus in them at all, so that clip is ten
+  seconds and the game plays it on two playheads at rates 2.3 % either side of
+  one, which puts the pair's period at three and a quarter minutes instead of ten
+  seconds. The promenade gets the same treatment for the same reason.
 
   These five and the 2.8 KB ćuk are the only recorded sounds in the build.
   Every other noise the game makes — engines, water, fire, footsteps, the birds,
