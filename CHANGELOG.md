@@ -8,6 +8,70 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.97.1] — 2026-08-22
+
+Two fixes that arrived after 1.97.0 had gone up, and one measurement that is
+worth more than either of them.
+
+### Fixed
+
+- **Baye went on standing in the A-pose after her walk was fixed.** `IDLE_A`
+  and `IDLE_B` are hers as well as the bathers', and the pass that corrected
+  the bathers was scoped out of `human_mh.py` while another agent held it. Now
+  corrected at source rather than by a second rewriter, which also caught four
+  poses that keyed the arms as ABSOLUTES and therefore kept the A-pose even
+  after the idle had lost it: `NOTICE`, `UNTIE_C`, `IDLE_B`, and the idle left
+  arm inside `WINE_LIFT`. Her ankles go 0.458 m apart to **0.109**, knees 0.333
+  to 0.163, elbow bend 60°/57° to 16°/13°, hands from 70 mm outboard of their
+  own shoulder to 26. Fixing it at source also kept `IDLE_B`'s 2° of shoulder
+  breath — 3 cm of wrist swing — which a rewriter has to flatten.
+- **Three bathers were standing in the sea off the west beach**, a metre below
+  the lip, holding nothing. The loop that puts somebody halfway down every
+  other ladder did not have the beach test the ladders themselves have:
+  `ladder()` skips `t < beachTo + 8`, because a ladder is how you get out of
+  water you cannot stand up in and the west end is shingle you walk out of. The
+  skip draws its `rng()` and throws it away — a bare `continue` would have
+  eaten three numbers out of the stream and moved every bather, parasol and hut
+  east of the beach (rule 4). Census identical either side at seen 446 / thin
+  333 / plain 86 / rich 27, and 0 figures below the waterline west of t 220
+  where there were 3.
+
+### The measurement
+
+**The ankle-crossing minimum does not transfer between rigs, and the number in
+the tree was wrong.** Correcting hip adduction to close a splayed stance has a
+minimum: push past it and the ankles cross. The bathers pass had found its own
+minimum empirically and guessed the neighbouring rig's at "about 11.5". Measured
+on each skeleton: **Baye crosses at 14.8°, the 1.72 m bather at 10.0°.** So the
+walk's 11° is a good stance on Baye and 2.6 cm of crossed ankles on the bather —
+the same number, opposite verdicts. The guess is corrected in place.
+
+Of the six `STAND_*` constants only `TRACK` is shared with the walk; the other
+five are solved per rig (`SOLE 12` on Baye against the bathers' 8.5, because her
+contrapposto fixes the sum of the two foot rolls near −5° and 12 is where they
+come out equal).
+
+### Verified rather than assumed
+
+- **All 24 of Baye's clips checked frame by frame**, before and after. Eleven
+  moved, all of them the fix: idle, wave, notice, kneel, getup, flip, heart,
+  note, wine, untie, submit. Thirteen are identical to the digit, **the walk
+  among them** — ankles 0.112–0.124, wrists 0.331–0.341, bit-identical every
+  frame, plus a nine-frame in-game burst against the shipped payload.
+- **The wine pour still lands.** `WINE_POUR`'s right wrist is 0.361 forward /
+  0.285 right / 1.084 up, unchanged to the millimetre, which matters because
+  the glass on the tabouret in the kabina is placed from those numbers.
+- **The eight bathers did not move.** The `_stand` rewriter did not have to go,
+  but it had to stop double-correcting: five of its numbers are absolute and
+  idempotent, the elbow undo is added, so it now applies `40 − STAND_ELBOW_UNDO`.
+  Idle, idle-breath and notice are identical to the third decimal on all eight.
+
+### Also
+
+- The `--probe` docstring in the rig tooling claimed −Y was in front and ±X
+  lateral. It is **+X in front, +Y her left** — verified twice, against the
+  rest-pose foot positions and against the pour numbers `kabinaKit` quotes back.
+
 ## [1.97.0] — 2026-08-22
 
 The release where the place got its own voice, and where three things that
