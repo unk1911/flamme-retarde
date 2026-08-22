@@ -1,18 +1,14 @@
 # plan
 
-The working record for the Jadrija build: what the survey shows, what has been
-built from it, what is still open, and what needs Misha's judgement.
+`jadrija-TODO.md` is the working record for the Jadrija build: the rules that
+cost a build to learn, what is still open, what the survey shows that is not
+built yet, and a one-line-per-item account of what is.
 
-- **`jadrija-TODO.md`** — one entry per pass. The survey findings frame by
-  frame, the hard-won rules, and the bugs with their causes written down. This
-  is deliberately long: it is what survives when the conversation context is
-  compacted, and several of its notes exist because the same mistake was made
-  twice before anyone wrote it down.
-- **`QUESTIONS.md`** — decisions made alone that Misha should check, and the
-  ones still genuinely open. Nothing here blocks; each has a defensible
-  choice already built.
+It is here rather than in a scratch directory because it is part of the
+project — the reasoning behind the geometry, which the geometry cannot carry —
+and because it is the only memory that survives a context compaction.
 
-It lives in the repo because it is part of this project — the reasoning behind
-the geometry, which the geometry itself cannot carry. It held nothing but text
-and it never holds a photograph: the survey stills are third-party or personal
-and stay out of version control.
+Keep it short. It is read every pass; anything that has become a rule belongs
+under RULES in one line, not as an essay under the item that taught it.
+
+Text only. Survey stills are third-party or personal and stay out of the repo.
