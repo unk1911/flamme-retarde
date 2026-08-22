@@ -13078,10 +13078,12 @@ async function buildJadrija(scene) {
    *
    * The broad phase is one subtraction against `t`, and a sweep of the list
    * rather than a grid — the same call `showAhead` makes about the 563
-   * blockers, for the same reason. There are eleven people in here today and a
-   * grid over eleven of anything is a second copy of the beach layout to keep
-   * in step with the first. The reject is on the shore coordinate rather than
-   * on world distance because every one of these carries `t` already: a walker
+   * blockers, for the same reason. Ten people are in the soft list today and
+   * she makes eleven — seventeen circles between them, because a sunbather is
+   * two — and a grid over seventeen of anything is a second copy of the beach
+   * layout to keep in step with the first. The reject is on the shore
+   * coordinate rather than on world distance because every one of these carries
+   * `t` already: a walker
    * advances along it and never has to be projected back out of world space,
    * which is precisely why they are stored that way.
    *
@@ -13090,7 +13092,7 @@ async function buildJadrija(scene) {
    */
   function bodies(x, z, pad) {
     bodyN = 0;
-    const [t, s] = local(x, z);
+    const [t] = local(x, z);
     // The widest thing in the list plus the caller's own reach. Everything
     // outside this band on `t` cannot possibly touch, whatever its `s`.
     const band = pad + BODY.lieR + BODY.lieSpan;

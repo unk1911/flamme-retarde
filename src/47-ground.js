@@ -565,14 +565,6 @@ async function buildGround(scene, field) {
   const upright = (c) => c.mode !== 'down' && c.mode !== 'lost';
 
   /**
-   * Push a point out of everybody who is upright. World space and recomputed
-   * every frame, because these are not buildings: a person walks, so they cannot
-   * live in `field.blockers`, which is a static list of axis-aligned boxes in the
-   * runway's own axes. A person is a circle rather than a box, so it is the
-   * radius that ejects you and not the nearest face — but it is the same idea and
-   * the same one pass that confine() makes over the buildings.
-   */
-  /**
    * Who you are touching this frame, and who you were touching last frame.
    *
    * The pair exists only to make a bump one event instead of sixty a second.
@@ -616,10 +608,8 @@ async function buildGround(scene, field) {
    * `walk()` — and all it needs from here is an honest correction.
    *
    * And the vertical. Somebody on a towel is 0.42 m of person and the hop
-   * clears 1.98, so `top` lets you jump them; somebody on their feet is 1.78
-   * and you never will. Only while actually airborne, exactly as `confine`
-   * reads the tops of its boxes, because standing on something is not the same
-   * as clearing it.
+   * clears 1.98, so you go over them; somebody on their feet is 1.78 and you
+   * never will. See the column test in the loop.
    */
   function unbody(x, z, y) {
     const r = GROUND.body * 2;
@@ -1866,12 +1856,12 @@ async function buildGround(scene, field) {
     field = next;
     vetBlockers(next);
     objects = next.objects || [];
-    // Nobody is out here. The aerodrome's seven are built against the
-    // aerodrome's spots and cannot be relocated meaningfully, so they go away
-    // and come back if you are ever pointed at the field again.
     // Whoever you were leaning on is somebody else's locale now, and a stale
     // key here would swallow the first bump you got in the new one.
     touching.clear(); touched.clear();
+    // Nobody is out here. The aerodrome's seven are built against the
+    // aerodrome's spots and cannot be relocated meaningfully, so they go away
+    // and come back if you are ever pointed at the field again.
     const home = next.crewSpots && next.crewSpots.length;
     crew = home ? allCrew : [];
     if (!home) for (const c of allCrew) c.fig.root.visible = false;
