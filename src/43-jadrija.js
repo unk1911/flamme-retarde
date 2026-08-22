@@ -4476,9 +4476,23 @@ async function buildJadrija(scene) {
     /**
      * @param t,s  where you are, in the resort's frame
      * @param d    how far away you are, for the sound and for the gate
+     * @param y    and how high, world frame — or null for "do not ask"
+     *
+     * `d` is measured flat, in (t, s), because everything else here is: it is
+     * the gate on the solver and the range on the sound and neither wants a
+     * height in it. But a Canadair passing over the kabine is at (t, s) zero
+     * from this doorway too, and the crossing test below is deliberately a test
+     * of the *segment* you moved along — which is exactly what a hundred metres
+     * of aeroplane a frame does. So the height is asked for as well, and the
+     * only thing it is used for is to say that you are in the opening rather
+     * than over the roof of it. `null` skips the question, for the debug hook,
+     * which drives the curtain with no camera at all.
      */
-    function step(t, s, d, dt) {
+    function step(t, s, d, dt, y = null) {
       if (d > 26) { prevT = prevS = null; return 0; }
+      // In the doorway, vertically: under the head of the opening and not in
+      // the sea room below it. A walker's eye is 1.6 m up a 2.03 m opening.
+      const inHole = y == null || (y < yTop && y > yTop - 3.4);
       const h = Math.min(dt, 0.05);
       const vs = prevS == null ? 0 : (s - prevS) / h;
       const vt = prevT == null ? 0 : (t - prevT) / h;
@@ -4486,7 +4500,7 @@ async function buildJadrija(scene) {
       prevT = t; prevS = s;
       // Are you in the doorway at all. Half a metre either side of the strands,
       // which is a shoulder and an arm.
-      const through = s > sHang - 0.55 && s < sHang + 0.55;
+      const through = inHole && s > sHang - 0.55 && s < sHang + 0.55;
 
       /**
        * The crossing itself.
@@ -4511,7 +4525,7 @@ async function buildJadrija(scene) {
        * teleport, which straddles them just the same. One test catches both,
        * and it never needs to know that the cut exists.
        */
-      if (wasS != null && (wasS - sHang) * (s - sHang) < 0) {
+      if (inHole && wasS != null && (wasS - sHang) * (s - sHang) < 0) {
         const u = (sHang - wasS) / (s - wasS);
         const tx = wasT + (t - wasT) * u;           // where across the doorway
         const dx = Math.abs(tx - K.dc);
@@ -8687,7 +8701,7 @@ async function buildJadrija(scene) {
     if (audio) audio.radioClick(SET.band >= 0);
   }
 
-  function stepKabina(pt, ps, dt) {
+  function stepKabina(pt, ps, dt, camY) {
     if (!kit || !special) return;
     const K = special;
     // Before the near gate, and with its own: the curtain is the one thing in
@@ -8695,7 +8709,7 @@ async function buildJadrija(scene) {
     // for a second or two after you have gone through and stopped being near.
     if (beads) {
       beads.step(pt, ps,
-        Math.hypot(pt - K.dc, ps - (K.face + 0.075)), dt);
+        Math.hypot(pt - K.dc, ps - (K.face + 0.075)), dt, camY);
     }
     // Kept outside the near gate below, because a radio you can hear from the
     // promenade is most of what makes anybody walk over and look through the
@@ -13051,7 +13065,7 @@ async function buildJadrija(scene) {
     // twenty-four bones and wants one, and the distance both of them turn on is
     // the same number. Gating out here would mean measuring it twice.
     stepDog(cam, dt);
-    stepKabina(pt, ps, dt);
+    stepKabina(pt, ps, dt, cam.y);
 
     if (skinFig) {
       const dx = cam.x - skinFig.mesh.position.x, dz = cam.z - skinFig.mesh.position.z;
