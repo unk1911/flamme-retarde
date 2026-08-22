@@ -71,8 +71,15 @@ days of guessing.
       passes: the first was a wine bottle, because the barrel was half a metre
       on a 0.30 m diameter and the shoulder eased over. A butane bottle is as
       tall in the barrel as it is wide and the shoulder turns hard.
-- [ ] Ragged tarmac edge into the dust parking (b_076): the tarmac stops in a
-      cracked, patched edge and cars stand nose-in on limestone dust beyond it.
+- [x] The tarmac apron and its ragged edge (b_076). Pale sun-bleached grey,
+      NOT dark asphalt — what separates it from the dust in the frame is
+      surface, not colour. Ragged inland edge as a function of t, made-good
+      patches in a paler mix, crumbled lumps lying off the edge.
+      The crazing had to be a NET: 460 loose dashes over 1200 m2 read as litter
+      on a clean strip, because you can count them. It is 2600 chains of 2-5
+      joined segments with a big turn at every joint now — a craquelure cell is
+      a polygon, not a curve — started thickly enough that they run into each
+      other and close the cells.
 - [ ] Roadside street furniture (b_046): round blue no-stopping sign on a grey
       post, concrete blocks across the lane end, cut-stone kerb retaining the
       bank, open timber pergola frame on a gable.

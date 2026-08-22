@@ -5777,6 +5777,96 @@ async function buildJadrija(scene) {
         post(W, t + jit(t | 0, 59) * 0.6, s, y - r * 0.4, y + r * 0.9, r,
           [g, g * 0.985, g * 0.930], 5);
       }
+
+      // ── and the tarmac apron the dust gives out from ──────────────────
+      //
+      // b_076 films this straight down: an apron of tarmac that stops in a
+      // ragged, crumbling edge and becomes coarse limestone gravel. The whole
+      // band here was drawn as dust, and the seam is the thing the frame is
+      // about.
+      //
+      // The tarmac is NOT the dark asphalt the word suggests. Twenty summers
+      // of this sun have taken it to a pale grey barely darker than the dust
+      // beside it, and what separates the two in the photograph is not colour
+      // so much as SURFACE: the tarmac is smooth and crazed all over with a
+      // fine craquelure, and the gravel is loose and full of white stones. So
+      // the colour difference is kept small on purpose and the crazing is what
+      // does the work.
+      b = deck;
+      const ASPH = [0.348, 0.338, 0.318];
+      const PATCH = [0.404, 0.398, 0.386];
+      // Where the tarmac gives out, as a function of t rather than a line: an
+      // edge somebody laid would be straight, and this one is where the last
+      // load happened to reach.
+      const edgeAt = (t) => WALL.s + 4.35
+        + (jit(t * 0.7 | 0, 80) - 0.5) * 1.7
+        + Math.sin(t * 0.21) * 0.45;
+      const aStep = 1.3;
+      for (let t = 214; t < LEN - 14; t += aStep) {
+        const t1 = Math.min(t + aStep, LEN - 14);
+        const e0 = edgeAt(t), e1 = edgeAt(t1);
+        const k = (t * 0.5) | 0;
+        // A made-good patch in a different mix, which the frame has one of
+        // right in the middle of the apron.
+        const col = jit(k, 81) > 0.87 ? PATCH
+          : [ASPH[0] * (0.94 + jit(k, 82) * 0.13),
+            ASPH[1] * (0.94 + jit(k, 82) * 0.13),
+            ASPH[2] * (0.94 + jit(k, 82) * 0.13)];
+        b.quad(W(t, s0, surfaceY(t, s0) + 0.045),
+          W(t1, s0, surfaceY(t1, s0) + 0.045),
+          W(t1, e1, surfaceY(t1, e1) + 0.045),
+          W(t, e0, surfaceY(t, e0) + 0.045), col);
+      }
+      // The craquelure, and it has to be a NET.
+      //
+      // Not the cracks the promenade got — those are single lines walking
+      // across a slab with branches off them. This is what a tarmac surface
+      // does when the binder has gone: it breaks into cells, and the cells in
+      // the photograph are 0.2 to 0.5 m across. The first cut scattered 460
+      // loose dashes over twelve hundred square metres — one every 2.7 m² —
+      // and at that spacing they do not read as cracking at all, they read as
+      // litter lying on a clean grey strip. You can count them.
+      //
+      // So: chains, not dashes. Each crack is three or four segments joined
+      // end to end with a turn at every joint, and they are started thickly
+      // enough that they run into each other, which is what closes the cells.
+      const CRK = [0.258, 0.252, 0.243];
+      for (let n = 0; n < 2600; n++) {
+        let t = 216 + jit(n, 84) * (LEN - 232);
+        const e = edgeAt(t);
+        let sv = s0 + 0.25 + jit(n, 85) * (e - s0 - 0.5);
+        if (sv >= e - 0.15) continue;
+        let a0 = jit(n, 86) * TAU;
+        const segs = 2 + ((jit(n, 93) * 3) | 0);
+        for (let k = 0; k < segs; k++) {
+          // A turn at each joint, and a big one: a craquelure cell is not a
+          // gentle curve, it is a polygon.
+          a0 += (jit(n * 7 + k, 94) - 0.5) * 1.9;
+          const len = 0.16 + jit(n * 7 + k, 87) * 0.30;
+          const w = 0.018 + jit(n * 7 + k, 88) * 0.018;
+          const t1 = t + Math.cos(a0) * len, s1c = sv + Math.sin(a0) * len;
+          if (s1c <= s0 + 0.1 || s1c >= edgeAt(t1) - 0.1) break;
+          const nt = -Math.sin(a0) * w, ns = Math.cos(a0) * w;
+          const y = surfaceY(t, sv) + 0.048;
+          b.quad(W(t + nt, sv + ns, y), W(t1 + nt, s1c + ns, y),
+            W(t1 - nt, s1c - ns, y), W(t - nt, sv - ns, y), CRK);
+          t = t1; sv = s1c;
+        }
+      }
+      // And the edge itself, crumbling: lumps of tarmac that have come away
+      // and are lying just off it. Without these the seam is a cut line, and
+      // in the photograph it is a broken one.
+      b = up;
+      for (let t = 216; t < LEN - 16; t += 0.75) {
+        if (jit(t * 4 | 0, 89) > 0.5) continue;
+        const e = edgeAt(t) + (jit(t * 4 | 0, 90) - 0.5) * 0.5;
+        const y = surfaceY(t, e);
+        const r = 0.075 + jit(t * 4 | 0, 91) * 0.080;
+        frustumTS(y - 0.02, [t, e, r, r * 0.72],
+          y + r * 0.35, [t + (jit(t * 4 | 0, 92) - 0.5) * 0.08, e,
+            r * 0.78, r * 0.55],
+          [0.300, 0.295, 0.288], [0.345, 0.340, 0.330]);
+      }
       b = back7;
     }
 
