@@ -13580,13 +13580,13 @@ async function buildJadrija(scene) {
   //   canopy  posts and a roof and no walls at all
   //   fence   posts and rails and a stipple quad for the mesh
   const SHOPS = [
-    { key: 'f2', kind: 'box', t0: 200, t1: 213, s0: 34, s1: 50, h: 2.6,
+    { key: 'f2', kind: 'box', t0: 200, t1: 213, s0: 30, s1: 37.2, h: 2.6,
       name: 'PIZZERIA', sub: 'F2', roof: [0.430, 0.252, 0.180],
       body: [0.560, 0.535, 0.487], awn: 0, fg: '#b03024', bg: '#efeade' },
     { key: 'konoba', kind: 'canopy', t0: 240, t1: 252, s0: 10, s1: 19, h: 2.7,
       name: null, roof: [0.330, 0.285, 0.205], post: [0.055, 0.150, 0.115],
       body: [0.075, 0.290, 0.250] },
-    { key: 'mini', kind: 'box', t0: 272, t1: 284, s0: 18, s1: 30, h: 2.45,
+    { key: 'mini', kind: 'box', t0: 272, t1: 284, s0: 18, s1: 23.4, h: 2.45,
       name: 'beach bar MINI', roof: [0.560, 0.535, 0.478],
       body: [0.115, 0.360, 0.150], awn: 2.6, fg: '#1a1a18', bg: '#ded7c7',
       plinth: [0.520, 0.430, 0.270] },
@@ -13595,11 +13595,11 @@ async function buildJadrija(scene) {
     { key: 'tisak', kind: 'kiosk', t0: 305.5, t1: 309, s0: 22, s1: 24.2, h: 2.7,
       name: 'TISAK', roof: [0.470, 0.090, 0.070], body: [0.560, 0.535, 0.487],
       fg: '#ffffff', bg: '#c8201c' },
-    { key: 'h2o', kind: 'box', t0: 312, t1: 325, s0: 22, s1: 32, h: 2.8,
+    { key: 'h2o', kind: 'box', t0: 312, t1: 325, s0: 22, s1: 27.0, h: 2.8,
       name: 'Caffee bar H2O', roof: [0.470, 0.462, 0.440],
-      body: [0.045, 0.041, 0.038], awn: 3.0, fg: '#1c2b33', bg: '#e9eced',
+      body: [0.505, 0.528, 0.545], awn: 3.0, fg: '#1c2b33', bg: '#e9eced',
       pier: [0.430, 0.405, 0.360] },
-    { key: 'slast', kind: 'box', t0: 328, t1: 343, s0: 22, s1: 32, h: 2.95,
+    { key: 'slast', kind: 'box', t0: 328, t1: 343, s0: 22, s1: 27.2, h: 2.95,
       name: 'Slastičarnica', sub: 'JADRIJA', roof: [0.590, 0.578, 0.545],
       body: [0.560, 0.535, 0.487], awn: 3.0, fg: '#a8221c', bg: '#eeece6',
       vitrine: true, cooler: true, scallop: true },
@@ -13609,7 +13609,7 @@ async function buildJadrija(scene) {
     { key: 'maslina', kind: 'kiosk', t0: 352, t1: 358, s0: 28, s1: 30.5, h: 2.6,
       name: 'Maslina', roof: [0.100, 0.108, 0.115], body: [0.075, 0.082, 0.088],
       flag: [0.185, 0.075, 0.165], fg: '#f0e8f0', bg: '#4e2c48' },
-    { key: 'tramp2', kind: 'box', t0: 469, t1: 475, s0: 21, s1: 33, h: 2.55,
+    { key: 'tramp2', kind: 'box', t0: 469, t1: 475, s0: 21, s1: 26.6, h: 2.55,
       name: 'Caffe TRAMPULIN', roof: [0.430, 0.252, 0.180],
       body: [0.560, 0.535, 0.487], awn: 3.2, fg: '#33302c', bg: '#e8e0cf',
       pergola: [0.075, 0.230, 0.140], bench: [0.330, 0.145, 0.095] },
@@ -13842,6 +13842,161 @@ async function buildJadrija(scene) {
   }
 
   /** A moulded chair and a café table, which is all the terraces need. */
+  /**
+   * The back of a shop, and the yard it stands in.
+   *
+   * Every box on this boardwalk was a rendered front with five blank faces
+   * behind it. That was survivable while nobody stood behind them — and then
+   * the wood got cars parked in it, which means the player walks the whole
+   * length of the rear elevation on the way in from the lane. Filmed from
+   * there, `h2o` was a ten-metre-deep unbroken slab of near-black: the one
+   * object in the resort you could see from the trees and the one nobody had
+   * drawn a single feature on.
+   *
+   * What is actually behind a Dalmatian beach kiosk is a service yard. A steel
+   * door with a step up to it, a meter cabinet, the condenser that runs the
+   * cold cabinet, a downpipe off the eaves, and whatever the delivery left
+   * standing against the wall. None of it is invented: it is the same kit on
+   * the back of every one of them, and it is the reason the front can be
+   * clean.
+   */
+  function shopBack(S, y0, top) {
+    const back = S.s1;
+    const body = S.body || [0.520, 0.492, 0.430];
+    const REND = shade(body, 0.93);
+    const DARK = shade(body, 0.62);
+    const STEEL = [0.318, 0.324, 0.330];
+    const GREY = [0.470, 0.472, 0.468];
+    const len = S.t1 - S.t0;
+    const key = (S.t0 | 0);
+
+    // The render does not run to the ground: there is a plinth course, and it
+    // is grubbier than the wall above it.
+    boxTS(S.t0 - 0.04, S.t1 + 0.04, back - 0.03, back + 0.09, y0, y0 + 0.44,
+      shade(body, 0.78), shade(body, 0.86));
+
+    // A gutter along the eaves with a downpipe at each end. Two boxes and a
+    // post, and it is the difference between a wall and a building.
+    boxTS(S.t0 - 0.2, S.t1 + 0.2, back + 0.04, back + 0.16, top - 0.14, top - 0.02,
+      GREY, shade(GREY, 1.08));
+    for (const dt of [0.5, len - 0.5]) {
+      post(W, S.t0 + dt, back + 0.10, y0, top - 0.12, 0.045, GREY, 6);
+      // The shoe at the bottom, kicked out over a concrete splash pad.
+      boxTS(S.t0 + dt - 0.07, S.t0 + dt + 0.07, back + 0.10, back + 0.34,
+        y0 + 0.02, y0 + 0.16, GREY);
+      b = deck;
+      boxTS(S.t0 + dt - 0.30, S.t0 + dt + 0.30, back + 0.06, back + 0.50,
+        y0 - 0.04, y0 + 0.03, CONC[2], CONC[1]);
+      b = up;
+    }
+
+    // The service door: a reveal cut into the render, a leaf standing 60 mm
+    // behind it, a kick plate and a lever. Steel, because every one of them is.
+    const td = S.t0 + len * (0.26 + jit(key, 61) * 0.14);
+    boxTS(td - 0.48, td + 0.48, back - 0.02, back + 0.12, y0, y0 + 2.06, DARK);
+    boxTS(td - 0.42, td + 0.42, back + 0.02, back + 0.08, y0 + 0.02, y0 + 2.00,
+      STEEL, shade(STEEL, 1.06));
+    boxTS(td - 0.42, td + 0.42, back + 0.06, back + 0.10, y0 + 0.02, y0 + 0.34,
+      shade(STEEL, 0.86));
+    boxTS(td + 0.28, td + 0.36, back + 0.08, back + 0.16, y0 + 1.02, y0 + 1.10,
+      [0.560, 0.556, 0.540]);
+    // And the step, which is what tells you the floor inside is not the yard.
+    b = deck;
+    boxTS(td - 0.62, td + 0.62, back + 0.08, back + 0.72, y0 - 0.10, y0 + 0.06,
+      CONC[1], CONC[0]);
+    b = up;
+
+    // The meter cabinet and, above it, the box the whole street's phone line
+    // comes into. Both are grey plastic and both are always beside the door.
+    boxTS(td + 0.72, td + 1.28, back + 0.02, back + 0.24, y0 + 0.90, y0 + 1.66,
+      GREY, shade(GREY, 1.10));
+    boxTS(td + 0.76, td + 1.24, back + 0.24, back + 0.26, y0 + 0.94, y0 + 1.62,
+      shade(GREY, 0.88));
+    boxTS(td + 0.86, td + 1.14, back + 0.02, back + 0.14, y0 + 1.76, y0 + 2.04,
+      shade(GREY, 0.94));
+
+    // The condenser. A cold cabinet at the front is a fan unit at the back —
+    // on two brackets, clear of the ground, with a louvred face and the pipe
+    // run going back in through the wall in its own lagging.
+    const tc = S.t1 - 1.6 - jit(key, 62) * 0.8;
+    const cy = y0 + 1.28;
+    boxTS(tc - 0.52, tc + 0.52, back + 0.06, back + 0.46, cy, cy + 0.72,
+      [0.545, 0.548, 0.545], [0.575, 0.578, 0.575]);
+    for (let i = 0; i < 7; i++) {
+      const yy = cy + 0.10 + i * 0.078;
+      boxTS(tc - 0.46, tc + 0.46, back + 0.46, back + 0.48, yy, yy + 0.045,
+        [0.235, 0.240, 0.245]);
+    }
+    for (const o of [-0.42, 0.42]) {
+      boxTS(tc + o - 0.04, tc + o + 0.04, back + 0.04, back + 0.44,
+        cy - 0.10, cy, STEEL);
+      boxTS(tc + o - 0.05, tc + o + 0.05, back + 0.02, back + 0.10,
+        cy - 0.10, cy + 0.74, STEEL);
+    }
+    post(W, tc - 0.30, back + 0.20, cy + 0.72, top - 0.16, 0.045,
+      [0.620, 0.615, 0.600], 6);
+
+    // A vent hood over the servery, and its duct.
+    const tv = S.t0 + len * 0.62;
+    boxTS(tv - 0.34, tv + 0.34, back + 0.02, back + 0.30, top - 0.86, top - 0.42,
+      [0.505, 0.508, 0.505], [0.535, 0.538, 0.535]);
+    boxTS(tv - 0.20, tv + 0.20, back + 0.06, back + 0.26, top - 0.42, top + 0.34,
+      [0.505, 0.508, 0.505]);
+    post(W, tv, back + 0.16, top + 0.34, top + 0.52, 0.24,
+      [0.470, 0.472, 0.470], 8);
+
+    // A high window with a security grille, because the store room has one and
+    // it is the only opening in the whole elevation that is not the door.
+    const tw = S.t0 + len * 0.80;
+    boxTS(tw - 0.44, tw + 0.44, back - 0.02, back + 0.10, y0 + 1.36, y0 + 2.02,
+      DARK);
+    boxTS(tw - 0.38, tw + 0.38, back + 0.04, back + 0.07, y0 + 1.42, y0 + 1.96,
+      [0.090, 0.105, 0.115]);
+    for (let i = 0; i < 4; i++) {
+      const a = tw - 0.30 + i * 0.20;
+      boxTS(a - 0.015, a + 0.015, back + 0.07, back + 0.10, y0 + 1.40, y0 + 1.98,
+        [0.240, 0.238, 0.230]);
+    }
+
+    // What is standing in the yard. Crates go in a stack against the wall,
+    // the bin goes where it can be wheeled out, and the gas is in a pair by
+    // the door with a chain round it.
+    const CRATE = [[0.560, 0.230, 0.130], [0.130, 0.290, 0.480],
+      [0.180, 0.400, 0.200], [0.520, 0.480, 0.180]];
+    const tb = S.t0 + len * 0.44;
+    for (let i = 0; i < 5; i++) {
+      const c = CRATE[((jit(key, 70 + i) * 97) | 0) % CRATE.length];
+      const off = (jit(key, 80 + i) - 0.5) * 0.14;
+      const yy = y0 + i * 0.31;
+      boxTS(tb - 0.28 + off, tb + 0.28 + off, back + 0.14, back + 0.66,
+        yy, yy + 0.29, c, shade(c, 1.10));
+      // The stacking rim, which is what stops a crate reading as a brick.
+      boxTS(tb - 0.29 + off, tb + 0.29 + off, back + 0.13, back + 0.67,
+        yy + 0.25, yy + 0.29, shade(c, 0.86));
+    }
+    // The wheelie bin: a tapered body, a lid with a lip, and two wheels.
+    const tn = S.t0 + len * 0.44 + 0.98;
+    frustumTS(y0 + 0.10, [tn, back + 0.62, 0.32, 0.28],
+      y0 + 1.06, [tn, back + 0.58, 0.36, 0.32],
+      [0.150, 0.230, 0.165], [0.170, 0.255, 0.185]);
+    boxTS(tn - 0.38, tn + 0.38, back + 0.24, back + 0.94, y0 + 1.06, y0 + 1.16,
+      [0.115, 0.185, 0.130], [0.135, 0.210, 0.150]);
+    for (const o of [-0.28, 0.28]) {
+      post(W, tn + o, back + 0.34, y0, y0 + 0.11, 0.055, [0.075, 0.075, 0.080], 6);
+    }
+    // Two gas bottles by the door, and the bar across them.
+    for (let i = 0; i < 2; i++) {
+      const tg = td - 0.72 - i * 0.36;
+      post(W, tg, back + 0.34, y0, y0 + 0.62, 0.16, [0.640, 0.230, 0.120], 8);
+      post(W, tg, back + 0.34, y0 + 0.62, y0 + 0.74, 0.09, [0.470, 0.170, 0.090], 7);
+    }
+    boxTS(td - 1.16, td - 0.56, back + 0.18, back + 0.22, y0 + 0.46, y0 + 0.52,
+      STEEL);
+
+    runs.push({ t0: S.t0 - 0.2, t1: S.t1 + 0.2, s0: back, s1: back + 1.0,
+      y: y0, h: 1.3 });
+  }
+
   function terraceSet(t, s, y, ang, col) {
     const seat = [0.230, 0.235, 0.240];
     for (const [dt, ds] of [[0, 0], [0.62, 0.10], [0.30, 0.74]]) {
@@ -14207,6 +14362,7 @@ async function buildJadrija(scene) {
         S.flag);
       if (S.name) shopSign(S, ft, S.s0 - 1.42, y0 + 2.0, 0.66, 1.8);
     }
+    if (S.kind === 'box') shopBack(S, y0, top);
     shopKit(S, y0, top, awn > 0 ? S.s0 - awn : null);
     // Chairs and tables under the awning, four sets to a frontage. Every café
     // in the survey has them and the game had not one chair on this shore.
