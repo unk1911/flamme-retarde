@@ -13586,9 +13586,13 @@ async function buildJadrija(scene) {
     { key: 'konoba', kind: 'canopy', t0: 240, t1: 252, s0: 10, s1: 19, h: 2.7,
       name: null, roof: [0.330, 0.285, 0.205], post: [0.055, 0.150, 0.115],
       body: [0.075, 0.290, 0.250] },
+    // 175806: the walls are pale render and glass and the GREEN is the
+    // joinery — the door frames, the mullions, the trim. A body of 0.36 green
+    // painted the whole twelve metres of it and read as a hoarding.
     { key: 'mini', kind: 'box', t0: 272, t1: 284, s0: 18, s1: 23.4, h: 2.45,
       name: 'beach bar MINI', roof: [0.560, 0.535, 0.478],
-      body: [0.115, 0.360, 0.150], awn: 2.6, fg: '#1a1a18', bg: '#ded7c7',
+      body: [0.520, 0.528, 0.508], awn: 2.6, fg: '#1a2a3a', bg: '#ded7c7',
+      pier: [0.075, 0.290, 0.140],
       plinth: [0.520, 0.430, 0.270] },
     { key: 'kiosk', kind: 'kiosk', t0: 290, t1: 293, s0: 20, s1: 23, h: 2.4,
       name: null, roof: [0.430, 0.252, 0.180], body: [0.130, 0.400, 0.130] },
@@ -14209,6 +14213,171 @@ async function buildJadrija(scene) {
   }
 
   /** One business. Everything upright goes in `up`; pads stay in `deck`. */
+  /**
+   * What one shop has that the others do not.
+   *
+   * `shopKit` is the kit every frontage on the boardwalk shares — counter,
+   * mullions, rafters, downpipe, pots. This is the other half: the thing in
+   * each photograph that could not be anywhere else, and the reason the
+   * businesses were reading as one business drawn four times.
+   */
+  function shopExtras(S, y0, top) {
+    const STEEL = [0.480, 0.486, 0.480];
+    const TIMB = [0.235, 0.150, 0.105];
+
+    if (S.key === 'konoba') {
+      // 175856. The counter stands on a limestone rubble base course, the top
+      // is teal, and the stools are scarlet and lime — which is the whole
+      // colour of the place and the one thing in the frame you could not
+      // guess.
+      const cs = S.s1 - 1.5;
+      for (let t = S.t0 + 1.1; t < S.t0 + 7.3; t += 0.42) {
+        const g = 0.90 + jit(t * 7 | 0, 130) * 0.20;
+        frustumTS(y0, [t + 0.21, cs + 0.5, 0.21, 0.52],
+          y0 + 0.34 + jit(t * 7 | 0, 131) * 0.10,
+          [t + 0.20, cs + 0.5, 0.18, 0.49],
+          [0.560 * g, 0.535 * g, 0.485 * g]);
+      }
+      const SCAR = [0.620, 0.115, 0.095], LIME = [0.400, 0.640, 0.120];
+      for (let k = 0; k < 5; k++) {
+        const t = S.t0 + 1.9 + k * 1.15, s = cs - 0.78;
+        const col = k % 2 ? LIME : SCAR;
+        for (const [ot, os] of [[-0.15, -0.15], [0.15, -0.15],
+          [-0.15, 0.15], [0.15, 0.15]]) {
+          post(W, t + ot, s + os, y0, y0 + 0.72, 0.018, [0.560, 0.566, 0.560], 5);
+        }
+        // The foot ring, which is what stops a bar stool reading as a stick.
+        for (const os of [-0.17, 0.17]) {
+          boxTS(t - 0.17, t + 0.17, s + os - 0.015, s + os + 0.015,
+            y0 + 0.24, y0 + 0.27, [0.560, 0.566, 0.560]);
+        }
+        boxTS(t - 0.20, t + 0.20, s - 0.20, s + 0.20, y0 + 0.72, y0 + 0.79,
+          col, shade(col, 1.12));
+        // A low back, on the ones that have one.
+        if (k % 2 === 0) {
+          boxTS(t - 0.19, t + 0.19, s + 0.17, s + 0.21, y0 + 0.79, y0 + 1.10,
+            shade(col, 0.92));
+        }
+      }
+      // The concrete collar somebody poured round the pine that comes up
+      // through this terrace. The tree itself is planted in `shopPlanting`,
+      // below: `pine` is fine to call from here — it is a declaration and it
+      // hoists — but `greens` is a `const` a thousand lines further down and
+      // reading it from here is the temporal dead zone all over again.
+      post(W, S.t1 - 1.6, S.s0 + 2.2, y0 - 0.05, y0 + 0.16, 0.62,
+        [0.520, 0.505, 0.470], 9);
+      return;
+    }
+
+    if (S.key === 'mini') {
+      // 175806. The awning over this terrace is not on the building: it is a
+      // cantilever on a grey steel mast with a stack of pebble-aggregate
+      // ballast slabs at its foot, and the ballast is the memorable half.
+      const mt = S.t1 - 1.2, ms = S.s0 - 5.2;
+      for (let i = 0; i < 3; i++) {
+        const r = 0.78 - i * 0.07;
+        boxTS(mt - r, mt + r, ms - r, ms + r,
+          y0 + i * 0.15, y0 + 0.15 + i * 0.15,
+          [0.520, 0.500, 0.455], [0.548, 0.528, 0.482]);
+      }
+      post(W, mt, ms, y0 + 0.45, y0 + 3.45, 0.085, [0.400, 0.406, 0.410], 8);
+      // The arm, cranked out over the tables, and the canopy hanging off it.
+      boxTS(mt - 0.06, mt + 0.06, ms, ms + 2.9, y0 + 3.30, y0 + 3.45,
+        [0.400, 0.406, 0.410]);
+      for (let i = 0; i < 4; i++) {
+        const a0 = (i / 4) * TAU + 0.4, a1 = ((i + 1) / 4) * TAU + 0.4;
+        const R = 2.15;
+        b.quad(W(mt, ms + 2.6, y0 + 3.34),
+          W(mt + Math.cos(a0) * R, ms + 2.6 + Math.sin(a0) * R, y0 + 2.88),
+          W(mt + Math.cos(a1) * R, ms + 2.6 + Math.sin(a1) * R, y0 + 2.88),
+          W(mt, ms + 2.6, y0 + 3.34),
+          i % 2 ? [0.585, 0.570, 0.530] : [0.555, 0.540, 0.502]);
+      }
+      // The planter on legs. What grows in it is planted in `shopPlanting`,
+      // and so are the yellow deckchairs.
+      const pt = S.t0 + 6.4, ps = S.s0 - 3.6;
+      for (const [ot, os] of [[-0.62, -0.22], [0.62, -0.22], [-0.62, 0.22], [0.62, 0.22]]) {
+        post(W, pt + ot, ps + os, y0, y0 + 0.52, 0.045, TIMB, 5);
+      }
+      boxTS(pt - 0.72, pt + 0.72, ps - 0.30, ps + 0.30, y0 + 0.52, y0 + 0.86,
+        TIMB, [0.300, 0.255, 0.190]);
+      boxTS(pt - 0.66, pt + 0.66, ps - 0.25, ps + 0.25, y0 + 0.84, y0 + 0.88,
+        [0.230, 0.330, 0.180]);
+      // And the diagonal timber lattice that screens the far end of it.
+      for (let k = 0; k < 9; k++) {
+        const a = S.t1 - 0.4 - k * 0.24;
+        b.quad(W(a, S.s0 - 0.35, y0 + 0.10), W(a + 0.10, S.s0 - 0.35, y0 + 0.10),
+          W(a + 0.72, S.s0 - 0.35, y0 + 1.90), W(a + 0.62, S.s0 - 0.35, y0 + 1.90),
+          TIMB);
+        b.quad(W(a + 0.72, S.s0 - 0.33, y0 + 0.10), W(a + 0.62, S.s0 - 0.33, y0 + 0.10),
+          W(a, S.s0 - 0.33, y0 + 1.90), W(a + 0.10, S.s0 - 0.33, y0 + 1.90),
+          shade(TIMB, 1.14));
+      }
+      return;
+    }
+
+    if (S.key === 'tramp2') {
+      // 174947. The canopy is on green steel with a diagonal brace at every
+      // head, and there is a yellow ice-cream cart standing under it with
+      // pressed panels on the side.
+      const fs = S.s0 - (S.awn || 3.2);
+      for (let t = S.t0; t <= S.t1 + 0.01; t += 3.0) {
+        for (const d of [-0.55, 0.55]) {
+          b.quad(W(t + d * 0.1, fs + 0.30, y0 + 1.86),
+            W(t + d, fs + 0.30, y0 + 2.36),
+            W(t + d, fs + 0.36, y0 + 2.36),
+            W(t + d * 0.1, fs + 0.36, y0 + 1.86), S.pergola);
+        }
+      }
+      const ct = S.t0 + 1.6, cs = fs + 1.05;
+      boxTS(ct - 0.78, ct + 0.78, cs - 0.44, cs + 0.44, y0 + 0.34, y0 + 1.02,
+        [0.660, 0.600, 0.320], [0.700, 0.640, 0.360]);
+      boxTS(ct - 0.72, ct + 0.72, cs - 0.46, cs - 0.42, y0 + 0.44, y0 + 0.92,
+        [0.560, 0.500, 0.240]);
+      boxTS(ct - 0.80, ct + 0.80, cs - 0.46, cs + 0.46, y0 + 1.02, y0 + 1.08,
+        [0.760, 0.755, 0.740]);
+      for (const [ot, os] of [[-0.62, 0.30], [0.62, 0.30], [0.62, -0.30]]) {
+        post(W, ct + ot, cs + os, y0, y0 + 0.34, 0.09, [0.120, 0.120, 0.125], 7);
+      }
+      return;
+    }
+  }
+
+  /**
+   * Where the lane meets the resort: a lift barrier and the sign that goes
+   * with it.
+   *
+   * 174947 has both, ten metres east of Trampulin — the red and white boom
+   * across the tarmac and the round "except permit holders" plate on its own
+   * post. It is the edge of the place, and the game simply stopped.
+   */
+  function laneGate(t, s) {
+    const y = surfaceY(t, s);
+    const RED = [0.620, 0.110, 0.090], WHT = [0.760, 0.755, 0.740];
+    // The two uprights, one at each side of the lane.
+    for (const os of [-3.1, 3.1]) {
+      for (let i = 0; i < 4; i++) {
+        post(W, t, s + os, y + i * 0.28, y + 0.28 + i * 0.28, 0.055,
+          i % 2 ? WHT : RED, 6);
+      }
+      boxTS(t - 0.22, t + 0.22, s + os - 0.22, s + os + 0.22, y - 0.05, y + 0.08,
+        [0.505, 0.500, 0.482]);
+    }
+    // The boom, banded, hinged at the left post and dropped across.
+    for (let i = 0; i < 12; i++) {
+      const a = s - 3.0 + i * 0.5;
+      boxTS(t - 0.05, t + 0.05, a, a + 0.5, y + 1.00, y + 1.14,
+        i % 2 ? RED : WHT);
+    }
+    // And the sign: a white plate with a red rim on its own post.
+    const st = t + 1.9;
+    post(W, st, s + 3.6, y, y + 2.30, 0.038, [0.500, 0.505, 0.500], 6);
+    post(W, st, s + 3.6, y + 2.30, y + 2.34, 0.34, RED, 12);
+    post(W, st, s + 3.6, y + 2.34, y + 2.37, 0.27, WHT, 12);
+    boxTS(st - 0.20, st + 0.20, s + 3.55, s + 3.58, y + 2.30, y + 2.36,
+      [0.140, 0.140, 0.145]);
+  }
+
   function shopfront(S) {
     const tc = (S.t0 + S.t1) * 0.5;
     const y0 = at(tc).deck;
@@ -14257,6 +14426,7 @@ async function buildJadrija(scene) {
         y0 + 1.02, y0 + 1.08, shade(body, 1.2));
       runs.push({ t0: S.t0 + 1.1, t1: S.t0 + 7.3, s0: S.s1 - 1.5, s1: S.s1 - 0.5,
         y: y0, h: 1.08 });
+      shopExtras(S, y0, y0 + S.h);
       // Only the counter blocks; the rest is a roof you walk under.
       b = deck;
       return;
@@ -14387,6 +14557,7 @@ async function buildJadrija(scene) {
       shopBack(S, y0, top);
     }
     shopKit(S, y0, top, awn > 0 ? S.s0 - awn : null);
+    shopExtras(S, y0, top);
     // Chairs and tables under the awning, four sets to a frontage. Every café
     // in the survey has them and the game had not one chair on this shore.
     if (awn > 0) {
@@ -14442,6 +14613,7 @@ async function buildJadrija(scene) {
   centenary(346, 6.0, 3.2, 1.8, at(346).deck + 1.25,
     { bg: '#cfe4d8', fg: '#1d3b30', big: '100' });
   centenary(212, 22.0, 2.6, 1.5, at(212).deck + 1.15, { bg: '#e8e2cc' });
+  laneGate(486, 30.6);
 
   if (special) special.sign = neonSign(special);
 
@@ -17197,6 +17369,39 @@ async function buildJadrija(scene) {
       dome(W, t, s, gy, -0.20, 0.20, [0.700, 0.694, 0.668], 9);
       post(W, t, s, y + 2.92, gy, 0.055, [0.300, 0.302, 0.298], 7);
     }
+  }
+
+  // The half of the shop extras that cannot run with the shops.
+  //
+  // `shopfront` is called at line 2600 and `pine`, `lounger` and `agave` are
+  // all fine from there — they are declarations and they hoist — but what they
+  // WRITE to is not: `greens` is a `const` declared with the wood. So the
+  // furniture and the planting of a terrace are built here, in the resort's
+  // frame, off the same table the frontage was.
+  {
+    const back10 = b;
+    b = up;
+    for (const S of SHOPS) {
+      if (S.key === 'konoba') {
+        const y0 = at((S.t0 + S.t1) * 0.5).deck;
+        pine(S.t1 - 1.6, S.s0 + 2.2, y0 + 0.10, 11.5, -1);
+        greens.push([S.t1 - 1.6, S.s0 + 2.2, 0.55, 9]);
+      }
+      if (S.key === 'mini') {
+        const y0 = at((S.t0 + S.t1) * 0.5).deck;
+        // Yellow sling deckchairs. Every frame of this terrace has them and
+        // nothing else on the shore is that colour.
+        for (let k = 0; k < 3; k++) {
+          lounger(S.t0 + 1.4 + k * 1.5, S.s0 - 4.4 - (k % 2) * 0.7, y0,
+            -0.22 + k * 0.18, [0.680, 0.560, 0.075]);
+        }
+        for (let k = 0; k < 5; k++) {
+          agave(S.t0 + 5.9 + k * 0.25, S.s0 - 3.6, y0 + 0.86,
+            0.13 + jit(k, 140) * 0.06);
+        }
+      }
+    }
+    b = back10;
   }
 
   // Two pines beside the vikendica's terrace — the only thing that is allowed
