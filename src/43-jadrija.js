@@ -166,9 +166,11 @@ const JAD = {
   // photograph in the survey could, because the walk never reached t 0-189.
   //
   // There is one run of kabine at Jadrija and it is at the eastern end. West of
-  // it, in order going west: the plaza, Slasticarnica Jadrija, Caffee bar H2O,
-  // Beach bar Mini, the mole, Pizzeria F2, and then the sand of Strand Jadrija
-  // all the way to the end. Not a hut on any of it. The old `rowFrom: 52` put
+  // it, in order going west: Slasticarnica Jadrija, Caffee bar H2O, Beach bar
+  // Mini, the mole, Pizzeria F2, and then the sand of Strand Jadrija all the
+  // way to the end. Not a hut on any of it. (A plaza used to head that list,
+  // over the water at t 344-400. It is gone — see "the plaza that was here,
+  // and is not".) The old `rowFrom: 52` put
   // eighty of them along that beach and through the middle of the businesses,
   // which is the single largest thing this model had wrong about the place.
   //
