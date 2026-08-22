@@ -9968,6 +9968,10 @@ async function buildJadrija(scene) {
         // which travelling clip that is — the pair is the whole of what stops
         // her walking on the spot.
         made: 0, stall: 0, gait: null,
+        // How fast the gap between you is opening, damped, and what it was
+        // last frame. One frame of it is noise — she wanders two metres a
+        // second on her own — so what the routine reads is the rate.
+        away: 0, dWas: 0,
         // The hop. How high off the deck she is, how fast that is changing,
         // how long until she will take another one, and how far into the tuck
         // she is — which is eased rather than switched, because a pair of
@@ -10739,8 +10743,8 @@ async function buildJadrija(scene) {
     // fifteen metres past the western end of it. So the window slides to keep
     // you inside it while you are on foot down here — see `show.t0`.
     slack: 22,
-    // How far behind she will let you get before giving up, and how far she
-    // will let you get before breaking off a number to come after you.
+    // How far behind she will let you get before giving up, and how far away
+    // you have to be before walking off breaks off a number.
     //
     // `far` is 46 and stays 46, because it is the distance at which she gives
     // up on somebody she has *noticed* — a person who wandered past. This is a
@@ -11633,15 +11637,21 @@ async function buildJadrija(scene) {
   const KNEES = { submit: 1, kept: 1, creep: 1 };
 
   /**
-   * The four she is allowed to leave the ground in.
+   * The three she is allowed to leave the ground in.
    *
    * Everything else is either a clip that has both feet nailed to the deck for
    * its own reasons — the dances, the card, the stamp — or a place where a
    * woman suddenly hopping would be answering the wrong question: the room, the
    * knees, and the turn. She larks about out on the promenade, and this is the
    * list of the phases that *are* larking about.
+   *
+   * `aim` is not on it and was. It is the second of run-up into a cartwheel,
+   * so a hop taken there is still in the air when the wheel starts and her feet
+   * come over her head at the top of it — measured once at 1.20 m off the deck
+   * on a landing that should have been 0.08. Nothing catches that from inside
+   * the hop, because by then it is a perfectly good cartwheel.
    */
-  const HOPPING = { play: 1, home: 1, orbit: 1, aim: 1 };
+  const HOPPING = { play: 1, home: 1, orbit: 1 };
 
   /** The indoor track, as a set, so the trigger can tell it is already on it. */
   const KABIN = { come: 1, enter: 1, wine: 1, meet: 1, untie: 1,
@@ -11658,6 +11668,20 @@ async function buildJadrija(scene) {
     // a beach can do — and `far` is the distance at which she gives up on you.
     const withYou = state.phase === 'ground' && d < SHOW.lose;
     show.withYou = withYou ? 1 : 0;
+    // And whether you are going somewhere.
+    //
+    // On the *rate* the gap opens and not on the gap, which was the first cut
+    // and was wrong in the one place it most matters: `9` drops you sixteen
+    // metres from her, three past `drop`, so the opening routine — the whole
+    // showcase, all five numbers in a fixed order — cut itself short every
+    // single time before you had seen any of it. Standing back to watch is not
+    // walking away. 1.2 m/s is above anything her own wander can fake and well
+    // under the 3.4 you walk at.
+    if (dt > 0) {
+      show.away = damp(show.away, (d - show.dWas) / dt, 3, dt);
+      show.dWas = d;
+    }
+    const leaving = withYou && d > SHOW.drop && show.away > 1.2;
     // A one-shot that has run off its end. `update` leaves `curT` past `dur`
     // and `sample` clamps, so this stays true until something else is played.
     const done = S.cur && !S.cur.loop && S.curT >= S.cur.dur;
@@ -11999,7 +12023,7 @@ async function buildJadrija(scene) {
     // step after him. Emptying the queue is the whole fix: everything in the
     // routine ends by calling `showNext`, and `showNext` with nothing left goes
     // to the wander — which is the state that follows you.
-    if (withYou && d > SHOW.drop && show.queue.length) show.queue.length = 0;
+    if (leaving && show.queue.length) show.queue.length = 0;
 
     const K = special;
     const inside = !!K && pt > K.t0 - 0.25 && pt < K.t1 + 0.25
@@ -12208,7 +12232,7 @@ async function buildJadrija(scene) {
         // already walked off — the same argument as the queue above, one state
         // earlier. Getting down on all fours is delight at somebody arriving;
         // staying down there while they leave is not.
-        if (show.tmr > (withYou && d > SHOW.drop ? 1.5 : SHOW.crawlFor)) {
+        if (show.tmr > (leaving ? 1.5 : SHOW.crawlFor)) {
           go('up', 'getup', 0.28);
         }
         break;
@@ -12233,7 +12257,7 @@ async function buildJadrija(scene) {
         showMove(SHOW.hop * sat((u - 0.34) / 0.10) * sat((1.10 - u) / 0.12), dt);
         if (u >= 0.98 && !show.said) { show.said = 1; showSay('whump', d); }
         if (done) {
-          if (show.flips < SHOW.flips && !(withYou && d > SHOW.drop)) {
+          if (show.flips < SHOW.flips && !leaving) {
             // Restarting the clip rather than playing it: `play` refuses a clip
             // that is already current, and this one ends on the pose it starts
             // from, so a hard rewind is seamless.
@@ -12254,7 +12278,12 @@ async function buildJadrija(scene) {
         // a state machine gets to happy-go-lucky.
         show.played += dt;
         show.tick -= dt;
-        if (show.tick <= 0) {
+        // Not while she is in the air: the roll below can put her into a
+        // somersault or a run of cartwheels, and either of those started
+        // half a metre off the deck is a figure that has been interrupted by
+        // itself. The tick stays expired and comes up again on the frame she
+        // lands, which costs three quarters of a second once in a while.
+        if (show.tick <= 0 && show.air <= 0) {
           showWander(SHOW.turn, SHOW.swing);
           // A table rather than a chain of `dice < a + b + c` tests, which is
           // what this was. Five terms was already at the edge of readable and
@@ -12329,7 +12358,7 @@ async function buildJadrija(scene) {
         show.played += dt;
         showMove(SHOW.wheel * sat((w - 0.14) / 0.16) * sat((1.16 - w) / 0.20), dt);
         if (done) {
-          if (show.wheels < SHOW.wheels && !(withYou && d > SHOW.drop)) {
+          if (show.wheels < SHOW.wheels && !leaving) {
             show.wheels++; S.curT = 0; show.said = 0; show.tmr = 0;
             showSay('whee', d);
           } else {
@@ -12449,8 +12478,8 @@ async function buildJadrija(scene) {
           show.said = show.tmr;
           showSay(say1(CHAT), d);
         }
-        if (show.tmr > SHOW[HOLD_FOR[show.phase]]
-          || d > (withYou ? SHOW.drop : SHOW.far)) showNext();
+        if (show.tmr > SHOW[HOLD_FOR[show.phase]] || leaving
+          || d > SHOW.far) showNext();
         break;
 
       case 'heart':
@@ -12473,7 +12502,7 @@ async function buildJadrija(scene) {
           show.said = show.tmr; showSay(say1(CHAT), d);
         }
         if (show.tmr > (show.phase === 'heart' ? SHOW.heartFor : SHOW.noteFor)
-          || d > (withYou ? SHOW.drop : SHOW.far)) showNext();
+          || leaving || d > SHOW.far) showNext();
         break;
 
       // ── the turn ─────────────────────────────────────────────────────────
@@ -13333,7 +13362,7 @@ async function buildJadrija(scene) {
       // clamp and every arrival taken out of it. `made` well under `vel` for
       // more than a moment is a figure walking on the spot.
       made: +show.made.toFixed(2), stall: +show.stall.toFixed(2),
-      gait: show.gait, withYou: show.withYou,
+      gait: show.gait, withYou: show.withYou, away: +show.away.toFixed(2),
       // The stage she is actually fenced to this frame, which slides with you.
       stage: [+show.t0.toFixed(1), +show.t1.toFixed(1)],
       base: [+SHOW.t0.toFixed(1), +SHOW.t1.toFixed(1)],
