@@ -4564,62 +4564,44 @@ async function buildJadrija(scene) {
   // there is the sea bed, so you walked off the concrete and into the water on
   // a structure you could see under your feet. `bounds` said the same thing
   // from the other side — a flat `s0` of 1.1 for the whole shore.
-  // ── the plaza ──────────────────────────────────────────────────────────────
-  // The largest single surface at the real Jadrija, and there was no equivalent
-  // here at all.
+  // ── the plaza that was here, and is not ────────────────────────────────────
   //
-  // Between the Slasticarnica and the kabine the aerial shows a great apron of
-  // poured concrete running out over deep water — power-floated, saw-cut into
-  // bays, with a hard square edge and no railing on it anywhere, and people
-  // lying on it in the frames of the walk. It is not a terrace and it is not a
-  // quay: it is the piece of ground the whole eastern half of the resort is
-  // arranged around, and the game had water there.
+  // Taken out on the user's word, looking at an aerial of his own game: "get
+  // rid of this thing u added, i dunno what that is but that doesn't exist in
+  // the real jadrija".
+  //
+  // What stood here was 56 m of shore by 34 m of open water, t 344-400, s 1.0
+  // out to -34: one poured slab at `at(t).lip`, laid down in 1.5 m steps in
+  // three shades of new concrete with a square unrailed face 2.6 m into the
+  // sea and saw cuts across it every 4.5 m. The shore frame is a parallel
+  // offset of a traced waterline and not a rigid one (rule 9b), so those 1.5 m
+  // steps splayed as they ran out, and from the air the whole thing read as a
+  // folded paper fan of pale strips lying flat on the channel — nineteen
+  // hundred square metres of concrete with two people on it.
+  //
+  // It was argued for from the aerial, as "the largest single surface at the
+  // real Jadrija". The fieldwork does not say that. `docs/jadrija-fieldwork.md`
+  // has one plaza in it and it is somewhere else and something else: "past the
+  // kabine the peninsula has a new promenade — a bright near-white slab plaza
+  // on a wide expansion grid, rows of cream parasols, timber picnic benches,
+  // young pines in square tree pits, a bar, and the kiosk". That is dry ground
+  // east of the huts with things standing on it, not an apron over deep water
+  // between the businesses and the kabine, and rule 12 covers the difference.
+  // If the new promenade is ever built it goes where the walk found it.
+  //
+  // What went with the slab: its walking surface in `walkY`, its exemption in
+  // `standable`, its seaward `s0Of` in `bounds` — all three of which were an
+  // invisible floor a metre over the sea once the concrete was gone — and the
+  // two exclusions that kept the towels and the mooring rings off it, so that
+  // stretch of quay is furnished like the rest of the quay again.
+  //
+  // What did not: `PLAZA` survives the slab, because the lane wall's `gap()`
+  // still opens the back wall over t 336-408 and that opening was argued for
+  // as the place the crowd crosses the band on its way out here. Closing it
+  // welds two wall runs into one and moves the blocker count, which is a
+  // decision of its own and not this one. It is the only thing left reading
+  // these numbers, and nothing draws anything here at all now.
   const PLAZA = { t0: 344, t1: 400, out: 34, bay: 4.5 };
-  const onPlazaT = (t) => t > PLAZA.t0 - 0.5 && t < PLAZA.t1 + 0.5;
-  const onPlaza = (t, s) => onPlazaT(t) && s > -PLAZA.out - 0.8 && s < 1.2;
-  {
-    const back3 = b;
-    b = deck;
-    // New concrete, and it reads as new: paler and cooler than the ninety-year
-    // -old bays of the promenade beside it, which is the whole reason the joint
-    // between them is visible from the far end of the beach.
-    const NEWC = [[0.585, 0.560, 0.512], [0.560, 0.536, 0.490],
-      [0.606, 0.580, 0.530]];
-    // One continuous surface, not a row of slabs.
-    //
-    // Drawing a box per bay gave each bay the average of its own two ends, so
-    // adjacent bays sat at slightly different heights and the whole apron came
-    // out stepped, with a ragged edge over the water and daylight in the
-    // joints. A poured slab is poured in one go and saw-cut afterwards, so:
-    // one deck at 1.5 m resolution taking its height from the shore, and the
-    // cuts laid on top of it as lines.
-    const STEP = 1.5;
-    for (let t = PLAZA.t0; t < PLAZA.t1 - 0.01; t += STEP) {
-      const t2 = Math.min(t + STEP, PLAZA.t1);
-      const a = at(t), c2 = at(t2);
-      const ya = a.lip, yc = c2.lip;
-      const col = NEWC[((t / STEP) | 0) % 3];
-      b.quad(pt(a, -PLAZA.out, ya), pt(c2, -PLAZA.out, yc),
-        pt(c2, 1.0, yc), pt(a, 1.0, ya), col);
-      // The seaward face, square and unrailed, down into the water.
-      b.quad(pt(a, -PLAZA.out, ya - 2.6), pt(c2, -PLAZA.out, yc - 2.6),
-        pt(c2, -PLAZA.out, yc), pt(a, -PLAZA.out, ya), STONE);
-    }
-    // The ends of it, and then the saw cuts across.
-    for (const [te, dir] of [[PLAZA.t0, -1], [PLAZA.t1, 1]]) {
-      const e = at(te);
-      b.quad(pt(e, -PLAZA.out, e.lip - 2.6), pt(e, 1.0, e.lip - 2.6),
-        pt(e, 1.0, e.lip), pt(e, -PLAZA.out, e.lip), STONE);
-      void dir;
-    }
-    for (let t = PLAZA.t0 + PLAZA.bay; t < PLAZA.t1 - 0.5; t += PLAZA.bay) {
-      const a = at(t - 0.035), c2 = at(t + 0.035);
-      b.quad(pt(a, -PLAZA.out, a.lip + 0.004), pt(c2, -PLAZA.out, c2.lip + 0.004),
-        pt(c2, 1.0, c2.lip + 0.004), pt(a, 1.0, a.lip + 0.004),
-        [0.360, 0.348, 0.325]);
-    }
-    b = back3;
-  }
 
   const onMoleT = (t) => t > JET.t - JET.w - 0.6 && t < JET.t + JET.w + 0.6;
   // Two ranges, and they are deliberately different.
@@ -6617,6 +6599,10 @@ async function buildJadrija(scene) {
       && Math.abs(t - (S.t0 + (S.t1 - S.t0) * 0.33)) < 2.2);
     const gap = (t) => crosses(t) || doorway(t)
       || (t > JET.t - 12 && t < JET.t + 12)
+      // The plaza this opening was cut for is gone — see "the plaza that was
+      // here, and is not". The hole is left standing because closing it welds
+      // the two runs either side of it into one and moves a blocker, and that
+      // is a separate argument from the one the slab lost.
       || (t > PLAZA.t0 - 8 && t < PLAZA.t1 + 8)
       || (t > VIK.t - 12 && t < VIK.t + 12);
     const step = 2.4;
@@ -7242,7 +7228,7 @@ async function buildJadrija(scene) {
     for (let t = JAD.beachTo + 5; t < LEN - 8; t += 4.6) {
       const k = t | 0;
       if (jit(k, 200) > 0.72) continue;
-      if (!clearOfShops(t) || onMoleT(t) || onPlazaT(t)) continue;
+      if (!clearOfShops(t) || onMoleT(t)) continue;
       const s = 1.5 + jit(k, 201) * 5.4;
       const y = surfaceY(t, s);
       const ang = (jit(k, 202) - 0.5) * 0.5;
@@ -7339,7 +7325,7 @@ async function buildJadrija(scene) {
     // it, because this quay was a working quay before it was a bathing one.
     b = deck;
     for (let t = JAD.beachTo + 7; t < LEN - 6; t += 17.5) {
-      if (onMoleT(t) || onPlazaT(t)) continue;
+      if (onMoleT(t)) continue;
       const s = 0.62 + jit(t | 0, 600) * 0.22;
       const y = surfaceY(t, s);
       // The pocket: a shallow dish of shadow, which is what you actually see.
@@ -9419,7 +9405,6 @@ async function buildJadrija(scene) {
       if (f != null) return f;
     }
     if (onMoleY(t, s)) return JET.top;
-    if (onPlaza(t, s) && s < 0.6) return at(t).lip;
     if (t < -5 || t > LEN + 5 || s < -3 || s > JAD.back + JAD.bleed) {
       return Math.max(groundAt(x, z), 0);
     }
@@ -13104,8 +13089,7 @@ async function buildJadrija(scene) {
     // out there is a hillside 1 to 7 m above the sea the whole way across,
     // measured along four lines through the wood.
     bounds: { t0: 3, t1: LEN - 3, s0: 1.1, s1: 300,
-      s0Of: (t) => (onMoleT(t) ? -JET.out - 0.9
-        : onPlazaT(t) ? -PLAZA.out + 0.6 : 1.1) },
+      s0Of: (t) => (onMoleT(t) ? -JET.out - 0.9 : 1.1) },
     /**
      * And the far shore, which a box cannot describe.
      *
@@ -13121,7 +13105,6 @@ async function buildJadrija(scene) {
     standable: (x, z) => {
       const [t, s] = local(x, z);
       if (onMoleWalk(t, s)) return true;
-      if (onPlaza(t, s)) return true;
       if (s < 1.0) return false;
       if (s < JAD.reachIn) return true;
       return walkY(x, z) > 0.55;
