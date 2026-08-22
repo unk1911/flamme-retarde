@@ -60,6 +60,13 @@ days of guessing.
    is genuinely in front.
 4. **Raycast from the camera to it** and print each hit's distance, local
    (t, s), and `aVCol` vertex colour. The colour names the culprit outright.
+5. **If that fails, PAINT IT.** Give every piece of the assembly a different
+   flat colour and take ONE screenshot. This is the step that should have been
+   second and was fifth: the television's brown bar survived four rounds of
+   inference, a nudge test and three raycasts, and the paint named it in a
+   single frame. Raycasting is unreliable here anyway — a camera-attached
+   overlay quad intercepts every ray, and pushing `raycaster.near` past it
+   still returned nothing for the prop meshes.
 
 ---
 
@@ -80,9 +87,15 @@ days of guessing.
       joined segments with a big turn at every joint now — a craquelure cell is
       a polygon, not a curve — started thickly enough that they run into each
       other and close the cells.
-- [ ] Roadside street furniture (b_046): round blue no-stopping sign on a grey
-      post, concrete blocks across the lane end, cut-stone kerb retaining the
-      bank, open timber pergola frame on a gable.
+- [x] Roadside street furniture (b_046). The stop is not a gate: a low rubble
+      wall with a sawn cap across the lane end, and four squat concrete tubs
+      plugging the gap in it — a car cannot pass and a pushchair can. The sign
+      is the SALTIRE one, zabrana zaustavljanja, not the single-bar no-parking
+      disc. Built face-on, which `post` cannot do (it extrudes upwards, so a
+      disc made of it lies flat like a table): rim, field and X are ONE PLANE
+      cut into non-overlapping pieces. Plus the capped return with limestone
+      offcuts in the dust, and the garden wall with the square opening and the
+      timber frame behind it.
 - [ ] Trampulin's name painted on the render left of the door, as b_106 has it
       rather than on a fascia board. Blocked: the frontage is 6 m with a 3.8 m
       serving opening, so there is ~1 m of render either side — the shop's
@@ -107,6 +120,45 @@ days of guessing.
 - [ ] `Voice 260811_213809.m4a` is unidentified — 21:38, broadband 200-2000 Hz,
       no cicada or cricket band. Not shipped, because the game has no night and
       naming it would be inventing one. Ask Misha what it is.
+
+**From Misha, 22 Aug — the playing pass**
+
+Eight things found by actually running around the place. Four are out to agents
+as of this writing; the state of each is in the git log, not here.
+
+- [x] `9` answered only from the seat and from the water. During the V walk-up
+      the phase is already 'ground', so it hit the guard and said "there is no
+      aeroplane here" while the cut carried on. During R it DID move the walker
+      and left the camera on the jetty — `leaveWater` tore the cut down but
+      `camOverride` still held its last frame. Both fixed, `f31dc9b`.
+- [x] The ENTER hop was 1.11 m measured, which clears a bench and a bin and
+      nothing else. 7.0 m/s against 12.0 gravity measures 1.983 m at 1.17 s of
+      hang — twice the height for a tenth of a second more airtime. `f31dc9b`.
+- [x] The kabina television. A hard-edged brown bar down the middle of the
+      picture that READS AS AN OBJECT — it has edges and a lit top face — and
+      was hunted as one for an hour through four rounds of wrong inference. It
+      is the cabinet's own front face two millimetres behind the picture plane.
+      The tube stands 50 mm proud with a moulded surround now. See the method
+      note below: painting the assembly found it in one screenshot.
+- [ ] Her walk is a bear's — stance too wide, arms too far off the body. Both
+      arms and legs need to move through space like a person's.
+- [ ] West of the businesses the ground comes up through everything: benches
+      grown into it, bathers neck deep. Almost certainly rule 2 again, but
+      MEASURE the four height functions on a grid before assuming.
+- [ ] The standing crowd reads as switched-off robots. Either give every figure
+      some motion, however small, or seat them — in the chairs, on the wall,
+      legs in the sea. A standing figure with nothing moving is the one thing
+      not allowed.
+- [ ] The beds repeat audibly after ~15 s and want to be much longer; size is
+      explicitly not a constraint any more. And they should MORPH by position —
+      toward the water it becomes the water recording, into the pines it becomes
+      the forest — not fade between separate stages.
+- [ ] She swims the R chase in a dead straight line. Wants a wandering track:
+      zig-zags, changes of heading, still catchable.
+- [ ] Slasticarnica to a much higher level of detail than the rest of the
+      parade, from `/mnt/c/tmp/refs/jadrija/survey/2/`. It is the setting of a
+      coming ice-cream side-quest, so it has to be worth standing in front of.
+      Invent no flavour, no price and no name the photographs do not show.
 
 **Verify**
 - [ ] Knee-height close-up pass on the clutter — sandals, dropped towels,
