@@ -237,6 +237,24 @@ as of this writing; the state of each is in the git log, not here.
       110 / 198 at s -0.28, but the ladder loop itself skips `t < beachTo + 8`,
       so they are on ladders that are not there. Skipping them costs a
       discarded `rng()` per skip (rule 4) or the whole beach moves.
+- [x] "There is another walking block if I run eastward... at some point I hit
+      an invisible block/wall, but I am able to overcome it if I \<enter\>
+      JUMP." It was at t 170.5 and it ran from the water to the hillside.
+      Nothing was drawn there and nothing was ever meant to be: the playground
+      bench had a collider and no geometry, and the collider was written
+      `solid(t, s, 0, [0.330, 0.145, 0.095], 0.9)` — the timber's colour where
+      the half-depth `c` goes. `confine` asks `Math.abs(ds) >= b.c + g`, that
+      sum is the STRING "0.33,0.145,0.0950.55", the comparison coerces to NaN,
+      NaN is not >= anything, and the box stopped having an end in s. Measured
+      on the built page: `confine` returns NaN at t 170.5 for s 4, 12, 25, 36
+      and 50, and passes clean at t 168 and 173. The jump went through it
+      because the airborne test — `y > b.y + b.h + 0.05` — is the one thing
+      about the box that still worked.
+      The collider is gone, and `retarget` now vets a locale's boxes: four
+      finite numbers or the box is switched off and said out loud. Walked all
+      nine lanes from s 6 to s 30 afterwards, west end to east, and every one
+      reaches t 565 of 572 — every remaining stop names a bench, a bather, a
+      parasol pole, a pine, a hut row or a house. Census unchanged.
 
 **Verify**
 - [ ] Knee-height close-up pass on the clutter — sandals, dropped towels,
