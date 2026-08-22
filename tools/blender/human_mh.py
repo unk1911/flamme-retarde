@@ -4721,15 +4721,26 @@ WINE_HOLD = dict(WINE_REACH, **{
     "armLR": (-18 + STAND_ELBOW_UNDO, -5, -13), "handR": (28, 1, 6),
 })
 
-# Lifted clear of the stool, upright, about hip height in front of her right
-# side. It is the beat between picking a bottle up and doing something with
-# it, and it is also what the pour comes back to before she puts it down.
+# Lifted clear of the stool, upright, and — this is the part that changed —
+# still over the stool rather than parked at her hip.
+#
+# The glass is 0.128 m from where the bottle stands, on the same stool. A hand
+# that takes the bottle at 0.397 in front of her and pours at 0.394 has moved
+# it three centimetres; the first cut of this pose sent it 0.245 m out to her
+# right hip first and then 0.213 m back again, which is 0.37 m of travel spent
+# arriving where it started. That is not a beat, it is a detour, and a detour
+# is half of what "totally awkward" was pointing at.
+#
+# So it is now a lift: 0.12 m straight up off the stool and a hand's width in
+# towards her, upright, and on the way to the glass rather than away from it.
+# It still holds for half a second, because a bottle that comes off a stool and
+# starts pouring in the same movement is a bottle nobody picked up.
 WINE_LIFT = dict(IDLE_A, **{
-    "spine02": (0, 0, 1.0), "spine03": (0, 0, 0.5), "chest": (0, 0, 0),
+    "spine02": (2, 0, 1.0), "spine03": (2, 0, 0.5), "chest": (2, 0, 0),
     "neck": (-2, 0, 0), "head": (-10, -6, 1),
-    "clavicleR": (0, 0, -10),
-    "armUR": (-34, -2, -23),
-    "armLR": (-20 + STAND_ELBOW_UNDO, 3, -15), "handR": (42, 7, -6),
+    "clavicleR": (0, 0, -5.7),
+    "armUR": (-37.9, -7.6, -25.5),
+    "armLR": (-21.6 + STAND_ELBOW_UNDO, 4.5, -16.7), "handR": (43.1, 18.2, 2.3),
     # The left arm is the one doing nothing, so it is the idle's arm with the
     # two degrees of the lift's own lean on the shoulder. Absolutes here kept
     # the A-pose in the one clip where she is standing still for five seconds
@@ -4756,21 +4767,81 @@ WINE_LIFT = dict(IDLE_A, **{
 # Which means the trunk does the work rather than the shoulder: she leans in
 # over it, and the head goes with the lean because a person pouring looks at
 # what they are pouring into.
-def _pour(u, e, z=-8, lean=-6):
-    return dict(WINE_LIFT, **{
-        "spine02": (lean, 0, 1.0), "spine03": (lean, 0, 0.5),
-        "chest": (lean * 0.7, 0, 0), "neck": (-6, 0, 0), "head": (-22, -4, 1),
-        "clavicleR": (0, 0, -12),
-        "armUR": (u, 0, z), "armLR": (e, 0, -16), "handR": (-14, 0, -12),
-    })
+#
+# And then it needs one more thing that no amount of leaning gives you, which
+# is where the second cut of these poses came from.
+#
+# 43-jadrija.js turns the bottle off the axis her wrist is holding it on by the
+# smallest rotation that puts the lip over the glass. That correction is a
+# *safety net*: when the pose is right it does nothing. The first cut of this
+# pose left the bottle at 52° from vertical while the glass sat 110° away from
+# the hand, so the net did 87° of work on every frame of the pour — the bottle
+# swung a right angle out of her grip the instant `pour` started to ramp, held
+# there for a second, and swung back. That is the whole of "the wine bottle
+# gets lodged in her hand": it was not a bad frame, it was a hinge.
+#
+# The three below were solved against the glass rather than against a feeling,
+# with the lip hung on the target, and with one term the first pass did not
+# have: the closest approach between the bottle and her forearm. A bottle is
+# 77 mm across, a forearm about 70, and the grip point sits 44 mm off the wrist
+# joint — so an axis lying along the forearm, parallel or anti-parallel, buries
+# half the bottle in her arm, and nothing else in the measurement can see it,
+# because a bottle is a solid of revolution and spinning it changes no number.
+# See plan/wine-pour-wip/solve.py, `seg_gap`.
+#
+# What comes out is a pour that is three keys and one movement: the hand parks
+# over the glass once and then only the wrist turns.
+#
+#     WINE_TIP     tilt  46°   lip 0.147 above the glass, not yet pouring
+#     WINE_POUR    tilt 116°   lip on the glass, aim correction 1.1 cm
+#     WINE_POUR_B  tilt 123°   the same, 14 mm higher, as the glass fills
+#
+# The hand moves 15 mm across all three. Everything the eye reads as the pour
+# is the wrist rolling over, which is what a wrist does and what a shoulder
+# swinging a bottle across a room does not.
 
+# The bottle arrives over the glass, tipped but not yet pouring. This is the
+# key that separates the travel from the turn: the arm has finished moving here
+# and has not started tipping, and splitting those two is most of why the clip
+# now reads as deliberate rather than as one continuous lurch.
+WINE_TIP = dict(WINE_LIFT, **{
+    "spine02": (-2.0, 0, 1.0), "spine03": (-0.8, 0, 0.5), "chest": (-5.2, 0, 0),
+    "neck": (-4, 0, 0), "head": (-17, -5, 1),
+    "clavicleR": (0, 0, 0.5),
+    "armUR": (-45.5, -23.5, -11.0),
+    "armLR": (-34 + STAND_ELBOW_UNDO, -1.3, -18.0), "handR": (-11.1, 23.4, 4.1),
+})
 
-# Where the wrist lands, per `--probe`, in metres off the floor she is standing
-# on: 0.36 in front of her, 0.29 out to her right, 1.08 up. `kabinaKit` puts
-# the glass and her standing mark where they have to be for that to be a pour —
-# the glass 0.30 ahead of her and a hand's width right, its rim 0.95 up — and
-# those numbers travel together. Move one and the bottle pours past the glass.
-WINE_POUR = _pour(-38, -18, -2, -12)
+# Pouring. Her palm lands 0.394 in front of her, a thumb's width right of her
+# own midline and 1.012 up; the bottle's own axis puts its lip within 11 mm of
+# the target over the glass, so the runtime aim has 11 mm left to do and the
+# hand slides 9 mm down the bottle. Both are inside the width of the label.
+#
+# `kabinaKit` puts the glass and her standing mark where they have to be for
+# that to be a pour — the glass 0.30 ahead of her and a hand's width right, its
+# rim 0.95 up — and those numbers travel together. Move one and the bottle
+# pours past the glass.
+WINE_POUR = dict(WINE_LIFT, **{
+    "spine02": (-2.4, 0, 1.0), "spine03": (-6.6, 0, 0.5), "chest": (-12, 0, 0),
+    "neck": (-6, 0, 0), "head": (-22, -4, 1),
+    "clavicleR": (0, 0, 4),
+    "armUR": (-46.0, -29.3, -6.7),
+    "armLR": (-34 + STAND_ELBOW_UNDO, -27.7, -11.4), "handR": (-40, 23.6, 53.9),
+})
+
+# And a second one, seven degrees further over and fourteen millimetres higher.
+#
+# A pour is held for a second and a bit, which at 30 fps is forty frames of a
+# pose that does not change — and a still frame held for forty frames is the
+# one thing an eye is certain about. So the hold drifts: the bottle tips a
+# little further as the glass fills and the hand comes up with it, which is
+# what a hand does, and it is small enough that nobody will ever name it.
+WINE_POUR_B = dict(WINE_POUR, **{
+    "spine02": (-1.7, 0, 1.0), "spine03": (-7.3, 0, 0.5),
+    "head": (-24, -4, 1),
+    "armUR": (-47.9, -34, -1.8),
+    "armLR": (-34 + STAND_ELBOW_UNDO, -40.6, -10.4), "handR": (-40, 35.0, 55),
+})
 
 # And the wrap. Both hands to the knot at her hip, a tug, and then away —
 # the hands drop rather than being put anywhere, because what she is doing is
@@ -4975,11 +5046,28 @@ CLIPS = [
     # The two indoor ones. Both one-shots and both slow — nothing in this room
     # happens at the speed anything on the promenade happens at, and that is
     # the point of the room.
+    # The wine, in twelve keys rather than nine, and every one of the three new
+    # ones is at a place where something changes direction.
+    #
+    # It used to go idle, reach, hold, lift, pour, pour, lift, hold, reach,
+    # idle — which reads as a list and moved like one. Two keys of the same
+    # pose 1.1 s apart is a freeze, and `WINE_LIFT` straight into `WINE_POUR`
+    # is a hand crossing 0.21 m while the wrist turns 112°, so the arm and the
+    # wrist were doing their work in the same half second and neither of them
+    # was legible.
+    #
+    # Now the travel and the turn are separated — `WINE_TIP` is the hand
+    # arriving with the bottle still up, and the two pour keys are the wrist
+    # rolling over with the hand parked — and the hold in the middle drifts
+    # instead of freezing. `wineAt` in src/43-jadrija.js carries the two
+    # windows that ride on these times and they have to move together: `held`
+    # ramps across 1.10-1.45 and back over 4.40-4.70, `pour` across 2.05-2.55
+    # and back over 3.20-3.60, which is key to key in both directions.
     {"name": "wine", "loop": False,
-     "keys": [(0.00, IDLE_A), (0.60, WINE_REACH), (1.00, WINE_HOLD),
-              (1.55, WINE_LIFT), (2.05, WINE_POUR), (3.15, WINE_POUR),
-              (3.60, WINE_LIFT), (4.10, WINE_HOLD), (4.45, WINE_REACH),
-              (5.05, IDLE_A)]},
+     "keys": [(0.00, IDLE_A), (0.55, WINE_REACH), (1.05, WINE_HOLD),
+              (1.50, WINE_LIFT), (2.05, WINE_TIP), (2.55, WINE_POUR),
+              (3.20, WINE_POUR_B), (3.60, WINE_TIP), (4.00, WINE_LIFT),
+              (4.40, WINE_HOLD), (4.60, WINE_REACH), (5.05, IDLE_A)]},
     {"name": "untie", "loop": False,
      "keys": [(0.00, IDLE_A), (0.60, UNTIE_A), (1.05, UNTIE_B),
               (1.35, UNTIE_B), (1.85, UNTIE_C), (2.55, IDLE_A)]},
@@ -5338,8 +5426,12 @@ def main():
     # wrong twice over. Two independent checks, since a comment has now lied
     # about it once: the rest pose puts both feet at y = ±0.231 and both hands
     # at x = +0.185, and `kabinaKit` in src/43-jadrija.js quotes this probe's
-    # own output for `WINE_POUR` as 0.36 in front and 0.29 to her right, which
-    # is what comes out of this as x = +0.361, y = −0.285.
+    # own output for `WINE_POUR` as 0.32 in front and 0.09 to her right, which
+    # is what comes out of this as x = +0.319, y = −0.093. `WINE_LIFT` is the
+    # louder version of the same check — 0.35 in front and 0.20 to her right,
+    # x = +0.353, y = −0.196 — because the pour reaches across her midline and
+    # a check whose whole content is a sign wants a number that is not near
+    # nought.
     if "--probe" in argv:
         bpy.ops.wm.open_mainfile(filepath=str(BLEND))
         rig = bpy.data.objects["rig"]

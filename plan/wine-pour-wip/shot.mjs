@@ -15,6 +15,15 @@ const CAMS = {
   side: { dt: 0.55, ds: 2.60, h: 1.50, aim: 1.00, fov: 42 },
   // Roughly what the user caught: over her left shoulder, poster in frame.
   back: { dt: -0.55, ds: 2.05, h: 1.62, aim: 1.05, fov: 48 },
+  // And the one that actually shows the pour, which none of the three above
+  // do. She stands facing the tabouret and the tabouret is against the wall,
+  // so every station out in the room is behind her and her own back is in
+  // front of the bottle. This one is round on her left, close in to the wall
+  // and inside the door's swing, and it is the only place in the hut you can
+  // stand and see the bottle, the glass and the hand at the same time. The
+  // aim is the stool rather than her, because at this range the difference is
+  // the whole frame.
+  pour: { dt: -1.10, ds: 1.25, h: 1.45, aim: 1.00, fov: 36, at: [0.20, 0.12] },
 };
 const US = [0.0, 0.60, 0.95, 1.35, 1.90, 2.40, 2.90, 3.40, 3.90, 4.40];
 
@@ -31,7 +40,7 @@ const js = (cam, u) => `(() => {
     const e = document.getElementById(id); if (e) e.style.display = 'none';
   }
   const c = raw.toWorld(bt + ${cam.dt}, bs + ${cam.ds});
-  const h = raw.toWorld(wt, ws);
+  const h = raw.toWorld(${cam.at ? `bt + ${cam.at[0]}, bs + ${cam.at[1]}` : 'wt, ws'});
   __fr.free();
   __fr.fov(${cam.fov});
   __fr.look(c[0], K.floor + ${cam.h}, c[2], h[0], K.floor + ${cam.aim}, h[2]);
