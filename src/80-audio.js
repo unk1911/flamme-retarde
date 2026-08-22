@@ -404,11 +404,55 @@ function buildAudio() {
    * `d` here is measured across the doorway rather than to the player, because
    * a crossing happens where the strands are: you are always at zero.
    */
+  /**
+   * The recorded curtain, when there is one.
+   *
+   * build/payload/beads.mp3 — Freesound #817911, released under CC0 1.0, which
+   * is why it is here rather than one of the better-sounding CC BY ones: this
+   * page ships as a single file with nowhere to put a credit line, and the
+   * LICENSE note is explicit that the bundle owes nobody anything. Downsampled
+   * to 24 kHz mono to sit with the field recordings, which are all 24 kHz: at
+   * the 48 kHz it arrived as it was the cleanest, brightest object in the mix
+   * and read as an import rather than as a door. 9 KB.
+   *
+   * It plays the *crossing* and nothing else. The tail stays synthesised,
+   * because the tail has to answer to how hard the strands are still moving —
+   * `din`, a number that changes every frame — and no amount of taper on a
+   * fixed clip can follow that. Samples for what is recorded once, synthesis
+   * for what has to respond: the same line src/25-sea.js draws.
+   */
+  let beadBuf = null;
+  function beadSample(a, far, t0) {
+    sampleLoad('beads', (b) => { beadBuf = b; });
+    if (!beadBuf) return false;
+    const src = ctx.createBufferSource();
+    src.buffer = beadBuf;
+    // A curtain does not make the same noise twice, and one clip fired at one
+    // rate on every crossing is the thing that gives a sample away. A shove is
+    // also a faster event than a brush, so rate follows amplitude a little.
+    src.playbackRate.value = 0.94 + a * 0.10 + Math.random() * 0.06;
+    const g = ctx.createGain();
+    // Levelled by measurement, not by ear: the clip is -34.7 dBFS mean and
+    // -4.6 dBFS peak, against cicadas.mp3 at -25.7 mean. It is nearly all
+    // transient, which is what it is for.
+    g.gain.value = 0.55 * a * far;
+    src.connect(g).connect(master);
+    if (verbSend) g.connect(verbSend);
+    src.start(t0);
+    return true;
+  }
+
   function beadShove(amp = 1, d = 0) {
     if (!ctx) return;
     const t0 = ctx.currentTime;
     const far = Math.max(0.04, 1 - d / 24);
     const a = clamp(amp, 0.25, 1);
+    // The recording carries the crossing where it decoded. The synthesised
+    // shove below is not a fallback bolted on for form's sake — it is what
+    // shipped this afternoon and what was measured, and a build whose payload
+    // has been stripped, or a decoder that will not take an mp3, is a build
+    // that still has a bead curtain.
+    if (beadSample(a, far, t0)) return;
     burst({ freq: 300, q: 0.9, dur: 0.11, gain: 0.10 * a * far, sweep: 0.42 });
     burst({ freq: 2500, q: 0.35, dur: 0.09, gain: 0.16 * a * far, sweep: 0.30 });
     const n = 10 + Math.round(a * 14);

@@ -72,12 +72,13 @@ Applies to the authored content rather than the machinery:
   in the channel off Šibenik and trimmed, filtered and levelled by
   `tools/cut_field.py`, and
   `build/payload/cuk.mp3`, a scops owl recorded by the same hand elsewhere;
+  `build/payload/beads.mp3` is *not* one of these — see section 3;
 - `docs/*.png`;
 - the assembled `flamme-retarde.html` as a whole.
 
 Share-alike here is deliberate and not merely inherited. Nothing in the bundle
-now forces it — the ambience is my own field recording and owes nobody anything
-— and it stays because it is the right answer for a thing built almost entirely
+forces it — the ambience is my own field recording bar one CC0 sample, and CC0
+asks for nothing at all — and it stays because it is the right answer for a thing built almost entirely
 out of open data and other people's generosity, and because I would rather not
 argue about whether a base64 blob inside an HTML file is a Collection or an
 Adaptation.
@@ -125,6 +126,22 @@ licence in section 2, but only while the attribution above travels with them.
 It appears in `README.md`, in this file, and on the title screen, where the
 credit line reads *"terrain & town derived from OpenStreetMap & public elevation
 data"* (`veil.credit` in `src/02-i18n.js`).
+
+### The bead curtain — CC0 1.0
+
+`build/payload/beads.mp3` is Freesound sound #817911, dedicated to the public
+domain under Creative Commons Zero 1.0. https://freesound.org/s/817911/
+
+CC0 waives everything, including the attribution CC BY would have required, and
+that is the reason it was chosen over better-sounding recordings under other
+terms: this game ships as one HTML file with nowhere to put a credit line, and
+a licence that needs one does not fit it. The notice is here because saying
+where a thing came from is a different obligation from being made to.
+
+Downsampled to 24 kHz mono and tapered to 1.15 s to sit with the field
+recordings. It is played only for the *crossing* of the kabina's curtain; the
+tail after you are through is synthesised in `src/80-audio.js`, because it has
+to follow how hard the strands are still swinging.
 
 ### Terrain heightfield — public domain
 

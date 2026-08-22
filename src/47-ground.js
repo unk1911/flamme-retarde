@@ -2017,7 +2017,12 @@ async function buildGround(scene, field) {
         const d = Math.hypot(you.x - b.x, you.z - b.z) - b.r;
         if (best === null || d < best) best = d;
       }
-      return best;
+      // `bodies` takes the pad as a broad-phase hint and is free to hand back
+      // more than it strictly has to. Without this the answer is whatever the
+      // nearest candidate happened to be, tens of metres out — which the front
+      // plane clamps away to nothing, but which makes this accessor a liar to
+      // anybody reading it, and it is read.
+      return best !== null && best <= NEAR_BODY ? best : null;
     },
     /**
      * Jump. Refused if you are already off the ground, so leaning on the key

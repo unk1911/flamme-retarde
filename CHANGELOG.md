@@ -8,6 +8,145 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.99.0] — 2026-08-22
+
+Seven agents in parallel off `bff3996`, one branch each. Five landed complete,
+two were parked against a usage ceiling with their findings committed and
+written up. The pattern of the day: three of the seven complaints were not the
+thing they looked like, and two independent agents found the same rig bug from
+opposite ends.
+
+### Fixed
+
+- **Nineteen hundred square metres of concrete were lying on the open sea.** The
+  plaza — a poured slab at t 344–400, 56 m of shore by 34 m out over the water,
+  with an unrailed face 2.6 m down into the channel. The fan of pale tapered
+  strips it made from the air is what its 1.5 m paving steps do when they splay
+  seaward, because the shore frame is a parallel offset of a traced waterline
+  and not a rigid one (rule 9b). It was argued into existence from an aerial as
+  "the largest single surface at the real Jadrija"; the fieldwork has exactly
+  one plaza and it is dry ground east of the huts with parasols and tree pits
+  on it. Rule 12. Gone, with its walking surface, its `standable` exemption and
+  its seaward bound — any one left behind is a metre of solid air over the sea.
+  Removing it also lifted two exclusions that had been keeping towels and
+  mooring rings off 56 m of quay, so the triangle count went *up* by 10: the
+  slab was 180 and the returning furniture is 190.
+
+- **You could walk through people.** 77 of the 87 bathers were already boxes in
+  the static list and stopped you fine; the bug was the ten the casting pass
+  deliberately skipped — 3 promenade walkers, 6 sunbathers, 1 wader — and Baye,
+  who is not in the crowd at all. One predicate said "skip these" for good
+  reasons and nothing downstream ever picked them up. The static list is built
+  once, so the missing half is a per-frame circle: radius 0.24 m off the rig, a
+  sunbather two circles of 0.30 at ±0.23 m along the *body* axis because `pose`
+  lays them down with a roll. Radial push only, so the tangent survives and you
+  slide. Both ends of the column are tested, which is how you can hop a 0.42 m
+  sunbather and never a 1.78 m stranger. **352 walks straight at people: 27
+  ended inside a body before, 0 after.** Cost `+2.6 µs` a frame.
+
+- **You could walk through the tables.** 98 drawn pieces had no collider — 63
+  café chairs, 21 tables, 5 bar stools, 3 pergola posts, 2 shower posts, a 3 m
+  cantilever mast, a planter, a bench, a flagpole. It felt arbitrary rather
+  than broken for a reason worth writing down: two chairs in three have a
+  seated bather in them, and a seated bather *is* a collider. The person
+  stopped you; the chair they sat on did not. Walking inland at t 333.66 used
+  to carry you to s 19.73, through three chairs and a table; it stops at 16.78
+  now. Corridors checked by flood-filling the walkable grid before and after —
+  narrowest reachable run on the promenade 4.6 m and on the terraces 2.6 m,
+  both identical; 45.8 m² newly occupied and 0.1 m² walled off.
+
+- **The bead curtain made no sound when you went through it.** It fired all
+  along, just never where you could hear it: the doorway is a cut, not a walk.
+  Crossing `s = K.face` at 17.20 stands you at `K.standIn`, 19.65, and the
+  strands hang at 17.27 — 7 cm past the trigger plane — so you get within seven
+  centimetres of the curtain and are then taken 2.4 m away from it, and the loud
+  middle of a crossing never happens. Two of the four rattles a real
+  walk-through produced fired at `d = 2.38 m`, after the jump. Now a segment
+  test: did the line you moved along this frame straddle the strands inside the
+  doorway's width. It catches the real 6 cm step going out and the teleport
+  going in without needing to know the cut exists.
+
+- **The promenade had no walkers on it at all.** `BEATS = 3` took the three
+  westernmost and the pool below filtered them out, so every other walker was
+  deleted rather than thinned — and the three it kept stood at t 13, 57 and 105,
+  which is sand. The promenade starts at 205. `walkers` read **3**; it reads
+  **27**.
+
+- **The wine bottle was lodged in her hand.** Its foot was pinned below the
+  wrist joint in *world* Y with its aim left at identity, so a 306 mm cylinder
+  stood vertical with its axis running up through her forearm, uncorrelated
+  with the wrist. Fixed through `boneTurn`, the way the hat was. Her reach was
+  wrong too — `armUR` carried `+16`, which on this rig swings a limb's far end
+  *backward*, so she reached away from a bottle sitting 0.52 m from her palm.
+
+- **Two agents found the same rig bug from opposite ends.** The head aim was
+  written `atan2(dx, dz)`, the Three.js way; this rig's forward is **+X**, so
+  the yaw is `atan2(-dz, dx)` and the first cut turned her head a right angle to
+  the side of whoever bumped her. Same class as the bottle. Written into the
+  TODO as a rule.
+
+### Added
+
+- **They say something when you walk into them.** A head turn over 0.34 s, held
+  2.3 s, released over 0.85 s, clamped to 1.05 rad, applied after the pose
+  switch because four of six poses write the head yaw off their own clock. The
+  line goes in the speech balloon at 1.45×, with a 5 s global cooldown and 14 s
+  per person, and only about 55% of people speak at all — off `fg.seed`, so it
+  is a habit rather than a dice roll. Three lines weighted 2:1:1 toward the one
+  asked for, in all three languages: *uhm... excuuuuse me!* / *euh...
+  pardooooon !* / *ovaj... oprostiiiite!*
+
+- **A recorded bead curtain**, `build/payload/beads.mp3` — Freesound #817911,
+  CC0 1.0, 9 KB. Downsampled to 24 kHz mono to sit with the field recordings;
+  at the 48 kHz it arrived as, it was the cleanest brightest thing in the mix
+  and read as an import. It plays the *crossing* only. The tail stays
+  synthesised, because the tail has to follow how hard the strands are still
+  moving and no taper on a fixed clip can do that. CC0 was chosen over
+  better-sounding recordings under other terms for one reason: this game ships
+  as a single file with nowhere to put a credit line.
+
+- **`SKIN_CAST` goes from 8 to 20** — two and a half times as many properly
+  skinned figures, covering the café terrace the ice-cream errand is set on.
+  Twenty is the largest count that measured free (18.05 / 12.97 / 13.26 ms
+  against a baseline of 18.97 / 13.40 / 12.80). The branch left it at 41, which
+  its own measurement rejected at 26.16 ms — 38 fps where the game holds 60.
+  The distance-staggered pose ladder stays, because it costs nothing here and
+  is what makes a larger number arguable later.
+
+- **The front clip plane follows the nearest person.** `ground.nearBody()`, and
+  a fifth term in the same ramp a wall and a kite bar already use. The collider
+  stops you 0.30 m off somebody's surface and the standing clip sat at 1.2 m,
+  so without this the head turn and the line arrived from an empty promenade.
+  Measured: 0.30 m away pulls the plane to 0.18. Two fixes landed in the same
+  hour and neither branch could see the other.
+
+- `__fr.jad.bumps()`, `__fr.jad.bodies(pad)`, `ground.nearBody()`.
+
+### Known
+
+- **`0` still throws**, every frame once it starts: `skipToGround` →
+  `ground.force()` → `seedSpotFire()` reads `far[0]`/`far[1]` unguarded at
+  `src/47-ground.js:614` and `objects` can be shorter than two. Reported by
+  three separate agents today. Next.
+- **The wine pour is half fixed.** The parenting and the reach are right; the
+  pour pose still lays the bottle at 118.6° — past horizontal, across her body
+  — with her hand on the punt. No bake is committed, so the shipped clip has
+  the src fix and none of the pose work. Tools and a per-clip hash harness are
+  in `plan/wine-pour-wip/`.
+- **The cars are still boxes.** Research in `plan/cars-in-the-wood-WIP.md`: no
+  shelf library, because there is no glTF parser in the bundle and there is not
+  going to be one, so every candidate has to pass through Blender anyway. The
+  footage says the car park is white and silver modern superminis and small
+  crossovers, one dark blue MPV, one small white van and one older red hatch —
+  not the Golfs and Zastavas that were guessed at.
+- **The marionettes are still there.** 55 of 92 people. They are deliberate:
+  120 people in 22 draw calls against 7 000 triangles each for the good tier.
+  Raising `SKIN_CAST` past 20 needs the pose ladder re-measured at 24 and 30.
+- The 77 static bathers still hold you off 0.71 m in a square, against 0.54 m
+  in a circle for the dynamic ones — one mechanism for people would be tidier.
+- The lane wall's `gap()` still opens 72 m of back wall at t 336–408, whose only
+  justification was the crowd crossing to a plaza that no longer exists.
+
 ## [1.98.0] — 2026-08-22
 
 Four bugs from one playing pass, worked in parallel. Two of them turned out to
