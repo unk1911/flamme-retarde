@@ -5001,6 +5001,13 @@ async function buildJadrija(scene) {
     // one end, and it reads as part of the paving rather than as a chair.
     for (let t = JAD.beachTo + 24; t < LEN - 20; t += 61) {
       if (!clearOfShops(t)) continue;
+      // And not across the front of the vikendica. The run starts at
+      // `beachTo + 24` = 229 and the house is at 232, so the first bench of the
+      // whole promenade landed three metres off its steps: six metres of
+      // precast, 0.49 m high, straight across the way in. At eye height that is
+      // below the crosshair, and running into it reads as an invisible wall
+      // rather than as a bench — which is exactly how it was reported.
+      if (Math.abs(t - VIK.t) < 12) continue;
       const y = at(t).deck, sb = JAD.mid + 2.6;
       boxTS(t - 3.0, t + 3.0, sb - 0.30, sb + 0.30, y, y + 0.45, PLINTH,
         shade(PLINTH, 1.06));

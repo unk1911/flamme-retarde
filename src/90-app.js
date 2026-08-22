@@ -299,7 +299,34 @@ addEventListener('keydown', (e) => {
     // metres from *and then* fell through to the wade, which is the whole of
     // why E in the sea did nothing you could see.
     if (state.phase === 'swim') { wadeAshore(); return; }
+    // The kite and the foil are in the water too — `inWater()` has said so all
+    // along — and E did nothing in either, because only 'swim' reached the
+    // wade. Put the gear away first and then go ashore, which is what the key
+    // means everywhere else: E is the door.
+    if (state.phase === 'ride' || state.phase === 'foil') {
+      if (state.phase === 'ride') dropKite(); else dropFoil();
+      if (state.phase === 'swim') wadeAshore();
+      return;
+    }
     toggleGround();
+  }
+  // ENTER — jump.
+  //
+  // Asked for as an escape hatch and that is mostly what it is. The walker
+  // follows the ground exactly, so once `confine` has pushed you up against
+  // something there is no way over it: you are simply stopped, and if the thing
+  // stopping you is a knee-high blocker whose geometry reads as scenery, being
+  // stopped by it looks like an invisible wall. A hop clears anything whose top
+  // is below your feet — see the airborne test in `confine`.
+  //
+  // On foot only. In the seat Enter is not a jump and under a canopy you are
+  // already off the ground.
+  if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+    if (state.phase === 'ground' && ground && ground.ok && !state.paused) {
+      e.preventDefault();
+      ground.hop();
+      return;
+    }
   }
   // J for e[J]ect. Deliberately not next to anything: it is the one key in the
   // game you cannot take back, and it should not be within reach of the fingers
@@ -1455,23 +1482,34 @@ function skipToJadrija() {
  * where you are standing and what you are facing when it hands back control:
  * the cut ends on the shot, not near it.
  */
+// Written as offsets ALONG THE SHORE FROM THE HOUSE, not as absolute t.
+//
+// These were absolute — 23.6 to 33.5 — and correct while `VIK.t` was 24.0.
+// The house moved to 232 to stand where the real one does, on the last of the
+// open frontage west of the mole, and the shot did not go with it: eleven
+// seconds of camera walking up a staircase two hundred metres away over bare
+// beach. `s` and the heights are unchanged, because neither the house's
+// distance from the water nor its floor levels moved.
+//
+// `VIK` is declared in 44-vikendica.js, which the build concatenates before
+// this file, so it is initialised by the time this literal is evaluated.
 const VIK_WALK = [
   // Along the promenade from the east, with the house coming up on your left
   // and the water on your right.
-  { at: [33.5, 15.4, 1.76], look: [26.5, 22.0, 3.20], dur: 2.6 },
+  { at: [VIK.t + 9.5, 15.4, 1.76], look: [VIK.t + 2.5, 22.0, 3.20], dur: 2.6 },
   // At the foot of the flight, looking up it. This is the shot the whole thing
   // exists for — a first-row house is a house you look *up* at from the walk.
   // The foot moved: the flight now starts at the south face of the house, at
   // s 21.54, where it used to run out to 20.39.
-  { at: [28.8, 20.5, 1.72], look: [28.1, 25.6, 4.30], dur: 1.8 },
+  { at: [VIK.t + 4.8, 20.5, 1.72], look: [VIK.t + 4.1, 25.6, 4.30], dur: 1.8 },
   // Up. Two legs, because a single easing over 2.9 m of rise reads as a lift.
-  { at: [28.1, 23.1, 3.12], look: [28.1, 26.0, 4.50], dur: 1.7 },
-  { at: [28.1, 25.0, 4.56], look: [27.0, 25.3, 4.30], dur: 1.6 },
+  { at: [VIK.t + 4.1, 23.1, 3.12], look: [VIK.t + 4.1, 26.0, 4.50], dur: 1.7 },
+  { at: [VIK.t + 4.1, 25.0, 4.56], look: [VIK.t + 3.0, 25.3, 4.30], dur: 1.6 },
   // Through the door, and the room opens out to the left.
-  { at: [26.4, 25.2, 4.56], look: [23.6, 24.0, 4.30], dur: 1.7 },
+  { at: [VIK.t + 2.4, 25.2, 4.56], look: [VIK.t - 0.4, 24.0, 4.30], dur: 1.7 },
   // And stop where you would stop: in the middle of the floor with the terrace
   // and the channel in front of you.
-  { at: [25.30, 24.10, 4.56], look: [25.10, 15.50, 4.20], dur: 1.9 },
+  { at: [VIK.t + 1.3, 24.10, 4.56], look: [VIK.t + 1.1, 15.50, 4.20], dur: 1.9 },
 ];
 
 let vikWalk = null;

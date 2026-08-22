@@ -17008,6 +17008,13 @@ async function buildJadrija(scene) {
     // one end, and it reads as part of the paving rather than as a chair.
     for (let t = JAD.beachTo + 24; t < LEN - 20; t += 61) {
       if (!clearOfShops(t)) continue;
+      // And not across the front of the vikendica. The run starts at
+      // `beachTo + 24` = 229 and the house is at 232, so the first bench of the
+      // whole promenade landed three metres off its steps: six metres of
+      // precast, 0.49 m high, straight across the way in. At eye height that is
+      // below the crosshair, and running into it reads as an invisible wall
+      // rather than as a bench — which is exactly how it was reported.
+      if (Math.abs(t - VIK.t) < 12) continue;
       const y = at(t).deck, sb = JAD.mid + 2.6;
       boxTS(t - 3.0, t + 3.0, sb - 0.30, sb + 0.30, y, y + 0.45, PLINTH,
         shade(PLINTH, 1.06));
@@ -28582,6 +28589,13 @@ function buildKites(scene, jadrija) {
 
 const GROUND = {
   eye: 1.66,
+  // The hop. `hopV` is the launch speed and `hopG` the gravity that brings you
+  // back, so the apex is hopV^2 / 2g — 1.15 m, which clears the 0.49 m bench
+  // and the 0.99 m bin on the promenade with something to spare. It exists as
+  // an escape hatch as much as a move: the walker follows the ground exactly
+  // and has no way at all to get over a thing it has been pushed against.
+  hopV: 4.75,
+  hopG: 9.81,
   walk: 3.4,               // m/s — a fast walk in kit
   // Shift. 6.1 m/s was a real sprint in real kit and it was the wrong number:
   // the places you are asked to cross on foot are four hundred metres of
@@ -28847,6 +28861,15 @@ async function buildGround(scene, field) {
     aim: [0, 0, 0], aimKind: null, aimSoak: -1, aimHot: false,
     gait: 0, bob: 0,                 // where you are in the stride, and how much of it shows
     eye: GROUND.eye,                 // how tall you are standing right now — see `stoop`
+    // The hop, and the ground under it. `y` is where your feet are and it has
+    // always been read straight back out of `walkY` every tick, which is what
+    // makes this a ground-follower with no way to leave the ground. `gy` is
+    // that value; `hop` is how far above it you currently are.
+    //
+    // They are kept apart on purpose. `walkY` takes the previous height as a
+    // hint so it can tell a balcony from the path underneath it, and handing it
+    // a hopped height would let a jump snap you onto the storey above.
+    gy: null, hop: 0, hopV: 0,
   };
 
   /**
@@ -28944,7 +28967,7 @@ async function buildGround(scene, field) {
    * cross the promenade was one frame's worth of acceleration — 1.4 m/s, on a
    * key that promises 6, with no wall anywhere near them.
    */
-  function confine(x, z, y) {
+  function confine(x, z, y, airborne) {
     const B = field.bounds;
     let [t, s] = field.local(x, z);
     const t0 = t, s0 = s;
@@ -28984,6 +29007,14 @@ async function buildGround(scene, field) {
         // means the blocker applies — a crew member walking the field is not
         // on a building, and the walls of the house should still be walls.
         if (b.ceil != null && y != null && y > b.ceil) continue;
+        // Or one you are currently over the top of, which is the whole point of
+        // the hop: a bench is 0.49 m and a bin is 0.99, and a walker who has
+        // been shoved against one has no other way past it. Only while actually
+        // airborne — standing on something is not the same as clearing it, and
+        // applying this on the ground would let you walk through the low half
+        // of the world.
+        if (airborne && b.h != null && b.y != null && y != null
+          && y > b.y + b.h + 0.05) continue;
         // A blocker may carry its own rotation within the locale frame. The
         // aerodrome never needs one — everything on it was laid out in runway
         // axes — but a village was laid out to its lanes, and a house at 40° to
@@ -29973,7 +30004,7 @@ async function buildGround(scene, field) {
     // standing against a hangar can then hold you against it but never push you
     // through it, and a hold is something you can always walk sideways out of.
     const [bx, bz] = unbody(tx, tz);
-    let [nx, nz, hit] = confine(bx, bz, you.y);
+    let [nx, nz, hit] = confine(bx, bz, you.y, you.hop > 0.05);
     // The waterline, where the locale has one. Tried as two independent axes
     // before being refused outright, so walking into the sea at an angle slides
     // you along the beach instead of gluing you to the spot — the shoreline is
@@ -30027,7 +30058,16 @@ async function buildGround(scene, field) {
     }
     const moved = Math.hypot(nx - you.x, nz - you.z);
     you.x = nx; you.z = nz;
-    you.y = field.walkY(you.x, you.z, you.y);
+    // The ground, then the hop on top of it. `gy` is what `walkY` says and is
+    // what gets handed back to `walkY` next tick; `you.y` is where your feet
+    // actually are, which during a hop is above it.
+    you.gy = field.walkY(you.x, you.z, you.gy != null ? you.gy : you.y);
+    if (you.hop > 0 || you.hopV !== 0) {
+      you.hopV -= GROUND.hopG * dt;
+      you.hop += you.hopV * dt;
+      if (you.hop <= 0) { you.hop = 0; you.hopV = 0; }
+    }
+    you.y = you.gy + you.hop;
     // Eased, so ducking under the eaves is a movement and not a cut. The hard
     // cap in pose() is what stops a teleport arriving on the deck at full
     // height with its head outside.
@@ -30198,6 +30238,7 @@ async function buildGround(scene, field) {
     const [px2, pz2] = confine(bx, bz);
     you.x = px2; you.z = pz2;
     you.y = field.walkY(you.x, you.z);
+    you.gy = you.y; you.hop = 0; you.hopV = 0;
     you.vx = you.vz = 0;
     you.pitch = 0;
     // Facing the problem, not the aeroplane. You have just spent thirty seconds
@@ -30255,6 +30296,7 @@ async function buildGround(scene, field) {
     const [px, pz] = confine(x, z);
     you.x = px; you.z = pz;
     you.y = field.walkY(px, pz);
+    you.gy = you.y; you.hop = 0; you.hopV = 0;
     you.vx = you.vz = 0;
     return true;
   }
@@ -30263,6 +30305,7 @@ async function buildGround(scene, field) {
     const [px, pz] = confine(x, z);
     you.x = px; you.z = pz;
     you.y = field.walkY(px, pz);
+    you.gy = you.y; you.hop = 0; you.hopV = 0;
     you.vx = you.vz = 0;
     you.yaw = yaw;
     you.pitch = 0;
@@ -30346,6 +30389,20 @@ async function buildGround(scene, field) {
     get armed() { return armed; },
     update, enter, leave, bail, canEnter, canBoard, look, pose, you,
     retarget, dropIn, stepTo, addGuest,
+    /**
+     * Jump. Refused if you are already off the ground, so leaning on the key
+     * is one hop and not a hover.
+     *
+     * Its first job is not athletics: this walker follows the ground exactly
+     * and, once `confine` has pushed you against something, has no way over it
+     * at all. See `GROUND.hopV` and the airborne test in `confine`.
+     */
+    hop: () => {
+      if (!active || you.hop > 0 || you.hopV !== 0) return false;
+      you.hopV = GROUND.hopV;
+      return true;
+    },
+    airborne: () => you.hop > 0.05,
     /** Whichever locale currently owns you — for a test, and read-only. */
     get field() { return field; },
     get stranded() { return stranded; },
@@ -30404,6 +30461,7 @@ async function buildGround(scene, field) {
     put(x, z, yaw, pitch = 0, yHint = null) {
       const [px2, pz2] = confine(x, z);
       you.x = px2; you.z = pz2; you.y = field.walkY(px2, pz2, yHint);
+      you.gy = you.y; you.hop = 0; you.hopV = 0;
       you.yaw = yaw; you.pitch = pitch;
     },
     /**
@@ -30429,6 +30487,7 @@ async function buildGround(scene, field) {
       const a = Math.atan2(t[2] - you.z, t[0] - you.x);
       const [px2, pz2] = confine(t[0] - Math.cos(a) * 8, t[2] - Math.sin(a) * 8);
       you.x = px2; you.z = pz2; you.y = field.walkY(px2, pz2);
+      you.gy = you.y; you.hop = 0; you.hopV = 0;
       you.yaw = Math.atan2(-(t[0] - you.x), -(t[2] - you.z));
       const d = Math.hypot(t[0] - you.x, t[2] - you.z);
       // Aim a little high: the jet droops, and that is the point of it.
@@ -42565,7 +42624,34 @@ addEventListener('keydown', (e) => {
     // metres from *and then* fell through to the wade, which is the whole of
     // why E in the sea did nothing you could see.
     if (state.phase === 'swim') { wadeAshore(); return; }
+    // The kite and the foil are in the water too — `inWater()` has said so all
+    // along — and E did nothing in either, because only 'swim' reached the
+    // wade. Put the gear away first and then go ashore, which is what the key
+    // means everywhere else: E is the door.
+    if (state.phase === 'ride' || state.phase === 'foil') {
+      if (state.phase === 'ride') dropKite(); else dropFoil();
+      if (state.phase === 'swim') wadeAshore();
+      return;
+    }
     toggleGround();
+  }
+  // ENTER — jump.
+  //
+  // Asked for as an escape hatch and that is mostly what it is. The walker
+  // follows the ground exactly, so once `confine` has pushed you up against
+  // something there is no way over it: you are simply stopped, and if the thing
+  // stopping you is a knee-high blocker whose geometry reads as scenery, being
+  // stopped by it looks like an invisible wall. A hop clears anything whose top
+  // is below your feet — see the airborne test in `confine`.
+  //
+  // On foot only. In the seat Enter is not a jump and under a canopy you are
+  // already off the ground.
+  if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+    if (state.phase === 'ground' && ground && ground.ok && !state.paused) {
+      e.preventDefault();
+      ground.hop();
+      return;
+    }
   }
   // J for e[J]ect. Deliberately not next to anything: it is the one key in the
   // game you cannot take back, and it should not be within reach of the fingers
@@ -43721,23 +43807,34 @@ function skipToJadrija() {
  * where you are standing and what you are facing when it hands back control:
  * the cut ends on the shot, not near it.
  */
+// Written as offsets ALONG THE SHORE FROM THE HOUSE, not as absolute t.
+//
+// These were absolute — 23.6 to 33.5 — and correct while `VIK.t` was 24.0.
+// The house moved to 232 to stand where the real one does, on the last of the
+// open frontage west of the mole, and the shot did not go with it: eleven
+// seconds of camera walking up a staircase two hundred metres away over bare
+// beach. `s` and the heights are unchanged, because neither the house's
+// distance from the water nor its floor levels moved.
+//
+// `VIK` is declared in 44-vikendica.js, which the build concatenates before
+// this file, so it is initialised by the time this literal is evaluated.
 const VIK_WALK = [
   // Along the promenade from the east, with the house coming up on your left
   // and the water on your right.
-  { at: [33.5, 15.4, 1.76], look: [26.5, 22.0, 3.20], dur: 2.6 },
+  { at: [VIK.t + 9.5, 15.4, 1.76], look: [VIK.t + 2.5, 22.0, 3.20], dur: 2.6 },
   // At the foot of the flight, looking up it. This is the shot the whole thing
   // exists for — a first-row house is a house you look *up* at from the walk.
   // The foot moved: the flight now starts at the south face of the house, at
   // s 21.54, where it used to run out to 20.39.
-  { at: [28.8, 20.5, 1.72], look: [28.1, 25.6, 4.30], dur: 1.8 },
+  { at: [VIK.t + 4.8, 20.5, 1.72], look: [VIK.t + 4.1, 25.6, 4.30], dur: 1.8 },
   // Up. Two legs, because a single easing over 2.9 m of rise reads as a lift.
-  { at: [28.1, 23.1, 3.12], look: [28.1, 26.0, 4.50], dur: 1.7 },
-  { at: [28.1, 25.0, 4.56], look: [27.0, 25.3, 4.30], dur: 1.6 },
+  { at: [VIK.t + 4.1, 23.1, 3.12], look: [VIK.t + 4.1, 26.0, 4.50], dur: 1.7 },
+  { at: [VIK.t + 4.1, 25.0, 4.56], look: [VIK.t + 3.0, 25.3, 4.30], dur: 1.6 },
   // Through the door, and the room opens out to the left.
-  { at: [26.4, 25.2, 4.56], look: [23.6, 24.0, 4.30], dur: 1.7 },
+  { at: [VIK.t + 2.4, 25.2, 4.56], look: [VIK.t - 0.4, 24.0, 4.30], dur: 1.7 },
   // And stop where you would stop: in the middle of the floor with the terrace
   // and the channel in front of you.
-  { at: [25.30, 24.10, 4.56], look: [25.10, 15.50, 4.20], dur: 1.9 },
+  { at: [VIK.t + 1.3, 24.10, 4.56], look: [VIK.t + 1.1, 15.50, 4.20], dur: 1.9 },
 ];
 
 let vikWalk = null;

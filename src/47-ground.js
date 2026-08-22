@@ -30,6 +30,13 @@
 
 const GROUND = {
   eye: 1.66,
+  // The hop. `hopV` is the launch speed and `hopG` the gravity that brings you
+  // back, so the apex is hopV^2 / 2g — 1.15 m, which clears the 0.49 m bench
+  // and the 0.99 m bin on the promenade with something to spare. It exists as
+  // an escape hatch as much as a move: the walker follows the ground exactly
+  // and has no way at all to get over a thing it has been pushed against.
+  hopV: 4.75,
+  hopG: 9.81,
   walk: 3.4,               // m/s — a fast walk in kit
   // Shift. 6.1 m/s was a real sprint in real kit and it was the wrong number:
   // the places you are asked to cross on foot are four hundred metres of
@@ -295,6 +302,15 @@ async function buildGround(scene, field) {
     aim: [0, 0, 0], aimKind: null, aimSoak: -1, aimHot: false,
     gait: 0, bob: 0,                 // where you are in the stride, and how much of it shows
     eye: GROUND.eye,                 // how tall you are standing right now — see `stoop`
+    // The hop, and the ground under it. `y` is where your feet are and it has
+    // always been read straight back out of `walkY` every tick, which is what
+    // makes this a ground-follower with no way to leave the ground. `gy` is
+    // that value; `hop` is how far above it you currently are.
+    //
+    // They are kept apart on purpose. `walkY` takes the previous height as a
+    // hint so it can tell a balcony from the path underneath it, and handing it
+    // a hopped height would let a jump snap you onto the storey above.
+    gy: null, hop: 0, hopV: 0,
   };
 
   /**
@@ -392,7 +408,7 @@ async function buildGround(scene, field) {
    * cross the promenade was one frame's worth of acceleration — 1.4 m/s, on a
    * key that promises 6, with no wall anywhere near them.
    */
-  function confine(x, z, y) {
+  function confine(x, z, y, airborne) {
     const B = field.bounds;
     let [t, s] = field.local(x, z);
     const t0 = t, s0 = s;
@@ -432,6 +448,14 @@ async function buildGround(scene, field) {
         // means the blocker applies — a crew member walking the field is not
         // on a building, and the walls of the house should still be walls.
         if (b.ceil != null && y != null && y > b.ceil) continue;
+        // Or one you are currently over the top of, which is the whole point of
+        // the hop: a bench is 0.49 m and a bin is 0.99, and a walker who has
+        // been shoved against one has no other way past it. Only while actually
+        // airborne — standing on something is not the same as clearing it, and
+        // applying this on the ground would let you walk through the low half
+        // of the world.
+        if (airborne && b.h != null && b.y != null && y != null
+          && y > b.y + b.h + 0.05) continue;
         // A blocker may carry its own rotation within the locale frame. The
         // aerodrome never needs one — everything on it was laid out in runway
         // axes — but a village was laid out to its lanes, and a house at 40° to
@@ -1421,7 +1445,7 @@ async function buildGround(scene, field) {
     // standing against a hangar can then hold you against it but never push you
     // through it, and a hold is something you can always walk sideways out of.
     const [bx, bz] = unbody(tx, tz);
-    let [nx, nz, hit] = confine(bx, bz, you.y);
+    let [nx, nz, hit] = confine(bx, bz, you.y, you.hop > 0.05);
     // The waterline, where the locale has one. Tried as two independent axes
     // before being refused outright, so walking into the sea at an angle slides
     // you along the beach instead of gluing you to the spot — the shoreline is
@@ -1475,7 +1499,16 @@ async function buildGround(scene, field) {
     }
     const moved = Math.hypot(nx - you.x, nz - you.z);
     you.x = nx; you.z = nz;
-    you.y = field.walkY(you.x, you.z, you.y);
+    // The ground, then the hop on top of it. `gy` is what `walkY` says and is
+    // what gets handed back to `walkY` next tick; `you.y` is where your feet
+    // actually are, which during a hop is above it.
+    you.gy = field.walkY(you.x, you.z, you.gy != null ? you.gy : you.y);
+    if (you.hop > 0 || you.hopV !== 0) {
+      you.hopV -= GROUND.hopG * dt;
+      you.hop += you.hopV * dt;
+      if (you.hop <= 0) { you.hop = 0; you.hopV = 0; }
+    }
+    you.y = you.gy + you.hop;
     // Eased, so ducking under the eaves is a movement and not a cut. The hard
     // cap in pose() is what stops a teleport arriving on the deck at full
     // height with its head outside.
@@ -1646,6 +1679,7 @@ async function buildGround(scene, field) {
     const [px2, pz2] = confine(bx, bz);
     you.x = px2; you.z = pz2;
     you.y = field.walkY(you.x, you.z);
+    you.gy = you.y; you.hop = 0; you.hopV = 0;
     you.vx = you.vz = 0;
     you.pitch = 0;
     // Facing the problem, not the aeroplane. You have just spent thirty seconds
@@ -1703,6 +1737,7 @@ async function buildGround(scene, field) {
     const [px, pz] = confine(x, z);
     you.x = px; you.z = pz;
     you.y = field.walkY(px, pz);
+    you.gy = you.y; you.hop = 0; you.hopV = 0;
     you.vx = you.vz = 0;
     return true;
   }
@@ -1711,6 +1746,7 @@ async function buildGround(scene, field) {
     const [px, pz] = confine(x, z);
     you.x = px; you.z = pz;
     you.y = field.walkY(px, pz);
+    you.gy = you.y; you.hop = 0; you.hopV = 0;
     you.vx = you.vz = 0;
     you.yaw = yaw;
     you.pitch = 0;
@@ -1794,6 +1830,20 @@ async function buildGround(scene, field) {
     get armed() { return armed; },
     update, enter, leave, bail, canEnter, canBoard, look, pose, you,
     retarget, dropIn, stepTo, addGuest,
+    /**
+     * Jump. Refused if you are already off the ground, so leaning on the key
+     * is one hop and not a hover.
+     *
+     * Its first job is not athletics: this walker follows the ground exactly
+     * and, once `confine` has pushed you against something, has no way over it
+     * at all. See `GROUND.hopV` and the airborne test in `confine`.
+     */
+    hop: () => {
+      if (!active || you.hop > 0 || you.hopV !== 0) return false;
+      you.hopV = GROUND.hopV;
+      return true;
+    },
+    airborne: () => you.hop > 0.05,
     /** Whichever locale currently owns you — for a test, and read-only. */
     get field() { return field; },
     get stranded() { return stranded; },
@@ -1852,6 +1902,7 @@ async function buildGround(scene, field) {
     put(x, z, yaw, pitch = 0, yHint = null) {
       const [px2, pz2] = confine(x, z);
       you.x = px2; you.z = pz2; you.y = field.walkY(px2, pz2, yHint);
+      you.gy = you.y; you.hop = 0; you.hopV = 0;
       you.yaw = yaw; you.pitch = pitch;
     },
     /**
@@ -1877,6 +1928,7 @@ async function buildGround(scene, field) {
       const a = Math.atan2(t[2] - you.z, t[0] - you.x);
       const [px2, pz2] = confine(t[0] - Math.cos(a) * 8, t[2] - Math.sin(a) * 8);
       you.x = px2; you.z = pz2; you.y = field.walkY(px2, pz2);
+      you.gy = you.y; you.hop = 0; you.hopV = 0;
       you.yaw = Math.atan2(-(t[0] - you.x), -(t[2] - you.z));
       const d = Math.hypot(t[0] - you.x, t[2] - you.z);
       // Aim a little high: the jet droops, and that is the point of it.
