@@ -4226,21 +4226,29 @@ async function buildJadrija(scene) {
       [0.230, 0.235, 0.245], [0.115, 0.115, 0.125], [0.380, 0.130, 0.115],
       [0.140, 0.200, 0.340], [0.480, 0.470, 0.430]];
     let n = 0;
-    for (let t = JAD.beachTo - 40; t < LEN - 30; t += 5.6) {
+    for (let t = JAD.beachTo - 40; t < LEN - 30; t += 4.0) {
       if (!clearOfShops(t)) continue;
       // Dense: the aerial shows the whole back of the wood given over to it in
       // August, and one car every fourteen metres reads as a lay-by rather than
       // as a car park.
+      // Tightened from 5.6 m to 4.0 m when the second row came out: one row
+      // at the old spacing is a lay-by, and the aerial has the whole back of
+      // the wood given over to it in August.
       const j = jit(t | 0, 21);
-      if (j > 0.74) continue;
+      if (j > 0.80) continue;
       // Inside 39 m of the water, and that is not a taste call: the note over
       // the house thinning records that OSM maps nothing at all within 39 m of
       // this shore, which makes it the one band where a car cannot end up
       // parked in somebody's front room. The first cut put two rows at 37 and
       // 50 and the second row stood inside the houses — invisible from the
       // promenade and unmissable the moment the camera was in one.
-      const row = jit(t | 0, 22) < 0.5 ? 0 : 1;
-      const s0 = JAD.rowB + 5.4 + row * 5.6 + jit(t | 0, 23) * 1.4;
+      // And the clamp was on the NOSE. `s0` is where the front bumper stands
+      // and the car is 4.3 m long *inland* of it, so the second row started at
+      // 37.1-38.5 and ended at 42.8 — inside the OSM footprints, which is the
+      // exact failure the 38 m rule was written down for. One nose-in row on
+      // the lane's seaward side is what fits, and it fits with its tail at
+      // 35.5 rather than with its nose there.
+      const s0 = JAD.rowB + 5.0 + jit(t | 0, 23) * 1.4;
       const y = surfaceY(t, s0 + 2.0);
       const col = PAINT[((jit(t | 0, 24) * 97) | 0) % PAINT.length];
       // Nose-in: the long axis runs inland, so `s` is the length of the car.
@@ -4631,6 +4639,163 @@ async function buildJadrija(scene) {
     }
     greens.push([t, s, 0.30, 4]);
   }
+  // ── the lane wall ──────────────────────────────────────────────────────────
+  //
+  // b_090 and a_160 both open on it and a_030 has it again behind the houses:
+  // a low white rendered wall with a dressed limestone coping, 0.8-1.0 m, with
+  // planters standing on it. a_160 calls it what it is — "the boundary element
+  // of the whole approach" — and the game had nothing at all between the back
+  // of the shops and the trees. Filmed from the wood that band was one bare
+  // orange expanse five hundred metres long.
+  //
+  // It runs at s 29.2, which is where it can run: the shop rears now stop at
+  // 27.2 and the first cars stand at 31.5, so the wall divides the two the way
+  // it does in the footage — the resort on one side of it, what you arrived in
+  // on the other.
+  const WALL = { s: 29.2, w: 0.135, h: 0.86, cap: 0.115, capOut: 0.075 };
+  {
+    const REND = [0.615, 0.600, 0.568];
+    const CAP = [0.545, 0.528, 0.482];
+    const yAt = (t) => surfaceY(t, WALL.s);
+    // Where it stops.
+    //
+    // Not "at every shop", which is what the first cut said and which took
+    // forty metres of wall out in one piece: h2o and the Slasticarnica stand
+    // end to end and `clearOfShops` opens two and a half metres either side of
+    // each, so the whole middle of the resort — the part everybody looks at —
+    // came out with no wall at all. A wall stops where something is standing
+    // ON it, and the shop rears now stop at s 27.2, which is two metres clear.
+    // So the test is whether the building crosses the line, plus a delivery
+    // opening opposite each back door, plus the mole and the plaza, which are
+    // where the crowd crosses the band.
+    const crosses = (t) => SHOPS.some((S) => t > S.t0 - 1.8 && t < S.t1 + 1.8
+      && S.s0 - (S.awn || 0) - 1.0 < WALL.s + 0.7 && S.s1 + 1.0 > WALL.s - 0.7);
+    const doorway = (t) => SHOPS.some((S) => S.kind === 'box'
+      && Math.abs(t - (S.t0 + (S.t1 - S.t0) * 0.33)) < 2.2);
+    const gap = (t) => crosses(t) || doorway(t)
+      || (t > JET.t - 12 && t < JET.t + 12)
+      || (t > PLAZA.t0 - 8 && t < PLAZA.t1 + 8)
+      || (t > VIK.t - 12 && t < VIK.t + 12);
+    const step = 2.4;
+    let run0 = null;
+    for (let t = 214; t < LEN - 14 + step; t += step) {
+      const t1 = Math.min(t + step, LEN - 14);
+      const open = gap(t) || gap(t1) || t >= LEN - 14;
+      if (!open) {
+        const y0 = yAt(t), y1 = yAt(t1);
+        const sa = WALL.s - WALL.w, sb = WALL.s + WALL.w;
+        // Panel. Built as quads rather than as a box per bay, for the reason
+        // the plaza was: a box takes the average of its own two ends and the
+        // run comes out stepped over ground that falls a metre in fifty.
+        const q = (s, ya, yb, ha, hb, col) => b.quad(
+          W(t, s, ya), W(t1, s, yb), W(t1, s, hb), W(t, s, ha), col);
+        q(sa, y0 - 0.30, y1 - 0.30, y0 + WALL.h, y1 + WALL.h, REND);
+        b.quad(W(t1, sb, y1 - 0.30), W(t, sb, y0 - 0.30),
+          W(t, sb, y0 + WALL.h), W(t1, sb, y1 + WALL.h), shade(REND, 0.93));
+        // The coping: a course of dressed blocks, proud of the render on both
+        // faces, laid one to a bay so the joints read.
+        const ca = WALL.s - WALL.w - WALL.capOut, cb = WALL.s + WALL.w + WALL.capOut;
+        const k = 0.96 + 0.08 * ((t | 0) % 5) / 4;
+        const C2 = [CAP[0] * k, CAP[1] * k, CAP[2] * k];
+        b.quad(W(t, ca, y0 + WALL.h), W(t1, ca, y1 + WALL.h),
+          W(t1, cb, y1 + WALL.h), W(t, cb, y0 + WALL.h), shade(C2, 0.92));
+        b.quad(W(t, ca, y0 + WALL.h + WALL.cap), W(t1, ca, y1 + WALL.h + WALL.cap),
+          W(t1, cb, y1 + WALL.h + WALL.cap), W(t, cb, y0 + WALL.h + WALL.cap),
+          shade(C2, 1.06));
+        b.quad(W(t, ca, y0 + WALL.h), W(t1, ca, y1 + WALL.h),
+          W(t1, ca, y1 + WALL.h + WALL.cap), W(t, ca, y0 + WALL.h + WALL.cap), C2);
+        b.quad(W(t1, cb, y1 + WALL.h), W(t, cb, y0 + WALL.h),
+          W(t, cb, y0 + WALL.h + WALL.cap), W(t1, cb, y1 + WALL.h + WALL.cap),
+          shade(C2, 0.95));
+        if (run0 === null) run0 = t;
+      } else if (run0 !== null) {
+        // A return at each end, so the run stops on a face and not on a hole.
+        for (const te of [run0, t]) {
+          boxTS(te - 0.16, te + 0.16, WALL.s - 0.24, WALL.s + 0.24,
+            yAt(te) - 0.3, yAt(te) + WALL.h + WALL.cap + 0.06,
+            shade(REND, 0.97), shade(CAP, 1.02));
+        }
+        runs.push({ t0: run0, t1: t, s0: WALL.s - 0.4, s1: WALL.s + 0.4,
+          y: yAt(run0), h: WALL.h });
+        run0 = null;
+      }
+    }
+
+    // The track itself. a_075 films the floor of the stand: bare needle litter,
+    // orange-brown, with white limestone chips through it — and where the cars
+    // stand it is worn down to the dust. Drawn into the ground buffer at three
+    // centimetres, because it is a wear pattern and not a pavement: nobody
+    // laid this, it is simply where everybody drives.
+    {
+      const back7 = b;
+      b = deck;
+      const DUST = [[0.520, 0.470, 0.392], [0.545, 0.492, 0.410],
+        [0.498, 0.452, 0.378], [0.560, 0.508, 0.428]];
+      const s0 = WALL.s + 1.6, s1 = WALL.s + 7.4;
+      const step = 2.6, nS = 3;
+      for (let t = 214; t < LEN - 14; t += step) {
+        const t1 = Math.min(t + step, LEN - 14);
+        for (let k = 0; k < nS; k++) {
+          const a0 = s0 + (s1 - s0) * (k / nS)
+            + (jit(t | 0, 40 + k) - 0.5) * 0.9;
+          const a1 = k === nS - 1 ? s1 : s0 + (s1 - s0) * ((k + 1) / nS)
+            + (jit(t | 0, 41 + k) - 0.5) * 0.9;
+          const c = DUST[((jit(t | 0, 50 + k) * 97) | 0) % DUST.length];
+          b.quad(W(t, a0, surfaceY(t, a0) + 0.03),
+            W(t1, a0, surfaceY(t1, a0) + 0.03),
+            W(t1, a1, surfaceY(t1, a1) + 0.03),
+            W(t, a1, surfaceY(t, a1) + 0.03), c);
+        }
+      }
+      // And the chips. White limestone, the size of a fist, thrown up out of
+      // the dust wherever a tyre has turned on it.
+      b = up;
+      for (let t = 215; t < LEN - 15; t += 1.35) {
+        if (jit(t | 0, 55) > 0.62) continue;
+        const s = s0 + jit(t * 3 | 0, 56) * (s1 - s0);
+        const y = surfaceY(t, s);
+        const r = 0.055 + jit(t | 0, 57) * 0.055;
+        const g = 0.760 + jit(t | 0, 58) * 0.110;
+        post(W, t + jit(t | 0, 59) * 0.6, s, y - r * 0.4, y + r * 0.9, r,
+          [g, g * 0.985, g * 0.930], 5);
+      }
+      b = back7;
+    }
+
+    // The planters. Terracotta, standing ON the coping, with something in
+    // flower in them — which is the detail that makes it a wall somebody
+    // maintains rather than a barrier somebody poured.
+    for (let t = 219; t < LEN - 18; t += 11.4) {
+      if (gap(t)) continue;
+      const y = yAt(t) + WALL.h + WALL.cap;
+      const kind = jit(t | 0, 31);
+      const POT = kind < 0.6 ? [0.545, 0.290, 0.180] : [0.505, 0.492, 0.462];
+      frustumTS(y, [t, WALL.s, 0.20, 0.20], y + 0.34, [t, WALL.s, 0.26, 0.26],
+        POT, shade(POT, 1.08));
+      boxTS(t - 0.27, t + 0.27, WALL.s - 0.27, WALL.s + 0.27,
+        y + 0.34, y + 0.40, shade(POT, 1.12), shade(POT, 0.72));
+      if (kind < 0.45) oleander(t, WALL.s, y + 0.36, 0.30 + jit(t | 0, 32) * 0.14);
+      else agave(t, WALL.s, y + 0.38, 0.26 + jit(t | 0, 33) * 0.10);
+    }
+
+    // The other lamp. a_160 films two types and the game had only the tall
+    // cranked column: this is the short post with the white sphere on it, and
+    // it belongs on the lane side rather than over the walk.
+    for (let t = 226; t < LEN - 20; t += 24.5) {
+      if (gap(t)) continue;
+      const s = WALL.s + 1.15;
+      const y = surfaceY(t, s);
+      post(W, t, s, y, y + 0.16, 0.115, [0.300, 0.302, 0.298], 8);
+      post(W, t, s, y + 0.16, y + 2.92, 0.052, [0.300, 0.302, 0.298], 7);
+      // A sphere is two hemispheres, and a negative height on `dome` is the
+      // bottom one.
+      const gy = y + 3.12;
+      dome(W, t, s, gy, 0.20, 0.20, [0.760, 0.752, 0.720], 9);
+      dome(W, t, s, gy, -0.20, 0.20, [0.700, 0.694, 0.668], 9);
+      post(W, t, s, y + 2.92, gy, 0.055, [0.300, 0.302, 0.298], 7);
+    }
+  }
+
   // Two pines beside the vikendica's terrace — the only thing that is allowed
   // to be in that view, and the thing that is in it in life. Beside and not in
   // front: at ±8 m along the shore they frame the water rather than stand in it.
