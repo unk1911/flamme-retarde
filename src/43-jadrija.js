@@ -901,9 +901,13 @@ async function buildJadrija(scene) {
     // the top of a room whose whole job is to be dark.
     ceil: 2.10,
     step: 0.30,            // the doorstep, seaward of the face
-    // Where it is: the third door of the first front-row run past the jetty,
-    // so the way to find it is the way you already walk — out to the boat
-    // landing, then turn along the row.
+    // Which door of its run, counting from the near end. Which run is not a
+    // number in here and cannot be: it is the first one that stands on shore
+    // straight enough for a rectangular room to be drawn on it, which is a
+    // question about the coastline and is answered by `squareRow`. The two
+    // together put the door about twenty metres into the block — past the bend
+    // at the tip of the spit, and still the first one you come to walking the
+    // row from the resort.
     nth: 2,
   };
   // Taken back off the special kabina's own walls. `GROUND.girth` is 0.55, and
@@ -1142,6 +1146,63 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * Where along the row a *room* can stand.
+   *
+   * Everything at Jadrija is laid out in the shore's own (t, s) frame and drawn
+   * through `W`, and `W` is a parallel offset: the point at (t, s) is the traced
+   * waterline at arc length t, pushed s metres inland along that station's
+   * normal. Offsetting a curve inland does not preserve length along it. Two
+   * points s metres in from a shore of local radius R are only (1 − s/R) as far
+   * apart as their feet on the waterline are, and where the shore turns towards
+   * the sea the normals converge on a focus at s = R. Everything drawn between
+   * here and there is squeezed along t and left alone along s, so a rectangle in
+   * (t, s) comes out a trapezium in the world — narrower at the back than the
+   * front, with two of its corners out of square.
+   *
+   * For eighty shut huts none of that matters and it never has. A hut 2.15 m
+   * wide on a bend is a wedge a few centimetres narrower at the back, which is
+   * what a hut on a bend is, and nobody can get inside one to disagree. It
+   * matters enormously for the one you can walk into, and it is the whole of why
+   * that one was broken. The kabine stand 17.2 m in from the waterline and run
+   * 5.4 m back; this shore turns 46 degrees in the fifty metres between t 360 and
+   * t 410, R about 49 m at the worst of it. At t 402, where the open one landed,
+   * the frame had already spent a third of the distance to its focus: a room the
+   * spec says is 4.04 by 5.30 was drawn 2.70 m wide at the door, 2.29 m at the
+   * back and 5.8 degrees out of square at one corner. From inside it read as a
+   * tunnel with a sloping ceiling, because that is exactly what it was.
+   *
+   * Nothing can be done about the corner — it is the tip of the spit and it is
+   * where the place is. So the door is not put where the row happens to begin.
+   * It is put at the first station along the row where the frame draws the hut's
+   * own footprint as a rectangle, at the face and at the back wall both, to
+   * within `TRUE`. East of t 412 this shore is dead straight for sixty metres
+   * and the room comes out square to four decimal places.
+   *
+   * A measurement of the shore rather than a number chosen on it, so that the
+   * next time the coast moves — and it has moved twice — the door moves with it
+   * instead of quietly going crooked again.
+   */
+  function squareRow(front, span) {
+    const TRUE = 0.02;
+    const wide = (t, s) => {
+      const A = W(t, s, 0), B = W(t + span, s, 0);
+      return Math.hypot(B[0] - A[0], B[2] - A[2]) / span;
+    };
+    const [tA, tB] = JAD.rows[0];
+    let best = tA, bestErr = Infinity;
+    for (let t = tA; t < tB - span; t += 0.5) {
+      const e = Math.max(Math.abs(wide(t, front) - 1),
+        Math.abs(wide(t, front + KAB.depth) - 1));
+      if (e <= TRUE) return t;
+      if (e < bestErr) { bestErr = e; best = t; }
+    }
+    // Nowhere on this row is square. Take the straightest place there is rather
+    // than returning nothing: a room that is slightly out of true is a defect,
+    // and a resort with no door in it anywhere is a missing feature.
+    return best;
+  }
+
+  /**
    * One run of joined huts: individual boxes so each can be its own colour, one
    * continuous roof over the lot, and a door on every seaward face. Joined is
    * how they are built — a party wall each side and a gable only at the ends —
@@ -1192,12 +1253,21 @@ async function buildJadrija(scene) {
     const eave = y0 + JAD.plinth + JAD.cabH;
     const ridge = eave + JAD.cabRise;
     // Which hut in this run — if any — is the one that opens: the third door of
-    // the first front-row run past the jetty. Stated as an ordinal rather than
-    // as a position along the shore, because the runs are laid out by `rng` and
-    // a fixed `t` lands in the alley between two of them as often as not.
-    // Costs no draw of `rng` either way, so the rest of the beach comes out of
-    // the seed exactly as it did before there was a door in it anywhere.
-    const sk = front === JAD.rowA && !special && t0 > gapAt
+    // the first front-row run that starts on straight shore. Stated as an
+    // ordinal within the run rather than as a position along it, because the
+    // runs are laid out by `rng` and a fixed `t` lands in the alley between two
+    // of them as often as not. Costs no draw of `rng` either way, so the rest
+    // of the beach comes out of the seed exactly as it did before there was a
+    // door in it anywhere — and, this time, exactly as it did before the door
+    // was moved along the row.
+    //
+    // It used to be the first run past the jetty, which was a good rule when the
+    // kabine ran the whole length of the shore and became a dead letter the day
+    // `JAD.rows` put them all at the eastern end: the jetty is at t 258 and the
+    // nearest hut to it is 138 m away. What the rule actually selected after
+    // that was the first run in the block, which begins at t 396, which is in
+    // the middle of the bend at the tip of the spit. See `squareRow`.
+    const sk = front === JAD.rowA && !special && t0 >= kabFrom
       ? Math.min(KAB.nth, n - KAB.bays) : -1;
     for (let k = 0; k < n; k++) {
       const a = t0 + k * JAD.cabW, c = a + JAD.cabW;
@@ -1485,6 +1555,12 @@ async function buildJadrija(scene) {
    * of hut would be a corridor rather than a place.
    */
   const gapAt = JAD.jetty;
+  // And where the one that opens goes. Measured off the shore, not chosen on
+  // it — see `squareRow`, which is where the argument is. Taken here rather
+  // than inside `cabinRun` because it is a property of the row and not of any
+  // run in it, and because the scan is 300-odd calls into `at` and there is no
+  // reason to pay for it once per run.
+  const kabFrom = squareRow(JAD.rowA, JAD.cabW * KAB.bays);
   for (const [front, phase] of [[JAD.rowA, 0], [JAD.rowB, JAD.cabW * 0.5]]) {
    for (const [tA, tB] of JAD.rows) {
     let t = tA + phase;
