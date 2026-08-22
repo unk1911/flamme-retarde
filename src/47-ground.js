@@ -1736,9 +1736,43 @@ async function buildGround(scene, field) {
    * different ones puts you on a hillside instead, and nothing downstream
    * notices.
    */
+  /**
+   * A blocker is four numbers, and one of them not being a number is not a
+   * small mistake — it is the whole locale sealed off.
+   *
+   * `confine` asks `Math.abs(ds) >= b.c + g`. If `b.c` is anything but a
+   * number, `b.c + g` is a string, the comparison coerces it to NaN, and NaN
+   * is not >= anything: the test that says "you are past the end of this box"
+   * can no longer fire, so the box stops having an end. One mistyped argument
+   * three thousand lines away in the resort — a bench's colour written where
+   * its half-depth goes — put an invisible wall 1.10 m thick across the whole
+   * of Jadrija at t 170.5, beach to hillside, and walking into it handed back
+   * a NaN position that no later frame could recover from. It took an hour to
+   * find and it reads, from inside the game, exactly like the world ending.
+   *
+   * So the boxes are vetted once, when the locale is taken on, rather than
+   * trusted sixty times a second: anything that is not four finite numbers is
+   * switched off and said out loud. A missing collider is a prop you can walk
+   * through, which is a small and visible fault. The alternative is this one.
+   */
+  const vetted = new WeakSet();
+  function vetBlockers(loc) {
+    if (!loc.blockers || vetted.has(loc)) return;
+    vetted.add(loc);
+    const ok = (v) => typeof v === 'number' && Number.isFinite(v);
+    const bad = loc.blockers.filter(
+      (b) => !(ok(b.t) && ok(b.s) && ok(b.a) && ok(b.c)));
+    if (!bad.length) return;
+    for (const b of bad) b.off = true;
+    console.warn('ground: ' + bad.length + ' blocker(s) in ' + (loc.kind || 'locale')
+      + ' have a non-numeric extent and have been switched off — '
+      + bad.map((b) => 't ' + b.t + ' s ' + b.s + ' a ' + b.a + ' c ' + b.c).join('; '));
+  }
+
   function retarget(next) {
     if (!next || !next.site) return false;
     field = next;
+    vetBlockers(next);
     objects = next.objects || [];
     // Nobody is out here. The aerodrome's seven are built against the
     // aerodrome's spots and cannot be relocated meaningfully, so they go away

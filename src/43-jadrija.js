@@ -6493,9 +6493,17 @@ async function buildJadrija(scene) {
         [0.500, 0.505, 0.500]);
     }
 
-    // And a bench inside the railing, facing the frame, because somebody has
-    // to sit there for two hours.
-    solid(PLAY.t0 + 13.5, PLAY.s1 - 1.4, 0, [0.330, 0.145, 0.095], 0.9);
+    // There was a bench inside the railing here — or rather there was not.
+    // Nothing was ever drawn for it; all it had was a collider, and that
+    // collider was written `solid(t, s, 0, [0.330, 0.145, 0.095], 0.9)` with
+    // the timber's colour standing where its half-depth goes. `confine` then
+    // asks `Math.abs(ds) >= b.c + g`, `b.c + g` is the STRING
+    // "0.33,0.145,0.0950.55", the comparison is NaN and therefore false, and a
+    // box that is 1.10 m wide in t becomes unbounded in s: an invisible wall
+    // across the beach, the promenade, the huts and the lane at t 170.5, which
+    // handed back a NaN position to anybody who walked into it and could only
+    // be passed by jumping. Measured before: every lane from s 4 to s 50 dead
+    // at t 169.95. There is no bench, so there is no collider.
     b = back8;
   }
 
