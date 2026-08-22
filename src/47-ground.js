@@ -621,7 +621,7 @@ async function buildGround(scene, field) {
    * reads the tops of its boxes, because standing on something is not the same
    * as clearing it.
    */
-  function unbody(x, z, y, airborne) {
+  function unbody(x, z, y) {
     const r = GROUND.body * 2;
     for (const c of crew) {
       if (!upright(c)) continue;
@@ -642,7 +642,19 @@ async function buildGround(scene, field) {
       const list = field.bodyList();
       for (let i = 0; i < n; i++) {
         const b = list[i];
-        if (airborne && y != null && b.top != null && y > b.top + 0.05) continue;
+        // The vertical, which for a person is a different question from the one
+        // `confine` asks of a box.
+        //
+        // A box's `y` is the ground it stands on and you are allowed to be on
+        // top of one, so there the test is airborne-only — standing on a bench
+        // is not clearing it. A person is not something you stand on: if your
+        // soles are above the top of their head you are on another storey, or
+        // on the mole, or coming down out of a hop, and none of those is in
+        // their way. So both ends of the column are tested and neither is
+        // gated on the hop. It is what lets you jump a sunbather at 0.42 m and
+        // never a stranger at 1.78.
+        if (y != null && b.top != null
+          && (y > b.top + 0.05 || y + GROUND.eye < b.y0)) continue;
         const rr = GROUND.body + b.r;
         const dx = x - b.x, dz = z - b.z;
         const d = Math.hypot(dx, dz);
@@ -1541,7 +1553,7 @@ async function buildGround(scene, field) {
     // People first, walls second, so that the wall has the last word. Somebody
     // standing against a hangar can then hold you against it but never push you
     // through it, and a hold is something you can always walk sideways out of.
-    const [bx, bz] = unbody(tx, tz, you.y, you.hop > 0.05);
+    const [bx, bz] = unbody(tx, tz, you.y);
     let [nx, nz, hit] = confine(bx, bz, you.y, you.hop > 0.05);
     // The waterline, where the locale has one. Tried as two independent axes
     // before being refused outright, so walking into the sea at an angle slides

@@ -13041,6 +13041,16 @@ async function buildJadrija(scene) {
     // circle big enough to cover the whole figure would be a 0.9 m disc you
     // could not get within arm's reach of, and one small enough to be honest
     // about the trunk would leave their feet walkable.
+    //
+    // And they are solid at all, which is worth saying because 47-ground.js has
+    // a note directly contradicting it: `upright` there refuses to make anybody
+    // prone an obstacle. That note is about a casualty at a burning aerodrome,
+    // and every word of its reasoning is about being one — you have to be able
+    // to stand over somebody to put them out, and a body that went down against
+    // a hangar must not become a wedge you can be pinned behind. Neither is
+    // true of somebody asleep on a towel in the sun, and walking through one is
+    // precisely what was reported. Two different questions that happen to share
+    // a posture.
     lieR: 0.30,
     lieSpan: 0.46,
     // How high the top of somebody's head is, as a multiple of their scale, and
@@ -13057,9 +13067,9 @@ async function buildJadrija(scene) {
   // of garbage that shows up as a hitch and not as a frame time.
   const bodyBuf = [];
   let bodyN = 0;
-  function pushBody(x, z, r, top, kind, idx) {
-    const e = bodyBuf[bodyN] || (bodyBuf[bodyN] = { x: 0, z: 0, r: 0, top: 0, kind: '', idx: 0 });
-    e.x = x; e.z = z; e.r = r; e.top = top; e.kind = kind; e.idx = idx;
+  function pushBody(x, z, r, y0, top, kind, idx) {
+    const e = bodyBuf[bodyN] || (bodyBuf[bodyN] = { x: 0, z: 0, r: 0, y0: 0, top: 0, kind: '', idx: 0 });
+    e.x = x; e.z = z; e.r = r; e.y0 = y0; e.top = top; e.kind = kind; e.idx = idx;
     bodyN++;
   }
 
@@ -13098,11 +13108,11 @@ async function buildJadrija(scene) {
         const ax = Math.cos(f.yaw), az = -Math.sin(f.yaw);
         const half = BODY.lieSpan * 0.5 * sc;
         pushBody(f.x + ax * half, f.z + az * half, BODY.lieR * sc,
-          f.y + BODY.lieTop * sc, 'bather', f.idx);
+          f.y, f.y + BODY.lieTop * sc, 'bather', f.idx);
         pushBody(f.x - ax * half, f.z - az * half, BODY.lieR * sc,
-          f.y + BODY.lieTop * sc, 'bather', f.idx);
+          f.y, f.y + BODY.lieTop * sc, 'bather', f.idx);
       } else {
-        pushBody(f.x, f.z, BODY.r * sc, f.y + BODY.top * sc, 'bather', f.idx);
+        pushBody(f.x, f.z, BODY.r * sc, f.y, f.y + BODY.top * sc, 'bather', f.idx);
       }
     }
     // And her, who is not one of the crowd and is the one everybody noticed.
@@ -13114,7 +13124,8 @@ async function buildJadrija(scene) {
       const p = toWorld(show.t, show.s);
       // Her hop takes her off the deck, and something 0.76 m over your head is
       // not in your way. `show.air` is how far up she is.
-      pushBody(p[0], p[2], BODY.r, p[1] + show.air + BODY.top, 'baye', -1);
+      pushBody(p[0], p[2], BODY.r, p[1] + show.air,
+        p[1] + show.air + BODY.top, 'baye', -1);
     }
     return bodyN;
   }
