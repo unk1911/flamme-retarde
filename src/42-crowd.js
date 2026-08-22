@@ -333,16 +333,31 @@ function makeCrowd(scene, rig, cap) {
         skel.pelvis.position.y = skel.restY - 0.72;
         skel.legLU.rotation.z = 1.55;
         skel.legRU.rotation.z = 1.52;
-        skel.legLL.rotation.z = -1.50 + Math.sin(ph * 0.6) * 0.09;
-        skel.legRL.rotation.z = -1.46 + Math.sin(ph * 0.6 + 2.1) * 0.09;
-        skel.torso.rotation.z = -0.14;
+        // Same clock per figure and the same complaint answered as in the
+        // standing case below: two people sitting on a quay do not swing their
+        // legs in time with each other, and a pair of shins moving through five
+        // degrees is a pair of shins that is not moving.
+        const sr = 0.70 + fg.seed * 0.70;
+        skel.legLL.rotation.z = -1.50 + Math.sin(ph * 0.62 * sr) * 0.19;
+        skel.legRL.rotation.z = -1.46 + Math.sin(ph * 0.55 * sr + 2.1) * 0.17;
+        // The trunk rocks slowly over the hips, which is what you do when there
+        // is nothing behind you to lean on.
+        skel.torso.rotation.z = -0.14 + Math.sin(ph * 0.24 * sr) * 0.085;
         // Arms back and straight, taking the weight. Everybody sits like this.
         skel.armLU.rotation.z = -0.62; skel.armLU.rotation.x = SPLAY * 2.4;
         skel.armRU.rotation.z = -0.58; skel.armRU.rotation.x = -SPLAY * 2.4;
         skel.armLL.rotation.z = 0.22;
         skel.armRL.rotation.z = 0.20;
-        skel.head.rotation.z = 0.06 + Math.sin(ph * 0.35) * 0.05;
-        skel.head.rotation.y = Math.sin(ph * 0.23) * 0.30;
+        // And every half minute or so one hand comes up off the slab — the arm
+        // takes the weight again afterwards, which is why it goes back rather
+        // than staying wherever it got to.
+        const sact = sat((Math.sin(ph * 0.21 * sr + fg.seed * 4.3) - 0.72) / 0.24);
+        skel.armRU.rotation.z += sact * 0.95;
+        skel.armRL.rotation.z += sact * 0.85;
+        skel.armRU.rotation.x -= sact * 0.22;
+        skel.head.rotation.z = 0.06 + Math.sin(ph * 0.35 * sr) * 0.07 - sact * 0.08;
+        skel.head.rotation.y = Math.sin(ph * 0.23 * sr) * 0.30
+          + Math.sin(ph * 0.52 * sr + 0.8) * 0.11;
         break;
 
       case 'lie':
@@ -393,20 +408,108 @@ function makeCrowd(scene, rig, cap) {
 
       default: {
         // Standing about. This is the pose most of the beach is in at any
-        // moment and the one the old figures were frozen in, so it is the one
-        // that has to not be frozen: weight shifts from hip to hip, the torso
-        // follows it, and the head looks around on a slower clock than the
-        // body so the two are never in step.
-        const w = Math.sin(ph * 0.42);
-        skel.pelvis.rotation.x = w * 0.045;
-        skel.pelvis.position.y = skel.restY - Math.abs(w) * 0.012;
-        skel.torso.rotation.x = -w * 0.030;
-        skel.legLU.rotation.x = w * 0.030;
-        skel.legRU.rotation.x = w * 0.030;
+        // moment and it is the one that has to not be frozen.
+        //
+        // It was not frozen, and it read as frozen anyway, which is the more
+        // interesting failure. What was here turned the head through 31° and
+        // shifted the hips, and standing on the promenade watching it the
+        // verdict was a room full of robots whose batteries had run out.
+        // Three things were wrong with it and none of them was the amount of
+        // motion in the file.
+        //
+        // The crowd shared one clock. Every figure ran the same 16.6 s weight
+        // shift and the same 26 s head turn, offset only in phase, so the beach
+        // breathed in and out as one animal and none of it read as anybody
+        // deciding anything.
+        //
+        // Everything below the neck moved by two or three degrees. A 0.045 rad
+        // hip roll moves the top of the head by four centimetres; at fifteen
+        // metres that is a third of a pixel, so the only thing that actually
+        // moved on screen was the head, on a twenty-six second period, which is
+        // slow enough that you have to watch one figure to see it at all.
+        //
+        // And it was a pure sine. A person standing about is not a slow
+        // oscillator. They are still, and then they *do* something — hands to
+        // the hips, a hand up against the sun, a stretch, a towel shaken out —
+        // and the doing is the whole of what the eye reads as alive.
+        //
+        // So: a clock per figure, a weight shift with some weight in it, hands
+        // that are never quite still, and a piece of business every half minute
+        // or so. All of it off `fg.seed`, which already carries the phase
+        // offset, so this costs nothing at build time and no draws off `rng` —
+        // the seed a figure is given is the habit it keeps.
+        const rate = 0.70 + fg.seed * 0.70;
+        const w = Math.sin(ph * 0.42 * rate);
+        // The weight goes on to one leg and then the other. The pelvis rolls,
+        // the loaded hip comes up, the torso leans back against it and the free
+        // knee softens — which is the difference between somebody standing and
+        // a figure balanced on two straight legs.
+        skel.pelvis.rotation.x = w * 0.075;
+        skel.pelvis.position.y = skel.restY - Math.abs(w) * 0.030;
+        skel.torso.rotation.x = -w * 0.055;
+        // Counter-rotated against the pelvis, or the roll swings both feet
+        // sideways across the concrete. The residual is the old 0.030.
+        skel.legLU.rotation.x = w * 0.075 - w * 0.045;
+        skel.legRU.rotation.x = w * 0.075 - w * 0.045;
+        skel.legLL.rotation.z = -(0.04 + 0.13 * Math.max(0, w));
+        skel.legRL.rotation.z = -(0.04 + 0.13 * Math.max(0, -w));
+        // The arms on a slower clock than the hips and out of step with each
+        // other, because two arms swinging together is a march.
+        const swA = Math.sin(ph * 0.31 * rate);
+        const swB = Math.sin(ph * 0.31 * rate + 1.9);
         skel.armLU.rotation.x = SPLAY + w * 0.05;
         skel.armRU.rotation.x = -SPLAY + w * 0.05;
-        skel.head.rotation.y = Math.sin(ph * 0.27) * 0.55;
-        skel.head.rotation.z = Math.sin(ph * 0.19) * 0.07;
+        skel.armLU.rotation.z = swA * 0.085;
+        skel.armRU.rotation.z = swB * 0.080;
+        skel.armLL.rotation.z = 0.10 + Math.max(0, swA) * 0.16;
+        skel.armRL.rotation.z = 0.10 + Math.max(0, swB) * 0.15;
+        // Two frequencies on the head, so it arrives somewhere and looks about
+        // once it is there rather than sweeping like a radar.
+        skel.head.rotation.y = Math.sin(ph * 0.27 * rate) * 0.42
+          + Math.sin(ph * 0.61 * rate + 1.3) * 0.16;
+        skel.head.rotation.z = Math.sin(ph * 0.19 * rate) * 0.06;
+        // And the shoulders follow the head a little, which is most of what
+        // makes a turn of the head look like attention rather than a hinge.
+        skel.torso.rotation.y = Math.sin(ph * 0.27 * rate) * 0.14;
+
+        // The business. `act` is zero for three quarters of a cycle 25 to 50 s
+        // long and then ramps to one for a few seconds. Which piece of business
+        // is fixed per figure and never changes, because a person has habits.
+        const act = sat((Math.sin(ph * 0.20 * rate + fg.seed * 5.1) - 0.70) / 0.25);
+        if (act > 0) {
+          switch ((fg.seed * 4) | 0) {
+            case 0:                                   // hands to the hips
+              skel.armLU.rotation.x = SPLAY + act * 0.40;
+              skel.armRU.rotation.x = -SPLAY - act * 0.40;
+              skel.armLL.rotation.z += act * 1.30;
+              skel.armRL.rotation.z += act * 1.26;
+              break;
+            case 1:                                   // a hand up against the sun
+              skel.armRU.rotation.z -= act * 0.55;
+              skel.armRU.rotation.x = -SPLAY - act * 0.95;
+              skel.armRL.rotation.z += act * 1.55;
+              skel.head.rotation.z -= act * 0.10;
+              break;
+            case 2:                                   // a stretch
+              skel.armLU.rotation.z -= act * 0.85;
+              skel.armRU.rotation.z -= act * 0.80;
+              skel.armLU.rotation.x = SPLAY + act * 0.30;
+              skel.armRU.rotation.x = -SPLAY - act * 0.30;
+              skel.torso.rotation.z -= act * 0.10;
+              break;
+            default: {                                // shaking a towel out
+              // 1.2 Hz, which is how fast a towel actually gets shaken and far
+              // and away the most visible thing anybody on this beach does.
+              const flap = Math.sin(ph * 8.2) * act * 0.34;
+              skel.armLU.rotation.z += act * 0.95 + flap;
+              skel.armRU.rotation.z += act * 0.90 + flap;
+              skel.armLL.rotation.z += act * 0.30;
+              skel.armRL.rotation.z += act * 0.28;
+              skel.torso.rotation.x -= act * 0.06;
+              break;
+            }
+          }
+        }
         break;
       }
     }

@@ -359,8 +359,38 @@ async function buildJadrija(scene) {
     st.beach = 1 - k;
   }
 
-  const midOf = (st) => st.mid;
-  const lipOf = (st) => st.lip;
+  /**
+   * The three levels again, but as a height at a POINT rather than at a
+   * station — and never below the hill they are cut into.
+   *
+   * A terrace is one number per station, which is what a poured slab is: it
+   * does not care how far inland you are standing on it. That holds for the
+   * two hundred metres of concrete and it is false for the two hundred metres
+   * west of it, because there is no concrete there. The beach flattening above
+   * fits the whole cross-section to `hl`, the ground under the *seaward* four
+   * metres, and the hillside behind a beach does not stay at the height of its
+   * own waterline: measured at t 100 it is 1.26 m at s 10 and 2.76 m at s 30.
+   * So the promenade level west of `beachTo` ran a metre and a half under the
+   * terrain, the terrain won because it is drawn too, and everything placed on
+   * `surfaceY` out there — benches, lamps, bathers — was buried to the neck.
+   *
+   * This is the third time that has been fixed one call site at a time (see
+   * rule 2 in plan/jadrija-TODO.md), so it is fixed here instead, where every
+   * call site goes through it. Where the concrete is genuinely above the hill
+   * the maximum is the concrete and nothing moves — measured across the built
+   * stretch, the slab stands 0.1 to 2.2 m proud of the terrain at every station
+   * from t 200 east, so this is a no-op there to the centimetre.
+   *
+   * `STAND` is the standoff, and it is 0.12 m for the reason in rule 5: this
+   * shore is two kilometres from the origin, a surface laid exactly on another
+   * one is decided by float rounding, and the loser is decided per pixel.
+   */
+  const STAND = 0.12;
+  const lipOf = (st, s = 0) => Math.max(st.lip, gAt(st, s) + STAND);
+  const midOf = (st, s = JAD.lip) => Math.max(st.mid, gAt(st, s) + STAND);
+  const deckOf = (st, s = JAD.mid) => Math.max(st.deck, gAt(st, s) + STAND);
+  /** How much of a beach this is: 1 out on the sand, 0 by the time the quay starts. */
+  const beachOf = (t) => (t > JAD.beachTo ? 0 : sat((JAD.beachTo - t) / JAD.beachFade));
 
   /** Station at an arbitrary arc length, extrapolating past either end. */
   function at(t) {
@@ -390,9 +420,9 @@ async function buildJadrija(scene) {
   /** The height of whatever you are standing on, in locale coordinates. */
   function surfaceY(t, s) {
     const st = at(t);
-    const d = st.deck;
-    if (s < JAD.lip) return st.lip;
-    if (s < JAD.mid) return st.mid;
+    const d = deckOf(st, Math.min(s, JAD.back));
+    if (s < JAD.lip) return lipOf(st, s);
+    if (s < JAD.mid) return midOf(st, s);
     if (s < JAD.back) return d;
     // Past the back edge the concrete ramps into the hill over `bleed` metres,
     // so there is no step to trip over where the resort ends.
@@ -544,12 +574,22 @@ async function buildJadrija(scene) {
     return [c(-1, -1), c(1, -1), c(1, 1), c(-1, 1)];
   }
 
-  /** A strip of surface running the whole shore, between two inland offsets. */
-  function ribbon(s0, s1, yOf, col) {
+  /**
+   * A strip of surface running the whole shore, between two inland offsets.
+   *
+   * `yOf` is asked for each corner rather than once per station, because the
+   * levels are not flat across the section any more — west of `beachTo` they
+   * climb with the hill, and a band 7 m wide asked once at its seaward edge
+   * is a shelf that the terrain comes through half way along.
+   */
+  function ribbon(s0, s1, yOf, col, nS = 1) {
     for (let i = 0; i < ST.length - 1; i++) {
       const a = ST[i], c = ST[i + 1];
-      b.quad(pt(a, s0, yOf(a)), pt(c, s0, yOf(c)),
-        pt(c, s1, yOf(c)), pt(a, s1, yOf(a)), col(i));
+      for (let k = 0; k < nS; k++) {
+        const u = s0 + (s1 - s0) * (k / nS), v = s0 + (s1 - s0) * ((k + 1) / nS);
+        b.quad(pt(a, u, yOf(a, u)), pt(c, u, yOf(c, u)),
+          pt(c, v, yOf(c, v)), pt(a, v, yOf(a, v)), col(i, (u + v) * 0.5));
+      }
     }
   }
 
@@ -588,9 +628,9 @@ async function buildJadrija(scene) {
       for (let k = 0; k < nS; k++) {
         const a0 = cut(i, k), a1 = cut(i, k + 1);
         const c0 = cut(i + 1, k), c1 = cut(i + 1, k + 1);
-        b.quad(pt(a, a0, yOf(a)), pt(c, c0, yOf(c)),
-          pt(c, c1, yOf(c)), pt(a, a1, yOf(a)),
-          cols(i * 7 + k * 3 + ((jit(i, k) * 5) | 0)));
+        b.quad(pt(a, a0, yOf(a, a0)), pt(c, c0, yOf(c, c0)),
+          pt(c, c1, yOf(c, c1)), pt(a, a1, yOf(a, a1)),
+          cols(i * 7 + k * 3 + ((jit(i, k) * 5) | 0), i * step, (a0 + a1) * 0.5));
       }
     }
   }
@@ -599,8 +639,8 @@ async function buildJadrija(scene) {
   function riser(s, loOf, hiOf, col) {
     for (let i = 0; i < ST.length - 1; i++) {
       const a = ST[i], c = ST[i + 1];
-      b.quad(pt(a, s, loOf(a)), pt(c, s, loOf(c)),
-        pt(c, s, hiOf(c)), pt(a, s, hiOf(a)), col(i));
+      b.quad(pt(a, s, loOf(a, s)), pt(c, s, loOf(c, s)),
+        pt(c, s, hiOf(c, s)), pt(a, s, hiOf(a, s)), col(i, s));
     }
   }
 
@@ -650,15 +690,33 @@ async function buildJadrija(scene) {
   const mixc = (a, c, k) => [a[0] + (c[0] - a[0]) * k, a[1] + (c[1] - a[1]) * k,
     a[2] + (c[2] - a[2]) * k];
   const beachAt = (i) => (ST[Math.min(i, ST.length - 1)].beach || 0);
-  const bay = (i) => mixc(CONC[i % 3], SHINGLE[i % 4], beachAt(i));
-  const bayIn = (i) => mixc(CONC[(i + 2) % 3], SHINGLE[(i + 1) % 4], beachAt(i));
+  /**
+   * What the beach is made of, across the beach.
+   *
+   * Shingle at the water and dead needles over limestone dust by the time you
+   * are level with the back of the huts, because that is where a beach stops
+   * being a beach: the pines and the first row of houses come down to about
+   * s 20 out here and what is under them is the same floor as the wood behind
+   * the kabine. Painting the whole 33 m section shingle laid a pale apron the
+   * width of a car park across the sand — which is what it looked like the
+   * first time the western terraces were lifted out of the hillside they had
+   * been buried in, because until then the terrain had been drawing this
+   * ground and the terrain gets it right.
+   *
+   * The inland end is `LITTER` for exactly that reason: it is the colour the
+   * needle floor in TERRAIN_FRAG was measured to, so the seam between the
+   * resort's ground and the terrain's does not show. See the note over it.
+   */
+  const shore = (i, s) => mixc(SHINGLE[i % 4], LITTER[i % 3], sat((s - 9) / 9));
+  const bay = (i, s = 0) => mixc(CONC[i % 3], shore(i, s), beachAt(i));
+  const bayIn = (i, s = 0) => mixc(CONC[(i + 2) % 3], shore(i + 1, s), beachAt(i));
   const duff = (i) => LITTER[i % 3];
 
   // The three levels, seaward to inland, then the quay wall down into the water.
   ribbon(0, JAD.lip, lipOf, bay);
   riser(JAD.lip, lipOf, midOf, bayIn);
   ribbon(JAD.lip, JAD.mid, midOf, bayIn);
-  riser(JAD.mid, midOf, (st) => st.deck, bay);
+  riser(JAD.mid, midOf, deckOf, bay);
   // The promenade, and then the ground behind the back row, which is not
   // promenade. The concrete on this shore stops a stride behind the last hut
   // and everything past it is wood: needles, dust and pine. Running the slab
@@ -672,13 +730,20 @@ async function buildJadrija(scene) {
   const walkTo = JAD.rowA + JAD.cabD + 1.0;
   // Poured slab by the water, flags inland of it, and a straight seam between.
   const PAVE = Math.min(walkTo - 1.5, JAD.mid + 7.5);
-  ribbon(JAD.mid, PAVE, (st) => st.deck, bay);
-  paving(PAVE, walkTo, (st) => st.deck, (i) => FLAG[i % FLAG.length], 5);
-  ribbon(walkTo, JAD.back, (st) => st.deck, duff);
+  ribbon(JAD.mid, PAVE, deckOf, bay, 2);
+  // And the flags go to shingle over the sand for the same reason the slab
+  // does. The crazy paving used to run the full 572 m, which was invisible
+  // while the western end of it was a metre under the hillside; lift it on to
+  // the hill where it belongs and it becomes a 5 m strip of limestone flags
+  // laid across a beach. `paving` hands its colour function the arc length as
+  // well as the flag index so this can be asked.
+  paving(PAVE, walkTo, deckOf,
+    (i, t, u) => mixc(FLAG[i % FLAG.length], shore(i, u), beachOf(t)), 5);
+  ribbon(walkTo, JAD.back, deckOf, duff, 3);
   for (let i = 0; i < ST.length - 1; i++) {
     const a = ST[i], c = ST[i + 1];
     b.quad(pt(a, 0, -JAD.quay), pt(c, 0, -JAD.quay),
-      pt(c, 0, lipOf(c)), pt(a, 0, lipOf(a)), STONE);
+      pt(c, 0, lipOf(c, 0)), pt(a, 0, lipOf(a, 0)), STONE);
     // A darker band just above the water, where it is never quite dry.
     b.quad(pt(a, 0.02, 0.05), pt(c, 0.02, 0.05),
       pt(c, 0.02, 0.62), pt(a, 0.02, 0.62), SALT);
@@ -688,13 +753,14 @@ async function buildJadrija(scene) {
     const a = ST[i], c = ST[i + 1];
     const s0 = JAD.back, s1 = JAD.back + JAD.bleed;
     const ya = surfaceY(a.t, s1), yc = surfaceY(c.t, s1);
-    b.quad(pt(a, s0, a.deck), pt(c, s0, c.deck), pt(c, s1, yc), pt(a, s1, ya), duff(i));
+    b.quad(pt(a, s0, deckOf(a, s0)), pt(c, s0, deckOf(c, s0)),
+      pt(c, s1, yc), pt(a, s1, ya), duff(i));
   }
   for (const [st, out] of [[ST[0], -1], [ST[ST.length - 1], 1]]) {
     const s0 = 0, s1 = JAD.back;
-    const y = st.deck;
+    const y = deckOf(st, s1);
     const A = pt(st, s0, -JAD.quay), B = pt(st, s1, -JAD.quay);
-    const c = pt(st, s1, y), d = pt(st, s0, lipOf(st));
+    const c = pt(st, s1, y), d = pt(st, s0, lipOf(st, s0));
     if (out > 0) b.quad(A, B, c, d, STONE); else b.quad(d, c, B, A, STONE);
   }
 
@@ -3970,7 +4036,11 @@ async function buildJadrija(scene) {
   const LAMP = { post: 4.80, arm: 0.90, s: JAD.mid + 1.20 };
   for (let t = 12; t < LEN - 8; t += 27) {
     if (!clearOfShops(t)) continue;
-    const st = at(t), y = st.deck, top = y + LAMP.post;
+    // `surfaceY` and not `st.deck`: a lamp column stands at one inland offset
+    // and the deck is only the height of the promenade where there is one. On
+    // the beach the hill is above it and a column set on `st.deck` goes in to
+    // the shin. See the note over `deckOf`.
+    const y = surfaceY(t, LAMP.s), top = y + LAMP.post;
     if (t > JAD.beachTo) clutter(t + 1.1, LAMP.s - 1.4, y, 3, (t | 0) * 7 + 1);
     boxTS(t - 0.075, t + 0.075, LAMP.s - 0.075, LAMP.s + 0.075, y, top,
       [0.190, 0.186, 0.178]);
@@ -4035,9 +4105,15 @@ async function buildJadrija(scene) {
   };
   for (let t = 18; t < LEN - 10; t += 33) {
     if (!clearOfShops(t)) continue;
-    const st = at(t), y = st.deck;
     const B = BENCH;
     const sF = JAD.rowA - B.front;           // front of the seat, inland offset
+    // The bench is a rigid object 0.6 m deep and it stands at whichever of its
+    // two edges is higher, because a bench on a slope leans back rather than
+    // sinking its front legs. On the promenade both edges are the same slab and
+    // this is `st.deck` again; on the beach the inland edge is 20 cm up the
+    // hill, and taking the seaward one buried the whole seat and left four
+    // slats of the back standing out of the sand — which is what was reported.
+    const y = Math.max(surfaceY(t, sF), surfaceY(t, sF + B.depth + 0.10));
     const sB = sF + B.depth;                 // where the back springs from
     const IRON = [0.196, 0.204, 0.196];      // weathered dark green, not black
     const half = B.len / 2;
@@ -4644,8 +4720,12 @@ async function buildJadrija(scene) {
   // The middle terrace is the shelf people actually lay their towels on: wide
   // enough for a parasol and a pair of loungers, and one step above the water.
   for (let t = 9; t < LEN - 9; t += 7.4 + rng() * 5.0) {
-    const st = at(t), y = st.mid;
     if (Math.abs(t - gapAt) < 5) continue;                  // keep the jetty clear
+    // Everything in this camp stands on `surfaceY` at its own inland offset,
+    // and not on `st.mid` for the whole group. The middle terrace is one number
+    // per station, which is what a poured shelf is; west of `beachTo` there is
+    // no shelf and the sand climbs about 4 cm a metre, so a parasol at s 9 and
+    // the lounger at s 7.5 under it are not on the same level. See `deckOf`.
     // Free-standing parasols belong on the sand, not on the concrete.
     //
     // In thirty-nine photographs and a hundred and thirty-two frames of the
@@ -4660,7 +4740,7 @@ async function buildJadrija(scene) {
     // licence in either direction.
     if (t < JAD.beachTo && rng() < 0.62) {
       const s = 5.4 + rng() * 3.6;
-      parasol(t, s, y, pick(SWIM));
+      parasol(t, s, surfaceY(t, s), pick(SWIM));
       // The pole only. The canopy is at 1.9 m and being stopped by shade you
       // are walking under is worse than walking through it.
       solid(t, s, 0.09, 0.09, 2.3);
@@ -4669,7 +4749,8 @@ async function buildJadrija(scene) {
       const n = 1 + (rng() < 0.55 ? 1 : 0);
       for (let i = 0; i < n; i++) {
         const lt = t + (i - (n - 1) * 0.5) * 1.5;
-        lounger(lt, s - 1.5, y, Math.PI, pick([[0.900, 0.890, 0.870],
+        const ly = surfaceY(lt, s - 1.5);
+        lounger(lt, s - 1.5, ly, Math.PI, pick([[0.900, 0.890, 0.870],
           [0.240, 0.420, 0.560], [0.860, 0.560, 0.300]]));
         // Turned through Math.PI, so its local −0.92…+0.87 lands seaward of the
         // placement point rather than inland of it.
@@ -4681,10 +4762,15 @@ async function buildJadrija(scene) {
         // Feet seaward, head inland. The rig lies down by tipping about its
         // own root, so the anchor is the soles and `ang` points from the head
         // towards the feet — see the `lie` case in src/42-crowd.js.
-        if (rng() < 0.5) B(lt, s - 2.30, y + 0.52, -Math.PI / 2, 'lie', 1);
+        // Off the lounger's own floor and not off the camp's, or she sunbathes
+        // half a metre above the frame she is lying on.
+        if (rng() < 0.5) B(lt, s - 2.30, ly + 0.52, -Math.PI / 2, 'lie', 1);
       }
     } else if (rng() < 0.5) {
-      B(t, 5.0 + rng() * 4.0, y, Math.PI + (rng() - 0.5) * 1.4, 'stand', 1);
+      // Drawn before the call rather than inside it, because `surfaceY` wants
+      // the offset and the order of the draws off `rng` is the beach layout.
+      const bs = 5.0 + rng() * 4.0;
+      B(t, bs, surfaceY(t, bs), Math.PI + (rng() - 0.5) * 1.4, 'stand', 1);
     }
   }
 
@@ -4692,7 +4778,7 @@ async function buildJadrija(scene) {
   // water, which is what that step is for and the reason it is 4.2 m wide.
   for (let t = 6; t < LEN - 6; t += 5.2 + rng() * 6.5) {
     if (Math.abs(t - gapAt) < 4) continue;
-    const st = at(t), y = st.lip;
+    const y = surfaceY(t, 1.4);
     const r = rng();
     // 0.55 m in, not 1.25: the thigh reaches about 0.43 m forward of the hip,
     // so this is where the knee lands on the lip of the quay and the shins
@@ -4719,8 +4805,13 @@ async function buildJadrija(scene) {
   // became seven and forty-six figures became twenty-two, which is the halving
   // asked for, in the place where halving it is worth the least.
   for (let t = 10; t < LEN - 10; t += 8 + rng() * 9) {
-    const st = at(t), y = st.deck;
     const lane = JAD.mid + 1.6 + rng() * 6.0;
+    // The lane is drawn first and the floor is asked for at the lane, because
+    // this is the strip where the deck and the hill part company: west of
+    // `beachTo` the promenade level is fitted to the waterline and the ground
+    // at s 16 is most of a metre above it. Everybody put on `st.deck` out here
+    // was walking through the sand up to the hip. See `deckOf`.
+    const y = surfaceY(t, lane);
     let lead;
     if (rng() < 0.84) {
       // A beat of 30–90 m, clamped inside the resort. Short beats read as
@@ -4742,7 +4833,7 @@ async function buildJadrija(scene) {
     // walking a beat neither of them is on is a bug you would have to watch for
     // a minute to see.
     if (lead && rng() < 0.5) {
-      B(t + 0.7, lane + 1.1, y, lead.ang, lead.pose,
+      B(t + 0.7, lane + 1.1, surfaceY(t + 0.7, lane + 1.1), lead.ang, lead.pose,
         rng() < 0.28 ? 0.68 : 1, lead.beat && { ...lead.beat });
     }
   }
@@ -5008,7 +5099,7 @@ async function buildJadrija(scene) {
       // below the crosshair, and running into it reads as an invisible wall
       // rather than as a bench — which is exactly how it was reported.
       if (Math.abs(t - VIK.t) < 12) continue;
-      const y = at(t).deck, sb = JAD.mid + 2.6;
+      const sb = JAD.mid + 2.6, y = surfaceY(t, sb);
       boxTS(t - 3.0, t + 3.0, sb - 0.30, sb + 0.30, y, y + 0.45, PLINTH,
         shade(PLINTH, 1.06));
       boxTS(t + 0.9, t + 2.9, sb - 0.27, sb + 0.27, y + 0.45, y + 0.49, SLAT,
@@ -5029,7 +5120,7 @@ async function buildJadrija(scene) {
     // it — both of them photographed, and both of them the only saturated
     // colour on this stretch of concrete.
     for (const t of [JAD.beachTo + 46, JAD.jetty + 96]) {
-      const y = at(t).deck, ss = JAD.mid + 1.0;
+      const ss = JAD.mid + 1.0, y = surfaceY(t, ss);
       post(W, t, ss, y, y + 2.20, 0.055, COBALT, 8);
       for (const hh of [1.40, 1.62]) {
         boxTS(t - 0.045, t + 0.045, ss - 0.34, ss - 0.02, y + hh, y + hh + 0.05,
@@ -6530,6 +6621,12 @@ async function buildJadrija(scene) {
     for (let n = 0; n < 190; n++) {
       let t = 4 + jit(n, 500) * (LEN - 8);
       let s = 0.6 + jit(n, 501) * (JAD.back - 2.0);
+      // Not on the beach. Concrete cracks and shingle does not, and the western
+      // two hundred metres has no slab in it to crack — these were being drawn
+      // there all along and were invisible only because the whole western
+      // section was a metre under the hillside. `jit` is a hash of `n` and not
+      // a draw off `rng`, so skipping one moves nothing else on the shore.
+      if (t < JAD.beachTo) continue;
       if (onMoleT(t) && s > -2) { /* the mole gets them too */ }
       let a = jit(n, 502) * TAU;
       let turn = 0;
@@ -6562,6 +6659,7 @@ async function buildJadrija(scene) {
     for (let n = 0; n < 26; n++) {
       const t = 6 + jit(n, 540) * (LEN - 12);
       const s = 1.2 + jit(n, 541) * (JAD.back - 3.0);
+      if (t < JAD.beachTo) continue;              // nor are these — see above
       const ht = 0.5 + jit(n, 542) * 1.5, hs = 0.4 + jit(n, 543) * 1.2;
       if (s - hs < 0.4 || s + hs > JAD.back - 0.4) continue;
       const g = 0.88 + jit(n, 544) * 0.26;
@@ -11493,6 +11591,24 @@ async function buildJadrija(scene) {
       return walkY(x, z) > 0.55;
     },
     blockers, local, toWorld, walkY, inField, vik,
+    /**
+     * The four heights at one station, side by side, because the difference
+     * between them is the bug this file keeps having.
+     *
+     * `surfaceY` is the concrete and `groundAt` is the hill, and inside s 33.1
+     * the concrete wins whatever the hill is doing — which is right on the
+     * built stretch and wrong on the beach, where there is no concrete. Every
+     * time something has been placed a metre underground here it has been
+     * because those two were assumed to agree. They are not exported so that
+     * anything can *use* them; they are exported so a probe can print them
+     * next to each other and see the disagreement instead of arguing about it.
+     */
+    heights: (t, s) => {
+      const st = at(t);
+      const x = st.x + st.nx * s, z = st.z + st.nz * s;
+      return { surfaceY: surfaceY(t, s), groundAt: Math.max(groundAt(x, z), 0),
+        standY: standY(t, s), walkY: walkY(x, z) };
+    },
     /** What grows on this headland — see the note over GROVE. Read by 45-trees.js. */
     grove,
     /**
