@@ -17735,6 +17735,98 @@ async function buildJadrija(scene) {
         y: y0, h });
     }
 
+    // ── and west of the piers it is a retaining wall ──────────────────────
+    //
+    // b_016 films the west end from inside the pine stand, and it settles what
+    // happens where the resort runs out. The wood floor is a good metre below
+    // the lane behind it, and what holds the one off the other is a wall of
+    // SAWN limestone blocks: coursed, four or five courses, joints straight
+    // and level, a wide flat top — and it comes down the slope in STEPS. That
+    // last part is the whole character of it. A wall that follows a falling
+    // grade is a ramp with a face on it; a mason building a retaining wall
+    // levels each length and steps at the joint, and the steps are what you
+    // see from below.
+    //
+    // So the boundary is three treatments along one edge and every one of them
+    // is in the footage: ashlar in the wood, rubble piers on the approach,
+    // rendered wall with a coping through the businesses. That is not
+    // inconsistency, it is a place that was built in three goes.
+    {
+      const RUN = 6.4, AW = 0.175;
+      const gAt = (t, s) => {
+        const st = at(t);
+        return Math.max(surfaceY(t, s),
+          groundAt(st.x + st.nx * s, st.z + st.nz * s));
+      };
+      const CORE = [0.352, 0.330, 0.288];
+      for (let t0 = 24; t0 < 214; t0 += RUN) {
+        const t1 = Math.min(t0 + RUN - 0.22, 214);
+        if (gap(t0) || gap(t1)) continue;
+        // The top is level over the run and steps at the joint: the highest
+        // ground it retains, taken in 0.18 m stages so the step reads as a
+        // step and not as a wobble.
+        let hi = -1e9, lo = 1e9;
+        for (let u = t0; u <= t1; u += 0.7) {
+          hi = Math.max(hi, gAt(u, WALL.s + 1.5));
+          lo = Math.min(lo, gAt(u, WALL.s - 1.7));
+        }
+        const base = lo - 0.30;
+        // A floor under the height, and this is the difference between a wall
+        // and nothing at all. Taking the top purely off the ground it retains
+        // meant that wherever the deck was flat — which is most of the wood —
+        // the run came out under half a metre and was skipped, and the whole
+        // west end shipped with a kerb. b_016 has a wall there whatever the
+        // grade does: it is a BOUNDARY that also retains, and it stands 0.9 m
+        // out of the needle floor even where there is no bank behind it.
+        const top = Math.min(
+          Math.max(Math.round(hi / 0.18) * 0.18 + 0.07, base + 0.80),
+          base + 2.0);
+        // The core, seen only through the joints, and dark for the reason the
+        // piers' was: at anything paler the joints read as more wall.
+        boxTS(t0, t1, WALL.s - 0.10, WALL.s + 0.10, base, top - 0.02,
+          CORE, shade(CORE, 1.05));
+        // The courses. Sawn blocks ARE the thing a box is right for — the
+        // frustum rule is for rubble, where four parallel sides read as brick.
+        // Here they are supposed to.
+        // 0.21 m courses came out as three fat bands. The frame has four or
+        // five courses in under a metre, so the course is 0.17 and the joint
+        // between them is a fifth of it — a joint you cannot see is a wall
+        // with lines painted on it.
+        let course = 0;
+        for (let y = base; y < top - 0.09; y += 0.172, course++) {
+          const yt = Math.min(y + 0.136, top - 0.02);
+          // Half-lap: every second course starts on a half block, which is how
+          // the joints in the frame break and the one thing that stops a wall
+          // of equal blocks reading as a printed texture.
+          let u = t0 + (course % 2 ? 0.28 : 0.0);
+          for (let k = 0; u < t1 - 0.06; k++) {
+            const L = 0.40 + jit(course * 31 + k + (t0 | 0), 70) * 0.30;
+            const u1 = Math.min(u + L, t1);
+            // +-8% was not enough to tell one block from the next at eight
+            // metres and the run came out as one grey surface. Limestone cut
+            // out of the same quarry still varies by more than that, and the
+            // colour is WARM: the first cut was grey and sat in the shot
+            // looking like poured concrete.
+            const g = 0.86 + jit(course * 31 + k + (t0 | 0), 71) * 0.30;
+            const col = [0.618 * g, 0.566 * g, 0.452 * g];
+            // A hair of relief per block, in and out, so the face is not a
+            // plane with lines drawn on it.
+            const o = (jit(course * 31 + k + (t0 | 0), 72) - 0.5) * 0.035;
+            boxTS(u + 0.055, u1 - 0.055, WALL.s - AW - o, WALL.s + AW + o,
+              y + 0.018, yt, col, shade(col, 1.07));
+            u = u1;
+          }
+        }
+        // The flat top, oversailing the face, which is the line the eye
+        // follows down the steps.
+        boxTS(t0 - 0.06, t1 + 0.06, WALL.s - AW - 0.085, WALL.s + AW + 0.085,
+          top - 0.055, top + 0.055,
+          [0.575, 0.542, 0.468], [0.640, 0.605, 0.525]);
+        runs.push({ t0, t1, s0: WALL.s - 0.34, s1: WALL.s + 0.34,
+          y: base, h: top - base });
+      }
+    }
+
     // The planters. Terracotta, standing ON the coping, with something in
     // flower in them — which is the detail that makes it a wall somebody
     // maintains rather than a barrier somebody poured.
