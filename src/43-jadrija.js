@@ -1704,6 +1704,7 @@ async function buildJadrija(scene) {
     scene.add(mesh);
   }
 
+
   /**
    * The parts that make a frontage read as one, rather than as a box with a
    * name on it.
@@ -2188,16 +2189,15 @@ async function buildJadrija(scene) {
     // awning from any viewpoint lower than the awning itself, which is every
     // viewpoint a walker has. The photograph has them filling the upper half of
     // the opening and stopping well clear of the fascia.
-    const t = (S.t0 + S.t1) * 0.5, sIn = S.s0 - 0.06;
+    const t = (S.t0 + S.t1) * 0.5, sIn = S.s0 - 0.55;   // was -0.06
     const st = at(t), p = W(t, sIn, y0 + (top - y0) * 0.60);
     const w = (S.t1 - S.t0) * 0.80, h = (top - y0) * 0.38;
-    // The tray, drawn the way `shopSign` draws its own — which is the one
-    // difference between the two and therefore the thing to try.
     const back8 = b;
     b = up;
-    boxTS(t - w * 0.5 - 0.04, t + w * 0.5 + 0.04, sIn + 0.01, sIn + 0.09,
+    boxTS(t - w * 0.5 - 0.04, t + w * 0.5 + 0.04, sIn + 0.02, sIn + 0.10,
       p[1] - h * 0.5 - 0.03, p[1] + h * 0.5 + 0.03, [0.300, 0.296, 0.288]);
     b = back8;
+
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
       new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
     mesh.position.set(p[0], p[1], p[2]);
