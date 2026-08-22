@@ -4882,6 +4882,25 @@ window.__fr = {
     },
     /** The performance, and a way to run it in a window that will not animate. */
     show: () => jadrija && jadrija.show(),
+    /**
+     * The last few people you walked into, newest last.
+     *
+     * `kind` is 'baye' or 'bather', `idx` is the casting order, and (t, s) is
+     * where the contact happened — which is the shore frame and not world
+     * metres, because that is the frame everybody on this beach was laid out
+     * in and the frame a probe can read.
+     */
+    bumps: () => (jadrija && jadrija.bumps ? jadrija.bumps() : null),
+    /** Debug: who is standing close enough to be resolved against right now. */
+    bodies: (pad = 1.2) => {
+      if (!jadrija || !jadrija.bodies) return null;
+      const p = camera.position;
+      const n = jadrija.bodies(p.x, p.z, pad);
+      const L = jadrija.bodyList();
+      return L.slice(0, n).map((b) => ({ kind: b.kind, idx: b.idx,
+        r: +b.r.toFixed(2), top: +b.top.toFixed(2),
+        d: +Math.hypot(b.x - p.x, b.z - p.z).toFixed(2) }));
+    },
     // `camera.position`, not `camPos`: the smoothed follow position is written
     // once a frame by the render loop, and this exists precisely because the
     // render loop is not running often enough to be trusted.

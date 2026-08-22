@@ -6154,8 +6154,20 @@ async function buildJadrija(scene) {
     for (const b of keep.slice(0, CAST)) bathers.push(b);
   }
 
+  // And `b.solid` is the flag that keeps the two halves of "you cannot walk
+  // through a person" from drifting apart.
+  //
+  // Somebody who never moves can be a box in the static list, which is free —
+  // it is built once and `confine` was already walking it. Somebody who does
+  // move cannot, and gets a circle resolved every frame instead; see `bodies`
+  // near the crowd loop. What must never happen is a figure that falls between
+  // the two and is solid in neither, which is exactly what the report was: the
+  // three promenade walkers and the sunbathers were skipped here for good
+  // reasons and nothing downstream picked them up. So the predicate is written
+  // once, here, and the dynamic half is defined as *everybody it said no to*.
   for (const b of bathers) {
     if (b.pose === 'lie' || b.pose === 'wade' || b.beat) continue;
+    b.solid = true;
     solid(b.t, b.s, 0.16 * b.k, 0.16 * b.k, 1.8 * b.k);
   }
 
@@ -12979,9 +12991,12 @@ async function buildJadrija(scene) {
   const qAim = new THREE.Quaternion(), qId = new THREE.Quaternion();
 
   const walkers = [];
+  // Everybody the static blocker list does not hold — see `bodies` below.
+  const soft = [];
   let cast = 0;
   let seated = 0;
-  for (const b of bathers) {
+  for (let bi = 0; bi < bathers.length; bi++) {
+    const b = bathers[bi];
     // The first few get a mesh of their own; everybody else is an instance of
     // one of two. Ordered by the cast pass above, which already put the
     // scripted business and a spread of poses at the front.
@@ -13022,10 +13037,196 @@ async function buildJadrija(scene) {
       seat: b.seat,
       seed: rng(),
       scale: b.k * (0.94 + rng() * 0.13),
+      // Whether the static blocker list already holds this one — see the
+      // `solid` loop up in the casting. Carried on to the figure so that the
+      // per-frame collider below can be defined as the complement of it rather
+      // than as a second copy of the same three conditions.
+      solid: !!b.solid,
+      // Where this one sits in the casting order, which is the only stable name
+      // anybody in the crowd has. Handed out with a bump so that whatever
+      // reacts to being walked into can tell one bather from another. It
+      // indexes the casting order, not `crowd.all()` — that one comes back
+      // grouped by rig — so the way back to the figure is to look for the
+      // matching `idx` on it, which every figure now carries.
+      idx: bi,
       skin: pick(SKIN), suit: pick(SWIM), hair: pick(HAIR),
     };
     C.figures.push(fg);
     if (b.beat) walkers.push(fg);
+    if (!fg.solid) soft.push(fg);
+  }
+
+  // ── people you cannot walk through ─────────────────────────────────────────
+  //
+  // A blocker is a box in the shore frame built once and never touched again,
+  // and that is the right answer for a hut, a bench and a bather who is going
+  // to stand in the same square metre until the tab is closed. It is the wrong
+  // answer for anybody who walks: three of the crowd pace the promenade end to
+  // end and the show figure has 172 m of stage, and a static list cannot follow
+  // any of them. So they were left out of it — and nothing else picked them up,
+  // which is how you came to be able to walk straight through her.
+  //
+  // What follows is the other half: a circle in plan, handed to the walker's
+  // own resolver in 47-ground.js every frame. It is a circle and not a box for
+  // the same reason `unbody` there is: a person has no faces, and being ejected
+  // through the nearest one of four imaginary ones is what makes a figure feel
+  // like a wardrobe. And it is resolved as a slide rather than a stop, which is
+  // the whole difference between somebody being in your way and somebody being
+  // a wall — walk into a shoulder at an angle and you go past it.
+  //
+  // Nothing here pushes anybody but you. The asymmetry is deliberate and it is
+  // the same one `jostle` keeps at the aerodrome: being solid has to be able to
+  // stop you, but a figure that could shove you must be able to shove you into
+  // a hut and hold you there, and the cheapest guarantee that it never happens
+  // is that only your own input ever moves you. She walks through you; you do
+  // not walk through her. What it costs is a frame or two of overlap when she
+  // walks into your back, which is a frame or two and then she is past.
+  const BODY = {
+    // The plan radius of one of them at the shoulders.
+    //
+    // Measured off the rig rather than guessed. The trunk part's own bounding
+    // box is 0.334 m across and 0.424 m front to back, so the circle that fits
+    // inside it has r 0.167 and the one that contains it has r 0.212; the arms
+    // hang outside both and swing. 0.24 sits above the containing circle and
+    // well under the corner-to-corner 0.37 a posed figure actually sweeps,
+    // which is the honest middle: you cannot stand inside somebody, and you are
+    // not held off a metre of empty deck either.
+    //
+    // Against the walker's own `GROUND.body` of 0.30 that is 0.54 m between
+    // centres, which is close enough to hand something over and the same order
+    // as the 0.60 the aerodrome's crew keep from each other.
+    //
+    // There is no taper down the legs, and that is worth saying because it
+    // looks like an omission. The walker is a vertical line from the soles of
+    // its boots to its eye at 1.66 m, so the two of you overlap over the whole
+    // of both bodies whenever you are standing on the same deck and the widest
+    // section always wins. A radius that narrowed at the ankles would be a
+    // number that could never once fire. What the vertical extent *is* good for
+    // is the hop, and that is `top` below.
+    r: 0.24,
+    // Somebody lying on a towel is not a circle by any reading — they are 1.75 m
+    // of person with their head at one end — so they get two of them, a torso
+    // and a pair of legs, half a metre apart along the way they are lying. One
+    // circle big enough to cover the whole figure would be a 0.9 m disc you
+    // could not get within arm's reach of, and one small enough to be honest
+    // about the trunk would leave their feet walkable.
+    //
+    // And they are solid at all, which is worth saying because 47-ground.js has
+    // a note directly contradicting it: `upright` there refuses to make anybody
+    // prone an obstacle. That note is about a casualty at a burning aerodrome,
+    // and every word of its reasoning is about being one — you have to be able
+    // to stand over somebody to put them out, and a body that went down against
+    // a hangar must not become a wedge you can be pinned behind. Neither is
+    // true of somebody asleep on a towel in the sun, and walking through one is
+    // precisely what was reported. Two different questions that happen to share
+    // a posture.
+    lieR: 0.30,
+    lieSpan: 0.46,
+    // How high the top of somebody's head is, as a multiple of their scale, and
+    // it is here so that the hop means something. `GROUND.hopV` clears 1.98 m,
+    // which is over a sunbather and nowhere near over a person on their feet —
+    // so jumping a towel works and jumping a stranger does not, which is the
+    // right pair of answers.
+    top: 1.78,
+    lieTop: 0.42,
+  };
+
+  // Reused rather than rebuilt, because this is called once a frame from the
+  // walker and a fresh array of fresh objects sixty times a second is the kind
+  // of garbage that shows up as a hitch and not as a frame time.
+  const bodyBuf = [];
+  let bodyN = 0;
+  function pushBody(x, z, r, y0, top, kind, idx) {
+    const e = bodyBuf[bodyN] || (bodyBuf[bodyN] = { x: 0, z: 0, r: 0, y0: 0, top: 0, kind: '', idx: 0 });
+    e.x = x; e.z = z; e.r = r; e.y0 = y0; e.top = top; e.kind = kind; e.idx = idx;
+    bodyN++;
+  }
+
+  /**
+   * Everybody within `pad` of (x, z) who is not already a box, in world metres.
+   *
+   * The broad phase is one subtraction against `t`, and a sweep of the list
+   * rather than a grid — the same call `showAhead` makes about the 563
+   * blockers, for the same reason. Ten people are in the soft list today and
+   * she makes eleven — seventeen circles between them, because a sunbather is
+   * two — and a grid over seventeen of anything is a second copy of the beach
+   * layout to keep in step with the first. The reject is on the shore
+   * coordinate rather than on world distance because every one of these carries
+   * `t` already: a walker
+   * advances along it and never has to be projected back out of world space,
+   * which is precisely why they are stored that way.
+   *
+   * Returned as a shared buffer with a count, so the caller must read it before
+   * calling again. Nobody does anything else with it.
+   */
+  function bodies(x, z, pad) {
+    bodyN = 0;
+    const [t] = local(x, z);
+    // The widest thing in the list plus the caller's own reach. Everything
+    // outside this band on `t` cannot possibly touch, whatever its `s`.
+    const band = pad + BODY.lieR + BODY.lieSpan;
+    for (const f of soft) {
+      if (f.t < t - band || f.t > t + band) continue;
+      const sc = f.scale || 1;
+      if (f.mode === 'lie') {
+        // Along the way they are lying, and that axis is across the yaw and not
+        // along it. `pose` lays a sunbather down with `rotation.set(0, yaw,
+        // Math.PI / 2)` in YXZ, which rolls the figure about its own Z before
+        // aiming it — so the head ends up along local −X, and local X yawed is
+        // the frame's right vector. Using the forward vector here instead lies
+        // the collider across the body, which is the one mistake that looks
+        // like it works from directly in front.
+        const ax = Math.cos(f.yaw), az = -Math.sin(f.yaw);
+        const half = BODY.lieSpan * 0.5 * sc;
+        pushBody(f.x + ax * half, f.z + az * half, BODY.lieR * sc,
+          f.y, f.y + BODY.lieTop * sc, 'bather', f.idx);
+        pushBody(f.x - ax * half, f.z - az * half, BODY.lieR * sc,
+          f.y, f.y + BODY.lieTop * sc, 'bather', f.idx);
+      } else {
+        pushBody(f.x, f.z, BODY.r * sc, f.y, f.y + BODY.top * sc, 'bather', f.idx);
+      }
+    }
+    // And her, who is not one of the crowd and is the one everybody noticed.
+    // Only while she is actually drawn: `stepShow` stops being called past
+    // 250 m and a collider standing where she was left is a person-shaped hole
+    // in the promenade you would walk into with nobody in it.
+    if (show && skinFig && skinFig.mesh.visible
+      && show.t > t - band && show.t < t + band) {
+      const p = toWorld(show.t, show.s);
+      // Her hop takes her off the deck, and something 0.76 m over your head is
+      // not in your way. `show.air` is how far up she is.
+      pushBody(p[0], p[2], BODY.r, p[1] + show.air,
+        p[1] + show.air + BODY.top, 'baye', -1);
+    }
+    return bodyN;
+  }
+  /** The shared buffer `bodies` fills. Read it, do not keep it. */
+  const bodyList = () => bodyBuf;
+
+  // Set by the reaction code below; called by the collider above when the player
+  // walks into somebody. `kind` is 'baye' or 'bather', `idx` indexes the crowd,
+  // (t, s) is where the contact happened.
+  let onBump = null;
+  function setBumpHandler(fn) { onBump = fn; }
+
+  /**
+   * The last few times you walked into somebody, newest last.
+   *
+   * A ring and not a log: this exists so a probe can ask "did that contact
+   * actually register" without the answer being a megabyte after ten minutes on
+   * the promenade.
+   */
+  const bumpLog = [];
+  /**
+   * One contact. Called by the collider in 47-ground.js, which does the
+   * debouncing — this is a fresh bump every time, never one per frame.
+   */
+  function bump(kind, idx, x, z) {
+    const [t, s] = local(x, z);
+    bumpLog.push({ kind, idx, t: +t.toFixed(2), s: +s.toFixed(2),
+      at: +crowdT.toFixed(2) });
+    if (bumpLog.length > 12) bumpLog.shift();
+    if (onBump) onBump(kind, idx, t, s);
   }
 
   function pause() {
@@ -13194,6 +13395,15 @@ async function buildJadrija(scene) {
       return walkY(x, z) > 0.55;
     },
     blockers, local, toWorld, walkY, inField, vik,
+    /**
+     * The people a box cannot hold, and the way back when you walk into one.
+     *
+     * `bodies(x, z, pad)` fills a shared buffer and returns how many; the
+     * buffer is `bodyList()`. `bump` is called by the collider on a fresh
+     * contact only. See the block over `BODY` for why any of this exists.
+     */
+    bodies, bodyList, bump, setBumpHandler,
+    bumps: () => bumpLog.slice(),
     /**
      * The four heights at one station, side by side, because the difference
      * between them is the bug this file keeps having.
