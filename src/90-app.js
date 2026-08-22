@@ -273,6 +273,20 @@ addEventListener('keydown', (e) => {
     }
     return;
   }
+  // E, but only out in the water: ahead of the pause guard with the four back
+  // doors, and there for the same reason they are. It is the way out. Somebody
+  // who has stopped to read the hint that names the key and then presses it
+  // should go ashore, and there is no way of telling from the chair how many
+  // of ten reports of "cannot exit water" were a pause nobody remembered
+  // pressing.
+  //
+  // The kite and the foil are in the water too — `inWater()` has always said
+  // so — and E means the same thing in both: put the gear away, then walk out.
+  if (e.code === 'KeyE' && inWater()) {
+    e.preventDefault();
+    goAshore();
+    return;
+  }
   // While the world is stopped, only the settings answer. Cycling the camera or
   // dropping the gear against a frozen simulation puts the picture and the
   // state out of step, and the HUD is not being redrawn to tell you.
@@ -293,21 +307,9 @@ addEventListener('keydown', (e) => {
   // in both halves of the game, which is why it is not shared with anything.
   if (e.code === 'KeyE') {
     e.preventDefault();
-    // In the water E means one thing and it is not this one. Written the other
-    // way round — this line first, with no `return` after it — every press out
-    // there ran `toggleGround()` against an aeroplane you were four hundred
-    // metres from *and then* fell through to the wade, which is the whole of
-    // why E in the sea did nothing you could see.
-    if (state.phase === 'swim') { wadeAshore(); return; }
-    // The kite and the foil are in the water too — `inWater()` has said so all
-    // along — and E did nothing in either, because only 'swim' reached the
-    // wade. Put the gear away first and then go ashore, which is what the key
-    // means everywhere else: E is the door.
-    if (state.phase === 'ride' || state.phase === 'foil') {
-      if (state.phase === 'ride') dropKite(); else dropFoil();
-      if (state.phase === 'swim') wadeAshore();
-      return;
-    }
+    // Every water phase was answered above the pause guard and returned there.
+    // On this side of it there is only the aeroplane door left.
+    if (inWater()) return;
     toggleGround();
   }
   // ENTER — jump.
@@ -1305,6 +1307,16 @@ function afootToast() {
  * mask kept its frame on the screen, and the front clip stayed at the
  * underwater plane while you walked around a village.
  */
+/**
+ * The waterline the walk model refused a step at, on the frame that just ran.
+ *
+ * Null every other time, which is the whole point of it existing rather than
+ * `ground.wet()` being read directly. See the frame loop. Declared up here
+ * because `leaveWater` clears it and `leaveWater` is the first thing in the
+ * file that does — see RULES 3 in plan/jadrija-TODO.md.
+ */
+let handover = null;
+
 function leaveWater(was = state.phase) {
   // Whatever else is going on, the race does not survive leaving the water.
   //
@@ -1328,28 +1340,59 @@ function leaveWater(was = state.phase) {
   // is idempotent, and putting it inside the swim branch would mean trusting
   // `was` to be right about a thing you can see on your own face.
   if (mask) mask.reset();
-  if (was === 'swim') {
-    swim.leave();
-    $('swim-hud').hidden = true;
-    $('under').classList.remove('on');
-    $('under').hidden = true;
-    if (IS_TOUCH) $('stouch').hidden = true;
-    wasUnder = false;
-    return true;
-  }
-  if (was === 'ride') {
-    ride.leave();
-    $('ride-hud').hidden = true;
-    if (IS_TOUCH) $('stouch').hidden = true;
-    return true;
-  }
-  if (was === 'foil') {
-    foil.leave();
-    $('foil-hud').hidden = true;
-    if (IS_TOUCH) $('stouch').hidden = true;
-    return true;
-  }
-  return false;
+  // And then the whole of the water comes off the screen, whatever `was` says.
+  //
+  // This branched three ways on `was` and did nothing at all if `was` named
+  // none of them, which is a teardown that has to be told what it is tearing
+  // down. `skipToVikendica` is the caller that showed why that is wrong: it
+  // reads `state.phase`, and by the time anything downstream of it has run the
+  // phase can already have moved. One reading of the phase that was a frame
+  // stale left a swim active with its HUD up and a mask on your face for the
+  // whole eleven seconds of a camera walking up somebody else's staircase.
+  //
+  // Leaving a mode that is not running is free — read them, they set a flag —
+  // and hiding a hidden div is free. What is not free is a screen that has to
+  // be told which of three overlays it is wearing.
+  const wet = was === 'swim' || was === 'ride' || was === 'foil'
+    || (swim && swim.active) || (ride && ride.active) || (foil && foil.active);
+  if (swim && swim.active) swim.leave();
+  if (ride && ride.active) ride.leave();
+  if (foil && foil.active) foil.leave();
+  $('swim-hud').hidden = true;
+  $('ride-hud').hidden = true;
+  $('foil-hud').hidden = true;
+  // The underwater tint is the one piece of this that is not a div you can
+  // simply hide: `paintSwimHud` drives its opacity, and an element left at
+  // 0.4 with `hidden` cleared by something downstream comes back blue.
+  $('under').classList.remove('on');
+  $('under').style.opacity = '0';
+  $('under').hidden = true;
+  if (IS_TOUCH) $('stouch').hidden = true;
+  wasUnder = false;
+  // Nothing in the water can still be holding the shoreline handover either.
+  // See the frame loop: a stale one is how you got put back in.
+  handover = null;
+  return !!wet;
+}
+
+/**
+ * The way out of the water, whichever water you are in.
+ *
+ * E on a keyboard and ASHORE under a thumb are the same door and now go
+ * through the same function. They did not: the touch button called
+ * `wadeAshore()` straight, which answers only in 'swim', so on the kite and
+ * the foil — both of which draw the same control strip — the button was
+ * furniture.
+ */
+function goAshore() {
+  if (!inWater()) return false;
+  // The world being stopped is not a reason to stay in the sea. See the note
+  // on the key handler, above the pause guard.
+  if (state.paused) setPaused(false);
+  if (state.phase === 'ride') dropKite();
+  else if (state.phase === 'foil') dropFoil();
+  // Both of those hand you to the swim, which is where the walk out starts.
+  return state.phase === 'swim' ? wadeAshore() : false;
 }
 
 /** True where a back door is allowed to fire from. */
@@ -1467,7 +1510,15 @@ function skipToGround() {
  * there", and being on foot somewhere else is the reason to press it.
  */
 function skipToJadrija() {
-  if (!ground || !ground.ok || !jadrija || !jadrija.figureAt) return;
+  if (!ground || !ground.ok || !jadrija || !jadrija.figureAt) {
+    // Was a silent return, and a back door that silently does nothing is
+    // indistinguishable from a back door that took you somewhere and something
+    // else took you back. That is exactly how this one was reported: "9 puts
+    // me back in swim mode". It did not — something else did — but there was
+    // nothing on the screen that could tell the two apart.
+    toast(T('toast.noComputer'));
+    return;
+  }
   if (state.paused) setPaused(false);
   if (vikWalk) { vikWalk = null; vikHold = false; }
   camOverride = null;
@@ -1481,9 +1532,15 @@ function skipToJadrija() {
   const [ft, fs] = jadrija.figureAt;
   const w = jadrija.toWorld(ft + 16, fs - 1);
   const her = jadrija.toWorld(ft, fs);
-  if (!ground.retarget(jadrija)) return;
-  if (!ground.dropIn(w[0], w[2],
-    Math.atan2(-(her[0] - w[0]), -(her[2] - w[2])))) return;
+  if (!ground.retarget(jadrija) || !ground.dropIn(w[0], w[2],
+    Math.atan2(-(her[0] - w[0]), -(her[2] - w[2])))) {
+    toast(T('ground.noPlane'));
+    return;
+  }
+  // The phase `dropIn` set, said again here for the same reason `wadeAshore`
+  // says it: this is the end of a transition and the end of a transition is
+  // where the state is written down, not somewhere in the middle of one.
+  state.phase = 'ground';
   $('hud').hidden = true;
   $('chute-hud').hidden = true;
   $('ground-hud').hidden = false;
@@ -1832,8 +1889,28 @@ function skipToVikendica() {
   if (state.phase !== 'fly' && state.phase !== 'ground' && !inWater()) return;
   // Same as the other two: the walk-up is a camera shot and a swim left
   // running under it would still be counting your breath.
-  if (inWater()) { leaveWater(); state.phase = 'fly'; }
-  startVikWalk();
+  //
+  // Unconditionally, and no longer only when `inWater()` agrees. `inWater()`
+  // reads the phase, `leaveWater` reads the phase again, and the whole of the
+  // mask-at-the-vikendica report is what happens when one of those two
+  // readings is of a phase that has already moved. On dry land it costs three
+  // hidden divs being hidden again; in the water it is the difference between
+  // a shot and a shot with somebody else's breath bar over it.
+  const wasWet = inWater();
+  leaveWater();
+  if (eject) eject.reset();
+  if (wasWet) state.phase = 'fly';
+  if (!startVikWalk()) {
+    // There is no house to walk up to. Say so rather than leaving the phase
+    // parked between the water it has just left and the staircase it never
+    // reached — which is a state with no controls attached to it.
+    if (wasWet) toast(T('ground.noPlane'));
+    return;
+  }
+  // The walk-up drives the camera itself. Anything else that was holding it —
+  // a race cut torn down half a second ago, a laptop — has to let go, or the
+  // shot plays underneath somebody else's frame.
+  camOverride = null;
 }
 
 // ── the race out to the platform ─────────────────────────────────────────────
@@ -2727,15 +2804,96 @@ function shoreWalk(x0, z0, yaw) {
 }
 
 /**
- * E, in the water.
+ * Somewhere to stand, from a point in the sea, that cannot come back empty.
  *
- * Chest deep it is a wade and always was. Out of your depth it is now a swim
- * you do not have to do — the report on it was blunt, and it was right: the
- * only thing between you and the beach at that point is four minutes of
- * holding W, and nothing in this game is improved by four minutes of holding
- * W. So it finds the shore, puts you on it and flashes the picture once, which
- * is the difference between a cut and a bug.
+ * This is the answer to the same report ten times over. E had three ways to
+ * fail — `shoreWalk` finding nothing, `dryLand` finding no beach, the ground
+ * mode refusing the locale — and all three ended in a toast reading "no shore"
+ * and a swimmer still swimming. A toast is not an outcome for the only key
+ * that gets you out of the sea. Measured on the instrumented build none of the
+ * three was even firing, which is worse than it sounds: it meant ten reports
+ * had been answered by tightening searches that were already succeeding.
+ *
+ * So the searches stay, and under them there is now a floor. In order:
+ *
+ *   1. `dryLand` from where the swim walked to, which is the good answer and
+ *      the one that gets used off any beach in the game.
+ *   2. Rings, outward, to four hundred metres: the nearest sample that the
+ *      cover mask calls land and the terrain agrees is above the waterline.
+ *      This is what answers on a coast with no beach on it — a channel wall, a
+ *      quay, the far side of a headland.
+ *   3. The same rings again with the height test dropped, because the DEM is
+ *      12.7 m a sample and there are flats where `isSea` says land for sixty
+ *      metres while `groundAt` is still reading 0.10.
+ *   4. A hand-placed spot: the promenade at Jadrija, sixteen metres up from
+ *      the figure, which is the same place `9` puts you and is known to be
+ *      standable because a cheat key stands on it. Then the apron.
+ *
+ * `how` says which rung answered, so a landing that keeps coming out of rung 4
+ * is visible in `__fr.modes()` instead of being felt as a teleport.
  */
+function landing(from) {
+  const [x0, z0, a0] = from;
+  const loc = (x, z) => localeAt(x, z, airfield, jadrija, city);
+  // `retarget` refuses a locale with no site. Open country always has one, so
+  // this only ever matters if the synthesiser is handed something it cannot
+  // centre on — but the whole point of this function is that nothing below it
+  // is allowed to be the reason E did nothing.
+  const ok = (x, z, a, how) => {
+    const l = loc(x, z);
+    return l && l.site ? { at: [x, z, a], loc: l, how } : null;
+  };
+
+  const land = dryLand(x0, z0, a0);
+  if (land.dry && land.at && !isSea(land.at[0], land.at[1])) {
+    const g = ok(land.at[0], land.at[1], land.at[2], 'dryLand');
+    if (g) return g;
+  }
+
+  // Rings. Nearest first, so the answer is still the shore you were swimming
+  // at rather than whichever bearing the loop happened to start on.
+  for (const strict of [true, false]) {
+    for (let r = 12; r <= 400; r *= 1.5) {
+      const n = Math.max(16, Math.round(r * 0.6));
+      let best = null, bestD = 1e9;
+      for (let i = 0; i < n; i++) {
+        const ang = (i / n) * Math.PI * 2;
+        const dx = -Math.sin(ang), dz = -Math.cos(ang);
+        // A metre and a half further in than the first dry sample, and the
+        // sample two metres past that has to be dry as well: landing on a
+        // waterline is landing in the sea one wave later.
+        const x = x0 + dx * r, z = z0 + dz * r;
+        if (isSea(x, z) || isSea(x + dx * 2, z + dz * 2)) continue;
+        if (strict && groundAt(x, z) < 0.45) continue;
+        const px = x + dx * 1.5, pz = z + dz * 1.5;
+        if (isSea(px, pz)) continue;
+        const d = Math.hypot(px - x0, pz - z0);
+        if (d < bestD) { bestD = d; best = [px, pz, ang]; }
+      }
+      if (best) {
+        const g = ok(best[0], best[1], best[2], strict ? 'ring' : 'ringFlat');
+        if (g) return g;
+      }
+    }
+  }
+
+  // The floor. Somebody has swum off the edge of a thirteen-kilometre world
+  // and there is genuinely nothing within four hundred metres of them; put
+  // them on the promenade rather than leave them in the water, and say so.
+  if (jadrija && jadrija.figureAt && jadrija.site) {
+    const [ft, fs] = jadrija.figureAt;
+    const w = jadrija.toWorld(ft + 16, fs - 1);
+    const her = jadrija.toWorld(ft, fs);
+    return { at: [w[0], w[2], Math.atan2(-(her[0] - w[0]), -(her[2] - w[2]))],
+      loc: jadrija, how: 'promenade' };
+  }
+  if (airfield && airfield.site && airfield.apron) {
+    const [ax, , az] = airfield.apron;
+    return { at: [ax, az, airfield.site.yaw], loc: airfield, how: 'apron' };
+  }
+  return { at: null, loc: null, how: 'none' };
+}
+
 /**
  * Why the last press of E did what it did.
  *
@@ -2746,35 +2904,40 @@ function shoreWalk(x0, z0, yaw) {
  */
 let lastWade = null;
 
+/**
+ * E, in the water.
+ *
+ * Chest deep it is a wade and always was. Out of your depth it is now a swim
+ * you do not have to do — the report on it was blunt, and it was right: the
+ * only thing between you and the beach at that point is four minutes of
+ * holding W, and nothing in this game is improved by four minutes of holding
+ * W. So it finds the shore, puts you on it and flashes the picture once, which
+ * is the difference between a cut and a bug.
+ */
 function wadeAshore() {
   if (state.phase !== 'swim') { lastWade = { why: 'phase:' + state.phase }; return false; }
+  if (!ground || !ground.ok) { lastWade = { why: 'noGround' }; toast(T('ground.noPlane')); return false; }
   const y = swim.you;
   const far = !swim.canWade();
   const from = far ? shoreWalk(y.x, y.z, y.yaw) : [y.x, y.z, y.yaw];
-  // Three things in this sequence used to be unable to report a failure, and
-  // between them they are the whole of the complaint. `shoreWalk` returned the
-  // point it started from when the distance field was saturated; `dryLand`
-  // returned a sea bed when it found no beach; and `dropIn` cannot refuse
-  // anything — read it, it ends in `return true` and has no other exit. So the
-  // key fired, the search failed three times in silence, and the walk model was
-  // handed a spot under the surface. Every one of them is checked here now.
-  if (!from) { lastWade = { why: 'shoreWalk', far }; toast(T('toast.noShore')); return false; }
-  const land = dryLand(from[0], from[1], from[2]);
-  const spot = land.at;
-  if (!land.dry || !spot || isSea(spot[0], spot[1])) {
-    lastWade = { why: !spot ? 'dryLand:none' : !land.dry ? 'dryLand:wet' : 'dryLand:sea',
-      far, at: spot ? [Math.round(spot[0]), Math.round(spot[1])] : null };
-    toast(T('toast.noShore'));
-    return false;
-  }
-  if (!ground || !ground.ok
-    || !ground.retarget(localeAt(spot[0], spot[1], airfield, jadrija, city))
-    || !ground.dropIn(spot[0], spot[1], spot[2], true)) {
-    lastWade = { why: 'ground', far, at: [Math.round(spot[0]), Math.round(spot[1])] };
+  // `shoreWalk` returning null is no longer a failure, it is a rung: it means
+  // the distance field had nothing to descend, and the ladder below starts
+  // from where you are instead. See `landing`.
+  const found = landing(from || [y.x, y.z, y.yaw]);
+  const spot = found.at;
+  // Nothing left that can refuse. `landing` walks a ladder that ends at a
+  // hand-placed spot on the promenade, `retarget` is retried against the two
+  // built locales if the synthesised one will not have it, and `dropIn` has no
+  // exit but `return true`. If this is ever reached there is no walking mode
+  // at all, which is a page that failed to build and not a shore that could
+  // not be found.
+  if (!spot || !ground.retarget(found.loc) || !ground.dropIn(spot[0], spot[1], spot[2], true)) {
+    lastWade = { why: 'ground', far, how: found.how };
     toast(T('ground.noPlane'));
     return false;
   }
-  lastWade = { why: 'ok', far, at: [Math.round(spot[0]), Math.round(spot[1])] };
+  lastWade = { why: 'ok', far, how: found.how,
+    at: [Math.round(spot[0]), Math.round(spot[1])] };
   // `leaveWater` rather than `swim.leave`, so the race and its HUD come off
   // with it. Leaving them running was survivable while E only fired chest deep
   // — you cannot be chest deep and racing — and is not now that it fires from
@@ -3721,8 +3884,13 @@ function frame() {
     // And if that walk was into the sea, it was a walk into the sea. The
     // barrier at the waterline used to be the end of the world in that
     // direction; now it is a doorway, and the far side of it has its own mode.
-    const wet = ground.wet && ground.wet();
-    if (wet) waadeIn(wet[0], wet[1]);
+    //
+    // `handover`, not `ground.wet()`. See the note where it is filled in, below
+    // `ground.update`: read straight out of the mode this is last frame's
+    // answer, and last frame may have been a frame of swimming, in which case
+    // it is not an answer at all — it is whatever the walk model was holding
+    // when it stopped running, and it holds it for ever.
+    if (handover) { const w = handover; handover = null; waadeIn(w[0], w[1]); }
     updateMission(real);
   }
 
@@ -4001,6 +4169,29 @@ function frame() {
   if (recess) fire.events.length = 0;
   else fire.update(real, dt);
   ground.update(dt);
+  // The shoreline handover, latched here and spent at the top of the next
+  // frame.
+  //
+  // `ground.wet()` is an *output of one step of `walk()`* — "the step you just
+  // asked for was refused and there is water a metre and a half past it" — and
+  // `walk()` is the only thing that ever clears it. `walk()` runs only while
+  // the mode is driving somebody, so the moment you go swimming it stops
+  // running and the last waterline you leant on is frozen into the getter for
+  // the rest of the session.
+  //
+  // The frame loop then read that getter at the top of every ground frame. So
+  // every door out of the water — E, 9, V — put you correctly on dry land, and
+  // the next frame read a pair of coordinates from a walk you took ten minutes
+  // ago and swam you back out to the spot you had just left. Measured: one
+  // frozen pair, `[-2094, 382]`, was still being handed back at the end of a
+  // seventeen-case run in which it was returned to seventeen times. Three
+  // separate bug reports — E cannot get me out of the water, 9 puts me back in
+  // swim mode, V keeps my mask on — are that one value.
+  //
+  // Latching it here says the thing that was actually meant: a handover is
+  // only good if the walk model produced it on the frame that just ran, while
+  // it was the thing being driven.
+  handover = state.phase === 'ground' && ground.wet ? ground.wet() : null;
   // The other three keep working while your wreck is still settling — and while
   // you are on foot. Gating this on the flying phase left all three of them
   // hanging motionless in the sky for the whole ground mission, which is both
@@ -5056,6 +5247,22 @@ window.__fr = {
     walkY: (x, z, y) => ground.walkY(x, z, y),
     /** Debug: is the land cover at (x, z) water? The shoreline test. */
     sea: (x, z) => isSea(x, z),
+    /**
+     * Where E would put you from a point in the sea, without going there.
+     *
+     * The ladder in `landing` has four rungs and only the first one answers
+     * anywhere near this coast, which is exactly the problem with it: the
+     * other three are the floor under a key that must not fail, and a floor
+     * nothing ever stands on is a floor nobody has weighed. This is how they
+     * get weighed.
+     */
+    landing: (x, z, yaw = 0) => {
+      const g = landing([x, z, yaw]);
+      return { how: g.how, at: g.at ? [Math.round(g.at[0]), Math.round(g.at[1])] : null,
+        loc: g.loc ? (g.loc.kind || (g.loc === jadrija ? 'jadrija' : 'airfield')) : null,
+        sea: g.at ? (isSea(g.at[0], g.at[1]) ? 1 : 0) : null,
+        y: g.at ? +groundAt(g.at[0], g.at[1]).toFixed(2) : null };
+    },
     /**
      * On foot anywhere at all, synthesising a locale for open country the same
      * way a parachute landing does. `jad.stand` only reaches Jadrija, and the
