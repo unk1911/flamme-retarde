@@ -91,7 +91,22 @@ days of guessing.
 - [ ] Paving: the FLAG palette is close enough to CONC that the seam is subtle.
       v_022 has warmer, yellower flags with visibly darker joints.
 - [ ] Per-shop detail pass, one shop per iteration, against its own photographs.
-- [ ] Sound: shore bed, voice murmur, footsteps by surface, cicadas.
+- [x] Sound: klapa out, five field recordings in — the promenade as one bed,
+      the hillside cicadas, the same chorus from inside the pines crossfaded on
+      canopy, the sea against the concrete edge (driven off `shoreAt` from
+      47-ground, because it follows your feet and not the camera), and a boat
+      passing in the channel every 50-135 s. Verified: all five decode, no
+      console errors, 61 fps, the wood crossfade goes 0 -> 0.53 under the pines,
+      the boat fires and runs 23 s.
+- [ ] The five audio levels were set by ARITHMETIC off measured RMS, not by ear.
+      Needs one listening pass. `SHORE.gain` 0.30, `CICADA.level` 3.2,
+      `LAP.gain` 0.20, `BOAT.gain` 0.085, `BOAT.every` 50-135 s. If the
+      promenade sounds muffled standing on it that is `SHORE.lpNear` (4 kHz),
+      held short of the cicada band so the two chorus clips do not double.
+      `shore.mp3` is 19 s and has voices in it, so events come round every 19 s.
+- [ ] `Voice 260811_213809.m4a` is unidentified — 21:38, broadband 200-2000 Hz,
+      no cicada or cricket band. Not shipped, because the game has no night and
+      naming it would be inventing one. Ask Misha what it is.
 
 **Verify**
 - [ ] Knee-height close-up pass on the clutter — sandals, dropped towels,

@@ -4082,7 +4082,7 @@ function frame() {
     / (1 + Math.pow(Math.max(0, cicD) / 130, 1.8));
   if (afoot !== wasAfoot || (afoot && Math.abs(cicG - cicadaGain) > 0.0015)) {
     cicadaGain = cicG;
-    audio.cicadas(afoot, cicG);
+    audio.cicadas(afoot, cicG, cicW);
     wasAfoot = afoot;
   }
   // The beach, shut out by the wall. This used to make the cicadas *louder*
@@ -4090,7 +4090,7 @@ function frame() {
   // was the wrong theory: a changing hut with a hillside of cicadas at full
   // level in it is not a room you have walked into, it is a room somebody has
   // taken the roof off. They go through a gain and a lowpass now — see `room`
-  // in src/80-audio.js — with the klapa on the same bus, and the radio on the
+  // in src/80-audio.js — with the shore bed on the same bus, and the radio on the
   // table pointedly not, because it is the one sound in here that is in here.
   if (afoot && Math.abs(indoors - cicadaAt) > 0.01) {
     cicadaAt = indoors;
@@ -4181,22 +4181,23 @@ function frame() {
     camera.updateProjectionMatrix();
   }
 
-  // And the klapa, off the terrace at Jadrija. Measured from the camera rather
+  // And Jadrija itself, off the promenade. Measured from the camera rather
   // than from the aeroplane, which is the same point in every mode except the
   // chase view and is the right one in that too: what you hear should follow
   // where you are looking from, not where the airframe is.
   //
-  // Deliberately audible from a long way out. On a still August afternoon four
-  // men singing outdoors carry a kilometre over flat water, and the whole point
-  // of the thing is that you pick it up as a suggestion somewhere over the
-  // channel and only work out what it is on the way in.
+  // Deliberately audible from a long way out. A couple of hundred people on a
+  // concrete promenade on a still August afternoon carry over flat water the
+  // way any broad low source does, and the whole point of the thing is that you
+  // pick it up as a suggestion somewhere over the channel and only work out
+  // what it is on the way in.
   if (jadrija && state.phase !== 'intro') {
     const d = Math.hypot(camera.position.x - jadrija.site.x,
       camera.position.z - jadrija.site.z);
-    // Indoors the singers go away by being put back over the water: the same
-    // distance curve `klapa` already has, walked out to the edge of earshot.
-    // Cheaper than a second gain stage and, unlike one, it takes the top off
-    // them on the way — which is what a shut door does to four men singing.
+    // Indoors the beach goes away by being put back over the water: the same
+    // distance curve `shore` already has, walked out to the edge of earshot.
+    // Cheaper than a second gain stage and, unlike one, it takes the top off it
+    // on the way — which is what a shut door does to a crowd.
     //
     // And on a board they stay with you. A rider does ten metres a second and
     // is a kilometre out inside two minutes, which put the whole of the kite
@@ -4204,7 +4205,7 @@ function frame() {
     // expedition. Capped rather than pinned: it still opens all the way up
     // when you carve back in along the terrace, it just stops going away.
     const dk = state.phase === 'ride' || state.phase === 'foil' ? Math.min(d, 400) : d;
-    audio.klapa(dk + indoors * 2000, state.phase === 'fly');
+    audio.shore(dk + indoors * 2000, state.phase === 'fly');
   }
 
   if (state.scooping) {
@@ -4565,9 +4566,11 @@ window.__fr = {
   },
   audio: {
     raw: () => audio,
-    klapa: () => audio.klapaStats(),
-    /** Step the klapa at a given range without flying there. */
-    at: (d, inside = false) => { audio.klapa(d, inside); return audio.klapaStats(); },
+    shore: () => audio.shoreStats(),
+    /** Step the shore bed at a given range without flying there. */
+    at: (d, inside = false) => { audio.shore(d, inside); return audio.shoreStats(); },
+    /** Likewise the water at the edge, which is metres to the coastline. */
+    lap: (d) => { audio.lapping(d); return audio.shoreStats(); },
     beds: () => audio.beds(),
     fire: () => audio.fireStats(),
     /** The beat on its own, without having to soak her for sixteen seconds. */
@@ -4654,7 +4657,7 @@ window.__fr = {
     bones: (...a) => jadrija.bones(...a),
     /**
      * How far into the special kabina the game thinks you are, 0 to 1 — the
-     * number the light and the klapa both hang off, which is the only way to
+     * number the light and the shore bed both hang off, which is the only way to
      * tell a door that is not working from a room that is not dark enough.
      */
     indoors: () => ({ v: +indoors.toFixed(3),

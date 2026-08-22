@@ -60,7 +60,7 @@ const STRINGS = {
     'veil.hintTouch': 'drag anywhere on the left to fly &nbsp;·&nbsp; throttle on '
       + 'the right<br>SCOOP and DROP are <b>held</b>, not tapped',
     'veil.credit': 'terrain &amp; town derived from OpenStreetMap &amp; public elevation data',
-    'veil.klapa': 'klapa at Donje Selo &copy; Draceane, CC BY-SA 4.0 — trimmed &amp; levelled &#8599;',
+    'veil.field': 'shore, cicadas and water recorded at Jadrija, August 2026',
     'veil.src': 'source on GitHub &#8599;',
 
     // HUD
@@ -402,7 +402,7 @@ const STRINGS = {
     'veil.hintTouch': 'povuci bilo gdje lijevo za let &nbsp;·&nbsp; gas je desno<br>'
       + 'ZAHVAT i IZBACI se <b>drže</b>, ne tapkaju',
     'veil.credit': 'teren i grad izvedeni iz OpenStreetMapa i javnih podataka o visinama',
-    'veil.klapa': 'klapa u Donjem Selu &copy; Draceane, CC BY-SA 4.0 — skraćeno i ujednačeno &#8599;',
+    'veil.field': 'more, cvrčci i valovi snimljeni na Jadriji, kolovoz 2026.',
     'veil.src': 'izvorni kod na GitHubu &#8599;',
 
     'hud.elapsed': 'proteklo',
@@ -721,7 +721,7 @@ const STRINGS = {
     'veil.hintTouch': 'glissez à gauche pour voler &nbsp;·&nbsp; gaz à droite<br>'
       + 'ÉCOPER et LARGUER se <b>maintiennent</b> enfoncés',
     'veil.credit': 'relief et ville dérivés d\'OpenStreetMap et de données altimétriques publiques',
-    'veil.klapa': 'klapa à Donje Selo &copy; Draceane, CC BY-SA 4.0 — coupée et égalisée &#8599;',
+    'veil.field': 'mer, cigales et clapot enregistrés à Jadrija, août 2026',
     'veil.src': 'code source sur GitHub &#8599;',
 
     'hud.elapsed': 'écoulé',

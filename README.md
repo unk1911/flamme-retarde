@@ -518,7 +518,7 @@ Two grants, because this is two things. The engine — `src/`, `tools/`, `build.
 — is **MIT**: take the terrain sampler, the collision solver, the synthesised
 audio graph, do what you like. The game itself — the prose, the worlds, the
 Blender models, the assembled `flamme-retarde.html` — is **CC BY-SA 4.0**, to
-match the klapa and the open data it is built out of.
+match the open data it is built out of.
 
 The third-party components below keep their own terms, and the intro panels are
 deliberately outside both grants — they are machine output painted from
@@ -531,19 +531,30 @@ including how to rebuild without the parts you may not want.
 - Coastline, land cover, buildings, roads, landmarks: © OpenStreetMap contributors, [ODbL](https://www.openstreetmap.org/copyright).
 - [Three.js](https://threejs.org), MIT.
 - Intro panels generated with Google Gemini 2.5 Flash Image from reference photographs.
-- **The klapa**: [*Donje Selo, 12. susret klapa, 2018 (02)*](https://commons.wikimedia.org/wiki/File:Donje_Selo,_12._susret_klapa,_2018_(02).webm)
-  by Wikimedia Commons contributor **Draceane**, recorded at the twelfth *susret
-  klapa* at Donje Selo on Šolta on **11 August 2018**, licensed
-  [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
-  *Changes made*: audio extracted from the video, trimmed to 0.3–47.0 s,
-  high-passed at 70 Hz, faded in and out, loudness-normalised to −16 LUFS, and
-  re-encoded as 56 kbps mono MP3. The adapted audio in `build/payload/klapa.mp3`
-  is offered under the same **CC BY-SA 4.0** licence. Distance attenuation and
-  filtering are applied live at runtime, not baked into the file.
+- **The ambience**: recorded at Jadrija in **August 2026**, mine, no third-party
+  terms. Six field recordings became five mono clips in the payload:
 
-  This is the only recorded sound in the build. Every other noise the game
-  makes — engines, water, fire, cicadas, footsteps — is synthesised from
-  oscillators and noise at run time and owes nobody a credit.
+  | clip | source | s | rate | kbps | KB |
+  |---|---|---|---|---|---|
+  | `shore.mp3` | the promenade, 13 Aug | 19.0 | 22 050 | 56 | 131 |
+  | `cicadas.mp3` | the hillside, 12 Aug | 14.0 | 24 000 | 56 | 96 |
+  | `wood.mp3` | inside the pines, 17 Aug | 9.0 | 24 000 | 56 | 62 |
+  | `lapping.mp3` | the pier, 16 Aug | 14.0 | 22 050 | 48 | 83 |
+  | `boat.mp3` | a boat off Šibenik, 17 Aug | 10.0 | 16 000 | 40 | 49 |
+
+  *Changes made*: each trimmed to the window whose two ends match best in level
+  and in spectrum, so the loop seam is inaudible; high-passed (150 Hz for the
+  shore and the pier, 2 kHz for the two choruses, 28 Hz for the boat) to take
+  out a 117 Hz rumble that is the loudest single thing in three of the six
+  sources; the two choruses low-passed at 10 kHz and levelled to the same
+  −25.2 dBFS RMS so they crossfade without a step; nothing taken past −1 dBFS
+  peak. Distance, weather, walls and Doppler are applied live at run time and
+  none of it is baked into the files.
+
+  These five and the 2.8 KB ćuk are the only recorded sounds in the build.
+  Every other noise the game makes — engines, water, fire, footsteps, the birds,
+  three radio stations — is synthesised from oscillators and noise at run time
+  and owes nobody a credit.
 - **The dog**: [*Pug*](https://poly.pizza/m/1gXKv15ik8) by
   **[Quaternius](https://quaternius.com)**, dedicated to the public domain under
   [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). The source

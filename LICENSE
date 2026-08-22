@@ -1,16 +1,15 @@
 # Licence
 
 Flamme Retardé is not one work under one licence. It is a program that draws a
-real place, and the place came from somewhere. The code is mine; the terrain,
-the streets, the buildings and the singing are other people's, on terms I have
-to pass along intact. This file says which is which.
+real place, and the place came from somewhere. The code is mine, and so is the
+sound of the place now; the terrain, the streets and the buildings are other
+people's, on terms I have to pass along intact. This file says which is which.
 
     src/, tools/, build.py ................. MIT
     Everything else I made ................. CC BY-SA 4.0
     Three.js r0.180.0 ...................... MIT
     OpenStreetMap-derived payload .......... ODbL 1.0 (+ attribution)
     Terrain heightfield .................... public domain
-    build/payload/klapa.mp3 ................ CC BY-SA 4.0
     build/payload/panel_*.webp,
       refs/panels/*.png .................... see "The intro panels", below
 
@@ -68,14 +67,19 @@ Applies to the authored content rather than the machinery:
   `build/firefighter.blend`, `tools/blender/*.py`, and the baked
   `build/payload/*.fr3d.gz` (the cathedral, both forts, the Jadrija lighthouse,
   the Šibenik bridge, the Canadair, the firefighter);
+- the field recordings and the clips cut from them —
+  `build/payload/{shore,cicadas,wood,lapping,boat}.mp3`, recorded at Jadrija and
+  in the channel off Šibenik and trimmed, filtered and levelled by hand, and
+  `build/payload/cuk.mp3`, a scops owl recorded by the same hand elsewhere;
 - `docs/*.png`;
 - the assembled `flamme-retarde.html` as a whole.
 
-Share-alike here is deliberate and not merely inherited. The klapa arrives under
-BY-SA and I would rather the bundle match it outright than argue about whether a
-base64 blob inside an HTML file is a Collection or an Adaptation. It also seems
-the right answer for a thing built almost entirely out of open data and other
-people's generosity.
+Share-alike here is deliberate and not merely inherited. Nothing in the bundle
+now forces it — the ambience is my own field recording and owes nobody anything
+— and it stays because it is the right answer for a thing built almost entirely
+out of open data and other people's generosity, and because I would rather not
+argue about whether a base64 blob inside an HTML file is a Collection or an
+Adaptation.
 
 **Attribution.** Credit *Flamme Retardé* by unk1911, link to
 https://github.com/unk1911/flamme-retarde, indicate changes, and keep the
@@ -130,24 +134,6 @@ from public-domain sources (SRTM and successors). The Terrain Tiles dataset
 aggregates several providers, some of which ask for attribution; the credit
 above covers it.
 
-### The klapa — CC BY-SA 4.0
-
-`build/payload/klapa.mp3` is adapted from
-[*Donje Selo, 12. susret klapa, 2018 (02)*](https://commons.wikimedia.org/wiki/File:Donje_Selo,_12._susret_klapa,_2018_(02).webm)
-by Wikimedia Commons contributor **Draceane**, recorded at the twelfth *susret
-klapa* at Donje Selo on Šolta on 11 August 2018, licensed
-[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
-
-Changes made: audio extracted from the video, trimmed to 0.3–47.0 s, high-passed
-at 70 Hz, faded in and out, loudness-normalised to −16 LUFS, re-encoded as
-56 kbps mono MP3. The adapted audio is offered under the same CC BY-SA 4.0. The
-distance attenuation and filtering you hear are applied live at run time and are
-not baked into the file.
-
-This is the only recorded sound in the build. Everything else the game makes —
-engines, water, fire, cicadas, footsteps — is synthesised from oscillators and
-noise at run time and owes nobody a credit.
-
 ### The intro panels — no grant offered
 
 `build/payload/panel_*.webp` and `refs/panels/*.png` were generated with Google
@@ -181,13 +167,10 @@ dolphin@edeliverables.com and it will come out.
 
 ## Building a version with less in it
 
-Two of the components above have terms someone might want to be clear of. Both
-drop out cleanly, because the payload is a directory the build walks rather than
-a manifest it hard-codes:
+One of the components above has terms someone might want to be clear of, and it
+drops out cleanly, because the payload is a directory the build walks rather
+than a manifest it hard-codes:
 
-- **The klapa.** Delete `build/payload/klapa.mp3` and rebuild. `src/80-audio.js`
-  guards on `PAYLOAD.klapa` and silently does nothing without it; Jadrija just
-  gets quieter.
 - **The panels.** Delete `build/payload/panel_*.webp` and rebuild, or regenerate
   them from your own references as above.
 

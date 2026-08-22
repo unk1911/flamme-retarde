@@ -1,6 +1,11 @@
 // -----------------------------------------------------------------------------
-// Sound, synthesised. No recordings — everything below is oscillators and one
-// shared noise buffer, so the whole game stays a single file.
+// Sound. The machines are synthesised — oscillators and one shared noise buffer,
+// because an engine or a fire or a branch is a spectrum, and a spectrum is cheap
+// and follows a throttle. The *places* are recorded: five short mono clips cut
+// from field recordings made at Jadrija in August, 421 KB in the payload,
+// because a promenade full of people and a hillside of cicadas are not spectra
+// and three rounds of trying to build them out of filtered noise proved it. See
+// "the recordings", below.
 //
 // The mix is built around one fact: a CL-415 is two 2 380 hp turboprops eighteen
 // feet from your head. The blade-pass tone is the loudest thing in the game and
@@ -138,7 +143,7 @@ function buildAudio() {
     // under, and the top of the band gone with it. That is why putting your
     // head under at a noisy beach is the loudest silence there is.
     //
-    // So this sits on the master rather than on the bed: the klapa, the
+    // So this sits on the master rather than on the bed: the promenade, the
     // cicadas, the Canadair overhead, the fire on the hill and the transistor
     // set all go away together, because they are all on the wrong side of the
     // same surface. What is left is the low end, which is genuinely what you
@@ -151,13 +156,14 @@ function buildAudio() {
       .connect(ctx.destination);
 
     // ── the bed ───────────────────────────────────────────────────────────
-    // The two continuous sounds that stand still and fill the whole band at
-    // Jadrija — the klapa and the cicadas — go through here rather than
-    // straight to master, so that something small can duck them.
+    // The continuous sounds that stand still and fill the whole band at
+    // Jadrija — the promenade, the cicadas, the sea against the edge — go
+    // through here rather than straight to master, so that something small can
+    // duck them.
     //
     // This exists because of one bug that took two goes to understand. Her
     // ćuk was firing correctly, at a level that measured fine on its own, and
-    // was inaudible: four men singing at 0.55 and a summer's worth of cicadas
+    // was inaudible: a whole resort at 0.55 and a summer's worth of cicadas
     // mask a quarter-second whistle completely, and the limiter downstream
     // then does the rest, because a bed that is already holding the
     // compressor down leaves a transient nothing to open into. Making her
@@ -169,7 +175,7 @@ function buildAudio() {
     // bed out of the way and they want it for different lengths of time. Her
     // squeaks take `bed` for a fifth of a second at a time and write to it with
     // `cancelScheduledValues`; the music below holds `bedDuck` down for half a
-    // minute. Sharing one node, whichever spoke last would win, and the klapa
+    // minute. Sharing one node, whichever spoke last would win, and the beach
     // would come back up under the beat every time she made a noise.
     bed = ctx.createGain();
     bed.gain.value = 1;
@@ -178,9 +184,10 @@ function buildAudio() {
     bed.connect(bedDuck).connect(master);
 
     // ── outdoors ──────────────────────────────────────────────────────────
-    // The two sounds on the bed that belong to the beach rather than to the
-    // player — the klapa off the terrace and the hillside of cicadas behind
-    // it — pass through here first, so that a shut door can take them away.
+    // The sounds on the bed that belong to the beach rather than to the player
+    // — the promenade, the hillside of cicadas behind it, the sea against the
+    // edge and whatever is going past out in the channel — pass through here
+    // first, so that a shut door can take them away.
     //
     // A fourth stage rather than reusing the bed, because the transistor set
     // on the table is also on the bed and it is the one thing in the game
@@ -262,7 +269,7 @@ function buildAudio() {
     // time. It just did not sound like water. A Q of 1.6 parked at 3400 Hz is
     // about a third of an octave wide, and a third of an octave of white noise
     // is not a jet leaving a nozzle, it is air leaving a tyre: thin, pitched,
-    // and the first thing the ear throws away when a klapa is singing over it.
+    // and the first thing the ear throws away with a whole resort over it.
     //
     // So: opened out to the better part of two octaves and brought down, with a
     // lowpassed layer underneath carrying the mass. Neither half is water on
@@ -1089,7 +1096,7 @@ function buildAudio() {
     lead: 1.10,          // s — the length of the `flare` clip, so the beat drops
     root: 41.203,        // E1, and everything below is semitones off it
     gain: 0.50,
-    duck: 0.86,          // how far under the beat the klapa and the cicadas go
+    duck: 0.86,          // how far under the beat the beach and the cicadas go
   };
 
   // One sixteenth per character, sixteen to the bar, two bars. `x` is a hit and
@@ -1363,123 +1370,352 @@ function buildAudio() {
     }
   }
 
-  // ── the klapa ───────────────────────────────────────────────────────────────
+  // ── the recordings ──────────────────────────────────────────────────────────
   /**
-   * The one recorded sound in the whole game. Everything else here is
-   * synthesised from noise and oscillators, which is the right way to build an
-   * engine or a fire and completely the wrong way to build four men singing.
+   * Everything from here to the transistor set is a place rather than a
+   * machine, and every one of them is a recording.
    *
-   * It is a real klapa, recorded at the twelfth susret klapa at Donje Selo on
-   * Šolta on the eleventh of August 2018 — forty kilometres down the same coast,
-   * eight days after the date this game is set on, near enough. CC BY-SA 4.0 by
-   * the Wikimedia Commons contributor Draceane; trimmed, high-passed and
-   * levelled here, and the credit is in the README and on the title screen.
+   * The division is not laziness in one direction or extravagance in the other.
+   * A machine is a spectrum: two turboprops are a blade-pass tone and a
+   * combustion rumble, a fire is noise under 700 Hz with a surge in it, and a
+   * branch at eight bar is two bands of noise that wander. Those are filters
+   * and oscillators and they are *better* built that way, because they have to
+   * follow throttle and distance and how much of a hillside is alight.
    *
-   * The clip is deliberately the dry, close one rather than a pre-muddied
-   * distant mix: the distance is applied live below, so that walking towards it
-   * opens the filter continuously instead of crossfading between two mixes.
+   * A place is not a spectrum. Jadrija on an August afternoon is a promenade
+   * full of people, water working a concrete edge, somebody's radio, and a
+   * hillside of cicadas behind all of it, and none of those agree with each
+   * other for two seconds together. Filtered noise gives you the *level* of
+   * that and never the life in it: the cicada bandpass further down was tuned
+   * off measurements of the real chorus and has the carrier and the Q right to
+   * within a couple of per cent, and it is still audibly a filter. It is the
+   * same lesson the ćuk taught, and it cost the same three rounds to learn.
+   *
+   * So there are five clips, cut from recordings made on the spot at Jadrija in
+   * August, 421 KB of mono MP3 in the payload:
+   *
+   *     shore     19.0 s  22 050 Hz  56 kbps  the promenade, whole
+   *     cicadas   14.0 s  24 000 Hz  56 kbps  the chorus off the hillside
+   *     wood       9.0 s  24 000 Hz  56 kbps  the same chorus from inside it
+   *     lapping   14.0 s  22 050 Hz  48 kbps  the sea against the stone edge
+   *     boat      10.0 s  16 000 Hz  40 kbps  an engine out in the channel
+   *
+   * All five are high-passed, because a 117 Hz rumble is the loudest single
+   * thing in three of the six source files and it is not the sound of anywhere;
+   * the two choruses are low-passed at 10 kHz as well and levelled to the same
+   * RMS so they can crossfade without a step. That is the whole of what was
+   * done to them. No fades, no distance, no weather baked in: everything you
+   * hear of range and walls and water is applied live below, so walking towards
+   * a thing opens it continuously instead of crossfading between a near mix and
+   * a far one.
+   *
+   * Each was chosen by searching its source for the window whose two ends match
+   * best in level and in spectrum, so that the loop seam is inaudible. That
+   * measure — not a crossfade — is what a bed with no beat in it needs: what
+   * gives a loop away is a step in level, and nobody can hear a discontinuity
+   * in noise they could not have predicted anyway. The worst of the five
+   * matches to within half a decibel and the best to within a hundredth.
    */
-  const KLAPA = {
-    full: 90,            // m — inside this you are standing in the middle of it
-    fade: 1600,          // m — past this the channel has swallowed it
-    // What it plays at, up close, on foot. Halved again, and this is the fifth
-    // time it has come down: 0.55 at first, 0.44 when her voice turned out to
-    // be inaudible under it, 0.22, 0.11, and 0.055 now. That is twenty decibels
-    // off where it started, which reads as drastic written down and is not —
-    // this is four men singing at the far end of a promenade you are walking
-    // down, and the thing being modelled is a game in which somebody else is
-    // the point. Asked for three times, which is the answer; there is no
-    // argument left to make about the level of a thing the player keeps saying
-    // is too loud.
-    //
-    // The distance law does the rest and is unchanged: it still opens up as you
-    // walk into it and is still a suggestion across the channel. It is only no
-    // longer a thing everything else has to be mixed around.
-    gain: 0.055,
-    inside: 0.05,        // and what an airframe with two turboprops leaves of it
-    lpNear: 9000,        // Hz — the filter wide open, next to the singers
-    lpFar: 750,          // and what a kilometre of sea over water leaves of it
-  };
-  let klapaBuf = null, klapaNodes = null, klapaTried = false;
 
   /**
-   * Decoded once, lazily, on the first frame that wants it — which is the first
-   * frame Jadrija is within earshot, and never at all if you fly the whole
-   * sortie over the far side of the channel.
+   * One baked MP3 out of the payload and into an AudioBuffer, once.
+   *
+   * Lazily, because none of these is certain to be wanted: fly the whole sortie
+   * over the far side of the channel and Jadrija is never within earshot.
+   *
+   * Every failure here is silent on purpose. A build with the clip deleted, a
+   * decoder that will not take the file, a context that has gone away — all
+   * three leave a game that is quieter rather than a game that is broken, and
+   * the `tried` set is what stops a failed decode being retried sixty times a
+   * second for the rest of the session.
    */
-  function klapaLoad() {
-    if (klapaTried || !ctx || typeof PAYLOAD === 'undefined' || !PAYLOAD.klapa) return;
-    klapaTried = true;
+  const sampleTried = new Set();
+  function sampleLoad(key, keep) {
+    if (sampleTried.has(key) || !ctx) return;
+    if (typeof PAYLOAD === 'undefined' || !PAYLOAD[key]) return;
+    sampleTried.add(key);
     try {
-      const bin = atob(PAYLOAD.klapa);
+      const bin = atob(PAYLOAD[key]);
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       // The callback form as well as the promise: Safari resolved decodeAudioData
       // by callback for years and still accepts both, and one silent failure
       // here costs the whole feature.
-      ctx.decodeAudioData(bytes.buffer, (buf) => { klapaBuf = buf; },
-        () => { /* undecodable — the game is not worse without it */ });
+      ctx.decodeAudioData(bytes.buffer, keep, () => { /* undecodable */ });
     } catch (e) { /* likewise */ }
   }
 
+  // ── the promenade ───────────────────────────────────────────────────────────
+  /**
+   * The whole of Jadrija as one sound, heard from wherever you happen to be.
+   *
+   * This is the bed the approach is built around, and it is deliberately
+   * audible from a long way out: on a still August afternoon a promenade full
+   * of people carries over flat water the way any broad low-frequency source
+   * does, and the point of the thing is that you pick it up as a suggestion
+   * somewhere over the channel and only work out what it is on the way in.
+   *
+   * The clip is the dry, close one. Distance is two ramps applied here: a gain
+   * that goes as the square of how far in you are, and a lowpass that opens
+   * from 750 Hz to 4 kHz. The lowpass is the half that sells it — a kilometre
+   * of sea air takes the top off a crowd long before it takes the level, which
+   * is why a distant beach is a *hum* and not a quiet beach.
+   *
+   * 4 kHz and not further open, because the chorus has a bed of its own below
+   * and the two clips were recorded a day apart in the same place — this one
+   * peaks at 522 Hz and has the hillside behind it, that one peaks at 5 016 Hz
+   * and is the hillside. Left wide, the cicadas in this clip sit on top of the
+   * cicadas in that one: the same texture twice and uncorrelated, which is not
+   * the same thing as more of it. So this bed owns the body of the place and
+   * `cicadas` owns the top of it, and the seam between them is a frequency
+   * rather than a distance.
+   */
+  const SHORE = {
+    full: 90,            // m — inside this you are standing on the promenade
+    fade: 1600,          // m — past this the channel has swallowed it
+    // What it plays at, up close, on foot.
+    //
+    // Set by measurement rather than by ear, and it wants an ear. shore.mp3
+    // sits at −28.2 dBFS RMS, so 0.30 puts the bed at about −38.5 dBFS on the
+    // outdoor bus at the water's edge — two and a half decibels above where the
+    // music that used to hold this slot ended up after five goes at getting it
+    // out of everybody's way. Two and a half, because the argument that drove
+    // that number down was that a tune demands to be listened to and a bed
+    // does not; a promenade is the room, not a thing in it.
+    gain: 0.30,
+    inside: 0.27,        // and what an airframe with two turboprops leaves of it
+    lpNear: 4000,        // Hz — the filter as far open as it goes, on the spot
+    lpFar: 750,          // and what a kilometre of sea over water leaves of it
+  };
+  let shoreBuf = null, shoreNodes = null;
+
   /**
    * @param d       metres from the listener to the middle of Jadrija, or null
-   *                for "nowhere near it", which stops the voices
+   *                for "nowhere near it", which stops the bed
    * @param inside  true if the listener is in the aeroplane
    */
-  function klapa(d, inside) {
+  function shore(d, inside) {
     if (!ctx || dead) return;
     // `!(d <= fade)` rather than `d > fade`, because NaN fails both comparisons
     // and would otherwise fall through to the gain ramp below — and a non-finite
     // value handed to setTargetAtTime throws, inside the frame callback, which
     // stops the render loop dead. Whatever produced the NaN, silence is the
     // right answer to it.
-    if (d == null || !(d <= KLAPA.fade)) {
-      if (klapaNodes) klapaNodes.g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.9);
+    if (d == null || !(d <= SHORE.fade)) {
+      if (shoreNodes) shoreNodes.g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.9);
       return;
     }
-    if (!klapaBuf) { klapaLoad(); return; }
+    if (!shoreBuf) { sampleLoad('shore', (b) => { shoreBuf = b; }); return; }
     const t0 = ctx.currentTime;
-    if (!klapaNodes) {
+    if (!shoreNodes) {
       const src = ctx.createBufferSource();
-      src.buffer = klapaBuf;
+      src.buffer = shoreBuf;
       src.loop = true;
-      // Both ends inside the recording rather than at its edges, so the seam
-      // lands in a breath between two phrases instead of on the fade.
-      src.loopStart = 0.8;
-      src.loopEnd = Math.max(2, klapaBuf.duration - 1.2);
+      // Both ends inside the clip rather than at its edges. Half a second is
+      // far more than an MP3 decoder's leading padding, which is a couple of
+      // dozen milliseconds, and it is also the inset the seam was measured at —
+      // so the loop lands where it was chosen to land however many samples of
+      // silence the decoder decided to hand back first.
+      src.loopStart = 0.5;
+      src.loopEnd = Math.max(1, shoreBuf.duration - 0.5);
       const lp = ctx.createBiquadFilter();
-      lp.type = 'lowpass'; lp.frequency.value = KLAPA.lpFar; lp.Q.value = 0.4;
-      // Sea air takes the very bottom out too, and without this the voices
-      // arrive across a kilometre of water sounding like they are underneath it.
-      const hp = ctx.createBiquadFilter();
-      hp.type = 'highpass'; hp.frequency.value = 150;
+      lp.type = 'lowpass'; lp.frequency.value = SHORE.lpFar; lp.Q.value = 0.4;
       const g = ctx.createGain();
       g.gain.value = 0.0001;
-      src.connect(hp).connect(lp).connect(g).connect(outBus);
+      src.connect(lp).connect(g).connect(outBus);
       // And a send that is *heaviest* when you are furthest away, because at a
       // kilometre what reaches you is mostly the hillside behind the resort
-      // rather than the singers.
+      // rather than the people on it.
       let w = null;
       if (verbSend) { w = ctx.createGain(); w.gain.value = 0.5; g.connect(w).connect(verbSend); }
-      src.start(t0, 0.8);
-      klapaNodes = { src, g, lp, w };
+      src.start(t0, 0.5);
+      shoreNodes = { src, g, lp, w };
     }
     // 1 at the resort, 0 at the edge of earshot. Squared, so it is a presence
-    // over most of the channel and a wall of sound only when you are in it.
-    const t = sat((KLAPA.fade - d) / (KLAPA.fade - KLAPA.full));
-    const amp = (inside ? KLAPA.inside : KLAPA.gain) * t * t;
-    const n = klapaNodes;
+    // over most of the channel and the whole world only when you are in it.
+    const t = sat((SHORE.fade - d) / (SHORE.fade - SHORE.full));
+    const amp = (inside ? SHORE.inside : SHORE.gain) * t * t;
+    const n = shoreNodes;
     n.g.gain.setTargetAtTime(Math.max(amp, 0.0001), t0, 0.45);
     n.lp.frequency.setTargetAtTime(
-      KLAPA.lpFar + (KLAPA.lpNear - KLAPA.lpFar) * Math.pow(t, 1.6), t0, 0.5);
+      SHORE.lpFar + (SHORE.lpNear - SHORE.lpFar) * Math.pow(t, 1.6), t0, 0.5);
     if (n.w) n.w.gain.setTargetAtTime(0.12 + 0.55 * (1 - t), t0, 0.5);
+  }
+
+  // ── the water against the edge ──────────────────────────────────────────────
+  /**
+   * The sea working the stone, heard on foot and only on foot.
+   *
+   * There is no sand at Jadrija. The frontage is poured concrete standing about
+   * three quarters of a metre proud of the water, with washed shingle where the
+   * west bay runs in, and the sea goes at all of it all day. Standing on the
+   * promenade that slapping is nearer to you than anything else in the place —
+   * nearer than the people, nearer than the hillside — because it is a few
+   * metres away and directly below.
+   *
+   * So it hangs off the distance to the coastline rather than off the distance
+   * to Jadrija: `shoreAt` is a distance transform of the whole coast and the
+   * edge is the edge wherever you are standing on it. Full level within seven
+   * metres, gone by seventy, which is about where the promenade stops being a
+   * waterfront and starts being a car park.
+   *
+   * On the outdoor bus with everything else at Jadrija, so a shut door takes it
+   * away — which is right, because a shut door is exactly what it is: a hundred
+   * millimetres of render leaves you the body of it and none of its edge, and
+   * the edge is all this is.
+   */
+  const LAP = {
+    full: 7,             // m from the water's edge — standing over it
+    fade: 70,            // and where it stops being part of where you are
+    // lapping.mp3 sits at −24.0 dBFS RMS, so this is about −38 dBFS at the
+    // edge: level with the promenade bed rather than under it, because at four
+    // metres it genuinely is.
+    gain: 0.20,
+  };
+  let lapBuf = null, lapNodes = null;
+
+  /** @param d metres to the water's edge, or null for "not on your feet". */
+  function lapping(d) {
+    if (!ctx) return;
+    if (d == null || !(d <= LAP.fade)) {
+      if (lapNodes) lapNodes.g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.7);
+      return;
+    }
+    if (!lapBuf) { sampleLoad('lapping', (b) => { lapBuf = b; }); return; }
+    const t0 = ctx.currentTime;
+    if (!lapNodes) {
+      const src = ctx.createBufferSource();
+      src.buffer = lapBuf;
+      src.loop = true;
+      src.loopStart = 0.5;
+      src.loopEnd = Math.max(1, lapBuf.duration - 0.5);
+      const g = ctx.createGain();
+      g.gain.value = 0.0001;
+      src.connect(g).connect(outBus);
+      src.start(t0, 0.5);
+      lapNodes = { src, g };
+    }
+    // Linear in distance and not squared. This is a line source — the whole
+    // frontage and forty-two metres of mole, all of it working at once — and a
+    // line falls off as 1/r where a point falls off as 1/r².
+    const t = sat((LAP.fade - d) / (LAP.fade - LAP.full));
+    lapNodes.g.gain.setTargetAtTime(Math.max(LAP.gain * t, 0.0001), t0, 0.35);
+  }
+
+  // ── something going past ────────────────────────────────────────────────────
+  /**
+   * A boat out in the channel, every minute or two, for as long as you are on
+   * your feet within earshot of Jadrija.
+   *
+   * The survey has no boat alongside the mole and no hull inside the swim line
+   * — see the notes in 43-jadrija.js, which is why neither is built — but it
+   * has eleven of them lying to moorings off the west bay, which means the
+   * water in front of this place belongs to people who arrive in one. Nothing
+   * is drawn for this. It is the sound of a channel that is worked, and its
+   * whole job is to be the thing that happens while nothing is happening: a
+   * bed that never changes stops being heard, and the ear will take any
+   * evidence at all that the world did not stop when you did.
+   *
+   * The clip is ten seconds of a diesel with its firing order at 65 Hz and
+   * almost nothing above a kilohertz, which is roughly what is left of an
+   * engine after a few hundred metres of open water — so the recording and the
+   * use happen to match, and no filtering is being asked to invent distance
+   * that is not already in it. Looped for the length of a pass rather than
+   * played once, because a pass is half a minute and this is the cleanest seam
+   * of the five: a hundredth of a decibel and half a decibel of spectrum.
+   *
+   * The pass is four ramps run off the same two landmarks — closest approach at
+   * the halfway mark, gone at the end. Level up and down, the lowpass opening
+   * and closing, the pan crossing, and the playback rate coming down through
+   * it. That last is Doppler, ±2 % for a small boat, which is about a third of
+   * a semitone and is not heard as pitch at all. It is heard as the thing
+   * going past.
+   */
+  const BOAT = {
+    every: [50, 135],    // s between passes, picked afresh each time
+    pass: 26,            // s from first audible to gone
+    // boat.mp3 sits at −20.5 dBFS RMS, so this peaks at about −42 dBFS: under
+    // everything, which is where a boat three hundred metres out belongs.
+    gain: 0.085,
+    lpFar: 260,          // Hz — coming up the channel
+    lpNear: 900,         // and abeam of you
+    doppler: 0.021,
+  };
+  let boatBuf = null, boatAt = 30 + Math.random() * 60, boatEnds = 0;
+
+  function boatTick(dt, afoot) {
+    if (!ctx || !outBus) return;
+    // Counted down whether or not anybody is listening, because a pass that is
+    // already running goes on running when you climb into the aeroplane — the
+    // nodes are scheduled and there is nothing to cancel — and a timer that
+    // stops with it would then hold the next one off for half a minute after
+    // you got out again.
+    boatEnds -= dt;
+    // Two conditions, and the second was an afterthought that turned out to be
+    // the important one. On your feet, because from the aeroplane there are two
+    // turboprops eighteen feet from your head and this is not a sound that
+    // exists — and scheduling it anyway would have a pass start unheard and
+    // arrive halfway through on the frame you climb out.
+    //
+    // And within earshot of Jadrija, which is what the shore bed's own gain
+    // says: `afoot` is also true standing on the apron at Rokići, four
+    // kilometres inland up a hillside, where an outboard going by would be a
+    // remarkable thing. Read off that gain rather than off a distance of its
+    // own because there is only one right answer to "is the player at the
+    // water" and it should only be computed once. 0.03 of 0.30 is about
+    // eleven hundred metres out.
+    if (!afoot || !shoreNodes || shoreNodes.g.gain.value < 0.03) {
+      // And the next one comes twenty seconds after you step back out, rather
+      // than at once — arriving on the frame the mode changes reads as a thing
+      // the game did, not a thing the channel did.
+      boatAt = BOAT.every[0] * 0.4;
+      return;
+    }
+    boatAt -= dt;
+    if (boatAt > 0 || boatEnds > 0) return;
+    if (!boatBuf) { sampleLoad('boat', (b) => { boatBuf = b; }); return; }
+    boatAt = BOAT.every[0] + Math.random() * (BOAT.every[1] - BOAT.every[0]);
+    boatEnds = BOAT.pass;
+    const t0 = ctx.currentTime;
+    const mid = t0 + BOAT.pass * 0.5;
+    const end = t0 + BOAT.pass;
+    const src = ctx.createBufferSource();
+    src.buffer = boatBuf;
+    src.loop = true;
+    src.loopStart = 0.5;
+    src.loopEnd = Math.max(1, boatBuf.duration - 0.5);
+    // No two boats are the same engine, and one that is always the same engine
+    // is one boat going round in circles.
+    const rate = 0.90 + Math.random() * 0.22;
+    src.playbackRate.setValueAtTime(rate * (1 + BOAT.doppler), t0);
+    src.playbackRate.linearRampToValueAtTime(rate * (1 - BOAT.doppler), end);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.Q.value = 0.5;
+    lp.frequency.setValueAtTime(BOAT.lpFar, t0);
+    lp.frequency.linearRampToValueAtTime(BOAT.lpNear, mid);
+    lp.frequency.linearRampToValueAtTime(BOAT.lpFar, end);
+    const pn = ctx.createStereoPanner();
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    pn.pan.setValueAtTime(-0.85 * dir, t0);
+    pn.pan.linearRampToValueAtTime(0.85 * dir, end);
+    const g = ctx.createGain();
+    // Exponentially up and exponentially down, which is what 1/r sounds like
+    // when the thing is moving at a constant speed past a fixed point: almost
+    // nothing for the first half of the approach and then all of it at once.
+    // A linear fade in and out is a boat on a crane.
+    const amp = BOAT.gain * (0.7 + Math.random() * 0.6);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(amp, mid);
+    g.gain.exponentialRampToValueAtTime(0.0001, end);
+    src.connect(lp).connect(pn).connect(g).connect(outBus);
+    src.start(t0);
+    src.stop(end + 0.2);
   }
 
   // ── the transistor set in the kabina ───────────────────────────────────────
   /**
-   * A song out of a small speaker, and the only music in this game that is not
-   * four men from Šolta.
+   * A song out of a small speaker, and the only music in this game — the only
+   * thing in it, now, that somebody wrote rather than something that happened.
    *
    * Synthesised rather than sampled, which here is not the compromise it sounds
    * like. What makes a set like this recognisable is almost none of it being
@@ -1493,7 +1729,9 @@ function buildAudio() {
    * Three stations, because the tuning knob has to be worth turning. They are
    * the three things actually coming out of the air over this coast in August:
    * a klapa, a brass-and-accordion dance number, and something slow at the far
-   * end of the dial that is mostly carrier.
+   * end of the dial that is mostly carrier. All three are melodies written here
+   * out of oscillators and owe nobody a credit; there is no recorded music in
+   * this build at all.
    */
   const DIAL = [
     // [pointer 0..1, seconds a step, [semitones from A3, ...], sustain, timbre]
@@ -1643,7 +1881,7 @@ function buildAudio() {
    * `wet` is 0…1 for being in the water at all, and it only touches the beach.
    * Treading water your ears are two centimetres above a surface that is
    * moving, which means half of every second one of them is under; and the
-   * klapa is coming to you across the water at a grazing angle rather than
+   * promenade is coming to you across the water at a grazing angle rather than
    * down a hillside. Both of those take the top off it long before you dive.
    * So the beach is already going before `sub` has done anything, which is
    * exactly what it sounds like from out there.
@@ -1756,14 +1994,14 @@ function buildAudio() {
     // The beach and the sea are the same weighting they always were, but the
     // wet term now carries nearly all of it. Standing in the shallows with your
     // ears a hand above the surface you are not at a beach any more — the
-    // klapa is coming to you across water at a grazing angle, off a surface
+    // beach is coming to you across water at a grazing angle, off a surface
     // that reflects almost all of it back up the hill, and the half of every
     // second your ears spend under takes the rest. It was audible here and it
     // should not have been.
     // Two surfaces, and they were being added together as if they were one.
     //
     // The first is being in the water at all: your ears are at the waterline,
-    // half of every second one of them is under, and the klapa is arriving
+    // half of every second one of them is under, and the beach is arriving
     // across the water at a grazing angle off a surface that reflects almost
     // all of it back up the hill. That is worth 24 dB and it happens the
     // moment you are in, before you have gone anywhere.
@@ -1784,48 +2022,107 @@ function buildAudio() {
       20000 * Math.pow(500 / 20000, x) * Math.pow(0.22, subV), t, tau);
   }
 
-  /**
-   * Cicadas. Thirty summers of them, and the sound of every August afternoon
-   * on this coast — band-passed noise, amplitude-modulated at the wingbeat.
-   */
   let roomV = 0, subV = 0, wetV = 0;
+
+  /**
+   * Cicadas. Thirty summers of them, and the sound of every August afternoon on
+   * this coast.
+   *
+   * Two clips and not one, because the hillside and the wood on it are not the
+   * same sound and walking from one into the other is one of the two or three
+   * things there are to do at Jadrija. Out on the promenade the chorus is
+   * *behind* you and above you, a hundred metres of pine on a slope, arriving
+   * as one wide thing with no direction in it. Fifteen paces in under the
+   * canopy it is all around your head and individual insects come and go in
+   * it — a different recording, not a louder one, and no filter turns the
+   * first into the second.
+   *
+   * Crossfaded on how much canopy is over you, in square root and not in
+   * proportion, because these are two uncorrelated noise beds: their powers
+   * add where their amplitudes do not, and a linear crossfade between them
+   * sags three decibels in the middle. Which is exactly where you are standing
+   * when you walk into the trees.
+   *
+   * The bandpassed noise this replaces is still here underneath and still gets
+   * used — see `synthCicadas` — because the chorus has to be there on the frame
+   * you step out of the aeroplane and a decode is a frame or two behind that.
+   */
+  const CICADA = {
+    // The caller's gain is a distance-and-canopy weighting that was calibrated
+    // against filtered noise and runs to about 0.05, and a recording is not the
+    // oscillator it replaces. cicadas.mp3 and wood.mp3 are levelled to the same
+    // −25.2 dBFS RMS, so this puts the chorus at about −41 dBFS on the outdoor
+    // bus at full weighting, which is where the bed the beach was mixed around
+    // used to sit. Measured, not judged; it wants an ear.
+    level: 3.2,
+    fade: 0.8,           // s — how fast the wood comes in as you walk into it
+  };
+  let cicadaBuf = null, woodBuf = null;
   let cicadaNodes = null;
-  function cicadas(on, gain = 0.055) {
-    if (!ctx) return;
-    const t0 = ctx.currentTime;
-    if (!on) {
-      if (cicadaNodes) {
-        cicadaNodes.g.gain.setTargetAtTime(0.0001, t0, 0.9);
-        const dead = cicadaNodes;
-        setTimeout(() => { try { dead.src.stop(); } catch (e) { /* gone */ } }, 4000);
-        cicadaNodes = null;
-      }
-      return;
+
+  /** Wind one set of nodes down and let go of it. */
+  function cicadaStop(t0, tau) {
+    if (!cicadaNodes) return;
+    const gone = cicadaNodes;
+    cicadaNodes = null;
+    gone.g.gain.cancelScheduledValues(t0);
+    gone.g.gain.setTargetAtTime(0.0001, t0, tau);
+    setTimeout(() => {
+      for (const s of gone.srcs) { try { s.stop(); } catch (e) { /* gone */ } }
+    }, (tau * 5 + 0.5) * 1000);
+  }
+
+  /** The two recordings, on a crossfade. */
+  function realCicadas(t0) {
+    const g = ctx.createGain();
+    g.gain.value = 0.0001;
+    g.connect(outBus);
+    const srcs = [], mix = [];
+    for (const buf of [cicadaBuf, woodBuf]) {
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      src.loopStart = 0.5;
+      src.loopEnd = Math.max(1, buf.duration - 0.5);
+      const cg = ctx.createGain();
+      cg.gain.value = 0.0001;
+      src.connect(cg).connect(g);
+      // Started at a different place in each clip every session. Both loops are
+      // short and the pair of them would otherwise come round together on the
+      // same beat for as long as the game is open.
+      src.start(t0, 0.5 + Math.random() * (buf.duration - 1.5));
+      srcs.push(src); mix.push(cg);
     }
-    if (cicadaNodes) { cicadaNodes.g.gain.setTargetAtTime(gain, t0, 1.2); return; }
+    return { real: true, g, srcs, openG: mix[0], woodG: mix[1] };
+  }
+
+  /**
+   * The fallback: band-passed noise, amplitude-modulated at the wingbeat.
+   *
+   * Every number here was measured off the recordings that have now replaced
+   * it, which is why it gets as close as it does — and why it never got there.
+   * Two walks through the pines at Jadrija put the chorus at a carrier of
+   * 4 900 to 5 250 Hz with its half-power points at 4 611 and 5 607, a Q of
+   * about five; the clips baked into the payload peak at 5 016 and 5 162 Hz.
+   * The second band is real energy and comes down to a third, because the
+   * 6–12 kHz octave runs eight to ten decibels under the carrier and for
+   * stretches of the second walk is simply not there.
+   *
+   * What none of that gets is that Cicada orni is a *tone* out of an insect and
+   * a hillside of them is thousands of tones that start and stop. Modulated
+   * noise has the spectrum and the beat and no grain, and the ear takes about
+   * four seconds to decide it is listening to a machine.
+   */
+  function synthCicadas(t0, gain) {
     const src = ctx.createBufferSource();
     src.buffer = noiseBuf; src.loop = true;
-    // 5 100 Hz, and narrow.
-    //
-    // Both numbers are off a recording rather than off a memory of one. Two
-    // walks through the pines at Jadrija put the chorus at a carrier of
-    // 4 900 to 5 250 Hz with its half-power points at 4 611 and 5 607 — which
-    // is a Q of about five, not the 2.4 this had, and the difference is
-    // audible: at 2.4 the band is two and a half kilohertz wide and the thing
-    // reads as hiss with a bump in it. Cicada orni is a *tone*.
-    //
-    // The second band stays, because there is real energy up there and a pure
-    // 5 kHz band is a test signal, but it comes down to a third. On the
-    // recordings the 6–12 kHz octave runs eight to ten decibels under the
-    // carrier and for stretches of the second walk it is simply not there.
     const bp = ctx.createBiquadFilter();
     bp.type = 'bandpass'; bp.frequency.value = 5100; bp.Q.value = 4.4;
     const bp2 = ctx.createBiquadFilter();
     bp2.type = 'bandpass'; bp2.frequency.value = 8400; bp2.Q.value = 3.0;
     const bp2g = ctx.createGain(); bp2g.gain.value = 0.34;
     const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.setTargetAtTime(gain, t0, 1.6);
+    g.gain.value = 0.0001;
     // Two modulators beating against each other: a whole hillside of them,
     // never quite in unison.
     for (const [rate, depth] of [[47, 0.55], [39.5, 0.35]]) {
@@ -1839,7 +2136,34 @@ function buildAudio() {
     src.connect(bp2).connect(bp2g).connect(g);
     g.connect(outBus);
     src.start(t0);
-    cicadaNodes = { src, g };
+    return { real: false, g, srcs: [src] };
+  }
+
+  /**
+   * @param on    whether there is a hillside within earshot at all
+   * @param gain  the caller's distance-and-canopy weighting, ~0…0.05
+   * @param wood  how much canopy is over the listener, 0…1
+   */
+  function cicadas(on, gain = 0.055, wood = 0) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    if (!on) { cicadaStop(t0, 0.9); return; }
+    sampleLoad('cicadas', (b) => { cicadaBuf = b; });
+    sampleLoad('wood', (b) => { woodBuf = b; });
+    const have = !!(cicadaBuf && woodBuf);
+    // Half a second is long enough not to be a click and short enough that
+    // nobody hears which of the two hillsides they are standing under. It only
+    // ever happens once, a beat or two after the first frame on foot.
+    if (cicadaNodes && !cicadaNodes.real && have) cicadaStop(t0, 0.5);
+    if (!cicadaNodes) cicadaNodes = have ? realCicadas(t0) : synthCicadas(t0, gain);
+    const n = cicadaNodes;
+    n.g.gain.setTargetAtTime(Math.max((n.real ? gain * CICADA.level : gain), 0.0001),
+      t0, 1.2);
+    if (n.real) {
+      const k = sat(wood);
+      n.openG.gain.setTargetAtTime(Math.max(Math.sqrt(1 - k), 0.0001), t0, CICADA.fade);
+      n.woodG.gain.setTargetAtTime(Math.max(Math.sqrt(k), 0.0001), t0, CICADA.fade);
+    }
   }
 
   /**
@@ -2013,8 +2337,8 @@ function buildAudio() {
       form: 1.0, q: 6.5, wave: 'sine', attack: 0.16, reps: 1, gap: 0, step: 1 },
   };
 
-  // How far down the klapa and the cicadas go while she is making a noise, at
-  // full level. Nine decibels now rather than six — the klapa came down by the
+  // How far down the beach and the cicadas go while she is making a noise, at
+  // full level. Nine decibels now rather than six — the bed came down by the
   // same amount at the same time and this went with it, because the point of
   // the duck is the *ratio* between her and the bed for the fifth of a second
   // she is using, and holding the ratio while lowering both is what keeps the
@@ -2054,25 +2378,19 @@ function buildAudio() {
     cuk: [[1.00, 0.00]],
     wake: [[0.96, 0.00], [1.12, 0.26]],
   };
-  let cukBuf = null, cukTried = false;
+  let cukBuf = null;
 
   // Matched against the 0.400 the oscillator peaked at and then taken up a
   // couple of decibels, because "still too quiet" was the other half of the
-  // complaint and the klapa coming down 6 dB only bought back what it had taken.
+  // complaint and the bed coming down 6 dB only bought back what it had taken.
   const CUK_LEVEL = 0.62;
 
-  /** Lazily, exactly like the klapa, and for the same reason. */
-  function cukLoad() {
-    if (cukTried || !ctx || typeof PAYLOAD === 'undefined' || !PAYLOAD.cuk) return;
-    cukTried = true;
-    try {
-      const bin = atob(PAYLOAD.cuk);
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      ctx.decodeAudioData(bytes.buffer, (buf) => { cukBuf = buf; },
-        () => { /* undecodable — the oscillator below still answers */ });
-    } catch (e) { /* likewise */ }
-  }
+  /**
+   * Lazily, through the same loader as the five beds, and for the same reason:
+   * an owl nobody walks past is 2.8 KB nobody has to decode. If it never comes
+   * back the oscillator below still answers.
+   */
+  const cukLoad = () => sampleLoad('cuk', (buf) => { cukBuf = buf; });
 
   /**
    * @returns the length of the utterance, or 0 if there is no sample to play
@@ -2123,12 +2441,12 @@ function buildAudio() {
     const samp = sampled(kind, g0, at, pn);
     if (bed) {
       // The whole utterance, not one syllable — the trill is four of them and
-      // ducking for the first would leave the other three under the singers.
+      // ducking for the first would leave the other three under the beach.
       const span = samp || v.reps * v.dur + (v.reps - 1) * v.gap;
       bed.gain.cancelScheduledValues(at);
       // Clamped separately from `g0`, which now runs to 1.8: at anything over
       // 1.5 this expression goes negative, and a negative gain is not a quiet
-      // klapa, it is the klapa with its phase flipped.
+      // bed, it is the bed with its phase flipped.
       bed.gain.setTargetAtTime(1 - (1 - BED_DUCK) * clamp(g0, 0, 1), at, 0.035);
       bed.gain.setTargetAtTime(1, at + span + 0.10, 0.28);
     }
@@ -2196,6 +2514,9 @@ function buildAudio() {
     fireTick(dt);
     radioTick();
     bubbleTrain(dt);
+    // Likewise above the gate, and for the same reason: a boat in the channel
+    // is nobody's aeroplane's business.
+    boatTick(dt, !!s.afoot);
     // `dead` means your aeroplane is over. It used to mean the mixer was
     // switched off, and conflating those two is the whole of "the water only
     // hisses if I arrive by the 9 key".
@@ -2450,7 +2771,8 @@ function buildAudio() {
      */
     tap: () => (ctx ? { ctx, out: outTap } : null),
     setVolume, getVolume, setMuffle, keyClick, printTick,
-    setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas, klapa, room, water,
+    setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas,
+    shore, lapping, room, water,
     firestarter, slowmo, radioTune, radioClick,
     /** Where the pointer sits for each station, so the dial can be drawn. */
     radioDial: () => DIAL.map((d) => d.f),
@@ -2497,22 +2819,40 @@ function buildAudio() {
     }),
     /** Likewise for the ćuk, which is the second sample in the build. */
     cukStats: () => ({
-      tried: cukTried,
+      tried: sampleTried.has('cuk'),
       loaded: !!cukBuf,
       secs: cukBuf ? +cukBuf.duration.toFixed(3) : 0,
       rate: cukBuf ? cukBuf.sampleRate : 0,
       hose: nodes.hose ? +nodes.hose.g.gain.value.toFixed(4) : -1,
     }),
-    /** For a test: did the one sample in the build decode, and what is it doing? */
-    klapaStats: () => ({
+    /**
+     * For a test: which of the five field recordings decoded, and what are the
+     * beds built out of them doing?
+     *
+     * Every one of them fails silently by design, which is right for a game and
+     * useless for finding out why Jadrija is quiet. `tried` says the payload
+     * had the clip and the decoder was handed it; `loaded` says it came back.
+     * A key that is tried and not loaded is a decoder that would not take the
+     * file; a key in neither is a clip the payload was never built with.
+     */
+    shoreStats: () => ({
       state: ctx ? ctx.state : 'no ctx',
-      tried: klapaTried,
-      loaded: !!klapaBuf,
-      secs: klapaBuf ? +klapaBuf.duration.toFixed(2) : 0,
-      rate: klapaBuf ? klapaBuf.sampleRate : 0,
-      playing: !!klapaNodes,
-      gain: klapaNodes ? +klapaNodes.g.gain.value.toFixed(4) : 0,
-      lp: klapaNodes ? Math.round(klapaNodes.lp.frequency.value) : 0,
+      tried: [...sampleTried],
+      loaded: { shore: !!shoreBuf, cicadas: !!cicadaBuf, wood: !!woodBuf,
+        lapping: !!lapBuf, boat: !!boatBuf },
+      secs: shoreBuf ? +shoreBuf.duration.toFixed(2) : 0,
+      rate: shoreBuf ? shoreBuf.sampleRate : 0,
+      playing: !!shoreNodes,
+      gain: shoreNodes ? +shoreNodes.g.gain.value.toFixed(4) : 0,
+      lp: shoreNodes ? Math.round(shoreNodes.lp.frequency.value) : 0,
+      lap: lapNodes ? +lapNodes.g.gain.value.toFixed(4) : 0,
+      cicada: cicadaNodes ? {
+        real: cicadaNodes.real,
+        gain: +cicadaNodes.g.gain.value.toFixed(4),
+        wood: cicadaNodes.real ? +cicadaNodes.woodG.gain.value.toFixed(3) : 0,
+      } : null,
+      boatIn: +boatAt.toFixed(1),
+      boatFor: +Math.max(0, boatEnds).toFixed(1),
     }),
     birdCall, squeak, radalt, gpwsSink, gpwsPullUp, hullSlam, impact, boom, kill,
     get ctx() { return ctx; } };

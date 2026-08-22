@@ -1598,6 +1598,23 @@ async function buildGround(scene, field) {
 
   // ── the loop ───────────────────────────────────────────────────────────────
   function update(dt) {
+    // The sea against the concrete edge — see `lapping` in src/80-audio.js.
+    // Driven from here rather than from the frame loop because it is the one
+    // bed at Jadrija that follows your feet and not the camera: it is four
+    // metres below you and directly beneath, so what sets it is where you are
+    // standing and never where you are looking from.
+    //
+    // Off `shoreAt`, which is the distance transform of the whole coastline
+    // rather than anything that knows about Jadrija. The frontage is half a
+    // kilometre of poured edge and forty-two metres of mole and the water goes
+    // at all of it at once, so the edge is the edge wherever you are on it, and
+    // a bed hung off the distance to one named point would be loudest in the
+    // car park.
+    //
+    // Null while the mode is not driving anybody, which includes swimming: the
+    // swimmer's position lives in 59-swim.js and out there the sea has taken
+    // the outdoor bus 24 dB down anyway.
+    audio.lapping(active ? shoreAt(you.x, you.z) : null);
     // The field burns whether or not anybody is standing in it. Leaving this
     // gated on the ground phase would mean an airfield that only ever caught
     // fire while you were watching, which is the kind of thing you can feel.
