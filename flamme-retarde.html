@@ -13619,6 +13619,14 @@ async function buildJadrija(scene) {
   // this prevents, and both of them look like a bug rather than like furniture.
   const clearOfShops = (t) => !SHOPS.some((S) => t > S.t0 - 2.5 && t < S.t1 + 2.5);
 
+  // Hoisted, and this is the third time this file has taught the same lesson.
+  // The playground is BUILT down beside the wood, but the car loop and the
+  // tree loop both have to keep out of it and both of them run earlier — so a
+  // `const` declared at the build site is in the temporal dead zone when they
+  // read it, the whole resort throws, and the only symptom is a page that
+  // never finishes loading. See the note on `facing`.
+  const PLAY = { t0: 157, t1: 176, s0: 28.9, s1: 37.4 };
+
   /**
    * A painted sign, on a canvas.
    *
@@ -16255,6 +16263,10 @@ async function buildJadrija(scene) {
       // exact failure the 38 m rule was written down for. One nose-in row on
       // the lane's seaward side is what fits, and it fits with its tail at
       // 35.5 rather than with its nose there.
+      // Not inside the playground railing. The car loop starts at
+      // `beachTo - 40` = 165, which is the middle of the compound, and three
+      // of them were standing on the turf with the swing frame over them.
+      if (t > PLAY.t0 - 3 && t < PLAY.t1 + 3) continue;
       const s0 = JAD.rowB + 5.0 + jit(t | 0, 23) * 1.4;
       const y = surfaceY(t, s0 + 2.0);
       const col = PAINT[((jit(t | 0, 24) * 97) | 0) % PAINT.length];
@@ -16586,6 +16598,217 @@ async function buildJadrija(scene) {
   // because it takes salt and nothing eats it; agave on the rough slope past the
   // concrete, which is exactly where it grows without being planted.
   const greens = [];
+  // ── the playground ─────────────────────────────────────────────────────────
+  //
+  // a_160 films it from the top of the approach lane: a fenced compound on the
+  // inland side, green artificial turf inside a dark green tubular railing,
+  // and a climbing frame in blue steel with a red slide off it — orange, blue,
+  // green and red, all of it, against the one green pad in five hundred metres
+  // of limestone. It is the loudest object on the approach and the game had
+  // nothing there.
+  //
+  // The railing in the frame is not mesh. It is tube: a top rail, a bottom
+  // rail, uprights at a hand's width, and a row of loops welded along the foot
+  // — the standard Croatian municipal park railing, and the loops are the half
+  // of it anybody would recognise.
+  {
+    const back8 = b;
+    const GRN = [0.055, 0.230, 0.130];        // the railing
+    const TURF = [0.130, 0.330, 0.145];
+    const BLUE = [0.075, 0.235, 0.520];
+    const RED = [0.560, 0.115, 0.085];
+    const YEL = [0.640, 0.500, 0.075];
+    const ORA = [0.640, 0.320, 0.060];
+    // The ground here, and not `surfaceY`.
+    //
+    // `surfaceY` returns the promenade deck for anything inside s = 33.1 and
+    // only starts blending to the hill past that. Out at the west end the hill
+    // has already come up by then, so a pad laid on `surfaceY` at s 29 is
+    // laid a metre and a half UNDER the wood — which is where the first turf
+    // went, visible only as a green sliver where the camera looked down a
+    // slope. The higher of the two is what "on the ground" means out here.
+    const yg = (t, s) => {
+      const st = at(t);
+      return Math.max(surfaceY(t, s),
+        groundAt(st.x + st.nx * s, st.z + st.nz * s));
+    };
+
+    // The pad. Turf inside, and the limestone gravel apron the frame's feet
+    // are actually bedded in.
+    b = deck;
+    for (let t = PLAY.t0; t < PLAY.t1; t += 2.2) {
+      const t1 = Math.min(t + 2.2, PLAY.t1);
+      for (let k = 0; k < 3; k++) {
+        const a0 = PLAY.s0 + (PLAY.s1 - PLAY.s0) * (k / 3);
+        const a1 = PLAY.s0 + (PLAY.s1 - PLAY.s0) * ((k + 1) / 3);
+        const g = 0.94 + 0.12 * ((jit(t | 0, 90 + k) * 5) | 0) / 4;
+        b.quad(W(t, a0, yg(t, a0) + 0.04), W(t1, a0, yg(t1, a0) + 0.04),
+          W(t1, a1, yg(t1, a1) + 0.04), W(t, a1, yg(t, a1) + 0.04),
+          [TURF[0] * g, TURF[1] * g, TURF[2] * g]);
+      }
+    }
+    b = up;
+
+    // The railing. Posts, two rails, uprights, and the loops.
+    const rail = (t0, t1, s, gapT) => {
+      const h = 1.06;
+      for (let t = t0; t <= t1 + 0.01; t += 2.4) {
+        if (gapT && Math.abs(t - gapT) < 1.5) continue;
+        post(W, t, s, yg(t, s) - 0.2, yg(t, s) + h + 0.06, 0.045, GRN, 6);
+      }
+      for (const yy of [0.30, h]) {
+        for (let t = t0; t < t1; t += 1.2) {
+          const t1b = Math.min(t + 1.2, t1);
+          if (gapT && t > gapT - 1.5 && t < gapT + 1.5) continue;
+          boxTS(t, t1b, s - 0.028, s + 0.028,
+            yg(t, s) + yy - 0.028, yg(t, s) + yy + 0.028, GRN);
+        }
+      }
+      for (let t = t0 + 0.12; t < t1; t += 0.145) {
+        if (gapT && t > gapT - 1.5 && t < gapT + 1.5) continue;
+        boxTS(t - 0.016, t + 0.016, s - 0.016, s + 0.016,
+          yg(t, s) + 0.30, yg(t, s) + h, GRN);
+      }
+      // The loop row: a half-round in each bay, standing on the bottom rail.
+      for (let t = t0 + 0.6; t < t1 - 0.3; t += 1.2) {
+        if (gapT && t > gapT - 1.5 && t < gapT + 1.5) continue;
+        const y = yg(t, s);
+        for (let i = 0; i < 7; i++) {
+          const a0 = Math.PI * (i / 7), a1 = Math.PI * ((i + 1) / 7);
+          const R = 0.30;
+          boxTS(t + Math.cos(a0) * R - 0.02, t + Math.cos(a0) * R + 0.02,
+            s - 0.02, s + 0.02,
+            y + 0.30 - Math.sin(a0) * R * 0.0,
+            y + 0.30 - 0.0, GRN);
+          b.quad(W(t + Math.cos(a0) * R, s - 0.022, y + 0.30 - Math.sin(a0) * R),
+            W(t + Math.cos(a1) * R, s - 0.022, y + 0.30 - Math.sin(a1) * R),
+            W(t + Math.cos(a1) * R, s + 0.022, y + 0.30 - Math.sin(a1) * R),
+            W(t + Math.cos(a0) * R, s + 0.022, y + 0.30 - Math.sin(a0) * R), GRN);
+        }
+      }
+    };
+    const railS = (s0, s1, t) => {
+      const h = 1.06;
+      for (let s = s0; s <= s1 + 0.01; s += 2.4) {
+        post(W, t, s, yg(t, s) - 0.2, yg(t, s) + h + 0.06, 0.045, GRN, 6);
+      }
+      for (const yy of [0.30, h]) {
+        boxTS(t - 0.028, t + 0.028, s0, s1,
+          yg(t, s0) + yy - 0.028, yg(t, s0) + yy + 0.028, GRN);
+      }
+      for (let s = s0 + 0.12; s < s1; s += 0.145) {
+        boxTS(t - 0.016, t + 0.016, s - 0.016, s + 0.016,
+          yg(t, s) + 0.30, yg(t, s) + h, GRN);
+      }
+    };
+    rail(PLAY.t0, PLAY.t1, PLAY.s0, PLAY.t0 + 5.5);
+    rail(PLAY.t0, PLAY.t1, PLAY.s1, null);
+    railS(PLAY.s0, PLAY.s1, PLAY.t0);
+    railS(PLAY.s0, PLAY.s1, PLAY.t1);
+
+    // The climbing frame. Four blue legs, a deck at 1.30, a red pitched roof
+    // over it, a ladder up one side and the slide off the other.
+    const ct = PLAY.t0 + 8.5, cs = PLAY.s0 + 3.2;
+    const cy = yg(ct, cs);
+    for (const [ot, os] of [[-0.85, -0.85], [0.85, -0.85], [-0.85, 0.85], [0.85, 0.85]]) {
+      post(W, ct + ot, cs + os, cy - 0.25, cy + 2.34, 0.058, BLUE, 6);
+    }
+    boxTS(ct - 0.92, ct + 0.92, cs - 0.92, cs + 0.92, cy + 1.24, cy + 1.32,
+      YEL, [0.700, 0.560, 0.110]);
+    // The rails round three sides of the deck, so it is a platform and not a
+    // shelf.
+    for (const [a, c, s0, s1] of [[ct - 0.92, ct + 0.92, cs - 0.92, cs - 0.86],
+      [ct - 0.92, ct - 0.86, cs - 0.92, cs + 0.92],
+      [ct + 0.86, ct + 0.92, cs - 0.92, cs + 0.92]]) {
+      boxTS(a, c, s0, s1, cy + 1.32, cy + 1.86, ORA, shade(ORA, 1.10));
+    }
+    frustumTS(cy + 2.34, [ct, cs, 1.06, 1.06], cy + 2.86, [ct, cs, 0.10, 0.10],
+      RED, shade(RED, 1.12));
+    // The ladder, on the inland face.
+    for (const o of [-0.34, 0.34]) {
+      post(W, ct + o, cs + 1.55, cy, cy + 1.34, 0.035, GRN, 5);
+    }
+    for (let i = 0; i < 4; i++) {
+      const yy = cy + 0.28 + i * 0.30;
+      boxTS(ct - 0.36, ct + 0.36, cs + 1.50, cs + 1.60, yy, yy + 0.05, YEL);
+    }
+    boxTS(ct - 0.38, ct + 0.38, cs + 0.90, cs + 1.58, cy + 1.30, cy + 1.36,
+      shade(YEL, 0.92));
+    // The slide: a bed falling from the deck to the turf, with a rail either
+    // side and a kick at the bottom. Quads, because a box cannot fall.
+    {
+      const sa = cs - 0.90, sb = cs - 3.30;
+      const ya = cy + 1.26, yb = cy + 0.30;
+      const q = (o0, o1, col) => b.quad(
+        W(ct + o0, sa, ya), W(ct + o1, sa, ya),
+        W(ct + o1, sb, yb), W(ct + o0, sb, yb), col);
+      q(-0.34, 0.34, RED);
+      for (const o of [-0.36, 0.36]) {
+        b.quad(W(ct + o, sa, ya), W(ct + o, sa, ya + 0.22),
+          W(ct + o, sb, yb + 0.22), W(ct + o, sb, yb), shade(RED, 0.88));
+        b.quad(W(ct + o, sb, yb), W(ct + o, sb, yb + 0.22),
+          W(ct + o, sa, ya + 0.22), W(ct + o, sa, ya), shade(RED, 1.10));
+      }
+      boxTS(ct - 0.38, ct + 0.38, sb - 0.55, sb + 0.02, cy + 0.24, cy + 0.32,
+        RED, shade(RED, 1.14));
+      for (const o of [-0.30, 0.30]) {
+        post(W, ct + o, sb - 0.30, cy, cy + 0.26, 0.035, BLUE, 5);
+      }
+    }
+    // The monkey bars, running off the frame to a second pair of legs.
+    {
+      const mt = ct + 3.4;
+      for (const os of [-0.62, 0.62]) {
+        post(W, mt, cs + os, cy - 0.25, cy + 2.10, 0.052, BLUE, 6);
+        boxTS(ct + 0.85, mt, cs + os - 0.035, cs + os + 0.035,
+          cy + 2.02, cy + 2.10, GRN);
+      }
+      for (let t = ct + 1.15; t < mt; t += 0.36) {
+        boxTS(t - 0.022, t + 0.022, cs - 0.64, cs + 0.64,
+          cy + 2.02, cy + 2.06, YEL);
+      }
+    }
+
+    // The swing frame: two A-legs, a top bar and two seats on chains.
+    {
+      const st = PLAY.t1 - 4.6, ss = PLAY.s0 + 4.6, sy = yg(st, ss);
+      for (const ot of [-1.55, 1.55]) {
+        for (const os of [-0.95, 0.95]) {
+          frustumTS(sy - 0.2, [st + ot + (os > 0 ? 0.02 : -0.02), ss + os, 0.05, 0.05],
+            sy + 2.24, [st + ot, ss, 0.045, 0.045], BLUE);
+        }
+      }
+      boxTS(st - 1.70, st + 1.70, ss - 0.055, ss + 0.055,
+        sy + 2.20, sy + 2.30, GRN, shade(GRN, 1.14));
+      for (const ot of [-0.72, 0.72]) {
+        for (const o2 of [-0.19, 0.19]) {
+          post(W, st + ot + o2, ss, sy + 0.56, sy + 2.20, 0.012,
+            [0.480, 0.484, 0.480], 4);
+        }
+        boxTS(st + ot - 0.24, st + ot + 0.24, ss - 0.10, ss + 0.10,
+          sy + 0.52, sy + 0.58, ot < 0 ? RED : YEL);
+      }
+    }
+
+    // A spring rider, which is the one thing on a Croatian park pad that is
+    // never the same twice and is always yellow.
+    {
+      const rt = PLAY.t0 + 3.2, rs = PLAY.s0 + 6.4, ry = yg(rt, rs);
+      post(W, rt, rs, ry, ry + 0.40, 0.075, [0.500, 0.505, 0.500], 6);
+      boxTS(rt - 0.62, rt + 0.62, rs - 0.20, rs + 0.20, ry + 0.40, ry + 0.62,
+        YEL, shade(YEL, 1.10));
+      boxTS(rt - 0.10, rt + 0.10, rs - 0.30, rs + 0.30, ry + 0.62, ry + 0.94,
+        ORA);
+      boxTS(rt - 0.26, rt + 0.26, rs - 0.10, rs + 0.10, ry + 0.88, ry + 0.94,
+        [0.500, 0.505, 0.500]);
+    }
+
+    // And a bench inside the railing, facing the frame, because somebody has
+    // to sit there for two hours.
+    solid(PLAY.t0 + 13.5, PLAY.s1 - 1.4, 0, [0.330, 0.145, 0.095], 0.9);
+    b = back8;
+  }
+
   // The stand behind the promenade, which the second walk-through films from
   // the inside and which was, until now, a hedge.
   //
@@ -16609,6 +16832,10 @@ async function buildJadrija(scene) {
       // s 59, which is well into the OSM footprints, and a pine growing up
       // through a roof is the same bug as a car parked in a hall.
       const s = JAD.rowB + 2.2 + row * 3.4 + rng() * 3.0;
+      // Not inside the playground railing either — a pine growing up through
+      // the climbing frame is the same bug as one growing through a roof.
+      if (t > PLAY.t0 - 1.5 && t < PLAY.t1 + 1.5
+        && s > PLAY.s0 - 1.5 && s < PLAY.s1 + 1.5) continue;
       // Not through the vikendica, which stands out here now and is 6.8 by 7.7
       // of the strip these were planted along.
       if (Math.hypot(t - VIK.t, s - VIK.s) < 8.5) continue;
