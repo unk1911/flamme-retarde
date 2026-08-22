@@ -2494,7 +2494,22 @@ async function buildJadrija(scene) {
       { name: 'Lubenica', col: [0.860, 0.490, 0.445], rib: null },
       { name: 'Mango', col: [0.835, 0.755, 0.340], rib: null },
       { name: 'Zelena Jabuka', col: [0.490, 0.680, 0.310], rib: null },
-      { name: null, col: [0.830, 0.775, 0.680], rib: [0.490, 0.330, 0.180] },
+      // Bounty, and the only name in this table that was not read off a
+      // plaque. The card is turned away in every frame; Misha named it from
+      // standing there, which is better evidence than a photograph and is the
+      // one kind of source that outranks the rule about not inventing names.
+      // The colour and the ribbon are unchanged — cream with a dark swirl is
+      // what the pan is in `selection-2`, and coconut with chocolate through it
+      // is what Bounty is, so nothing had to be bent to fit.
+      //
+      // `off` shifts the plaque a third of a bay along so it does not stand in
+      // front of "Jogurt Šumsko voće" behind it. That one is the only two-line
+      // plaque in the case and therefore the only one that hangs low enough for
+      // a front-row card at the same `t` to cut into it — every other pair
+      // clears on the 0.14 m of height between the rows. Still over its own
+      // pan: a third of a bay is 0.15 m and the pan is three times that.
+      { name: 'Bounty', col: [0.830, 0.775, 0.680], rib: [0.490, 0.330, 0.180],
+        off: -0.32 },
       { name: 'Cookies', col: [0.810, 0.745, 0.640], rib: [0.180, 0.125, 0.095] },
       // Pale blue, and the plaque is under the promenade's reflection in both
       // frames that reach it. Blue ice cream on this coast is one of three
@@ -2829,7 +2844,7 @@ async function buildJadrija(scene) {
     const plaques = (list, sPl, yPl, sClip, yClip) => {
       list.forEach((F, k) => {
         if (!F.name) return;
-        const ct = t0Pan + k * BAY + BAY * 0.5;
+        const ct = t0Pan + k * BAY + BAY * (0.5 + (F.off || 0));
         post(W, ct, sClip, yClip, yPl - 0.045, 0.006, [0.600, 0.606, 0.600], 4);
         seaFacing(flavourPlaque(F.name), ct, sPl, yPl, 0.24, 0.105,
           'slast:plaque:' + F.name);
