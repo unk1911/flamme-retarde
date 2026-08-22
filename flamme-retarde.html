@@ -14890,6 +14890,142 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * The fish on the sanitary block.
+   *
+   * 175447 catches it side-on from the plaza and 175149 has it again from the
+   * lane: a fat yellow fish with a crown on its head, painted on the pink
+   * render beside a green door. It is somebody's, it is signed in the corner,
+   * and it is the only thing on that whole elevation that anybody looks at.
+   *
+   * Painted the way `gullMural` is painted, and for the same reasons: on
+   * transparent ground so what shows between the strokes is the render with
+   * the render's own weather on it, in two passes with the second thinned and
+   * offset, and with a scatter of the wall's colour dabbed back over at the
+   * end. A clean vector fish is clip art. This is a fish somebody did with a
+   * tin of yellow and half an hour.
+   */
+  function fishMural() {
+    const W = 768, H = 768;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    let seed = 19220701;
+    const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff)
+      / 0x7fffffff;
+
+    const YEL = ['#e8c032', '#d9ae22', '#f0cd48', '#c99a1c'];
+    const INK = 'rgba(96, 72, 30, 0.82)';
+
+    // The body: an egg lying on its side, drawn as a closed curve with the
+    // radius wobbling, so no two summers of it are the same shape.
+    const body = (cx, cy, rx, ry, fill, jitter) => {
+      g.beginPath();
+      for (let i = 0; i <= 48; i++) {
+        const a = (i / 48) * Math.PI * 2;
+        const w = 1 + (rnd() - 0.5) * jitter;
+        const x = cx + Math.cos(a) * rx * w;
+        const y = cy + Math.sin(a) * ry * w;
+        if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+      }
+      g.closePath();
+      g.fillStyle = fill;
+      g.fill();
+    };
+
+    // Two passes. The under-pass is wider and darker and shows at the edges
+    // the way a second coat that was not quite laid over the first does.
+    body(400, 400, 214, 168, YEL[3], 0.055);
+    body(396, 396, 206, 160, YEL[0], 0.045);
+    body(388, 384, 168, 122, YEL[2], 0.05);
+
+    // The tail, two strokes off the back.
+    g.fillStyle = YEL[1];
+    g.beginPath();
+    g.moveTo(196, 400); g.lineTo(64, 300); g.lineTo(96, 404);
+    g.lineTo(60, 508); g.closePath(); g.fill();
+    g.fillStyle = YEL[3];
+    g.beginPath();
+    g.moveTo(200, 404); g.lineTo(78, 322); g.lineTo(104, 402); g.closePath();
+    g.fill();
+
+    // Dorsal spines and the pelvic fin.
+    g.fillStyle = YEL[1];
+    for (let i = 0; i < 5; i++) {
+      const x = 330 + i * 46;
+      g.beginPath();
+      g.moveTo(x, 268 + i * 4); g.lineTo(x + 18, 214 + i * 10);
+      g.lineTo(x + 40, 262 + i * 5); g.closePath(); g.fill();
+    }
+    g.beginPath();
+    g.moveTo(360, 540); g.lineTo(408, 604); g.lineTo(452, 534); g.closePath();
+    g.fill();
+
+    // The crown. Three points and a band, sitting on top and slightly askew,
+    // which is the whole joke of the thing.
+    g.save();
+    g.translate(452, 236); g.rotate(-0.16);
+    g.fillStyle = YEL[0];
+    g.beginPath();
+    g.moveTo(-84, 4);
+    g.lineTo(-64, -62); g.lineTo(-34, -14); g.lineTo(0, -78);
+    g.lineTo(34, -14); g.lineTo(64, -62); g.lineTo(84, 4);
+    g.closePath(); g.fill();
+    g.fillStyle = YEL[3];
+    g.fillRect(-86, 2, 172, 22);
+    g.restore();
+
+    // The eye: a ring, a pupil, and a highlight put in with the corner of the
+    // brush.
+    g.fillStyle = '#f6ecd4'; g.beginPath();
+    g.arc(516, 374, 44, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#2b2418'; g.beginPath();
+    g.arc(524, 378, 22, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.75)'; g.beginPath();
+    g.arc(514, 366, 7, 0, Math.PI * 2); g.fill();
+
+    // The mouth, the gill, and the outline — all one loose line.
+    g.strokeStyle = INK; g.lineCap = 'round'; g.lineJoin = 'round';
+    g.lineWidth = 9;
+    g.beginPath(); g.moveTo(576, 424); g.quadraticCurveTo(600, 444, 570, 462);
+    g.stroke();
+    g.lineWidth = 7;
+    g.beginPath(); g.moveTo(452, 306); g.quadraticCurveTo(430, 400, 456, 494);
+    g.stroke();
+    g.lineWidth = 8;
+    g.beginPath();
+    for (let i = 0; i <= 40; i++) {
+      const a = (i / 40) * Math.PI * 2;
+      const w = 1 + (rnd() - 0.5) * 0.05;
+      const x = 396 + Math.cos(a) * 208 * w, y = 396 + Math.sin(a) * 162 * w;
+      if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+    }
+    g.stroke();
+
+    // Spots, and then the wall dabbed back over the top of all of it.
+    g.fillStyle = 'rgba(150, 112, 34, 0.35)';
+    for (let i = 0; i < 22; i++) {
+      const a = rnd() * Math.PI * 2, r = rnd() * 0.8;
+      g.beginPath();
+      g.arc(392 + Math.cos(a) * 180 * r, 396 + Math.sin(a) * 138 * r,
+        6 + rnd() * 13, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 260; i++) {
+      const x = rnd() * W, y = rnd() * H;
+      g.globalAlpha = 0.05 + rnd() * 0.16;
+      g.beginPath(); g.arc(x, y, 2 + rnd() * 11, 0, Math.PI * 2); g.fill();
+    }
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = 'source-over';
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    return tex;
+  }
+
+  /**
    * And hanging it: a quad six millimetres off the render, lit like everything
    * else and transparent everywhere the brush did not go.
    *
@@ -16932,6 +17068,26 @@ async function buildJadrija(scene) {
     }
     post(W, SAN.t1 - 0.6, SAN.s1 + 0.14, y - 0.3, y + 2.60, 0.055,
       [0.400, 0.396, 0.386], 7);
+
+    // The fish. Hung the way `endMural` hangs the gull — a quad a few
+    // millimetres off the render with the paint's own alpha — and rotated the
+    // way `shopSign` is, because this is a face across the shore and not a
+    // gable along it.
+    {
+      const ft = 348.35, fs = SAN.s0 + 0.55;
+      const st = at(ft), p = W(ft, fs - 0.008, y + 1.16);
+      const mw = 1.55;
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(mw, mw),
+        solidMaterial(0xffffff, {
+          spec: 0.02, vcol: false, transparent: true, depthWrite: false,
+          decl: 'uniform sampler2D uMuralMap;',
+          body: 'vec4 mu = texture2D(uMuralMap, vUv);\nbase = mu.rgb;\nalpha = mu.a;',
+          uniforms: { uMuralMap: { value: fishMural() } },
+        }));
+      mesh.position.set(p[0], p[1], p[2]);
+      mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
+      scene.add(mesh);
+    }
 
     runs.push({ t0: SAN.t0 - 0.4, t1: SAN.t1 + 0.4, s0: SAN.s0 - 0.4,
       s1: SAN.s1 + 0.4, y, h: 2.7 });
