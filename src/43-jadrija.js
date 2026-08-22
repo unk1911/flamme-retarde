@@ -4249,7 +4249,17 @@ async function buildJadrija(scene) {
     // always a little air going through it. Small — this is what stops the
     // thing reading as a painted board when nobody has touched it for a while.
     stir: 0.020,
-    din: 0.55,             // rad/s of total movement that counts as a rattle
+    // rad/s of mean movement that counts as a rattle. 0.55 was set by eye and
+    // it sat too near the top of what a crossing makes. Measured through the
+    // solver: a walk at 3.4 m/s dead through the middle of the doorway peaks at
+    // 1.07, and one 0.7 m off centre — still inside the opening — peaks at
+    // 0.59. So the loudest thing the curtain ever does cleared the bar by a
+    // factor of two and everything either side of that cleared it by nothing,
+    // which came out as four taps and then silence while the strands were
+    // plainly still swinging. 0.30 is under the quiet half of a crossing and
+    // still six times the 0.04 the draught alone reaches, which is the gap the
+    // number has to sit in.
+    din: 0.30,
   };
 
   /**
@@ -4468,16 +4478,85 @@ async function buildJadrija(scene) {
     /**
      * @param t,s  where you are, in the resort's frame
      * @param d    how far away you are, for the sound and for the gate
+     * @param y    and how high, world frame — or null for "do not ask"
+     *
+     * `d` is measured flat, in (t, s), because everything else here is: it is
+     * the gate on the solver and the range on the sound and neither wants a
+     * height in it. But a Canadair passing over the kabine is at (t, s) zero
+     * from this doorway too, and the crossing test below is deliberately a test
+     * of the *segment* you moved along — which is exactly what a hundred metres
+     * of aeroplane a frame does. So the height is asked for as well, and the
+     * only thing it is used for is to say that you are in the opening rather
+     * than over the roof of it. `null` skips the question, for the debug hook,
+     * which drives the curtain with no camera at all.
      */
-    function step(t, s, d, dt) {
+    function step(t, s, d, dt, y = null) {
       if (d > 26) { prevT = prevS = null; return 0; }
+      // In the doorway, vertically. This is not a fit — it is a test for "on
+      // the ground here" against "over the top of the row", and the two are
+      // tens of metres apart, so it is drawn wide on purpose. A walker's eye is
+      // 1.62 m up a 1.98 m opening, and the ground in front of the kabine is
+      // not level with their floor; a gate cut close to the head of the opening
+      // would turn a slope of a foot into silence.
+      const inHole = y == null || (y < yTop + 1.2 && y > yTop - 3.4);
       const h = Math.min(dt, 0.05);
       const vs = prevS == null ? 0 : (s - prevS) / h;
       const vt = prevT == null ? 0 : (t - prevT) / h;
+      const wasS = prevS, wasT = prevT;
       prevT = t; prevS = s;
       // Are you in the doorway at all. Half a metre either side of the strands,
       // which is a shoulder and an arm.
-      const through = s > sHang - 0.55 && s < sHang + 0.55;
+      const through = inHole && s > sHang - 0.55 && s < sHang + 0.55;
+
+      /**
+       * The crossing itself.
+       *
+       * Contact above is a *contact* model and it was the whole model, which
+       * left the one moment anybody would call "going through the beads" with
+       * no sound of its own at all. Two things conspire in that. The tail is
+       * driven off the mean angular rate across forty-five strands, and a
+       * walker is a point 0.72 m wide against a doorway 1.45 m wide, so half
+       * the curtain never moves and the mean is diluted by the half that does
+       * not — which is why the threshold above had to come down. And the
+       * doorway is a *cut*: crossing the wall
+       * plane at s = K.face fades the screen and stands you at K.standIn, 2.4 m
+       * inside — so on the way in you get within seven centimetres of the
+       * strands and are then taken away from them, and the loud middle of the
+       * crossing, the part where a hundred beads leave the frame at once, never
+       * happens in the solver to be heard.
+       *
+       * So test the *segment* you moved along this frame rather than where you
+       * ended it, the same way the threshold upstairs does. Walking out, that
+       * segment is a real 6 cm step through the strands; walking in, it is the
+       * teleport, which straddles them just the same. One test catches both,
+       * and it never needs to know that the cut exists.
+       */
+      if (inHole && wasS != null && (wasS - sHang) * (s - sHang) < 0) {
+        const u = (sHang - wasS) / (s - wasS);
+        const tx = wasT + (t - wasT) * u;           // where across the doorway
+        const dx = Math.abs(tx - K.dc);
+        if (dx < K.dj + 0.10) {
+          // How hard, from how fast you went through it. A teleport has no
+          // honest speed, so this is clamped at both ends: leaning through is
+          // never silent and running through is never more than running
+          // through. 3.0 m/s is a shade under the walk.
+          const hard = clamp(Math.abs(s - wasS) / h / 3.0, 0.45, 1);
+          if (audio) audio.beadShove(hard, dx);
+          // And give the strands the shove as well, not only the ear. Without
+          // this the tail after walking *in* is whatever eight frames of
+          // approach managed to build before the cut took you, which is
+          // nothing — and the curtain you look back at through the doorway is
+          // hanging still one second after you parted it.
+          for (let i = 0; i < n; i++) {
+            const t0 = K.dc - K.dj + gap * (i + 0.5);
+            const dd = Math.abs(tx - t0);
+            if (dd >= BEAD.reach * 2.2) continue;
+            const w = 1 - dd / (BEAD.reach * 2.2);
+            velS[i] += Math.sign(s - wasS) * 3.4 * hard * w * w;
+          }
+          cool = 0.10;
+        }
+      }
       phase += h;
       const air = BEAD.stir * Math.sin(phase * 1.7);
       let din = 0;
@@ -4511,7 +4590,10 @@ async function buildJadrija(scene) {
       // have gone, and that tail is most of what the noise is for.
       cool = Math.max(0, cool - h);
       if (audio && din > BEAD.din && cool <= 0) {
-        audio.rattle(Math.min(1, din / 2.6), d);
+        // Over 2.6 nothing a crossing produced could ask for more than 0.4 of
+        // this sound; over 1.3 the loud part of one asks for all of it and the
+        // dying part still tapers, which is the shape it wanted all along.
+        audio.rattle(Math.min(1, din / 1.3), d);
         cool = 0.16 + 0.22 * Math.random();
       }
       return din;
@@ -8611,7 +8693,7 @@ async function buildJadrija(scene) {
     if (audio) audio.radioClick(SET.band >= 0);
   }
 
-  function stepKabina(pt, ps, dt) {
+  function stepKabina(pt, ps, dt, camY) {
     if (!kit || !special) return;
     const K = special;
     // Before the near gate, and with its own: the curtain is the one thing in
@@ -8619,7 +8701,7 @@ async function buildJadrija(scene) {
     // for a second or two after you have gone through and stopped being near.
     if (beads) {
       beads.step(pt, ps,
-        Math.hypot(pt - K.dc, ps - (K.face + 0.075)), dt);
+        Math.hypot(pt - K.dc, ps - (K.face + 0.075)), dt, camY);
     }
     // Kept outside the near gate below, because a radio you can hear from the
     // promenade is most of what makes anybody walk over and look through the
@@ -12974,7 +13056,7 @@ async function buildJadrija(scene) {
     // twenty-four bones and wants one, and the distance both of them turn on is
     // the same number. Gating out here would mean measuring it twice.
     stepDog(cam, dt);
-    stepKabina(pt, ps, dt);
+    stepKabina(pt, ps, dt, cam.y);
 
     if (skinFig) {
       const dx = cam.x - skinFig.mesh.position.x, dz = cam.z - skinFig.mesh.position.z;
