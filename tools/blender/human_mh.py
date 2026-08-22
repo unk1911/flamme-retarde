@@ -3423,15 +3423,89 @@ SKIP_AIR = SKIP_HALF[3][1]
 WALK_PELVIS = -2.0        # a gentler forward carry than the skip's -4
 WALK_DUR = 1.00           # one cycle: a step onto the left, a step onto the right
 
+# ── the six numbers that make it a person walking and not a bear ────────────
+#
+# All six pull a limb *in* toward the midline, and every one of them is paying
+# off the same debt: the base mesh is an A-pose and the A-pose is the widest
+# attitude a body has. Nothing here touches the swing, which is `WALK_KEYS` and
+# was never the problem — the report was that she walks "like some bear, with
+# her legs too wide apart", and a gait can be timed perfectly and still read as
+# an animal if the limbs are in the wrong plane while they do it.
+#
+# The old numbers were 2 at the hip and nothing anywhere else, and the comment
+# that shipped with them claimed they put her "feet under the hips rather than
+# out either side of them". Measured off the exported clip they did nothing of
+# the sort: her ankles ran 36 to 40 cm apart through the whole cycle. A walking
+# adult's step width — the sideways gap between where the two feet land — is
+# about 10 cm, and 12 cm on a wide day. Forty is a bear.
+#
+# Every figure below is a joint-centre distance read off the posed rig by
+# `tools/blender` probe, not an eyeballed angle, because the angle is never the
+# thing that is wrong: the rest pose already has 6.5° of splay in the thigh and
+# another 9.3° in the shin, and an angle typed into a clip is only ever the
+# correction on top of that.
+
+# The hip, and the biggest single number in the walk. The thigh comes off the
+# A-pose's +6.5° of abduction and finishes 4° *inside* vertical, which is the
+# real thing: a femur runs inward from the hip to the knee on everybody, and it
+# runs inward further on a woman. Ankles 11-12 cm apart, knees 16-17.
+WALK_TRACK = 11.0
+# The shin, which needed almost nothing once the hip was right. The knee's
+# adduction is inherited, so all this does is take the last 2° of the base
+# mesh's outward-flaring tibia off and leave the shank a couple of degrees
+# inside vertical, where a real one is.
+WALK_SHANK = 2.0
+# And the sole, which is the whole reason the two above are not enough on their
+# own. Thirteen degrees of hip and knee adduction is thirteen degrees of roll
+# carried down the chain to a foot that was flat before it, and a foot rolled
+# 13° is a woman walking on the insides of her feet — which was the first thing
+# the narrowed track actually produced. This is the ankle giving it all back:
+# soles within 3° of flat at every key, measured off the posed bone's own up
+# axis rather than assumed.
+WALK_SOLE = 13.0
+# The shoulder. Twenty-nine was the idle's number and it was borrowed for the
+# walk, and it is right for a figure standing still and about five degrees shy
+# for one moving: it left the elbows 4 cm outboard of the shoulders. At 34 the
+# humerus hangs 5.6° out from vertical, which is where a relaxed arm hangs.
+WALK_ARM_IN = 34.0
+# The forearm, and the one that reads worst of the six when it is missing. Three
+# degrees of it left every wrist 5 cm *outboard* of its own elbow through the
+# whole cycle — arms bowed out around the body, which is exactly the shape that
+# gets called a bear. Twenty brings the wrists to 33 cm apart, just outside the
+# thighs, so the forearms converge on the way down the way real ones do. Not
+# further: at 38 they are 25 cm apart and her hands swing through her hips.
+WALK_FORE_IN = 20.0
+# The elbow's resting bend, for which see `_walk_elbow` — the sixth number, and
+# the only one of the six that is not lateral.
+WALK_ELBOW = 18.0
+
 
 def _walk_elbow(a):
-    """How far the elbow is folded for a swing of `a`, in degrees, negative.
+    """How far the elbow is folded for a swing of `a`, in degrees.
 
-    Straight-ish behind her and folded in front, which is what an arm does and
-    is also the only way a hand gets behind a hip on a swing this small. `a`
-    runs -22 (that arm is back) to +22 (it is forward); the bend runs -8 to -30.
+    Straight-ish behind her and folded in front, which is what an arm does. `a`
+    runs -22 (that arm is back) to +22 (it is forward); the bend runs +18 to -4.
+
+    ── the constant, which used to be -8 and is now +18 ──────────────────
+
+    Sign first, because the name lies about it and cost an afternoon: on this
+    bone a *more negative* X does not fold the elbow, it swings the hand
+    further forward. The base mesh's forearm already leaves the elbow 46° bent
+    and pointing forward-and-out — that is what an A-pose is — so zero at this
+    joint is not a straight arm, it is an arm held out in front. Starting the
+    ramp at -8 added to that instead of undoing it.
+
+    What it produced is measurable and was in every frame: over a whole cycle
+    her wrist travelled from 2 cm in front of her shoulder to 30 cm in front of
+    it and never once went behind, riding at navel height at the top of the
+    swing. That is a woman carrying a tray, which is the failure the previous
+    comment here warned about and then shipped anyway.
+
+    At +18 the base bend is undone down to about 28° — a real walking elbow —
+    and the hand swings -13 cm to +27 cm about the shoulder at hip height,
+    which is an arm.
     """
-    return -8.0 - 0.5 * (a + 22.0)
+    return WALK_ELBOW - 0.5 * (a + 22.0)
 
 
 def _walk_pose(up, sup, fre, arm, sway):
@@ -3470,29 +3544,26 @@ def _walk_pose(up, sup, fre, arm, sway):
         # the mirror keeps them that way on its own: the left arm's value at the
         # end of the half-cycle is the right arm's value at the start of it.
         #
-        # ── and 29 of adduction, not 7 ─────────────────────────────────
-        #
-        # The same number the idle uses, and for the same reason its own note
-        # gives: the MakeHuman base stands in an A-pose with the upper arms 40°
-        # out from the body, so anything short of about thirty leaves a figure
-        # walking with its arms held away from it. The idle was written with
-        # that in mind and this was not, and seven degrees of it left the upper
-        # arms 33° out through the whole cycle — measured off the exported
-        # clip, shoulder to elbow, not eyeballed. On one figure doing one thing
-        # that is a stiff walk. On three of eight bathers strolling a
-        # promenade it is a beach of scarecrows, which is what it was called
-        # when it was finally noticed.
-        #
-        # It is lateral only. The swing is `arm` on X and the elbow hangs off
-        # that, so pulling the shoulders in does not touch the gait.
-        "armUL": (-arm, 0, 29), "armLL": (_walk_elbow(arm), 0, 3),
+        # Everything about where the arm *is*, as opposed to what it is doing,
+        # is now one of the six constants above: `WALK_ARM_IN` at the shoulder,
+        # `WALK_FORE_IN` at the elbow, and `WALK_ELBOW` as the base of the
+        # ramp. That split is worth keeping — the swing is `arm` on X and
+        # nothing here reads it, so pulling a limb in toward the midline can
+        # never quietly change the gait, and the gait can never quietly widen
+        # her out again.
+        "armUL": (-arm, 0, WALK_ARM_IN),
+        "armLL": (_walk_elbow(arm), 0, WALK_FORE_IN),
         "handL": (-4, 0, 0),
-        "armUR": (arm, 0, -29), "armLR": (_walk_elbow(-arm), 0, -3),
+        "armUR": (arm, 0, -WALK_ARM_IN),
+        "armLR": (_walk_elbow(-arm), 0, -WALK_FORE_IN),
         "handR": (-4, 0, 0),
-        # And a narrower track than the skip's ±4: feet under the hips rather
-        # than out either side of them, which is what stops a walk waddling.
-        "legUL": (sup[0], 0, 2), "legLL": (sup[1], 0, 0), "footL": (sup[2], 0, 0),
-        "legUR": (fre[0], 0, -2), "legLR": (fre[1], 0, 0), "footR": (fre[2], 0, 0),
+        # The three lateral numbers on each leg, in the order the chain applies
+        # them: adduct the thigh, take the base mesh's flare out of the shin,
+        # then roll the sole back flat under the pair of them.
+        "legUL": (sup[0], 0, WALK_TRACK), "legLL": (sup[1], 0, WALK_SHANK),
+        "footL": (sup[2], WALK_SOLE, 0),
+        "legUR": (fre[0], 0, -WALK_TRACK), "legLR": (fre[1], 0, -WALK_SHANK),
+        "footR": (fre[2], -WALK_SOLE, 0),
     }
 
 
