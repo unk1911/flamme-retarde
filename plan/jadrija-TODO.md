@@ -368,3 +368,22 @@ weighting, shared terrace seating so nobody sits off a chair, towels on bare
 concrete. 89 people at 60 fps.
 
 165k → 323k triangles.
+
+## KNOWN, from the 22 Aug playing pass
+
+- **`0` throws and does not stop throwing.** `skipToGround` → `ground.force()`
+  → `seedSpotFire()` reads `far[0]` and `far[1]` off a sorted `objects` with no
+  guard, and `objects` can be shorter than two. `47-ground.js:614`.
+- **`swimwear()` smears.** The walking woman's suit paints red blotches across
+  her back and buttocks. Same mechanism as the nape wedge that was fixed today
+  — a paint volume interpolating across triangles four times the size it was
+  authored for — but in `swimwear()` rather than `cutters()`.
+- **`toWorld` and `walkY` disagree by up to 1.05 m at (392, 8.5)**, in Baye's
+  lane on the terrace. She stands on `toWorld`, which is where the deck is
+  drawn, so it does not show on her; something that stands on `walkY` there
+  would float or sink.
+- **Probe harness: `gpuLaunch()` returns an `env` as well as `args`, and both
+  have to reach `spawn`.** Passing only the args leaves `GALLIUM_DRIVER` and
+  the WSL library path unset, `--use-angle=gl` falls through to software GL,
+  and the world takes longer than five minutes to build instead of two seconds.
+  Cost most of an afternoon; the symptom is a probe that looks hung.

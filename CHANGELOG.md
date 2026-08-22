@@ -8,6 +8,100 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [Unreleased]
+
+Four bugs from one playing pass, worked in parallel. Two of them turned out to
+be a single stale number each, in the sense that matters: a value that was
+correct when it was written and was never moved when the thing it described
+moved.
+
+### Fixed
+
+- **E did not get you out of the water, 9 put you back in it, and V left the
+  mask on your face.** One value, three reports. `ground.wet()` is an output of
+  one step of `walk()` — "the step you asked for was refused and there is sea a
+  metre and a half past it" — and `walk()` is the only thing that ever clears
+  it. `walk()` runs only while the walking mode is driving somebody, so the
+  moment you go swimming it stops running and the last waterline you leant on
+  is frozen into the getter for the rest of the session. The frame loop read
+  that getter at the top of every ground frame and waded you back in on it. So
+  every door out of the water worked, and the next frame undid it. Instrumented
+  first, which is what settled it: `__fr.modes().wade` reported `why: "ok"` on
+  **all 17 presses of E**, with `wet` reading the same frozen `[-2094, 382]`
+  every time. Ten reports had been answered by tightening searches that were
+  already succeeding. The handover is now latched after `ground.update` and
+  only when the phase that just ran was `'ground'`, and spent on the next frame.
+  **29 transitions, before 0/28, after 29/29.**
+- **E can no longer refuse.** Under the searches there is now a ladder —
+  `dryLand`, rings outward to 400 m, the same rings with the height test
+  dropped, then the promenade spot `9` uses. Weighed at 8 points including 3 km
+  of open water and the corner of the world: every answer on dry land. The
+  `toast.noShore` refusal is gone, and the ASHORE button on glass goes through
+  the same door the key does instead of calling the wade directly.
+- **An invisible wall sealed the promenade at t 170.5.** A bench that was never
+  drawn — the only trace of it was a collider, written with the timber's colour
+  standing where its half-depth goes. `confine` then asks
+  `Math.abs(ds) >= b.c + g`, `b.c + g` is the string `"0.33,0.145,0.0950.55"`,
+  the comparison coerces to NaN, and NaN is not `>=` anything: **a box 1.10 m
+  wide in t stopped having an end in s.** Beach to hillside, every lane dead at
+  t 169.95, and passable only by jumping because the airborne skip was the one
+  part of the box still working. Blockers 564 → 563. `retarget` now vets a
+  locale's boxes once when it takes them on — four finite numbers or the box is
+  off and says so. It fired on nothing else in the game.
+- **Baye vanished after a 9 and then walked on the spot.** `SHOW.t0`/`t1`, the
+  stage she is allowed to walk on, were written `JAD.jetty ± 86` when she stood
+  22 m east of the mole. She moved to t 429 and the stage did not go with her,
+  so it stayed [172, 344] while she lived 85 m outside it. Measured: at 5 s she
+  is at t 429, at 6 s — her first frame of crawl — **t 343.7, 85.3 m west in
+  one frame.** Then `home` aimed her back and the clamp held her at exactly
+  344.0 playing a full-rate walk cycle at 1.85 m/s of asked speed and zero
+  ground speed. The stage now hangs off her own spot, and `show.made` measures
+  ground actually covered so the clip's clock runs off what she carried rather
+  than what she asked for.
+- **Every advanced bather had a black wedge on the nape.** The `nape` cutter is
+  a paint volume that lays near-black 27 mm below the neck joint — right for
+  Baye, whose hair is a modelled knot and tail lying over it. The eight bathers
+  get the same cutter set and never get `extras()`: no knot, no tail, so it
+  painted a stripe down a bare neck, and at 7 000 triangles against Baye's
+  28 000 the paint interpolated across triangles four times the size and the
+  stripe became a wedge to the shoulder blades. Lowest hair-coloured vertex was
+  at y 1.494 on a 1.72 m figure, 8 cm below where any haircut ends. The cutter
+  is now gated on having a tail. Vertex colours only: **all nine clips on all
+  eight figures are bit-identical**, and Baye's own blob was not re-baked.
+
+### Added
+
+- **Baye comes with you, and reads the room.** On foot at Jadrija she follows
+  loosely rather than tracking — measured average 7.77 m, min 1.98, max 20.4
+  over a 112 m walk to the Slastičarnica — with the cartwheels and the larking
+  in between, and the stage slides ahead of her so she can reach the shop. The
+  card is place-keyed off her own position: `mayhaps` / `ice-cream for baye?`
+  at the Slastičarnica, `hut for baye?` at the kabine, `race you, duck?` on the
+  mole, `nice house, duck!` at the vikendica, `sea is wet!` at the water; two
+  times in three, otherwise her own three. The ice-cream line is two cards
+  because twenty-seven characters lands on `fitText`'s 28 px floor and
+  photographs as a grey smear.
+- **She hops what she can clear and walks round what she cannot.** Apex
+  **0.726–0.729 m** against the player's 1.983, 0.70–0.75 s airborne, lower
+  foot 0.086–0.107 m over a deck that agrees with `walkY` to the millimetre. A
+  6 m low wall is walked round; a bench and a bin are hopped.
+- `__fr.modes()` reads the whole mode machine in one call — phase, what each
+  water mode thinks it is doing, which HUDs are actually on the screen, and why
+  the last press of E did what it did. `__fr.ground.landing(x, z)` weighs the
+  ladder without going there.
+
+### Known
+
+- **Pressing `0` throws** — `skipToGround` → `ground.force()` → `seedSpotFire()`
+  reads `far[0]`/`far[1]` with no guard, and `objects` can be shorter than two.
+  Found by the transitions pass, which routes around `0` deliberately.
+- **The walking woman's swimsuit smears across her back and buttocks in red
+  blotches** — the same paint-on-a-coarse-mesh mechanism as the nape, in
+  `swimwear()` rather than `cutters()`.
+- **`toWorld` and `walkY` disagree by up to 1.05 m at (392, 8.5)**, in Baye's
+  own lane. She stands on `toWorld`, which is where the deck is drawn, so it
+  does not show on her.
+
 ## [1.97.1] — 2026-08-22
 
 Two fixes that arrived after 1.97.0 had gone up, and one measurement that is
