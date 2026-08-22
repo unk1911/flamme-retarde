@@ -12820,18 +12820,42 @@ async function buildJadrija(scene) {
       qAim.identity();
       if (show.held > 0 && handR >= 0) {
         f.boneAt(handR, vHand).applyMatrix4(f.mesh.matrixWorld);
-        // Upright in the hand: the grip is low on the body, which is where you
-        // hold a bottle you have just picked up. Not at the neck — that is a
-        // waiter.
-        vHold.copy(vHand);
-        vHold.y -= BOT.grip;
-        // And the pour, which is not a rotation. Aim it: the lip goes to a
-        // fixed point six centimetres over the glass and the bottle lies back
-        // along the line from her hand to it, so the tilt is whatever the angle
-        // between the two happens to be that frame.
+        // In the hand, and not merely at it.
         //
-        // This used to aim at her mouth, and a mouth is a hard target — it is
-        // 3 cm above a bone called `head` that is really the atlas, it moves
+        // This used to be two lines: the bottle's foot went `BOT.grip` below
+        // the wrist joint in *world* Y and its rotation was left at identity,
+        // so a 30 cm cylinder stood bolt upright with its axis running through
+        // the middle of the wrist and on up the forearm — welded into her arm
+        // rather than held in her hand, and pointing wherever gravity pointed
+        // however her wrist was turned. It is the same bug the hat had (see
+        // `boneTurn` in 41-skin.js): an attachment pinned to a bone's position
+        // and left square to the world slides off the moment the bone rotates.
+        //
+        // So: the hand's whole frame. `boneTurn` is how far the wrist has come
+        // since the bind pose, `PALM` is where the bottle's grip point sits in
+        // that hand — a finger's breadth medial of the wrist joint and a hand's
+        // depth down it, which is the middle of a closed fist — and `GRIP_UP`
+        // is the direction that fist points a bottle. Both are measured off
+        // `IDLE_A`, the arm hanging at her side, because that is the one pose
+        // where what a hand does with a bottle needs no argument: it holds it
+        // upright. Everything after that is the wrist's own business, which is
+        // what makes the poses in tools/blender/human_mh.py able to *aim* it.
+        f.boneTurn(handR, qTurn);
+        qHand.copy(f.mesh.quaternion).multiply(qTurn);
+        vPalm.copy(PALM).applyQuaternion(qHand).add(vHand);
+        vAx.copy(GRIP_UP).applyQuaternion(qHand);
+        let grip = BOT.grip;
+        // And the pour, which is now a correction rather than a replacement.
+        // The lip goes to a fixed point six centimetres over the glass, and
+        // the bottle is turned off the axis her wrist is already holding it on
+        // by the smallest rotation that gets it there — so the further the
+        // pose is from the pour, the more work this does, and when the pose is
+        // right it does almost none. A bottle that agrees with the hand for
+        // four seconds and disagrees with it for one is worse than one that
+        // never agrees at all.
+        //
+        // The target used to be her mouth, and a mouth is a hard target — it
+        // is 3 cm above a bone called `head` that is really the atlas, it moves
         // when she tips her head back, and every centimetre the aim is out puts
         // 30 cm of glass through her face. The glass on the stool does not move
         // and is not part of her, so the whole class of error goes away: the
@@ -12839,22 +12863,31 @@ async function buildJadrija(scene) {
         if (show.pour > 0 && kit.pourAt) {
           const g = kit.pourAt, gw = toWorld(g[0], g[1]);
           vMouth.set(gw[0], g[2], gw[2]);
-          vAx.subVectors(vMouth, vHand);
-          const reach = vAx.length();
-          vAx.multiplyScalar(1 / reach);
-          qAim.setFromUnitVectors(UPV, vAx).slerp(qId, 1 - show.pour);
+          vSip.subVectors(vMouth, vPalm);
+          const reach = vSip.length();
+          vSip.multiplyScalar(1 / reach);
+          qFix.setFromUnitVectors(vAx, vSip).slerp(qId, 1 - show.pour);
+          vAx.applyQuaternion(qFix);
           // How far up the bottle her hand ends up. Hanging the lip on the
           // target and letting the rest fall where it may is right only while
           // the gap happens to be a bottle long; outside that the choice is
           // between a bottle through the stool and one held by nothing. So the
-          // grip is what is fixed, clamped to the body of the bottle where a
-          // hand pouring one actually goes, and any leftover is spent on the
-          // lip stopping short — which is a stream a centimetre longer and is
-          // the error nobody sees.
-          const at = clamp(BOT.lip - reach, 0.02, 0.20);
-          vHold.lerp(vSip.copy(vHand).addScaledVector(vAx, -at), show.pour);
+          // grip stays inside a few centimetres of where her fingers closed on
+          // it, and any leftover is spent on the lip stopping short — which is
+          // a stream a centimetre longer and is the error nobody sees.
+          grip += (clamp(BOT.lip - reach, BOT.grip - 0.055, BOT.grip + 0.035)
+            - BOT.grip) * show.pour;
         }
+        qAim.setFromUnitVectors(UPV, vAx);
+        vHold.copy(vPalm).addScaledVector(vAx, -grip);
         vPos.lerp(vHold, show.held);
+        // On the way off the stool and back on to it the bottle is half hers
+        // and half the room's, so its attitude is too: it stands up out of her
+        // hand as she takes it and settles square again as she lets go. Without
+        // this it snaps upright on the frame `held` reaches nought, and a
+        // bottle set down is the one moment in the clip you are looking
+        // straight at it.
+        if (show.held < 1) qAim.slerp(qId, 1 - show.held);
       }
       kit.bottle.position.copy(vPos);
       kit.bottle.quaternion.copy(qAim);
@@ -12886,7 +12919,19 @@ async function buildJadrija(scene) {
   let handR = null;
   // Where along its own axis the bottle is held, and where its lip is. Both
   // read off the profile it is actually built to, up in `kabinaKit`.
-  const BOT = { grip: 0.115, lip: 0.300 };
+  //
+  // 0.185 and not 0.115: a hand closing on a bottle standing on a stool takes
+  // it round the shoulder, not round the punt. It is 7 cm of reach she does not
+  // have to find — the tabouret is 0.40 m in front of her standing mark and her
+  // arm from shoulder to wrist is 0.47 — and it is where the fingers of a fist
+  // that has just lifted something actually are. Not the neck: that is a
+  // waiter.
+  const BOT = { grip: 0.185, lip: 0.300 };
+  // The bottle in the hand, both measured off `IDLE_A` with the arm hanging —
+  // see the long note at the grip above. Figure space: +x is in front of her,
+  // +y is up, +z is her right.
+  const PALM = new THREE.Vector3(0.0443, -0.0748, 0.0096);
+  const GRIP_UP = new THREE.Vector3(-0.5014, 0.6297, -0.5934);
 
   /**
    * The two windows the `wine` clip drives, off one clock, because they are
@@ -12906,8 +12951,11 @@ async function buildJadrija(scene) {
   const vHand = new THREE.Vector3(), vMouth = new THREE.Vector3();
   const vHold = new THREE.Vector3(), vSip = new THREE.Vector3();
   const vPos = new THREE.Vector3(), vAx = new THREE.Vector3();
+  const vPalm = new THREE.Vector3();
   const UPV = new THREE.Vector3(0, 1, 0);
   const qAim = new THREE.Quaternion(), qId = new THREE.Quaternion();
+  const qTurn = new THREE.Quaternion(), qHand = new THREE.Quaternion();
+  const qFix = new THREE.Quaternion();
 
   const walkers = [];
   let cast = 0;

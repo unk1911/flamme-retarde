@@ -4677,30 +4677,59 @@ NOTE_B = dict(NOTE_A, **{
 # The bottle. She is standing beside the tabouret with it on her right, so this
 # is a shoulder that goes forward and an elbow that opens, and the lean is in
 # the spine rather than in the hip — she is picking a bottle up, not lifting a
-# crate. 43-jadrija.js hangs the bottle off wherever `handR` actually ends up,
-# the same way it hangs the card off both hands, so none of these angles has to
-# be accurate to a real bottle. What they have to be is a reach.
+# crate.
+#
+# These four are the one set of poses in this file that are not free. Since
+# `boneTurn` went into 43-jadrija.js the bottle is *in* the hand rather than
+# hanging off its position, so where `handR` ends up and which way it is turned
+# decide where the bottle is and which way it points — and the bottle has to
+# start on a tabouret that does not move, has to end up over a glass that does
+# not move, and has to be upright in between. All three numbers are in
+# `kabinaKit`; the wrist targets they come to, in metres off the floor she
+# stands on and in her own frame (+x in front of her, +y her left, +z up):
+#
+#     the bottle standing on the stool   0.403  -0.020  0.728  (its foot)
+#     so her palm, `BOT.grip` up it      0.403  -0.020  0.913
+#     the lip's target over the glass    0.286  -0.062  0.958
+#
+# The first cut of these poses missed the first of those by 0.52 m — she swung
+# her arm *backwards* (on this rig +X on the upper arm swings the far end back,
+# and the reach carried +16) while arching her spine away (+9/+10/+8 likewise),
+# and the bottle then slid half a metre through the air into a hand that had
+# never gone to it. Every angle below was solved against the numbers above and
+# then looked at; `--probe` prints where a pose actually puts the wrist, and
+# that is the only thing worth arguing with.
+#
+# 0.40 m in front of her at hip height is past the end of a 0.47 m arm hanging
+# off an upright spine, so the lean is real: about thirty degrees of it, spread
+# down the spine rather than folded at one joint. She is bending to a stool.
 WINE_REACH = dict(IDLE_A, **{
-    "spine02": (9, 0, 1.0), "spine03": (10, 0, 0.5),
-    "chest": (8, 0, 0), "neck": (-8, 0, 0), "head": (-16, -10, 1),
-    "clavicleR": (0, 0, -6),
-    "armUR": (16, -10, -20), "armLR": (-10, 0, -6), "handR": (-10, 0, -8),
+    "spine02": (-14.5, 0, 1.0), "spine03": (-12.5, 0, 0.5),
+    "chest": (-7, 0, 0), "neck": (8, 0, 0), "head": (-6, -4, 1),
+    "clavicleR": (0, 0, -3),
+    "armUR": (-60, -16, -39),
+    "armLR": (-14 + STAND_ELBOW_UNDO, -5, -13), "handR": (28, 1, 6),
 })
 
 # Closed on it. The elbow comes in a little as the hand takes the weight, which
-# is the whole of what makes a grasp read as a grasp rather than as a touch.
+# is the whole of what makes a grasp read as a grasp rather than as a touch —
+# and the wrist does not move, because the wrist is now the bottle's attitude
+# and a bottle still standing on a stool is not tipping.
 WINE_HOLD = dict(WINE_REACH, **{
-    "armUR": (14, -8, -22), "armLR": (-22, 0, -6), "handR": (-16, 0, -6),
+    "spine02": (-13, 0, 1.0), "spine03": (-11, 0, 0.5),
+    "armUR": (-57, -16, -39),
+    "armLR": (-18 + STAND_ELBOW_UNDO, -5, -13), "handR": (28, 1, 6),
 })
 
 # Lifted clear of the stool, upright, about hip height in front of her right
 # side. It is the beat between picking a bottle up and doing something with
 # it, and it is also what the pour comes back to before she puts it down.
 WINE_LIFT = dict(IDLE_A, **{
-    "spine02": (4, 0, 1.0), "spine03": (4, 0, 0.5), "chest": (3, 0, 0),
-    "neck": (-4, 0, 0), "head": (-12, -6, 1),
-    "clavicleR": (0, 0, -8),
-    "armUR": (-30, 0, -16), "armLR": (-58, 0, -10), "handR": (-10, 0, -8),
+    "spine02": (0, 0, 1.0), "spine03": (0, 0, 0.5), "chest": (0, 0, 0),
+    "neck": (-2, 0, 0), "head": (-10, -6, 1),
+    "clavicleR": (0, 0, -10),
+    "armUR": (-34, -2, -23),
+    "armLR": (-20 + STAND_ELBOW_UNDO, 3, -15), "handR": (42, 7, -6),
     # The left arm is the one doing nothing, so it is the idle's arm with the
     # two degrees of the lift's own lean on the shoulder. Absolutes here kept
     # the A-pose in the one clip where she is standing still for five seconds
