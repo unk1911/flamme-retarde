@@ -572,7 +572,56 @@ async function buildGround(scene, field) {
    * radius that ejects you and not the nearest face — but it is the same idea and
    * the same one pass that confine() makes over the buildings.
    */
-  function unbody(x, z) {
+  /**
+   * Who you are touching this frame, and who you were touching last frame.
+   *
+   * The pair exists only to make a bump one event instead of sixty a second.
+   * Somebody leaning on the W key against a stranger's back is *in contact* for
+   * as long as they lean, and a locale that wanted to react to that — turn a
+   * head, say something — would be handed the same contact every frame until
+   * they let go. So the collider keeps the set it resolved last frame, and the
+   * only contacts it reports are the ones that were not in it.
+   *
+   * Keyed by kind and index rather than by the body object, because the objects
+   * are a reused buffer: the thing at slot 3 is a different person from one
+   * frame to the next, and identity on a recycled object is not identity.
+   */
+  let touching = new Set();
+  let touched = new Set();
+
+  /**
+   * Push a point out of everybody who is upright. World space and recomputed
+   * every frame, because these are not buildings: a person walks, so they cannot
+   * live in `field.blockers`, which is a static list of axis-aligned boxes in the
+   * runway's own axes. A person is a circle rather than a box, so it is the
+   * radius that ejects you and not the nearest face — but it is the same idea and
+   * the same one pass that confine() makes over the buildings.
+   *
+   * Two lists, and they are two because the two modes grew people at different
+   * times. `crew` is the aerodrome's seven, who carry their own radius in
+   * `GROUND.body` and are the only people the ground mission ever had. Anybody
+   * else is the locale's: a resort has eighty-seven bathers and a show figure
+   * with a hundred and seventy metres of stage, and the only thing that knows
+   * where any of them is standing this frame is the file that walks them. So it
+   * is asked — `field.bodies(x, z, pad)` fills a shared buffer with everybody
+   * near enough to matter and hands back a count, and each of them brings its
+   * own radius, because a child is not the width of a heavy man and somebody
+   * lying on a towel is not a circle at all.
+   *
+   * The push is radial and nothing else. That is what makes this a slide rather
+   * than a wall: walk into a shoulder square on and the whole of your speed is
+   * along the normal and it all goes, so you stop dead; walk into it at twenty
+   * degrees and only the sliver pointing at them goes, so you go past. The
+   * caller does that arithmetic — see the note over the velocity kill in
+   * `walk()` — and all it needs from here is an honest correction.
+   *
+   * And the vertical. Somebody on a towel is 0.42 m of person and the hop
+   * clears 1.98, so `top` lets you jump them; somebody on their feet is 1.78
+   * and you never will. Only while actually airborne, exactly as `confine`
+   * reads the tops of its boxes, because standing on something is not the same
+   * as clearing it.
+   */
+  function unbody(x, z, y, airborne) {
     const r = GROUND.body * 2;
     for (const c of crew) {
       if (!upright(c)) continue;
@@ -585,6 +634,37 @@ async function buildGround(scene, field) {
       const uz = d > 1e-3 ? dz / d : Math.cos(you.yaw);
       x = c.x + ux * r; z = c.z + uz * r;
     }
+    if (field.bodies && field.bodyList) {
+      // The reach handed to the broad phase is your own half-width plus the
+      // widest anybody in the list can be; the locale adds its own margin on
+      // top, because it is the one that knows how long a sunbather is.
+      const n = field.bodies(x, z, GROUND.body + 0.6);
+      const list = field.bodyList();
+      for (let i = 0; i < n; i++) {
+        const b = list[i];
+        if (airborne && y != null && b.top != null && y > b.top + 0.05) continue;
+        const rr = GROUND.body + b.r;
+        const dx = x - b.x, dz = z - b.z;
+        const d = Math.hypot(dx, dz);
+        if (d >= rr) continue;
+        const ux = d > 1e-3 ? dx / d : Math.sin(you.yaw);
+        const uz = d > 1e-3 ? dz / d : Math.cos(you.yaw);
+        x = b.x + ux * rr; z = b.z + uz * rr;
+        // Both halves of the guard earn their place. `touching` is last frame,
+        // and it is what turns a lean into one event. `touched` is this frame,
+        // and it is there because a body is not always one circle: somebody
+        // lying down is two of them sharing an index, and without this you
+        // would walk into a sunbather and bump them twice.
+        const key = b.kind + b.idx;
+        if (!touching.has(key) && !touched.has(key) && field.bump) {
+          field.bump(b.kind, b.idx, x, z);
+        }
+        touched.add(key);
+      }
+    }
+    // Swap the two sets rather than clearing and refilling one, so that a frame
+    // in which you touch nobody costs nothing at all.
+    const swap = touching; touching = touched; touched = swap; touched.clear();
     return [x, z];
   }
 
@@ -1461,7 +1541,7 @@ async function buildGround(scene, field) {
     // People first, walls second, so that the wall has the last word. Somebody
     // standing against a hangar can then hold you against it but never push you
     // through it, and a hold is something you can always walk sideways out of.
-    const [bx, bz] = unbody(tx, tz);
+    const [bx, bz] = unbody(tx, tz, you.y, you.hop > 0.05);
     let [nx, nz, hit] = confine(bx, bz, you.y, you.hop > 0.05);
     // The waterline, where the locale has one. Tried as two independent axes
     // before being refused outright, so walking into the sea at an angle slides
@@ -1777,6 +1857,9 @@ async function buildGround(scene, field) {
     // Nobody is out here. The aerodrome's seven are built against the
     // aerodrome's spots and cannot be relocated meaningfully, so they go away
     // and come back if you are ever pointed at the field again.
+    // Whoever you were leaning on is somebody else's locale now, and a stale
+    // key here would swallow the first bump you got in the new one.
+    touching.clear(); touched.clear();
     const home = next.crewSpots && next.crewSpots.length;
     crew = home ? allCrew : [];
     if (!home) for (const c of allCrew) c.fig.root.visible = false;
