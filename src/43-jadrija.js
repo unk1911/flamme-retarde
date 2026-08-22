@@ -5867,6 +5867,215 @@ async function buildJadrija(scene) {
             r * 0.78, r * 0.55],
           [0.300, 0.295, 0.288], [0.345, 0.340, 0.330]);
       }
+      // ── and what stands at the top of the lane ──────────────────────────
+      //
+      // b_046 films the lane end from the middle of the tarmac and there are
+      // three things in that frame the game did not have. None of them is
+      // decoration: between them they are the reason this is a lane and not a
+      // strip of grey.
+      //
+      // First the STOP, and it is not a gate. The lane runs into a low rubble
+      // wall with a sawn cap, and where the wall has a gap in it somebody has
+      // stood four squat concrete tubs across the gap, shoulder to shoulder
+      // with a hand's width between them and a person's width left at the end.
+      // That is the entire traffic scheme, and it is better than a barrier:
+      // a car cannot get through it and a pushchair can.
+      //
+      // Second the SIGN, and it is not the no-parking disc. It is the one with
+      // the saltire — zabrana zaustavljanja, no stopping at all — blue field,
+      // red rim, red X, on a plain galvanised post at the verge.
+      //
+      // Third, where the wall turns its return, a sawn slab oversailing it and
+      // flat limestone offcuts lying in the dust beside it where they were put
+      // down and not picked up again.
+      //
+      // The house the wall belongs to is not here. It stands at forty-odd
+      // metres inland and this shore has one hard rule about that band, so
+      // what is built is what you can see from the lane: the rendered garden
+      // wall with the square opening cut through it, and the timber frame
+      // standing behind the opening.
+      {
+        const back8 = b;
+        const LANE = 215.6;                       // where the tarmac stops
+        const RUB = [0.575, 0.556, 0.508];
+        const CAP = [0.585, 0.566, 0.518];
+        const wIn = WALL.s + 7.4;                 // the inland end of the run
+        const wOut = WALL.s + 0.3;                // and where it meets the wall
+        const gapA = WALL.s + 2.4, gapB = WALL.s + 6.2;
+
+        // The wall itself, in two lengths with the gap between them. Level
+        // over each length: this is the same mason as the piers and he does
+        // not follow a grade.
+        b = up;
+        for (const [a, c] of [[wOut, gapA], [gapB, wIn]]) {
+          const y = surfaceY(LANE, (a + c) * 0.5);
+          const h = 0.84;
+          const core = [0.330, 0.315, 0.288];
+          boxTS(LANE - 0.16, LANE + 0.16, a, c, y - 0.30, y + h - 0.02,
+            core, shade(core, 1.06));
+          // Rubble, one stone at a time, turned on its own axis. A hand's
+          // breadth proud of the mortar and not a centimetre less.
+          const nSt = Math.round((c - a) * 9);
+          for (let k = 0; k < nSt; k++) {
+            const sv = a + 0.10 + jit(k + (a * 3 | 0), 96) * (c - a - 0.20);
+            const face = k % 2 ? LANE + 0.14 : LANE - 0.14;
+            const out = k % 2 ? 0.105 : -0.105;
+            const yy = y - 0.22 + jit(k + (a * 3 | 0), 97) * (h + 0.16);
+            const rr = 0.100 + jit(k + (a * 3 | 0), 98) * 0.090;
+            const g = 0.78 + jit(k + (a * 3 | 0), 99) * 0.44;
+            frustumTS(yy, [face + out * 0.30, sv, 0.075, rr * 0.92],
+              yy + rr * 1.4, [face + out + (jit(k + (a * 3 | 0), 100) - 0.5) * 0.07,
+                sv, 0.085, rr * 0.70],
+              [RUB[0] * g, RUB[1] * g, RUB[2] * g],
+              [RUB[0] * g * 1.05, RUB[1] * g * 1.05, RUB[2] * g * 1.05]);
+          }
+          // The cap, oversailing both faces — the one straight line on it.
+          boxTS(LANE - 0.29, LANE + 0.29, a - 0.08, c + 0.08,
+            y + h - 0.04, y + h + 0.11, CAP, shade(CAP, 1.07));
+          runs.push({ t0: LANE - 0.32, t1: LANE + 0.32, s0: a, s1: c,
+            y: y - 0.30, h: h + 0.41 });
+        }
+        // And the return at the inland end, which is where the crop shows the
+        // cap coming round a corner and the bank behind it.
+        {
+          const y = surfaceY(LANE, wIn);
+          boxTS(LANE + 0.16, LANE + 1.35, wIn - 0.32, wIn + 0.02,
+            y - 0.30, y + 0.80, shade(RUB, 0.86), RUB);
+          boxTS(LANE + 0.10, LANE + 1.43, wIn - 0.40, wIn + 0.10,
+            y + 0.80, y + 0.95, CAP, shade(CAP, 1.07));
+          runs.push({ t0: LANE + 0.10, t1: LANE + 1.43, s0: wIn - 0.40,
+            s1: wIn + 0.10, y: y - 0.30, h: 1.25 });
+        }
+
+        // The four tubs. Squat: as wide across as they are tall, a rolled foot
+        // and a flare at the lip, and a flat dirty top. Turned, because a
+        // cylinder built out of boxes is a box.
+        for (let k = 0; k < 4; k++) {
+          const sv = gapA + 0.52 + k * 0.94;
+          const y = surfaceY(LANE, sv);
+          const g = 0.93 + jit(k, 101) * 0.14;
+          const CON = [0.545 * g, 0.522 * g, 0.470 * g];
+          lathe(W, LANE + (jit(k, 102) - 0.5) * 0.10, sv, [
+            [y - 0.04, 0.000], [y - 0.04, 0.415],
+            [y + 0.055, 0.442], [y + 0.545, 0.424],   // the rolled foot
+            [y + 0.630, 0.468], [y + 0.715, 0.472],   // and the flare at the lip
+            [y + 0.735, 0.436], [y + 0.735, 0.000],
+          ], CON, 13);
+          runs.push({ t0: LANE - 0.47, t1: LANE + 0.47, s0: sv - 0.47,
+            s1: sv + 0.47, y: y - 0.04, h: 0.78 });
+        }
+
+        // The sign, facing the way you come.
+        //
+        // `post` extrudes upwards, so a disc built out of it lies flat like a
+        // table top — which is fine read from an aeroplane and wrong read from
+        // the lane. This one stands with its face across the lane, and the rim,
+        // the field and the saltire are ONE PLANE cut into pieces that do not
+        // overlap. Two kilometres out from the origin a twelve-millimetre
+        // standoff is below what the depth buffer can separate, and stacking
+        // concentric discs a centimetre apart is the mistake that cost two days
+        // on the shop signs.
+        {
+          const st = LANE + 5.4, sv = edgeAt(st) + 0.85;
+          const y = surfaceY(st, sv), r = 0.30;
+          const POST = [0.505, 0.512, 0.500];
+          post(W, st, sv, y - 0.05, y + 2.42, 0.034, POST, 7);
+          const RED = [0.640, 0.115, 0.105];
+          const BLU = [0.098, 0.238, 0.520];
+          const BACK = [0.455, 0.458, 0.448];
+          const cy = y + 2.02, ri = r * 0.815;
+          const fr = st - 0.028, bk = st + 0.028;
+          const N = 32;
+          const P = (rr, a, tt) =>
+            W(tt, sv + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+          for (let i = 0; i < N; i++) {
+            const a0 = i / N * TAU, a1 = (i + 1) / N * TAU;
+            const am = (a0 + a1) * 0.5;
+            // The saltire: an arm wherever the wedge sits within twelve degrees
+            // of an odd multiple of forty-five.
+            const dA = Math.abs((am % (Math.PI * 0.5)) - Math.PI * 0.25);
+            const fill = dA < 0.205 ? RED : BLU;
+            b.quad(P(ri, a0, fr), P(r, a0, fr), P(r, a1, fr), P(ri, a1, fr), RED);
+            b.tri(W(fr, sv, cy), P(ri, a0, fr), P(ri, a1, fr), fill);
+            b.tri(W(bk, sv, cy), P(r, a1, bk), P(r, a0, bk), BACK);
+            b.quad(P(r, a0, fr), P(r, a0, bk), P(r, a1, bk), P(r, a1, fr),
+              BACK);
+          }
+        }
+
+        // Limestone offcuts lying in the dust beside the return. Flat, thin,
+        // and lying where they were dropped — a slab on edge would be a slab
+        // somebody stood up.
+        b = deck;
+        for (let k = 0; k < 14; k++) {
+          const st = LANE + 0.6 + jit(k, 103) * 4.2;
+          const sv = wIn - 1.5 + jit(k, 104) * 2.4;
+          const y = surfaceY(st, sv) + 0.03;
+          const rr = 0.16 + jit(k, 105) * 0.16;
+          const a = jit(k, 106) * TAU;
+          const ct = Math.cos(a), sn = Math.sin(a);
+          const g = 0.90 + jit(k, 107) * 0.20;
+          const col = [0.640 * g, 0.618 * g, 0.560 * g];
+          b.quad(W(st + ct * rr, sv + sn * rr, y),
+            W(st - sn * rr * 0.7, sv + ct * rr * 0.7, y),
+            W(st - ct * rr, sv - sn * rr, y),
+            W(st + sn * rr * 0.7, sv - ct * rr * 0.7, y), col);
+        }
+        b = up;
+
+        // ── the garden wall with the window in it ────────────────────────
+        //
+        // The thing in the frame that is not roadside at all, and the reason
+        // it is here anyway: from the lane it IS the roadside. A flat panel of
+        // pale render standing off the inland edge, a big square opening cut
+        // straight through it with the corners eased, and behind the opening a
+        // frame of squared timber gone rust-brown in the sun, holding up
+        // nothing you can see from here.
+        //
+        // Clamped at its TAIL and not its origin: the frame is the deepest
+        // thing on it and the frame is what has to stay inside 38.
+        {
+          const ct2 = 262.0, ws = 36.35;
+          const y = surfaceY(ct2, ws);
+          const REN = [0.598, 0.578, 0.578];
+          const top = y + 2.46;
+          // The panel, in three pieces so the opening is a hole and not a
+          // darker rectangle painted on.
+          const oT0 = ct2 - 1.05, oT1 = ct2 + 1.05;
+          const oY0 = y + 0.62, oY1 = y + 2.02;
+          boxTS(ct2 - 3.25, oT0, ws - 0.09, ws + 0.09, y - 0.25, top,
+            REN, shade(REN, 1.06));
+          boxTS(oT1, ct2 + 3.25, ws - 0.09, ws + 0.09, y - 0.25, top,
+            REN, shade(REN, 1.06));
+          boxTS(oT0, oT1, ws - 0.09, ws + 0.09, y - 0.25, oY0,
+            REN, shade(REN, 1.06));
+          boxTS(oT0, oT1, ws - 0.09, ws + 0.09, oY1, top,
+            REN, shade(REN, 1.06));
+          // The reveal, which is what says the wall has a thickness.
+          boxTS(oT0 - 0.02, oT0 + 0.04, ws - 0.085, ws + 0.085, oY0, oY1,
+            shade(REN, 0.80));
+          boxTS(oT1 - 0.04, oT1 + 0.02, ws - 0.085, ws + 0.085, oY0, oY1,
+            shade(REN, 0.80));
+          boxTS(oT0, oT1, ws - 0.085, ws + 0.085, oY1 - 0.06, oY1,
+            shade(REN, 0.74));
+          // And the timber behind it. Four uprights and two beams over, rust
+          // brown, squared and not planed.
+          const TIM = [0.372, 0.238, 0.178];
+          for (let k = 0; k < 4; k++) {
+            const pt = ct2 - 1.55 + k * 1.03;
+            boxTS(pt - 0.055, pt + 0.055, ws + 0.72, ws + 0.83,
+              y - 0.10, y + 2.18, TIM, shade(TIM, 1.10));
+          }
+          for (let k = 0; k < 2; k++) {
+            const bs = ws + 0.62 + k * 0.62;
+            boxTS(ct2 - 1.75, ct2 + 1.75, bs, bs + 0.09,
+              y + 2.18, y + 2.30, shade(TIM, 0.92), TIM);
+          }
+          runs.push({ t0: ct2 - 3.25, t1: ct2 + 3.25, s0: ws - 0.12,
+            s1: ws + 0.12, y: y - 0.25, h: 2.71 });
+        }
+        b = back8;
+      }
       b = back7;
     }
 
@@ -7026,8 +7235,32 @@ async function buildJadrija(scene) {
       gy + 0.47, [vt, vs, 0.248, 0.196], KIT.wood);
     frustum(W, gy + 0.47, [vt, vs, 0.248, 0.196],
       gy + 0.52, [vt, vs, 0.220, 0.170], KIT.wood, KIT.woodT);
+    // The picture stands 5 cm proud of the cabinet, with a moulded surround
+    // filling the gap — and that separation is the whole point of it.
+    //
+    // It used to sit two millimetres in front of the wood, which is what a
+    // photograph of a television measures and what a depth buffer cannot tell
+    // apart. What you got was a clean brown bar down the middle of the picture:
+    // not a wobble and not a shimmer, a hard-edged strip where the cabinet's
+    // own front face won the rounding and the tube lost it. It read as an
+    // object standing in the room, and it was hunted as one.
+    //
+    // Same lesson as the shop signs and as the poster below, which says it
+    // outright: at this distance from the world origin two millimetres is not
+    // a standoff, it is a coin toss. Nothing on this shore may be nearly
+    // co-planar with anything else — and a set whose bezel is proud of its
+    // cabinet is what these actually look like anyway.
+    const PR = 0.050;
+    for (const [ta, tc, ya, yc] of [
+      [vt - 0.248, vt - 0.226, gy + 0.10, gy + 0.52],
+      [vt + 0.226, vt + 0.248, gy + 0.10, gy + 0.52],
+      [vt - 0.248, vt + 0.248, gy + 0.50, gy + 0.52],
+      [vt - 0.248, vt + 0.248, gy + 0.10, gy + 0.12],
+    ]) {
+      boxTS(ta, tc, vs - 0.196 - PR, vs - 0.196, ya, yc, KIT.wood, KIT.woodT);
+    }
     {
-      const p = W(vt, vs - 0.198, gy + 0.31);
+      const p = W(vt, vs - 0.196 - PR - 0.002, gy + 0.31);
       tv.mesh.position.set(p[0], p[1], p[2]);
       const st = at(vt);
       tv.mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
