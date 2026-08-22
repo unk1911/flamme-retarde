@@ -1619,6 +1619,7 @@ async function buildJadrija(scene) {
   // read it, the whole resort throws, and the only symptom is a page that
   // never finishes loading. See the note on `facing`.
   const PLAY = { t0: 157, t1: 176, s0: 28.9, s1: 37.4 };
+  const SAN = { t0: 347.4, t1: 357.2, s0: 32.0, s1: 36.6 };
 
   /**
    * A painted sign, on a canvas.
@@ -1864,8 +1865,17 @@ async function buildJadrija(scene) {
   function shopBack(S, y0, top) {
     const back = S.s1;
     const body = S.body || [0.520, 0.492, 0.430];
-    const REND = shade(body, 0.93);
-    const DARK = shade(body, 0.62);
+    // A brand colour is a front, not a building. Maslina's body is 0.08 grey
+    // — right for the face the name is on, and from the wood it was a hole in
+    // the world. Anything this dark gets a plain render skin on the back,
+    // which is what is actually there: nobody paints the service side.
+    const lum = body[0] * 0.2126 + body[1] * 0.7152 + body[2] * 0.0722;
+    const REND = lum < 0.16 ? [0.470, 0.452, 0.420] : shade(body, 0.93);
+    if (lum < 0.16) {
+      boxTS(S.t0 - 0.01, S.t1 + 0.01, back - 0.04, back + 0.03,
+        y0 - 0.35, top, REND, shade(REND, 1.06));
+    }
+    const DARK = shade(REND, 0.62);
     const STEEL = [0.318, 0.324, 0.330];
     const GREY = [0.470, 0.472, 0.468];
     const len = S.t1 - S.t0;
@@ -1873,8 +1883,8 @@ async function buildJadrija(scene) {
 
     // The render does not run to the ground: there is a plinth course, and it
     // is grubbier than the wall above it.
-    boxTS(S.t0 - 0.04, S.t1 + 0.04, back - 0.03, back + 0.09, y0, y0 + 0.44,
-      shade(body, 0.78), shade(body, 0.86));
+    boxTS(S.t0 - 0.04, S.t1 + 0.04, back - 0.05, back + 0.09, y0, y0 + 0.44,
+      shade(REND, 0.80), shade(REND, 0.88));
 
     // A gutter along the eaves with a downpipe at each end. Two boxes and a
     // post, and it is the difference between a wall and a building.
@@ -2363,7 +2373,12 @@ async function buildJadrija(scene) {
         S.flag);
       if (S.name) shopSign(S, ft, S.s0 - 1.42, y0 + 2.0, 0.66, 1.8);
     }
-    if (S.kind === 'box') shopBack(S, y0, top);
+    // Maslina is a kiosk and six metres long, and from the lane its back was
+    // the same void h2o's was. Short kiosks are skipped: the yard kit does not
+    // fit in three and a half metres and comes out as a pile.
+    if (S.kind === 'box' || (S.kind === 'kiosk' && S.t1 - S.t0 > 5)) {
+      shopBack(S, y0, top);
+    }
     shopKit(S, y0, top, awn > 0 ? S.s0 - awn : null);
     // Chairs and tables under the awning, four sets to a frontage. Every café
     // in the survey has them and the game had not one chair on this shore.
@@ -2414,7 +2429,9 @@ async function buildJadrija(scene) {
   for (const S of SHOPS) shopfront(S);
   // The three placements, all photographed. The hoarding beside Maslina, the
   // panel out on the plaza, and the pair at the west end by the cabins.
-  centenary(349, 33.2, 4.4, 2.2, at(349).deck + 1.35);
+  // 349 / 33.2 was inside the sanitary block once that was built. East of
+  // Maslina and clear of it, which is the same piece of open ground.
+  centenary(361.5, 31.4, 4.4, 2.2, at(361.5).deck + 1.35);
   centenary(346, 6.0, 3.2, 1.8, at(346).deck + 1.25,
     { bg: '#cfe4d8', fg: '#1d3b30', big: '100' });
   centenary(212, 22.0, 2.6, 1.5, at(212).deck + 1.15, { bg: '#e8e2cc' });
@@ -4260,6 +4277,7 @@ async function buildJadrija(scene) {
       // `beachTo - 40` = 165, which is the middle of the compound, and three
       // of them were standing on the turf with the swing frame over them.
       if (t > PLAY.t0 - 3 && t < PLAY.t1 + 3) continue;
+      if (t > SAN.t0 - 3 && t < SAN.t1 + 3) continue;
       const s0 = JAD.rowB + 5.0 + jit(t | 0, 23) * 1.4;
       const y = surfaceY(t, s0 + 2.0);
       const col = PAINT[((jit(t | 0, 24) * 97) | 0) % PAINT.length];
@@ -4591,6 +4609,155 @@ async function buildJadrija(scene) {
   // because it takes salt and nothing eats it; agave on the rough slope past the
   // concrete, which is exactly where it grows without being planted.
   const greens = [];
+  // ── the sanitary block ─────────────────────────────────────────────────────
+  //
+  // Photographed straight on at t 355: the flat-roofed rendered block behind
+  // Maslina, in two masses, with a thick concrete roof slab oversailing the
+  // render by a hand's breadth on every side. Lime render gone salmon and
+  // grey in patches, damp staining up from the ground, three dark green
+  // louvred doors, and a red fire cabinet with two white H's on it bolted to
+  // the wall beside them. A washing line is strung across the right-hand half
+  // with a row of painted garments on it — that is a mural, not laundry, and
+  // it is on the wall in the photograph.
+  //
+  // It is the single most-used building on the shore and the game had a wood
+  // where it stands. Nobody puts a bathing station on a peninsula without one.
+  {
+    const back9 = b;
+    b = up;
+    const y = surfaceY((SAN.t0 + SAN.t1) * 0.5, SAN.s0);
+    const PINK = [0.520, 0.408, 0.352];        // the main mass
+    const GREY = [0.468, 0.432, 0.398];        // the wing, greyer
+    const SLAB = [0.505, 0.492, 0.462];        // the roof slab
+    const DOOR = [0.075, 0.215, 0.130];        // louvred, dark green
+    const RED = [0.600, 0.095, 0.075];
+    const tm = 350.4;                          // where the wing meets the block
+
+    // The concrete apron it stands on, cracked and patched.
+    b = deck;
+    for (let t = SAN.t0 - 1.6; t < SAN.t1 + 1.6; t += 2.1) {
+      const t1 = Math.min(t + 2.1, SAN.t1 + 1.6);
+      for (let k = 0; k < 2; k++) {
+        const a0 = SAN.s0 - 2.2 + k * 3.6, a1 = a0 + 3.6;
+        const g = 0.93 + 0.14 * ((jit(t | 0, 100 + k) * 5) | 0) / 4;
+        b.quad(W(t, a0, surfaceY(t, a0) + 0.05), W(t1, a0, surfaceY(t1, a0) + 0.05),
+          W(t1, a1, surfaceY(t1, a1) + 0.05), W(t, a1, surfaceY(t, a1) + 0.05),
+          [0.545 * g, 0.528 * g, 0.492 * g]);
+      }
+    }
+    b = up;
+
+    // The two masses. The wing is lower and greyer, and its slab is thinner.
+    const mass = (a, c, s0, s1, h, col, cap) => {
+      boxTS(a, c, s0, s1, y - 0.35, y + h, col, shade(col, 0.94));
+      // The slab. Oversailing on all four sides, which is the whole silhouette
+      // of this building: without it the block is a shed.
+      boxTS(a - 0.30, c + 0.30, s0 - 0.30, s1 + 0.30, y + h, y + h + cap,
+        SLAB, shade(SLAB, 1.10));
+      // And the drip: a darker line under the slab where the water runs off it.
+      boxTS(a - 0.30, c + 0.30, s0 - 0.31, s0 - 0.24, y + h - 0.07, y + h,
+        shade(SLAB, 0.78));
+    };
+    mass(tm, SAN.t1, SAN.s0, SAN.s1, 2.42, PINK, 0.24);
+    mass(SAN.t0, tm + 0.02, SAN.s0 + 0.55, SAN.s1 - 0.55, 2.14, GREY, 0.18);
+
+    // The damp band. Render this old is two colours from the ground up, and
+    // the join is a stain and not a line.
+    for (const [a, c, s, col] of [[tm, SAN.t1, SAN.s0, PINK],
+      [SAN.t0, tm, SAN.s0 + 0.55, GREY]]) {
+      for (let t = a; t < c; t += 0.9) {
+        const t1 = Math.min(t + 0.9, c);
+        const hh = 0.42 + jit(t | 0, 110) * 0.30;
+        boxTS(t, t1, s - 0.025, s + 0.01, y - 0.35, y + hh, shade(col, 0.80));
+      }
+    }
+
+    // Three louvred doors. A reveal, a leaf set back in it, and the louvres —
+    // which are what make a door on a wall like this read at thirty metres.
+    for (const td of [349.2, 352.3, 353.5]) {
+      boxTS(td - 0.46, td + 0.46, SAN.s0 - 0.04, SAN.s0 + 0.14,
+        y - 0.35, y + 2.06, [0.185, 0.150, 0.128]);
+      boxTS(td - 0.40, td + 0.40, SAN.s0 + 0.02, SAN.s0 + 0.09,
+        y - 0.02, y + 2.00, DOOR, shade(DOOR, 1.12));
+      for (let i = 0; i < 16; i++) {
+        const yy = y + 0.10 + i * 0.115;
+        boxTS(td - 0.38, td + 0.38, SAN.s0 - 0.015, SAN.s0 + 0.03,
+          yy, yy + 0.055, shade(DOOR, i % 2 ? 1.22 : 0.86));
+      }
+      // The frame, proud of the leaf on three sides.
+      for (const o of [-0.42, 0.42]) {
+        boxTS(td + o - 0.035, td + o + 0.035, SAN.s0 - 0.03, SAN.s0 + 0.06,
+          y - 0.02, y + 2.06, shade(DOOR, 0.72));
+      }
+      boxTS(td - 0.46, td + 0.46, SAN.s0 - 0.03, SAN.s0 + 0.06,
+        y + 2.00, y + 2.06, shade(DOOR, 0.72));
+      // The step, worn hollow in the middle.
+      b = deck;
+      boxTS(td - 0.52, td + 0.52, SAN.s0 - 0.62, SAN.s0 + 0.02,
+        y - 0.14, y + 0.02, shade(SLAB, 0.94), shade(SLAB, 1.04));
+      b = up;
+    }
+
+    // The fire cabinet. Red, projecting, with two white squares on the doors
+    // and a black hinge line down the middle.
+    {
+      const tf = 355.6;
+      boxTS(tf - 0.56, tf + 0.56, SAN.s0 - 0.18, SAN.s0 + 0.02,
+        y + 0.52, y + 1.66, RED, shade(RED, 1.14));
+      boxTS(tf - 0.02, tf + 0.02, SAN.s0 - 0.19, SAN.s0 - 0.16,
+        y + 0.54, y + 1.64, shade(RED, 0.55));
+      for (const o of [-0.30, 0.30]) {
+        boxTS(tf + o - 0.13, tf + o + 0.13, SAN.s0 - 0.20, SAN.s0 - 0.185,
+          y + 1.24, y + 1.50, [0.860, 0.858, 0.848]);
+      }
+      // The handle, and the pipe stub coming out of the wall beside it.
+      boxTS(tf + 0.44, tf + 0.50, SAN.s0 - 0.24, SAN.s0 - 0.18,
+        y + 1.02, y + 1.14, [0.220, 0.220, 0.225]);
+      post(W, tf + 0.86, SAN.s0 - 0.06, y + 0.30, y + 0.62, 0.045,
+        [0.400, 0.402, 0.398], 6);
+    }
+
+    // The painted washing line. Six garments on a catenary, and it is painted
+    // ON the wall — so it is flat against the render, a hair proud of it.
+    {
+      const a = 354.2, c = 357.0, top = y + 2.02, sag = 0.20;
+      const yl = (u) => top - Math.sin(Math.PI * u) * sag;
+      const N = 14;
+      for (let i = 0; i < N; i++) {
+        const u0 = i / N, u1 = (i + 1) / N;
+        const t0 = a + (c - a) * u0, t1 = a + (c - a) * u1;
+        boxTS(t0, t1, SAN.s0 - 0.022, SAN.s0 - 0.012, yl(u0) - 0.018, yl(u0) + 0.018,
+          [0.290, 0.245, 0.220]);
+      }
+      const GARM = [[0.760, 0.735, 0.700], [0.700, 0.520, 0.520],
+        [0.640, 0.612, 0.560], [0.560, 0.470, 0.520],
+        [0.720, 0.700, 0.660], [0.600, 0.545, 0.505]];
+      for (let i = 0; i < 6; i++) {
+        const u = 0.10 + i * 0.155;
+        const tg = a + (c - a) * u, ty = yl(u);
+        const w = 0.16 + jit(i, 120) * 0.09, h = 0.30 + jit(i, 121) * 0.22;
+        boxTS(tg - w, tg + w, SAN.s0 - 0.021, SAN.s0 - 0.014,
+          ty - h, ty - 0.02, GARM[i]);
+        // The peg.
+        boxTS(tg - 0.03, tg + 0.03, SAN.s0 - 0.026, SAN.s0 - 0.016,
+          ty - 0.05, ty + 0.07, [0.545, 0.470, 0.360]);
+      }
+    }
+
+    // A high vent grille in the return, and the soil pipe on the back.
+    boxTS(SAN.t1 - 0.05, SAN.t1 + 0.06, SAN.s0 + 1.4, SAN.s0 + 2.1,
+      y + 1.70, y + 2.06, [0.150, 0.145, 0.138]);
+    for (let i = 0; i < 5; i++) {
+      boxTS(SAN.t1 + 0.02, SAN.t1 + 0.07, SAN.s0 + 1.44, SAN.s0 + 2.06,
+        y + 1.74 + i * 0.07, y + 1.77 + i * 0.07, shade(PINK, 1.10));
+    }
+    post(W, SAN.t1 - 0.6, SAN.s1 + 0.14, y - 0.3, y + 2.60, 0.055,
+      [0.400, 0.396, 0.386], 7);
+
+    runs.push({ t0: SAN.t0 - 0.4, t1: SAN.t1 + 0.4, s0: SAN.s0 - 0.4,
+      s1: SAN.s1 + 0.4, y, h: 2.7 });
+    b = back9;
+  }
   // ── the playground ─────────────────────────────────────────────────────────
   //
   // a_160 films it from the top of the approach lane: a fenced compound on the
@@ -4829,6 +4996,8 @@ async function buildJadrija(scene) {
       // the climbing frame is the same bug as one growing through a roof.
       if (t > PLAY.t0 - 1.5 && t < PLAY.t1 + 1.5
         && s > PLAY.s0 - 1.5 && s < PLAY.s1 + 1.5) continue;
+      if (t > SAN.t0 - 1.5 && t < SAN.t1 + 1.5
+        && s > SAN.s0 - 1.5 && s < SAN.s1 + 1.5) continue;
       // Not through the vikendica, which stands out here now and is 6.8 by 7.7
       // of the strip these were planted along.
       if (Math.hypot(t - VIK.t, s - VIK.s) < 8.5) continue;
