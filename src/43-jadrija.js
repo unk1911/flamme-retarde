@@ -5951,7 +5951,20 @@ async function buildJadrija(scene) {
 
   // Somebody halfway down every other ladder, which is the one place on this
   // shore where a still figure reads unambiguously as mid-movement.
+  //
+  // The same beach test the ladders themselves use, and it was missing here.
+  // `ladder()` skips `t < beachTo + 8` because a ladder is how you get out of
+  // water you cannot stand up in and the west end is shingle you walk out of —
+  // but this loop did not, so t 22, 110 and 198 each put somebody halfway down
+  // a ladder that is not there. From the water it read as three people standing
+  // in the sea at s -0.28, a metre below the lip, holding nothing.
+  //
+  // The draw still happens on the way past. `B` takes its `rng()` before it
+  // decides anything, so a bare `continue` here would eat three numbers out of
+  // the stream and move every bather, parasol and hut east of the beach (rule
+  // 4). Verified: the census is identical either side of this change.
   for (let t = 22; t < LEN - 12; t += 88) {
+    if (t < JAD.beachTo + 8) { rng(); continue; }
     const st = at(t);
     B(t + 0.34, -0.28, st.lip - 0.95, 0, 'stand', 1);
   }
