@@ -8074,7 +8074,13 @@ async function buildJadrija(scene) {
     // is transparent, so a wine glass has to be a *bright* solid — an unlit
     // pane of glass reads as a pane of glass by being the lightest thing on the
     // table, not by being see-through.
-    crystal: [0.760, 0.800, 0.815], wine: [0.300, 0.045, 0.072],
+    // The crystal was 0.760 / 0.800 / 0.815, which is the albedo of white
+    // plastic, not of glass. A horizontal-ish surface in this room takes enough
+    // light that it clipped to flat white and took its own profile with it —
+    // the bowl had no shape in the frame at all — a flat white blob on a stool.
+    // Glass reads as glass by being
+    // dark and picking up a hard specular, not by being bright.
+    crystal: [0.345, 0.372, 0.390], wine: [0.300, 0.045, 0.072],
     // The wrap, off. `SCARF_DARK` and `SCARF_LITE` out of human_mh.py, split
     // the difference — on the floor it is a heap and not a net, and there is
     // no pattern left to be dark and light halves of.
@@ -8636,14 +8642,25 @@ async function buildJadrija(scene) {
     }
     // What ends up in the glass, and what gets it there. Both are their own
     // meshes for the same reason the bottle is: they are not always there.
-    // The wine is a lid on the bowl rather than a filled bowl — you can only
-    // ever see its surface and the ring of it against the crystal — and it sits
-    // a fraction inside the glass so the two do not argue about the z-buffer.
+    //
+    // The wine used to be a lid on the bowl, sitting a fraction INSIDE the
+    // crystal so the two could not argue about the z-buffer. It was drawn, it
+    // was `visible`, and it could not be seen by anybody, ever — because the
+    // glass is an opaque lathe in the room's shared buffer and an opaque glass
+    // has no inside. Everything within it is behind its front face.
+    //
+    // It cannot be fixed by making the crystal transparent: the glass is merged
+    // into `kit` with every other surface in the room and does not have a
+    // material of its own to make transparent. So the wine goes on the OUTSIDE
+    // of the bowl instead, a millimetre and a half proud of the crystal at every
+    // height, from the bottom of the bowl up to its own surface — which is what
+    // a glass of red actually looks like at three metres anyway. The bottom of
+    // the bowl is red, the rim is not, and the line between them is the level.
     const wbuf = propBuilder();
     b = wbuf;
     lathe(O, 0, 0, [
-      [0.0810, 0.0000], [0.0830, 0.0148], [0.0930, 0.0290],
-      [0.1090, 0.0368], [0.1220, 0.0380], [0.1220, 0.0000],
+      [0.0810, 0.0000], [0.0830, 0.0175], [0.0930, 0.0335],
+      [0.1090, 0.0413], [0.1220, 0.0424], [0.1220, 0.0000],
     ], KIT.wine, 16);
     // And the stream, built one metre long about its own base so that a scale
     // and a position are all it needs. Six sides at 3 mm: it is on screen for
