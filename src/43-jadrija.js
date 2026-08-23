@@ -2996,6 +2996,20 @@ async function buildJadrija(scene) {
    * photograph rather than given invented numbers. At the distance anybody
    * reads this from in the game they are a couple of pixels either way, which
    * is the same thing the photograph does to them.
+   *
+   * That still stands after the 23 August 2026 survey. Its four frames —
+   * 20260823_111815, _111819, _111954 and _112051 — are the gelato counter
+   * from inside the shop, beach bar MINI and the pine shade. None of them
+   * shows this board, so the three numbers on it are still the three numbers
+   * on it. 20260823_111819 does read SLADOLED KUGLA 2,50 € and a cornet at
+   * 1,00 €, but those are two hand-lettered cards standing on the counter
+   * inside the shop, not the price of SLADOLED up here, and putting a counter
+   * card's number on the board would be rule 12 broken by a side door.
+   *
+   * The third item in the right-hand column is still off the board. The best
+   * reading of it at full resolution is KOKICE, but KORICE was what the
+   * survey wrote down, the two differ by one stroke at this scale, and
+   * nothing photographed since settles it.
    */
   /**
    * The centenary hoarding: JADRIJA 100, OD 1922.
@@ -3182,46 +3196,155 @@ async function buildJadrija(scene) {
       grad.addColorStop(1, '#e8b322');
       return grad;
     };
+    const BAYS = [[0.015, 0.315], [0.345, 0.655], [0.685, 0.985]];
+    const RULE = H * 0.035;
     const bay = (x0, x1) => {
       g.fillStyle = '#aebecb';
       g.fillRect(CW * x0, H * 0.06, CW * (x1 - x0), H * 0.88);
-      g.strokeStyle = '#f2f4f5'; g.lineWidth = H * 0.035;
+      g.strokeStyle = '#f2f4f5'; g.lineWidth = RULE;
       g.strokeRect(CW * x0, H * 0.06, CW * (x1 - x0), H * 0.88);
     };
-    bay(0.015, 0.315); bay(0.345, 0.655); bay(0.685, 0.985);
-    // Left bay: the cold drinks.
-    g.textAlign = 'left';
-    g.fillStyle = warm();
-    ['LIMUNADA', 'SPRITE', 'TONIC', 'FANTA'].forEach((t, i) => {
-      g.font = `700 ${H * 0.15}px ${SANS}`;
-      g.fillText(t, CW * 0.045, H * (0.26 + i * 0.19));
+    BAYS.forEach(([a, c]) => bay(a, c));
+    /**
+     * The blue field inside bay `k` — the box everything in it is measured
+     * against.
+     *
+     * Every position in here used to be a fraction of the whole canvas, and
+     * that is what broke the price column. A bay is 0.30 of the canvas wide,
+     * so the numbers' right margin — 0.985 minus 0.975 — came out at 0.010·CW,
+     * eleven pixels on the 1106-pixel canvas this board makes, of which the
+     * frame's own 0.035·H stroke eats four and a half from the inside. The
+     * item column's left margin, from the same arithmetic, was twenty-two.
+     * The prices stood on the frame and the labels touched it.
+     *
+     * `strokeRect` centres the stroke on the rectangle, so half the rule
+     * stands inside the blue and half outside it, and that half is what every
+     * margin in this function has to clear before it starts.
+     */
+    const fieldOf = (k) => ({
+      x0: CW * BAYS[k][0] + RULE * 0.5, x1: CW * BAYS[k][1] - RULE * 0.5,
+      y0: H * 0.06 + RULE * 0.5, y1: H * 0.94 - RULE * 0.5,
     });
-    // Middle bay: the name, small over large, which is how it is set.
-    g.textAlign = 'center';
-    g.font = `600 ${H * 0.12}px ${SANS}`;
-    g.fillText('Slastičarnica', CW * 0.5, H * 0.26);
-    g.font = `800 ${H * 0.26}px ${SANS}`;
-    g.fillText('JADRIJA', CW * 0.5, H * 0.55);
-    // Right bay: what it costs. A white label where the photograph has one.
-    g.textAlign = 'left';
-    const items = [['SLADOLED', null], ['KUPOVI', '8.00 €'], ['FRAPPE', '7.00 €'],
-      ['KRAFNE', null], ['ESPRESSO', '2.00 €'], ['MACCHIATO', null],
-      ['CAPPUCCINO', null]];
-    items.forEach(([t, price], i) => {
-      const y = H * (0.19 + i * 0.115);
-      g.font = `700 ${H * 0.105}px ${SANS}`;
-      g.fillStyle = warm();
-      g.fillText(t, CW * 0.705, y);
-      if (price) {
-        g.textAlign = 'right';
-        g.font = `600 ${H * 0.095}px ${SANS}`;
-        g.fillText(price, CW * 0.975, y);
-        g.textAlign = 'left';
-      } else {
-        g.fillStyle = '#f4f6f7';
-        g.fillRect(CW * 0.905, y - H * 0.085, CW * 0.068, H * 0.10);
+    /**
+     * How big one COLUMN of lines can be set, and how hard it has to squeeze.
+     *
+     * Two things this used to get wrong, both of them visible on the board.
+     *
+     * The first is that the face on the real sign is a fat rounded condensed
+     * one and Helvetica is not. Measured off 20260821_175713: MACCHIATO is
+     * 145 px wide at a 30 px cap height, and Helvetica Bold at that cap height
+     * would be 250 — the real face is Helvetica squeezed to about 0.58. So a
+     * line is set at the cap height the photograph has and SQUEEZED to fit,
+     * down to `floor`, and only if that is still too wide does it come down in
+     * size. Shrinking first gives letters half the photograph's height, which
+     * is the wrong answer to a width problem.
+     *
+     * The second is that a size chosen per line is not a menu board. Sized one
+     * at a time, SPRITE came out a third taller than the LIMUNADA above it,
+     * because SPRITE is shorter. So the whole column is measured first and the
+     * worst-off line decides for all of them — which is what a signwriter
+     * does and what the photograph shows.
+     *
+     * `maxOf` is per line and not one number, because a row carrying 8.00 €
+     * has less width for its name than a row carrying a blank white label.
+     */
+    const column = (rows, weight, px, maxOf, floor) => {
+      let need = 1;
+      for (const r of rows) {
+        g.font = `${weight} ${px}px ${SANS}`;
+        need = Math.max(need, (g.measureText(r[0]).width || 1) / maxOf(r));
       }
-    });
+      const sx = Math.max(floor, 1 / need);
+      return { weight, px: need * sx > 1 ? px / (need * sx) : px, sx };
+    };
+    /**
+     * One line of it, at the size the column settled on.
+     *
+     * `align` is honoured through the transform: the translate puts the origin
+     * on the anchor, so a right-aligned number ends exactly at `x` whatever
+     * the squeeze turned out to be.
+     *
+     * The translate is in x ONLY and the baseline goes to `fillText`, which
+     * looks like a stylistic choice and is not. `warm()` is a gradient, and a
+     * gradient is resolved in the user space in force when the fill happens:
+     * translating in y first moved every line to the red end of it and the
+     * board came out one flat colour instead of running red to gold down the
+     * bay. The squeeze is horizontal, so x is the only axis that has to move.
+     */
+    const line = (text, m, x, y, align) => {
+      g.textAlign = align;
+      g.font = `${m.weight} ${m.px}px ${SANS}`;
+      g.save();
+      g.translate(x, 0);
+      g.scale(m.sx, 1);
+      g.fillText(text, 0, y);
+      g.restore();
+    };
+    // Left bay: the cold drinks. Caps at about two thirds of the row pitch,
+    // which is what the photograph measures on this column.
+    {
+      const f = fieldOf(0), fw = f.x1 - f.x0, fh = f.y1 - f.y0;
+      const rows = [['LIMUNADA'], ['SPRITE'], ['TONIC'], ['FANTA']];
+      const top = f.y0 + fh * 0.045, pitch = (fh * 0.91) / rows.length;
+      const m = column(rows, '700', pitch * 0.93, () => fw * 0.93, 0.68);
+      g.fillStyle = warm();
+      rows.forEach((r, i) => {
+        line(r[0], m, f.x0 + fw * 0.035, top + pitch * (i + 0.76), 'left');
+      });
+    }
+    // Middle bay: the name, small over large, which is how it is set.
+    {
+      const f = fieldOf(1), fw = f.x1 - f.x0, fh = f.y1 - f.y0;
+      const cx = (f.x0 + f.x1) * 0.5;
+      g.fillStyle = warm();
+      line('Slastičarnica',
+        column([['Slastičarnica']], '600', H * 0.15, () => fw * 0.84, 0.72),
+        cx, f.y0 + fh * 0.26, 'center');
+      line('JADRIJA',
+        column([['JADRIJA']], '800', H * 0.34, () => fw * 0.90, 0.68),
+        cx, f.y0 + fh * 0.62, 'center');
+    }
+    // Right bay: what it costs. A white label where the photograph has one.
+    //
+    // The columns are the photograph's. On 20260821_175713 the right-hand blue
+    // field runs x 2980 to 3200; the names start at 2988 and the longest of
+    // them reaches 3130; 8.00 € runs 3115 to 3175 and the little white labels
+    // 3140 to 3172. As fractions of the field: names from 0.035, numbers
+    // ending at 0.925, a label 0.19 wide. A name and its own number overlap in
+    // the photograph only because no row there has both a long name and a wide
+    // price — so the budget is per row, 0.55 of the field for a name with a
+    // number beside it and 0.60 for one with a label.
+    //
+    // Nothing here is invented. Only KUPOVI 8.00, FRAPPE 7.00 and ESPRESSO
+    // 2.00 could ever be read; the other four are the little white labels they
+    // are up there, and if the layout leaves room for more numbers the room
+    // stays empty. The four photographs of 23 August 2026 are the gelato
+    // counter, beach bar MINI and the pine shade — none of them shows this
+    // board, so none of them makes a fourth number legible.
+    {
+      const f = fieldOf(2), fw = f.x1 - f.x0, fh = f.y1 - f.y0;
+      const items = [['SLADOLED', null], ['KUPOVI', '8.00 €'], ['FRAPPE', '7.00 €'],
+        ['KRAFNE', null], ['ESPRESSO', '2.00 €'], ['MACCHIATO', null],
+        ['CAPPUCCINO', null]];
+      const top = f.y0 + fh * 0.045, pitch = (fh * 0.91) / items.length;
+      const rx = f.x1 - fw * 0.075;                 // where a number ends
+      const lw = fw * 0.19;                         // an illegible one's label
+      const mi = column(items, '700', pitch * 0.92,
+        (r) => fw * (r[1] ? 0.55 : 0.60), 0.58);
+      const mp = column(items.filter((r) => r[1]).map((r) => [r[1]]),
+        '600', pitch * 0.92, () => fw * 0.30, 0.75);
+      items.forEach(([t, price], i) => {
+        const y = top + pitch * (i + 0.76);
+        g.fillStyle = warm();
+        line(t, mi, f.x0 + fw * 0.035, y, 'left');
+        if (price) {
+          line(price, mp, rx, y, 'right');
+        } else {
+          g.fillStyle = '#f4f6f7';
+          g.fillRect(rx - lw, y - pitch * 0.58, lw, pitch * 0.70);
+        }
+      });
+    }
     const tex = new THREE.CanvasTexture(C);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
@@ -4165,9 +4288,38 @@ async function buildJadrija(scene) {
     // where 20260821_175713 has them. Same construction as `shopSign` — a face
     // with a tray 0.10 m behind it, both placed off the face rather than off
     // the building, for the reason written out at length up there.
+    //
+    // SIZED OFF THE PHOTOGRAPH AND OFF THE OPENING, not off the shop.
+    //
+    // It was `(t1 − t0) · 0.34` by 1.18 — a fraction of the shop's *modelled*
+    // width, and this shop is modelled 15 m wide because that is what the
+    // counter, the drinks fridge and the four metres of gelato cabinet need.
+    // The real frontage is about half that, so 0.34 of it came out at 5.1 m
+    // and the board was drawn at an aspect of 4.3 against the photograph's
+    // 2.18 — measured on 20260821_175713, where the assembly runs 2400 to 3230
+    // across and 1055 to 1435 down.
+    //
+    // Which would only have been ugly, except that 5.1 m centred at 0.70 of
+    // the shop put the east end at t 341.05, three quarters of a metre PAST
+    // the serving opening's east reveal at `oc`. `shopExtras` tiles that
+    // reveal, and its jamb stands at s0−0.30 … s0−0.16 — two centimetres in
+    // FRONT of this board at s0−0.14 — from t 340.36 to 340.70, with the
+    // roller-shutter jamb behind it to 340.76. Between them they covered the
+    // right-hand bay from 0.87 of its width to 0.95, which is exactly the
+    // price column: 8.00 and 2.00 were gone, 7.00 showed a sliver of itself
+    // through the gap between two courses of tile, and the little white
+    // labels were sliced. The board was never clipped — it was BEHIND
+    // something, and the something was built after it.
+    //
+    // So: the photograph's aspect, and the east edge hung 0.15 m clear of that
+    // reveal. Measured back off the built mesh, the board runs t 337.65 to
+    // 340.09 — a quarter of a metre clear of the tiled jamb at one end and a
+    // tenth of a metre clear of the gelato cabinet's hood at `cm + 2.05` at
+    // the other. There is no room to be had beyond that at either end; the
+    // board fits between the two of them or it does not fit.
     if (S.panels) {
-      const pw = (S.t1 - S.t0) * 0.34, ph = 1.18;
-      const pt = S.t0 + (S.t1 - S.t0) * 0.70, ps = S.s0 - 0.14;
+      const ph = 1.18, pw = ph * 2.18;
+      const pt = oc - 0.15 - pw * 0.5, ps = S.s0 - 0.14;
       const py = y0 + 1.62;
       const back = b;
       b = up;
