@@ -189,8 +189,10 @@ as of this writing; the state of each is in the git log, not here.
       arms and legs need to move through space like a person's. CLOSED 23 Aug
       on Misha's word: "her walk is just fine now, u can close that out." The
       only evidence a gait item can be closed on is somebody watching it, and
-      he raised it. The numbers from the stand pass below are what the walk was
-      corrected against, and they stand as the record of what changed.
+      he raised it — and there is a written fix behind that verdict: the same
+      22 Aug pass found the same rest splay against 2 degrees of correction,
+      and `_walk_elbow`'s sign backwards, which on that bone swings the hand
+      forward when it should swing it back. See the 1.99.0 CHANGELOG entry.
 - [x] And so is the bathers' STAND, which the walk pass did not touch: "at
       least some of the bathers still have that bear-pose, the A-pose, with
       spread legs and arms". Same cause, one clip along — `IDLE_A` corrects the
@@ -216,9 +218,17 @@ as of this writing; the state of each is in the git log, not here.
       seated clips in the bake with the legs solved per figure against a 0.46 m
       seat. All 24 terrace occupants are the skinned tier. 60 fps standing in
       front of it, against 60-61 before.
-- [ ] West of the businesses the ground comes up through everything: benches
-      grown into it, bathers neck deep. Almost certainly rule 2 again, but
-      MEASURE the four height functions on a grid before assuming.
+- [x] West of the businesses the ground comes up through everything: benches
+      grown into it, bathers neck deep. FIXED 22 Aug in `2862236`, and this
+      line was simply never ticked — Misha, 23 Aug: "u already fixed the 'west
+      of the businesses ground comes up' issue." The cause was the beach
+      flattening fitting the whole 33 m cross-section to the ground under the
+      seaward 4 m, so the deck was pinned at the waterline while the hill
+      climbed behind it: terrain stood up to 1.50 m above the surface
+      everything was placed on. `lipOf`/`midOf`/`deckOf` are heights at a point
+      now, so the rule is enforced by the function rather than by remembering
+      it. The instruction above was followed to the letter — measured on a
+      10x18 grid, worst case +0.02 m.
 - [ ] The standing crowd reads as switched-off robots. Either give every figure
       some motion, however small, or seat them — in the chairs, on the wall,
       legs in the sea. A standing figure with nothing moving is the one thing
