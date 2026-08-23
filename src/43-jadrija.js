@@ -6282,7 +6282,7 @@ async function buildJadrija(scene) {
   // ice-cream errand is set on, and it holds sixty. The ladder stays, because
   // it costs nothing at this count and is what makes a larger one arguable
   // later — the number to re-measure next is thirty.
-  const SKIN_CAST = 20;
+  const SKIN_CAST = 24;
   // And on top of those, the café terraces.
   //
   // Reported 22 Aug, of the tables: "replace those marionettes with our high
