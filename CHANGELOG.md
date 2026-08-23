@@ -8,6 +8,52 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.108.0] — 2026-08-23
+
+### Fixed
+
+- **The canopy you stand under is not a plate any more — and it was never a
+  pine, or the tree system.** The complaint was logged against
+  `src/45-trees.js`; the fix is entirely in `src/43-jadrija.js`, and finding
+  that out was most of the work. The landscape trees were frozen invisible in
+  the running page (`repack` rewrites `mesh.visible` twice a second, so the
+  property has to be *redefined*, not assigned) and **the plate over the
+  promenade at t 230 did not move.** `jadrija.inField` excludes the landscape
+  planting from the resort entirely. What you stand under at Jadrija is the
+  shore's own `pine()`, `olive()` and `oleander()`, baked into the static mesh —
+  and painting each builder a flat colour and taking one screenshot showed the
+  "flat olive mass" in the complaint is **literally an olive**, one of the three
+  in front of the vikendica's terrace that the source asks for as
+  "open-crowned, so from the terrace you are looking at the sea through a tree".
+
+  The cause was arithmetic nobody had done: a pine's nine puffs summed to 44 m²
+  of foliage over a 57 m² crown with all of it inside the inner two thirds —
+  **over 200 % coverage there** — and an olive's five lobes came to 122 % of its
+  own crown. Nothing that dense has gaps to see sky through.
+
+  Now five boughs leave the trunk and go out and up, each forks, each twig
+  carries a spray of two tufts rather than one ball, and three more sit high
+  over the middle: **23 puffs at just under 60 % plan coverage**, capped at
+  1.05 m so a 14 m tree cannot hang a 3 m plate over your head. The olive gets
+  nine smaller lobes spread to the rim and over twice the height band, 58 %.
+  Worked from `v595/a_019` and `a_027`, both of which look up through the stand.
+  Lattice — canopy-edge pixels per canopy pixel, looking up — roughly **doubled
+  at all three stations**.
+
+  Costs +77 862 triangles on the static shore mesh. Measured uncapped at the
+  three promenade stations after merging: **12.4 / 7.8 / 9.1 ms** against a
+  16.7 ms budget. The `rng` budget is unchanged at 40 draws a pine and 1 an
+  olive, so Rule 4 holds and the census is untouched. `src/45-trees.js` was not
+  edited and the far silhouettes are bit-identical.
+
+### Known
+
+- `oleander()` has the same over-coverage, but it is a shrub and never a
+  ceiling, so it was left alone.
+- The vikendica's front olives overhang the promenade with their crown bottom
+  about a metre above head height. That is a placement question, not a geometry
+  one.
+
 ## [1.107.0] — 2026-08-23
 
 ### Fixed
