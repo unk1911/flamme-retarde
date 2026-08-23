@@ -1886,7 +1886,10 @@ async function buildJadrija(scene) {
     { key: 'slast', kind: 'box', t0: 328, t1: 343, s0: 22, s1: 27.2, h: 2.95,
       name: 'slastičarnica', sub: 'JADRIJA', roof: [0.590, 0.578, 0.545],
       body: [0.560, 0.535, 0.487], awn: 3.0, fg: '#26241f', bg: '#f4f2ee',
-      vitrine: true, cooler: true, scallop: true, panels: true },
+      vitrine: true, cooler: true, scallop: true, panels: true,
+      // 20260823_111815 and _111819: the wall behind this counter is mirror
+      // tile floor to ceiling with three glass shelves of stemware on it.
+      backBar: true },
     { key: 'tramp', kind: 'fence', t0: 348, t1: 362, s0: 46, s1: 56, h: 2.2,
       name: null, post: [0.640, 0.520, 0.060], body: [0.055, 0.075, 0.062],
       rail: [0.660, 0.545, 0.075], skirt: [0.545, 0.075, 0.065] },
@@ -3703,6 +3706,203 @@ async function buildJadrija(scene) {
     }
   }
 
+  /**
+   * The wall behind the Slasticarnica's counter, on a canvas.
+   *
+   * Both of this morning's counter photographs are mostly this wall and the
+   * game had a black panel there — the "lightbox" trick the serving opening is
+   * drawn with, which is right for a kiosk you never get close to and is
+   * nothing at all from two metres, which is the only distance this shop is
+   * ever looked at.
+   *
+   * What is actually there is MIRROR TILE, floor to ceiling, in squares about a
+   * hand and a half across with dark joints between them, and on brackets off
+   * it three glass shelves carrying rows of stemware standing upside down. The
+   * mirror is why the inside of this shop reads as twice its own depth in every
+   * photograph of it, and it is the single most characteristic thing about the
+   * place after the counter itself.
+   *
+   * Everything set here is a shape or a colour and not a word. The boxed stock
+   * on the shelves is bright and unreadable in both frames, so it ships as
+   * blocks of colour; the framed licence on the wall ships as a framed cream
+   * panel with a crest on it and no text. Rule 12 applies to a texture exactly
+   * as it applies to a sign, and a wall of invented brand names would be the
+   * worst thing that could be put on it.
+   *
+   * The two things that ARE drawn as themselves are the round wall clock —
+   * white face, black bezel, and the hands at the time the photograph was taken
+   * — and the Croatian flag hanging in the corner. Both are unambiguous.
+   */
+  function backBarSkin(w, h) {
+    const PX = 1024, C = document.createElement('canvas');
+    C.width = PX; C.height = Math.round(PX * h / w);
+    const H = C.height;
+    const g = C.getContext('2d');
+    // The mirror. A grid of squares, each a slightly different silver, over a
+    // vertical ramp — a mirror in a shaded room is darker at the bottom because
+    // what it is reflecting down there is the room and not the doorway, and a
+    // flat grey grid reads as bathroom tile.
+    const gr = g.createLinearGradient(0, 0, 0, H);
+    gr.addColorStop(0, '#aab3b7'); gr.addColorStop(1, '#79828a');
+    g.fillStyle = gr; g.fillRect(0, 0, PX, H);
+    const TL = 62;
+    for (let x = 0; x < PX; x += TL) {
+      for (let y = 0; y < H; y += TL) {
+        const q = ((x * 7 + y * 13) % 11) / 11;
+        g.fillStyle = `rgba(${196 + q * 44 | 0},${204 + q * 40 | 0},${208 + q * 38 | 0},${0.26 + q * 0.30})`;
+        g.fillRect(x + 2, y + 2, TL - 4, TL - 4);
+      }
+    }
+    // The joints, drawn rather than left as the ground showing through. A tile
+    // wall with no joint is a sheet of metal, and the first cut left the ground
+    // dark enough that the whole run read as a black cabinet with white funnels
+    // in it rather than as a mirror.
+    g.fillStyle = 'rgba(40,44,48,0.35)';
+    for (let x = 0; x < PX; x += TL) g.fillRect(x, 0, 2, H);
+    for (let y = 0; y < H; y += TL) g.fillRect(0, y, PX, 2);
+
+    // The fittings on the wall go in the LEFT third and not the right, because
+    // the right of this face is behind the gelato case and behind the menu
+    // boards, and a clock nobody can see is a clock that was not worth drawing.
+    // The control cabinet, with the red flash on its door: the one thing in the
+    // room that is neither glass nor mirror, and it anchors the wall.
+    g.fillStyle = '#e6e6e2'; g.fillRect(PX * 0.035, H * 0.02, PX * 0.100, H * 0.20);
+    g.fillStyle = '#cfcfc9'; g.fillRect(PX * 0.035, H * 0.20, PX * 0.100, H * 0.028);
+    g.fillStyle = '#9aa0a2';
+    g.fillRect(PX * 0.050, H * 0.055, PX * 0.040, H * 0.055);
+    g.fillStyle = '#c8241c';
+    g.beginPath();
+    g.moveTo(PX * 0.118, H * 0.125); g.lineTo(PX * 0.098, H * 0.170);
+    g.lineTo(PX * 0.110, H * 0.170); g.lineTo(PX * 0.094, H * 0.205);
+    g.lineTo(PX * 0.124, H * 0.155); g.lineTo(PX * 0.108, H * 0.155);
+    g.closePath(); g.fill();
+    // The framed licence. A crest, five ruled lines and NO TEXT — see the note
+    // above: rule 12 applies to a texture exactly as it applies to a sign.
+    g.fillStyle = '#b08a4e';
+    g.fillRect(PX * 0.170, H * 0.025, PX * 0.075, H * 0.185);
+    g.fillStyle = '#f3f0e6';
+    g.fillRect(PX * 0.176, H * 0.038, PX * 0.063, H * 0.160);
+    g.fillStyle = '#c8241c';
+    g.fillRect(PX * 0.200, H * 0.055, PX * 0.016, H * 0.030);
+    g.fillStyle = 'rgba(60,60,60,0.45)';
+    for (let i = 0; i < 5; i++) {
+      g.fillRect(PX * 0.181, H * (0.110 + i * 0.019), PX * 0.052, 2);
+    }
+    // The clock. White face, black bezel, and the hands at twenty past eleven,
+    // which is when the photograph was taken and is the only defensible time to
+    // put on it.
+    const cx = PX * 0.300, cy = H * 0.115, cr = H * 0.088;
+    g.fillStyle = '#15151a';
+    g.beginPath(); g.arc(cx, cy, cr, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#f6f6f2';
+    g.beginPath(); g.arc(cx, cy, cr * 0.84, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#20202a'; g.lineWidth = 2;
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      g.beginPath();
+      g.moveTo(cx + Math.sin(a) * cr * 0.72, cy - Math.cos(a) * cr * 0.72);
+      g.lineTo(cx + Math.sin(a) * cr * 0.60, cy - Math.cos(a) * cr * 0.60);
+      g.stroke();
+    }
+    g.lineWidth = 3;
+    for (const [frac, len] of [[11.33 / 12, 0.44], [20 / 60, 0.66]]) {
+      const a = frac * Math.PI * 2;
+      g.beginPath(); g.moveTo(cx, cy);
+      g.lineTo(cx + Math.sin(a) * cr * len, cy - Math.cos(a) * cr * len);
+      g.stroke();
+    }
+    // And the flag hanging beside it. Three bands and the chequy, which at this
+    // size is eight squares and is still unmistakable.
+    const fx = PX * 0.352, fw = PX * 0.026, fh = H * 0.34;
+    for (const [i, col] of [[0, '#c8102e'], [1, '#f4f4f2'], [2, '#1b3c8c']]) {
+      g.fillStyle = col; g.fillRect(fx, i * fh / 3, fw, fh / 3);
+    }
+    for (let i = 0; i < 4; i++) {
+      for (let k = 0; k < 2; k++) {
+        g.fillStyle = (i + k) % 2 ? '#c8102e' : '#f4f4f2';
+        g.fillRect(fx + k * fw / 2, fh * 0.34 + i * fh * 0.055, fw / 2, fh * 0.055);
+      }
+    }
+
+    // Three glass shelves on their brackets, and the stemware standing upside
+    // down on them. A stem is three strokes — a foot, a stalk and a bowl — and
+    // hung the wrong way up it is the bowl that is nearest the shelf, which is
+    // the whole silhouette and the reason a row of them is unmistakable.
+    const SH = [H * 0.40, H * 0.63, H * 0.86];
+    for (const y of SH) {
+      g.fillStyle = 'rgba(238,244,248,0.62)';
+      g.fillRect(24, y, PX - 48, 5);
+      g.fillStyle = 'rgba(255,255,255,0.40)';
+      g.fillRect(24, y - 2, PX - 48, 2);
+      for (let x = 54; x < PX - 40; x += 34) {
+        const bh = H * 0.085;
+        g.fillStyle = 'rgba(236,244,248,0.42)';
+        g.beginPath();
+        g.moveTo(x - 11, y + 5); g.lineTo(x + 11, y + 5);
+        g.lineTo(x + 4, y + 5 + bh * 0.62); g.lineTo(x - 4, y + 5 + bh * 0.62);
+        g.closePath(); g.fill();
+        g.fillRect(x - 2, y + 5 + bh * 0.60, 4, bh * 0.30);
+        g.fillRect(x - 8, y + 5 + bh * 0.88, 16, 3);
+      }
+    }
+    // The boxed stock along the middle shelf. Colour and no words: it is bright
+    // and illegible in both frames and always was.
+    const box = ['#e07a24', '#3f8ed0', '#5aa832', '#c0357a', '#e0b81c'];
+    for (let i = 0; i < 5; i++) {
+      g.fillStyle = box[i];
+      g.fillRect(PX * 0.15 + i * 44, SH[1] - H * 0.155, 36, H * 0.155);
+      g.fillStyle = 'rgba(255,255,255,0.72)';
+      g.fillRect(PX * 0.15 + i * 44 + 6, SH[1] - H * 0.122, 24, H * 0.052);
+    }
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    return tex;
+  }
+
+  /**
+   * Hang that wall in the serving opening, and put the mullions back in front
+   * of it.
+   *
+   * The face goes at `s0−0.14`, which is where the three menu panels also
+   * hang — but they start at t 335.95 and this stops at 335.90, so the two
+   * never share a plane over the same ground and there is nothing for the depth
+   * buffer to get wrong. It is also the reason this covers the WEST half of the
+   * opening only: a back wall painted across the boards would be a back wall in
+   * front of the prices.
+   *
+   * `shopKit` stands its mullions at `s0−0.03`, which is one centimetre in
+   * front of the dark panel they are drawn against — rule 5 in the place
+   * nobody looks, and which of the two wins at two kilometres from origin is
+   * decided by rounding. Three of the five fall inside this face and would be
+   * behind it whatever they did, so they are drawn again here at `s0−0.26`:
+   * proper solids, 0.12 m clear of the wall, in front of it the way a mullion
+   * in an opening actually is.
+   */
+  function backBar(S, y0, top) {
+    const oa = S.t0 + (S.t1 - S.t0) * 0.18, oc = S.t1 - (S.t1 - S.t0) * 0.18;
+    const t1 = Math.min(oc, 335.90);
+    const t0 = oa + 0.15;
+    if (t1 - t0 < 1.0) return;
+    // Stopping at `top − 0.62` and not `top − 0.38`, which is where the dark
+    // panel behind it stops. Painting the whole panel put the control cabinet,
+    // the licence, the clock and the flag in a band that the frontage above the
+    // opening covers from every viewpoint a walker has — the paint method,
+    // one flat magenta quad and one screenshot, and the answer was off the
+    // image in a second after twenty minutes of reasoning about awnings.
+    const yLo = y0 + 1.10, yHi = top - 0.62;
+    const w = t1 - t0, h = yHi - yLo;
+    seaFacing(backBarSkin(w, h), (t0 + t1) * 0.5, S.s0 - 0.14,
+      (yLo + yHi) * 0.5, w, h, 'slast:backbar');
+    const body = S.body || [0.520, 0.492, 0.430];
+    const nmul = Math.max(2, Math.round((oc - oa) / 1.5));
+    for (let k = 1; k < nmul; k++) {
+      const t = oa + (oc - oa) * (k / nmul);
+      if (t < t0 || t > t1) continue;
+      boxTS(t - 0.035, t + 0.035, S.s0 - 0.26, S.s0 - 0.18, y0 + 1.06,
+        top - 0.34, shade(body, 0.78), shade(body, 0.92));
+    }
+  }
+
   /** One business. Everything upright goes in `up`; pads stay in `deck`. */
   /**
    * What one shop has that the others do not.
@@ -4443,6 +4643,9 @@ async function buildJadrija(scene) {
     // chips on it until the 22 August survey, which is what a shop looks like
     // when nobody has ever stood in front of it.
     if (S.vitrine) gelatoCase(S, y0);
+    // And the mirror-tiled wall behind it, which is what the two counter
+    // photographs of 23 August are mostly of. See `backBar`.
+    if (S.backBar) backBar(S, y0, top);
     // The three menu panels, on the frontage right of the serving opening,
     // where 20260821_175713 has them. Same construction as `shopSign` — a face
     // with a tray 0.10 m behind it, both placed off the face rather than off
