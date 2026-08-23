@@ -451,10 +451,18 @@ concrete. 89 people at 60 fps.
 - **`0` throws and does not stop throwing.** `skipToGround` → `ground.force()`
   → `seedSpotFire()` reads `far[0]` and `far[1]` off a sorted `objects` with no
   guard, and `objects` can be shorter than two. `47-ground.js:614`.
-- **`swimwear()` smears.** The walking woman's suit paints red blotches across
-  her back and buttocks. Same mechanism as the nape wedge that was fixed today
-  — a paint volume interpolating across triangles four times the size it was
-  authored for — but in `swimwear()` rather than `cutters()`.
+- [x] **`swimwear()` smears.** The walking woman's suit paints red blotches
+  across her back and buttocks. FIXED 23 Aug, and not in `swimwear()`: the
+  volume and the colour were both right and the mesh was wrong. `paint` ran
+  before `export_skin` decimated, the COLLAPSE decimator averages the colours it
+  merges, and what shipped was a ramp 25 to 80 mm wide on each side of a garment
+  drawn 110 mm tall — 72 mm of solid red inside 182 mm of pink, then
+  interpolated across thigh triangles up to 198 mm long. `export_skin` now takes
+  `repaint` (the same coats, laid on the decimated copy) and `dense` (an
+  inverted vertex group over the hem, which is the only thing the decimator will
+  accept as "keep this"). 100 per cent solid, 107 mm tall, 16.4 mm triangles,
+  33 mm of bleed. Both default off, so Baye's blob is untouched; on all eight
+  bathers the bone table and the nine clips are bit-identical.
 - **`toWorld` and `walkY` disagree by up to 1.05 m at (392, 8.5)**, in Baye's
   lane on the terrace. She stands on `toWorld`, which is where the deck is
   drawn, so it does not show on her; something that stands on `walkY` there

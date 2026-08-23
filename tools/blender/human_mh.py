@@ -1532,6 +1532,11 @@ def hem_group(body, coats, name="hem"):
     place the mesh's coarseness shows, and it is about a tenth of the budget.
     Everything on either side of it is free to collapse as far as the ratio
     wants, because flat colour does not care how big its triangles are.
+
+    The group is safe to leave on the object it is exported from, and that is
+    not luck: `weights` below reads `gname`, which is taken before this runs, so
+    a group added afterwards is not in it and is skipped along with every other
+    group whose name is not a bone's.
     """
     me = body.data
     g = body.vertex_groups.get(name) or body.vertex_groups.new(name=name)

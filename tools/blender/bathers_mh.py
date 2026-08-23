@@ -218,6 +218,14 @@ def swimwear(J, kind, suit, h):
     # giving the garment a middle — so the brief runs from the natural waist to
     # the top of the thigh, which is 11 cm and is also what a brief is. The
     # trunks were never affected: they were 20 cm from the start.
+    #
+    # That reasoning was right about the gradient and wrong about where to fix
+    # it, and it stayed wrong until 23 Aug: the fade is not a property of the
+    # paint at all, it is the decimator averaging the colours of the vertices it
+    # merges, and the answer is to paint the export copy after it has run rather
+    # than to grow the garment until the fade is a smaller fraction of it. See
+    # `repaint` at the bottom of `one`. 11 cm is kept because 11 cm is what a
+    # brief is, which is the only reason it ever needed.
     if kind == "trunks":
         top, bot = hip + 0.02 * k, leg - 0.17 * k
     else:
