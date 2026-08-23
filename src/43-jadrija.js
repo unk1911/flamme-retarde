@@ -1347,9 +1347,32 @@ async function buildJadrija(scene) {
     // huts either side of the special one, and the special one puts up its own
     // walls. A single box over the lot would be a sign hung on a wall.
     const h = ridge - y0;
+    // Split at the cafe, exactly as the pad above it is, and for the same
+    // reason twice over.
+    //
+    // The huts through Caffe TRAMPULIN are skipped at the draw — `cafeBlocks`,
+    // up in the k loop — because the cafe was built in the alley between the
+    // two rows and the front row otherwise stands across its fascia. The
+    // blocker was not skipped with them. So both rows carried an invisible
+    // wall through the one building on this shore they had been carved out of:
+    // measured on 22 Aug at t 467.91-490.41, s 16.65-20.55, 2.66 m tall on the
+    // front row, and t 469.66-487.86, s 25.55-29.45 on the back. A cafe you
+    // could see, walk up to, and not reach.
+    //
+    // This is the same fault as the bench at t 170.5 that sealed the promenade
+    // for weeks, and it has the same shape: geometry and collision written in
+    // two places, and only one of them told about the exception. Anything that
+    // opens a hole in a row here has to open it in both.
+    const pushRun = (a, c) => {
+      for (const [pa, pc] of cafeBlocks(a, c, front)
+        ? [[a, EAST_CAFE.t0], [EAST_CAFE.t1, c]]
+        : [[a, c]]) {
+        if (pc - pa < 0.15) continue;
+        runs.push({ t0: pa, t1: pc, s0: front - 0.55, s1: back + 0.45, y: y0, h });
+      }
+    };
     if (sk < 0) {
-      runs.push({ t0: t0 - 0.5, t1: t1 + 0.5, s0: front - 0.55, s1: back + 0.45,
-        y: y0, h });
+      pushRun(t0 - 0.5, t1 + 0.5);
     } else {
       // Pulled back by `SNUG` where they meet the door, and only there. Left
       // alone, each neighbour's blocker grows 0.55 m into the opening when
@@ -1361,14 +1384,8 @@ async function buildJadrija(scene) {
       // solid blocker up the middle of the room, and the right-hand half of a
       // 4 m floor was a wall you could see across and not walk across.
       const a = t0 + sk * JAD.cabW, c = a + JAD.cabW * KAB.bays;
-      if (a > t0) {
-        runs.push({ t0: t0 - 0.5, t1: a - SNUG, s0: front - 0.55, s1: back + 0.45,
-          y: y0, h });
-      }
-      if (c < t1) {
-        runs.push({ t0: c + SNUG, t1: t1 + 0.5, s0: front - 0.55, s1: back + 0.45,
-          y: y0, h });
-      }
+      if (a > t0) pushRun(t0 - 0.5, a - SNUG);
+      if (c < t1) pushRun(c + SNUG, t1 + 0.5);
     }
     b = deck;
   }
