@@ -6445,6 +6445,565 @@ async function buildJadrija(scene) {
     }
   }
 
+  // ── where the made surface stops ───────────────────────────────────────────
+  //
+  // Survey item, v595/v597, 23 Aug. Sixty-odd frames of the two inland walks
+  // are looking straight down this and nobody had named it: at the edge of the
+  // tarmac, where the made ground gives out and the needle floor begins, there
+  // is a run of SHORT FREESTANDING KERB BLOCKS. `a_192` has it square on and
+  // `b_026`, `b_003`, `b_007` and `b_017` all have it again from the wood side.
+  //
+  // What each one is: about 2.6 m of wall with a metre of gap to the next,
+  // 0.58 m tall and 0.36 m wide, built of four or five courses of THIN sawn
+  // limestone — honey-coloured, 0.10 m to a course, fine dark joints — under a
+  // single cap beam of pale grey concrete that oversails both faces. Each
+  // length is level in itself and steps down to the next, the way a mason
+  // builds anything that follows a falling grade, and the steps are the whole
+  // character of the thing from along the run.
+  //
+  // What it is FOR is the part that makes it worth building rather than
+  // decorating with. It retains nothing — the ground is the same height on
+  // both sides of it — and it fences nothing, because a metre of gap every
+  // three and a half metres is not a fence. It stops a car and it lets a
+  // pushchair through, and it draws the line between the resort's concrete and
+  // the wood. The game had that seam and nothing on it: `walkTo` is 21.1 and
+  // everything from there to `back` at 33.1 is a bare orange band twelve
+  // metres wide and five hundred long, which is exactly how it films.
+  //
+  // The `b_016` note over the stacked fence panels already refers to "a low
+  // kerb at the edge of the needle floor". The panels lean on it. It was never
+  // built.
+  //
+  // POSITION: `s` is a reading and `t` is not. The seam at `walkTo` is where
+  // the game's own paving stops, so putting the kerb on it is not a guess —
+  // but v595 and v597 carry no GPS, so which arc lengths along this shore have
+  // a kerb and which do not is a placement. What is chosen here is "all of the
+  // wood, none of the buildings", which is what both walks show and is the
+  // honest generalisation of it.
+  //
+  // NO COLLIDER, deliberately, and the reason is a number. `GROUND.girth` is
+  // 0.55 and `confine` adds it to every half-extent, so the 1.05 m gaps
+  // between these would come out 0.00 m wide and this would be five hundred
+  // metres of sealed wall across the one band the crowd, the cars and the
+  // walker all cross. A 0.58 m kerb you step over is the smaller error by a
+  // long way, and the bench at t 170.5 is what the other choice costs.
+  {
+    const back9 = b;
+    b = up;
+    // Two stones, not one. The cap is sawn, grey and cold; the courses under it
+    // are the local limestone and much warmer, and in every frame the two read
+    // as different materials. Drawing the lot in one colour gives a concrete
+    // upstand, which is a kerb and not this.
+    // First cut had the cap at 0.600 against blocks at 0.585 and it came out a
+    // white plastic beam sitting on a dark brown band: the cap was reading as
+    // painted concrete and the courses as creosoted timber. The frames have the
+    // two much closer together and both of them warm — this is one quarry's
+    // limestone sawn two ways, not two materials. Cap down, blocks up, and the
+    // difference between them is now hue and finish rather than brightness.
+    // And down again after looking at it: 0.560 still photographed as a white
+    // plank laid along the wood, which is the one thing a limestone cap is not.
+    // At 0.505 it takes the sun without going to paper, and the courses under
+    // it are the brighter of the two in the shot, which is how `a_192` reads.
+    const CAP = [0.505, 0.492, 0.462];
+    const CAPTOP = [0.545, 0.532, 0.498];
+    const BLOCK = [0.615, 0.565, 0.442];
+    const JOINT = [0.455, 0.412, 0.320];
+    const RUBBLE = [0.560, 0.535, 0.480];
+    // Segment 2.60 m, gap 1.05 m — measured off `a_192`, where four of them run
+    // away from the camera with a walker's stride and a half between each.
+    const SEG = 2.60, PITCH = 3.65;
+    const ks = walkTo + 0.30;
+    for (let t = 30; t < 392; t += PITCH) {
+      const t1 = t + SEG;
+      // Where it stops. `clearOfShops` opens 2.5 m either side of every
+      // frontage, and six of the ten shops straddle s 21.4 outright — mini
+      // sits 18 to 23.4, h2o and the Slasticarnica 22 to 27. And not across
+      // the vikendica, whose terrace front lands at 19.3 m: the same twelve
+      // metres the lane wall gives it. The playground and the sanitary block
+      // need no test at all — they start at s 28.9 and 32.0, well inland of
+      // this line — and putting one in would have opened a gap that nothing in
+      // the footage asks for.
+      if (!clearOfShops(t) || !clearOfShops(t1)) continue;
+      if (Math.abs(t - VIK.t) < 12 || Math.abs(t1 - VIK.t) < 12) continue;
+      // Level over its own length and stepping at the joint: the highest
+      // ground under the run, so no length of it is ever buried at one end.
+      // Taken in 0.16 m stages, which is a course, so a step is a course and
+      // not a wobble.
+      let hi = -1e9;
+      for (let u = t; u <= t1; u += 0.6) hi = Math.max(hi, surfaceY(u, ks));
+      const y0 = Math.round(hi / 0.16) * 0.16;
+      const CAPH = 0.170, H = 0.580;
+      // The courses. Four of them under the cap, each drawn as its own box so
+      // the joints are geometry and not paint — at 0.10 m a course is a real
+      // band from six metres away, which is where you walk past this.
+      const nC = 4, ch = (H - CAPH) / nC;
+      for (let k = 0; k < nC; k++) {
+        const a = y0 + k * ch;
+        const g = 0.90 + jit((t * 3) | 0, 70 + k) * 0.22;
+        boxTS(t, t1, ks - 0.155, ks + 0.155, a + 0.012, a + ch,
+          [BLOCK[0] * g, BLOCK[1] * g, BLOCK[2] * g]);
+        // The bed joint under it, set back so it reads as a shadow line rather
+        // than as a stripe of paint on a flat face.
+        boxTS(t, t1, ks - 0.135, ks + 0.135, a, a + 0.014, JOINT);
+      }
+      // The cap, oversailing 0.055 m each face. That is more than the frames
+      // show and it is rule 6: a 25 mm oversail at six metres is a pixel, and
+      // what makes this read as a capped wall rather than as one block is the
+      // shadow line under the cap.
+      boxTS(t - 0.03, t1 + 0.03, ks - 0.210, ks + 0.210,
+        y0 + H - CAPH, y0 + H, CAP, CAPTOP);
+      // And the loose limestone at the foot of it, which is in every frame:
+      // broken lumps the size of a fist lying in the dust on the wood side,
+      // where the ground was never made good after the wall went in.
+      for (let k = 0; k < 3; k++) {
+        const u = jit((t * 5) | 0, 74 + k);
+        if (u > 0.62) continue;
+        const rt = t + 0.3 + u * (SEG - 0.6);
+        const rs = ks + 0.30 + jit((t * 5) | 0, 77 + k) * 0.55;
+        const r = 0.085 + jit((t * 5) | 0, 80 + k) * 0.075;
+        const yy = surfaceY(rt, rs);
+        // A frustum, not a box — rule 7, and the same lesson as the rip-rap.
+        frustumTS(yy, [rt, rs, r, r * 0.85],
+          yy + r * 1.25, [rt + (jit((t * 5) | 0, 83 + k) - 0.5) * 0.06,
+            rs + (jit((t * 5) | 0, 86 + k) - 0.5) * 0.06, r * 0.55, r * 0.45],
+          RUBBLE, shade(RUBBLE, 1.08));
+      }
+    }
+    b = back9;
+  }
+
+  // ── ZABRANJENO ODLAGANJE OTPADA ────────────────────────────────────────────
+  //
+  // Survey item, `b_003`, with `b_002` and `b_016`-`b_018` on the same sign
+  // from further off. It stands in the dust at the wood edge, two thin
+  // galvanised posts under a white panel about a metre by seven hundred: a dark
+  // red rule round the edge, ZABRANJENO in red capitals, ODLAGANJE OTPADA! in
+  // smaller ones under it, and three red prohibition roundels below that — a
+  // figure tipping a sack, a figure putting down a box, a trailer tipping a
+  // load. Bottom of the panel about 1.35 m up.
+  //
+  // Worth the triangles because of what it says rather than what it is. It is
+  // the only piece of written Croatian anywhere in the wood, and a fly-tipping
+  // notice is a thing a municipality puts up — it says somebody owns this
+  // ground and comes and looks at it, which nothing else on this shore does.
+  // Every other sign in the game is a business advertising itself.
+  //
+  // The wording is transcribed off the frame and not one letter more. The
+  // pictograms are not: what the frame supports at that size is three dark
+  // shapes in three red rings, and drawing them as anything more specific than
+  // that would be inventing a sign.
+  //
+  // PLACEMENT, not measurement. v597 has no GPS. t 138 is a stretch of open
+  // wood: west of Pizzeria F2 at 200, east of nothing, twenty metres clear of
+  // the playground compound at 157, and the kerb run passes in front of it.
+  {
+    const SIGN_T = 138, SIGN_S = 23.6;
+    const w = 1.00, h = 0.72, yc0 = surfaceY(SIGN_T, SIGN_S);
+    const yc = yc0 + 1.71;
+    const C = document.createElement('canvas');
+    C.width = 1000; C.height = 720;
+    const g = C.getContext('2d');
+    const RED = '#b0201d';
+    g.fillStyle = '#f2f0e8';
+    g.fillRect(0, 0, 1000, 720);
+    g.strokeStyle = RED; g.lineWidth = 16;
+    g.strokeRect(20, 20, 960, 680);
+    g.textAlign = 'center';
+    g.fillStyle = RED;
+    // Fitted to the width the way `shopSign` learned to: set at 100 px, measure,
+    // then scale so the word fills the board. A fixed size gives a legend that
+    // is either clipped or lost in the middle of a metre of white.
+    const fit = (text, capPx, ty, frac) => {
+      g.font = '700 100px "Helvetica Neue", Arial, sans-serif';
+      const at100 = g.measureText(text).width || 1;
+      const size = Math.min(capPx, 100 * (1000 * frac) / at100);
+      g.font = `700 ${size}px "Helvetica Neue", Arial, sans-serif`;
+      g.fillText(text, 500, ty);
+    };
+    fit('ZABRANJENO', 150, 190, 0.80);
+    fit('ODLAGANJE OTPADA!', 108, 300, 0.84);
+    // The three roundels. A white disc, a red ring, a dark shape inside it and
+    // the bar across — which is the whole of what a prohibition sign is, and
+    // the whole of what this one resolves to in the frame.
+    for (let i = 0; i < 3; i++) {
+      const cx = 220 + i * 280, cy = 510, r = 135;
+      g.fillStyle = '#ffffff';
+      g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = RED; g.lineWidth = 30;
+      g.beginPath(); g.arc(cx, cy, r - 15, 0, Math.PI * 2); g.stroke();
+      g.fillStyle = '#2a2a2c';
+      if (i === 0) {
+        g.beginPath(); g.arc(cx - 30, cy - 58, 22, 0, Math.PI * 2); g.fill();
+        g.fillRect(cx - 46, cy - 30, 34, 76);
+        g.fillRect(cx + 4, cy - 12, 58, 52);
+      } else if (i === 1) {
+        g.beginPath(); g.arc(cx + 34, cy - 58, 22, 0, Math.PI * 2); g.fill();
+        g.fillRect(cx + 18, cy - 30, 34, 76);
+        g.fillRect(cx - 66, cy - 6, 74, 62);
+      } else {
+        g.beginPath();
+        g.moveTo(cx - 76, cy + 22); g.lineTo(cx + 40, cy + 22);
+        g.lineTo(cx + 76, cy - 44); g.lineTo(cx - 20, cy - 44);
+        g.closePath(); g.fill();
+        g.beginPath(); g.arc(cx - 40, cy + 48, 26, 0, Math.PI * 2); g.fill();
+      }
+      g.strokeStyle = RED; g.lineWidth = 30;
+      g.beginPath();
+      g.moveTo(cx - r * 0.68, cy + r * 0.68);
+      g.lineTo(cx + r * 0.68, cy - r * 0.68);
+      g.stroke();
+    }
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    const backS = b;
+    b = up;
+    const GALV = [0.545, 0.552, 0.548];
+    // Two posts, and they run past the panel top by a hand's width, which is
+    // what a bolted-on panel looks like and is also the only thing that stops
+    // the board reading as a decal floating in the wood.
+    for (const o of [-0.34, 0.34]) {
+      post(W, SIGN_T + o, SIGN_S + 0.14, yc0, yc0 + 2.10, 0.026, GALV, 6);
+    }
+    // The tray behind the print. 0.10 m, not 0.02 — this is the number that
+    // made three boardwalk signs read as missing; see `shopSign`.
+    boxTS(SIGN_T - w * 0.5 - 0.04, SIGN_T + w * 0.5 + 0.04,
+      SIGN_S + 0.10, SIGN_S + 0.19,
+      yc - h * 0.5 - 0.035, yc + h * 0.5 + 0.035, [0.300, 0.300, 0.305]);
+    b = backS;
+    {
+      const st = at(SIGN_T), p = W(SIGN_T, SIGN_S, yc);
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+        new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+      mesh.position.set(p[0], p[1], p[2]);
+      // Facing the sea, like every other read-me surface on this shore: the
+      // seaward direction is the inland normal turned round.
+      mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
+      mesh.name = 'sign:zabranjeno';
+      scene.add(mesh);
+    }
+  }
+
+  // ── the wood is camped in ──────────────────────────────────────────────────
+  //
+  // Survey item, `b_007` best, with `b_003`-`b_010` all round it. This is the
+  // thing about the two walk-throughs that changes what the place *is*, and it
+  // is not an object: under the pines, between the trunks and off the made
+  // ground, people have set up for the day. Pop-up dome beach tents, pale grey
+  // and white, about two metres long and a metre high with the mouth turned to
+  // the water. Folding recliners in pink-and-white and blue-and-white stripe,
+  // one of them with somebody asleep on it. White monobloc garden chairs
+  // standing on their own. Towels spread on the needles.
+  //
+  // The game's wood has fifty-two cars in it and nothing else, which makes it
+  // a car park with trees. What the footage has is a wood people spend August
+  // in, and the cars are the smaller half of that.
+  //
+  // Nothing here touches `rng` — every number is `jit`, so the tent count can
+  // change tomorrow without moving a bather (rule 4).
+  //
+  // PLACEMENT. Six pitches between t 40 and t 200, at s 23 to 27: inland of the
+  // kerb, seaward of the lane wall at 29.2, and clear of the playground
+  // compound. v597 has no GPS and none of these is a measured position.
+  {
+    const backC = b;
+    b = up;
+    const SHELL = [[0.700, 0.702, 0.690], [0.640, 0.660, 0.680],
+      [0.690, 0.672, 0.630]];
+    const MOUTH = [0.235, 0.240, 0.250];
+    const FRAME = [0.480, 0.488, 0.492];
+    const CLOTH = [[0.700, 0.360, 0.430], [0.230, 0.330, 0.560],
+      [0.640, 0.600, 0.300], [0.560, 0.250, 0.260]];
+    const MONO = [0.735, 0.735, 0.720];
+    for (let k = 0; k < 6; k++) {
+      // Six pitches over 118 m rather than over 160: the eastern end of this
+      // band is where the tavern trailer stands, and a recliner reaches 1.6 m
+      // out from its own pitch.
+      const t = 44 + k * 22.0 + jit(k, 90) * 8.0;
+      if (t > PLAY.t0 - 6 && t < PLAY.t1 + 6) continue;
+      if (!clearOfShops(t)) continue;
+      const s = 23.4 + jit(k, 91) * 3.2;
+      const y = surfaceY(t, s);
+      // The tent. A dome squashed along `s` and stretched along `t` — a pop-up
+      // is an ellipse in plan, and a circular one reads as an igloo. `dome`
+      // takes its own projection, so the stretch goes in there rather than into
+      // a second copy of the function.
+      const yaw = (jit(k, 92) - 0.5) * 0.8;
+      const P = (dt, ds, yy) => {
+        const c = Math.cos(yaw), sn = Math.sin(yaw);
+        const a = dt * 1.38, e = ds * 0.96;
+        return W(t + a * c - e * sn, s + a * sn + e * c, yy);
+      };
+      const shell = SHELL[((jit(k, 93) * 71) | 0) % SHELL.length];
+      dome(P, 0, 0, y + 0.02, 1.02, 0.74, shell, 8);
+      // The mouth: a raked flap standing clear of the shell rather than a hole
+      // cut in it. The shell's widest point is 0.71 m out in `s`, so 0.82 puts
+      // this 0.11 m proud of it — rule 5's clearance, and at this size the
+      // rake is what makes it read as an open flap and not a floating panel.
+      b.quad(P(-0.52, -0.82, y + 0.02), P(0.52, -0.82, y + 0.02),
+        P(0.46, -0.60, y + 0.66), P(-0.46, -0.60, y + 0.66), MOUTH);
+      // Two recliners beside it, low and raked, on a tube frame. Six pieces:
+      // two side rails, a seat, a back, and the two front legs. Anything less
+      // and it is a coloured wedge on the ground.
+      for (let j = 0; j < 2; j++) {
+        const rt = t + (j ? 1.55 : -1.62) + (jit(k * 4 + j, 94) - 0.5) * 0.5;
+        const rs = s - 0.35 + jit(k * 4 + j, 95) * 1.1;
+        const ry = surfaceY(rt, rs);
+        const cl = CLOTH[((jit(k * 4 + j, 96) * 83) | 0) % CLOTH.length];
+        const Q = (dt, ds, yy) => W(rt + dt, rs + ds, yy);
+        for (const o of [-0.30, 0.30]) {
+          boxIn(Q, o - 0.025, o + 0.025, -0.85, 0.62, ry + 0.30, ry + 0.35,
+            FRAME);
+        }
+        for (const o of [-0.30, 0.30]) {
+          post(Q, o, -0.80, ry, ry + 0.32, 0.022, FRAME, 5);
+          post(Q, o, 0.58, ry, ry + 0.32, 0.022, FRAME, 5);
+        }
+        // The sling: seat flat, back raked up over the head end. Drawn as two
+        // quads and NOT as a box — a box has a top and a bottom and a lounger
+        // seen from the side would show 40 mm of edge it does not have.
+        b.quad(Q(-0.30, -0.78, ry + 0.36), Q(0.30, -0.78, ry + 0.36),
+          Q(0.30, 0.30, ry + 0.36), Q(-0.30, 0.30, ry + 0.36), cl);
+        b.quad(Q(-0.30, 0.30, ry + 0.36), Q(0.30, 0.30, ry + 0.36),
+          Q(0.30, 0.62, ry + 0.86), Q(-0.30, 0.62, ry + 0.86), cl);
+      }
+      // A white monobloc chair at two pitches in three, standing on its own the
+      // way they always are — the most numerous manufactured object at Jadrija
+      // and there was not one in the game.
+      if (jit(k, 97) < 0.66) {
+        const ct = t + 2.5 + jit(k, 98) * 1.4, cs = s + 1.2;
+        const cy = surfaceY(ct, cs);
+        const Q = (dt, ds, yy) => W(ct + dt, cs + ds, yy);
+        for (const [ot, os] of [[-0.21, -0.19], [0.21, -0.19],
+          [-0.21, 0.19], [0.21, 0.19]]) {
+          post(Q, ot, os, cy, cy + 0.44, 0.022, MONO, 4);
+        }
+        boxIn(Q, -0.24, 0.24, -0.23, 0.23, cy + 0.44, cy + 0.50, MONO);
+        boxIn(Q, -0.22, 0.22, 0.17, 0.23, cy + 0.50, cy + 0.94, MONO);
+      }
+      // And a towel on the needles, which is the cheapest thing in this block
+      // and half of what makes it read as occupied from thirty metres.
+      {
+        const wt = t - 1.2 + jit(k, 99) * 2.6, ws = s - 1.5;
+        const cl = CLOTH[((jit(k, 100) * 61) | 0) % CLOTH.length];
+        const wy = surfaceY(wt, ws) + 0.06;
+        b.quad(W(wt - 0.42, ws - 0.85, wy), W(wt + 0.42, ws - 0.85, wy),
+          W(wt + 0.42, ws + 0.85, wy), W(wt - 0.42, ws + 0.85, wy), cl);
+      }
+    }
+    b = backC;
+  }
+
+  // ── the tavern trailer ─────────────────────────────────────────────────────
+  //
+  // Survey item, `b_068` and `b_070` best, `b_066`-`b_075` around them. At the
+  // back of a tavern under the pines there is a POLISHED ALUMINIUM ROUND-ENDED
+  // CATERING TRAILER: about 3.4 m long and 2.0 m wide, standing high on its
+  // wheels, mirror-bright, the roof one continuous barrel that turns down over
+  // both ends. The serving opening is in the END and not the flank — a tall
+  // dark doorway with a red-painted frame round it and the ovens lit inside —
+  // and a chrome flue stands up off the roof behind it. It is parked hard
+  // against a white outbuilding with a pantile roof.
+  //
+  // It is worth building for one reason: it is the only curved metal object in
+  // four hundred frames of survey. Everything else at Jadrija is stone, render,
+  // hull or pine, and a bright convex thing among the trunks reads from the far
+  // end of the promenade. It is not a second copy of the white box trailer at
+  // the top of the beach — that one is a plain cuboid on a jockey wheel and
+  // this one is a barrel.
+  //
+  // And what makes it a tavern rather than a lone trailer, from `b_070`: one
+  // crimson square parasol with a printed valance, a poseur table under it at
+  // standing height, and bar stools with round red padded seats on black tube.
+  // Not the low cream café furniture the promenade has — a different business,
+  // and the furniture is how you can tell.
+  //
+  // NO NAME on any of it. The parasol in the frame carries a beer brand and the
+  // A-board carries a product, and both are legible; leaving them blank is the
+  // only reading of rule 12 that cannot be wrong. The shape is the find.
+  //
+  // PLACEMENT, not measurement. v597 has no GPS. t 190 is the last open wood
+  // before Pizzeria F2 at 200, with `clearOfShops` satisfied by 7.5 m.
+  {
+    const backT = b;
+    b = up;
+    const tt = 190.0, ss = 25.5;
+    const y = surfaceY(tt, ss);
+    // Its long axis runs INLAND, so the round end with the hatch in it faces
+    // the promenade. A trailer parked broadside would show its blank flank to
+    // everyone walking past, which is the one thing a serving hatch is not for.
+    const A = Math.PI * 0.5;
+    const ca = Math.cos(A), sa = Math.sin(A);
+    // (u along the trailer, v across it) into the shore frame.
+    const P = (u, v, yy) => W(tt + u * ca - v * sa, ss + u * sa + v * ca, yy);
+    // Polished aluminium has no diffuse colour to speak of — what you see is
+    // the sky on the top of the barrel and the ground on the flank, which is
+    // why it is drawn as three bands of one metal rather than as one flat
+    // grey. Bands, not geometry: a raised belt line would be 30 mm of relief
+    // at two kilometres from the origin, which rule 5 says is nothing.
+    const SKY = [0.700, 0.712, 0.730];
+    const MID = [0.630, 0.638, 0.650];
+    const LOW = [0.545, 0.548, 0.552];
+    const SKIRT = [0.310, 0.312, 0.322];
+    const DARK = [0.085, 0.085, 0.092];
+    const REDF = [0.560, 0.140, 0.120];
+    const GLOW = [0.560, 0.400, 0.235];
+    const HL = 0.68, R = 1.02;          // 3.40 m long over 2.04 m wide
+    const FLOOR = y + 0.76, EAVE = y + 1.88, RISE = 0.66;
+    // The plan: a stadium — a rectangle with a half-round on each end. Fourteen
+    // points round it, which at this size is a curve and not a polygon.
+    const OUT = [];
+    const NE = 7;
+    for (let i = 0; i <= NE; i++) {
+      const th = -Math.PI / 2 + (i / NE) * Math.PI;
+      OUT.push([HL + R * Math.cos(th), R * Math.sin(th)]);
+    }
+    for (let i = 0; i <= NE; i++) {
+      const th = Math.PI / 2 + (i / NE) * Math.PI;
+      OUT.push([-HL + R * Math.cos(th), R * Math.sin(th)]);
+    }
+    const NP = OUT.length;
+    // The flank, in three bands.
+    const BANDS = [[0.00, 0.34, LOW], [0.34, 0.72, MID], [0.72, 1.00, SKY]];
+    for (let i = 0; i < NP; i++) {
+      const [u0, v0] = OUT[i], [u1, v1] = OUT[(i + 1) % NP];
+      for (const [f0, f1, col] of BANDS) {
+        const a0 = FLOOR + (EAVE - FLOOR) * f0, a1 = FLOOR + (EAVE - FLOOR) * f1;
+        b.quad(P(u0, v0, a0), P(u1, v1, a0), P(u1, v1, a1), P(u0, v0, a1), col);
+      }
+    }
+    // The roof. Each ring is the plan outline pulled in towards the SPINE — the
+    // 1.36 m of centreline between the two end radii — rather than towards a
+    // point, which is what makes this a barrel with round ends and not a dome.
+    // The last ring is 0.09 of full width rather than zero: a ring of zero
+    // radius is a line, a quad with two coincident corners is a degenerate
+    // triangle, and flat shading reads the normal off the cross product and
+    // renders the degenerate half black. Same lesson as `lathe`.
+    const RINGS = [[1.00, 0.00], [0.87, 0.44], [0.60, 0.76], [0.09, 1.00]];
+    const spine = (u) => Math.max(-HL, Math.min(HL, u));
+    for (let k = 0; k < RINGS.length - 1; k++) {
+      const [c0, h0] = RINGS[k], [c1, h1] = RINGS[k + 1];
+      const ya = EAVE + RISE * h0, yb = EAVE + RISE * h1;
+      const col = k === 0 ? SKY : [SKY[0] * 1.05, SKY[1] * 1.05, SKY[2] * 1.05];
+      for (let i = 0; i < NP; i++) {
+        const [u0, v0] = OUT[i], [u1, v1] = OUT[(i + 1) % NP];
+        const p0 = spine(u0), p1 = spine(u1);
+        b.quad(P(p0 + (u0 - p0) * c0, v0 * c0, ya),
+          P(p1 + (u1 - p1) * c0, v1 * c0, ya),
+          P(p1 + (u1 - p1) * c1, v1 * c1, yb),
+          P(p0 + (u0 - p0) * c1, v0 * c1, yb), col);
+      }
+    }
+    // The skirt and chassis under the floor, set in so the body overhangs it.
+    for (let i = 0; i < NP; i++) {
+      const [u0, v0] = OUT[i], [u1, v1] = OUT[(i + 1) % NP];
+      b.quad(P(u0 * 0.94, v0 * 0.88, y + 0.24), P(u1 * 0.94, v1 * 0.88, y + 0.24),
+        P(u1 * 0.94, v1 * 0.88, FLOOR), P(u0 * 0.94, v0 * 0.88, FLOOR), SKIRT);
+    }
+    // Two wheels, half tucked under the skirt.
+    for (const o of [-1, 1]) {
+      const Q = (dt, ds, yy) => P(0.10 + dt, o * (R * 0.86) + ds, yy);
+      lathe(Q, 0, 0, [[y + 0.04, 0], [y + 0.06, 0.30], [y + 0.62, 0.32],
+        [y + 0.64, 0]], DARK, 9);
+    }
+    // The hatch, in the seaward end. Three planes at three depths, because at
+    // this distance from the origin two of them 20 mm apart are decided by
+    // rounding: the red frame stands 0.06 m off the shell, the dark opening
+    // 0.19, and the warm strip of what is lit inside it 0.24. Rule 5.
+    const EU = -(HL + R);
+    b.quad(P(EU - 0.06, -0.76, FLOOR + 0.02), P(EU - 0.06, 0.76, FLOOR + 0.02),
+      P(EU - 0.06, 0.76, FLOOR + 1.02), P(EU - 0.06, -0.76, FLOOR + 1.02), REDF);
+    b.quad(P(EU - 0.19, -0.62, FLOOR + 0.10), P(EU - 0.19, 0.62, FLOOR + 0.10),
+      P(EU - 0.19, 0.62, FLOOR + 0.94), P(EU - 0.19, -0.62, FLOOR + 0.94), DARK);
+    b.quad(P(EU - 0.24, -0.52, FLOOR + 0.18), P(EU - 0.24, 0.52, FLOOR + 0.18),
+      P(EU - 0.24, 0.52, FLOOR + 0.60), P(EU - 0.24, -0.52, FLOOR + 0.60), GLOW);
+    // And the flap propped up over it, which is the shape that says "open".
+    b.quad(P(EU - 0.02, -0.78, FLOOR + 1.04), P(EU - 0.02, 0.78, FLOOR + 1.04),
+      P(EU - 0.92, 0.70, FLOOR + 1.52), P(EU - 0.92, -0.70, FLOOR + 1.52), MID);
+    for (const o of [-0.70, 0.70]) {
+      const q0 = P(EU - 0.06, o, FLOOR + 1.06), q1 = P(EU - 0.90, o, FLOOR + 1.50);
+      b.quad(q0, [q0[0] + 0.03, q0[1], q0[2] + 0.03],
+        [q1[0] + 0.03, q1[1], q1[2] + 0.03], q1, SKIRT);
+    }
+    // The flue off the roof behind the hatch: a chrome tube with a cowl.
+    post(P, -0.30, 0.34, EAVE + RISE * 0.86, EAVE + RISE + 0.44, 0.075, SKY, 8);
+    dome(P, -0.30, 0.34, EAVE + RISE + 0.44, 0.16, 0.13, SKY, 8);
+    // The drawbar, down on its jockey wheel at the inland end.
+    boxIn(P, HL + R - 0.10, HL + R + 1.05, -0.07, 0.07, y + 0.34, y + 0.44,
+      SKIRT);
+    post(P, HL + R + 0.94, 0, y + 0.04, y + 0.40, 0.055, SKIRT, 6);
+    // The blue tarpaulin over a stack, which stands beside it in every frame:
+    // something rectangular under a sheet that does not fit it, so the corners
+    // are round and the sides sag.
+    {
+      const BLUE = [0.140, 0.330, 0.660];
+      const bt2 = tt - 2.6, bs2 = ss - 0.4;
+      const by = surfaceY(bt2, bs2);
+      const Q = (dt, ds, yy) => W(bt2 + dt * 1.15, bs2 + ds * 0.95, yy);
+      boxIn(Q, -0.52, 0.52, -0.44, 0.44, by + 0.02, by + 0.90, BLUE,
+        shade(BLUE, 1.10));
+      dome(Q, 0, 0, by + 0.86, 0.34, 0.60, shade(BLUE, 1.06), 7);
+    }
+    // And the one crimson parasol, with a poseur table and three stools under
+    // it. Standing height, not seated: the frame has people at the table on
+    // their feet with the tops at their elbows.
+    {
+      const CRIM = [0.520, 0.115, 0.135];
+      const VAL = [0.430, 0.090, 0.110];
+      const TUBE = [0.115, 0.115, 0.122];
+      const TOP = [0.300, 0.300, 0.312];
+      const SEAT = [0.560, 0.140, 0.150];
+      const pt2 = tt - 5.4, ps2 = ss - 0.8;
+      const py = surfaceY(pt2, ps2);
+      post(W, pt2, ps2, py, py + 2.44, 0.045, TUBE, 6);
+      // Four sloping panels and a valance, which is what a market parasol is.
+      // A cone would be a garden one, and this is not that shape.
+      const HW = 1.55;
+      for (let i = 0; i < 4; i++) {
+        const a0 = i * Math.PI * 0.5 + Math.PI * 0.25;
+        const a1 = a0 + Math.PI * 0.5;
+        const c0 = [Math.cos(a0) * HW, Math.sin(a0) * HW];
+        const c1 = [Math.cos(a1) * HW, Math.sin(a1) * HW];
+        b.quad(W(pt2, ps2, py + 2.44),
+          W(pt2 + c0[0], ps2 + c0[1], py + 2.06),
+          W(pt2 + (c0[0] + c1[0]) * 0.5, ps2 + (c0[1] + c1[1]) * 0.5,
+            py + 2.14),
+          W(pt2 + c1[0], ps2 + c1[1], py + 2.06), CRIM);
+        // The valance hanging off that edge — 0.20 m of it, printed, and the
+        // thing that stops a parasol reading as a paper hat.
+        b.quad(W(pt2 + c0[0], ps2 + c0[1], py + 2.06),
+          W(pt2 + c1[0], ps2 + c1[1], py + 2.06),
+          W(pt2 + c1[0], ps2 + c1[1], py + 1.86),
+          W(pt2 + c0[0], ps2 + c0[1], py + 1.86), VAL);
+      }
+      // The table: a column on a disc with a dark round top at elbow height.
+      lathe(W, pt2, ps2, [[py + 0.02, 0.34], [py + 0.06, 0.34],
+        [py + 0.08, 0.08], [py + 1.02, 0.08], [py + 1.04, 0.42],
+        [py + 1.10, 0.42], [py + 1.10, 0]], TOP, 10);
+      // Three stools at 120°, which is what `seatRing` learned the hard way is
+      // the only arrangement that never puts a back to its own table.
+      for (let i = 0; i < 3; i++) {
+        const a = i * (Math.PI * 2 / 3) + 0.4;
+        const st2 = pt2 + Math.cos(a) * 1.05, ss2 = ps2 + Math.sin(a) * 1.05;
+        const sy = surfaceY(st2, ss2);
+        const Q = (dt, ds, yy) => W(st2 + dt, ss2 + ds, yy);
+        for (const [ot, os] of [[-0.16, -0.16], [0.16, -0.16],
+          [-0.16, 0.16], [0.16, 0.16]]) {
+          post(Q, ot * 1.4, os * 1.4, sy, sy + 0.74, 0.018, TUBE, 4);
+        }
+        lathe(Q, 0, 0, [[sy + 0.42, 0.24], [sy + 0.44, 0.24]], TUBE, 8);
+        lathe(Q, 0, 0, [[sy + 0.74, 0], [sy + 0.76, 0.27], [sy + 0.84, 0.27],
+          [sy + 0.86, 0]], SEAT, 10);
+      }
+      runs.push({ t0: pt2 - 0.5, t1: pt2 + 0.5, s0: ps2 - 0.5, s1: ps2 + 0.5,
+        y: py, h: 2.0 });
+    }
+    // The trailer is solid and is the one thing here big enough to walk into.
+    runs.push({ t0: tt - R - 0.1, t1: tt + R + 0.1,
+      s0: ss - (HL + R) - 0.1, s1: ss + (HL + R) + 1.2, y, h: EAVE + RISE - y });
+    b = backT;
+  }
+
   // ── the wall along the back, and the playground behind it ─────────────────
   // Both from the approach lane, and both recurring: a low rendered wall capped
   // with dressed limestone blocks runs the length of it with planters standing
