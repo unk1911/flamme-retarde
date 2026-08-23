@@ -233,10 +233,17 @@ as of this writing; the state of each is in the git log, not here.
       some motion, however small, or seat them — in the chairs, on the wall,
       legs in the sea. A standing figure with nothing moving is the one thing
       not allowed.
-- [ ] The beds repeat audibly after ~15 s and want to be much longer; size is
+- [x] The beds repeat audibly after ~15 s and want to be much longer; size is
       explicitly not a constraint any more. And they should MORPH by position —
       toward the water it becomes the water recording, into the pines it becomes
-      the forest — not fade between separate stages.
+      the forest — not fade between separate stages. DONE, and this line is a
+      duplicate of the one under **Build** above that records the same
+      complaint and its fix: the clips are recut long (24.6 / 10.1 / 68.1 /
+      69.6 / 44.1 s against 19 / 14 / 9 / 14 / 10), the two that would not go
+      long run on two playheads 2.3 % apart so their period is minutes, and the
+      three beds are one bed divided by where you stand — MORPH in 80-audio.js.
+      What is genuinely still open out of that work is the five LEVELS, which
+      have their own line above and want an ear rather than arithmetic.
 - [x] She swims the R chase in a dead straight line. Wants a wandering track:
       zig-zags, changes of heading, still catchable. DONE, and never ticked —
       Misha, 23 Aug: "the 'R' chase is fine. u can close it out." Three sines
