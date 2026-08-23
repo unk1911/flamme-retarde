@@ -8,6 +8,94 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.112.0] — 2026-08-23
+
+Four objects off the two inland walk-throughs, and a recorder that will now film
+a demo. The Jadrija half is the ranked survey lists being worked down in order;
+the recorder half came out of Misha trying to use it and finding it was built
+for a different job than the one he had.
+
+### Added
+
+- **The green palisade on a rubble wall** (`survey-v59x` #1 outstanding, seven
+  frames). Reading `a_154` at a metre instead of at a distance corrected three
+  things in the catalogue entry that proposed it: it is a **sea**-green, not a
+  bright one — sunlit pales measure 153,207,195 and the same pales in shade
+  44,69,63, a paint with as much blue in it as the water; there is **no sawn
+  cap**, the rubble's own ragged course is the top; and the pales stand proud of
+  the top rail, which is the whole difference between a palisade and a panel.
+  The masonry is deliberately a third thing from the two already on this shore —
+  stone nearly covering the face like the garden wall's, joints thin and dark
+  like the approach piers'.
+- **The lavender bank on a drystone wall** (#6), thirty-two metres of it. Taken
+  next for what it *is* rather than what it adds: everything planted at Jadrija
+  is dark green and all of it is correct, and this measures 126,141,122 — a pale
+  unsaturated sage that is nowhere else on the shore. The wall is **dry**, which
+  is the difference between it and the two either side: no mortar, so what shows
+  between the plates is the dark inside of the wall, and the gaps are chinked
+  with the small stones a dry waller drives in to close a bed.
+- **The big agave in a limestone rockery** (#7), three of them. The only plant in
+  the entire survey with a hard edge — everything else at Jadrija is a mass and
+  is drawn as a `puff`. Not the existing `agave`, which is eight flat triangles
+  for a pot on the coping and which draws from `rng()`, so it cannot be touched
+  (rule 4). The blades arch from vertical at the crown to flat at the skirt, and
+  they are channelled, which is why the plant reads as paired surfaces at
+  different angles instead of as card.
+- **MINI's shopfront joinery, and RENT A BOAT** (`survey-3` #6). A bay of rough
+  driftwood framing with the trunk slice, a shelf with two pots and pinned
+  notices, then the sign, then the chalkboard, then the opening — the order the
+  photograph has them in. RENT A BOAT is the fifth thing this survey can say
+  outright; the price list under it ships as **rows**, and the chalkboard as
+  strokes, because neither reads. `panelSign` is new: a canvas on a
+  `PlaneGeometry`, because at 0.30 m across letters drawn as geometry are a dozen
+  triangles each and still unreadable.
+
+All four are **placements** and say so in the code — neither inland video
+carries GPS. They sit on one frontage line at s 40.4, which now runs four
+neighbouring properties with four different boundaries, which is what the lane
+in the footage is.
+
+### Changed
+
+- **The recorder keeps the whole take.** It was a rolling buffer holding the last
+  ten to twenty seconds — Misha filmed the kabine, got 18.92 s, and said what
+  the design had been quietly refusing: "it should just keep rolling and let me
+  record arbitrary length of video." The change is a **deletion**. The two-deck
+  stagger existed only to avoid ever cutting a WebM, and a recording that is
+  never cut does not need two decks to avoid cutting it. One deck, from arm to
+  disarm, every chunk kept. The ring-buffer autopsy stays in the header because
+  the first thing anyone will add back is a cap that drops the oldest chunks: a
+  WebM missing its head looks fine and decodes wrong. At the half-hour ceiling it
+  **stops and says so**.
+- **L is the only key.** It was L to arm and N to save, and the asymmetry was the
+  real bug — L on an armed recorder *threw the take away*, so the obvious gesture
+  for "stop recording" was the one that lost it. Shruggable at ten seconds;
+  not shruggable once takes are arbitrary length. L now starts, and L stops,
+  writes the file and disarms — using `stop()` rather than a mid-run
+  `requestData()`, so the segment is closed properly instead of leaving a file
+  with no Duration in its header. A window resize used to cost "the buffer" and
+  now costs the whole take, so it toasts with the seconds lost.
+
+### Known
+
+- **The wood floor is still warm orange-tan sand** and `20260823_112051` shows
+  pale angular crushed limestone with needle litter. Still the largest
+  photograph-to-game mismatch, still deliberately untouched: it is shared ground
+  and repainting it repaints the whole resort, which wants to be a decision
+  rather than a side effect.
+- The recorder's m:ss display past a minute is not exercised by any test; the
+  counter below a minute is.
+- **A very short take on a loaded machine can come back empty.** Seen once in
+  five release-smoke runs: L, six seconds, L, and the answer is "Nothing
+  recorded — give it a second next time" with no file. It is not a defect in the
+  recorder, and the message is the honest one: `captureStream` only emits when
+  the page draws, so a machine busy enough to stall the canvas for the whole of
+  a six-second take leaves `MediaRecorder` with nothing to hand back, and the
+  code correctly reports that rather than writing a broken file. The identical
+  plan re-run immediately afterwards kept 6 s / 2.0 MB. Worth knowing because
+  the failure looks like a bug and is not one; a take of any real length has
+  never done it.
+
 ## [1.111.0] — 2026-08-23
 
 Four photographs taken this morning, four prices Misha knew off by heart, and a

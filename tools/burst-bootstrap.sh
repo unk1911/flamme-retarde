@@ -17,6 +17,14 @@ log(){ echo "[burst $(date -u +%T)] $*"; }
 
 MAX_MIN=__MAX_MIN__
 ARCH=__ARCH__
+# Which stack. burst.py fills these; the Wan 2.1 values are the pins that are
+# known to work together and the Wan 2.2 values are master, because Wan 2.2
+# did not exist when those pins were cut.
+COMFY_REF=__COMFY_REF__
+WVW_REF=__WVW_REF__
+KJ_REF=__KJ_REF__
+VHS_REF=__VHS_REF__
+TORCH_IDX=__TORCH_IDX__
 SD_KEY='__SELF_DESTRUCT_KEY__'
 
 # ---- 1. the hard stop --------------------------------------------------------
@@ -63,7 +71,7 @@ cd /home/ubuntu
 # ComfyUI nor the node. v0.3.41 is what the laptop runs and predates it.
 sudo -u ubuntu git clone https://github.com/comfyanonymous/ComfyUI.git
 cd ComfyUI
-sudo -u ubuntu git checkout -q v0.3.41
+sudo -u ubuntu git checkout -q "$COMFY_REF"
 sudo -u ubuntu python3 -m venv venv
 V=/home/ubuntu/ComfyUI/venv/bin
 sudo -u ubuntu $V/pip install -q --upgrade pip wheel
@@ -71,9 +79,9 @@ sudo -u ubuntu $V/pip install -q --upgrade pip wheel
 # torch. Lambda images ship CUDA 12.x; aarch64 needs the ARM index, which is why
 # `up` passes the arch down rather than letting pip guess.
 if [ "$ARCH" = "aarch64" ]; then
-  log "torch for aarch64 (cu124)"
+  log "torch for aarch64 ($TORCH_IDX)"
   sudo -u ubuntu $V/pip install -q torch torchvision torchaudio \
-    --index-url https://download.pytorch.org/whl/cu124
+    --index-url "https://download.pytorch.org/whl/$TORCH_IDX"
   # Explicit, because the aarch64 torch wheel does not depend on triton the way
   # the x86 one does, and sageattention imports triton at *import* time. Without
   # it, `pip install sageattention` succeeds and `import sageattention` raises —
@@ -82,9 +90,9 @@ if [ "$ARCH" = "aarch64" ]; then
   log "triton for aarch64 (sageattention needs it at import)"
   sudo -u ubuntu $V/pip install -q triton || log "  triton unavailable"
 else
-  log "torch for x86_64 (cu121)"
+  log "torch for x86_64 ($TORCH_IDX)"
   sudo -u ubuntu $V/pip install -q torch torchvision torchaudio \
-    --index-url https://download.pytorch.org/whl/cu121
+    --index-url "https://download.pytorch.org/whl/$TORCH_IDX"
 fi
 sudo -u ubuntu $V/pip install -q -r requirements.txt
 
@@ -113,6 +121,11 @@ cd custom_nodes
 clone_at() {   # clone_at <repo> <sha>
   local name=${1##*/}
   sudo -u ubuntu git clone -q "https://github.com/$1.git" || return 1
+  # "main" is a branch, not a sha, and `checkout FETCH_HEAD` after fetching a
+  # branch is still the right thing — it lands on the branch tip. Skipping the
+  # fetch entirely when the ref is "main" would leave the clone's default
+  # branch, which is the same commit, so either way works; doing the fetch
+  # keeps one code path.
   ( cd "$name" && sudo -u ubuntu git fetch -q --depth 1 origin "$2" \
       && sudo -u ubuntu git checkout -q FETCH_HEAD ) || log "  WARN $name not pinned"
   # `sudo -u ubuntu` on the rev-parse too. Without it root asks git about a
@@ -121,9 +134,9 @@ clone_at() {   # clone_at <repo> <sha>
   # silently proves nothing.
   log "  $name @ $(cd "$name" && sudo -u ubuntu git rev-parse --short HEAD)"
 }
-clone_at kijai/ComfyUI-WanVideoWrapper 8479624614ec0d52e982bbbab633736fb1a15eef
-clone_at kijai/ComfyUI-KJNodes         f7eb33abc80a2aded1b46dff0dd14d07856a7d50
-clone_at Kosinkadink/ComfyUI-VideoHelperSuite a7ce59e381934733bfae03b1be029756d6ce936d
+clone_at kijai/ComfyUI-WanVideoWrapper "$WVW_REF"
+clone_at kijai/ComfyUI-KJNodes         "$KJ_REF"
+clone_at Kosinkadink/ComfyUI-VideoHelperSuite "$VHS_REF"
 for d in */; do
   [ -f "$d/requirements.txt" ] && sudo -u ubuntu $V/pip install -q -r "$d/requirements.txt"
 done

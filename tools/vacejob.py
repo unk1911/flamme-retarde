@@ -45,6 +45,17 @@ AP.add_argument("--seed", type=int, default=7731)
 AP.add_argument("--light", type=float, default=1.0)      # cfg-step-distill
 AP.add_argument("--sim2real", type=float, default=0.55)
 AP.add_argument("--vace", type=float, default=1.0)
+AP.add_argument("--vacestart", type=float, default=0.0)
+# vace_end_percent was hardcoded to 1.0 until 23 Aug 2026, which is to say the
+# control signal was welded on through every single step of every run ever made.
+# That is the setting that makes an output read as "the render with a filter on
+# it": the late steps are where a diffusion model puts in material — grain,
+# specular, bark, corrosion — and holding a flat-shaded game frame over them
+# forbids exactly that. Below 1.0 the early steps still lock the composition and
+# the camera, and the tail is free.
+AP.add_argument("--vaceend", type=float, default=1.0,
+                help="fraction of the schedule the control signal is applied "
+                     "over; 1.0 welds the render on through the last step")
 AP.add_argument("--swap", type=int, default=24)
 AP.add_argument("--denoise", type=float, default=1.0)
 AP.add_argument("--ctx", type=int, default=0)            # 0 = one shot
@@ -53,6 +64,9 @@ AP.add_argument("--ctxstride", type=int, default=4)   # pixel frames; 4 = 1 late
 AP.add_argument("--upscale", default=None)
 AP.add_argument("--outw", type=int, default=0)
 AP.add_argument("--pos", default=None, help="override the positive prompt")
+AP.add_argument("--neg", default=None,
+                help="override the negative prompt. Inert at cfg 1.0 — it only "
+                     "becomes live once --light 0 removes the distill LoRA")
 AP.add_argument("--ref", default=None,
                 help="photograph(s) of the real subject, comma-separated paths")
 AP.add_argument("--attn", default="sageattn",
@@ -106,12 +120,19 @@ node("swap", "WanVideoBlockSwap",
 
 # The two LoRAs, chained. lightx2v is the cfg-step distill — it is what makes
 # twelve steps enough — and ditto_sim2real is the one doing the actual job.
-node("lora1", "WanVideoLoraSelect",
-     {"lora": "Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32.safetensors",
-      "strength": A.light, "low_mem_load": False})
-node("lora2", "WanVideoLoraSelect",
-     {"lora": "Wan21_14B_VACE_lora_ditto_sim2real_bf16.safetensors",
-      "strength": A.sim2real, "prev_lora": ["lora1", 0], "low_mem_load": False})
+# `--light 0` does not mean "apply it at zero strength", it means take it out.
+# The wrapper still merges a zero-strength LoRA — same load time, same memory,
+# and on at least one build a strength of exactly 0.0 is not a no-op. Leaving
+# the node out is the only way to be sure the run is measuring the base model.
+lora2_in = {"lora": "Wan21_14B_VACE_lora_ditto_sim2real_bf16.safetensors",
+            "strength": A.sim2real, "low_mem_load": False}
+if A.light:
+    node("lora1", "WanVideoLoraSelect",
+         {"lora": "Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32"
+                  ".safetensors",
+          "strength": A.light, "low_mem_load": False})
+    lora2_in["prev_lora"] = ["lora1", 0]
+node("lora2", "WanVideoLoraSelect", lora2_in)
 
 node("vacesel", "WanVideoVACEModelSelect",
      {"vace_model": "Wan2_1-VACE_module_14B_fp8_e4m3fn.safetensors"})
@@ -134,7 +155,7 @@ node("model", "WanVideoModelLoader",
       "vace_model": ["vacesel", 0]})
 
 node("txt", "WanVideoTextEncode",
-     {"t5": ["t5", 0], "positive_prompt": A.pos or POS, "negative_prompt": NEG,
+     {"t5": ["t5", 0], "positive_prompt": A.pos or POS, "negative_prompt": A.neg or NEG,
       "force_offload": True})
 
 # ── the control signal ──────────────────────────────────────────────────────
@@ -158,8 +179,8 @@ node("fit", "ImageResizeKJ",
 # Fed through VHS_LoadImagePath rather than LoadImage because that one wants the
 # file inside ComfyUI's own input directory, and these arrive from a phone.
 vace_in = {"vae": ["vae", 0], "width": A.w, "height": A.h, "num_frames": A.n,
-           "strength": A.vace, "vace_start_percent": 0.0,
-           "vace_end_percent": 1.0, "input_frames": ["fit", 0],
+           "strength": A.vace, "vace_start_percent": A.vacestart,
+           "vace_end_percent": A.vaceend, "input_frames": ["fit", 0],
            "tiled_vae": False}
 if A.ref:
     paths = [r.strip() for r in A.ref.split(",") if r.strip()]

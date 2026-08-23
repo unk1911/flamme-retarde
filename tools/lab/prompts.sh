@@ -140,3 +140,43 @@ printed cocktail poster on the whitewashed wall, a small round wooden stool \
 with a bottle standing on it, dust in the air, hard shafts of light, deep \
 shadow, real photographed video, shallow depth of field, film grain, 35mm, \
 warm cinematic colour grade"
+
+# ── the promenade at Jadrija, 23 Aug 2026 (fr-clip-20260823-135829) ──────────
+#
+# The second restyle sitting picked its window out of the 63 s recording rather
+# than hoping, and picked the *exterior*: t=8.937 s, 81 frames at 16 fps. The
+# kabine interior was 48 % black and full of the shower effect's white particle
+# blobs, and both of those cost the first sitting its best variant. This window
+# is the opposite — mean luma 86-117, under 2 % of pixels below 25, no droplets
+# anywhere, and the subject is a real place with real photographs of it.
+#
+# What is actually in the control frames, which is the only thing worth putting
+# in a prompt: the row of concrete bathing cabins with royal-blue metal doors,
+# the red OPEN sign on its bracket over the gate, the printed shutter with the
+# cathedral silhouette on it, umbrella pines overhead, sunlit paving, hard
+# shadows, a strip of sea at the left, two or three people walking.
+JADRIJA2="photorealistic footage walking along a row of concrete beach changing \
+cabins at Jadrija near Sibenik, Croatia, in high summer, weathered grey render \
+and whitewash on the walls, bright blue painted metal doors and louvred vents, \
+a red illuminated OPEN sign on a steel bracket over an open gateway, umbrella \
+stone pines spreading overhead with flaking orange bark, sunlit concrete paving \
+with hard black shadows, a strip of turquoise Adriatic sea and moored boats \
+beyond, two holidaymakers in swimwear walking past, brilliant August midday \
+sun, real photographed handheld holiday video, film grain, 35mm, sharp fine \
+detail, cinematic colour grade"
+
+# The first negative prompt in this file that has ever done anything.
+#
+# Every run before 23 Aug 2026 carried `lightx2v_cfg_step_distill`, which only
+# works at cfg 1.0 — and at cfg 1.0 there is no unconditional branch to steer
+# away from, so the negative embed is computed, passed, and ignored. Drop the
+# LoRA (`--light 0`) and raise cfg and it becomes live, at four to five times
+# the sampling cost. Written for what these outputs actually do wrong rather
+# than as a generic quality incantation: the failure mode is flat untextured
+# render surfaces, plastic skin, and — from FIRE, twice — snow in August.
+NEG_REAL="3d render, video game screenshot, unreal engine, low poly, flat \
+shading, untextured surfaces, plastic sheen, cartoon, anime, illustration, \
+digital painting, cgi, smooth plastic skin, oversaturated, posterised, colour \
+banding, blurry, soft focus, motion smear, warped geometry, melting \
+architecture, duplicated limbs, extra people, floating objects, text, \
+watermark, subtitles, logo, snow, winter, overcast, night"

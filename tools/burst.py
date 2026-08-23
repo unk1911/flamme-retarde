@@ -118,7 +118,8 @@ FLEET = [t.strip() for t in os.environ.get(
 # `preflight` with HTTP HEAD *before* anything is rented, because discovering
 # a 404 after the meter starts is the expensive way to find a typo.
 HF = "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main"
-MODELS = [
+HF8 = "https://huggingface.co/Kijai/WanVideo_comfy_fp8_scaled/resolve/main"
+MODELS_21 = [
     ("diffusion_models", "Wan2_1-T2V-14B_fp8_e4m3fn.safetensors",
      f"{HF}/Wan2_1-T2V-14B_fp8_e4m3fn.safetensors"),
     ("diffusion_models", "Wan2_1-VACE_module_14B_fp8_e4m3fn.safetensors",
@@ -142,6 +143,56 @@ MODELS = [
      "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/"
      "RealESRGAN_x4plus.pth"),
 ]
+
+# Wan 2.2 A14B is a mixture of experts and that is the whole story of this list.
+# There is no single checkpoint: a HIGH-noise expert does the early steps and a
+# LOW-noise one the late steps, with a handover at a step boundary — so two 15 GB
+# transformers, two VACE modules, and two distill LoRAs, all of them paired. Get
+# one half of a pair from a different release and the boundary is a seam.
+#
+# The VAE is still Wan 2.1's; the A14B line did not change it. (The 5B TI2V line
+# did, which is what `Wan2_2_VAE_bf16` is for, and it is not this.)
+MODELS_22 = [
+    ("diffusion_models", "Wan2_2-T2V-A14B_HIGH_fp8_e4m3fn_scaled_KJ.safetensors",
+     f"{HF8}/T2V/Wan2_2-T2V-A14B_HIGH_fp8_e4m3fn_scaled_KJ.safetensors"),
+    ("diffusion_models", "Wan2_2-T2V-A14B_LOW_fp8_e4m3fn_scaled_KJ.safetensors",
+     f"{HF8}/T2V/Wan2_2-T2V-A14B-LOW_fp8_e4m3fn_scaled_KJ.safetensors"),
+    ("diffusion_models",
+     "Wan2_2_Fun_VACE_module_A14B_HIGH_fp8_e4m3fn_scaled_KJ.safetensors",
+     f"{HF8}/VACE/Wan2_2_Fun_VACE_module_A14B_HIGH_fp8_e4m3fn_scaled_KJ"
+     ".safetensors"),
+    ("diffusion_models",
+     "Wan2_2_Fun_VACE_module_A14B_LOW_fp8_e4m3fn_scaled_KJ.safetensors",
+     f"{HF8}/VACE/Wan2_2_Fun_VACE_module_A14B_LOW_fp8_e4m3fn_scaled_KJ"
+     ".safetensors"),
+    ("text_encoders", "umt5-xxl-enc-fp8_e4m3fn.safetensors",
+     f"{HF}/umt5-xxl-enc-fp8_e4m3fn.safetensors"),
+    ("vae", "wan_2.1_vae.safetensors", f"{HF}/Wan2_1_VAE_bf16.safetensors"),
+    ("loras", "Wan22_T2V_HIGH_Lightning_4steps.safetensors",
+     f"{HF}/LoRAs/Wan22-Lightning/Wan22_A14B_T2V_HIGH_Lightning_4steps_lora"
+     "_250928_rank128_fp16.safetensors"),
+    ("loras", "Wan22_T2V_LOW_Lightning_4steps.safetensors",
+     f"{HF}/LoRAs/Wan22-Lightning/Wan22_A14B_T2V_LOW_Lightning_4steps_lora"
+     "_250928_rank64_fp16.safetensors"),
+]
+
+# A stack is a (ComfyUI ref, custom-node refs, torch index, model list) that are
+# known to belong together. Wan 2.1 is the pinned June-2025 set that has run
+# every experiment in the notebook. Wan 2.2 cannot use it: the pinned wrapper
+# predates Wan 2.2 by five weeks and contains not one mention of it, so that
+# stack is master all the way down and a newer torch, because ComfyUI master
+# needs >= 2.7 for the PEP 585 annotation in comfy_kitchen's custom op.
+STACKS = {
+    "wan21": dict(comfy="v0.3.41",
+                  wvw="8479624614ec0d52e982bbbab633736fb1a15eef",
+                  kj="f7eb33abc80a2aded1b46dff0dd14d07856a7d50",
+                  vhs="a7ce59e381934733bfae03b1be029756d6ce936d",
+                  torch="cu121", models=MODELS_21),
+    "wan22": dict(comfy="master", wvw="main", kj="main", vhs="main",
+                  torch="cu128", models=MODELS_22),
+}
+STACK = os.environ.get("BURST_STACK", "wan21")
+MODELS = STACKS[STACK]["models"]
 
 # Derived from BURST_STATE, not fixed, and this one cost a benchmark.
 #
@@ -259,7 +310,7 @@ def cmd_preflight(_a):
     for b in ("ssh", "rsync"):
         line(subprocess.run(["which", b], capture_output=True).returncode == 0, b)
 
-    print("models (HEAD, no download)")
+    print(f"models (HEAD, no download) — stack {STACK}")
     for sub, name, url in MODELS:
         ok, detail = head_ok(url)
         line(ok, f"{sub}/{name[:30]}", detail)
@@ -323,6 +374,11 @@ def cmd_up(a):
     user_data = (BOOTSTRAP.read_text()
                  .replace("__MAX_MIN__", str(int(a.max_min)))
                  .replace("__ARCH__", arch)
+                 .replace("__COMFY_REF__", STACKS[STACK]["comfy"])
+                 .replace("__WVW_REF__", STACKS[STACK]["wvw"])
+                 .replace("__KJ_REF__", STACKS[STACK]["kj"])
+                 .replace("__VHS_REF__", STACKS[STACK]["vhs"])
+                 .replace("__TORCH_IDX__", STACKS[STACK]["torch"])
                  .replace("__SELF_DESTRUCT_KEY__", "" if a.no_self_destruct else key)
                  .replace("__MODELS__", "\n".join(
                      f"{sub}|{fn}|{url}" for sub, fn, url in MODELS)))
@@ -467,21 +523,32 @@ def cmd_run(a):
                      f"(expected {nonce!r}, got {got!r}) — another burst has "
                      "that port. Set BURST_PORT and retry.")
 
-        cmd = [sys.executable, str(ROOT / "tools" / "vacejob.py"),
+        # Which driver. The Wan 2.2 graph forks into two experts and does not
+        # fit vacejob.py's straight line, so the stack picks the file — and the
+        # stack is already what decided which weights are on the box.
+        job = "vacejob22.py" if STACK == "wan22" else "vacejob.py"
+        cmd = [sys.executable, str(ROOT / "tools" / job),
                "--frames", "/home/ubuntu/job/frames", "--n", str(n),
                "--w", str(a.w), "--h", str(a.h), "--tag", a.tag,
                "--steps", str(a.steps), "--denoise", str(a.denoise),
-               "--sim2real", str(a.sim2real), "--vace", str(a.vace),
+               "--vace", str(a.vace),
+               "--vaceend", str(a.vaceend), "--vacestart", str(a.vacestart),
+               "--cfg", str(a.cfg), "--light", str(a.light),
+               "--shift", str(a.shift),
                "--seed", str(a.seed), "--swap", str(a.swap),
                "--attn", attn,
                "--host", f"http://127.0.0.1:{PORT}"]
-        if a.ctx:
+        cmd += (["--boundary", str(a.boundary)] if STACK == "wan22"
+                else ["--sim2real", str(a.sim2real)])
+        if a.ctx and STACK != "wan22":
             cmd += ["--ctx", str(a.ctx), "--ctxover", str(a.ctxover),
                     "--ctxstride", str(a.ctxstride)]
         if a.upscale:
             cmd += ["--upscale", a.upscale, "--outw", str(a.outw)]
         if a.pos:
             cmd += ["--pos", a.pos]
+        if a.neg:
+            cmd += ["--neg", a.neg]
         if refs_remote:
             cmd += ["--ref", refs_remote]
         say("queueing " + a.tag)
@@ -570,6 +637,22 @@ def main():
     r.add_argument("--denoise", type=float, default=0.80)
     r.add_argument("--sim2real", type=float, default=0.70)
     r.add_argument("--vace", type=float, default=1.0)
+    # The control signal's grip over the schedule. Was not reachable from here
+    # at all until 23 Aug 2026 — vacejob hardcoded 1.0 — so every result in the
+    # notebook up to that date holds the game geometry through the final step.
+    r.add_argument("--vacestart", type=float, default=0.0)
+    r.add_argument("--vaceend", type=float, default=1.0)
+    # cfg and light are one knob wearing two hats. The lightx2v distill LoRA is
+    # what makes 12 steps enough, and it only works at cfg 1.0 — which switches
+    # classifier-free guidance off, and with it the negative prompt. `--light 0
+    # --cfg 5.5 --steps 30` is the un-distilled configuration: 4-5x the sampling
+    # time, and the first time NEG has ever done anything.
+    r.add_argument("--cfg", type=float, default=1.0)
+    r.add_argument("--light", type=float, default=1.0)
+    r.add_argument("--shift", type=float, default=5.0)
+    # Wan 2.2 only: the step at which the high-noise expert hands over to the
+    # low-noise one. 0 lets vacejob22 pick steps//3.
+    r.add_argument("--boundary", type=int, default=0)
     r.add_argument("--seed", type=int, default=7731)
     r.add_argument("--ctx", type=int, default=0)
     r.add_argument("--ctxover", type=int, default=24)
@@ -583,6 +666,7 @@ def main():
                    const="")
     r.add_argument("--outw", type=int, default=1920)
     r.add_argument("--pos", default=None)
+    r.add_argument("--neg", default=None)
     r.add_argument("--out", default=str(Path.home() / "fr-video" / "burst"))
     r.add_argument("--timeout", type=float, default=60)
     r.add_argument("--attn", default="")
