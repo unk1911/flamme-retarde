@@ -117,11 +117,15 @@ days of guessing.
       cut into non-overlapping pieces. Plus the capped return with limestone
       offcuts in the dust, and the garden wall with the square opening and the
       timber frame behind it.
-- [ ] Trampulin's name painted on the render left of the door, as b_106 has it
-      rather than on a fascia board. Blocked: the frontage is 6 m with a 3.8 m
-      serving opening, so there is ~1 m of render either side — the shop's
-      proportions need revisiting first. `wallName()` was written and deleted
-      rather than shipped switched off.
+- [x] Trampulin's name is on the render, not on a fascia board. The blocker
+      recorded here was the wrong one: it assumed the name had to go on the
+      ~1 m of render either side of the serving opening, so it waited on the
+      shop's proportions. 20260821_174940 shows it on the terrace's BACK wall,
+      above the opening and under the corrugated roof — six metres of render,
+      and always was. `awn > 0` could not express "awning AND name on the wall"
+      because the render name lived only in the `else`; there is a `wallName`
+      flag now. The 4.3 m cream board that used to hang off the awning edge was
+      the loudest thing on this end of the promenade and is gone.
 - [ ] Paving: the FLAG palette is close enough to CONC that the seam is subtle.
       v_022 has warmer, yellower flags with visibly darker joints.
 - [ ] Per-shop detail pass, one shop per iteration, against its own photographs.

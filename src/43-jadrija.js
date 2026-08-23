@@ -1812,7 +1812,8 @@ async function buildJadrija(scene) {
     { key: 'tramp2', kind: 'box', t0: 469, t1: 475, s0: 21, s1: 26.6, h: 2.55,
       name: 'Caffe TRAMPULIN', roof: [0.430, 0.252, 0.180],
       body: [0.560, 0.535, 0.487], awn: 3.2, fg: '#33302c', bg: '#e8e0cf',
-      pergola: [0.075, 0.230, 0.140], bench: [0.330, 0.145, 0.095] },
+      pergola: [0.075, 0.230, 0.140], bench: [0.330, 0.145, 0.095],
+      wallName: true },
   ];
   // What the promenade's own loops have to keep out of. A lamp coming up
   // through an awning and a bench standing inside a shop are the two failures
@@ -3612,8 +3613,30 @@ async function buildJadrija(scene) {
       // Stood 0.40 m off the valance rather than 0.16, and 0.46 m deep
       // rather than 0.38 — which did not fix what it was meant to fix, but is
       // the right depth for the board anyway.
-      else if (S.name) shopSign(S, (S.t0 + S.t1) * 0.5, fs - 0.40, top - 0.34,
-        Math.min(6.4, (S.t1 - S.t0) * 0.72), 0.46);
+      else if (S.name && !S.wallName) {
+        shopSign(S, (S.t0 + S.t1) * 0.5, fs - 0.40, top - 0.34,
+          Math.min(6.4, (S.t1 - S.t0) * 0.72), 0.46);
+      }
+      // Trampulin has an awning AND its name on the wall behind it, which is
+      // the combination this branch could not express: `awn > 0` took the
+      // valance board and the render name lived only in the `else`.
+      //
+      // 20260821_174940 is unambiguous. There is no board on the terrace roof
+      // at all — the name is small dark lettering straight on the render at the
+      // back of the terrace, above head height, perhaps a third of the frontage
+      // wide. The game hung a 4.3 m cream board off the awning edge with the
+      // name across the whole of it, which is why it read as the loudest thing
+      // on this end of the promenade when in life you have to look for it.
+      //
+      // This is `b_106` in the survey list, and the reason it stood open is
+      // recorded there as the frontage's proportions. That was the wrong
+      // blocker: the name does not go on the 1 m of render either side of the
+      // serving opening, it goes on the terrace's back wall, which is six
+      // metres of it and always was.
+      else if (S.name && S.wallName) {
+        shopSign(S, (S.t0 + S.t1) * 0.5, S.s0 - 0.14, top - 0.52,
+          (S.t1 - S.t0) * 0.36, 0.30);
+      }
       // The scalloped fascia. The photograph has one on this awning whether or
       // not the name is up there with it.
       if (S.scallop || S.menu) {
