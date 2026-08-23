@@ -24,12 +24,19 @@ geodata pipeline.
   re-pointed at the nearest bathers about seven times a second. Measured at the
   three promenade stations, figures within 15 m of the camera, skinned against
   instanced: 2/3, 5/5 and 10/3 before; **5/0, 9/0 and 12/0 after** — every
-  bather you can walk up to is a proper one, at all three. Frame time uncapped
-  at 1280x720, mean over 360 frames and two runs of each: **16.3 / 11.0 /
-  11.2 ms after against 16.6 / 10.7 / 10.8 before** — nothing at the west
-  station, which is the one near the 16.7 ms a 60 fps frame has, and three
-  tenths of a millisecond at the other two. It is the same twenty-four meshes
-  at the same cost, pointed somewhere useful.
+  bather you can walk up to is a proper one, at all three.
+
+  It is also **faster**, which was not the point and is worth writing down.
+  Uncapped at 1280x720, median of 360 frames, three runs of each build run
+  alternately because this machine's load moves by 4 ms over an hour:
+  **13.0 / 8.4 / 8.9 ms against 16.0 / 10.7 / 11.4 before**, and the new build
+  wins all nine pairs. A skinned figure two hundred metres away was never free
+  — it is 7 000 triangles submitted and a bone palette uploaded every third or
+  eighth frame — and its instanced stand-in is 132 triangles inside a draw call
+  that was happening anyway. Pointing the twenty-four expensive meshes at the
+  people you can actually see gets the other sixty for nothing. The west
+  station, which is the one that was breaching the 16.7 ms a 60 fps frame has,
+  now has 3.7 ms of headroom.
 - **`SKIN_CAST` is 24**, up from 20 and re-measured: 16.1 / 10.6 / 10.4 ms at
   the three stations against 15.9 / 10.2 / 9.9 at twenty. Thirty breaches 60 fps
   at the west station, so this is the ceiling rather than a stop on the way.
@@ -51,6 +58,14 @@ geodata pipeline.
 
 ### Fixed
 
+- **The skinned bathers cast shadows now.** They never have: the instanced tier
+  has been in the near cascade since the crowd was written and the skinned tier
+  was not, which nobody could see while the good figures were mostly two
+  hundred metres away. With the cast following the player it became the whole
+  picture — walk toward a bather and watch their shadow go out, photographed at
+  the middle station. `dynamic: true` is what makes it affordable: `syncMoving`
+  copies each proxy's visibility off its mesh, and `flush` has already hidden
+  everybody past 240 m and every slot standing in for nobody.
 - **The café terraces are untouched.** `SKIN_SEATED`'s twenty-four chair
   sitters stay pinned to the skinned tier at whatever distance: the terrace is
   the one place a player walks up to and stops, and the three seated clips are
