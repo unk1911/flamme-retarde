@@ -145,6 +145,20 @@ recordings. It is played only for the *crossing* of the kabina's curtain; the
 tail after you are through is synthesised in `src/80-audio.js`, because it has
 to follow how hard the strands are still swinging.
 
+### The crowd's voices — synthesised, not recorded
+
+`build/payload/bump_{yo,walkin,goin}_{m,f}.mp3` are six short lines — three, in
+a man's voice and a woman's — spoken by somebody you have walked into on the
+promenade. They were generated with ElevenLabs text-to-speech on 23 August 2026
+from wording written for this game, using two of that service's stock voices.
+No person said them and no recording of a person is in them.
+
+The wording is mine and the licence above covers it. What ElevenLabs grants over
+its own output is a matter between the account holder and ElevenLabs, and this
+notice is here so that anyone redistributing the bundle knows which six files to
+ask that question about. They are trimmed to the speech, levelled to -20 dBFS
+RMS and cut to 24 kHz mono to sit with the field recordings.
+
 ### The radio — an off-air recording, and the one thing here I cannot license
 
 `build/payload/radio.mp3` is 32.1 seconds cut by `tools/cut_field.py` from a

@@ -254,6 +254,12 @@ const STRINGS = {
     'bump.excuse': 'uhm... excuuuuse me!',
     'bump.hey': 'hey — watch it!',
     'bump.ow': 'ow!',
+    // The three that are said OUT LOUD — build/payload/bump_*.mp3. The text is
+    // what the recording says, word for word, because a balloon that disagrees
+    // with the voice under it is worse than either alone.
+    'bump.yo': 'yo! watch it!',
+    'bump.walkin': "hey — i'm walkin' here!",
+    'bump.goin': "yo, where d'you think you're goin', bro?",
 
     // The gameplay recorder — src/92-clip.js. No <b> in the two toasts, unlike
     // most of the strings around here that name a key: `toast()` sets
@@ -592,6 +598,12 @@ const STRINGS = {
     'bump.excuse': 'ovaj... oprostiiiite!',
     'bump.hey': 'hej — pazi malo!',
     'bump.ow': 'joj!',
+    // Translated, and the recording under them stays English — see the note in
+    // 80-audio.js. A Croatian balloon over an American voice is the lesser of
+    // the two mismatches available.
+    'bump.yo': 'ej! pazi!',
+    'bump.walkin': 'ej — hodam ovdje!',
+    'bump.goin': 'ej, kamo si to krenuo, stari?',
 
     // the gameplay recorder — src/92-clip.js
     'clip.rec': 'snima',
@@ -913,6 +925,9 @@ const STRINGS = {
     'bump.excuse': 'euh... pardooooon !',
     'bump.hey': 'hé — attention !',
     'bump.ow': 'aïe !',
+    'bump.yo': 'hé ! attention !',
+    'bump.walkin': "hé — je marche, moi !",
+    'bump.goin': 'hé, tu vas où comme ça, mec ?',
 
     // the gameplay recorder — src/92-clip.js
     'clip.rec': 'rec',

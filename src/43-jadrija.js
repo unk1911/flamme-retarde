@@ -14726,7 +14726,19 @@ async function buildJadrija(scene) {
    * the first one again — a crowd with one line in it is a crowd with a tape
    * recorder in it.
    */
-  const EXCUSE = ['bump.excuse', 'bump.excuse', 'bump.hey', 'bump.ow'];
+  // Seven entries and not four, and the weighting is the point. "uhm...
+  // excuuuuse me!" is still twice as likely as anything else, because most
+  // people on a crowded promenade apologise for being walked into even when it
+  // was not their fault. The three added on 23 Aug are the ones who do not:
+  // Misha asked for them in his own words — "like being pissed and saying 'yo,
+  // watch it!', or with italian NYC brooklyn pissed-off accent, 'hey, i'm
+  // walkin' here!'" — and those three are the ONLY ones with a recorded voice
+  // under them, which is why they are the loud ones. Somebody muttering "uhm,
+  // excuse me" is muttering it. Three in seven bark; the rest just look at you.
+  const EXCUSE = ['bump.excuse', 'bump.excuse', 'bump.hey', 'bump.ow',
+    'bump.yo', 'bump.walkin', 'bump.goin'];
+  /** Which of them have a clip in the payload, and under what name. */
+  const BARK = { 'bump.yo': 'yo', 'bump.walkin': 'walkin', 'bump.goin': 'goin' };
   const looking = [];        // the figures with a head part-way round
   let bumpBalloon = null;    // made on the first bump and never again
   let bumpSaid = null;       // { fg, t } while a line is up
@@ -14830,7 +14842,13 @@ async function buildJadrija(scene) {
     // a fact about them rather than about the order you happen to meet them
     // in. A different mixing from the `fg.seed < says` test above, or the
     // people who speak would all have drawn the same line out of it.
-    const line = T(EXCUSE[((fg.seed * 7919) | 0) % EXCUSE.length]);
+    const key = EXCUSE[((fg.seed * 7919) | 0) % EXCUSE.length];
+    const line = T(key);
+    // The voice, where there is one, in this figure's own. `sex` is on the
+    // figure because the crowd already drew it to decide which rig to use, and
+    // half this beach is women — one voice for everybody would be one person
+    // following you down the promenade.
+    if (audio && audio.bark && BARK[key]) audio.bark(BARK[key], fg.sex);
     bumpBalloon.say(line);
     bumpBalloon.said = line;
     bumpSaid = { fg, t: 0 };
@@ -14839,6 +14857,10 @@ async function buildJadrija(scene) {
 
   /** Advance every head that is part-way round, and the line over one of them. */
   function stepBump(dt, cam) {
+    // Ask for the six clips before anybody is walked into. Same lesson as
+    // `beadWarm`: a decode that starts when the sound is wanted is a sound that
+    // is missing the first time, and the first time is the one you remember.
+    if (audio && audio.barkWarm) audio.barkWarm();
     bumpClock += dt;
     if (bumpCool > 0) bumpCool -= dt;
     if (!looking.length && !bumpSaid) return;
@@ -14936,6 +14958,9 @@ async function buildJadrija(scene) {
     const p = toWorld(b.t, b.s);
     const fg = {
       mode: b.pose,
+      // Which voice is theirs when they are walked into. Drawn above to pick a
+      // rig, and kept because the two have to be the same person.
+      sex,
       x: p[0], y: b.y, z: p[2], yaw: rigYaw(b.t, b.ang),
       // The (t, s) shadow of the world position, kept for the walkers: it is
       // far cheaper to advance a distance along the shore than to re-solve for

@@ -459,6 +459,69 @@ function buildAudio() {
    */
   function beadWarm() { sampleLoad('beads', (b) => { beadBuf = b; }); }
 
+  // ── somebody you have just walked into ─────────────────────────────────────
+  /**
+   * The line the crowd says out loud when you barge into them.
+   *
+   * Six clips, `build/payload/bump_{yo,walkin,goin}_{m,f}.mp3` — three lines in
+   * a man's voice and a woman's, because half this beach is women and one voice
+   * for everybody would be one person following you around. Synthesised with
+   * ElevenLabs on 23 Aug to Misha's own wording, trimmed to the speech, levelled
+   * to -20 dBFS RMS and cut to 24 kHz mono to sit with the field recordings —
+   * the same treatment beads.mp3 got, for the same reason: a clip at a
+   * different rate is the cleanest thing in the mix and reads as an import.
+   *
+   * ONLY THREE OF THE SEVEN LINES ARE SPOKEN, and that is the design rather
+   * than a shortfall. `EXCUSE` in 43-jadrija.js also holds "uhm... excuuuuse
+   * me!", "hey — watch it!" and "ow!", and somebody who says "uhm, excuse me"
+   * says it under their breath. The ones with a voice are the ones who are
+   * annoyed enough to use it, so about three people in seven bark at you and
+   * the rest just look.
+   *
+   * The recording is English in every language. The balloon over it is
+   * translated, which is a mismatch, and it is the smaller of the two on
+   * offer — the alternative is eighteen clips and a second voice cast in two
+   * more languages for four words apiece. Said out loud here rather than left
+   * for somebody to discover.
+   */
+  const BARKS = ['bump_yo_m', 'bump_yo_f', 'bump_walkin_m', 'bump_walkin_f',
+    'bump_goin_m', 'bump_goin_f'];
+  const barkBuf = {};
+
+  /** Ask for all six before anybody is walked into. See `beadWarm`. */
+  function barkWarm() {
+    for (const k of BARKS) {
+      if (!barkBuf[k]) sampleLoad(k, (b) => { barkBuf[k] = b; });
+    }
+  }
+
+  /**
+   * @param line  'yo' | 'walkin' | 'goin'
+   * @param sex   'm' | 'f' — whose voice, and it is the figure's own
+   * @param d     metres, for the range; a bump happens at arm's length, so this
+   *              is nearly always zero and is here for the debug hook
+   */
+  function bark(line, sex, d = 0) {
+    if (!ctx || !bed) return false;
+    const key = 'bump_' + line + '_' + (sex === 'f' ? 'f' : 'm');
+    const buf = barkBuf[key];
+    if (!buf) { barkWarm(); return false; }
+    const t0 = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    // Not the same person twice. A shove is a fast event and a grumble is a
+    // slow one, so the spread is small and downward as often as up — anything
+    // wider than this stops sounding like a different person and starts
+    // sounding like a different tape speed.
+    src.playbackRate.value = 0.96 + Math.random() * 0.09;
+    const g = ctx.createGain();
+    g.gain.value = 0.62 * Math.max(0.05, 1 - d / 22);
+    src.connect(g).connect(bed);
+    if (verbSend) { const w = ctx.createGain(); w.gain.value = 0.18; g.connect(w).connect(verbSend); }
+    src.start(t0);
+    return true;
+  }
+
   function beadShove(amp = 1, d = 0) {
     if (!ctx) return;
     const t0 = ctx.currentTime;
@@ -3065,7 +3128,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, rattle,
-    beadShove, beadWarm, canopy, boots,
+    beadShove, beadWarm, bark, barkWarm, canopy, boots,
     /**
      * The last node before the speakers, and the context it lives in.
      *
