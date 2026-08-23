@@ -3624,13 +3624,42 @@ async function buildJadrija(scene) {
         post(W, t, S.s0 + 0.4, y0, y0 + S.h, 0.075, S.post, 6);
         post(W, t, S.s1 - 0.4, y0, y0 + S.h, 0.075, S.post, 6);
       }
+      // The roof is two layers, and it has to be, because 20260821_175856 shows
+      // the two doing different jobs.
+      //
+      // It was one box coloured reed-brown all over, and the underside of that
+      // box is the largest surface anybody standing at this bar can see: eleven
+      // metres by nine of flat dark olive filling the top of the frame, which
+      // is what made the konoba read as gloomy from the promenade and is the
+      // big brown mass that turns up in every screenshot taken from t 230.
+      //
+      // In the photograph the reed is the top and the ragged eaves, and the
+      // ceiling under it is warm amber translucent panelling with the afternoon
+      // coming through it. That glow is most of what the place looks like. So:
+      // an amber deck, and the reed laid over it 0.10 m proud and overhanging
+      // 0.12 m all round, which is enough that the reed reads as the roof from
+      // outside and the amber reads as the ceiling from under it.
+      //
+      // The amber is high — 0.760 / 0.585 / 0.165 — because it is a horizontal
+      // surface facing DOWN, so it gets no sun at all and only bounce, and an
+      // honest albedo for translucent yellow plastic comes out of the renderer
+      // as brown. What is being modelled here is a light source, not a colour.
+      const AMBER = [0.760, 0.585, 0.165];
       boxTS(S.t0 - 0.5, S.t1 + 0.5, S.s0 - 0.5, S.s1 + 0.5,
-        y0 + S.h, y0 + S.h + 0.28, S.roof, shade(S.roof, 1.12));
-      // The band of yellow roof panelling under the eave.
-      boxTS(S.t0 - 0.5, S.t1 + 0.5, S.s0 - 0.5, S.s0 - 0.32,
-        y0 + S.h - 0.16, y0 + S.h, [0.620, 0.545, 0.185]);
+        y0 + S.h, y0 + S.h + 0.10, AMBER, shade(AMBER, 0.9));
+      boxTS(S.t0 - 0.62, S.t1 + 0.62, S.s0 - 0.62, S.s1 + 0.62,
+        y0 + S.h + 0.10, y0 + S.h + 0.38, S.roof, shade(S.roof, 1.12));
       // The counter, an L round two sides, with its teal top.
-      boxTS(S.t0 + 1.2, S.t0 + 7.2, S.s1 - 1.4, S.s1 - 0.6, y0, y0 + 1.02, body);
+      //
+      // The front of it is not teal. 20260821_175856 has dark maroon vertical
+      // boarding from the paving up to the counter, and the teal is the top and
+      // the return only — which is why the row of red and green stools reads
+      // against it the way it does. Painted teal all the way down, the stools
+      // sat on a wall of their own colour family and the counter had no base.
+      boxTS(S.t0 + 1.2, S.t0 + 7.2, S.s1 - 1.4, S.s1 - 0.6, y0, y0 + 0.86,
+        [0.245, 0.075, 0.070]);
+      boxTS(S.t0 + 1.2, S.t0 + 7.2, S.s1 - 1.4, S.s1 - 0.6,
+        y0 + 0.86, y0 + 1.02, body);
       boxTS(S.t0 + 1.1, S.t0 + 7.3, S.s1 - 1.5, S.s1 - 0.5,
         y0 + 1.02, y0 + 1.08, shade(body, 1.2));
       runs.push({ t0: S.t0 + 1.1, t1: S.t0 + 7.3, s0: S.s1 - 1.5, s1: S.s1 - 0.5,
