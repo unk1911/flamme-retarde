@@ -25,8 +25,11 @@ geodata pipeline.
   three promenade stations, figures within 15 m of the camera, skinned against
   instanced: 2/3, 5/5 and 10/3 before; **5/0, 9/0 and 12/0 after** — every
   bather you can walk up to is a proper one, at all three. Frame time uncapped
-  at 1280x720 is 15.7 / 10.6 / 11.0 ms against 16.5 / 10.4 / 10.8 before, which
-  is the same cast at the same cost pointed somewhere useful.
+  at 1280x720, mean over 360 frames and two runs of each: **16.3 / 11.0 /
+  11.2 ms after against 16.6 / 10.7 / 10.8 before** — nothing at the west
+  station, which is the one near the 16.7 ms a 60 fps frame has, and three
+  tenths of a millisecond at the other two. It is the same twenty-four meshes
+  at the same cost, pointed somewhere useful.
 - **`SKIN_CAST` is 24**, up from 20 and re-measured: 16.1 / 10.6 / 10.4 ms at
   the three stations against 15.9 / 10.2 / 9.9 at twenty. Thirty breaches 60 fps
   at the west station, so this is the ceiling rather than a stop on the way.
