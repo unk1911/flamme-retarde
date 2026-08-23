@@ -13624,8 +13624,12 @@ async function buildJadrija(scene) {
     // mannequin all session and a blob four pixels tall two hundred metres
     // away was spending the budget. Now the same twenty-four meshes follow
     // you. See `stepCast` below.
-    const roveOk = !!crowds.skin && blobbable && !b.chair
-      && castBlob && castBlob[bi] >= 0;
+    // `crowds.m || crowds.f` because a roving candidate's home is the
+    // instanced tier and it is only *lent* to a slot. With no rig loaded at
+    // all there is nowhere to lend them from, and a figure in both arrays
+    // would be drawn twice.
+    const roveOk = !!crowds.skin && !!(crowds.m || crowds.f) && blobbable
+      && !b.chair && castBlob && castBlob[bi] >= 0;
     // Drawn whether or not it is wanted. Rule 4: the `rng` stream is the beach,
     // and a draw that happens only for the people who did *not* get a blob
     // makes `SKIN_CAST` a knob that reshuffles every gait, every swimsuit and
@@ -14181,7 +14185,8 @@ async function buildJadrija(scene) {
             idx: fg.idx, blob: BATHER_CAST[fg.blob], mode: fg.mode,
             d: +Math.hypot(fg.x - lastCam.x, fg.z - lastCam.z).toFixed(1),
             skinM: +(castNatH[fg.blob] * fg.hscale).toFixed(3),
-            instM: +((crowds.m || crowds.f).height * fg.scale).toFixed(3),
+            instM: +(((crowds.m || crowds.f || {}).height || 0)
+              * fg.scale).toFixed(3),
           })).sort((a2, b2) => a2.d - b2.d) : [],
       }),
       /**
