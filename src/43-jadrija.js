@@ -3606,7 +3606,7 @@ async function buildJadrija(scene) {
         column([['JADRIJA']], '800', H * 0.34, () => fw * 0.90, 0.68),
         cx, f.y0 + fh * 0.62, 'center');
     }
-    // Right bay: what it costs. Seven items and, since 23 August 2026, seven
+    // Right bay: what it costs. Eight items and, since 23 August 2026, eight
     // prices — there are no blank white labels left on this board.
     //
     // The columns are still the photograph's. On 20260821_175713 the right-hand
@@ -3626,14 +3626,27 @@ async function buildJadrija(scene) {
     // exactly the height the numbers were already set at: before this the
     // three prices stood two pixels shorter than the names beside them.
     //
-    // Where the four new numbers come from, because it matters. Only KUPOVI
-    // 8.00, FRAPPE 7.00 and ESPRESSO 2.00 were ever legible in the survey
-    // photograph — the rest of the column was lost to a reflection, to a
-    // customer's head and to type too small to resolve, and it shipped as the
-    // blank white labels the picture actually shows. SLADOLED 2.50, KRAFNE
-    // 2.50, MACCHIATO 2.50 and CAPPUCCINO 3.50 were SUPPLIED BY MISHA on
-    // 23 August 2026 out of his own knowledge of the shop. They are not read
-    // off any photograph and they are not guessed.
+    // Where the numbers that are not in the photograph come from, because it
+    // matters. Only KUPOVI 8.00, FRAPPE 7.00 and ESPRESSO 2.00 were ever
+    // legible in the survey photograph — the rest of the column was lost to a
+    // reflection, to a customer's head and to type too small to resolve, and
+    // it shipped as the blank white labels the picture actually shows.
+    // SLADOLED 2.50, KRAFNE 2.50, MACCHIATO 2.50 and CAPPUCCINO were SUPPLIED
+    // BY MISHA on 23 August 2026 out of his own knowledge of the shop. They
+    // are not read off any photograph and they are not guessed.
+    //
+    // Corrected the same night, from the same source: CAPPUCCINO is 3.00 and
+    // not the 3.50 first given, and there is a NESCAFE under it at 3.00 — the
+    // eighth row, and the reason the pitch dropped an item's worth. Both
+    // stand on his recollection alone, like the four above them.
+    //
+    // Worth noting what that does to the layout: the row count is the only
+    // thing anyone has to change here. `pitch` divides the field by
+    // `items.length` and `column()` re-fits the whole column to whatever cap
+    // height that leaves, so adding a row shrinks the type for every row at
+    // once and keeps the board looking set by one hand. NESCAFE is shorter
+    // than CAPPUCCINO, so the widest name — and with it the 0.55 budget the
+    // column is fitted against — is unchanged.
     //
     // This is not rule 12 being relaxed, it is a better source arriving. Rule
     // 12 forbids inventing a name or a number the evidence does not carry; it
@@ -3646,7 +3659,8 @@ async function buildJadrija(scene) {
       const f = fieldOf(2), fw = f.x1 - f.x0, fh = f.y1 - f.y0;
       const items = [['SLADOLED', '2.50 €'], ['KUPOVI', '8.00 €'],
         ['FRAPPE', '7.00 €'], ['KRAFNE', '2.50 €'], ['ESPRESSO', '2.00 €'],
-        ['MACCHIATO', '2.50 €'], ['CAPPUCCINO', '3.50 €']];
+        ['MACCHIATO', '2.50 €'], ['CAPPUCCINO', '3.00 €'],
+        ['NESCAFE', '3.00 €']];
       const top = f.y0 + fh * 0.045, pitch = (fh * 0.91) / items.length;
       const rx = f.x1 - fw * 0.075;                 // where a number ends
       const mi = column(items, '700', pitch * 0.92, () => fw * 0.55, 0.58);

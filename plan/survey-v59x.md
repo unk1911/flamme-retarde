@@ -95,7 +95,16 @@ standing on a wall of irregular limestone rubble with a flat sawn cap. It runs
 for tens of metres and it is the loudest colour in the lane. The game's
 boundary is white render, rubble piers and ashlar — three treatments, none of
 them this one. Would add a fourth, and it is the one a returning visitor sees
-first. *Good next job.*
+first. **BUILT, 23 Aug** as `palisadeWall`, sixteen and a half metres at
+t 241.0-257.5 on s 40.4, between the ashlar garden wall and the lavender bank.
+Two things the frame does not tell you. The rubble wall came out reading as
+BLOCKWORK, because every stone was given the full height of its row, so the
+rows read as courses: the fix is to set the band first and let each stone take
+a fraction of it and float inside, with the gain spread widened from ±17% to
+±24%. And the pales had to come down from 52 mm to 44 mm, because a bar with
+depth paints wider than its width — at 52 the fence read as boarding.
+The pale count is derived from the WORLD length of the run, not from t, since
+a metre of t is not a metre of world (rule 9b).
 
 **6. The lavender bank on a drystone wall.** `a_171`–`a_180`. A continuous
 silver-grey lavender or santolina planting on top of a low dry-stone retaining
