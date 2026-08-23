@@ -3245,8 +3245,13 @@ async function buildJadrija(scene) {
      * worst-off line decides for all of them — which is what a signwriter
      * does and what the photograph shows.
      *
-     * `maxOf` is per line and not one number, because a row carrying 8.00 €
-     * has less width for its name than a row carrying a blank white label.
+     * `maxOf` is per line and not one number, so that a row whose number is
+     * wider than its neighbours' can be given less width for its name than
+     * they get. The right bay wanted that while four of its seven rows carried
+     * a blank white label instead of a price and could spare their names the
+     * room; now that every row carries a price of the same set width, all
+     * seven ask for the same budget and the hook is only waiting for the next
+     * board that needs it.
      */
     const column = (rows, weight, px, maxOf, floor) => {
       let need = 1;
@@ -3304,45 +3309,57 @@ async function buildJadrija(scene) {
         column([['JADRIJA']], '800', H * 0.34, () => fw * 0.90, 0.68),
         cx, f.y0 + fh * 0.62, 'center');
     }
-    // Right bay: what it costs. A white label where the photograph has one.
+    // Right bay: what it costs. Seven items and, since 23 August 2026, seven
+    // prices — there are no blank white labels left on this board.
     //
-    // The columns are the photograph's. On 20260821_175713 the right-hand blue
-    // field runs x 2980 to 3200; the names start at 2988 and the longest of
-    // them reaches 3130; 8.00 € runs 3115 to 3175 and the little white labels
-    // 3140 to 3172. As fractions of the field: names from 0.035, numbers
-    // ending at 0.925, a label 0.19 wide. A name and its own number overlap in
-    // the photograph only because no row there has both a long name and a wide
-    // price — so the budget is per row, 0.55 of the field for a name with a
-    // number beside it and 0.60 for one with a label.
+    // The columns are still the photograph's. On 20260821_175713 the right-hand
+    // blue field runs x 2980 to 3200; the names start at 2988 and the longest
+    // of them reaches 3130; 8.00 € runs 3115 to 3175. As fractions of the
+    // field: names from 0.035, numbers ending at 0.925. A name and its own
+    // number overlap in the photograph only because no row there has both a
+    // long name and a wide price — so a name is budgeted 0.55 of the field,
+    // which is what the widest number leaves it once its 0.30 and the two
+    // margins are taken off, and every row gets that same budget because every
+    // row now carries a number. Four of them did not before, and those four
+    // were allowed 0.60 because a label is narrower than a price; that
+    // exception is gone with the labels, and CAPPUCCINO — already squeezed to
+    // the 0.58 floor — no longer clears 0.55 at the pitch's own cap height. So
+    // the whole column comes down with it, 17 canvas pixels of cap to 15,
+    // which is what a signwriter does and which by luck brings the names to
+    // exactly the height the numbers were already set at: before this the
+    // three prices stood two pixels shorter than the names beside them.
     //
-    // Nothing here is invented. Only KUPOVI 8.00, FRAPPE 7.00 and ESPRESSO
-    // 2.00 could ever be read; the other four are the little white labels they
-    // are up there, and if the layout leaves room for more numbers the room
-    // stays empty. The four photographs of 23 August 2026 are the gelato
-    // counter, beach bar MINI and the pine shade — none of them shows this
-    // board, so none of them makes a fourth number legible.
+    // Where the four new numbers come from, because it matters. Only KUPOVI
+    // 8.00, FRAPPE 7.00 and ESPRESSO 2.00 were ever legible in the survey
+    // photograph — the rest of the column was lost to a reflection, to a
+    // customer's head and to type too small to resolve, and it shipped as the
+    // blank white labels the picture actually shows. SLADOLED 2.50, KRAFNE
+    // 2.50, MACCHIATO 2.50 and CAPPUCCINO 3.50 were SUPPLIED BY MISHA on
+    // 23 August 2026 out of his own knowledge of the shop. They are not read
+    // off any photograph and they are not guessed.
+    //
+    // This is not rule 12 being relaxed, it is a better source arriving. Rule
+    // 12 forbids inventing a name or a number the evidence does not carry; it
+    // has never forbidden one the owner of the game states as fact, and an
+    // owner's statement is the only thing that legitimately turns a white
+    // label into a price. Anything still unsourced would still be a label —
+    // the branch that drew them went only because nothing is left for it to
+    // draw, and it is a two-line job to put back.
     {
       const f = fieldOf(2), fw = f.x1 - f.x0, fh = f.y1 - f.y0;
-      const items = [['SLADOLED', null], ['KUPOVI', '8.00 €'], ['FRAPPE', '7.00 €'],
-        ['KRAFNE', null], ['ESPRESSO', '2.00 €'], ['MACCHIATO', null],
-        ['CAPPUCCINO', null]];
+      const items = [['SLADOLED', '2.50 €'], ['KUPOVI', '8.00 €'],
+        ['FRAPPE', '7.00 €'], ['KRAFNE', '2.50 €'], ['ESPRESSO', '2.00 €'],
+        ['MACCHIATO', '2.50 €'], ['CAPPUCCINO', '3.50 €']];
       const top = f.y0 + fh * 0.045, pitch = (fh * 0.91) / items.length;
       const rx = f.x1 - fw * 0.075;                 // where a number ends
-      const lw = fw * 0.19;                         // an illegible one's label
-      const mi = column(items, '700', pitch * 0.92,
-        (r) => fw * (r[1] ? 0.55 : 0.60), 0.58);
-      const mp = column(items.filter((r) => r[1]).map((r) => [r[1]]),
+      const mi = column(items, '700', pitch * 0.92, () => fw * 0.55, 0.58);
+      const mp = column(items.map((r) => [r[1]]),
         '600', pitch * 0.92, () => fw * 0.30, 0.75);
       items.forEach(([t, price], i) => {
         const y = top + pitch * (i + 0.76);
         g.fillStyle = warm();
         line(t, mi, f.x0 + fw * 0.035, y, 'left');
-        if (price) {
-          line(price, mp, rx, y, 'right');
-        } else {
-          g.fillStyle = '#f4f6f7';
-          g.fillRect(rx - lw, y - pitch * 0.58, lw, pitch * 0.70);
-        }
+        line(price, mp, rx, y, 'right');
       });
     }
     const tex = new THREE.CanvasTexture(C);
