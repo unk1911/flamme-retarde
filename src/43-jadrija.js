@@ -5882,6 +5882,45 @@ async function buildJadrija(scene) {
       }
       runs.push({ t0: bt - 0.6, t1: bt + 2.4, s0: bs - 2.1, s1: bs + 2.1,
         y: surfaceY(bt, bs), h: 1.1 });
+
+      // And the white box trailer standing beside them, which is the other
+      // half of survey item a_160 and the half that was never built.
+      //
+      // In the frame it is a plain white box on a small road trailer, parked
+      // at the top of the beach where the lane runs out — square, taller than
+      // it is wide, no windows on the side that faces the camera, sitting
+      // level on its jockey wheel with the drawbar down. It is the only white
+      // rectangle on this stretch and it reads from a long way off, which is
+      // most of why it is worth having: everything else at the top of this
+      // beach is stone, hull or pine.
+      //
+      // Six metres west of the hulls and a metre and a half further up the
+      // bank, so it stands clear of them rather than in the same heap.
+      {
+        const tt = bt - 6.0, ts = bs + 1.5;
+        const y = surfaceY(tt, ts);
+        const P = (dt, ds, yy) => W(tt + dt, ts + ds, yy);
+        const WHITE = [0.780, 0.782, 0.775];
+        const SHADE = [0.700, 0.704, 0.700];
+        const DARK = [0.105, 0.105, 0.112];
+        // The chassis it sits on, then the box, which overhangs it slightly
+        // the way a box body always does.
+        boxIn(P, -1.15, 1.15, -0.62, 0.62, y + 0.38, y + 0.46, DARK);
+        boxIn(P, -1.28, 1.28, -0.74, 0.74, y + 0.46, y + 1.94, WHITE, SHADE);
+        // A dark shadow gap under the eaves rather than a drawn edge — at this
+        // size a 3 cm reveal is below a pixel and the box goes flat without it.
+        boxIn(P, -1.30, 1.30, -0.76, 0.76, y + 1.86, y + 1.94, SHADE);
+        // Two wheels and the jockey wheel under the drawbar.
+        for (const o of [-0.66, 0.66]) {
+          boxIn(P, o - 0.13, o + 0.13, -0.80, -0.66, y + 0.06, y + 0.62, DARK);
+          boxIn(P, o - 0.13, o + 0.13, 0.66, 0.80, y + 0.06, y + 0.62, DARK);
+        }
+        // The drawbar, an A off the front, down on its wheel.
+        boxIn(P, -0.10, 0.10, 0.62, 1.62, y + 0.30, y + 0.40, DARK);
+        boxIn(P, -0.07, 0.07, 1.52, 1.66, y + 0.04, y + 0.34, DARK);
+        runs.push({ t0: tt - 1.4, t1: tt + 1.4, s0: ts - 0.9, s1: ts + 1.8,
+          y, h: 1.94 });
+      }
     }
     b = back7;
   }
