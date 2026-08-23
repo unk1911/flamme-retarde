@@ -4925,6 +4925,8 @@ window.__fr = {
      */
     tiers: (r = 15) => (jadrija && jadrija.crowd.tiers
       ? jadrija.crowd.tiers(r) : null),
+    /** The roving skinned cast: who is in a slot, and how tall they come out. */
+    cast: () => (jadrija && jadrija.crowd.cast ? jadrija.crowd.cast() : null),
     /** Debug: who is standing close enough to be resolved against right now. */
     bodies: (pad = 1.2) => {
       if (!jadrija || !jadrija.bodies) return null;

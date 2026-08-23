@@ -204,6 +204,111 @@ const BATHER_CAST = [
 ];
 
 /**
+ * What each of the eight has on, and what colour they are.
+ *
+ * Read off `SUITS` in tools/blender/bathers_mh.py, which is where they are
+ * baked: the first triple is the swimwear and the second the skin. Nothing at
+ * runtime needs these to *draw* a blob — the colours are in its vertices and
+ * the shader is `base *= vVCol` — so this table would be dead weight if the
+ * cast were fixed.
+ *
+ * It is here because the cast is not fixed. A bather who is a blob when you
+ * are near them and eleven tapered boxes when you are not is one person drawn
+ * two ways, and the two ways have to agree about what colour they are or
+ * walking toward somebody repaints them. The instanced tier is the one that
+ * can be told: it has `aInstColor` / `aInstSuit` / `aInstHair` and asks the
+ * mesh's marker palette which is which. So the blob's baked paint is copied on
+ * to its own instanced stand-in, and the direction of the copy is the whole
+ * answer to "which colours are this person's own" — the blob's, because the
+ * blob is the one that cannot be told otherwise.
+ *
+ * If a suit is ever re-baked, this table is what goes stale, and what it looks
+ * like is a bather who changes colour at about fifty metres.
+ */
+const BATHER_PAINT = {
+  woman_young_slim: { suit: [0.78, 0.16, 0.18], skin: [0.83, 0.68, 0.58] },
+  man_old_heavy: { suit: [0.24, 0.26, 0.30], skin: [0.72, 0.55, 0.44] },
+  girl_child: { suit: [0.86, 0.31, 0.42], skin: [0.80, 0.64, 0.53] },
+  man_young_fit: { suit: [0.11, 0.16, 0.28], skin: [0.74, 0.56, 0.44] },
+  woman_young_full: { suit: [0.88, 0.62, 0.14], skin: [0.42, 0.29, 0.22] },
+  boy_child: { suit: [0.16, 0.36, 0.62], skin: [0.72, 0.56, 0.42] },
+  woman_old: { suit: [0.30, 0.34, 0.52], skin: [0.78, 0.63, 0.53] },
+  man_young_lean: { suit: [0.18, 0.42, 0.36], skin: [0.76, 0.62, 0.47] },
+};
+
+/**
+ * And their hair, which is one colour for all eight.
+ *
+ * `HAIR_P` in tools/blender/human_mh.py. The bathers take the literal rather
+ * than the marker — `post=False`, see the note in `one` in bathers_mh.py — so
+ * every one of them has the same dark brown on, and the instanced stand-in
+ * must have it too or the promotion is a haircut. It is within a couple of
+ * units of `HAIR[0]` in 43-jadrija.js, which is the palette entry this
+ * effectively pins the whole promotable half of the beach to.
+ */
+const BATHER_HAIR = [0.128, 0.094, 0.070];
+
+/**
+ * How tall a baked figure stands, in metres, off its own vertices.
+ *
+ * Not read from a table, because there is one — `BATHERS` in
+ * tools/blender/mh_morph.py names a height for each of the eight — and a
+ * second copy of a number that is already in the mesh is a number that can
+ * disagree with the mesh. The bind pose stands with its soles on y = 0, so the
+ * tallest vertex is the stature and nothing has to be measured about the pose.
+ */
+function skinHeight(data) {
+  const p = data.geo.attributes.position.array;
+  let hi = 0;
+  for (let i = 1; i < p.length; i += 3) if (p[i] > hi) hi = p[i];
+  return hi;
+}
+
+/**
+ * The same question of the instanced rig, which has no vertices in one place.
+ *
+ * The rig is a tree of pivots with a lump of geometry hanging off each, so the
+ * top of the head is the head part's own highest vertex plus every pivot
+ * between it and the ground. Walked rather than looked up for the reason
+ * above: 42-crowd.js has said "a canonical 1.70 m figure" in prose for as long
+ * as it has existed and nothing has ever checked.
+ *
+ * The parts are in parent-before-child order — `rigSkeleton` already depends
+ * on it — so one pass accumulates the chain.
+ */
+function rigHeight(rig) {
+  const up = new Float64Array(rig.parts.length);
+  let hi = 0;
+  for (let i = 0; i < rig.parts.length; i++) {
+    const p = rig.parts[i];
+    up[i] = p.pivot[1] + (p.parent < 0 ? 0 : up[p.parent]);
+    const a = p.geo.attributes.position.array;
+    for (let k = 1; k < a.length; k += 3) {
+      const v = up[i] + a[k];
+      if (v > hi) hi = v;
+    }
+  }
+  return hi;
+}
+
+/**
+ * How fast this person's clip runs, as a multiple of nominal.
+ *
+ * Shared, because the same number has to be used in two places that are not
+ * near each other: `flush` writes it on to the figure that is drawing somebody
+ * and 43-jadrija.js advances the clock of everybody who is *not* being drawn
+ * by a blob, so that a person promoted mid-stride carries on from where their
+ * clip had got to rather than from wherever the last occupant of the slot left
+ * it. Two copies of it would be two clocks running at different rates and a
+ * figure that jumps the moment it becomes worth looking at.
+ */
+function clipRate(fg) {
+  return fg.mode === 'walk'
+    ? Math.max(0.7, Math.min(1.6, (fg.speed || 0.92) / 0.92))
+    : 0.90 + fg.seed * 0.22;
+}
+
+/**
  * The same contract as `makeCrowd`, backed by one skinned figure per person.
  *
  * Two casts became three. The aerodrome crew are eleven rigid parts in a Group
@@ -222,18 +327,39 @@ const BATHER_CAST = [
  * tools/blender/mh_morph.py for the eight recipes and bathers_mh.py for the
  * bake.
  *
- * `figs` are already-loaded skinned figures. Binding is by index and it has to
- * be: a figure whose identity is reassigned per frame is a person who changes
- * body when you walk past them.
+ * `figs` are already-loaded skinned figures, and they come in two halves.
+ *
+ * The first `figs.length - rove` of them are bound by index and stay bound.
+ * That was the whole rule once, and the reason given for it was that a figure
+ * whose identity is reassigned per frame is a person who changes body when you
+ * walk past them — which is true, and was the wrong conclusion. What actually
+ * followed from a fixed binding is that the twenty-four best figures on this
+ * shore were chosen before you arrived: a mannequin at your elbow stayed a
+ * mannequin all session while a blob two hundred metres away, four pixels
+ * tall, spent the budget. Reported, of the promenade: wooden marionettes just
+ * standing around.
+ *
+ * So the last `rove` of them are slots rather than people. A slot is pointed
+ * at whoever is nearest, `assign` moves it, and the person it is pointed at
+ * carries everything that makes them themselves — their colours, their
+ * stature, their clip and the phase it had got to. What a slot owns is one
+ * mesh and one bone palette; what it does not own is an identity. See
+ * `stepCast` in 43-jadrija.js for the choosing, which is promenade logic and
+ * belongs there.
  *
  * The `figures` array, the `flush(t, cam)` call and the distance cut are all
  * `makeCrowd`'s, so the promenade logic in 43-jadrija.js does not know which of
  * the two it is talking to.
  */
-function makeSkinCrowd(scene, figs, cap) {
+function makeSkinCrowd(scene, figs, cap, rove = 0) {
   const figures = [];
+  // Where the pinned half stops and the roving half starts.
+  const PIN = Math.max(0, figs.length - rove);
+  // `slots[j]` is whoever `figs[PIN + j]` is standing in for, or null.
+  const slots = new Array(figs.length - PIN).fill(null);
   let drawn = 0;
   let last = -1;
+  let ups = 0, downs = 0;
 
   // What each pose is called over here. The crowd's `mode` is a body position
   // and a clip is a body position over time, so most of them land on `idle`:
@@ -301,6 +427,164 @@ function makeSkinCrowd(scene, figs, cap) {
 
   let frame = 0;
 
+  /**
+   * Point slot `j` at `fg`, or at nobody.
+   *
+   * Four things have to happen together here and every one of them is a way
+   * this reads wrong if it is left out. The person leaving takes their clock
+   * with them, so that being demoted and promoted again forty seconds later
+   * resumes the same idle rather than restarting it. The person arriving is
+   * marked `rebind`, which is what makes `step` below start their clip from
+   * *their* phase and re-pose the mesh on the spot instead of waiting for the
+   * distance ladder's turn — a slot that changes hands and does not re-pose is
+   * a new person wearing the last one's pose for up to eight frames.
+   * `fg.hidden` is the flag the instanced tier reads, and it is set here and
+   * cleared here so that a person can never be drawn twice or drawn not at
+   * all. And the mesh goes invisible for the one frame in between, because the
+   * only thing worse than the swap being visible is it being visible in the
+   * wrong place.
+   */
+  function assign(j, fg) {
+    const was = slots[j];
+    if (was === fg) return false;
+    const f = figs[PIN + j];
+    if (was) {
+      if (f.state && f.state.cur) was.clock = f.state.curT;
+      was.hidden = false;
+      was.slot = -1;
+      was.bizOn = false;
+      downs++;
+    }
+    slots[j] = fg;
+    f.mesh.visible = false;
+    if (fg) {
+      fg.hidden = true;
+      fg.slot = j;
+      fg.rebind = true;
+      ups++;
+    }
+    return true;
+  }
+
+  /**
+   * Draw one person on one figure. Returns whether they were drawn at all.
+   *
+   * `i` is only the stagger's — see the ladder at the bottom — and has to be
+   * distinct per figure rather than per person, which is why the roving half
+   * passes its slot's index in `figs` and not the bather's.
+   */
+  function step(fg, f, i, t, dt, cam, maxSq, nearSq, midSq) {
+    const dx = fg.x - cam.x, dz = fg.z - cam.z;
+    const d2 = dx * dx + dz * dz;
+    if (d2 > maxSq) { f.mesh.visible = false; return false; }
+    const want = wantClip(fg, f);
+    // A slot that has just changed hands. Everything on the mesh belongs to
+    // whoever was standing here a frame ago — the clip and where it had got
+    // to, a head still turned toward where you were when they noticed you,
+    // and a pose owed to the ladder — and none of it is this person's.
+    //
+    // No fade. A crossfade between two clips is the right answer when one
+    // person changes what they are doing and the wrong one here: there is
+    // nothing to fade *from* except a stranger, in a different place, at a
+    // different height.
+    if (fg.rebind) {
+      fg.rebind = false;
+      f.aim('head', 0, 1, 0, 0);
+      fg.aimed = false;
+      fg.lag = 0;
+      if (f.playing() !== want) f.play(want, { fade: 0, from: fg.clock || 0 });
+      else if (f.state) { f.state.curT = fg.clock || 0; f.state.prev = null; }
+      fg.rebound = true;
+    }
+
+    // A piece of business, on this figure's own clock.
+    //
+    // Same argument as the instanced tier's `act`, and the same seed, for the
+    // same reason: a crowd that shares one clock breathes in and out as one
+    // animal. Here it can be a real clip rather than a hand-written pose, so
+    // it is one — and the gate is an *edge* rather than a window, because a
+    // one-shot is started once and then left to run.
+    //
+    // Nobody walking, and nobody sitting: the wave is keyed from a standing
+    // pose and playing it on somebody in a chair lifts them out of it.
+    if ((fg.mode === 'stand' || fg.mode === 'wade') && !midBiz(f)) {
+      const rate = 0.70 + fg.seed * 0.70;
+      const ph = t * 0.9 + fg.seed * 6.283;
+      const g = Math.sin(ph * 0.20 * rate + fg.seed * 5.1) > 0.94;
+      if (g && !fg.bizOn) {
+        f.play(BIZ[(fg.seed * BIZ.length * 7) % BIZ.length | 0],
+          { fade: 0.25, next: want });
+      }
+      fg.bizOn = g;
+    }
+
+    if (!midBiz(f) && f.playing() !== want) {
+      // `from` is the whole difference between a crowd and a chorus line. The
+      // eight blobs are cast round-robin, so the same person stands on this
+      // shore four or five times over, and four copies of one mesh starting
+      // one 4.6 s idle at t = 0 is four copies of one mesh. The clips that
+      // land here all loop, and `sample` takes the phase modulo the duration,
+      // so any number at all is a legal offset.
+      //
+      // `fg.clock` rather than the `fg.seed * 11.3` it was seeded with: the
+      // clock is that same offset, still running, so a person who changes what
+      // they are doing lands mid-clip instead of at whatever phase they were
+      // handed when the beach was built.
+      f.play(want, { fade: 0.28, from: fg.clock || fg.seed * 11.3 });
+    }
+    // The walk clip is authored at about 0.92 m/s; anybody strolling faster
+    // than that plays it faster rather than sliding.
+    //
+    // And everybody else runs their idle a few per cent off nominal, which is
+    // the cheapest half of not being a clone: two figures on the same phase
+    // offset would otherwise stay on it for as long as you watched them.
+    if (f.state) f.state.speed = clipRate(fg);
+    f.mesh.position.set(fg.x, fg.y, fg.z);
+    f.mesh.rotation.set(0, fg.yaw, 0);
+    // Stature. Set here and not once at bind time because a figure is bound
+    // by index and the index outlives any one person; and left at 1 for
+    // anybody in a chair, because the three seated clips are solved in metres
+    // against a 0.46 m seat and a sitter scaled by 6 per cent is a sitter
+    // 3 cm off their own chair. See `sit_clips` in bathers_mh.py.
+    f.mesh.scale.setScalar(fg.hscale || 1);
+    f.mesh.updateMatrixWorld();
+    // The same head turn the instanced tier does in `pose`, and the same two
+    // numbers written from outside — see the note there. `aim` is in figure
+    // space, where +y is up, so an extra yaw about +y is exactly what
+    // `f.mesh.rotation.y` already means and no offset has to be measured.
+    //
+    // Only touched while it is happening or on the frame it stops. `aim`
+    // walks the bone list by name to find the head and there are twenty-eight
+    // of them, which is nothing once and is thirty-two lookups a frame if it
+    // is asked unconditionally for a crowd that is not being bumped.
+    if (fg.look || fg.aimed) {
+      f.aim('head', 0, 1, 0, fg.look ? fg.lookY * fg.look : 0);
+      fg.aimed = !!fg.look;
+    }
+    // The pose, at a rate that falls off with distance — see POSE_NEAR. The
+    // stagger by `i` is not cosmetic: without it every figure in a band
+    // re-poses on the same frame and the cost that was spread over three
+    // frames arrives on one of them, which is a stutter rather than a saving.
+    //
+    // `rebound` is the one frame the ladder must not be allowed to skip. It is
+    // set by `assign` above and is the difference between a slot that changes
+    // hands cleanly and one that wears the previous occupant's pose on this
+    // person's body until the stagger next comes round to it.
+    const every = d2 < nearSq ? 1 : d2 < midSq ? 3 : 8;
+    fg.lag = (fg.lag || 0) + dt;
+    if (fg.rebound || every === 1 || (frame + i) % every === 0) {
+      f.update(fg.lag);
+      fg.lag = 0;
+      fg.rebound = false;
+      // Handed back to the person rather than left on the mesh, so that a
+      // demotion and a later promotion resume one clip instead of restarting
+      // it. `stepCast` keeps it running for everybody who is not in a slot.
+      if (f.state) fg.clock = f.state.curT;
+    }
+    f.mesh.visible = true;
+    return true;
+  }
+
   function flush(t, cam) {
     // A delta, because these animate rather than being posed from absolute
     // time. Clamped: the first frame after a locale builds is worth several
@@ -311,100 +595,36 @@ function makeSkinCrowd(scene, figs, cap) {
     let n = 0;
     const maxSq = CROWD.poseM * CROWD.poseM;
     const nearSq = POSE_NEAR * POSE_NEAR, midSq = POSE_MID * POSE_MID;
-    const lim = Math.min(cap, figs.length, figures.length);
+    const lim = Math.min(cap, PIN, figures.length);
     for (let i = 0; i < lim; i++) {
-      const fg = figures[i], f = figs[i];
-      const dx = fg.x - cam.x, dz = fg.z - cam.z;
-      const d2 = dx * dx + dz * dz;
-      if (d2 > maxSq) { f.mesh.visible = false; continue; }
-      const want = wantClip(fg, f);
-
-      // A piece of business, on this figure's own clock.
-      //
-      // Same argument as the instanced tier's `act`, and the same seed, for the
-      // same reason: a crowd that shares one clock breathes in and out as one
-      // animal. Here it can be a real clip rather than a hand-written pose, so
-      // it is one — and the gate is an *edge* rather than a window, because a
-      // one-shot is started once and then left to run.
-      //
-      // Nobody walking, and nobody sitting: the wave is keyed from a standing
-      // pose and playing it on somebody in a chair lifts them out of it.
-      if ((fg.mode === 'stand' || fg.mode === 'wade') && !midBiz(f)) {
-        const rate = 0.70 + fg.seed * 0.70;
-        const ph = t * 0.9 + fg.seed * 6.283;
-        const g = Math.sin(ph * 0.20 * rate + fg.seed * 5.1) > 0.94;
-        if (g && !fg.bizOn) {
-          f.play(BIZ[(fg.seed * BIZ.length * 7) % BIZ.length | 0],
-            { fade: 0.25, next: want });
-        }
-        fg.bizOn = g;
-      }
-
-      if (!midBiz(f) && f.playing() !== want) {
-        // `from` is the whole difference between a crowd and a chorus line. The
-        // eight blobs are cast round-robin, so the same person stands on this
-        // shore four or five times over, and four copies of one mesh starting
-        // one 4.6 s idle at t = 0 is four copies of one mesh. The clips that
-        // land here all loop, and `sample` takes the phase modulo the duration,
-        // so any number at all is a legal offset.
-        f.play(want, { fade: 0.28, from: fg.seed * 11.3 });
-      }
-      // The walk clip is authored at about 0.92 m/s; anybody strolling faster
-      // than that plays it faster rather than sliding.
-      //
-      // And everybody else runs their idle a few per cent off nominal, which is
-      // the cheapest half of not being a clone: two figures on the same phase
-      // offset would otherwise stay on it for as long as you watched them.
-      if (f.state) {
-        f.state.speed = fg.mode === 'walk'
-          ? Math.max(0.7, Math.min(1.6, (fg.speed || 0.92) / 0.92))
-          : 0.90 + fg.seed * 0.22;
-      }
-      f.mesh.position.set(fg.x, fg.y, fg.z);
-      f.mesh.rotation.set(0, fg.yaw, 0);
-      // Stature. Set here and not once at bind time because a figure is bound
-      // by index and the index outlives any one person; and left at 1 for
-      // anybody in a chair, because the three seated clips are solved in metres
-      // against a 0.46 m seat and a sitter scaled by 6 per cent is a sitter
-      // 3 cm off their own chair. See `sit_clips` in bathers_mh.py.
-      f.mesh.scale.setScalar(fg.hscale || 1);
-      f.mesh.updateMatrixWorld();
-      // The same head turn the instanced tier does in `pose`, and the same two
-      // numbers written from outside — see the note there. `aim` is in figure
-      // space, where +y is up, so an extra yaw about +y is exactly what
-      // `f.mesh.rotation.y` already means and no offset has to be measured.
-      //
-      // Only touched while it is happening or on the frame it stops. `aim`
-      // walks the bone list by name to find the head and there are twenty-eight
-      // of them, which is nothing once and is thirty-two lookups a frame if it
-      // is asked unconditionally for a crowd that is not being bumped.
-      if (fg.look || fg.aimed) {
-        f.aim('head', 0, 1, 0, fg.look ? fg.lookY * fg.look : 0);
-        fg.aimed = !!fg.look;
-      }
-      // The pose, at a rate that falls off with distance — see POSE_NEAR. The
-      // stagger by `i` is not cosmetic: without it every figure in a band
-      // re-poses on the same frame and the cost that was spread over three
-      // frames arrives on one of them, which is a stutter rather than a saving.
-      const every = d2 < nearSq ? 1 : d2 < midSq ? 3 : 8;
-      fg.lag = (fg.lag || 0) + dt;
-      if (every === 1 || (frame + i) % every === 0) {
-        f.update(fg.lag);
-        fg.lag = 0;
-      }
-      f.mesh.visible = true;
-      n++;
+      if (step(figures[i], figs[i], i, t, dt, cam, maxSq, nearSq, midSq)) n++;
     }
-    for (let i = lim; i < figs.length; i++) figs[i].mesh.visible = false;
+    for (let i = lim; i < PIN; i++) figs[i].mesh.visible = false;
+    // And the roving half, which is the same work about a different question:
+    // who is standing here now.
+    for (let j = 0; j < slots.length; j++) {
+      const fg = slots[j], f = figs[PIN + j];
+      if (!fg) { f.mesh.visible = false; continue; }
+      if (step(fg, f, PIN + j, t, dt, cam, maxSq, nearSq, midSq)) n++;
+    }
     drawn = n;
   }
 
   return {
-    figures, flush, layers: [], kind: 'skin',
+    figures, flush, layers: [], kind: 'skin', slots, assign,
     /** Everybody this tier is answerable for right now. See `tierCount`. */
-    live: () => figures.slice(),
+    live: () => figures.concat(slots.filter(Boolean)),
     tris: figs.reduce((a, f) => a + f.tris, 0),
     get drawn() { return drawn; },
+    /**
+     * How many times a slot has been filled and emptied since the page loaded.
+     *
+     * The measurement that says whether the hysteresis is doing anything: a
+     * walk along the promenade should promote a few dozen people, and if it
+     * promotes a few thousand then two of them are trading a slot every frame
+     * and the fix is a wider `ROVE.hold`, not a smaller cast.
+     */
+    get swaps() { return { up: ups, down: downs }; },
   };
 }
 
@@ -680,6 +900,12 @@ function makeCrowd(scene, rig, cap) {
     const maxSq = CROWD.poseM * CROWD.poseM;
     for (const fg of figures) {
       if (n >= cap) break;
+      // Somebody the good tier is drawing this frame — see `assign` in
+      // `makeSkinCrowd`. The flag is set and cleared there and read only here,
+      // which is the whole of "the marionette goes the instant its skinned
+      // twin appears": one person, one boolean, and no frame in which either
+      // both of them or neither of them is on the concrete.
+      if (fg.hidden) continue;
       const dx = fg.x - cam.x, dz = fg.z - cam.z;
       if (dx * dx + dz * dz > maxSq) continue;
       pose(fg, t);
@@ -712,7 +938,9 @@ function makeCrowd(scene, rig, cap) {
   return {
     figures, layers, flush, kind: 'inst',
     /** Everybody this tier is answerable for right now. See `tierCount`. */
-    live: () => figures.slice(),
+    live: () => figures.filter((fg) => !fg.hidden),
+    /** How tall this rig stands at scale 1. See `rigHeight`. */
+    height: rigHeight(rig),
     tris: rig.parts.reduce((a, p) => a + p.geo.index.count / 3, 0),
     get drawn() { return drawn; },
   };
