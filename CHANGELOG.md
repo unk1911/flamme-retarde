@@ -8,6 +8,61 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.109.0] — 2026-08-23
+
+All 409 frames of the two inland walk-throughs read — v595 and v597, of which
+about four hundred had never been opened. Neither carries GPS, so they settle
+objects, materials and construction and can never settle a position; everything
+built from them goes in at a placement stated as a placement, in the source, in
+words.
+
+### Added
+
+- **`plan/survey-v59x.md`** — the catalogue, and the deliverable. Seventeen
+  objects that are in the footage and not in the game, ranked, each with its best
+  frame; a section of things checked and found already built (`laneGate` is the
+  red-and-white boom, `ladder` is the stainless grab-hoops, `mapBoard` is the
+  coast map on the kabina gable); and three recorded but deliberately not
+  proposed. Top of the unbuilt list: the green steel picket fence on a rubble
+  wall, a fourth boundary treatment and the loudest colour in the lane.
+
+- **The wood-edge kerb blocks.** Short freestanding walls where the made surface
+  stops — 2.6 m long with a metre of gap, four courses of thin sawn limestone
+  under one cap beam, 0.58 m tall, level in themselves and stepping to the next.
+  In about sixty frames. They sit on `walkTo` = 21.1, which is where the game's
+  own paving already stops, so the `s` is a reading and only the arc lengths are
+  a placement. **This is the kerb the `b_016` fence panels have been leaning on
+  since 22 Aug — there was nothing there.**
+
+- **ZABRANJENO ODLAGANJE OTPADA** at t 138, wording transcribed, pictograms
+  drawn as three dark shapes in three red rings because that is what the frame
+  supports and no more.
+
+- **The wood is camped in** — six pitches between t 44 and 162: pop-up dome
+  tents with the mouth to the water, folding recliners, monobloc chairs, towels.
+
+- **The tavern trailer** at t 190 — a polished round-ended catering trailer with
+  its serving doorway in the *end*, a flue off the barrel roof, a blue tarpaulin
+  over a stack, one crimson parasol over a poseur table and three red-topped
+  stools. No name on any of it, so none is given.
+
+### Fixed
+
+- **`propLayer` silently dropped the index.** It copied position, normal and
+  `aVCol` and stopped, which was right for every prototype it was written for —
+  `propBuilder().geo()` is an unindexed soup. Anything out of `readFR3D` is
+  indexed, and dropping the index there does not fail: it draws the vertex
+  buffer in storage order, a heap of flat shards on the ground. The cars hit it
+  on 22 Aug and worked around it at their own call site rather than touch a path
+  six other layers depend on; this is the same fix at the source, so the
+  workaround is gone rather than duplicated.
+
+### Known
+
+- **`__fr.jad.stand` does not test for a building at (t, s)** and puts the debug
+  camera inside the vikendica at t 230, inside h2o at t 320 and inside a kabina
+  at t 500. Pre-existing, and it cost real time this session.
+
 ## [1.108.0] — 2026-08-23
 
 ### Fixed
