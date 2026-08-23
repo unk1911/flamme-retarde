@@ -587,6 +587,17 @@ function propLayer(scene, proto, cap, opts = {}) {
   geo.setAttribute('position', proto.attributes.position);
   geo.setAttribute('normal', proto.attributes.normal);
   geo.setAttribute('aVCol', proto.attributes.aVCol);
+  // And the index, if the prototype has one.
+  //
+  // Every proto this was written for comes out of `propBuilder().geo()`, which
+  // is an unindexed soup of triangles, so there was never an index to carry and
+  // the omission cost nothing for years. Anything out of `readFR3D` is indexed,
+  // and dropping the index there does not fail — it draws the vertex buffer in
+  // storage order, which is a heap of flat shards lying on the ground. The cars
+  // hit this on 22 Aug and worked around it by setting the index at their own
+  // call site rather than touching a path six other layers depend on; this is
+  // the same fix at the source, and it is a no-op for all six of them.
+  if (proto.index) geo.setIndex(proto.index);
   geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e9);
 
   const aPos = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);

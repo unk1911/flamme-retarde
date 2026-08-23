@@ -162,16 +162,17 @@ async function buildJadrijaCars(scene, sites) {
       const geo = blobs[half];
       tris += (geo.index.count / 3) * mine.length;
       const L = propLayer(scene, geo, mine.length, { spec: 0.34, specPower: 60 });
-      // `propLayer` copies position, normal and aVCol and stops, because every
-      // prototype it was written for comes out of `propBuilder.geo()`, which is
-      // a raw triangle soup with no index at all. `readFR3D` is the opposite:
-      // its vertices are deduplicated on (position, normal, colour) and the
-      // triangles live entirely in the index buffer. Handing that over without
-      // the index draws the vertex array in storage order, three at a time —
-      // which is not a car with a fault in it, it is a heap of flat shards
-      // lying on the ground where a car should be, and it took one screenshot
-      // to see and a while to believe.
-      L.geo.setIndex(geo.index);
+      // The index used to be set here, because `propLayer` copied position,
+      // normal and aVCol and stopped — every prototype it was written for comes
+      // out of `propBuilder.geo()`, a raw triangle soup with no index at all,
+      // whereas `readFR3D` deduplicates its vertices and keeps the triangles
+      // entirely in the index buffer. Handing that over without the index draws
+      // the vertex array in storage order, three at a time, which is not a car
+      // with a fault in it but a heap of flat shards lying on the ground.
+      //
+      // `propLayer` carries the index itself now, on 23 Aug, so this is gone
+      // rather than duplicated. The note stays because the failure is silent
+      // and the next indexed prototype would have found it the same way.
       let lo = [1e9, 1e9, 1e9];
       let hi = [-1e9, -1e9, -1e9];
       mine.forEach((s, i) => {
