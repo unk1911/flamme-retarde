@@ -139,15 +139,52 @@ second cut — a ring of white cubes wider than the plant is the failure, and
 the causes were a top rectangle at 0.55 of the bottom (a box with the corners
 off), a ring radius up to 0.97 r, and a colour brighter than the sand.
 
-**8. The glass-recycling igloos.** `b_047`, `b_048`. Two pale domed containers,
-about 1.5 m across, standing behind a green picket fence at the lane side next
-to a brown timber notice board on posts with a pitched roof. Municipal, dull,
-and exactly the sort of thing that makes a place look lived in.
+**8. ~~The glass-recycling igloos.~~ WRONG — it is item 9, seen again.**
+`b_047`, `b_048`. Opened at full size on 23 Aug: there are no igloos there and
+no notice board. What is behind that gate is **one car under a fitted
+silver-grey cover**, and what was read as "two pale domed containers about
+1.5 m across" is its roof and its bonnet with the windscreen between them. The
+green thing beside it is the gate, not a picket fence.
 
-**9. The car under a fitted cover.** `a_048`–`a_050`, `a_086`–`a_089`. A car
-shrouded in a fitted silver-grey cover, standing among the pines with a wheel
-showing under the skirt. Two of them in v595, both left for the season. The
-game has 52 built cars and every one of them is uncovered.
+Rule 12 cuts both ways and this is the other way: the catalogue named a thing
+the footage does not carry. Nothing was built from it, which is the only
+reason it cost nothing. **The lesson is that a contact sheet is not evidence** —
+every one of the four objects that got built this week was opened at full size
+first, and this is the one that was not.
+
+**9. The car under a fitted cover.** `a_048`–`a_050`, `a_086`–`a_089`, and
+`b_047` (see 8). A car shrouded in a fitted silver-grey cover, standing among
+the pines with a wheel showing under the skirt. Two of them in v595, both left
+for the season. The game has 52 built cars and every one of them is uncovered.
+**BUILT, 23 Aug** as a sixth car model, `covered` — a separate, rounder loft
+thrown over the crossover's own plan, at `w: 0.05`, which puts two of the
+fifty-two under covers.
+
+Four things had to be found, and three of them by looking at the render:
+
+- **All its creases are gone.** That is the whole read. The bonnet, the
+  windscreen rake and the roof become one slope; the shoulder a car holds
+  nearly vertical goes round. So the cover is not the body with a skin on it,
+  it is its own loft: the envelope of belt-and-roof, Gaussian-blurred at
+  0.20 m, on a superellipse power of 2.30 against the body's 3.10.
+- **A 1-2-1 kernel is not a blur.** Six passes over a 25 mm sampling is an
+  effective radius of 60 mm and the corner to be lost is half a metre wide. It
+  came back with every crease still in it.
+- **And a blur is nothing without stations.** `station_xs` cuts the loft in
+  about fifteen places and straight-lines between them, so a belt table
+  smoothed at 25 mm was resampled straight back into the polyline it started
+  as. The cover adds a station every 160 mm.
+- **A cover does not cut a wheel arch.** Keeping the body's lift — 0.40 m of
+  sill rising to 0.72 over each axle — gives a hem with two deep scallops in
+  it, and a deep scallop over a wheel reads as a *wing*: the render came back
+  looking like an unpainted car. The hem runs nearly straight at 0.32 and the
+  wheels go inside it, with 75 mm of clearance to the tyre wall, so what shows
+  below the fabric is the bottom half of each tyre. Which is the photograph.
+
+The colour has the blue taken *out*: measured across `a_087` the cover's blue
+lean is 0.078 in sun and 0.115 in the sky-lit midtones but **0.030 in the deep
+shade under the pine, where no sky reaches it**. That last one is the fabric.
+Same trap as the lavender, and this time it was seen coming.
 
 **10. The red-and-white marker posts.** `a_051`, `a_052`, `a_053`. Slim posts
 in alternating red and white bands, about 1.1 m, standing in the dust along a

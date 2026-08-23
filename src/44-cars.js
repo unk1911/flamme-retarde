@@ -54,6 +54,15 @@ const CAR_PAINT = {
   blue: [0.148, 0.202, 0.328],
   red: [0.520, 0.128, 0.108],
   sand: [0.638, 0.608, 0.545],
+  // Not a paint: the fitted cover on the car that is left for the season.
+  //
+  // The blue in it is measured OFF and not on, which is the same trap the
+  // lavender bank fell into. Sampled across `a_087`, the cover's blue lean
+  // runs 0.078 in full sun and 0.115 in the sky-lit midtones — but 0.030 in
+  // the deep shade under the pine, where no sky reaches it. That last one is
+  // the fabric; the other two are the sky, and the game puts the sky back by
+  // itself. Mixed at 0.10 this would be a blue car cover.
+  cover: [0.652, 0.668, 0.692],
 };
 
 /**
@@ -65,7 +74,26 @@ const CAR_PAINT = {
  * hatchbacks would be a period piece rather than this August.
  */
 const CAR_MODELS = [
-  { key: 'supermini', w: 0.34,
+  // Two of the fifty-two are put away under covers, and two is the number the
+  // footage has: `a_048`-`a_050` and `a_086`-`a_089` in v595, both among the
+  // pines. (There is a third behind a gate on the lane at `b_047`, which the
+  // survey catalogued as a glass-recycling igloo and is not — see the note in
+  // tools/blender/cars.py.)
+  //
+  // 0.05 is fitted to that count and not derived from it. `carModelFor` walks
+  // these weights against `jit`, which is a sine hash over the station index
+  // and not a uniform draw, so fifty-two of them do not land in proportion:
+  // 0.04 gave one covered car, 0.06 gave four, 0.05 gives two. The weight is
+  // the dial and the count on the built page is the reading, which is the same
+  // way every other number on this shore was arrived at.
+  //
+  // The 0.05 comes off `supermini`, the commonest, so the rest of the mix
+  // keeps its shape. Every car in the row changes model when this table
+  // changes, and that is fine and is why the note on `carModelFor` exists: the
+  // car loop takes no `rng()` calls, so nothing else on the beach moves with
+  // it. Rule 4 is about the `rng` stream and this is not in it.
+  { key: 'covered', w: 0.05, paint: ['cover'] },
+  { key: 'supermini', w: 0.29,
     paint: ['white', 'white', 'white', 'white', 'pearl', 'silver', 'silver',
       'grey', 'slate', 'blue'] },
   { key: 'crossover', w: 0.25,

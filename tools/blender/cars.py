@@ -616,6 +616,154 @@ def build_details(spec, sink):
             prev, prevx = rg, x
 
 
+# --------------------------------------------------------------------- cover --
+#
+# A car under a fitted cover, left for the season.
+#
+# `a_087` is the frame this is built from — a crossover under a silver-grey
+# fitted cover among the pines, with a white uncovered car parked beside it and
+# a sawn kerb block in front. There are two of them in v595 (`a_048`-`a_050`
+# and `a_086`-`a_089`) and a third behind a gate on the lane at `b_047`. The
+# survey catalogued that third one as a glass-recycling igloo; it is not, it is
+# this, and the plan has been corrected.
+#
+# The single thing that makes a covered car read as a covered car is that **all
+# its creases are gone**. The bonnet, the windscreen rake and the roof become
+# one smooth slope; the shoulder that a car holds nearly vertical goes round;
+# the tail turns a corner instead of stopping at a tailgate. So this is not the
+# body with a skin over it — it is a *separate, rounder loft* thrown over the
+# same plan, and the three numbers that do the work are the standoff, the
+# smoothing, and a much lower superellipse power.
+#
+# The second thing, and the one that was easy to get wrong: **a cover does not
+# follow the wheel arches.** It hangs. `sill_at` lifts the body's bottom edge
+# over each axle by 0.32 m because that is what a wing does, and a cover thrown
+# over the same car has a bottom edge that is very nearly a straight line with
+# the wheels showing under it. So `arch` comes down to within 50 mm of `sill`,
+# and the skirt hangs 70 mm lower than the body's did.
+
+COVER_STAND = 0.050       # how far the fabric stands off the panel
+COVER_POWER = 2.30        # the shoulder, rounded off — the body's is 3.1
+COVER_SILL_FRAC = 0.90    # the hem, drawn in a little under the sills
+COVER_BLUR = 0.20         # metres of Gaussian along the length
+
+
+def _gh_top(spec, x):
+    """Roof height at station ``x``, or None where the greenhouse has ended.
+
+    The `gh` knots carry `None` for z at each end, which means "meets the belt
+    line here" — so those entries are dropped and `pw` is left to clamp.
+    """
+    knots = [(g[0], g[1]) for g in spec.get("gh", ()) if g[1] is not None]
+    if not knots:
+        return None
+    if x > knots[0][0] or x < knots[-1][0]:
+        return None
+    return pw(knots, x)
+
+
+def _blur(xs, vs, sigma):
+    """Gaussian along the length, with the ends held rather than darkened.
+
+    A 1-2-1 kernel was the first cut and it is the wrong tool: six passes over
+    a 25 mm sampling is an effective radius of about 60 mm, and the corner this
+    has to lose — where the windscreen meets the roof — is half a metre wide.
+    It came out with every crease still in it. This is a real kernel with a
+    real width, and 0.20 m is where a car stops having a windscreen and has not
+    yet started being a tent.
+    """
+    out = []
+    for i, x in enumerate(xs):
+        num = den = 0.0
+        for j, xj in enumerate(xs):
+            d = (x - xj) / sigma
+            if abs(d) > 3.0:
+                continue
+            w = math.exp(-0.5 * d * d)
+            num += w * vs[j]
+            den += w
+        out.append(num / den)
+    return out
+
+
+def cover_spec(spec):
+    """Derive the cover's own loft from the car it is thrown over."""
+    x0, x1 = spec["x0"], spec["x1"]
+    n = int((x1 - x0) / 0.025) + 1
+    xs = [x1 - (x1 - x0) * i / (n - 1) for i in range(n)]
+
+    # The envelope: whichever is higher at each station, the body's belt line
+    # or the roof. Sampled at 25 mm rather than at the body's own stations,
+    # because the corner this has to round off falls *between* two of those.
+    top = []
+    for x in xs:
+        gh = _gh_top(spec, x)
+        top.append(max(pw(spec["belt"], x), gh if gh is not None else 0.0))
+    top = _blur(xs, top, COVER_BLUR)
+    hws = _blur(xs, [pw(spec["hw"], x) for x in xs], COVER_BLUR * 0.6)
+    hwbs = _blur(xs, [pw(spec["hwb"], x) for x in xs], COVER_BLUR * 0.6)
+
+    # Round both ends off. The loft caps each end with a fan across the whole
+    # section, which on a body is a bumper and looks like one; on a cover it is
+    # a cliff, and the tail came back looking sawn off. So the last 0.26 m
+    # draws in to 0.62 of its width and 40 mm of its height on a cosine, which
+    # is a hem gathered round a bumper rather than a flat lid over it.
+    def _round(x):
+        d = min(x1 - x, x - x0)
+        if d >= 0.26:
+            return 0.0
+        return 0.5 * (1.0 + math.cos(math.pi * d / 0.26))
+    for i, x in enumerate(xs):
+        u = _round(x)
+        hws[i] *= 1.0 - 0.38 * u
+        hwbs[i] *= 1.0 - 0.44 * u
+        top[i] -= 0.040 * u
+
+    # The bottom edge, and this is the half of it that took three tries.
+    #
+    # A cover does not cut a wheel arch. Keeping the body's lift — 0.40 m of
+    # sill rising to 0.72 over each axle — gives a hem with two deep scallops
+    # in it, and a deep scallop over a wheel does not read as fabric, it reads
+    # as a wing: the render came back looking like an unpainted car.
+    #
+    # So the hem runs very nearly straight, and the wheels go *inside* it. At
+    # the crossover's 0.325 m the tyre stands 0.65 m tall and its outer wall is
+    # 0.77 from the centreline, while the cover's flank at the hem is 0.845 —
+    # 75 mm of clearance — so everything above 0.32 is simply enclosed and what
+    # shows below the fabric is the bottom half of each tyre and the dark under
+    # the car. Which is the photograph.
+    sill = 0.320
+    out = dict(spec)
+    # Stations every 160 mm along the whole length.
+    #
+    # Without this the blur above does nothing you can see. `station_xs` cuts
+    # the loft at about fifteen places — the two ends, the middle and a cluster
+    # of five round each axle — and everything between them is a straight line,
+    # so a belt table smoothed at 25 mm was being resampled back into the same
+    # polyline it started as and the creases came out exactly where they had
+    # been. A body gets away with fifteen because a body genuinely is flat
+    # between its creases. A cover is curved everywhere.
+    step = 0.160
+    nk = int((x1 - x0) / step)
+    stations = tuple(round(x0 + (x1 - x0) * i / nk, 4) for i in range(1, nk))
+    out["belt"] = [(x, z + COVER_STAND) for x, z in zip(xs, top)]
+    out["hw"] = [(x, w + COVER_STAND) for x, w in zip(xs, hws)]
+    out["hwb"] = [(x, w + COVER_STAND) for x, w in zip(xs, hwbs)]
+    out["power"] = COVER_POWER
+    out["sill_frac"] = COVER_SILL_FRAC
+    out["sill"] = sill
+    out["arch"] = sill + 0.030          # a suggestion of the arch, not an arch
+    out["arch_span"] = spec["arch_span"] * 1.6
+    out["end_sill"] = sill + 0.130      # it does ride up over the bumpers
+    out["waist"] = 0.52
+    # Everything a cover hides.
+    for k in ("gh", "rails", "roofbox", "mirror_x", "rocker", "recolour",
+              "glass_panels"):
+        out.pop(k, None)
+    out["extra_x"] = stations
+    return out
+
+
 # -------------------------------------------------------------------- models --
 #
 # Five body types. The dimensions are ordinary ones for the class — a supermini
@@ -744,6 +892,16 @@ MODELS = [
     },
 ]
 
+# And the sixth, which is the second model in this list wearing a cover. It is
+# built by name rather than by copying numbers, so a change to the crossover
+# changes what is under the cover too — which is the point, since it *is* a
+# crossover: the frame shows the wheel, the arch and enough of the flank below
+# the hem to say what class of car it is.
+MODELS.append(dict(
+    next(m for m in MODELS if m["name"] == "crossover"),
+    name="covered", cover=True,
+))
+
 
 # ---------------------------------------------------------------------- bake --
 
@@ -757,6 +915,14 @@ def build_car(spec):
         + (("dark", spec["x1"] - 0.30, spec["x1"] + 0.01, -0.90, -0.04),
            ("dark", spec["x0"] - 0.01, spec["x0"] + 0.30, -0.90, -0.04)))
     sink = Sink()
+    if spec.get("cover"):
+        # The cover, and then the car's own wheels standing under its hem.
+        # Nothing else: a fitted cover hides the glass, the bumpers, the lamps,
+        # the plates and the mirrors, and every one of those showing through it
+        # would say "car with a sheet on" rather than "car put away".
+        build_body(cover_spec(spec), sink)
+        build_wheels(spec, sink)
+        return sink.objects()
     build_body(spec, sink)
     build_greenhouse(spec, sink)
     build_panels(spec, sink)
@@ -773,6 +939,8 @@ def extents(spec):
     half-width, which is the car's extent along the shore because the row is
     parked nose-in; ``h`` is the overall height, for the walk blocker.
     """
+    if spec.get("cover"):
+        spec = cover_spec(spec)          # the cover is what occupies the space
     hw = max(v for _x, v in spec["hw"])
     h = max(pw(spec["belt"], x) for x, _v in spec["belt"])
     if spec.get("gh"):
