@@ -155,16 +155,21 @@ days of guessing.
       the three beds are now one bed divided by where you stand — see MORPH in
       80-audio.js. The levels themselves were left where they were: what was
       wrong with them was never how loud they were.
-- [ ] The five audio levels are still arithmetic, not judgement — `SHORE.gain`
+- [x] The five audio levels are still arithmetic, not judgement — `SHORE.gain`
       0.30, `CICADA.level` 3.2 and its `lift` 1.2, `LAP.gain` 0.28, `BOAT.gain`
-      0.085. The morph holds the SUM within half a decibel of what was liked
-      everywhere on the promenade and takes it 1.3 dB down ninety metres into
-      the pines, which is a judgement and wants an ear on it. If the promenade
-      sounds muffled standing on it that is `SHORE.lpNear` (4 kHz), held short
-      of the cicada band so the two chorus clips do not double.
-- [ ] `Voice 260811_213809.m4a` is unidentified — 21:38, broadband 200-2000 Hz,
-      no cicada or cricket band. Not shipped, because the game has no night and
-      naming it would be inventing one. Ask Misha what it is.
+      0.085. SETTLED 23 Aug: "the 5 audio levels don't worry about it either i
+      like the current audio." The ear this item was waiting for has now been
+      put on it, and the answer is that the numbers are right. They are not
+      arithmetic any more — they are heard and kept. Do not re-derive them.
+      If the promenade ever sounds muffled standing on it that is
+      `SHORE.lpNear` (4 kHz), held short of the cicada band so the two chorus
+      clips do not double.
+- [x] `Voice 260811_213809.m4a` is unidentified — 21:38, broadband 200-2000 Hz,
+      no cicada or cricket band. SHELVED 23 Aug, and it was never a defect:
+      "forget this clip, it's for night and we don't have night." Which settles
+      what it is as well as what to do with it. It stays out of the payload and
+      out of this list; if a night is ever built, the recording is where it
+      always was and `tools/cut_field.py` already knows it as source 1.
 
 **From Misha, 22 Aug — the playing pass**
 
