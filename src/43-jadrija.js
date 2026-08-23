@@ -2077,10 +2077,17 @@ async function buildJadrija(scene) {
     // joinery — the door frames, the mullions, the trim. A body of 0.36 green
     // painted the whole twelve metres of it and read as a hoarding.
     { key: 'mini', kind: 'box', t0: 272, t1: 284, s0: 18, s1: 23.4, h: 2.45,
-      name: 'beach bar MINI', roof: [0.560, 0.535, 0.478],
+      name: 'beach bar MINI', split: ['beach bar ', 'MINI'],
+      roof: [0.560, 0.535, 0.478],
       body: [0.520, 0.528, 0.508], awn: 2.6, fg: '#1a2a3a', bg: '#ded7c7',
       pier: [0.075, 0.290, 0.140],
-      plinth: [0.520, 0.430, 0.270] },
+      plinth: [0.520, 0.430, 0.270],
+      // 20260823_111954: the shade over this terrace is a pair of big square
+      // taupe canopies on grey steel masts standing in plinths of stacked
+      // washed-aggregate block, and not the cream octagon in a car rim that
+      // every other cafe on the boardwalk has. See `bigShade`.
+      shade: { canvas: [0.508, 0.468, 0.352], mast: [0.335, 0.340, 0.348],
+        block: [0.500, 0.487, 0.440] } },
     { key: 'kiosk', kind: 'kiosk', t0: 290, t1: 293, s0: 20, s1: 23, h: 2.4,
       name: null, roof: [0.430, 0.252, 0.180], body: [0.130, 0.400, 0.130] },
     { key: 'tisak', kind: 'kiosk', t0: 305.5, t1: 309, s0: 22, s1: 24.2, h: 2.7,
@@ -2099,7 +2106,10 @@ async function buildJadrija(scene) {
     { key: 'slast', kind: 'box', t0: 328, t1: 343, s0: 22, s1: 27.2, h: 2.95,
       name: 'slastičarnica', sub: 'JADRIJA', roof: [0.590, 0.578, 0.545],
       body: [0.560, 0.535, 0.487], awn: 3.0, fg: '#26241f', bg: '#f4f2ee',
-      vitrine: true, cooler: true, scallop: true, panels: true },
+      vitrine: true, cooler: true, scallop: true, panels: true,
+      // 20260823_111815 and _111819: the wall behind this counter is mirror
+      // tile floor to ceiling with three glass shelves of stemware on it.
+      backBar: true },
     { key: 'tramp', kind: 'fence', t0: 348, t1: 362, s0: 46, s1: 56, h: 2.2,
       name: null, post: [0.640, 0.520, 0.060], body: [0.055, 0.075, 0.062],
       rail: [0.660, 0.545, 0.075], skirt: [0.545, 0.075, 0.065] },
@@ -2168,9 +2178,34 @@ async function buildJadrija(scene) {
       g.font = `600 ${size}px "Helvetica Neue", Arial, sans-serif`;
       g.fillText(text, C.width / 2, y);
     };
-    fit(S.name, S.sub ? C.height * 0.44 : C.height * 0.60,
-      S.sub ? C.height * 0.46 : C.height * 0.70);
-    if (S.sub) fit(S.sub, C.height * 0.46, C.height * 0.95);
+    // A name set in two weights on one line, which is what `20260823_111954`
+    // has painted on beach bar MINI's awning: "beach bar" in a light rounded
+    // lower case and "MINI" in heavy capitals half again as tall, both by the
+    // same hand and both black on the cream valance. Set at one weight it read
+    // as a fascia somebody ordered from a signwriter, which is the one thing
+    // this shore's businesses do not do.
+    //
+    // Both runs are solved together — the pair has to fill the board, so the
+    // size cannot be found from either half on its own.
+    if (S.split) {
+      const [lead, emph] = S.split;
+      const FF = '"Trebuchet MS", "Segoe UI", "Helvetica Neue", Arial, sans-serif';
+      g.font = `400 100px ${FF}`;
+      const wl = g.measureText(lead).width || 1;
+      g.font = `800 118px ${FF}`;
+      const we = g.measureText(emph).width || 1;
+      const k = Math.min(C.height * 0.62 / 100, C.width * 0.88 / (wl + we));
+      g.textAlign = 'left';
+      const x0 = (C.width - (wl + we) * k) * 0.5, base = C.height * 0.78;
+      g.font = `400 ${100 * k}px ${FF}`;
+      g.fillText(lead, x0, base);
+      g.font = `800 ${118 * k}px ${FF}`;
+      g.fillText(emph, x0 + wl * k, base);
+    } else {
+      fit(S.name, S.sub ? C.height * 0.44 : C.height * 0.60,
+        S.sub ? C.height * 0.46 : C.height * 0.70);
+      if (S.sub) fit(S.sub, C.height * 0.46, C.height * 0.95);
+    }
     const tex = new THREE.CanvasTexture(C);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
@@ -3695,6 +3730,435 @@ async function buildJadrija(scene) {
     // the cabinet back, which is drawn.
 
     runs.push({ t0: ca, t1: cc, s0: S.s0 - 1.72, s1: S.s0 - 0.50, y: y0, h: 1.92 });
+    counterKit(S, y0, ca, cc, cm);
+  }
+
+  /**
+   * The printed wrap round the cone tub, on a canvas.
+   *
+   * Two panels of it are square on to the camera in `20260823_111819` and
+   * everything set here is read off them: an orange-to-gold panel on the left
+   * with "Slatki Kornet" across the top in a dark brown hand and a photograph
+   * of a waffle cone under it, and a sky-blue panel to the right of that with
+   * the price on it. The big red three-dimensional capitals that occupy most
+   * of the wrap are NOT set. Only "SLA" is legible on one panel and "KOR" on
+   * the next; the word they belong to is obvious and obvious is not evidence,
+   * so what goes on the model is the red the capitals are, as a band on the
+   * prism behind this face, and no letters. Rule 12, and the same discipline
+   * the five unnamed pans in the case ship under.
+   *
+   * "1,00 €" is legible outright, twice, and goes on.
+   */
+  function coneTubWrap() {
+    const C = document.createElement('canvas');
+    C.width = 256; C.height = 216;
+    const g = C.getContext('2d');
+    // The gold ground. It is a print of a sunburst behind the cone rather than
+    // a flat orange — a vertical ramp is the cheapest thing that reads as one
+    // at the size this is ever seen at.
+    const gr = g.createLinearGradient(0, 0, 0, 216);
+    gr.addColorStop(0, '#f6a63a'); gr.addColorStop(0.45, '#f6d79a');
+    gr.addColorStop(1, '#f2a828');
+    g.fillStyle = gr; g.fillRect(0, 0, 256, 216);
+    g.fillStyle = '#3a2410';
+    g.font = '600 30px "Comic Sans MS", "Segoe Print", "Helvetica Neue", Arial, sans-serif';
+    g.textAlign = 'center';
+    g.fillText('Slatki Kornet', 128, 40);
+    // The cone. A wafer triangle with the lattice scored across it and a scoop
+    // of pale ice cream sitting in the mouth, which is what the photograph on
+    // the real wrap is.
+    g.fillStyle = '#c98f4e';
+    g.beginPath(); g.moveTo(88, 74); g.lineTo(168, 74); g.lineTo(128, 168);
+    g.closePath(); g.fill();
+    g.strokeStyle = '#a97236'; g.lineWidth = 2;
+    for (let i = -3; i <= 3; i++) {
+      g.beginPath(); g.moveTo(128 + i * 22, 74); g.lineTo(128 + i * 7, 168);
+      g.stroke();
+    }
+    for (let k = 1; k < 5; k++) {
+      const y = 74 + k * 20, w = 40 * (1 - k / 5.0);
+      g.beginPath(); g.moveTo(128 - w, y); g.lineTo(128 + w, y); g.stroke();
+    }
+    g.fillStyle = '#f0e6d2';
+    g.beginPath(); g.ellipse(128, 70, 44, 16, 0, 0, Math.PI * 2); g.fill();
+    // And the price, on its own white patch at the foot, where the blue panel
+    // of the wrap carries it.
+    g.fillStyle = '#ffffff'; g.fillRect(72, 156, 112, 34);
+    g.fillStyle = '#141414';
+    g.font = '700 28px "Helvetica Neue", Arial, sans-serif';
+    g.fillText('1,00 €', 128, 182);
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    return tex;
+  }
+
+  /**
+   * The card in the acrylic holder on the counter.
+   *
+   * Square on and wholly legible in `20260823_111819`: SLADOLED in fat red
+   * capitals that warm to gold at the last letter, KUGLA under it in the same
+   * hand, and 2,50 € in black on a white patch let into the bottom right —
+   * all on a sky-blue ground with paler blue cloud shapes printed on it. It is
+   * a stock card from a wholesaler rather than the shop's own sign, which is
+   * why it is the one lettering on this counter that is not hand-written.
+   *
+   * The price is a number the photograph carries, so it goes on. It is the
+   * fourth price in the game that came out of the survey rather than out of
+   * somebody's head.
+   */
+  function scoopCard() {
+    const C = document.createElement('canvas');
+    C.width = 320; C.height = 224;
+    const g = C.getContext('2d');
+    g.fillStyle = '#7fc4e8'; g.fillRect(0, 0, 320, 224);
+    // The clouds: three soft pale wedges, off-centre and nowhere near the
+    // edges, for the reason the gull mural's wash is drawn that way.
+    g.fillStyle = 'rgba(255,255,255,0.28)';
+    for (const [x, y, r] of [[70, 46, 54], [232, 30, 42], [180, 190, 60]]) {
+      g.beginPath(); g.ellipse(x, y, r, r * 0.52, 0, 0, Math.PI * 2); g.fill();
+    }
+    g.textAlign = 'left';
+    // Both words are SET TO FIT and not set at a fixed size, which is the
+    // lesson `shopSign` has already learnt twice in this file: "SLADOLED" at a
+    // size chosen by eye ran off the right-hand edge of the canvas and the card
+    // shipped reading SLADOL / KUG. Solve for the size that fills the room and
+    // let a cap stop it going the other way.
+    const fit = (text, room, cap) => {
+      g.font = '800 100px "Helvetica Neue", Arial Black, Arial, sans-serif';
+      const px = Math.min(cap, 100 * room / (g.measureText(text).width || 1));
+      g.font = `800 ${px}px "Helvetica Neue", Arial Black, Arial, sans-serif`;
+      return px;
+    };
+    // SLADOLED warms from red to gold along the word, which is a printed
+    // gradient and not eight separately coloured letters.
+    const w1 = g.createLinearGradient(14, 0, 306, 0);
+    w1.addColorStop(0, '#e8362a'); w1.addColorStop(0.62, '#ef5a20');
+    w1.addColorStop(1, '#f4b21c');
+    g.strokeStyle = '#8f1c14'; g.lineWidth = 4;
+    g.fillStyle = w1;
+    fit('SLADOLED', 292, 66);
+    g.fillText('SLADOLED', 14, 88); g.strokeText('SLADOLED', 14, 88);
+    g.fillStyle = '#ee4a22';
+    // KUGLA shares the line with the price patch, so it gets the left half of
+    // the card and not the whole of it.
+    fit('KUGLA', 168, 66);
+    g.fillText('KUGLA', 14, 168); g.strokeText('KUGLA', 14, 168);
+    g.fillStyle = '#ffffff'; g.fillRect(192, 118, 116, 58);
+    g.fillStyle = '#161616';
+    g.font = '600 40px "Helvetica Neue", Arial, sans-serif';
+    g.textAlign = 'center';
+    g.fillText('2,50 €', 250, 160);
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    return tex;
+  }
+
+  /**
+   * What is standing on the counter over the gelato case.
+   *
+   * `20260823_111819` is the whole of this: the serving counter square on from
+   * a metre and a half, with five objects on it and nothing else. Left to
+   * right they are a stainless drainer tray, a heavy glass bowl with a hedgehog
+   * of plastic tasting spoons standing out of it, a chipped white tin, the
+   * printed scoop card in its acrylic holder, and a clear tub of waffle cones
+   * with a paper wrap round the bottom of it.
+   *
+   * They stand on the case's own hood, which the 22 August pass drew as a raked
+   * slab from `s0−1.44` at `y0+1.86` to `s0−0.46` at `y0+1.92`. That is the one
+   * horizontal surface behind the glass and in front of the shop, and it is
+   * where the counter in the photograph is: the tray, the bowl and the tin are
+   * all in front of the server and behind the pans. Every foot here is set at
+   * `y0+1.86` — the LOW end of the rake — so that whatever the hood's top is
+   * doing at that particular `s`, the object's base is buried in it rather than
+   * skimming it. Rule 5, in the same place it caught the pan rims.
+   *
+   * Nothing is drawn east of t 336.0. The three menu panels hang at `s0−0.14`
+   * from t 335.95, and a cone tub 0.6 m in front of the left-hand edge of a
+   * board is a cone tub standing over the prices.
+   */
+  function counterKit(S, y0, ca, cc, cm) {
+    const STEEL = [0.505, 0.500, 0.486];
+    const BRIGHT = [0.645, 0.638, 0.622];
+    const yb = y0 + 1.86;                      // the hood's low edge: every foot
+    const cs = S.s0 - 0.95;                    // the middle of the hood, in s
+
+    // The drainer. A shallow stainless tray with a darker perforated bed let
+    // into it, which from the promenade is a bright rectangle with a dull one
+    // inside it — and that contrast is the only thing that says "perforated"
+    // at this size.
+    {
+      const ct = cm - 1.95;
+      boxTS(ct - 0.26, ct + 0.26, cs - 0.17, cs + 0.17, yb, yb + 0.075,
+        BRIGHT, shade(BRIGHT, 1.06));
+      boxTS(ct - 0.21, ct + 0.21, cs - 0.13, cs + 0.13, yb + 0.055, yb + 0.085,
+        shade(STEEL, 0.86), shade(STEEL, 0.92));
+    }
+
+    // The bowl of tasting spoons. Pressed glass, which in this builder is a
+    // very pale desaturated solid and not a transparent one — the same call
+    // `gelatoCase` makes for the stacked coupes, and for the same reason: a
+    // translucent quad here is an opaque grey lump over the counter.
+    //
+    // The spoons are the point of it. A bowl on its own is a lump; nine white
+    // sticks standing out of the mouth at every angle is unmistakable, and it
+    // is the object in the frame that most says somebody is serving from this
+    // counter right now.
+    {
+      const ct = cm - 1.35;
+      const GLASS = [0.700, 0.735, 0.720];
+      lathe(W, ct, cs, [[yb, 0.055], [yb + 0.03, 0.105], [yb + 0.10, 0.145],
+        [yb + 0.19, 0.140], [yb + 0.26, 0.098]], GLASS, 10);
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * TAU + 0.4, lean = 0.055 + jit(i, 810) * 0.075;
+        frustumTS(yb + 0.17,
+          [ct + Math.cos(a) * 0.03, cs + Math.sin(a) * 0.03, 0.010, 0.010],
+          yb + 0.17 + 0.20 + jit(i, 811) * 0.06,
+          [ct + Math.cos(a) * lean, cs + Math.sin(a) * lean, 0.013, 0.013],
+          [0.860, 0.855, 0.830], [0.885, 0.880, 0.855]);
+      }
+    }
+
+    // The tin. Square, enamelled, and the enamel has gone off it in patches —
+    // which is drawn as a chalkier band round the bottom third rather than as
+    // spots, because a spot at this size is one pixel and a band is a tin that
+    // has been slid along a counter for twenty years.
+    {
+      const ct = cm - 0.92;
+      boxTS(ct - 0.10, ct + 0.10, cs - 0.10, cs + 0.10, yb, yb + 0.13,
+        [0.585, 0.590, 0.585]);
+      boxTS(ct - 0.101, ct + 0.101, cs - 0.101, cs + 0.101, yb + 0.11, yb + 0.30,
+        [0.775, 0.775, 0.760]);
+      boxTS(ct - 0.112, ct + 0.112, cs - 0.112, cs + 0.112, yb + 0.28, yb + 0.335,
+        [0.505, 0.525, 0.540], [0.545, 0.565, 0.580]);
+    }
+
+    // The scoop card, on its tray. Both placed off the front of the card the
+    // way `shopSign` places its board, so that nothing added to this counter
+    // later can get between the two.
+    {
+      const ct = cm - 0.42, cw = 0.30, ch = 0.21;
+      const back = b;
+      b = up;
+      boxTS(ct - cw * 0.5 - 0.01, ct + cw * 0.5 + 0.01, cs - 0.10, cs - 0.04,
+        yb + 0.02, yb + 0.02 + ch + 0.02, [0.520, 0.545, 0.560]);
+      b = back;
+      seaFacing(scoopCard(), ct, cs - 0.14, yb + 0.03 + ch * 0.5, cw, ch,
+        'slast:scoopcard');
+    }
+
+    // The cone tub. A clear drum of wafer cones with the printed wrap round
+    // the bottom of it and a clear domed lid on the top. The cones read as one
+    // pale wafer mass and not as cones, which is what a tub of forty of them
+    // seen through a scratched plastic drum is.
+    {
+      const ct = cm + 0.12;
+      post(W, ct, cs, yb, yb + 0.42, 0.148, [0.735, 0.640, 0.470], 12);
+      // The wrap, as a prism a hair wider than the drum. The band it carries is
+      // the red the big capitals are printed in; the capitals themselves are
+      // not set — see the note over `coneTubWrap`.
+      post(W, ct, cs, yb + 0.015, yb + 0.275, 0.156, [0.560, 0.735, 0.845], 12);
+      post(W, ct, cs, yb + 0.120, yb + 0.205, 0.158, [0.760, 0.235, 0.180], 12);
+      seaFacing(coneTubWrap(), ct, cs - 0.196, yb + 0.152, 0.205, 0.200,
+        'slast:conetub');
+      dome(W, ct, cs, yb + 0.42, 0.055, 0.152, [0.760, 0.775, 0.770], 10);
+    }
+  }
+
+  /**
+   * The wall behind the Slasticarnica's counter, on a canvas.
+   *
+   * Both of this morning's counter photographs are mostly this wall and the
+   * game had a black panel there — the "lightbox" trick the serving opening is
+   * drawn with, which is right for a kiosk you never get close to and is
+   * nothing at all from two metres, which is the only distance this shop is
+   * ever looked at.
+   *
+   * What is actually there is MIRROR TILE, floor to ceiling, in squares about a
+   * hand and a half across with dark joints between them, and on brackets off
+   * it three glass shelves carrying rows of stemware standing upside down. The
+   * mirror is why the inside of this shop reads as twice its own depth in every
+   * photograph of it, and it is the single most characteristic thing about the
+   * place after the counter itself.
+   *
+   * Everything set here is a shape or a colour and not a word. The boxed stock
+   * on the shelves is bright and unreadable in both frames, so it ships as
+   * blocks of colour; the framed licence on the wall ships as a framed cream
+   * panel with a crest on it and no text. Rule 12 applies to a texture exactly
+   * as it applies to a sign, and a wall of invented brand names would be the
+   * worst thing that could be put on it.
+   *
+   * The two things that ARE drawn as themselves are the round wall clock —
+   * white face, black bezel, and the hands at the time the photograph was taken
+   * — and the Croatian flag hanging in the corner. Both are unambiguous.
+   */
+  function backBarSkin(w, h) {
+    const PX = 1024, C = document.createElement('canvas');
+    C.width = PX; C.height = Math.round(PX * h / w);
+    const H = C.height;
+    const g = C.getContext('2d');
+    // The mirror. A grid of squares, each a slightly different silver, over a
+    // vertical ramp — a mirror in a shaded room is darker at the bottom because
+    // what it is reflecting down there is the room and not the doorway, and a
+    // flat grey grid reads as bathroom tile.
+    const gr = g.createLinearGradient(0, 0, 0, H);
+    gr.addColorStop(0, '#aab3b7'); gr.addColorStop(1, '#79828a');
+    g.fillStyle = gr; g.fillRect(0, 0, PX, H);
+    const TL = 62;
+    for (let x = 0; x < PX; x += TL) {
+      for (let y = 0; y < H; y += TL) {
+        const q = ((x * 7 + y * 13) % 11) / 11;
+        g.fillStyle = `rgba(${196 + q * 44 | 0},${204 + q * 40 | 0},${208 + q * 38 | 0},${0.26 + q * 0.30})`;
+        g.fillRect(x + 2, y + 2, TL - 4, TL - 4);
+      }
+    }
+    // The joints, drawn rather than left as the ground showing through. A tile
+    // wall with no joint is a sheet of metal, and the first cut left the ground
+    // dark enough that the whole run read as a black cabinet with white funnels
+    // in it rather than as a mirror.
+    g.fillStyle = 'rgba(40,44,48,0.35)';
+    for (let x = 0; x < PX; x += TL) g.fillRect(x, 0, 2, H);
+    for (let y = 0; y < H; y += TL) g.fillRect(0, y, PX, 2);
+
+    // The fittings on the wall go in the LEFT third and not the right, because
+    // the right of this face is behind the gelato case and behind the menu
+    // boards, and a clock nobody can see is a clock that was not worth drawing.
+    // The control cabinet, with the red flash on its door: the one thing in the
+    // room that is neither glass nor mirror, and it anchors the wall.
+    g.fillStyle = '#e6e6e2'; g.fillRect(PX * 0.035, H * 0.02, PX * 0.100, H * 0.20);
+    g.fillStyle = '#cfcfc9'; g.fillRect(PX * 0.035, H * 0.20, PX * 0.100, H * 0.028);
+    g.fillStyle = '#9aa0a2';
+    g.fillRect(PX * 0.050, H * 0.055, PX * 0.040, H * 0.055);
+    g.fillStyle = '#c8241c';
+    g.beginPath();
+    g.moveTo(PX * 0.118, H * 0.125); g.lineTo(PX * 0.098, H * 0.170);
+    g.lineTo(PX * 0.110, H * 0.170); g.lineTo(PX * 0.094, H * 0.205);
+    g.lineTo(PX * 0.124, H * 0.155); g.lineTo(PX * 0.108, H * 0.155);
+    g.closePath(); g.fill();
+    // The framed licence. A crest, five ruled lines and NO TEXT — see the note
+    // above: rule 12 applies to a texture exactly as it applies to a sign.
+    g.fillStyle = '#b08a4e';
+    g.fillRect(PX * 0.170, H * 0.025, PX * 0.075, H * 0.185);
+    g.fillStyle = '#f3f0e6';
+    g.fillRect(PX * 0.176, H * 0.038, PX * 0.063, H * 0.160);
+    g.fillStyle = '#c8241c';
+    g.fillRect(PX * 0.200, H * 0.055, PX * 0.016, H * 0.030);
+    g.fillStyle = 'rgba(60,60,60,0.45)';
+    for (let i = 0; i < 5; i++) {
+      g.fillRect(PX * 0.181, H * (0.110 + i * 0.019), PX * 0.052, 2);
+    }
+    // The clock. White face, black bezel, and the hands at twenty past eleven,
+    // which is when the photograph was taken and is the only defensible time to
+    // put on it.
+    const cx = PX * 0.300, cy = H * 0.115, cr = H * 0.088;
+    g.fillStyle = '#15151a';
+    g.beginPath(); g.arc(cx, cy, cr, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#f6f6f2';
+    g.beginPath(); g.arc(cx, cy, cr * 0.84, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#20202a'; g.lineWidth = 2;
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      g.beginPath();
+      g.moveTo(cx + Math.sin(a) * cr * 0.72, cy - Math.cos(a) * cr * 0.72);
+      g.lineTo(cx + Math.sin(a) * cr * 0.60, cy - Math.cos(a) * cr * 0.60);
+      g.stroke();
+    }
+    g.lineWidth = 3;
+    for (const [frac, len] of [[11.33 / 12, 0.44], [20 / 60, 0.66]]) {
+      const a = frac * Math.PI * 2;
+      g.beginPath(); g.moveTo(cx, cy);
+      g.lineTo(cx + Math.sin(a) * cr * len, cy - Math.cos(a) * cr * len);
+      g.stroke();
+    }
+    // And the flag hanging beside it. Three bands and the chequy, which at this
+    // size is eight squares and is still unmistakable.
+    const fx = PX * 0.352, fw = PX * 0.026, fh = H * 0.34;
+    for (const [i, col] of [[0, '#c8102e'], [1, '#f4f4f2'], [2, '#1b3c8c']]) {
+      g.fillStyle = col; g.fillRect(fx, i * fh / 3, fw, fh / 3);
+    }
+    for (let i = 0; i < 4; i++) {
+      for (let k = 0; k < 2; k++) {
+        g.fillStyle = (i + k) % 2 ? '#c8102e' : '#f4f4f2';
+        g.fillRect(fx + k * fw / 2, fh * 0.34 + i * fh * 0.055, fw / 2, fh * 0.055);
+      }
+    }
+
+    // Three glass shelves on their brackets, and the stemware standing upside
+    // down on them. A stem is three strokes — a foot, a stalk and a bowl — and
+    // hung the wrong way up it is the bowl that is nearest the shelf, which is
+    // the whole silhouette and the reason a row of them is unmistakable.
+    const SH = [H * 0.40, H * 0.63, H * 0.86];
+    for (const y of SH) {
+      g.fillStyle = 'rgba(238,244,248,0.62)';
+      g.fillRect(24, y, PX - 48, 5);
+      g.fillStyle = 'rgba(255,255,255,0.40)';
+      g.fillRect(24, y - 2, PX - 48, 2);
+      for (let x = 54; x < PX - 40; x += 34) {
+        const bh = H * 0.085;
+        g.fillStyle = 'rgba(236,244,248,0.42)';
+        g.beginPath();
+        g.moveTo(x - 11, y + 5); g.lineTo(x + 11, y + 5);
+        g.lineTo(x + 4, y + 5 + bh * 0.62); g.lineTo(x - 4, y + 5 + bh * 0.62);
+        g.closePath(); g.fill();
+        g.fillRect(x - 2, y + 5 + bh * 0.60, 4, bh * 0.30);
+        g.fillRect(x - 8, y + 5 + bh * 0.88, 16, 3);
+      }
+    }
+    // The boxed stock along the middle shelf. Colour and no words: it is bright
+    // and illegible in both frames and always was.
+    const box = ['#e07a24', '#3f8ed0', '#5aa832', '#c0357a', '#e0b81c'];
+    for (let i = 0; i < 5; i++) {
+      g.fillStyle = box[i];
+      g.fillRect(PX * 0.15 + i * 44, SH[1] - H * 0.155, 36, H * 0.155);
+      g.fillStyle = 'rgba(255,255,255,0.72)';
+      g.fillRect(PX * 0.15 + i * 44 + 6, SH[1] - H * 0.122, 24, H * 0.052);
+    }
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    return tex;
+  }
+
+  /**
+   * Hang that wall in the serving opening, and put the mullions back in front
+   * of it.
+   *
+   * The face goes at `s0−0.14`, which is where the three menu panels also
+   * hang — but they start at t 335.95 and this stops at 335.90, so the two
+   * never share a plane over the same ground and there is nothing for the depth
+   * buffer to get wrong. It is also the reason this covers the WEST half of the
+   * opening only: a back wall painted across the boards would be a back wall in
+   * front of the prices.
+   *
+   * `shopKit` stands its mullions at `s0−0.03`, which is one centimetre in
+   * front of the dark panel they are drawn against — rule 5 in the place
+   * nobody looks, and which of the two wins at two kilometres from origin is
+   * decided by rounding. Three of the five fall inside this face and would be
+   * behind it whatever they did, so they are drawn again here at `s0−0.26`:
+   * proper solids, 0.12 m clear of the wall, in front of it the way a mullion
+   * in an opening actually is.
+   */
+  function backBar(S, y0, top) {
+    const oa = S.t0 + (S.t1 - S.t0) * 0.18, oc = S.t1 - (S.t1 - S.t0) * 0.18;
+    const t1 = Math.min(oc, 335.90);
+    const t0 = oa + 0.15;
+    if (t1 - t0 < 1.0) return;
+    // Stopping at `top − 0.62` and not `top − 0.38`, which is where the dark
+    // panel behind it stops. Painting the whole panel put the control cabinet,
+    // the licence, the clock and the flag in a band that the frontage above the
+    // opening covers from every viewpoint a walker has — the paint method,
+    // one flat magenta quad and one screenshot, and the answer was off the
+    // image in a second after twenty minutes of reasoning about awnings.
+    const yLo = y0 + 1.10, yHi = top - 0.62;
+    const w = t1 - t0, h = yHi - yLo;
+    seaFacing(backBarSkin(w, h), (t0 + t1) * 0.5, S.s0 - 0.14,
+      (yLo + yHi) * 0.5, w, h, 'slast:backbar');
+    const body = S.body || [0.520, 0.492, 0.430];
+    const nmul = Math.max(2, Math.round((oc - oa) / 1.5));
+    for (let k = 1; k < nmul; k++) {
+      const t = oa + (oc - oa) * (k / nmul);
+      if (t < t0 || t > t1) continue;
+      boxTS(t - 0.035, t + 0.035, S.s0 - 0.26, S.s0 - 0.18, y0 + 1.06,
+        top - 0.34, shade(body, 0.78), shade(body, 0.92));
+    }
   }
 
   /** One business. Everything upright goes in `up`; pads stay in `deck`. */
@@ -4024,6 +4488,140 @@ async function buildJadrija(scene) {
       [0.140, 0.140, 0.145]);
   }
 
+  /**
+   * The shade over beach bar MINI's terrace, which is not a parasol.
+   *
+   * `20260823_111954` is the third of the four photographs of 23 August and it
+   * is taken from the concrete apron looking straight into the bar. What is
+   * over the tables is a pair of BIG SQUARE canopies in a taupe canvas, near
+   * four metres across, nearly flat, on a mast of grey square hollow steel with
+   * four triangular gussets welded round its foot. The mast does not stand in a
+   * ballast disc: it is bolted to a painted plate that sits on a low PLINTH OF
+   * STACKED PRECAST BLOCKS — pale washed aggregate with the stones standing out
+   * of the face, three courses of them laid as a square kerb round the plate,
+   * with a strip of black rubber over one block and rust running down from the
+   * steel. Nothing else on this shore is built that way.
+   *
+   * The generic cafe parasol — cream, eight panels, standing in a car rim
+   * filled with concrete — is right for the Slasticarnica and H2O and Caffe
+   * Trampulin, and it was on MINI's terrace too, which made four businesses
+   * that all shade themselves the same way. This is the one that does not.
+   *
+   * Two of them, at the same two anchors the cream pair used, because those are
+   * where the tables are and the photograph has them over the tables.
+   */
+  function bigShade(S, y0, fs) {
+    const CANV = S.shade.canvas || [0.508, 0.468, 0.352];
+    const MAST = S.shade.mast || [0.335, 0.340, 0.348];
+    const BLOCK = S.shade.block || [0.500, 0.487, 0.440];
+    const HALF = 1.92;                     // half the canopy, so 3.84 m square
+    const PL = 0.66;                       // half the plinth
+    const BH = 0.135;                      // one course of blocks
+    for (let k = 0; k < 2; k++) {
+      const t = S.t0 + 1.3 + k * ((S.t1 - S.t0 - 2.6) || 1);
+      const s = fs - 3.6;
+      const y = at(t).deck;
+
+      // The plinth. Three courses of blocks laid as a square ring — a ring and
+      // not a solid, because the photograph is taken from close enough to see
+      // the plate and the bolt inside it, and a solid block of aggregate under
+      // a mast is a pedestal, which is a different object with a different
+      // meaning. Every course is offset half a block from the one under it, so
+      // the vertical joints break; a stack of blocks whose joints line up is a
+      // wall built by somebody who has never built one.
+      const W2 = 0.26;                     // one block across its width
+      for (let c = 0; c < 3; c++) {
+        for (let e = 0; e < 4; e++) {
+          const along = e < 2, near = e % 2 === 0;
+          // The two runs along `t` go corner to corner; the two along `s` stop
+          // a block's width short at each end, so the four corners are made by
+          // the t-runs and no two blocks occupy the same corner.
+          const lo = along ? -PL : -PL + W2, hi = along ? PL : PL - W2;
+          // Half a block of stagger on the middle course, which is what breaks
+          // the vertical joints. A stack whose joints line up is a wall built
+          // by somebody who has never built one.
+          const off = (c % 2) * (hi - lo) / 6;
+          const n = 3;
+          for (let i = 0; i < n; i++) {
+            const g = 0.90 + jit(c * 17 + e * 5 + i + (t | 0), 640) * 0.22;
+            const col = [BLOCK[0] * g, BLOCK[1] * g, BLOCK[2] * g];
+            const u0 = Math.max(lo, lo + (i + 0) * (hi - lo) / n + off);
+            const u1 = Math.min(hi, lo + (i + 1) * (hi - lo) / n + off) - 0.012;
+            if (u1 <= u0) continue;
+            const v0 = near ? -PL : PL - W2, v1 = near ? -PL + W2 : PL;
+            const y0b = y + c * BH, y1b = y + (c + 1) * BH - 0.008;
+            if (along) boxTS(t + u0, t + u1, s + v0, s + v1, y0b, y1b, col,
+              shade(col, 1.08));
+            else boxTS(t + v0, t + v1, s + u0, s + u1, y0b, y1b, col,
+              shade(col, 1.08));
+          }
+        }
+      }
+      // The strip of black rubber somebody laid over the near course, which is
+      // in the frame and is the only dark thing on the whole plinth.
+      boxTS(t - 0.30, t - 0.02, s - PL, s - PL + 0.24, y + 3 * BH - 0.01,
+        y + 3 * BH + 0.02, [0.085, 0.085, 0.090]);
+
+      // The plate, the gussets and the mast. The plate is what the plinth is
+      // built round and it stands ON the ground inside the ring rather than on
+      // the blocks — which is what the photograph shows and is also the only
+      // arrangement that makes sense of a plinth with a hole in the middle.
+      const yp = y + 0.04;
+      boxTS(t - 0.24, t + 0.24, s - 0.24, s + 0.24, y, yp,
+        shade(MAST, 0.86), shade(MAST, 1.02));
+      for (const [dt, ds] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        frustumTS(yp, [t + dt * 0.145, s + ds * 0.145, 0.008 + 0.075 * Math.abs(ds),
+          0.008 + 0.075 * Math.abs(dt)],
+        yp + 0.26, [t + dt * 0.070, s + ds * 0.070, 0.008 + 0.012 * Math.abs(ds),
+          0.008 + 0.012 * Math.abs(dt)], MAST, shade(MAST, 1.08));
+      }
+      const top = y + 2.86;
+      boxTS(t - 0.065, t + 0.065, s - 0.065, s + 0.065, yp, top, MAST,
+        shade(MAST, 1.10));
+
+      // The canopy. Four panels falling from a small square crown to the eaves,
+      // and a valance hanging straight down off the rim. Drawn from both sides:
+      // you spend the whole of this terrace underneath one, and the underside
+      // is what you are actually looking at.
+      //
+      // Nearly flat and not conical. 0.30 m of fall over 1.9 m is about nine
+      // degrees, which is what the frame has — a market canopy is a taut sheet
+      // with a slight crown, and anything steeper reads as a circus tent.
+      const eave = top - 0.34, crown = 0.34;
+      for (let e = 0; e < 4; e++) {
+        const sg = e < 2 ? 1 : -1, ax = e % 2 === 0;
+        const A = ax ? [t + sg * HALF, s - HALF] : [t - HALF, s + sg * HALF];
+        const Bp = ax ? [t + sg * HALF, s + HALF] : [t + HALF, s + sg * HALF];
+        const C = ax ? [t + sg * crown, s + crown] : [t + crown, s + sg * crown];
+        const D = ax ? [t + sg * crown, s - crown] : [t - crown, s + sg * crown];
+        const cl = e % 2 ? CANV : shade(CANV, 1.06);
+        b.quad(W(A[0], A[1], eave), W(Bp[0], Bp[1], eave),
+          W(C[0], C[1], top), W(D[0], D[1], top), cl);
+        b.quad(W(D[0], D[1], top), W(C[0], C[1], top),
+          W(Bp[0], Bp[1], eave), W(A[0], A[1], eave), shade(cl, 0.86));
+      }
+      // The valance, 0.22 m of it, which is the band the eye reads the canopy's
+      // edge off. Without it the four panels end in a line in the air.
+      for (let e = 0; e < 4; e++) {
+        const sg = e < 2 ? 1 : -1, ax = e % 2 === 0;
+        const cl = shade(CANV, 0.98);
+        if (ax) {
+          boxTS(t + sg * HALF - 0.03, t + sg * HALF + 0.03, s - HALF, s + HALF,
+            eave - 0.22, eave + 0.01, cl);
+        } else {
+          boxTS(t - HALF, t + HALF, s + sg * HALF - 0.03, s + sg * HALF + 0.03,
+            eave - 0.22, eave + 0.01, cl);
+        }
+      }
+      // Blocked: the plinth stops you and the mast stops you, and both are
+      // things you would walk into rather than step over. The canopy is 2.5 m
+      // up and is not a blocker, which is the whole point of standing under it.
+      runs.push({ t0: t - PL, t1: t + PL, s0: s - PL, s1: s + PL,
+        y, h: 3 * BH });
+      furniture.push({ t, s, a: 0.10, c: 0.10, h: 2.4, y });
+    }
+  }
+
   function shopfront(S) {
     const tc = (S.t0 + S.t1) * 0.5;
     const y0 = at(tc).deck;
@@ -4302,6 +4900,9 @@ async function buildJadrija(scene) {
     // chips on it until the 22 August survey, which is what a shop looks like
     // when nobody has ever stood in front of it.
     if (S.vitrine) gelatoCase(S, y0);
+    // And the mirror-tiled wall behind it, which is what the two counter
+    // photographs of 23 August are mostly of. See `backBar`.
+    if (S.backBar) backBar(S, y0, top);
     // The three menu panels, on the frontage right of the serving opening,
     // where 20260821_175713 has them. Same construction as `shopSign` — a face
     // with a tray 0.10 m behind it, both placed off the face rather than off
@@ -4424,10 +5025,13 @@ async function buildJadrija(scene) {
           k % 3 === 0 ? [0.190, 0.200, 0.210] : [0.560, 0.548, 0.512]);
       }
     }
+    // Except at beach bar MINI, whose shade is a different object entirely and
+    // gets `bigShade` instead. See the note over it.
+    if (S.shade) bigShade(S, y0, S.s0 - awn);
     // And the cafe's own parasols: cream, on a pebble-aggregate disc, one to a
     // pair of tables. Furled and tied after five, which is how every frame shot
     // at ten to six in the survey has them.
-    if (awn > 0) {
+    if (awn > 0 && !S.shade) {
       const fs = S.s0 - awn;
       const furled = (CONFIG.hour || 14) > 17;
       const CREAM = [0.560, 0.545, 0.508];
@@ -4492,6 +5096,197 @@ async function buildJadrija(scene) {
     { bg: '#cfe4d8', fg: '#1d3b30', big: '100' });
   centenary(212, 22.0, 2.6, 1.5, at(212).deck + 1.15, { bg: '#e8e2cc' });
   laneGate(486, 30.6);
+
+  /**
+   * A garden boundary at the back of the wood, and it is A PLACEMENT.
+   *
+   * `20260823_112051` is the fourth of the four photographs of 23 August. It
+   * is taken from inside the pine stand, standing on the crushed-limestone
+   * floor with people camped on towels a few metres away, looking inland at
+   * where the wood stops. What stops it is four things, one behind the next:
+   *
+   *   a wall of irregular limestone SLABS, mortared, wide pale joints, about a
+   *   metre out of the floor and stepping up as the ground rises — not the
+   *   rounded field rubble of the approach piers and not the sawn ashlar of
+   *   the west end, but broad flat plates laid every way, which is a third
+   *   masonry on this shore and the loudest of the three at close range;
+   *
+   *   a wide double GATE of vertical round bars in the gap, taller than the
+   *   wall, in a warm brass-gold that is either metallic paint or a very old
+   *   coat of it, with dry grass growing through the foot of it;
+   *
+   *   a railing of black bars standing ON the wall east of the gate, with
+   *   heavier square posts at its ends;
+   *
+   *   and behind all of it a clipped evergreen hedge a good two metres tall,
+   *   with the first floor of a rendered house showing over the top.
+   *
+   * The photograph carries NO GPS — none of the four do; they are Galaxy S24
+   * frames with the location off. So this is placed and not surveyed, and the
+   * placement is stated here rather than implied: t 224 to 239.5 at s 40.4,
+   * which is the seaward frontage of the two-storey house that stands inland
+   * of the vikendica, chosen because that is the piece of ground the
+   * photograph could be of and because the settlement houses there stand on
+   * bare sand with no boundary of any kind, which no house in Dalmatia does.
+   * `b_016`'s fence panels and the wood-edge kerb blocks went in under exactly
+   * this rule and are recorded the same way.
+   *
+   * Nothing here draws from `rng()` — the stone sizes come out of `jit`, which
+   * is a hash and not the stream. Rule 4.
+   */
+  function gardenWall(t0, t1, sw, gate0, gate1) {
+    const back = b;
+    b = up;
+    const STONE = [0.452, 0.446, 0.418];
+    const CORE = [0.575, 0.565, 0.535];
+    const GOLD = [0.545, 0.462, 0.245];
+    const IRON = [0.082, 0.084, 0.090];
+    const LEAF = [0.105, 0.208, 0.112];
+    const AW = 0.17;                        // half the wall's thickness
+    const gAt = (t, s) => {
+      const st = at(t);
+      return Math.max(surfaceY(t, s), groundAt(st.x + st.nx * s, st.z + st.nz * s));
+    };
+    // The wall, in level lengths that step at the joint. Same construction the
+    // west-end retaining wall uses and for the same reason: a wall that follows
+    // a falling grade is a ramp with a face on it.
+    const RUN = 3.9;
+    const tops = [];
+    for (let a = t0; a < t1 - 0.01; a += RUN) {
+      const c = Math.min(a + RUN, t1);
+      let hi = -1e9;
+      for (let u = a; u <= c; u += 0.6) hi = Math.max(hi, gAt(u, sw));
+      const top = Math.round((hi + 0.98) / 0.16) * 0.16;
+      tops.push([a, c, top]);
+      // Skip the leaf of wall the gate stands in. The gate is a hole in the
+      // masonry and not a panel bolted over it — in the frame you can see the
+      // ground running straight through under the bars.
+      if (c > gate0 && a < gate1) {
+        for (const [p, q] of [[a, gate0], [gate1, c]]) {
+          if (q - p > 0.15) stoneRun(p, q, top);
+        }
+      } else {
+        stoneRun(a, c, top);
+      }
+    }
+    function stoneRun(a, c, top) {
+      const base = gAt((a + c) * 0.5, sw) - 0.34;
+      // The core is the MORTAR here, and pale, which is the opposite of what
+      // the approach piers do. Those are field rubble with the joints in
+      // shadow, so their core is dark and anything paler read as more wall.
+      // This is a mortared slab wall: what shows between the plates is a wide
+      // pale bed of it in full sun, and drawn dark the whole run came out as a
+      // black plane with a scatter of bricks stuck on the front.
+      boxTS(a, c, sw - 0.115, sw + 0.115, base, top - 0.02, CORE,
+        shade(CORE, 1.05));
+      // The slabs, TILED and not scattered. They very nearly cover the face —
+      // broad flat plates split off a bed and laid to whatever course each one
+      // happens to make, half again as wide as they are tall, with a finger of
+      // mortar showing round each. The first cut put twenty loose stones on
+      // three metres of wall and it read as a rockery propped against a
+      // hoarding: the joint has to be the thin thing and the stone the thick
+      // one, which is the whole difference between a wall and a decoration.
+      for (const near of [true, false]) {
+        const out = near ? -1 : 1;
+        let row = 0;
+        for (let y = base + 0.06; y < top - 0.10; row++) {
+          const hh = 0.135 + jit(((a * 9) | 0) + row * 7, 663) * 0.075;
+          let u = a + (row % 2 ? 0.19 : 0.02);
+          for (let k = 0; u < c - 0.06; k++) {
+            const key = ((a * 9) | 0) + row * 31 + k;
+            const L = 0.26 + jit(key, 660) * 0.30;
+            const u1 = Math.min(u + L, c);
+            const g = 0.86 + jit(key, 664) * 0.30;
+            const col = [STONE[0] * g, STONE[1] * g, STONE[2] * g];
+            // A hair of tilt at each end, so no two slabs sit on one line and
+            // the courses read as a mason working round what he was given.
+            const d0 = (jit(key, 661) - 0.5) * 0.05;
+            const d1 = (jit(key, 662) - 0.5) * 0.05;
+            const yl = Math.max(base + 0.02, y + d0);
+            const yh = Math.min(top - 0.03, y + hh + d1);
+            if (yh - yl > 0.05 && u1 - u > 0.09) {
+              frustumTS(yl, [(u + u1) * 0.5, sw + out * 0.10,
+                (u1 - u) * 0.5 - 0.022, 0.055],
+              yh, [(u + u1) * 0.5 + d0 * 0.6, sw + out * AW,
+                (u1 - u) * 0.5 - 0.030, 0.048], col, shade(col, 1.07));
+            }
+            u = u1 + 0.026;
+          }
+          y += hh + 0.030;
+        }
+      }
+      // And the flat top, which is what the railing stands on and the only
+      // straight line on the whole thing.
+      boxTS(a, c, sw - AW - 0.015, sw + AW + 0.015, top - 0.10, top,
+        shade(STONE, 0.96), shade(STONE, 1.10));
+      runs.push({ t0: a, t1: c, s0: sw - 0.30, s1: sw + 0.30,
+        y: base, h: top - base });
+    }
+
+    // The gate. Two leaves of vertical round bar between a round jamb post at
+    // each end, a head rail, a mid rail at about three fifths, and a bottom
+    // rail off the ground — which is the pattern in the frame and is also the
+    // only pattern a gate this wide can be built in without sagging.
+    {
+      const gy = gAt((gate0 + gate1) * 0.5, sw);
+      const HEAD = gy + 1.98, MID = gy + 1.14, FOOT = gy + 0.09;
+      for (const t of [gate0 + 0.06, (gate0 + gate1) * 0.5, gate1 - 0.06]) {
+        post(W, t, sw, gy - 0.15, HEAD + 0.06, 0.048, GOLD, 7);
+      }
+      for (const [yl, yh] of [[FOOT, FOOT + 0.07], [MID, MID + 0.06],
+        [HEAD - 0.07, HEAD]]) {
+        boxTS(gate0, gate1, sw - 0.035, sw + 0.035, yl, yh, GOLD,
+          shade(GOLD, 1.10));
+      }
+      for (let t = gate0 + 0.20; t < gate1 - 0.11; t += 0.115) {
+        // Straight past the middle post rather than stopping either side of
+        // it: a gate leaf's bars run the full height of the leaf and the stile
+        // stands in front of them. Drawn thin, and there are thirty of them,
+        // so this is the one place on the wall worth counting triangles.
+        post(W, t, sw, FOOT + 0.03, HEAD - 0.04, 0.017, GOLD, 4);
+      }
+      runs.push({ t0: gate0, t1: gate1, s0: sw - 0.16, s1: sw + 0.16,
+        y: gy, h: 1.98 });
+    }
+
+    // The black railing, standing on the wall east of the gate. Bars at the
+    // same spacing as the gate's and half its height, with a heavier square
+    // post where each length starts.
+    for (const [a, c, top] of tops) {
+      if (c <= gate1 + 0.1) continue;
+      const p0 = Math.max(a, gate1 + 0.5);
+      boxTS(p0, c, sw - 0.022, sw + 0.022, top + 0.02, top + 0.07, IRON);
+      boxTS(p0, c, sw - 0.022, sw + 0.022, top + 0.86, top + 0.94, IRON,
+        shade(IRON, 1.6));
+      for (let t = p0 + 0.10; t < c - 0.05; t += 0.12) {
+        post(W, t, sw, top + 0.05, top + 0.90, 0.013, IRON, 4);
+      }
+      boxTS(p0 - 0.04, p0 + 0.04, sw - 0.045, sw + 0.045, top, top + 1.00,
+        IRON, shade(IRON, 1.5));
+    }
+
+    // The hedge behind it. Clipped, so it is a block and not a bush — but the
+    // top of a clipped hedge in August is not a straight line, it is a straight
+    // line with a summer's growth standing out of it, and the domes are that
+    // growth. Without them the whole run reads as a painted wall.
+    for (let a = t0; a < t1 - 0.01; a += 1.3) {
+      const c = Math.min(a + 1.3, t1);
+      const gy = gAt((a + c) * 0.5, sw + 1.1);
+      const h = 1.92 + jit((a * 3) | 0, 670) * 0.22;
+      boxTS(a, c + 0.02, sw + 0.42, sw + 1.44, gy - 0.20, gy + h,
+        LEAF, shade(LEAF, 1.30));
+      for (let k = 0; k < 2; k++) {
+        const ct = a + 0.32 + k * 0.62;
+        dome(W, ct, sw + 0.72 + jit((a * 3) | 0 + k, 671) * 0.42, gy + h - 0.08,
+          0.16 + jit((a * 3) | 0 + k, 672) * 0.16, 0.34,
+          shade(LEAF, 1.12), 6);
+      }
+      runs.push({ t0: a, t1: c, s0: sw + 0.42, s1: sw + 1.44, y: gy, h: h });
+    }
+    b = back;
+  }
+  // The placement, stated: the frontage of the house inland of the vikendica.
+  gardenWall(224.0, 239.5, 40.4, 230.2, 233.9);
 
   if (special) special.sign = neonSign(special);
 
