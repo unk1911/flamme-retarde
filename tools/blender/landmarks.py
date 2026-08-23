@@ -326,7 +326,40 @@ def lighthouse():
 def fort_nicholas():
     parts = []
     # Arrowhead in plan, point to the west (down the channel).
+    #
+    # `PLAN_X` / `PLAN_Y` are how this got to the size it actually is, and they
+    # are not a taste decision. The hull below was written by hand and came out
+    # a little over half the fortress: measured 23 August 2026, the OSM way at
+    # world (-1237.2, 718.5) has an oriented plan of 129.9 x 113.3 m, and the
+    # scarp here — the widest course, the one at sea level, and therefore the
+    # one OSM is tracing — was 74.2 x 58.0.
+    #
+    # The pair is fitted rather than read off those two numbers, and the
+    # difference matters. Matching the bounding box exactly (1.751, 1.953) is
+    # matching the *widest* bearing, and a landmark you sail past is seen from
+    # every bearing — so instead both factors are the least-squares fit of the
+    # model's silhouette width against the way's, sampled every degree through
+    # a half turn with the yaw of 1.256 applied. That is 1.690 and 2.040 for
+    # 10.7 % rms, and the two are far apart because the hand-drawn arrowhead
+    # was not only small, it was much too narrow for its length.
+    #
+    # It was caught from the sea, which is the only place it shows. A
+    # photograph from the Brod on 23 August (1000150377, 23 mm equivalent)
+    # puts 123 m of fortress across the frame at 662 m, and the model put 51 m
+    # there. The note at the head of this file already carried the number that
+    # would have caught it — "a 30 deg wedge whose tip is 76 m from the
+    # centroid" — measured off the same polygon and then not applied: the hull
+    # written under it has its tip 44 m out. Fitted, this presents 10.71 deg
+    # of fortress from the Brod against the way's own 10.04 and the
+    # photograph's 10.7; the old hull presented 6.0.
+    #
+    # Heights are left alone. The same photograph gives about 16.6 m of wall
+    # above the water against the 13.0 m built here, but the waterline at that
+    # range is a hazy edge and ten pixels of doubt on it is three metres of
+    # fortress, so that is inside the measurement and this is not.
+    PLAN_X, PLAN_Y = 1.690, 2.040
     hull = [(-34, 0), (-16, -21), (18, -25), (30, -12), (30, 12), (18, 25), (-16, 21)]
+    hull = [(x * PLAN_X, y * PLAN_Y) for x, y in hull]
     scarp = [(x * 1.16, y * 1.16) for x, y in hull]
 
     bm = bmesh.new()
@@ -350,8 +383,10 @@ def fort_nicholas():
     for i in range(9):
         t = i / 8
         for s in (-1, 1):
-            x = -34 + t * 50
-            y = s * (2 + t * 22)
+            # Same plan scale as the hull, or the gun ports march off the wall
+            # they are cut into.
+            x = (-34 + t * 50) * PLAN_X
+            y = s * (2 + t * 22) * PLAN_Y
             bm_box(bm, x, y, 7.4, 2.2, 2.2, 1.6)
     ports = new_object(bm, "nikola_ports")
     parts.append((ports, DARKMETAL))

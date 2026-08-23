@@ -49,8 +49,19 @@ const LANDMARKS = [
   // water on the two seaward faces, which is why this reads at all — but on
   // the SE side there is a rock and sand spit joining the fort to the shore,
   // and there is no spit here.
+  //
+  // The model was also *half the fortress* until 23 August 2026, which nothing
+  // caught because nothing looks at it from close enough to tell — the boat
+  // was the first thing in this game to sail past it. See the note in
+  // tools/blender/landmarks.py: the plan is now the 129.9 x 113.3 m the OSM
+  // way traces, where it had been 74.2 x 58.0.
+  //
+  // `clear` went with it. It suppresses the extruded-box city inside a radius,
+  // and 55 m was sized to the small model while the real footprint reaches
+  // 79.4 m from its centroid — so the far corners of the fort's own way were
+  // being extruded as a building *through* the landmark standing on them.
   { key: 'fort_nikola_fr3d', place: 'tvrđava svetog nikole', yaw: 1.256, atY: 0,
-    clear: 55, name: 'tvrđava sv. Nikole' },
+    clear: 82, name: 'tvrđava sv. Nikole' },
   { key: 'fort_mihovil_fr3d', place: 'tvrđava svetog mihovila', yaw: 0.38, sink: 5.0,
     clear: 48, name: 'tvrđava sv. Mihovila' },
   // The one landmark that is not a place but a span. OSM way 70310004 carries

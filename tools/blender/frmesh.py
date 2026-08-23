@@ -12,6 +12,7 @@ Blender is Z-up, three.js is Y-up. The conversion happens once, on export:
 from __future__ import annotations
 
 import gzip
+import io
 import math
 import struct
 from pathlib import Path
@@ -348,7 +349,19 @@ def gather(items, origin=(0.0, 0.0, 0.0), base=0):
 
 def _write(path: Path, blob: bytes, ni: int, nv: int, note: str):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(gzip.compress(blob, 9))
+    # `mtime=0`, and not `gzip.compress(blob, 9)`.
+    #
+    # gzip stamps the wall clock into bytes 4-7 of its header, so re-baking an
+    # unchanged model produced a payload with different bytes and an identical
+    # decompressed body. That is not cosmetic: build.py says out loud that an
+    # unchanged tree must rebuild byte-for-byte, because comparing checksums
+    # against the server is how a deploy is verified — and any landmark bake
+    # silently broke it. Measured 23 Aug 2026: all five landmarks changed md5
+    # with no source edit, and all five decompressed identical.
+    buf = io.BytesIO()
+    with gzip.GzipFile(fileobj=buf, mode="wb", compresslevel=9, mtime=0) as gz:
+        gz.write(blob)
+    path.write_bytes(buf.getvalue())
     print("  %-18s %6d tris  %6d verts  %5.0f KB  %s"
           % (path.name, ni // 3, nv, len(path.read_bytes()) / 1024, note))
 
