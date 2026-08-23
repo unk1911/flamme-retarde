@@ -313,9 +313,10 @@ as of this writing; the state of each is in the git log, not here.
 - **b_106** Caffe TRAMPULIN: name on the wall; two tall pale-grey electrical
   cabinets, a scooter against them, a picnic bench, red-and-white barrier tape,
   translucent corrugated roof on green steel over the side terrace.
-- **b_016** green mesh fence panels stacked leaning against the promenade kerb.
-- **a_160** stack of red and yellow kayaks/pedalos beside the wall; a white box
-  trailer at the top of the beach.
+- ~~**b_016** green mesh fence panels~~ — built 22 Aug. Position along the
+  shore is a placement, not a measurement: v597 has no GPS.
+- ~~**a_160** kayaks/pedalos and the white box trailer~~ — the hulls went in
+  with the bank armouring; the trailer was built 22 Aug.
 
 ## SOURCES
 
