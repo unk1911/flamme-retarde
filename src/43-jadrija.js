@@ -9841,9 +9841,10 @@ async function buildJadrija(scene) {
     // children. `b.k` is the placement's note that somebody is a child — 0.66,
     // and it is only ever that or 1 — and putting a child on a 1.84 m man's
     // mesh scaled to 1.19 m gives a very small adult, which is not a child.
-    // Within a band it is round-robin rather than random: it costs no draw of
-    // `rng` (Rule 4), and it is the only assignment that guarantees the eight
-    // turn up in equal numbers, which is what the slot allocation below needs.
+    // Within a band it is dealt round the shore rather than drawn: it costs no
+    // draw of `rng` (Rule 4), it puts the eight out in equal numbers, which is
+    // what the slot allocation below wants, and it is the only version of this
+    // that guarantees no two neighbours are the same person. See below.
     const CHILD_H = 1.45;
     if (parsed.length) {
       castNatH = parsed.map(skinHeight);
@@ -9854,18 +9855,40 @@ async function buildJadrija(scene) {
       if (!bands[0].length) bands[0] = bands[1];
       if (!bands[1].length) bands[1] = bands[0];
       castBlob = new Int8Array(bathers.length).fill(-1);
-      const turn = [0, 0];
       const per = new Int32Array(parsed.length);
+      const cand = [[], []];
       for (let bi = 0; bi < bathers.length; bi++) {
         const b = bathers[bi];
         // The same predicate the casting loop uses, and it has to be: a chair
         // sitter is pinned to the terrace and a sunbather has no clip, so
         // neither is ever a candidate for a roving slot.
         if (b.chair || b.pose === 'sit' || b.pose === 'lie') continue;
-        const band = bands[b.k < 0.9 ? 0 : 1];
-        const c = band[turn[b.k < 0.9 ? 0 : 1]++ % band.length];
-        castBlob[bi] = c;
-        per[c]++;
+        cand[b.k < 0.9 ? 0 : 1].push(bi);
+      }
+      // Round-robin *along the shore*, and the ordering is the whole of it.
+      //
+      // Round-robin in placement order was the first cut and it put four
+      // identical women on one terrace. `bathers` comes out of the casting
+      // pass interleaved by pose — stand, wade, walk, sit, lie, stand, … —
+      // and `spread` within a pose steps three places along the shore rather
+      // than scattering, so the standers near you arrive three apart in a list
+      // that is being dealt six ways. Six and three are not coprime: every
+      // stander in one stretch of promenade got one of two blobs, and from the
+      // middle station that is a beach bar with four copies of the same woman
+      // at it.
+      //
+      // Sorted by `t` first, the deal is over neighbours instead of over an
+      // index, so no two people standing next to each other are ever the same
+      // person and you would have to walk past six of them to see a repeat.
+      // It costs no draw of `rng` — Rule 4 — because `b.t` is already placed.
+      for (let g = 0; g < 2; g++) {
+        const band = bands[g];
+        cand[g].sort((x, y) => bathers[x].t - bathers[y].t);
+        cand[g].forEach((bi, k) => {
+          const c = band[k % band.length];
+          castBlob[bi] = c;
+          per[c]++;
+        });
       }
       // And how many slots each of the eight gets, in proportion to how many
       // people on this shore are them. Largest remainder, because twenty-four
@@ -9873,16 +9896,34 @@ async function buildJadrija(scene) {
       // fewer children on this beach than adults, and three slots apiece would
       // leave six of the twenty-four standing idle out of reach of anybody
       // they could possibly stand in for.
-      const tot = per.reduce((a2, c) => a2 + c, 0) || 1;
-      const want = [...per].map((c, i) => ({ i, q: c * SKIN_CAST / tot }));
-      castSlot = [];
-      for (const w of want) { w.n = Math.floor(w.q); w.r = w.q - w.n; }
-      let left = SKIN_CAST - want.reduce((a2, w) => a2 + w.n, 0);
-      for (const w of [...want].sort((x, y) => y.r - x.r)) {
+      //
+      // One slot reserved for every one of the eight who has anybody at all to
+      // stand in for, before the proportion is worked out on the rest. Strict
+      // proportion gave the two children none: there are two child bathers on
+      // this shore who are not sitting on the quay, against fifty-three
+      // adults, and 24 x 1/55 rounds to nothing — so the one thing on the
+      // beach a player would notice most, a child, was the one thing that
+      // could never be promoted. A reserved slot costs nothing, because a slot
+      // that is always pointed at the same person costs exactly what a slot
+      // that is being fought over costs.
+      const seats = per.map((c) => (c > 0 ? 1 : 0));
+      let left = SKIN_CAST - seats.reduce((a2, c) => a2 + c, 0);
+      const spare = per.map((c, i) => ({ i, c: Math.max(0, c - seats[i]) }));
+      const tot = spare.reduce((a2, w) => a2 + w.c, 0) || 1;
+      for (const w of spare) {
+        w.q = w.c * left / tot;
+        w.n = Math.floor(w.q);
+        w.r = w.q - w.n;
+      }
+      left -= spare.reduce((a2, w) => a2 + w.n, 0);
+      for (const w of [...spare].sort((x, y) => y.r - x.r)) {
         if (left-- <= 0) break;
         w.n++;
       }
-      for (const w of want) for (let k = 0; k < w.n; k++) castSlot.push(w.i);
+      castSlot = [];
+      for (let i = 0; i < per.length; i++) {
+        for (let k = 0; k < seats[i] + spare[i].n; k++) castSlot.push(i);
+      }
     }
     // Round-robin over the eight, so the twenty-four on the terraces are the
     // same eight people three times over rather than three of them eight times.
