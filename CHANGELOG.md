@@ -8,6 +8,49 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.107.0] — 2026-08-23
+
+### Fixed
+
+- **The swimwear smear, and it was not `swimwear()`.** The last open bug from
+  the 22 Aug playing pass: the walking woman's suit painted red blotches across
+  her back and buttocks with a streak down one thigh. The TODO's guess was that
+  a paint volume was too small for the mesh, the way the nape wedge had been.
+  Both the volume and the colour were right; the **mesh** was wrong, and the
+  mechanism is one step later.
+
+  `paint()` runs *before* `export_skin()` decimates, and Blender's COLLAPSE
+  decimator interpolates every attribute it merges, colour included — so a
+  boundary one vertex wide going in is two or three vertices deep coming out.
+  Measured across all eight bathers that ramp is **25–80 mm a side**, a property
+  of the mesh and nothing to do with the size of the garment. Men's trunks are
+  156–190 mm of solid colour and survive it, which is why nobody ever
+  complained. The women's brief is authored at 110 mm and shipped as **72 mm of
+  solid red inside 182 mm of pink — 38 % of the suit's vertices carrying the
+  suit's colour.** That haze was then Gouraud-interpolated across triangles with
+  a **97.5 mm median and a 198.5 mm maximum on the thigh**, dragging tint 136 mm
+  below the lowest painted vertex. That is the streak.
+
+  `export_skin()` gained two parameters, both default off on the `tail=`
+  precedent: **`repaint`** lays the same coats on the *decimated* copy before the
+  vertices are written, and **`dense`** hands the decimator an inverted vertex
+  group over the hem — inverted because a *zero* weight is what COLLAPSE reads
+  as "leave this one alone". Suit vertices at the suit's own colour 38 % →
+  **100 %**; brief 72/182 mm → **107/107**; triangles under the hem 34.9 mm →
+  **16.4**; bleed 136 mm → **33**. All eight blobs came out *smaller*, −11.5 KB
+  in total. Bone table and all nine clips bit-identical on every figure; Baye's
+  blob is not rebaked at all.
+
+### Known
+
+- **The head eats 45 % of a bather's triangle budget** — 3 154 of 6 999, against
+  about 128 for each thigh — and that imbalance is why the hem needed rescuing
+  in the first place. `HEAD_CUTS` has never been revisited for figures seen at
+  3–40 m.
+- The hip brief is cut as a horizontal belt, so it crosses the buttocks rather
+  than covering them. Now that the hem is crisp that reads as a design choice
+  rather than a defect; it is a silhouette question, not a paint one.
+
 ## [1.106.0] — 2026-08-23
 
 ### Added
