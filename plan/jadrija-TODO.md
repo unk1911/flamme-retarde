@@ -234,10 +234,30 @@ as of this writing; the state of each is in the git log, not here.
       now, so the rule is enforced by the function rather than by remembering
       it. The instruction above was followed to the letter — measured on a
       10x18 grid, worst case +0.02 m.
-- [ ] The standing crowd reads as switched-off robots. Either give every figure
+- [x] The standing crowd reads as switched-off robots. Either give every figure
       some motion, however small, or seat them — in the chairs, on the wall,
-      legs in the sea. A standing figure with nothing moving is the one thing
-      not allowed.
+      legs in the sea. DONE, and never ticked — Misha, 23 Aug: "i think u
+      already did that and maybe forgot." BOTH halves were done. The motion is
+      at `42-crowd.js:770`, where this line's own verdict is quoted, along with
+      the three causes: one clock shared by the whole crowd, so the beach
+      breathed in and out as one animal; two or three degrees below the neck,
+      which at fifteen metres is a third of a pixel, leaving a head on a 26 s
+      period as the only thing moving on screen; and a pure sine, where a
+      person standing about is still and then *does* something. A clock per
+      figure, a weight shift with weight in it, hands never quite still, a
+      piece of business every 25-50 s, all off `fg.seed`. Median displacement
+      over three seconds 26 mm -> 59 mm, nothing under a centimetre. The
+      seating is the terrace: all 24 occupants on the skinned tier, three to a
+      table at 120 degrees, legs solved per figure against a 0.46 m seat.
+      Re-checked 23 Aug on the built page with the camera nailed down and two
+      frames three seconds apart. Under the beach bar awning, which has no sky
+      in it, 0.70 % of pixels change and the diff is exactly two human
+      silhouettes and nothing else. On the open promenade the raw number is
+      13 % and most of that is CLOUD — quoting it as crowd motion would be
+      wrong, and the human-shaped patches are the three or four by the
+      shopfront. A three-second window cannot catch every figure mid-business
+      at a 25-50 s interval, which is why the 26 -> 59 mm figure is the one
+      that settles it and the photographs only corroborate.
 - [x] The beds repeat audibly after ~15 s and want to be much longer; size is
       explicitly not a constraint any more. And they should MORPH by position —
       toward the water it becomes the water recording, into the pines it becomes
