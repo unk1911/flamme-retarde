@@ -318,6 +318,15 @@ as of this writing; the state of each is in the git log, not here.
   those arc lengths were all taken from the water, at s -37 to -54 — so this is
   left as a decision rather than guessed. `PLAZA` survives solely as this
   opening's numbers.
+- **The photo geotags were stale by up to 43.8 m and are now regenerated.**
+  `geotag.tsv` had been computed against a 189 m shore; the shore is 572 m. Mean
+  error 27 m in `s`, worst 43.8 m, all of it pushing photographs seaward — which
+  is why so many of them appeared to have been taken from out in the channel.
+  Nothing built off it needs revisiting: the identifications that mattered were
+  made from what is visible in the frame (a painted sign, a bench, a diving
+  platform) and not from the table. But it is worth knowing that the numbers
+  quoted in older entries here are in the old frame.
+
 - **The `a_030` back lane is still not locatable.** Two-storey pale yellow
   render, grey-green louvred shutters, vine pergola on green steel, cars nose-in
   against a low rubble-based wall, metalled surface running down to the sea. The
@@ -344,6 +353,22 @@ as of this writing; the state of each is in the git log, not here.
 
 - 39 photos + 132 s 4K walk — `~/fr-video/survey/{photos,vframes}`
 - geotag table (t/s per photo) — `~/fr-video/survey/geotag.tsv`
+
+  **Regenerate it whenever the shore geometry changes.** `t` and `s` are not
+  properties of a photograph; they are the photograph's GPS run through
+  `jadrija.local(x, z)` in whatever page was built at the time, so a table is
+  only as current as the shore that produced it. The one committed with the
+  survey was computed against a build with `shoreM` **189** and a census of
+  `{seen:436, thin:278, plain:124, rich:34}` — the shore is 572 m now — and it
+  was wrong by a mean of **27 m in `s`** and up to **43.8 m**, which put
+  photographs forty metres out in the channel that were actually taken standing
+  on the promenade. Every one of those "taken from the water" readings was an
+  artefact. Re-run after any change to the trace:
+
+      node tools/geotag.mjs ~/fr-video/survey/gps.tsv > ~/fr-video/survey/geotag.tsv
+
+  and check the `site:` line it prints on stderr against the census sentinel
+  before trusting a single row. The stale table is kept as `geotag.tsv.stale-189m.bak`.
 - v595 (inland walk) 220 frames, v597 (lane and tree line) 189 frames —
   `~/fr-video/survey/v59{5,7}`, extracted from `/mnt/c/tmp/refs/jadrija/`
 - Report: https://claude.ai/code/artifact/6b992f51-c846-414a-8819-3d939d4a6d37
