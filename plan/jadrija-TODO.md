@@ -185,8 +185,12 @@ as of this writing; the state of each is in the git log, not here.
       is the cabinet's own front face two millimetres behind the picture plane.
       The tube stands 50 mm proud with a moulded surround now. See the method
       note below: painting the assembly found it in one screenshot.
-- [ ] Her walk is a bear's — stance too wide, arms too far off the body. Both
-      arms and legs need to move through space like a person's.
+- [x] Her walk is a bear's — stance too wide, arms too far off the body. Both
+      arms and legs need to move through space like a person's. CLOSED 23 Aug
+      on Misha's word: "her walk is just fine now, u can close that out." The
+      only evidence a gait item can be closed on is somebody watching it, and
+      he raised it. The numbers from the stand pass below are what the walk was
+      corrected against, and they stand as the record of what changed.
 - [x] And so is the bathers' STAND, which the walk pass did not touch: "at
       least some of the bathers still have that bear-pose, the A-pose, with
       spread legs and arms". Same cause, one clip along — `IDLE_A` corrects the
