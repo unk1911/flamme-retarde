@@ -1516,6 +1516,53 @@ def paint(body, coats):
     return body
 
 
+def hem_group(body, coats, name="hem"):
+    """A vertex group over the hems of `coats` — the edges the paint crosses.
+
+    The decimator has exactly one lever over *where* it spends what it is
+    allowed to keep, and it is this: a vertex whose weight is zero is never
+    collapsed. So an inverted group is an absolute reprieve, and it has to be
+    spent on very little or it eats the whole budget. Weighting the *garment*
+    rather than its hem was tried and cost 2 134 of 3 573 vertices — sixty per
+    cent of a whole person spent on the inside of a bikini, with the head down
+    from 3 154 triangles to 939 to pay for it.
+
+    So it is the hem alone: every vertex of every edge that has one end inside a
+    coat and the other outside. That is a one-vertex-wide ring, it is the only
+    place the mesh's coarseness shows, and it is about a tenth of the budget.
+    Everything on either side of it is free to collapse as far as the ratio
+    wants, because flat colour does not care how big its triangles are.
+
+    The group is safe to leave on the object it is exported from, and that is
+    not luck: `weights` below reads `gname`, which is taken before this runs, so
+    a group added afterwards is not in it and is skipped along with every other
+    group whose name is not a bone's.
+    """
+    me = body.data
+    g = body.vertex_groups.get(name) or body.vertex_groups.new(name=name)
+    dive = 0.0012
+    inside = set()
+    for i, v in enumerate(me.vertices):
+        p = v.co - v.normal * dive
+        for tree, _m, _p, _prio, lo, hi, _name in coats:
+            if not (lo.x <= p.x <= hi.x and lo.y <= p.y <= hi.y
+                    and lo.z <= p.z <= hi.z):
+                continue
+            if _inside(tree, p):
+                inside.add(i)
+                break
+    ring = set()
+    for e in me.edges:
+        a, b = e.vertices
+        if (a in inside) != (b in inside):
+            ring.add(a)
+            ring.add(b)
+    g.add(sorted(ring), 1.0, "REPLACE")
+    print("[mh]   hem: %d verts inside the coats, %d on the edge and held "
+          "against the decimator" % (len(inside), len(ring)))
+    return name
+
+
 # --------------------------------------------------------------------------- #
 #  export                                                                      #
 # --------------------------------------------------------------------------- #
@@ -2698,7 +2745,8 @@ def post_preview(J, body):
     return ob
 
 
-def export_skin(body, rig, path, clips, tris=26000, J=None, post=True):
+def export_skin(body, rig, path, clips, tris=26000, J=None, post=True,
+                repaint=None, dense=None):
     """Write the figure as a .fr3d **v4** blob: mesh, skeleton and clips.
 
     v1 froze the armature into the vertices, which is why the promenade got a
@@ -2714,6 +2762,12 @@ def export_skin(body, rig, path, clips, tris=26000, J=None, post=True):
 
     The mesh is exported in the **bind** pose, so the rig has to be at rest when
     this runs or every vertex is deformed twice.
+
+    `repaint` is the same list of coats `paint` takes, applied again to the
+    decimated copy on its way out, and `dense` is the subset of them whose hems
+    the decimator has to be told to leave alone. Together they are what a figure
+    whose paint is finer than its mesh needs; see the notes at the decimator and
+    at `hem_group`, and for why neither is simply always on.
     """
     rest = _rest_locals(rig)
     bindex = {name: i for i, (name, _p, _l, _g) in enumerate(rest)}
@@ -2748,7 +2802,56 @@ def export_skin(body, rig, path, clips, tris=26000, J=None, post=True):
         d = holder.modifiers.new("dec", "DECIMATE")
         d.decimate_type = "COLLAPSE"
         d.ratio = tris / have
+        # Spend the triangles where the paint is finer than the mesh. See
+        # `hem_group`, and the note below for why a repainted figure needs this
+        # as well as the repaint and not instead of it.
+        if dense:
+            d.vertex_group = hem_group(holder, dense)
+            # Inverted, because a *zero* weight is what the collapse reads as
+            # "leave this one alone" — a group of ones protects nothing and a
+            # group of ones with everything else at zero, which was the first
+            # try, protects the entire rest of the figure and decimates nothing
+            # at all: 351 452 triangles came out of a 7 000 budget.
+            d.invert_vertex_group = True
         bpy.ops.object.modifier_apply(modifier="dec")
+    # And then, on the figures that ask for it, painted again — on *this* mesh.
+    #
+    # The decimator interpolates every attribute it carries, colour included: a
+    # vertex that survives a collapse comes out holding the average of the ones
+    # that went into it. So a boundary that was one vertex wide before the
+    # decimator arrives two or three vertices deep after it, and what ships is
+    # not an edge but a ramp. Measured on the eight bathers, that ramp is 25 to
+    # 80 mm on every side of every painted edge and about 50 in the middle of
+    # that, whatever the edge is — it is a property of the mesh and not of the
+    # paint, and it does not shrink when the garment does.
+    #
+    # Which is survivable on something big and fatal on something small. The
+    # men's trunks are 160 to 190 mm of solid colour and read as trunks; the
+    # women's brief is 110 mm as authored and arrives as 72 mm of solid red
+    # inside 182 mm of pink, so two thirds of the garment is ramp — and what
+    # you see from behind is a red smear across the buttocks with a run of it
+    # 136 mm down the thigh. There is no fix for that on the paint side,
+    # because the only lever there is to make the garment bigger than its own
+    # ramp, and a brief is not 200 mm tall.
+    #
+    # So paint it after the decimator instead of before. Every vertex then
+    # comes out exactly the colour its cutter gave it, the ramp collapses to
+    # the single triangle that straddles the hem — which is what a soft edge
+    # actually is — and the garment is as tall as it was drawn. It costs one
+    # more pass of the same ray-parity test over a quarter of the vertices, and
+    # it is off by default: with `repaint=None` this is the function it was, and
+    # Baye's blob comes out byte-for-byte what it was.
+    #
+    # That alone is not the whole fix, and it is worth saying why, because the
+    # numbers say it plainly. Repainting takes the brief from 72 mm of solid
+    # colour inside 182 mm of pink to 103 mm of solid colour and no pink at all
+    # — but the triangles the hem now runs across are still 50 mm at the median
+    # and 198 at the worst, so the *edge* is still a hand's breadth of ramp and
+    # still hangs a red streak 179 mm down the back of the thigh. `dense` is the
+    # other half: it stops the decimator collapsing the hem itself. With both,
+    # the triangles under the hem are 16 mm and the streak is 33.
+    if repaint:
+        paint(holder, repaint)
     src = holder.data
     src.calc_loop_triangles()
     try:
