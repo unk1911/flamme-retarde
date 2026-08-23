@@ -390,15 +390,30 @@ as of this writing; the state of each is in the git log, not here.
       the loudest colour in the lane.
 
 **Tidy**
-- [ ] `menuWall()` is dead code, not a render bug — nothing in `SHOPS` sets
-      `menu`, so its one call site never fires. It also sits in
-      `if (S.menu) menuWall(); else if (S.name) shopSign();` with 26 lines of
-      comment between the halves, so the first shop to get a menu silently
-      loses its sign. Untangle or delete.
+- [x] `menuWall()` is dead code, not a render bug — nothing in `SHOPS` sets
+      `menu`, so its one call site never fires. DELETED 23 Aug on Misha's word:
+      "if it's truly dead just blow it away." It was truly dead and it was also
+      SUPERSEDED, which is the part that made deleting it safe rather than
+      merely tidy: `menuPanels()` draws the same board off a better photograph
+      (20260821_175713, face-on at fifteen metres) with an explicit note on
+      which words are read straight off the glass and which are inferred, and
+      it is wired up through `S.panels` on `slast`, so it actually renders.
+      Gone with it: the `else if` tangle — `shopSign` is a plain `if` now — and
+      `S.menu` in the scallop test, which is `S.scallop` alone. Triangles
+      identical either side at 440 073, which is the proof nothing it drew was
+      ever drawn.
 
 ---
 
 ## SETTLED
+
+- **The Slasticarnica's back-lit panel belongs to a different frontage.** It was
+  read across, and the claim that this shop's name is on a panel inside rather
+  than on its awning came from that. `slasticarnica-behind-view` catches the
+  lane elevation square on: the awning fascia reads "slastičarnica JADRIJA",
+  lower-case word, upper-case name, dark serif on white. Recorded here because
+  it lived only in `menuWall()`'s doc comment, which was deleted with the
+  function on 23 Aug.
 
 - **Dive board east**, t 430 s -40 — confirmed by Misha. Race is 175 m along
   the shore, not 66 straight out.

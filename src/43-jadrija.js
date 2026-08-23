@@ -2611,108 +2611,6 @@ async function buildJadrija(scene) {
   }
 
   /**
-   * The lit wall behind the counter.
-   *
-   * WRONG, and left standing with the correction rather than quietly edited,
-   * because this function is dead code — nothing in `SHOPS` sets `menu` — and
-   * the claim under it is what would be reached for if anything ever did.
-   *
-   * What it used to say was that the Slasticarnica's name is not on its awning
-   * but on a back-lit panel inside, in a row with the price boards and a strip
-   * of product light-boxes, and that the awning itself is plain white with a
-   * scalloped edge and nothing written on it anywhere. The 22 August 2026
-   * survey settles it: `slasticarnica-behind-view` catches the lane elevation
-   * square on and the awning fascia along that whole side reads
-   * "slastičarnica JADRIJA" — lower-case word, upper-case name, dark serif on
-   * white. The name IS on the awning. The scalloped edge is real and so is the
-   * white, and both are kept.
-   *
-   * The back-lit panel is a different frontage's and was read across.
-   *
-   * Only the three prices the survey could actually read go on the board.
-   * Six back-lit panels were legible enough to place and only three of the
-   * words on them could be made out; the rest are drawn as the flame-orange
-   * blocks they are rather than lettered with guesses.
-   */
-  function menuWall(S, y0, top) {
-    const PX = 1024, C = document.createElement('canvas');
-    C.width = PX; C.height = 512;
-    const g = C.getContext('2d');
-    g.fillStyle = '#f2f4f6'; g.fillRect(0, 0, C.width, C.height);
-    // The product strip along the top: orange flame grounds with a pale block
-    // where the photograph of the thing is.
-    for (let i = 0; i < 6; i++) {
-      const x = 8 + i * (C.width - 16) / 6, w = (C.width - 16) / 6 - 8;
-      const grd = g.createLinearGradient(x, 0, x + w, 0);
-      grd.addColorStop(0, '#f0a03c'); grd.addColorStop(0.5, '#e8641c');
-      grd.addColorStop(1, '#f0a03c');
-      g.fillStyle = grd; g.fillRect(x, 8, w, 150);
-      g.fillStyle = '#efe7dc'; g.fillRect(x + w * 0.18, 26, w * 0.64, 108);
-    }
-    // Three boards below it. Left and right are blue price lists; the middle
-    // is the name.
-    const bw = (C.width - 32) / 3;
-    for (let i = 0; i < 3; i++) {
-      const x = 8 + i * (bw + 8);
-      g.fillStyle = i === 1 ? '#ffffff' : '#dceaf6';
-      g.fillRect(x, 172, bw, C.height - 190);
-      g.textAlign = i === 1 ? 'center' : 'left';
-      if (i === 1) {
-        g.fillStyle = '#1f4f96';
-        g.font = '600 44px "Helvetica Neue", Arial, sans-serif';
-        g.fillText('Slastičarnica', x + bw / 2, 236);
-        g.fillStyle = '#b3242a';
-        g.font = '800 76px "Helvetica Neue", Arial, sans-serif';
-        g.fillText('JADRIJA', x + bw / 2, 312);
-      } else {
-        g.fillStyle = '#1f4f96';
-        g.font = '600 34px "Helvetica Neue", Arial, sans-serif';
-        // Left board: the drinks that were legible. Right: the prices, and
-        // only the three that could be read.
-        const rows = i === 0
-          ? [['LIMUNADA', ''], ['SPRITE', ''], ['SLADOLED', ''], ['KRAFNE', '']]
-          : [['KUPOVI', '8.00 €'], ['FRAPPE', '7.00 €'], ['ESPRESSO', '2.00 €'],
-            ['MACCHIATO', '']];
-        rows.forEach(([k, v], r) => {
-          g.fillText(k, x + 18, 226 + r * 56);
-          if (v) {
-            g.textAlign = 'right';
-            g.fillText(v, x + bw - 18, 226 + r * 56);
-            g.textAlign = 'left';
-          }
-        });
-      }
-    }
-    const tex = new THREE.CanvasTexture(C);
-    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
-    // On the front face, not behind it. The first cut put this at s0 + 0.30 —
-    // thirty centimetres *into* a solid body box — so the whole wall was inside
-    // the building and the shop had no signage at all from the promenade. In
-    // life these boards are on the back wall of an open serving recess; the
-    // recess is a dark panel here rather than a hole, so the honest place for
-    // them is the frontage itself, which is where they read from anyway.
-    // Between the counter and the underside of the canopy, which is a narrower
-    // band than it sounds: at 0.70 of the wall height the boards sat behind the
-    // awning from any viewpoint lower than the awning itself, which is every
-    // viewpoint a walker has. The photograph has them filling the upper half of
-    // the opening and stopping well clear of the fascia.
-    const t = (S.t0 + S.t1) * 0.5, sIn = S.s0 - 0.55;   // was -0.06
-    const st = at(t), p = W(t, sIn, y0 + (top - y0) * 0.60);
-    const w = (S.t1 - S.t0) * 0.80, h = (top - y0) * 0.38;
-    const back8 = b;
-    b = up;
-    boxTS(t - w * 0.5 - 0.04, t + w * 0.5 + 0.04, sIn + 0.02, sIn + 0.10,
-      p[1] - h * 0.5 - 0.03, p[1] + h * 0.5 + 0.03, [0.300, 0.296, 0.288]);
-    b = back8;
-
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
-      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
-    mesh.position.set(p[0], p[1], p[2]);
-    mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
-    scene.add(mesh);
-  }
-
-  /**
    * What is in the Slasticarnica's cabinet, read off the glass.
    *
    * Six photographs of 22 August 2026, three of them square on to the counter
@@ -3959,7 +3857,6 @@ async function buildJadrija(scene) {
       for (let t = S.t0 - 0.2; t <= S.t1 + 0.21; t += (S.t1 - S.t0 + 0.4) / 3) {
         post(W, t, fs + 0.20, y0, top - 0.44, 0.055, [0.560, 0.552, 0.530], 6);
       }
-      if (S.menu) menuWall(S, y0, top);
       // Stood 0.40 m off the valance rather than 0.16, and 0.46 m deep
       // rather than 0.38.
       //
@@ -3973,7 +3870,7 @@ async function buildJadrija(scene) {
       // Stood 0.40 m off the valance rather than 0.16, and 0.46 m deep
       // rather than 0.38 — which did not fix what it was meant to fix, but is
       // the right depth for the board anyway.
-      else if (S.name && !S.wallName) {
+      if (S.name && !S.wallName) {
         shopSign(S, (S.t0 + S.t1) * 0.5, fs - 0.40, top - 0.34,
           Math.min(6.4, (S.t1 - S.t0) * 0.72), 0.46);
       }
@@ -3999,7 +3896,7 @@ async function buildJadrija(scene) {
       }
       // The scalloped fascia. The photograph has one on this awning whether or
       // not the name is up there with it.
-      if (S.scallop || S.menu) {
+      if (S.scallop) {
         for (let t = S.t0 - 0.4; t < S.t1 + 0.4; t += 0.42) {
           post(W, t, fs + 0.04, top - 0.30, top - 0.16, 0.115,
             shade(S.roof, 0.98), 7);
