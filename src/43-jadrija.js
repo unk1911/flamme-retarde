@@ -5961,6 +5961,66 @@ async function buildJadrija(scene) {
         runs.push({ t0: tt - 1.4, t1: tt + 1.4, s0: ts - 0.9, s1: ts + 1.8,
           y, h: 1.94 });
       }
+
+      // Survey item b_016: green mesh fence panels stacked leaning against the
+      // kerb, with one more standing on its own further along.
+      //
+      // What the frame supports and what it does not, stated plainly. It
+      // supports the object — dark green welded-mesh panels in a galvanised
+      // frame, three or four of them stacked and leaning back at a shallow
+      // angle against a low kerb at the edge of the needle floor, and a fifth
+      // standing upright against a hedge a few metres past. It does not
+      // support a position along this shore: b_016 is a v597 frame and v597
+      // carries no GPS, so the `t` below is a placement and not a measurement.
+      // Rule 12 cuts both ways and this is the honest side of it.
+      //
+      // Drawn as a frame and four internal bars with nothing between them,
+      // rather than as a solid panel. Mesh at ten metres is a haze you can see
+      // the ground through, and a filled green rectangle is a gate.
+      {
+        const MESH = [0.085, 0.245, 0.140];
+        const GALV = [0.520, 0.535, 0.545];
+        // One panel, leaning back by `lean` from upright, hinged at its foot.
+        const panel = (pt0, ps0, lean, yaw) => {
+          const y = surfaceY(pt0, ps0);
+          const ct = Math.cos(yaw), st = Math.sin(yaw);
+          // Panel-local (u along the panel, v up it) into shore (t, s).
+          const P = (u, v, yy) => W(pt0 + u * ct - v * Math.sin(lean) * st,
+            ps0 + u * st + v * Math.sin(lean) * ct, yy);
+          const H = 1.15, Wd = 2.02;
+          const up = (v) => y + v * Math.cos(lean);
+          // Frame: two stiles and two rails.
+          for (const u of [-Wd / 2, Wd / 2]) {
+            boxIn(P, u - 0.025, u + 0.025, -0.018, 0.018, up(0), up(H), GALV);
+          }
+          for (const v of [0.03, H - 0.03]) {
+            boxIn(P, -Wd / 2, Wd / 2, -0.016, 0.016, up(v) - 0.022,
+              up(v) + 0.022, GALV);
+          }
+          // And the mesh, four bars across and three up, which is as much as a
+          // panel this size wants before it fills in and stops being mesh.
+          for (let i = 1; i <= 4; i++) {
+            const u = -Wd / 2 + (Wd * i) / 5;
+            boxIn(P, u - 0.008, u + 0.008, -0.008, 0.008, up(0.05), up(H - 0.05),
+              MESH);
+          }
+          for (let j = 1; j <= 3; j++) {
+            const v = (H * j) / 4;
+            boxIn(P, -Wd / 2 + 0.03, Wd / 2 - 0.03, -0.008, 0.008,
+              up(v) - 0.008, up(v) + 0.008, MESH);
+          }
+        };
+        // The stack: four of them, each leaning a little further back than the
+        // one in front, which is what a stack against a wall does.
+        const kt = bt - 21.0, ks = bs + 2.6;
+        for (let k = 0; k < 4; k++) {
+          panel(kt + k * 0.09, ks + k * 0.075, -(0.62 + k * 0.035), 0.10);
+        }
+        // And the fifth, upright and on its own, six metres along.
+        panel(kt + 6.2, ks + 0.4, -0.10, -0.22);
+        runs.push({ t0: kt - 1.3, t1: kt + 1.3, s0: ks - 0.5, s1: ks + 1.0,
+          y: surfaceY(kt, ks), h: 0.95 });
+      }
     }
     b = back7;
   }
