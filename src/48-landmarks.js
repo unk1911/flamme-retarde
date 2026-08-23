@@ -20,7 +20,36 @@ const LANDMARKS = [
     name: 'katedrala sv. Jakova' },
   { key: 'lighthouse_fr3d', place: 'svjetionik rt jadrija', yaw: 0.62, sink: 0.8,
     clear: 16, name: 'svjetionik Jadrija' },
-  { key: 'fort_nikola_fr3d', place: 'tvrđava svetog nikole', yaw: -0.54, sink: 2.4,
+  // The second landmark that is a place and not a piece of ground.
+  //
+  // It stands on the islet of Ljuljevac, which is 150 m across and therefore
+  // twenty-three texels of a 6.35 m raster — and OSM's coastline way is not
+  // drawn round it, so the bake never put any land there. `groundAt` at the
+  // OSM centroid (-1237.7, 720.2) reads **-11.34 m**, which is the seabed, and
+  // `sink: 2.4` took it a further 2.4 down. The model spans y -1.5..+13.0, so
+  // the parapet of the fort that shut the Ottoman fleet out of this channel
+  // has been sitting **0.74 m under the surface** since the day it went in.
+  // Nothing showed it: the only other reader of `landmarkSites` is the city
+  // generator, which wants a clearance radius and not a height.
+  //
+  // `atY: 0` — the same answer the bridge gets, for the same reason and with
+  // one better: the Blender source calls the -1.5..+3.0 block "the battered
+  // base, wider at sea level", so local y = 0 is where the model was drawn to
+  // meet the water. Everything below it is scarp and belongs under.
+  //
+  // The yaw is measured now rather than eyeballed. The OSM polygon is a
+  // three-lobed plan — a round bastion NNW, an arm E, and a 30° wedge whose
+  // tip is 76 m from the centroid at bearing 198° — and the wedge is the point
+  // Sanmicheli aimed down the channel at anything coming in. The model's own
+  // point is at local -X, so the yaw that puts it on 198° is atan2(0.95, 0.31)
+  // = 1.256. It was -0.54, which aimed it WNW at the open sea off Zablaće:
+  // 106° out, and broadside-on from the one place you now sail past it.
+  //
+  // What is still missing is the islet. The walls rise straight out of the
+  // water on the two seaward faces, which is why this reads at all — but on
+  // the SE side there is a rock and sand spit joining the fort to the shore,
+  // and there is no spit here.
+  { key: 'fort_nikola_fr3d', place: 'tvrđava svetog nikole', yaw: 1.256, atY: 0,
     clear: 55, name: 'tvrđava sv. Nikole' },
   { key: 'fort_mihovil_fr3d', place: 'tvrđava svetog mihovila', yaw: 0.38, sink: 5.0,
     clear: 48, name: 'tvrđava sv. Mihovila' },
