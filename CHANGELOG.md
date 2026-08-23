@@ -8,6 +8,70 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.101.0] — 2026-08-22
+
+Survey work, overnight, against the geotagged photographs and the two inland
+walk-throughs. Two of the three items turned out to be one bug wearing a
+different hat: geometry and collision written in two places, with only one of
+them told about the exception.
+
+### Fixed
+
+- **Caffe TRAMPULIN had two invisible walls through it.** `cabinRun` skips
+  *drawing* the huts across the cafe — it was built in the alley between the two
+  kabine rows, so the front row otherwise stands over its fascia, and that
+  exception has been in the draw loop for months. `runs.push` was never told.
+  Both rows carried their full-length collider straight through the one building
+  they had been opened for: t 467.91–490.41 at s 16.65–20.55 and 2.66 m tall on
+  the front row, t 469.66–487.86 at s 25.55–29.45 on the back. The result was a
+  cafe with a sign, a counter, tables, chairs and people in them that you could
+  see, walk up to, and not reach. Walking inland at t 471.5 stopped at s 16.65;
+  it goes to 23.4 now, which is the terrace. **This is the bench at t 170.5
+  again**, so the split is one helper both branches call rather than a second
+  copy of the condition.
+
+- **Trampulin's bench was eighteen metres of plank** — `t0 − 6` to `t1 + 6`
+  against a six-metre shop. The comment above it argued the overshoot was
+  harmless because it lay inside the hut row's blocker where nobody could reach
+  it; that blocker was the bug above, so the overshoot was standing in the open.
+  20260821_174940 has one slatted timber bench on a dark green frame, the width
+  of the terrace. The collider was already clipped to the frontage — it had to
+  be, or it sealed the only gap through the hut row — so the drawing came back
+  to meet the collider rather than the other way about.
+
+- **The promenade's two surfaces read as one.** v_022 is the only frame with
+  both in it and the seam across the middle. Three faults: the flag palette
+  differed from the concrete in brightness by 14% and in hue by nothing (R:B
+  1.34 against 1.32); the colour index was `i*7 + k*3` plus a jitter, which mod
+  five is `2i + 3k` — a diagonal lattice the jitter could shift but never break,
+  so the paving was a tiled check about 3 m across; and the flags were 2.2 m
+  square against stones that run 0.4–1.0 m. Now warm honey-ochre at R:B ~1.6
+  with twice the spread, a pure hash for the colour, and cells near 1.1 m.
+  341 814 triangles against 335 126; 57–61 fps either way.
+
+### Added
+
+- **Trampulin's name is on the render, not on a board.** 20260821_174940 has no
+  board on the terrace roof at all — small dark lettering straight on the render
+  at the back of the terrace, above the serving opening. The game hung a 4.3 m
+  cream board off the awning edge, which made it the loudest object on this end
+  of the promenade when in life you have to look for it. This is survey item
+  `b_106`, and the reason recorded for it standing open was the wrong blocker:
+  it assumed the name had to fit on the metre of render either side of the
+  serving opening. It does not go there. What actually blocked it was that a
+  shop with an awning took the valance board and the render name lived only in
+  the `else`, so a shop with both could not be described.
+
+### Known
+
+- The flag joints are still only where one colour meets the next. v_022 has them
+  wide and visibly darker than the stones; there is no joint geometry at all.
+- `a_030`, the back lane — two-storey pale yellow render, grey-green louvred
+  shutters, vine pergola on green steel, cars nose-in against a low rubble-based
+  wall. The game has houses there and no lane, no parking, no walls. Deferred
+  rather than guessed: v595 carries no GPS, so the lane has no (t, s) the
+  footage supports yet, and Rule 12 says that is not a number to invent.
+
 ## [1.100.0] — 2026-08-22
 
 The two jobs that were parked against a usage ceiling earlier today, resumed and

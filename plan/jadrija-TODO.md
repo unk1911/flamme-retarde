@@ -126,8 +126,16 @@ days of guessing.
       because the render name lived only in the `else`; there is a `wallName`
       flag now. The 4.3 m cream board that used to hang off the awning edge was
       the loudest thing on this end of the promenade and is gone.
-- [ ] Paving: the FLAG palette is close enough to CONC that the seam is subtle.
-      v_022 has warmer, yellower flags with visibly darker joints.
+- [x] Paving: three faults, not one. The palette differed from CONC in
+      brightness by 14% and in hue by nothing (R:B 1.34 against 1.32), so it
+      warmed to R:B ~1.6 with twice the spread. The colour index was
+      `i*7 + k*3` plus a jitter, and mod 5 that is `2i + 3k` — a diagonal
+      lattice the jitter could shift but not break, so the paving was a tiled
+      check about 3 m across; it is a hash now. And the flags were 2.2 m square
+      against 0.4-1.0 m stones in v_022. +6 688 triangles, fps unchanged.
+      Still open: the joints themselves. v_022 has them wide and visibly darker
+      than the stones, and the flags here have no joint geometry at all — the
+      edges are just where one colour meets the next.
 - [ ] Per-shop detail pass, one shop per iteration, against its own photographs.
 - [x] Sound: klapa out, five field recordings in — the promenade as one bed,
       the hillside cicadas, the same chorus from inside the pines crossfaded on
