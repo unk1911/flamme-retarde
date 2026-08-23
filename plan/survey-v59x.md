@@ -277,11 +277,50 @@ Two things still open, both in `MORNING.md`:
 Also in these frames and already built: **Slastičarnica 1974 Jadrija** on the
 counter vinyl — checked on the built page, it is there and correct.
 
-**12. The tavern's crimson parasols and picnic tables.** `b_066`–`b_075`.
-Square dark-red parasols with a printed valance, over timber picnic benches on
-gravel, with blue plastic chairs stacked under a tarpaulin. The game's terrace
-furniture is all cream and its parasols are all white. One crimson set would
-say that the tavern is not the same business as the promenade cafés.
+**12. The tavern's crimson parasol and beer-garden sets.** `b_066`–`b_075`.
+**BUILT, 23 Aug** — and most of it was already there. The parasol, the poseur
+table, the red-topped stools and the blue tarpaulin all went in with the
+catering trailer (item 4), which was built off the same frames. What this pass
+adds is the timber, and it corrects the item twice.
+
+**The arrangement is wrong in the catalogue.** It reads "crimson square
+parasols... over timber picnic benches". There is **one** parasol, and it is
+not over the timber at all: under it are the poseur table and the stools, and
+the timber stands *beside* it in the shade of the pines, uncovered. Two kinds
+of seating for two ways of drinking, which is more interesting than one.
+
+**And it is not a picnic bench.** It is a **Bierzeltgarnitur** — a folding
+beer-tent set: a trestle table with two loose benches, all three in the same
+varnished orange pine on black folding steel, every leg frame carrying a
+diagonal X-brace. That X is the signature. An American picnic table is one
+welded A-frame with the benches attached; this is three pieces that fold flat
+and go in a shed. Two sets, west of the parasol, where `b_071` has them.
+
+Two colour findings, and they pull opposite ways:
+
+- **The timber's warmth is real and stays.** Sampled in sun it is
+  0.527/0.346/0.282, and unlike the lavender bank and the car cover that warmth
+  is varnish rather than the light — so it goes in nearly as measured. It still
+  needed a second pass: at the measured separation it photographed as *salmon*
+  under the game's own ambient, and red-minus-blue had to go from 0.226 to
+  0.262 to read as varnish rather than dusty pink.
+- **The canopy is strewn with dropped pine litter**, and the patches are the
+  same red *washed out*, not a tan laid over it. Clean canopy 0.393/0.160/0.237
+  against litter 0.573/0.253/0.330 — green lifts 1.58 and red only 1.46, so the
+  first cut used `shade()`, kept the saturation, and came out as a brighter red
+  that read as lighting. Mixed toward a pale warm grey instead. It is drawn by
+  subdividing the panel and lifting cells, so nothing is floated above a
+  surface two kilometres from the origin where rule 5 says it would flicker.
+
+NOT BUILT, and it is a question rather than an omission: **the valance carries
+a wordmark**. It reads `Karlovačko`, with the brewery's shield beside it, and
+it is perfectly legible at full size. The trailer's own note decided to leave
+every brand off — *"the parasol in the frame carries a beer brand and the
+A-board carries a product, and both are legible; leaving them blank is the only
+reading of rule 12 that cannot be wrong"* — and that decision is honoured here
+rather than quietly reversed. But it sits awkwardly next to the slastičarnica
+board, which names Coca Cola, Sprite, Fanta, Orangina and Nes Caffe off exactly
+the same kind of evidence. `MORNING.md` asks which way to go.
 
 **13. The concrete slipway.** `b_118`–`b_121`. Two parallel sunken concrete
 tracks crossing the apron and running down into the sea, the concrete old and

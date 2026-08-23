@@ -53,7 +53,25 @@ And one I did not build: **the centre bay's lower two thirds is empty**. The
 real one has a photograph of krafne under the name, and now that both flanking
 bays are full that gap is conspicuous where it was not before. Worth doing?
 
-## 3. How many kabine does Jadrija actually have? *(carried over)*
+## 3. Brands: the board names them, the parasol does not
+
+The tavern's parasol valance reads **Karlovačko** with the brewery's shield,
+and it is perfectly legible in `b_069`. The trailer's own note decided to leave
+every brand off — *"leaving them blank is the only reading of rule 12 that
+cannot be wrong"* — and I have honoured that rather than quietly reversing it.
+
+But it sits badly next to the slastičarnica board, which names **Coca Cola,
+Sprite, Fanta, Orangina and Nes Caffe** off exactly the same kind of evidence.
+One of the two is inconsistent and I do not think it is mine to pick:
+
+- **Name them all**, on the grounds that rule 12 is about not inventing, and
+  these are read off the frames like everything else; or
+- **Name none**, and the drinks board loses five product names.
+
+The valance is currently a plain red band with a small white mark and an
+illegible run, which is what the small print on the trader's panel does.
+
+## 4. How many kabine does Jadrija actually have? *(carried over)*
 
 `JAD.cabW` is 2.15 m a bay and two independent measurements off your own
 footage say 0.95–1.05 m — a monobloc chair against the wall, and six
@@ -63,13 +81,13 @@ countable 110–130 mm planks per door leaf. Fixing it doubles the row to about
 A published figure would settle it, or you may simply know. Written up in
 `plan/jadrija-TODO.md`.
 
-## 4. The wood floor — repaint it? *(carried over, yours to call)*
+## 5. The wood floor — repaint it? *(carried over, yours to call)*
 
 The game has warm orange-tan sand under the pines. `20260823_112051` shows
 pale angular crushed limestone with needle litter. It is the right change and
 it repaints the whole resort, so it is your call and I have not touched it.
 
-## 5. Five unpushed commits, plus tonight's *(carried over)*
+## 6. Five unpushed commits, plus tonight's *(carried over)*
 
 `main` is ahead of the remote and I have not pushed. Say the word.
 
@@ -99,6 +117,13 @@ it repaints the whole resort, so it is your call and I have not touched it.
   and the price column rebuilt: four prices are printed with the menu and the
   rest are white stickers stuck over it, which is what makes it look ragged in
   every photograph. TONIC and FANTA are now read rather than inferred.
+- **Survey item 12 built — the tavern's beer-garden sets.** Most of that item
+  was already standing (the parasol, poseur table, stools and tarpaulin went in
+  with the catering trailer); what this adds is the timber, and it corrects the
+  catalogue twice — there is one parasol not several, it is *not* over the
+  timber, and the timber is a folding Bierzeltgarnitur rather than a picnic
+  bench. The parasol's canopy is now strewn with the dropped pine litter the
+  frames show.
 - **Survey item 10 built — the folding parking bollards.** The survey had them
   as "red-and-white marker posts" with "two lying knocked over". They are
   lockable bollards, each with a hinged collar, a padlock and a lifting eye

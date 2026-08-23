@@ -9625,11 +9625,57 @@ async function buildJadrija(scene) {
         const a1 = a0 + Math.PI * 0.5;
         const c0 = [Math.cos(a0) * HW, Math.sin(a0) * HW];
         const c1 = [Math.cos(a1) * HW, Math.sin(a1) * HW];
-        b.quad(W(pt2, ps2, py + 2.44),
-          W(pt2 + c0[0], ps2 + c0[1], py + 2.06),
-          W(pt2 + (c0[0] + c1[0]) * 0.5, ps2 + (c0[1] + c1[1]) * 0.5,
-            py + 2.14),
-          W(pt2 + c1[0], ps2 + c1[1], py + 2.06), CRIM);
+        /**
+         * The panel, and the pine litter lying on it.
+         *
+         * `b_069` at full size: about a third of this canopy is covered in
+         * dropped needles and bracts from the pine standing over it, in
+         * ragged patches. Measured, the patches are **the same red lifted** —
+         * clean canopy 0.393/0.160/0.237 against litter at 0.451 to 0.573 on
+         * the same hue, a factor of about 1.35 — and not a tan or a grey laid
+         * over it. So they are drawn as a brighter shade of the panel rather
+         * than as a second material, which also means they cannot z-fight:
+         * the panel is subdivided and some cells are lifted, and nothing new
+         * is floated 30 mm above a surface two kilometres from the origin
+         * where rule 5 says it would flicker anyway.
+         *
+         * It is worth the sixteen quads a panel because it is the difference
+         * between a parasol and *this* parasol. Every other parasol at Jadrija
+         * stands on open concrete; this one has been under a pine all summer.
+         */
+        const AP = [0, 0, py + 2.44];
+        const BP = [c0[0], c0[1], py + 2.06];
+        const CP = [(c0[0] + c1[0]) * 0.5, (c0[1] + c1[1]) * 0.5, py + 2.14];
+        const DP = [c1[0], c1[1], py + 2.06];
+        const N = 4;
+        const at2 = (u, v) => {
+          const e0 = [0, 1, 2].map((k) => AP[k] + (BP[k] - AP[k]) * u);
+          const e1 = [0, 1, 2].map((k) => DP[k] + (CP[k] - DP[k]) * u);
+          const q = [0, 1, 2].map((k) => e0[k] + (e1[k] - e0[k]) * v);
+          return W(pt2 + q[0], ps2 + q[1], q[2]);
+        };
+        for (let r = 0; r < N; r++) {
+          for (let c = 0; c < N; c++) {
+            const key = i * 97 + r * 11 + c;
+            const j = jit(key, 61);
+            // Patchier toward the rim, which is where it collects: a panel
+            // seeded evenly came out looking like a chessboard.
+            // Mixed toward a pale warm grey, not `shade`d. `shade` scales all
+            // three channels and keeps the saturation, so the patches came
+            // out as a *brighter red* and read as lighting rather than as
+            // debris. The measurement says otherwise: clean canopy
+            // 0.393/0.160/0.237 against litter 0.573/0.253/0.330 lifts green
+            // by 1.58 and red by only 1.46, which is a wash-out and not a
+            // brightening. Dead needles over red go pink.
+            const k = 0.34 + jit(key, 63) * 0.30;
+            const col = j < 0.30 + 0.26 * (r / (N - 1))
+              ? [CRIM[0] + (0.660 - CRIM[0]) * k,
+                CRIM[1] + (0.505 - CRIM[1]) * k,
+                CRIM[2] + (0.430 - CRIM[2]) * k] : CRIM;
+            b.quad(at2(r / N, c / N), at2((r + 1) / N, c / N),
+              at2((r + 1) / N, (c + 1) / N), at2(r / N, (c + 1) / N), col);
+          }
+        }
         // The valance hanging off that edge — 0.20 m of it, printed, and the
         // thing that stops a parasol reading as a paper hat.
         b.quad(W(pt2 + c0[0], ps2 + c0[1], py + 2.06),
@@ -9658,6 +9704,83 @@ async function buildJadrija(scene) {
       }
       runs.push({ t0: pt2 - 0.5, t1: pt2 + 0.5, s0: ps2 - 0.5, s1: ps2 + 0.5,
         y: py, h: 2.0 });
+    }
+    // ── the beer-garden sets ────────────────────────────────────────────────
+    //
+    // Survey item 12, and the item has the arrangement wrong. It reads
+    // "crimson square parasols with a printed valance, over timber picnic
+    // benches on gravel". Opened at full size, `b_071` shows **one** parasol
+    // and it is not over the timber at all: under it are the poseur table and
+    // the red-topped stools built above, and the timber stands *beside* it in
+    // the shade of the pines, uncovered. Two different kinds of seating for
+    // two different ways of drinking, which is more interesting than one.
+    //
+    // And it is not a picnic bench. It is a **Bierzeltgarnitur** — a folding
+    // beer-tent set: a trestle table with two loose benches, all three in the
+    // same varnished orange pine on black folding steel, and every leg frame
+    // carries a diagonal X-brace. That X is the whole signature of the thing.
+    // An American picnic table is one welded A-frame unit with the benches
+    // attached; this is three separate pieces that fold flat and go in a shed.
+    //
+    // The timber is warm and stays warm. Sampled off `b_071` in sun it is
+    // 0.527/0.346/0.282 — and unlike the lavender and the car cover, that
+    // warmth is not the light. It is varnish on pine, so it goes in very
+    // nearly as measured rather than being pulled back toward neutral.
+    {
+      // Darker than the 0.527/0.346/0.282 the frame measures, and only just:
+      // the game's own sun is warm and the first build came out salmon rather
+      // than varnished pine. The red-to-green ratio is held at the measured
+      // 1.52 and the whole thing comes down about 12 %. Then a second pass
+      // for saturation: at the measured separation it photographed as salmon
+      // under the game's own ambient, so red-minus-blue goes from 0.226 to
+      // 0.262, which is the difference between dusty pink and varnish.
+      const WOOD = [0.452, 0.276, 0.190];
+      const WTOP = [0.508, 0.316, 0.222];
+      const LEG = [0.098, 0.096, 0.100];
+      const HL = 1.10;                       // half of a 2.2 m set
+      const beerSet = (bt, bsv, ang) => {
+        const co = Math.cos(ang), sn = Math.sin(ang);
+        const P = (u, v, yy) =>
+          W(bt + u * co - v * sn, bsv + u * sn + v * co, yy);
+        const gy = surfaceY(bt, bsv);
+        boxIn(P, -HL, HL, -0.25, 0.25, gy + 0.755, gy + 0.800, WOOD, WTOP);
+        for (const v of [-0.560, 0.560]) {
+          boxIn(P, -HL, HL, v - 0.123, v + 0.123,
+            gy + 0.470, gy + 0.508, WOOD, WTOP);
+        }
+        /**
+         * One folding leg frame: two uprights, a rail under the top, and the
+         * X. The X is emitted as two ribbons with BOTH windings rather than
+         * as boxes — at 16 mm of steel seen from five metres a box is eight
+         * triangles to say what two say, and a single-sided quad is a brace
+         * that vanishes when you walk round the table.
+         */
+        const frame = (u, v0, v1, top) => {
+          for (const v of [v0, v1]) post(P, u, v, gy, gy + top, 0.020, LEG, 4);
+          boxIn(P, u - 0.020, u + 0.020, v0, v1,
+            gy + top - 0.075, gy + top - 0.035, LEG, LEG);
+          const wq = 0.014;
+          for (const [va, vb] of [[v0, v1], [v1, v0]]) {
+            const A0 = P(u - wq, va, gy + 0.045);
+            const A1 = P(u + wq, va, gy + 0.045);
+            const B0 = P(u - wq, vb, gy + top - 0.075);
+            const B1 = P(u + wq, vb, gy + top - 0.075);
+            b.quad(A0, A1, B1, B0, LEG);
+            b.quad(B0, B1, A1, A0, LEG);
+          }
+        };
+        for (const u of [-0.86, 0.86]) frame(u, -0.235, 0.235, 0.755);
+        for (const v of [-0.560, 0.560]) {
+          for (const u of [-0.80, 0.80]) {
+            frame(u, v - 0.112, v + 0.112, 0.470);
+          }
+        }
+      };
+      // Two of them, west of the parasol and under the trees, which is where
+      // `b_071` has them. Angles differ by a few degrees because nobody
+      // squares up a folding table on gravel.
+      beerSet(tt - 9.2, ss - 0.2, 0.055);
+      beerSet(tt - 12.4, ss + 0.1, -0.040);
     }
     // The trailer is solid and is the one thing here big enough to walk into.
     runs.push({ t0: tt - R - 0.1, t1: tt + R + 0.1,
