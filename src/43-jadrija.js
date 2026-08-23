@@ -3478,7 +3478,12 @@ async function buildJadrija(scene) {
 
   function menuPanels(w, h) {
     const C = document.createElement('canvas');
-    C.height = 256;
+    // 384 and not 256. Every position in here is a fraction of `H`, so this is
+    // texels and nothing else — but the left bay now carries RADNO VRIJEME and
+    // a five-line trader block at the foot, and at 256 the hours line was four
+    // pixels of cap. The width cap is 2048 and this board's aspect brings it
+    // to about 1650, so it still fits.
+    C.height = 384;
     C.width = Math.min(2048, Math.round(256 * w / h));
     const g = C.getContext('2d');
     const CW = C.width, H = C.height;
@@ -3573,6 +3578,49 @@ async function buildJadrija(scene) {
      * board came out one flat colour instead of running red to gold down the
      * bay. The squeeze is horizontal, so x is the only axis that has to move.
      */
+    /**
+     * A price, and there are two kinds of them on this board.
+     *
+     * The big ones — 8.00 on KUPOVI, 7.00 on FRAPPE, 2.00 on ESPRESSO, 3.00 on
+     * NES CAFFE — are printed with the board, in a dark hand about the size of
+     * the item beside them. Everything else is a **small white sticker stuck
+     * on over the print**, in a different and much smaller type. That is not a
+     * detail: it is why the price column looks ragged in every photograph of
+     * this shop, and drawing all of them in the board's own lettering — which
+     * is what this did until 23 August 2026 — makes a printed menu out of a
+     * menu that has been repriced twice.
+     *
+     * Both are DARK. They were being drawn in `warm()` with the names, and the
+     * photographs have no warm price anywhere on this frontage.
+     */
+    const sticker = (xr, yBase, text, sh) => {
+      g.font = `600 ${sh * 0.58}px ${SANS}`;
+      const pw = g.measureText(text).width + sh * 0.40;
+      const x0 = xr - pw, y0 = yBase - sh * 0.82;
+      g.fillStyle = '#f7f7f4';
+      g.fillRect(x0, y0, pw, sh);
+      g.strokeStyle = '#c4c8c6';
+      g.lineWidth = Math.max(1, sh * 0.045);
+      g.strokeRect(x0, y0, pw, sh);
+      g.fillStyle = '#2a2622';
+      g.textAlign = 'right';
+      g.fillText(text, xr - sh * 0.22, y0 + sh * 0.76);
+    };
+    const printed = (xr, yBase, text, px, maxw) => {
+      // Fitted, like everything else on this board. Set at the cap height the
+      // photograph has and brought down only if it will not go — the first cut
+      // set it at 0.62 of the pitch and 8.00 € came out taller than the KUPOVI
+      // beside it and touching it.
+      g.font = `700 ${px}px ${SANS}`;
+      const w = g.measureText(text).width;
+      if (w > maxw) {
+        px *= maxw / w;
+        g.font = `700 ${px}px ${SANS}`;
+      }
+      g.fillStyle = '#26231f';
+      g.textAlign = 'right';
+      g.fillText(text, xr, yBase);
+    };
     const line = (text, m, x, y, align) => {
       g.textAlign = align;
       g.font = `${m.weight} ${m.px}px ${SANS}`;
@@ -3582,17 +3630,99 @@ async function buildJadrija(scene) {
       g.fillText(text, 0, y);
       g.restore();
     };
-    // Left bay: the cold drinks. Caps at about two thirds of the row pitch,
-    // which is what the photograph measures on this column.
+    // Left bay: the cold drinks, their prices, and the hours.
+    //
+    // Six rows and not four. `b_184` and `b_186` of the v597 walk are this
+    // board from two and from five metres, square on and unobstructed, and
+    // between them they settle everything the 20260821 frame could not:
+    // ORANGINA and COCA COLA are the fifth and sixth rows, every row carries a
+    // white price sticker, and TONIC and FANTA are read straight off the glass
+    // rather than inferred from their opening letters.
+    //
+    // LIMUNADA is 2.50 and the other five are 3.00, all on stickers.
     {
       const f = fieldOf(0), fw = f.x1 - f.x0, fh = f.y1 - f.y0;
-      const rows = [['LIMUNADA'], ['SPRITE'], ['TONIC'], ['FANTA']];
-      const top = f.y0 + fh * 0.045, pitch = (fh * 0.91) / rows.length;
-      const m = column(rows, '700', pitch * 0.93, () => fw * 0.93, 0.68);
-      g.fillStyle = warm();
+      const rows = [['LIMUNADA', '2.50 €'], ['SPRITE', '3.00 €'],
+        ['TONIC', '3.00 €'], ['FANTA', '3.00 €'], ['ORANGINA', '3.00 €'],
+        ['COCA COLA', '3.00 €']];
+      // The foot is the trader panel and the opening hours, and it takes a
+      // fifth of the bay in the photograph.
+      const foot = fh * 0.21, body = fh - foot;
+      const top = f.y0 + body * 0.03, pitch = (body * 0.94) / rows.length;
+      const m = column(rows, '700', pitch * 0.86, () => fw * 0.58, 0.58);
+      const sh = pitch * 0.42;
       rows.forEach((r, i) => {
-        line(r[0], m, f.x0 + fw * 0.035, top + pitch * (i + 0.76), 'left');
+        const y = top + pitch * (i + 0.78);
+        g.fillStyle = warm();
+        line(r[0], m, f.x0 + fw * 0.035, y, 'left');
+        sticker(f.x1 - fw * 0.045, y, r[1], sh);
       });
+
+      // RADNO VRIJEME · 07-00, and the trader panel beside it.
+      //
+      // The hours are the second real number in this game that the footage
+      // carries — the first is OD 1922 on the centenary hoarding — and they
+      // are set the way the panel sets them: a small line of caps over a big
+      // one, both in a black serif, on the pale ground rather than in the blue.
+      //
+      // What is beside them is a trader's panel and it is deliberately not
+      // spelled out. Legible in `b_186`: "JADRIJA" in quotes, Slastičarnica,
+      // and Gradsko kupalište. NOT legible, and not going in either way: the
+      // proprietor's name and the OIB. The name is a private individual's and
+      // the OIB is a real company's tax number, and neither belongs in a game
+      // whatever the resolution — so those two lines are drawn as the marks
+      // they are at this distance, which is also exactly what the frame shows.
+      const SERIF = 'Georgia, "Times New Roman", serif';
+      const fy = f.y1 - foot;
+      g.fillStyle = '#dfe6ea';
+      g.fillRect(f.x0, fy, fw, foot);
+      // Two columns and they must not meet. The first cut gave each of them
+      // the whole width and right-aligned one against left-aligning the other,
+      // and 07-00 came down across "Gradsko kupalište" while RADNO VRIJEME sat
+      // on top of "JADRIJA". The bay is a third the width of the real panel
+      // relative to its height, so both blocks are fitted to a share of it:
+      // the trader's 0.45 and the hours' 0.44, with a gutter between.
+      const fitLeft = (text, px, x, y, maxw, weight) => {
+        g.font = `${weight} ${px}px ${SERIF}`;
+        const w = g.measureText(text).width;
+        if (w > maxw) g.font = `${weight} ${px * maxw / w}px ${SERIF}`;
+        g.textAlign = 'left';
+        g.fillText(text, x, y);
+      };
+      const fitRight = (text, px, x, y, maxw, weight) => {
+        g.font = `${weight} ${px}px ${SERIF}`;
+        const w = g.measureText(text).width;
+        if (w > maxw) g.font = `${weight} ${px * maxw / w}px ${SERIF}`;
+        g.textAlign = 'right';
+        g.fillText(text, x, y);
+      };
+      const hx = f.x1 - fw * 0.05, hw = fw * 0.44;
+      g.fillStyle = '#3d3d3a';
+      fitRight('RADNO VRIJEME', foot * 0.20, hx, fy + foot * 0.34, hw, '600');
+      g.fillStyle = '#131313';
+      fitRight('07-00', foot * 0.48, hx, fy + foot * 0.84, hw, '600');
+      // The trader block: three lines that are read and two that are not.
+      const tx = f.x0 + fw * 0.05, tw = fw * 0.45;
+      g.fillStyle = '#2c2c2a';
+      fitLeft('"JADRIJA"', foot * 0.21, tx, fy + foot * 0.24, tw * 0.62, '700');
+      fitLeft('Slastičarnica', foot * 0.165, tx, fy + foot * 0.44, tw, '400');
+      fitLeft('Gradsko kupalište', foot * 0.165, tx, fy + foot * 0.98, tw, '400');
+      // and the two that stay marks — the proprietor's name and the OIB.
+      //
+      // Broken into words rather than run as one bar. A single 7%-tall bar per
+      // line at half alpha is a *redaction*, which is the one thing this must
+      // not look like: the point is that the panel has small print on it that
+      // you cannot read from here, not that something has been taken off it.
+      // Three or four short runs with gaps, thinner and paler, reads as type.
+      g.fillStyle = 'rgba(58,58,56,0.34)';
+      const marks = [[0.62, [0.13, 0.19, 0.09]], [0.80, [0.07, 0.30, 0.11]]];
+      for (const [yy, runs] of marks) {
+        let cx2 = tx;
+        for (const run of runs) {
+          g.fillRect(cx2, fy + foot * yy - foot * 0.046, tw * run, foot * 0.046);
+          cx2 += tw * (run + 0.035);
+        }
+      }
     }
     // Middle bay: the name, small over large, which is how it is set.
     {
@@ -3655,22 +3785,39 @@ async function buildJadrija(scene) {
     // label into a price. Anything still unsourced would still be a label —
     // the branch that drew them went only because nothing is left for it to
     // draw, and it is a two-line job to put back.
+    //
+    // And what `b_184` changed on 23 August, late. It is this board from two
+    // metres, square on, and it settles three things the 20260821 frame could
+    // not. The last row reads **NES CAFFE**, two words, at a printed 3.00 —
+    // which is Misha's price arriving in the footage a few hours after he gave
+    // it, and the spelling is the board's rather than his because the board is
+    // the one that is photographed. Four of the prices are PRINTED with the
+    // menu and the rest are white stickers stuck over it, which is why the
+    // column looks ragged. And every price on this frontage is dark: they were
+    // being set in `warm()` alongside the names and there is not a warm number
+    // anywhere in any photograph of this shop.
+    //
+    // Still off the board: the third row. `b_184` shows it plainly enough to
+    // count — the real menu has NINE rows and this has eight — but the word is
+    // five pixels of stroke and reads as KOKICE or KORICE depending on the
+    // frame. A row that is known to exist is not a licence to name it.
     {
       const f = fieldOf(2), fw = f.x1 - f.x0, fh = f.y1 - f.y0;
-      const items = [['SLADOLED', '2.50 €'], ['KUPOVI', '8.00 €'],
-        ['FRAPPE', '7.00 €'], ['KRAFNE', '2.50 €'], ['ESPRESSO', '2.00 €'],
-        ['MACCHIATO', '2.50 €'], ['CAPPUCCINO', '3.00 €'],
-        ['NESCAFE', '3.00 €']];
+      // `true` where the price is printed with the board, `false` where it is
+      // a sticker over it.
+      const items = [['SLADOLED', '2.50 €', false], ['KUPOVI', '8.00 €', true],
+        ['FRAPPE', '7.00 €', true], ['KRAFNE', '2.50 €', false],
+        ['ESPRESSO', '2.00 €', true], ['MACCHIATO', '2.50 €', false],
+        ['CAPPUCCINO', '3.00 €', false], ['NES CAFFE', '3.00 €', true]];
       const top = f.y0 + fh * 0.045, pitch = (fh * 0.91) / items.length;
       const rx = f.x1 - fw * 0.075;                 // where a number ends
       const mi = column(items, '700', pitch * 0.92, () => fw * 0.55, 0.58);
-      const mp = column(items.map((r) => [r[1]]),
-        '600', pitch * 0.92, () => fw * 0.30, 0.75);
-      items.forEach(([t, price], i) => {
+      items.forEach(([t, price, print], i) => {
         const y = top + pitch * (i + 0.76);
         g.fillStyle = warm();
         line(t, mi, f.x0 + fw * 0.035, y, 'left');
-        line(price, mp, rx, y, 'right');
+        if (print) printed(rx, y, price, pitch * 0.52, fw * 0.30);
+        else sticker(rx, y, price, pitch * 0.42);
       });
     }
     const tex = new THREE.CanvasTexture(C);

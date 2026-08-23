@@ -35,7 +35,25 @@ What I need beyond the point itself:
 Not blocked on you, and started: the fortress it faces was half size and is
 now rebuilt to its OSM footprint.
 
-## 2. How many kabine does Jadrija actually have? *(carried over)*
+## 2. Two small ones on the slastičarnica board
+
+Built tonight from `b_184` and `b_186` — the drinks board now has all six rows
+with their prices, and RADNO VRIJEME · 07-00 across the foot. Two things I
+could not settle:
+
+- **The third row on the right-hand board.** The real menu has nine rows and
+  the game has eight, because that word is five pixels of stroke and reads
+  KOKICE or KORICE depending on the frame. Popcorn or wafer shells — you will
+  know. It stays off the board until you say.
+- **NES CAFFE or NESCAFE?** You said NESCAFE; the board plainly reads NES
+  CAFFE, two words. I used the board's spelling because the board is the thing
+  that is photographed — say the word and it goes back.
+
+And one I did not build: **the centre bay's lower two thirds is empty**. The
+real one has a photograph of krafne under the name, and now that both flanking
+bays are full that gap is conspicuous where it was not before. Worth doing?
+
+## 3. How many kabine does Jadrija actually have? *(carried over)*
 
 `JAD.cabW` is 2.15 m a bay and two independent measurements off your own
 footage say 0.95–1.05 m — a monobloc chair against the wall, and six
@@ -45,13 +63,13 @@ countable 110–130 mm planks per door leaf. Fixing it doubles the row to about
 A published figure would settle it, or you may simply know. Written up in
 `plan/jadrija-TODO.md`.
 
-## 3. The wood floor — repaint it? *(carried over, yours to call)*
+## 4. The wood floor — repaint it? *(carried over, yours to call)*
 
 The game has warm orange-tan sand under the pines. `20260823_112051` shows
 pale angular crushed limestone with needle litter. It is the right change and
 it repaints the whole resort, so it is your call and I have not touched it.
 
-## 4. Five unpushed commits, plus tonight's *(carried over)*
+## 5. Five unpushed commits, plus tonight's *(carried over)*
 
 `main` is ahead of the remote and I have not pushed. Say the word.
 
@@ -76,6 +94,11 @@ it repaints the whole resort, so it is your call and I have not touched it.
   sixth car model: a separate, rounder loft thrown over the crossover's own
   plan, because what makes a covered car read as one is that all its creases
   are gone.
+- **Survey item 11 built — the drinks board.** Six rows and six prices where
+  there were four rows and none, the hours and the trader's panel at the foot,
+  and the price column rebuilt: four prices are printed with the menu and the
+  rest are white stickers stuck over it, which is what makes it look ragged in
+  every photograph. TONIC and FANTA are now read rather than inferred.
 - **Survey item 8 was a misidentification and is now a correction.** The "two
   pale domed containers" behind a fence at `b_047` are not glass-recycling
   igloos. They are the roof and the bonnet of the covered car from item 9,

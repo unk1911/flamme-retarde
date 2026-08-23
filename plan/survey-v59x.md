@@ -190,16 +190,45 @@ Same trap as the lavender, and this time it was seen coming.
 in alternating red and white bands, about 1.1 m, standing in the dust along a
 concrete kerb strip at the wood edge. Two of them lie knocked over.
 
-**11. The slastičarnica drinks board.** `b_182`–`b_188`. On the counter wall,
-beside the "Slastičarnica JADRIJA" panel already built: a printed board in red
-capitals reading LIMUNADA / SPRITE / TONIC / FANTA / ORANGINA / COCA COLA with
-a price column, and **07-00** across the foot of it — the opening hours, and
-the second date-or-number in the game that the footage actually carries. Also a
-row of backlit photo panels along the fascia on an orange sunburst ground —
-Ice Caffe, Krafne, Espresso, Limunada — and a blue board of SLADOLED / KUPOVI /
-KORICE / FRAPPE / KRAFNE / ESPRESSO / MACCHIATO / CAPPUCCINO / ICE CAFFE.
-The shop already had its high-detail pass; this is what is still legible in the
-frames and not on the model.
+**11. The slastičarnica drinks board.** `b_182`–`b_188`. **BUILT, 23 Aug.**
+
+`b_184` is this frontage from two metres and `b_186` from five, both square on
+and unobstructed, and between them they settle far more than the item was
+written for. The left bay had four rows and no prices; it has six rows and six
+now — LIMUNADA 2.50, and SPRITE, TONIC, FANTA, ORANGINA and COCA COLA at 3.00
+— with **RADNO VRIJEME · 07-00** across the foot beside the trader's panel.
+
+Four things the frames settled that the 20260821 photograph could not:
+
+- **TONIC and FANTA are read rather than inferred.** They went on the board in
+  August with their tails behind a customer's head and a note saying so. The
+  note retires.
+- **Not every price is printed.** Four of the nine on the right-hand board —
+  8.00 on KUPOVI, 7.00 on FRAPPE, 2.00 on ESPRESSO and 3.00 on NES CAFFE — are
+  printed with the menu. Every other price on this frontage is a **small white
+  sticker stuck over the print**, in a different and much smaller type. That is
+  what makes the price column look ragged in every photograph of the shop, and
+  drawing them all in the board's own lettering made a printed menu out of one
+  that has been repriced twice.
+- **And every price is dark.** They were being set in `warm()` with the names.
+  There is not a warm number anywhere on this frontage.
+- **The last row is NES CAFFE**, two words, at a printed 3.00 — which is
+  Misha's price of the same evening arriving in the footage a few hours after
+  he gave it. The spelling is the board's, because the board is the one that
+  is photographed.
+
+Two things still open, both in `MORNING.md`:
+
+- **The right-hand board has NINE rows and the game has eight.** `b_184` shows
+  the third one plainly enough to count but the word is five pixels of stroke
+  and reads KOKICE or KORICE depending on the frame. A row that is known to
+  exist is not a licence to name it, so it stays off.
+- **The centre bay's lower two thirds is empty.** The real one carries a
+  photograph of krafne under the name, and with both flanking bays now full
+  that gap is conspicuous where it was not before.
+
+Also in these frames and already built: **Slastičarnica 1974 Jadrija** on the
+counter vinyl — checked on the built page, it is there and correct.
 
 **12. The tavern's crimson parasols and picnic tables.** `b_066`–`b_075`.
 Square dark-red parasols with a printed valance, over timber picnic benches on
