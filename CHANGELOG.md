@@ -8,6 +8,50 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.102.0] — 2026-08-22
+
+### Fixed
+
+- **There is wine in the glass now, and the glass is glass.** Left open by the
+  agent that fixed the pour: the wine mesh is drawn, it is `visible`, and nobody
+  has ever seen it. The wine was a lid on the bowl sitting a fraction *inside*
+  the crystal so the two could not argue about the z-buffer — but the glass is
+  an opaque lathe merged into the room's shared buffer, and an opaque glass has
+  no inside. Making the crystal transparent is not available either: it has no
+  material of its own. So the wine skins the **outside** of the bowl, 1.5 mm
+  proud of the crystal at every height, which is what a glass of red looks like
+  at three metres anyway — the bottom of the bowl is red, the rim is not, and
+  the line between them is the level. And the crystal was 0.760/0.800/0.815,
+  the albedo of white plastic: it clipped to flat white and took its own profile
+  with it, so photographed on the stool it was a white blob with a stem. Now
+  0.345/0.372/0.390.
+
+- **`SKIN_CAST` was raised this afternoon on a worthless measurement.** The
+  probe was vsync-capped, so 8, 20, 24, 30 and 41 all came back at 16.7 ms and
+  looked identical. Re-measured uncapped, median of 95 frames, at the three
+  promenade stations, with the pose ladder in: 8 → 13.8/8.6/8.6, 20 →
+  15.9/10.2/9.9, 24 → 16.1/10.6/10.4, 30 → **16.8**/11.1/11.2, 41 →
+  18.7/12.6/12.8. Sixty frames a second is 16.7 ms, so 30 breaches it at the
+  west station and 24 is the ceiling. It ships at 24.
+
+### Added
+
+- **The white box trailer at the top of the beach**, which is the half of survey
+  item `a_160` that was never built — the hulls went in with the bank armouring.
+  A plain white box body overhanging a dark chassis, level on its jockey wheel
+  with the drawbar down, six metres west of the kayaks and a metre and a half up
+  the bank. It is the only white rectangle on this stretch, which is most of why
+  it earns its place: everything else at the top of this beach is stone, hull or
+  pine.
+
+### Known
+
+- **A bigger `SKIN_CAST` is not the answer to the marionettes and the numbers
+  now say so.** The 24 skinned figures are chosen at *build* time, so they are
+  fixed individuals: the mannequin at your elbow stays a mannequin all session
+  while a skinned figure two hundred metres away spends the budget. The ones you
+  walk up to are always the wrong ones.
+
 ## [1.101.0] — 2026-08-22
 
 Survey work, overnight, against the geotagged photographs and the two inland
