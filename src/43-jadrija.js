@@ -5288,6 +5288,242 @@ async function buildJadrija(scene) {
   // The placement, stated: the frontage of the house inland of the vikendica.
   gardenWall(224.0, 239.5, 40.4, 230.2, 233.9);
 
+  /**
+   * The green palisade on a rubble wall, and it is A PLACEMENT.
+   *
+   * Seven frames of the two inland walk-throughs carry it — `a_154` and `a_159`
+   * in v595, `b_026`, `b_050`, `b_051` and `b_052` in v597 — and `a_154` is the
+   * one that settles the whole assembly, shot from a metre away with the sun
+   * across it. Going back to that frame at full size corrected three things in
+   * the catalogue entry that proposed this object:
+   *
+   *   the colour is NOT "bright green". It is a sea-green, very near teal:
+   *   sunlit pales measure 153,207,195 and the same pales in shade 44,69,63 —
+   *   a paint with as much blue in it as the water has. Drawn a pure green it
+   *   would be the only pure hue anywhere on this shore;
+   *
+   *   there is no sawn cap under it. The catalogue said there was, by analogy
+   *   with the approach piers, and there is not. The rubble's own ragged last
+   *   course is the top, and the fence's bottom rail sits straight on it;
+   *
+   *   and the pales stand PROUD of the top rail by about a fifth of their
+   *   height, which is the whole difference between a palisade and a panel.
+   *   Both rails run behind the pales, and the fence is 2 m panels, each one
+   *   level in itself, stepping at every joint as the lane climbs.
+   *
+   * The masonry is a third thing again from the two already standing here. The
+   * approach piers at 216 are field rubble with the joints in shadow, so their
+   * core is dark and the stones sit loose on the face. The garden wall at 224
+   * is broad flat plates in wide beds of pale mortar. This is angular limestone
+   * packed tight: the stone nearly covers the face, like the garden wall's, and
+   * the joints are thin and dark, like the piers'.
+   *
+   * Neither video carries GPS, so the position is chosen and said out loud. It
+   * carries on the frontage the garden wall is already on — s 40.4 — from
+   * t 241.0 to 257.5, which is the next two houses east along it. They stand on
+   * bare sand today, which is the same complaint the garden wall went in
+   * against, and `b_016`'s fence panels and the wood-edge kerb blocks are
+   * recorded the same way.
+   *
+   * Rule 9b is why the pales are not stepped in `t`. Sixteen metres of frontage
+   * forty metres inland is a trapezium in the world, so a constant step in `t`
+   * comes out as pales that fan. The run's WORLD length is measured, the pale
+   * count comes off that, and each pale's width is converted back through the
+   * local scale — so every one of them is 52 mm wide where it actually stands.
+   * Nothing here draws from `rng()`; the stone comes out of `jit`. Rule 4.
+   */
+  function palisadeWall(t0, t1, sw) {
+    const back = b;
+    b = up;
+    const STONE = [0.418, 0.408, 0.386];
+    const CORE = [0.216, 0.208, 0.196];
+    const PALE = [0.290, 0.545, 0.470];
+    const DK = [0.086, 0.146, 0.085], LT = [0.208, 0.332, 0.198];
+    const AW = 0.16;                       // half the wall's thickness
+    const PANEL = 2.05;
+    const gAt = (t, s) => {
+      const st = at(t);
+      return Math.max(surfaceY(t, s), groundAt(st.x + st.nx * s, st.z + st.nz * s));
+    };
+    // A rotated frame in (t, s), which is what `facing` is — and this is a
+    // local copy of it because of rule 3. `facing` is a `const` arrow declared
+    // three thousand lines further down the same one lexical scope, so it does
+    // not exist yet when this runs, and the only symptom is a page that stops
+    // at 78% and never finishes. Four lines beats moving a call site away from
+    // the object it draws.
+    const spin = (ct, cs, ang) => {
+      const co = Math.cos(ang), sn = Math.sin(ang);
+      return (dt, ds, y) => W(ct + dt * co - ds * sn, cs + dt * sn + ds * co, y);
+    };
+    // World metres per unit of `t` at this `s`: 1.0 out on the water, and less
+    // than that inland wherever the shore turns. This is rule 9b made into a
+    // number instead of a warning.
+    const scale = (t) => {
+      const p = W(t - 0.5, sw, 0), q = W(t + 0.5, sw, 0);
+      return Math.hypot(q[0] - p[0], q[2] - p[2]) || 1;
+    };
+
+    function stoneRun(a, c, top) {
+      const base = gAt((a + c) * 0.5, sw) - 0.36;
+      // The core is the joint, and DARK — the opposite of the garden wall's,
+      // which is a mortared slab wall with wide beds of it in full sun. Here
+      // the plates are packed and what shows between them is a shadow.
+      boxTS(a, c, sw - 0.105, sw + 0.105, base, top - 0.02, CORE,
+        shade(CORE, 1.06));
+      // The first cut of this came out as BLOCKWORK — a neat grey coursing
+      // with pale joints, which is a breeze-block wall and not a rubble one.
+      // The cause was that every stone in a row was the full height of the
+      // row, so the rows read as courses however much the widths varied; a
+      // rubble wall's rows are bands a mason fills with whatever fits, and the
+      // stones in one band are not the same height as each other. So the band
+      // is set first and each stone takes a fraction of it and floats inside
+      // it, and the gain spread went from +-17% to +-24% so that no two
+      // neighbours are the same limestone.
+      for (const near of [true, false]) {
+        const out = near ? -1 : 1;
+        let row = 0;
+        for (let y = base + 0.05; y < top - 0.10; row++) {
+          const hh = 0.135 + jit(((a * 11) | 0) + row * 5, 683) * 0.115;
+          let u = a + jit(((a * 11) | 0) + row, 688) * 0.24;
+          for (let k = 0; u < c - 0.05; k++) {
+            const key = ((a * 11) | 0) + row * 29 + k;
+            const L = 0.15 + jit(key, 680) * 0.42;
+            const u1 = Math.min(u + L, c);
+            const g = 0.76 + jit(key, 684) * 0.48;
+            const col = [STONE[0] * g, STONE[1] * g, STONE[2] * g];
+            const sh = hh * (0.52 + jit(key, 689) * 0.50);
+            const off = (hh - sh) * jit(key, 678);
+            const d0 = (jit(key, 681) - 0.5) * 0.070;
+            const d1 = (jit(key, 682) - 0.5) * 0.070;
+            const yl = Math.max(base + 0.02, y + off + d0);
+            const yh = Math.min(top - 0.09, y + off + sh + d1);
+            if (yh - yl > 0.040 && u1 - u > 0.07) {
+              frustumTS(yl, [(u + u1) * 0.5, sw + out * 0.090,
+                (u1 - u) * 0.5 - 0.014, 0.052],
+              yh, [(u + u1) * 0.5 + d0 * 0.9, sw + out * AW,
+                (u1 - u) * 0.5 - 0.030, 0.042], col, shade(col, 1.10));
+            }
+            u = u1 + 0.012 + jit(key, 679) * 0.028;
+          }
+          y += hh * 0.80;
+        }
+      }
+      // The ragged top, which is where this wall differs from every other one
+      // on the shore: no dressed cap, no straight line. A last course of
+      // flatter plates whose tops wander a few centimetres either side of the
+      // line the panel above is set out from.
+      let u = a;
+      for (let k = 0; u < c - 0.04; k++) {
+        const key = ((a * 11) | 0) + k * 3;
+        const L = 0.19 + jit(key, 685) * 0.40;
+        const u1 = Math.min(u + L, c);
+        const g = 0.80 + jit(key, 686) * 0.40;
+        const col = [STONE[0] * g, STONE[1] * g, STONE[2] * g];
+        const yt = top + (jit(key, 687) - 0.60) * 0.075;
+        frustumTS(yt - 0.09 - jit(key, 677) * 0.055,
+          [(u + u1) * 0.5, sw, (u1 - u) * 0.5 - 0.010, AW],
+          yt, [(u + u1) * 0.5, sw, (u1 - u) * 0.5 - 0.026, AW - 0.016],
+          col, shade(col, 1.16));
+        u = u1 + 0.010 + jit(key, 676) * 0.022;
+      }
+      runs.push({ t0: a, t1: c, s0: sw - 0.28, s1: sw + 0.28,
+        y: base, h: top - base + 1.02 });
+    }
+
+    /** One panel: pales in front, two rails behind, a stile at each end. */
+    function palisade(a, c, top) {
+      const sc = scale((a + c) * 0.5);
+      const wm = (m) => m / sc;            // world metres -> units of t
+      const TIP = top + 1.02;
+      const n = Math.max(2, Math.round((c - a) * sc / 0.098));
+      // 52 mm on 98 mm centres is what the frame measures, and at 52 the run
+      // came out reading as a boarded fence with slots in it: the pale is a
+      // 3D bar, so at any angle off square you see its side face as well as
+      // its front and it paints wider than it is. 44 gives back the daylight.
+      const half = wm(0.022);
+      for (let i = 0; i < n; i++) {
+        const ct = a + (c - a) * (i + 0.5) / n;
+        boxTS(ct - half, ct + half, sw - 0.011, sw + 0.011, top - 0.05, TIP,
+          PALE, shade(PALE, 1.20));
+      }
+      // Behind the pales, both of them, which is what you can see through the
+      // gaps and is the reason the run reads as bars and not as a board.
+      for (const y of [top + 0.13, top + 0.80]) {
+        boxTS(a, c, sw + 0.016, sw + 0.046, y, y + 0.050,
+          shade(PALE, 0.84), shade(PALE, 1.04));
+      }
+      for (const t of [a + wm(0.04), c - wm(0.04)]) {
+        boxTS(t - wm(0.030), t + wm(0.030), sw - 0.028, sw + 0.028,
+          top - 0.08, TIP - 0.20, shade(PALE, 0.92), shade(PALE, 1.14));
+      }
+    }
+
+    for (let a = t0; a < t1 - 0.01; a += PANEL) {
+      const c = Math.min(a + PANEL, t1);
+      let hi = -1e9;
+      for (let u = a; u <= c; u += 0.5) hi = Math.max(hi, gAt(u, sw));
+      const top = Math.round((hi + 0.80) / 0.14) * 0.14;
+      stoneRun(a, c, top);
+      palisade(a, c, top);
+    }
+
+    // The mass behind it, and it is NOT the clipped hedge the garden wall has.
+    // `a_154` has an unclipped evergreen — laurel or pittosporum, dark and
+    // glossy and without a flower on it — grown hard against the bars and
+    // hanging over them. Some of it comes THROUGH the fence, which is the
+    // detail that says the fence has stood there longer than the last person
+    // who cut anything back.
+    // First cut came out as a ROW OF CHRISTMAS TREES, which is rule 10's
+    // symptom arrived at from the other direction: the argument order was
+    // right and the numbers were wrong. A `puff` taller than it is wide is a
+    // cone, and eleven of them at a fixed 1.45 m spacing is a row of cones.
+    // Wider than tall, spaced closer than their own radius so they run into
+    // each other, and three to a station rather than two.
+    // Second cut buried the fence. Driving both radii off one `r` meant that
+    // making the mass tall enough to show over a 1.85 m palisade made it 1.6 m
+    // wide as well, so it grew straight through the bars and out over the lane
+    // and the object this whole run exists to show was a few pales glimpsed
+    // through a hedge. The two radii are separate numbers now, and the seaward
+    // reach is the one that is held: centre at s + 1.55 and never more than
+    // 1.10 m of horizontal radius keeps the leaf 0.45 m clear of the pales,
+    // which is what `a_154` has — the fence in front, the mass behind and over
+    // it, and daylight between the two.
+    for (let a = t0; a < t1 - 0.01; a += 1.05) {
+      const c = Math.min(a + 1.05, t1);
+      const key = (a * 5) | 0;
+      const ct = (a + c) * 0.5;
+      const gy = gAt(ct, sw + 1.95);
+      const hr = 1.25 + jit(key, 690) * 0.28;
+      const vr = 0.72 + jit(key, 698) * 0.20;
+      const P = spin(ct, sw + 1.95, jit(key, 691) * TAU);
+      const band = [gy + 0.2, gy + 2.6];
+      // Four rows, not three. A `puff` comes to a POINT at the top — the
+      // sweep is +-0.49pi, so the last ring is a couple of centimetres across
+      // — and with three rows there is only one ring between the two points,
+      // which is a bipyramid however the radii are set. It took two cuts to
+      // see that the cones were coming from the row count and not only from
+      // the radii.
+      puff(P, 0, 0, gy + 1.70, vr, hr, DK, LT, band, 8, 4, 0.36, key % 97);
+      puff(P, (jit(key, 692) - 0.5) * 1.0, 0.30 + jit(key, 693) * 0.34,
+        gy + 1.02 + jit(key, 694) * 0.40, vr * 0.86, hr * 0.72,
+        DK, LT, band, 8, 4, 0.40, (key + 13) % 97);
+      // And one shoot in three comes THROUGH the bars — small, because a
+      // shoot is small, and the detail that says the fence has stood there
+      // longer than the last person who cut anything back.
+      if (jit(key, 697) < 0.34) {
+        puff(spin(ct, sw + 0.05, jit(key, 695) * TAU), 0, 0,
+          gy + 0.85 + jit(key, 696) * 0.55, 0.19, 0.27,
+          DK, LT, [gy, gy + 2.0], 8, 4, 0.44, (key + 31) % 97);
+      }
+      runs.push({ t0: a, t1: c, s0: sw + 0.55, s1: sw + 2.45,
+        y: gy, h: 2.4 });
+    }
+    b = back;
+  }
+  // The placement, stated: the two houses east of the one the garden wall
+  // fronts, on the same line.
+  palisadeWall(241.0, 257.5, 40.4);
+
   if (special) special.sign = neonSign(special);
 
   /**
