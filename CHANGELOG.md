@@ -8,6 +8,110 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.110.0] — 2026-08-23
+
+Everything Misha found in one morning of playing, plus the survey's most
+architectural object finally built. Nine of the entries below started as a
+sentence from him and none of them started as a plan.
+
+### Fixed
+
+- **The bead curtain sounded for you and for nobody else.** `beadCurtain` held
+  one pair of previous coordinates, because the player was the only mover the
+  solver had ever been given — so she walked in to pour a drink and the dog
+  trotted out under a curtain hanging dead still. `prev` is a Map keyed by who
+  now, and the crossing test and the contact drive both moved into a
+  `part(who, …)` that runs once per mover. Both walk the same three marks at
+  `t = K.dc`, so both cross square on. Measured with the player standing on the
+  floor of the hut and never moving: five shoves in forty-five seconds — hers
+  in at 15.5 s, his in at 22.0, the player's own crossing out at 25.8, hers out
+  at 27.8, his out at 30.1. Swing peaks 0.49 and 0.40 against 0.02 idle.
+- **The first crossing of a session sounded different from all the rest.** Not
+  silence: the synthesised shove. `beadSample` starts the decode on its first
+  call and returns false while it is in flight, so crossing one got the
+  fallback and crossing two onward got the recording. Every other sample here
+  is a bed, wanted continuously, where a first call that returns nothing costs
+  a frame nobody hears; this one's first use IS the event. `beadWarm()` now
+  separates asking from playing. 26 noise bursts before, one buffer source
+  after.
+- **The radio played three tunes written out of oscillators.** The argument for
+  that was good — a set like this is almost none of it the music — and the
+  result was wrong: "it currently plays some silly songs." It is Misha's own
+  recording now, `build/payload/radio.mp3`, 32.1 s. And the filtering the old
+  note argued for is mostly GONE for that note's own reason: the recording
+  already carries the cone, peaking at 350–800 Hz and 37 dB down by 8 kHz, so a
+  1150 Hz bandpass in front of it is the telephone the note warned about. What
+  is left is the distance, which a recording made standing over the set cannot
+  carry. The loop is bar-locked — a seam is scored on level and spectrum, both
+  blind to a beat, so `bar` constrains the length to whole bars and the pulse
+  carries across the join. 127.06 bpm, 17 bars, seam −0.02 dB in level and
+  1.87 dB in spectrum. The level is not taste: −18.94 dBFS is what the three
+  synth stations came out of the old rig at, rebuilt in numpy and measured.
+- **The diving platform stood on two legs.** "In reality it's not 2 concrete
+  slabs going down, but one thicker concrete slab" — from 2.9 m down, looking
+  up. The two masses above water are right and the photograph says so; below
+  it each had its own shaft, justified by a comment saying nobody sees it.
+  Wrong twice: the chase finishes at this platform, and two masses on separate
+  legs in eight metres of water is a jetty. One prism now, t 428.36–432.76,
+  4.40 by 1.96 m. Read off the built mesh because it is under eight metres of
+  water: two distinct `t` values at y −8.00, four at −0.55.
+- **Standing and seated bathers could not react.** They were static blockers;
+  `bump` is fired from `unbody` over the dynamic list and from nowhere else, so
+  a figure in the static list could never turn its head or speak — an invisible
+  wall with a person painted near it. Three more faults went with it: a box
+  held you at 0.71 m where a person holds you at 0.54, so you were stopped
+  further away by exactly the people who did not notice; `solid()` pushes
+  `y: 0`, so a bather up the slope had a box whose top was below their own feet
+  and you could hop through them; and the box is axis-aligned in (t, s), a
+  trapezium on the bend around a cylinder. Blockers 645 → 592, which is the 27
+  standing plus 26 seated boxes removed exactly.
+- **The Slastičarnica's prices were behind the tiled reveal, not clipped.**
+  Dumping the canvas settled it in one step — every price whole and inside its
+  bay. The reveal's east jamb sits at s0−0.30…−0.16 and the board hung at
+  s0−0.14, two centimetres further in, covering the right-hand bay from 0.87 to
+  0.95 of its width: exactly the price column. The board reached that far
+  because it was sized off the shop, `(t1−t0)·0.34` of a 15 m frontage = 5.1 m,
+  against 2.18 measured on the photograph. Canvas width, row overflow,
+  `textAlign` and the 2048 clamp were each ruled out by measurement first, and
+  so was rule 9b — the plane's corners deviate from the traced wall by 2–8 mm.
+
+### Added
+
+- **The doorway through the concrete wall**, seven photographs and the most
+  architectural thing in the whole survey, unbuilt since 21 Aug because nobody
+  knew which wall it belonged to. Misha settled it: the screen wall between the
+  first front-row run and the second, the one with the openable kabina.
+  t 415.50–419.93, opening 0.85 × 2.20 at t 417.45, three core boxes leaving
+  the hole so the jamb and soffit faces are the reveal. Walkable — the blocker
+  splits either side the way `pushRun` splits a run round the café — measured
+  clear width 0.61 m.
+- **The crowd says it out loud.** Six clips, three lines in a man's voice and a
+  woman's, because half this beach is women. Only three of the seven lines are
+  spoken and that is the design: somebody who says "uhm, excuse me" says it
+  under their breath, so three people in seven bark and the rest just look.
+- **Enter starts the game.** Gated on `started` rather than on the button's
+  `hidden`, because Enter is also the jump.
+
+### Changed
+
+- **Both murals moved, on Misha's word about where they are in life.** The
+  seagull to the west end of the first front-row block; Mr Mors off the
+  sanitary block's salmon wall — in deep shade behind the pines, which is why
+  it read as a dark wall — onto the end wall of the block standing in the wood
+  with the cars nose-in against it. Both stand 30 mm proud instead of 6.
+- **`menuWall()` deleted**, 105 lines. Dead *and* superseded: `menuPanels()`
+  draws the same board off a better photograph and actually renders. Its
+  `if (S.menu) … else if (S.name)` tangle would have eaten the sign of the
+  first shop ever given a menu. Triangles identical either side.
+
+### Known
+
+- The recorded voices are English in every language while the balloon over them
+  is translated. The alternative is eighteen clips and a second voice cast in
+  two more languages for four words apiece.
+- The doorway is shore-parallel rather than across the gap. Both readings fit
+  "between block 1 and block 2"; the photographs decided it.
+
 ## [1.109.0] — 2026-08-23
 
 All 409 frames of the two inland walk-throughs read — v595 and v597, of which
