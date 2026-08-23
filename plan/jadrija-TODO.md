@@ -303,6 +303,28 @@ as of this writing; the state of each is in the git log, not here.
 
 ---
 
+## KNOWN, from the 22 Aug overnight sweep
+
+- **Pine canopies are opaque plates from underneath.** Standing under one on the
+  promenade at t 230 the canopy is a single flat olive mass filling the top of
+  the frame, where a real Aleppo shows a lattice with sky through it. Not
+  touched: it is the tree system, not the shore, and `docs/how-a-tree-is-drawn.pdf`
+  says the current form was arrived at deliberately. Worth a look only if the
+  trees are ever revisited for their own sake.
+- **The lane wall's `gap()` still opens t 336-408** for a plaza that was deleted
+  on 22 Aug. Closing it welds two runs into one, moves the blocker count, and
+  puts 72 m of new white wall inland that nobody has asked for. No survey frame
+  settles whether the wall runs continuously there — the photographs that cover
+  those arc lengths were all taken from the water, at s -37 to -54 — so this is
+  left as a decision rather than guessed. `PLAZA` survives solely as this
+  opening's numbers.
+- **The `a_030` back lane is still not locatable.** Two-storey pale yellow
+  render, grey-green louvred shutters, vine pergola on green steel, cars nose-in
+  against a low rubble-based wall, metalled surface running down to the sea. The
+  game has houses there and no lane, no parking, no walls. Blocked on the same
+  thing `b_016` was: v595 carries no GPS, so there is no `t` the footage
+  supports. Either geotag a frame from it or accept a placement and say so.
+
 ## SURVEY — found, not yet built
 
 - **a_030** the back lane: two-storey pale yellow render house, grey-green
