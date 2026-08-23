@@ -8,6 +8,45 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.105.0] — 2026-08-23
+
+Per-shop survey pass, working the photographs that only became usable when the
+geotag table was corrected.
+
+### Added
+
+- **The Slasticarnica's menu panels.** Three bays in white aluminium frames on
+  pale blue-grey, lettering in a red-to-yellow gradient — the only warm thing on
+  a white building and what the eye goes to from the promenade. The game had
+  none of it. Rule 12 applies to a menu as much as to a place name, so the
+  source records which words are read straight off the glass (LIMUNADA, SPRITE,
+  SLADOLED, KUPOVI, FRAPPE, KRAFNE, ESPRESSO, MACCHIATO, CAPPUCCINO, and the
+  prices 8.00, 7.00 and 2.00), which two are inferred from their opening letters
+  with the rest behind a customer's head (TONIC, FANTA), and which one is
+  omitted entirely because it could not be settled between readings. The
+  illegible prices are drawn as the little white labels they are in the
+  photograph rather than given invented numbers.
+
+- **"My name is Mr Mors."** The fish on the sanitary block had its crown, its
+  bubbles and its rings, and not the pale green speech blob top right that makes
+  the wall funny rather than decorative — the fish introduces itself, in
+  English, on a Croatian bathing beach.
+
+### Fixed
+
+- **The fish was painted on bare grey render.** The block is two masses and the
+  pink was on the eastern one; the fish hangs a metre inside the western.
+  20260821_175206 is unambiguous — the wall the fish crosses is salmon render
+  and the unpainted grey with the green louvred door is the part beyond it.
+  Somebody rendered and painted that wall in order to have something to paint
+  on. Only the colours swap; the masses keep their own heights and depths.
+
+### Checked, and left alone
+
+- The thing on the fish's head is a **crown**, not a drum. Enlarged and settled
+  rather than assumed — an orange oval opening with a dark band of pale
+  triangular points, exactly as the existing comment said.
+
 ## [1.104.0] — 2026-08-22
 
 The marionettes, answered properly — and the answer was not a bigger number.
