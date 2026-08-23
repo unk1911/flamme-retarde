@@ -305,12 +305,31 @@ as of this writing; the state of each is in the git log, not here.
 
 ## KNOWN, from the 22 Aug overnight sweep
 
-- **Pine canopies are opaque plates from underneath.** Standing under one on the
-  promenade at t 230 the canopy is a single flat olive mass filling the top of
-  the frame, where a real Aleppo shows a lattice with sky through it. Not
-  touched: it is the tree system, not the shore, and `docs/how-a-tree-is-drawn.pdf`
-  says the current form was arrived at deliberately. Worth a look only if the
-  trees are ever revisited for their own sake.
+- **Canopies were opaque plates from underneath — FIXED, and it was not the
+  tree system.** The complaint was right and the diagnosis in it was not.
+  `docs/how-a-tree-is-drawn.pdf` and `45-trees.js` are about the *landscape*
+  trees, which are excluded from the resort field entirely (`jadrija.inField`)
+  and whose near model has had limbs and separate clumps since it was grown
+  rather than placed. Hiding both landscape LODs from the page left the plate
+  over the promenade exactly where it was. What you stand under at Jadrija is
+  this file's own planting: `pine()`, `olive()` and `oleander()`, baked into
+  the static shore mesh — about 160 pines in the three rows behind the
+  promenade plus the staked young ones, and the vikendica's own trees. The
+  "flat olive mass" at t 230 is, literally, an olive: one of the three in front
+  of the vikendica's terrace.
+  Both builders now add up in plan before they are believed. A pine's nine
+  puffs were 44 m² over a 57 m² crown with all of it in the inner two thirds;
+  it is now five boughs, each forking into two twigs, each twig carrying a
+  spray of two small tufts, plus three higher over the middle — 23 puffs at
+  under 60 %, capped at 1.05 m so a fourteen-metre tree cannot hang a
+  three-metre plate over your head. An olive's five lobes were 122 % of their
+  own crown; nine smaller ones spread to the rim are 58 %. Measured looking up
+  at three stations: canopy edge pixels per canopy pixel roughly doubled
+  (0.0050→0.0091, 0.0101→0.0237, 0.0109→0.0208), the static shore mesh went
+  310 228 → 388 090 triangles, the landscape trees did not move at all
+  (`live` 40 064, `near` 419, 4 547 578 tris), and the frame cost is +0.25 ms
+  at the worst station and inside noise at the other two, against a 16.7 ms
+  budget the tightest station uses 13.1 ms of.
 - **The lane wall's `gap()` still opens t 336-408** for a plaza that was deleted
   on 22 Aug. Closing it welds two runs into one, moves the blocker count, and
   puts 72 m of new white wall inland that nobody has asked for. No survey frame
