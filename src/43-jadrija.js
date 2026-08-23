@@ -6550,8 +6550,15 @@ async function buildJadrija(scene) {
       // show and it is rule 6: a 25 mm oversail at six metres is a pixel, and
       // what makes this read as a capped wall rather than as one block is the
       // shadow line under the cap.
+      // Each cap its own stone, within a few per cent. Without this the tops
+      // are the one horizontal surface in the wood taking the sun square on,
+      // they all come back at exactly the same value, and a hundred of them
+      // seen down the run read as a dotted white line rather than as masonry.
+      const cg = 0.94 + jit((t * 3) | 0, 73) * 0.13;
       boxTS(t - 0.03, t1 + 0.03, ks - 0.210, ks + 0.210,
-        y0 + H - CAPH, y0 + H, CAP, CAPTOP);
+        y0 + H - CAPH, y0 + H,
+        [CAP[0] * cg, CAP[1] * cg, CAP[2] * cg],
+        [CAPTOP[0] * cg, CAPTOP[1] * cg, CAPTOP[2] * cg]);
       // And the loose limestone at the foot of it, which is in every frame:
       // broken lumps the size of a fist lying in the dust on the wood side,
       // where the ground was never made good after the wall went in.
@@ -6910,18 +6917,26 @@ async function buildJadrija(scene) {
     // this distance from the origin two of them 20 mm apart are decided by
     // rounding: the red frame stands 0.06 m off the shell, the dark opening
     // 0.19, and the warm strip of what is lit inside it 0.24. Rule 5.
+    //
+    // And it is a DOORWAY, not a hatch: 0.80 m of opening and 1.52 m of it,
+    // nearly twice as tall as it is wide. The first cut made it 1.24 by 0.84,
+    // which is the proportion of a serving flap, and on a 2.04 m end it filled
+    // the whole face — a red-bordered rectangle with a bright band inside it,
+    // which is a poster. The trailer read as a billboard on wheels. `b_068`
+    // has a door with a man standing in it, and what is lit inside is a strip
+    // at counter height and not the opening.
     const EU = -(HL + R);
-    b.quad(P(EU - 0.06, -0.76, FLOOR + 0.02), P(EU - 0.06, 0.76, FLOOR + 0.02),
-      P(EU - 0.06, 0.76, FLOOR + 1.02), P(EU - 0.06, -0.76, FLOOR + 1.02), REDF);
-    b.quad(P(EU - 0.19, -0.62, FLOOR + 0.10), P(EU - 0.19, 0.62, FLOOR + 0.10),
-      P(EU - 0.19, 0.62, FLOOR + 0.94), P(EU - 0.19, -0.62, FLOOR + 0.94), DARK);
-    b.quad(P(EU - 0.24, -0.52, FLOOR + 0.18), P(EU - 0.24, 0.52, FLOOR + 0.18),
-      P(EU - 0.24, 0.52, FLOOR + 0.60), P(EU - 0.24, -0.52, FLOOR + 0.60), GLOW);
+    b.quad(P(EU - 0.06, -0.50, FLOOR + 0.00), P(EU - 0.06, 0.50, FLOOR + 0.00),
+      P(EU - 0.06, 0.50, FLOOR + 1.70), P(EU - 0.06, -0.50, FLOOR + 1.70), REDF);
+    b.quad(P(EU - 0.19, -0.40, FLOOR + 0.08), P(EU - 0.19, 0.40, FLOOR + 0.08),
+      P(EU - 0.19, 0.40, FLOOR + 1.60), P(EU - 0.19, -0.40, FLOOR + 1.60), DARK);
+    b.quad(P(EU - 0.24, -0.30, FLOOR + 0.74), P(EU - 0.24, 0.30, FLOOR + 0.74),
+      P(EU - 0.24, 0.30, FLOOR + 0.96), P(EU - 0.24, -0.30, FLOOR + 0.96), GLOW);
     // And the flap propped up over it, which is the shape that says "open".
-    b.quad(P(EU - 0.02, -0.78, FLOOR + 1.04), P(EU - 0.02, 0.78, FLOOR + 1.04),
-      P(EU - 0.92, 0.70, FLOOR + 1.52), P(EU - 0.92, -0.70, FLOOR + 1.52), MID);
-    for (const o of [-0.70, 0.70]) {
-      const q0 = P(EU - 0.06, o, FLOOR + 1.06), q1 = P(EU - 0.90, o, FLOOR + 1.50);
+    b.quad(P(EU - 0.02, -0.66, FLOOR + 1.72), P(EU - 0.02, 0.66, FLOOR + 1.72),
+      P(EU - 0.72, 0.58, FLOOR + 2.04), P(EU - 0.72, -0.58, FLOOR + 2.04), MID);
+    for (const o of [-0.58, 0.58]) {
+      const q0 = P(EU - 0.06, o, FLOOR + 1.74), q1 = P(EU - 0.70, o, FLOOR + 2.02);
       b.quad(q0, [q0[0] + 0.03, q0[1], q0[2] + 0.03],
         [q1[0] + 0.03, q1[1], q1[2] + 0.03], q1, SKIRT);
     }
