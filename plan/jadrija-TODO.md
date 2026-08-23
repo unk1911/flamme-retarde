@@ -572,22 +572,29 @@ as of this writing; the state of each is in the git log, not here.
 - ~~**a_160** kayaks/pedalos and the white box trailer~~ — the hulls went in
   with the bank armouring; the trailer was built 22 Aug.
 
-- **20260821_175025 and its six neighbours** (t 476.5, s 42.7, corrected
-  geotags): a bare concrete wall with a **tall narrow doorway cut straight
-  through it** — no door, no frame, about 0.85 m by 2.2 m, the reveal showing
-  the wall's own thickness, and the sea, an island and the beach framed in it.
-  A small recessed vent with dark mesh high on the left, a pale grey louvred
-  grille recessed on the right, a rough concrete capping slab along the top
-  with a ragged edge, form marks and vertical construction joints down the
-  face. It is the most architectural thing in the whole survey and the game has
-  nothing like it.
+- ~~**20260821_175025 and its six neighbours**~~ — built 23 Aug. A bare
+  concrete wall with a tall narrow doorway cut straight through it, no door and
+  no frame, 0.85 m by 2.2 m, the reveal showing the wall's own thickness, a
+  recessed vent with dark mesh on one side of it and a pale grey louvred grille
+  on the other, a capping slab with a ragged edge, and shutter joints down the
+  face.
 
-  Not built, deliberately. It needs a decision this file should not make on its
-  own: which wall it is. Seven photographs put the photographer at s 42.7,
-  which is well inland of both kabine rows, so this is either the resort's back
-  wall or a screen wall in the eastern block — and building a 2.2 m hole in the
-  wrong one puts a view of the sea through something with houses behind it.
-  Worth settling with Misha, and then it is an afternoon's work.
+  **Which wall it is** was the only thing stopping this and Misha settled it:
+  the gap between the first run of the front row and the second, the second
+  being the run with the open kabina in it — t 415.50 to 419.93, on the back
+  line of the row at s 19.68-20.10. The doorway is at t 417.45 and it is a
+  route, not a picture: `screenWall` splits its own blocker either side of the
+  opening the way `pushRun` splits a run around Caffe TRAMPULIN, and the clear
+  standing width comes out at 0.61 m, walked through and measured. Blockers
+  645 -> 647, +528 triangles, census untouched.
+
+  The framing settles itself: the camera standing in the alley at s 23.5 had
+  the channel, the far shore and the beach dead centre between those two blocks
+  *before* the wall existed, which is 20260821_175025 in order — reveal, yard,
+  promenade, beach, water, island. From the wood side it is 20260821_175029: a
+  long bare wall down the lane with the white kabine beyond it. The `t 476.5,
+  s 42.7` geotag is not where it went and is not meant to be; the photograph
+  settles the object, Misha settles the wall.
 
 ## SOURCES
 
