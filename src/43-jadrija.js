@@ -1015,9 +1015,10 @@ async function buildJadrija(scene) {
   let firstGable = null;
   // Every back row run's west end, in the order they are laid. The back row
   // stands with the pine wood and the parked cars against it, and one of these
-  // is where the fish went — see `fishGable` below, which picks by arc length
-  // because the runs themselves are laid out of `rng` and their ends are not
-  // numbers this file gets to choose.
+  // is where the fish went — see `fishGable` below, which picks the one nearest
+  // `firstGable` and so puts the fish straight across the alley from the gull.
+  // It has to pick rather than know: the runs themselves are laid out of `rng`
+  // and their ends are not numbers this file gets to choose.
   const backGables = [];
   // The gap between the first two runs of the front row: the two end walls
   // facing each other across it, and everything the screen wall between them
@@ -5021,25 +5022,44 @@ async function buildJadrija(scene) {
   const board = gable ? mapBoard(gable) : null;
   const mural = firstGable ? endMural(firstGable, gullMural()) : null;
 
-  // The fish, on the wood side.
+  // The fish, across the lane from the gull.
   //
   // "My name is Mr Mors" was painted on the sanitary block, on the seaward face
   // of its salmon mass at t 348.35 — which is a wall in shade behind a pine
-  // wood, and Misha's screenshot of it is a dark rectangle you cannot read.
-  // It belongs on the end wall of one of the back row's blocks: those are the
-  // buildings standing IN the wood, they have the parked cars against them, and
-  // their west ends are the only large blank faces on this shore that take the
-  // evening sun square on. It is 1.55 m square, which on a gable 2.90 m of `s`
-  // wide leaves a good half-metre of render either side.
+  // wood, and Misha's screenshot of it is a dark rectangle you cannot read. It
+  // spent a morning on the far end of the back row instead, at t 519.27, which
+  // is a blank wall in the car park and is a fair reading of "in the wood with
+  // the cars against it" — but it is also 120 m from anywhere anybody stands,
+  // and it was not what he meant.
   //
-  // The arc length is a placement and the file should say so: which run of the
-  // back row ends nearest `FISH_T` is a property of a layout drawn out of `rng`
-  // and not of anything the survey settles. What the survey settles is that the
-  // fish is on a blank wall in the car park, and every candidate here is one.
-  const FISH_T = 520;
-  const fishGable = backGables.length
-    ? backGables.reduce((a, g) => (Math.abs(g.t - FISH_T) < Math.abs(a.t - FISH_T) ? g : a))
-    : null;
+  // What he meant, and marked with an arrow on his own screenshot, is "the wall
+  // of the kabine next to the one with the seagull mural": the blank end wall of
+  // the block ACROSS the alley from the gull, on the face that looks back at it.
+  // Stand in the lane at a walker's height looking up the row and those two
+  // walls are the whole frame — the gull on the front row's west end with the
+  // crazy paving at its foot, and this one on the back row's west end with the
+  // pines behind it, the parked cars beside it and bare dust in front. They are
+  // 8.9 m apart across the alley, which is why one shot holds both.
+  //
+  // So the wall is found by measuring off the gull rather than by naming an arc
+  // length: whichever back-row run ends nearest `firstGable`. That is the run
+  // that starts the back row, and it is worth saying plainly that WHICH run that
+  // is remains a placement and not a survey fact — the back row is laid in runs
+  // of five to ten bays drawn out of `rng`, so where its runs end is a number
+  // this file can only find, never choose. On the seed as it stands that end
+  // came out at t 396.92, 1.07 m up-shore of the gull's 395.85 and 8.9 m inland
+  // of it. What the survey settles is which wall, and the wall is the one the
+  // arrow points at.
+  //
+  // `o` is −1 here exactly as it is on the gull, which is the whole of what
+  // makes both of them face back down `t` — i.e. face you as you come up the
+  // lane, rather than face into their own concrete. It is 1.55 m square, which
+  // on a gable 2.90 m of `s` wide leaves a good half-metre of render either
+  // side, and `endMural` stands it the same 30 mm proud that the gull gets.
+  const fishGable = backGables.length && firstGable
+    ? backGables.reduce((a, g) =>
+      (Math.abs(g.t - firstGable.t) < Math.abs(a.t - firstGable.t) ? g : a))
+    : (backGables[0] || null);
   const fish = fishGable ? endMural(fishGable, fishMural(), 1.55, 1, 1.30) : null;
 
   // ── the bead curtain ───────────────────────────────────────────────────────
@@ -8076,11 +8096,12 @@ async function buildJadrija(scene) {
       [0.400, 0.396, 0.386], 7);
 
     // The fish used to hang here, on the seaward face of the salmon mass at
-    // t 348.35. It is on the back row's gable in the car park now — see
-    // `fishGable`, up with the gull. What is left behind is a rendered and
-    // painted wall with nothing on it, which is what the note above says this
-    // mass is for: somebody rendered and painted it in order to have something
-    // to paint on, and the painting has moved rather than the plaster.
+    // t 348.35. It is on the back row's first gable now, across the alley from
+    // the gull — see `fishGable`, up with the gull. What is left behind is a
+    // rendered and painted wall with nothing on it, which is what the note
+    // above says this mass is for: somebody rendered and painted it in order to
+    // have something to paint on, and the painting has moved rather than the
+    // plaster.
 
     runs.push({ t0: SAN.t0 - 0.4, t1: SAN.t1 + 0.4, s0: SAN.s0 - 0.4,
       s1: SAN.s1 + 0.4, y, h: 2.7 });
@@ -16422,6 +16443,21 @@ async function buildJadrija(scene) {
     /** Debug: where the gull ended up, so a camera can be pointed at it. */
     mural: () => mural && { at: mural.at.map((v) => +v.toFixed(2)),
       p: mural.mesh.position.toArray().map((v) => +v.toFixed(2)) },
+    /**
+     * Debug: the blank run ends a mural can be hung on.
+     *
+     * `first` is the front row's west end, which carries the gull; `back` is
+     * every back-row run's west end in the order they were laid, one of which
+     * carries the fish. They come out of `rng` and there is no other way to
+     * learn where they are from outside, which is what made hanging the fish
+     * "on the wall across the lane from the gull" a guess for a morning: it is
+     * `back[0]`, and this says so in one call.
+     */
+    gables: () => ({
+      first: firstGable && { t: +firstGable.t.toFixed(2), o: firstGable.o,
+        front: firstGable.front, back: firstGable.back, floor: +firstGable.floor.toFixed(2) },
+      back: backGables.map((g, i) => ({ i, t: +g.t.toFixed(2), o: g.o,
+        front: g.front, back: g.back, floor: +g.floor.toFixed(2) })) }),
     /** Debug: and the fish, which hangs off the same function on the wood side. */
     fish: () => fish && { at: fish.at.map((v) => +v.toFixed(2)),
       p: fish.mesh.position.toArray().map((v) => +v.toFixed(2)) },
