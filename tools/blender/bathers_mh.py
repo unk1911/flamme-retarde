@@ -844,8 +844,9 @@ def one(name, height, obj, check=False):
     MH.smooth(body, 1, above=J["neck"].z)
     rig = MH.armature(J)
     MH.skin(body, rig)
-    MH.paint(body, MH.cutters(J, k=k, torso=False, tail=False)
-             + swimwear(J, kind, suit, height))
+    wear = swimwear(J, kind, suit, height)
+    coats = MH.cutters(J, k=k, torso=False, tail=False) + wear
+    MH.paint(body, coats)
     out = OUT / ("bather_%s.fr3d.gz" % name)
     # `post=False`, and that is the difference between eight bathers and eight
     # copies of Baye. The lay-on pass adds her nails, her bracelet and her hip
@@ -859,7 +860,26 @@ def one(name, height, obj, check=False):
               if c["name"] in STAND_CLIPS else c
               for c in BATHER_CLIPS] + sit_clips(rig, J))
     _sit_report(rig, clips)
-    MH.export_skin(body, rig, out, clips, tris=TRIS, post=False)
+    # `repaint` and `dense`, which are the two halves of one answer.
+    #
+    # Baye is 28 085 triangles and these are 7 000, and that quarter is where
+    # every paint complaint about them has come from. It cost the nape wedge,
+    # which was a cutter for a ponytail nobody here has; it cost the brief two
+    # rewrites; and it was still costing the suit, which arrived as red blotches
+    # across the back and buttocks of the woman walking the promenade — 72 mm of
+    # red inside 182 mm of pink and a streak of it 136 mm down her thigh, on a
+    # brief drawn 110 mm tall.
+    #
+    # Neither the colour nor the volume was wrong. The mesh was: the decimator
+    # averages the colours it merges and then interpolates what is left across
+    # triangles half the height of the garment. So the export copy is painted
+    # again after the decimator has run, and the decimator is told to leave the
+    # hem alone before it runs — see the notes beside it and beside `hem_group`
+    # in human_mh.py. It comes back 100 per cent solid, 107 mm tall, over 16 mm
+    # triangles, and 1.8 KB *smaller*; the rig, the bone table and all nine
+    # clips are bit-identical.
+    MH.export_skin(body, rig, out, clips, tris=TRIS, post=False,
+                   repaint=coats, dense=wear)
     return out
 
 
