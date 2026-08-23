@@ -283,13 +283,16 @@ const STRINGS = {
     // of the chase strings have it and do print it, which is a separate thing
     // to fix or to stop writing.)
     'clip.rec': 'rec',
+    'clip.rec.full': 'full',
     'clip.keep': 'N keeps it',
-    'clip.on': 'Rolling. N keeps the last ten seconds · L stops.',
+    'clip.on': 'Recording. N keeps everything since now · L stops.',
     'clip.off': 'Recorder off.',
     'clip.saved': 'Kept %s seconds · %m MB, in your downloads.',
-    'clip.empty': 'Nothing in the buffer yet — give it a second.',
+    'clip.empty': 'Nothing recorded yet — give it a second.',
     'clip.cannot': 'This browser will not record the canvas.',
-    'clip.hint': 'Nothing is rolling. L arms the recorder.',
+    'clip.hint': 'Nothing is recording. L arms the recorder.',
+    'clip.full': 'Stopped at %s minutes. N still keeps what you have.',
+    'clip.resized': 'Window resized — %s seconds lost. Recording again from here.',
 
     // end screen
     'over.crashed': 'You went in.',
@@ -637,13 +640,16 @@ const STRINGS = {
 
     // the gameplay recorder — src/92-clip.js
     'clip.rec': 'snima',
+    'clip.rec.full': 'puno',
     'clip.keep': 'N sprema',
-    'clip.on': 'Snima. N sprema zadnjih deset sekundi · L gasi.',
+    'clip.on': 'Snima. N sprema sve od sada · L gasi.',
     'clip.off': 'Snimanje ugašeno.',
     'clip.saved': 'Spremljeno %s s · %m MB, u preuzimanjima.',
-    'clip.empty': 'U međuspremniku još nema ništa — daj mu sekundu.',
+    'clip.empty': 'Još nije ništa snimljeno — daj mu sekundu.',
     'clip.cannot': 'Ovaj preglednik ne snima platno.',
     'clip.hint': 'Ništa se ne snima. L pali snimanje.',
+    'clip.full': 'Stalo na %s minuta. N i dalje sprema snimljeno.',
+    'clip.resized': 'Prozor promijenjen — izgubljeno %s s. Snima ponovno odavde.',
 
     'over.crashed': 'Pao si.',
     'over.won': 'Vatra je ugašena.',
@@ -974,13 +980,16 @@ const STRINGS = {
 
     // the gameplay recorder — src/92-clip.js
     'clip.rec': 'rec',
+    'clip.rec.full': 'plein',
     'clip.keep': 'N pour garder',
-    'clip.on': 'Ça tourne. N garde les dix dernières secondes · L arrête.',
+    'clip.on': 'Ça tourne. N garde tout depuis maintenant · L arrête.',
     'clip.off': 'Enregistreur arrêté.',
     'clip.saved': '%s secondes gardées · %m Mo, dans vos téléchargements.',
-    'clip.empty': 'Rien dans le tampon pour l\'instant — laissez-lui une seconde.',
+    'clip.empty': 'Rien d\'enregistré pour l\'instant — laissez-lui une seconde.',
     'clip.cannot': 'Ce navigateur n\'enregistre pas le canevas.',
     'clip.hint': 'Rien ne tourne. L arme l\'enregistreur.',
+    'clip.full': 'Arrêté à %s minutes. N garde toujours ce que vous avez.',
+    'clip.resized': 'Fenêtre redimensionnée — %s secondes perdues. On repart d\'ici.',
 
     'over.crashed': 'Vous êtes tombé.',
     'over.won': 'Le feu est éteint.',

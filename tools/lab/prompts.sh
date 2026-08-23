@@ -124,3 +124,19 @@ hut, an old 1960s wooden valve television with rabbit-ear aerials glowing on a \
 small table, a vintage bakelite radio beside it, dim warm interior, dust in the \
 air, a bead curtain and bright sunlight at the door, real photographed video, \
 shallow depth of field, film grain, 35mm, moody cinematic colour grade"
+
+# The kabine interior clip Misha recorded on 23 Aug (fr-clip-20260823-121149).
+# KABWINE above is close but describes a different beat — it has her soaking wet
+# in front of a folding bed, and the bed is not in this window. Written against
+# the control frames themselves, which is the whole lesson of the 33-run matrix:
+# a dark hut, a bead curtain full of sun on the left with the channel beyond it,
+# the cocktail poster on the right wall, the stool and the bottle.
+KAB3="photorealistic footage inside a small dark whitewashed beach changing hut \
+on the Dalmatian coast near Sibenik, Croatia, a young woman standing on the \
+bare concrete floor with wet skin and her hands behind her head, a doorway \
+hung with a shimmering bead curtain beside her with brilliant August sunlight \
+pouring through it, the deep blue Adriatic and a low green island beyond, a \
+printed cocktail poster on the whitewashed wall, a small round wooden stool \
+with a bottle standing on it, dust in the air, hard shafts of light, deep \
+shadow, real photographed video, shallow depth of field, film grain, 35mm, \
+warm cinematic colour grade"

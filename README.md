@@ -40,8 +40,8 @@ is a real footprint.
 | `0` | **skip straight to Rokići, on foot** — the back door, see below |
 | `P` / `Esc` | **pause** — the fire stops too |
 | `H` | hide the HUD |
-| `L` | **record** — keeps a rolling buffer of the last ten seconds |
-| `N` | keep it — writes the buffer out as a `.webm`, and goes on recording |
+| `L` | **record** — starts recording, and keeps going until you stop it |
+| `N` | keep it — writes the take out as a `.webm`, and goes on recording |
 
 On foot at the airfield:
 
@@ -489,12 +489,19 @@ which steps the simulation without rendering.
 `tools/record.mjs` films the vikendica cutscene by holding its clock and
 scrubbing it frame by frame, which only works because a cutscene is a function
 of time. Gameplay is a function of the mouse, so it is recorded rather than
-reconstructed: `L` in the game arms a rolling buffer of the last ten seconds of
-the canvas — two `MediaRecorder`s staggered so that neither file is ever cut —
-and `N` drops what is in it into your downloads as a `.webm`, with the game's
-own sound in it, and keeps recording. There is a `REC` indicator in the bottom
-right corner whenever it is armed, because the failure this prevents is playing
-for twenty minutes with the buffer switched off.
+reconstructed: `L` in the game starts a `MediaRecorder` over the canvas and `N`
+drops everything since you pressed `L` into your downloads as a `.webm`, with
+the game's own sound in it, and keeps recording. Takes are arbitrary length —
+one deck, never recycled, never cut, so what comes out is a complete file
+Chrome wrote itself; there is a half-hour ceiling, and it stops and says so
+rather than dropping the beginning, because a WebM missing its head decodes
+wrong instead of failing. There is a `REC` indicator in the bottom right corner
+whenever it is armed, because the failure this prevents is playing for twenty
+minutes with the recorder switched off.
+
+It was a ten-second rolling buffer until 23 Aug 2026 — the idea being that you
+could keep a thing after it had happened rather than before. What that could
+not do is film a demo.
 
 What it films is the canvas, so the HUD, the toasts and the indicator itself
 are never in the clip.

@@ -1,5 +1,5 @@
 // -----------------------------------------------------------------------------
-// The last ten seconds.
+// The gameplay recorder: arm it, play, keep the lot.
 //
 // tools/record.mjs films the cutscene by holding its clock still and scrubbing
 // it a frame at a time, and that works because the cut is a pure function of
@@ -13,9 +13,21 @@
 // keeping the recent past and nothing else, and a key that writes that past to
 // a file. Nothing is planned, nothing is set up, and nothing has to be repeated
 // for the camera — you play, and when something happens that is worth showing
-// you keep the ten seconds that just went by. The .webm it drops is watchable
-// as it stands and is what tools/clip.mjs turns into frames for the VACE
-// restyle in tools/vacejob.py.
+// you keep everything since you armed it. The .webm it drops is watchable as
+// it stands and is what tools/clip.mjs turns into frames for the VACE restyle
+// in tools/vacejob.py.
+//
+// It was a ROLLING BUFFER until 23 Aug: two staggered decks holding the last
+// ten to twenty seconds, so that a thing worth keeping could be kept after it
+// had already happened. Misha filmed the kabine, got 18.92 s, and said what
+// the design had been quietly refusing all along — "it should just keep
+// rolling and let me record arbitrary length of video". He is right, and the
+// change is a deletion rather than an addition: the stagger existed only to
+// avoid ever cutting a WebM, and a recording that is never cut does not need
+// two decks to avoid cutting it. One deck, started when you arm and kept in
+// full, is both simpler and unbounded. What it costs is memory that grows —
+// see `maxMin`, which is the price of the promise and is stated rather than
+// discovered.
 //
 // One consequence of filming the canvas rather than the page, and it is the
 // single most useful thing to know about this file: *the HUD is not in it*.
@@ -59,10 +71,14 @@
 // takes 15.77 ms and a frame that takes 14.96 both fit in 16.7. It needs a
 // fixed scene, `--disable-gpu-vsync`, and alternating windows.
 //
-// ── the obvious ring buffer does not survive being cut ──
+// ── nothing is ever cut, and this is why ──
+//
+// This is kept from the rolling-buffer version because it is the reason the
+// recorder is shaped the way it is, and because the first thing anybody will
+// want to add back is a cap that drops the oldest chunks. It does not work.
 //
 // The obvious implementation is one recorder with a timeslice, an array of the
-// chunks it hands back, and a shift() of anything older than ten seconds. It
+// chunks it hands back, and a shift() of anything older than the window. It
 // produces a broken file, and the way it breaks is quiet enough to ship by
 // accident.
 //
@@ -73,7 +89,7 @@
 // be. Measured, with a 500 ms timeslice over sixteen seconds of a test canvas:
 // thirty chunks recorded, ten dropped, twenty-one kept, and ffmpeg then decodes
 // 325 frames spread over a sixteen-second timeline for what was supposed to be
-// the last ten. Half a second of stale picture at the head, a five-second
+// the last N. Half a second of stale picture at the head, a five-second
 // freeze, and then the shot — because the timecode in a block is relative to
 // the Cluster header that was thrown away with the gap, so every surviving
 // block lands where it was rather than where it now is. On top of that the cut
@@ -81,22 +97,16 @@
 // boundaries; the chunks in that test each began one byte into a BlockGroup,
 // which is a coincidence that holds today and is nobody's promise.
 //
-// So the cut never happens. Two recorders run on the same stream, staggered by
-// ten seconds and each recycled after twenty, so that at any instant one of
-// them has been running for between ten and twenty seconds. Saving takes that
-// older one — every chunk it has, from its own EBML header onwards, in order,
-// with nothing removed — which is a complete and ordinary WebM file that Chrome
-// wrote itself. The clip is therefore between ten and twenty seconds long and
-// always ends at the key press, which is the end that matters; tools/clip.mjs
-// takes the last N seconds off the tail if a fixed length is wanted.
+// So the cut never happens, and now it never has to: ONE recorder runs from the
+// moment you arm until you disarm, and saving takes every chunk it has, from
+// its own EBML header onwards, in order, with nothing removed. That is a
+// complete and ordinary WebM file that Chrome wrote itself, of whatever length
+// you played for. tools/clip.mjs takes the last N seconds off the tail if a
+// fixed length is wanted.
 //
-// Two decks means two VP8 encoders. It does not mean two readbacks: both are
-// attached to the same MediaStream, so the canvas is captured once a frame and
-// that one frame is handed to both. The 5.4% above is the pair of them
-// together with the audio, which is the only figure worth quoting — an attempt
-// to price one deck against two came out inside the noise on a laptop sharing
-// its GPU with a sampler, and a number that cannot be measured twice is not a
-// number.
+// The 5.4% measured above was the old pair of decks plus the audio, so one deck
+// is that or better; it has not been re-measured, because the number that
+// mattered was the ceiling and the ceiling has come down.
 //
 // ── the sound comes free ──
 //
@@ -112,9 +122,16 @@
 // -----------------------------------------------------------------------------
 
 const CLIP = {
-  // The promise: press the key and you keep at least this much. What you
-  // actually get is between one and two of these — see the header.
-  secs: 10,
+  // The one hard limit, and it exists because a recording that is never cut is
+  // a recording that grows. At `bps` below this is a megabyte a second, so half
+  // an hour is about 1.8 GB of Blobs — which Chrome pages to disk rather than
+  // holding on the heap, so what it actually spends is scratch space.
+  //
+  // When it is reached the recorder STOPS and says so. It does not start
+  // dropping the oldest chunks: see the header — a WebM with its head or its
+  // middle missing is a file that looks fine and decodes wrong, which is the
+  // one outcome worse than stopping.
+  maxMin: 30,
   // Frames a second asked of the canvas. Not 60: the restyle runs at 16 and
   // anything above 30 is picture nobody will use, paid for at full price in
   // readbacks. A canvas capture cannot exceed what the page draws anyway, so
@@ -123,9 +140,11 @@ const CLIP = {
   // 8 Mbit/s at 720p is roughly four times what a video site would use for the
   // same picture, and deliberately: these frames are the *control signal* for a
   // VACE pass, and a blocking artefact in the input is a blocking artefact the
-  // restyle will faithfully keep. Twenty seconds of it is 20 MB, so 40 MB of
-  // Blobs for the pair of decks at full stretch — which is worth saying out
-  // loud and is still less than a quarter of what the page itself weighs.
+  // restyle will faithfully keep. It is 1 MB a second, so at `secs: 30` the
+  // pair of decks hold up to 120 MB of Blobs at full stretch — worth saying
+  // out loud, and the reason this number and `secs` have to be read together.
+  // Chrome pages Blobs of that size to disk rather than to the heap, so what
+  // it actually costs is scratch space and not the tab's memory.
   bps: 8e6,
   audioBps: 160e3,
   // How often the recorder hands back what it has. Only bookkeeping — the
@@ -165,16 +184,19 @@ function clipMime(withAudio) {
 }
 
 /**
- * Start one deck in slot `i`, replacing whatever was there.
+ * Start the deck, replacing whatever was there.
  *
  * The outgoing recorder's `ondataavailable` is unhooked before it is stopped,
  * because `stop()` flushes one last chunk and that chunk belongs to a segment
- * that is being thrown away. Left hooked it appends twenty seconds of the past
- * on to the front of the new deck's array, and the file that comes out has the
- * old segment's header in the middle of it.
+ * that is being thrown away. Left hooked it appends the old take on to the
+ * front of the new deck's array, and the file that comes out has the old
+ * segment's header in the middle of it.
+ *
+ * The only thing that calls this twice is the resize handler, and there it
+ * throws the take away — which is why that handler says so out loud now.
  */
-function clipDeck(rig, i) {
-  const old = rig.decks[i];
+function clipDeck(rig) {
+  const old = rig.deck;
   if (old) {
     try { old.mr.ondataavailable = null; old.mr.stop(); } catch (e) { /* gone */ }
   }
@@ -189,22 +211,16 @@ function clipDeck(rig, i) {
     if (deck.flush) { const done = deck.flush; deck.flush = null; done(); }
   };
   mr.start(CLIP.slice);
-  rig.decks[i] = deck;
+  rig.deck = deck;
   return deck;
-}
-
-/** The deck that has been running longest, which is the one worth keeping. */
-function clipOldest(rig) {
-  const live = rig.decks.filter(Boolean);
-  return live.length ? live.reduce((a, b) => (a.t0 <= b.t0 ? a : b)) : null;
 }
 
 /** Whether the recorder is running. */
 function clipArmed() { return !!clipRig; }
 
-/** How many seconds are in the bank — what a press of the save key would get. */
+/** How many seconds are banked — what a press of the save key would get. */
 function clipHeld() {
-  const deck = clipRig && clipOldest(clipRig);
+  const deck = clipRig && clipRig.deck;
   return deck ? (performance.now() - deck.t0) / 1000 : 0;
 }
 
@@ -250,27 +266,21 @@ function clipArm() {
     return false;
   }
 
-  const rig = { stream, mime, withAudio, decks: [null, null], turn: 0 };
+  const rig = { stream, mime, withAudio, deck: null, full: false };
   clipRig = rig;
-  clipDeck(rig, 0);
-  // The stagger. Every ten seconds the deck whose turn it is starts again, so
-  // slot 1 is (re)started at 10 s, 30 s, 50 s and slot 0 at 20 s, 40 s, 60 s —
-  // and once the first twenty seconds have gone by, the older of the two is
-  // never younger than ten. The opening twenty are the exception and cannot be
-  // anything else: nothing can hand back a past it did not record. The HUD
-  // counts up through them so it is visible rather than surprising.
+  clipDeck(rig);
+  // No stagger and no recycling. One deck runs from here until you disarm,
+  // and every chunk it hands back is kept, so what a save writes is the whole
+  // take. The two-deck rotation this replaces is described in the header, and
+  // so is the reason it existed — it was never about wanting a short clip, it
+  // was about never having to cut a WebM. Not cutting one at all satisfies that
+  // better than cutting one carefully.
   //
-  // `turn` starts at 0 and is flipped *before* use, so the first tick lands on
-  // slot 1. Starting it at 1 recycles slot 0 at ten seconds instead and never
-  // starts slot 1 at all until twenty — which leaves exactly one deck running
-  // and a buffer that sawtooths between nought and ten seconds instead of ten
-  // and twenty. It read as working: the recorder armed, the HUD counted, the
-  // clip came out fine. It was only a test asserting sixteen seconds in the
-  // bank after sixteen seconds of being armed, and getting 6.05, that found
-  // it.
-  rig.cycle = setInterval(() => clipDeck(rig, rig.turn = 1 - rig.turn),
-    CLIP.secs * 1000);
-  rig.paint = setInterval(clipHud, 500);
+  // The half-second timer now does two jobs: it paints the indicator, and it is
+  // where the hard limit is enforced. Both belong off the recorder's own clock
+  // rather than off `frame()`, so a page with nobody recording never branches
+  // on this file at all.
+  rig.paint = setInterval(clipTick, 500);
   clipHud();
   return true;
 }
@@ -279,11 +289,12 @@ function clipDisarm() {
   const rig = clipRig;
   if (!rig) return;
   clipRig = null;
-  clearInterval(rig.cycle);
   clearInterval(rig.paint);
-  for (const deck of rig.decks) {
-    if (!deck) continue;
-    try { deck.mr.ondataavailable = null; deck.mr.stop(); } catch (e) { /* gone */ }
+  if (rig.deck) {
+    try {
+      rig.deck.mr.ondataavailable = null;
+      rig.deck.mr.stop();
+    } catch (e) { /* gone */ }
   }
   // Stopping the tracks is what actually takes the capture off the canvas.
   // Stopping only the recorders leaves the stream live and the readback still
@@ -311,9 +322,13 @@ function clipToggle() {
 // encoder underneath them when the frame size changes. A segment that straddles
 // a resize is therefore a file whose header disagrees with half its own frames,
 // and rather than find out what each player does with that, both decks are
-// started again at the new size. The recording carries on; what it costs is the
-// buffer, which goes back to nothing and fills again exactly as it did when it
-// was first armed. Going fullscreen is the everyday way to hit this.
+// started again at the new size.
+//
+// Under the rolling buffer that cost "the buffer", which refilled in twenty
+// seconds and was barely worth mentioning. It now costs THE WHOLE TAKE, so it
+// is said out loud: a toast, and the counter visibly back at zero. Going
+// fullscreen is the everyday way to hit it, so the thing to do is go
+// fullscreen first and arm second.
 let clipResizeT = 0;
 addEventListener('resize', () => {
   if (!clipRig) return;
@@ -322,14 +337,16 @@ addEventListener('resize', () => {
   clearTimeout(clipResizeT);
   clipResizeT = setTimeout(() => {
     if (!clipRig) return;
-    clipDeck(clipRig, 0);
-    clipDeck(clipRig, 1);
+    const lost = clipHeld();
+    clipDeck(clipRig);
+    clipRig.full = false;
     clipHud();
+    if (lost > 2) toast(T('clip.resized').replace('%s', lost.toFixed(0)), 'bad');
   }, 400);
 });
 
 /**
- * Everything the older deck has, as one Blob, without stopping it.
+ * Everything the deck has, as one Blob, without stopping it.
  *
  * `requestData()` rather than `stop()`: stopping ends the segment properly but
  * also ends the recording, and the point of this is that you can keep three
@@ -343,12 +360,16 @@ addEventListener('resize', () => {
  * There is a race worth knowing about and not worth fixing: if the timeslice
  * timer fires between hooking `flush` and calling `requestData`, the promise
  * resolves on the timer's chunk instead and the last few milliseconds of the
- * tail arrive after the Blob was built. It costs at most one frame off the end
- * of a ten-second clip.
+ * tail arrive after the Blob was built. It costs at most one frame off the end.
+ *
+ * Note that successive saves in one session are NESTED — the second contains
+ * the first, because the deck is never reset. That is the honest consequence of
+ * not cutting, and it is the right default: L, then play, then save is one
+ * take, and anyone wanting two separate takes presses L twice between them.
  */
 async function clipTake() {
   const rig = clipRig;
-  const deck = rig && clipOldest(rig);
+  const deck = rig && rig.deck;
   if (!deck || deck.mr.state !== 'recording') return null;
   const secs = (performance.now() - deck.t0) / 1000;
   await new Promise((done) => {
@@ -375,8 +396,8 @@ function clipStamp() {
 // does it is pressed at the moment something exciting is happening, which is
 // exactly when a person presses a key twice — and two overlapping `clipTake`s
 // on one deck means the first one's `flush` is overwritten by the second's, so
-// it hangs until its own timeout and then downloads the same ten seconds under
-// a second name.
+// it hangs until its own timeout and then downloads the same bank of picture
+// under a second name.
 let clipSaving = false;
 
 async function clipSave() {
@@ -435,14 +456,40 @@ function clipHush() { clipHushed = !clipHushed; clipHud(); return clipHushed; }
  * anonymous flex items of their own and the spacing comes out doubled in some
  * places and missing in others.
  */
+/**
+ * The recorder's own half-second heartbeat: enforce the limit, then paint.
+ *
+ * Stopping at the cap rather than dropping the oldest chunks is the header's
+ * argument arriving in code. The deck is stopped and the rig left armed, so
+ * what is already banked is still saveable — the alternative, disarming, would
+ * throw away half an hour of somebody's afternoon to tidy up a counter.
+ */
+function clipTick() {
+  const rig = clipRig;
+  if (!rig) return;
+  if (!rig.full && clipHeld() >= CLIP.maxMin * 60) {
+    rig.full = true;
+    try { rig.deck.mr.stop(); } catch (e) { /* already gone */ }
+    toast(T('clip.full').replace('%s', String(CLIP.maxMin)), 'bad');
+  }
+  clipHud();
+}
+
+/** m:ss past a minute, plain seconds below it. */
+function clipClock(secs) {
+  if (secs < 60) return `${secs.toFixed(0)}s`;
+  const m = Math.floor(secs / 60);
+  return `${m}:${String(Math.floor(secs - m * 60)).padStart(2, '0')}`;
+}
+
 function clipHud() {
   const el = $('clip-rec');
   if (!el) return;
   if (!clipRig || clipHushed) { el.hidden = true; return; }
   el.hidden = false;
-  const held = Math.min(clipHeld(), CLIP.secs * 2);
-  el.innerHTML = `<i></i><b>${T('clip.rec')}</b><em>${held.toFixed(0)}s</em>`
-    + `<span>${T('clip.keep')}</span>`;
+  const held = clipHeld();
+  el.innerHTML = `<i></i><b>${T(clipRig.full ? 'clip.rec.full' : 'clip.rec')}</b>`
+    + `<em>${clipClock(held)}</em><span>${T('clip.keep')}</span>`;
 }
 
 onLangChange(clipHud);
@@ -453,9 +500,10 @@ onLangChange(clipHud);
  *
  * A download is a file dialog and a disk, neither of which a headless driver
  * has by default; base64 comes back over the same channel every other probe on
- * `__fr` uses. Ten seconds at 8 Mbit/s is about 10 MB, so 13 MB of string —
- * fine over a debugger socket, ridiculous anywhere else, which is why the game
- * itself never calls this.
+ * `__fr` uses. It is a megabyte a second and base64 is four thirds of that, so
+ * a minute is 80 MB of string — fine over a debugger socket for a short take,
+ * ridiculous anywhere else, which is why the game itself never calls this and
+ * why a test that arms this recorder should keep its take short.
  */
 async function clipGrab() {
   const took = await clipTake();
