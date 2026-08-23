@@ -302,6 +302,28 @@ as of this writing; the state of each is in the git log, not here.
       before (the synth), one buffer source after (the clip), and the eight
       crossings after that unchanged.
 
+- [x] The radio played three synthesised tunes. Misha, 23 Aug: "when u spray
+      the radio, it currently plays some silly songs, replace with [his own
+      off-air recording]." The old argument — that a set like this is almost
+      none of it the music, so build it out of oscillators and the band limit
+      IS the timbre — was sound and the result was wrong: three monophonic
+      melodies in thirds read as a games console, because a station is a whole
+      arrangement heard through a letterbox. `build/payload/radio.mp3`, 32.1 s,
+      cut by `tools/cut_field.py`, and the filtering the old note argued for is
+      mostly gone for that note's own reason: the recording already carries the
+      cone. What is left is the distance, which it cannot carry, because it was
+      made standing over the set. The dial keeps three positions and only the
+      middle is the station; the other two are hiss and the station bleeding
+      through it muffled. Level is not taste — -18.94 dBFS is what the three
+      synth stations came out of the old rig at, rebuilt in numpy and measured.
+      NOTE: the recording is his, the broadcast on it is not. LICENSE section 3
+      says so explicitly and does not pretend otherwise.
+- [x] Enter starts the game. "when game first start, i must mouse-click on
+      'take off', but it would be cool to just press 'Enter'." Gated on
+      `started` and not on the button's `hidden`, because Enter is also the
+      jump: `started` is the one flag that is false before the veil is left and
+      true for ever after.
+
 **Verify**
 - [ ] Knee-height close-up pass on the clutter — sandals, dropped towels,
       slumped bags. They are 25 cm objects and have never resolved in a shot

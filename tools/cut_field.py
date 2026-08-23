@@ -57,6 +57,7 @@ FILES = {
     5: 'Voice 260817_150851 jadrija sibenik boat.m4a',
     6: 'Voice 260817_153025 jadrija ambience - cicadas - walking - '
        'through - magical - forest.m4a',
+    7: 'WhatsApp Audio 2026-08-23 at 5.50.13 AM - radio.mp4',
 }
 # 1 is not cut. It was recorded at 21:38 and is broadband 200-2000 Hz with no
 # cicada and no cricket band in it; nobody has been able to say what it is, and
@@ -85,6 +86,23 @@ FILES = {
 #   lapping  the pier, all of it. 73 s.
 #   boat     two minutes of diesel at a very steady 65 Hz. Any window will do,
 #            which is why this one has the cleanest seam of the five.
+#   radio    the transistor set in the kabina, 23 Aug, and the only one of
+#            these that is not a place. The first 2.2 s are the recorder being
+#            put down at -37 dBFS; after that it is level to the end.
+#
+# `bar` is for the radio and for nothing else, and it is the only judgement in
+# this file that is about music rather than about noise. A seam is scored on
+# level and spectrum, both of which are blind to a beat — and a beat is the one
+# thing an ear tracks without being asked, so a loop that joins beautifully in
+# both and lands three tenths of a second early in the bar is heard as a skip
+# every time it comes round. Constrain the LENGTH to a whole number of bars and
+# the pulse carries across the seam whatever the start offset is. The harmony
+# can still step; the pulse cannot, and the pulse is what gives a loop away.
+#
+# 127.06 bpm, measured by combing the onset envelope over periods from 0.40 to
+# 0.55 s at a fifth of a millisecond and summing the response at one, two and
+# four beats: 0.47220 s a beat, 1.88880 s a bar, comb score 0.79 against a
+# noise floor of about 0.1. Twenty bars is 37.8 s and the source gives 39.2.
 BEDS = [
     dict(key='shore',   src=3, window=(0.6, 26.9), length=(23.0, 26.0),
          rate=22050, kbps=96, hp=(3, 180), lp=None,  rms=-28.16,
@@ -101,6 +119,18 @@ BEDS = [
     dict(key='boat',    src=5, window=(1.0, 119.0), length=(34.0, 44.0),
          rate=16000, kbps=64, hp=(2, 45),  lp=None,  rms=-20.45,
          what='the channel off Sibenik, 17 Aug'),
+    # -18.94 dBFS is not a taste: it is the level the three synthesised stations
+    # it replaces came out of the rig at. Those were measured by rebuilding
+    # `radioNote` in numpy and running each station through the old rig at the
+    # near end of its sweep — a 1320 Hz bandpass at Q 0.62 into a 340 Hz
+    # highpass — which put them at -18.55, -19.41 and -19.39 dBFS, mean -19.11.
+    # The new rig is a 150 Hz highpass and a 6 kHz lowpass, which costs a
+    # unit-RMS clip 0.17 dB, so the file goes in 0.17 dB hotter and the room
+    # hears exactly what it heard before. The source rolls off 17 dB by 4 kHz
+    # and is 37 dB down by 8 kHz, so 16 kHz sampling throws nothing away.
+    dict(key='radio',   src=7, window=(2.2, 41.3), length=(26.4, 37.8),
+         rate=16000, kbps=48, hp=(2, 60),  lp=None,  rms=-18.94,
+         bar=1.88880, what='the set in the kabina, 23 Aug'),
 ]
 
 INSET = 0.5     # s — where 80-audio.js puts loopStart and loopEnd
@@ -159,7 +189,12 @@ def pick(x, bed, sr):
     """
     w0, w1 = bed['window']
     best = None
+    # Whole bars for anything that has a beat in it, half-second steps for
+    # everything else. See the note on `bar` above.
+    drop = bed.get('bar', 0.5)
     L = bed['length'][1]
+    if bed.get('bar'):
+        L = drop * int(L / drop + 1e-9)
     while L >= bed['length'][0] - 1e-9:
         a = w0
         while a + L <= w1 + 1e-9:
@@ -168,7 +203,7 @@ def pick(x, bed, sr):
             if best is None or score < best[0]:
                 best = (score, a, L, s, dl, ds)
             a += STEP
-        L -= 0.5
+        L -= drop
     return best
 
 

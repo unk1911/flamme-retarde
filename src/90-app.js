@@ -4630,6 +4630,27 @@ $('enter').addEventListener('click', () => {
   else playIntro();
 });
 
+/**
+ * Enter as well as the button.
+ *
+ * The first thing this page asks anybody to do should not need a mouse, and a
+ * keypress is as good a gesture as a click for the audio context — which is the
+ * only reason the button exists at all.
+ *
+ * Gated on `started`, and not on the button being on screen. Enter is also the
+ * jump, and `started` is the one flag in this file that is false before the
+ * veil is left and true for ever after; the button's `hidden` is not, so a
+ * player who clicked with the mouse would still have a listener sitting here
+ * that turns every jump into a second `beginFlight`. `repeat` is out for the
+ * same reason: holding the key down must not send its later repeats through to
+ * a game that has by then started.
+ */
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || e.repeat || started || $('enter').hidden) return;
+  e.preventDefault();
+  $('enter').click();
+});
+
 $('watch').addEventListener('click', () => {
   leaveVeil();
   playIntro();
