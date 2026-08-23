@@ -2449,7 +2449,7 @@ async function buildJadrija(scene) {
    * here and these are not co-planar with anything: they hang off a frame that
    * is itself 60 mm proud of the render, and 40 more puts them clear of it.
    */
-  function panelSign(t, s, y, w, h, draw) {
+  function panelSign(t, s, y, w, h, draw, yaw) {
     const PX = 512, C = document.createElement('canvas');
     C.width = PX; C.height = Math.round(PX * h / w);
     draw(C.getContext('2d'), C);
@@ -2460,8 +2460,76 @@ async function buildJadrija(scene) {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
       new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
     mesh.position.set(p[0], p[1], p[2]);
-    mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
+    // Seaward by default, because every sign this was written for is on a
+    // shopfront. `yaw` turns it off that — a quarter turn puts a plate across
+    // the lane instead of across the water, which is where a bollard's is.
+    mesh.rotation.y = Math.atan2(-st.nx, -st.nz) + (yaw || 0);
     scene.add(mesh);
+  }
+
+  /**
+   * NE PARKIRAJ !, on the second bollard.
+   *
+   * Read off `a_051` at full resolution. The roundel is the blue disc with the
+   * red ring and the red saltire — no stopping, and the saltire rather than
+   * the single bar is checked, because one bar is no *parking* and this has
+   * two. Under it a line of small red capitals, and under that a black
+   * pictogram of a tow truck with a car hanging off its hook.
+   *
+   * The first line is read. The second is five, six and seven letters at about
+   * a dozen pixels a word and it goes on as marks — the same rule the RENT A
+   * BOAT price rows ship under. What such a sign says in Croatia is not in
+   * doubt and is also not the same thing as reading it.
+   */
+  function neParkiraj(g, C) {
+    const w = C.width, h = C.height;
+    g.fillStyle = '#f4f3ef';
+    g.fillRect(0, 0, w, h);
+    g.strokeStyle = '#b9bcbb';
+    g.lineWidth = w * 0.022;
+    g.strokeRect(w * 0.022, h * 0.016, w * 0.956, h * 0.968);
+    // The roundel: disc, ring, saltire.
+    const cx = w * 0.5, cy = h * 0.295, r = w * 0.365;
+    g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2);
+    g.fillStyle = '#20357e'; g.fill();
+    g.lineWidth = r * 0.26; g.strokeStyle = '#c0202a';
+    g.beginPath(); g.arc(cx, cy, r * 0.87, 0, Math.PI * 2); g.stroke();
+    g.lineWidth = r * 0.22; g.lineCap = 'butt';
+    for (const d of [Math.PI * 0.25, -Math.PI * 0.25]) {
+      const dx = Math.cos(d) * r * 0.87, dy = Math.sin(d) * r * 0.87;
+      g.beginPath();
+      g.moveTo(cx - dx, cy - dy); g.lineTo(cx + dx, cy + dy); g.stroke();
+    }
+    // The line that is read.
+    g.textAlign = 'center';
+    g.fillStyle = '#b41f22';
+    g.font = `800 ${h * 0.058}px "Helvetica Neue", Arial, sans-serif`;
+    g.fillText('NE PARKIRAJ !', cx, h * 0.610);
+    // and the line that is not.
+    g.fillStyle = 'rgba(150,40,40,0.62)';
+    let x = w * 0.115;
+    for (const run of [0.155, 0.20, 0.28]) {
+      g.fillRect(x, h * 0.638, w * run, h * 0.026);
+      x += w * (run + 0.045);
+    }
+    // The tow truck, with a car on the hook. Two boxes, a cab, a boom and four
+    // wheels — it is 0.09 m of plate on the built page and what has to survive
+    // is one vehicle picking another one up off the ground.
+    g.fillStyle = '#171717';
+    const by = h * 0.845, uw = w * 0.030;
+    g.fillRect(w * 0.150, by - uw * 2.6, uw * 3.4, uw * 2.6);   // truck body
+    g.fillRect(w * 0.150, by - uw * 4.4, uw * 1.9, uw * 1.9);   // cab
+    g.fillRect(w * 0.500, by - uw * 2.2, uw * 5.0, uw * 2.0);   // the car
+    g.fillRect(w * 0.500, by - uw * 3.4, uw * 3.0, uw * 1.3);   // its roof
+    g.save();                                                   // the boom
+    g.translate(w * 0.150 + uw * 3.2, by - uw * 3.5);
+    g.rotate(0.30);
+    g.fillRect(0, 0, w * 0.20, uw * 0.7);
+    g.restore();
+    for (const [px, pr] of [[0.178, 0.9], [0.262, 0.9],
+      [0.560, 0.8], [0.690, 0.8]]) {
+      g.beginPath(); g.arc(w * px, by, uw * pr, 0, Math.PI * 2); g.fill();
+    }
   }
 
   /**
@@ -9003,6 +9071,158 @@ async function buildJadrija(scene) {
       }
     }
     b = back9;
+  }
+
+  // ── the folding parking bollards ───────────────────────────────────────────
+  //
+  // Survey item 10, and the item is wrong twice over. It has them as
+  // "red-and-white marker posts, about 1.1 m, standing in the dust along a
+  // concrete kerb strip", with "two of them lying knocked over". Opened at
+  // full size, `a_051` and `a_052` show **lockable folding parking bollards**:
+  // each has a hinged collar bolted to the concrete with a padlock hanging off
+  // it, and a lifting eye through the cap so it can be dropped flat and driven
+  // over. That is a different object with a different job — a marker post
+  // marks, this one is a lock — and it is why they are here at all.
+  //
+  // Nor is anything lying down. `a_053` has one **snapped off at the socket**,
+  // a bare galvanised stub 0.20 m out of the ground with a pale cut top and no
+  // paint left on it, which from a contact sheet reads as a post on the floor.
+  // Of the three that stand, one leans hard. That mixture is the whole
+  // character of the run: municipal kit, installed properly, half wrecked.
+  //
+  // MEASURED off `a_051`, where the run is square to the camera. The post is
+  // 32 px against 323 px of its own height, so 0.09 m on 1.05 m. Bands are
+  // near enough 0.15 and start white at the collar. The plate on the second
+  // one is 107 x 154 px, which on the same scale is 0.35 x 0.50 — a big plate
+  // for a bollard, and it is checked twice because it looked wrong: it really
+  // does cover half the post.
+  //
+  // WHAT THE PLATE SAYS. The roundel is the blue disc with a red ring and a
+  // red saltire — no stopping — and under it two lines of small red type over
+  // a black pictogram of a tow truck lifting a car. The first line is
+  // **NE PARKIRAJ !** and is read. The second is five, six and seven letters
+  // and I can only tell you what a sign like this always says, which is not
+  // the same as reading it, so it goes on as marks. The pictogram is drawn,
+  // because a truck with a car hanging off its hook is legible at this size in
+  // a way that six-point Croatian is not.
+  //
+  // POSITION is a placement and is stated as one, like the kerb blocks above.
+  // What the footage shows is bollards on the edge of a made vehicle surface
+  // where it meets the wood. The one such edge this model has is the seaward
+  // lip of the nose-in car row, so they go along that, in the western wood
+  // clear of every shop — twenty-four metres of it, which is what `a_051`
+  // covers, and not five hundred.
+  {
+    const back10 = b;
+    b = up;
+    const RED = [0.628, 0.152, 0.128];
+    const WHT = [0.828, 0.822, 0.802];
+    const COLLAR = [0.150, 0.148, 0.146];
+    const BARE = [0.560, 0.566, 0.572];      // galvanised, unpainted
+    const R = 0.045, HT = 1.05, BAND = 0.15;
+    const bs = JAD.rowB + 3.6;               // seaward of the car noses
+    /**
+     * One bollard at `(t, s)`, leaning `lean` metres at the cap.
+     *
+     * The lean is why this does not use `post()`. That helper reuses the
+     * bottom ring's x and z for the top one and only changes y, which is
+     * exactly right for a pole and cannot tilt: the whole point of the second
+     * one in `a_052` is that it has been shoved.
+     */
+    const gAt = (t2, s2) => {
+      const st2 = at(t2);
+      return Math.max(surfaceY(t2, s2),
+        groundAt(st2.x + st2.nx * s2, st2.z + st2.nz * s2));
+    };
+    const bollard = (t, s, lean, seed) => {
+      const y0 = gAt(t, s);
+      const lt = Math.cos(seed * 2.1) * lean, ls = Math.sin(seed * 2.1) * lean;
+      const P = (u, a, r) => W(t + lt * u + Math.cos(a) * r,
+        s + ls * u + Math.sin(a) * r, y0 + HT * u);
+      const seg = (u0, u1, r, col, sides) => {
+        const n = sides || 8;
+        for (let i = 0; i < n; i++) {
+          const a0 = (i / n) * TAU, a1 = ((i + 1) / n) * TAU;
+          b.quad(P(u0, a0, r), P(u0, a1, r), P(u1, a1, r), P(u1, a0, r), col);
+        }
+      };
+      // The collar: a hinge plate and its clamp, and the one part of this that
+      // is not a painted tube.
+      seg(0, 0.075, R * 1.34, COLLAR);
+      // The bands, white at the collar and alternating up — and the count is
+      // forced ODD, which is not tidiness. Six bands puts red under the cap
+      // and the photographs have white there, so the eye came out as a white
+      // lid on a red post instead of as a ring through a white top.
+      let n = Math.round((HT - 0.075 * HT) / BAND);
+      if (n % 2 === 0) n += 1;
+      for (let k = 0; k < n; k++) {
+        const u0 = 0.075 + (1 - 0.075) * (k / n);
+        const u1 = 0.075 + (1 - 0.075) * ((k + 1) / n);
+        seg(u0, u1, R, k % 2 ? RED : WHT);
+      }
+      // The cap, and the eye through it. The eye is two segments of a much
+      // thinner tube standing proud rather than a torus: at 0.09 m of post it
+      // is four pixels from anywhere you can stand.
+      const top = [];
+      for (let i = 0; i < 8; i++) {
+        top.push(P(1, (i / 8) * TAU, R * 0.98));
+      }
+      for (let i = 1; i < 7; i++) b.tri(top[0], top[i], top[i + 1], WHT);
+      seg(1.0, 1.0 + 0.030 / HT, R * 0.30, COLLAR, 5);
+      // The padlock, hanging at the collar.
+      const py = y0 + 0.055;
+      frustumTS(py - 0.030, [t + 0.028, s + R * 1.1, 0.017, 0.010],
+        py + 0.012, [t + 0.028, s + R * 1.1, 0.015, 0.009],
+        COLLAR, shade(COLLAR, 1.5));
+    };
+    /** What is left when one has been snapped off at the socket. */
+    const stub = (t, s) => {
+      const y0 = gAt(t, s);
+      const P = (a, r, y) => W(t + Math.cos(a) * r, s + Math.sin(a) * r, y);
+      const n = 8;
+      for (let i = 0; i < n; i++) {
+        const a0 = (i / n) * TAU, a1 = ((i + 1) / n) * TAU;
+        b.quad(P(a0, R, y0), P(a1, R, y0),
+          P(a1, R, y0 + 0.20), P(a0, R, y0 + 0.20), BARE);
+      }
+      // The cut top, pale and flat, which is the whole tell.
+      const rim = [];
+      for (let i = 0; i < n; i++) rim.push(P((i / n) * TAU, R, y0 + 0.20));
+      for (let i = 1; i < n - 1; i++) {
+        b.tri(rim[0], rim[i + 1], rim[i], shade(BARE, 1.24));
+      }
+    };
+    // T0 is east of the playground and it has to be. `PLAY` runs t 157-176 on
+    // s 28.9-37.4 and this line is at 29.7, so a run starting at 172 put two
+    // bollards inside the compound, on the safety surfacing, next to the
+    // slide. The car loop already skips `PLAY` and `SAN` for exactly this and
+    // the same two guards are here rather than being remembered.
+    const T0 = 182.0, PITCH10 = 4.8;
+    for (let k = 0; k < 6; k++) {
+      const t = T0 + k * PITCH10;
+      if (!clearOfShops(t)) continue;
+      if (t > PLAY.t0 - 3 && t < PLAY.t1 + 3) continue;
+      if (t > SAN.t0 - 3 && t < SAN.t1 + 3) continue;
+      if (k === 3) { stub(t, bs); continue; }
+      // One of the six leans, which is the one in `a_052`.
+      bollard(t, bs, k === 4 ? 0.13 : 0.012 * (jit(t | 0, 91) - 0.5), k);
+    }
+    b = back10;
+    // And the plate, on the second of them.
+    {
+      // Offset along `t` and not along `s`, which is the whole reason `yaw`
+      // was added. The quarter turn sends the plate's normal from seaward to
+      // along-shore, so a standoff measured across the shore puts it *beside*
+      // the post rather than in front of it — which is what the first build
+      // did, and it read as a plate on a stick next to a bollard.
+      // West-facing, on the west side of the post: a bollard's plate faces the
+      // car coming at it, and the lane runs up the shore. `-PI/2` turns the
+      // normal to -t and the standoff goes the same way — with the two of them
+      // disagreeing the post stands in front of its own sign.
+      const t = T0 + PITCH10, sw = 0.30, sh = 0.42;
+      panelSign(t - R - 0.014, bs, gAt(t, bs) + 0.62, sw, sh, neParkiraj,
+        -Math.PI * 0.5);
+    }
   }
 
   // ── ZABRANJENO ODLAGANJE OTPADA ────────────────────────────────────────────

@@ -186,9 +186,56 @@ lean is 0.078 in sun and 0.115 in the sky-lit midtones but **0.030 in the deep
 shade under the pine, where no sky reaches it**. That last one is the fabric.
 Same trap as the lavender, and this time it was seen coming.
 
-**10. The red-and-white marker posts.** `a_051`, `a_052`, `a_053`. Slim posts
-in alternating red and white bands, about 1.1 m, standing in the dust along a
-concrete kerb strip at the wood edge. Two of them lie knocked over.
+**10. ~~The red-and-white marker posts.~~ Folding parking bollards.**
+`a_051`, `a_052`, `a_053`. **BUILT, 23 Aug**, and the item was wrong twice.
+
+They are not marker posts. Opened at full size, each one has a **hinged collar
+bolted to the concrete with a padlock hanging off it** and a **lifting eye
+through the cap**, so it drops flat and a car drives over it. A marker post
+marks; this one is a lock, and that is the reason it is on this edge at all.
+
+And nothing is lying down. `a_053` has one **snapped off at the socket** — a
+bare galvanised stub 0.20 m out of the ground with a pale cut top and no paint
+left on it, which from a contact sheet reads as a post on the floor. Of the
+three that stand, one leans hard. Municipal kit, installed properly, half
+wrecked: that mixture is the whole character of the run and it is built in —
+six positions, one of them a stub, one of them leaning.
+
+Measured off `a_051`, where the run is square to the camera: the post is 32 px
+against 323 px of its own height, so **0.09 m on 1.05 m**, with bands of about
+0.15 starting white at the collar. The plate on the second one is 107 × 154 px
+on the same scale — **0.35 × 0.50 m**, a big plate for a bollard, checked twice
+because it looked wrong. It really does cover half the post.
+
+Three things the render taught:
+
+- **The band count has to be ODD.** Six bands puts red under the cap and the
+  photographs have white there, so the eye came out as a white lid on a red
+  post instead of a ring through a white top.
+- **`post()` cannot lean**, because it reuses the bottom ring's x and z for the
+  top one and only changes y. The whole point of the second one in `a_052` is
+  that it has been shoved, so this lofts its own tube.
+- **A quarter-turned plate has to be offset the way it now faces.** `panelSign`
+  gained a `yaw`, and with the standoff still measured across the shore the
+  sign stood *beside* the bollard instead of on it.
+
+WHAT THE PLATE SAYS, and what it does not. The roundel is the blue disc with a
+red ring and a red **saltire** — no stopping, and the saltire rather than the
+single bar is checked, because one bar is no *parking* and this has two. The
+first line under it is **NE PARKIRAJ !** and is read. The second is five, six
+and seven letters at about a dozen pixels a word; what a sign like this always
+says is not the same as reading it, so it goes on as marks. The tow truck with
+a car on its hook is drawn, because a picture survives at a size six-point
+Croatian does not.
+
+POSITION is a placement, like the kerb blocks. The footage has bollards on the
+edge of a made vehicle surface where it meets the wood; the one such edge this
+model has is the seaward lip of the nose-in car row, so they run along that in
+the western wood — twenty-four metres, which is what `a_051` covers, and not
+five hundred. The first build put two of them **inside the playground**, on the
+safety surfacing next to the slide, because `PLAY` runs t 157-176 on s 28.9 and
+this line is at 29.7. The car loop already skips `PLAY` and `SAN` for exactly
+that, and both guards are now here rather than being remembered.
 
 **11. The slastičarnica drinks board.** `b_182`–`b_188`. **BUILT, 23 Aug.**
 
