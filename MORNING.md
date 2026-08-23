@@ -99,6 +99,11 @@ it repaints the whole resort, so it is your call and I have not touched it.
   and the price column rebuilt: four prices are printed with the menu and the
   rest are white stickers stuck over it, which is what makes it look ragged in
   every photograph. TONIC and FANTA are now read rather than inferred.
+- **Survey item 10 built — the folding parking bollards.** The survey had them
+  as "red-and-white marker posts" with "two lying knocked over". They are
+  lockable bollards, each with a hinged collar, a padlock and a lifting eye
+  through the cap; and nothing is lying down — one is snapped off at the
+  socket, which from a contact sheet reads as a post on the floor.
 - **Survey item 8 was a misidentification and is now a correction.** The "two
   pale domed containers" behind a fence at `b_047` are not glass-recycling
   igloos. They are the roof and the bonnet of the covered car from item 9,
