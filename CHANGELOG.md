@@ -8,6 +8,31 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.106.0] — 2026-08-23
+
+### Added
+
+- **The centenary hoarding: JADRIJA 100, OD 1922.** An enclosure on the
+  chippings behind the businesses, clad in printed cream panel on galvanised
+  legs, and the print is the best piece of graphic design at Jadrija — rows of
+  kabina doors in their four colours with one in eight ajar, JADRIJA arched over
+  a white 100 whose zeros are the front of a kabina, a sea ladder in the corner,
+  a small red flower over the I. **The date is off the panel and nowhere else**,
+  and it makes this the only place in the game that says how old the resort is.
+
+  Two things the making of it taught. The doors must be sized off the *door*,
+  not off a column count: a kabina door on this print is about one to three, and
+  deriving width from "thirteen across" gave doors nearly as wide as they were
+  tall, so the panel read as a chequerboard rather than a row of huts. And the
+  printed colours must be lighter than the kabina palette itself — this is flat
+  ink on cream in full sun, and at the paint's own saturation it reads as a wall
+  of colour instead of a drawing of one.
+
+  Its position is a placement and not a measurement, and the source says so: the
+  geotag puts the camera on the promenade at s 6.8 while the frame shows
+  chippings, pines and red tile thirty metres inland. GPS under pine canopy is
+  worth about ten metres.
+
 ## [1.105.0] — 2026-08-23
 
 Per-shop survey pass, working the photographs that only became usable when the
