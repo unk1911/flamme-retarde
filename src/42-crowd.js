@@ -400,7 +400,9 @@ function makeSkinCrowd(scene, figs, cap) {
   }
 
   return {
-    figures, flush, layers: [],
+    figures, flush, layers: [], kind: 'skin',
+    /** Everybody this tier is answerable for right now. See `tierCount`. */
+    live: () => figures.slice(),
     tris: figs.reduce((a, f) => a + f.tris, 0),
     get drawn() { return drawn; },
   };
@@ -708,7 +710,9 @@ function makeCrowd(scene, rig, cap) {
   }
 
   return {
-    figures, layers, flush,
+    figures, layers, flush, kind: 'inst',
+    /** Everybody this tier is answerable for right now. See `tierCount`. */
+    live: () => figures.slice(),
     tris: rig.parts.reduce((a, p) => a + p.geo.index.count / 3, 0),
     get drawn() { return drawn; },
   };

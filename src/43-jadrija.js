@@ -13736,6 +13736,37 @@ async function buildJadrija(scene) {
   }
 
   let crowdT = 0;
+  // Where the camera was on the last frame the crowd was stepped.
+  //
+  // Kept so that a probe can ask "how many of the good figures are near me"
+  // without being handed a camera to ask it about. It is the one number the
+  // casting below turns on, and a question about the casting that has to be
+  // told where you are standing is a question that can be answered wrongly.
+  const lastCam = { x: 0, z: 0 };
+
+  /**
+   * Who is drawn by which tier, within `r` metres of you.
+   *
+   * This is the measurement the roving cast exists to move, and it is worth a
+   * handle of its own because the thing it counts is invisible from outside:
+   * both tiers draw people, both draw them in the right place, and the only
+   * difference is which mesh. `skin` is how many of the eight blobs are within
+   * reach of you and `inst` how many of the tapered blocks are — so a change
+   * that works pushes the first up and the second down without moving `total`.
+   */
+  function tierCount(r = 15) {
+    const rr = r * r;
+    const out = { r, skin: 0, inst: 0, total: 0 };
+    for (const k in crowds) {
+      for (const fg of crowds[k].live()) {
+        const dx = fg.x - lastCam.x, dz = fg.z - lastCam.z;
+        if (dx * dx + dz * dz > rr) continue;
+        out[crowds[k].kind === 'skin' ? 'skin' : 'inst']++;
+        out.total++;
+      }
+    }
+    return out;
+  }
 
   /**
    * Walk the walkers, then pose everybody.
@@ -13747,6 +13778,7 @@ async function buildJadrija(scene) {
    */
   function updateCrowd(dt, cam) {
     crowdT += dt;
+    lastCam.x = cam.x; lastCam.z = cam.z;
     // The one skinned figure here is posed on the CPU — twenty-eight bones,
     // once a frame — so she is only worth doing when there is somebody near
     // enough to tell. Past a quarter of a kilometre she is a couple of pixels
@@ -13849,6 +13881,8 @@ async function buildJadrija(scene) {
       },
       /** Every figure, live, for a test that wants to know where they are. */
       all: () => Object.values(crowds).flatMap((c) => c.figures),
+      /** How many of each tier are within `r` metres of you. See `tierCount`. */
+      tiers: tierCount,
       /**
        * Walk into somebody without walking into them.
        *

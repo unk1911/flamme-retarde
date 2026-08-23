@@ -4917,6 +4917,14 @@ window.__fr = {
      * in and the frame a probe can read.
      */
     bumps: () => (jadrija && jadrija.bumps ? jadrija.bumps() : null),
+    /**
+     * How many of each tier of bather is within `r` metres of you.
+     *
+     * The one number that says whether the good figures are the ones you can
+     * reach. See `tierCount` in 43-jadrija.js.
+     */
+    tiers: (r = 15) => (jadrija && jadrija.crowd.tiers
+      ? jadrija.crowd.tiers(r) : null),
     /** Debug: who is standing close enough to be resolved against right now. */
     bodies: (pad = 1.2) => {
       if (!jadrija || !jadrija.bodies) return null;
