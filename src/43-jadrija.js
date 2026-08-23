@@ -6411,6 +6411,12 @@ async function buildJadrija(scene) {
   // ice-cream errand is set on, and it holds sixty. The ladder stays, because
   // it costs nothing at this count and is what makes a larger one arguable
   // later — the number to re-measure next is thirty.
+  //
+  // Re-measured, and it is twenty-four. Uncapped at 1280x720 over 95 frames at
+  // the three promenade stations: 16.1 / 10.6 / 10.4 ms against 15.9 / 10.2 /
+  // 9.9 at twenty, which is inside the noise. Thirty is 16.8 / 11.1 / 11.2 and
+  // that first number is over the 16.7 ms a 60 fps frame has, so twenty-four
+  // is the ceiling rather than a stop on the way to more.
   const SKIN_CAST = 24;
   // And on top of those, the café terraces.
   //
@@ -10005,6 +10011,15 @@ async function buildJadrija(scene) {
    * come from: the same two meshes at 0.66.
    */
   const crowds = {};
+  // Which of the eight each bather is, when they are one, and how tall the
+  // eight actually are. Filled in the block below and read by the casting loop
+  // a few thousand lines down, which is a long way for three arrays to travel
+  // — but the choosing has to happen where the blobs are parsed and the
+  // spending has to happen where the people are bound, and those are not the
+  // same place.
+  let castBlob = null;                  // bather index -> blob, or -1
+  let castNatH = null;                  // blob -> how tall it stands, in metres
+  let castSlot = null;                  // roving slot -> which blob it is
   {
     // Eight blobs, thirty-two people.
     //
@@ -10047,14 +10062,123 @@ async function buildJadrija(scene) {
         return null;
       }
     }))).filter(Boolean);
+    // ── who is who, and which mesh a slot has to be ────────────────────────
+    //
+    // A roving slot cannot be pointed at just anybody. The slot *is* a mesh —
+    // one of the eight, with its own build and its own paint baked into its
+    // vertices — so the only people it can stand in for are people who are
+    // that person. Which means every bather who could ever be promoted has to
+    // be told which of the eight they are, once, at build time, and told it
+    // for good: a bather whose blob was chosen when they were promoted would
+    // be a different body every time you walked up to them.
+    //
+    // Two bands, because the eight are 1.24 m to 1.84 m and two of them are
+    // children. `b.k` is the placement's note that somebody is a child — 0.66,
+    // and it is only ever that or 1 — and putting a child on a 1.84 m man's
+    // mesh scaled to 1.19 m gives a very small adult, which is not a child.
+    // Within a band it is dealt round the shore rather than drawn: it costs no
+    // draw of `rng` (Rule 4), it puts the eight out in equal numbers, which is
+    // what the slot allocation below wants, and it is the only version of this
+    // that guarantees no two neighbours are the same person. See below.
+    const CHILD_H = 1.45;
+    if (parsed.length) {
+      castNatH = parsed.map(skinHeight);
+      const bands = [[], []];
+      castNatH.forEach((h, i) => bands[h < CHILD_H ? 0 : 1].push(i));
+      // A band with nobody in it — a payload short of its children — falls
+      // back to the other one rather than dividing by zero.
+      if (!bands[0].length) bands[0] = bands[1];
+      if (!bands[1].length) bands[1] = bands[0];
+      castBlob = new Int8Array(bathers.length).fill(-1);
+      const per = new Int32Array(parsed.length);
+      const cand = [[], []];
+      for (let bi = 0; bi < bathers.length; bi++) {
+        const b = bathers[bi];
+        // The same predicate the casting loop uses, and it has to be: a chair
+        // sitter is pinned to the terrace and a sunbather has no clip, so
+        // neither is ever a candidate for a roving slot.
+        if (b.chair || b.pose === 'sit' || b.pose === 'lie') continue;
+        cand[b.k < 0.9 ? 0 : 1].push(bi);
+      }
+      // Round-robin *along the shore*, and the ordering is the whole of it.
+      //
+      // Round-robin in placement order was the first cut and it put four
+      // identical women on one terrace. `bathers` comes out of the casting
+      // pass interleaved by pose — stand, wade, walk, sit, lie, stand, … —
+      // and `spread` within a pose steps three places along the shore rather
+      // than scattering, so the standers near you arrive three apart in a list
+      // that is being dealt six ways. Six and three are not coprime: every
+      // stander in one stretch of promenade got one of two blobs, and from the
+      // middle station that is a beach bar with four copies of the same woman
+      // at it.
+      //
+      // Sorted by `t` first, the deal is over neighbours instead of over an
+      // index, so no two people standing next to each other are ever the same
+      // person and you would have to walk past six of them to see a repeat.
+      // It costs no draw of `rng` — Rule 4 — because `b.t` is already placed.
+      for (let g = 0; g < 2; g++) {
+        const band = bands[g];
+        cand[g].sort((x, y) => bathers[x].t - bathers[y].t);
+        cand[g].forEach((bi, k) => {
+          const c = band[k % band.length];
+          castBlob[bi] = c;
+          per[c]++;
+        });
+      }
+      // And how many slots each of the eight gets, in proportion to how many
+      // people on this shore are them. Largest remainder, because twenty-four
+      // over eight is only exact while the bands divide evenly — there are far
+      // fewer children on this beach than adults, and three slots apiece would
+      // leave six of the twenty-four standing idle out of reach of anybody
+      // they could possibly stand in for.
+      //
+      // One slot reserved for every one of the eight who has anybody at all to
+      // stand in for, before the proportion is worked out on the rest. Strict
+      // proportion gave the two children none: there are two child bathers on
+      // this shore who are not sitting on the quay, against fifty-three
+      // adults, and 24 x 1/55 rounds to nothing — so the one thing on the
+      // beach a player would notice most, a child, was the one thing that
+      // could never be promoted. A reserved slot costs nothing, because a slot
+      // that is always pointed at the same person costs exactly what a slot
+      // that is being fought over costs.
+      // `Array.from` and not `per.map`, because `per` is an Int32Array and its
+      // `map` hands back another Int32Array — every object below would be
+      // coerced to zero, which is a page that loads to 78 per cent and stops.
+      const seats = Array.from(per, (c) => (c > 0 ? 1 : 0));
+      let left = SKIN_CAST - seats.reduce((a2, c) => a2 + c, 0);
+      const spare = Array.from(per, (c, i) => ({ i, c: Math.max(0, c - seats[i]) }));
+      const tot = spare.reduce((a2, w) => a2 + w.c, 0) || 1;
+      for (const w of spare) {
+        w.q = w.c * left / tot;
+        w.n = Math.floor(w.q);
+        w.r = w.q - w.n;
+      }
+      left -= spare.reduce((a2, w) => a2 + w.n, 0);
+      for (const w of [...spare].sort((x, y) => y.r - x.r)) {
+        if (left-- <= 0) break;
+        w.n++;
+      }
+      castSlot = [];
+      for (let i = 0; i < per.length; i++) {
+        for (let k = 0; k < seats[i] + spare[i].n; k++) castSlot.push(i);
+      }
+    }
     // Round-robin over the eight, so the twenty-four on the terraces are the
     // same eight people three times over rather than three of them eight times.
     // They sit at four different cafés and no two of a kind share a table.
+    //
+    // The terraces first and the roving slots after, which is the split
+    // `makeSkinCrowd` reads off `rove`. The order matters only in that the
+    // pinned half has to be the front of the array.
     const figs = [];
-    for (let i = 0; parsed.length && i < SKIN_CAST + SKIN_SEATED; i++) {
+    for (let i = 0; parsed.length && i < SKIN_SEATED; i++) {
       figs.push(skinnedFigure(parsed[i % parsed.length], SKINOPT));
     }
-    if (figs.length) crowds.skin = makeSkinCrowd(scene, figs, figs.length);
+    for (const c of castSlot || []) figs.push(skinnedFigure(parsed[c], SKINOPT));
+    if (figs.length) {
+      crowds.skin = makeSkinCrowd(scene, figs, figs.length,
+        (castSlot || []).length);
+    }
     // And the instanced pair as well, which used to be the *fallback* for a
     // payload with no blobs in it and is now the second tier of a crowd.
     //
@@ -13699,6 +13823,12 @@ async function buildJadrija(scene) {
   const walkers = [];
   // Everybody the static blocker list does not hold — see `bodies` below.
   const soft = [];
+  // Everybody who could be promoted, grouped by which of the eight they are.
+  // Grouped and not one list, because a slot is a mesh: slot `j` can only ever
+  // be pointed at somebody who is `castSlot[j]`, so the nearest-first question
+  // is asked eight times over a tenth of a list each rather than once over all
+  // of it. See `stepCast`.
+  const rove = (castNatH || []).map(() => []);
   let cast = 0;
   let seated = 0;
   for (let bi = 0; bi < bathers.length; bi++) {
@@ -13715,17 +13845,42 @@ async function buildJadrija(scene) {
     // on the slab itself with their legs over the water, and the two are half a
     // metre apart. There is no clip for `lie` at all.
     const blobbable = b.chair || (b.pose !== 'sit' && b.pose !== 'lie');
-    const wantSkin = !!crowds.skin && blobbable
-      && (b.chair ? seated < SKIN_SEATED : cast < SKIN_CAST);
+    // Pinned to the good tier, for good. Only the chairs are, and the reason
+    // is that a café terrace is the one place on this shore you walk up to and
+    // *stop*: it is where the ice-cream errand is set, the tables are two
+    // metres apart, and a seated figure that swapped tiers as you crossed the
+    // terrace would do it in front of your face. The three seated clips are
+    // also solved in metres against a 0.46 m chair — see `sit_clips` in
+    // bathers_mh.py — and the instanced rig's `sit` is measured for somebody
+    // on the lip of the quay, half a metre lower, so a chair sitter demoted
+    // would not be sitting on their chair. Both arguments point the same way.
+    const pinSkin = !!crowds.skin && b.chair && seated < SKIN_SEATED;
+    // And everybody else who *could* be a blob is a candidate for one — which
+    // is the change. The cast used to be cut here, at build time, in placement
+    // order, and that is exactly the complaint: the twenty-four best figures
+    // were chosen before anybody arrived, so the mannequin at your elbow was a
+    // mannequin all session and a blob four pixels tall two hundred metres
+    // away was spending the budget. Now the same twenty-four meshes follow
+    // you. See `stepCast` below.
+    // `crowds.m || crowds.f` because a roving candidate's home is the
+    // instanced tier and it is only *lent* to a slot. With no rig loaded at
+    // all there is nowhere to lend them from, and a figure in both arrays
+    // would be drawn twice.
+    const roveOk = !!crowds.skin && !!(crowds.m || crowds.f) && blobbable
+      && !b.chair && castBlob && castBlob[bi] >= 0;
     // Drawn whether or not it is wanted. Rule 4: the `rng` stream is the beach,
     // and a draw that happens only for the people who did *not* get a blob
     // makes `SKIN_CAST` a knob that reshuffles every gait, every swimsuit and
     // every height downstream of it every time it is touched. One discarded
     // number a head buys the right to tune the cast without moving the crowd.
     const sex = rng() < 0.5 ? 'f' : 'm';
-    const C = wantSkin ? crowds.skin
+    // The instanced tier is now everybody's home except the terrace's. A
+    // roving candidate lives here and is *lent* to a slot; `fg.hidden` is what
+    // says which of the two is drawing them this frame.
+    const C = pinSkin ? crowds.skin
       : (crowds[sex] || crowds.m || crowds.f || crowds.skin);
-    if (wantSkin) { if (b.chair) seated++; else cast++; }
+    if (pinSkin) seated++;
+    if (roveOk) cast++;
     if (!C) break;
     const p = toWorld(b.t, b.s);
     const fg = {
@@ -13769,7 +13924,18 @@ async function buildJadrija(scene) {
       // matching `idx` on it, which every figure now carries.
       idx: bi,
       skin: pick(SKIN), suit: pick(SWIM), hair: pick(HAIR),
+      // Which of the eight this person is, if they are ever going to be one,
+      // and which roving slot is currently drawing them. See `stepCast`.
+      blob: roveOk ? castBlob[bi] : -1,
+      slot: -1,
+      hidden: false,
+      // The clip clock, seeded with the offset the skinned tier used to hand
+      // out at the moment it started somebody's idle. It runs from here on
+      // whether or not this person is being drawn by a blob, which is what
+      // makes a promotion mid-stroll resume a walk rather than restart one.
+      clock: 0,
     };
+    fg.clock = fg.seed * 11.3;
     // The same number again with the placement's child multiplier taken back
     // out, because the two tiers mean different things by a height.
     //
@@ -13782,7 +13948,36 @@ async function buildJadrija(scene) {
     // blobs get the jitter alone — and nothing at all if they are in a chair,
     // for the reason in `flush`.
     fg.hscale = b.chair ? 1 : fg.scale / b.k;
+    // Except for anybody who can change tiers, where a height is no longer a
+    // matter of taste. The instanced rig draws this person 1.7-odd metres tall
+    // times `fg.scale`; the blob draws them its own stature times `fg.hscale`;
+    // and if those two numbers disagree then walking toward somebody makes
+    // them grow, which is a worse thing to see than a mannequin. So the blob
+    // is scaled to whatever the instances were already going to be, and the
+    // rig's height is measured rather than taken from the 1.70 m this file has
+    // been asserting in prose since the crowd was written.
+    if (roveOk) fg.hscale = (C.height || 1.70) * fg.scale / castNatH[fg.blob];
+    // And the same argument about colour, settled the other way round.
+    //
+    // The blob's skin and swimwear are baked into its vertices and its shader
+    // is `base *= vVCol` — there is no uniform to ask, and adding one would be
+    // adding it to the tier that is *already* right. The instanced tier is the
+    // one that can be told: three per-instance colours and a marker palette
+    // that asks which is which. So the stand-in is repainted to match the
+    // person, not the person to match whichever mesh they land on.
+    //
+    // What it costs is the palette variety on the promotable half of the
+    // beach: eight suits instead of six times four times three. What it buys
+    // is that nobody on this shore changes colour when you walk up to them,
+    // and the sunbathers and the quay sitters — who can never be promoted and
+    // are most of the towels — keep the full palette. See `BATHER_PAINT`.
+    if (roveOk) {
+      const paint = BATHER_PAINT[BATHER_CAST[fg.blob]];
+      if (paint) { fg.skin = paint.skin; fg.suit = paint.suit; }
+      fg.hair = BATHER_HAIR;
+    }
     C.figures.push(fg);
+    if (roveOk) rove[fg.blob].push(fg);
     if (b.beat) walkers.push(fg);
     if (!fg.solid) soft.push(fg);
   }
@@ -13812,6 +14007,91 @@ async function buildJadrija(scene) {
   // is that only your own input ever moves you. She walks through you; you do
   // not walk through her. What it costs is a frame or two of overlap when she
   // walks into your back, which is a frame or two and then she is past.
+  // Which roving slots are which of the eight, the other way round.
+  //
+  // `castSlot[j]` says what mesh slot `j` is; this says which slots a given
+  // one of the eight owns, which is the question `stepCast` actually asks.
+  // Built once, here, rather than searched every time.
+  const slotsOf = (castNatH || []).map(() => []);
+  (castSlot || []).forEach((c, j) => slotsOf[c].push(j));
+
+  /**
+   * How the good figures decide who to be.
+   *
+   * `ROVE.hold` is the hysteresis and it is in metres. A slot is not handed to
+   * whoever is nearest — it is handed to whoever is nearest *by eight metres*,
+   * because two people standing at more or less the same distance would
+   * otherwise trade the slot every time the sort came out the other way, which
+   * is a person and a mannequin flickering back and forth on the same square
+   * of concrete. Eight metres against a stroll of about 1.4 m/s is six seconds
+   * between the earliest a swap can happen and the earliest it can be undone,
+   * and there is nothing on this shore that moves fast enough to beat it.
+   *
+   * `ROVE.every` is how often the question is asked at all. Seven times a second is
+   * far more often than anybody's ranking changes and is still a fifteenth of
+   * the sorts a per-frame answer would do; it is also a second layer of the
+   * same damping, since a swap cannot happen twice inside 0.15 s.
+   *
+   * (`ROVE` and not `CAST`, which is already the number of people at Jadrija
+   * eight thousand lines up. Every file in src/ shares one lexical scope and
+   * this file has been bitten by that name four times.)
+   *
+   * Neither of these is a distance at which somebody is promoted. There is no
+   * such distance: a slot that has nobody near it stands in for whoever is
+   * furthest away rather than going empty, because an idle slot costs exactly
+   * what a busy one does — a mesh, a skeleton and a palette upload — and the
+   * upload is the cost. Free is not a thing a slot can be.
+   */
+  const ROVE = { hold: 8, every: 0.15 };
+  // Long, so the first frame the resort is stepped does a full casting pass
+  // rather than leaving twenty-four blobs standing on the origin.
+  let castClk = 1e9;
+
+  /**
+   * Re-point the roving slots at whoever is nearest, and keep everybody's
+   * clip clock running whether or not they are being drawn by one.
+   *
+   * The clock first and unconditionally: it is one multiply and one add per
+   * candidate, about fifty of them, and it is the whole of "a figure promoted
+   * mid-walk does not restart its clip". Somebody demoted at the west end and
+   * promoted again two minutes later comes back into the same idle at the
+   * phase it would have reached, because it never stopped.
+   */
+  function stepCast(dt, cam) {
+    const skin = crowds.skin;
+    if (!skin || !skin.slots.length) return;
+    for (const g of rove) {
+      for (const fg of g) if (!fg.hidden) fg.clock += dt * clipRate(fg);
+    }
+    castClk += dt;
+    if (castClk < ROVE.every) return;
+    castClk = 0;
+    for (let c = 0; c < rove.length; c++) {
+      const list = rove[c], js = slotsOf[c];
+      if (!js.length || !list.length) continue;
+      for (const fg of list) {
+        const dx = fg.x - cam.x, dz = fg.z - cam.z;
+        // Sitting tenants pay eight metres less rent. See `ROVE.hold`.
+        fg.rank = Math.sqrt(dx * dx + dz * dz) - (fg.slot >= 0 ? ROVE.hold : 0);
+      }
+      list.sort((a2, b2) => a2.rank - b2.rank);
+      const n = Math.min(js.length, list.length);
+      // Everybody who has lost their slot gives it up first, or the winners
+      // below find nowhere to stand and the two halves disagree about who is
+      // being drawn.
+      for (let i = n; i < list.length; i++) {
+        if (list[i].slot >= 0) skin.assign(list[i].slot, null);
+      }
+      let k = 0;
+      for (let i = 0; i < n; i++) {
+        if (list[i].slot >= 0) continue;
+        while (k < js.length && skin.slots[js[k]]) k++;
+        if (k >= js.length) break;
+        skin.assign(js[k], list[i]);
+      }
+    }
+  }
+
   const BODY = {
     // The plan radius of one of them at the shoulders.
     //
@@ -13965,6 +14245,45 @@ async function buildJadrija(scene) {
   }
 
   let crowdT = 0;
+  // Where the camera was on the last frame the crowd was stepped.
+  //
+  // Kept so that a probe can ask "how many of the good figures are near me"
+  // without being handed a camera to ask it about. It is the one number the
+  // casting below turns on, and a question about the casting that has to be
+  // told where you are standing is a question that can be answered wrongly.
+  const lastCam = { x: 0, z: 0 };
+
+  /**
+   * Who is drawn by which tier, within `r` metres of you.
+   *
+   * This is the measurement the roving cast exists to move, and it is worth a
+   * handle of its own because the thing it counts is invisible from outside:
+   * both tiers draw people, both draw them in the right place, and the only
+   * difference is which mesh. `skin` is how many of the eight blobs are within
+   * reach of you and `inst` how many of the tapered blocks are — so a change
+   * that works pushes the first up and the second down without moving `total`.
+   */
+  function tierCount(r = 15) {
+    const rr = r * r;
+    const out = { r, skin: 0, inst: 0, total: 0, why: {} };
+    for (const k in crowds) {
+      for (const fg of crowds[k].live()) {
+        const dx = fg.x - lastCam.x, dz = fg.z - lastCam.z;
+        if (dx * dx + dz * dz > rr) continue;
+        out[crowds[k].kind === 'skin' ? 'skin' : 'inst']++;
+        out.total++;
+        // Why any instanced figure is still one, near you, which is the only
+        // interesting half of this. A `lie` or a quay `sit` has no clip in the
+        // bake and is *supposed* to be here; anything else near you is a
+        // promotion that did not happen and wants explaining.
+        if (crowds[k].kind !== 'skin') {
+          const w = fg.blob >= 0 ? 'unpromoted' : fg.mode;
+          out.why[w] = (out.why[w] || 0) + 1;
+        }
+      }
+    }
+    return out;
+  }
 
   /**
    * Walk the walkers, then pose everybody.
@@ -13976,6 +14295,7 @@ async function buildJadrija(scene) {
    */
   function updateCrowd(dt, cam) {
     crowdT += dt;
+    lastCam.x = cam.x; lastCam.z = cam.z;
     // The one skinned figure here is posed on the CPU — twenty-eight bones,
     // once a frame — so she is only worth doing when there is somebody near
     // enough to tell. Past a quarter of a kilometre she is a couple of pixels
@@ -14049,6 +14369,12 @@ async function buildJadrija(scene) {
     // bumped is a clock that never gets to fourteen.
     stepBump(dt, cam);
 
+    // Who the good figures are, before anybody is drawn as one. After the
+    // walkers have moved, because the ranking is on where people are *now*,
+    // and before the flushes, because `fg.hidden` decides which of the two
+    // tiers draws each of them and both of them read it below.
+    stepCast(dt, cam);
+
     for (const k in crowds) crowds[k].flush(crowdT, cam);
     // And the fish, which is three hands and a Date and is not worth a gate.
     if (vik) vik.tick();
@@ -14078,6 +14404,37 @@ async function buildJadrija(scene) {
       },
       /** Every figure, live, for a test that wants to know where they are. */
       all: () => Object.values(crowds).flatMap((c) => c.figures),
+      /** How many of each tier are within `r` metres of you. See `tierCount`. */
+      tiers: tierCount,
+      /**
+       * The roving cast: who the eight are, how tall, and who is in a slot.
+       *
+       * `natH` and `rigH` are the two numbers the whole identity argument
+       * turns on — a blob's own stature and the instanced rig's — and they are
+       * measured off the meshes rather than written down, so this is the only
+       * way to see what they came out as. `swaps` counts promotions and
+       * demotions since the page loaded, which is how you tell hysteresis that
+       * is working from hysteresis that is not there.
+       */
+      cast: () => ({
+        natH: (castNatH || []).map((h) => +h.toFixed(3)),
+        rigH: Object.values(crowds).filter((c) => c.height)
+          .map((c) => +c.height.toFixed(3)),
+        slots: castSlot || [],
+        pool: rove.map((g) => g.length),
+        held: crowds.skin ? crowds.skin.slots.filter(Boolean).length : 0,
+        swaps: crowds.skin ? crowds.skin.swaps : null,
+        // Who is in a slot right now, nearest first, with the stature they are
+        // drawn at on each tier. The two columns must agree.
+        who: crowds.skin ? crowds.skin.slots.filter(Boolean)
+          .map((fg) => ({
+            idx: fg.idx, blob: BATHER_CAST[fg.blob], mode: fg.mode,
+            d: +Math.hypot(fg.x - lastCam.x, fg.z - lastCam.z).toFixed(1),
+            skinM: +(castNatH[fg.blob] * fg.hscale).toFixed(3),
+            instM: +(((crowds.m || crowds.f || {}).height || 0)
+              * fg.scale).toFixed(3),
+          })).sort((a2, b2) => a2.d - b2.d) : [],
+      }),
       /**
        * Walk into somebody without walking into them.
        *
@@ -14099,6 +14456,8 @@ async function buildJadrija(scene) {
       }),
       /** The instanced layers, so the near shadow cascade can occlude with them. */
       meshes: () => Object.values(crowds).flatMap((c) => c.layers.map((L) => L.mesh)),
+      /** And the skinned ones, which each need a palette of their own. */
+      shadows: (shadow) => (crowds.skin ? crowds.skin.shadows(shadow) : []),
     },
     site: { x: mid.x + mid.nx * 16, z: mid.z + mid.nz * 16, yaw: Math.atan2(mid.ux, -mid.uz) },
     /**
