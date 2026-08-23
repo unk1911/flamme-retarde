@@ -848,6 +848,11 @@ async function boot() {
     for (const m of jadrija.crowd.meshes()) {
       shadow.cast(m, { instanced: true, near: true });
     }
+    // And the good ones, which are not instanced and cannot share either of
+    // the two depth materials: a skinned figure's shape is in a bone palette
+    // and the depth pass has to be handed it too. See `shadows` in 42-crowd.js
+    // for why this is only now worth what it costs.
+    if (jadrija.crowd.shadows) jadrija.crowd.shadows(shadow);
     // And the row parked in the wood. These used to be baked into `upMesh` and
     // so cast into both cascades; instanced and near-only is the same deal the
     // town's cars get, and a car is nine texels across in the far map.

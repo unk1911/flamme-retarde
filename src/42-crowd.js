@@ -612,6 +612,23 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
 
   return {
     figures, flush, layers: [], kind: 'skin', slots, assign,
+    /**
+     * Register every figure with the shadow map.
+     *
+     * Late, and from 90-app.js, because the shadow does not exist when the
+     * resort is built. `dynamic` is what makes it affordable: `syncMoving`
+     * copies each proxy's visibility off its mesh, and `flush` has already
+     * hidden everybody past 240 m and every slot standing in for nobody, so
+     * the depth pass draws exactly the people who are on screen.
+     *
+     * It was not here before and it showed the moment the cast started
+     * following the player. The instanced tier casts — one proxy per layer,
+     * registered in 90-app.js since the crowd was written — and the skinned
+     * tier did not, which was invisible while the good figures were mostly far
+     * away and became the whole picture when they were mostly at your elbow:
+     * you would walk toward a bather and watch their shadow go out.
+     */
+    shadows: (shadow) => figs.map((f) => f.cast(shadow, { near: true })),
     /** Everybody this tier is answerable for right now. See `tierCount`. */
     live: () => figures.concat(slots.filter(Boolean)),
     tris: figs.reduce((a, f) => a + f.tris, 0),

@@ -14221,6 +14221,8 @@ async function buildJadrija(scene) {
       }),
       /** The instanced layers, so the near shadow cascade can occlude with them. */
       meshes: () => Object.values(crowds).flatMap((c) => c.layers.map((L) => L.mesh)),
+      /** And the skinned ones, which each need a palette of their own. */
+      shadows: (shadow) => (crowds.skin ? crowds.skin.shadows(shadow) : []),
     },
     site: { x: mid.x + mid.nx * 16, z: mid.z + mid.nz * 16, yaw: Math.atan2(mid.ux, -mid.uz) },
     /**
