@@ -72,13 +72,15 @@ Applies to the authored content rather than the machinery:
   in the channel off Šibenik and trimmed, filtered and levelled by
   `tools/cut_field.py`, and
   `build/payload/cuk.mp3`, a scops owl recorded by the same hand elsewhere;
-  `build/payload/beads.mp3` is *not* one of these — see section 3;
+  `build/payload/beads.mp3` is *not* one of these — see section 3, and neither
+  is `build/payload/radio.mp3`, which is my recording of somebody else's
+  broadcast — see section 3 for what that does and does not cover;
 - `docs/*.png`;
 - the assembled `flamme-retarde.html` as a whole.
 
 Share-alike here is deliberate and not merely inherited. Nothing in the bundle
-forces it — the ambience is my own field recording bar one CC0 sample, and CC0
-asks for nothing at all — and it stays because it is the right answer for a thing built almost entirely
+forces it — the ambience is my own field recording bar one CC0 sample and one
+off-air one, and CC0 asks for nothing at all — and it stays because it is the right answer for a thing built almost entirely
 out of open data and other people's generosity, and because I would rather not
 argue about whether a base64 blob inside an HTML file is a Collection or an
 Adaptation.
@@ -142,6 +144,39 @@ Downsampled to 24 kHz mono and tapered to 1.15 s to sit with the field
 recordings. It is played only for the *crossing* of the kabina's curtain; the
 tail after you are through is synthesised in `src/80-audio.js`, because it has
 to follow how hard the strands are still swinging.
+
+### The crowd's voices — synthesised, not recorded
+
+`build/payload/bump_*_{m,f}.mp3` are thirty-two short lines — sixteen, in a
+man's voice and a woman's — spoken by somebody you have walked into on the
+promenade. They were generated with ElevenLabs text-to-speech on 23 August 2026
+from wording written for this game, using two voices from that service's shared
+library, `Pauly - Brooklyn Wise Guy` and `Brooklyn - African American New
+Yorker`. No person said them and no recording of a person is in them.
+
+The wording is mine and the licence above covers it. What ElevenLabs grants over
+its own output is a matter between the account holder and ElevenLabs, and this
+notice is here so that anyone redistributing the bundle knows which six files to
+ask that question about. They are trimmed to the speech, levelled to -20 dBFS
+RMS and cut to 24 kHz mono to sit with the field recordings.
+
+### The radio — an off-air recording, and the one thing here I cannot license
+
+`build/payload/radio.mp3` is 32.1 seconds cut by `tools/cut_field.py` from a
+recording made on 23 August 2026 of a transistor set playing. The *recording*
+is mine and the licence above covers it. What is coming out of the set is not:
+it is a broadcast, and whoever wrote and recorded the music on it holds their
+own rights in it, which no licence I grant can touch and which I am not
+claiming to have cleared.
+
+It is here because the three tunes it replaced were written out of oscillators
+and read as a games console rather than as a station — see the note at the top
+of the radio in `src/80-audio.js`. It is thirty-two seconds, band-limited by
+the speaker it came out of and again by the doorway, and it plays only inside
+one hut that you have to find. That is a judgement about proportion and not a
+legal opinion, and anyone redistributing this bundle should make their own:
+the clip is one file, it is named, and taking it out costs the radio its sound
+and nothing else.
 
 ### Terrain heightfield — public domain
 

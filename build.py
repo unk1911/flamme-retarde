@@ -36,7 +36,7 @@ DEPLOY = Path("/mnt/c/tmp/flamme-retarde")
 # rebuild byte-for-byte identically, because comparing checksums is how we
 # check that what is on the server is what is in the repo. Bump them together
 # when cutting a release, next to the CHANGELOG entry.
-VERSION = "1.109.0"
+VERSION = "1.110.0"
 BUILD_DATE = "2026-08-23"
 
 THREE_VERSION = "0.180.0"
@@ -241,7 +241,18 @@ def main() -> None:
     size = OUT.stat().st_size / 1024 / 1024
     print(f"wrote {OUT} — v{VERSION} ({BUILD_DATE}), {size:.2f} MB")
 
-    if DEPLOY.parent.exists():
+    # NOT from a worktree. `DEPLOY` is one fixed path and every agent working in
+    # a `.claude/worktrees/` checkout runs this same script, so three agents
+    # building in parallel took turns stamping their own build over the copy
+    # Misha actually plays. On 23 Aug that put a 1.109.0 worktree build on top
+    # of the 1.110.0 release three minutes after it shipped, and the symptom was
+    # him asking why the live site was ahead of his own machine. The build in
+    # the worktree is still written and still checked; it is only publishing to
+    # the shared path that a worktree has no business doing.
+    inWorktree = ".claude/worktrees/" in str(ROOT).replace("\\", "/")
+    if inWorktree:
+        print(f"note: worktree build — not publishing to {DEPLOY}")
+    elif DEPLOY.parent.exists():
         DEPLOY.mkdir(parents=True, exist_ok=True)
         shutil.copy2(OUT, DEPLOY / "flamme-retarde.html")
         shutil.copy2(OUT, DEPLOY / "index.html")

@@ -91,6 +91,25 @@ days of guessing.
 
 ---
 
+## HOW THIS FILE IS KEPT
+
+Cross an item off in the SAME commit that fixes it. Six items were found closed
+on 23 Aug that had been fixed, merged and written up in the CHANGELOG days
+earlier and left ticking over here as outstanding work — the walk, the west-end
+heights, the R chase, the bathers on absent ladders, the beds, the crowd. Every
+one of them got proposed back to Misha as a job. A list that lies about what is
+done is worse than no list.
+
+## STANDING — not items, and never finished
+
+- **The per-shop detail pass.** One shop per iteration, against its own
+  photographs. This used to sit in OPEN with a checkbox, which was the wrong
+  shape for it — Misha, 23 Aug: "isn't that just a continuous thing we do, we
+  keep refining its shoppe." It is. Slasticarnica and Caffe TRAMPULIN have had
+  theirs; the other eight have not, and there is no state at which the parade
+  is done. Rule 12 governs every pass: invent no name, no price and no number
+  the photographs do not carry.
+
 ## OPEN
 
 **Build**
@@ -136,7 +155,6 @@ days of guessing.
       Still open: the joints themselves. v_022 has them wide and visibly darker
       than the stones, and the flags here have no joint geometry at all — the
       edges are just where one colour meets the next.
-- [ ] Per-shop detail pass, one shop per iteration, against its own photographs.
 - [x] Sound: klapa out, five field recordings in — the promenade as one bed,
       the hillside cicadas, the same chorus from inside the pines crossfaded on
       canopy, the sea against the concrete edge (driven off `shoreAt` from
@@ -155,16 +173,21 @@ days of guessing.
       the three beds are now one bed divided by where you stand — see MORPH in
       80-audio.js. The levels themselves were left where they were: what was
       wrong with them was never how loud they were.
-- [ ] The five audio levels are still arithmetic, not judgement — `SHORE.gain`
+- [x] The five audio levels are still arithmetic, not judgement — `SHORE.gain`
       0.30, `CICADA.level` 3.2 and its `lift` 1.2, `LAP.gain` 0.28, `BOAT.gain`
-      0.085. The morph holds the SUM within half a decibel of what was liked
-      everywhere on the promenade and takes it 1.3 dB down ninety metres into
-      the pines, which is a judgement and wants an ear on it. If the promenade
-      sounds muffled standing on it that is `SHORE.lpNear` (4 kHz), held short
-      of the cicada band so the two chorus clips do not double.
-- [ ] `Voice 260811_213809.m4a` is unidentified — 21:38, broadband 200-2000 Hz,
-      no cicada or cricket band. Not shipped, because the game has no night and
-      naming it would be inventing one. Ask Misha what it is.
+      0.085. SETTLED 23 Aug: "the 5 audio levels don't worry about it either i
+      like the current audio." The ear this item was waiting for has now been
+      put on it, and the answer is that the numbers are right. They are not
+      arithmetic any more — they are heard and kept. Do not re-derive them.
+      If the promenade ever sounds muffled standing on it that is
+      `SHORE.lpNear` (4 kHz), held short of the cicada band so the two chorus
+      clips do not double.
+- [x] `Voice 260811_213809.m4a` is unidentified — 21:38, broadband 200-2000 Hz,
+      no cicada or cricket band. SHELVED 23 Aug, and it was never a defect:
+      "forget this clip, it's for night and we don't have night." Which settles
+      what it is as well as what to do with it. It stays out of the payload and
+      out of this list; if a night is ever built, the recording is where it
+      always was and `tools/cut_field.py` already knows it as source 1.
 
 **From Misha, 22 Aug — the playing pass**
 
@@ -185,8 +208,14 @@ as of this writing; the state of each is in the git log, not here.
       is the cabinet's own front face two millimetres behind the picture plane.
       The tube stands 50 mm proud with a moulded surround now. See the method
       note below: painting the assembly found it in one screenshot.
-- [ ] Her walk is a bear's — stance too wide, arms too far off the body. Both
-      arms and legs need to move through space like a person's.
+- [x] Her walk is a bear's — stance too wide, arms too far off the body. Both
+      arms and legs need to move through space like a person's. CLOSED 23 Aug
+      on Misha's word: "her walk is just fine now, u can close that out." The
+      only evidence a gait item can be closed on is somebody watching it, and
+      he raised it — and there is a written fix behind that verdict: the same
+      22 Aug pass found the same rest splay against 2 degrees of correction,
+      and `_walk_elbow`'s sign backwards, which on that bone swings the hand
+      forward when it should swing it back. See the 1.99.0 CHANGELOG entry.
 - [x] And so is the bathers' STAND, which the walk pass did not touch: "at
       least some of the bathers still have that bear-pose, the A-pose, with
       spread legs and arms". Same cause, one clip along — `IDLE_A` corrects the
@@ -212,19 +241,59 @@ as of this writing; the state of each is in the git log, not here.
       seated clips in the bake with the legs solved per figure against a 0.46 m
       seat. All 24 terrace occupants are the skinned tier. 60 fps standing in
       front of it, against 60-61 before.
-- [ ] West of the businesses the ground comes up through everything: benches
-      grown into it, bathers neck deep. Almost certainly rule 2 again, but
-      MEASURE the four height functions on a grid before assuming.
-- [ ] The standing crowd reads as switched-off robots. Either give every figure
+- [x] West of the businesses the ground comes up through everything: benches
+      grown into it, bathers neck deep. FIXED 22 Aug in `2862236`, and this
+      line was simply never ticked — Misha, 23 Aug: "u already fixed the 'west
+      of the businesses ground comes up' issue." The cause was the beach
+      flattening fitting the whole 33 m cross-section to the ground under the
+      seaward 4 m, so the deck was pinned at the waterline while the hill
+      climbed behind it: terrain stood up to 1.50 m above the surface
+      everything was placed on. `lipOf`/`midOf`/`deckOf` are heights at a point
+      now, so the rule is enforced by the function rather than by remembering
+      it. The instruction above was followed to the letter — measured on a
+      10x18 grid, worst case +0.02 m.
+- [x] The standing crowd reads as switched-off robots. Either give every figure
       some motion, however small, or seat them — in the chairs, on the wall,
-      legs in the sea. A standing figure with nothing moving is the one thing
-      not allowed.
-- [ ] The beds repeat audibly after ~15 s and want to be much longer; size is
+      legs in the sea. DONE, and never ticked — Misha, 23 Aug: "i think u
+      already did that and maybe forgot." BOTH halves were done. The motion is
+      at `42-crowd.js:770`, where this line's own verdict is quoted, along with
+      the three causes: one clock shared by the whole crowd, so the beach
+      breathed in and out as one animal; two or three degrees below the neck,
+      which at fifteen metres is a third of a pixel, leaving a head on a 26 s
+      period as the only thing moving on screen; and a pure sine, where a
+      person standing about is still and then *does* something. A clock per
+      figure, a weight shift with weight in it, hands never quite still, a
+      piece of business every 25-50 s, all off `fg.seed`. Median displacement
+      over three seconds 26 mm -> 59 mm, nothing under a centimetre. The
+      seating is the terrace: all 24 occupants on the skinned tier, three to a
+      table at 120 degrees, legs solved per figure against a 0.46 m seat.
+      Re-checked 23 Aug on the built page with the camera nailed down and two
+      frames three seconds apart. Under the beach bar awning, which has no sky
+      in it, 0.70 % of pixels change and the diff is exactly two human
+      silhouettes and nothing else. On the open promenade the raw number is
+      13 % and most of that is CLOUD — quoting it as crowd motion would be
+      wrong, and the human-shaped patches are the three or four by the
+      shopfront. A three-second window cannot catch every figure mid-business
+      at a 25-50 s interval, which is why the 26 -> 59 mm figure is the one
+      that settles it and the photographs only corroborate.
+- [x] The beds repeat audibly after ~15 s and want to be much longer; size is
       explicitly not a constraint any more. And they should MORPH by position —
       toward the water it becomes the water recording, into the pines it becomes
-      the forest — not fade between separate stages.
-- [ ] She swims the R chase in a dead straight line. Wants a wandering track:
-      zig-zags, changes of heading, still catchable.
+      the forest — not fade between separate stages. DONE, and this line is a
+      duplicate of the one under **Build** above that records the same
+      complaint and its fix: the clips are recut long (24.6 / 10.1 / 68.1 /
+      69.6 / 44.1 s against 19 / 14 / 9 / 14 / 10), the two that would not go
+      long run on two playheads 2.3 % apart so their period is minutes, and the
+      three beds are one bed divided by where you stand — MORPH in 80-audio.js.
+      What is genuinely still open out of that work is the five LEVELS, which
+      have their own line above and want an ear rather than arithmetic.
+- [x] She swims the R chase in a dead straight line. Wants a wandering track:
+      zig-zags, changes of heading, still catchable. DONE, and never ticked —
+      Misha, 23 Aug: "the 'R' chase is fine. u can close it out." Three sines
+      at periods that do not divide into one another: 33 s of drift, 13.4 s of
+      correction, 3.1 s of the yaw inside a stroke, with her pace breathing
+      +/-7 %. Measured at 3.84 m of cross-track on a path 3.6 % longer than the
+      rhumb line, which is a wander you can still catch.
 - [x] Slasticarnica to a much higher level of detail than the rest of the
       parade, from `/mnt/c/tmp/refs/jadrija/survey/2/`. It is the setting of a
       coming ice-cream side-quest, so it has to be worth standing in front of.
@@ -238,17 +307,27 @@ as of this writing; the state of each is in the git log, not here.
       at one; the pan construction was found by PAINTING it (rule 5's method,
       below) after reasoning about it failed, again.
 
-- [ ] The shut kabine standing on the bend are still WEDGES: 2.15 m of
-      frontage drawn as 1.42 m at t 400 and 3.38 m at t 480 (rule 9b). Nobody
-      can get inside one, but the first run of the block reads visibly cramped
-      seen down the row. The honest fix is to build each run on a rigid frame
-      of its own — which is what a straight building on a curving promenade
-      actually is — rather than to keep choosing where to stand things.
-- [ ] Three bathers stand in the sea off the west beach holding nothing: the
+- [x] The shut kabine standing on the bend are still WEDGES: 2.15 m of
+      frontage drawn as 1.42 m at t 400 and 3.38 m at t 480 (rule 9b). CLOSED
+      23 Aug: "i don't see any problems there for now it's totally fine." The
+      measurement is not withdrawn and neither is rule 9b — a constant slice of
+      `t` really is a trapezium in the world, and anything else built along
+      this bend will splay the same way. What is withdrawn is the claim that it
+      READS wrong, which was mine and not his, and which was the entire case
+      for rebuilding each run on a rigid frame. Nobody can get inside one and
+      nobody standing on the promenade minds. If the row ever looks wrong down
+      its length the numbers above are still true and the fix is still the one
+      described; until then this is a note about the frame, not a defect.
+- [x] Three bathers stand in the sea off the west beach holding nothing: the
       "somebody halfway down every other ladder" loop puts figures at t 22 /
       110 / 198 at s -0.28, but the ladder loop itself skips `t < beachTo + 8`,
-      so they are on ladders that are not there. Skipping them costs a
-      discarded `rng()` per skip (rule 4) or the whole beach moves.
+      so they are on ladders that are not there. DONE, and never ticked —
+      "the 3 bathers in the sea thingie also close out." The fix is the one
+      this line specified, at `43-jadrija.js:7376`:
+      `if (t < JAD.beachTo + 8) { rng(); continue; }` — the skip draws its
+      number and throws it away, because a bare `continue` would have eaten
+      three out of the stream and moved every bather, parasol and hut east of
+      the beach (rule 4). Census identical either side.
 - [x] "There is another walking block if I run eastward... at some point I hit
       an invisible block/wall, but I am able to overcome it if I \<enter\>
       JUMP." It was at t 170.5 and it ran from the water to the hillside.
@@ -268,10 +347,86 @@ as of this writing; the state of each is in the git log, not here.
       reaches t 565 of 572 — every remaining stop names a bench, a bather, a
       parasol pole, a pine, a hut row or a house. Census unchanged.
 
+- [x] The beads only sounded for YOU. Misha, 23 Aug: "when NPC baye walks
+      in/out or when the NPC doggie walks through it, it doesn't make the beed
+      sound, but it should make a sound regardless of who is walking thru it."
+      The solver held one pair of previous coordinates, because the player was
+      the only mover it had ever been handed — so she walked in to pour a drink
+      and he trotted out under a curtain hanging dead still. `beadCurtain` keeps
+      a `prev` keyed by who now, and `step` takes the others alongside you; the
+      crossing test and the contact drive both moved into a `part(who, ...)`
+      that runs once per mover. Both of them walk the same three marks at
+      t = K.dc — `moveDog`'s legs and hers — so both cross square on, dx 0.00.
+      They pass `null` for height: the gate exists so a Canadair overhead does
+      not part a bead curtain from four hundred feet, and neither of them can
+      leave the ground. Measured with the player standing still on the floor of
+      the hut and never moving: five shoves in forty-five seconds, hers in at
+      15.5 s, his in at 22.0, the player's own teleport out at 25.8 (hard 1.00,
+      so no regression there), hers out at 27.8 and his out at 30.1. Swing
+      peaks 0.49 and 0.40 on the two NPC crossings against 0.02 idle, rattles
+      0 to 23. fps 61, census unchanged, no errors.
+
+- [x] The FIRST crossing of a session sounded different from all the rest.
+      Misha, 23 Aug: "when i walk into kabine for the first time, the beeds
+      don't make that beed sound. but henceafter they do." Not silence — the
+      synthesised shove, which is what you hear when the recording is not there
+      yet. `beadSample` kicked the decode on its first call and returned false
+      while it was in flight, so crossing one got the synth and crossing two
+      onward got beads.mp3. Every other sample in 80-audio.js is a bed: asked
+      for on the frame its locale comes up, wanted continuously after, so a
+      first call that returns nothing costs a frame nobody can hear. This one's
+      first use IS the event. Separated asking from playing — `beadWarm()`, and
+      `stepKabina` calls it every frame there is a curtain, which is a Set
+      lookup. Measured on a cold page walking in on foot: 26 noise bursts
+      before (the synth), one buffer source after (the clip), and the eight
+      crossings after that unchanged.
+
+- [x] The radio played three synthesised tunes. Misha, 23 Aug: "when u spray
+      the radio, it currently plays some silly songs, replace with [his own
+      off-air recording]." The old argument — that a set like this is almost
+      none of it the music, so build it out of oscillators and the band limit
+      IS the timbre — was sound and the result was wrong: three monophonic
+      melodies in thirds read as a games console, because a station is a whole
+      arrangement heard through a letterbox. `build/payload/radio.mp3`, 32.1 s,
+      cut by `tools/cut_field.py`, and the filtering the old note argued for is
+      mostly gone for that note's own reason: the recording already carries the
+      cone. What is left is the distance, which it cannot carry, because it was
+      made standing over the set. The dial keeps three positions and only the
+      middle is the station; the other two are hiss and the station bleeding
+      through it muffled. Level is not taste — -18.94 dBFS is what the three
+      synth stations came out of the old rig at, rebuilt in numpy and measured.
+      NOTE: the recording is his, the broadcast on it is not. LICENSE section 3
+      says so explicitly and does not pretend otherwise.
+- [x] Enter starts the game. "when game first start, i must mouse-click on
+      'take off', but it would be cool to just press 'Enter'." Gated on
+      `started` and not on the button's `hidden`, because Enter is also the
+      jump: `started` is the one flag that is false before the veil is left and
+      true for ever after.
+
+- [x] The diving platform stood on two legs. Misha, 23 Aug, looking up at it
+      from 2.9 m down: "in reality it's not 2 concrete slabs going down, but one
+      thicker concrete slab going down." The two masses above water are right
+      and the photograph says so; below it each had its own shaft to the sea
+      bed, on the argument that nobody sees it — which is wrong twice, because
+      the chase finishes at this platform and you swim under it, and because
+      two masses on separate legs in eight metres of water is a jetty, not a
+      lump poured onto the bed with a later pour on top of it. One prism now,
+      the union of both: t 428.36-432.76, s -40.98 to -39.02, 4.40 by 1.96 m,
+      up to -0.55. Read off the built mesh: at y -8.00 there are two distinct t
+      values, so it is one box; at -0.55 there are four, which is the footing's
+      outer faces plus the two pours starting on it. The seam is where it
+      should be and there is nothing below it. -12 triangles.
+
 **Verify**
-- [ ] Knee-height close-up pass on the clutter — sandals, dropped towels,
+- [x] Knee-height close-up pass on the clutter — sandals, dropped towels,
       slumped bags. They are 25 cm objects and have never resolved in a shot
-      from 15 m.
+      from 15 m. DROPPED 23 Aug: "don't worry about the clutter remove that
+      from the list." Note what is being dropped, because it is not a defect
+      and never was: the objects are built and in the world, and this was a
+      standing offer to go and check they read as sandals rather than as
+      coloured lumps. Nobody has taken that shot and nobody now will. If one of
+      them ever looks wrong from the promenade it will be reported like
+      anything else.
 
 **Mine**
 - [x] v595 and v597, all 409 frames, 23 Aug. The catalogue is
@@ -284,15 +439,30 @@ as of this writing; the state of each is in the git log, not here.
       the loudest colour in the lane.
 
 **Tidy**
-- [ ] `menuWall()` is dead code, not a render bug — nothing in `SHOPS` sets
-      `menu`, so its one call site never fires. It also sits in
-      `if (S.menu) menuWall(); else if (S.name) shopSign();` with 26 lines of
-      comment between the halves, so the first shop to get a menu silently
-      loses its sign. Untangle or delete.
+- [x] `menuWall()` is dead code, not a render bug — nothing in `SHOPS` sets
+      `menu`, so its one call site never fires. DELETED 23 Aug on Misha's word:
+      "if it's truly dead just blow it away." It was truly dead and it was also
+      SUPERSEDED, which is the part that made deleting it safe rather than
+      merely tidy: `menuPanels()` draws the same board off a better photograph
+      (20260821_175713, face-on at fifteen metres) with an explicit note on
+      which words are read straight off the glass and which are inferred, and
+      it is wired up through `S.panels` on `slast`, so it actually renders.
+      Gone with it: the `else if` tangle — `shopSign` is a plain `if` now — and
+      `S.menu` in the scallop test, which is `S.scallop` alone. Triangles
+      identical either side at 440 073, which is the proof nothing it drew was
+      ever drawn.
 
 ---
 
 ## SETTLED
+
+- **The Slasticarnica's back-lit panel belongs to a different frontage.** It was
+  read across, and the claim that this shop's name is on a panel inside rather
+  than on its awning came from that. `slasticarnica-behind-view` catches the
+  lane elevation square on: the awning fascia reads "slastičarnica JADRIJA",
+  lower-case word, upper-case name, dark serif on white. Recorded here because
+  it lived only in `menuWall()`'s doc comment, which was deleted with the
+  function on 23 Aug.
 
 - **Dive board east**, t 430 s -40 — confirmed by Misha. Race is 175 m along
   the shore, not 66 straight out.
@@ -402,22 +572,29 @@ as of this writing; the state of each is in the git log, not here.
 - ~~**a_160** kayaks/pedalos and the white box trailer~~ — the hulls went in
   with the bank armouring; the trailer was built 22 Aug.
 
-- **20260821_175025 and its six neighbours** (t 476.5, s 42.7, corrected
-  geotags): a bare concrete wall with a **tall narrow doorway cut straight
-  through it** — no door, no frame, about 0.85 m by 2.2 m, the reveal showing
-  the wall's own thickness, and the sea, an island and the beach framed in it.
-  A small recessed vent with dark mesh high on the left, a pale grey louvred
-  grille recessed on the right, a rough concrete capping slab along the top
-  with a ragged edge, form marks and vertical construction joints down the
-  face. It is the most architectural thing in the whole survey and the game has
-  nothing like it.
+- ~~**20260821_175025 and its six neighbours**~~ — built 23 Aug. A bare
+  concrete wall with a tall narrow doorway cut straight through it, no door and
+  no frame, 0.85 m by 2.2 m, the reveal showing the wall's own thickness, a
+  recessed vent with dark mesh on one side of it and a pale grey louvred grille
+  on the other, a capping slab with a ragged edge, and shutter joints down the
+  face.
 
-  Not built, deliberately. It needs a decision this file should not make on its
-  own: which wall it is. Seven photographs put the photographer at s 42.7,
-  which is well inland of both kabine rows, so this is either the resort's back
-  wall or a screen wall in the eastern block — and building a 2.2 m hole in the
-  wrong one puts a view of the sea through something with houses behind it.
-  Worth settling with Misha, and then it is an afternoon's work.
+  **Which wall it is** was the only thing stopping this and Misha settled it:
+  the gap between the first run of the front row and the second, the second
+  being the run with the open kabina in it — t 415.50 to 419.93, on the back
+  line of the row at s 19.68-20.10. The doorway is at t 417.45 and it is a
+  route, not a picture: `screenWall` splits its own blocker either side of the
+  opening the way `pushRun` splits a run around Caffe TRAMPULIN, and the clear
+  standing width comes out at 0.61 m, walked through and measured. Blockers
+  645 -> 647, +528 triangles, census untouched.
+
+  The framing settles itself: the camera standing in the alley at s 23.5 had
+  the channel, the far shore and the beach dead centre between those two blocks
+  *before* the wall existed, which is 20260821_175025 in order — reveal, yard,
+  promenade, beach, water, island. From the wood side it is 20260821_175029: a
+  long bare wall down the lane with the white kabine beyond it. The `t 476.5,
+  s 42.7` geotag is not where it went and is not meant to be; the photograph
+  settles the object, Misha settles the wall.
 
 ## SOURCES
 

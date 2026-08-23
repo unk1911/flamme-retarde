@@ -1001,11 +1001,30 @@ async function buildJadrija(scene) {
   // this promenade with nothing on it: every other face in the resort is either
   // a door, a vent or the back of a hut in an alley nobody walks down.
   let gable = null;
-  // And the one at the other end of the same run, which the sign argument above
-  // gave up on and the gull gets: a mural is not a thing you walk towards to
-  // read, it is a thing you notice as you come round the corner of the block,
-  // and the near end is the corner you come round.
-  let nearGable = null;
+  // And the wall the gull is painted on, which is the WEST end of the FIRST run
+  // of the front row — the blank white face you come round walking the
+  // promenade east out of the resort. It used to be the west end of the run
+  // with the open kabina in it, four blocks further on; a mural is not a thing
+  // you walk towards to read, it is a thing you notice as you come round the
+  // corner of the block, and the first block is the first corner there is.
+  // Moved 23 Aug on Misha's reading of his own screenshot.
+  //
+  // `o` is −1 on both of these: the wall faces back down `t`, which is the
+  // whole of the difference from `gable`, and everything hung on one of them
+  // needs the same sign.
+  let firstGable = null;
+  // Every back row run's west end, in the order they are laid. The back row
+  // stands with the pine wood and the parked cars against it, and one of these
+  // is where the fish went — see `fishGable` below, which picks by arc length
+  // because the runs themselves are laid out of `rng` and their ends are not
+  // numbers this file gets to choose.
+  const backGables = [];
+  // The gap between the first two runs of the front row: the two end walls
+  // facing each other across it, and everything the screen wall between them
+  // needs to stand on. Filled by `cabinRun` when it lays the run with the open
+  // kabina in it, which is the second one.
+  let screenGap = null;
+  let prevGableA = null;  // the east end of the last front-row run laid
 
   const runs = [];        // for the blockers, later
   /**
@@ -1412,12 +1431,27 @@ async function buildJadrija(scene) {
     // far one is the wall you are looking at while you walk the row towards it.
     if (sk >= 0) {
       gable = { t: T1 + 0.05, front, back, floor: y0 + JAD.plinth, eave };
-      // And the near one, which is the same wall at the other end of the same
-      // run and is the only other blank face on this promenade. It faces the
-      // other way down t, which is the whole of the difference: `o` is −1 here
-      // where it is +1 there, and everything hung on it needs the same sign.
-      nearGable = { t: T0 - 0.05, o: -1, front, back,
+    }
+    // The two end walls that face each other across a gap in the front row, and
+    // the wood-side end wall of every run in the back row. All three are
+    // recorded here rather than measured afterwards because a run's ends come
+    // out of `rng` — `t0` and `n` are drawn in the layout loop — so the only
+    // place that knows where a wall actually stands is the call that built it.
+    const nearFace = { t: T0 - 0.05, o: -1, front, back,
+      floor: y0 + JAD.plinth, eave };
+    if (front === JAD.rowA) {
+      if (!firstGable) firstGable = nearFace;
+      // The screen wall goes between the run before this one and this one, and
+      // "this one" is the run with the open kabina in it. Both walls are needed
+      // and only the second call knows both, so it is taken here.
+      if (sk >= 0 && prevGableA) {
+        screenGap = { t0: prevGableA.t, t1: nearFace.t, front, back,
+          floor: y0 + JAD.plinth, y0 };
+      }
+      prevGableA = { t: T1 + 0.05, o: 1, front, back,
         floor: y0 + JAD.plinth, eave };
+    } else {
+      backGables.push(nearFace);
     }
 
     // The run is one blocker, except where a door was cut in it: then it is the
@@ -1645,6 +1679,188 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * The concrete screen wall between the first two blocks of the front row,
+   * with the doorway cut straight through it.
+   *
+   * 20260821_175025 and its six neighbours, and it is the most architectural
+   * thing in four hundred frames of survey: a bare concrete wall — no render,
+   * no limewash, board-marked and weathered grey-brown — with a tall narrow
+   * opening cut through it, no door and no frame, 0.85 m by 2.2 m, the reveal
+   * showing the wall's own thickness. A small vent recessed high on one side
+   * with dark mesh behind it, a pale grey louvred grille recessed on the other,
+   * a rough capping slab along the top with a ragged edge, and vertical shutter
+   * joints down the face.
+   *
+   * **Which wall it is** was the only thing stopping this being built, and it
+   * is now settled: it goes in the gap between the first run of the front row
+   * and the second, the second being the run with the open kabina in it. The
+   * seven photographs put the photographer at s 42.7, well inland, looking
+   * seaward through the opening at the sea, an island and the beach — and that
+   * is exactly what this gap gives. The camera standing in the alley at s 23.5
+   * before the wall existed had the channel, Zlarin and a bather framed dead
+   * centre between the two blocks. So the wall closes the gap along the back
+   * line of the row, the alley and the wood are behind it, and what you see
+   * through the doorway is the yard between the blocks, the promenade, the
+   * beach and the water — the photograph, in order.
+   *
+   * It also gives the doorway something to be *for*. The gap was one of ten
+   * identical 3.7 m holes in the front row; now it is the way through, and the
+   * way through is 0.61 m of clear standing room rather than 3.7 m of nothing.
+   *
+   * Nothing in here touches `rng`. The ragged capping and the tonal patching
+   * come off `jit`, which is a hash of the arc length, for the same reason
+   * everything else on this shore does: a single draw taken off the seed here
+   * would move every bather on the beach.
+   */
+  function screenWall(gp) {
+    const t0 = gp.t0, t1 = gp.t1;
+    if (!(t1 - t0 > 1.6)) return;           // no gap, no wall
+    // Thickness. The reveal in the photograph is a good hand's span deep and
+    // then some — you can see the shadow turn the corner in it — and 0.42 m is
+    // what a freestanding wall three metres tall is poured at.
+    const TH = 0.42, SKIN = 0.088;
+    const s1 = gp.back, s0 = s1 - TH;       // s1 is the alley face, s0 the yard
+    const CORE = s1 - 0.090;                // the skin hangs on the alley side
+    const dj = 0.425, HEAD = 2.20;          // 0.85 m by 2.2 m, off the survey
+    const TOP = 2.66, CAP = 0.17, FOOT = 0.40;
+    // Where in the run of wall the opening sits. Not centred: the photograph
+    // has a broad blank panel with the vent on one side of the doorway and a
+    // narrower one with the grille on the other, and from the alley — which is
+    // where the photographer stood — the broad one is on the left, which in
+    // this frame is the higher `t`.
+    const dc = t0 + (t1 - t0) * 0.44;
+    const gy = surfaceY(dc, s1 - TH * 0.5);
+    const y0 = gy - FOOT, yTop = gy + TOP;
+
+    const RAW = [0.470, 0.442, 0.398];      // board-marked concrete, weathered
+    const CAPC = [0.512, 0.487, 0.442];     // the capping slab, paler and drier
+    const JNT = [0.402, 0.378, 0.342];      // shutter joints and the lift line
+    const DARK = [0.060, 0.056, 0.050];     // whatever is behind the mesh
+    const LOUV = [0.606, 0.600, 0.582];     // the grille, pale grey and painted
+
+    const back0 = b;
+    b = up;
+
+    // The core, in three pieces round the opening. Three pieces and not one
+    // box with a hole wished into it: `boxIn` draws six outward faces and has
+    // no inside, so the only way to have a hole is not to draw the wall there
+    // — and the happy consequence is that the two jamb faces and the soffit
+    // come for free, pointing into the opening, which is the reveal.
+    boxTS(t0, dc - dj, s0, CORE, y0, yTop, RAW, RAW);
+    boxTS(dc + dj, t1, s0, CORE, y0, yTop, RAW, RAW);
+    boxTS(dc - dj, dc + dj, s0, CORE, gy + HEAD, yTop, RAW, RAW);
+
+    /**
+     * One panel of the alley-side skin with a rectangular hole in it — four
+     * boxes round the opening, exactly as `frontSkin` cuts the kabine's doors
+     * out of their render, and for the same reason: a recess in a solid box is
+     * inside the box.
+     */
+    const holed = (a, c, ha, hc, hy0, hy1) => {
+      if (ha > a) boxTS(a, ha, CORE + 0.002, s1, y0, yTop, RAW, RAW);
+      if (c > hc) boxTS(hc, c, CORE + 0.002, s1, y0, yTop, RAW, RAW);
+      boxTS(ha, hc, CORE + 0.002, s1, hy1, yTop, RAW, RAW);
+      boxTS(ha, hc, CORE + 0.002, s1, y0, hy0, RAW, RAW);
+    };
+    // The vent: a small recess with dark mesh, high on the broad panel.
+    const vt = dc + dj + (t1 - dc - dj) * 0.55, vw = 0.36, vh = 0.15;
+    const vy = gy + 2.16;
+    holed(dc + dj, t1, vt - vw, vt + vw, vy - vh, vy + vh);
+    // The mesh, and it goes on the ALLEY side of the core's face. Set 6 mm the
+    // other way it is inside the core box, which has no inside — the recess
+    // then shows bare concrete and the vent reads as a dent. Photographed both
+    // ways before this line was written down.
+    boxTS(vt - vw - 0.02, vt + vw + 0.02, CORE + 0.001, CORE + 0.007,
+      vy - vh - 0.02, vy + vh + 0.02, DARK, DARK);
+    // The louvred grille: taller than it is wide, recessed the same depth, near
+    // the outer edge of the narrow panel. Five blades at alternating depth,
+    // which is how `door` sells a louvre it cannot lean.
+    const gt = t0 + (dc - dj - t0) * 0.30, gw = 0.21, gh = 0.30;
+    const gyC = gy + 2.02;
+    holed(t0, dc - dj, gt - gw, gt + gw, gyC - gh, gyC + gh);
+    boxTS(gt - gw - 0.02, gt + gw + 0.02, CORE + 0.001, CORE + 0.007,
+      gyC - gh - 0.02, gyC + gh + 0.02, DARK, DARK);
+    for (let i = 0; i < 6; i++) {
+      const y = gyC - gh + 0.014 + (i * (gh * 2 - 0.028)) / 6;
+      boxTS(gt - gw + 0.012, gt + gw - 0.012, CORE + (i % 2 ? 0.004 : 0.016),
+        CORE + 0.030, y, y + (gh * 2 - 0.028) / 6 - 0.014,
+        i % 2 ? [LOUV[0] * 0.78, LOUV[1] * 0.78, LOUV[2] * 0.78] : LOUV);
+    }
+    // The skin over the doorway, which has nothing cut in it.
+    boxTS(dc - dj, dc + dj, CORE + 0.002, s1, gy + HEAD, yTop, RAW, RAW);
+
+    // The capping slab: poured on top in one go and broken along its edge ever
+    // since. Drawn in bays with the top height and the overhang jittered off
+    // the arc length, because a slab with a level edge is a coping stone and
+    // this is not one.
+    for (let a = t0 - 0.06; a < t1 + 0.05; a += 0.58) {
+      const c = Math.min(a + 0.58, t1 + 0.06);
+      const j = jit((a * 7) | 0, 61), k = jit((a * 7) | 0, 62);
+      boxTS(a, c, s0 - 0.055 - k * 0.030, s1 + 0.055 + j * 0.030,
+        yTop, yTop + CAP * (0.82 + j * 0.36), CAPC,
+        [CAPC[0] * (0.94 + k * 0.12), CAPC[1] * (0.94 + k * 0.12),
+          CAPC[2] * (0.94 + k * 0.12)]);
+    }
+
+    // The shutter joints, both faces, and the lift line where one pour met the
+    // next. Drawn 5 mm proud rather than sunk, for the reason the kabine's
+    // skirt is: 5 mm of relief either way is invisible and the tone is not.
+    const clearOfHoles = (a) => !(a > dc - dj - 0.10 && a < dc + dj + 0.10)
+      && !(a > vt - vw - 0.10 && a < vt + vw + 0.10)
+      && !(a > gt - gw - 0.10 && a < gt + gw + 0.10);
+    for (let a = t0 + 0.86; a < t1 - 0.35; a += 0.98) {
+      // Not across an opening. A shutter joint is a line in the pour and it
+      // stops where the pour does; run through the vent it is a bright bar
+      // splitting a dark recess in two, which is what the first build had.
+      if (!clearOfHoles(a)) continue;
+      for (const [q0, q1] of [[s0 - 0.006, s0 - 0.001], [s1 + 0.001, s1 + 0.006]]) {
+        boxTS(a - 0.022, a + 0.022, q0, q1, gy - 0.05, yTop - 0.02, JNT, JNT);
+      }
+    }
+    for (const [q0, q1] of [[s0 - 0.006, s0 - 0.001], [s1 + 0.001, s1 + 0.006]]) {
+      for (const [a, c] of [[t0, dc - dj], [dc + dj, t1]]) {
+        boxTS(a, c, q0, q1, gy + 1.34, gy + 1.37, JNT, JNT);
+      }
+    }
+    // And the damp band at the foot, which every concrete wall standing in
+    // gravel on this coast has and which is the difference between poured
+    // concrete and a grey box.
+    for (let a = t0; a < t1 - 0.02; a += 0.74) {
+      const c = Math.min(a + 0.74, t1);
+      if (c > dc - dj && a < dc + dj) continue;
+      const hh = 0.30 + jit((a * 7) | 0, 63) * 0.26;
+      for (const [q0, q1] of [[s0 - 0.007, s0 - 0.002], [s1 + 0.002, s1 + 0.007]]) {
+        boxTS(a, c, q0, q1, gy - 0.05, gy + hh,
+          [RAW[0] * 0.84, RAW[1] * 0.85, RAW[2] * 0.86]);
+      }
+    }
+    b = back0;
+
+    // ── what you cannot walk through ────────────────────────────────────────
+    //
+    // In two pieces with the doorway between them, exactly as `pushRun` splits
+    // a run around Caffe TRAMPULIN and for the identical reason: geometry and
+    // collision are written in two places here, and anything that opens a hole
+    // in one has to open it in the other. A doorway you cannot walk through is
+    // a painting.
+    //
+    // `HOLD` is how close the jamb lets you stand and it is the whole of
+    // whether this works. `GROUND.girth` is 0.55 and `confine` adds it to every
+    // half-extent, so blockers taken right up to the jambs would close 1.10 m
+    // of an 0.85 m opening — a doorway you can see the sea through and cannot
+    // put a foot in. Pulled back by `girth - HOLD` each side the clear standing
+    // width comes out at 0.85 − 2 × 0.12 = 0.61 m, which is measured by walking
+    // through it and not by hoping.
+    const HOLD = 0.12, PULL = GROUND.girth - HOLD;
+    for (const [a, c] of [[t0 - 0.06, dc - dj - PULL], [dc + dj + PULL, t1 + 0.06]]) {
+      if (c - a < 0.15) continue;
+      runs.push({ t0: a, t1: c, s0: s0 - 0.06, s1: s1 + 0.06,
+        y: y0, h: TOP + CAP + FOOT });
+    }
+    return { t: dc, s: (s0 + s1) * 0.5, gy, door: [dj * 2, HEAD], span: t1 - t0 };
+  }
+
+  /**
    * Lay the rows out. Runs of seven to thirteen with an alley between, and a
    * deliberate hole left in the middle of both rows where the jetty comes ashore
    * — a resort has a way through it to the water, and two unbroken 350 m walls
@@ -1676,6 +1892,9 @@ async function buildJadrija(scene) {
     }
    }
   }
+  // And the wall across the gap between the first two of them, which needs
+  // both runs laid before it can know where either of its ends is.
+  const doorway = screenGap ? screenWall(screenGap) : null;
 
   /**
    * The sign, which is the only thing wrong with the facade and is therefore the
@@ -2646,108 +2865,6 @@ async function buildJadrija(scene) {
   }
 
   /**
-   * The lit wall behind the counter.
-   *
-   * WRONG, and left standing with the correction rather than quietly edited,
-   * because this function is dead code — nothing in `SHOPS` sets `menu` — and
-   * the claim under it is what would be reached for if anything ever did.
-   *
-   * What it used to say was that the Slasticarnica's name is not on its awning
-   * but on a back-lit panel inside, in a row with the price boards and a strip
-   * of product light-boxes, and that the awning itself is plain white with a
-   * scalloped edge and nothing written on it anywhere. The 22 August 2026
-   * survey settles it: `slasticarnica-behind-view` catches the lane elevation
-   * square on and the awning fascia along that whole side reads
-   * "slastičarnica JADRIJA" — lower-case word, upper-case name, dark serif on
-   * white. The name IS on the awning. The scalloped edge is real and so is the
-   * white, and both are kept.
-   *
-   * The back-lit panel is a different frontage's and was read across.
-   *
-   * Only the three prices the survey could actually read go on the board.
-   * Six back-lit panels were legible enough to place and only three of the
-   * words on them could be made out; the rest are drawn as the flame-orange
-   * blocks they are rather than lettered with guesses.
-   */
-  function menuWall(S, y0, top) {
-    const PX = 1024, C = document.createElement('canvas');
-    C.width = PX; C.height = 512;
-    const g = C.getContext('2d');
-    g.fillStyle = '#f2f4f6'; g.fillRect(0, 0, C.width, C.height);
-    // The product strip along the top: orange flame grounds with a pale block
-    // where the photograph of the thing is.
-    for (let i = 0; i < 6; i++) {
-      const x = 8 + i * (C.width - 16) / 6, w = (C.width - 16) / 6 - 8;
-      const grd = g.createLinearGradient(x, 0, x + w, 0);
-      grd.addColorStop(0, '#f0a03c'); grd.addColorStop(0.5, '#e8641c');
-      grd.addColorStop(1, '#f0a03c');
-      g.fillStyle = grd; g.fillRect(x, 8, w, 150);
-      g.fillStyle = '#efe7dc'; g.fillRect(x + w * 0.18, 26, w * 0.64, 108);
-    }
-    // Three boards below it. Left and right are blue price lists; the middle
-    // is the name.
-    const bw = (C.width - 32) / 3;
-    for (let i = 0; i < 3; i++) {
-      const x = 8 + i * (bw + 8);
-      g.fillStyle = i === 1 ? '#ffffff' : '#dceaf6';
-      g.fillRect(x, 172, bw, C.height - 190);
-      g.textAlign = i === 1 ? 'center' : 'left';
-      if (i === 1) {
-        g.fillStyle = '#1f4f96';
-        g.font = '600 44px "Helvetica Neue", Arial, sans-serif';
-        g.fillText('Slastičarnica', x + bw / 2, 236);
-        g.fillStyle = '#b3242a';
-        g.font = '800 76px "Helvetica Neue", Arial, sans-serif';
-        g.fillText('JADRIJA', x + bw / 2, 312);
-      } else {
-        g.fillStyle = '#1f4f96';
-        g.font = '600 34px "Helvetica Neue", Arial, sans-serif';
-        // Left board: the drinks that were legible. Right: the prices, and
-        // only the three that could be read.
-        const rows = i === 0
-          ? [['LIMUNADA', ''], ['SPRITE', ''], ['SLADOLED', ''], ['KRAFNE', '']]
-          : [['KUPOVI', '8.00 €'], ['FRAPPE', '7.00 €'], ['ESPRESSO', '2.00 €'],
-            ['MACCHIATO', '']];
-        rows.forEach(([k, v], r) => {
-          g.fillText(k, x + 18, 226 + r * 56);
-          if (v) {
-            g.textAlign = 'right';
-            g.fillText(v, x + bw - 18, 226 + r * 56);
-            g.textAlign = 'left';
-          }
-        });
-      }
-    }
-    const tex = new THREE.CanvasTexture(C);
-    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
-    // On the front face, not behind it. The first cut put this at s0 + 0.30 —
-    // thirty centimetres *into* a solid body box — so the whole wall was inside
-    // the building and the shop had no signage at all from the promenade. In
-    // life these boards are on the back wall of an open serving recess; the
-    // recess is a dark panel here rather than a hole, so the honest place for
-    // them is the frontage itself, which is where they read from anyway.
-    // Between the counter and the underside of the canopy, which is a narrower
-    // band than it sounds: at 0.70 of the wall height the boards sat behind the
-    // awning from any viewpoint lower than the awning itself, which is every
-    // viewpoint a walker has. The photograph has them filling the upper half of
-    // the opening and stopping well clear of the fascia.
-    const t = (S.t0 + S.t1) * 0.5, sIn = S.s0 - 0.55;   // was -0.06
-    const st = at(t), p = W(t, sIn, y0 + (top - y0) * 0.60);
-    const w = (S.t1 - S.t0) * 0.80, h = (top - y0) * 0.38;
-    const back8 = b;
-    b = up;
-    boxTS(t - w * 0.5 - 0.04, t + w * 0.5 + 0.04, sIn + 0.02, sIn + 0.10,
-      p[1] - h * 0.5 - 0.03, p[1] + h * 0.5 + 0.03, [0.300, 0.296, 0.288]);
-    b = back8;
-
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
-      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
-    mesh.position.set(p[0], p[1], p[2]);
-    mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
-    scene.add(mesh);
-  }
-
-  /**
    * What is in the Slasticarnica's cabinet, read off the glass.
    *
    * Six photographs of 22 August 2026, three of them square on to the counter
@@ -2914,6 +3031,20 @@ async function buildJadrija(scene) {
    * photograph rather than given invented numbers. At the distance anybody
    * reads this from in the game they are a couple of pixels either way, which
    * is the same thing the photograph does to them.
+   *
+   * That still stands after the 23 August 2026 survey. Its four frames —
+   * 20260823_111815, _111819, _111954 and _112051 — are the gelato counter
+   * from inside the shop, beach bar MINI and the pine shade. None of them
+   * shows this board, so the three numbers on it are still the three numbers
+   * on it. 20260823_111819 does read SLADOLED KUGLA 2,50 € and a cornet at
+   * 1,00 €, but those are two hand-lettered cards standing on the counter
+   * inside the shop, not the price of SLADOLED up here, and putting a counter
+   * card's number on the board would be rule 12 broken by a side door.
+   *
+   * The third item in the right-hand column is still off the board. The best
+   * reading of it at full resolution is KOKICE, but KORICE was what the
+   * survey wrote down, the two differ by one stroke at this scale, and
+   * nothing photographed since settles it.
    */
   /**
    * The centenary hoarding: JADRIJA 100, OD 1922.
@@ -3100,46 +3231,155 @@ async function buildJadrija(scene) {
       grad.addColorStop(1, '#e8b322');
       return grad;
     };
+    const BAYS = [[0.015, 0.315], [0.345, 0.655], [0.685, 0.985]];
+    const RULE = H * 0.035;
     const bay = (x0, x1) => {
       g.fillStyle = '#aebecb';
       g.fillRect(CW * x0, H * 0.06, CW * (x1 - x0), H * 0.88);
-      g.strokeStyle = '#f2f4f5'; g.lineWidth = H * 0.035;
+      g.strokeStyle = '#f2f4f5'; g.lineWidth = RULE;
       g.strokeRect(CW * x0, H * 0.06, CW * (x1 - x0), H * 0.88);
     };
-    bay(0.015, 0.315); bay(0.345, 0.655); bay(0.685, 0.985);
-    // Left bay: the cold drinks.
-    g.textAlign = 'left';
-    g.fillStyle = warm();
-    ['LIMUNADA', 'SPRITE', 'TONIC', 'FANTA'].forEach((t, i) => {
-      g.font = `700 ${H * 0.15}px ${SANS}`;
-      g.fillText(t, CW * 0.045, H * (0.26 + i * 0.19));
+    BAYS.forEach(([a, c]) => bay(a, c));
+    /**
+     * The blue field inside bay `k` — the box everything in it is measured
+     * against.
+     *
+     * Every position in here used to be a fraction of the whole canvas, and
+     * that is what broke the price column. A bay is 0.30 of the canvas wide,
+     * so the numbers' right margin — 0.985 minus 0.975 — came out at 0.010·CW,
+     * eleven pixels on the 1106-pixel canvas this board makes, of which the
+     * frame's own 0.035·H stroke eats four and a half from the inside. The
+     * item column's left margin, from the same arithmetic, was twenty-two.
+     * The prices stood on the frame and the labels touched it.
+     *
+     * `strokeRect` centres the stroke on the rectangle, so half the rule
+     * stands inside the blue and half outside it, and that half is what every
+     * margin in this function has to clear before it starts.
+     */
+    const fieldOf = (k) => ({
+      x0: CW * BAYS[k][0] + RULE * 0.5, x1: CW * BAYS[k][1] - RULE * 0.5,
+      y0: H * 0.06 + RULE * 0.5, y1: H * 0.94 - RULE * 0.5,
     });
-    // Middle bay: the name, small over large, which is how it is set.
-    g.textAlign = 'center';
-    g.font = `600 ${H * 0.12}px ${SANS}`;
-    g.fillText('Slastičarnica', CW * 0.5, H * 0.26);
-    g.font = `800 ${H * 0.26}px ${SANS}`;
-    g.fillText('JADRIJA', CW * 0.5, H * 0.55);
-    // Right bay: what it costs. A white label where the photograph has one.
-    g.textAlign = 'left';
-    const items = [['SLADOLED', null], ['KUPOVI', '8.00 €'], ['FRAPPE', '7.00 €'],
-      ['KRAFNE', null], ['ESPRESSO', '2.00 €'], ['MACCHIATO', null],
-      ['CAPPUCCINO', null]];
-    items.forEach(([t, price], i) => {
-      const y = H * (0.19 + i * 0.115);
-      g.font = `700 ${H * 0.105}px ${SANS}`;
-      g.fillStyle = warm();
-      g.fillText(t, CW * 0.705, y);
-      if (price) {
-        g.textAlign = 'right';
-        g.font = `600 ${H * 0.095}px ${SANS}`;
-        g.fillText(price, CW * 0.975, y);
-        g.textAlign = 'left';
-      } else {
-        g.fillStyle = '#f4f6f7';
-        g.fillRect(CW * 0.905, y - H * 0.085, CW * 0.068, H * 0.10);
+    /**
+     * How big one COLUMN of lines can be set, and how hard it has to squeeze.
+     *
+     * Two things this used to get wrong, both of them visible on the board.
+     *
+     * The first is that the face on the real sign is a fat rounded condensed
+     * one and Helvetica is not. Measured off 20260821_175713: MACCHIATO is
+     * 145 px wide at a 30 px cap height, and Helvetica Bold at that cap height
+     * would be 250 — the real face is Helvetica squeezed to about 0.58. So a
+     * line is set at the cap height the photograph has and SQUEEZED to fit,
+     * down to `floor`, and only if that is still too wide does it come down in
+     * size. Shrinking first gives letters half the photograph's height, which
+     * is the wrong answer to a width problem.
+     *
+     * The second is that a size chosen per line is not a menu board. Sized one
+     * at a time, SPRITE came out a third taller than the LIMUNADA above it,
+     * because SPRITE is shorter. So the whole column is measured first and the
+     * worst-off line decides for all of them — which is what a signwriter
+     * does and what the photograph shows.
+     *
+     * `maxOf` is per line and not one number, because a row carrying 8.00 €
+     * has less width for its name than a row carrying a blank white label.
+     */
+    const column = (rows, weight, px, maxOf, floor) => {
+      let need = 1;
+      for (const r of rows) {
+        g.font = `${weight} ${px}px ${SANS}`;
+        need = Math.max(need, (g.measureText(r[0]).width || 1) / maxOf(r));
       }
-    });
+      const sx = Math.max(floor, 1 / need);
+      return { weight, px: need * sx > 1 ? px / (need * sx) : px, sx };
+    };
+    /**
+     * One line of it, at the size the column settled on.
+     *
+     * `align` is honoured through the transform: the translate puts the origin
+     * on the anchor, so a right-aligned number ends exactly at `x` whatever
+     * the squeeze turned out to be.
+     *
+     * The translate is in x ONLY and the baseline goes to `fillText`, which
+     * looks like a stylistic choice and is not. `warm()` is a gradient, and a
+     * gradient is resolved in the user space in force when the fill happens:
+     * translating in y first moved every line to the red end of it and the
+     * board came out one flat colour instead of running red to gold down the
+     * bay. The squeeze is horizontal, so x is the only axis that has to move.
+     */
+    const line = (text, m, x, y, align) => {
+      g.textAlign = align;
+      g.font = `${m.weight} ${m.px}px ${SANS}`;
+      g.save();
+      g.translate(x, 0);
+      g.scale(m.sx, 1);
+      g.fillText(text, 0, y);
+      g.restore();
+    };
+    // Left bay: the cold drinks. Caps at about two thirds of the row pitch,
+    // which is what the photograph measures on this column.
+    {
+      const f = fieldOf(0), fw = f.x1 - f.x0, fh = f.y1 - f.y0;
+      const rows = [['LIMUNADA'], ['SPRITE'], ['TONIC'], ['FANTA']];
+      const top = f.y0 + fh * 0.045, pitch = (fh * 0.91) / rows.length;
+      const m = column(rows, '700', pitch * 0.93, () => fw * 0.93, 0.68);
+      g.fillStyle = warm();
+      rows.forEach((r, i) => {
+        line(r[0], m, f.x0 + fw * 0.035, top + pitch * (i + 0.76), 'left');
+      });
+    }
+    // Middle bay: the name, small over large, which is how it is set.
+    {
+      const f = fieldOf(1), fw = f.x1 - f.x0, fh = f.y1 - f.y0;
+      const cx = (f.x0 + f.x1) * 0.5;
+      g.fillStyle = warm();
+      line('Slastičarnica',
+        column([['Slastičarnica']], '600', H * 0.15, () => fw * 0.84, 0.72),
+        cx, f.y0 + fh * 0.26, 'center');
+      line('JADRIJA',
+        column([['JADRIJA']], '800', H * 0.34, () => fw * 0.90, 0.68),
+        cx, f.y0 + fh * 0.62, 'center');
+    }
+    // Right bay: what it costs. A white label where the photograph has one.
+    //
+    // The columns are the photograph's. On 20260821_175713 the right-hand blue
+    // field runs x 2980 to 3200; the names start at 2988 and the longest of
+    // them reaches 3130; 8.00 € runs 3115 to 3175 and the little white labels
+    // 3140 to 3172. As fractions of the field: names from 0.035, numbers
+    // ending at 0.925, a label 0.19 wide. A name and its own number overlap in
+    // the photograph only because no row there has both a long name and a wide
+    // price — so the budget is per row, 0.55 of the field for a name with a
+    // number beside it and 0.60 for one with a label.
+    //
+    // Nothing here is invented. Only KUPOVI 8.00, FRAPPE 7.00 and ESPRESSO
+    // 2.00 could ever be read; the other four are the little white labels they
+    // are up there, and if the layout leaves room for more numbers the room
+    // stays empty. The four photographs of 23 August 2026 are the gelato
+    // counter, beach bar MINI and the pine shade — none of them shows this
+    // board, so none of them makes a fourth number legible.
+    {
+      const f = fieldOf(2), fw = f.x1 - f.x0, fh = f.y1 - f.y0;
+      const items = [['SLADOLED', null], ['KUPOVI', '8.00 €'], ['FRAPPE', '7.00 €'],
+        ['KRAFNE', null], ['ESPRESSO', '2.00 €'], ['MACCHIATO', null],
+        ['CAPPUCCINO', null]];
+      const top = f.y0 + fh * 0.045, pitch = (fh * 0.91) / items.length;
+      const rx = f.x1 - fw * 0.075;                 // where a number ends
+      const lw = fw * 0.19;                         // an illegible one's label
+      const mi = column(items, '700', pitch * 0.92,
+        (r) => fw * (r[1] ? 0.55 : 0.60), 0.58);
+      const mp = column(items.filter((r) => r[1]).map((r) => [r[1]]),
+        '600', pitch * 0.92, () => fw * 0.30, 0.75);
+      items.forEach(([t, price], i) => {
+        const y = top + pitch * (i + 0.76);
+        g.fillStyle = warm();
+        line(t, mi, f.x0 + fw * 0.035, y, 'left');
+        if (price) {
+          line(price, mp, rx, y, 'right');
+        } else {
+          g.fillStyle = '#f4f6f7';
+          g.fillRect(rx - lw, y - pitch * 0.58, lw, pitch * 0.70);
+        }
+      });
+    }
     const tex = new THREE.CanvasTexture(C);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
@@ -4557,7 +4797,6 @@ async function buildJadrija(scene) {
       for (let t = S.t0 - 0.2; t <= S.t1 + 0.21; t += (S.t1 - S.t0 + 0.4) / 3) {
         post(W, t, fs + 0.20, y0, top - 0.44, 0.055, [0.560, 0.552, 0.530], 6);
       }
-      if (S.menu) menuWall(S, y0, top);
       // Stood 0.40 m off the valance rather than 0.16, and 0.46 m deep
       // rather than 0.38.
       //
@@ -4571,7 +4810,7 @@ async function buildJadrija(scene) {
       // Stood 0.40 m off the valance rather than 0.16, and 0.46 m deep
       // rather than 0.38 — which did not fix what it was meant to fix, but is
       // the right depth for the board anyway.
-      else if (S.name && !S.wallName) {
+      if (S.name && !S.wallName) {
         shopSign(S, (S.t0 + S.t1) * 0.5, fs - 0.40, top - 0.34,
           Math.min(6.4, (S.t1 - S.t0) * 0.72), 0.46);
       }
@@ -4597,7 +4836,7 @@ async function buildJadrija(scene) {
       }
       // The scalloped fascia. The photograph has one on this awning whether or
       // not the name is up there with it.
-      if (S.scallop || S.menu) {
+      if (S.scallop) {
         for (let t = S.t0 - 0.4; t < S.t1 + 0.4; t += 0.42) {
           post(W, t, fs + 0.04, top - 0.30, top - 0.16, 0.115,
             shade(S.roof, 0.98), 7);
@@ -4650,9 +4889,38 @@ async function buildJadrija(scene) {
     // where 20260821_175713 has them. Same construction as `shopSign` — a face
     // with a tray 0.10 m behind it, both placed off the face rather than off
     // the building, for the reason written out at length up there.
+    //
+    // SIZED OFF THE PHOTOGRAPH AND OFF THE OPENING, not off the shop.
+    //
+    // It was `(t1 − t0) · 0.34` by 1.18 — a fraction of the shop's *modelled*
+    // width, and this shop is modelled 15 m wide because that is what the
+    // counter, the drinks fridge and the four metres of gelato cabinet need.
+    // The real frontage is about half that, so 0.34 of it came out at 5.1 m
+    // and the board was drawn at an aspect of 4.3 against the photograph's
+    // 2.18 — measured on 20260821_175713, where the assembly runs 2400 to 3230
+    // across and 1055 to 1435 down.
+    //
+    // Which would only have been ugly, except that 5.1 m centred at 0.70 of
+    // the shop put the east end at t 341.05, three quarters of a metre PAST
+    // the serving opening's east reveal at `oc`. `shopExtras` tiles that
+    // reveal, and its jamb stands at s0−0.30 … s0−0.16 — two centimetres in
+    // FRONT of this board at s0−0.14 — from t 340.36 to 340.70, with the
+    // roller-shutter jamb behind it to 340.76. Between them they covered the
+    // right-hand bay from 0.87 of its width to 0.95, which is exactly the
+    // price column: 8.00 and 2.00 were gone, 7.00 showed a sliver of itself
+    // through the gap between two courses of tile, and the little white
+    // labels were sliced. The board was never clipped — it was BEHIND
+    // something, and the something was built after it.
+    //
+    // So: the photograph's aspect, and the east edge hung 0.15 m clear of that
+    // reveal. Measured back off the built mesh, the board runs t 337.65 to
+    // 340.09 — a quarter of a metre clear of the tiled jamb at one end and a
+    // tenth of a metre clear of the gelato cabinet's hood at `cm + 2.05` at
+    // the other. There is no room to be had beyond that at either end; the
+    // board fits between the two of them or it does not fit.
     if (S.panels) {
-      const pw = (S.t1 - S.t0) * 0.34, ph = 1.18;
-      const pt = S.t0 + (S.t1 - S.t0) * 0.70, ps = S.s0 - 0.14;
+      const ph = 1.18, pw = ph * 2.18;
+      const pt = oc - 0.15 - pw * 0.5, ps = S.s0 - 0.14;
       const py = y0 + 1.62;
       const back = b;
       b = up;
@@ -5450,29 +5718,38 @@ async function buildJadrija(scene) {
   }
 
   /**
-   * And hanging it: a quad six millimetres off the render, lit like everything
-   * else and transparent everywhere the brush did not go.
+   * And hanging it: a quad thirty millimetres off the render, lit like
+   * everything else and transparent everywhere the brush did not go.
    *
-   * Six millimetres is not a frame, it is z-fighting clearance. The mural has
-   * no thickness and wants none — the moment it stands proud enough to cast an
-   * edge it is a board, and the whole point of the thing is that it is paint.
+   * Thirty millimetres is not a frame, it is z-fighting clearance. The mural
+   * has no thickness and wants none — the moment it stands proud enough to
+   * cast an edge it is a board, and the whole point of the thing is that it is
+   * paint. It used to be six, which worked; rule 5 says co-planarity fails at
+   * two kilometres from the origin and these walls are at x −1942, so the
+   * margin went up to thirty and was checked at a grazing angle, where three
+   * centimetres on a 1.9 m quad is a millimetre of sky and nothing else.
+   *
+   * Both murals on this shore hang off this one function now. The fish used to
+   * build its own quad against the sanitary block's render with the same eight
+   * lines written out again, which is how the two of them drifted apart.
    */
-  function endMural(gb) {
+  function endMural(gb, tex, mw = 1.90, aspect = 592 / 1024, lift = 1.46) {
     const sc = (gb.front + gb.back) * 0.5;
-    const mw = 1.90, mh = mw * 592 / 1024;
-    const yc = gb.floor + 1.46;
+    const mh = mw * aspect;
+    const yc = gb.floor + lift;
     const st = at(gb.t);
-    const p = W(gb.t + 0.006 * gb.o, sc, yc);
+    const p = W(gb.t + 0.030 * gb.o, sc, yc);
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(mw, mh),
       solidMaterial(0xffffff, {
         spec: 0.02, vcol: false, transparent: true, depthWrite: false,
         decl: 'uniform sampler2D uMuralMap;',
         body: 'vec4 mu = texture2D(uMuralMap, vUv);\nbase = mu.rgb;\nalpha = mu.a;',
-        uniforms: { uMuralMap: { value: gullMural() } },
+        uniforms: { uMuralMap: { value: tex } },
       }));
     mesh.position.set(p[0], p[1], p[2]);
     // This end faces back down t, which the board on the far gable does not —
-    // hence the sign. Get it wrong and the gull is painted on the inside.
+    // hence the sign. Get it wrong and the paint is on the inside of the wall,
+    // which looks exactly like the mural having vanished.
     mesh.rotation.y = Math.atan2(st.ux * gb.o, st.uz * gb.o);
     scene.add(mesh);
     return { mesh, at: [gb.t, sc] };
@@ -5537,7 +5814,28 @@ async function buildJadrija(scene) {
       houses: panel.houses, lanes: panel.lanes };
   }
   const board = gable ? mapBoard(gable) : null;
-  const mural = nearGable ? endMural(nearGable) : null;
+  const mural = firstGable ? endMural(firstGable, gullMural()) : null;
+
+  // The fish, on the wood side.
+  //
+  // "My name is Mr Mors" was painted on the sanitary block, on the seaward face
+  // of its salmon mass at t 348.35 — which is a wall in shade behind a pine
+  // wood, and Misha's screenshot of it is a dark rectangle you cannot read.
+  // It belongs on the end wall of one of the back row's blocks: those are the
+  // buildings standing IN the wood, they have the parked cars against them, and
+  // their west ends are the only large blank faces on this shore that take the
+  // evening sun square on. It is 1.55 m square, which on a gable 2.90 m of `s`
+  // wide leaves a good half-metre of render either side.
+  //
+  // The arc length is a placement and the file should say so: which run of the
+  // back row ends nearest `FISH_T` is a property of a layout drawn out of `rng`
+  // and not of anything the survey settles. What the survey settles is that the
+  // fish is on a blank wall in the car park, and every candidate here is one.
+  const FISH_T = 520;
+  const fishGable = backGables.length
+    ? backGables.reduce((a, g) => (Math.abs(g.t - FISH_T) < Math.abs(a.t - FISH_T) ? g : a))
+    : null;
+  const fish = fishGable ? endMural(fishGable, fishMural(), 1.55, 1, 1.30) : null;
 
   // ── the bead curtain ───────────────────────────────────────────────────────
   //
@@ -5777,7 +6075,13 @@ async function buildJadrija(scene) {
     const velS = new Float32Array(n);
     const velT = new Float32Array(n);
     const tmp = new Float32Array(n);
-    let prevT = null, prevS = null, cool = 0, phase = 0;
+    // Where each thing that can part this curtain was standing last frame,
+    // keyed by what it is. It used to be one pair of numbers, because the
+    // player was the only mover the solver had ever been given — so the beads
+    // hung dead still while she walked in to pour a drink and the dog trotted
+    // out under them. A doorway does not care who is coming through it.
+    const prev = new Map();
+    let cool = 0, phase = 0;
 
     function write() {
       let o = 0;
@@ -5801,37 +6105,33 @@ async function buildJadrija(scene) {
     write();
 
     /**
-     * @param t,s  where you are, in the resort's frame
-     * @param d    how far away you are, for the sound and for the gate
-     * @param y    and how high, world frame — or null for "do not ask"
+     * One mover against the curtain: the crossing, and the contact while it is
+     * standing in the strands.
      *
-     * `d` is measured flat, in (t, s), because everything else here is: it is
-     * the gate on the solver and the range on the sound and neither wants a
-     * height in it. But a Canadair passing over the kabine is at (t, s) zero
-     * from this doorway too, and the crossing test below is deliberately a test
-     * of the *segment* you moved along — which is exactly what a hundred metres
-     * of aeroplane a frame does. So the height is asked for as well, and the
-     * only thing it is used for is to say that you are in the opening rather
-     * than over the roof of it. `null` skips the question, for the debug hook,
-     * which drives the curtain with no camera at all.
+     * `who` is a key and nothing more. It says whose last position this one is
+     * a step from, so that two things in the doorway at the same time — you on
+     * your way out and the dog on his way in — cannot read each other's stride
+     * as their own and produce one impossible six-metre step between them.
+     *
+     * `y` is world height, or `null` for "do not ask". Only one mover here has
+     * ever needed asking, and the gate below says why.
      */
-    function step(t, s, d, dt, y = null) {
-      if (d > 26) { prevT = prevS = null; return 0; }
+    function part(who, t, s, y, h) {
+      const p = prev.get(who);
+      const wasT = p ? p[0] : null, wasS = p ? p[1] : null;
+      if (p) { p[0] = t; p[1] = s; } else prev.set(who, [t, s]);
       // In the doorway, vertically. This is not a fit — it is a test for "on
       // the ground here" against "over the top of the row", and the two are
       // tens of metres apart, so it is drawn wide on purpose. A walker's eye is
       // 1.62 m up a 1.98 m opening, and the ground in front of the kabine is
       // not level with their floor; a gate cut close to the head of the opening
       // would turn a slope of a foot into silence.
+      //
+      // She and the dog pass `null`, and it is not laziness: the gate exists so
+      // that a Canadair overhead, which is at (t, s) zero from this doorway
+      // too, does not part a bead curtain from four hundred feet. Neither of
+      // them can leave the ground.
       const inHole = y == null || (y < yTop + 1.2 && y > yTop - 3.4);
-      const h = Math.min(dt, 0.05);
-      const vs = prevS == null ? 0 : (s - prevS) / h;
-      const vt = prevT == null ? 0 : (t - prevT) / h;
-      const wasS = prevS, wasT = prevT;
-      prevT = t; prevS = s;
-      // Are you in the doorway at all. Half a metre either side of the strands,
-      // which is a shoulder and an arm.
-      const through = inHole && s > sHang - 0.55 && s < sHang + 0.55;
 
       /**
        * The crossing itself.
@@ -5866,6 +6166,9 @@ async function buildJadrija(scene) {
           // never silent and running through is never more than running
           // through. 3.0 m/s is a shade under the walk.
           const hard = clamp(Math.abs(s - wasS) / h / 3.0, 0.45, 1);
+          // `dx` is where across the doorway it happened, and the sound is
+          // panned off it — which is right whoever went through, because it is
+          // a property of the door and not of the ear.
           if (audio) audio.beadShove(hard, dx);
           // And give the strands the shove as well, not only the ear. Without
           // this the tail after walking *in* is whatever eight frames of
@@ -5882,23 +6185,55 @@ async function buildJadrija(scene) {
           cool = 0.10;
         }
       }
+
+      // And the contact, for as long as it is against the strands. Half a metre
+      // either side of them, which is a shoulder and an arm.
+      if (!inHole || s <= sHang - 0.55 || s >= sHang + 0.55) return;
+      const vs = wasS == null ? 0 : (s - wasS) / h;
+      const vt = wasT == null ? 0 : (t - wasT) / h;
+      for (let i = 0; i < n; i++) {
+        const t0 = K.dc - K.dj + gap * (i + 0.5);
+        const dd = Math.abs(t - t0);
+        if (dd >= BEAD.reach) continue;
+        // Driven toward your speed while you are against it, rather than
+        // kicked once per frame — which is both what contact does and the
+        // only way the result does not depend on the frame rate.
+        const w = Math.min(1, (1 - dd / BEAD.reach) * 1.6) * Math.min(1, h * BEAD.grip);
+        velS[i] += (clamp(vs, -5, 5) * BEAD.push - velS[i]) * w;
+        velT[i] += (clamp(vt, -5, 5) * BEAD.push * 0.5 - velT[i]) * w;
+      }
+    }
+
+    /**
+     * @param t,s    where you are, in the resort's frame
+     * @param d      how far away you are, for the sound and for the gate
+     * @param y      and how high, world frame — or null for "do not ask",
+     *               which is what the debug hook passes: it drives the curtain
+     *               with no camera at all
+     * @param others everything else that can part it this frame: triples of
+     *               `[key, t, s]`, ground-bound, so they carry no height
+     *
+     * `d` is measured flat, in (t, s), because everything else here is: it is
+     * the gate on the solver and the range on the sound and neither wants a
+     * height in it.
+     *
+     * The gate stays on YOU and not on the movers, deliberately. Past 26 m the
+     * doorway is a hand's width of screen and nothing that happens in it is
+     * worth forty-five strands of solver a frame — so if she walks in while you
+     * are at the far end of the promenade, the curtain neither swings nor
+     * sounds, and there is nobody there to know it. `prev` is cleared with it,
+     * because a segment measured across that gap is not a step anybody took.
+     */
+    function step(t, s, d, dt, y = null, others = null) {
+      if (d > 26) { prev.clear(); return 0; }
+      const h = Math.min(dt, 0.05);
+      part('you', t, s, y, h);
+      if (others) for (const o of others) part(o[0], o[1], o[2], null, h);
       phase += h;
       const air = BEAD.stir * Math.sin(phase * 1.7);
       let din = 0;
       for (let i = 0; i < n; i++) tmp[i] = angS[i];
       for (let i = 0; i < n; i++) {
-        if (through) {
-          const t0 = K.dc - K.dj + gap * (i + 0.5);
-          const dd = Math.abs(t - t0);
-          if (dd < BEAD.reach) {
-            // Driven toward your speed while you are against it, rather than
-            // kicked once per frame — which is both what contact does and the
-            // only way the result does not depend on the frame rate.
-            const w = Math.min(1, (1 - dd / BEAD.reach) * 1.6) * Math.min(1, h * BEAD.grip);
-            velS[i] += (clamp(vs, -5, 5) * BEAD.push - velS[i]) * w;
-            velT[i] += (clamp(vt, -5, 5) * BEAD.push * 0.5 - velT[i]) * w;
-          }
-        }
         const l = i > 0 ? tmp[i - 1] : tmp[i];
         const r = i < n - 1 ? tmp[i + 1] : tmp[i];
         velS[i] += (-BEAD.spring * Math.sin(angS[i] - air)
@@ -6093,11 +6428,27 @@ async function buildJadrija(scene) {
     const PLANK = [0.744, 0.726, 0.668];
     const PIPE = [0.796, 0.800, 0.792];
 
+    // ── the footing, which is one pour ───────────────────────────────────────
+    //
+    // "Nobody sees it" was the argument for giving each mass its own shaft down
+    // to the sea bed, and it was wrong twice over. You can swim here — the
+    // chase finishes at this platform — and Misha, 23 Aug, looking up at it
+    // from 2.9 m down: "in reality it's not 2 concrete slabs going down, but
+    // one thicker concrete slab going down." He is right about the concrete as
+    // well as about the screenshot. Two masses standing in eight metres of
+    // water on separate legs is a jetty; this is a lump poured onto the sea
+    // bed, and a later pour on top of an older one shares its base. The seam
+    // you can see is at the top, where the two pours meet, and not underneath.
+    //
+    // So: one prism from the bed to just under the surface, spanning both. The
+    // union of what stood here — big at t-1.64…t+0.40, small at t+1.36…t+2.76,
+    // s -0.98…+0.98 between them — which is 4.40 m by 1.96 m, centred half a
+    // metre east of the old mass because the newer block is that side.
+    frustumTS(-8.0, [D.t + 0.56, D.s, 2.20, 0.98],
+      -0.55, [D.t + 0.56, D.s, 2.20, 0.98], WET);
+
     // ── the big mass ─────────────────────────────────────────────────────────
-    // Below the water it is a plain shaft — nobody sees it and the sea bed here
-    // is eight metres down. Above it, the flare, which is the whole shape.
-    frustumTS(-8.0, [D.t - 0.62, D.s, 1.02, 0.98],
-      -0.55, [D.t - 0.62, D.s, 1.02, 0.98], WET);
+    // The flare, which is the whole shape, standing on the footing above.
     frustumTS(-0.55, [D.t - 0.62, D.s, 1.02, 0.98],
       y - 0.26, [D.t - 0.62, D.s, 1.92, 1.34], OLD);
     // The cap: a slab a little proud of the flare all round, which is where
@@ -6109,9 +6460,9 @@ async function buildJadrija(scene) {
     // Squarer, whiter, a hand lower, and set half a metre further out. In the
     // photograph it reads as a separate pour that arrived later, which is what
     // happens to every one of these on this coast.
-    frustumTS(-8.0, [D.t + 2.06, D.s - 0.16, 0.70, 0.74],
-      -0.50, [D.t + 2.06, D.s - 0.16, 0.70, 0.74], WET);
-    frustumTS(-0.50, [D.t + 2.06, D.s - 0.16, 0.70, 0.74],
+    // It has no shaft of its own any more; it stands on the shared footing at
+    // -0.55, five centimetres below where its own leg used to start.
+    frustumTS(-0.55, [D.t + 2.06, D.s - 0.16, 0.70, 0.74],
       y - 0.46, [D.t + 2.06, D.s - 0.16, 0.94, 0.92], NEW);
     frustumTS(y - 0.46, [D.t + 2.06, D.s - 0.16, 0.96, 0.94],
       y - 0.26, [D.t + 2.06, D.s - 0.16, 0.98, 0.96], [0.808, 0.806, 0.778],
@@ -8303,11 +8654,38 @@ async function buildJadrija(scene) {
   // three promenade walkers and the sunbathers were skipped here for good
   // reasons and nothing downstream picked them up. So the predicate is written
   // once, here, and the dynamic half is defined as *everybody it said no to*.
-  for (const b of bathers) {
-    if (b.pose === 'lie' || b.pose === 'wade' || b.beat) continue;
-    b.solid = true;
-    solid(b.t, b.s, 0.16 * b.k, 0.16 * b.k, 1.8 * b.k);
-  }
+  //
+  // 23 Aug: nobody is solid any more, and the predicate above is what decided
+  // it. Misha: "there are some NPC bathers who are just standing there, not
+  // actively moving, those i seem to be able to walk right through them...
+  // there should be object detection on them just like on the moving NPC
+  // bathers. i like how it works now for the walking NPCs, how they slightly
+  // turn their heads and a balloon shows up."
+  //
+  // They were not walk-through-able on foot — measured, all 27 standing and all
+  // 26 seated push `confine` — but they could not REACT, and that is the same
+  // complaint arriving by another road. `bump` is fired from `unbody` in
+  // 47-ground.js, which walks `bodyList()`; `confine` walks `field.blockers`
+  // and knows nothing about people. A figure in the static list can therefore
+  // never turn its head and never speak, so walking into one is walking into an
+  // invisible wall that happens to have a person painted near it. The half
+  // metre of difference is the tell: a box holds you at 0.16 + `GROUND.girth`
+  // 0.55 = 0.71 m, where a person holds you at `GROUND.body` 0.30 + `BODY.r`
+  // 0.24 = 0.54 m. You are stopped further away by the ones who do not notice.
+  //
+  // Two more things the static list was quietly getting wrong, both of which go
+  // away with it. `solid()` pushes `y: 0`, which is the shore frame's zero and
+  // not the ground the person is standing on — so a bather up the hillside had
+  // a 1.8 m box whose top was below their own feet, and `confine`'s height test
+  // is airborne-only, which means you could hop clean through them. And the box
+  // is axis-aligned in (t, s), so on the bend it is a trapezium (rule 9b) while
+  // the person in it is a cylinder.
+  //
+  // The cost is a longer sweep in `bodies()`: eleven soft figures became about
+  // ninety. That is ninety compares behind one `t`-band reject, once a frame,
+  // against a 16.7 ms budget — it does not show up. What it buys is that
+  // everybody on this shore is the same kind of obstacle as everybody else.
+  void solid;
 
   // Dinghies: two alongside the jetty and a few on their own moorings off the
   // shelf. None of them is going anywhere — this is a bathing station, and the
@@ -8492,25 +8870,12 @@ async function buildJadrija(scene) {
     post(W, SAN.t1 - 0.6, SAN.s1 + 0.14, y - 0.3, y + 2.60, 0.055,
       [0.400, 0.396, 0.386], 7);
 
-    // The fish. Hung the way `endMural` hangs the gull — a quad a few
-    // millimetres off the render with the paint's own alpha — and rotated the
-    // way `shopSign` is, because this is a face across the shore and not a
-    // gable along it.
-    {
-      const ft = 348.35, fs = SAN.s0 + 0.55;
-      const st = at(ft), p = W(ft, fs - 0.008, y + 1.16);
-      const mw = 1.55;
-      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(mw, mw),
-        solidMaterial(0xffffff, {
-          spec: 0.02, vcol: false, transparent: true, depthWrite: false,
-          decl: 'uniform sampler2D uMuralMap;',
-          body: 'vec4 mu = texture2D(uMuralMap, vUv);\nbase = mu.rgb;\nalpha = mu.a;',
-          uniforms: { uMuralMap: { value: fishMural() } },
-        }));
-      mesh.position.set(p[0], p[1], p[2]);
-      mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
-      scene.add(mesh);
-    }
+    // The fish used to hang here, on the seaward face of the salmon mass at
+    // t 348.35. It is on the back row's gable in the car park now — see
+    // `fishGable`, up with the gull. What is left behind is a rendered and
+    // painted wall with nothing on it, which is what the note above says this
+    // mass is for: somebody rendered and painted it in order to have something
+    // to paint on, and the painting has moved rather than the plaster.
 
     runs.push({ t0: SAN.t0 - 0.4, t1: SAN.t1 + 0.4, s0: SAN.s0 - 0.4,
       s1: SAN.s1 + 0.4, y, h: 2.7 });
@@ -10994,8 +11359,24 @@ async function buildJadrija(scene) {
     // this room you can hear and see from the promenade, and it is still moving
     // for a second or two after you have gone through and stopped being near.
     if (beads) {
+      // There is a curtain in this doorway, so have the sound of one ready.
+      // Every frame, and it costs a Set lookup: `sampleLoad` remembers what it
+      // has been asked for, and asking before the audio context exists is a
+      // no-op it does not remember — which is what makes this safe to call from
+      // the first frame of the locale rather than from some event.
+      if (audio && audio.beadWarm) audio.beadWarm();
+      // Everything else in this resort that can go through that door. Both of
+      // them walk the same three marks at t = K.dc — `moveDog`'s legs and hers
+      // — so both cross the strands square on, and both used to do it in
+      // silence with the curtain hanging dead still behind them. Built fresh
+      // each frame because it is at most two entries and never survives one.
+      const with_ = [];
+      if (show && skinFig && skinFig.mesh.visible) {
+        with_.push(['her', show.t, show.s]);
+      }
+      if (dog && dog.mesh.visible) with_.push(['dog', dog.at[0], dog.at[1]]);
       beads.step(pt, ps,
-        Math.hypot(pt - K.dc, ps - (K.face + 0.075)), dt, camY);
+        Math.hypot(pt - K.dc, ps - (K.face + 0.075)), dt, camY, with_);
     }
     // Kept outside the near gate below, because a radio you can hear from the
     // promenade is most of what makes anybody walk over and look through the
@@ -15511,9 +15892,17 @@ async function buildJadrija(scene) {
     hold: 2.30,        // s it stays there, which is also how long the line is up
     back: 0.85,        // s letting it go again, slower than it came
     reach: 1.05,       // rad, the most a neck does before a body has to follow
-    cool: 5.0,         // s before anybody on this beach says anything again
+    // Was 5.0 / 0.55 before the sixteen lines went in. With three recorded
+    // lines out of seven and a coin-flip on top, barging down a full
+    // promenade produced silence more often than not — which is what
+    // "they don't say nuthin" was. With sixteen there is no repetition to
+    // protect against, so the gate can come down to where being walked into
+    // reliably gets an answer. The per-person 14 s is UNCHANGED: the same
+    // person snapping at you twice in a row is the thing that would read as
+    // a machine.
+    cool: 2.2,         // s before anybody on this beach says anything again
     again: 14.0,       // s before the *same* person does
-    says: 0.55,        // the share of people who speak rather than only look
+    says: 0.82,        // the share of people who speak rather than only look
     // How high over their own feet the balloon hangs. Standing, sitting in a
     // chair on a terrace, and lying on a lounger — which is in here for
     // completeness rather than because it happens, since a sunbather is behind
@@ -15528,7 +15917,28 @@ async function buildJadrija(scene) {
    * the first one again — a crowd with one line in it is a crowd with a tape
    * recorder in it.
    */
-  const EXCUSE = ['bump.excuse', 'bump.excuse', 'bump.hey', 'bump.ow'];
+  // Sixteen lines, and every one of them has a voice.
+  //
+  // The first cut had seven, of which three were recorded and four were polite.
+  // Misha, having played it: "they do turn their heads, but they don't say
+  // nuthin... they should say something out loud in pissed off BKLYN accent ..
+  // u can cycle through like 16 different annoying responses." Both halves of
+  // that are the same bug. Only three in seven had a clip, and on top of that
+  // sat a 55 % chance of speaking at all and a five-second global cooldown — so
+  // shoving your way down a crowded promenade produced silence far more often
+  // than not, and what you heard was the head turn.
+  //
+  // So the polite three are gone from the pool and all sixteen are recorded.
+  // `bump.excuse`, `bump.hey` and `bump.ow` keep their translations because
+  // they are still what a *balloon* would say in a language the voice does not
+  // speak — see the note over `bark` in 80-audio.js — but nobody draws them.
+  const EXCUSE = ['bump.watchit', 'bump.walkin', 'bump.goin', 'bump.blind',
+    'bump.easy', 'bump.beach', 'bump.eyes', 'bump.fuhged', 'bump.standin',
+    'bump.invisible', 'bump.hurry', 'bump.space', 'bump.knowyou',
+    'bump.righthere', 'bump.again', 'bump.kiddinme'];
+  /** Every one of them has a clip, in both voices. `bump.x` -> `bump_x_{m,f}`. */
+  const BARK = {};
+  for (const k of EXCUSE) BARK[k] = k.slice(5);
   const looking = [];        // the figures with a head part-way round
   let bumpBalloon = null;    // made on the first bump and never again
   let bumpSaid = null;       // { fg, t } while a line is up
@@ -15632,7 +16042,13 @@ async function buildJadrija(scene) {
     // a fact about them rather than about the order you happen to meet them
     // in. A different mixing from the `fg.seed < says` test above, or the
     // people who speak would all have drawn the same line out of it.
-    const line = T(EXCUSE[((fg.seed * 7919) | 0) % EXCUSE.length]);
+    const key = EXCUSE[((fg.seed * 7919) | 0) % EXCUSE.length];
+    const line = T(key);
+    // The voice, where there is one, in this figure's own. `sex` is on the
+    // figure because the crowd already drew it to decide which rig to use, and
+    // half this beach is women — one voice for everybody would be one person
+    // following you down the promenade.
+    if (audio && audio.bark && BARK[key]) audio.bark(BARK[key], fg.sex);
     bumpBalloon.say(line);
     bumpBalloon.said = line;
     bumpSaid = { fg, t: 0 };
@@ -15641,6 +16057,10 @@ async function buildJadrija(scene) {
 
   /** Advance every head that is part-way round, and the line over one of them. */
   function stepBump(dt, cam) {
+    // Ask for the six clips before anybody is walked into. Same lesson as
+    // `beadWarm`: a decode that starts when the sound is wanted is a sound that
+    // is missing the first time, and the first time is the one you remember.
+    if (audio && audio.barkWarm) audio.barkWarm();
     bumpClock += dt;
     if (bumpCool > 0) bumpCool -= dt;
     if (!looking.length && !bumpSaid) return;
@@ -15738,6 +16158,9 @@ async function buildJadrija(scene) {
     const p = toWorld(b.t, b.s);
     const fg = {
       mode: b.pose,
+      // Which voice is theirs when they are walked into. Drawn above to pick a
+      // rig, and kept because the two have to be the same person.
+      sex,
       x: p[0], y: b.y, z: p[2], yaw: rigYaw(b.t, b.ang),
       // The (t, s) shadow of the world position, kept for the walkers: it is
       // far cheaper to advance a distance along the shore than to re-solve for
@@ -15993,6 +16416,14 @@ async function buildJadrija(scene) {
     // right pair of answers.
     top: 1.78,
     lieTop: 0.42,
+    // And somebody sitting down, who arrived in this list on 23 Aug when the
+    // static blockers went. A seated figure is the same circle in plan — the
+    // shoulders do not narrow — but they are not 1.78 m tall, and giving them
+    // the standing height would put a column over the head of everybody on the
+    // quay lip that `GROUND.hopV` cannot clear. Head about 1.30 m above the
+    // deck they are sitting on: 0.46 m of seat, which is what the three seated
+    // clips were solved against, plus a seated trunk and neck.
+    sitTop: 1.30,
   };
 
   // Reused rather than rebuilt, because this is called once a frame from the
@@ -16047,7 +16478,9 @@ async function buildJadrija(scene) {
         pushBody(f.x - ax * half, f.z - az * half, BODY.lieR * sc,
           f.y, f.y + BODY.lieTop * sc, 'bather', f.idx);
       } else {
-        pushBody(f.x, f.z, BODY.r * sc, f.y, f.y + BODY.top * sc, 'bather', f.idx);
+        // Seated people are the same circle and a lower column. See `sitTop`.
+        const h = f.mode === 'sit' ? BODY.sitTop : BODY.top;
+        pushBody(f.x, f.z, BODY.r * sc, f.y, f.y + h * sc, 'bather', f.idx);
       }
     }
     // And her, who is not one of the crowd and is the one everybody noticed.
@@ -16801,6 +17234,12 @@ async function buildJadrija(scene) {
     /** Debug: where the gull ended up, so a camera can be pointed at it. */
     mural: () => mural && { at: mural.at.map((v) => +v.toFixed(2)),
       p: mural.mesh.position.toArray().map((v) => +v.toFixed(2)) },
+    /** Debug: and the fish, which hangs off the same function on the wood side. */
+    fish: () => fish && { at: fish.at.map((v) => +v.toFixed(2)),
+      p: fish.mesh.position.toArray().map((v) => +v.toFixed(2)) },
+    /** Debug: the doorway through the screen wall — where it is and how wide. */
+    screen: () => doorway && { t: +doorway.t.toFixed(2), s: +doorway.s.toFixed(2),
+      gy: +doorway.gy.toFixed(2), door: doorway.door, span: +doorway.span.toFixed(2) },
     /** Debug: the tourist board, and what its map found to draw. */
     beads: () => beads && {
       strands: beads.strands, gap: +beads.gap.toFixed(4),
