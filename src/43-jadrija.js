@@ -8055,6 +8055,56 @@ async function buildJadrija(scene) {
       boxTS(bt - 0.50, bt - 0.38, bs - 0.16, bs + 0.16, y + 0.92, y + 0.96,
         [0.100, 0.100, 0.110]);
     }
+
+    // Scooters, which this shore had none of and which every frame of it has.
+    //
+    // 20260821_175830 has two parked nose-in against the hedge behind the bar,
+    // both dark, both with a top box on the carrier; the b_106 note has a third
+    // leaning by the electrical cabinets at Trampulin. A moped is what a
+    // Dalmatian bathing station is reached on when it is not reached on foot,
+    // and the game had bicycles and nothing with an engine.
+    //
+    // Step-through, because that is what all three of them are: a floor between
+    // the feet, a leg shield standing up in front of it, a seat over the rear
+    // wheel and a box behind that. The silhouette is the leg shield and the box;
+    // everything else could be a bicycle.
+    const scooter = (mt, ms, yaw, body) => {
+      const y = surfaceY(mt, ms);
+      const P = facing(mt, ms, yaw);
+      const TYRE = [0.085, 0.085, 0.092];
+      const DARK = [0.130, 0.130, 0.140];
+      const CHROME = [0.620, 0.630, 0.645];
+      // The wheels, as rings of chords — the same trick the bicycles use, and
+      // for the same reason: a box with a dark colour on it is not a wheel.
+      for (const [wu, R] of [[0.66, 0.21], [-0.60, 0.21]]) {
+        for (let j = 0; j < 10; j++) {
+          const a0 = (j / 10) * TAU, a1 = ((j + 1) / 10) * TAU;
+          const q = (a, o) => P(wu + Math.cos(a) * R, o,
+            y + R + Math.sin(a) * R);
+          b.quad(q(a0, -0.055), q(a1, -0.055), q(a1, 0.055), q(a0, 0.055), TYRE);
+        }
+      }
+      // Floor, leg shield, seat, rear body, top box.
+      boxIn(P, -0.30, 0.34, -0.20, 0.20, y + 0.30, y + 0.36, DARK);
+      boxIn(P, 0.34, 0.50, -0.21, 0.21, y + 0.30, y + 0.96, body,
+        shade(body, 1.08));
+      boxIn(P, -0.62, -0.10, -0.19, 0.19, y + 0.40, y + 0.66, body,
+        shade(body, 1.05));
+      boxIn(P, -0.56, -0.02, -0.17, 0.17, y + 0.66, y + 0.78, DARK);
+      boxIn(P, -0.72, -0.34, -0.19, 0.19, y + 0.78, y + 1.06, DARK,
+        shade(DARK, 1.3));
+      // Bars and a mirror on a stalk, which is the only thing up at eye height.
+      boxIn(P, 0.40, 0.48, -0.30, 0.30, y + 0.98, y + 1.04, CHROME);
+      boxIn(P, 0.42, 0.46, 0.24, 0.30, y + 1.04, y + 1.22, CHROME);
+      boxIn(P, 0.38, 0.50, 0.22, 0.34, y + 1.20, y + 1.28, DARK);
+      runs.push({ t0: mt - 0.9, t1: mt + 0.9, s0: ms - 0.5, s1: ms + 0.5,
+        y, h: 1.05 });
+    };
+    // The two behind the bar, nose-in to the hedge as the photograph has them.
+    scooter(281.4, 25.9, 0.16, [0.155, 0.160, 0.175]);
+    scooter(282.5, 26.0, 0.10, [0.125, 0.115, 0.120]);
+    // And the third, at Trampulin, by the cabinets. b_106.
+    scooter(477.2, 24.3, -1.42, [0.330, 0.320, 0.325]);
     b = back11;
   }
 
