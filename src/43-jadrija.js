@@ -2880,6 +2880,174 @@ async function buildJadrija(scene) {
    * reads this from in the game they are a couple of pixels either way, which
    * is the same thing the photograph does to them.
    */
+  /**
+   * The centenary hoarding: JADRIJA 100, OD 1922.
+   *
+   * 20260821_175215 and 175149. A bin store or plant enclosure out on the
+   * limestone chippings behind the businesses, clad on every face in printed
+   * cream panels, and the print is the best piece of graphic design at Jadrija:
+   * rows and rows of the kabina doors in their four colours, some of them drawn
+   * ajar, with JADRIJA arched across the middle over a big white 100 whose two
+   * zeros are the front of a kabina — an arch with four coloured doors inside
+   * it and a step under it. A sea ladder in the corner. A small red flower over
+   * the I.
+   *
+   * The date is off the panel and not from anywhere else: OD 1922, and 1922 +
+   * 100 is 2022, which is when this went up. It is the only place in the game
+   * that says how old this place is, and it says it because the hoarding does.
+   *
+   * `end` draws the narrow face, which carries the same thing smaller with the
+   * date under it instead of the ladder.
+   */
+  function jadrija100(w, h, end) {
+    const C = document.createElement('canvas');
+    C.height = 512;
+    C.width = Math.min(2048, Math.max(256, Math.round(512 * w / h)));
+    const g = C.getContext('2d');
+    const CW = C.width, H = C.height;
+    const CREAM = '#e9e7bf';
+    // Lighter than they first came out. These are printed flat colour on a
+    // cream panel in full sun, not the doors themselves, and at the saturation
+    // the kabina palette uses they read as a wall of paint rather than as a
+    // drawing of a wall of doors.
+    const DOOR = ['#7fb4d8', '#c9564a', '#6da862', '#dcbb5c', '#cba86a'];
+    g.fillStyle = CREAM; g.fillRect(0, 0, CW, H);
+    // A door: a coloured leaf with a handle, and one in eight standing open,
+    // which is what makes the pattern read as a row of huts and not as stripes.
+    const door = (x, y, dw, dh, i) => {
+      const c = DOOR[i % DOOR.length];
+      const ajar = (i % 8) === 3;
+      if (ajar) {
+        g.fillStyle = '#6b4a2c';
+        g.fillRect(x, y, dw, dh);
+        g.fillStyle = c;
+        g.beginPath();
+        g.moveTo(x + dw * 0.15, y);
+        g.lineTo(x + dw * 1.15, y + dh * 0.06);
+        g.lineTo(x + dw * 1.15, y + dh * 0.94);
+        g.lineTo(x + dw * 0.15, y + dh);
+        g.closePath(); g.fill();
+      } else {
+        g.fillStyle = c;
+        g.fillRect(x, y, dw, dh);
+      }
+      g.fillStyle = 'rgba(40,36,30,0.55)';
+      g.fillRect(x + dw * (ajar ? 0.75 : 0.62), y + dh * 0.47, dw * 0.16, dh * 0.035);
+    };
+    // Sized off the DOOR and not off the panel, which is the whole of why the
+    // first cut looked wrong. A kabina door on this print is about one to three
+    // — tall and narrow, the proportion of the real thing — and deriving the
+    // width from a column count gave doors nearly as wide as they were tall,
+    // so the panel read as a chequerboard instead of as a row of huts.
+    const rows = 4;
+    const dh = (H / rows) * 0.72;
+    const dw = dh / 3.0;
+    const pitch = dw * 2.05, vpitch = H / rows;
+    const cols = Math.max(3, Math.floor((CW - dw) / pitch));
+    const gx = (CW - (cols - 1) * pitch - dw) / 2;
+    const gy = H * (end ? 0.15 : 0.06);
+    // The logo sits in a clear rectangle in the middle and the grid steps round
+    // it, which is what the panel does rather than printing over its own doors.
+    const clear = end
+      ? { x0: -1, x1: -1, y0: -1, y1: -1 }
+      : { x0: CW * 0.325, x1: CW * 0.675, y0: H * 0.18, y1: H * 0.92 };
+    let n = 0;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const x = gx + c * pitch, y = gy + r * vpitch;
+        n++;
+        if (x + dw > clear.x0 && x < clear.x1 && y + dh > clear.y0 && y < clear.y1) continue;
+        door(x, y, dw, dh, n + r);
+      }
+    }
+    // The wordmark.
+    const cx = CW * 0.5;
+    const nameY = end ? H * 0.115 : H * 0.295;
+    g.fillStyle = '#f6f4ec';
+    g.textAlign = 'center';
+    g.font = `700 ${H * (end ? 0.085 : 0.12)}px "Helvetica Neue", Arial, sans-serif`;
+    const NAME = 'JADRIJA';
+    // Letter-spaced by hand so it can be arched slightly, which the panel does.
+    const px = H * (end ? 0.085 : 0.12);
+    g.save();
+    g.translate(cx, nameY);
+    const step = px * 0.74;
+    NAME.split('').forEach((ch, i) => {
+      const o = i - (NAME.length - 1) / 2;
+      g.save();
+      g.translate(o * step, Math.abs(o) * px * 0.045);
+      g.rotate(o * 0.035);
+      g.fillText(ch, 0, 0);
+      g.restore();
+    });
+    g.restore();
+    // The flower over the I, six petals and a dark middle.
+    g.fillStyle = '#c8453c';
+    const fy = nameY - px * 0.82;
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      g.beginPath();
+      g.ellipse(cx + Math.cos(a) * px * 0.10, fy + Math.sin(a) * px * 0.10,
+        px * 0.075, px * 0.042, a, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.fillStyle = '#8e2f28';
+    g.beginPath(); g.arc(cx, fy, px * 0.045, 0, Math.PI * 2); g.fill();
+    if (end) {
+      g.fillStyle = '#f6f4ec';
+      g.font = `600 ${H * 0.062}px "Helvetica Neue", Arial, sans-serif`;
+      g.fillText('..OD 1922.', cx, H * 0.93);
+      const tex0 = new THREE.CanvasTexture(C);
+      tex0.colorSpace = THREE.SRGBColorSpace;
+      tex0.anisotropy = 8;
+      return tex0;
+    }
+    // The 100, whose zeros are the front of a kabina: an arch, four doors in
+    // it, and a step under the lot.
+    const ay = H * 0.505, aw = CW * 0.125, ah = H * 0.285;
+    g.fillStyle = '#f6f4ec';
+    g.font = `800 ${H * 0.30}px "Helvetica Neue", Arial, sans-serif`;
+    g.textAlign = 'right';
+    g.fillText('1', cx - aw * 0.86, ay + ah * 0.86);
+    g.textAlign = 'center';
+    // The arch.
+    g.beginPath();
+    g.moveTo(cx - aw * 0.62, ay + ah);
+    g.lineTo(cx - aw * 0.62, ay + ah * 0.40);
+    g.arc(cx + aw * 0.10, ay + ah * 0.40, aw * 0.72, Math.PI, 0);
+    g.lineTo(cx + aw * 0.82, ay + ah);
+    g.closePath(); g.fill();
+    // Four doors inside it.
+    const inner = [CREAM, '#5f9a55', '#d6b048', '#c0453b'];
+    for (let i = 0; i < 4; i++) {
+      g.fillStyle = inner[i];
+      const bw = aw * 0.26;
+      g.fillRect(cx - aw * 0.50 + i * bw * 1.12, ay + ah * 0.44, bw, ah * 0.52);
+      g.fillStyle = 'rgba(240,238,230,0.9)';
+      g.fillRect(cx - aw * 0.50 + i * bw * 1.12 + bw * 0.62,
+        ay + ah * 0.66, bw * 0.18, ah * 0.035);
+    }
+    // The step.
+    g.fillStyle = '#f6f4ec';
+    g.fillRect(cx - aw * 0.86, ay + ah * 1.02, aw * 1.72, ah * 0.075);
+    g.fillRect(cx - aw * 0.54, ay + ah * 1.14, aw * 1.08, ah * 0.055);
+    // And the ladder in the corner, which is the other thing this shore is.
+    const lx = CW * 0.90, ly = H * 0.74, lw = CW * 0.035, lh = H * 0.20;
+    g.strokeStyle = '#f6f4ec'; g.lineWidth = Math.max(2, H * 0.011);
+    g.beginPath();
+    g.moveTo(lx - lw * 0.5, ly + lh); g.lineTo(lx - lw * 0.5, ly);
+    g.moveTo(lx + lw * 0.5, ly + lh); g.lineTo(lx + lw * 0.5, ly);
+    for (let i = 0; i <= 4; i++) {
+      const yy = ly + (lh * i) / 4;
+      g.moveTo(lx - lw * 0.5, yy); g.lineTo(lx + lw * 0.5, yy);
+    }
+    g.stroke();
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    return tex;
+  }
+
   function menuPanels(w, h) {
     const C = document.createElement('canvas');
     C.height = 256;
@@ -6876,6 +7044,64 @@ async function buildJadrija(scene) {
 
     runs.push({ t0: SAN.t0 - 0.4, t1: SAN.t1 + 0.4, s0: SAN.s0 - 0.4,
       s1: SAN.s1 + 0.4, y, h: 2.7 });
+
+    // The centenary hoarding, out on the chippings east of the block.
+    //
+    // 20260821_175215: an enclosure — a bin store, by the look of it — clad on
+    // every face in printed cream panel, standing clear of the ground on slim
+    // galvanised legs on its own poured pad. The print is JADRIJA 100 and the
+    // date, and it is the best piece of graphic design at Jadrija; see
+    // `jadrija100`.
+    //
+    // The position is a placement and not a measurement, and the distinction
+    // matters more here than usual. The photograph's geotag puts the camera at
+    // t 358.8, s 6.8, which is out on the promenade — and what is behind the
+    // hoarding in frame is limestone chippings, pines and houses with red tile,
+    // which is thirty metres inland of that. GPS under pine canopy is worth
+    // about ten metres and the corrected table is only as good as the trace, so
+    // what the frame settles is the object and its surroundings, not its arc
+    // length. It goes east of the sanitary block because that is chippings with
+    // pines and houses behind it, which is the ground the photograph shows.
+    {
+      const ht = 360.6, hs = 32.4;
+      const hy = Math.max(surfaceY(ht, hs),
+        groundAt(at(ht).x + at(ht).nx * hs, at(ht).z + at(ht).nz * hs));
+      const HL = 4.20, HD = 2.15, HH = 1.72, LEG = 0.24;
+      const PANEL = [0.775, 0.768, 0.590];
+      const P = (dt, ds, yy) => W(ht + dt, hs + ds, yy);
+      // The pad, standing proud of the chippings so it reads as poured.
+      boxIn(P, -HL / 2 - 0.28, HL / 2 + 0.28, -HD / 2 - 0.26, HD / 2 + 0.26,
+        hy - 0.06, hy + 0.10, [0.640, 0.632, 0.612], [0.690, 0.682, 0.660]);
+      // Four legs, then the clad box floating on them.
+      for (const ot of [-HL / 2 + 0.32, HL / 2 - 0.32]) {
+        for (const os of [-HD / 2 + 0.18, HD / 2 - 0.18]) {
+          boxIn(P, ot - 0.035, ot + 0.035, os - 0.035, os + 0.035,
+            hy + 0.10, hy + 0.10 + LEG, [0.520, 0.530, 0.540]);
+        }
+      }
+      const y0h = hy + 0.10 + LEG;
+      boxIn(P, -HL / 2, HL / 2, -HD / 2, HD / 2, y0h, y0h + HH,
+        PANEL, [0.700, 0.694, 0.545]);
+      // The print, on the long face that looks back down the shore and on the
+      // west end, which are the two the photograph has.
+      const st = at(ht);
+      const face = (dt, ds, w, hgt, yaw, end) => {
+        const q = W(ht + dt, hs + ds, y0h + HH * 0.5);
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(w, hgt),
+          new THREE.MeshBasicMaterial({ map: jadrija100(w, hgt, end),
+            side: THREE.DoubleSide }));
+        m.position.set(q[0], q[1], q[2]);
+        m.rotation.y = yaw;
+        m.name = 'hoarding:' + (end ? 'end' : 'side');
+        scene.add(m);
+      };
+      face(0, -HD / 2 - 0.012, HL - 0.10, HH - 0.10,
+        Math.atan2(-st.nx, -st.nz), false);
+      face(-HL / 2 - 0.012, 0, HD - 0.10, HH - 0.10,
+        Math.atan2(-st.ux, -st.uz), true);
+      runs.push({ t0: ht - HL / 2 - 0.3, t1: ht + HL / 2 + 0.3,
+        s0: hs - HD / 2 - 0.3, s1: hs + HD / 2 + 0.3, y: hy, h: HH + LEG });
+    }
     b = back9;
   }
   // ── the playground ─────────────────────────────────────────────────────────
