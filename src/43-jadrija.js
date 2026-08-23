@@ -1857,10 +1857,17 @@ async function buildJadrija(scene) {
     // joinery — the door frames, the mullions, the trim. A body of 0.36 green
     // painted the whole twelve metres of it and read as a hoarding.
     { key: 'mini', kind: 'box', t0: 272, t1: 284, s0: 18, s1: 23.4, h: 2.45,
-      name: 'beach bar MINI', roof: [0.560, 0.535, 0.478],
+      name: 'beach bar MINI', split: ['beach bar ', 'MINI'],
+      roof: [0.560, 0.535, 0.478],
       body: [0.520, 0.528, 0.508], awn: 2.6, fg: '#1a2a3a', bg: '#ded7c7',
       pier: [0.075, 0.290, 0.140],
-      plinth: [0.520, 0.430, 0.270] },
+      plinth: [0.520, 0.430, 0.270],
+      // 20260823_111954: the shade over this terrace is a pair of big square
+      // taupe canopies on grey steel masts standing in plinths of stacked
+      // washed-aggregate block, and not the cream octagon in a car rim that
+      // every other cafe on the boardwalk has. See `bigShade`.
+      shade: { canvas: [0.508, 0.468, 0.352], mast: [0.335, 0.340, 0.348],
+        block: [0.500, 0.487, 0.440] } },
     { key: 'kiosk', kind: 'kiosk', t0: 290, t1: 293, s0: 20, s1: 23, h: 2.4,
       name: null, roof: [0.430, 0.252, 0.180], body: [0.130, 0.400, 0.130] },
     { key: 'tisak', kind: 'kiosk', t0: 305.5, t1: 309, s0: 22, s1: 24.2, h: 2.7,
@@ -1948,9 +1955,34 @@ async function buildJadrija(scene) {
       g.font = `600 ${size}px "Helvetica Neue", Arial, sans-serif`;
       g.fillText(text, C.width / 2, y);
     };
-    fit(S.name, S.sub ? C.height * 0.44 : C.height * 0.60,
-      S.sub ? C.height * 0.46 : C.height * 0.70);
-    if (S.sub) fit(S.sub, C.height * 0.46, C.height * 0.95);
+    // A name set in two weights on one line, which is what `20260823_111954`
+    // has painted on beach bar MINI's awning: "beach bar" in a light rounded
+    // lower case and "MINI" in heavy capitals half again as tall, both by the
+    // same hand and both black on the cream valance. Set at one weight it read
+    // as a fascia somebody ordered from a signwriter, which is the one thing
+    // this shore's businesses do not do.
+    //
+    // Both runs are solved together — the pair has to fill the board, so the
+    // size cannot be found from either half on its own.
+    if (S.split) {
+      const [lead, emph] = S.split;
+      const FF = '"Trebuchet MS", "Segoe UI", "Helvetica Neue", Arial, sans-serif';
+      g.font = `400 100px ${FF}`;
+      const wl = g.measureText(lead).width || 1;
+      g.font = `800 118px ${FF}`;
+      const we = g.measureText(emph).width || 1;
+      const k = Math.min(C.height * 0.62 / 100, C.width * 0.88 / (wl + we));
+      g.textAlign = 'left';
+      const x0 = (C.width - (wl + we) * k) * 0.5, base = C.height * 0.78;
+      g.font = `400 ${100 * k}px ${FF}`;
+      g.fillText(lead, x0, base);
+      g.font = `800 ${118 * k}px ${FF}`;
+      g.fillText(emph, x0 + wl * k, base);
+    } else {
+      fit(S.name, S.sub ? C.height * 0.44 : C.height * 0.60,
+        S.sub ? C.height * 0.46 : C.height * 0.70);
+      if (S.sub) fit(S.sub, C.height * 0.46, C.height * 0.95);
+    }
     const tex = new THREE.CanvasTexture(C);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
@@ -3998,6 +4030,140 @@ async function buildJadrija(scene) {
       [0.140, 0.140, 0.145]);
   }
 
+  /**
+   * The shade over beach bar MINI's terrace, which is not a parasol.
+   *
+   * `20260823_111954` is the third of the four photographs of 23 August and it
+   * is taken from the concrete apron looking straight into the bar. What is
+   * over the tables is a pair of BIG SQUARE canopies in a taupe canvas, near
+   * four metres across, nearly flat, on a mast of grey square hollow steel with
+   * four triangular gussets welded round its foot. The mast does not stand in a
+   * ballast disc: it is bolted to a painted plate that sits on a low PLINTH OF
+   * STACKED PRECAST BLOCKS — pale washed aggregate with the stones standing out
+   * of the face, three courses of them laid as a square kerb round the plate,
+   * with a strip of black rubber over one block and rust running down from the
+   * steel. Nothing else on this shore is built that way.
+   *
+   * The generic cafe parasol — cream, eight panels, standing in a car rim
+   * filled with concrete — is right for the Slasticarnica and H2O and Caffe
+   * Trampulin, and it was on MINI's terrace too, which made four businesses
+   * that all shade themselves the same way. This is the one that does not.
+   *
+   * Two of them, at the same two anchors the cream pair used, because those are
+   * where the tables are and the photograph has them over the tables.
+   */
+  function bigShade(S, y0, fs) {
+    const CANV = S.shade.canvas || [0.508, 0.468, 0.352];
+    const MAST = S.shade.mast || [0.335, 0.340, 0.348];
+    const BLOCK = S.shade.block || [0.500, 0.487, 0.440];
+    const HALF = 1.92;                     // half the canopy, so 3.84 m square
+    const PL = 0.66;                       // half the plinth
+    const BH = 0.135;                      // one course of blocks
+    for (let k = 0; k < 2; k++) {
+      const t = S.t0 + 1.3 + k * ((S.t1 - S.t0 - 2.6) || 1);
+      const s = fs - 3.6;
+      const y = at(t).deck;
+
+      // The plinth. Three courses of blocks laid as a square ring — a ring and
+      // not a solid, because the photograph is taken from close enough to see
+      // the plate and the bolt inside it, and a solid block of aggregate under
+      // a mast is a pedestal, which is a different object with a different
+      // meaning. Every course is offset half a block from the one under it, so
+      // the vertical joints break; a stack of blocks whose joints line up is a
+      // wall built by somebody who has never built one.
+      const W2 = 0.26;                     // one block across its width
+      for (let c = 0; c < 3; c++) {
+        for (let e = 0; e < 4; e++) {
+          const along = e < 2, near = e % 2 === 0;
+          // The two runs along `t` go corner to corner; the two along `s` stop
+          // a block's width short at each end, so the four corners are made by
+          // the t-runs and no two blocks occupy the same corner.
+          const lo = along ? -PL : -PL + W2, hi = along ? PL : PL - W2;
+          // Half a block of stagger on the middle course, which is what breaks
+          // the vertical joints. A stack whose joints line up is a wall built
+          // by somebody who has never built one.
+          const off = (c % 2) * (hi - lo) / 6;
+          const n = 3;
+          for (let i = 0; i < n; i++) {
+            const g = 0.90 + jit(c * 17 + e * 5 + i + (t | 0), 640) * 0.22;
+            const col = [BLOCK[0] * g, BLOCK[1] * g, BLOCK[2] * g];
+            const u0 = Math.max(lo, lo + (i + 0) * (hi - lo) / n + off);
+            const u1 = Math.min(hi, lo + (i + 1) * (hi - lo) / n + off) - 0.012;
+            if (u1 <= u0) continue;
+            const v0 = near ? -PL : PL - W2, v1 = near ? -PL + W2 : PL;
+            const y0b = y + c * BH, y1b = y + (c + 1) * BH - 0.008;
+            if (along) boxTS(t + u0, t + u1, s + v0, s + v1, y0b, y1b, col,
+              shade(col, 1.08));
+            else boxTS(t + v0, t + v1, s + u0, s + u1, y0b, y1b, col,
+              shade(col, 1.08));
+          }
+        }
+      }
+      // The strip of black rubber somebody laid over the near course, which is
+      // in the frame and is the only dark thing on the whole plinth.
+      boxTS(t - 0.30, t - 0.02, s - PL, s - PL + 0.24, y + 3 * BH - 0.01,
+        y + 3 * BH + 0.02, [0.085, 0.085, 0.090]);
+
+      // The plate, the gussets and the mast. The plate is what the plinth is
+      // built round and it stands ON the ground inside the ring rather than on
+      // the blocks — which is what the photograph shows and is also the only
+      // arrangement that makes sense of a plinth with a hole in the middle.
+      const yp = y + 0.04;
+      boxTS(t - 0.24, t + 0.24, s - 0.24, s + 0.24, y, yp,
+        shade(MAST, 0.86), shade(MAST, 1.02));
+      for (const [dt, ds] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        frustumTS(yp, [t + dt * 0.145, s + ds * 0.145, 0.008 + 0.075 * Math.abs(ds),
+          0.008 + 0.075 * Math.abs(dt)],
+        yp + 0.26, [t + dt * 0.070, s + ds * 0.070, 0.008 + 0.012 * Math.abs(ds),
+          0.008 + 0.012 * Math.abs(dt)], MAST, shade(MAST, 1.08));
+      }
+      const top = y + 2.86;
+      boxTS(t - 0.065, t + 0.065, s - 0.065, s + 0.065, yp, top, MAST,
+        shade(MAST, 1.10));
+
+      // The canopy. Four panels falling from a small square crown to the eaves,
+      // and a valance hanging straight down off the rim. Drawn from both sides:
+      // you spend the whole of this terrace underneath one, and the underside
+      // is what you are actually looking at.
+      //
+      // Nearly flat and not conical. 0.30 m of fall over 1.9 m is about nine
+      // degrees, which is what the frame has — a market canopy is a taut sheet
+      // with a slight crown, and anything steeper reads as a circus tent.
+      const eave = top - 0.34, crown = 0.34;
+      for (let e = 0; e < 4; e++) {
+        const sg = e < 2 ? 1 : -1, ax = e % 2 === 0;
+        const A = ax ? [t + sg * HALF, s - HALF] : [t - HALF, s + sg * HALF];
+        const Bp = ax ? [t + sg * HALF, s + HALF] : [t + HALF, s + sg * HALF];
+        const C = ax ? [t + sg * crown, s + crown] : [t + crown, s + sg * crown];
+        const D = ax ? [t + sg * crown, s - crown] : [t - crown, s + sg * crown];
+        const cl = e % 2 ? CANV : shade(CANV, 1.06);
+        b.quad(W(A[0], A[1], eave), W(Bp[0], Bp[1], eave),
+          W(C[0], C[1], top), W(D[0], D[1], top), cl);
+        b.quad(W(D[0], D[1], top), W(C[0], C[1], top),
+          W(Bp[0], Bp[1], eave), W(A[0], A[1], eave), shade(cl, 0.86));
+      }
+      // The valance, 0.22 m of it, which is the band the eye reads the canopy's
+      // edge off. Without it the four panels end in a line in the air.
+      for (let e = 0; e < 4; e++) {
+        const sg = e < 2 ? 1 : -1, ax = e % 2 === 0;
+        const cl = shade(CANV, 0.98);
+        if (ax) {
+          boxTS(t + sg * HALF - 0.03, t + sg * HALF + 0.03, s - HALF, s + HALF,
+            eave - 0.22, eave + 0.01, cl);
+        } else {
+          boxTS(t - HALF, t + HALF, s + sg * HALF - 0.03, s + sg * HALF + 0.03,
+            eave - 0.22, eave + 0.01, cl);
+        }
+      }
+      // Blocked: the plinth stops you and the mast stops you, and both are
+      // things you would walk into rather than step over. The canopy is 2.5 m
+      // up and is not a blocker, which is the whole point of standing under it.
+      runs.push({ t0: t - PL, t1: t + PL, s0: s - PL, s1: s + PL,
+        y, h: 3 * BH });
+      furniture.push({ t, s, a: 0.10, c: 0.10, h: 2.4, y });
+    }
+  }
+
   function shopfront(S) {
     const tc = (S.t0 + S.t1) * 0.5;
     const y0 = at(tc).deck;
@@ -4370,10 +4536,13 @@ async function buildJadrija(scene) {
           k % 3 === 0 ? [0.190, 0.200, 0.210] : [0.560, 0.548, 0.512]);
       }
     }
+    // Except at beach bar MINI, whose shade is a different object entirely and
+    // gets `bigShade` instead. See the note over it.
+    if (S.shade) bigShade(S, y0, S.s0 - awn);
     // And the cafe's own parasols: cream, on a pebble-aggregate disc, one to a
     // pair of tables. Furled and tied after five, which is how every frame shot
     // at ten to six in the survey has them.
-    if (awn > 0) {
+    if (awn > 0 && !S.shade) {
       const fs = S.s0 - awn;
       const furled = (CONFIG.hour || 14) > 17;
       const CREAM = [0.560, 0.545, 0.508];
