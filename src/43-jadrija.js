@@ -5524,6 +5524,212 @@ async function buildJadrija(scene) {
   // fronts, on the same line.
   palisadeWall(241.0, 257.5, 40.4);
 
+  /**
+   * The lavender bank on a drystone wall, and it is A PLACEMENT.
+   *
+   * `a_171` to `a_180` in v595 — ten frames walking up the approach lane, and
+   * `a_174` and `a_177` are the two that carry it. A low DRY-STONE retaining
+   * wall holds a raised bed a half-metre above the lane, and the bed is planted
+   * end to end with mounded silver-grey bushes, shoulder to shoulder, with fine
+   * flower spikes standing out of the top of them and mostly gone over.
+   *
+   * The reason it is worth its triangles is colour and nothing else. Everything
+   * planted at Jadrija so far is dark green — pine, tamarisk, oleander, ivy, the
+   * clipped hedge at 224, the mass behind the palisade at 241 — and all of it is
+   * correct. The lavender measures 126,141,122 in the mean and 159,174,155 in
+   * the sun: a pale, almost unsaturated sage that is not on this shore anywhere.
+   * Thirty metres of it does more for the place than another object would.
+   *
+   * On rule 12: the note that proposed this called it "lavender or santolina"
+   * and it stays that way. Nothing in ten frames settles the species, the
+   * spikes are over, and the plant is drawn as what it looks like rather than
+   * as what it might be called. The red flowering thing in the same bed at the
+   * near end of `a_174` ships as red flowers over green leaf, unnamed, for the
+   * same reason.
+   *
+   * The wall is DRY, and that is the whole difference between it and the two
+   * either side of it. The garden wall at 224 is mortared with wide pale beds;
+   * the palisade wall at 241 is packed tight with thin dark joints. This one has
+   * no mortar in it at all — what shows between the plates is the dark inside of
+   * the wall, the stones are flat and laid roughly level, and the gaps are
+   * chinked with small stones the way a dry waller closes a bed.
+   *
+   * v595 carries no GPS, so the position is chosen and said out loud: t 259.0
+   * to 291.0 on the same s 40.4 frontage the garden wall and the palisade are
+   * already on, which makes three neighbouring properties along one lane with
+   * three different boundaries — which is what the lane in the footage is.
+   * Nothing here draws from `rng()`. Rule 4.
+   */
+  function lavenderBank(t0, t1, sw) {
+    const back = b;
+    b = up;
+    const STONE = [0.455, 0.420, 0.372];
+    // No mortar. The core is the dark inside of the wall seen through the bed
+    // joints, and it is darker than either of the other two walls' because
+    // there is nothing in there to catch the light.
+    const CORE = [0.168, 0.158, 0.144];
+    const SOIL = [0.285, 0.188, 0.132];
+    // First cut of the foliage came out MINT — a pale blue-grey pillow — and
+    // the plant in the frame is not blue. 126,141,122 has green on top and the
+    // blue lowest of the three, so the blue has to sit below the red as well
+    // as below the green, and it did not.
+    // Twice, because the renderer's light has a say in this that the
+    // photograph's numbers do not carry. 126,141,122 has the red and the blue
+    // within six of each other, and a colour mixed at that ratio came out MINT
+    // on the screen: the sun here is warm and the ambient is sky, so anything
+    // desaturated picks the blue up in its own shade. The blue has to be mixed
+    // lower than the frame measures it to arrive at the frame's colour.
+    const DK = [0.318, 0.360, 0.250], LT = [0.560, 0.600, 0.440];
+    // And the spikes are GREY-violet and mostly over, not a lupin. Drawn at
+    // 0.505,0.462,0.585 on a fat head they came out as purple lollipops
+    // standing in a row, which is the loudest thing this bank could possibly
+    // have been and the opposite of what it is for.
+    const FLT = [0.412, 0.388, 0.452];
+    const RDK = [0.330, 0.080, 0.072], RLT = [0.635, 0.170, 0.135];
+    const AW = 0.175;
+    const RUN = 2.6;
+    const gAt = (t, s) => {
+      const st = at(t);
+      return Math.max(surfaceY(t, s), groundAt(st.x + st.nx * s, st.z + st.nz * s));
+    };
+    const spin = (ct, cs, ang) => {
+      const co = Math.cos(ang), sn = Math.sin(ang);
+      return (dt, ds, y) => W(ct + dt * co - ds * sn, cs + dt * sn + ds * co, y);
+    };
+
+    const tops = [];
+    for (let a = t0; a < t1 - 0.01; a += RUN) {
+      const c = Math.min(a + RUN, t1);
+      let hi = -1e9;
+      for (let u = a; u <= c; u += 0.5) hi = Math.max(hi, gAt(u, sw));
+      const top = Math.round((hi + 0.60) / 0.12) * 0.12;
+      tops.push([a, c, top]);
+      const base = gAt((a + c) * 0.5, sw) - 0.30;
+      boxTS(a, c, sw - 0.10, sw + 0.10, base, top - 0.03, CORE, shade(CORE, 1.05));
+      // Flat plates laid roughly level, which is what a dry waller has to do —
+      // he has no mortar to make up a difference with, so every stone has to
+      // bed on the one under it.
+      for (const near of [true, false]) {
+        const out = near ? -1 : 1;
+        let row = 0;
+        for (let y = base + 0.04; y < top - 0.07; row++) {
+          const hh = 0.085 + jit(((a * 13) | 0) + row * 5, 703) * 0.130;
+          let u = a + jit(((a * 13) | 0) + row, 708) * 0.22;
+          for (let k = 0; u < c - 0.04; k++) {
+            const key = ((a * 13) | 0) + row * 37 + k;
+            const L = 0.18 + jit(key, 700) * 0.38;
+            const u1 = Math.min(u + L, c);
+            const g = 0.72 + jit(key, 704) * 0.52;
+            const col = [STONE[0] * g, STONE[1] * g, STONE[2] * g];
+            const sh = hh * (0.44 + jit(key, 709) * 0.58);
+            const off = (hh - sh) * jit(key, 698);
+            const d0 = (jit(key, 701) - 0.5) * 0.040;
+            const yl = Math.max(base + 0.02, y + off);
+            const yh = Math.min(top - 0.05, y + off + sh + d0);
+            if (yh - yl > 0.035 && u1 - u > 0.07) {
+              frustumTS(yl, [(u + u1) * 0.5, sw + out * 0.095,
+                (u1 - u) * 0.5 - 0.012, 0.052],
+              yh, [(u + u1) * 0.5 + d0, sw + out * AW,
+                (u1 - u) * 0.5 - 0.022, 0.046], col, shade(col, 1.09));
+            }
+            // Chinking: the small stone a dry waller drives into the gap to
+            // close a bed. Without them the wall reads as flags stacked with
+            // slots between, which is a stack and not a wall.
+            if (jit(key, 707) < 0.45 && u1 < c - 0.10) {
+              const cs2 = 0.045 + jit(key, 706) * 0.035;
+              frustumTS(yh - cs2 * 1.6, [u1 + 0.02, sw + out * (AW - 0.02),
+                cs2, cs2 * 0.7],
+              yh - 0.005, [u1 + 0.02, sw + out * (AW - 0.01), cs2 * 0.7,
+                cs2 * 0.5], shade(col, 0.90), shade(col, 1.06));
+            }
+            u = u1 + 0.014;
+          }
+          y += hh * 0.86;
+        }
+      }
+      // The top course, and it is what stops the wall showing a dark line
+      // along its head: the core has to be covered, and a dry wall's last
+      // course is the widest stones the waller had, laid flat and NOT dressed.
+      {
+        let u = a;
+        for (let k = 0; u < c - 0.03; k++) {
+          const key = ((a * 13) | 0) + k * 5;
+          const L = 0.22 + jit(key, 705) * 0.34;
+          const u1 = Math.min(u + L, c);
+          const g = 0.78 + jit(key, 702) * 0.44;
+          const col = [STONE[0] * g, STONE[1] * g, STONE[2] * g];
+          const yt = top + (jit(key, 699) - 0.62) * 0.055;
+          frustumTS(yt - 0.075 - jit(key, 697) * 0.045,
+            [(u + u1) * 0.5, sw, (u1 - u) * 0.5 - 0.010, AW],
+            yt, [(u + u1) * 0.5, sw, (u1 - u) * 0.5 - 0.020, AW - 0.012],
+            col, shade(col, 1.14));
+          u = u1 + 0.010;
+        }
+      }
+      // The bed the wall retains. Soil, not sand: `a_174` has it dark and
+      // reddish between the bushes, and drawn in the wood's own colour the
+      // planting looked like it was standing on the beach.
+      boxTS(a - 0.02, c + 0.02, sw + 0.09, sw + 3.1, top - 0.55, top - 0.02,
+        SOIL, shade(SOIL, 1.12));
+      runs.push({ t0: a, t1: c, s0: sw - 0.28, s1: sw + 0.28,
+        y: base, h: top - base });
+    }
+
+    // The planting. Mounds wider than they are tall, packed close enough to run
+    // into one another — `a_174` has no bare soil showing along the front of
+    // the bed at all — with the spikes standing out of the top of them.
+    const bedY = (t) => {
+      for (const [a, c, top] of tops) if (t >= a - 0.01 && t <= c + 0.01) return top;
+      return gAt(t, sw) + 0.6;
+    };
+    let n = 0;
+    for (let t = t0 + 0.5; t < t1 - 0.4; t += 0.86, n++) {
+      const key = (t * 17) | 0;
+      const s = sw + 0.75 + jit(key, 710) * 1.55;
+      const y = bedY(t) - 0.12;
+      const hr = 0.38 + jit(key, 711) * 0.34;
+      const vr = 0.24 + jit(key, 712) * 0.15;
+      const red = n % 6 === 4;
+      const P = spin(t, s, jit(key, 713) * TAU);
+      const band = [y, y + vr * 2.3];
+      // 0.40 of jag is a pillow. A lavender bush is a thousand woody stems
+      // and what you see of it is the lumps, so the shape has to break.
+      puff(P, 0, 0, y + vr * 1.05, vr, hr, DK, LT, band, 8, 4, 0.54, key % 89);
+      puff(P, (jit(key, 714) - 0.5) * 0.6, (jit(key, 715) - 0.5) * 0.6,
+        y + vr * (0.85 + jit(key, 716) * 0.5), vr * 0.72, hr * 0.74,
+        DK, LT, band, 7, 4, 0.58, (key + 7) % 89);
+      const tip = y + vr * 2.05;
+      if (red) {
+        // The red flowering thing at the near end of the bed in `a_174`. Not
+        // named, because the frame does not name it: red flowers over green.
+        for (let i = 0; i < 5; i++) {
+          const a2 = jit(key + i, 717) * TAU, d = jit(key + i, 718) * hr * 0.85;
+          puff(P, Math.cos(a2) * d, Math.sin(a2) * d,
+            tip - 0.06 + jit(key + i, 719) * 0.12, 0.052, 0.060,
+            RDK, RLT, [tip - 0.2, tip + 0.2], 6, 3, 0.34, (key + 23 + i) % 89);
+        }
+      } else {
+        // The spikes. Thin, upright, and mostly over — a fine stem with a
+        // short head on it, which at a metre and a half is the whole of what
+        // says lavender rather than a grey bush.
+        for (let i = 0; i < 5; i++) {
+          const a2 = jit(key + i * 3, 720) * TAU;
+          const d = jit(key + i * 3, 721) * hr * 0.80;
+          const st2 = t + Math.cos(a2) * d, ss = s + Math.sin(a2) * d;
+          const h = 0.17 + jit(key + i * 3, 722) * 0.11;
+          // Slender: a stem you can see and a head barely wider than it. The
+          // head used to be 26 mm on a 10 mm stem, which is a drumstick.
+          post(W, st2, ss, tip - 0.10, tip + h * 0.40, 0.012,
+            shade(LT, 0.82), 3);
+          post(W, st2, ss, tip + h * 0.30, tip + h, 0.016, FLT, 3);
+        }
+      }
+    }
+    b = back;
+  }
+  // The placement, stated: the third frontage along, east of the palisade.
+  lavenderBank(259.0, 291.0, 40.4);
+
   if (special) special.sign = neonSign(special);
 
   /**

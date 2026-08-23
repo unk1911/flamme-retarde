@@ -103,6 +103,14 @@ wall, running the whole length of the lane, with bougainvillea in magenta at
 the house corners. The game's planting is pine, tamarisk, oleander and ivy —
 correct, and all of it dark green. Sixty metres of silver-grey against it
 would do more for the colour of the place than another object.
+**BUILT, 23 Aug**, thirty-two metres of it at t 259.0-291.0 on s 40.4, which
+puts three neighbouring frontages with three different boundaries along one
+lane. Two things had to be found on the screen rather than in the frame: the
+foliage had to be mixed with LESS blue than 126,141,122 measures, because the
+sun here is warm and the ambient is sky so anything desaturated picks blue up
+in its own shade and comes out mint; and the spikes are grey-violet and thin,
+because at the frame's saturation on a head wide enough to see they were
+purple lollipops standing in a row.
 
 **7. The agave in a limestone rockery.** `a_112`, `a_113`, `b_096`, `b_100`.
 A big blue-green agave, 1.5 m across, planted in a heap of broken limestone at
