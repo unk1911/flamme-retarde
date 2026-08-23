@@ -8,6 +8,41 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.103.0] — 2026-08-22
+
+More survey work. One of these was found only by walking the shore end to end
+and looking at it, which is worth recording as a method and not just a fix.
+
+### Added
+
+- **The flags have mortar between them.** v_022 has the joints wide and visibly
+  darker than the stones; this had no joint geometry at all — a "joint" was the
+  line where one flag's colour met the next one's, so any two neighbours of a
+  similar shade had no joint in the frame and the paving went back to being a
+  plane with a pattern on it. Each cell is drawn twice now: full size in mortar,
+  then inset 55 mm and lifted 50 mm in stone. The inset runs across the shore as
+  well as along it, because a flag cut only in `s` gets a joint on two sides out
+  of four and reads as planking. +9 360 triangles, exactly two per cell.
+
+- **`b_016`: the green mesh fence panels** — four stacked and leaning back
+  against the kerb, each a little further over than the one in front, and a
+  fifth standing on its own six metres along. Drawn as a frame and seven bars
+  with nothing between them: mesh at ten metres is a haze you can see the ground
+  through, and a filled green rectangle is a gate. The position along the shore
+  is a placement and not a measurement — `b_016` is a v597 frame and v597 has no
+  GPS — and the comment in the source says so.
+
+### Fixed
+
+- **A grey mortar grid was printed across forty metres of beach.** The joints
+  went in as a fixed colour, and `paving` is handed the arc length as well as
+  the flag index precisely so the flags can go to shingle over the sand — which
+  they do, and a constant does not go anywhere. The mortar is now the cell's own
+  colour times 0.76, so it follows every blend the stone follows. It was
+  invisible from anywhere on the promenade and obvious from the beach, and it
+  turned up in a screenshot sweep of the whole shore rather than in the frame
+  the change was made in.
+
 ## [1.102.0] — 2026-08-22
 
 ### Fixed
