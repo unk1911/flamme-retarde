@@ -616,7 +616,16 @@ async function buildJadrija(scene) {
     const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
     return v - Math.floor(v);
   };
-  function paving(s0, s1, yOf, cols, nS = 5, step = 2.2) {
+  // `nS` courses across the band and a station every `step` metres along it.
+  //
+  // 5 and 2.2 gave flags about 2.2 m by 2.2 m. The stones in v_022 are 0.4 m
+  // to 1.0 m across — a flag you can stand on with both feet and have room
+  // over, not a flag you can lie on — so at the old size the promenade was
+  // paved in slabs four times the area of the real ones and read as municipal
+  // precast rather than as stone somebody laid by eye. 9 and 1.1 puts a cell
+  // near 1.2 m by 1.1 m, which is as close as this can get while the cut lines
+  // still have to run station to station.
+  function paving(s0, s1, yOf, cols, nS = 9, step = 1.1) {
     // Subdivided along the shore as well as across it. The stations are six
     // metres apart, so cutting only in `s` gives six-metre flags — which reads
     // as decking, not as paving. `at()` interpolates a station anywhere, so the
@@ -632,7 +641,17 @@ async function buildJadrija(scene) {
         const c0 = cut(i + 1, k), c1 = cut(i + 1, k + 1);
         b.quad(pt(a, a0, yOf(a, a0)), pt(c, c0, yOf(c, c0)),
           pt(c, c1, yOf(c, c1)), pt(a, a1, yOf(a, a1)),
-          cols(i * 7 + k * 3 + ((jit(i, k) * 5) | 0), i * step, (a0 + a1) * 0.5));
+          // The flag's colour index, and it has to be a hash and nothing else.
+          //
+          // It was `i * 7 + k * 3 + ((jit(i, k) * 5) | 0)`, and the arithmetic
+          // half of that is the bug: taken mod five, `7i + 3k` is `2i + 3k`,
+          // which is a diagonal stripe that repeats every five stations and
+          // every five courses. The jitter on the end could shift a flag by up
+          // to four places but not break the lattice under it, so the paving
+          // came out as a regular diagonal check about three metres across —
+          // which is what a tiled floor looks like, and crazy paving is the
+          // opposite of a tiled floor.
+          cols((jit(i, k * 37 + 11) * 4096) | 0, i * step, (a0 + a1) * 0.5));
       }
     }
   }
@@ -669,10 +688,24 @@ async function buildJadrija(scene) {
   // measurements, 1.019 / 0.939 / 0.858, is applied here rather than to the
   // light, because it is this concrete that is warm and not the afternoon.
   const CONC = [[0.479, 0.427, 0.364], [0.450, 0.402, 0.341], [0.507, 0.451, 0.383]];
-  // The flags of the old promenade: warm pale limestone, five shades, measured
-  // off the paving in the walk-through where it runs into full afternoon sun.
-  const FLAG = [[0.545, 0.500, 0.408], [0.512, 0.470, 0.382], [0.578, 0.530, 0.432],
-    [0.498, 0.455, 0.372], [0.560, 0.512, 0.418]];
+  // The flags of the old promenade: warm honey limestone, five shades.
+  //
+  // Re-measured against v_022, which is the one frame in the survey that has
+  // both surfaces in it and the seam between them running across the middle.
+  // The old palette was taken off the same footage but read as one material
+  // with the concrete beside it: R:B was 1.34 against CONC's 1.32, so the two
+  // differed in brightness by fourteen per cent and in hue by nothing at all,
+  // and the seam that in life is the most obvious thing on the promenade was
+  // a faint step in grey.
+  //
+  // What v_022 actually shows is a warm honey-ochre crazy paving against a
+  // cool grey poured slab — the flags are yellow, and they are yellow enough
+  // that the seam reads from fifty metres. So R:B goes to about 1.6, and the
+  // spread across the five shades goes from sixteen per cent to thirty-three,
+  // because the other half of what makes it read as crazy paving is that no
+  // two stones in the frame are the same colour.
+  const FLAG = [[0.592, 0.520, 0.372], [0.523, 0.455, 0.322], [0.648, 0.575, 0.418],
+    [0.487, 0.421, 0.298], [0.615, 0.535, 0.378]];
   const SALT = [0.336, 0.308, 0.268];        // the wet band at the waterline
   const STONE = [0.393, 0.347, 0.292];       // the quay wall
   // Dead Aleppo needles over limestone dust, which is what the ground is
@@ -739,8 +772,12 @@ async function buildJadrija(scene) {
   // the hill where it belongs and it becomes a 5 m strip of limestone flags
   // laid across a beach. `paving` hands its colour function the arc length as
   // well as the flag index so this can be asked.
+  // The course count is left to `paving` now. It was pinned at 5 here, which
+  // silently overrode the default and meant halving the station spacing there
+  // bought nothing across the band — the flags got shorter along the shore and
+  // stayed 2.2 m wide across it, which is a plank, not a flag.
   paving(PAVE, walkTo, deckOf,
-    (i, t, u) => mixc(FLAG[i % FLAG.length], shore(i, u), beachOf(t)), 5);
+    (i, t, u) => mixc(FLAG[i % FLAG.length], shore(i, u), beachOf(t)));
   ribbon(walkTo, JAD.back, deckOf, duff, 3);
   for (let i = 0; i < ST.length - 1; i++) {
     const a = ST[i], c = ST[i + 1];
