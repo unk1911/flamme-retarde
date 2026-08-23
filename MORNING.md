@@ -72,3 +72,12 @@ it repaints the whole resort, so it is your call and I have not touched it.
   relies on to verify a deploy.
 - **Survey item 5 marked built.** `palisadeWall` had been in the file since
   yesterday morning with nothing in the plan to say so.
+- **Survey item 9 built — two of the fifty-two cars are under covers.** A
+  sixth car model: a separate, rounder loft thrown over the crossover's own
+  plan, because what makes a covered car read as one is that all its creases
+  are gone.
+- **Survey item 8 was a misidentification and is now a correction.** The "two
+  pale domed containers" behind a fence at `b_047` are not glass-recycling
+  igloos. They are the roof and the bonnet of the covered car from item 9,
+  with the windscreen between them. Nothing had been built from it. The lesson
+  is in the plan: a contact sheet is not evidence.
