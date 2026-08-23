@@ -91,6 +91,25 @@ days of guessing.
 
 ---
 
+## HOW THIS FILE IS KEPT
+
+Cross an item off in the SAME commit that fixes it. Six items were found closed
+on 23 Aug that had been fixed, merged and written up in the CHANGELOG days
+earlier and left ticking over here as outstanding work — the walk, the west-end
+heights, the R chase, the bathers on absent ladders, the beds, the crowd. Every
+one of them got proposed back to Misha as a job. A list that lies about what is
+done is worse than no list.
+
+## STANDING — not items, and never finished
+
+- **The per-shop detail pass.** One shop per iteration, against its own
+  photographs. This used to sit in OPEN with a checkbox, which was the wrong
+  shape for it — Misha, 23 Aug: "isn't that just a continuous thing we do, we
+  keep refining its shoppe." It is. Slasticarnica and Caffe TRAMPULIN have had
+  theirs; the other eight have not, and there is no state at which the parade
+  is done. Rule 12 governs every pass: invent no name, no price and no number
+  the photographs do not carry.
+
 ## OPEN
 
 **Build**
@@ -136,7 +155,6 @@ days of guessing.
       Still open: the joints themselves. v_022 has them wide and visibly darker
       than the stones, and the flags here have no joint geometry at all — the
       edges are just where one colour meets the next.
-- [ ] Per-shop detail pass, one shop per iteration, against its own photographs.
 - [x] Sound: klapa out, five field recordings in — the promenade as one bed,
       the hillside cicadas, the same chorus from inside the pines crossfaded on
       canopy, the sea against the concrete edge (driven off `shoreAt` from
@@ -289,12 +307,17 @@ as of this writing; the state of each is in the git log, not here.
       at one; the pan construction was found by PAINTING it (rule 5's method,
       below) after reasoning about it failed, again.
 
-- [ ] The shut kabine standing on the bend are still WEDGES: 2.15 m of
-      frontage drawn as 1.42 m at t 400 and 3.38 m at t 480 (rule 9b). Nobody
-      can get inside one, but the first run of the block reads visibly cramped
-      seen down the row. The honest fix is to build each run on a rigid frame
-      of its own — which is what a straight building on a curving promenade
-      actually is — rather than to keep choosing where to stand things.
+- [x] The shut kabine standing on the bend are still WEDGES: 2.15 m of
+      frontage drawn as 1.42 m at t 400 and 3.38 m at t 480 (rule 9b). CLOSED
+      23 Aug: "i don't see any problems there for now it's totally fine." The
+      measurement is not withdrawn and neither is rule 9b — a constant slice of
+      `t` really is a trapezium in the world, and anything else built along
+      this bend will splay the same way. What is withdrawn is the claim that it
+      READS wrong, which was mine and not his, and which was the entire case
+      for rebuilding each run on a rigid frame. Nobody can get inside one and
+      nobody standing on the promenade minds. If the row ever looks wrong down
+      its length the numbers above are still true and the fix is still the one
+      described; until then this is a note about the frame, not a defect.
 - [x] Three bathers stand in the sea off the west beach holding nothing: the
       "somebody halfway down every other ladder" loop puts figures at t 22 /
       110 / 198 at s -0.28, but the ladder loop itself skips `t < beachTo + 8`,
