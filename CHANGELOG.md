@@ -8,6 +8,77 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.104.0] — 2026-08-22
+
+The marionettes, answered properly — and the answer was not a bigger number.
+
+### Fixed
+
+- **The good bathers follow you now.** The 24 skinned figures were chosen at
+  *build* time, so they were fixed individuals: the mannequin at your elbow
+  stayed one all session while a skinned figure two hundred metres away, that
+  you could not even resolve, spent the budget. The ones you walked up to were
+  always the wrong ones. The 24 meshes are **slots** rather than people now,
+  re-pointed 6.7 times a second at whoever is nearest, with 8 m of hysteresis so
+  two people at equal distance do not trade a slot every frame.
+
+  Measured in the merged build, within 15 m of the camera, skinned against
+  instanced: **4/0** at t 214, **9/0** at t 268, **10/0** at t 330. Zero
+  marionettes anywhere you can see one. Within 30 m the only instanced figures
+  left are the lying and quay-sitting poses, which have no clip in the bake.
+
+  **And it is faster.** p50 uncapped, three runs of each build alternated
+  because the machine drifted 4 ms over the session: west 16.0 → **13.0** ms,
+  mid 10.7 → **8.4**, east 11.4 → **8.9**. Nine pairs, all won. A skinned figure
+  at 200 m was never free, and its instanced stand-in is 132 triangles inside a
+  draw call that already exists. The west station had been breaching the 16.7 ms
+  budget; it has 3.7 ms of headroom.
+
+  Identity survives the swap, which is the part that would have been worse than
+  mannequins if it did not: 55 people held a slot over a 440 m walk, **36
+  promotions and 36 demotions, and zero figures changed body, colour or drawn
+  height**. The skinned tier bakes paint into its vertices and has no tint
+  uniform, so the copy goes the other way — each promotable bather's *instanced*
+  stand-in is repainted to its blob's baked swimwear and skin, and heights are
+  reconciled by measuring both rigs off their own vertices. The instanced rig
+  came out at 1.696 m, incidentally; the "canonical 1.70 m" in the prose had
+  never been checked.
+
+- **The skinned bathers never cast a shadow.** The instanced tier has been in
+  the near cascade since the crowd was written and the skinned tier was not —
+  invisible while the good figures were mostly far away, and the whole picture
+  once the cast follows you: walk toward a bather and their shadow goes out.
+
+### Added
+
+- **Three scooters.** Two nose-in against the hedge behind beach bar MINI as
+  20260821_175830 has them, and a third at Trampulin by the electrical cabinets
+  per `b_106`. Step-through, with the leg shield and the top box that are the
+  whole silhouette, and wheels built as rings of chords because a dark box is
+  not a wheel. A moped is what a Dalmatian bathing station is reached on when it
+  is not reached on foot, and the game had bicycles and nothing with an engine.
+
+- **The konoba's ceiling is amber.** Per-shop pass against 20260821_175856 — one
+  of three photographs that only became usable when the geotag table was
+  corrected. The roof was one box coloured reed-brown all over, and the
+  underside of that box is the largest surface anybody at this bar can see:
+  eleven metres by nine of flat dark olive. In the photograph the reed is the
+  top and the ragged eaves, and the ceiling under it is warm translucent
+  panelling with the afternoon coming through. Two layers now. The counter front
+  is maroon boarding under its teal top, too, which is why the row of red and
+  green stools reads against it.
+
+### Fixed — tooling
+
+- **The survey's geotag table was computed against a 189 m shore.** The shore is
+  572 m. `t` and `s` are not properties of a photograph — they are its GPS run
+  through `jadrija.local(x, z)` in whatever page was built at the time — and
+  nothing said so. Corrections run to a mean of **27 m in `s`** and a worst case
+  of **43.8 m**, all of it seaward, which is why so many photographs appeared to
+  have been taken from out in the channel when they were taken standing on the
+  promenade. Regenerated; `SOURCES` now says to re-run after any change to the
+  trace and to check the `site:` line against the census sentinel first.
+
 ## [1.103.0] — 2026-08-22
 
 More survey work. One of these was found only by walking the shore end to end
