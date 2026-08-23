@@ -442,6 +442,23 @@ function buildAudio() {
     return true;
   }
 
+  /**
+   * Ask for the clip before anybody goes through the door.
+   *
+   * `beadSample` starts the decode on its first call and returns false while it
+   * is in flight — so the FIRST crossing of a session got the synthesised shove
+   * and every one after it got the recording. That is audible: the two do not
+   * sound the same, and the one it happens to is the one you remember, because
+   * it is the first time you walk into the hut.
+   *
+   * Every other sample in this file is a bed. `shore`, `cicadas`, `wood` and
+   * `lapping` are asked for on the frame their locale comes up and are wanted
+   * continuously from then on, so a first call that returns nothing costs a
+   * frame nobody can hear. This one's first use IS the event. That asymmetry is
+   * the whole of the bug, and the fix is to separate asking from playing.
+   */
+  function beadWarm() { sampleLoad('beads', (b) => { beadBuf = b; }); }
+
   function beadShove(amp = 1, d = 0) {
     if (!ctx) return;
     const t0 = ctx.currentTime;
@@ -3059,7 +3076,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, rattle,
-    beadShove, canopy, boots,
+    beadShove, beadWarm, canopy, boots,
     /**
      * The last node before the speakers, and the context it lives in.
      *

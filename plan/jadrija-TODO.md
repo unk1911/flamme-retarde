@@ -287,6 +287,21 @@ as of this writing; the state of each is in the git log, not here.
       peaks 0.49 and 0.40 on the two NPC crossings against 0.02 idle, rattles
       0 to 23. fps 61, census unchanged, no errors.
 
+- [x] The FIRST crossing of a session sounded different from all the rest.
+      Misha, 23 Aug: "when i walk into kabine for the first time, the beeds
+      don't make that beed sound. but henceafter they do." Not silence — the
+      synthesised shove, which is what you hear when the recording is not there
+      yet. `beadSample` kicked the decode on its first call and returned false
+      while it was in flight, so crossing one got the synth and crossing two
+      onward got beads.mp3. Every other sample in 80-audio.js is a bed: asked
+      for on the frame its locale comes up, wanted continuously after, so a
+      first call that returns nothing costs a frame nobody can hear. This one's
+      first use IS the event. Separated asking from playing — `beadWarm()`, and
+      `stepKabina` calls it every frame there is a curtain, which is a Set
+      lookup. Measured on a cold page walking in on foot: 26 noise bursts
+      before (the synth), one buffer source after (the clip), and the eight
+      crossings after that unchanged.
+
 **Verify**
 - [ ] Knee-height close-up pass on the clutter — sandals, dropped towels,
       slumped bags. They are 25 cm objects and have never resolved in a shot

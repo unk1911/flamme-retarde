@@ -10236,6 +10236,12 @@ async function buildJadrija(scene) {
     // this room you can hear and see from the promenade, and it is still moving
     // for a second or two after you have gone through and stopped being near.
     if (beads) {
+      // There is a curtain in this doorway, so have the sound of one ready.
+      // Every frame, and it costs a Set lookup: `sampleLoad` remembers what it
+      // has been asked for, and asking before the audio context exists is a
+      // no-op it does not remember — which is what makes this safe to call from
+      // the first frame of the locale rather than from some event.
+      if (audio && audio.beadWarm) audio.beadWarm();
       // Everything else in this resort that can go through that door. Both of
       // them walk the same three marks at t = K.dc — `moveDog`'s legs and hers
       // — so both cross the strands square on, and both used to do it in
