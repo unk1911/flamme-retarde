@@ -684,6 +684,14 @@ def main():
     # 0 is right for 80 GB and a guaranteed OOM on an A10: 22.6 GB usable does
     # not hold 16.3 GB of weights plus a 20 670-token activation set. Measured:
     # A10 needs 20 at 480p and 40 at 720p.
+    #
+    # And 0 is NOT unconditionally right on a 40 GB A100 either, which is the
+    # correction to the 23 Aug morning note. That measurement (686 s at swap 0
+    # against 785 s at swap 20, so swap 0 wins) was taken with no reference
+    # images. Add two, as every run of the afternoon did, and the same job OOMs
+    # 94 seconds in inside forward_vace's rope_apply — ref_images extend the
+    # VACE sequence and the working set with it. On 40 GB at 720p n=81: swap 0
+    # with no refs, swap 20 with refs.
     r.add_argument("--swap", type=int, default=0)
     r.set_defaults(fn=cmd_run)
 

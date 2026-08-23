@@ -24,6 +24,27 @@ Three knobs matter and they interact:
                holding them, and both decided there was an open space where
                the bathroom is.
 
+               It is also, measured 23 Aug 2026, THE knob — the one that
+               decides whether the output is a photograph or a filtered render,
+               and by a margin nothing else came close to. On the Jadrija
+               promenade window, mean image gradient: the raw render 2.33, the
+               settled recipe at denoise 0.85 3.54, the same run at denoise
+               1.00 **8.08**, and a real photograph of the same cabin wall
+               10.41. One flag, at no extra cost in time, moved the result from
+               about 15 % of the way to a photograph to about 71 %. At 1.00 the
+               cabins acquire render texture and rain staining, the doors
+               acquire slats and hinges and weathered paint, and the ground
+               becomes stone setts with pine shadow moving across it — none of
+               which exist anywhere in the control frames.
+
+               What it costs is fidelity. At 1.00 nothing anchors the picture
+               but VACE, which holds the camera path and the main masses and lets
+               the rest move: the promenade widens, figures relocate, buildings
+               appear. Interiors are worse than exteriors for this, which is
+               what the bathroom above was. Bracket it: 1.00 for a demo reel,
+               0.95 when the shot has to stay closer, 0.85 when it has to
+               match.
+
 The distill LoRA runs at cfg 1.0, which makes the negative prompt inert. It is
 still passed, because a text embed is required and an empty one is worse.
 """
@@ -46,13 +67,22 @@ AP.add_argument("--light", type=float, default=1.0)      # cfg-step-distill
 AP.add_argument("--sim2real", type=float, default=0.55)
 AP.add_argument("--vace", type=float, default=1.0)
 AP.add_argument("--vacestart", type=float, default=0.0)
-# vace_end_percent was hardcoded to 1.0 until 23 Aug 2026, which is to say the
-# control signal was welded on through every single step of every run ever made.
-# That is the setting that makes an output read as "the render with a filter on
-# it": the late steps are where a diffusion model puts in material — grain,
-# specular, bark, corrosion — and holding a flat-shaded game frame over them
-# forbids exactly that. Below 1.0 the early steps still lock the composition and
-# the camera, and the tail is free.
+# vace_end_percent was hardcoded to 1.0 until 23 Aug 2026. The theory was that
+# this is what makes an output read as "the render with a filter on it" — the
+# late steps are where a diffusion model puts material in, so holding a
+# flat-shaded game frame over them should forbid exactly that.
+#
+# Measured 23 Aug on the Jadrija promenade window, and the theory is WRONG in
+# the configuration it was proposed for. Two runs identical but for this flag,
+# 1.0 against 0.6, at denoise 0.85: mean image gradient 3.54 against 3.55. The
+# same test on Wan 2.2 gave 2.88 against 3.15. Cosmetic in both model families.
+#
+# The reason is that there are two anchors and this is the weaker one. Below
+# 1.0, `--denoise` starts the sampler from the *render's own latents* rather
+# than from noise, so the render is baked into the initialisation and releasing
+# the control signal late barely changes where the trajectory ends. Turning
+# this down while denoise stays low is releasing the handbrake with the car
+# still in gear. See --denoise.
 AP.add_argument("--vaceend", type=float, default=1.0,
                 help="fraction of the schedule the control signal is applied "
                      "over; 1.0 welds the render on through the last step")
