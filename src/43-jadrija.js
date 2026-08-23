@@ -1879,7 +1879,7 @@ async function buildJadrija(scene) {
     { key: 'slast', kind: 'box', t0: 328, t1: 343, s0: 22, s1: 27.2, h: 2.95,
       name: 'slastičarnica', sub: 'JADRIJA', roof: [0.590, 0.578, 0.545],
       body: [0.560, 0.535, 0.487], awn: 3.0, fg: '#26241f', bg: '#f4f2ee',
-      vitrine: true, cooler: true, scallop: true },
+      vitrine: true, cooler: true, scallop: true, panels: true },
     { key: 'tramp', kind: 'fence', t0: 348, t1: 362, s0: 46, s1: 56, h: 2.2,
       name: null, post: [0.640, 0.520, 0.060], body: [0.055, 0.075, 0.062],
       rail: [0.660, 0.545, 0.075], skirt: [0.545, 0.075, 0.065] },
@@ -2857,6 +2857,92 @@ async function buildJadrija(scene) {
    * the real one is set in, and it is the one part of this sign that is
    * genuinely the shop's identity rather than a slogan.
    */
+  /**
+   * The three menu panels on the Slasticarnica's frontage.
+   *
+   * 20260821_175713, face-on from about fifteen metres, and the game had none
+   * of it: three bays in white aluminium frames on a pale blue-grey ground,
+   * with the lettering in a red-to-yellow gradient. It is the only warm thing
+   * on a white building and it is what your eye goes to from the promenade.
+   *
+   * WHAT IS LEGIBLE AND WHAT IS NOT, because rule 12 applies to a menu as much
+   * as to a place name. Fully legible: LIMUNADA, SPRITE, SLADOLED, KUPOVI,
+   * FRAPPE, KRAFNE, ESPRESSO, MACCHIATO, CAPPUCCINO, and the prices 8.00 on
+   * KUPOVI, 7.00 on FRAPPE and 2.00 on ESPRESSO. Inferred from their opening
+   * letters, with the rest of the word behind a customer's head: TONIC and
+   * FANTA — the only two words here that are not read straight off the glass,
+   * and they are noted rather than quietly included. Omitted entirely: the
+   * third item in the right-hand column, which is five or six letters and
+   * which I could not settle between readings, so it is not on the board.
+   *
+   * The illegible prices are drawn as the little white labels they are in the
+   * photograph rather than given invented numbers. At the distance anybody
+   * reads this from in the game they are a couple of pixels either way, which
+   * is the same thing the photograph does to them.
+   */
+  function menuPanels(w, h) {
+    const C = document.createElement('canvas');
+    C.height = 256;
+    C.width = Math.min(2048, Math.round(256 * w / h));
+    const g = C.getContext('2d');
+    const CW = C.width, H = C.height;
+    const SANS = '"Helvetica Neue", Arial, sans-serif';
+    // The aluminium the three bays are framed in.
+    g.fillStyle = '#dfe2e4'; g.fillRect(0, 0, CW, H);
+    // A warm fill, top to bottom, which is what all the lettering is set in.
+    const warm = () => {
+      const grad = g.createLinearGradient(0, H * 0.1, 0, H * 0.9);
+      grad.addColorStop(0, '#c8342a');
+      grad.addColorStop(0.55, '#e0641f');
+      grad.addColorStop(1, '#e8b322');
+      return grad;
+    };
+    const bay = (x0, x1) => {
+      g.fillStyle = '#aebecb';
+      g.fillRect(CW * x0, H * 0.06, CW * (x1 - x0), H * 0.88);
+      g.strokeStyle = '#f2f4f5'; g.lineWidth = H * 0.035;
+      g.strokeRect(CW * x0, H * 0.06, CW * (x1 - x0), H * 0.88);
+    };
+    bay(0.015, 0.315); bay(0.345, 0.655); bay(0.685, 0.985);
+    // Left bay: the cold drinks.
+    g.textAlign = 'left';
+    g.fillStyle = warm();
+    ['LIMUNADA', 'SPRITE', 'TONIC', 'FANTA'].forEach((t, i) => {
+      g.font = `700 ${H * 0.15}px ${SANS}`;
+      g.fillText(t, CW * 0.045, H * (0.26 + i * 0.19));
+    });
+    // Middle bay: the name, small over large, which is how it is set.
+    g.textAlign = 'center';
+    g.font = `600 ${H * 0.12}px ${SANS}`;
+    g.fillText('Slastičarnica', CW * 0.5, H * 0.26);
+    g.font = `800 ${H * 0.26}px ${SANS}`;
+    g.fillText('JADRIJA', CW * 0.5, H * 0.55);
+    // Right bay: what it costs. A white label where the photograph has one.
+    g.textAlign = 'left';
+    const items = [['SLADOLED', null], ['KUPOVI', '8.00 €'], ['FRAPPE', '7.00 €'],
+      ['KRAFNE', null], ['ESPRESSO', '2.00 €'], ['MACCHIATO', null],
+      ['CAPPUCCINO', null]];
+    items.forEach(([t, price], i) => {
+      const y = H * (0.19 + i * 0.115);
+      g.font = `700 ${H * 0.105}px ${SANS}`;
+      g.fillStyle = warm();
+      g.fillText(t, CW * 0.705, y);
+      if (price) {
+        g.textAlign = 'right';
+        g.font = `600 ${H * 0.095}px ${SANS}`;
+        g.fillText(price, CW * 0.975, y);
+        g.textAlign = 'left';
+      } else {
+        g.fillStyle = '#f4f6f7';
+        g.fillRect(CW * 0.905, y - H * 0.085, CW * 0.068, H * 0.10);
+      }
+    });
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    return tex;
+  }
+
   function caseVinyl(w, h) {
     const C = document.createElement('canvas');
     C.height = 256;
@@ -3791,6 +3877,28 @@ async function buildJadrija(scene) {
     // chips on it until the 22 August survey, which is what a shop looks like
     // when nobody has ever stood in front of it.
     if (S.vitrine) gelatoCase(S, y0);
+    // The three menu panels, on the frontage right of the serving opening,
+    // where 20260821_175713 has them. Same construction as `shopSign` — a face
+    // with a tray 0.10 m behind it, both placed off the face rather than off
+    // the building, for the reason written out at length up there.
+    if (S.panels) {
+      const pw = (S.t1 - S.t0) * 0.34, ph = 1.18;
+      const pt = S.t0 + (S.t1 - S.t0) * 0.70, ps = S.s0 - 0.14;
+      const py = y0 + 1.62;
+      const back = b;
+      b = up;
+      boxTS(pt - pw * 0.5 - 0.04, pt + pw * 0.5 + 0.04, ps + 0.10, ps + 0.18,
+        py - ph * 0.5 - 0.03, py + ph * 0.5 + 0.03, [0.300, 0.296, 0.288]);
+      b = back;
+      const pst = at(pt), pp = W(pt, ps, py);
+      const pm = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph),
+        new THREE.MeshBasicMaterial({ map: menuPanels(pw, ph),
+          side: THREE.DoubleSide }));
+      pm.position.set(pp[0], pp[1], pp[2]);
+      pm.rotation.y = Math.atan2(-pst.nx, -pst.nz);
+      pm.name = 'menu:' + S.key;
+      scene.add(pm);
+    }
     // The pergola and the plank bench at Trampulin, which is exactly what the
     // promenade benches are already built out of.
     if (S.pergola) {
