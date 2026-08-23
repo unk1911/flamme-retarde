@@ -448,9 +448,9 @@ concrete. 89 people at 60 fps.
 
 ## KNOWN, from the 22 Aug playing pass
 
-- **`0` throws and does not stop throwing.** `skipToGround` → `ground.force()`
-  → `seedSpotFire()` reads `far[0]` and `far[1]` off a sorted `objects` with no
-  guard, and `objects` can be shorter than two. `47-ground.js:614`.
+- ~~**`0` throws**~~ — guarded in 1.99.1. It warns with the locale's name
+  instead. Never did reproduce; if that warning ever prints, the locale it names
+  is the bug.
 - **`swimwear()` smears.** The walking woman's suit paints red blotches across
   her back and buttocks. Same mechanism as the nape wedge that was fixed today
   — a paint volume interpolating across triangles four times the size it was
