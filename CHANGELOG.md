@@ -8,6 +8,87 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.111.0] — 2026-08-23
+
+Four photographs taken this morning, four prices Misha knew off by heart, and a
+crowd that finally answers back in the accent he asked for. Everything here
+except the survey mining came out of him playing the 1.110.0 build and saying
+what was wrong with it.
+
+### Added
+
+- **Sixteen things to say, and every one of them recorded.** "They do turn their
+  heads, but they don't say nuthin... they should say something out loud in
+  pissed off BKLYN accent — u can cycle through like 16 different annoying
+  responses." Both halves of that were the same fault. 1.110.0 voiced three of
+  seven lines, and over the top of that sat a 55 % chance of speaking at all and
+  a five-second global cooldown — so barging down a full promenade produced
+  silence far more often than sound, and what you got was the head turn.
+  Thirty-two clips now, sixteen lines in a man's voice and a woman's, 298 KB.
+  The account holds 42 voices and not one is a New Yorker; both of these are
+  ElevenLabs shared-library voices, `Pauly - Brooklyn Wise Guy` and `Brooklyn -
+  African American New Yorker`, and both synthesise straight off their public
+  voice_id, so nothing was added to the account. With sixteen lines there is no
+  repetition left to defend against, so two gates come down — `BUMP.cool`
+  5.0 → 2.2 s and `BUMP.says` 0.55 → 0.82. The per-person 14 s is unchanged on
+  purpose: the same person snapping at you twice running is the one thing here
+  that would read as a machine. Bumping 24 people gave 17 spoken lines and 11
+  distinct clips among them.
+- **The Slastičarnica's counter, from `20260823_111819`** — drainer tray, glass
+  bowl of tasting spoons, chipped white tin, the acrylic scoop card reading
+  SLADOLED KUGLA 2,50 €, and the cone tub, Slatki Kornet, 1,00 €. The big red
+  capitals on the tub wrap are *not* set: only "SLA" and "KOR" are legible, so
+  the red ships as a band with no letters.
+- **The mirror wall behind it** — mirror tile, three glass shelves of upturned
+  stemware, control cabinet, a framed licence with a crest and no words, a clock
+  at 11:20, the flag. It replaces a black panel that was read across from a
+  different frontage.
+- **Beach bar MINI shades itself the way its own photograph does** — two square
+  taupe canopies on grey steel masts with gusseted feet, standing in plinths of
+  stacked washed-aggregate block, and its fascia in two weights. Opt-in, so the
+  other three cafés keep their cream parasols.
+- **A garden boundary at the back of the wood** — mortared limestone slabs, a
+  brass-gold bar gate, black railing, clipped hedge. **A placement**, and it says
+  so in the code: none of the four photographs carries GPS.
+- **`plan/survey-3.md`** — what each of the four can and cannot settle, a ranked
+  list, and an explicit "checked and found already built" section.
+
+### Fixed
+
+- **Mr Mors was on the wrong wall.** Moved this morning to a block out in the
+  pine wood, which was not where he wanted it: "the wall of the kabine next to
+  the one with the seagull mural". It is on the blank end wall directly across
+  the lane from the gull now, t 519.27 → **396.92**, facing back down the lane at
+  it. Found by publishing a `gables()` accessor listing every run end rather than
+  by guessing an arc length — of ten candidates only one is anywhere near the
+  gull, 1.07 m up-shore and 8.9 m inland. The frame was reproduced before the
+  decision was made, and the camera had to be computed in world metres: the
+  (t, s) frame is badly non-orthonormal at the spit tip, where 8 m of `t` at
+  s ≈ 22 is about 4.5 m of world.
+- **The four prices that were behind a reflection are on the board.** SLADOLED
+  2.50, KRAFNE 2.50, MACCHIATO 2.50, CAPPUCCINO 3.50 — supplied by Misha out of
+  his own knowledge of the shop on 23 August, not read off a photograph and not
+  guessed. **This is not rule 12 being relaxed**; rule 12 forbids inventing a
+  number the evidence does not carry, and has never forbidden one the owner
+  states as fact. The comment over `menuPanels` says which three were legible on
+  `20260821_175713`, why the other four were not, and where they came from. The
+  blank-label branch and its per-row budget went with them, so all seven rows now
+  take the same budget: worst gap 8 px, zero warm pixels outside the bay.
+
+### Known
+
+- **The wood floor is wrong.** `20260823_112051` shows pale angular crushed
+  limestone with needle litter; the game has warm orange-tan sand. It is the
+  biggest single mismatch in the four and it is deliberately untouched, because
+  repainting it touches the whole resort and wants to be a decision rather than a
+  survey side effect.
+- **"Med" is not legible in any of the four.** The flavour order was confirmed,
+  not corrected. If Misha says it is there, that outranks a photograph.
+- The recorded voices are English in every language while the balloon over them
+  is translated into all three.
+- `__fr.renderer` is not published, so `renderer.info.render.triangles` reads 2
+  from the page. The real count is `__fr.stats().jadrija.tris`.
+
 ## [1.110.0] — 2026-08-23
 
 Everything Misha found in one morning of playing, plus the survey's most
