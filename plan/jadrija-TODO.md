@@ -531,6 +531,89 @@ as of this writing; the state of each is in the git log, not here.
 
 ## SURVEY — found, not yet built
 
+### survey/4 — 23 Aug 2026, forty-seven stills and a six-minute 4K pan
+
+`/mnt/c/tmp/refs/jadrija/survey/4/`. The pan is
+`1000150414-super-valuable-pan-kabine-and-other-stuffs.mp4`, 369.9 s at 3840x2160
+and 30 fps, read at one frame per three seconds plus stills at the interesting
+timecodes. This is by a long way the best material anybody has had on the kabine
+— the August batch had one run of them in it and this has four, plus two
+minutes of wall at arm's length, plus the inside of one.
+
+**BUILT 23 Aug** — the render, the palette, the wear, the dado, and the `kabine`
+bed. See the commit.
+
+**FOUND, NOT BUILT — and the big one is the first:**
+
+- **The bay is about half the width the model has it.** `JAD.cabW` is 2.15 m.
+  Measured on frame 0:39, which is as square-on as the pan ever gets: a monobloc
+  chair standing against the wall (0.80 m) gives 200 px/m at the wall plane, and
+  at that scale the doors come out 0.75-0.85 m wide on a pitch of 0.95-1.05 m,
+  with a pier of 0.15-0.30 m between them. The doors are planked and you can
+  count the boards — six to a leaf, so 110-130 mm each, which is a board. At
+  2.15 m of bay those boards would be 270 mm and there is no such board.
+  Corroborated on frame 0:09 against a second monobloc and two 5 L water
+  bottles. So the ratio the photographs give is door/bay = 0.77-0.80 where the
+  model has 0.42, and it is why the render reads as a row of lock-ups with wide
+  grey piers rather than as a row of cubicles that is nearly all door.
+  Not built, and the reason is arithmetic rather than doubt: the block is
+  t 396-557 and at 1.05 m the same frontage is 153 doors a row instead of 75.
+  The header comment on `JAD.from` rejected 320 huts on a triangle budget and
+  the `JAD.rows` comment records 348 huts costing 267k triangles, so this is
+  reopening a decision that was already argued and lost once. It wants its own
+  pass with a count of what is really there — Jadrija's kabina count is a
+  published number and nobody has looked it up — and a plan for the geometry,
+  not a constant edited on a Sunday.
+- **Two doors that are not on the model at all.** Frames 3:42 and 3:45: two
+  bays are faced in **crazy-paving limestone**, white and ochre flags with wide
+  mortar joints, with a white PVC door in them. They are somebody's own
+  improvement and there are only two, which is exactly why they are worth
+  having: a hundred metres of identical treatment with two exceptions in it is
+  what a row of privately owned huts looks like.
+- **The doors are open, and there is a curtain in them.** 0:24, 2:57, 3:48 and
+  4:03: an open kabina at Jadrija has a **plastic strip fly curtain** in it —
+  magenta, green, blue and yellow ribbons — or a cloth one, or a bamboo blind.
+  The model has eighty shut doors and one open room. Every photograph has
+  several open ones with something hanging in the hole.
+- **The clothesline.** A line strung from a nail on the wall to the next hut
+  with towels pegged on it, and a row of five coat hooks screwed to the render
+  outside the door (4:09). Two of the frames are of nothing but that.
+- **What is inside one.** 0:09 through the open door: a folding sun lounger
+  stored on end, a red cool box, a wooden shelf high on the back wall with a
+  bag on it, a striped towel on a hook, a mat on the floor. And at 3:48,
+  through a louvred shutter: a **blue-framed camp bed**, a table under a
+  checked cloth, a pink curtain. The one room the game has is furnished off the
+  August batch and this is a second and third example of the same room.
+- **The transom is glazed or meshed and framed in the door's colour.** 0:39 is
+  the clearest: every door has a small horizontal light over it, the frame
+  painted with the door and the pane dark or wire. The model draws this and
+  draws it as a slot with three bars, which is right for half of them.
+- **KABINAŠI.** A small enamelled sign, purple lettering on white, on the end
+  wall at 0:24. Not set — one word, legible, and it is the name of the thing.
+- **Brod.** Stills _377/_378: the pier the Šibenik boat comes to. A rusted
+  cast-iron mushroom bollard and a newer brass one on a concrete quay with
+  mooring rings let into the slab, and **St Nicholas Fortress** square across
+  the water behind it. _357/_370/_376: the moorings, thirty-odd small white
+  pasare with ŠB registrations.
+- **The fish-head tap.** _358/_359: a bronze spout cast as a fish, bolted to a
+  two-metre block of orange-ochre limestone with a stone trough under it, on a
+  pebble bed. It is the only piece of sculpture at Jadrija.
+- **The little free library.** _367/_368/_369: a wooden box on two steel posts
+  with a lift-up lid full of books, and beside it a white panel painted with a
+  row of coloured book spines. Green cast-iron and timber benches, gravel with
+  a white limestone-block edging.
+- **Pizzeria Kod Koze** (_335): grey render, terracotta pantiles, yellow
+  monobloc chairs on crazy paving. **The konoba at _336/_337**: green-grey
+  fibre-cement sheet on a timber pergola over a whitewashed rubble base, green
+  posts, a mosaic mural. **The green kiosk** (_342/_343): bright green painted
+  metal with a TISAK sign, beer crates stacked outside, a yellow barrier.
+  **beach bar MINI and the grill** (4:48-6:10): white square parasols with
+  pointed crowns, backlit photo menu boxes, Ožujsko parasols, POMMES FRITES
+  banners, pallet furniture, chevron timber screens.
+- **The ground in the wood** (_344/_345/_347): pale compacted dirt with white
+  limestone chips through it and brown pine litter, not sand. And pine bark:
+  grey-brown plates with **orange-red** inner bark showing at the seams.
+
 - **a_030** the back lane: two-storey pale yellow render house, grey-green
   louvred shutters, vine pergola on green steel. The game has houses here and
   no lane, no parking, no walls.

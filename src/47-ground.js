@@ -1732,6 +1732,13 @@ async function buildGround(scene, field) {
     // swimmer's position lives in 59-swim.js and out there the sea has taken
     // the outdoor bus 24 dB down anyway.
     audio.lapping(active ? shoreAt(you.x, you.z) : null);
+    // And the rows, which follow your feet for the same reason and are driven
+    // from the same place. `rowsAt` is Jadrija's and the aerodrome has no such
+    // thing, so this is nothing at all anywhere but the promenade — which is
+    // correct, and is why it is asked of the locale rather than of the world.
+    if (audio.kabine) {
+      audio.kabine(active && field.rowsAt ? field.rowsAt(you.x, you.z) : 0);
+    }
     // The field burns whether or not anybody is standing in it. Leaving this
     // gated on the ground phase would mean an airfield that only ever caught
     // fire while you were watching, which is the kind of thing you can feel.

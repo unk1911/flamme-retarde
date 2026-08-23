@@ -1566,14 +1566,21 @@ function buildAudio() {
    * within a couple of per cent, and it is still audibly a filter. It is the
    * same lesson the ćuk taught, and it cost the same three rounds to learn.
    *
-   * So there are five clips, cut from recordings made on the spot at Jadrija in
-   * August by `tools/cut_field.py`, 2.3 MB of mono MP3 in the payload:
+   * So there are six clips, cut on the spot at Jadrija in August by
+   * `tools/cut_field.py`, 3.0 MB of mono MP3 in the payload:
    *
    *     shore     24.5 s  22 050 Hz  96 kbps  the promenade, 13 Aug
    *     cicadas   10.0 s  24 000 Hz  96 kbps  the hillside, 12 Aug
    *     wood      68.0 s  24 000 Hz  96 kbps  inside the pines, 17 Aug
    *     lapping   69.5 s  22 050 Hz  96 kbps  the pier, 16 Aug
    *     boat      44.0 s  16 000 Hz  64 kbps  the channel off Sibenik, 17 Aug
+   *     kabine    55.5 s  22 050 Hz  96 kbps  along the rows, 23 Aug
+   *
+   * The last of those is the only one that is not from the recorder: it is the
+   * sound track of a six-minute 4K pan along the kabine, and it went in ahead
+   * of the recording made specially for the same job because the two were
+   * measured against each other and the video won by thirteen decibels in the
+   * band voices live in. See the note in `tools/cut_field.py`.
    *
    * All five are high-passed, because a 117 Hz rumble is the loudest single
    * thing in three of the six source files and it is not the sound of anywhere;
@@ -1744,6 +1751,17 @@ function buildAudio() {
     // what ninety metres of pine does to a couple of hundred people.
     water: 0.62,
     wood: 0.80,
+    // And what the rows take. Less than either, and deliberately: the alley
+    // between two runs of kabine is nine metres of concrete with a 2.6 m wall
+    // down each side and both ends open to the beach — it does not shut the
+    // promenade out the way ninety metres of pine does, it puts it round a
+    // corner. 0.45 leaves the crowd about 2.6 dB down in there, which is a
+    // move you can hear walking in and not a door closing.
+    rows: 0.45,
+    // How much of the water's share the rows take with them — see
+    // `placeWeights`. Not all of it: the alleys are open at both ends and the
+    // front row's own frontage is eight metres from the edge.
+    duck: 0.72,
     // And what the chorus gets back for it. The wood clip has to come up by
     // more than the promenade goes down, because it is the only bed left when
     // you are properly in the trees and the sum has to land where it was.
@@ -1752,12 +1770,29 @@ function buildAudio() {
   // Where the last frame said you were. `null` is "nobody is on their feet",
   // which is also what the aeroplane looks like from here, and it reads as open
   // ground: no cede, no canopy, the promenade bed exactly as it always was.
-  let placeD = null, placeCan = 0;
+  let placeD = null, placeCan = 0, placeRow = 0;
 
   function placeWeights() {
-    if (placeD == null) return { water: 0, wood: 0 };
-    const near = sat((MORPH.fade - placeD) / (MORPH.fade - MORPH.full));
-    return { water: near, wood: sat(placeCan) * (1 - near) };
+    if (placeD == null) return { water: 0, wood: 0, rows: 0 };
+    const rows = sat(placeRow);
+    // And the edge, less whatever is standing between you and it.
+    //
+    // This is not tidying, it is the whole of whether the rows are a place.
+    // `shoreAt` is a distance transform of the coastline and knows nothing
+    // about buildings, so in the alley between the two rows — 25 m from the
+    // water, well inside the 70 m the morph fades over — it reports 0.71 and
+    // hands the sea seven tenths of the mix. What is actually between you and
+    // the water there is nine metres of concrete and a run of kabine 2.6 m
+    // tall, and standing in it you can barely hear the edge. `MORPH.duck` is
+    // that wall, and without it the new bed comes up into a mix that has not
+    // made room for it.
+    const near = sat((MORPH.fade - placeD) / (MORPH.fade - MORPH.full))
+      * (1 - MORPH.duck * rows);
+    // The rows beat the canopy. There are pines growing out of the alleys at
+    // the east end and `canopyAt` reads about 0.5 in there, so without this the
+    // deep-wood clip would come up while you are standing between two walls of
+    // hut with the sky overhead.
+    return { water: near, wood: sat(placeCan) * (1 - near) * (1 - rows), rows };
   }
 
   // ── the promenade ───────────────────────────────────────────────────────────
@@ -1850,7 +1885,8 @@ function buildAudio() {
     // water nor under a canopy, and zero out in the channel where there is no
     // position at all, so the factor is 1 and the bed is what it always was.
     const m = placeWeights();
-    const cede = MORPH.water * m.water + MORPH.wood * m.wood;
+    const cede = MORPH.water * m.water + MORPH.wood * m.wood
+      + MORPH.rows * m.rows;
     const amp = (inside ? SHORE.inside : SHORE.gain) * t * t * Math.sqrt(1 - cede);
     const n = shoreNodes;
     n.g.gain.setTargetAtTime(Math.max(amp, 0.0001), t0, 0.45);
@@ -1933,7 +1969,85 @@ function buildAudio() {
     // frontage and forty-two metres of mole, all of it working at once — and a
     // line falls off as 1/r where a point falls off as 1/r².
     const t = sat((LAP.fade - d) / (LAP.fade - LAP.full));
-    lapNodes.g.gain.setTargetAtTime(Math.max(LAP.gain * t, 0.0001), t0, 0.35);
+    // Ducked by the rows exactly as the morph's water term is, and it has to be
+    // the same number in both places: this bed and that weighting are two
+    // halves of one statement about where the sea is, and if only one of them
+    // knew about the kabine then walking into the alley would take the crowd
+    // behind the water and leave the water at the level it had on the edge.
+    lapNodes.g.gain.setTargetAtTime(
+      Math.max(LAP.gain * t * (1 - MORPH.duck * sat(placeRow)), 0.0001), t0, 0.35);
+  }
+
+  // ── among the kabine ────────────────────────────────────────────────────────
+  /**
+   * What the rows sound like from inside them.
+   *
+   * The promenade bed is two hundred people at forty metres, recorded on
+   * 13 August from out on the concrete, and it is right for the whole of
+   * Jadrija seen from anywhere — which is what it is for. It is wrong for one
+   * place, and that place is the one the game now lets you walk into: the alley
+   * between two runs of kabine, where what you can hear is four people at two
+   * metres, somebody's flip-flops on the slab, a door, and the sea working the
+   * concrete under the front row. Not a louder crowd. A nearer one.
+   *
+   * The clip is 55.5 s off the sound track of the 23 Aug pan — see the note in
+   * tools/cut_field.py, which measured it against the dedicated recording made
+   * the same evening and took this one, because the recording made specially
+   * for it turned out to be a phone in a pocket and the video's own track is
+   * the one with a beach in it. Levelled to `shore`'s own RMS to the hundredth
+   * of a decibel, so the two divide power between them without the sum moving.
+   *
+   * It hangs off how far into the block you are and not off a distance to a
+   * point, for the reason `lapping` hangs off `shoreAt`: the rows are 160 m of
+   * frontage in eighteen runs and the middle of them is not a place. What is
+   * passed in is 0 out on the promenade and 1 in the alley — 43-jadrija.js
+   * works it out in the shore frame, where it is two comparisons.
+   *
+   * One playhead. Fifty-five seconds is over the minute where a period stops
+   * being something the ear can hold, and unlike the promenade this bed is only
+   * up while you are actually in there.
+   */
+  const ROWS = {
+    // shore.mp3 and kabine.mp3 are both at -28.16 dBFS RMS, so this is the same
+    // 0.30 the promenade plays at up close. The two are never both at full: the
+    // weighting hands power from one to the other and back.
+    gain: 0.30,
+    // Wide open. This is the only bed in the game with no distance on it at
+    // all, because there is no distance on it — by the time it is audible you
+    // are standing in the middle of it, and the walls either side are doing the
+    // filtering that a kilometre of sea does for the promenade.
+    lp: 6500,
+  };
+  let rowBuf = null, rowNodes = null;
+
+  /** @param k 0 out on the promenade, 1 in the alley between two runs. */
+  function kabine(k) {
+    if (!ctx || dead) return;
+    placeRow = k == null || !(k >= 0) ? 0 : sat(k);
+    if (placeRow <= 0.001) {
+      if (rowNodes) rowNodes.g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.8);
+      return;
+    }
+    if (!rowBuf) { sampleLoad('kabine', (b) => { rowBuf = b; }); return; }
+    const t0 = ctx.currentTime;
+    if (!rowNodes) {
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = ROWS.lp; lp.Q.value = 0.4;
+      const g = ctx.createGain();
+      g.gain.value = 0.0001;
+      const srcs = voices(rowBuf, 1, 0, lp, t0);
+      lp.connect(g).connect(outBus);
+      // A little send, and less than the promenade's. Two parallel walls three
+      // metres apart is a room, and it is a room with no ceiling and both ends
+      // open — so there is something there and it is not a hall.
+      let w = null;
+      if (verbSend) { w = ctx.createGain(); w.gain.value = 0.22; g.connect(w).connect(verbSend); }
+      rowNodes = { srcs, g, lp, w };
+    }
+    // Squared, like the promenade's: the alley is a place you are in or are
+    // not, and a linear ramp puts half a beach in your ear from the promenade.
+    const amp = ROWS.gain * placeRow * placeRow;
+    rowNodes.g.gain.setTargetAtTime(Math.max(amp, 0.0001), t0, 0.40);
   }
 
   // ── something going past ────────────────────────────────────────────────────
@@ -3151,7 +3265,7 @@ function buildAudio() {
     tap: () => (ctx ? { ctx, out: outTap } : null),
     setVolume, getVolume, setMuffle, keyClick, printTick,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas,
-    shore, lapping, room, water,
+    shore, lapping, kabine, room, water,
     firestarter, slowmo, radioTune, radioClick,
     /** Where the pointer sits for each station, so the dial can be drawn. */
     radioDial: () => DIAL.map((d) => d.f),
@@ -3218,7 +3332,7 @@ function buildAudio() {
       state: ctx ? ctx.state : 'no ctx',
       tried: [...sampleTried],
       loaded: { shore: !!shoreBuf, cicadas: !!cicadaBuf, wood: !!woodBuf,
-        lapping: !!lapBuf, boat: !!boatBuf },
+        lapping: !!lapBuf, boat: !!boatBuf, kabine: !!rowBuf },
       // How long each of the five actually came back as, because the whole of
       // this pass was about length and a build that quietly shipped the old
       // short clips would look identical from every other number in here.
@@ -3228,6 +3342,7 @@ function buildAudio() {
         wood: woodBuf ? +woodBuf.duration.toFixed(2) : 0,
         lapping: lapBuf ? +lapBuf.duration.toFixed(2) : 0,
         boat: boatBuf ? +boatBuf.duration.toFixed(2) : 0,
+        kabine: rowBuf ? +rowBuf.duration.toFixed(2) : 0,
       },
       rate: shoreBuf ? shoreBuf.sampleRate : 0,
       // How many playheads are up, which is what makes the periods long.
@@ -3238,6 +3353,7 @@ function buildAudio() {
       gain: shoreNodes ? +shoreNodes.g.gain.value.toFixed(4) : 0,
       lp: shoreNodes ? Math.round(shoreNodes.lp.frequency.value) : 0,
       lap: lapNodes ? +lapNodes.g.gain.value.toFixed(4) : 0,
+      rows: rowNodes ? +rowNodes.g.gain.value.toFixed(4) : 0,
       // Where the morph thinks you are and what it is doing about it — the one
       // place the whole positional crossfade can be read off. `cede` is the
       // share of its power the promenade has handed over; `open` and `wood` on
@@ -3249,7 +3365,9 @@ function buildAudio() {
           canopy: +placeCan.toFixed(3),
           water: +m.water.toFixed(3),
           wood: +m.wood.toFixed(3),
-          cede: +(MORPH.water * m.water + MORPH.wood * m.wood).toFixed(3),
+          rows: +m.rows.toFixed(3),
+          cede: +(MORPH.water * m.water + MORPH.wood * m.wood
+            + MORPH.rows * m.rows).toFixed(3),
         };
       })(),
       cicada: cicadaNodes ? {

@@ -453,6 +453,45 @@ async function buildJadrija(scene) {
   // the aerodrome casts its hangars and its objects and never its apron.
   const deck = propBuilder();
   const up = propBuilder();
+  // And a third: the rendered masonry of the kabine, which is the same lighting
+  // as `up` with a surface on it.
+  //
+  // A separate buffer and not a flag, because there is nowhere to put a flag.
+  // `propBuilder` carries position, normal and one vertex colour and there is no
+  // spare channel; and the alternative — deciding in the fragment program which
+  // surfaces are render by looking at how pale and how vertical they are — puts
+  // ninety years of Adriatic weather on every white boat hull and parasol mast
+  // on the beach. The cost of the split is one draw call. See `rendMesh`.
+  // One buffer per run of kabine, not one for the lot.
+  //
+  // The weathering hangs off height *up the wall* — where the damp foot stops,
+  // where the algae comes off the coping — and the fragment program has world y
+  // and nothing else, so the floor has to be told to it. The first version told
+  // it once, as the mean of every run: 2.157 m. Then the model was asked how
+  // far the runs actually disagree and the answer was **1.68 m**, which is the
+  // block running along a shore that climbs from t 396 to t 557. At that spread
+  // a single number puts the damp foot half a metre up the wall at one end of
+  // the block and under the concrete at the other — which is worse than no damp
+  // foot at all, because a stain that floats is read as a decal and a stain
+  // that is missing is read as a clean wall.
+  //
+  // So each run carries its own floor. Eighteen buffers, eighteen materials and
+  // one shader program: three.js caches on source and every one of these is the
+  // same source with a different uniform, which is the trick `makeFigure` in
+  // 47-ground.js uses to give seven people seven wetnesses. It also buys back
+  // frustum culling, which the two big shared buffers cannot have — a run is
+  // nine metres long and most of them are behind you.
+  //
+  // Declared here and not at the build: everything in this file is one lexical
+  // scope and `cabinRun` runs a thousand lines before the meshes are made.
+  // (Rule 3.)
+  const rends = [];
+  let rendNow = null;               // the run being laid, for `kabina` to find
+  let footLo = Infinity, footHi = -Infinity;
+  // Which run this is, in laying order. The wall colour is a property of the
+  // run and the runs come out of `rng`, so the only thing that knows one run
+  // from the next is the call that builds it.
+  let runSeq = 0;
   let b = deck;
   const pt = (st, s, y) => [st.x + st.nx * s, y, st.z + st.nz * s];
   const W = (t, s, y) => pt(at(t), s, y);
@@ -924,12 +963,113 @@ async function buildJadrija(scene) {
   // same frame — the render is twenty per cent *darker* than the paving, where
   // the old albedos here made it twice as bright. That one number is most of
   // why the row read as a lido and not as ninety years of Adriatic weather.
+  //
+  // ── and there is more than one wall ──
+  //
+  // The August batch had one run in it. The 23 Aug batch — forty-seven stills
+  // and six minutes of 4K pan — has four, and they are not shades of each
+  // other, they are different paint:
+  //
+  //   limewash   frame 0:39 and stills _397/_398. Creamy white, laid on so
+  //              many times the arrises are rounded off. This is the run with
+  //              JadriJa painted across its seaward end in black capitals and
+  //              the saturated doors under a white coping, and it is the one
+  //              picture of this place anybody has ever taken.
+  //   apricot    frames 0:06-0:15. A whole run painted peach-orange with
+  //              bottle-green doors. Not weathered ochre — paint, and recent.
+  //   cream      frames 4:15-4:48, the landward faces of the back runs. Warm
+  //              pale beige, smooth modern render, almost no weathering, doors
+  //              set back in a raised architrave.
+  //   grey       stills _393/_395. Bare cement gone chalky, half of it fallen
+  //              off, with a sky-blue dado up to shoulder height and the blue
+  //              gone patchy with it. This is the run the August measurement
+  //              was taken on, and it is the reason that measurement was right
+  //              about one wall and wrong about the row.
+  //
+  // Hue is what the measurement can carry and level is not: every frame in the
+  // new batch is within an hour of sunset, the sun is orange enough to move
+  // R:B by a factor of two and a half, and a vertical wall collects a share of
+  // sky that a horizontal slab does not. So these are set by *ratio against
+  // CONC in the same frame* — the method the August note used — and then put
+  // at a level that matches what the wall does against the promenade beside it
+  // in the frame. On limewash that is brighter than the concrete and on the
+  // grey run it is darker, which is exactly the disagreement the two batches
+  // were having.
+  //
+  // Chosen per RUN and not per bay. The old rule dealt five near-identical
+  // greys round the bays on the theory that an owner re-renders his own hut;
+  // the photographs say an owner repaints his own *door* and the wall is done
+  // by the resort in one go — a run is one colour end to end, and the within-
+  // run unevenness that rule was reaching for is a texture, which the render
+  // buffer now draws properly. One bay in fourteen is off on its own, because
+  // three of them in the batch are.
   const WASH = [
-    [0.400, 0.368, 0.312], [0.372, 0.342, 0.292], [0.428, 0.394, 0.334],
-    [0.386, 0.355, 0.302], [0.414, 0.381, 0.323],
+    [0.655, 0.618, 0.540],   // limewash — the JadriJa run
+    [0.600, 0.428, 0.278],   // apricot
+    [0.585, 0.545, 0.462],   // cream, the modern back runs
+    [0.400, 0.368, 0.312],   // grey cement, as measured in August
+    [0.640, 0.548, 0.376],   // pale ochre — stills _404/_408
+    [0.545, 0.578, 0.438],   // pistachio — frames 3:30-3:39
   ];
-  const washAt = (k) => WASH[((k * 7 + ((k * k) >> 1)) % WASH.length + WASH.length)
-    % WASH.length];
+  /**
+   * How far gone each of those is, 0 to 1, and it is not a style knob.
+   *
+   * A single weathering strength was the first thing tried and it is wrong in
+   * both directions at once, because the batch shows the two extremes fifty
+   * metres apart. The back runs at 4:15-4:48 are smooth modern render with
+   * hairline cracks and nothing else — put a peeling coat on those and they
+   * stop being the runs in the photograph. The grey block at _393/_395 has lost
+   * something like half its top coat and has a metre of chalky damp up from the
+   * concrete — level that down to a tasteful mottle and it stops being that
+   * one. So condition travels with the paint, which is also how it works: the
+   * runs that were repainted recently are the runs that are not falling off.
+   *
+   * The float grain does not scale all the way down with it. A hand-floated
+   * render has a grain the day it is laid, and a wall with no grain at all at
+   * three metres is the thing this whole pass exists to stop.
+   */
+  const WEAR = [0.78, 0.34, 0.16, 1.00, 0.60, 0.44];
+  /**
+   * And the dado, which only one of the six has.
+   *
+   * `[r, g, b, height]` in the wall's own frame, height in metres above the
+   * concrete, zero for no dado. Stills _393 and _395: the grey run is painted
+   * sky blue from the ground to about shoulder height along its whole length,
+   * with the bare render left above it. It is the most recognisable wall in the
+   * batch after the JadriJa gable — you cannot walk past it without seeing it —
+   * and the model had a hundred and sixty metres of unbroken single-tone wall.
+   *
+   * One run in six, because in the photographs it is one in four and the other
+   * three are plainly not painted at all. A blue dado on every kabina at
+   * Jadrija would be a lido again, which is the mistake the August pass made in
+   * the other direction.
+   */
+  const DADO = [
+    [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0],
+    [0.240, 0.435, 0.605, 1.52],
+    [0, 0, 0, 0], [0, 0, 0, 0],
+  ];
+  // Which of the six a run got. Off the run's ordinal in laying order, not off
+  // `rng` — the runs come out of the layout loop and adding a draw here would
+  // move every bather, parasol and hut downstream of it (rule 4).
+  //
+  // Five, which is coprime with six, so eighteen runs come out three of each
+  // and no two neighbours ever match. That second property is the one that
+  // matters and it is why the first version of this — which had a `run >> 2`
+  // stirred into it to break up the cycle — went back out: it dealt the blue
+  // dado to runs 3 and 4 and again to 11 and 12, and two adjacent runs the
+  // same colour do not read as two runs, they read as one thirty-metre
+  // building, which is the thing the alleys exist to prevent.
+  const washRun = (run) => (run * 5) % WASH.length;
+  // And the bay's own colour. A run is one wall end to end, except for the odd
+  // bay somebody did himself: one in fourteen, taking the next tin along the
+  // shelf rather than a random one, so a mis-matched bay reads as a tin that
+  // was going spare and not as confetti.
+  const washAt = (k, run) => {
+    const i = washRun(run);
+    return ((k * 7 + (k >> 1)) % 14) === 3
+      ? WASH[(i + 3) % WASH.length] : WASH[i];
+  };
   // Three greys. The red pantile that used to sit in the middle of this list
   // belongs on Caffe Trampulin and on the pizzeria, and on nothing on this row:
   // the only pitched red roof anywhere in the survey is on a restaurant.
@@ -1351,6 +1491,15 @@ async function buildJadrija(scene) {
     b = up;
     const eave = y0 + JAD.plinth + JAD.cabH;
     const ridge = eave + JAD.cabRise;
+    // This run's own buffer, its own floor and its own local origin — see
+    // `rendMat`, which is where the argument for all three is.
+    const runIx = runSeq++;
+    rendNow = propBuilder();
+    rends.push({ buf: rendNow, foot: y0 + JAD.plinth,
+      wear: WEAR[washRun(runIx)], dado: DADO[washRun(runIx)],
+      mid: W(t0 + n * JAD.cabW * 0.5, (front + back) * 0.5, 0) });
+    footLo = Math.min(footLo, y0 + JAD.plinth);
+    footHi = Math.max(footHi, y0 + JAD.plinth);
     // Which hut in this run — if any — is the one that opens: the third door of
     // the first front-row run that starts on straight shore. Stated as an
     // ordinal within the run rather than as a position along it, because the
@@ -1371,7 +1520,7 @@ async function buildJadrija(scene) {
     for (let k = 0; k < n; k++) {
       const a = t0 + k * JAD.cabW, c = a + JAD.cabW;
       const col = CAB[Math.floor(rng() * CAB.length)];
-      const wash = washAt(k + (t0 | 0));
+      const wash = washAt(k + (t0 | 0), runIx);
       // Not through the cafe. The colour above is drawn and then thrown away,
       // exactly as the open kabina's second bay is, so every hut, bather and
       // parasol downstream comes out of the seed where it already stood — the
@@ -1397,9 +1546,16 @@ async function buildJadrija(scene) {
       // in life is continuous render from one end of the run to the other.
       const dc = (a + c) * 0.5;
       const fl = y0 + JAD.plinth;
+      // The render into `rend` and the joinery into `up`. The split is not by
+      // object, it is by *material*: a painted door does not craze, streak or
+      // grow algae the way the wall round it does, and a door that weathered
+      // with its wall would take the one clean saturated thing on the facade
+      // and put ninety years of it on that too.
+      b = rendNow;
       boxTS(a, c, front + REVEAL, back, fl, eave, wash);
       frontSkin(a, c, dc, front, fl, eave, wash);
       plaster(a, front, fl, eave, wash, k + (t0 | 0), dc);
+      b = up;
       // Louvred or planked, two thirds to one — off the bay index, not `rng`,
       // so the beach behind it stays where the seed put it.
       door(dc, front, fl, col, (k * 5 + (t0 | 0)) % 3 !== 0);
@@ -1424,8 +1580,10 @@ async function buildJadrija(scene) {
     for (const [T, o] of [[T0, -1], [T1, 1]]) {
       const A = W(T, e0, eave), B = W(T, mid, ridge), C = W(T, e1, eave);
       if (o > 0) b.tri(A, B, C, TRIM); else b.tri(C, B, A, TRIM);
+      b = rendNow;
       boxTS(T - 0.05 * o, T + 0.05 * o, front, back,
         y0 + JAD.plinth, eave, [0.760, 0.745, 0.700]);
+      b = up;
     }
     // The far end of this run, if this is the run with the door in it. The far
     // end and not the near one: the near one is four bays from the sign and the
@@ -1556,6 +1714,11 @@ async function buildJadrija(scene) {
 
     const top = floor + KAB.ceil;
     const w = KAB.wall;
+    // Outside is render and goes in the render buffer with the rest of the row;
+    // inside is a dark lined box and stays in `up`. The one you can walk into
+    // has to weather exactly like the eighty you cannot, or it stops being one
+    // of them the moment you look along the wall.
+    b = rendNow;
     // Sides, back, and the two jambs. The lintel closes the wall over the door.
     boxTS(wl, wl + w, front, s1, floor, eave, wash);
     boxTS(wr - w, wr, front, s1, floor, eave, wash);
@@ -1592,6 +1755,7 @@ async function buildJadrija(scene) {
       // each bay one of the two clear runs comes out empty and is skipped.
       plaster(a + i * JAD.cabW, front, floor, eave, wash, i * 3 + (a | 0), dc, dj);
     }
+    b = up;
     doorKit(dc, front, floor, dj, 0.040);
     vent(dc, front, floor + 2.10, KAB.door * 0.62, col);
     surround(dc, front, floor, col, dj, floor + 2.38);
@@ -12925,7 +13089,177 @@ async function buildJadrija(scene) {
   const vilMesh = new THREE.Mesh(vil.geo(), solidMaterial(0xffffff, {
     spec: 0.05, specPower: 16, side: THREE.DoubleSide, emissive: 0.07, body: FACE,
   }));
-  for (const m of [deckMesh, upMesh, vilMesh]) { m.frustumCulled = false; scene.add(m); }
+
+  /**
+   * The kabine, with ninety years of weather on them.
+   *
+   * Everything else in this file is geometry. A door is a hole with a leaf hung
+   * at the back of it; a skirt is a box standing 6 mm proud; a rendering patch
+   * is a rectangle four per cent off its neighbour. All of that is *form*, and
+   * the walls between the doors had none of it and were never going to: a wall
+   * is a rectangle, and a rectangle of one colour is a rectangle of one colour
+   * however carefully the colour was measured.
+   *
+   * That is what a restyle pass said on 23 Aug, and it said it in the strongest
+   * way available: run the render through an image model and the thing it fixes
+   * first, before the trees and before the people, is the kabine — because a
+   * hundred metres of untextured plane is the single loudest statement in the
+   * frame that this is a game. Nothing else on the promenade is as large, as
+   * near, or as flat. The concrete has joints and wear laid into it as geometry
+   * and the sea has a shader; the kabine had neither.
+   *
+   * So they get a surface, and it is procedural and world-space, because there
+   * is no texture coordinate to hang a map on — `propBuilder` writes position,
+   * normal and colour, and adding UVs to it would touch every prop at Jadrija
+   * to serve one wall. What is used instead is the wall's own plane: the
+   * horizontal distance along its tangent, and height. That is a real 2D frame
+   * on any vertical surface, it costs nothing to derive, and it cannot seam,
+   * because there is no chart to seam between.
+   *
+   * Five terms, each of them something the 23 Aug survey photographs show and
+   * the model did not have. Measured off frame 0:39 of the pan and stills
+   * 1000150393/395/404/408, which between them cover four different runs:
+   *
+   *  1. The float.  Sand-cement laid on by hand with a steel trowel. Fine — a
+   *     couple of centimetres — and weak, because at four metres it is a
+   *     texture and at twelve it has to disappear rather than crawl.
+   *  2. The patchwork.  A run is re-rendered a bay at a time by whoever owns
+   *     the bay, so the wall is a quilt of slightly different creams that stays
+   *     that way for twenty years. This is the term `plaster()` already draws
+   *     one rectangle of; here it is the whole wall, at half a metre.
+   *  3. The foot.  Every kabina in every photograph is dirtier for the bottom
+   *     half-metre and greyer with it: splash off the concrete, feet, hoses,
+   *     and the sea when the bura is up. Its top edge is ragged, never level.
+   *  4. The crown.  Black-green algae hanging off the coping in streaks, which
+   *     is the second thing the eye finds on a white wall after the doors, and
+   *     which runs *down* and so has to be stretched in y and not in x.
+   *  5. The peel.  Islands where the last coat has gone and the grey cement is
+   *     out from under it — sparse up high, most of the wall down low. Not
+   *     drawn as edges: rule 6 says a 3 mm arris is half a pixel at fifteen
+   *     metres, so what is drawn is the tone of the exposed render.
+   *
+   * The specular is left where `up` has it and the emissive with it, because
+   * this is the same masonry standing on the same terrace and the bounce off
+   * the concrete is the same bounce. What changes is what the sun lands on.
+   */
+  /**
+   * `org` is the run's own centre and the foot of its wall, and it is not a
+   * convenience — it is the whole of whether any of this is visible.
+   *
+   * The noise is sampled in world metres and this shore is two kilometres from
+   * the origin, so `vWorld.xz` arrives at the fragment program around 2 100.
+   * Multiply that by the 23 cycles a metre the float grain wants and you are at
+   * 48 000, where a 24-bit mantissa leaves `fract()` about 256 distinct values
+   * per unit — so the finest term collapses onto a lattice and disappears, and
+   * the coarsest one, which is stretched twelve to one in y, comes out as a
+   * fence of regular vertical bands down every wall. That is exactly what the
+   * first build did, and it is the same trap `h21` in 00-core.js already has a
+   * note about for the sea.
+   *
+   * Subtracting the run's own centre puts every sample inside ±6 m, where a
+   * float has more precision than the screen has pixels. `seed` is what stops
+   * eighteen runs then being the identical wall: a per-run offset of a few
+   * hundred metres in the noise field, which is large enough that no two runs
+   * correlate and small enough that the precision won back is kept.
+   */
+  const rendMat = (org, seed, wear, dado) => solidMaterial(0xffffff, {
+    spec: 0.04, specPower: 10, side: THREE.DoubleSide, emissive: 0.22,
+    uniforms: { uOrg: { value: org }, uSeed: { value: seed },
+      uWear: { value: wear }, uDado: { value: dado } },
+    decl: 'uniform vec3 uOrg;\nuniform vec2 uSeed;\nuniform float uWear;\n'
+      + 'uniform vec4 uDado;',
+    body: `
+      n = gl_FrontFacing ? n : -n;
+      base *= vVCol;
+      // Walls only. The coping is the same material and takes the same grain,
+      // but it must not take the foot or the crown — those are a wall's ends,
+      // and a horizontal slab has neither.
+      float wallness = clamp(1.0 - abs(n.y) * 1.8, 0.0, 1.0);
+      // And not the dark at the back of an open reveal, which frontSkin draws
+      // into this buffer because it is part of the same wall panel and which is
+      // 0.04 albedo. Weathering it lifts it to a light grey and the row comes
+      // out with a fogged pane behind every louvre.
+      float pale = smoothstep(0.10, 0.26, dot(base, vec3(0.333)));
+      wallness *= pale;
+      vec2 tang = normalize(vec2(-n.z, n.x) + vec2(1e-5));
+      vec3 rel = vWorld - uOrg;
+      vec2 uv = vec2(dot(rel.xz, tang), rel.y) + uSeed;
+      float hy = rel.y;
+
+      // 1. the float
+      float grain = fbm2(uv * 21.0, 3) - 0.5;
+      // 2. the patchwork — one bay is 2.15 m, so the feature is about a third
+      //    of that and the eye reads it as within-the-bay unevenness rather
+      //    than as a grid.
+      float mottle = fbm2(uv * 1.45 + vec2(4.3, 1.7), 3) - 0.5;
+      // and a slow drag through it, which is the trowel and the rain both:
+      // stretched seven to one, so it smears down the wall and not along it.
+      float drag = fbm2(vec2(uv.x * 1.15, uv.y * 0.17) + vec2(21.0, 3.0), 3) - 0.5;
+      base *= 1.0 + (grain * (0.085 + 0.075 * uWear)
+        + (mottle * 0.300 + drag * 0.215) * uWear);
+
+      // 2b. the dado, where a run has one. Stills _393 and _395 are a whole
+      //     run painted sky blue up to shoulder height with the bare grey
+      //     render left above it, and the blue has gone patchy in exactly the
+      //     way a cheap masonry paint does — so it is painted here *before*
+      //     the weathering rather than after, and the foot, the peel and the
+      //     grain all run through it. uDado.a is how high it comes; zero is
+      //     a run that has not got one, which is most of them.
+      //
+      //     The top edge is not level. Nobody strikes a line for this, and a
+      //     ruled band across a beach wall reads as a decal at any distance.
+      float dadoTop = uDado.a + 0.09 * (fbm2(vec2(uv.x * 1.1, 12.0), 2) - 0.5);
+      base = mix(base, uDado.rgb,
+        uDado.a > 0.0 ? wallness * smoothstep(dadoTop, dadoTop - 0.05, hy) : 0.0);
+
+      // 3. the foot. Ragged top edge, and it is a *stain* — it goes grey-green
+      //    rather than dark, because what is on it is splash and not shadow.
+      float ragged = 0.42 + 0.34 * fbm2(vec2(uv.x * 1.9, 3.1), 2);
+      float foot = wallness * smoothstep(ragged, -0.02, hy)
+        * (0.55 + 0.45 * fbm2(uv * 5.5 + vec2(9.0), 2));
+      base = mix(base, base * vec3(0.63, 0.65, 0.62), foot * 0.85 * uWear);
+
+      // 4. the crown. Under the coping and running down out of it — so the
+      //    noise is stretched hard in y, and it is a *few* streaks and not a
+      //    band, because a continuous dark line under a coping is a shadow and
+      //    the eye has already been given one of those by the geometry.
+      float head = ${(JAD.plinth + JAD.cabH).toFixed(3)};
+      float algae = wallness * smoothstep(0.62, 0.05, head - hy)
+        * smoothstep(0.50, 0.80, fbm2(vec2(uv.x * 1.5, uv.y * 0.22 + 6.0), 2));
+      base = mix(base, base * vec3(0.47, 0.51, 0.43), algae * 0.60 * uWear);
+
+      // 5. the peel. "low" is what puts most of it in the bottom metre, which
+      //    is where every photograph of a failed coat on this shore has it.
+      float low = 0.28 + 0.72 * smoothstep(1.7, 0.1, hy);
+      // 4.2 cycles a metre and a narrow threshold, so what comes off is a
+      // scatter of hand-sized islands and not three continental blobs. The
+      // first cut was at 1.9 and read as a wall with a leak in it rather than
+      // as a coat that has failed — which is the difference between damp and
+      // peel, and the photographs are all the second one.
+      float p = fbm2(uv * 4.2 + vec2(17.0, 5.0), 4);
+      float peel = wallness * low * pale * smoothstep(0.545, 0.615, p);
+      // The peel is the one term that is not merely scaled by condition: a
+      // coat either has come off or it has not, so what wear moves is how much
+      // of the wall it has taken, and below about a third it takes none.
+      peel *= smoothstep(0.30, 0.95, uWear);
+      base = mix(base, vec3(0.352, 0.331, 0.296), peel * 0.70);
+      spec *= 1.0 - 0.35 * peel;
+    `,
+  });
+  // Culled, unlike the two shared buffers, which cannot be: a run is nine
+  // metres of hut and there are eighteen of them along a hundred and sixty
+  // metres of shore, so standing at one end most of them are behind you.
+  const rendTris = rends.reduce((n, r) => n + r.buf.count(), 0) / 3;
+  const rendMeshes = rends.map((r, i) => {
+    const m = new THREE.Mesh(r.buf.geo(), rendMat(
+      new THREE.Vector3(r.mid[0], r.foot, r.mid[2]),
+      new THREE.Vector2((i * 137.4) % 311, (i * 71.9) % 197), r.wear,
+      new THREE.Vector4(...r.dado)));
+    m.geometry.computeBoundingSphere();
+    return m;
+  });
+  for (const m of [deckMesh, upMesh, vilMesh]) { m.frustumCulled = false; }
+  for (const m of [deckMesh, upMesh, vilMesh, ...rendMeshes]) scene.add(m);
 
   // ── the locale ─────────────────────────────────────────────────────────────
   /**
@@ -17730,6 +18064,36 @@ async function buildJadrija(scene) {
       const [t, s] = local(x, z);
       return vik.headroom(t, s, y);
     },
+    /**
+     * How far into the rows of kabine you are, 0 to 1.
+     *
+     * What the promenade bed hands its power to when you walk in among the huts
+     * — see `kabine` in src/80-audio.js, which is where the argument for it is.
+     * Two ramps in the shore's own frame and nothing else, because that is all
+     * "in among the kabine" is: inside the t window the runs occupy, and
+     * between the seaward face of the front row and the back of the back one.
+     *
+     * The ramps are wide on purpose. A hard edge at the corner of a run gives
+     * you a bed that switches on as you pass a wall, and what actually happens
+     * is that the place closes round you over three or four paces. 6 m along
+     * the shore and 3 m across it is about that at a walk, and it also means
+     * the alleys *between* runs — which are 4 to 6 m of gap that this cannot
+     * see, since it knows the block and not the individual runs — read as
+     * being in the rows rather than as eighteen switches down the row.
+     *
+     * Nothing is asked of the geometry: the runs come out of `rng` and this is
+     * a property of where they were allowed to go, which is `JAD.rows` and the
+     * cross-section, both of which are written down.
+     */
+    rowsAt: (x, z) => {
+      const [t, sv] = local(x, z);
+      const [tA, tB] = JAD.rows[0];
+      const along = Math.min(sat((t - tA) / 6), sat((tB - t) / 6));
+      if (along <= 0) return 0;
+      const s0 = JAD.rowA, s1 = JAD.rowB + JAD.cabD;
+      const across = Math.min(sat((sv - s0) / 3), sat((s1 + 1.5 - sv) / 3));
+      return along * across;
+    },
     /** And how close to its skin, either side of it — see `vik.hull`. */
     hullAt: (x, y, z) => {
       if (!vik) return 0;
@@ -17844,7 +18208,12 @@ async function buildJadrija(scene) {
     tint() { /* concrete does not scorch, and the huts are not hers to burn */ },
     flushTint() {},
     // Only what stands up casts. See the note where the buffers are made.
-    meshes: [deckMesh, upMesh, vilMesh], casters: [upMesh, vilMesh], length: LEN,
+    // The render meshes cast and receive with `up`, which they were part of
+    // until this pass and which is where a hundred metres of hut belongs: take
+    // them out of the caster list and the rows stop throwing the long shadows
+    // that are half of what the promenade looks like at seven in the evening.
+    meshes: [deckMesh, upMesh, vilMesh, ...rendMeshes],
+    casters: [upMesh, vilMesh, ...rendMeshes], length: LEN,
     /** The town builder asks this so it does not draw these twice. */
     ownsBuilding: (bl) => taken.has(bl),
     houses: houses.length,
@@ -18154,7 +18523,22 @@ async function buildJadrija(scene) {
       // nothing like enough to say the legend is legible.
       el: board.tex.image,
     },
-    tris: (deck.count() + up.count() + vil.count()) / 3,
+    tris: (deck.count() + up.count() + vil.count() + rendTris * 3) / 3,
+    /**
+     * What the render buffer cost, and what the runs disagreed about.
+     *
+     * `foot` is the height the weathering is measured up from and `spread` is
+     * how far the individual runs' floors are from it — the one number that
+     * says whether a single uniform is an honest answer to "where is the
+     * bottom of the wall". Anything much over a tenth of a metre and the damp
+     * foot starts to sit at the wrong height on the runs at the ends.
+     */
+    render: {
+      tris: rendTris,
+      runs: rends.length,
+      foot: [+footLo.toFixed(2), +footHi.toFixed(2)],
+      spread: rends.length ? +(footHi - footLo).toFixed(3) : null,
+    },
     /**
      * The car park: how many of each of the five, and what they cost to draw.
      *

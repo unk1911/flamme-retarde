@@ -58,6 +58,11 @@ FILES = {
     6: 'Voice 260817_153025 jadrija ambience - cicadas - walking - '
        'through - magical - forest.m4a',
     7: 'WhatsApp Audio 2026-08-23 at 5.50.13 AM - radio.mp4',
+    # Not a recording — the sound track of the six-minute 4K pan along the
+    # kabine of 23 Aug, which is in the survey folder and not in with the
+    # others. An absolute path, because it does not live under SRC.
+    8: '/mnt/c/tmp/refs/jadrija/survey/4/'
+       '1000150414-super-valuable-pan-kabine-and-other-stuffs.mp4',
 }
 # 1 is not cut. It was recorded at 21:38 and is broadband 200-2000 Hz with no
 # cicada and no cricket band in it; nobody has been able to say what it is, and
@@ -128,6 +133,36 @@ BEDS = [
     # unit-RMS clip 0.17 dB, so the file goes in 0.17 dB hotter and the room
     # hears exactly what it heard before. The source rolls off 17 dB by 4 kHz
     # and is 37 dB down by 8 kHz, so 16 kHz sampling throws nothing away.
+    # ── the rows ────────────────────────────────────────────────────────────
+    #
+    # The one bed in here that is not from the recorder. Misha's note on the
+    # 23 Aug batch says the pan "can be harvested for its AUDIO — you get the
+    # sea splashing against the rock and the sounds of people around the
+    # kabine", and it can, and it is the right source for it — but not for the
+    # reason it is the obvious one, so both candidates were measured.
+    #
+    # There is also a dedicated 61 s recording made the same evening and named
+    # `jadrija - kabine - water`, which is the obvious choice and is the wrong
+    # one. Normalised to unit RMS and read in third-octave bands it is a
+    # bottom-heavy recording and almost nothing else: -13.9 dB at 60-120 Hz and
+    # -11.7 at 120-250, then falling off a cliff — -27.7 by 2.8 kHz, -38.1 by
+    # 7 kHz, thirteen decibels under the shipped promenade clip in the band
+    # where voices live. That is a pocket and a hand on a phone, not a beach.
+    #
+    # The pan's own track, over its first minute, is flat: -13.9 at 250-500,
+    # -15.7 at 500-900, -16.9 at 900-1600 and still -22.2 at 4.6 kHz. It is
+    # 9 dB quieter overall — the phone's gain rides down under a 4K capture —
+    # and level is the one thing normalisation fixes for nothing.
+    #
+    # What is in that first minute is the walk along the front of the row: the
+    # water working the concrete a couple of metres below, children, flip-flops
+    # on the slab, a family going past close enough to hear the words. Which is
+    # a different sound from `shore` and not a louder one — `shore` is two
+    # hundred people at forty metres and this is four people at two, so the two
+    # of them divide by position the way the sea and the pines already do.
+    dict(key='kabine',  src=8, window=(1.0, 62.0), length=(38.0, 56.0),
+         rate=22050, kbps=96, hp=(3, 180), lp=(2, 10500), rms=-28.16,
+         what='along the rows, 23 Aug'),
     dict(key='radio',   src=7, window=(2.2, 41.3), length=(26.4, 37.8),
          rate=16000, kbps=48, hp=(2, 60),  lp=None,  rms=-18.94,
          bar=1.88880, what='the set in the kabina, 23 Aug'),
@@ -136,6 +171,12 @@ BEDS = [
 INSET = 0.5     # s — where 80-audio.js puts loopStart and loopEnd
 MATCH = 0.35    # s — how much of each end the seam is judged on
 STEP = 0.02     # s — the search grid
+
+
+def source(bed):
+    """Where bed's source file is. FILES may carry an absolute path."""
+    f = FILES[bed['src']]
+    return f if os.path.isabs(f) else os.path.join(SRC, f)
 
 
 def decode(path):
@@ -208,7 +249,7 @@ def pick(x, bed, sr):
 
 
 def cut(bed):
-    x = decode(os.path.join(SRC, FILES[bed['src']]))
+    x = decode(source(bed))
     score, a, L, s, dl, ds = pick(x, bed, SR)
     y = x[int(a * SR):int((a + L) * SR)].copy()
     # The filters, at 48 kHz and before the resample, so the resampler's own
