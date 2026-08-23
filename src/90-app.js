@@ -246,12 +246,10 @@ addEventListener('keydown', (e) => {
   // Ahead of the pause guard, like the back doors above: the whole point of
   // this is to keep something that has just happened, and the most natural
   // thing in the world at that moment is to hit Escape first and think second.
+  // One key, both ends. It was L to arm and N to save, and the asymmetry was
+  // the bug: L on an armed recorder threw the take away, so the obvious
+  // gesture for "stop recording" was the one that lost it.
   if (e.code === 'KeyL') { e.preventDefault(); clipToggle(); return; }
-  if (e.code === 'KeyN') {
-    e.preventDefault();
-    if (clipArmed()) clipSave(); else toast(T('clip.hint'));
-    return;
-  }
   // Q and Shift already hold the sprint on; this is the *press*, which is worth
   // a burst on top of it. `e.repeat` is the whole of the guard — a held key
   // autorepeats at thirty a second and would be an infinite surge.
@@ -4813,8 +4811,11 @@ window.__fr = {
     arm: () => clipArm(),
     disarm: () => clipDisarm(),
     armed: () => clipArmed(),
-    /** Seconds in the bank — what N would write out right now. */
+    /** Seconds recorded — what a press of L would write out right now. */
     held: () => +clipHeld().toFixed(2),
+    /** What L does on an armed recorder: stop, write the file, disarm. */
+    end: () => clipEnd(),
+    /** A snapshot WITHOUT stopping. No key does this; tests do. */
     save: () => clipSave(),
     grab: () => clipGrab(),
   },

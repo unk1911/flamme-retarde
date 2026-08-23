@@ -307,8 +307,9 @@ function clipDisarm() {
   clipHud();
 }
 
+/** L: not armed, so start. Armed, so stop and keep it. */
 function clipToggle() {
-  if (clipRig) { clipDisarm(); toast(T('clip.off')); return false; }
+  if (clipRig) { clipEnd(); return false; }
   if (!clipArm()) { toast(T('clip.cannot'), 'bad'); return false; }
   toast(T('clip.on'));
   return true;
@@ -400,14 +401,9 @@ function clipStamp() {
 // under a second name.
 let clipSaving = false;
 
-async function clipSave() {
-  if (!clipRig || clipSaving) return false;
-  clipSaving = true;
-  let took = null;
-  try { took = await clipTake(); } catch (e) { console.error(e); }
-  clipSaving = false;
-  if (!took) { toast(T('clip.empty'), 'bad'); return false; }
-  const url = URL.createObjectURL(took.blob);
+/** The <a download> dance, which both ways out of here need. */
+function clipDownload(blob, secs) {
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = `fr-clip-${clipStamp()}.webm`;
@@ -420,8 +416,66 @@ async function clipSave() {
   // reads it asynchronously, so pulling the URL out from under it in the same
   // tick truncates the file on a slow disk.
   setTimeout(() => URL.revokeObjectURL(url), 30000);
-  toast(T('clip.saved').replace('%s', took.secs.toFixed(0))
-    .replace('%m', (took.blob.size / 1048576).toFixed(1)));
+  toast(T('clip.saved').replace('%s', secs.toFixed(0))
+    .replace('%m', (blob.size / 1048576).toFixed(1)));
+}
+
+/**
+ * L, the second time: stop, write the file, disarm.
+ *
+ * One key does the whole job, which is the shape Misha asked for on 23 Aug —
+ * "simplify it so L is the only key". It had been two: L armed and disarmed, N
+ * saved. That is one key too many for the thing it does, and worse, the two
+ * were not symmetrical — L stopping the recorder THREW THE TAKE AWAY, so the
+ * obvious gesture for "end recording" was the one that lost it. A recorder
+ * whose stop button discards is a bug however it is documented.
+ *
+ * `stop()` rather than `clipTake`'s `requestData()`, because this really is the
+ * end: stopping flushes the last chunk and closes the segment, where
+ * requestData leaves a file with no Duration in its header. `clipSave` still
+ * exists on `__fr.clip` and still takes a snapshot without stopping — that is
+ * useful to a test and to nobody sitting at the keyboard.
+ */
+async function clipEnd() {
+  const rig = clipRig;
+  if (!rig || clipSaving) return false;
+  clipSaving = true;
+  const deck = rig.deck;
+  let blob = null;
+  // At the ceiling the deck was already stopped by `clipTick`, so the length is
+  // the ceiling and not the time since arming — which keeps counting.
+  const secs = !deck ? 0
+    : rig.full ? CLIP.maxMin * 60 : (performance.now() - deck.t0) / 1000;
+  if (deck && deck.mr.state !== 'inactive') {
+    await new Promise((done) => {
+      deck.flush = done;
+      try { deck.mr.stop(); } catch (e) { done(); }
+      // Longer than `clipTake`'s 1.5 s: a final flush of half an hour of
+      // buffered Blobs is more work than a mid-run `requestData`.
+      setTimeout(() => { if (deck.flush) { deck.flush = null; done(); } }, 4000);
+    });
+  }
+  if (deck && deck.chunks.length) {
+    blob = new Blob(deck.chunks, { type: 'video/webm' });
+  }
+  clipSaving = false;
+  // Disarmed either way. Pressing stop and still being armed afterwards is the
+  // other half of the same confusion.
+  clipDisarm();
+  if (!blob) { toast(T('clip.empty'), 'bad'); return false; }
+  clipDownload(blob, secs);
+  return true;
+}
+
+/** A snapshot without stopping — `__fr.clip.save()`, for tests. */
+async function clipSave() {
+  if (!clipRig || clipSaving) return false;
+  clipSaving = true;
+  let took = null;
+  try { took = await clipTake(); } catch (e) { console.error(e); }
+  clipSaving = false;
+  if (!took) { toast(T('clip.empty'), 'bad'); return false; }
+  clipDownload(took.blob, took.secs);
   return true;
 }
 

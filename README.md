@@ -40,8 +40,7 @@ is a real footprint.
 | `0` | **skip straight to Rokići, on foot** — the back door, see below |
 | `P` / `Esc` | **pause** — the fire stops too |
 | `H` | hide the HUD |
-| `L` | **record** — starts recording, and keeps going until you stop it |
-| `N` | keep it — writes the take out as a `.webm`, and goes on recording |
+| `L` | **record** — press to start, press again to stop and keep the `.webm` |
 
 On foot at the airfield:
 
@@ -489,9 +488,9 @@ which steps the simulation without rendering.
 `tools/record.mjs` films the vikendica cutscene by holding its clock and
 scrubbing it frame by frame, which only works because a cutscene is a function
 of time. Gameplay is a function of the mouse, so it is recorded rather than
-reconstructed: `L` in the game starts a `MediaRecorder` over the canvas and `N`
-drops everything since you pressed `L` into your downloads as a `.webm`, with
-the game's own sound in it, and keeps recording. Takes are arbitrary length —
+reconstructed: `L` starts a `MediaRecorder` over the canvas and `L` again stops
+it and drops the whole take into your downloads as a `.webm`, with the game's
+own sound in it. One key, both ends. Takes are arbitrary length —
 one deck, never recycled, never cut, so what comes out is a complete file
 Chrome wrote itself; there is a half-hour ceiling, and it stops and says so
 rather than dropping the beginning, because a WebM missing its head decodes
