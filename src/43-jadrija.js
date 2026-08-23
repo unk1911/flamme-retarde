@@ -633,14 +633,42 @@ async function buildJadrija(scene) {
     const cut = (i, k) => (k === 0 ? s0 : k === nS ? s1
       : s0 + (s1 - s0) * (k / nS)
         + (jit(i, k) - 0.5) * ((s1 - s0) / nS) * 0.66);
+    // The mortar between them, which v_022 has wide and visibly darker than the
+    // stones and which this had none of at all — the "joints" were nothing but
+    // the line where one flag's colour met the next one's, so on any two
+    // neighbours of a similar shade there was no joint in the frame.
+    //
+    // Done by drawing each cell twice: once at full size in mortar, and once
+    // inset by JOINT and lifted by LIFT in stone. The lift is what keeps it off
+    // the z-buffer's mercy — rule 5 wants 0.10 m at this distance from the
+    // origin and a joint that deep would be a trench, but the two surfaces here
+    // are not co-planar in the sense the rule is about: the stone sits over the
+    // mortar rather than beside it, and 0.05 m of separation with a smaller
+    // footprint does not fight. Checked in the frame rather than argued.
+    const JOINT = 0.055, LIFT = 0.05;
+    const MORTAR = [0.404, 0.372, 0.318];
     const n = Math.floor(LEN / step);
     for (let i = 0; i < n; i++) {
       const a = at(i * step), c = at((i + 1) * step);
+      // The inset stations, so the joint runs across the shore as well as along
+      // it. Two extra `at` calls a cell; a flag cut only in `s` gets a joint on
+      // two sides out of four and reads as planking.
+      const ai = at(i * step + JOINT), ci = at((i + 1) * step - JOINT);
       for (let k = 0; k < nS; k++) {
         const a0 = cut(i, k), a1 = cut(i, k + 1);
         const c0 = cut(i + 1, k), c1 = cut(i + 1, k + 1);
+        // The mortar bed, full size, so neighbouring cells' beds meet and there
+        // is no hole between them.
         b.quad(pt(a, a0, yOf(a, a0)), pt(c, c0, yOf(c, c0)),
-          pt(c, c1, yOf(c, c1)), pt(a, a1, yOf(a, a1)),
+          pt(c, c1, yOf(c, c1)), pt(a, a1, yOf(a, a1)), MORTAR);
+        // And the stone on top of it. A cell narrower than two joints has no
+        // stone left to draw and is all mortar, which is what a sliver between
+        // two big flags actually is.
+        const b0 = a0 + JOINT, b1 = a1 - JOINT;
+        const d0 = c0 + JOINT, d1 = c1 - JOINT;
+        if (b1 - b0 < 0.02 || d1 - d0 < 0.02) continue;
+        const L = (st, u) => { const q = pt(st, u, yOf(st, u)); q[1] += LIFT; return q; };
+        b.quad(L(ai, b0), L(ci, d0), L(ci, d1), L(ai, b1),
           // The flag's colour index, and it has to be a hash and nothing else.
           //
           // It was `i * 7 + k * 3 + ((jit(i, k) * 5) | 0)`, and the arithmetic
