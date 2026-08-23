@@ -349,6 +349,23 @@ as of this writing; the state of each is in the git log, not here.
 - ~~**a_160** kayaks/pedalos and the white box trailer~~ — the hulls went in
   with the bank armouring; the trailer was built 22 Aug.
 
+- **20260821_175025 and its six neighbours** (t 476.5, s 42.7, corrected
+  geotags): a bare concrete wall with a **tall narrow doorway cut straight
+  through it** — no door, no frame, about 0.85 m by 2.2 m, the reveal showing
+  the wall's own thickness, and the sea, an island and the beach framed in it.
+  A small recessed vent with dark mesh high on the left, a pale grey louvred
+  grille recessed on the right, a rough concrete capping slab along the top
+  with a ragged edge, form marks and vertical construction joints down the
+  face. It is the most architectural thing in the whole survey and the game has
+  nothing like it.
+
+  Not built, deliberately. It needs a decision this file should not make on its
+  own: which wall it is. Seven photographs put the photographer at s 42.7,
+  which is well inland of both kabine rows, so this is either the resort's back
+  wall or a screen wall in the eastern block — and building a 2.2 m hole in the
+  wrong one puts a view of the sea through something with houses behind it.
+  Worth settling with Misha, and then it is an afternoon's work.
+
 ## SOURCES
 
 - 39 photos + 132 s 4K walk — `~/fr-video/survey/{photos,vframes}`
