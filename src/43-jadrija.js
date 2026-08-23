@@ -5890,6 +5890,37 @@ async function buildJadrija(scene) {
    * above your head, and then a flat, broken umbrella — the shade is in patches
    * and the sky comes through it. That is the tree; the cone the distance layer
    * draws is a fir, and there are no firs on this coast.
+   *
+   * Nine puffs on a shallow disc said all of that and did not do it, and the
+   * way to see why is to add the puffs up in plan rather than to look at the
+   * outline. Eight of 0.11h round one of 0.135h come to 44 m² of foliage over a
+   * crown that is 57 m² — and every one of them inside the inner two thirds of
+   * it, where the sum runs past two hundred per cent. From the side that is a
+   * broken umbrella and it always was. From directly underneath, which is
+   * where the promenade puts you for most of its length, it is one olive plate
+   * with a nick out of the edge, and the ceiling of the world at Jadrija is
+   * that plate repeated a hundred and fifty times.
+   *
+   * a_019 and a_027 film the lane through the stand looking up and settle what
+   * is actually over you: bare limbs going out across bright sky, the needle
+   * clusters hanging in ones and twos at their far ends, the crown readable as
+   * several separate plates at different heights, and more sky than tree. The
+   * ground under it in the same frames is dappled, not shaded — a canopy that
+   * lets that much light through cannot be a surface.
+   *
+   * So the crown is built the way the tree builds it. Five boughs leave the
+   * trunk together and go out and up; each forks in two; each twig carries a
+   * spray of two tufts rather than one ball, each about half the size of the
+   * old puffs and at its own height. Three more sit higher over the middle,
+   * which is what keeps the thing an umbrella rather than a wreath. Twenty
+   * three small puffs cover a little under 60 % of the crown in plan where
+   * nine large ones covered 78 % of it and 200 % of the middle, and the
+   * difference is the sky.
+   *
+   * The rng budget is unchanged at forty draws a tree, because the stream *is*
+   * the layout — rule 4, and the census is downstream of every tree on this
+   * shore. Four before the crown, six for each of the five boughs, two for each
+   * of the three upper clusters.
    */
   function pine(t, s, y, h, leanTo) {
     // The trunk is the thing the wood is made of, and it was wrong in three
@@ -5903,29 +5934,82 @@ async function buildJadrija(scene) {
     const lean = leanTo == null ? (rng() - 0.5) * 0.9
       : leanTo * (0.55 + rng() * 0.85);
     const rad = 0.15 + rng() * 0.14;
+    // Which way round the crown is keyed. Five boughs on a fixed phase comb: a
+    // row of trees all fork the same way and the stand reads as a hedge cut by
+    // a machine. One draw, and it is the cheapest variation in the file.
+    const spin = rng() * TAU;
     post(P, 0, 0, y, y + h * 0.34, rad, [0.330, 0.270, 0.215], 7);
     post(P, lean * 0.34, 0, y + h * 0.32, y + h * 0.76, rad * 0.74,
       [0.360, 0.295, 0.235], 7);
-    const cx = lean, top = y + h * 0.78;
-    // Three limbs leaving the trunk under the crown, so the umbrella is
-    // carried rather than balanced on the end of a stick.
-    for (let i = 0; i < 3; i++) {
-      const a = (i / 3) * TAU + rng();
-      post(P, cx * 0.6 + Math.cos(a) * h * 0.09, Math.sin(a) * h * 0.09,
-        y + h * 0.70, top + h * 0.02, 0.075, [0.360, 0.295, 0.235], 5);
-    }
-    // Nine puffs on a shallow disc rather than three plates stacked on each
-    // other. An Aleppo pine is a broken ceiling; a ceiling needs holes, and a
-    // hole needs an edge on both sides of it.
-    const band = [top - h * 0.11, top + h * 0.15];
+    const cx = lean, fork = y + h * 0.72, top = y + h * 0.80;
+    // The gradient runs over the whole crown and not over one puff, or thirteen
+    // of these read as thirteen balls. It has to reach below the lowest fork
+    // and above the highest cluster, both of which moved.
+    const band = [y + h * 0.70, y + h * 0.92];
     const DK = [0.118, 0.178, 0.100], LT = [0.250, 0.350, 0.195];
-    for (let i = 0; i < 9; i++) {
-      const a = (i / 9) * TAU + rng() * 0.55;
-      const d = (i ? 0.38 + rng() * 0.62 : 0) * h * 0.25;
-      const rr = h * (i ? 0.082 + rng() * 0.058 : 0.135);
-      puff(P, cx + Math.cos(a) * d, Math.sin(a) * d,
-        top + (rng() - 0.40) * h * 0.075, rr * 0.60, rr,
-        DK, LT, band, 9, 3, 0.46, i + 1);
+    const WOOD = [0.345, 0.280, 0.222];
+    // The boughs. Five, leaving the top of the trunk together and going out
+    // and up — which is the whole of why an Aleppo reads as an umbrella and
+    // not as a fir. `lathe` takes a per-ring offset, so one call is the bent
+    // limb; three rings is enough because what carries at this size is the
+    // line, not the taper.
+    //
+    // They are 17 cm through at the trunk and 4 at the tip, which is two or
+    // three pixels at the far end, and they are not there to be looked at.
+    // They are there so the gap beside them has an edge on it: an opening in a
+    // canopy reads as an opening because something dark stops at its rim, and
+    // nine floating puffs had nothing to stop against.
+    for (let i = 0; i < 5; i++) {
+      const a = spin + (i / 5) * TAU + (rng() - 0.5) * 0.62;
+      const reach = h * (0.16 + rng() * 0.09);
+      const rise = h * (0.035 + rng() * 0.075);
+      const b0t = cx * 0.55;
+      const b1t = b0t + Math.cos(a) * reach, b1s = Math.sin(a) * reach;
+      lathe(P, 0, 0, [
+        [fork - h * 0.03, 0.085, b0t, 0],
+        [fork + rise * 0.45, 0.050, b0t + (b1t - b0t) * 0.52, b1s * 0.52],
+        [fork + rise, 0.022, b1t, b1s],
+      ], WOOD, 4);
+      // And the fork at the end of it, which is where the needles are. Two
+      // twigs at a shared spread, one a little above the other, so no two
+      // clusters on the tree sit in the same plane and the crown comes apart
+      // into plates when you are under it.
+      const spread = 0.55 + rng() * 0.75;
+      for (let k = 0; k < 2; k++) {
+        const ta = a + (k ? spread : -spread);
+        // Capped in metres as well as in units of the tree. A cluster that is
+        // a fixed fraction of the height is 1.6 m across on a nine-metre pine
+        // and 3.2 m on a fourteen-metre one, and a three-metre plate two
+        // metres over your head is the flat ceiling again by another route.
+        // Nothing in a_019 or a_027 is over about two metres of needle.
+        const rr = Math.min(h * (0.050 + rng() * 0.062), 1.05);
+        const tw = h * 0.085;
+        const ct = b1t + Math.cos(ta) * tw, cs = b1s + Math.sin(ta) * tw;
+        const cy = fork + rise + h * (k ? 0.040 : -0.018);
+        lathe(P, 0, 0, [[fork + rise * 0.92, 0.022, b1t, b1s],
+          [cy, 0, ct, cs]], WOOD, 3);
+        // Two clusters on each twig and not one. A single ball at the end of a
+        // stick is a leaf, and thirteen of them are a lime tree in a park; what
+        // an Aleppo hangs out there is a spray, several tufts strung along the
+        // last metre of the branch and running back towards the trunk. The
+        // second is smaller, nearer and a little lower, and it costs no draw on
+        // the stream because it is derived from the first.
+        puff(P, ct, cs, cy, rr * 0.66, rr, DK, LT, band, 7, 3, 0.58,
+          i * 4 + k * 2 + 1);
+        puff(P, b1t + (ct - b1t) * 0.42, b1s + (cs - b1s) * 0.42, cy - h * 0.014,
+          rr * 0.57, rr * 0.86, DK, LT, band, 6, 3, 0.58, i * 4 + k * 2 + 2);
+      }
+    }
+    // Three over the middle, higher than the ring and small. Without them the
+    // crown is a wreath with a hole in the centre, which is what a photograph
+    // of one bough taken from underneath looks like and not what a tree does.
+    for (let i = 0; i < 3; i++) {
+      const a = spin + 1.1 + (i / 3) * TAU + rng() * 0.8;
+      const rr = Math.min(h * (0.062 + rng() * 0.036), 1.05);
+      const d = h * (0.07 + i * 0.030);
+      puff(P, cx * 0.5 + Math.cos(a) * d, Math.sin(a) * d,
+        top + h * (0.020 + i * 0.032), rr * 0.66, rr, DK, LT, band, 7, 3, 0.58,
+        21 + i);
     }
   }
 
@@ -5936,17 +6020,34 @@ async function buildJadrija(scene) {
     for (const o of [-0.16, 0.18]) {
       post(P, o, o * 0.4, y + h * 0.30, y + h * 0.58, 0.10, [0.420, 0.380, 0.315], 4);
     }
-    // Five lobes with light between them, which is what makes an olive read as
-    // an olive: you can see the sky through the middle of one.
-    const band = [y + h * 0.40, y + h * 0.92];
+    // Lobes with light between them, which is what makes an olive read as an
+    // olive: you can see the sky through the middle of one.
+    //
+    // It said so and it did not do it, for the same reason the pine did not.
+    // Five lobes of 0.33h, 0.24h, 0.23h, 0.21h and 0.20h come to 0.95h² of
+    // foliage over a crown that is 0.79h² — a hundred and twenty per cent, so
+    // there was no hole in it anywhere and the middle was double-covered. That
+    // is the tree standing over the promenade at t 230, and the olive plate in
+    // the complaint is an olive.
+    //
+    // Nine lobes, none of them more than 0.16h, spread out to the rim and over
+    // twice the height band the five sat in. 0.49h² over 0.83h², which is
+    // 58 %: from underneath that is four or five separate masses with daylight
+    // between them and two more behind, which is what an olive is. The three
+    // in front of the vikendica's terrace were asked for as "four metres and
+    // open-crowned, so from the terrace you are looking at the sea through a
+    // tree rather than at a tree" — this is the first version of them that is.
+    const band = [y + h * 0.34, y + h * 0.96];
     const DK = [0.205, 0.240, 0.162], LT = [0.392, 0.448, 0.302];
-    const olC = [[0, 0, 0.33, 0.60], [-0.52, 0.38, 0.24, 0.50],
-      [0.50, -0.32, 0.23, 0.48], [0.26, 0.50, 0.21, 0.68],
-      [-0.32, -0.44, 0.20, 0.66]];
+    const olC = [[0.06, -0.08, 0.16, 0.80], [-0.68, 0.48, 0.15, 0.52],
+      [0.66, -0.42, 0.14, 0.48], [0.34, 0.66, 0.13, 0.72],
+      [-0.42, -0.62, 0.13, 0.62], [-0.14, 0.74, 0.12, 0.42],
+      [0.60, 0.26, 0.12, 0.64], [-0.60, -0.10, 0.11, 0.44],
+      [0.18, -0.72, 0.11, 0.56]];
     for (let i = 0; i < olC.length; i++) {
       const [dx, dz, r, hy] = olC[i];
-      puff(P, dx * h * 0.5, dz * h * 0.5, y + h * hy, h * r * 0.74, h * r,
-        DK, LT, band, 10, 4, 0.44, i + 3);
+      puff(P, dx * h * 0.5, dz * h * 0.5, y + h * hy, h * r * 0.82, h * r,
+        DK, LT, band, 7, 3, 0.52, i + 3);
     }
   }
 
