@@ -9906,9 +9906,12 @@ async function buildJadrija(scene) {
       // could never be promoted. A reserved slot costs nothing, because a slot
       // that is always pointed at the same person costs exactly what a slot
       // that is being fought over costs.
-      const seats = per.map((c) => (c > 0 ? 1 : 0));
+      // `Array.from` and not `per.map`, because `per` is an Int32Array and its
+      // `map` hands back another Int32Array — every object below would be
+      // coerced to zero, which is a page that loads to 78 per cent and stops.
+      const seats = Array.from(per, (c) => (c > 0 ? 1 : 0));
       let left = SKIN_CAST - seats.reduce((a2, c) => a2 + c, 0);
-      const spare = per.map((c, i) => ({ i, c: Math.max(0, c - seats[i]) }));
+      const spare = Array.from(per, (c, i) => ({ i, c: Math.max(0, c - seats[i]) }));
       const tot = spare.reduce((a2, w) => a2 + w.c, 0) || 1;
       for (const w of spare) {
         w.q = w.c * left / tot;
