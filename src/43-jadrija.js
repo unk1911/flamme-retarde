@@ -5730,6 +5730,156 @@ async function buildJadrija(scene) {
   // The placement, stated: the third frontage along, east of the palisade.
   lavenderBank(259.0, 291.0, 40.4);
 
+  /**
+   * The big agave in a limestone rockery. `a_112` and `a_113` in v595, `b_096`
+   * and `b_100` in v597 — and `a_112` is square on to it from three metres.
+   *
+   * It is the only plant in the whole survey with a HARD EDGE. Everything else
+   * growing at Jadrija is a mass — pine canopy, oleander, tamarisk, the hedge,
+   * the lavender that just went in — and a mass is drawn as a `puff` and reads
+   * as one. This is a rosette of rigid blades a metre and a half across, each
+   * of them a straight line with a point on the end, and from any distance at
+   * all it is a silhouette rather than a texture. There are at least three of
+   * them in the footage.
+   *
+   * The existing `agave` is not this and is not meant to be: eight flat
+   * triangles, drawn 0.26 m across, standing in a pot on the wall coping where
+   * a plant is a suggestion. It also draws from `rng()` — it is part of the
+   * beach stream — so it cannot be touched without moving every bather east of
+   * it. Rule 4. This one is separate, takes its numbers from `jit`, and is the
+   * one that gets looked at.
+   *
+   * Four things off `a_112` that the small one has none of:
+   *
+   *   the blades ARCH. The inner ones stand near vertical, the outer ones flop
+   *   until the tips are below the crown, and the sequence between them is
+   *   continuous. A rosette of straight spokes is a starfish;
+   *
+   *   they are CHANNELLED. Each blade is a shallow V with the spine standing
+   *   proud, which is why the plant reads in the sun as a set of paired
+   *   surfaces at different angles rather than as flat card;
+   *
+   *   they are widest about a fifth of the way up, not at the base, and they
+   *   come to a point with a dark spine on it;
+   *
+   *   and the colour is a GREY green — 115,128,99 in the mean, 163,176,146 in
+   *   the sun — with the undersides paler than the tops.
+   *
+   * The rockery is a heap of broken limestone round the foot, which is how
+   * every one of them in the footage is planted: angular lumps, no two the
+   * same, and none of them dressed.
+   *
+   * PLACEMENT, and stated as one: three of them on the frontage the garden
+   * wall, the palisade and the lavender bank are on, each standing at a break
+   * between two of them — which is where `a_112`'s stands, at a corner.
+   */
+  function agaveBig(t, s, r, seed) {
+    const back = b;
+    b = up;
+    const gAt = (t2, s2) => {
+      const st = at(t2);
+      return Math.max(surfaceY(t2, s2), groundAt(st.x + st.nx * s2, st.z + st.nz * s2));
+    };
+    const y0 = gAt(t, s);
+    const LEAF = [0.348, 0.398, 0.262];
+    const ROCK = [0.452, 0.440, 0.406];
+    const N = 15;
+    for (let i = 0; i < N; i++) {
+      const key = seed * 131 + i;
+      const a = i * 2.3999632 + seed * 0.7;      // the golden angle, so no two
+      const co = Math.cos(a), sn = Math.sin(a);  // blades line up
+      // Upright at the crown, flat at the skirt, and continuous between: `u`
+      // walks that sequence, and the golden angle keeps the two orders from
+      // ever agreeing with each other.
+      const u = i / (N - 1);
+      const droop = u * u;
+      const L = r * (1.00 - 0.30 * u) * (0.88 + jit(key, 730) * 0.24);
+      const reach = L * (0.30 + 0.68 * droop);
+      const apex = L * (0.98 - 0.86 * droop);
+      const tipY = y0 + apex - L * 0.30 * droop;
+      const midY = y0 + L * (0.62 - 0.24 * droop);
+      const wMax = L * (0.155 + jit(key, 731) * 0.045);
+      const g = 0.86 + jit(key, 732) * 0.28;
+      const top = [LEAF[0] * g, LEAF[1] * g, LEAF[2] * g];
+      const bot = shade(top, 0.74);
+      const SEG = 4;
+      // A quadratic through base -> control -> tip, which is the cheapest curve
+      // that both stands up and lies down.
+      const at2 = (p) => {
+        const q = 1 - p;
+        const d = 2 * q * p * (reach * 0.42) + p * p * reach;
+        const yy = q * q * y0 + 2 * q * p * midY + p * p * tipY;
+        return [d, yy];
+      };
+      let prev = at2(0), pw = wMax * 0.34, pf = 0;
+      for (let k = 1; k <= SEG; k++) {
+        const p = k / SEG;
+        const cur = at2(p);
+        // Widest a fifth of the way up and a point at the end.
+        const w = wMax * Math.pow(1 - p, 0.60) * (0.42 + 0.58 * Math.min(1, p * 4.5));
+        const fold = wMax * 0.30 * (1 - p);      // the channel's spine
+        const P0 = W(t + co * prev[0], s + sn * prev[0], prev[1]);
+        const P1 = W(t + co * cur[0], s + sn * cur[0], cur[1]);
+        const spine0 = [P0[0], P0[1] + pf, P0[2]];
+        const spine1 = [P1[0], P1[1] + fold, P1[2]];
+        for (const side of [-1, 1]) {
+          const E0 = W(t + co * prev[0] - sn * side * pw,
+            s + sn * prev[0] + co * side * pw, prev[1]);
+          const E1 = W(t + co * cur[0] - sn * side * w,
+            s + sn * cur[0] + co * side * w, cur[1]);
+          const col = side > 0 ? top : shade(top, 0.90);
+          if (side > 0) b.quad(spine0, spine1, E1, E0, col);
+          else b.quad(E0, E1, spine1, spine0, col);
+        }
+        prev = cur; pw = w; pf = fold;
+        if (k === SEG) {
+          // The spine on the point, which is the one dark mark on the plant.
+          void bot;
+          const T = W(t + co * (cur[0] + reach * 0.03),
+            s + sn * (cur[0] + reach * 0.03), cur[1] - L * 0.012);
+          b.tri(spine1, T, [P1[0], P1[1] - 0.012, P1[2]], [0.185, 0.168, 0.118]);
+        }
+      }
+    }
+    // The rockery. Broken limestone heaped round the foot, no two the same and
+    // none of them dressed — which is how every agave in the footage is planted.
+    //
+    // First cut came out as a ring of WHITE CUBES standing on open sand, which
+    // is three faults at once and all of them worth writing down. The top
+    // rectangle was 0.55 of the bottom on one axis and 0.51 on the other, which
+    // over a height about equal to the width is a box with the corners knocked
+    // off — rule 7, arrived at by not tapering enough rather than by using the
+    // wrong primitive. They stood at 0.42 to 0.97 of the plant's own radius, so
+    // the ring was wider than the plant and read as a kerb round it instead of
+    // a heap under it. And 0.545 with the gain running to 1.22 puts them at
+    // 0.66 against sand at about 0.60, so they were the brightest thing in the
+    // frame. Wedges now, half buried, tight in, and darker than the ground.
+    for (let k = 0; k < 14; k++) {
+      const key = seed * 71 + k;
+      const a = jit(key, 740) * TAU;
+      const d = r * (0.30 + jit(key, 741) * 0.42);
+      const rt = t + Math.cos(a) * d, rs = s + Math.sin(a) * d;
+      const rr = 0.10 + jit(key, 742) * 0.14;
+      const gy = gAt(rt, rs) - 0.10 - jit(key, 747) * 0.06;
+      const gg = 0.72 + jit(key, 743) * 0.44;
+      const col = [ROCK[0] * gg, ROCK[1] * gg, ROCK[2] * gg];
+      frustumTS(gy, [rt, rs, rr, rr * (0.72 + jit(key, 748) * 0.40)],
+        gy + rr * (0.85 + jit(key, 744) * 0.75),
+        [rt + (jit(key, 745) - 0.5) * rr * 1.3,
+          rs + (jit(key, 746) - 0.5) * rr * 1.3,
+          rr * (0.18 + jit(key, 749) * 0.22), rr * 0.22],
+        col, shade(col, 1.10));
+    }
+    runs.push({ t0: t - r * 0.5, t1: t + r * 0.5, s0: s - r * 0.5,
+      s1: s + r * 0.5, y: y0, h: r * 0.9 });
+    b = back;
+  }
+  // The placement, stated: at each break in the frontage — the corner where it
+  // starts, the gap between the palisade and the lavender, and the far end.
+  agaveBig(222.2, 40.6, 1.14, 1);
+  agaveBig(258.4, 40.7, 1.02, 2);
+  agaveBig(292.6, 40.5, 1.22, 3);
+
   if (special) special.sign = neonSign(special);
 
   /**

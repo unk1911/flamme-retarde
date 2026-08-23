@@ -116,7 +116,19 @@ purple lollipops standing in a row.
 A big blue-green agave, 1.5 m across, planted in a heap of broken limestone at
 a road corner, leaves rigid and turned every way. There are at least three of
 them. A single unmistakable silhouette, cheap in triangles, and the only plant
-in the survey with a hard edge.
+in the survey with a hard edge. **BUILT, 23 Aug** as `agaveBig` — three of
+them, at t 222.2 / 258.4 / 292.6 on s 40.5-40.7, each standing at a break
+between two frontages, which is where `a_112`'s stands. NOT the existing
+`agave`, which is eight flat triangles 0.26 m across for a pot on the coping
+and which draws from `rng()`, so it cannot be touched (rule 4). Four things
+`a_112` carries that the small one has none of: the blades arch, from near
+vertical at the crown to flat at the skirt; they are channelled, a shallow V
+with the spine proud, which is why the plant reads as paired surfaces at
+different angles instead of flat card; they are widest a fifth of the way up;
+and the colour is a grey green, 115,128,99 in the mean. The rockery took a
+second cut — a ring of white cubes wider than the plant is the failure, and
+the causes were a top rectangle at 0.55 of the bottom (a box with the corners
+off), a ring radius up to 0.97 r, and a colour brighter than the sand.
 
 **8. The glass-recycling igloos.** `b_047`, `b_048`. Two pale domed containers,
 about 1.5 m across, standing behind a green picket fence at the lane side next
