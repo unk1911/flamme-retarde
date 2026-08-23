@@ -444,6 +444,14 @@ as of this writing; the state of each is in the git log, not here.
   One frame every 2.00 s of each walk (439.2 s and 377.2 s), shot portrait so
   the frames are 1600x2844. **All 409 read, 23 Aug** — the catalogue of what
   is in them and not in the game is `plan/survey-v59x.md`.
+- Four photographs of 23 Aug 2026 — `/mnt/c/tmp/refs/jadrija/survey/3/`. The
+  gelato counter twice, beach bar MINI from the apron, and the wood and the
+  boundary behind it near the vikendica. **Rotate them before reading them:**
+  three are EXIF Rotate 90 CW and the fourth, `20260823_111819`, is Rotate
+  **180**. **None of the four carries GPS** — checked with `exiftool -a -G1`
+  and `exiftool -n -GPS:all`, there is no GPS block on any of them — so
+  `geotag.tsv` has nothing to say about them. Anything built from the fourth is
+  a placement. The catalogue is `plan/survey-3.md`.
 - Report: https://claude.ai/code/artifact/6b992f51-c846-414a-8819-3d939d4a6d37
 
 ## MECHANICS
