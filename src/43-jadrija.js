@@ -3673,32 +3673,32 @@ async function buildJadrija(scene) {
         // A post is only a maze when it is the only way past.
         furniture.push({ t, s: fs + 0.3, a: 0.09, c: 0.09, h: 2.4, y: y0 });
       }
-      boxTS(S.t0 - 6, S.t1 + 6, fs - 0.35, fs - 0.05, y0 + 0.44, y0 + 0.50,
-        S.bench);
-      for (let t = S.t0 - 5; t <= S.t1 + 5; t += 1.8) {
+      // Across the shop's own frontage and no further.
+      //
+      // It was drawn eighteen metres long — `t0 − 6` to `t1 + 6` — against a
+      // six-metre shop, and the note below this used to explain that the
+      // overshoot was harmless because it lay inside the hut row's blocker and
+      // nobody could get to it. That blocker was the bug: both kabine rows were
+      // carrying a full-length collider through the cafe they had been carved
+      // out of, and it went this evening. So the overshoot is standing on open
+      // ground now, and 20260821_174940 says what is actually there — one
+      // slatted timber bench on a dark green frame, running the width of the
+      // terrace and stopping at the render pier, not a plank crossing two
+      // buildings' worth of promenade.
+      boxTS(S.t0, S.t1, fs - 0.35, fs - 0.05, y0 + 0.44, y0 + 0.50, S.bench);
+      for (let t = S.t0 + 0.5; t <= S.t1 - 0.49; t += 1.8) {
         boxTS(t - 0.04, t + 0.04, fs - 0.32, fs - 0.08, y0, y0 + 0.44,
           [0.075, 0.230, 0.140]);
       }
-      // The plank bench, and only the seven metres of it that are across the
-      // shop's own frontage.
+      // The collider, which now matches the plank exactly — it was already
+      // clipped to the frontage while the drawing ran eighteen metres, because
+      // blocking the whole plank sealed the one gap through the hut row at
+      // t 465.2…467.2 and measured shut on the walk map. The drawing has come
+      // back to meet it rather than the other way about.
       //
-      // It is drawn eighteen metres long — `t0 − 6` to `t1 + 6` — and the
-      // overshoot is not on open ground. The back row of huts here is a
-      // blocker 3.9 m deep at s 16.65…20.55 running from t 467.95 east, with
-      // one gap in it at t 465.2…467.2, and that gap is the way through from
-      // the promenade to everything behind the row. Blocking the whole plank
-      // put a bench across the doorway: measured on the walk map, s 17.2…18.0
-      // went from open to sealed and the gap stopped being a gap. So the
-      // collider stops at the frontage, where a bench outside a café actually
-      // is, and the tails stay walk-through.
-      //
-      // `h` of 0.50 is what makes even this safe: `confine` lets an airborne
-      // walker over anything they have cleared, so half a metre is a step up
-      // rather than a wall — walking into it stops you, hopping it does not.
-      //
-      // The overshoot itself is a drawing fault and is left alone here: from
-      // t 468 east the plank, its supports and the pergola posts are inside
-      // the hut row, which is the frontage's problem and not the collider's.
+      // `h` of 0.50 is what makes it a bench and not a wall: `confine` lets an
+      // airborne walker over anything they have cleared, so half a metre is a
+      // step up — walking into it stops you, hopping it does not.
       furniture.push({ t: (S.t0 + S.t1) * 0.5, s: fs - 0.20,
         a: (S.t1 - S.t0) * 0.5 + 0.5, c: 0.15, h: 0.50, y: y0 });
     }
