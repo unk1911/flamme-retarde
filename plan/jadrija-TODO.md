@@ -237,8 +237,13 @@ as of this writing; the state of each is in the git log, not here.
       explicitly not a constraint any more. And they should MORPH by position —
       toward the water it becomes the water recording, into the pines it becomes
       the forest — not fade between separate stages.
-- [ ] She swims the R chase in a dead straight line. Wants a wandering track:
-      zig-zags, changes of heading, still catchable.
+- [x] She swims the R chase in a dead straight line. Wants a wandering track:
+      zig-zags, changes of heading, still catchable. DONE, and never ticked —
+      Misha, 23 Aug: "the 'R' chase is fine. u can close it out." Three sines
+      at periods that do not divide into one another: 33 s of drift, 13.4 s of
+      correction, 3.1 s of the yaw inside a stroke, with her pace breathing
+      +/-7 %. Measured at 3.84 m of cross-track on a path 3.6 % longer than the
+      rhumb line, which is a wander you can still catch.
 - [x] Slasticarnica to a much higher level of detail than the rest of the
       parade, from `/mnt/c/tmp/refs/jadrija/survey/2/`. It is the setting of a
       coming ice-cream side-quest, so it has to be worth standing in front of.
@@ -258,11 +263,16 @@ as of this writing; the state of each is in the git log, not here.
       seen down the row. The honest fix is to build each run on a rigid frame
       of its own — which is what a straight building on a curving promenade
       actually is — rather than to keep choosing where to stand things.
-- [ ] Three bathers stand in the sea off the west beach holding nothing: the
+- [x] Three bathers stand in the sea off the west beach holding nothing: the
       "somebody halfway down every other ladder" loop puts figures at t 22 /
       110 / 198 at s -0.28, but the ladder loop itself skips `t < beachTo + 8`,
-      so they are on ladders that are not there. Skipping them costs a
-      discarded `rng()` per skip (rule 4) or the whole beach moves.
+      so they are on ladders that are not there. DONE, and never ticked —
+      "the 3 bathers in the sea thingie also close out." The fix is the one
+      this line specified, at `43-jadrija.js:7376`:
+      `if (t < JAD.beachTo + 8) { rng(); continue; }` — the skip draws its
+      number and throws it away, because a bare `continue` would have eaten
+      three out of the stream and moved every bather, parasol and hut east of
+      the beach (rule 4). Census identical either side.
 - [x] "There is another walking block if I run eastward... at some point I hit
       an invisible block/wall, but I am able to overcome it if I \<enter\>
       JUMP." It was at t 170.5 and it ran from the water to the hillside.
