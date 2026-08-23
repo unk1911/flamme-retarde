@@ -7458,11 +7458,38 @@ async function buildJadrija(scene) {
   // three promenade walkers and the sunbathers were skipped here for good
   // reasons and nothing downstream picked them up. So the predicate is written
   // once, here, and the dynamic half is defined as *everybody it said no to*.
-  for (const b of bathers) {
-    if (b.pose === 'lie' || b.pose === 'wade' || b.beat) continue;
-    b.solid = true;
-    solid(b.t, b.s, 0.16 * b.k, 0.16 * b.k, 1.8 * b.k);
-  }
+  //
+  // 23 Aug: nobody is solid any more, and the predicate above is what decided
+  // it. Misha: "there are some NPC bathers who are just standing there, not
+  // actively moving, those i seem to be able to walk right through them...
+  // there should be object detection on them just like on the moving NPC
+  // bathers. i like how it works now for the walking NPCs, how they slightly
+  // turn their heads and a balloon shows up."
+  //
+  // They were not walk-through-able on foot — measured, all 27 standing and all
+  // 26 seated push `confine` — but they could not REACT, and that is the same
+  // complaint arriving by another road. `bump` is fired from `unbody` in
+  // 47-ground.js, which walks `bodyList()`; `confine` walks `field.blockers`
+  // and knows nothing about people. A figure in the static list can therefore
+  // never turn its head and never speak, so walking into one is walking into an
+  // invisible wall that happens to have a person painted near it. The half
+  // metre of difference is the tell: a box holds you at 0.16 + `GROUND.girth`
+  // 0.55 = 0.71 m, where a person holds you at `GROUND.body` 0.30 + `BODY.r`
+  // 0.24 = 0.54 m. You are stopped further away by the ones who do not notice.
+  //
+  // Two more things the static list was quietly getting wrong, both of which go
+  // away with it. `solid()` pushes `y: 0`, which is the shore frame's zero and
+  // not the ground the person is standing on — so a bather up the hillside had
+  // a 1.8 m box whose top was below their own feet, and `confine`'s height test
+  // is airborne-only, which means you could hop clean through them. And the box
+  // is axis-aligned in (t, s), so on the bend it is a trapezium (rule 9b) while
+  // the person in it is a cylinder.
+  //
+  // The cost is a longer sweep in `bodies()`: eleven soft figures became about
+  // ninety. That is ninety compares behind one `t`-band reject, once a frame,
+  // against a 16.7 ms budget — it does not show up. What it buys is that
+  // everybody on this shore is the same kind of obstacle as everybody else.
+  void solid;
 
   // Dinghies: two alongside the jetty and a few on their own moorings off the
   // shelf. None of them is going anywhere — this is a bathing station, and the
@@ -15164,6 +15191,14 @@ async function buildJadrija(scene) {
     // right pair of answers.
     top: 1.78,
     lieTop: 0.42,
+    // And somebody sitting down, who arrived in this list on 23 Aug when the
+    // static blockers went. A seated figure is the same circle in plan — the
+    // shoulders do not narrow — but they are not 1.78 m tall, and giving them
+    // the standing height would put a column over the head of everybody on the
+    // quay lip that `GROUND.hopV` cannot clear. Head about 1.30 m above the
+    // deck they are sitting on: 0.46 m of seat, which is what the three seated
+    // clips were solved against, plus a seated trunk and neck.
+    sitTop: 1.30,
   };
 
   // Reused rather than rebuilt, because this is called once a frame from the
@@ -15218,7 +15253,9 @@ async function buildJadrija(scene) {
         pushBody(f.x - ax * half, f.z - az * half, BODY.lieR * sc,
           f.y, f.y + BODY.lieTop * sc, 'bather', f.idx);
       } else {
-        pushBody(f.x, f.z, BODY.r * sc, f.y, f.y + BODY.top * sc, 'bather', f.idx);
+        // Seated people are the same circle and a lower column. See `sitTop`.
+        const h = f.mode === 'sit' ? BODY.sitTop : BODY.top;
+        pushBody(f.x, f.z, BODY.r * sc, f.y, f.y + h * sc, 'bather', f.idx);
       }
     }
     // And her, who is not one of the crowd and is the one everybody noticed.
