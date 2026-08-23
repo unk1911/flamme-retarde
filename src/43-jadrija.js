@@ -14030,13 +14030,21 @@ async function buildJadrija(scene) {
    */
   function tierCount(r = 15) {
     const rr = r * r;
-    const out = { r, skin: 0, inst: 0, total: 0 };
+    const out = { r, skin: 0, inst: 0, total: 0, why: {} };
     for (const k in crowds) {
       for (const fg of crowds[k].live()) {
         const dx = fg.x - lastCam.x, dz = fg.z - lastCam.z;
         if (dx * dx + dz * dz > rr) continue;
         out[crowds[k].kind === 'skin' ? 'skin' : 'inst']++;
         out.total++;
+        // Why any instanced figure is still one, near you, which is the only
+        // interesting half of this. A `lie` or a quay `sit` has no clip in the
+        // bake and is *supposed* to be here; anything else near you is a
+        // promotion that did not happen and wants explaining.
+        if (crowds[k].kind !== 'skin') {
+          const w = fg.blob >= 0 ? 'unpromoted' : fg.mode;
+          out.why[w] = (out.why[w] || 0) + 1;
+        }
       }
     }
     return out;

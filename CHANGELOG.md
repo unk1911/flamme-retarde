@@ -8,6 +8,52 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [Unreleased]
+
+### Changed
+
+- **The twenty-four good bathers are now whoever you are standing next to.**
+  Reported, of the Jadrija promenade: "old-school wooden-marionette-looking
+  bathers, just kinda standin' around". The complaint was not that the
+  instanced tier exists — it is 132 triangles against the skinned tier's 7 000
+  and it carries most of the beach — it was that which twenty-four people got
+  the good mesh was decided at build time, in placement order, before anybody
+  arrived. So a mannequin at your elbow stayed a mannequin for the whole
+  session while a blob two hundred metres off, four pixels tall, spent the
+  budget. `SKIN_CAST`'s twenty-four meshes are now slots rather than people,
+  re-pointed at the nearest bathers about seven times a second. Measured at the
+  three promenade stations, figures within 15 m of the camera, skinned against
+  instanced: 2/3, 5/5 and 10/3 before; **5/0, 9/0 and 12/0 after** — every
+  bather you can walk up to is a proper one, at all three. Frame time uncapped
+  at 1280x720 is 15.7 / 10.6 / 11.0 ms against 16.5 / 10.4 / 10.8 before, which
+  is the same cast at the same cost pointed somewhere useful.
+- **`SKIN_CAST` is 24**, up from 20 and re-measured: 16.1 / 10.6 / 10.4 ms at
+  the three stations against 15.9 / 10.2 / 9.9 at twenty. Thirty breaches 60 fps
+  at the west station, so this is the ceiling rather than a stop on the way.
+- **A promoted bather keeps their own colours, stature, clip and phase.** The
+  skinned tier bakes paint into its vertices and has no tint uniform, so the
+  copy goes the other way: a bather's instanced stand-in is repainted to the
+  blob's own swimwear and skin (`BATHER_PAINT`, read off `SUITS` in
+  bathers_mh.py), and the blob is scaled so that both tiers draw them at
+  exactly the same height — the eight statures and the instanced rig's 1.696 m
+  are now measured off the meshes rather than asserted in prose. Over a 440 m
+  traverse of the promenade, no figure changed body, colour or height on
+  promotion. Hysteresis is eight metres of discount to whoever holds a slot:
+  standing still for thirty seconds costs one promotion.
+- **Nobody standing next to anybody else is the same person.** The eight blobs
+  are dealt along the shore rather than in placement order; dealing in
+  placement order put four identical women at one beach bar, because `spread`
+  steps three along the shore within a pose and six blobs dealt three apart is
+  two blobs.
+
+### Fixed
+
+- **The café terraces are untouched.** `SKIN_SEATED`'s twenty-four chair
+  sitters stay pinned to the skinned tier at whatever distance: the terrace is
+  the one place a player walks up to and stops, and the three seated clips are
+  solved against a 0.46 m chair that the instanced `sit` pose is half a metre
+  away from.
+
 ## [1.101.0] — 2026-08-22
 
 Survey work, overnight, against the geotagged photographs and the two inland
