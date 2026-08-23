@@ -154,6 +154,16 @@ trailing plants in pots on the counter, chalkboard menus in white chalk, and a
 white **RENT A BOAT** sign with a price list on it beside the door. RENT A BOAT
 is fully legible and is a fifth thing the survey can say outright. The prices
 beside it are not — they are five or six ruled rows and none of them reads.
+**BUILT, 23 Aug**: a bay of rough driftwood framing at the west end of the
+frontage with the trunk slice, a shelf with the two pots on it and the pinned
+notices over them, then the RENT A BOAT panel and the chalkboard, then the
+opening — which is the order the frame has them in. RENT A BOAT ships as words
+and the price list ships as ROWS; the chalkboard ships as strokes. `panelSign`
+is the new helper: a canvas on a `PlaneGeometry`, the same construction
+`centenary` uses, because at 0.30 m across letters drawn as geometry are a
+dozen triangles each and still unreadable. The inside of the opening is dark
+green now, which is most of what you can see of the place in the photograph and
+was the same neutral dark every other shop has.
 
 **7. The pale crushed-limestone wood floor.** `_112051` fills its lower half
 with the wood floor at a metre's distance: angular buff-white limestone

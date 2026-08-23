@@ -2272,6 +2272,103 @@ async function buildJadrija(scene) {
    * difference — the promenade is walked at eye height, which is the one
    * distance a plain extrusion cannot survive.
    */
+
+  /**
+   * A small lettered panel hung flat on a shopfront, seaward-facing.
+   *
+   * Same construction as `centenary` — a canvas, a `PlaneGeometry` and an
+   * unlit material — and the same reason for it: at 0.30 m across, letters
+   * drawn as geometry are a dozen triangles each and still unreadable, and
+   * letters drawn on a texture cost one quad for the whole board.
+   *
+   * The standoff is 40 mm. Rule 5 says a co-planar surface needs 0.10 m out
+   * here and these are not co-planar with anything: they hang off a frame that
+   * is itself 60 mm proud of the render, and 40 more puts them clear of it.
+   */
+  function panelSign(t, s, y, w, h, draw) {
+    const PX = 512, C = document.createElement('canvas');
+    C.width = PX; C.height = Math.round(PX * h / w);
+    draw(C.getContext('2d'), C);
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    const st = at(t), p = W(t, s, y);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+    mesh.position.set(p[0], p[1], p[2]);
+    mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
+    scene.add(mesh);
+  }
+
+  /**
+   * RENT A BOAT, on beach bar MINI's frame.
+   *
+   * The two words are set. Everything under them is NOT: `20260823_111954` has
+   * five or six ruled rows with a price column and at that size in that shade
+   * not one of them reads, so they ship as rows. A price list of invented
+   * numbers on a real business's board is exactly the thing rule 12 exists to
+   * stop, and this shop has already had one photograph's worth of guessed
+   * prices corrected by Misha out loud.
+   */
+  function rentBoat(g, C) {
+    const w = C.width, h = C.height;
+    g.fillStyle = '#f3f0e7';
+    g.fillRect(0, 0, w, h);
+    g.strokeStyle = '#c0b9a8';
+    g.lineWidth = w * 0.020;
+    g.strokeRect(w * 0.02, h * 0.014, w * 0.96, h * 0.972);
+    g.textAlign = 'center';
+    g.fillStyle = '#c4241a';
+    g.font = `800 ${h * 0.135}px "Helvetica Neue", Arial, sans-serif`;
+    g.fillText('RENT A', w * 0.5, h * 0.155);
+    g.font = `800 ${h * 0.165}px "Helvetica Neue", Arial, sans-serif`;
+    g.fillText('BOAT', w * 0.5, h * 0.325);
+    // The rows. Six of them, a wide bar for the thing and a narrow one for the
+    // price, and no letters anywhere near them.
+    for (let k = 0; k < 6; k++) {
+      const yy = h * (0.40 + k * 0.095);
+      g.fillStyle = '#2c4a7a';
+      g.fillRect(w * 0.09, yy, w * (0.30 + jit(k, 760) * 0.24), h * 0.030);
+      g.fillStyle = '#3b3b3b';
+      g.fillRect(w * 0.70, yy, w * (0.10 + jit(k, 761) * 0.11), h * 0.030);
+      g.strokeStyle = '#d6cfbe';
+      g.lineWidth = w * 0.006;
+      g.beginPath();
+      g.moveTo(w * 0.07, yy + h * 0.058);
+      g.lineTo(w * 0.93, yy + h * 0.058);
+      g.stroke();
+    }
+  }
+
+  /** The chalkboard beside it: white chalk on black, and not one word of it. */
+  function chalkMenu(g, C) {
+    const w = C.width, h = C.height;
+    g.fillStyle = '#151513';
+    g.fillRect(0, 0, w, h);
+    g.strokeStyle = '#5a4a36';
+    g.lineWidth = w * 0.055;
+    g.strokeRect(w * 0.028, h * 0.014, w * 0.944, h * 0.972);
+    g.lineCap = 'round';
+    for (let k = 0; k < 11; k++) {
+      const yy = h * (0.075 + k * 0.082);
+      const head = k % 4 === 0;
+      g.strokeStyle = head ? 'rgba(245,242,232,0.92)' : 'rgba(228,224,212,0.66)';
+      g.lineWidth = w * (head ? 0.030 : 0.020);
+      let x = w * (0.14 + jit(k, 762) * 0.06);
+      const end = w * (0.52 + jit(k, 763) * 0.32);
+      g.beginPath();
+      g.moveTo(x, yy);
+      // A hand writing, not a rule: the stroke wanders and it lifts.
+      while (x < end) {
+        const step = w * (0.05 + jit(k * 7 + x, 764) * 0.07);
+        g.lineTo(x + step, yy + h * (jit(k * 7 + x, 765) - 0.5) * 0.022);
+        x += step;
+        if (jit(k * 13 + x, 766) < 0.22) { g.stroke(); g.beginPath(); g.moveTo(x + w * 0.02, yy); x += w * 0.02; }
+      }
+      g.stroke();
+    }
+  }
+
   function shopKit(S, y0, top, fs) {
     const body = S.body || [0.520, 0.492, 0.430];
     const DARK = [0.045, 0.041, 0.038];
@@ -4275,6 +4372,134 @@ async function buildJadrija(scene) {
         b.quad(W(a + 0.72, S.s0 - 0.33, y0 + 0.10), W(a + 0.62, S.s0 - 0.33, y0 + 0.10),
           W(a, S.s0 - 0.33, y0 + 1.90), W(a + 0.10, S.s0 - 0.33, y0 + 1.90),
           shade(TIMB, 1.14));
+      }
+      // ── the joinery at the west end of the frontage ─────────────────────
+      //
+      // `20260823_111954`, ranked sixth in plan/survey-3.md and the richest
+      // thing in that frame that was left alone on the first pass. Beside the
+      // serving opening, under the awning, there is a bay of ROUGH TIMBER — two
+      // uprights and a braced head, driftwood pale and nothing like the sawn
+      // joinery on the rest of this boardwalk — and hung on it, in this order
+      // from the corner: a big round slice of tree trunk, a shelf with a
+      // trailing succulent and a spider plant on it, the white RENT A BOAT
+      // sign, and a chalkboard. Above them, notices pinned to the frame.
+      //
+      // RENT A BOAT is the fifth thing this survey can say OUTRIGHT, and it is
+      // the only one in this bay. The price list beside it is five or six ruled
+      // rows and not one of them reads, so it ships as rows and not as words —
+      // the same call the cone tub's big red capitals shipped under, and the
+      // same one that keeps SLADOL off the shop wall. The chalkboard is white
+      // chalk on black at an angle no letter survives, so it ships as strokes.
+      {
+        const RTIM = [0.470, 0.418, 0.330];
+        const WOOD = [0.582, 0.500, 0.372];
+        const fw = S.s0 - 0.06;
+        const ba = S.t0 + 0.30, bc = S.t0 + 1.95;
+        // The frame. Round in section and knotty, which is why it is `post`
+        // with five sides and not a box: the whole point of this bay is that
+        // it is the one thing on the shore somebody made out of what washed up.
+        for (const t of [ba, bc]) {
+          post(W, t, fw - 0.07, y0, y0 + 2.26, 0.062, RTIM, 5);
+        }
+        boxTS(ba - 0.09, bc + 0.09, fw - 0.15, fw - 0.02, y0 + 2.18, y0 + 2.30,
+          RTIM, shade(RTIM, 1.12));
+        // KNEE braces, short and in the corners. The first cut ran them the
+        // full width from head to mid-post and the bay came out with a great
+        // diagonal beam across it, which is a gantry and not a shopfront: what
+        // the frame carries is a shelf and a sign, and a brace that size would
+        // be holding a roof up.
+        for (const sg of [1, -1]) {
+          const tp = sg > 0 ? ba : bc;
+          const tq = tp + sg * 0.42;
+          b.quad(W(tp, fw - 0.03, y0 + 1.72), W(tp + sg * 0.075, fw - 0.03, y0 + 1.72),
+            W(tq + sg * 0.075, fw - 0.03, y0 + 2.14), W(tq, fw - 0.03, y0 + 2.14),
+            shade(RTIM, 1.06));
+        }
+        // The trunk slice, hung flat on the frame. A disc in the VERTICAL
+        // plane, so it cannot be `post` — that extrudes upwards, and a disc
+        // made of it hangs edge-on and reads as a tin.
+        {
+          const ct = ba + 0.34, cy = y0 + 1.72, rr = 0.20;
+          const face = fw - 0.11;
+          for (let i = 0; i < 11; i++) {
+            const a0 = (i / 11) * TAU, a1 = ((i + 1) / 11) * TAU;
+            b.tri(W(ct, face, cy),
+              W(ct + Math.cos(a0) * rr, face, cy + Math.sin(a0) * rr),
+              W(ct + Math.cos(a1) * rr, face, cy + Math.sin(a1) * rr),
+              i % 2 ? WOOD : shade(WOOD, 1.07));
+            // The bark, which is the dark ring that makes it a slice of tree
+            // and not a plate.
+            b.quad(W(ct + Math.cos(a0) * rr, face, cy + Math.sin(a0) * rr),
+              W(ct + Math.cos(a1) * rr, face, cy + Math.sin(a1) * rr),
+              W(ct + Math.cos(a1) * rr, face + 0.055, cy + Math.sin(a1) * rr),
+              W(ct + Math.cos(a0) * rr, face + 0.055, cy + Math.sin(a0) * rr),
+              [0.225, 0.178, 0.128]);
+          }
+          // The heart, a shade darker than the sapwood.
+          for (let i = 0; i < 9; i++) {
+            const a0 = (i / 9) * TAU, a1 = ((i + 1) / 9) * TAU;
+            b.tri(W(ct, face - 0.006, cy),
+              W(ct + Math.cos(a0) * rr * 0.42, face - 0.006, cy + Math.sin(a0) * rr * 0.42),
+              W(ct + Math.cos(a1) * rr * 0.42, face - 0.006, cy + Math.sin(a1) * rr * 0.42),
+              shade(WOOD, 0.86));
+          }
+        }
+        // The shelf, and what is standing on it.
+        boxTS(ba + 0.08, bc - 0.06, fw - 0.30, fw - 0.04, y0 + 1.06, y0 + 1.12,
+          shade(RTIM, 0.90), shade(RTIM, 1.10));
+        {
+          // The trailing one. Strands hanging off the shelf, blue-green and
+          // beaded — three-sided, because a hanging quad is a ribbon.
+          const pt = ba + 0.30, ps = fw - 0.17;
+          post(W, pt, ps, y0 + 1.12, y0 + 1.30, 0.085, [0.470, 0.408, 0.352], 7);
+          const SUC = [0.402, 0.520, 0.448];
+          for (let k = 0; k < 7; k++) {
+            const a = (k / 7) * TAU;
+            const d = 0.055 + jit(k, 750) * 0.030;
+            post(W, pt + Math.cos(a) * d, ps + Math.sin(a) * d,
+              y0 + 1.30 - (0.30 + jit(k, 751) * 0.28), y0 + 1.34, 0.017,
+              k % 2 ? SUC : shade(SUC, 0.88), 3);
+          }
+        }
+        {
+          // And the one with the arching striped blades.
+          const pt = ba + 0.86, ps = fw - 0.17;
+          post(W, pt, ps, y0 + 1.12, y0 + 1.32, 0.090, [0.520, 0.492, 0.462], 7);
+          const GRN = [0.235, 0.400, 0.208];
+          for (let k = 0; k < 9; k++) {
+            const a = (k / 9) * TAU + 0.4;
+            const co = Math.cos(a), sn = Math.sin(a);
+            // Long and NARROW. At 0.044 across the base and 0.16 of reach a
+            // blade is a wide stubby triangle, and nine of them is a shrub
+            // made of bunting.
+            const reach = 0.23 + jit(k, 752) * 0.19;
+            const rise = 0.22 + jit(k, 753) * 0.12;
+            const bY = y0 + 1.34;
+            b.quad(W(pt - sn * 0.013, ps + co * 0.013, bY),
+              W(pt + sn * 0.013, ps - co * 0.013, bY),
+              W(pt + co * reach * 0.55, ps + sn * reach * 0.55, bY + rise),
+              W(pt + co * reach, ps + sn * reach, bY + rise * 0.22),
+              k % 2 ? GRN : shade(GRN, 1.22));
+          }
+        }
+        // The notices pinned over them. White, small, and blank: they are A4
+        // sheets seen at an angle in the shade and there is not a word on any
+        // of them the frame can carry.
+        for (let k = 0; k < 3; k++) {
+          const t = ba + 0.52 + k * 0.34;
+          boxTS(t - 0.065, t + 0.065, fw - 0.045, fw - 0.028,
+            y0 + 1.92 + jit(k, 754) * 0.05, y0 + 2.11 + jit(k, 754) * 0.05,
+            [0.720, 0.712, 0.690], [0.760, 0.752, 0.728]);
+        }
+        panelSign(bc + 0.42, fw - 0.04, y0 + 1.66, 0.30, 0.46, rentBoat);
+        panelSign(bc + 0.92, fw - 0.04, y0 + 1.16, 0.40, 0.88, chalkMenu);
+        // And the inside of the opening is DARK GREEN — boarded, and it is the
+        // only green interior on this boardwalk. The opening used to look into
+        // the same neutral dark every other shop does, and in the frame the
+        // green is most of what you can see of the place.
+        const oa2 = S.t0 + (S.t1 - S.t0) * 0.18, oc2 = S.t1 - (S.t1 - S.t0) * 0.18;
+        boxTS(oa2, oc2, S.s0 + 0.55, S.s0 + 0.66, y0 + 0.10, top - 0.30,
+          [0.072, 0.186, 0.128], [0.090, 0.215, 0.150]);
       }
       return;
     }
