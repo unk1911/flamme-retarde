@@ -645,8 +645,17 @@ async function buildJadrija(scene) {
     // are not co-planar in the sense the rule is about: the stone sits over the
     // mortar rather than beside it, and 0.05 m of separation with a smaller
     // footprint does not fight. Checked in the frame rather than argued.
+    // The mortar takes its colour from the stone it is between, a fixed step
+    // darker, rather than being a constant.
+    //
+    // It WAS a constant, [0.404, 0.372, 0.318], and the west end showed why
+    // that cannot work: `paving` is handed the arc length as well as the flag
+    // index precisely so the flags can go to shingle over the sand, which they
+    // do — and a fixed mortar does not go anywhere. The result was a grey
+    // mortar grid printed across forty metres of beach, with orange sand in
+    // the cells. Found by walking the shore and looking at it, which is the
+    // only way that one was ever going to turn up.
     const JOINT = 0.055, LIFT = 0.05;
-    const MORTAR = [0.404, 0.372, 0.318];
     const n = Math.floor(LEN / step);
     for (let i = 0; i < n; i++) {
       const a = at(i * step), c = at((i + 1) * step);
@@ -659,8 +668,22 @@ async function buildJadrija(scene) {
         const c0 = cut(i + 1, k), c1 = cut(i + 1, k + 1);
         // The mortar bed, full size, so neighbouring cells' beds meet and there
         // is no hole between them.
+        // The flag's colour, and the index into the palette has to be a hash
+        // and nothing else. It was `i * 7 + k * 3 + ((jit(i, k) * 5) | 0)`,
+        // and the arithmetic half of that is the bug: taken mod five, `7i + 3k`
+        // is `2i + 3k`, a diagonal stripe repeating every five stations and
+        // every five courses. The jitter could shift a flag four places but not
+        // break the lattice under it, so the paving came out as a regular
+        // diagonal check about three metres across — which is what a tiled
+        // floor looks like, and crazy paving is the opposite of a tiled floor.
+        const stone = cols((jit(i, k * 37 + 11) * 4096) | 0, i * step,
+          (a0 + a1) * 0.5);
+        // Multiplied out rather than passed through `shade`, which is declared
+        // four hundred lines below this and would be in the temporal dead zone
+        // when the shore builds. That trap has cost this file four evenings.
+        const mortar = [stone[0] * 0.76, stone[1] * 0.76, stone[2] * 0.76];
         b.quad(pt(a, a0, yOf(a, a0)), pt(c, c0, yOf(c, c0)),
-          pt(c, c1, yOf(c, c1)), pt(a, a1, yOf(a, a1)), MORTAR);
+          pt(c, c1, yOf(c, c1)), pt(a, a1, yOf(a, a1)), mortar);
         // And the stone on top of it. A cell narrower than two joints has no
         // stone left to draw and is all mortar, which is what a sliver between
         // two big flags actually is.
@@ -668,18 +691,7 @@ async function buildJadrija(scene) {
         const d0 = c0 + JOINT, d1 = c1 - JOINT;
         if (b1 - b0 < 0.02 || d1 - d0 < 0.02) continue;
         const L = (st, u) => { const q = pt(st, u, yOf(st, u)); q[1] += LIFT; return q; };
-        b.quad(L(ai, b0), L(ci, d0), L(ci, d1), L(ai, b1),
-          // The flag's colour index, and it has to be a hash and nothing else.
-          //
-          // It was `i * 7 + k * 3 + ((jit(i, k) * 5) | 0)`, and the arithmetic
-          // half of that is the bug: taken mod five, `7i + 3k` is `2i + 3k`,
-          // which is a diagonal stripe that repeats every five stations and
-          // every five courses. The jitter on the end could shift a flag by up
-          // to four places but not break the lattice under it, so the paving
-          // came out as a regular diagonal check about three metres across —
-          // which is what a tiled floor looks like, and crazy paving is the
-          // opposite of a tiled floor.
-          cols((jit(i, k * 37 + 11) * 4096) | 0, i * step, (a0 + a1) * 0.5));
+        b.quad(L(ai, b0), L(ci, d0), L(ci, d1), L(ai, b1), stone);
       }
     }
   }
