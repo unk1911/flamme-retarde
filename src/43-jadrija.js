@@ -5335,11 +5335,27 @@ async function buildJadrija(scene) {
     const PLANK = [0.744, 0.726, 0.668];
     const PIPE = [0.796, 0.800, 0.792];
 
+    // ── the footing, which is one pour ───────────────────────────────────────
+    //
+    // "Nobody sees it" was the argument for giving each mass its own shaft down
+    // to the sea bed, and it was wrong twice over. You can swim here — the
+    // chase finishes at this platform — and Misha, 23 Aug, looking up at it
+    // from 2.9 m down: "in reality it's not 2 concrete slabs going down, but
+    // one thicker concrete slab going down." He is right about the concrete as
+    // well as about the screenshot. Two masses standing in eight metres of
+    // water on separate legs is a jetty; this is a lump poured onto the sea
+    // bed, and a later pour on top of an older one shares its base. The seam
+    // you can see is at the top, where the two pours meet, and not underneath.
+    //
+    // So: one prism from the bed to just under the surface, spanning both. The
+    // union of what stood here — big at t-1.64…t+0.40, small at t+1.36…t+2.76,
+    // s -0.98…+0.98 between them — which is 4.40 m by 1.96 m, centred half a
+    // metre east of the old mass because the newer block is that side.
+    frustumTS(-8.0, [D.t + 0.56, D.s, 2.20, 0.98],
+      -0.55, [D.t + 0.56, D.s, 2.20, 0.98], WET);
+
     // ── the big mass ─────────────────────────────────────────────────────────
-    // Below the water it is a plain shaft — nobody sees it and the sea bed here
-    // is eight metres down. Above it, the flare, which is the whole shape.
-    frustumTS(-8.0, [D.t - 0.62, D.s, 1.02, 0.98],
-      -0.55, [D.t - 0.62, D.s, 1.02, 0.98], WET);
+    // The flare, which is the whole shape, standing on the footing above.
     frustumTS(-0.55, [D.t - 0.62, D.s, 1.02, 0.98],
       y - 0.26, [D.t - 0.62, D.s, 1.92, 1.34], OLD);
     // The cap: a slab a little proud of the flare all round, which is where
@@ -5351,9 +5367,9 @@ async function buildJadrija(scene) {
     // Squarer, whiter, a hand lower, and set half a metre further out. In the
     // photograph it reads as a separate pour that arrived later, which is what
     // happens to every one of these on this coast.
-    frustumTS(-8.0, [D.t + 2.06, D.s - 0.16, 0.70, 0.74],
-      -0.50, [D.t + 2.06, D.s - 0.16, 0.70, 0.74], WET);
-    frustumTS(-0.50, [D.t + 2.06, D.s - 0.16, 0.70, 0.74],
+    // It has no shaft of its own any more; it stands on the shared footing at
+    // -0.55, five centimetres below where its own leg used to start.
+    frustumTS(-0.55, [D.t + 2.06, D.s - 0.16, 0.70, 0.74],
       y - 0.46, [D.t + 2.06, D.s - 0.16, 0.94, 0.92], NEW);
     frustumTS(y - 0.46, [D.t + 2.06, D.s - 0.16, 0.96, 0.94],
       y - 0.26, [D.t + 2.06, D.s - 0.16, 0.98, 0.96], [0.808, 0.806, 0.778],

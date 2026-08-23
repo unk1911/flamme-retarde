@@ -348,6 +348,20 @@ as of this writing; the state of each is in the git log, not here.
       jump: `started` is the one flag that is false before the veil is left and
       true for ever after.
 
+- [x] The diving platform stood on two legs. Misha, 23 Aug, looking up at it
+      from 2.9 m down: "in reality it's not 2 concrete slabs going down, but one
+      thicker concrete slab going down." The two masses above water are right
+      and the photograph says so; below it each had its own shaft to the sea
+      bed, on the argument that nobody sees it — which is wrong twice, because
+      the chase finishes at this platform and you swim under it, and because
+      two masses on separate legs in eight metres of water is a jetty, not a
+      lump poured onto the bed with a later pour on top of it. One prism now,
+      the union of both: t 428.36-432.76, s -40.98 to -39.02, 4.40 by 1.96 m,
+      up to -0.55. Read off the built mesh: at y -8.00 there are two distinct t
+      values, so it is one box; at -0.55 there are four, which is the footing's
+      outer faces plus the two pours starting on it. The seam is where it
+      should be and there is nothing below it. -12 triangles.
+
 **Verify**
 - [ ] Knee-height close-up pass on the clutter — sandals, dropped towels,
       slumped bags. They are 25 cm objects and have never resolved in a shot
