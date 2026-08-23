@@ -375,9 +375,15 @@ as of this writing; the state of each is in the git log, not here.
       should be and there is nothing below it. -12 triangles.
 
 **Verify**
-- [ ] Knee-height close-up pass on the clutter — sandals, dropped towels,
+- [x] Knee-height close-up pass on the clutter — sandals, dropped towels,
       slumped bags. They are 25 cm objects and have never resolved in a shot
-      from 15 m.
+      from 15 m. DROPPED 23 Aug: "don't worry about the clutter remove that
+      from the list." Note what is being dropped, because it is not a defect
+      and never was: the objects are built and in the world, and this was a
+      standing offer to go and check they read as sandals rather than as
+      coloured lumps. Nobody has taken that shot and nobody now will. If one of
+      them ever looks wrong from the promenade it will be reported like
+      anything else.
 
 **Mine**
 - [x] v595 and v597, all 409 frames, 23 Aug. The catalogue is
