@@ -3437,6 +3437,238 @@ async function buildJadrija(scene) {
     // the cabinet back, which is drawn.
 
     runs.push({ t0: ca, t1: cc, s0: S.s0 - 1.72, s1: S.s0 - 0.50, y: y0, h: 1.92 });
+    counterKit(S, y0, ca, cc, cm);
+  }
+
+  /**
+   * The printed wrap round the cone tub, on a canvas.
+   *
+   * Two panels of it are square on to the camera in `20260823_111819` and
+   * everything set here is read off them: an orange-to-gold panel on the left
+   * with "Slatki Kornet" across the top in a dark brown hand and a photograph
+   * of a waffle cone under it, and a sky-blue panel to the right of that with
+   * the price on it. The big red three-dimensional capitals that occupy most
+   * of the wrap are NOT set. Only "SLA" is legible on one panel and "KOR" on
+   * the next; the word they belong to is obvious and obvious is not evidence,
+   * so what goes on the model is the red the capitals are, as a band on the
+   * prism behind this face, and no letters. Rule 12, and the same discipline
+   * the five unnamed pans in the case ship under.
+   *
+   * "1,00 €" is legible outright, twice, and goes on.
+   */
+  function coneTubWrap() {
+    const C = document.createElement('canvas');
+    C.width = 256; C.height = 216;
+    const g = C.getContext('2d');
+    // The gold ground. It is a print of a sunburst behind the cone rather than
+    // a flat orange — a vertical ramp is the cheapest thing that reads as one
+    // at the size this is ever seen at.
+    const gr = g.createLinearGradient(0, 0, 0, 216);
+    gr.addColorStop(0, '#f6a63a'); gr.addColorStop(0.45, '#f6d79a');
+    gr.addColorStop(1, '#f2a828');
+    g.fillStyle = gr; g.fillRect(0, 0, 256, 216);
+    g.fillStyle = '#3a2410';
+    g.font = '600 30px "Comic Sans MS", "Segoe Print", "Helvetica Neue", Arial, sans-serif';
+    g.textAlign = 'center';
+    g.fillText('Slatki Kornet', 128, 40);
+    // The cone. A wafer triangle with the lattice scored across it and a scoop
+    // of pale ice cream sitting in the mouth, which is what the photograph on
+    // the real wrap is.
+    g.fillStyle = '#c98f4e';
+    g.beginPath(); g.moveTo(88, 74); g.lineTo(168, 74); g.lineTo(128, 168);
+    g.closePath(); g.fill();
+    g.strokeStyle = '#a97236'; g.lineWidth = 2;
+    for (let i = -3; i <= 3; i++) {
+      g.beginPath(); g.moveTo(128 + i * 22, 74); g.lineTo(128 + i * 7, 168);
+      g.stroke();
+    }
+    for (let k = 1; k < 5; k++) {
+      const y = 74 + k * 20, w = 40 * (1 - k / 5.0);
+      g.beginPath(); g.moveTo(128 - w, y); g.lineTo(128 + w, y); g.stroke();
+    }
+    g.fillStyle = '#f0e6d2';
+    g.beginPath(); g.ellipse(128, 70, 44, 16, 0, 0, Math.PI * 2); g.fill();
+    // And the price, on its own white patch at the foot, where the blue panel
+    // of the wrap carries it.
+    g.fillStyle = '#ffffff'; g.fillRect(72, 156, 112, 34);
+    g.fillStyle = '#141414';
+    g.font = '700 28px "Helvetica Neue", Arial, sans-serif';
+    g.fillText('1,00 €', 128, 182);
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    return tex;
+  }
+
+  /**
+   * The card in the acrylic holder on the counter.
+   *
+   * Square on and wholly legible in `20260823_111819`: SLADOLED in fat red
+   * capitals that warm to gold at the last letter, KUGLA under it in the same
+   * hand, and 2,50 € in black on a white patch let into the bottom right —
+   * all on a sky-blue ground with paler blue cloud shapes printed on it. It is
+   * a stock card from a wholesaler rather than the shop's own sign, which is
+   * why it is the one lettering on this counter that is not hand-written.
+   *
+   * The price is a number the photograph carries, so it goes on. It is the
+   * fourth price in the game that came out of the survey rather than out of
+   * somebody's head.
+   */
+  function scoopCard() {
+    const C = document.createElement('canvas');
+    C.width = 320; C.height = 224;
+    const g = C.getContext('2d');
+    g.fillStyle = '#7fc4e8'; g.fillRect(0, 0, 320, 224);
+    // The clouds: three soft pale wedges, off-centre and nowhere near the
+    // edges, for the reason the gull mural's wash is drawn that way.
+    g.fillStyle = 'rgba(255,255,255,0.28)';
+    for (const [x, y, r] of [[70, 46, 54], [232, 30, 42], [180, 190, 60]]) {
+      g.beginPath(); g.ellipse(x, y, r, r * 0.52, 0, 0, Math.PI * 2); g.fill();
+    }
+    g.textAlign = 'left';
+    // Both words are SET TO FIT and not set at a fixed size, which is the
+    // lesson `shopSign` has already learnt twice in this file: "SLADOLED" at a
+    // size chosen by eye ran off the right-hand edge of the canvas and the card
+    // shipped reading SLADOL / KUG. Solve for the size that fills the room and
+    // let a cap stop it going the other way.
+    const fit = (text, room, cap) => {
+      g.font = '800 100px "Helvetica Neue", Arial Black, Arial, sans-serif';
+      const px = Math.min(cap, 100 * room / (g.measureText(text).width || 1));
+      g.font = `800 ${px}px "Helvetica Neue", Arial Black, Arial, sans-serif`;
+      return px;
+    };
+    // SLADOLED warms from red to gold along the word, which is a printed
+    // gradient and not eight separately coloured letters.
+    const w1 = g.createLinearGradient(14, 0, 306, 0);
+    w1.addColorStop(0, '#e8362a'); w1.addColorStop(0.62, '#ef5a20');
+    w1.addColorStop(1, '#f4b21c');
+    g.strokeStyle = '#8f1c14'; g.lineWidth = 4;
+    g.fillStyle = w1;
+    fit('SLADOLED', 292, 66);
+    g.fillText('SLADOLED', 14, 88); g.strokeText('SLADOLED', 14, 88);
+    g.fillStyle = '#ee4a22';
+    // KUGLA shares the line with the price patch, so it gets the left half of
+    // the card and not the whole of it.
+    fit('KUGLA', 168, 66);
+    g.fillText('KUGLA', 14, 168); g.strokeText('KUGLA', 14, 168);
+    g.fillStyle = '#ffffff'; g.fillRect(192, 118, 116, 58);
+    g.fillStyle = '#161616';
+    g.font = '600 40px "Helvetica Neue", Arial, sans-serif';
+    g.textAlign = 'center';
+    g.fillText('2,50 €', 250, 160);
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    return tex;
+  }
+
+  /**
+   * What is standing on the counter over the gelato case.
+   *
+   * `20260823_111819` is the whole of this: the serving counter square on from
+   * a metre and a half, with five objects on it and nothing else. Left to
+   * right they are a stainless drainer tray, a heavy glass bowl with a hedgehog
+   * of plastic tasting spoons standing out of it, a chipped white tin, the
+   * printed scoop card in its acrylic holder, and a clear tub of waffle cones
+   * with a paper wrap round the bottom of it.
+   *
+   * They stand on the case's own hood, which the 22 August pass drew as a raked
+   * slab from `s0−1.44` at `y0+1.86` to `s0−0.46` at `y0+1.92`. That is the one
+   * horizontal surface behind the glass and in front of the shop, and it is
+   * where the counter in the photograph is: the tray, the bowl and the tin are
+   * all in front of the server and behind the pans. Every foot here is set at
+   * `y0+1.86` — the LOW end of the rake — so that whatever the hood's top is
+   * doing at that particular `s`, the object's base is buried in it rather than
+   * skimming it. Rule 5, in the same place it caught the pan rims.
+   *
+   * Nothing is drawn east of t 336.0. The three menu panels hang at `s0−0.14`
+   * from t 335.95, and a cone tub 0.6 m in front of the left-hand edge of a
+   * board is a cone tub standing over the prices.
+   */
+  function counterKit(S, y0, ca, cc, cm) {
+    const STEEL = [0.505, 0.500, 0.486];
+    const BRIGHT = [0.645, 0.638, 0.622];
+    const yb = y0 + 1.86;                      // the hood's low edge: every foot
+    const cs = S.s0 - 0.95;                    // the middle of the hood, in s
+
+    // The drainer. A shallow stainless tray with a darker perforated bed let
+    // into it, which from the promenade is a bright rectangle with a dull one
+    // inside it — and that contrast is the only thing that says "perforated"
+    // at this size.
+    {
+      const ct = cm - 1.95;
+      boxTS(ct - 0.26, ct + 0.26, cs - 0.17, cs + 0.17, yb, yb + 0.075,
+        BRIGHT, shade(BRIGHT, 1.06));
+      boxTS(ct - 0.21, ct + 0.21, cs - 0.13, cs + 0.13, yb + 0.055, yb + 0.085,
+        shade(STEEL, 0.86), shade(STEEL, 0.92));
+    }
+
+    // The bowl of tasting spoons. Pressed glass, which in this builder is a
+    // very pale desaturated solid and not a transparent one — the same call
+    // `gelatoCase` makes for the stacked coupes, and for the same reason: a
+    // translucent quad here is an opaque grey lump over the counter.
+    //
+    // The spoons are the point of it. A bowl on its own is a lump; nine white
+    // sticks standing out of the mouth at every angle is unmistakable, and it
+    // is the object in the frame that most says somebody is serving from this
+    // counter right now.
+    {
+      const ct = cm - 1.35;
+      const GLASS = [0.700, 0.735, 0.720];
+      lathe(W, ct, cs, [[yb, 0.055], [yb + 0.03, 0.105], [yb + 0.10, 0.145],
+        [yb + 0.19, 0.140], [yb + 0.26, 0.098]], GLASS, 10);
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * TAU + 0.4, lean = 0.055 + jit(i, 810) * 0.075;
+        frustumTS(yb + 0.17,
+          [ct + Math.cos(a) * 0.03, cs + Math.sin(a) * 0.03, 0.010, 0.010],
+          yb + 0.17 + 0.20 + jit(i, 811) * 0.06,
+          [ct + Math.cos(a) * lean, cs + Math.sin(a) * lean, 0.013, 0.013],
+          [0.860, 0.855, 0.830], [0.885, 0.880, 0.855]);
+      }
+    }
+
+    // The tin. Square, enamelled, and the enamel has gone off it in patches —
+    // which is drawn as a chalkier band round the bottom third rather than as
+    // spots, because a spot at this size is one pixel and a band is a tin that
+    // has been slid along a counter for twenty years.
+    {
+      const ct = cm - 0.92;
+      boxTS(ct - 0.10, ct + 0.10, cs - 0.10, cs + 0.10, yb, yb + 0.13,
+        [0.585, 0.590, 0.585]);
+      boxTS(ct - 0.101, ct + 0.101, cs - 0.101, cs + 0.101, yb + 0.11, yb + 0.30,
+        [0.775, 0.775, 0.760]);
+      boxTS(ct - 0.112, ct + 0.112, cs - 0.112, cs + 0.112, yb + 0.28, yb + 0.335,
+        [0.505, 0.525, 0.540], [0.545, 0.565, 0.580]);
+    }
+
+    // The scoop card, on its tray. Both placed off the front of the card the
+    // way `shopSign` places its board, so that nothing added to this counter
+    // later can get between the two.
+    {
+      const ct = cm - 0.42, cw = 0.30, ch = 0.21;
+      const back = b;
+      b = up;
+      boxTS(ct - cw * 0.5 - 0.01, ct + cw * 0.5 + 0.01, cs - 0.10, cs - 0.04,
+        yb + 0.02, yb + 0.02 + ch + 0.02, [0.520, 0.545, 0.560]);
+      b = back;
+      seaFacing(scoopCard(), ct, cs - 0.14, yb + 0.03 + ch * 0.5, cw, ch,
+        'slast:scoopcard');
+    }
+
+    // The cone tub. A clear drum of wafer cones with the printed wrap round
+    // the bottom of it and a clear domed lid on the top. The cones read as one
+    // pale wafer mass and not as cones, which is what a tub of forty of them
+    // seen through a scratched plastic drum is.
+    {
+      const ct = cm + 0.12;
+      post(W, ct, cs, yb, yb + 0.42, 0.148, [0.735, 0.640, 0.470], 12);
+      // The wrap, as a prism a hair wider than the drum. The band it carries is
+      // the red the big capitals are printed in; the capitals themselves are
+      // not set — see the note over `coneTubWrap`.
+      post(W, ct, cs, yb + 0.015, yb + 0.275, 0.156, [0.560, 0.735, 0.845], 12);
+      post(W, ct, cs, yb + 0.120, yb + 0.205, 0.158, [0.760, 0.235, 0.180], 12);
+      seaFacing(coneTubWrap(), ct, cs - 0.196, yb + 0.152, 0.205, 0.200,
+        'slast:conetub');
+      dome(W, ct, cs, yb + 0.42, 0.055, 0.152, [0.760, 0.775, 0.770], 10);
+    }
   }
 
   /** One business. Everything upright goes in `up`; pads stay in `deck`. */
