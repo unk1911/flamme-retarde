@@ -1324,6 +1324,54 @@ html.touch #ride-hud { bottom: 7.4rem; }
 #fo-hint { min-height: 1.2em; opacity: .9; }
 html.touch #foil-hud { bottom: 7.4rem; }
 
+/* ── the boat to Šibenik ─────────────────────────────────────────────────── */
+/* The same stack as the kite and the foil, because it is the same place on the
+   screen and there is no reason for the fourth water mode to invent a fifth
+   layout. What is different is that none of it is a control: the bar is the
+   only thing on this HUD that changes on its own account and it is the passage,
+   which is why it is the widest thing here and why the number over it counts
+   *down* — the question a passenger has is how long is left. */
+#brod-hud {
+  position: fixed;
+  left: 50%;
+  bottom: 4.2vh;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .5em;
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .75);
+}
+#brod-hud[hidden] { display: none; }
+#br-track {
+  width: 15rem;
+  height: .28rem;
+  border: 1px solid rgba(255, 255, 255, .30);
+  background: rgba(0, 0, 0, .25);
+}
+#br-run {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #cfeef2;
+  transition: width .25s linear;
+}
+/* The callout. It is the only line on this HUD that says anything about the
+   world rather than about the boat, so it gets the ember colour the radio uses
+   and it is allowed to be empty for minutes at a time. */
+#br-say {
+  min-height: 1.2em;
+  font-size: .72rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ember-hi);
+  opacity: .95;
+}
+#br-hint { min-height: 1.2em; opacity: .85; }
+html.touch #brod-hud { bottom: 7.4rem; }
+
 #swim-hud {
   position: fixed;
   left: 50%;

@@ -17626,6 +17626,26 @@ async function buildJadrija(scene) {
       jettyEnd: (() => { const p = W(JET.t, -JET.out + 0.5, at(JET.t).lip);
         return [p[0], p[1], p[2]]; })(),
     },
+    /**
+     * The mole itself, for anything that has to come alongside it.
+     *
+     * Four numbers and two points, and deliberately not a berth: 59-brod.js
+     * works out where the boat lies, where you stand to get on her and where
+     * her first waypoint is, all from these — so moving the mole moves the boat
+     * with it. Same rule `swimRun` above is exported under, for the same
+     * reason: a second copy of `gapAt` in another file is a second copy that
+     * can be wrong.
+     *
+     * `root` and `head` are the centre line at either end. `w` is the
+     * half-width, so the two faces are ±w, and `out` is how far she runs from
+     * the waterline — which is where `s = 0` is and not where the concrete
+     * starts, so a berth measured off `out` is measured off the water.
+     */
+    mole: {
+      root: (() => { const p = W(JET.t, 0, JET.top); return [p[0], p[1], p[2]]; })(),
+      head: (() => { const p = W(JET.t, -JET.out, JET.top); return [p[0], p[1], p[2]]; })(),
+      top: JET.top, w: JET.w, out: JET.out, t: JET.t,
+    },
     // Kept a metre off the quay edge: the bounds are what stops a walker, and
     // stopping them exactly at the drop would let the camera hang over it.
     //

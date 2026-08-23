@@ -285,6 +285,14 @@ addEventListener('keydown', (e) => {
     goAshore();
     return;
   }
+  // And E aboard the boat, above the pause guard with the rest of them, for the
+  // reason that block gives: somebody who has stopped to read the line naming
+  // the key and then presses it should get off the boat.
+  if (e.code === 'KeyE' && state.phase === 'brod') {
+    e.preventDefault();
+    leaveBrod();
+    return;
+  }
   // While the world is stopped, only the settings answer. Cycling the camera or
   // dropping the gear against a frozen simulation puts the picture and the
   // state out of step, and the HUD is not being redrawn to tell you.
@@ -306,8 +314,10 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyE') {
     e.preventDefault();
     // Every water phase was answered above the pause guard and returned there.
-    // On this side of it there is only the aeroplane door left.
+    // On this side of it there are two doors left: the boat, if you are stood
+    // at the head of the mole with her alongside, and the aeroplane.
     if (inWater()) return;
+    if (boardBrod()) return;
     toggleGround();
   }
   // ENTER — jump.
@@ -366,7 +376,8 @@ addEventListener('keydown', (e) => {
     e.preventDefault(); toggleSwimAuto(); return;
   }
   if (state.phase === 'ground' || state.phase === 'chute'
-    || state.phase === 'swim' || state.phase === 'foil') {
+    || state.phase === 'swim' || state.phase === 'foil'
+    || state.phase === 'brod') {
     // On foot, or under a canopy, the aeroplane's controls are all meaningless
     // and several of them would quietly reconfigure an aircraft you are not
     // sitting in — or, by then, an aircraft that is a hole in a hillside.
@@ -388,7 +399,8 @@ canvas.addEventListener('click', () => {
   // Never on a touchscreen: there is no pointer to lock, and asking for it on
   // iOS throws up a permission bar over the top of the game.
   if (!IS_TOUCH && (state.phase === 'fly' || state.phase === 'ground'
-    || state.phase === 'chute' || state.phase === 'swim') && !pointerLocked) grabPointer();
+    || state.phase === 'chute' || state.phase === 'swim'
+    || state.phase === 'brod') && !pointerLocked) grabPointer();
 });
 document.addEventListener('pointerlockchange', () => {
   const had = pointerLocked;
@@ -440,6 +452,13 @@ addEventListener('mousemove', (e) => {
   if (state.phase === 'swim') {
     const g = 0.0017 * flight.p.sens * (camera.fov / baseFov);
     swim.look(e.movementX * g, e.movementY * g);
+    return;
+  }
+  // On the boat it is a head and nothing else — there is no steering to take
+  // it away from. Walking gain, because you are standing up on a deck.
+  if (state.phase === 'brod') {
+    const g = 0.0020 * flight.p.sens * (camera.fov / baseFov);
+    brod.look(e.movementX * g, e.movementY * g);
     return;
   }
   // Same again under the canopy: the mouse is your head. What the canopy does
@@ -701,7 +720,7 @@ function updateCamera(dt) {
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
   trees, landmarks, alerts, roads, rail, props, airfield, jadrija, ground, birds, eject,
   mirror, mirrorP, swim, under, seabed, arms, mask, kites, ride, foil, chase, you,
-  ao;
+  brod, ao;
 /** You plus the three wingmen, as the birds see them. Built once, in boot(). */
 let birdFlush = [];
 
@@ -795,6 +814,7 @@ async function boot() {
   seabed = buildBed(scene);
   ride = buildRide(scene);
   foil = buildFoil(scene);
+  brod = buildBrod(scene);
   chase = await buildChase(scene);
 
   await step(74, 'load.stone');
@@ -805,6 +825,10 @@ async function boot() {
   // Jadrija first: it claims the footprints it is going to rebuild in detail,
   // and the town builder has to know about that before it draws them.
   jadrija = await buildJadrija(scene);
+  // She cannot be moored until the shore has been traced, because where she
+  // lies is worked out from the mole and the mole is worked out from the
+  // waterline. Nothing else in the boat knows anything about Jadrija.
+  if (brod && jadrija) brod.moor(jadrija);
   // The one surface in the game that is a view rather than a colour. Costs a
   // dot product everywhere except stood in front of it — see `49-mirror.js`.
   if (jadrija && jadrija.vik) {
@@ -1170,9 +1194,15 @@ function setPaused(on) {
   // is the newest of the five, and the breath clock does not stop for a
   // doorbell — which is the one mode where not being able to stop it actually
   // costs you something.
+  //
+  // `brod` is on it for a harder version of the same reason. The boat to
+  // Šibenik is nine and a half minutes long and it is the only thing in this
+  // game that takes that long without asking you for anything, so it is the
+  // one most likely to be interrupted by the room you are sitting in — and a
+  // voyage that cannot be stopped is a voyage you have to watch the end of.
   if (state.phase !== 'fly' && state.phase !== 'crashing'
     && state.phase !== 'ground' && state.phase !== 'chute'
-    && state.phase !== 'swim') return;
+    && state.phase !== 'swim' && state.phase !== 'brod') return;
   if (state.paused === on) return;
   state.paused = on;
   $('pause').hidden = !on;
@@ -2629,6 +2659,29 @@ function paintFoilHud() {
 }
 
 /**
+ * The passage, and what has just gone past.
+ *
+ * Minutes remaining rather than metres run, because a passenger's question is
+ * how long is left, and because 4 469 m means nothing to anybody who has not
+ * read the file. It is computed off her *actual* speed rather than off
+ * `cruise`, so the five seconds she spends alongside before letting go read as
+ * a dash and not as a lie, and so the last three hundred metres — where she is
+ * braking — count down slower, which is what braking is.
+ */
+function paintBrodHud() {
+  if (!brod || !brod.active) return;
+  const left = Math.max(0, brod.total - brod.run);
+  const mins = brod.speed > 0.4 ? left / brod.speed / 60 : null;
+  $('br-left').textContent = mins == null ? '–' : (mins < 1 ? '<1' : Math.ceil(mins));
+  $('br-run').style.width = (sat(brod.run / (brod.total || 1)) * 100).toFixed(1) + '%';
+  const c = brod.call;
+  $('br-say').textContent = c ? T(c.key) : '';
+  $('br-hint').innerHTML = brod.phase === 'alongside'
+    ? TK('brod.ashoreHint', 'brod.ashoreHintTouch')
+    : TK('brod.hint', 'brod.hintTouch');
+}
+
+/**
  * The two numbers, the wash, and the one hint.
  *
  * The wash is the whole picture and it is a `div`. It could have been a fog
@@ -3098,6 +3151,125 @@ function dropKite(hard = false) {
 }
 
 /**
+ * E on the mole — get on the boat.
+ *
+ * There is no key of its own for this and there is not going to be one. E is
+ * the door in both halves of this game already, the board is full to the point
+ * where the keydown handler keeps a list of what is left, and standing at the
+ * head of a mole with a boat alongside is the single most obvious place in the
+ * world for "the door" to mean that boat. `canBoard` is seven metres from a
+ * mark on the mole and nothing else — see 59-brod.js.
+ */
+function boardBrod() {
+  if (state.phase !== 'ground' || !brod || !ground || !ground.ok) return false;
+  const y = ground.you;
+  if (!brod.canBoard(y.x, y.z)) return false;
+  if (!brod.enter()) return false;
+  ground.bail();
+  eject.reset();
+  // Whatever was holding the camera lets go of it here. Nothing should be — but
+  // `skipToJadrija` is a whole comment in this file about a back door that
+  // moved the player and left a dead cutscene holding the last frame, and this
+  // is a door.
+  camOverride = null;
+  state.phase = 'brod';
+  $('ground-hud').hidden = true;
+  $('hud').hidden = true;
+  $('chute-hud').hidden = true;
+  $('swim-hud').hidden = true;
+  $('brod-hud').hidden = false;
+  if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = true; $('stouch').hidden = false; }
+  if (!IS_TOUCH && !pointerLocked) grabPointer();
+  paintDeviceText();
+  toast(T('toast.onTheBoat'));
+  return true;
+}
+
+/**
+ * E aboard, and it means two different things depending on where she is.
+ *
+ * Alongside at Šibenik it is the gangway. Anywhere else on those four and a
+ * half kilometres it is **over the side**, which is the same rule every other
+ * water mode in this game obeys — you never leave the water straight on to
+ * land, the sea is the one door — read from the other end: you never leave a
+ * boat straight on to land either, unless she is tied to it.
+ */
+function leaveBrod() {
+  if (state.phase !== 'brod' || !brod) return false;
+  if (state.paused) setPaused(false);
+  return brod.phase === 'alongside' ? landAtSibenik() : overTheSide();
+}
+
+/** Off the rail, into the channel, and the swim takes it from there. */
+function overTheSide() {
+  const at = brod.where();
+  if (!swim || !swim.enter(at[0], at[2], brod.heading(), -0.5)) return false;
+  brod.leave();
+  brod.reset();
+  state.phase = 'swim';
+  $('brod-hud').hidden = true;
+  $('swim-hud').hidden = false;
+  if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = true; $('stouch').hidden = false; }
+  if (audio) audio.plunge(0.9);
+  wasUnder = false;
+  paintDeviceText();
+  toast(T('toast.overTheSide'));
+  return true;
+}
+
+/**
+ * Alongside the riva, and off her.
+ *
+ * The step-ashore mark is *walked to* rather than written down: march from the
+ * berth toward the cathedral in two-metre steps until `isSea` goes false and
+ * the ground is a hand above the water, then take three more. Which means it
+ * survives a re-bake of the coastline, and means the one number in it that is
+ * a decision — how far past the waterline you stand — is the only one.
+ *
+ * From there it is `localeAt`, which is the same machinery a parachute landing
+ * in the middle of the old town gets: a kilometre and a half of country
+ * synthesised round you with the city's own footprints as its walls. Eight
+ * hundred of them, in the densest part of Šibenik.
+ */
+function landAtSibenik() {
+  const q = brod.quay;
+  if (!q || !ground || !ground.ok) return false;
+  const K = placeNamed('katedrala');
+  let dx = (K ? K.x : q.x + 90) - q.x, dz = (K ? K.z : q.z - 30) - q.z;
+  const L = Math.hypot(dx, dz) || 1;
+  dx /= L; dz /= L;
+  let hit = null;
+  for (let d = 2; d <= 90; d += 2) {
+    const x = q.x + dx * d, z = q.z + dz * d;
+    if (!isSea(x, z) && groundAt(x, z) > 0.15) { hit = [x + dx * 3, z + dz * 3]; break; }
+  }
+  if (!hit) { toast(T('toast.noQuay')); return false; }
+  // `headingToYaw`, not a hand-rolled `atan2`. The walk model's yaw is not a
+  // compass bearing: its forward is `(-sin yaw, -cos yaw)`, so the naive
+  // `atan2(dx, -dz)` is the correct answer *mirrored about north* — which put
+  // you ashore under the cathedral facing out to sea, and only out to sea in
+  // the half of the world where the sign happened to agree.
+  const yaw = headingToYaw(dx, dz);
+  if (!ground.retarget(localeAt(hit[0], hit[1], airfield, jadrija, city))
+    || !ground.dropIn(hit[0], hit[1], yaw, true)) {
+    toast(T('toast.noQuay'));
+    return false;
+  }
+  brod.leave();
+  brod.reset();
+  state.phase = 'ground';
+  $('brod-hud').hidden = true;
+  $('hud').hidden = true;
+  $('ground-hud').hidden = false;
+  if (IS_TOUCH) { $('touch').hidden = true; $('stouch').hidden = true; $('gtouch').hidden = false; }
+  if (!IS_TOUCH && !pointerLocked) grabPointer();
+  if (audio) audio.boots();
+  paintDeviceText();
+  toast(T('toast.ashoreSibenik'));
+  return true;
+}
+
+/**
  * The other way in: you walked off the front and kept going. Same handover as
  * the canopy's, minus the canopy — and deliberately the same function on the
  * way back out, so the shore is one door and not two.
@@ -3416,7 +3588,12 @@ function updateGroundHUD(dt) {
   if (g.refilling) hint = T('ground.filling');
   else if (g.pack < 1 && g.reserve < 1) { hint = T('ground.empty'); urgent = true; }
   else if (g.pack < 1) { hint = TK('ground.dry', 'ground.dryTouch'); urgent = true; }
-  else if (g.canBoard) hint = TK('ground.board', 'ground.boardTouch');
+  // The boat first. Where she is there is no aeroplane, so the two can never
+  // both be true — but the offer that is two metres away wins over the one that
+  // is a mile away on principle rather than by luck.
+  else if (brod && brod.canBoard(ground.you.x, ground.you.z)) {
+    hint = TK('brod.board', 'brod.boardTouch');
+  } else if (g.canBoard) hint = TK('ground.board', 'ground.boardTouch');
   $('gh-hint').textContent = hint;
   $('gh-hint').className = urgent ? 'urgent' : '';
 
@@ -3878,8 +4055,17 @@ function frame() {
   // So the whole of it holds: no spread, no burn-out, no spot calls, no win and
   // no loss. Walk back to the aeroplane and the fire is where you left it, which
   // is also the only honest thing to do with a clock you have stopped.
-  recess = (state.phase === 'ground' || state.phase === 'chute') && !!jadrija
-    && jadrija.inField(camera.position.x, camera.position.z);
+  //
+  // And the boat is on the list unconditionally, which is a stronger claim than
+  // the Jadrija one and rests on the same argument. The voyage is nine and a
+  // half minutes of standing on a deck watching the channel go by; a fire that
+  // spread through all of it would end the mission somewhere off the fortress
+  // with nobody in the frame looking at it, every single time, so the side
+  // quest would be a way of losing. Get off her and the fire is where you left
+  // it — which is also the only honest thing to do with a clock you stopped.
+  recess = ((state.phase === 'ground' || state.phase === 'chute') && !!jadrija
+    && jadrija.inField(camera.position.x, camera.position.z))
+    || state.phase === 'brod';
 
   if (state.phase === 'ground') {
     // The branch, on mouse or space. The aeroplane's own input is deliberately
@@ -4040,6 +4226,26 @@ function frame() {
     updateMission(real);
   }
 
+  if (state.phase === 'brod') {
+    // She is still going in somewhere behind you, same as under the canopy.
+    if (eject.active) flyDerelict(dt);
+    const out = brod.update(dt, {
+      // The only input on her: two axes of walking her deck. There is no
+      // throttle and no wheel — see the header of 59-brod.js.
+      fwd: (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0)
+        - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0) + TOUCH.sy,
+      side: (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0)
+        - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0) + TOUCH.sx,
+      sprint: keys.has('ShiftLeft') || keys.has('ShiftRight') || TOUCH.sfast,
+    });
+    if (out === 'call' && brod.call) toast(T(brod.call.key));
+    else if (out === 'alongside') toast(T('brod.arrived'), 'good');
+    paintBrodHud();
+    // Not `updateMission`: `recess` is true for the whole voyage, and calling
+    // it would still run the clock, the score and the radio over a fire that is
+    // deliberately not moving. See the note over `recess`.
+  }
+
   if (state.phase === 'fly') {
     readKeys(dt);
     flight.update(dt, input);
@@ -4095,6 +4301,7 @@ function frame() {
   else if (state.phase === 'ground') ground.pose(camera);
   else if (state.phase === 'ride') ride.pose(camera);
   else if (state.phase === 'foil') foil.pose(camera);
+  else if (state.phase === 'brod') brod.pose(camera);
   else if (state.phase === 'swim') { swim.pose(camera); poseSwimBody(dt); }
   else if (state.phase === 'chute' || eject.active) eject.pose(camera);
   else if (state.phase !== 'intro') updateCamera(dt);
@@ -4102,6 +4309,10 @@ function frame() {
   // off where you were.
   if (state.phase === 'ride') ride.draw();
   if (state.phase === 'foil') foil.draw();
+  // The one mode that is drawn when it is *not* running: she lies at the mole
+  // whenever you are near enough to see her, which is what makes walking out
+  // there something you do on purpose. See `idle` in 59-brod.js.
+  if (brod) { if (state.phase === 'brod') brod.draw(); else brod.idle(dt, camera.position); }
   if (chase && (chase.active || chase.poised)) chase.draw(dt);
   U.uCamPos.value.copy(camera.position);
   // How deep the eye itself is, which is what dims the water rather than
@@ -4556,7 +4767,7 @@ function frame() {
     // something, which is right if that was the end of you and wrong if you
     // walked away from it — see the note on `dead` in 80-audio.js.
     afoot: state.phase === 'ground' || state.phase === 'chute'
-      || state.phase === 'swim',
+      || state.phase === 'swim' || state.phase === 'brod',
   });
 
   if (state.phase === 'ground') {
@@ -4869,6 +5080,8 @@ window.__fr = {
     at: (d, inside = false) => { audio.shore(d, inside); return audio.shoreStats(); },
     /** Likewise the water at the edge, which is metres to the coastline. */
     lap: (d) => { audio.lapping(d); return audio.shoreStats(); },
+    /** And the rows: 0 out on the promenade, 1 in the alley. */
+    rows: (k) => { audio.kabine(k); return audio.shoreStats(); },
     beds: () => audio.beds(),
     fire: () => audio.fireStats(),
     /** The beat on its own, without having to soak her for sixteen seconds. */
@@ -5173,6 +5386,58 @@ window.__fr = {
       return { ...foil.stats(), out };
     },
   },
+  brod: {
+    stats: () => (brod ? brod.stats() : null),
+    raw: () => brod,
+    /** Get on her without walking out to the mole first. */
+    go: () => {
+      if (!brod || !brod.enter()) return null;
+      if (ground && ground.ok && state.phase === 'ground') ground.bail();
+      camOverride = null;
+      state.phase = 'brod';
+      for (const id of ['hud', 'ground-hud', 'chute-hud', 'swim-hud', 'ride-hud',
+        'foil-hud']) $(id).hidden = true;
+      $('brod-hud').hidden = false;
+      paintBrodHud();
+      return brod.stats();
+    },
+    /**
+     * Step the voyage without the frame loop, for the same reason the foil has
+     * one: software GL runs at a few frames a second and this passage is nine
+     * and a half minutes long, so nothing about it can be checked in real time.
+     */
+    tick: (secs, dtStep = 1 / 30, ctl = {}) => {
+      if (!brod || !brod.active) return null;
+      let out = null;
+      for (let t = 0; t < secs; t += dtStep) out = brod.update(dtStep, ctl) || out;
+      brod.pose(camera);
+      paintBrodHud();
+      return { ...brod.stats(), out };
+    },
+    /** Jump to a point on the passage, in metres run, and look at the world. */
+    at: (m) => {
+      if (!brod) return null;
+      camOverride = null;
+      if (!brod.active) {
+        if (!brod.enter()) return null;
+        if (ground && ground.ok && state.phase === 'ground') ground.bail();
+        state.phase = 'brod';
+        for (const id of ['hud', 'ground-hud', 'chute-hud', 'swim-hud', 'ride-hud',
+          'foil-hud']) $(id).hidden = true;
+        $('brod-hud').hidden = false;
+      }
+      brod.seek(m);
+      // Several steps rather than one: `place` *chases* the attitude, so a
+      // single frame after a teleport of four kilometres leaves her flat.
+      for (let i = 0; i < 30; i++) brod.update(0.05, {});
+      brod.pose(camera);
+      paintBrodHud();
+      return brod.stats();
+    },
+    /** The two ends, so a shot can be set up against them. */
+    marks: () => (brod ? { dock: brod.dock, berth: brod.berth, quay: brod.quay,
+      total: brod.total } : null),
+  },
   swim: {
     stats: () => (swim ? swim.stats() : null),
     raw: () => swim,
@@ -5432,6 +5697,7 @@ window.__fr = {
     mask: mask && mask.on ? 1 : 0,
     ride: ride && ride.active ? 1 : 0,
     foil: foil && foil.active ? 1 : 0,
+    brod: brod && brod.active ? 1 : 0,
     // The one that has been lying to everybody: what `ground.wet()` is
     // reporting right now, whether or not anybody has walked anywhere.
     wet: ground && ground.wet ? ground.wet() : null,
@@ -5439,7 +5705,7 @@ window.__fr = {
     cut: chaseCut ? 1 : 0,
     cam: camOverride ? 1 : 0,
     hud: ['hud', 'ground-hud', 'swim-hud', 'ride-hud', 'foil-hud', 'chase-hud',
-      'chute-hud', 'under', 'stouch']
+      'brod-hud', 'chute-hud', 'under', 'stouch']
       .filter((id) => $(id) && !$(id).hidden),
     at: [+camera.position.x.toFixed(1), +camera.position.y.toFixed(2),
       +camera.position.z.toFixed(1)],

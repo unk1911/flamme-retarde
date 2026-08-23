@@ -50,7 +50,7 @@ On foot at the airfield:
 | `W` `A` `S` `D` | walk |
 | `shift` | run |
 | `SPACE` / left click | **open the branch** |
-| `E` | climb back in — stand next to the aeroplane |
+| `E` | climb back in — stand next to the aeroplane · **or board the boat**, at the head of the Jadrija mole |
 
 Under the canopy:
 
@@ -156,6 +156,37 @@ the world loads rather than typed in, so it cannot drift off the coast if the
 terrain is ever re-baked. It is the same shape of frame the aerodrome uses, which
 is what lets the on-foot mode walk here without knowing where "here" is. You can
 walk 135 m inland, and the huts and every house are solid.
+
+### The boat to Šibenik
+
+At the head of the Jadrija mole there is a boat lying alongside with her engine
+ticking over: fifteen and a half metres of wooden Dalmatian passenger boat,
+white with a dark strake along the sheer and a gold line under it. Walk out to
+her and press `E`, and she takes you to Šibenik.
+
+**It is the one thing in this game that is not the fire.** You do not steer her
+— a scheduled boat is not a vehicle you are given, it is a vehicle you are on —
+and there is nothing to do for the next nine and a half minutes except walk her
+deck and look at where you are. Which is the point: everything the rest of the
+game is flown over at three hundred metres goes past at eye height.
+
+The route is not drawn by hand. It is a minimum-clearance path through the same
+land-cover raster the fire reads its fuel from, run from the mole to the town
+quay and then smoothed — thirty-one waypoints, 4 469 m, eight to thirty-five
+metres of water under it the whole way. It leaves Jadrija to the south, rounds
+Rt Jadrija with the lighthouse 184 m to port, passes **Tvrđava svetog Nikole**
+104 m to starboard — the sixteenth-century artillery fort on its islet, and that
+is the hand it passes on coming in from the sea — turns up into **Kanal svetog
+Ante**, runs the narrows where there are two hundred metres of water and karst
+both sides, and comes alongside the riva at Šibenik eighty-six metres from the
+cathedral. She heels and pitches on the actual wave surface, sampled at her four
+corners.
+
+`E` again gets you off her: at Šibenik that is the gangway and you carry on on
+foot under the cathedral; anywhere else on those four and a half kilometres it
+is over the side, and you are swimming. The fire does not spread while you are
+aboard — a side quest that ends your mission from somewhere off the fortress,
+every time, is a way of losing rather than a thing to do.
 
 ### On foot
 
