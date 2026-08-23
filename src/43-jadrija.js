@@ -4982,7 +4982,13 @@ async function buildJadrija(scene) {
     const velS = new Float32Array(n);
     const velT = new Float32Array(n);
     const tmp = new Float32Array(n);
-    let prevT = null, prevS = null, cool = 0, phase = 0;
+    // Where each thing that can part this curtain was standing last frame,
+    // keyed by what it is. It used to be one pair of numbers, because the
+    // player was the only mover the solver had ever been given — so the beads
+    // hung dead still while she walked in to pour a drink and the dog trotted
+    // out under them. A doorway does not care who is coming through it.
+    const prev = new Map();
+    let cool = 0, phase = 0;
 
     function write() {
       let o = 0;
@@ -5006,37 +5012,33 @@ async function buildJadrija(scene) {
     write();
 
     /**
-     * @param t,s  where you are, in the resort's frame
-     * @param d    how far away you are, for the sound and for the gate
-     * @param y    and how high, world frame — or null for "do not ask"
+     * One mover against the curtain: the crossing, and the contact while it is
+     * standing in the strands.
      *
-     * `d` is measured flat, in (t, s), because everything else here is: it is
-     * the gate on the solver and the range on the sound and neither wants a
-     * height in it. But a Canadair passing over the kabine is at (t, s) zero
-     * from this doorway too, and the crossing test below is deliberately a test
-     * of the *segment* you moved along — which is exactly what a hundred metres
-     * of aeroplane a frame does. So the height is asked for as well, and the
-     * only thing it is used for is to say that you are in the opening rather
-     * than over the roof of it. `null` skips the question, for the debug hook,
-     * which drives the curtain with no camera at all.
+     * `who` is a key and nothing more. It says whose last position this one is
+     * a step from, so that two things in the doorway at the same time — you on
+     * your way out and the dog on his way in — cannot read each other's stride
+     * as their own and produce one impossible six-metre step between them.
+     *
+     * `y` is world height, or `null` for "do not ask". Only one mover here has
+     * ever needed asking, and the gate below says why.
      */
-    function step(t, s, d, dt, y = null) {
-      if (d > 26) { prevT = prevS = null; return 0; }
+    function part(who, t, s, y, h) {
+      const p = prev.get(who);
+      const wasT = p ? p[0] : null, wasS = p ? p[1] : null;
+      if (p) { p[0] = t; p[1] = s; } else prev.set(who, [t, s]);
       // In the doorway, vertically. This is not a fit — it is a test for "on
       // the ground here" against "over the top of the row", and the two are
       // tens of metres apart, so it is drawn wide on purpose. A walker's eye is
       // 1.62 m up a 1.98 m opening, and the ground in front of the kabine is
       // not level with their floor; a gate cut close to the head of the opening
       // would turn a slope of a foot into silence.
+      //
+      // She and the dog pass `null`, and it is not laziness: the gate exists so
+      // that a Canadair overhead, which is at (t, s) zero from this doorway
+      // too, does not part a bead curtain from four hundred feet. Neither of
+      // them can leave the ground.
       const inHole = y == null || (y < yTop + 1.2 && y > yTop - 3.4);
-      const h = Math.min(dt, 0.05);
-      const vs = prevS == null ? 0 : (s - prevS) / h;
-      const vt = prevT == null ? 0 : (t - prevT) / h;
-      const wasS = prevS, wasT = prevT;
-      prevT = t; prevS = s;
-      // Are you in the doorway at all. Half a metre either side of the strands,
-      // which is a shoulder and an arm.
-      const through = inHole && s > sHang - 0.55 && s < sHang + 0.55;
 
       /**
        * The crossing itself.
@@ -5071,6 +5073,9 @@ async function buildJadrija(scene) {
           // never silent and running through is never more than running
           // through. 3.0 m/s is a shade under the walk.
           const hard = clamp(Math.abs(s - wasS) / h / 3.0, 0.45, 1);
+          // `dx` is where across the doorway it happened, and the sound is
+          // panned off it — which is right whoever went through, because it is
+          // a property of the door and not of the ear.
           if (audio) audio.beadShove(hard, dx);
           // And give the strands the shove as well, not only the ear. Without
           // this the tail after walking *in* is whatever eight frames of
@@ -5087,23 +5092,55 @@ async function buildJadrija(scene) {
           cool = 0.10;
         }
       }
+
+      // And the contact, for as long as it is against the strands. Half a metre
+      // either side of them, which is a shoulder and an arm.
+      if (!inHole || s <= sHang - 0.55 || s >= sHang + 0.55) return;
+      const vs = wasS == null ? 0 : (s - wasS) / h;
+      const vt = wasT == null ? 0 : (t - wasT) / h;
+      for (let i = 0; i < n; i++) {
+        const t0 = K.dc - K.dj + gap * (i + 0.5);
+        const dd = Math.abs(t - t0);
+        if (dd >= BEAD.reach) continue;
+        // Driven toward your speed while you are against it, rather than
+        // kicked once per frame — which is both what contact does and the
+        // only way the result does not depend on the frame rate.
+        const w = Math.min(1, (1 - dd / BEAD.reach) * 1.6) * Math.min(1, h * BEAD.grip);
+        velS[i] += (clamp(vs, -5, 5) * BEAD.push - velS[i]) * w;
+        velT[i] += (clamp(vt, -5, 5) * BEAD.push * 0.5 - velT[i]) * w;
+      }
+    }
+
+    /**
+     * @param t,s    where you are, in the resort's frame
+     * @param d      how far away you are, for the sound and for the gate
+     * @param y      and how high, world frame — or null for "do not ask",
+     *               which is what the debug hook passes: it drives the curtain
+     *               with no camera at all
+     * @param others everything else that can part it this frame: triples of
+     *               `[key, t, s]`, ground-bound, so they carry no height
+     *
+     * `d` is measured flat, in (t, s), because everything else here is: it is
+     * the gate on the solver and the range on the sound and neither wants a
+     * height in it.
+     *
+     * The gate stays on YOU and not on the movers, deliberately. Past 26 m the
+     * doorway is a hand's width of screen and nothing that happens in it is
+     * worth forty-five strands of solver a frame — so if she walks in while you
+     * are at the far end of the promenade, the curtain neither swings nor
+     * sounds, and there is nobody there to know it. `prev` is cleared with it,
+     * because a segment measured across that gap is not a step anybody took.
+     */
+    function step(t, s, d, dt, y = null, others = null) {
+      if (d > 26) { prev.clear(); return 0; }
+      const h = Math.min(dt, 0.05);
+      part('you', t, s, y, h);
+      if (others) for (const o of others) part(o[0], o[1], o[2], null, h);
       phase += h;
       const air = BEAD.stir * Math.sin(phase * 1.7);
       let din = 0;
       for (let i = 0; i < n; i++) tmp[i] = angS[i];
       for (let i = 0; i < n; i++) {
-        if (through) {
-          const t0 = K.dc - K.dj + gap * (i + 0.5);
-          const dd = Math.abs(t - t0);
-          if (dd < BEAD.reach) {
-            // Driven toward your speed while you are against it, rather than
-            // kicked once per frame — which is both what contact does and the
-            // only way the result does not depend on the frame rate.
-            const w = Math.min(1, (1 - dd / BEAD.reach) * 1.6) * Math.min(1, h * BEAD.grip);
-            velS[i] += (clamp(vs, -5, 5) * BEAD.push - velS[i]) * w;
-            velT[i] += (clamp(vt, -5, 5) * BEAD.push * 0.5 - velT[i]) * w;
-          }
-        }
         const l = i > 0 ? tmp[i - 1] : tmp[i];
         const r = i < n - 1 ? tmp[i + 1] : tmp[i];
         velS[i] += (-BEAD.spring * Math.sin(angS[i] - air)
@@ -10199,8 +10236,18 @@ async function buildJadrija(scene) {
     // this room you can hear and see from the promenade, and it is still moving
     // for a second or two after you have gone through and stopped being near.
     if (beads) {
+      // Everything else in this resort that can go through that door. Both of
+      // them walk the same three marks at t = K.dc — `moveDog`'s legs and hers
+      // — so both cross the strands square on, and both used to do it in
+      // silence with the curtain hanging dead still behind them. Built fresh
+      // each frame because it is at most two entries and never survives one.
+      const with_ = [];
+      if (show && skinFig && skinFig.mesh.visible) {
+        with_.push(['her', show.t, show.s]);
+      }
+      if (dog && dog.mesh.visible) with_.push(['dog', dog.at[0], dog.at[1]]);
       beads.step(pt, ps,
-        Math.hypot(pt - K.dc, ps - (K.face + 0.075)), dt, camY);
+        Math.hypot(pt - K.dc, ps - (K.face + 0.075)), dt, camY, with_);
     }
     // Kept outside the near gate below, because a radio you can hear from the
     // promenade is most of what makes anybody walk over and look through the

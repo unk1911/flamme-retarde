@@ -268,6 +268,25 @@ as of this writing; the state of each is in the git log, not here.
       reaches t 565 of 572 — every remaining stop names a bench, a bather, a
       parasol pole, a pine, a hut row or a house. Census unchanged.
 
+- [x] The beads only sounded for YOU. Misha, 23 Aug: "when NPC baye walks
+      in/out or when the NPC doggie walks through it, it doesn't make the beed
+      sound, but it should make a sound regardless of who is walking thru it."
+      The solver held one pair of previous coordinates, because the player was
+      the only mover it had ever been handed — so she walked in to pour a drink
+      and he trotted out under a curtain hanging dead still. `beadCurtain` keeps
+      a `prev` keyed by who now, and `step` takes the others alongside you; the
+      crossing test and the contact drive both moved into a `part(who, ...)`
+      that runs once per mover. Both of them walk the same three marks at
+      t = K.dc — `moveDog`'s legs and hers — so both cross square on, dx 0.00.
+      They pass `null` for height: the gate exists so a Canadair overhead does
+      not part a bead curtain from four hundred feet, and neither of them can
+      leave the ground. Measured with the player standing still on the floor of
+      the hut and never moving: five shoves in forty-five seconds, hers in at
+      15.5 s, his in at 22.0, the player's own teleport out at 25.8 (hard 1.00,
+      so no regression there), hers out at 27.8 and his out at 30.1. Swing
+      peaks 0.49 and 0.40 on the two NPC crossings against 0.02 idle, rattles
+      0 to 23. fps 61, census unchanged, no errors.
+
 **Verify**
 - [ ] Knee-height close-up pass on the clutter — sandals, dropped towels,
       slumped bags. They are 25 cm objects and have never resolved in a shot
