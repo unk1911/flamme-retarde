@@ -274,8 +274,14 @@ as of this writing; the state of each is in the git log, not here.
       from 15 m.
 
 **Mine**
-- [ ] v595: 218 of 220 frames unread.
-- [ ] v597: ~179 of 189 frames unread.
+- [x] v595 and v597, all 409 frames, 23 Aug. The catalogue is
+      `plan/survey-v59x.md`: seventeen objects that are in the footage and not
+      in the game, ranked, each against the frame that shows it best, plus the
+      ones checked and found already built. Four of them are built — see
+      SURVEY below. The other thirteen are ordered in that file and the top of
+      the unbuilt list is the green steel picket fence on a rubble wall
+      (`b_026`, `b_050`, `a_154`), which is a fourth boundary treatment and
+      the loudest colour in the lane.
 
 **Tidy**
 - [ ] `menuWall()` is dead code, not a render bug — nothing in `SHOPS` sets
@@ -346,6 +352,34 @@ as of this writing; the state of each is in the git log, not here.
   translucent corrugated roof on green steel over the side terrace.
 - ~~**b_016** green mesh fence panels~~ — built 22 Aug. Position along the
   shore is a placement, not a measurement: v597 has no GPS.
+- ~~**a_192 / b_026** the wood-edge kerb blocks~~ — built 23 Aug, and it is
+  the biggest thing either walk-through had: sixty-odd frames of both videos
+  are looking straight down a run of short freestanding sawn-stone walls at
+  the edge of the made surface. 2.6 m of wall, a metre of gap, four courses
+  under one cap beam, 0.58 m tall, level in itself and stepping to the next.
+  They go on `walkTo`, which is where the game's own paving stops, so `s` is a
+  reading; which arc lengths have one is a placement. **No collider**, and the
+  reason is a number worth keeping: `GROUND.girth` is 0.55 and `confine` adds
+  it to every half-extent, so a 1.05 m gap comes out 0.00 m wide and this
+  would be five hundred metres of sealed wall across the band the crowd, the
+  cars and the walker all cross. The `b_016` note above refers to "a low kerb
+  at the edge of the needle floor"; that is this, and until now it was not
+  there — the fence panels were leaning on nothing.
+- ~~**b_003** ZABRANJENO ODLAGANJE OTPADA~~ — built 23 Aug at t 138, a
+  placement. The wording is transcribed and the pictograms are three dark
+  shapes in three red rings, because three dark shapes in three red rings is
+  what the frame supports.
+- ~~**b_007** the wood is camped in~~ — built 23 Aug, six pitches between
+  t 44 and t 162, placements. Pop-up dome tents with the mouth turned to the
+  water, folding recliners, white monobloc chairs, towels. The wood had
+  fifty-two cars in it and nothing else.
+- ~~**b_068 / b_070** the tavern trailer~~ — built 23 Aug at t 190, a
+  placement. A polished round-ended catering trailer with the serving doorway
+  in its END, a flue off the barrel roof, a blue tarpaulin over a stack, one
+  crimson parasol over a poseur table and three red-topped stools. The only
+  curved metal object in four hundred frames of survey. No name on any of it:
+  the parasol carries a beer brand in the frame and the A-board a product, and
+  blank is the only reading of rule 12 that cannot be wrong.
 - ~~**a_160** kayaks/pedalos and the white box trailer~~ — the hulls went in
   with the bank armouring; the trailer was built 22 Aug.
 
@@ -387,7 +421,10 @@ as of this writing; the state of each is in the git log, not here.
   and check the `site:` line it prints on stderr against the census sentinel
   before trusting a single row. The stale table is kept as `geotag.tsv.stale-189m.bak`.
 - v595 (inland walk) 220 frames, v597 (lane and tree line) 189 frames —
-  `~/fr-video/survey/v59{5,7}`, extracted from `/mnt/c/tmp/refs/jadrija/`
+  `~/fr-video/survey/v59{5,7}`, extracted from `/mnt/c/tmp/refs/jadrija/`.
+  One frame every 2.00 s of each walk (439.2 s and 377.2 s), shot portrait so
+  the frames are 1600x2844. **All 409 read, 23 Aug** — the catalogue of what
+  is in them and not in the game is `plan/survey-v59x.md`.
 - Report: https://claude.ai/code/artifact/6b992f51-c846-414a-8819-3d939d4a6d37
 
 ## MECHANICS
