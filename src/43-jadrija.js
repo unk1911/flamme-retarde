@@ -6243,7 +6243,13 @@ async function buildJadrija(scene) {
   // ice-cream errand is set on, and it holds sixty. The ladder stays, because
   // it costs nothing at this count and is what makes a larger one arguable
   // later — the number to re-measure next is thirty.
-  const SKIN_CAST = 20;
+  //
+  // Re-measured, and it is twenty-four. Uncapped at 1280x720 over 95 frames at
+  // the three promenade stations: 16.1 / 10.6 / 10.4 ms against 15.9 / 10.2 /
+  // 9.9 at twenty, which is inside the noise. Thirty is 16.8 / 11.1 / 11.2 and
+  // that first number is over the 16.7 ms a 60 fps frame has, so twenty-four
+  // is the ceiling rather than a stop on the way to more.
+  const SKIN_CAST = 24;
   // And on top of those, the café terraces.
   //
   // Reported 22 Aug, of the tables: "replace those marionettes with our high
