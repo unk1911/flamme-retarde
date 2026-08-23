@@ -147,11 +147,12 @@ to follow how hard the strands are still swinging.
 
 ### The crowd's voices — synthesised, not recorded
 
-`build/payload/bump_{yo,walkin,goin}_{m,f}.mp3` are six short lines — three, in
-a man's voice and a woman's — spoken by somebody you have walked into on the
+`build/payload/bump_*_{m,f}.mp3` are thirty-two short lines — sixteen, in a
+man's voice and a woman's — spoken by somebody you have walked into on the
 promenade. They were generated with ElevenLabs text-to-speech on 23 August 2026
-from wording written for this game, using two of that service's stock voices.
-No person said them and no recording of a person is in them.
+from wording written for this game, using two voices from that service's shared
+library, `Pauly - Brooklyn Wise Guy` and `Brooklyn - African American New
+Yorker`. No person said them and no recording of a person is in them.
 
 The wording is mine and the licence above covers it. What ElevenLabs grants over
 its own output is a matter between the account holder and ElevenLabs, and this

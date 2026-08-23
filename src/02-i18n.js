@@ -254,12 +254,28 @@ const STRINGS = {
     'bump.excuse': 'uhm... excuuuuse me!',
     'bump.hey': 'hey — watch it!',
     'bump.ow': 'ow!',
-    // The three that are said OUT LOUD — build/payload/bump_*.mp3. The text is
-    // what the recording says, word for word, because a balloon that disagrees
-    // with the voice under it is worse than either alone.
-    'bump.yo': 'yo! watch it!',
+    // The sixteen that are said OUT LOUD — build/payload/bump_*.mp3, in a
+    // Brooklyn man's voice and a Brooklyn woman's. The English text is what the
+    // recording says WORD FOR WORD, because a balloon that disagrees with the
+    // voice under it is worse than either alone. The three above are no longer
+    // drawn; they are kept because they are still what these would say in a
+    // language the recording does not speak.
+    'bump.watchit': 'yo! watch it!',
     'bump.walkin': "hey — i'm walkin' here!",
     'bump.goin': "yo, where d'you think you're goin', bro?",
+    'bump.blind': "ay! you blind or somethin'?",
+    'bump.easy': 'whoa, whoa, whoa. easy, pal.',
+    'bump.beach': 'hey! plenty of beach, buddy.',
+    'bump.eyes': 'hey — eyes up, champ.',
+    'bump.fuhged': 'fuhgeddaboudit.',
+    'bump.standin': "ay, i'm standin' here!",
+    'bump.invisible': "what, i'm invisible now?",
+    'bump.hurry': "you in a hurry or somethin'?",
+    'bump.space': 'yo. personal space. look it up.',
+    'bump.knowyou': 'ay! do i know you?',
+    'bump.righthere': "c'mon, i'm right here!",
+    'bump.again': 'again? seriously?',
+    'bump.kiddinme': "you kiddin' me with this?",
 
     // The gameplay recorder — src/92-clip.js. No <b> in the two toasts, unlike
     // most of the strings around here that name a key: `toast()` sets
@@ -599,11 +615,25 @@ const STRINGS = {
     'bump.hey': 'hej — pazi malo!',
     'bump.ow': 'joj!',
     // Translated, and the recording under them stays English — see the note in
-    // 80-audio.js. A Croatian balloon over an American voice is the lesser of
-    // the two mismatches available.
-    'bump.yo': 'ej! pazi!',
+    // 80-audio.js. A Croatian balloon over a Brooklyn voice is the lesser of the
+    // two mismatches available: the alternative is thirty-two more clips and a
+    // second voice cast, for four words apiece.
+    'bump.watchit': 'ej! pazi!',
     'bump.walkin': 'ej — hodam ovdje!',
     'bump.goin': 'ej, kamo si to krenuo, stari?',
+    'bump.blind': 'ej! jesi slijep?',
+    'bump.easy': 'polako, polako. smiri se.',
+    'bump.beach': 'ej! ima plaže napretek.',
+    'bump.eyes': 'ej — gledaj kuda ideš.',
+    'bump.fuhged': 'ma daj, zaboravi.',
+    'bump.standin': 'ej, ja tu stojim!',
+    'bump.invisible': 'što sam ja, nevidljiv?',
+    'bump.hurry': 'kud žuriš?',
+    'bump.space': 'ej. malo prostora, može?',
+    'bump.knowyou': 'ej! poznajemo se?',
+    'bump.righthere': 'ma daj, tu sam!',
+    'bump.again': 'opet? ozbiljno?',
+    'bump.kiddinme': 'zezaš me?',
 
     // the gameplay recorder — src/92-clip.js
     'clip.rec': 'snima',
@@ -925,9 +955,22 @@ const STRINGS = {
     'bump.excuse': 'euh... pardooooon !',
     'bump.hey': 'hé — attention !',
     'bump.ow': 'aïe !',
-    'bump.yo': 'hé ! attention !',
-    'bump.walkin': "hé — je marche, moi !",
+    'bump.watchit': 'hé ! attention !',
+    'bump.walkin': 'hé — je marche, moi !',
     'bump.goin': 'hé, tu vas où comme ça, mec ?',
+    'bump.blind': 'eh ! t\'es aveugle ou quoi ?',
+    'bump.easy': 'oh là, oh là. du calme.',
+    'bump.beach': 'hé ! y a de la plage, pourtant.',
+    'bump.eyes': 'hé — regarde devant toi.',
+    'bump.fuhged': 'laisse tomber, va.',
+    'bump.standin': 'eh, je suis debout là !',
+    'bump.invisible': 'quoi, je suis invisible ?',
+    'bump.hurry': 'tu es pressé ou quoi ?',
+    'bump.space': 'hé. un peu d\'espace, non ?',
+    'bump.knowyou': 'eh ! on se connaît ?',
+    'bump.righthere': 'oh, je suis juste là !',
+    'bump.again': 'encore ? sérieux ?',
+    'bump.kiddinme': 'tu te fous de moi ?',
 
     // the gameplay recorder — src/92-clip.js
     'clip.rec': 'rec',

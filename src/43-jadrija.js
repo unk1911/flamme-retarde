@@ -15097,9 +15097,17 @@ async function buildJadrija(scene) {
     hold: 2.30,        // s it stays there, which is also how long the line is up
     back: 0.85,        // s letting it go again, slower than it came
     reach: 1.05,       // rad, the most a neck does before a body has to follow
-    cool: 5.0,         // s before anybody on this beach says anything again
+    // Was 5.0 / 0.55 before the sixteen lines went in. With three recorded
+    // lines out of seven and a coin-flip on top, barging down a full
+    // promenade produced silence more often than not — which is what
+    // "they don't say nuthin" was. With sixteen there is no repetition to
+    // protect against, so the gate can come down to where being walked into
+    // reliably gets an answer. The per-person 14 s is UNCHANGED: the same
+    // person snapping at you twice in a row is the thing that would read as
+    // a machine.
+    cool: 2.2,         // s before anybody on this beach says anything again
     again: 14.0,       // s before the *same* person does
-    says: 0.55,        // the share of people who speak rather than only look
+    says: 0.82,        // the share of people who speak rather than only look
     // How high over their own feet the balloon hangs. Standing, sitting in a
     // chair on a terrace, and lying on a lounger — which is in here for
     // completeness rather than because it happens, since a sunbather is behind
@@ -15114,19 +15122,28 @@ async function buildJadrija(scene) {
    * the first one again — a crowd with one line in it is a crowd with a tape
    * recorder in it.
    */
-  // Seven entries and not four, and the weighting is the point. "uhm...
-  // excuuuuse me!" is still twice as likely as anything else, because most
-  // people on a crowded promenade apologise for being walked into even when it
-  // was not their fault. The three added on 23 Aug are the ones who do not:
-  // Misha asked for them in his own words — "like being pissed and saying 'yo,
-  // watch it!', or with italian NYC brooklyn pissed-off accent, 'hey, i'm
-  // walkin' here!'" — and those three are the ONLY ones with a recorded voice
-  // under them, which is why they are the loud ones. Somebody muttering "uhm,
-  // excuse me" is muttering it. Three in seven bark; the rest just look at you.
-  const EXCUSE = ['bump.excuse', 'bump.excuse', 'bump.hey', 'bump.ow',
-    'bump.yo', 'bump.walkin', 'bump.goin'];
-  /** Which of them have a clip in the payload, and under what name. */
-  const BARK = { 'bump.yo': 'yo', 'bump.walkin': 'walkin', 'bump.goin': 'goin' };
+  // Sixteen lines, and every one of them has a voice.
+  //
+  // The first cut had seven, of which three were recorded and four were polite.
+  // Misha, having played it: "they do turn their heads, but they don't say
+  // nuthin... they should say something out loud in pissed off BKLYN accent ..
+  // u can cycle through like 16 different annoying responses." Both halves of
+  // that are the same bug. Only three in seven had a clip, and on top of that
+  // sat a 55 % chance of speaking at all and a five-second global cooldown — so
+  // shoving your way down a crowded promenade produced silence far more often
+  // than not, and what you heard was the head turn.
+  //
+  // So the polite three are gone from the pool and all sixteen are recorded.
+  // `bump.excuse`, `bump.hey` and `bump.ow` keep their translations because
+  // they are still what a *balloon* would say in a language the voice does not
+  // speak — see the note over `bark` in 80-audio.js — but nobody draws them.
+  const EXCUSE = ['bump.watchit', 'bump.walkin', 'bump.goin', 'bump.blind',
+    'bump.easy', 'bump.beach', 'bump.eyes', 'bump.fuhged', 'bump.standin',
+    'bump.invisible', 'bump.hurry', 'bump.space', 'bump.knowyou',
+    'bump.righthere', 'bump.again', 'bump.kiddinme'];
+  /** Every one of them has a clip, in both voices. `bump.x` -> `bump_x_{m,f}`. */
+  const BARK = {};
+  for (const k of EXCUSE) BARK[k] = k.slice(5);
   const looking = [];        // the figures with a head part-way round
   let bumpBalloon = null;    // made on the first bump and never again
   let bumpSaid = null;       // { fg, t } while a line is up

@@ -463,20 +463,27 @@ function buildAudio() {
   /**
    * The line the crowd says out loud when you barge into them.
    *
-   * Six clips, `build/payload/bump_{yo,walkin,goin}_{m,f}.mp3` — three lines in
-   * a man's voice and a woman's, because half this beach is women and one voice
-   * for everybody would be one person following you around. Synthesised with
-   * ElevenLabs on 23 Aug to Misha's own wording, trimmed to the speech, levelled
-   * to -20 dBFS RMS and cut to 24 kHz mono to sit with the field recordings —
-   * the same treatment beads.mp3 got, for the same reason: a clip at a
-   * different rate is the cleanest thing in the mix and reads as an import.
+   * Thirty-two clips: sixteen lines in a man's voice and a woman's, because
+   * half this beach is women and one voice for everybody would be one person
+   * following you around. Trimmed to the speech, levelled to -20 dBFS RMS and
+   * cut to 24 kHz mono to sit with the field recordings — the same treatment
+   * beads.mp3 got, for the same reason: a clip at a different rate is the
+   * cleanest thing in the mix and reads as an import. 298 KB the lot.
    *
-   * ONLY THREE OF THE SEVEN LINES ARE SPOKEN, and that is the design rather
-   * than a shortfall. `EXCUSE` in 43-jadrija.js also holds "uhm... excuuuuse
-   * me!", "hey — watch it!" and "ow!", and somebody who says "uhm, excuse me"
-   * says it under their breath. The ones with a voice are the ones who are
-   * annoyed enough to use it, so about three people in seven bark at you and
-   * the rest just look.
+   * The voices are ElevenLabs' `Pauly - Brooklyn Wise Guy` and `Brooklyn -
+   * African American New Yorker`, both from the shared library and both usable
+   * without adding anything to the account — which is worth recording, because
+   * the first cut used two stock American voices and Misha's note on hearing
+   * them was that he wanted "pissed off BKLYN accent... using a brooklyn actor
+   * voice". Neither is a person reading for this game; they are that service's
+   * voices saying wording written for it.
+   *
+   * Sixteen and not three, and every one of them recorded. The first cut voiced
+   * three of seven lines and left four polite ones silent, which was a defensible
+   * design and did not survive contact: with a 55 % chance of speaking and a
+   * five-second global cooldown over the top, most shoves produced no sound at
+   * all and what you got was the head turn. Sixteen lines is enough that nothing
+   * repeats, which is what lets the gates come down — see `BUMP` over there.
    *
    * The recording is English in every language. The balloon over it is
    * translated, which is a mismatch, and it is the smaller of the two on
@@ -484,8 +491,11 @@ function buildAudio() {
    * more languages for four words apiece. Said out loud here rather than left
    * for somebody to discover.
    */
-  const BARKS = ['bump_yo_m', 'bump_yo_f', 'bump_walkin_m', 'bump_walkin_f',
-    'bump_goin_m', 'bump_goin_f'];
+  const BARK_LINES = ['watchit', 'walkin', 'goin', 'blind', 'easy', 'beach',
+    'eyes', 'fuhged', 'standin', 'invisible', 'hurry', 'space', 'knowyou',
+    'righthere', 'again', 'kiddinme'];
+  const BARKS = [];
+  for (const l of BARK_LINES) BARKS.push('bump_' + l + '_m', 'bump_' + l + '_f');
   const barkBuf = {};
 
   /** Ask for all six before anybody is walked into. See `beadWarm`. */
