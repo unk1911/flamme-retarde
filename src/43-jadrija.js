@@ -4608,6 +4608,197 @@ async function buildJadrija(scene) {
   centenary(212, 22.0, 2.6, 1.5, at(212).deck + 1.15, { bg: '#e8e2cc' });
   laneGate(486, 30.6);
 
+  /**
+   * A garden boundary at the back of the wood, and it is A PLACEMENT.
+   *
+   * `20260823_112051` is the fourth of the four photographs of 23 August. It
+   * is taken from inside the pine stand, standing on the crushed-limestone
+   * floor with people camped on towels a few metres away, looking inland at
+   * where the wood stops. What stops it is four things, one behind the next:
+   *
+   *   a wall of irregular limestone SLABS, mortared, wide pale joints, about a
+   *   metre out of the floor and stepping up as the ground rises — not the
+   *   rounded field rubble of the approach piers and not the sawn ashlar of
+   *   the west end, but broad flat plates laid every way, which is a third
+   *   masonry on this shore and the loudest of the three at close range;
+   *
+   *   a wide double GATE of vertical round bars in the gap, taller than the
+   *   wall, in a warm brass-gold that is either metallic paint or a very old
+   *   coat of it, with dry grass growing through the foot of it;
+   *
+   *   a railing of black bars standing ON the wall east of the gate, with
+   *   heavier square posts at its ends;
+   *
+   *   and behind all of it a clipped evergreen hedge a good two metres tall,
+   *   with the first floor of a rendered house showing over the top.
+   *
+   * The photograph carries NO GPS — none of the four do; they are Galaxy S24
+   * frames with the location off. So this is placed and not surveyed, and the
+   * placement is stated here rather than implied: t 224 to 239.5 at s 40.4,
+   * which is the seaward frontage of the two-storey house that stands inland
+   * of the vikendica, chosen because that is the piece of ground the
+   * photograph could be of and because the settlement houses there stand on
+   * bare sand with no boundary of any kind, which no house in Dalmatia does.
+   * `b_016`'s fence panels and the wood-edge kerb blocks went in under exactly
+   * this rule and are recorded the same way.
+   *
+   * Nothing here draws from `rng()` — the stone sizes come out of `jit`, which
+   * is a hash and not the stream. Rule 4.
+   */
+  function gardenWall(t0, t1, sw, gate0, gate1) {
+    const back = b;
+    b = up;
+    const STONE = [0.452, 0.446, 0.418];
+    const CORE = [0.575, 0.565, 0.535];
+    const GOLD = [0.545, 0.462, 0.245];
+    const IRON = [0.082, 0.084, 0.090];
+    const LEAF = [0.105, 0.208, 0.112];
+    const AW = 0.17;                        // half the wall's thickness
+    const gAt = (t, s) => {
+      const st = at(t);
+      return Math.max(surfaceY(t, s), groundAt(st.x + st.nx * s, st.z + st.nz * s));
+    };
+    // The wall, in level lengths that step at the joint. Same construction the
+    // west-end retaining wall uses and for the same reason: a wall that follows
+    // a falling grade is a ramp with a face on it.
+    const RUN = 3.9;
+    const tops = [];
+    for (let a = t0; a < t1 - 0.01; a += RUN) {
+      const c = Math.min(a + RUN, t1);
+      let hi = -1e9;
+      for (let u = a; u <= c; u += 0.6) hi = Math.max(hi, gAt(u, sw));
+      const top = Math.round((hi + 0.98) / 0.16) * 0.16;
+      tops.push([a, c, top]);
+      // Skip the leaf of wall the gate stands in. The gate is a hole in the
+      // masonry and not a panel bolted over it — in the frame you can see the
+      // ground running straight through under the bars.
+      if (c > gate0 && a < gate1) {
+        for (const [p, q] of [[a, gate0], [gate1, c]]) {
+          if (q - p > 0.15) stoneRun(p, q, top);
+        }
+      } else {
+        stoneRun(a, c, top);
+      }
+    }
+    function stoneRun(a, c, top) {
+      const base = gAt((a + c) * 0.5, sw) - 0.34;
+      // The core is the MORTAR here, and pale, which is the opposite of what
+      // the approach piers do. Those are field rubble with the joints in
+      // shadow, so their core is dark and anything paler read as more wall.
+      // This is a mortared slab wall: what shows between the plates is a wide
+      // pale bed of it in full sun, and drawn dark the whole run came out as a
+      // black plane with a scatter of bricks stuck on the front.
+      boxTS(a, c, sw - 0.115, sw + 0.115, base, top - 0.02, CORE,
+        shade(CORE, 1.05));
+      // The slabs, TILED and not scattered. They very nearly cover the face —
+      // broad flat plates split off a bed and laid to whatever course each one
+      // happens to make, half again as wide as they are tall, with a finger of
+      // mortar showing round each. The first cut put twenty loose stones on
+      // three metres of wall and it read as a rockery propped against a
+      // hoarding: the joint has to be the thin thing and the stone the thick
+      // one, which is the whole difference between a wall and a decoration.
+      for (const near of [true, false]) {
+        const out = near ? -1 : 1;
+        let row = 0;
+        for (let y = base + 0.06; y < top - 0.10; row++) {
+          const hh = 0.135 + jit(((a * 9) | 0) + row * 7, 663) * 0.075;
+          let u = a + (row % 2 ? 0.19 : 0.02);
+          for (let k = 0; u < c - 0.06; k++) {
+            const key = ((a * 9) | 0) + row * 31 + k;
+            const L = 0.26 + jit(key, 660) * 0.30;
+            const u1 = Math.min(u + L, c);
+            const g = 0.86 + jit(key, 664) * 0.30;
+            const col = [STONE[0] * g, STONE[1] * g, STONE[2] * g];
+            // A hair of tilt at each end, so no two slabs sit on one line and
+            // the courses read as a mason working round what he was given.
+            const d0 = (jit(key, 661) - 0.5) * 0.05;
+            const d1 = (jit(key, 662) - 0.5) * 0.05;
+            const yl = Math.max(base + 0.02, y + d0);
+            const yh = Math.min(top - 0.03, y + hh + d1);
+            if (yh - yl > 0.05 && u1 - u > 0.09) {
+              frustumTS(yl, [(u + u1) * 0.5, sw + out * 0.10,
+                (u1 - u) * 0.5 - 0.022, 0.055],
+              yh, [(u + u1) * 0.5 + d0 * 0.6, sw + out * AW,
+                (u1 - u) * 0.5 - 0.030, 0.048], col, shade(col, 1.07));
+            }
+            u = u1 + 0.026;
+          }
+          y += hh + 0.030;
+        }
+      }
+      // And the flat top, which is what the railing stands on and the only
+      // straight line on the whole thing.
+      boxTS(a, c, sw - AW - 0.015, sw + AW + 0.015, top - 0.10, top,
+        shade(STONE, 0.96), shade(STONE, 1.10));
+      runs.push({ t0: a, t1: c, s0: sw - 0.30, s1: sw + 0.30,
+        y: base, h: top - base });
+    }
+
+    // The gate. Two leaves of vertical round bar between a round jamb post at
+    // each end, a head rail, a mid rail at about three fifths, and a bottom
+    // rail off the ground — which is the pattern in the frame and is also the
+    // only pattern a gate this wide can be built in without sagging.
+    {
+      const gy = gAt((gate0 + gate1) * 0.5, sw);
+      const HEAD = gy + 1.98, MID = gy + 1.14, FOOT = gy + 0.09;
+      for (const t of [gate0 + 0.06, (gate0 + gate1) * 0.5, gate1 - 0.06]) {
+        post(W, t, sw, gy - 0.15, HEAD + 0.06, 0.048, GOLD, 7);
+      }
+      for (const [yl, yh] of [[FOOT, FOOT + 0.07], [MID, MID + 0.06],
+        [HEAD - 0.07, HEAD]]) {
+        boxTS(gate0, gate1, sw - 0.035, sw + 0.035, yl, yh, GOLD,
+          shade(GOLD, 1.10));
+      }
+      for (let t = gate0 + 0.20; t < gate1 - 0.11; t += 0.115) {
+        // Straight past the middle post rather than stopping either side of
+        // it: a gate leaf's bars run the full height of the leaf and the stile
+        // stands in front of them. Drawn thin, and there are thirty of them,
+        // so this is the one place on the wall worth counting triangles.
+        post(W, t, sw, FOOT + 0.03, HEAD - 0.04, 0.017, GOLD, 4);
+      }
+      runs.push({ t0: gate0, t1: gate1, s0: sw - 0.16, s1: sw + 0.16,
+        y: gy, h: 1.98 });
+    }
+
+    // The black railing, standing on the wall east of the gate. Bars at the
+    // same spacing as the gate's and half its height, with a heavier square
+    // post where each length starts.
+    for (const [a, c, top] of tops) {
+      if (c <= gate1 + 0.1) continue;
+      const p0 = Math.max(a, gate1 + 0.5);
+      boxTS(p0, c, sw - 0.022, sw + 0.022, top + 0.02, top + 0.07, IRON);
+      boxTS(p0, c, sw - 0.022, sw + 0.022, top + 0.86, top + 0.94, IRON,
+        shade(IRON, 1.6));
+      for (let t = p0 + 0.10; t < c - 0.05; t += 0.12) {
+        post(W, t, sw, top + 0.05, top + 0.90, 0.013, IRON, 4);
+      }
+      boxTS(p0 - 0.04, p0 + 0.04, sw - 0.045, sw + 0.045, top, top + 1.00,
+        IRON, shade(IRON, 1.5));
+    }
+
+    // The hedge behind it. Clipped, so it is a block and not a bush — but the
+    // top of a clipped hedge in August is not a straight line, it is a straight
+    // line with a summer's growth standing out of it, and the domes are that
+    // growth. Without them the whole run reads as a painted wall.
+    for (let a = t0; a < t1 - 0.01; a += 1.3) {
+      const c = Math.min(a + 1.3, t1);
+      const gy = gAt((a + c) * 0.5, sw + 1.1);
+      const h = 1.92 + jit((a * 3) | 0, 670) * 0.22;
+      boxTS(a, c + 0.02, sw + 0.42, sw + 1.44, gy - 0.20, gy + h,
+        LEAF, shade(LEAF, 1.30));
+      for (let k = 0; k < 2; k++) {
+        const ct = a + 0.32 + k * 0.62;
+        dome(W, ct, sw + 0.72 + jit((a * 3) | 0 + k, 671) * 0.42, gy + h - 0.08,
+          0.16 + jit((a * 3) | 0 + k, 672) * 0.16, 0.34,
+          shade(LEAF, 1.12), 6);
+      }
+      runs.push({ t0: a, t1: c, s0: sw + 0.42, s1: sw + 1.44, y: gy, h: h });
+    }
+    b = back;
+  }
+  // The placement, stated: the frontage of the house inland of the vikendica.
+  gardenWall(224.0, 239.5, 40.4, 230.2, 233.9);
+
   if (special) special.sign = neonSign(special);
 
   /**
