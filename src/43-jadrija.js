@@ -4443,6 +4443,43 @@ async function buildJadrija(scene) {
     g.globalAlpha = 1;
     g.globalCompositeOperation = 'source-over';
 
+    // "My name is Mr Mors", in a pale green blob up in the corner.
+    //
+    // 20260821_175206 has it top right of the fish and it is the thing that
+    // makes the whole wall funny rather than decorative: the fish introduces
+    // itself, in English, on a Croatian bathing beach, in somebody's
+    // handwriting. Off the photograph exactly — three lines, `is` on its own,
+    // and the name underlined.
+    //
+    // Set in cursive with a stack of fallbacks and a sans at the end, because
+    // this canvas is rasterised in whatever browser opens the page and a
+    // missing script face silently becomes the default. It is meant to read as
+    // written by hand; if it comes out as a sans it is still a hand-lettered
+    // blob and nothing about the wall breaks.
+    {
+      const bx = W * 0.735, by = H * 0.175;
+      g.fillStyle = '#c9cf72';
+      g.beginPath();
+      g.ellipse(bx, by, W * 0.115, H * 0.078, -0.06, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = 'rgba(28, 26, 20, 0.88)';
+      g.textAlign = 'center';
+      const CURSIVE = '"Segoe Script", "Bradley Hand", "Comic Sans MS", cursive,'
+        + ' "Helvetica Neue", Arial, sans-serif';
+      g.font = `500 ${H * 0.038}px ${CURSIVE}`;
+      g.fillText('My name', bx, by - H * 0.022);
+      g.font = `500 ${H * 0.030}px ${CURSIVE}`;
+      g.fillText('is', bx - W * 0.030, by + H * 0.010);
+      g.font = `600 ${H * 0.042}px ${CURSIVE}`;
+      g.fillText('Mr Mors', bx, by + H * 0.048);
+      g.strokeStyle = 'rgba(28, 26, 20, 0.88)';
+      g.lineWidth = H * 0.005;
+      g.beginPath();
+      g.moveTo(bx - W * 0.055, by + H * 0.056);
+      g.lineTo(bx + W * 0.052, by + H * 0.056);
+      g.stroke();
+    }
+
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 4;
@@ -6709,13 +6746,25 @@ async function buildJadrija(scene) {
       boxTS(a - 0.30, c + 0.30, s0 - 0.31, s0 - 0.24, y + h - 0.07, y + h,
         shade(SLAB, 0.78));
     };
-    mass(tm, SAN.t1, SAN.s0, SAN.s1, 2.42, PINK, 0.24);
-    mass(SAN.t0, tm + 0.02, SAN.s0 + 0.55, SAN.s1 - 0.55, 2.14, GREY, 0.18);
+    // Which mass is painted, and it is the one with the fish on it.
+    //
+    // 20260821_175206 is unambiguous: the wall the fish is painted across is
+    // salmon render, and the grey unpainted render with the green louvred door
+    // is the part beyond it. This had the pink on the eastern mass and the grey
+    // on the western — and the fish hangs at t 348.35, which is a metre inside
+    // the western one. So the fish was painted on bare grey render, which is
+    // the one thing a mural on this coast never is: somebody rendered and
+    // painted that wall in order to have something to paint on.
+    //
+    // Only the colours swap. The two masses keep their own heights and depths,
+    // because those came off the same photograph and are not in question.
+    mass(tm, SAN.t1, SAN.s0, SAN.s1, 2.42, GREY, 0.24);
+    mass(SAN.t0, tm + 0.02, SAN.s0 + 0.55, SAN.s1 - 0.55, 2.14, PINK, 0.18);
 
     // The damp band. Render this old is two colours from the ground up, and
     // the join is a stain and not a line.
-    for (const [a, c, s, col] of [[tm, SAN.t1, SAN.s0, PINK],
-      [SAN.t0, tm, SAN.s0 + 0.55, GREY]]) {
+    for (const [a, c, s, col] of [[tm, SAN.t1, SAN.s0, GREY],
+      [SAN.t0, tm, SAN.s0 + 0.55, PINK]]) {
       for (let t = a; t < c; t += 0.9) {
         const t1 = Math.min(t + 0.9, c);
         const hh = 0.42 + jit(t | 0, 110) * 0.30;
