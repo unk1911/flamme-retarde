@@ -462,7 +462,13 @@ function initTouch() {
 
   addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse') return;
-    if (state.phase !== 'swim' || isControl(e.target)) return;
+    // The boat borrows this strip whole, because it is the same two halves
+    // meaning the same two things — a thumb that walks and a half-screen that
+    // is a head — and a fifth control scheme for a mode with two axes in it
+    // would be a fifth set of ways to be wrong. What the boat does not have is
+    // DIVE, UP and AUTO; `paintBrodTouch` takes those off it.
+    if ((state.phase !== 'swim' && state.phase !== 'brod')
+      || isControl(e.target)) return;
     e.preventDefault();
     if (e.clientX < innerWidth * 0.46 && sId === null) {
       sId = e.pointerId;
@@ -521,7 +527,9 @@ function initTouch() {
     el.classList.toggle('on', TOUCH.sfast);
   });
   tap('t-sauto', () => toggleSwimAuto());
-  tap('t-ashore', () => goAshore());
+  // ASHORE is the same door E is, and on the boat E means the boat's version
+  // of it: the gangway alongside at Šibenik, over the side anywhere else.
+  tap('t-ashore', () => (state.phase === 'brod' ? leaveBrod() : goAshore()));
   tap('t-sset', () => togglePanel());
   tap('t-spause', () => togglePause());
 
@@ -557,8 +565,27 @@ function paintTouchHUD() {
  * does anything teaches a thumb nothing.
  */
 function paintSwimTouch(wade, auto) {
+  for (const id of ['t-dive', 't-rise', 't-fast', 't-sauto']) {
+    document.getElementById(id).hidden = false;
+  }
   document.getElementById('t-ashore').classList.toggle('armed', !!wade);
   document.getElementById('t-sauto').classList.toggle('on', !!auto);
+}
+
+/**
+ * The same strip, minus the three buttons a boat has no use for.
+ *
+ * DIVE, UP and a swim autopilot are all controls for a body in the water, and
+ * a button that is lit and does nothing is worse than no button: it is a thumb
+ * learning something untrue. ASHORE stays and is always armed, because on the
+ * boat it always does something — over the side is a thing you are allowed to
+ * do at any point on those four and a half kilometres.
+ */
+function paintBrodTouch() {
+  for (const id of ['t-dive', 't-rise', 't-fast', 't-sauto']) {
+    document.getElementById(id).hidden = true;
+  }
+  document.getElementById('t-ashore').classList.add('armed');
 }
 
 initTouch();

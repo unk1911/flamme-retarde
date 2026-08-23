@@ -77,16 +77,30 @@ const BROD = {
   slowAt: 300,               // m from the berth that she comes off cruise
   letGo: 5.0,                // s alongside with the engine on before she moves
 
-  // The walkable deck, in her frame: +x forward, +z to starboard. Four
-  // rectangles — the cockpit, both side decks and the foredeck — because that
-  // is what is walkable on a boat this shape, and one box would let you stand
-  // inside the wheelhouse. The `y` is the sole each one stands at.
+  // The walkable deck, in her frame: +x forward, +z to starboard.
+  //
+  // **Bands along her length, clamped athwart by her own hull**, and not four
+  // rectangles. Rectangles was the first cut and it did not work, for a reason
+  // that is obvious once you have walked into it: a hull is a shape that
+  // narrows, so a rectangle is either inside the boat at its widest station or
+  // outside her at its narrowest, and four of them laid end to end leave *gaps
+  // between them* where nothing is standable. Measured on the built page:
+  // boarding on the starboard side deck and pressing S for thirty seconds
+  // walked you 2.5 m aft and stopped dead at the after end of that rectangle,
+  // with the cockpit 0.20 m away across a strip of nothing.
+  //
+  // So each band gives an x range, the sole it stands at, and a `hole` — the
+  // half-width taken out of the middle of it by the deckhouse. The outer limit
+  // is `brodSheer(x)` less the bulwark and a hand's breadth, which is the hull.
+  // The bands **overlap** at both joins, and the first match wins, so stepping
+  // aft off the side deck puts you down the 0.34 m into the cockpit rather than
+  // into the sea.
   decks: [
-    { x0: -7.00, x1: -1.35, z0: -1.08, z1: 1.08, y: 0.72 },   // cockpit
-    { x0: -1.35, x1: 4.55, z0: -1.66, z1: -1.28, y: 1.06 },   // port side deck
-    { x0: -1.35, x1: 4.55, z0: 1.28, z1: 1.66, y: 1.06 },     // starboard
-    { x0: 4.55, x1: 6.40, z0: -0.85, z1: 0.85, y: 1.22 },     // foredeck
+    { x0: -7.50, x1: -1.20, y: 0.72, hole: 0 },      // the cockpit, full width
+    { x0: -1.35, x1: 4.40, y: 1.06, hole: 1.16 },    // the side decks
+    { x0: 4.30, x1: 6.60, y: 1.22, hole: 0 },        // the foredeck
   ],
+  edge: 0.06,                // how far in from the bulwark you may stand
   walk: 1.55,                // m/s about the deck — it is a deck, not a runway
   run: 2.6,
 
@@ -148,6 +162,49 @@ const CHANNEL = [
 const yawOfX = (dx, dz) => Math.atan2(-dz, dx);
 
 /**
+ * Her stations: `[x, keel y, chine y, chine half-beam, sheer y, sheer half-beam]`.
+ *
+ * Out here rather than inside `brodProto` because two things read it and they
+ * have to agree: the loft that draws the hull, and `brodSheer` below, which is
+ * what decides how far out on her deck you are allowed to stand. When they were
+ * two tables the deck was a guess at the hull.
+ *
+ * The sheer is the line the whole boat is read by — high at the stem, lowest
+ * about two thirds aft, lifting a hand's breadth again at the transom.
+ *
+ * These heights were 0.45 m lower on the first cut and it was the one thing
+ * about her that was measurably wrong. `JET.top` at the Jadrija mole comes out
+ * at **1.46 m** above the sea — the terrace lip, not the 0.72 the comment in
+ * 43-jadrija.js quotes — so a boat with 1.05 m of freeboard lies with her
+ * gunwale 0.4 m *below* the quay you board her from, and from the mole all you
+ * can see of her is a roof. She is a passenger boat: her rail comes to the
+ * pier, which is how anybody gets on.
+ */
+const BROD_ST = [
+  [7.80, 0.35, 0.62, 0.10, 2.24, 0.22],
+  [7.10, -0.55, -0.10, 0.34, 2.05, 0.72],
+  [5.90, -1.00, -0.52, 0.74, 1.86, 1.26],
+  [4.20, -1.14, -0.72, 1.14, 1.68, 1.75],
+  [2.00, -1.15, -0.80, 1.44, 1.55, 2.02],
+  [-0.60, -1.13, -0.80, 1.52, 1.48, 2.10],
+  [-3.20, -1.06, -0.76, 1.50, 1.48, 2.08],
+  [-5.90, -0.90, -0.64, 1.42, 1.54, 1.99],
+  [-7.80, -0.62, -0.46, 1.28, 1.62, 1.82],
+];
+
+/** The sheer height and half-beam at any x, interpolated between stations. */
+function brodSheer(x) {
+  let a = BROD_ST[0], c = BROD_ST[1];
+  for (let i = 0; i < BROD_ST.length - 1; i++) {
+    if (x <= BROD_ST[i][0] && x >= BROD_ST[i + 1][0]) {
+      a = BROD_ST[i]; c = BROD_ST[i + 1]; break;
+    }
+  }
+  const u = clamp((a[0] - x) / ((a[0] - c[0]) || 1), 0, 1);
+  return [a[4] + (c[4] - a[4]) * u, a[5] + (c[5] - a[5]) * u];
+}
+
+/**
  * The hull, the house and everything standing on her.
  *
  * Local frame is `boatProto`'s — **+X forward, +Y up, +Z to starboard** — so
@@ -183,25 +240,7 @@ function brodProto() {
   //
   // The sheer is the line the whole boat is read by: high at the stem, lowest
   // about two thirds aft, lifting a hand's breadth again at the transom.
-  //
-  // The sheer heights were 0.45 m lower on the first cut and it was the one
-  // thing about her that was measurably wrong. `JET.top` at the mole comes out
-  // at **1.46 m** above the sea — the terrace lip, not the 0.72 the comment in
-  // 43-jadrija.js quotes — so a boat with 1.05 m of freeboard lies with her
-  // gunwale 0.4 m *below* the quay you board her from, and from the mole all
-  // you can see of her is a roof. She is a passenger boat: her rail comes to
-  // the pier, which is how anybody gets on.
-  const ST = [
-    [7.80, 0.35, 0.62, 0.10, 2.24, 0.22],
-    [7.10, -0.55, -0.10, 0.34, 2.05, 0.72],
-    [5.90, -1.00, -0.52, 0.74, 1.86, 1.26],
-    [4.20, -1.14, -0.72, 1.14, 1.68, 1.75],
-    [2.00, -1.15, -0.80, 1.44, 1.55, 2.02],
-    [-0.60, -1.13, -0.80, 1.52, 1.48, 2.10],
-    [-3.20, -1.06, -0.76, 1.50, 1.48, 2.08],
-    [-5.90, -0.90, -0.64, 1.42, 1.54, 1.99],
-    [-7.80, -0.62, -0.46, 1.28, 1.62, 1.82],
-  ];
+  const ST = BROD_ST;
 
   const NS = 7;
   const N = NS * 2 - 1;
@@ -274,22 +313,14 @@ function brodProto() {
   const sideQuad = (s, A, B, C, D, col) =>
     (s > 0 ? b.quad(D, C, B, A, col) : b.quad(A, B, C, D, col));
 
-  /** The sheer height and half-beam at any x, by interpolating the stations. */
-  const sheerAt = (x) => {
-    let a = ST[0], c = ST[1];
-    for (let i = 0; i < ST.length - 1; i++) {
-      if (x <= ST[i][0] && x >= ST[i + 1][0]) { a = ST[i]; c = ST[i + 1]; break; }
-    }
-    const u = clamp((a[0] - x) / ((a[0] - c[0]) || 1), 0, 1);
-    return [a[4] + (c[4] - a[4]) * u, a[5] + (c[5] - a[5]) * u];
-  };
+  const sheerAt = brodSheer;
 
   // ── the deck and the bulwark ─────────────────────────────────────────────
   // The sheer curves and the sole does not; that is the whole difference
   // between a gunwale you look over and a floor you stand on. The sole steps up
   // twice going forward — cockpit, side deck, foredeck — which is what the
   // engine under the house and the chain locker under the foredeck do to it.
-  const soleAt = (x) => (x > 4.55 ? 1.22 : (x > -1.35 ? 1.06 : 0.72));
+  const soleAt = (x) => (x > 4.30 ? 1.22 : (x > -1.35 ? 1.06 : 0.72));
   {
     const NX = 26;
     for (let i = 0; i < NX; i++) {
@@ -332,24 +363,30 @@ function brodProto() {
   // deck, with the wheelhouse standing proud of it at the front. Seven lights a
   // side, which is what the mural has, and the mural is the only thing in the
   // survey that shows the whole boat at once.
-  b.box(1.60, 1.06 + 0.97, 0, 5.90, 1.94, 2.40, HOUSE, HOUSE);
-  b.box(4.00, 1.06 + 1.20, 0, 1.10, 1.48, 2.10, HOUSE, HOUSE);
+  //
+  // 2.20 wide and stopping at x 4.30, both of which are the hull's doing rather
+  // than a preference: she is 4.20 in the beam amidships and 3.4 at the after
+  // end of the house, and a house 2.40 across leaves a side deck that has
+  // narrowed to nothing by the time it reaches the wheelhouse. A side deck you
+  // cannot get to the end of is a side deck that ends in a wall.
+  b.box(1.475, 1.06 + 0.97, 0, 5.65, 1.94, 2.20, HOUSE, HOUSE);
+  b.box(3.75, 1.06 + 1.20, 0, 1.10, 1.48, 1.90, HOUSE, HOUSE);
   {
     const y = 1.06 + 1.22;
     for (let i = 0; i < 7; i++) {
-      const x = -0.80 + i * 0.83;
-      for (const s of [1, -1]) b.box(x, y, s * 1.215, 0.54, 0.60, 0.03, GLASS);
+      const x = -0.85 + i * 0.79;
+      for (const s of [1, -1]) b.box(x, y, s * 1.115, 0.52, 0.60, 0.03, GLASS);
     }
     for (let i = -1; i <= 1; i++) {
-      b.box(4.56, 1.06 + 1.36, i * 0.66, 0.03, 0.64, 0.58, GLASS);
+      b.box(4.31, 1.06 + 1.36, i * 0.60, 0.03, 0.64, 0.52, GLASS);
     }
     // The door into the house, on the port side aft, standing open.
-    b.box(-1.37, 1.06 + 0.86, -0.62, 0.04, 1.72, 0.74, DARK);
+    b.box(-1.37, 1.06 + 0.86, -0.56, 0.04, 1.72, 0.70, DARK);
   }
   // The roof: a flat deck with a coaming, and the boat's one piece of shade.
   // Everybody on every boat in the survey sits under this.
-  b.box(1.60, 1.06 + 1.99, 0, 6.20, 0.10, 2.66, HOUSE, HOUSE);
-  b.box(4.00, 1.06 + 1.99, 0, 1.20, 0.10, 2.30, HOUSE, HOUSE);
+  b.box(1.475, 1.06 + 1.99, 0, 5.95, 0.10, 2.46, HOUSE, HOUSE);
+  b.box(3.75, 1.06 + 1.99, 0, 1.20, 0.10, 2.10, HOUSE, HOUSE);
 
   // ── the rails ────────────────────────────────────────────────────────────
   // Pipe stanchions and two wires round the foredeck only. Aft the bulwark is
@@ -381,15 +418,15 @@ function brodProto() {
   // of the port quarter of the roof, and benches down both sides of the
   // cockpit. The ensign is a flat panel and not cloth, because the only thing
   // that reads from the far side of a fifteen-metre deck is red-white-blue.
-  b.box(4.66, 1.06 + 2.90, 0, 0.14, 3.90, 0.14, TRIM);
-  b.box(2.60, 1.06 + 2.36, -0.96, 0.16, 0.66, 0.16, DARK);
+  b.box(4.44, 1.06 + 2.90, 0, 0.14, 3.90, 0.14, TRIM);
+  b.box(2.40, 1.06 + 2.36, -0.86, 0.16, 0.66, 0.16, DARK);
   for (const s of [1, -1]) {
     b.box(-4.20, 0.72 + 0.42, s * 1.42, 5.30, 0.08, 0.52, TRIM);
     b.box(-4.20, 0.72 + 0.20, s * 1.66, 5.30, 0.42, 0.06, TRIM);
   }
   for (let i = 0; i < 3; i++) {
     const col = [[0.78, 0.16, 0.16], [0.94, 0.94, 0.94], [0.10, 0.20, 0.52]][i];
-    b.box(5.12, 1.06 + 4.40 - i * 0.18, 0, 0.80, 0.18, 0.02, col);
+    b.box(4.90, 1.06 + 4.40 - i * 0.18, 0, 0.80, 0.18, 0.02, col);
   }
   return b.geo();
 }
@@ -634,10 +671,44 @@ function buildBrod(scene) {
     boat.updateMatrixWorld();
   }
 
-  /** Is (lx, lz) somewhere you may stand? The deck height there, or null. */
+  /**
+   * Is (lx, lz) somewhere you may stand? The sole there, or null.
+   *
+   * A band in x, a hole in the middle where the deckhouse is, and the hull for
+   * the outer limit — see the note over `BROD.decks` for why it is not four
+   * rectangles. First match wins, and the bands overlap on purpose.
+   */
   function deckAt(lx, lz) {
+    const out = brodSheer(lx)[1] - 0.24 - BROD.edge;
+    const a = Math.abs(lz);
     for (const d of BROD.decks) {
-      if (lx > d.x0 && lx < d.x1 && lz > d.z0 && lz < d.z1) return d.y;
+      if (lx > d.x0 && lx < d.x1 && a >= d.hole && a < out) return d.y;
+    }
+    return null;
+  }
+
+  /**
+   * The same step, with the hull allowed to push you in.
+   *
+   * The gunwale is not a wall you stop at, it is a line that closes on you as
+   * she narrows — walk forward along a side deck and the boat gets thinner
+   * under your feet, so the honest answer to "there is no deck at the z you
+   * asked for" is to move you inboard, not to stop you. Without this you walk
+   * up the port side and halt at x 3.84 with the bow four metres away and
+   * nothing on the screen saying why.
+   *
+   * The **house is not treated the same way**, and that is the point of the
+   * asymmetry: `hole` is a refusal and `out` is a clamp. Sliding you past the
+   * inner limit would teleport you sideways out of the middle of the cockpit
+   * and on to a side deck the moment you walked at the back of the deckhouse.
+   */
+  function slideIn(lx, lz) {
+    const out = brodSheer(lx)[1] - 0.24 - BROD.edge;
+    const a = Math.abs(lz);
+    for (const d of BROD.decks) {
+      if (lx <= d.x0 || lx >= d.x1) continue;
+      if (a < d.hole || out <= d.hole + 0.04) continue;
+      return { z: Math.sign(lz || 1) * Math.min(a, out - 0.02), y: d.y };
     }
     return null;
   }
@@ -668,7 +739,7 @@ function buildBrod(scene) {
     group.visible = true;
     phase = 'letgo';
     s = 0; sp = 0; tmr = 0; said = -1;
-    you.x = 1.20; you.z = 1.47; you.yaw = 0; you.pitch = -0.02;
+    you.x = 1.20; you.z = 1.30; you.yaw = 0; you.pitch = -0.02;
     you.deck = deckAt(you.x, you.z) ?? 1.06;
     return true;
   }
@@ -728,13 +799,18 @@ function buildBrod(scene) {
       const dy = deckAt(nx, nz);
       if (dy != null) { you.x = nx; you.z = nz; you.deck = dy; }
       else {
-        // Slide along whichever axis still lands on a deck, so a bulwark or the
-        // side of the house is something you brush past rather than stop dead
-        // against — the same rule the walk model uses ashore.
-        const ax = deckAt(nx, you.z);
-        if (ax != null) { you.x = nx; you.deck = ax; }
-        const az = deckAt(you.x, nz);
-        if (az != null) { you.z = nz; you.deck = az; }
+        const sl = slideIn(nx, nz);
+        if (sl) { you.x = nx; you.z = sl.z; you.deck = sl.y; }
+        else {
+          // And then, only if the hull could not take it, slide along whichever
+          // axis still lands on a deck — so the side of the house is something
+          // you brush past rather than stop dead against. Same rule the walk
+          // model uses ashore.
+          const ax = deckAt(nx, you.z);
+          if (ax != null) { you.x = nx; you.deck = ax; }
+          const az = deckAt(you.x, nz);
+          if (az != null) { you.z = nz; you.deck = az; }
+        }
       }
     }
 

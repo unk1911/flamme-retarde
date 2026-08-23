@@ -2679,6 +2679,7 @@ function paintBrodHud() {
   $('br-hint').innerHTML = brod.phase === 'alongside'
     ? TK('brod.ashoreHint', 'brod.ashoreHintTouch')
     : TK('brod.hint', 'brod.hintTouch');
+  if (IS_TOUCH) paintBrodTouch();
 }
 
 /**
