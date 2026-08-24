@@ -1,0 +1,28 @@
+{
+  "_": [
+    "One prompt per shot, keyed by chunk range. This is the lever the restyle",
+    "notebook calls 'the obvious next lever' and had never pulled: at cfg 1.0",
+    "the distill LoRA switches classifier-free guidance off, which makes the",
+    "negative prompt inert, so the positive prompt is the ENTIRE text",
+    "conditioning — and one prompt cannot describe both a sunlit promenade and",
+    "an unlit concrete room. The 33-run matrix learned that the expensive way:",
+    "a cabin-interior prompt left over the top of aerial control frames turned",
+    "a Canadair into a green toy on a windowsill.",
+    "",
+    "Where the split is, measured on the control frames rather than guessed:",
+    "the source cuts from exterior to interior at frame 228, t = 14.25 s, where",
+    "mean luma falls from 86 to 38 in four frames. That is inside chunk 2, so",
+    "chunk 2 gets the exterior prompt — it opens bright and the last second of",
+    "it is dark, and of the two mismatches that is the cheaper one.",
+    "",
+    "Rules these are written under, from restyle-prompt-dominates: describe the",
+    "picture that is actually in the control frames; name what you want",
+    "positively, because you cannot forbid anything; and camera jargon alone",
+    "makes it worse, so the film terms are seasoning at the end and never the",
+    "subject."
+  ],
+
+  "0-2": "photorealistic documentary video of a public bathing station on the Dalmatian coast near Sibenik, Croatia, in high summer: a long row of small concrete changing cabins with weathered blue painted doors, sunlit concrete paving with hard shadows, tall umbrella pines, a red OPEN sign, holidaymakers in swimwear walking along the promenade, the deep blue Adriatic beyond, bare grey limestone hills baked in August heat, dry golden scrub, harsh midday sun, heat haze, real photographed video, film grain, 35mm, cinematic colour grade",
+
+  "3-11": "photorealistic video shot inside a small concrete beach changing cabin on the Dalmatian coast in high summer, dim interior in deep shadow, one bright doorway of hard sunlight and blue sea behind it, a person changing, bare skin lit only by the daylight from the door, an old cathode-ray television on a wooden stand glowing in the dark, a bed against the wall, a printed poster curling on rough painted render, dust in the light, warm tungsten and cool daylight mixed, real photographed video, low light, film grain, 35mm, cinematic colour grade"
+}

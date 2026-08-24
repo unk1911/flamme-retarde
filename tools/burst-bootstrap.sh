@@ -193,14 +193,44 @@ MODELS
 # ---- 5. serve ----------------------------------------------------------------
 # Loopback only. The operator reaches it through an SSH tunnel; nothing here is
 # exposed to the internet.
-cat > /etc/systemd/system/comfyui.service <<EOS
+#
+# ONE WORKER PER GPU, and on an 8x box that is the whole point of renting one.
+#
+# Wan generates 81 frames at a time and no setting changes that, so a 60 s film
+# is twelve independent jobs. Twelve jobs on one GPU is three hours; twelve jobs
+# on eight GPUs is two waves and half an hour, for the same number of GPU-hours
+# and therefore very nearly the same money — plus one bootstrap instead of
+# eight, which is the part that is actually cheaper.
+#
+# A template unit and a wrapper script rather than eight copies of the unit,
+# because systemd substitutes %i textually and cannot do arithmetic: the port
+# has to be worked out somewhere that can add.
+#
+# Worker k is GPU k on port 8188+k, so **worker 0 is exactly the single-GPU
+# service this replaced** and everything that already speaks to :8188 — status,
+# run, the readiness probe below — carries on working without knowing.
+#
+# No stagger between them. ComfyUI loads weights on the first prompt rather than
+# at startup, so eight workers starting at once read nothing; when their first
+# jobs land they all pull the same 60 GB through the page cache, and this box
+# has more than a terabyte of RAM to hold it.
+cat > /home/ubuntu/comfy-worker.sh <<'EOS'
+#!/bin/bash
+set -eu
+exec env CUDA_VISIBLE_DEVICES="$1" \
+  /home/ubuntu/ComfyUI/venv/bin/python /home/ubuntu/ComfyUI/main.py \
+  --listen 127.0.0.1 --port $((8188 + $1)) --disable-auto-launch
+EOS
+chmod +x /home/ubuntu/comfy-worker.sh
+chown ubuntu:ubuntu /home/ubuntu/comfy-worker.sh
+cat > /etc/systemd/system/comfyui@.service <<EOS
 [Unit]
-Description=ComfyUI
+Description=ComfyUI on GPU %i
 After=network.target
 [Service]
 User=ubuntu
 WorkingDirectory=/home/ubuntu/ComfyUI
-ExecStart=$V/python main.py --listen 127.0.0.1 --port 8188 --disable-auto-launch
+ExecStart=/home/ubuntu/comfy-worker.sh %i
 Restart=on-failure
 [Install]
 WantedBy=multi-user.target
@@ -223,8 +253,14 @@ for i in $(seq 1 30); do
   sleep 10
 done
 
-systemctl enable --now comfyui
-log "comfyui starting; bootstrap done"
+NGPU=$(nvidia-smi -L 2>/dev/null | wc -l)
+[ "$NGPU" -ge 1 ] || NGPU=1
+for g in $(seq 0 $((NGPU - 1))); do
+  systemctl enable --now "comfyui@$g"
+done
+echo "$NGPU" > /home/ubuntu/job/ngpu
+chown ubuntu:ubuntu /home/ubuntu/job/ngpu
+log "comfyui starting on $NGPU gpu(s), ports 8188-$((8188 + NGPU - 1)); bootstrap done"
 
 # One last check, because a missing custom node does not stop ComfyUI starting —
 # it just removes nodes from /object_info and turns the first queue into a 400.

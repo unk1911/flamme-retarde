@@ -1,0 +1,92 @@
+{
+  "_": [
+    "Sixty seconds of Flamme Retardé, in four shots of three chunks each.",
+    "",
+    "The arithmetic is the whole shape of this file. Wan generates 81 frames at",
+    "a time and nothing can change that, so a 60 s film is twelve independent",
+    "jobs — and the one place a seam between two independently generated chunks",
+    "is invisible is a cut. So every shot is a whole number of chunks (243 = 3 x",
+    "81 = 15.19 s), the three cuts land exactly on chunk boundaries 3, 6 and 9,",
+    "and the eight seams left over are inside a continuous take where the same",
+    "seed and the same prompt are holding them together.",
+    "",
+    "It also buys the thing the restyle notebook calls the obvious next lever",
+    "and has never done: a prompt per shot. At cfg 1.0 the positive prompt is",
+    "the entire text conditioning, and one prompt cannot describe both an",
+    "aeroplane over a burning hillside and a bathing terrace. See",
+    "tools/lab/demo60-prompts.sh."
+  ],
+  "fps": 16,
+  "chunk": 81,
+  "size": "1280x720",
+  "shots": [
+    {
+      "name": "runin",
+      "frames": 243,
+      "_": [
+        "The run-in, from the sea. No `per` at all: this is the game's own chase",
+        "camera, which is a spring behind a flight model, and hand-animating a",
+        "camera that follows an aeroplane looks exactly like hand-animating a",
+        "camera that follows an aeroplane.",
+        "",
+        "Placed 2.5 km short of the ignition point on a bearing of 68 deg, which",
+        "puts the coast across the middle of the frame and the smoke column dead",
+        "ahead. At 92 m/s the shot covers 1.4 km and never arrives, on purpose:",
+        "the aeroplane is still closing when the cut comes."
+      ],
+      "setup": "__fr.free(); __fr.cam(0); __fr.place(-3900, 320, 1050, 5.093)"
+    },
+    {
+      "name": "drop",
+      "frames": 243,
+      "_": [
+        "Over the fire, on the close camera, and the load goes down at 5.6 s.",
+        "",
+        "The drop is driven by a synthetic keydown rather than by a handle, and",
+        "that is worth a note because the file says twice that it cannot be:",
+        "`input.drop` is recomputed every frame from `keys.has('KeyF')`, and a",
+        "dispatched KeyboardEvent does reach that set. What does not reach it is",
+        "anything dispatched BEFORE the pause, because `setPaused` clears it."
+      ],
+      "setup": "__fr.free(); __fr.cam(1); __fr.place(-2500, 150, 380, 5.093)",
+      "per": "if (i === 90) window.dispatchEvent(new KeyboardEvent('keydown', {code: 'KeyF', bubbles: true})); if (i === 152) window.dispatchEvent(new KeyboardEvent('keyup', {code: 'KeyF', bubbles: true}));"
+    },
+    {
+      "name": "prom",
+      "frames": 243,
+      "_": [
+        "The bathing terrace, walked west to east past the kabine.",
+        "",
+        "This is the shot the restyle notebook says works — architecture,",
+        "vegetation and skin in one frame, with real parallax down a row of",
+        "buildings, which is where temporal coherence either holds or gives the",
+        "game away. 48 m in 15.2 s is 3.2 m/s, which is a brisk walk and about",
+        "twice what a dolly would do; slower reads as a real camera but leaves",
+        "the whole shot on four huts.",
+        "",
+        "Eye at 1.62 m off the promenade deck, looking 14 m ahead and a little",
+        "inland so the row runs across the frame rather than away down it."
+      ],
+      "setup": "__fr.pause(false); __fr.pause(true); __fr.free()",
+      "per": "(() => { const J = __fr.jad.raw(); const t = 296 + T * 3.16; const a = J.toWorld(t, 10.6); const c = J.toWorld(t + 14, 15.4); __fr.look(a[0], a[1] + 1.62, a[2], c[0], c[1] + 1.15, c[2]); })()"
+    },
+    {
+      "name": "brod",
+      "frames": 243,
+      "_": [
+        "Out along the Brod, ending on Tvrdava svetog Nikole.",
+        "",
+        "The pier runs on a bearing of 55.5 deg from a root at (-1770.5, 328.5);",
+        "the causeway behind it ramps from the shelf up to the 1.15 m deck over",
+        "30 m, and the camera height follows that ramp rather than floating over",
+        "it. 46 m of walk in 15.2 s.",
+        "",
+        "The aim eases from 'along the pier' to 'the fortress' over the shot, so",
+        "it opens on the boat lying alongside and closes on the thing the whole",
+        "side quest is pointed at, 646 m away across the channel."
+      ],
+      "setup": "__fr.pause(false); __fr.pause(true); __fr.free()",
+      "per": "(() => { const b = 55.5 * Math.PI / 180, ax = Math.sin(b), az = -Math.cos(b); const u = -26 + T * 4.6; const x = -1770.5 + ax * u, z = 328.5 + az * u; const deck = u < 0 ? 0.10 + (1.15 - 0.10) * (u + 30) / 30 : 1.15; const k = Math.min(1, Math.max(0, (T - 4) / 8)); const hx = -1770.5 + ax * (u + 60), hz = 328.5 + az * (u + 60); const tx = hx + (-1237.2 - hx) * k, tz = hz + (718.5 - hz) * k; __fr.look(x, deck + 1.62, z, tx, deck + 1.0 + 14 * k, tz); })()"
+    }
+  ]
+}

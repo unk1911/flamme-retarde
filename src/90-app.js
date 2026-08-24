@@ -666,6 +666,12 @@ function cycleCamera() { camMode = (camMode + 1) % CAMS.length; }
 // A fixed viewpoint for the screenshot tool, so a shot of a building is a shot
 // of a building and not of wherever the aeroplane drifted to while it settled.
 let camOverride = null;
+// Seconds of world per frame while filming, or 0 for wall time. See `frame()`.
+let filmDt = 0;
+// One-frame-at-a-time filming: how many passes the recorder still wants, and
+// who to tell when the next one has finished drawing. See `__fr.filmStep`.
+let filmWant = 0;
+let filmDone = null;
 
 function updateCamera(dt) {
   if (camOverride) {
@@ -3994,10 +4000,37 @@ function frame() {
   // never read comes back as one enormous dt — and a pause you sat through for
   // thirty seconds would resume by integrating thirty seconds of flight in a
   // single step, straight through whichever hill you were over.
-  const real = Math.min(0.05, clock.getDelta());
+  const wall = Math.min(0.05, clock.getDelta());
+  // Filming. `__fr.filmDt(1/16)` pins the world's step to a fixed number of
+  // seconds a frame, whatever the renderer is managing.
+  //
+  // Wall time is right for a game and useless for a camera. A headless page
+  // draws this scene at somewhere between three and thirty frames a second
+  // depending on where it is pointed, so a film taken by capturing every frame
+  // is a film whose *world* advances by a different amount in every frame of
+  // it — the aeroplane crawls over the fire and sprints over the water, and
+  // nothing in the footage is at a constant rate. The 0.05 clamp above hides
+  // the worst of it and is not a fix: it makes every frame slower than 20 fps
+  // identical, and every frame faster than 20 fps not.
+  //
+  // Pinned, the page is a film camera: N frames is exactly N x dt of world,
+  // evenly spaced, reproducible, and independent of the machine it ran on.
+  // Nothing but `tools/film.mjs` sets it, and it is off by default.
+  //
+  // The clock is still read every frame even when it is ignored, for the same
+  // reason the comment above gives: an interval nobody reads comes back as one
+  // enormous delta the moment somebody does.
+  const real = filmDt > 0 ? filmDt : wall;
   // Nothing else: not the sim, not uTime, not even the render. The canvas holds
   // the last frame it drew, which is exactly the picture a pause should show.
-  if (state.paused) return;
+  //
+  // Except for one asked-for pass, which is how a film gets taken. Paused is
+  // the only state in which a recorder can be sure the world advanced exactly
+  // once between two captures: left running, an unknown number of animation
+  // frames fire while a screenshot is being encoded, and the footage comes out
+  // evenly *lit* and unevenly *timed*. See `__fr.filmStep`.
+  const filming = filmWant > 0;
+  if (state.paused && !filming) return;
 
   // Slow motion, and it is one multiplication because there is one delta.
   //
@@ -4804,6 +4837,14 @@ function frame() {
   const now = performance.now();
   if (lastFrameMs) state.fps = damp(state.fps, 1000 / Math.max(1, now - lastFrameMs), 2, dt);
   lastFrameMs = now;
+  // Down here and not at the top: the recorder is waiting to be told the frame
+  // is *drawn*, and everything above this line is what drawing it means.
+  if (filming) {
+    filmWant--;
+    const tell = filmDone;
+    filmDone = null;
+    if (tell) tell();
+  }
 }
 
 // The cinematic is thirty seconds long and it is the same thirty seconds every
@@ -5769,6 +5810,24 @@ window.__fr = {
   setPos: (x, y, z) => flight.reset(x, z, 0, y),
   place: (x, y, z, yaw) => { flight.reset(x, z, yaw ?? 0, y); },
   cam: (i) => { camMode = i % CAMS.length; },
+  /**
+   * Pin the world's clock to a fixed step, for filming. 0 puts it back.
+   *
+   * `__fr.filmDt(1 / 16)` and then one capture per animation frame gives 16
+   * frames a second of world time however long each frame took to draw, which
+   * is what makes a headless page usable as a camera. See `frame()`.
+   */
+  filmDt: (v) => { filmDt = Math.max(0, +v || 0); return filmDt; },
+  /**
+   * Run exactly one frame of a paused world and resolve when it is on screen.
+   *
+   * The pair of these is the whole camera: `filmDt` fixes how much world a
+   * frame is worth and this takes one frame's worth. Await it, capture, repeat
+   * — and what comes out is evenly spaced in world time no matter how long any
+   * individual frame took to draw, which on this page is anywhere between a
+   * thirtieth of a second and a third of one depending on where it is pointed.
+   */
+  filmStep: () => new Promise((res) => { filmDone = res; filmWant = 1; }),
   /**
    * Where you are in the real world, and how to get somewhere in it.
    *

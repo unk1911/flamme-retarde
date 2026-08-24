@@ -595,6 +595,198 @@ def cmd_run(a):
     return 2 if timed_out else 0
 
 
+def cmd_fan(a):
+    """One box, every GPU on it, one chunk of the film each.
+
+    `run` is one job on one worker and it is the right shape for an experiment:
+    change a flag, watch the number move. This is the other shape — the film is
+    already decided and what is left is twelve identical jobs that differ only
+    in which 81 frames they read.
+
+    Wan generates 81 frames at a time and nothing changes that, so the length of
+    a film is a *count of jobs*, and a count of jobs is the one thing a box with
+    eight GPUs in it can divide. Twelve chunks over eight workers is two waves.
+    The money is very nearly unchanged — the same twelve GPU-jobs are paid for
+    either way — and what is actually saved is the bootstrap, which is per box
+    and not per GPU.
+
+    All twelve are queued at once. `vacejob22.py` posts to /prompt and returns,
+    and each worker runs its own queue in order, so the wave structure falls out
+    of `chunk % workers` without anything here having to schedule it.
+    """
+    st = state_read()
+    if not st:
+        sys.exit("no instance — `up` first")
+    ip = st["ip"]
+    frames = Path(a.frames).expanduser()
+    if not frames.is_dir():
+        sys.exit(f"not a directory: {frames}")
+    have = sorted(frames.glob("*.png"))
+    say(f"{len(have)} frames in {frames}")
+
+    n = (a.chunk - 1) // 4 * 4 + 1
+    if n != a.chunk:
+        say(f"--chunk {a.chunk} rounded to {n} (the VAE's temporal stride is 4, "
+            "so output is always 4k+1 frames)")
+    chunks = a.chunks or len(have) // n
+    if chunks * n > len(have):
+        sys.exit(f"{chunks} chunks of {n} needs {chunks * n} frames, "
+                 f"and there are {len(have)}")
+
+    # How many workers the box actually started, which the bootstrap wrote down.
+    # Asking nvidia-smi here would count GPUs; this counts servers, and on a box
+    # where one unit failed to start those are different numbers.
+    r = ssh(ip, "cat /home/ubuntu/job/ngpu 2>/dev/null || echo 1", check=False)
+    ngpu = max(1, int((r.stdout or "1").strip().splitlines()[-1] or 1))
+    workers = min(a.workers or ngpu, ngpu)
+    say(f"{ngpu} worker(s) on the box, using {workers} · "
+        f"{chunks} chunks of {n} = {chunks * n} frames "
+        f"({chunks * n / a.fps:.2f} s at {a.fps} fps) · "
+        f"{-(-chunks // workers)} wave(s)")
+
+    prompts = {}
+    if a.prompts:
+        raw = json.loads(Path(a.prompts).expanduser().read_text())
+        # Either a flat list, one per chunk, or {"0-2": "...", "3-11": "..."}.
+        if isinstance(raw, list):
+            prompts = {i: v for i, v in enumerate(raw)}
+        else:
+            for k, v in raw.items():
+                if k.startswith("_"):
+                    continue
+                lo, _, hi = k.partition("-")
+                for i in range(int(lo), int(hi or lo) + 1):
+                    prompts[i] = v
+        say(f"{len(set(prompts.values()))} distinct prompt(s) over {len(prompts)} chunks")
+
+    attn = a.attn
+    if not attn:
+        r = ssh(ip, "cat /home/ubuntu/job/attn 2>/dev/null || true", check=False)
+        attn = (r.stdout or "").strip() or "sageattn"
+    say(f"attention: {attn}")
+
+    ssh(ip, "mkdir -p ~/job/frames ~/job/out")
+    say("uploading frames (once — every worker reads a window out of the same "
+        "directory)")
+    subprocess.run(
+        ["rsync", "-az", "--delete", "-e", " ".join(ssh_base(ip)[:-1]),
+         str(frames) + "/", f"ubuntu@{ip}:job/frames/"], check=True,
+        stdin=subprocess.DEVNULL)
+
+    # One ssh, every forward. Eight processes would be eight things to reap and
+    # eight ways to leak a tunnel; -L stacks.
+    fwd = []
+    for k in range(workers):
+        fwd += ["-L", f"{PORT + k}:127.0.0.1:{8188 + k}"]
+    tun = subprocess.Popen(
+        ssh_base(ip)[:-1] + ["-o", "ExitOnForwardFailure=yes", "-N"] + fwd
+        + [f"ubuntu@{ip}"], stdin=subprocess.DEVNULL)
+    say(f"tunnel :{PORT}..{PORT + workers - 1} -> {ip}:8188..{8188 + workers - 1}")
+
+    timed_out = False
+    try:
+        for k in range(workers):
+            for _ in range(60):
+                try:
+                    urllib.request.urlopen(
+                        f"http://127.0.0.1:{PORT + k}/system_stats", timeout=5)
+                    break
+                except Exception:                         # noqa: BLE001
+                    time.sleep(5)
+            else:
+                sys.exit(f"worker {k} never answered on :{PORT + k} — `status`")
+        say(f"{workers} worker(s) answering")
+
+        # Identity, once. A port collision gives a tunnel that answers perfectly
+        # while pointing at somebody else's box — see the note over PORT — and
+        # eight forwards are eight chances at it.
+        nonce = f"{ip}-{PORT}-{os.getpid()}"
+        nfile = f"burst-nonce-{PORT}.txt"
+        ssh(ip, "mkdir -p ~/ComfyUI/input && printf '%s' "
+                + shlex.quote(nonce) + f" > ~/ComfyUI/input/{nfile}")
+        try:
+            got = urllib.request.urlopen(
+                f"http://127.0.0.1:{PORT}/view?filename={nfile}&type=input",
+                timeout=15).read().decode()
+        except Exception as e:                            # noqa: BLE001
+            got = f"<unreadable: {e}>"
+        if got != nonce:
+            sys.exit(f"the tunnel on :{PORT} is NOT this instance — set "
+                     "BURST_PORT and retry")
+
+        tags = []
+        for c in range(chunks):
+            tag = f"{a.tag}{c:02d}"
+            tags.append(tag)
+            k = c % workers
+            cmd = [sys.executable, str(ROOT / "tools" / "vacejob22.py"),
+                   "--frames", "/home/ubuntu/job/frames",
+                   "--n", str(n), "--skip", str(c * n),
+                   "--w", str(a.w), "--h", str(a.h), "--tag", tag,
+                   "--steps", str(a.steps), "--denoise", str(a.denoise),
+                   "--vace", str(a.vace), "--vaceend", str(a.vaceend),
+                   "--vacestart", str(a.vacestart), "--cfg", str(a.cfg),
+                   "--light", str(a.light), "--shift", str(a.shift),
+                   "--boundary", str(a.boundary),
+                   # The same seed in every chunk, deliberately. Eleven of the
+                   # twelve joins are inside a continuous take, and the noise a
+                   # chunk starts from is one of the few things that can be held
+                   # identical across a seam.
+                   "--seed", str(a.seed), "--swap", str(a.swap),
+                   "--attn", attn, "--no-check",
+                   "--host", f"http://127.0.0.1:{PORT + k}"]
+            if a.upscale:
+                cmd += ["--upscale", a.upscale, "--outw", str(a.outw)]
+            if prompts.get(c):
+                cmd += ["--pos", prompts[c]]
+            elif a.pos:
+                cmd += ["--pos", a.pos]
+            if a.neg:
+                cmd += ["--neg", a.neg]
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            ok = "queued" in (r.stdout or "")
+            say(f"  chunk {c:2d} -> gpu {k} :{PORT + k}  {tag}  "
+                + ("queued" if ok else "FAILED"))
+            if not ok:
+                print((r.stdout or "")[-1500:], (r.stderr or "")[-1500:])
+                sys.exit(f"chunk {c} was not accepted — nothing else queued")
+
+        want = chunks * n
+        t0 = time.time()
+        while True:
+            r = ssh(ip, "ls ~/ComfyUI/output 2>/dev/null | grep -c "
+                    + shlex.quote(f"^vace{a.tag}") + " || true", check=False)
+            done = int((r.stdout or "0").strip().splitlines()[-1] or 0)
+            el = (time.time() - t0) / 60
+            rate = done / el if el > 0.5 and done else 0
+            say(f"{done}/{want} frames · {el:.1f} min"
+                + (f" · eta {(want - done) / rate:.1f} min" if rate else "")
+                + f" · ${st['price'] * (time.time() - st['launched']) / 3600:.2f}")
+            if done >= want:
+                break
+            if el > a.timeout:
+                timed_out = True
+                say(f"gave up waiting after {a.timeout} min at {done}/{want} — "
+                    "fetching whatever finished")
+                break
+            time.sleep(30)
+    finally:
+        tun.terminate()
+
+    out = Path(a.out).expanduser()
+    out.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["rsync", "-az", "-e", " ".join(ssh_base(ip)[:-1]),
+         f"ubuntu@{ip}:ComfyUI/output/", str(out) + "/",
+         "--include", f"vace{a.tag}*", "--include", "*/", "--exclude", "*"],
+        check=True, stdin=subprocess.DEVNULL)
+    got = len(list(out.glob(f"vace{a.tag}*")))
+    mins = (time.time() - st["launched"]) / 60
+    say(f"{got} frames in {out} · ${st['price'] * mins / 60:.2f} spent so far")
+    say("`tools/burst.py down` when you are finished — the meter is running")
+    return 2 if timed_out else 0
+
+
 def cmd_down(_a):
     import lambda_gpu as L
     st = state_read()
@@ -694,6 +886,43 @@ def main():
     # with no refs, swap 20 with refs.
     r.add_argument("--swap", type=int, default=0)
     r.set_defaults(fn=cmd_run)
+
+    # `fan` takes everything `run` takes about the model, and differs only in
+    # what it does with a box: chunk the film, one chunk per GPU, all queued at
+    # once. Defaults are the 23 August winning recipe rather than `run`'s, which
+    # are still the experiment's — see plan/restyle notes and the note on
+    # `--denoise` being a cliff and not a dial.
+    f = sub.add_parser("fan")
+    f.add_argument("--frames", required=True)
+    f.add_argument("--chunk", type=int, default=81)
+    f.add_argument("--chunks", type=int, default=0,
+                   help="0 = as many whole chunks as the frames allow")
+    f.add_argument("--workers", type=int, default=0, help="0 = every GPU")
+    f.add_argument("--fps", type=float, default=16.0, help="for the log only")
+    f.add_argument("--prompts", default=None,
+                   help="JSON list, or {\"0-2\": \"...\"} by chunk range")
+    f.add_argument("--w", type=int, default=1280)
+    f.add_argument("--h", type=int, default=720)
+    f.add_argument("--tag", default="_d")
+    f.add_argument("--steps", type=int, default=12)
+    f.add_argument("--denoise", type=float, default=0.97)
+    f.add_argument("--vace", type=float, default=1.0)
+    f.add_argument("--vacestart", type=float, default=0.0)
+    f.add_argument("--vaceend", type=float, default=0.8)
+    f.add_argument("--cfg", type=float, default=1.0)
+    f.add_argument("--light", type=float, default=1.0)
+    f.add_argument("--shift", type=float, default=5.0)
+    f.add_argument("--boundary", type=int, default=0)
+    f.add_argument("--seed", type=int, default=7731)
+    f.add_argument("--upscale", default="")
+    f.add_argument("--outw", type=int, default=1920)
+    f.add_argument("--pos", default=None)
+    f.add_argument("--neg", default=None)
+    f.add_argument("--out", default=str(Path.home() / "fr-video" / "fan"))
+    f.add_argument("--timeout", type=float, default=75)
+    f.add_argument("--attn", default="")
+    f.add_argument("--swap", type=int, default=0)
+    f.set_defaults(fn=cmd_fan)
 
     a = p.parse_args()
     sys.exit(a.fn(a))

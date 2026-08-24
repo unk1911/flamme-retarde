@@ -62,6 +62,12 @@ import urllib.request
 AP = argparse.ArgumentParser()
 AP.add_argument("--frames", required=True)
 AP.add_argument("--n", type=int, default=81)
+# Where in the sequence this job's window starts. One directory of frames on
+# the box, twelve jobs reading twelve windows out of it — which is the whole of
+# what makes a 60 s film eight GPUs' worth of work instead of one GPU's worth
+# of waiting. Uploading twelve directories would upload the same 970 PNGs
+# twelve times.
+AP.add_argument("--skip", type=int, default=0)
 AP.add_argument("--w", type=int, default=1280)
 AP.add_argument("--h", type=int, default=720)
 AP.add_argument("--tag", default="_vace22")
@@ -170,7 +176,7 @@ node("txt", "WanVideoTextEncode",
       "negative_prompt": A.neg or NEG, "force_offload": True})
 
 node("src", "VHS_LoadImagesPath",
-     {"directory": A.frames, "image_load_cap": A.n, "skip_first_images": 0,
+     {"directory": A.frames, "image_load_cap": A.n, "skip_first_images": A.skip,
       "select_every_nth": 1})
 node("fit", "ImageResizeKJ",
      {"image": ["src", 0], "width": A.w, "height": A.h,
