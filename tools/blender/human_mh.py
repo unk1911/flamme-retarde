@@ -1410,23 +1410,54 @@ def cutters(J, k=(1.0, 1.0, 1.0), torso=True, tail=True):
     # shaved neck, which is a worse read than no tail at all.
     #
     # It only goes on the figure that has the tail, and that is the whole of
-    # `tail`. This blob bottoms out 27 mm *below* the neck joint, which is what
-    # hair pulled back over a nape does and is four centimetres lower than any
-    # haircut ends — so on a figure with nothing gathered into a knot it is a
-    # stripe of near-black painted down a bare neck. The eight bathers shipped
-    # with one and it was the first thing anybody said about them: a dark wedge
-    # running from the hairline to the shoulder blades. Cutting it is not a
-    # loss, because a cap ending in the cap's own ellipse is a haircut, and what
-    # the nape was holding up was never there.
+    # `tail`. The eight bathers shipped with one and it was the first thing
+    # anybody said about them: a dark wedge running from the hairline to the
+    # shoulder blades. Cutting it there is not a loss, because a cap ending in
+    # the cap's own ellipse is a haircut, and what the nape was holding up was
+    # never there.
     #
     # It reads worse on them than the same paint does on her for the reason
     # `perineum` sets out: paint is interpolated across whatever triangle it
     # lands on, these are decimated to a quarter of her density, and the wedge
     # that is three centimetres of gradient on Baye is ten on a child.
+    #
+    # ── and it was too long on her as well ───────────────────────────────────
+    #
+    # Cutting it from the bathers fixed the bathers and left the same paint on
+    # the one figure that kept it, where it was reported again: black on the
+    # neck, below the hairline, either side of the tail. Measured off the
+    # exported blob rather than off the cutter, the old ellipsoid — centre
+    # `neck.z + 0.058`, half-height 0.085 — painted 168 vertices of the body
+    # shell below the head joint, reaching down to y = 1.4657. That is 125 mm
+    # under the head joint at 1.5907 and 11 mm under the neck joint at 1.4768:
+    # the whole back of the neck. The tail hangs clear of it at x −0.131 to
+    # −0.034 and is only 36 mm across, while the paint runs out to |z| = 0.046,
+    # so about 16 mm of painted neck stood proud either side of the tail. That
+    # is the black in the report, and it is paint — not a shadow, not the tail's
+    # root, and not a quantisation edge.
+    #
+    # The bottom is now put on a landmark instead of on a guess. Down the back
+    # midline the surface tucks furthest forward at y = 1.535, x = −0.011, and
+    # that is where its normal flips: above it the vertex normals point down and
+    # back (n.y −0.13 at 1.54, −0.45 at 1.58) because that is the underside of
+    # the occiput, and below it they point up and back (+0.08 at 1.53, +0.31 at
+    # 1.50) because that is neck. Hair gathered into a knot lies on the half
+    # that faces down and stops at the crease; it does not lie on the half that
+    # faces up. So the ellipsoid is sized to land its lower boundary there —
+    # where the neck's own surface sits, the boundary is at
+    # `centre − 0.807 × half-height` — which puts the paint's last row at
+    # y = 1.538, 3 mm above the crease and 53 mm under the head joint.
+    #
+    # Shorter, not just higher: the half-height comes down with the centre so
+    # the top still clears the cap. The cap alone reaches y = 1.576 on the back
+    # midline and this reaches 1.629, so the two overlap by five centimetres and
+    # there is no bare ring between them — checked vertex by vertex down the
+    # midline strip, and the painted band is continuous from the crown to 1.538
+    # on both the old numbers and these.
     if tail:
         add("nape", HAIR_M, HAIR_P, 2,
-            (fx(-0.073), 0.0, J["neck"].z + 0.058 * kz),
-            (0.105 * kx, 0.070 * ky, 0.085 * kz), rows=14, seg=22)
+            (fx(-0.073), 0.0, J["neck"].z + 0.100 * kz),
+            (0.105 * kx, 0.070 * ky, 0.052 * kz), rows=14, seg=22)
 
     # There is no painted garment on this figure any more, and that is the whole
     # of the entry. She wears geometry (see `hip_scarf`) and nothing else.
