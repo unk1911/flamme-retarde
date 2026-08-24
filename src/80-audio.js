@@ -17,6 +17,9 @@ function buildAudio() {
   let ctx = null;
   let master = null, verb = null, verbSend = null, verbGain = null, bed = null, bedDuck = null;
   let outBus = null, outLp = null;
+  // The birds sitting still in the trees behind the resort. Their own stage of
+  // the wall, because a wall is not one number — see PERCH.
+  let perchBus = null, perchEye = null;
   let subG = null, subLp = null;
   let slowLp = null;
   let outTap = null;      // the last node before the speakers — see `tap`
@@ -204,6 +207,19 @@ function buildAudio() {
     outLp = ctx.createBiquadFilter();
     outLp.type = 'lowpass'; outLp.frequency.value = 20000; outLp.Q.value = 0.4;
     outBus.connect(outLp).connect(bed);
+
+    // ── the open window ───────────────────────────────────────────────────
+    // A second way through the same wall, for the birds in the trees behind
+    // the house. See PERCH, which is where the 0.44 is argued.
+    perchBus = ctx.createGain();
+    perchBus.gain.value = 1;
+    // And an eye on it, for the same reason `fireBus` has one: what a test
+    // needs is not the gain somebody wrote, it is the dBFS of samples the
+    // graph actually computed. See `perchStats`.
+    perchEye = ctx.createAnalyser();
+    perchEye.fftSize = 2048;
+    perchBus.connect(perchEye);
+    perchBus.connect(bed);
 
     // ── the valley ────────────────────────────────────────────────────────
     // A convolution bus with a hand-made impulse response: a few discrete
@@ -2278,6 +2294,237 @@ function buildAudio() {
     src.stop(end + 0.2);
   }
 
+  // ── something sitting still ────────────────────────────────────────────────
+  /**
+   * The birds in the pines behind the vikendica.
+   *
+   * Misha, 24 Aug: "when we are in vikendica, there are some beautiful bird
+   * songs that can be heard, and one of them is the eurasian collared-dove, i
+   * recorded". Rule 12 settles the name — it is his bird and his peninsula —
+   * and the recording is at
+   * /mnt/c/tmp/refs/jadrija/field-recordings/, cut by tools/cut_field.py,
+   * which is where everything measured about it is written down.
+   *
+   * NOT A BED, and the temptation to make it one is the whole point of this
+   * note. The source is 6.2 s long and a six-second loop is a period you can
+   * count on one hand; but far more than that, a dove is *made* of its silence.
+   * It says `coo-COO-cuk`, waits, says it again three or four times, and then
+   * there is nothing from that tree for a minute. A loop can only ever ship the
+   * saying. So one phrase is cut — 1.32 s — and the silence is owned here,
+   * which turns one clip into an afternoon and makes the next bird a row in the
+   * table below rather than another 800 KB of payload.
+   *
+   * THE THREE TIMES, and only the first of them is measured. `beat` is: the
+   * recording's three phrases start 1.52 and 1.55 s apart, so the clip fired at
+   * 1.53 s intervals reassembles the recording almost exactly — its own 0.10 s
+   * of lead-in and 0.10 s of tail sit inside the 0.21 s of gap that leaves.
+   * `run` and `every` are choices and are named as such: three is the fewest
+   * the recording supports, because it holds three with no break in them, and
+   * the rest is what it takes to be a bird that is *there* without becoming
+   * furniture. What that comes out as, run through `perchRun(3600)` and
+   * counted: 65 bouts and 322 phrases in the hour, bouts of three to seven in
+   * about equal numbers, 1.55 s between phrases inside one and 49.8 s of
+   * silence between them. A little over five phrases a minute, in five-second
+   * handfuls.
+   *
+   * WHY IT IS LOUDER INDOORS, which is the part that answers the request.
+   *
+   * Nothing here does anything special about being in the vikendica. What
+   * happens is that walking through that door already takes the beach 24 dB
+   * down and puts a 500 Hz lid on it — measured, `beds()` in the living room
+   * reads out 0.061 and 502 Hz — and pushes the shore bed's own distance out
+   * by two kilometres on top, which leaves `shoreStats().gain` at 0.0001. The
+   * room is quiet. So a sound that comes through that wall at only five
+   * decibels down goes from being under the promenade to being well over it,
+   * without a single line of code that knows where you are standing.
+   *
+   * Measured, at `perchStats().rms`, which is an AnalyserNode on the bus:
+   *
+   *   living room    24.7 m  phrase -44.7 dBFS RMS, peak window -40.2, and
+   *                          the whole of what is left of the beach in there
+   *                          is about -59 — so the bird is 14 dB OVER it
+   *   promenade      38.4 m  phrase -43.9, and the beach outside is about
+   *                          -32 — so the same bird is 12 dB UNDER it
+   *
+   * Twenty-six decibels of swing on walking through a door, and not one line
+   * of it is about the door. That is why this has its own stage of the wall
+   * instead of hanging off `outBus`: at 0.061 and 502 Hz a 550 Hz bird is
+   * simply gone, and the one place he asked to hear it is the one place it
+   * would not be.
+   *
+   * 0.44 is a choice and there is no measurement behind it. It is an August
+   * window with nothing in it: a hole in a wall takes a few decibels off what
+   * comes through and almost none of the top, where a shut door takes both.
+   * There is no lowpass here to go with the gain because the clip is filtered
+   * to 320-2600 Hz at the other end and is already 24 dB down by 700 Hz — any
+   * filter a window applied would be working in a band this file does not
+   * have. When a bird arrives that has some top on it, this is where it goes.
+   */
+  const PERCH = [
+    {
+      key: 'dove', clip: 'dove',
+      // Where it sits, in the resort's own frame, and how far up the tree.
+      //
+      // Not an arbitrary point. `veg.nearest('pine', …)` finds a planted pine
+      // standing at this station — 11.4 m tall with a 9.6 m crown — and the
+      // canopy behind the house starts about here: `veg.canopy` reads 0.15 at
+      // s 30, 0.31 at 40, 0.45 at 50 and 0.73 at 70 along this stretch. So the
+      // bird is in the first of the pines rather than over open concrete.
+      //
+      // 24.7 m from the middle of the living room, and inland: the other
+      // direction is the channel, and a collared dove does not sit on water.
+      // Which tree it is in the recording nobody knows and nobody can, so the
+      // choice of *this* one is a choice, made because it is a real tree in
+      // the right place.
+      t: 243.5, s: 46.0, up: 8.0,
+      // What the clip is scaled by at nought metres. It decodes at -14.20 dBFS
+      // RMS — tools/cut_field.py measures that off the file it has just
+      // written and prints it — so this and the distance law are the whole of
+      // the arithmetic behind the four levels in the note above.
+      gain: 0.12,
+      run: [3, 7],           // phrases in a bout
+      beat: [1.46, 1.62],    // s between phrase onsets — measured, see above
+      every: [22, 74],       // s of nothing between bouts
+      // How far off it carries. Half the level at `half` metres and gone by
+      // `gone`, on a power between 1 (a point in free air) and 2 (a point in a
+      // wood, which is what this is) — so it owns the west end of the resort
+      // and is not audible from the middle of it: standing at t 120, 123 m
+      // off, the distance term is 0.068 and the phrase is 25 dB under the
+      // promenade it is being heard across. `gone` is a node-count cut and not
+      // an audibility one; by 240 m this is 26 dB down on its own account and
+      // the bird is long past arguable.
+      half: 20, roll: 1.5, gone: 240,
+      // Air over a couple of hundred metres, and nothing else — the clip has
+      // no top left to take. Open at the tree, shut at the far end.
+      lpNear: 5000, lpFar: 1100,
+    },
+  ];
+
+  // An August window, and what is behind the 0.44 is in the note above.
+  const PERCH_WALL = 0.44;
+
+  /**
+   * One of these per bird, kept off the table so that the table stays a
+   * description of a species and this stays a description of one afternoon.
+   *
+   * `clock` is this ticker's own seconds and not the context's, so a test can
+   * fast-forward the whole thing and still read back the intervals it designed.
+   */
+  const perchNow = PERCH.map((p) => ({
+    buf: null,
+    // Not all at nought, and not all at the same nought: a game that opens
+    // with every bird on the peninsula saying its piece at once is a dawn
+    // chorus, and this is three in the afternoon.
+    at: p.every[0] * (0.35 + Math.random() * 0.9),
+    left: 0, next: 0, clock: 0, rate: 1, turn: 1,
+    d: 1e9, pan: 0, fired: 0, last: -1, gain: 0, log: [],
+  }));
+
+  /**
+   * Where the listener is, relative to bird `i` — written every frame by
+   * 90-app.js, which is the only place that knows both the shore frame and
+   * where the camera is.
+   */
+  function perch(i, d, pan) {
+    const n = perchNow[i];
+    if (!n) return;
+    n.d = d;
+    n.pan = pan;
+  }
+
+  /** How much of the world outside the wall arrives at the bird bus. */
+  function applyPerch(tau) {
+    if (!ctx || dead || !perchBus) return;
+    perchBus.gain.setTargetAtTime(1 - PERCH_WALL * roomV, ctx.currentTime, tau);
+  }
+
+  /**
+   * The clock the bouts run off.
+   *
+   * Above the `dead` gate in update(), like the boat and for the same reason: a
+   * dove in a pine has no opinion about whether your aeroplane is still flying.
+   */
+  function perchTick(dt, afoot) {
+    if (!ctx || !perchBus) return;
+    for (let i = 0; i < PERCH.length; i++) {
+      const p = PERCH[i], n = perchNow[i];
+      n.clock += dt;
+      // Out of earshot, or in the aeroplane with two turboprops eighteen feet
+      // from your head. The bout timer is reset rather than paused, so
+      // arriving back on the beach is not immediately followed by a bird — a
+      // sound that lands on the frame the mode changes reads as a thing the
+      // game did, not a thing the tree did.
+      if (!afoot || n.d > p.gone) {
+        n.left = 0;
+        n.at = p.every[0] * 0.5;
+        continue;
+      }
+      if (n.left > 0) {
+        n.next -= dt;
+        if (n.next > 0) continue;
+      } else {
+        n.at -= dt;
+        if (n.at > 0) continue;
+        if (!n.buf) {
+          sampleLoad(p.clip, (b) => { n.buf = b; });
+          // Nothing to play yet and the timer has run out, so try again in a
+          // moment rather than every frame for the rest of the session.
+          n.at = 2;
+          continue;
+        }
+        // A whole bout is decided at once, because the two things that vary
+        // *between* bouts and not within them are how high the bird is holding
+        // the note and how it is facing. Within a bout a dove repeats itself
+        // to a degree that is the whole character of the species.
+        n.left = p.run[0] + Math.floor(Math.random() * (p.run[1] - p.run[0] + 1));
+        n.rate = 1 + (Math.random() * 2 - 1) * 0.025;
+        n.turn = 0.85 + Math.random() * 0.30;
+      }
+      n.next = p.beat[0] + Math.random() * (p.beat[1] - p.beat[0]);
+      n.left -= 1;
+      if (n.left <= 0) {
+        n.at = p.every[0] + Math.random() * (p.every[1] - p.every[0]);
+        n.left = 0;
+      }
+      say(p, n);
+    }
+  }
+
+  /** One phrase, at the distance and bearing the last frame reported. */
+  function say(p, n) {
+    const t0 = ctx.currentTime;
+    const near = 1 / (1 + Math.pow(Math.max(n.d, 0) / p.half, p.roll));
+    const amp = p.gain * near * n.turn;
+    const src = ctx.createBufferSource();
+    src.buffer = n.buf;
+    // The bout's own pitch, and then a little on top of it, because the three
+    // phrases in the recording are not quite the same note either.
+    src.playbackRate.value = n.rate * (0.997 + Math.random() * 0.006);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.Q.value = 0.5;
+    lp.frequency.value = p.lpFar + (p.lpNear - p.lpFar) * near;
+    const pn = ctx.createStereoPanner();
+    // 0.8 rather than 1: a bird in a tree is off to one side, not in one ear.
+    pn.pan.value = clamp(n.pan * 0.8, -1, 1);
+    const g = ctx.createGain();
+    g.gain.value = amp;
+    src.connect(lp).connect(pn).connect(g).connect(perchBus);
+    // Every one of these happens over limestone with a hillside behind it, and
+    // the same 0.30 the ćuk and the gulls already send.
+    if (verbSend) {
+      const w = ctx.createGain(); w.gain.value = 0.30;
+      g.connect(w).connect(verbSend);
+    }
+    src.start(t0);
+    n.fired += 1;
+    n.last = t0;
+    n.gain = amp;
+    // The last twenty, for a test that wants to see the shape of the intervals
+    // rather than the count. In the ticker's own seconds — see `perchNow`.
+    n.log.push(+n.clock.toFixed(2));
+    if (n.log.length > 20) n.log.shift();
+  }
+
   // ── the transistor set in the kabina ───────────────────────────────────────
   /**
    * A station out of a small speaker, and the only music in this game.
@@ -2426,6 +2673,7 @@ function buildAudio() {
   function room(v) {
     roomV = sat(v);
     applyOut(0.12);
+    applyPerch(0.12);
   }
 
   /**
@@ -3118,6 +3366,9 @@ function buildAudio() {
     // Likewise above the gate, and for the same reason: a boat in the channel
     // is nobody's aeroplane's business.
     boatTick(dt, !!s.afoot);
+    // And the birds sitting in the pines, which are nobody's aeroplane's
+    // business either.
+    perchTick(dt, !!s.afoot);
     // And the hillside, which needs a clock of its own for two reasons. It has
     // to be able to swap the oscillators for the recordings on the frame the
     // decode lands rather than on the frame somebody happens to walk, and the
@@ -3383,6 +3634,15 @@ function buildAudio() {
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas,
     shore, lapping, kabine, room, water,
     firestarter, slowmo, radioTune, radioClick,
+    /**
+     * The birds sitting still in the trees. `perches()` is the table — the
+     * only place a species is described — and 90-app.js walks it every frame
+     * to say how far away each one is; `perch(i, d, pan)` is that answer.
+     * Adding a bird is a row in PERCH plus a clip in the payload, and nothing
+     * on this side of the wall changes at all.
+     */
+    perches: () => PERCH,
+    perch,
     /** Where the pointer sits for each station, so the dial can be drawn. */
     radioDial: () => DIAL.map((d) => d.f),
     /**
@@ -3454,6 +3714,67 @@ function buildAudio() {
         now: ctx ? +ctx.currentTime.toFixed(2) : -1,
         state: ctx ? ctx.state : 'none',
       };
+    },
+    /**
+     * For a test: are the birds in the trees actually singing?
+     *
+     * Everything about this fails silently. `sampleLoad` returns nothing on a
+     * missing key, a bird out of earshot is indistinguishable from a bird
+     * whose timer never ran, and the whole thing is a sound that is *meant* to
+     * be absent most of the time — so "I did not hear it" is not evidence of
+     * anything. Hence: `tried`/`loaded` for the clip, `fired` for the count,
+     * `log` for the last twenty firing times in the ticker's own seconds so
+     * the interval distribution can be read rather than assumed, and `rms` off
+     * an AnalyserNode on the bus, which is the dBFS of samples the graph
+     * actually computed and is the only number in here that is evidence.
+     * `-120` is the empty reading.
+     */
+    perchStats: () => {
+      let rms = -120;
+      if (perchEye) {
+        const d = new Float32Array(perchEye.fftSize);
+        perchEye.getFloatTimeDomainData(d);
+        let sum = 0;
+        for (let i = 0; i < d.length; i++) sum += d[i] * d[i];
+        rms = +(10 * Math.log10(Math.max(sum / d.length, 1e-12))).toFixed(2);
+      }
+      return {
+        wall: perchBus ? +perchBus.gain.value.toFixed(3) : -1,
+        rms,
+        now: ctx ? +ctx.currentTime.toFixed(2) : -1,
+        birds: PERCH.map((p, i) => {
+          const n = perchNow[i];
+          return {
+            key: p.key,
+            tried: sampleTried.has(p.clip),
+            loaded: !!n.buf,
+            secs: n.buf ? +n.buf.duration.toFixed(3) : 0,
+            rate: n.buf ? n.buf.sampleRate : 0,
+            d: +n.d.toFixed(1), pan: +n.pan.toFixed(2),
+            // What the last phrase was scheduled at, which is the distance
+            // law and the bout's own loudness and nothing else — the wall is
+            // on the bus above.
+            gain: +n.gain.toFixed(5),
+            fired: n.fired, last: +n.last.toFixed(2),
+            left: n.left, at: +n.at.toFixed(2), clock: +n.clock.toFixed(2),
+            log: n.log.slice(),
+          };
+        }),
+      };
+    },
+    /**
+     * For a test: run the bouts forward without waiting a minute a bout.
+     *
+     * The real ticker, at the real frame time, with the real scheduling — so
+     * what comes back in `log` is the distribution the game will produce and
+     * not a model of it. The phrases it schedules all land within a few
+     * milliseconds of each other in context time, which makes `rms` meaningless
+     * for the duration and is why the level is measured in a separate,
+     * real-time pass.
+     */
+    perchRun: (secs, step = 1 / 60) => {
+      for (let i = 0; i < Math.round(secs / step); i++) perchTick(step, true);
+      return perchNow.map((n) => n.log.slice());
     },
     /** Likewise for the ćuk, which is the second sample in the build. */
     cukStats: () => ({
