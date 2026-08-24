@@ -187,6 +187,22 @@ void main(){
   vec3 n = normalize(vNormal);
   vec3 base = uBase * vColor;
   float spec = uSpecAmount;
+  // How much of that gloss is allowed to be a *mirror*, held apart from how
+  // much of it is a highlight. Negative means "whatever spec is", which is
+  // what every surface in the game got before there were two numbers here and
+  // what every one of them that does not write to this still gets.
+  //
+  // They are not the same quantity, and one surface proved it. The sun lobe
+  // below is a lobe: it is a smooth function of the normal and a noisy normal
+  // only makes it wobble. The sky term is a perfect mirror — no roughness, no
+  // Fresnel — so reflect() doubles every error in the normal and then maps it
+  // onto a gradient that runs from zenith blue to horizon white. On a mesh
+  // that has been decimated eightfold that is a patchwork rather than a sheen,
+  // and it is invisible only because nearly everything here is matt: at
+  // spec 0.09 the patches are a couple of levels wide. At the 0.45 that being
+  // hosed puts on the skinned figure's face they were reported, fairly, as
+  // splotches under her eyes.
+  float env = -1.0;
   float alpha = uOpacity;
 
   ${body}
@@ -204,7 +220,7 @@ void main(){
   // A little sky reflection on anything glossy keeps painted metal from
   // reading as plastic when it banks against the blue.
   vec3 r = reflect(viewDir, n);
-  col += skyColor(normalize(r), false) * spec * 0.35;
+  col += skyColor(normalize(r), false) * (env < 0.0 ? spec : env) * 0.35;
 
   col += base * uEmissive;
 
