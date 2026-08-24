@@ -18609,7 +18609,23 @@ async function buildJadrija(scene) {
     // has stopped and `walkY` falls through to the terrain, and the terrain
     // out there is a hillside 1 to 7 m above the sea the whole way across,
     // measured along four lines through the wood.
-    bounds: { t0: 3, t1: LEN - 3, s0: 1.1, s1: 300,
+    // `t1` runs PAST the end of the traced shore, and that is deliberate.
+    //
+    // It was `LEN - 3`. The Brod — the quay the Šibenik boat comes to, worked
+    // out from three photographs in `plan/brod-location.md` — sits at t 579.6,
+    // s 134.1 in this frame, which is ten metres beyond that clamp. The symptom
+    // was Misha reporting he could *almost* walk to it: `confine` was pulling
+    // him back at 569.2 every frame and the last ten metres were a wall with
+    // nothing in it.
+    //
+    // Walking out there is well defined. `at()` extrapolates past either end
+    // along the last station's tangent, so the frame simply runs straight on;
+    // past `JAD.back` the concrete has stopped and `walkY` falls through to the
+    // terrain, which out on the spit is a hillside a few metres above the sea.
+    // Twenty-two metres of margin is enough to stand on the spot and turn round
+    // on it, and it is not so much that the box reaches water the `s0Of` seaward
+    // limit was never measured against.
+    bounds: { t0: 3, t1: LEN + 22, s0: 1.1, s1: 300,
       s0Of: (t) => (onMoleT(t) ? -JET.out - 0.9 : 1.1) },
     /**
      * And the far shore, which a box cannot describe.

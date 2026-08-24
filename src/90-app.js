@@ -5724,6 +5724,81 @@ window.__fr = {
   setPos: (x, y, z) => flight.reset(x, z, 0, y),
   place: (x, y, z, yaw) => { flight.reset(x, z, yaw ?? 0, y); },
   cam: (i) => { camMode = i % CAMS.length; },
+  /**
+   * Where you are in the real world, and how to get somewhere in it.
+   *
+   * `__fr.gps()` reads the position back as degrees. `__fr.gps(lat, lon)` puts
+   * you there — on foot if you are on foot, and as a camera if you are not.
+   *
+   * This exists because of the Brod. Misha can stand on a quay at Jadrija and
+   * I cannot, and the only thing either of us can hand the other is a pair of
+   * numbers that mean the same in both places — so a survey frame with no GPS
+   * in it stops being a dead end the moment somebody walks to the spot in the
+   * game and reads the coordinates off.
+   *
+   * The projection is `tools/bake.py`'s, reduced. That file works in the DEM's
+   * frame and then subtracts the offset to the game's origin, which cancels:
+   * `x = (lon - ORIGIN_LON) * M_LON` and `z = -(lat - ORIGIN_LAT) * M_LAT`
+   * exactly. The one number that is NOT the origin's is the longitude scale —
+   * it is fixed at the *DEM's* centre latitude, 43.7150, because that is the
+   * cosine bake.py used to lay every footprint down. Recomputing it at 43.7280
+   * would be more correct and would put everything 15 m out, which is the kind
+   * of wrong that looks right.
+   *
+   * Checked against Tvrđava svetog Nikole, whose OSM way centres at game
+   * (-1237.2, 718.5): this returns 43.721546, 15.854624, and the fortress is
+   * where OSM says it is.
+   */
+  gps: (lat, lon) => {
+    const M_LAT = 111320.0;
+    const M_LON = 111320.0 * Math.cos(43.7150 * Math.PI / 180);
+    const OLAT = 43.7280, OLON = 15.8700;
+    const toWorldLL = (la, lo) => [(lo - OLON) * M_LON, -(la - OLAT) * M_LAT];
+    if (lat == null) {
+      const c = camera.position;
+      const p = (ground && ground.active && ground.you) ? ground.you : null;
+      const rd = (v) => +v.toFixed(6);
+      const one = (x, z) => ({
+        lat: rd(OLAT - z / M_LAT), lon: rd(OLON + x / M_LON),
+        world: [+x.toFixed(1), +z.toFixed(1)],
+      });
+      // On foot, your feet ARE the answer and the camera is not: in ground
+      // mode the view can still be the aeroplane's for a frame or two after a
+      // drop, and reporting both invites the wrong one to be read. Off foot
+      // there is nothing to report but the camera.
+      if (p) {
+        const feet = one(p.x, p.z);
+        return { feet, paste: feet.lat + ', ' + feet.lon, on: 'foot' };
+      }
+      const eye = one(c.x, c.z);
+      return { eye, paste: eye.lat + ', ' + eye.lon, on: 'camera' };
+    }
+    const [x, z] = toWorldLL(lat, lon);
+    if (Math.abs(x) > 6500 || Math.abs(z) > 6500) {
+      return { error: 'outside the 13 km world', world: [+x.toFixed(1), +z.toFixed(1)] };
+    }
+    // On foot if the walk is up; otherwise a camera, 40 m up and looking down
+    // at it, which is the only thing that can be done from a cockpit.
+    // `lost: false`, because arriving by debug handle is not being stranded —
+    // the default marks you as having lost the aeroplane, which is right when
+    // you have bailed out and wrong when you have typed a coordinate.
+    //
+    // `retarget` only inside Jadrija's own kilometre. `dropIn` runs `confine`
+    // against whatever locale is loaded, so teleporting across the map with
+    // the resort still attached would clamp you back to its walk box; and
+    // attaching the resort to somewhere it does not cover would do the same
+    // thing in the other direction.
+    if (ground && ground.ok && ground.dropIn) {
+      const site = jadrija && jadrija.site;
+      const near = site
+        && Math.hypot(x - site.x, z - site.z) < 1200;
+      if (near) ground.retarget(jadrija);
+      ground.dropIn(x, z, near ? site.yaw : 0, false);
+      return { walked: [+x.toFixed(1), +z.toFixed(1)], locale: near ? 'jadrija' : 'open' };
+    }
+    camOverride = [x, groundAt(x, z) + 40, z - 30, x, groundAt(x, z), z];
+    return { flew: [+x.toFixed(1), +z.toFixed(1)] };
+  },
   look: (px, py, pz, tx, ty, tz) => { camOverride = [px, py, pz, tx, ty, tz]; },
   free: () => {
     camOverride = null;

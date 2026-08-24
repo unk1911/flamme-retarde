@@ -8,6 +8,45 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.113.1] — 2026-08-24
+
+Misha, on 1.113.0: *"add a parameter or 2 parameters, where i can specify the
+gps coordinates of the world, and it snaps to that location... but i think u got
+it right... i can* almost *walk to it"*. Both halves of that, and the "almost"
+had a cause.
+
+### Added
+
+- **`__fr.gps()` and `__fr.gps(lat, lon)`.** The first reads your position back
+  as degrees, the second puts you there — on foot if you are on foot, as a
+  camera forty metres up if you are in the aeroplane. It exists because of the
+  Brod: he can stand on a quay at Jadrija and I cannot, and a pair of degrees is
+  the only thing either of us can hand the other that means the same in both
+  places. A survey frame with no GPS in it stops being a dead end the moment
+  somebody walks to the spot in the game and reads the coordinates off.
+
+  The projection is `tools/bake.py`'s, reduced — that file works in the DEM's
+  frame and then subtracts the offset to the game's origin, which cancels
+  exactly. The one number that is **not** the origin's is the longitude scale:
+  it stays pinned to the DEM's centre latitude of 43.7150, because that is the
+  cosine bake.py laid every footprint down with. Recomputing it at the origin's
+  own 43.7280 would be more correct and would put everything 15 m out, which is
+  the kind of wrong that looks right. Checked against Tvrđava svetog Nikole,
+  whose OSM way centres at game (-1237.2, 718.5): it reads back 43.721546,
+  15.854624, and the fortress is where OSM says it is.
+
+### Fixed
+
+- **The last ten metres to the Brod were a wall with nothing in it.** The walk
+  box ended at `t = LEN - 3`, which is 569.2, and the Brod sits at t 579.6 — so
+  `confine` was pulling him back every frame for the want of ten metres. `t1`
+  runs to `LEN + 22` now. Walking out there is well defined: `at()` extrapolates
+  past either end along the last station's tangent, so the shore frame simply
+  runs straight on, and past `JAD.back` `walkY` falls through to the terrain,
+  which out on the spit is a hillside a few metres above the sea. Verified by
+  teleporting to 43.724982, 15.847840 and reading the position back: world
+  (-1783, 336) exactly, t 579.6, standing on ground.
+
 ## [1.113.0] — 2026-08-24
 
 A night down the ranked survey lists, and the night's real finding is about the
