@@ -328,10 +328,41 @@ cracked with grass in the joints. The right shape for the place and it explains
 where the boats come out. Ranked low only because it is a ground detail and
 rule 6 says ground detail at 15 m is a pixel and a half.
 
-**14. The park bench with cast-iron ends.** `b_114`, `b_119`, `b_017`. Pale
-timber slats — four in the seat, three in the back — on black cast-iron scroll
-ends with a curved arm. The game's tree-line bench is timber; this is the
-municipal pattern, and it is the one standing against the kabine.
+**14. The park bench with cast-iron ends.** `b_114`, `b_119`, `b_017`.
+**BUILT, 23 Aug**, and the catalogue is wrong three times over — the fourth
+item this week to change shape once the frame was opened at full size.
+
+It has "four in the seat, three in the back... with a curved arm". `b_114` is
+this bench from four metres and `b_119` from twelve, both unobstructed:
+
+- the back has **two** slats, a narrow one over a wide one;
+- the seat is **one wide board**. The top surface has no gap line anywhere
+  along it — checked at 8× on `b_114`, which is the only frame that sees the
+  seat from above at all;
+- and there is **no arm**. The end is a single slim casting — a foot, a leg
+  that swells at mid-height, and a standard leaning back off the seat to
+  finish in a small crook. What the item calls a curved arm is that crook: it
+  carries the back and it is at shoulder height, not elbow.
+
+It is a **different bench** from the one already in the file. `BENCH` is the
+promenade pattern — five seat slats, four back slats, a bent green iron end
+frame, standing in a run every 33 m. This is one bench, in black, of a much
+lighter build, against the west gable of the kabine block. Two municipal
+patterns in one resort is what a place added to for a century looks like, and
+that is why it is its own object rather than a parameter on the other.
+
+Two findings worth keeping:
+
+- **A casting is not a rod.** The first cut ran one thin member from foot to
+  seat and the end came out as two black sticks. What says "casting" at ten
+  metres is that it changes section on the way up and that the frame reads as
+  one piece — so each leg is two lengths with a swell between them and the two
+  are tied under the seat.
+- **This scene's ambient washes warm timber out, and that is now twice in one
+  night.** The tavern's beer sets photographed salmon and this photographed
+  cream, both set at their measured separation. Red-minus-blue has to go
+  roughly 0.045 past the sample before blond pine reads as blond pine. Treat
+  the measurement as a floor for warm wood, not as the answer.
 
 **15. The white plastic monobloc chair.** `b_004`, `b_005`, `b_133`, `b_196`.
 Everywhere: on the mole, in the wood, outside the kabine. One of the few

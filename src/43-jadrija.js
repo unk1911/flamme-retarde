@@ -9225,6 +9225,119 @@ async function buildJadrija(scene) {
     }
   }
 
+  // ── the municipal bench at the kabine gable ────────────────────────────────
+  //
+  // Survey item 14, and like 8, 10 and 12 the catalogue is wrong once you open
+  // the frame. It has "pale timber slats — four in the seat, three in the back
+  // — on black cast-iron scroll ends with a curved arm". `b_114` and `b_119`
+  // are this bench from four metres and from twelve, both unobstructed:
+  //
+  //   * the back has **two** slats, a narrow one over a wide one;
+  //   * the seat is **one wide board**, not four slats — the top surface has
+  //     no gap line anywhere along it;
+  //   * and there is **no arm at all**. The end is a single slim casting: a
+  //     foot, a leg, and a standard that leans back off the seat and finishes
+  //     in a small crook. What the item calls a curved arm is that crook,
+  //     which carries the back and is at shoulder height, not elbow.
+  //
+  // It is a different bench from the one already in this file. `BENCH` above
+  // is the promenade pattern — five seat slats, four back slats, a bent green
+  // iron end frame — and it stands in a run every 33 m. This is one bench, in
+  // black, of a much lighter build, and it stands against the west gable of
+  // the kabine block with a bin beside it. Two municipal patterns in one
+  // resort is exactly what a place that has been added to for a century looks
+  // like, and it is the reason this is worth its own object rather than a
+  // parameter on the other.
+  //
+  // The timber is a pale blond, masked out of `b_119` at 0.734/0.645/0.509 —
+  // warm but barely saturated, which is softwood under fresh clear varnish and
+  // not the orange of the tavern's benches. It goes in a little under that
+  // because the sample is a sunlit face and this has to hold up in shade.
+  {
+    const backB = b;
+    b = up;
+    // Blue pulled down past the measurement, and this is the SECOND time
+    // tonight: the tavern's beer sets needed the same and for the same reason.
+    // A warm timber set at its measured separation photographs washed out
+    // under this scene's ambient — the beer sets came out salmon and this came
+    // out cream — so red-minus-blue goes from the sampled 0.225 to 0.272
+    // before it reads as blond varnished pine rather than as painted board.
+    const WOOD = [0.700, 0.606, 0.428];
+    const WTOP = [0.752, 0.656, 0.470];
+    const IRON = [0.128, 0.120, 0.118];
+    /**
+     * One member of the casting: a box between two points in the end's own
+     * (across, up) plane, `w` thick along the bench.
+     *
+     * A ribbon would have done for the beer sets' bracing because that is a
+     * flat strap seen face-on. This is not — the leg of a bench is met from
+     * every side as you walk round it, and a single quad turns invisible edge
+     * on. Eight corners, six quads.
+     */
+    const member = (P, u, v0, y0, v1, y1, w, th, col) => {
+      let dv = v1 - v0, dy = y1 - y0;
+      const L = Math.hypot(dv, dy) || 1;
+      dv /= L; dy /= L;
+      const pv = -dy * th * 0.5, py2 = dv * th * 0.5;
+      const C = (e, sgn, sgu) => P(u + sgu * w * 0.5,
+        (e ? v1 : v0) + sgn * pv, (e ? y1 : y0) + sgn * py2);
+      const A0 = C(0, 1, -1), A1 = C(0, 1, 1), A2 = C(0, -1, 1), A3 = C(0, -1, -1);
+      const B0 = C(1, 1, -1), B1 = C(1, 1, 1), B2 = C(1, -1, 1), B3 = C(1, -1, -1);
+      b.quad(A0, A1, B1, B0, col);
+      b.quad(A1, A2, B2, B1, col);
+      b.quad(A2, A3, B3, B2, col);
+      b.quad(A3, A0, B0, B3, col);
+      b.quad(B0, B1, B2, B3, col);
+      b.quad(A3, A2, A1, A0, col);
+    };
+    const gableBench = (bt, bsv, ang) => {
+      const co = Math.cos(ang), sn = Math.sin(ang);
+      const P = (u, v, yy) =>
+        W(bt + u * co - v * sn, bsv + u * sn + v * co, yy);
+      const gy = surfaceY(bt, bsv);
+      const HL = 0.925;                       // 1.85 m along
+      // The seat: one board, 0.30 deep, falling 20 mm to the back.
+      boxIn(P, -HL, HL, -0.150, 0.150, gy + 0.398, gy + 0.440, WOOD, WTOP);
+      // The back: a wide slat then a narrow one, both leaning 0.26 rad.
+      const rake = 0.26, cr = Math.cos(rake), sr = Math.sin(rake);
+      for (const [h, wid] of [[0.215, 0.105], [0.400, 0.058]]) {
+        const cv = 0.170 + sr * h, cy = gy + 0.470 + cr * h;
+        // Laid in the rake, so the boards are parallel to the lean rather than
+        // standing plumb inside it.
+        member(P, 0, cv - sr * wid * 0.5, cy - cr * wid * 0.5,
+          cv + sr * wid * 0.5, cy + cr * wid * 0.5, HL * 2, 0.030, WOOD);
+      }
+      // The two castings.
+      for (const u of [-HL + 0.055, HL - 0.055]) {
+        // Each leg in two lengths with a swell between them, and the two of
+        // them tied under the seat. The first cut ran one thin member from
+        // the foot to the seat and the end came out as two black sticks: a
+        // casting is not a rod, and what says so at ten metres is that it
+        // changes section on the way up and that the frame is one piece.
+        member(P, u, -0.175, gy + 0.008, -0.150, gy + 0.175, 0.052, 0.046, IRON);
+        member(P, u, -0.150, gy + 0.175, -0.130, gy + 0.398, 0.044, 0.038, IRON);
+        member(P, u, -0.152, gy + 0.150, -0.148, gy + 0.205, 0.066, 0.062, IRON);
+        member(P, u, 0.150, gy + 0.008, 0.132, gy + 0.175, 0.052, 0.046, IRON);
+        member(P, u, 0.132, gy + 0.175, 0.108, gy + 0.398, 0.044, 0.038, IRON);
+        member(P, u, 0.134, gy + 0.150, 0.130, gy + 0.205, 0.066, 0.062, IRON);
+        // The tie under the seat that makes it one frame.
+        member(P, u, -0.132, gy + 0.352, 0.110, gy + 0.352, 0.038, 0.032, IRON);
+        // The foot pads, which is what stops it reading as a plank on wires.
+        member(P, u, -0.205, gy + 0.006, -0.145, gy + 0.006, 0.070, 0.028, IRON);
+        member(P, u, 0.120, gy + 0.006, 0.180, gy + 0.006, 0.070, 0.028, IRON);
+        // The standard, leaning back off the seat, and the crook on the end of
+        // it that the back slats bolt to.
+        member(P, u, 0.108, gy + 0.398, 0.290, gy + 0.905, 0.042, 0.038, IRON);
+        member(P, u, 0.290, gy + 0.905, 0.222, gy + 0.955, 0.042, 0.034, IRON);
+      }
+    };
+    // Against the west gable of the kabine block, which is where `b_114` has
+    // it: the rows run t 396-557, so the wall is at 396 and the bench stands
+    // half a metre off it with its back to it, looking down the promenade.
+    // `s` puts it on the middle of the block's own depth.
+    gableBench(394.6, JAD.rowA + JAD.cabD * 0.5, Math.PI * 0.5);
+  }
+
   // ── ZABRANJENO ODLAGANJE OTPADA ────────────────────────────────────────────
   //
   // Survey item, `b_003`, with `b_002` and `b_016`-`b_018` on the same sign
