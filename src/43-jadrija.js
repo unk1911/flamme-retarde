@@ -17056,21 +17056,68 @@ async function buildJadrija(scene) {
     // a question, and a question you have to hold for five seconds has been
     // answered by the holding.
     soakIn: 1.5,
-    // A minute is a set piece and ten seconds is a twitch. Twenty-six is long
-    // enough to light four or five patches of deck and put you properly behind.
-    blazeFor: 26,
+    // As long as the record, and the record is what decides it now.
+    //
+    // This was 26 s, on the argument that a minute is a set piece and ten
+    // seconds is a twitch. Then the synth kit was replaced by a recording of
+    // Misha's and he played it and asked why the music only ran for half a
+    // minute when he had given us two — and he is right, because the 26 was
+    // never a judgement about the burn. It was a judgement about how long a
+    // drum machine can repeat two bars before it is a loop you are waiting
+    // out, made when the cue was a drum machine.
+    //
+    // A record does not have that problem, and the length of the thing is now
+    // simply how much of the recording is honestly usable: 109.67476 s of
+    // source, which is the 1.1154 s lead-in plus thirty-two eight-beat
+    // phrases, and 108.1592 s of game time once `FIRE.beat / FIRE.srcBeat`
+    // has sped it up. Take `FIRE.lead` — the 1.10 s of `flare` before the
+    // downbeat — and the 0.45 s fade in `fireStop` off that and 106.3 is what
+    // is left, with three tenths of a second in hand. The recording stops at
+    // 117.10 s of its own clock and everything after that is a room with a
+    // phone in it; the measurement is in the note over `CUES` in
+    // tools/cut_field.py.
+    //
+    // It is a long time to be on fire. That is the point: `castEvery` and
+    // `boastEvery` below both had to be re-thought around it, and the answer
+    // in both cases was to spread out rather than to do more.
+    blazeFor: 106.3,
     // And five with the branch on her ends it, which is the loop closing: the
     // water started this and the water is what stops it. Not instant, because
     // instant would mean the whole sequence could be cancelled by a player who
     // happened to still be holding the trigger when it began.
     douseFor: 5,
-    castEvery: [1.4, 2.5],   // seconds between fireballs
+    // Seconds between fireballs, and the number that decides it is not taste,
+    // it is `fires` below. Seven patches at a `life` of 30 s each means a slot
+    // comes free every 4.3 s if nobody puts anything out, and a ball that lands
+    // on a full deck goes through `light`'s early return and does NOTHING — it
+    // arcs down, it hits the concrete, and no fire appears. Over a 26 s burn
+    // that never came up. Over this one it does: measured across a whole burn
+    // at the old [1.4, 2.5], she threw 29 balls and lit 23 patches, so one
+    // throw in five was a dud you watched land.
+    //
+    // 2.6 to 4.4 plus the 0.76 s of the `cast` clip is a cycle of about 4.3 s,
+    // which is the rate the deck actually frees space at, and the player
+    // dousing frees it faster still. It is slower than the old number and the
+    // burn is four times as long, so she throws more in total and wastes
+    // almost none of it.
+    castEvery: [2.6, 4.4],
     // And between cards. The first is seeded at the far end of this at the
     // moment she lights, so the fire comes first and the announcement comes
-    // after it — which is the right order for a boast — and a twenty-six second
-    // burn then gets two of them. Three would be a woman with a sign rather
-    // than a woman on fire.
-    boastEvery: [6, 11],
+    // after it — which is the right order for a boast.
+    //
+    // This was [6, 11], which put two cards in a 26 s burn and was right for
+    // one; the note here used to say that three would be a woman with a sign
+    // rather than a woman on fire. At 106 s the same numbers gave SIX, and the
+    // measurement is worse than the count: sampling her phase every frame over
+    // a whole burn, 23.9% of it was `boast`. A quarter of the set piece was
+    // her standing still holding up a sign, and there are two lines in
+    // `FIRE_NOTES`, so it was the same joke three times over.
+    //
+    // Stretched by a factor of three it comes out at three cards in 106 s —
+    // one every 29 s, about a tenth of the burn — which is a running gag
+    // rather than a placard. Writing more lines instead was the other way to
+    // fix it and is rule 12: nobody has said what else she would say.
+    boastEvery: [18, 30],
     // Two cards at 2.2 s each. Long enough to read four words and take the
     // second one as a punchline, short enough that she is a woman on fire who
     // paused rather than a woman holding a sign.
@@ -17123,9 +17170,19 @@ async function buildJadrija(scene) {
     // A hundred and forty degrees lays them out along the deck either side of
     // you, where they can be seen and got to.
     ballSpread: 2.4,
-    fires: 7,           // most patches alight at once. A cap and not a budget:
-                        // seven is already more than the branch can hold, and
-                        // without one a routine you ignore lays down thirteen.
+    // Most patches alight at once. A cap and not a budget: seven is already
+    // more than the branch can hold, and without one a routine you ignore laid
+    // down thirteen when the burn was 26 s.
+    //
+    // It is now the thing that keeps a hundred-second burn from being a wall
+    // of fire, and it does the job without changing: watched all the way
+    // through, the deck sits at six or seven patches from about half a minute
+    // in and it still sits at six or seven at a hundred, because they go out
+    // at `life` as fast as she lights them. What accumulates is the tally and
+    // not the promenade — 17 apron objects lost over a burn nobody fought,
+    // against four or five over the old one. That is a score, not a wall, and
+    // there is no fail state behind it.
+    fires: 7,
   };
 
   /**

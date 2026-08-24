@@ -201,9 +201,19 @@ BEDS = [
 # own beat is 0.43 s — the synth this replaces was pinned to `FIRE_DUR` in
 # tools/blender/human_mh.py so that her boot lands on the beat, and 141.49
 # against 139.53 would walk three quarters of a beat apart over the 26 s the
-# routine runs for. 80-audio.js plays the clip at 1.0140 to close that, which
-# is 24 cents of pitch and is why the tempo is measured here rather than
+# routine used to run for. 80-audio.js plays the clip at 1.0140 to close that,
+# which is 24 cents of pitch and is why the tempo is measured here rather than
 # rounded.
+#
+# It survived the window going four times longer, which was not a given: two
+# decimal places of beat is 255 beats of accumulation over the cue that ships
+# now, and a tenth of a per cent out would be half a beat by the end of it.
+# Re-measured by folding the onset envelope onto a candidate phrase length over
+# the whole 8.50-117.06 s and taking the length whose folded profile has the
+# most contrast, the answer is 3.39270 s a phrase against the 3.39248 written
+# here — 0.22 ms a phrase, 7 ms over the whole cue, and the folding score at
+# the shipped value is 0.4846 against the peak's 0.4907. So the constant
+# stands.
 #
 # WHERE THE WINDOW IS. The recording has a shape and the shape is what chose
 # it. There is a stop-start intro: the track drops to -39 dB or lower for
@@ -212,25 +222,39 @@ BEDS = [
 # gaps at all and it runs level to the end. So the first 25 s builds and the
 # rest sits.
 #
-# The window starts 1.1154 s before the downbeat at 8.5030 s and runs eight
-# phrases. The lead-in is deliberate and is the whole reason the start is not
-# on the beat: `FIRE.lead` is 1.10 s of game time, the length of the `flare`
-# clip, and what has to land on the downbeat is her first stamp — so the clip
-# has to carry 1.10 s of game time, 1.1154 s of source, in front of its own
-# downbeat. What is in that 1.1154 s here is the deepest gap in the recording,
-# falling from -24 to -41 dB. It is a hole in front of the hit, which is what
-# the riser it replaces was for.
+# The window starts 1.1154 s before the downbeat at 8.5030 s. The lead-in is
+# deliberate and is the whole reason the start is not on the beat: `FIRE.lead`
+# is 1.10 s of game time, the length of the `flare` clip, and what has to land
+# on the downbeat is her first stamp — so the clip has to carry 1.10 s of game
+# time, 1.1154 s of source, in front of its own downbeat. What is in that
+# 1.1154 s here is the deepest gap in the recording, falling from -24 to
+# -41 dB. It is a hole in front of the hit, which is what the riser it replaces
+# was for. Measured over the candidate downbeats, this one has the biggest step
+# across its downbeat of any window in the file — the lead-in is -29.56 dBFS
+# against -23.10 for the bar after it, +6.46 dB.
 #
-# Measured over the candidate downbeats, this one has the biggest step across
-# its downbeat of any window in the file — the lead-in is -29.56 dBFS against
-# -23.10 for the bar after it, +6.46 dB — and it ends at 35.64 s, ten seconds
-# inside the part with no gaps in it. So the cue starts sparse under the flare
-# and has filled out by the time she is stamping.
+# WHERE IT ENDS, which is a measurement and not the length of the file. The
+# record stops at 117.10 s and the last 5.67 s of the recording is not it. At
+# 117.10 the level steps from -22.4 dBFS to -25.3 and then to -28.4 across
+# 119.50-120.45, and — the part that says what it is — the top goes with it:
+# the 5-11 kHz band carries -13.3 dB of the energy up to 117.06 and -18.1 dB
+# after it. On the spectrogram everything above about 5 kHz simply stops on one
+# frame and what is left is a couple of harmonic stacks down at 1-3 kHz. It is
+# the speaker being turned off or walked away from, with the phone still
+# running. Cutting to 122.77 because that is where the file ends would ship six
+# seconds of somebody's room.
 #
-# 28.2553 s of source is 27.86 s at 1.0140, against a routine that is
-# `FIRE.lead` plus `SHOW.blazeFor` — 1.10 + 26.0 — and a 0.45 s stop fade, so
-# 27.55 s. The clip outlasts the longest turn by three tenths of a second and
-# is not a second longer than it has to be.
+# So the window is the lead-in plus **32 phrases**, 109.67476 s, ending at
+# 117.06231 s — 38 ms before the step. That the record's own last hit sits at
+# 117.04, inside the bar this boundary closes, is the corroboration: counting
+# thirty-two phrases off that downbeat lands on the end of the music to within
+# a fortieth of a second, which a wrong phrase length could not do.
+#
+# 109.6748 s of source is 108.1592 s at 1.0140, against a routine that is
+# `FIRE.lead` plus `SHOW.blazeFor` — 1.10 + 106.3 — and a 0.45 s stop fade, so
+# 107.85 s. The clip outlasts the longest turn by three tenths of a second,
+# which is the margin the 28 s cut had, and there is nothing left in the
+# recording to make it longer with.
 #
 # THE LEVEL, which is measured the way the radio's was and then cannot be
 # written here.
@@ -243,37 +267,52 @@ BEDS = [
 # -14.402 over the whole cue including the riser, and it PEAKS at -1.62. A
 # crest factor of 12.6 dB.
 #
-# This recording's crest factor over the chosen window is 17.53 dB, and it is
-# the material and not a click: 2 492 samples in the window are over half the
-# peak. So a file normalised to -14.23 dBFS RMS peaks at **+3.30 dBFS** and is
+# This recording's crest factor over the chosen window is 17.62 dB, and it is
+# the material and not a click: 10 270 samples in the window are over half the
+# peak. So a file normalised to -14.23 dBFS RMS peaks at **+3.39 dBFS** and is
 # a clipped file. That is not a window that can be picked again — every
 # candidate downbeat in the recording comes out between 16.9 and 18.5 dB of
 # crest — and the note above `finish` is right that the answer is not a
 # limiter.
 #
-# So the level match is split. The file ships at -18.03 dBFS RMS, which puts
-# its peak at exactly the -0.50 dBFS `finish` allows, and 80-audio.js puts the
+# So the level match is split. The file ships at -18.13 dBFS RMS, which puts
+# its peak at the -0.50 dBFS `finish` allows, and 80-audio.js puts the
 # difference back on the sample's own gain node — so what reaches `fireBus` is
 # at `target`, -14.23 dBFS, and the room hears the cue at the level it heard
-# the synth at. Nothing clips on the way: the peak at the bus INPUT is +2.93
+# the synth at. Nothing clips on the way: the peak at the bus INPUT is +3.39
 # dBFS whichever way the split is made, and the bus is at `FIRE.gain` 0.50, so
-# what arrives at the master peaks at -3.09 dBFS against the synth's -7.64.
-# Louder in the peaks by 4.6 dB, identical in RMS, and that difference is
+# what arrives at the master peaks at -2.62 dBFS against the synth's -7.64.
+# Louder in the peaks by 5.0 dB, identical in RMS, and that difference is
 # simply what music is next to a drum machine.
 #
-# `makeup` is not -18.03 subtracted from -14.23, and the 0.53 dB it is out by
+# The tenth of a decibel between this and the -18.03 the 28 s cut shipped at is
+# the whole reason `finish` checks the peak instead of assuming it, and the
+# check earned its keep here: the loudest single sample in the recording is at
+# 115.83 s, which is inside the long window and was nowhere near the short one,
+# and re-cutting at -18.03 came back `!! firestarter peaks at -0.41 dBFS — pick
+# again`. A longer window catches a louder peak. It is written on the tin.
+#
+# `makeup` is not -18.13 subtracted from -14.23, and the 0.59 dB it is out by
 # is the encoder. LAME at 80 kbps mono into 24 kHz throws away everything over
 # about 11 kHz, and this source still carries -19.9 dB of its energy in the
 # 7-11 kHz band and more above it, so the clip that comes BACK out of the file
-# is 0.53 dB quieter than the one that went in. `cut_cue` decodes the mp3 it
+# is 0.59 dB quieter than the one that went in. `cut_cue` decodes the mp3 it
 # just wrote and reads it, rather than trusting the number it asked for; the
 # constant below is that measurement and the tool shouts if a re-cut moves it.
 # This is the same correction the `radio` bed carries for its own rig, applied
 # at the other end of the chain.
+#
+# THE BITRATE STAYS AT 80. Four times the window is four times the file — 277
+# KB became 1 072, and base64 in the page makes that 1 429 KB against 369, so
+# the build goes from 23.91 MB to 24.95. 64 kbps was cut and measured as the
+# alternative and saves 214 KB of that (286 KB in the page, 1.1% of the
+# build), which is not enough to pay for taking a bitrate off the one piece of
+# music in the game — every other clip in the payload is a bed under something
+# and this one is the thing you are listening to.
 CUES = [
-    dict(key='firestarter', src=9, at=7.38755, sec=28.25525,
-         rate=24000, kbps=80, hp=(2, 70), lp=None, rms=-18.03,
-         target=-14.23, makeup=4.33, what='the turn, 24 Aug'),
+    dict(key='firestarter', src=9, at=7.38755, sec=109.67476,
+         rate=24000, kbps=80, hp=(2, 70), lp=None, rms=-18.13,
+         target=-14.23, makeup=4.49, what='the turn, 24 Aug'),
 ]
 
 INSET = 0.5     # s — where 80-audio.js puts loopStart and loopEnd

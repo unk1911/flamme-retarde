@@ -1276,16 +1276,25 @@ function buildAudio() {
     // tools/cut_field.py: 141.49 bpm against this kit's 139.53. Played at
     // `beat / srcBeat` the clip runs at the tempo her boot is stamping at, and
     // the whole argument above about `FIRE_DUR` and exact halves survives the
-    // change of instrument. It costs 24 cents of pitch over 28 seconds, which
-    // is a quarter of what a DJ's fader has under its detent.
+    // change of instrument. It costs 24 cents of pitch, which is a quarter of
+    // what a DJ's fader has under its detent.
+    //
+    // Five decimal places, and they are all load-bearing now that the cue is
+    // a hundred and eight seconds instead of twenty-eight: that is 255 beats
+    // of accumulation, so a tenth of a per cent of tempo error is half a beat
+    // apart by the end and her boot is landing in the hole. Re-measured over
+    // the whole of the shipped window it comes out at 0.424087 — 7 ms of drift
+    // across the entire cue. See the note over `CUES`.
     srcBeat: 0.42406,
-    // And the make-up on the sample, +4.33 dB. The file cannot ship at the
-    // synth's own -14.23 dBFS because this material's crest factor is 17.5 dB
-    // and it would clip; it ships at -18.03, decodes at -18.56 once the
+    // And the make-up on the sample, +4.49 dB. The file cannot ship at the
+    // synth's own -14.23 dBFS because this material's crest factor is 17.6 dB
+    // and it would clip; it ships at -18.13, decodes at -18.72 once the
     // encoder's lowpass has had the top off it, and this puts it back. The
     // number is measured by `cut_cue`, which decodes the mp3 it just wrote and
-    // shouts if a re-cut moves it away from what is written here.
-    samp: 1.648,
+    // shouts if a re-cut moves it away from what is written here — and it did
+    // shout, when the window went from 28 s to 110 and swallowed the loudest
+    // sample in the recording.
+    samp: 1.677,
   };
 
   // One sixteenth per character, sixteen to the bar, two bars. `x` is a hit and
@@ -1554,6 +1563,15 @@ function buildAudio() {
     // on `squeak` says how it came out: the first one of the session is
     // synthesised and nobody has ever noticed.
     //
+    // What the kit does over the length the turn runs to now is play its two
+    // bars thirty-one times, because that is the whole of it: `fireTick` walks
+    // `fireStep` forward for ever and takes it modulo `FIRE_STEPS`. It does not
+    // run out, drift or stop — the shriek still arrives every second bar and
+    // the bar line still survives a dropped frame — it simply repeats, which
+    // is what a drum machine standing in for a record does. Nothing about the
+    // fallback needed changing for the longer burn, and that is worth writing
+    // down because it is the sort of thing that is assumed and then is not so.
+    //
     // Everything downstream is identical either way. The clip goes into
     // `fireBus` exactly where the kit's sixteen note gains go, at a level
     // measured to match theirs, so the distance roll-off in `fireTick`, the
@@ -1667,11 +1685,14 @@ function buildAudio() {
    * band voices live in. See the note in `tools/cut_field.py`.
    *
    * There is a seventh clip in the payload and it is not one of these. The
-   * firestarter cue, 28.3 s at 270 KB, comes out of the same tool by a
+   * firestarter cue, 109.7 s at 1 072 KB, comes out of the same tool by a
    * different door — `cut_cue` rather than `cut` — because it is played once
    * under a moment and stopped, and nothing about seams, insets or the length
    * search applies to a thing with no join in it. It is also the only clip
-   * here that is not a place: see `FIRE` and the note over `cut_cue`.
+   * here that is not a place: see `FIRE` and the note over `cut_cue`. It is on
+   * its own a third of the payload, which is what it costs to have the turn
+   * last as long as the record does rather than as long as a set piece is
+   * usually allowed to.
    *
    * All five are high-passed, because a 117 Hz rumble is the loudest single
    * thing in three of the six source files and it is not the sound of anywhere;
