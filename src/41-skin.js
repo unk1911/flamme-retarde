@@ -802,6 +802,7 @@ uniform vec3 uEye;
 uniform vec3 uEyeR;
 uniform vec3 uSockR;
 uniform vec3 uBrowR;
+uniform vec3 uBrowCol;
 uniform vec3 uLidCol;
 uniform vec3 uLashCol;
 uniform vec3 uLip;
@@ -904,7 +905,7 @@ const FACE_FRAG = /* glsl */ `
       float keep = 1.0 - smoothstep(${FACE.keep[0].toFixed(3)},
         ${FACE.keep[1].toFixed(3)}, length(e));
       base = mix(base, uLidCol, sock * (1.0 - keep));
-      base = mix(base, vec3(${FACE.browCol.join(', ')}),
+      base = mix(base, uBrowCol,
         1.0 - smoothstep(0.60, 1.0, length((f - vec3(uEye.x,
           uEye.y + ${FACE.brow[0]}, uEye.z * ${FACE.brow[1]})) / uBrowR)));
     }
@@ -1284,6 +1285,15 @@ function skinnedFigure(data, opts = {}) {
     uEyeR: V(FACE.eyeR),
     uSockR: V(FACE.sockR),
     uBrowR: V(FACE.browR),
+    // Per figure, because the brow is the one thing on this face that has to
+    // follow a dye job done in the caller's own fragment body. The mesh's brow
+    // is painted HAIR_P and wiped off again a few lines into FACE_FRAG, so
+    // whatever the hair is recoloured to out there never reaches it: a blonde
+    // built by dyeing the hair alone keeps the brunette's brows, and on a face
+    // filling the frame in the kabina that is the first thing you see. The
+    // default is the colour the cutter used, so a figure that says nothing
+    // gets exactly what it got before.
+    uBrowCol: V(opts.browCol || FACE.browCol),
     uLidCol: V(anchors.lid),
     uLashCol: V(anchors.lash),
     uLip: V(anchors.corner || [0, -99, 0]),

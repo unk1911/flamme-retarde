@@ -15719,16 +15719,131 @@ async function buildJadrija(scene) {
       },
     };
   }
+  /**
+   * She is blonde, and it is a dye job in her own fragment and not a re-bake.
+   *
+   * The rig arrives with one exact brown on its hair — HAIR_P out of
+   * human_mh.py, (0.128, 0.094, 0.070) — and that colour is not only a colour:
+   * `easeNape` in 41-skin.js finds the hair vertices in the blob by it, to take
+   * the nape off the head bone. Re-baking her fair would have moved the colour
+   * and left the lookup matching nothing, and her nape would have gone rigid to
+   * her skull again. Chloe is dyed blue in her own shader over the same baked
+   * brown for the same reason; this is that mechanism, in her colours.
+   *
+   * Two tones and not one, which on blonde is the difference between hair and a
+   * wig. Dark brown reads as a mass because it is nearly black and its own
+   * self-shadow does all the work; a single flat fair colour has no shadow left
+   * in it and comes out a helmet. So the crown is `hi` and the underside and the
+   * nape are `lo`, broken up around the skull by locks the width of a real one.
+   *
+   * `hi` sits under the skin's own 0.760 on every channel, deliberately — the
+   * specular is added on top of the albedo and a blonde that starts near white
+   * has nowhere to go but clipped in Dalmatian sun.
+   */
+  const BAYE_HAIR = {
+    lo: [0.300, 0.208, 0.112],     // the nape, the underside, the roots
+    hi: [0.640, 0.500, 0.290],     // the crown, where the sun is on it
+    // Her brows, and they are neither. A blonde with the brunette's brows on is
+    // a wig seen from the other side, and a blonde with her own hair colour on
+    // her brows has no brows at all at any distance — the patch is 6 mm of paint
+    // on skin that is 0.760, and it disappears at about 0.55. Real fair brows
+    // run a couple of shades under the hair, which is what this is: darker than
+    // `lo`, well up from the near-black the cutter painted.
+    brow: [0.268, 0.196, 0.124],
+    // And the pubic hair, which human_mh.py deliberately gave the hair marker so
+    // that a recoloured head and an un-recoloured crotch could never happen. It
+    // is baked PUBIC_P — (0.225, 0.163, 0.128), three shades up from HAIR_P and
+    // therefore *not* caught by the dye's window, which is measured off HAIR_P —
+    // so it takes a window and a lift of its own. Lifted rather than dyed to the
+    // hair colour: that note's own reasoning is that a flat patch on lit skin
+    // cannot take the contrast the head's mass can, and it holds in the other
+    // direction too.
+    pubic: [0.225, 0.163, 0.128],
+    pubicTo: [0.430, 0.340, 0.238],
+  };
+  const gl3 = (a) => a.map((n) => n.toFixed(3)).join(', ');
+
   if (PAYLOAD.human_skin_fr3d) {
     try {
       skinFig = await loadSkin('human_skin_fr3d', {
         spec: 0.09,
         specPower: 24,
         face: true,
+        browCol: BAYE_HAIR.brow,
         // Literal colours, as the landmarks do. The marker palette in
         // 42-crowd.js is for figures the runtime recolours per instance, and
-        // there is exactly one of these.
-        body: 'base *= vVCol;',
+        // there is exactly one of these — so the dye below is written straight
+        // into her own fragment rather than through the marker slots.
+        body: `
+          vec3 vcol = vVCol;
+          {
+            // Not a window round HAIR_P but a *line* from the skin to it, and
+            // that is the whole of what a dye job on a decimated head has to
+            // get right. The bake paints hair on vertices and the decimator
+            // then averages them with their neighbours, so the hairline is not
+            // an edge: measured off the blob, 228 vertices above y 1.29 sit at
+            // every mixture between SKIN_P and HAIR_P there is, and on a
+            // brunette nobody could see them. Dye only the ones that are all
+            // hair and that ramp survives as a jagged dark-brown seam round the
+            // temple, over the ear and down the nape — which is exactly what
+            // the first pass shipped. So each vertex is projected onto the
+            // skin-to-hair line, and what it gets back is the same fraction of
+            // the *blonde*: a vertex that was a third hair comes out a third
+            // fair, and the soft edge stays soft.
+            //
+            // onLine is what keeps everything else out. At 0.035 the two
+            // things that lie near this line and must not move are both
+            // excluded — the lashes at 0.102 and the lip line at 0.056 — and so
+            // is the areola at 0.050, which the height gate would catch anyway.
+            vec3 SK = vec3(0.761, 0.588, 0.475);        // SKIN_P, off the blob
+            vec3 ax = vec3(0.129, 0.094, 0.071) - SK;   // and HAIR_P from it
+            float w = dot(vcol - SK, ax) / dot(ax, ax);
+            float wc = clamp(w, 0.0, 1.0);
+            float onLine = 1.0 - smoothstep(0.018, 0.035, distance(vcol, SK + ax * wc));
+            // Above the collarbone only. Every hair vertex on her is between
+            // y 1.313 and 1.748 in the bind pose, and the one other thing on
+            // this line is the perianal skin at y 0.85 — which is pigment, is
+            // not hair, and must not be dyed anything.
+            float dye = onLine * smoothstep(0.06, 0.22, w) * step(1.29, vLocal.y);
+            if (dye > 0.0) {
+              // Two breakups, because one is not enough on this head. The sine
+              // is locks round the skull — on the angle and not on height, so a
+              // lock is one colour root to tip, which is the reason Chloe's pink
+              // is written the same way. But the tail hangs on the axis that
+              // angle is measured about, so every vertex in it has the same
+              // angle and the sine alone leaves it a smooth cone — which is
+              // precisely the surface a blonde cannot afford, and is the largest
+              // piece of hair she has. The second noise is on the position, so
+              // it runs down the tail as well as round the head.
+              float ang = atan(vLocal.z, vLocal.x - 0.033);
+              float lock = 0.5 + 0.5 * sin(ang * 9.0 + 2.3);
+              float grain = 0.5 * vnoise2(vec2(ang * 3.1, vLocal.y * 46.0))
+                + 0.5 * vnoise2(vec2((vLocal.x + vLocal.z) * 40.0, vLocal.y * 40.0));
+              lock = mix(lock, grain, 0.55);
+              // And the mass: crown lit, nape and underside in their own shade.
+              // 1.31 is her lowest hair vertex and 1.66 is above the ears.
+              float sun = smoothstep(1.31, 1.66, vLocal.y);
+              vec3 hair = mix(vec3(${gl3(BAYE_HAIR.lo)}),
+                vec3(${gl3(BAYE_HAIR.hi)}),
+                clamp(sun * 0.55 + lock * 0.55, 0.0, 1.0));
+              vcol = mix(vcol, mix(SK, hair, wc), dye);
+              // A little more sheen than skin and no more, because the highlight
+              // is added to the albedo and this albedo is already twice the
+              // brown's. Fair hair with a skin-grade specular on it reads matte.
+              spec = mix(spec, 0.135, dye * wc);
+            }
+            // The rest of what a blonde has to take with her.
+            //
+            // Off vVCol and not off vcol: PUBIC_P lies on the skin-to-hair line
+            // too, at w 0.85, so by here the dye above has already had a look at
+            // it — the height gate is what stops it, and testing the dyed colour
+            // would make that dependence invisible.
+            float pub = 1.0 - smoothstep(0.014, 0.040,
+              distance(vVCol, vec3(${gl3(BAYE_HAIR.pubic)})));
+            vcol = mix(vcol, vec3(${gl3(BAYE_HAIR.pubicTo)}), pub);
+          }
+          base *= vcol;
+        `,
       });
       if (!skinFig) throw new Error('no skinned figure');
       const mesh = skinFig.mesh;
