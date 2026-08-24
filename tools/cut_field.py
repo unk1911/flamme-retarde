@@ -22,6 +22,13 @@ needs instead is a window chosen by hand off the shape of the recording, and
 the two paths share only the tail — filter, level, encode — which is where the
 duplication would actually have cost something.
 
+A cue is also the answer for a sound that repeats but does not run, which the
+dove below is and which is worth saying out loud because a bed is the obvious
+thing to reach for. Something that says its piece, stops, and says it again is
+made of a phrase and a silence, and a loop can only ship the phrase — so cut
+the phrase alone and let the game own the silence, and 1.32 s of source covers
+an afternoon instead of six seconds covering six.
+
 WHAT THE HARD PART IS
 
 Not the filtering, which is four lines. The window. A bed loops for as long as
@@ -75,6 +82,13 @@ FILES = {
     8: '/mnt/c/tmp/refs/jadrija/survey/4/'
        '1000150414-super-valuable-pan-kabine-and-other-stuffs.mp4',
     9: 'WhatsApp Audio 2026-08-24 at 8.54.48 AM - fs.mp4',
+    # The name is not a typo and must not be tidied. Misha renamed the file
+    # after recording it and the rename went on the end of a name that already
+    # had `.mp` in it, so the extension is `.mp4` and the middle of the string
+    # says `.mp - eurasian collared dove`. Typing what he typed gets a
+    # FileNotFoundError.
+    10: 'WhatsApp Audio 2026-08-24 at 2.12.14 PM.mp '
+        '- eurasian collared dove.mp4',
 }
 # 1 is not cut. It was recorded at 21:38 and is broadband 200-2000 Hz with no
 # cicada and no cricket band in it; nobody has been able to say what it is, and
@@ -182,7 +196,8 @@ BEDS = [
 
 # ── the cues ────────────────────────────────────────────────────────────────
 #
-# One so far: what plays when the girl on the beach turns.
+# Two: what plays when the girl on the beach turns, and the dove behind the
+# vikendica.
 #
 # WHAT THE SOURCE IS, measured and not guessed, because rule 12 applies to a
 # recording as much as to a shopfront. 122.77 s, mono, 48 kHz. Normalised to
@@ -309,10 +324,85 @@ BEDS = [
 # build), which is not enough to pay for taking a bitrate off the one piece of
 # music in the game — every other clip in the payload is a bed under something
 # and this one is the thing you are listening to.
+# ── the dove ────────────────────────────────────────────────────────────────
+#
+# Misha, 24 Aug: "when we are in vikendica, there are some beautiful bird songs
+# that can be heard, and one of them is the eurasian collared-dove, i recorded".
+# Rule 12 puts the identification beyond argument — it is his bird and his
+# peninsula — so nothing below is trying to name it, only to measure it.
+#
+# WHAT THE SOURCE IS. 6.208 s, mono, 48 kHz, 102 KB. Normalised to unit RMS and
+# read in third-octave bands it is nothing at all until 250 Hz (-39.0 at 60-120,
+# -33.1 at 120-250) and then two bands carry the whole recording: -16.3 at
+# 250-500 and -8.4 at 500-900, with 900-1600 already 21 dB down at -29.1 and the
+# floor from there on. A collared dove is a 550 Hz sound and nearly a pure one.
+#
+# It is a WhatsApp voice note and it has been through a noise suppressor, which
+# is the one thing about it that constrains the window. Measured in a 380-900 Hz
+# bandpass: the file's first 0.65 s reads -44.9 dBFS RMS, the 0.38 s of gap
+# between two phrases in the middle reads -30.1, and the last 0.55 s reads
+# -33.8. The floor steps up 15 dB at 0.73 s and back down at 5.38, on one frame
+# each time and across the whole band. So the recording is 4.65 s long whatever
+# the container says, and both ends of the file are outside it.
+#
+# WHAT IS IN IT. Three phrases, and the reason this is a cue and not a bed is
+# that they are identical and evenly spaced. Onsets at 0.93, 2.45 and 4.00 s:
+# 1.52 s and 1.55 s apart. Each is the three notes the bird is famous for —
+# measured on the third, 4.00-4.29, a 0.04 s dip, 4.34-4.69, a 0.23 s gap, then
+# 4.93-5.09. A dove does not drone. It says its piece, waits, and says it again,
+# and six seconds of that on a loop is a period you could count in your sleep.
+#
+# So ONE phrase is cut and 80-audio.js does the spacing. That is not a saving,
+# it is the whole design: a run of three at 1.53 s is the recording back, a run
+# of six is a bird that has more to say, and the twenty to eighty seconds of
+# silence between runs is the half of this sound that a loop cannot have. One
+# clip, and the material is unlimited.
+#
+# WHICH PHRASE. The third, and the other two are ruled out by measurement
+# rather than by taste. The first starts 0.20 s after the suppressor opens, so
+# any window with a lead-in on it has that 15 dB step inside the clip. The
+# second is the quietest of the three — -15.32 dBFS RMS against -12.72 and
+# -13.62. The third is 1.7 dB louder than the second and carries the loudest
+# single sample in the recording, at 5.03 s.
+#
+# WHERE THE WINDOW IS. 3.90 to 5.22 s. That is 0.10 s of lead-in, the phrase,
+# and 0.10 s of tail, and the two are matched: the 380-900 band reads about -33
+# dBFS across both. The lead-in is what stops a run sounding like a sampler
+# being triggered, and 0.10 s is what there is — the previous phrase's last note
+# ends at 3.53 and the suppressor shuts at 5.38, so the window has 0.37 s of
+# clearance at the front and 0.16 at the back and could not be much longer at
+# either end anyway.
+#
+# The arithmetic closes, which is the corroboration that the window is the right
+# length: 1.32 s of clip at 1.53 s of spacing leaves 0.21 s of silence between
+# one clip and the next, and 0.10 + 0.10 of that is the clip's own head and
+# tail. Play three of them at the measured spacing and what comes out is the
+# recording.
+#
+# THE FILTERS. Read against the 0.38 s of gap before it, the phrase is +10.7 dB
+# at 380-500 Hz and +20.8 at 500-700, and there is no other band in this
+# recording where it is more than a few decibels either side of the noise it is
+# sitting in. Everything outside 380-700 Hz is therefore a phone in a garden and
+# not a bird: below is traffic and handling, above is the suppressor's own hiss,
+# which the third-octave read finds coming back *up* to -29.5 dB at 7-11 kHz.
+# 320 Hz and 2 600 Hz take both and leave the fundamental and what is left of
+# the second harmonic. 12 kHz sampling then throws away nothing at all.
+#
+# THE LEVEL is the one thing here that is not measured against something that
+# already exists, because unlike the firestarter this cue replaces nothing.
+# There is no synthesised dove to match. So the file ships as hot as `finish`
+# will allow — -13.75 dBFS RMS, which with this window's 13.1 dB of crest puts
+# the peak at -0.64 — and the whole of the level lives in `PERCH.dove.gain` in
+# 80-audio.js, where it can be set against the beach bed it has to be heard
+# over. The read-back below is still done and still reported: it is what tells
+# that end what the file it is scaling actually decodes at.
 CUES = [
     dict(key='firestarter', src=9, at=7.38755, sec=109.67476,
          rate=24000, kbps=80, hp=(2, 70), lp=None, rms=-18.13,
          target=-14.23, makeup=4.49, what='the turn, 24 Aug'),
+    dict(key='dove', src=10, at=3.90, sec=1.32,
+         rate=12000, kbps=40, hp=(2, 320), lp=(2, 2600), rms=-13.75,
+         what='one phrase, 24 Aug'),
 ]
 
 INSET = 0.5     # s — where 80-audio.js puts loopStart and loopEnd
@@ -456,10 +546,16 @@ def cut_cue(cue):
     What it does that no bed does is read the file back. A bed's level is set
     by RMS before the encoder and that is the end of it, because a bed is
     crossfaded against other beds cut the same way and they all lose the same
-    top. A cue is levelled against a SYNTHESISER, and the number that has to
-    match is the one that comes out of the decoder — so the mp3 is decoded
-    again here and the make-up the game has to apply is measured rather than
-    subtracted.
+    top. A cue may be levelled against a SYNTHESISER, and then the number that
+    has to match is the one that comes out of the decoder — so the mp3 is
+    decoded again here and the make-up the game has to apply is measured rather
+    than subtracted.
+
+    `target` is what says a cue is one of those. Without it there is nothing to
+    match and nothing to shout about, and the read-back is reported instead of
+    checked: the dove replaces no synthesiser, ships as hot as `finish` allows,
+    and carries its level in 80-audio.js — which still has to be told what the
+    file it is scaling decodes at, and this is where that number comes from.
     """
     x = decode(source(cue))
     a, L = cue['at'], cue['sec']
@@ -468,13 +564,17 @@ def cut_cue(cue):
     back = decode(os.path.join(OUT, cue['key'] + '.mp3'))
     got = 20 * np.log10(np.sqrt(np.mean(back ** 2)))
     dpk = 20 * np.log10(np.max(np.abs(back)))
-    makeup = cue['target'] - got
-    if abs(makeup - cue['makeup']) > 0.05:
-        print(f"  !! {cue['key']}: 80-audio.js carries makeup {cue['makeup']:+.2f} dB "
-              f"and this cut needs {makeup:+.2f} — FIRE.samp is wrong")
+    makeup = None
+    if cue.get('target') is not None:
+        makeup = cue['target'] - got
+        if abs(makeup - cue['makeup']) > 0.05:
+            print(f"  !! {cue['key']}: 80-audio.js carries makeup {cue['makeup']:+.2f} dB "
+                  f"and this cut needs {makeup:+.2f} — FIRE.samp is wrong")
+    tail = (f"makeup {makeup:+.2f}" if makeup is not None
+            else 'no target — level lives in the game')
     print(f"  {cue['key']:<12s} {L:5.1f} s  from {a:6.2f} s of r{cue['src']}  "
           f"{cue['rate']:5d} Hz {cue['kbps']:3d}k {kb:6.1f} KB  "
-          f"one-shot, decodes at {got:+.2f} dBFS, makeup {makeup:+.2f}"
+          f"one-shot, decodes at {got:+.2f} dBFS, {tail}"
           f"      peak {peak:+.1f}/{dpk:+.1f}")
     return dict(cue, kb=kb, peak=peak, got=got, need=makeup)
 

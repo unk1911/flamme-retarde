@@ -4142,6 +4142,12 @@ let wasAfoot = false;
 // door has to move the light and the sound together or it is two effects that
 // happen to share a threshold.
 let indoors = 0;
+/**
+ * Where the perched birds are, in world metres — resolved from the stations in
+ * `audio.perches()` the first frame Jadrija exists and then left alone,
+ * because the shore frame does not move and neither do they.
+ */
+let perchW = null;
 let inLatch = 0;
 let cicadaAt = 0;
 let waterAt = -1, wetAt = -1;
@@ -5024,6 +5030,39 @@ function frame() {
     // when you carve back in along the terrace, it just stops going away.
     const dk = state.phase === 'ride' || state.phase === 'foil' ? Math.min(d, 400) : d;
     audio.shore(dk + indoors * 2000, state.phase === 'fly');
+    // And the birds sitting still in the pines behind the vikendica.
+    //
+    // The mixer owns what they sound like and how often; the only thing it
+    // cannot know is where they are, because a station in the resort's frame
+    // means nothing over there. So this is the whole of the coupling: resolve
+    // each perch to a world point once — the shore frame does not move — and
+    // then hand back a distance and a bearing every frame.
+    //
+    // Deliberately NOT put through the `indoors * 2000` trick the shore bed
+    // uses above. That works for the promenade because a crowd that is further
+    // away is exactly what a crowd behind a wall sounds like; it is wrong for
+    // a bird twenty-four metres away in a tree, which is exactly where it was
+    // before you shut the door. What the wall does to these is a stage on
+    // their own bus — see PERCH in src/80-audio.js.
+    const birds = audio.perches();
+    if (!perchW && birds.length && jadrija.toWorld) {
+      perchW = birds.map((b) => {
+        const w = jadrija.toWorld(b.t, b.s);
+        return [w[0], w[1] + b.up, w[2]];
+      });
+    }
+    if (perchW) {
+      // The camera's own +X in world space, straight off its matrix rather
+      // than through a Vector3 nobody needs: this runs every frame per bird.
+      const e = camera.matrixWorld.elements;
+      for (let i = 0; i < perchW.length; i++) {
+        const w = perchW[i];
+        const bx = w[0] - camera.position.x, by = w[1] - camera.position.y,
+          bz = w[2] - camera.position.z;
+        const bd = Math.hypot(bx, by, bz);
+        audio.perch(i, bd, bd > 1 ? (bx * e[0] + bz * e[2]) / bd : 0);
+      }
+    }
   }
 
   if (state.scooping) {
@@ -5475,6 +5514,15 @@ window.__fr = {
     fire: () => audio.fireStats(),
     /** The beat on its own, without having to soak her for sixteen seconds. */
     beat: (g = 1) => { audio.firestarter(g); return audio.fireStats(); },
+    /**
+     * The birds in the pines: what has loaded, how far off they are, how many
+     * phrases have been sung and when. `perchRun(300)` runs five minutes of
+     * bouts through the real ticker in a few milliseconds and hands back the
+     * firing times, which is the only way to see the interval distribution
+     * without sitting through it.
+     */
+    perch: () => audio.perchStats(),
+    perchRun: (secs = 300, step) => audio.perchRun(secs, step),
   },
   land: {
     at: (x, z) => groundAt(x, z),
