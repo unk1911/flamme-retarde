@@ -174,21 +174,70 @@ not touched, because the wood floor is shared ground and changing it repaints
 the whole resort. It wants to be somebody's decision rather than a side effect
 of a survey pass. *Best next job of anything in this list.*
 
+**8. The white perforated-mesh armchair.** **BUILT, 24 Aug** as `meshChair`.
+Drawn as a real lattice — four bars each way in the seat and four in the back —
+and not as a darker panel, because the whole of what separates it from the
+monobloc at three metres is that you can see the terrace *through* the back of
+it, and a dark rectangle is the one thing that reads as the opposite. About 380
+triangles a chair against a resort that is half a million.
+
 **8. The white perforated-mesh armchair.** `_111954`, a dozen of them, from
 two metres. A square-hole resin mesh in the back and the seat, square-section
 arms and tapered round legs — not the smooth monobloc the game seats everybody
 on. It is the commonest single object in this photograph.
+
+**9. The black pedestal café table.** **BUILT, 24 Aug** as `pedestalTable`,
+under every set on MINI's terrace: a 0.62 m top on a black column with an
+eight-ribbed disc base. The ribs are what stops the base reading as a hockey
+puck.
 
 **9. The black pedestal café table.** `_111954`. A dark round top on a black
 column with a heavy ribbed disc base. The game's terrace tables are pale and
 square-legged. One black round table per set would separate MINI's terrace from
 the promenade cafés the way the crimson parasols would separate the tavern.
 
+**10. Somebody behind the counter.** **ATTEMPTED 24 Aug, BACKED OUT — read this
+before trying again.**
+
+The approach was right and the result was not drawn. Two `stand` figures pushed
+straight into `bathers` *after* the cast pass (`bathers.length = 0; keep.slice`)
+so they take no slot from the spread of best-drawn figures, and by `push` rather
+than through `B()` so the turnout roll never happens and the `rng` stream is
+untouched — the census stayed 446/333/86/27 throughout, and `stats.people` went
+92 to 94, so they were in the list.
+
+**They were in the list and nothing drew them.** Whatever assigns an instance
+does not pick up entries appended after that pass, and finding out which stage
+drops them is the work this item actually needs.
+
+Two things settled on the way that are worth keeping:
+
+- **There is one slot in that room and it is 0.40 m deep.** `gelatoCase` puts
+  the cabinet back at `s0 − 0.54` and the back bar's mirror hangs at `s0 − 0.14`.
+  A server stands at about `s0 − 0.36` because there is nowhere else to stand.
+- **They have to be dressed, and a shell will do it.** Everybody the crowd draws
+  on this shore is a bather, because that is what a bathing station is full of
+  and the rig has nothing else to wear — and a bare chest behind an ice-cream
+  counter is not a missing detail, it is the wrong claim. Both photographs have
+  these two in black t-shirts and it is the only thing in either frame that says
+  *working* rather than *queueing*. A static garment works here and nowhere else
+  on this shore: these are the only two figures pinned to a spot for the whole
+  session, so a shell that does not deform never separates from the body inside
+  it. Written in `ang + PI/2`, for the same reason `terraceSet`'s chairs are —
+  `ang` is where they look and a garment is written across the shoulders.
+
 **10. Somebody behind the counter.** `_111815` and `_111819` both have two
 young men in black t-shirts working the counter, and one of them is looking
 straight at the camera in the first. There is nobody serving at any counter
 anywhere in this game. It would be the cheapest single thing that could be done
 to the boardwalk and it is not a survey job.
+
+**11. The furled white parasol west of MINI's canopies.** **BUILT, 24 Aug**,
+furled at any hour — it is furled at five to twelve in the frame, so it is not
+in use rather than out of season — and plain, which is the call `b_069`'s
+valance already shipped under. Its base is the one thing not in the frame and
+ships as a plain moulded one rather than as the boardwalk's car rim, because a
+rim is a specific claim and this is the absence of one.
 
 **11. The furled white parasol west of MINI's canopies.** `_111954`. A round
 white parasol on a white pole standing on the apron beyond the square canopies,
@@ -201,10 +250,21 @@ right of the flag, red on white, partly behind the cone tub. Only the first six
 letters are legible. Recorded, not built: a sign that reads SLADOL is worse
 than no sign, and completing it would be inventing.
 
+**13. The folding mesh chairs at the wall.** **BUILT, 24 Aug**, two of them
+against `gardenWall` at t 227-229 on s 39.6, which is the stretch `_112051` is
+of.
+
 **13. The folding mesh chairs at the wall.** `_112051`. Two dark folding chairs
 with mesh seats standing empty in the shade against the boundary wall, left
 there by somebody. Cheap, and exactly the sort of thing that says the wood is
 used rather than looked at.
+
+**14. The toddler push car.** **BUILT, 24 Aug**, on the outer edge of MINI's
+terrace between the two canopy plinths. Two things it got wrong first: parked
+at `t1 - 1.2` it was *inside* the second plinth, buried to the roof in stacked
+aggregate block with nothing showing but the handle; and with 0.072 m wheels
+inset from the body it read as a market barrow, because what says ride-on is
+that the wheels are a third of the height of it and stand outside the tub.
 
 **14. The toddler push car.** `_111954`. A red-and-yellow plastic ride-on
 parked at the edge of MINI's terrace. One object, unmistakable, and the game's

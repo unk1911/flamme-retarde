@@ -323,7 +323,36 @@ board, which names Coca Cola, Sprite, Fanta, Orangina and Nes Caffe off exactly
 the same kind of evidence. `MORNING.md` asks which way to go.
 
 **13. ~~The concrete slipway.~~ NOT A SLIPWAY — broken terrace nosings.**
-`b_118`-`b_121`. **SURVEYED, NOT BUILT, 23 Aug.** The fifth item this week to
+`b_118`-`b_121`. **SURVEYED 23 Aug, BUILT 24 Aug.**
+
+Built as material that is **there** and never as material taken away: a sound
+nosing stands 0.12 m proud of the face under it and a broken one is simply
+absent, so the ragged edge comes out of where the lengths stop rather than out
+of cutting a quad that is already drawn. That is also the only way to keep it
+off the riser's own plane, which at 2.1 km from the origin is the difference
+between a shadow line and a flickering band four hundred metres long (rule 5).
+
+Along the whole shore rather than at the one place it was filmed, with the
+soundness walked by `jit` in ten-metre runs — one damaged patch on an otherwise
+perfect apron reads as a decal, and an apron that is sound in places is an apron
+of a certain age.
+
+Three things it got wrong first, all of them value:
+
+- **Rubble off a 0.22 m step is fist-sized.** Lumps up to 0.34 m across read as
+  dropped paving slabs.
+- **A fracture face is paler by a few points, not by a fifth.** 0.548 on a
+  horizontal face here clips to white — see the note over `CONC`, which is the
+  same finding from the other end.
+- **Grass is thin, it tapers and it leans, and a box survives none of those.**
+  Three 24 mm boxes a tuft put a row of little green bollards in the joint.
+  Each blade is now a quad that comes to a point, drawn twice so it does not
+  vanish edge on, and the pair costs less than the box did.
+
+And the drum beside the gable bench is built with it — see below.
+
+**13. ~~The concrete slipway.~~ NOT A SLIPWAY — broken terrace nosings.**
+`b_118`-`b_121`. *(the original working, kept:)* The fifth item this week to
 change once the frames were opened at full size, and the correction is bigger
 than the others because it removes a reason to build it.
 
@@ -391,6 +420,8 @@ Two findings worth keeping:
 **15. The white plastic monobloc chair.** `b_004`, `b_005`, `b_133`, `b_196`.
 Everywhere: on the mole, in the wood, outside the kabine. One of the few
 objects that appears in both videos and in the still photographs.
+**ALREADY BUILT** — checked 24 Aug: it went in with item 3, the camped wood,
+and stands at two pitches in three. Nothing to do.
 
 **16. The turquoise barrel planters.** `a_213`–`a_220`. Half wine barrels
 painted a strong turquoise with the hoops picked out, each with a small olive
