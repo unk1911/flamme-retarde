@@ -8,6 +8,135 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.113.0] — 2026-08-24
+
+A night down the ranked survey lists, and the night's real finding is about the
+lists themselves: **five of the items were wrong**, and every one of them was
+caught the same way — by opening the frame at full size instead of trusting the
+contact sheet. Two were the wrong object entirely. One removed a reason to
+build. That is now the working rule for this catalogue, written at the head of
+`plan/survey-v59x.md`: a contact sheet is not evidence.
+
+The other half of the night is a landmark that turned out to be half the size
+of the thing it is named after, found by pointing the camera where the boat is
+going to sail.
+
+### Added
+
+- **Two of the fifty-two cars are put away under covers** (`survey-v59x` #9). A
+  sixth car model rather than a skin over an existing one, because the single
+  thing that makes a covered car read as one is that **all its creases are
+  gone** — the bonnet, the windscreen rake and the roof become one slope and the
+  shoulder a car holds nearly vertical goes round. So it is its own loft over
+  the crossover's plan, blurred at 0.20 m, on a superellipse power of 2.30
+  against the body's 3.10. Three things had to be found in the render: a 1-2-1
+  kernel is not a blur at this scale; a blur is nothing without stations, since
+  `station_xs` cuts the loft in fifteen places and straight-lines between them;
+  and **a cover does not cut a wheel arch** — keeping the body's lift gave a hem
+  with two deep scallops in it, which reads as a wing and came back looking like
+  an unpainted car.
+- **The folding parking bollards at the wood edge** (#10). Red and white on a
+  hinged collar with a padlock, and a lifting eye through the cap so the whole
+  thing drops flat and a car drives over it. One of the six carries a **NE
+  PARKIRAJ !** plate with the no-stopping roundel and a tow truck with a car on
+  its hook; one leans; one is a bare galvanised stub, snapped off at the socket.
+- **The tavern's beer-garden sets** (#12), and **pine litter on the parasol
+  canopy**. About a third of that canopy is covered in what has dropped out of
+  the tree standing over it, and the patches are the same red *washed out* —
+  green lifts 1.58 where red lifts only 1.46 — so they are drawn by subdividing
+  the panel and mixing cells toward a pale warm grey, not by floating anything
+  above a surface two kilometres from the origin where rule 5 says it would
+  flicker.
+- **The bench at the kabine gable** (#14). A second municipal pattern, distinct
+  from the promenade bench already in the file, which stays as it is. A casting
+  is not a rod: the first cut ran one thin member from foot to seat and the end
+  came out as two black sticks, so each leg is two lengths with a swell between
+  them and the two are tied under the seat.
+- **The drinks board is a menu again** (#11). The left bay had four items and no
+  prices; it has six and six, with **RADNO VRIJEME · 07-00** and the trader's
+  panel across the foot. `b_184` and `b_186` also retire a caveat that has stood
+  since August: TONIC and FANTA were inferred from their opening letters with
+  the rest behind a customer's head, and they are read off the glass now.
+
+### Changed
+
+- **Tvrđava svetog Nikole was a little over half the fortress.** 74.2 × 58.0 m
+  against a 129.9 × 113.3 m OSM way, and a photograph from the shore puts 124 m
+  of it across the frame at 662 m. Nothing had caught it because nothing in this
+  game had ever looked at it from sea level — the boat is the first thing that
+  sails past. The note at the head of that landmark already carried the number
+  that would have caught it, measured off the same polygon when the yaw was
+  fixed, and then not applied. The scale pair is **fitted** rather than read off
+  the bounding box: matching the box is matching the widest bearing, and a
+  landmark you sail past is seen from all of them. `clear` went 55 → 82 with it,
+  because the far corners of the fort's own way were being extruded as a
+  building through the landmark standing on them.
+- **CAPPUCCINO is 3.00 and there is a NES CAFFE under it**, both from Misha and
+  both then found in `b_184` a few hours later. The spelling is the board's.
+- **Four of the prices on that board are printed and the rest are stickers.**
+  Small white labels stuck over the print, in a different and much smaller type,
+  which is what makes the column look ragged in every photograph of the shop.
+  Drawing them all in the board's own lettering made a printed menu out of one
+  that has been repriced twice. They are also all **dark** — they were being set
+  in `warm()` with the names and there is not a warm number anywhere on that
+  frontage.
+- **`panelSign` takes a yaw**, so a plate can face along the lane instead of out
+  to sea. The standoff has to turn with it: measured across the shore, a
+  quarter-turned sign stands *beside* its post rather than on it.
+- **The landmark bake is reproducible.** gzip stamps the wall clock into bytes
+  4-7, so re-baking an unchanged model gave a different payload with an
+  identical body — all five landmarks changed md5 with no source edit.
+  `build.py` says out loud that an unchanged tree must rebuild byte-for-byte,
+  because comparing checksums against the server is how a deploy is verified,
+  and any landmark bake silently broke that. Two consecutive bakes are now
+  identical.
+
+### Fixed
+
+- **Survey item 8 was never there.** The "two pale domed containers" behind a
+  fence at `b_047` are not glass-recycling igloos. They are the roof and the
+  bonnet of a covered car, with the windscreen between them. Nothing had been
+  built from it.
+- **Survey item 10 was the wrong object.** "Red-and-white marker posts... two of
+  them lie knocked over." A marker post marks; these are locks. And nothing is
+  lying down — one is snapped off at the socket, which from a contact sheet
+  reads as a post on the floor.
+- **Survey item 12 had the arrangement inverted.** There is one parasol, not
+  several, and it is *not* over the timber: under it are the poseur table and
+  the stools, and the timber stands beside it in the shade, uncovered.
+- **Survey item 14 was wrong three times.** Two back slats and not three, one
+  wide seat board and not four slats, and no arm at all — what the item calls a
+  curved arm is the crook at the top of the standard, at shoulder height,
+  carrying the back.
+- **There is no slipway at Jadrija** (#13). `b_120` and `b_121` look straight
+  down the apron to the waterline: one broad cracked slab meeting shingle. What
+  the item saw is in `b_118` and runs the other way — two broken step risers
+  **parallel to the shore**, undercut, rubble at the foot and grass in the
+  joint. Recorded, not built: it is spalling on terrace edges the game already
+  has, and it is the next pass rather than this one.
+
+### Known
+
+- **The Brod is located and the boat has not been moved.** Solved from the three
+  photographs of 18:36 alone — no GPS, but timestamps and focal lengths turn out
+  to be enough. Four constraints (angular width, the fort dead centre, the quay
+  square to it, and a sight-line that stays over water) collapse 600 × 500 m of
+  coast to ten cells at **world (-1783, 336)**, and the game's camera there
+  reproduces the photograph. It is off the end of the modelled shore —
+  `traceShore()` stops at x -1846 precisely because "the inlet on the north side
+  comes into the window" — so moving the boat means a world-coordinate anchor, a
+  quay, a walk route and `CHANNEL` re-run from a new first waypoint. Waiting on
+  Misha. Full working in `plan/brod-location.md`.
+- **The right-hand board has nine rows and this has eight.** `b_184` shows the
+  third one plainly enough to count, but the word is five pixels of stroke and
+  reads KOKICE or KORICE depending on the frame. A row that is known to exist is
+  not a licence to name it.
+- **Brands are inconsistent and deliberately left so.** The drinks board names
+  Coca Cola, Sprite, Fanta, Orangina and Nes Caffe; the tavern parasol's valance
+  reads Karlovačko and is blank. The trailer's own note made that call and it is
+  honoured here rather than quietly reversed, but one of the two is wrong.
+  `MORNING.md` asks which.
+
 ## [1.112.0] — 2026-08-23
 
 Four objects off the two inland walk-throughs, and a recorder that will now film
