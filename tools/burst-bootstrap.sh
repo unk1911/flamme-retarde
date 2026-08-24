@@ -36,17 +36,51 @@ if [ -n "$SD_KEY" ]; then
   install -m 700 -d /opt/burst
   cat > /opt/burst/selfdestruct.sh <<'EOS'
 #!/bin/bash
+# Which box am I? By the name `up` launched me under, and nothing else.
+#
+# This is the fix for the one that got away. On 24 Aug 2026 the timer fired
+# exactly on schedule at 19:11:32 and then *exited 1*, and the H100 it was
+# guarding ran another four hours. Two reasons, both here:
+#
+#   The EC2 metadata service does not exist on Lambda, so the first curl was
+#   always going to fail — and with no --max-time it took 2m15s to say so.
+#
+#   The fallback matched `socket.gethostbyname(socket.gethostname())` against
+#   the API's `ip` field. That resolves the box's *private* address and the API
+#   reports its *public* one, so the comparison never matched on any Lambda
+#   instance ever. `ID` came back empty and the script bailed, silently.
+#
+# The name is the one identifier that exists *before* the launch, which matters:
+# `up` has to render this script into cloud-init user_data before it has an
+# instance id to put in it. It is unique per launch — it carries the epoch
+# second — so matching on it cannot pick up somebody else's box.
 KEY=$(cat /opt/burst/key)
-ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null)
-[ -n "$ID" ] || ID=$(curl -s -H "Authorization: Bearer $KEY" \
-  https://cloud.lambda.ai/api/v1/instances \
-  | python3 -c 'import sys,json,socket;d=json.load(sys.stdin)["data"];
-me=socket.gethostbyname(socket.gethostname())
-print(next((i["id"] for i in d if i.get("ip")==me),""))' 2>/dev/null)
-[ -n "$ID" ] || exit 1
-curl -s -X POST -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-  -d "{\"instance_ids\":[\"$ID\"]}" \
-  https://cloud.lambda.ai/api/v1/instance-operations/terminate
+NAME='__SD_NAME__'
+API=https://cloud.lambda.ai/api/v1
+ID=""
+# Ten tries over five minutes rather than one. A dead-man's switch that gives up
+# on a single 503 is not a dead-man's switch, and a transient 503 in exactly
+# this API is what stranded a running instance from `up`'s side the same day.
+for _try in $(seq 1 10); do
+  ID=$(curl -s --max-time 20 -H "Authorization: Bearer $KEY" "$API/instances" \
+    | python3 -c 'import sys,json
+d=json.load(sys.stdin).get("data",[])
+print(next((i["id"] for i in d if i.get("name")==sys.argv[1]),""))' "$NAME" 2>/dev/null)
+  [ -n "$ID" ] && break
+  sleep 30
+done
+if [ -z "$ID" ]; then
+  # Loudly, and not `shutdown -h`: halting the OS on Lambda leaves the instance
+  # allocated and still billing, so it would buy nothing and cost the one thing
+  # left that is worth having, which is being able to get in and look.
+  logger -t flamme-selfdestruct "CANNOT RESOLVE $NAME — STILL BILLING"
+  echo "$(date -u +%FT%TZ) cannot resolve $NAME" >> /opt/burst/failed
+  exit 1
+fi
+logger -t flamme-selfdestruct "terminating $ID ($NAME)"
+curl -s --max-time 30 -X POST -H "Authorization: Bearer $KEY" \
+  -H "Content-Type: application/json" -d "{\"instance_ids\":[\"$ID\"]}" \
+  "$API/instance-operations/terminate"
 EOS
   printf '%s' "$SD_KEY" > /opt/burst/key
   chmod 600 /opt/burst/key; chmod 700 /opt/burst/selfdestruct.sh

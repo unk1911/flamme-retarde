@@ -371,6 +371,11 @@ def cmd_up(a):
         f"(${price * a.max_min / 60:.2f} worst case)")
 
     arch = "aarch64" if "gh200" in name else "x86_64"
+    # Named before it is launched, and the name goes into the box as well as to
+    # Lambda — it is how the self-destruct identifies itself, because the
+    # instance id does not exist yet at the moment this user_data is rendered.
+    # See the long note in burst-bootstrap.sh; the epoch second makes it unique.
+    iname = f"flamme-burst-{int(time.time())}"
     user_data = (BOOTSTRAP.read_text()
                  .replace("__MAX_MIN__", str(int(a.max_min)))
                  .replace("__ARCH__", arch)
@@ -380,11 +385,12 @@ def cmd_up(a):
                  .replace("__VHS_REF__", STACKS[STACK]["vhs"])
                  .replace("__TORCH_IDX__", STACKS[STACK]["torch"])
                  .replace("__SELF_DESTRUCT_KEY__", "" if a.no_self_destruct else key)
+                 .replace("__SD_NAME__", iname)
                  .replace("__MODELS__", "\n".join(
                      f"{sub}|{fn}|{url}" for sub, fn, url in MODELS)))
 
     iid = L.launch(name, region, os.environ["LAMBDA_SSH_KEY_NAME"],
-                   f"flamme-burst-{int(time.time())}", user_data)
+                   iname, user_data)
     say(f"launched {iid}; waiting for an address")
     # Twenty minutes, not ten, and it says what it is waiting on. Lambda hands
     # out an address in about ninety seconds most days and in rather more than
