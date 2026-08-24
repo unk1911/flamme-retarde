@@ -9336,6 +9336,193 @@ async function buildJadrija(scene) {
     // half a metre off it with its back to it, looking down the promenade.
     // `s` puts it on the middle of the block's own depth.
     gableBench(394.6, JAD.rowA + JAD.cabD * 0.5, Math.PI * 0.5);
+
+    // ── and the drum beside it ───────────────────────────────────────────────
+    //
+    // Settled in passing while item 13 was being re-read: the grey drum at the
+    // bench's end in `b_114` is **not a bin**, which is what the catalogue had
+    // it down as. It is a round planter with a dead twiggy shrub in it — no
+    // lid, no liner, a pale weathered grey, and the thing standing in it has no
+    // leaf on it anywhere in the frame.
+    //
+    // That is the sixth item this week to change once the frame was opened at
+    // full size, and it is the cheapest of them: a bin and a planter are the
+    // same drum, and the whole difference is what is on top.
+    {
+      const DRUM = [0.560, 0.552, 0.530];
+      const RIM = [0.606, 0.598, 0.574];
+      const SOIL = [0.230, 0.196, 0.160];
+      const TWIG = [0.318, 0.276, 0.226];
+      const pt0 = 393.4, ps = JAD.rowA + JAD.cabD * 0.5 + 1.35;
+      const py = surfaceY(pt0, ps);
+      const P = (u, v, yy) => W(pt0 - v, ps + u, yy);
+      post(P, 0, 0, py + 0.005, py + 0.46, 0.235, DRUM, 12);
+      post(P, 0, 0, py + 0.46, py + 0.52, 0.250, RIM, 12);
+      // The soil, a hand's breadth below the rim, so the drum reads as open.
+      post(P, 0, 0, py + 0.40, py + 0.43, 0.225, SOIL, 12);
+      // Nine twigs out of it, each leaning in its own plane — `member` works in
+      // the (across, up) plane at one offset along, so giving every twig its own
+      // offset is what stops them being a fan. Nothing forks: a dead shrub at
+      // four metres is a handful of lines, and modelling the branching would be
+      // spending a hundred triangles on something that reads at ten.
+      for (let k = 0; k < 9; k++) {
+        const u0 = (jit(k, 140) - 0.5) * 0.24;
+        const v0 = (jit(k, 141) - 0.5) * 0.24;
+        const lean = 0.20 + jit(k, 142) * 0.42;
+        const hgt = 0.42 + jit(k, 143) * 0.44;
+        const dir = jit(k, 144) < 0.5 ? -1 : 1;
+        member(P, u0, v0, py + 0.40,
+          v0 + dir * lean * hgt, py + 0.40 + hgt, 0.016, 0.014, TWIG);
+        // one kink near the top, which is most of what says dead wood
+        member(P, u0, v0 + dir * lean * hgt, py + 0.40 + hgt,
+          v0 + dir * lean * hgt * 0.55, py + 0.40 + hgt + 0.16, 0.013, 0.011, TWIG);
+      }
+    }
+  }
+
+  // ── the broken terrace nosings ──────────────────────────────────────────────
+  //
+  // Survey item 13 of v59x, which was catalogued as a concrete slipway, is not
+  // one. `b_120` and `b_121` look straight down the apron to the waterline and
+  // what is there is one broad cracked slab meeting limestone shingle — no
+  // tracks, no ramp, nothing a trailer has ever backed down. What the item saw
+  // is in `b_118` and it runs the **other way**: the apron is stepped down in
+  // terraces parallel to the shore, and both step risers have broken away.
+  // Ragged, undercut, rubble spilled at the foot, grass rooted the length of
+  // the joint. Two long parallel lines of damage across the apron — which from
+  // a contact sheet is exactly what two sunken tracks would look like, except
+  // that they lie along the shore rather than down it.
+  //
+  // So this is a decoration on an edge the game already has, and that is what
+  // makes it cheap: `riser()` drew both of them a thousand lines ago.
+  //
+  // It is drawn as material that is **there**, never as material taken away.
+  // A nosing is a lip; a sound nosing stands 0.12 m proud of the face under it
+  // and a broken one is simply absent, so the ragged edge comes out of where
+  // the lengths stop rather than out of cutting a quad that is already drawn.
+  // That also keeps rule 5: nothing here is coplanar with anything, which at
+  // 2.1 km from the origin is the difference between a shadow line and a
+  // flickering band four hundred metres long.
+  //
+  // Along the whole shore rather than at the one place it was filmed, and with
+  // the intensity walked by `jit` so that some stretches are sound and some are
+  // eaten. One damaged patch on an otherwise perfect apron reads as a decal;
+  // an apron that is sound in places is an apron of a certain age.
+  //
+  // Nothing here touches `rng` (rule 4).
+  {
+    const backB = b;
+    b = up;
+    // Concrete, and a *small* spread of it. The first cut had the fracture
+    // faces at 0.548 and the lumps up to 0.34 m across, and what came out was
+    // dropped paving slabs: a broken edge is paler than the weathered face
+    // beside it by a few points, not by a fifth, and rubble off a 0.22 m step
+    // is fist-sized. See the note over CONC for why anything past 0.5 on a
+    // horizontal surface here clips to white and takes the joints with it.
+    const NOSE = [0.474, 0.428, 0.368];    // sound concrete, a shade off the slab
+    const CHIP = [0.508, 0.466, 0.404];    // a fracture face, and only just paler
+    const RUBBLE = [0.466, 0.424, 0.368];
+    const WEED = [0.238, 0.292, 0.146];
+
+    /**
+     * One length of sound nosing: five quads and no inland face.
+     *
+     * `boxIn` would be one call, and its inland face would land exactly on the
+     * riser quad. The face is inside the step and cannot be seen, so the honest
+     * saving is to not draw it — which is also the only way to keep it off the
+     * riser's own plane.
+     */
+    const lip = (t0, t1, sEdge, yOf, proj, th) => {
+      const s0 = sEdge - proj, s1 = sEdge;
+      const A = (t, ss, dy) => W(t, ss, yOf(t) + dy);
+      // top
+      b.quad(A(t0, s0, 0), A(t1, s0, 0), A(t1, s1, 0), A(t0, s1, 0), NOSE);
+      // the seaward face, which is the shadow line
+      b.quad(A(t0, s0, -th), A(t1, s0, -th), A(t1, s0, 0), A(t0, s0, 0), NOSE);
+      // the underside
+      b.quad(A(t0, s1, -th), A(t1, s1, -th), A(t1, s0, -th), A(t0, s0, -th), NOSE);
+      // and the two broken ends, in the paler colour that says fresh fracture
+      b.quad(A(t0, s1, -th), A(t0, s0, -th), A(t0, s0, 0), A(t0, s1, 0), CHIP);
+      b.quad(A(t1, s0, -th), A(t1, s1, -th), A(t1, s1, 0), A(t1, s0, 0), CHIP);
+    };
+
+    /**
+     * Walk one riser: lengths of lip, gaps between them, rubble in the gaps and
+     * weed in the joint the whole way.
+     */
+    const nosings = (sEdge, loOf, hiOf, seed) => {
+      const yTop = (t) => hiOf(at(t), sEdge);
+      const yBot = (t) => loOf(at(t), sEdge);
+      let t = 5 + jit(seed, 150) * 5;
+      let k = 0;
+      while (t < LEN - 5) {
+        // How sound this stretch is, walked slowly along the shore: a low
+        // frequency so that soundness comes in runs of ten metres and not
+        // length by length.
+        const health = jit(seed * 7 + ((t / 11) | 0), 151);
+        const run = (0.9 + jit(seed + k, 152) * 3.4) * (0.45 + health);
+        const t1 = Math.min(t + run, LEN - 5);
+        if (t1 - t > 0.35) {
+          lip(t, t1, sEdge, yTop, 0.115 + jit(seed + k, 153) * 0.030,
+            0.052 + jit(seed + k, 154) * 0.024);
+        }
+        // The gap, and what is in it.
+        const gap = (0.35 + jit(seed + k, 155) * 1.9) * (1.5 - health);
+        const g0 = t1, g1 = Math.min(t1 + gap, LEN - 4);
+        const lumps = (jit(seed + k, 156) * 3.2) | 0;
+        for (let j = 0; j < lumps; j++) {
+          const lt = g0 + (g1 - g0) * ((j + 0.5) / lumps)
+            + (jit(seed + k * 5 + j, 157) - 0.5) * 0.3;
+          const ls = sEdge - 0.09 - jit(seed + k * 5 + j, 158) * 0.42;
+          const w = 0.028 + jit(seed + k * 5 + j, 159) * 0.058;
+          const d = 0.024 + jit(seed + k * 5 + j, 160) * 0.048;
+          const h = 0.022 + jit(seed + k * 5 + j, 161) * 0.042;
+          const by = yBot(lt);
+          // No paler top: a horizontal face here takes the sun square on and
+          // CHIP on it came out as a white brick lying on the promenade. The
+          // fracture colour stays on the lip's broken ends, which are vertical
+          // and in the step's own shade.
+          boxIn(W, lt - w, lt + w, ls - d, ls + d, by, by + h, RUBBLE);
+        }
+        // Grass in the joint. Not only in the gaps — the whole length of the
+        // seam has something rooted in it, which is the half of `b_118` that
+        // says nobody has touched this in twenty years.
+        const tufts = 1 + ((jit(seed + k, 162) * 2.6) | 0);
+        for (let j = 0; j < tufts; j++) {
+          const wt = t + (t1 + gap - t) * jit(seed + k * 3 + j, 163);
+          if (wt > LEN - 4) break;
+          const wy = yBot(wt);
+          // Blades, not posts. The first cut drew each tuft as three 24 mm
+          // boxes and what stood in the joint was a row of little green
+          // bollards — grass is thin, it tapers and it leans, and none of
+          // those three survives a box. Each blade is a quad that comes to a
+          // point, drawn twice so it does not vanish edge on, and the pair of
+          // them costs less than the box did.
+          for (let n = 0; n < 4; n++) {
+            const q = seed + k * 13 + j * 4 + n;
+            const o = (jit(q, 165) - 0.5) * 0.13;
+            const so = sEdge - 0.020 - jit(q, 166) * 0.048;
+            const hh = 0.055 + jit(q, 167) * 0.105;
+            const lt = (jit(q, 168) - 0.5) * 0.10;
+            const ls = (jit(q, 169) - 0.5) * 0.07;
+            const A = W(wt + o - 0.011, so, wy);
+            const B = W(wt + o + 0.011, so, wy);
+            const T = W(wt + o + lt, so + ls, wy + hh);
+            b.quad(A, B, T, T, WEED);
+            b.quad(T, T, B, A, WEED);
+          }
+        }
+        t = g1 + 0.05;
+        k++;
+      }
+    };
+
+    // The two risers `riser()` drew: the lip of the bathing platform and the
+    // step up to the promenade. Different seeds, or the two lines of damage
+    // would break in the same places and read as one object seen twice.
+    nosings(JAD.lip, lipOf, midOf, 3);
+    nosings(JAD.mid, midOf, deckOf, 11);
+    b = backB;
   }
 
   // ── ZABRANJENO ODLAGANJE OTPADA ────────────────────────────────────────────
