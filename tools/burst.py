@@ -921,7 +921,21 @@ def main():
     f.add_argument("--out", default=str(Path.home() / "fr-video" / "fan"))
     f.add_argument("--timeout", type=float, default=75)
     f.add_argument("--attn", default="")
-    f.add_argument("--swap", type=int, default=0)
+    # 20, and NOT `run`'s 0, and the difference cost $2.84 and eleven minutes on
+    # eight GPUs at once. `fan` is Wan 2.2 only, and 2.2 is a mixture of experts
+    # — two 14B transformers AND two VACE modules — so it wants roughly twice
+    # the resident weights 2.1 does. On a 40 GB A100 at 1280x720 n=81 it peaked
+    # at 39 872 MiB of 40 960 and OOM'd on all eight workers at once; at 20 it
+    # sits at 29 GB with no measurable time cost.
+    #
+    # The measurement `run` still defaults to — swap 0 on a 40 GB card with no
+    # reference images — was taken on Wan **2.1** and does not carry. It stays
+    # there because `run` serves both stacks.
+    #
+    # Worth knowing what the failure looks like, because it is quiet: the
+    # queues drain, every GPU falls to 0 %, and the frame poll reports 0/972
+    # until it times out. The word OOM appears only in the worker's journal.
+    f.add_argument("--swap", type=int, default=20)
     f.set_defaults(fn=cmd_fan)
 
     a = p.parse_args()
