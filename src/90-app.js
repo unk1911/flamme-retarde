@@ -891,6 +891,12 @@ async function boot() {
   // in a bone palette that the two shared ones know nothing about. Near
   // cascade: she is 1.75 m and the far map cannot draw anything under two.
   if (jadrija && jadrija.figure) jadrija.figure.cast(shadow);
+  // And the two things on her that are not skinned. `syncMoving` reads the
+  // source mesh's `visible` every frame, so before the turn — when they are
+  // hidden — they cast nothing.
+  if (jadrija) {
+    for (const m of jadrija.horns) shadow.cast(m, { dynamic: true, near: true });
+  }
   roads = buildRoads(scene);
   rail = buildRail(scene);
   props = buildProps(scene, roads.lanes);
