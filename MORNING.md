@@ -117,6 +117,10 @@ it repaints the whole resort, so it is your call and I have not touched it.
   and the price column rebuilt: four prices are printed with the menu and the
   rest are white stickers stuck over it, which is what makes it look ragged in
   every photograph. TONIC and FANTA are now read rather than inferred.
+- **Survey item 14 built — the bench at the kabine gable.** A second municipal
+  pattern, distinct from the promenade bench already in the game: two back
+  slats, one wide seat board, slim black cast ends, no arm. The catalogue had
+  all three of those wrong.
 - **Survey item 12 built — the tavern's beer-garden sets.** Most of that item
   was already standing (the parasol, poseur table, stools and tarpaulin went in
   with the catering trailer); what this adds is the timber, and it corrects the
