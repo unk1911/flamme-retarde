@@ -16184,8 +16184,19 @@ async function buildJadrija(scene) {
   let skinFig = null;
   let show = null;
   let banner = null;
+  // The two horns, as a group hung off her head bone. Null until she has a
+  // skin; empty of everything until the latch. See `CROP`.
+  let horns = null;
+  // How many vertices `flagTail` claimed. In the stats because it is the one
+  // number that says the flood fill found what it went looking for: 266 on the
+  // blob this was written against, 150 of knot and 116 of tail.
+  let tailN = 0;
   // Set by `__fr.jad.pose` and by nothing in the game. See the note there.
   let posed = null;
+  // The same idea for the haircut: set by `__fr.jad.put`'s sixth argument and
+  // by nothing in the game, and it holds `show.shorn` where a screenshot put
+  // it instead of letting the ramp run on to 1 on the next frame.
+  let shornPin = null;
 
   // ── the note ───────────────────────────────────────────────────────────────
   /**
@@ -16547,6 +16558,242 @@ async function buildJadrija(scene) {
   };
   const gl3 = (a) => a.map((n) => n.toFixed(3)).join(', ');
 
+  /**
+   * And what the turn does to her hair, which is a haircut and not a hat.
+   *
+   * She already shouts that she is a firestarter, twice, on two cards. This is
+   * the other half of that joke: Keith Flint's cut out of the Prodigy video —
+   * two horns standing up off the top of the skull and the sides taken down to
+   * stubble. It arrives on the flare, under the same crash as the wrap and the
+   * ink, because the argument over that latch is that the turn is one event.
+   *
+   * Three things, one number. `show.shorn` runs 0 to 1 over `CROP.in` and
+   * drives the shave in her fragment, the horns' scale, and the ponytail going
+   * off from the tip up. At 0 every one of them is an exact no-op, which is
+   * what keeps the figure before the turn the figure she has always been.
+   *
+   * All of it is measured off the exported blob rather than off the cutters in
+   * human_mh.py, because the decimator moves things: the crown is flat at
+   * y 1.748 from x 0.04 to 0.07, the skull is 0.092 half-wide at the brow and
+   * 0.066 at y 1.72, and the back of it never comes further back than
+   * x -0.041 above y 1.60.
+   */
+  const CROP = {
+    // The crest — the strip that keeps its hair. `yLo`/`yHi` is the line down
+    // the side of the skull and `zIn`/`zOut` is its half-width, both written
+    // as the ramp they are smoothstepped over rather than as a threshold and
+    // a width.
+    //
+    // On Flint the shave runs high and what is left on top is narrow, and the
+    // two numbers here are what that is on this skull. y 1.700-1.724 puts the
+    // line above the ear — the hairline over the temple is at 1.61 — and above
+    // the widest part of the head, so from the side there is stubble from the
+    // ear to within a couple of centimetres of the top. |z| 0.034-0.050 is an
+    // 88 mm strip on a head that is 132 mm across at y 1.72, so it keeps the
+    // middle of the top and shaves the shoulders of the skull either side.
+    //
+    // And the back of it, which the first pass did not have and needed. The
+    // skull only drops under 1.70 well behind the crown, so a crest cut on
+    // height and width alone ran on over the occiput and came out — from three
+    // quarters on, which is the angle you meet her at — as a small pale bun
+    // sitting behind the horns. The crown is flat from x 0.04 to 0.07 and the
+    // horns are rooted at 0.086, so ending it at 0.030 leaves the whole strip
+    // in front of the crown and takes the back of the head down with the
+    // sides. Which is the cut: everything below and behind is off.
+    yLo: 1.700, yHi: 1.724, zIn: 0.034, zOut: 0.050, xLo: -0.005, xHi: 0.030,
+    // Stubble, and it is stubble rather than scalp. A shaved head is not skin
+    // — it is a few days of hair seen through it, darker and matte — and the
+    // read at fifteen metres is the boundary, so it has to be dark enough to
+    // draw one. Under her skin's 0.761/0.588/0.475 by about a half on every
+    // channel and desaturated toward grey, which is what fair stubble is.
+    stub: [0.398, 0.334, 0.292],
+    // Her hair's specular is 0.135 and that is for a mass with a highlight
+    // running along it. Cropped hair has no highlight; this is nearer the
+    // skin's own 0.09 and under it.
+    stubSpec: 0.045,
+    // Where the horns are rooted, as an offset from the head bone at
+    // (0.0169, 1.5907, 0). The scalp over (x 0.086, |z| 0.028) is at y 1.746,
+    // so the root ring sits 17 mm inside it and nothing shows while the scale
+    // is still small. |z| 0.028 puts both of them well inside the crest rather
+    // than on its edge, which is what makes them look grown rather than
+    // planted.
+    root: [0.0691, 0.1383, 0.028],
+    // How long the whole haircut takes. The flare's own clip is 1.10 s and the
+    // crash lands at the end of it, so this is short enough to be part of that
+    // downbeat and not a beat of its own.
+    in: 0.22,
+  };
+
+  /**
+   * One horn, as a stack of horizontal rings up a leaning spine.
+   *
+   * Rings in the horizontal plane rather than perpendicular to the spine. The
+   * spine leans thirteen degrees, so a horizontal section is 3% wider than a
+   * true one; the alternative is carrying a frame up the curve and keeping it
+   * from twisting, which is a lot of arithmetic for three per cent of a horn.
+   *
+   * The lobes are the point of the cross-section. A tapered cone this size is
+   * a rubber spike whatever colour it is painted — what makes it a gathered
+   * lock of hair is three soft ridges running up it and turning as they go,
+   * which is one cosine on the ring angle and one term of twist.
+   *
+   * `sgn` is +1 for her right (+z) and -1 for her left. The ring is walked the
+   * other way round for the mirrored one, so the winding — and every face
+   * normal with it — survives the reflection.
+   */
+  function hornGeo(sgn) {
+    // The spine point and the radius there, in the horn's own frame: +y up,
+    // +x forward, +z outboard. It rises 0.148 and leans 0.033 out and 0.014
+    // back, so the tip stands 13 cm clear of the scalp and finishes at
+    // |z| 0.061 — inside the 0.092 the head is half-wide, which is what keeps
+    // two horns reading as hair and not as antlers.
+    //
+    // The lean was 0.044 and that was too much. Seventeen degrees off the
+    // vertical, from a root 56 mm from its pair, is a pair of ears: the eye
+    // reads the *angle between* them, not either one, and at 34 degrees apart
+    // nothing about it says hair. Thirteen is a tuft that has been pulled up
+    // and has fallen open a little, which is what these are.
+    const SPINE = [
+      [0.000, -0.010, 0.000, 0.0285],
+      [-0.002, 0.024, 0.003, 0.0295],
+      [-0.006, 0.056, 0.008, 0.0245],
+      [-0.010, 0.088, 0.016, 0.0175],
+      [-0.013, 0.120, 0.025, 0.0100],
+      [-0.014, 0.148, 0.033, 0.0018],
+    ];
+    const SIDES = 9;
+    const pos = [], col = [], idx = [];
+    const R = SPINE.length;
+    // Root nearly the brown the bake gave her and the tip well over the
+    // crown's own blonde. The dye's note holds here and harder: a single fair
+    // colour over a smooth taper is a candle, and the only things this has to
+    // break it up are its own gradient and its own ridges.
+    const ROOT = [0.330, 0.238, 0.132], TIP = [0.700, 0.556, 0.335];
+    const tint = (k) => {
+      for (let c = 0; c < 3; c++) col.push(ROOT[c] + (TIP[c] - ROOT[c]) * k);
+    };
+    for (let r = 0; r < R; r++) {
+      const dx = SPINE[r][0], y = SPINE[r][1], dz = SPINE[r][2],
+        rad = SPINE[r][3];
+      const u = r / (R - 1), t = Math.pow(u, 0.70);
+      for (let j = 0; j < SIDES; j++) {
+        const a = sgn * (j / SIDES * Math.PI * 2 + u * 0.85);
+        const lobe = 0.82 + 0.18 * Math.cos(3 * a);
+        pos.push(dx + rad * lobe * Math.cos(a), y,
+          sgn * dz + rad * lobe * Math.sin(a));
+        // A little per-strand variation on top of the gradient, off `jit` and
+        // never off `rng` — this is built long after the beach is laid out.
+        tint(t * (0.90 + 0.20 * jit(j, r + sgn * 7)));
+      }
+    }
+    for (let r = 0; r < R - 1; r++) {
+      for (let j = 0; j < SIDES; j++) {
+        const a = r * SIDES + j, b = r * SIDES + (j + 1) % SIDES;
+        idx.push(a, b, b + SIDES, a, b + SIDES, a + SIDES);
+      }
+    }
+    // Both ends closed, because the shadow caster shares this geometry and an
+    // open tube casts a shadow with a hole down the middle of it. The root cap
+    // is 17 mm inside her skull and is never seen from anywhere.
+    for (let e = 0; e < 2; e++) {
+      const r = e ? R - 1 : 0, c = pos.length / 3;
+      let cx = 0, cy = 0, cz = 0;
+      for (let j = 0; j < SIDES; j++) {
+        const v = (r * SIDES + j) * 3;
+        cx += pos[v]; cy += pos[v + 1]; cz += pos[v + 2];
+      }
+      pos.push(cx / SIDES, cy / SIDES, cz / SIDES);
+      tint(Math.pow(r / (R - 1), 0.70));
+      for (let j = 0; j < SIDES; j++) {
+        const a = r * SIDES + j, b = r * SIDES + (j + 1) % SIDES;
+        if (e) idx.push(c, a, b); else idx.push(c, b, a);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('aVCol', new THREE.Float32BufferAttribute(col, 3));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    return g;
+  }
+
+  /**
+   * Flag the ponytail and the knot on her own copy of the blob, in `uv`.
+   *
+   * They have to be found rather than named, because they do not arrive as
+   * anything the runtime can see. `extras()` in human_mh.py appends them last
+   * and stores the count in `extraN`, but that is a Blender property and the
+   * decimator has shuffled the order by the time the blob is written: measured
+   * on it, the knot's 150 vertices and the tail's 116 are scattered from index
+   * 12454 to 13518 with 13 000 body triangles interleaved. So there is no
+   * range to draw and no range to skip.
+   *
+   * What they are is two closed shells with no edge shared with anything else,
+   * so a flood fill from one vertex of each is exact. The seeds are the two
+   * furthest-back *unclaimed* vertices in two height bands, and the margin is
+   * not close: above y 1.45 the body never comes further back than x -0.045,
+   * and the tail reaches -0.131 and the knot -0.095.
+   *
+   * Written into `uv.x` because the .fr3d skin carries no texture coordinates
+   * — nothing on this figure is textured — so `uv` is an unused attribute that
+   * `solidVertex` already forwards to the fragment as `vUv`. The alternative
+   * is a new attribute, and a new attribute needs a declaration in the vertex
+   * program that `opts.decl` cannot give it: decl goes to both stages, and an
+   * `attribute` in a fragment shader will not compile.
+   *
+   * It is her copy alone. `loadSkin` inflates the payload again on every call,
+   * so the three figures built from `human_skin_fr3d` — this one, the mirror
+   * and the chase — hold three separate geometries, which is also why `wear()`
+   * can take her wrap off without undressing the other two.
+   */
+  function flagTail(geo) {
+    const pos = geo.attributes.position.array, ix = geo.index.array;
+    const n = geo.attributes.position.count;
+    const uv = new Float32Array(n * 2);
+    // Vertex -> the triangles that use it, built once. 84 000 indices.
+    const head = new Int32Array(n).fill(-1);
+    const next = new Int32Array(ix.length).fill(-1);
+    for (let t = 0; t < ix.length; t++) {
+      const v = ix[t]; next[t] = head[v]; head[v] = t;
+    }
+    let found = 0;
+    for (const band of [[1.45, 1.60], [1.64, 1.74]]) {
+      let seed = -1, back = 1e9;
+      for (let i = 0; i < n; i++) {
+        const y = pos[i * 3 + 1];
+        // Already flagged is skipped, and that is the whole of the second
+        // pass. Without it the second seed lands on the *tail* again — it
+        // reaches y 1.718 and x -0.116 up there, further back than any part of
+        // the knot — the fill finds a shell it has already walked, and the
+        // knot ships unflagged. Which it did: a dark knob at the crown, in the
+        // exact place a bun would be, on a woman who has just had her head
+        // shaved.
+        if (uv[i * 2] > 0) continue;
+        if (y < band[0] || y >= band[1] || pos[i * 3] >= back) continue;
+        back = pos[i * 3]; seed = i;
+      }
+      // The margin is not close: no body vertex above y 1.45 is further back
+      // than x -0.045, and these two shells reach -0.131 and -0.095.
+      if (seed < 0 || back > -0.085) { console.warn('no tail seed', band); continue; }
+      const stack = [seed];
+      uv[seed * 2] = 1;
+      while (stack.length) {
+        const v = stack.pop();
+        found++;
+        for (let t = head[v]; t >= 0; t = next[t]) {
+          const t0 = t - t % 3;
+          for (let k = 0; k < 3; k++) {
+            const w = ix[t0 + k];
+            if (uv[w * 2] > 0) continue;
+            uv[w * 2] = 1; stack.push(w);
+          }
+        }
+      }
+    }
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    return found;
+  }
+
   if (PAYLOAD.human_skin_fr3d) {
     try {
       skinFig = await loadSkin('human_skin_fr3d', {
@@ -16554,11 +16801,29 @@ async function buildJadrija(scene) {
         specPower: 24,
         face: true,
         browCol: BAYE_HAIR.brow,
+        // How far through the haircut she is. One uniform for all three parts
+        // of it — see `CROP` — and it is only ever driven by `show.shorn`,
+        // which is only ever driven by the latch.
+        uniforms: { uShorn: { value: 0 } },
+        decl: 'uniform float uShorn;',
         // Literal colours, as the landmarks do. The marker palette in
         // 42-crowd.js is for figures the runtime recolours per instance, and
         // there is exactly one of these — so the dye below is written straight
         // into her own fragment rather than through the marker slots.
         body: `
+          // The ponytail, going. vUv.x is the flag flagTail() wrote on the
+          // knot and the tail and on nothing else, so this cannot reach the
+          // skull however wrong the height is.
+          //
+          // From the tip up rather than all at once, and over the same fifth
+          // of a second as everything else, because she is catching fire and
+          // hair that burns off from the bottom is the one way of losing it
+          // that does not need a second effect to explain it. The line is in
+          // undisplaced bind space, so it tracks the geometry through every
+          // clip. 1.29 is under the tail's lowest vertex at 1.313 and 1.80 is
+          // over the knot's highest at 1.726, so at uShorn 0 this discards
+          // nothing at all and by 0.86 it has discarded all of it.
+          if (vUv.x > 0.5 && vLocal.y < mix(1.29, 1.80, uShorn)) discard;
           vec3 vcol = vVCol;
           {
             // Not a window round HAIR_P but a *line* from the skin to it, and
@@ -16610,11 +16875,41 @@ async function buildJadrija(scene) {
               vec3 hair = mix(vec3(${gl3(BAYE_HAIR.lo)}),
                 vec3(${gl3(BAYE_HAIR.hi)}),
                 clamp(sun * 0.48 + lock * 0.64, 0.0, 1.0));
+              // And the shave, which goes on the *hair* colour and not on the
+              // finished one. That is the whole of the order of operations
+              // here and it is the difference between a haircut and a stain:
+              // everything below still multiplies by wc, so a vertex the
+              // decimator left a third hair comes out a third stubble, and the
+              // ramp that took 214 mixed vertices to get the hairline right
+              // carries the new boundary for free. Nothing can creep on to
+              // bare forehead, because bare forehead has wc 0.
+              //
+              // The crest is the three ramps in CROP multiplied: high enough
+              // on the skull, near enough the midline, and forward of the
+              // crown. Squared, so the corners where they meet round off
+              // instead of coming to a point — a shave line with a corner in
+              // it reads as a mistake.
+              float crest = smoothstep(${CROP.yLo.toFixed(3)},
+                  ${CROP.yHi.toFixed(3)}, vLocal.y)
+                * (1.0 - smoothstep(${CROP.zIn.toFixed(3)},
+                  ${CROP.zOut.toFixed(3)}, abs(vLocal.z)))
+                * smoothstep(${CROP.xLo.toFixed(3)},
+                  ${CROP.xHi.toFixed(3)}, vLocal.x);
+              float shorn = uShorn * (1.0 - crest * crest);
+              // Grained rather than flat, for the reason the deleted lining in
+              // human_mh.py is deleted: a large flat patch on lit skin reads as
+              // spray paint. It rides the same lock the blonde does, so the
+              // stubble breaks up along the same strands the hair did.
+              hair = mix(hair, vec3(${gl3(CROP.stub)}) * (0.88 + 0.24 * lock),
+                shorn);
               vcol = mix(vcol, mix(SK, hair, wc), dye);
               // A little more sheen than skin and no more, because the highlight
               // is added to the albedo and this albedo is already twice the
               // brown's. Fair hair with a skin-grade specular on it reads matte.
-              spec = mix(spec, 0.135, dye * wc);
+              // Cropped it goes under the skin's own, which is what stops the
+              // shaved sides reading as a wet swimming cap.
+              spec = mix(spec, mix(0.135, ${CROP.stubSpec.toFixed(3)}, shorn),
+                dye * wc);
             }
             // The rest of what a blonde has to take with her.
             //
@@ -16650,6 +16945,41 @@ async function buildJadrija(scene) {
       mesh.updateMatrixWorld();
       scene.add(mesh);
       banner = makeBanner(skinFig);
+      // The haircut. The flag on the ponytail is written once, on her own
+      // copy of the geometry; the horns are two meshes on one group that
+      // rides the head bone, and the group is what carries `boneTurn` so the
+      // bone is read once a frame rather than twice.
+      tailN = flagTail(mesh.geometry);
+      horns = new THREE.Group();
+      horns.visible = false;
+      mesh.add(horns);
+      for (const sgn of [-1, 1]) {
+        // A group a horn rather than a mesh a horn, because the growth is a
+        // scale about the root and the root is not the geometry's origin in
+        // two of the three axes.
+        const g = new THREE.Group();
+        g.position.set(CROP.root[0], CROP.root[1], sgn * CROP.root[2]);
+        const m = new THREE.Mesh(hornGeo(sgn), solidMaterial(0xffffff, {
+          // Her hair's own numbers, so a horn and the crest it stands in are
+          // lit by the same lobe. `solidMaterial` and not the flat shade in
+          // 49-you.js: that one has the sun stuck to the camera, which is
+          // right for a thing only ever seen in a mirror in one small room and
+          // wrong for anything standing on this beach.
+          spec: 0.135, specPower: 24,
+          // `solidVertex` forwards `aVCol` to the fragment as `vVCol` and
+          // leaves `vColor` white, so every vertex-coloured surface in the
+          // game has to spend it itself. One that forgets comes out white,
+          // which is what the first pair of these were.
+          body: 'base *= vVCol;',
+        }));
+        // She is 1.75 m and these are 13 cm on top of her; the mesh they hang
+        // off is already inside the frustum whenever they are, and a bounding
+        // sphere the size of a fist is exactly the case culling gets wrong at
+        // the edge of the screen.
+        m.frustumCulled = false;
+        g.add(m);
+        horns.add(g);
+      }
       testFigure = { mesh, fig: skinFig, tris: skinFig.tris, at: [ft, fs] };
 
       // The survey pole that used to stand here is gone.
@@ -16728,6 +17058,12 @@ async function buildJadrija(scene) {
         soak: 0, burn: 0, cast: 0, boast: 0,
         // The one thing here that only ever goes one way. See the flare.
         turned: 0,
+        // And how far through the haircut the latch has got her: 0 to 1 over
+        // `CROP.in`, driving the horns, the shave and the ponytail together.
+        // Stepped in `placeHorns` rather than here, so that a frame held by
+        // `__fr.jad.pose` — which does not run the routine at all — still has
+        // a woman with the right head on her.
+        shorn: 0,
         // Indoors: which waypoint of the way in she is on, and whether the
         // wrap has come off. `shed` is a latch for the same reason `turned` is
         // — it is read every frame by the line that draws the wrap, and a
@@ -18433,6 +18769,60 @@ async function buildJadrija(scene) {
   /** The indoor track, as a set, so the trigger can tell it is already on it. */
   const KABIN = { come: 1, enter: 1, wine: 1, meet: 1, untie: 1,
     dwell: 1, leave: 1 };
+
+  // Scratch for the horns, hoisted out of the frame loop.
+  const vHorn = new THREE.Vector3(), qHorn = new THREE.Quaternion();
+  let headB = null;
+
+  /**
+   * Put the horns where her skull is, and take the haircut a frame further on.
+   *
+   * Called after the pose has been solved and instead of from inside
+   * `stepShow`, for two reasons. The routine is not the only thing that steps
+   * her — `__fr.jad.pose` holds a frame with the routine switched off — and
+   * `boneAt` means nothing until `fig.update` has run, which is the line above
+   * the call site either way.
+   *
+   * Figure space, so there is no matrix to apply: the group is a child of her
+   * mesh and inherits everything the mesh has. `boneTurn` and not `boneAt`
+   * alone, and that is the hat's whole lesson from 41-skin.js — the head bone
+   * is at the *base* of the skull, so a horn is an offset from it, and an
+   * offset that does not turn with the bone ends up beside her head the first
+   * time she looks at anything. She throws her head back in the flare and goes
+   * upside down in a cartwheel, and both of those are that bug at full scale.
+   *
+   * The rise is a scale about the root and it is an easeOutBack: past full
+   * length by a third of the ramp, over it by a tenth at the top, back down by
+   * the end. A horn that grows to its own length and stops is a horn being
+   * extruded; this is a thing that has snapped up and rung.
+   *
+   * Uniform rather than along the horn's own axis, so the first frames are
+   * short *and* thin — a stub at full width leaning at its full angle is a
+   * lump, and the 17 mm the root is sunk into her scalp hides a thin one
+   * completely.
+   */
+  function placeHorns(dt) {
+    if (!horns || !show || !skinFig) return;
+    show.shorn = shornPin != null ? shornPin
+      : show.turned ? Math.min(1, show.shorn + dt / CROP.in) : 0;
+    skinFig.material.uniforms.uShorn.value = show.shorn;
+    const on = show.shorn > 0;
+    horns.visible = on;
+    // On the meshes as well as on the group, because the shadow proxy is not
+    // in this tree: `syncMoving` reads the *source mesh's* own `visible` flag,
+    // and a group hidden over the top of it is a flag it never sees.
+    for (const g of horns.children) g.children[0].visible = on;
+    if (!on) return;
+    if (headB === null) headB = skinFig.boneIndex('head');
+    if (headB < 0) { horns.visible = false; return; }
+    skinFig.boneAt(headB, vHorn);
+    horns.position.copy(vHorn);
+    horns.quaternion.copy(skinFig.boneTurn(headB, qHorn));
+    // easeOutBack, with the standard 1.70158.
+    const u = show.shorn - 1;
+    const k = 1 + 2.70158 * u * u * u + 1.70158 * u * u;
+    for (const g of horns.children) g.scale.setScalar(k);
+  }
 
   function stepShow(dt, pt, ps) {
     if (!show || !skinFig) return;
@@ -20516,6 +20906,9 @@ async function buildJadrija(scene) {
         // dt is a pose whose cloth never arrives.
         if (posed) skinFig.state.curT = posed.at;
         else stepShow(dt, pt, ps);
+        // After both, because it reads the bones the step above has just
+        // solved and it has to run on the held frame as well as the live one.
+        placeHorns(dt);
       }
     }
     // Outside the range gate above, because a ball that is already in the air
@@ -20926,8 +21319,17 @@ async function buildJadrija(scene) {
       skinFig.state.curT = at;
       return { posed: name, at, playing: skinFig.playing() };
     },
-    /** Debug: put her at (t, s), and optionally straight into a phase. */
-    putShow: (t, s, phase, at, ang) => {
+    /**
+     * Debug: put her at (t, s), and optionally straight into a phase.
+     *
+     * `shorn` is the sixth and it is only ever passed by a screenshot. The
+     * haircut is a fifth of a second long and a headless page runs about one
+     * frame in that time, so there is no way to *catch* the middle of it —
+     * this is how a still of it gets taken. It sets the latch as well as the
+     * meter, because `placeHorns` derives one from the other every frame and
+     * would put a number set on its own straight back to zero.
+     */
+    putShow: (t, s, phase, at, ang, shorn) => {
       if (!show || !skinFig) return null;
       show.t = t; show.s = s; show.vel = 0; show.rate = 0; show.leg = 0;
       if (ang != null) { show.ang = ang; show.want = ang; }
@@ -20935,7 +21337,22 @@ async function buildJadrija(scene) {
         show.phase = phase; show.tmr = 0; show.held = 0; show.pour = 0;
         skinFig.play({ wine: 'wine', untie: 'untie', submit: 'submit',
           kept: 'kept', creep: 'knees', note: 'note', heart: 'heart',
-          shimmy: 'shimmy', twerk: 'twerk' }[phase] || 'idle', { fade: 0 });
+          shimmy: 'shimmy', twerk: 'twerk',
+          // The turn, and the two airborne moves she goes on doing after it.
+          // `flare` is the throw; the rest of the turn is played over the
+          // stamp, which is what `go` does with them in the routine.
+          flare: 'flare', blaze: 'firestarter', cast: 'cast', boast: 'note',
+          wheel: 'cartwheel', flip: 'flip' }[phase] || 'idle', { fade: 0 });
+        // And the latch, for every phase that is downstream of it. Set rather
+        // than eased, for the reason `shorn` above exists.
+        if (phase !== 'flare' && MUSIC[phase]) {
+          show.turned = 1; show.shorn = 1; show.burn = 1;
+        }
+      }
+      shornPin = shorn == null ? null : shorn;
+      if (shorn != null) {
+        show.turned = shorn > 0 ? 1 : 0;
+        show.shorn = shorn;
       }
       // And scrub, because a headless page runs its clock at a fraction of the
       // wall clock and a five-second clip is not a thing a screenshot can wait
@@ -21048,9 +21465,20 @@ async function buildJadrija(scene) {
     testFigure: testFigure && { tris: testFigure.tris, at: testFigure.at,
       bones: skinFig ? skinFig.bones.length : 0,
       clips: skinFig ? skinFig.clips.join('+') : 'none',
+      tailN,
       playing: skinFig ? skinFig.playing() : 'none' },
     /** The skinned figure, for the debug API and for whatever animates her. */
     figure: skinFig,
+    /**
+     * The two horns, for the shadow pass and nothing else.
+     *
+     * They are children of her mesh and are posed in figure space, so they
+     * come free everywhere except here: the caster is a proxy in a scene of
+     * its own and only knows about meshes it has been handed. Dynamic, because
+     * she walks; `near`, for the reason her own caster is — the far cascade
+     * cannot draw anything under two metres.
+     */
+    horns: horns ? horns.children.map((g) => g.children[0]) : [],
     /** What the internet last said, or nulls. Read by a test, and by nothing else. */
     btc: () => live.btc,
     live: () => ({ ...live }),
@@ -21156,7 +21584,7 @@ async function buildJadrija(scene) {
         ? +skinFig.face.streak.toFixed(2) : null,
       hit: +show.hit.toFixed(2), spin: show.spin,
       soak: +show.soak.toFixed(1), burn: +show.burn.toFixed(2),
-      turned: show.turned,
+      turned: show.turned, shorn: +show.shorn.toFixed(2),
       balls: balls.length, fires: fires.filter((f) => f.burning > 0).length,
     },
     /**
