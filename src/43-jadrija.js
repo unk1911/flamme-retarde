@@ -16131,21 +16131,22 @@ async function buildJadrija(scene) {
   const BAYE_HAIR = {
     lo: [0.300, 0.208, 0.112],     // the nape, the underside, the roots
     hi: [0.640, 0.500, 0.290],     // the crown, where the sun is on it
-    // Her brows, and they are neither. A blonde with the brunette's brows on is
-    // a wig seen from the other side, and a blonde with her own hair colour on
-    // her brows has no brows at all at any distance — the patch is 6 mm of paint
-    // on skin that is 0.760, and it disappears at about 0.55. Real fair brows
-    // run a couple of shades under the hair, which is what this is: darker than
-    // `lo`, well up from the near-black the cutter painted.
+    // Her brows, and they are neither, which is a judgement and not a
+    // measurement. A blonde wearing the brunette's brows is the wig seen from
+    // the other side; a blonde whose brows are her own hair colour has no brows
+    // at all, because a 6 mm strip of paint that light on skin this light is
+    // nothing at conversational distance, never mind at twenty metres. Real
+    // fair brows run a couple of shades under the hair, and that is what this
+    // is: darker than `lo`, well up from the near-black the cutter painted.
     brow: [0.268, 0.196, 0.124],
     // And the pubic hair, which human_mh.py deliberately gave the hair marker so
-    // that a recoloured head and an un-recoloured crotch could never happen. It
-    // is baked PUBIC_P — (0.225, 0.163, 0.128), three shades up from HAIR_P and
-    // therefore *not* caught by the dye's window, which is measured off HAIR_P —
-    // so it takes a window and a lift of its own. Lifted rather than dyed to the
-    // hair colour: that note's own reasoning is that a flat patch on lit skin
-    // cannot take the contrast the head's mass can, and it holds in the other
-    // direction too.
+    // that a recoloured head and an un-recoloured crotch could never happen. Its
+    // baked colour is PUBIC_P, (0.225, 0.163, 0.128) — which does lie on the
+    // skin-to-hair line the dye works along, at w 0.85, and is kept off it only
+    // by the height gate. So it is lifted here instead, and lifted rather than
+    // taken all the way to the hair colour: that note's own argument is that a
+    // flat patch on lit skin cannot carry the contrast the head's mass can, and
+    // it holds in this direction too.
     pubic: [0.225, 0.163, 0.128],
     pubicTo: [0.430, 0.340, 0.238],
   };
@@ -16169,7 +16170,7 @@ async function buildJadrija(scene) {
             // that is the whole of what a dye job on a decimated head has to
             // get right. The bake paints hair on vertices and the decimator
             // then averages them with their neighbours, so the hairline is not
-            // an edge: measured off the blob, 228 vertices above y 1.29 sit at
+            // an edge: measured off the blob, 214 vertices above y 1.29 sit at
             // every mixture between SKIN_P and HAIR_P there is, and on a
             // brunette nobody could see them. Dye only the ones that are all
             // hair and that ramp survives as a jagged dark-brown seam round the
@@ -16205,15 +16206,15 @@ async function buildJadrija(scene) {
               // it runs down the tail as well as round the head.
               float ang = atan(vLocal.z, vLocal.x - 0.033);
               float lock = 0.5 + 0.5 * sin(ang * 9.0 + 2.3);
-              float grain = 0.5 * vnoise2(vec2(ang * 3.1, vLocal.y * 46.0))
-                + 0.5 * vnoise2(vec2((vLocal.x + vLocal.z) * 40.0, vLocal.y * 40.0));
-              lock = mix(lock, grain, 0.55);
+              float grain = 0.5 * vnoise2(vec2(ang * 3.1, vLocal.y * 30.0))
+                + 0.5 * vnoise2(vec2((vLocal.x + vLocal.z) * 27.0, vLocal.y * 31.0));
+              lock = mix(lock, grain, 0.60);
               // And the mass: crown lit, nape and underside in their own shade.
               // 1.31 is her lowest hair vertex and 1.66 is above the ears.
               float sun = smoothstep(1.31, 1.66, vLocal.y);
               vec3 hair = mix(vec3(${gl3(BAYE_HAIR.lo)}),
                 vec3(${gl3(BAYE_HAIR.hi)}),
-                clamp(sun * 0.55 + lock * 0.55, 0.0, 1.0));
+                clamp(sun * 0.48 + lock * 0.64, 0.0, 1.0));
               vcol = mix(vcol, mix(SK, hair, wc), dye);
               // A little more sheen than skin and no more, because the highlight
               // is added to the albedo and this albedo is already twice the
