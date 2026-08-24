@@ -242,8 +242,13 @@ rim is a specific claim and this is the absence of one.
 **11. The furled white parasol west of MINI's canopies.** `_111954`. A round
 white parasol on a white pole standing on the apron beyond the square canopies,
 one of the two shades that are not the taupe pair. It carries a beer brand
-across the valance in the frame, and it ships — when it ships — plain. That is
-the same call `b_069`'s tavern parasol already shipped under.
+across the valance in the frame, and it used to ship plain, which was the same
+call `b_069`'s tavern parasol shipped under. **Both are printed as of 24 Aug**:
+Misha named the six brands and an owner's statement outranks a photograph. This
+one takes STELLA ARTOIS, on the hem gathered at the bottom of the furled bundle
+— one repeat all the way round, so you read four or five letters of it from the
+terrace and the rest goes round the back, which is what the real one gives you.
+See survey-v59x item 12 for the whole reversal.
 
 **12. The chalky "SLADOL…" wall sign.** `_111819`, low on the shop wall to the
 right of the flag, red on white, partly behind the cone tub. Only the first six

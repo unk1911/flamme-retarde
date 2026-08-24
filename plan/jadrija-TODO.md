@@ -651,7 +651,10 @@ bed. See the commit.
   crimson parasol over a poseur table and three red-topped stools. The only
   curved metal object in four hundred frames of survey. No name on any of it:
   the parasol carries a beer brand in the frame and the A-board a product, and
-  blank is the only reading of rule 12 that cannot be wrong.
+  blank is the only reading of rule 12 that cannot be wrong. **Reversed for the
+  parasol, 24 Aug** — Misha named the brands, an owner's statement outranks a
+  photograph, and the valance now prints OŽUJSKO. See survey item 12. The
+  A-board is still blank; he named parasols and a rack, not a chalkboard.
 - ~~**a_160** kayaks/pedalos and the white box trailer~~ — the hulls went in
   with the bank armouring; the trailer was built 22 Aug.
 
