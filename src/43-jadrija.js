@@ -3994,6 +3994,14 @@ async function buildJadrija(scene) {
     // eighth row, and the reason the pitch dropped an item's worth. Both
     // stand on his recollection alone, like the four above them.
     //
+    // And KOKICE, 24 August, third row, no price — the ninth. See the note
+    // over `items`. The count is the only thing that has to change: `pitch`
+    // divides the field by `items.length` and `column()` re-fits the whole
+    // column to whatever cap height that leaves, so a ninth row shrinks the
+    // type for all nine at once and the board still looks set by one hand.
+    // KOKICE is shorter than CAPPUCCINO, so the widest name — and with it the
+    // 0.55 budget the column is fitted against — is unchanged again.
+    //
     // Worth noting what that does to the layout: the row count is the only
     // thing anyone has to change here. `pitch` divides the field by
     // `items.length` and `column()` re-fits the whole column to whatever cap
@@ -4021,15 +4029,26 @@ async function buildJadrija(scene) {
     // being set in `warm()` alongside the names and there is not a warm number
     // anywhere in any photograph of this shop.
     //
-    // Still off the board: the third row. `b_184` shows it plainly enough to
-    // count — the real menu has NINE rows and this has eight — but the word is
+    // The third row, settled 24 August. `b_184` shows it plainly enough to
+    // count — the real menu has NINE rows and this had eight — but the word is
     // five pixels of stroke and reads as KOKICE or KORICE depending on the
-    // frame. A row that is known to exist is not a licence to name it.
+    // frame, and a row that is known to exist is not a licence to name it. So
+    // it stayed off the board until Misha read it: **KOKICE**, popcorn, and
+    // *"the price for it is left blank"*.
+    //
+    // Blank means blank, and it is drawn as nothing rather than as an empty
+    // white label. That distinction is the whole of the price column's own
+    // grammar and it is worth keeping straight: a **sticker** is a price the
+    // shop has changed, a **printed** number is one it has not, and an empty
+    // label would be a third thing — a price that exists and cannot be read,
+    // which is what four rows shipped as before he supplied them. KOKICE has
+    // no price on the board, so there is nothing over its name.
     {
       const f = fieldOf(2), fw = f.x1 - f.x0, fh = f.y1 - f.y0;
       // `true` where the price is printed with the board, `false` where it is
-      // a sticker over it.
+      // a sticker over it; `null` for a row that carries no price at all.
       const items = [['SLADOLED', '2.50 €', false], ['KUPOVI', '8.00 €', true],
+        ['KOKICE', null, false],
         ['FRAPPE', '7.00 €', true], ['KRAFNE', '2.50 €', false],
         ['ESPRESSO', '2.00 €', true], ['MACCHIATO', '2.50 €', false],
         ['CAPPUCCINO', '3.00 €', false], ['NES CAFFE', '3.00 €', true]];
@@ -4040,6 +4059,7 @@ async function buildJadrija(scene) {
         const y = top + pitch * (i + 0.76);
         g.fillStyle = warm();
         line(t, mi, f.x0 + fw * 0.035, y, 'left');
+        if (!price) return;
         if (print) printed(rx, y, price, pitch * 0.52, fw * 0.30);
         else sticker(rx, y, price, pitch * 0.42);
       });

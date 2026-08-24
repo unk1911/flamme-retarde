@@ -29,41 +29,31 @@ inlet running south-west from the pier root. Is it moorings on lines, or a
 pontoon, or boats just pulled up the beach? That decides whether it is thirty
 small hulls or a structure.
 
-## 2. Two small ones on the slastičarnica board
+## 2. The board — ANSWERED and closed
 
-Built tonight from `b_184` and `b_186` — the drinks board now has all six rows
-with their prices, and RADNO VRIJEME · 07-00 across the foot. Two things I
-could not settle:
+Both settled 24 August:
 
-- **The third row on the right-hand board.** The real menu has nine rows and
-  the game has eight, because that word is five pixels of stroke and reads
-  KOKICE or KORICE depending on the frame. Popcorn or wafer shells — you will
-  know. It stays off the board until you say.
-- **NES CAFFE or NESCAFE?** You said NESCAFE; the board plainly reads NES
-  CAFFE, two words. I used the board's spelling because the board is the thing
-  that is photographed — say the word and it goes back.
+- **KOKICE**, and *"the price for it is left blank"*. It is the third row, and
+  blank means blank — nothing over the name, rather than the empty white label
+  four rows shipped as before you supplied their prices. That distinction is
+  the price column's own grammar: a sticker is a price the shop has changed, a
+  printed number is one it has not, and an empty label is a price that exists
+  and cannot be read. KOKICE's does not exist. Nine rows now.
+- **NES CAFFE stays**, on your word. The board's spelling, because the board is
+  the thing that is photographed. Closed.
 
-And one I did not build: **the centre bay's lower two thirds is empty**. The
-real one has a photograph of krafne under the name, and now that both flanking
-bays are full that gap is conspicuous where it was not before. Worth doing?
+Still open from that pass, and small: **the centre bay's lower two thirds is
+empty.** The real one has a photograph of krafne under the name, and now that
+both flanking bays are full the gap is conspicuous where it was not before.
 
-## 3. Brands: the board names them, the parasol does not
+## 3. Brands — ANSWERED, in hand
 
-The tavern's parasol valance reads **Karlovačko** with the brewery's shield,
-and it is perfectly legible in `b_069`. The trailer's own note decided to leave
-every brand off — *"leaving them blank is the only reading of rule 12 that
-cannot be wrong"* — and I have honoured that rather than quietly reversing it.
-
-But it sits badly next to the slastičarnica board, which names **Coca Cola,
-Sprite, Fanta, Orangina and Nes Caffe** off exactly the same kind of evidence.
-One of the two is inconsistent and I do not think it is mine to pick:
-
-- **Name them all**, on the grounds that rule 12 is about not inventing, and
-  these are read off the frames like everything else; or
-- **Name none**, and the drinks board loses five product names.
-
-The valance is currently a plain red band with a small white mark and an
-illegible run, which is what the small print on the trader's panel does.
+You gave six: **JANA, CORONA, OŽUJSKO, STELLA ARTOIS, STAROPRAMEN** (on the
+bicycle rack) and **JAMNICA** (since 1828). Handed to a single agent on 24
+August. The trailer's *"leaving them blank is the only reading of rule 12 that
+cannot be wrong"* is superseded the way the four prices were: rule 12 forbids
+inventing what the evidence does not carry, never what the owner states as
+fact.
 
 ## 4. How many kabine does Jadrija actually have? *(carried over)*
 
