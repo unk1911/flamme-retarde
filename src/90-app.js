@@ -218,6 +218,16 @@ addEventListener('keydown', (e) => {
     skipToComputer();
     return;
   }
+  // The trampoline cut, and its skip. Ahead of the pause guard AND ahead of
+  // Escape, which would otherwise stop the world in the middle of a shot and
+  // leave a paused camera two hundred metres over the beach with no way back
+  // to the game that owns it. Three keys rather than one because this is a
+  // seven-second cut with no button on it: Escape is what a cinematic means
+  // everywhere, and Enter and Space are what a hand actually presses.
+  if (flyCut && (e.code === 'Escape' || e.code === 'Enter'
+    || e.code === 'NumpadEnter' || e.code === 'Space')) {
+    e.preventDefault(); endFlyCut(); return;
+  }
   if (e.code === 'KeyO') { e.preventDefault(); skipToComputer(); return; }
   if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); togglePause(); return; }
   // Ahead of the pause guard on purpose: pausing to read the hint and then
@@ -331,9 +341,25 @@ addEventListener('keydown', (e) => {
   //
   // On foot only. In the seat Enter is not a jump and under a canopy you are
   // already off the ground.
+  //
+  // Three jumps on one key, tried hardest first, and they are one block because
+  // they were three and only the first of them could ever run. `hopOut` had its
+  // own `if (e.code === 'Enter' && state.phase === 'ground')` seventy lines
+  // below this, and this block returns unconditionally for every Enter on foot
+  // — so the balcony jump has been unreachable from the keyboard, silently, and
+  // the only thing that still reached it was the debug handle. Adding a fourth
+  // jump under the same key without collapsing them would have made a second
+  // one dead the same way.
+  //
+  // The order is the order of specificity: a trampoline bed is one square metre
+  // of the resort, the vikendica's plinth is one building, and the hop is
+  // everywhere else. Each of the first two declines quietly when you are not
+  // standing on the thing it is about.
   if (e.code === 'Enter' || e.code === 'NumpadEnter') {
     if (state.phase === 'ground' && ground && ground.ok && !state.paused) {
       e.preventDefault();
+      if (bounceOut()) return;
+      if (hopOut()) return;
       ground.hop();
       return;
     }
@@ -363,11 +389,9 @@ addEventListener('keydown', (e) => {
     return;
   }
   if (e.code === 'KeyU' && state.phase === 'ground') { e.preventDefault(); launchOut(); return; }
-  // And Enter is the small one: running at the balcony rail, off it, and down
-  // under the cloth on to the promenade. Same key you would hit anyway when
-  // you have decided to do something, and it declines quietly — standing still
-  // or standing on the beach it is not a jump, and nothing happens.
-  if (e.code === 'Enter' && state.phase === 'ground') { e.preventDefault(); hopOut(); return; }
+  // Enter — the balcony rail and the trampoline — is answered in the one block
+  // above, with the ordinary hop. It used to be answered here as well, and here
+  // never ran.
   // T is the autopilot in both seats. In the aeroplane it flies the job list;
   // in the water there is one job and it swims you at it. Same key, same
   // promise — somebody else has the controls until you take them back — which
@@ -464,6 +488,11 @@ addEventListener('mousemove', (e) => {
   // Same again under the canopy: the mouse is your head. What the canopy does
   // is on the rudder keys, because pulling a riser is a hand, not a look.
   if (state.phase === 'chute') {
+    // Except while a shot has the camera. The canopy's heading and the view are
+    // one number — see `look` in 57-eject.js — so a mouse moved during the
+    // trampoline cut would be steering a parachute nobody can see, and the shot
+    // ends behind a heading that is no longer the one it was framed for.
+    if (flyCut) return;
     const g = 0.0020 * flight.p.sens;
     eject.look(e.movementX * g, e.movementY * g);
     return;
@@ -2591,6 +2620,260 @@ function hopOut() {
   return true;
 }
 
+/**
+ * Enter, standing on a trampoline bed.
+ *
+ * Third of the three jumps on the key and the first one tried, because it is
+ * the most specific: four squares of black mat in the pine wood behind the back
+ * row, and nowhere else in the game does Enter mean this.
+ *
+ * The physics is `launchOut` — U, the charge under your boots — and that is the
+ * ask rather than a shortcut. What a bed does to a body is a very large impulse
+ * straight up followed by a very long time in the air with nothing to do, and
+ * that is exactly the shape the escape charge already has, down to the canopy
+ * streaming at the top of the climb. There is no second parachute here and no
+ * second set of numbers: `LAUNCH.up` and `LAUNCH.hang` are integrated by the
+ * same `v' = -g - k v²` in 57-eject.js, and the apex is the same 202 m at 5.7 s
+ * that U has been giving since it stopped being fifty.
+ *
+ * What is different is what you see while it happens. U is a fire escape and
+ * puts you straight into the first person, because the thing you want from it
+ * is to look at where you are going. This is not an escape from anything; the
+ * whole of it is the going up, and the going up is the one event in the game
+ * that is better watched than had. Hence `startFlyCut`.
+ *
+ * Declines quietly everywhere that is not a bed, which is everywhere but four
+ * squares of one resort — see the note on the Enter block.
+ */
+function bounceOut() {
+  if (!ground || !ground.ok || !ground.active || state.paused) return false;
+  if (!eject || eject.active) return false;
+  if (!jadrija || !jadrija.onBed || ground.field !== jadrija) return false;
+  const g = ground.you;
+  // Feet on the cloth. `gy` is what `walkY` answered and is the mat's own
+  // height when you are over one; `hop` is how far above that you actually
+  // are, and a bed you are sailing over on an ordinary jump has not got you.
+  if (g.hop > 0.05) return false;
+  const bed = jadrija.onBed(g.x, g.z, g.gy);
+  if (!bed) return false;
+  launchedFrom = { stranded: ground.stranded };
+  ground.bail();
+  eject.reset();
+  eject.launch(g.x, g.y, g.z, g.yaw, LAUNCH.up, LAUNCH.hang);
+  // Not `boom()`. That is a cartridge going off under a pair of boots and it is
+  // the right noise for U; this is thirty square metres of sprung cloth letting
+  // go, which is the low thump `boots()` already is — 92 Hz down to 38 in a
+  // sixth of a second — with the grit in it standing in for the springs.
+  if (audio) { audio.boots(); audio.gasp(0.8); }
+  alerts.bump(1.6);
+  $('ground-hud').hidden = true;
+  $('hud').hidden = true;
+  if (IS_TOUCH) { $('gtouch').hidden = true; $('touch').hidden = true; }
+  startFlyCut(bed, g.yaw);
+  toast(T('toast.tramp'));
+  return true;
+}
+
+// -----------------------------------------------------------------------------
+// Free as a bird.
+//
+// Built on the race's cut and not on the title cinematic, and the two are
+// genuinely different animals. `intro` in 70-intro.js is text over a held
+// image with a fade and a skip button: nothing in the world moves and the whole
+// of it is words. This is a camera move on the live scene with a person in it,
+// which is what `stepChaseCut` is — camera through `camOverride`, the body
+// through `you.drive`, everything hung off a clock. So it is that machinery,
+// written out here rather than shared, because the race's shot is five legs
+// between fixed points on a jetty and every frame of this one is solved off a
+// body that is doing ninety metres a second.
+//
+// The shot, and why. "Wide-eyed and FREE as a bird" is a feeling and not a
+// frame, and the reading taken is: you have to see what she left, and then you
+// have to see nothing under her at all. So a third of a second on the ground
+// beside the bed while it throws her — the park, the fence, the pines, and her
+// going up out of the top of the frame — and then everything after it is her
+// against sky with Jadrija shrinking underneath. The camera orbits half a turn
+// while it falls away from her, passes under her at the middle of the shot
+// looking up, and ends behind her shoulder as the cloth blossoms, which is
+// where the first person is about to be.
+//
+// Her face is the game's own, not a rig invented for this: `face.rate = 0` is
+// the skin's word for staring and is what wide-eyed IS here — she stops
+// blinking for seven seconds — and `gape` opens her mouth. The smile is kept
+// low on purpose, because a smile narrows the eyes in this shader (see
+// `setBlink` in 41-skin.js) and narrowed eyes are the opposite of the ask.
+// -----------------------------------------------------------------------------
+
+const FLY = {
+  // How long the camera stays on the ground with the bed, and where it aims.
+  //
+  // The aim is a FIXED point three metres over the mat and not her, and that is
+  // the whole of what makes this beat work. Tracking her was the first cut and
+  // it is unwatchable: ninety metres a second is twenty-one metres of altitude
+  // by the time a screenshot lands, so a camera pointed at her has tilted
+  // through sixty degrees inside a third of a second and the frame is empty
+  // sky with a speck in it — the park, the fence, the four beds and the pines,
+  // which are the only reason to be on the ground at all, are all off the
+  // bottom of it. Held on the bed instead, she streaks up out of the top of a
+  // frame that stays on what threw her, which is what a launch looks like.
+  //
+  // Placed off the bed's own two clear bearings rather than at an angle taken
+  // from her heading, and inside the cage rather than outside it: the mesh is
+  // opaque black at this range, and a camera on a bearing that follows the
+  // player is a camera behind a black panel about half the time. Diagonally,
+  // because neither axis on its own is far enough back — five metres of gravel
+  // seaward and two metres to the end of the row.
+  bed: 0.30,
+  bedOut: 4.3,    // m seaward of the bed centre
+  bedAlong: 4.6,  // and m down the row towards the middle of it
+  bedH: 2.00,     // m over the mat, which is about somebody watching
+  // Where it looks, over the mat. 2.4 rather than 3.4 for one reason: the
+  // vertical field is 58°, so the aim decides which of the bed and the sky the
+  // frame gets, and at 3.4 the beds are thirty degrees down and off the bottom
+  // of it. At 2.4 the park sits in the lower third and she is in shot up to
+  // about six metres of altitude, which at ninety metres a second is the first
+  // seventieth of a second — this beat is the park, and she is a streak.
+  bedAim: 2.80,
+  // And the whole thing. Seven seconds, the same as the race's cut, and it is
+  // measured rather than chosen: the canopy streams at LAUNCH.hang + tumble =
+  // 5.70 s and is full 1.15 s after that, so a shot that ends before 6.85 ends
+  // before the thing it is about.
+  dur: 7.0,
+  /**
+   * Where the camera is, as [t, radius, height, azimuth, aim].
+   *
+   * Radius and height are metres from her eye; azimuth is measured from the
+   * angle that ends up directly behind her, so the orbit lands square on the
+   * first person's heading however she was facing when the bed let go. `aim` is
+   * how far above her eye the camera looks — the canopy's centre is 6.4 m up
+   * (EJECT.riser), so the last two keys aim between her and the cloth.
+   */
+  // The one number that governs all of these is the angle the camera ends up
+  // looking UP at: from two hundred metres the horizon is a degree and a bit
+  // below level, so anything steeper than about 25° puts the whole of Šibenik
+  // off the bottom of the frame and leaves her a figure in an empty blue
+  // rectangle. That is what the third key was on the first pass — 6.5 m under
+  // her at 9 m out is 38°, and it photographed as nothing at all. Every key
+  // here keeps (aim − height) / radius under 0.45.
+  keys: [
+    [0.30, 7.0, -1.2, -3.60, -0.2],
+    [2.10, 13.0, -4.0, -2.90, 0.1],
+    [3.70, 8.5, -3.4, -2.05, 0.1],
+    [5.40, 16.0, -2.0, -1.10, 2.2],
+    [6.30, 22.0, 2.0, -0.45, 3.8],
+    [7.00, 9.0, 0.8, 0.00, 0.8],
+  ],
+  // Her, while it happens. `tread` is the only clip on this rig that is upright
+  // with the arms out and the legs loose, which is what a body thrown off a
+  // trampoline is and is as close to a bird as fourteen authored actions get.
+  spin: 1.30,     // rad/s she turns on the way up, easing out as the cloth fills
+  lean: 0.42,     // rad of chest-to-the-sky, gone by the time she is hanging
+  roll: 0.22,     // rad of lazy roll, and how fast it goes round
+  rollHz: 1.70,
+};
+
+/** The trampoline shot, or null. See the block above. */
+let flyCut = null;
+
+function startFlyCut(bed, yaw) {
+  // The canopy's HUD belongs to the descent and not to this. It comes back in
+  // `endFlyCut`, on both the way the shot ends.
+  $('chute-hud').hidden = true;
+  if (IS_TOUCH) $('ctouch').hidden = true;
+  flyCut = {
+    t: 0,
+    at: bed.at.slice(),
+    out: bed.out.slice(),
+    along: bed.along.slice(),
+    // Where the camera has to finish: behind her, looking the way she is. She
+    // faces (−sin yaw, −cos yaw) — see `pose` in 57-eject.js — so behind her is
+    // +(sin, cos), and the azimuth of that is π/2 − yaw.
+    az: Math.PI / 2 - yaw,
+    yaw,
+    spun: 0,
+  };
+}
+
+/** Put the shot away, whether it ran out or was skipped. */
+function endFlyCut() {
+  if (!flyCut) return;
+  flyCut = null;
+  camOverride = null;
+  if (you) {
+    you.drive(null);
+    const f = you.fig && you.fig.face;
+    if (f) { f.rate = 1; f.gape = 0; f.smile = 0; }
+  }
+  // Only if you are still under it. Skipping is instant and the canopy is
+  // still there; running out is not the only way this ends, and a landing
+  // during the shot would leave a chute HUD over a walk.
+  if (eject && eject.active) {
+    $('chute-hud').hidden = false;
+    if (IS_TOUCH) $('ctouch').hidden = false;
+  }
+}
+
+/** One frame of it. Wall time, like the race's cut and the walk to the house. */
+function stepFlyCut(dt) {
+  if (!flyCut) return;
+  if (!eject || !eject.active) { endFlyCut(); return; }
+  flyCut.t += dt;
+  const t = flyCut.t;
+  if (t >= FLY.dur) { endFlyCut(); return; }
+  const P = eject.pos;
+  const A = flyCut.az;
+
+  if (t < FLY.bed) {
+    // On the ground with the bed, aimed at the bed. See `bedAim`.
+    const B = flyCut.at, o = flyCut.out, al = flyCut.along;
+    camOverride = [
+      B[0] + o[0] * FLY.bedOut + al[0] * FLY.bedAlong,
+      B[1] + FLY.bedH,
+      B[2] + o[1] * FLY.bedOut + al[1] * FLY.bedAlong,
+      B[0], B[1] + FLY.bedAim, B[2],
+    ];
+  } else {
+    const K = FLY.keys;
+    let i = 0;
+    while (i < K.length - 2 && t >= K[i + 1][0]) i++;
+    const a = K[i], c = K[i + 1];
+    const u = clamp((t - a[0]) / (c[0] - a[0]), 0, 1);
+    const f = u * u * (3 - 2 * u);
+    const r = lerp(a[1], c[1], f), h = lerp(a[2], c[2], f);
+    const az = A + lerp(a[3], c[3], f), aim = lerp(a[4], c[4], f);
+    camOverride = [
+      P.x + Math.cos(az) * r, P.y + h, P.z + Math.sin(az) * r,
+      P.x, P.y + aim, P.z,
+    ];
+  }
+
+  if (!you) return;
+  // She turns on the way up and stops turning as the cloth takes her weight,
+  // which is what a canopy does to a body: the risers are the first thing since
+  // the bed that has any say in which way she is pointing.
+  const settle = 1 - sat((t - 4.4) / 1.6);
+  flyCut.spun += dt * FLY.spin * settle;
+  you.drive({
+    at: [P.x, P.y - EJECT.eye, P.z],
+    yaw: flyCut.yaw + Math.PI / 2 + flyCut.spun,
+    pitch: FLY.lean * settle,
+    roll: FLY.roll * settle * Math.sin(t * FLY.rollHz),
+    clip: 'tread',
+    // Fast while she is flying and slow once she is hanging. The clip is
+    // authored for somebody keeping their chin out of the water; played at 1.7
+    // it is a body scissoring in air, and at 0.45 it is a pair of legs under a
+    // parachute, which is the same twenty-eight bones doing two jobs.
+    speed: 0.45 + 1.25 * settle,
+  });
+  const fc = you.fig && you.fig.face;
+  if (fc) {
+    // Wide-eyed, literally: `rate` is blinks a second and zero is a stare.
+    fc.rate = 0;
+    fc.gape = (0.22 + 0.50 * sat((t - 0.1) / 0.9)) * (1 - 0.55 * sat((t - 5.2) / 1.3));
+    fc.smile = 0.32 * sat((t - 1.2) / 1.4);
+  }
+}
+
 // Whether the cloth has been heard to open on this descent. The canopy fills
 // over about a second inside 57-eject.js and nothing in there makes a noise, so
 // the sound is hung off the number rather than off an event: watch inflation
@@ -4128,7 +4411,11 @@ function frame() {
     // Two things are happening at once and only one of them is you. You are
     // hanging under a canopy watching the other one go in.
     flyDerelict(dt);
-    eject.update(dt, {
+    // Hands off while the shot has her. Same argument the race makes when it
+    // passes `{ held: true }` to the swim: the toggles would be steering a
+    // canopy the player cannot see, and a riser hauled during the cut turns the
+    // frame the shot was composed for.
+    eject.update(dt, flyCut ? { turn: 0, dive: 0, flare: false } : {
       turn: clamp((keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0)
         - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0) + TOUCH.cx, -1, 1),
       // Up is the front risers and down is the brakes, which is the way round
@@ -4324,6 +4611,7 @@ function frame() {
   // a hydraulic door.
   if (vikWalk && !vikHold) stepVikWalk(real);
   if (chaseCut) stepChaseCut(real);
+  if (flyCut) stepFlyCut(real);
   if (comp) stepComputer(real);
   else { checkLaptopSpray(); checkTvSpray(); }
   if (!camOverride) stepLens(real);
@@ -4332,6 +4620,14 @@ function frame() {
   // under water there is a second filter on top of it already, so the two
   // stack into something further off rather than fighting.
   if (audio) audio.slowmo(zoom);
+  // Ahead of the override and not inside the chain below it, because `pose` on
+  // the parachute is two jobs and only one of them is the camera: it is also
+  // the one place the canopy is positioned, scaled and swung on its risers. A
+  // shot that takes the camera and skips this leaves the cloth parked wherever
+  // it was last frame, which for the trampoline cut is a canopy on the ground
+  // at the trampoline park while the person it belongs to is at two hundred
+  // metres. The override is applied straight after and has the last word.
+  if (camOverride && eject.active) eject.pose(camera);
   if (camOverride) updateCamera(dt);
   else if (state.phase === 'ground') ground.pose(camera);
   else if (state.phase === 'ride') ride.pose(camera);
@@ -5228,6 +5524,34 @@ window.__fr = {
       return { at: [+w[0].toFixed(1), +w[1].toFixed(2), +w[2].toFixed(1)],
         ts: st.map((v) => +v.toFixed(1)) };
     },
+    /**
+     * Debug: the four trampoline beds, and standing on one of them.
+     *
+     * The park is at s 51, eighteen metres behind the back row and up through
+     * the pines, and walking there to test the bounce is forty seconds every
+     * time. Same reasoning as `pose(clip, at, settle)` next door.
+     *
+     * `bounce()` is the Enter you would press once you were up there, and it
+     * goes through `bounceOut` rather than round it — so a test that passes
+     * here is a test of the key and not of a private copy of it.
+     */
+    beds: () => (jadrija && jadrija.beds ? jadrija.beds().map((b) => ({
+      t: +b.t.toFixed(2), s: +b.s.toFixed(2), y: +b.y.toFixed(2),
+      at: b.at.map((v) => +v.toFixed(1)),
+    })) : null),
+    tramp: (k = 1, yaw = null) => {
+      if (!jadrija || !jadrija.beds) return null;
+      const list = jadrija.beds();
+      const b = list[clamp(Math.round(k), 0, list.length - 1)];
+      if (!b) return null;
+      return __fr.jad.stand(b.t, b.s, yaw);
+    },
+    bounce: () => bounceOut(),
+    /** Debug: how far through the trampoline cut we are, or null. */
+    flyCut: () => (flyCut ? { t: +flyCut.t.toFixed(2),
+      spun: +flyCut.spun.toFixed(2),
+      alt: eject && eject.active ? +eject.agl().toFixed(1) : null,
+      chute: eject ? eject.phase : null } : null),
     probe: (t, s) => {
       const w = jadrija.toWorld(t, s);
       return { w: w.map((v) => +v.toFixed(2)), back: jadrija.local(w[0], w[2])
