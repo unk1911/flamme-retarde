@@ -8,6 +8,159 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.117.0] — 2026-08-24
+
+### Eight assignments, and six of them turned out to be somewhere other than where they looked
+
+A batch of defects and additions from one sitting with the game. Six of the
+eight were diagnosed somewhere other than the place the symptom appeared, which
+is the through-line of this release and is why each one is written up by cause
+rather than by symptom.
+
+**Her hip wrap hangs off gravity now, not off her hips.** The fringe stood off
+her back like a porcupine whenever she went down on all fours, and had done for
+a long time. There was no bug to find at runtime because there was no runtime
+code: `hip_scarf()` bakes 88 tassels as six-vertex prisms bound **rigid to the
+pelvis at full weight**, each pointing along "down *her*" — a body-frame
+direction. Pitch the pelvis 85° for the crawl and all 88 come with it. The
+exporter's own docstring defends the binding — *"a hip scarf is tied to the hips
+and does not follow a knee"* — which is right for the band and wrong for the
+fringe. Corrected at runtime rather than by re-baking, since there is no Blender
+run in the build loop: each strand eases toward world-down at 9/s, **then** is
+clamped to 1.92 rad off its baked lie. Clamping the *target* instead leaves a
+lagging strand pointing at the ground through a somersault, i.e. inside her hips
+— checked numerically before building. Standing idle renders to identical
+pixels; fully inverted the strands flare square to gravity.
+
+**JadriJa is painted on a limewash gable, in the letters it is cut in.** Mixed
+case, both J's capital, traced off 20-column occupancy grids of each glyph:
+cap 220 px, x-height 0.72 of it, word 4.94 caps long. Drawn as polygons with
+wobbled edges, two coats, counters knocked out and the wall's staining scumbled
+back over. Hung by `endMural` rather than `panelSign`, because `panelSign` is
+unlit and paint on a sunlit wall rendered as a poster stuck on. The footage
+settles the *kind* of wall — a west-facing front-row gable seen head-on walking
+the promenade east — but not the position along the arc, and two clues disagree:
+a caffe bar through the block's corner points at TRAMPULIN, the white limewash
+at a `WASH[0]` run. Colour won, because this file already labels that run *"the
+JadriJa run"*. Recorded in the code as a placement, not a survey.
+
+**The turn is scored by a recording, and the drum machine is the spare.** The
+sixteen-voice kit is replaced by a clip of Misha's, and `SHOW.blazeFor` goes
+**26 s to 106.3** so she is alight for the whole of it — 108.16 s of game time.
+The window stops at 117.06 s of the source because the record stops at 117.10
+and the last six seconds are a speaker switched off with the phone still
+running: everything above 5 kHz ends on one frame and what is left is two
+harmonic stacks at 1–3 kHz. 32 eight-beat phrases at a measured 141.49 bpm, with
+**7 ms of tempo drift across the whole cue**, so her boot is still on the beat at
+two minutes. Level matched by lifting the entire synth kit into an
+`OfflineAudioContext` rather than reimplementing it in numpy: −14.228 dBFS, crest
+12.6 dB against the recording's 17.5, so an RMS match would peak at +3.30 dBFS
+and clip. Split instead — file at −18.13, `FIRE.samp` +4.49 dB on the sample's
+own node. **The kit is kept as the fallback**, because `sampleLoad` fails
+silently by design and this is the one moment that must not be silent; proved by
+emptying the payload entry and rebuilding.
+
+The two numbers beside `blazeFor` were 26-second numbers and are re-derived, not
+retuned to taste. `castEvery` 1.4–2.5 → **2.6–4.4**: the deck holds seven fires
+with a 30 s life, freeing a slot every 4.3 s, and a ball landing on a full deck
+takes `light()`'s early return and does nothing visible — at the old rate one
+throw in five was a dud you watched land. `boastEvery` 6–11 → **18–30**: six
+cards from a pool of two lines, with a quarter of the set piece spent standing
+still holding one. No new dialogue (rule 12). The deck itself holds at six or
+seven patches from half a minute in to a hundred, so the level stays winnable;
+what accumulates is the tally.
+
+**The trampoline throws you two hundred metres up, and you watch it happen.**
+The four beds are standable and the cage has a gateway cut into it — it was one
+solid 17 × 13 m blocker you could not get within 1.5 m of. `walkY` answers the
+mat at `+0.39` and the pad ring at `+0.44`, registered from inside the drawing
+loop out of the same four numbers the geometry uses, and deliberately not in
+`standY`, where a 0.39 m step would stand every bather and chair in that square
+on top of it. Enter on a mat is `launchOut()`'s own numbers — 202 m apex at
+5.7 s, canopy streaming at the top — under a 7 s shot built on the race's
+camera-override pattern rather than the intro's, since the intro is text over a
+held image and this is a live camera move with her in it. Every travelling key
+holds the look-down under 25°: the first pass had one at 38° and photographed as
+a figure in a blank blue rectangle. Wide-eyed is the skin's own `rate = 0` stare
+plus `gape`; no facial rig was invented.
+
+**And the balcony jump comes back.** `hopOut()` had its own Enter handler
+seventy lines *below* the ordinary hop, which returns unconditionally for every
+Enter on foot — so it has been unreachable from the keyboard, findable only
+through `__fr.ground.hop()`. Collapsing the three jumps into one ordered
+dispatch to make room for a fourth fixes it as a side effect.
+
+**The nape cutter stops at the hairline.** The black on the back of Baye's neck
+was painted vertex colour — not a shadow, not the tail's root, not a
+quantisation edge. The cutter reached **125 mm under the head joint and 11 mm
+under the neck joint**, painting 168 body-shell vertices at `HAIR_P`, and ran out
+to |z| 46 mm against a 36 mm ponytail, so a wedge of near-black neck stood proud
+either side of it. The bathers escaped it by having the cutter *deleted*
+(`tail=False`) under a note recording the identical complaint — a fix never
+available to Baye, who has the tail it exists for. Its floor now sits on a
+measured landmark: y 1.535, where the vertex normals down the back midline flip
+from facing down (the underside of the occiput) to facing up (the neck). Hair
+gathered into a knot lies on the half that faces down. 168 verts → 82, band
+still continuous from the crown. Chloe and the chase figure inherit the same
+line and are fixed with it — Chloe's was dyed by her own shader and read as a
+hair panel; the chase figure takes raw vertex colour, had the literal near-black,
+and swims prone with her head up.
+
+**Wet skin is a highlight, not a mirror.** The splotches under her eyes when you
+hosed her were not in the wet shader at all: they were the environment
+reflection in the *shared* lit material, a roughness-free Fresnel-free mirror of
+the sky. Hosing takes `spec` 0.09 → 0.45 and that number is spent twice — on the
+sun's lobe, which is fine, and on that mirror. `reflect()` doubles every error in
+a normal, and the normals under her eyes are exactly the ones `easeSockets()`
+rewrites one vertex at a time, over a band whose size and place match the
+patches. Two frames settled it, both by overriding uniforms with no rebuild: dry
+with `spec` forced to 0.45 reproduced every patch at zero wetness; soaked with
+the sky colours zeroed showed none and kept the highlight. Only the mirror the
+*water* adds is Fresnel-gated — ~2% head-on, where every patch was, full at the
+grazing angles where sky actually sits on a wet face. Dry renders to identical
+pixels; the wet delta goes from +13.6 mean, a patchy brightening, to −4.1.
+`env` is written nowhere else in the tree, so every other material is
+byte-identical.
+
+**Baye is blonde, and she is dyed rather than re-baked.** `HAIR_VCOL` is the
+runtime's *identifier* for hair vertices, so re-baking the colour would move it
+out from under `easeNape`'s lookup and put the rigid flap straight back on her
+neck; dyeing changes nothing in the blob, so colour and identifier cannot drift.
+The trap was the decimator: it averages painted vertices with their neighbours,
+so the hairline is not an edge — **214 vertices sit at every mixture of skin and
+hair**, invisible on a brunette and a jagged dark seam on a blonde. Each is
+projected onto the skin-to-hair line and given back the same fraction of the
+blonde. Two tones, locks round the skull *and* a position noise down the tail,
+because every tail vertex shares one angle and the sine alone left it a smooth
+cone. Brows go to a warm mid-brown through a new **per-figure** uniform, which is
+why Chloe keeps her blue and the chase figure its own.
+
+**Two pitches on the beach are still for sale, and their hems say so.** A
+seventh brand that is deliberately not a seventh beer: graphite on the parasol's
+own white, at weight 700 rather than the 800 a brand sets its own name in, and
+`YOUR AD HERE` is the whole of the text — no company, no telephone, no price.
+Two of the eleven beach parasols, chosen off `jit()` through a placement
+counter so the `rng` stream never learns about it. One is invisible; four make
+the station read as a hire company that has sold nothing.
+
+### Also
+
+- `__fr.jad.raw().pose(clip, at, settle)` and `putShow(t, s, phase, at, ang)`,
+  because `crawl`, `getup` and `flip` are mid-sequence and were unreachable.
+- `fireStats()` reports the real output RMS off an `AnalyserNode` plus the
+  context clock, in place of a `gain` that only proved a ramp was *scheduled*.
+- `cut_field.py` grows `cut_cue` — its own path, sharing only filter, level and
+  encode with the loop beds. A one-shot has no join to hide, and letting `pick`
+  search for a seam nobody will hear is answering a question nobody asked.
+  Re-cutting the existing beds through the refactor gives byte-identical files.
+- `toast.tramp` — "free as a bird" — in all three locales.
+- **A `--repaint` re-bake is not bit-identical.** A genuine no-op run moved
+  `human_skin.fr3d.gz` from 14916 verts to 14918, drifting in the laid-on
+  geometry. `bathers_mh.py` cites bit-identity as a check; it does not hold.
+
+Page 23.51 → 24.97 MB, almost all of it the two minutes of audio. Census
+`{seen:446, thin:333, plain:86, rich:27}` throughout.
+
 ## [1.116.0] — 2026-08-24
 
 ### Six brands on the shade, and the blank valance decision is reversed in its own words
