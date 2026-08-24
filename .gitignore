@@ -49,3 +49,10 @@ __pycache__/
 
 # Burst instance state — live rented-GPU ids, per BURST_STATE. Never tracked.
 build/*.json
+
+# Scratch from a session that is over. `plan/*.md` is the project's design
+# record and is cited by name from the source; the `-wip` directories beside it
+# were never that — throwaway probe scripts and contact sheets from an
+# afternoon's work on one animation, force-added at the time and then left. If
+# a working directory turns out to be worth keeping, it earns a .md.
+plan/*-wip/
