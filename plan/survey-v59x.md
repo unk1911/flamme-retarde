@@ -322,11 +322,35 @@ rather than quietly reversed. But it sits awkwardly next to the slastičarnica
 board, which names Coca Cola, Sprite, Fanta, Orangina and Nes Caffe off exactly
 the same kind of evidence. `MORNING.md` asks which way to go.
 
-**13. The concrete slipway.** `b_118`–`b_121`. Two parallel sunken concrete
-tracks crossing the apron and running down into the sea, the concrete old and
-cracked with grass in the joints. The right shape for the place and it explains
-where the boats come out. Ranked low only because it is a ground detail and
-rule 6 says ground detail at 15 m is a pixel and a half.
+**13. ~~The concrete slipway.~~ NOT A SLIPWAY — broken terrace nosings.**
+`b_118`-`b_121`. **SURVEYED, NOT BUILT, 23 Aug.** The fifth item this week to
+change once the frames were opened at full size, and the correction is bigger
+than the others because it removes a reason to build it.
+
+The item has "two parallel sunken concrete tracks crossing the apron and
+running down into the sea... it explains where the boats come out". There is no
+slipway. `b_120` and `b_121` look straight down the apron to the waterline and
+what is there is one **broad, continuous, badly cracked slab** meeting a band of
+pale limestone shingle at the sea — no tracks, no ramp, nothing a trailer has
+ever backed down.
+
+What the item saw is in `b_118`, and it runs the **other way**. The apron in
+front of the kabine gable is **stepped down in two broad terraces parallel to
+the shore**, and both step risers have broken away: ragged, undercut, rubble
+spilled at the foot and grass rooted the length of the joint. Two long parallel
+lines of damage across the apron — which from a contact sheet is exactly what
+two sunken tracks would look like, except that they are along the shore rather
+than down it, and they stop at the concrete's edge.
+
+So the thing worth building here is **spalled nosings on the terrace edges the
+game already has** — undercut, rubble at the foot, weed in the joint — and not
+a slipway. It stays low-ranked for the reason the item already gives, but it is
+now a decoration on an existing edge rather than a new structure, which makes
+it cheaper than it looked.
+
+Also settled in passing: the grey drum beside the bench in `b_114` is not a
+bin. It is a **round grey planter with a dead twiggy shrub in it**, and it sits
+against the gable at the bench's east end.
 
 **14. The park bench with cast-iron ends.** `b_114`, `b_119`, `b_017`.
 **BUILT, 23 Aug**, and the catalogue is wrong three times over — the fourth

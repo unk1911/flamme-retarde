@@ -117,6 +117,12 @@ it repaints the whole resort, so it is your call and I have not touched it.
   and the price column rebuilt: four prices are printed with the menu and the
   rest are white stickers stuck over it, which is what makes it look ragged in
   every photograph. TONIC and FANTA are now read rather than inferred.
+- **Survey item 13 surveyed and NOT built — there is no slipway.** `b_120` and
+  `b_121` look straight down the apron to the water and show one broad cracked
+  slab meeting shingle. What the catalogue saw is in `b_118` and runs the other
+  way: two broken step risers **parallel to the shore**, undercut with rubble
+  and grass in the joint. Worth building as spalling on the terrace edges the
+  game already has — a decoration, not a structure. Left for the next pass.
 - **Survey item 14 built — the bench at the kabine gable.** A second municipal
   pattern, distinct from the promenade bench already in the game: two back
   slats, one wide seat board, slim black cast ends, no arm. The catalogue had
