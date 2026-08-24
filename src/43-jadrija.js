@@ -2308,6 +2308,37 @@ async function buildJadrija(scene) {
   const PLAY = { t0: 157, t1: 176, s0: 28.9, s1: 37.4 };
   const SAN = { t0: 347.4, t1: 357.2, s0: 32.0, s1: 36.6 };
   const TRAMP = { t0: 346.4, t1: 363.6, s0: 44.4, s1: 57.6 };
+  // The way in, in t, on the seaward side of the fence — the side you arrive
+  // from, because everything else at Jadrija is between here and the water.
+  // Five bays of the 1.1 m mesh module wide, so nothing has to be drawn in
+  // fractions of a bay; it is not a measurement off a photograph, and the
+  // width it actually had to clear is `GROUND.girth` doubled — a 2.2 m gate is
+  // 1.1 m of walkable gap once `confine` has inflated the two jambs, which is
+  // a doorway you have to aim at rather than a way in.
+  const TRAMP_GATE = [353.5, 356.8];
+  // The four beds, filled in when the park is drawn and read by `walkY` so you
+  // can stand on one. Deliberately not `standY`: a bed is 0.39 m of step that
+  // exists for the walker and nothing else, and putting it in `standY` would
+  // stand every bather, chair and parasol `toWorld` ever places in this square
+  // on top of it.
+  const trampBeds = [];
+
+  /**
+   * Which trampoline bed you are over, and how high its surface is there.
+   *
+   * The pad ring is 5 cm proud of the mat it surrounds — see the ring the beds
+   * are drawn as — so this answers two heights rather than one. Walking off the
+   * mat on to the ring is a step you feel and is what the ring is.
+   */
+  function bedAtTS(t, s) {
+    for (const b of trampBeds) {
+      const dt = Math.abs(t - b.t), ds = Math.abs(s - b.s);
+      if (dt > b.pad || ds > b.pad) continue;
+      return { bed: b, mat: dt <= b.mat && ds <= b.mat,
+        y: dt <= b.mat && ds <= b.mat ? b.matY : b.padY };
+    }
+    return null;
+  }
 
   /**
    * A painted sign, on a canvas.
@@ -5794,14 +5825,26 @@ async function buildJadrija(scene) {
       b = up;
       // Four sides, not two. Uprights, a top rail and a mid rail in tube, the
       // mesh hung between them, and the red pad wrapping the bottom.
-      const side = (a, c, sc, along) => {
+      //
+      // `gap` is the gateway, and only the seaward side has one. It was drawn
+      // as four closed sides because nothing could walk into it; now something
+      // can, and a fence with beds inside it and no way through is a fence
+      // somebody was meant to get past. The gap is skipped in whole bays — the
+      // mesh module is 1.1 m and the gate is five of them — so no course of pad
+      // or rail ends in the middle of a quad, and the two jambs get a post of
+      // their own where the 2.35 m post spacing would not have put one.
+      const side = (a, c, sc, along, gap) => {
         const P = (u, y) => (along ? W(u, sc, y) : W(sc, u, y));
         const yAt = (u) => (along ? surfaceY(u, sc) : surfaceY(sc, u));
-        for (let u = a; u <= c + 0.01; u += 2.35) {
+        const inGap = (u) => gap && u > gap[0] - 0.01 && u < gap[1] + 0.01;
+        const stile = (u) => {
           if (along) post(W, u, sc, yAt(u), yAt(u) + S.h + 0.10, 0.055, YEL, 6);
           else post(W, sc, u, yAt(u), yAt(u) + S.h + 0.10, 0.055, YEL, 6);
-        }
+        };
+        for (let u = a; u <= c + 0.01; u += 2.35) if (!inGap(u)) stile(u);
+        if (gap) { stile(gap[0]); stile(gap[1]); }
         for (let u = a; u < c; u += 1.1) {
+          if (inGap(u + 0.55)) continue;
           const u1 = Math.min(u + 1.1, c);
           const y = yAt(u), y1 = yAt(u1);
           // The red pad, which is the loudest thing in the photograph.
@@ -5821,7 +5864,7 @@ async function buildJadrija(scene) {
           }
         }
       };
-      side(S.t0, S.t1, S.s0, true);
+      side(S.t0, S.t1, S.s0, true, TRAMP_GATE);
       side(S.t0, S.t1, S.s1, true);
       side(S.s0, S.s1, S.t0, false);
       side(S.s0, S.s1, S.t1, false);
@@ -5848,15 +5891,49 @@ async function buildJadrija(scene) {
           [-1.45, 1.45], [1.45, 1.45]]) {
           post(W, bt + ot, bs + os, by, by + 0.32, 0.045, YEL, 5);
         }
+        // And what the walker stands on, taken from the same four numbers the
+        // geometry above was drawn with rather than written out again. The mat
+        // is 0.39 m over the gravel and the ring round it 0.44 — a kerb, not a
+        // wall, so nothing has to be climbed to get on to one.
+        trampBeds.push({ t: bt, s: bs, y: by, mat: 1.24, pad: 1.55,
+          matY: by + 0.39, padY: by + 0.44 });
       }
       // And the chairs outside it, red and black, which is where the parents
-      // are.
+      // are. Four sets now and not five: the third of them stood at t 355.4,
+      // which is the middle of the gateway, and a table and two chairs across
+      // the only way in is not something anybody arranges. Their blockers were
+      // also the real ones — marching a walker in from s 41 was stopped at
+      // 43.5 by the furniture, two and a half metres before it ever reached
+      // the fence. `terraceSet` draws no `rng`, so dropping one costs the beach
+      // layout nothing (rule 4).
       for (let k = 0; k < 5; k++) {
-        terraceSet(S.t0 + 1.6 + k * 2.9, S.s0 - 2.4, surfaceY(S.t0, S.s0 - 2.4),
+        const kt = S.t0 + 1.6 + k * 2.9;
+        if (kt > TRAMP_GATE[0] - 1.0 && kt < TRAMP_GATE[1] + 1.0) continue;
+        terraceSet(kt, S.s0 - 2.4, surfaceY(S.t0, S.s0 - 2.4),
           (k % 2) * 0.6 - 0.3,
           k % 2 ? [0.560, 0.135, 0.110] : [0.130, 0.130, 0.138]);
       }
-      runs.push({ t0: S.t0, t1: S.t1, s0: S.s0, s1: S.s1, y: y0, h: S.h });
+      // Four walls and a doorway, where this used to be one solid box seventeen
+      // metres by thirteen. The box was honest while the beds were scenery —
+      // you could no more walk into the park than into a hut — and it is the
+      // whole of why you could not: `confine` pushed you back out of the
+      // footprint from a metre and a half away.
+      //
+      // Off `surfaceY` and not off `y0`, which for this compound is the
+      // promenade deck forty metres downhill. The height only matters to the
+      // airborne test in `confine` — clear the top of a blocker and it stops
+      // stopping you — and a fence whose recorded floor is four metres under
+      // the ground it stands on is a fence a hop goes through.
+      const W_ = 0.12;
+      const wall = (t0, t1, s0, s1) => {
+        const gy = surfaceY((t0 + t1) * 0.5, (s0 + s1) * 0.5);
+        runs.push({ t0, t1, s0, s1, y: gy, h: S.h });
+      };
+      wall(S.t0 - W_, TRAMP_GATE[0], S.s0 - W_, S.s0 + W_);
+      wall(TRAMP_GATE[1], S.t1 + W_, S.s0 - W_, S.s0 + W_);
+      wall(S.t0 - W_, S.t1 + W_, S.s1 - W_, S.s1 + W_);
+      wall(S.t0 - W_, S.t0 + W_, S.s0 - W_, S.s1 + W_);
+      wall(S.t1 - W_, S.t1 + W_, S.s0 - W_, S.s1 + W_);
       b = deck;
       return;
     }
@@ -15411,6 +15488,12 @@ async function buildJadrija(scene) {
       if (f != null) return f;
     }
     if (onMoleY(t, s)) return JET.top;
+    // A trampoline bed, which is the one floor out here that is not the hill.
+    // Ahead of the fall-through below and not after it: the park is at s 51,
+    // eighteen metres past the back of the concrete, so every question about it
+    // leaves through that early return and never reaches `standY`.
+    const bed = bedAtTS(t, s);
+    if (bed) return bed.y;
     if (t < -5 || t > LEN + 5 || s < -3 || s > JAD.back + JAD.bleed) {
       return Math.max(groundAt(x, z), 0);
     }
@@ -20112,6 +20195,40 @@ async function buildJadrija(scene) {
       return !isSea(x, z);
     },
     blockers, local, toWorld, walkY, inField, vik,
+    /**
+     * The four trampoline beds, in world metres, and which one you are on.
+     *
+     * `onBed` takes the height as well as the place because being over a bed
+     * and being on one are different questions: mid-hop your feet are a metre
+     * clear of it, and a bed you are not touching must not throw you. 0.25 m of
+     * tolerance is the walker's own settle — `you.y` is eased towards `walkY`
+     * rather than snapped to it — and is well under the 0.39 m the mat stands
+     * above the gravel, so standing beside a bed never reads as standing on it.
+     */
+    beds: () => trampBeds.map((b) => {
+      const st = at(b.t);
+      return { t: b.t, s: b.s, y: b.matY,
+        at: [st.x + st.nx * b.s, b.matY, st.z + st.nz * b.s] };
+    }),
+    onBed: (x, z, y) => {
+      const [t, s] = local(x, z);
+      const hit = bedAtTS(t, s);
+      if (!hit) return null;
+      if (y != null && Math.abs(y - hit.y) > 0.25) return null;
+      const st = at(hit.bed.t);
+      // And which way there is room. The shore normal points inland, so `out`
+      // is seaward — the five metres of gravel between the beds and the fence
+      // with the gate in it — and `along` runs down the row towards the middle
+      // of it, which is the only along-shore direction with any clearance: the
+      // beds at the ends of the row are two metres from their own end of the
+      // cage. Between them they are where a camera can stand inside the mesh,
+      // and the mesh is opaque black from outside.
+      const dir = hit.bed.t < (TRAMP.t0 + TRAMP.t1) * 0.5 ? 1 : -1;
+      return { t: hit.bed.t, s: hit.bed.s, y: hit.y, mat: hit.mat,
+        at: [st.x + st.nx * hit.bed.s, hit.bed.matY,
+          st.z + st.nz * hit.bed.s],
+        out: [-st.nx, -st.nz], along: [st.ux * dir, st.uz * dir] };
+    },
     /**
      * The people a box cannot hold, and the way back when you walk into one.
      *
