@@ -1244,6 +1244,39 @@ const FACE_FRAG = /* glsl */ `
       float outer = smoothstep(0.016, 0.026, f.z);
       base = mix(base, vec3(${FACE.dolphin.join(', ')}), dolphin * frame * outer * uDolphin);
     }
+
+    // ── and how much of all that gloss is allowed to be a mirror ──────────
+    //
+    // Every wet line above raised spec, and the material spends spec twice:
+    // once on the sun's own lobe, which is the highlight that says a
+    // face has water on it, and once on a mirror image of the sky. The mirror
+    // is the half that went wrong. It is a mirror with no roughness in it, so
+    // it doubles whatever error is in the normal — and her head is a decimated
+    // shell whose normals under each eye have been rewritten one vertex at a
+    // time by easeSockets(). Dry, at 0.09, that wobble is a couple of levels.
+    // Hosed, at 0.45, it is grey-blue patches on both cheeks, and that is what
+    // was reported. Two test frames settle which half it was: holding the
+    // figure dry and forcing spec to 0.45 by hand reproduces every patch, and
+    // soaking her with the sky term zeroed removes every one of them and
+    // leaves the highlight alone.
+    //
+    // So the sheen the skin already had keeps its mirror exactly as it was,
+    // and only the part the water adds is put behind a Fresnel term — which is
+    // the angle at which a film of water actually reflects anything. Head-on
+    // it returns about 2%, so the middle of a face, which is what she shows
+    // the camera and where all of the patches were, now gets almost none of
+    // the sky. Edge-on it returns nearly all of it, so what arrives instead is
+    // a bright rim down the side of the cheek and along the jaw — which is
+    // where the sky is on a wet face, and is most of what makes one read as
+    // wet at all.
+    //
+    // A min rather than a plain sum, so the several places above that push
+    // spec *down* — the inside of the mouth, the body of the spill — keep the
+    // low mirror they asked for instead of being lifted back to the skin's.
+    float fv = 1.0 - abs(dot(n, normalize(uCamPos - vWorld)));
+    float f2 = fv * fv;
+    env = min(spec, uSpecAmount
+      + (spec - uSpecAmount) * (0.04 + 0.96 * f2 * f2 * fv));
   }
 `;
 
