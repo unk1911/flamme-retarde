@@ -5,7 +5,7 @@
 // This one is you against somebody who is better at it than you are, which is
 // the oldest thing that happens on a beach: she is on the end of the jetty, she
 // goes in, and by the time you are in the water she has a seven-metre lead on a
-// two-hundred-metre swim to the platform.
+// hundred-and-fifty-metre swim to the platform.
 //
 // Three decisions are worth writing down.
 //

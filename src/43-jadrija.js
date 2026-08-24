@@ -9047,7 +9047,7 @@ async function buildJadrija(scene) {
     }
 
     // ── the ladder ───────────────────────────────────────────────────────────
-    // Down the shoreward face, under the pipes, which is where the two of them
+    // Down the seaward face, under the pipes, which is where the two of them
     // are bending to. Six rungs to the water and two more under it, because
     // the last one you can see is never the last one there is.
     for (const ot of [-1.28, -0.20]) {
