@@ -8,6 +8,69 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.116.0] — 2026-08-24
+
+### Six brands on the shade, and the blank valance decision is reversed in its own words
+
+Misha named them: **JANA, CORONA, OŽUJSKO, STELLA ARTOIS, STAROPRAMEN** (*live
+your way*) and **JAMNICA** (*since 1828*). Until today every shade on this shore
+shipped blank, under a note in the catering trailer that said in so many words
+that *"leaving them blank is the only reading of rule 12 that cannot be wrong"*.
+That note is rewritten rather than quietly contradicted, on the same precedent
+the four slastičarnica prices went in on: rule 12 forbids inventing what the
+evidence does not carry, never what the owner states as fact.
+
+No terrace sells two beers. The tavern's crimson parasol is Ožujsko; the
+promenade cafés' cream octagons are Corona; MINI carries Jamnica over its tables
+with Stella Artois on the one parasol standing off them; the hired beach
+parasols are Jana; and Staropramen is on a **new municipal bicycle rack** — a
+galvanised comb of four wheel slots with a printed backboard, which is where
+Misha put that one himself.
+
+**No crests.** A name, in house colours, as type — no shields, no attempt at a
+wordmark's own lettering. None of it can be verified from here and a hand-drawn
+approximation of a registered device is a worse lie than a blank band was.
+
+Where the tavern is concerned the photograph and the owner disagree: `b_069`
+reads **Karlovačko**, which is not among the six. Put to him with the conflict
+spelled out, his answer was "keep as is" — so Ožujsko stands and the
+photograph's reading is kept written down in both the code and the survey rather
+than dropped for being inconvenient.
+
+Four things the renders changed, all caught at full size:
+
+- **A canvas is sRGB and this file's colour is linear.** `#6e171c` beside
+  `[0.430, 0.090, 0.110]` is a third of the brightness, so the first tavern
+  valance came out near-black against its own parasol.
+- **The shore frame reverses handedness**, so every ring written by increasing
+  angle wound its print *inward* — a quiet failure, because letter direction
+  lives in the UVs and the only symptom was the outside getting the dimmed
+  show-through.
+- **The UVs were mirrored against the winding** on top of that, so every name on
+  the shore was set backwards on the correctly lit face.
+- **The pale grounds were too pale** — 0.845 under a 0.560 café canopy is a
+  strip of white card. Same finding as the timber in item 14, from a third
+  direction.
+
+### Three bicycles' worth of things nobody had looked at
+
+The four bicycles at the gate turn out to have been standing **inside somebody's
+changing room** since the day they went in: they are at t 484.2, s 27.6, and the
+back row's seaward face is at 26.1. Squaring them into the new rack surfaced two
+more — the saddle and handlebars were placed in the shore frame while the rest
+of the machine is built through `facing`, so the bars floated half a metre off
+the side in mid air; and a wheel was a 0.12 × 0.66 m ellipse extruded *along* the
+bicycle instead of a circle in its own plane.
+
+### And the film
+
+`tools/burst.py fan`, `vacejob22.py --skip`, one ComfyUI per GPU in the
+bootstrap, and `tools/lab/finish60.sh`: a 60.75 s photoreal restyle of the
+23 August clip, twelve chunks over eight A100s in two waves — 26 minutes of
+sampling against 2h 15m on one card, for $16.97. `__fr.filmDt` and
+`__fr.filmStep` pin the world's clock and run one paused frame at a time, so a
+headless page can film evenly whatever it is pointed at.
+
 ## [1.115.0] — 2026-08-24
 
 ### Six survey items, and the step edges that have been broken for twenty years

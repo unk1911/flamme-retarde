@@ -355,6 +355,10 @@ it is not among the six, so this is the one place on the shore where the two
 sources genuinely conflict. The owner wins, the photograph stays written down —
 here and in the code — rather than being dropped because it became inconvenient.
 
+Put to Misha on 24 August with the conflict spelled out, and his answer was
+**"keep as is"**. So Ožujsko stands on that valance and the question is closed;
+this paragraph is now the record of a decision rather than of an open one.
+
 **No crests.** A name, in house colours, as type: no shields, no horn, no
 crown, no attempt at a wordmark's own lettering. None of it can be verified from
 here, and a hand-drawn approximation of a registered device is a worse lie than
