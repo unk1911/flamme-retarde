@@ -3045,7 +3045,155 @@ async function buildJadrija(scene) {
       y: y0, h: 1.3 });
   }
 
-  function terraceSet(t, s, y, ang, col) {
+  /**
+   * The white perforated-mesh armchair, which is what beach bar MINI seats
+   * everybody on.
+   *
+   * Survey item 8 of 23 August: `20260823_111954` has a dozen of them from two
+   * metres, and it is the commonest single object in that photograph. It is
+   * **not** the moulded monobloc `terraceSet` draws everywhere else — a
+   * square-hole resin mesh in the back and the seat, square-section arms, and
+   * tapered round legs that splay.
+   *
+   * The mesh is drawn as a mesh and not as a darker panel. That was the cheap
+   * option and it is the wrong one here for a reason particular to this chair:
+   * the whole of what separates it from the monobloc at three metres is that
+   * you can see the terrace *through* the back of it, and a dark rectangle is
+   * the one thing that reads as the opposite. Four bars each way in each panel
+   * — thirty-two boxes a chair, about 380 triangles, against a resort that is
+   * half a million.
+   *
+   * Written in the chair's own axes: `dt` across the seat, `ds` fore-and-aft
+   * with the back at +ds, which is `terraceSet`'s convention and the reason
+   * the frame handed in here is `face + PI/2`. See the note there.
+   */
+  function meshChair(P, y, col) {
+    const HW = 0.225, HD = 0.215;        // half across, half fore-and-aft
+    const SEAT = y + 0.420;
+    const bar = shade(col, 0.92);
+    const dark = shade(col, 0.84);
+    // The seat frame: four rails round an open square.
+    boxIn(P, -HW, HW, -HD, -HD + 0.038, SEAT, SEAT + 0.038, col);
+    boxIn(P, -HW, HW, HD - 0.038, HD, SEAT, SEAT + 0.038, col);
+    boxIn(P, -HW, -HW + 0.038, -HD, HD, SEAT, SEAT + 0.038, col);
+    boxIn(P, HW - 0.038, HW, -HD, HD, SEAT, SEAT + 0.038, col);
+    // and the mesh across it, two layers crossing, both inside the frame's
+    // depth so the rails still read as rails.
+    for (let i = 1; i < 5; i++) {
+      const u = -HW + 2 * HW * (i / 5);
+      boxIn(P, u - 0.008, u + 0.008, -HD, HD, SEAT + 0.006, SEAT + 0.019, bar);
+    }
+    for (let i = 1; i < 5; i++) {
+      const v = -HD + 2 * HD * (i / 5);
+      boxIn(P, -HW, HW, v - 0.008, v + 0.008, SEAT + 0.018, SEAT + 0.031, bar);
+    }
+    // The back, raked, in its own sheared frame: `ds` grows with height so the
+    // panel leans away from the sitter instead of standing plumb.
+    const RAKE = 0.155;
+    const B = (dt, h, dv) => P(dt, HD - 0.019 + RAKE * h + (dv || 0), SEAT + 0.038 + h);
+    const H = 0.415;
+    const post2 = (dt) => {
+      for (let k = 0; k < 4; k++) {
+        const h0 = H * (k / 4), h1 = H * ((k + 1) / 4);
+        const A = B(dt - 0.019, h0), C = B(dt + 0.019, h0);
+        const D = B(dt + 0.019, h1), E = B(dt - 0.019, h1);
+        b.quad(A, C, D, E, col);
+        b.quad(E, D, C, A, col);
+      }
+    };
+    post2(-HW + 0.019); post2(HW - 0.019);
+    // the top rail, which is the thing a hand goes on
+    for (let k = 0; k < 1; k++) {
+      const A = B(-HW, H), C = B(HW, H), D = B(HW, H, 0.030), E = B(-HW, H, 0.030);
+      b.quad(A, C, D, E, col);
+      const A2 = B(-HW, H - 0.042), C2 = B(HW, H - 0.042);
+      b.quad(A2, C2, C, A, col);
+      b.quad(E, D, B(HW, H - 0.042, 0.030), B(-HW, H - 0.042, 0.030), col);
+    }
+    // the mesh in the back: uprights, then crossbars over them
+    for (let i = 1; i < 5; i++) {
+      const u = -HW + 2 * HW * (i / 5);
+      for (let k = 0; k < 2; k++) {
+        const h0 = H * (k / 2), h1 = H * ((k + 1) / 2) - 0.001;
+        b.quad(B(u - 0.008, h0), B(u + 0.008, h0), B(u + 0.008, h1), B(u - 0.008, h1), bar);
+        b.quad(B(u - 0.008, h1, 0.013), B(u + 0.008, h1, 0.013),
+          B(u + 0.008, h0, 0.013), B(u - 0.008, h0, 0.013), bar);
+      }
+    }
+    for (let i = 1; i < 4; i++) {
+      const h = H * (i / 4);
+      b.quad(B(-HW, h - 0.008, 0.014), B(HW, h - 0.008, 0.014),
+        B(HW, h + 0.008, 0.014), B(-HW, h + 0.008, 0.014), bar);
+      b.quad(B(HW, h + 0.008, 0.026), B(-HW, h + 0.008, 0.026),
+        B(-HW, h - 0.008, 0.026), B(HW, h - 0.008, 0.026), bar);
+    }
+    // The arms. Square section, and they are half of why this is not a
+    // monobloc: a moulded garden chair has none.
+    for (const sgn of [-1, 1]) {
+      const u = sgn * (HW - 0.012);
+      boxIn(P, u - 0.021, u + 0.021, -HD + 0.02, HD - 0.01,
+        SEAT + 0.190, SEAT + 0.226, col);
+      // the front support down to the leg head
+      boxIn(P, u - 0.019, u + 0.019, -HD + 0.02, -HD + 0.056,
+        SEAT + 0.038, SEAT + 0.190, col);
+    }
+    // Tapered round legs, splayed. `lathe` takes the lean in the profile, so
+    // each is one call rather than a stack of cones nobody can line up.
+    for (const [ot, os] of [[-HW + 0.03, -HD + 0.03], [HW - 0.03, -HD + 0.03],
+      [-HW + 0.03, HD - 0.03], [HW - 0.03, HD - 0.03]]) {
+      const lt = Math.sign(ot) * 0.035, ls = Math.sign(os) * 0.030;
+      lathe(P, ot, os, [
+        [y + 0.002, 0.0155, lt, ls],
+        [y + 0.16, 0.0185, lt * 0.55, ls * 0.55],
+        [SEAT + 0.030, 0.0215, 0, 0],
+      ], dark, 7);
+    }
+  }
+
+  /**
+   * The black pedestal café table on MINI's terrace.
+   *
+   * Survey item 9: a dark round top on a black column with a heavy ribbed disc
+   * base. The boardwalk's other tables are pale and square-legged, and one
+   * black round table per set separates MINI's terrace from the promenade
+   * cafés the way the crimson parasol separates the tavern.
+   *
+   * The ribs are what makes the base read as cast rather than as a hockey
+   * puck, and there are eight of them because that is what fits round a 0.30 m
+   * disc at a rib you can see.
+   */
+  function pedestalTable(t, s, y) {
+    const BLACK = [0.108, 0.106, 0.110];
+    const TOP = [0.138, 0.134, 0.132];
+    const RIB = [0.086, 0.084, 0.088];
+    // The base: a low disc with a chamfer, and the ribs standing on it.
+    lathe(W, t, s, [[y + 0.004, 0.300], [y + 0.030, 0.300],
+      [y + 0.050, 0.245], [y + 0.062, 0.120]], BLACK, 14);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * TAU;
+      const c = Math.cos(a), sn = Math.sin(a);
+      const Q = (dt, ds, yy) => W(t + dt * c - ds * sn, s + dt * sn + ds * c, yy);
+      boxIn(Q, 0.085, 0.285, -0.014, 0.014, y + 0.028, y + 0.058, RIB);
+    }
+    // The column, and a collar under the top.
+    lathe(W, t, s, [[y + 0.055, 0.052], [y + 0.660, 0.046],
+      [y + 0.690, 0.100]], BLACK, 10);
+    // The top: 0.62 m across, 0.030 thick, with a rolled edge.
+    lathe(W, t, s, [[y + 0.690, 0.310], [y + 0.706, 0.318],
+      [y + 0.722, 0.310]], TOP, 16);
+    lathe(W, t, s, [[y + 0.722, 0.310], [y + 0.722, 0]], TOP, 16);
+  }
+
+  /**
+   * `kind` is `'mesh'` for beach bar MINI and undefined everywhere else.
+   *
+   * Not a separate function, because everything about a *set* — where the ring
+   * of chairs goes, which way each of them looks, what stops a walker — is the
+   * same question at every café on this boardwalk and was answered once. What
+   * differs at MINI is the two objects the ring is made of, and those are
+   * `meshChair` and `pedestalTable`.
+   */
+  function terraceSet(t, s, y, ang, col, kind) {
     const seat = [0.230, 0.235, 0.240];
     const R = seatRing(t, s, ang);
     for (const [ct, cs, face] of R.seats) {
@@ -3074,11 +3222,15 @@ async function buildJadrija(scene) {
       const a = face + Math.PI * 0.5;
       const c = Math.cos(a), sn = Math.sin(a);
       const P = (dt, ds, yy) => W(ct + dt * c - ds * sn, cs + dt * sn + ds * c, yy);
-      boxIn(P, -0.24, 0.24, -0.23, 0.23, y + 0.40, y + 0.46, col || seat);
-      boxIn(P, -0.24, 0.24, 0.17, 0.23, y + 0.46, y + 0.86, col || seat);
-      for (const [ot, os] of [[-0.19, -0.17], [0.19, -0.17], [-0.19, 0.17], [0.19, 0.17]]) {
-        boxIn(P, ot - 0.022, ot + 0.022, os - 0.022, os + 0.022,
-          y, y + 0.40, shade(col || seat, 0.8));
+      if (kind === 'mesh') {
+        meshChair(P, y, col || seat);
+      } else {
+        boxIn(P, -0.24, 0.24, -0.23, 0.23, y + 0.40, y + 0.46, col || seat);
+        boxIn(P, -0.24, 0.24, 0.17, 0.23, y + 0.46, y + 0.86, col || seat);
+        for (const [ot, os] of [[-0.19, -0.17], [0.19, -0.17], [-0.19, 0.17], [0.19, 0.17]]) {
+          boxIn(P, ot - 0.022, ot + 0.022, os - 0.022, os + 0.022,
+            y, y + 0.40, shade(col || seat, 0.8));
+        }
       }
       // And the chair as a thing you cannot stand in.
       //
@@ -3102,9 +3254,13 @@ async function buildJadrija(scene) {
       // walks up to eight times per call.
       furniture.push({ t: ct, s: cs, a: 0.20, c: 0.20, h: 0.86, y });
     }
-    boxTS(R.ct - 0.30, R.ct + 0.30, R.cs - 0.30, R.cs + 0.30, y + 0.70, y + 0.75,
-      [0.520, 0.512, 0.492]);
-    post(W, R.ct, R.cs, y, y + 0.70, 0.035, [0.330, 0.334, 0.330], 6);
+    if (kind === 'mesh') {
+      pedestalTable(R.ct, R.cs, y);
+    } else {
+      boxTS(R.ct - 0.30, R.ct + 0.30, R.cs - 0.30, R.cs + 0.30, y + 0.70, y + 0.75,
+        [0.520, 0.512, 0.492]);
+      post(W, R.ct, R.cs, y, y + 0.70, 0.035, [0.330, 0.334, 0.330], 6);
+    }
     // The table, which is a 0.60 m top on a single pedestal and the thing that
     // was actually named in the report. `y` is the deck it stands on rather
     // than the sea-level zero `solid()` writes, so the hop in `confine` — the
@@ -5637,10 +5793,19 @@ async function buildJadrija(scene) {
     // in the survey has them and the game had not one chair on this shore.
     if (awn > 0) {
       const fs = S.s0 - awn;
+      // MINI is the one terrace on this shore that is not seated on moulded
+      // monoblocs. `20260823_111954` has a dozen white perforated-mesh
+      // armchairs on it and a black pedestal table under every canopy — see
+      // `meshChair` and `pedestalTable`, and survey items 8 and 9 of that pass.
+      // The chairs there are white and not the boardwalk's two greys, so the
+      // colour comes with the kind.
+      const mesh = S.key === 'mini';
       for (let k = 0; k < 4; k++) {
         const t = S.t0 + 0.9 + k * ((S.t1 - S.t0 - 1.8) / 3);
         terraceSet(t, fs - 1.9 + (k % 2) * 0.5, y0, (k % 2) * 0.5 - 0.25,
-          k % 3 === 0 ? [0.190, 0.200, 0.210] : [0.560, 0.548, 0.512]);
+          mesh ? [0.735, 0.733, 0.720]
+            : k % 3 === 0 ? [0.190, 0.200, 0.210] : [0.560, 0.548, 0.512],
+          mesh ? 'mesh' : undefined);
       }
     }
     // Except at beach bar MINI, whose shade is a different object entirely and
@@ -9522,6 +9687,170 @@ async function buildJadrija(scene) {
     // would break in the same places and read as one object seen twice.
     nosings(JAD.lip, lipOf, midOf, 3);
     nosings(JAD.mid, midOf, deckOf, 11);
+    b = backB;
+  }
+
+  // ── three more off 23 August ────────────────────────────────────────────────
+  //
+  // Survey items 11, 14 and 13 of the shop pass, which are one block because
+  // they are three small objects and none of them is worth its own.
+  //
+  // Nothing here touches `rng` (rule 4).
+  {
+    const backB = b;
+    b = up;
+    const M = SHOPS.find((S) => S.key === 'mini');
+
+    // ── 11. the furled white parasol ──────────────────────────────────────────
+    //
+    // `20260823_111954`: a round white parasol on a white pole standing on the
+    // apron **beyond** MINI's two square canopies, one of the two shades in
+    // that frame that are not the taupe pair. It is furled at five to twelve,
+    // which is not the hour that furls every other parasol on this boardwalk —
+    // this one is simply not in use, so it ships furled at any hour.
+    //
+    // It carries a beer brand across the valance in the photograph and it ships
+    // plain, which is the call `b_069`'s tavern parasol already shipped under.
+    //
+    // The base is the one thing here that is not in the frame — the photograph
+    // is taken from the terrace and the foot of the pole is behind a canopy
+    // block. Something has to hold a parasol up, so it gets a plain moulded
+    // one and not the car rim the boardwalk's cream octagons stand in: a rim
+    // is a specific claim and this is the absence of one.
+    if (M) {
+      const WHITE = [0.700, 0.698, 0.686];
+      const BASE = [0.520, 0.516, 0.500];
+      const pt0 = M.t0 - 2.8;
+      const ps = M.s0 - M.awn - 1.4;
+      const yy = surfaceY(pt0, ps);
+      post(W, pt0, ps, yy + 0.004, yy + 0.075, 0.290, BASE, 10);
+      post(W, pt0, ps, yy + 0.075, yy + 0.115, 0.230, BASE, 10);
+      post(W, pt0, ps, yy + 0.06, yy + 2.36, 0.032, WHITE, 6);
+      // Furled: a long thin cone of cloth bound to the pole, and the tie round
+      // it, which is the thing that says furled rather than says missing.
+      lathe(W, pt0, ps, [[yy + 0.92, 0.028], [yy + 1.05, 0.105],
+        [yy + 2.28, 0.078], [yy + 2.44, 0.020]], WHITE, 8);
+      post(W, pt0, ps, yy + 1.62, yy + 1.68, 0.086, shade(WHITE, 0.86), 8);
+      runs.push({ t0: pt0 - 0.35, t1: pt0 + 0.35, s0: ps - 0.35, s1: ps + 0.35,
+        y: yy, h: 0.12 });
+    }
+
+    // ── 14. the toddler push car ──────────────────────────────────────────────
+    //
+    // `20260823_111954`, parked at the edge of MINI's terrace: a red-and-yellow
+    // plastic ride-on. One object, unmistakable, and the resort's whole crowd
+    // has no children's things in it at all — which is a strange thing for a
+    // bathing station in August.
+    //
+    // Small enough that its wheels have to be round. A 0.16 m box wheel at two
+    // metres is a brick, and this stands where people queue.
+    if (M) {
+      const RED = [0.580, 0.135, 0.115];
+      const YEL = [0.720, 0.585, 0.115];
+      const BLK = [0.098, 0.096, 0.100];
+      // Between the two canopy masts and outside them, which takes a moment's
+      // arithmetic rather than an eye: `bigShade` stands its plinths at
+      // `t0 + 1.3` and `t1 - 1.3` on `fs - 3.6`, each 1.32 m square, and the
+      // first cut of this parked the car inside the second one — buried to the
+      // roof in stacked aggregate block with nothing showing but the handle.
+      const ct = (M.t0 + M.t1) * 0.5 + 0.4, cs = M.s0 - M.awn - 4.4;
+      const cy = surfaceY(ct, cs);
+      const ang = 0.7;
+      const co = Math.cos(ang), sn = Math.sin(ang);
+      const P = (dt, ds, yy) => W(ct + dt * co - ds * sn, cs + dt * sn + ds * co, yy);
+      // A wheel: a short cylinder about an axis running across the car.
+      const wheel = (dt, ds, r, hw) => {
+        for (let i = 0; i < 7; i++) {
+          const a0 = (i / 7) * TAU, a1 = ((i + 1) / 7) * TAU;
+          const A = P(dt - hw, ds + Math.cos(a0) * r, cy + r + Math.sin(a0) * r);
+          const B = P(dt - hw, ds + Math.cos(a1) * r, cy + r + Math.sin(a1) * r);
+          const C = P(dt + hw, ds + Math.cos(a1) * r, cy + r + Math.sin(a1) * r);
+          const D = P(dt + hw, ds + Math.cos(a0) * r, cy + r + Math.sin(a0) * r);
+          b.quad(A, B, C, D, BLK);
+          b.tri(P(dt + hw, ds, cy + r), D, C, BLK);
+          b.tri(P(dt - hw, ds, cy + r), B, A, BLK);
+        }
+      };
+      // Big wheels, and out at the body's own width. They were 0.072 and inset
+      // and the thing read as a market barrow: what says ride-on is that the
+      // wheels are a third of the height of it and stand outside the tub.
+      for (const [dt, ds] of [[-0.163, -0.190], [0.163, -0.190],
+        [-0.163, 0.200], [0.163, 0.200]]) wheel(dt, ds, 0.092, 0.034);
+      // The tub, and the sill line round it that every one of these has.
+      boxIn(P, -0.150, 0.150, -0.290, 0.290, cy + 0.100, cy + 0.285, RED);
+      boxIn(P, -0.163, 0.163, -0.275, 0.275, cy + 0.250, cy + 0.285, YEL);
+      // A seat back, and the roof on four pillars over it.
+      boxIn(P, -0.130, 0.130, 0.150, 0.190, cy + 0.285, cy + 0.410, RED);
+      for (const [dt, ds] of [[-0.145, -0.215], [0.145, -0.215],
+        [-0.145, 0.230], [0.145, 0.230]]) {
+        post(P, dt, ds, cy + 0.285, cy + 0.470, 0.017, RED, 5);
+      }
+      boxIn(P, -0.175, 0.175, -0.265, 0.270, cy + 0.470, cy + 0.508, YEL);
+      // The push handle over the tail, which is what makes it a toddler's and
+      // not a toy.
+      post(P, -0.118, 0.290, cy + 0.285, cy + 0.640, 0.014, YEL, 5);
+      post(P, 0.118, 0.290, cy + 0.285, cy + 0.640, 0.014, YEL, 5);
+      boxIn(P, -0.132, 0.132, 0.276, 0.304, cy + 0.640, cy + 0.668, YEL);
+      runs.push({ t0: ct - 0.4, t1: ct + 0.4, s0: cs - 0.4, s1: cs + 0.4,
+        y: cy, h: 0.30 });
+    }
+
+    // ── 13. two folding chairs against the boundary wall ──────────────────────
+    //
+    // `20260823_112051`: two dark folding chairs with mesh seats standing empty
+    // in the shade against the wall at the back of the wood, left there by
+    // somebody. Cheap, and exactly the sort of thing that says the wood is used
+    // rather than looked at — which is the same argument the six camped pitches
+    // under the pines went in on.
+    //
+    // Against `gardenWall`, which runs t 224.0-239.5 on s 40.4 and is the
+    // stretch that photograph is of. A hand's breadth off the render, because
+    // a chair leaning on a wall touches it at the back rail only.
+    {
+      const FRAME = [0.148, 0.146, 0.152];
+      const MESH = [0.196, 0.198, 0.206];
+      const folding = (ft, fs, fang) => {
+        const fy = surfaceY(ft, fs);
+        const co = Math.cos(fang), sn = Math.sin(fang);
+        const P = (dt, ds, yy) =>
+          W(ft + dt * co - ds * sn, fs + dt * sn + ds * co, yy);
+        const HW = 0.205;
+        // The X of a folding frame, seen from the side: the front legs run up
+        // to the back rail and the back legs up to the front of the seat, and
+        // they cross. Two tubes a side, and the crossing is the whole read.
+        for (const sgn of [-1, 1]) {
+          const u = sgn * (HW - 0.014);
+          const rail = (v0, y0, v1, y1, th) => {
+            let dv = v1 - v0, dy = y1 - y0;
+            const L = Math.hypot(dv, dy) || 1;
+            dv /= L; dy /= L;
+            const pv = -dy * th, py = dv * th;
+            const C = (e, g, h) => P(u + h * 0.014,
+              (e ? v1 : v0) + g * pv, (e ? y1 : y0) + g * py);
+            const A0 = C(0, 1, -1), A1 = C(0, 1, 1), A2 = C(0, -1, 1), A3 = C(0, -1, -1);
+            const B0 = C(1, 1, -1), B1 = C(1, 1, 1), B2 = C(1, -1, 1), B3 = C(1, -1, -1);
+            b.quad(A0, A1, B1, B0, FRAME); b.quad(A1, A2, B2, B1, FRAME);
+            b.quad(A2, A3, B3, B2, FRAME); b.quad(A3, A0, B0, B3, FRAME);
+          };
+          rail(-0.195, fy + 0.004, 0.150, fy + 0.435, 0.013);   // front leg
+          rail(0.205, fy + 0.004, -0.140, fy + 0.435, 0.013);   // back leg
+          rail(0.150, fy + 0.435, 0.235, fy + 0.860, 0.012);    // the back
+        }
+        // The mesh seat and the mesh back, each a slack panel and not a board.
+        b.quad(P(-HW, -0.150, fy + 0.428), P(HW, -0.150, fy + 0.428),
+          P(HW, 0.150, fy + 0.442), P(-HW, 0.150, fy + 0.442), MESH);
+        b.quad(P(-HW, 0.150, fy + 0.442), P(HW, 0.150, fy + 0.442),
+          P(HW, -0.150, fy + 0.428), P(-HW, -0.150, fy + 0.428), MESH);
+        b.quad(P(-HW, 0.168, fy + 0.500), P(HW, 0.168, fy + 0.500),
+          P(HW, 0.226, fy + 0.828), P(-HW, 0.226, fy + 0.828), MESH);
+        b.quad(P(-HW, 0.226, fy + 0.828), P(HW, 0.226, fy + 0.828),
+          P(HW, 0.168, fy + 0.500), P(-HW, 0.168, fy + 0.500), MESH);
+        runs.push({ t0: ft - 0.3, t1: ft + 0.3, s0: fs - 0.3, s1: fs + 0.3,
+          y: fy, h: 0.44 });
+      };
+      folding(227.4, 39.55, 0.10);
+      folding(228.5, 39.62, -0.34);
+    }
     b = backB;
   }
 
