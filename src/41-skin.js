@@ -1247,6 +1247,126 @@ const FACE_FRAG = /* glsl */ `
   }
 `;
 
+// ── the fringe on the hip wrap ───────────────────────────────────────────────
+//
+// `hip_scarf` in tools/blender/human_mh.py builds the wrap as a band round her
+// hips and then hangs eighty-eight tassels off the hem, each one a three-sided
+// prism six vertices long. Its docstring says "everything rigid to the pelvis,
+// which is right: a hip scarf is tied to the hips and does not follow a knee",
+// and for the band that is exactly right. For the tassels it is exactly wrong,
+// and it was wrong from the day they were added.
+//
+// A tassel is baked pointing along (0.1·outward, −1, 0) — straight down her,
+// measured in the *bind* pose, which is a body standing up. Bind it rigidly to
+// the pelvis and "down her" is what it stays: it is a direction in her frame,
+// not in the world's. Stand her up and the two agree and the fringe hangs. Put
+// her on all fours — `crawl`, held for 4.6 s in the routine in 43-jadrija.js —
+// and the pelvis pitches through most of a right angle, so eighty-eight strands
+// swing up with it and stand off her back. It was reported as a porcupine and
+// that is the word for it.
+//
+// Gravity is a world direction, so it is resolved as one. Each strand keeps a
+// direction of its own, eased towards world-down, and the six vertices of the
+// prism are turned about the strand's *root* so the fringe stays sewn to the
+// hem it hangs off. Three numbers do all of it:
+//
+//   `cone` is the only thing keeping a strand out of her leg. She is not a
+//   cloth simulation and never will be, so nothing here knows where her thigh
+//   is; what it knows is where the strand was *baked*, which is a direction the
+//   modeller chose so that it clears her. A strand is allowed to swing at most
+//   this far from that direction and no further, which costs nothing standing
+//   (it is already down), gives a crawl essentially all of the correction it
+//   wants (the pelvis pitches about 85°), and — the case that matters — stops a
+//   somersault from turning the fringe inside out. Inverted, world-down is 180°
+//   away from the baked direction and an unclamped hang would drive every
+//   strand straight through her hips; clamped, they end up square to gravity,
+//   which is a fringe flying out of a tuck and is what one does.
+//
+//   `ease` is how fast a strand takes up a new direction, and it is what makes
+//   the flips read rather than snap. One somersault is 1.4 s, so at 9/s a
+//   strand is most of the way there within a fifth of a turn — settled by the
+//   time she lands, lagging while she is over. The crawl is held long enough
+//   that the number is invisible there, which is the right way round: the pose
+//   the bug was reported in is the one this must be *correct* in, not the one
+//   it should be interesting in.
+//
+// Both are chosen rather than measured. Nothing in the footage shows a hip
+// wrap swinging and there is no honest number to take.
+const FRINGE = {
+  cone: 1.92,        // rad, the furthest a strand may swing off its baked lie
+  ease: 9.0,         // per second, towards where gravity wants it
+  min: 8,            // fewer strands than this and the tail is not a fringe
+};
+
+/**
+ * Find the tassels at the tail of a blob, or null if there are none.
+ *
+ * `shed` counts the indices at the end of the buffer that are the wrap, and
+ * within that run the band comes first and the fringe last — `post_geometry`
+ * appends them in that order and nothing between there and here reorders a
+ * vertex. So the fringe is found by walking the index buffer backwards in the
+ * eight triangles a prism takes and stopping at the first chunk that is not
+ * one: a chunk qualifies only if its twenty-four indices are exactly the six
+ * consecutive vertices the prism owns, which the band's quads never are.
+ *
+ * Read off the geometry rather than typed, because SCARF_SEG and FRINGE_N live
+ * in a Python file that is not shipped and a figure baked with a different
+ * count would otherwise be silently mangled.
+ */
+function fringeStrands(data) {
+  if (!data.shed) return null;
+  const idx = data.geo.index.array;
+  const pos = data.geo.attributes.position.array;
+  const nrm = data.geo.attributes.normal.array;
+  const bi = data.geo.attributes.aBoneIdx.array;
+  const nv = data.nv, ni = data.ni;
+  let n = 0;
+  while ((n + 1) * 24 <= data.shed && nv - (n + 1) * 6 >= 0) {
+    const b = nv - (n + 1) * 6, e = ni - n * 24;
+    let seen = 0;
+    for (let k = e - 24; k < e; k++) {
+      const v = idx[k] - b;
+      if (v < 0 || v > 5) { seen = -1; break; }
+      seen |= 1 << v;
+    }
+    if (seen !== 63) break;
+    n++;
+  }
+  if (n < FRINGE.min) return null;
+
+  const v0 = nv - n * 6;
+  const root = new Float32Array(n * 3);     // bind-pose root centre
+  const along = new Float32Array(n * 3);    // and the unit way it was baked
+  const off = new Float32Array(n * 18);     // the six vertices, off the root
+  const nrm0 = new Float32Array(n * 18);
+  const bone = new Uint8Array(n);
+  for (let j = 0; j < n; j++) {
+    // Six vertices to a prism and the order inside one is load-bearing: the
+    // root ring is the first three and the tip ring is the last three, because
+    // `_strand` writes `for end in (0, 1)` outermost.
+    const b = v0 + j * 6;
+    let rx = 0, ry = 0, rz = 0, tx = 0, ty = 0, tz = 0;
+    for (let k = 0; k < 3; k++) {
+      const p = (b + k) * 3, q = (b + k + 3) * 3;
+      rx += pos[p] / 3; ry += pos[p + 1] / 3; rz += pos[p + 2] / 3;
+      tx += pos[q] / 3; ty += pos[q + 1] / 3; tz += pos[q + 2] / 3;
+    }
+    const dx = tx - rx, dy = ty - ry, dz = tz - rz;
+    const l = Math.hypot(dx, dy, dz) || 1;
+    const o = j * 3;
+    root[o] = rx; root[o + 1] = ry; root[o + 2] = rz;
+    along[o] = dx / l; along[o + 1] = dy / l; along[o + 2] = dz / l;
+    for (let k = 0; k < 6; k++) {
+      const p = (b + k) * 3, w = j * 18 + k * 3;
+      off[w] = pos[p] - rx; off[w + 1] = pos[p + 1] - ry; off[w + 2] = pos[p + 2] - rz;
+      nrm0[w] = nrm[p]; nrm0[w + 1] = nrm[p + 1]; nrm0[w + 2] = nrm[p + 2];
+    }
+    // One bone at full weight, which is what `post_geometry` binds them with.
+    bone[j] = bi[b * 4];
+  }
+  return { n, v0, root, along, off, nrm0, bone };
+}
+
 /**
  * Wrap a decoded v3 blob into something that can be posed.
  *
@@ -1377,6 +1497,20 @@ function skinnedFigure(data, opts = {}) {
         Math.abs(bindT[foot * 3 + 2]));
     }
   }
+
+  // The fringe on the hip wrap, and where each strand is currently hanging.
+  //
+  // The table is read-only and could be shared, but `sway` writes back into
+  // `data.geo`, so a blob carrying a wrap must not be handed to `skinnedFigure`
+  // twice — two figures would fight over one buffer and both would wear the
+  // pose of whichever was stepped last. Nothing does: `human_skin_fr3d` goes
+  // through `loadSkin`, which parses afresh each time, and the eight bathers
+  // that *are* shared are baked without a wrap. See the note over `parsed` in
+  // src/43-jadrija.js, which already makes the same promise about `wear`.
+  const fringe = fringeStrands(data);
+  const hang = fringe ? new Float32Array(fringe.n * 3) : null;
+  let hung = false;                     // whether `hang` holds anything yet
+  let worn = true;
 
   // Scratch, allocated once.
   const localQ = new Float32Array(nb * 4), localT = new Float32Array(nb * 3);
@@ -1531,6 +1665,110 @@ function skinnedFigure(data, opts = {}) {
     // getting it to the GPU: 1.3 KB a frame, on a figure that is only stepped
     // at all when somebody is inside 250 m of her.
     boneTex.needsUpdate = true;
+    if (fringe && worn) sway(dt);
+  }
+
+  /**
+   * Let the fringe hang, now that the palette says where the hips have got to.
+   *
+   * Done on the CPU and written back into the bind-pose buffer, which sounds
+   * like the wrong way round and is the cheap one: it is 528 vertices against
+   * the 14,916 a vertex program would have to test, it costs no attribute and
+   * no uniform, and — the part that decided it — the depth-only caster in
+   * `skinCasterVert` reads the same buffer, so the shadow of the fringe is the
+   * fringe without a second copy of this arithmetic to keep in step with it.
+   *
+   * The buffer is the bind pose, so a position written here is skinned again by
+   * the pelvis on its way to the screen. Everything below therefore happens in
+   * the *bind* frame: the correction is worked out in the figure's frame, where
+   * gravity is known, and then carried back through the bone's own rotation —
+   * which is orthogonal, so its inverse is its transpose and there is nothing
+   * to invert. What comes out is a turn about the strand's root, so the root
+   * itself never moves and the fringe stays sewn to the hem.
+   */
+  function sway(dt) {
+    const F = fringe, P = palette;
+    // Which way is down, in the figure's own frame. Not (0, −1, 0): she is
+    // yawed on the promenade, but `you` rolls and pitches with the ground under
+    // her and 61-chase.js pitches the whole rig, and a fringe that hangs down
+    // *her* on a hillside is the bug this is fixing wearing a different hat.
+    // The world matrix is a frame stale at worst, which is less lag than the
+    // easing below already has.
+    const e = mesh.matrixWorld.elements;
+    let gx = -e[1], gy = -e[5], gz = -e[9];
+    const gl = Math.hypot(gx, gy, gz) || 1;
+    gx /= gl; gy /= gl; gz /= gl;
+    const cc = Math.cos(FRINGE.cone), sc = Math.sin(FRINGE.cone);
+    const k = hung ? 1 - Math.exp(-FRINGE.ease * Math.max(dt, 0)) : 1;
+    const pos = data.geo.attributes.position.array;
+    const nrm = data.geo.attributes.normal.array;
+    for (let j = 0; j < F.n; j++) {
+      const o = F.bone[j] * 12, a = j * 3;
+      const a0 = F.along[a], a1 = F.along[a + 1], a2 = F.along[a + 2];
+      // Where the strand would point if nothing had been done about it — which
+      // is the porcupine, and is also the axis the swing is measured off.
+      const ax = P[o] * a0 + P[o + 1] * a1 + P[o + 2] * a2;
+      const ay = P[o + 4] * a0 + P[o + 5] * a1 + P[o + 6] * a2;
+      const az = P[o + 8] * a0 + P[o + 9] * a1 + P[o + 10] * a2;
+      // Fall towards straight down, and then be stopped by the cone. That
+      // order, and not the other one: clamping the *target* leaves the eased
+      // direction free to lag anywhere it likes, which is exactly what happens
+      // through a somersault — she rotates in a fifth of a second and the
+      // strand, still pointing at the ground, ends up inside her hips. Clamping
+      // what came out makes the limit an invariant instead of a preference, and
+      // it is also the more honest picture: cloth caught against a body is
+      // dragged round by it.
+      let hx = hang[a] + (gx - hang[a]) * k;
+      let hy = hang[a + 1] + (gy - hang[a + 1]) * k;
+      let hz = hang[a + 2] + (gz - hang[a + 2]) * k;
+      const hl = Math.hypot(hx, hy, hz) || 1;
+      hx /= hl; hy /= hl; hz /= hl;
+      // Gram-Schmidt rather than an axis and a trig pair, so the one degenerate
+      // case — a strand turned exactly inside out — is a length test.
+      const c = ax * hx + ay * hy + az * hz;
+      if (c < cc) {
+        let px = hx - ax * c, py = hy - ay * c, pz = hz - az * c;
+        const pl = Math.hypot(px, py, pz);
+        if (pl < 1e-4) { hx = ax; hy = ay; hz = az; } else {
+          px /= pl; py /= pl; pz /= pl;
+          hx = ax * cc + px * sc; hy = ay * cc + py * sc; hz = az * cc + pz * sc;
+        }
+      }
+      hang[a] = hx; hang[a + 1] = hy; hang[a + 2] = hz;
+      // Back through the bone. `along` is already the baked direction in this
+      // frame, so the turn is from it to the transposed hang.
+      const bx = P[o] * hx + P[o + 4] * hy + P[o + 8] * hz;
+      const by = P[o + 1] * hx + P[o + 5] * hy + P[o + 9] * hz;
+      const bz = P[o + 2] * hx + P[o + 6] * hy + P[o + 10] * hz;
+      // Rodrigues with the axis left unnormalised: for unit a and b the cross
+      // product is |sin| times the axis and the dot is the cosine, and
+      // (1 − cos)/sin² collapses to 1/(1 + cos). The pole at cos = −1 is what
+      // `cone` is keeping away — the turn can never exceed it.
+      const cx = a1 * bz - a2 * by, cy = a2 * bx - a0 * bz, cz = a0 * by - a1 * bx;
+      const cd = a0 * bx + a1 * by + a2 * bz;
+      const f = 1 / (1 + Math.max(cd, -0.999));
+      for (let m = 0; m < 6; m++) {
+        const w = j * 18 + m * 3, v = (F.v0 + j * 6 + m) * 3;
+        for (let pass = 0; pass < 2; pass++) {
+          const src = pass ? F.nrm0 : F.off, dst = pass ? nrm : pos;
+          const vx = src[w], vy = src[w + 1], vz = src[w + 2];
+          const dc = cx * vx + cy * vy + cz * vz;
+          dst[v] = vx * cd + (cy * vz - cz * vy) + cx * dc * f;
+          dst[v + 1] = vy * cd + (cz * vx - cx * vz) + cy * dc * f;
+          dst[v + 2] = vz * cd + (cx * vy - cy * vx) + cz * dc * f;
+        }
+        pos[v] += F.root[a]; pos[v + 1] += F.root[a + 1]; pos[v + 2] += F.root[a + 2];
+      }
+    }
+    hung = true;
+    for (const at of [data.geo.attributes.position, data.geo.attributes.normal]) {
+      // Set rather than added to: `update` runs whenever she is inside 250 m
+      // and the upload only happens when she is actually drawn, so an appended
+      // range would grow without bound every time she is culled.
+      at.clearUpdateRanges();
+      at.addUpdateRange(F.v0 * 3, F.n * 18);
+      at.needsUpdate = true;
+    }
   }
 
   // ── the face, over time ────────────────────────────────────────────────
@@ -1646,6 +1884,7 @@ function skinnedFigure(data, opts = {}) {
    * one thing that would have made this hard and was already paid for.
    */
   function wear(on) {
+    worn = !!on;
     data.geo.setDrawRange(0, on ? Infinity : data.ni - data.shed);
   }
 

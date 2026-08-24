@@ -15403,6 +15403,8 @@ async function buildJadrija(scene) {
   let skinFig = null;
   let show = null;
   let banner = null;
+  // Set by `__fr.jad.pose` and by nothing in the game. See the note there.
+  let posed = null;
 
   // ── the note ───────────────────────────────────────────────────────────────
   /**
@@ -19553,7 +19555,13 @@ async function buildJadrija(scene) {
         // wide, so this is gated a good deal harder than the pose is. Inside
         // 40 m is about where a face stops being a smudge.
         if (dx * dx + dz * dz < 40 * 40) skinFig.faceTick(dt);
-        stepShow(dt, pt, ps);
+        // `__fr.jad.pose` takes the routine out of the loop and holds one frame
+        // of one clip. The clock is put back after the step rather than instead
+        // of it, because the step is what drives everything that is *not* the
+        // clip — the fringe's swing among it — and a pose held with a frozen
+        // dt is a pose whose cloth never arrives.
+        if (posed) skinFig.state.curT = posed.at;
+        else stepShow(dt, pt, ps);
       }
     }
     // Outside the range gate above, because a ball that is already in the air
@@ -19886,6 +19894,39 @@ async function buildJadrija(scene) {
       if (!vik) return 0;
       const [t, s] = local(x, z);
       return vik.hull(t, s, y);
+    },
+    /**
+     * Debug: hold her in one frame of one clip, and stop the routine.
+     *
+     * `putShow` scrubs a phase and is the right tool for a *phase* — it knows
+     * which clip goes with one and what else that phase has in its hands. This
+     * is the other half of the same problem and the routine has no handle for
+     * it: the crawl, the getup and the somersault are not phases anybody can
+     * ask for, they are three seconds each in the middle of a fixed sequence
+     * that has to be walked into and then waited out, and a headless page runs
+     * at about a frame a second. Anything that has to be judged in all of those
+     * poses — the fringe on the wrap, which hangs off her hips and is wrong in
+     * exactly the ones you cannot reach — needs to name the clip directly.
+     *
+     * The routine stops while a pose is held, so she does not walk out of the
+     * frame between the two shots that are meant to be compared. `pose(null)`
+     * hands her back. Nothing in the game calls this.
+     *
+     * `settle` seconds of clock are run at the pinned frame before it returns,
+     * because the swing on the fringe is a damped follow and a pose stepped
+     * once is a pose whose cloth has not caught up with it yet.
+     */
+    pose: (name, at = 0, settle = 1.5) => {
+      if (!skinFig) return null;
+      if (!name) { posed = null; return { posed: null }; }
+      if (!skinFig.clips.includes(name)) return { posed: null, clips: skinFig.clips };
+      posed = { name, at };
+      skinFig.play(name, { fade: 0 });
+      skinFig.state.prev = null;
+      const n = Math.max(1, Math.round(settle * 60));
+      for (let i = 0; i < n; i++) { skinFig.state.curT = at; skinFig.update(1 / 60); }
+      skinFig.state.curT = at;
+      return { posed: name, at, playing: skinFig.playing() };
     },
     /** Debug: put her at (t, s), and optionally straight into a phase. */
     putShow: (t, s, phase, at, ang) => {
