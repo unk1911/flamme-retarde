@@ -312,15 +312,77 @@ Two colour findings, and they pull opposite ways:
   subdividing the panel and lifting cells, so nothing is floated above a
   surface two kilometres from the origin where rule 5 says it would flicker.
 
-NOT BUILT, and it is a question rather than an omission: **the valance carries
-a wordmark**. It reads `Karlovačko`, with the brewery's shield beside it, and
-it is perfectly legible at full size. The trailer's own note decided to leave
-every brand off — *"the parasol in the frame carries a beer brand and the
-A-board carries a product, and both are legible; leaving them blank is the only
-reading of rule 12 that cannot be wrong"* — and that decision is honoured here
-rather than quietly reversed. But it sits awkwardly next to the slastičarnica
-board, which names Coca Cola, Sprite, Fanta, Orangina and Nes Caffe off exactly
-the same kind of evidence. `MORNING.md` asks which way to go.
+**THE VALANCE IS PRINTED. BUILT, 24 Aug**, and this item asked the question
+that got it answered.
+
+It used to end: *"NOT BUILT, and it is a question rather than an omission: the
+valance carries a wordmark. It reads `Karlovačko`, with the brewery's shield
+beside it, and it is perfectly legible at full size. The trailer's own note
+decided to leave every brand off — 'leaving them blank is the only reading of
+rule 12 that cannot be wrong' — and that decision is honoured here rather than
+quietly reversed. But it sits awkwardly next to the slastičarnica board, which
+names Coca Cola, Sprite, Fanta, Orangina and Nes Caffe off exactly the same kind
+of evidence."*
+
+Misha answered it on 24 August, verbatim: *"as far as brands on the parasols:
+JANA, CORONA, OZUSKO, STELLA ARTOIS, STAROPRAMEN (LIVE YOUR WAY) [the bicycle
+rack], JAMNICA (since 1828)."* An owner's statement is a source and it outranks
+a photograph; that is the same door the slastičarnica's four blank price labels
+walked through the day before, and it is the only door there is. Rule 12 is
+unchanged — it forbids inventing a name the evidence does not carry, and it has
+never forbidden one the owner states as fact.
+
+So six surfaces are printed and each is argued at its own build site in
+`src/43-jadrija.js`. The kit is `brandOf` / `brandTexture` / `brandBand` /
+`brandRing`, immediately under `panelSign`, and the long note over it carries
+the reversal:
+
+| brand | where | why there |
+| --- | --- | --- |
+| **OŽUJSKO** | the tavern's crimson square parasol, t 190 | red band, white type, and the valance was already that red |
+| **CORONA** | the promenade cafés' cream octagons | blue and gold on cream is the one livery that does not fight a cream canopy |
+| **JANA** | the hired beach parasols | four letters, on the shallowest hem on the shore at 0.12 m |
+| **STELLA ARTOIS** | the furled parasol on MINI's apron | the one hem wrapped round a pole; you read four letters of it and the rest goes round the back |
+| **JAMNICA** *since 1828* | MINI's two big canopies | the only fascia deep enough at 0.23 m to set two lines |
+| **STAROPRAMEN** *LIVE YOUR WAY* | the bicycle rack, which had to be built | Misha placed this one himself, in brackets |
+
+No terrace is asked to sell two beers: the tavern is Ožujsko alone, the cafés
+are Corona, and MINI carries Jamnica over the tables with Stella on the one
+parasol standing off them.
+
+**And Karlovačko loses, on the record.** The frame still reads `Karlovačko` and
+it is not among the six, so this is the one place on the shore where the two
+sources genuinely conflict. The owner wins, the photograph stays written down —
+here and in the code — rather than being dropped because it became inconvenient.
+
+**No crests.** A name, in house colours, as type: no shields, no horn, no
+crown, no attempt at a wordmark's own lettering. None of it can be verified from
+here, and a hand-drawn approximation of a registered device is a worse lie than
+a blank band was.
+
+Three things the renders changed, all of them caught at full size:
+
+- **A canvas is sRGB and this file's colour is linear.** `#6e171c` beside
+  `[0.430, 0.090, 0.110]` is not a near miss, it is a third of the brightness,
+  and the first tavern valance came out near-black against its own parasol.
+  `linHex()` converts, so the numbers in the brand table stay in the file's own
+  convention.
+- **The shore frame reverses handedness**, because `s` runs along the inland
+  normal `(uz, −ux)`. A ring written the way anybody writes one — round by
+  increasing angle — comes out wound INWARD, so the printed side of every
+  valance faced the pole and the outside got the dimmed show-through. Quiet, not
+  loud: the letters still read the right way round, because that is in the UVs.
+- **And then the UVs were mirrored anyway.** For the quad's own normal to point
+  at you, you have to be looking at it with the first point on your right — so a
+  `u` that climbs with the point list climbs right to left, and every name on
+  the shore was set backwards on the correctly lit face. `u` is measured back
+  from the far end now.
+
+Item 14's warning bit here too: the printed grounds started at 0.845 and a hem
+that pale under a 0.560 café canopy is a strip of white card stapled to a
+parasol. Cream is 0.702 — the furled parasol's own white — while the ground that
+prints on the beach parasols stays high, because their alternate panels are
+0.930 and a hem three shades under those reads as grey.
 
 **13. ~~The concrete slipway.~~ NOT A SLIPWAY — broken terrace nosings.**
 `b_118`-`b_121`. **SURVEYED 23 Aug, BUILT 24 Aug.**

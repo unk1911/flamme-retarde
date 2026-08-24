@@ -2467,6 +2467,334 @@ async function buildJadrija(scene) {
     scene.add(mesh);
   }
 
+  // ── the brands ─────────────────────────────────────────────────────────────
+  //
+  // Every parasol, canopy and valance on this shore has shipped blank, and the
+  // reason is written over the catering trailer: *"the parasol in the frame
+  // carries a beer brand and the A-board carries a product, and both are
+  // legible; leaving them blank is the only reading of rule 12 that cannot be
+  // wrong."* That was the right call on the evidence it had, and it is reversed
+  // here, on 24 August 2026, for exactly the reason four white labels on the
+  // slastičarnica's board became four prices the day before: a better source
+  // arrived.
+  //
+  // SUPPLIED BY MISHA, verbatim: *"as far as brands on the parasols: JANA,
+  // CORONA, OZUSKO, STELLA ARTOIS, STAROPRAMEN (LIFE YOUR WAY) [the bicycle
+  // rack], JAMNICA (since 1828)"*. Six brands, named as the brands this
+  // resort's shade carries. They are not read off any photograph and they are
+  // not guessed.
+  //
+  // Two transcriptions, and both are his. `OZUSKO` is set here as **Ožujsko**,
+  // which is the beer — the diacritics and the missing `j` are a keyboard, not
+  // a claim, and the same hand wrote `Slasticarnica` for a shop this file
+  // spells with a č. And the strapline is **LIVE YOUR WAY**: he wrote `LIFE`,
+  // was asked, and said it was his own slip — so `LIVE` is what is printed and
+  // `LIFE` is what is quoted above. It was never going to be corrected on his
+  // behalf without asking: a strapline is a name, and rule 12 does not have a
+  // clause for names you are fairly sure you know better.
+  //
+  // This is not rule 12 being relaxed. Rule 12 forbids inventing a name the
+  // evidence does not carry; it has never forbidden one the owner of the game
+  // states as fact, and an owner's statement is the only thing that
+  // legitimately turns a blank valance into a printed one. Anything he did not
+  // name is still blank — MINI's own awning, the tavern's A-board, the shade
+  // over the Bierzeltgarnituren — and every one of those is a two-line job to
+  // print the day he names it.
+  //
+  // WHAT IS SET AND WHAT IS NOT. A name, in the house colours, as type. No
+  // crests, no shields, no roundels, no attempt at a wordmark's own lettering:
+  // none of that can be verified from here, and a hand-drawn approximation of a
+  // registered device is a worse lie than a blank band ever was. Ožujsko's
+  // shield, Stella's horn, Jamnica's crown — all absent, deliberately. A brand
+  // set cleanly in the right colours on a valance is what a printed valance
+  // looks like at the distance anybody reads one from.
+  //
+  // AND ONE FINDING KEPT, because it now disagrees with what is built. Survey
+  // item 12 opened `b_069` at full size and read the tavern parasol's valance:
+  // it says `Karlovačko`, with the brewery's shield beside it, and Karlovačko
+  // is not among the six. His statement outranks a photograph — that is the
+  // whole of the rule, and the rule does not get to be quoted only when it is
+  // convenient — so OŽUJSKO is what is printed there and the photograph's
+  // reading stays written down rather than being quietly dropped. It is the
+  // one place on this shore where the two sources actually conflict.
+
+  /**
+   * A linear triple, as this file writes colour, in the sRGB hex a canvas takes.
+   *
+   * Not a nicety. A `b.quad` colour goes into `aVCol` and straight into `base`
+   * in the fragment shader, which works in linear; a canvas texture is tagged
+   * `SRGBColorSpace` and is decoded on the way in. So writing `#6e171c` beside
+   * `[0.430, 0.090, 0.110]` is not a near miss, it is a third of the
+   * brightness — the first cut of the tavern valance came out near-black
+   * against the parasol it hangs from, which is how this was found. Write the
+   * linear number the rest of the file already uses and convert it here.
+   */
+  function linHex(c) {
+    const e = (v) => {
+      const x = Math.max(0, Math.min(1, v));
+      const s = x <= 0.0031308 ? x * 12.92
+        : 1.055 * Math.pow(x, 1 / 2.4) - 0.055;
+      return Math.round(s * 255).toString(16).padStart(2, '0');
+    };
+    return '#' + e(c[0]) + e(c[1]) + e(c[2]);
+  }
+
+  /**
+   * The six, as one repeat of printed cloth.
+   *
+   * `ar` is the length of one repeat in BAND DEPTHS, and it is the only number
+   * here that needs thinking about. A valance is a long thin strip and a brand
+   * on one repeats along it — that is what a printed valance is. One centred
+   * wordmark on a four-metre band reads as a mistake, and `brandBand` gets the
+   * repeat length by multiplying `ar` by the depth of the cloth it is given, so
+   * the same texture prints correctly on a 0.12 m beach valance and on MINI's
+   * 0.23 m canopy fascia without anybody choosing a number twice.
+   *
+   * Colours are linear, like everything else in this file. They are house
+   * colours and nothing more precise than that is claimed: red and white for
+   * Ožujsko, blue on white for Jana, blue and gold on cream for Corona, red and
+   * gold on cream for Stella Artois, green on white for Jamnica.
+   */
+  function brandOf(key) {
+    // Two grounds, and the difference between them is measured against what
+    // the cloth beside them is dyed rather than picked off a swatch.
+    //
+    // CREAM started at 0.845 and was wrong by half. The cafés' canopies are
+    // 0.560 and the furled parasol's cloth is 0.700, so a 0.845 hem under them
+    // did not read as printed cloth at all — it read as a strip of white card
+    // stapled to a cream parasol, and on a horizontal-ish band that pale it is
+    // also straight into survey item 14's clipping. 0.702 is the furled
+    // parasol's own white, which is what a printed valance on this shore is.
+    // PAPER stays high: it prints on the beach parasols, whose alternate panels
+    // are 0.930, and a hem three shades under those reads as grey.
+    const CREAM = [0.702, 0.688, 0.622];
+    const PAPER = [0.860, 0.856, 0.838];
+    const GOLD = [0.585, 0.425, 0.110];
+    return {
+      // The tavern's parasol. Red band, white type, which is Ožujsko's whole
+      // livery — and the band was already this red before it was printed, so
+      // the parasol did not change colour to take a brand.
+      ozujsko: { ar: 4.6, bg: [0.430, 0.090, 0.110], ink: [0.880, 0.868, 0.842],
+        rule: [0.880, 0.868, 0.842], text: 'OŽUJSKO', weight: '800' },
+      // The hired beach parasols. Four letters is the shortest name of the six
+      // and these carry the shallowest valance on the shore at 0.12 m, which is
+      // why it goes here rather than on something with room.
+      jana: { ar: 5.0, bg: PAPER, ink: [0.045, 0.150, 0.395],
+        rule: [0.045, 0.150, 0.395], text: 'JANA', weight: '800' },
+      // The promenade cafés' cream octagons.
+      corona: { ar: 5.2, bg: CREAM, ink: [0.050, 0.125, 0.330], rule: GOLD,
+        text: 'CORONA', weight: '700' },
+      // The furled parasol on MINI's apron. Two words and the longest name of
+      // the six, on the one band that is wrapped round a pole rather than hung
+      // in a straight line — see the note there.
+      stella: { ar: 6.8, bg: CREAM, ink: [0.505, 0.075, 0.075], rule: GOLD,
+        text: 'STELLA ARTOIS', weight: '700' },
+      // MINI's two big canopies. `since 1828` is Misha's, in his own brackets,
+      // and it is the only date printed anywhere on this shore that did not
+      // come off a photograph.
+      jamnica: { ar: 6.2, bg: PAPER, ink: [0.070, 0.300, 0.160],
+        rule: [0.070, 0.300, 0.160], text: 'JAMNICA', sub: 'since 1828',
+        weight: '800' },
+      // The bicycle rack at the gate, and this one prints ONCE across a panel
+      // rather than repeating along a hem, so `ar` is the panel's own aspect.
+      staropramen: { ar: 4.2, bg: [0.395, 0.072, 0.082],
+        ink: [0.882, 0.858, 0.795], rule: GOLD, text: 'STAROPRAMEN',
+        sub: 'LIVE YOUR WAY', weight: '800' },
+    }[key];
+  }
+
+  /**
+   * One repeat of a brand, drawn once and kept.
+   *
+   * Cached on the function, and that is not laziness: there are fifteen or so
+   * beach parasols and a canvas apiece would be fifteen textures of the same
+   * four letters. `ar` fixes the aspect, so one canvas serves every depth of
+   * band the brand is printed on.
+   */
+  function brandTexture(key) {
+    if (!brandTexture.cache) brandTexture.cache = {};
+    if (brandTexture.cache[key]) return brandTexture.cache[key];
+    const S = brandOf(key);
+    const C = document.createElement('canvas');
+    C.width = 768;
+    C.height = Math.round(768 / S.ar);
+    const g = C.getContext('2d');
+    const CW = C.width, H = C.height;
+    const FF = '"Helvetica Neue", Arial, sans-serif';
+    g.fillStyle = linHex(S.bg);
+    g.fillRect(0, 0, CW, H);
+    // Two rules, top and bottom, which is what nearly every printed hem on
+    // this coast has and which is most of what says "printed" at fifteen
+    // metres, where the name itself is four grey marks.
+    g.fillStyle = linHex(S.rule);
+    g.fillRect(0, Math.round(H * 0.055), CW, Math.max(1, Math.round(H * 0.05)));
+    g.fillRect(0, Math.round(H * 0.895), CW, Math.max(1, Math.round(H * 0.05)));
+    // Fitted both ways, the way `shopSign` learned to: capped on the height so
+    // a short name is not a slab, and solved against the width so a long one
+    // does not run off the ends of its own repeat.
+    const set = (text, weight, capPx, maxW, y) => {
+      g.font = `${weight} 100px ${FF}`;
+      const at100 = g.measureText(text).width || 1;
+      g.font = `${weight} ${Math.min(capPx, 100 * maxW / at100)}px ${FF}`;
+      g.fillText(text, CW * 0.5, y);
+    };
+    g.textAlign = 'center';
+    g.fillStyle = linHex(S.ink);
+    if (S.sub) {
+      set(S.text, S.weight, H * 0.42, CW * 0.76, H * 0.585);
+      set(S.sub, '500', H * 0.24, CW * 0.52, H * 0.845);
+    } else {
+      set(S.text, S.weight, H * 0.50, CW * 0.74, H * 0.685);
+    }
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    // The whole point of the thing: it tiles along the band and not across it.
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    brandTexture.cache[key] = tex;
+    return tex;
+  }
+
+  /** One lit material per brand, shared by every band that prints it. */
+  function brandMaterial(key) {
+    if (!brandMaterial.cache) brandMaterial.cache = {};
+    if (brandMaterial.cache[key]) return brandMaterial.cache[key];
+    // LIT, and not `MeshBasicMaterial` like `shopSign` and `panelSign`. Those
+    // are boards whose one job is to be read from the promenade and which are
+    // better off ignoring the eave's shadow across them. A valance is cloth: it
+    // hangs off the same rim as the panel above it and has to take the same sun
+    // and the same shadow, or the parasol comes apart into a canopy and a
+    // sticker. A little bounce, because the underside of a valance faces four
+    // metres of white concrete.
+    const m = solidMaterial(0xffffff, {
+      spec: 0.04,
+      emissive: 0.10,
+      vcol: false,
+      side: THREE.DoubleSide,
+      decl: 'uniform sampler2D uBrandMap;',
+      // `gl_FrontFacing` twice, and the prop material at `src/37-props.js` had
+      // both of these before this did.
+      //
+      // The normal first: a double-sided quad reports one normal, so the inside
+      // of a valance was being lit as though it were the outside and the
+      // underside of every parasol on the shore came out sunlit. The first fix
+      // here was to emit each quad twice with opposite windings, which is what
+      // `parasol` does for its canopy — it works, and it is twice the geometry
+      // for something the house material solves in eleven characters.
+      //
+      // And the print second. A valance is one ply, so what you see from
+      // underneath is the print coming THROUGH the cloth, reversed and dimmer,
+      // not a second print. At full brightness the far side of a parasol read
+      // as a mirror-image sign hung inside it, which is the sort of thing that
+      // looks like a bug even when it is nearly right.
+      body: 'base = texture2D(uBrandMap, vUv).rgb * (gl_FrontFacing ? 1.0 : 0.72);'
+        + '\n  n = gl_FrontFacing ? n : -n;',
+      uniforms: { uBrandMap: { value: brandTexture(key) } },
+    });
+    brandMaterial.cache[key] = m;
+    return m;
+  }
+
+  /**
+   * A printed band along a rim: a parasol's valance, a canopy's fascia, the
+   * panel on a bicycle rack.
+   *
+   * `top` and `bot` are matching runs of WORLD points — the hem's top edge and
+   * the bottom of the drop under it. The texture runs along the band by arc
+   * length, so a scalloped rim and a straight one both print evenly, and the
+   * repeat is snapped to a whole number of names round a closed rim: a valance
+   * that comes back round to a half-finished `OŽUJS` is the one thing a printer
+   * would never let out of the shop.
+   *
+   * One quad a segment, double-sided, with the normal turned round on the back
+   * face in the shader — see `brandMaterial`. The winding decides which face is
+   * the printed one, so `top` and `bot` have to run the same way round every
+   * rim they are given: anticlockwise in plan puts the print outward.
+   */
+  function brandBand(key, top, bot, opts) {
+    const O = opts || {};
+    const n = top.length;
+    if (n < 2) return null;
+    const d3 = (a, c) => Math.hypot(a[0] - c[0], a[1] - c[1], a[2] - c[2]);
+    const cum = [0];
+    for (let i = 1; i < n; i++) cum.push(cum[i - 1] + d3(top[i - 1], top[i]));
+    const L = cum[n - 1];
+    if (L <= 0) return null;
+    let drop = 0;
+    for (let i = 0; i < n; i++) drop += d3(top[i], bot[i]);
+    drop /= n;
+    let rep = drop * brandOf(key).ar;
+    if (O.once) rep = L;
+    else rep = L / Math.max(1, Math.round(L / rep));
+    const pos = [], nrm = [], uv = [];
+    const push = (p, N, u, v) => {
+      pos.push(p[0], p[1], p[2]);
+      nrm.push(N[0], N[1], N[2]);
+      uv.push(u, v);
+    };
+    for (let i = 0; i < n - 1; i++) {
+      const a = top[i], c = top[i + 1], e = bot[i + 1], f = bot[i];
+      const ux = c[0] - a[0], uy = c[1] - a[1], uz = c[2] - a[2];
+      const vx = f[0] - a[0], vy = f[1] - a[1], vz = f[2] - a[2];
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      const M = Math.hypot(nx, ny, nz) || 1;
+      nx /= M; ny /= M; nz /= M;
+      // `u` runs BACKWARDS along the point list, and this is the only line in
+      // the file that has to think about it.
+      //
+      // The winding is fixed by the quad — `a, c, e` is `top[i]`, `top[i+1]`,
+      // `bot[i+1]` — and for the geometric normal of that winding to point at
+      // you, you have to be looking at it with `a` on your RIGHT and `c` on
+      // your left. So the point list runs right to left across the printed
+      // face, and a `u` that climbs with the point list climbs right to left
+      // with it: every name on the shore came out mirrored, on the side that
+      // was correctly lit and correctly printed. Measuring `u` back from the
+      // far end turns the type round without touching a single normal.
+      const u0 = (L - cum[i]) / rep, u1 = (L - cum[i + 1]) / rep;
+      const N = [nx, ny, nz];
+      push(a, N, u0, 1); push(c, N, u1, 1); push(e, N, u1, 0);
+      push(a, N, u0, 1); push(e, N, u1, 0); push(f, N, u0, 0);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    const mesh = new THREE.Mesh(g, brandMaterial(key));
+    mesh.name = 'brand:' + key;
+    scene.add(mesh);
+    return mesh;
+  }
+
+  /**
+   * The commonest case: a band round a ring of points in the SHORE frame.
+   *
+   * `ring` is `[[t, s], ...]` once round, `yTop` the hem's top and `dropTo` the
+   * bottom of it. Closed, so the last point joins the first and the repeat gets
+   * snapped to whole names.
+   *
+   * IT WALKS THE RING BACKWARDS, and that is not a taste. `pt` puts `s` along
+   * the inland normal, which is `(uz, -ux)` — the shore tangent turned the
+   * *other* way — so the map from (t, s) to world has a negative determinant
+   * and reverses handedness. A ring written the way anybody writes one, going
+   * round by increasing angle in (t, s), therefore comes out CLOCKWISE in the
+   * world, its faces wound inward, and the printed side of every valance on
+   * this shore ends up facing the pole. It is a quiet failure rather than a
+   * loud one: the letters still read the right way round, because which way a
+   * word faces is in the UVs and not in the winding — all that happens is that
+   * the OUTSIDE gets the dimmed show-through and the inside gets the print,
+   * which looks like slightly odd lighting until you work out what it is.
+   */
+  function brandRing(key, ring, yTop, dropTo) {
+    const top = [], bot = [];
+    for (let i = ring.length; i >= 0; i--) {
+      const [rt, rs] = ring[i % ring.length];
+      top.push(W(rt, rs, yTop));
+      bot.push(W(rt, rs, dropTo));
+    }
+    return brandBand(key, top, bot);
+  }
+
   /**
    * NE PARKIRAJ !, on the second bollard.
    *
@@ -5394,19 +5722,24 @@ async function buildJadrija(scene) {
         b.quad(W(D[0], D[1], top), W(C[0], C[1], top),
           W(Bp[0], Bp[1], eave), W(A[0], A[1], eave), shade(cl, 0.86));
       }
-      // The valance, 0.22 m of it, which is the band the eye reads the canopy's
+      // The valance, 0.23 m of it, which is the band the eye reads the canopy's
       // edge off. Without it the four panels end in a line in the air.
-      for (let e = 0; e < 4; e++) {
-        const sg = e < 2 ? 1 : -1, ax = e % 2 === 0;
-        const cl = shade(CANV, 0.98);
-        if (ax) {
-          boxTS(t + sg * HALF - 0.03, t + sg * HALF + 0.03, s - HALF, s + HALF,
-            eave - 0.22, eave + 0.01, cl);
-        } else {
-          boxTS(t - HALF, t + HALF, s + sg * HALF - 0.03, s + sg * HALF + 0.03,
-            eave - 0.22, eave + 0.01, cl);
-        }
-      }
+      //
+      // It prints JAMNICA, and `since 1828` under it in Misha's own brackets —
+      // the only date printed anywhere on this shore that did not come off a
+      // photograph. A canopy this size wants the name with the most to say and
+      // this fascia has the depth for two lines at 0.23 m, which none of the
+      // parasol hems has. It is also the one surface here that is not a beer:
+      // MINI's apron already carries Stella on the furled parasol standing off
+      // it, and one terrace does not sell two.
+      //
+      // It WAS a 0.06 m box on each side, and the box is gone. A printed band
+      // and the cloth it is printed on cannot be two surfaces — laying the
+      // print on the box's outer face is rule 5's co-planar pair exactly, and
+      // standing it 0.10 m off would be a valance floating clear of its own
+      // canopy. A valance is one ply of cloth and is now built as one.
+      brandRing('jamnica', [[t - HALF, s - HALF], [t + HALF, s - HALF],
+        [t + HALF, s + HALF], [t - HALF, s + HALF]], eave + 0.01, eave - 0.22);
       // Blocked: the plinth stops you and the mast stops you, and both are
       // things you would walk into rather than step over. The canopy is 2.5 m
       // up and is not a blocker, which is the whole point of standing under it.
@@ -5869,16 +6202,38 @@ async function buildJadrija(scene) {
         post(W, t, s2, yy + 0.10, yy + 2.42, 0.035, [0.520, 0.512, 0.492], 6);
         if (furled) {
           // Tied: a long thin cone of cloth up the pole.
+          //
+          // And no band on it, which is the honest answer rather than the
+          // convenient one. A furled parasol has its hem rolled into the bundle
+          // and shows about a hand's width of it; printing CORONA up the side of
+          // a tied cone would be a brand painted on a pole. After five these
+          // simply stop advertising, the way they do on the boardwalk.
           post(W, t, s2, yy + 0.95, yy + 2.62, 0.11, CREAM, 7);
         } else {
+          const R = 1.42;
           for (let i = 0; i < 8; i++) {
             const a0 = (i / 8) * TAU, a1 = ((i + 1) / 8) * TAU;
-            const R = 1.42;
             b.quad(W(t, s2, yy + 2.42),
               W(t + Math.cos(a0) * R, s2 + Math.sin(a0) * R, yy + 2.04),
               W(t + Math.cos(a1) * R, s2 + Math.sin(a1) * R, yy + 2.04),
               W(t, s2, yy + 2.42), i % 2 ? CREAM : shade(CREAM, 0.94));
           }
+          // CORONA on the hem, and the hem is NEW: these eight panels ended in
+          // a line in the air, which is the thing the beach parasols' own note
+          // says a valance exists to stop. So the band pays for itself twice —
+          // it carries the brand and it finishes the parasol.
+          //
+          // Blue and gold on cream, which is both the brand's livery and the
+          // one combination that does not fight a cream canopy. It is the
+          // promenade cafés that get the beer: the tavern at t 190 is a
+          // different business two hundred metres up the shore and carries
+          // Ožujsko, and beach bar MINI carries Jamnica over the terrace and
+          // Stella on the one parasol standing off it. No terrace on this shore
+          // is asked to sell two beers.
+          brandRing('corona', [0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
+            const a = (i / 8) * TAU;
+            return [t + Math.cos(a) * R, s2 + Math.sin(a) * R];
+          }), yy + 2.04, yy + 1.86);
         }
         runs.push({ t0: t - 0.5, t1: t + 0.5, s0: s2 - 0.5, s1: s2 + 0.5,
           y: yy, h: 0.10 });
@@ -8315,13 +8670,38 @@ async function buildJadrija(scene) {
           b.quad(p00, p01, p11, p10, c);
           b.quad(p10, p11, p01, p00, c);
         }
-        // The valance: a hand's width of cloth hanging off the rim, which every
-        // one of these has and which is most of the silhouette from underneath.
-        const e0 = pt3(A0, 1, v0), e1 = pt3(A1, 1, v1);
-        const d0 = [e0[0], e0[1] - 0.12, e0[2]], d1 = [e1[0], e1[1] - 0.12, e1[2]];
-        b.quad(e0, d0, d1, e1, c);
-        b.quad(e1, d1, d0, e0, c);
       }
+    }
+    // The valance: a hand's width of cloth hanging off the rim, which every one
+    // of these has and which is most of the silhouette from underneath.
+    //
+    // It carries JANA, and a hired parasol is the one thing on this shore where
+    // that needs no defending: nobody prints the canopy of a parasol they rent
+    // out by the day, and everybody prints the hem. The four letters are the
+    // shortest of Misha's six and this is the shallowest hem on the shore at
+    // 0.12 m, which is why they are here and not on something with room.
+    //
+    // It used to be eight pairs of quads in the panel loop, taking each panel's
+    // own colour, so the hem alternated with the canopy above it. That is wrong
+    // twice: a printed hem is one continuous piece of cloth however many panels
+    // are sewn above it, and the repeat has to be counted round the whole rim
+    // before it can be snapped to a whole number of names. So it is one band,
+    // through the same scalloped rim points the panels end on — the sag is what
+    // stops a printed hem reading as a hoop of card.
+    {
+      const ring = [];
+      for (let i = 0; i < 8; i++) {
+        for (let k = 0; k < CRS; k++) {
+          const v = k / CRS;
+          ring.push(pt3(((i + v) / 8) * TAU, 1, v));
+        }
+      }
+      // Backwards, for the reason written out over `brandRing`: the shore
+      // frame reverses handedness, so a rim built by increasing angle winds
+      // inward and prints on the side nobody can see.
+      ring.reverse();
+      ring.push(ring[0]);
+      brandBand('jana', ring, ring.map((p) => [p[0], p[1] - 0.12, p[2]]));
     }
   }
 
@@ -9729,8 +10109,10 @@ async function buildJadrija(scene) {
     // which is not the hour that furls every other parasol on this boardwalk —
     // this one is simply not in use, so it ships furled at any hour.
     //
-    // It carries a beer brand across the valance in the photograph and it ships
-    // plain, which is the call `b_069`'s tavern parasol already shipped under.
+    // It carries a beer brand across the valance in the photograph, and this
+    // note used to end *"and it ships plain, which is the call `b_069`'s tavern
+    // parasol already shipped under"*. Both of them are printed now: Misha named
+    // the six on 24 August and this one takes STELLA ARTOIS. See `brandOf`.
     //
     // The base is the one thing here that is not in the frame — the photograph
     // is taken from the terrace and the foot of the pole is behind a canopy
@@ -9751,6 +10133,29 @@ async function buildJadrija(scene) {
       lathe(W, pt0, ps, [[yy + 0.92, 0.028], [yy + 1.05, 0.105],
         [yy + 2.28, 0.078], [yy + 2.44, 0.020]], WHITE, 8);
       post(W, pt0, ps, yy + 1.62, yy + 1.68, 0.086, shade(WHITE, 0.86), 8);
+      // And the printed hem, hanging off the bottom of the bundle as a limp
+      // cuff, which is where a furled parasol's valance actually ends up: the
+      // canopy rolls into the tie and the hem is the last thing in, so it hangs
+      // below everything and it is the only printed cloth still showing.
+      //
+      // ONE repeat, all the way round, and that is arithmetic rather than
+      // taste. `brandBand` snaps the repeat to a whole number of names round a
+      // closed rim, and 0.66 m of octagon will take exactly one STELLA ARTOIS
+      // if the cuff is as deep as the brand's own aspect wants — so the depth
+      // is solved from the circumference instead of being chosen, and the type
+      // comes out at its right proportions rather than squeezed into whatever
+      // was left. From the promenade you read four or five letters of it and
+      // the rest goes round the back, which is what you get off the real one.
+      //
+      // The cone is INSIDE the cuff and is not co-planar with it: at the top
+      // ring they are 3 mm apart and by the bottom of the cuff the cone has
+      // shrunk to half the radius. Nothing here is a print laid on a surface.
+      const CUFF = 0.108;
+      const HEM = 16 * CUFF * Math.sin(Math.PI / 8) / brandOf('stella').ar;
+      brandRing('stella', [0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
+        const a = (i / 8) * TAU;
+        return [pt0 + Math.cos(a) * CUFF, ps + Math.sin(a) * CUFF];
+      }), yy + 1.05, yy + 1.05 - HEM);
       runs.push({ t0: pt0 - 0.35, t1: pt0 + 0.35, s0: ps - 0.35, s1: ps + 0.35,
         y: yy, h: 0.12 });
     }
@@ -10120,9 +10525,18 @@ async function buildJadrija(scene) {
   // Not the low cream café furniture the promenade has — a different business,
   // and the furniture is how you can tell.
   //
-  // NO NAME on any of it. The parasol in the frame carries a beer brand and the
-  // A-board carries a product, and both are legible; leaving them blank is the
-  // only reading of rule 12 that cannot be wrong. The shape is the find.
+  // THE PARASOL IS PRINTED, and this note used to say the opposite of that.
+  //
+  // It read: *"NO NAME on any of it. The parasol in the frame carries a beer
+  // brand and the A-board carries a product, and both are legible; leaving them
+  // blank is the only reading of rule 12 that cannot be wrong."* That was the
+  // right call while a photograph was the only source; on 24 August 2026 Misha
+  // named the brands this resort's shade carries, and an owner's statement
+  // outranks a photograph. The valance now prints OŽUJSKO. See `brandOf` for
+  // the whole reversal, including what `b_069` actually reads and why it lost.
+  //
+  // The A-BOARD IS STILL BLANK. He named parasols and a bicycle rack; he did
+  // not name what is chalked on a board, and the shape is still the find.
   //
   // PLACEMENT, not measurement. v597 has no GPS. t 190 is the last open wood
   // before Pizzeria F2 at 200, with `clearOfShops` satisfied by 7.5 m.
@@ -10259,7 +10673,6 @@ async function buildJadrija(scene) {
     // their feet with the tops at their elbows.
     {
       const CRIM = [0.520, 0.115, 0.135];
-      const VAL = [0.430, 0.090, 0.110];
       const TUBE = [0.115, 0.115, 0.122];
       const TOP = [0.300, 0.300, 0.312];
       const SEAT = [0.560, 0.140, 0.150];
@@ -10325,13 +10738,22 @@ async function buildJadrija(scene) {
               at2((r + 1) / N, (c + 1) / N), at2(r / N, (c + 1) / N), col);
           }
         }
-        // The valance hanging off that edge — 0.20 m of it, printed, and the
-        // thing that stops a parasol reading as a paper hat.
-        b.quad(W(pt2 + c0[0], ps2 + c0[1], py + 2.06),
-          W(pt2 + c1[0], ps2 + c1[1], py + 2.06),
-          W(pt2 + c1[0], ps2 + c1[1], py + 1.86),
-          W(pt2 + c0[0], ps2 + c0[1], py + 1.86), VAL);
       }
+      // The valance — 0.20 m of it, and the thing that stops a parasol reading
+      // as a paper hat. It is now genuinely printed rather than described as
+      // printed: OŽUJSKO, white on the red it was already dyed.
+      //
+      // ONE mesh round the whole rim and not four quads inside the panel loop,
+      // because a repeat has to be counted round the whole 8.8 m of hem before
+      // it can be snapped to a whole number of names, and a per-panel quad
+      // cannot know what the other three are doing. The old flat `VAL` quad is
+      // gone rather than being left underneath: a printed band 2 km from the
+      // origin, laid on a plain one in the same plane, is rule 5's flickering
+      // band exactly, and there is nothing for the plain one to do anyway.
+      brandRing('ozujsko', [0, 1, 2, 3].map((i) => {
+        const a = i * Math.PI * 0.5 + Math.PI * 0.25;
+        return [pt2 + Math.cos(a) * HW, ps2 + Math.sin(a) * HW];
+      }), py + 2.06, py + 1.86);
       // The table: a column on a disc with a dark round top at elbow height.
       lathe(W, pt2, ps2, [[py + 0.02, 0.34], [py + 0.06, 0.34],
         [py + 0.08, 0.08], [py + 1.02, 0.08], [py + 1.04, 0.42],
@@ -12403,31 +12825,177 @@ async function buildJadrija(scene) {
       clutter(bt + 0.9, bs - 0.8, y, 3, (bt | 0) * 11 + 5);
     }
 
-    // Bicycles at the gate. 174947 has four of them leaning on the barrier,
-    // which is where every bicycle in Dalmatia is left.
+    // ── the bicycle rack ──────────────────────────────────────────────────────
+    //
+    // SUPPLIED BY MISHA, 24 August 2026, in his own brackets: STAROPRAMEN, with
+    // the strapline LIVE YOUR WAY, goes on "the bicycle rack". There was no
+    // bicycle rack. There were four bicycles leaning on the barrier — which is
+    // where every bicycle in Dalmatia is left, and which is what `174947` has —
+    // so the rack is built and the bicycles are put in it.
+    //
+    // It is the municipal pattern and not a hoop stand, because the brief for
+    // the object is the advertisement: a Croatian bathing station's rack is a
+    // low galvanised comb of wheel slots with a printed panel standing along
+    // one side of it, and the panel is why the comb is there. A run of bare
+    // hoops has nowhere to put a name.
+    //
+    // AND IT IS NOT AT THE BARRIER, because the barrier is not where the
+    // bicycles were. They were written at `t 484.2, s 27.6`, and the back row
+    // of kabine has its seaward face at `JAD.rowB` = 26.1 and is `JAD.cabD` =
+    // 2.90 m deep, so 27.6 is one and a half metres INSIDE it. All four of them
+    // have been standing in somebody's changing room since the day they went
+    // in, and nobody caught it because a bicycle is a thin thing seen against a
+    // white wall from the one side you can stand on. Found by aiming a camera
+    // at the spot and getting a cabin door four metres away.
+    //
+    // So the rack goes in the ALLEY, at the same `t`. The alley is the six
+    // metres between the two rows — `rowB - rowA - cabD` — and it is the way in
+    // from the lane gate, so it is walked by everyone who arrives on anything.
+    //
+    // Against the FRONT row and not the back one, which is the second thing
+    // this got wrong. The first cut stood it on the back row's seaward face at
+    // 25.85 and it was a metre of advertising hoarding parked across somebody's
+    // changing-room door: every kabina in both rows opens seaward, so the back
+    // row's alley face is all doors and the front row's alley face — `rowA +
+    // cabD` = 20.1 — is a blank wall the whole length of the run. That wall is
+    // what a municipal rack is bolted to. 20.35 for the panel puts the case
+    // 0.12 m off it rather than in it, and the print faces inland, up the alley
+    // at the people coming down it.
+    //
+    // The panel is 2.18 m by 0.52 m, and neither number was chosen. `brandOf`
+    // gives Staropramen an aspect of 4.2 because that is what two lines of it
+    // want, and `brandBand` prints one repeat across a panel rather than tiling
+    // it, so the panel is that aspect at the height a rack's panel stands or
+    // the type comes out stretched.
+    {
+      const RT = 484.5, RS = 20.35;                // the panel's own plane
+      const PH = 0.52, PW = PH * brandOf('staropramen').ar;
+      const HALF = PW * 0.5;
+      const STEEL = [0.400, 0.408, 0.420];
+      const GALV = [0.520, 0.528, 0.540];
+      const ry = surfaceY(RT, RS);
+      // The sheet stands at 0.96 m and not at 0.46, and a render settled it.
+      //
+      // At 0.46 the panel filled the space the bicycles occupy, and four sets
+      // of handlebars — which sit at 0.92 to 0.96 and are 0.32 m across — were
+      // drawn straight across the middle of the name. That is not wrong of the
+      // handlebars; it is what a panel put at wheel height gets. A rack that
+      // carries an advertisement carries it as a BACKBOARD, clear over the top
+      // of what is parked in it, which is why every one of these you have ever
+      // seen is chest high with the comb on the ground underneath.
+      const p0 = ry + 0.96, p1 = p0 + PH;          // the printed sheet
+      // The carrier: a shallow steel case behind the sheet, 0.10 m back. That
+      // number is `shopSign`'s, and its note is worth re-reading before anyone
+      // shortens it — at two kilometres from the origin a tray 0.02 m behind a
+      // face is a coin toss over which of them the depth buffer draws, and
+      // three boardwalk signs were reported missing on exactly that.
+      boxTS(RT - HALF - 0.05, RT + HALF + 0.05, RS - 0.13, RS,
+        p0 - 0.06, p1 + 0.06, STEEL, shade(STEEL, 1.12));
+      // The frame round the sheet, at the sheet's own plane, which is what
+      // closes the 0.10 m void at the edges. Without it the panel reads as a
+      // poster hovering in front of a box, which is what it is.
+      for (const [a, c] of [[p1, p1 + 0.06], [p0 - 0.06, p0]]) {
+        boxTS(RT - HALF - 0.05, RT + HALF + 0.05, RS - 0.005, RS + 0.115,
+          a, c, GALV, shade(GALV, 1.10));
+      }
+      for (const e of [-1, 1]) {
+        boxTS(RT + e * (HALF + 0.05) - 0.06 * (e > 0 ? 1 : 0),
+          RT + e * (HALF + 0.05) + 0.06 * (e < 0 ? 1 : 0),
+          RS - 0.005, RS + 0.115, p0 - 0.06, p1 + 0.06, GALV);
+        // And the legs under the case, down to the paving.
+        boxTS(RT + e * (HALF - 0.02) - 0.035, RT + e * (HALF - 0.02) + 0.035,
+          RS - 0.11, RS - 0.02, ry, p0 - 0.05, STEEL);
+        boxTS(RT + e * (HALF - 0.02) - 0.09, RT + e * (HALF - 0.02) + 0.09,
+          RS - 0.20, RS + 0.06, ry, ry + 0.02, [0.300, 0.305, 0.315]);
+      }
+      // The comb, inland of the panel, so the bicycles stand in front of it and
+      // not between it and the people it is printed for.
+      //
+      // Four slots, each a PAIR of flat bars 50 mm apart — which is what a
+      // wheel slot is, and what one fin every half metre is not. The pairs are
+      // on the bicycles' own 0.52 m pitch and the two low rails tie them
+      // together, which is the whole of the fabrication.
+      for (const rs2 of [[RS + 0.30, RS + 0.34], [RS + 0.58, RS + 0.62]]) {
+        boxTS(RT - HALF, RT + HALF, rs2[0], rs2[1], ry + 0.06, ry + 0.12,
+          GALV, shade(GALV, 1.12));
+      }
+      for (let j = 0; j < 4; j++) {
+        const ct = RT + (j - 1.5) * 0.52;
+        // 0.05 m of gap, which is what the wheel this rack holds is thick:
+        // `facing` turns the bicycle so its own `dt` runs across the shore, and
+        // the wheel it draws is 0.033 m along `t`. A 25 mm slot put both bars
+        // through the tyre.
+        for (const o of [-0.035, 0.035]) {
+          boxTS(ct + o - 0.010, ct + o + 0.010, RS + 0.30, RS + 0.62,
+            ry + 0.08, ry + 0.40, GALV, shade(GALV, 1.14));
+        }
+      }
+      // STAROPRAMEN, facing inland up the alley.
+      //
+      // Two points and `once`, so the name prints across the panel instead of
+      // tiling along it — a hem repeats and a hoarding does not. The pair runs
+      // from −t to +t and not the other way, which is what turns the printed
+      // face inland: see the handedness note over `brandRing`.
+      brandBand('staropramen',
+        [W(RT - HALF, RS + 0.10, p1), W(RT + HALF, RS + 0.10, p1)],
+        [W(RT - HALF, RS + 0.10, p0), W(RT + HALF, RS + 0.10, p0)],
+        { once: true });
+      runs.push({ t0: RT - HALF - 0.1, t1: RT + HALF + 0.1,
+        s0: RS - 0.2, s1: RS + 0.7, y: ry, h: p1 + 0.06 - ry });
+    }
+
+    // And the bicycles, four of them, one to a slot. They used to lean on the
+    // barrier at 0.62 m apart with every other one shifted 0.30 m inland, which
+    // is what a bicycle left against a rail does — and, as the rack's note
+    // says, what they were actually doing was standing inside the kabine. In a
+    // rack they stand on the comb's pitch, square, and with almost none of the
+    // lean.
     for (let i = 0; i < 4; i++) {
-      const bt = 484.2 + i * 0.62, bs = 27.6 + (i % 2) * 0.30;
+      const bt = 484.5 + (i - 1.5) * 0.52, bs = 20.35 + 0.98;
       const y = surfaceY(bt, bs);
       const FR = [[0.560, 0.140, 0.115], [0.145, 0.230, 0.430],
         [0.180, 0.180, 0.190], [0.520, 0.505, 0.470]][i];
-      const lean = 0.16;
+      // 0.05 and not 0.16: a wheel held in a slot stands very nearly upright,
+      // and the lean was there to say "propped against something".
+      const lean = 0.05;
+      // Still +90°, and worth checking rather than assuming: `facing` sends the
+      // bicycle's own `dt` along +s at this angle, so the FRONT wheel — the one
+      // at `dt −0.52`, which is the end both the down tube and the head tube
+      // run to — lands at `bs − 0.52`, seaward, in the slot, with the rest of
+      // the machine standing inland of the rack. Which is the way round
+      // anybody parks a bicycle in a wheel slot.
       const P = facing(bt, bs, Math.PI * 0.5);
       // Two wheels, each a ring of short chords — a bicycle is legible from
       // its wheels and from nothing else.
+      // A WHEEL IS A CIRCLE IN THE MACHINE'S OWN PLANE, and this drew an
+      // ellipse across it.
+      //
+      // The ring was `wd + cos(a) * R * 0.18` along the bicycle against
+      // `sin(a) * R` in height — 0.12 m long by 0.66 m tall — and it was then
+      // extruded 0.03 m ALONG the bicycle as well, so the tyre's width ran
+      // fore-and-aft instead of side to side. Four bicycles left in a heap
+      // against a barrier hid all of it; four standing square in a rack, seen
+      // from down the alley, are four pairs of tall black ovals on sticks, and
+      // the comment over this says a bicycle is legible from its wheels and
+      // from nothing else. It is right, which is why the wheels have to be.
+      //
+      // So: `cos(a) * R` for the full circle, the 0.036 m of tyre laid across
+      // the machine where a tyre goes, and the lean taken as a tilt about the
+      // wheelbase — proportional to height, so the contact patch stays on the
+      // ground and the top of the wheel is what moves. Drawn both ways round,
+      // because a rim is a surface with two sides and you walk past these.
       for (const wd of [-0.52, 0.52]) {
         for (let j = 0; j < 12; j++) {
           const a0 = (j / 12) * TAU, a1 = ((j + 1) / 12) * TAU;
-          const R = 0.33;
-          const p0 = P(wd + Math.cos(a0) * R * 0.18, lean * Math.cos(a0) * R,
-            y + 0.34 + Math.sin(a0) * R);
-          const p1 = P(wd + Math.cos(a1) * R * 0.18, lean * Math.cos(a1) * R,
-            y + 0.34 + Math.sin(a1) * R);
-          b.quad(p0, p1,
-            P(wd + Math.cos(a1) * R * 0.18 + 0.03, lean * Math.cos(a1) * R,
-              y + 0.34 + Math.sin(a1) * R),
-            P(wd + Math.cos(a0) * R * 0.18 + 0.03, lean * Math.cos(a0) * R,
-              y + 0.34 + Math.sin(a0) * R),
-            [0.120, 0.120, 0.128]);
+          const R = 0.33, TY = 0.018;
+          const rim = (a, o) => {
+            const h = y + 0.34 + Math.sin(a) * R;
+            return P(wd + Math.cos(a) * R, lean * (h - y) + o, h);
+          };
+          const A0 = rim(a0, -TY), A1 = rim(a1, -TY);
+          const B0 = rim(a0, TY), B1 = rim(a1, TY);
+          b.quad(A0, A1, B1, B0, [0.120, 0.120, 0.128]);
+          b.quad(B0, B1, A1, A0, [0.120, 0.120, 0.128]);
         }
       }
       // The frame: a down tube, a seat tube, a top tube and the bars.
@@ -12446,9 +13014,21 @@ async function buildJadrija(scene) {
       tube(0.10, 0.30, 0.10, 0.92, 0.020);
       tube(0.10, 0.92, -0.52, 0.34, 0.020);
       tube(-0.44, 0.92, 0.10, 0.86, 0.018);
-      boxTS(bt + 0.02, bt + 0.18, bs - 0.06, bs + 0.06, y + 0.90, y + 0.96,
+      // The saddle and the bars, and both of them were in the WRONG FRAME.
+      //
+      // They were `boxTS(bt + 0.02, …)` and `boxTS(bt - 0.50, …)` — shore
+      // coordinates, straight off the placement point — while every other part
+      // of the bicycle is built through `P`, which turns it a quarter circle.
+      // So the saddle sat across the frame instead of along it and the
+      // handlebars stood half a metre off the side of the machine, in mid air,
+      // level with the middle of it. The numbers were right all along: 0.02 to
+      // 0.18 is exactly where the seat post comes up and −0.50 to −0.38 is
+      // exactly over the front wheel, in the bicycle's OWN dt. They only ever
+      // needed `boxIn(P, …)`. Four bicycles parked in a jumble against a rail
+      // hid it; four in a rack, square and evenly spaced, do not.
+      boxIn(P, 0.02, 0.18, -0.06, 0.06, y + 0.90, y + 0.96,
         [0.100, 0.100, 0.110]);
-      boxTS(bt - 0.50, bt - 0.38, bs - 0.16, bs + 0.16, y + 0.92, y + 0.96,
+      boxIn(P, -0.50, -0.38, -0.16, 0.16, y + 0.92, y + 0.96,
         [0.100, 0.100, 0.110]);
     }
 
