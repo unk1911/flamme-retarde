@@ -8,6 +8,66 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.115.0] — 2026-08-24
+
+### Six survey items, and the step edges that have been broken for twenty years
+
+**The terrace nosings** — v59x item 13, the one catalogued as a concrete slipway
+and is not one. `b_120` and `b_121` look straight down the apron to the water
+and show one broad cracked slab meeting shingle; what the item saw is in `b_118`
+and runs the *other way*, two lines of damage **along** the shore where both step
+risers have broken away.
+
+Built as material that is **there** and never as material taken away: a sound
+nosing stands 0.12 m proud of the face under it and a broken one is simply
+absent, so the ragged edge comes out of where the lengths stop rather than out
+of cutting a quad that is already drawn. That is also the only way to keep it
+off the riser's own plane — at 2.1 km from the origin the difference between a
+shadow line and a flickering band four hundred metres long. Along the whole
+shore with the soundness walked by `jit` in ten-metre runs, because one damaged
+patch on an otherwise perfect apron reads as a decal.
+
+**beach bar MINI does not seat anybody on a monobloc.** `20260823_111954` has a
+dozen white perforated-mesh armchairs on that terrace and they are the commonest
+single object in the frame. Drawn as a real lattice — four bars each way in the
+seat and four in the back — and not as a darker panel, because the whole of what
+separates that chair from the boardwalk's moulded one at three metres is that
+you can see the terrace *through* it, and a dark rectangle reads as the exact
+opposite. Black pedestal tables with an eight-ribbed disc base under every set.
+
+- **KOKICE**, third row of the drinks board, no price. Nine rows now, and the
+  type re-fitted itself for all nine. Blank means blank: nothing over the name,
+  and not the empty white label four rows shipped as before Misha supplied their
+  prices. A sticker is a price the shop has changed, a printed number is one it
+  has not, and an empty label is a price that exists and cannot be read.
+- **NES CAFFE** confirmed on his word — the board's spelling, because the board
+  is the thing that is photographed. Closed.
+- The **furled white parasol** west of MINI's canopies, plain, and furled at any
+  hour: it is furled at five to twelve in the frame, so it is not in use rather
+  than out of season.
+- The **toddler push car** at the edge of MINI's terrace. The resort's crowd had
+  no children's things in it at all, which is a strange thing for a bathing
+  station in August.
+- Two **folding mesh chairs** left against the boundary wall in the wood.
+- The grey drum beside the gable bench is a **planter with a dead shrub in it**,
+  not a bin — the sixth item this week to change once the frame was opened at
+  full size.
+- v59x item 15, the white monobloc chair, was **already built** and nobody had
+  ticked it.
+
+Three findings written down, all of them from getting it wrong first: rubble off
+a 0.22 m step is fist-sized and 0.34 m lumps read as dropped paving slabs; a
+fracture face is paler than the weathered concrete beside it by a few points and
+not by a fifth; and grass is thin, it tapers and it leans, so three 24 mm boxes a
+tuft put a row of little green bollards in the joint where blades were wanted.
+
+**Attempted and backed out: somebody behind the slastičarnica counter.** The two
+figures went into the list without costing the `rng` stream a draw — the census
+never moved — and nothing drew them: whatever assigns an instance does not pick
+up entries appended after the cast pass. What the room allows (one slot, 0.40 m
+deep, between the cabinet back and the mirror) and what they have to wear is
+written up in `plan/survey-3.md` for the next attempt.
+
 ## [1.114.0] — 2026-08-24
 
 ### The Brod is where OSM says it is, and you can walk out to it
