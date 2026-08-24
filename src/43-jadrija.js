@@ -2559,15 +2559,23 @@ async function buildJadrija(scene) {
   //
   // AND A SEVENTH THAT IS NOT A BRAND. Misha, on seeing the six: *"on some of
   // the parasols there should be a message: YOUR AD HERE"*. So `spare` — the
-  // hire company's own hem on a pitch nobody has bought, touting for the
-  // advertiser who has not taken it yet. It is set apart from the six on
-  // purpose: no house colours, because there is no house; graphite on the same
-  // paper the JANA hem prints on, which is the parasol's own white and is what
-  // a rate card looks like. `YOUR AD HERE` is the whole of the text — no
-  // company, no telephone number, no price, because rule 12 has not stopped
-  // applying just because the thing being printed is addressed to the reader.
-  // English, because that is the language he wrote it in and because the
-  // advertiser this hem is talking to is the one who flew in.
+  // hem on a pitch nobody has bought, touting for the advertiser who has not
+  // taken it yet. It is set apart from the six on purpose: no house colours,
+  // because there is no house; graphite on the same cream the CORONA hem
+  // beside it prints on, which is the parasol's own cloth and is what a rate
+  // card looks like. `YOUR AD HERE` is the whole of the text — no company, no
+  // telephone number, no price, because rule 12 has not stopped applying just
+  // because the thing being printed is addressed to the reader. English,
+  // because that is the language he wrote it in and because the advertiser
+  // this hem is talking to is the one who flew in.
+  //
+  // And it went out on the sand first, on two of the eleven hired beach
+  // parasols, which was wrong for a reason worth keeping: a beach hem is
+  // 0.12 m deep, so the message is gone by fifteen metres, and both pitches
+  // stood where nobody walks. Misha, seeing it: *"we need that to be in a more
+  // popular/visible spot"*. So it moved onto the promenade cafés' octagons —
+  // 0.18 m of hem two metres off the walk — and it is still two of them and
+  // not four. See the caller in `shopfront`.
 
   /**
    * A linear triple, as this file writes colour, in the sRGB hex a canvas takes.
@@ -2632,19 +2640,31 @@ async function buildJadrija(scene) {
       // why it goes here rather than on something with room.
       jana: { ar: 5.0, bg: PAPER, ink: [0.045, 0.150, 0.395],
         rule: [0.045, 0.150, 0.395], text: 'JANA', weight: '800' },
-      // The unsold pitches, on the same paper as JANA and off the same roll —
-      // it is the same hire company's hem, and the only thing missing is the
+      // The unsold pitch, on the same cream as CORONA and off the same roll —
+      // it is the same terrace's other hem, and the only thing missing is the
       // advertiser. Graphite rather than a colour, and 700 rather than the 800
       // a brand sets its own name in: nothing here is anybody's livery.
       //
-      // `ar` 7.6 is the one number that had to be worked out. The type is
-      // capped on the band's depth at half of it, so a name only shrinks when
-      // it runs out of repeat to sit in — and twelve characters do that below
-      // about 5.4. At 7.6 the cap still binds, so YOUR AD HERE prints at the
-      // same 6 cm on a 0.12 m hem that JANA's four letters do, and eight
-      // repeats go round a 1.18 m rim with half of each one left as air. That
-      // spacing is most of what separates a rate card from a wordmark.
-      spare: { ar: 7.6, bg: PAPER, ink: [0.075, 0.078, 0.085],
+      // `ar` 7.6 is the one number that had to be worked out, and it survived
+      // the move off the beach unchanged. The type is capped on the band's
+      // depth at half of it, so a name only shrinks when it runs out of repeat
+      // to sit in — and twelve characters do that below `ar` 5.18, measured on
+      // the same font stack the texture is drawn with. At 7.6 the cap still
+      // binds, so YOUR AD HERE prints at exactly the cap height CORONA does on
+      // whatever hem it is given: 6 cm on the 0.12 m beach valance it used to
+      // hang from, 9 cm on the cafés' 0.18 m one. Shot side by side at eight
+      // metres the two are the same size of letter and the whole difference
+      // between them is the repeat, which is what it should be.
+      //
+      // What `ar` buys is the air, and the air is the point. The octagon's rim
+      // measures 8.73 m round at the slastičarnica and 9.47 m at H2O — the
+      // same ring in (t, s), 9% longer in the world sixty metres up the shore,
+      // which is rule 9b doing what rule 9b does — so CORONA snaps to nine and
+      // ten repeats round them and YOUR AD HERE to six and seven. That is a
+      // name every 1.35 to 1.45 m of which 0.50 is type and the rest is blank
+      // cloth, against 0.43 for a wordmark on the hem beside it. Half a repeat
+      // of nothing is most of what separates a rate card from a brand.
+      spare: { ar: 7.6, bg: CREAM, ink: [0.075, 0.078, 0.085],
         rule: [0.075, 0.078, 0.085], text: 'YOUR AD HERE', weight: '700' },
       // The promenade cafés' cream octagons.
       corona: { ar: 5.2, bg: CREAM, ink: [0.050, 0.125, 0.330], rule: GOLD,
@@ -6282,6 +6302,33 @@ async function buildJadrija(scene) {
       const fs = S.s0 - awn;
       const furled = (CONFIG.hour || 14) > 17;
       const CREAM = [0.560, 0.545, 0.508];
+      // Which of the two hems has not been sold. One per terrace on two of the
+      // three that get parasols, named rather than counted, and it is the END
+      // of the run that is picked and not the index: `k` 0 is the low-`t` end
+      // and `k` 1 the high one, so H2O's is its west parasol at t 313.3 and the
+      // slastičarnica's is its east one at t 341.7.
+      //
+      // Those are the two OUTER ends of the pair of terraces, and that is the
+      // whole of the choice. Both parasols on a frontage stand at the same
+      // s 15.4, a stride off the walk, so neither is nearer the promenade than
+      // the other and there is nothing between them at close range. What
+      // separates them is the approach. The outer one is the first hem on the
+      // run you meet — from the bathing station and the beach walking east,
+      // from the lane gate and the sanitary block walking west — and it stands
+      // clear against sky the whole way in: photographed at eight metres it is
+      // a sentence and at fifteen it is still visibly printed cloth. The inner
+      // two are six metres apart across the gap between the two buildings, one
+      // of them behind the other from every approach, and neither is read
+      // until you are level with it.
+      //
+      // It leaves each terrace with its CORONA parasol on the inside, which is
+      // also the busier half of it, so from anywhere between the two cafés you
+      // are looking at two Corona parasols and the terraces still read as
+      // Corona terraces. Caffe TRAMPULIN keeps both of its: four unsold pitches
+      // on this shore would read as a station that has sold nothing, which is
+      // the failure the beach placement was reasoned out of before it was
+      // reasoned off the beach.
+      const spareK = S.key === 'h2o' ? 0 : S.key === 'slast' ? 1 : -1;
       for (let k = 0; k < 2; k++) {
         // At the ENDS of the terrace, not straddling the middle of it.
         //
@@ -6341,10 +6388,17 @@ async function buildJadrija(scene) {
           // Ožujsko, and beach bar MINI carries Jamnica over the terrace and
           // Stella on the one parasol standing off it. No terrace on this shore
           // is asked to sell two beers.
-          brandRing('corona', [0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
-            const a = (i / 8) * TAU;
-            return [t + Math.cos(a) * R, s2 + Math.sin(a) * R];
-          }), yy + 2.04, yy + 1.86);
+          //
+          // And two of the six hems here are not a beer at all but the rate
+          // card — see `spareK`. That does not break the rule: a terrace with
+          // one Corona parasol and one still touting for an advertiser is a
+          // terrace that sells Corona and has a pitch left, which is one
+          // business, not two.
+          brandRing(k === spareK ? 'spare' : 'corona',
+            [0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
+              const a = (i / 8) * TAU;
+              return [t + Math.cos(a) * R, s2 + Math.sin(a) * R];
+            }), yy + 2.04, yy + 1.86);
         }
         runs.push({ t0: t - 0.5, t1: t + 0.5, s0: s2 - 0.5, s1: s2 + 0.5,
           y: yy, h: 0.10 });
@@ -9235,7 +9289,7 @@ async function buildJadrija(scene) {
    * Everything is drawn from both sides. You spend most of your time on this
    * beach underneath one.
    */
-  function parasol(t, s, y, col, hem) {
+  function parasol(t, s, y, col) {
     const P = facing(t, s, rng() * TAU);
     const POLE = [0.560, 0.545, 0.520];
     const WHITE = [0.930, 0.920, 0.895];
@@ -9284,11 +9338,11 @@ async function buildJadrija(scene) {
     // shortest of Misha's six and this is the shallowest hem on the shore at
     // 0.12 m, which is why they are here and not on something with room.
     //
-    // `hem` is how a pitch that nobody has bought says so — see `spare` in
-    // `brandOf`, and the caller for which ones. Only the hem changes: the
-    // canopy above it is the same alternating cloth on the same pole, because
-    // an unsold pitch is not a different parasol, it is the same parasol with
-    // nothing sold on it.
+    // Every one of them, with no exceptions and nothing to choose between
+    // them. Two of these used to carry the YOUR AD HERE hem instead and no
+    // longer do: 0.12 m of cloth cannot hold a twelve-character message at any
+    // distance you would meet one of these from. That hem is on the cafés'
+    // octagons now — see the caller, and `spare` in `brandOf`.
     //
     // It used to be eight pairs of quads in the panel loop, taking each panel's
     // own colour, so the hem alternated with the canopy above it. That is wrong
@@ -9310,7 +9364,7 @@ async function buildJadrija(scene) {
       // inward and prints on the side nobody can see.
       ring.reverse();
       ring.push(ring[0]);
-      brandBand(hem || 'jana', ring, ring.map((p) => [p[0], p[1] - 0.12, p[2]]));
+      brandBand('jana', ring, ring.map((p) => [p[0], p[1] - 0.12, p[2]]));
     }
   }
 
@@ -9745,30 +9799,21 @@ async function buildJadrija(scene) {
     return b;
   };
 
-  // Which pitches nobody has bought the hem of. Counted over the parasols that
-  // actually go up rather than over the stations the loop steps through, so it
-  // is an index into the row you can see and not into the layout's arithmetic —
-  // and off `jit`, never `rng`, because a single extra draw here moves every
-  // bather, parasol and hut east of it. See `spare` in `brandOf`.
+  // Every one of the eleven parasols on this beach prints JANA, and none of
+  // them is a spare pitch any more.
   //
-  // Eleven parasols go up on this beach, at t 9, 16.6, 60.1, 68.1, 80.1, 91.3,
-  // 102, 142.2, 150, 170 and 200.8, and one in five of eleven is two. Two is
-  // the number that survived looking at it. One is invisible — you can walk the
-  // whole beach and never pass it. Four and the station reads as a hire company
-  // that has sold nothing, which is a sadder place than the one being built.
+  // Two of them were: a `jit`-picked pair at t 142.2 and 200.8 carrying the
+  // YOUR AD HERE hem. Both are on the sand west of `beachTo`, and the reason
+  // they are gone is measured rather than felt — a beach valance is 0.12 m
+  // deep, which sets the type at 6 cm, and 6 cm of graphite on white cloth is
+  // four grey marks by fifteen metres. The pitch that is touting for an
+  // advertiser was the one thing on this shore that nobody could read. It
+  // hangs on two of the promenade cafés' octagons instead, where the hem is
+  // half again as deep and the walk goes two metres past it — see `shopfront`,
+  // and `spare` in `brandOf`.
   //
-  // The seed is 23 because 23 is what put them at 142.2 and 200.8. That is the
-  // pair that matters: 200.8 is the last pitch before `beachTo`, so it is the
-  // first parasol you meet walking west out of the resort and the one the
-  // promenade runs straight past; 142.2 is sixty metres on, in the middle of
-  // the row, so the message reads as a couple of spare pitches rather than as
-  // one oddity at the end. Seeds that put both at the western end were tried
-  // and are no good — down there the only way to read a hem is to go and stand
-  // under it. The threshold has room either side of it: the two chosen sit at
-  // 0.175 and 0.030 and the next parasol up is at 0.263, so 0.20 is not
-  // balanced on a rounding.
-  let pitch = 0;
-  const hemAt = () => (jit(pitch++, 23) < 0.20 ? 'spare' : null);
+  // Nothing here is drawn off `rng`, so taking the two `jit` draws out moved
+  // nothing: the census is the same 446/333/86/27 either side of the change.
 
   // The middle terrace is the shelf people actually lay their towels on: wide
   // enough for a parasol and a pair of loungers, and one step above the water.
@@ -9793,7 +9838,7 @@ async function buildJadrija(scene) {
     // licence in either direction.
     if (t < JAD.beachTo && rng() < 0.62) {
       const s = 5.4 + rng() * 3.6;
-      parasol(t, s, surfaceY(t, s), pick(SWIM), hemAt());
+      parasol(t, s, surfaceY(t, s), pick(SWIM));
       // The pole only. The canopy is at 1.9 m and being stopped by shade you
       // are walking under is worse than walking through it.
       solid(t, s, 0.09, 0.09, 2.3);
