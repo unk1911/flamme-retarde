@@ -110,6 +110,37 @@ WHITEGOODS = (0.905, 0.900, 0.885)
 # than a glazed wall tile in life; here it also has to be whiter than one for
 # the object to exist at all.
 PORCELAIN = (0.968, 0.972, 0.978)
+# The bojler's jacket, and it is a *third* white, not either of the two above.
+#
+# Stove-enamelled steel that has been on that wall for twenty years, hanging
+# directly over the washing machine — so it is judged against WHITEGOODS from a
+# metre away and against TILE_WALL over its whole silhouette, and it must not
+# be either. Measured off the photograph against the tile beside it at the same
+# height: the machine's lid comes back 20 per cent brighter than the tile it
+# stands against, the tank only 7, and every sample down the tank is warmer than
+# every sample off the machine. That is an appliance white that has gone off,
+# which is exactly what it is. Given WHITEGOODS instead, a metre of tank and the
+# machine under it weld into one white column — which is the single thing this
+# corner cannot be allowed to read as, because the whole point of the corner is
+# that there are two objects stacked in it.
+ENAMEL_W = (0.880, 0.868, 0.840)
+# And the lonac on top of the machine, which is enamel of the other kind:
+# oxblood outside, speckled blue-grey inside, rolled black rim. Every sample of
+# the pot in the photograph is in the machine's own shadow, so the hue is the
+# photograph's (R twice G, B about G) and the value is set by what has to
+# separate: the body from the cobalt floor beyond it, the inside from the body.
+ENAMEL_POT = (0.245, 0.088, 0.070)
+ENAMEL_POT_H = (0.340, 0.155, 0.105)   # the two D-handles, catching light
+POT_IN = (0.415, 0.430, 0.460)
+# The bucket. Also read out of shadow — that side of the room has no light on
+# it at all — so this is a plain saturated blue plastic set where it separates
+# from TILE_FLOOR, which is the one thing it has to do: a bucket standing on
+# cobalt tiling at the same value is a hole in the floor.
+# Opened up once it was in the room: this corner has no light on it, the
+# bucket stands in the machine's shadow on tiling that is already blue, and at
+# the first value it was a rim on the floor and no body under it.
+BUCKET_B = (0.140, 0.300, 0.650)
+BUCKET_IN = (0.095, 0.215, 0.500)
 FRIDGE_RED = (0.720, 0.105, 0.095)  # the tall one. Half the photographs.
 STEEL = (0.640, 0.650, 0.660)
 CHROME = (0.780, 0.790, 0.800)
@@ -2661,6 +2692,132 @@ def _wc(kit, bx, ty, floor=F2, cistern="close", face="+x"):
                     floor + 0.798, floor + 0.818, r, r * 0.94, seg=12)
 
 
+def _bojler(kit, cx, cy, zb, d=0.450, h=0.900):
+    """The electric water heater over the washing machine, and its fittings.
+
+    Off the owner's own photograph of the corner, and the photograph gives one
+    of the two numbers and refuses the other.
+
+    The diameter it gives. The jacket's silhouette measures 376 px where the
+    machine's front face below it measures 568 px for a known 60 cm; the two
+    planes are 35 cm apart in depth, and closing that ratio over any camera
+    distance a 2.4 m bathroom can hold puts the tank between 44 and 47 across.
+    That is the Ø 45 jacket every domestic Croatian tank from 50 to 100 litres
+    is wound on, so 45.
+
+    The height it refuses: the crown is cropped off the top of the frame, so it
+    cannot be measured at all. What survives is the aspect. 730 px of jacket
+    are in frame; reading the cropped dome as a hemisphere off the width still
+    showing at the cut adds about 39, so 769 against 376, or 2.05 — and a
+    camera pitched down stretches the top of its own frame, so 2.05 is a
+    ceiling and not a reading. Ø 45 x 89 is the 80 litre and comes to 1.98;
+    Ø 45 x 105 is the 100 and comes to 2.33. So 45 x 90, the 80, and that
+    height is the catalogue's and not the photograph's. Said plainly because it
+    is the one number here that was not measured.
+
+    It hangs with its crown 5 cm under the ceiling, which looks wrong written
+    down and is what an installer does — the tank goes as high as the pipework
+    lets it, and the room it is really in is taller than this one's 2.40. The
+    consequence is the thing that makes the corner: 22 cm of air between the
+    dished bottom of the tank and the rim of the pot standing on the machine,
+    with the fittings and the flexi hanging down into it. That gap is the one
+    vertical the photograph does state, and it states about 23.
+
+    Cheap on purpose. The jacket is one loft of ten rings, because a bojler is a
+    cylinder with a dished bottom and a torispherical top and nothing else, and
+    everything that makes it read as a bojler rather than as a white drum is in
+    the last 3 per cent: the thermometer, the fittings hanging under the dish,
+    and the flexi dropping into the corner.
+    """
+    r = d / 2
+    # z is written as a height above the jacket's own underside, so the whole
+    # tank moves by moving `zb` and nothing has to be re-added.
+    rings = [(0.000, 0.086), (0.026, 0.148), (0.058, 0.202),
+             # The rolled rim under the jacket is the widest point on the tank
+             # and it is what the dish hangs off.
+             (0.084, r + 0.005), (0.112, r),
+             (0.886, r), (0.942, r - 0.007), (0.980, r - 0.035),
+             (0.996, r - 0.113), (1.000, r - 0.170)]
+    # 28 sides and not the 20 the rest of this file uses on a pipe: 20 puts a
+    # 7 cm flat on a Ø 45 cylinder, and the tank is looked at from a metre in a
+    # flat-shaded room, so at 20 the shading bands read as facets and the thing
+    # is a drum after all. 28 is 5 cm and the bands close up.
+    bm_loft(kit.bm(ENAMEL_W, 0.004),
+            [(zb + h * z, rr, rr, cx, cy) for z, rr in rings], seg=28)
+
+    # The rating plate low on the body, and the maker's badge beside it. Both
+    # are white stickers with printing on them and the printing is four pixels
+    # at any distance a player can stand: what goes in is the blue mark, which
+    # is the only part of either that carries at this size, and no lettering —
+    # inventing a legible brand is inventing a fact the footage cannot support.
+    zp = zb + 0.138
+    kit.span((0.935, 0.935, 0.925), cx - 0.040, cx + 0.040,
+             cy + r - 0.020, cy + r + 0.0025, zp - 0.015, zp + 0.015, bev=0.002)
+    kit.span((0.160, 0.380, 0.620), cx - 0.023, cx + 0.023,
+             cy + r + 0.0025, cy + r + 0.0060, zp - 0.006, zp + 0.006, bev=0.002)
+
+    # The thermometer, and it is the whole difference between a bojler and a
+    # white drum. Ø 9.5, which is large for a gauge and is what the photograph
+    # measures — these tanks carry a dial you are meant to read from the
+    # doorway — and it sits 72 per cent of the way up the jacket, which is
+    # where the photograph has it above the rolled rim. The needle is radial
+    # and its angle is not a reading: at this size it is three pixels of red,
+    # and a temperature is a number the picture cannot be made to say.
+    #
+    # Four discs, and the order they stand in is the whole of it. The chrome
+    # bezel is a solid disc rather than a ring, so it has to be the *back* one:
+    # built the other way round — chrome in front, face and needle behind —
+    # every part of the gauge that says what it is ends up inside the chrome,
+    # and Ø 9.5 of the one detail this object needs renders as a blank puck.
+    # Each shell is set clear of the one behind it, never flush with it.
+    zd = zb + h - 0.250
+    _lay_disc(kit, CHROME, cx, cy + r - 0.0080, zd, 0.048, 0.020, seg=24)
+    _lay_disc(kit, (0.920, 0.920, 0.905), cx, cy + r - 0.0005, zd, 0.039, 0.013,
+              seg=24)
+    kit.span((0.640, 0.100, 0.090), cx + 0.004, cx + 0.032,
+             cy + r + 0.0040, cy + r + 0.0095, zd - 0.003, zd + 0.003, bev=0.001)
+    _lay_disc(kit, DARKMETAL, cx, cy + r + 0.0110, zd, 0.008, 0.012, seg=10)
+
+    # Under the dish: the red label on the flange cover, the outlet tee, the
+    # safety valve's discharge into the wall, and the flexi.
+    kit.span((0.620, 0.090, 0.080), cx - 0.020, cx + 0.020,
+             cy + 0.170, cy + 0.186, zb + 0.038, zb + 0.052, bev=0.002)
+    bm_cylinder(kit.bm(CHROME, 0.003), cx + 0.070, cy + 0.005,
+                zb - 0.080, zb + 0.010, 0.014, 0.014, seg=8)
+    arm = bm_cylinder(kit.bm(CHROME, 0.003), 0, 0, -0.038, 0.038,
+                      0.011, 0.011, seg=8)
+    _rot_y(arm, cx + 0.108, cy + 0.005, zb - 0.045)
+    # The valve pipe goes into the wall through a plastic collar, because a pipe
+    # that stops in mid-air two centimetres off the tiling is worse than no pipe.
+    # Halfway down the 22 cm gap, which is where the photograph has the collar
+    # and is also the only height it can take: run lower and the discharge
+    # crosses the rim of the pot instead of clearing it.
+    bm_cylinder(kit.bm(STEEL, 0.003), cx + 0.090, cy - 0.040,
+                zb - 0.135, zb + 0.020, 0.012, 0.012, seg=8)
+    leg = bm_cylinder(kit.bm(STEEL, 0.003), 0, 0, -0.095, 0.095,
+                      0.012, 0.012, seg=8)
+    _rot_x(leg, cx + 0.090, cy - 0.135, zb - 0.130)
+    _lay_disc(kit, (0.900, 0.900, 0.890), cx + 0.090, cy - 0.235, zb - 0.130,
+              0.042, 0.030, seg=14)
+
+    # And the flexi, which leaves the tee, swings clear of the pot on the
+    # machine and drops down the 13 cm gap between the machine's end and the
+    # tiling, into the wall near the floor. In the photograph it loops the other
+    # way, across the front of the pot and down the far side; it cannot here,
+    # because this machine is 42 deep against that one's 60 and the loop would
+    # have to pass through the pot to do it. Same hose, same job, the side of
+    # the machine the room actually leaves room for.
+    _tube(kit.bm(STEEL, 0.003),
+          [(cx + dx, cy + dy, zb + dz) for dx, dy, dz in (
+              (0.070, -0.005, -0.060), (0.080, 0.015, -0.140),
+              (0.100, 0.050, -0.220), (0.130, 0.070, -0.310),
+              (0.160, 0.050, -0.380), (0.180, -0.010, -0.430),
+              (0.190, -0.090, -0.500), (0.190, -0.150, -0.740),
+              (0.185, -0.210, -1.040), (0.180, -0.270, -1.110),
+              (0.178, -0.300, -1.250))],
+          0.013, seg=8)
+
+
 def bathroom(kit):
     """Two forty-five by one sixty-five, a box in the north-west corner of the
     big room. Door in the east wall hard against the north side, window high in
@@ -2744,12 +2901,12 @@ def bathroom(kit):
     kit.span(CHROME, vx - 0.06, vx + 0.62, y1 - 0.20, y1 - 0.02,
              F2 + 1.16, F2 + 1.19, bev=0.004)
 
-    # The white unit, and the towel rail in front of it, against the south
-    # wall at the door end — the opposite wall, and the one run in this room
-    # with nothing else on it. It used to stand on the north wall between the
-    # basin and the door, which put a white box in the only place you could
-    # have stood to use the basin. Every `y1 - d` below now reads `y0 + d`:
-    # the same distance, measured off the other face.
+    # The washing machine, against the south wall at the door end — the
+    # opposite wall, and the one run in this room with nothing else on it. It
+    # used to stand on the north wall between the basin and the door, which put
+    # a white box in the only place you could have stood to use the basin.
+    # Every `y1 - d` below now reads `y0 + d`: the same distance, measured off
+    # the other face.
     wx = x1 - 0.72
     kit.span(WHITEGOODS, wx, wx + 0.58, y0 + 0.02, y0 + 0.44, F2 + 0.02,
              F2 + 0.86, bev=0.008)
@@ -2757,22 +2914,99 @@ def bathroom(kit):
              F2 + 0.74, F2 + 0.84, bev=0.004)
     kit.span((0.86, 0.87, 0.88), wx - 0.02, wx + 0.60, y0, y0 + 0.47,
              F2 + 0.86, F2 + 0.90, bev=0.008)
-    for c in (wx + 0.10, wx + 0.48):
-        bm_cylinder(kit.bm(CHROME, 0.002), c, y0 + 0.06, F2 + 1.10, F2 + 1.24,
-                    0.012, 0.012, seg=8)
-    kit.span(CHROME, wx + 0.08, wx + 0.50, y0 + 0.03, y0 + 0.09,
-             F2 + 1.22, F2 + 1.25, bev=0.004)
-    kit.span((0.42, 0.72, 0.46), wx + 0.12, wx + 0.30, y0 + 0.04, y0 + 0.11,
-             F2 + 0.86, F2 + 1.23, bev=0.006)
-    kit.span((0.90, 0.90, 0.88), wx + 0.32, wx + 0.48, y0 + 0.04, y0 + 0.11,
-             F2 + 0.90, F2 + 1.23, bev=0.006)
+    # The door, the dial and the display. This was a blank white box until now,
+    # and a blank white box is a cupboard: everything else in this corner is
+    # arranged around a washing machine, and the object the arrangement is
+    # about had none of the three things that say what it is. It is a front
+    # loader in the photograph — 39 cm door ring, black glass, a round program
+    # dial to the right of the machine's centre and a display to the left of
+    # it. No lettering on any of them.
+    # Both discs are shallow and the black one is the proud one. Built deep,
+    # they are a black drum on a grey collar standing 4 cm off the front of the
+    # machine, which is a porthole in a ship and not a door on an appliance:
+    # the ring is nearly flush and only the glass bulges.
+    _lay_disc(kit, (0.78, 0.79, 0.80), wx + 0.29, y0 + 0.436, F2 + 0.44,
+              0.180, 0.024, seg=24)
+    _lay_disc(kit, BLACK, wx + 0.29, y0 + 0.446, F2 + 0.44, 0.152, 0.026,
+              seg=24)
+    _lay_disc(kit, DARKMETAL, wx + 0.40, y0 + 0.462, F2 + 0.79, 0.028, 0.030,
+              seg=12)
+    kit.span(BLACK, wx + 0.08, wx + 0.24, y0 + 0.452, y0 + 0.468,
+             F2 + 0.775, F2 + 0.805, bev=0.003)
 
-    # There used to be two things on the floor, on the principle that nobody's
-    # bathroom floor is clear. One was a bucket, and it was standing exactly
-    # where the lavatory is, so it read as a teal drum sat in the pan. The
-    # other was a pink bottle in the middle of the open floor with nothing
-    # near it, which is not clutter, it is litter. The cobalt tiling is better
-    # off bare.
+    # The towel rail has come off the top of the machine and gone on the wall
+    # beside it, which is where a towel rail is. It stood on the machine's back
+    # edge with both towels hanging down the tiling behind it — and the top of
+    # this machine is not free space, it is where the lonac lives. Same rail,
+    # same two towels, 42 cm of the south wall between the shower and the
+    # machine, and now you can reach them without leaning over a hot lid.
+    tx = x0 + 1.21
+    for c in (tx - 0.19, tx + 0.19):
+        leg = bm_cylinder(kit.bm(CHROME, 0.002), 0, 0, -0.045, 0.045,
+                          0.010, 0.010, seg=8)
+        _rot_x(leg, c, y0 + 0.050, F2 + 1.10)
+    kit.span(CHROME, tx - 0.21, tx + 0.21, y0 + 0.085, y0 + 0.115,
+             F2 + 1.085, F2 + 1.115, bev=0.004)
+    kit.span((0.42, 0.72, 0.46), tx - 0.16, tx + 0.02, y0 + 0.070, y0 + 0.135,
+             F2 + 0.70, F2 + 1.10, bev=0.006)
+    kit.span((0.90, 0.90, 0.88), tx + 0.04, tx + 0.18, y0 + 0.070, y0 + 0.135,
+             F2 + 0.74, F2 + 1.10, bev=0.006)
+
+    # And what the room is actually for, which is the corner in the owner's
+    # photograph: the bojler over the machine, the enamel lonac on it, and the
+    # bucket on the floor beside it.
+    #
+    # The tank hangs on the south wall hard into the east corner, 3 cm off the
+    # tiling behind it and 4 cm off the tiling beside it — a cylinder is tangent
+    # to a wall rather than parallel with one, so rule 5 has nothing to bite on
+    # here, and there are no brackets because there are none to see: the plate
+    # it hangs on is behind the tank.
+    _bojler(kit, x1 - 0.28, y0 + 0.27, F2 + 1.45)
+
+    # The pot is the third object in the photograph and the most characterful
+    # thing in the frame — an enamel lonac parked on the washing machine, which
+    # is the detail that makes the room somebody's rather than a bathroom.
+    #
+    # It is nearly as wide as the bojler and that is the measurement, not an
+    # impression: the pot and the tank stand within 5 cm of the same depth, so
+    # their silhouettes can be compared straight off the photograph without
+    # knowing where the camera was, and 370 px against the tank's 376 puts the
+    # pot at 43 or 44 across and about 36 tall. It cannot have all of that
+    # here. This machine is a slim 42-deep front loader — which is the machine
+    # a 1.65 m bathroom takes, and it is not the 60-deep one in the picture —
+    # so a 43 pot would stand over both its edges. Held to Ø 40 at the rim,
+    # Ø 37 at the base, 35 tall: forty litres, the largest that will sit on the
+    # lid it has to sit on, and it still fills the machine the way it does in
+    # the photograph.
+    #
+    # Rolled black rim, speckled blue-grey inside, two D-handles. No lid: the
+    # grey-blue disc across the top of it in the picture is the *inside*, which
+    # is why this is built as a vessel and not as a drum.
+    px, py = wx + 0.29, y0 + 0.22
+    _vessel(kit, px, py, F2 + 0.90, F2 + 1.25, 0.185, 0.200, 0.010,
+            ENAMEL_POT, POT_IN, rim_c=DARKMETAL, seg=18)
+    for s in (1, -1):
+        ox = px + s * 0.186
+        for z0h, z1h in ((F2 + 1.196, F2 + 1.212), (F2 + 1.086, F2 + 1.102)):
+            kit.span(ENAMEL_POT_H, ox, ox + s * 0.052,
+                     py - 0.012, py + 0.012, z0h, z1h, bev=0.003)
+        kit.span(ENAMEL_POT_H, ox + s * 0.040, ox + s * 0.052,
+                 py - 0.012, py + 0.012, F2 + 1.086, F2 + 1.212, bev=0.003)
+
+    # The bucket, which is the other thing he asked for. It went in once before
+    # and came out again, and the reason was placement and not the bucket: it
+    # stood exactly where the lavatory is and read as a teal drum sat in the
+    # pan. Here it is where it is in the picture — on the floor at the end of
+    # the machine, tucked to the wall, in the one stretch of cobalt you can see
+    # from the door. Ten litres: 29 across the mouth, 24 across the base, 28
+    # tall, which is the standard size and is not measured, because the one in
+    # the photograph is tipped over a mop head and cannot be.
+    _vessel(kit, x0 + 1.45, y0 + 0.19, F2 + 0.02, F2 + 0.30, 0.120, 0.145,
+            0.012, BUCKET_B, BUCKET_IN, seg=16)
+    for s in (1, -1):
+        kit.span(BUCKET_B, x0 + 1.45 + s * 0.128, x0 + 1.45 + s * 0.156,
+                 y0 + 0.165, y0 + 0.215, F2 + 0.235, F2 + 0.290, bev=0.003)
+
     ceiling_light(kit, (x0 + x1) / 2, (y0 + y1) / 2, dome=True)
 
 
@@ -2782,6 +3016,112 @@ def _lay_disc(kit, colour, cx, cy, cz, r, t, seg=18, bev=0.003):
     for v in vs:
         x, y, z = v.co
         v.co = (cx + x, cy + z, cz + y)
+
+
+def _vessel(kit, cx, cy, z0, z1, r0, r1, wall, out_c, in_c,
+            rim_c=None, floor=None, seg=16, bev=0.003):
+    """An open vessel — a bucket, a cooking pot — with an inside you can see.
+
+    Rule 8, and the reason this needs a builder of its own: a truncated cone
+    with a cap on it is a drum, and the only view anybody will ever have of a
+    bucket standing on a bathroom floor is from standing height, looking down
+    into it. So the inner wall and the bottom are not detail, they are the
+    object. The house's shader is `FrontSide`, so an inward-facing surface that
+    is not *wound* inward is not there at all.
+
+    Which is also why these three shells are adopted rather than dropped in the
+    colour buckets: `Kit.parts()` runs `recalc_face_normals` over each bucket,
+    and told to work out which way is out of an open cone it turns the inner
+    wall inside out again. Same escape hatch the modifier objects use, and the
+    bevel is put on by hand because that is what the bucket would have done.
+
+    The inside is a shade darker than the outside on purpose. Ambient in this
+    shader is hemispheric on the normal alone, with no bounce: the inner wall of
+    a bucket is vertical and so is the outer, so identical albedo renders
+    identically and the vessel comes back as a solid blue lump with a ring drawn
+    on it. Three per cent of value is the whole difference between a bucket and
+    a bollard.
+    """
+    fz = z0 + (wall * 1.6 if floor is None else floor)
+    at = lambda z: r0 + (r1 - r0) * (z - z0) / (z1 - z0)
+
+    def ring(bm, z, r):
+        return [bm.verts.new((cx + math.cos(TAU * i / seg) * r,
+                              cy + math.sin(TAU * i / seg) * r, z))
+                for i in range(seg)]
+
+    def adopt(bm, colour, name):
+        ob = new_object(bm, "%s_%s" % (kit.name, name), recalc=False)
+        if bev > 0:
+            bevel(ob, bev, segments=1, angle=35.0)
+        kit.adopt(ob, colour)
+
+    # Outside, and the base it stands on. Rings run anticlockwise seen from
+    # above, so `bm_prism`'s winding is the winding here: a side quad taken
+    # bottom-i, bottom-j, top-j, top-i faces out, and a cap taken reversed
+    # faces down.
+    bo = bmesh.new()
+    ob, ot = ring(bo, z0, r0), ring(bo, z1, r1)
+    for i in range(seg):
+        j = (i + 1) % seg
+        bo.faces.new((ob[i], ob[j], ot[j], ot[i]))
+    bo.faces.new(tuple(reversed(ob)))
+    adopt(bo, out_c, "vessel_out")
+
+    # The rim, which is its own colour on the pot: an enamel lonac has a rolled
+    # black edge and it is the line that says the thing is open.
+    br = bmesh.new()
+    ro, ri = ring(br, z1, r1), ring(br, z1, r1 - wall)
+    for i in range(seg):
+        j = (i + 1) % seg
+        br.faces.new((ro[i], ro[j], ri[j], ri[i]))
+    adopt(br, rim_c or out_c, "vessel_rim")
+
+    # And the inside: the same cone wound the other way, and a bottom.
+    bi = bmesh.new()
+    it, ib = ring(bi, z1, r1 - wall), ring(bi, fz, at(fz) - wall)
+    for i in range(seg):
+        j = (i + 1) % seg
+        bi.faces.new((it[i], it[j], ib[j], ib[i]))
+    bi.faces.new(tuple(ib))
+    adopt(bi, in_c, "vessel_in")
+
+
+def _tube(bm, pts, r, seg=8):
+    """Sweep a round section along a polyline — a hose, a flex, a cable.
+
+    `bm_cylinder` builds along Z and cannot be tilted, and the two rotations
+    this file already has lay one down along X or along Y. The flexi off the
+    bottom of a bojler is none of those: it leaves the fitting downwards, swings
+    forward off the machine, and drops into the corner. Framing is a cross
+    product against whichever axis the run is least parallel to, which would
+    twist a textured tube along its length and cannot be seen on a round one.
+    """
+    rings = []
+    for i, p in enumerate(pts):
+        a, b = pts[max(i - 1, 0)], pts[min(i + 1, len(pts) - 1)]
+        d = [b[k] - a[k] for k in range(3)]
+        n = math.sqrt(sum(v * v for v in d)) or 1.0
+        d = [v / n for v in d]
+        ref = (0.0, 0.0, 1.0) if abs(d[2]) < 0.9 else (1.0, 0.0, 0.0)
+        u = [d[1] * ref[2] - d[2] * ref[1], d[2] * ref[0] - d[0] * ref[2],
+             d[0] * ref[1] - d[1] * ref[0]]
+        n = math.sqrt(sum(v * v for v in u)) or 1.0
+        u = [v / n for v in u]
+        v = [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2],
+             d[0] * u[1] - d[1] * u[0]]
+        rings.append([bm.verts.new(tuple(
+            p[k] + (math.cos(TAU * j / seg) * u[k]
+                    + math.sin(TAU * j / seg) * v[k]) * r for k in range(3)))
+            for j in range(seg)])
+    bm.verts.ensure_lookup_table()
+    for i in range(len(rings) - 1):
+        for j in range(seg):
+            k = (j + 1) % seg
+            bm.faces.new((rings[i][j], rings[i][k],
+                          rings[i + 1][k], rings[i + 1][j]))
+    bm.faces.new(tuple(rings[0]))
+    bm.faces.new(tuple(reversed(rings[-1])))
 
 
 def _plate_bm(bm, poly, y0, y1):
