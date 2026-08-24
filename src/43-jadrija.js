@@ -1153,6 +1153,11 @@ async function buildJadrija(scene) {
   // whole of the difference from `gable`, and everything hung on one of them
   // needs the same sign.
   let firstGable = null;
+  // And every front-row run's west end, in laying order — `firstGable` is the
+  // first of them. Kept from 24 Aug because there is a second thing to hang on
+  // a wall of exactly that kind now: the JadriJa word off `1000150398`, which
+  // is painted on one of these and is not on the one the gull is on.
+  const frontGables = [];
   // Every back row run's west end, in the order they are laid. The back row
   // stands with the pine wood and the parked cars against it, and one of these
   // is where the fish went — see `fishGable` below, which picks the one nearest
@@ -1596,10 +1601,13 @@ async function buildJadrija(scene) {
     // recorded here rather than measured afterwards because a run's ends come
     // out of `rng` — `t0` and `n` are drawn in the layout loop — so the only
     // place that knows where a wall actually stands is the call that built it.
+    // `wash` rides along because one of the things now hung on a wall of this
+    // kind cares what colour the wall is: see `wordGable`.
     const nearFace = { t: T0 - 0.05, o: -1, front, back,
-      floor: y0 + JAD.plinth, eave };
+      floor: y0 + JAD.plinth, eave, wash: washRun(runIx) };
     if (front === JAD.rowA) {
       if (!firstGable) firstGable = nearFace;
+      frontGables.push(nearFace);
       // The screen wall goes between the run before this one and this one, and
       // "this one" is the run with the open kabina in it. Both walls are needed
       // and only the second call knows both, so it is taken here.
@@ -7486,6 +7494,249 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * JadriJa, hand-cut, across the end of a block.
+   *
+   * `1000150398`, 23 Aug 2026 at 18:47:43: the word painted in heavy black
+   * across almost the whole width of a white rendered end wall standing on the
+   * concrete at the water's edge, with the caffe bar's blue-framed passage
+   * round its corner to the east (`1000150396`, a minute earlier). The `DADO`
+   * note two thousand lines up already calls the blue-dado run "the most
+   * recognisable wall in the batch after the JadriJa gable"; this is that
+   * gable, and until now it was the one thing in that batch with nothing built
+   * for it.
+   *
+   * IT IS NOT A TYPEFACE and it is not set as one. The seven glyphs are
+   * polygons traced off the photograph — 20-column occupancy grids over each
+   * letter, which give a cap height of 220 px, an x-height 0.72 of it, stems a
+   * fifth of a cap wide, and a word 4.94 cap heights long. What makes it a
+   * hand-cut stencil rather than a condensed grotesque is where the strokes
+   * are CUT: the d's ascender is chopped by a shallow diagonal falling to the
+   * right, the a's counter is one bent slot that runs out through the left
+   * side of the letter, the r's arm ends in a stub with a square notch under
+   * it, and BOTH J's are capitals with the tail turning up — JadriJa, which is
+   * how it is painted and how this file has been spelling it since the render
+   * pass. Set in any real face it would be a different wall.
+   *
+   * Two things about the real one are not reproduced, and both are size. That
+   * block is about 7 m wide and 3 m tall and the word crosses 85% of it at a
+   * cap height of half the wall. A kabina gable here is 2.90 m of `s` and
+   * 2.44 m of render, so the word is fitted to the wall it is on and comes out
+   * 0.46 m in the cap; and it hangs at reading height rather than at the
+   * photograph's sixth of a wall height off the ground, because that low on a
+   * wall this short it would be behind whoever is sitting against it — which
+   * is what is happening in the photograph.
+   */
+  function jadrijaMural() {
+    const W = 1024, H = 256;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+
+    // The date on the photograph, as `gullMural` uses the date of the fire:
+    // a fixed table, so the wall is the same wall every time the page loads.
+    const SEED = 20260823;
+    let seed = SEED;
+    const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff)
+      / 0x7fffffff;
+    const reseed = () => { seed = SEED; };
+
+    // The em. `CAP` is the cap height in canvas pixels and `BASE` the
+    // baseline; an x-height letter's top is `XH` of a cap below the cap line.
+    const CAP = 190, BASE = 222, LEFT = 42, XH = 0.28;
+
+    /**
+     * The letters, in a unit em: x across the letter's own width, y from the
+     * cap line (0) to the baseline (1), with `x: 1` meaning the glyph is drawn
+     * between the x-height line and the baseline instead. `w` is the letter's
+     * width in cap heights. `ink` contours are filled and `holes` are cut back
+     * out of them, which is what a counter in a stencil this heavy is — the
+     * a's is not a bowl, it is a slot.
+     */
+    const G = {
+      J: { w: 0.605,
+        ink: [[[0.60, 0], [1, 0], [1, 1], [0, 1], [0, 0.61], [0.40, 0.61],
+          [0.40, 0.81], [0.60, 0.81]]], holes: [] },
+      d: { w: 0.591,
+        ink: [[[0.60, 0], [1, 0.12], [1, 1], [0, 1], [0, 0.33], [0.20, 0.24],
+          [0.60, 0.24]]],
+        holes: [[[0.505, 0.45], [0.615, 0.455], [0.605, 0.80], [0.495, 0.795]]] },
+      i: { w: 0.242,
+        ink: [[[0, 0], [1, 0], [1, 0.165], [0, 0.165]],
+          [[0.03, 0.275], [0.97, 0.275], [0.97, 1], [0.03, 1]]], holes: [] },
+      a: { w: 0.513, x: 1,
+        ink: [[[0.30, 0], [1, 0], [1, 1], [0, 1], [0, 0.15]]],
+        holes: [[[0.35, 0.105], [0.50, 0.105], [0.50, 0.40], [0.05, 0.655],
+          [0, 0.655], [0, 0.53], [0.30, 0.39], [0.35, 0.36]],
+        [[0.355, 0.665], [0.50, 0.68], [0.49, 0.875], [0.35, 0.86]]] },
+      r: { w: 0.480, x: 1,
+        ink: [[[0, 0], [0.80, 0], [1, 0.10], [1, 0.40], [0.60, 0.40],
+          [0.60, 0.30], [0.42, 0.30], [0.42, 1], [0, 1]]], holes: [] },
+    };
+    // The word, and the gap AFTER each letter in cap heights. The gaps are
+    // measured between the ink of one letter and the next on the photograph
+    // and they are not even — 0.17 between the i and the second J against 0.30
+    // between the a and the d — because nobody stepped a stencil along a chalk
+    // line, they eyed it.
+    const WORD = [['J', 0.21], ['a', 0.30], ['d', 0.25], ['r', 0.21],
+      ['i', 0.17], ['J', 0.25], ['a', 0]];
+    // And how far each letter's foot sits off the common baseline, in cap
+    // heights, with what it was cut to as a fraction of the nominal cap. The
+    // first J is a thirtieth of a cap taller than the rest and stands a
+    // thirtieth lower; the d and the r are a hundredth short. Straighten these
+    // and the word snaps back into being type.
+    const DRIFT = [[0.030, 1.02], [0.012, 1.00], [-0.006, 0.99],
+      [-0.004, 0.99], [-0.004, 1.00], [0.006, 1.00], [0.004, 0.99]];
+
+    /**
+     * One contour as a canvas path, with the edge broken up on the way in.
+     *
+     * A stencil cut out of card with a knife and painted through with a wide
+     * brush has no straight edge at the scale one canvas pixel is worth here
+     * (about 2.5 mm on the built wall). Every edge is walked at roughly a
+     * thirteenth of a cap and pushed off the line by up to a hundredth of one
+     * along the edge's own normal, so what comes out has a cut edge rather
+     * than a vector one. `rnd` is reseeded before each pass, so the underpaint
+     * wobbles the way the top coat does and reads as one cut and two coats
+     * instead of as two different letters.
+     */
+    const trace = (pts, ox, oy, sx, sy) => {
+      g.beginPath();
+      const n = pts.length;
+      for (let i = 0; i < n; i++) {
+        const a = pts[i], b = pts[(i + 1) % n];
+        const px = ox + a[0] * sx, py = oy + a[1] * sy;
+        const qx = ox + b[0] * sx, qy = oy + b[1] * sy;
+        const len = Math.hypot(qx - px, qy - py) || 1;
+        const nx = -(qy - py) / len, ny = (qx - px) / len;
+        const k = Math.max(1, Math.round(len / (CAP * 0.075)));
+        for (let j = 0; j < k; j++) {
+          const u = j / k, w = (rnd() - 0.5) * CAP * 0.012;
+          const x = px + (qx - px) * u + nx * w;
+          const y = py + (qy - py) * u + ny * w;
+          if (i === 0 && j === 0) g.moveTo(x, y); else g.lineTo(x, y);
+        }
+      }
+      g.closePath();
+    };
+
+    /**
+     * Walk the word and hand every contour to `fn` in canvas pixels.
+     *
+     * `dx`, `dy` and `k` shift and swell the whole word, which is how the
+     * underpaint is laid: the same letters a couple of millimetres down and to
+     * the right and two per cent fat, so the first coat shows along the bottom
+     * and the right of every stroke the way a second coat brushed on by hand
+     * leaves it.
+     */
+    const lay = (which, fn, dx = 0, dy = 0, k = 1) => {
+      let pen = LEFT;
+      for (let n = 0; n < WORD.length; n++) {
+        const key = WORD[n][0], gap = WORD[n][1], gl = G[key];
+        const drop = DRIFT[n][0], scale = DRIFT[n][1];
+        const cap = CAP * scale * k;
+        const top = BASE + drop * CAP - cap * (gl.x ? 1 - XH : 1);
+        const sy = gl.x ? cap * (1 - XH) : cap;
+        const sx = gl.w * cap;
+        for (const cont of gl[which]) {
+          fn(cont, pen + dx - sx * (k - 1) * 0.5, top + dy, sx, sy);
+        }
+        pen += gl.w * CAP + gap * CAP;
+      }
+    };
+
+    // ── the paint ──────────────────────────────────────────────────────────
+    //
+    // Not black. Sampled off `1000150398`, the letters run 27/25/23 against a
+    // render at 156/156/154 in the same evening light — a paint about a
+    // thirtieth of the wall's reflectance, warm rather than blue. These are
+    // the sRGB the canvas takes and the shader decodes, and `#312e28` lands at
+    // about 3% linear, which is where a matt black paint actually sits; the
+    // gull's own primaries are `#37373a` for the same reason.
+    const COAT = '#312e28';
+    const UNDER = '#403b33';
+
+    reseed();
+    g.fillStyle = UNDER;
+    g.globalAlpha = 0.62;
+    lay('ink', (cont, ox, oy, sx, sy) => {
+      trace(cont, ox, oy, sx, sy); g.fill();
+    }, CAP * 0.014, CAP * 0.011, 1.018);
+
+    reseed();
+    g.globalAlpha = 1;
+    g.fillStyle = COAT;
+    lay('ink', (cont, ox, oy, sx, sy) => {
+      trace(cont, ox, oy, sx, sy); g.fill();
+    });
+
+    // The bleed. Paint brushed through a stencil onto float-finished render
+    // wicks a few millimetres into the grain past the card, and that thin
+    // fringe is most of what says "painted on" rather than "printed and stuck
+    // up". Laid before the counters are cut and then put back round them,
+    // because a counter fills in at its edges exactly as the outside bleeds
+    // out.
+    //
+    // Narrow and fairly dark, and that is the correction. The first cut was a
+    // seventh of a cap at alpha 0.20, and a wide half-transparent rim of black
+    // over a white wall is not a bleed, it is a light grey KEYLINE — it drew
+    // the outline of every letter and the word came out looking like seven
+    // stickers. Three pixels at 0.34 softens the cut edge and draws nothing.
+    reseed();
+    g.strokeStyle = 'rgba(49, 46, 40, 0.34)';
+    g.lineWidth = CAP * 0.016;
+    g.lineJoin = 'round';
+    lay('ink', (cont, ox, oy, sx, sy) => {
+      trace(cont, ox, oy, sx, sy); g.stroke();
+    });
+
+    reseed();
+    g.globalCompositeOperation = 'destination-out';
+    lay('holes', (cont, ox, oy, sx, sy) => {
+      trace(cont, ox, oy, sx, sy); g.fill();
+    });
+    g.globalCompositeOperation = 'source-over';
+    reseed();
+    g.lineWidth = CAP * 0.012;
+    lay('holes', (cont, ox, oy, sx, sy) => {
+      trace(cont, ox, oy, sx, sy); g.stroke();
+    });
+
+    // ── and the wall back over the top of it ───────────────────────────────
+    //
+    // Two ways, and they do different jobs. `destination-out` takes the paint
+    // off in patches, so the render's own colour and the render's own light
+    // come through the letters where the coat has chalked away — the same
+    // trick the fish ends on. `source-atop` then lays the grey staining that
+    // runs down this wall ACROSS the letters only and never on the bare render
+    // either side of them, because the render either side is not this
+    // texture's to paint: it is the kabina's, with the kabina's light on it.
+    g.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 140; i++) {
+      const x = rnd() * W, y = rnd() * H;
+      g.globalAlpha = 0.03 + rnd() * 0.10;
+      g.beginPath(); g.arc(x, y, 1.2 + rnd() * 4.5, 0, Math.PI * 2); g.fill();
+    }
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = 'source-atop';
+    for (let i = 0; i < 14; i++) {
+      const x = rnd() * W, y = rnd() * H;
+      g.globalAlpha = 0.04 + rnd() * 0.07;
+      g.fillStyle = rnd() < 0.5 ? '#8c8a82' : '#6d6a60';
+      g.beginPath();
+      g.ellipse(x, y, 10 + rnd() * 44, 6 + rnd() * 16,
+        rnd() * Math.PI, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = 'source-over';
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    return tex;
+  }
+
+  /**
    * And hanging it: a quad thirty millimetres off the render, lit like
    * everything else and transparent everywhere the brush did not go.
    *
@@ -7500,13 +7751,21 @@ async function buildJadrija(scene) {
    * Both murals on this shore hang off this one function now. The fish used to
    * build its own quad against the sanitary block's render with the same eight
    * lines written out again, which is how the two of them drifted apart.
+   *
+   * `off` is that clearance, and it is a parameter from 24 Aug because the
+   * JadriJa word does not get to argue its way out of rule 5 the way these two
+   * did. Their case is that a soft-edged fresco with no straight side in it
+   * hides three centimetres of parallax; a word in flat black with hard
+   * vertical stems does not, and if it flickers against the render the whole
+   * wall is gone. It takes the rule's 0.105 m and the fresco keeps its 0.030.
    */
-  function endMural(gb, tex, mw = 1.90, aspect = 592 / 1024, lift = 1.46) {
+  function endMural(gb, tex, mw = 1.90, aspect = 592 / 1024, lift = 1.46,
+    off = 0.030) {
     const sc = (gb.front + gb.back) * 0.5;
     const mh = mw * aspect;
     const yc = gb.floor + lift;
     const st = at(gb.t);
-    const p = W(gb.t + 0.030 * gb.o, sc, yc);
+    const p = W(gb.t + off * gb.o, sc, yc);
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(mw, mh),
       solidMaterial(0xffffff, {
         spec: 0.02, vcol: false, transparent: true, depthWrite: false,
@@ -7623,6 +7882,50 @@ async function buildJadrija(scene) {
       (Math.abs(g.t - firstGable.t) < Math.abs(a.t - firstGable.t) ? g : a))
     : (backGables[0] || null);
   const fish = fishGable ? endMural(fishGable, fishMural(), 1.55, 1, 1.30) : null;
+
+  // And the word, on the end wall it is painted on.
+  //
+  // WHAT THE FOOTAGE SETTLES, and it settles a good deal. `1000150398` is the
+  // west end of a front-row block: a flat-roofed white rendered gable standing
+  // on the concrete with the sea on your left, seen dead on by somebody
+  // walking the promenade east — the same reading of the same kind of wall
+  // that put the gull on `firstGable`, and the shadows agree, because at
+  // 18:47 CEST on 23 August the sun bears 283 degrees and that wall is lit
+  // frontally. Past its far corner is a blue-framed passage through the block
+  // with a green-shuttered CAFFE BAR behind it (`1000150396`, a minute
+  // earlier), and the wall itself is white limewash.
+  //
+  // WHAT IT DOES NOT SETTLE is where along the shore that block stands: the
+  // batch carries no GPS, and rule 12 does not let a photograph be turned into
+  // an arc length. So this is a PLACEMENT and is said plainly as one.
+  //
+  // The two clues that survive disagree, and the disagreement is worth the
+  // paragraph. The cafe puts the wall next to Caffe TRAMPULIN, t 467.6; the
+  // colour puts it on a run washed `WASH[0]`, which this file has been
+  // labelling "limewash — the JadriJa run" since the render pass and is
+  // therefore its own recorded identification of this exact wall. They cannot
+  // both be had: the run at the cafe is `WASH[2]`, cream, and the run that
+  // ends nearest the cafe on the west is the one carrying the sky-blue dado —
+  // which is the OTHER wall in the batch, the one the `DADO` note calls "the
+  // most recognisable wall in the batch after the JadriJa gable". Hanging the
+  // word there would have made the file contradict itself in two places at
+  // once, and it did, for one build; the screenshot is what caught it.
+  //
+  // So the colour wins. It goes on the first front-row run washed `WASH[0]`
+  // that is not `firstGable`'s — the gull's run is limewash too — and if the
+  // layout ever comes out without a second one it falls back to any front-row
+  // gable with no dado on it. Which run that is remains a number this file can
+  // only find and never choose, exactly as the fish's is.
+  //
+  // 2.50 m of a 2.90 m gable leaves 0.20 m of render either side, which is
+  // about what the photograph leaves, and the quad is 0.105 m proud rather
+  // than the fresco's 0.030 — see `endMural`.
+  const notGull = frontGables.filter((gb) => gb !== firstGable);
+  const wordGable = notGull.find((gb) => gb.wash === 0)
+    || notGull.find((gb) => !DADO[gb.wash][3]) || null;
+  const word = wordGable
+    ? endMural(wordGable, jadrijaMural(), 2.50, 256 / 1024, 1.38, 0.105)
+    : null;
 
   // ── the bead curtain ───────────────────────────────────────────────────────
   //
@@ -20319,8 +20622,14 @@ async function buildJadrija(scene) {
     gables: () => ({
       first: firstGable && { t: +firstGable.t.toFixed(2), o: firstGable.o,
         front: firstGable.front, back: firstGable.back, floor: +firstGable.floor.toFixed(2) },
+      front: frontGables.map((g, i) => ({ i, t: +g.t.toFixed(2), o: g.o,
+        front: g.front, back: g.back, floor: +g.floor.toFixed(2),
+        wash: g.wash, dado: !!DADO[g.wash][3] })),
       back: backGables.map((g, i) => ({ i, t: +g.t.toFixed(2), o: g.o,
         front: g.front, back: g.back, floor: +g.floor.toFixed(2) })) }),
+    /** Debug: and the JadriJa word, which hangs off the same function again. */
+    word: () => word && { at: word.at.map((v) => +v.toFixed(2)),
+      p: word.mesh.position.toArray().map((v) => +v.toFixed(2)) },
     /** Debug: and the fish, which hangs off the same function on the wood side. */
     fish: () => fish && { at: fish.at.map((v) => +v.toFixed(2)),
       p: fish.mesh.position.toArray().map((v) => +v.toFixed(2)) },

@@ -1272,6 +1272,20 @@ function buildAudio() {
     root: 41.203,        // E1, and everything below is semitones off it
     gain: 0.50,
     duck: 0.86,          // how far under the beat the beach and the cicadas go
+    // The recording's own beat, measured off the onset envelope in
+    // tools/cut_field.py: 141.49 bpm against this kit's 139.53. Played at
+    // `beat / srcBeat` the clip runs at the tempo her boot is stamping at, and
+    // the whole argument above about `FIRE_DUR` and exact halves survives the
+    // change of instrument. It costs 24 cents of pitch over 28 seconds, which
+    // is a quarter of what a DJ's fader has under its detent.
+    srcBeat: 0.42406,
+    // And the make-up on the sample, +4.33 dB. The file cannot ship at the
+    // synth's own -14.23 dBFS because this material's crest factor is 17.5 dB
+    // and it would clip; it ships at -18.03, decodes at -18.56 once the
+    // encoder's lowpass has had the top off it, and this puts it back. The
+    // number is measured by `cut_cue`, which decodes the mp3 it just wrote and
+    // shouts if a re-cut moves it away from what is written here.
+    samp: 1.648,
   };
 
   // One sixteenth per character, sixteen to the bar, two bars. `x` is a hit and
@@ -1287,16 +1301,43 @@ function buildAudio() {
   const FIRE_N = { 0: 0, 3: 3, 5: 5, 6: 6, 7: 7, a: 10, c: 12 };
   const FIRE_STEPS = 32;
 
-  let fireBus = null, fireCurve = null;
+  let fireBus = null, fireCurve = null, fireEye = null;
   let fireOn = false, fireHold = 0, fireAt = 0, fireStep = 0, fireLevel = 0;
+  // The recording, and the one playhead it is ever on. `fireSrc` non-null is
+  // also the flag that says the kit below is not playing this turn.
+  let fireBuf = null, fireSrc = null;
 
   const fireHz = (semi) => FIRE.root * Math.pow(2, semi / 12);
+
+  /**
+   * Ask for the clip long before anybody wants to hear it.
+   *
+   * Called off `shore` — i.e. from the moment Jadrija is within earshot at all,
+   * which is 900 m and several minutes before she could possibly turn. The
+   * lesson is `beadWarm`'s and `radioTune`'s: a decode that starts when the
+   * sound is wanted is a sound that is missing the first time it is wanted, and
+   * this is the one moment in the game there is no second chance at.
+   */
+  function fireWarm() { sampleLoad('firestarter', (b) => { fireBuf = b; }); }
 
   function fireInit() {
     if (fireBus) return;
     fireBus = ctx.createGain();
     fireBus.gain.value = 0.0001;
     fireBus.connect(master);
+    // And a tap on it, for the headless test and for nothing else.
+    //
+    // tools/shoot.mjs launches Chrome with `--autoplay-policy=
+    // no-user-gesture-required` and its comment says why: without it the
+    // context stays suspended, its clock never advances, and a test reads
+    // zeros and passes for the wrong reason. The inverse trap is just as easy —
+    // asserting on `fireBus.gain.value` proves that a ramp was SCHEDULED, not
+    // that a sample was ever computed. This is 2 048 real output samples off
+    // the bus, and `fireStats` reports their RMS, so the assertion can be that
+    // sound came out.
+    fireEye = ctx.createAnalyser();
+    fireEye.fftSize = 2048;
+    fireBus.connect(fireEye);
     // A soft clipper for the bass, and the reason the bass has one at all: a
     // sawtooth through a resonant filter is a synthesiser, and a sawtooth
     // through a resonant filter through a tanh is a fuzz pedal. The curve is
@@ -1497,10 +1538,42 @@ function buildAudio() {
     if (fireOn) return;
     fireOn = true;
     fireInit();
+    fireWarm();
     const t = ctx.currentTime;
     fireBus.gain.cancelScheduledValues(t);
     fireBus.gain.setValueAtTime(0.0001, t);
     fireBus.gain.exponentialRampToValueAtTime(FIRE.gain * fireLevel, t + 0.10);
+    // The recording if it has landed, and the kit if it has not.
+    //
+    // The kit is KEPT, and not as sentiment. `sampleLoad` fails silently by
+    // design — a build with the clip cut out of the payload, a decoder that
+    // will not take an 80 kbps mono mp3, a context that went away — and the
+    // one thing that must not happen on any of those paths is that the turn
+    // happens in silence. It is also simply not decoded yet the first few
+    // seconds of a session. The ćuk settled this argument already and the note
+    // on `squeak` says how it came out: the first one of the session is
+    // synthesised and nobody has ever noticed.
+    //
+    // Everything downstream is identical either way. The clip goes into
+    // `fireBus` exactly where the kit's sixteen note gains go, at a level
+    // measured to match theirs, so the distance roll-off in `fireTick`, the
+    // duck on the beach and the 0.45 s fade in `fireStop` all work on it
+    // without knowing which of the two they have.
+    if (fireBuf) {
+      fireSrc = ctx.createBufferSource();
+      fireSrc.buffer = fireBuf;
+      fireSrc.playbackRate.value = FIRE.beat / FIRE.srcBeat;
+      const g = ctx.createGain();
+      g.gain.value = FIRE.samp;
+      fireSrc.connect(g).connect(fireBus);
+      // No offset and no loop. The clip was cut with `FIRE.lead` of its own in
+      // front of the downbeat, so starting it here — on the frame the flare
+      // clip starts — is what puts the record's downbeat under her first stamp.
+      fireSrc.start(t);
+      fireAt = t + FIRE.lead;
+      fireStep = 0;
+      return;
+    }
     fireRiser(t, FIRE.lead);
     // The crash on the downbeat, and it is the one place a long bright noise
     // tail is right: it covers the seam between the riser and the first bar.
@@ -1519,6 +1592,13 @@ function buildAudio() {
       fireBus.gain.setValueAtTime(Math.max(0.0001, fireBus.gain.value), t);
       fireBus.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
     }
+    // Stopped after the fade rather than on it, and dropped either way. A
+    // BufferSource cannot be started twice, so holding on to a stopped one is
+    // holding on to a turn that can never happen again.
+    if (fireSrc) {
+      try { fireSrc.stop(t + 0.50); } catch (e) { /* already done */ }
+      fireSrc = null;
+    }
     if (bedDuck) bedDuck.gain.setTargetAtTime(1, t, 1.1);
   }
 
@@ -1529,6 +1609,10 @@ function buildAudio() {
     if (fireHold <= 0) { fireStop(); return; }
     fireBus.gain.setTargetAtTime(FIRE.gain * fireLevel, t, 0.18);
     if (bedDuck) bedDuck.gain.setTargetAtTime(1 - FIRE.duck * fireLevel, t, 0.30);
+    // The level and the duck are the bus's and belong to both; the look-ahead
+    // below is the sequencer's and belongs to the kit alone. A recording has
+    // its own clock in it.
+    if (fireSrc) return;
     const step = FIRE.beat / 4;
     // Frames the game dropped are notes that are now in the past, and a note
     // scheduled in the past does not get skipped, it plays immediately — so a
@@ -1581,6 +1665,13 @@ function buildAudio() {
    * of the recording made specially for the same job because the two were
    * measured against each other and the video won by thirteen decibels in the
    * band voices live in. See the note in `tools/cut_field.py`.
+   *
+   * There is a seventh clip in the payload and it is not one of these. The
+   * firestarter cue, 28.3 s at 270 KB, comes out of the same tool by a
+   * different door — `cut_cue` rather than `cut` — because it is played once
+   * under a moment and stopped, and nothing about seams, insets or the length
+   * search applies to a thing with no join in it. It is also the only clip
+   * here that is not a place: see `FIRE` and the note over `cut_cue`.
    *
    * All five are high-passed, because a 117 Hz rumble is the loudest single
    * thing in three of the six source files and it is not the sound of anywhere;
@@ -1860,6 +1951,10 @@ function buildAudio() {
       if (shoreNodes) shoreNodes.g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.9);
       return;
     }
+    // Within earshot of the resort at all, which is the cue to start fetching
+    // the one clip in the payload that gets played exactly once and cannot be
+    // late. See `fireWarm`.
+    fireWarm();
     if (!shoreBuf) { sampleLoad('shore', (b) => { shoreBuf = b; }); return; }
     const t0 = ctx.currentTime;
     if (!shoreNodes) {
@@ -3301,15 +3396,44 @@ function buildAudio() {
         dead, master: master ? +master.gain.value.toFixed(3) : -1,
       };
     },
-    /** For a test: is the beat running, and where in the two bars is it? */
-    fireStats: () => ({
-      on: fireOn,
-      level: +fireLevel.toFixed(3),
-      step: fireStep,
-      bars: +(fireStep / 16).toFixed(2),
-      gain: fireBus ? +fireBus.gain.value.toFixed(4) : 0,
-      bed: bedDuck ? +bedDuck.gain.value.toFixed(3) : 1,
-    }),
+    /**
+     * For a test: is the beat running, where in the two bars is it, and — the
+     * only one of these that is evidence — what came out of the bus.
+     *
+     * `rms` is measured off an AnalyserNode hung on `fireBus`, so it is the
+     * dBFS of samples the graph actually computed. `now` is the context clock,
+     * which does not advance in a suspended context. A test that asserts on
+     * `on` or `gain` alone passes in a context that has never rendered a
+     * sample; one that asserts `now` moved and `rms` is over the floor cannot.
+     * `-120` is the empty reading.
+     */
+    fireStats: () => {
+      let rms = -120;
+      if (fireEye) {
+        const d = new Float32Array(fireEye.fftSize);
+        fireEye.getFloatTimeDomainData(d);
+        let sum = 0;
+        for (let i = 0; i < d.length; i++) sum += d[i] * d[i];
+        rms = +(10 * Math.log10(Math.max(sum / d.length, 1e-12))).toFixed(2);
+      }
+      return {
+        on: fireOn,
+        level: +fireLevel.toFixed(3),
+        step: fireStep,
+        bars: +(fireStep / 16).toFixed(2),
+        gain: fireBus ? +fireBus.gain.value.toFixed(4) : 0,
+        bed: bedDuck ? +bedDuck.gain.value.toFixed(3) : 1,
+        // Which of the two is playing, whether the clip is in yet, and how
+        // long it is — the sample is a one-shot, so `secs` is also how long the
+        // cue can last before it runs out.
+        samp: !!fireSrc,
+        clip: !!fireBuf,
+        secs: fireBuf ? +(fireBuf.duration / (FIRE.beat / FIRE.srcBeat)).toFixed(2) : 0,
+        rms,
+        now: ctx ? +ctx.currentTime.toFixed(2) : -1,
+        state: ctx ? ctx.state : 'none',
+      };
+    },
     /** Likewise for the ćuk, which is the second sample in the build. */
     cukStats: () => ({
       tried: sampleTried.has('cuk'),
