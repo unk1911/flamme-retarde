@@ -825,10 +825,11 @@ async function boot() {
   // Jadrija first: it claims the footprints it is going to rebuild in detail,
   // and the town builder has to know about that before it draws them.
   jadrija = await buildJadrija(scene);
-  // She cannot be moored until the shore has been traced, because where she
-  // lies is worked out from the mole and the mole is worked out from the
-  // waterline. Nothing else in the boat knows anything about Jadrija.
-  if (brod && jadrija) brod.moor(jadrija);
+  // Where she lies is a pair of degrees now — the Brod, on the far side of the
+  // spit — so this no longer waits on the shore having been traced. It stays
+  // here because the quay is masonry in the same scene and the loading order
+  // is the order things appear.
+  if (brod) brod.moor();
   // The one surface in the game that is a view rather than a colour. Costs a
   // dot product everywhere except stood in front of it — see `49-mirror.js`.
   if (jadrija && jadrija.vik) {
@@ -4870,7 +4871,13 @@ function playIntro() {
   // Skipping counts as having seen it. Someone who pressed skip is the last
   // person who wants it again next time.
   markIntroSeen();
-  if (location.search.includes('nointro')) { beginFlight(); return; }
+  // A coordinate in the link is somebody going to a place, not somebody
+  // starting the game, and making them sit through the cinematic every time
+  // would be the whole of what is annoying about a bookmark. `?jadrija` and
+  // `?ground` still play it: those are back doors into the mission, and the
+  // mission is what the cinematic is the beginning of.
+  if (location.search.includes('nointro')
+    || QUERY.has('gps') || QUERY.has('tgps')) { beginFlight(); return; }
   $('cine').hidden = false;
   requestAnimationFrame(() => $('cine').classList.add('open'));
   intro.start(beginFlight);
@@ -4898,8 +4905,46 @@ function beginFlight() {
   if (!IS_TOUCH) setTimeout(grabPointer, 250);
   // The same back door as `0`, as a link — which is the only version of it a
   // phone can use, there being no keyboard to press it on.
-  if (location.search.includes('jadrija')) setTimeout(skipToJadrija, 60);
+  if (QUERY.has('gps') || QUERY.has('tgps')) setTimeout(queryDoor, 60);
+  else if (location.search.includes('jadrija')) setTimeout(skipToJadrija, 60);
   else if (location.search.includes('ground')) setTimeout(skipToGround, 60);
+}
+
+/**
+ * `?gps=43.724982,15.847840` — start the game standing there.
+ *
+ * And `?tgps=579.6,134.1`, the same door in the shore frame: `t` metres along
+ * the traced Jadrija shoreline and `s` metres inland from it, which is the
+ * frame every number in 43-jadrija.js is written in and therefore the one
+ * worth being able to type. Misha asked for both, and the pair is the point —
+ * degrees are how you say where a place is to somebody standing in it, and
+ * (t, s) is how you say where a thing is to the file that draws it.
+ *
+ * Both go through the Jadrija door first. That is not because they always land
+ * there — `__fr.gps` picks its own locale through `localeAt` and answers from
+ * anywhere in the 13 km world — but because the door is what swaps the HUD,
+ * takes the pointer and writes the phase down, and a teleport that leaves the
+ * flight HUD up is a teleport that looks broken.
+ *
+ * A coordinate that will not parse says so and does nothing, rather than
+ * silently flying the mission: a link is typed by hand and a typo in one
+ * should be visible.
+ */
+function queryDoor() {
+  const pair = (v) => {
+    const p = String(v).split(',').map((n) => Number(n.trim()));
+    return (p.length === 2 && Number.isFinite(p[0]) && Number.isFinite(p[1])) ? p : null;
+  };
+  const g = QUERY.get('gps'), tg = QUERY.get('tgps');
+  const p = pair(g != null ? g : tg);
+  if (!p) {
+    toast('?' + (g != null ? 'gps' : 'tgps') + '= wants two numbers', 'bad');
+    return;
+  }
+  skipToJadrija();
+  if (state.phase !== 'ground') return;   // the door said why
+  const r = g != null ? __fr.gps(p[0], p[1]) : __fr.jad.stand(p[0], p[1]);
+  if (!r || r.error) toast(r && r.error ? r.error : 'nowhere', 'bad');
 }
 
 $('cine-skip').addEventListener('click', beginFlight);
@@ -5783,18 +5828,19 @@ window.__fr = {
     // the default marks you as having lost the aeroplane, which is right when
     // you have bailed out and wrong when you have typed a coordinate.
     //
-    // `retarget` only inside Jadrija's own kilometre. `dropIn` runs `confine`
-    // against whatever locale is loaded, so teleporting across the map with
-    // the resort still attached would clamp you back to its walk box; and
-    // attaching the resort to somewhere it does not cover would do the same
-    // thing in the other direction.
+    // The locale comes from `localeAt`, which is the machinery a parachute
+    // landing uses and the only thing that gets a far coordinate right.
+    // `dropIn` runs `confine` against whatever locale is loaded, so arriving
+    // three kilometres away with the resort still attached would clamp you
+    // straight back into its walk box — which is what the first version of
+    // this did, having decided the locale on a 1200 m radius of its own.
     if (ground && ground.ok && ground.dropIn) {
-      const site = jadrija && jadrija.site;
-      const near = site
-        && Math.hypot(x - site.x, z - site.z) < 1200;
-      if (near) ground.retarget(jadrija);
-      ground.dropIn(x, z, near ? site.yaw : 0, false);
-      return { walked: [+x.toFixed(1), +z.toFixed(1)], locale: near ? 'jadrija' : 'open' };
+      const loc = localeAt(x, z, airfield, jadrija, city);
+      if (loc && ground.retarget(loc)) {
+        ground.dropIn(x, z, loc === jadrija ? jadrija.site.yaw : 0, false);
+        return { walked: [+x.toFixed(1), +z.toFixed(1)],
+          locale: loc.kind || (loc === jadrija ? 'jadrija' : 'airfield') };
+      }
     }
     camOverride = [x, groundAt(x, z) + 40, z - 30, x, groundAt(x, z), z];
     return { flew: [+x.toFixed(1), +z.toFixed(1)] };

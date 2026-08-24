@@ -5,35 +5,29 @@ blocked behind each one.
 
 ---
 
-## 1. The Brod — is this the quay? *(blocks the boat sidequest)*
+## 1. The Brod — ANSWERED, and built
 
-I think I have found it from the photographs alone. Full working in
-`plan/brod-location.md`; the short version:
+You confirmed the place; OSM turned out to be carrying the structure. `Jadrija
+VII` is a surveyed asphalt road that **dead-ends** at the water 45 m north-east
+of where you stood, and the `natural=coastline` way runs out from that terminus
+as a finger 6 m wide and 45 m long. That is the pier, drawn as coastline the way
+built moles usually are.
 
-**World (-1783, 336)** — the north-east side of the spit, past the east end of
-the modelled frontage, 662 m from Tvrđava svetog Nikole with the shore facing
-it within 5°.
+So both of the things I could not settle are settled: **46 m, bearing 55.5°**,
+root on the shore at (-1770.5, 328.5). The DEM has none of it — 6.35 m a pixel
+puts the whole finger 4 m under water — which is why the first cut of the build
+invented a pier of its own.
 
-It is the **only** point on that whole coast that satisfies all four of: the
-fortress subtending the 10.4–10.7° the photographs measure, being dead centre
-in frame, the quay edge square to it, and a sight-line to it that stays over
-water the whole way. Standing the game's camera there reproduces the
-composition of `1000150377` exactly.
+It is built: the pier, a 30 m causeway over the shelf between it and dry ground,
+the five fittings on the south-east face where they were photographed, a walk
+locale of its own so the deck holds you up, and the channel re-cut from the new
+berth. Full working in `plan/brod-location.md`.
 
-**Is that the right spot, or near it?** If you can put a pin on it, that
-settles it in one message and I will build it.
-
-What I need beyond the point itself:
-
-- **How far does the quay run, and which way?** The photographs show a
-  straight coping with a rubbing baulk, one mushroom bollard and one bitt, and
-  a marina of small boats off to one side. I cannot tell from them whether
-  that is 15 m of quay or 60.
-- **Is the boat's berth the same face as the marina, or round the corner
-  from it?**
-
-Not blocked on you, and started: the fortress it faces was half size and is
-now rebuilt to its OSM footprint.
+**One thing I would still like from you:** the marina. `1000150376` looks up a
+narrow inlet with small boats moored and a beach at its head, and OSM has that
+inlet running south-west from the pier root. Is it moorings on lines, or a
+pontoon, or boats just pulled up the beach? That decides whether it is thirty
+small hulls or a structure.
 
 ## 2. Two small ones on the slastičarnica board
 

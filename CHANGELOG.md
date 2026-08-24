@@ -8,6 +8,56 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.114.0] — 2026-08-24
+
+### The Brod is where OSM says it is, and you can walk out to it
+
+Misha stood on the coordinate and said *"that's your brod alright"*, then found
+he could not move once he got there. Both halves of that are fixed, and the
+second one turned out to be two separate bugs behind one symptom.
+
+**The legs.** `update()` in 47-ground.js returned before `walk()` whenever the
+fire was neither armed nor `stranded` — and `__fr.gps(lat, lon)` deliberately
+passes `lost: false`, because typing a coordinate is not losing the aeroplane.
+So the one way on to the ground that did not claim to have lost the aircraft was
+the one way that could not take a step. The walk comes up above that gate now;
+nothing else does, because nothing else there has anything to do.
+
+**The shore.** Jadrija's `standable` past the concrete was `walkY > 0.55`, and
+this DEM is 6.35 m a pixel: on the 900 × 500 m window round the spit, **14.4% of
+the cells the cover raster calls land are at or below 0.55 m** — the whole
+waterline fringe. It is `!isSea` now, which is what open country has always
+done, and no cell that raster calls sea is above 0.55 anywhere in that window.
+
+**And the pier.** The location was found from three photographs; the *structure*
+came from two things in `build/osm/` that nothing had ever read. `Jadrija VII`
+is a surveyed asphalt road that dead-ends at the water, and the coastline way
+runs out from that terminus as a finger 6 m wide and 45 m long — a mole, drawn
+as coastline the way built moles are. Fitted: **46 m on bearing 55.5°**, root at
+(-1770.5, 328.5), the fortress 646 m off the south-east face at 130.4°. Built
+with a battered skirt, a coping course, a slabbed deck, a 30 m causeway over the
+shelf the DEM has drowned, and the five photographed fittings unchanged in the
+frame they were written for.
+
+- `?gps=43.724982,15.847840` and `?tgps=t,s` as links, which skip the cinematic.
+- `tools/channel.py` committed — the Dijkstra that cuts `CHANNEL`, re-run from
+  the new berth: 26 waypoints, 3 816 m, tightest clearance 25 m. `callLight` is
+  gone with the loop round Rt Jadrija that the old route made and this one does
+  not; the rest are re-timed.
+- `brodLocale` — open country with the pier's deck laid over it, because open
+  country's `walkY` is the DEM and the DEM has the deck under water.
+- You board over her **port** rail. `enter()` said starboard and asserted the
+  reason; she lies bow-out offset to her own starboard, so the pier is to port
+  and you were stepping over the boat.
+- `__fr.gps(lat, lon)` picks its locale through `localeAt` instead of a 1200 m
+  radius of its own, so a teleport across the map no longer clamps you back
+  into the resort's walk box.
+- Written down and **not** fixed: `local()` in 43-jadrija.js diverges past about
+  40 m of offset — three Newton steps on a curved frame — and returns a station
+  two hundred metres from the foot of its own normal. Keeping the best iterate
+  instead of the last is two lines and moves the beach (census 446/333/86/27 →
+  445/337/90/18), so it stays. See rule 4 and the note in the file.
+
 ## [1.113.1] — 2026-08-24
 
 Misha, on 1.113.0: *"add a parameter or 2 parameters, where i can specify the

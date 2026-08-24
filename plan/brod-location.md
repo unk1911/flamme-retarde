@@ -124,3 +124,66 @@ placement when the man who has stood on the quay is asleep in the next
 timezone and has offered to point at it.
 
 **Ask first.** `MORNING.md`, question 1.
+
+---
+
+## 24 August: OSM had it all along
+
+Misha walked out to (-1783, 336) in the game and said *"that's your brod
+alright"* — so the place is confirmed. What was **not** confirmed, and what the
+questions at the top of `MORNING.md` were about, is the structure: how far the
+quay runs and which way.
+
+Two things in `build/osm/` settle it, and nothing in this game had ever looked
+at either:
+
+1. **`Jadrija VII`** — asphalt, `highway=unclassified`, tagged `source=survey`
+   — comes down the headland and **dead-ends** at world **(-1758, 316)**. A road
+   that ends at the water ends at a landing.
+2. The **`natural=coastline`** way runs out from that terminus as a finger six
+   metres wide and about forty-five long: (-1766.8, 333.5) → (-1757.1, 318.8) →
+   (-1740.8, 315.5) → (-1733.0, 306.6) → (-1726.3, 299.0), round the tip, and
+   back down the other side (-1729.8, 295.9) → (-1742.5, 310.3) → (-1767.7,
+   315.1). That is not a shore. It is a mole, drawn as coastline the way built
+   moles usually are.
+
+Principal axis through those eight points: **bearing 55.5°**, 46 m long, root on
+the shore at **(-1770.5, 328.5)**. From the head, Tvrđava svetog Nikole is
+**646 m on bearing 130.4°** — inside the 620–680 m the photographs measure, and
+on the bearing they were taken along.
+
+**Which corrects the reading of `1000150377`.** The pier runs 55.5° and the
+fortress lies 75° off that — square off the **south-east face**. So the coping
+edge straight across the bottom of that portrait frame is the pier's own edge
+seen from *across* it, not from along it: he was standing on the pier looking
+over the side, which is also why the fittings are laid out along the bottom of
+the frame rather than running away into it.
+
+**None of it is in the DEM.** The height field is 6.35 m a pixel and it has the
+whole finger under water — the tip reads −4.4 m, and the shelf from the road
+terminus back to the shore sits at 0.01–0.16 m for thirty metres. That is why
+the first cut of the build invented a pier of its own pointing straight at the
+fortress: it had one constraint and no plan. The lesson is the one at the head
+of `plan/survey-v59x.md`, in a new place — **check the shipped OSM before
+inventing geometry**, because the survey that made it may have walked the thing
+you are guessing at.
+
+The 30 m causeway between the shore and the pier root is the model's answer to
+that shelf, and it is the reason the confirmed coordinate is now a point you
+stand on *on the approach* rather than a point in the water.
+
+## What is built
+
+- 46 m of pier on the OSM axis, battered skirt, coping course, slabbed deck.
+- The 30 m causeway back to ground the DEM agrees is ground.
+- `moleFittings` — baulk, mushroom, bitt, rope, fender — on the south-east
+  face, in the frame they were written for, unchanged.
+- A locale of its own (`brodLocale`), because open country's `walkY` is the DEM
+  and the DEM has the deck under water. Open country with the deck laid over it.
+- `CHANNEL` re-cut from the new berth by `tools/channel.py`, which is now
+  committed: 26 waypoints, 3 816 m, tightest clearance 25 m.
+- She lies bow-out on the south-east face with 3.3 m under her, and you board
+  over her **port** rail — which is a correction: `enter()` said starboard and
+  asserted the reason, and it had you stepping over the boat.
+
+Still open: the marina of small craft in the inlet behind the root.

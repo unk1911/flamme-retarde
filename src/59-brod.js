@@ -18,20 +18,31 @@
 //
 // ── the route ───────────────────────────────────────────────────────────────
 //
-// `CHANNEL` is not drawn by hand. It is a min-clearance Dijkstra through the
-// shipped SEA mask of `build/payload/terrain_c.png`, from the head of the
-// Jadrija mole to the town quay, with the step cost `1 + 260/clearance` so the
-// line hunts the middle of the water instead of cutting the corners; then
-// smoothed and resampled at 150 m. Thirty-one waypoints, 4 469 m, every one of
-// them `isSea` at 6.35 m resolution with 8 to 35 m of water under it.
+// `CHANNEL` is not drawn by hand, and the thing that drew it is now committed
+// as `tools/channel.py`: a min-clearance Dijkstra through the shipped SEA mask
+// of `build/payload/terrain_c.png`, from the berth to the town quay, with the
+// step cost `1 + 260/clearance` so the line hunts the middle of the water
+// instead of cutting the corners; then smoothed — no pass may push a point
+// inside 22 m of clearance — and resampled at 150 m.
+//
+//     python3 tools/channel.py --from=-1783,336 --to=1457,-822
+//
+// Twenty-seven waypoints, 3 850 m, every one of them `isSea` at 6.35 m
+// resolution and none of them with less than 100 m of water round it once she
+// is clear of the quay.
 //
 // What it passes, measured against the OSM geometry rather than remembered:
 //
-//     s    745 m   Svjetionik Rt Jadrija      184 m to port
-//     s  1 043 m   Tvrđava svetog Nikole      104 m to starboard
-//     s  1 400 m   into Kanal svetog Ante, and the shores close to 250 m
-//     s  2 460 m   the narrows — 220 m of water, karst both sides
-//     s  4 469 m   alongside at Šibenik, 86 m from the cathedral
+//     s    600 m   Tvrđava svetog Nikole      170 m to starboard
+//     s    800 m   into Kanal svetog Ante, and the shores close to 250 m
+//     s  1 860 m   the narrows — 220 m of water, karst both sides
+//     s  3 850 m   alongside at Šibenik, 86 m from the cathedral
+//
+// It was 4 469 m and it started at the mole. What the move to the Brod takes
+// out is the loop north about Rt Jadrija: the Brod is on the far side of the
+// point already, which is the whole reason the boat comes to it and not to the
+// bathing mole — from the Brod you leave straight up the channel with the
+// fortress ahead and to starboard, and from the mole you cannot.
 //
 // The fortress passes on the **starboard** hand, which is the hand it passes on
 // coming in from the sea. Getting that right is why 48-landmarks.js had to be
@@ -49,7 +60,7 @@
 // And there is no timetable. Misha's "today it was too late for the boat" is
 // the feeling this is built out of and it is deliberately *not* the mechanic: a
 // side quest behind a clock you cannot see is a side quest nobody finds. She
-// lies alongside the mole with her engine ticking over from the moment you can
+// lies alongside the Brod with her engine ticking over from the moment you can
 // walk out to her, and she waits.
 // -----------------------------------------------------------------------------
 
@@ -114,16 +125,82 @@ const BROD = {
 
   board: 7.0,                // m from the boarding mark that she may be got on
 
+  /**
+   * The Brod, in world metres. This is where she lies.
+   *
+   * Misha, the evening of 23 August: *"the boat sidequest, u placed the boat in
+   * the wrong spot... the boat should be at the Brod, facing St Nicholas
+   * fortress, that's where the boat comes to."* Then, the next morning, having
+   * walked out to the point three photographs put it at: *"that's your brod
+   * alright."*
+   *
+   * That confirmed the **place**. What settles the **structure** is OSM, and it
+   * turns out to have been carrying it the whole time — two things nothing in
+   * this game had ever looked at:
+   *
+   *   1. `Jadrija VII`, an asphalt `highway=unclassified` tagged
+   *      `source=survey`, comes down the headland and **dead-ends** at world
+   *      (-1758, 316). A road that ends at the water ends at a landing.
+   *   2. The `natural=coastline` way runs out from that terminus as a finger
+   *      six metres wide and about forty-five long, out to a tip at (-1726,
+   *      299) and back down the other side. That is not a shore. That is a
+   *      mole, drawn as coastline the way built moles usually are.
+   *
+   * Fitted to those eight coastline points by principal axis: a pier bearing
+   * **55.5°**, root on the shore at (-1770.5, 328.5), 46 m long. It is 45 m
+   * north-east of the point he stood on, which is where the road brings you and
+   * where you would stand looking at it.
+   *
+   * None of that was visible in the DEM. The height field is 6.35 m a pixel and
+   * it has the whole finger under water — the tip reads -4.4 m — which is why
+   * the first cut of this built a pier of its own out of nothing, pointing
+   * straight at the fortress because that was the only constraint it had.
+   *
+   * From the head, Tvrđava svetog Nikole is **646 m away on bearing 130.4°**.
+   * The pier runs 55.5°, so the fortress lies almost square off the south-east
+   * face — and that is `1000150377` exactly: the coping edge straight across the
+   * bottom of a portrait frame with the fortress centred above it. He was
+   * standing on the pier looking across it, not along it. The distance is
+   * inside the 620–680 m the photographs measure and the bearing is the one
+   * they were taken on.
+   *
+   * So she lies on the **south-east face**, which is the face the fittings were
+   * photographed on and the face that looks at the fortress. The marina of small
+   * craft in `1000150378` is the inlet behind the root, running south-west, and
+   * is not built.
+   *
+   * `wide`, `top` and `apron` are still a placement: the coastline gives the
+   * plan and says nothing about the section.
+   */
+  quay: {
+    root: [-1770.5, 328.5],  // world x, z — the shore end of the pier
+    face: 55.5,              // compass bearing it runs out along
+    len: 46.0,
+    wide: 6.0,
+    top: 1.15,               // deck above sea level; the bathing mole's is 1.46
+    apron: 30.0,             // the causeway off the root, back on to the shore
+  },
+
   // Landmark callouts, in metres run. `side` is the hand it passes on.
+  // Re-timed when the berth moved to the Brod: the route is 3 850 m from there
+  // and was 4 433 m from the mole, and it is not a uniform shortening — the
+  // Brod is already round the point, so what the passage loses is the whole
+  // northward loop about Rt Jadrija at the front of it. Every call below is
+  // the arc length at which the new route passes the thing it names, projected
+  // from the old one and re-measured against the OSM geometry.
+  //
+  // `brod.callLight` is gone with the loop. From the mole the Rt Jadrija light
+  // came abeam at 184 m; from the Brod its closest approach is 539 m and it is
+  // astern from the moment you let go. Announcing it would be announcing
+  // something you cannot pick out, which is worse than saying nothing.
   calls: [
     { at: 40, key: 'brod.callAway', side: '' },
-    { at: 700, key: 'brod.callLight', side: 'port' },
-    { at: 1000, key: 'brod.callNikola', side: 'stbd' },
-    { at: 1500, key: 'brod.callChannel', side: '' },
-    { at: 2450, key: 'brod.callNarrows', side: '' },
-    { at: 3450, key: 'brod.callSpilja', side: 'port' },
-    { at: 4050, key: 'brod.callTown', side: '' },
-    { at: 4380, key: 'brod.callBerth', side: '' },
+    { at: 520, key: 'brod.callNikola', side: 'stbd' },
+    { at: 800, key: 'brod.callChannel', side: '' },
+    { at: 1860, key: 'brod.callNarrows', side: '' },
+    { at: 2860, key: 'brod.callSpilja', side: 'port' },
+    { at: 3470, key: 'brod.callTown', side: '' },
+    { at: 3800, key: 'brod.callBerth', side: '' },
   ],
 };
 
@@ -136,14 +213,13 @@ const BROD = {
  * `swimRun` is exported under in 43-jadrija.js and it is the same rule.
  */
 const CHANNEL = [
-  [-2098.9, 492.2], [-2072.2, 637.1], [-1978.2, 752.0], [-1867.3, 851.2],
-  [-1726.5, 891.5], [-1577.8, 886.7], [-1448.8, 816.6], [-1341.4, 713.4],
-  [-1232.8, 611.4], [-1125.4, 508.3], [-1024.4, 398.8], [-918.2, 294.8],
-  [-778.5, 250.4], [-630.7, 232.1], [-485.8, 198.9], [-344.8, 152.0],
-  [-198.8, 122.7], [-56.6, 80.7], [71.2, 4.4], [216.5, -21.9],
-  [365.4, -20.3], [510.3, 12.4], [657.2, 14.7], [785.0, -60.0],
-  [893.0, -162.4], [995.3, -270.7], [1095.2, -381.1], [1163.1, -513.2],
-  [1253.9, -630.6], [1359.1, -735.9], [1457.0, -822.0],
+  [-1596.0, 343.6], [-1488.7, 448.3], [-1373.4, 542.3], [-1224.1, 548.4],
+  [-1100.1, 471.2], [-996.5, 362.8], [-885.1, 263.2], [-736.8, 249.4],
+  [-588.8, 226.2], [-447.0, 182.5], [-303.4, 147.3], [-157.3, 115.3],
+  [-20.5, 61.8], [106.0, -17.1], [255.6, -22.2], [405.6, -20.7],
+  [546.9, 26.3], [693.4, 8.0], [814.5, -80.3], [917.5, -189.2],
+  [1021.4, -297.4], [1122.4, -407.9], [1181.6, -543.8], [1286.3, -651.2],
+  [1392.3, -757.3], [1457.5, -822.4],
 ];
 
 /**
@@ -521,6 +597,244 @@ function moleFittings(M) {
 }
 
 /**
+ * The Brod's frame, in world metres, derived once from `BROD.quay`.
+ *
+ * `+x` runs **out along the pier** from the shore root to the head — which is
+ * the same frame `moleFittings` was written in, and the reason it drops on to
+ * this pier unchanged. `+z` is athwart, and `side` picks the hand she lies on:
+ * −1 is the north-east face, open water and the channel, with the marina of
+ * small craft on the south-west face where `1000150378` shows it.
+ *
+ * Worth checking rather than assuming: three.js maps local +X to
+ * `(cos θ, −sin θ)` and local +Z to `(sin θ, cos θ)`, so with
+ * `θ = yawOfX(ax, az)` local +z lands on `(−az, ax)`. Take the quarter turn the
+ * other way and every fitting ends up on the wrong face of the pier.
+ */
+function brodAnchor() {
+  const Q = BROD.quay;
+  const b = Q.face * Math.PI / 180;
+  const ax = Math.sin(b), az = -Math.cos(b);     // out along the pier, from a bearing
+  const tx = -az, tz = ax;                       // local +z, athwart
+  const w = Q.wide * 0.5;
+  const rx = Q.root[0], rz = Q.root[1];
+  return {
+    root: [rx, rz], along: [ax, az], athw: [tx, tz],
+    w, out: Q.len, top: Q.top, apron: Q.apron, side: 1,
+    head: [rx + ax * Q.len, rz + az * Q.len],
+    toW: (u, v) => [rx + ax * u + tx * v, rz + az * u + tz * v],
+    /** World point -> (u, v) in the pier's frame. A rigid frame, so this is exact. */
+    local: (wx, wz) => {
+      const dx = wx - rx, dz = wz - rz;
+      return [dx * ax + dz * az, dx * tx + dz * tz];
+    },
+  };
+}
+
+/**
+ * The pier itself: thirty-four metres of masonry off the north-east shore of
+ * the spit, pointing at St Nicholas'.
+ *
+ * The deck, a battered skirt round all four sides, a coping course standing
+ * proud of it, and a rubble ramp off the root. Nothing else — the fittings are
+ * `moleFittings`, which was written off the photographs *of this pier* and has
+ * only ever been in the wrong place.
+ *
+ * The skirt is a batter and not a wall, per rule 7: at 1.8 km from the origin a
+ * vertical slab of masonry reads as cardboard, and what makes a pier look like
+ * a pier from the deck of a boat is that its base is wider than its top. 0.30 m
+ * over 2.5 m of height, which is what shows under the rubbing baulk.
+ *
+ * The ramp's landward edge is sampled off the real DEM rather than assumed
+ * flat. It is nearly flat here — the shelf is 0.2 m for forty metres — but
+ * "nearly" is the kind of thing that puts one end of a ramp in a trench, and
+ * asking costs eight lookups once.
+ */
+function brodQuay(M) {
+  const b = propBuilder();
+  // Taken off the bathing mole rather than invented: `CONC[2]` is the deck of
+  // the one other structure in this game that stands over open water, and
+  // `STONE` is its wall. The first cut of this was a neutral pale grey around
+  // 0.70 and it rendered as white paper — a limestone quay is a *warm* half
+  // value, and at this scene's ambient anything above about 0.55 stops having
+  // a surface at all. Same finding as the timber, from the other end.
+  const DECK = [0.507, 0.451, 0.383];
+  const JOINT = [0.442, 0.392, 0.332];
+  const COPE = [0.545, 0.487, 0.414];
+  const FACE = [0.393, 0.347, 0.292];
+  const RUB = [0.470, 0.424, 0.362];
+  const TOP = M.top, W = M.w, L = M.out;
+  const BASE = -2.10;                  // how far down the skirt is carried
+  const BAT = 0.30;                    // how far it stands out at the bottom
+  const COPE_H = 0.16, LIP = 0.10;
+  const P = (u, v, y) => { const w = M.toW(u, v); return [w[0], y, w[1]]; };
+
+  // All four sides, walked as a loop of corners, so the ends meet the flanks in
+  // a mitre instead of in a seam you can see from the boat and so the four
+  // cannot drift apart. COPE_H is the shadow line under the coping: it is the
+  // thing that says "pier" at two hundred metres and at two, which is why the
+  // coping is its own course and not just the top of the wall.
+  const rim = [[0, -W], [0, W], [L, W], [L, -W], [0, -W]];
+  for (let i = 0; i < rim.length - 1; i++) {
+    const [u0, v0] = rim[i], [u1, v1] = rim[i + 1];
+    // Outward from this side, so the batter leans the right way on each face
+    // without anything having to know which face it is on.
+    const ex = u1 - u0, ev = v1 - v0;
+    const el = Math.hypot(ex, ev) || 1;
+    const ou = ev / el, ov = -ex / el;
+    const O = (u, v, d, y) => P(u + ou * d, v + ov * d, y);
+    b.quad(O(u0, v0, BAT, BASE), O(u1, v1, BAT, BASE),
+      O(u1, v1, LIP, TOP - COPE_H), O(u0, v0, LIP, TOP - COPE_H), FACE);
+    b.quad(O(u0, v0, LIP, TOP - COPE_H), O(u1, v1, LIP, TOP - COPE_H),
+      O(u1, v1, LIP, TOP), O(u0, v0, LIP, TOP), COPE);
+    b.quad(O(u0, v0, LIP, TOP), O(u1, v1, LIP, TOP),
+      O(u1, v1, 0, TOP), O(u0, v0, 0, TOP), COPE);
+  }
+  // The deck, laid in slabs across the pier with a joint between each pair.
+  //
+  // One quad was the first cut and it is the same mistake the kabine row was:
+  // a hundred metres of untextured plane reads as a game, and thirty-four
+  // metres of it reads as a game you are standing on. The slabs are 2.2 m —
+  // what a poured bay is — and each takes a small step of tone off a sine hash
+  // of its index, so the deck has a grain running across it and a walker has
+  // something to measure their own pace against.
+  //
+  // Coplanar and *adjacent*, never overlapping: two quads that share an edge
+  // are exact at any distance, and two that share a plane are the z-fight rule
+  // 5 is about. So the joint is a slab of its own colour, not a line laid over
+  // the top of one.
+  const BAY = 2.2, JW = 0.06;
+  const nBay = Math.max(1, Math.round(L / BAY));
+  const hash = (i) => Math.sin(i * 12.9898 + 4.1414) * 43758.5453;
+  for (let i = 0; i < nBay; i++) {
+    const u0 = (i / nBay) * L, u1 = ((i + 1) / nBay) * L;
+    const k = (hash(i) - Math.floor(hash(i)) - 0.5) * 0.055;
+    const cl = [DECK[0] + k, DECK[1] + k * 0.92, DECK[2] + k * 0.84];
+    b.quad(P(u0, -W, TOP), P(u0, W, TOP), P(u1 - JW, W, TOP), P(u1 - JW, -W, TOP), cl);
+    if (i < nBay - 1) {
+      b.quad(P(u1 - JW, -W, TOP), P(u1 - JW, W, TOP),
+        P(u1, W, TOP), P(u1, -W, TOP), JOINT);
+    }
+  }
+
+  // The causeway off the root, back on to the shore.
+  //
+  // Thirty metres of it, and that is measured rather than chosen: along this
+  // axis the DEM runs 0.01 m at the root and does not get above a foot until
+  // 40 m inland — a flat wet limestone shelf, which is what the tip of this
+  // spit is. So the pier does not begin at a beach; it begins at a causeway
+  // over the shelf, and the causeway is what carries the deck down to ground
+  // that is actually ground.
+  //
+  // The confirmed coordinate — 43.724982, 15.847840, where he stood — is 15 m
+  // along it. Walk out from there and you are on the approach to the pier,
+  // which is where a photograph of the pier gets taken from.
+  //
+  // Drawn as a top and two flanks, because a ribbon with no sides reads as a
+  // painted line on the water from the deck of the boat. Wound the same way
+  // round as the deck above: the first cut of the ramp was wound the other way
+  // and rendered as the inside of itself, which at this hour is black.
+  const A = M.apron, NSEG = 10;
+  const gy = (u, v) => {
+    const q = M.toW(u, v);
+    return Math.max(groundAt(q[0], q[1]), 0.10);
+  };
+  // The deck height along it: the pier's top at the root, the shelf at the far
+  // end, straight between.
+  const ry = (u) => {
+    const k = (u + A) / A;
+    return gy(-A, 0) * (1 - k) + TOP * k;
+  };
+  for (let i = 0; i < NSEG; i++) {
+    const u0 = -A + (i / NSEG) * A, u1 = -A + ((i + 1) / NSEG) * A;
+    const y0 = ry(u0), y1 = ry(u1);
+    b.quad(P(u0, -W, y0), P(u0, W, y0), P(u1, W, y1), P(u1, -W, y1), RUB);
+    // the two flanks, down to whatever the shelf is doing under them
+    b.quad(P(u0, -W, gy(u0, -W) - 0.25), P(u1, -W, gy(u1, -W) - 0.25),
+      P(u1, -W, y1), P(u0, -W, y0), FACE);
+    b.quad(P(u1, W, gy(u1, W) - 0.25), P(u0, W, gy(u0, W) - 0.25),
+      P(u0, W, y0), P(u1, W, y1), FACE);
+  }
+  return b.geo();
+}
+
+/**
+ * Standing on the Brod.
+ *
+ * `localeAt` sends this stretch of shore to open country, whose `walkY` is the
+ * DEM and nothing else — so without this the pier is a metre of masonry you
+ * walk straight through and stand inside, at the height of the water it is
+ * standing in. The resort cannot answer for it either: the Brod is 134 m
+ * outside `jadrija.inField` and the shore frame does not reach it. See the note
+ * in `local()` in 43-jadrija.js for what happens if you make it try.
+ *
+ * So: open country, with the pier's own deck laid over it. Eleven members, of
+ * which three change — everything else about walking on a headland was already
+ * right.
+ */
+function brodLocale(city) {
+  const M = brodAnchor();
+  const Q = BROD.quay;
+  const mid = M.toW(Q.len * 0.5, 0);
+  const base = openLocale(mid[0], mid[1], city);
+  const A = M.apron;
+  // The deck over the pier, the ramp behind it, the DEM everywhere else. The
+  // ramp is what you walk up to get on: a metre of step at the root of a pier
+  // is a pier nobody boards from.
+  const walkY = (wx, wz) => {
+    const [u, v] = M.local(wx, wz);
+    if (v > -M.w && v < M.w && u > -A && u < M.out) {
+      if (u >= 0) return M.top;
+      // The causeway, and the same straight line the geometry draws — sampled
+      // at its far end and not underfoot, or the deck you walk on would ripple
+      // over a shelf the deck you can see is bridging.
+      const k = (u + A) / A;                       // 0 at the shelf, 1 at the root
+      const far = M.toW(-A, 0);
+      return Math.max(groundAt(far[0], far[1]), 0.10) * (1 - k) + M.top * k;
+    }
+    return Math.max(groundAt(wx, wz), 0);
+  };
+  const cx = base.site.x, cz = base.site.z;
+  return {
+    ...base,
+    kind: 'brod',
+    walkY,
+    toWorld: (t, s) => [cx + t, walkY(cx + t, cz + s), cz + s],
+    /**
+     * The pier stands in the water for most of its length, so `!isSea` on its
+     * own refuses the whole of the thing you came here to walk out along.
+     */
+    standable: (wx, wz) => {
+      const [u, v] = M.local(wx, wz);
+      if (v > -M.w && v < M.w && u > -A && u < M.out) return true;
+      return !isSea(wx, wz);
+    },
+  };
+}
+
+/** True if a point belongs to the Brod rather than to open country. */
+function atBrod(x, z) {
+  const Q = BROD.quay;
+  const b = Q.face * Math.PI / 180;
+  const cx = Q.root[0] + Math.sin(b) * Q.len * 0.5;
+  const cz = Q.root[1] - Math.cos(b) * Q.len * 0.5;
+  return Math.hypot(x - cx, z - cz) < 110;
+}
+
+/**
+ * One of them, built the first time somebody stands there.
+ *
+ * `localeAt` is called on every parachute landing, every debug teleport and
+ * every `?gps=` link, and `openLocale` inside it walks the city's footprint
+ * list — so handing back a fresh locale each time would rebuild a thousand
+ * blockers to answer a question about a quay that never moves.
+ */
+let brodLoc = null;
+function brodLocaleCached(city) {
+  if (!brodLoc) brodLoc = brodLocale(city);
+  return brodLoc;
+}
+
+/**
  * The boat, the berth and the voyage.
  *
  * The same five verbs as the kite, the foil and the swim — `enter`, `leave`,
@@ -564,31 +878,33 @@ function buildBrod(scene) {
   const eHead = new THREE.Euler(0, 0, 0, 'YXZ');
 
   /**
-   * Lay the berth and the route out, once the locale exists.
+   * Lay the quay, the berth and the route out.
    *
-   * `jadrija.mole` is the only thing this module takes from that file, and
-   * everything here is derived from it rather than written down: the berth, the
-   * boarding mark, the fittings and the first waypoint all move together.
+   * Everything is derived from `BROD.quay` rather than written down: the
+   * masonry, the fittings, the berth, the boarding mark and the first leg of
+   * the voyage all move together when the coordinate moves. That was the rule
+   * when the berth was taken from `jadrija.mole` and it is still the rule; only
+   * the anchor has changed, from a structure in the resort's shore frame to a
+   * pair of degrees in the world.
+   *
+   * She lies on the **south-east** face: the face the fittings were
+   * photographed on and the face St Nicholas' lies square off. There is 3.3 m
+   * of water under her there against 1.15 m of draught, and the pier's other
+   * side is the one the small craft use.
    */
-  function moor(jadrija) {
-    if (!jadrija || !jadrija.mole) return false;
-    const M = jadrija.mole;
-    const hx = M.head[0], hz = M.head[2];
-    const rx = M.root[0], rz = M.root[2];
-    let ox = hx - rx, oz = hz - rz;                 // seaward, along the mole
-    const L = Math.hypot(ox, oz) || 1;
-    ox /= L; oz /= L;
-    // Athwart it. She lies on the side that faces east — up the channel, out of
-    // the swell that comes round the point, and in sight of the whole eastern
-    // half of the resort. Taken as a sign rather than written down, so a
-    // re-traced shore that flips the normal does not put her on the beach.
-    const sgn = -oz > 0 ? 1 : -1;
-    const px = -oz * sgn, pz = ox * sgn;
-    const bx = hx - ox * 8.0 + px * (M.w + 2.35);
-    const bz = hz - oz * 8.0 + pz * (M.w + 2.35);
+  function moor() {
+    const A = brodAnchor();
+    const BERTH_IN = 8.0;
+    const hx = A.head[0], hz = A.head[1];
+    const rx = A.root[0], rz = A.root[1];
+    const ox = A.along[0], oz = A.along[1];
+    const sgn = A.side;
+    const px = A.athw[0] * sgn, pz = A.athw[1] * sgn;
+    const bx = hx - ox * BERTH_IN + px * (A.w + 2.35);
+    const bz = hz - oz * BERTH_IN + pz * (A.w + 2.35);
     berth = { x: bx, z: bz, yaw: yawOfX(ox, oz) };
-    dock = { x: hx - ox * 8.0 + px * (M.w - 1.4),
-      z: hz - oz * 8.0 + pz * (M.w - 1.4), y: M.top };
+    dock = { x: hx - ox * BERTH_IN + px * (A.w - 1.4),
+      z: hz - oz * BERTH_IN + pz * (A.w - 1.4), y: A.top };
 
     route = [[bx, bz], ...CHANNEL.map((p) => [p[0], p[1]])];
     arc = [0];
@@ -602,8 +918,16 @@ function buildBrod(scene) {
       yaw: yawOfX(last[0] - prev[0], last[1] - prev[1]) };
 
     if (!fitting) {
+      // The masonry is built straight into world coordinates — `brodQuay` has
+      // the frame and does the transform itself, because its ramp samples the
+      // DEM and the DEM only answers in world metres.
+      const quayMesh = new THREE.Mesh(brodQuay(A), mat);
+      quayMesh.updateMatrixWorld();
+      scene.add(quayMesh);
+      // The fittings are not: they were written in the mole's own frame and
+      // they stay in it, which is the whole reason that frame was chosen.
       fitting = new THREE.Mesh(
-        moleFittings({ top: M.top, w: M.w, out: M.out, side: sgn }), mat);
+        moleFittings({ top: A.top, w: A.w, out: A.out, side: sgn }), mat);
       fitting.position.set(rx, 0, rz);
       fitting.rotation.y = yawOfX(ox, oz);
       fitting.updateMatrixWorld();
@@ -724,14 +1048,25 @@ function buildBrod(scene) {
   /**
    * Step aboard.
    *
-   * You land on the **starboard side deck**, standing, looking forward, and
-   * both halves of that are decided rather than convenient. Starboard because
-   * that is the side the mole is on — she lies with her starboard rail to the
-   * quay, so it is the rail you step over — and because it is the hand
-   * everything worth seeing passes on: the fortress at 104 m, the town at the
-   * end of it. Forward because the first cut put you in the middle of the
-   * cockpit facing the bow, three metres from the aft wall of the deckhouse,
-   * and nine minutes of Dalmatia opened on a shot of a white wall.
+   * You land on the **port side deck**, standing, looking forward, and both
+   * halves of that are decided rather than convenient.
+   *
+   * Port because that is the rail the pier is against, and it is worth being
+   * exact about why, because this was wrong and the comment that was here was
+   * the reason it stayed wrong. She lies bow-out, offset from the pier's
+   * centreline by `w + 2.35` on the side the pier's fittings are on — so the
+   * pier is on the hand a boat bow-out has to *its own port*, whatever face of
+   * the pier that is. This said "starboard because that is the side the mole
+   * is on", asserted rather than derived, and it had you stepping over her and
+   * landing on the rail facing open water.
+   *
+   * Forward because the first cut put you in the middle of the cockpit facing
+   * the bow, three metres from the aft wall of the deckhouse, and nine minutes
+   * of Dalmatia opened on a shot of a white wall.
+   *
+   * Which hand the voyage is best watched from is a separate question and you
+   * answer it with your legs: the fortress goes by 170 m to **starboard** at s
+   * 600, so the first thing to do after letting go is cross her deck.
    */
   function enter() {
     if (!route || active) return false;
@@ -739,7 +1074,7 @@ function buildBrod(scene) {
     group.visible = true;
     phase = 'letgo';
     s = 0; sp = 0; tmr = 0; said = -1;
-    you.x = 1.20; you.z = 1.30; you.yaw = 0; you.pitch = -0.02;
+    you.x = 1.20; you.z = -1.30; you.yaw = 0; you.pitch = -0.02;
     you.deck = deckAt(you.x, you.z) ?? 1.06;
     return true;
   }

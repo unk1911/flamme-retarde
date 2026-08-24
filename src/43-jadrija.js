@@ -13915,6 +13915,28 @@ async function buildJadrija(scene) {
     //
     // Newton, on arc length. The along-shore residual is the step, because the
     // curve is parameterised by its own length, and it lands in two.
+    //
+    // In two *on the promenade*, and only there. Newton converges while the
+    // offset is inside the frame's own radius of curvature, and this shore
+    // bends: at 134 m off it the step overshoots, the next overshoots further,
+    // and three iterations stop wherever they happen to be. That is not a
+    // rounding error — it is a `t` two hundred metres from the foot of its own
+    // normal. It is how the Brod came to be catalogued at t 579.6, s 134.1:
+    // that pair round-trips (it is a real solution of the frame), but the quay
+    // is not at it. `toWorld(579.6, 134.1)` is 204 m away from the quay, and
+    // `plan/brod-location.md` believed the wrong end of it.
+    //
+    // KEPT AS IT IS, DELIBERATELY. Keeping the best iterate instead of the
+    // last is two lines and strictly more honest, and it moves the beach: the
+    // census goes 446/333/86/27 -> 445/337/90/18, because something in the
+    // layout asks `local` about a point out where it diverges and spends the
+    // `rng` stream on the answer. See rule 4. The resort is the artifact and
+    // the artifact was built on these numbers.
+    //
+    // What follows from it: nothing may be *placed* by (t, s) beyond about
+    // 40 m of offset without checking that `toWorld` puts it back where you
+    // meant. The Brod does not live in this frame at all — `localeAt` sends it
+    // to open country, which is world-axis-aligned and has no such problem.
     for (let k = 0; k < 3; k++) {
       const c = at(t);
       t += (x - c.x) * c.ux + (z - c.z) * c.uz;
@@ -18611,12 +18633,12 @@ async function buildJadrija(scene) {
     // measured along four lines through the wood.
     // `t1` runs PAST the end of the traced shore, and that is deliberate.
     //
-    // It was `LEN - 3`. The Brod — the quay the Šibenik boat comes to, worked
-    // out from three photographs in `plan/brod-location.md` — sits at t 579.6,
-    // s 134.1 in this frame, which is ten metres beyond that clamp. The symptom
-    // was Misha reporting he could *almost* walk to it: `confine` was pulling
-    // him back at 569.2 every frame and the last ten metres were a wall with
-    // nothing in it.
+    // It was `LEN - 3`, and the symptom was Misha reporting he could *almost*
+    // walk east to the Brod: `confine` pulled him back at 569.2 every frame and
+    // the last stretch was a wall with nothing in it. Whatever `local` calls
+    // the far side of the headland — and out there it calls it something not
+    // to be trusted, see the note in `local` — the clamp was real and it was
+    // met before anything you can see.
     //
     // Walking out there is well defined. `at()` extrapolates past either end
     // along the last station's tangent, so the frame simply runs straight on;
@@ -18636,15 +18658,31 @@ async function buildJadrija(scene) {
      * bathing terrace `bounds` has already had the last word, and `walkY`
      * there is the promenade slab rather than the ground under it.
      *
-     * The threshold is 0.55 m and not zero because `walkY` clamps to sea level
-     * off the concrete — at exactly zero you would walk out on to the water.
+     * Out there the test is the cover raster and not a height, which is what
+     * open country has always done — see `standable` in 49-open.js. It was
+     * `walkY(x, z) > 0.55`, on the reasoning that `walkY` clamps to sea level
+     * off the concrete so a zero threshold would let you walk out on to the
+     * water. True of the clamp, and quietly false of this headland: the DEM is
+     * 6.35 m a pixel and it smears every shoreline down to the tideline, so on
+     * the 900 x 500 m window round the spit **14.4% of the cells the cover
+     * raster calls land sit at or below 0.55 m** — the whole waterline fringe,
+     * and with it the Brod, which the DEM puts at 0.13 m.
+     *
+     * The symptom was Misha teleporting to the quay and finding he could not
+     * move: `walk()` refuses a step whose destination is unstandable and then
+     * retries each axis alone, and out there all three answers were no, so he
+     * was held on the spot by a shoreline that had been rounded off.
+     *
+     * Nothing is lost by the swap. On that same window **no cell the raster
+     * calls sea is above 0.55 m** — the two tests agree everywhere except on
+     * the fringe the height one was wrong about.
      */
     standable: (x, z) => {
       const [t, s] = local(x, z);
       if (onMoleWalk(t, s)) return true;
       if (s < 1.0) return false;
       if (s < JAD.reachIn) return true;
-      return walkY(x, z) > 0.55;
+      return !isSea(x, z);
     },
     blockers, local, toWorld, walkY, inField, vik,
     /**

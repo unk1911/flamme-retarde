@@ -1754,6 +1754,20 @@ async function buildGround(scene, field) {
         radio('call.rokici', 'radio.rokiciSpot');
         toast(T('toast.rokici'), 'bad');
       }
+      // Nothing is burning, so there is no field to run — but there may still
+      // be somebody standing in it, and their legs are not the fire's business.
+      //
+      // Until the fire is spotted, `stranded` was the only thing that let you
+      // walk: the two ways on to the ground before that are the debug handles
+      // and the door of a parked aeroplane, and both of them used to arrive
+      // with `lost: true`. `__fr.gps(lat, lon)` does not — arriving by typing a
+      // coordinate is not losing the aeroplane — so it walked you to the Brod
+      // and dropped you there with the whole update returning above `walk()`.
+      // You could look around and you could not take a step, which is what
+      // Misha reported. Every other consumer of `active` is behind the arm gate
+      // for a reason (nothing to spray, no field to soak, no crew to find), so
+      // it is only the walk that comes up here.
+      if (active) walk(dt);
       return;
     }
     if (armed && !seeded) {

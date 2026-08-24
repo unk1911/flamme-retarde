@@ -113,5 +113,11 @@ function localeAt(x, z, airfield, jadrija, city) {
   // terrace, and it is deliberately tight. What the locale wants is "can this
   // place answer for the ground here", and that is a wider question.
   if (jadrija && jadrija.inField && jadrija.inField(x, z, 5)) return jadrija;
+  // The Brod. A third hand-built place, and the newest: a masonry quay on the
+  // north-east shore of the spit, 134 m outside anything Jadrija's shore frame
+  // can address. Open country would answer for the hillside correctly and for
+  // the quay not at all — its `walkY` is the DEM, and the DEM has the quay's
+  // deck a metre and a fifth under the water it is holding back.
+  if (atBrod(x, z)) return brodLocaleCached(city);
   return openLocale(x, z, city);
 }
