@@ -583,18 +583,28 @@ async function buildJadrija(scene) {
   const frustumTS = (y0, r0, y1, r1, col, topCol) =>
     frustum(W, y0, r0, y1, r1, col, topCol);
 
-  function bar(t0, t1, sec, col, topCol) {
+  function barIn(P, t0, t1, sec, col, topCol) {
     const [P0, P1, P2, P3] = sec;
-    const A = W(t0, P0[0], P0[1]), B = W(t1, P0[0], P0[1]);
-    const D = W(t0, P1[0], P1[1]), C = W(t1, P1[0], P1[1]);
-    const d = W(t0, P2[0], P2[1]), c = W(t1, P2[0], P2[1]);
-    const a = W(t0, P3[0], P3[1]), q = W(t1, P3[0], P3[1]);
+    const A = P(t0, P0[0], P0[1]), B = P(t1, P0[0], P0[1]);
+    const D = P(t0, P1[0], P1[1]), C = P(t1, P1[0], P1[1]);
+    const d = P(t0, P2[0], P2[1]), c = P(t1, P2[0], P2[1]);
+    const a = P(t0, P3[0], P3[1]), q = P(t1, P3[0], P3[1]);
     b.quad(a, q, c, d, topCol || col);
     b.quad(D, C, B, A, col);
     b.quad(A, B, q, a, col);
     b.quad(C, D, d, c, col);
     b.quad(B, C, c, q, col);
     b.quad(D, A, a, d, col);
+  }
+  /**
+   * The same, in the shore frame, which is where all but one caller wants it.
+   *
+   * The exception is the diving platform, which stands far enough out that the
+   * shore frame stretches under it — see the block over `DIVE` — and so passes
+   * a rigid frame of its own, exactly as `boxIn` and `frustum` already allow.
+   */
+  function bar(t0, t1, sec, col, topCol) {
+    barIn(W, t0, t1, sec, col, topCol);
   }
 
   /** The commonest cross-section of all: an upright rectangle. */
@@ -8756,7 +8766,7 @@ async function buildJadrija(scene) {
 
   // ── the skakaonica ─────────────────────────────────────────────────────────
   /**
-   * The diving platform, fourteen metres off the head of the jetty.
+   * The diving platform, twenty-nine metres off the head of the eastern mole.
    *
    * Every bathing beach on this coast has one and Jadrija's is the thing the
    * whole shore is arranged around in August: a concrete slab on four piles
@@ -8791,9 +8801,85 @@ async function buildJadrija(scene) {
   // into the channel. The race is longer for it, not shorter — 175 m from the
   // mole head to the board instead of 66 — because the distance is now along
   // the shore rather than straight out from it.
-  const DIVE = { t: 430, s: -40.0, w: 2.1, top: at(430).lip + 0.55 };
+  //
+  // ── and then the moles arrived, and it was standing beside one ─────────────
+  //
+  // Misha, 24 Aug, over a near-plan aerial of his own game with a magenta arrow
+  // drawn from the platform out into open water: *"one super minor update: move
+  // the diving station to where i point to it with the red arrow."*
+  //
+  // Where the arrow lands took a fit rather than a look, because the shot is
+  // oblique enough that eye-balling the along-shore axis gets the direction
+  // backwards. His frame is the game, so the fit is against the game's own
+  // geometry: mole 1380201137's deck at both ends, `JET`'s head, the orange
+  // marker on the swim line and the platform itself — five 3D points solved for
+  // a six-parameter pinhole (position, yaw, pitch, fov). It converges at
+  // **3.7 px RMS** on 1704 x 919 — pos (-1952, 123, 411), heading WSW, 59°
+  // down, 49° fov — and at the arrowhead the ground scale is **6.9 px/m**. The
+  // arrowhead unprojects on to the sea plane at **(-1978.3, 528.8)**, 47 m from
+  // where the thing stands now: 46 m west along the shore and 12 m further out.
+  // A four-point homography through the same control points puts it 3 m away
+  // from that, which is the honest uncertainty on the answer.
+  //
+  // **What is at that point, and why it is not arbitrary.** Resolved in mole
+  // 1380201137's own frame the arrowhead is 71.8 m out along its axis and 5.4 m
+  // to one side — which is to say **29 m straight off the head of the mole that
+  // was built this morning**. Where it stands now is 31 m out along that same
+  // axis and 30 m off its *flank*: the platform used to be alone out there, and
+  // since the moles went in it has been floating beside one. He is putting it
+  // back off a pier head, which is where every skakaonica on this coast is.
+  //
+  // **What it costs the race.** `swimRun` is measured off this, so the chase in
+  // src/61-chase.js is now **146 m** from the jetty head to the board and not
+  // 175 — the platform came 46 m west, which is 46 m *toward* the start. Still
+  // a minute and a half of crawl, and still both ends of it a swim apart; the
+  // 175 m in the paragraph above is what the previous move made it, not what it
+  // is. Anything shorter than about a hundred metres would want arguing over.
+  //
+  // **The water.** Not the reason, and worth saying so with the numbers rather
+  // than inventing one. `terrain_h.png` has the bed at **-4.27 m** under the old
+  // position and **-5.39 m** under the arrowhead, so both are divable off a
+  // 2.6 m slab and neither is a shelf — the pale water in his screenshot is the
+  // 6.35 m/px DEM smearing the shore, not a sandbank under the board. What the
+  // move buys is a metre of depth and the right relationship to the mole.
+  //
+  // **Its own frame, per rule 9b, and this one is not a nicety.** At 55 m of
+  // offset, on the bend where the promenade turns, the shore frame stretches by
+  // 2.7 to one: the 7.52 m the board spans in `t` comes out **20.34 m** long on
+  // the ground. The platform is rigid and it now has a rigid frame — `DIVE.P`,
+  // the shore frame linearised at the anchor, so `P(DIVE.t, s)` is `W(DIVE.t, s)`
+  // exactly and everything either side of it is a true offset. Every solid
+  // below is drawn through it. `local()` is not asked anything: the anchor was
+  // found by searching the *forward* map for the (t, s) whose `W` is the
+  // arrowhead, which lands within 0.10 m.
+  const DIVE = {
+    t: 396.8,
+    s: -54.8,
+    w: 2.1,
+    // A freeboard and not a terrace level: this is how far the slab stands out
+    // of the sea, and moving the thing forty-seven metres along the shore must
+    // not change it. So it stays derived from the promenade at t 430 — the
+    // station it used to stand off, and where the half metre of slab over the
+    // lip was measured — and not from the new anchor, where the lip is 0.55 m
+    // lower and the deck would silently drop with it.
+    top: at(430).lip + 0.55,
+  };
+  DIVE.P = (() => {
+    const st = at(DIVE.t);
+    return (u, v, y) => [
+      st.x + st.ux * (u - DIVE.t) + st.nx * v, y,
+      st.z + st.uz * (u - DIVE.t) + st.nz * v,
+    ];
+  })();
   {
-    const D = DIVE, y = D.top;
+    const D = DIVE, y = D.top, P = D.P;
+    // The shore-frame helpers, on the platform's frame instead. Same arguments,
+    // same order; the only difference is that `t` and `s` are now metres on a
+    // rigid pair of axes rather than a station and a normal offset.
+    const frustumD = (y0, r0, y1, r1, col, topCol) =>
+      frustum(P, y0, r0, y1, r1, col, topCol);
+    const boxD = (t0, t1, s0, s1, y0, y1, col, topCol) =>
+      boxIn(P, t0, t1, s0, s1, y0, y1, col, topCol);
     // Built from the photograph, and the photograph says something quite
     // different from what used to stand here.
     //
@@ -8834,16 +8920,16 @@ async function buildJadrija(scene) {
     // union of what stood here — big at t-1.64…t+0.40, small at t+1.36…t+2.76,
     // s -0.98…+0.98 between them — which is 4.40 m by 1.96 m, centred half a
     // metre east of the old mass because the newer block is that side.
-    frustumTS(-8.0, [D.t + 0.56, D.s, 2.20, 0.98],
+    frustumD(-8.0, [D.t + 0.56, D.s, 2.20, 0.98],
       -0.55, [D.t + 0.56, D.s, 2.20, 0.98], WET);
 
     // ── the big mass ─────────────────────────────────────────────────────────
     // The flare, which is the whole shape, standing on the footing above.
-    frustumTS(-0.55, [D.t - 0.62, D.s, 1.02, 0.98],
+    frustumD(-0.55, [D.t - 0.62, D.s, 1.02, 0.98],
       y - 0.26, [D.t - 0.62, D.s, 1.92, 1.34], OLD);
     // The cap: a slab a little proud of the flare all round, which is where
     // the shuttering stopped and is the one hard horizontal on the thing.
-    frustumTS(y - 0.26, [D.t - 0.62, D.s, 1.96, 1.38],
+    frustumD(y - 0.26, [D.t - 0.62, D.s, 1.96, 1.38],
       y, [D.t - 0.62, D.s, 1.98, 1.40], [0.712, 0.730, 0.702], CONC[2]);
 
     // ── the smaller, newer block ─────────────────────────────────────────────
@@ -8852,9 +8938,9 @@ async function buildJadrija(scene) {
     // happens to every one of these on this coast.
     // It has no shaft of its own any more; it stands on the shared footing at
     // -0.55, five centimetres below where its own leg used to start.
-    frustumTS(-0.55, [D.t + 2.06, D.s - 0.16, 0.70, 0.74],
+    frustumD(-0.55, [D.t + 2.06, D.s - 0.16, 0.70, 0.74],
       y - 0.46, [D.t + 2.06, D.s - 0.16, 0.94, 0.92], NEW);
-    frustumTS(y - 0.46, [D.t + 2.06, D.s - 0.16, 0.96, 0.94],
+    frustumD(y - 0.46, [D.t + 2.06, D.s - 0.16, 0.96, 0.94],
       y - 0.26, [D.t + 2.06, D.s - 0.16, 0.98, 0.96], [0.808, 0.806, 0.778],
       [0.836, 0.834, 0.804]);
 
@@ -8863,7 +8949,7 @@ async function buildJadrija(scene) {
     // does not read as a new casting.
     for (const [ot, wt, sh] of [[-1.30, 0.30, 0.62], [-0.34, 0.19, 0.44],
       [0.42, 0.24, 0.55]]) {
-      boxTS(D.t - 0.62 + ot - wt, D.t - 0.62 + ot + wt,
+      boxD(D.t - 0.62 + ot - wt, D.t - 0.62 + ot + wt,
         D.s - 1.36, D.s - 1.30, y - 0.26 - sh * 1.5, y - 0.26,
         [0.520, 0.552, 0.532]);
     }
@@ -8873,14 +8959,14 @@ async function buildJadrija(scene) {
     // way past the small one. It is the thinnest thing out here and it is the
     // thing you see first: a dark line against the channel with nothing under
     // the far end of it.
-    bar(D.t - 2.42, D.t + 5.10,
+    barIn(P, D.t - 2.42, D.t + 5.10,
       [[D.s - 0.40, y + 0.015], [D.s + 0.40, y + 0.015],
        [D.s + 0.40, y + 0.105], [D.s - 0.40, y + 0.105]], PLANK,
       [0.796, 0.780, 0.722]);
     // And the two bearers under it where it crosses each mass, which is what
     // stops it reading as a decal on the top of the concrete.
     for (const ot of [-0.62, 2.06]) {
-      boxTS(D.t + ot - 0.36, D.t + ot + 0.36, D.s - 0.30, D.s + 0.30,
+      boxD(D.t + ot - 0.36, D.t + ot + 0.36, D.s - 0.30, D.s + 0.30,
         y - 0.05, y + 0.015, [0.560, 0.548, 0.512]);
     }
 
@@ -8900,10 +8986,10 @@ async function buildJadrija(scene) {
         prof.push([y + 1.34 + Math.sin(a) * 0.30, 0.036,
           0, -(1 - Math.cos(a)) * 0.30]);
       }
-      lathe(W, bt, bs, prof, PIPE, 8);
+      lathe(P, bt, bs, prof, PIPE, 8);
       // The foot: a collar where it goes into the concrete, because a pipe
       // that simply stops at a surface reads as sunk into mud.
-      post(W, bt, bs, y - 0.02, y + 0.07, 0.062, [0.612, 0.616, 0.606], 8);
+      post(P, bt, bs, y - 0.02, y + 0.07, 0.062, [0.612, 0.616, 0.606], 8);
     }
 
     // ── the ladder ───────────────────────────────────────────────────────────
@@ -8911,12 +8997,12 @@ async function buildJadrija(scene) {
     // are bending to. Six rungs to the water and two more under it, because
     // the last one you can see is never the last one there is.
     for (const ot of [-1.28, -0.20]) {
-      boxTS(D.t + ot - 0.030, D.t + ot + 0.030,
+      boxD(D.t + ot - 0.030, D.t + ot + 0.030,
         D.s - 1.40, D.s - 1.33, y - 2.55, y - 0.10, PIPE);
     }
     for (let k = 0; k < 8; k++) {
       const yy = y - 0.34 - k * 0.30;
-      boxTS(D.t - 1.31, D.t - 0.17, D.s - 1.42, D.s - 1.35,
+      boxD(D.t - 1.31, D.t - 0.17, D.s - 1.42, D.s - 1.35,
         yy, yy + 0.036, PIPE);
     }
   }
@@ -11927,6 +12013,11 @@ async function buildJadrija(scene) {
   {
     const FLOAT = [0.930, 0.925, 0.905], MARK = [0.870, 0.400, 0.130];
     for (let t = 8; t < LEN - 8; t += 3.0) {
+      // The orange one keeps following `DIVE.t`, and it should. It used to sit
+      // *at* the platform, which stood two metres outside the line; the
+      // platform is now fifteen metres outside it, so what this marks is the
+      // place on the rope you cross to swim out to the skakaonica — which is
+      // what an odd-coloured float in a run of white ones is for.
       const c = Math.abs(t - DIVE.t) < 1.6 ? MARK : FLOAT;
       const r = c === MARK ? 0.22 : 0.06;
       boxTS(t - r, t + r, -38 - r, -38 + r, -r, r, c);
@@ -20524,9 +20615,14 @@ async function buildJadrija(scene) {
     swimRun: {
       start: (() => { const p = W(JET.t + JET.w + 1.6, -JET.out + 3, 0);
         return [p[0], p[2]]; })(),
-      board: (() => { const p = W(DIVE.t, DIVE.s + DIVE.w + 1.2, 0);
+      // Through the platform's own frame and not `W`. At `DIVE.t` the two are
+      // the same point by construction — that is what linearising at the anchor
+      // means — but the platform is 55 m out, where an offset in `t` through
+      // `W` is 2.7 times as long as it says it is. Anything measured off the
+      // board from here has to be measured in the frame the board is built in.
+      board: (() => { const p = DIVE.P(DIVE.t, DIVE.s + DIVE.w + 1.2, 0);
         return [p[0], p[2]]; })(),
-      deck: (() => { const p = W(DIVE.t, DIVE.s, DIVE.top);
+      deck: (() => { const p = DIVE.P(DIVE.t, DIVE.s, DIVE.top);
         return [p[0], p[1], p[2]]; })(),
       jetty: (() => { const p = W(JET.t, -JET.out + 3, at(JET.t).lip);
         return [p[0], p[1], p[2]]; })(),
