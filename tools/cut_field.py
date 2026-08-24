@@ -11,6 +11,17 @@ Misha's own footage and they are large — at
 and this is the only thing that has ever turned them into what ships. Run it
 whenever a bed wants re-cutting; it is deterministic and it overwrites.
 
+TWO KINDS OF THING COME OUT OF HERE, and the second one arrived on 24 August.
+A BED loops for as long as the game is open and everything below about seams,
+insets and the length search exists for it. A CUE plays once, under a moment,
+and then stops — and none of that machinery applies to it, because a one-shot
+has no join to hide. `cut_cue` is its own six lines for exactly that reason:
+the alternative was to let `pick` search for a seam that will never be heard,
+which is a search returning an answer to a question nobody asked. What a cue
+needs instead is a window chosen by hand off the shape of the recording, and
+the two paths share only the tail — filter, level, encode — which is where the
+duplication would actually have cost something.
+
 WHAT THE HARD PART IS
 
 Not the filtering, which is four lines. The window. A bed loops for as long as
@@ -63,6 +74,7 @@ FILES = {
     # others. An absolute path, because it does not live under SRC.
     8: '/mnt/c/tmp/refs/jadrija/survey/4/'
        '1000150414-super-valuable-pan-kabine-and-other-stuffs.mp4',
+    9: 'WhatsApp Audio 2026-08-24 at 8.54.48 AM - fs.mp4',
 }
 # 1 is not cut. It was recorded at 21:38 and is broadband 200-2000 Hz with no
 # cicada and no cricket band in it; nobody has been able to say what it is, and
@@ -168,6 +180,102 @@ BEDS = [
          bar=1.88880, what='the set in the kabina, 23 Aug'),
 ]
 
+# ── the cues ────────────────────────────────────────────────────────────────
+#
+# One so far: what plays when the girl on the beach turns.
+#
+# WHAT THE SOURCE IS, measured and not guessed, because rule 12 applies to a
+# recording as much as to a shopfront. 122.77 s, mono, 48 kHz. Normalised to
+# unit RMS and read in third-octave bands it is -39.1 dB at 60-120 Hz, -26.9 at
+# 120-250, then up to a plateau of -13.4 to -13.0 across 900-4600 and still
+# -19.9 at 7-11 kHz. That shape is not a place: the six field recordings all
+# carry 12 to 20 dB more below 250 Hz than this does. It is the shape the
+# `radio` source has — -42.4, -26.4, then a plateau — and the radio is a small
+# speaker recorded on a phone. So this is music, played out of a speaker, into
+# the same phone.
+#
+# It has a tempo, and it does not drift: the onset envelope autocorrelates at
+# 0.536 over the whole two minutes at a lag of 3.3925 s, with the half and the
+# eighth of that lag under it. **0.42406 s a beat, 141.49 bpm, and eight beats
+# to a two-bar phrase.** That is worth two decimal places because the game's
+# own beat is 0.43 s — the synth this replaces was pinned to `FIRE_DUR` in
+# tools/blender/human_mh.py so that her boot lands on the beat, and 141.49
+# against 139.53 would walk three quarters of a beat apart over the 26 s the
+# routine runs for. 80-audio.js plays the clip at 1.0140 to close that, which
+# is 24 cents of pitch and is why the tempo is measured here rather than
+# rounded.
+#
+# WHERE THE WINDOW IS. The recording has a shape and the shape is what chose
+# it. There is a stop-start intro: the track drops to -39 dB or lower for
+# about half a second at the end of every phrase, at 4.6, 8.0, 11.4, 14.7 and
+# 18.1 s, the gaps getting shallower each time, and from 25.1 s on there are no
+# gaps at all and it runs level to the end. So the first 25 s builds and the
+# rest sits.
+#
+# The window starts 1.1154 s before the downbeat at 8.5030 s and runs eight
+# phrases. The lead-in is deliberate and is the whole reason the start is not
+# on the beat: `FIRE.lead` is 1.10 s of game time, the length of the `flare`
+# clip, and what has to land on the downbeat is her first stamp — so the clip
+# has to carry 1.10 s of game time, 1.1154 s of source, in front of its own
+# downbeat. What is in that 1.1154 s here is the deepest gap in the recording,
+# falling from -24 to -41 dB. It is a hole in front of the hit, which is what
+# the riser it replaces was for.
+#
+# Measured over the candidate downbeats, this one has the biggest step across
+# its downbeat of any window in the file — the lead-in is -29.56 dBFS against
+# -23.10 for the bar after it, +6.46 dB — and it ends at 35.64 s, ten seconds
+# inside the part with no gaps in it. So the cue starts sparse under the flare
+# and has filled out by the time she is stamping.
+#
+# 28.2553 s of source is 27.86 s at 1.0140, against a routine that is
+# `FIRE.lead` plus `SHOW.blazeFor` — 1.10 + 26.0 — and a 0.45 s stop fade, so
+# 27.55 s. The clip outlasts the longest turn by three tenths of a second and
+# is not a second longer than it has to be.
+#
+# THE LEVEL, which is measured the way the radio's was and then cannot be
+# written here.
+#
+# Measured first: the `firestarter` synth was lifted whole out of 80-audio.js
+# into an OfflineAudioContext — `fireInit`, `fireRiser`, the crash, and
+# `fireBeat` scheduled on the same grid `fireTick` schedules it on, with
+# `fireBus.gain` pinned at 1 so what is read is what feeds the bus — and
+# rendered at 48 kHz. It comes out at **-14.228 dBFS RMS** over the beat,
+# -14.402 over the whole cue including the riser, and it PEAKS at -1.62. A
+# crest factor of 12.6 dB.
+#
+# This recording's crest factor over the chosen window is 17.53 dB, and it is
+# the material and not a click: 2 492 samples in the window are over half the
+# peak. So a file normalised to -14.23 dBFS RMS peaks at **+3.30 dBFS** and is
+# a clipped file. That is not a window that can be picked again — every
+# candidate downbeat in the recording comes out between 16.9 and 18.5 dB of
+# crest — and the note above `finish` is right that the answer is not a
+# limiter.
+#
+# So the level match is split. The file ships at -18.03 dBFS RMS, which puts
+# its peak at exactly the -0.50 dBFS `finish` allows, and 80-audio.js puts the
+# difference back on the sample's own gain node — so what reaches `fireBus` is
+# at `target`, -14.23 dBFS, and the room hears the cue at the level it heard
+# the synth at. Nothing clips on the way: the peak at the bus INPUT is +2.93
+# dBFS whichever way the split is made, and the bus is at `FIRE.gain` 0.50, so
+# what arrives at the master peaks at -3.09 dBFS against the synth's -7.64.
+# Louder in the peaks by 4.6 dB, identical in RMS, and that difference is
+# simply what music is next to a drum machine.
+#
+# `makeup` is not -18.03 subtracted from -14.23, and the 0.53 dB it is out by
+# is the encoder. LAME at 80 kbps mono into 24 kHz throws away everything over
+# about 11 kHz, and this source still carries -19.9 dB of its energy in the
+# 7-11 kHz band and more above it, so the clip that comes BACK out of the file
+# is 0.53 dB quieter than the one that went in. `cut_cue` decodes the mp3 it
+# just wrote and reads it, rather than trusting the number it asked for; the
+# constant below is that measurement and the tool shouts if a re-cut moves it.
+# This is the same correction the `radio` bed carries for its own rig, applied
+# at the other end of the chain.
+CUES = [
+    dict(key='firestarter', src=9, at=7.38755, sec=28.25525,
+         rate=24000, kbps=80, hp=(2, 70), lp=None, rms=-18.03,
+         target=-14.23, makeup=4.33, what='the turn, 24 Aug'),
+]
+
 INSET = 0.5     # s — where 80-audio.js puts loopStart and loopEnd
 MATCH = 0.35    # s — how much of each end the seam is judged on
 STEP = 0.02     # s — the search grid
@@ -248,49 +356,97 @@ def pick(x, bed, sr):
     return best
 
 
+def filt(y, spec):
+    """
+    The filters, at 48 kHz and before the resample, so the resampler's own
+    anti-alias is the only thing shaping the top and nothing has to be undone.
+    """
+    if spec['hp']:
+        y = sig.sosfiltfilt(sig.butter(spec['hp'][0], spec['hp'][1],
+                                       btype='high', fs=SR, output='sos'), y)
+    if spec['lp']:
+        y = sig.sosfiltfilt(sig.butter(spec['lp'][0], spec['lp'][1],
+                                       btype='low', fs=SR, output='sos'), y)
+    return y
+
+
+def finish(spec, y):
+    """
+    To the level the clip it replaces was heard at, exactly, and then encoded.
+
+    A longer window catches more of whatever the loudest thing in the recording
+    is — somebody shouting on the pier is 8 dB over the rest of it — and the
+    level is set by RMS, so the peak has to be checked and not assumed.
+    Anything over -0.5 dBFS would clip the decoder rather than the file; nothing
+    here comes near it, and if something ever does the answer is a different
+    window, not a limiter.
+    """
+    y = y * (10 ** (spec['rms'] / 20) / max(np.sqrt(np.mean(y ** 2)), 1e-12))
+    peak = 20 * np.log10(np.max(np.abs(y)))
+    if peak > -0.5:
+        print(f"  !! {spec['key']} peaks at {peak:+.2f} dBFS — pick again")
+    tmp = f"/tmp/cut_{spec['key']}.wav"
+    import scipy.io.wavfile as wav
+    wav.write(tmp, SR, (np.clip(y, -1, 1) * 32767).astype('<i2'))
+    dst = os.path.join(OUT, spec['key'] + '.mp3')
+    subprocess.run(['lame', '--quiet', '-m', 'm', '--resample',
+                    str(spec['rate'] / 1000.0), '-b', str(spec['kbps']),
+                    '--cbr', tmp, dst], check=True)
+    return os.path.getsize(dst) / 1024.0, peak
+
+
 def cut(bed):
     x = decode(source(bed))
     score, a, L, s, dl, ds = pick(x, bed, SR)
-    y = x[int(a * SR):int((a + L) * SR)].copy()
-    # The filters, at 48 kHz and before the resample, so the resampler's own
-    # anti-alias is the only thing shaping the top and nothing has to be undone.
-    if bed['hp']:
-        y = sig.sosfiltfilt(sig.butter(bed['hp'][0], bed['hp'][1],
-                                       btype='high', fs=SR, output='sos'), y)
-    if bed['lp']:
-        y = sig.sosfiltfilt(sig.butter(bed['lp'][0], bed['lp'][1],
-                                       btype='low', fs=SR, output='sos'), y)
-    # To the level the clip it replaces was heard at, exactly.
-    y *= 10 ** (bed['rms'] / 20) / max(np.sqrt(np.mean(y ** 2)), 1e-12)
-    peak = 20 * np.log10(np.max(np.abs(y)))
-    # A longer window catches more of whatever the loudest thing in the
-    # recording is — somebody shouting on the pier is 8 dB over the rest of it —
-    # and the level above is set by RMS, so the peak has to be checked and not
-    # assumed. Anything over -0.5 dBFS would clip the decoder rather than the
-    # file; nothing here comes near it, and if something ever does the answer is
-    # a different window, not a limiter.
-    if peak > -0.5:
-        print(f"  !! {bed['key']} peaks at {peak:+.2f} dBFS — pick again")
-    tmp = f"/tmp/cut_{bed['key']}.wav"
-    import scipy.io.wavfile as wav
-    wav.write(tmp, SR, (np.clip(y, -1, 1) * 32767).astype('<i2'))
-    dst = os.path.join(OUT, bed['key'] + '.mp3')
-    subprocess.run(['lame', '--quiet', '-m', 'm', '--resample',
-                    str(bed['rate'] / 1000.0), '-b', str(bed['kbps']),
-                    '--cbr', tmp, dst], check=True)
-    kb = os.path.getsize(dst) / 1024.0
-    print(f"  {bed['key']:<8s} {L:5.1f} s  from {a:6.2f} s of r{bed['src']}  "
+    y = filt(x[int(a * SR):int((a + L) * SR)].copy(), bed)
+    kb, peak = finish(bed, y)
+    print(f"  {bed['key']:<12s} {L:5.1f} s  from {a:6.2f} s of r{bed['src']}  "
           f"{bed['rate']:5d} Hz {bed['kbps']:3d}k {kb:6.1f} KB  "
           f"seam {dl:+.2f} dB level, {ds:.2f} dB spectrum  peak {peak:+.1f}")
     return dict(bed, sec=L, at=a, kb=kb, seam_l=dl, seam_s=ds, peak=peak)
 
 
+def cut_cue(cue):
+    """
+    A one-shot, at a window somebody chose by hand.
+
+    No seam, no inset, no search: the clip is played once and stopped, so both
+    of its ends are heard exactly once and neither is heard next to the other.
+    Everything this shares with a bed is in `filt` and `finish`.
+
+    What it does that no bed does is read the file back. A bed's level is set
+    by RMS before the encoder and that is the end of it, because a bed is
+    crossfaded against other beds cut the same way and they all lose the same
+    top. A cue is levelled against a SYNTHESISER, and the number that has to
+    match is the one that comes out of the decoder — so the mp3 is decoded
+    again here and the make-up the game has to apply is measured rather than
+    subtracted.
+    """
+    x = decode(source(cue))
+    a, L = cue['at'], cue['sec']
+    y = filt(x[int(a * SR):int((a + L) * SR)].copy(), cue)
+    kb, peak = finish(cue, y)
+    back = decode(os.path.join(OUT, cue['key'] + '.mp3'))
+    got = 20 * np.log10(np.sqrt(np.mean(back ** 2)))
+    dpk = 20 * np.log10(np.max(np.abs(back)))
+    makeup = cue['target'] - got
+    if abs(makeup - cue['makeup']) > 0.05:
+        print(f"  !! {cue['key']}: 80-audio.js carries makeup {cue['makeup']:+.2f} dB "
+              f"and this cut needs {makeup:+.2f} — FIRE.samp is wrong")
+    print(f"  {cue['key']:<12s} {L:5.1f} s  from {a:6.2f} s of r{cue['src']}  "
+          f"{cue['rate']:5d} Hz {cue['kbps']:3d}k {kb:6.1f} KB  "
+          f"one-shot, decodes at {got:+.2f} dBFS, makeup {makeup:+.2f}"
+          f"      peak {peak:+.1f}/{dpk:+.1f}")
+    return dict(cue, kb=kb, peak=peak, got=got, need=makeup)
+
+
 if __name__ == '__main__':
     only = sys.argv[1:] 
     rows = [cut(b) for b in BEDS if not only or b['key'] in only]
+    rows += [cut_cue(c) for c in CUES if not only or c['key'] in only]
     print()
-    print('  clip      source                        s    rate  kbps     KB')
+    print('  clip          source                        s    rate  kbps     KB')
     for r in rows:
-        print(f"  {r['key']:<8s}  {r['what']:<26s} {r['sec']:5.1f}  "
+        print(f"  {r['key']:<12s}  {r['what']:<26s} {r['sec']:5.1f}  "
               f"{r['rate']:5d}  {r['kbps']:4d}  {r['kb']:6.1f}")
     print(f"  total {sum(r['kb'] for r in rows):.0f} KB")
