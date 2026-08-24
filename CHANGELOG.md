@@ -8,6 +8,79 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.118.0] — 2026-08-24
+
+### Two piers, a mohawk and a dove — and most of it was found by measuring
+
+**Both moles off the kabine were missing, and so was the reason.**
+`fetch_osm.py` had never asked OpenStreetMap for `man_made=pier`, so two
+real piers had been absent from every build. Misha's screenshot of the
+gap turned out to be a Google aerial rotated about 180°; fitted at
+0.223 m/px on three control points, his typed coordinate landed 54.7 m
+from the pier he had arrowed and 3.2 m from a *second* real one. Both
+are built, on their own rigid (u,v) frames, and `walkY` and `standable`
+both ask them.
+
+**The diving platform was floating beside a mole, not off the end of
+one.** His red arrow, fitted against a reproduction of his own camera —
+five 3D↔2D correspondences, 3.7 px RMS — lands 47 m west and seaward.
+In the new mole's frame that is 29 m straight off its head; the old
+position was 30 m off its flank. At 54.8 m offshore on the bend the
+shore frame stretches 2.7:1, so the platform now carries a rigid frame
+of its own, linearised at the anchor. The race is 146 m, not 175.
+
+**The unsold parasol hems moved to the cafés.** A beach hem is 0.12 m
+deep and the message died past about 15 m; a café hem is 0.18 and it
+prints at 9 cm of cap instead of 6. One hem on each of two terraces,
+not four — four blanks is a hire company that has sold nothing. The
+aspect ratio did not have to move: the depth cap binds for both brands,
+so the blank and CORONA print at exactly the same cap height and the
+whole difference is the repeat.
+
+**At the flare she comes up shorn, with two horns.** Keith Flint, 1996.
+One number, `shorn`, 0→1 over 0.22 s, derived every frame from the
+existing latch so it cannot be stranded; at 0 all three parts are exact
+no-ops. The horns are geometry on the head bone; the shave is a recolour
+applied to the hair colour *before* the skin-to-hair weight is spent, so
+the ramp that fixed the hairline carries the new boundary for free and
+stubble can never reach bare forehead. The tail goes, as a fragment
+discard rather than a vertex collapse — `easeNape` hands its lower half
+to the neck bone, so a collapsed blob would punch out of her skull the
+moment she tips her head. Her *shadow* still has a ponytail; the depth
+caster is a separate vertex program and does not know.
+
+**A collared dove in the pines behind the vikendica.** His own
+recording, and the measurement decided the design: the file has been
+through a noise suppressor whose floor steps 15 dB on one frame at
+0.73 s and back at 5.38, so both ends of it are outside the real
+recording. It ships as a cue and not a bed, and the reason is the bird —
+a dove is made of its silence, and a loop can only ship the saying. One
+phrase, 1.32 s, and the game owns the gaps. No new gate: the existing
+indoors machinery gives 26 dB of swing on walking through a door.
+
+**A bojler, a lonac and a bucket over the washing machine.** Ø45 × 90,
+and the two numbers come from different places on purpose — the diameter
+is measured off his photograph against the machine's 60 cm front face,
+but the crown is cropped off the top of the frame, so the height is the
+catalogue's 80-litre and the docstring says so. Three whites, not two:
+`WHITEGOODS` would weld a metre of tank to the machine into one white
+column, and the corner exists because two objects are stacked in it.
+
+**Raffaello, not Bounty.** The one name in the gelato case that was never
+read off a plaque — the card is turned away in every frame and Misha
+named it from standing there. The pan keeps its dark ribbon, which is the
+one place the name and the photograph disagree: what the pan looks like
+is a measurement, what the confection contains is an inference from its
+name, so the photograph keeps the pan and he keeps the card.
+
+### Also
+
+- The chase called it a two-hundred-metre swim; it was 175 and is 146.
+- The ladder's comment said shoreward and the geometry says seaward.
+- The vikendica renders with the changing hut's acoustics — a masonry
+  house with five windows is muffled like a wooden hut with one shut
+  door. Found, deliberately not fixed, recorded here.
+
 ## [1.117.0] — 2026-08-24
 
 ### Eight assignments, and six of them turned out to be somewhere other than where they looked

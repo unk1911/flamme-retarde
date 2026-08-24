@@ -3817,13 +3817,19 @@ async function buildJadrija(scene) {
       { name: 'Lubenica', col: [0.860, 0.490, 0.445], rib: null },
       { name: 'Mango', col: [0.835, 0.755, 0.340], rib: null },
       { name: 'Zelena Jabuka', col: [0.490, 0.680, 0.310], rib: null },
-      // Bounty, and the only name in this table that was not read off a
+      // Raffaello, and the only name in this table that was not read off a
       // plaque. The card is turned away in every frame; Misha named it from
       // standing there, which is better evidence than a photograph and is the
       // one kind of source that outranks the rule about not inventing names.
-      // The colour and the ribbon are unchanged — cream with a dark swirl is
-      // what the pan is in `selection-2`, and coconut with chocolate through it
-      // is what Bounty is, so nothing had to be bent to fit.
+      // He first called it Bounty and corrected it to Raffaello, and the
+      // correction stands for the same reason the first name did: he was there.
+      //
+      // The pan keeps its dark ribbon, which is the one place the name and the
+      // photograph do not agree. A Raffaello is coconut and almond and has no
+      // chocolate in it, but the pan in `selection-2` is plainly cream with a
+      // dark swirl through it, and what the pan looks like is a measurement
+      // while what the confection contains is an inference from its name. So
+      // the photograph keeps the pan and Misha keeps the card.
       //
       // `off` shifts the plaque a third of a bay along so it does not stand in
       // front of "Jogurt Šumsko voće" behind it. That one is the only two-line
@@ -3831,7 +3837,7 @@ async function buildJadrija(scene) {
       // a front-row card at the same `t` to cut into it — every other pair
       // clears on the 0.14 m of height between the rows. Still over its own
       // pan: a third of a bay is 0.15 m and the pan is three times that.
-      { name: 'Bounty', col: [0.830, 0.775, 0.680], rib: [0.490, 0.330, 0.180],
+      { name: 'Raffaello', col: [0.830, 0.775, 0.680], rib: [0.490, 0.330, 0.180],
         off: -0.32 },
       { name: 'Cookies', col: [0.810, 0.745, 0.640], rib: [0.180, 0.125, 0.095] },
       // Pale blue, and the plaque is under the promenade's reflection in both
