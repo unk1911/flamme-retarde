@@ -8151,6 +8151,203 @@ async function buildJadrija(scene) {
   const onMoleY = (t, s) => onMoleT(t) && s > -JET.out - 1.2 && s < 0.45;
   const onMoleWalk = (t, s) => onMoleT(t) && s > -JET.out - 1.2;
 
+  // ── the two moles off the kabine ───────────────────────────────────────────
+  /**
+   * Jadrija has three structures standing over open water, not one, and until
+   * now this file built the western one and nothing else.
+   *
+   * Misha, 24 Aug, over an aerial of his own game with the missing thing
+   * scribbled on it: *"where the red marker is, is where the missing
+   * jetty/pier is... i might be wrong but it should be attached to the land at
+   * approximately 43.723677, 15.846657"* — world (-1878.2, 481.2).
+   *
+   * **OSM has both of them, and had them all along.** The `coast` layer this
+   * file traces its shore from is not the only thing Overpass will give you for
+   * this bay: `man_made=pier` returns five ways inside the resort, of which two
+   * are on the bathing frontage and are these. They are absent from
+   * `build/osm/*.json` only because `tools/fetch_osm.py` never asked for the
+   * tag. Same lesson as the Brod, in a new place — check the map before
+   * inventing geometry.
+   *
+   *   way 1380201137 — nine nodes, root on the coastline between its own nodes
+   *     39 and 40, principal axis **224.0°**, **42.8 m** long, sides sitting at
+   *     v +1.8 and −2.3 about that axis, so **4.2 m** across. Head at
+   *     (-1962.0, 504.3). This is the one the arrow points at.
+   *   way 1380201136 — a four-node rectangle at the corner where the promenade
+   *     turns south, axis **178.1°**, **12.8 m** long and **2.9 m** across,
+   *     its landward end cut on the diagonal of the shore.
+   *
+   * **Which one he meant, and how far out his coordinate is.** The screenshot
+   * is a Google aerial rotated about 180°, which is why it reads as though the
+   * sea were north — so the mole with the wide head that his arrow lands on
+   * runs down-left in world terms, not up-right. Fitting his two visible
+   * structures and the shore corner against a georeferenced Esri tile at z18
+   * gives 0.223 m/px and a half turn; on that fit the arrowhead falls at
+   * (-1940, 485), thirteen metres out along **1380201137**. So the pier he is
+   * pointing at comes ashore at (-1932.3, 473.4) and his typed coordinate is
+   * **54.7 m** east of it — it lands within 3.2 m of the root of the *other*
+   * one, 1380201136, which is a real pier too and is also missing. He said "i
+   * might be wrong"; he was, by one structure, and both are built here.
+   *
+   * **The section is the bathing mole's, not the Brod's.** `b_144` and `b_121`
+   * of the v597 walk look straight along one of these with a man standing on
+   * it: flat poured concrete, no rail, no bollard, a swim ladder at the head,
+   * and freeboard you could sit on with your feet in the water. So the same
+   * treatment as `JET` above — poured solid to the bed, deck flush with the
+   * promenade it leaves, stone armour at the head — with the batter and the
+   * slabbed bays `brodQuay` uses, because forty-three metres of untextured
+   * plane reads as a game whichever pier it is on.
+   *
+   * **Its own frame, per rule 9b.** `W(t, s)` is a parallel offset of a traced
+   * waterline and a 43 m rectangle laid out in it comes out a trapezium; worse,
+   * 1380201137 runs 68° off the shore normal, so in (t, s) it is a slanted band
+   * 28 m long in `t`. Everything below is in `(u, v)` — `u` out along the mole
+   * from the root, `v` athwart — dropped on the world by `A.P`, which is rigid
+   * and exact.
+   */
+  const MOLE = [
+    { root: [-1932.3, 473.4], face: 224.0, len: 42.8, wide: 4.2 },
+    { root: [-1881.3, 481.9], face: 178.1, len: 12.8, wide: 2.9 },
+  ].map((M) => {
+    const br = M.face * Math.PI / 180;
+    const ax = Math.sin(br), az = -Math.cos(br);   // out along it, from a bearing
+    const nx = -az, nz = ax;                       // athwart
+    const rx = M.root[0], rz = M.root[1];
+    const P = (u, v, y) => [rx + ax * u + nx * v, y, rz + az * u + nz * v];
+    // The deck is the promenade it leaves, which is what `JET` does — with the
+    // 0.12 m standoff on top of it, because unlike `JET` these moles come
+    // ashore two to three metres *inland* of the traced waterline and lay a
+    // 4 m width of deck over the lip terrace before they clear it. Two surfaces
+    // in one plane 2.1 km from the origin is rule 5, and 0.72 m is the mole
+    // freeboard the survey measured, kept as the floor for a station where the
+    // terrace is lower than that.
+    const rt = local(rx, rz);
+    const top = Math.max(lipOf(at(rt[0]), Math.max(rt[1], 0)), 0.72) + STAND;
+    // The footprint in shore coordinates, for `bounds` — which can only think
+    // in `t` and needs to know over which stations the seaward wall has a hole
+    // in it. Taken from the four corners rather than from the axis: the mole is
+    // oblique to the shore, so its `t` span is wider than its length suggests.
+    let t0 = Infinity, t1 = -Infinity, sMin = Infinity;
+    for (const u of [0, M.len]) {
+      for (const v of [-M.wide / 2, M.wide / 2]) {
+        const p = P(u, v, 0), ts = local(p[0], p[2]);
+        t0 = Math.min(t0, ts[0]); t1 = Math.max(t1, ts[0]);
+        sMin = Math.min(sMin, ts[1]);
+      }
+    }
+    return { ...M, ax, az, nx, nz, P, top, w: M.wide / 2, t0, t1, sMin };
+  });
+
+  {
+    const backM = b; b = up;
+    // The mole's own concrete, the wet band round its foot, and the rubble at
+    // its head. The first two are `JET`'s exactly, so the three structures on
+    // this frontage are one material; `WET` is the diving platform's tidal
+    // band, which is the thing that says "standing in the sea" from the
+    // promenade.
+    const MASS = [0.720, 0.706, 0.664];
+    const MWET = [0.352, 0.408, 0.396];
+    for (let m = 0; m < MOLE.length; m++) {
+      const A = MOLE[m], P = A.P, W2 = A.w, L = A.len, TOP = A.top;
+      const BASE = -2.4;              // poured to the bed, as `JET` is
+      const BAT = 0.30;               // how far the foot stands out (rule 7)
+      const DK = TOP - 0.14;          // the top of the mass, under the slabs
+      const YW = 0.26;                // the top of the wet band
+      // The mass, in courses along it rather than as one prism, for the reason
+      // the kabine row is not one box: forty-three metres of untextured plane
+      // reads as a game, and the flank of this thing is the whole of what you
+      // see of it from the promenade. Each course takes a small step of tone off
+      // a `jit` hash of its index — never `rng`, which is the beach layout
+      // (rule 4). They abut rather than overlap, so the only quads they share a
+      // plane with are each other's end faces, which are inside the solid.
+      //
+      // The batter is sampled from one taper rather than written twice, so the
+      // wet band and the dry mass above it are two pieces of the same lean and
+      // there is no step where they meet. It runs on `v` alone: the courses meet
+      // end to end and a batter on their ends would open the joints.
+      const NS = Math.max(1, Math.round(L / 4.4));
+      for (let i = 0; i < NS; i++) {
+        const u0 = (i / NS) * L, u1 = ((i + 1) / NS) * L;
+        const cu = (u0 + u1) / 2, hu = (u1 - u0) / 2;
+        const sec = (y) => {
+          const k = (DK - y) / (DK - BASE);
+          return [cu, 0, hu, W2 + BAT * k];
+        };
+        const j = (jit(i + m * 41, 7.71) - 0.5) * 0.05;
+        const cl = [MASS[0] + j, MASS[1] + j * 0.96, MASS[2] + j * 0.90];
+        frustum(P, BASE, sec(BASE), YW, sec(YW), MWET, MWET);
+        frustum(P, YW - 0.05, sec(YW - 0.05), DK, sec(DK), cl, cl);
+      }
+      // The deck, laid in bays across it with the mass showing through the
+      // joints. Each slab is a solid standing 0.14 m proud and dropped 0.20 m
+      // into the mass, not a quad on top of it: a slab laid in the mass's own
+      // plane is the z-fight rule 5 is about, and at 2.1 km it is decided per
+      // pixel. The tone step is a `jit` hash of the bay index — never `rng`,
+      // which is the beach layout (rule 4).
+      const BAY = 2.2, JW = 0.07;
+      const n = Math.max(1, Math.round(L / BAY));
+      for (let i = 0; i < n; i++) {
+        const u0 = (i / n) * L, u1 = ((i + 1) / n) * L - (i < n - 1 ? JW : 0);
+        const k = (jit(i + m * 97, 3.31) - 0.5) * 0.055;
+        const cl = [CONC[2][0] + k, CONC[2][1] + k * 0.92, CONC[2][2] + k * 0.84];
+        const r = [(u0 + u1) / 2, 0, (u1 - u0) / 2, W2 - 0.02];
+        frustum(P, TOP - 0.20, r, TOP, r, MASS, cl);
+      }
+      // The armour at the head — the one thing on either of them that is not
+      // flat, and what makes the head read wider than the shaft in the aerial,
+      // which in both the satellite and the Esri tile it does.
+      //
+      // Carried to 0.78 m and no higher. `JET` takes its armour to `top - 0.30`
+      // and that is right at a station where the promenade is 1.46 m; at 2.19 m
+      // it is a two-metre block of shadowed limestone standing off the end of
+      // the pier, which is what the first cut of this looked like from the
+      // water — a black wall, not a rubble toe. Armour is what is piled against
+      // the head at the waterline, so it stops at the waterline.
+      frustum(P, -1.9, [L + 0.35, 0, 1.6, W2 + 1.0],
+        Math.min(TOP - 0.34, 0.78), [L + 0.35, 0, 1.0, W2 + 0.55], STONE, CONC[1]);
+    }
+    b = backM;
+  }
+
+  /**
+   * The deck height at a world point, if that point is on one of the two moles.
+   *
+   * In the mole's own frame and not in `(t, s)`, for the reason in the block
+   * above: `local()` is a projection on to a traced polyline and it is the
+   * thing that put the Brod 204 m from where it is.
+   *
+   * One function, asked by both `walkY` and `standable`, and that is the point:
+   * the band at the root of `JET` where a walk height and a standing test
+   * disagreed by 0.4 m is what put people in the water on purpose. A quarter of
+   * a metre of slop round the edge, which covers the slabs' inset and the width
+   * of a walker's girth and is not enough to read as standing on the sea.
+   */
+  function onMole(x, z) {
+    for (const A of MOLE) {
+      const dx = x - A.root[0], dz = z - A.root[1];
+      const u = dx * A.ax + dz * A.az;
+      if (u < -0.25 || u > A.len + 0.25) continue;
+      const v = dx * A.nx + dz * A.nz;
+      if (v > -A.w - 0.25 && v < A.w + 0.25) return A.top;
+    }
+    return null;
+  }
+
+  /**
+   * How far seaward the wall opens at station `t`, or null where it does not.
+   *
+   * A rectangle in `(t, s)` big enough to hold a mole that runs 68° off the
+   * shore normal — `onMole` draws the actual shape inside it, and `standable`
+   * refuses everything else, exactly as `onMoleWalk` does for `JET`.
+   */
+  const moleSeaward = (t) => {
+    let s = null;
+    for (const A of MOLE) {
+      if (t > A.t0 - 2 && t < A.t1 + 2) s = Math.min(s == null ? Infinity : s, A.sMin);
+    }
+    return s == null ? null : s - 2;
+  };
+
   // ── the skakaonica ─────────────────────────────────────────────────────────
   /**
    * The diving platform, fourteen metres off the head of the jetty.
@@ -15108,6 +15305,10 @@ async function buildJadrija(scene) {
       if (f != null) return f;
     }
     if (onMoleY(t, s)) return JET.top;
+    // And the two moles off the kabine, which are asked in world metres
+    // because they live on frames of their own — see `onMole`.
+    const mo = onMole(x, z);
+    if (mo != null) return mo;
     if (t < -5 || t > LEN + 5 || s < -3 || s > JAD.back + JAD.bleed) {
       return Math.max(groundAt(x, z), 0);
     }
@@ -19764,7 +19965,11 @@ async function buildJadrija(scene) {
     // on it, and it is not so much that the box reaches water the `s0Of` seaward
     // limit was never measured against.
     bounds: { t0: 3, t1: LEN + 22, s0: 1.1, s1: 300,
-      s0Of: (t) => (onMoleT(t) ? -JET.out - 0.9 : 1.1) },
+      s0Of: (t) => {
+        if (onMoleT(t)) return -JET.out - 0.9;
+        const m = moleSeaward(t);
+        return m == null ? 1.1 : m;
+      } },
     /**
      * And the far shore, which a box cannot describe.
      *
@@ -19796,6 +20001,7 @@ async function buildJadrija(scene) {
     standable: (x, z) => {
       const [t, s] = local(x, z);
       if (onMoleWalk(t, s)) return true;
+      if (onMole(x, z) != null) return true;
       if (s < 1.0) return false;
       if (s < JAD.reachIn) return true;
       return !isSea(x, z);
