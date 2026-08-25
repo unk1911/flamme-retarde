@@ -158,6 +158,38 @@ recordings. It is played only for the *crossing* of the kabina's curtain; the
 tail after you are through is synthesised in `src/80-audio.js`, because it has
 to follow how hard the strands are still swinging.
 
+### The dog and the cat — CC0 1.0
+
+Two meshes in this game were not modelled for it, and both are dedicated to the
+public domain by the people who made them. Their sources are committed at
+`tools/blender/assets/`, which has a longer note on each.
+
+- **Pug**, by **Quaternius** (https://quaternius.com), obtained via Poly Pizza:
+  https://poly.pizza/m/1gXKv15ik8 — `tools/blender/dog.py` bakes it to
+  `build/payload/dog.fr3d.gz`.
+- **cat**, by **hsunq2007**, generated with Meshy and published there under
+  CC0: https://www.meshy.ai/3d-models/cat-01979f8f-28e0-785a-bb0d-1828950e2725
+  — `tools/blender/cat.py` bakes it to `build/payload/cat.fr3d.gz`.
+
+CC0 waives everything, attribution included. Both are named here anyway, on the
+principle the bead curtain's note sets out: saying where a thing came from is a
+different obligation from being made to.
+
+The cat is a *generated* mesh and this file will not leave that to be inferred.
+The intro panels below are outside both grants because machine output painted
+from photographs that are not mine is not mine to license; the cat is different
+in law — its uploader dedicated it to the public domain and that dedication is
+what is being relied on — but it is the same in kind, and a reader comparing
+the two deserves to be told which is which rather than left to spot it in a UV
+atlas.
+
+**Changes made to both**: turned onto the game's +X, scaled to the real
+animal's dimensions, dropped so the lowest vertex sits on z = 0, and rewritten
+into this project's own skinned format. The cat was additionally decimated from
+10 000 triangles to 4 200 and its 2048x2048 texture was baked down to one
+colour per vertex and discarded — nothing in this game samples a texture, and
+there is no UV in the format to sample it with.
+
 ### The birds — CC BY-SA 4.0, CC BY-SA 3.0, CC BY 4.0 and one public domain
 
 `build/payload/{crow,gull,swift,beeeater,blackbird,swallow,wagtail}.mp3` are

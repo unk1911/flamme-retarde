@@ -40,3 +40,31 @@ change to somebody else's rig and it is not a criticism of it: the paws hang off
 `root` because this armature was built for IK, where foot placement belongs in
 root space, and `Jump` uses exactly that. It is simply not the rig this format
 can play.
+
+## cat.glb
+
+- **cat**, by **hsunq2007**, made with [Meshy](https://www.meshy.ai) and
+  published there under **CC0 1.0 Universal**:
+  https://www.meshy.ai/3d-models/cat-01979f8f-28e0-785a-bb0d-1828950e2725
+- 8 115 vertices, 10 000 triangles, one material with a 2048x2048 texture, a
+  27-bone quadruped armature and one walk cycle.
+
+**It is a generated mesh, and that is worth saying rather than leaving to be
+noticed.** The intro panels are already outside both of this project's grants
+for the same reason and `LICENSE` says so at length; this one is inside them
+because its uploader put it under CC0, but what CC0 settles is the licence and
+not the provenance. Nobody drew this cat. It shows in the UV atlas, which is
+not an unwrap anybody would author — a few hundred islands packed automatically,
+with whole eyes and noses scattered through it at random angles — and
+`tools/blender/cat.py` has to work around exactly that when it bakes the
+texture down to vertex colours.
+
+**Committed, and here the CDN argument is not hypothetical.** The download URL
+Meshy hands out is signed and carries an expiry a few days out; it is already
+dead. There is no re-fetching this one, so the 4 MB sits in the repository and
+the build works from a clean clone, which is what this directory is for.
+
+`tools/blender/cat.py` reads it and writes `build/payload/cat.fr3d.gz` — turned
+onto the game's +X, scaled on a real cat's head-and-body length, dropped onto
+z = 0, decimated to 4 200 triangles and repainted as vertex colours, because
+nothing in this game samples a texture.

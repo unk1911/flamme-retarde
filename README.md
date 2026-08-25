@@ -639,6 +639,23 @@ including how to rebuild without the parts you may not want.
   other four already flew over this map with a synthesised voice and now use
   their own: gull, pallid swift, hooded crow and — new — bee-eater, all in
   `src/44-birds.js`. Nothing about how they fly changed.
+- **The cat**: [*cat*](https://www.meshy.ai/3d-models/cat-01979f8f-28e0-785a-bb0d-1828950e2725)
+  by **hsunq2007**, generated with [Meshy](https://www.meshy.ai) and published
+  there under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+  A *generated* mesh, said plainly rather than left to be noticed —
+  [LICENSE](LICENSE) section 3 sets out why that is worth distinguishing from
+  the CC0 dog even though the licence is the same. The source `.glb` is
+  committed at `tools/blender/assets/cat.glb`, and here the usual argument for
+  committing rather than fetching is not hypothetical: Meshy's download URL is
+  signed and expires within days, so there is no re-fetching it.
+  [`tools/blender/cat.py`](tools/blender/cat.py) turns it into
+  `build/payload/cat.fr3d.gz` — onto the game's +X, scaled on a real cat's
+  head-and-body length of 0.46 m (which puts its shoulder at 0.253 m, and a
+  domestic shorthair is 23–25 cm, so two dimensions agree off one factor),
+  dropped onto z = 0, decimated 10 000 → 4 200 triangles, and its 2048×2048
+  texture baked down to one colour per vertex and thrown away, because nothing
+  in this game samples a texture. It keeps its 27-bone armature and its walk
+  cycle, and lives under the slastičarnica's terrace tables.
 - **The dog**: [*Pug*](https://poly.pizza/m/1gXKv15ik8) by
   **[Quaternius](https://quaternius.com)**, dedicated to the public domain under
   [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). The source

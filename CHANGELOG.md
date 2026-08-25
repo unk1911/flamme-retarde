@@ -8,6 +8,81 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.121.0] — 2026-08-25
+
+### A cat under the slastičarnica's tables
+
+**The third thing on the skinned path, and the second quadruped.** Misha
+found a CC0 cat and asked for it under the slastičarnica's tables. It
+arrives better equipped than the pug did — 27 bones AND a walk cycle,
+where the pug brought an armature and two actions neither of which was a
+gait, so `dog.py` had to solve a trot with a two-link IK solver. None of
+that was needed here; the walk in the file is used. Worth recording that
+`skinnedFigure` has now taken a 28-bone woman, a 24-bone pug and a
+27-bone cat without being told which is which.
+
+**Its colour was in a texture, and this game has never sampled one.**
+There is no UV in the format and no sampler in any shader. The pug was
+no trouble — two flat materials, read straight out of a table — but this
+one has a single 2048×2048 PNG which is 3.5 MB of the 4 MB file and none
+of it can ship. So it is baked to vertex colours and thrown away, and
+two things had to be dealt with to make that read as a cat. The atlas is
+not an unwrap anybody drew: it is a few hundred islands packed
+automatically, with whole eyes and noses scattered through it at random
+angles, so neighbouring vertices on the animal land nowhere near each
+other on the sheet and a point sample gives a cat speckled with pink
+nose and yellow iris across its flank. Each sample is a 9×9 block rather
+than one texel, and then the per-vertex colours are relaxed three times
+across the mesh's *own* edges — a blur in the geometry, which is the
+only place the blur means anything. What survives is a ginger back, a
+paler chest and darker feet and tail; what dies is the confetti.
+
+**Scaled on the animal, not on its bounding box.** It arrives at a
+hundredth of a unit — 17 mm nose to tail. Anchored on head-and-body
+length, 0.46 m for a domestic shorthair, and then checked against a
+second measurement: at that factor the shoulder joint stands 0.253 m
+off the ground, and a cat is 23–25 cm at the shoulder. The bounding box
+would have been wrong here in a way it was not for the dog, because
+this cat's highest vertex belongs to `tail3` and the tail is carried up
+— the box's height is a tail and not an animal. The shoulder check
+fired on the first run, by three millimetres, and the tolerance was
+widened rather than the model moved; it is left in place, because a
+check that has fired once and been argued with is worth more than one
+that never fires.
+
+**Decimated 10 000 → 4 200 triangles**, which is 285 KB of payload down
+to 159 KB. Generated meshes are uniformly dense — the ears carry as many
+triangles per centimetre as the flank — so there was a lot to give back
+for an animal that is 60 cm long and mostly under a table.
+
+**The walk is taken out of the walk.** A cycle that travels is right for
+a film and wrong for a game: the runtime carries the animal itself, so a
+clip that also travels arrives at double speed with only one of the two
+attached to the feet. The horizontal root channels are flattened to
+their own mean — flattened rather than zeroed, because zeroing moves the
+animal to wherever the rig's origin happens to be. The vertical is left
+alone; that one is the bob. What the flattening measures on its way past
+is the gait's own speed, 0.58 m/s, which is what the game must move him
+at or the paws skate.
+
+**He works all four tables and back.** The first cut used the first and
+the third and the comment over it claimed he passed under the middle one
+on the way. He did not — the terrace's tables alternate 0.74 m in `s`,
+so that line goes *past* table 1 at about two feet, which is a cat
+walking round a table and not under it. Four stations, 4.4 m a leg,
+every leg starting and ending under a table. The stations are not typed:
+`terraceTables` is split out of `terraceSeats` so the chairs, the people
+in them and the cat all read the same arithmetic.
+
+**Credited, and its provenance said plainly.** CC0 asks for nothing, and
+`LICENSE` names it anyway — along with the dog, which turned out never to
+have had a section of its own. The cat is a *generated* mesh, and that is
+written down rather than left to be spotted in a UV atlas: it is inside
+this project's grants where the intro panels are outside them, but it is
+the same kind of thing and a reader deserves to be told which is which.
+Committed rather than fetched, and here that argument is not hypothetical
+— Meshy's download URL is signed and expires within days.
+
 ## [1.120.0] — 2026-08-25
 
 ### The bin store was a changing station

@@ -3124,7 +3124,14 @@ async function buildJadrija(scene) {
    * thousand lines apart both need it: the one that draws the furniture and the
    * one that puts somebody in it.
    */
-  function terraceSeats(S) {
+  /**
+   * Where a terrace's four TABLES stand, as `[t, s]`. Split out of
+   * `terraceSeats` when the cat arrived and needed to sit under one: the
+   * chairs, the people in them and now the cat all have to agree about where
+   * the table is, and three copies of this arithmetic would have been three
+   * places for it to drift.
+   */
+  function terraceTables(S) {
     const out = [];
     if (!S.awn) return out;
     const fs = S.s0 - S.awn;
@@ -3132,7 +3139,16 @@ async function buildJadrija(scene) {
       const t = S.t0 + 0.9 + k * ((S.t1 - S.t0 - 1.8) / 3);
       const s = fs - 1.9 + (k % 2) * 0.5;
       const ang = (k % 2) * 0.5 - 0.25;
-      for (const seat of seatRing(t, s, ang).seats) out.push(seat);
+      const r = seatRing(t, s, ang);
+      out.push({ ct: r.ct, cs: r.cs, ang, seats: r.seats });
+    }
+    return out;
+  }
+
+  function terraceSeats(S) {
+    const out = [];
+    for (const tab of terraceTables(S)) {
+      for (const seat of tab.seats) out.push(seat);
     }
     return out;
   }
@@ -17311,6 +17327,51 @@ async function buildJadrija(scene) {
   let dog = null;
 
   /**
+   * The cat under the slastičarnica's tables.
+   *
+   * Misha, 25 Aug: "bring in this cc0 cat into the game, have him run under the
+   * slasteciarnica table or something". The "or something" is doing some work,
+   * so: he lives under those tables rather than merely crossing beneath one.
+   * A cat on a café terrace in August is not passing through — it has picked
+   * the shadiest thing on the concrete and it is under it, and the only reason
+   * it ever moves is that the other table has come into shade or somebody has
+   * dropped something. Two stations and a trot between them says that; a beat
+   * up and down the promenade would have been the dog's behaviour with a
+   * different mesh on it, and the dog is already doing the dog.
+   *
+   * The stations are not typed. They are `seatRing`'s own table centres, all
+   * four of them — the same function the chairs are drawn from and the same
+   * one that decides where somebody sits — so the cat is under the table
+   * wherever the table has got to.
+   *
+   * All four, and he works along them and back, because the first cut of this
+   * used the first and the third and the comment over it claimed he passed
+   * under the middle one on his way between them. He did not. The terrace's
+   * tables alternate 0.74 m in `s` — `terraceTables` puts the odd ones further
+   * out from the shopfront than the even ones — so a straight line between
+   * table 0 and table 2 goes *past* table 1 at about two feet, which is a cat
+   * walking round a table and not under it. Four stations and a leg of 4.4 m
+   * between each is the same idea with the claim made true: every leg starts
+   * and ends under a table, and the zig-zag in `s` is the terrace's own.
+   *
+   * `walk` is not a tuning number, exactly as `DOG.trot` is not: the clip in
+   * the file carries the animal 0.58 m/s and tools/blender/cat.py measures that
+   * off the root channel before it flattens it and prints it. Everything below
+   * divides by it to get a playback rate, so the paws and the ground agree.
+   * `trot` is what he crosses at — a cat covering ground it has crossed a
+   * hundred times moves at about two and a half times its amble and does not
+   * hurry, and 1.45 m/s is that.
+   */
+  const CAT = {
+    walk: 0.58,                 // m/s the clip itself travels
+    trot: 1.45,                 // m/s he actually crosses at
+    turn: 3.4,                  // rad/s — a cat turns on the spot faster than a dog
+    under: [4.0, 14.0],         // how long he stays under one, seconds
+    near: 90,                   // past this he is not posed, see stepCat
+  };
+  let cat = null;
+
+  /**
    * The stretch, the speed, and the size of him.
    *
    * `trot` is not a tuning number. The clip is solved in
@@ -17472,6 +17533,44 @@ async function buildJadrija(scene) {
       };
     } catch (e) {
       console.warn('dog failed:', e.message);
+    }
+  }
+
+  if (PAYLOAD.cat_fr3d) {
+    try {
+      // The third thing on this path and the second quadruped, which is the
+      // point worth recording: `skinnedFigure` has now taken a 28-bone woman,
+      // a 24-bone pug and a 27-bone cat without being told which is which.
+      // No `face` here either, and for the same reason as the dog's.
+      const fig = await loadSkin('cat_fr3d', {
+        // Flatter and glossier than the dog. A short-haired cat in full sun
+        // has a sheen along the back that a pug does not, and 0.05/20 read as
+        // felt on him; this is the same lobe wound up until it does something.
+        spec: 0.11, specPower: 30, body: 'base *= vVCol;',
+      });
+      if (!fig) throw new Error('no skinned cat');
+      const S = SHOPS.find((x) => x.key === 'slast');
+      const tabs = S ? terraceTables(S) : [];
+      if (tabs.length < 3) throw new Error('no slastičarnica terrace');
+      // All four — see CAT, which is where the reason they are not two is
+      // written down.
+      CAT.at = tabs.map((x) => [x.ct, x.cs]);
+      const fig0 = CAT.at[0];
+      const p = toWorld(fig0[0], fig0[1]);
+      const mesh = fig.mesh;
+      mesh.position.set(p[0], p[1], p[2]);
+      mesh.rotation.y = rigYaw(fig0[0], Math.PI * 0.5);
+      mesh.updateMatrixWorld();
+      scene.add(mesh);
+      fig.play('walk', { fade: 0 });
+      fig.state.speed = 0.22;
+      cat = {
+        mesh, fig, at: [fig0[0], fig0[1]], tris: fig.tris,
+        mode: 'under', timer: 2.0 + Math.random() * 6.0, leg: 0, dir: 1,
+        yaw: mesh.rotation.y, want: mesh.rotation.y,
+      };
+    } catch (e) {
+      console.warn('cat failed:', e.message);
     }
   }
 
@@ -17755,6 +17854,78 @@ async function buildJadrija(scene) {
     if (!dog || !dog.mesh.visible) return null;
     const p = toWorld(dog.at[0], dog.at[1]);
     return { x: p[0], y: p[1], z: p[2], r: DOG.hitR, h: DOG.hitH };
+  }
+
+  /**
+   * Trot to the other table, or sit under this one.
+   *
+   * Deliberately half the state machine the dog has and none of the special
+   * cases: no jet, no room, no cot. He is scenery with a gait.
+   */
+  function moveCat(dt) {
+    const c = cat;
+    if (c.mode === 'under') {
+      c.timer -= dt;
+      if (c.timer > 0) return;
+      // Along the row and back again. Turning at the ends rather than wrapping
+      // round to the first: a cat that walked off the end of the terrace and
+      // reappeared at the other end would be a cat teleporting behind the
+      // counter, and there is a shopfront in the way of the honest version.
+      if (c.leg + c.dir < 0 || c.leg + c.dir >= CAT.at.length) c.dir = -c.dir;
+      c.leg += c.dir;
+      c.mode = 'turn';
+      const g = CAT.at[c.leg];
+      c.want = rigYaw(c.at[0], Math.atan2(g[1] - c.at[1], g[0] - c.at[0]));
+      return;
+    }
+    if (c.mode === 'turn') {
+      // Shortest way round, and then walk once he is pointing at it.
+      let d = c.want - c.yaw;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      const step = Math.sign(d) * Math.min(Math.abs(d), CAT.turn * dt);
+      c.yaw += step;
+      if (Math.abs(d) < 0.05) {
+        c.mode = 'cross';
+        c.fig.play('walk', { fade: 0.12 });
+        c.fig.state.speed = CAT.trot / CAT.walk;
+      }
+      return;
+    }
+    // Crossing. Straight at the far table, and stop when he is under it.
+    const g = CAT.at[c.leg];
+    const dt2 = g[0] - c.at[0], ds = g[1] - c.at[1];
+    const d = Math.hypot(dt2, ds);
+    const step = CAT.trot * dt;
+    if (d <= step) {
+      c.at[0] = g[0]; c.at[1] = g[1];
+      c.mode = 'under';
+      c.timer = CAT.under[0] + Math.random() * (CAT.under[1] - CAT.under[0]);
+      // Back to the walk at a stroll rather than to an idle: there is exactly
+      // one clip in this file — see tools/blender/cat.py, which had one action
+      // to bake and baked it — so "sitting under a table" is the same cycle
+      // taken slowly enough to read as a cat shifting its weight. It is the
+      // one thing here that is a compromise rather than a choice, and the fix
+      // if it ever grates is an idle in the bake and not a number out here.
+      c.fig.state.speed = 0.22;
+      return;
+    }
+    c.at[0] += dt2 / d * step;
+    c.at[1] += ds / d * step;
+  }
+
+  function stepCat(camPos, dt) {
+    if (!cat) return;
+    const d = Math.hypot(camPos.x - cat.mesh.position.x,
+      camPos.z - cat.mesh.position.z);
+    // Tighter than the dog's 120 m, because he is half the dog and under a
+    // table: at ninety metres this is a smudge in the shade of a terrace.
+    if (d > CAT.near) return;
+    moveCat(dt);
+    cat.fig.update(dt);
+    const p = toWorld(cat.at[0], cat.at[1]);
+    cat.mesh.position.set(p[0], p[1], p[2]);
+    cat.mesh.rotation.y = cat.yaw;
   }
 
   function stepDog(camPos, dt) {
@@ -21065,6 +21236,7 @@ async function buildJadrija(scene) {
     // twenty-four bones and wants one, and the distance both of them turn on is
     // the same number. Gating out here would mean measuring it twice.
     stepDog(cam, dt);
+    stepCat(cam, dt);
     stepKabina(pt, ps, dt, cam.y);
 
     if (skinFig) {
@@ -21679,6 +21851,27 @@ async function buildJadrija(scene) {
      * the head's own origin — so it read as dead solid while the dog was quite
      * visibly breathing. Whatever moves, this moves.
      */
+    /**
+     * The cat, and the same `pose` trick for the same reason: one clip played
+     * at 0.22 under a table is a very slow-moving animal, and "very slow" and
+     * "frozen because the range gate shut" are the same screenshot.
+     */
+    cat: () => {
+      if (!cat) return null;
+      const f = cat.fig, v = new THREE.Vector3();
+      let pose = 0;
+      for (let i = 0; i < f.bones.length; i++) {
+        f.boneAt(i, v);
+        pose += v.x + v.y + v.z;
+      }
+      return { at: [+cat.at[0].toFixed(2), +cat.at[1].toFixed(2)],
+        tris: cat.tris, bones: f.bones.length, clips: f.clips.join('+'),
+        mode: cat.mode, leg: cat.leg, dir: cat.dir,
+        timer: +cat.timer.toFixed(2),
+        speed: +f.state.speed.toFixed(3), yaw: +cat.yaw.toFixed(3),
+        under: CAT.at && CAT.at.map((a) => [+a[0].toFixed(2), +a[1].toFixed(2)]),
+        pose: +pose.toFixed(5) };
+    },
     dog: () => {
       if (!dog) return null;
       const f = dog.fig, v = new THREE.Vector3();
