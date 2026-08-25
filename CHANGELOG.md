@@ -8,6 +8,61 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.120.0] — 2026-08-25
+
+### The bin store was a changing station
+
+**It was never a bin store, and it was never a board.** The thing on
+the chippings east of Maslina was drawn by `centenary` — the same
+function that prints the JADRIJA 100 hoardings — as a flat 4.4 m panel
+on galvanised legs. The comment over its placement had every
+observation right and the conclusion wrong: *"an enclosure — a bin
+store, by the look of it — clad on every face in printed cream panel,
+standing clear of the ground on slim galvanised legs on its own poured
+pad."* All true. But a single photograph taken from the front cannot
+show that a thing has no roof and no back.
+
+**Misha, 25 Aug, with a GPS fix: "it's actually a changing space".**
+Rule 12 — he has stood in it. So it is two open-topped cubicles now:
+back and both sides shut, a spine between the bays, cream panels on an
+anthracite top rail, slim galvanised legs, a poured pad wider than the
+hut on every side, and the centenary print on a screen standing 0.40 m
+proud of the two doorways so there is no straight sight line into
+either. `centenaryTex` is split out of `centenary` so the hoardings and
+this screen are one artwork and not two drawings of it — those four
+door colours are quoting eight hundred real ones and had no business
+being typed twice.
+
+**The position stopped being a guess.** The old note said so itself:
+*"The position is a placement and not a measurement."* His fix is
+43.724058, 15.845499 — world (−1971.3, 438.8), which `local` puts at
+t 365.5, s 26.3 and `toWorld` returns to the metre. Four metres along
+the shore and five seaward of where the board had been standing.
+
+**The dimensions are read and not measured, and are marked as such.**
+Nothing in the photograph carries a scale. What is known is the type: a
+two-bay beach changing booth is chest-to-crown tall, because its whole
+function is that a standing adult is not visible over it and its whole
+economy is that it uses no more panel than that.
+
+**You cannot walk into it, and nothing this size ever will be.** Worth
+writing down because the arithmetic is general and it cost two goes.
+`confine` inflates every blocker by `GROUND.girth` — 0.55 — on all four
+sides, so the 0.06 m front panel is a 1.16 m deep band of no-go, and
+the panels either side of the doors put that band across the *whole*
+frontage rather than across themselves. Widening the doorways does
+nothing, because what seals the front is the depth of the band and not
+its gaps; shortening the screen only trades a sealed slot for a sealed
+middle. `SNUG` gives back 0.33 against a shortfall over a metre. A
+free-space map at 0.2 m spacing came back with both cubicles free,
+every point outside blocked and no route between them — the exact shape
+of a room you can only reach by teleporting into it.
+
+So the hut keeps its real size and is left solid. Going in will be a
+threshold rather than a walk when it is built — which is what the
+kabina already does, and the kabina has a 1.45 m door and still does
+it. Tabled, with Baye's turn at the hut and the cat.
+
 ## [1.119.0] — 2026-08-25
 
 ### Seven more birds, and four of them were already flying

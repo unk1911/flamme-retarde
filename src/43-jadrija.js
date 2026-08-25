@@ -3707,7 +3707,16 @@ async function buildJadrija(scene) {
    * this resort is built out of — eight hundred coloured doors in two rows —
    * so the board reads as the place explaining itself.
    */
-  function centenary(t, s, w, h, y, opts = {}) {
+  /**
+   * The print on its own, so that a hoarding and the side of a building can be
+   * the same artwork rather than two drawings of it.
+   *
+   * Split out when the changing station arrived: that thing carries this print
+   * across its front panel, and a second copy of the door grid would have been
+   * a second place for the four door colours to drift from the eight hundred
+   * real ones they are quoting.
+   */
+  function centenaryTex(w, h, opts = {}) {
     const DOOR = ['#cf3b2e', '#3f9a56', '#6cb2dd', '#e3b23c'];
     const PX = 1024, C = document.createElement('canvas');
     C.width = PX; C.height = Math.round(PX * h / w);
@@ -3747,6 +3756,11 @@ async function buildJadrija(scene) {
     const tex = new THREE.CanvasTexture(C);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
+    return tex;
+  }
+
+  function centenary(t, s, w, h, y, opts = {}) {
+    const tex = centenaryTex(w, h, opts);
     const st = at(t), p = W(t, s, y);
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
       new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
@@ -3771,6 +3785,164 @@ async function buildJadrija(scene) {
     b = back4;
     runs.push({ t0: t - w * 0.5, t1: t + w * 0.5, s0: s - 0.05, s1: s + 0.45,
       y: at(t).deck, h: y + h * 0.5 - at(t).deck });
+  }
+
+  /**
+   * The changing station on the chippings, which was a bin store for a week.
+   *
+   * `centenary` above had this as a flat 4.4 m board on legs, and the comment
+   * over its placement guessed at what it was: "an enclosure — a bin store, by
+   * the look of it — clad on every face in printed cream panel, standing clear
+   * of the ground on slim galvanised legs on its own poured pad". Every one of
+   * those observations is right. The conclusion was wrong, and it was wrong in
+   * the way a single photograph of a thing taken from the front is always
+   * liable to be: there was no way to see that it has no roof and no back.
+   *
+   * Misha, 25 Aug, with a GPS fix: "yo uhave it as a solid block but it's
+   * actually a changing space". Rule 12 — he has stood in it. So it is two
+   * open-topped cubicles you walk into, and the print that made it look like a
+   * hoarding is on the screen in front of the doors.
+   *
+   * THE POSITION IS NOW A MEASUREMENT. The old one said so itself: "The
+   * position is a placement and not a measurement". His fix is
+   * 43.724058, 15.845499 — world (-1971.3, 438.8), which `local` puts at
+   * t 365.5, s 26.3, and the round trip through `toWorld` comes back to the
+   * metre it started at. That is 4 m along the shore and 5 m seaward of where
+   * the board was standing.
+   *
+   * THE DIMENSIONS ARE READ AND NOT MEASURED, and are marked as such because
+   * nothing in the photograph carries a scale. What is known is the type: a
+   * two-bay beach changing booth is chest-to-crown tall, because its whole
+   * function is that a standing adult is not visible over it and its whole
+   * economy is that it uses no more panel than that. 1.95 m of panel on 0.16 m
+   * of leg, and a footprint of 3.00 by 2.45, is that thing; the print's own
+   * aspect on the front screen is the one proportion the photograph does fix.
+   *
+   * YOU CANNOT WALK INTO THIS, AND NOTHING THIS SIZE EVER WILL BE. Written
+   * down because it cost two goes to work out and the arithmetic is general.
+   *
+   * `confine` inflates every blocker by `GROUND.girth` on all four sides, and
+   * girth is 0.55. So a 0.06 m front panel is a 1.16 m deep band of no-go, and
+   * the two panels either side of the doors put that band across the WHOLE
+   * frontage — not just across the panels. Widening the doors does nothing,
+   * because what seals the front is the depth of the band and not its gaps;
+   * shortening the screen only swaps the sealed slot for a sealed middle. A
+   * free-space map at 0.2 m came back with both cubicles free, everything
+   * outside blocked, and no route between them, which is the exact shape of a
+   * room you can only reach by teleporting into it. `SNUG` is not enough
+   * either: it gives back 0.33 and the shortfall is over a metre.
+   *
+   * So the building is left at its real size and left SOLID, and for now you
+   * walk round it and not into it. Widening it to brute-force a way in would
+   * have been wrong twice over — see Rule 6, and see what `cabW` at 2.15 m is
+   * still costing.
+   *
+   * WHEN THE WAY IN IS BUILT it will be a threshold and not a walk, which is
+   * what the kabina already does — and note that the kabina has a 1.45 m door
+   * and still does it, because the arithmetic above beat it too. Crossing the
+   * line in front of a cubicle should dip to black and stand you inside it:
+   * `dipStart` in 90-app.js and `KAB.standIn` are the mechanism, already
+   * written and already used. NONE OF THAT IS HERE YET. Misha tabled it on
+   * 25 Aug along with the cat and Baye's turn at this hut, and what shipped is
+   * the object being the right object.
+   *
+   * NO STRAIGHT SIGHT LINE, which is the one thing a changing booth has to do
+   * and the reason for the screen standing 0.40 m proud of the doors. It is
+   * 1.76 m across two 0.60 m doorways set 1.20 m apart, so it covers both of
+   * them and overlaps each jamb by more than half a metre; you come in round
+   * its ends, through a 0.62 m slot, and turn. From outside, at any angle, the
+   * inside of a cubicle is behind either the screen or a side wall.
+   */
+  function changingStation(t, s, opts = {}) {
+    const CREAM = [0.845, 0.828, 0.628];     // the printed panel, sunlit
+    const FRAME = [0.235, 0.240, 0.248];     // the anthracite top rail and posts
+    const GALV = [0.520, 0.528, 0.522];      // the legs, same as the hoarding's
+    const PAD = [0.585, 0.575, 0.548];       // the poured pad
+    const HW = 1.50, HD = 1.225;             // half width along t, half depth along s
+    const LEG = 0.16, TOP = 2.02, RAIL = 0.06;
+    const DOOR = 0.60;                       // one cubicle's doorway
+    const y = surfaceY(t, s);
+    const s0 = s - HD, s1 = s + HD;          // s0 seaward and shut, s1 the door side
+    const SCR = s1 + 0.40;                   // the screen, standing proud
+    const th = 0.05;                         // panel thickness
+    const back = b;
+    b = up;
+
+    // The pad first: poured, and a hand's breadth proud of the chippings. It
+    // runs wider than the hut on every side because that is what it does in
+    // the photograph — the legs stand well inboard of its edge.
+    boxTS(t - HW - 0.14, t + HW + 0.14, s0 - 0.14, SCR + 0.14, y, y + 0.10,
+      PAD, shade(PAD, 1.05));
+    const yl = y + 0.10 + LEG;               // underside of the panels
+    const panel = (ta, tb, sa, sb) => {
+      boxTS(ta, tb, sa, sb, yl, y + 0.10 + TOP, CREAM, shade(CREAM, 1.07));
+      // The rail across the top, which is the only dark line on the thing and
+      // is most of why it reads as a made object rather than a stack of boards.
+      boxTS(ta - 0.012, tb + 0.012, sa - 0.012, sb + 0.012,
+        y + 0.10 + TOP, y + 0.10 + TOP + RAIL, FRAME, shade(FRAME, 1.30));
+    };
+    // The shut three sides, and the spine that makes it two cubicles.
+    panel(t - HW, t + HW, s0 - th, s0);                        // seaward, shut
+    panel(t - HW, t - HW + th, s0, s1);                        // west side
+    panel(t + HW - th, t + HW, s0, s1);                        // east side
+    panel(t - th * 0.5, t + th * 0.5, s0, s1);                 // the spine
+    // The door side: a panel out to each doorway and nothing between them.
+    panel(t - HW, t - DOOR, s1 - th, s1);
+    panel(t + DOOR, t + HW, s1 - th, s1);
+    // And the screen, with the print on it.
+    panel(t - 0.88, t + 0.88, SCR - th, SCR);
+    for (const o of [-0.84, 0.84]) {
+      post(W, t + o, SCR - th * 0.5, y + 0.10, yl + 0.02, 0.028, GALV, 6);
+    }
+    // The legs. Four under the hut and two under the screen, slim and
+    // galvanised, and they are the reason there is daylight under all of it.
+    for (const ot of [-HW + 0.10, -0.02, HW - 0.10]) {
+      for (const os of [s0 + 0.06, s1 - 0.06]) {
+        post(W, t + ot, os, y + 0.10, yl + 0.02, 0.028, GALV, 6);
+      }
+    }
+    // The corner posts, which carry the rail down to the pad at the four
+    // corners the way the frame in the photograph does.
+    for (const ot of [-HW + 0.03, HW - 0.03]) {
+      for (const os of [s0 + 0.03, s1 - 0.03]) {
+        post(W, t + ot, os, yl, y + 0.10 + TOP + RAIL, 0.030, FRAME, 6);
+      }
+    }
+    // The print, on the outward face of the screen. Same artwork as the
+    // hoardings, which is the point: it is the same print, and the resort put
+    // it on everything it owns.
+    const PW = 1.62, PH = 1.28;
+    const tex = centenaryTex(PW, PH, opts);
+    const st = at(t), p = W(t, s + HD + 0.40 + 0.006, y + 0.10 + LEG + 0.98);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH),
+      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+    mesh.position.set(p[0], p[1], p[2]);
+    // Landward, because the doors face the chippings and the trees and the
+    // screen's printed face is the one you walk up to. `centenary` turns its
+    // boards seaward; this is the same expression with the sign flipped.
+    mesh.rotation.y = Math.atan2(st.nx, st.nz);
+    scene.add(mesh);
+    b = back;
+
+    // ── what you can walk through ──────────────────────────────────────────
+    // One blocker a panel rather than one box round the hut, so the shape that
+    // stops you is the shape that is drawn: the screen stands clear of the
+    // doors with a gap either side of it, and walking round the outside of
+    // this thing feels like walking round a hut and not round a crate.
+    //
+    // It does NOT let you in — see the note on the docstring. Two goes were
+    // spent trying and the second one is the reason the panels are laid out
+    // one per blocker rather than as a single box; that much was worth
+    // keeping whatever happens to the doorway.
+    const H = 0.10 + TOP;
+    const wall = (t0, t1, sa, sb) => runs.push({ t0, t1, s0: sa, s1: sb, y, h: H });
+    wall(t - HW, t + HW, s0 - th, s0);                         // seaward, shut
+    wall(t - HW, t - HW + th, s0, s1);                         // west side
+    wall(t + HW - th, t + HW, s0, s1);                         // east side
+    wall(t - th * 0.5, t + th * 0.5, s0, s1);                  // the spine
+    wall(t - HW, t - DOOR, s1 - th, s1);                       // west of the doors
+    wall(t + DOOR, t + HW, s1 - th, s1);                       // east of them
+    wall(t - 0.88, t + 0.88, SCR - th, SCR);                   // the screen
   }
 
   /**
@@ -6430,7 +6602,10 @@ async function buildJadrija(scene) {
   // panel out on the plaza, and the pair at the west end by the cabins.
   // 349 / 33.2 was inside the sanitary block once that was built. East of
   // Maslina and clear of it, which is the same piece of open ground.
-  centenary(361.5, 31.4, 4.4, 2.2, at(361.5).deck + 1.35);
+  // Not a hoarding. See `changingStation`, which is what this actually is and
+  // where it actually stands — his GPS fix, 4 m along and 5 m seaward of the
+  // placement this line used to guess at.
+  changingStation(365.5, 26.3);
   centenary(346, 6.0, 3.2, 1.8, at(346).deck + 1.25,
     { bg: '#cfe4d8', fg: '#1d3b30', big: '100' });
   centenary(212, 22.0, 2.6, 1.5, at(212).deck + 1.15, { bg: '#e8e2cc' });
