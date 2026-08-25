@@ -71,16 +71,21 @@ Applies to the authored content rather than the machinery:
   `build/payload/{shore,cicadas,wood,lapping,boat}.mp3`, recorded at Jadrija and
   in the channel off Šibenik and trimmed, filtered and levelled by
   `tools/cut_field.py`, and
-  `build/payload/cuk.mp3`, a scops owl recorded by the same hand elsewhere;
+  `build/payload/{cuk,dove}.mp3` — a scops owl and a collared dove recorded by
+  the same hand;
   `build/payload/beads.mp3` is *not* one of these — see section 3, and neither
   is `build/payload/radio.mp3`, which is my recording of somebody else's
-  broadcast — see section 3 for what that does and does not cover;
+  broadcast, nor the seven bird calls
+  `build/payload/{crow,gull,swift,beeeater,blackbird,swallow,wagtail}.mp3`,
+  which are other people's recordings — see section 3 for all of them;
 - `docs/*.png`;
 - the assembled `flamme-retarde.html` as a whole.
 
 Share-alike here is deliberate and not merely inherited. Nothing in the bundle
-forces it — the ambience is my own field recording bar one CC0 sample and one
-off-air one, and CC0 asks for nothing at all — and it stays because it is the right answer for a thing built almost entirely
+forces it — the ambience is my own field recording bar one CC0 sample, one
+off-air one and seven borrowed bird calls; the birds are the first thing in the
+bundle whose licence would have asked for share-alike anyway — and it stays
+because it was already the right answer for a thing built almost entirely
 out of open data and other people's generosity, and because I would rather not
 argue about whether a base64 blob inside an HTML file is a Collection or an
 Adaptation.
@@ -140,10 +145,65 @@ terms: this game ships as one HTML file with nowhere to put a credit line, and
 a licence that needs one does not fit it. The notice is here because saying
 where a thing came from is a different obligation from being made to.
 
+**That last argument no longer holds, and it was wrong when it was written.**
+The title screen has carried a credit footer since the first build — it is
+where OpenStreetMap is acknowledged — and a footer that can hold one credit can
+hold another. What was really true is that nothing had yet been worth taking on
+an attribution obligation for. In August 2026 seven bird recordings were, the
+footer got a second line, and the sentence above is left standing as what was
+believed at the time rather than quietly corrected. See *The birds* below.
+
 Downsampled to 24 kHz mono and tapered to 1.15 s to sit with the field
 recordings. It is played only for the *crossing* of the kabina's curtain; the
 tail after you are through is synthesised in `src/80-audio.js`, because it has
 to follow how hard the strands are still swinging.
+
+### The birds — CC BY-SA 4.0, CC BY-SA 3.0, CC BY 4.0 and one public domain
+
+`build/payload/{crow,gull,swift,beeeater,blackbird,swallow,wagtail}.mp3` are
+cut from seven recordings on Wikimedia Commons by `tools/cut_birds.py`, which
+fetches each from Commons the first time it is run and does not commit the
+sources. The eighth bird, `build/payload/dove.mp3`, is mine and is covered by
+section 2.
+
+| clip | species | Commons file | recordist | licence |
+|---|---|---|---|---|
+| `crow.mp3` | *Corvus cornix* | `Corvus cornix.ogg` | Oona Räisänen (Mysid) | public domain |
+| `gull.mp3` | *Larus michahellis* | `Yellow-legged Gull - Larus michahellis michahellis.ogg` | Cedric Mroczko | CC BY-SA 4.0 |
+| `swift.mp3` | *Apus pallidus* | `Cri de martinet pâle, Espagne.wav` | Xavier Riera | CC BY-SA 4.0 |
+| `beeeater.mp3` | *Merops apiaster* | `Bijeneter - SoundCloud - Beeld en Geluid.ogg` | Beeld en Geluid | CC BY-SA 3.0 |
+| `blackbird.mp3` | *Turdus merula* | `Common Blackbird song (Turdus merula).ogg` | Diana Tudor | CC BY 4.0 |
+| `swallow.mp3` | *Hirundo rustica* | `Hirundo rustica - Barn Swallow XC468712.mp3` | Marie-Lan Taÿ Pamart | CC BY-SA 4.0 |
+| `wagtail.mp3` | *Motacilla flava* | `Motacilla flava - Western Yellow Wagtail XC436362.mp3` | Joost van Bruggen | CC BY-SA 4.0 |
+
+Each file's Commons page carries the recordist's own description and the full
+licence deed; five of the seven originate at xeno-canto and keep their XC
+numbers in the filename so the original entry can be found.
+
+**Changes made**, so that "indicate changes" is satisfied here and not only in
+the abstract: one call, strophe or twitter was taken from each source by hand;
+each was band-limited to the range its species actually occupies; 8 ms fades
+were applied at both ends; and each was levelled to −1.0 dBFS peak and encoded
+as mono mp3 at 16–22 kHz. The exact windows, filters and rates are the table at
+the top of `tools/cut_birds.py`. At run time the game applies distance, stereo
+placement, a lowpass standing for air, a pitch and rate walk down a series, and
+the wall of the vikendica; none of that is baked into the files.
+
+**Why CC BY-SA is not a problem here.** The obligations are attribution and
+share-alike. Attribution is on the title screen (`veil.birds` in
+`src/02-i18n.js`) and in full above and in `README.md`. Share-alike is already
+what section 2 does: the assembled `flamme-retarde.html` is CC BY-SA 4.0, and
+BY-SA 3.0 material may be adapted into a BY-SA 4.0 work under the one-way
+compatibility the 4.0 deed grants. Nothing about these seven files changes the
+terms on the rest of the bundle, and nothing in the bundle relicenses them —
+they remain their recordists' work under their own deeds.
+
+**Why Wikimedia Commons and not xeno-canto directly.** XC's API moved to v3 and
+now requires a per-account key, which would put a credential in a build that
+has to run from a clean clone. Commons mirrors much of the same catalogue with
+the recordist and licence carried across and needs no key. It also settles the
+licence question before it is asked: Commons does not accept non-commercial-only
+files, so anything reachable through it is free for any use.
 
 ### The crowd's voices — synthesised, not recorded
 

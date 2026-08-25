@@ -61,6 +61,7 @@ const STRINGS = {
       + 'the right<br>SCOOP and DROP are <b>held</b>, not tapped',
     'veil.credit': 'terrain &amp; town derived from OpenStreetMap &amp; public elevation data',
     'veil.field': 'shore, cicadas and water recorded at Jadrija, August 2026',
+    'veil.birds': 'bird calls by Räisänen, Mroczko, Riera, Beeld en Geluid, Tudor, Taÿ Pamart, van Bruggen — Wikimedia Commons, CC BY-SA',
     'veil.src': 'source on GitHub &#8599;',
 
     // HUD
@@ -464,6 +465,7 @@ const STRINGS = {
       + 'ZAHVAT i IZBACI se <b>drže</b>, ne tapkaju',
     'veil.credit': 'teren i grad izvedeni iz OpenStreetMapa i javnih podataka o visinama',
     'veil.field': 'more, cvrčci i valovi snimljeni na Jadriji, kolovoz 2026.',
+    'veil.birds': 'glasanje ptica: Räisänen, Mroczko, Riera, Beeld en Geluid, Tudor, Taÿ Pamart, van Bruggen — Wikimedia Commons, CC BY-SA',
     'veil.src': 'izvorni kod na GitHubu &#8599;',
 
     'hud.elapsed': 'proteklo',
@@ -832,6 +834,7 @@ const STRINGS = {
       + 'ÉCOPER et LARGUER se <b>maintiennent</b> enfoncés',
     'veil.credit': 'relief et ville dérivés d\'OpenStreetMap et de données altimétriques publiques',
     'veil.field': 'mer, cigales et clapot enregistrés à Jadrija, août 2026',
+    'veil.birds': 'chants d\'oiseaux : Räisänen, Mroczko, Riera, Beeld en Geluid, Tudor, Taÿ Pamart, van Bruggen — Wikimedia Commons, CC BY-SA',
     'veil.src': 'code source sur GitHub &#8599;',
 
     'hud.elapsed': 'écoulé',

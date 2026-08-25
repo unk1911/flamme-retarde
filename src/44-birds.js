@@ -1,12 +1,21 @@
 // -----------------------------------------------------------------------------
 // Birds.
 //
-// Three species, because on this coast in August there are three and they could
+// Four species, because on this coast in August there are four and they could
 // not be less alike. Yellow-legged gulls (Larus michahellis) own the channel and
 // the harbour: they soar, they wheel, and a fit one will go the best part of a
-// minute between wingbeats. Common swifts scream around the roofs of the old
+// minute between wingbeats. Pallid swifts scream around the roofs of the old
 // town at chimney height, all flicker and no glide worth the name. Hooded crows
-// work the karst inland, beating steadily, going somewhere.
+// work the karst inland, beating steadily, going somewhere. And bee-eaters hunt
+// high over the scrub in loose parties, three beats and a long glide, calling
+// the whole time.
+//
+// The fourth arrived, and the second was renamed, on 25 Aug, when Misha listed
+// what he had heard at the vikendica that morning: eight species, four of them
+// already in this file or newly wanted here. What each of the four sounds like
+// now lives in VOICE in 80-audio.js — a recording apiece, in place of the
+// oscillator that used to answer. Nothing about how they FLY changed; that was
+// already the valuable part and it was already right.
 //
 // Making those three *move* differently is most of the value here, so they are
 // one integrator with three sets of numbers, and the numbers that differ are the
@@ -64,8 +73,18 @@ const FLOCK = [
   {
     key: 'swift',
     n: 26,
-    // 42 cm across and 17 grams. Apus apus does everything on the wing, which is
-    // why there is no rafting here and no perching anywhere in this file.
+    // 42 cm across and 17 grams. Apus does everything on the wing, which is why
+    // there is no rafting here and no perching anywhere in this file — its feet
+    // cling to a vertical wall and will not close round a branch.
+    //
+    // `pallidus` and not `apus`, which was what this said until Misha named it.
+    // Rule 12 settles it on its own — he was standing under them — but the two
+    // are also a fortnight apart in the calendar and the calendar agrees with
+    // him. Common swifts clear out of the Mediterranean by the start of August;
+    // pallid swifts are often on a second brood and stay into the autumn. So on
+    // a Dalmatian morning at the end of August the birds still screaming round
+    // the roofs are overwhelmingly the pallid ones, and the recording in the
+    // payload is one of those, from Spain.
     span: 0.42, len: 0.17, girth: 0.86, chord: 0.52,
     body: [0.21, 0.19, 0.18],
     wing: [0.17, 0.16, 0.15],
@@ -102,6 +121,45 @@ const FLOCK = [
     call: [14, 34],
     rafts: 0,
     where: (x, z) => !isSea(x, z) && urbanAt(x, z) < 0.5,
+  },
+  {
+    key: 'beeeater',
+    n: 14,
+    // Merops apiaster: 46 cm across and 28 of that is bird, the last few being
+    // the two tail pins. Loose parties rather than a flock — fourteen spread
+    // over the sky, not fourteen in a ball.
+    span: 0.46, len: 0.28, girth: 0.85, chord: 0.62,
+    // The colours are the ones you actually get, which is to say from below and
+    // against the sky. All the chestnut and gold is on the BACK of this bird and
+    // you will not see a scrap of it from the ground: what is underneath is a
+    // blue-green breast and belly, and wings that are warm copper underneath
+    // with a dark trailing edge baked into the strip shading like the gull's
+    // primaries. Painting the famous topside here would be painting a bird
+    // nobody in this game is ever positioned to see.
+    body: [0.42, 0.62, 0.66],
+    wing: [0.62, 0.48, 0.30],
+    cruise: 12, flee: 20, climb: 4.0,
+    // The signature, and the reason this is worth being a fourth species rather
+    // than a recoloured crow: three or four quick beats and then a long flat
+    // glide on stiff triangular wings. `glide` at 2.4 against `burst` at 0.9 is
+    // that ratio, and it is nothing like the gull's soaring — a gull's glide is
+    // a bird resting, a bee-eater's is part of the stroke.
+    beat: 5.5, amp: 0.55, dihedral: 0.05,
+    burst: 0.9, glide: 2.4,
+    turn: 1.0, bank: 0.9,
+    wheel: 1.1, wheelRate: 0.22,
+    // High. They hawk for dragonflies and bees well up, and a party will drift
+    // across at a hundred metres calling the whole way, which is usually how
+    // you know they are there at all.
+    band: [25, 110], calm: 2.2,
+    ring: 0.46,
+    // The most vocal thing in this sky by a distance. A bee-eater in flight
+    // calls almost continuously, so the gap between calls is the shortest here.
+    call: [4, 9],
+    rafts: 0,
+    // Open country: over the karst and the scrub, not out over the channel and
+    // not down among the roofs of the old town, which are the swift's.
+    where: (x, z) => !isSea(x, z) && urbanAt(x, z) < 0.6,
   },
 ];
 

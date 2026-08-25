@@ -8,6 +8,96 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.119.0] — 2026-08-25
+
+### Seven more birds, and four of them were already flying
+
+**Misha listed eight species he had heard from the vikendica that
+morning.** Hooded Crow, Pallid Swift, Eurasian Blackbird, Yellow-legged
+Gull, Western Yellow Wagtail, European Bee-eater, Barn Swallow, and the
+collared dove again. Four of the eight were already in the game and had
+been since the sky was written — gull, swift and crow fly, wheel, flush
+off the water when the Canadair comes over, and called with a swept
+oscillator. So for those the work was not to add a bird. It was to give
+the bird that is already up there its own voice, which is eleven lines
+of table: `birdCall` still decides how many syllables, still walks them
+down in pitch and level as a bird running out of breath, still tightens
+the gaps for an alarm. A recording is dropped in where the oscillator
+was and every one of those behaviours survives it. The first gull of a
+session is still synthesised, exactly as the ćuk has always been.
+
+**The swift was the wrong swift.** This file said *Apus apus* and Misha
+named *Apus pallidus*, and the calendar agrees with him: common swifts
+clear out of the Mediterranean by the start of August, pallid swifts are
+often on a second brood and stay into the autumn, so the birds still
+screaming round the roofs of Šibenik on 25 August are overwhelmingly the
+pallid ones. Renamed, and the recording is one of those.
+
+**The bee-eater is a fourth flying species, not a fifth perched one.**
+Three or four quick beats and a long flat glide on stiff triangular
+wings — `glide` 2.4 against `burst` 0.9 — hunting at 25 to 110 m over
+the karst and calling almost continuously, which is usually how you know
+they are there at all. Painted as they are actually seen: blue-green
+underneath with copper under the wing. All the famous chestnut and gold
+is on the back of that bird and nobody in this game is ever positioned
+to see it.
+
+**Three more sit still, and the swift can never be one of them.** The
+blackbird sings from a song post 9.5 m up at the far end of the same
+pines the dove is in, 24 m the other side of the house so the two are
+not one bird in the stereo field; the swallows twitter from the wire
+over the back forecourt; the wagtail works the waterline in front,
+which is the only one of the four that comes from the seaward side. A
+pallid swift is not here and cannot be: its feet cling to a vertical
+wall and will not close round a branch.
+
+**A blackbird at three in the afternoon is not the blackbird everybody
+is thinking of.** At the first setting it sang 199 strophes an hour and
+was the loudest thing at the house by 10 dB. That is a dawn blackbird
+holding a territory at the hour that matters; the game is set at three
+in the afternoon, when it sings in short bursts and then goes quiet for
+minutes. 87 an hour now — one you notice when it starts.
+
+**The window got a lid.** `PERCH` reserved one in a note: "when a bird
+arrives that has some top on it, this is where it goes." Two did — the
+swallow's twitter runs to 11 kHz and the wagtail's call is nothing but
+top — so the open August window now takes a little of the top as well
+as its few decibels overall. Gently, at 7 kHz, because a hole in a wall
+is broadband. The dove's published numbers are unchanged, because there
+is nothing above 700 Hz on a dove for a lowpass to find.
+
+**One-shots are levelled by peak, not by RMS.** Cutting these the way
+the beds are cut put six of the seven over 0 dBFS, the swallow by 7.9.
+A bed is thirty seconds of promenade at about 12 dB of crest, so setting
+its RMS sets its headroom too; a single bird call is a transient in
+silence at 14 to 22 dB, and it is not the same problem. Peak-levelled,
+each keeps its own dynamics and they all arrive with the same decibel of
+headroom — and how loud each one *is* moves into `80-audio.js`, where
+the distance law can be seen at the same time.
+
+**Measured, at `__fr.audio.perchRun(3600)`:** dove 331 phrases an hour,
+blackbird 87, swallow 189, wagtail 205 — 13.5 a minute between them
+around the house, in handfuls a second and a half to five seconds apart
+with a minute or two of nothing in between. `__fr.audio.voices()` is
+new and says which of the four flying birds has its recording yet,
+because `sampleLoad` fails silently by design and a gull still on the
+oscillator sounds like a gull.
+
+**And the first credit this game has ever owed anybody.** Seven of the
+eight recordings are other people's, from Wikimedia Commons, six of them
+CC BY-SA and one public domain — so the title-screen footer has a second
+line, `LICENSE` has a section, and `README.md` has the table. Which
+contradicts an argument in `LICENSE` that CC0 was chosen for the bead
+curtain because "this game ships as one HTML file with nowhere to put a
+credit line". There has been a credit footer since the first build; the
+sentence is left standing as what was believed at the time, with a note
+saying so. `tools/cut_birds.py` fetches its sources from Commons on
+first run rather than committing 7 MB of somebody else's audio, and it
+stops the build if a Commons file has changed under it.
+
+**Cost:** 58 KB of payload for eight birds, and 72 birds in the sky
+where there were 58.
+
 ## [1.118.0] — 2026-08-24
 
 ### Two piers, a mohawk and a dove — and most of it was found by measuring

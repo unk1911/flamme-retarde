@@ -5523,6 +5523,8 @@ window.__fr = {
      */
     perch: () => audio.perchStats(),
     perchRun: (secs = 300, step) => audio.perchRun(secs, step),
+    /** And the four in the air: whether each has its recording yet. */
+    voices: () => audio.voiceStats(),
   },
   land: {
     at: (x, z) => groundAt(x, z),

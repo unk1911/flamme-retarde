@@ -600,10 +600,45 @@ including how to rebuild without the parts you may not want.
   one, which puts the pair's period at three and a quarter minutes instead of ten
   seconds. The promenade gets the same treatment for the same reason.
 
-  These five and the 2.8 KB ćuk are the only recorded sounds in the build.
-  Every other noise the game makes — engines, water, fire, footsteps, the birds,
-  three radio stations — is synthesised from oscillators and noise at run time
-  and owes nobody a credit.
+  Engines, water, fire, footsteps, the crowd and three radio stations are still
+  synthesised from oscillators and noise at run time and owe nobody a credit.
+  The recorded clips that are *not* mine are the bead curtain, the off-air
+  radio and the eight bird calls below; [LICENSE](LICENSE) section 3 sets out
+  each of them.
+- **The birds**: eight species, seven of them other people's recordings. Misha
+  named them on 25 August 2026, having heard the lot from the vikendica that
+  morning. The collared dove is his own recording and is cut by
+  `tools/cut_field.py` with the rest of the ambience; the other seven come from
+  Wikimedia Commons and are cut by
+  [`tools/cut_birds.py`](tools/cut_birds.py), which fetches each source from
+  Commons on first run rather than committing 7 MB of somebody else's audio.
+
+  | clip | species | source | recordist | licence |
+  |---|---|---|---|---|
+  | `dove.mp3` | *Streptopelia decaocto* | recorded at Jadrija, 24 Aug 2026 | Misha | mine |
+  | `crow.mp3` | *Corvus cornix* | [Corvus cornix.ogg](https://commons.wikimedia.org/wiki/File:Corvus_cornix.ogg) | Oona Räisänen (Mysid) | public domain |
+  | `gull.mp3` | *Larus michahellis* | [Yellow-legged Gull — Larus michahellis michahellis.ogg](https://commons.wikimedia.org/wiki/File:Yellow-legged_Gull_-_Larus_michahellis_michahellis.ogg) | Cedric Mroczko | CC BY-SA 4.0 |
+  | `swift.mp3` | *Apus pallidus* | [Cri de martinet pâle, Espagne.wav](https://commons.wikimedia.org/wiki/File:Cri_de_martinet_p%C3%A2le,_Espagne.wav) | Xavier Riera | CC BY-SA 4.0 |
+  | `beeeater.mp3` | *Merops apiaster* | [Bijeneter — SoundCloud — Beeld en Geluid.ogg](https://commons.wikimedia.org/wiki/File:Bijeneter_-_SoundCloud_-_Beeld_en_Geluid.ogg) | Beeld en Geluid | CC BY-SA 3.0 |
+  | `blackbird.mp3` | *Turdus merula* | [Common Blackbird song (Turdus merula).ogg](https://commons.wikimedia.org/wiki/File:Common_Blackbird_song_(Turdus_merula).ogg) | Diana Tudor | CC BY 4.0 |
+  | `swallow.mp3` | *Hirundo rustica* | [Hirundo rustica — Barn Swallow XC468712.mp3](https://commons.wikimedia.org/wiki/File:Hirundo_rustica_-_Barn_Swallow_XC468712.mp3) | Marie-Lan Taÿ Pamart | CC BY-SA 4.0 |
+  | `wagtail.mp3` | *Motacilla flava* | [Motacilla flava — Western Yellow Wagtail XC436362.mp3](https://commons.wikimedia.org/wiki/File:Motacilla_flava_-_Western_Yellow_Wagtail_XC436362.mp3) | Joost van Bruggen | CC BY-SA 4.0 |
+
+  *Changes made*: one call, one strophe or one twitter taken from each source by
+  hand; band-limited to what the species actually occupies (250 Hz–3.8 kHz for
+  the crow, 2.8–11 kHz for the wagtail, and so on) so that whatever else was in
+  the recording is not; 8 ms fades on both ends; levelled to −1.0 dBFS **peak**
+  rather than to a fixed RMS, because these are transients in silence at 14 to
+  22 dB of crest and a fixed RMS put six of the seven over 0 dBFS. All 58 KB of
+  them. Distance, direction, the lowpass that stands for air and the wall of the
+  vikendica are applied live and none of it is baked in.
+
+  Four of the eight sit still and are played from a fixed station behind or
+  beside the vikendica — the dove and the blackbird in the pines, the swallows
+  on the wire at the back of the plot, the wagtail down at the waterline. The
+  other four already flew over this map with a synthesised voice and now use
+  their own: gull, pallid swift, hooded crow and — new — bee-eater, all in
+  `src/44-birds.js`. Nothing about how they fly changed.
 - **The dog**: [*Pug*](https://poly.pizza/m/1gXKv15ik8) by
   **[Quaternius](https://quaternius.com)**, dedicated to the public domain under
   [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). The source

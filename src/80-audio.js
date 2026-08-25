@@ -19,7 +19,7 @@ function buildAudio() {
   let outBus = null, outLp = null;
   // The birds sitting still in the trees behind the resort. Their own stage of
   // the wall, because a wall is not one number — see PERCH.
-  let perchBus = null, perchEye = null;
+  let perchBus = null, perchLp = null, perchEye = null;
   let subG = null, subLp = null;
   let slowLp = null;
   let outTap = null;      // the last node before the speakers — see `tap`
@@ -216,10 +216,21 @@ function buildAudio() {
     // And an eye on it, for the same reason `fireBus` has one: what a test
     // needs is not the gain somebody wrote, it is the dBFS of samples the
     // graph actually computed. See `perchStats`.
+    // A lid on that window as well as a gain, now that there are birds coming
+    // through it with some top on them. See PERCH_TOP.
+    perchLp = ctx.createBiquadFilter();
+    perchLp.type = 'lowpass'; perchLp.Q.value = 0.4;
+    perchLp.frequency.value = 20000;
+    perchBus.connect(perchLp);
+    // The eye goes AFTER the lid and not on the bus, so that what it reports
+    // is still the whole of what the wall did. It was on the bus when the gain
+    // was the whole of the wall; moving it does not move the dove numbers in
+    // the note above, because the dove is 24 dB down by 700 Hz and there is
+    // nothing up there for a 7 kHz lowpass to take off it.
     perchEye = ctx.createAnalyser();
     perchEye.fftSize = 2048;
-    perchBus.connect(perchEye);
-    perchBus.connect(bed);
+    perchLp.connect(perchEye);
+    perchLp.connect(bed);
 
     // ── the valley ────────────────────────────────────────────────────────
     // A convolution bus with a hand-made impulse response: a few discrete
@@ -2398,10 +2409,126 @@ function buildAudio() {
       // no top left to take. Open at the tree, shut at the far end.
       lpNear: 5000, lpFar: 1100,
     },
+    // ── and then he listed seven more ──────────────────────────────────────
+    //
+    // Misha, 25 Aug: "just this morning, i heard the bird calls of: Hooded
+    // Crow, Pallid Swift, Eurasian Blackbird, Yellow-legged Gull, Western
+    // Yellow Wagtail, European Bee-eater, Barn Swallow, and again the Eurasian
+    // Collared-Dove". Eight species, and they did NOT all come here, which is
+    // the one design decision in this change worth arguing:
+    //
+    //   crow, gull, swift    already fly in this game, already call, and their
+    //   and the bee-eater    voice was an oscillator. They went to VOICE, and
+    //                        44-birds.js flies them. A hooded crow pinned to
+    //                        one station in one pine would have been a worse
+    //                        crow than the one already up there working the
+    //                        karst, and a swift cannot perch at all — Apus has
+    //                        feet that cling to a wall and will not grip a
+    //                        branch, which is why there is no swift in this
+    //                        table and never can be.
+    //   the three below      sit still and sing from a fixed place, which is
+    //                        what this table is for.
+    //
+    // Levels. The dove's clip decodes at -14.20 dBFS and is scaled by 0.12, so
+    // it leaves the table at 0.023 RMS at nought metres, and that number is
+    // the one liked. Each of these is set to the amplitude that a bird of its
+    // species would have against a dove standing in the same place — the
+    // blackbird half again louder, the wagtail a little under, the swallow's
+    // twitter well under half — and then divided by what its own clip actually
+    // decodes at, which cut_birds.py measures and prints. The division is
+    // arithmetic; the ratios are a judgement and are named as one.
+    {
+      key: 'blackbird', clip: 'blackbird',
+      // The other end of the same stand of pines from the dove, and higher up
+      // it. A blackbird does not sing from inside cover the way a dove calls
+      // from inside it — it takes a song post near the top of something and is
+      // deliberately conspicuous, which is why this is 9.5 m where the dove is
+      // 8.0 and 24 m the other side of the house from it. Two birds in one
+      // tree would be one bird in the stereo field.
+      t: 219.0, s: 41.0, up: 9.5,
+      // Clip decodes at -18.79 dBFS; 1.5x a dove is 0.035 RMS, so 0.035/0.115.
+      gain: 0.30,
+      // A strophe, then a pause about as long as the strophe, four to ten
+      // times over; and then nothing from that tree for a minute or two. The
+      // clip is 2.55 s, so `beat` at 4.2-6.0 is the pause the species leaves
+      // and not a number chosen to sound busy.
+      // `every` is long, and the reason is the clock rather than the bird. This
+      // game is set at three in the afternoon — the dove's note says so and the
+      // beach outside is full — and a blackbird at three in the afternoon in
+      // August is not the blackbird everybody is thinking of. That one is at
+      // dawn and again at dusk, and it is relentless because it is holding a
+      // territory at the hour that matters. In the middle of a hot afternoon it
+      // sings in short bursts and then goes quiet for minutes. At [45, 150] this
+      // sang 199 strophes an hour and was the loudest thing at the house by 10
+      // dB; at [110, 260] it is 77, which is a blackbird you notice when it
+      // starts rather than one you stop hearing.
+      run: [3, 7], beat: [4.2, 6.0], every: [110, 260],
+      // It carries. A blackbird in song is the loudest thing in a European
+      // garden and the only bird here worth hearing from the far kabine, so
+      // `half` is half again the dove's and `gone` is 300 m.
+      half: 30, roll: 1.5, gone: 300,
+      lpNear: 7000, lpFar: 1500,
+    },
+    {
+      key: 'swallow', clip: 'swallow',
+      // On the wire over the back forecourt, where the plot's gate is. Barn
+      // swallows nest under the eaves of exactly this kind of house and sit in
+      // rows on exactly this kind of wire, so the honest place for them is on
+      // the building — but not ON it: at 4.2 m up on the house itself this
+      // would be five metres from somebody standing in the living room, and a
+      // group of swallows five metres away is not a detail, it is an event.
+      // Eleven metres out at the back of the plot is the same birds in the
+      // same place and is a house with swallows at it.
+      t: 240.0, s: 33.0, up: 4.2,
+      // Clip decodes at -23.36 dBFS; 0.45x a dove is 0.011 RMS.
+      gain: 0.15,
+      // Not a phrase and a silence. A perched group twitters more or less
+      // continuously in bouts, so this is a short run of long clips with
+      // little between them, and the bout ends when they go up.
+      run: [2, 5], beat: [3.0, 5.5], every: [30, 90],
+      // 17 grams of bird, and it does not carry at all — this is the one in
+      // the table you have to be at the house to hear.
+      half: 14, roll: 1.5, gone: 140,
+      // It has real top on it: the recordist high-passed at 1.9 kHz and there
+      // is energy to 11. This and the wagtail are the birds PERCH_TOP was
+      // reserved for.
+      lpNear: 11000, lpFar: 2500,
+    },
+    {
+      key: 'wagtail', clip: 'wagtail',
+      // Down at the waterline in front of the house, which is the one bird
+      // here that is on the ground and the one that comes from the seaward
+      // side. It is 23 m from the living room the way the dove is 25, and
+      // opposite it, so the two of them open the stereo field across the
+      // house rather than crowding one side of it.
+      //
+      // A simplification, stated: the clip is a FLIGHT call — its recordist
+      // labels it so — and this plays it from a fixed point. A wagtail works
+      // a stretch of shore in short bounding flights and calls on every one,
+      // so what is wrong here is that the point does not move over the twenty
+      // metres it would really cover. At 23 m away that is a bearing that
+      // should wander and does not. It is the smallest lie in this table and
+      // it is not worth a moving source to fix.
+      t: 228.0, s: 2.0, up: 0.3,
+      // Clip decodes at -17.18 dBFS; 0.6x a dove is 0.014 RMS.
+      gain: 0.10,
+      // One thin `tsli` at a time, a couple to half a dozen as it works along.
+      run: [2, 6], beat: [0.9, 2.4], every: [35, 110],
+      half: 12, roll: 1.5, gone: 120,
+      lpNear: 11000, lpFar: 2200,
+    },
   ];
 
   // An August window, and what is behind the 0.44 is in the note above.
   const PERCH_WALL = 0.44;
+  // And the lid the note above promised to whichever bird turned up with some
+  // top on it. Two did — the swallow's twitter runs to 11 kHz and the
+  // wagtail's call is nothing but top — so the window now takes a little of it
+  // as well as a few decibels overall. 7 kHz is a gentle lid on purpose: this
+  // is a hole in a wall in August, not a shut door, and a hole in a wall is
+  // broadband. Interpolated from wide open with `roomV` so that standing on
+  // the terrace applies nothing at all.
+  const PERCH_TOP = 7000;
 
   /**
    * One of these per bird, kept off the table so that the table stays a
@@ -2436,6 +2563,8 @@ function buildAudio() {
   function applyPerch(tau) {
     if (!ctx || dead || !perchBus) return;
     perchBus.gain.setTargetAtTime(1 - PERCH_WALL * roomV, ctx.currentTime, tau);
+    perchLp.frequency.setTargetAtTime(
+      20000 + (PERCH_TOP - 20000) * roomV, ctx.currentTime, tau);
   }
 
   /**
@@ -3084,7 +3213,67 @@ function buildAudio() {
     crow: { f0: 470, f1: 340, dur: 0.26, amp: 0.055, rasp: 0.85, raspHz: 74,
       form: 2.4, q: 2.6, reps: [2, 2], gap: [0.14, 0.16],
       alarm: { dur: 0.18, reps: [3, 4], gap: [0.06, 0.06] } },
+    // Four now, and this one is a liquid rolled `prruip` rather than a cry:
+    // little rasp, no sweep worth the name, and a Q high enough that what is
+    // left is nearly a whistle. Which is the honest limit of this synthesiser
+    // for a bee-eater — the roll in a real one is a fast tremolo the bird makes
+    // in its throat, and `raspHz` at 120 is an impression of it and not the
+    // thing. It is here to be the voice for the frame or two before the
+    // recording decodes, and after that it is never heard again. See VOICE.
+    beeeater: { f0: 2050, f1: 1750, dur: 0.16, amp: 0.040, rasp: 0.30,
+      raspHz: 120, form: 1.2, q: 6.0, reps: [1, 3], gap: [0.16, 0.20],
+      alarm: { dur: 0.11, reps: [3, 4], gap: [0.06, 0.06] } },
   };
+
+  /**
+   * And what those four actually sound like, which is a recording of each.
+   *
+   * Misha, 25 Aug, listing what he had heard at the vikendica that morning:
+   * "Hooded Crow, Pallid Swift, Eurasian Blackbird, Yellow-legged Gull,
+   * Western Yellow Wagtail, European Bee-eater, Barn Swallow, and again the
+   * Eurasian Collared-Dove". Four of those eight already flew in this game and
+   * already called — see 44-birds.js — and what they called with was the
+   * oscillator above. So for those four the work was not to add a bird. It was
+   * to give the bird that is already there its own voice.
+   *
+   * THE SWAP IS THE ĆUK'S, exactly. `sampled()` a few hundred lines up does
+   * this for the girl's whistle and its note is the argument in full: the
+   * table stays, the recording is lazily decoded, and until it lands the
+   * synthesiser answers. The first gull of a session is synthesised and nobody
+   * has ever noticed. What is different here is only that there are four of
+   * them and they are not all the same length, so the series timing comes off
+   * the buffer instead of off `dur`.
+   *
+   * NOTHING ABOVE THIS CHANGES. `birdCall` still decides how many syllables,
+   * still walks them down in pitch and level as a bird running out of breath,
+   * still tightens the gaps for an alarm, and 44-birds.js still decides which
+   * bird calls, where it is and how loud. A recording is dropped in where the
+   * oscillator was and every one of those behaviours survives it — which is
+   * why this is eleven lines of table rather than a second calling system.
+   *
+   * `level` is a PEAK match and not a loudness match, and it is worth being
+   * clear which. cut_birds.py levels every clip to -1.0 dBFS peak, so a buffer
+   * played at gain g peaks at 0.891 g; `level` is the synthesiser's own `amp`
+   * divided by that 0.891, which puts the recording's loudest sample exactly
+   * where the oscillator's envelope peak used to be. It is deliberately NOT an
+   * RMS match: these clips run 14 to 15 dB of crest against a swept tone's
+   * three or four, so matching their RMS to the oscillator's would have made
+   * every bird on the map three times its old amplitude at the peak. Peak
+   * matching keeps the mix where it was and lets the recordings be quieter on
+   * average, which is what a real bird is.
+   *
+   * `alarm` is the playback rate an alarm call is taken at. The synthesiser
+   * raised f0 for alarms — a bird that means it goes up as well as faster —
+   * and a rate is the only way a buffer can do the same thing. It shortens
+   * them too, which is also what happens.
+   */
+  const VOICE = {
+    gull: { clip: 'gull', level: 0.079, alarm: 1.18 },
+    swift: { clip: 'swift', level: 0.031, alarm: 1.10 },
+    crow: { clip: 'crow', level: 0.062, alarm: 1.14 },
+    beeeater: { clip: 'beeeater', level: 0.045, alarm: 1.12 },
+  };
+  const voiceBuf = Object.create(null);
 
   /**
    * The figure on the promenade, who does not talk.
@@ -3333,12 +3522,39 @@ function buildAudio() {
       pn.connect(w).connect(verbSend);
     }
 
+    // The recording, if it has arrived. Asking for it is what starts it
+    // decoding, so the synthesiser answers this one and the buffer is there
+    // for the next — see VOICE.
+    const voice = VOICE[kind];
+    let buf = null;
+    if (voice) {
+      buf = voiceBuf[kind] || null;
+      if (!buf) sampleLoad(voice.clip, (b) => { voiceBuf[kind] = b; });
+    }
+
     const n = v.reps[0] + Math.floor(Math.random() * (v.reps[1] - v.reps[0] + 1));
     let at = ctx.currentTime;
     for (let i = 0; i < n; i++) {
       // Each syllable a shade lower and quieter than the one before: a bird
       // runs out of breath down a series rather than repeating itself.
       const k = Math.pow(0.94, i);
+      if (buf) {
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        // `k` is the same walk down the series the oscillator does, spent on
+        // rate instead of on frequency — which drops the pitch and stretches
+        // the syllable at once, and both of those are what a tiring bird does.
+        const rate = (alarm ? voice.alarm : 1) * k * (0.97 + Math.random() * 0.06);
+        src.playbackRate.value = rate;
+        const sg = ctx.createGain();
+        sg.gain.value = voice.level * g0 * Math.pow(0.84, i);
+        src.connect(sg).connect(pn);
+        src.start(at);
+        // Off the buffer rather than off `dur`: these are four different
+        // lengths and the table's `dur` describes the oscillator, not them.
+        at += buf.duration / rate + v.gap[0] + Math.random() * v.gap[1];
+        continue;
+      }
       const dur = v.dur * (0.85 + Math.random() * 0.3);
       syllable(at, {
         f0: v.f0 * k * (0.97 + Math.random() * 0.06), f1: v.f1 * k, dur,
@@ -3347,6 +3563,7 @@ function buildAudio() {
         form: v.form, q: v.q, dest: pn,
       });
       // A swift's scream is half air, and no amount of oscillator gets there.
+      // Not needed on the sampled path above, where the air is in the file.
       if (v.air) {
         burst({ freq: v.air, q: 6, dur: dur * 0.8, gain: v.amp * g0 * 1.5, dest: pn });
       }
@@ -3729,6 +3946,22 @@ function buildAudio() {
      * actually computed and is the only number in here that is evidence.
      * `-120` is the empty reading.
      */
+    /**
+     * Which of the four flying birds is speaking with its own voice yet.
+     *
+     * Here for the same reason perchStats is: the swap in `birdCall` is
+     * invisible from outside — a gull that is still on the oscillator sounds
+     * like a gull — so without this there is no way to tell a recording that
+     * decoded from one that silently failed, and sampleLoad fails silently by
+     * design. `secs` is the buffer's own length, which is also a check that
+     * the clip that arrived is the clip that was cut.
+     */
+    voiceStats: () => Object.keys(VOICE).map((k) => ({
+      key: k, clip: VOICE[k].clip,
+      loaded: !!voiceBuf[k],
+      secs: voiceBuf[k] ? +voiceBuf[k].duration.toFixed(3) : 0,
+      level: VOICE[k].level,
+    })),
     perchStats: () => {
       let rms = -120;
       if (perchEye) {
