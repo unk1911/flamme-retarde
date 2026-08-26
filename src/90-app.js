@@ -4768,7 +4768,7 @@ function frame() {
   // metres. The override is applied straight after and has the last word.
   if (camOverride && eject.active) eject.pose(camera);
   if (camOverride) updateCamera(dt);
-  else if (state.phase === 'ground') ground.pose(camera, bodyCam ? 2.35 : 0);
+  else if (state.phase === 'ground') ground.pose(camera, bodyCam ? 3.10 : 0);
   else if (state.phase === 'ride') ride.pose(camera);
   else if (state.phase === 'foil') foil.pose(camera);
   else if (state.phase === 'brod') brod.pose(camera);

@@ -2003,8 +2003,22 @@ async function buildGround(scene, field) {
    * of the middle of the frame without moving where the shot is pointed.
    */
   const THIRD = {
-    back: 2.35,             // m down the view line
-    up: 0.30,               // m of lift, applied after the pull-back
+    // Arithmetic and not taste. The camera sits `up` above her eye and `back`
+    // down the view line, so her feet fall atan((1.66 + up) / back) below the
+    // centre of the screen, and the vertical field of view is 58 degrees —
+    // half of it is 29. At the first cut's 2.35 and 0.30 that came to 39.8
+    // degrees and her feet were a good way off the bottom of the frame, which
+    // is what Misha reported. 3.10 and 0.06 puts them at 28.9, just inside,
+    // and she reads whole.
+    //
+    // It is a trade and the other side of it is the alleys: 3.10 m of
+    // pull-back is more than most of them have behind you, so the march below
+    // will be shortening this a lot more often than it used to. That is the
+    // right way round — a camera that is occasionally closer than it wants is
+    // better than one that never shows you your own feet — and the floor at
+    // `min` is what stops the short end being ugly.
+    back: 3.10,             // m down the view line
+    up: 0.06,               // m of lift, applied after the pull-back
     step: 0.15,             // m per collision probe — see below
     ahead: 6.0,             // where lookAt is put, ahead of HER and not of the camera
     // Below this the third person gives up and hands the frame back to the

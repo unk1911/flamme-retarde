@@ -8,6 +8,26 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.126.0] — 2026-08-26
+
+### The third person shows her feet
+
+**Arithmetic, not taste.** The camera sits `up` above her eye and
+`back` down the view line, so her feet fall
+`atan((1.66 + up) / back)` below the centre of the screen, and the
+vertical field of view is 58 degrees — half of it is 29. At 1.123.0's
+2.35 and 0.30 that came to **39.8 degrees**, which is why her feet were
+a good way off the bottom of the frame. 3.10 and 0.06 puts them at
+**28.9**, just inside, and she reads whole.
+
+It is a trade and the other side of it is the alleys: 3.10 m of
+pull-back is more than a lot of them have behind you, so the march that
+keeps the camera out of walls will be shortening this more often than it
+used to. That is the right way round — a camera occasionally closer than
+it wants beats one that never shows you your own feet — and the floor at
+`THIRD.min` is what stops the short end being ugly. Measured in the
+alley behind the first block: 2.97 m of the 3.10, and she stays drawn.
+
 ## [1.125.0] — 2026-08-26
 
 ### Baye uses the changing hut, and comes out in a different wrap
