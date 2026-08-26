@@ -264,7 +264,9 @@ Four things the frames settled that the 20260821 photograph could not:
   he gave it. The spelling is the board's, because the board is the one that
   is photographed.
 
-Two things still open, both in `MORNING.md`:
+Two things that were open in `MORNING.md`, both PAUSED 26 Aug 2026 with the
+rest of the open work. Neither is answered; they are written down here so that
+what is missing is legible when somebody comes back to them:
 
 - **The right-hand board has NINE rows and the game has eight.** `b_184` shows
   the third one plainly enough to count but the word is five pixels of stroke
@@ -509,10 +511,10 @@ not on the shore.
   the sanitary block already built, seen from the other side, and probably the
   same terraces — but v595 has no GPS and a second copy of a building the game
   already has is the worst possible outcome. Needs a geotagged frame or Misha.
-- **The `a_030` back lane** — already in the TODO under SURVEY, still blocked
-  on the same thing.
+- **The `a_030` back lane** — already in the TODO under SURVEY, blocked on the
+  same thing. PAUSED 26 Aug 2026.
 - **The doorway through the concrete wall**, `20260821_175025` — already in the
-  TODO, blocked on which wall it belongs to.
+  TODO, blocked on which wall it belongs to. PAUSED 26 Aug 2026.
 
 ## Things checked and found already built
 

@@ -110,7 +110,19 @@ done is worse than no list.
   is done. Rule 12 governs every pass: invent no name, no price and no number
   the photographs do not carry.
 
-## OPEN
+## OPEN — nothing open, PAUSED 26 Aug 2026
+
+Every checkbox below is done. The four prose items that were genuinely still
+open on 26 Aug — the paving joints, the lane wall's `gap()`, the `a_030` back
+lane and the doorway through the concrete wall — were closed unfinished when
+the project paused, each marked in place. They are closed and NOT answered:
+the gaps are real and the notes stay so that whoever picks this up starts from
+what is missing rather than from a clean sheet.
+
+Two questions were closed the same day without answers, on Misha's call: how
+wide a kabina bay really is (`JAD.cabW` 2.15 m against 0.95-1.05 measured off
+his own footage) and the marina in the inlet behind the Brod's root.
+
 
 **Build**
 - [x] Gas bottles: turned with `lathe` instead of stacked posts — rolled foot,
@@ -152,9 +164,11 @@ done is worse than no list.
       lattice the jitter could shift but not break, so the paving was a tiled
       check about 3 m across; it is a hash now. And the flags were 2.2 m square
       against 0.4-1.0 m stones in v_022. +6 688 triangles, fps unchanged.
-      Still open: the joints themselves. v_022 has them wide and visibly darker
-      than the stones, and the flags here have no joint geometry at all — the
-      edges are just where one colour meets the next.
+      PAUSED 26 Aug 2026, unbuilt: the joints themselves. v_022 has them wide
+      and visibly darker than the stones, and the flags here have no joint
+      geometry at all — the edges are just where one colour meets the next.
+      Closed with the rest of the open work when Misha paused the project; it
+      is a real gap and not a resolved one, and this is the record of that.
 - [x] Sound: klapa out, five field recordings in — the promenade as one bed,
       the hillside cicadas, the same chorus from inside the pines crossfaded on
       canopy, the sea against the concrete edge (driven off `shoreAt` from
@@ -506,8 +520,8 @@ as of this writing; the state of each is in the git log, not here.
   (`live` 40 064, `near` 419, 4 547 578 tris), and the frame cost is +0.25 ms
   at the worst station and inside noise at the other two, against a 16.7 ms
   budget the tightest station uses 13.1 ms of.
-- **The lane wall's `gap()` still opens t 336-408** for a plaza that was deleted
-  on 22 Aug. Closing it welds two runs into one, moves the blocker count, and
+- **The lane wall's `gap()` still opens t 336-408** — PAUSED 26 Aug 2026,
+  undecided. For a plaza that was deleted Closing it welds two runs into one, moves the blocker count, and
   puts 72 m of new white wall inland that nobody has asked for. No survey frame
   settles whether the wall runs continuously there — the photographs that cover
   those arc lengths were all taken from the water, at s -37 to -54 — so this is
@@ -529,7 +543,15 @@ as of this writing; the state of each is in the git log, not here.
   thing `b_016` was: v595 carries no GPS, so there is no `t` the footage
   supports. Either geotag a frame from it or accept a placement and say so.
 
-## SURVEY — found, not yet built
+## SURVEY — found, not yet built — PAUSED 26 Aug 2026
+
+Everything under this heading is a thing the survey shows that the game does
+not have. None of it is a bug and none of it is decided against; it is the
+backlog of what was seen and not built, and Misha paused the project on
+26 Aug with all of it still here. Kept in full rather than cleared, because
+the value of this section is the observation and that does not go stale — it
+is the same photographs whenever anybody comes back.
+
 
 ### survey/4 — 23 Aug 2026, forty-seven stills and a six-minute 4K pan
 

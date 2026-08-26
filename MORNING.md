@@ -43,9 +43,10 @@ Both settled 24 August:
 - **NES CAFFE stays**, on your word. The board's spelling, because the board is
   the thing that is photographed. Closed.
 
-Still open from that pass, and small: **the centre bay's lower two thirds is
-empty.** The real one has a photograph of krafne under the name, and now that
-both flanking bays are full the gap is conspicuous where it was not before.
+**The centre bay's lower two thirds is empty — PAUSED 26 Aug 2026, unbuilt.**
+The real one has a photograph of krafne under the name, and now that both
+flanking bays are full the gap is conspicuous where it was not before. Small,
+real, and closed unfinished when the project paused.
 
 ## 3. Brands — ANSWERED, in hand
 
