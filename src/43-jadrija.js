@@ -1613,7 +1613,13 @@ async function buildJadrija(scene) {
     // place that knows where a wall actually stands is the call that built it.
     // `wash` rides along because one of the things now hung on a wall of this
     // kind cares what colour the wall is: see `wordGable`.
-    const nearFace = { t: T0 - 0.05, o: -1, front, back,
+    // `t1` is the run's FAR end, and it is here from 26 Aug because the boat
+    // is not hung on an end wall at all — it runs along the back of the run,
+    // and a thing that spans a whole run has to be told where the run stops.
+    // It cannot be measured afterwards for exactly the reason the near end
+    // cannot: `t0` and `n` are drawn out of the layout loop, so this call is
+    // the only place that knows.
+    const nearFace = { t: T0 - 0.05, t1: T1 + 0.05, o: -1, front, back,
       floor: y0 + JAD.plinth, eave, wash: washRun(runIx) };
     if (front === JAD.rowA) {
       if (!firstGable) firstGable = nearFace;
@@ -3773,6 +3779,69 @@ async function buildJadrija(scene) {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
     return tex;
+  }
+
+  /**
+   * The 100 itself, as a mark rather than as a word.
+   *
+   * `centenaryTex` above sets its hundred in Helvetica, and its own comment
+   * has always described something else: "a big 100 whose zeroes are hut
+   * fronts". The zeroes ARE hut fronts, and `brod-mural.jpg` is the frame that
+   * proves it — the stamp in the mural's bottom corner is the same mark at
+   * about a tenth of the size, and at that size the two arched door fronts are
+   * the only thing left of it. So the glyph lives here, once, and the mural
+   * borrows it rather than drawing a second hundred that could drift.
+   *
+   * A kabina door in this file is an arched opening with a fanlight over two
+   * leaves, and that is exactly what each zero is: an arch-topped panel with
+   * the transom and the meeting stile cut out of it. Cut, not drawn — the
+   * joints come out with `destination-out` so what shows through them is
+   * whatever the mark was stamped on, which on the mural is dark water.
+   *
+   * WHAT THIS DOES NOT DO is rewrite `centenaryTex`'s own hundred, and that is
+   * a decision rather than an oversight. Its comment describes hut fronts and
+   * its code sets Helvetica, so the two disagree and one of them is wrong —
+   * but the evidence in hand is a photograph of THIS wall, not of the
+   * hoarding, and swapping the glyph would silently redraw three shipped
+   * objects on the strength of it. The seam is here when somebody has a frame
+   * of the hoarding close enough to settle it.
+   *
+   * `x, y` is the top left, `h` the cap height. Returns the width used, so a
+   * caller can centre it — or hang a reflection under it — without knowing the
+   * proportions.
+   */
+  function hundredMark(g, x, y, h, col) {
+    const stem = h * 0.20, gap = h * 0.085, wide = h * 0.62;
+    const joint = Math.max(h * 0.055, 2);
+    // The 1. A bar with the little angled flag the real one has, which at a
+    // tenth of this size is the only thing telling it from a door jamb.
+    g.fillStyle = col;
+    g.beginPath();
+    g.moveTo(x, y + h * 0.30);
+    g.lineTo(x + stem * 0.55, y + h * 0.10);
+    g.lineTo(x + stem, y + h * 0.10);
+    g.lineTo(x + stem, y + h);
+    g.lineTo(x, y + h);
+    g.closePath();
+    g.fill();
+    // And the two doors.
+    for (let i = 0; i < 2; i++) {
+      const dx = x + stem + gap + i * (wide + gap);
+      const r = wide * 0.5, sill = y + h, spring = y + r;
+      g.beginPath();
+      g.moveTo(dx, sill);
+      g.lineTo(dx, spring);
+      g.arc(dx + r, spring, r, Math.PI, 0);
+      g.lineTo(dx + wide, sill);
+      g.closePath();
+      g.fill();
+      // The transom under the arch and the stile between the leaves.
+      g.globalCompositeOperation = 'destination-out';
+      g.fillRect(dx, spring + r * 0.34, wide, joint);
+      g.fillRect(dx + r - joint * 0.5, spring + r * 0.34, joint, sill - spring - r * 0.34);
+      g.globalCompositeOperation = 'source-over';
+    }
+    return stem + gap * 2 + wide * 2;
   }
 
   function centenary(t, s, w, h, y, opts = {}) {
@@ -8101,6 +8170,630 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * The excursion boat, along the back of the first block.
+   *
+   * `brod-mural.jpg`, 25 Aug 2026 at 13:00 — the newest thing in the survey by
+   * two days. A whole kabine run's back wall painted with a Dalmatian
+   * excursion boat lying in stylised water, photographed from the gravel on
+   * the landward side. It is the largest piece of painting at Jadrija by an
+   * order of magnitude, and it carries the JADRIJA 100 mark in its bottom
+   * corner, which is the thing that says it is a commission and not graffiti.
+   *
+   * THREE THINGS THE PHOTOGRAPH SETTLES, all three the opposite of the way the
+   * job was described to me, which is why they are written down rather than
+   * assumed:
+   *
+   *  - THE HULL IS WHITE to the waterline. The maroon is the DECKHOUSE, up
+   *    above the deck, and the life rings hang on that — not on the hull.
+   *  - THERE IS NO SAND BAND under the water. The water runs all the way down
+   *    to the foot of the wall. The cream is bare render ABOVE the paint: it
+   *    is the wall, not a beach, and it is why the top fifth of this canvas is
+   *    deliberately empty.
+   *  - the wall's vent slots run along the TOP, under the roof slab.
+   *
+   * Bow to the RIGHT as photographed. That was worth an hour and two wrong
+   * answers: a bluff bow and a counter stern have the same silhouette — both
+   * overhang at the top — and the tender stowed at the other end reads as a
+   * foredeck if you want it to. What settles it is the sheer, which sweeps up
+   * hardest to the right, and the near-vertical little transom with the after
+   * rail turning across it at the left. She has an open shelter deck aft
+   * reading as a black band behind white stanchion rails, a white saloon
+   * forward with a black band of rounded lights, a tender on chocks abaft the
+   * deckhouse, three life rings, tyre fenders over the side, and a varnished
+   * caprail running the whole length of the sheer.
+   *
+   * EVERY PROPORTION IS MEASURED, and measured off a RECTIFIED copy rather
+   * than off the frame — which matters far more than it sounds. The wall
+   * recedes: its right-hand end is 22% nearer the camera than its left, so a
+   * boat traced straight off the photograph comes out with a drooping stern
+   * and a bow half a metre too high. The rectification is one vanishing point
+   * with the verticals kept, off the wall's own two edges: wall height
+   * h(x) = 616 + 0.04719 (x − 860) px, and distance along it X/H =
+   * ln(h/h₀)/0.04719. It turns the wall into a true elevation and hands over
+   * the one number the whole thing hangs off:
+   *
+   *      THE PAINTED PANEL IS 4.454 WALL-HEIGHTS WIDE.
+   *
+   * That is where this canvas's aspect comes from, and where the mural's
+   * 10.60 m by 2.38 m comes from at the call. Everything below is in the
+   * (u, v) of that elevation — u along the wall from the stern end, v down it
+   * from the eave — so the tables read straight back onto the photograph.
+   *
+   * The palette is sampled off the same rectified image and then very nearly
+   * left alone, which is a decision and not laziness. The day was overcast,
+   * which normally means lifting everything; but `WASH[0]`, the limewash this
+   * wall is actually painted in, is (0.655, 0.618, 0.540) against the
+   * photograph's own render at (0.76, 0.71, 0.55) — the frame and the game are
+   * already within a few per cent. Only the whites are lifted, by about 8%,
+   * because lime white in August is the one thing an overcast frame really
+   * does lose.
+   *
+   * Painted the way `gullMural` and `fishMural` are painted, for their
+   * reasons: on transparent ground so what shows between the strokes is the
+   * render with the render's own weather on it, in flat cut shapes rather than
+   * gradients, and finished with a scatter of dabs taken back out again.
+   */
+  function brodMural(ratio) {
+    // ── TWO COORDINATE SYSTEMS, AND THE FIRST CUT ONLY HAD ONE ────────────
+    //
+    // The boat is 4.454 wall-heights long and that is measured and fixed. The
+    // WALL is whatever the layout made it — 14.3 m here, or six wall-heights —
+    // and which is longer is not a number this file gets to choose.
+    //
+    // The first cut made the mural exactly the boat: a 4.454-wide panel of
+    // paint floating in the middle of a six-wide wall. It looked like a poster
+    // nailed up, which is the one failure the gull's note is entirely about,
+    // and the screenshot caught it in one frame — the water ended in a hard
+    // vertical cut with bare render either side, and the smoothing round the
+    // closing corner had taken a bite out of the bottom as well.
+    //
+    // What the photograph actually shows is water ARRIS TO ARRIS with a boat
+    // in it. So the canvas is sized to the wall (`ratio` is the wall's own
+    // length over its height, measured by `wallArc` before a stroke goes on),
+    // the water is drawn in CANVAS space and fills it, and the boat is drawn
+    // in its own space — 4.454 heights wide, centred — and keeps every
+    // proportion it was measured with whatever the run turned out to be.
+    //
+    // `X` is boat space, `XC` is canvas space, `Y` is shared: v is fractions of
+    // the wall's height in both, because the wall's height is the one thing the
+    // two systems agree about.
+    const H = 660;
+    const W = Math.min(Math.round(H * ratio), 4096);
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    // The date on the photograph, as the other two use theirs: a fixed table,
+    // so the wall is the same wall every time the page loads.
+    let seed = 20260825;
+    const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff)
+      / 0x7fffffff;
+    // 0.72 rather than 0.50, and it is a composition decision and not a
+    // measurement. The boat is 3.96 wall-heights stem to stern and this wall
+    // is 5.95, so there are two wall-heights of water to put somewhere; dead
+    // centre gives her a metre and a half of it at each end and she reads as a
+    // model in a case. Weighted forward she has open water astern and comes up
+    // close to the west arris — which is the end you meet first, round the
+    // corner from the gull, and the end the sea shows past.
+    const BOAT = 4.4522 * H, bx = (W - BOAT) * 0.72;
+    const X = (u) => bx + u * BOAT;
+    const XC = (u) => u * W;
+    const Y = (v) => v * H;
+    // `X` IS AFFINE AND `XC` IS NOT, WHICH IS A TRAP AND IT CAUGHT ME. Boat
+    // space has an origin at `bx`, so `X(w)` is a POSITION and never a WIDTH:
+    // `fillRect(X(u), y, X(w), h)` puts a rectangle three metres too wide on
+    // the wall. Five of those went in with the second cut and the build after
+    // it had white slabs standing out past the bow and a black bar across the
+    // deckhouse. A length in boat space is `BOAT * w`, and there is no
+    // shorthand for it on purpose.
+
+    const SEA = '#242831';        // the body of the water
+    const SEA_D = '#191a1f';      // its darkest troughs
+    // Lifted from the measured #34373e. At the sample value it was four steps
+    // off the body colour and the water read as one flat black mass at any
+    // distance over five metres; the shelves in the photograph are plainly a
+    // separate, bluer value and this is what it takes to keep them once the
+    // renderer's own light is on top.
+    const SEA_L = '#3d4250';      // the shelves the crests sit on
+    const FOAM = '#565a63';       // the hatching, which is cut not blended
+    const FOAM_L = '#7c8089';     // and its brightest strokes
+    const HULL = '#d2d0c4';       // topsides
+    const HULL_L = '#e2e0d3';
+    const HULL_S = '#78807e';     // the shadow round the turn of the bilge
+    const DARK = '#17171c';       // shelter deck aft, saloon lights forward
+    const RAIL = '#eceadf';       // every piece of white joinery
+    const SALOON = '#dcdacd';
+    const OCHRE = '#9d7c52';      // the varnished caprail
+    const OCHRE_L = '#bd9c66';
+    const MAROON = '#54231f';     // the deckhouse
+    const MAROON_D = '#3a2b28';   // its shaded after end
+
+    /** A smooth polyline through (u, v) stations. */
+    const curve = (pts, close) => {
+      g.beginPath();
+      g.moveTo(X(pts[0][0]), Y(pts[0][1]));
+      for (let i = 1; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        g.quadraticCurveTo(X(a[0]), Y(a[1]),
+          X((a[0] + b[0]) * 0.5), Y((a[1] + b[1]) * 0.5));
+      }
+      const e = pts[pts.length - 1];
+      g.lineTo(X(e[0]), Y(e[1]));
+      if (close) g.closePath();
+    };
+
+    // ── the sheer ─────────────────────────────────────────────────────────
+    // The single most important line in the picture and the one every other
+    // measurement hangs off, so it is a table read off the elevation rather
+    // than a formula: v 0.487 at both ends and 0.652 amidships. That is a
+    // sixth of a wall height of sheer, which is a great deal for a real hull
+    // and is not a mistake — she is drawn slightly from above, and the painter
+    // exaggerated it on top of that.
+    const SHEER = [[0.030, 0.487], [0.09, 0.528], [0.17, 0.568], [0.26, 0.598],
+      [0.36, 0.622], [0.46, 0.640], [0.56, 0.652], [0.65, 0.646],
+      [0.73, 0.622], [0.80, 0.586], [0.86, 0.542], [0.905, 0.501],
+      [0.925, 0.487]];
+    const sheerAt = (u) => {
+      let i = 1;
+      while (i < SHEER.length - 1 && SHEER[i][0] < u) i++;
+      const a = SHEER[i - 1], b = SHEER[i];
+      const f = Math.min(Math.max((u - a[0]) / (b[0] - a[0]), 0), 1);
+      return a[1] + (b[1] - a[1]) * f;
+    };
+    /** The same stations shifted `dv` down the wall. Declared up here with
+     * `along` and not where it is first written, because everything in this
+     * file is one lexical scope and a `const` used above its declaration is
+     * rule 3 — a page that never finishes loading, with no other symptom. */
+    const shift = (pts, dv) => pts.map((p) => [p[0], p[1] + dv]);
+    /** Stations along the sheer from `ua` to `ub`, offset `dv` down the wall. */
+    const along = (ua, ub, dv, n = 14) => {
+      const out = [];
+      for (let i = 0; i <= n; i++) {
+        const u = ua + (ub - ua) * i / n;
+        out.push([u, sheerAt(u) + dv]);
+      }
+      return out;
+    };
+
+    // ── the sea ───────────────────────────────────────────────────────────
+    // Not a rectangle with a wave line drawn on it: a mass whose top edge IS
+    // the wave line, so there is no straight side anywhere in the picture. The
+    // measured edge sits around v 0.22 over the aft two thirds and climbs to
+    // v 0.10 in the last quarter — the swell is bigger at the bow end, and
+    // that alone is what stops the water reading as a painted dado.
+    //
+    // The amplitude here is about twice the measurement and that is deliberate
+    // and is the correction from the first cut. At the measured ±0.01 it came
+    // out a ruled line at fifteen metres: a wave you have to be told about is
+    // not a wave. The stations still carry the measured MEAN and the measured
+    // climb; what has been opened up is the wobble between them.
+    //
+    // The table runs from u −0.22 to 1.22 in BOAT space, which covers a canvas
+    // a third longer than the boat with room to spare at both ends.
+    const TOP = [[-0.22, 0.212], [-0.15, 0.244], [-0.08, 0.216], [-0.01, 0.240],
+      [0.06, 0.212], [0.13, 0.236], [0.20, 0.214], [0.27, 0.238],
+      [0.34, 0.208], [0.41, 0.232], [0.47, 0.176], [0.52, 0.214],
+      [0.58, 0.190], [0.64, 0.206], [0.71, 0.160], [0.79, 0.100],
+      [0.84, 0.172], [0.88, 0.124], [0.93, 0.100], [0.97, 0.148],
+      [1.03, 0.112], [1.09, 0.166], [1.15, 0.120], [1.22, 0.160]];
+    // The wavy top through `curve`, and then the other three sides as straight
+    // lines to explicit corners. That last part is not fussiness: running the
+    // whole loop through `curve` smooths the closing corner into an arc, and
+    // the first build had a metre-wide bite taken out of the bottom of the
+    // painting where the water should have met the concrete.
+    const seaPath = () => {
+      curve(TOP, false);
+      g.lineTo(XC(1.08), Y(1.06));
+      g.lineTo(XC(-0.08), Y(1.06));
+      g.closePath();
+    };
+    seaPath();
+    g.fillStyle = SEA; g.fill();
+
+    // Everything else in the water is clipped to that shape, so no patch and
+    // no crest can climb above the wave line and leave a bruise on the render.
+    g.save();
+    seaPath(); g.clip();
+
+    // Flat patches of three values with the hatching laid on top of them, and
+    // that order is what makes it a woodcut instead of a gradient. Sizes are in
+    // pixels off `H` rather than in fractions of the canvas, because the canvas
+    // is as long as the wall turned out to be and a fraction of it is not a
+    // fixed size on the render.
+    for (let i = 0; i < 44; i++) {
+      const cx = XC(rnd()), cy = Y(0.14 + rnd() * 0.84);
+      const rw = H * (0.16 + rnd() * 0.58), rh = H * (0.05 + rnd() * 0.20);
+      g.beginPath();
+      for (let k = 0; k <= 8; k++) {
+        const a = (k / 8) * Math.PI * 2, r = 1 + (rnd() - 0.5) * 0.55;
+        const x = cx + Math.cos(a) * rw * r, y = cy + Math.sin(a) * rh * r;
+        if (k === 0) g.moveTo(x, y); else g.lineTo(x, y);
+      }
+      g.closePath();
+      g.fillStyle = rnd() < 0.5 ? SEA_D : SEA_L;
+      g.globalAlpha = 0.45 + rnd() * 0.45;
+      g.fill();
+    }
+    g.globalAlpha = 1;
+
+    // The crests. Bands of parallel wavy strokes — the painter cut them with a
+    // brush edge rather than blending them, and copying that is most of why
+    // this reads as the same hand as the wall in the photograph.
+    g.lineCap = 'round';
+    for (let i = 0; i < 52; i++) {
+      const x0 = XC(rnd() * 1.06 - 0.03), v0 = 0.10 + rnd() * 0.84;
+      const wd = H * (0.22 + rnd() * 0.54);
+      const rows = 4 + ((rnd() * 6) | 0);
+      g.strokeStyle = rnd() < 0.35 ? FOAM_L : FOAM;
+      g.lineWidth = 2.5 + rnd() * 2.5;
+      for (let r = 0; r < rows; r++) {
+        const v = v0 + r * (0.011 + rnd() * 0.007);
+        g.beginPath();
+        for (let k = 0; k <= 10; k++) {
+          const y = Y(v + Math.sin(k * 1.9 + i) * 0.0065);
+          const x = x0 + (k / 10) * wd;
+          if (k === 0) g.moveTo(x, y); else g.lineTo(x, y);
+        }
+        g.stroke();
+      }
+    }
+    g.restore();
+
+    // ── the hull ──────────────────────────────────────────────────────────
+    // Sheer along the top, and the wetted profile back along the bottom: down
+    // the raked stem at the bow, along a keel that is deepest at v 0.947
+    // around amidships, and up the little transom at the stern.
+    const KEEL = [[0.925, 0.487], [0.916, 0.600], [0.902, 0.726],
+      [0.878, 0.816], [0.820, 0.882], [0.735, 0.925], [0.620, 0.946],
+      [0.500, 0.947], [0.390, 0.933], [0.290, 0.906], [0.190, 0.866],
+      [0.110, 0.812], [0.060, 0.742], [0.036, 0.640], [0.030, 0.487]];
+    const hullPath = [...SHEER, ...KEEL];
+    curve(hullPath, true);
+    g.fillStyle = HULL; g.fill();
+
+    g.save();
+    curve(hullPath, true); g.clip();
+    // Grey up from the waterline, and it FOLLOWS THE KEEL rather than being a
+    // vertical gradient across the whole hull. That was the first version and
+    // it is wrong for a reason worth keeping: the sheer runs from v 0.487 to
+    // 0.652 and the keel from 0.487 to 0.947, so no horizontal band is at a
+    // constant depth in the hull — a vertical ramp shades the ends and misses
+    // the middle, and what it drew was a flat pale slab with a dirty bottom.
+    // Two bands offset off the keel curve do the job, and they are the whole
+    // of the roundness: a hull with no turn of bilge in it is a cut-out.
+    for (const [dv, alpha] of [[0.150, 0.40], [0.062, 0.46]]) {
+      curve([...KEEL, ...shift(KEEL, -dv).slice().reverse()], true);
+      g.fillStyle = HULL_S; g.globalAlpha = alpha; g.fill();
+    }
+    g.globalAlpha = 1;
+    // And a lit strip just under the caprail, which is where the topsides
+    // actually catch anything.
+    curve([...along(0.03, 0.925, 0.012), ...along(0.925, 0.03, 0.062)], true);
+    g.fillStyle = HULL_L; g.globalAlpha = 0.55; g.fill();
+    g.globalAlpha = 1;
+    g.restore();
+
+    // The boot-topping: one dark line where she sits in it. Drawn as a stroke
+    // along the keel rather than as a filled band, because on the wall it is
+    // one pass of a loaded brush and it wanders.
+    curve(KEEL.slice(1, -1), false);
+    g.strokeStyle = 'rgba(28,30,34,0.62)'; g.lineWidth = H * 0.020; g.stroke();
+
+    // ── the deck structures ───────────────────────────────────────────────
+    // Aft of u 0.44 she is open: a shelter deck under an awning, which from
+    // outside is a white fascia strip with a black hole under it. Forward of
+    // it the saloon is enclosed and white, with a band of rounded lights.
+    //
+    // Both are built the same way and the order is the trick — fill the whole
+    // superstructure white first, then cut the dark band into it, so the white
+    // strip above the dark is a leftover and cannot drift out of parallel.
+    const DECKTOP = [[0.042, 0.258], [0.12, 0.280], [0.22, 0.296],
+      [0.32, 0.310], [0.44, 0.320]];
+    const SALTOP = [[0.44, 0.320], [0.52, 0.316], [0.60, 0.322],
+      [0.68, 0.333], [0.75, 0.352], [0.80, 0.378], [0.836, 0.416]];
+    curve([...DECKTOP, ...along(0.44, 0.042, -0.004)], true);
+    g.fillStyle = SALOON; g.fill();
+    curve([...SALTOP, ...along(0.836, 0.44, -0.004)], true);
+    g.fillStyle = SALOON; g.fill();
+    // The fascia's own shadow line under the awning edge, aft only.
+    curve(DECKTOP, false);
+    g.strokeStyle = 'rgba(120,120,112,0.5)'; g.lineWidth = H * 0.006; g.stroke();
+
+    // The dark aft band: the shelter deck, which is a hole and not a colour.
+    curve([...shift(DECKTOP, 0.046), ...along(0.44, 0.042, -0.014)], true);
+    g.fillStyle = DARK; g.fill();
+
+    // And the lights forward. A continuous black band with white mullions cut
+    // back over it, because that is how they are painted — the glass is one
+    // stroke and the frames are the second pass on top.
+    // The band sits a little higher than the measurement — 0.055 rather than
+    // 0.072 down from the deckhead — because the guard rail crosses in front of
+    // it, which it does in the photograph too, and four white wires over the
+    // bottom two thirds of a light turns a window into a row of small squares.
+    const winTop = shift(SALTOP, 0.055), winBot = shift(SALTOP, 0.200);
+    curve([...winTop, ...winBot.slice().reverse()], true);
+    g.fillStyle = DARK; g.fill();
+    const sal = (u) => {
+      let i = 1;
+      while (i < SALTOP.length - 1 && SALTOP[i][0] < u) i++;
+      const a = SALTOP[i - 1], b = SALTOP[i];
+      const f = Math.min(Math.max((u - a[0]) / (b[0] - a[0]), 0), 1);
+      return a[1] + (b[1] - a[1]) * f;
+    };
+    // Seven lights between u 0.47 and u 0.80, which is what the frame shows,
+    // and the mullions are 0.008 of the wall — a hand's width on the boat.
+    g.fillStyle = SALOON;
+    for (let i = 0; i <= 7; i++) {
+      const u = 0.462 + i * (0.345 / 7);
+      g.beginPath();
+      g.moveTo(X(u), Y(sal(u) + 0.049));
+      g.lineTo(X(u + 0.009), Y(sal(u + 0.009) + 0.049));
+      g.lineTo(X(u + 0.009), Y(sal(u + 0.009) + 0.206));
+      g.lineTo(X(u), Y(sal(u) + 0.206));
+      g.closePath();
+      g.fill();
+    }
+    // The band used to be capped at both ends with a squared-off block of
+    // white. It is gone: the saloon mass already covers that ground, and what
+    // the caps actually did was stand a hard white rectangle up over the deck
+    // line at the bow, which read as a container on the foredeck.
+
+    // ── the deckhouse ─────────────────────────────────────────────────────
+    // The maroon, and it is nearly at the eave: the top of it is v 0.02, which
+    // on this wall is 5 cm under the roof slab. That is measured and it is the
+    // reason the mural is hung to the full height of the render rather than as
+    // a panel — there is no room above her for a margin.
+    //
+    // STRAIGHT LINES, not `curve`. A deckhouse is a box — this is rule 7's
+    // point about masonry applied to joinery, and the first cut ignored it:
+    // run through the same smoother the sheer uses, the square step in the top
+    // of the block rounded clean away and what came out was a low red blob
+    // sitting on the deck at half its height.
+    const HOUSE = [[0.185, 0.098], [0.235, 0.098], [0.235, 0.022],
+      [0.455, 0.022], [0.455, 0.318], [0.185, 0.292]];
+    const housePath = () => {
+      g.beginPath();
+      g.moveTo(X(HOUSE[0][0]), Y(HOUSE[0][1]));
+      for (const [hu, hv] of HOUSE.slice(1)) g.lineTo(X(hu), Y(hv));
+      g.closePath();
+    };
+    housePath();
+    g.fillStyle = MAROON; g.fill();
+    // Its after end is in its own shadow and goes nearly to black, which is
+    // most of what gives the block any depth at all.
+    g.save();
+    housePath(); g.clip();
+    const hs = g.createLinearGradient(X(0.32), 0, X(0.455), 0);
+    hs.addColorStop(0, 'rgba(58,43,40,0)');
+    hs.addColorStop(1, 'rgba(40,30,29,0.92)');
+    g.fillStyle = hs; g.fillRect(X(0.18), 0, BOAT * 0.29, Y(0.34));
+    g.restore();
+    // Windows in it: dark, square, and only in the after half.
+    g.fillStyle = MAROON_D;
+    for (const [wu, ww] of [[0.256, 0.030], [0.345, 0.042], [0.397, 0.042]]) {
+      g.fillRect(X(wu), Y(0.062), BOAT * ww, Y(0.096));
+    }
+    g.fillStyle = 'rgba(18,18,20,0.85)';
+    for (const [wu, ww] of [[0.345, 0.042], [0.397, 0.042]]) {
+      g.fillRect(X(wu), Y(0.062), BOAT * ww, Y(0.096));
+    }
+
+    // ── the tender ────────────────────────────────────────────────────────
+    // On chocks abaft the deckhouse with a davit each end. It is drawn as a
+    // shallow open boat and nothing else — at this size the thwarts are two
+    // strokes and the rest is the shape.
+    g.strokeStyle = RAIL; g.lineWidth = H * 0.009; g.lineCap = 'round';
+    for (const du of [0.128, 0.222]) {
+      g.beginPath();
+      g.moveTo(X(du), Y(0.300)); g.lineTo(X(du), Y(0.150));
+      g.stroke();
+    }
+    g.beginPath();
+    g.moveTo(X(0.128), Y(0.152));
+    g.quadraticCurveTo(X(0.134), Y(0.126), X(0.150), Y(0.132));
+    g.stroke();
+    curve([[0.126, 0.226], [0.17, 0.214], [0.225, 0.208], [0.222, 0.252],
+      [0.196, 0.288], [0.156, 0.290], [0.128, 0.264]], true);
+    g.fillStyle = RAIL; g.fill();
+    curve([[0.136, 0.232], [0.175, 0.222], [0.216, 0.217]], false);
+    g.strokeStyle = 'rgba(120,124,120,0.65)'; g.lineWidth = H * 0.010;
+    g.stroke();
+
+    // ── the caprail ───────────────────────────────────────────────────────
+    // Varnished, and the only warm line in the whole picture. Laid after the
+    // deck structures so it runs in front of them, which is what it does.
+    curve(SHEER, false);
+    g.strokeStyle = OCHRE; g.lineWidth = H * 0.028; g.stroke();
+    curve(along(0.03, 0.925, -0.008), false);
+    g.strokeStyle = OCHRE_L; g.lineWidth = H * 0.010; g.stroke();
+
+    // ── the rails ─────────────────────────────────────────────────────────
+    // Four wires and a stanchion every 0.022 of the wall, from the transom to
+    // the stem. The top of it sits 0.19 of a wall height above the caprail for
+    // most of the length and rises toward the bow, which is measured: the
+    // pulpit forward is shallower than the run of the rail amidships.
+    const railTop = (u) => sheerAt(u) - 0.19 + Math.max(0, (u - 0.78) / 0.145)
+      * 0.072;
+    g.strokeStyle = RAIL; g.lineCap = 'butt';
+    for (let w = 0; w < 4; w++) {
+      const f = w / 3.4;
+      g.lineWidth = H * (w === 0 ? 0.015 : 0.010);
+      g.beginPath();
+      for (let i = 0; i <= 60; i++) {
+        const u = 0.042 + (0.925 - 0.042) * i / 60;
+        const y = Y(railTop(u) + (sheerAt(u) - railTop(u)) * f);
+        if (i === 0) g.moveTo(X(u), y); else g.lineTo(X(u), y);
+      }
+      g.stroke();
+    }
+    // A stanchion every 0.030 of the boat, not 0.022. At the tighter spacing
+    // they collided with the saloon's mullions and the forward half came out a
+    // picket fence with a boat behind it.
+    g.lineWidth = H * 0.008;
+    for (let u = 0.048; u < 0.925; u += 0.030) {
+      g.beginPath();
+      g.moveTo(X(u), Y(railTop(u))); g.lineTo(X(u), Y(sheerAt(u) + 0.004));
+      g.stroke();
+    }
+    // The two ends turn in across the boat with a diagonal brace in them,
+    // which is the detail that makes a rail read as a rail and not a fence.
+    g.lineWidth = H * 0.013;
+    for (const [ua, ub] of [[0.042, 0.075], [0.892, 0.925]]) {
+      g.beginPath();
+      g.moveTo(X(ua), Y(railTop(ua))); g.lineTo(X(ub), Y(sheerAt(ub)));
+      g.stroke();
+      g.beginPath();
+      g.moveTo(X(ua), Y(sheerAt(ua))); g.lineTo(X(ua), Y(railTop(ua)));
+      g.stroke();
+    }
+
+    // ── the life rings ────────────────────────────────────────────────────
+    // Three, and their positions are read off the elevation rather than spaced
+    // evenly: two on the deckhouse and one forward on the saloon.
+    // A ring is 0.100 of the wall across, not the 0.150 the first cut had:
+    // at that size they stopped being life rings hung on a deckhouse and
+    // became portholes cut into it, which is a different boat.
+    for (const [ru, rv] of [[0.245, 0.238], [0.335, 0.250], [0.455, 0.228]]) {
+      g.beginPath();
+      g.arc(X(ru), Y(rv), Y(0.050), 0, Math.PI * 2);
+      g.strokeStyle = RAIL; g.lineWidth = H * 0.020; g.stroke();
+      // The four bindings, cut out so what shows through is the deckhouse.
+      g.globalCompositeOperation = 'destination-out';
+      g.lineWidth = H * 0.024;
+      for (let k = 0; k < 4; k++) {
+        const a = k * Math.PI * 0.5 + 0.6;
+        g.beginPath();
+        g.moveTo(X(ru) + Math.cos(a) * Y(0.036), Y(rv) + Math.sin(a) * Y(0.036));
+        g.lineTo(X(ru) + Math.cos(a) * Y(0.066), Y(rv) + Math.sin(a) * Y(0.066));
+        g.stroke();
+      }
+      g.globalCompositeOperation = 'source-over';
+    }
+
+    // ── fenders and lines ─────────────────────────────────────────────────
+    // Tyres over the side, which is what every working boat on this coast
+    // hangs out, and a few mooring lines running down across the topsides.
+    // Radii are fractions of the WALL HEIGHT, and that is the fix rather than
+    // the detail: `X(fr)` was reading `fr` as a fraction of the boat's LENGTH,
+    // which made every fender four and a half times too big — five black
+    // tractor wheels bolted to the topsides, and the one thing in the first
+    // build you could not look past.
+    for (const [fu, fv, fr, dark] of [[0.135, 0.712, 0.055, false],
+      [0.216, 0.760, 0.058, false], [0.272, 0.792, 0.040, false],
+      [0.862, 0.842, 0.050, true], [0.884, 0.836, 0.044, true]]) {
+      const rr = Y(fr);
+      g.beginPath();
+      g.arc(X(fu), Y(fv), rr, 0, Math.PI * 2);
+      g.strokeStyle = dark ? 'rgba(24,25,29,0.92)' : 'rgba(150,154,150,0.95)';
+      g.lineWidth = rr * 0.62; g.stroke();
+      if (!dark) {
+        g.beginPath();
+        g.arc(X(fu), Y(fv), rr * 1.18, -2.4, -0.6);
+        g.strokeStyle = 'rgba(224,222,212,0.8)';
+        g.lineWidth = rr * 0.24; g.stroke();
+      }
+    }
+    g.strokeStyle = 'rgba(212,212,202,0.55)'; g.lineWidth = H * 0.006;
+    for (const [au, av, bu, bv] of [[0.300, 0.430, 0.214, 0.742],
+      [0.452, 0.452, 0.362, 0.790], [0.610, 0.462, 0.520, 0.812],
+      [0.760, 0.462, 0.690, 0.800]]) {
+      g.beginPath();
+      g.moveTo(X(au), Y(av)); g.lineTo(X(bu), Y(bv)); g.stroke();
+    }
+
+    // ── the stamp ─────────────────────────────────────────────────────────
+    // JADRIJA 100, in the bottom corner over the dark water, at a fifteenth of
+    // the wall's height. The glyph is `hundredMark` — the same mark the
+    // hoarding and the changing station carry, drawn once. It is a maker's
+    // stamp and it is meant to be found rather than read: make it any bigger
+    // and the wall stops being a painting of a boat and becomes signage.
+    const markW = hundredMark(g, X(0.0205), Y(0.716), Y(0.072), '#e6e0cd');
+    // And the two short strokes under it, which are the mark's own reflection
+    // in the water. They are drawn here rather than in `hundredMark` because
+    // the only place this file has ever SEEN them is on this wall — the
+    // hoarding and the changing station carry the hundred on a printed cream
+    // panel with no water anywhere near it, and putting a reflection on those
+    // would be inventing (rule 12).
+    g.strokeStyle = '#e6e0cd';
+    g.lineCap = 'butt';
+    for (const [dy, f0, f1] of [[0.014, 0.06, 0.92], [0.030, 0.24, 0.70]]) {
+      g.lineWidth = Y(0.008);
+      g.beginPath();
+      g.moveTo(X(0.0205) + markW * f0, Y(0.788 + dy));
+      g.lineTo(X(0.0205) + markW * f1, Y(0.788 + dy));
+      g.stroke();
+    }
+
+    // ── ten summers ───────────────────────────────────────────────────────
+    // Lime render takes the brush unevenly and then loses it in patches. Dabs
+    // of nothing thrown at the paint, heavier low down where the wall wicks
+    // damp up out of the concrete, which is where every one of these murals
+    // actually goes first.
+    // Dabs of nothing, small. The first pass had them up to 16 px on the long
+    // axis, which on a canvas at 280 px to the metre is a six-centimetre hole,
+    // and eight hundred of those is not a weathered wall — it is measles. Seven
+    // is a two-centimetre crumb of lost lime and reads as chalking.
+    g.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 900; i++) {
+      const v = 0.14 + Math.sqrt(rnd()) * 0.86;
+      g.beginPath();
+      g.ellipse(XC(rnd()), Y(v), 2 + rnd() * 7, 1.5 + rnd() * 4, rnd() * 3.1, 0,
+        Math.PI * 2);
+      g.fillStyle = `rgba(0,0,0,${0.04 + rnd() * 0.13 + v * 0.08})`;
+      g.fill();
+    }
+    // And the two ends, which are 8 cm off the arris and want to look brushed
+    // rather than guillotined. A ragged sliver taken out of each edge.
+    for (const side of [0, 1]) {
+      for (let i = 0; i < 90; i++) {
+        const v = rnd();
+        const bite = (0.004 + rnd() * rnd() * 0.020) * W;
+        g.globalAlpha = 0.35 + rnd() * 0.65;
+        g.fillRect(side ? W - bite : 0, Y(v * 1.02 - 0.01), bite, H * 0.035);
+      }
+    }
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = 'source-over';
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.anisotropy = 8;
+    return tex;
+  }
+
+  /**
+   * How long a wall actually is, and where along it a given metre falls.
+   *
+   * `t` is not metres of anything. `W(t, s, y)` offsets a traced curve inland,
+   * and offsetting a curve does not preserve length along it — rule 9b, and on
+   * the first block's back wall it is not a rounding error: 19.65 m of `t` is
+   * 14.3 m of wall, a t-scale of 0.73. Anything that wants to be a stated
+   * number of METRES wide has to walk this table instead of lerping `t`.
+   *
+   * Out here rather than inside `endMural` because two things need it and they
+   * have to agree: the strip that hangs the paint, and the painter that has to
+   * size its canvas to the wall before a single stroke goes on it.
+   */
+  function wallArc(t0, t1, s, y) {
+    const TAB = 160;
+    const tOf = [], arc = [0];
+    for (let i = 0; i <= TAB; i++) tOf.push(t0 + (t1 - t0) * i / TAB);
+    for (let i = 1; i <= TAB; i++) {
+      const A = W(tOf[i - 1], s, y), B = W(tOf[i], s, y);
+      arc.push(arc[i - 1] + Math.hypot(B[0] - A[0], B[2] - A[2]));
+    }
+    return {
+      span: arc[TAB],
+      tAt: (L) => {
+        let i = 1;
+        while (i < TAB && arc[i] < L) i++;
+        const d = Math.max(arc[i] - arc[i - 1], 1e-6);
+        return tOf[i - 1] + (tOf[i] - tOf[i - 1]) * ((L - arc[i - 1]) / d);
+      },
+    };
+  }
+
+  /**
    * And hanging it: a quad thirty millimetres off the render, lit like
    * everything else and transparent everywhere the brush did not go.
    *
@@ -8122,28 +8815,107 @@ async function buildJadrija(scene) {
    * hides three centimetres of parallax; a word in flat black with hard
    * vertical stems does not, and if it flickers against the render the whole
    * wall is gone. It takes the rule's 0.105 m and the fresco keeps its 0.030.
+   *
+   * ── AND `wall`, WHICH IS A SECOND GEOMETRY AND NOT A SECOND FUNCTION ──
+   *
+   * Everything above is true of a mural on a GABLE, and a gable mural can be
+   * one flat quad for a reason that is easy to miss: a gable spans `s`, and a
+   * line of constant `t` is a straight radial line in the world no matter what
+   * the shore is doing. It cannot bow. Three murals were hung that way before
+   * anybody noticed that was luck rather than design.
+   *
+   * The boat is not on a gable. It runs ALONG the back of a whole run, which
+   * means it spans `t` — and rule 9b is about exactly that: `W(t, s, y)` is a
+   * parallel offset of a traced curve, so a long line of constant `s` is a
+   * curve and not a chord. MEASURED, on the wall the boat is actually on: over
+   * the 13.83 m of that back wall the face bows **0.153 m** off its own chord,
+   * and 0.066 m over just half of it. The mural stands 0.10 m proud. A single
+   * flat quad would therefore be buried 5 cm into the render in the middle and
+   * flying 15 cm clear of it at the ends — not a z-fighting shimmer, a mural
+   * visibly peeling off a wall. The number is the whole argument.
+   *
+   * So when `wall` is given the mural is built as a STRIP OF QUADS whose
+   * vertices are sampled off `W` itself, which is rule 9b's own "built on a
+   * frame of its own" — the thing that note has been recording as unbuilt
+   * since it was written. Two consequences worth stating:
+   *
+   *  - `mw` is metres of WALL, not of `t`. Those are not the same thing and on
+   *    this run they are not close: 19.65 m of `t` is 14.08 m of world, a
+   *    t-scale of 0.72. So the strip walks an arc-length table rather than
+   *    lerping `t`, and the mural comes out the width it was asked for.
+   *  - 24 segments, which is 0.44 m of wall each. `at()` lerps between shore
+   *    stations 6 m apart, so the wall is really a polyline with a kink every
+   *    6 m; anything finer than that resolves it, and 24 leaves the worst
+   *    residual under half a millimetre. It costs 50 vertices.
+   *
+   * `mirror` runs the texture the other way along the wall. The boat needs it:
+   * what transfers from the photograph is not "bow on the right" but that the
+   * bow is paired with the corner the sea shows past, and in this alley that
+   * corner is the west one.
    */
   function endMural(gb, tex, mw = 1.90, aspect = 592 / 1024, lift = 1.46,
-    off = 0.030) {
-    const sc = (gb.front + gb.back) * 0.5;
+    off = 0.030, wall = null) {
     const mh = mw * aspect;
     const yc = gb.floor + lift;
-    const st = at(gb.t);
-    const p = W(gb.t + off * gb.o, sc, yc);
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(mw, mh),
-      solidMaterial(0xffffff, {
-        spec: 0.02, vcol: false, transparent: true, depthWrite: false,
-        decl: 'uniform sampler2D uMuralMap;',
-        body: 'vec4 mu = texture2D(uMuralMap, vUv);\nbase = mu.rgb;\nalpha = mu.a;',
-        uniforms: { uMuralMap: { value: tex } },
-      }));
-    mesh.position.set(p[0], p[1], p[2]);
-    // This end faces back down t, which the board on the far gable does not —
-    // hence the sign. Get it wrong and the paint is on the inside of the wall,
-    // which looks exactly like the mural having vanished.
-    mesh.rotation.y = Math.atan2(st.ux * gb.o, st.uz * gb.o);
+    const mat = solidMaterial(0xffffff, {
+      spec: 0.02, vcol: false, transparent: true, depthWrite: false,
+      decl: 'uniform sampler2D uMuralMap;',
+      body: 'vec4 mu = texture2D(uMuralMap, vUv);\nbase = mu.rgb;\nalpha = mu.a;',
+      uniforms: { uMuralMap: { value: tex } },
+    });
+
+    if (!wall) {
+      const sc = (gb.front + gb.back) * 0.5;
+      const st = at(gb.t);
+      const p = W(gb.t + off * gb.o, sc, yc);
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(mw, mh), mat);
+      mesh.position.set(p[0], p[1], p[2]);
+      // This end faces back down t, which the board on the far gable does not —
+      // hence the sign. Get it wrong and the paint is on the inside of the wall,
+      // which looks exactly like the mural having vanished.
+      mesh.rotation.y = Math.atan2(st.ux * gb.o, st.uz * gb.o);
+      scene.add(mesh);
+      return { mesh, at: [gb.t, sc] };
+    }
+
+    const face = wall.s + off;
+    const yb = yc - mh * 0.5, yt = yc + mh * 0.5;
+    const { span, tAt: tAtArc } = wallArc(wall.t0, wall.t1, face, yb);
+
+    const SEG = 24;
+    const L0 = (span - mw) * 0.5;
+    const pos = [], nor = [], uvs = [], idx = [];
+    for (let i = 0; i <= SEG; i++) {
+      const f = i / SEG;
+      const t = tAtArc(L0 + mw * f);
+      const st = at(t);
+      // `at()` lerps its normals between stations, so they come back a hair
+      // short of unit length — the same trap the car yaws fell into.
+      const inv = 1 / (Math.hypot(st.nx, st.nz) || 1);
+      const A = W(t, face, yb), B = W(t, face, yt);
+      pos.push(A[0], A[1], A[2], B[0], B[1], B[2]);
+      nor.push(st.nx * inv, 0, st.nz * inv, st.nx * inv, 0, st.nz * inv);
+      const u = wall.mirror ? 1 - f : f;
+      uvs.push(u, 0, u, 1);
+    }
+    for (let i = 0; i < SEG; i++) {
+      const a = i * 2, b = a + 1, cc = a + 2, d = a + 3;
+      // (bottom, top, next bottom) is the winding that faces INLAND. The frame
+      // has `nx: uz, nz: −ux`, so tangent × up comes out −n and it is the other
+      // order that looks up the alley. Get it backwards and the paint is on the
+      // inside of the wall — the same failure the gable branch warns about, and
+      // it looks exactly the same: nothing there at all.
+      idx.push(a, b, cc, cc, b, d);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setIndex(idx);
+    const mesh = new THREE.Mesh(geo, mat);
     scene.add(mesh);
-    return { mesh, at: [gb.t, sc] };
+    return { mesh, at: [tAtArc(L0 + mw * 0.5), face], seg: SEG,
+      span: +span.toFixed(2), wide: +mw.toFixed(2) };
   }
 
   /**
@@ -8289,6 +9061,79 @@ async function buildJadrija(scene) {
     || notGull.find((gb) => !DADO[gb.wash][3]) || null;
   const word = wordGable
     ? endMural(wordGable, jadrijaMural(), 2.50, 256 / 1024, 1.38, 0.105)
+    : null;
+
+  // And the boat, along the back of the first block.
+  //
+  // WHICH WALL was the whole of the work here, and it was settled by standing
+  // in the resort rather than by reading the photograph, because the frame
+  // carries no GPS — every value in its GPS IFD is NaN — and rule 12 does not
+  // let a photograph be turned into an arc length. So this is a PLACEMENT, and
+  // it is argued from the model.
+  //
+  // What the photograph DOES settle is the KIND of wall: a long low run of
+  // rendered kabine with its vent slots under the roof slab, seen across open
+  // ground, with the sea past one end. There are two walls of that kind at
+  // Jadrija and only two — the back of the front row, which faces the alley,
+  // and the back of the back row, which faces the wood.
+  //
+  // THE BACK ROW'S BACK WALL IS THE ONE THAT LOOKS RIGHT AND IS WRONG, and
+  // that is worth the paragraph because it is where a morning went. The
+  // photograph's near side is a wide gravel forecourt with a bin, a gate and a
+  // staked sapling on it, which reads as the car park behind the block and not
+  // as a six-metre alley. But `carSites` parks nose-in at s 31.1 to 32.5, one
+  // every four metres, against a wall at s 29.0 — put the camera where the
+  // photographer stood and it is INSIDE somebody's car. You cannot see that
+  // wall in this model and you cannot stand back from it. The forecourt in the
+  // frame is a real forecourt at a real Jadrija; it is not one here.
+  //
+  // The alley is. It is 6.0 m of crushed limestone, it is the one place behind
+  // the frontage the player is actually invited into — the screen wall has a
+  // doorway cut through it at t 417.45 for no other reason — and the first
+  // run's back wall is the largest blank surface in the resort. Two views
+  // carry it: coming round the gull's own corner into the west mouth of the
+  // alley, and coming through that doorway and turning west, where the wall
+  // runs away from you for fourteen metres with the sea and the bathers past
+  // its far corner. That second one is the photograph's composition almost
+  // exactly, and it is why the bow points WEST rather than "right as
+  // photographed" — what transfers is that the bow is paired with the corner
+  // the sea shows past. Hence `mirror`.
+  //
+  // THE NUMBERS, and which of them is measured and which is a decision.
+  //
+  // 2.38 m of height is the render's own 2.44 less 0.06, which is what it
+  // takes to clear the 0.09 m fascia under the roof slab. The bottom edge sits
+  // on the floor, as the paint does in the frame. That one is arithmetic.
+  //
+  // The WIDTH is measured, and not off the photograph: `wallArc` walks the
+  // wall's own face and reports 14.30 m, and the mural takes all of it bar
+  // 0.08 m at each arris. That is the correction from the first build, which
+  // hung a 10.60 m panel — the boat's own 4.454 wall-heights — in the middle
+  // of it and left 1.85 m of bare render either side. It read as a poster
+  // nailed to a wall, which is the exact failure the gull's note is written
+  // about. In the photograph the water goes arris to arris and the boat sits
+  // in it, so the canvas is sized to the wall and the boat keeps its measured
+  // 4.454 inside that. `brodMural` takes the ratio and does the rest.
+  //
+  // The top fifth of the texture is empty, so what is above the wave line is
+  // limewash: this run is `WASH[0]`, the same limewash the JadriJa word is on.
+  //
+  // 0.045 m of standoff. Not the rule's 0.105 and not the fresco's 0.030, and
+  // the reason is that the strip has taken the curvature argument away — it
+  // follows the wall to under a millimetre, so all the clearance has left to
+  // buy is depth precision at x −1940. The gull's 0.030 is proven there. At
+  // 0.105 the near end of eleven metres of paint stood visibly off the render
+  // at a grazing angle down the alley, which is a board and not a painting.
+  const brodWall = firstGable && firstGable.t1
+    ? { t0: firstGable.t, t1: firstGable.t1, s: firstGable.back, mirror: true }
+    : null;
+  const brod = brodWall
+    ? ((BH) => {
+      const wide = wallArc(brodWall.t0, brodWall.t1, brodWall.s + 0.045,
+        firstGable.floor).span - 0.16;
+      return endMural(firstGable, brodMural(wide / BH), wide, BH / wide,
+        BH * 0.5, 0.045, brodWall);
+    })(2.38)
     : null;
 
   // ── the bead curtain ───────────────────────────────────────────────────────
@@ -22127,6 +22972,16 @@ async function buildJadrija(scene) {
     /** Debug: and the JadriJa word, which hangs off the same function again. */
     word: () => word && { at: word.at.map((v) => +v.toFixed(2)),
       p: word.mesh.position.toArray().map((v) => +v.toFixed(2)) },
+    /**
+     * Debug: the boat, which is the one that is not a flat quad.
+     *
+     * `span` is the wall's own arc length and `wide` the mural's, both in
+     * metres — the pair to check when the shore moves, because the whole point
+     * of the strip is that the second stays put while the first does not.
+     */
+    brod: () => brod && { at: brod.at.map((v) => +v.toFixed(2)),
+      seg: brod.seg, span: brod.span, wide: brod.wide,
+      p: brod.mesh.position.toArray().map((v) => +v.toFixed(2)) },
     /** Debug: and the fish, which hangs off the same function on the wood side. */
     fish: () => fish && { at: fish.at.map((v) => +v.toFixed(2)),
       p: fish.mesh.position.toArray().map((v) => +v.toFixed(2)) },
