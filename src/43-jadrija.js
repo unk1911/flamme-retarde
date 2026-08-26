@@ -8286,26 +8286,80 @@ async function buildJadrija(scene) {
     // deckhouse. A length in boat space is `BOAT * w`, and there is no
     // shorthand for it on purpose.
 
-    const SEA = '#242831';        // the body of the water
-    const SEA_D = '#191a1f';      // its darkest troughs
-    // Lifted from the measured #34373e. At the sample value it was four steps
-    // off the body colour and the water read as one flat black mass at any
-    // distance over five metres; the shelves in the photograph are plainly a
-    // separate, bluer value and this is what it takes to keep them once the
-    // renderer's own light is on top.
-    const SEA_L = '#3d4250';      // the shelves the crests sit on
-    const FOAM = '#565a63';       // the hatching, which is cut not blended
-    const FOAM_L = '#7c8089';     // and its brightest strokes
-    const HULL = '#d2d0c4';       // topsides
-    const HULL_L = '#e2e0d3';
-    const HULL_S = '#78807e';     // the shadow round the turn of the bilge
-    const DARK = '#17171c';       // shelter deck aft, saloon lights forward
-    const RAIL = '#eceadf';       // every piece of white joinery
-    const SALOON = '#dcdacd';
-    const OCHRE = '#9d7c52';      // the varnished caprail
-    const OCHRE_L = '#bd9c66';
-    const MAROON = '#54231f';     // the deckhouse
-    const MAROON_D = '#3a2b28';   // its shaded after end
+    // ── THE CANVAS TAKES ONE EXTRA GAMMA, AND EVERY COLOUR BELOW IS A ────
+    //    CONSEQUENCE OF THAT
+    //
+    // The first cut sampled the water off the rectified photograph and wrote
+    // the hex straight in, on the argument that `WASH[0]` — this wall's own
+    // limewash, (0.655, 0.618, 0.540) — is within a few per cent of the
+    // photograph's own render at (0.76, 0.71, 0.55), so the two were already in
+    // the same space. THAT COMPARISON IS IN THE WRONG SPACE, and it is worth
+    // being precise about why, because the same trap is waiting in every canvas
+    // in this file.
+    //
+    // A canvas goes up as SRGB8_ALPHA8 and is decoded to linear on sample. A
+    // vertex colour is a float and goes to the shader raw. So the canvas takes
+    // a decode that nothing else in the resort takes. MEASURED, by painting
+    // seven flat grey bands into this canvas and reading them off a screenshot
+    // of the wall:
+    //
+    //     canvas byte    32   64   96  128  160  192  255
+    //     rendered        5   13   28   50   81  116  205
+    //
+    // which fits `out = 205.5 · base^0.888` where `base` is what the shader is
+    // handed — and `base` for a canvas is the DECODE of the byte. Net of it,
+    // the canvas is squared relative to everything else: a hex renders at about
+    // (hex/255)² of white. Near white that is a few per cent and invisible,
+    // which is exactly why the gull, the fish and this boat's own hull all look
+    // right and why three builds went past without anyone catching it. At the
+    // dark end it is a factor of six, and it turned the sea into a hole in the
+    // wall.
+    //
+    // So every value below is derived, not picked. For each colour: take its
+    // ratio to the bare limewash IN THE PHOTOGRAPH (a ratio, because the
+    // photograph is overcast and the render is in sun and the absolute numbers
+    // are not comparable), apply that ratio to the bare limewash IN THE BUILD,
+    // and invert the curve above to get the `base` that lands there. Luma
+    // carries the level and each paint keeps its own chroma — carrying the
+    // channels separately divides out the limewash's warmth twice and turns
+    // every white on the boat blue.
+    //
+    // The five water values then take one further ×1.21, which is the only
+    // fudge here and is honest about what it is: the carry sets the colour of
+    // the SEA, and what gets measured is the whole FIELD, which the dark
+    // patches drag below it.
+    //
+    //                        water/wall luma    sd     B−R
+    //     photograph              0.271        14.8    +8.0
+    //     build, before           0.085        10.9    +4.3
+    //     build, after            0.277        15.5    +9.0
+    //
+    // `paint` is what closes the trap. It takes the number this file MEANS —
+    // 0 to 1, the same units as `WASH`, `CONC`, `CAB` and every other colour
+    // in the resort — and returns the css the canvas has to hold for the
+    // shader to be handed that number back. Nothing below is a hex any more,
+    // and comparing a value here against `WASH[0]` is now a fair comparison.
+    const enc = (v) => Math.round(255 * (v <= 0.0031308 ? v * 12.92
+      : 1.055 * Math.pow(Math.max(v, 0), 1 / 2.4) - 0.055));
+    const paint = (r, g, b, a) => (a == null
+      ? `rgb(${enc(r)},${enc(g)},${enc(b)})`
+      : `rgba(${enc(r)},${enc(g)},${enc(b)},${a})`);
+
+    const SEA_D = paint(0.073, 0.076, 0.092);    // its darkest troughs
+    const SEA = paint(0.150, 0.155, 0.179);      // the body of the water
+    const SEA_L = paint(0.166, 0.177, 0.202);    // the shelves the crests sit on
+    const FOAM = paint(0.247, 0.258, 0.277);     // hatching, cut not blended
+    const FOAM_L = paint(0.362, 0.374, 0.401);   // and its brightest strokes
+    const HULL = paint(0.635, 0.635, 0.600);     // topsides
+    const HULL_L = paint(0.699, 0.691, 0.645);   // where they catch the light
+    const HULL_S = paint(0.338, 0.358, 0.351);   // round the turn of the bilge
+    const DARK = paint(0.049, 0.047, 0.060);     // shelter deck aft, lights fwd
+    const RAIL = paint(0.738, 0.731, 0.688);     // every piece of white joinery
+    const SALOON = paint(0.677, 0.670, 0.624);   // the saloon sides
+    const OCHRE = paint(0.462, 0.354, 0.222);    // the varnished caprail
+    const OCHRE_L = paint(0.565, 0.458, 0.280);  // its lit edge
+    const MAROON = paint(0.222, 0.091, 0.082);   // the deckhouse
+    const MAROON_D = paint(0.149, 0.108, 0.105); // its shaded after end
 
     /** A smooth polyline through (u, v) stations. */
     const curve = (pts, close) => {
@@ -8476,7 +8530,7 @@ async function buildJadrija(scene) {
     // along the keel rather than as a filled band, because on the wall it is
     // one pass of a loaded brush and it wanders.
     curve(KEEL.slice(1, -1), false);
-    g.strokeStyle = 'rgba(28,30,34,0.62)'; g.lineWidth = H * 0.020; g.stroke();
+    g.strokeStyle = paint(0.110, 0.118, 0.133, 0.62); g.lineWidth = H * 0.020; g.stroke();
 
     // ── the deck structures ───────────────────────────────────────────────
     // Aft of u 0.44 she is open: a shelter deck under an awning, which from
@@ -8496,7 +8550,7 @@ async function buildJadrija(scene) {
     g.fillStyle = SALOON; g.fill();
     // The fascia's own shadow line under the awning edge, aft only.
     curve(DECKTOP, false);
-    g.strokeStyle = 'rgba(120,120,112,0.5)'; g.lineWidth = H * 0.006; g.stroke();
+    g.strokeStyle = paint(0.471, 0.471, 0.439, 0.5); g.lineWidth = H * 0.006; g.stroke();
 
     // The dark aft band: the shelter deck, which is a hole and not a colour.
     curve([...shift(DECKTOP, 0.046), ...along(0.44, 0.042, -0.014)], true);
@@ -8563,8 +8617,8 @@ async function buildJadrija(scene) {
     g.save();
     housePath(); g.clip();
     const hs = g.createLinearGradient(X(0.32), 0, X(0.455), 0);
-    hs.addColorStop(0, 'rgba(58,43,40,0)');
-    hs.addColorStop(1, 'rgba(40,30,29,0.92)');
+    hs.addColorStop(0, paint(0.227, 0.169, 0.157, 0));
+    hs.addColorStop(1, paint(0.157, 0.118, 0.114, 0.92));
     g.fillStyle = hs; g.fillRect(X(0.18), 0, BOAT * 0.29, Y(0.34));
     g.restore();
     // Windows in it: dark, square, and only in the after half.
@@ -8572,7 +8626,7 @@ async function buildJadrija(scene) {
     for (const [wu, ww] of [[0.256, 0.030], [0.345, 0.042], [0.397, 0.042]]) {
       g.fillRect(X(wu), Y(0.062), BOAT * ww, Y(0.096));
     }
-    g.fillStyle = 'rgba(18,18,20,0.85)';
+    g.fillStyle = paint(0.071, 0.071, 0.078, 0.85);
     for (const [wu, ww] of [[0.345, 0.042], [0.397, 0.042]]) {
       g.fillRect(X(wu), Y(0.062), BOAT * ww, Y(0.096));
     }
@@ -8595,7 +8649,7 @@ async function buildJadrija(scene) {
       [0.196, 0.288], [0.156, 0.290], [0.128, 0.264]], true);
     g.fillStyle = RAIL; g.fill();
     curve([[0.136, 0.232], [0.175, 0.222], [0.216, 0.217]], false);
-    g.strokeStyle = 'rgba(120,124,120,0.65)'; g.lineWidth = H * 0.010;
+    g.strokeStyle = paint(0.471, 0.486, 0.471, 0.65); g.lineWidth = H * 0.010;
     g.stroke();
 
     // ── the caprail ───────────────────────────────────────────────────────
@@ -8683,16 +8737,20 @@ async function buildJadrija(scene) {
       const rr = Y(fr);
       g.beginPath();
       g.arc(X(fu), Y(fv), rr, 0, Math.PI * 2);
-      g.strokeStyle = dark ? 'rgba(24,25,29,0.92)' : 'rgba(150,154,150,0.95)';
+      // The pale fenders take the hull's own shadow value. Carried straight
+      // off the photograph they came out within a step of the topsides they
+      // hang on and vanished — a rope fender against a white hull is read by
+      // its shadow, not by its colour.
+      g.strokeStyle = dark ? paint(0.094, 0.098, 0.114, 0.92) : HULL_S;
       g.lineWidth = rr * 0.62; g.stroke();
       if (!dark) {
         g.beginPath();
         g.arc(X(fu), Y(fv), rr * 1.18, -2.4, -0.6);
-        g.strokeStyle = 'rgba(224,222,212,0.8)';
+        g.strokeStyle = paint(0.878, 0.871, 0.831, 0.8);
         g.lineWidth = rr * 0.24; g.stroke();
       }
     }
-    g.strokeStyle = 'rgba(212,212,202,0.55)'; g.lineWidth = H * 0.006;
+    g.strokeStyle = paint(0.831, 0.831, 0.792, 0.55); g.lineWidth = H * 0.006;
     for (const [au, av, bu, bv] of [[0.300, 0.430, 0.214, 0.742],
       [0.452, 0.452, 0.362, 0.790], [0.610, 0.462, 0.520, 0.812],
       [0.760, 0.462, 0.690, 0.800]]) {
@@ -8706,14 +8764,14 @@ async function buildJadrija(scene) {
     // hoarding and the changing station carry, drawn once. It is a maker's
     // stamp and it is meant to be found rather than read: make it any bigger
     // and the wall stops being a painting of a boat and becomes signage.
-    const markW = hundredMark(g, X(0.0205), Y(0.716), Y(0.072), '#e6e0cd');
+    const markW = hundredMark(g, X(0.0205), Y(0.716), Y(0.072), paint(0.902, 0.878, 0.804));
     // And the two short strokes under it, which are the mark's own reflection
     // in the water. They are drawn here rather than in `hundredMark` because
     // the only place this file has ever SEEN them is on this wall — the
     // hoarding and the changing station carry the hundred on a printed cream
     // panel with no water anywhere near it, and putting a reflection on those
     // would be inventing (rule 12).
-    g.strokeStyle = '#e6e0cd';
+    g.strokeStyle = paint(0.902, 0.878, 0.804);
     g.lineCap = 'butt';
     for (const [dy, f0, f1] of [[0.014, 0.06, 0.92], [0.030, 0.24, 0.70]]) {
       g.lineWidth = Y(0.008);
