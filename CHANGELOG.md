@@ -8,6 +8,58 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.123.0] — 2026-08-26
+
+### B works on land, and Chloe is in the frame
+
+**Third person was already built — it was gated to the water.** `B`
+has toggled `bodyCam` since the swim got a body, with a tuned
+over-the-shoulder rig and toasts in three languages, behind one
+condition: `state.phase === 'swim'`, whose comment read *"only in the
+water: it is the only mode with a body to look at"*. That was true when
+it was written. Misha, 26 Aug: *"I think we should be able to see me
+from anywhere."* So the walk has it too. Not the aeroplane — there is no
+body in the cockpit, and the outside views are `CAMS`, which is the
+aeroplane's own answer and has four of them.
+
+**Pulled back down the line of sight, not swung round to look at her.**
+This is the one real decision. `poseSwimBody`'s camera aims *ahead* of
+the swimmer, because open water has nothing to aim at and a camera
+pointed at a back is a portrait. On land the opposite constraint binds:
+this mode has a hose, `aimAt` casts down the centre of the screen, and
+the jet lands on the crosshair. Move the look direction and all of that
+lies. So the direction is untouched, the camera slides 2.35 m back along
+it, and what you were aimed at before you pressed B is what you are
+aimed at after. The lift is a lift and not a tilt, for the same reason.
+
+**The camera is kept out of walls by `confine` itself**, marched rather
+than solved: step back 0.15 m at a time and stop at the last point
+`confine` leaves alone. It cannot disagree with the thing that decides
+where your body may go, because it is the same function, and it costs at
+most sixteen calls a frame while the third person is on. Measured in the
+alley behind the first block: 2.7 m of pull-back in the open, collapsing
+to 0.05 m with her back to the mural wall.
+
+**And 0.05 m is why there is a floor under it.** At that range the
+camera is inside her own head, which is the view `49-you.js` says nobody
+wants. Under `THIRD.min` — 0.95 m — the third person gives the frame
+back to the first and `seen: false` stops her being drawn at all, since
+a body drawn there is a body you are standing inside. Verified both
+ways: back to a wall gives first person and no figure, the open alley
+gives the full 2.29 m and a figure.
+
+**She is animated off the walk.** `walk` over 0.35 m/s and `idle` under
+it, with the playback rate set from ground speed against the clip's
+authored 0.92 m/s — the number `42-crowd.js` measures and states.
+Clamped to 2.4, because this mode's top speed is 9.4 m/s and a tenfold
+stretch is not a gait: past that the legs stop reading as legs, and what
+is actually wrong at 9.4 m/s is the 9.4.
+
+**`poseSwimBody` is now called every frame rather than inside a phase
+branch.** It is also the only thing that ever hands her *back*, so
+hanging it off one phase meant leaving that phase with the third person
+on left a body standing on the promenade with nobody in it.
+
 ## [1.122.0] — 2026-08-26
 
 ### The excursion boat, along the back of the first block

@@ -1986,7 +1986,41 @@ async function buildGround(scene, field) {
     you.pitch = clamp(you.pitch - dy, -1.35, 1.05);
   }
 
-  function pose(camera) {
+  /**
+   * `back` is metres to pull the camera down its own view line, and 0 is the
+   * first person this has always been.
+   *
+   * PULLED BACK ALONG THE LINE OF SIGHT, and not swung round to look AT her,
+   * which is the one decision in here. `poseSwimBody`'s camera aims ahead of
+   * the swimmer because there is nothing to aim at in open water and a camera
+   * pointed at a back is a portrait. On land the opposite constraint binds:
+   * this mode has a hose, `aimAt` casts down the centre of the screen, and the
+   * jet lands where the crosshair is. Move the look direction and every one of
+   * those lies. So the direction is untouched, the camera slides back down it,
+   * and what you aimed at before you pressed B is what you are aimed at after.
+   *
+   * `up` is a lift and not a tilt, for the same reason: it takes her head out
+   * of the middle of the frame without moving where the shot is pointed.
+   */
+  const THIRD = {
+    back: 2.35,             // m down the view line
+    up: 0.30,               // m of lift, applied after the pull-back
+    step: 0.15,             // m per collision probe — see below
+    ahead: 6.0,             // where lookAt is put, ahead of HER and not of the camera
+    // Below this the third person gives up and hands the frame back to the
+    // first. Measured against the failure rather than chosen: with her back to
+    // the mural wall the march finds 0.05 m, which puts the camera inside her
+    // own head — and the inside of a skull is the thing 49-you.js says nobody
+    // wants a view of. Anything under about a metre is a face full of neck, so
+    // under a metre it is not worth having and the eye is better.
+    min: 0.95,
+  };
+  // What the last `pose` actually managed. Read by 90-app.js, which is what
+  // decides whether to draw her: at 0 the camera is at her eye and a body
+  // drawn there is a body you are standing inside.
+  let thirdD = 0;
+
+  function pose(camera, back = 0) {
     // The head, not the boots. Down as each boot lands, side to side once per
     // pair of them — see gait(). The sway is applied along your own right, so
     // it stays a weight shift however you are facing rather than drifting the
@@ -1997,16 +2031,46 @@ async function buildGround(scene, field) {
     const ex = you.x + rx * sway;
     const ey = you.y + Math.min(you.eye, eyeAt(you.x, you.z, you.y)) + dy;
     const ez = you.z + rz * sway;
-    camera.position.set(ex, ey, ez);
     const cp = Math.cos(you.pitch);
+    const lx = -Math.sin(you.yaw) * cp, ly = Math.sin(you.pitch),
+      lz = -Math.cos(you.yaw) * cp;
+
+    let cx = ex, cy = ey, cz = ez;
+    if (back > 0) {
+      // How far back it actually gets. Marched rather than solved, and the
+      // test is `confine` itself rather than a second idea about what is
+      // solid: step back a hand's breadth at a time and stop at the last
+      // point confine leaves alone. That gives the behaviour a camera has to
+      // have in a resort made of alleys 1.4 m wide — it slides in when you
+      // back into a wall instead of ending up on the other side of it — and
+      // it cannot disagree with the thing that decides where your body may
+      // go, because it is the same function.
+      //
+      // It costs at most sixteen confine() calls a frame, and only while the
+      // third person is on.
+      let d = 0;
+      for (let k = THIRD.step; k <= back + 1e-6; k += THIRD.step) {
+        const tx = ex - lx * k, tz = ez - lz * k;
+        const [nx, nz] = confine(tx, tz, ey);
+        if (Math.hypot(nx - tx, nz - tz) > 0.02) break;
+        d = k;
+      }
+      if (d < THIRD.min) d = 0;
+      thirdD = d;
+      if (d > 0) {
+        cx = ex - lx * d; cy = ey - ly * d + THIRD.up; cz = ez - lz * d;
+      }
+    } else {
+      thirdD = 0;
+    }
+    camera.position.set(cx, cy, cz);
     // Aimed from where the head actually is, or the bob would swing the whole
     // world about a fixed look-at point and you would be looking round a room
-    // rather than walking through one.
-    camera.lookAt(
-      ex - Math.sin(you.yaw) * cp,
-      ey + Math.sin(you.pitch),
-      ez - Math.cos(you.yaw) * cp,
-    );
+    // rather than walking through one. In the third person it is aimed from
+    // her head as well and NOT from the camera, which is what keeps the view
+    // line the same one the hose is on.
+    camera.lookAt(ex + lx * THIRD.ahead, ey + ly * THIRD.ahead,
+      ez + lz * THIRD.ahead);
   }
 
   const alight = () => {
@@ -2021,6 +2085,8 @@ async function buildGround(scene, field) {
     get active() { return active; },
     get armed() { return armed; },
     update, enter, leave, bail, canEnter, canBoard, look, pose, you,
+    /** How far the third person got behind her last frame; 0 is first. */
+    thirdD: () => thirdD,
     retarget, dropIn, stepTo, addGuest,
     /**
      * How much clear air there is between your eye and the nearest person,

@@ -270,12 +270,22 @@ addEventListener('keydown', (e) => {
     // key elsewhere in this handler, and swallowing them here would be a
     // surprise the next time somebody moves this block.
   }
-  // B — round behind her, and back again. Only in the water: it is the only
-  // mode with a body to look at, and the only one where being outside your own
-  // eyes is not a bug. See `poseSwimBody`.
+  // B — round behind her, and back again.
+  //
+  // It said "only in the water: it is the only mode with a body to look at",
+  // and that was true when it was written and is not any more. Misha, 26 Aug:
+  // "I think we should be able to see me from anywhere". So the walk gets it
+  // too, and what makes that possible is that the body was never the hard
+  // part — `you.drive` has taken an arbitrary pose since the chase cut needed
+  // one, and the camera is `ground.pose`'s own eye slid backwards down the
+  // line it was already looking along.
+  //
+  // Still not the aeroplane, and that is not an oversight. There is no body in
+  // the cockpit and the outside views are `CAMS` — see `cycleCamera`, which is
+  // the aeroplane's own answer to this question and has four of them.
   if (e.code === 'KeyB') {
     e.preventDefault();
-    if (state.phase === 'swim') {
+    if (state.phase === 'swim' || state.phase === 'ground') {
       bodyCam = !bodyCam;
       toast(T(bodyCam ? 'body.on' : 'body.off'));
     }
@@ -2209,6 +2219,43 @@ function poseSwimBody(dt) {
   // boards on the first frame of the cut if the third person happened to be
   // on when R was pressed.
   if (chaseCut) return;
+  // On foot, which is the other half of this now. Kept in front of the swim
+  // branch rather than folded into it: everything below is about a body in
+  // water — how deep it floats, how far its root leads its eye when it is
+  // prone, whether the necklace has come off — and none of that means
+  // anything to somebody standing on concrete.
+  if (bodyCam && state.phase === 'ground' && ground && ground.ok) {
+    const g = ground.you;
+    const sp = Math.hypot(g.vx, g.vz);
+    // Her root is between her feet, so `at` is simply where she stands —
+    // `g.y` is already the hopped height, which is why the eye is taken off it
+    // directly in `ground.pose`.
+    //
+    // The yaw is the swim branch's, and for the same reason: the rig faces +X
+    // and the walk carries the same quarter turn every other user of it does.
+    you.drive({
+      at: [g.x, g.y, g.z],
+      yaw: g.yaw + Math.PI / 2,
+      // No pitch. Looking up does not lean a walking body back, it moves a
+      // head — and the head is not what the camera is behind.
+      pitch: 0,
+      // Not drawn when the camera could not get behind her — see THIRD.min in
+      // 47-ground.js. With her back to a wall the pull-back collapses to a few
+      // centimetres, the shot is the first person in all but name, and a body
+      // drawn at that range is the inside of her head.
+      seen: ground.thirdD() > 0,
+      clip: sp > 0.35 ? 'walk' : 'idle',
+      // The walk clip is authored at about 0.92 m/s — 42-crowd.js measures it
+      // and says so — and this mode's top speed is 9.4, which is a tenfold
+      // range no cycle survives being stretched across. Clamped to 2.4, so a
+      // sprint is a fast walk and not a blur: past that the legs stop reading
+      // as legs, and what is actually wrong at 9.4 m/s is the 9.4.
+      speed: sp > 0.35 ? clamp(sp / 0.92, 0.6, 2.4) : 1,
+      wet: false,
+    });
+    _bodyHas = true;
+    return;
+  }
   if (!bodyCam || !swim.active) {
     if (_bodyHas) { you.drive(null); _bodyHas = false; }
     return;
@@ -4641,13 +4688,22 @@ function frame() {
   // metres. The override is applied straight after and has the last word.
   if (camOverride && eject.active) eject.pose(camera);
   if (camOverride) updateCamera(dt);
-  else if (state.phase === 'ground') ground.pose(camera);
+  else if (state.phase === 'ground') ground.pose(camera, bodyCam ? 2.35 : 0);
   else if (state.phase === 'ride') ride.pose(camera);
   else if (state.phase === 'foil') foil.pose(camera);
   else if (state.phase === 'brod') brod.pose(camera);
-  else if (state.phase === 'swim') { swim.pose(camera); poseSwimBody(dt); }
+  else if (state.phase === 'swim') swim.pose(camera);
   else if (state.phase === 'chute' || eject.active) eject.pose(camera);
   else if (state.phase !== 'intro') updateCamera(dt);
+  // Every frame and not inside a branch, which it was while the swim was the
+  // only mode with a body. Two modes drive her now, and more than that, the
+  // function is also the only thing that ever hands her BACK — so hanging it
+  // off a phase meant that leaving that phase with the third person on left a
+  // body standing on the promenade with nobody in it. It early-returns in
+  // every other case, and it is called after the poses above for the reason
+  // its own note gives: the eye is the point both cameras agree about, so the
+  // body is hung off the first person's answer.
+  poseSwimBody(dt);
   // After the pose, because the rig hangs off where you ended up rather than
   // off where you were.
   if (state.phase === 'ride') ride.draw();
@@ -5908,7 +5964,15 @@ window.__fr = {
   swim: {
     stats: () => (swim ? swim.stats() : null),
     raw: () => swim,
-    /** Third person, as the B key does it. See `poseSwimBody`. */
+    /**
+     * Third person, as the B key does it. See `poseSwimBody`.
+     *
+     * Left under `swim` although it is no longer only the swim's, because it
+     * is what anybody who has used it types and moving it would break that for
+     * the sake of a tidier tree. Note it TOGGLES when called with nothing:
+     * `body()` in a probe flips the state it was meant to be reading, which
+     * has now cost two wrong test runs. Pass `true` to read-and-set.
+     */
     body: (v) => { bodyCam = v == null ? !bodyCam : !!v; return bodyCam; },
     driven: () => (you ? you.driven() : null),
     dip: (x, z, yaw = 0, depth = 0.3) => {
