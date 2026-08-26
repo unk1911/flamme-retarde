@@ -55,19 +55,25 @@ cannot be wrong"* is superseded the way the four prices were: rule 12 forbids
 inventing what the evidence does not carry, never what the owner states as
 fact.
 
-## 4. How many kabine does Jadrija actually have? *(carried over)*
+## 4. How many kabine does Jadrija actually have? — CLOSED, not fixed
 
-`JAD.cabW` is 2.15 m a bay and two independent measurements off your own
+`JAD.cabW` is 2.15 m a bay and two independent measurements off Misha's own
 footage say 0.95–1.05 m — a monobloc chair against the wall, and six
-countable 110–130 mm planks per door leaf. Fixing it doubles the row to about
-306 huts, which is a different place.
+countable 110–130 mm planks per door leaf. Fixing it would roughly double the
+row to about 306 huts, which is a different place.
 
-A published figure would settle it, or you may simply know. Written up in
-`plan/jadrija-TODO.md`.
+**Closed on 26 Aug on his call: not worth pursuing.** Closed and not answered
+— the discrepancy is real and is left standing, and this paragraph is the
+record of that rather than a resolution of it. The bay stays at 2.15 m, the
+frontage stays as wide as it reads today, and anybody who comes back to this
+should start from the fact that the number in the code was never the number in
+the footage. The workings are in `plan/jadrija-TODO.md` and are not deleted.
 
-## 5. Five unpushed commits, plus tonight's *(carried over)*
+## 5. Unpushed commits — CLOSED, no longer true
 
-`main` is ahead of the remote and I have not pushed. Say the word.
+Written when `main` was five commits ahead of the remote. Everything is pushed
+and the tree is clean; on 26 Aug it went out to 1.126.0 and was verified by
+matching md5 against the server. Nothing is waiting.
 
 ---
 
