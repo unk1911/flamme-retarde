@@ -23,11 +23,12 @@ the five fittings on the south-east face where they were photographed, a walk
 locale of its own so the deck holds you up, and the channel re-cut from the new
 berth. Full working in `plan/brod-location.md`.
 
-**One thing I would still like from you:** the marina. `1000150376` looks up a
-narrow inlet with small boats moored and a beach at its head, and OSM has that
-inlet running south-west from the pier root. Is it moorings on lines, or a
-pontoon, or boats just pulled up the beach? That decides whether it is thirty
-small hulls or a structure.
+**The marina — CLOSED 26 Aug, unbuilt.** `1000150376` looks up a narrow inlet
+with small boats moored and a beach at its head, and OSM has that inlet
+running south-west from the pier root. Whether it is moorings on lines, a
+pontoon, or hulls pulled up the beach was never established, and that is the
+difference between thirty small boats and a structure. Closed on his call
+without an answer; the working is kept in `plan/brod-location.md`.
 
 ## 2. The board — ANSWERED and closed
 

@@ -186,4 +186,11 @@ stand on *on the approach* rather than a point in the water.
   over her **port** rail — which is a correction: `enter()` said starboard and
   asserted the reason, and it had you stepping over the boat.
 
-Still open: the marina of small craft in the inlet behind the root.
+**Closed 26 Aug on Misha's call, unbuilt.** The marina of small craft in the
+inlet behind the root — `1000150376` looks up a narrow inlet with boats moored
+and a beach at its head, and OSM has that inlet running south-west from the
+pier root. What was never established is whether it is moorings on lines, a
+pontoon, or hulls pulled up the beach, and that is the whole difference
+between thirty small boats and a structure. He closed it rather than answer
+it; the question is left written down here so that anybody who picks it up
+starts from what is missing rather than from the photograph.
