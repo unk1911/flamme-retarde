@@ -18011,6 +18011,15 @@ async function buildJadrija(scene) {
           uScarfB: { value: new THREE.Vector3(...SCARVES[0][1]) } },
         decl: 'uniform float uShorn;\n'
           + 'uniform vec3 uScarfA;\nuniform vec3 uScarfB;',
+        // And the same discard on the shadow, which it did not have. The
+        // ponytail comes off in her own fragment and her silhouette on the
+        // concrete kept it for three releases — a woman with a shaved head
+        // casting a shadow with a tail in it. Same test, same numbers, over
+        // the caster's own copies of uv and the bind position. See `cast` in
+        // 41-skin.js for why this is a fragment discard and not a cull.
+        casterDecl: 'uniform float uShorn;',
+        casterDrop: 'vDropUv.x > 0.5 '
+          + '&& vDropLocal.y < mix(1.29, 1.80, uShorn)',
         // Literal colours, as the landmarks do. The marker palette in
         // 42-crowd.js is for figures the runtime recolours per instance, and
         // there is exactly one of these — so the dye below is written straight

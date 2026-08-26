@@ -148,13 +148,36 @@ function readFR3DSkin(buf) {
  * not fit her, and this pass is the *more* likely of the two to be run on a
  * driver that is short of registers, because it is the one that runs twice.
  */
-function skinCasterVert(nb) {
+/**
+ * The depth fragment for a caster that has to discard, which is the shared one
+ * with the figure's own test in front of it. Rebuilt rather than copied: the
+ * packing is `GLSL_PACK` in 06-shadow.js and there must not be a second
+ * version of it, because a shadow map written with a different pack than it is
+ * read with is a shadow that is simply in the wrong place.
+ */
+function skinCasterFrag(drop, decl) {
+  return /* glsl */ `
+precision highp float;
+varying float vDepth;
+varying vec2 vDropUv;
+varying vec3 vDropLocal;
+${decl}
+${GLSL_PACK}
+void main(){
+  if (${drop}) discard;
+  gl_FragColor = packDepth(clamp(vDepth, 0.0, 1.0));
+}
+`;
+}
+
+function skinCasterVert(nb, drop = null) {
   return /* glsl */ `
 attribute vec4 aBoneIdx;
 attribute vec4 aBoneWt;
 uniform sampler2D uBones;
 uniform float uBoneRows;
 varying float vDepth;
+${drop ? 'varying vec2 vDropUv;\nvarying vec3 vDropLocal;' : ''}
 
 vec4 boneRow(float i){
   return texture2D(uBones, vec2((i + 0.5) / uBoneRows, 0.5));
@@ -176,6 +199,7 @@ void main(){
   vec3 p = (modelMatrix * vec4(sp, 1.0)).xyz;
   gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
   vDepth = gl_Position.z / gl_Position.w * 0.5 + 0.5;
+${drop ? '  vDropUv = uv;\n  vDropLocal = position;' : ''}
 }
 `;
 }
@@ -1903,11 +1927,35 @@ function skinnedFigure(data, opts = {}) {
     setBlink(v * v * (3 - 2 * v));
   }
 
-  /** Register with the shadow pass, sharing this figure's bone palette. */
+  /**
+   * Register with the shadow pass, sharing this figure's bone palette.
+   *
+   * `opts.casterDrop` is a GLSL boolean over `vDropUv` and `vDropLocal` — the
+   * figure's own uv and its undisplaced bind position — and anything it is
+   * true for casts no shadow. It exists because a surface that discards part
+   * of itself and a caster that does not are a figure with the shadow of hair
+   * she no longer has: the girl's ponytail is dropped by a fragment discard in
+   * her own body shader, and for three releases her silhouette on the concrete
+   * kept it. The condition is passed in rather than built here because the
+   * numbers in it are hers — see CROP in 43-jadrija.js — and this file has no
+   * business knowing them.
+   *
+   * A FRAGMENT discard and not a vertex cull, which is the whole reason this
+   * costs two varyings. Culling by pushing vertices out of clip space is
+   * cheaper and is wrong on exactly the triangles that matter: the flag is
+   * per-vertex, so the boundary of the tail is triangles with some corners
+   * flagged and some not, and moving one corner to infinity stretches the
+   * other two across the shadow map. Discarding per pixel is what the surface
+   * does, and the shadow has to agree with the surface or there was no point.
+   */
   function cast(shadow, o = {}) {
+    const drop = o.casterDrop || opts.casterDrop || null;
     return shadow.cast(mesh, {
       near: o.near !== false, dynamic: true,
-      material: shadow.casterMaterial(skinCasterVert(nb), { uBones, uBoneRows }),
+      material: shadow.casterMaterial(
+        skinCasterVert(nb, drop),
+        { uBones, uBoneRows, ...(drop ? (opts.uniforms || {}) : {}) },
+        drop ? skinCasterFrag(drop, opts.casterDecl || '') : null),
     });
   }
 

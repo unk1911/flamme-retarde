@@ -143,6 +143,8 @@ float shadowAt(vec3 worldPos){
 }
 `;
 
+/** The body of the depth fragment, so a caster that has to discard can
+ * rebuild it rather than copy it. See `casterMaterial`'s `frag`. */
 const SHADOW_DEPTH_FRAG = /* glsl */ `
 precision highp float;
 varying float vDepth;
@@ -383,11 +385,17 @@ function buildShadow(renderer) {
   }
 
   /** Depth-only material for a caster, sharing the caster's vertex program. */
-  function casterMaterial(vertexShader, uniforms = {}) {
+  /**
+   * `frag` overrides the shared depth fragment, and there is exactly one
+   * reason to want that: a caster whose SURFACE discards part of itself has to
+   * discard the same part here, or it casts the shadow of geometry nobody can
+   * see. See the ponytail in 41-skin.js.
+   */
+  function casterMaterial(vertexShader, uniforms = {}, frag = null) {
     return new THREE.ShaderMaterial({
       uniforms: { ...uniforms, uShadowPass: { value: 1 } },
       vertexShader,
-      fragmentShader: SHADOW_DEPTH_FRAG,
+      fragmentShader: frag || SHADOW_DEPTH_FRAG,
       // Back faces only, which is the fix for shadow acne on a closed body.
       // Writing the *far* side of the hull into the map puts the whole depth of
       // the aeroplane between the lit skin and the nearest occluder, so the skin

@@ -8,6 +8,46 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.127.0] — 2026-08-26
+
+### Her shadow loses the ponytail too
+
+**Three releases of a woman with a shaved head casting a shadow with a
+tail in it.** The haircut is a fragment discard in her own body shader —
+`flagTail` marks the knot and the tail in `uv.x` and the surface throws
+those pixels away above `uShorn` — and the depth pass knew nothing about
+it. `skinCasterVert` is position and nothing else, by design, so it drew
+every triangle she has and the silhouette on the concrete kept the hair
+she had just lost.
+
+**Opt-in, because the caster is shared.** Every skinned thing in the
+game uses it — the bathers, the dog, the cat, Chloe — and a discard
+wired in unconditionally would have taken the cat's shadow with it: it
+has a `uv` from its glTF, plenty of it over 0.5, and it is 0.5 m tall so
+the whole animal is under the 1.29 threshold. So `cast` takes a
+`casterDrop` — a GLSL boolean over the caster's own copies of `uv` and
+the bind position — and the numbers in it are passed in from
+43-jadrija.js, because they are hers and 41-skin.js has no business
+knowing them.
+
+**A fragment discard and not a vertex cull**, which is what the two new
+varyings buy. Pushing flagged vertices out of clip space is cheaper and
+is wrong on exactly the triangles that matter: the flag is per-vertex,
+so the boundary of the tail is triangles with some corners flagged and
+some not, and moving one corner to infinity stretches the other two
+across the shadow map. The surface discards per pixel; the shadow has to
+agree with the surface or there was no point.
+
+`casterMaterial` takes a fragment override now, and the variant is built
+from `GLSL_PACK` rather than copying it — a shadow map written with a
+different pack than it is read with is a shadow in the wrong place.
+
+**Verified by forcing the condition true**, which removed her shadow
+entirely and left her standing on bare concrete. Differencing screenshots
+of the shipped condition was tried first and abandoned: the resort is
+alive, fifty thousand pixels move between any two frames, and the signal
+does not survive it.
+
 ## [1.126.0] — 2026-08-26
 
 ### The third person shows her feet
