@@ -3938,6 +3938,15 @@ async function buildJadrija(scene) {
    * its ends, through a 0.62 m slot, and turn. From outside, at any angle, the
    * inside of a cubicle is behind either the screen or a side wall.
    */
+  /**
+   * Where the changing station is and where its two cubicles put you.
+   *
+   * Filled by `changingStation` and read by 90-app.js, which owns the dip.
+   * Derived and not typed: the numbers below are the same HW/HD/SCR the walls
+   * are built from, so moving the hut moves its threshold with it.
+   */
+  let changing = null;
+
   function changingStation(t, s, opts = {}) {
     const CREAM = [0.845, 0.828, 0.628];     // the printed panel, sunlit
     const FRAME = [0.235, 0.240, 0.248];     // the anthracite top rail and posts
@@ -4028,6 +4037,58 @@ async function buildJadrija(scene) {
     wall(t - HW, t - DOOR, s1 - th, s1);                       // west of the doors
     wall(t + DOOR, t + HW, s1 - th, s1);                       // east of them
     wall(t - 0.88, t + 0.88, SCR - th, SCR);                   // the screen
+
+    // ── and the way in, which is a threshold and not a walk ────────────────
+    // The argument is in the docstring. What is recorded here is only the
+    // geometry of it, because the machinery lives in 90-app.js next to the
+    // kabina's, which is the other place in this game you get into by
+    // crossing a line rather than by fitting through a gap.
+    //
+    // `line` is 0.70 m outside the screen's face. It has to be outside what
+    // `confine` will let you reach — the screen is a blocker and holds you
+    // 0.55 m off it — or the crossing could never happen at all. 0.70 leaves
+    // fifteen centimetres of walkable ground on the far side of it, which is
+    // enough that a walk into the hut crosses rather than stopping on it.
+    //
+    // `at` is the middle of each cubicle. Not the geometric middle: the spine
+    // and the two side walls each take 0.55 m of standable room off the bay,
+    // which leaves about 0.35 m of it, and 0.72 m off the axis is the middle
+    // of what is left rather than the middle of what is built.
+    //
+    // `out` is in front of the screen and NOT where you were standing when
+    // you crossed. Coming out of the hut where you went into it means walking
+    // out backwards through your own footprints; coming out in front of it,
+    // facing away, is what leaving a changing room is.
+    // WHICH IS WALKED AND NOT CROSSED, in the end, and the docstring above is
+    // written from before that was known. What settles it is `GROUND.tight`:
+    // `confine` inflates by `girthAt`, which drops from 0.55 to 0.26 wherever
+    // `field.tightTS` says so, and that mechanism exists because the vikendica
+    // has rooms you have to be able to stand in. Under it the hut's numbers
+    // come out the other way round — the 0.60 m doorways want 0.52 and the
+    // 0.62 m slots beside the screen want the same, so the labyrinth is
+    // passable at the size the photograph says it is, and a threshold that
+    // teleports you past your own building is not needed after all.
+    //
+    // So the footprint below is handed to `tightTS`, and what is recorded is
+    // the two cubicles as REGIONS rather than a line: `bay` is which one you
+    // are standing in, and stepping into one is what changes you.
+    changing = {
+      t, s, face: SCR, half: HW,
+      // The footprint tight girth applies over, and it reaches 0.9 m BEYOND
+      // the screen rather than stopping at it. Measured off the failure: with
+      // the region ending at the screen's own face she walked up to s 28.55
+      // and stopped, because the last stride before the slot is still outside
+      // the hut and still on the full 0.55, and 0.55 off the screen is further
+      // out than the slot's mouth. The tight girth has to start before the
+      // gap, not at it, or you can see the way in and never reach it.
+      t0: t - HW - 0.2, t1: t + HW + 0.2, s0, s1: SCR + 0.9,
+      // Behind the front panels is a cubicle; the spine divides them. Half a
+      // panel thickness of slack at the front so the boundary is inside the
+      // room rather than in the doorway, where standing on it would flicker.
+      bay: (bt, bs) => (bs > s1 - 0.10 || bs < s0 || bt < t - HW || bt > t + HW
+        ? -1 : (bt < t ? 0 : 1)),
+      floor: y,
+    };
   }
 
   /**
@@ -22489,7 +22550,9 @@ async function buildJadrija(scene) {
      * Where you are a person rather than a clearance. See `GROUND.tight` — this
      * is the only locale in the game with an inside to be inside of.
      */
-    tightTS: (t, s) => !!(vik && vik.tight(t, s)),
+    tightTS: (t, s) => !!(vik && vik.tight(t, s))
+      || !!(changing && t > changing.t0 && t < changing.t1
+            && s > changing.s0 && s < changing.s1),
     /**
      * And where there is a ceiling over you, which is a different question and
      * a narrower one — see `vik.indoorsAt`. Taken in world metres because the
@@ -22674,6 +22737,11 @@ async function buildJadrija(scene) {
      * singers still on is exactly the half-in-half-out this was supposed to
      * cure. A threshold you have already walked through is not a threshold.
      */
+    /**
+     * The changing station's threshold geometry — see `changing`, and see
+     * `dipChanging` in 90-app.js, which is the thing that uses it.
+     */
+    changing: () => changing,
     kabina: special && {
       inside: (x, z) => {
         const [t, s] = local(x, z);

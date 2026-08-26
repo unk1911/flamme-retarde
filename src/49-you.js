@@ -45,6 +45,12 @@ const YOU = {
   vest: [0.885, 0.900, 0.860],
   // And what is under it, showing at the scoop and over the shoulders.
   under: [0.055, 0.058, 0.068],
+  // What she changes into. Deep teal, and picked for one reason: it has to
+  // read as NOT the vest from behind at three metres, which is where the
+  // third person puts you, and the vest is a warm off-white. A dark cool
+  // colour is the largest step available without inventing a pattern this
+  // shader has no way to draw.
+  swim: [0.075, 0.185, 0.200],
   // Pink through the blue. Not a tint over the whole head — three or four
   // locks taken pink, which is what a highlight is.
   pink: [0.560, 0.150, 0.330],
@@ -132,14 +138,23 @@ async function buildYou(scene) {
   // the head is the lashes at 0.10 away, so the window is wide enough to be
   // exact and narrow enough to leave her eyebrows alone. The height gate is
   // belt and braces: whatever else on her is that brown, it is not her head.
+  // Dressed or changed. One uniform, because the difference between the two
+  // is a hem and a colour — see the note on `hem` in the body below. Ramped
+  // rather than switched by the caller if it ever wants to; the changing hut
+  // does not, because the change happens behind a screen with the picture
+  // faded to black and there is nothing to see it move.
+  const uSwim = { value: 0 };
+
   const fig = await loadSkin('human_skin_fr3d', {
     spec: 0.09,
     specPower: 24,
     face: true,
+    uniforms: { uSwim },
     // Declared out here because the body is spliced into main() and GLSL ES 1.0
     // will not take a function inside a function. Everything below is used by
     // the sleeve and the print and by nothing else on this figure.
     decl: `
+      uniform float uSwim;
       float youHash(vec3 p) {
         return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123);
       }
@@ -240,8 +255,17 @@ async function buildYou(scene) {
         float front = smoothstep(0.020, 0.105, vLocal.x)
           * (1.0 - smoothstep(0.030, 0.105, abs(vLocal.z)));
         float neck = mix(1.450, 1.372, front);
+        // The hem, which is the whole of the change of clothes.
+        //
+        // uSwim runs 0 to 1 and takes the bottom of the garment from 0.995
+        // — a tank that covers her to the hip — up to 1.275, which is a band
+        // across the bust. Nothing else about the shape moves: the neckline,
+        // the trunk cut and the scoop are the same terms doing the same work,
+        // because a swimsuit top and a vest differ in how far down they go and
+        // not in how they are held up. The straps go with it, below.
+        float hem = mix(0.995, 1.275, uSwim);
         float scoop = trunk
-          * smoothstep(0.995, 1.020, vLocal.y)
+          * smoothstep(hem, hem + 0.025, vLocal.y)
           * (1.0 - smoothstep(neck, neck + 0.012, vLocal.y));
         float vest = scoop;
         // Two straps over the shoulders, on a fixed height band rather than
@@ -250,11 +274,38 @@ async function buildYou(scene) {
         float band = smoothstep(0.052, 0.066, abs(vLocal.z))
           * (1.0 - smoothstep(0.130, 0.146, abs(vLocal.z)))
           * (1.0 - smoothstep(0.090, 0.125, abs(vLocal.x - 0.010)));
+        // The straps come off with the vest. A bandeau with two shoulder
+        // straps still floating above it — which is what leaving them on
+        // looks like, because they are a band in HEIGHT and the raised hem
+        // does not touch them — is not a swimsuit, it is a bug.
         vest = max(vest, band
           * smoothstep(1.405, 1.425, vLocal.y)
-          * (1.0 - smoothstep(1.468, 1.486, vLocal.y)));
-        vcol = mix(vcol, vec3(${YOU.vest.map((n) => n.toFixed(3)).join(', ')}),
+          * (1.0 - smoothstep(1.468, 1.486, vLocal.y))
+          * (1.0 - uSwim));
+        vcol = mix(vcol,
+          mix(vec3(${YOU.vest.map((n) => n.toFixed(3)).join(', ')}),
+              vec3(${YOU.swim.map((n) => n.toFixed(3)).join(', ')}), uSwim),
           vest);
+
+        // And the bottom half, which only exists when she is changed.
+        //
+        // It has to be painted, and finding that out is what this block is.
+        // The hip wrap she wears otherwise is GEOMETRY — the joined tail of
+        // the mesh that write_skin counts in shed — and taking it off with
+        // wear leaves nothing behind it, because there was never anything
+        // behind it to leave. Every other figure on this beach has swimwear in
+        // its baked vertex colours; she is the one figure whose clothes are
+        // all paint, so hers has to be painted too.
+        //
+        // The same trunk test as the vest, for the same reason: at this height
+        // her hands hang at the hip and a band that went all the way round in
+        // z would put a stripe across both wrists.
+        float briefs = trunk
+          * smoothstep(0.800, 0.826, vLocal.y)
+          * (1.0 - smoothstep(0.988, 1.008, vLocal.y));
+        vcol = mix(vcol,
+          vec3(${YOU.swim.map((n) => n.toFixed(3)).join(', ')}),
+          briefs * uSwim);
 
         // What is under it, showing where the vest stops: a dark edge round
         // the scoop, and a narrower dark strap inboard of each white one.
@@ -693,6 +744,8 @@ async function buildYou(scene) {
     tick,
     /** Debug: draw her in the room, and stop her following the camera. */
     show: (v) => { mesh.visible = !!v; return mesh.visible; },
+    /** Changed for the water, or dressed. See `uSwim` and `setDressed`. */
+    swim: (v) => { uSwim.value = v ? 1 : 0; return uSwim.value; },
     freeze: (v) => { frozen = !!v; return frozen; },
     /**
      * Take her off the camera and put her somewhere.

@@ -8,6 +8,66 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.124.0] — 2026-08-26
+
+### You can walk into the changing station, and it changes you
+
+**It turned out not to need a threshold at all.** 1.120.0 shipped the
+hut solid with a note saying you could never walk into it: `confine`
+inflates every blocker by `GROUND.girth` = 0.55 on all four sides, the
+0.06 m front panels put a 1.16 m band of no-go across the whole
+frontage, and no door width gets you through that. All true — and it
+missed the lever. `girthAt` drops girth to `GROUND.tight` = 0.26
+wherever `field.tightTS` says so, which exists because the vikendica has
+rooms you have to be able to stand in. Under 0.26 the hut's own numbers
+come out the other way: the 0.60 m doorways want 0.52 and the 0.62 m
+slots beside the screen want the same. So the building keeps the size
+the photograph gives it, its footprint goes to `tightTS`, and you walk
+round the screen and in, which is how you get into the real one. The dip
+teleport was written, tested and thrown away.
+
+**The tight region has to start before the gap, not at it.** Measured
+off the failure: with it ending at the screen's own face she walked up
+to s 28.55 and stopped, because the last stride before the slot is still
+outside the hut and still on the full 0.55 — and 0.55 off the screen is
+further out than the slot's mouth. It reaches 0.9 m beyond the screen
+now. You could see the way in and not reach it.
+
+**Stepping into a cubicle changes her.** A region test and not a
+crossing: `changing.bay(t, s)` is which of the two you are standing in.
+Only on the way in — a changing room does not change you back on the way
+out. The dip stays and is doing something real: it is the only way to
+say that time passed, and without it she flickers between two frames
+while standing still, which reads as a bug rather than an event.
+
+**Two garments, two mechanisms.** The hip wrap is geometry and comes off
+through `wear` — `write_skin` has carried a `shed` count for it since it
+was authored, and `loadSkin` re-inflates per call so Chloe's draw range
+is hers alone and nobody on the beach loses theirs. The vest is paint,
+so it is a uniform: `uSwim` takes the hem from 0.995 to 1.275 and drops
+the shoulder straps, because a vest and a swim top differ in how far
+down they go and not in how they are held up.
+
+**And she needed a bottom half, which is how the wrap was found out.**
+Shedding it left her with nothing, because there was never anything
+behind it — every other figure on this beach has swimwear in its baked
+vertex colours, and she is the one whose clothes are all paint. So the
+briefs are painted too, on the same trunk test as the vest: at that
+height her hands hang at the hip and a band that went all the way round
+would put a stripe across both wrists.
+
+**`toast` was rendering its own markup as text**, and had been since
+long before this. It used `textContent`, and four of its strings —
+`chase.on`, `chase.lost`, `body.on` and now `chg.changed` — carry a
+bolded key, so "**B** to get back in your own eyes" has been printing
+its angle brackets on screen. It uses `innerHTML` now. Nothing it is
+ever called with is user input: all thirty-six keys come out of `T()`,
+and every one was checked to be plain text or a simple `<b>` pair first.
+
+**French was missing four keys** — `body.on` and `body.off` had never
+been translated, an oversight from when the third person shipped for the
+swim. All three languages are back to 321.
+
 ## [1.123.0] — 2026-08-26
 
 ### B works on land, and Chloe is in the frame

@@ -3723,7 +3723,15 @@ document.addEventListener('visibilitychange', () => {
 
 function toast(msg, kind = '') {
   const el = $('toast');
-  el.textContent = msg;
+  // innerHTML and not textContent, which is what this was and which quietly
+  // broke four of its own strings. `chase.on`, `chase.lost` and `body.on` have
+  // carried a bolded key — "<b>B</b> to get back in your own eyes" — since
+  // they were written, and every one of them has been rendering the angle
+  // brackets on screen. Nothing here is user input: every string this is ever
+  // called with comes out of `T()` and 02-i18n.js, and all thirty-six of them
+  // were checked to be plain text or a simple <b> pair before this was
+  // changed. If that ever stops being true, this is the line that has to know.
+  el.innerHTML = msg;
   el.className = 'on ' + kind;
   clearTimeout(el._t);
   el._t = setTimeout(() => { el.className = kind; }, 1900);
@@ -4332,6 +4340,78 @@ function crossThreshold(dt, afoot) {
 
 function dipStart(fn) { dipPhase = 1; dipT = 0; dipDo = fn; dipPin = null; }
 
+// ── the changing station ─────────────────────────────────────────────────────
+/**
+ * Whether Chloe is dressed, and which cubicle she is standing in.
+ *
+ * `dressed` is the whole of the state and it is deliberately one boolean.
+ * There is no wardrobe here and there should not be: a bathing station has
+ * exactly two things you can be wearing and the entire point of the hut is
+ * that it is where you stop being one of them.
+ */
+let dressed = true;
+let inChg = -1;          // which bay, or -1 for outside
+let chgStep = null;      // last (t, s), for the crossing test
+
+/**
+ * In and out of the changing station.
+ *
+ * WALKED, NOT TELEPORTED, which is the opposite of what this was going to be
+ * and of what `changingStation`'s own docstring still argues for. The reason
+ * is `GROUND.tight`: the hut's footprint is handed to `tightTS`, `confine`
+ * drops from 0.55 to 0.26 inside it, and at 0.26 the 0.60 m doorways and the
+ * 0.62 m slots either side of the screen are passable. The building is the
+ * size the photograph says and you get into it by walking round the screen,
+ * which is how you get into the real one. The kabina's dip is still the right
+ * answer for the kabina, whose door is a hole in a wall with a room behind it;
+ * it is the wrong answer here, where the thing in the way is a screen you walk
+ * around.
+ *
+ * So this is a REGION test and not a crossing. Stepping into either cubicle
+ * changes her; stepping out does nothing, because a changing room does not
+ * change you back on the way out.
+ *
+ * The dip stays, and it is doing something real: it is the only way to say
+ * that time passed. Without it she flickers from dressed to changed between
+ * two frames while standing still, which reads as a bug rather than as an
+ * event. Down, black, up — and she is different when it comes back.
+ */
+function crossChanging(afoot) {
+  const C = jadrija && jadrija.changing && jadrija.changing();
+  if (!afoot || !C || !ground || !ground.ok || dipCool > 0 || dipPhase
+      || state.phase !== 'ground') {
+    if (!afoot) { inChg = -1; }
+    return;
+  }
+  const [t, s] = jadrija.local(camera.position.x, camera.position.z);
+  const bay = C.bay(t, s);
+  if (bay === inChg) return;
+  const was = inChg;
+  inChg = bay;
+  // Only on the way IN. Walking out is not a second change of clothes, and
+  // stepping across the spine from one cubicle to the other is not one either
+  // — which you cannot do anyway, but the test is written so that it would not
+  // matter if the spine ever came out.
+  if (bay >= 0 && was < 0) dipStart(() => setDressed(!dressed));
+}
+
+/**
+ * Dressed or changed, everywhere it shows.
+ *
+ * Two things and no more, which is what makes this cheap: the hip wrap is
+ * geometry and comes off through `wear` — `write_skin` has carried a `shed`
+ * count for it since the wrap was authored, and `loadSkin` re-inflates per
+ * call so Chloe's draw range is hers alone and nobody on the beach loses
+ * theirs. The vest is paint, so it is a uniform: see `uSwim` in 49-you.js.
+ */
+function setDressed(v) {
+  dressed = !!v;
+  if (!you) return;
+  if (you.fig && you.fig.wear) you.fig.wear(dressed);
+  if (you.swim) you.swim(!dressed);
+  toast(T(dressed ? 'chg.dressed' : 'chg.changed'));
+}
+
 /** What `state.phase` was last frame, so the change itself can be acted on. */
 let lastPhase = '';
 
@@ -4880,6 +4960,7 @@ function frame() {
   // change the exposure on the way through it.
   if (raw > 0.62) darkWant = vikIn > kabIn ? 0.34 : 1;
   crossThreshold(dt, afoot);
+  crossChanging(afoot);
   // Held wherever the crossing put it while the screen is dark, so the light
   // in the room is already the room's light when it comes back up. Watching a
   // 0.3 s exposure ramp *after* a cut is watching the cut not have worked.
@@ -5974,6 +6055,11 @@ window.__fr = {
      * has now cost two wrong test runs. Pass `true` to read-and-set.
      */
     body: (v) => { bodyCam = v == null ? !bodyCam : !!v; return bodyCam; },
+    /** The changing station: dressed or not, and which cubicle she is in. */
+    changed: (v) => {
+      if (v != null) setDressed(!v);
+      return { dressed, bay: inChg, at: chgStep };
+    },
     driven: () => (you ? you.driven() : null),
     dip: (x, z, yaw = 0, depth = 0.3) => {
       if (!swim) return null;
