@@ -8,6 +8,61 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.125.0] — 2026-08-26
+
+### Baye uses the changing hut, and comes out in a different wrap
+
+**Four waypoints and no pathfinder, because none is needed.** Her lane
+is s 6.4 to 15.4 and the hut is at s 26.3, which sounds like it is behind
+the kabine and is not: a blocker map of t 356–376 comes back clear from
+s 8 to s 25, because the runs are elsewhere along the shore. So `showTo`
+walks her there in a straight line. What is *not* straight is the last
+four metres — the hut is a labyrinth and the whole point of it is that
+you cannot see in — so the waypoints are the ones a person walks: up to
+the mouth of the slot beside the screen, round its end, into the bay,
+and the same two in reverse coming out. Nothing hides her while she is
+in there; the screen does that, which is what it is for.
+
+**The wrap is dyed along an axis, not at its two ends**, and that took
+three goes to see. `human_mh.py` bakes it as a checker of SCARF_DARK and
+SCARF_LITE a vertex apart, so almost none of the cloth is either of them
+— it is the interpolation between, which is a grey ramp. A test matching
+the two endpoints to within three hundredths dyed the few pixels nearest
+a vertex and nothing else; set to pure red and pure green it came out as
+thin red and green diagonals over an undyed charcoal ground, which is a
+photograph of the bug. The fix projects the vertex colour onto the
+dark-to-light axis and mixes the new pair by where it lands, so the
+weave survives the dye instead of being averaged into one flat cloth.
+How far the colour sits *off* that axis is what keeps it on the wrap:
+skin projects to the light end and then misses it by 0.6, twenty times
+the tolerance. Five dye lots — the baked charcoal, madder, indigo, ochre
+and verdigris — and a figure that has never been near the hut is the
+figure that shipped.
+
+**The trigger is on `idle` as well as `play`, which is a correction.**
+The first cut hung it on `play` alone, reasoning that a detour there
+reads as her own idea. True, and useless: `play` is the far end of her
+showcase, and a minute of standing beside her at the hut went idle →
+notice → down → crawl → up → flip → shimmy → twerk → heart → note → aim
+→ wheel without reaching it. `idle` is where she actually spends her
+time.
+
+That correction had a bug in it worth recording: adding a second
+`case 'idle':` above `play` to get the fall-through made the real idle
+case **dead code**, because a switch takes the first matching label and
+the other forty lines never ran again. It is one shared `hutCheck`
+called from both now.
+
+**She is not sent.** One draw in six, on a 95-second cooldown, and only
+when you are within eleven metres of the hut and she is within
+twenty-five. A woman who walks to the changing rooms every time somebody
+stands near them is a vending machine.
+
+**`__fr.jad.raw().scarf()` reads and does not advance**, unlike
+`__fr.swim.body()`, which toggles when called with nothing and has now
+cost three test runs between them — a probe sampling it every frame was
+advancing the thing it was sampling.
+
 ## [1.124.0] — 2026-08-26
 
 ### You can walk into the changing station, and it changes you

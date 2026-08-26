@@ -17695,6 +17695,46 @@ async function buildJadrija(scene) {
    * specular is added on top of the albedo and a blonde that starts near white
    * has nowhere to go but clipped in Dalmatian sun.
    */
+  /**
+   * Her hip wraps, dark and light, in the order she works through them.
+   *
+   * `human_mh.py` bakes the wrap as a checker of two colours — SCARF_DARK and
+   * SCARF_LITE — and the first pair here are those two exactly, so a figure
+   * that has never been near the changing hut is the figure that shipped. The
+   * rest are the same weave in a different dye lot: a real one of these is one
+   * cloth printed several ways, which is why every pair keeps the light one
+   * about four times the dark one rather than being two free colours.
+   */
+  const SCARVES = [
+    [[0.078, 0.073, 0.086], [0.345, 0.330, 0.365]],   // the baked one, charcoal
+    [[0.090, 0.045, 0.052], [0.400, 0.215, 0.230]],   // madder red
+    [[0.040, 0.072, 0.088], [0.190, 0.330, 0.395]],   // indigo
+    [[0.088, 0.078, 0.038], [0.395, 0.355, 0.180]],   // ochre
+    [[0.042, 0.080, 0.058], [0.195, 0.360, 0.270]],   // verdigris
+  ];
+  let scarfIx = 0;
+
+  /**
+   * Put her in the next wrap, or a named one.
+   *
+   * The dye is a fragment test and not a second mesh: the wrap is already in
+   * her geometry with the two baked colours on it, so recognising them by
+   * colour and swapping is the same trick her hair is dyed with — see the note
+   * on `browCol`, which is about the one thing that trick gets wrong. The
+   * height gate matters more here than it does for hair: SCARF_DARK is a very
+   * dark grey and so are her lashes, and without a band round the hips this
+   * would dye her eyelids to match her skirt.
+   */
+  function showScarf(ix) {
+    if (!skinFig || !skinFig.material) return scarfIx;
+    scarfIx = ((ix == null ? scarfIx + 1 : ix) % SCARVES.length + SCARVES.length)
+      % SCARVES.length;
+    const u = skinFig.material.uniforms;
+    if (u.uScarfA) u.uScarfA.value.set(...SCARVES[scarfIx][0]);
+    if (u.uScarfB) u.uScarfB.value.set(...SCARVES[scarfIx][1]);
+    return scarfIx;
+  }
+
   const BAYE_HAIR = {
     lo: [0.300, 0.208, 0.112],     // the nape, the underside, the roots
     hi: [0.640, 0.500, 0.290],     // the crown, where the sun is on it
@@ -17965,8 +18005,12 @@ async function buildJadrija(scene) {
         // How far through the haircut she is. One uniform for all three parts
         // of it — see `CROP` — and it is only ever driven by `show.shorn`,
         // which is only ever driven by the latch.
-        uniforms: { uShorn: { value: 0 } },
-        decl: 'uniform float uShorn;',
+        uniforms: { uShorn: { value: 0 },
+          // Which wrap she has on. See `SCARVES` and `showScarf`.
+          uScarfA: { value: new THREE.Vector3(...SCARVES[0][0]) },
+          uScarfB: { value: new THREE.Vector3(...SCARVES[0][1]) } },
+        decl: 'uniform float uShorn;\n'
+          + 'uniform vec3 uScarfA;\nuniform vec3 uScarfB;',
         // Literal colours, as the landmarks do. The marker palette in
         // 42-crowd.js is for figures the runtime recolours per instance, and
         // there is exactly one of these — so the dye below is written straight
@@ -18082,6 +18126,53 @@ async function buildJadrija(scene) {
               distance(vVCol, vec3(${gl3(BAYE_HAIR.pubic)})));
             vcol = mix(vcol, vec3(${gl3(BAYE_HAIR.pubicTo)}), pub);
           }
+
+          // And the wrap, whichever one she came out of the hut in.
+          //
+          // Off vVCol for the same reason the pubic test above is: by here the
+          // hair dye has already had a look at this vertex, and testing the
+          // dyed colour would hide that. The two baked colours are recognised
+          // separately and replaced separately, because the wrap is a checker
+          // of them — mixing on a single distance would average the weave into
+          // one flat cloth and lose the pattern that makes it a wrap.
+          //
+          // ALONG THE AXIS, not at its two ends, and that is the whole of
+          // what took three goes to see.
+          //
+          // The wrap is baked as a checker of two colours a vertex apart —
+          // SCARF_DARK and SCARF_LITE out of human_mh.py — so almost none of
+          // the cloth is actually either of them. It is the interpolation
+          // between them, which is a grey ramp, and a test that matched the
+          // two endpoints to within three hundredths dyed the few pixels
+          // nearest a vertex and nothing else. Set to pure red and pure green
+          // it came out as thin red and green diagonals over an undyed
+          // charcoal ground, which is a photograph of the bug.
+          //
+          // So: project the vertex colour onto the dark-to-light axis and use
+          // where it lands to mix the new pair the same way. u carries the
+          // weave across, so the checker survives the dye instead of being
+          // averaged into one flat cloth. off is how far the colour sits OFF
+          // that axis, and it is what keeps this on the wrap: skin projects to
+          // the light end and then misses it by 0.6, which is twenty times the
+          // tolerance.
+          //
+          // The height band is still doing real work. SCARF_DARK is within the
+          // colour tolerance of her lashes and of the darkest vertices on an
+          // eyeball, and the axis runs through neutral grey, so without a gate
+          // round the hips this dyes her eyelids to match her skirt. 0.62 is
+          // under the fringe's lowest strand, which is 0.67 and is part of the
+          // wrap and has to change with it.
+          {
+            const vec3 A0 = vec3(0.078, 0.075, 0.086);
+            const vec3 B0 = vec3(0.345, 0.329, 0.365);
+            vec3 ax = B0 - A0;
+            float u = clamp(dot(vVCol - A0, ax) / dot(ax, ax), 0.0, 1.0);
+            float off = distance(vVCol, A0 + ax * u);
+            float on = smoothstep(0.600, 0.650, vLocal.y)
+              * (1.0 - smoothstep(1.140, 1.185, vLocal.y))
+              * (1.0 - smoothstep(0.022, 0.055, off));
+            vcol = mix(vcol, mix(uScarfA, uScarfB, u), on);
+          }
           base *= vcol;
         `,
       });
@@ -18152,6 +18243,10 @@ async function buildJadrija(scene) {
       // that happens when you walk up to her, and a 2.8 m mast standing 6 m away
       // put a red wall straight through the middle of the performance.
       show = {
+        // The changing hut. `hutCool` is seconds before she will consider it
+        // again, `hutSide` is which cubicle (−1 west, +1 east) and `hutLeg` is
+        // which waypoint of the two she is walking to. See the `hutGo` case.
+        hutCool: 30, hutSide: -1, hutLeg: 0,
         phase: 'idle', t: ft, s: fs, ang: -Math.PI / 2, want: -Math.PI / 2,
         tmr: 0, flips: 0, said: 0, home: [ft, fs],
         // The wander: the heading the random walk is on, seconds until it is
@@ -20169,6 +20264,7 @@ async function buildJadrija(scene) {
     // and `sample` clamps, so this stays true until something else is played.
     const done = S.cur && !S.cur.loop && S.curT >= S.cur.dur;
     show.tmr += dt;
+    if (show.hutCool > 0) show.hutCool -= dt;
     // Where she was before anything in this function moved her. Taken here
     // rather than inside the movers because there are four of them — `showMove`,
     // `showTo`, `showCreep` and `showHold` — and the question "did she actually
@@ -20198,6 +20294,40 @@ async function buildJadrija(scene) {
       show.t0 = Math.min(clamp(lo, 8, LEN - 8), show.t);
       show.t1 = Math.max(clamp(hi, 8, LEN - 8), show.t);
     }
+
+    /**
+     * Off to the changing hut, sometimes, if you are near it.
+     *
+     * Called from `idle` and from `play` and written once rather than twice,
+     * because the first cut added a second `case 'idle':` above `play` to get
+     * the fall-through and made the real idle case dead code — a switch takes
+     * the first matching label and the other forty lines never ran again.
+     *
+     * BOTH of those modes and not just `play`, which is a correction. `play`
+     * is where she is enjoying herself near you and a detour there reads as
+     * her own idea, which was the argument for putting it there alone. True,
+     * and useless: `play` is the far end of her showcase, and a minute of
+     * standing beside her at the hut went idle → notice → down → crawl → up →
+     * flip → shimmy → twerk → heart → note → aim → wheel without ever reaching
+     * it. `idle` is where she actually spends her time.
+     *
+     * She is not sent, and the draw is why. One in six, on a 95-second
+     * cooldown after each trip: a woman who walks to the changing rooms every
+     * time somebody stands near them is a vending machine.
+     */
+    const hutCheck = (pt2, ps2, withYou2) => {
+      if (!changing || show.hutCool > 0 || !withYou2) return false;
+      // You within eleven metres of it and her within twenty-five, so she is
+      // not setting off across the resort — this is a thing she does because
+      // it is right there, which is why anybody uses one.
+      if (Math.hypot(pt2 - changing.t, ps2 - changing.s) > 11) return false;
+      if (Math.hypot(show.t - changing.t, show.s - changing.s) > 25) return false;
+      if (Math.random() >= 0.17) return false;
+      show.hutSide = show.t < changing.t ? -1 : 1;
+      show.hutLeg = 0;
+      go('hutGo', 'walk', 0.30);
+      return true;
+    };
 
     const go = (phase, clip, fade = 0.30) => {
       // Back to nominal on every clip change. `showPace` below runs the walk
@@ -20670,6 +20800,7 @@ async function buildJadrija(scene) {
       }
 
       case 'idle':
+        if (hutCheck(pt, ps, withYou)) break;
         show.want = -Math.PI / 2;                        // back to the water
         // The ćuk, on her own, every few seconds — the one noise she makes when
         // nothing is happening. It is what tells you there is something up
@@ -20754,7 +20885,20 @@ async function buildJadrija(scene) {
         break;
       }
 
+      // Off to the changing hut, sometimes, if you are near it.
+      //
+      // On `idle` as well as `play`, which is a correction. The first cut hung
+      // it on `play` alone, reasoning that `play` is where she is enjoying
+      // herself near you and a detour there reads as her own idea. True, and
+      // useless: `play` is the far end of her showcase, and a minute of
+      // standing next to her at the hut went idle → notice → down → crawl →
+      // up → flip → shimmy → twerk → heart → note → aim → wheel without ever
+      // reaching it. A trigger that only fires after the whole routine has run
+      // is a trigger nobody will ever see. `idle` is where she actually spends
+      // her time, and a woman standing about near a changing room deciding to
+      // use it needs no more motivation than that.
       case 'play':
+        if (hutCheck(pt, ps, withYou)) break;
         // The larking about. A random walk in heading and speed, turned back
         // by the edges of the deck rather than stopped by them, with a
         // somersault thrown in whenever the dice say so — which is as close as
@@ -21119,6 +21263,84 @@ async function buildJadrija(scene) {
           go('blaze', 'firestarter', 0.16);
         }
         break;
+
+      // ── the changing hut ──────────────────────────────────────────────
+      //
+      // Misha, 25 Aug: "NPC baye can go into it as well, if we are near a
+      // station she might go in and out of it, and perhaps to change her hip
+      // scarf outfits (different colours)".
+      //
+      // Four legs and no pathfinder, because none is needed and one would be
+      // the wrong tool: showTo walks a straight line, and the ground between
+      // her lane and the hut is empty for twenty metres either side of it —
+      // the kabine runs are elsewhere along the shore, and a blocker map of
+      // t 356-376 comes back clear from s 8 to s 25. What is NOT a straight
+      // line is the last four metres, because the hut is a labyrinth and the
+      // whole point of it is that you cannot see in. So the waypoints are the
+      // ones a person walks: up to the mouth of the slot beside the screen,
+      // round its end, and into the bay.
+      //
+      // She goes at HER pace and is not sent. The trigger is that you are near
+      // the hut and she is with you, and even then it is one draw in six — a
+      // woman who walks to the changing rooms every time you stand near them
+      // is a vending machine.
+      case 'hutGo': {
+        const C = changing;
+        if (!C) { go('home', 'walk', 0.3); break; }
+        // The mouth of the slot: outside the screen, off to the side she is
+        // already nearest, so she does not cross the front of it to use the
+        // far end.
+        const side = show.hutSide;
+        const aim = show.hutLeg === 0
+          ? [C.t + side * 1.15, C.face + 0.75]
+          : [C.t + side * 1.15, C.s + 0.25];
+        const dist = showTo(aim[0], aim[1], dt, 1.0);
+        show.want = Math.atan2(aim[1] - show.s, aim[0] - show.t);
+        if (dist < 0.30) {
+          if (show.hutLeg === 0) { show.hutLeg = 1; break; }
+          show.hutLeg = 0;
+          go('hutIn', 'walk', 0.25);
+        }
+        break;
+      }
+      // In the cubicle. She is behind the screen and out of sight from every
+      // angle — that is what the screen is for — so nothing here has to hide
+      // her and nothing does. The wrap changes at the moment the timer runs
+      // out rather than on the way in, because a woman who changes the instant
+      // she is out of sight has not changed, she has flickered.
+      case 'hutIn': {
+        const C = changing;
+        const aim = [C.t + show.hutSide * 0.72, C.s];
+        const dist = showTo(aim[0], aim[1], dt, 0.85);
+        show.want = Math.atan2(aim[1] - show.s, aim[0] - show.t);
+        if (dist < 0.22) go('hutOn', 'idle', 0.40);
+        break;
+      }
+      case 'hutOn':
+        showHold(dt);
+        if (show.tmr > 4.2) {
+          showScarf(null);
+          go('hutOut', 'walk', 0.30);
+        }
+        break;
+      // And back out the way she came in, which is the same two waypoints in
+      // the other order. Then `home`, which is where every one of her numbers
+      // ends and which already knows to abandon it if you are standing there.
+      case 'hutOut': {
+        const C = changing;
+        const aim = show.hutLeg === 0
+          ? [C.t + show.hutSide * 1.15, C.face + 0.75]
+          : [C.home ? show.home[0] : C.t, SHOW_LANE0 + 1.5];
+        const dist = showTo(aim[0], aim[1], dt, 1.0);
+        show.want = Math.atan2(aim[1] - show.s, aim[0] - show.t);
+        if (dist < 0.35) {
+          if (show.hutLeg === 0) { show.hutLeg = 1; break; }
+          show.hutLeg = 0;
+          show.hutCool = 95;
+          go('home', 'walk', 0.30);
+        }
+        break;
+      }
 
       case 'home': {
         // Unless there is somebody to be with, in which case her spot can wait.
@@ -22742,6 +22964,16 @@ async function buildJadrija(scene) {
      * `dipChanging` in 90-app.js, which is the thing that uses it.
      */
     changing: () => changing,
+    /**
+     * Her hip wrap. READ-ONLY with no argument, which `__fr.swim.body` is not
+     * and which cost two test runs there and one here: a probe that samples
+     * this every frame was advancing the thing it was sampling. Pass an index
+     * to set one, or 'next' to move her on.
+     */
+    scarf: (ix) => ({
+      ix: ix === undefined ? scarfIx : showScarf(ix === 'next' ? null : ix),
+      of: SCARVES.length,
+    }),
     kabina: special && {
       inside: (x, z) => {
         const [t, s] = local(x, z);
@@ -22894,6 +23126,12 @@ async function buildJadrija(scene) {
     /** Where the performance has got to. */
     show: () => show && {
       phase: show.phase, clip: skinFig ? skinFig.playing() : null,
+      // The changing hut: how long until she will consider it, which cubicle
+      // and which waypoint. See `hutCheck`.
+      hut: { cool: +show.hutCool.toFixed(1), side: show.hutSide,
+        leg: show.hutLeg, withYou: show.withYou,
+        dHer: changing ? +Math.hypot(show.t - changing.t,
+          show.s - changing.s).toFixed(1) : -1 },
       t: +show.t.toFixed(1), s: +show.s.toFixed(1),
       ang: +show.ang.toFixed(2), flips: show.flips,
       wheels: show.wheels, side: +show.side.toFixed(2),
