@@ -65,13 +65,7 @@ countable 110–130 mm planks per door leaf. Fixing it doubles the row to about
 A published figure would settle it, or you may simply know. Written up in
 `plan/jadrija-TODO.md`.
 
-## 5. The wood floor — repaint it? *(carried over, yours to call)*
-
-The game has warm orange-tan sand under the pines. `20260823_112051` shows
-pale angular crushed limestone with needle litter. It is the right change and
-it repaints the whole resort, so it is your call and I have not touched it.
-
-## 6. Five unpushed commits, plus tonight's *(carried over)*
+## 5. Five unpushed commits, plus tonight's *(carried over)*
 
 `main` is ahead of the remote and I have not pushed. Say the word.
 
