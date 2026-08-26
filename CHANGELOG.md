@@ -8,6 +8,87 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.122.0] — 2026-08-26
+
+### The excursion boat, along the back of the first block
+
+**A fourth mural, and the first one that is not on a gable.** Misha
+photographed it on 25 August: an Adriatic passenger launch painted the
+whole length of a kabine run's back wall, white to the waterline with an
+oxblood deckhouse, life rings on the deckhouse and not the hull, ochre
+caprail, and dark water arris to arris. It carries the JADRIJA 100
+centenary mark at the stern end — the same "100" whose zeroes are hut
+fronts that `centenaryTex` already draws — so it is part of the
+centenary programme and not a private piece.
+
+**Placed on evidence rather than on a coordinate.** The photograph's
+EXIF has GPS tags but every value is NaN; the camera wrote the structure
+and never got a fix. So the wall was argued: the back of the first
+front-row run, t 395.85 → 415.2 at s 20.10, which is the wall on your
+right coming round the gull's own corner and on your left, with the sea
+past its far corner, coming through the screen-wall doorway. The back
+row's back wall — which the photograph's wide gravel forecourt first
+suggested — was rejected because a camera standing there is inside a
+parked car: `carSites` parks nose-in at s 31.1–32.5, one every 4 m.
+
+**Rule 9b finally has its strip.** That wall is on the bend and bows
+**0.153 m off its own chord** over 14.32 m, so a flat quad would be
+buried 5 cm in the render amidships and stand 15 cm clear at the ends.
+`endMural` gains a `wall` parameter: given one it builds 24 quads whose
+vertices come off `W(t, s, y)` directly, normals from the shore frame,
+`uv` walked along an arc-length table because metres of wall and metres
+of `t` are not the same thing — 19.65 m of `t` is 14.08 m of world on
+this run. The gable branch stays a flat quad, and for a geometric reason
+rather than a lazy one: a gable spans `s`, and a line of constant `t` is
+a straight radial that cannot bow. `wallArc` is split out because the
+painter needs the same measurement to size its canvas.
+
+**And a colour-space bug that had been shipping since the first mural.**
+The water came out near-black — 0.05 of the bare wall's brightness where
+the photograph is 0.30. The cause was not the palette. A canvas texture
+is uploaded `SRGB8_ALPHA8` and decoded to linear on sample, while a
+vertex colour is a float handed to the shader raw — so a mural canvas
+takes a decode nothing else in the resort takes. Measured by painting
+seven flat grey bands into a canvas and reading them back off a
+screenshot of the wall:
+
+    canvas byte    32   64   96  128  160  192  255
+    rendered        5   13   28   50   81  116  205
+
+which fits `out = 205.5 · base^0.888` — net of the render's own
+response, **the canvas is squared against everything else.** Near white
+that is a few per cent and invisible, which is exactly why the gull, the
+fish and this boat's own hull all looked right and three builds went
+past without anyone catching it. At the dark end it is a factor of six.
+It also explains a failed first fix: lifting the palette 2.1× moved the
+ratio only 0.085 → 0.098, because under a squaring the correction
+needed is the square root and not the ratio.
+
+The fix is a conversion and not a brighter palette. `paint(r,g,b,a)`
+takes the number the file *means* — 0–1, the same units as `WASH`,
+`CONC` and `CAB` — and returns the css the canvas must hold for the
+shader to be handed that number back. There is no hex left in
+`brodMural`, and a value in it can now be compared against `WASH[0]`
+fairly, which was the thing that had been silently untrue. Every colour
+is then derived: its ratio to the bare limewash *in the photograph*,
+applied to the bare limewash *in the build*, inverted through the
+measured curve. Luma carries the level and each paint keeps its own
+chroma — carrying the channels separately divides the limewash's warmth
+out twice and turns every white on the boat blue.
+
+Water against wall, before and after: **0.085 → 0.276**, against the
+photograph's 0.271. The same carry took the deckhouse from a near-black
+(24, 5, 5) to an oxblood (54, 24, 22) and lifted the saloon lights off
+pure black. The near-whites barely moved, as the arithmetic predicts.
+
+**Verified on the wrong build first, which is worth writing down.**
+`tools/shoot.mjs` does not serve the page — it defaults to port 8794,
+and on this machine 8794 is a long-running server rooted in the main
+checkout. Shooting from a worktree without `--url` photographs main, and
+an hour went into concluding the mural "was not rendering at all" before
+that was noticed. Census `{seen:446, thin:333, plain:86, rich:27}`
+unchanged.
+
 ## [1.121.0] — 2026-08-25
 
 ### A cat under the slastičarnica's tables
