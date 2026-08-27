@@ -3903,33 +3903,52 @@ async function buildJadrija(scene) {
    * of leg, and a footprint of 3.00 by 2.45, is that thing; the print's own
    * aspect on the front screen is the one proportion the photograph does fix.
    *
-   * YOU CANNOT WALK INTO THIS, AND NOTHING THIS SIZE EVER WILL BE. Written
-   * down because it cost two goes to work out and the arithmetic is general.
+   * YOU WALK INTO THIS, and it took three goes. The first two are worth
+   * keeping because the arithmetic is general and it is what decides every
+   * interior in this game.
    *
-   * `confine` inflates every blocker by `GROUND.girth` on all four sides, and
-   * girth is 0.55. So a 0.06 m front panel is a 1.16 m deep band of no-go, and
-   * the two panels either side of the doors put that band across the WHOLE
-   * frontage — not just across the panels. Widening the doors does nothing,
-   * because what seals the front is the depth of the band and not its gaps;
-   * shortening the screen only swaps the sealed slot for a sealed middle. A
-   * free-space map at 0.2 m came back with both cubicles free, everything
-   * outside blocked, and no route between them, which is the exact shape of a
-   * room you can only reach by teleporting into it. `SNUG` is not enough
-   * either: it gives back 0.33 and the shortfall is over a metre.
+   * `confine` inflates every blocker by the girth on all four sides. At the
+   * outdoor 0.55 a 0.06 m panel is a 1.16 m band of no-go, the two panels
+   * either side of the doors put that band across the WHOLE frontage, and a
+   * free-space map came back with both cubicles free, everything outside
+   * blocked, and no route between them — a room you can only reach by
+   * teleporting. Widening the doors does nothing, because what seals the front
+   * is the depth of the band and not its gaps.
    *
-   * So the building is left at its real size and left SOLID, and for now you
-   * walk round it and not into it. Widening it to brute-force a way in would
-   * have been wrong twice over — see Rule 6, and see what `cabW` at 2.15 m is
-   * still costing.
+   * `GROUND.tight` at 0.26 was the second go and it read as a fix, because two
+   * of the three pinch points come out positive under it: the doorway is 0.575
+   * clear and the slot beside the screen 0.57, so each leaves 5 cm. Five
+   * centimetres is not zero, which is exactly why it shipped and exactly why
+   * Misha could not get in — "I tried from every angle" is what a 5 cm window
+   * feels like on a keyboard that moves you in tenths of a metre. And the
+   * third pinch point was never checked at all: the corridor between the
+   * screen and the doors was 0.35 clear, which under 0.26 is 3 cm and under
+   * ANY girth a person could have is nothing. A free-space map would have said
+   * so in a second. It was not run, because the arithmetic that had been run
+   * came out positive and there is no feeling more expensive than that one.
    *
-   * WHEN THE WAY IN IS BUILT it will be a threshold and not a walk, which is
-   * what the kabina already does — and note that the kabina has a 1.45 m door
-   * and still does it, because the arithmetic above beat it too. Crossing the
-   * line in front of a cubicle should dip to black and stand you inside it:
-   * `dipStart` in 90-app.js and `KAB.standIn` are the mechanism, already
-   * written and already used. NONE OF THAT IS HERE YET. Misha tabled it on
-   * 25 Aug along with the cat and Baye's turn at this hut, and what shipped is
-   * the object being the right object.
+   * What makes it work is one number of each kind and both of them are argued
+   * from the type rather than tuned:
+   *
+   *   `changing.girth` 0.16 — you turned side on. 0.26 is a person square to a
+   *   0.90 m door, which is right in the flat and wrong in a beach hut, where
+   *   what everybody actually does is turn sideways and shuffle.
+   *
+   *   `SCR` at 0.75 rather than 0.40 — the read that contradicted itself. See
+   *   the note on it below.
+   *
+   * Under those the three gaps are 0.25, 0.25 and 0.38 m of free walking, and
+   * a flood fill from the chippings reaches every square centimetre of both
+   * cubicles. The building is still the size the photograph says it is: Rule 6
+   * held, and see what `cabW` at 2.15 m is still costing.
+   *
+   * THE THRESHOLD IS NOT USED HERE. The kabina crosses a line and dips to
+   * black because its door is a hole in a wall with a room behind it; this is
+   * a screen you walk around, and being stood past your own building would
+   * throw away the one thing the labyrinth is for. The dip survives as the
+   * *change of clothes* and nothing else — `crossChanging` in 90-app.js is a
+   * region test on `bay`, not a crossing. `standY` also ramps you up on to the
+   * 0.10 m pad, which nothing needed while you could only walk round it.
    *
    * NO STRAIGHT SIGHT LINE, which is the one thing a changing booth has to do
    * and the reason for the screen standing 0.40 m proud of the doors. It is
@@ -3957,7 +3976,19 @@ async function buildJadrija(scene) {
     const DOOR = 0.60;                       // one cubicle's doorway
     const y = surfaceY(t, s);
     const s0 = s - HD, s1 = s + HD;          // s0 seaward and shut, s1 the door side
-    const SCR = s1 + 0.40;                   // the screen, standing proud
+    // The screen, standing proud, and 0.75 rather than the 0.40 this was built
+    // with. Both are reads and neither is a measurement — nothing in the
+    // photograph carries a scale — but 0.40 was a read that contradicted the
+    // thing being read. It leaves 0.35 m of clear passage between the screen
+    // and the doors, and 0.35 m is not a passage: a person turned fully side
+    // on is 0.32 across the shoulders, so the gap the whole building is
+    // organised around would be one a bather has to be poured through. The
+    // type settles it exactly as it settles the height — a baffle you walk
+    // behind is built at about 0.7 m of clear, because less than that is a
+    // trap — and 0.75 to the face of a 0.05 panel is 0.70. It also blocks the
+    // sight line BETTER, not worse: the ray from the end of the screen through
+    // the doorway is shallower the further out the screen stands.
+    const SCR = s1 + 0.75;
     const th = 0.05;                         // panel thickness
     const back = b;
     b = up;
@@ -4024,10 +4055,10 @@ async function buildJadrija(scene) {
     // doors with a gap either side of it, and walking round the outside of
     // this thing feels like walking round a hut and not round a crate.
     //
-    // It does NOT let you in — see the note on the docstring. Two goes were
-    // spent trying and the second one is the reason the panels are laid out
-    // one per blocker rather than as a single box; that much was worth
-    // keeping whatever happens to the doorway.
+    // One per panel is also what lets you in at all: a single box round the
+    // hut has no doorway to thread and no slot to come round, and every one of
+    // the three gaps the flood fill walks through is a gap between two of
+    // these. See the docstring for the arithmetic they have to survive.
     const H = 0.10 + TOP;
     const wall = (t0, t1, sa, sb) => runs.push({ t0, t1, s0: sa, s1: sb, y, h: H });
     wall(t - HW, t + HW, s0 - th, s0);                         // seaward, shut
@@ -4038,40 +4069,17 @@ async function buildJadrija(scene) {
     wall(t + DOOR, t + HW, s1 - th, s1);                       // east of them
     wall(t - 0.88, t + 0.88, SCR - th, SCR);                   // the screen
 
-    // ── and the way in, which is a threshold and not a walk ────────────────
-    // The argument is in the docstring. What is recorded here is only the
-    // geometry of it, because the machinery lives in 90-app.js next to the
-    // kabina's, which is the other place in this game you get into by
-    // crossing a line rather than by fitting through a gap.
+    // ── and the way in, which is a walk ────────────────────────────────────
+    // A threshold was written for this and thrown away twice, and the second
+    // time is the one that stuck: the way in is the way in, and what is
+    // recorded here is only what the rest of the game has to know about it.
     //
-    // `line` is 0.70 m outside the screen's face. It has to be outside what
-    // `confine` will let you reach — the screen is a blocker and holds you
-    // 0.55 m off it — or the crossing could never happen at all. 0.70 leaves
-    // fifteen centimetres of walkable ground on the far side of it, which is
-    // enough that a walk into the hut crosses rather than stopping on it.
-    //
-    // `at` is the middle of each cubicle. Not the geometric middle: the spine
-    // and the two side walls each take 0.55 m of standable room off the bay,
-    // which leaves about 0.35 m of it, and 0.72 m off the axis is the middle
-    // of what is left rather than the middle of what is built.
-    //
-    // `out` is in front of the screen and NOT where you were standing when
-    // you crossed. Coming out of the hut where you went into it means walking
-    // out backwards through your own footprints; coming out in front of it,
-    // facing away, is what leaving a changing room is.
-    // WHICH IS WALKED AND NOT CROSSED, in the end, and the docstring above is
-    // written from before that was known. What settles it is `GROUND.tight`:
-    // `confine` inflates by `girthAt`, which drops from 0.55 to 0.26 wherever
-    // `field.tightTS` says so, and that mechanism exists because the vikendica
-    // has rooms you have to be able to stand in. Under it the hut's numbers
-    // come out the other way round — the 0.60 m doorways want 0.52 and the
-    // 0.62 m slots beside the screen want the same, so the labyrinth is
-    // passable at the size the photograph says it is, and a threshold that
-    // teleports you past your own building is not needed after all.
-    //
-    // So the footprint below is handed to `tightTS`, and what is recorded is
-    // the two cubicles as REGIONS rather than a line: `bay` is which one you
-    // are standing in, and stepping into one is what changes you.
+    // The footprint goes to `tightTS`, which hands `confine` the girth this
+    // building needs rather than the one the field uses. The cubicles go down
+    // as REGIONS rather than as a line: `bay` is which one you are standing
+    // in, and stepping into one is what changes you. `crossChanging` in
+    // 90-app.js owns the rest, including the dip — which stays, not to move
+    // you anywhere but to say that time passed.
     changing = {
       t, s, face: SCR, half: HW,
       // The footprint tight girth applies over, and it reaches 0.9 m BEYOND
@@ -4082,6 +4090,36 @@ async function buildJadrija(scene) {
       // out than the slot's mouth. The tight girth has to start before the
       // gap, not at it, or you can see the way in and never reach it.
       t0: t - HW - 0.2, t1: t + HW + 0.2, s0, s1: SCR + 0.9,
+      // What you are, in here, and it is not `GROUND.tight`.
+      //
+      // The two gaps in this building are the same width and it is not a
+      // coincidence — both are what is left of 1.50 m once a 0.88 m screen or
+      // a 0.60 m door jamb has taken its share: 0.57 m. `confine` inflates
+      // every panel by the girth on both sides, so what you actually have to
+      // thread is 0.57 - 2g. At `GROUND.tight` that is 0.055 m. It is not
+      // zero, which is why the arithmetic said yes and why the first cut of
+      // this shipped, and it is five centimetres of window on a keyboard that
+      // moves you in tenths of a metre — "I tried from every angle", which is
+      // exactly what a 5 cm window feels like from outside.
+      //
+      // 0.16 leaves 0.25 m, which is a doorway. And it is not a fudge: 0.26 is
+      // a person square on to the door, 0.16 is the same person turned side on
+      // to get through it, which is what anybody does in a beach hut. It also
+      // pulls the whole inflated footprint back inside `t0`/`t1` above — at
+      // 0.26 the side walls inflated to 1.76 and the tight region stopped at
+      // 1.70, so the outer 6 cm of the hut was being collided against at the
+      // full 0.55. That was the second reason it felt sealed.
+      girth: 0.16,
+      // The poured pad, which is 0.10 m proud of the chippings and which
+      // `surfaceY` knows nothing about. Free for a week, because you could
+      // only walk round the outside of this thing; the moment you can walk
+      // into it, it is the kabina's floorboards again — you stand in the
+      // concrete to the ankle. `standY` ramps on to it. The 0.20 m is the
+      // ramp, taken outside the pad edge: a 10 cm step is a kerb rather than a
+      // floor giving way, but the edge is drawn as a vertical face and a
+      // walker who pops up level with it looks like they have been lifted.
+      pad: { t0: t - HW - 0.14, t1: t + HW + 0.14, s0: s0 - 0.14, s1: SCR + 0.14,
+        h: 0.10, ramp: 0.20 },
       // Behind the front panels is a cubicle; the spine divides them. Half a
       // panel thickness of slack at the front so the boundary is inside the
       // room rather than in the doorway, where standing on it would flicker.
@@ -17019,6 +17057,15 @@ async function buildJadrija(scene) {
         && s > K.face - 0.55 && s < K.s1 + 0.10) {
       return y + (K.floor - y) * sat((s - (K.face - 0.55)) / 0.55);
     }
+    // The changing station's pad. Same problem as the kabina's and the same
+    // answer, except that a pad is approached from all four sides rather than
+    // through one face — so the ramp hangs off the distance to the nearest
+    // edge instead of off `s` alone. Negative outside, zero on the edge.
+    const P = changing && changing.pad;
+    if (P) {
+      const d = Math.min(t - P.t0, P.t1 - t, s - P.s0, P.s1 - s);
+      if (d > -P.ramp) return y + P.h * sat((d + P.ramp) / P.ramp);
+    }
     return y;
   }
 
@@ -18422,17 +18469,32 @@ async function buildJadrija(scene) {
    * between each is the same idea with the claim made true: every leg starts
    * and ends under a table, and the zig-zag in `s` is the terrace's own.
    *
-   * `walk` is not a tuning number, exactly as `DOG.trot` is not: the clip in
-   * the file carries the animal 0.58 m/s and tools/blender/cat.py measures that
-   * off the root channel before it flattens it and prints it. Everything below
-   * divides by it to get a playback rate, so the paws and the ground agree.
-   * `trot` is what he crosses at — a cat covering ground it has crossed a
-   * hundred times moves at about two and a half times its amble and does not
-   * hurry, and 1.45 m/s is that.
+   * `walk` is not a tuning number, exactly as `DOG.trot` is not, but getting
+   * it took two goes and the first one was 0.58 — which was wrong by the same
+   * factor that had his belly through the terrace. `strip_root` reads the
+   * root channel and converts it to metres, and the factor it was handed was
+   * the bone scale rather than the bone scale times the import matrix: out by
+   * a hundred, in the direction that flatters. Corrected, the root travels
+   * 0.006 m/s, which is to say the clip is a game cycle and walks ON THE SPOT.
+   * There is no ground speed in the root at all.
+   *
+   * So it is measured where it actually is — see `gait` in tools/blender/cat.py.
+   * In one cycle the body advances by D and every paw travels backwards
+   * through exactly that D while it is planted, so a paw's fore-aft range IS
+   * the stride. Four legs, four readings: 0.183, 0.175, 0.149, 0.148 m over a
+   * one-second cycle, and the agreement between the pairs is what says the
+   * clip is foot-locked well enough to be asked. 0.16 m/s.
+   *
+   * `trot` follows from it rather than being picked: everything below divides
+   * by `walk` to get a playback rate, and 0.48 is three times the clip. A cat
+   * crossing four metres of concrete it has crossed a hundred times steps
+   * about three times as fast as it ambles and does not hurry. The old 1.45
+   * was nine times the clip once the arithmetic was right, which is a cat
+   * being dragged rather than one walking.
    */
   const CAT = {
-    walk: 0.58,                 // m/s the clip itself travels
-    trot: 1.45,                 // m/s he actually crosses at
+    walk: 0.16,                 // m/s the clip's own paws cover
+    trot: 0.48,                 // m/s he actually crosses at
     turn: 3.4,                  // rad/s — a cat turns on the spot faster than a dog
     under: [4.0, 14.0],         // how long he stays under one, seconds
     near: 90,                   // past this he is not posed, see stepCat
@@ -22780,10 +22842,13 @@ async function buildJadrija(scene) {
     /**
      * Where you are a person rather than a clearance. See `GROUND.tight` — this
      * is the only locale in the game with an inside to be inside of.
+     *
+     * Two insides now, and they do not want the same number, so this answers
+     * with one where the flat is happy with `true`. See `changing.girth`.
      */
-    tightTS: (t, s) => !!(vik && vik.tight(t, s))
-      || !!(changing && t > changing.t0 && t < changing.t1
-            && s > changing.s0 && s < changing.s1),
+    tightTS: (t, s) => (vik && vik.tight(t, s) ? true
+      : (changing && t > changing.t0 && t < changing.t1
+         && s > changing.s0 && s < changing.s1 ? changing.girth : false)),
     /**
      * And where there is a ceiling over you, which is a different question and
      * a narrower one — see `vik.indoorsAt`. Taken in world metres because the

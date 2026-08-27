@@ -176,6 +176,87 @@ def strip_root(act, rig, scale):
     return (span / secs) if secs > 0 else 0.0
 
 
+def fix_actions(scale):
+    """Scale every `location` channel in every action by `scale`.
+
+    The other half of baking the import matrix and the metre scale into the
+    bone data, and the half that is easy to forget because nothing about the
+    rest skeleton looks wrong without it. A pose bone's `location` is measured
+    in the bone's own rest space, whose axes stay unit length whatever you do
+    to the armature data underneath — so a transform applied to the bones does
+    not reach the animation that moves them.
+
+    Leaving it out is what put this cat's belly through the terrace. The rest
+    pose is dropped so the lowest paw is exactly z = 0, and then the walk's
+    root channel — authored before the scale and never divided by it — pushes
+    the whole animal down by the crouch it was carrying at the old size. The
+    error is the crouch times one minus the scale, which is a hand's breadth
+    here: enough to bury the legs and leave a cat that reads as lying down.
+
+    Rotations need nothing; they are scale-free. dog.py has carried the same
+    function since it was written, which is the whole reason it stands on the
+    deck and this did not.
+    """
+    n = 0
+    for act in bpy.data.actions:
+        for fc in act.fcurves:
+            if not fc.data_path.endswith("location"):
+                continue
+            n += 1
+            for kp in fc.keyframe_points:
+                kp.co.y *= scale
+                kp.handle_left.y *= scale
+                kp.handle_right.y *= scale
+    print("[cat] scaled %d location channels by %.4f" % (n, scale))
+
+
+def gait(act, rig):
+    """How fast the walk actually carries him, measured off the paws.
+
+    `strip_root` is the right way to get this from a clip authored for film,
+    where the hips travel and the number falls straight out of the root
+    channel. This clip is not one of those: it is a game cycle and it walks on
+    the spot, so the root channel is worth six millimetres a second and means
+    nothing. Ask it anyway and you get a cat that has to be played back at a
+    hundred and forty times speed to cross a terrace.
+
+    So the stride is measured where it is: in one full cycle the body advances
+    by D, and every paw spends the stance travelling backwards through exactly
+    that D relative to the body before swinging forward through it again. The
+    fore-aft range of a paw over the cycle IS the stride, and four legs give
+    four readings of the same number — the mean of them over the length of the
+    clip is the speed over the ground.
+
+    Forward is +X by the time this runs: the quarter turn in `build` puts the
+    nose there, and the rig is in metres and unit-scaled, so nothing needs
+    converting.
+    """
+    scn = bpy.context.scene
+    if rig.animation_data is None:
+        rig.animation_data_create()
+    rig.animation_data.action = act
+    f0, f1 = (int(round(v)) for v in act.frame_range)
+    paws = [b for b in ("frontleg2", "R_frontleg2", "backleg2", "R_backleg2")
+            if b in rig.pose.bones]
+    if len(paws) < 4:
+        return 0.0
+    lo = {b: 1e9 for b in paws}
+    hi = {b: -1e9 for b in paws}
+    for f in range(f0, f1 + 1):
+        scn.frame_set(f)
+        bpy.context.view_layer.update()
+        for b in paws:
+            x = (rig.matrix_world @ rig.pose.bones[b].head).x
+            lo[b] = min(lo[b], x)
+            hi[b] = max(hi[b], x)
+    scn.frame_set(f0)
+    strides = [hi[b] - lo[b] for b in paws]
+    secs = (f1 - f0) / scn.render.fps
+    print("[cat] stride per paw %s m over %.2f s"
+          % (" ".join("%.3f" % v for v in strides), secs))
+    return (sum(strides) / len(strides) / secs) if secs > 0 else 0.0
+
+
 def bake_colours(me):
     """One colour per vertex, sampled off the texture and then relaxed.
 
@@ -268,6 +349,10 @@ def build():
     zs = [v.co.z for v in cat.data.vertices]
     for d in (cat.data, rig.data):
         d.transform(Matrix.Translation((0.0, 0.0, -min(zs))))
+    # And the animation, which the two transforms above do not reach. See
+    # `fix_actions` — this line is the difference between a cat on the terrace
+    # and a cat in it.
+    fix_actions(rig_mw.to_scale().x * k)
 
     sh = rig.data.bones["frontleg"].head_local.z
     if not SHOULDER[0] <= sh <= SHOULDER[1]:
@@ -354,9 +439,12 @@ def build():
     act = next((a for a in bpy.data.actions if a.name.startswith(CLIP)), None)
     if act is None:
         sys.exit("[cat] no action starting '%s'" % CLIP)
-    speed = strip_root(act, rig, k)
-    print("[cat] walk travels %.2f m/s in the file — the game must move it at "
-          "that or the paws skate" % speed)
+    # 1.0 and not `k`: `fix_actions` has already put every location
+    # channel in metres, so there is nothing left for this to convert.
+    travel = strip_root(act, rig, 1.0)
+    speed = gait(act, rig)
+    print("[cat] root travels %.3f m/s, paws %.2f m/s — the game must move it "
+          "at the second or they skate" % (travel, speed))
     baked = [bake_action(rig, act, "walk", loop=True, rest=rest)]
 
     OUT.mkdir(parents=True, exist_ok=True)

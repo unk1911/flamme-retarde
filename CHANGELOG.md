@@ -8,6 +8,78 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.128.0] — 2026-08-27
+
+### Three things Misha found in one sitting
+
+**The cat was in the terrace, not on it.** `tools/blender/cat.py` bakes
+the import matrix and the metre scale into the bone data and never
+touched the actions, and a pose bone's `location` is measured in the
+bone's own rest space — whose axes stay unit length whatever you do to
+the armature underneath. So the rest pose was dropped so the lowest paw
+sits at exactly z = 0, and then the walk's root channel, authored at
+thirty-six times the size and never divided by it, pushed the whole
+animal down by the crouch it was carrying. Belly on the concrete, legs
+gone. dog.py has carried `fix_actions` since the day it was written,
+which is the whole reason the dog stands on the deck; cat.py now has it
+too.
+
+The same missing factor had been quietly lying about his gait. Corrected,
+the root travels 0.006 m/s — the clip is a game cycle and walks on the
+spot, so there is no ground speed in it at all, and the 0.58 m/s the
+game was moving him at was a hundredfold arithmetic error that happened
+to land on a plausible number. Measured where it actually is instead:
+in one cycle every paw travels backwards through exactly the distance
+the body advances, so a paw's fore-aft range IS the stride. Four legs
+give 0.183, 0.175, 0.149, 0.148 m over a one-second cycle. He walks at
+0.16 and crosses at 0.48, which is three times the clip rather than
+nine.
+
+### You can walk into the changing station
+
+**"I tried from every angle... it just doesn't work."** He was right,
+and the arithmetic that said otherwise was checked on two of the three
+gaps. `confine` inflates every panel by the girth on both sides, so what
+you thread is the clear width minus twice it. At `GROUND.tight` the
+0.575 m doorway and the 0.57 m slot beside the screen each leave 5 cm —
+not zero, which is exactly why it shipped, and five centimetres on a
+keyboard that moves you in tenths of a metre is a wall. The third gap
+was never measured at all: the corridor between the screen and the doors
+was 0.35 m clear, which is 3 cm under any girth a person could have.
+
+Two numbers, both argued from the type rather than tuned. The hut names
+its own girth — `tightTS` may now answer with a number instead of `true`
+— and 0.16 is a person turned side on, which is what everybody does in a
+beach hut. And the screen stands 0.75 m proud of the doors rather than
+0.40: both are reads off a photograph that carries no scale, but 0.40
+was a read that contradicted the thing being read, because a baffle you
+walk behind cannot be narrower than the bather. Under those the three
+gaps are 0.25, 0.25 and 0.38 m, and a flood fill from the chippings
+reaches every square centimetre of both cubicles. The building is still
+the size the photograph says it is.
+
+`standY` also ramps you up on to the poured pad now. It is 0.10 m proud
+of the chippings and nothing needed to know that while you could only
+walk round the outside; the moment you can walk in, it is the kabina's
+floorboards again — you stand in the concrete to the ankle.
+
+### And the camera walks round you
+
+**"it would be cool if somehow i could see myself sorta floating and
+seeing from back/front/side/etc."** Stand still in the third person and
+it does: after a second and a bit the camera leaves the view line and
+laps you, eighteen seconds to the revolution, and the aim swings off
+what she is looking at and on to her over the first half radian. Walk
+off and it winds back in behind you the short way round; spray and it
+does the same, because the view line is the line the hose is on and a
+crosshair on her back while the water goes somewhere else is not a
+camera angle.
+
+It meets walls the way the rest of the third person does — the pull-back
+is marched against `confine` — and when the lap runs into one it turns
+round and sweeps back rather than collapsing into her eye for a third of
+a revolution.
+
 ## [1.127.0] — 2026-08-26
 
 ### Her shadow loses the ponytail too

@@ -51,6 +51,7 @@ On foot at the airfield:
 | `shift` | run |
 | `SPACE` / left click | **open the branch** |
 | `E` | climb back in — stand next to the aeroplane · **or board the boat**, at the head of the Jadrija mole |
+| `B` | **third person** — see yourself; stand still and the camera walks round you |
 
 Under the canopy:
 

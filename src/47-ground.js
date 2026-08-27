@@ -364,8 +364,18 @@ async function buildGround(scene, field) {
    * A locale that has an interior in it says so, and inside one you are a person
    * rather than a clearance — see `GROUND.tight`.
    */
-  const girthAt = (t, s) =>
-    (field.tightTS && field.tightTS(t, s) ? GROUND.tight : GROUND.girth);
+  //
+  // A locale may also name its own number instead of taking `tight`, by
+  // answering with one rather than with `true`. The changing station is why:
+  // 0.26 is a person square on, it is right for a flat with 0.90 m doors, and
+  // the beach hut's doorways are 0.57 m. Two of those inflate to 0.52 and
+  // leave a five-centimetre window to thread — arithmetically passable and, on
+  // a keyboard, not passable at all. See `changing.girth` in 43-jadrija.js.
+  const girthAt = (t, s) => {
+    const v = field.tightTS && field.tightTS(t, s);
+    if (v === true) return GROUND.tight;
+    return typeof v === 'number' ? v : GROUND.girth;
+  };
 
   /**
    * Is this locale point *properly* inside any structure?
@@ -2028,13 +2038,40 @@ async function buildGround(scene, field) {
     // wants a view of. Anything under about a metre is a face full of neck, so
     // under a metre it is not worth having and the eye is better.
     min: 0.95,
+    // ── the slow turn round her ────────────────────────────────────────────
+    //
+    // Misha, 27 Aug: "when i use 'B', i always can only just see myself from
+    // the back... it would be cool if somehow i could see myself sorta
+    // floating and seeing from back/front/side/etc." Two ways were offered by
+    // him and this is the one that needs no second key: stand still in the
+    // third person and the camera walks round you.
+    //
+    // It is hung off standing still rather than off a keypress because that is
+    // the only state in which it is unambiguously what you want. A camera that
+    // has swung to your front while you are walking is a camera you cannot
+    // steer by, and every game that has tried it has had to put the controls
+    // back the other way round halfway through the turn. Stopped, there is
+    // nothing to steer, so there is nothing to get wrong.
+    orbit: 0.34,            // rad/s — a shade over eighteen seconds a lap
+    orbitWait: 1.2,         // s of standing still before it starts
+    orbitBack: 3.2,         // rad/s it unwinds at the moment you walk off
+    orbitMove: 0.35,        // m/s above which you count as walking
+    // How far off the view line it has to get before the aim is fully on her
+    // rather than on where she is looking. Half a radian: at nought it is
+    // exactly the framing that shipped, and by 29 degrees she is centred.
+    orbitAim: 0.50,
+    orbitDrop: 0.34,        // m below the eye it aims — her chest, not her head
   };
   // What the last `pose` actually managed. Read by 90-app.js, which is what
   // decides whether to draw her: at 0 the camera is at her eye and a body
   // drawn there is a body you are standing inside.
   let thirdD = 0;
+  // Where round her the camera has got to, which way it is going, and how long
+  // she has been standing still. Zero is directly behind, which is where it
+  // starts and where it goes back to.
+  let orb = 0, orbDir = 1, orbHold = 0;
 
-  function pose(camera, back = 0) {
+  function pose(camera, back = 0, dt = 0) {
     // The head, not the boots. Down as each boot lands, side to side once per
     // pair of them — see gait(). The sway is applied along your own right, so
     // it stays a weight shift however you are facing rather than drifting the
@@ -2050,6 +2087,10 @@ async function buildGround(scene, field) {
       lz = -Math.cos(you.yaw) * cp;
 
     let cx = ex, cy = ey, cz = ez;
+    // Where the aim goes when the camera is behind her: down her own view
+    // line, so the frame shows what she is looking at and not what she is.
+    let ax = ex + lx * THIRD.ahead, ay = ey + ly * THIRD.ahead,
+      az = ez + lz * THIRD.ahead;
     if (back > 0) {
       // How far back it actually gets. Marched rather than solved, and the
       // test is `confine` itself rather than a second idea about what is
@@ -2062,20 +2103,77 @@ async function buildGround(scene, field) {
       //
       // It costs at most sixteen confine() calls a frame, and only while the
       // third person is on.
-      let d = 0;
-      for (let k = THIRD.step; k <= back + 1e-6; k += THIRD.step) {
-        const tx = ex - lx * k, tz = ez - lz * k;
-        const [nx, nz] = confine(tx, tz, ey);
-        if (Math.hypot(nx - tx, nz - tz) > 0.02) break;
-        d = k;
+      //
+      // `a` is how far round her the camera has swung. At zero this is the
+      // expression it has always been: `-l` is straight back down the view
+      // line. Turning it is a rotation of the horizontal part only, so the
+      // pitch keeps doing what pitch does and the lap stays level.
+      const march = (a) => {
+        const ca = Math.cos(a), sa = Math.sin(a);
+        const bx = -lx * ca - lz * sa, bz = lx * sa - lz * ca;
+        let d = 0;
+        for (let k = THIRD.step; k <= back + 1e-6; k += THIRD.step) {
+          const tx = ex + bx * k, tz = ez + bz * k;
+          const [nx, nz] = confine(tx, tz, ey);
+          if (Math.hypot(nx - tx, nz - tz) > 0.02) break;
+          d = k;
+        }
+        return [d, bx, bz];
+      };
+
+      // Advance the lap, or wind it back in. Moving wins outright and it winds
+      // back the short way round, so walking off never sends the camera the
+      // long way about her to catch up.
+      const was = orb;
+      // Spraying counts as moving even when your feet are not. The aim swings
+      // to her the moment the camera leaves the view line, and the view line
+      // is the line the hose is on — so a lap that carried on through a jet
+      // would put the crosshair on her back while the water went somewhere
+      // nobody can see. Nothing else about the walker needs guarding: turning
+      // on the spot turns the lap with you, because the angle is measured off
+      // your own yaw and not off the world.
+      if (you.spraying || you.refilling
+          || Math.hypot(you.vx, you.vz) > THIRD.orbitMove) {
+        orbHold = 0;
+        if (orb !== 0) {
+          const TAU = Math.PI * 2;
+          let a = ((orb + Math.PI) % TAU + TAU) % TAU - Math.PI;
+          const step = THIRD.orbitBack * dt;
+          orb = Math.abs(a) <= step ? 0 : a - Math.sign(a) * step;
+        }
+      } else if ((orbHold += dt) > THIRD.orbitWait) {
+        orb += THIRD.orbit * orbDir * dt;
+      }
+
+      let [d, bx, bz] = march(orb);
+      // A wall it cannot get round. Turn round and sweep back rather than
+      // collapsing to the first person: the march is a function of the angle,
+      // so an unchecked lap past a wall would drop into her eye for a third of
+      // a revolution and pop back out — which reads as the camera breaking
+      // rather than as a camera meeting a wall. Standing still, the angle that
+      // worked last frame still works.
+      if (d < THIRD.min && orb !== was && was !== 0) {
+        orbDir = -orbDir;
+        orb = was;
+        [d, bx, bz] = march(orb);
       }
       if (d < THIRD.min) d = 0;
       thirdD = d;
       if (d > 0) {
-        cx = ex - lx * d; cy = ey - ly * d + THIRD.up; cz = ez - lz * d;
+        cx = ex + bx * d; cy = ey - ly * d + THIRD.up; cz = ez + bz * d;
+        // And once it is off the view line there is no sense aiming down it —
+        // she would walk out of frame within a quarter of the lap. Blended in
+        // over the first half radian so nothing jumps at the start of one.
+        const f = Math.min(1, Math.abs(orb) / THIRD.orbitAim);
+        if (f > 0) {
+          ax += (ex - ax) * f;
+          ay += (ey - THIRD.orbitDrop - ay) * f;
+          az += (ez - az) * f;
+        }
       }
     } else {
       thirdD = 0;
+      orb = 0; orbHold = 0; orbDir = 1;
     }
     camera.position.set(cx, cy, cz);
     // Aimed from where the head actually is, or the bob would swing the whole
@@ -2083,8 +2181,7 @@ async function buildGround(scene, field) {
     // rather than walking through one. In the third person it is aimed from
     // her head as well and NOT from the camera, which is what keeps the view
     // line the same one the hose is on.
-    camera.lookAt(ex + lx * THIRD.ahead, ey + ly * THIRD.ahead,
-      ez + lz * THIRD.ahead);
+    camera.lookAt(ax, ay, az);
   }
 
   const alight = () => {

@@ -4356,16 +4356,19 @@ let chgStep = null;      // last (t, s), for the crossing test
 /**
  * In and out of the changing station.
  *
- * WALKED, NOT TELEPORTED, which is the opposite of what this was going to be
- * and of what `changingStation`'s own docstring still argues for. The reason
- * is `GROUND.tight`: the hut's footprint is handed to `tightTS`, `confine`
- * drops from 0.55 to 0.26 inside it, and at 0.26 the 0.60 m doorways and the
- * 0.62 m slots either side of the screen are passable. The building is the
- * size the photograph says and you get into it by walking round the screen,
- * which is how you get into the real one. The kabina's dip is still the right
- * answer for the kabina, whose door is a hole in a wall with a room behind it;
- * it is the wrong answer here, where the thing in the way is a screen you walk
- * around.
+ * WALKED, NOT TELEPORTED, which is the opposite of what this was going to be.
+ * The hut's footprint is handed to `tightTS`, which answers with a girth of
+ * its own — 0.16, a person turned side on — and under it the doorway, the
+ * slot beside the screen and the corridor behind it are all a quarter of a
+ * metre of free walking. The building is the size the photograph says and you
+ * get into it by walking round the screen, which is how you get into the real
+ * one. The kabina's dip is still the right answer for the kabina, whose door
+ * is a hole in a wall with a room behind it; it is the wrong answer here,
+ * where the thing in the way is a screen you walk around.
+ *
+ * The first cut of this shipped on `GROUND.tight` at 0.26 and could not be
+ * entered at all — see `changingStation`, which carries the three numbers and
+ * why two of them looked fine.
  *
  * So this is a REGION test and not a crossing. Stepping into either cubicle
  * changes her; stepping out does nothing, because a changing room does not
@@ -4768,7 +4771,7 @@ function frame() {
   // metres. The override is applied straight after and has the last word.
   if (camOverride && eject.active) eject.pose(camera);
   if (camOverride) updateCamera(dt);
-  else if (state.phase === 'ground') ground.pose(camera, bodyCam ? 3.10 : 0);
+  else if (state.phase === 'ground') ground.pose(camera, bodyCam ? 3.10 : 0, dt);
   else if (state.phase === 'ride') ride.pose(camera);
   else if (state.phase === 'foil') foil.pose(camera);
   else if (state.phase === 'brod') brod.pose(camera);
