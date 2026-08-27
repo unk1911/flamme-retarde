@@ -2197,6 +2197,75 @@ const BODY = {
   ease: 9.0,
 };
 
+/**
+ * The jump, which only the third person can see and which was a plank.
+ *
+ * Misha, 27 Aug: "when i use B to see myself do a jump i just lift up
+ * completely straight... it should look more natural with the bending of the
+ * knees for the jump and while i'm in the air i should be moving my legs".
+ * He was watching `ground.you.hop` translate a standing idle two metres into
+ * the air and back, because that is all there was: the hop is an arc applied
+ * to her feet and nothing in the rig knew it was happening.
+ *
+ * Two aims a leg, in the rig's own sagittal axis, which is exactly what Baye
+ * already does clearing a bench — see `SHOW.tuck` in 43-jadrija.js. The hips
+ * bring the knees up and the knees fold the heels back under her.
+ *
+ * `air` is the shape of the arc and not a second clock: `hop / apex` is a
+ * triangle that is zero on the deck at both ends and one at the top, so the
+ * knees come up as she rises and the legs are down again by the time there is
+ * anything to land on. 43-jadrija.js learned that the expensive way — read off
+ * a timer, the knees were still 0.58 of the way up when her feet met the deck
+ * and she landed folded.
+ *
+ * `crouch` is the other half and it is a compromise worth naming. A jump reads
+ * as crouch, drive, tuck, reach, absorb, and the first of those cannot happen
+ * here: `ground.hop()` launches on the keystroke, the hop is an escape hatch
+ * as much as a move, and putting a hundred milliseconds of wind-up in front of
+ * an escape hatch is a worse bug than a stiff jump. So the crouch is spent at
+ * the two ends where it still reads — a fast straightening out of the first
+ * 0.13 s of the rise, which is a push-off, and a longer fold on touchdown,
+ * which is an absorb. She is four centimetres off the deck for the first and
+ * on it for the second, and neither is long enough to look at.
+ *
+ * `drop` is what stops the crouch floating her: folding a hip and a knee
+ * shortens the leg, and with the root between her feet the feet are what come
+ * up. Sinking the root by the shortening puts them back on the concrete.
+ */
+const JUMP = {
+  // GROUND.hopV squared over twice GROUND.hopG. Written out rather than
+  // computed so that changing the hop and forgetting this one shows up as a
+  // tuck that peaks early rather than as nothing at all.
+  apex: 2.04,
+  // These are the second set. The first — 0.62 and 0.95 — were picked to be
+  // conservative and were simply not visible: measured at the apex through
+  // `__fr.swim.jump`, they carried the knee 0.25 m forward and the foot 0.08 m
+  // off its standing height, which at the four metres the third person puts
+  // you at is a leg that has not moved. Baye clears a bench at 0.95 and 1.20
+  // and reads as a jump; this is that, and a little more knee, because she is
+  // not clearing anything and the whole shape is the point.
+  tuck: 0.95,             // rad the knees come up at the top of the arc
+  knee: 1.30,             // and how far the heels fold back under her
+  // A jump is not symmetrical and a symmetrical one is uncanny — two legs
+  // doing the identical thing at the identical moment is a puppet on one
+  // string. Twelve per cent apart is not a scissor kick, it is one leg leading
+  // the other by a frame or two, which is what a person does.
+  split: 0.12,
+  crouch: 0.45,           // rad of hip flex in the push-off and the landing
+  crouchKnee: 0.85,       // and the knee that goes with it
+  // The arms. Up and back on the way, which is where they go: the swing is
+  // half of what a standing jump is made of and leaving them hanging reads as
+  // somebody being lifted rather than jumping.
+  arm: 0.55,
+  // m the root sinks so the crouch does not lift her. Measured off the same
+  // probe: a fold of this size takes the foot about 45 mm off the deck, and a
+  // crouch that leaves her standing in the air is worse than no crouch.
+  drop: 0.045,
+  push: 0.13,             // s the push-off takes to straighten
+  land: 0.24,             // s the landing takes to come back up
+};
+let jumpWas = 0, jumpPush = 0, jumpLand = 0, jumpPosed = false;
+
 /** Third person in the water: off, or on with the mask down. */
 let bodyCam = false;
 const _bodyAt = new THREE.Vector3();
@@ -2211,6 +2280,26 @@ let _bodyHas = false;
  * about, so the body is hung off the first person's answer and the second
  * person is hung off the body. Nothing has to be solved twice.
  */
+/**
+ * Take the jump back off her.
+ *
+ * `aim` holds a rotation until it is handed a zero, which is exactly what it
+ * has to do for a pose that is driven every frame and exactly wrong for one
+ * that is driven by a branch. Turn the third person off at the top of a hop,
+ * or press R, and the ground branch below simply stops running — and she
+ * carries the tuck into the next thing she does. A swimmer stroking out to the
+ * marker with her knees folded under her is not a subtle bug, but it only
+ * happens if you press B in mid-air, which is to say it would have shipped.
+ */
+function clearJump() {
+  if (!you || !jumpPosed) return;
+  jumpPosed = false;
+  jumpWas = 0; jumpPush = 0; jumpLand = 0;
+  for (const b of ['legUL', 'legUR', 'legLL', 'legLR', 'armUL', 'armUR']) {
+    you.fig.aim(b, 1, 0, 0, 0);
+  }
+}
+
 function poseSwimBody(dt) {
   if (!you) return;
   // The shot owns her while it is running, and it puts her on a jetty rather
@@ -2218,7 +2307,7 @@ function poseSwimBody(dt) {
   // particular, the tidy-up below, which would otherwise take her off the
   // boards on the first frame of the cut if the third person happened to be
   // on when R was pressed.
-  if (chaseCut) return;
+  if (chaseCut) { clearJump(); return; }
   // On foot, which is the other half of this now. Kept in front of the swim
   // branch rather than folded into it: everything below is about a body in
   // water — how deep it floats, how far its root leads its eye when it is
@@ -2227,6 +2316,35 @@ function poseSwimBody(dt) {
   if (bodyCam && state.phase === 'ground' && ground && ground.ok) {
     const g = ground.you;
     const sp = Math.hypot(g.vx, g.vz);
+    // The jump. Edges first: `hop` is the height over the ground and it is
+    // exactly zero when she is on it, so leaving and arriving are one
+    // comparison each and neither needs a flag from the collider.
+    if (g.hop > 0 && jumpWas <= 0) jumpPush = 1;
+    if (g.hop <= 0 && jumpWas > 0) jumpLand = 1;
+    jumpWas = g.hop;
+    jumpPush = Math.max(0, jumpPush - dt / JUMP.push);
+    jumpLand = Math.max(0, jumpLand - dt / JUMP.land);
+    const air = g.hop > 0 ? clamp(g.hop / JUMP.apex, 0, 1) : 0;
+    // Both ends want the same fold, and they cannot overlap — she is either
+    // leaving the ground or on it — so the larger of the two IS the crouch.
+    const sq = Math.max(jumpPush, jumpLand);
+    const hipA = air * JUMP.tuck + sq * JUMP.crouch;
+    const kneeA = air * JUMP.knee + sq * JUMP.crouchKnee;
+    // Cleared to nothing below a hundredth rather than left at a millionth:
+    // `aim` reads zero as "forget this bone" and anything else as a rotation
+    // to carry for ever, so a walk with a residual tuck on it never gets its
+    // legs back.
+    const hp = hipA < 0.01 ? 0 : hipA, kn = kneeA < 0.01 ? 0 : kneeA;
+    const L = 1 + JUMP.split, R = 1 - JUMP.split;
+    you.fig.aim('legUL', 1, 0, 0, hp * L);
+    you.fig.aim('legUR', 1, 0, 0, hp * R);
+    you.fig.aim('legLL', 1, 0, 0, -kn * L);
+    you.fig.aim('legLR', 1, 0, 0, -kn * R);
+    const ar = air * JUMP.arm;
+    const aa = ar < 0.01 ? 0 : ar;
+    you.fig.aim('armUL', 1, 0, 0, aa);
+    you.fig.aim('armUR', 1, 0, 0, aa);
+    jumpPosed = hp > 0 || kn > 0 || aa > 0;
     // Her root is between her feet, so `at` is simply where she stands —
     // `g.y` is already the hopped height, which is why the eye is taken off it
     // directly in `ground.pose`.
@@ -2234,7 +2352,7 @@ function poseSwimBody(dt) {
     // The yaw is the swim branch's, and for the same reason: the rig faces +X
     // and the walk carries the same quarter turn every other user of it does.
     you.drive({
-      at: [g.x, g.y, g.z],
+      at: [g.x, g.y - sq * JUMP.drop, g.z],
       yaw: g.yaw + Math.PI / 2,
       // No pitch. Looking up does not lean a walking body back, it moves a
       // head — and the head is not what the camera is behind.
@@ -2256,6 +2374,7 @@ function poseSwimBody(dt) {
     _bodyHas = true;
     return;
   }
+  clearJump();
   if (!bodyCam || !swim.active) {
     if (_bodyHas) { you.drive(null); _bodyHas = false; }
     return;
@@ -6064,6 +6183,37 @@ window.__fr = {
       return { dressed, bay: inChg, at: chgStep };
     },
     driven: () => (you ? you.driven() : null),
+    /**
+     * The jump, and whether the rig has heard about it.
+     *
+     * `hit` is the answer to the only question that matters when the legs come
+     * out straight: did `aim` find the bone. It returns false for a name the
+     * rig does not carry and says nothing, so a jump posed against the wrong
+     * skeleton looks exactly like a jump that was never posed at all.
+     */
+    jump: () => {
+      if (!ground || !ground.ok || !you) return null;
+      const g = ground.you;
+      return { hop: +g.hop.toFixed(3), hopV: +g.hopV.toFixed(2),
+        air: +(g.hop > 0 ? clamp(g.hop / JUMP.apex, 0, 1) : 0).toFixed(3),
+        push: +jumpPush.toFixed(2), land: +jumpLand.toFixed(2),
+        // Where the knee, the heel and the hand actually are in figure space.
+        // Not decoration: the first cut of this posed nothing at all and
+        // looked exactly like the second, which posed 0.25 m of knee travel
+        // that nobody could see at four metres. A screenshot cannot tell those
+        // two apart and this can — 0.47 to 0.65 of knee is a jump, 0.47 to
+        // 0.53 is a rounding error with a comment over it.
+        at: (() => {
+          const v = new THREE.Vector3(); const o = {};
+          for (const n of ['legLL', 'footL', 'handL']) {
+            const i = you.fig.bones.findIndex((b) => b.name === n);
+            if (i < 0) { o[n] = 'NO SUCH BONE'; continue; }
+            you.fig.boneAt(i, v);
+            o[n] = [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)];
+          }
+          return o;
+        })() };
+    },
     dip: (x, z, yaw = 0, depth = 0.3) => {
       if (!swim) return null;
       swim.enter(x, z, yaw, 0);

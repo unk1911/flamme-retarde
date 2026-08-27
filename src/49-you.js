@@ -257,13 +257,31 @@ async function buildYou(scene) {
         float neck = mix(1.450, 1.372, front);
         // The hem, which is the whole of the change of clothes.
         //
-        // uSwim runs 0 to 1 and takes the bottom of the garment from 0.995
-        // — a tank that covers her to the hip — up to 1.275, which is a band
-        // across the bust. Nothing else about the shape moves: the neckline,
-        // the trunk cut and the scoop are the same terms doing the same work,
-        // because a swimsuit top and a vest differ in how far down they go and
-        // not in how they are held up. The straps go with it, below.
-        float hem = mix(0.995, 1.275, uSwim);
+        // uSwim runs 0 to 1 and takes the bottom of the garment from 0.995 —
+        // a tank that covers her to the hip — up to 1.075. Nothing else about
+        // the shape moves: the neckline, the trunk cut and the scoop are the
+        // same terms doing the same work, because a swimsuit top and a vest
+        // differ in how far down they go and not in how they are held up. The
+        // straps go with it, below.
+        //
+        // 1.075 IS A MEASUREMENT AND 1.275 WAS NOT. The first number here was
+        // written as "a band across the bust" and it was picked by eye off a
+        // shader, which is a way of picking a number that cannot be checked.
+        // It lands ABOVE the bust: bucket her bind positions by height and
+        // take the frontmost vertex within 0.14 of the midline in each, and
+        // the front of her rises from 0.151 at y 1.10 to a plateau of 0.166 to
+        // 0.169 across y 1.16 to 1.26 before falling away. That plateau is the
+        // bust and 1.275 is over the top of it, so what the garment did was
+        // stop just above the nipples — which is why Misha read the whole
+        // thing as paint left on her rather than as a swimsuit. It is: a band
+        // that crosses a breast instead of covering it is body paint, whatever
+        // colour it is in.
+        //
+        // The under-bust crease is the dip at y 1.12, off the midline at
+        // z -0.083. 1.075 clears it by 45 mm and the smoothstep's far edge at
+        // 1.100 still clears it by 20, so the garment starts on ribcage and
+        // covers the bust whole.
+        float hem = mix(0.995, 1.075, uSwim);
         float scoop = trunk
           * smoothstep(hem, hem + 0.025, vLocal.y)
           * (1.0 - smoothstep(neck, neck + 0.012, vLocal.y));
@@ -345,7 +363,13 @@ async function buildYou(scene) {
         // detail that exists is the detail that survives.
         {
           vec2 P = vec2(vLocal.z, vLocal.y - 1.176);
-          float on = vest
+          // And it comes off with the tank it is printed on. The mask is the
+          // vest term, which is the garment whichever garment that is, so
+          // without it the swimsuit carries her band skull across the bust —
+          // same graphic on both is the clearest possible statement that
+          // neither is cloth. Nobody has this printed on their swimming
+          // costume either.
+          float on = vest * (1.0 - uSwim)
             * smoothstep(0.028, 0.060, vLocal.x)
             * (1.0 - smoothstep(0.104, 0.132, abs(vLocal.z)));
           vec3 pc = vec3(0.0);

@@ -8,6 +8,60 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.129.0] — 2026-08-27
+
+### The swimsuit was body paint, and the jump was a plank
+
+**"still has that blue/green paint on me after changing."** He read it
+as paint because it *was* one: the swim hem sat at local y 1.275 and her
+bust is at 1.16 to 1.26, so the garment stopped a centimetre above the
+nipples and what it drew was a band across a breast rather than a top
+over one. That is body paint whatever colour it is in. The old number
+had been picked by eye off a shader, which is a way of picking a number
+that cannot be checked; this one is measured — bucket her bind positions
+by height and take the frontmost vertex within 0.14 m of the midline,
+and the front of her rises from 0.151 at y 1.10 to a plateau of 0.166 to
+0.169 across 1.16 to 1.26 before falling away. The under-bust crease is
+the dip at 1.12. The hem is now 1.075, which clears it by 45 mm.
+
+The skull came off with it. The print is masked on the garment term,
+whichever garment that is, so the swimsuit was carrying her band's
+artwork across the bust — the same graphic on both is the clearest
+possible statement that neither is cloth.
+
+### And the jump has legs in it
+
+**"i just lift up completely straight... it should look more natural
+with the bending of the knees."** It was `ground.you.hop` translating a
+standing idle two metres into the air and back; nothing in the rig knew
+it was happening. Two aims a leg now, in the rig's own sagittal axis —
+the same thing Baye does clearing a bench — driven off `hop / apex`,
+which is a triangle that is zero on the deck at both ends and one at the
+top, so the knees come up as she rises and the legs are down again by
+the time there is anything to land on. The arms swing with them and the
+two legs are twelve per cent apart, because two legs doing the identical
+thing at the identical moment is a puppet on one string.
+
+**The first cut of the numbers was invisible and a screenshot could not
+say so.** 0.62 and 0.95 carried the knee 0.25 m forward and the foot
+0.08 m off its standing height, which at four metres is a leg that has
+not moved — and it looks exactly like a pose that was never applied at
+all, which is what the hour before it was spent chasing. So
+`__fr.swim.jump` reports where the knee, the heel and the hand actually
+are: 0.47 to 0.65 of knee is a jump, 0.47 to 0.53 is a rounding error
+with a comment over it.
+
+The crouch is the compromise and it is named as one. A jump reads as
+crouch, drive, tuck, reach, absorb, and the first of those cannot happen
+here — the hop launches on the keystroke, it is an escape hatch as much
+as a move, and a hundred milliseconds of wind-up in front of an escape
+hatch is a worse bug than a stiff jump. So it is spent at the two ends
+where it still reads: a fast straightening out of the first 0.13 s of
+the rise, and a longer fold on touchdown. `clearJump` takes the whole
+thing back off her when the branch stops running, because `aim` holds a
+rotation until it is handed a zero and pressing B in mid-air would
+otherwise have her swimming to the marker with her knees folded up.
+
 ## [1.128.0] — 2026-08-27
 
 ### Three things Misha found in one sitting
