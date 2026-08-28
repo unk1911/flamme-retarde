@@ -21691,9 +21691,14 @@ async function buildJadrija(scene) {
       // sagittal plane on this rig, which is z — see the note on the tuck.
       const bow = show.stance < 0.004 ? 0
         : show.stance * (SHOW.bow / SHOW.stance);
-      f.aim('spine01', 0, 0, 1, bow * 0.45);
-      f.aim('spine02', 0, 0, 1, bow * 0.33);
-      f.aim('spine03', 0, 0, 1, bow * 0.22);
+      // NEGATIVE, and the sign is not arbitrary. The legs take +z to swing the
+      // knee forward; the spine takes -z to do the same to the chest, because
+      // a leg bone points DOWN its limb and a spine bone points UP. Same world
+      // axis, opposite bones, opposite apparent direction — and at +z what she
+      // did was arch backwards, which is what got reported.
+      f.aim('spine01', 0, 0, -1, bow * 0.45);
+      f.aim('spine02', 0, 0, -1, bow * 0.33);
+      f.aim('spine03', 0, 0, -1, bow * 0.22);
       // (0, 0, 1) AND NOT (1, 0, 0), which is what this said for as long as
       // it has existed and is the axis the comment above already claims. On
       // this rig x is fore-and-aft and z is lateral — 49-you.js says so in the

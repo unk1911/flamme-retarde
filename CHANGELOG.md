@@ -8,6 +8,21 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.147.0] — 2026-08-28
+
+### The bend was going backwards
+
+One sign. The legs take +z to swing a knee forward and the spine takes
+**-z** to do the same to the chest, because a leg bone points DOWN its
+limb and a spine bone points UP — same world axis, opposite bones,
+opposite apparent direction. At +z she arched backwards, which is what
+got reported.
+
+Third sign or axis error in this rig in three releases, all of the same
+family, and all of them cheap to have checked: point one bone, look at
+where the end of it went. `__fr.jad.youAim` does exactly that and was
+written for the first of them.
+
 ## [1.146.0] — 2026-08-28
 
 ### Seventeen degrees is not a bend
