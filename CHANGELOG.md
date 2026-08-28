@@ -8,6 +8,18 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.142.0] — 2026-08-28
+
+### And the septum ring
+
+**"Chloe price (me) doesn't have a nose ring."** She does not. Same
+story as the ponytail and the same door: it was authored on the shared
+figure, which is Baye, who does. `--noseptum` drops that shell from
+`extras` on Chloe's bake alone. Baye keeps hers.
+
+Her extras are now two anklets and nothing else — 216 verts, down from
+728 when she was still wearing somebody else's hair and jewellery.
+
 ## [1.141.0] — 2026-08-28
 
 ### Chloe loses the ponytail, and the hat stops eating her ears

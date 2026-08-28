@@ -220,6 +220,12 @@ SKIN_OUT = None
 # questions: a morphed body is not by itself a reason to lose a hairstyle, and
 # the next figure through here may well want to keep it.
 NO_TAIL = False
+# And the septum ring, same story and the same door.
+#
+# Misha, 28 Aug: "Chloe price (me) doesn't have a nose ring". She does not.
+# It was authored on the shared figure, which is Baye, who does — and it stays
+# on her.
+NO_SEPTUM = False
 
 
 def fetch():
@@ -591,10 +597,11 @@ def extras(body, J):
     # side. Cycling the coordinates x,y,z -> z,x,y turns one into the other; it
     # is a rotation and not a mirror, so the winding — and with it every face
     # normal — comes through unchanged.
-    rv, rf = ring((0.0, 0.0, 0.0), SEPTUM_R, SEPTUM_R, SEPTUM_WIRE,
-                  seg=16, ring_seg=5)
-    add_shell([(SEPTUM[0] + v[2], v[0], SEPTUM[1] + v[1]) for v in rv], rf,
-              ANKLET_M, ANKLET_P)
+    if not NO_SEPTUM:
+        rv, rf = ring((0.0, 0.0, 0.0), SEPTUM_R, SEPTUM_R, SEPTUM_WIRE,
+                      seg=16, ring_seg=5)
+        add_shell([(SEPTUM[0] + v[2], v[0], SEPTUM[1] + v[1]) for v in rv], rf,
+                  ANKLET_M, ANKLET_P)
 
     me = bpy.data.meshes.new("extras")
     me.from_pydata([tuple(v) for v in vs], [], fs)
@@ -633,8 +640,9 @@ def extras(body, J):
     bpy.ops.object.join()
     body["extraN"] = len(vs)
     body["hairN"] = 0
-    print("[mh] extras: %d verts, %d faces joined (%s2 anklets + septum)"
-          % (len(vs), len(fs), "" if NO_TAIL else "hair + "))
+    print("[mh] extras: %d verts, %d faces joined (%s2 anklets%s)"
+          % (len(vs), len(fs), "" if NO_TAIL else "hair + ",
+             "" if NO_SEPTUM else " + septum"))
     return body
 
 
@@ -5363,7 +5371,7 @@ def render(tag, names):
 # --------------------------------------------------------------------------- #
 
 def main():
-    global NO_RENDER, BODY_OVERRIDE, SKIN_OUT, BLEND, NO_TAIL
+    global NO_RENDER, BODY_OVERRIDE, SKIN_OUT, BLEND, NO_TAIL, NO_SEPTUM
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     NO_RENDER = "--norender" in argv
     # A different mesh, a different skin and a different .blend, so that baking
@@ -5378,6 +5386,7 @@ def main():
     if "--blend" in argv:
         BLEND = Path(argv[argv.index("--blend") + 1])
     NO_TAIL = "--notail" in argv
+    NO_SEPTUM = "--noseptum" in argv
     levels = SUBSURF
     if "--sub" in argv:
         levels = int(argv[argv.index("--sub") + 1])
