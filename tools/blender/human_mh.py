@@ -208,6 +208,18 @@ ANUS_M, ANUS_P = (0.393, 0.262, 0.226), (0.393, 0.262, 0.226)
 # just a morph of the first.
 BODY_OVERRIDE = None
 SKIN_OUT = None
+# Drop the hair knot and the tail from `extras`. Chloe's, and hers alone.
+#
+# Misha, 28 Aug: "Chloe Price doesn't have a pony tail... can u chop off the
+# pony tail off our character". She does not, and never did — the reference is
+# a chin-length choppy bob and nothing behind it. The knot and the tube were
+# authored for Baye, who does, and Chloe wore them for as long as the two of
+# them shared one mesh. She has her own now.
+#
+# A flag rather than a consequence of `--body`, because the two are different
+# questions: a morphed body is not by itself a reason to lose a hairstyle, and
+# the next figure through here may well want to keep it.
+NO_TAIL = False
 
 
 def fetch():
@@ -555,7 +567,7 @@ def extras(body, J):
     # Each piece is its own closed shell, which is what `skin()` needs: its
     # loose-shell pass hands a whole shell to one bone, and that is exactly the
     # rig these want — a tail rigid to the skull, a band rigid to the shin.
-    vs, fs = ball(*HAIR_KNOT, rows=16, seg=20)
+    vs, fs = ([], []) if NO_TAIL else ball(*HAIR_KNOT, rows=16, seg=20)
     tint = [(HAIR_M, HAIR_P)] * len(vs)
 
     def add_shell(sv, sf, mark, prev):
@@ -564,7 +576,8 @@ def extras(body, J):
         fs.extend([[i + off for i in f] for f in sf])
         tint.extend([(mark, prev)] * len(sv))
 
-    add_shell(*tube(HAIR_TAIL, seg=16), HAIR_M, HAIR_P)
+    if not NO_TAIL:
+        add_shell(*tube(HAIR_TAIL, seg=16), HAIR_M, HAIR_P)
     for s in (1, -1):
         ank = J["%s-ankle" % ("l" if s > 0 else "r")]
         add_shell(*ring((ank.x, ank.y, ank.z + ANKLET_Z),
@@ -620,8 +633,8 @@ def extras(body, J):
     bpy.ops.object.join()
     body["extraN"] = len(vs)
     body["hairN"] = 0
-    print("[mh] extras: %d verts, %d faces joined (hair + 2 anklets + septum)"
-          % (len(vs), len(fs)))
+    print("[mh] extras: %d verts, %d faces joined (%s2 anklets + septum)"
+          % (len(vs), len(fs), "" if NO_TAIL else "hair + "))
     return body
 
 
@@ -5350,7 +5363,7 @@ def render(tag, names):
 # --------------------------------------------------------------------------- #
 
 def main():
-    global NO_RENDER, BODY_OVERRIDE, SKIN_OUT, BLEND
+    global NO_RENDER, BODY_OVERRIDE, SKIN_OUT, BLEND, NO_TAIL
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     NO_RENDER = "--norender" in argv
     # A different mesh, a different skin and a different .blend, so that baking
@@ -5364,6 +5377,7 @@ def main():
         SKIN_OUT = Path(argv[argv.index("--out") + 1])
     if "--blend" in argv:
         BLEND = Path(argv[argv.index("--blend") + 1])
+    NO_TAIL = "--notail" in argv
     levels = SUBSURF
     if "--sub" in argv:
         levels = int(argv[argv.index("--sub") + 1])

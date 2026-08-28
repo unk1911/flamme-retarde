@@ -8,6 +8,33 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.141.0] — 2026-08-28
+
+### Chloe loses the ponytail, and the hat stops eating her ears
+
+**"Chloe Price doesn't have a pony tail."** She does not — the reference
+is a chin-length choppy bob with nothing behind it. The knot and the
+tube were authored for Baye, who does have one, and Chloe wore them for
+as long as the two of them shared a mesh. She has her own now, so
+`human_mh.py` takes `--notail` and drops those two shells from `extras`.
+A flag rather than a consequence of `--body`, because a morphed body is
+not by itself a reason to lose a hairstyle. **Baye keeps hers**, along
+with the `uShorn` haircut that shears it off in 43-jadrija.js.
+
+**And with the tail gone the hat's own silhouette was finally visible**,
+which is worth saying plainly: a good deal of what has been called a
+weird hat for the last nine releases was a blue column of hair hanging
+behind it.
+
+What was left was a bathing cap. The three profile points below the hem
+tapered gently — 0.076 at the bottom against 0.096 at the hem — and her
+skull WIDENS as it drops, 0.081 at y 1.68 to 0.098 at 1.60. Cloth that
+narrows more slowly than the head widens never gets inside it, so the
+skirt stayed visible all the way down past her ears to the nape. Tucking
+hard instead — 0.040 against 0.095 — puts the surface inside the skull
+by y 1.63, which is the top of the ear, which is where a beanie stops.
+The hem went up 22 mm with it.
+
 ## [1.140.0] — 2026-08-28
 
 ### The hat was 49 mm behind her head
