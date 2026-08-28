@@ -8,6 +8,45 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.143.0] — 2026-08-28
+
+### Walk into Baye and she shimmies at you
+
+**"if i bump into NPC baye, she should do her 'shimmy shimmy' routine."**
+She has had the clip since the figure was baked and it was reachable
+only through the opening routine and a 0.12 die, so most people will
+never have seen it. She is also already a bumpable body — `bodies` has
+pushed her as `kind: 'baye'` for as long as the collider has existed,
+and `bumpReact` returned false on the first line for anything that was
+not a bather.
+
+Armed in the handler and entered in `stepShow`, for the reason the
+crowd's head turn is: `bump` is called from inside `confine`, which is
+the collider, which must not start a clip from underneath a state
+machine. `SHIMMYABLE` is her eight outdoor idles and nothing else —
+being walked into is not a reason to break off the hose, the kabina, a
+somersault or the room — and a six-second cooldown makes shuffling
+against her one shimmy rather than a stutter of them.
+
+The first cut of that list had a `wander` phase in it that does not
+exist. Checked against every `go()` in the file, which is the only way
+to write a set of state names down.
+
+### And two things the last release broke
+
+**The mouth.** "like a skeleton", and it was: hollow cheeks at 0.60, a
+chin lengthened 0.35 and a mouth narrowed 0.25 are each defensible alone
+and gaunt together. The three that make the lower face read as bone are
+halved or gone; the cheekbones, which are what the reference actually
+has, keep their full weight.
+
+**The jump.** 0.95 of hip and 1.30 of knee folds her into a ball, and
+12 per cent of split scissors it — from behind, which is the one angle
+it was never checked at. Back to 0.62 and 0.95 with 6 per cent, which
+carries the knee a quarter of a metre and reads as a person jumping. The
+larger pair had been chosen because the first cut "was invisible at four
+metres", and that reading came off a render I had framed wrongly.
+
 ## [1.142.0] — 2026-08-28
 
 ### And the septum ring

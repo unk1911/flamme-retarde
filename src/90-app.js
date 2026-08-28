@@ -2244,19 +2244,31 @@ const JUMP = {
   // you at is a leg that has not moved. Baye clears a bench at 0.95 and 1.20
   // and reads as a jump; this is that, and a little more knee, because she is
   // not clearing anything and the whole shape is the point.
-  tuck: 0.95,             // rad the knees come up at the top of the arc
-  knee: 1.30,             // and how far the heels fold back under her
+  // 0.62 and 0.95, back down from 0.95 and 1.30. The larger pair was chosen
+  // because the first cut "was invisible" at four metres — and that reading
+  // was taken off a render I had framed wrongly, which is the same mistake
+  // twice in one object. Measured, 0.62 carries the knee a quarter of a metre
+  // and the foot 80 mm; that is not invisible, it is a jump. 0.95 folds her
+  // knees to her chest, which from behind in the third person is somebody
+  // being winched up in a ball.
+  tuck: 0.62,             // rad the knees come up at the top of the arc
+  knee: 0.95,             // and how far the heels fold back under her
   // A jump is not symmetrical and a symmetrical one is uncanny — two legs
   // doing the identical thing at the identical moment is a puppet on one
   // string. Twelve per cent apart is not a scissor kick, it is one leg leading
   // the other by a frame or two, which is what a person does.
-  split: 0.12,
+  // Six per cent, down from twelve. The idea is right — two legs doing the
+  // identical thing at the identical moment is a puppet on one string — and
+  // twelve was too much of it: on a deep tuck it reads as a scissor kick and
+  // the hips look wrong from any angle but the side, which is the one angle
+  // it was checked at.
+  split: 0.06,
   crouch: 0.45,           // rad of hip flex in the push-off and the landing
   crouchKnee: 0.85,       // and the knee that goes with it
   // The arms. Up and back on the way, which is where they go: the swing is
   // half of what a standing jump is made of and leaving them hanging reads as
   // somebody being lifted rather than jumping.
-  arm: 0.55,
+  arm: 0.40,
   // m the root sinks so the crouch does not lift her. Measured off the same
   // probe: a fold of this size takes the foot about 45 mm off the deck, and a
   // crouch that leaves her standing in the air is worse than no crouch.

@@ -108,15 +108,20 @@ CHLOE = ("chloe", 1.750, [
     ("head/head-invertedtriangular", 0.35),
     ("cheek/l-cheek-bones-incr", 0.75),
     ("cheek/r-cheek-bones-incr", 0.75),
-    ("cheek/l-cheek-inner-decr", 0.60),
-    ("cheek/r-cheek-inner-decr", 0.60),
-    ("chin/chin-width-decr", 0.60),
-    ("chin/chin-height-incr", 0.35),
-    ("chin/chin-prognathism-decr", 0.20),
-    ("nose/nose-scale-horiz-decr", 0.50),
+    # Hollow cheeks, a long chin and a narrowed mouth are, together, the recipe
+    # for a skull. Misha, 28 Aug: "mouth looks weird... like a skeleton". Each
+    # of the four was defensible on its own and the sum of them was gaunt, so
+    # the three that make the lower face read as bone are halved or gone and
+    # the cheekbones — which are the thing the reference actually has — keep
+    # their full weight.
+    ("cheek/l-cheek-inner-decr", 0.30),
+    ("cheek/r-cheek-inner-decr", 0.30),
+    ("chin/chin-width-decr", 0.55),
+    ("chin/chin-height-incr", 0.10),
+    ("chin/chin-prognathism-decr", 0.10),
+    ("nose/nose-scale-horiz-decr", 0.45),
     ("nose/nose-hump-decr", 0.35),
     ("forehead/forehead-scale-vert-decr", 0.25),
-    ("mouth/mouth-scale-horiz-decr", 0.25),
 ])
 
 BATHERS = [

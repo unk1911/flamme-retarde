@@ -20308,6 +20308,21 @@ async function buildJadrija(scene) {
    */
   const HOPPING = { play: 1, home: 1, orbit: 1 };
 
+  /**
+   * What being walked into is allowed to interrupt.
+   *
+   * Short on purpose, and shorter than `OWN`. She is on the promenade doing
+   * nothing in particular in every one of these; anywhere else — the hose, the
+   * kabina, a somersault she is halfway through, and above all the room — a
+   * shove is not a reason to break off and dance. `aim` is in because it is
+   * only the walk that lines a cartwheel up, and `joy` because it is already
+   * the state of being pleased about something. The eight of them are her
+   * whole outdoor idle — checked against every `go()` in the file, because the
+   * first cut of this list had a `wander` in it that does not exist.
+   */
+  const SHIMMYABLE = { idle: 1, play: 1, home: 1, orbit: 1, aim: 1, joy: 1,
+    notice: 1, rest: 1 };
+
   /** The indoor track, as a set, so the trigger can tell it is already on it. */
   const KABIN = { come: 1, enter: 1, wine: 1, meet: 1, untie: 1,
     dwell: 1, leave: 1 };
@@ -20772,6 +20787,22 @@ async function buildJadrija(scene) {
     // routine ends by calling `showNext`, and `showNext` with nothing left goes
     // to the wander — which is the state that follows you.
     if (leaving && show.queue.length) show.queue.length = 0;
+
+    // The bump, cashed in. `OWN` below is what outranks the room; this is what
+    // outranks the wander, and it is deliberately a shorter list — being
+    // walked into is not a reason to abandon the hose, the kabina or a
+    // somersault you are halfway through. `bumpShim` is a cooldown so that
+    // shuffling against her is one shimmy and not a stutter of them.
+    show.bumpShim = Math.max(0, (show.bumpShim || 0) - dt);
+    if (show.bumped) {
+      show.bumped = 0;
+      if (!show.bumpShim && SHIMMYABLE[show.phase]) {
+        show.bumpShim = SHOW.shimmyFor + 2.6;
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        showSay('whee', Math.hypot(pt - show.t, ps - show.s));
+        go('shimmy', 'shimmy', 0.30);
+      }
+    }
 
     const K = special;
     const inside = !!K && pt > K.t0 - 0.25 && pt < K.t1 + 0.25
@@ -21969,6 +22000,21 @@ async function buildJadrija(scene) {
    */
   function bumpReact(kind, idx, t, s) {
     void idx;                       // see `crowdAt` — the position is the name
+    // Walk into Baye and she shimmies at you.
+    //
+    // Misha, 28 Aug: "if i bump into NPC baye, she should do her shimmy shimmy
+    // routine". She has had the clip since the figure was baked and it was
+    // only ever reachable through the opening routine and a 0.12 die, which
+    // means most people have never seen it.
+    //
+    // ARMED HERE, ENTERED IN `stepShow`, for the same reason the crowd's head
+    // turn below is: `bump` is called from inside `confine`, which is the
+    // collider, which knows nothing about her state machine and must not start
+    // a clip from underneath it. `show.bumped` is a flag the next step reads.
+    if (kind === 'baye') {
+      if (show) show.bumped = 1;
+      return true;
+    }
     if (kind !== 'bather') return false;
     const fg = crowdAt(t, s);
     if (!fg || fg.mode === 'lie') return false;
