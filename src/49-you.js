@@ -38,7 +38,14 @@ const YOU = {
   // The cap is aubergine rather than black: in every reference of her it is a
   // dark purple slouch beanie, and read as black it stops being hers.
   hair: [0.13, 0.45, 0.70],
-  cap: [0.115, 0.070, 0.165],
+  // Near-black with a blue cast, off the photograph Misha sent. This was
+  // aubergine on the argument that "read as black it stops being hers", and
+  // the argument is sound and was applied to the wrong hat: in the reference
+  // it is a very dark navy jersey, black in the shade and blue where the light
+  // catches it, nothing like a purple. What keeps it from being flat black is
+  // that the blue is a third as strong again as the red, which survives the
+  // lighting here — it is the same trick, on the right hue.
+  cap: [0.050, 0.058, 0.095],
   // The vest is not white. It is a washed-out sage-white, which is what a
   // cotton tank that has been through a Dalmatian summer twenty times is, and
   // it also stops the shirt blowing out to paper next to the porcelain.
@@ -94,12 +101,46 @@ const YOU = {
   // surface it is already outside of, so the bob came through at both temples
   // as two hard blue slabs and no amount of moving the thing about fixed it.
   //
-  // 0.100 stands it 8 mm proud at the widest and 8 mm proud at the hem, which
-  // is a knitted hat with a head in it. 0.086 tall on 1.688 puts the crown
-  // 24 mm over hers, which is the slack a slouch beanie has. The fore-and-aft
-  // 0.122 is left alone: the brow is outside on purpose, because that is where
-  // the fringe goes.
+  // 0.101 stands it 9 mm proud at the widest, which is a knitted hat with a
+  // head in it.
+  //
+  // AND IT IS A SLOUCH, which is the thing four passes of this object kept
+  // failing to be. Misha, 28 Aug, with a photograph: "here's high resolution
+  // hat... can't u make it like that?" What is in that frame is not a
+  // skullcap. The hem crosses the brow, and from there the whole volume goes
+  // BACK and UP — the crown is over the middle of the skull, the mass carries
+  // on past the back of the head by three or four centimetres, and it hangs.
+  // Every version before this was an ellipsoid the size of a head, sitting on
+  // a head, which is a swimming cap.
+  //
+  // So it is 152 long against a skull that is 305 from brow to nape, centred
+  // 20 mm behind the head bone and leaned back 23 degrees. The front-aft is
+  // the number that makes the shape; the width and the height are what make
+  // it fit. The brow stays outside on purpose — that is where the fringe
+  // goes, and in the photograph the fringe is the whole front of her head.
   hat: { at: [0.000, 1.688, 0.000], r: [0.122, 0.086, 0.100], tilt: 0.30 },
+  // The beanie's own shape, which is NOT the mask above and does not have to
+  // be. See `beanie` in the body of this file: the mask is the volume of hair
+  // to throw away and is therefore a skullcap, and the hat is a slouch that
+  // carries on past the back of her head into air, where there is no hair to
+  // throw away and nothing to agree with.
+  //
+  // `hem` is the height the fabric leaves the skull at, `fa` how much longer
+  // it is fore-and-aft than across, `lean` how far back the crown has gone by
+  // the time it gets there, and `prof` the half-section as [radius, height
+  // over the hem] — the first three points of which are BELOW the hem and
+  // inside her head, so the visible edge is the curve where cloth leaves
+  // scalp rather than a ring drawn at a height.
+  beanie: {
+    hem: 1.668, fa: 1.30, lean: -0.32,
+    prof: [
+      [0.072, -0.075], [0.092, -0.046], [0.101, -0.018],
+      [0.105, 0.008], [0.107, 0.030], [0.106, 0.052],
+      [0.102, 0.070], [0.095, 0.084], [0.084, 0.095],
+      [0.068, 0.104], [0.048, 0.110], [0.026, 0.114],
+      [0.000, 0.116],
+    ],
+  },
   // A trim, if she ends up facing off-square. The rig's own forward is +X —
   // see `rigYaw` in 43-jadrija.js, which is the one place that says so — and
   // the yaw below is built for that, so this wants to be zero.
@@ -619,58 +660,46 @@ async function buildYou(scene) {
   // is inside her head and never drawn, so the hem is the intersection curve
   // between hat and hair, which is a better line than any theta cut.
   const H = YOU.hat;
+  const B = YOU.beanie;
+
+  // A SLOUCH IS NOT AN ELLIPSOID, and four passes of this object went into
+  // finding that out the long way. An ellipsoid centred on a head can hug it
+  // or it can balloon past it; it cannot do both, because the same surface has
+  // to be near the skull at the hem and a long way from it at the crown. Every
+  // version of this hat was therefore either a swimming cap or — once it was
+  // given enough length to slouch — a beret sitting on top of her, floating,
+  // with a band of forehead under it. Misha sent a photograph and asked "can't
+  // u make it like that", and what is in that photograph is a tube of jersey
+  // gathered at the crown: tight where it leaves the brow, swelling over the
+  // skull, and carrying up and BACK into air behind her head.
+  //
+  // So it is a lathe of that half-section, ovalled fore-and-aft to the shape
+  // of a head, and then SHEARED — every vertex moved back in proportion to how
+  // far up it is. The shear is the slouch and it is the whole trick: the hem
+  // does not move at all, so the fit is untouched, while the crown goes back
+  // 79 mm by the time it gets there.
+  //
+  // And it is decoupled from `YOU.hat`, which is now only the mask. Those two
+  // used to be one ellipsoid on the argument that a hat and a hole in the hair
+  // that disagree leave hair standing in the air — true, but the requirement
+  // is one-way. The mask has to contain every hair the hat covers; it does not
+  // have to BE the hat. The hair stops at the skull, so the mask is a skullcap
+  // and the four centimetres of slouch behind her head are over nothing.
   const hat = new THREE.Group();
-  hat.position.set(H.at[0] - YOU.bone[0], H.at[1] - YOU.bone[1],
-    H.at[2] - YOU.bone[2]);
-  hat.rotation.z = H.tilt;
-  hat.scale.set(H.r[0] / H.r[1], 1, H.r[2] / H.r[1]);
+  hat.position.set(0 - YOU.bone[0], B.hem - YOU.bone[1], 0 - YOU.bone[2]);
   head.add(hat);
-
-  // 32 by 20 and not 24 by 16. It is the only curved silhouette on her, it is
-  // the thing at the top of every mirror shot, and eight hundred more
-  // triangles on one object is nothing next to the 28 000 she already is.
-  hat.add(new THREE.Mesh(new THREE.SphereGeometry(H.r[1], 32, 20), capMat));
-
-  // The turn-up, at the height where the ellipsoid comes out of the hair —
-  // 3 cm below its centre, where its own radius is 7.4 — so the roll lands on
-  // the visible edge of the knit rather than floating inside her head or out
-  // in the air. The tilt puts it low at the nape and high over the brow, which
-  // is how the thing is worn.
-  //
-  // NOT A TORUS UNDER THE HAT GROUP, which is what it was and is why Misha
-  // kept calling this hat weird. `hat` carries a non-uniform scale — 1.5 in x
-  // and 1.0625 in z, which is what ovals the sphere to a head — and a scale
-  // like that goes through a torus's TUBE as well as through its ring. The
-  // roll came out half again as fat fore-and-aft as it was laterally, which
-  // reads as a hoop standing off the dome at the brow and the nape and buried
-  // in it at the ears. A rolled hem is the same thickness all the way round;
-  // that is most of what makes it read as knitwear.
-  //
-  // So the ring is an ellipse in its own right and the tube is swept round it,
-  // in a group with the hat's placement and tilt but NO scale. The semi-axes
-  // are the sphere's radius at that height taken through the scale by hand —
-  // 0.0742 by 1.5 and by 1.0625 — so it still lands exactly on the dome.
-  const roll = new THREE.Group();
-  roll.position.copy(hat.position);
-  roll.rotation.z = H.tilt;
-  head.add(roll);
   {
-    // Where the roll sits, and the ring radius DERIVED from it rather than
-    // typed. It used to be a literal 0.0742, which was the sphere's radius
-    // 30 mm down when the sphere was 80 mm — true when it was written and a
-    // hem floating inside her skull the moment the hat was resized.
-    const HEM = -0.043;
-    const RR = Math.sqrt(H.r[1] * H.r[1] - HEM * HEM);
-    const TUBE = 0.0135, N = 32;
-    const pts = [];
-    for (let i = 0; i < N; i++) {
-      const a = (i / N) * Math.PI * 2;
-      pts.push(new THREE.Vector3(Math.cos(a) * RR * (H.r[0] / H.r[1]), HEM,
-        Math.sin(a) * RR * (H.r[2] / H.r[1])));
+    const pts = B.prof.map(([r, y]) => new THREE.Vector2(r, y));
+    const geo = new THREE.LatheGeometry(pts, 40);
+    const a = geo.attributes.position;
+    for (let i = 0; i < a.count; i++) {
+      const x = a.getX(i), y = a.getY(i);
+      // Oval first, then shear. The other order leans it and then stretches
+      // the lean, which is a hat falling off sideways.
+      a.setX(i, x * B.fa + B.lean * Math.max(0, y));
     }
-    const curve = new THREE.CatmullRomCurve3(pts, true, 'catmullrom', 0.5);
-    roll.add(new THREE.Mesh(
-      new THREE.TubeGeometry(curve, N * 2, TUBE, 10, true), capMat));
+    geo.computeVertexNormals();
+    hat.add(new THREE.Mesh(geo, capMat));
   }
 
   // There were four locks of hair here as well — flat tapered cones down each

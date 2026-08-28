@@ -8,6 +8,47 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.136.0] — 2026-08-28
+
+### A slouch is not an ellipsoid
+
+**Misha sent a photograph and asked "can't u make it like that".** Four
+passes of this object had gone into moving one ellipsoid around, and the
+photograph is what finally said why none of them worked: an ellipsoid
+centred on a head can hug it or it can balloon past it, and a slouch
+beanie does both. The same surface is tight where it leaves the brow and
+a long way from the skull at the crown. So every version was either a
+swimming cap or — once it was given enough length to slouch — a beret
+sitting on top of her with a band of forehead underneath.
+
+**The hat and the hair mask are now two different things, and that is
+the fix.** They used to be one ellipsoid, on the argument that a hat and
+a hole in the hair that disagree leave hair standing in the air. True,
+and the requirement is one-way: the mask has to CONTAIN every hair the
+hat covers, not BE the hat. Hair stops at the skull, so the mask goes
+back to being the skullcap that fits it — 0.122 by 0.086 by 0.100 — and
+the four centimetres of slouch behind her head are over nothing and mask
+nothing.
+
+Freed of that, the hat is what it is in the reference: a lathe of the
+half-section of a jersey beanie, ovalled 1.30 fore-and-aft to the shape
+of a head, and then SHEARED, every vertex carried back in proportion to
+its height. The shear is the slouch and it is the whole trick — the hem
+does not move at all, so the fit is untouched, while the crown goes back
+by a third of its rise. The first three points of the profile are BELOW
+the hem and inside her head, so the visible edge is the curve where
+cloth leaves scalp rather than a ring drawn at a height. The turn-up
+torus is gone with the ellipsoid it belonged to; a jersey beanie is
+turned once, not rolled, and 13.5 mm of tube was reading as a bicycle
+tyre round her head.
+
+The colour goes with the shape: 0.050, 0.058, 0.095, a very dark navy.
+It was aubergine on the argument that "read as black it stops being
+hers", which is sound and was applied to the wrong hat — in the
+reference it is black in the shade and blue where the light catches it,
+and what keeps it off flat black is the blue running a third stronger
+than the red.
+
 ## [1.135.0] — 2026-08-28
 
 ### The beanie, measured this time
