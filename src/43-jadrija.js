@@ -19393,6 +19393,14 @@ async function buildJadrija(scene) {
     // about 12 cm between her heels, which is a stance; much past that is a
     // straddle.
     stance: 0.16,
+    // rad the trunk carries forward with it. "turn around, bend over spreading
+    // her legs a bit" — this is the bend, spread over three spine joints so it
+    // is a back curving rather than a hinge at the waist.
+    bow: 0.30,
+    // s the bump's shimmy runs for, against the routine's 3.4. Asked for
+    // longer, and it is the whole of the reaction rather than one beat of a
+    // sequence.
+    bumpFor: 7.5,
     // And the two she does with her hands. Held longer than the shimmy because
     // both of them are things you are meant to *read* — a gesture you have to
     // recognise and a card you have to actually finish — and three seconds is
@@ -20315,21 +20323,42 @@ async function buildJadrija(scene) {
   /**
    * What being walked into is allowed to interrupt.
    *
-   * Short on purpose, and shorter than `OWN`. She is on the promenade doing
-   * nothing in particular in every one of these; anywhere else — the hose, the
-   * kabina, a somersault she is halfway through, and above all the room — a
-   * shove is not a reason to break off and dance. `aim` is in because it is
-   * only the walk that lines a cartwheel up, and `joy` because it is already
-   * the state of being pleased about something. The eight of them are her
-   * whole outdoor idle — checked against every `go()` in the file, because the
-   * first cut of this list had a `wander` in it that does not exist.
+   * EVERYTHING SHE DOES OUTDOORS, which is the second version of this list.
+   *
+   * Misha, 28 Aug: "she should always turn around". The first cut was her
+   * eight idles, on the reasoning that a shove is not a reason to break off a
+   * cartwheel — and what that produced is a reaction that fires most of the
+   * time, which from outside is a reaction that looks broken. Always is a
+   * feature and sometimes is a bug, and there is nothing out here she is doing
+   * that a person walking into her would not interrupt.
+   *
+   * What stays out is the indoor track, the fire and the hose — `KABIN`,
+   * `MUSIC` and `OWN`, which are checked separately below. Those are the ones
+   * where breaking off is not a reaction, it is losing the thread of something
+   * the player is also in the middle of.
+   *
+   * `shimmy` itself is in the list, so bumping her again during one restarts
+   * the clock rather than being swallowed. The cooldown is what stops that
+   * being a stutter, and it is now shorter than the dance.
    */
   const SHIMMYABLE = { idle: 1, play: 1, home: 1, orbit: 1, aim: 1, joy: 1,
-    notice: 1, rest: 1 };
+    notice: 1, rest: 1, flip: 1, up: 1, wheel: 1, down: 1, crawl: 1,
+    bask: 1, hop: 1, out: 1, shimmy: 1, twerk: 1, heart: 1, note: 1 };
 
   /** The indoor track, as a set, so the trigger can tell it is already on it. */
   const KABIN = { come: 1, enter: 1, wine: 1, meet: 1, untie: 1,
     dwell: 1, leave: 1 };
+
+  /**
+   * Everything that outranks the room, hoisted.
+   *
+   * The turn, and the room's own answer to the hose. It lived inside
+   * `stepShow` next to the one line that read it until the bump needed the
+   * same set eighty lines earlier — and one lexical scope means a `const`
+   * declared below is a temporal dead zone above it, which is RULE 3 and is a
+   * page that never finishes loading rather than a wrong answer.
+   */
+  const OWN = { flare: 1, submit: 1, kept: 1, rise: 1, creep: 1 };
 
   // Scratch for the horns, hoisted out of the frame loop.
   const vHorn = new THREE.Vector3(), qHorn = new THREE.Quaternion();
@@ -20800,8 +20829,10 @@ async function buildJadrija(scene) {
     show.bumpShim = Math.max(0, (show.bumpShim || 0) - dt);
     if (show.bumped) {
       show.bumped = 0;
-      if (!show.bumpShim && SHIMMYABLE[show.phase]) {
-        show.bumpShim = SHOW.shimmyFor + 2.6;
+      if (!show.bumpShim && SHIMMYABLE[show.phase]
+          && !KABIN[show.phase] && !MUSIC[show.phase] && !OWN[show.phase]) {
+        show.bumpShim = 0.9;
+        show.shimTil = SHOW.bumpFor;
         // BACK TO YOU, and set as a flag rather than as a heading because the
         // shimmy case re-aims her at you every frame — writing `want` here
         // lasts exactly one frame, which is how the first cut of this came out
@@ -20817,12 +20848,12 @@ async function buildJadrija(scene) {
     const K = special;
     const inside = !!K && pt > K.t0 - 0.25 && pt < K.t1 + 0.25
       && ps > K.face + 0.15 && ps < K.s1 + 0.2;
-    // `OWN` is everything that outranks the room: the turn, and the room's own
-    // answer to the hose. The second one is not optional — `submit` is entered
-    // from *inside* the kabina, so without it this line fires on the very next
-    // frame and walks her back to the doorway to start coming in again, out of
-    // a pose she has just gone down into three feet away from you.
-    const OWN = { flare: 1, submit: 1, kept: 1, rise: 1, creep: 1 };
+    // `OWN` — hoisted, see the note on it — is everything that outranks the
+    // room: the turn, and the room's own answer to the hose. The second is not
+    // optional: `submit` is entered from *inside* the kabina, so without it
+    // this line fires on the very next frame and walks her back to the doorway
+    // to start coming in again, out of a pose she has just gone down into
+    // three feet away from you.
     if (inside && !KABIN[show.phase] && !MUSIC[show.phase]
         && !OWN[show.phase] && !show.turned) {
       show.leg = 0;
@@ -21287,8 +21318,12 @@ async function buildJadrija(scene) {
           show.said = show.tmr;
           showSay(say1(CHAT), d);
         }
-        if (show.tmr > SHOW[HOLD_FOR[show.phase]] || leaving
-          || d > SHOW.far) { show.shimBack = 0; showNext(); }
+        // The bump's shimmy runs on its own clock — `SHOW.bumpFor` rather than
+        // `shimmyFor` — because it was asked for longer and because the
+        // routine's 3.4 s is a beat in a sequence while this one is the whole
+        // of what you get for walking into somebody.
+        if (show.tmr > (show.shimBack ? show.shimTil : SHOW[HOLD_FOR[show.phase]])
+          || leaving || d > SHOW.far) { show.shimBack = 0; showNext(); }
         break;
 
       case 'heart':
@@ -21645,6 +21680,15 @@ async function buildJadrija(scene) {
       show.stance = damp(show.stance || 0,
         show.phase === 'shimmy' && show.shimBack ? SHOW.stance : 0, 7, dt);
       const spread = show.stance < 0.004 ? 0 : show.stance;
+      // And the bend. Three joints rather than one, weighted up the spine, so
+      // what it draws is a back with a curve in it instead of a mannequin
+      // folded at the hips. Same axis as everything else that moves in the
+      // sagittal plane on this rig, which is z — see the note on the tuck.
+      const bow = show.stance < 0.004 ? 0
+        : show.stance * (SHOW.bow / SHOW.stance);
+      f.aim('spine01', 0, 0, 1, bow * 0.45);
+      f.aim('spine02', 0, 0, 1, bow * 0.33);
+      f.aim('spine03', 0, 0, 1, bow * 0.22);
       // (0, 0, 1) AND NOT (1, 0, 0), which is what this said for as long as
       // it has existed and is the axis the comment above already claims. On
       // this rig x is fore-and-aft and z is lateral — 49-you.js says so in the
@@ -22568,8 +22612,19 @@ async function buildJadrija(scene) {
    * One contact. Called by the collider in 47-ground.js, which does the
    * debouncing — this is a fresh bump every time, never one per frame.
    */
+  /**
+   * Somebody outside who wants to know a contact happened, whatever it was.
+   *
+   * Separate from `setBumpHandler`, which this file uses for its own
+   * reactions and must keep. A second, additive hook so 90-app.js can hang the
+   * collision blip off it without taking the reaction away.
+   */
+  let onThud = null;
+  function setThud(fn) { onThud = fn; }
+
   function bump(kind, idx, x, z) {
     const [t, s] = local(x, z);
+    if (onThud) onThud(kind);
     bumpLog.push({ kind, idx, t: +t.toFixed(2), s: +s.toFixed(2),
       at: +crowdT.toFixed(2) });
     if (bumpLog.length > 12) bumpLog.shift();
@@ -22981,7 +23036,7 @@ async function buildJadrija(scene) {
      * buffer is `bodyList()`. `bump` is called by the collider on a fresh
      * contact only. See the block over `BODY` for why any of this exists.
      */
-    bodies, bodyList, bump, setBumpHandler,
+    bodies, bodyList, bump, setBumpHandler, setThud,
     bumps: () => bumpLog.slice(),
     /**
      * The four heights at one station, side by side, because the difference

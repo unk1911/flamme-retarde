@@ -393,6 +393,26 @@ function buildAudio() {
    * cooldown from src/43-jadrija.js while the strands are still swinging, which
    * is what gives it the tail after somebody has walked through.
    */
+  /**
+   * You have walked into somebody. Two short blips, the second lower.
+   *
+   * Misha, 28 Aug: "maybe some sort of beeping sound can be made when there's
+   * collision so i know audiotirally that there's a collision". Deliberately
+   * NOT a thud: a thud is a sound the world makes and would want to be in the
+   * mix with the sea and the crowd, whereas this is an instrument telling you
+   * about a state you cannot otherwise see. So it is a machine noise, quiet,
+   * and it falls rather than rises — a rising pair reads as a prompt and a
+   * falling pair reads as a stop.
+   *
+   * Fired once per fresh contact and not per frame: the collider keeps
+   * `touching` and `touched` for exactly that reason, so leaning on somebody
+   * is one blip and not a tone.
+   */
+  function nudge() {
+    beep(760, 0.045, 0.030);
+    setTimeout(() => beep(560, 0.055, 0.026), 55);
+  }
+
   function rattle(amp = 1, d = 0) {
     if (!ctx || amp <= 0.02) return;
     const t0 = ctx.currentTime;
@@ -3835,7 +3855,7 @@ function buildAudio() {
     slowLp.frequency.value = 20000 * Math.pow(620 / 20000, clamp(k, 0, 1));
   }
 
-  return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, rattle,
+  return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
     beadShove, beadWarm, bark, barkWarm, canopy, boots,
     /**
      * The last node before the speakers, and the context it lives in.

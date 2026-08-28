@@ -870,6 +870,10 @@ async function boot() {
   // Jadrija first: it claims the footprints it is going to rebuild in detail,
   // and the town builder has to know about that before it draws them.
   jadrija = await buildJadrija(scene);
+  // The collision blip. Hung on here rather than inside 43-jadrija.js because
+  // the mixer lives in this file and reaching down the concatenation for it
+  // from up there is Rule 3 waiting to happen.
+  if (jadrija && jadrija.setThud) jadrija.setThud(() => { if (audio) audio.nudge(); });
   // Where she lies is a pair of degrees now — the Brod, on the far side of the
   // spit — so this no longer waits on the shore having been traced. It stays
   // here because the quay is masonry in the same scene and the loading order
@@ -5300,10 +5304,28 @@ function frame() {
   // and the front plane is free. Same ramp as a wall, so walking up to somebody
   // and walking up to a doorframe pull the plane in the same way.
   const faceD = state.phase === 'ground' && ground.nearBody ? ground.nearBody() : null;
-  const faceNow = faceD == null ? 0
-    : Math.min(1, Math.max(0, (1.2 - (faceD - 0.12)) / 1.14));
-  clipNear = Math.max(indoors, hullNow, bedNow, rideNear, faceNow);
-  const wantNear = 1.2 - 1.14 * clipNear;
+  clipNear = Math.max(indoors, hullNow, bedNow, rideNear);
+  let wantNear = 1.2 - 1.14 * clipNear;
+  // Somebody else's face, and it is taken out of the ramp above rather than
+  // fed into it.
+  //
+  // The ramp bottoms out at 0.12 m against a stand-off of 0.24, which is fine
+  // for the body it measures and wrong for the person attached to it.
+  // `nearBody` reports the distance to a COLUMN — `b.r` is 0.30 and it is the
+  // collider's cylinder — and an arm does not stay inside its own column. Her
+  // hands come up when she talks to you; Misha's screenshot is a forearm and a
+  // shoulder sliced flat, at maybe 0.10 m, in front of a plane at 0.12.
+  //
+  // So the plane is put 0.28 m nearer than the nearest column, floored at
+  // 0.04. At the stand-off the collider actually holds — 0.54 m between
+  // centres, 0.24 m of clear air to the column — that is the floor, which is
+  // 200 mm of reach outside a cylinder before anything is cut, and an arm is
+  // about that. The floor is what keeps the depth buffer honest at the other
+  // end of a hundred and sixty-nine square kilometres; 0.04 against the 0.06
+  // this could already reach is not a change in that.
+  if (faceD != null) {
+    wantNear = Math.min(wantNear, clamp(faceD - 0.28, 0.04, 1.2));
+  }
   if (Math.abs(camera.near - wantNear) > 0.005) {
     camera.near = wantNear;
     camera.updateProjectionMatrix();

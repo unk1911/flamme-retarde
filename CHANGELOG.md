@@ -8,6 +8,65 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.145.0] — 2026-08-28
+
+### Always, longer, and bent over
+
+**"sometimes she doesn't do the turn around... she should always."**
+The first cut allowed the bump to interrupt her eight idles, on the
+reasoning that a shove is not a reason to break off a cartwheel. What
+that produces is a reaction that fires most of the time, and from
+outside a reaction that fires most of the time is a broken one. Always
+is a feature; sometimes is a bug. `SHIMMYABLE` is now everything she
+does outdoors — what stays out is the indoor track, the fire and the
+hose, which are checked separately and where breaking off is not a
+reaction but losing the thread of something the player is also in.
+
+`shimmy` is in its own list, so bumping her again during one restarts
+the clock rather than being swallowed; the cooldown is down to 0.9 s,
+which is shorter than the dance and only there to stop a stutter.
+
+**Longer**: `SHOW.bumpFor` is 7.5 s against the routine's 3.4. The
+routine's shimmy is one beat of a sequence; this is the whole of what
+you get for walking into somebody.
+
+**And bent over**: `SHOW.bow` carries the trunk 0.30 rad forward, spread
+over three spine joints weighted 0.45 / 0.33 / 0.22 so what it draws is
+a back with a curve in it rather than a mannequin hinged at the waist.
+It rides the same clock as the stance and is cleared by the same aims.
+
+### Her arm stopped being sliced off
+
+**"parts of her get cut off... wonder if this can be fixed."** The front
+clip plane. There has been a rule for this since people became solid,
+and it measures to a COLUMN: `nearBody` reports the distance to the
+collider's cylinder, `b.r` is 0.30, and an arm does not stay inside its
+own column. Her hands come up when she talks to you, so the screenshot
+is a forearm and a shoulder cut flat at maybe 0.10 m in front of a plane
+that had bottomed out at 0.12.
+
+The plane is now put 0.28 m nearer than the nearest column and floored
+at 0.04, so at the stand-off the collider actually holds — 0.54 m
+between centres, 0.24 m of clear air — there is 200 mm of reach outside
+the cylinder before anything is cut, and an arm is about that. Measured
+beside her: 0.04, against 0.12 before.
+
+### And it tells you now
+
+`audio.nudge` on every fresh contact — two short blips, the second
+lower. Deliberately not a thud: a thud is a sound the world makes and
+would want to sit in the mix with the sea and the crowd, and this is an
+instrument reporting a state you cannot otherwise see. Falling rather
+than rising, because a rising pair reads as a prompt and a falling pair
+reads as a stop. Once per contact and not per frame — the collider keeps
+`touching` and `touched` for exactly that reason, so leaning on somebody
+is one blip and not a tone.
+
+Hung off a second, additive hook (`setThud`) rather than
+`setBumpHandler`, which 43-jadrija.js needs for its own reactions, and
+wired from 90-app.js because the mixer lives there and reaching down the
+concatenation for it would be Rule 3 waiting to happen.
+
 ## [1.144.0] — 2026-08-28
 
 ### The axis was x and it should always have been z
