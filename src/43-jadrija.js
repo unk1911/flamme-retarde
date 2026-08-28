@@ -19115,7 +19115,7 @@ async function buildJadrija(scene) {
     cat.mesh.rotation.y = cat.yaw;
   }
 
-  function stepDog(camPos, dt) {
+  function stepDog(camPos, dt, yt = null, ys = null) {
     if (!dog) return;
     const b = dog.balloon;
     const d = Math.hypot(camPos.x - dog.mesh.position.x,
@@ -19127,7 +19127,10 @@ async function buildJadrija(scene) {
     // Out of range he stops where he was, mid-stride, and stays there: a dog
     // frozen at 120 m is a dog you cannot see is frozen.
     if (d < 120) {
-      const [pt, ps] = local(camPos.x, camPos.z);
+      // The dog comes to YOU and is drawn for the camera, which are two
+      // different points now — see the note in `updateCrowd`. `camPos` keeps
+      // the range gate above; the station he walks to is the person's.
+      const [pt, ps] = yt == null ? local(camPos.x, camPos.z) : [yt, ys];
       moveDog(dt, pt, ps);
       // The sit, laid over the idle clip: pitch the whole animal nose-up about
       // his root, and swing the hind legs forward under him. `aim` is in figure
@@ -20364,6 +20367,10 @@ async function buildJadrija(scene) {
   }
 
   function stepShow(dt, pt, ps) {
+    // Kept only so a probe can ask what she is steering by. The camera and the
+    // person were the same point until B, and telling them apart from outside
+    // is otherwise guesswork — see `updateCrowd`.
+    show.pt = pt; show.ps = ps;
     if (!show || !skinFig) return;
     const f = skinFig, S = f.state;
     const d = Math.hypot(show.t - pt, show.s - ps);
@@ -22535,23 +22542,36 @@ async function buildJadrija(scene) {
    * that pauses in the same places every run is a machine, and nothing about
    * where somebody stops for a moment on a promenade needs to survive a reload.
    */
-  function updateCrowd(dt, cam) {
+  function updateCrowd(dt, cam, at = null) {
     crowdT += dt;
     lastCam.x = cam.x; lastCam.z = cam.z;
     // The one skinned figure here is posed on the CPU — twenty-eight bones,
     // once a frame — so she is only worth doing when there is somebody near
     // enough to tell. Past a quarter of a kilometre she is a couple of pixels
     // and the palette she was left holding is as good as any other.
-    // Where you are, in the frame everybody here is laid out in.
-    const [pt, ps] = local(cam.x, cam.z);
+    //
+    // WHERE YOU ARE, WHICH IS NOT WHERE THE CAMERA IS. It was the same point
+    // for the whole life of this file — the ground mode is first person and
+    // the eye is the walker — so every behaviour in here reads the camera and
+    // means the person. The third person on land broke that quietly: at 3.10 m
+    // of pull-back, and a lap round her on top of it, the camera can be on the
+    // far side of Chloe from whoever is deciding what to do about her.
+    //
+    // Misha, 28 Aug: Baye "seems to gravitate towards the camera, not to me
+    // (Chloe), which is counter-intuitive... camera is just a passive
+    // observer". Exactly so. `at` is the person and `cam` stays the camera —
+    // and the gates below that ask "is this worth posing" keep the camera on
+    // purpose, because that question really is about the viewer.
+    const who = at || cam;
+    const [pt, ps] = local(who.x, who.z);
 
     // Unconditional, and carries its own gate inside instead. The balloon work
     // is two subtractions and a hypot and wants no gate at all; the pose is
     // twenty-four bones and wants one, and the distance both of them turn on is
     // the same number. Gating out here would mean measuring it twice.
-    stepDog(cam, dt);
+    stepDog(cam, dt, pt, ps);
     stepCat(cam, dt);
-    stepKabina(pt, ps, dt, cam.y);
+    stepKabina(pt, ps, dt, who.y);
 
     if (skinFig) {
       const dx = cam.x - skinFig.mesh.position.x, dz = cam.z - skinFig.mesh.position.z;
@@ -22911,6 +22931,41 @@ async function buildJadrija(scene) {
      * a narrower one — see `vik.indoorsAt`. Taken in world metres because the
      * only caller has a camera and not a station.
      */
+    /**
+     * Are two points in the same room? World metres, both of them.
+     *
+     * Written for the third person and for nothing else. `confine` stops the
+     * camera at a wall, which is most of the job and is not all of it: a
+     * doorway is not a wall, so a camera walking backwards out of a kabina
+     * goes through the door and stands on the beach looking in at you.
+     *
+     * Misha, 28 Aug: "when i'm in the kabine, and i do B, when the camera
+     * rotates, it gets me sorta in/out of the kabine... the camera has to stay
+     * within the bounds of the kabine". It does not want a bigger kabina — see
+     * Rule 6, and the hut is 2.15 m of a measured 0.95 to 1.05 already — it
+     * wants the pull-back to know that a door is a way out.
+     *
+     * Two rooms in this locale and they are asked differently: the open kabina
+     * is a footprint, and the vikendica has `indoorsAt` because it has storeys
+     * and a ceiling that runs out. Anything else on this shore has no inside,
+     * so two points outdoors are always in the same nothing.
+     */
+    sameRoom: (ax, az, bx, bz, y) => {
+      const K = special;
+      if (K) {
+        const inK = (x, z) => {
+          const [t, s] = local(x, z);
+          return t > K.t0 && t < K.t1 && s > K.face && s < K.s1;
+        };
+        if (inK(ax, az) !== inK(bx, bz)) return false;
+      }
+      if (vik) {
+        const [at, as] = local(ax, az);
+        const [bt, bs] = local(bx, bz);
+        if (!vik.indoorsAt(at, as, y) !== !vik.indoorsAt(bt, bs, y)) return false;
+      }
+      return true;
+    },
     indoorsAt: (x, y, z) => {
       if (!vik) return 0;
       const [t, s] = local(x, z);
@@ -23315,6 +23370,10 @@ async function buildJadrija(scene) {
         dHer: changing ? +Math.hypot(show.t - changing.t,
           show.s - changing.s).toFixed(1) : -1 },
       t: +show.t.toFixed(1), s: +show.s.toFixed(1),
+      // Who she is attending to, in the shore's frame. This is the WALKER and
+      // not the camera; if those two ever agree while the third person is on
+      // and swung round, something has gone back to reading `cam`.
+      you: show.pt == null ? null : [+show.pt.toFixed(2), +show.ps.toFixed(2)],
       ang: +show.ang.toFixed(2), flips: show.flips,
       wheels: show.wheels, side: +show.side.toFixed(2),
       pace: +show.pace.toFixed(2), played: +show.played.toFixed(1),

@@ -4973,7 +4973,15 @@ function frame() {
   // The bathers. They pose off the camera rather than off the aeroplane: the
   // whole point of them is what they look like from the promenade, and on foot
   // the aeroplane is parked two kilometres away at Rokići.
-  if (jadrija) jadrija.update(dt, camera.position);
+  // The camera and the person, separately, because B put three metres and a
+  // lap between them — see `updateCrowd` in 43-jadrija.js. On foot the person
+  // is the walker; everywhere else there is nobody on the ground and the
+  // camera is the only answer there is.
+  if (jadrija) {
+    jadrija.update(dt, camera.position,
+      state.phase === 'ground' && ground && ground.ok
+        ? { x: ground.you.x, y: ground.you.y, z: ground.you.z } : null);
+  }
   rail.update(dt);
   sea.update(camera);
   // The water column, which only exists while somebody is inside it. Keyed on

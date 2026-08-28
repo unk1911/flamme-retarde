@@ -8,6 +8,46 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.133.0] — 2026-08-28
+
+### The camera is a passive observer, and everybody had been treating it as you
+
+**"she seems to gravitate towards the camera, not to me (Chloe), which
+is counter-intuitive... camera is just a passive observer."** Exactly
+right, and it was general rather than hers: `updateCrowd` has read the
+player's position off the camera since the day it was written, because
+until B went to land the two were the same point. The ground mode is
+first person; the eye IS the walker. Third person put 3.10 m between
+them and the lap put the camera on the far side of her.
+
+So `updateCrowd(dt, cam, at)` now takes both, and everything that
+DECIDES something reads `at` while everything that asks "is this worth
+posing" keeps `cam` — because that question really is about the viewer.
+Baye's whole routine moves with it, and so does the dog, who comes to
+you, and `stepKabina`, which is about whose feet are on the floor.
+`__fr.jad.show().you` reports the point she is steering by, so the two
+can never quietly become one again without a probe saying so: steering
+by 429.00, 12.40 with the camera at 427.12, 10.07 is the fix working.
+
+### And a door is not a wall
+
+**"when i'm in the kabine, and i do B, when the camera rotates, it gets
+me sorta in/out of the kabine."** `confine` stops the pull-back at a
+wall, which is most of the job and is not all of it: a doorway is an
+opening, so the march walks the camera through it and stands it on the
+beach looking in at you.
+
+`sameRoom` in 43-jadrija.js answers whether two world points are in the
+same inside, and the march breaks the moment the camera would leave the
+one she is in. Two rooms on this shore and they are asked differently —
+the open kabina is a footprint, the vikendica has storeys and a ceiling
+that runs out — and anything without an inside leaves the field off and
+pays one comparison against undefined.
+
+The hut is NOT bigger. It was offered as the fix and it is the one thing
+that cannot be: `JAD.cabW` is already 2.15 m against a measured 0.95 to
+1.05, which is Rule 6's standing complaint about this object.
+
 ## [1.132.0] — 2026-08-28
 
 ### She changes out of things

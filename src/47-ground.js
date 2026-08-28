@@ -2116,6 +2116,13 @@ async function buildGround(scene, field) {
           const tx = ex + bx * k, tz = ez + bz * k;
           const [nx, nz] = confine(tx, tz, ey);
           if (Math.hypot(nx - tx, nz - tz) > 0.02) break;
+          // And a door is not a wall. `confine` is happy to walk the camera
+          // straight out through one, which for somebody standing in a kabina
+          // is a shot from the beach of the doorway they are behind. A locale
+          // with insides says where they end — see `sameRoom` in
+          // 43-jadrija.js; one without leaves the field off and this costs a
+          // comparison against undefined.
+          if (field.sameRoom && !field.sameRoom(ex, ez, tx, tz, ey)) break;
           d = k;
         }
         return [d, bx, bz];
