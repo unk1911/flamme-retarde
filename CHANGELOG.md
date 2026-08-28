@@ -8,6 +8,25 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.138.0] — 2026-08-28
+
+### Tighter, and a way to stop asking
+
+The profile now follows the skull it is on. Measured lateral half-widths
+over the hem are 0.077, 0.076, 0.070, 0.057, 0.037 and gone by 82 mm;
+the beanie is that plus about 13 mm of knit, tapering the way a head
+tapers, with `fa` 1.45 for the oval and the lean down to 0.14. What was
+left before was a dome that held 90 mm of radius most of the way up a
+skull that had stopped being 90 mm wide two centimetres below it, and
+what that draws is a bag.
+
+**`__fr.jad.youHat({ fa: 1.5, lean: -0.10 })`** re-lathes it in place.
+Seven releases went into this shape one page-rebuild at a time, at forty
+seconds a look, and every one of them was somebody typing a number into
+a file so somebody else could disagree with a screenshot. The eighth
+disagreement can be settled in the console and handed back as four
+numbers.
+
 ## [1.137.0] — 2026-08-28
 
 ### The beanie fits

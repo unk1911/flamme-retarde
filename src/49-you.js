@@ -142,12 +142,12 @@ const YOU = {
   // The give is all in the crown and the shear now, which is where a beanie
   // keeps it.
   beanie: {
-    hem: 1.668, fa: 1.42, lean: -0.20,
+    hem: 1.668, fa: 1.45, lean: -0.14,
     prof: [
-      [0.070, -0.075], [0.086, -0.045], [0.090, -0.018],
-      [0.091, 0.004], [0.090, 0.024], [0.087, 0.044],
-      [0.081, 0.062], [0.072, 0.078], [0.059, 0.092],
-      [0.042, 0.103], [0.023, 0.110], [0.000, 0.114],
+      [0.072, -0.075], [0.086, -0.045], [0.090, -0.018],
+      [0.091, 0.004], [0.090, 0.020], [0.086, 0.038],
+      [0.079, 0.055], [0.069, 0.070], [0.055, 0.083],
+      [0.038, 0.093], [0.020, 0.099], [0.000, 0.103],
     ],
   },
   // A trim, if she ends up facing off-square. The rig's own forward is +X —
@@ -695,21 +695,37 @@ async function buildYou(scene) {
   // have to BE the hat. The hair stops at the skull, so the mask is a skullcap
   // and the four centimetres of slouch behind her head are over nothing.
   const hat = new THREE.Group();
-  hat.position.set(0 - YOU.bone[0], B.hem - YOU.bone[1], 0 - YOU.bone[2]);
   head.add(hat);
-  {
-    const pts = B.prof.map(([r, y]) => new THREE.Vector2(r, y));
+  let capMesh = null;
+
+  /**
+   * Build the beanie, and rebuild it on demand.
+   *
+   * A function rather than a block because this shape has now taken seven
+   * releases to land and every one of them was a full rebuild of the page to
+   * look at one number. `__fr.jad.youHat({ fa: 1.5, lean: -0.1 })` re-lathes
+   * it in place, so the next person to disagree with it — including Misha,
+   * who is the reason it exists — can dial it in the console in seconds and
+   * hand back four numbers instead of a screenshot.
+   */
+  function beanie(o = {}) {
+    const b = { ...B, ...o };
+    hat.position.set(0 - YOU.bone[0], b.hem - YOU.bone[1], 0 - YOU.bone[2]);
+    if (capMesh) { hat.remove(capMesh); capMesh.geometry.dispose(); }
+    const pts = b.prof.map(([r, y]) => new THREE.Vector2(r, y));
     const geo = new THREE.LatheGeometry(pts, 40);
     const a = geo.attributes.position;
     for (let i = 0; i < a.count; i++) {
-      const x = a.getX(i), y = a.getY(i);
       // Oval first, then shear. The other order leans it and then stretches
       // the lean, which is a hat falling off sideways.
-      a.setX(i, x * B.fa + B.lean * Math.max(0, y));
+      a.setX(i, a.getX(i) * b.fa + b.lean * Math.max(0, a.getY(i)));
     }
     geo.computeVertexNormals();
-    hat.add(new THREE.Mesh(geo, capMat));
+    capMesh = new THREE.Mesh(geo, capMat);
+    hat.add(capMesh);
+    return { hem: b.hem, fa: b.fa, lean: b.lean, prof: b.prof };
   }
+  beanie();
 
   // There were four locks of hair here as well — flat tapered cones down each
   // side of her face and two across the forehead — on the theory that the
@@ -837,6 +853,8 @@ async function buildYou(scene) {
     mesh,
     fig,
     tick,
+    /** Re-lathe the beanie from the console. See `beanie`. */
+    beanie,
     /** Debug: draw her in the room, and stop her following the camera. */
     show: (v) => { mesh.visible = !!v; return mesh.visible; },
     /**

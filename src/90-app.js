@@ -5832,6 +5832,14 @@ window.__fr = {
     you: () => (you ? you.stats() : null),
     youRaw: () => you,
     youShow: (v) => (you ? you.show(v) : null),
+    /**
+     * Re-lathe her beanie without a rebuild.
+     *
+     * `__fr.jad.youHat({ fa: 1.5, lean: -0.10 })`, or with a whole `prof`.
+     * Seven releases went into this shape one page-rebuild at a time; this is
+     * so the eighth disagreement can be settled in the console.
+     */
+    youHat: (o) => (you ? you.beanie(o || {}) : null),
     youFreeze: (v) => (you ? you.freeze(v) : null),
     /** The threshold: where it thinks you are, and whether it is mid-cut. */
     dip: () => {
