@@ -8,6 +8,33 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.134.0] — 2026-08-28
+
+### The sleeve was tattooed down her leg
+
+**"it looks like paint job from the tattoo that somehow imprints on the
+right leg."** It is exactly that, and the gate has been wrong since the
+sleeve was written.
+
+`vLocal` is the BIND pose, and in the bind pose her arms are OUT, not
+hanging. Bucket her vertices by height and read the widest thing on the
+body in each band: 0.22 at y 0.78, 0.20 at 0.86, and only 0.18 from 0.90
+up — while the arm does not exist below y 0.96 at all and is out at
+0.34 to 0.52 above it. The sleeve's threshold is `side > 0.19`, so
+everywhere below y 0.86 the only thing it can possibly be catching is
+the outer hip and thigh. The old lower bound of 0.720 handed it all of
+that.
+
+0.900 clears the last body vertex over the threshold by four centimetres
+and costs the sleeve nothing: the lowest thing on her hand is at 0.96,
+so it still runs deltoid to knuckles.
+
+It had been hidden by the hip wrap for as long as there was one, and
+surfaced the moment the wrap stopped being replaced by a painted
+garment. The previous release dismissed the tattoo as the cause with an
+estimate of where the thigh sits in z instead of a measurement of it,
+and the estimate was out by 100 mm in the one direction that mattered.
+
 ## [1.133.0] — 2026-08-28
 
 ### The camera is a passive observer, and everybody had been treating it as you

@@ -412,8 +412,28 @@ async function buildYou(scene) {
       // ink is stuck to her skin, not to the space her arm happened to be in.
       {
         float side = vLocal.z * ${YOU.right.toFixed(1)};
+        // 0.900 and not 0.720, and the 180 mm is why it has to be measured
+        // rather than reasoned about.
+        //
+        // vLocal is the BIND pose and in the bind pose her arms are out, not
+        // hanging: bucket her vertices by height and the body reaches z 0.22
+        // at y 0.78, 0.20 at 0.86 and only 0.18 from 0.90 up, while the arm
+        // does not exist below 0.96 at all and is out at 0.34 to 0.52 above
+        // it. So a threshold of 0.19 catches the OUTER HIP AND THIGH
+        // everywhere below y 0.86, and the old lower bound of 0.72 handed it
+        // the whole of that. A tattoo sleeve down her leg.
+        //
+        // It hid behind the hip wrap for as long as there was one. Misha found
+        // it the moment the wrap stopped being replaced by a painted garment
+        // — "it looks like paint job from the tattoo that somehow imprints on
+        // the right leg", which is exactly what it is — and I looked straight
+        // at the gate a release earlier and talked myself out of it with a
+        // guess at the numbers instead of reading them off the mesh.
+        //
+        // 0.900 clears the last body vertex over 0.19 by four centimetres and
+        // costs the sleeve nothing: the lowest thing on her hand is at 0.96.
         float arm = smoothstep(0.180, 0.202, side)
-          * smoothstep(0.720, 0.790, vLocal.y)
+          * smoothstep(0.900, 0.945, vLocal.y)
           * (1.0 - smoothstep(1.398, 1.452, vLocal.y));
         if (arm > 0.002) {
           float f = youFbm(vLocal * 30.0);
