@@ -409,8 +409,15 @@ function buildAudio() {
    * is one blip and not a tone.
    */
   function nudge() {
-    beep(760, 0.045, 0.030);
-    setTimeout(() => beep(560, 0.055, 0.026), 55);
+    // 0.12 and 0.10, up from 0.030 and 0.026. Verified reaching the mixer —
+    // the hook fires `nudge` once per fresh contact — and Misha still could
+    // not hear it, which at that gain is not surprising: the promenade bed,
+    // the sea and a crowd are all running underneath, and 0.03 of square wave
+    // is what `squelch` uses for a sound you are already expecting because you
+    // pressed the button that makes it. An alert you did not ask for has to be
+    // louder than one you did.
+    beep(760, 0.055, 0.12);
+    setTimeout(() => beep(560, 0.070, 0.10), 60);
   }
 
   function rattle(amp = 1, d = 0) {

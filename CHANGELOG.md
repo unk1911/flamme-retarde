@@ -8,6 +8,29 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.146.0] — 2026-08-28
+
+### Seventeen degrees is not a bend
+
+`SHOW.bow` was 0.30 rad. That is seventeen degrees, which is a lean —
+"i don't think she is doing the bending when i bump into her" is exactly
+what seventeen degrees looks like from outside, which is nothing. 0.85
+is forty-nine, still spread 0.45 / 0.33 / 0.22 up the spine so it is a
+back curving rather than a hinge, and now unmistakable.
+
+### And the blip was reaching the mixer all along
+
+Worth writing down because the first two measurements of it were both
+wrong. Spying on the exported `beep` showed zero calls — invalid, since
+`nudge` calls the module's own closure and not the object's property.
+Spying on `nudge` itself showed one call per fresh contact, which is the
+hook working exactly as intended.
+
+So it was never wiring, it was gain. 0.030 of square wave is what
+`squelch` uses for a sound you are expecting because you pressed the
+button that makes it, and this one arrives under a promenade bed, the
+sea and a crowd, unasked for. 0.12 and 0.10, and a little longer.
+
 ## [1.145.0] — 2026-08-28
 
 ### Always, longer, and bent over

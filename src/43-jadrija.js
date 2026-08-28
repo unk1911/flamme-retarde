@@ -19396,7 +19396,12 @@ async function buildJadrija(scene) {
     // rad the trunk carries forward with it. "turn around, bend over spreading
     // her legs a bit" — this is the bend, spread over three spine joints so it
     // is a back curving rather than a hinge at the waist.
-    bow: 0.30,
+    //
+    // 0.85 and not 0.30. The first number was seventeen degrees, which is a
+    // lean and not a bend: "i don't think she is doing the bending when i bump
+    // into her" is what seventeen degrees looks like from outside, which is
+    // nothing. 0.85 is forty-nine, which is a person bending over.
+    bow: 0.85,
     // s the bump's shimmy runs for, against the routine's 3.4. Asked for
     // longer, and it is the whole of the reaction rather than one beat of a
     // sequence.
