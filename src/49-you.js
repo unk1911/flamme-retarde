@@ -131,14 +131,23 @@ const YOU = {
   // over the hem] — the first three points of which are BELOW the hem and
   // inside her head, so the visible edge is the curve where cloth leaves
   // scalp rather than a ring drawn at a height.
+  //
+  // THE RADIUS IS LATERAL AND THE OVAL DOES THE LENGTH, and getting that
+  // backwards is what made the first slouch read, in Misha's words, like the
+  // hat you wear over an afro. A lathe radius of 0.105 with `fa` at 1.30 gives
+  // 105 mm across a skull that measures 77 — twenty-eight millimetres of air
+  // on each side, which is a tam. The same envelope comes out fitted at 0.091
+  // and 1.42: 14 mm proud laterally, 13 mm proud at the nape over a braincase
+  // that is 130 long against 77 wide, which is the oval a head actually is.
+  // The give is all in the crown and the shear now, which is where a beanie
+  // keeps it.
   beanie: {
-    hem: 1.668, fa: 1.30, lean: -0.32,
+    hem: 1.668, fa: 1.42, lean: -0.20,
     prof: [
-      [0.072, -0.075], [0.092, -0.046], [0.101, -0.018],
-      [0.105, 0.008], [0.107, 0.030], [0.106, 0.052],
-      [0.102, 0.070], [0.095, 0.084], [0.084, 0.095],
-      [0.068, 0.104], [0.048, 0.110], [0.026, 0.114],
-      [0.000, 0.116],
+      [0.070, -0.075], [0.086, -0.045], [0.090, -0.018],
+      [0.091, 0.004], [0.090, 0.024], [0.087, 0.044],
+      [0.081, 0.062], [0.072, 0.078], [0.059, 0.092],
+      [0.042, 0.103], [0.023, 0.110], [0.000, 0.114],
     ],
   },
   // A trim, if she ends up facing off-square. The rig's own forward is +X —

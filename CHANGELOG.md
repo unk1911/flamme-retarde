@@ -8,6 +8,20 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.137.0] — 2026-08-28
+
+### The beanie fits
+
+**"it looks like the type of hat black people have to hold their afros
+... Chloe's hat has to much tighter on her head."** The radius was doing
+the wrong job. A lathe's radius is LATERAL and `fa` is what makes it a
+head-shaped oval, and 0.105 with `fa` 1.30 put 105 mm across a skull
+that measures 77 — twenty-eight millimetres of air on each side, which
+is a tam whoever is wearing it. The same envelope comes out fitted at
+0.091 and 1.42: 14 mm proud laterally, 13 mm at the nape, over a
+braincase that is 130 long against 77 wide. The give is in the crown and
+the shear now, which is where a beanie keeps it.
+
 ## [1.136.0] — 2026-08-28
 
 ### A slouch is not an ellipsoid
