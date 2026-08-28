@@ -4525,6 +4525,10 @@ function crossChanging(afoot) {
  * count for it since the wrap was authored, and `loadSkin` re-inflates per
  * call so Chloe's draw range is hers alone and nobody on the beach loses
  * theirs. The vest is paint, so it is a uniform: see `uSwim` in 49-you.js.
+ *
+ * Both of them come OFF, and neither is replaced. That is what was asked for
+ * — "if we walk in with clothes we leave without" — and four releases went
+ * into a painted swimming costume that was never part of it.
  */
 function setDressed(v) {
   dressed = !!v;

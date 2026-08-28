@@ -45,19 +45,9 @@ const YOU = {
   vest: [0.885, 0.900, 0.860],
   // And what is under it, showing at the scoop and over the shoulders.
   under: [0.055, 0.058, 0.068],
-  // What she changes into. Deep teal, and picked for one reason: it has to
-  // read as NOT the vest from behind at three metres, which is where the
-  // third person puts you, and the vest is a warm off-white. A dark cool
-  // colour is the largest step available without inventing a pattern this
-  // shader has no way to draw.
-  // Lifted from 0.075/0.185/0.200 once the shapes were right. That value was
-  // chosen against the vest — dark and cool, so it reads as NOT a warm
-  // off-white from three metres — and it does that job at this one too. What
-  // it did not do is survive shade: at 0.075 the whole garment falls into the
-  // figure's own ambient occlusion under an awning, and a garment you cannot
-  // tell from a shadow is a smudge. Still deep, still cool, still nothing like
-  // the vest.
-  swim: [0.098, 0.240, 0.258],
+  // There is no colour here for what she changes INTO, and there was one for
+  // four releases. She changes out of things — see the note over the scoop in
+  // the body shader.
   // Pink through the blue. Not a tint over the whole head — three or four
   // locks taken pink, which is what a highlight is.
   pink: [0.560, 0.150, 0.330],
@@ -262,42 +252,26 @@ async function buildYou(scene) {
         float front = smoothstep(0.020, 0.105, vLocal.x)
           * (1.0 - smoothstep(0.030, 0.105, abs(vLocal.z)));
         float neck = mix(1.450, 1.372, front);
-        // The hem, which is the whole of the change of clothes.
+        // The hem. A constant, and it stopped being one for four releases
+        // while this file tried to turn the tank into a swimming costume when
+        // she changes. See the note over the scoop for why it does not now.
+        float hem = 0.995;
         //
-        // uSwim runs 0 to 1 and takes the bottom of the garment from 0.995 —
-        // a tank that covers her to the hip — up to 1.075. Nothing else about
-        // the shape moves: the neckline, the trunk cut and the scoop are the
-        // same terms doing the same work, because a swimsuit top and a vest
-        // differ in how far down they go and not in how they are held up. The
-        // straps go with it, below.
-        //
-        // 1.075 IS A MEASUREMENT AND 1.275 WAS NOT. The first number here was
-        // written as "a band across the bust" and it was picked by eye off a
-        // shader, which is a way of picking a number that cannot be checked.
-        // It lands ABOVE the bust: bucket her bind positions by height and
-        // take the frontmost vertex within 0.14 of the midline in each, and
-        // the front of her rises from 0.151 at y 1.10 to a plateau of 0.166 to
-        // 0.169 across y 1.16 to 1.26 before falling away. That plateau is the
-        // bust and 1.275 is over the top of it, so what the garment did was
-        // stop just above the nipples — which is why Misha read the whole
-        // thing as paint left on her rather than as a swimsuit. It is: a band
-        // that crosses a breast instead of covering it is body paint, whatever
-        // colour it is in.
-        //
-        // The under-bust crease is the dip at y 1.12, off the midline at
-        // z -0.083. 1.075 clears it by 45 mm and the smoothstep's far edge at
-        // 1.100 still clears it by 20, so the garment starts on ribcage and
-        // covers the bust whole.
-        // And the top's hem lifts at the sides for the same reason the leg
-        // opening does: a garment cut flat all the way round is the one thing
-        // no garment is. Only 18 mm — this is an underarm and not a neckline —
-        // and only when she is changed, because the tank really does hang
-        // straight and its hem really is a flat line at the hip.
-        float hem = mix(0.995, 1.075, uSwim)
-          + uSwim * 0.018 * smoothstep(0.030, 0.125, abs(vLocal.z));
+        // AND THE WHOLE OF IT COMES OFF WHEN SHE CHANGES. That is the change:
+        // the hip wrap is geometry and leaves through wear(), the tank is
+        // paint and leaves through here, and what is left is her. Misha asked
+        // for exactly that on 25 Aug — "if we walk in with clothes we leave
+        // without" — and four releases were spent instead building a swimming
+        // costume nobody asked for, then arguing with its hem, then its print,
+        // then the cut of its leg. He said "some weird blue-green thing on me"
+        // three times and every time it was read as a complaint about the
+        // shape of the thing rather than about there being a thing. It is the
+        // Jadrija bathing station in August; the beach is full of people this
+        // file already draws with less on than this.
         float scoop = trunk
           * smoothstep(hem, hem + 0.025, vLocal.y)
-          * (1.0 - smoothstep(neck, neck + 0.012, vLocal.y));
+          * (1.0 - smoothstep(neck, neck + 0.012, vLocal.y))
+          * (1.0 - uSwim);
         float vest = scoop;
         // Two straps over the shoulders, on a fixed height band rather than
         // one that follows the neckline — hang them off the scoop and the
@@ -314,72 +288,7 @@ async function buildYou(scene) {
           * (1.0 - smoothstep(1.468, 1.486, vLocal.y))
           * (1.0 - uSwim));
         vcol = mix(vcol,
-          mix(vec3(${YOU.vest.map((n) => n.toFixed(3)).join(', ')}),
-              vec3(${YOU.swim.map((n) => n.toFixed(3)).join(', ')}), uSwim),
-          vest);
-
-        // And the bottom half, which only exists when she is changed.
-        //
-        // It has to be painted, and finding that out is what this block is.
-        // The hip wrap she wears otherwise is GEOMETRY — the joined tail of
-        // the mesh that write_skin counts in shed — and taking it off with
-        // wear leaves nothing behind it, because there was never anything
-        // behind it to leave. Every other figure on this beach has swimwear in
-        // its baked vertex colours; she is the one figure whose clothes are
-        // all paint, so hers has to be painted too.
-        //
-        // The same trunk test as the vest, for the same reason: at this height
-        // her hands hang at the hip and a band that went all the way round in
-        // z would put a stripe across both wrists.
-        //
-        // THE LEG OPENING IS A CURVE AND NOT A LINE, and that is the whole of
-        // what was wrong here. Everything on this figure is painted by height,
-        // which is fine for a hem across a ribcage and is exactly wrong for
-        // the bottom of a pair of briefs: a flat cut at one height saws
-        // straight across both thighs and the gap between them, and what it
-        // draws is not a garment at all. It is a tide mark. Misha called it a
-        // weird blue-green thing on her three times and he was describing the
-        // line, not the colour.
-        //
-        // So the height the garment stops at is a function of where you are
-        // round the leg. Near the middle it runs low, because that is the
-        // crotch and there is nothing there to expose; out at the hip it
-        // climbs to just under the waistband, which is a high-cut leg and is
-        // what a swimming costume does. Round the front it climbs a little
-        // further again — briefs cover more behind than in front, and the
-        // asymmetry is most of why a cut reads as tailored rather than as
-        // stencilled.
-        // The two ends of it are measured against the waistband above, which
-        // sits at 0.996. 0.898 is a hundred millimetres under it and 0.962 is
-        // thirty-four, and both of those are the garment: past about 0.975 the
-        // opening would meet the waistband and the brief would have a hole in
-        // its own hip.
-        //
-        // WHAT MOVED HERE IS THE RAMP AND NOT THE DEPTH, and getting that the
-        // wrong way round cost a release. The flat band this replaced ran to
-        // 0.800 and covered her; the curve that replaced it kept the depth but
-        // spread it over 45 to 150 mm of z, which is a slow ramp, and a slow
-        // ramp at that depth paints the whole inner thigh. That is the dark
-        // tongue between her legs in the screenshot — teal, but under the
-        // figure's own occlusion it reads as a blob rather than as cloth.
-        //
-        // Raising the middle to get rid of it was the obvious answer and it
-        // was wrong: at 0.898 the tongue went and so did the covering, and
-        // what was underneath is the body this figure has always had under its
-        // paint. So the middle goes back down where it has to be and the ramp
-        // is what tightens. 45 to 150 mm painted the thigh; 18 to 80 climbed
-        // so fast off the midline that the brief came out a thong. 28 to 105
-        // is a gusset the width of a gusset — narrow and deep, not shallow and
-        // wide, and not a string either.
-        float side = smoothstep(0.028, 0.105, abs(vLocal.z));
-        float legY = mix(0.815, 0.962, side)
-          + 0.010 * smoothstep(-0.020, 0.090, vLocal.x);
-        float briefs = trunk
-          * smoothstep(legY, legY + 0.010, vLocal.y)
-          * (1.0 - smoothstep(0.996, 1.006, vLocal.y));
-        vcol = mix(vcol,
-          vec3(${YOU.swim.map((n) => n.toFixed(3)).join(', ')}),
-          briefs * uSwim);
+          vec3(${YOU.vest.map((n) => n.toFixed(3)).join(', ')}), vest);
 
         // What is under it, showing where the vest stops: a dark edge round
         // the scoop, and a narrower dark strap inboard of each white one.
@@ -425,7 +334,7 @@ async function buildYou(scene) {
           // same graphic on both is the clearest possible statement that
           // neither is cloth. Nobody has this printed on their swimming
           // costume either.
-          float on = vest * (1.0 - uSwim)
+          float on = vest
             * smoothstep(0.028, 0.060, vLocal.x)
             * (1.0 - smoothstep(0.104, 0.132, abs(vLocal.z)));
           vec3 pc = vec3(0.0);
@@ -824,7 +733,13 @@ async function buildYou(scene) {
     tick,
     /** Debug: draw her in the room, and stop her following the camera. */
     show: (v) => { mesh.visible = !!v; return mesh.visible; },
-    /** Changed for the water, or dressed. See `uSwim` and `setDressed`. */
+    /**
+     * Changed for the water, or dressed.
+     *
+     * The name is left over from when this swapped one painted garment for
+     * another. It takes the painted one OFF; the geometry half of the same
+     * change is `wear`, and `setDressed` in 90-app.js calls the pair.
+     */
     swim: (v) => { uSwim.value = v ? 1 : 0; return uSwim.value; },
     freeze: (v) => { frozen = !!v; return frozen; },
     /**

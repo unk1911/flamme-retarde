@@ -8,6 +8,32 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.132.0] — 2026-08-28
+
+### She changes out of things
+
+**"why u trying to put brief on me."** Because I misread the request on
+25 August and then spent four releases defending the misreading. What
+was asked for was: *"it should be stateful: if we walk in with clothes
+we leave without, or vice versa."* Without. What got built was a painted
+swimming costume she changes INTO, and every round of feedback since has
+been about that costume rather than about the changing station.
+
+"I still have some weird blue/green thing on" was said three times. It
+was read as a complaint about the SHAPE of the thing all three times —
+the hem was over the bust, so the hem moved; the band's skull print was
+on the swimsuit, so the print came off; the leg opening was a flat cut
+across both thighs, so it became a curve, then a narrower gusset. Every
+one of those was a real defect in a thing that should not have existed,
+and fixing them made the wrong object better.
+
+So `uSwim` now takes the paint OFF rather than swapping it for another
+colour. The change of clothes is what it was always specified to be and
+what it already half was: the hip wrap is geometry and leaves through
+`wear`, the tank is paint and leaves through the scoop term, and what is
+left is her. `YOU.swim`, the painted briefs, the morphing hem and its
+side lift are all gone with it.
+
 ## [1.131.0] — 2026-08-28
 
 ### The promenade is 5 cm thicker than the height it is drawn from
