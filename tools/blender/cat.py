@@ -210,6 +210,148 @@ def fix_actions(scale):
     print("[cat] scaled %d location channels by %.4f" % (n, scale))
 
 
+def settle(cat, rig):
+    """Drop him again, and this time against the CLIP rather than the rest pose.
+
+    `build` puts the lowest vertex of the REST pose at exactly z = 0, which is
+    the right thing to do and is not enough. A rest pose is a T-pose with the
+    legs straight down; a walk cycle carries the body lower than that for most
+    of its length, because a leg in stance is a bent leg. So the animal that
+    was dropped to the floor standing still is in the floor the moment it
+    plays, by however much the crouch is worth.
+
+    Which is why "the cat is below the ground" survived one fix. `fix_actions`
+    was the big half — the root channel was authored at thirty-six times the
+    size and put his belly on the concrete — but it left a hand's breadth
+    behind, and a hand's breadth on a 0.25 m animal is his legs gone to the
+    knee.
+
+    So the mesh is DEFORMED and measured, frame by frame, over the whole cycle:
+    `build` cleared the modifiers, so one goes back for the duration. The
+    lowest evaluated vertex over the whole clip is what has to touch zero.
+    Both the mesh and the rest skeleton move by it, which leaves the pose
+    exactly as it was — a pose is its rest plus a local offset, and shifting
+    the rest shifts the two together.
+    """
+    act = next((a for a in bpy.data.actions if a.name.startswith(CLIP)), None)
+    if act is None:
+        return 0.0
+    if rig.animation_data is None:
+        rig.animation_data_create()
+    rig.animation_data.action = act
+    mod = cat.modifiers.new("measure", "ARMATURE")
+    mod.object = rig
+    scn = bpy.context.scene
+    f0, f1 = (int(round(v)) for v in act.frame_range)
+    low, at = 1e9, f0
+    for f in range(f0, f1 + 1):
+        scn.frame_set(f)
+        bpy.context.view_layer.update()
+        ev = cat.evaluated_get(bpy.context.evaluated_depsgraph_get())
+        me = ev.to_mesh()
+        z = min(v.co.z for v in me.vertices)
+        ev.to_mesh_clear()
+        if z < low:
+            low, at = z, f
+    scn.frame_set(f0)
+    cat.modifiers.remove(mod)
+    # The paw bone heads at the same instant, printed so the runtime can be
+    # asked the identical question — see `__fr.jad.cat().paws`. Two numbers
+    # that disagree localise a sinking animal to the bake in one step; two
+    # that agree say the ground is the liar.
+    names = [b for b in ("Hips", "frontleg2", "R_frontleg2", "backleg2",
+                         "R_backleg2") if b in rig.pose.bones]
+    paws = {b: 1e9 for b in names}
+    for f in range(f0, f1 + 1):
+        scn.frame_set(f)
+        bpy.context.view_layer.update()
+        for b in names:
+            paws[b] = min(paws[b],
+                          round((rig.matrix_world @ rig.pose.bones[b].head).z
+                                - low, 4))
+    scn.frame_set(f0)
+    rests = {b: round(rig.data.bones[b].head_local.z - low, 4) for b in names}
+    print("[cat] lowest each paw ankle gets over the deck: %s" % paws)
+    print("[cat] the same ankles in the REST pose: %s" % rests)
+    if abs(low) > 1e-4:
+        for d in (cat.data, rig.data):
+            d.transform(Matrix.Translation((0.0, 0.0, -low)))
+    print("[cat] walk sits %+.3f m against the rest pose (lowest at frame %d)"
+          " — lifted by that" % (low, at))
+    return low
+
+
+def bake_root_scale(cat, rig):
+    """Take the exporter's scale out of the POSE and put it in the skeleton.
+
+    This clip carries a uniform 0.74496 on the root bone, on every frame, and
+    it is not animation — twenty-five keys, one distinct value. It is a rest
+    offset somebody's exporter parked in the pose because glTF had somewhere to
+    put it. Blender honours it and composes every bone below the root at three
+    quarters of its rest offset; the runtime cannot, because `bake_action`
+    writes `m.to_quaternion()` and the format has no channel for scale at all.
+
+    Nothing warns. The drift check in frskin.py watches translation, and the
+    translations were clean to a tenth of a millimetre — which is how this
+    survived two fixes. What it looks like from outside is an animal whose rest
+    pose and root are exactly right (they were: 0.2750 and 0.1925 in both
+    Blender and the game, to four decimals) and whose paws are 57 mm lower in
+    the game than in the file. A leg composed at 1.0 instead of 0.745 reaches
+    0.2265 instead of 0.169 — that difference IS the 57 mm, and it is why the
+    cat was in the terrace rather than on it.
+
+    So the scale is folded into the bone data and the mesh together, where the
+    format can carry it, and the pose is left with nothing but rotation. The
+    location channels come too: a pose bone's `location` lives in unit local
+    axes and does not follow a transform applied to the bones, exactly as
+    `fix_actions` sets out — it is the same trap twice in one file.
+
+    Done BEFORE the BODY scaling on purpose. `k` is derived from the mesh, and
+    after this the mesh is the animal the clip describes rather than a rest
+    pose a third bigger — so 0.46 m of head and body is 0.46 m of the cat you
+    actually see.
+    """
+    act = next((a for a in bpy.data.actions if a.name.startswith(CLIP)), None)
+    if act is None:
+        return 1.0
+    if rig.animation_data is None:
+        rig.animation_data_create()
+    rig.animation_data.action = act
+    root = rig.data.bones[0].name
+    scn = bpy.context.scene
+    f0, f1 = (int(round(v)) for v in act.frame_range)
+    seen = set()
+    for f in range(f0, f1 + 1):
+        scn.frame_set(f)
+        bpy.context.view_layer.update()
+        seen.add(tuple(round(v, 5)
+                       for v in rig.pose.bones[root].matrix_basis.to_scale()))
+    scn.frame_set(f0)
+    if len(seen) != 1:
+        sys.exit("[cat] root scale is animated (%d distinct) — this needs a "
+                 "format that carries scale, not a fold" % len(seen))
+    sx, sy, sz = seen.pop()
+    if abs(sx - sy) > 1e-4 or abs(sx - sz) > 1e-4:
+        sys.exit("[cat] root scale %s is not uniform — cannot be folded"
+                 % ((sx, sy, sz),))
+    if abs(sx - 1.0) < 1e-4:
+        return 1.0
+    for d in (cat.data, rig.data):
+        d.transform(Matrix.Scale(sx, 4))
+    fix_actions(sx)
+    n = 0
+    for a in bpy.data.actions:
+        for fc in list(a.fcurves):
+            if fc.data_path.endswith("scale"):
+                a.fcurves.remove(fc)
+                n += 1
+    for pb in rig.pose.bones:
+        pb.scale = (1.0, 1.0, 1.0)
+    print("[cat] folded a constant root pose scale of %.5f into the skeleton "
+          "and dropped %d scale channel(s)" % (sx, n))
+    return sx
+
+
 def gait(act, rig):
     """How fast the walk actually carries him, measured off the paws.
 
@@ -335,6 +477,10 @@ def build():
     rig.data.transform(rig_mw)
     cat.matrix_world = rig.matrix_world = Matrix.Identity(4)
 
+    # The exporter's scale, out of the pose and into the bones, before
+    # anything measures this animal. See `bake_root_scale`.
+    bake_root_scale(cat, rig)
+
     fix = Matrix.Rotation(math.pi / 2, 4, "Z")
     for d in (cat.data, rig.data):
         d.transform(fix)
@@ -353,11 +499,36 @@ def build():
     # `fix_actions` — this line is the difference between a cat on the terrace
     # and a cat in it.
     fix_actions(rig_mw.to_scale().x * k)
+    # THE ORDER OF THE NEXT THREE LINES IS THE WHOLE OF THE SECOND BUG.
+    #
+    # `settle` measures the clip and drops the animal so the lowest thing it
+    # ever does touches zero. `strip_root` REWRITES the clip. Run them the
+    # other way round — which is how this file was laid out, because
+    # `strip_root` was a bake-time concern and `settle` a transform-time one —
+    # and the measurement is of a pose nobody will ever see. That was worth
+    # eleven centimetres, which on a 0.25 m animal is its legs.
+    #
+    # So the clip is finished first and measured second. Nothing here depends
+    # on the mesh, and `rest_locals` and the vertex read further down both
+    # depend on the drop, so this is the only place all three can go.
+    act = next((a for a in bpy.data.actions if a.name.startswith(CLIP)), None)
+    if act is None:
+        sys.exit("[cat] no action starting '%s'" % CLIP)
+    # 1.0 and not `k`: `fix_actions` has already put every location channel in
+    # metres, so there is nothing left for this to convert.
+    travel = strip_root(act, rig, 1.0)
+    speed = gait(act, rig)
+    print("[cat] root travels %.3f m/s, paws %.2f m/s — the game must move it "
+          "at the second or they skate" % (travel, speed))
 
+    # Read before `settle` lifts him, deliberately: this is shoulder height off
+    # the ground he stands on, and after the lift the rest pose is not standing
+    # on it any more — the walk is, by exactly the lift.
     sh = rig.data.bones["frontleg"].head_local.z
     if not SHOULDER[0] <= sh <= SHOULDER[1]:
         print("[cat]   WARNING shoulder %.3f m is outside %s — check BODY"
               % (sh, SHOULDER))
+    settle(cat, rig)
     xs = [v.co.x for v in cat.data.vertices]
     ys = [v.co.y for v in cat.data.vertices]
     zs = [v.co.z for v in cat.data.vertices]
@@ -436,15 +607,6 @@ def build():
     if orphans:
         print("[cat]   WARNING %d vertices had no bone weight at all" % orphans)
 
-    act = next((a for a in bpy.data.actions if a.name.startswith(CLIP)), None)
-    if act is None:
-        sys.exit("[cat] no action starting '%s'" % CLIP)
-    # 1.0 and not `k`: `fix_actions` has already put every location
-    # channel in metres, so there is nothing left for this to convert.
-    travel = strip_root(act, rig, 1.0)
-    speed = gait(act, rig)
-    print("[cat] root travels %.3f m/s, paws %.2f m/s — the game must move it "
-          "at the second or they skate" % (travel, speed))
     baked = [bake_action(rig, act, "walk", loop=True, rest=rest)]
 
     OUT.mkdir(parents=True, exist_ok=True)

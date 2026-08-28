@@ -18481,20 +18481,28 @@ async function buildJadrija(scene) {
    * So it is measured where it actually is — see `gait` in tools/blender/cat.py.
    * In one cycle the body advances by D and every paw travels backwards
    * through exactly that D while it is planted, so a paw's fore-aft range IS
-   * the stride. Four legs, four readings: 0.183, 0.175, 0.149, 0.148 m over a
+   * the stride. Four legs, four readings: 0.245, 0.235, 0.200, 0.199 m over a
    * one-second cycle, and the agreement between the pairs is what says the
-   * clip is foot-locked well enough to be asked. 0.16 m/s.
+   * clip is foot-locked well enough to be asked. 0.22 m/s.
    *
-   * `trot` follows from it rather than being picked: everything below divides
-   * by `walk` to get a playback rate, and 0.48 is three times the clip. A cat
-   * crossing four metres of concrete it has crossed a hundred times steps
-   * about three times as fast as it ambles and does not hurry. The old 1.45
-   * was nine times the clip once the arithmetic was right, which is a cat
-   * being dragged rather than one walking.
+   * That reading moved once more, from 0.16 to 0.22, and the reason is worth
+   * having: the clip parked a constant 0.745 scale on its root bone, the
+   * format has no channel for scale, and until `bake_root_scale` folded it
+   * into the skeleton the animal the game drew was a third larger than the
+   * animal the clip was measured on. `BODY` at 0.46 m is head and body for a
+   * domestic shorthair and it now applies to the cat you can see rather than
+   * to a rest pose nobody ever does.
+   *
+   * `trot` follows from `walk` rather than being picked: everything below
+   * divides by it to get a playback rate, and 0.66 is three times the clip. A
+   * cat crossing four metres of concrete it has crossed a hundred times steps
+   * about three times as fast as it ambles and does not hurry. The first cut
+   * of this was 1.45, which was nine times the clip once the arithmetic was
+   * right — a cat being dragged rather than one walking.
    */
   const CAT = {
-    walk: 0.16,                 // m/s the clip's own paws cover
-    trot: 0.48,                 // m/s he actually crosses at
+    walk: 0.22,                 // m/s the clip's own paws cover
+    trot: 0.66,                 // m/s he actually crosses at
     turn: 3.4,                  // rad/s — a cat turns on the spot faster than a dog
     under: [4.0, 14.0],         // how long he stays under one, seconds
     near: 90,                   // past this he is not posed, see stepCat
@@ -23146,6 +23154,57 @@ async function buildJadrija(scene) {
         mode: cat.mode, leg: cat.leg, dir: cat.dir,
         timer: +cat.timer.toFixed(2),
         speed: +f.state.speed.toFixed(3), yaw: +cat.yaw.toFixed(3),
+        // The paw ankles, in metres over the plane the animal is placed on.
+        // tools/blender/cat.py prints the identical four numbers off the same
+        // clip, which is the only way to tell a bake that sinks him from a
+        // ground that is not where it says it is — and this file has now been
+        // wrong about which of those it was twice.
+        paws: (() => {
+          const o = {}, u = new THREE.Vector3();
+          for (const n of ['Hips', 'frontleg2', 'R_frontleg2', 'backleg2', 'R_backleg2']) {
+            const i = f.bones.findIndex((b) => b.name === n);
+            if (i < 0) { o[n] = null; continue; }
+            f.boneAt(i, u);
+            o[n] = +u.y.toFixed(4);
+          }
+          return o;
+        })(),
+        // The same bones in the BIND pose, composed straight out of the rest
+        // hierarchy the file shipped. If these disagree with Blender's
+        // head_local the payload is wrong; if only the posed ones disagree,
+        // the clip is. There is no third place for a sinking animal to hide.
+        rest: (() => {
+          const B = f.bones, wq = [], wt = [];
+          const rot = (q, v) => {
+            const [x, y, z, w] = q;
+            const ix = w * v[0] + y * v[2] - z * v[1];
+            const iy = w * v[1] + z * v[0] - x * v[2];
+            const iz = w * v[2] + x * v[1] - y * v[0];
+            const iw = -x * v[0] - y * v[1] - z * v[2];
+            return [ix * w + iw * -x + iy * -z - iz * -y,
+              iy * w + iw * -y + iz * -x - ix * -z,
+              iz * w + iw * -z + ix * -y - iy * -x];
+          };
+          const mul = (a, b) => [
+            a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+            a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+            a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+            a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]];
+          for (let i = 0; i < B.length; i++) {
+            const b = B[i], p = b.parent;
+            if (p < 0) { wq[i] = b.q.slice(); wt[i] = b.t.slice(); continue; }
+            wq[i] = mul(wq[p], b.q);
+            const r = rot(wq[p], b.t);
+            wt[i] = [wt[p][0] + r[0], wt[p][1] + r[1], wt[p][2] + r[2]];
+          }
+          const o = {};
+          for (const n of ['Hips', 'frontleg2', 'backleg2']) {
+            const i = B.findIndex((b) => b.name === n);
+            o[n] = i < 0 ? null : +wt[i][1].toFixed(4);
+          }
+          return o;
+        })(),
+        meshY: +cat.mesh.position.y.toFixed(4),
         under: CAT.at && CAT.at.map((a) => [+a[0].toFixed(2), +a[1].toFixed(2)]),
         pose: +pose.toFixed(5) };
     },

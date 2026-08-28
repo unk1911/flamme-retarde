@@ -50,7 +50,14 @@ const YOU = {
   // third person puts you, and the vest is a warm off-white. A dark cool
   // colour is the largest step available without inventing a pattern this
   // shader has no way to draw.
-  swim: [0.075, 0.185, 0.200],
+  // Lifted from 0.075/0.185/0.200 once the shapes were right. That value was
+  // chosen against the vest — dark and cool, so it reads as NOT a warm
+  // off-white from three metres — and it does that job at this one too. What
+  // it did not do is survive shade: at 0.075 the whole garment falls into the
+  // figure's own ambient occlusion under an awning, and a garment you cannot
+  // tell from a shadow is a smudge. Still deep, still cool, still nothing like
+  // the vest.
+  swim: [0.098, 0.240, 0.258],
   // Pink through the blue. Not a tint over the whole head — three or four
   // locks taken pink, which is what a highlight is.
   pink: [0.560, 0.150, 0.330],
@@ -281,7 +288,13 @@ async function buildYou(scene) {
         // z -0.083. 1.075 clears it by 45 mm and the smoothstep's far edge at
         // 1.100 still clears it by 20, so the garment starts on ribcage and
         // covers the bust whole.
-        float hem = mix(0.995, 1.075, uSwim);
+        // And the top's hem lifts at the sides for the same reason the leg
+        // opening does: a garment cut flat all the way round is the one thing
+        // no garment is. Only 18 mm — this is an underarm and not a neckline —
+        // and only when she is changed, because the tank really does hang
+        // straight and its hem really is a flat line at the hip.
+        float hem = mix(0.995, 1.075, uSwim)
+          + uSwim * 0.018 * smoothstep(0.030, 0.125, abs(vLocal.z));
         float scoop = trunk
           * smoothstep(hem, hem + 0.025, vLocal.y)
           * (1.0 - smoothstep(neck, neck + 0.012, vLocal.y));
@@ -318,9 +331,30 @@ async function buildYou(scene) {
         // The same trunk test as the vest, for the same reason: at this height
         // her hands hang at the hip and a band that went all the way round in
         // z would put a stripe across both wrists.
+        //
+        // THE LEG OPENING IS A CURVE AND NOT A LINE, and that is the whole of
+        // what was wrong here. Everything on this figure is painted by height,
+        // which is fine for a hem across a ribcage and is exactly wrong for
+        // the bottom of a pair of briefs: a flat cut at one height saws
+        // straight across both thighs and the gap between them, and what it
+        // draws is not a garment at all. It is a tide mark. Misha called it a
+        // weird blue-green thing on her three times and he was describing the
+        // line, not the colour.
+        //
+        // So the height the garment stops at is a function of where you are
+        // round the leg. Near the middle it runs low, because that is the
+        // crotch and there is nothing there to expose; out at the hip it
+        // climbs to just under the waistband, which is a high-cut leg and is
+        // what a swimming costume does. Round the front it climbs a little
+        // further again — briefs cover more behind than in front, and the
+        // asymmetry is most of why a cut reads as tailored rather than as
+        // stencilled.
+        float side = smoothstep(0.045, 0.150, abs(vLocal.z));
+        float legY = mix(0.848, 0.978, side)
+          + 0.026 * smoothstep(-0.020, 0.090, vLocal.x);
         float briefs = trunk
-          * smoothstep(0.800, 0.826, vLocal.y)
-          * (1.0 - smoothstep(0.988, 1.008, vLocal.y));
+          * smoothstep(legY, legY + 0.010, vLocal.y)
+          * (1.0 - smoothstep(0.996, 1.006, vLocal.y));
         vcol = mix(vcol,
           vec3(${YOU.swim.map((n) => n.toFixed(3)).join(', ')}),
           briefs * uSwim);

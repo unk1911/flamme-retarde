@@ -8,6 +8,62 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.130.0] — 2026-08-28
+
+### The cat, third time, and this one is the cause
+
+**A constant 0.74496 on the root bone, on every frame of the clip.** Not
+animation — twenty-five keys, one distinct value; a rest offset somebody's
+exporter parked in the pose because glTF had somewhere to put it. Blender
+honours it and composes every bone below the root at three quarters of its
+rest offset. The runtime cannot: `bake_action` writes
+`m.to_quaternion()` and the format has no channel for scale at all. So
+the game drew a cat whose legs reached 0.2265 m below the hip where the
+clip called for 0.169, and the difference — 57 mm — is what was under
+the concrete.
+
+**Nothing warned.** frskin.py's drift check watches translation, and the
+translations were clean to a tenth of a millimetre. That is how this
+survived two fixes: `fix_actions` in 1.128.0 was real and got his belly
+off the paving, `settle` was real and worth another 19 mm, and neither
+was the cause. What finally localised it was asking Blender and the
+runtime the identical question about the identical bones —
+`tools/blender/cat.py` prints them and `__fr.jad.cat()` returns them.
+The rest hierarchy agreed to four decimals. The root agreed to four
+decimals. Only the paws disagreed, which leaves rotation or scale, and
+the rotations were right.
+
+`bake_root_scale` folds it into the skeleton and the mesh where the
+format can carry it, and leaves the pose with nothing but rotation. It
+runs before the `BODY` scaling on purpose, so 0.46 m of head and body is
+now 0.46 m of the cat you can see rather than of a rest pose nobody ever
+does — which makes the animal 34% larger, and the gait with it: he walks
+at 0.22 and crosses at 0.66.
+
+### And the swimsuit stopped being paint
+
+**"i still have some weird blue/green thing on."** Third time of asking,
+and the previous two answers had both been about coverage — the hem was
+above the bust, then the band print was on the swimsuit. This one is
+about the LINE. Everything on this figure is painted by height, which is
+right for a hem across a ribcage and exactly wrong for the bottom of a
+pair of briefs: a flat cut at one height saws straight across both
+thighs and the gap between them, and what it draws is a tide mark.
+
+So the height the garment stops at is now a function of where you are
+round the leg — low near the middle, climbing to just under the
+waistband out at the hip, and a little higher again round the front,
+because briefs cover more behind than in front and that asymmetry is
+most of why a cut reads as tailored rather than stencilled. The top's
+hem lifts 18 mm at the sides for the same reason, and only when she is
+changed: the tank really does hang straight.
+
+The colour came up with it, from 0.075/0.185/0.200 to 0.098/0.240/0.258.
+The old value was picked against the vest and does that job at either
+number; what it could not do was survive shade, where the whole garment
+fell into the figure's own ambient occlusion. A garment you cannot tell
+from a shadow is a smudge.
+
 ## [1.129.0] — 2026-08-27
 
 ### The swimsuit was body paint, and the jump was a plank
