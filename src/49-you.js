@@ -349,9 +349,31 @@ async function buildYou(scene) {
         // further again — briefs cover more behind than in front, and the
         // asymmetry is most of why a cut reads as tailored rather than as
         // stencilled.
-        float side = smoothstep(0.045, 0.150, abs(vLocal.z));
-        float legY = mix(0.848, 0.978, side)
-          + 0.026 * smoothstep(-0.020, 0.090, vLocal.x);
+        // The two ends of it are measured against the waistband above, which
+        // sits at 0.996. 0.898 is a hundred millimetres under it and 0.962 is
+        // thirty-four, and both of those are the garment: past about 0.975 the
+        // opening would meet the waistband and the brief would have a hole in
+        // its own hip.
+        //
+        // WHAT MOVED HERE IS THE RAMP AND NOT THE DEPTH, and getting that the
+        // wrong way round cost a release. The flat band this replaced ran to
+        // 0.800 and covered her; the curve that replaced it kept the depth but
+        // spread it over 45 to 150 mm of z, which is a slow ramp, and a slow
+        // ramp at that depth paints the whole inner thigh. That is the dark
+        // tongue between her legs in the screenshot — teal, but under the
+        // figure's own occlusion it reads as a blob rather than as cloth.
+        //
+        // Raising the middle to get rid of it was the obvious answer and it
+        // was wrong: at 0.898 the tongue went and so did the covering, and
+        // what was underneath is the body this figure has always had under its
+        // paint. So the middle goes back down where it has to be and the ramp
+        // is what tightens. 45 to 150 mm painted the thigh; 18 to 80 climbed
+        // so fast off the midline that the brief came out a thong. 28 to 105
+        // is a gusset the width of a gusset — narrow and deep, not shallow and
+        // wide, and not a string either.
+        float side = smoothstep(0.028, 0.105, abs(vLocal.z));
+        float legY = mix(0.815, 0.962, side)
+          + 0.010 * smoothstep(-0.020, 0.090, vLocal.x);
         float briefs = trunk
           * smoothstep(legY, legY + 0.010, vLocal.y)
           * (1.0 - smoothstep(0.996, 1.006, vLocal.y));

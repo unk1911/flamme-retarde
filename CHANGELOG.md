@@ -8,6 +8,52 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.131.0] — 2026-08-28
+
+### The promenade is 5 cm thicker than the height it is drawn from
+
+**"the cat is still maybe a few centimetres below the surface."** He was
+right and it was not the cat this time — it was the paving, and it was
+everything that stands on it.
+
+`paving` lays every flag twice: mortar at `deckOf`, and the stone inset
+by JOINT and lifted by LIFT over it, because two co-planar surfaces two
+kilometres from the origin fight and 0.05 m of separation with a smaller
+footprint does not. That is the right call and the note over it has said
+so since the flags went down. What nobody carried through is that the
+stone is then the surface you STAND on, while `surfaceY` still answers
+with the mortar.
+
+A ray straight down at each of the cat's four tables comes back with the
+drawn deck at 2.5371, 2.5480, 2.5719 and 2.5895 against a `surfaceY` of
+2.4871, 2.4980, 2.5219 and 2.5395 — the same 0.0500 four times, which is
+a constant and not a wobble. The dog looked right the whole time because
+he works the water's edge at s 5.6 and the band starts at PAVE.
+
+The lift goes in `standY` and not in `surfaceY`, because `surfaceY` is
+what the drawing passes build the promenade's own furniture from — the
+flags included — and lifting it would move the paving out from under
+itself. `standY` is the one that answers "what is under your feet". The
+terrace furniture is still bedded on the mortar and is a separate job.
+
+`paveBand` is a `let` filled by the pass that lays the flags rather than
+a read of `PAVE`/`walkTo`, which are declared eight hundred lines below
+`standY` in one lexical scope — see RULE 3.
+
+### And the brief needed a narrower gusset, not a shallower one
+
+The high cut in 1.130.0 was right and its ramp was not: 45 to 150 mm of
+z is a slow climb, and at the depth a brief needs that paints the whole
+inner thigh, where the figure's own occlusion turns teal almost black.
+That is the dark tongue hanging between her legs in the screenshot.
+
+Raising the middle to get rid of it was the obvious answer and it was
+wrong twice over — at 0.898 the tongue went and so did the covering, and
+what is underneath is the body this figure has always had under its
+paint. So the middle goes back down to 0.815 where it has to be and the
+RAMP is what tightens. 18 to 80 mm came out a thong; 28 to 105 is a
+gusset the width of a gusset.
+
 ## [1.130.0] — 2026-08-28
 
 ### The cat, third time, and this one is the cause

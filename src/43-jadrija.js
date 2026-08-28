@@ -674,6 +674,26 @@ async function buildJadrija(scene) {
   // precast rather than as stone somebody laid by eye. 9 and 1.1 puts a cell
   // near 1.2 m by 1.1 m, which is as close as this can get while the cut lines
   // still have to run station to station.
+  /**
+   * How far the stone stands over the mortar it is bedded in.
+   *
+   * Shared, and that is the whole point of naming it: `paving` draws the flags
+   * this far up and `standY` puts your feet on them, and the two disagreeing
+   * is five centimetres of animal in the concrete. See the note in `standY`.
+   */
+  const PAVE_LIFT = 0.05;
+  /**
+   * The band the flags cover, as [s0, s1], filled where they are laid.
+   *
+   * A `let` and not a read of `PAVE`/`walkTo` because of RULE 3. Those are
+   * declared eight hundred lines below this, `standY` is called during the
+   * build as well as after it, and one lexical scope means a reference from up
+   * here is a temporal dead zone and a page that never finishes loading. Null
+   * until the flags exist, which is also the honest answer: before they are
+   * laid there is nothing standing proud of anything.
+   */
+  let paveBand = null;
+
   function paving(s0, s1, yOf, cols, nS = 9, step = 1.1) {
     // Subdivided along the shore as well as across it. The stations are six
     // metres apart, so cutting only in `s` gives six-metre flags — which reads
@@ -704,7 +724,7 @@ async function buildJadrija(scene) {
     // mortar grid printed across forty metres of beach, with orange sand in
     // the cells. Found by walking the shore and looking at it, which is the
     // only way that one was ever going to turn up.
-    const JOINT = 0.055, LIFT = 0.05;
+    const JOINT = 0.055, LIFT = PAVE_LIFT;
     const n = Math.floor(LEN / step);
     for (let i = 0; i < n; i++) {
       const a = at(i * step), c = at((i + 1) * step);
@@ -867,6 +887,10 @@ async function buildJadrija(scene) {
   // stayed 2.2 m wide across it, which is a plank, not a flag.
   paving(PAVE, walkTo, deckOf,
     (i, t, u) => mixc(FLAG[i % FLAG.length], shore(i, u), beachOf(t)));
+  // And now `standY` can answer with the stone rather than the mortar it is
+  // bedded in. Set here rather than declared with the numbers, so that the one
+  // thing that can turn it on is the pass that actually lays the flags.
+  paveBand = [PAVE, walkTo];
   ribbon(walkTo, JAD.back, deckOf, duff, 3);
   for (let i = 0; i < ST.length - 1; i++) {
     const a = ST[i], c = ST[i + 1];
@@ -17057,6 +17081,31 @@ async function buildJadrija(scene) {
         && s > K.face - 0.55 && s < K.s1 + 0.10) {
       return y + (K.floor - y) * sat((s - (K.face - 0.55)) / 0.55);
     }
+    // The paving, which is 0.05 m thicker than the height it is drawn from.
+    //
+    // `paving` lays every flag twice — mortar at `deckOf`, and the stone inset
+    // by JOINT and lifted by LIFT over it, because two co-planar surfaces at
+    // two kilometres from the origin fight and 0.05 m of separation with a
+    // smaller footprint does not. That is the right call and the note over it
+    // says so. What nobody carried through is that the stone is then the
+    // surface you STAND on, and `surfaceY` still answers with the mortar: so
+    // everything `toWorld` places between PAVE and walkTo has been five
+    // centimetres into the promenade since the flags were laid.
+    //
+    // Which is "the cat is still a few centimetres below the surface", and it
+    // is a good deal more than the cat. A ray straight down at each of his
+    // four tables comes back with the drawn deck at 2.5371, 2.5480, 2.5719 and
+    // 2.5895 against a `surfaceY` of 2.4871, 2.4980, 2.5219 and 2.5395 — the
+    // same 0.0500 four times, which is a constant and not a wobble. The dog
+    // looked right the whole time because he works the water's edge at s 5.6
+    // and the band starts at PAVE.
+    //
+    // It goes in `standY` and NOT in `surfaceY` on purpose. `surfaceY` is what
+    // the drawing passes build the promenade's own furniture from — the flags
+    // themselves included — and lifting it would move the paving out from
+    // under itself. `standY` is the one that answers "what is under your
+    // feet", which is the question with a stone in the way.
+    if (paveBand && s > paveBand[0] && s < paveBand[1]) return y + PAVE_LIFT;
     // The changing station's pad. Same problem as the kabina's and the same
     // answer, except that a pad is approached from all four sides rather than
     // through one face — so the ramp hangs off the distance to the nearest
