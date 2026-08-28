@@ -8,6 +8,41 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.135.0] — 2026-08-28
+
+### The beanie, measured this time
+
+**"maybe u can fix my/Chloe's pink hat... it still looks weird."** Two
+faults, and both of them were things nobody had put a number to.
+
+**The hat was narrower than her head.** Bucket her bind positions by
+height and read the skull: widest at |z| 0.092 around y 1.60, 0.078 at
+the hem height of 1.66, x from -0.129 to +0.176 fore and aft, crown at
+1.75. The ellipsoid was 0.085 across — seven millimetres narrower than
+her head at its widest, and flush with the skin at the hem. That is a
+hat with no thickness, and nothing can be covered by a surface it is
+already outside of, so the rig's bob came through at both temples as two
+hard blue slabs. `YOU.hat.r` is now 0.122 by 0.086 by 0.100: 8 mm proud
+at the widest and at the hem, 24 mm of crown clearance, and the
+fore-and-aft left alone because the brow is outside on purpose — that is
+where the fringe goes.
+
+**The turn-up was a torus inside a non-uniform scale.** `hat` carries
+1.5 in x and 1.0625 in z, which is what ovals a sphere into a head, and
+a scale like that goes through a torus's TUBE as well as its ring. The
+roll came out half again as fat fore-and-aft as it was laterally — a
+hoop standing off the dome at brow and nape and buried in it at the
+ears. A rolled hem is the same thickness the whole way round; that is
+most of what makes it read as knitwear. It is now a round tube swept
+along an elliptical path, in a group with the hat's placement and tilt
+and no scale at all, and its ring radius is derived from `YOU.hat.r`
+rather than being the literal 0.0742 that was true only while the sphere
+was 80 mm.
+
+The dome is 32 by 20 rather than 24 by 16. It is the only curved
+silhouette on her and it is at the top of every mirror shot; eight
+hundred triangles against the 28 000 she already is.
+
 ## [1.134.0] — 2026-08-28
 
 ### The sleeve was tattooed down her leg

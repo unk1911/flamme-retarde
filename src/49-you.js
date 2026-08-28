@@ -85,7 +85,21 @@ const YOU = {
   // that hides the hair underneath the hat has to describe exactly the volume
   // the hat occupies — a hat and a hole in the hair that disagree by a
   // millimetre is a seam you can see from across the room.
-  hat: { at: [0.000, 1.695, 0.000], r: [0.120, 0.080, 0.085], tilt: 0.30 },
+  // MEASURED, at the fourth time of asking about this hat. Bucket her bind
+  // positions by height and read the skull: it is widest at |z| 0.092 around
+  // y 1.60, is 0.078 at 1.66, runs x -0.129 to +0.176 fore and aft, and stops
+  // at 1.75. Against that the old ellipsoid was 0.085 across — SEVEN
+  // MILLIMETRES NARROWER THAN HER HEAD at its widest and flush with the skin
+  // at the hem, which is a hat with no thickness. Nothing can be covered by a
+  // surface it is already outside of, so the bob came through at both temples
+  // as two hard blue slabs and no amount of moving the thing about fixed it.
+  //
+  // 0.100 stands it 8 mm proud at the widest and 8 mm proud at the hem, which
+  // is a knitted hat with a head in it. 0.086 tall on 1.688 puts the crown
+  // 24 mm over hers, which is the slack a slouch beanie has. The fore-and-aft
+  // 0.122 is left alone: the brow is outside on purpose, because that is where
+  // the fringe goes.
+  hat: { at: [0.000, 1.688, 0.000], r: [0.122, 0.086, 0.100], tilt: 0.30 },
   // A trim, if she ends up facing off-square. The rig's own forward is +X —
   // see `rigYaw` in 43-jadrija.js, which is the one place that says so — and
   // the yaw below is built for that, so this wants to be zero.
@@ -612,18 +626,52 @@ async function buildYou(scene) {
   hat.scale.set(H.r[0] / H.r[1], 1, H.r[2] / H.r[1]);
   head.add(hat);
 
-  hat.add(new THREE.Mesh(new THREE.SphereGeometry(H.r[1], 24, 16), capMat));
+  // 32 by 20 and not 24 by 16. It is the only curved silhouette on her, it is
+  // the thing at the top of every mirror shot, and eight hundred more
+  // triangles on one object is nothing next to the 28 000 she already is.
+  hat.add(new THREE.Mesh(new THREE.SphereGeometry(H.r[1], 32, 20), capMat));
 
   // The turn-up, at the height where the ellipsoid comes out of the hair —
   // 3 cm below its centre, where its own radius is 7.4 — so the roll lands on
   // the visible edge of the knit rather than floating inside her head or out
-  // in the air. The group's scale ovals it to the head, and the tilt puts it
-  // low at the nape and high over the brow, which is how the thing is worn.
-  const brim = new THREE.Mesh(
-    new THREE.TorusGeometry(0.0742, 0.013, 8, 24), capMat);
-  brim.rotation.x = Math.PI / 2;
-  brim.position.set(0, -0.030, 0);
-  hat.add(brim);
+  // in the air. The tilt puts it low at the nape and high over the brow, which
+  // is how the thing is worn.
+  //
+  // NOT A TORUS UNDER THE HAT GROUP, which is what it was and is why Misha
+  // kept calling this hat weird. `hat` carries a non-uniform scale — 1.5 in x
+  // and 1.0625 in z, which is what ovals the sphere to a head — and a scale
+  // like that goes through a torus's TUBE as well as through its ring. The
+  // roll came out half again as fat fore-and-aft as it was laterally, which
+  // reads as a hoop standing off the dome at the brow and the nape and buried
+  // in it at the ears. A rolled hem is the same thickness all the way round;
+  // that is most of what makes it read as knitwear.
+  //
+  // So the ring is an ellipse in its own right and the tube is swept round it,
+  // in a group with the hat's placement and tilt but NO scale. The semi-axes
+  // are the sphere's radius at that height taken through the scale by hand —
+  // 0.0742 by 1.5 and by 1.0625 — so it still lands exactly on the dome.
+  const roll = new THREE.Group();
+  roll.position.copy(hat.position);
+  roll.rotation.z = H.tilt;
+  head.add(roll);
+  {
+    // Where the roll sits, and the ring radius DERIVED from it rather than
+    // typed. It used to be a literal 0.0742, which was the sphere's radius
+    // 30 mm down when the sphere was 80 mm — true when it was written and a
+    // hem floating inside her skull the moment the hat was resized.
+    const HEM = -0.043;
+    const RR = Math.sqrt(H.r[1] * H.r[1] - HEM * HEM);
+    const TUBE = 0.0135, N = 32;
+    const pts = [];
+    for (let i = 0; i < N; i++) {
+      const a = (i / N) * Math.PI * 2;
+      pts.push(new THREE.Vector3(Math.cos(a) * RR * (H.r[0] / H.r[1]), HEM,
+        Math.sin(a) * RR * (H.r[2] / H.r[1])));
+    }
+    const curve = new THREE.CatmullRomCurve3(pts, true, 'catmullrom', 0.5);
+    roll.add(new THREE.Mesh(
+      new THREE.TubeGeometry(curve, N * 2, TUBE, 10, true), capMat));
+  }
 
   // There were four locks of hair here as well — flat tapered cones down each
   // side of her face and two across the forehead — on the theory that the
