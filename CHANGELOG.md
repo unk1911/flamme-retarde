@@ -8,6 +8,29 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.140.0] — 2026-08-28
+
+### The hat was 49 mm behind her head
+
+Eight releases went into the shape of this thing and the shape was never
+the fault. The lathe axis sat at x = 0, because that is where a lathe
+goes if nobody thinks about it, and a head is not centred there: bucket
+her bind positions by height across the band the hat occupies and the
+braincase centres at **+0.035**, running -0.116 to +0.161 at the hem and
+-0.069 to +0.128 near the crown. The lean then took the crown 14 mm
+further back again. The hat has been hanging off the back of her skull
+since it was built.
+
+**Every symptom was that one offset.** The mass overhanging the nape —
+which read as a bag, then as a cap for an afro, then as a beret — was
+the hat standing behind the head. The bare band of forehead under the
+front edge was the same 49 mm missing from the other end. Both ends of
+one error, and eight passes went into the PROFILE, which could not have
+fixed it: no half-section put in the wrong place is going to fit.
+
+`ax` is now a number in `YOU.beanie` rather than a zero nobody wrote
+down, and `__fr.jad.youHat({ ax: 0.04 })` moves it live with the rest.
+
 ## [1.139.0] — 2026-08-28
 
 ### Chloe gets her own face

@@ -125,12 +125,28 @@ const YOU = {
   // carries on past the back of her head into air, where there is no hair to
   // throw away and nothing to agree with.
   //
-  // `hem` is the height the fabric leaves the skull at, `fa` how much longer
-  // it is fore-and-aft than across, `lean` how far back the crown has gone by
-  // the time it gets there, and `prof` the half-section as [radius, height
-  // over the hem] — the first three points of which are BELOW the hem and
+  // `hem` is the height the fabric leaves the skull at, `ax` WHERE ITS AXIS
+  // STANDS FORE AND AFT, `fa` how much longer it is fore-and-aft than across,
+  // `lean` how far back the crown has gone by the time it gets there, and
+  // `prof` the half-section as [radius, height over the hem] — the first three points of which are BELOW the hem and
   // inside her head, so the visible edge is the curve where cloth leaves
   // scalp rather than a ring drawn at a height.
+  //
+  // `ax` IS THE ONE THAT WAS ACTUALLY WRONG, and it took eight releases to
+  // look at it, because it was never a number — it was a zero nobody had
+  // written down. The lathe axis sat at x = 0 because that is where a lathe
+  // goes if you do not think about it, and a head is not centred there: bucket
+  // her bind positions by height across the band this hat occupies and the
+  // braincase centres at +0.035, running -0.116 to +0.161 at the hem and
+  // -0.069 to +0.128 near the crown. So the hat was standing 35 mm behind the
+  // skull it was on, and the lean took the crown 14 mm further back again.
+  //
+  // Every symptom followed from that one offset. The mass overhanging the nape
+  // — which is what read as a bag, then as an afro cap, then as a beret — was
+  // the hat hanging off the back of her head. The bare band of forehead under
+  // the front edge was the same 49 mm missing from the other end. Eight passes
+  // went into the PROFILE, which was never the thing: no half-section put in
+  // the wrong place is going to fit.
   //
   // THE RADIUS IS LATERAL AND THE OVAL DOES THE LENGTH, and getting that
   // backwards is what made the first slouch read, in Misha's words, like the
@@ -142,7 +158,7 @@ const YOU = {
   // The give is all in the crown and the shear now, which is where a beanie
   // keeps it.
   beanie: {
-    hem: 1.668, fa: 1.45, lean: -0.14,
+    hem: 1.668, ax: 0.030, fa: 1.42, lean: -0.08,
     prof: [
       [0.076, -0.075], [0.091, -0.045], [0.095, -0.018],
       [0.096, 0.004], [0.095, 0.020], [0.091, 0.038],
@@ -729,7 +745,8 @@ async function buildYou(scene) {
    */
   function beanie(o = {}) {
     const b = { ...B, ...o };
-    hat.position.set(0 - YOU.bone[0], b.hem - YOU.bone[1], 0 - YOU.bone[2]);
+    hat.position.set((b.ax || 0) - YOU.bone[0], b.hem - YOU.bone[1],
+      0 - YOU.bone[2]);
     if (capMesh) { hat.remove(capMesh); capMesh.geometry.dispose(); }
     const pts = b.prof.map(([r, y]) => new THREE.Vector2(r, y));
     const geo = new THREE.LatheGeometry(pts, 40);
@@ -742,7 +759,7 @@ async function buildYou(scene) {
     geo.computeVertexNormals();
     capMesh = new THREE.Mesh(geo, capMat);
     hat.add(capMesh);
-    return { hem: b.hem, fa: b.fa, lean: b.lean, prof: b.prof };
+    return { hem: b.hem, ax: b.ax, fa: b.fa, lean: b.lean, prof: b.prof };
   }
   beanie();
 
