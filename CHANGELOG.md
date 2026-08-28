@@ -8,6 +8,56 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.144.0] — 2026-08-28
+
+### The axis was x and it should always have been z
+
+**"the knees/legs bend sideways somehow so weird/ and unnatural and
+wrong."** They did, on every jump this game has ever drawn. On this rig
+**x is fore-and-aft and z is lateral** — 49-you.js has said so since it
+was written, in the terms that paint her vest: `front` is a smoothstep
+on `vLocal.x` and `trunk` is one on `abs(vLocal.z)`. A rotation about x
+is therefore ABDUCTION, and the tuck was swinging her legs out sideways
+rather than bringing her knees up.
+
+Measured, at 0.7 rad on the hip:
+
+| axis | what the knee does |
+|---|---|
+| (1, 0, 0) | z −0.108 → −0.401, **0.29 m sideways** |
+| (0, 0, 1) | x 0.036 → +0.314, **0.28 m forward** |
+
+and (0, 0, 1) does the same on both legs, so there was no mirror in it
+either. The arms were being thrown out sideways by the same mistake; on
+z they swing forward and up, 0.27 m and 0.11 m at 0.6 rad.
+
+**It was measured before and read wrongly.** Three releases ago this
+file recorded "the knee moved 0.38 m forward" about a number that was z.
+The measurement was right and the axis label on it was not, which is a
+worse failure than not measuring — it produced confidence.
+
+**Baye's somersault had it too**, because Chloe's jump was copied from
+there: `SHOW.tuck` has been a straddle since it was written, and the
+comment over it has always claimed to be using "the rig's own sagittal
+axis". It is now.
+
+### And walking into her turns her round
+
+`show.shimBack` marks the bump's shimmy apart from the routine's. The
+routine one is done AT somebody and points its shoulders at you, which
+is what its note says and is still true; the one you get for walking
+into her is turned away, with about 12 cm between her heels. The stance
+rides on the same two hip aims the tuck uses, with opposite signs — one
+leg out each way, which is what makes it a stance rather than both legs
+leaning — and it eases in rather than switching, because a clip that
+starts with the feet already apart reads as a cut.
+
+A flag and not a second phase: the clip, the hold, the chatter and the
+way out are identical. It had to be a flag rather than a heading, too —
+the shimmy case re-aims her at you every frame, so writing `want` at
+entry lasted exactly one frame, which is how the first cut came out
+still facing forwards.
+
 ## [1.143.0] — 2026-08-28
 
 ### Walk into Baye and she shimmies at you

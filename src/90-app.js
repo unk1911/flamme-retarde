@@ -2308,7 +2308,7 @@ function clearJump() {
   jumpPosed = false;
   jumpWas = 0; jumpPush = 0; jumpLand = 0;
   for (const b of ['legUL', 'legUR', 'legLL', 'legLR', 'armUL', 'armUR']) {
-    you.fig.aim(b, 1, 0, 0, 0);
+    you.fig.aim(b, 0, 0, 1, 0);
   }
 }
 
@@ -2347,15 +2347,36 @@ function poseSwimBody(dt) {
     // to carry for ever, so a walk with a residual tuck on it never gets its
     // legs back.
     const hp = hipA < 0.01 ? 0 : hipA, kn = kneeA < 0.01 ? 0 : kneeA;
+    // THE AXIS IS Z AND IT WAS X FOR THREE RELEASES.
+    //
+    // Misha, 28 Aug: "the knees/legs bend sideways somehow so weird/ and
+    // unnatural and wrong". They did. On this rig x is fore-and-aft and z is
+    // lateral — 49-you.js has said so since it was written, in the terms that
+    // paint her vest: `front` is a smoothstep on vLocal.x and `trunk` is one on
+    // abs(vLocal.z). A rotation about x is therefore ABDUCTION, and every tuck
+    // this jump has ever done swung her legs out sideways.
+    //
+    // (1, 0, 0) was copied from Baye's somersault in 43-jadrija.js without
+    // asking what it did, and the measurement that should have caught it was
+    // taken and then read with the axes swapped: I wrote down "the knee moved
+    // 0.38 m forward" about a number that was z. Measured properly, at 0.7 rad
+    // on the hip, x moves the knee 0.29 m sideways and z moves it 0.28 m
+    // forward — and z does the same on both legs, so there is no mirror to
+    // worry about either.
     const L = 1 + JUMP.split, R = 1 - JUMP.split;
-    you.fig.aim('legUL', 1, 0, 0, hp * L);
-    you.fig.aim('legUR', 1, 0, 0, hp * R);
-    you.fig.aim('legLL', 1, 0, 0, -kn * L);
-    you.fig.aim('legLR', 1, 0, 0, -kn * R);
+    you.fig.aim('legUL', 0, 0, 1, hp * L);
+    you.fig.aim('legUR', 0, 0, 1, hp * R);
+    // Negative, because the shin folds the heel back under a thigh that has
+    // just come forward. Same axis, opposite sense.
+    you.fig.aim('legLL', 0, 0, 1, -kn * L);
+    you.fig.aim('legLR', 0, 0, 1, -kn * R);
     const ar = air * JUMP.arm;
     const aa = ar < 0.01 ? 0 : ar;
-    you.fig.aim('armUL', 1, 0, 0, aa);
-    you.fig.aim('armUR', 1, 0, 0, aa);
+    // And the arms on the same axis, which carries the hand forward and up —
+    // 0.27 m and 0.11 m at 0.6 rad. That is a swing; x was throwing them out
+    // to the sides like a tightrope walker.
+    you.fig.aim('armUL', 0, 0, 1, aa);
+    you.fig.aim('armUR', 0, 0, 1, aa);
     jumpPosed = hp > 0 || kn > 0 || aa > 0;
     // Her root is between her feet, so `at` is simply where she stands —
     // `g.y` is already the hopped height, which is why the eye is taken off it
@@ -5852,6 +5873,29 @@ window.__fr = {
      * so the eighth disagreement can be settled in the console.
      */
     youHat: (o) => (you ? you.beanie(o || {}) : null),
+    /**
+     * Aim one of her bones and report where the leg went.
+     *
+     * Exists because "the knees bend sideways" took two releases to believe:
+     * the jump's tuck was written on axis (1, 0, 0) copied from Baye's
+     * somersault, and this figure's fore-aft is x while its lateral is z, so
+     * a rotation about x is ABDUCTION. The measurement that should have caught
+     * it was taken and then read with the axes swapped.
+     *
+     * `__fr.jad.youAim('legUL', 0,0,1, 0.6)` and look at where the knee is.
+     */
+    youAim: (b, ax, ay, az, ang) => {
+      if (!you) return null;
+      you.fig.aim(b, ax, ay, az, ang);
+      you.fig.update(0);
+      const v = new THREE.Vector3(), o = {};
+      for (const n of ['legLL', 'footL', 'legLR', 'footR', 'handL', 'handR']) {
+        const i = you.fig.bones.findIndex((x) => x.name === n);
+        you.fig.boneAt(i, v);
+        o[n] = [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)];
+      }
+      return o;
+    },
     youFreeze: (v) => (you ? you.freeze(v) : null),
     /** The threshold: where it thinks you are, and whether it is mid-cut. */
     dip: () => {

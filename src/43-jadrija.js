@@ -19389,6 +19389,10 @@ async function buildJadrija(scene) {
     // a cycle against the shimmy's 0.44 — so 3.8 s is about seven of them,
     // which is the same *count* rather than the same clock.
     twerk: 0.10, twerkFor: 3.8,
+    // rad of abduction a hip takes while she shimmies. A little: 0.16 puts
+    // about 12 cm between her heels, which is a stance; much past that is a
+    // straddle.
+    stance: 0.16,
     // And the two she does with her hands. Held longer than the shimmy because
     // both of them are things you are meant to *read* — a gesture you have to
     // recognise and a card you have to actually finish — and three seconds is
@@ -20798,7 +20802,13 @@ async function buildJadrija(scene) {
       show.bumped = 0;
       if (!show.bumpShim && SHIMMYABLE[show.phase]) {
         show.bumpShim = SHOW.shimmyFor + 2.6;
-        show.want = Math.atan2(ps - show.s, pt - show.t);
+        // BACK TO YOU, and set as a flag rather than as a heading because the
+        // shimmy case re-aims her at you every frame — writing `want` here
+        // lasts exactly one frame, which is how the first cut of this came out
+        // facing forwards. Misha asked for it turned away; every other
+        // reaction in this file turns her to face whoever caused it, so this
+        // is the one place the sign is deliberate.
+        show.shimBack = 1;
         showSay('whee', Math.hypot(pt - show.t, ps - show.s));
         go('shimmy', 'shimmy', 0.30);
       }
@@ -21264,15 +21274,21 @@ async function buildJadrija(scene) {
         // making, it is what the move is: the whole thing happens behind her,
         // and facing you she would be a woman doing a deep squat.
         show.played += dt;
+        // `shimBack` is the bump's shimmy and not the routine's. The routine
+        // one is done AT somebody and points its shoulders at you, which is
+        // what the note above is about and is still true; the one you get for
+        // walking into her is turned away, because that is what was asked for.
+        // A flag rather than a second phase, because everything else about the
+        // two — the clip, the hold, the chatter, the way out — is identical.
         show.want = Math.atan2(ps - show.s, pt - show.t)
-          + (show.phase === 'twerk' ? Math.PI : 0);
+          + (show.phase === 'twerk' || show.shimBack ? Math.PI : 0);
         if (show.tmr - show.said > SHOW.say[0] * 0.7
           + Math.random() * (SHOW.say[1] - SHOW.say[0])) {
           show.said = show.tmr;
           showSay(say1(CHAT), d);
         }
         if (show.tmr > SHOW[HOLD_FOR[show.phase]] || leaving
-          || d > SHOW.far) showNext();
+          || d > SHOW.far) { show.shimBack = 0; showNext(); }
         break;
 
       case 'heart':
@@ -21614,10 +21630,35 @@ async function buildJadrija(scene) {
       // the legs are down again by the time there is anything to land on.
       show.tuck = damp(show.tuck, sat(show.air / hopApex()), 16, dt);
       const k = show.tuck < 0.01 ? 0 : show.tuck;
-      f.aim('legUL', 1, 0, 0, k * SHOW.tuck);
-      f.aim('legUR', 1, 0, 0, k * SHOW.tuck);
-      f.aim('legLL', 1, 0, 0, -k * SHOW.tuckKnee);
-      f.aim('legLR', 1, 0, 0, -k * SHOW.tuckKnee);
+      // Feet apart while she shimmies, and only then.
+      //
+      // Misha, 28 Aug: "she should shimmy while having her back turned to me,
+      // and spread her legs a little". The stance rides on the same two hip
+      // aims the tuck uses, with OPPOSITE signs — one leg out each way, which
+      // is what makes it a stance rather than both legs leaning. Eased on
+      // `show.stance` rather than switched, because a clip that starts with
+      // the feet already apart reads as a cut.
+      //
+      // Sharing the aims with the tuck is deliberate: `aim` holds a rotation
+      // until it is handed a zero, and two places writing one bone is two
+      // places to forget to clear it.
+      show.stance = damp(show.stance || 0,
+        show.phase === 'shimmy' && show.shimBack ? SHOW.stance : 0, 7, dt);
+      const spread = show.stance < 0.004 ? 0 : show.stance;
+      // (0, 0, 1) AND NOT (1, 0, 0), which is what this said for as long as
+      // it has existed and is the axis the comment above already claims. On
+      // this rig x is fore-and-aft and z is lateral — 49-you.js says so in the
+      // terms that paint her vest — so a rotation about x abducts. Measured at
+      // 0.7 rad on the hip: x carries the knee 0.29 m SIDEWAYS and z carries
+      // it 0.28 m forward, and z does the same on both legs, so there is no
+      // mirror in it. Her tuck has been a straddle.
+      //
+      // Found from the other end: Chloe's jump was copied from here, and "the
+      // knees/legs bend sideways" about that is just as true about this.
+      f.aim('legUL', 0, 0, 1, k * SHOW.tuck + spread);
+      f.aim('legUR', 0, 0, 1, k * SHOW.tuck - spread);
+      f.aim('legLL', 0, 0, 1, -k * SHOW.tuckKnee);
+      f.aim('legLR', 0, 0, 1, -k * SHOW.tuckKnee);
     }
 
     // Turn towards `want` at a rate a person turns at, and never the long way
