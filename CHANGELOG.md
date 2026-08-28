@@ -8,6 +8,46 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.139.0] — 2026-08-28
+
+### Chloe gets her own face
+
+**"make the facial shape/features more like this pic somehow."** She had
+been wearing the MakeHuman neutral — the average of everybody, which is
+soft and round — and the face in the reference is angular: high
+cheekbones with hollows under them, a narrow chin, a straight narrow
+nose, a long face. All of that is a weighted sum of MakeHuman face
+targets, so `CHLOE` in `mh_morph.py` is thirteen of them and no
+guesswork.
+
+**Her own bake, so Baye is untouched.** `human_skin.fr3d.gz` is also
+Baye in 43-jadrija.js and the swimmer in 61-chase.js, and morphing the
+shared mesh would have given a fire performer at a bathing station
+somebody else's face. `human_mh.py` now takes `--body`, `--out` and
+`--blend`; `fetch()` is the one place that file gets its mesh from, so a
+whole second figure costs one override and no fork. 571 KB against a
+25 MB build, and `human_skin.fr3d.gz` is byte-identical.
+
+**Face targets only, and that is a rule rather than a preference.** She
+is the one figure whose clothes, tattoo and hat are all PAINT, and every
+one of those is a threshold in her bind-space height — the vest hem at
+0.995, the sleeve at 0.900, the brief between 0.815 and 0.962. A
+macrodetail or a bodyshape in that recipe and every one of them is
+measuring a different woman: the garments slide, the sleeve comes back
+down her leg, the hat floats.
+
+**The face paint had to be retargeted with it.** Every number in
+`cutters` — brow, lash, lip, iris — was measured off the base mesh's
+skull in absolute metres, and a morphed skull is a different one. This
+is the same `vault` retarget `bathers_mh.py` has always done for its
+eight, applied on the `--body` path only: it comes out exactly (1, 1, 1)
+on the unmorphed base, so the shared figure is bit-for-bit what it was.
+
+The morph widened her braincase by 6 mm, which took the beanie's
+clearance at the hem down to 6 mm, so the profile came up to match. That
+is the whole of what a face-only morph costs downstream, which is why it
+is a face-only morph.
+
 ## [1.138.0] — 2026-08-28
 
 ### Tighter, and a way to stop asking

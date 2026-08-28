@@ -81,6 +81,44 @@ RAW = ("https://raw.githubusercontent.com/makehumancommunity/makehuman/"
 # eight variations on one build. The corners are corners of a *human* range, not
 # of a caricature: at 1.0 the heavy old man is a heavy old man, not a balloon.
 # Restraint here reads as sameness, which is the thing this exists to fix.
+# ── Chloe ─────────────────────────────────────────────────────────────────── #
+#
+# FACE TARGETS ONLY, and that is a hard rule rather than a preference. She is
+# the one figure in this game whose clothes, tattoo and hat are all PAINT, and
+# every one of those is a threshold in her bind-space height: the vest hem at
+# 0.995, the sleeve's lower bound at 0.900, the brief's leg opening between
+# 0.815 and 0.962, the beanie's at 1.668. Put a macrodetail or a bodyshape in
+# here and every one of those numbers is measuring a different woman — the
+# garments slide, the sleeve comes back down her leg, the hat floats. The head
+# moves and nothing else does, so the only numbers that have to be re-measured
+# are the four the hat is built from.
+#
+# Misha, 28 Aug, with a cosplay photograph: "make the facial shape/features
+# more like this pic somehow". What is in that frame is angular and
+# androgynous — high cheekbones with hollows under them, a narrow chin, a
+# straight narrow nose, a long face. The base mesh is none of those; it is the
+# MakeHuman neutral, which is soft and round because it is the average of
+# everybody.
+#
+# Baked as its own body and its own skin so BAYE IS UNTOUCHED. She and the
+# race swimmer share `human_skin.fr3d.gz` with Chloe, and morphing that would
+# have given a fire performer at a bathing station somebody else's face.
+CHLOE = ("chloe", 1.750, [
+    ("head/head-oval", 0.50),
+    ("head/head-invertedtriangular", 0.35),
+    ("cheek/l-cheek-bones-incr", 0.75),
+    ("cheek/r-cheek-bones-incr", 0.75),
+    ("cheek/l-cheek-inner-decr", 0.60),
+    ("cheek/r-cheek-inner-decr", 0.60),
+    ("chin/chin-width-decr", 0.60),
+    ("chin/chin-height-incr", 0.35),
+    ("chin/chin-prognathism-decr", 0.20),
+    ("nose/nose-scale-horiz-decr", 0.50),
+    ("nose/nose-hump-decr", 0.35),
+    ("forehead/forehead-scale-vert-decr", 0.25),
+    ("mouth/mouth-scale-horiz-decr", 0.25),
+])
+
 BATHERS = [
     ("girl_child", 1.24, [
         ("macrodetails/caucasian-female-child", 1.0),
@@ -248,11 +286,11 @@ def main():
     lo, hi = body_span(lines, verts)
     print("base %d verts, neutral body %.4f units" % (len(verts), hi - lo))
     if "--list" in sys.argv:
-        for n, h, r in BATHERS:
+        for n, h, r in BATHERS + [CHLOE]:
             print("  %-18s %4.2f m  %s" % (n, h, ", ".join(
                 t.split("/")[-1] + "@" + str(w) for t, w in r)))
         return
-    for name, height, recipe in BATHERS:
+    for name, height, recipe in BATHERS + [CHLOE]:
         build(name, height, recipe, lines, verts, where)
 
 

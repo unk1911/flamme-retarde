@@ -657,6 +657,19 @@ including how to rebuild without the parts you may not want.
   texture baked down to one colour per vertex and thrown away, because nothing
   in this game samples a texture. It keeps its 27-bone armature and its walk
   cycle, and lives under the slastičarnica's terrace tables.
+- **The people**: every human figure in the game — Chloe, Baye, the crew and
+  the twenty-seven bathers — is built on
+  **[MakeHuman](http://www.makehumancommunity.org/)**'s base mesh and its
+  morph targets, released under
+  [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) per
+  `LICENSE.ASSETS.md` in that project. Nothing of MakeHuman's is committed
+  here: `tools/blender/mh_morph.py` fetches `base.obj` and the `.target` files
+  it needs on first run, caches them under `build/`, and bakes a body as a
+  weighted sum — which is all MakeHuman itself is, one mesh plus several
+  hundred lists of per-vertex deltas. The rigs, the weights, the clips, the
+  faces, the paint and the clothes are this project's. CC0 asks for no
+  attribution; this is here anyway.
+
 - **The dog**: [*Pug*](https://poly.pizza/m/1gXKv15ik8) by
   **[Quaternius](https://quaternius.com)**, dedicated to the public domain under
   [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). The source
@@ -666,8 +679,9 @@ including how to rebuild without the parts you may not want.
   its material seam so its two colours become vertex colours like everything
   else here. CC0 asks for no attribution; this is here anyway.
 
-  It is the only geometry in the game that was not authored for it. Everything
-  else — four landmarks, the aeroplane, the figure, thirteen thousand
+  It and the cat are the only *objects* in the game that were not authored for
+  it — the people are the base mesh above, given everything that makes them
+  people here. Everything else — four landmarks, the aeroplane, thirteen thousand
   footprints, a hundred and sixty-nine square kilometres of karst — is built by
   something in `tools/`, because all of it is *specific*. A dog on a beach is
   not specific.

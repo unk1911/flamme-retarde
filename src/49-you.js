@@ -144,10 +144,10 @@ const YOU = {
   beanie: {
     hem: 1.668, fa: 1.45, lean: -0.14,
     prof: [
-      [0.072, -0.075], [0.086, -0.045], [0.090, -0.018],
-      [0.091, 0.004], [0.090, 0.020], [0.086, 0.038],
-      [0.079, 0.055], [0.069, 0.070], [0.055, 0.083],
-      [0.038, 0.093], [0.020, 0.099], [0.000, 0.103],
+      [0.076, -0.075], [0.091, -0.045], [0.095, -0.018],
+      [0.096, 0.004], [0.095, 0.020], [0.091, 0.038],
+      [0.083, 0.055], [0.072, 0.070], [0.057, 0.083],
+      [0.039, 0.093], [0.021, 0.099], [0.000, 0.103],
     ],
   },
   // A trim, if she ends up facing off-square. The rig's own forward is +X —
@@ -206,7 +206,26 @@ async function buildYou(scene) {
   // faded to black and there is nothing to see it move.
   const uSwim = { value: 0 };
 
-  const fig = await loadSkin('human_skin_fr3d', {
+  // HER OWN MESH, and not the one Baye and the race swimmer are built from.
+  //
+  // Misha, 28 Aug: "make the facial shape/features more like this pic somehow",
+  // with a cosplay photograph of the character. The base this figure shipped on
+  // is the MakeHuman neutral — soft and round, because it is the average of
+  // everybody — and the face in that photograph is angular: high cheekbones
+  // with hollows under them, a narrow chin, a straight narrow nose, a long
+  // face. All of that is a weighted sum of MakeHuman face targets, which is
+  // what CHLOE in tools/blender/mh_morph.py now is.
+  //
+  // It had to be a second bake rather than a morph of the shared one, because
+  // `human_skin_fr3d` is also Baye in 43-jadrija.js and the swimmer in
+  // 61-chase.js, and giving a fire performer at a bathing station somebody
+  // else's face is not a fix. 571 KB against a 25 MB build.
+  //
+  // FACE TARGETS ONLY. Her body is the same vertices it always was, and it has
+  // to be: everything she wears is paint on a height threshold — the vest hem
+  // at 0.995, the sleeve at 0.900, the brief between 0.815 and 0.962 — and a
+  // body morph moves every one of them off the woman they were measured on.
+  const fig = await loadSkin('chloe_skin_fr3d', {
     spec: 0.09,
     specPower: 24,
     face: true,

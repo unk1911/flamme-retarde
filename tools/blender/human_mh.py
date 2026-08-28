@@ -201,7 +201,18 @@ ANUS_M, ANUS_P = (0.393, 0.262, 0.226), (0.393, 0.262, 0.226)
 #  getting the mesh                                                            #
 # --------------------------------------------------------------------------- #
 
+# Set by `--body` and read by `fetch`, which is the ONE place this file gets
+# its mesh from — every joint read, every vault measurement and the load itself
+# come through it. So a whole second figure costs one override and no fork.
+# See CHLOE in mh_morph.py for what the second figure is and why she is not
+# just a morph of the first.
+BODY_OVERRIDE = None
+SKIN_OUT = None
+
+
 def fetch():
+    if BODY_OVERRIDE is not None:
+        return BODY_OVERRIDE
     if CACHE.exists() and CACHE.stat().st_size > 1_000_000:
         return CACHE
     CACHE.parent.mkdir(parents=True, exist_ok=True)
@@ -5339,9 +5350,20 @@ def render(tag, names):
 # --------------------------------------------------------------------------- #
 
 def main():
-    global NO_RENDER
+    global NO_RENDER, BODY_OVERRIDE, SKIN_OUT, BLEND
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     NO_RENDER = "--norender" in argv
+    # A different mesh, a different skin and a different .blend, so that baking
+    # Chloe cannot quietly overwrite the figure eight bathers and Baye are
+    # built from. All three move together or none of them do.
+    if "--body" in argv:
+        BODY_OVERRIDE = Path(argv[argv.index("--body") + 1])
+        if not BODY_OVERRIDE.exists():
+            sys.exit("[mh] no such body %s" % BODY_OVERRIDE)
+    if "--out" in argv:
+        SKIN_OUT = Path(argv[argv.index("--out") + 1])
+    if "--blend" in argv:
+        BLEND = Path(argv[argv.index("--blend") + 1])
     levels = SUBSURF
     if "--sub" in argv:
         levels = int(argv[argv.index("--sub") + 1])
@@ -5653,7 +5675,18 @@ def main():
     rig = armature(J)
     print("[mh] bones %d" % len(rig.data.bones))
     skin(body, rig)
-    paint(body, cutters(J))
+    # The face frame. Every number in `cutters` — brow, lash, lip, iris — was
+    # measured off the base mesh's skull, and a `--body` is a different skull:
+    # Chloe's face targets take 7 mm off her jaw and put her cheekbones out,
+    # and eyebrows placed in absolute metres land somewhere else on that. This
+    # is the same retarget `bathers_mh.py` does for its eight, and it is
+    # exactly (1, 1, 1) on the unmorphed base, so the shared figure is
+    # bit-for-bit what it was.
+    k = (1.0, 1.0, 1.0)
+    if BODY_OVERRIDE is not None:
+        k = tuple(a / b for a, b in zip(vault(path, J["l-eye"].z), SKULL))
+        print("[mh] head frame  %.3f %.3f %.3f" % k)
+    paint(body, cutters(J, k=k))
     _material(body)
     _lights()
 
@@ -5670,7 +5703,9 @@ def main():
     # ships it any more: it wrote 427 KB for one frozen attitude, and the same
     # body with its skeleton attached is 470 KB for all of them.
     pose(rig, {})
-    export_skin(body, rig, ROOT / "build" / "payload" / "human_skin.fr3d.gz", CLIPS)
+    export_skin(body, rig,
+                SKIN_OUT or (ROOT / "build" / "payload" / "human_skin.fr3d.gz"),
+                CLIPS)
 
     BLEND.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND))
