@@ -249,6 +249,13 @@ NO_ANKLETS = False
 # removable", and on a figure with nothing removable the honest answer is
 # nought. Baye still has hers, and hers is what the mechanism was built for.
 NO_SCARF = False
+# And the boots, which are the one thing here that goes ON rather than off.
+#
+# Opt-in and not opt-out, because they are cut to Chloe's reference and to
+# nobody else's: everyone else at Jadrija is barefoot on hot concrete, which is
+# what a bathing station is. See `boots` for why these are geometry when the
+# rest of what she wears is paint.
+WITH_BOOTS = False
 
 
 def fetch():
@@ -2761,6 +2768,306 @@ def perineum(mesh, out):
     return ANUS_SEG + 1
 
 
+# --------------------------------------------------------------------------- #
+#  the boots                                                                   #
+# --------------------------------------------------------------------------- #
+#
+# The one garment on her that had to be geometry, and the argument for it is the
+# argument the necklace already won: paint cannot leave the body.
+#
+# Everything else Chloe wears is a colour swap in src/49-you.js — the dye job,
+# the tank, the print, the sleeve, the jeans — because all of those are cloth
+# lying on a surface the rig already has, and paint on a surface is free, cannot
+# clip, and cannot fall out of a pose. A boot is not that. A boot is 12 mm of
+# leather standing off a 40 mm ankle, and the whole of what makes it read as a
+# boot is the OUTLINE: the blunt toe, the slab of sole, the shaft that is
+# straight where the calf is not. Painted, it came out as a dark sock with a
+# lacing pattern on it — which is exactly what it was.
+#
+# Misha, 29 Aug: "what about the boots... there's no way to do a real boot, not
+# a 'painted-on' boot?" There is, and the reason it looked as though there might
+# not be is worth writing down, because it was wrong.
+#
+# ── why the ankle is not a problem ─────────────────────────────────────────────
+#
+# Everything laid on after the decimator — the nails, the wrist band, the wrap,
+# the perineum — carries ONE bone at full weight, and the note over the nails
+# says why: there are no finger bones, so a fingertip is rigid to its hand in
+# every clip this figure has. That is true of a fingertip and it is not true of
+# a boot, which spans the one joint on the leg that actually moves through its
+# whole range every stride. A shaft rigid to the shin and a foot rigid to the
+# foot would tear open at the ankle the first time she walked.
+#
+# But that was never a limit of the format. `write_skin` has carried FOUR bone
+# influences per vertex since v1 and the shader adds exactly four; the single
+# bone was a convenience for four things that did not need more. So these are
+# skinned instead — `_boot_weights` in `export_skin` reads the four influences
+# off the nearest body vertices and blends them by inverse distance, which
+# gives the boot the leg's own weights. It creases at the ankle because the leg
+# creases at the ankle.
+#
+# ── and the numbers ───────────────────────────────────────────────────────────
+#
+# Measured, per `_leg_profile`, not typed. The shape of a foot from above is
+# nothing like a circle and the shaft is a cone that leans, so the shell is a
+# radial silhouette about the leg's own axis at each height — the same
+# instrument `hip_scarf` uses on the hips, with two changes it needed:
+#
+#   * the axis is per row, because the legs converge going up. Measured on
+#     Chloe: the leg's centre line runs y = -0.234 at the sole and -0.196 at
+#     the top of the shaft, and a fixed axis put the shell 20 mm into her shin
+#     at one end or 20 mm off it at the other.
+#   * the axis in x is the ANKLE's, held constant up the whole boot, and NOT
+#     each row's own centre. A foot's bbox centre is at x = 0.075 and a shin's
+#     at x = 0.000, so per-row centring stacks the rows on a staircase.
+#
+# The sole sits 10 mm below her bare sole, so she stands a centimetre into the
+# ground. That is deliberate and it is the cheap side of the trade: the
+# alternative is to lift the figure by the sole's thickness, which means
+# YOU.eye, every `drive` call, the mirror, and the beach placement all move
+# together for a centimetre nobody can see.
+
+BOOT_TOP = 0.345          # z of the rim, mid-shin — see src/49-you.js, which
+                          # paints this exact number and has to agree with it
+BOOT_SOLE = -0.010        # and of the bottom of the outsole
+BOOT_SEG = 22             # segments round the boot
+BOOT_LEATHER = (0.150, 0.108, 0.076)
+BOOT_SOLE_COL = (0.040, 0.038, 0.038)
+
+# The shell, as (height, how far it stands off the measured leg). The last row
+# runs back DOWN and inward: that is the turned-over cuff, and it is what closes
+# the top of the tube against her shin. An open tube on a FrontSide material is
+# a hole you can see down.
+BOOT_RIB = [
+    (BOOT_SOLE,      0.011),
+    (0.007,          0.014),   # the welt, which is the widest part of a boot
+    (0.023,          0.013),   # and the slab of sole under it
+    (0.031,          0.009),   # where the upper steps in off the welt
+    (0.048,          0.008),   # and three ribs up the toe box, because the box
+    (0.068,          0.008),   # is 104 mm tall and two rows in it is a prow
+    (0.086,          0.009),
+    (0.108,          0.010),   # the vamp, over the instep, and the ankle
+    (0.160,          0.012),
+    (0.235,          0.013),
+    (0.300,          0.014),
+    (0.332,          0.018),   # the cuff flares
+    (BOOT_TOP,       0.020),   # the rim
+    (BOOT_TOP - 0.016, -0.002),  # and rolled back INTO the leg, closing it
+]
+# Two of those numbers were four millimetres bigger and both were wrong in a
+# way only a close render showed.
+#
+# The welt was nine millimetres proud of the upper. A welt is four or five, and
+# nine — all the way round, on a sole that is already wider than the foot —
+# came out as a flange standing off the boot on every side. It read as a
+# snowshoe.
+#
+# And the last rib was +3 mm, which is a ring of leather sitting three
+# millimetres OFF her shin with her shin coming up through the middle of it. A
+# rolled cuff has to close on the leg or it is not a roll, it is a tube with the
+# lid off, and that is exactly what it looked like from above: a dark ellipse
+# you could see straight down. −2 mm sinks the ring into her, which nothing can
+# see and nothing can get through.
+
+# A boot's toe box does not follow the toes. Her foot is 205 mm in front of the
+# ankle at the sole and only 73 mm by z = 0.06, because that is where toes stop
+# and an instep starts — so a shell that only followed the measurement would
+# have a toe that slopes back at 60 degrees.
+#
+# So there is a floor under the measurement over the front of the boot, and it
+# is a SUPERELLIPSE rather than a lobe. The first cut multiplied a length by
+# cos(bearing), which is a teardrop: full length dead ahead and two thirds of it
+# twenty degrees off, so the boot came to a point and read as a winklepicker.
+# What a toe box is is a rounded rectangle — 200 mm long, 120 wide, square-ish
+# at the corners — and `n = 6` is that: at 20 degrees off the centre line it
+# still gives 174 mm where the cosine gave 190 and the true ellipse gives 148.
+#
+# The height falls off as a quarter-circle and not linearly, which is the other
+# half of blunt: the box holds its full width up to half its height and only
+# then rolls over.
+BOOT_TOE_L = 0.196        # from the ankle's axis to the tip
+BOOT_TOE_W = 0.045        # and half its width
+BOOT_TOE_N = 5.0          # how square the corners are
+BOOT_TOE_Z = 0.104        # and how high the box stands
+BOOT_TOE_P = 2.2          # how long it holds its length on the way up
+
+
+def _leg_profile(mesh, sy, z0, z1, rows, bins):
+    """One leg's silhouette as max radius per (height, bearing), about its own
+    axis at each height.
+
+    `sy` is +1 for her left leg and -1 for her right. Bearing is measured so
+    that 0 is straight in front of her and +pi/2 is OUTBOARD on either leg,
+    which makes the two profiles mirror images and lets one builder make both.
+
+    Returns (tab, ax, ay, z0, dz): the table, and the axis it was measured
+    about, per row.
+    """
+    dz = (z1 - z0) / (rows - 1)
+    tau = math.pi * 2.0
+    pts = [[] for _ in range(rows)]
+    for v in mesh.vertices:
+        p = v.co
+        if p.z < z0 - dz or p.z > z1 + dz:
+            continue
+        if p.y * sy < 0.04 or abs(p.y) > 0.42:
+            continue
+        i = max(0, min(rows - 1, int(round((p.z - z0) / dz))))
+        pts[i].append(p)
+
+    def med(vals):
+        vals = sorted(vals)
+        return vals[len(vals) // 2] if vals else 0.0
+
+    # The axis in x is the ankle's, held for the whole boot; in y it is each
+    # row's own, because that is the one that actually moves. See the note above
+    # for what happens when either of those is decided the other way.
+    ank = [p for row in pts for p in row if 0.085 < p.z < 0.170]
+    axc = med([p.x for p in ank]) if ank else 0.0
+    ay = [med([p.y for p in row]) if len(row) > 3 else sy * 0.22 for row in pts]
+    for i in range(1, rows):                       # a median on a sparse row is
+        if len(pts[i]) <= 3:                       # noise; carry the last good
+            ay[i] = ay[i - 1]                      # one up instead
+
+    tab = [[0.0] * bins for _ in range(rows)]
+    for i, row in enumerate(pts):
+        for p in row:
+            dx, dy = p.x - axc, (p.y - ay[i]) * sy
+            r = math.hypot(dx, dy)
+            b = int((math.atan2(-dy, dx) % tau) / tau * bins) % bins
+            if r > tab[i][b]:
+                tab[i][b] = r
+    # Sparse rows leave gaps. Fill each from its neighbours round the ring
+    # rather than from the row mean, which on a foot — 205 mm at the front and
+    # 45 mm at the side — is not a radius anything has.
+    for row in tab:
+        for k in range(bins):
+            if row[k] > 0:
+                continue
+            for step in range(1, bins):
+                a, b = row[(k - step) % bins], row[(k + step) % bins]
+                if a > 0 or b > 0:
+                    row[k] = max(a, b)
+                    break
+    return tab, axc, ay, z0, dz
+
+
+def _leg_r(prof, z, ang):
+    """Bilinear lookup into `_leg_profile`, wrapping in bearing."""
+    tab, _axc, _ay, z0, dz = prof
+    rows, bins = len(tab), len(tab[0])
+    tau = math.pi * 2.0
+    f = max(0.0, min(rows - 1.001, (z - z0) / dz))
+    i0 = int(f)
+    ti = f - i0
+    g = (ang % tau) / tau * bins
+    b0 = int(g) % bins
+    tb = g - int(g)
+    b1 = (b0 + 1) % bins
+    lo = tab[i0][b0] * (1 - tb) + tab[i0][b1] * tb
+    hi = tab[i0 + 1][b0] * (1 - tb) + tab[i0 + 1][b1] * tb
+    return lo * (1 - ti) + hi * ti
+
+
+def _leg_axis(prof, z):
+    """Where that leg's centre line is at this height."""
+    _tab, axc, ay, z0, dz = prof
+    f = max(0.0, min(len(ay) - 1.001, (z - z0) / dz))
+    i0 = int(f)
+    t = f - i0
+    return axc, ay[i0] * (1 - t) + ay[i0 + 1] * t
+
+
+def _boot(mesh, sy, out):
+    """One boot: a closed shell round the foot and up the shin.
+
+    Wound so the outside faces out. `(round the ring) x (up the shell)` has to
+    come out along the outward radius, and going round the natural way while
+    stepping UP gives the inside — the same handedness trap `hip_scarf` fell
+    into, where the material is FrontSide and what you see is the far half of
+    the garment from behind.
+    """
+    pos, nrm, col, tri = out
+    prof = _leg_profile(mesh, sy, BOOT_SOLE, BOOT_TOP + 0.02, 22, BOOT_SEG)
+    tau = math.pi * 2.0
+    base = len(pos)
+    rows = len(BOOT_RIB)
+
+    for (z, gap) in BOOT_RIB:
+        cx, cy = _leg_axis(prof, max(z, 0.002))
+        for k in range(BOOT_SEG + 1):
+            a = tau * (k % BOOT_SEG) / BOOT_SEG
+            r = _leg_r(prof, max(z, 0.002), a) + gap
+            # The toe box, which is a floor under the measurement and not a
+            # shape of its own — behind her it is nought and changes nothing.
+            ca = math.cos(a)
+            if z < BOOT_TOE_Z and ca > 0.0:
+                # Held high and then dropped, rather than a quarter-circle.
+                # A toe box keeps its length most of the way up and rolls over
+                # at the top; a circle starts falling immediately, and with the
+                # ribs this coarse that came out as a flat plate with a prow.
+                k = math.sqrt(max(0.0, 1.0 - (max(z, 0.0) / BOOT_TOE_Z)
+                                  ** BOOT_TOE_P))
+                sa = abs(math.sin(a))
+                q = ((ca / BOOT_TOE_L) ** BOOT_TOE_N
+                     + (sa / BOOT_TOE_W) ** BOOT_TOE_N)
+                r = max(r, k * q ** (-1.0 / BOOT_TOE_N))
+            d = Vector((math.cos(a), -math.sin(a) * sy, 0.0))
+            pos.append(Vector((cx, cy, z)) + d * r)
+            # The bottom ring's normals are tipped 45 degrees down, and that is
+            # not a nicety. The outsole below it is a fan on to a hub whose
+            # normal is straight down, so a horizontal ring next to it makes the
+            # interpolated normal sweep through ninety degrees across one
+            # triangle — and somewhere in that sweep it points at the key. It
+            # rendered as three white specks on the edge of the toe.
+            nrm.append(d if z > BOOT_SOLE + 0.001
+                       else Vector((d.x, d.y, -1.0)).normalized())
+            col.append(BOOT_SOLE_COL if z < 0.030 else BOOT_LEATHER)
+
+    # Wound per strip, off whether that strip goes UP or down.
+    #
+    # Ten of the eleven do go up and one does not: the last rib is the turned
+    # cuff, which runs back down the outside of the rim to close the tube. Going
+    # round the ring the same way while stepping the other way reverses the
+    # handedness, so a fixed winding puts 88 triangles — every cuff on both
+    # boots — inside out, and on a FrontSide material that is not a wrong-facing
+    # lip, it is no lip at all. Measured off the exported blob by taking each
+    # triangle's geometric normal against its own stored one; that is also how
+    # the sole fan below was caught.
+    for i in range(rows - 1):
+        up = 1 if BOOT_RIB[i + 1][0] > BOOT_RIB[i][0] else -1
+        for k in range(BOOT_SEG):
+            a0 = base + i * (BOOT_SEG + 1) + k
+            b0 = a0 + BOOT_SEG + 1
+            if sy * up > 0:
+                tri.append((a0, b0, b0 + 1))
+                tri.append((a0, b0 + 1, a0 + 1))
+            else:
+                tri.append((a0, b0 + 1, b0))
+                tri.append((a0, a0 + 1, b0 + 1))
+
+    # The outsole: a fan closing the bottom ring on to its own centre, dropped
+    # two millimetres so the disc is not co-planar with the ring it closes.
+    cx, cy = _leg_axis(prof, 0.002)
+    hub = len(pos)
+    pos.append(Vector((cx + 0.055, cy, BOOT_SOLE - 0.002)))
+    nrm.append(Vector((0.0, 0.0, -1.0)))
+    col.append(BOOT_SOLE_COL)
+    for k in range(BOOT_SEG):
+        a0 = base + k
+        if sy > 0:
+            tri.append((hub, a0, a0 + 1))
+        else:
+            tri.append((hub, a0 + 1, a0))
+    return len(pos) - base
+
+
+def boots(mesh, out):
+    """Both of them."""
+    n = _boot(mesh, 1, out) + _boot(mesh, -1, out)
+    print("[mh]   boots %d verts" % n)
+    return n
+
 def post_geometry(J, src, mesh, bindex):
     """Everything laid on after the decimator: ten nails, a bracelet, a wrap.
 
@@ -2794,10 +3101,21 @@ def post_geometry(J, src, mesh, bindex):
     # the middle of the thing it is in the middle of.
     n = perineum(mesh, out)
     bone += [bindex["pelvis"]] * n
+    # Everything from here down is REMOVABLE, and it has to stay that way: the
+    # shed count is one contiguous run at the tail of the index buffer, so
+    # anything she can take off goes after this line and anything she cannot
+    # goes before it. On Baye that run is the wrap; on Chloe it is the boots;
+    # on the eight bathers it is nothing at all.
     kept = len(tri)
     if not NO_SCARF:
         n = hip_scarf(mesh, out)
         bone += [bindex["pelvis"]] * n
+    if WITH_BOOTS:
+        n = boots(mesh, out)
+        # None, and not a bone index. See `_boot_weights` in `export_skin`:
+        # these are the only laid-on vertices on any figure that are skinned
+        # rather than pinned, because they are the only ones that span a joint.
+        bone += [None] * n
     return pos, nrm, col, bone, tri, len(tri) - kept
 
 
@@ -3025,18 +3343,66 @@ def export_skin(body, rig, path, clips, tris=26000, J=None, post=True,
             J, _js, _jd = read_joints(fetch())
         npos, nnrm, ncol, nbone, ntri, nshed = post_geometry(
             J, src, body.data, bindex)
+    # A laid-on vertex with `None` for its bone is SKINNED rather than pinned:
+    # it takes the four influences off the body vertices nearest to it, blended
+    # by inverse distance. That is the whole of what lets a boot span an ankle.
+    #
+    # The bone at full weight above is right for everything that does not cross
+    # a joint — a nail is rigid to its hand, a wrap is rigid to the pelvis — and
+    # it is wrong for a shell that runs from the toe to mid-shin. Rigid to the
+    # shin, a boot's foot swings away from the foot; rigid to the foot, its
+    # shaft swings away from the leg; split at the ankle, it tears open there.
+    # Read off the leg, it creases where the leg creases, which is what a boot
+    # made of leather does.
+    #
+    # Four neighbours and not one, on a mesh whose triangles down the shin are
+    # 15 to 25 mm: nearest-neighbour makes the weights a Voronoi diagram, and a
+    # Voronoi boundary running across a smooth shell is a visible fold that
+    # snaps rather than bends. `p ** 2` falls off fast enough that a vertex
+    # sitting on a body vertex is still essentially that vertex's weights.
+    kd = None
+    if any(b is None for b in nbone):
+        from mathutils import kdtree
+        kd = kdtree.KDTree(len(src.vertices))
+        for vi, v in enumerate(src.vertices):
+            kd.insert(v.co, vi)
+        kd.balance()
+
+    def _boot_weights(co):
+        acc = {}
+        for _c, vi, dist in kd.find_n(co, 4):
+            w = 1.0 / max(dist, 1e-4) ** 2
+            wi, ww = wcache[vi] if vi in wcache else weights(vi)
+            wcache[vi] = (wi, ww)
+            for b, q in zip(wi, ww):
+                if q:
+                    acc[b] = acc.get(b, 0.0) + w * q
+        gs = sorted(((v, b) for b, v in acc.items()), reverse=True)[:MAX_INFLUENCES]
+        if not gs:
+            return (0, 0, 0, 0), (255, 0, 0, 0)
+        tot = sum(v for v, _ in gs)
+        q = [max(0, min(255, int(round(v / tot * 255)))) for v, _ in gs]
+        q[0] += 255 - sum(q)
+        ix = [b for _, b in gs] + [0] * (MAX_INFLUENCES - len(gs))
+        q += [0] * (MAX_INFLUENCES - len(q))
+        return tuple(ix), tuple(q)
+
     lay0 = len(pos) // 3
     for k in range(len(npos)):
         p, nv, c = npos[k], nnrm[k], ncol[k]
         pos.extend((p.x, p.z, -p.y))
         nrm.extend((nv.x, nv.z, -nv.y))
         cols.extend(min(255, max(0, int(x * 255 + 0.5))) for x in c)
-        bidx.extend((nbone[k], 0, 0, 0))
-        bwgt.extend((255, 0, 0, 0))
+        if nbone[k] is None:
+            wi, ww = _boot_weights(p)
+        else:
+            wi, ww = (nbone[k], 0, 0, 0), (255, 0, 0, 0)
+        bidx.extend(wi)
+        bwgt.extend(ww)
     for t in ntri:
         idx.extend(lay0 + q for q in t)
-    print("[mh]   laid on %d verts %d tris (nails, band, perineum, wrap) — wrap is %d"
-          % (len(npos), len(ntri), nshed))
+    print("[mh]   laid on %d verts %d tris (nails, band, perineum, wrap, boots)"
+          " — shed is %d" % (len(npos), len(ntri), nshed))
 
     baked = [_bake_clip(rest, c) for c in clips]
 
@@ -5398,7 +5764,7 @@ def render(tag, names):
 
 def main():
     global NO_RENDER, BODY_OVERRIDE, SKIN_OUT, BLEND, NO_TAIL, NO_SEPTUM
-    global NO_ANKLETS, NO_SCARF
+    global NO_ANKLETS, NO_SCARF, WITH_BOOTS
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     NO_RENDER = "--norender" in argv
     # A different mesh, a different skin and a different .blend, so that baking
@@ -5416,6 +5782,7 @@ def main():
     NO_SEPTUM = "--noseptum" in argv
     NO_ANKLETS = "--noanklets" in argv
     NO_SCARF = "--noscarf" in argv
+    WITH_BOOTS = "--boots" in argv
     levels = SUBSURF
     if "--sub" in argv:
         levels = int(argv[argv.index("--sub") + 1])
@@ -5618,7 +5985,15 @@ def main():
         _lights()
         pose(rig, {})
         post_preview(J, body)
-        render("trinket", ("nails", "hips", "hipside"))
+        # `--views` here for the same reason it exists on `--reskin`: the boots
+        # are the first thing this door was ever asked to show that is not on
+        # the hips or the hands, and arguing about the shape of a toe box
+        # through a camera pointed at somebody's wrist is not arguing about it.
+        views = ("nails", "hips", "hipside")
+        if "--views" in argv:
+            views = tuple(n for n in argv[argv.index("--views") + 1:]
+                          if not n.startswith("-") and n in VIEWS)
+        render("trinket", views)
         return
 
     # Where the hands actually end up, in metres, and nothing else.

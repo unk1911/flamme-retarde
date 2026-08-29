@@ -8,6 +8,74 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.149.0] — 2026-08-29
+
+### A real boot
+
+Misha, on the painted pair that shipped an hour earlier: "there's no way to
+do a real boot, not a 'painted-on' boot?" There is, and the note that said
+otherwise was wrong about the reason.
+
+Everything Chloe wears is paint because paint cannot clip through the body
+it is on and costs nothing in the payload, and for a tank over a chest that
+is free — the body under it is already the right shape. A boot is the case
+that argument runs out on. What makes a boot read is 12 mm of leather
+standing off a 40 mm ankle, and paint has no silhouette, so what shipped was
+a dark sock with a lacing pattern on it.
+
+The thing that looked like a blocker was the ankle. Everything laid on after
+the decimator — nails, wrist band, wrap, perineum — carries **one bone at
+full weight**, and the note over the nails explains why that is right for
+them: there are no finger bones, so a fingertip is rigid to its hand in
+every clip. A boot spans the one joint on the leg that goes through its full
+range every stride. Rigid to the shin its foot swings off the foot; rigid to
+the foot its shaft swings off the leg; split at the ankle it tears open.
+
+But that was never a limit of the format. `write_skin` has carried four
+influences per vertex since v1 and the shader adds exactly four — the single
+bone was a convenience for four things that did not need more. So laid-on
+geometry can now be *skinned*: pass `None` for the bone and `export_skin`
+reads the four influences off the four nearest body vertices, blended by
+inverse distance. The sole comes out `footL 242 / toeL 11 / legLL 4`, which
+is the leg's own weighting, and the boot creases where the leg creases.
+
+The shell itself is measured, per `_leg_profile` — a radial silhouette about
+the leg's own axis at each height, which is `hip_scarf`'s instrument with two
+changes it needed: the axis is per row, because the legs converge going up
+(y = -0.234 at the sole, -0.196 at the rim), and the axis in **x** is the
+ankle's held constant, because a foot's centre is at 0.075 and a shin's at
+0.000 and per-row centring stacks the rows on a staircase.
+
+Four things were wrong first and each was caught by a measurement rather
+than by looking:
+
+* 130 of 1 012 triangles were inside out — every cuff on both boots, and
+  every sole fan. The cuff strip is the one rib of eleven that runs *down*,
+  and going round the ring the same way while stepping the other way
+  reverses the handedness. Caught by taking each exported triangle's
+  geometric normal against its own stored one.
+* The turned cuff sat 3 mm *off* her shin with her shin coming up through
+  the middle of it, so from above the boot was a tube with the lid off. It
+  goes 2 mm inside her now.
+* The welt stood 9 mm proud of the upper all the way round. A welt is four
+  or five, and nine on a sole already wider than the foot read as a
+  snowshoe.
+* The toe was a teardrop, because the floor under the measurement was a
+  length times cos(bearing). A toe box is a rounded rectangle: 196 mm by
+  90, `n = 6`, held to half its height and then rolled over.
+
+She stands a centimetre into the ground, which is the outsole's thickness
+and the cheap side of that trade — the alternative is `YOU.eye`, every
+`drive` call, the mirror and the beach placement all moving together for a
+centimetre nobody can see.
+
+`wear()` is live on her again, and on a better tenant: it used to take off a
+hip wrap, which is exactly the kind of thing paint could have done.
+
+Also: `--trinkets` takes `--views` now, for the reason `--reskin` already
+did. Arguing about the shape of a toe box through a camera pointed at
+somebody's wrist is not arguing about it.
+
 ## [1.148.0] — 2026-08-29
 
 ### The scarf was Baye's

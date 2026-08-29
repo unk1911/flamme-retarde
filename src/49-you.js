@@ -21,11 +21,18 @@
 // bearing round the leg. Paint cannot clip through the body it is on, cannot
 // fall out of a pose, and costs nothing in the payload.
 //
-// It gives up one thing and it is the same thing every time: a silhouette. A
-// painted boot is a boot's colour on an ankle that is still an ankle's width.
-// That is the trade the tank made first, and at the distance a mirror — or the
-// camera on B — puts her at, it is the right one; a modelled boot on a joint
-// that flexes as hard as an ankle would clip on every stride.
+// Paint gives up one thing, always the same thing: a silhouette. For a tank
+// over a chest and a sleeve down an arm that costs nothing — the body under
+// them is already the right shape. For a boot it is the whole garment, because
+// what makes a boot read is 12 mm of leather standing off a 40 mm ankle, and
+// painted it came out a dark sock with a lacing pattern on it.
+//
+// So the boots are geometry, and they are the only thing here that is. See
+// boots() in tools/blender/human_mh.py: a measured shell round each foot and up
+// each shin, skinned to the leg's own four bone influences so it creases at the
+// ankle rather than tearing there, laid on after the decimator at the tail of
+// the index buffer so that taking it off is a draw range. This block still
+// paints it — a height is a height whether the surface is skin or leather.
 //
 // Two things are not paint, and both for the same reason: they leave her. The
 // beanie stands proud of the crown and the necklace hangs off the chest, and a
@@ -470,20 +477,35 @@ async function buildYou(scene) {
 
         // ---- the boots
         //
-        // One thing is given up here and it is worth saying out loud: paint
-        // has no silhouette, so this is a boot's colour and a boot's pattern
-        // on an ankle that is still an ankle's width. At the distance a mirror
-        // puts her at, that is the trade the tank already made — and a modelled
-        // boot on a joint that flexes as hard as an ankle does is the
-        // one garment on her that would clip on every stride.
+        // These are the one thing she wears that is NOT paint, and this block
+        // is what paints them. The shell is real geometry — see boots() in
+        // tools/blender/human_mh.py, and the note over it for why a boot is the
+        // case the argument for paint runs out on: the whole of what makes a
+        // boot read is its outline, and painted it came out a dark sock with a
+        // lacing pattern on it.
         //
-        // The top edge is not level. A tall boot slouches, so it waves three
-        // times round the leg with a little noise on top, and the denim
-        // bunched underneath shows in the troughs.
-        float top = 0.345 + 0.013 * sin(ang * 3.0 + 0.6)
-          + 0.009 * youNoise(vLocal * 26.0);
+        // So everything below now lands on leather standing 10 to 20 mm off her
+        // leg rather than on the leg, and it does that for free: the shell is
+        // built in the same bind space this reads, a couple of centimetres
+        // outboard of the skin, and a height is still a height.
+        //
+        // 0.345 IS BOOT_TOP AND HAS TO BE. The two numbers are the same rim
+        // seen from two sides — Blender puts the last ring of vertices there
+        // and this decides where the leather stops being leather — and any
+        // disagreement between them is either a band of bare denim above the
+        // boot or a band of painted leather above the denim. The transition
+        // starts a millimetre ABOVE it so that the rim itself is fully leather
+        // and the blend band lands on the leg inside the boot, where it is not
+        // visible from anywhere.
+        //
+        // It used to wave. A slouched top edge is the right idea and it is the
+        // geometry's job now: a painted wave and a straight ring of vertices
+        // disagree by up to seven millimetres, because the bearing this reads
+        // is taken about a straight-line fit to an axis the bake measures per
+        // row.
+        const float top = 0.345;
         float boot = dressed * limb
-          * (1.0 - smoothstep(top - 0.006, top + 0.004, ly));
+          * (1.0 - smoothstep(top + 0.001, top + 0.007, ly));
         if (boot > 0.002) {
           vec3 lea = ${rgb(YOU.leather)};
           lea = mix(lea, ${rgb(YOU.scuff)},
@@ -531,12 +553,17 @@ async function buildYou(scene) {
           lea = mix(lea, ${rgb(YOU.buckle)},
             panel * (1.0 - smoothstep(0.28, 0.36, abs(abs(ang) - 0.32)))
               * (1.0 - smoothstep(0.10, 0.20, abs(fract(ly * 15.0) - 0.5))) * 0.8);
-          // The sole, and a pale welt on top of it. The welt is the line that
-          // says there is a sole at all, since there is no outline to say it.
+          // The sole, and a pale welt on the top edge of it.
+          //
+          // Both heights are the geometry's, not a guess: BOOT_RIB puts the
+          // slab of sole from -0.010 to 0.023 and steps the upper in at 0.031,
+          // so the black stops where the slab does and the welt lands on the
+          // step. It used to stop at 0.020 against a sole that had no step at
+          // all, which is what a painted-on boot needed and this does not.
           lea = mix(lea, ${rgb(YOU.sole)},
-            1.0 - smoothstep(0.020, 0.026, ly));
+            1.0 - smoothstep(0.023, 0.028, ly));
           lea = mix(lea, ${rgb(YOU.welt)},
-            smoothstep(0.024, 0.028, ly) * (1.0 - smoothstep(0.030, 0.035, ly)));
+            smoothstep(0.026, 0.030, ly) * (1.0 - smoothstep(0.033, 0.038, ly)));
           vcol = mix(vcol, lea, boot);
         }
       }
@@ -1157,10 +1184,9 @@ async function buildYou(scene) {
      * Changed for the water, or dressed.
      *
      * The name is left over from when this swapped one painted garment for
-     * another. It takes the painted ones off — the tank, the jeans and the
-     * boots, all three — and there is no geometry half of the change any more:
-     * `wear` was the hip scarf, and the hip scarf was Baye's. `setDressed` in
-     * 90-app.js still calls the pair, because the mechanism is live on her.
+     * another. It takes the painted ones off — the tank, its print and the
+     * jeans — and the geometry half is `wear`, which takes off her boots.
+     * `setDressed` in 90-app.js calls the pair.
      */
     swim: (v) => { uSwim.value = v ? 1 : 0; return uSwim.value; },
     freeze: (v) => { frozen = !!v; return frozen; },
