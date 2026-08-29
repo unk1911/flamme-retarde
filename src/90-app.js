@@ -4557,13 +4557,17 @@ function crossChanging(afoot) {
 /**
  * Dressed or changed, everywhere it shows.
  *
- * Two things and no more, which is what makes this cheap: the hip wrap is
- * geometry and comes off through `wear` — `write_skin` has carried a `shed`
- * count for it since the wrap was authored, and `loadSkin` re-inflates per
- * call so Chloe's draw range is hers alone and nobody on the beach loses
- * theirs. The vest is paint, so it is a uniform: see `uSwim` in 49-you.js.
+ * One uniform and one draw range, which is what makes this cheap. The uniform
+ * is `uSwim` in 49-you.js and it is now the whole of it for Chloe: the tank,
+ * the jeans and the boots are all paint, and paint is a number. `wear` is the
+ * other half and it no longer does anything on her — she wore a hip scarf
+ * until 1.148 and that scarf was Baye's, so it came off the bake rather than
+ * off the figure, which takes `shed` to nought and a draw range to the whole
+ * buffer. The call stays because the mechanism is still live on everybody
+ * else, and `loadSkin` re-inflates per call so nobody on the beach loses
+ * theirs.
  *
- * Both of them come OFF, and neither is replaced. That is what was asked for
+ * Everything comes OFF, and none of it is replaced. That is what was asked for
  * — "if we walk in with clothes we leave without" — and four releases went
  * into a painted swimming costume that was never part of it.
  */

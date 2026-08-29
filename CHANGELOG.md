@@ -8,6 +8,52 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.148.0] — 2026-08-29
+
+### The scarf was Baye's
+
+Chloe was wearing a woven hip wrap with a fringe, tied on her left hip.
+It is a nice piece of geometry and it is not hers — it was authored for
+Baye, and Chloe had it because the two of them shared one mesh for as
+long as they did. It survived the bake that gave her a face of her own
+because a face bake is a face bake.
+
+She has black skinny jeans and lace-up boots now, off the character
+reference: shredded and patched at both knees, mauve on her left thigh, a
+faded indigo over her right knee, a dull red low on her left shin, each
+one stitched round with ochre thread. Paint, like the tank and the sleeve
+— see 49-you.js for what that trades away, which is a silhouette.
+
+The gold anklets are off her too, and the wrist band and the
+cartridge-case necklace stay. `--noanklets` and `--noscarf` in
+tools/blender/human_mh.py, which is the same door `--notail` and
+`--noseptum` went through.
+
+Two things worth writing down, because both were wrong first and obvious
+in the render:
+
+* The patch boxes were 0.056 deep about x = 0.046, so their front face
+  stood at x = 0.102 — and the front of her thigh is at 0.117. Each box
+  cut a hole out of the middle of its own front and all three came out
+  as horseshoes. Fore-and-aft is a BACK EDGE on a leg, not a boundary.
+* Dropping the wrap takes `shed` to nought, which makes `wear()` inert
+  on this figure and only this figure. That is the honest answer rather
+  than a loose end: `shed` counts the removable triangles at the tail of
+  the buffer, and she has none. Baye still has hers.
+
+### And `build/chloe_mh.blend` is not tracked any more
+
+It is 46 MB, it is rewritten in full by every bake, and it is regenerated
+from `build/mh_bodies/mh_chloe.obj` in four minutes — which is exactly the
+argument `.gitignore` already makes for `human.blend` and `human_mh.blend`.
+It escaped that rule by being a new filename: the rule lists names, and a
+name it has never seen is a name it does not match. It has been tracked
+since 1.144.0 and two bakes have gone into the history at 46 MB apiece.
+
+Untracked here, with the pattern's reasoning written next to it. What is
+already in the history stays there for now — this repository is public and
+rewriting its history is not a tidy-up.
+
 ## [1.147.0] — 2026-08-28
 
 ### The bend was going backwards

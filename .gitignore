@@ -12,13 +12,21 @@ build/*_preview.png
 build/barrier_debug.png
 
 # The MakeHuman base and the working blends it turns into. The small rigid-part
-# blends next to them *are* committed, but these two are 24 MB and 42 MB and are
+# blends next to them *are* committed, but these are 24, 42 and 46 MB and are
 # rewritten by every full run of tools/blender/human_mh.py, which rebuilds them
 # from the .obj it fetches. What has to survive is the exported blob in
 # build/payload, and that is committed.
+#
+# chloe_mh.blend is named here because it is NOT covered by the two above and
+# was tracked for one release before anyone noticed: it arrived in 1.144.0 with
+# the second figure, under a new name, and a rule that lists filenames does not
+# see a new filename. Two rebakes put 96 MB of blob in the history. Untracked
+# from 1.148.0 — the history still carries what it carries, and that is a
+# separate decision because this repository is public.
 build/mh_base.obj
 build/human.blend
 build/human_mh.blend
+build/chloe_mh.blend
 
 # The morph targets and the bodies they make, for the same reason and by the
 # same rule as the base above: 8 MB of .target files that tools/blender/

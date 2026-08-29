@@ -13,12 +13,19 @@
 // of the reflection pass and hidden again before the room is drawn.
 //
 // What makes her hers is almost entirely paint. The rig already has hair, and
-// arms, and a chest — so the blue is a colour swap in the fragment shader
-// rather than a wig, the vest is a mask over the trunk rather than a garment,
-// the skull on the front of it is drawn with algebra rather than sampled from
-// a texture this rig has no UVs for, and the sleeve down her right arm is
-// three noise fields. Paint cannot clip through the body it is on, cannot fall
-// out of a pose, and costs nothing in the payload.
+// arms, and a chest, and legs — so the blue is a colour swap in the fragment
+// shader rather than a wig, the vest is a mask over the trunk rather than a
+// garment, the skull on the front of it is drawn with algebra rather than
+// sampled from a texture this rig has no UVs for, the sleeve down her right
+// arm is three noise fields, and the jeans and the boots are a height and a
+// bearing round the leg. Paint cannot clip through the body it is on, cannot
+// fall out of a pose, and costs nothing in the payload.
+//
+// It gives up one thing and it is the same thing every time: a silhouette. A
+// painted boot is a boot's colour on an ankle that is still an ankle's width.
+// That is the trade the tank made first, and at the distance a mirror — or the
+// camera on B — puts her at, it is the right one; a modelled boot on a joint
+// that flexes as hard as an ankle would clip on every stride.
 //
 // Two things are not paint, and both for the same reason: they leave her. The
 // beanie stands proud of the crown and the necklace hangs off the chest, and a
@@ -74,6 +81,33 @@ const YOU = {
   // The cord and the three spent cases on it.
   cord: [0.045, 0.045, 0.052],
   brass: [0.780, 0.580, 0.160],
+  // And the bottom half of her. Black skinny jeans, shredded and patched, into
+  // scuffed lace-ups to mid-shin — see the block at the end of the body shader
+  // for how they are drawn and for what they replaced.
+  //
+  // `denim` is not black and `leather` is not brown, for the vest's reason
+  // twice over: a garment that is one flat value at this distance is a hole in
+  // the figure, and what makes black denim read as denim is that it has gone
+  // grey unevenly. So the pair is a base and a wear colour, and the wear does
+  // most of the work.
+  denim: [0.072, 0.079, 0.098],
+  fade: [0.178, 0.188, 0.218],
+  // The three patches. Mauve on her left thigh, a paler indigo over her right
+  // knee and a dull red low on her left shin — which is the arrangement in the
+  // reference, and the point of it is that no two of them are the same cloth.
+  patchA: [0.352, 0.212, 0.302],
+  patchB: [0.268, 0.322, 0.448],
+  patchC: [0.470, 0.132, 0.106],
+  // Ochre thread, run round the inside of each patch as a dashed line.
+  stitch: [0.520, 0.468, 0.330],
+  // The boots.
+  leather: [0.150, 0.108, 0.076],
+  scuff: [0.330, 0.252, 0.178],
+  strapC: [0.082, 0.062, 0.048],
+  buckle: [0.480, 0.430, 0.330],
+  lace: [0.300, 0.270, 0.220],
+  sole: [0.040, 0.038, 0.038],
+  welt: [0.235, 0.196, 0.150],
   // Which way her right arm is. The rig faces +X and up is +Y, so her right is
   // +X × +Y = +Z. One number rather than a sed, because if the export ever
   // mirrors the rig this is the only line that has to change and the sleeve is
@@ -241,6 +275,10 @@ async function buildYou(scene) {
   // to be: everything she wears is paint on a height threshold — the vest hem
   // at 0.995, the sleeve at 0.900, the brief between 0.815 and 0.962 — and a
   // body morph moves every one of them off the woman they were measured on.
+  // Every colour on her goes into the shader as a literal, and the block at
+  // the end of the body quotes fourteen of them. `rgb` is that, once.
+  const rgb = (c) => 'vec3(' + c.map((n) => n.toFixed(3)).join(', ') + ')';
+
   const fig = await loadSkin('chloe_skin_fr3d', {
     spec: 0.09,
     specPower: 24,
@@ -281,6 +319,228 @@ async function buildYou(scene) {
     `,
     body: `
       vec3 vcol = vVCol;
+
+      // ------------------------------------------------------ jeans and boots
+      //
+      // The bottom half of her, and it is the same argument as the tank: paint
+      // on skin she already has, which cannot clip through the leg it is on
+      // and costs nothing in the payload.
+      //
+      // What makes it worth a paragraph is what it REPLACES, because that part
+      // was geometry. The figure came with a hip scarf — a woven wrap with a
+      // fringe, tied on the left hip, built in tools/blender/human_mh.py and
+      // taken off through wear() when she changes. That scarf is Baye's. It
+      // is on Chloe only because the two of them shared one mesh for as long
+      // as they did, and it survived the bake that gave her a face of her own
+      // because a face bake is a face bake.
+      //
+      // Misha, 29 Aug: "she inherited the hip scarf from baye but really she
+      // needs boots and jeans with patches, like pictured here", with the
+      // character reference. So the wrap is off her bake — --noscarf, which
+      // also takes shed to nought and makes wear() inert on this figure
+      // and no other — and what is here is what is in that reference: black
+      // skinny jeans, shredded and patched at the knees, into scuffed
+      // lace-ups to mid-shin.
+      //
+      // It goes FIRST, before the tank, so the tank hangs over the waistband
+      // rather than the other way round.
+      //
+      // Two things are measured off the blob rather than chosen. The leg's own
+      // centre line in z, which the boot needs so it knows where its front is:
+      //
+      //     y     axis      y     axis
+      //     0.10  0.231     0.25  0.204
+      //     0.15  0.224     0.30  0.199
+      //     0.20  0.215
+      //
+      // — 0.234 − 0.115 y, good to eight millimetres over the whole boot. And
+      // where her arms are, which is what the trousers have to be kept off:
+      // bucketed by height, from y 0.98 to 1.12 she reads |z| 0.00 to 0.19 and
+      // then 0.40 to 0.52, with nothing at all in between. There is no near
+      // miss to worry about — but the cut has to be made high up and only high
+      // up, because her FEET are out at |z| 0.283, which is wider than it.
+      {
+        float dressed = 1.0 - uSwim;
+        float ly = vLocal.y;
+        float lat = abs(vLocal.z);
+        float axz = 0.234 - 0.115 * min(ly, 0.34);
+        float u = lat - axz;                  // outboard of that leg's axis
+        float fwd = vLocal.x + 0.004;         // fore and aft, + is in front
+        float ang = atan(u, fwd);             // 0 dead ahead, +pi/2 outboard
+        float limb = 1.0 - smoothstep(0.24, 0.30, lat)
+          * smoothstep(0.90, 0.96, ly);
+
+        // ---- the jeans
+        //
+        // Low on the hip and down to the toes, because the boot is painted
+        // over the bottom of them and denim under leather is denim nobody
+        // sees. The waist is 1.00 against a tank hem of 0.995, so there is a
+        // five millimetre overlap and no ring of bare waist between them.
+        float trews = dressed * limb * (1.0 - smoothstep(0.996, 1.010, ly));
+        if (trews > 0.002) {
+          vec3 cloth = ${rgb(YOU.denim)};
+          // Washed unevenly. A flat value here is a black leg, not a garment.
+          cloth = mix(cloth, ${rgb(YOU.fade)},
+            smoothstep(0.44, 0.74, youFbm(vLocal * 9.5)) * 0.50);
+          // Pale where a knee and a hip actually wear: over the kneecap, and
+          // in whiskers off the front of the hip.
+          cloth = mix(cloth, ${rgb(YOU.fade)},
+            (1.0 - smoothstep(0.020, 0.100, abs(ly - 0.470)))
+              * smoothstep(-0.010, 0.060, fwd) * 0.62);
+          cloth = mix(cloth, ${rgb(YOU.fade)},
+            smoothstep(0.700, 0.860, ly) * (1.0 - smoothstep(0.880, 0.970, ly))
+              * smoothstep(0.020, 0.090, fwd)
+              * (1.0 - smoothstep(0.28, 0.62, abs(sin(ly * 84.0 + lat * 31.0))))
+              * 0.42);
+
+          // The patches. Each is a box in her own bind space with a dashed
+          // line of thread run round the inside of it, and the boxes are
+          // placed off the same height table the axis came from: at y 0.63 her
+          // left thigh runs z −0.071 to −0.204, at 0.47 her right knee runs
+          // 0.112 to 0.217, at 0.42 her left shin runs −0.118 to −0.239.
+          //
+          // A Chebyshev box and not an ellipsoid, because a patch has corners
+          // and the corners are most of what says it is a patch.
+          //
+          // THE FORE-AND-AFT HALF-WIDTH IS DELIBERATELY BIGGER THAN THE LEG,
+          // and the first cut of this got it wrong in a way that was obvious
+          // the moment it was rendered and not before. A patch was 0.056 deep
+          // about x = 0.046, so its front face stood at x = 0.102 — and the
+          // front of her thigh is at 0.117. The box therefore cut a hole out
+          // of the middle of its own front, and all three patches came out as
+          // horseshoes with the leg's own centre line showing through them.
+          //
+          // So x is not a boundary here, it is a BACK EDGE: the half-width is
+          // set past the front of the leg at every one of these heights, which
+          // leaves the y and z faces to make the shape and puts the only x cut
+          // round the back where nothing sees it. A patch on a trouser leg
+          // does wrap round to the seam; that is what it is doing.
+          //
+          // And the edges are not straight. A patch cut with scissors and sewn
+          // on by hand is crooked at the millimetre, and a box is not — the
+          // first render of these came out as three perfect rectangles, which
+          // reads as a decal. One noise field pushed into the distance wobbles
+          // every edge of all three by a couple of millimetres at once.
+          float thr = 0.0;
+          float wob = (youNoise(vLocal * 78.0) - 0.5) * 0.075;
+          vec3 q;
+          float d, f;
+          q = abs(vLocal - vec3(0.075, 0.628, -0.140))
+            / vec3(0.075, 0.086, 0.052);
+          d = max(max(q.x, q.y), q.z) + wob;
+          f = 1.0 - smoothstep(0.94, 1.02, d);
+          cloth = mix(cloth, ${rgb(YOU.patchA)}, f);
+          thr = max(thr, f * smoothstep(0.79, 0.87, d));
+          q = abs(vLocal - vec3(0.060, 0.470, 0.165))
+            / vec3(0.075, 0.056, 0.042);
+          d = max(max(q.x, q.y), q.z) + wob;
+          f = 1.0 - smoothstep(0.94, 1.02, d);
+          cloth = mix(cloth, ${rgb(YOU.patchB)}, f);
+          thr = max(thr, f * smoothstep(0.79, 0.87, d));
+          q = abs(vLocal - vec3(0.045, 0.415, -0.175))
+            / vec3(0.070, 0.032, 0.040);
+          d = max(max(q.x, q.y), q.z) + wob;
+          f = 1.0 - smoothstep(0.94, 1.02, d);
+          cloth = mix(cloth, ${rgb(YOU.patchC)}, f);
+          thr = max(thr, f * smoothstep(0.79, 0.87, d));
+          // Dashed, off her own position: the gradient of that dot product is
+          // 94 per metre, so the stitch repeats every eleven millimetres,
+          // which is a stitch.
+          cloth = mix(cloth, ${rgb(YOU.stitch)},
+            thr * step(0.44, fract(dot(vLocal, vec3(61.0, 47.0, 53.0)))) * 0.85);
+
+          // And the rips, which are holes in the paint rather than marks on
+          // it: trews decides whether there is a trouser leg here at all, so
+          // a rip multiplies it and what comes through is her.
+          float rip = max(
+            (1.0 - smoothstep(0.005, 0.011,
+              abs(ly - 0.492 - 0.004 * sin(vLocal.z * 78.0))))
+              * (1.0 - smoothstep(0.055, 0.076, abs(vLocal.z + 0.160)))
+              * smoothstep(-0.020, 0.030, fwd),
+            (1.0 - smoothstep(0.004, 0.010,
+              abs(ly - 0.735 - 0.005 * sin(vLocal.z * 64.0))))
+              * (1.0 - smoothstep(0.040, 0.062, abs(vLocal.z - 0.140)))
+              * smoothstep(0.020, 0.070, fwd));
+          // A rip in denim is not a hole, it is a hole with the warp still
+          // lying across it. Leaving a few threads standing is also what stops
+          // a 10 mm slit reading as a drawn black line.
+          rip *= step(0.30, fract(vLocal.z * 190.0 + ly * 40.0));
+          vcol = mix(vcol, cloth, trews * (1.0 - rip));
+        }
+
+        // ---- the boots
+        //
+        // One thing is given up here and it is worth saying out loud: paint
+        // has no silhouette, so this is a boot's colour and a boot's pattern
+        // on an ankle that is still an ankle's width. At the distance a mirror
+        // puts her at, that is the trade the tank already made — and a modelled
+        // boot on a joint that flexes as hard as an ankle does is the
+        // one garment on her that would clip on every stride.
+        //
+        // The top edge is not level. A tall boot slouches, so it waves three
+        // times round the leg with a little noise on top, and the denim
+        // bunched underneath shows in the troughs.
+        float top = 0.345 + 0.013 * sin(ang * 3.0 + 0.6)
+          + 0.009 * youNoise(vLocal * 26.0);
+        float boot = dressed * limb
+          * (1.0 - smoothstep(top - 0.006, top + 0.004, ly));
+        if (boot > 0.002) {
+          vec3 lea = ${rgb(YOU.leather)};
+          lea = mix(lea, ${rgb(YOU.scuff)},
+            smoothstep(0.50, 0.80, youFbm(vLocal * 34.0)) * 0.45);
+          // The toe and the heel counter, which is where a boot goes pale
+          // first and in that order.
+          lea = mix(lea, ${rgb(YOU.scuff)},
+            smoothstep(0.085, 0.165, vLocal.x)
+              * (1.0 - smoothstep(0.050, 0.090, ly)) * 0.90);
+          lea = mix(lea, ${rgb(YOU.scuff)},
+            (1.0 - smoothstep(-0.045, -0.020, vLocal.x))
+              * (1.0 - smoothstep(0.060, 0.110, ly)) * 0.55);
+          // The turned-down cuff, which is the line that says where the boot
+          // ENDS. Without it a dark shaft against dark denim is one leg: the
+          // first cut of this had the leather two shades off the jeans and the
+          // top of the boot could not be found in the render at all.
+          lea = mix(lea, ${rgb(YOU.strapC)},
+            smoothstep(top - 0.030, top - 0.020, ly));
+          lea = mix(lea, ${rgb(YOU.scuff)},
+            smoothstep(top - 0.010, top - 0.005, ly) * 0.55);
+          // Two straps round the shaft, each with a buckle on the outboard
+          // side of it — which is where the bearing earns its keep.
+          float strap = max(
+            1.0 - smoothstep(0.009, 0.013, abs(ly - 0.168)),
+            1.0 - smoothstep(0.010, 0.014, abs(ly - 0.298)));
+          lea = mix(lea, ${rgb(YOU.strapC)}, strap);
+          lea = mix(lea, ${rgb(YOU.buckle)},
+            strap * (1.0 - smoothstep(0.16, 0.30, abs(ang - 1.30))));
+          // The laces: two families of diagonals crossing over the front third
+          // of the shaft. Thirty periods to the metre puts six crossings up a
+          // boot this tall, which is about what a boot this tall has.
+          float la = fract(ly * 15.0 + ang * 1.8);
+          float lb = fract(ly * 15.0 - ang * 1.8);
+          float panel = (1.0 - smoothstep(0.30, 0.46, abs(ang)))
+            * smoothstep(0.100, 0.128, ly)
+            * (1.0 - smoothstep(top - 0.048, top - 0.022, ly));
+          float lace = max(1.0 - smoothstep(0.055, 0.150, abs(la - 0.5)),
+                           1.0 - smoothstep(0.055, 0.150, abs(lb - 0.5)))
+            * panel;
+          lea = mix(lea, ${rgb(YOU.lace)}, lace * 0.90);
+          // The eyelets, which are the row of dots the laces run between and
+          // the thing that stops a cross-hatch reading as fishnet. Fifteen
+          // crossings to the metre puts one every seven millimetres up the
+          // facing, which is an eyelet.
+          lea = mix(lea, ${rgb(YOU.buckle)},
+            panel * (1.0 - smoothstep(0.28, 0.36, abs(abs(ang) - 0.32)))
+              * (1.0 - smoothstep(0.10, 0.20, abs(fract(ly * 15.0) - 0.5))) * 0.8);
+          // The sole, and a pale welt on top of it. The welt is the line that
+          // says there is a sole at all, since there is no outline to say it.
+          lea = mix(lea, ${rgb(YOU.sole)},
+            1.0 - smoothstep(0.020, 0.026, ly));
+          lea = mix(lea, ${rgb(YOU.welt)},
+            smoothstep(0.024, 0.028, ly) * (1.0 - smoothstep(0.030, 0.035, ly)));
+          vcol = mix(vcol, lea, boot);
+        }
+      }
+
       {
         float dye = 1.0 - smoothstep(0.020, 0.055,
           distance(vcol, vec3(0.129, 0.094, 0.071)));
@@ -897,8 +1157,10 @@ async function buildYou(scene) {
      * Changed for the water, or dressed.
      *
      * The name is left over from when this swapped one painted garment for
-     * another. It takes the painted one OFF; the geometry half of the same
-     * change is `wear`, and `setDressed` in 90-app.js calls the pair.
+     * another. It takes the painted ones off — the tank, the jeans and the
+     * boots, all three — and there is no geometry half of the change any more:
+     * `wear` was the hip scarf, and the hip scarf was Baye's. `setDressed` in
+     * 90-app.js still calls the pair, because the mechanism is live on her.
      */
     swim: (v) => { uSwim.value = v ? 1 : 0; return uSwim.value; },
     freeze: (v) => { frozen = !!v; return frozen; },

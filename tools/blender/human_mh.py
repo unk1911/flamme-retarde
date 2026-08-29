@@ -226,6 +226,29 @@ NO_TAIL = False
 # It was authored on the shared figure, which is Baye, who does — and it stays
 # on her.
 NO_SEPTUM = False
+# And the two gold anklets, same door again.
+#
+# Misha, 29 Aug: "remove the anklets from Chloe but keep the other stuff". The
+# other stuff is the wrist band and the cartridge-case necklace, both of which
+# are in the reference and both of which stay. The anklets are not, and they
+# were never a costume decision about her — they are on the shared figure
+# because they are on Baye, who dances barefoot on concrete and wears them.
+NO_ANKLETS = False
+# And the hip scarf.
+#
+# This one is not a trinket, it is the entire lower half of what she is wearing
+# — and it is Baye's. Misha, same message: "she inherited the hip scarf from
+# baye but really she needs boots and jeans with patches, like pictured here",
+# with the character reference. So the wrap comes off the bake and the jeans
+# and the boots are painted on in src/49-you.js, the same way the tank and the
+# sleeve are.
+#
+# Dropping it takes `shed` to nought, which makes `wear()` in 41-skin.js a
+# no-op for this figure and only this figure. That is correct rather than a
+# loose end: `shed` is "how many triangles at the tail of the buffer are
+# removable", and on a figure with nothing removable the honest answer is
+# nought. Baye still has hers, and hers is what the mechanism was built for.
+NO_SCARF = False
 
 
 def fetch():
@@ -584,11 +607,12 @@ def extras(body, J):
 
     if not NO_TAIL:
         add_shell(*tube(HAIR_TAIL, seg=16), HAIR_M, HAIR_P)
-    for s in (1, -1):
-        ank = J["%s-ankle" % ("l" if s > 0 else "r")]
-        add_shell(*ring((ank.x, ank.y, ank.z + ANKLET_Z),
-                        ANKLET_R[0], ANKLET_R[1], ANKLET_WIRE),
-                  ANKLET_M, ANKLET_P)
+    if not NO_ANKLETS:
+        for s in (1, -1):
+            ank = J["%s-ankle" % ("l" if s > 0 else "r")]
+            add_shell(*ring((ank.x, ank.y, ank.z + ANKLET_Z),
+                            ANKLET_R[0], ANKLET_R[1], ANKLET_WIRE),
+                      ANKLET_M, ANKLET_P)
 
     # `ring` builds about the vertical axis, which is what an anklet wants. A
     # septum ring hangs in the frontal plane instead: the piercing runs from one
@@ -640,8 +664,9 @@ def extras(body, J):
     bpy.ops.object.join()
     body["extraN"] = len(vs)
     body["hairN"] = 0
-    print("[mh] extras: %d verts, %d faces joined (%s2 anklets%s)"
+    print("[mh] extras: %d verts, %d faces joined (%s%s%s)"
           % (len(vs), len(fs), "" if NO_TAIL else "hair + ",
+             "no anklets" if NO_ANKLETS else "2 anklets",
              "" if NO_SEPTUM else " + septum"))
     return body
 
@@ -2770,8 +2795,9 @@ def post_geometry(J, src, mesh, bindex):
     n = perineum(mesh, out)
     bone += [bindex["pelvis"]] * n
     kept = len(tri)
-    n = hip_scarf(mesh, out)
-    bone += [bindex["pelvis"]] * n
+    if not NO_SCARF:
+        n = hip_scarf(mesh, out)
+        bone += [bindex["pelvis"]] * n
     return pos, nrm, col, bone, tri, len(tri) - kept
 
 
@@ -5372,6 +5398,7 @@ def render(tag, names):
 
 def main():
     global NO_RENDER, BODY_OVERRIDE, SKIN_OUT, BLEND, NO_TAIL, NO_SEPTUM
+    global NO_ANKLETS, NO_SCARF
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     NO_RENDER = "--norender" in argv
     # A different mesh, a different skin and a different .blend, so that baking
@@ -5387,6 +5414,8 @@ def main():
         BLEND = Path(argv[argv.index("--blend") + 1])
     NO_TAIL = "--notail" in argv
     NO_SEPTUM = "--noseptum" in argv
+    NO_ANKLETS = "--noanklets" in argv
+    NO_SCARF = "--noscarf" in argv
     levels = SUBSURF
     if "--sub" in argv:
         levels = int(argv[argv.index("--sub") + 1])
