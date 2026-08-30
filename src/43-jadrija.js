@@ -19389,6 +19389,17 @@ async function buildJadrija(scene) {
     // a cycle against the shimmy's 0.44 — so 3.8 s is about seven of them,
     // which is the same *count* rather than the same clock.
     twerk: 0.10, twerkFor: 3.8,
+    // ── the overlay the shimmy wore when it was the bump's answer ─────────
+    //
+    // NOTHING REACHES THESE TWO ANY MORE and they are kept for the reason the
+    // moonwalk's keys are: what was taken out is the single line that shipped
+    // them. The bump enters the twerk now (Misha, 30 Aug: "instead of shimmy
+    // shimmy she should be doing the other routine, i think the bend routine")
+    // and the twerk is a bend in its own right — hips, knees and four spine
+    // joints, authored together and moving on the beat — so laying another
+    // forty-nine degrees of spine over the top of it would fold her in half.
+    // Putting the shimmy back is `go('shimmy', 'shimmy', 0.30)` in the bump.
+    //
     // rad of abduction a hip takes while she shimmies. A little: 0.16 puts
     // about 12 cm between her heels, which is a stance; much past that is a
     // straddle.
@@ -19402,7 +19413,7 @@ async function buildJadrija(scene) {
     // into her" is what seventeen degrees looks like from outside, which is
     // nothing. 0.85 is forty-nine, which is a person bending over.
     bow: 0.85,
-    // s the bump's shimmy runs for, against the routine's 3.4. Asked for
+    // s the bump's dance runs for, against the routine's 3.8. Asked for
     // longer, and it is the whole of the reaction rather than one beat of a
     // sequence.
     bumpFor: 7.5,
@@ -20342,11 +20353,11 @@ async function buildJadrija(scene) {
    * where breaking off is not a reaction, it is losing the thread of something
    * the player is also in the middle of.
    *
-   * `shimmy` itself is in the list, so bumping her again during one restarts
+   * `twerk` itself is in the list, so bumping her again during one restarts
    * the clock rather than being swallowed. The cooldown is what stops that
    * being a stutter, and it is now shorter than the dance.
    */
-  const SHIMMYABLE = { idle: 1, play: 1, home: 1, orbit: 1, aim: 1, joy: 1,
+  const BUMPABLE = { idle: 1, play: 1, home: 1, orbit: 1, aim: 1, joy: 1,
     notice: 1, rest: 1, flip: 1, up: 1, wheel: 1, down: 1, crawl: 1,
     bask: 1, hop: 1, out: 1, shimmy: 1, twerk: 1, heart: 1, note: 1 };
 
@@ -20829,24 +20840,45 @@ async function buildJadrija(scene) {
     // The bump, cashed in. `OWN` below is what outranks the room; this is what
     // outranks the wander, and it is deliberately a shorter list — being
     // walked into is not a reason to abandon the hose, the kabina or a
-    // somersault you are halfway through. `bumpShim` is a cooldown so that
-    // shuffling against her is one shimmy and not a stutter of them.
-    show.bumpShim = Math.max(0, (show.bumpShim || 0) - dt);
+    // somersault you are halfway through. `bumpAgain` is a cooldown so that
+    // shuffling against her is one dance and not a stutter of them.
+    //
+    // THE TWERK AND NOT THE SHIMMY, which is the second version of this.
+    //
+    // Misha, 30 Aug: "instead of shimmy shimmy she should be doing the other
+    // routine, i think the bend routine". That is the twerk, and it is the
+    // right call for a reason worth writing down: the bend the shimmy does
+    // here was never in the clip. It was `SHOW.bow`, 49 degrees laid over the
+    // top of a dance authored standing up, plus `SHOW.stance` to put her feet
+    // apart — a pose bolted onto a loop that does not know about it. The
+    // twerk is a bend all the way down: 40 degrees of hip flexion, a 56-degree
+    // knee and 36 of forward carry spread over four spine joints, all of it
+    // authored together in tools/blender/human_mh.py and all of it moving on
+    // the beat instead of being held rigid through one. So the overlay goes
+    // with it — `stance` is gated on the shimmy and stays gated on it — and
+    // what she does when you walk into her is now one clip doing one thing.
+    show.bumpAgain = Math.max(0, (show.bumpAgain || 0) - dt);
     if (show.bumped) {
       show.bumped = 0;
-      if (!show.bumpShim && SHIMMYABLE[show.phase]
+      if (!show.bumpAgain && BUMPABLE[show.phase]
           && !KABIN[show.phase] && !MUSIC[show.phase] && !OWN[show.phase]) {
-        show.bumpShim = 0.9;
-        show.shimTil = SHOW.bumpFor;
+        show.bumpAgain = 0.9;
+        show.bumpTil = SHOW.bumpFor;
         // BACK TO YOU, and set as a flag rather than as a heading because the
-        // shimmy case re-aims her at you every frame — writing `want` here
+        // dance cases re-aim her at you every frame — writing `want` here
         // lasts exactly one frame, which is how the first cut of this came out
         // facing forwards. Misha asked for it turned away; every other
         // reaction in this file turns her to face whoever caused it, so this
-        // is the one place the sign is deliberate.
-        show.shimBack = 1;
+        // is the one place the sign is deliberate. The twerk turns her away on
+        // its own account as well, so for this phase the flag is belt and
+        // braces — it stays because it is also what tells the two clocks
+        // apart, and because the shimmy would need it if it ever came back.
+        show.bumpBack = 1;
         showSay('whee', Math.hypot(pt - show.t, ps - show.s));
-        go('shimmy', 'shimmy', 0.30);
+        // A longer fade than the shimmy's 0.30 for `enterTwerk`'s reason: this
+        // one starts from a deep squat, and a third of a second from standing
+        // to that is a collapse rather than a move.
+        go('twerk', 'twerk', 0.44);
       }
     }
 
@@ -21310,25 +21342,26 @@ async function buildJadrija(scene) {
         // making, it is what the move is: the whole thing happens behind her,
         // and facing you she would be a woman doing a deep squat.
         show.played += dt;
-        // `shimBack` is the bump's shimmy and not the routine's. The routine
-        // one is done AT somebody and points its shoulders at you, which is
-        // what the note above is about and is still true; the one you get for
-        // walking into her is turned away, because that is what was asked for.
-        // A flag rather than a second phase, because everything else about the
-        // two — the clip, the hold, the chatter, the way out — is identical.
+        // `bumpBack` is the dance you get for walking into her and not the
+        // routine's. The routine's shimmy is done AT somebody and points its
+        // shoulders at you, which is what the note above is about and is still
+        // true; the one you get for walking into her is turned away, because
+        // that is what was asked for. A flag rather than a second phase,
+        // because everything else about the two — the clip, the hold, the
+        // chatter, the way out — is identical.
         show.want = Math.atan2(ps - show.s, pt - show.t)
-          + (show.phase === 'twerk' || show.shimBack ? Math.PI : 0);
+          + (show.phase === 'twerk' || show.bumpBack ? Math.PI : 0);
         if (show.tmr - show.said > SHOW.say[0] * 0.7
           + Math.random() * (SHOW.say[1] - SHOW.say[0])) {
           show.said = show.tmr;
           showSay(say1(CHAT), d);
         }
-        // The bump's shimmy runs on its own clock — `SHOW.bumpFor` rather than
-        // `shimmyFor` — because it was asked for longer and because the
-        // routine's 3.4 s is a beat in a sequence while this one is the whole
+        // The bump's dance runs on its own clock — `SHOW.bumpFor` rather than
+        // `twerkFor` — because it was asked for longer and because the
+        // routine's 3.8 s is a beat in a sequence while this one is the whole
         // of what you get for walking into somebody.
-        if (show.tmr > (show.shimBack ? show.shimTil : SHOW[HOLD_FOR[show.phase]])
-          || leaving || d > SHOW.far) { show.shimBack = 0; showNext(); }
+        if (show.tmr > (show.bumpBack ? show.bumpTil : SHOW[HOLD_FOR[show.phase]])
+          || leaving || d > SHOW.far) { show.bumpBack = 0; showNext(); }
         break;
 
       case 'heart':
@@ -21670,7 +21703,10 @@ async function buildJadrija(scene) {
       // the legs are down again by the time there is anything to land on.
       show.tuck = damp(show.tuck, sat(show.air / hopApex()), 16, dt);
       const k = show.tuck < 0.01 ? 0 : show.tuck;
-      // Feet apart while she shimmies, and only then.
+      // Feet apart while she shimmies, and only then — which since the bump
+      // was pointed at the twerk is never. See the note over `SHOW.stance`:
+      // the gate is the shimmy's and stays the shimmy's, because the twerk
+      // carries its own 13 degrees of hip track and its own bend.
       //
       // Misha, 28 Aug: "she should shimmy while having her back turned to me,
       // and spread her legs a little". The stance rides on the same two hip
@@ -21683,7 +21719,7 @@ async function buildJadrija(scene) {
       // until it is handed a zero, and two places writing one bone is two
       // places to forget to clear it.
       show.stance = damp(show.stance || 0,
-        show.phase === 'shimmy' && show.shimBack ? SHOW.stance : 0, 7, dt);
+        show.phase === 'shimmy' && show.bumpBack ? SHOW.stance : 0, 7, dt);
       const spread = show.stance < 0.004 ? 0 : show.stance;
       // And the bend. Three joints rather than one, weighted up the spine, so
       // what it draws is a back with a curve in it instead of a mannequin
@@ -22095,12 +22131,14 @@ async function buildJadrija(scene) {
    */
   function bumpReact(kind, idx, t, s) {
     void idx;                       // see `crowdAt` — the position is the name
-    // Walk into Baye and she shimmies at you.
+    // Walk into Baye and she turns her back on you and twerks.
     //
     // Misha, 28 Aug: "if i bump into NPC baye, she should do her shimmy shimmy
-    // routine". She has had the clip since the figure was baked and it was
-    // only ever reachable through the opening routine and a 0.12 die, which
-    // means most people have never seen it.
+    // routine", and then 30 Aug: "instead of shimmy shimmy she should be doing
+    // the other routine, i think the bend routine". Both clips have been there
+    // since the figure was baked and both were only ever reachable through the
+    // opening routine and a one-in-eight die, which means most people had seen
+    // neither.
     //
     // ARMED HERE, ENTERED IN `stepShow`, for the same reason the crowd's head
     // turn below is: `bump` is called from inside `confine`, which is the
@@ -23105,11 +23143,28 @@ async function buildJadrija(scene) {
     sameRoom: (ax, az, bx, bz, y) => {
       const K = special;
       if (K) {
-        const inK = (x, z) => {
+        // THE LID, WHICH IS FOUR OF THE SIX FACES THIS TEST USED TO KNOW ABOUT.
+        //
+        // Misha, 30 Aug: "the camera still sometimes goes outside of the
+        // kabine and the screen looks fucked up since we end up OUTSIDE". It
+        // did, and it was never the walls. The pull-back is a slide down the
+        // VIEW LINE, so any downward glance carries the camera up as it goes
+        // back — and a kabina is a box 2.10 m tall with a 1.66 m eye in it,
+        // which leaves 0.44 m of air overhead. Measured at the standing spot:
+        // floor 3.11, ceiling 5.21, and seventeen degrees of pitch put the
+        // camera at 5.50, on the roof, looking down at the row.
+        //
+        // `y` is the height of the SECOND point and of that one only. The
+        // first is the person, and a person is standing on the floor of
+        // whatever room they are in; it is the camera that can be anywhere.
+        // 5 cm off the ceiling and 10 off the floor, so a camera pinned
+        // against either is inside the room and not in the slab.
+        const inK = (x, z, h) => {
+          if (h != null && (h < K.floor - 0.10 || h > K.top - 0.05)) return false;
           const [t, s] = local(x, z);
           return t > K.t0 && t < K.t1 && s > K.face && s < K.s1;
         };
-        if (inK(ax, az) !== inK(bx, bz)) return false;
+        if (inK(ax, az, null) !== inK(bx, bz, y)) return false;
       }
       if (vik) {
         const [at, as] = local(ax, az);

@@ -8,6 +8,46 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.151.0] — 2026-08-30
+
+### The lid, and the other routine
+
+Two things Misha had asked for once already.
+
+**B in the kabina put the camera on the roof.** "Under no circumstance should
+the camera viewpoint break out of the kabine." `sameRoom` was added in 1.133.0 for
+exactly this and it fixed the walls, which is four of a box's six faces. The
+pull-back is a slide down the *view line*, and a view line has a vertical
+component: look down at all and the camera rises as it goes back. A kabina is
+2.10 m tall and your eye is at 1.66, so there is 0.44 m of air over your head —
+seventeen degrees of pitch spends 0.29 m of it at a metre of pull-back, and at
+the full 3.10 m four degrees is enough. Measured at the standing spot: floor
+3.11, ceiling 5.21, camera 5.50. Every test in the march was being taken at the
+eye's height, which is not where the camera ends up.
+
+So the kabina gets its lid and its floor in `sameRoom`, and the pull-back
+becomes two steps instead of one: march back at eye height, which is a question
+about walls, then take as much of the lift as the room will give. The lift is
+solved rather than marched — the test is monotone in height inside a box, so
+five halvings land within 3 cm of the underside for five `confine` calls instead
+of twenty-five. And it *clamps* rather than giving up: breaking the march on a
+ceiling would drop the whole shot back to the first person the moment you
+glanced at your own boots indoors. Now the camera keeps its distance and loses
+only the part of the lift that would go through the roof. Nothing changes
+outdoors — 3.10 m of pull-back and the full lift, as before.
+
+**Walk into Baye and she twerks.** "Instead of shimmy shimmy she should be
+doing the other routine, i think the bend routine." That is the twerk, and it is
+the better answer for a reason worth writing down: the bend the shimmy did here
+was never in the clip. It was `SHOW.bow` — forty-nine degrees laid over three
+spine joints of a dance authored standing up — plus `SHOW.stance` to put her
+feet apart. A pose bolted onto a loop that does not know about it. The twerk is
+a bend all the way down: forty degrees of hip flexion, a fifty-six-degree knee
+and thirty-six of forward carry spread over four spine joints, all authored
+together and all moving on the beat instead of being held rigid through it. So
+the overlay goes with it. It stays in the file, unreached, the way the moonwalk
+keys do — what was taken out is the one line that shipped it.
+
 ## [1.150.5] — 2026-08-30
 
 ### The sea from the aeroplane

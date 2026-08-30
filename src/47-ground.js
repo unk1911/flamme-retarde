@@ -2101,31 +2101,80 @@ async function buildGround(scene, field) {
       // it cannot disagree with the thing that decides where your body may
       // go, because it is the same function.
       //
-      // It costs at most sixteen confine() calls a frame, and only while the
-      // third person is on.
+      // It costs at most twenty-one confine() calls a frame for the pull-back
+      // and five more for the lift, and only while the third person is on.
       //
+      // One point, and whether the camera may stand at it. Pulled out of the
+      // march because the lift below asks exactly the same question at the
+      // same place, and two copies of it would be two places to forget the
+      // door.
+      const stands = (tx, ty, tz) => {
+        const [nx, nz] = confine(tx, tz, ty);
+        if (Math.hypot(nx - tx, nz - tz) > 0.02) return false;
+        // And a door is not a wall. `confine` is happy to walk the camera
+        // straight out through one, which for somebody standing in a kabina
+        // is a shot from the beach of the doorway they are behind. A locale
+        // with insides says where they end — see `sameRoom` in
+        // 43-jadrija.js; one without leaves the field off and this costs a
+        // comparison against undefined.
+        return !field.sameRoom || field.sameRoom(ex, ez, tx, tz, ty);
+      };
+
       // `a` is how far round her the camera has swung. At zero this is the
       // expression it has always been: `-l` is straight back down the view
       // line. Turning it is a rotation of the horizontal part only, so the
       // pitch keeps doing what pitch does and the lap stays level.
+      //
+      // Marched at EYE HEIGHT, which is deliberate and is why the lift below
+      // exists as its own step: how far back the camera can get is a question
+      // about walls, and answering it at whatever height a downward glance
+      // happens to have raised the camera to would let it reach further back
+      // through a room simply because it was also on its way through the
+      // ceiling.
       const march = (a) => {
         const ca = Math.cos(a), sa = Math.sin(a);
         const bx = -lx * ca - lz * sa, bz = lx * sa - lz * ca;
         let d = 0;
         for (let k = THIRD.step; k <= back + 1e-6; k += THIRD.step) {
-          const tx = ex + bx * k, tz = ez + bz * k;
-          const [nx, nz] = confine(tx, tz, ey);
-          if (Math.hypot(nx - tx, nz - tz) > 0.02) break;
-          // And a door is not a wall. `confine` is happy to walk the camera
-          // straight out through one, which for somebody standing in a kabina
-          // is a shot from the beach of the doorway they are behind. A locale
-          // with insides says where they end — see `sameRoom` in
-          // 43-jadrija.js; one without leaves the field off and this costs a
-          // comparison against undefined.
-          if (field.sameRoom && !field.sameRoom(ex, ez, tx, tz, ey)) break;
+          if (!stands(ex + bx * k, ey, ez + bz * k)) break;
           d = k;
         }
         return [d, bx, bz];
+      };
+
+      /**
+       * How much of the lift the room will take.
+       *
+       * THE BUG THIS FIXES IS THE ONE THAT SURVIVED `sameRoom`. The pull-back
+       * is a slide down the view line and the line has a vertical component,
+       * so the camera rises as it goes back whenever you are looking down —
+       * and every test in here was being taken at the eye's height, which is
+       * not where the camera ends up. In a kabina there is 0.44 m of air over
+       * your eye and seventeen degrees of pitch spends 0.29 m of it at 1 m of
+       * pull-back; at the full 3.10 it is through the roof at four degrees.
+       *
+       * Solved rather than marched, which is the one place in this function
+       * that is. The test is monotone in height inside a box — a point that is
+       * through the ceiling is still through it a metre further up — so five
+       * halvings put the camera within 3 cm of the underside for five calls
+       * instead of the twenty-five a march at `step` would cost. `ey` is known
+       * good: the march that produced (tx, tz) tested exactly that point at
+       * exactly that height.
+       *
+       * And it CLAMPS rather than giving up. Breaking the march on a ceiling
+       * would drop the whole shot back to the first person the moment you
+       * glanced at your own boots indoors, which is a worse thing than a
+       * camera that keeps its distance and loses some of its lift — and the
+       * lift was never on the view line anyway. See `THIRD.up`.
+       */
+      const lift = (tx, tz, want) => {
+        if (stands(tx, want, tz)) return want;
+        let lo = ey, hi = want;
+        for (let i = 0; i < 5; i++) {
+          const mid = (lo + hi) * 0.5;
+          if (stands(tx, mid, tz)) lo = mid; else hi = mid;
+        }
+        return lo;
       };
 
       // Advance the lap, or wind it back in. Moving wins outright and it winds
@@ -2167,7 +2216,8 @@ async function buildGround(scene, field) {
       if (d < THIRD.min) d = 0;
       thirdD = d;
       if (d > 0) {
-        cx = ex + bx * d; cy = ey - ly * d + THIRD.up; cz = ez + bz * d;
+        cx = ex + bx * d; cz = ez + bz * d;
+        cy = lift(cx, cz, ey - ly * d + THIRD.up);
         // And once it is off the view line there is no sense aiming down it —
         // she would walk out of frame within a quarter of the lap. Blended in
         // over the first half radian so nothing jumps at the start of one.
