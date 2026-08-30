@@ -8,6 +8,33 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.150.4] — 2026-08-30
+
+### It was the whitecaps
+
+Misha, fourth time: "no sorry, i don't like new water from above.. same shit."
+
+Fourth time right, and the reason the last three attempts missed is that all
+three were looking for the thing I had most recently changed. What settled it in
+one step was subtracting a blurred copy of the water from itself and multiplying
+the residue by eight. At the 540 m opening the old sea comes back as featureless
+grain. 1.150.3 came back **covered in small white dashes**, evenly scattered
+across the whole channel — and in motion those crawl.
+
+They are the whitecaps, at the eight per cent of white the far-field wash had
+been left at. That number went 0.22, then 0.10, on the argument that there
+really are whitecaps out there and the water really is lighter for them. The
+argument is true about the sea and false about the picture: a whitecap you
+cannot resolve is not a fainter whitecap, it is a mark. Eight per cent of white
+is nothing in a mean, invisible in a full-frame screenshot, and a scatter of
+marks in a magnified crop. The honest number is zero, and it is now zero.
+
+At 540 m the sea is now indistinguishable from 1.149.0 under ×8 amplification —
+residual standard deviation 7.581 against 7.568 — which is the first time in
+this run of releases that "the same as before up high" has been a measurement
+rather than an opinion. Whitecaps, capillary detail, groups and the backlit glow
+all still arrive from about 150 m down, which is where they were wanted.
+
 ## [1.150.3] — 2026-08-30
 
 ### Six sines are not a sea at 540 m

@@ -51,7 +51,7 @@ const SEA = {
   // (capA, capB, capMin, -): the footprint in metres over which a whitecap
   // stops being resolvable as a shape, and how much of the white paint is left
   // once it has. See capRes in the fragment.
-  capK: [0.55, 2.2, 0.10, 0.70],
+  capK: [0.55, 2.2, 0.00, 0.70],
   // capK.w is where the per-pixel wave field starts fading to flat, in metres
   // of footprint — see waveFade. How eagerly the sum drops an individual
   // component as the footprint overtakes it. 1 fades each one out between a wavelength every eight pixels
@@ -685,11 +685,18 @@ void main(){
   // game starts, that is exactly what it looked like: the water came out
   // peppered with white dashes.
   //
-  // So past uCapK.xy the foam stops being paint and becomes a wash. Coverage is
-  // kept — there really are whitecaps out there and the water is genuinely
-  // lighter for them — but the peak whiteness comes off and the threshold
-  // widens, which turns a scatter of hard dots into a soft mottling that hazes
-  // out with everything else.
+  // So past uCapK.xy the foam stops being paint and becomes a wash, and then
+  // stops entirely: uCapK.z is 0.
+  //
+  // It was 0.22, then 0.10, on the argument that there really are whitecaps out
+  // there and the water really is lighter for them. Both were wrong, and the
+  // thing that settled it was subtracting a blurred copy of the water from
+  // itself and multiplying the residue by eight. The old sea came back as
+  // featureless grain. This one came back covered in little white dashes —
+  // eight per cent of white is nothing in a mean and it is a scatter of marks
+  // in a picture, and in motion they crawl. That is what "too fake" was. A
+  // whitecap you cannot resolve is not a fainter whitecap, it is a mark; the
+  // honest number is zero.
   //
   // Measured, because the eye and the mean are both useless here — a scatter of
   // two-pixel dots moves the average brightness of the frame by nothing at all.
