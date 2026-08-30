@@ -6456,9 +6456,11 @@ window.__fr = {
   sea: (o) => {
     const F = sea.mat.uniforms.uFoamK.value;
     const K = sea.mat.uniforms.uSeaK.value;
+    const C = sea.mat.uniforms.uCapK.value;
     const map = {
       steepA: [F, 'x'], steepB: [F, 'y'], crestA: [F, 'z'], crestB: [F, 'w'],
       micro: [K, 'x'], microFade: [K, 'y'], backlit: [K, 'z'], windrow: [K, 'w'],
+      capA: [C, 'x'], capB: [C, 'y'], capMin: [C, 'z'],
     };
     for (const [k, v] of Object.entries(o || {})) {
       if (map[k] && Number.isFinite(v)) map[k][0][map[k][1]] = v;

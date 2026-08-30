@@ -8,6 +8,50 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.150.1] — 2026-08-30
+
+### Not from up there
+
+Misha, on 1.150.0: "I like the water upon closer approach but when the game
+first starts, at that height, the water looks worse than it did before." He was
+right, and the A/B is unambiguous — at the 540 m the game opens at, the new sea
+came out peppered with small white dashes, evenly scattered and at full
+contrast. That does not read as whitecaps. It reads as dirt on the lens.
+
+The mean brightness of the frame is identical either way, which is why looking
+at averages found nothing; the measure that sees it is mean absolute
+pixel-to-pixel difference over the open water. At 540 m: **0.165** in 1.149.0,
+**0.664** in 1.150.0, **0.196** now.
+
+Two causes, and the smaller one was the obvious one.
+
+**The foam.** Crest foam stopped being multiplied by the near fade in 1.150.0,
+which was right — the sea does not stop breaking 240 m out — but nothing then
+took its place. A whitecap is five to fifteen metres of broken water; once a
+pixel covers more than that there is no shape left to draw, and drawing one
+anyway is a fixed-size feature that never shrinks, scattered evenly over the
+picture. Which is the same mistake the capillary ripples used to make one scale
+down, and it has the same fix: past a footprint of half a metre the foam stops
+being paint and becomes a wash. Coverage is kept, because there really are
+whitecaps out there and the water really is lighter for them; the peak
+whiteness comes off and the threshold widens, so a scatter of hard dots becomes
+a soft mottling that hazes out with everything else.
+
+**The capillary normal, which was two thirds of it.** Its backstop fade was set
+at 2 to 9 metres of footprint, about twice as far as three taps of a 512 tile
+can actually carry. The residual normal that survived was too small to read as
+surface and quite large enough to strike a specular glint off every pixel of
+open water. It now goes at 1 to 4.5 m, which changes nothing below about 200 m
+and takes the glint out above it. It also, as a side effect, ends the argument
+about Snell's window at the waterline: at that grazing angle the footprint is
+enormous and there is no capillary layer left to smash it.
+
+The peak local contrast is the number worth keeping: 104 in 1.149.0, 136 in
+1.150.0, **64** now. There is more texture on the water than the old sea had
+and less of it is a hard edge.
+
+`__fr.sea()` gains `capA`, `capB` and `capMin`.
+
 ## [1.150.0] — 2026-08-30
 
 ### The sea remembers

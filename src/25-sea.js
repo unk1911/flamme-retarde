@@ -40,7 +40,11 @@ const SEA = {
   // (micro, microFade, backlit, windrow): the strength of the capillary normal,
   // the footprint in metres at which it starts to go, how hard a backlit crest
   // glows, and how hard the windrows carve the foam.
-  seaK: [2.00, 2.0, 6.0, 1.0],
+  seaK: [2.00, 1.0, 6.0, 1.0],
+  // (capA, capB, capMin, -): the footprint in metres over which a whitecap
+  // stops being resolvable as a shape, and how much of the white paint is left
+  // once it has. See capRes in the fragment.
+  capK: [0.55, 2.2, 0.10, 0.0],
 };
 
 const SEA_VERT = /* glsl */ `
@@ -286,6 +290,7 @@ uniform vec2 uWind;
 uniform float uWindSpeed;
 uniform vec4 uFoamK;
 uniform vec4 uSeaK;
+uniform vec4 uCapK;
 
 varying vec3 vWorld;
 varying vec3 vWaveN;
@@ -384,9 +389,13 @@ void main(){
   // Each layer's slope lives in its own rotated frame, so carry it back through
   // the transpose before summing or all three lean the same wrong way.
   vec2 micro = r0.xz * 0.46 + (r1.xz * rotA) * 0.33 + (r2.xz * rotB) * 0.21;
-  // The fade survives, as a backstop rather than as the mechanism: 2 to 9
+  // The fade survives, as a backstop rather than as the mechanism: 1 to 4.5
   // metres of footprint instead of 0.18 to 1.6, which is about where even
-  // anisotropic filtering has run out of tile to resolve. Amplitude tracks the
+  // anisotropic filtering has run out of tile to resolve. It was 2 to 9 for a
+  // day, which is roughly twice as far as the taps can actually carry: from the
+  // 540 m opening the residual normal was still large enough to strike a
+  // specular glint off every pixel, and that — not the foam — was two thirds of
+  // the speckle the first cut of this put over the whole channel. Amplitude tracks the
   // wind, because how ruffled the surface is between the waves is the one thing
   // wind speed most obviously does to water and nothing here used to read it.
   float det = 1.0 - smoothstep(uSeaK.y, uSeaK.y * 4.5, fw);
@@ -547,6 +556,30 @@ void main(){
   // zero is what left the far channel looking like enamel.
   float crest = smoothstep(uFoamK.z, uFoamK.w, vFoamCrest) * (1.0 - far * 0.65);
 
+  // How much of a whitecap this pixel can still resolve. A cap is five to
+  // fifteen metres of broken water; once a pixel covers more than that there is
+  // no shape left to draw, and drawing one anyway is the same mistake the
+  // capillary ripples used to make one scale down — a fixed-size feature that
+  // never shrinks, scattered evenly over the whole picture, which the eye reads
+  // as grain on the lens rather than as sea. From 540 m, which is where this
+  // game starts, that is exactly what it looked like: the water came out
+  // peppered with white dashes.
+  //
+  // So past uCapK.xy the foam stops being paint and becomes a wash. Coverage is
+  // kept — there really are whitecaps out there and the water is genuinely
+  // lighter for them — but the peak whiteness comes off and the threshold
+  // widens, which turns a scatter of hard dots into a soft mottling that hazes
+  // out with everything else.
+  //
+  // Measured, because the eye and the mean are both useless here — a scatter of
+  // two-pixel dots moves the average brightness of the frame by nothing at all.
+  // Mean absolute pixel-to-pixel difference over the open water band at the
+  // 540 m opening: 0.165 before any of this, 0.664 when it first shipped, 0.196
+  // now. The peak matters more than the mean and it went the other way: 104
+  // before, 136 when it shipped, 64 now — so there is more texture out there
+  // than the old sea had and less of it is a hard edge.
+  float capRes = 1.0 - smoothstep(uCapK.x, uCapK.y, fw);
+
   // Windrows. Foam does not stay where it was made: Langmuir cells comb it into
   // long streaks running downwind, tens of metres apart and much longer than
   // they are wide. What was here was isotropic fbm, which gives an even spatter
@@ -584,14 +617,18 @@ void main(){
   // — and let the mask decide where within that any of it actually is.
   float cover = clamp(surf * 0.85 + crest * 0.95, 0.0, 1.0);
   float carved = cover * rows * uSeaK.w;
-  float foam = smoothstep(0.34, 0.66, carved);
+  // The ramp widens as the cap stops resolving, which is what lowers the peak
+  // without lowering the coverage: the same carved value that came out pure
+  // white close in comes out half way up a much longer slope far away.
+  float foam = smoothstep(mix(0.16, 0.34, capRes), mix(1.05, 0.66, capRes), carved);
   // And the raft is not the whole story. Behind and around a breaker is a slick
   // of bubbles that is translucent, not paint: it lifts the water a little and
   // takes the shine off it. Without this second, wider, much weaker tier the
   // foam has nothing to sit in and every patch reads as an applied object.
   float foamThin = smoothstep(0.14, 0.58, carved);
-  col = mix(col, vec3(0.92, 0.96, 0.97), foam * 0.85);
-  col = mix(col, mix(col, vec3(0.82, 0.88, 0.90), 0.34), foamThin * (1.0 - foam));
+  col = mix(col, vec3(0.92, 0.96, 0.97), foam * 0.85 * mix(uCapK.z, 1.0, capRes));
+  col = mix(col, mix(col, vec3(0.82, 0.88, 0.90), 0.34),
+            foamThin * (1.0 - foam) * mix(uCapK.z, 1.0, capRes));
 
   if (below) {
     gl_FragColor = vec4(fromBelow(viewDir, n, dist, foam), 1.0);
@@ -619,6 +656,7 @@ function buildSea(scene) {
       uWindSpeed: U.uWindSpeed,
       uFoamK: { value: new THREE.Vector4(...SEA.foamK) },
       uSeaK: { value: new THREE.Vector4(...SEA.seaK) },
+      uCapK: { value: new THREE.Vector4(...SEA.capK) },
       uCenter: { value: new THREE.Vector2() },
       uReach: { value: SEA.reach },
       uNear: { value: SEA.near },
