@@ -6460,7 +6460,7 @@ window.__fr = {
     const map = {
       steepA: [F, 'x'], steepB: [F, 'y'], crestA: [F, 'z'], crestB: [F, 'w'],
       micro: [K, 'x'], microFade: [K, 'y'], backlit: [K, 'z'], windrow: [K, 'w'],
-      capA: [C, 'x'], capB: [C, 'y'], capMin: [C, 'z'],
+      capA: [C, 'x'], capB: [C, 'y'], capMin: [C, 'z'], waveFar: [C, 'w'],
     };
     const lod = sea.mat.uniforms.uWaveLod;
     if (o && Number.isFinite(o.waveLod)) lod.value = o.waveLod;

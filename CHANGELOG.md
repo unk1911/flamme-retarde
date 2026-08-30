@@ -8,6 +8,37 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.150.3] — 2026-08-30
+
+### Six sines are not a sea at 540 m
+
+Misha on 1.150.2: "old water looks better than new water, from very high up.
+Up close it's a different story. From beginning of the game, the new water looks
+too fake / too geometricized."
+
+He is right and this one is not a bug, it is a limit. 1.150.2 put the wave field
+back into the view from altitude and the field it put there was six
+monochromatic components with the short ones faded — which is a grating, however
+far apart their directions are splayed. Wave groups modulate a grating without
+making it stop being one. Out there it read as ribbed fabric, and a flat
+gradient, which is what this sea drew at that height for its whole life, is
+honestly better: an empty picture makes no claim, and a regular one claims
+something false.
+
+So the per-pixel wave field now fades to flat over a footprint of 0.7 to 1.6 m,
+which lands it at full strength at 150 m and below and gone by 300. Everything
+1.150.2 added is still there where six components can carry a sea, and the
+opening view is the one that was preferred.
+
+Worth keeping the middle of the ladder in view, because it is where the whole
+exercise actually paid: at 150 m the old sea is a field of hard white aliased
+glitter and the new one is soft wave texture with the swell reading through it.
+The old sea was not better at altitude because it was good. It was better
+because it drew nothing, and nothing beats a wrong pattern.
+
+`__fr.sea()` gains `waveFar`, which is that crossover in metres of footprint, so
+the next argument about it can be had in the console rather than in a rebuild.
+
 ## [1.150.2] — 2026-08-30
 
 ### There was no sea up there

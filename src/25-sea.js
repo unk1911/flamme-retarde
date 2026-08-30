@@ -51,9 +51,10 @@ const SEA = {
   // (capA, capB, capMin, -): the footprint in metres over which a whitecap
   // stops being resolvable as a shape, and how much of the white paint is left
   // once it has. See capRes in the fragment.
-  capK: [0.55, 2.2, 0.10, 0.0],
-  // How eagerly the per-pixel wave sum drops a component as the footprint
-  // overtakes it. 1 fades each one out between a wavelength every eight pixels
+  capK: [0.55, 2.2, 0.10, 0.70],
+  // capK.w is where the per-pixel wave field starts fading to flat, in metres
+  // of footprint — see waveFade. How eagerly the sum drops an individual
+  // component as the footprint overtakes it. 1 fades each one out between a wavelength every eight pixels
   // and every three; lower keeps the swell further out and risks aliasing.
   waveLod: 1.0,
 };
@@ -507,6 +508,23 @@ void main(){
   // up, and which is why there is now a sea out there at all.
   vec3 waveDisp; vec3 waveN; float waveBrk;
   seaWave(vP, uTime, 0.0, fw, waveDisp, waveN, waveBrk);
+  // And then it goes away again, on the footprint, and this is a judgement and
+  // not a limit.
+  //
+  // Shading the sum per pixel put waves back into the view from altitude, and
+  // the waves were wrong: six monochromatic components with the short ones
+  // faded are a grating however far apart their directions are splayed, and
+  // groups modulate a grating without making it stop being one. From 540 m it
+  // read as ribbed fabric — "too fake, too geometricized" — and a flat gradient,
+  // which is what this sea drew there for its whole life, is honestly better.
+  // An empty picture makes no claim; a regular one claims something false.
+  //
+  // Six components can be a sea at 40 m and cannot be a sea at 540. So the
+  // whole field fades to flat between uCapK.w and 2.3x it, which is the crossing
+  // where the last components coarse enough to survive stop interfering and
+  // start ruling lines. Everything below that keeps it.
+  float waveFade = 1.0 - smoothstep(uCapK.w, uCapK.w * 2.3, fw);
+  waveN = normalize(mix(vec3(0.0, 1.0, 0.0), waveN, waveFade));
   vec3 n = normalize(waveN + vec3(micro.x, 0.0, micro.y));
   // Far water must be *rougher*, not sharper: flatten the normal and widen the
   // highlight as a pixel starts to cover many waves, or the glitter aliases
