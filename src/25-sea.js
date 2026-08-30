@@ -5,6 +5,27 @@
 // quads give sub-metre chop under the hull on a scooping run and still reach
 // past the far islands. The seabed comes out of the same height texture as the
 // land, which is what puts the turquoise shelf exactly where the shallows are.
+//
+// Five things happen on top of that lattice, and four of them arrived together
+// in 1.150.0 after reading ABYSSAL (github.com/Token-Gremlin/natural-disasters,
+// MIT) — see the credit in the README for what was taken and what was not:
+//
+//   1. A capillary normal from a baked, mipped tile rather than per-pixel
+//      noise, so the ripples survive to the horizon instead of being switched
+//      off at 1.6 m of footprint to hide their own aliasing. See 24-ripple.js.
+//   2. Whitecaps fired on wave *steepness* as well as on folding, because a
+//      Gerstner sum whose steepness is capped can never fold and so could never
+//      break. In gerstner(), below.
+//   3. Foam with a memory: the same field evaluated at two earlier times, so a
+//      breaker leaves a raft behind it rather than twinkling.
+//   4. Foam combed into downwind windrows, which is what stops it reading as
+//      wet sand once it covers a wave face.
+//   5. Light that went into a crest and came back out, which is most of what
+//      separates water from coloured glass with a sky in it.
+//
+// Four of those are thresholds on a distribution whose shape is only knowable
+// by looking at it, so they are uniforms and not constants: SEA.foamK and
+// SEA.seaK, live on __fr.sea().
 // -----------------------------------------------------------------------------
 
 const SEA = {
@@ -12,6 +33,14 @@ const SEA = {
   reach: 17000,       // metres from the camera to the outer ring
   near: 1.5,          // metres at the very centre; sets the exponential rate
   waveScale: 1.0,
+  // Whitecaps, as (steepA, steepB, crestA, crestB): where on the slope
+  // distribution a wave starts to spill, and where the resulting coverage is
+  // taken as foam. Tunable live — see __fr.sea in 90-app.js.
+  foamK: [0.075, 0.145, 0.12, 0.62],
+  // (micro, microFade, backlit, windrow): the strength of the capillary normal,
+  // the footprint in metres at which it starts to go, how hard a backlit crest
+  // glows, and how hard the windrows carve the foam.
+  seaK: [2.00, 2.0, 6.0, 1.0],
 };
 
 const SEA_VERT = /* glsl */ `
@@ -24,6 +53,7 @@ uniform float uK;
 uniform float uWaveScale;
 uniform vec2 uWind;
 uniform float uWindSpeed;
+uniform vec4 uFoamK;
 
 varying vec3 vWorld;
 varying vec3 vWaveN;
@@ -57,7 +87,7 @@ ${GLSL_TERRAIN}
  * the ones the wind has just made and they are the ones going everywhere.
  */
 void gerstner(vec2 p, float t, float cell, out vec3 disp, out vec3 n,
-              out float fold){
+              out float brk){
   disp = vec3(0.0);
   vec3 acc = vec3(0.0, 1.0, 0.0);
   vec2 w = normalize(uWind + vec2(1e-4));
@@ -86,6 +116,8 @@ void gerstner(vec2 p, float t, float cell, out vec3 disp, out vec3 n,
   qs[3] = 0.85; qs[4] = 0.90; qs[5] = 0.90;
 
   float jxx = 0.0, jzz = 0.0, jxz = 0.0;
+  vec2 gradF = vec2(0.0);
+  float hF = 0.0;
   for (int i = 0; i < N; i++){
     float k = 6.2831853 / lens[i];
     float c = sqrt(9.81 / k);
@@ -100,9 +132,19 @@ void gerstner(vec2 p, float t, float cell, out vec3 disp, out vec3 n,
     // and let the per-pixel ripple carry that scale instead.
     float a0 = amp * amps[i];
     float a = a0 * (1.0 - smoothstep(lens[i] * 0.22, lens[i] * 0.45, cell));
-    if (a < 1.0e-5) continue;
     float ph = dot(d, p) * k + t * c * k * 0.42;
     float sn = sin(ph), cs = cos(ph);
+    // The breaking test reads the sea at full amplitude, before the cell fade.
+    // That fade is a statement about the *lattice* — this patch of mesh is too
+    // coarse to carry an eight metre wave — and not about the water, which is
+    // still breaking out there. Testing the faded field instead put every
+    // whitecap inside fifty metres of the camera and left the rest of the
+    // channel glassy, which is a rendering limit wearing a weather forecast.
+    // You see distant whitecaps as white, not as waves; this is how they get
+    // to be white.
+    gradF += d * k * a0 * cs;
+    hF += a0 * sn;
+    if (a < 1.0e-5) continue;
     // Cap the steepness per component so the sum cannot fold the mesh even
     // when the wind gets up: q·k·a is the number that has to stay under one.
     float q = min(qs[i], 0.92 / max(k * a, 1e-4));
@@ -124,7 +166,45 @@ void gerstner(vec2 p, float t, float cell, out vec3 disp, out vec3 n,
   // The determinant of the horizontal map. One where the water is undisturbed,
   // falling toward zero where the crest is being crushed together, and it is
   // the last of those that is a whitecap.
-  fold = (1.0 - jxx) * (1.0 - jzz) - jxz * jxz;
+  float fold = (1.0 - jxx) * (1.0 - jzz) - jxz * jxz;
+
+  // Folding on its own leaves this sea glassy, and the loop above is the reason
+  // why. A Gerstner sum only folds once q*k*a passes one, and the cap two dozen
+  // lines up holds exactly that number at 0.92 so the mesh cannot turn itself
+  // inside out — so the single criterion the foam was reading could never fire.
+  // Every whitecap the sea has ever drawn came from the shore band.
+  //
+  // What actually limits a wind wave is steepness. Past roughly H/L = 1/7 the
+  // crest can no longer hold itself up and spills, and that lives in the
+  // surface slope, which this loop has already accumulated: acc.xz is the
+  // height gradient, negated, before it gets normalised into a normal.
+  //
+  // Slope alone paints the whole flank, so two gates on top of it:
+  //
+  //   lee   — a wave spills down the face it is travelling toward. Weight the
+  //           foam onto the forward side of the crest rather than ringing it.
+  //   above — air is only entrained at the top. The steepest part of a big wave
+  //           is halfway down it, and without this gate the foam comes out as
+  //           broad blobs sitting in the troughs, which is not a thing water
+  //           does.
+  //
+  // The threshold is not the physical 1/7. This is a fetch-limited sea whose
+  // RMS slope is about 0.076, so a physically honest number would never fire
+  // either; uFoamK.xy picks off the top few per cent of the distribution, which
+  // is what a whitecap is.
+  float slope = length(gradF);
+  float lee = 0.55 - 0.45 * clamp(dot(gradF / max(slope, 1e-4), w), -1.0, 1.0);
+  float above = smoothstep(0.25, 1.10, hF / max(amp, 1e-4));
+  float steep = smoothstep(uFoamK.x, uFoamK.y, slope) * lee * above;
+
+  brk = max(1.0 - fold, steep);
+}
+
+/** The breaking measure alone, for the history taps. See vFoamCrest below. */
+float seaBreak(vec2 p, float t, float cell){
+  vec3 d; vec3 nn; float b;
+  gerstner(p, t, cell, d, nn, b);
+  return b;
 }
 
 void main(){
@@ -141,7 +221,7 @@ void main(){
   vec2 warped = dir * (uNear * (exp(uK * m) - 1.0));
   vec2 wxz = uCenter + warped;
 
-  vec3 disp; vec3 n; float fold;
+  vec3 disp; vec3 n; float brk;
   // The shortest wave here is 7.5 m and the longest 46 m, and the lattice
   // spacing passes 6 m at about 100 m out. Carrying the Gerstner normal any
   // further than that samples the wave less than once a crest and the aliasing
@@ -155,15 +235,40 @@ void main(){
   // short waves exist at all near the camera; this one is still needed for the
   // long ones, which outlive their own sampling well before the horizon.
   float near = 1.0 - smoothstep(70.0, 240.0, length(warped));
-  gerstner(wxz, uTime, cell, disp, n, fold);
+  gerstner(wxz, uTime, cell, disp, n, brk);
   disp *= near;
+
+  // Foam that remembers. What was here fired on the instant the crest was
+  // folding and stopped the instant it was not, so a whitecap existed for as
+  // long as the wave took to pass one vertex and left no wake at all — the sea
+  // twinkled instead of breaking.
+  //
+  // A real breaker leaves a raft of bubbles behind it that takes seconds to go.
+  // Since these waves are analytic there is no need for a foam buffer to hold
+  // that history: the question "was this patch of water breaking a second ago"
+  // has a closed-form answer, which is the same field evaluated at an earlier
+  // time. Two taps back, each worth less than the last, and the maximum of the
+  // three is the coverage.
+  //
+  // The two history taps run over the inner three quarters of the lattice,
+  // which reaches about 1.6 km. Past that a whitecap is two pixels across and
+  // whether it lingers is not a question the screen can answer, so it is not
+  // worth paying three times to ask it.
+  float foam = brk;
+  if (m < 0.75) {
+    foam = max(foam, seaBreak(wxz, uTime - 0.55, cell) * 0.62);
+    foam = max(foam, seaBreak(wxz, uTime - 1.15, cell) * 0.34);
+  }
 
   // The horizontal part goes into the world position, which is the whole point
   // — and it means vWorld.xz is where this vertex actually *is*, so every
   // lookup the fragment does off it stays honest.
   vWorld = vec3(wxz.x + disp.x, disp.y, wxz.y + disp.z);
   vWaveN = normalize(mix(vec3(0.0, 1.0, 0.0), n, near));
-  vFoamCrest = (1.0 - mix(1.0, fold, near));
+  // Not multiplied by near. The crest foam used to be, which meant the sea
+  // stopped breaking 240 m out — the one place the old fold test could still
+  // fire was also the only place the foam was allowed to exist.
+  vFoamCrest = foam;
   gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0);
 }
 `;
@@ -172,11 +277,15 @@ const SEA_FRAG = /* glsl */ `
 precision highp float;
 
 uniform sampler2D uCover;
+uniform sampler2D uRipple;
 uniform vec3 uAmbSky;
 uniform vec3 uAmbGround;
 uniform float uAmbI;
 uniform float uNight;
 uniform vec2 uWind;
+uniform float uWindSpeed;
+uniform vec4 uFoamK;
+uniform vec4 uSeaK;
 
 varying vec3 vWorld;
 varying vec3 vWaveN;
@@ -242,53 +351,57 @@ void main(){
   bool below = !gl_FrontFacing;
 
   // ── detail normal ───────────────────────────────────────────────────────
-  // Two scrolling octaves, faded out with distance so the far sea does not
-  // sparkle into aliasing.
+  // Three taps of one baked tile, at incommensurate world scales.
+  //
+  // This used to be six octaves of value noise evaluated per pixel, and the
+  // long comment that stood here was an account of losing a fight with it.
+  // Procedural noise has no mip chain: there is no cheaper, blurrier version to
+  // reach for once a pixel stops covering one ripple and starts covering forty,
+  // so the period had to be pinned to the *screen* — about ten pixels, whatever
+  // the distance — and the whole layer switched off past a 1.6 m footprint,
+  // because past that it was not surface any more, it was grain. Measured on
+  // one frame, blanking it took the high-frequency energy over open water from
+  // 25 to 6. The ripples were the static.
+  //
+  // A texture has the mip chain built in, and the hardware picks the level per
+  // pixel and filters between them, which is precisely the thing the noise
+  // could not do. So the ripples get a real world-scale wavelength and survive
+  // to the horizon on their own terms instead of being cut early to hide their
+  // own aliasing. See 24-ripple.js for the bake.
   vec2 w = normalize(uWind + vec2(1e-4));
-  // Procedural noise has no mip chain, and distance alone cannot stand in for
-  // one: looking along the water at a shallow angle, a single pixel row covers
-  // hundreds of metres of sea even though the distance is small. fwidth gives the
-  // true footprint, so drive the ripple period straight off it and keep it at
-  // roughly ten pixels whatever the angle. This is the whole fix for the
-  // banding — everything else was treating the symptom.
   float fw = max(length(fwidth(vWorld.xz)), 0.0025);
-  float f1 = 1.0 / max(3.2, fw * 10.0);
-  float f2 = 1.0 / max(1.4, fw * 4.2);
-  // Once a pixel genuinely covers many waves there is no detail left to show;
-  // fade the perturbation out rather than letting it turn into noise.
-  //
-  // Thirty metres was far too generous, and this one fade is the whole of the
-  // sea's static. Measured on the same frame, blanking the detail normal took
-  // the high-frequency energy over open water from 25 to 6; nothing else in
-  // this shader moved it by more than a point. The ripples were the static.
-  //
-  // The reason is that their period is pinned to the *screen* — ten pixels,
-  // whatever the distance — so they never shrink and never band-limit; they
-  // are a fixed layer of grain over the picture that reshuffles whenever the
-  // camera moves. Close in that grain is the surface and it is exactly right.
-  // Far out it is the surface of nothing, and it was still at full strength a
-  // kilometre away. Tried and rejected: fewer octaves (worse — the central
-  // difference of a smoother field is larger), a longer period (worse — fewer
-  // ripples per pixel is not the problem), a real world-scale wavelength that
-  // fades per octave (worse — a 3.2 m ripple is four pixels across at a
-  // hundred metres, which is the same trap one step further out), and an
-  // analytic footprint instead of fwidth (worse, and fwidth was never at
-  // fault). What works is to stop drawing them sooner: 25 to 11.5, with the
-  // view from the waterline unchanged to two decimal places, which is the
-  // trade this wants — the ripples matter where you can see one.
-  float det = 1.0 - smoothstep(0.18, 1.6, fw);
-  vec2 p1 = vWorld.xz * f1 + w * uTime * 1.1;
-  vec2 p2 = vWorld.xz * f2 - w * uTime * 0.7;
-  float e = 0.55;
-  vec2 grad = vec2(
-    fbm2(p1 + vec2(e, 0.0), 3) - fbm2(p1 - vec2(e, 0.0), 3),
-    fbm2(p1 + vec2(0.0, e), 3) - fbm2(p1 - vec2(0.0, e), 3)
-  ) * 1.5;
-  grad += vec2(
-    fbm2(p2 + vec2(e, 0.0), 2) - fbm2(p2 - vec2(e, 0.0), 2),
-    fbm2(p2 + vec2(0.0, e), 2) - fbm2(p2 - vec2(0.0, e), 2)
-  ) * 0.7;
-  vec3 n = normalize(vWaveN + vec3(-grad.x, 0.0, -grad.y) * det * 0.9);
+  // Each tap is turned to its own angle. Three copies of one tile at scales
+  // that differ by a factor of three will otherwise line up every so often and
+  // print a crosshatch across the whole sea — which is a failure the old fade
+  // hid by never letting the layer live long enough to repeat.
+  mat2 rotA = mat2( 0.8339, 0.5519, -0.5519, 0.8339);
+  mat2 rotB = mat2(-0.2225, 0.9749, -0.9749, -0.2225);
+  vec2 drift = w * uTime;
+  vec2 qA = rotA * vWorld.xz, qB = rotB * vWorld.xz;
+  vec3 r0 = texture2D(uRipple, vWorld.xz * 0.115 + drift * 0.016).xyz * 2.0 - 1.0;
+  vec3 r1 = texture2D(uRipple, qA * 0.305 - drift * 0.042).xyz * 2.0 - 1.0;
+  vec3 r2 = texture2D(uRipple, qB * 0.780 + drift * 0.094).xyz * 2.0 - 1.0;
+  // Each layer's slope lives in its own rotated frame, so carry it back through
+  // the transpose before summing or all three lean the same wrong way.
+  vec2 micro = r0.xz * 0.46 + (r1.xz * rotA) * 0.33 + (r2.xz * rotB) * 0.21;
+  // The fade survives, as a backstop rather than as the mechanism: 2 to 9
+  // metres of footprint instead of 0.18 to 1.6, which is about where even
+  // anisotropic filtering has run out of tile to resolve. Amplitude tracks the
+  // wind, because how ruffled the surface is between the waves is the one thing
+  // wind speed most obviously does to water and nothing here used to read it.
+  float det = 1.0 - smoothstep(uSeaK.y, uSeaK.y * 4.5, fw);
+  micro *= det * uSeaK.x * (0.45 + 0.055 * uWindSpeed);
+  // A quarter of it from underneath, and this is not a fudge. Above the water
+  // the slope steers a reflection, and a five degree facet moves the reflected
+  // ray by ten. Below it the same facet steers a *refraction* right at the
+  // critical angle, where five degrees is the difference between seeing the sky
+  // and seeing the sea bed mirrored back down — so the detail that reads as
+  // texture from above reads, from below, as Snell's window smashed into navy
+  // blotches. Which is exactly what the first version of this did to the view
+  // from the waterline at Jadrija, and the shot that caught it is the reason
+  // there is a baseline in the scratchpad.
+  micro *= gl_FrontFacing ? 1.0 : 0.25;
+  vec3 n = normalize(vWaveN + vec3(micro.x, 0.0, micro.y));
   // Far water must be *rougher*, not sharper: flatten the normal and widen the
   // highlight as a pixel starts to cover many waves, or the glitter aliases
   // into banding all the way to the horizon.
@@ -351,6 +464,37 @@ void main(){
 
   vec3 col = mix(body * (uAmbSky * uAmbI * 1.5 + uSunColor * uSunI * 0.16), sky, fres);
 
+  // ── the light that came back out ────────────────────────────────────────
+  // Everything above is the surface: a mirror with a body colour behind it, and
+  // a body colour is a flat fact about the depth here. What was missing is the
+  // light that went *into* a wave and came out again toward the eye, which is a
+  // fact about the wave — and it is most of what separates water from coloured
+  // glass with a sky in it.
+  //
+  // A crest glows because it is thin. The sun is coming through a few tens of
+  // centimetres of it, so the height of the wave is the gate: troughs are metres
+  // of water and stay dark. It only appears when you are looking into the sun,
+  // and it peaks on the far side of the crest, where the normal is turned away
+  // from the light and the sheet between you and it is thinnest.
+  //
+  // It does not take the body colour, and that is the point. body is a fact
+  // about the depth *under* this pixel — nearly black over the channel — and
+  // multiplying by it made a backlit crest over deep water glow electric blue,
+  // which is the one thing it never does. The light in question never went down
+  // there: it crossed thirty centimetres of crest, and thirty centimetres of
+  // Adriatic is green whether the bottom is two metres below it or forty. So
+  // the glow gets the shelf colour wherever it happens.
+  vec3 glow = vec3(0.060, 0.315, 0.270);
+  // No floor under the height. With one, flat water glowed too, and since flat
+  // water is most of the sea the effect arrived as broad horizontal bands lying
+  // across the middle distance rather than as light in the crests. Only water
+  // standing above its own mean level is thin enough to be lit through.
+  float thin = clamp(vWorld.y * 1.8, 0.0, 1.20);
+  float backlit = thin
+    * pow(clamp(dot(uSunDir, viewDir), 0.0, 1.0), 4.0)
+    * pow(0.5 - 0.5 * clamp(dot(uSunDir, n), -1.0, 1.0), 3.0);
+  col += glow * uSunColor * uSunI * backlit * uSeaK.z * (1.0 - far);
+
   // ── sun glitter ─────────────────────────────────────────────────────────
   // Wide and dirty rather than a clean highlight: at this scale each glint is
   // thousands of facets, so the lobe has to be broad or it strobes.
@@ -395,12 +539,59 @@ void main(){
   float shoreT = (1.0 - smoothstep(0.0, 0.030, cv.a)) * (1.0 - unknown);
   float surf = smoothstep(0.35, 0.9, shoreT)
              * (0.55 + 0.45 * sin(vWorld.x * 0.16 + vWorld.z * 0.13 - uTime * 1.7));
-  // Whitecap where the surface is folding, which is a threshold on a number
-  // that means something rather than on a height that does not.
-  float crest = smoothstep(0.34, 0.82, vFoamCrest) * (1.0 - far);
-  float foamNoise = fbm2(vWorld.xz * 0.6 + uTime * 0.25, 3);
-  float foam = clamp(surf * 0.9 + crest * 0.7, 0.0, 1.0) * smoothstep(0.25, 0.75, foamNoise + 0.28);
+  // Whitecap where the surface is breaking, which is a threshold on a number
+  // that means something rather than on a height that does not. See the two
+  // criteria in the vertex shader; uFoamK.zw is where they land.
+  // The far fade is partial. A whitecap a kilometre off is a couple of pixels
+  // and cannot be drawn as a shape, but it is still white, and taking it to
+  // zero is what left the far channel looking like enamel.
+  float crest = smoothstep(uFoamK.z, uFoamK.w, vFoamCrest) * (1.0 - far * 0.65);
+
+  // Windrows. Foam does not stay where it was made: Langmuir cells comb it into
+  // long streaks running downwind, tens of metres apart and much longer than
+  // they are wide. What was here was isotropic fbm, which gives an even spatter
+  // — and an even spatter over a whole wave face does not read as foam, it
+  // reads as wet sand.
+  //
+  // Same baked tile as the ripples, sampled in the wind's own frame with the
+  // along-wind axis squashed by four and a half so the blotches come out drawn
+  // out downwind. Its alpha channel is the height field the normals were made
+  // from, which is exactly the mask this wants, so it costs no second texture
+  // and it arrives properly mip-filtered, which the fbm never was.
+  mat2 wf = mat2(w.x, -w.y, w.y, w.x);
+  vec2 qs = wf * vWorld.xz;
+  vec2 stretch = vec2(0.22, 1.0);
+  float rows = texture2D(uRipple, qs * 0.055 * stretch
+                 + vec2(uTime * 0.010, -uTime * 0.006)).a * 0.42
+             + texture2D(uRipple, qs * 0.170 * stretch
+                 - vec2(uTime * 0.024, uTime * 0.014)).a * 0.35
+             + texture2D(uRipple, qs * 0.560 * stretch
+                 + vec2(uTime * 0.055, uTime * 0.031)).a * 0.23;
+  // The tile's height channel only spans about 0.30 to 0.74, so it has to be
+  // stretched before it can carve anything: multiplying by a mask that never
+  // goes near zero is not carving, it is dimming.
+  rows = smoothstep(0.36, 0.64, rows);
+
+  // The mask multiplies rather than modulates. Where the pattern is empty the
+  // water stays water, however much the crest test asked for foam there — and
+  // that is the whole reason the edges belong to the texture.
+  //
+  // They have to. vFoamCrest is a *vertex* quantity interpolated across lattice
+  // cells six to ten metres wide, so thresholding it directly draws the
+  // lattice: the first version of this came out as hard-edged white slabs
+  // sitting on the water like ice floes, at exactly the size of a quad. Keep
+  // the crest term as a soft coverage — how much foam this water is entitled to
+  // — and let the mask decide where within that any of it actually is.
+  float cover = clamp(surf * 0.85 + crest * 0.95, 0.0, 1.0);
+  float carved = cover * rows * uSeaK.w;
+  float foam = smoothstep(0.34, 0.66, carved);
+  // And the raft is not the whole story. Behind and around a breaker is a slick
+  // of bubbles that is translucent, not paint: it lifts the water a little and
+  // takes the shine off it. Without this second, wider, much weaker tier the
+  // foam has nothing to sit in and every patch reads as an applied object.
+  float foamThin = smoothstep(0.14, 0.58, carved);
   col = mix(col, vec3(0.92, 0.96, 0.97), foam * 0.85);
+  col = mix(col, mix(col, vec3(0.82, 0.88, 0.90), 0.34), foamThin * (1.0 - foam));
 
   if (below) {
     gl_FragColor = vec4(fromBelow(viewDir, n, dist, foam), 1.0);
@@ -422,9 +613,12 @@ function buildSea(scene) {
     uniforms: {
       ...shareLight(), ...shareHaze(), ...shareTerrain(), ...shareWater(),
       uCover: U.uCover,
+      uRipple: U.uRipple,
       uCamPos: U.uCamPos,
       uWind: U.uWind,
       uWindSpeed: U.uWindSpeed,
+      uFoamK: { value: new THREE.Vector4(...SEA.foamK) },
+      uSeaK: { value: new THREE.Vector4(...SEA.seaK) },
       uCenter: { value: new THREE.Vector2() },
       uReach: { value: SEA.reach },
       uNear: { value: SEA.near },

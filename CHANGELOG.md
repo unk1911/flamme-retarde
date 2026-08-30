@@ -8,6 +8,100 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.150.0] — 2026-08-30
+
+### The sea remembers
+
+Misha sent a link: "I saw someone had done water really well, in Three.js. I
+wonder if there is anything we can borrow from that project, to make our water
+better?" The project is
+[ABYSSAL](https://github.com/Token-Gremlin/natural-disasters) by Davi
+(Token-Gremlin), MIT — a procedural ocean and weather simulation with no assets
+at all, which is this project's own house rule arrived at independently. Its
+headline feature is a three-cascade FFT wave field, and that is the one thing
+here that was *not* worth taking: an FFT ocean is tiled, infinite and flat, and
+this sea's whole identity is that it is none of those. It has a seabed, a
+turquoise shelf, a shoreline and Snell's window, and grafting a spectral field
+onto bathymetry is where all the work would have gone.
+
+What it does have is four answers to problems this sea had also been having,
+and one of them was a problem nobody here had noticed was a problem.
+
+**The ripples now survive.** The detail normal was six octaves of value noise
+evaluated per pixel, and procedural noise has no mip chain — there is no
+cheaper, blurrier version to reach for once a pixel stops covering one ripple
+and starts covering forty. The old shader worked around that by pinning the
+ripple period to the *screen*, about ten pixels whatever the distance, and then
+switching the layer off past a 1.6 m footprint. From the cockpit that fade
+lands a third of the way up the frame and everything beyond it was plastic. A
+texture has the mip chain built in, so `24-ripple.js` bakes one seamless
+512×512 tile of wind-ruffle on the GPU at load — mipped, anisotropic, still
+nothing fetched — and the sea takes three rotated taps of it at world scale.
+The rotations matter: three copies of one tile at scales a factor of three
+apart will otherwise line up and print a crosshatch across the whole channel,
+which the old fade hid by never letting the layer live long enough to repeat.
+
+**The sea can break.** Whitecaps were fired on the Jacobian of the horizontal
+map going negative, which is a wave folding through itself — and the wave sum
+caps its own steepness at 0.92 precisely so the mesh cannot do that. The one
+criterion the foam was reading could never fire. Every whitecap this game has
+ever drawn came from the shore band. What actually limits a wind wave is
+steepness, and past roughly H/L = 1/7 the crest spills; that lives in the
+surface slope, which the loop was already accumulating and throwing away. Two
+gates keep it honest — foam on the face the wave is travelling toward, and only
+on water high in its own band, because air is entrained at the top and the
+steepest part of a big wave is halfway down it. The test reads the sea at full
+amplitude, before the lattice fade: that fade is a statement about the mesh
+being too coarse to carry an eight metre wave, not about the water, which is
+still breaking out there. You see distant whitecaps as white, not as waves.
+
+**The foam remembers.** It used to exist for exactly as long as a crest took to
+cross one vertex, so the sea twinkled instead of breaking. ABYSSAL integrates a
+rate into a persistent buffer; these waves are analytic, so no buffer is needed
+— "was this water breaking a second ago" has a closed-form answer, which is the
+same field at an earlier time. Two taps back, decaying.
+
+**The foam streaks.** Langmuir cells comb surface foam into long rows running
+downwind. The mask was isotropic noise, and an even spatter over a whole wave
+face reads as wet sand; it is now the same baked tile sampled in the wind's own
+frame with the along-wind axis squashed by four and a half. It multiplies
+rather than modulates, so where the pattern is empty the water stays water —
+which is also what stopped the first attempt looking like ice floes, because
+`vFoamCrest` is a vertex quantity and thresholding it directly draws the
+lattice at exactly the size of a quad.
+
+**And the crests glow.** There was no subsurface term at all: the surface was a
+mirror with a flat body colour behind it. Light that goes into a wave and comes
+back out is most of what separates water from coloured glass, and a crest glows
+because it is thin. It takes the shelf colour rather than the local body colour
+— thirty centimetres of Adriatic is green whether the bottom is two metres down
+or forty, and multiplying by the body made a backlit crest over the channel
+glow electric blue.
+
+Four numbers turned out to be thresholds on distributions whose shape is only
+knowable by looking, so they are uniforms rather than constants and live on
+`__fr.sea()`, alongside a new `__fr.hour()` for putting the sun where a backlit
+crest can be seen at all.
+
+### Fixed
+
+- The first bake of the capillary tile used a normal slope of 0.85 where it
+  wanted 0.030. Every normal came out on its side, and a tile of saturated
+  normals pointing in random directions averages — under the very mipmapping
+  the exercise was built for — to a flat mid-grey. The texture looked plausible
+  and rendered a sea of glass. `__fr.ripple()` reads four numbers back off the
+  tile, which is the whole diagnosis and did not exist because a baked texture
+  is the one thing in this build nobody can look at.
+- The capillary normal is quartered on the underside of the surface. Above the
+  water a five-degree facet moves a reflection by ten; below it the same facet
+  steers a refraction right at the critical angle, where five degrees is the
+  difference between seeing the sky and seeing the sea bed mirrored back down.
+  At full strength it smashed Snell's window into navy blotches, which is what
+  the view from the waterline at Jadrija looked like for about an hour.
+- Crest foam was multiplied by the near fade, so the sea stopped breaking 240 m
+  out — the only place the old fold test could fire was also the only place the
+  foam was allowed to exist.
+
 ## [1.149.0] — 2026-08-29
 
 ### A real boot

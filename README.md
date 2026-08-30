@@ -679,6 +679,23 @@ including how to rebuild without the parts you may not want.
   its material seam so its two colours become vertex colours like everything
   else here. CC0 asks for no attribution; this is here anyway.
 
+- **The sea, partly**: the whitecap and capillary work in 1.150.0 was done
+  after reading
+  **[ABYSSAL](https://github.com/Token-Gremlin/natural-disasters)** by
+  **Davi (Token-Gremlin)**, MIT-licensed — a procedural ocean and weather
+  simulation that solves several problems this sea had also been having, and
+  solves them better. No code was copied: the wave sum here is still six
+  Gerstner components rather than three FFT cascades, and the noise, the tiling
+  and the bake are this project's. What was taken is the *reasoning* — that
+  folding alone leaves a wind sea glassy and steepness is the criterion that
+  fires; that foam has to be integrated as a rate rather than snapped on; that
+  surface foam combs into downwind windrows and isotropic noise reads as wet
+  sand; that a capillary layer wants a mipped tile and not per-pixel noise —
+  plus a handful of its constants that there was no sense re-deriving, among
+  them the two tap rotations, the windrow stretch, and a baked normal slope of
+  0.030 that this project first got wrong by a factor of twenty-eight. MIT asks
+  for the notice only where code travels; this is here anyway.
+
   It and the cat are the only *objects* in the game that were not authored for
   it — the people are the base mesh above, given everything that makes them
   people here. Everything else — four landmarks, the aeroplane, thirteen thousand

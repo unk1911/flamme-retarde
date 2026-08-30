@@ -512,6 +512,11 @@ const U = {
   uWind: { value: new THREE.Vector2(0.87, -0.5) },
   uWindSpeed: { value: 9.0 },
 
+  // The capillary tile baked in 24-ripple.js: rgb a wind-ruffle normal, a its
+  // height. Mipped and anisotropic, which is the whole reason it is a texture
+  // and not six octaves of noise.
+  uRipple: { value: null },
+
   // world lookups
   uTerrain: { value: null },
   uFire: { value: null },

@@ -854,6 +854,7 @@ async function boot() {
   terrain = buildTerrain(scene);
 
   await step(70, 'load.sea');
+  bakeRipple(renderer);
   sea = buildSea(scene);
   under = buildUnder(scene);
   seabed = buildBed(scene);
@@ -6419,6 +6420,52 @@ window.__fr = {
       stepVikWalk(0);
       return { leg: vikWalk.leg, u: +vikWalk.u.toFixed(3) };
     },
+  },
+
+  /**
+   * Debug: the sea's two tuning vectors, live.
+   *
+   * Four of the five knobs added in 1.150.0 are thresholds on a distribution
+   * whose shape is only knowable by looking at it — where on the slope curve a
+   * wave starts to spill, how hard a backlit crest should glow — and each one
+   * costs a two minute rebuild to try. So they are uniforms.
+   *
+   *   __fr.sea()                       read them back
+   *   __fr.sea({ steepA: 0.11 })       one at a time
+   *   __fr.sea({ micro: 0.45, backlit: 3.2 })
+   */
+  /**
+   * Debug: move the sun. The one thing a backlit crest needs is a low sun, and
+   * there was no way to ask for one from outside the closure.
+   */
+  /** Debug: the baked capillary tile. See rippleStats in 24-ripple.js. */
+  ripple: () => rippleStats(renderer),
+
+  hour: (h) => {
+    if (h != null) { state.hour = +h; setSun(); }
+    const d = U.uSunDir.value;
+    return {
+      hour: state.hour,
+      elevDeg: +state.sunElev.toFixed(1),
+      // The yaw that looks straight into it, which is the only thing anybody
+      // ever wants this for.
+      yaw: +headingToYaw(d.x, d.z).toFixed(3),
+    };
+  },
+
+  sea: (o) => {
+    const F = sea.mat.uniforms.uFoamK.value;
+    const K = sea.mat.uniforms.uSeaK.value;
+    const map = {
+      steepA: [F, 'x'], steepB: [F, 'y'], crestA: [F, 'z'], crestB: [F, 'w'],
+      micro: [K, 'x'], microFade: [K, 'y'], backlit: [K, 'z'], windrow: [K, 'w'],
+    };
+    for (const [k, v] of Object.entries(o || {})) {
+      if (map[k] && Number.isFinite(v)) map[k][0][map[k][1]] = v;
+    }
+    const out = {};
+    for (const [k, [vec, c]] of Object.entries(map)) out[k] = +vec[c].toFixed(4);
+    return out;
   },
 
   /**
