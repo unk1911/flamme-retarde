@@ -6463,13 +6463,16 @@ window.__fr = {
       capA: [C, 'x'], capB: [C, 'y'], capMin: [C, 'z'], waveFar: [C, 'w'],
     };
     const lod = sea.mat.uniforms.uWaveLod;
+    const fsw = sea.mat.uniforms.uFarSwell;
     if (o && Number.isFinite(o.waveLod)) lod.value = o.waveLod;
+    if (o && Number.isFinite(o.farSwell)) fsw.value = o.farSwell;
     for (const [k, v] of Object.entries(o || {})) {
       if (map[k] && Number.isFinite(v)) map[k][0][map[k][1]] = v;
     }
     const out = {};
     for (const [k, [vec, c]] of Object.entries(map)) out[k] = +vec[c].toFixed(4);
     out.waveLod = +lod.value.toFixed(3);
+    out.farSwell = +fsw.value.toFixed(3);
     return out;
   },
 

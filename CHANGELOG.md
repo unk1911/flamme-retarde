@@ -8,6 +8,38 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.150.5] — 2026-08-30
+
+### The sea from the aeroplane
+
+Misha, fifth time: "no still don't like it from above."
+
+By 1.150.4 the water at 540 m was provably identical to 1.149.0 — residual
+standard deviation 7.581 against 7.568 under ×8 amplification — so this could
+not be a regression, and it took five rounds to notice that nobody had ever said
+it was. "Old water looks better than new water" is not "old water is good". It
+was better than corduroy and better than crawling dashes, and it was a dead navy
+slab, which is what this sea has shown from the aeroplane for its whole life.
+Shooting the opening altitude on all eight headings made it obvious: five of
+them are a flat block of dark blue with nothing in it at all.
+
+Fading the analytic wave field out up there, in 1.150.3, was the right call and
+only half a call. A sea from 540 m is not featureless — it is a big soft
+irregular mottling of swell groups, slicks and patches of different roughness —
+and the reason six sines cannot draw it is that six sines are periodic and that
+mottling is not.
+
+**A texture is not periodic at any scale you can see, and it has a mip chain.**
+That is the argument the capillary tile already won one scale down, and it wins
+again three scales up: the same baked tile, sampled at one repeat per 660 m and
+per 215 m so its features land at sixty and twenty metres, cross-fades in
+exactly where the analytic sum gives up. It cannot come out as corduroy, it
+cannot crawl, and it hazes into the horizon on the mip chain rather than on a
+fade somebody had to choose.
+
+`__fr.sea()` gains `farSwell`. Still 60 fps everywhere, desktop and mobile — it
+is two texture fetches on the fragments that had stopped doing the wave sum.
+
 ## [1.150.4] — 2026-08-30
 
 ### It was the whitecaps

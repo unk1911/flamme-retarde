@@ -57,6 +57,8 @@ const SEA = {
   // component as the footprint overtakes it. 1 fades each one out between a wavelength every eight pixels
   // and every three; lower keeps the swell further out and risks aliasing.
   waveLod: 1.0,
+  // How hard the far tile mottles the water the analytic sum gave up on.
+  farSwell: 0.85,
 };
 
 /**
@@ -382,6 +384,7 @@ uniform vec4 uFoamK;
 uniform vec4 uSeaK;
 uniform vec4 uCapK;
 uniform float uWaveScale;
+uniform float uFarSwell;
 
 varying vec3 vWorld;
 varying vec2 vP;
@@ -525,6 +528,30 @@ void main(){
   // start ruling lines. Everything below that keeps it.
   float waveFade = 1.0 - smoothstep(uCapK.w, uCapK.w * 2.3, fw);
   waveN = normalize(mix(vec3(0.0, 1.0, 0.0), waveN, waveFade));
+
+  // And something takes its place, because flat is not the answer either.
+  //
+  // Fading the sum out up there was the right call and it was only half a call:
+  // what it left behind was a dead navy slab, which is what this sea has always
+  // shown from the aeroplane and what four releases of arguing about whitecaps
+  // never touched. A sea from 540 m is not featureless. It is a big soft
+  // irregular mottling — swell groups, slicks, patches of different roughness —
+  // and the reason six sines cannot draw it is that six sines are periodic and
+  // that mottling is not.
+  //
+  // A texture is not periodic at any scale you can see, and it has a mip chain,
+  // which is the whole argument the capillary tile already won one scale down.
+  // Same tile, sampled at one repeat per 660 m and per 215 m, so its features
+  // land at sixty and twenty metres — swell-sized. It arrives exactly where the
+  // analytic field gives up and it can never come out as corduroy.
+  float farAmt = 1.0 - waveFade;
+  if (farAmt > 0.004) {
+    vec2 dr = w * uTime;
+    vec3 s0 = texture2D(uRipple, vWorld.xz * 0.00152 + dr * 0.00090).xyz * 2.0 - 1.0;
+    vec3 s1 = texture2D(uRipple, rotA * vWorld.xz * 0.00465 - dr * 0.00220).xyz * 2.0 - 1.0;
+    vec2 sw = s0.xz * 0.62 + (s1.xz * rotA) * 0.38;
+    waveN = normalize(waveN + vec3(sw.x, 0.0, sw.y) * farAmt * uFarSwell);
+  }
   vec3 n = normalize(waveN + vec3(micro.x, 0.0, micro.y));
   // Far water must be *rougher*, not sharper: flatten the normal and widen the
   // highlight as a pixel starts to cover many waves, or the glitter aliases
@@ -785,6 +812,7 @@ function buildSea(scene) {
       uSeaK: { value: new THREE.Vector4(...SEA.seaK) },
       uCapK: { value: new THREE.Vector4(...SEA.capK) },
       uWaveLod: { value: SEA.waveLod },
+      uFarSwell: { value: SEA.farSwell },
       uCenter: { value: new THREE.Vector2() },
       uReach: { value: SEA.reach },
       uNear: { value: SEA.near },
