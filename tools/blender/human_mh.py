@@ -3862,6 +3862,130 @@ KNEE_A = _knee(1)
 KNEE_B = _knee(-1)
 
 
+# ── and the other end of the same afternoon ─────────────────────────────────
+#
+# On her back with her knees drawn up and her hands round her own shins,
+# looking up the length of herself at you. Misha, 30 Aug: "after spraying the
+# NPC baye with water for a while, she should lay down on her back and sorta
+# hold her legs with her hands and look up and smile."
+#
+# Where the rotation lives is the only structural decision here and it is
+# already made: the somersault carries a whole revolution on `pelvis` alone,
+# because that bone's local X is this rig's sagittal axis and everything else
+# hangs off it. Negative takes her head forward and down — at -180 she is
+# upside down mid-tuck — so POSITIVE ninety takes her over backwards until the
+# spine is horizontal and her face is up. Her head finishes behind where she
+# was kneeling and her knees come up toward you, which is the right way round:
+# the thing she is looking at is at the other end of her.
+#
+# The legs then read in their own frame as if she were standing, because a hip
+# does not know which way up its owner is: -95 on the thigh is flexion and
+# brings the knee to the chest, +80 on the shin folds it back over the thigh.
+# What that draws, lying down, is a knee over her hip with the shin across it.
+#
+# `@root` is hand-authored rather than solved. `floor_poses` finds the lowest
+# HAND, FOOT or HEAD — see `_lowest` and `TIPS` — and on a supine figure the
+# lowest thing is her back, which is not on that list and never will be, so the
+# solver would happily hang her a hand's breadth in the air off a heel. 0.128 m
+# of hip above the deck is half a body's thickness, measured off the mesh.
+RECLINE_ROOT = 0.128 - 0.934
+
+# Sitting back off her heels with her hands going down behind her: the way a
+# person actually gets from kneeling to lying, and the reason this is a clip
+# and not a cut. Weight already behind the hips, the shins beginning to come
+# out from under her.
+# -0.47 and not -0.60, and the difference is her heels. Every other key in this
+# clip is solved off her back; this one still has her weight on her feet, and
+# the probe put the ankle 0.486 m above rest — so a root a hand's breadth lower
+# buries both of them in the concrete for the two-thirds of a second she is on
+# her way down. Nothing renders that; it is a coordinate, and it was found by
+# reading one.
+RECLINE_A = {
+    "@root": (0.06, 0.0, -0.47),
+    "pelvis": (34, 0, 0),
+    "spine01": (6, 0, 0), "spine02": (6, 0, 0), "spine03": (4, 0, 0),
+    "chest": (2, 0, 0), "neck": (-8, 0, 0), "head": (-6, 0, 0),
+    "clavicleL": (0, 0, -4), "clavicleR": (0, 0, 4),
+    "armUL": (72, 0, 20), "armLL": (-8, 0, 6), "handL": (-10, 0, -6),
+    "armUR": (72, 0, -20), "armLR": (-8, 0, -6), "handR": (-10, 0, 6),
+    "legUL": (-46, 0, 6), "legLL": (98, 0, 0), "footL": (-18, 0, 0),
+    "legUR": (-46, 0, -6), "legLR": (98, 0, 0), "footR": (-18, 0, 0),
+}
+
+# Down, flat, legs still out along the floor and the arms still beside her.
+# One key between sitting and the hold, so the knees come up as a separate
+# movement rather than arriving with her shoulders.
+RECLINE_B = {
+    "@root": (0.16, 0.0, RECLINE_ROOT),
+    "pelvis": (88, 0, 0),
+    "spine01": (2, 0, 0), "spine02": (2, 0, 0), "spine03": (0, 0, 0),
+    "chest": (0, 0, 0), "neck": (-14, 0, 0), "head": (-12, 0, 0),
+    "armUL": (26, 0, 26), "armLL": (-30, 0, 10), "handL": (-8, 0, -4),
+    "armUR": (26, 0, -26), "armLR": (-30, 0, -10), "handR": (-8, 0, 4),
+    "legUL": (-16, 0, 5), "legLL": (24, 0, 0), "footL": (-14, 0, 0),
+    "legUR": (-16, 0, -5), "legLR": (24, 0, 0), "footR": (-14, 0, 0),
+}
+
+# The hold. Knees up, hands round the shins, chin down off the deck so she is
+# looking along herself rather than at the ceiling — which from where you are
+# standing is her looking up at you, and is the whole of what the pose is for.
+#
+# Parameterised because the reach is the whole problem and it was settled with
+# `--probe` rather than with renders, the way KNEEL_BACK's arms were. Measured
+# on this rig: shoulder to elbow 0.237 m, elbow to wrist 0.234, so a hand can
+# get 0.47 m from its shoulder with the arm straight and wants to be nearer
+# 0.40 to look like a grip rather than a lunge. The first cut had the thigh
+# 4 degrees past vertical, which put her knee 0.67 m from her shoulder — a
+# reach she does not have, and the hands went overhead instead.
+#
+# Two levers close that gap and both are things a person actually does: the
+# knees come further over the chest, and the spine curls so the shoulders lift
+# toward them. The spine sign is the one to get right — negative X is forward
+# flexion on every spine bone (see `_tuck`, which curls to -14), and lying on
+# her back forward flexion is what lifts her head and shoulders off the floor.
+def _cradle(hip, knee, curl, sh, el, wr=-14, abU=18, abL=12, shy=0):
+    return {
+        "@root": (0.16, 0.0, RECLINE_ROOT),
+        "pelvis": (90, 0, 0),
+        "spine01": (curl, 0, 0), "spine02": (curl, 0, 0),
+        "spine03": (curl * 0.8, 0, 0), "chest": (curl * 0.8, 0, 0),
+        # Off the deck and looking down the length of herself. The neck carries
+        # most of it because a chin lift is a neck and not a back.
+        "neck": (-24, 0, 0), "head": (-20, 0, 0),
+        "clavicleL": (0, 0, 6), "clavicleR": (0, 0, -6),
+        "armUL": (sh, shy, abU), "armLL": (el, 0, abL), "handL": (wr, 0, -6),
+        "armUR": (sh, -shy, -abU), "armLR": (el, 0, -abL), "handR": (wr, 0, 6),
+        "legUL": (hip, 0, 9), "legLL": (knee, 0, 0), "footL": (-16, 0, 0),
+        "legUR": (hip, 0, -9), "legLR": (knee, 0, 0), "footR": (-16, 0, 0),
+    }
+
+
+# Settled on a grid rather than by eye, which is the second time this file has
+# had to do that for a pair of arms and for the same reason KNEEL_BACK gives:
+# where a hand ENDS UP is a question a coordinate answers in a second and a
+# picture answers in five minutes. Thirty-six candidates over shoulder, elbow
+# and abduction, scored on three numbers — how far down the shin the wrist
+# lands, how far off the shin's axis it sits, and how nearly the forearm points
+# ALONG the shin.
+#
+# That third number is the one nobody would think to score and it is the whole
+# difference between holding a leg and reaching past one. The hand on this
+# figure is a fixed mesh with the fingers spread: they continue the forearm and
+# they are 0.19 m long, so a wrist that is touching the shin with the forearm
+# crossing it at sixty degrees renders as a woman with her hands up by her own
+# face. The winner puts the wrist 0.049 m below the knee, 0.038 m off its axis
+# — which on a shin 0.05 m thick is contact — with the forearm 0.78 aligned, so
+# the fingers run up the leg.
+CRADLE = _cradle(-118, 78, -8, -40, -20, -20, 30, 24)
+
+# The same, a breath later, and everything in it is small for KNEEL_BACK_B's
+# reason: a held position that does not move is a mannequin. She breathes, the
+# knees ease a degree or two, and her chin comes up a little further.
+CRADLE_B = _cradle(-121, 76, -10, -42, -19, -20, 30, 24)
+CRADLE_B["@root"] = (0.16, 0.0, RECLINE_ROOT + 0.006)
+CRADLE_B["head"] = (-23, 4, 0)
+
+
 # ── the somersault ──────────────────────────────────────────────────────────
 #
 # One tucked front somersault, and the entire revolution is carried on `pelvis`
@@ -5638,6 +5762,28 @@ CLIPS = [
               (1.55, KNEEL_BACK)]},
     {"name": "kept", "loop": True,
      "keys": [(0.0, KNEEL_BACK), (2.2, KNEEL_BACK_B), (4.4, KNEEL_BACK)]},
+    # And the far end of it, which is what keeping the water on her past `kept`
+    # gets you: down off her heels, onto her back, and her knees come up. Two
+    # clips again for `submit` and `kept`'s reason — the way down happens once
+    # and what she is at the bottom of it she stays.
+    #
+    # 2.3 s, which is longer than `submit`'s 1.55 and has to be: that one is a
+    # kneel and this is a whole body changing which way up it is, through a
+    # sit-back it would look boneless without.
+    {"name": "recline", "loop": False,
+     "keys": [(0.00, KNEEL_BACK), (0.75, RECLINE_A), (1.55, RECLINE_B),
+              (2.30, CRADLE)]},
+    {"name": "cradle", "loop": True,
+     "keys": [(0.0, CRADLE), (2.6, CRADLE_B), (5.2, CRADLE)]},
+    # And back up, which is the same three keys in reverse and is a clip rather
+    # than a crossfade for a reason worth writing down: `getup` starts from
+    # FOURS, and blending from a woman on her back with her knees up to a woman
+    # on all fours over a third of a second is not a transition, it is a body
+    # passing through itself. Everything that goes down this way comes back up
+    # it, and then `rise` does what it has always done from KNEEL_BACK.
+    {"name": "situp", "loop": False,
+     "keys": [(0.00, CRADLE), (0.70, RECLINE_B), (1.45, RECLINE_A),
+              (2.20, KNEEL_BACK)]},
     # And going somewhere on them, at 0.40 m/s — 1.2 s a cycle, two half
     # strides, which is a knee and about 24 cm each. `SHOW.creep` in
     # 43-jadrija.js is that number and the two have to move together or she
@@ -5689,6 +5835,20 @@ VIEWS = {
     # anything below the knee is more than forty pixels tall.
     "feet": (38.0, 16.0, 0.170, 1.60, 900, 700),
     "rear": (156.0, 9.0, 1.150, 2.30, 760, 1120),
+    # And two for a pose that is lying down, which none of the others can
+    # frame: every camera above targets the midline at chest or head height on
+    # a figure that is standing, and a supine one is a metre and a half of body
+    # spread along X. Landscape, and the only entries here whose target is
+    # behind the origin, because the head of a woman on her back is 0.45 m
+    # behind her own hips.
+    #
+    # HEIGHT 1.05 AND NOT 0.13, which looks like an error and is not: `--reskin`
+    # renders `pose()`, and `pose()` sets bone Eulers only. `@root` is composed
+    # by the *exporter*, so a supine pose previews at standing hip height with
+    # its feet in the air. Aim at where the render puts her, not at where the
+    # game will.
+    "floor": (62.0, 18.0, 1.050, 3.90, 1120, 760, -0.220, 0.0),
+    "floorside": (90.0, 6.0, 1.050, 3.70, 1120, 760, -0.220, 0.0),
 }
 
 
@@ -6025,7 +6185,12 @@ def main():
             out = []
             # Heads and not tails: a bone's head is the joint, and the joint is
             # what 43-jadrija.js reads when it hangs a bottle off `handR`.
-            for bone in ("head", "chest", "pelvis", "footR", "handL", "handR"):
+            # The knees went on the list the day a pose asked her to hold her
+            # own shins: where a hand has to *arrive* is a joint further down
+            # the leg, and a probe that reports the hand and not the target is
+            # half an answer.
+            for bone in ("head", "chest", "pelvis", "legLR", "footR",
+                         "armUR", "armLR", "handL", "handR"):
                 if bone in rig.pose.bones:
                     v = rig.matrix_world @ rig.pose.bones[bone].head
                     out.append("%s(%+.3f %+.3f %+.3f)" % (bone, v.x, v.y, v.z))

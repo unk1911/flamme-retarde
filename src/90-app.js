@@ -4381,6 +4381,45 @@ let cicadaGain = 0.05, cicadaWood = -1;
 let recess = false;
 let lastFrameMs = 0;
 
+// Where the PERSON is, as against where the camera is.
+//
+// THEY STOPPED BEING THE SAME POINT the day B grew a third person on foot,
+// and four things that mean "you" went on asking the camera. Misha, 30 Aug:
+// "the rotating camera B mode inside kabine is still messed up and sometimes
+// breaks out of the kabine... and sometimes the walls shimmer."
+//
+// Measured, standing still on the middle of the kabina floor with the lap
+// running: she never moves — s 19.65 for fifteen samples — and the camera
+// swings between s 17.31, which is the doorway, and s 22.21, which is the
+// back wall. `kabina.inside` is a ramp across the door, so it read anywhere
+// from 0.14 to 1.00, the Schmitt latch below flipped out and back in, and
+// with it went `indoors`: the near clip swung between 0.064 m and 1.194 m
+// and the exposure between 0.42 and 0.919. A front plane at 1.2 m in a room
+// 4 m across throws away every wall you are standing next to, which is the
+// whole of "the walls shimmer" and most of "we end up OUTSIDE" — you are not
+// outside, the room has been clipped off in front of you.
+//
+// So the room is asked about the eye, and the eye is where the walker is.
+// 43-jadrija.js has carried the same warning since Baye learned to follow
+// you: "this is the WALKER and not the camera; if those two ever agree while
+// the third person is on and swung round, something has gone back to reading
+// `cam`."
+//
+// `you.y` is the floor under her boots and `you.eye` is her standing height,
+// already eased down by `eyeAt` wherever there is something to duck under.
+// The bob and the sway are deliberately left out: they are a few centimetres
+// of gait and a threshold has no business flickering at 2 Hz because somebody
+// is walking. Under `camOverride` there is no walker to speak of — the cuts
+// fly the camera through the house on their own — so the camera stands in.
+const personPt = new THREE.Vector3();
+function personAt() {
+  if (!camOverride && state.phase === 'ground' && ground && ground.ok) {
+    const y = ground.you;
+    return personPt.set(y.x, y.y + y.eye, y.z);
+  }
+  return personPt.copy(camera.position);
+}
+
 /**
  * The threshold.
  *
@@ -4462,7 +4501,13 @@ function crossThreshold(dt, afoot) {
     return;
   }
 
-  const [t, s] = jadrija.local(camera.position.x, camera.position.z);
+  // The eye and not the camera — see `personAt`. In the third person the cut
+  // was being fired by a point up to 3.1 m behind you, so walking in put the
+  // screen down a stride and a half after you were already standing in the
+  // room, and the lap on its own could carry the camera back out over the
+  // sill while you had not moved at all.
+  const at = personAt();
+  const [t, s] = jadrija.local(at.x, at.z);
   const prev = roomStep;
   roomStep = [t, s];
   // This has to be a crossing, not merely being somewhere behind the hut in
@@ -4543,7 +4588,11 @@ function crossChanging(afoot) {
     if (!afoot) { inChg = -1; }
     return;
   }
-  const [t, s] = jadrija.local(camera.position.x, camera.position.z);
+  // Likewise the eye. This one is a region test rather than a crossing, so
+  // the third person's camera swinging through a cubicle would have changed
+  // her out of her clothes from the other side of the screen.
+  const at = personAt();
+  const [t, s] = jadrija.local(at.x, at.z);
   const bay = C.bay(t, s);
   if (bay === inChg) return;
   const was = inChg;
@@ -5129,10 +5178,15 @@ function frame() {
   // bedroom partition. Being *in* a house that you can see straight out of is
   // worse than not being able to go in at all, because it is the one thing the
   // house was built to test.
+  // Both asked about the EYE and not the camera — see `personAt`, which
+  // carries the measurement. This is the line the shimmer came out of: the
+  // latch below is fed from here, `indoors` is fed from the latch, and the
+  // near clip and the exposure are both fed from `indoors`.
+  const at = personAt();
   const kabIn = afoot && jadrija && jadrija.kabina
-    ? jadrija.kabina.inside(camera.position.x, camera.position.z) : 0;
+    ? jadrija.kabina.inside(at.x, at.z) : 0;
   const vikIn = afoot && jadrija && jadrija.indoorsAt
-    ? jadrija.indoorsAt(camera.position.x, camera.position.y, camera.position.z)
+    ? jadrija.indoorsAt(at.x, at.y, at.z)
     : 0;
   const raw = Math.max(kabIn, vikIn);
   if (raw > 0.62) inLatch = 1; else if (raw < 0.18) inLatch = 0;
@@ -6039,8 +6093,13 @@ window.__fr = {
       // The near clip, which is what "I can see through that wall" actually is.
       near: +camera.near.toFixed(3),
       cam: [+camera.position.x.toFixed(1), +camera.position.z.toFixed(1)],
+      // And the eye, which is the point the room is actually asked about.
+      // Printed next to the camera on purpose: the gap between these two is
+      // the bug this pair exists to catch, and it is invisible in any reading
+      // that shows only one of them.
+      eye: [+personAt().x.toFixed(1), +personAt().z.toFixed(1)],
       kab: jadrija && jadrija.kabina
-        ? +jadrija.kabina.inside(camera.position.x, camera.position.z).toFixed(3) : null,
+        ? +jadrija.kabina.inside(personAt().x, personAt().z).toFixed(3) : null,
       vik: jadrija && jadrija.indoorsAt
         ? jadrija.indoorsAt(camera.position.x, camera.position.y,
           camera.position.z) : null,

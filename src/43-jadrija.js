@@ -18411,6 +18411,14 @@ async function buildJadrija(scene) {
         // `fill` is the slow one under it — not whether the water is on her
         // mouth but how long it has been.
         gape: 0, fill: 0,
+        // Where she is easing to while she lies down, or null. See
+        // `reclineSpot`.
+        lie: null,
+        // And the second meter on the same jet, which only runs while she is
+        // already down. `tmr` cannot do this job: in `kept` that clock is
+        // already counting how long the water has been OFF, and one counter
+        // cannot run both ways. See `SHOW.reclineIn`.
+        recl: 0,
         // And the turn. `soak` is the one number in here that is a *total*
         // rather than a state — how many seconds of jet she has taken, over
         // the whole session, forgotten only very slowly. `burn` is how much of
@@ -19553,6 +19561,33 @@ async function buildJadrija(scene) {
     creep: 0.40,
     creepFrom: 1.35,
     creepTo: 0.80,
+    // ── and the far end of it ─────────────────────────────────────────────
+    //
+    // Misha, 30 Aug: "in the kabine, after spraying the NPC baye with water
+    // for a while, she should lay down on her back and sorta hold her legs
+    // with her hands and look up and smile."
+    //
+    // Built as a SECOND stage rather than as a replacement for the kneel,
+    // which is the one design call in here. "After spraying for a while" is
+    // already what gets her onto her knees — `soakIn` is 1.5 s of it — so the
+    // reading that makes both true is escalation: keep the branch on her once
+    // she is down and it goes further. It also gives the meter somewhere left
+    // to go, which is the game-design answer as well as the reading one.
+    //
+    // 3.2 s, against the 1.5 that got her down. Longer on purpose: the first
+    // stage is a reaction and can be stumbled into, and this one should be
+    // something you did rather than something that happened.
+    reclineIn: 3.2,
+    // How long she stays on her back once the water is off, measured from the
+    // moment it stops the way `keptFor` is. Three seconds longer than the
+    // kneel's eleven, because getting up off your back is a bigger decision
+    // than getting up off your heels — and because `situp` is 2.2 s of it.
+    cradleFor: 14,
+    // How far off the walls she is pulled before she goes down. A kneeling
+    // woman is a 0.6 m footprint and a reclining one is 1.6 m of body laid out
+    // BEHIND her, so a spot that was fine to kneel on can put her head through
+    // the back wall. Same inset the knee shuffle uses, doubled.
+    reclineOff: 1.00,
     // How far the chin comes up while the water is on her down there, in
     // radians. Thirty degrees off whatever the clip had her head doing: enough
     // that she is looking up at somebody standing over her rather than at their
@@ -19722,6 +19757,40 @@ async function buildJadrija(scene) {
    * and the clip is authored to the pace rather than the other way round — so
    * this moves her at one speed and plays it at one rate.
    */
+  /**
+   * Where she ends up when she lies down, and it is not where she was kneeling.
+   *
+   * The rotation lives on `pelvis` — see CRADLE in tools/blender/human_mh.py —
+   * so her head finishes 0.75 m BEHIND whatever she is facing and her feet
+   * sweep 0.95 m out in FRONT of it. `creep` is allowed to arrive at 0.80 m,
+   * which is the right distance for somebody on their knees and is closer than
+   * her own feet are about to reach: she would lie down through you.
+   *
+   * A QUARTER TURN WAS TRIED FIRST AND THE ROOM SAID NO. Broadside is the
+   * framing that shows the whole pose at once, and to see it you have to stand
+   * perpendicular — which in a floor 4.04 m by 5.1 m puts the camera 1.9 m off
+   * her midline and through the front wall. Shot from the only places you can
+   * actually stand, a body lying across a room this small is a body seen end
+   * on anyway. So she keeps facing you, the way every other thing she does
+   * indoors faces you, and what changes is the distance.
+   *
+   * Eased over the two and a third seconds of the clip rather than set: it is
+   * 0.55 m, she is going from her heels onto her back while it happens, and
+   * settling back as you lie down is what a body does. Snapped, it is a
+   * teleport in the one phase where the player is standing close enough to see
+   * one.
+   */
+  function reclineSpot(pt, ps) {
+    const K = special;
+    const dt0 = show.t - pt, ds0 = show.s - ps;
+    const L = Math.hypot(dt0, ds0) || 1;
+    const back = 0.55;
+    return [
+      clamp(show.t + dt0 / L * back, K.t0 + SHOW.reclineOff, K.t1 - SHOW.reclineOff),
+      clamp(show.s + ds0 / L * back, K.face + SHOW.reclineOff, K.s1 - SHOW.reclineOff),
+    ];
+  }
+
   function showCreep(tt, ss, dt) {
     const d0 = tt - show.t, d1 = ss - show.s;
     const dist = Math.hypot(d0, d1);
@@ -20262,7 +20331,9 @@ async function buildJadrija(scene) {
     // for the identical reason the turn is: it is not a mood, it is a thing
     // that has happened, and the meter refilling underneath it would have her
     // going down onto her knees from a position she is already in.
-    submit: 1, kept: 1, rise: 1, creep: 1 };
+    submit: 1, kept: 1, rise: 1, creep: 1,
+    // And the second stage of it, for the same reason again.
+    recline: 1, cradle: 1, situp: 1 };
 
   // And the three of those that have a beat under them. `flare` is in it
   // because the riser is the point of the riser: the music starts a second and
@@ -20308,6 +20379,10 @@ async function buildJadrija(scene) {
     // in the building at the bottom of it — which is the whole of why this is
     // not the promenade's answer to the same water. Out there she catches fire.
     submit: 0.75, kept: 1.00, rise: 0.80, creep: 0.95,
+    // And the far end of it. "look up and smile" — so the widest she has,
+    // which is the same number the heart gets, and it is on her the whole way
+    // down rather than arriving at the bottom.
+    recline: 0.95, cradle: 1.00, situp: 0.85,
   };
 
   /**
@@ -20317,7 +20392,21 @@ async function buildJadrija(scene) {
    * on her while she goes, and a chin that waits for the clip to finish before
    * coming up is a chin that comes up after the moment it was answering.
    */
-  const KNEES = { submit: 1, kept: 1, creep: 1 };
+  const KNEES = { submit: 1, kept: 1, creep: 1,
+    // On her back she still drinks it — the mouth, the foam and what runs down
+    // her are all the same gesture wherever she is lying.
+    recline: 1, cradle: 1 };
+
+  /**
+   * And the ones she answers with her CHIN, which is not the same list.
+   *
+   * The lift is 30 degrees of head extension and it exists to take her eyes off
+   * somebody's knees and onto their face — which is a thing you need doing only
+   * while you are UPRIGHT. On her back the clip has already lifted her head off
+   * the deck to look down the length of herself, and 30 degrees more tips it
+   * backwards onto the floor: the exact opposite of the thing the lift is for.
+   */
+  const CHIN = { submit: 1, kept: 1, creep: 1 };
 
   /**
    * The three she is allowed to leave the ground in.
@@ -20374,7 +20463,8 @@ async function buildJadrija(scene) {
    * declared below is a temporal dead zone above it, which is RULE 3 and is a
    * page that never finishes loading rather than a wrong answer.
    */
-  const OWN = { flare: 1, submit: 1, kept: 1, rise: 1, creep: 1 };
+  const OWN = { flare: 1, submit: 1, kept: 1, rise: 1, creep: 1,
+    recline: 1, cradle: 1, situp: 1 };
 
   // Scratch for the horns, hoisted out of the frame loop.
   const vHorn = new THREE.Vector3(), qHorn = new THREE.Quaternion();
@@ -20781,7 +20871,8 @@ async function buildJadrija(scene) {
         // in the shader.
         f.face.streak = her ? 1 : 0;
       }
-      f.aim('head', 0, 0, 1, show.gape * SHOW.chin * (0.86 + 0.20 * show.fill));
+      f.aim('head', 0, 0, 1, CHIN[show.phase]
+        ? show.gape * SHOW.chin * (0.86 + 0.20 * show.fill) : 0);
     }
 
     // And the wrap, which she never puts back on.
@@ -20994,6 +21085,26 @@ async function buildJadrija(scene) {
         // pose — which is the version anybody who finds this will want, and
         // costs one term.
         if (show.hit > 0) show.tmr = 0;
+        // And the water still going. `kept` is not where the meter stops: hold
+        // the branch on her down there for `reclineIn` and she goes onto her
+        // back. Its own counter, because `tmr` two lines up is already running
+        // the opposite question and one number cannot do both.
+        //
+        // It bleeds back at half rate rather than resetting, so a jet that
+        // wanders off her for a moment — which is what a jet aimed by hand
+        // does — does not start the whole thing over.
+        show.recl = clamp(show.recl
+          + (show.hit > 0 ? dt : -dt * 0.5), 0, SHOW.reclineIn);
+        if (show.recl >= SHOW.reclineIn) {
+          show.recl = 0;
+          // Where she is going to end up, worked out once and eased into over
+          // the clip — see `reclineSpot`, which is also what keeps 1.7 m of
+          // body off the walls of a room 4 m across.
+          show.lie = reclineSpot(pt, ps);
+          showSay('squee', d);
+          go('recline', 'recline', 0.34);
+          break;
+        }
         // Back off across the room and she comes after you rather than letting
         // you watch from the door. Only while you are still in here: from a
         // kabina the way out is one metre of doorway, and a woman shuffling
@@ -21004,6 +21115,55 @@ async function buildJadrija(scene) {
         } else if (show.hit <= 0 && show.tmr > SHOW.keptFor) {
           go('rise', 'getup', 0.35);
         }
+        break;
+
+      // ── and the far end of it ──
+      // Down onto her back, knees up, hands round her own shins, looking up
+      // the length of herself at you.
+      //
+      // Still aimed at you while she goes down, for `submit`'s reason: which
+      // way she is pointed decides where her head ends up, and the clip has to
+      // start from a kneel that is already facing the right way. It is the
+      // *hold* below that stops aiming.
+      case 'recline':
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        if (show.lie) {
+          show.t = damp(show.t, show.lie[0], 2.6, dt);
+          show.s = damp(show.s, show.lie[1], 2.6, dt);
+        }
+        if (done) go('cradle', 'cradle', 0.34);
+        break;
+
+      // THE ONE PHASE IN HERE THAT DOES NOT RE-AIM AT YOU, and deliberately: a
+      // body lying on the floor that swings round to keep facing somebody
+      // walking past it is a compass needle, not a person. `want` keeps
+      // whatever `recline` left it at. Every other indoor phase re-aims every
+      // frame and every one of them is upright.
+      case 'cradle':
+        // Same hold as `kept` and for the same reason: `hit` is the grace
+        // window the jet refreshes, so keeping the branch on her keeps her
+        // there.
+        if (show.hit > 0) show.tmr = 0;
+        // No `creep` out of this one. She is on her back — backing off across
+        // the room gets you looked at, not followed, and a figure shuffling
+        // after somebody from a supine pose is not a thing a body does.
+        if (show.hit <= 0 && show.tmr > SHOW.cradleFor) {
+          go('situp', 'situp', 0.30);
+        }
+        break;
+
+      // Back up the way she came down, and then `rise` from where it has
+      // always started. See the note over the clip: `getup` begins on all
+      // fours, and crossfading to that from her back is a body passing through
+      // itself.
+      case 'situp':
+        // And back to facing you on the way up, because everything she does
+        // from her knees is done at somebody.
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        // Hosed again halfway up and she goes straight back down, which is the
+        // answer anybody would expect and costs one line.
+        if (show.hit > 0) { go('recline', 'recline', 0.34); break; }
+        if (done) go('kept', 'kept', 0.30);
         break;
 
       // On her knees, coming to you. `tmr` is held down the whole way, so the
@@ -23159,10 +23319,16 @@ async function buildJadrija(scene) {
         // whatever room they are in; it is the camera that can be anywhere.
         // 5 cm off the ceiling and 10 off the floor, so a camera pinned
         // against either is inside the room and not in the slab.
+        // `K.s0` and not `K.face`, which is the inner face of the front wall
+        // rather than its outer one. The 10 cm between them is the door
+        // REVEAL — the hole in the wall, not the room behind it — and the lap
+        // parked the camera in it: measured at s 17.21 against a face of
+        // 17.20, one centimetre from the jamb, with half the frustum out on
+        // the promenade. A room is its air and not the opening into it.
         const inK = (x, z, h) => {
           if (h != null && (h < K.floor - 0.10 || h > K.top - 0.05)) return false;
           const [t, s] = local(x, z);
-          return t > K.t0 && t < K.t1 && s > K.face && s < K.s1;
+          return t > K.t0 && t < K.t1 && s > K.s0 && s < K.s1;
         };
         if (inK(ax, az, null) !== inK(bx, bz, y)) return false;
       }
@@ -23272,6 +23438,10 @@ async function buildJadrija(scene) {
         skinFig.play({ wine: 'wine', untie: 'untie', submit: 'submit',
           kept: 'kept', creep: 'knees', note: 'note', heart: 'heart',
           shimmy: 'shimmy', twerk: 'twerk',
+          // The far end of the indoor hose, so a still of it can be taken
+          // without holding a branch on her for five seconds at one frame a
+          // second — which a headless page cannot do at all.
+          recline: 'recline', cradle: 'cradle', situp: 'situp',
           // The turn, and the two airborne moves she goes on doing after it.
           // `flare` is the throw; the rest of the turn is played over the
           // stamp, which is what `go` does with them in the routine.

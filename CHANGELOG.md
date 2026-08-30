@@ -8,6 +8,81 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.152.0] — 2026-08-30
+
+### The room was reading the camera
+
+**B in the kabina, take three.** 1.151.0 gave the box a lid and stopped the
+camera going through the roof, and it was still wrong: "the rotating camera B
+mode inside kabine is still messed up and sometimes breaks out of the kabine...
+and sometimes the walls shimmer."
+
+Measured this time before touching anything. Standing still on the middle of
+the floor with the lap running, fifteen samples: **she never moves — s 19.65
+every frame — and the camera swings between s 17.31, the doorway, and s 22.21,
+the back wall.** `kabina.inside()` is a ramp across the door, so it read
+anywhere from 0.14 to 1.00, the Schmitt latch flipped out and back in, and with
+it went `indoors` — **the near clip swung between 0.064 m and 1.194 m and the
+exposure between 0.42 and 0.919, twenty times a lap.**
+
+A front clip plane at 1.2 m in a room 4 m across throws away every wall you are
+standing next to. That is the whole of "the walls shimmer" and most of "we end
+up OUTSIDE": you were never outside, the room was being clipped off in front of
+you and the exposure was flashing to the promenade's.
+
+The cause is one line, in four places. `kabIn`, `vikIn`, `crossThreshold` and
+`crossChanging` all ask where *you* are by reading `camera.position`, which was
+the same point as your eye until B grew a third person on foot. So they now ask
+`personAt()` instead. 43-jadrija.js has carried the warning since Baye learned
+to follow you — *"this is the WALKER and not the camera; if those two ever agree
+while the third person is on and swung round, something has gone back to reading
+`cam`"* — and the room had simply never got the memo. Same lap now: near 0.063,
+exposure 0.42, latch 1, flat for the whole revolution. The kabina's own bound
+also moves from the outer face of the front wall to the inner one, so the camera
+sits in the room's air rather than in the door reveal.
+
+It also fixes two things nobody had reported yet. The doorway cut was being
+fired by a point 3 m behind you, so walking in put the screen down a stride and
+a half after you were already standing in the room; and the changing station is
+a *region* test, so the third person's camera swinging through a cubicle would
+have changed her out of her clothes from the other side of the screen.
+
+### And the far end of the hose
+
+"In the kabine, after spraying the NPC baye with water for a while, she should
+lay down on her back and sorta hold her legs with her hands and look up and
+smile."
+
+Built as a second stage rather than as a replacement: 1.5 s of water already
+puts her on her knees, so keep the branch on her for another 3.2 and she goes
+down onto her back. Three new clips — `recline`, `cradle` and `situp` — because
+the way down happens once and what she is at the bottom of it she stays, and
+because `getup` starts from all fours: crossfading to that from her back is a
+body passing through itself, so everything that goes down this way comes back up
+it.
+
+The pose was settled on a grid rather than by eye, the way KNEEL_BACK's arms
+were. Thirty-six candidates over shoulder, elbow and abduction, scored on three
+numbers: how far down the shin the wrist lands, how far off its axis it sits,
+and **how nearly the forearm points along the shin** — that third one being the
+one nobody would think to score and the whole difference between holding a leg
+and reaching past one. The hand is a fixed mesh with the fingers spread; they
+continue the forearm and they are 0.19 m long, so a wrist touching the shin with
+the forearm crossing it at sixty degrees renders as a woman with her hands up by
+her own face. The winner puts the wrist 49 mm below the knee, 38 mm off its
+axis, forearm 0.78 aligned.
+
+A quarter turn was tried and the room said no: broadside is the framing that
+shows the whole pose, and to see it you must stand perpendicular — which on a
+floor 4.04 m by 5.1 m puts the camera through the front wall. So she keeps
+facing you and settles 0.55 m back over the two and a third seconds of the clip
+instead, which is both what makes room for her own feet and what a body does
+lying down.
+
+`--probe` gains the knees, the shoulder and the elbow; VIEWS gains `floor` and
+`floorside`, the only cameras in that table that can frame a figure who is lying
+down.
+
 ## [1.151.0] — 2026-08-30
 
 ### The lid, and the other routine
