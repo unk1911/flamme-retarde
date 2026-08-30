@@ -8,6 +8,57 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.150.2] — 2026-08-30
+
+### There was no sea up there
+
+Misha, for the third time: "your water still sucks from up high in the
+airplane." He was right for the third time, and the first two answers were both
+answers to a different question — 1.150.1 removed a speckle I had added, which
+made the view from altitude no worse than before without making it any good.
+
+Putting the two builds side by side as a magnified crop, which should have been
+the first thing done rather than the fifth, showed what neither the metric nor
+the full-frame screenshot had: at 540 m **both** builds draw a flat gradient.
+Not a smoother sea — no sea. And the reason had been sitting in the vertex
+shader since long before any of this work: `disp *= near` stops displacing the
+lattice past 240 m, which is honest, because past 240 m the lattice is too
+coarse to displace without turning into static locked to the grid — and the
+wave *normal* was being flattened along with it. From 540 m, which is the
+height the game opens at, the nearest visible water is already 600 m away. So
+every wave in the frame was switched off, and the Adriatic was a mirror with a
+colour ramp on it, at every altitude the aeroplane actually flies at.
+
+**The wave field is now shaded per pixel.** The sum moves into a chunk both
+shaders share, the vertex carries the undisplaced lattice point, and the
+fragment re-evaluates the same six components there — band-limited by its own
+footprint rather than by the lattice cell. Distant water gets the shading of a
+wave field it is too far away to be given the shape of, which is the same
+bargain the capillary tile makes one scale down and the whitecaps make one
+scale up. The blanket far-flattening that used to sit on the normal drops from
+0.88 to 0.30: it existed because the normal arriving here was an interpolated
+guess that got worse with distance, and it is now a real band limit instead.
+
+That put a sea up there, and the sea was corduroy — uniform parallel ribbing
+across the whole channel, because six monochromatic components sum to something
+exactly periodic and out there only the two or three longest survive. Two
+further changes, both of which the near field wanted anyway:
+
+- **Wave groups.** A real spectrum is continuous, so neighbouring frequencies
+  beat: crests are born, run a few wavelengths and die. Six components cannot
+  be continuous but can be given the consequence of it — two slow cosines,
+  400 and 470 m, driving a per-component phase offset and amplitude envelope.
+  The phase term is kept small on purpose; its gradient adds to the local
+  wavenumber, and at the first value tried the swell warped like heat haze.
+- **Directional spread that straddles the wind.** The swell and the peak sat
+  5.7° apart, which is not a spread, it is a grating — and a grating is exactly
+  what the sea looked like. They now splay to ±18° and cross, and a crossing is
+  what makes a crest short.
+
+`__fr.sea()` gains `waveLod`. Still 60 fps at 1280×720 and at mobile settings:
+the per-pixel sum is twelve transcendentals, against the six fbm2 evaluations
+the old detail normal was doing before 1.150.0 took them out.
+
 ## [1.150.1] — 2026-08-30
 
 ### Not from up there

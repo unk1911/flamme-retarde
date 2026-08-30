@@ -23,9 +23,16 @@
 //   5. Light that went into a crest and came back out, which is most of what
 //      separates water from coloured glass with a sky in it.
 //
-// Four of those are thresholds on a distribution whose shape is only knowable
-// by looking at it, so they are uniforms and not constants: SEA.foamK and
-// SEA.seaK, live on __fr.sea().
+// And one more in 1.150.2, which is the one that mattered from the aeroplane:
+//
+//   6. The wave field is shaded per pixel, band-limited by the pixel's own
+//      footprint, instead of being interpolated from a vertex normal that the
+//      lattice had already flattened at 240 m. Everything above 240 m altitude
+//      was looking at a mirror. See SEA_WAVE, below.
+//
+// The thresholds are all uniforms rather than constants, because every one of
+// them is a threshold on a distribution whose shape is only knowable by looking
+// at it: SEA.foamK, SEA.seaK, SEA.capK and SEA.waveLod, live on __fr.sea().
 // -----------------------------------------------------------------------------
 
 const SEA = {
@@ -45,26 +52,35 @@ const SEA = {
   // stops being resolvable as a shape, and how much of the white paint is left
   // once it has. See capRes in the fragment.
   capK: [0.55, 2.2, 0.10, 0.0],
+  // How eagerly the per-pixel wave sum drops a component as the footprint
+  // overtakes it. 1 fades each one out between a wavelength every eight pixels
+  // and every three; lower keeps the swell further out and risks aliasing.
+  waveLod: 1.0,
 };
 
-const SEA_VERT = /* glsl */ `
-precision highp float;
-
-uniform vec2 uCenter;
-uniform float uReach;
-uniform float uNear;
-uniform float uK;
-uniform float uWaveScale;
-uniform vec2 uWind;
-uniform float uWindSpeed;
-uniform vec4 uFoamK;
-
-varying vec3 vWorld;
-varying vec3 vWaveN;
-varying float vFoamCrest;
-
-${GLSL_TERRAIN}
-
+/**
+ * The wave field, shared by both shaders.
+ *
+ * It lives out here rather than in the vertex shader because the fragment needs
+ * it too, and for one reason: past 240 m the vertex shader stops displacing the
+ * lattice, because past 240 m the lattice is too coarse to be displaced without
+ * turning into blue static locked to the grid. That is an honest limit on the
+ * *mesh*. What was not honest was flattening the shading with it — the normal
+ * went to straight up along with the geometry, so from 540 m, which is the
+ * height this game opens at and where the nearest visible water is already
+ * 600 m away, every wave in the frame was switched off and the Adriatic was a
+ * mirror with a colour ramp on it. It had been that way for as long as there
+ * has been a sea here; it took somebody saying "your water still sucks from up
+ * high" three times to go and look at a magnified crop instead of a metric.
+ *
+ * So the fragment evaluates the same sum per pixel and band-limits it by its
+ * own footprint instead of by the lattice. Distant water gets the *shading* of
+ * a wave field it is too far away to be given the *shape* of, which is the same
+ * bargain the capillary tile makes one scale down and the whitecaps make one
+ * scale up.
+ */
+const SEA_WAVE = /* glsl */ `
+uniform float uWaveLod;
 /**
  * The sea state, as a Gerstner sum — and now an actual Gerstner sum.
  *
@@ -90,8 +106,8 @@ ${GLSL_TERRAIN}
  * and the spread widens as the wavelength drops, because the short waves are
  * the ones the wind has just made and they are the ones going everywhere.
  */
-void gerstner(vec2 p, float t, float cell, out vec3 disp, out vec3 n,
-              out float brk){
+void seaWave(vec2 p, float t, float cell, float fw, out vec3 disp, out vec3 n,
+             out float brk){
   disp = vec3(0.0);
   vec3 acc = vec3(0.0, 1.0, 0.0);
   vec2 w = normalize(uWind + vec2(1e-4));
@@ -100,11 +116,19 @@ void gerstner(vec2 p, float t, float cell, out vec3 disp, out vec3 n,
 
   const int N = 6;
   vec2 dirs[N];
-  dirs[0] = normalize(w + across * 0.10);
+  // Directional spread, and it has to straddle the wind rather than lean off
+  // one side of it. The swell and the peak used to sit 5.7 degrees apart, which
+  // is not a spread, it is a grating — and from altitude, where those two are
+  // the only components still resolvable, a grating is exactly what the sea
+  // looked like: unbroken parallel crests running the full width of the frame.
+  // Splayed to plus and minus eighteen degrees they cross instead of stacking,
+  // and a crossing is what makes a crest short. Real fetch-limited spreading is
+  // wider than this at the short end, which is what the last three do.
+  dirs[0] = normalize(w + across * 0.34);
   dirs[1] = w;
-  dirs[2] = normalize(w + across * 0.42);
-  dirs[3] = normalize(w - across * 0.58);
-  dirs[4] = normalize(w + across * 0.86);
+  dirs[2] = normalize(w - across * 0.30);
+  dirs[3] = normalize(w + across * 0.62);
+  dirs[4] = normalize(w - across * 0.86);
   dirs[5] = normalize(across + w * 0.25);
   float lens[N];
   lens[0] = 78.0; lens[1] = 46.0; lens[2] = 27.0;
@@ -118,6 +142,30 @@ void gerstner(vec2 p, float t, float cell, out vec3 disp, out vec3 n,
   float qs[N];
   qs[0] = 0.35; qs[1] = 0.55; qs[2] = 0.72;
   qs[3] = 0.85; qs[4] = 0.90; qs[5] = 0.90;
+
+  // Wave groups.
+  //
+  // Six monochromatic components sum to something exactly periodic, and from
+  // 540 m that periodicity *is* the picture: a uniform corduroy ribbing laid
+  // over the whole channel, because out there the short components have faded
+  // and what is left is two or three long ones that are nearly co-aligned. It
+  // reads as ribbed fabric, not as sea.
+  //
+  // A real sea comes in groups — sets — and the reason is that a real spectrum
+  // is continuous, so neighbouring frequencies beat against each other: crests
+  // are born, run for a few wavelengths and die. Six components cannot be a
+  // continuous spectrum, but they can be given the consequence of one. Two slow
+  // cosines, evaluated once for the whole sum, drive a phase offset and an
+  // amplitude envelope that differ per component — which stretches the wave
+  // here, compresses it there, and ends crests. Their periods are 400 and
+  // 470 m, five to ten wavelengths of the swell, which is what a group is.
+  //
+  // The phase term is deliberately small. Its gradient adds to the local
+  // wavenumber, so at 1.9 the longest component's wavelength swung by two
+  // thirds and the swell visibly warped like heat haze; 0.75 holds it inside a
+  // quarter, which is beating and not distortion.
+  float g1 = sin(dot(p, vec2( 0.01310, 0.00870)) + t * 0.103);
+  float g2 = sin(dot(p, vec2(-0.00710, 0.01130)) - t * 0.079);
 
   float jxx = 0.0, jzz = 0.0, jxz = 0.0;
   vec2 gradF = vec2(0.0);
@@ -134,9 +182,24 @@ void gerstner(vec2 p, float t, float cell, out vec3 disp, out vec3 n,
     // blue static, which is the same failure the detail normal already had to
     // be taught about further down. Fade each one out as the cells overtake it
     // and let the per-pixel ripple carry that scale instead.
-    float a0 = amp * amps[i];
-    float a = a0 * (1.0 - smoothstep(lens[i] * 0.22, lens[i] * 0.45, cell));
-    float ph = dot(d, p) * k + t * c * k * 0.42;
+    float fi = float(i);
+    // Sets. Each component gets its own blend of the two group fields, so they
+    // wax and wane out of step with one another rather than the whole sea
+    // breathing at once.
+    float env = mix(g1, g2, fract(fi * 0.37 + 0.19));
+    float a0 = amp * amps[i] * (1.0 + 0.34 * env);
+    // Two independent reasons a component has to go, and they are not the same
+    // reason. cell is about the *mesh*: this patch of lattice is too coarse to
+    // carry an eight metre wave, so the vertex shader must not try. fw is about
+    // the *pixel*: this fragment covers forty metres of sea, so a fifteen metre
+    // wave in it is not a wave, it is a coin toss. The vertex passes cell and
+    // no footprint; the fragment passes footprint and no cell; the table and
+    // the arithmetic in between are shared so the two can never drift apart.
+    float a = a0
+      * (1.0 - smoothstep(lens[i] * 0.22,  lens[i] * 0.45, cell))
+      * (1.0 - smoothstep(lens[i] * 0.125 * uWaveLod, lens[i] * 0.33 * uWaveLod, fw));
+    float ph = dot(d, p) * k + t * c * k * 0.42
+             + (g1 * (0.6 + 0.50 * fi) + g2 * (1.1 - 0.13 * fi)) * 0.75;
     float sn = sin(ph), cs = cos(ph);
     // The breaking test reads the sea at full amplitude, before the cell fade.
     // That fade is a statement about the *lattice* — this patch of mesh is too
@@ -207,9 +270,30 @@ void gerstner(vec2 p, float t, float cell, out vec3 disp, out vec3 n,
 /** The breaking measure alone, for the history taps. See vFoamCrest below. */
 float seaBreak(vec2 p, float t, float cell){
   vec3 d; vec3 nn; float b;
-  gerstner(p, t, cell, d, nn, b);
+  seaWave(p, t, cell, 0.0, d, nn, b);
   return b;
 }
+`;
+
+const SEA_VERT = /* glsl */ `
+precision highp float;
+
+uniform vec2 uCenter;
+uniform float uReach;
+uniform float uNear;
+uniform float uK;
+uniform float uWaveScale;
+uniform vec2 uWind;
+uniform float uWindSpeed;
+uniform vec4 uFoamK;
+
+varying vec3 vWorld;
+varying vec2 vP;
+varying float vFoamCrest;
+
+${GLSL_TERRAIN}
+
+${SEA_WAVE}
 
 void main(){
   // position.xz is in [-1,1]. Map it exponentially: sub-metre quads under the
@@ -239,7 +323,7 @@ void main(){
   // short waves exist at all near the camera; this one is still needed for the
   // long ones, which outlive their own sampling well before the horizon.
   float near = 1.0 - smoothstep(70.0, 240.0, length(warped));
-  gerstner(wxz, uTime, cell, disp, n, brk);
+  seaWave(wxz, uTime, cell, 0.0, disp, n, brk);
   disp *= near;
 
   // Foam that remembers. What was here fired on the instant the crest was
@@ -268,7 +352,12 @@ void main(){
   // — and it means vWorld.xz is where this vertex actually *is*, so every
   // lookup the fragment does off it stays honest.
   vWorld = vec3(wxz.x + disp.x, disp.y, wxz.y + disp.z);
-  vWaveN = normalize(mix(vec3(0.0, 1.0, 0.0), n, near));
+  // The undisplaced lattice point, which is the parameter the wave sum is a
+  // function of. The fragment re-evaluates the sum here rather than
+  // interpolating a normal, so it has to be *this* and not vWorld.xz: a
+  // Gerstner surface is a map from p, and feeding it back its own image gives
+  // the normal of a different sea.
+  vP = wxz;
   // Not multiplied by near. The crest foam used to be, which meant the sea
   // stopped breaking 240 m out — the one place the old fold test could still
   // fire was also the only place the foam was allowed to exist.
@@ -291,9 +380,10 @@ uniform float uWindSpeed;
 uniform vec4 uFoamK;
 uniform vec4 uSeaK;
 uniform vec4 uCapK;
+uniform float uWaveScale;
 
 varying vec3 vWorld;
-varying vec3 vWaveN;
+varying vec2 vP;
 varying float vFoamCrest;
 
 ${GLSL_NOISE}
@@ -301,6 +391,7 @@ ${GLSL_TERRAIN}
 ${GLSL_SKY}
 ${GLSL_HAZE}
 ${GLSL_WATER}
+${SEA_WAVE}
 
 /**
  * The surface from underneath, which is a different object from the surface.
@@ -410,12 +501,23 @@ void main(){
   // from the waterline at Jadrija, and the shot that caught it is the reason
   // there is a baseline in the scratchpad.
   micro *= gl_FrontFacing ? 1.0 : 0.25;
-  vec3 n = normalize(vWaveN + vec3(micro.x, 0.0, micro.y));
+  // The wave field, evaluated here rather than interpolated. Its components
+  // fade on this pixel's own footprint, so what survives is exactly what this
+  // pixel can carry — which past 240 m is everything the lattice had to give
+  // up, and which is why there is now a sea out there at all.
+  vec3 waveDisp; vec3 waveN; float waveBrk;
+  seaWave(vP, uTime, 0.0, fw, waveDisp, waveN, waveBrk);
+  vec3 n = normalize(waveN + vec3(micro.x, 0.0, micro.y));
   // Far water must be *rougher*, not sharper: flatten the normal and widen the
   // highlight as a pixel starts to cover many waves, or the glitter aliases
   // into banding all the way to the horizon.
   float far = smoothstep(1.2, 18.0, fw);
-  n = normalize(mix(n, vec3(0.0, 1.0, 0.0), far * 0.88));
+  // Only a third of what it was. This blanket flattening existed because the
+  // normal arriving here was an interpolated guess that got worse with
+  // distance, so the safe thing was to throw it away; the per-component
+  // footprint fade above is a real band limit and does the same job honestly.
+  // Left at 0.88 it cancelled the whole point of computing the sum per pixel.
+  n = normalize(mix(n, vec3(0.0, 1.0, 0.0), far * 0.30));
   // And the twelve per cent that fade leaves behind is not nothing, because
   // what is left is not a *small* wobble — it is the full swing of the wave
   // normal, sampled at random, at twelve per cent weight. Measure how much the
@@ -657,6 +759,7 @@ function buildSea(scene) {
       uFoamK: { value: new THREE.Vector4(...SEA.foamK) },
       uSeaK: { value: new THREE.Vector4(...SEA.seaK) },
       uCapK: { value: new THREE.Vector4(...SEA.capK) },
+      uWaveLod: { value: SEA.waveLod },
       uCenter: { value: new THREE.Vector2() },
       uReach: { value: SEA.reach },
       uNear: { value: SEA.near },
