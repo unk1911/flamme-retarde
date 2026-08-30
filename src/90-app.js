@@ -5567,6 +5567,12 @@ function frame() {
   const now = performance.now();
   if (lastFrameMs) state.fps = damp(state.fps, 1000 / Math.max(1, now - lastFrameMs), 2, dt);
   lastFrameMs = now;
+  // The recorder's own composite, and it has to be here rather than anywhere
+  // else in the file: a WebGL canvas without `preserveDrawingBuffer` is empty
+  // by the time this task ends, so the one moment the drawing buffer can be
+  // copied out of is between the last render above and the return below. It
+  // early-returns unless the recorder is armed AND the capture rate is due.
+  clipFrame();
   // Down here and not at the top: the recorder is waiting to be told the frame
   // is *drawn*, and everything above this line is what drawing it means.
   if (filming) {
@@ -5846,6 +5852,12 @@ window.__fr = {
     /** A snapshot WITHOUT stopping. No key does this; tests do. */
     save: () => clipSave(),
     grab: () => clipGrab(),
+    /** A copy of the next frame the recorder films — see `clipShotNext`. */
+    shot: () => clipShotNext(),
+    /** Does the mirror wrap where the browser wraps? See `clipWrapCheck`. */
+    wrap: () => clipWrapCheck(),
+    /** Paint the terminal into any 2-D context — for timing it. */
+    mirror: (ctx, k) => crtMirror(ctx, k),
   },
   skipIntro: () => beginFlight(),
   /**

@@ -676,3 +676,432 @@ const computer = (() => {
         custom: DIALS.prompt !== CRT.prompt } }),
   };
 })();
+
+
+// -----------------------------------------------------------------------------
+// The terminal, inked a second time, into a 2-D canvas.
+//
+// Misha, 30 Aug: "how come when i try to record L, and i log into
+// alienware/ottakyo, it doesn't record that screen?"
+//
+// Because it was never in the picture. The recorder films the canvas's own
+// captureStream — see src/92-clip.js — and everything above is DOM laid over
+// the top of it, which is exactly why the HUD has never turned up in a clip
+// either. That is a feature everywhere else on the screen and a hole here: the
+// terminal IS the scene while you are sitting at it, and a thirty-second take
+// of the flat with a green rectangle missing out of the middle is a take of
+// nothing happening.
+//
+// So this paints it again, into a canvas the recorder can see. Two rules kept
+// it from becoming a second implementation of the terminal:
+//
+//   THE DOM DOES THE LAYOUT. Every box here comes out of
+//   `getBoundingClientRect()` and every colour, font, padding and line height
+//   out of `getComputedStyle()`. Nothing is hardcoded, so the mirror follows
+//   the stylesheet — including the phone media query, the sign-in form
+//   appearing and going away, and the log's own scroll position, which needs no
+//   handling at all because a scrolled-away line reports a rect outside the
+//   glass and is skipped.
+//
+//   IT WALKS RATHER THAN KNOWS. `crtWalk` recurses the subtree painting
+//   background, border and text for whatever it finds. Adding a chip or a
+//   second button to the bar needs nothing here. The only two things it cannot
+//   read are the two CSS gradients — a computed `background-image` is a string
+//   nobody wants to parse — so the backdrop and the shell are the two special
+//   cases, and they are marked as such.
+//
+// It is painted only while the recorder is armed and only at the capture rate,
+// so a page with nobody recording never runs a line of it.
+// -----------------------------------------------------------------------------
+
+const crtNum = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
+
+/** One element's box, in canvas pixels. `k` is canvas px per CSS px. */
+function crtRect(el, k) {
+  const r = el.getBoundingClientRect();
+  return { x: r.left * k, y: r.top * k, w: r.width * k, h: r.height * k,
+    r: r.right * k, b: r.bottom * k };
+}
+
+/**
+ * The font shorthand, rebuilt.
+ *
+ * Composed from the four longhands rather than read off `cs.font`, which is
+ * specified to return the empty string whenever the shorthand cannot represent
+ * every property — and it usually cannot.
+ */
+function crtFont(cs, k) {
+  return `${cs.fontStyle} ${cs.fontWeight} ${crtNum(cs.fontSize) * k}px ${cs.fontFamily}`;
+}
+
+/** A rounded rectangle, or a plain one on a canvas too old to have the method. */
+function crtPath(ctx, r, rad) {
+  ctx.beginPath();
+  if (rad > 0.5 && ctx.roundRect) ctx.roundRect(r.x, r.y, r.w, r.h, rad);
+  else ctx.rect(r.x, r.y, r.w, r.h);
+}
+
+/**
+ * Background and borders for one element.
+ *
+ * Each edge separately, because this stylesheet uses one-sided borders as
+ * rules — the bar's underline, the input row's, the tools strip's — and a
+ * stroked rectangle would draw all four of them.
+ */
+function crtBox(ctx, r, cs, k) {
+  // Boxes never glow. The bloom in this stylesheet is a `text-shadow` and
+  // nothing else, and a border drawn under a live shadow state left over from
+  // the last run of text is the classic canvas bug of a stale context.
+  crtNoGlow(ctx);
+  const bg = cs.backgroundColor;
+  if (bg && bg !== 'transparent' && !bg.endsWith(', 0)')) {
+    ctx.fillStyle = bg;
+    crtPath(ctx, r, crtNum(cs.borderTopLeftRadius) * k);
+    ctx.fill();
+  }
+  const edge = (w, col, x0, y0, x1, y1) => {
+    if (!(w > 0) || !col || col.endsWith(', 0)')) return;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = Math.max(1, w);
+    ctx.beginPath();
+    ctx.moveTo(x0, y0); ctx.lineTo(x1, y1);
+    ctx.stroke();
+  };
+  const t = crtNum(cs.borderTopWidth) * k, b = crtNum(cs.borderBottomWidth) * k;
+  const l = crtNum(cs.borderLeftWidth) * k, rt = crtNum(cs.borderRightWidth) * k;
+  edge(t, cs.borderTopColor, r.x, r.y + t / 2, r.r, r.y + t / 2);
+  edge(b, cs.borderBottomColor, r.x, r.b - b / 2, r.r, r.b - b / 2);
+  edge(l, cs.borderLeftColor, r.x + l / 2, r.y, r.x + l / 2, r.b);
+  edge(rt, cs.borderRightColor, r.r - rt / 2, r.y, r.r - rt / 2, r.b);
+}
+
+/**
+ * Wrap a run of monospace text to a box, the way the browser wrapped it.
+ *
+ * By CHARACTER COUNT and not by measuring candidates. The glass is
+ * `var(--mono)` throughout, so one advance width answers every question about
+ * where a line ends — which is both exact and about forty times cheaper than
+ * the usual measure-and-back-off loop, and this runs thirty times a second.
+ *
+ * `white-space: pre-wrap` means a newline is a newline, and `word-break:
+ * break-word` means a token longer than the box is cut rather than allowed to
+ * overhang. Both are reproduced; the greedy break on spaces between them is
+ * what the browser does.
+ */
+function crtWrap(text, cols) {
+  const out = [];
+  for (const para of String(text).split('\n')) {
+    if (!para.length) { out.push(''); continue; }
+    let line = '';
+    for (const word of para.split(/(\s+)/)) {
+      if (!word.length) continue;
+      if (line.length && line.length + word.length > cols) {
+        // Trimmed, and only on a SOFT break. `pre-wrap` hangs a trailing space
+        // past the end of a wrapped line rather than drawing it, which is why
+        // the browser's own line box comes back one glyph narrower than the
+        // characters on it — the difference `clipWrapCheck` reports as an
+        // `off` of 1 if this is left in. An explicit newline is not this case:
+        // there the spaces are real and are kept.
+        out.push(line.replace(/\s+$/, ''));
+        line = /^\s+$/.test(word) ? '' : word;
+      } else {
+        line += word;
+      }
+      while (line.length > cols) { out.push(line.slice(0, cols)); line = line.slice(cols); }
+    }
+    out.push(line);
+  }
+  return out;
+}
+
+/**
+ * The phosphor bloom, off the stylesheet.
+ *
+ * `text-shadow: 0 0 .55rem rgba(125, 245, 168, 0.45)` on the glass, inherited
+ * by everything in it — and it is not a detail. Without it the mirror renders
+ * as a terminal *font* on a dark rectangle; with it, it renders as a tube.
+ *
+ * Computed styles serialise a shadow as colour first and then three lengths,
+ * which is the one shape this has to read. Anything else — a list of two
+ * shadows, a keyword colour — falls through to no glow rather than to a wrong
+ * one.
+ */
+const CRT_SHADOW = /^(rgba?\([^)]*\)|#[0-9a-f]+)\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+(-?[\d.]+)px/i;
+
+function crtGlow(ctx, cs, k) {
+  const m = CRT_SHADOW.exec(cs.textShadow || '');
+  if (!m) { ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; return; }
+  ctx.shadowColor = m[1];
+  ctx.shadowOffsetX = crtNum(m[2]) * k;
+  ctx.shadowOffsetY = crtNum(m[3]) * k;
+  ctx.shadowBlur = crtNum(m[4]) * k;
+}
+
+const crtNoGlow = (ctx) => {
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+};
+
+/** How long the caret has been on, as a terminal blinks: 1.06 s, 60% lit. */
+const crtBlink = () => (performance.now() % 1060) < 640;
+
+/**
+ * The text of one leaf, and its caret if it has the focus.
+ *
+ * `value` and not `textContent` for the two form controls, which is the whole
+ * of what makes the sign-in readable in a film — and the password comes out as
+ * bullets, because the mirror has no business putting on the screen something
+ * the screen itself is not showing.
+ */
+function crtInk(ctx, el, cs, r, k) {
+  const form = el.tagName === 'INPUT' || el.tagName === 'TEXTAREA';
+  const raw = form
+    ? (el.type === 'password' ? '•'.repeat(el.value.length) : el.value)
+    : el.textContent;
+  const focused = form && document.activeElement === el;
+  if (!raw && !focused) return;
+
+  ctx.font = crtFont(cs, k);
+  if ('letterSpacing' in ctx) {
+    ctx.letterSpacing = (cs.letterSpacing === 'normal' ? 0
+      : crtNum(cs.letterSpacing) * k) + 'px';
+  }
+  ctx.fillStyle = cs.color;
+  ctx.textBaseline = 'middle';
+  crtGlow(ctx, cs, k);
+
+  const bl = crtNum(cs.borderLeftWidth) * k, bt = crtNum(cs.borderTopWidth) * k;
+  const x0 = r.x + bl + crtNum(cs.paddingLeft) * k;
+  const y0 = r.y + bt + crtNum(cs.paddingTop) * k;
+  const w = Math.max(1, r.w - bl - crtNum(cs.borderRightWidth) * k
+    - crtNum(cs.paddingLeft) * k - crtNum(cs.paddingRight) * k);
+  const lh = (cs.lineHeight === 'normal' ? crtNum(cs.fontSize) * 1.2
+    : crtNum(cs.lineHeight)) * k;
+  const adv = ctx.measureText('M').width || 1;
+  const ch = Math.max(0, r.h - bt - crtNum(cs.borderBottomWidth) * k
+    - crtNum(cs.paddingTop) * k - crtNum(cs.paddingBottom) * k);
+  // How many lines the BROWSER put in it. One is the case worth having: the
+  // SIGN IN button is seven characters in a box seven characters wide, and a
+  // column count that rounds the wrong way breaks it over two lines inside a
+  // button that is one line tall. The DOM already knows the answer, so ask it
+  // rather than out-guessing it, and let the same number cap the wrap
+  // everywhere else so a rounding drift can never spill out of its own box.
+  const maxL = Math.max(1, Math.round(ch / Math.max(1, lh)));
+  // NO SLACK ON THE COLUMN COUNT, and a quarter of a character of it was
+  // wrong. Measured against the real line boxes: the log's content box is
+  // 884.4 px, one advance is 7.507, and `Range.getClientRects()` says the
+  // browser's own lines are 833.3 px — which is 111 characters, because the
+  // next word would take the line to 885.8 and overflow by 1.4 px. A quarter
+  // of a character of generosity is exactly enough to let that word through,
+  // and the whole paragraph then wraps one word later than the real one for
+  // the rest of its length. Floor it. The 0.02 is float noise and nothing
+  // else: it can never gain a character.
+  const cols = Math.max(1, Math.floor(w / adv + 0.02));
+  const lines = !raw ? ['']
+    : maxL === 1 ? [String(raw).replace(/\n/g, ' ')]
+      : crtWrap(raw, cols).slice(0, maxL);
+
+  let last = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const y = y0 + lh * (i + 0.5);
+    if (lines[i]) ctx.fillText(lines[i], x0, y);
+    last = i;
+  }
+  if (focused && crtBlink()) {
+    // A block caret at the end of the last line, which is where the DOM one is
+    // whenever nobody has clicked into the middle of the text — and a caret
+    // that is one character out is a caret nobody notices in a film.
+    const x = x0 + lines[last].length * adv;
+    ctx.fillRect(x, y0 + lh * last + lh * 0.12, Math.max(1, adv * 0.9), lh * 0.76);
+  }
+  crtNoGlow(ctx);
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+
+/**
+ * Paint one element and everything under it.
+ *
+ * A node with element children is a container and its own text is whitespace;
+ * a leaf is where the ink goes. That one rule is what lets this file know
+ * nothing about the terminal's markup.
+ */
+function crtWalk(ctx, el, k, clip) {
+  const cs = getComputedStyle(el);
+  if (cs.display === 'none' || cs.visibility === 'hidden') return;
+  if (crtNum(cs.opacity) < 0.02) return;
+  const r = crtRect(el, k);
+  if (r.w < 0.5 || r.h < 0.5) return;
+  // Scrolled out of the glass. This is the whole of the log's scroll handling:
+  // a rect is viewport-relative, so a line that has gone off the top of the
+  // scroller reports one outside its parent and is simply not drawn.
+  if (clip && (r.b < clip.y - 1 || r.y > clip.b + 1)) return;
+  crtBox(ctx, r, cs, k);
+  const kids = el.children;
+  if (!kids.length) { crtInk(ctx, el, cs, r, k); return; }
+  const inner = el.id === 'crt-log' ? r : clip;
+  for (let i = 0; i < kids.length; i++) crtWalk(ctx, kids[i], k, inner);
+}
+
+/**
+ * Everything about the glass that can change what it looks like, as a string.
+ *
+ * THE MIRROR IS CACHED AND THIS IS WHY IT CAN BE. Measured in the flat with
+ * the terminal up: 58 fps idle, 49 armed, which is 3.2 ms a frame — and the
+ * paint itself times at 0.302 ms in a tight loop. The gap is not the drawing.
+ * It is that `crtPaint` asks `getComputedStyle` and `getBoundingClientRect`
+ * about forty times, and in a warm loop with nothing dirtying the DOM those
+ * are free, while in a real frame each one can flush style and layout. The
+ * warm-loop number was the wrong measurement.
+ *
+ * A terminal changes about twice a second — the caret — and then all at once
+ * while a model is streaming into it. So the paint is kept and re-blitted, and
+ * this decides when to throw it away. Deliberately NOT a rect: reading one
+ * forces the layout this whole thing exists to avoid. Everything below is a
+ * property read or a computed style, the size comes from the canvas that is
+ * being drawn into, and a resize arrives through `clipSurface` anyway.
+ */
+function crtSig(k, w, h) {
+  const root = $('crt');
+  if (!root || root.hidden) return '';
+  const cs = getComputedStyle(root);
+  if (crtNum(cs.opacity) < 0.02) return '';
+  const shell = $('crt-shell');
+  if (!shell) return '';
+  const log = $('crt-log'), last = log && log.lastElementChild;
+  const inEl = $('crt-in'), user = $('crt-user'), pass = $('crt-pass');
+  return [
+    k, w, h, cs.opacity, getComputedStyle(shell).transform,
+    log ? log.children.length : 0,
+    last ? last.textContent.length : 0,
+    // The scroller's own position, because a wheel over a full log moves every
+    // line on the glass without changing a single character of it.
+    log ? Math.round(log.scrollTop) : 0,
+    user ? user.value : '', pass ? pass.value.length : 0,
+    inEl ? inEl.value : '',
+    ($('crt-who') || {}).textContent || '',
+    ($('crt-login') || {}).hidden, ($('crt-row') || {}).hidden,
+    ($('crt-tools') || {}).hidden,
+    ($('crt-chip') || { className: '' }).className,
+    document.activeElement && document.activeElement.id,
+    crtBlink() ? 1 : 0,
+  ].join('|');
+}
+
+let crtCache = null, crtCacheCtx = null, crtCacheSig = '';
+
+/**
+ * The terminal, on to a 2-D context. Returns false when it is not up.
+ *
+ * `k` is canvas pixels per CSS pixel — the same number the renderer's pixel
+ * ratio is, worked out from the canvas rather than asked for, so a composite
+ * at a different size than the drawing buffer still lands in the right place.
+ *
+ * Painted into a canvas of its own and blitted, for `crtSig`'s reason. The
+ * cache is dropped the moment the terminal is not up, so a session that never
+ * opens the laptop never allocates it.
+ */
+function crtMirror(ctx, k) {
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const sig = crtSig(k, W, H);
+  if (!sig) {
+    crtCache = null; crtCacheCtx = null; crtCacheSig = '';
+    return false;
+  }
+  if (!crtCache || crtCache.width !== W || crtCache.height !== H) {
+    crtCache = document.createElement('canvas');
+    crtCache.width = W; crtCache.height = H;
+    crtCacheCtx = crtCache.getContext('2d');
+    crtCacheSig = '';
+  }
+  if (sig !== crtCacheSig) {
+    crtCacheSig = sig;
+    crtCacheCtx.clearRect(0, 0, W, H);
+    crtPaint(crtCacheCtx, k);
+  }
+  ctx.drawImage(crtCache, 0, 0);
+  return true;
+}
+
+/** The actual ink. Called only when `crtSig` says something has moved. */
+function crtPaint(ctx, k) {
+  const root = $('crt');
+  if (!root || root.hidden) return false;
+  const cs = getComputedStyle(root);
+  const a = crtNum(cs.opacity);
+  if (a < 0.02) return false;
+  const shellEl = $('crt-shell');
+  if (!shellEl) return false;
+  // Cleared by the caller, so this paints on transparency and the composite
+  // underneath it shows through the backdrop's own alpha — which is what the
+  // CSS does too.
+
+  const sc = getComputedStyle(shellEl);
+  const sa = crtNum(sc.opacity);
+
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  ctx.save();
+  ctx.globalAlpha = a;
+
+  // ── special case one: the backdrop ──
+  // `radial-gradient(ellipse at 50% 45%, rgba(6,20,12,.82), rgba(2,5,4,.96) 72%)`.
+  // An ellipse is a circle under a scale, which is how canvas does one.
+  ctx.save();
+  ctx.translate(W * 0.5, H * 0.45);
+  // The horizontal squash IS the ellipse: the gradient below is a circle, and
+  // the transform is in force for both the gradient's own coordinates and the
+  // fill, so the two cannot disagree.
+  ctx.scale(W / Math.max(1, H), 1);
+  const bg = ctx.createRadialGradient(0, 0, 0, 0, 0, H);
+  bg.addColorStop(0, 'rgba(6, 20, 12, 0.82)');
+  bg.addColorStop(0.72, 'rgba(2, 5, 4, 0.96)');
+  bg.addColorStop(1, 'rgba(2, 5, 4, 0.96)');
+  ctx.fillStyle = bg;
+  ctx.fillRect(-W, -H * 2, W * 2, H * 4);
+  ctx.restore();
+
+  if (sa < 0.02) { ctx.restore(); return true; }
+  ctx.globalAlpha = a * sa;
+
+  // ── special case two: the shell's own gradient ──
+  // The tube also *scales up* on the way in — `transform: scaleY(.02)` easing
+  // to 1 — and the rect already carries that, because a transform is in the
+  // box a browser reports. So the warm-up is in the film for free.
+  const sr = crtRect(shellEl, k);
+  const shell = ctx.createLinearGradient(0, sr.y, 0, sr.b);
+  shell.addColorStop(0, '#062015');
+  shell.addColorStop(0.6, '#04140d');
+  shell.addColorStop(1, '#030e09');
+  ctx.fillStyle = shell;
+  crtPath(ctx, sr, crtNum(sc.borderTopLeftRadius) * k);
+  ctx.fill();
+  ctx.save();
+  ctx.clip();
+  for (const kid of shellEl.children) {
+    if (kid.id === 'crt-scan') continue;      // painted last, over everything
+    crtWalk(ctx, kid, k, null);
+  }
+  // ── and the scanlines ──
+  // `repeating-linear-gradient(transparent 0 2px, rgba(0,0,0,.14) 2px 3px)`
+  // under `mix-blend-mode: multiply`, which over a picture this dark is close
+  // enough to a plain dark band that the difference is not worth a second
+  // buffer. Stepped in CSS pixels so the pitch is the pitch you see.
+  const scan = $('crt-scan');
+  if (scan && getComputedStyle(scan).display !== 'none') {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.14)';
+    const step = 3 * k, band = Math.max(1, k);
+    for (let y = sr.y; y < sr.b; y += step) ctx.fillRect(sr.x, y + 2 * k, sr.w, band);
+    const vig = ctx.createRadialGradient(
+      sr.x + sr.w / 2, sr.y + sr.h / 2, Math.min(sr.w, sr.h) * 0.31,
+      sr.x + sr.w / 2, sr.y + sr.h / 2, Math.max(sr.w, sr.h) * 0.62);
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(1, 'rgba(0,0,0,0.30)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(sr.x, sr.y, sr.w, sr.h);
+  }
+  ctx.restore();
+
+  // The border last, so nothing painted inside sits on top of it.
+  crtBox(ctx, sr, sc, k);
+  ctx.restore();
+  return true;
+}

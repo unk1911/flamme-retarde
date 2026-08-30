@@ -36,9 +36,44 @@
 // sitting over the top of the canvas, and captureStream never sees it. Every
 // clip comes out clean, always, with no arrangements made and nothing to
 // remember to press. (tools/shoot.mjs is the opposite: Page.captureScreenshot
-// composites the page, which is why its stills have the HUD in them.) The one
-// time it is a limitation is a clip that is *supposed* to show the instruments
-// — that would want a screen recording, not this.
+// composites the page, which is why its stills have the HUD in them.)
+//
+// ── with exactly one exception, and it is the ottakyo terminal ──
+//
+// Misha, 30 Aug: "how come when i try to record L, and i log into
+// alienware/ottakyo, it doesn't record that screen?" Because of the paragraph
+// above — and the paragraph above is right about the HUD and wrong about this
+// one thing. A HUD is furniture over a picture and leaving it out is the
+// feature. The terminal is not furniture: while you are sitting at it it IS
+// the scene, and a thirty-second take of a flat with a green rectangle missing
+// out of the middle of it is a take of nothing happening.
+//
+// So the recorder no longer films the WebGL canvas. It films a 2-D composite —
+// the drawing buffer, then the terminal inked over it by `crtMirror` in
+// src/48-computer.js, which reads the real DOM's boxes and computed styles so
+// there is no second layout to keep in step. Everything else that is DOM stays
+// out, exactly as before.
+//
+// What that costs is one `drawImage` of the drawing buffer per captured frame,
+// and it is deliberately per CAPTURED frame rather than per drawn one: the
+// composite is skipped unless `1 / CLIP.fps` has passed, so a page running at
+// 144 pays for thirty of them a second and not a hundred and forty-four. It
+// has to happen inside the animation frame that drew it — a WebGL canvas
+// without `preserveDrawingBuffer` is empty by the time the task ends — which
+// is why `clipFrame()` is called from the bottom of `frame()` and nowhere
+// else.
+//
+// Measured on the 4090, six-second samples:
+//
+//     at Jadrija, nothing open      not armed 60 fps · armed 60-61
+//     in the flat, terminal up      not armed 56-58  · armed 59
+//
+// which is to say it is not measurable, and the blit itself times at 0.002 ms.
+// It was not free on the first cut: the terminal in front of you took 58 fps
+// to 49, because `crtPaint` asks the DOM about forty questions and in a real
+// frame each `getBoundingClientRect` can flush layout. The mirror is now
+// painted only when something on the glass has actually moved — see `crtSig`
+// in src/48-computer.js — and blitted the rest of the time.
 //
 // Three things had to be settled before it was worth writing.
 //
@@ -155,6 +190,136 @@ const CLIP = {
 
 // Everything below is null until L is pressed and null again after it.
 let clipRig = null;
+// The canvas that is actually filmed: the drawing buffer with the terminal
+// over it. `alpha: false` rather than a black fill every frame — the drawing
+// buffer has an alpha channel, VP8 has not, and an opaque 2-D canvas is both
+// the cheaper way to say so and the one that cannot leave a frame half
+// transparent.
+let clipCanvas = null, clipCtx = null;
+// When the last composite was taken, so the cost is paid at the capture rate
+// and not at the frame rate.
+let clipDrewAt = 0;
+// A test asking for a copy of the next composited frame.
+//
+// It has to be the NEXT one and cannot be this one: the drawing buffer is only
+// readable inside the animation frame that filled it, so a probe called from a
+// debugger console sees a canvas that has already been cleared. Hooking a
+// resolver here and firing it from `clipFrame` is the difference between a
+// test of the composite and a test of a black rectangle.
+let clipShot = null;
+
+/**
+ * The composite, sized to the drawing buffer.
+ *
+ * Sized HERE and in the resize handler and nowhere else. Changing the size of
+ * a canvas a MediaStream is capturing changes the frame size under a WebM
+ * header that was written once — the whole reason the resize handler restarts
+ * the deck — so `clipFrame` scales into whatever size this is rather than
+ * resizing it, and a stretched picture for the 400 ms of a debounce is a much
+ * smaller thing than a file whose header disagrees with its frames.
+ */
+function clipSurface() {
+  if (!clipCanvas) {
+    clipCanvas = document.createElement('canvas');
+    clipCtx = clipCanvas.getContext('2d', { alpha: false });
+  }
+  clipCanvas.width = Math.max(2, canvas.width);
+  clipCanvas.height = Math.max(2, canvas.height);
+  clipDrewAt = 0;
+  return clipCanvas;
+}
+
+/**
+ * One composited frame. Called from the bottom of `frame()`, and only there.
+ *
+ * The early return is the whole of what a page with nobody recording pays for
+ * this file per frame.
+ */
+function clipFrame() {
+  if (!clipRig || !clipCtx) return;
+  const now = performance.now();
+  // A millisecond of slack, because a 60 Hz page against a 30 fps gate lands
+  // either side of exactly 33.3 and would otherwise drop every other capture
+  // to 20.
+  if (now - clipDrewAt < 1000 / CLIP.fps - 1) return;
+  clipDrewAt = now;
+  const c = clipCanvas;
+  clipCtx.drawImage(canvas, 0, 0, c.width, c.height);
+  // Canvas pixels per CSS pixel, off the canvas itself rather than off
+  // `devicePixelRatio`: the composite may be a different size than the element
+  // — see `clipSurface` — and it is this ratio, not the renderer's, that puts
+  // a DOM box in the right place on it.
+  const k = c.width / Math.max(1, canvas.clientWidth || c.width);
+  const drew = crtMirror(clipCtx, k);
+  if (clipShot) {
+    const tell = clipShot;
+    clipShot = null;
+    tell({ w: c.width, h: c.height, crt: !!drew, png: c.toDataURL('image/png') });
+  }
+}
+
+/**
+ * A copy of the next frame the recorder actually films, as a PNG data URL.
+ *
+ * The only way to see what a take will contain without watching the take.
+ * Resolves on the next composite rather than returning one, for the reason over
+ * `clipShot`: outside an animation frame the drawing buffer is gone and every
+ * honest-looking answer is black.
+ */
+/**
+ * Does the mirror break its lines where the browser breaks them?
+ *
+ * The one thing about this mirror that can be wrong without LOOKING wrong. A
+ * paragraph that wraps a word late still reads as a paragraph, and the only
+ * way to catch it by eye is to hold two pictures side by side and count. So it
+ * is measured instead: `Range.getClientRects()` returns one rect per visual
+ * line, and dividing each by the advance turns the browser's own layout into a
+ * column count that `crtWrap` can be held against.
+ *
+ * It is how the 0.25 in `crtInk` was caught. The log's content box is 884.4 px
+ * and one advance is 7.507, so 117 columns fit and 118 do not — and a quarter
+ * of a character of generosity let the 118th through, after which the whole
+ * paragraph wrapped one word later than the real one.
+ *
+ * Returns a row per block, worst first, so a regression is a non-zero `worst`
+ * rather than a picture somebody has to compare.
+ */
+function clipWrapCheck() {
+  const log = $('crt-log');
+  if (!log) return null;
+  const probe = document.createElement('canvas').getContext('2d');
+  const out = [];
+  for (const el of log.children) {
+    const cs = getComputedStyle(el);
+    probe.font = crtFont(cs, 1);
+    if ('letterSpacing' in probe) {
+      probe.letterSpacing = (cs.letterSpacing === 'normal' ? 0
+        : parseFloat(cs.letterSpacing)) + 'px';
+    }
+    const adv = probe.measureText('M').width || 1;
+    const w = el.getBoundingClientRect().width;
+    const rg = document.createRange();
+    rg.selectNodeContents(el);
+    // One rect per line fragment, and the one-character ones are the trailing
+    // spaces a break leaves behind — they are not lines and are dropped.
+    const dom = Array.from(rg.getClientRects())
+      .map((r) => Math.round(r.width / adv)).filter((c) => c > 1);
+    const mine = crtWrap(el.textContent, Math.max(1, Math.floor(w / adv + 0.02)))
+      .filter((l) => l.length > 1).map((l) => l.length);
+    let off = Math.abs(dom.length - mine.length);
+    for (let i = 0; i < Math.min(dom.length, mine.length); i++) {
+      off = Math.max(off, Math.abs(dom[i] - mine[i]));
+    }
+    out.push({ off, dom, mine });
+  }
+  out.sort((a, b) => b.off - a.off);
+  return { worst: out.length ? out[0].off : 0, blocks: out };
+}
+
+function clipShotNext() {
+  if (!clipRig) return Promise.resolve(null);
+  return new Promise((done) => { clipShot = done; });
+}
 // The one thing arming leaves behind in somebody else's graph: the connection
 // from the mix's last node into a MediaStreamDestination. Held so that
 // disarming can take it out again.
@@ -231,7 +396,13 @@ function clipArm() {
   // 30 fps of a canvas that may not be drawing 30. The argument matters: with
   // none at all Chrome captures on every composite, which on a page running at
   // 144 would be 144 readbacks a second for a clip nothing will play above 30.
-  const stream = canvas.captureStream(CLIP.fps);
+  //
+  // Of the COMPOSITE and not of the drawing buffer — see the header. Nothing
+  // has been drawn into it yet, so the first captured frame is the black an
+  // `alpha: false` canvas starts as; `clipFrame` overwrites it inside the next
+  // animation frame, which at worst is one frame of black at the head of a
+  // file that starts with somebody pressing a key anyway.
+  const stream = clipSurface().captureStream(CLIP.fps);
 
   // The mix, if there is one. `tap()` returns null until the AudioContext
   // exists, which is until somebody has clicked Take off — so a recorder armed
@@ -300,6 +471,10 @@ function clipDisarm() {
   // Stopping only the recorders leaves the stream live and the readback still
   // happening every frame, for a file nobody is writing.
   for (const t of rig.stream.getTracks()) t.stop();
+  // And the composite goes back to nothing. Two megapixels of RGBA is 8 MB and
+  // it is dead weight the moment the last track is stopped; the next arm makes
+  // another one, which costs a canvas allocation once per press of L.
+  clipCanvas = null; clipCtx = null; clipDrewAt = 0;
   if (clipTapOut) {
     try { clipTapOut.out.disconnect(clipTapOut.dest); } catch (e) { /* gone */ }
     clipTapOut = null;
@@ -339,6 +514,10 @@ addEventListener('resize', () => {
   clipResizeT = setTimeout(() => {
     if (!clipRig) return;
     const lost = clipHeld();
+    // The composite first, and then the deck, and the order is the point: the
+    // new segment's header is written from the track's frame size, and the
+    // track's frame size is this canvas.
+    clipSurface();
     clipDeck(clipRig);
     clipRig.full = false;
     clipHud();

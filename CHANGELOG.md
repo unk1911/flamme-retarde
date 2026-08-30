@@ -8,6 +8,64 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.153.0] — 2026-08-30
+
+### The terminal is in the film now
+
+Misha: "how come when i try to record L, and i log into alienware/ottakyo, it
+doesn't record that screen?"
+
+Because the recorder films `canvas.captureStream()` and the ottakyo terminal is
+DOM — `#crt` in shell.html, a div, a form and two inputs laid over the top of
+the canvas. It is the same reason no clip has ever had the instruments, the
+tank, a toast or the recorder's own indicator in it, and everywhere else that
+is the feature: every take comes out clean with nothing to remember to press.
+
+It is not the feature here. A HUD is furniture over a picture; the terminal is
+the scene while you are sitting at it, and thirty seconds of a flat with a green
+rectangle missing out of the middle is thirty seconds of nothing happening.
+
+So the recorder no longer films the drawing buffer. It films a 2-D composite:
+the drawing buffer, then the terminal inked over it by `crtMirror`. Everything
+else that is DOM stays out, exactly as before.
+
+**Two rules kept the mirror from becoming a second implementation of the
+terminal.** The DOM does the layout — every box comes out of
+`getBoundingClientRect()` and every colour, font, padding, line height and text
+shadow out of `getComputedStyle()`, so the mirror follows the stylesheet
+including the phone media query, the sign-in form appearing and going away, and
+the log's scroll position, which needs no handling at all because a scrolled-off
+line reports a rect outside the glass and is skipped. And it walks rather than
+knows: `crtWalk` recurses the subtree painting background, border and text for
+whatever it finds, so adding a chip or a button to the bar needs nothing here.
+The only two things it cannot read are the two CSS gradients, and those are
+marked as the special cases they are.
+
+**The wrap is checked rather than eyeballed**, because it is the one thing that
+can be wrong without looking wrong — a paragraph that breaks a word late still
+reads as a paragraph. `clipWrapCheck` (`__fr.clip.wrap()`) takes the browser's
+own line boxes from `Range.getClientRects()`, divides by the advance and holds
+`crtWrap` against them. It caught two things a picture would not have: a quarter
+of a character of rounding slack, which let a 118th column through a box that
+fits 117 and wrapped the rest of the paragraph one word late; and the trailing
+space `pre-wrap` hangs past a soft break, which made every line read one glyph
+wide. Worst offset is now 0 on every block.
+
+**And it is measured.** At Jadrija with nothing open: 60 fps not armed, 60–61
+armed. In the flat with the terminal up: 56–58 not armed, 59 armed. The first
+cut was not free — 58 down to 49 — because `crtPaint` asks the DOM about forty
+questions and in a real frame each `getBoundingClientRect` can flush layout,
+which a warm timing loop hides completely. The mirror is now repainted only when
+something on the glass has moved (`crtSig`, an O(1) signature that deliberately
+reads no rects) and blitted the rest of the time.
+
+Verified end to end by decoding frames out of a WebM the recorder actually
+wrote, not by trusting the composite: the terminal is in the file, wrapping
+line-for-line with the real screen, with the room live behind it.
+
+`__fr.clip.shot()` returns the next frame the recorder films as a PNG, which
+is the only way to see what a take will contain without watching the take.
+
 ## [1.152.0] — 2026-08-30
 
 ### The room was reading the camera
