@@ -551,6 +551,15 @@ as of this writing; the state of each is in the git log, not here.
   thing `b_016` was: v595 carries no GPS, so there is no `t` the footage
   supports. Either geotag a frame from it or accept a placement and say so.
 
+- **A figure behind H2O's counter and Trampulin's does not render.** Tried
+  31 Aug at the same standoff that works at MINI, the konoba and the gelato
+  case (`s0 - 0.15`), with `k` set, on the shop's own deck datum, unhidden,
+  at five camera stations. What shows is a shoulder and two hands. A raycast
+  from the camera to the head point hits nothing, so it is not static
+  occlusion, and it is not the datum. Left out rather than shipped broken —
+  see the note beside `posts` in `43-jadrija.js`. Whoever picks this up should
+  start in the crowd layer and not in the shopfront.
+
 ## SURVEY — found, not yet built — PAUSED 26 Aug 2026
 
 Everything under this heading is a thing the survey shows that the game does

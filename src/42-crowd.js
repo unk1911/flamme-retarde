@@ -780,7 +780,21 @@ function makeCrowd(scene, rig, cap) {
         skel.torso.rotation.y = -dig * 0.16;
         // Head down into the case when digging, and looking about the shop
         // when not — never at the sea, because there is a mirror that way.
-        skel.head.rotation.z = 0.05 + dig * 0.28;
+        //
+        // 0.11 and not 0.28, and the 0.17 rad between them is a whole head.
+        // This joint's `rotation.z` swings the crown BACKWARD, not the chin
+        // down, and the head's pivot is far enough below its centre that at
+        // 0.33 rad the crown travels about 0.15 m inland. A server stands at
+        // `s0 - 0.15`, which is the number that puts his hip exactly on the
+        // counter panel's face, so 0.15 m inland of that is inside the shop
+        // body — a solid box from `s0` to `s1`. The gelato server has been
+        // shipping since 1.154.0 with the top of his skull inside the back
+        // wall and it read as nothing at all, because what is left is a neck.
+        // Found by putting three of them at 0.15, 0.60 and 1.20 m of standoff
+        // in one build and shooting the row: the near one had no head and the
+        // other two did. Checked at four phases of the dig cycle, since `dig`
+        // is what moves it and a still frame only proves one phase.
+        skel.head.rotation.z = 0.04 + dig * 0.11;
         skel.head.rotation.y = Math.sin(ph * 0.23 * rate) * 0.26 - dig * 0.14;
         skel.legLU.rotation.x = w * 0.05;
         skel.legRU.rotation.x = w * 0.05;

@@ -14973,6 +14973,77 @@ async function buildJadrija(scene) {
     }
   }
 
+  // And the other four counters, for the same reason.
+  //
+  // The instruction that put two men behind the gelato case was about the
+  // gelato case, and what it is actually about is that a shop with customers
+  // in front of it and nobody in it is not open. MINI has a dozen people on
+  // its terrace, the konoba's stools are occupied and its surfboard is against
+  // the post, H2O and Trampulin both have chairs out — and every one of those
+  // counters was empty. That is a generalisation of what Misha asked for and
+  // it is written down as one: no frame is being read here that was not
+  // already read, and nobody is given a livery, a name or a job beyond
+  // standing where the person who works there stands.
+  //
+  // Maslina is deliberately NOT in this list. Its opening is three shelves of
+  // stock from oa+0.12 to oc-0.12 at s0-0.155 to s0-0.095, and s0-0.15 is
+  // inside them: a server there would have the goods through his chest. A
+  // six-metre kiosk with a serving hatch does not have room for a person you
+  // can see, which is the same finding the gelato case gave.
+  //
+  // TISAK is not in it either, and for the opposite reason: `1000150343` has
+  // the door standing open and nobody in the frame at it.
+  {
+    // Three of these are `shopKit` frontages and share its geometry exactly:
+    // the counter's front panel runs s0-0.28 to s0-0.02 and reaches y0+0.98,
+    // so s0-0.15 puts the front of the hip on the panel's face, which is the
+    // number the gelato pair are standing on and the argument for it is up
+    // there. `t` is picked to fall BETWEEN two mullions — those stand at
+    // oa + (oc-oa)*k/nmul with nmul = round((oc-oa)/1.5), and a figure
+    // directly behind one is a man with a batten down his face.
+    //
+    // The konoba is not a `shopKit` shop and has its own L-shaped counter at
+    // s1-1.5 to s1-0.5, so its barman stands inland of that at s1-0.35.
+    const TEE = [0.700, 0.690, 0.665];         // a plain shirt, not a livery
+    const CROP = [0.098, 0.070, 0.050];
+    //
+    // `k` is not optional on a pushed entry and there is no default behind it.
+    // `scale: b.k * (0.92 + rng() * 0.16)` is read straight off the record, so
+    // an entry without one is scaled by `undefined` and comes out zero: the
+    // four of them were built, indexed, unhidden and in the right place, and
+    // every one of them was a point. `B()` sets it and `push` does not. Their
+    // heights are a shade apart because four men the same height behind four
+    // counters is a chorus line.
+    //
+    // TWO, and it was meant to be four. H2O and Trampulin were built, placed,
+    // scaled and unhidden at the same standoff and shot from five stations
+    // between them, and at neither shop does a figure behind the counter show
+    // more than a shoulder and two hands. It is not occlusion by anything
+    // static — a raycast from the camera to the head point comes back empty —
+    // and it is not the deck datum, which is now taken from the shop's own
+    // midpoint the way `shopfront` takes it. It is something in the crowd
+    // layer that this pass did not get to the bottom of. Two counters with
+    // somebody at them beats four with two men made of hands, so the other
+    // two are recorded here rather than shipped.
+    const posts = [
+      ['mini', 274.60, null, 'serve', 1.00],
+      ['konoba', 244.00, 0.35, 'stand', 1.02],
+    ];
+    for (const [key, t, backOff, pose, k] of posts) {
+      const S = SHOPS.find((x) => x.key === key);
+      if (!S) continue;
+      const ss = backOff == null ? S.s0 - 0.15 : S.s1 - backOff;
+      // The shop's OWN datum and not the deck under the man's feet.
+      // `shopfront` builds every one of these from `at((t0+t1)/2).deck` and
+      // the counter is 1.06 m above that, so a figure standing on the deck at
+      // his own `t` is off by however much the shore rises between the two —
+      // and the whole question here is how much of him clears a counter.
+      const y0 = at((S.t0 + S.t1) * 0.5).deck;
+      bathers.push({ t, s: ss, y: y0, ang: -Math.PI / 2,
+        pose, k, beat: null, sex: 'm', shirt: TEE, hair: CROP, staff: true });
+    }
+  }
+
   // And `b.solid` is the flag that keeps the two halves of "you cannot walk
   // through a person" from drifting apart.
   //

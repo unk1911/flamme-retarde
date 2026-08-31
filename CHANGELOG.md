@@ -8,6 +8,53 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.164.0] — 2026-08-31
+
+### The gelato server has been shipping without the top of his head
+
+MINI has a dozen people on its terrace, the konoba's stools are taken and its
+surfboard is against the post, and there was nobody behind either counter. The
+instruction that put two men behind the gelato case was about the gelato case;
+what it is actually about is that a shop with customers in front of it and
+nobody in it is not open. So: a barman at MINI and one at the konoba, in a
+plain shirt, standing where the person who works there stands, and no name,
+livery or job invented for either. That is a generalisation of what Misha
+asked for and it is written down in the source as one.
+
+Getting them there turned up a real bug in the `serve` pose, which has been in
+since 1.154.0. **That joint's `rotation.z` swings the crown backward, not the
+chin down**, and the head's pivot is far enough below its centre that at the
+0.33 rad it was set to, the crown travels about 0.15 m inland. A server stands
+at `s0 - 0.15` — the number that puts his hip exactly on the counter panel's
+face — so 0.15 m inland of that is inside the shop body, which is a solid box
+from `s0` to `s1`. The gelato server at the case has been serving ice cream
+with the top of his skull inside the back wall for a week, and it read as
+nothing at all, because what is left when you take a head off is a neck.
+
+It was found by putting three identical figures at 0.15, 0.60 and 1.20 m of
+standoff in one build and shooting the row: the near one had no head and the
+other two did. The nod is 0.11 now and it is checked at four phases of the dig
+cycle, since `dig` is what moves it and one still frame only proves one phase.
+
+Two other things fixed on the way. `k` is not optional on a pushed bather:
+`scale: b.k * (0.92 + rng() * 0.16)` is read straight off the record, so an
+entry without one is scaled by `undefined` and comes out zero — the first cut
+of all four was built, indexed, unhidden, in the right place and rendered as a
+point. `B()` sets `k` and `push` does not. And the staff now stand on the
+shop's own datum, `at((t0+t1)/2).deck`, which is what `shopfront` builds the
+counter from, rather than on the deck under their own feet.
+
+**Two, and it was meant to be four.** H2O and Trampulin were built, placed,
+scaled and unhidden at the same standoff and shot from five stations, and at
+neither does a figure behind the counter show more than a shoulder and two
+hands. It is not static occlusion — a raycast from the camera to the head
+point comes back empty — and it is not the datum. It is something in the crowd
+layer this pass did not get to the bottom of, and it is recorded in the source
+next to the list. Two counters with somebody at them beats four with two men
+made of hands.
+
+Census unchanged at 446/333/86/27, people 96 to 98, 59-61 fps.
+
 ## [1.163.0] — 2026-08-31
 
 ### Fifteen summers, and a blank green box
