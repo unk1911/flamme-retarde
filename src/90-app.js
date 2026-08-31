@@ -196,6 +196,25 @@ addEventListener('keydown', (e) => {
   // playing — run, in most games — and it never makes a browser shortcut on
   // its own.
   if (e.ctrlKey || e.metaKey || e.altKey) return;
+  // And a key typed into a text field belongs to the field.
+  //
+  // Misha, 31 Aug: "i cannot seem to type in the password into the sign-in.. i
+  // think the game keys are somehow overriding it". They were. Every branch
+  // below is happy to call preventDefault on a bare letter, and a password is
+  // made of bare letters — N is Baye's voice, P pauses, M opens the settings,
+  // ? opens the help sheet, and each of them ate the character on its way past.
+  //
+  // Not a list of keys to leave alone: a list is wrong the moment somebody adds
+  // a binding or a field. The laptop terminal has always been safe because the
+  // whole handler bails while it is open, which is the same rule written for
+  // one case; this is that rule written once, for every field there will ever
+  // be. Escape is the exception, because closing the thing you are typing in is
+  // the one game action that still belongs to the game.
+  const el = e.target;
+  if (e.code !== 'Escape' && el
+      && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) {
+    return;
+  }
   // At the laptop the keyboard belongs to the laptop. Every letter in here is a
   // letter somebody is typing into a prompt, and W A S D would otherwise be
   // four steps across the living room taken by a camera that is not being drawn
@@ -242,6 +261,14 @@ addEventListener('keydown', (e) => {
   }
   if (e.code === 'Escape' && !$('help').hidden) {
     e.preventDefault(); toggleHelp(false); return;
+  }
+  // The sign-in sheet swallows the keyboard whole while it is up — not only the
+  // field. Otherwise a key pressed after clicking the backdrop still reaches
+  // the game, and toggling Baye's voice from behind a modal asking you to sign
+  // in so she can talk is a small joke at the player's expense.
+  if (!$('signin').hidden) {
+    if (e.code === 'Escape') { e.preventDefault(); toggleSignIn(false); }
+    return;
   }
   if (e.code === 'KeyO') { e.preventDefault(); skipToComputer(); return; }
   if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); togglePause(); return; }

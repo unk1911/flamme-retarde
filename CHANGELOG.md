@@ -8,6 +8,30 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.168.1] — 2026-08-31
+
+### Fixed: you could not type a password into the sign-in
+
+Misha, minutes after 1.168.0 shipped: *"i cannot seem to type in the password
+into the sign-in.. i think the game keys are somehow overriding it"*. They were.
+The global `keydown` handler calls `preventDefault` on bare letters — N is
+Baye's voice, P pauses, M opens the settings, `?` opens the help sheet — and a
+password is made of bare letters, so each of those was eaten on its way to the
+field.
+
+The laptop terminal has never had this problem because the whole handler bails
+while it is open (`if (computer.active) … return`), which is the right rule
+written for exactly one case. It is now written once for every field there will
+ever be: a keystroke whose target is an `<input>`, a `<textarea>` or anything
+`contenteditable` belongs to that field and returns immediately. Escape is the
+one exception, because closing the thing you are typing in is still the game's
+job — and Escape now closes the sign-in sheet, the way it already closed the
+help sheet.
+
+Not a list of keys to avoid: a list is wrong the moment somebody adds a binding
+or a field. Verified by dispatching all 21 bound letters at the password box and
+asserting that none of them comes back `defaultPrevented`.
+
 ## [1.168.0] — 2026-08-31
 
 ### Baye has a voice, and the sign-in moved to the front door
