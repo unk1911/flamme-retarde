@@ -702,6 +702,23 @@ bed. See the commit.
   screen to two metres, a named awning over it, a corrugated upper storey with
   a stepped parapet and a roof vent. See `slastBack`, which sits on top of the
   shared `shopBack` rather than replacing it.
+- **The "JadriJa" wall — FOUND 31 Aug, NOT BUILT, and it is the signature
+  image of the place.** `_397` and `_398`, and it is recorded nowhere in this
+  file. A whitewashed flat-roofed block standing on the concrete apron at the
+  water's edge at the head of the seaward kabine row, with **JadriJa** across
+  its end wall in black hand-cut capitals about 4.5 m wide and 1.3 m tall —
+  capital J, lowercase a-d-r-i, capital J, lowercase a, squared-off brush
+  letterforms with the counters cut as straight slots. A heavy moulded coping
+  band along the top of the wall, a dark blue door and green timber doors in
+  the return, a steel ladder into the water off the quay edge to its left, and
+  the far arm of the bay with its own kabine row across the water behind.
+  **Blocked on the same thing `a_030` is: this is a BUILDING, not a detail.**
+  It is taller than a kabina, has a parapet where they have a ridge, and is
+  about seven metres deep where `JAD.cabD` is under three, so it cannot be
+  painted on the end of a run — it has to be placed. Neither frame carries
+  GPS. Somebody should say where, and then it is an afternoon's work: the
+  block, the coping, the lettering (`paintedWord` at weight 800, on a plane
+  turned a quarter to face along the shore), the ladder and the apron.
 - **The ground in the wood** (_344/_345/_347): pale compacted dirt with white
   limestone chips through it and brown pine litter, not sand. ~~And pine bark:
   grey-brown plates with **orange-red** inner bark showing at the seams.~~
