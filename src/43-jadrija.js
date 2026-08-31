@@ -1536,7 +1536,7 @@ async function buildJadrija(scene) {
    * is the same nothing the door has behind it.
    */
   const VENTH = 0.235;
-  function vent(dc, front, y0, w, col) {
+  function vent(dc, front, y0, w, col, style = 0) {
     const h = w * 0.5, hh = VENTH;
     // Frame: a lintel over and a sill under, in the door's colour.
     for (const [a0, a1] of [[y0 - 0.045, y0], [y0 + hh, y0 + hh + 0.045]]) {
@@ -1547,13 +1547,110 @@ async function buildJadrija(scene) {
       boxTS(dc + o * h, dc + o * (h + 0.045), front - 0.030, front - 0.001,
         y0, y0 + hh, shade(col, 0.88));
     }
-    // And the grille, which on half of them is chicken wire and on the other
-    // half is three bits of bar. Three bits of bar.
+    // And what is in it, which was three bits of bar on every hut on the beach.
+    //
+    // Survey/4: "the transom is glazed or meshed and framed in the door's
+    // colour. 0:39 is the clearest: every door has a small horizontal light
+    // over it, the frame painted with the door and the pane dark or wire. The
+    // model draws this and draws it as a slot with three bars, which is right
+    // for HALF of them." So it is three now, dealt off the bay index and not
+    // off `rng`: three bars, a dark pane, and chicken wire, which is a grid
+    // fine enough that at five metres it is a grey haze with a frame round it.
     const GRILLE = [0.255, 0.245, 0.230];
-    for (let i = 1; i <= 3; i++) {
-      const x = dc - h + (w * i) / 4;
-      boxTS(x - 0.011, x + 0.011, front - 0.008, front + 0.012, y0, y0 + hh, GRILLE);
+    if (style === 1) {
+      boxTS(dc - h, dc + h, front - 0.004, front + 0.010, y0, y0 + hh,
+        [0.055, 0.058, 0.062], [0.075, 0.080, 0.086]);
+    } else if (style === 2) {
+      boxTS(dc - h, dc + h, front + 0.002, front + 0.012, y0, y0 + hh,
+        [0.048, 0.046, 0.044]);
+      for (let i = 1; i <= 9; i++) {
+        const x = dc - h + (w * i) / 10;
+        boxTS(x - 0.005, x + 0.005, front - 0.004, front + 0.004, y0, y0 + hh,
+          GRILLE);
+      }
+      for (let j = 1; j <= 2; j++) {
+        const yy = y0 + (hh * j) / 3;
+        boxTS(dc - h, dc + h, front - 0.004, front + 0.004,
+          yy - 0.005, yy + 0.005, GRILLE);
+      }
+    } else {
+      for (let i = 1; i <= 3; i++) {
+        const x = dc - h + (w * i) / 4;
+        boxTS(x - 0.011, x + 0.011, front - 0.008, front + 0.012, y0, y0 + hh,
+          GRILLE);
+      }
     }
+  }
+
+  /**
+   * The two bays somebody faced in stone, off frames 3:42 and 3:45.
+   *
+   * "Two bays are faced in crazy-paving limestone, white and ochre flags with
+   * wide mortar joints, with a white PVC door in them. They are somebody's own
+   * improvement and there are only two, which is exactly why they are worth
+   * having: a hundred metres of identical treatment with two exceptions in it
+   * is what a row of privately owned huts looks like."
+   *
+   * Two, and exactly two: the bay index is mixed and taken modulo the number
+   * of bays in the block, so this cannot quietly become eight the day the row
+   * is re-laid. It costs no draw of `rng`.
+   *
+   * The flags are a jittered grid and not a regular one, and the difference is
+   * the whole object: rows of equal rectangles with equal joints is TILING,
+   * and crazy paving is the thing tiling is not. Every row is a different
+   * height and every flag in it a different width, so no two joints line up
+   * across the wall.
+   */
+  function crazyFace(a, c, dc, front, floor, eave, half, k) {
+    const MORTAR = [0.365, 0.352, 0.322];
+    const FLAG = [[0.640, 0.612, 0.545], [0.585, 0.520, 0.398],
+      [0.680, 0.660, 0.610], [0.545, 0.492, 0.392], [0.620, 0.578, 0.470]];
+    const runs2 = [[a, dc - half - 0.075], [dc + half + 0.075, c]];
+    let n = 0;
+    for (const [x0, x1] of runs2) {
+      if (x1 - x0 < 0.06) continue;
+      boxTS(x0, x1, front - 0.052, front - 0.040, floor, eave - 0.05, MORTAR);
+      let y = floor + 0.01;
+      for (let row = 0; y < eave - 0.14; row++) {
+        const rh = 0.16 + 0.20 * ((k + row * 5) % 5) / 4;
+        // Every row starts at a different offset and the first flag in it is
+        // cut short by that offset, so no vertical joint ever lines up with
+        // the one above. Without it the wall came out COURSED — regular rows
+        // of near-equal blocks, which is ashlar, and ashlar is the one thing
+        // crazy paving is defined by not being.
+        const off2 = 0.055 * ((k * 7 + row * 13) % 5);
+        let x = x0 + 0.012 - off2;
+        for (let i = 0; x < x1 - 0.05; i++) {
+          const fw2 = 0.13 + 0.26 * ((k * 3 + row * 7 + i * 11) % 7) / 6;
+          const x2 = Math.min(x + fw2, x1 - 0.012);
+          const xa = Math.max(x, x0 + 0.012);
+          if (x2 - xa < 0.03) { x = x2 + 0.020; continue; }
+          const col = FLAG[(row * 3 + i * 2 + k) % FLAG.length];
+          boxTS(xa, x2, front - 0.064, front - 0.050,
+            y, Math.min(y + rh - 0.022, eave - 0.06), col, shade(col, 1.10));
+          x = x2 + 0.020;
+          n++;
+        }
+        y += rh;
+      }
+    }
+    return n;
+  }
+
+  /** A white PVC door: one leaf, one panel, no louvres and no paint. */
+  function pvcDoor(dc, front, floor) {
+    const h = DOORW * 0.5;
+    const WHITEP = [0.665, 0.668, 0.668];
+    const face = front + 0.045;
+    boxTS(dc - h + 0.012, dc + h - 0.012, face, face + 0.032,
+      floor + 0.010, floor + DOORH - 0.010, WHITEP, shade(WHITEP, 1.06));
+    // The moulded panel, which is the only relief on one of these.
+    boxTS(dc - h + 0.10, dc + h - 0.10, face - 0.010, face,
+      floor + 0.16, floor + DOORH - 0.30, shade(WHITEP, 1.10),
+      shade(WHITEP, 1.14));
+    // A brushed handle, and it is a lever rather than a hasp.
+    boxTS(dc + h - 0.24, dc + h - 0.10, face - 0.030, face - 0.012,
+      floor + 1.02, floor + 1.06, [0.545, 0.548, 0.545]);
   }
 
   /**
@@ -1774,16 +1871,36 @@ async function buildJadrija(scene) {
       b = rendNow;
       boxTS(a, c, front + REVEAL, back, fl, eave, wash);
       frontSkin(a, c, dc, front, fl, eave, wash);
-      plaster(a, front, fl, eave, wash, k + (t0 | 0), dc);
+      // Two bays in the block are faced in stone instead of rendered, and they
+      // get neither the skirt nor the render patch nor the eave shadow — see
+      // `crazyFace`. Everything else on the beach still does.
+      // The 17th and the 52nd bay in the block, counted as they are drawn.
+      //
+      // A modulo on the bay index was the first cut and it is the wrong shape
+      // of rule: the runs are laid out by `rng` and their lengths vary, so
+      // `(k * 13 + t0 * 7) % 37` is a lottery over a number of bays nobody
+      // controls — it can come out two, and it can come out none, and which
+      // one it is changes the day a run is one hut longer. The survey says
+      // there are TWO, so there are two, and they are counted.
+      bayN++;
+      const stone = bayN === 17 || bayN === 52;
+      if (stone) stoneBays.push([+dc.toFixed(1), +front.toFixed(1)]);
+      if (stone) crazyFace(a, c, dc, front, fl, eave, DOORW * 0.5, k + (t0 | 0));
+      else plaster(a, front, fl, eave, wash, k + (t0 | 0), dc);
       b = up;
       // Louvred or planked, two thirds to one — off the bay index, not `rng`,
       // so the beach behind it stays where the seed put it.
       // One in six stands open with a curtain in it. Off the bay index and the
       // run's own t, so it is fixed for the life of the seed and costs no draw
       // — see `openDoor`.
-      const oIx = (k * 7 + (t0 | 0) * 3) % 6;
+      const oIx = stone ? 1 : (k * 7 + (t0 | 0) * 3) % 6;
       if (oIx === 0) {
         openDoor(dc, front, fl, col, (k * 3 + (t0 | 0)) % 4);
+      } else if (stone) {
+        // A stone-faced bay has a white PVC door in it and no hasp: the whole
+        // of the improvement is that somebody replaced the joinery as well as
+        // the wall, and a painted hasp on a PVC leaf would undo it.
+        pvcDoor(dc, front, fl);
       } else {
         door(dc, front, fl, col, (k * 5 + (t0 | 0)) % 3 !== 0);
         doorKit(dc, front, fl, DOORW * 0.5, 0.045);
@@ -1791,9 +1908,12 @@ async function buildJadrija(scene) {
       // The rail between the door head and the vent, filling the last of the
       // opening. Painted with the door, because it was.
       boxTS(dc - DOORW * 0.5, dc + DOORW * 0.5, front + 0.010, front + REVEAL,
-        fl + DOORH, fl + OPENH - VENTH, shade(col, 0.86));
-      vent(dc, front, fl + OPENH - VENTH, DOORW - 0.06, col);
-      surround(dc, front, fl, col, DOORW * 0.5, fl + OPENH + 0.045);
+        fl + DOORH, fl + OPENH - VENTH,
+        stone ? [0.605, 0.608, 0.608] : shade(col, 0.86));
+      vent(dc, front, fl + OPENH - VENTH, DOORW - 0.06,
+        stone ? [0.640, 0.642, 0.642] : col, (k * 5 + (t0 | 0) * 3) % 3);
+      surround(dc, front, fl, stone ? [0.640, 0.642, 0.642] : col,
+        DOORW * 0.5, fl + OPENH + 0.045);
       // And a line of washing across one shut bay in nine.
       if (oIx !== 0 && (k * 4 + (t0 | 0)) % 9 === 0) {
         clothesline(a, c, front, fl, k + (t0 | 0));
@@ -2285,6 +2405,13 @@ async function buildJadrija(scene) {
   // than inside `cabinRun` because it is a property of the row and not of any
   // run in it, and because the scan is 300-odd calls into `at` and there is no
   // reason to pay for it once per run.
+  // How many kabine have been drawn, for the two that are faced in stone. A
+  // module-level counter and not a parameter, because the runs are built by a
+  // loop that does not know how many came before it.
+  let bayN = 0;
+  // And where the two of them ended up, because "the 17th bay in the block" is
+  // not a place anybody can go and look at. `__fr.jad.raw().stoneBays`.
+  const stoneBays = [];
   const kabFrom = squareRow(JAD.rowA, JAD.cabW * KAB.bays);
   for (const [front, phase] of [[JAD.rowA, 0], [JAD.rowB, JAD.cabW * 0.5]]) {
    for (const [tA, tB] of JAD.rows) {
@@ -7247,6 +7374,76 @@ async function buildJadrija(scene) {
     }
 
     if (S.key === 'tramp2') {
+      // ── the lane side, off `b_106` ───────────────────────────────────────
+      //
+      // The survey lists this frame as "name on the wall; two tall pale-grey
+      // electrical cabinets, a scooter against them, a picnic bench,
+      // red-and-white barrier tape, translucent corrugated roof on green steel
+      // over the side terrace". The name, the bench and the roof went in on
+      // 24 Aug; these three did not, and between them they are the whole
+      // difference between a café and a café somebody works at.
+      {
+        const CAB2 = [0.575, 0.578, 0.575];
+        // West of the frontage and OUT on the apron, not tucked against its
+        // west wall: there is a second building there and at s0+1.70 the pair
+        // of them stood in the 0.4 m slot between the two, where nothing can
+        // see them. `b_106` has them clear of the terrace with the scooter
+        // parked across their front, which is what this is.
+        const bt = S.t0 - 1.15, bs = S.s0 - 1.05;
+        for (let i = 0; i < 2; i++) {
+          const ct2 = bt + i * 0.70, gy = surfaceY(ct2, bs);
+          boxTS(ct2 - 0.31, ct2 + 0.31, bs - 0.19, bs + 0.19, gy, gy + 1.58,
+            CAB2, shade(CAB2, 1.10));
+          // The door, a shade down and set in, and the shallow weather lid.
+          boxTS(ct2 - 0.26, ct2 + 0.26, bs - 0.205, bs - 0.185, gy + 0.10,
+            gy + 1.46, shade(CAB2, 0.90));
+          boxTS(ct2 - 0.33, ct2 + 0.33, bs - 0.22, bs + 0.21, gy + 1.58,
+            gy + 1.66, shade(CAB2, 0.82), shade(CAB2, 0.94));
+          // The yellow label, which is the only colour on either of them and
+          // is on one of the two.
+          if (i === 0) {
+            boxTS(ct2 - 0.08, ct2 + 0.08, bs - 0.215, bs - 0.205,
+              gy + 1.06, gy + 1.22, [0.720, 0.600, 0.090]);
+          }
+          furniture.push({ t: ct2, s: bs, a: 0.35, c: 0.24, h: 1.66, y: gy });
+        }
+        // The scooter, leaning on its stand against them. Wheels, a body, a
+        // seat and a bar: at the four metres this is ever seen from, a scooter
+        // is a dark low mass with two black discs under it and a blue helmet
+        // on the seat, and the helmet is the part you actually notice.
+        const st2 = bt + 0.35, ss2 = bs - 0.85, gy2 = surfaceY(st2, ss2);
+        const DK2 = [0.085, 0.085, 0.092];
+        const BODY2 = [0.135, 0.170, 0.255];
+        for (const o of [-0.62, 0.58]) {
+          post(W, st2 + o, ss2, gy2 + 0.02, gy2 + 0.06, 0.27, DK2, 12);
+        }
+        boxTS(st2 - 0.52, st2 + 0.30, ss2 - 0.11, ss2 + 0.11, gy2 + 0.34,
+          gy2 + 0.62, BODY2, shade(BODY2, 1.18));
+        boxTS(st2 - 0.34, st2 + 0.14, ss2 - 0.13, ss2 + 0.13, gy2 + 0.62,
+          gy2 + 0.72, DK2, shade(DK2, 1.30));
+        boxTS(st2 + 0.24, st2 + 0.46, ss2 - 0.09, ss2 + 0.09, gy2 + 0.52,
+          gy2 + 1.04, BODY2);
+        boxTS(st2 + 0.34, st2 + 0.44, ss2 - 0.24, ss2 + 0.24, gy2 + 1.00,
+          gy2 + 1.06, DK2);
+        const HELM = [0.115, 0.230, 0.485];
+        dome(W, st2 - 0.10, ss2, gy2 + 0.72, 0.20, 0.14, HELM, 7);
+        furniture.push({ t: st2, s: ss2, a: 0.68, c: 0.24, h: 1.06, y: gy2 });
+        // And the barrier tape across the lane end, which is the loudest thing
+        // in the frame and is two posts and a stripe.
+        const ta = S.t1 + 0.6, tc = S.t1 + 3.9, ts2 = S.s0 + 2.4;
+        for (const t2 of [ta, tc]) {
+          const gy3 = surfaceY(t2, ts2);
+          post(W, t2, ts2, gy3, gy3 + 1.02, 0.026, [0.480, 0.472, 0.452], 5);
+        }
+        const gy4 = surfaceY((ta + tc) * 0.5, ts2);
+        for (let t2 = ta; t2 < tc - 0.01; t2 += 0.22) {
+          boxTS(t2, Math.min(t2 + 0.22, tc), ts2 - 0.004, ts2 + 0.004,
+            gy4 + 0.92, gy4 + 0.99,
+            ((t2 - ta) / 0.22 | 0) % 2 ? [0.700, 0.694, 0.672]
+              : [0.560, 0.075, 0.070]);
+        }
+      }
+
       // 174947. The canopy is on green steel with a diagonal brace at every
       // head, and there is a yellow ice-cream cart standing under it with
       // pressed panels on the side.
@@ -8697,6 +8894,109 @@ async function buildJadrija(scene) {
   }
   // The placement, stated: the third frontage along, east of the palisade.
   lavenderBank(259.0, 291.0, 40.4);
+
+  /**
+   * The little free library, off `_367`, `_368` and `_369`.
+   *
+   * "A wooden box on two steel posts with a lift-up lid full of books, and
+   * beside it a white panel painted with a row of coloured book spines. Green
+   * cast-iron and timber benches, gravel with a white limestone-block edging."
+   *
+   * `_368` is square on to it at two metres and settles the construction: a
+   * chest of stained pine boards standing on two dark steel legs, the front
+   * panel dropping down on two long galvanised strap hinges, a plank lid
+   * oversailing it at a slight rake, and one packed shelf of books behind.
+   *
+   * The books are the object. Twenty-odd spines at three to five centimetres
+   * each, all different heights and all different colours, is the only thing
+   * in the frame that could not be anything else — a plain dark slot behind a
+   * timber box is a meter cupboard.
+   *
+   * Placed, not measured: none of the three frames carries GPS. It stands at
+   * the wood edge east of the lavender bank, on the stretch of `walkTo` a
+   * walker actually passes, which is the same class of decision the tents, the
+   * trailer and the waste sign in the wood ship under.
+   */
+  function freeLibrary(lt, ls) {
+    const gy = surfaceY(lt, ls);
+    const TIMB3 = [0.330, 0.212, 0.118];
+    const DARKW2 = [0.215, 0.135, 0.078];
+    const LEG2 = [0.085, 0.082, 0.080];
+    const GALV2 = [0.560, 0.566, 0.570];
+    const HW = 0.76, HD = 0.22;
+    // The two legs, and they are set in from the ends the way the frame has
+    // them rather than under the corners.
+    for (const o of [-0.52, 0.52]) {
+      boxTS(lt + o - 0.035, lt + o + 0.035, ls - 0.035, ls + 0.035,
+        gy, gy + 0.60, LEG2);
+    }
+    // The carcass, and the drop-front on it.
+    boxTS(lt - HW, lt + HW, ls - HD, ls + HD, gy + 0.56, gy + 1.00,
+      TIMB3, shade(TIMB3, 1.14));
+    boxTS(lt - HW + 0.02, lt + HW - 0.02, ls - HD - 0.022, ls - HD + 0.002,
+      gy + 0.58, gy + 0.98, shade(TIMB3, 1.10), shade(TIMB3, 1.18));
+    for (const o of [-0.34, 0.34]) {
+      boxTS(lt + o - 0.035, lt + o + 0.035, ls - HD - 0.032, ls - HD - 0.020,
+        gy + 0.58, gy + 0.99, GALV2);
+    }
+    // The open bay: a back, two ends, and a shelf across the bottom of it.
+    boxTS(lt - HW, lt + HW, ls + HD - 0.05, ls + HD, gy + 1.00, gy + 1.44,
+      DARKW2, shade(DARKW2, 1.12));
+    for (const o of [-1, 1]) {
+      boxTS(lt + o * HW - o * 0.05, lt + o * HW, ls - HD, ls + HD,
+        gy + 1.00, gy + 1.44, DARKW2, shade(DARKW2, 1.16));
+    }
+    boxTS(lt - HW, lt + HW, ls - HD, ls + HD, gy + 1.00, gy + 1.04,
+      shade(DARKW2, 0.86));
+    // The books. Twenty-two spines, none the same height and none the same
+    // colour, packed tight and leaning at the right-hand end because the shelf
+    // is not quite full — which is what every one of these looks like.
+    const SPINE = [
+      [0.520, 0.150, 0.115], [0.115, 0.235, 0.480], [0.640, 0.560, 0.140],
+      [0.145, 0.375, 0.205], [0.480, 0.470, 0.440], [0.310, 0.130, 0.335],
+      [0.585, 0.330, 0.095], [0.090, 0.330, 0.360], [0.700, 0.690, 0.650],
+      [0.180, 0.180, 0.195],
+    ];
+    let bx = lt - HW + 0.07;
+    for (let i = 0; bx < lt + HW - 0.16; i++) {
+      const w = 0.028 + 0.022 * ((i * 7) % 3);
+      const hgt = 0.20 + 0.055 * ((i * 5) % 4);
+      const col = SPINE[(i * 3) % SPINE.length];
+      boxTS(bx, bx + w, ls - HD + 0.04, ls + HD - 0.055,
+        gy + 1.04, gy + 1.04 + hgt, col, shade(col, 1.20));
+      bx += w + 0.006;
+    }
+    // The lid: one plank, oversailing all round and raked back, dark with the
+    // weather on it.
+    bar(lt - HW - 0.08, lt + HW + 0.08,
+      [[ls - HD - 0.10, gy + 1.42], [ls + HD + 0.08, gy + 1.50],
+        [ls + HD + 0.08, gy + 1.56], [ls - HD - 0.10, gy + 1.48]],
+      DARKW2, shade(DARKW2, 1.20));
+    furniture.push({ t: lt, s: ls, a: 0.82, c: 0.30, h: 1.56, y: gy });
+    // The bench beside it: green cast-iron ends and timber slats, which is the
+    // same bench the park has and the frame has one of them a metre away.
+    const bt2 = lt + 1.55, gy2 = surfaceY(bt2, ls);
+    const IRONG = [0.075, 0.185, 0.115];
+    const SLAT2 = [0.235, 0.390, 0.230];
+    for (const o of [-0.62, 0.62]) {
+      boxTS(bt2 + o - 0.035, bt2 + o + 0.035, ls - 0.26, ls + 0.24,
+        gy2, gy2 + 0.44, IRONG);
+      boxTS(bt2 + o - 0.030, bt2 + o + 0.030, ls + 0.16, ls + 0.24,
+        gy2 + 0.44, gy2 + 0.92, IRONG);
+    }
+    for (let k = 0; k < 3; k++) {
+      boxTS(bt2 - 0.70, bt2 + 0.70, ls - 0.24 + k * 0.16,
+        ls - 0.24 + k * 0.16 + 0.12, gy2 + 0.42, gy2 + 0.47,
+        SLAT2, shade(SLAT2, 1.16));
+    }
+    for (let k = 0; k < 3; k++) {
+      boxTS(bt2 - 0.70, bt2 + 0.70, ls + 0.17, ls + 0.22,
+        gy2 + 0.52 + k * 0.14, gy2 + 0.63 + k * 0.14,
+        SLAT2, shade(SLAT2, 1.16));
+    }
+    furniture.push({ t: bt2, s: ls, a: 0.74, c: 0.30, h: 0.92, y: gy2 });
+  }
+  freeLibrary(303.5, 40.2);
 
   /**
    * The big agave in a limestone rockery. `a_112` and `a_113` in v595, `b_096`
@@ -24548,7 +24848,7 @@ async function buildJadrija(scene) {
       if (s < JAD.reachIn) return true;
       return !isSea(x, z);
     },
-    blockers, local, toWorld, walkY, inField, vik,
+    blockers, local, toWorld, walkY, inField, vik, stoneBays,
     /**
      * The four trampoline beds, in world metres, and which one you are on.
      *

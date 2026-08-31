@@ -8,6 +8,65 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.159.0] — 2026-08-31
+
+### Two huts somebody paid for, a library in the pines, and Trampulin's lane
+
+**Two kabine out of eighty are faced in stone.** Survey/4, frames 3:42 and
+3:45: "two bays are faced in crazy-paving limestone, white and ochre flags with
+wide mortar joints, with a white PVC door in them. They are somebody's own
+improvement and there are only two, which is exactly why they are worth having:
+a hundred metres of identical treatment with two exceptions in it is what a row
+of privately owned huts looks like."
+
+Two, and exactly two. The first cut picked them with a modulo on the bay index
+and that is the wrong shape of rule — the runs are laid out by `rng` and their
+lengths vary, so `(k * 13 + t0 * 7) % 37` is a lottery over a number of bays
+nobody controls: it can come out two, it can come out none, and which it is
+changes the day a run is one hut longer. They are counted now, the 17th and the
+52nd, and `__fr.jad.raw().stoneBays` says where they landed, because "the 17th
+bay in the block" is not a place anybody can go and look at.
+
+The flags had to stop lining up. Every row starting at the same left edge came
+out COURSED — regular rows of near-equal blocks, which is ashlar, and ashlar is
+the one thing crazy paving is defined by not being. Each row now starts at a
+different offset and is cut short by it, so no vertical joint sits above
+another. The bays get a white PVC door with a moulded panel and a lever handle,
+and no hasp: the whole of the improvement is that somebody replaced the joinery
+as well as the wall.
+
+**The transom has three kinds instead of one.** "Every door has a small
+horizontal light over it, the frame painted with the door and the pane dark or
+wire. The model draws this and draws it as a slot with three bars, which is
+right for HALF of them." Three bars, a dark pane, and chicken wire — a grid
+fine enough that at five metres it is a grey haze with a frame round it —
+dealt off the bay index, never `rng`.
+
+**The little free library.** `_367`, `_368` and `_369`, and `_368` is square on
+to it at two metres: a chest of stained pine boards on two dark steel legs, the
+front dropping down on two long galvanised strap hinges, a plank lid
+oversailing it at a rake, and one packed shelf of books behind. The books are
+the object — twenty-odd spines at three to five centimetres, no two the same
+height and no two the same colour. A plain dark slot behind a timber box is a
+meter cupboard. A green cast-iron and timber bench goes beside it, which the
+frame has a metre away.
+
+Placed, not measured: none of the three frames carries GPS. It stands at the
+wood edge east of the lavender bank, on the stretch of `walkTo` a walker
+actually passes — the same class of decision the tents, the trailer and the
+waste sign in the wood ship under.
+
+**And Trampulin's lane side.** `b_106` lists five things and the name, the
+bench and the roof went in on 24 August; the other three did not. Two tall
+pale-grey electrical cabinets with a yellow label on one, a scooter parked
+across their front with a blue helmet on the seat, and red-and-white barrier
+tape closing the lane end. They went against the west wall first, which is a
+0.4 m slot between this building and the next where nothing can see them;
+`b_106` has them out clear of the terrace.
+
++5 400 triangles over the two releases. 61 fps on the promenade, 60 square on to
+a kabine run, 60 at the library. Census untouched.
+
 ## [1.158.0] — 2026-08-31
 
 ### Tisak gets its shade, and the konoba gets its terrace

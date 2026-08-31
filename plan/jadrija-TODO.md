@@ -588,7 +588,9 @@ bed. See the commit.
   pass with a count of what is really there — Jadrija's kabina count is a
   published number and nobody has looked it up — and a plan for the geometry,
   not a constant edited on a Sunday.
-- **Two doors that are not on the model at all.** Frames 3:42 and 3:45: two
+- ~~**Two doors that are not on the model at all.**~~ BUILT 31 Aug as the
+  17th and 52nd bay in the block, counted rather than chosen by a modulo —
+  see `__fr.jad.raw().stoneBays`. Frames 3:42 and 3:45: two
   bays are faced in **crazy-paving limestone**, white and ochre flags with wide
   mortar joints, with a white PVC door in them. They are somebody's own
   improvement and there are only two, which is exactly why they are worth
@@ -611,7 +613,9 @@ bed. See the commit.
   through a louvred shutter: a **blue-framed camp bed**, a table under a
   checked cloth, a pink curtain. The one room the game has is furnished off the
   August batch and this is a second and third example of the same room.
-- **The transom is glazed or meshed and framed in the door's colour.** 0:39 is
+- ~~**The transom is glazed or meshed and framed in the door's colour.**~~
+  BUILT 31 Aug: three bars, a dark pane, or chicken wire, dealt off the bay
+  index. 0:39 is
   the clearest: every door has a small horizontal light over it, the frame
   painted with the door and the pane dark or wire. The model draws this and
   draws it as a slot with three bars, which is right for half of them.
@@ -627,7 +631,8 @@ bed. See the commit.
 - **The fish-head tap.** _358/_359: a bronze spout cast as a fish, bolted to a
   two-metre block of orange-ochre limestone with a stone trough under it, on a
   pebble bed. It is the only piece of sculpture at Jadrija.
-- **The little free library.** _367/_368/_369: a wooden box on two steel posts
+- ~~**The little free library.**~~ BUILT 31 Aug at t 303.5, s 40.2 — a
+  placement, since none of the three frames carries GPS. _367/_368/_369: a wooden box on two steel posts
   with a lift-up lid full of books, and beside it a white panel painted with a
   row of coloured book spines. Green cast-iron and timber benches, gravel with
   a white limestone-block edging.
@@ -681,9 +686,12 @@ bed. See the commit.
   no lane, no parking, no walls.
 - **b_046** as under OPEN.
 - **b_076** the dust parking, as under OPEN.
-- **b_106** Caffe TRAMPULIN: name on the wall; two tall pale-grey electrical
-  cabinets, a scooter against them, a picnic bench, red-and-white barrier tape,
-  translucent corrugated roof on green steel over the side terrace.
+- ~~**b_106** Caffe TRAMPULIN~~ — ALL BUILT. Name, bench and roof
+  24 Aug; the two tall pale-grey electrical cabinets, the scooter against them
+  and the red-and-white barrier tape 31 Aug. The cabinets went against the west
+  wall first, which is a 0.4 m slot between this building and the next where
+  nothing can see them; they stand clear of the terrace now, which is where the
+  frame has them.
 - ~~**b_016** green mesh fence panels~~ — built 22 Aug. Position along the
   shore is a placement, not a measurement: v597 has no GPS.
 - ~~**a_192 / b_026** the wood-edge kerb blocks~~ — built 23 Aug, and it is
