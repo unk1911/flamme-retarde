@@ -8,6 +8,78 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.155.0] — 2026-08-31
+
+### Pizzeria F2, Kod Kose, and a kiosk that is mostly crates
+
+Two more off the survey backlog, and a third item that turned out to be a
+misidentification rather than a job.
+
+**The pizzeria had four names and the game had none of them.** `1000150335` is
+square on to the whole frontage and reads all four: a small red-on-white
+PIZZERIA plate under the eaves, PIZZERIA again hand-painted on the render below
+the window in a thin dark hand, a fat red F2 beside it, and KOD-KOSE written
+DOWN the corner return, one letter to a line. The survey note spells that last
+one "Kod Koze"; the frame has an S. What shipped instead was a 5.6 m cream
+fascia board with PIZZERIA / F2 centred on it, which is a signwritten board
+this shop has never had.
+
+Two new flags carry it. `painted` suppresses the fascia, and `solid` suppresses
+the serving hole and everything `shopKit` hangs off it — counter, mullions and
+flanking boards — because this frontage is a wall with a shuttered window in it
+and the way in is round the corner and up the steps. What is there now: the
+window in two dark green louvred leaves, the three painted names, a wall
+planter, a lantern on a stone plinth, the Ledo chest freezer at the foot of
+three rubble steps, a stainless extraction hood and its flue over the kitchen
+door, a pergola of timber on green steel with a translucent deck, and four
+lemon monobloc chairs round a mosaic table — which the boardwalk's `terraceSet`
+could never have drawn, because it only fires under an awning and this shop has
+none.
+
+**Anything laid on a shop wall here needs 0.14 m of standoff before it is drawn
+at all.** The shutters went in at 0.075 m proud and did not exist. Painted
+magenta and stepped 0.02, 0.05, 0.08, 0.11, 0.14 and 0.17 in one screenshot,
+the bottom four were not there and the top two were. It is the same threshold
+the slastičarnica's mirror found from the other side yesterday — it hangs at
+s0-0.11 and disappears at s0-0.08 — and it is why every `shopSign` on this
+boardwalk sits at s0-0.14. Written into the source this time, because it has
+now been rediscovered twice.
+
+Two smaller things the same pass caught. A canvas that is clear except for its
+glyphs draws as an opaque black rectangle unless the material is `transparent`,
+so `seaFacing` now asks the texture. And the kitchen recess was drawn with a
+filled reveal box in front of it, which is a pale grey slab exactly the size of
+the hole; it is a frame of three members now.
+
+**The green kiosk is where the drink is kept.** `1000150342`: it shipped as
+three metres of flat bottle green with a terracotta pitched roof and nothing
+else. The frame has fourteen stacked crates against the wall and out into the
+track, a keg, two wheelie bins, a slatted timber crate leaning by the door, and
+a folding yellow barrier closing the service track behind. The building itself
+is sheet with standing joints, a big window and a glazed door each under a
+scrolled iron canopy, a guard rail across the window, and a pale barge board —
+and its green is 0.235/0.470/0.185, off 199/254/127 in full sun and 116/174/94
+on a half-lit face, rather than the bottle green that was there.
+
+Crates get a dark top face. A full crate shows twenty-four bottle tops from
+above whatever colour the crate is, and without that a stack is a column of
+coloured bricks. The wheelie bins' lids are a shade DOWN from the body and
+overhang it: lighter and flush is not a lid, it is a bright band round the top
+of a green box.
+
+**And the konoba is not the konoba.** The survey note lists "the konoba at
+_336/_337: green-grey fibre-cement sheet on a timber pergola over a whitewashed
+rubble base". Checked against `20260821_175856`, which is what the game's
+konoba was actually built from: that is a different building, a thatched roof
+on green steel posts with a teal counter and scarlet and lime stools on crazy
+paving, and the game has it and has it right. _336/_337 is a third business
+nobody has placed — heavy timber frame, sage-green rendered piers, a sage-green
+tubular rail with X-braces, a Croatian flag, and a painted blue wave filling
+the gable next door. Neither frame carries GPS. Recorded, not built: somebody
+has to say where it goes first.
+
++2 504 triangles. 60 fps at the pizzeria, 61 at the kiosk. Census untouched.
+
 ## [1.154.0] — 2026-08-31
 
 ### Somebody behind the counter, and Tisak is a newsagent

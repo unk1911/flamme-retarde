@@ -627,9 +627,17 @@ bed. See the commit.
   row of coloured book spines. Green cast-iron and timber benches, gravel with
   a white limestone-block edging.
 - **Pizzeria Kod Koze** (_335): grey render, terracotta pantiles, yellow
-  monobloc chairs on crazy paving. **The konoba at _336/_337**: green-grey
-  fibre-cement sheet on a timber pergola over a whitewashed rubble base, green
-  posts, a mosaic mural. **The green kiosk** (_342): bright green painted
+  monobloc chairs on crazy paving. **The timber shelter at _336/_337**: green-grey
+  fibre-cement sheet on a heavy timber frame over a whitewashed rubble base,
+  sage-green rendered piers, a sage-green tubular rail with X-braces standing
+  on the wall, a Croatian flag on a pole, and a painted blue wave filling the
+  gable of the building next door. **NOT the game's konoba** — checked
+  31 Aug against `20260821_175856`, which is what that one was built from and
+  is a different building forty metres away: a thatched roof on green steel
+  posts with a teal counter and scarlet and lime stools on crazy paving. The
+  game has the thatched bar and has never had this. Neither frame carries
+  GPS, so anything built from them is a placement and it wants somebody to
+  say where first. **The green kiosk** (_342): bright green painted
   metal, beer crates stacked outside, a yellow barrier, three wheelie bins
   and a keg. **CORRECTED 31 Aug** — this entry ran two buildings together
   and gave the wrong one a sign. _342 is the green kiosk and there is no

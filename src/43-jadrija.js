@@ -2279,9 +2279,14 @@ async function buildJadrija(scene) {
   //   canopy  posts and a roof and no walls at all
   //   fence   posts and rails and a stipple quad for the mesh
   const SHOPS = [
+    // Pizzeria F2, and Kod Kose, and the render is grey rather than the
+    // boardwalk's cream. `solid` because its frontage has no serving opening
+    // at all and `painted` because none of its four names is on a board — see
+    // `pizzeriaFront`, and `1000150335`, which reads all four.
     { key: 'f2', kind: 'box', t0: 200, t1: 213, s0: 30, s1: 37.2, h: 2.6,
       name: 'PIZZERIA', sub: 'F2', roof: [0.430, 0.252, 0.180],
-      body: [0.560, 0.535, 0.487], awn: 0, fg: '#b03024', bg: '#efeade' },
+      body: [0.510, 0.512, 0.518], awn: 0, fg: '#b03024', bg: '#efeade',
+      solid: true, painted: true },
     { key: 'konoba', kind: 'canopy', t0: 240, t1: 252, s0: 10, s1: 19, h: 2.7,
       name: null, roof: [0.330, 0.285, 0.205], post: [0.055, 0.150, 0.115],
       body: [0.075, 0.290, 0.250] },
@@ -2300,8 +2305,18 @@ async function buildJadrija(scene) {
       // every other cafe on the boardwalk has. See `bigShade`.
       shade: { canvas: [0.508, 0.468, 0.352], mast: [0.335, 0.340, 0.348],
         block: [0.500, 0.487, 0.440] } },
+    // The green kiosk of `1000150342`, and it is the drinks store for this end
+    // of the boardwalk rather than a shop you buy from: what is in the frame
+    // is fourteen stacked crates, a keg, two wheelie bins and a folding
+    // barrier across the track behind it. Nothing on it carries a name.
+    //
+    // The green was 0.130/0.400/0.130 and the frame will not support it. In
+    // full sun the cladding measures 199/254/127 and on a half-lit face
+    // 116/174/94, which is a fresh grass green rather than the bottle green
+    // that was here. The roof is pale sheet, not the terracotta every other
+    // kiosk on this shore has.
     { key: 'kiosk', kind: 'kiosk', t0: 290, t1: 293, s0: 20, s1: 23, h: 2.4,
-      name: null, roof: [0.430, 0.252, 0.180], body: [0.130, 0.400, 0.130] },
+      name: null, roof: [0.545, 0.545, 0.528], body: [0.235, 0.470, 0.185] },
     // 1000150343, square on to the whole of it, and the shop it shows is not
     // the shop the survey note describes. That note reads "the green kiosk
     // (_342/_343): bright green painted metal with a TISAK sign, beer crates
@@ -3088,15 +3103,19 @@ async function buildJadrija(scene) {
         top + 0.02, top + 0.11, STEEL);
       boxTS(S.t0 - 0.42, S.t0 - 0.34, fs - 0.05, fs + 0.05, y0, top + 0.02, STEEL);
     }
-    // The serving counter, and the mullions standing in the opening.
-    boxTS(oa - 0.10, oc + 0.10, S.s0 - 0.34, S.s0 + 0.06, y0 + 0.98, y0 + 1.06,
-      shade(body, 0.72), shade(body, 0.92));
-    boxTS(oa, oc, S.s0 - 0.28, S.s0 - 0.02, y0 + 0.10, y0 + 0.98, shade(body, 0.62));
-    const nmul = Math.max(2, Math.round((oc - oa) / 1.5));
-    for (let k = 1; k < nmul; k++) {
-      const t = oa + (oc - oa) * (k / nmul);
-      boxTS(t - 0.035, t + 0.035, S.s0 - 0.03, S.s0 + 0.07, y0 + 1.06, top - 0.34,
-        shade(body, 0.78));
+    // The serving counter, and the mullions standing in the opening. Skipped
+    // on a `solid` frontage, which has neither because it has no opening.
+    if (!S.solid) {
+      boxTS(oa - 0.10, oc + 0.10, S.s0 - 0.34, S.s0 + 0.06, y0 + 0.98, y0 + 1.06,
+        shade(body, 0.72), shade(body, 0.92));
+      boxTS(oa, oc, S.s0 - 0.28, S.s0 - 0.02, y0 + 0.10, y0 + 0.98,
+        shade(body, 0.62));
+      const nmul = Math.max(2, Math.round((oc - oa) / 1.5));
+      for (let k = 1; k < nmul; k++) {
+        const t = oa + (oc - oa) * (k / nmul);
+        boxTS(t - 0.035, t + 0.035, S.s0 - 0.03, S.s0 + 0.07, y0 + 1.06,
+          top - 0.34, shade(body, 0.78));
+      }
     }
     // The threshold, a boot-worn strip of a different concrete.
     boxTS(S.t0 + 0.3, S.t1 - 0.3, S.s0 - 0.55, S.s0 - 0.05, y0, y0 + 0.06,
@@ -3108,9 +3127,11 @@ async function buildJadrija(scene) {
     // Two boards flanking the opening — menus, prices, a beer plaque. Panels
     // rather than lettering: the survey could read three prices on the whole
     // boardwalk and inventing the rest would be the one thing worth not doing.
-    for (const [t, w] of [[oa - 0.42, 0.34], [oc + 0.42, 0.30]]) {
-      boxTS(t - w * 0.5, t + w * 0.5, S.s0 - 0.05, S.s0 + 0.02,
-        y0 + 1.15, y0 + 1.85, DARK, shade(body, 0.9));
+    if (!S.solid) {
+      for (const [t, w] of [[oa - 0.42, 0.34], [oc + 0.42, 0.30]]) {
+        boxTS(t - w * 0.5, t + w * 0.5, S.s0 - 0.05, S.s0 + 0.02,
+          y0 + 1.15, y0 + 1.85, DARK, shade(body, 0.9));
+      }
     }
     // A downpipe off the back corner and a pair of pots at the front ones.
     post(W, S.t1 - 0.12, S.s1 - 0.10, y0, top, 0.045, STEEL, 5);
@@ -4967,12 +4988,20 @@ async function buildJadrija(scene) {
    * finding a thing that will not render is to name the mesh, and sixteen
    * identical black plaques in a row cannot be told apart by position.
    */
-  function seaFacing(tex, t, s, y, w, h, name) {
+  function seaFacing(tex, t, s, y, w, h, name, turn = 0) {
     const st = at(t), p = W(t, s, y);
+    // `transparent` off unless the texture has holes in it. A canvas that is
+    // clear except for its glyphs — which is what `paintedWord` makes — draws
+    // as an opaque black rectangle without it, because alpha is written and
+    // never blended.
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
-      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide,
+        transparent: !!tex.userData.clear, depthWrite: !tex.userData.clear }));
     mesh.position.set(p[0], p[1], p[2]);
-    mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
+    // `turn` is a quarter turn about the vertical for anything painted on a
+    // return wall rather than on the frontage. Kod Kose is written down the
+    // corner of the pizzeria and there was no way to say that before.
+    mesh.rotation.y = Math.atan2(-st.nx, -st.nz) + turn;
     if (name) mesh.name = name;
     scene.add(mesh);
     return mesh;
@@ -5685,6 +5714,505 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * The green kiosk, off `1000150342`.
+   *
+   * It shipped as three metres of flat green with a terracotta pitched roof
+   * and nothing else, which is the generic kiosk with a colour on it. The
+   * frame has a great deal more and almost none of it is the building: this is
+   * where the drink for this end of the boardwalk is kept, and what you
+   * actually see is a wall of crates.
+   */
+  function greenKiosk(S, y0, top) {
+    const body = S.body;
+    const DK = [0.062, 0.148, 0.075];         // the joinery, near-black green
+    const IRON = [0.055, 0.055, 0.058];
+    const GLASS = [0.072, 0.098, 0.088];
+    const YEL = [0.720, 0.560, 0.075];
+
+    // ── the cladding, which is sheet with standing joints ───────────────────
+    for (let t = S.t0 + 0.5; t < S.t1 - 0.2; t += 0.72) {
+      boxTS(t - 0.030, t + 0.030, S.s0 - 0.20, S.s0 - 0.15, y0 + 0.05,
+        top - 0.05, shade(body, 0.82));
+    }
+    boxTS(S.t0, S.t1, S.s0 - 0.19, S.s0 - 0.15, y0 + 0.05, y0 + 0.11,
+      shade(body, 0.82));
+    // The barge board at the gable: pale, and the only pale thing on it.
+    boxTS(S.t0 - 0.12, S.t1 + 0.12, S.s0 - 0.22, S.s0 - 0.14, top - 0.11, top,
+      [0.520, 0.518, 0.500], [0.548, 0.546, 0.530]);
+
+    // ── the window and the door, each under its own arched canopy ──────────
+    const wt = S.t0 + 0.95, dt = S.t1 - 0.78;
+    // The window: a big pane in a heavy dark green frame, with the shelves of
+    // the store behind it just readable.
+    boxTS(wt - 0.62, wt + 0.62, S.s0 - 0.27, S.s0 - 0.19, y0 + 0.86, y0 + 2.02,
+      DK, shade(DK, 1.30));
+    boxTS(wt - 0.53, wt + 0.53, S.s0 - 0.24, S.s0 - 0.21, y0 + 0.94, y0 + 1.94,
+      GLASS);
+    for (let k = 0; k < 3; k++) {
+      const sy = y0 + 1.02 + k * 0.32;
+      boxTS(wt - 0.48, wt + 0.48, S.s0 - 0.232, S.s0 - 0.222, sy, sy + 0.11,
+        [0.235, 0.250, 0.230], [0.265, 0.280, 0.258]);
+    }
+    // The doorway, and the leaf standing open on to the step.
+    boxTS(dt - 0.52, dt + 0.52, S.s0 - 0.26, S.s0 - 0.19, y0, y0 + 2.10,
+      DK, shade(DK, 1.30));
+    boxTS(dt - 0.42, dt + 0.42, S.s0 - 0.22, S.s0 - 0.14, y0 + 0.02, y0 + 2.00,
+      [0.048, 0.052, 0.046]);
+    boxTS(dt + 0.44, dt + 0.49, S.s0 - 0.96, S.s0 - 0.20, y0 + 0.02, y0 + 2.00,
+      DK, shade(DK, 1.24));
+    boxTS(dt + 0.452, dt + 0.482, S.s0 - 0.90, S.s0 - 0.28, y0 + 0.50,
+      y0 + 1.86, GLASS);
+    // The two canopies. In the frame they are wrought iron scrolled up into a
+    // shallow arch with a sheet over them; at this size an arch is three short
+    // boxes stepping up and that is enough to say bracket rather than shelf.
+    for (const ct of [wt, dt]) {
+      for (let k = 0; k < 4; k++) {
+        const w2 = 0.62 - k * 0.055, yy = top - 0.52 + k * 0.055;
+        boxTS(ct - w2, ct + w2, S.s0 - 0.36 - k * 0.045, S.s0 - 0.30 - k * 0.045,
+          yy, yy + 0.05, IRON);
+      }
+      for (const o of [-0.58, 0.58]) {
+        boxTS(ct + o - 0.022, ct + o + 0.022, S.s0 - 0.34, S.s0 - 0.20,
+          top - 0.52, top - 0.28, IRON);
+      }
+    }
+    // The guard rail across the window, which is what stops anybody stepping
+    // off the step into the crates.
+    for (const o of [-0.68, 0.0, 0.68]) {
+      post(W, wt + o, S.s0 - 0.72, y0, y0 + 0.92, 0.024, IRON, 5);
+    }
+    for (const yy of [y0 + 0.86, y0 + 0.50]) {
+      boxTS(wt - 0.70, wt + 0.70, S.s0 - 0.745, S.s0 - 0.695, yy, yy + 0.045,
+        IRON);
+    }
+
+    // ── the crates, which are most of what this place looks like ───────────
+    //
+    // Colours off the frame and no lettering on any of them: Ozujsko yellow,
+    // Pepsi blue, Jamnica blue, Heineken green, and the black bottle crates
+    // that carry the empties back. A crate is 0.40 by 0.30 by 0.28, stacked
+    // four and five high against the wall and out into the track.
+    {
+      const CR = [
+        [0.585, 0.455, 0.080], [0.085, 0.180, 0.440], [0.125, 0.235, 0.475],
+        [0.075, 0.215, 0.115], [0.058, 0.058, 0.062], [0.455, 0.452, 0.440],
+      ];
+      // What a full crate shows from above is twenty-four bottle tops, which
+      // is dark whatever the crate is. Without it a stack is a column of
+      // coloured bricks and reads as toy.
+      const TOPS = [0.085, 0.082, 0.072];
+      const stacks = [
+        [S.t0 - 1.65, S.s0 - 0.95, 4], [S.t0 - 1.20, S.s0 - 1.35, 5],
+        [S.t0 - 0.62, S.s0 - 1.02, 3], [S.t0 + 0.10, S.s0 - 1.55, 5],
+        [S.t0 + 0.62, S.s0 - 1.20, 4], [S.t1 - 1.10, S.s0 - 1.62, 5],
+        [S.t1 - 0.55, S.s0 - 1.15, 3],
+      ];
+      let n = 0;
+      for (const [ct, cs, hi] of stacks) {
+        const gy = surfaceY(ct, cs);
+        for (let k = 0; k < hi; k++) {
+          const col = CR[(n * 3 + k * 2) % CR.length];
+          const yy = gy + k * 0.268;
+          boxTS(ct - 0.185, ct + 0.185, cs - 0.140, cs + 0.140, yy, yy + 0.235,
+            col, TOPS);
+          // The lip, which is what makes a stack of crates read as crates and
+          // not as a column of coloured bricks.
+          boxTS(ct - 0.190, ct + 0.190, cs - 0.145, cs + 0.145,
+            yy + 0.230, yy + 0.262, shade(col, 1.26), TOPS);
+          n++;
+        }
+        furniture.push({ t: ct, s: cs, a: 0.22, c: 0.18, h: hi * 0.268, y: gy });
+      }
+    }
+    // The keg, on its side of the crates.
+    {
+      const kt = S.t0 - 0.95, ks = S.s0 - 1.95, gy = surfaceY(kt, ks);
+      const STEEL2 = [0.545, 0.552, 0.560];
+      post(W, kt, ks, gy, gy + 0.58, 0.21, STEEL2, 10);
+      post(W, kt, ks, gy + 0.56, gy + 0.62, 0.17, shade(STEEL2, 0.86), 10);
+      furniture.push({ t: kt, s: ks, a: 0.23, c: 0.23, h: 0.62, y: gy });
+    }
+    // Two wheelie bins on the dirt at the east end, and a slatted timber crate
+    // leaning on the wall by the door.
+    {
+      const GREENB = [0.135, 0.215, 0.125];
+      for (const [bt, bs] of [[S.t1 + 0.85, S.s0 - 1.45], [S.t1 + 1.55, S.s0 - 1.30]]) {
+        const gy = surfaceY(bt, bs);
+        boxTS(bt - 0.29, bt + 0.29, bs - 0.30, bs + 0.30, gy + 0.20, gy + 1.00,
+          GREENB, shade(GREENB, 1.16));
+        boxTS(bt - 0.25, bt + 0.25, bs - 0.26, bs + 0.26, gy + 0.09, gy + 0.22,
+          shade(GREENB, 0.70));
+        // The lid is a shade DOWN from the body and overhangs it, not up. A
+        // lighter lid flush with the sides is not a lid, it is a green box
+        // with a bright band round the top of it, which is what the first cut
+        // of these looked like from three metres.
+        boxTS(bt - 0.31, bt + 0.31, bs - 0.34, bs + 0.34, gy + 1.00, gy + 1.09,
+          shade(GREENB, 0.80), shade(GREENB, 0.92));
+        for (const o of [-0.22, 0.22]) {
+          post(W, bt + o, bs + 0.24, gy, gy + 0.09, 0.075, IRON, 6);
+        }
+        furniture.push({ t: bt, s: bs, a: 0.32, c: 0.34, h: 1.07, y: gy });
+      }
+      const TIMB2 = [0.330, 0.245, 0.165];
+      const lt = S.t1 - 0.05, ls = S.s0 - 0.55, gy = surfaceY(lt, ls);
+      for (let k = 0; k < 5; k++) {
+        boxTS(lt - 0.26, lt + 0.26, ls - 0.09 - k * 0.02, ls - 0.03 - k * 0.02,
+          gy + 0.10 + k * 0.22, gy + 0.20 + k * 0.22, TIMB2,
+          shade(TIMB2, 1.12));
+      }
+      for (const o of [-0.24, 0.24]) {
+        boxTS(lt + o - 0.03, lt + o + 0.03, ls - 0.20, ls - 0.02, gy,
+          gy + 1.20, TIMB2);
+      }
+    }
+
+    // ── and the folding barrier across the track behind it ──────────────────
+    //
+    // Two yellow tubes and an upright, which is what closes this track to cars
+    // and leaves it open to anybody on foot. It is the yellow in the frame and
+    // it is thirty metres of it.
+    {
+      // Inland of the kiosk, on the track. The first cut put it at s0-3.35,
+      // which is out on the promenade in front of the shop: a barrier there
+      // closes the boardwalk rather than the service track, and the frame is
+      // taken standing on the track with the kiosk beyond it.
+      const bs2 = S.s1 + 2.20;
+      for (const [ba, bc] of [[S.t0 - 6.4, S.t0 - 3.3], [S.t0 - 3.1, S.t0 - 1.6]]) {
+        const gy = surfaceY((ba + bc) * 0.5, bs2);
+        boxTS(ba, bc, bs2 - 0.05, bs2 + 0.05, gy + 0.80, gy + 0.90, YEL,
+          shade(YEL, 1.16));
+        post(W, bc, bs2, gy, gy + 0.92, 0.055, YEL, 6);
+      }
+      const gy2 = surfaceY(S.t0 - 3.2, bs2);
+      post(W, S.t0 - 3.2, bs2, gy2, gy2 + 0.95, 0.060, YEL, 6);
+      furniture.push({ t: S.t0 - 3.2, s: bs2, a: 0.07, c: 0.07, h: 0.95,
+        y: gy2 });
+    }
+  }
+
+  /**
+   * A word painted straight on to render, in whatever hand.
+   *
+   * Three of the pizzeria's four names are this: PIZZERIA, F2 and KOD-KOSE are
+   * not signs, they are paint on the wall, and the last of them is written
+   * DOWN the corner one letter at a time. `vert` sets the letters one under
+   * another rather than rotating the whole word, because that is what somebody
+   * with a brush does and it is the only version of it that reads.
+   *
+   * Transparent, so what shows through is the shop's own render with its own
+   * light on it. A painted word on an opaque tile is a sticker.
+   */
+  function paintedWord(text, col, hh, vert = false, weight = 400, gap = 1.0) {
+    const C = document.createElement('canvas');
+    const cell = 128;
+    if (vert) {
+      C.width = cell;
+      C.height = Math.round(cell * text.length * gap);
+    } else {
+      C.width = Math.min(2048, Math.round(cell * hh));
+      C.height = cell;
+    }
+    const g = C.getContext('2d');
+    const FF = '"Trebuchet MS", "Segoe UI", "Helvetica Neue", Arial, sans-serif';
+    g.fillStyle = col;
+    g.textAlign = 'center';
+    if (vert) {
+      g.font = weight + ' ' + Math.round(cell * 0.70) + 'px ' + FF;
+      for (let i = 0; i < text.length; i++) {
+        g.fillText(text[i], C.width * 0.5, cell * (i * gap + 0.78));
+      }
+    } else {
+      g.font = weight + ' ' + Math.round(cell * 0.82) + 'px ' + FF;
+      const at100 = g.measureText(text).width || 1;
+      const size = Math.min(cell * 0.82, cell * 0.82 * (C.width * 0.94) / at100);
+      g.font = weight + ' ' + Math.round(size) + 'px ' + FF;
+      g.fillText(text, C.width * 0.5, C.height * 0.80);
+    }
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    tex.userData.clear = true;
+    return tex;
+  }
+
+  /** The little red-on-white board under the pizzeria's eaves. */
+  function pizzaBoard(w, h) {
+    const C = document.createElement('canvas');
+    C.height = 128;
+    C.width = Math.round(128 * w / h);
+    const g = C.getContext('2d');
+    g.fillStyle = '#f2efe8';
+    g.fillRect(0, 0, C.width, C.height);
+    g.strokeStyle = '#b8231f';
+    g.lineWidth = C.height * 0.09;
+    g.strokeRect(g.lineWidth * 0.5, g.lineWidth * 0.5,
+      C.width - g.lineWidth, C.height - g.lineWidth);
+    g.fillStyle = '#b8231f';
+    g.textAlign = 'left';
+    g.font = '700 ' + Math.round(C.height * 0.52) + 'px "Trebuchet MS", Arial, sans-serif';
+    g.fillText('PIZZERIA', C.width * 0.10, C.height * 0.70);
+    // The pictogram: a wedge of pizza, which is what is on the board and is
+    // two triangles and three dots at this size.
+    const cx = C.width * 0.86, cy = C.height * 0.52, r = C.height * 0.30;
+    g.beginPath();
+    g.moveTo(cx, cy - r);
+    g.lineTo(cx + r * 0.85, cy + r * 0.75);
+    g.lineTo(cx - r * 0.85, cy + r * 0.75);
+    g.closePath();
+    g.fill();
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    return tex;
+  }
+
+  /**
+   * Pizzeria F2 / Kod Kose, off `1000150335`.
+   *
+   * The survey note reads "Pizzeria Kod Koze (_335): grey render, terracotta
+   * pantiles, yellow monobloc chairs on crazy paving", and the frame settles
+   * the spelling as well as everything else: the corner reads **KOD-KOSE**,
+   * with an S, one letter to a line with a hyphen between the two words.
+   *
+   * Four names on one building and not one of them on a fascia board. A small
+   * red-on-white PIZZERIA plate under the eaves; PIZZERIA again, hand-painted
+   * on the render below the window in a thin dark hand; a fat red F2 beside
+   * it; and KOD-KOSE down the corner return. The game shipped a 5.6 m cream
+   * board with PIZZERIA / F2 centred on it, which is the one thing this shop
+   * has never had.
+   */
+  function pizzeriaFront(S, y0, top) {
+    const body = S.body;
+    const GREEN = [0.082, 0.128, 0.098];      // the shutters, near-black green
+    const TERRA = [0.415, 0.300, 0.230];
+    const STONE = [0.545, 0.522, 0.462];
+    // The gable of the little block, at the west end of the frontage. The
+    // OSM footprint is 13 m by 7.2 and this is the 3.6 m of it the photograph
+    // is of; the rest is the pergola and the kitchen behind.
+    const gc = S.t0 + 3.1;
+
+    // ── the window: two louvred leaves in a dark green frame ────────────────
+    const wLo = y0 + 1.62, wHi = y0 + 2.60;
+    //
+    // 0.16 m proud of the render and not 0.075, and that number is the whole
+    // of why this window did not exist for an afternoon. Anything laid on a
+    // shop wall here needs about 0.14 m of standoff before it is drawn at all:
+    // painted magenta and stepped 0.02, 0.05, 0.08, 0.11, 0.14, 0.17 in one
+    // screenshot, the bottom four were not there and the top two were. It is
+    // the same threshold the back bar's mirror found from the other side — it
+    // hangs at s0-0.11 and disappears at s0-0.08 — and it is why every
+    // `shopSign` on this boardwalk is placed at s0-0.14. Written down here
+    // because it was rediscovered twice in one day.
+    boxTS(gc - 0.86, gc + 0.86, S.s0 - 0.25, S.s0 - 0.16, wLo - 0.09, wHi + 0.09,
+      GREEN, shade(GREEN, 1.25));
+    // The slats. Nine to a leaf, and they are the only thing on this wall with
+    // a rhythm in it — an unlouvred green rectangle is a hole, not a shutter.
+    for (const lf of [-1, 1]) {
+      const a = gc + lf * 0.075, c = gc + lf * 0.80;
+      boxTS(Math.min(a, c), Math.max(a, c), S.s0 - 0.29, S.s0 - 0.25,
+        wLo, wHi, [0.048, 0.070, 0.056]);
+      for (let k = 0; k < 9; k++) {
+        const yy = wLo + 0.05 + k * ((wHi - wLo - 0.10) / 8);
+        boxTS(Math.min(a, c) + 0.03, Math.max(a, c) - 0.03,
+          S.s0 - 0.325, S.s0 - 0.285, yy, yy + 0.045,
+          shade(GREEN, 1.45), shade(GREEN, 1.70));
+      }
+    }
+    // The sill, and the render reveal round the opening.
+    boxTS(gc - 0.95, gc + 0.95, S.s0 - 0.34, S.s0 - 0.15, wLo - 0.15, wLo - 0.09,
+      shade(body, 1.10), shade(body, 1.18));
+
+    // ── the plate under the eaves ───────────────────────────────────────────
+    {
+      const w = 1.35, h = 0.36;
+      const bt = S.t0 + 1.35;
+      boxTS(bt - w * 0.5 - 0.03, bt + w * 0.5 + 0.03, S.s0 - 0.20, S.s0 - 0.14,
+        top - 0.52 - h * 0.5 - 0.03, top - 0.52 + h * 0.5 + 0.03,
+        [0.520, 0.510, 0.492]);
+      seaFacing(pizzaBoard(w, h), bt, S.s0 - 0.24, top - 0.52, w, h, 'f2:plate');
+    }
+
+    // ── and the three that are paint ────────────────────────────────────────
+    //
+    // As wide as the window and no wider. The first cut set it 2.30 m across
+    // in a 400 weight and it read as a heading somebody had typeset: in the
+    // frame the word is about the width of the shutters above it, thin, and
+    // sits close under the sill.
+    seaFacing(paintedWord('PIZZERIA', '#3b342c', 6.8, false, 300), gc - 0.14,
+      S.s0 - 0.16, y0 + 1.36, 1.72, 0.26, 'f2:painted');
+    // And the F2 immediately beside it, in the dull brick red of a marker that
+    // has been on a wall through a summer rather than the pillar-box red the
+    // first cut used.
+    seaFacing(paintedWord('F2', '#96241d', 1.5, false, 700), gc + 1.06,
+      S.s0 - 0.16, y0 + 1.31, 0.40, 0.34, 'f2:f2');
+    // Down the corner, on the return, which is what `turn` is for.
+    seaFacing(paintedWord('KOD-KOSE', '#3b342c', 1, true, 400, 0.94),
+      S.t1 - 0.16, S.s0 + 1.30, y0 + 2.05, 0.26, 1.95, 'f2:kod',
+      Math.PI * 0.5);
+
+    // ── the wall planter, three pockets of herbs on a grey batten ───────────
+    {
+      const pt2 = gc - 0.30, PL = [0.480, 0.478, 0.468];
+      boxTS(pt2 - 0.20, pt2 + 0.20, S.s0 - 0.21, S.s0 - 0.15,
+        y0 + 0.42, y0 + 1.16, PL);
+      for (let k = 0; k < 3; k++) {
+        const yy = y0 + 0.46 + k * 0.24;
+        boxTS(pt2 - 0.17, pt2 + 0.17, S.s0 - 0.38, S.s0 - 0.19, yy, yy + 0.14,
+          PL, shade(PL, 1.10));
+        dome(W, pt2, S.s0 - 0.30, yy + 0.14, 0.13, 0.15,
+          [0.175, 0.315, 0.155], 6);
+      }
+    }
+
+    // ── the lantern on its stone plinth at the corner ───────────────────────
+    {
+      const lt = S.t1 - 1.15, ls = S.s0 - 0.42;
+      boxTS(lt - 0.34, lt + 0.34, ls - 0.30, S.s0, y0, y0 + 0.46, STONE,
+        shade(STONE, 1.12));
+      const IRON = [0.070, 0.070, 0.074];
+      boxTS(lt - 0.11, lt + 0.11, ls - 0.11, ls + 0.11, y0 + 0.46, y0 + 0.90,
+        IRON);
+      boxTS(lt - 0.085, lt + 0.085, ls - 0.085, ls + 0.085, y0 + 0.52,
+        y0 + 0.84, [0.760, 0.740, 0.690]);
+      post(W, lt, ls, y0 + 0.90, y0 + 1.02, 0.10, IRON, 4);
+      furniture.push({ t: lt, s: ls, a: 0.36, c: 0.32, h: 1.02, y: y0 });
+    }
+
+    // ── the Ledo chest freezer at the foot of the steps ─────────────────────
+    {
+      const ft = S.t1 - 2.55, fs = S.s0 - 0.62;
+      const BLUE = [0.105, 0.235, 0.480];
+      boxTS(ft - 0.62, ft + 0.62, fs - 0.36, fs + 0.36, y0, y0 + 0.78,
+        BLUE, shade(BLUE, 1.14));
+      boxTS(ft - 0.64, ft + 0.64, fs - 0.38, fs + 0.38, y0 + 0.78, y0 + 0.88,
+        [0.690, 0.690, 0.680], [0.720, 0.720, 0.712]);
+      // The oval, which is the whole of what says Ledo at fifteen metres.
+      boxTS(ft - 0.26, ft + 0.26, fs - 0.375, fs - 0.345, y0 + 0.30, y0 + 0.56,
+        [0.760, 0.760, 0.755]);
+      boxTS(ft - 0.20, ft + 0.20, fs - 0.385, fs - 0.372, y0 + 0.35, y0 + 0.51,
+        [0.680, 0.110, 0.105]);
+      furniture.push({ t: ft, s: fs, a: 0.66, c: 0.40, h: 0.88, y: y0 });
+    }
+
+    // ── the kitchen end ─────────────────────────────────────────────────────
+    //
+    // Nine of this building's thirteen metres are blank render, which is what
+    // an OSM footprint gives you and is not what is in the frame: east of the
+    // gable the wall stops and there is a dark recess with rubble steps up to
+    // it, a stainless extraction hood over the doorway, and a pergola of
+    // timber on green steel carrying a translucent corrugated roof over the
+    // side terrace.
+    {
+      const ka = S.t1 - 5.6, kc = S.t1 - 1.9;
+      // The recess, and the shadow in it. Not a lightbox: the way in to this
+      // shop is a hole with a kitchen behind it and the frame shows nothing in
+      // there but dark.
+      boxTS(ka, kc, S.s0 - 0.16, S.s0 - 0.02, y0 + 0.30, top - 0.30,
+        [0.052, 0.048, 0.044]);
+      // A frame round it and not a panel over it. The first cut drew the
+      // reveal as a filled box from s0-0.30 to s0-0.16, which is a solid slab
+      // standing in front of the hole: the recess was there, behind a pale
+      // grey rectangle exactly its own size.
+      for (const [a2, c2] of [[ka - 0.14, ka], [kc, kc + 0.14]]) {
+        boxTS(a2, c2, S.s0 - 0.30, S.s0 - 0.16, y0 + 0.30, top - 0.30,
+          shade(body, 0.88), shade(body, 0.96));
+      }
+      boxTS(ka - 0.14, kc + 0.14, S.s0 - 0.30, S.s0 - 0.16, top - 0.44,
+        top - 0.30, shade(body, 0.88), shade(body, 0.96));
+      // Three rubble steps up to it, which is how you get in and is why the
+      // freezer stands at the bottom of them.
+      for (let k = 0; k < 3; k++) {
+        boxTS(ka + 0.30, kc - 0.30, S.s0 - 0.30 - (3 - k) * 0.34,
+          S.s0 - 0.30 - (2 - k) * 0.34, y0, y0 + 0.12 + k * 0.16,
+          STONE, shade(STONE, 1.12));
+      }
+      // The extraction hood over the door, in stainless, and its flue.
+      const HOOD = [0.545, 0.548, 0.540];
+      boxTS(ka + 0.10, kc - 0.10, S.s0 - 0.95, S.s0 - 0.28, top - 0.30,
+        top + 0.16, HOOD, shade(HOOD, 1.10));
+      post(W, (ka + kc) * 0.5, S.s0 - 0.60, top + 0.16, top + 0.95, 0.11,
+        shade(HOOD, 0.90), 6);
+      // The pergola: two green steel posts and a rank of timber rafters under
+      // a translucent corrugated deck, which is the amber ceiling the konoba
+      // has and the same argument for its colour.
+      const GSTEEL = [0.115, 0.205, 0.150];
+      const TIMBER = [0.330, 0.215, 0.145];
+      const py = top + 0.30;
+      for (const t of [ka - 0.20, kc + 0.20]) {
+        post(W, t, S.s0 - 3.10, y0, py, 0.070, GSTEEL, 6);
+      }
+      boxTS(ka - 0.30, kc + 0.30, S.s0 - 3.22, S.s0 - 3.00, py - 0.16, py,
+        TIMBER, shade(TIMBER, 1.10));
+      for (let t = ka - 0.20; t <= kc + 0.21; t += 0.62) {
+        boxTS(t - 0.045, t + 0.045, S.s0 - 3.20, S.s0 - 0.20,
+          py - 0.10, py - 0.02, TIMBER, shade(TIMBER, 1.08));
+      }
+      // Down from 0.700/0.560/0.230, which is the konoba's number and is right
+      // for eleven metres of ceiling seen from underneath. Four metres of it
+      // seen edge-on from the promenade is a bright yellow lid.
+      const AMBER = [0.545, 0.430, 0.215];
+      boxTS(ka - 0.40, kc + 0.40, S.s0 - 3.34, S.s0 - 0.10, py, py + 0.05,
+        AMBER, shade(AMBER, 0.92));
+      furniture.push({ t: ka - 0.20, s: S.s0 - 3.10, a: 0.09, c: 0.09,
+        h: py - y0, y: y0 });
+      furniture.push({ t: kc + 0.20, s: S.s0 - 3.10, a: 0.09, c: 0.09,
+        h: py - y0, y: y0 });
+    }
+
+    // ── the terrace: one mosaic table and four yellow chairs ────────────────
+    //
+    // `terraceSet` draws the boardwalk's monoblocs and only fires under an
+    // awning, and this shop has none. What is on this paving is four Nardi
+    // mesh chairs in a hard lemon yellow round a round table with a tiled top,
+    // and the yellow is the loudest thing in the frame after the red F2.
+    {
+      // Lemon, not highlighter. 0.760/0.700/0.130 came out fluorescent against
+      // grey render under this sun.
+      const YEL = [0.690, 0.628, 0.185];
+      const tt = gc + 0.20, ts = S.s0 - 2.15;
+      const gy = surfaceY(tt, ts);
+      post(W, tt, ts, gy, gy + 0.71, 0.055, [0.235, 0.235, 0.240], 6);
+      boxTS(tt - 0.34, tt + 0.34, ts - 0.34, ts + 0.34, gy + 0.02, gy + 0.05,
+        [0.235, 0.235, 0.240]);
+      // The top, and the mosaic on it: a ring of small tiles round a paler
+      // middle, which at two metres is what a tiled table looks like.
+      // A warm cream ground with two close rings of small tiles on it, which
+      // is what a mosaic table is. Ten big chips scattered over a white top
+      // read as somebody's paperwork.
+      const MOS = [0.585, 0.560, 0.492];
+      boxTS(tt - 0.38, tt + 0.38, ts - 0.38, ts + 0.38, gy + 0.71, gy + 0.75,
+        MOS, shade(MOS, 1.08));
+      for (const [r, n] of [[0.14, 8], [0.26, 14]]) {
+        for (let k = 0; k < n; k++) {
+          const a = k * TAU / n + r;
+          const ct = tt + Math.cos(a) * r, cs = ts + Math.sin(a) * r;
+          const tc = k % 3 === 0 ? [0.215, 0.365, 0.400]
+            : k % 3 === 1 ? [0.410, 0.435, 0.310] : [0.540, 0.512, 0.440];
+          boxTS(ct - 0.032, ct + 0.032, cs - 0.032, cs + 0.032,
+            gy + 0.748, gy + 0.754, tc);
+        }
+      }
+      for (let k = 0; k < 4; k++) {
+        const a = k * TAU / 4 + 0.5;
+        const ct = tt + Math.cos(a) * 0.78, cs = ts + Math.sin(a) * 0.78;
+        const cy = surfaceY(ct, cs);
+        for (const [du, dv] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19],
+          [0.19, 0.19]]) {
+          post(W, ct + du, cs + dv, cy, cy + 0.42, 0.018, YEL, 4);
+        }
+        boxTS(ct - 0.21, ct + 0.21, cs - 0.21, cs + 0.21, cy + 0.42, cy + 0.46,
+          YEL, shade(YEL, 1.10));
+        // The back, turned to face the table.
+        const bt2 = ct - Math.cos(a) * 0.20, bs2 = cs - Math.sin(a) * 0.20;
+        boxTS(bt2 - 0.21, bt2 + 0.21, bs2 - 0.035, bs2 + 0.035,
+          cy + 0.46, cy + 0.86, YEL, shade(YEL, 1.06));
+        furniture.push({ t: ct, s: cs, a: 0.24, c: 0.24, h: 0.86, y: cy });
+      }
+      furniture.push({ t: tt, s: ts, a: 0.40, c: 0.40, h: 0.75, y: gy });
+    }
+  }
+
+  /**
    * The TISAK band: a red strip with the wordmark and the freephone number.
    *
    * Not `shopSign`, and the reason is the layout rather than the colours. Every
@@ -5965,6 +6493,8 @@ async function buildJadrija(scene) {
     const TIMB = [0.235, 0.150, 0.105];
 
     if (S.key === 'tisak') { tisakFront(S, y0, top); return; }
+    if (S.key === 'f2') pizzeriaFront(S, y0, top);
+    if (S.key === 'kiosk') { greenKiosk(S, y0, top); return; }
 
     if (S.key === 'konoba') {
       // 175856. The counter stands on a limestone rubble base course, the top
@@ -6763,7 +7293,13 @@ async function buildJadrija(scene) {
     // wide as its frontage: it is a glazed corner with a door in it, and the
     // whole of its front is drawn in `shopExtras` — see `tisakFront`.
     const oa = S.t0 + (S.t1 - S.t0) * 0.18, oc = S.t1 - (S.t1 - S.t0) * 0.18;
-    if (!S.metal) {
+    //
+    // Nor on a `solid` one. The pizzeria's frontage in `1000150335` is a wall
+    // with a shuttered window in it and no opening of any kind: the way in is
+    // round the corner and up the stone steps past the freezer. A serving hole
+    // eight metres wide with a black lightbox behind it was the single biggest
+    // thing about that shop and it is not there in life.
+    if (!S.metal && !S.solid) {
       boxTS(oa, oc, S.s0 - 0.02, S.s0 + 0.10, y0 + 0.95, top - 0.35,
         [0.045, 0.041, 0.038]);
       boxTS(oa, oc, S.s0 - 0.10, S.s0 + 0.04, y0 + 0.86, y0 + 0.98,
@@ -6857,7 +7393,11 @@ async function buildJadrija(scene) {
         S.roof, shade(S.roof, 1.14));
       // Not for a kiosk: those get the fascia board below, and drawing both
       // put two names on Tisak and two on Maslina, twenty centimetres apart.
-      if (S.name && S.kind !== 'kiosk') {
+      // `painted` shops have no board to put a name on. The pizzeria's name is
+      // written on the render by hand in three separate pieces and a 5.6 m
+      // cream fascia across the middle of it is a signwritten board this shop
+      // has never had — see `pizzeriaFront`.
+      if (S.name && S.kind !== 'kiosk' && !S.painted) {
         shopSign(S, (S.t0 + S.t1) * 0.5, S.s0 - 0.14, top - 0.52,
           Math.min(5.6, (S.t1 - S.t0) * 0.70), 0.66);
       }
