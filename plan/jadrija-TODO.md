@@ -686,8 +686,11 @@ bed. See the commit.
   furniture and the chevron timber screens — none of which is in this
   footage either, so they want a source naming before anybody builds them.
 - **The ground in the wood** (_344/_345/_347): pale compacted dirt with white
-  limestone chips through it and brown pine litter, not sand. And pine bark:
-  grey-brown plates with **orange-red** inner bark showing at the seams.
+  limestone chips through it and brown pine litter, not sand. ~~And pine bark:
+  grey-brown plates with **orange-red** inner bark showing at the seams.~~
+  **BUILT 31 Aug** in the trees' own fragment hook — see `PINEBARK`/`DRYBARK`
+  in `45-trees.js`, which are also the species marker the shader reads. Not in
+  the mesh: a plate is 0.16 m and a trunk has seven sections in six metres.
 
 - **a_030** the back lane: two-storey pale yellow render house, grey-green
   louvred shutters, vine pergola on green steel. The game has houses here and

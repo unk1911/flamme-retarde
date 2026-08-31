@@ -100,6 +100,16 @@ function vegRing(y, r, seg, jag = 0) {
  * same units, and paint the trunk and the canopy with vertex colours so a
  * single instanced draw can carry both.
  */
+// Two barks, and the gap between them is a marker the fragment shader reads.
+// _344/_345/_347: Aleppo bark is "grey-brown plates with orange-red inner bark
+// showing at the seams", and that is the wood the whole peninsula is made of.
+// Cypress and olive are neither plated nor orange, so they get the grey one
+// and the shader leaves them alone. The olive was already 0.33/0.29/0.24 on
+// the far model and the shared brown on the near one, which is a species that
+// changed colour at 300 m; DRYBARK is that far colour, used by both.
+const PINEBARK = [0.315, 0.222, 0.158];
+const DRYBARK = [0.330, 0.290, 0.240];
+
 function vegGeo(rings, seg, split, barkCol, leafCol) {
   const g = loft(rings, { closed: true, caps: false });
   const n = g.attributes.position.count;
@@ -603,7 +613,15 @@ function vegGrown(spec, rnd, bark, leaf, shade) {
  */
 function vegNearPrototypes() {
   const rnd = mulberry32(0x7ee5);
-  const bark = [0.30, 0.23, 0.17];
+  // Bark is now two colours and the difference between them is read by the
+  // shader, not just by the eye. An Aleppo pine's trunk is plated, and the
+  // plates part to show orange-red inner bark at the seams; a cypress is
+  // stringy grey-brown and an olive is grey. `PINEBARK` is warm enough that
+  // `vVCol.r - vVCol.g` clears 0.086 and `DRYBARK` is grey enough that it
+  // does not reach 0.058, which is the whole of the species test. Do not
+  // narrow the gap between them without moving the thresholds in the tree
+  // fragment hook below.
+  const bark = PINEBARK;
 
   // Aleppo pine. Long bare trunk, everything happening in the top third, and
   // the umbrella made by the growth force rather than by hand: five limbs
@@ -644,7 +662,7 @@ function vegNearPrototypes() {
     sections: [9, 4], segments: [6, 4],
     tuft: [0.05, 4], tuftJit: 1.30, leaf: 0.32,
     squash: 0.90, puffSeg: 5, puffRow: 3, puffJag: 0.46,
-  }, rnd, bark, [0.09, 0.17, 0.11], [0.52, 1.42]);
+  }, rnd, DRYBARK, [0.09, 0.17, 0.11], [0.52, 1.42]);
 
   // Olive. Short thick trunk that divides low — three or four limbs off half a
   // metre of bole is the whole silhouette of the species, and it is `start`
@@ -661,7 +679,7 @@ function vegNearPrototypes() {
     sections: [4, 6, 3], segments: [8, 5, 4],
     tuft: [0.10, 3], tuftJit: 1.15, leaf: 0.16,
     squash: 0.80, puffSeg: 7, puffRow: 4, puffJag: 0.38,
-  }, rnd, [0.33, 0.29, 0.24], [0.36, 0.41, 0.30], [0.62, 1.22]);
+  }, rnd, DRYBARK, [0.36, 0.41, 0.30], [0.62, 1.22]);
 
   // Maquis. No trunk worth the name — a stub, and everything from it. The
   // gnarliness is the highest here of anything: scrub is a tangle, and the
@@ -678,13 +696,17 @@ function vegNearPrototypes() {
     sections: [3, 5], segments: [6, 4],
     tuft: [0.16, 3], tuftJit: 1.00, leaf: 0.40,
     squash: 0.88, puffSeg: 6, puffRow: 3, puffJag: 0.50,
-  }, rnd, bark, [0.26, 0.30, 0.19], [0.60, 1.26]);
+  }, rnd, DRYBARK, [0.26, 0.30, 0.19], [0.60, 1.26]);
 
   return { pine, cypress, olive, bush };
 }
 
 function vegPrototypes() {
-  const bark = [0.30, 0.23, 0.17];
+  // Both LODs have to agree about the bark as well as about the outline: the
+  // plate test is a threshold on the vertex colour, so a far pine painted
+  // 0.30/0.23 would lose its seams at exactly the distance the near model
+  // hands over and the wood would change species as you walked into it.
+  const bark = PINEBARK;
   // A pentagonal cross-section is what made the hillside read as faceted from
   // low down. Eight sides is the point where a canopy stops having corners; a
   // pine goes from 60 triangles to 96, and since the whole landscape is four
@@ -715,7 +737,7 @@ function vegPrototypes() {
     vegRing(0.00, 0.017, S), vegRing(0.10, 0.070, S),
     vegRing(0.32, 0.105, S, 0.10), vegRing(0.66, 0.095, S, 0.10),
     vegRing(0.90, 0.060, S), vegRing(1.00, 0.010, S),
-  ], S, 1, bark, [0.09, 0.17, 0.11]);
+  ], S, 1, DRYBARK, [0.09, 0.17, 0.11]);
 
   // Olive: short, thick, gnarled, silver-green and much harder to set alight.
   const olive = vegGeo([
@@ -723,13 +745,13 @@ function vegPrototypes() {
     vegRing(0.30, 0.44, S, 0.24), vegRing(0.46, 0.53, S, 0.23),
     vegRing(0.62, 0.56, S, 0.22), vegRing(0.80, 0.47, S, 0.21),
     vegRing(0.92, 0.32, S, 0.19), vegRing(1.00, 0.10, S),
-  ], S, 2, [0.33, 0.29, 0.24], [0.36, 0.41, 0.30]);
+  ], S, 2, DRYBARK, [0.36, 0.41, 0.30]);
 
   // Maquis: no trunk worth modelling, and the reason the whole coast goes up.
   const bush = vegGeo([
     vegRing(0.00, 0.42, B), vegRing(0.38, 0.58, B, 0.28),
     vegRing(0.74, 0.46, B, 0.26), vegRing(1.00, 0.10, B),
-  ], B, 0, bark, [0.26, 0.30, 0.19]);
+  ], B, 0, DRYBARK, [0.26, 0.30, 0.19]);
 
   return { pine, cypress, olive, bush };
 }
@@ -792,7 +814,78 @@ function buildTrees(scene, fire) {
       side: THREE.DoubleSide,
       // The prototype carries bark and leaf in its vertex colours; the per
       // instance colour is the individual's own tint and its charring.
-      body: 'base *= vVCol;\n  n = gl_FrontFacing ? n : -n;',
+      //
+      // Then the bark, which is the one thing at Jadrija you stand right next
+      // to. _344/_345/_347: grey-brown plates with orange-red inner bark at
+      // the seams. Three things make this cheap enough to put on forty
+      // thousand trees.
+      //
+      // It is masked by species, off the vertex colour rather than off a
+      // second attribute or a second draw: only the pine is plated, and the
+      // pine is the only bark warm enough to clear the threshold. It is
+      // masked by pixel footprint, so a tree far enough away that a plate is
+      // sub-pixel pays nothing at all and, more to the point, does not
+      // shimmer — the same lesson as the whitecaps and the needle floor, that
+      // a threshold the pixel cannot resolve is a mark and not a fainter
+      // version of the thing. And the noise is two-plane rather than 3D,
+      // blended by which way the surface faces, because a trunk is vertical
+      // and the two planes that matter are the two vertical ones.
+      //
+      // The seam colour is multiplied by vColor so a charred tree gets
+      // charred seams. Orange fissures on a black trunk would be embers.
+      body: [
+        'base *= vVCol;',
+        'n = gl_FrontFacing ? n : -n;',
+        'float plated = smoothstep(0.058, 0.086, vVCol.r - vVCol.g)',
+        // 0.030 to 0.100, which is full strength to about eleven metres and
+        // gone by thirty-six. The needle floor's 0.012/0.055 was copied here
+        // first and it is a GROUND number: a floor is seen at a grazing angle
+        // so its footprint runs away with distance, and a trunk is seen
+        // square on. At those thresholds the plates died at four metres and
+        // the only bark in the wood was the bottom of the nearest tree.
+        '  * (1.0 - smoothstep(0.018, 0.060, length(fwidth(vWorld))));',
+        'if (plated > 0.002) {',
+        // Which plane a face is parameterised by is the OTHER two axes, not
+        // the one it faces. Written the intuitive way round, a surface whose
+        // normal is mostly +X samples noise in x and y, and x barely changes
+        // across that face, so the plates collapse into horizontal bands
+        // around the trunk. Every trunk in the wood was a stack of rings.
+        '  vec2 nb = abs(normalize(vNormal).xz);',
+        '  float wx = nb.x / (nb.x + nb.y + 1e-4);',
+        // Value noise and not fbm2, and that is why the first three cuts of
+        // this were invisible. A seam is a threshold and a threshold needs a
+        // distribution wide enough to cut: fbm2 averages its octaves, so two
+        // of them pile up around 0.5 with a spread of about 0.12 and a cut at
+        // 0.36 catches almost nothing. Rendering f straight to the screen is
+        // what showed it — grey trunks, one dark patch on one tree in ten.
+        // A single vnoise2 uses the whole of 0 to 1; the second tap is
+        // weighted a fifth, enough to break the lattice and not enough to
+        // narrow the spread again. Plates run 0.16 m around the trunk and
+        // 0.48 m up it, which is what the frames show.
+        '  vec2 px = vec2(vWorld.x * 10.0, vWorld.y * 5.0);',
+        '  vec2 pz = vec2(vWorld.z * 10.0, vWorld.y * 5.0) + 19.7;',
+        // The second tap is ROTATED as well as scaled, which is the same
+        // 1.71/-1.06 matrix fbm2 uses and for the same reason: two value
+        // noises on the same axes share a lattice, and what came out was a
+        // trunk of diagonal parallelograms. A regular pattern is worse than
+        // no pattern.
+        '  mat2 rot = mat2(1.71, -1.06, 1.06, 1.71);',
+        '  float f = mix(vnoise2(px) * 0.80 + vnoise2(rot * px + 11.3) * 0.20,',
+        '                vnoise2(pz) * 0.80 + vnoise2(rot * pz + 11.3) * 0.20, wx);',
+        // A fissure is a CONTOUR of the noise, not its low ground. Cut at a
+        // threshold and what you get is the shape of the low regions, which
+        // for smooth noise is a scatter of ovals: the first cut of this put
+        // orange blotches on the trunks like a plane tree. Fissures are a
+        // connected network, and the connected thing in a scalar field is a
+        // level set. So take the distance to the half level, and the seam is
+        // wherever that distance is small: |f - 0.5| under about 0.11, which
+        // at this frequency is a band two to four centimetres wide.
+        '  float fis = 1.0 - abs(f - 0.5) * 2.0;',
+        '  base *= 1.0 + plated * (f - 0.5) * 0.44;',
+        '  base = mix(base, vec3(0.420, 0.150, 0.062) * vColor,',
+        '             smoothstep(0.845, 0.972, fis) * 0.86 * plated);',
+        '}',
+      ].join('\n  '),
     });
 
     const mesh = new THREE.Mesh(geo, mat);

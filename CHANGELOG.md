@@ -8,6 +8,54 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.162.0] — 2026-08-31
+
+### Bark, and four wrong answers on the way to it
+
+The survey has said since the August batch that the wood is Aleppo pine and
+that its bark is "grey-brown plates with orange-red inner bark showing at the
+seams" (_344/_345/_347). Every trunk on the peninsula was one flat brown, and
+so was every cypress and every olive, because all three came out of the same
+`const bark`. This is the surface you stand right next to on the walk up from
+the shore.
+
+It is done in the fragment, because it has to be: a plate is 0.16 m and the
+trunk has seven sections in six metres, so there is nowhere to put it in the
+mesh. Three things keep it cheap enough for forty thousand trees. It is masked
+by species off the vertex colour rather than by a second attribute or a second
+draw — `PINEBARK` is warm enough to clear `vVCol.r - vVCol.g > 0.086` and
+`DRYBARK` is not, which is also two truer colours than the shared brown they
+replace, and it closes a bug where the olive was one colour near and another
+far. It is masked by pixel footprint, so a tree whose plates are sub-pixel pays
+nothing. And the noise is two vertical planes blended by facing, not 3D.
+
+Four cuts of this were wrong and each was wrong in a way worth keeping:
+
+**The triplanar blend was inverted.** A face whose normal is mostly +X was
+sampling noise in x and y — and x barely changes across that face, so the
+plates collapsed into horizontal bands. Every trunk in the wood was a stack of
+rings. A face is parameterised by the other two axes, not the one it faces.
+
+**`fbm2` has no distribution to cut.** A seam is a threshold, and averaging two
+octaves piles the values up around 0.5 with a spread of about 0.12, so a cut at
+0.36 caught almost nothing. One `vnoise2` uses the whole of 0 to 1. Rendering
+`f` straight to the screen is what showed this; reasoning about it did not.
+
+**The footprint fade was a ground number.** 0.012/0.055 came from the needle
+floor, where a surface is seen at a grazing angle and its footprint runs away
+with distance. A trunk is seen square on. At those thresholds the bark died at
+four metres and the only bark in the wood was the bottom of the nearest tree —
+which is exactly what the screenshots showed, and it looked like a weak effect
+rather than a mis-scoped one.
+
+**A fissure is a contour, not a low patch.** Thresholding the noise gives the
+shape of its low ground, which for smooth noise is a scatter of ovals: the
+trunks came out blotched like a plane tree. Fissures are connected, and the
+connected thing in a scalar field is a level set. `1 - |f - 0.5| * 2` and cut
+near the top of that, which is a band two to four centimetres wide.
+
+No triangles, no census change, 58-61 fps.
+
 ## [1.161.0] — 2026-08-31
 
 ### Six metres of frontage in which nothing was a different colour
