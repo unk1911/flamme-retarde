@@ -3415,6 +3415,25 @@ async function buildJadrija(scene) {
 
   function shopKit(S, y0, top, fs) {
     const body = S.body || [0.520, 0.492, 0.430];
+    // The same test `shopBack` makes, for the same reason and on the other
+    // face of the same building.
+    //
+    // Maslina's body is 0.08 grey. `shopBack` already caught that from the
+    // wood — "a brand colour is a front, not a building… from the wood it was
+    // a hole in the world" — and gave the service side a plain render skin.
+    // The FRONT has the identical failure and nobody had stood at t 355 and
+    // looked: the counter is drawn `shade(body, 0.72)`, the mullions
+    // `shade(body, 0.78)` and the flanking boards are near-black already, so
+    // multiplying an 0.08 body gives 0.06, 0.06 and 0.04 — six metres of
+    // frontage in which nothing is a different colour from anything else. It
+    // is the darkest object on this shore by a factor of four and from the
+    // promenade it reads as a rectangular hole cut out of the resort.
+    //
+    // A dark shop is fine. A dark shop whose counter, mullions and boards are
+    // ALSO the fascia colour is not a shop, and it is not what is there
+    // either: nobody paints the counter in the sign-writer's colour.
+    const lum = body[0] * 0.2126 + body[1] * 0.7152 + body[2] * 0.0722;
+    const wood = lum < 0.16 ? [0.455, 0.440, 0.410] : body;
     const DARK = [0.045, 0.041, 0.038];
     const STEEL = [0.480, 0.486, 0.480];
     const oa = S.t0 + (S.t1 - S.t0) * 0.18, oc = S.t1 - (S.t1 - S.t0) * 0.18;
@@ -3434,14 +3453,22 @@ async function buildJadrija(scene) {
     // on a `solid` frontage, which has neither because it has no opening.
     if (!S.solid) {
       boxTS(oa - 0.10, oc + 0.10, S.s0 - 0.34, S.s0 + 0.06, y0 + 0.98, y0 + 1.06,
-        shade(body, 0.72), shade(body, 0.92));
+        shade(wood, 0.72), shade(wood, 0.92));
       boxTS(oa, oc, S.s0 - 0.28, S.s0 - 0.02, y0 + 0.10, y0 + 0.98,
-        shade(body, 0.62));
+        shade(wood, 0.62));
       const nmul = Math.max(2, Math.round((oc - oa) / 1.5));
       for (let k = 1; k < nmul; k++) {
         const t = oa + (oc - oa) * (k / nmul);
-        boxTS(t - 0.035, t + 0.035, S.s0 - 0.03, S.s0 + 0.07, y0 + 1.06,
-          top - 0.34, shade(body, 0.78));
+        // On a dark shop the mullions stand 0.23 m further out, in front of
+        // the shelves rather than behind them. Everything in one of these
+        // openings has to be proud of the body: the body is a solid box from
+        // s0 to s1 and the "opening" is a black panel 0.02 m in front of its
+        // face, so there is no inside to put anything in. The stack, outward:
+        // the panel at s0-0.02, the stock at s0-0.16 to s0-0.09, and these at
+        // s0-0.26.
+        const mf = lum < 0.16 ? 0.23 : 0;
+        boxTS(t - 0.035, t + 0.035, S.s0 - 0.03 - mf, S.s0 + 0.07 - mf,
+          y0 + 1.06, top - 0.34, shade(wood, 0.78));
       }
     }
     // The threshold, a boot-worn strip of a different concrete.
@@ -3457,7 +3484,31 @@ async function buildJadrija(scene) {
     if (!S.solid) {
       for (const [t, w] of [[oa - 0.42, 0.34], [oc + 0.42, 0.30]]) {
         boxTS(t - w * 0.5, t + w * 0.5, S.s0 - 0.05, S.s0 + 0.02,
-          y0 + 1.15, y0 + 1.85, DARK, shade(body, 0.9));
+          y0 + 1.15, y0 + 1.85, DARK, shade(wood, 0.9));
+      }
+    }
+    // And something on the shelves behind the opening, on a dark shop only.
+    //
+    // The lightbox trick the generic frontage uses — a near-black panel behind
+    // the hole so a shaded front does not read as a window on to a white wall
+    // — depends on there being something in FRONT of the black. On a pale shop
+    // there is: a counter, mullions and two boards, all of them lighter than
+    // the panel. On a dark one there was nothing, and the trick inverted.
+    if (lum < 0.16) {
+      const GOOD = [[0.560, 0.300, 0.130], [0.235, 0.380, 0.520],
+        [0.545, 0.520, 0.430], [0.480, 0.170, 0.145], [0.400, 0.470, 0.235]];
+      for (let r = 0; r < 3; r++) {
+        const sy = y0 + 1.24 + r * 0.42;
+        boxTS(oa + 0.12, oc - 0.12, S.s0 - 0.155, S.s0 - 0.095, sy, sy + 0.032,
+          [0.395, 0.382, 0.360], [0.430, 0.418, 0.395]);
+        for (let i = 0; i < 9; i++) {
+          const ct = oa + 0.22 + i * ((oc - oa - 0.44) / 9);
+          const g = 0.80 + ((i * 5 + r * 3) % 4) * 0.10;
+          const col = GOOD[(i * 3 + r) % GOOD.length];
+          boxTS(ct, ct + 0.115, S.s0 - 0.150, S.s0 - 0.105, sy + 0.030,
+            sy + 0.030 + 0.20 + 0.05 * ((i + r) % 3),
+            [col[0] * g, col[1] * g, col[2] * g], shade(col, 1.14));
+        }
       }
     }
     // A downpipe off the back corner and a pair of pots at the front ones.

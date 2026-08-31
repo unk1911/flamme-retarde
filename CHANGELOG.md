@@ -8,6 +8,42 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.161.0] — 2026-08-31
+
+### Six metres of frontage in which nothing was a different colour
+
+A thirteen-shot regression sweep of the shore turned up one real defect, and it
+was not in anything built this week. Maslina reads as a black void from the
+promenade. Its body is 0.075/0.082/0.088 and `shopKit` draws the counter at
+`shade(body, 0.72)`, the mullions at `shade(body, 0.78)` and the flanking
+boards near-black, so the whole shopfront was one colour and that colour was
+off. The kiosk had a name flag beside it and a hole where the shop was.
+
+`shopBack` had already caught this exact failure on the service side — the
+comment there reads "a brand colour is a front, not a building… from the wood
+it was a hole in the world" — and it fixes it with a luminance test. The front
+now uses the same test. Below 0.16 the joinery stops being derived from the
+body and becomes pale timber, 0.455/0.440/0.410, which is what a dark kiosk
+actually has: the counter, the mullions and the reveals are the light parts of
+the photograph and the shop is the dark part behind them.
+
+Then three shelves of stock in the opening, nine items to a shelf, off a
+five-colour palette. A shop with nothing in it is a hole whatever colour the
+frame is.
+
+Two attempts at placing them failed before the third landed, for a reason worth
+writing down: **the shop body is a solid box from `s0` to `s1` and the
+"opening" is a fake dark panel a couple of centimetres proud of its face.**
+There is no inside. Anything at `s0 + 0.02` is buried in the body; anything
+behind the panel is behind the panel. The stock had to be stacked *outward* —
+panel at `s0 - 0.02`, goods at `s0 - 0.155` to `s0 - 0.095`, mullions pushed
+out to `s0 - 0.26` so they still read as in front of the shelves. Depth in this
+file goes forwards, never back.
+
+Also corrected in `plan/jadrija-TODO.md`: the paving joints are recorded there
+as "PAUSED, unbuilt" and `paving()` has been drawing mortar and inset lifted
+stone in both axes for some time. Check the source before the list.
+
 ## [1.160.0] — 2026-08-31
 
 ### Five more things in the one room you can walk into

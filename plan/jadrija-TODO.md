@@ -164,11 +164,17 @@ his own footage) and the marina in the inlet behind the Brod's root.
       lattice the jitter could shift but not break, so the paving was a tiled
       check about 3 m across; it is a hash now. And the flags were 2.2 m square
       against 0.4-1.0 m stones in v_022. +6 688 triangles, fps unchanged.
-      PAUSED 26 Aug 2026, unbuilt: the joints themselves. v_022 has them wide
-      and visibly darker than the stones, and the flags here have no joint
-      geometry at all — the edges are just where one colour meets the next.
-      Closed with the rest of the open work when Misha paused the project; it
-      is a real gap and not a resolved one, and this is the record of that.
+      **The joints ARE built and this note was stale** — corrected 31 Aug.
+      It reads "unbuilt: the joints themselves… the flags here have no joint
+      geometry at all", and `paving` draws every cell twice: once full size in
+      mortar and once inset by `JOINT` 0.055 and lifted by `PAVE_LIFT` in
+      stone, with the inset taken in BOTH axes so a flag has a joint on four
+      sides rather than two. The mortar takes its colour from the stone it lies
+      between, a fixed step darker, because a constant grey mortar printed a
+      grid across forty metres of sand at the west end. Whoever wrote that note
+      closed the item on the state of the file a day before the fix, and the
+      only reason it was caught is that somebody went to build it and found it
+      already there. Check the source before the list.
 - [x] Sound: klapa out, five field recordings in — the promenade as one bed,
       the hillside cicadas, the same chorus from inside the pines crossfaded on
       canopy, the sea against the concrete edge (driven off `shoreAt` from
