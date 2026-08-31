@@ -17538,6 +17538,93 @@ async function buildJadrija(scene) {
       scene.add(poster);
     }
 
+    // ── what else is in one, off 0:09 and 3:48 ──────────────────────────────
+    //
+    // The room the game has was furnished off the August batch, from one open
+    // door. `1000150414` gives two more of the same room and the survey lists
+    // what is in them: at 0:09 "a folding sun lounger stored on end, a red
+    // cool box, a wooden shelf high on the back wall with a bag on it, a
+    // striped towel on a hook, a mat on the floor", and at 3:48, through a
+    // louvred shutter, "a blue-framed camp bed, a table under a checked cloth,
+    // a pink curtain". The bed and the table are here already; these five are
+    // the rest, and every one of them is the sort of thing that turns a set
+    // dressed for one shot into somewhere people keep their stuff.
+    {
+      const MAT = [0.395, 0.335, 0.205];
+      const RED2 = [0.475, 0.095, 0.080];
+      const PALE = [0.680, 0.672, 0.640];
+      const CANV = [0.245, 0.330, 0.430];
+      // The mat, just inside the door, and it is the one thing in here you
+      // stand on. Two millimetres proud of the floor is a coin toss at this
+      // distance from the origin — 12 is not.
+      boxTS(dc - 0.62, dc + 0.62, K.face + 0.55, K.face + 1.45,
+        f + 0.004, f + 0.016, MAT, shade(MAT, 1.14));
+      // The sun lounger, folded and stood on end against the back wall.
+      // `slat` rakes a section in the (inland, up) plane and `bar` extrudes it
+      // along the shore, which between them is the only way anything in this
+      // file leans.
+      {
+        const la = dc - 1.86, lc = dc - 1.24;
+        const sec = slat(K.s1 - 0.67, f + 0.98, 0.15, 1.94, 0.13);
+        bar(la, lc, sec, KIT.steel, shade(KIT.steel, 1.16));
+        // The sling, inset, so it is a lounger and not a plank: three bands of
+        // canvas across a tubular frame.
+        for (let i = 0; i < 3; i++) {
+          const q = -0.62 + i * 0.62;
+          bar(la + 0.09, lc - 0.09,
+            slat(K.s1 - 0.67, f + 0.98 + q * 0.94, 0.15, 0.42, 0.16), CANV,
+            shade(CANV, 1.18));
+        }
+        furniture.push({ t: (la + lc) * 0.5, s: K.s1 - 0.67,
+          a: 0.34, c: 0.22, h: 1.95, y: f });
+      }
+      // The cool box, on the floor by the foot of the cot. Red body, pale lid,
+      // a dark strap handle over it.
+      {
+        const bt = dc + 0.30, bs = K.s1 - 0.72;
+        boxTS(bt - 0.29, bt + 0.29, bs - 0.19, bs + 0.19, f, f + 0.30,
+          RED2, shade(RED2, 1.16));
+        boxTS(bt - 0.31, bt + 0.31, bs - 0.21, bs + 0.21, f + 0.30, f + 0.37,
+          PALE, shade(PALE, 1.10));
+        boxTS(bt - 0.06, bt + 0.06, bs - 0.21, bs + 0.21, f + 0.36, f + 0.42,
+          [0.115, 0.112, 0.110]);
+        furniture.push({ t: bt, s: bs, a: 0.32, c: 0.24, h: 0.42, y: f });
+      }
+      // The shelf, high on the back wall, on two brackets, with a bag on it.
+      {
+        const sy = f + 1.62, sb = K.s1 - 0.26;
+        boxTS(dc - 0.66, dc + 0.66, sb - 0.26, sb, sy, sy + 0.035,
+          KIT.wood, KIT.woodT);
+        for (const o of [-0.54, 0.54]) {
+          boxTS(dc + o - 0.022, dc + o + 0.022, sb - 0.22, sb,
+            sy - 0.16, sy, KIT.dark);
+        }
+        const BAG = [0.330, 0.300, 0.255];
+        frustum(W, sy + 0.035, [dc + 0.18, sb - 0.13, 0.190, 0.105],
+          sy + 0.27, [dc + 0.18, sb - 0.13, 0.155, 0.085], BAG,
+          shade(BAG, 1.12));
+        boxTS(dc + 0.10, dc + 0.26, sb - 0.14, sb - 0.12, sy + 0.26,
+          sy + 0.38, shade(BAG, 0.82));
+      }
+      // The towel on a hook, on the near wall where you would actually hang
+      // one: striped, because every towel in every one of these frames is.
+      {
+        // dc+1.86 and not dc+1.94: the room is 4.04 m across, so its inner
+        // wall face is at dc+1.92, and a hook at 1.94 is a hook inside the
+        // masonry with its towel hanging in the plane of the plaster.
+        const ht = dc + 1.86, hs = K.face + 2.30, hy = f + 1.58;
+        boxTS(ht - 0.05, ht, hs - 0.03, hs + 0.03, hy, hy + 0.05,
+          [0.155, 0.150, 0.148]);
+        const BANDS = [[0.620, 0.235, 0.145], [0.700, 0.688, 0.640],
+          [0.185, 0.360, 0.520], [0.700, 0.688, 0.640]];
+        for (let i = 0; i < 4; i++) {
+          boxTS(ht - 0.028, ht - 0.008, hs - 0.19, hs + 0.19,
+            hy - 0.16 - i * 0.17, hy - 0.01 - i * 0.17,
+            BANDS[i], shade(BANDS[i], 1.12));
+        }
+      }
+    }
+
     radio.draw(0.30, 0.0);
     tv.draw(null, 0x2545);
     return {

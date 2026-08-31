@@ -8,6 +8,41 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.160.0] — 2026-08-31
+
+### Five more things in the one room you can walk into
+
+The kabina you can walk into was furnished off the August batch, from one open
+door. `1000150414` gives two more of the same room and the survey lists what is
+in them: at 0:09 "a folding sun lounger stored on end, a red cool box, a wooden
+shelf high on the back wall with a bag on it, a striped towel on a hook, a mat
+on the floor", and at 3:48, through a louvred shutter, "a blue-framed camp bed,
+a table under a checked cloth, a pink curtain". The bed and the table were
+already here. These five are the rest.
+
+The lounger is stood on end against the back wall, which is where you put one
+in a room this size: `slat` rakes a section in the inland-and-up plane and
+`bar` extrudes it along the shore, and between them that is the only way
+anything in this file leans. Three bands of sling across a tubular frame,
+narrow enough that the frame shows between them — at 0.52 m they touched and it
+came out a wardrobe.
+
+Two numbers were wrong and both were the same mistake, which is reading a field
+off the debug handle instead of off the object. `special` carries `s1`; `back`
+is only the name `__fr.jad.kabina` gives it, so `K.back` was undefined and
+every one of these landed at NaN — built, counted, and drawn nowhere. And the
+hook went in at dc+1.94 in a room 4.04 m across, whose inner wall face is at
+dc+1.92: a hook inside the masonry with its towel hanging in the plane of the
+plaster.
+
+The room is nearly black by design — "no light gets into a wooden box with one
+door in it, which is the whole reason this room is worth walking into on a
+white afternoon" — so none of this is loud. Standing in the doorway with the
+afternoon behind you, it is a shelf, a bag, a folded lounger and a cool box,
+which is what a hut somebody keeps their summer in looks like.
+
+60 fps. Census untouched.
+
 ## [1.159.0] — 2026-08-31
 
 ### Two huts somebody paid for, a library in the pines, and Trampulin's lane

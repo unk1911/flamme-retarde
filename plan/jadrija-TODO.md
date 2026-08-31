@@ -607,7 +607,9 @@ bed. See the commit.
   A line strung from a nail on the wall to the next hut
   with towels pegged on it, and a row of five coat hooks screwed to the render
   outside the door (4:09). Two of the frames are of nothing but that.
-- **What is inside one.** 0:09 through the open door: a folding sun lounger
+- ~~**What is inside one.**~~ BUILT 31 Aug — the lounger on end, the
+  cool box, the high shelf and its bag, the towel on a hook and the floor mat.
+  0:09 through the open door: a folding sun lounger
   stored on end, a red cool box, a wooden shelf high on the back wall with a
   bag on it, a striped towel on a hook, a mat on the floor. And at 3:48,
   through a louvred shutter: a **blue-framed camp bed**, a table under a
