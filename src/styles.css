@@ -747,7 +747,9 @@ html.touch #swim-hud { bottom: 7.4rem; }
    icon — the toast styling next door is what a system message looks like and
    this deliberately looks like nothing of the sort. */
 #saying {
-  position: fixed; left: 50%; bottom: 12vh; transform: translateX(-50%);
+  /* 19vh, not 12: #toast is at 12vh and a system message landing exactly on
+     top of a line of her dialogue is two messages and no way to read either. */
+  position: fixed; left: 50%; bottom: 19vh; transform: translateX(-50%);
   z-index: 40; pointer-events: none;
   max-width: min(38rem, 84vw); text-align: center;
   font-family: var(--mono); font-size: .68rem; line-height: 1.75;
@@ -755,7 +757,27 @@ html.touch #swim-hud { bottom: 7.4rem; }
   text-shadow: 0 1px 3px rgba(0, 0, 0, .95), 0 0 14px rgba(0, 0, 0, .8);
 }
 #saying[hidden] { display: none; }
-html.touch #saying { bottom: 17vh; font-size: .62rem; }
+html.touch #saying { bottom: 24vh; font-size: .62rem; }
+
+/* Who you are, bottom left, out of the way of everything. Under the veil's
+   z-index on purpose — see the note in shell.html. */
+#whoami {
+  /* Top left, not bottom left: the bottom left corner is the wing roster —
+     WING 2 / WING 3 / WING 4 — and the badge landed squarely on the last row
+     of it. The top left is the one corner nothing owns; the gauges below it
+     start about 230 px down and the top strip is centred. */
+  position: fixed; left: 1.5rem; top: 1.1rem; z-index: 50;
+  pointer-events: none;
+  font-family: var(--mono); font-size: .5rem; letter-spacing: .18em;
+  text-transform: uppercase; color: #6f8189;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
+}
+#whoami[hidden] { display: none; }
+#whoami b { color: var(--sea); font-weight: 400; }
+html.touch #whoami { left: .8rem; top: .7rem; font-size: .45rem; }
+/* Just the name where there is no room for the sentence. */
+@media (max-width: 720px) { #whoami .lbl { display: none; } }
+html.touch #whoami .lbl { display: none; }
 
 /* The thumb's way in, at the foot of the settings panel. */
 #panel-help {

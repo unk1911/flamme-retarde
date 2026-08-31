@@ -151,6 +151,25 @@ function toggleSignIn(force) {
  * when the sheet is opened and nothing has changed at all.
  */
 function paintAuth() {
+  // The corner badge, which is the only part of this that outlives the sheet.
+  const badge = $('whoami');
+  if (badge) {
+    badge.hidden = !AUTH.user;
+    if (AUTH.user) {
+      badge.textContent = '';
+      // The label is its own element so a narrow screen can drop it and keep
+      // the name. On a 412 px phone the mission clock starts at x = 60 and
+      // "SIGNED IN UNK1911" is 96 px wide, so the full badge lands on the
+      // clock; the name alone is about 40 px and clears it.
+      const lbl = document.createElement('span');
+      lbl.className = 'lbl';
+      lbl.textContent = T('auth.badge') + ' ';
+      const b = document.createElement('b');
+      // textContent, never innerHTML: this string is a username off the wire.
+      b.textContent = AUTH.user;
+      badge.append(lbl, b);
+    }
+  }
   const who = $('signin-who');
   const form = $('signin-form');
   const out = $('signin-out');

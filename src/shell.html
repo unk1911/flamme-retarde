@@ -404,6 +404,15 @@
      reason since the crowd learned to talk. -->
 <div id="saying" hidden></div>
 
+<!-- Signed in, and still signed in twenty minutes later.
+     Misha, 31 Aug: "once i successfully sign in, there should be some indicator
+     that i'm signed in.. perhaps my username should stay displayed somewhere in
+     the corner". The title screen says it in the footer; this is the rest of
+     the game. z-index 50 is deliberately UNDER the veil (100), so it does not
+     need hiding while the splash is up — the splash is opaque and simply covers
+     it, and there is no second piece of state to keep in step. -->
+<div id="whoami" hidden></div>
+
 <div id="help" hidden>
   <div id="help-inner">
     <button id="help-close" aria-label="close">&times;</button>

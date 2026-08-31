@@ -8,6 +8,48 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.168.2] — 2026-08-31
+
+### Enter no longer launches the aeroplane out from under the sign-in
+
+Misha: *"pressing the <Enter> key on the password falls thru and causes the game
+to start prematurely"*. There are **two** `keydown` listeners on the window —
+the main one in `90-app.js`, and a small one at the bottom of the same file that
+lets Enter stand in for the Take off button, because the first thing this page
+asks anybody to do should not need a mouse. 1.168.1 taught the first about text
+fields and never touched the second.
+
+Both now share one `keyboardIsBusy(e)` helper: a keystroke whose target is an
+`<input>`, a `<textarea>` or anything `contenteditable` is somebody typing, and
+so is any key at all while the sign-in sheet is open — click the backdrop and
+the target is the sheet rather than the field, and the keyboard still is not the
+game's. One helper, both callers, no third way to get this wrong. Verified that
+Enter in the password box leaves the veil alone and that Enter with the sheet
+closed still takes off.
+
+### A badge that says who you are
+
+*"once i successfully sign in, there should be some indicator that i'm signed
+in.. perhaps my username should stay displayed somewhere in the corner"*. Top
+left, dim, always there while the session is: `signed in `**`unk1911`**. Its
+`z-index` is deliberately *under* the veil's, so the opaque title screen simply
+covers it — the splash already says the same thing in its footer, and this way
+there is no second piece of state to keep in step.
+
+Placing it took three tries and a measurement each time. Bottom left landed
+squarely on the last row of the wing roster. Top left was clean on a desktop and
+sat on the mission clock on a 412 px phone, where the clock starts at x = 60 and
+`SIGNED IN UNK1911` is 96 px wide. The label is now its own span that narrow
+screens drop, leaving the name alone at about 40 px. Confirmed by walking every
+visible leaf element with text and intersecting its box against the badge's:
+zero overlaps at 1440 x 900, 412 x 915 and 915 x 412.
+
+### Also
+
+- `#saying`, Baye's subtitle, moved from `bottom: 12vh` to `19vh`. `#toast` is
+  at 12vh, and a system message landing on top of a line of her dialogue is two
+  messages and no way to read either.
+
 ## [1.168.1] — 2026-08-31
 
 ### Fixed: you could not type a password into the sign-in

@@ -183,6 +183,27 @@ function grabPointer() {
   try { canvas.requestPointerLock()?.catch?.(() => {}); } catch { /* older API */ }
 }
 
+/**
+ * Is somebody typing, rather than playing?
+ *
+ * There are TWO keydown listeners on this window — this file's main one, and
+ * the little one at the bottom that lets Enter stand in for the Take off
+ * button. 1.168.1 taught the first about text fields and not the second, so
+ * Enter in the password box still fell through and launched the aeroplane out
+ * from under the sign-in sheet. One helper, both callers, no third way to get
+ * this wrong.
+ *
+ * The sheet counts even with nothing focused in it: click the backdrop and the
+ * target is the sheet, not the input, and the keyboard still is not the game's.
+ */
+function keyboardIsBusy(e) {
+  const el = e.target;
+  if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) {
+    return true;
+  }
+  return !$('signin').hidden;
+}
+
 addEventListener('keydown', (e) => {
   if (e.repeat) return;
   // A chord belongs to the browser, not to the game. Every branch below this
@@ -210,11 +231,7 @@ addEventListener('keydown', (e) => {
   // one case; this is that rule written once, for every field there will ever
   // be. Escape is the exception, because closing the thing you are typing in is
   // the one game action that still belongs to the game.
-  const el = e.target;
-  if (e.code !== 'Escape' && el
-      && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) {
-    return;
-  }
+  if (e.code !== 'Escape' && keyboardIsBusy(e)) return;
   // At the laptop the keyboard belongs to the laptop. Every letter in here is a
   // letter somebody is typing into a prompt, and W A S D would otherwise be
   // four steps across the living room taken by a camera that is not being drawn
@@ -5813,6 +5830,11 @@ $('enter').addEventListener('click', () => {
  */
 window.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter' || e.repeat || started || $('enter').hidden) return;
+  // Misha, 31 Aug: "pressing the <Enter> key on the password falls thru and
+  // causes the game to start prematurely". It did: this is a second listener
+  // with its own guards, and the field rule added to the main handler never
+  // reached it. Enter in the sign-in form is the form's — it submits it.
+  if (keyboardIsBusy(e)) return;
   e.preventDefault();
   $('enter').click();
 });
