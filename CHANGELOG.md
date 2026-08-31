@@ -8,6 +8,53 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.165.0] — 2026-08-31
+
+### The back of the ice cream shop, and a source for POMMES FRITES
+
+`slasticarnica-behind-view` had never been opened at full size. It catches the
+slastičarnica's whole service elevation square on from the wood, and none of it
+was in the game: a wall of reed screen — trska, the cane matting every terrace
+on this coast is shaded with — from the gravel up to about two metres; a
+shallow awning over it, sun-bleached to a warm grey, with "slastičarnica
+JADRIJA" in small dark script along its front edge; and above that a corrugated
+upper storey in blue-grey sheet with a stepped parapet and a black roof vent.
+The shared `shopBack` is flat render with a gutter, which is right for four
+shops on this shore and wrong for this one.
+
+`slastBack` goes ON TOP of the shared one rather than instead of it. The
+service door, the meter cabinet, the downpipes and their splash pads were all
+correct and are all still there — the reed parts either side of the door,
+which is what the frame shows, and the sheet bay at the east end is where the
+opening beside the Jamnica cabinet is.
+
+Canes at 0.22 m and not at their real 15 mm. A screen of eight hundred canes
+is 9 600 triangles to say what fifty-five say, and at the three metres this
+wall is ever looked at from what carries is the warm colour and a vertical
+grain, not the count. Alternate canes take a shade off so the grain survives
+being flat-lit at midday, and three binding wires cross them, which is the
+only horizontal in a roll of trska.
+
+**And POMMES FRITES, which the TODO has been asking for a source for.** It was
+listed under the MINI grill items as wanted but unbuildable — "none of which is
+in this footage either, so they want a source naming before anybody builds
+them". This frame is the source. The box stands on the gravel at the wood edge
+west of the shop, roughly in line with its back wall: a dark cabinet on two
+legs, POMMES over FRITES in heavy yellow, a red 100% roundel and a photograph
+of chips filling the lower half. It faces the LANE and not the boardwalk,
+because the boardwalk is on the other side of a building from it. The two words
+and the 100% are read; the rest of the poster is five or six words at about ten
+pixels a word and ships as marks, which is the rule RENT A BOAT's price rows
+and NE PARKIRAJ's second line already ship under.
+
+One thing worth writing down about `paintedWord`: **the plane's aspect has to
+be the canvas's aspect.** It makes a 128-pixel-tall canvas `hh` cells wide and
+the plane stretches whatever it is given to fit, so putting a 13.5:1 name on a
+12 m by 0.135 m board stretched it to 89:1 and the shop's name came out five
+times its own size and running off both ends of its own awning.
+
++1 668 triangles, 54-61 fps, census unchanged.
+
 ## [1.164.0] — 2026-08-31
 
 ### The gelato server has been shipping without the top of his head

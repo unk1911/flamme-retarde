@@ -2678,6 +2678,10 @@ async function buildJadrija(scene) {
       name: 'slastičarnica', sub: 'JADRIJA', roof: [0.590, 0.578, 0.545],
       body: [0.560, 0.535, 0.487], awn: 3.0, fg: '#26241f', bg: '#f4f2ee',
       vitrine: true, cooler: true, scallop: true, panels: true,
+      // The service elevation is a wall of reed screen under a named awning
+      // with a corrugated upper storey over it, and not the shared render
+      // back. See `slastBack` and `slasticarnica-behind-view`.
+      reedBack: true,
       // 20260823_111815 and _111819: the wall behind this counter is mirror
       // tile floor to ceiling with three glass shelves of stemware on it.
       backBar: true },
@@ -3410,6 +3414,131 @@ async function buildJadrija(scene) {
         if (jit(k * 13 + x, 766) < 0.22) { g.stroke(); g.beginPath(); g.moveTo(x + w * 0.02, yy); x += w * 0.02; }
       }
       g.stroke();
+    }
+  }
+
+  /**
+   * The slastičarnica's service side, which the shared `shopBack` gets wrong.
+   *
+   * `slasticarnica-behind-view` catches the whole elevation square on from the
+   * wood, and what is there is: a wall of reed screen — trska, the cane matting
+   * every terrace on this coast is shaded with — from the gravel up to about
+   * two metres; a shallow white awning over it on a light frame, sun-bleached
+   * to a warm grey, with "slastičarnica JADRIJA" in small dark script along its
+   * front edge; and above that a corrugated upper storey in blue-grey sheet
+   * with a stepped parapet and a black roof vent on it. The generic back is
+   * flat render with a gutter, which is right for four shops on this shore and
+   * wrong for this one.
+   *
+   * It goes ON TOP of `shopBack` rather than instead of it. The door, the
+   * meter cabinet, the downpipes and the splash pads underneath are all still
+   * correct and all still there — the reed splits either side of the door,
+   * which is what the frame shows, and the corrugated bay at the east end is
+   * where the opening beside the Jamnica cabinet is.
+   */
+  function slastBack(S, y0, top) {
+    const back = S.s1;
+    const REED = [0.545, 0.442, 0.255];        // trska, warm straw in full sun
+    const CANE = shade(REED, 0.80);
+    const SHEET = [0.400, 0.448, 0.478];       // the corrugated upper storey
+    const RIB = shade(SHEET, 1.14);
+    const AWN = [0.618, 0.612, 0.585];         // sun-bleached, not white
+    const FRAME = [0.545, 0.540, 0.520];
+    const len = S.t1 - S.t0;
+    // The same expression `shopBack` picks the service door with, because the
+    // reed has to part around it and a second guess at it would part around
+    // nothing.
+    const td = S.t0 + len * (0.26 + jit(S.t0 | 0, 61) * 0.14);
+    const tR = S.t1 - 3.2;                     // where the reed gives out
+    const yR = y0 + 2.10;                      // and how high it goes
+
+    // ── the reed ────────────────────────────────────────────────────────────
+    //
+    // Canes at 0.22 m and not at their real 15 mm. A screen of 800 canes is
+    // 9 600 triangles to say what 55 say, and at the three metres this wall is
+    // ever looked at from what carries is the warm colour and a vertical grain,
+    // not the count. Alternate canes take a shade off so the grain survives
+    // being flat-lit at midday.
+    for (const [a, c] of [[S.t0 - 0.05, td - 0.62], [td + 0.62, tR]]) {
+      boxTS(a, c, back - 0.02, back + 0.05, y0, yR, shade(REED, 0.90));
+      let n = 0;
+      for (let t = a + 0.06; t < c - 0.05; t += 0.22, n++) {
+        boxTS(t - 0.075, t + 0.075, back + 0.04, back + 0.075, y0 + 0.02, yR,
+          n % 2 ? REED : CANE);
+      }
+      // Three binding wires, which is what holds a roll of trska together and
+      // is the only horizontal in it.
+      for (const yy of [y0 + 0.34, y0 + 1.06, y0 + 1.86]) {
+        boxTS(a, c, back + 0.070, back + 0.085, yy, yy + 0.022,
+          shade(REED, 0.58));
+      }
+    }
+
+    // ── the awning ──────────────────────────────────────────────────────────
+    //
+    // `bar` extrudes a raked section along the shore and is the only helper in
+    // this file that can; a flat box would be a shelf. Out 1.12 m and down
+    // 0.34 over it, which is the fall in the frame.
+    const aHi = y0 + 2.52, aLo = y0 + 2.18;
+    bar(S.t0 - 0.15, tR + 0.15,
+      [[back + 0.02, aHi - 0.05], [back + 1.12, aLo - 0.05],
+        [back + 1.12, aLo], [back + 0.02, aHi]], AWN, shade(AWN, 1.08));
+    // The rafters under it, and the fascia across its front edge.
+    for (let t = S.t0; t < tR; t += 1.35) {
+      boxTS(t - 0.03, t + 0.03, back + 0.06, back + 1.10,
+        aHi - 0.13, aHi - 0.06, FRAME);
+    }
+    boxTS(S.t0 - 0.15, tR + 0.15, back + 1.10, back + 1.17,
+      aLo - 0.20, aLo, shade(AWN, 0.94), AWN);
+    {
+      // The name, on the fascia and not on the wall. Small, and left of
+      // centre: it is about 2.2 m of a twelve-metre board in the frame, put
+      // there so somebody walking the lane knows which back door is which,
+      // and it is not a shopfront.
+      //
+      // The plane's aspect has to BE the canvas's aspect. `paintedWord` makes
+      // a 128-pixel-tall canvas `hh` cells wide and the plane stretches it to
+      // fit, so a 12 m by 0.135 m board stretched a 13.5:1 canvas to 89:1 and
+      // the name came out five times its own size and running off both ends.
+      const AR = 13.5, h = 0.163;
+      seaFacing(paintedWord('slastičarnica JADRIJA', '#2f2a22', AR, false, 400),
+        S.t0 + 3.3, back + 1.185, aLo - 0.105,
+        AR * h, h, 'slast:backname', Math.PI);
+    }
+
+    // ── the corrugated upper storey, and the bay at the east end ────────────
+    boxTS(S.t0 - 0.03, S.t1 + 0.03, back - 0.01, back + 0.06, aHi, top - 0.16,
+      SHEET, shade(SHEET, 1.10));
+    for (let t = S.t0; t < S.t1; t += 0.30) {
+      boxTS(t - 0.045, t + 0.045, back + 0.05, back + 0.085, aHi + 0.04,
+        top - 0.18, RIB);
+    }
+    // The parapet steps up over the east third, which is the one thing about
+    // this roofline you notice from the lane.
+    boxTS(tR, S.t1 + 0.05, back - 0.03, back + 0.10, top - 0.18, top + 0.22,
+      shade(SHEET, 0.92), shade(SHEET, 1.04));
+    // And the east bay below the awning, which is sheet all the way down
+    // rather than reed: the opening beside the Jamnica cabinet is in it.
+    boxTS(tR, S.t1 + 0.03, back - 0.01, back + 0.055, y0, aHi, SHEET);
+    for (let t = tR + 0.15; t < S.t1; t += 0.30) {
+      boxTS(t - 0.045, t + 0.045, back + 0.05, back + 0.08, y0 + 0.05,
+        aHi - 0.05, RIB);
+    }
+
+    // ── the roof vent, and the bulkhead lamp on the sheet ───────────────────
+    {
+      const vt = S.t0 + 3.4, VENT = [0.115, 0.118, 0.122];
+      boxTS(vt - 0.30, vt + 0.30, back - 1.10, back - 0.52, top - 0.02,
+        top + 0.42, VENT, shade(VENT, 1.35));
+      boxTS(vt - 0.34, vt + 0.34, back - 1.14, back - 0.48, top + 0.40,
+        top + 0.46, shade(VENT, 1.20));
+    }
+    {
+      const lt = tR - 0.55, LAMP = [0.720, 0.700, 0.650];
+      boxTS(lt - 0.09, lt + 0.09, back + 0.08, back + 0.20, aHi + 0.22,
+        aHi + 0.40, LAMP, shade(LAMP, 1.12));
+      boxTS(lt - 0.05, lt + 0.05, back + 0.04, back + 0.10, aHi + 0.26,
+        aHi + 0.36, [0.330, 0.325, 0.310]);
     }
   }
 
@@ -8220,6 +8349,7 @@ async function buildJadrija(scene) {
     // fit in three and a half metres and comes out as a pile.
     if (S.kind === 'box' || (S.kind === 'kiosk' && S.t1 - S.t0 > 5)) {
       shopBack(S, y0, top);
+      if (S.reedBack) slastBack(S, y0, top);
     }
     if (S.kind === 'box') shopRoof(S, y0, top);
     // `shopKit` is the boardwalk's shared frontage — a serving counter with
@@ -9115,6 +9245,87 @@ async function buildJadrija(scene) {
     furniture.push({ t: bt2, s: ls, a: 0.74, c: 0.30, h: 0.92, y: gy2 });
   }
   freeLibrary(303.5, 40.2);
+
+  /**
+   * The POMMES FRITES lightbox, which the TODO has wanted a source for.
+   *
+   * It was listed under the MINI/grill items as "still not built and still
+   * wanted: the backlit photo menu boxes, the POMMES FRITES banners... none of
+   * which is in this footage either, so they want a source naming before
+   * anybody builds them." `slasticarnica-behind-view` is the source. The box
+   * stands on the gravel at the wood edge west of the slastičarnica, roughly
+   * in line with its back wall and with a pine behind it: a dark cabinet on
+   * two legs, POMMES over FRITES in heavy yellow, a red 100% roundel at the
+   * left and a photograph of chips filling the lower half.
+   *
+   * The two words and the 100% are read. Everything else on the poster is
+   * five or six words at about ten pixels a word and it ships as marks, which
+   * is the rule the RENT A BOAT price rows and the NE PARKIRAJ second line
+   * already ship under: what such a sign says is not in doubt and is also not
+   * the same thing as reading it.
+   */
+  function pommesBox(bt, bs) {
+    const gy = surfaceY(bt, bs);
+    const CASE = [0.052, 0.050, 0.055];
+    const LEG3 = [0.150, 0.148, 0.150];
+    const HW = 0.43, HD = 0.075, LO = gy + 0.60, HI = gy + 1.86;
+    for (const o of [-0.32, 0.32]) {
+      boxTS(bt + o - 0.030, bt + o + 0.030, bs - 0.030, bs + 0.030,
+        gy, LO + 0.10, LEG3);
+    }
+    boxTS(bt - HW, bt + HW, bs - HD, bs + HD, LO, HI, CASE, shade(CASE, 1.60));
+    // The poster, on the seaward face, which is the one the lane sees.
+    const C = document.createElement('canvas');
+    C.width = 420; C.height = 620;
+    const g = C.getContext('2d');
+    const FF = '"Trebuchet MS", "Segoe UI", "Helvetica Neue", Arial, sans-serif';
+    g.fillStyle = '#141216'; g.fillRect(0, 0, 420, 620);
+    // The photograph: chips heaped on a warm ground, which at this size is a
+    // scatter of pale sticks and not a picture of one.
+    g.fillStyle = '#3a2a16'; g.fillRect(14, 300, 392, 306);
+    for (let i = 0; i < 90; i++) {
+      const a = (i * 2.399) % 6.283;
+      const x = 210 + Math.cos(a * 1.7) * 150 + ((i * 37) % 41) - 20;
+      const y = 380 + Math.sin(a * 2.3) * 90 + ((i * 53) % 47) - 23;
+      const L = 26 + ((i * 29) % 30);
+      g.save(); g.translate(x, y); g.rotate(a);
+      const v = 0.80 + ((i * 17) % 5) * 0.04;
+      g.fillStyle = 'rgb(' + Math.round(238 * v) + ',' + Math.round(198 * v)
+        + ',' + Math.round(96 * v) + ')';
+      g.fillRect(-L * 0.5, -5, L, 10);
+      g.restore();
+    }
+    g.textAlign = 'center';
+    g.fillStyle = '#f4c327';
+    g.font = '700 82px ' + FF;
+    g.fillText('POMMES', 210, 130);
+    g.fillText('FRITES', 210, 212);
+    // The roundel.
+    g.beginPath(); g.arc(66, 268, 46, 0, Math.PI * 2);
+    g.fillStyle = '#c0201d'; g.fill();
+    g.fillStyle = '#f7f4ee'; g.font = '700 34px ' + FF;
+    g.fillText('100%', 66, 280);
+    // The lines nobody can read, as marks.
+    g.fillStyle = 'rgba(228,222,208,0.62)';
+    for (let r = 0; r < 3; r++) {
+      const w = 150 - r * 26;
+      g.fillRect(210 - w * 0.5 + 74, 248 + r * 17, w, 6);
+    }
+    g.strokeStyle = '#5e5a52'; g.lineWidth = 5;
+    g.strokeRect(7, 7, 406, 606);
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    // On the INLAND face. The frame is taken from the wood looking at the
+    // shop's back, and the box is facing the photographer: this thing is read
+    // by somebody walking the lane, not by anybody on the boardwalk, which is
+    // on the other side of a building from it.
+    seaFacing(tex, bt, bs + HD + 0.012, (LO + HI) * 0.5, HW * 2 - 0.05,
+      HI - LO - 0.05, 'pommes', Math.PI);
+    furniture.push({ t: bt, s: bs, a: 0.46, c: 0.12, h: HI - gy, y: gy });
+  }
+  pommesBox(325.6, 27.75);
+
 
   /**
    * The big agave in a limestone rockery. `a_112` and `a_113` in v595, `b_096`

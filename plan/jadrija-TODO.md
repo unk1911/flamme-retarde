@@ -691,9 +691,17 @@ bed. See the commit.
   the end post. The terrace had nothing on it at all before, because
   `terraceSet` only fires under an awning and this shop is a roof on posts.
   Still not built and still wanted: the white square parasols with pointed
-  crowns, the backlit photo menu boxes, the POMMES FRITES banners, the pallet
-  furniture and the chevron timber screens — none of which is in this
-  footage either, so they want a source naming before anybody builds them.
+  crowns, the pallet furniture and the chevron timber screens — none of which
+  is in this footage either, so they want a source naming before anybody
+  builds them. ~~The backlit photo menu boxes, the POMMES FRITES banners.~~
+  **SOURCED AND BUILT 31 Aug** — `slasticarnica-behind-view` has the box
+  standing on the gravel at the wood edge west of the slastičarnica, and that
+  is the frame that was being asked for. See `pommesBox`.
+- ~~**The slastičarnica's service elevation.**~~ **BUILT 31 Aug** from
+  `slasticarnica-behind-view`, opened at full size for the first time: reed
+  screen to two metres, a named awning over it, a corrugated upper storey with
+  a stepped parapet and a roof vent. See `slastBack`, which sits on top of the
+  shared `shopBack` rather than replacing it.
 - **The ground in the wood** (_344/_345/_347): pale compacted dirt with white
   limestone chips through it and brown pine litter, not sand. ~~And pine bark:
   grey-brown plates with **orange-red** inner bark showing at the seams.~~
