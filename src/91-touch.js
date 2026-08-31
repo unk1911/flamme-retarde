@@ -358,6 +358,10 @@ function initTouch() {
     TOUCH.grun = !TOUCH.grun;
     el.classList.toggle('on', TOUCH.grun);
   });
+  // Both of these are B. They do not set their own `on` class: `toggleBodyCam`
+  // does it for both at once, because the flag they show is also cleared from
+  // under them when you leave the body.
+  tap('t-body', () => toggleBodyCam());
 
   // ── under the canopy ──────────────────────────────────────────────────────
   // The same two halves once more. What is different is that one stick carries
@@ -526,6 +530,7 @@ function initTouch() {
     TOUCH.sfast = !TOUCH.sfast;
     el.classList.toggle('on', TOUCH.sfast);
   });
+  tap('t-sbody', () => toggleBodyCam());
   tap('t-sauto', () => toggleSwimAuto());
   // ASHORE is the same door E is, and on the boat E means the boat's version
   // of it: the gangway alongside at Šibenik, over the side anywhere else.

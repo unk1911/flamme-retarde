@@ -21,9 +21,14 @@
   <div class="veil-inner">
     <div class="eyebrow" data-i18n="veil.eyebrow">Šibenik &middot; Dalmatia &middot; 6 August 2024</div>
     <h1>Flamme&nbsp;Retardé</h1>
-    <h2 data-i18n="veil.sub">a Canadair over the Adriatic</h2>
-    <div class="rule"></div>
-    <p class="blurb" data-i18n-html="veil.blurb"></p>
+    <!-- The premise used to be spelled out here — the bomblet, the lebić, one
+         of four. It is gone, and the cinematic behind Take off is where it
+         always said it better anyway: this screen now carries a place, a date,
+         a name and a way in. Three paragraphs of prose and five lines of
+         attribution over a 412 px screen was the actual complaint, and half of
+         that prose was this. The .rule went with it — it divided the subtitle
+         from the blurb, and with the blurb gone it was a second horizontal
+         line sitting directly above the loading bar. -->
     <div class="bar"><i id="bar-fill"></i></div>
     <div id="stage" data-i18n="load.warm">warming the engines</div>
     <button id="enter" hidden data-i18n="veil.enter">Take off</button>
@@ -32,7 +37,6 @@
          button goes straight to the aeroplane and this is how you get the
          cinematic back. -->
     <button id="watch" hidden data-i18n="veil.watch">Watch the intro</button>
-    <p class="hint" id="hint" hidden></p>
   </div>
   <!-- Build stamp. Corner of the title screen, where it is out of the way but
        always in the same place, so you can tell at a glance which build a
@@ -40,29 +44,23 @@
   <div id="build" title="Flamme Retardé {{VERSION}}, built {{BUILD_DATE}}">
     <b>v{{VERSION}}</b><i>·</i><span>{{BUILD_DATE}}</span>
   </div>
+  <!-- Three items, and that is the whole footer.
+       It used to carry the OpenStreetMap line, the Jadrija field-recording
+       line and the seven-name bird licence, which on a 412 px screen was five
+       lines of small print under the Take off button and the single biggest
+       reason the title screen read as cluttered. All three now live in
+       README.md under "Sources and credits" — the OSM/ODbL notice, the
+       ambience, and the full bird table with species, file, recordist and
+       licence — and LICENSE section 3 carries the same attribution in the
+       form the licences ask for. Both travel with the repository this link
+       points at. What is owed is credit that a reader can reach, not credit
+       stapled to the splash screen.
+       (An earlier pass folded the wall behind a "credits & sources" button.
+       That was the right answer to a wall; deleting the wall is a better one,
+       so the button went with it.) -->
   <footer class="credit">
     <a class="src" href="https://edeliverables.com" target="_blank"
        rel="noopener">eDeliverables (2026)</a><i>·</i>
-    <span data-i18n-html="veil.credit"></span><i>·</i>
-    <!-- Not a link and not a licence notice: the ambience is recorded on the
-         spot at Jadrija and owes nobody anything. It is here because saying
-         where a sound came from is worth doing whether or not somebody makes
-         you. -->
-    <span data-i18n-html="veil.field"></span><i>·</i>
-    <!-- The next one IS a licence notice, and it is the first thing in this
-         game that has to be here. Seven of the eight bird recordings are other
-         people's work under CC BY-SA, which is satisfied by credit and by
-         share-alike, and the bundle is already CC BY-SA — so the whole of what
-         is owed is these seven names somewhere a player can see them.
-
-         Worth saying plainly because LICENSE argues the opposite: the bead
-         curtain was picked CC0 over better-sounding clips precisely because
-         "this game ships as one HTML file with nowhere to put a credit line."
-         That was true of a footer carrying one line about OpenStreetMap. It is
-         not true of this footer, which is a perfectly good place for a credit
-         and now has one. Section 3 of LICENSE carries the full attribution with
-         the licences and the links; this is the short form. -->
-    <span data-i18n-html="veil.birds"></span><i>·</i>
     <a class="src" href="https://github.com/unk1911/flamme-retarde" target="_blank" rel="noopener"
        data-i18n-html="veil.src">source on GitHub &#8599;</a><i>·</i>
     <a class="src" href="mailto:dolphin@edeliverables.com">dolphin@edeliverables.com</a>
@@ -274,6 +272,11 @@
          held: it is a thing you do to look at something, not a mode you are in.
          See `stepLens` in 90-app.js for why a closer look is a lens. -->
     <button id="t-look" data-i18n="touch.look">LOOK</button>
+    <!-- B. Round behind her and back again. It had been a keyboard-only view
+         since the day it stopped being water-only, which meant the one mode
+         where you can actually see who you are playing was reachable from
+         everything except the device most people open this on. -->
+    <button id="t-body" data-i18n="touch.body">BODY</button>
     <!-- U. One tap and no arming: this is the way out of being stuck under the
          floor, and a way out you have to press twice is a worse one. -->
     <button id="t-up" data-i18n="touch.up">UP</button>
@@ -333,6 +336,7 @@
   </div>
   <div id="smini">
     <button id="t-fast" data-i18n="touch.fast">FAST</button>
+    <button id="t-sbody" data-i18n="touch.body">BODY</button>
     <button id="t-sauto" data-i18n="touch.auto">AUTO</button>
     <button id="t-ashore" data-i18n="touch.ashore">ASHORE</button>
     <button id="t-sset" data-i18n="touch.set">SET</button>
@@ -375,6 +379,26 @@
   </div>
 </div>
 
+<!-- ─────────────────────────────────────────────────────── the help sheet ──
+     Every key the game answers, in one place, opened with ? or F1 and — for a
+     thumb, which has no ? to press — from the button at the foot of the
+     settings panel.
+
+     It exists because the title screen used to carry two lines of them, which
+     is where a control list is least useful and most in the way: you read it
+     before you have an aeroplane, forget it, and then have nowhere to look it
+     up. Half the keys were not on that list at all. This is the whole set,
+     grouped by what you are sitting in, and it is reachable from inside the
+     game where the question actually gets asked. -->
+<div id="help" hidden>
+  <div id="help-inner">
+    <button id="help-close" aria-label="close">&times;</button>
+    <h3 data-i18n="help.title">controls</h3>
+    <div id="help-cols"></div>
+    <p id="help-foot"></p>
+  </div>
+</div>
+
 <div id="panel" hidden>
   <h3 data-i18n="set.title">settings</h3>
   <div class="row lang">
@@ -382,6 +406,7 @@
     <div id="lang-pick"></div>
   </div>
   <div id="panel-rows"></div>
+  <button id="panel-help" data-i18n="help.open">controls &amp; keys</button>
   <p class="panel-foot" id="panel-foot"></p>
 </div>
 

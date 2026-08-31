@@ -228,6 +228,16 @@ addEventListener('keydown', (e) => {
     || e.code === 'NumpadEnter' || e.code === 'Space')) {
     e.preventDefault(); endFlyCut(); return;
   }
+  // ? and F1 — the help sheet. Above the pause guard because a paused game is
+  // exactly when somebody goes looking for it, and ESC closes it rather than
+  // unpausing when it is up. Not H: H already hides the HUD, and Misha asked
+  // for "H or equivalent" — this is the equivalent, and the conventional one.
+  if (e.code === 'F1' || (e.key === '?' || (e.code === 'Slash' && e.shiftKey))) {
+    e.preventDefault(); toggleHelp(); return;
+  }
+  if (e.code === 'Escape' && !$('help').hidden) {
+    e.preventDefault(); toggleHelp(false); return;
+  }
   if (e.code === 'KeyO') { e.preventDefault(); skipToComputer(); return; }
   if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); togglePause(); return; }
   // Ahead of the pause guard on purpose: pausing to read the hint and then
@@ -285,10 +295,7 @@ addEventListener('keydown', (e) => {
   // the aeroplane's own answer to this question and has four of them.
   if (e.code === 'KeyB') {
     e.preventDefault();
-    if (state.phase === 'swim' || state.phase === 'ground') {
-      bodyCam = !bodyCam;
-      toast(T(bodyCam ? 'body.on' : 'body.off'));
-    }
+    toggleBodyCam();
     return;
   }
   // E, but only out in the water: ahead of the pause guard with the four back
@@ -795,7 +802,6 @@ const headingToYaw = (dx, dz) => Math.atan2(-dx, -dz);
  * is a keyboard attached, not only on the language.
  */
 function paintDeviceText() {
-  $('hint').innerHTML = TK('veil.hint', 'veil.hintTouch');
   // The settings panel is the only place the build stamp is still reachable
   // once the title screen is gone, which is when you most want to check it.
   // On foot, every control the flight version names is either meaningless or
@@ -824,11 +830,13 @@ async function boot() {
   // The stage line keeps its key, so switching language mid-load retranslates
   // whatever it is currently saying instead of freezing in the old one.
   let stageKey = 'load.warm';
-  onLangChange(() => { stageEl.textContent = T(stageKey); });
+  // A null key is a step with nothing to say — the last one — and it clears
+  // the line rather than printing whatever T() makes of null.
+  onLangChange(() => { stageEl.textContent = stageKey ? T(stageKey) : ''; });
   const step = async (pct, key) => {
     bar.style.width = pct + '%';
     stageKey = key;
-    stageEl.textContent = T(key);
+    stageEl.textContent = key ? T(key) : '';
     await new Promise((r) => setTimeout(r, 16));
   };
 
@@ -1054,10 +1062,13 @@ async function boot() {
 
   startMission();
 
-  await step(100, 'load.ready');
+  // The last step used to sign off with a line of its own; now the bar simply
+  // fills and the line empties, which is the whole of what "ready" needs to
+  // say once there is a lit Take off button underneath it. `step` still runs:
+  // it is what takes the bar to 100 and yields a frame for it to get there.
+  await step(100, null);
   $('enter').hidden = false;
   $('watch').hidden = !introSeen();
-  $('hint').hidden = false;
 }
 
 // ── mission ──────────────────────────────────────────────────────────────────
@@ -1219,6 +1230,97 @@ function buildPanel() {
       r.out.textContent = r.s.fmt(parseFloat(r.inp.value));
     }
   });
+}
+
+/**
+ * The help sheet — every key the game answers.
+ *
+ * A table rather than a wall of prose, and grouped by what you are sitting in,
+ * because "what does F do" has two answers and which one is right depends on
+ * whether you are in the aeroplane. The glyph column is not translated: W is
+ * W on a Croatian keyboard too. Only the right-hand column goes through T().
+ */
+const HELP = [
+  ['help.g.fly', [
+    ['mouse · ← ↑ → ↓', 'help.k.stick'],
+    ['W · S', 'help.k.thr'],
+    ['A · D', 'help.k.rudder'],
+    ['SPACE', 'help.k.scoop'],
+    ['F', 'help.k.drop'],
+    ['Z', 'help.k.level'],
+    ['T', 'help.k.ap'],
+    ['C', 'help.k.cam'],
+    ['G', 'help.k.gear'],
+    ['X', 'help.k.centre'],
+  ]],
+  ['help.g.foot', [
+    ['W A S D · arrows', 'help.k.walk'],
+    ['SHIFT · Q', 'help.k.run'],
+    ['SPACE', 'help.k.branch'],
+    ['ENTER', 'help.k.hop'],
+    ['Z', 'help.k.lens'],
+    ['B', 'help.k.body'],
+    ['U', 'help.k.up'],
+    ['K', 'help.k.kite'],
+    ['F', 'help.k.foil'],
+    ['E', 'help.k.in'],
+    ['O', 'help.k.pc'],
+  ]],
+  ['help.g.water', [
+    ['W A S D · arrows', 'help.k.swim'],
+    ['SHIFT · Q', 'help.k.kick'],
+    ['SPACE', 'help.k.rise'],
+    ['C · CTRL', 'help.k.dive'],
+    ['T', 'help.k.auto'],
+    ['B', 'help.k.body'],
+    ['E', 'help.k.ashore'],
+  ]],
+  ['help.g.doors', [
+    ['J', 'help.k.bail'],
+    ['9', 'help.k.jadrija'],
+    ['0', 'help.k.rokici'],
+    ['V', 'help.k.vikendica'],
+    ['R', 'help.k.race'],
+  ]],
+  ['help.g.any', [
+    ['P · ESC', 'help.k.pause'],
+    ['M', 'help.k.settings'],
+    ['H', 'help.k.hud'],
+    ['L', 'help.k.clip'],
+    ['?  ·  F1', 'help.k.help'],
+  ]],
+];
+
+function buildHelp() {
+  // Not a data-i18n attribute: which line is right depends on whether there is
+  // a keyboard, and on glass neither ESC nor ? exists to be pressed.
+  $('help-foot').textContent = TK('help.note', 'help.noteTouch');
+  const cols = $('help-cols');
+  cols.textContent = '';
+  for (const [gk, rows] of HELP) {
+    const sec = document.createElement('section');
+    const h = document.createElement('h4');
+    h.textContent = T(gk);
+    sec.appendChild(h);
+    for (const [glyph, dk] of rows) {
+      const row = document.createElement('div');
+      const k = document.createElement('kbd');
+      k.textContent = glyph;
+      const d = document.createElement('span');
+      d.textContent = T(dk);
+      row.append(k, d);
+      sec.appendChild(row);
+    }
+    cols.appendChild(sec);
+  }
+}
+
+function toggleHelp(force) {
+  const el = $('help');
+  const show = force == null ? el.hidden : force;
+  if (show) buildHelp();
+  el.hidden = !show;
+  if (show) document.exitPointerLock?.();
 }
 
 function togglePanel() {
@@ -1430,6 +1532,7 @@ function leaveWater(was = state.phase) {
   chaseCut = null;
   if (you) you.drive(null);
   bodyCam = false;
+  syncBodyBtn();
   $('chase-hud').hidden = true;
   // Whatever took you out, the mask comes off in the same frame — see the note
   // on `reset` in 62-mask.js. Ahead of the branches on purpose: it is cheap, it
@@ -2285,6 +2388,30 @@ let jumpWas = 0, jumpPush = 0, jumpLand = 0, jumpPosed = false;
 
 /** Third person in the water: off, or on with the mask down. */
 let bodyCam = false;
+
+/**
+ * B, and the two buttons that are B on a phone.
+ *
+ * Only in the water and on foot, because those are the two modes with a body
+ * to look at; in the aeroplane the outside views are `CAMS` and `cycleCamera`
+ * is that question's answer. `syncBodyBtn` is what makes the button honest —
+ * `bodyCam` is also cleared by `leaveGround`, and a lit button over a
+ * first-person view is worse than no button.
+ */
+function toggleBodyCam() {
+  if (state.phase !== 'swim' && state.phase !== 'ground') return;
+  bodyCam = !bodyCam;
+  syncBodyBtn();
+  toast(TK(bodyCam ? 'body.on' : 'body.off',
+           bodyCam ? 'body.onTouch' : 'body.off'));
+}
+
+function syncBodyBtn() {
+  for (const id of ['t-body', 't-sbody']) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('on', bodyCam);
+  }
+}
 const _bodyAt = new THREE.Vector3();
 let _bodyHas = false;
 
@@ -5611,6 +5738,15 @@ function leaveVeil() {
   camAim.copy(flight.p.pos);
 }
 
+$('help-close').addEventListener('click', () => toggleHelp(false));
+// Clicking the backdrop, but not the sheet itself.
+$('help').addEventListener('click', (e) => {
+  if (e.target === $('help')) toggleHelp(false);
+});
+// The thumb's way in: a phone has no ? to press, and every touch HUD already
+// carries a SET button.
+$('panel-help').addEventListener('click', () => { togglePanel(); toggleHelp(true); });
+
 $('enter').addEventListener('click', () => {
   const seen = introSeen();
   leaveVeil();
@@ -5737,6 +5873,8 @@ boot().catch((e) => {
 
 // A small handle for the screenshot tool.
 window.__fr = {
+  /** The help sheet. Toggles when called with nothing, like `body`. */
+  help: (v) => { toggleHelp(v); return !$('help').hidden; },
   build: BUILD,
   /** What this machine's GL will do. `?gl` puts the same thing on the screen. */
   gl: () => glReport(),
@@ -6354,7 +6492,7 @@ window.__fr = {
      * `body()` in a probe flips the state it was meant to be reading, which
      * has now cost two wrong test runs. Pass `true` to read-and-set.
      */
-    body: (v) => { bodyCam = v == null ? !bodyCam : !!v; return bodyCam; },
+    body: (v) => { bodyCam = v == null ? !bodyCam : !!v; syncBodyBtn(); return bodyCam; },
     /** The changing station: dressed or not, and which cubicle she is in. */
     changed: (v) => {
       if (v != null) setDressed(!v);

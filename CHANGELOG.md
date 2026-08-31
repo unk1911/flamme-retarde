@@ -8,6 +8,79 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.167.0] — 2026-08-31
+
+### A title screen with nothing to read on it, and a key that says what the keys do
+
+Misha, from a phone: *"the landing page especially when viewed from phone is too
+busy with writing... make it minimalistic! there is so much writing that it is
+clobbering things up"*. It was, and the clobbering was literal — a screenshot at
+412 x 915 has the Take off button sitting underneath the control hints and the
+five-line attribution block, all three overlapping. The short-viewport rules
+that fix this were written against `max-height: 560px`, which is a phone held
+*sideways*; a phone held upright is 915 px tall and got none of them, so the
+credit footer stayed `position: absolute; bottom: 1.6rem` and landed on the
+button.
+
+**What the title screen carried, and what it carries now.** Gone: the premise
+paragraph about the bomblet and the lebić, the subtitle, the date on the
+eyebrow, "four aircraft, one afternoon", the two lines of control hints, and the
+three lines of attribution. What is left is a place, a name, a loading bar, Take
+off, Watch the intro, a version stamp and three links. The `.rule` divider went
+with the paragraph it was dividing — without it, it was a second horizontal line
+directly above the loading bar.
+
+**The attribution moved rather than vanished.** README.md has carried the whole
+of it under *Sources and credits* the entire time — the OpenStreetMap ODbL
+notice, the Jadrija field recordings, and the bird table with species, file,
+recordist and licence for all eight clips — and LICENSE section 3 carries the
+same in the form the licences ask for. Both travel with the repository the
+footer still links to. What CC BY-SA is owed is credit a reader can reach, and
+it is one link away rather than in six-point type under a button.
+
+**? or F1 opens a help sheet.** *"we need to maybe have a help page 'H' button?
+or equivalent, which shows all the shortcuts on it, it shouldn't be on the main
+landing page."* H is taken — it hides the HUD — so it is `?`, which is the
+conventional one, with F1 alongside. Thirty-eight bindings in five groups: in
+the aeroplane, on foot, in the water, getting somewhere, anywhere. The old
+title-screen hint listed nine of them.
+
+It sits above the title screen rather than below it, so it answers from the
+splash as well as mid-flight, and ESC closes it without also unpausing. On glass
+there is no `?` to press, so the settings panel grew a **controls & keys**
+button — every touch HUD already has a SET — and the closing line is
+device-aware, because "ESC or ? closes this" is a lie on a phone.
+
+### B is a button now
+
+`bodyCam` — round behind her and back — has been on `B` since it stopped being
+water-only, which meant the one view where you can see who you are playing was
+reachable from everything except the device most people open this on. It is now
+a **BODY** button in the on-foot row next to LOOK and in the swimming row next
+to FAST, and both light while it is on.
+
+The two of them share one `toggleBodyCam`, and it is the flag being cleared
+underneath them that makes that worth doing: `leaveGround` sets `bodyCam = false`
+on its own, and a lit button over a first-person view is worse than no button at
+all, so `syncBodyBtn` is called from there too.
+
+### The fold that was not
+
+The first cut at the attribution block folded it behind a `<details>` disclosure
+— CSS-only, so a credit line would never depend on JavaScript. It did not
+survive its own screenshot: Chrome no longer hides a closed disclosure by
+putting `display: none` on its children, it wraps them in `::details-content`
+and sets `content-visibility: hidden`, which no author `display` rule can
+override. The desktop footer vanished outright. The replacement was a button and
+a class — and then the wall was deleted instead, so both went.
+
+The second cut then did nothing at all, for a different reason worth writing
+down: the listener was added inside `paintDeviceText`, which is the *repaint*.
+It is on `onLangChange` and called from eighteen places, and it had attached two
+listeners before the title screen was even up. Two listeners toggle a class
+twice, which is the same as not toggling it. A listener added inside a repaint
+is a bug whatever else it does.
+
 ## [1.166.0] — 2026-08-31
 
 ### Three metres of unbroken green
