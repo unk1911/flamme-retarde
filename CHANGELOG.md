@@ -8,6 +8,54 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.157.0] — 2026-08-31
+
+### The kabine are open, and one of them has a name
+
+Three items off the survey/4 list, all from `1000150414` and all about the same
+thing: a row of eighty identical shut doors is a storage yard, and Jadrija's
+kabine are somebody's.
+
+**One door in six stands open with something hanging in it.** The survey
+records this as the biggest thing it found about the kabine after the bay
+width: "0:24, 2:57, 3:48 and 4:03 — an open kabina at Jadrija has a plastic
+strip fly curtain in it, magenta, green, blue and yellow ribbons, or a cloth
+one, or a bamboo blind. The model has eighty shut doors and one open room.
+Every photograph has several open ones with something hanging in the hole." At
+0:24 two of seven are open.
+
+Four kinds hang in them now — the plastic ribbons, a dark maroon cloth, a
+bamboo blind that runs the other way, and a striped cotton one — with the
+strips cut narrow and hung uneven, because a strip curtain never hangs level
+and a straight bottom edge is the one thing that makes it read as a painted
+panel. The leaf swings INWARD and stands at a right angle in the doorway,
+which is what the frame has and is also the only version that costs nothing: a
+leaf folded back against the render outside would cover its neighbour's door.
+
+Which huts are open is off the bay index and the run's own `t`, never `rng` —
+rule 4, the whole beach hangs off that stream. It is also *cheaper* than shut:
+an open hut skips twelve louvres and four pieces of ironmongery, so the whole
+change comes out at **−1 128 triangles**.
+
+**KABINAŠI.** The one word written anywhere on a hundred metres of kabine, and
+the survey's note on it is one line: "a small enamelled sign, purple lettering
+on white, on the end wall at 0:24. Not set — one word, legible, and it is the
+name of the thing." It is set now, on the west end of the run that carries the
+hut you can walk into, with the row of black coat hooks below it and the red
+towel and the green swim ring hanging off them that are the other half of that
+frame. It went on the east end first and disappeared behind the resort's map
+board, which is 1.6 m of that wall.
+
+`seaFacing` grew a quarter turn for it, so a canvas can face along the shore
+instead of out to sea — the same thing Kod Kose needed yesterday.
+
+**And a line of washing across one shut bay in nine.** Cord with a sag in it,
+a nail at each end, and three towels pegged on at different drops. Shut bays
+only: a towel across an open door is a curtain, and there is already one of
+those.
+
+61 fps on the promenade, 59 standing square on to a run. Census untouched.
+
 ## [1.156.0] — 2026-08-31
 
 ### The wood floor has stones in it, and its colour was never the problem

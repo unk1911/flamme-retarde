@@ -1333,6 +1333,187 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * The one word written anywhere on a hundred metres of kabine.
+   *
+   * Survey/4: "KABINAŠI. A small enamelled sign, purple lettering on white, on
+   * the end wall at 0:24. Not set — one word, legible, and it is the name of
+   * the thing." `1000150414` at 0:24 has it high on the gable end with a row
+   * of black coat hooks screwed to the render below it and a red towel and a
+   * swim ring hanging off them, which is the other half of that frame and is
+   * what says the row is lived in rather than locked up.
+   */
+  function kabinasiSign(w, h) {
+    const C = document.createElement('canvas');
+    C.height = 128;
+    C.width = Math.round(128 * w / h);
+    const g = C.getContext('2d');
+    g.fillStyle = '#f0eee7';
+    g.fillRect(0, 0, C.width, C.height);
+    g.strokeStyle = '#6b2a86';
+    g.lineWidth = C.height * 0.10;
+    g.strokeRect(g.lineWidth * 0.6, g.lineWidth * 0.6,
+      C.width - g.lineWidth * 1.2, C.height - g.lineWidth * 1.2);
+    g.fillStyle = '#6b2a86';
+    g.textAlign = 'center';
+    g.font = '700 ' + Math.round(C.height * 0.50) + 'px "Trebuchet MS", Arial, sans-serif';
+    g.fillText('KABINAŠI', C.width * 0.5, C.height * 0.68);
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    return tex;
+  }
+
+  /**
+   * The end wall of a run: the sign, the hooks, and what is hanging on them.
+   *
+   * `turn` on `seaFacing` is a quarter turn, so a canvas can face along the
+   * shore instead of out to sea. This is the only place at Jadrija where that
+   * is needed twice.
+   */
+  function kabinasi(T, front, back, floor, eave, side = 1) {
+    const sm = front + 1.35;
+    const o = side, off = (d) => (o > 0 ? T + d : T - d);
+    const IRON = [0.070, 0.068, 0.072];
+    // The plate. A tray behind the canvas for the same reason `shopSign` has
+    // one: a bare plane six centimetres off a wall loses to whatever is
+    // bolted on afterwards.
+    const w = 0.62, h = 0.19;
+    const yy = eave - 0.52;
+    boxTS(Math.min(off(0.05), off(0.11)), Math.max(off(0.05), off(0.11)),
+      sm - w * 0.5 - 0.02, sm + w * 0.5 + 0.02,
+      yy - h * 0.5 - 0.02, yy + h * 0.5 + 0.02, [0.545, 0.540, 0.525]);
+    seaFacing(kabinasiSign(w, h), off(0.17), sm, yy, w, h, 'kab:sign',
+      o * Math.PI * 0.5);
+    // The hooks: a batten and five of them, under the sign and out toward the
+    // promenade end of the wall.
+    const hs = sm + 0.70, hy = floor + 1.62;
+    boxTS(Math.min(off(0.05), off(0.09)), Math.max(off(0.05), off(0.09)),
+      hs - 0.34, hs + 0.34, hy, hy + 0.075,
+      [0.185, 0.170, 0.155]);
+    for (let i = 0; i < 5; i++) {
+      const sv = hs - 0.28 + i * 0.14;
+      boxTS(Math.min(off(0.05), off(0.14)), Math.max(off(0.05), off(0.14)),
+        sv - 0.014, sv + 0.014, hy - 0.05, hy + 0.02, IRON);
+    }
+    // A red towel over the middle three, and a swim ring on the end one.
+    const RED = [0.560, 0.085, 0.075];
+    boxTS(Math.min(off(0.09), off(0.115)), Math.max(off(0.09), off(0.115)),
+      hs - 0.19, hs + 0.13, hy - 0.62, hy + 0.01, RED, shade(RED, 1.18));
+    const RING = [0.135, 0.510, 0.470];
+    for (let i = 0; i < 8; i++) {
+      const a2 = i * TAU / 8;
+      const sv = hs - 0.30 + Math.cos(a2) * 0.115;
+      const yv = hy - 0.20 + Math.sin(a2) * 0.115;
+      boxTS(Math.min(off(0.09), off(0.125)), Math.max(off(0.09), off(0.125)),
+        sv - 0.032, sv + 0.032, yv - 0.032, yv + 0.032, RING);
+    }
+  }
+
+  /**
+   * A clothesline between two huts, with towels pegged on it.
+   *
+   * Survey/4: "a line strung from a nail on the wall to the next hut with
+   * towels pegged on it… two of the frames are of nothing but that." It hangs
+   * across the front of a bay, so it goes on shut ones only — a towel across
+   * an open door is a curtain, and there is already one of those.
+   */
+  const TOWELS = [
+    [0.560, 0.115, 0.105], [0.115, 0.310, 0.520], [0.640, 0.560, 0.155],
+    [0.545, 0.520, 0.480], [0.180, 0.420, 0.260], [0.580, 0.330, 0.115],
+  ];
+  function clothesline(a, c, front, floor, k) {
+    const y = floor + 1.94;
+    const fs = front - 0.16;
+    // The line itself: 6 mm of cord, and it sags, which is two boxes stepping
+    // down and back up rather than one straight one.
+    const CORD = [0.400, 0.386, 0.350];
+    const mid = (a + c) * 0.5;
+    boxTS(a + 0.05, mid, fs - 0.004, fs + 0.004, y - 0.03, y + 0.003, CORD);
+    boxTS(mid, c - 0.05, fs - 0.004, fs + 0.004, y - 0.03, y + 0.003, CORD);
+    boxTS(a + 0.02, a + 0.07, front - 0.03, front, y, y + 0.03, CORD);
+    boxTS(c - 0.07, c - 0.02, front - 0.03, front, y, y + 0.03, CORD);
+    for (let i = 0; i < 3; i++) {
+      const w = 0.30 + 0.08 * ((k + i * 3) % 3);
+      const x = a + 0.14 + i * ((c - a - 0.30) / 3);
+      const drop = 0.52 + 0.16 * ((k * 5 + i) % 3);
+      const col = TOWELS[(k * 2 + i) % TOWELS.length];
+      boxTS(x, Math.min(x + w, c - 0.06), fs - 0.016, fs + 0.016,
+        y - 0.03 - drop, y - 0.02, col, shade(col, 1.16));
+    }
+  }
+
+  /**
+   * A door standing open, with something hanging in the hole.
+   *
+   * Survey/4, the biggest thing it found about the kabine after the bay width:
+   * "0:24, 2:57, 3:48 and 4:03 — an open kabina at Jadrija has a plastic strip
+   * fly curtain in it, magenta, green, blue and yellow ribbons, or a cloth one,
+   * or a bamboo blind. The model has eighty shut doors and one open room. Every
+   * photograph has several open ones with something hanging in the hole."
+   *
+   * `1000150414` at 0:24 has two of seven doors open. One in six here, chosen
+   * off the bay index rather than out of `rng` — rule 4, the whole beach hangs
+   * off that stream — so which huts are open is fixed and nothing downstream of
+   * them moves.
+   *
+   * The leaf swings INWARD and stands at a right angle in the doorway, which is
+   * what the frame has and is also the only version that costs nothing: a leaf
+   * folded back against the render outside would cover its neighbour's door.
+   */
+  const HANGCOL = [
+    // The plastic strip curtain, in the four ribbons the frame names.
+    [[0.560, 0.075, 0.330], [0.085, 0.400, 0.190], [0.075, 0.230, 0.520],
+      [0.680, 0.560, 0.075]],
+    // A cloth one: dark maroon, which is what is hanging in the coral door.
+    [[0.185, 0.055, 0.060], [0.205, 0.062, 0.068], [0.170, 0.050, 0.055],
+      [0.195, 0.058, 0.064]],
+    // A bamboo blind.
+    [[0.395, 0.290, 0.155], [0.330, 0.240, 0.128], [0.420, 0.312, 0.170],
+      [0.350, 0.255, 0.138]],
+    // And a striped cotton one, off the hut at the left of 0:24.
+    [[0.545, 0.500, 0.430], [0.330, 0.288, 0.240], [0.560, 0.516, 0.445],
+      [0.300, 0.262, 0.220]],
+  ];
+  function openDoor(dc, front, floor, col, kind) {
+    const h = DOORW * 0.5;
+    // The leaf, standing in the doorway at a right angle to the wall. Hinged on
+    // the left, which is the side `doorKit` puts the hinges on.
+    const face = front + 0.045;
+    boxTS(dc - h + 0.012, dc - h + 0.048, face + 0.02, face + 0.72,
+      floor + 0.010, floor + DOORH - 0.010, shade(col, 0.94), col);
+    // A sliver of the back of it, which is never painted the same as the front.
+    boxTS(dc - h + 0.044, dc - h + 0.048, face + 0.02, face + 0.72,
+      floor + 0.010, floor + DOORH - 0.010, shade(col, 0.62));
+    // And what is hanging in the hole. Six ribbons across 0.88 m, or four wide
+    // bands if it is cloth, and the difference between them is only the width:
+    // the strips are cut narrow and a curtain is not.
+    const pal = HANGCOL[kind % HANGCOL.length];
+    const hs = front + 0.055;
+    if (kind % HANGCOL.length === 2) {
+      // The blind runs the other way.
+      const n = 14, y0b = floor + 0.05, y1b = floor + DOORH - 0.16;
+      for (let i = 0; i < n; i++) {
+        const y = y0b + i * ((y1b - y0b) / n);
+        boxTS(dc - h + 0.020, dc + h - 0.020, hs, hs + 0.012,
+          y, y + (y1b - y0b) / n - 0.008, pal[i % pal.length]);
+      }
+    } else {
+      const n = kind % HANGCOL.length === 0 ? 7 : 4;
+      const w = (DOORW - 0.04) / n;
+      for (let i = 0; i < n; i++) {
+        const x = dc - h + 0.020 + i * w;
+        // Hung slightly short and slightly uneven, because a strip curtain
+        // never hangs level and a straight bottom edge is the one thing that
+        // makes this read as a painted panel.
+        const drop = DOORH - 0.16 - 0.035 * ((i * 5) % 3);
+        boxTS(x + 0.004, x + w - 0.004, hs, hs + 0.010,
+          floor + DOORH - 0.06 - drop, floor + DOORH - 0.06,
+          pal[i % pal.length], shade(pal[i % pal.length], 1.14));
+      }
+    }
+  }
+
+  /**
    * The architrave, and the reason the door is a hole and not a sticker: a band
    * of paint on the render round the opening, in the door's own colour. Whoever
    * painted the door had the tin open and did the frame with it. It is also the
@@ -1597,15 +1778,34 @@ async function buildJadrija(scene) {
       b = up;
       // Louvred or planked, two thirds to one — off the bay index, not `rng`,
       // so the beach behind it stays where the seed put it.
-      door(dc, front, fl, col, (k * 5 + (t0 | 0)) % 3 !== 0);
-      doorKit(dc, front, fl, DOORW * 0.5, 0.045);
+      // One in six stands open with a curtain in it. Off the bay index and the
+      // run's own t, so it is fixed for the life of the seed and costs no draw
+      // — see `openDoor`.
+      const oIx = (k * 7 + (t0 | 0) * 3) % 6;
+      if (oIx === 0) {
+        openDoor(dc, front, fl, col, (k * 3 + (t0 | 0)) % 4);
+      } else {
+        door(dc, front, fl, col, (k * 5 + (t0 | 0)) % 3 !== 0);
+        doorKit(dc, front, fl, DOORW * 0.5, 0.045);
+      }
       // The rail between the door head and the vent, filling the last of the
       // opening. Painted with the door, because it was.
       boxTS(dc - DOORW * 0.5, dc + DOORW * 0.5, front + 0.010, front + REVEAL,
         fl + DOORH, fl + OPENH - VENTH, shade(col, 0.86));
       vent(dc, front, fl + OPENH - VENTH, DOORW - 0.06, col);
       surround(dc, front, fl, col, DOORW * 0.5, fl + OPENH + 0.045);
+      // And a line of washing across one shut bay in nine.
+      if (oIx !== 0 && (k * 4 + (t0 | 0)) % 9 === 0) {
+        clothesline(a, c, front, fl, k + (t0 | 0));
+      }
     }
+    // The name of the thing, on the end wall of the run that carries the one
+    // hut you can walk into — which is the run the player is most likely to
+    // reach the end of. See `kabinasi`.
+    // On the WEST end and not the east: the east end of this run already
+    // carries the resort's map board, which is 1.6 m of it, and the sign went
+    // in behind it.
+    if (sk >= 0) kabinasi(t0, front, back, y0 + JAD.plinth, eave, -1);
     // One roof: two slopes to a ridge running along the row, with an overhang
     // and a fascia under it so the eave has a shadow line.
     const mid = (front + back) * 0.5;

@@ -594,12 +594,15 @@ bed. See the commit.
   improvement and there are only two, which is exactly why they are worth
   having: a hundred metres of identical treatment with two exceptions in it is
   what a row of privately owned huts looks like.
-- **The doors are open, and there is a curtain in them.** 0:24, 2:57, 3:48 and
+- ~~**The doors are open, and there is a curtain in them.**~~ BUILT 31 Aug —
+  one door in six, four kinds of hanging, the leaf swung inward. Cheaper than
+  shut: an open hut skips twelve louvres and the ironmongery. 0:24, 2:57, 3:48 and
   4:03: an open kabina at Jadrija has a **plastic strip fly curtain** in it —
   magenta, green, blue and yellow ribbons — or a cloth one, or a bamboo blind.
   The model has eighty shut doors and one open room. Every photograph has
   several open ones with something hanging in the hole.
-- **The clothesline.** A line strung from a nail on the wall to the next hut
+- ~~**The clothesline.**~~ BUILT 31 Aug, across one shut bay in nine.
+  A line strung from a nail on the wall to the next hut
   with towels pegged on it, and a row of five coat hooks screwed to the render
   outside the door (4:09). Two of the frames are of nothing but that.
 - **What is inside one.** 0:09 through the open door: a folding sun lounger
@@ -612,7 +615,9 @@ bed. See the commit.
   the clearest: every door has a small horizontal light over it, the frame
   painted with the door and the pane dark or wire. The model draws this and
   draws it as a slot with three bars, which is right for half of them.
-- **KABINAŠI.** A small enamelled sign, purple lettering on white, on the end
+- ~~**KABINAŠI.**~~ BUILT 31 Aug, on the WEST end of the run with the open hut
+  — the east end carries the map board. A small enamelled sign, purple
+  lettering on white, on the end
   wall at 0:24. Not set — one word, legible, and it is the name of the thing.
 - **Brod.** Stills _377/_378: the pier the Šibenik boat comes to. A rusted
   cast-iron mushroom bollard and a newer brass one on a concrete quay with
