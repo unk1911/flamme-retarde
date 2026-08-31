@@ -6229,6 +6229,112 @@ async function buildJadrija(scene) {
    * where the drink for this end of the boardwalk is kept, and what you
    * actually see is a wall of crates.
    */
+  /**
+   * The green kiosk's back, which was three metres of unbroken green.
+   *
+   * `shopBack` gives every shop on this shore a service side and this kiosk is
+   * excluded from it — the test is `kind === 'box'` or a kiosk over five metres
+   * long, and this one is three. So the front got fourteen crates, a keg, two
+   * wheelie bins, a barrier and two canopies, and the elevation you actually
+   * walk past coming down from the lane was a flat green slab with nothing on
+   * it at all. It is the same failure `shopBack` was written for and this shop
+   * fell through the size test into it.
+   *
+   * `behind-scenes` is the frame: a white door with a long dark handle in a
+   * dark green surround, two shallow pale hoods on brackets over the door and
+   * the window beside it, a small lamp on the wall above, blue Pepsi crates
+   * stacked five and six high against the green, and a galvanised crowd
+   * barrier leaning at the far end.
+   */
+  function greenBack(S, y0, top) {
+    const back = S.s1;
+    const DKG = [0.062, 0.148, 0.075];
+    const WHITE = [0.660, 0.655, 0.630];
+    const GLASS2 = [0.072, 0.088, 0.082];
+    const dt = S.t0 + 1.28, wt = S.t0 + 2.42;
+
+    // The door: a white leaf in a dark green surround, and the surround is
+    // what makes it a door rather than a white rectangle on a green wall.
+    boxTS(dt - 0.52, dt + 0.52, back, back + 0.08, y0, y0 + 2.16,
+      DKG, shade(DKG, 1.30));
+    boxTS(dt - 0.44, dt + 0.44, back + 0.05, back + 0.11, y0 + 0.03, y0 + 2.08,
+      WHITE, shade(WHITE, 1.06));
+    // The handle, which is a full-height bar and not a knob.
+    boxTS(dt + 0.30, dt + 0.36, back + 0.11, back + 0.15, y0 + 0.86, y0 + 1.52,
+      [0.085, 0.085, 0.090]);
+    // The window beside it.
+    boxTS(wt - 0.36, wt + 0.36, back, back + 0.07, y0 + 0.98, y0 + 1.82,
+      DKG, shade(DKG, 1.30));
+    // The pane stands PROUD of its own frame. Written inside it — glass at
+    // back+0.04 in a frame that reaches back+0.07 — the frame is in front of
+    // it from every angle the wall is seen from and the window rendered as a
+    // flat dark-green rectangle: a shutter, not a window.
+    boxTS(wt - 0.29, wt + 0.29, back + 0.070, back + 0.086, y0 + 1.04,
+      y0 + 1.76, GLASS2);
+
+    // NO hoods, and the frame has two. This kiosk is 2.4 m to the eaves and
+    // its own roof slab already oversails the back by more than the hoods
+    // project: built at the height the photograph puts them, both of them
+    // disappeared under it, and built lower they would be a shelf across the
+    // top of a door that is 2.16 m tall. The building in `behind-scenes` is a
+    // storey taller than this one and is not going to be enlarged to fit its
+    // own canopies. The lamp, which sits in the same band, is set into the
+    // wall rather than standing off it for the same reason.
+    //
+    // The lamp on the wall over the door.
+    boxTS(dt - 0.62, dt - 0.48, back + 0.04, back + 0.18, y0 + 2.36, y0 + 2.48,
+      [0.620, 0.610, 0.575], [0.680, 0.672, 0.640]);
+
+    // The crates, stacked against the green west of the door. Pepsi blue, and
+    // the tops are dark whatever the crate is, which is the note the front's
+    // stacks already carry.
+    {
+      const PEP = [0.085, 0.180, 0.440];
+      const TOPS2 = [0.085, 0.082, 0.072];
+      for (const [ct, cs, hi] of [[S.t0 + 0.32, back + 0.30, 6],
+        [S.t0 + 0.72, back + 0.26, 5]]) {
+        const gy = surfaceY(ct, cs);
+        for (let k = 0; k < hi; k++) {
+          const yy = gy + k * 0.268;
+          boxTS(ct - 0.185, ct + 0.185, cs - 0.140, cs + 0.140, yy, yy + 0.235,
+            PEP, TOPS2);
+          boxTS(ct - 0.190, ct + 0.190, cs - 0.145, cs + 0.145,
+            yy + 0.230, yy + 0.262, shade(PEP, 1.26), TOPS2);
+        }
+        furniture.push({ t: ct, s: cs, a: 0.22, c: 0.18, h: hi * 0.268, y: gy });
+      }
+    }
+    // And the barrier leaning on the wall at the east end, which is where a
+    // barrier lives when it is not across anything. A crowd barrier is 2 m by
+    // 1.1 m and leans; the first cut of this ran 1.25 m along the wall with
+    // an 0.86 m rake and came out a pale lattice the size of the building, so
+    // the numbers here are the object's own and not a guess at its footprint.
+    {
+      const GALV3 = [0.585, 0.598, 0.605];
+      // PAST the east corner, not against the back: the wall is three metres
+      // and the door and the window already have 2.3 m of it, so a barrier
+      // leaning anywhere on it lands on the glass — which is exactly where the
+      // first one landed.
+      const bt = S.t1 + 0.58, bs = back + 0.16, gy = surfaceY(bt, bs);
+      for (const yy of [gy + 0.10, gy + 1.00]) {
+        boxTS(bt - 0.52, bt + 0.52, bs, bs + 0.05, yy, yy + 0.05,
+          GALV3, shade(GALV3, 1.10));
+      }
+      for (let i = 0; i < 5; i++) {
+        const ct = bt - 0.44 + i * 0.22;
+        boxTS(ct - 0.014, ct + 0.014, bs + 0.008, bs + 0.042,
+          gy + 0.08, gy + 1.06, GALV3);
+      }
+      // The feet, which are what a crowd barrier stands on and the only
+      // reason it is not a hurdle.
+      for (const o of [-0.48, 0.48]) {
+        boxTS(bt + o - 0.03, bt + o + 0.03, bs - 0.16, bs + 0.22,
+          gy, gy + 0.045, shade(GALV3, 0.86));
+      }
+      furniture.push({ t: bt, s: bs, a: 0.55, c: 0.22, h: 1.10, y: gy });
+    }
+  }
+
   function greenKiosk(S, y0, top) {
     const body = S.body;
     const DK = [0.062, 0.148, 0.075];         // the joinery, near-black green
@@ -7146,7 +7252,7 @@ async function buildJadrija(scene) {
 
     if (S.key === 'tisak') { tisakFront(S, y0, top); return; }
     if (S.key === 'f2') pizzeriaFront(S, y0, top);
-    if (S.key === 'kiosk') { greenKiosk(S, y0, top); return; }
+    if (S.key === 'kiosk') { greenKiosk(S, y0, top); greenBack(S, y0, top); return; }
 
     if (S.key === 'konoba') {
       // 175856. The counter stands on a limestone rubble base course, the top

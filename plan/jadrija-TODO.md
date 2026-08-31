@@ -697,6 +697,12 @@ bed. See the commit.
   **SOURCED AND BUILT 31 Aug** — `slasticarnica-behind-view` has the box
   standing on the gravel at the wood edge west of the slastičarnica, and that
   is the frame that was being asked for. See `pommesBox`.
+- ~~**The green kiosk's back.**~~ **BUILT 31 Aug** from `behind-scenes`: it
+  was three metres of unbroken green, because `shopBack` only fires for a
+  `box` or a kiosk over five metres and this one is three. Door, window, wall
+  lamp, Pepsi crates, crowd barrier. See `greenBack`. The frame's two window
+  hoods are deliberately NOT built — this kiosk is a storey shorter than the
+  photographed building and its own roof oversails them.
 - ~~**The slastičarnica's service elevation.**~~ **BUILT 31 Aug** from
   `slasticarnica-behind-view`, opened at full size for the first time: reed
   screen to two metres, a named awning over it, a corrugated upper storey with

@@ -8,6 +8,46 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.166.0] — 2026-08-31
+
+### Three metres of unbroken green
+
+The green kiosk's back was a flat slab with nothing on it at all. `shopBack`
+gives every shop on this shore a service side and this one is excluded from it:
+the test is `kind === 'box'` or a kiosk over five metres long, and this kiosk is
+three. So the front got fourteen crates, a keg, two wheelie bins, a folding
+barrier and two scrolled-iron canopies, and the elevation you actually walk past
+coming down from the lane got nothing. It is the exact failure `shopBack` was
+written for, and this shop fell through the size test into it.
+
+`behind-scenes` is the frame, and it had not been opened either: a white door
+with a full-height bar handle in a dark green surround, a window beside it, a
+small lamp on the wall under the eaves, blue Pepsi crates stacked five and six
+high against the green, and a galvanised crowd barrier standing on its feet.
+
+Three things the frame has that this building cannot take, and they are worth
+naming because the temptation each time is to grow the model instead:
+
+**The two hoods are not built.** This kiosk is 2.4 m to the eaves and its own
+roof slab oversails the back by more than a hood would project, so both of them
+disappeared under it; built lower they would be a shelf across the top of a
+2.16 m door. The building in the photograph is a storey taller than this one and
+it is not going to be enlarged to fit its own canopies.
+
+**The barrier went past the east corner rather than against the wall.** Three
+metres of back with a door and a window on it leaves nowhere to lean anything,
+and the first cut landed across the glass. Its first cut was also the size of
+the building: `bar` extrudes a section along the shore, and the uprights were
+written with the rake as the *thickness*, which makes each one a 0.9 m plate
+rather than a 28 mm bar.
+
+**The pane stands proud of its own frame.** Written inside it — glass at
+`back + 0.04` in a frame reaching `back + 0.07` — the frame is in front of the
+glass from every angle the wall is seen from, and the window rendered as a flat
+dark-green rectangle. A shutter, not a window.
+
++444 triangles, 58-61 fps.
+
 ## [1.165.0] — 2026-08-31
 
 ### The back of the ice cream shop, and a source for POMMES FRITES
