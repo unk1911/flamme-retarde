@@ -8,6 +8,129 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.168.0] — 2026-08-31
+
+### Baye has a voice, and the sign-in moved to the front door
+
+Misha: *"create the ability of user to LOGIN, from the very beginning page, and
+use the same user/pass authentication as what is available when we log into the
+laptop and sign into the ottakyo ablated model. in fact, if user logs in at the
+very beginning, then there's no need to later LOGIN during the laptop sequence,
+it's one and the same login."* And then the part he wanted first: *"when we come
+in the vicinity of the NPC baye, she occasionally communicates things to us
+using audio voice, in that same sultry voice... she should synthesize sort of
+the information of the moment, she should know our GPS location, what is
+happening, the things i have seen, places i have been, and current environment,
+current weather in jadrija, current news, current local news, current crypto
+news, bitcoin prices."*
+
+Stand near her at Jadrija, signed in, and she talks. Out loud, in the same
+ElevenLabs voice ablit-central reads its replies in, about the thing that is
+actually happening. The first line the service ever produced was *"The sea is
+twenty-eight degrees, darling, warm enough to keep us here until the cicadas
+finally lose their nerve"* — and the sea really was 28.4 °C off the end of that
+peninsula at the time, because a service on mpcn0 had asked Open-Meteo ninety
+seconds earlier.
+
+**It was already one login; it was only ever two forms.** The laptop has posted
+to `/abl/auth/password` since it arrived and has always been handed an
+`ablit_session` cookie — HMAC-signed by ablit-central's `webauth.py`, httponly,
+seven days. Nothing new was needed to make the title screen sign in: it posts
+the same form to the same endpoint for the same cookie. What changed is that the
+laptop now *asks* before it draws its form (`adopt()` in `48-computer.js`), so
+signing in at the front door means sitting down at the Alienware and finding the
+prompt already blinking.
+
+**The sign-in is one word on the splash.** 1.167.0 stripped that screen to a
+place, a name, a bar and a way in; putting a two-field login form back on it
+would have undone exactly that. So the footer gained the word `sign in`, the
+form lives behind it in a sheet, and once you are signed in the word becomes
+your name.
+
+### `server/baye/` — a new service, and where it had to go
+
+`baye.py` turns game state into a sentence and an mp3: it verifies the session,
+gathers the world, asks `gpt-5.6-luna` for one line in her register, sends that
+line to ElevenLabs in Jessica's voice (`LEnmbrrxYsUYS7vsRRwD`, the same voice id
+and the same four dials ablit-central uses) and hands back the audio. Three
+feeds, on three clocks, fetched off-thread and never awaited by a request:
+Open-Meteo for air and sea temperature and wind at Jadrija's own coordinates,
+CoinGecko for BTC and ETH, and Brave for world and Croatian-local headlines. A
+feed that is down leaves its slot empty and she talks about something else.
+
+**mpcn0 has no inbound port open to the internet except 22.** `ss` shows Caddy
+listening on 443 and `ufw` allows it, but from outside the box that port is *no
+route to host* — a DigitalOcean firewall sitting above ufw. That is why
+`abliterated.edeliverables.com` is an ngrok tunnel and not an A record, and it
+is why the new service does not listen publicly either. It binds 127.0.0.1, and
+`baye-tunnel.service` dials *out* to the web host and hands it that port on the
+far side, where Apache proxies `/baye/` to it. Plain `ssh -R` with
+`ServerAliveInterval` and `Restart=always` rather than autossh, which is the
+supervisor autossh was invented to be.
+
+**What the browser is not trusted with.** No key, no prompt, no model name. The
+page posts structured game state — numbers and short strings, every one of them
+clamped server-side — and gets back a sentence and an mp3. The persona, the
+model, the voice and the token ceiling live in `baye.py`. A modified client can
+lie about the altitude; it cannot make her say something else, and it cannot
+spend the OpenAI balance on anything but a line of Baye's dialogue. Rate limited
+per user (20 s apart, 90 an hour) with a global daily ceiling. Verified: no
+cookie is 401, a forged cookie is 401, and an immediate second call is 429.
+
+### Fixed: `/abl` was 404 on the link that actually gets shared
+
+The `<Location /abl/>` block lived only on the `flamme-retarde.edeliverables.com`
+vhost. The same directory is also served as `edeliverables.com/flamme-retarde/`
+— which is the URL in the footer and the one that gets sent to people — and on
+that origin the in-game laptop had nothing on the other end and never had.
+Both vhosts now include one shared `/etc/apache2/flamme-backends.inc`.
+
+The cookie's path is no longer rewritten to `/abl/` either. It could not be:
+`share_chat.py` sets it with no `domain=` and no `path=`, so it is host-only at
+`/`, and a cookie scoped to `/abl/` is simply never sent to `/baye/` — the
+browser would hold the credential and the voice service would answer 401
+forever.
+
+### Three bugs found by looking rather than by reading
+
+**`hidden` did nothing on the sign-in sheet.** `#signin-form { display: flex }`
+and `#signin-out { display: block }` are id selectors and beat the user agent's
+`[hidden] { display: none }` on specificity, so the first screenshot of the
+sheet showed the login form, the sign-out button and the "there is no line out
+of here" notice all at once, whatever the code set.
+
+**She was told she was flying while standing on the sand.** `state.altAgl`,
+`state.speed` and `state.water` belong to the aeroplane and keep their last
+values after you walk away from it; a probe taken barefoot at Jadrija read
+540 m and 86 knots. They are gated on `state.phase === 'fly'` now.
+
+**Empty lines that looked like refusals.** `gpt-5.6-luna` thinks before it
+answers and bills the thinking against the same ceiling as the reply. At
+`max_completion_tokens: 220`, a long context plus a bad roll on reasoning spent
+the budget before a word was written and came back empty with
+`finish_reason: "stop"`. 700 now, plus one retry — the brief is enforced by the
+persona, not by the ceiling.
+
+### Also
+
+- **N** toggles her voice; it is in the help sheet and in the settings panel.
+  H was taken by the HUD and V by the doors.
+- `audio.voice()` and `audio.hush()` play her through the mix rather than out of
+  a bare `<audio>`: she obeys the volume slider, goes muffled when your head
+  goes under, and lands in the recorder's tap. `voiceDuck` is a second duck in
+  series with `bedDuck` rather than a share of it, because the fire writes
+  `bedDuck` every frame it burns.
+- A subtitle (`#saying`) carries what she just said, for a player with the sound
+  off. Not a speech balloon: those belong to the bathers and the pug, and
+  `43-jadrija.js` has carried the reason since the crowd learned to talk.
+- `jadrija.bayeGap()` — how far she is from *you*, the walker, not the camera.
+- `__fr.voice()`, `__fr.voice.say()`, `__fr.who()`, `__fr.signin()`.
+- `tools/shoot.mjs --cookie name=value`, set before the first navigation, so the
+  signed-in half of the game can be tested headlessly at all.
+- `help.open` read `controls &amp; keys` on screen: `data-i18n` writes
+  `textContent`, so the entity printed literally. Same bug the credits wall had
+  in 1.167.0, same fix.
+
 ## [1.167.0] — 2026-08-31
 
 ### A title screen with nothing to read on it, and a key that says what the keys do

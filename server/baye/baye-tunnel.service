@@ -1,0 +1,28 @@
+# mpcn0 has no inbound port open to the internet but 22 — DigitalOcean's
+# firewall drops 443 above ufw, which is why ablit-central reaches the world
+# through ngrok. So baye does not listen publicly either: this dials OUT to the
+# web host and hands it 127.0.0.1:8791 on the far side, where Apache proxies
+# /baye/ to it. Plain ssh rather than autossh — ServerAliveInterval detects the
+# dead link and Restart=always is the supervisor autossh was invented to be.
+[Unit]
+Description=baye — reverse tunnel to the web host
+After=network-online.target baye.service
+Wants=network-online.target
+BindsTo=baye.service
+
+[Service]
+Type=simple
+User=unk1911
+ExecStart=/usr/bin/ssh -N -T \
+  -o BatchMode=yes \
+  -o ExitOnForwardFailure=yes \
+  -o ServerAliveInterval=30 \
+  -o ServerAliveCountMax=3 \
+  -o StrictHostKeyChecking=accept-new \
+  -R 127.0.0.1:8791:127.0.0.1:8791 \
+  unk1911@edeliverables.com
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

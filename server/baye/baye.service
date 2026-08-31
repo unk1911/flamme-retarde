@@ -1,0 +1,31 @@
+# The voice on the beach. Runs on mpcn0, next to ablit-central, because that is
+# where the session secret it checks against lives.
+[Unit]
+Description=baye — Flamme Retarde NPC voice service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=unk1911
+Group=unk1911
+WorkingDirectory=/home/unk1911/baye
+Environment=PYTHONUNBUFFERED=1
+Environment=ABLIT_ROOT=/home/unk1911/ablit-central
+Environment=BAYE_ENV=/etc/baye/baye.env
+ExecStart=/usr/bin/python3 /home/unk1911/baye/baye.py
+Restart=always
+RestartSec=3
+
+# It talks to three APIs and reads two config files; it has no business
+# anywhere else on the disk.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target

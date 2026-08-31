@@ -678,6 +678,85 @@ html.touch #swim-hud { bottom: 7.4rem; }
   text-transform: uppercase; color: #5d6e75;
 }
 
+/* ── signing in ───────────────────────────────────────────────────────────
+   Modelled on the help sheet down to the z-index, and for the same reason:
+   the title screen is where you sign in, so the sheet has to sit above it. */
+#signin {
+  position: fixed; inset: 0; z-index: 111;
+  display: flex; align-items: center; justify-content: center;
+  padding: 4vh 4vw;
+  background: rgba(4, 8, 11, .82);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  font-family: var(--mono);
+}
+#signin[hidden] { display: none; }
+#signin-inner {
+  position: relative; width: min(23rem, 100%);
+  padding: 1.7rem 1.8rem 1.5rem;
+  background: var(--panel); border: 1px solid var(--edge); border-radius: 3px;
+}
+#signin h3 {
+  margin: 0 0 .7rem; font-size: .62rem; letter-spacing: .34em;
+  text-transform: uppercase; color: var(--sea); font-weight: 400;
+}
+#signin-blurb, #signin-none {
+  margin: 0 0 1.2rem; font-size: .55rem; line-height: 1.8; color: #81949c;
+}
+#signin-who {
+  margin: 0 0 1.1rem; font-size: .58rem; letter-spacing: .06em; color: var(--salt);
+}
+#signin-close {
+  position: absolute; top: .5rem; right: .7rem;
+  font-size: 1.1rem; line-height: 1; color: #6f8189; padding: .35rem .5rem;
+}
+#signin-close:hover { color: var(--salt); }
+/* Every `display` below outranks the user agent's `[hidden] { display: none }`,
+   because a class or id selector beats an attribute selector on specificity.
+   Without these three lines the sheet shows the login form AND the sign-out
+   button AND the "no line out of here" notice, all at once, whatever the code
+   sets — which is exactly what shipped in the first screenshot of it. */
+#signin [hidden], #signin-form[hidden], #signin-out[hidden] { display: none; }
+#signin-form { display: flex; flex-direction: column; gap: .75rem; }
+#signin-form label { display: flex; flex-direction: column; gap: .3rem; }
+#signin-form span {
+  font-size: .5rem; letter-spacing: .24em; text-transform: uppercase; color: #6f8189;
+}
+#signin-form input {
+  font-family: var(--mono); font-size: .68rem; color: var(--salt);
+  background: rgba(0, 0, 0, .32);
+  border: 1px solid var(--edge); border-radius: 2px;
+  padding: .5rem .6rem; width: 100%;
+}
+#signin-form input:focus { outline: none; border-color: var(--sea-dim); }
+#signin-go, #signin-out {
+  display: block; width: 100%; margin-top: .5rem; padding: .55rem 0;
+  font-family: var(--mono); font-size: .55rem; letter-spacing: .2em;
+  text-transform: uppercase; color: #9fb2b9;
+  border: 1px solid var(--edge); border-radius: 2px;
+}
+#signin-go:hover, #signin-out:hover { color: var(--sea); border-color: var(--sea-dim); }
+#signin-go:disabled { opacity: .5; }
+#signin-err {
+  margin: .8rem 0 0; min-height: 1em;
+  font-size: .52rem; letter-spacing: .12em; color: var(--ember);
+}
+
+/* ── what she just said ───────────────────────────────────────────────────
+   Low and centred, clear of the touch HUD on both sides. A subtitle, so it
+   reads as speech rather than as a system message: no border, no panel, no
+   icon — the toast styling next door is what a system message looks like and
+   this deliberately looks like nothing of the sort. */
+#saying {
+  position: fixed; left: 50%; bottom: 12vh; transform: translateX(-50%);
+  z-index: 40; pointer-events: none;
+  max-width: min(38rem, 84vw); text-align: center;
+  font-family: var(--mono); font-size: .68rem; line-height: 1.75;
+  letter-spacing: .04em; color: #f2e7d8;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .95), 0 0 14px rgba(0, 0, 0, .8);
+}
+#saying[hidden] { display: none; }
+html.touch #saying { bottom: 17vh; font-size: .62rem; }
+
 /* The thumb's way in, at the foot of the settings panel. */
 #panel-help {
   display: block; width: 100%; margin-top: .4rem; padding: .55rem 0;
@@ -686,6 +765,15 @@ html.touch #swim-hud { bottom: 7.4rem; }
   border: 1px solid var(--edge); border-radius: 2px;
 }
 #panel-help:hover { color: var(--sea); border-color: var(--sea-dim); }
+#panel-voice {
+  display: block; width: 100%; margin-top: .4rem; padding: .55rem 0;
+  font-family: var(--mono); font-size: .55rem; letter-spacing: .2em;
+  text-transform: uppercase; color: #6f8189;
+  border: 1px solid var(--edge); border-radius: 2px;
+}
+#panel-voice:hover { color: var(--sea); border-color: var(--sea-dim); }
+/* Lit while she is switched on, the same way the touch HUD's toggles are. */
+#panel-voice.on { color: var(--ember); border-color: var(--ember); }
 
 #panel {
   position: fixed; right: 1.6rem; top: 50%; transform: translateY(-50%);

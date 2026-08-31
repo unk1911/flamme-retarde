@@ -16,6 +16,13 @@
 function buildAudio() {
   let ctx = null;
   let master = null, verb = null, verbSend = null, verbGain = null, bed = null, bedDuck = null;
+  // Baye's voice, and what it does to the beach under her. `voiceDuck` is a
+  // SECOND duck in series with `bedDuck` rather than a share of it: the fire
+  // writes `bedDuck` every frame it burns (see `fireTick`), so anything else
+  // setting that node is overwritten a sixtieth of a second later. Two nodes
+  // multiply, which is what two independent reasons to pull the bed down
+  // should do anyway.
+  let voiceEl = null, voiceGain = null, voiceDuck = null;
   let outBus = null, outLp = null;
   // The birds sitting still in the trees behind the resort. Their own stage of
   // the wall, because a wall is not one number — see PERCH.
@@ -184,7 +191,9 @@ function buildAudio() {
     bed.gain.value = 1;
     bedDuck = ctx.createGain();
     bedDuck.gain.value = 1;
-    bed.connect(bedDuck).connect(master);
+    voiceDuck = ctx.createGain();
+    voiceDuck.gain.value = 1;
+    bed.connect(bedDuck).connect(voiceDuck).connect(master);
 
     // ── outdoors ──────────────────────────────────────────────────────────
     // The sounds on the bed that belong to the beach rather than to the player
@@ -3857,6 +3866,60 @@ function buildAudio() {
    * `setTargetAtTime` re-armed sixty times a second never arrives anywhere, and
    * this is already being fed a value that has been eased by the caller.
    */
+  // ── a voice in the mix ────────────────────────────────────────────────────
+  /**
+   * Play one mp3 as if it were coming from the world.
+   *
+   * Through the graph rather than out of a bare `<audio>`, and the difference
+   * is not tidiness: hung on `master` she obeys the volume slider, goes muffled
+   * with everything else when your head goes under, slows with `slowmo`, and
+   * lands in `tools/record.mjs`'s tap so a filmed cut has her in it. An
+   * `<audio>` element playing to the speakers has none of that and cannot be
+   * given it later.
+   *
+   * The element is made once and reused. `createMediaElementSource` may be
+   * called only once per element, and calling it twice throws — which on a
+   * second line of dialogue would be a silent, permanent loss of her voice.
+   *
+   * Resolves when she has finished, or immediately with `false` if there is no
+   * graph to play into yet.
+   */
+  function voice(url, vol = 1.35) {
+    if (!ctx || !url) return Promise.resolve(false);
+    if (!voiceEl) {
+      voiceEl = new Audio();
+      voiceEl.preload = 'auto';
+      voiceGain = ctx.createGain();
+      ctx.createMediaElementSource(voiceEl).connect(voiceGain).connect(master);
+    }
+    voiceGain.gain.value = vol;
+    voiceEl.src = url;
+    // Pull the beach down while she talks. The cicadas at Jadrija are genuinely
+    // loud enough to bury a sentence, which is true of the real place and no
+    // help at all when the sentence is the feature.
+    const duck = (to, tc) => {
+      if (voiceDuck) voiceDuck.gain.setTargetAtTime(to, ctx.currentTime, tc);
+    };
+    duck(0.42, 0.18);
+    return new Promise((done) => {
+      const end = (ok) => {
+        voiceEl.onended = voiceEl.onerror = null;
+        duck(1, 0.45);
+        done(ok);
+      };
+      voiceEl.onended = () => end(true);
+      voiceEl.onerror = () => end(false);
+      voiceEl.play().catch(() => end(false));
+    });
+  }
+
+  /** Stop her mid-sentence — leaving the beach, or the switch going off. */
+  function hush() {
+    if (!voiceEl) return;
+    try { voiceEl.pause(); voiceEl.currentTime = 0; } catch (e) { /* never started */ }
+    if (voiceDuck && ctx) voiceDuck.gain.setTargetAtTime(1, ctx.currentTime, 0.25);
+  }
+
   function slowmo(k) {
     if (!slowLp) return;
     slowLp.frequency.value = 20000 * Math.pow(620 / 20000, clamp(k, 0, 1));
@@ -3877,7 +3940,7 @@ function buildAudio() {
     setVolume, getVolume, setMuffle, keyClick, printTick,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas,
     shore, lapping, kabine, room, water,
-    firestarter, slowmo, radioTune, radioClick,
+    firestarter, slowmo, radioTune, radioClick, voice, hush,
     /**
      * The birds sitting still in the trees. `perches()` is the table — the
      * only place a species is described — and 90-app.js walks it every frame

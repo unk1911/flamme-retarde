@@ -154,6 +154,31 @@ async function main() {
   // tried to pass silently did nothing.
   const sep = URL_BASE.includes('?') ? '&' : '?';
   const url = `${URL_BASE}${sep}q=${quality}&cb=${process.pid}`;
+
+  // --cookie name=value — a session, before the first request goes out.
+  //
+  // For the signed-in half of the game: the laptop terminal at Jadrija and
+  // Baye's voice both need an `ablit_session` cookie, and there is no way to
+  // get one from here without a password. Minting one on the server and
+  // handing it over is how those two get tested at all; without this the only
+  // thing a headless run can check is that they correctly do nothing.
+  //
+  // Set before `Page.navigate` on purpose — a cookie added after the document
+  // has loaded is a cookie the boot-time `authWhoami` did not see.
+  const cookie = opt('cookie', null);
+  if (cookie) {
+    const eq = cookie.indexOf('=');
+    const u = new URL(url);
+    await send('Network.enable');
+    await send('Network.setCookie', {
+      name: cookie.slice(0, eq),
+      value: cookie.slice(eq + 1),
+      domain: u.hostname,
+      path: '/',
+      secure: u.protocol === 'https:',
+    });
+  }
+
   await send('Page.navigate', { url });
 
   const evalJs = async (expr) => {

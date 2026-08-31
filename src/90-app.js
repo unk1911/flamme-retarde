@@ -228,6 +228,11 @@ addEventListener('keydown', (e) => {
     || e.code === 'NumpadEnter' || e.code === 'Space')) {
     e.preventDefault(); endFlyCut(); return;
   }
+  // N — Baye's voice. H was taken by the HUD and V by the doors, and this sits
+  // above the pause guard with ? and ESC because switching her off is something
+  // you want to be able to do while she is in the middle of a sentence.
+  if (e.code === 'KeyN') { e.preventDefault(); voice.toggle(); return; }
+
   // ? and F1 — the help sheet. Above the pause guard because a paused game is
   // exactly when somebody goes looking for it, and ESC closes it rather than
   // unpausing when it is up. Not H: H already hides the HUD, and Misha asked
@@ -1284,6 +1289,7 @@ const HELP = [
   ]],
   ['help.g.any', [
     ['P · ESC', 'help.k.pause'],
+    ['N', 'help.k.voice'],
     ['M', 'help.k.settings'],
     ['H', 'help.k.hud'],
     ['L', 'help.k.clip'],
@@ -5639,6 +5645,10 @@ function frame() {
   const own = gone ? 0
     : 1 - sat((camera.position.distanceTo(flight.p.pos) - 20) / 400);
   const nf = fire.nearestFire(camera.position.x, camera.position.z);
+  // Baye, if she has anything to say. Cheap when she has not: the first
+  // thing it does is ask whether you are signed in, and the second is how
+  // far away she is. See 49-voice.js.
+  voice.step(real);
   audio.update(dt, {
     throttle: flight.p.throttle,
     speed: state.speed,
@@ -5738,6 +5748,11 @@ function leaveVeil() {
   camAim.copy(flight.p.pos);
 }
 
+// One session for the whole game — the title screen's sign-in, and the check
+// that tells the laptop and Baye whether it already happened. See 47-auth.js.
+wireAuth();
+$('panel-voice').addEventListener('click', () => voice.toggle());
+syncVoiceBtn();
 $('help-close').addEventListener('click', () => toggleHelp(false));
 // Clicking the backdrop, but not the sheet itself.
 $('help').addEventListener('click', (e) => {
@@ -5875,6 +5890,20 @@ boot().catch((e) => {
 window.__fr = {
   /** The help sheet. Toggles when called with nothing, like `body`. */
   help: (v) => { toggleHelp(v); return !$('help').hidden; },
+  /**
+   * Baye's voice. `voice()` is what she is doing, `voice.say()` makes her
+   * say something now without waiting out the gap, and `voice.on(false)`
+   * is the switch. `sheet()` opens the sign-in.
+   */
+  voice: Object.assign(() => voice.stats(), {
+    say: () => voice.now(),
+    on: (v) => voice.toggle(v),
+    context: () => voice.context(),
+  }),
+  /** Who the page thinks you are, asked fresh rather than remembered. */
+  who: () => authWhoami(),
+  /** The sign-in sheet, so a probe can drive it. */
+  signin: (v) => { toggleSignIn(v); return !$('signin').hidden; },
   build: BUILD,
   /** What this machine's GL will do. `?gl` puts the same thing on the screen. */
   gl: () => glReport(),

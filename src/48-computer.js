@@ -372,6 +372,55 @@ const computer = (() => {
     printDue = 0;
   }
 
+  /**
+   * Put the terminal into its signed-in state. One place, two ways in.
+   *
+   * Split out of the sign-in handler when the title screen learned to sign in
+   * too: what happens after a good password and what happens when you sit down
+   * already carrying a session have to be identical, and two copies of eleven
+   * lines are two copies that drift.
+   */
+  function enter(info, name) {
+    user = name;
+    endpoint = pickEndpoints(info);
+    chat = [];
+    el.pass.value = '';
+    el.login.hidden = true;
+    el.row.hidden = false;
+    el.tools.hidden = false;
+    el.who.textContent = 'signed in as ' + user;
+    clear();
+    put('s', CRT.greet);
+    put('s', endpoint
+      ? 'ready. ask it something, or run a command — /sys, /temp and '
+        + 'the rest are on /help.'
+      : 'signed in, but nothing on that app looks like a chat — '
+        + 'the model cannot be reached from here.');
+  }
+
+  /**
+   * Take the session the title screen already got, rather than asking twice.
+   *
+   * Misha, 31 Aug: "if user logs in at the very beginning, then there's no need
+   * to later LOGIN during the laptop sequence, it's one and the same login."
+   * It is literally the same cookie — `/abl/auth/password` sets it and this
+   * terminal has always sent it — so there was never a second credential here,
+   * only a second form. This is the form going away when it has nothing to ask.
+   *
+   * Two questions and not one: `authWhoami` is a hundred bytes and says who you
+   * are, and `whoami` is the endpoint listing this file actually needs to send
+   * a message. The first is the fast no; the second is only paid on a yes.
+   */
+  async function adopt() {
+    if (user || !CRT.host) return false;
+    const name = AUTH.user || await authWhoami();
+    if (!name) return false;
+    const info = await whoami();
+    if (!info) return false;
+    enter(info, name);
+    return true;
+  }
+
   // ── wiring ─────────────────────────────────────────────────────────────────
   function wire() {
     if (ready) return;
@@ -394,21 +443,7 @@ const computer = (() => {
         if (!info) {
           el.err.textContent = 'rejected — check the user and the password';
         } else {
-          user = el.user.value.trim();
-          endpoint = pickEndpoints(info);
-          chat = [];
-          el.pass.value = '';
-          el.login.hidden = true;
-          el.row.hidden = false;
-          el.tools.hidden = false;
-          el.who.textContent = 'signed in as ' + user;
-          clear();
-          put('s', CRT.greet);
-          put('s', endpoint
-            ? 'ready. ask it something, or run a command — /sys, /temp and '
-              + 'the rest are on /help.'
-            : 'signed in, but nothing on that app looks like a chat — '
-              + 'the model cannot be reached from here.');
+          enter(info, el.user.value.trim());
           el.in.focus();
         }
       } catch (err) {
@@ -645,7 +680,16 @@ const computer = (() => {
     // nothing to transition from and the tube is on before it warms up.
     requestAnimationFrame(() => el.root.classList.add('on'));
     audio.setMuffle(1);
-    if (!user) { el.user.focus(); } else { el.in.focus(); }
+    if (user) { el.in.focus(); return true; }
+    // Not signed in *here* yet — but the title screen may already have done it.
+    // Asked rather than assumed, and asked without blocking the camera: the
+    // laptop opens, the tube warms up, and either the form is there when it
+    // settles or the prompt is. `active` is re-checked because the answer
+    // arrives a round trip later and you may have stood up again by then.
+    adopt().then((got) => {
+      if (!active) return;
+      (got ? el.in : el.user).focus();
+    });
     return true;
   }
 

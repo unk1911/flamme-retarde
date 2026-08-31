@@ -63,7 +63,15 @@
        rel="noopener">eDeliverables (2026)</a><i>·</i>
     <a class="src" href="https://github.com/unk1911/flamme-retarde" target="_blank" rel="noopener"
        data-i18n-html="veil.src">source on GitHub &#8599;</a><i>·</i>
-    <a class="src" href="mailto:dolphin@edeliverables.com">dolphin@edeliverables.com</a>
+    <a class="src" href="mailto:dolphin@edeliverables.com">dolphin@edeliverables.com</a><i>·</i>
+    <!-- The sign-in, as one word.
+         1.167.0 stripped this screen down to a place, a name, a bar and a way
+         in, because three paragraphs and five lines of attribution over a
+         412 px phone was the actual complaint. Putting a two-field login form
+         back on it would undo exactly that, so the form lives behind this and
+         this is the whole of it on the splash. Once you are signed in the word
+         becomes your name, which is the only status anybody needs. -->
+    <a class="src" id="signin-link" href="#" data-i18n="auth.signin">sign in</a>
   </footer>
 </div>
 
@@ -390,12 +398,42 @@
      up. Half the keys were not on that list at all. This is the whole set,
      grouped by what you are sitting in, and it is reachable from inside the
      game where the question actually gets asked. -->
+<!-- What Baye just said, for a player with the sound off and for a headless
+     probe reading the DOM. A subtitle and not a speech balloon: the balloons
+     belong to the bathers and the pug, and 43-jadrija.js has carried the
+     reason since the crowd learned to talk. -->
+<div id="saying" hidden></div>
+
 <div id="help" hidden>
   <div id="help-inner">
     <button id="help-close" aria-label="close">&times;</button>
     <h3 data-i18n="help.title">controls</h3>
     <div id="help-cols"></div>
     <p id="help-foot"></p>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── signing in ──
+     One session for the whole game. The same form the laptop at Jadrija
+     posts, to the same endpoint, for the same cookie — so doing it here means
+     the laptop is already signed in when you sit down at it, and Baye has a
+     voice. See 47-auth.js for why it is same-origin and what the cookie is. -->
+<div id="signin" hidden>
+  <div id="signin-inner">
+    <button id="signin-close" aria-label="close">&times;</button>
+    <h3 data-i18n="auth.title">sign in</h3>
+    <p id="signin-blurb" data-i18n="auth.blurb">One sign-in for the laptop at Jadrija and for Baye&rsquo;s voice.</p>
+    <p id="signin-who" hidden></p>
+    <form id="signin-form" autocomplete="off">
+      <label><span data-i18n="auth.user">user</span><input id="signin-user" type="text"
+        autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="username"></label>
+      <label><span data-i18n="auth.pass">password</span><input id="signin-pass" type="password"
+        autocomplete="current-password"></label>
+      <button id="signin-go" type="submit" data-i18n="auth.go">sign in</button>
+    </form>
+    <p id="signin-none" hidden data-i18n="auth.offOrigin">There is no line out of here &mdash; the sign-in only works on the deployed site.</p>
+    <p id="signin-err"></p>
+    <button id="signin-out" hidden data-i18n="auth.out">sign out</button>
   </div>
 </div>
 
@@ -406,6 +444,7 @@
     <div id="lang-pick"></div>
   </div>
   <div id="panel-rows"></div>
+  <button id="panel-voice" data-i18n="voice.open">Baye&rsquo;s voice</button>
   <button id="panel-help" data-i18n="help.open">controls &amp; keys</button>
   <p class="panel-foot" id="panel-foot"></p>
 </div>

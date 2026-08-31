@@ -550,6 +550,108 @@ Changes are tracked in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## Signing in, and Baye's voice
+
+Most of the game needs nothing but a browser. Two things need a session: the
+laptop at Jadrija, which talks to a private model on a GPU box, and Baye, who
+talks to you.
+
+It is **one** sign-in. The credential is `ablit_session` — an HMAC-signed,
+httponly cookie minted by [ablit-central](https://abliterated.edeliverables.com)'s
+`webauth.py`, good for seven days. The title screen's `sign in` link and the
+laptop's own form post the same body to the same endpoint and get the same
+cookie back, so doing it once does it everywhere: sit down at the Alienware
+afterwards and the prompt is already blinking.
+
+Both back ends are reached **same-origin**, through Apache, and that is not
+tidiness. A cross-site fetch to either dies at CORS, and the session cookie
+would not survive the trip. So `/abl/` proxies the model and `/baye/` proxies
+the voice, and the browser only ever sees one origin. Off the deployed site — a
+`file://` copy, a local server — there is no proxy and nothing to talk to; the
+sign-in sheet says so, the laptop says so, and Baye is simply quiet.
+
+### `server/baye/`
+
+A small service that turns game state into a sentence and an mp3.
+
+| | |
+|---|---|
+| `baye.py` | the service — session check, world feeds, model, speech |
+| `baye.service` | systemd unit; binds `127.0.0.1:8791` on mpcn0 |
+| `baye-tunnel.service` | `ssh -R` out to the web host, where Apache proxies `/baye/` |
+
+**Why the tunnel.** mpcn0 has no inbound port open to the internet except 22.
+`ss` shows Caddy listening on 443 and `ufw` allows it, but from outside that
+port is *no route to host* — a DigitalOcean firewall above ufw. It is the same
+reason `abliterated.edeliverables.com` is an ngrok tunnel and not an A record.
+So the service does not listen publicly: it dials out, and the web host proxies
+to the port that arrives on its own loopback.
+
+**What it does with a request.** Verifies the cookie (`webauth.unsign`, the same
+module and the same `SESSION_SECRET`, imported from the checkout next door
+rather than reimplemented so the two cannot drift). Rate-limits per user.
+Assembles the moment — where you are, what phase, what you have seen, plus three
+live feeds — and asks `gpt-5.6-luna` for one line in her register. Sends that
+line to ElevenLabs as Jessica (`LEnmbrrxYsUYS7vsRRwD`), the voice and the four
+dials ablit-central reads its own replies in. Hands back text and audio.
+
+The feeds run on their own clocks in a background thread and are **never awaited
+by a request**: Open-Meteo for air and sea temperature and wind at Jadrija's own
+coordinates, CoinGecko for BTC and ETH, Brave for world and Croatian-local
+headlines. A feed that is down leaves its slot empty and she talks about
+something else, which is correct for a beach — a line that arrives ten seconds
+late because CoinGecko was thinking is worse than a line that does not mention
+bitcoin.
+
+**What the browser is not trusted with.** No key, no prompt, no model name. The
+page posts structured game state — numbers and short strings, every one clamped
+server-side — and never a prompt. The persona, the model, the voice and the
+token ceiling all live in `baye.py`. A modified client can lie about the
+altitude; it cannot make her say something else, and it cannot spend the OpenAI
+balance on anything but a line of Baye's dialogue.
+
+### Secrets
+
+None of them are in this repository, which is public. `OPENAI_API_KEY` lives in
+`/etc/baye/baye.env` (`0640 root:unk1911` — the service runs as `unk1911`, and
+`0600 root:root` means a service that cannot read its own key).
+`SESSION_SECRET`, `ELEVENLABS_API_KEY` and `BRAVE_API_KEY` are read live out of
+ablit-central's `.env` and re-read when its mtime moves, so rotating a key there
+rotates it here without a deploy.
+
+### Installing it
+
+```sh
+scp server/baye/baye.py            mpcn0:~/baye/
+scp server/baye/*.service          mpcn0:/tmp/ && ssh mpcn0 '
+  sudo mv /tmp/baye*.service /etc/systemd/system/ &&
+  sudo systemctl daemon-reload &&
+  sudo systemctl enable --now baye.service baye-tunnel.service'
+```
+
+The Apache side is one shared include, `/etc/apache2/flamme-backends.inc`,
+pulled into both the `edeliverables.com` and `flamme-retarde.edeliverables.com`
+vhosts — the same files are served under both names, and `/abl` was 404 on the
+main one until 1.168.0.
+
+### Testing it
+
+`tools/shoot.mjs --cookie ablit_session=<token>` sets a session before the first
+navigation, which is the only way a headless run can exercise any of this. Mint
+one on the box:
+
+```sh
+ssh mpcn0 'python3 -c "
+import sys; sys.path.insert(0, \"/home/unk1911/ablit-central/bin\")
+import webauth
+env = dict(l.split(\"=\", 1) for l in open(\"/home/unk1911/ablit-central/.env\")
+           if \"=\" in l and not l.startswith(\"#\"))
+print(webauth.make_session(\"unk1911\", env[\"SESSION_SECRET\"].strip()))"'
+```
+
+`curl -s https://edeliverables.com/baye/health` needs no session and reports
+which feeds are populated.
+
 ## Licence
 
 Two grants, because this is two things. The engine — `src/`, `tools/`, `build.py`

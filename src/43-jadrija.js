@@ -26028,6 +26028,23 @@ async function buildJadrija(scene) {
       balls: balls.length, fires: fires.filter((f) => f.burning > 0).length,
     },
     /**
+     * How far Baye is from you, in metres, and what she is doing — or `null`
+     * when there is no performance on stage.
+     *
+     * `show.t/s` is her and `show.pt/ps` is YOU, both in the shore's own frame:
+     * `t` metres along the beach, `s` metres out from it. The camera is not in
+     * this answer on purpose — with the third person on and swung round, the
+     * camera can be ten metres from where you are standing, and "is she near
+     * me" has to mean the walker or it means nothing.
+     *
+     * Added for the voice (49-voice.js), which needs one number this module
+     * already has and would otherwise have to recompute from the debug tree.
+     */
+    bayeGap: () => (show && show.pt != null && show.t != null)
+      ? { m: Math.hypot(show.t - show.pt, show.s - show.ps),
+        phase: show.phase, withYou: !!show.withYou, indoors: sheIsIn() }
+      : null,
+    /**
      * Fill the soak meter by hand, so the turn can be seen without standing
      * there with the branch on her for sixteen seconds — which is exactly as
      * long headless as it is in a real window, and is sixteen seconds every
