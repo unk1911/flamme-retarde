@@ -165,6 +165,25 @@ dozen triangles each and still unreadable. The inside of the opening is dark
 green now, which is most of what you can see of the place in the photograph and
 was the same neutral dark every other shop has.
 
+**7. The pale crushed-limestone wood floor.** **BUILT 31 Aug, and the item's
+diagnosis was wrong.** It reads as a hue complaint and the hue is right. Before
+touching anything, sunlit patches were averaged both ways: `1000150345` gives
+R:G:B of 1.54:1.32:1 and 1.54:1.28:1, `20260823_112051` gives 1.35:1.18:1, and
+what the shader already rendered measures 1.56:1.31:1, 1.48:1.22:1 and
+1.55:1.23:1. The game sits inside the photographs' own spread. Re-colouring it
+would have made it worse, and that is what this item was asking for.
+
+What is actually missing is **local contrast**. Every scale of mottle in
+TERRAIN_FRAG is metres across and the smallest is 1.6 m; a floor of chippings
+has its whole character at 5 to 15 mm. So there is one more octave inside the
+litter ellipse now — sparse and hard on the bright side, which is a chipping,
+broad and soft on the dark, which is needle litter — faded out on the PIXEL
+FOOTPRINT rather than on distance, gone by the time a pixel covers 5.5 cm.
+Procedural noise has no mip chain and a quarter of a pixel of hard speckle
+crawls; the fade is the same handover the sea's three bands use. 61 fps at the
+wood, 60 from the air, and nothing changes on the sand because `shoreT` already
+holds the litter off the waterline.
+
 **7. The pale crushed-limestone wood floor.** `_112051` fills its lower half
 with the wood floor at a metre's distance: angular buff-white limestone
 chippings, 5–15 mm, with brown pine-needle litter through them and dark shade

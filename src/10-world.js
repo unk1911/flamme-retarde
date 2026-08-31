@@ -231,6 +231,43 @@ void main(){
     float lum = dot(base, vec3(0.2126, 0.7152, 0.0722));
     base = mix(base, lum * vec3(1.46, 1.06, 0.74), litter * 0.85);
     base *= mix(vec3(1.0), vec3(1.00, 0.88, 0.78), litter);
+
+    // ── the chips, and what they are for ──────────────────────────────────
+    //
+    // Survey/3 item 7 reads this floor as "angular buff-white limestone
+    // chippings, 5-15 mm, with brown pine-needle litter through them" against
+    // "a warm orange-tan sand" in the game, and calls it the biggest single
+    // difference between the photograph and the game. The obvious reading of
+    // that is that the hue is wrong. It is not, and it is worth writing down
+    // that this was measured before it was changed: averaged over sunlit
+    // patches, 1000150345 gives 1.54:1.32:1 and 1.54:1.28:1, 20260823_112051
+    // gives 1.35:1.18:1, and what this shader already renders is 1.56:1.31:1,
+    // 1.48:1.22:1 and 1.55:1.23:1. The hue sits inside the photographs'
+    // spread. Changing it would have made it worse.
+    //
+    // What is actually missing is local contrast. Every scale of mottle above
+    // is metres across; the smallest is 1.6 m, and a floor of chippings has
+    // its whole character at 5 to 15 mm. So: one more octave, bright where the
+    // noise is high and dark where it is low, which is chip and needle.
+    //
+    // Faded on the PIXEL FOOTPRINT and not on distance, the way the sea's
+    // bands hand over. Procedural noise has no mip chain: at 11 cm a feature
+    // is a couple of pixels at ten metres and a quarter of one at forty, and
+    // what a quarter of a pixel of hard speckle does is crawl. Gone by the
+    // time a pixel covers 5.5 cm of ground, which puts the whole effect inside
+    // the twenty-odd metres you can actually see a stone from.
+    float fw = length(fwidth(vWorld.xz));
+    float chipFade = (1.0 - smoothstep(0.012, 0.055, fw)) * litter;
+    if (chipFade > 0.001) {
+      float chip = fbm2(p * 11.0, 2);
+      // Sparse and hard on the bright side, broad and soft on the dark. A
+      // chipping is a small white thing with an edge on it and there are not
+      // many of them; needle litter is most of the floor and has no edge at
+      // all. Symmetric bands gave an even marbling, which is a different
+      // material - wet clay.
+      base *= 1.0 + chipFade * (smoothstep(0.735, 0.815, chip) * 0.72
+                              - smoothstep(0.560, 0.300, chip) * 0.26);
+    }
   }
 
   // ── the seabed ──────────────────────────────────────────────────────────

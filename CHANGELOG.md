@@ -8,6 +8,43 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.156.0] — 2026-08-31
+
+### The wood floor has stones in it, and its colour was never the problem
+
+Survey/3 item 7 has been sitting at the top of the backlog since 23 August with
+"*Best next job of anything in this list*" written under it, deliberately not
+touched because the wood floor is shared ground and repainting it changes the
+whole resort. It reads: "angular buff-white limestone chippings, 5–15 mm, with
+brown pine-needle litter through them… The game's wood floor is a warm
+orange-tan sand. This is the single biggest difference between the photograph
+and the game."
+
+**The hue is right.** That is the finding, and it is only a finding because it
+was measured before anything was edited. Averaged over sunlit patches, the
+photographs give R:G:B of 1.54:1.32:1 and 1.54:1.28:1 (`1000150345`) and
+1.35:1.18:1 (`20260823_112051`); the shader already rendered 1.56:1.31:1,
+1.48:1.22:1 and 1.55:1.23:1. The game sits inside the photographs' own spread.
+The obvious reading of the item — the ground is too orange, cool it down —
+would have made it worse.
+
+**What is missing is local contrast.** Every scale of mottle in TERRAIN_FRAG is
+metres across and the smallest is 1.6 m, and a floor of chippings has its whole
+character at 5 to 15 mm. There is one more octave inside the litter ellipse
+now: sparse and hard on the bright side, which is a chipping, broad and soft on
+the dark, which is needle litter. Symmetric bands were tried first and gave an
+even marbling, which is a different material — wet clay.
+
+**Faded on the pixel footprint, not on distance.** Procedural noise has no mip
+chain: at 11 cm a feature is a couple of pixels at ten metres and a quarter of
+one at forty, and a quarter of a pixel of hard speckle crawls. It is gone by
+the time a pixel covers 5.5 cm of ground, which puts the whole effect inside
+the twenty-odd metres you can see a stone from, and leaves the aerial view
+byte-identical. Same handover the sea's three bands use.
+
+61 fps standing in the wood, 60 from 260 m up. Nothing changes on the sand:
+`shoreT` was already holding the litter off the waterline.
+
 ## [1.155.0] — 2026-08-31
 
 ### Pizzeria F2, Kod Kose, and a kiosk that is mostly crates
