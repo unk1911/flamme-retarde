@@ -6690,6 +6690,65 @@ async function buildJadrija(scene) {
           BATTEN);
       }
       boxTS(S.t0 - 0.030, S.t0, S.s0, S.s1, y0 + 0.10, top - 0.36, PANEL);
+
+      // ── the staining ──────────────────────────────────────────────────────
+      //
+      // The rail above was put in as "the line the staining stops at" and then
+      // nothing stopped there, because nothing ran: the model had the frame of
+      // a fifteen-summer kiosk and the paint of a new one, and against
+      // `1000150343` that is the single biggest thing missing from it. What
+      // the frame shows is streaks off the roof edge running down the upper
+      // row, heaviest and widest at the top; the rail catches most of them;
+      // and the lower row is grimier overall with a few that got past.
+      //
+      // Deterministic from an index and NOT off `rng`. This runs once at build
+      // and the shore's stream is the beach: a draw taken here is a bather
+      // moved three hundred metres away (rule 4).
+      //
+      // Depth: the panel face is at S.s0 - 0.030 and the battens stand to
+      // S.s0 - 0.045, so a streak at -0.038 is in front of the panel and
+      // behind every frame member. A stain runs over sheet and stops at a
+      // rail, which is what being occluded by one looks like.
+      const grime = (n) => {
+        const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
+        return x - Math.floor(x);
+      };
+      {
+        const sF = S.s0 - 0.038;
+        const yHead = top - 0.40, yMid = y0 + 1.395;
+        const streak = (ct, hw, lo, hi, k) =>
+          boxTS(ct - hw, ct + hw, sF - 0.004, sF, lo, hi, shade(PANEL, k));
+        for (let i = 0; i < 16; i++) {
+          const u = grime(i * 3 + 1), v = grime(i * 3 + 2), w2 = grime(i * 3 + 3);
+          const ct = pa + 0.12 + u * (pc - pa - 0.24);
+          // A third of them dry out before the rail, which is what keeps the
+          // row from reading as a comb.
+          const lo = v < 0.34 ? yMid + 0.12 + w2 * 0.60 : yMid;
+          streak(ct, 0.018 + v * 0.062, lo, yHead, 0.54 + w2 * 0.22);
+        }
+        for (let i = 0; i < 6; i++) {
+          const u = grime(i * 5 + 41), v = grime(i * 5 + 42);
+          streak(pa + 0.18 + u * (pc - pa - 0.36), 0.014 + v * 0.030,
+            y0 + 0.30 + v * 0.55, y0 + 1.34, 0.74 + v * 0.12);
+        }
+        // The lower row is dirtier than the upper everywhere, not just in
+        // streaks, and darkest along the foot where it gets splashed.
+        boxTS(pa + 0.06, pc - 0.06, sF - 0.003, sF, y0 + 0.10, y0 + 1.30,
+          shade(PANEL, 0.90));
+        boxTS(pa + 0.06, pc - 0.06, sF - 0.006, sF - 0.001, y0 + 0.10,
+          y0 + 0.42, shade(PANEL, 0.80));
+        // The west end takes the same weather and shows it in the frame, so
+        // it gets the same treatment turned through ninety degrees.
+        const tF = S.t0 - 0.038;
+        for (let i = 0; i < 7; i++) {
+          const u = grime(i * 7 + 91), v = grime(i * 7 + 92);
+          const cs = S.s0 + 0.20 + u * (S.s1 - S.s0 - 0.40);
+          const hs = 0.016 + v * 0.045;
+          boxTS(tF - 0.004, tF, cs - hs, cs + hs,
+            v < 0.30 ? y0 + 1.55 : y0 + 0.55, top - 0.40,
+            shade(PANEL, 0.62 + v * 0.20));
+        }
+      }
     }
 
     // ── the livery strip ────────────────────────────────────────────────────
@@ -6813,8 +6872,16 @@ async function buildJadrija(scene) {
       }
       // The name across the middle, on all four sides, because a wrap is
       // printed all the way round and this one is seen from three of them.
-      brandRing('jana', [[ct - hw, cs - hd], [ct + hw, cs - hd],
-        [ct + hw, cs + hd], [ct - hw, cs + hd]], y0 + 1.02, y0 + 0.72);
+      // A centimetre proud of the cabinet, and it has to be. Written flush,
+      // the band and the box face are rule 5's co-planar pair exactly: the
+      // name z-fought with the green it is printed on and lost nearly all of
+      // it, so the loudest object in the frame after the red band shipped as
+      // a blank green box. The Jamnica poseur has stood its ring 5 mm off its
+      // own drum since the day it was built; this one did not.
+      const wo = 0.012;
+      brandRing('jana', [[ct - hw - wo, cs - hd - wo], [ct + hw + wo, cs - hd - wo],
+        [ct + hw + wo, cs + hd + wo], [ct - hw - wo, cs + hd + wo]],
+      y0 + 1.02, y0 + 0.72);
       // The grille along the foot, white, and the lid.
       boxTS(ct - hw + 0.05, ct + hw - 0.05, cs - hd - 0.012, cs - hd + 0.01,
         y0 + 0.04, y0 + 0.20, [0.700, 0.700, 0.692]);

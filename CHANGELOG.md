@@ -8,6 +8,40 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.163.0] — 2026-08-31
+
+### Fifteen summers, and a blank green box
+
+TISAK, checked side by side against `1000150343` at full size rather than
+against the note written from it. Two things the frame has that the model did
+not, and both had been half-built already.
+
+**The staining.** The kiosk had the frame of a fifteen-summer shop and the
+paint of a new one: khaki panels, clean everywhere. The frame is streaked dark
+from the roof edge down the upper row, heaviest and widest at the top, most of
+the streaks caught by the mid rail and the lower row grimier overall with a few
+that got past. The rail was already in the model, and the comment beside it
+already read "the line the staining stops at" — nothing stopped there, because
+nothing ran. Sixteen streaks on the front, six below the rail, seven on the
+west end, a general darkening of the lower row and a splash line along the
+foot. Dealt off an index and deliberately not off `rng`: this runs once at
+build and the shore's stream is the beach, so a draw taken here is a bather
+moved three hundred metres (rule 4). They sit at `S.s0 - 0.038`, in front of
+the panel face and behind every batten, so a stain runs over sheet and stops
+at a rail — which is what being occluded by one looks like.
+
+**The Jana cabinet was a blank green box.** The wrap has been in the file since
+the freezer was corrected: the pale green ground, the lemons, and `brandRing`
+laying JANA round all four faces from Misha's six names. It never showed,
+because the ring was written flush with the cabinet's own faces and that is
+rule 5's co-planar pair exactly. The name z-fought with the green it is printed
+on and lost nearly all of it. It stands 12 mm proud now. The Jamnica poseur has
+had its ring 5 mm off its own drum since the day it was built.
+
+Worth stating plainly: the note in `plan/` was right about both of these, and
+neither was findable from the note. Standing at t 300 and looking is what found
+them.
+
 ## [1.162.0] — 2026-08-31
 
 ### Bark, and four wrong answers on the way to it
