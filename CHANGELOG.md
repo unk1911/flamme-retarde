@@ -8,6 +8,30 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.169.1] — 2026-08-31
+
+### The folded sun lounger is out of the kabina
+
+Misha sent a screenshot of the room with an arrow on a tall blue-grey slab
+standing between the camera and the television: *"dunno what that is prolly
+need to remove it"*. It was the folding sun lounger, stored on end against the
+back wall — straight off his own 0:09 survey note, *"a folding sun lounger
+stored on end, a red cool box, a wooden shelf high on the back wall with a bag
+on it, a striped towel on a hook, a mat on the floor"*. The other four are still
+there. This one is gone, on his word: *"yeah remove that folded sun lounger
+please"*.
+
+It was modelled correctly and it still failed, which is the part worth keeping.
+A lounger folded flat is a rectangle: 62 cm wide, 1.95 m tall, three bands of
+canvas inset in a steel frame — and at that scale, in that light, next to a
+television, it read as a blank panel somebody had left standing in the middle of
+the room. The author of the thing knew it was a lounger and nobody else could.
+A prop that needs a caption is furniture the room is worse for having.
+
+The comment in `kabinaKit` says all of this in place, so the survey line does
+not put it back: if it returns it needs folded legs and a crossbar, so the
+silhouette says lounger on its own.
+
 ## [1.169.0] — 2026-08-31
 
 ### She talks about where you are standing, and you can hear her over the cicadas

@@ -18059,31 +18059,27 @@ async function buildJadrija(scene) {
       const MAT = [0.395, 0.335, 0.205];
       const RED2 = [0.475, 0.095, 0.080];
       const PALE = [0.680, 0.672, 0.640];
-      const CANV = [0.245, 0.330, 0.430];
       // The mat, just inside the door, and it is the one thing in here you
       // stand on. Two millimetres proud of the floor is a coin toss at this
       // distance from the origin — 12 is not.
       boxTS(dc - 0.62, dc + 0.62, K.face + 0.55, K.face + 1.45,
         f + 0.004, f + 0.016, MAT, shade(MAT, 1.14));
-      // The sun lounger, folded and stood on end against the back wall.
-      // `slat` rakes a section in the (inland, up) plane and `bar` extrudes it
-      // along the shore, which between them is the only way anything in this
-      // file leans.
-      {
-        const la = dc - 1.86, lc = dc - 1.24;
-        const sec = slat(K.s1 - 0.67, f + 0.98, 0.15, 1.94, 0.13);
-        bar(la, lc, sec, KIT.steel, shade(KIT.steel, 1.16));
-        // The sling, inset, so it is a lounger and not a plank: three bands of
-        // canvas across a tubular frame.
-        for (let i = 0; i < 3; i++) {
-          const q = -0.62 + i * 0.62;
-          bar(la + 0.09, lc - 0.09,
-            slat(K.s1 - 0.67, f + 0.98 + q * 0.94, 0.15, 0.42, 0.16), CANV,
-            shade(CANV, 1.18));
-        }
-        furniture.push({ t: (la + lc) * 0.5, s: K.s1 - 0.67,
-          a: 0.34, c: 0.22, h: 1.95, y: f });
-      }
+      // THE SUN LOUNGER IS NOT HERE, and that is deliberate.
+      //
+      // It was: folded and stood on end against the back wall, a steel frame
+      // 62 cm wide and 1.95 m tall with three bands of blue canvas inset into
+      // it, straight off the 0:09 note above. Taken out on Misha's word,
+      // 31 Aug 2026 — he sent a screenshot of the room with an arrow on it and
+      // "dunno what that is prolly need to remove it", and then "yeah remove
+      // that folded sun lounger please".
+      //
+      // The lesson is worth more than the object. It was modelled correctly
+      // and it still failed, because a lounger folded flat is a rectangle: at
+      // this scale, in this light, standing next to a television, it read as a
+      // blank panel somebody had left in the middle of the room. A prop that
+      // needs a caption to be recognised is furniture the room is worse for
+      // having. Same shelf as the moonwalk — if it comes back it needs the
+      // folded legs and a crossbar, so the silhouette says lounger on its own.
       // The cool box, on the floor by the foot of the cot. Red body, pale lid,
       // a dark strap handle over it.
       {
