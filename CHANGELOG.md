@@ -8,6 +8,86 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.154.0] — 2026-08-31
+
+### Somebody behind the counter, and Tisak is a newsagent
+
+Misha: "currently TISAK looks unfinished / doesn't have details. also, we need
+to place a man / NPC behind the counter of Gelato store, to make coffee or give
+out ice cream to NPC kids."
+
+Both were in the survey backlog and both had been looked at before. This is
+what they cost.
+
+**The slastičarnica has staff.** Two young men in black t-shirts at the
+serving counter and two children at the glass in front of them. There was
+nobody serving at any counter anywhere in this game, which is survey/3 item 10;
+it was attempted on 24 Aug, the census stayed put, `stats.people` went up by
+two, and nothing was drawn. The cause is arithmetic and it sits three thousand
+lines below the push: `castBlob` is a typed array sized `bathers.length` and
+each instanced rig is built `makeCrowd(scene, rig, bathers.length)`, both read
+when the crowd is constructed, so anybody appended after that has an index past
+the end of both. Same two lines of push, moved to after the cast pass and
+before anything counts the list. Four extra draws off `rng`, all of them after
+every other figure on the shore, so the census is untouched at 446/333/86/27.
+
+**A shirt is paint, not a shell.** The survey's plan for dressing them was a
+static garment box over the chest, because everybody the crowd draws on this
+shore is a bather and the rig has nothing else to wear. It does not need to be
+a box: the instanced tier is one layer per rig part with its own colour buffer,
+so answering the skin question differently for the trunk than for the head and
+the arms costs one comparison and gives a garment that deforms with a ribcage
+the standing pose rocks through five degrees. `fg.shirt`, and a `serve` pose to
+go with it — still for most of a cycle, then a dig into the case and back,
+off the figure's own seed so the two of them never reach at the same moment.
+
+**Three things had to be measured before any of it could be seen.** The gelato
+case is 1.64 m to the top of its glass and 1.92 to the top of its hood, which
+is taller than the 1.72 m man behind it: a figure in the case's own slot was
+shot from five viewpoints and the hood took his head from every one, so both
+servers stand at the plain counter west of it, where the top is 1.06 m. The
+case's back screen came down from 1.80 m to 1.20 m — 1.80 is over the head of
+a 1.75 m man, and 1.42 is barely better, because a sightline that grazes the
+top of a screen lands at almost the same height 0.22 m behind it. And the back
+bar's mirror moved 0.03 m: a man whose hips are behind the counter has his head
+on the body's own axis while his trunk leans out past it, so at s0-0.14 the
+shirt was in front of the plane and the face was behind it. At s0-0.08 the
+whole mirrored wall silently loses the depth test instead. It hangs at s0-0.11.
+
+**And Tisak is not the green kiosk.** The survey note reads "the green kiosk
+(_342/_343): bright green painted metal with a TISAK sign, beer crates stacked
+outside, a yellow barrier", and that is two buildings run together with the
+sign given to the wrong one. _342 is the green kiosk and carries no lettering
+at all. _343 is Tisak, thirty metres along: a steel kiosk the size of a
+shipping container in weathered khaki, its long side a grid of pressed panels
+stained down from the roof, a red livery strip along the top with the mark hard
+against the left-hand end and `www.tisak.hr` / `0800 666 770` in small type
+beside it, a flat roof with a pale capping, and one glazed corner with the door
+standing open on to magazine racks and shelved confectionery.
+
+What shipped before was a grey render box with a red pitched roof and a centred
+fascia board — the generic kiosk, which is right for Maslina and for the
+unnamed one and is none of this. `metal` switches the whole of it off: the
+render body, the pitched roof, the fascia, the serving hole and the shared
+`shopKit` with its counter, mullions, condenser, flue, menu boards and planted
+pots, none of which a sealed steel box with a door has. In their place, off
+`1000150343`: the panelled sides, the livery strip, the capped roof, the glazed
+corner with four shelves of stock behind it, the door standing open at a right
+angle, a 240 litre wheelie bin at one corner, a drinks cooler and a step ladder
+at the other, and a Bierzeltgarnitur on the gravel in front.
+
+Two of those took a second pass and both failures were the same failure. The
+door's glass was inset 8 mm into the leaf and the leaf came out plain white,
+because 8 mm is under the separation this shore can hold two kilometres from
+the origin; it is a frame of four members with the pane filling the hole
+between them now. And the panel grid was drawn at shade 0.92 against its
+battens, which reads at two metres and vanishes at fifteen, which is where this
+shop is looked at from. The grid is in the paint, not in the relief.
+
++814 triangles net over the whole pass, which is what taking `shopKit` and a
+pitched roof off one kiosk buys back. 96 people where there were 92. 61 fps at
+Tisak and 60 at the slastičarnica, against 59 and 60 before.
+
 ## [1.153.0] — 2026-08-30
 
 ### The terminal is in the film now

@@ -196,8 +196,41 @@ column with a heavy ribbed disc base. The game's terrace tables are pale and
 square-legged. One black round table per set would separate MINI's terrace from
 the promenade cafés the way the crimson parasols would separate the tavern.
 
-**10. Somebody behind the counter.** **ATTEMPTED 24 Aug, BACKED OUT — read this
-before trying again.**
+**10. Somebody behind the counter.** **BUILT 31 Aug.** Two young men in black
+t-shirts at the plain serving counter west of the gelato case, and two children
+at the glass in front of them. What follows is the 24 Aug attempt and its
+autopsy, kept because the cause it names is the cause and the two measurements
+under it are still the measurements.
+
+**The reason nothing was drawn is arithmetic and it is three thousand lines
+below the push.** `castBlob` is a typed array sized `bathers.length` and each
+instanced rig is built `makeCrowd(scene, rig, bathers.length)` — both read at
+the moment the crowd is constructed. Anybody appended after that has an index
+past the end of both: no blob, and no instance to be drawn into. The fix is the
+same two lines of push, moved to sit after the cast pass and before the crowd
+is built.
+
+**Three things the rebuild found that this item did not know:**
+
+- **The case's own slot cannot hold a person you can see.** The gelato case is
+  1.64 m to the top of its glass and 1.92 to the top of its hood — taller, by
+  eight centimetres, than the 1.72 m man behind it. A figure was put in the
+  0.40 m slot and shot from five viewpoints; from every one the hood took his
+  head and the glass rails took his shoulders. Both servers stand at the plain
+  counter west of the case instead, where the top is 1.06 m.
+- **A shirt is paint, not a shell.** This item's plan was a static garment box
+  over the chest. It does not need to be: the instanced rig is one layer per
+  part with its own colour buffer, so answering the skin question differently
+  for the trunk than for the head and arms costs one comparison and gives a
+  garment that deforms with the ribcage. See `fg.shirt` in 42-crowd.js.
+- **The mirror had to move 0.03 m.** A man whose hips are behind the counter
+  has his head on the body's own axis while his trunk leans out past it, so at
+  the back bar's old s0−0.14 the shirt was in front of the plane and the face
+  was behind it: a black t-shirt with two arms, two hands and no head. It hangs
+  at s0−0.11 now, and s0−0.08 is the other wall — at eight centimetres in front
+  of the shop's body the whole mirrored wall silently loses the depth test.
+
+**24 Aug, BACKED OUT — the original note:**
 
 The approach was right and the result was not drawn. Two `stand` figures pushed
 straight into `bathers` *after* the cast pass (`bathers.length = 0; keep.slice`)

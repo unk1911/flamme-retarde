@@ -648,6 +648,9 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
 function makeCrowd(scene, rig, cap) {
   const layers = rig.parts.map((p) => crowdLayer(scene, p.geo, cap));
   const skel = rigSkeleton(rig);
+  // Which layer is the trunk, so that one person on this beach can be wearing
+  // something. See `fg.shirt` in the write below.
+  const torsoIx = rig.parts.findIndex((p) => p.name === 'torso');
   const figures = [];
   const _p = new THREE.Vector3();
   const _q = new THREE.Quaternion();
@@ -752,6 +755,53 @@ function makeCrowd(scene, rig, cap) {
         skel.armLL.rotation.z = 0.30;
         skel.armRL.rotation.z = 0.26;
         break;
+
+      case 'serve': {
+        // Working a counter, which is the one thing on this shore that is a
+        // job rather than an afternoon. 20260823_111815 and _111819: two young
+        // men behind the gelato case, one with his head down in it and one
+        // looking out, and everything they do happens between the case in
+        // front of them and the mirror 0.36 m behind.
+        //
+        // So the motion is a cycle rather than a sway: a few seconds still,
+        // then a dig into the case and back. `fg.seed` sets the rate and the
+        // phase, and it is the same seed that decides which piece of business
+        // a standing figure has — two people working one counter must never
+        // reach at the same moment, which is exactly what one shared clock
+        // gave the beach and is recorded at length in the standing case below.
+        const rate = 0.70 + fg.seed * 0.70;
+        const w = Math.sin(ph * 0.31 * rate);
+        // Zero for most of the cycle and then a full reach, on the same shape
+        // the standing figure's business uses.
+        const dig = sat((Math.sin(ph * 0.26 * rate + fg.seed * 5.1) - 0.35) / 0.45);
+        skel.pelvis.rotation.x = w * 0.05;
+        skel.torso.rotation.z = 0.05 + dig * 0.16;
+        skel.torso.rotation.x = -w * 0.045;
+        skel.torso.rotation.y = -dig * 0.16;
+        // Head down into the case when digging, and looking about the shop
+        // when not — never at the sea, because there is a mirror that way.
+        skel.head.rotation.z = 0.05 + dig * 0.28;
+        skel.head.rotation.y = Math.sin(ph * 0.23 * rate) * 0.26 - dig * 0.14;
+        skel.legLU.rotation.x = w * 0.05;
+        skel.legRU.rotation.x = w * 0.05;
+        skel.legLL.rotation.z = -(0.04 + 0.11 * Math.max(0, w));
+        skel.legRL.rotation.z = -(0.04 + 0.11 * Math.max(0, -w));
+        // Both forearms up and in, which is the shape of somebody working at
+        // a counter — and the shape this has to be, because a counter is
+        // 1.06 m and hides everything a reaching arm does below it. The first
+        // cut sent the working arm 46 degrees forward and 60 more at the
+        // elbow, which is a scoop into a case and rendered as a bare arm
+        // hanging down the OUTSIDE of the counter in front of the customers.
+        // What is left to read with is the head, the shoulders and a pair of
+        // elbows, so that is what moves.
+        skel.armLU.rotation.x = SPLAY * 0.9;
+        skel.armRU.rotation.x = -SPLAY * 0.9;
+        skel.armLU.rotation.z = -0.12 + dig * 0.26;
+        skel.armRU.rotation.z = -0.08 + dig * 0.06;
+        skel.armLL.rotation.z = 1.52 + dig * 0.22;
+        skel.armRL.rotation.z = 1.58;
+        break;
+      }
 
       case 'wade':
         // Standing in half a metre of water. Arms held a little out and clear,
@@ -937,7 +987,23 @@ function makeCrowd(scene, rig, cap) {
         L.aScale.array[n * 3] = _s.x;
         L.aScale.array[n * 3 + 1] = _s.y;
         L.aScale.array[n * 3 + 2] = _s.z;
-        for (const [a, c] of [[L.aColor, fg.skin], [L.aSuit, fg.suit],
+        // A t-shirt, and it is paint rather than a garment.
+        //
+        // `aColor` is what the marker palette hands to every vertex the bake
+        // painted pure white, which is skin — and the parts are separate
+        // layers with separate attribute buffers, so answering that question
+        // differently for the trunk than for the head and the arms costs one
+        // comparison and dresses the figure in something with sleeves. It also
+        // deforms, which is the whole reason it is this and not a shell: the
+        // survey's plan for the two behind the gelato counter was a static box
+        // over the chest, and a box does not breathe with the ribcage the
+        // standing pose rocks through five degrees.
+        //
+        // The neck goes black with it. The neck is on the trunk part and there
+        // is nothing to be done about that short of a re-bake; at the two
+        // metres this is ever seen from it reads as a collar.
+        const skin = fg.shirt && j === torsoIx ? fg.shirt : fg.skin;
+        for (const [a, c] of [[L.aColor, skin], [L.aSuit, fg.suit],
           [L.aHair, fg.hair]]) {
           a.array[n * 3] = c[0]; a.array[n * 3 + 1] = c[1]; a.array[n * 3 + 2] = c[2];
         }

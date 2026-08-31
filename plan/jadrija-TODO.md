@@ -482,7 +482,9 @@ as of this writing; the state of each is in the git log, not here.
   the shore, not 66 straight out.
 - **Crazy paving is INLAND**, power-floated slab seaward. v_022 over the report.
 - **Four shops ship unnamed** — konoba, the glass-fronted bar, the green kiosk,
-  the trampoline operator. No legible sign in any frame.
+  the trampoline operator. No legible sign in any frame. The green kiosk is
+  NOT Tisak: that reading was two frames run together and is corrected under
+  the 22 Aug sweep below.
 - **Western 200 m is a beach**, not concrete terraces (`JAD.beachTo: 205`).
 - **Parasols kept on the sand** west of `beachTo` — no photograph reaches that
   stretch, and stripping it bare is the same mistake in the other direction.
@@ -627,8 +629,21 @@ bed. See the commit.
 - **Pizzeria Kod Koze** (_335): grey render, terracotta pantiles, yellow
   monobloc chairs on crazy paving. **The konoba at _336/_337**: green-grey
   fibre-cement sheet on a timber pergola over a whitewashed rubble base, green
-  posts, a mosaic mural. **The green kiosk** (_342/_343): bright green painted
-  metal with a TISAK sign, beer crates stacked outside, a yellow barrier.
+  posts, a mosaic mural. **The green kiosk** (_342): bright green painted
+  metal, beer crates stacked outside, a yellow barrier, three wheelie bins
+  and a keg. **CORRECTED 31 Aug** — this entry ran two buildings together
+  and gave the wrong one a sign. _342 is the green kiosk and there is no
+  lettering on any face of it; **_343 is TISAK**, thirty metres along and a
+  different object entirely: a steel kiosk the size of a shipping container
+  in weathered khaki, its long side a grid of pressed panels stained down
+  from the roof, a red livery strip along the top with TISAK hard against
+  the left-hand end and `www.tisak.hr` / `0800 666 770` in small type beside
+  it, a flat roof with a pale capping, one glazed corner with the door
+  standing open on to magazine racks and shelved confectionery, a green
+  wheelie bin at one corner and a drinks cooler and a step ladder at the
+  other, and a Bierzeltgarnitur on the gravel in front. **BUILT 31 Aug** —
+  see `tisakFront`. Nothing green about it, and nothing about the green
+  kiosk is a newsagent.
   **beach bar MINI and the grill** (4:48-6:10): white square parasols with
   pointed crowns, backlit photo menu boxes, Ožujsko parasols, POMMES FRITES
   banners, pallet furniture, chevron timber screens.
