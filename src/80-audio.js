@@ -16,12 +16,11 @@
 function buildAudio() {
   let ctx = null;
   let master = null, verb = null, verbSend = null, verbGain = null, bed = null, bedDuck = null;
-  // Baye's voice, and what it does to the beach under her. `voiceDuck` is a
-  // SECOND duck in series with `bedDuck` rather than a share of it: the fire
-  // writes `bedDuck` every frame it burns (see `fireTick`), so anything else
-  // setting that node is overwritten a sixtieth of a second later. Two nodes
-  // multiply, which is what two independent reasons to pull the bed down
-  // should do anyway.
+  // Baye's voice, and what it does to the beach under her. `voiceDuck` is its
+  // own node and not a share of `bedDuck` for two reasons: the fire writes
+  // `bedDuck` every frame it burns (see `fireTick`), so anything else setting
+  // that node is overwritten a sixtieth of a second later — and the bed is only
+  // a third of the mix anyway. It hangs off the master instead; see `start`.
   let voiceEl = null, voiceGain = null, voiceDuck = null;
   let outBus = null, outLp = null;
   // The birds sitting still in the trees behind the resort. Their own stage of
@@ -162,8 +161,22 @@ function buildAudio() {
     subG.gain.value = 1;
     subLp = ctx.createBiquadFilter();
     subLp.type = 'lowpass'; subLp.frequency.value = 20000; subLp.Q.value = 0.4;
-    master.connect(subG).connect(subLp).connect(slowLp).connect(comp)
-      .connect(ctx.destination);
+    // The duck she speaks over, and it sits HERE rather than on the bed.
+    //
+    // First attempt put it in series with `bedDuck`, which was wrong by
+    // inspection of this very graph: the bed carries the promenade, the
+    // cicadas and the sea, and everything else in the game — the engines, the
+    // gulls, the water, the fire — connects straight to `master`. Pulling the
+    // bed down took maybe a third of the mix with it and left her competing
+    // with the rest at full level.
+    //
+    // On the master it is the whole mix, and her voice is connected downstream
+    // of it (see `voice`), which makes this an actual sidechain rather than a
+    // fader that also turns her down.
+    voiceDuck = ctx.createGain();
+    voiceDuck.gain.value = 1;
+    master.connect(voiceDuck).connect(subG).connect(subLp).connect(slowLp)
+      .connect(comp).connect(ctx.destination);
 
     // ── the bed ───────────────────────────────────────────────────────────
     // The continuous sounds that stand still and fill the whole band at
@@ -191,9 +204,7 @@ function buildAudio() {
     bed.gain.value = 1;
     bedDuck = ctx.createGain();
     bedDuck.gain.value = 1;
-    voiceDuck = ctx.createGain();
-    voiceDuck.gain.value = 1;
-    bed.connect(bedDuck).connect(voiceDuck).connect(master);
+    bed.connect(bedDuck).connect(master);
 
     // ── outdoors ──────────────────────────────────────────────────────────
     // The sounds on the bed that belong to the beach rather than to the player
@@ -3884,13 +3895,18 @@ function buildAudio() {
    * Resolves when she has finished, or immediately with `false` if there is no
    * graph to play into yet.
    */
-  function voice(url, vol = 1.35) {
+  function voice(url, vol = 2.1) {
     if (!ctx || !url) return Promise.resolve(false);
     if (!voiceEl) {
       voiceEl = new Audio();
       voiceEl.preload = 'auto';
       voiceGain = ctx.createGain();
-      ctx.createMediaElementSource(voiceEl).connect(voiceGain).connect(master);
+      // To `subG`, not to `master`: `voiceDuck` sits between the two, so this
+      // is the one signal in the game that the duck does not touch. She still
+      // gets the limiter and `slowmo`; what she loses is the underwater
+      // lowpass, which is on the master, and a muffled voice is not the thing
+      // anybody was asking for when they put their head under.
+      ctx.createMediaElementSource(voiceEl).connect(voiceGain).connect(subG);
     }
     voiceGain.gain.value = vol;
     voiceEl.src = url;
@@ -3900,7 +3916,10 @@ function buildAudio() {
     const duck = (to, tc) => {
       if (voiceDuck) voiceDuck.gain.setTargetAtTime(to, ctx.currentTime, tc);
     };
-    duck(0.42, 0.18);
+    // Misha, 31 Aug: "make the volume on the talking louder, relative to other
+    // sounds, or perhaps while she speaks, make the other volumes softer".
+    // Both: 2.1 on her, and the rest of the beach down to a quarter.
+    duck(0.25, 0.15);
     return new Promise((done) => {
       const end = (ok) => {
         voiceEl.onended = voiceEl.onerror = null;
@@ -4011,6 +4030,10 @@ function buildAudio() {
         bars: +(fireStep / 16).toFixed(2),
         gain: fireBus ? +fireBus.gain.value.toFixed(4) : 0,
         bed: bedDuck ? +bedDuck.gain.value.toFixed(3) : 1,
+        // The sidechain: 1 when she is quiet, a quarter while she talks.
+        voiceDuck: voiceDuck ? +voiceDuck.gain.value.toFixed(3) : 1,
+        voiceGain: voiceGain ? +voiceGain.gain.value.toFixed(2) : 0,
+        speaking: !!(voiceEl && !voiceEl.paused && !voiceEl.ended),
         // Which of the two is playing, whether the clip is in yet, and how
         // long it is — the sample is a one-shot, so `secs` is also how long the
         // cue can last before it runs out.

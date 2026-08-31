@@ -142,6 +142,21 @@ const voice = (() => {
       : state.phase === 'ground' ? 'on foot on the beach beside you'
         : 'flying the Canadair';
     c.place = PLACES[kind] || String(kind);
+
+    // What is actually within reach, which is what she should be talking about.
+    //
+    // The place above is a locale — "Jadrija, the beach on the end of the
+    // peninsula" — and it is the same string for forty minutes. This is the
+    // shop you are standing in front of, and it changes every twenty paces.
+    // Without it she talked about the weather, because the weather was the only
+    // specific thing in the payload.
+    if (gap && gap.spot) c.spot = gap.spot;
+    // The one room in the resort you are inside rather than in front of. Asked
+    // about YOU and not about her: it is a doorway you walked through.
+    if (p && at(() => jadrija.kabina.inside(p.x, p.z), 0) > 0.5) {
+      c.spot = 'inside the beach hut with you, with the door shut';
+      c.alone = true;
+    }
     if (gap) c.near = +gap.m.toFixed(1);
     if (p) Object.assign(c, gpsOf(p.x, p.z));
 

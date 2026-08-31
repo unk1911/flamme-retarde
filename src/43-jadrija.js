@@ -22318,6 +22318,61 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * Where you two are standing, in enough detail to talk about it.
+   *
+   * `showPlace` above answers a different question and must keep answering it:
+   * it picks which of five cards she holds up, and its five keys are the five
+   * cards that exist. This one is for her voice, which can talk about anything,
+   * so it reads the shop table — the same `SHOPS` that puts the names on the
+   * awnings — and hands back what the place actually is.
+   *
+   * Misha, 31 Aug: "if we are near the gellato place (slasticarnica), if she
+   * would delve into her desires to slurp some tasty ice-cream... and if we are
+   * next to the bar, perhaps how she wants a drink, and inside the kabine, she
+   * should insinuate, indirectly, about all sorts of interesting activities".
+   * That needs the ice-cream shop to be distinguishable from the bar next door
+   * to it, and `showPlace` calls both of those "slast" and "nothing".
+   *
+   * Off YOUR position, and that is the difference from the card. The card is
+   * hers — she holds it up where she is standing — but "if we are near the
+   * gellato place" is about where the player is, and she only ever speaks when
+   * she is within sixteen metres of them anyway, so the two agree in play and
+   * disagree exactly when a test teleports. Falls back to hers if the walker is
+   * not up yet.
+   */
+  const VOICE_SPOT = {
+    slast: 'right outside the slasticarnica, the ice-cream shop',
+    h2o: 'outside Caffee bar H2O',
+    tramp2: 'outside Caffe TRAMPULIN',
+    mini: 'at beach bar MINI, where the grill is',
+    f2: 'outside the pizzeria',
+    maslina: 'by the Maslina kiosk',
+    tisak: 'by the TISAK newspaper kiosk',
+    konoba: 'under the konoba canopy',
+  };
+
+  function voiceSpot() {
+    if (!show) return null;
+    const t = show.pt == null ? show.t : show.pt;
+    const s = show.pt == null ? show.s : show.ps;
+    // A shop you are level with and standing in front of. 9 m along the shore
+    // is about the width of one awning either side of it; 12 m out is the
+    // terrace, past which you are on the promenade and not at the bar.
+    for (const S of SHOPS) {
+      const w = VOICE_SPOT[S.key];
+      if (!w) continue;
+      if (t > S.t0 - 9 && t < S.t1 + 9 && s > S.s0 - 12 && s < S.s1 + 4) return w;
+    }
+    if (s < SHOW.lane[0] + 1.1) return 'at the edge of the water';
+    if (Math.abs(t - JET.t) < 8) return 'out on the mole';
+    if (Math.abs(t - VIK.t) < 10) return 'by the vikendica';
+    if (s > 13.5 && t > JAD.rows[0][0] - 4 && t < JAD.rows[0][1] + 4) {
+      return 'along the row of beach huts';
+    }
+    return null;
+  }
+
+  /**
    * The idle chatter, and the reason it is a list rather than a coin flip.
    *
    * The ćuk keeps the largest share on purpose — it is the one call that is
@@ -26042,7 +26097,9 @@ async function buildJadrija(scene) {
      */
     bayeGap: () => (show && show.pt != null && show.t != null)
       ? { m: Math.hypot(show.t - show.pt, show.s - show.ps),
-        phase: show.phase, withYou: !!show.withYou, indoors: sheIsIn() }
+        phase: show.phase, withYou: !!show.withYou, indoors: sheIsIn(),
+        // What is within earshot to talk about. See `voiceSpot`.
+        spot: voiceSpot() }
       : null,
     /**
      * Fill the soak meter by hand, so the turn can be seen without standing

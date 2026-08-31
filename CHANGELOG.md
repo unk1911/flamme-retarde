@@ -8,6 +8,72 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.169.0] — 2026-08-31
+
+### She talks about where you are standing, and you can hear her over the cicadas
+
+Misha: *"the talking mechanism is great, the only comment is maybe make the
+volume on the talking louder... also she talks a lot about the weather and
+stuff, but it would be cool if she talked more about hyper-situational stuff,
+for instance, if we are near the gellato place (slasticarnica), if she would
+delve into her desires to slurp some tasty ice-cream... and if we are next to
+the bar, perhaps how she wants a drink, and inside the kabine, she should
+insinuate, indirectly, about all sorts of interesting activities"*.
+
+**The duck was in the wrong place, and it was mostly decorative.** It sat in
+series with `bedDuck` — and the bed carries the promenade, the cicadas and the
+sea, while *everything else in the game* connects straight to `master`: the
+engines, the gulls, the water, the fire, the radio. Pulling the bed down took
+about a third of the mix with it and left her competing with the rest at full
+level. `voiceDuck` now hangs off the master bus, and her voice is connected
+downstream of it, which makes it an actual sidechain rather than a fader that
+also turns her down. Her gain went 1.35 to 2.1 and the beach goes to a quarter
+while she speaks. Measured: 1 before, **0.25** during, 1 after.
+
+**`voiceSpot()` — what is within arm's reach, in words.** `showPlace()` already
+existed and had to stay as it is: it picks which of five cards she holds up, and
+its five keys are the five cards that exist. This is a second resolver for her
+voice, reading the same `SHOPS` table that puts the names on the awnings, so the
+ice-cream shop is distinguishable from the bar thirteen metres along from it.
+Nine venues answer — the slastičarnica, H2O, TRAMPULIN, MINI, the pizzeria,
+Maslina, TISAK, the konoba — plus the mole, the vikendica, the hut row and the
+water's edge. Inside the one kabina that opens it says so, and says you are
+alone in there.
+
+Off *your* position, not hers, which is the difference from the card: the card
+is hers and she holds it up where she is standing, but "if we are near the
+gellato place" is about the player. She only speaks within sixteen metres of you
+anyway, so the two agree in play and disagree exactly when a test teleports.
+
+**The persona now has an order of preference**, and the weather is last. If
+there is a RIGHT NOW line she does not mention the weather at all — it had been
+first by default because it was the only specific thing in the payload. What
+comes out:
+
+> Get me a cone before I melt, and choose a flavour you'd like to taste twice.
+> — Door shut, just us, and you're close enough to make this little hut feel
+> much smaller.
+
+Suggestive, not explicit: innuendo, double meaning, something left hanging. She
+implies and never describes.
+
+### Fixed: she was reading distances out to the metre
+
+*"Come the 151 metres to MINI's grill"*, and *"the last three metres down the
+mole"*. The context said "they are 3 m from you", and a model given a number
+reads the number out. It is a phrase now — close enough to touch, an arm's
+length away, a few paces off, across the way — because a person standing next to
+somebody does not know the distance to the metre and would never say it. The
+persona also forbids quoting any number back, and the four venue lines were
+re-checked with a digit scan.
+
+### Also
+
+- `__fr.jad.dip()` reports `standIn`, `standOut` and `door`, so a probe can walk
+  into the kabina instead of finding the door by eye.
+- `audio.fireStats()` reports `voiceDuck`, `voiceGain` and `speaking`, which is
+  how the sidechain above was measured rather than asserted.
+
 ## [1.168.2] — 2026-08-31
 
 ### Enter no longer launches the aeroplane out from under the sign-in

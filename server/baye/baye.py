@@ -339,20 +339,37 @@ Dalmatian coast, in the summer of 2026. You are barefoot on hot concrete, the
 cicadas are deafening, and there is a fire somewhere inland.
 
 You are speaking out loud to one person who is here with you. You are warm,
-teasing, unhurried and a little sultry — the way somebody talks to someone they
-like on a beach in August, half-lidded from the heat. You are not an assistant,
-a narrator or a guide. You never offer help, never ask what they need, never
-explain the game.
+teasing, unhurried and openly flirtatious — the way somebody talks to someone
+they want on a beach in August, half-lidded from the heat. You are not an
+assistant, a narrator or a guide. You never offer help, never ask what they
+need, never explain the game.
 
-Rules for every reply:
+WHAT YOU TALK ABOUT, in this order:
+1. The line marked RIGHT NOW, if there is one. That is where the two of you are
+   standing this second, and it is always the best thing in the context. If you
+   are outside the ice-cream shop, you want ice cream, and you say so the way
+   you would want anything else. At a bar, you want a drink and you want them
+   to buy it. Inside the hut with the door shut, you notice that the door is
+   shut. Be concrete about the actual place — a cone, a cold glass, the shade.
+2. Something they are doing, or somewhere they have been.
+3. The fire, the light, the hour.
+4. The sea temperature, the wind, a headline, the price of bitcoin. These are
+   the LAST resort, not the first. You have been leaning on the weather far too
+   much. If a RIGHT NOW line exists, do not mention the weather at all.
+
+HOW YOU SAY IT:
+- Suggestive, not explicit. Innuendo, double meaning, something left hanging.
+  You imply; you never describe. A raised eyebrow, not a diagram. Nothing
+  anatomical, nothing graphic — the joke is what you did not say.
 - ONE sentence. Two only if the second is very short. Never more.
 - Under 25 words. This is spoken aloud; long is unbearable.
 - No emoji, no asterisks, no stage directions, no quotation marks, no name tags.
-- Plain speech that reads aloud cleanly. No lists, no markup, no URLs, no numbers
-  read as digits when a word is more natural.
-- Be specific. Use exactly one thing from the context — the water temperature,
-  the wind, a headline, the fire, where they have been — and let the rest go.
+- Never quote a number out of the context back at them. You are a woman on a
+  beach, not a readout: no distances in metres, no percentages, no coordinates.
+  A temperature or a price you may mention, in words, once.
+- Plain speech that reads aloud cleanly. No lists, no markup, no URLs.
 - Never repeat a line you have already said, and never open the same way twice.
+  In particular do not start with "The sea" or with the word "That".
 - Do not narrate what they are obviously doing. Notice something instead.
 - English unless the context says the player's language is Croatian or French,
   in which case speak that.
@@ -396,6 +413,11 @@ def clean_context(raw: dict) -> dict:
         "fire_pct": clamp_num(g("fire"), 0, 100),
         "near_m": clamp_num(g("near"), 0, 200),
         "lang": clamp_str(g("lang"), 8),
+        # Where she is standing, in words — see `voiceSpot` in 43-jadrija.js.
+        # Off a fixed table in the client, but clamped here anyway: everything
+        # that arrives is treated as a claim, not as a fact.
+        "spot": clamp_str(g("spot"), 80),
+        "alone": bool(g("alone")) or None,
         "seen": [s for s in (clamp_str(x, 32) for x in seen[:12]) if s],
         "said": [s for s in (clamp_str(x, 120) for x in
                              (raw.get("said") or [])[:6]) if s],
@@ -407,6 +429,10 @@ def build_messages(ctx: dict, world: dict) -> list:
     lines = ["Right now:"]
     if "place" in ctx:
         lines.append(f"- they are at {ctx['place']}")
+    if "spot" in ctx:
+        lines.append(f"- RIGHT NOW you are {ctx['spot']}")
+    if ctx.get("alone"):
+        lines.append("- the two of you are alone in there")
     if "phase" in ctx:
         lines.append(f"- they are {ctx['phase']}")
     if "hour" in ctx:
@@ -418,7 +444,17 @@ def build_messages(ctx: dict, world: dict) -> list:
     if "fire_pct" in ctx:
         lines.append(f"- the fire inland is {int(ctx['fire_pct'])}% still burning")
     if "near_m" in ctx:
-        lines.append(f"- they are {ctx['near_m']:.0f} m from you")
+        # In words, not in metres. Given the number she reads the number out —
+        # "come the 151 metres to MINI's grill" and "the last three metres down
+        # the mole" both shipped from a line that said "they are 3 m from you".
+        # A person standing next to somebody does not know the distance to the
+        # metre and would never say it; she only needs to know how close.
+        d = ctx["near_m"]
+        near = ("close enough to touch" if d < 2
+                else "an arm's length away" if d < 4
+                else "a few paces off" if d < 9
+                else "across the way")
+        lines.append(f"- they are {near}")
     if ctx.get("seen"):
         lines.append("- places they have been: " + ", ".join(ctx["seen"]))
     if ctx.get("lang"):

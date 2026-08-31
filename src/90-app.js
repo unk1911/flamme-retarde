@@ -6217,6 +6217,10 @@ window.__fr = {
       const [t, s] = jadrija.local(camera.position.x, camera.position.z);
       return { inRoom, phase: dipPhase, cool: +dipCool.toFixed(2),
         t: +t.toFixed(2), s: +s.toFixed(2), sill: +(K.face + DIP.sill).toFixed(2),
+        // Where the room is, so a probe can walk into it without finding the
+        // door by eye. `standIn` is the middle of the floor; `door` is the
+        // threshold. Both are the numbers the crossing itself uses.
+        standIn: K.standIn, standOut: K.standOut, door: K.door,
         opacity: dipEl() ? dipEl().style.opacity : null };
     },
     stand: (t, s = 14, yaw = null) => {
