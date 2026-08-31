@@ -8,6 +8,56 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.158.0] — 2026-08-31
+
+### Tisak gets its shade, and the konoba gets its terrace
+
+**Tisak, second pass.** Three things in `1000150343` that the first pass either
+missed or read wrong, all found by opening the frame at full size instead of
+working from the thumbnail.
+
+The chiller is not a chiller. It is an upright freezer wrapped head to foot in
+a printed Jana Ice Tea livery — pale green ground, a lemon on it, the name
+across the middle, a white ventilation grille along the bottom — and it stands
+just outside the open door. It was built as a generic white cabinet with a
+glass door and a yellow header. The wrap is printed the way the parasol hems
+are, off the six brands Misha supplied, rather than as a colour with a guess on
+it; JANA is one of the six.
+
+And there are two square parasols, which nothing else on this shore has: a big
+white one with CORONA on its valance standing over the front of the kiosk, and
+a golden Ožujsko one beyond it. Every other parasol at Jadrija is an octagon in
+a car rim. Two beers at one pitch is exactly what the terrace note rules out —
+"no terrace on this shore is asked to sell two beers" — and this is not a
+terrace: it is a newsagent with somebody else's shade beside it, both brands
+are in the frame, and both are among the six.
+
+The first cut of them was a flat roof on a stick. A 0.34 m rise over a 1.32 m
+half is 14 degrees; it read as a canopy and hid the livery band on the kiosk
+behind it. 27 degrees is what the frame has. Two garden benches with pale
+cushions went in under them.
+
+**The konoba's terrace had nothing on it at all.** `terraceSet` is the
+boardwalk's monobloc-and-café-table kit and it only fires under an awning; this
+shop is a roof on posts with `awn` 0, so eleven metres of the best-sited
+terrace at Jadrija has been bare since it was built. It has dark wicker
+armchairs with white cushions round dark square tables, white barrel poseur
+tables in Jamnica's livery, and a surfboard leaning against the end post — and
+not one monobloc among them.
+
+**Third mislabel in the survey, and it is the same mistake each time.** The
+list files that stretch of footage under "beach bar MINI and the grill (4:48 -
+6:10)". Read frame by frame, the last eighty seconds of the pan are the
+konoba's terrace from the seaward side, and they match `20260821_175856`, which
+is what that shop was built from. After Tisak given the green kiosk's sign and
+the konoba given `_336/_337`, the rule is now written down: **check which
+building a note is about before building it.** MINI's own items — the square
+parasols with pointed crowns, the backlit photo menu boxes, the POMMES FRITES
+banners, the pallet furniture, the chevron screens — are not in this footage
+either and want a source naming first.
+
++884 triangles. 58 fps standing on the konoba terrace, 60 at Tisak.
+
 ## [1.157.0] — 2026-08-31
 
 ### The kabine are open, and one of them has a name

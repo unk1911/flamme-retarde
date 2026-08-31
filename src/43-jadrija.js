@@ -6608,31 +6608,109 @@ async function buildJadrija(scene) {
       }
       furniture.push({ t: bt, s: bs, a: 0.32, c: 0.34, h: 1.07, y: y0 });
     }
-    // The drinks cooler at the east corner, standing out on the apron with its
-    // back to the kiosk. White cabinet, glass door, a coloured header — the
-    // frame has two of them in the shop's own livery and the header is the one
-    // part of that a game at this scale can carry.
+    // The freezer, which is not a chiller with a glass door and never was.
+    //
+    // Opened at full size, `1000150343` has an upright cabinet standing just
+    // outside the open door, wrapped head to foot in a printed Jana Ice Tea
+    // livery: a pale green ground with a lemon on it and the name across the
+    // middle, and a white ventilation grille along the bottom. It is the
+    // second-loudest object in the frame after the red band and it was built
+    // as a generic white chiller with a yellow header.
+    //
+    // The wrap is the whole of it, so it is drawn the way the parasol hems
+    // are — a printed band, from the same six names Misha supplied, rather
+    // than a colour with a guess on it. JANA is one of the six.
     {
-      const ct = S.t1 + 0.62, cs = S.s0 - 0.48;
-      const CAB = [0.640, 0.638, 0.628];
-      boxTS(ct - 0.27, ct + 0.27, cs - 0.26, cs + 0.26, y0, y0 + 1.44,
-        CAB, shade(CAB, 1.08));
-      // The glass door, and it is not a hole. A 0.5 m by 1 m panel at 0.11
-      // grey is the blackest thing on this end of the promenade and reads as
-      // an opening in the side of the cabinet; what a lit chiller full of
-      // bottles actually gives you is a dim, slightly blue field with the
-      // shelf lines across it.
-      const CG = [0.235, 0.262, 0.288];
-      boxTS(ct - 0.22, ct + 0.22, cs - 0.28, cs - 0.25, y0 + 0.16, y0 + 1.08,
-        CG, shade(CG, 1.10));
-      for (let k = 0; k < 3; k++) {
-        const sy = y0 + 0.28 + k * 0.28;
-        boxTS(ct - 0.22, ct + 0.22, cs - 0.29, cs - 0.255, sy, sy + 0.11,
-          [0.360, 0.330, 0.230], [0.400, 0.370, 0.265]);
+      const ct = S.t1 - 0.30, cs = S.s0 - 1.05;
+      const WRAP = [0.575, 0.640, 0.470];      // the pale green of the print
+      const CAB = [0.665, 0.662, 0.650];
+      const hw = 0.66, hd = 0.36, hh = 1.46;
+      boxTS(ct - hw, ct + hw, cs - hd, cs + hd, y0, y0 + hh,
+        WRAP, shade(WRAP, 1.10));
+      // The lemon, which is the one shape on the wrap you read before the
+      // name: a pale disc low on the sheet with a warmer core.
+      for (const [lt, r] of [[ct - 0.34, 0.20], [ct + 0.30, 0.15]]) {
+        post(W, lt, cs - hd - 0.012, y0 + 0.52, y0 + 0.54, r,
+          [0.760, 0.735, 0.320], 10);
       }
-      boxTS(ct - 0.27, ct + 0.27, cs - 0.29, cs - 0.24, y0 + 1.12, y0 + 1.42,
-        [0.700, 0.665, 0.175], [0.740, 0.705, 0.215]);
-      furniture.push({ t: ct, s: cs, a: 0.29, c: 0.28, h: 1.44, y: y0 });
+      // The name across the middle, on all four sides, because a wrap is
+      // printed all the way round and this one is seen from three of them.
+      brandRing('jana', [[ct - hw, cs - hd], [ct + hw, cs - hd],
+        [ct + hw, cs + hd], [ct - hw, cs + hd]], y0 + 1.02, y0 + 0.72);
+      // The grille along the foot, white, and the lid.
+      boxTS(ct - hw + 0.05, ct + hw - 0.05, cs - hd - 0.012, cs - hd + 0.01,
+        y0 + 0.04, y0 + 0.20, [0.700, 0.700, 0.692]);
+      boxTS(ct - hw - 0.02, ct + hw + 0.02, cs - hd - 0.02, cs + hd + 0.02,
+        y0 + hh, y0 + hh + 0.055, CAB, shade(CAB, 1.10));
+      furniture.push({ t: ct, s: cs, a: 0.70, c: 0.40, h: hh, y: y0 });
+    }
+    // The two square parasols. `1000150343` has a big white one with CORONA on
+    // its valance standing over the front of the kiosk and a golden Ožujsko one
+    // beyond it, and square is the read: every other parasol on this shore is
+    // an octagon in a car rim and these two are four panels on a mast.
+    //
+    // Two beers at one pitch, which the terrace note explicitly rules out —
+    // "no terrace on this shore is asked to sell two beers". This is not a
+    // terrace. It is a newsagent with somebody else's shade standing beside it,
+    // and both brands are in the frame and both are among the six Misha named.
+    for (const [pt2, ps2, half, cloth, key] of [
+      [S.t0 + 1.10, S.s0 - 2.95, 1.32, [0.735, 0.728, 0.700], 'corona'],
+      [S.t1 + 2.30, S.s0 - 3.15, 1.18, [0.680, 0.545, 0.115], 'ozujsko'],
+    ]) {
+      const gy = surfaceY(pt2, ps2);
+      // A 0.34 m rise over a 1.32 m half is 14 degrees, which is not a parasol,
+      // it is a flat roof on a stick: the first cut read as a canopy and hid
+      // the livery band on the kiosk behind it. 0.66 is 27 degrees, which is
+      // what the frame has.
+      const eaveY = gy + 2.06, peak = gy + 2.72;
+      post(W, pt2, ps2, gy, gy + 0.13, 0.30, [0.325, 0.320, 0.310], 8);
+      post(W, pt2, ps2, gy + 0.06, eaveY + 0.30, 0.036,
+        [0.545, 0.540, 0.525], 6);
+      const cor = [[pt2 - half, ps2 - half], [pt2 + half, ps2 - half],
+        [pt2 + half, ps2 + half], [pt2 - half, ps2 + half]];
+      for (let i = 0; i < 4; i++) {
+        const a2 = cor[i], c2 = cor[(i + 1) % 4];
+        b.quad(W(pt2, ps2, peak), W(a2[0], a2[1], eaveY),
+          W(c2[0], c2[1], eaveY), W(pt2, ps2, peak),
+          i % 2 ? cloth : shade(cloth, 0.94));
+        // And the underside, because you stand under this one.
+        b.quad(W(c2[0], c2[1], eaveY - 0.012), W(a2[0], a2[1], eaveY - 0.012),
+          W(pt2, ps2, peak - 0.012), W(pt2, ps2, peak - 0.012),
+          shade(cloth, 0.80));
+      }
+      brandRing(key, cor, eaveY, eaveY - 0.20);
+      furniture.push({ t: pt2, s: ps2, a: 0.34, c: 0.34, h: 0.13, y: gy });
+    }
+    // Two garden benches under the shade, timber slats on a dark frame with a
+    // pale cushion on each, which is what the two people in the frame are
+    // sitting on.
+    for (const [bt, bs, ang] of [
+      [S.t0 + 2.15, S.s0 - 2.85, 0.0], [S.t0 + 0.15, S.s0 - 2.55, 0.5],
+    ]) {
+      const gy = surfaceY(bt, bs);
+      const co = Math.cos(ang), sn = Math.sin(ang);
+      const P = (u, v, yy) => W(bt + u * co - v * sn, bs + u * sn + v * co, yy);
+      const FRAME = [0.155, 0.140, 0.125];
+      const SLAT = [0.365, 0.255, 0.170];
+      const CUSH = [0.500, 0.545, 0.545];
+      for (const u of [-0.72, 0.72]) {
+        for (const v of [-0.22, 0.22]) {
+          post(P, u, v, gy, gy + 0.42, 0.026, FRAME, 4);
+        }
+        boxIn(P, u - 0.03, u + 0.03, -0.24, 0.24, gy + 0.40, gy + 0.46, FRAME);
+        post(P, u, 0.22, gy + 0.42, gy + 0.92, 0.026, FRAME, 4);
+      }
+      for (let k = 0; k < 3; k++) {
+        boxIn(P, -0.78, 0.78, -0.24 + k * 0.17, -0.24 + k * 0.17 + 0.13,
+          gy + 0.44, gy + 0.47, SLAT, shade(SLAT, 1.12));
+      }
+      for (let k = 0; k < 3; k++) {
+        boxIn(P, -0.78, 0.78, 0.20, 0.25,
+          gy + 0.52 + k * 0.14, gy + 0.63 + k * 0.14, SLAT, shade(SLAT, 1.12));
+      }
+      boxIn(P, -0.74, 0.74, -0.22, 0.18, gy + 0.47, gy + 0.55,
+        CUSH, shade(CUSH, 1.12));
+      furniture.push({ t: bt, s: bs, a: 0.82, c: 0.42, h: 0.92, y: gy });
     }
     // The step ladder leaning on the east end, which is where it is in the
     // frame and is the one object in it that says the shop is being worked in
@@ -6741,6 +6819,98 @@ async function buildJadrija(scene) {
       // reading it from here is the temporal dead zone all over again.
       post(W, S.t1 - 1.6, S.s0 + 2.2, y0 - 0.05, y0 + 0.16, 0.62,
         [0.520, 0.505, 0.470], 9);
+
+      // ── the terrace, which had nothing on it at all ──────────────────────
+      //
+      // `terraceSet` is the boardwalk's monobloc-and-café-table kit and it
+      // only fires under an awning; this shop is a roof on posts with `awn` 0,
+      // so eleven metres of the best-sited terrace at Jadrija has been empty
+      // since it was built. What is on it is in two sources that turn out to
+      // be the same place: `20260821_175856`, which this whole shop was built
+      // from, and the last eighty seconds of `1000150414` — the survey lists
+      // that stretch under "beach bar MINI and the grill" and it is not MINI,
+      // it is this terrace from the other side. Third mislabel in the file;
+      // see the corrections in plan/jadrija-TODO.md.
+      //
+      // Three things in it and not one of them is a monobloc: dark wicker
+      // armchairs with white cushions, white barrel poseur tables in Jamnica's
+      // livery, and a surfboard leaning against the rail.
+      const WICK = [0.185, 0.140, 0.108];
+      const CUSH = [0.680, 0.672, 0.650];
+      const wicker = (wt, ws, ang) => {
+        const gy = surfaceY(wt, ws);
+        const co = Math.cos(ang), sn = Math.sin(ang);
+        const P = (u, v, yy) => W(wt + u * co - v * sn, ws + u * sn + v * co, yy);
+        for (const [u, v] of [[-0.24, -0.24], [0.24, -0.24], [-0.24, 0.24],
+          [0.24, 0.24]]) {
+          post(P, u, v, gy, gy + 0.36, 0.022, [0.115, 0.108, 0.100], 4);
+        }
+        // The body is one woven box, which is what a rattan chair is: the
+        // frame is inside the weave and nothing of it shows but the legs.
+        boxIn(P, -0.28, 0.28, -0.28, 0.28, gy + 0.34, gy + 0.46,
+          WICK, shade(WICK, 1.22));
+        boxIn(P, -0.28, 0.28, 0.20, 0.28, gy + 0.46, gy + 0.92,
+          WICK, shade(WICK, 1.14));
+        for (const u of [-0.28, 0.28]) {
+          boxIn(P, u - 0.06, u + 0.06, -0.26, 0.26, gy + 0.46, gy + 0.64,
+            WICK, shade(WICK, 1.18));
+        }
+        boxIn(P, -0.24, 0.24, -0.22, 0.20, gy + 0.46, gy + 0.53,
+          CUSH, shade(CUSH, 1.10));
+        furniture.push({ t: wt, s: ws, a: 0.32, c: 0.32, h: 0.92, y: gy });
+      };
+      // A barrel poseur table with the livery round it. `1000150414` at 5:20
+      // has one at arm's length: a white drum about knee to elbow with a small
+      // round top, and the print wraps it rather than sitting on a hem.
+      const poseur = (pt2, ps2) => {
+        const gy = surfaceY(pt2, ps2);
+        const WH = [0.700, 0.696, 0.680];
+        post(W, pt2, ps2, gy, gy + 1.02, 0.30, WH, shade(WH, 1.10), 14);
+        post(W, pt2, ps2, gy + 1.00, gy + 1.07, 0.40, shade(WH, 1.14),
+          shade(WH, 1.20), 14);
+        const ring = [];
+        for (let i = 0; i < 14; i++) {
+          const a2 = (i / 14) * TAU;
+          ring.push([pt2 + Math.cos(a2) * 0.305, ps2 + Math.sin(a2) * 0.305]);
+        }
+        brandRing('jamnica', ring, gy + 0.74, gy + 0.50);
+        furniture.push({ t: pt2, s: ps2, a: 0.34, c: 0.34, h: 1.07, y: gy });
+      };
+      // Four chairs round two tables, two poseurs, and the tables are dark
+      // and square where the boardwalk's are pale and round.
+      const DKT = [0.135, 0.128, 0.122];
+      for (const [ct, cs2] of [[S.t0 + 2.6, S.s0 + 2.1], [S.t0 + 6.9, S.s0 + 1.5]]) {
+        const gy = surfaceY(ct, cs2);
+        for (const [u, v] of [[-0.30, -0.30], [0.30, -0.30], [-0.30, 0.30],
+          [0.30, 0.30]]) {
+          post(W, ct + u, cs2 + v, gy, gy + 0.72, 0.022, DKT, 4);
+        }
+        boxTS(ct - 0.36, ct + 0.36, cs2 - 0.36, cs2 + 0.36, gy + 0.70, gy + 0.75,
+          DKT, shade(DKT, 1.35));
+        furniture.push({ t: ct, s: cs2, a: 0.40, c: 0.40, h: 0.75, y: gy });
+        for (let q = 0; q < 2; q++) {
+          const a2 = q * Math.PI + 0.6;
+          wicker(ct + Math.cos(a2) * 0.86, cs2 + Math.sin(a2) * 0.86,
+            a2 + Math.PI);
+        }
+      }
+      poseur(S.t0 + 4.7, S.s0 + 0.9);
+      poseur(S.t1 - 1.5, S.s0 + 2.6);
+      // And a surfboard stood against the end post. `slat` rakes a section in
+      // the (inland, up) plane, which is the only way a leaning thing gets
+      // drawn in this file — `boxTS` cannot tip.
+      {
+        const bt = S.t0 + 0.55, gy = surfaceY(bt, S.s0 + 0.6);
+        const BOARD = [0.700, 0.696, 0.682];
+        bar(bt - 0.03, bt + 0.03,
+          slat(S.s0 + 0.70, gy + 1.05, 0.30, 2.24, 0.55), BOARD,
+          shade(BOARD, 1.08));
+        bar(bt - 0.032, bt + 0.032,
+          slat(S.s0 + 0.70, gy + 1.05, 0.30, 2.24, 0.075),
+          [0.145, 0.290, 0.470]);
+        furniture.push({ t: bt, s: S.s0 + 0.7, a: 0.10, c: 0.35, h: 2.1,
+          y: gy });
+      }
       return;
     }
 

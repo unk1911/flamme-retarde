@@ -657,9 +657,21 @@ bed. See the commit.
   other, and a Bierzeltgarnitur on the gravel in front. **BUILT 31 Aug** —
   see `tisakFront`. Nothing green about it, and nothing about the green
   kiosk is a newsagent.
-  **beach bar MINI and the grill** (4:48-6:10): white square parasols with
-  pointed crowns, backlit photo menu boxes, Ožujsko parasols, POMMES FRITES
-  banners, pallet furniture, chevron timber screens.
+  **The stretch at 4:48-6:10** was listed here as "beach bar MINI and the
+  grill" and it is NOT MINI. **CORRECTED 31 Aug** — read frame by frame, the
+  last eighty seconds of the pan are the KONOBA's terrace from the seaward
+  side, and they match `20260821_175856`, which is what that shop was built
+  from: the thatched roof on green steel, the teal counter, the scarlet and
+  lime stools. Third mislabel in this file, after Tisak/_342 and the konoba
+  at _336/_337. What the stretch actually shows, and what was BUILT 31 Aug:
+  dark wicker armchairs with white cushions round dark square tables, white
+  barrel poseur tables in Jamnica's livery, and a surfboard leaning against
+  the end post. The terrace had nothing on it at all before, because
+  `terraceSet` only fires under an awning and this shop is a roof on posts.
+  Still not built and still wanted: the white square parasols with pointed
+  crowns, the backlit photo menu boxes, the POMMES FRITES banners, the pallet
+  furniture and the chevron timber screens — none of which is in this
+  footage either, so they want a source naming before anybody builds them.
 - **The ground in the wood** (_344/_345/_347): pale compacted dirt with white
   limestone chips through it and brown pine litter, not sand. And pine bark:
   grey-brown plates with **orange-red** inner bark showing at the seams.
