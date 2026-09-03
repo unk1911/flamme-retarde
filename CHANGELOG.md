@@ -8,6 +8,79 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.171.0] — 2026-09-03
+
+### Seven ballet positions, and a swim ladder for a barre
+
+Asked for off a French-class poster, by name: *"we want to give her more skills,
+so she can show them off... perhaps develop these 7 ballet moves which are the
+classic ballet moves"* — arabesque, pirouette, attitude, développé, piqué, plié,
+relevé — with the staging as part of the ask: *"she can practice those moves
+when she walks up to anything that looks like a bar, and honestly the nearest
+object that looks like a bar to her is this one right here, that thingie u go
+down into the water on, the ladder"*.
+
+There are forty-two of them. She now walks down to one every so often, rests her
+left hand on its handrail, and works through the seven: first position, demi-plié
+and relevé at the rail, then she lets go and does retiré, développé à la
+seconde, piqué, a full pirouette, attitude and arabesque. Fifteen seconds, once,
+and then back to the wander. It is the longest single thing she does and the
+cool-down is fifty-five seconds, because twice in a minute would stop being a
+surprise.
+
+**The poses are fitted, not typed** — `tools/blender/ballet.py`, the same
+approach the wine pour got a release earlier. A ballet position is mostly a
+claim about where a foot is: the working toe *at* the supporting knee, the heels
+off the floor by 60 mm and not 5, the knee higher than the foot in an attitude.
+Those are numbers. Three things went wrong before that was admitted, and each is
+a whole class of mistake:
+
+- **The turnout and the track mirror the opposite way from the sagittal
+  angles.** Written on the same sign, the thighs rotated *inward* and her knees
+  crossed in a plié, which is the one thing a plié may not do.
+- **`legU` angles are measured from the leg hanging down.** An arabesque at 62°
+  is 28° above the floor, not 28° below the horizontal. What it rendered was a
+  woman wading.
+- **These are XYZ Eulers, which Blender applies as Rz·Ry·Rx**, so the abduction
+  term is applied *last*, about the leg's rest fore-aft axis. On a leg hanging
+  down that is abduction; on a leg already ninety degrees behind her it is a
+  roll, and it moves the foot up and down instead of sideways. That is why the
+  attitude and the arabesque kept crossing the working leg over her own midline
+  whichever way the sign went, and it is not fixable by thinking harder about
+  it. The working legs are fitted to a knee position and an ankle position now.
+
+**The ladder is too low to be a barre, and the pose admits it.** The handrail is
+0.90 m off the deck; her shoulder is 1.40 m with a 0.48 m arm, so a hand hanging
+dead straight reaches 0.92. She can rest a hand on it standing, and hold it
+through a demi-plié with eleven degrees of lean toward it — which is what
+anybody does at a barre built for somebody shorter. She cannot hold it on
+relevé: that makes her 65 mm taller and there is no arm angle that gives the
+height back, because the arm is already at full extension. Fitted anyway, it
+came out 80 mm above the rail through open air. So she holds it for the plié and
+lets go for everything after, which is both what the geometry allows and what a
+class actually looks like.
+
+Where she stands is derived rather than chosen, the way the wine's mark is: from
+wanting her hand on the rail, which fixes the mark at 0.60 m outboard of the
+ladder and 0.30 m from the water's edge, facing inland. At 0.52 m her
+turned-out left foot arrived inside the rail's own footprint and the upright
+came up through her thigh.
+
+**The pirouette turns in the clip, not in the game.** A full revolution written
+into `pelvis` y — the pelvis is the root bone and its local Y runs up the body,
+so a rotation there yaws the whole figure, legs included, which is what pivoting
+on the ball of one foot is. Everything after the turn carries 360 rather than
+going back to nought: a key at 0 following a key at 360 unwinds her the whole
+way round again in half a second.
+
+Two things the tests caught. `toBar` bailed out on `d > SHOW.far` — the same
+test `play` uses to send her home — which cancelled the walk on its first frame
+whenever the player was not already on the beach; the barre is the one thing she
+does for herself rather than at you, so it no longer cares where you are. And
+the walk's first waypoint is skipped when she is already seaward of it, because
+starting from the water's edge it walked her four metres back inland to a point
+she was already past.
+
 ## [1.170.0] — 2026-09-03
 
 ### She was holding the bottle by the wrong end

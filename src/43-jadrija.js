@@ -932,11 +932,25 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * Where every ladder went, along the shore, in `t`.
+   *
+   * Filled by `ladder()` as the resort is built rather than derived from the
+   * loop's rule, because the rule has an exception in it — no ladders west of
+   * the shingle — and a second copy of a rule with an exception in it is a
+   * second copy that will one day disagree with the first.
+   *
+   * The performance reads this: a ladder's handrail is the only thing on this
+   * shore shaped like a ballet barre, which is what `barreAt` is about.
+   */
+  const LADDERS = [];
+
+  /**
    * A ladder: two galvanised uprights bent over the coping, and rungs. Half a
    * dozen boxes, and the thing they buy is scale — you cannot look at a quay
    * with a ladder on it and misjudge how high above the water you are.
    */
   function ladder(t) {
+    LADDERS.push(t);
     const st = at(t), lip = st.lip;
     const GALV = [0.60, 0.62, 0.63];
     // The handrail arches *over* the coping and down the face, which is a
@@ -20590,6 +20604,10 @@ async function buildJadrija(scene) {
         // again, `hutSide` is which cubicle (−1 west, +1 east) and `hutLeg` is
         // which waypoint of the two she is walking to. See the `hutGo` case.
         hutCool: 30, hutSide: -1, hutLeg: 0,
+        // The barre. `barCool` starts at half `SHOW.barreCool` rather than at
+        // nought so that the first thing she ever does is not fifteen seconds
+        // of ballet with her back to somebody who has just arrived.
+        barCool: 28, bar: null,
         phase: 'idle', t: ft, s: fs, ang: -Math.PI / 2, want: -Math.PI / 2,
         tmr: 0, flips: 0, said: 0, home: [ft, fs],
         // The wander: the heading the random walk is on, seconds until it is
@@ -21496,6 +21514,20 @@ async function buildJadrija(scene) {
     // walk played at 2.4x does not look like hurrying, it looks like a film
     // running fast, so the honest ceiling is much lower than the old one and
     // the clip is the reason.
+    // The barre. `barre` is the odds on any one wander tick — about one in
+    // twenty-two — and `barreFrom` is how far she will walk to reach a ladder,
+    // which is deliberately short: crossing forty metres of promenade to do a
+    // plie is a woman on an errand, and going to the one that is right there
+    // is somebody who passed it and felt like it. The ladders are eleven
+    // metres apart and she plays a lane that starts 6.4 m inland of the water,
+    // so nothing under about 8 would ever fire at all — the shortest distance
+    // from her lane to a ladder's mark is 6.1 m and it is only that when she
+    // is standing exactly opposite one.
+    //
+    // `barreCool` is the wait afterwards, and it is long. Fifteen seconds of
+    // ballet is the longest single thing she does; twice in a minute would
+    // stop being a surprise, which is the whole of what it is for.
+    barre: 0.045, barreFrom: 14.0, barreCool: 55,
     turn: [0.55, 1.35], swing: 1.5, pace: [0.80, 1.55],
     crawlTurn: [0.9, 2.0], crawlSwing: 0.7,
     // How fast a drawn speed is taken up. `showWander` hands `showPace` a fresh
@@ -22813,6 +22845,52 @@ async function buildJadrija(scene) {
     for (const g of horns.children) g.scale.setScalar(k);
   }
 
+  /**
+   * The nearest ladder she could use as a barre, or null.
+   *
+   * Asked for in those words: *"she can practice those moves when she walks
+   * up to anything that looks like a bar, and honestly the nearest object
+   * that looks like a bar to her is this one right here, that thingie u go
+   * down into the water on, the ladder"*. There is nothing else on this
+   * shore shaped like a barre and there are fifty of these.
+   *
+   * WHERE SHE STANDS IS DERIVED, NOT CHOSEN, the same way the wine's mark
+   * is. `BAL_HOLD` in tools/blender/human_mh.py puts her left hand 0.05 m in
+   * front of her and 0.24 m out to her left, at 0.93 off the deck; the rail
+   * she has to put it on is the top of a ladder's outboard leg, which stands
+   * at `t + 0.28` and `s` 0.38 to 0.46, 0.90 m up. Two of those three fix
+   * the mark and the yaw:
+   *
+   *     her hand   = (t + 0.286, 0.361)   on the rail, a third along it
+   *     so she is  = (t + 0.60,  0.30)     facing inland, rail on her left
+   *
+   * Facing inland rather than out to sea is what the hand decides — the
+   * barre arm is her left, and the ladder has to be on that side — and it is
+   * the better of the two anyway: you walk down the promenade and meet her
+   * front on, with the water behind her.
+   *
+   * 0.30 m from the water's edge is close, and it is meant to be — it is
+   * where you stand at the top of a ladder. 0.60 m along it is NOT free
+   * either: at 0.52 her turned-out left foot arrived inside the rail's own
+   * footprint and the upright came up through her thigh. She is out far
+   * enough to be beside the thing rather than in it, and the barre arm was
+   * re-fitted for the longer reach.
+   */
+  function barreAt(t, ss) {
+    if (!LADDERS.length) return null;
+    let best = null, bd = SHOW.barreFrom;
+    for (const L of LADDERS) {
+      // Not the second ladder of a pair: they stand 1.4 m apart and the
+      // outboard rail of the near one is inside the far one's own footprint,
+      // so she would be dancing in the middle of a ladder.
+      const d2 = Math.hypot(L + 0.60 - t, 0.30 - ss);
+      if (d2 < bd) { bd = d2; best = L; }
+    }
+    if (best === null) return null;
+    if (best < SHOW.t0 + 1 || best > SHOW.t1 - 1) return null;
+    return [best + 0.60, 0.30, Math.PI / 2];
+  }
+
   function stepShow(dt, pt, ps) {
     // Kept only so a probe can ask what she is steering by. The camera and the
     // person were the same point until B, and telling them apart from outside
@@ -22847,6 +22925,7 @@ async function buildJadrija(scene) {
     const done = S.cur && !S.cur.loop && S.curT >= S.cur.dur;
     show.tmr += dt;
     if (show.hutCool > 0) show.hutCool -= dt;
+    if (show.barCool > 0) show.barCool -= dt;
     // Where she was before anything in this function moved her. Taken here
     // rather than inside the movers because there are four of them — `showMove`,
     // `showTo`, `showCreep` and `showHold` — and the question "did she actually
@@ -23609,6 +23688,26 @@ async function buildJadrija(scene) {
         // lands, which costs three quarters of a second once in a while.
         if (show.tick <= 0 && show.air <= 0) {
           showWander(SHOW.turn, SHOW.swing);
+          // The barre, and it is rolled BEFORE the table rather than being a
+          // line in it. Every other move can be started anywhere; this one
+          // needs a ladder within a few paces, so a roll that lands on it with
+          // nothing in reach has to fall through to the rest rather than eat
+          // the turn — which a table that breaks on its first hit cannot do.
+          if (show.barCool <= 0 && Math.random() < SHOW.barre) {
+            const bar = barreAt(show.t, show.s);
+            if (bar) {
+              show.bar = bar;
+              // Skip the waypoint if she is already seaward of it. She never
+              // is from `play` — the wander lane starts 6.4 m inland — but a
+              // probe can drop her anywhere, and starting on leg 0 from the
+              // water's edge walks her four metres back INLAND to a waypoint
+              // she is already past before turning round again.
+              show.leg = show.s < SHOW.lane[0] ? 1 : 0;
+              showSay('trill', d);
+              go('toBar', 'walk', 0.32);
+              break;
+            }
+          }
           // A table rather than a chain of `dice < a + b + c` tests, which is
           // what this was. Five terms was already at the edge of readable and
           // the sixth is where it tips: every line has to repeat the whole
@@ -23654,6 +23753,49 @@ async function buildJadrija(scene) {
         // losing you past `far` still ends it either way.
         if (!withYou && (show.played > SHOW.playFor || d > SHOW.far)) {
           go('home', 'walk', 0.32);
+        }
+        break;
+
+      // ── the barre ──
+      // Down to the water's edge and along to the ladder, in two legs for the
+      // reason `come` has three: a straight line from the middle of the deck
+      // to the head of a ladder crosses two terrace risers at a slant, and
+      // what that reads as is somebody walking through a step. So she comes
+      // down opposite it first and then turns in.
+      case 'toBar': {
+        // A guard and not a formality: the debug scrubber can drop her into
+        // this phase, and every other route in sets `show.bar` first.
+        if (!show.bar) { showNext(); break; }
+        const g = show.leg === 0 ? [show.bar[0], SHOW.lane[0] - 1.2]
+          : [show.bar[0], show.bar[1]];
+        const dist = showTo(g[0], g[1], dt, show.leg === 0 ? 1.0 : 0.68);
+        show.played += dt;
+        if (dist < (show.leg === 0 ? 0.55 : 0.16)) {
+          if (show.leg === 0) show.leg++;
+          else { show.leg = 0; go('ballet', 'ballet', 0.42); }
+        }
+        // NO BAIL-OUT ON LOSING YOU, deliberately, and it cost a test to
+        // learn why: `d > SHOW.far` here cancelled the walk on the very first
+        // frame whenever the player was not already on the beach, because that
+        // is the same test `play` uses to send her home. The barre is the one
+        // thing in this performance she does for herself rather than at you,
+        // so it does not care where you are. Fifteen seconds later `showNext`
+        // hands her back to the wander, which will send her home if it wants.
+        break;
+      }
+
+      // Fifteen seconds of it, and nothing to do but hold the mark and let the
+      // clip run. `want` is set every frame rather than once, because the turn
+      // rate is what carries her round on entry and a yaw written once would
+      // be overwritten by the wander she was in the middle of.
+      case 'ballet':
+        show.want = show.bar ? show.bar[2] : show.ang;
+        showHold(dt);
+        show.played += dt;
+        if (done) {
+          show.barCool = SHOW.barreCool;
+          showSay('trill', d);
+          showNext();
         }
         break;
 
@@ -25760,6 +25902,12 @@ async function buildJadrija(scene) {
       if (ang != null) { show.ang = ang; show.want = ang; }
       if (phase) {
         show.phase = phase; show.tmr = 0; show.held = 0; show.pour = 0;
+        // So that `put(t, s, 'toBar')` from a probe behaves the way the dice
+        // do — `barreAt` is hoisted out of `stepShow` for exactly this.
+        if (phase === 'toBar' || phase === 'ballet') {
+          show.bar = barreAt(t, s) || barreAt(show.t, show.s);
+          show.leg = show.s < SHOW.lane[0] ? 1 : 0;
+        }
         skinFig.play({ wine: 'wine', untie: 'untie', submit: 'submit',
           kept: 'kept', creep: 'knees', note: 'note', heart: 'heart',
           shimmy: 'shimmy', twerk: 'twerk',
@@ -25771,7 +25919,10 @@ async function buildJadrija(scene) {
           // `flare` is the throw; the rest of the turn is played over the
           // stamp, which is what `go` does with them in the routine.
           flare: 'flare', blaze: 'firestarter', cast: 'cast', boast: 'note',
-          wheel: 'cartwheel', flip: 'flip' }[phase] || 'idle', { fade: 0 });
+          wheel: 'cartwheel', flip: 'flip',
+          // The barre. `toBar` is the walk there and shares the walk's clip;
+          // `ballet` is the fifteen seconds themselves.
+          toBar: 'walk', ballet: 'ballet' }[phase] || 'idle', { fade: 0 });
         // And the latch, for every phase that is downstream of it. Set rather
         // than eased, for the reason `shorn` above exists.
         if (phase !== 'flare' && MUSIC[phase]) {
@@ -26067,6 +26218,10 @@ async function buildJadrija(scene) {
       phase: show.phase, clip: skinFig ? skinFig.playing() : null,
       // The changing hut: how long until she will consider it, which cubicle
       // and which waypoint. See `hutCheck`.
+      // `barreAt` is not reachable from here — it lives in the performance's
+      // own closure — and asking for it threw on every `__fr.jad.show()`.
+      bar: { cool: +show.barCool.toFixed(1), at: show.bar,
+        ladders: LADDERS.length, near: barreAt(show.t, show.s) },
       hut: { cool: +show.hutCool.toFixed(1), side: show.hutSide,
         leg: show.hutLeg, withYou: show.withYou,
         dHer: changing ? +Math.hypot(show.t - changing.t,

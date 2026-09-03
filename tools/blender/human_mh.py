@@ -3184,6 +3184,7 @@ def export_skin(body, rig, path, clips, tris=26000, J=None, post=True,
     skip_floor(rig)
     walk_floor(rig)
     fire_floor(rig)
+    ballet_floor(rig)
 
     # Duplicate the *object*, not the evaluated mesh.
     #
@@ -5674,6 +5675,374 @@ TREAD_B = dict(TREAD_A, **{
     "legUR": (-58, 0, -16), "legLR": (66, 0, 0),
 })
 
+# ── the barre ────────────────────────────────────────────────────────────────
+#
+# Seven ballet positions, and a swim ladder standing in for a barre.
+#
+# Asked for by name off a French-class poster — arabesque, pirouette, attitude,
+# developpe, pique, plie, releve — with the staging as part of the ask: *"she
+# can practice those moves when she walks up to anything that looks like a bar,
+# and honestly the nearest object that looks like a bar to her is this one
+# right here, that thingie u go down into the water on, the ladder"*.
+#
+# Every one of these is the same two decisions — what the working leg is doing
+# and where the arms are — over a supporting leg that is straight and, in five
+# of the seven, risen onto the ball of the foot. They were drafted, measured
+# and rendered in tools/blender/ballet.py and dumped from it, so what is below
+# is exactly what was looked at. Go back there to change one; do not nudge a
+# number here.
+#
+# THE THREE THINGS THAT WENT WRONG, because each is a whole class of mistake:
+#
+# 1. The turnout and the track mirror the OPPOSITE way from the sagittal
+#    angles. Written on the same sign, the thighs rotated inward and the knees
+#    crossed in a plie, which is the one thing a plie may not do.
+#
+# 2. `legU` angles are measured from the leg hanging DOWN. An arabesque at 62
+#    is 28 degrees above the floor, not 28 below the horizontal, and what it
+#    rendered was a woman wading.
+#
+# 3. These are XYZ Eulers, which Blender applies as Rz@Ry@Rx — so `track` is
+#    applied LAST, about the leg's rest fore-aft axis. On a leg hanging down
+#    that is abduction; on a leg already ninety degrees behind her it is a
+#    roll, and it moves the foot up and down instead of sideways. That is why
+#    the attitude and the arabesque kept crossing the working leg over her own
+#    midline whichever way the sign went, and it is not fixable by thinking
+#    harder. The working legs are FITTED to a knee position and an ankle
+#    position instead — see `fit_leg` in that file.
+#
+# And the barre itself is a compromise the geometry forced. The ladder's
+# handrail is 0.90 m off the deck; her shoulder is 1.40 m with a 0.48 m arm, so
+# a hand hanging dead straight reaches 0.92. She can rest a hand on it standing,
+# and hold it through a demi-plie with eleven degrees of lean toward it — which
+# is what anybody does at a barre built for somebody shorter. She cannot hold
+# it on releve: that makes her 65 mm taller and the arm is already straight.
+# So she holds it for the plie and lets go for everything after, which is both
+# what the geometry allows and what a class actually looks like.
+
+BAL_PLIE = dict(IDLE_A, **{
+    "spine01": (0.0, 0.0, 0.0),
+    "spine02": (0.0, 0.0, 0.0),
+    "spine03": (0.0, 0.0, 0.0),
+    "chest": (-2.0, 0.0, 0.0),
+    "neck": (0.0, 0.0, 0.0),
+    "head": (-2.0, -4.0, 0.0),
+    "clavicleL": (0.0, 0.0, 4.0),
+    "clavicleR": (0.0, 0.0, -4.0),
+    "armUL": (6.0, 8.0, 26.0),
+    "armLL": (-32.0, -10.0, 30.0),
+    "handL": (0.0, 8.0, 22.0),
+    "armUR": (6.0, -8.0, -26.0),
+    "armLR": (-32.0, 10.0, -30.0),
+    "handR": (0.0, -8.0, -22.0),
+    "legUL": (-9.0, -46.0, -15.0),
+    "legLL": (29.0, 0.0, 0.0),
+    "footL": (-6.0, 0.0, 0.0),
+    "toeL": (4.0, 0.0, 0.0),
+    "legUR": (-9.0, 46.0, 15.0),
+    "legLR": (29.0, 0.0, 0.0),
+    "footR": (-6.0, 0.0, 0.0),
+    "toeR": (4.0, 0.0, 0.0),
+})
+BAL_RELEVE = dict(IDLE_A, **{
+    "spine01": (0.0, 0.0, 0.0),
+    "spine02": (0.0, 0.0, 0.0),
+    "spine03": (0.0, 0.0, 0.0),
+    "chest": (-3.0, 0.0, 0.0),
+    "neck": (0.0, 0.0, 0.0),
+    "head": (-2.0, 0.0, 0.0),
+    "clavicleL": (0.0, 0.0, 12.0),
+    "clavicleR": (0.0, 0.0, -12.0),
+    "armUL": (-155.0, -12.0, 60.0),
+    "armLL": (-5.0, -12.0, 55.0),
+    "handL": (-21.0, -10.0, 9.0),
+    "armUR": (-155.0, 12.0, -60.0),
+    "armLR": (-5.0, 12.0, -55.0),
+    "handR": (-21.0, 10.0, -9.0),
+    "legUL": (0.0, -40.0, -4.0),
+    "legLL": (2.0, 0.0, 0.0),
+    "footL": (-34.0, 0.0, 0.0),
+    "toeL": (28.0, 0.0, 0.0),
+    "legUR": (0.0, 40.0, 4.0),
+    "legLR": (2.0, 0.0, 0.0),
+    "footR": (-34.0, 0.0, 0.0),
+    "toeR": (28.0, 0.0, 0.0),
+})
+BAL_PIROU = dict(IDLE_A, **{
+    "spine01": (0.0, 0.0, 0.0),
+    "spine02": (0.0, 0.0, 0.0),
+    "spine03": (0.0, 0.0, 0.0),
+    "chest": (-3.0, 0.0, 0.0),
+    "neck": (0.0, 0.0, 0.0),
+    "head": (0.0, 0.0, 0.0),
+    "clavicleL": (0.0, 0.0, 8.0),
+    "clavicleR": (0.0, 0.0, -8.0),
+    "armUL": (-35.0, 9.0, 5.0),
+    "armLL": (-10.0, 14.0, 56.0),
+    "handL": (-21.0, 16.0, 30.0),
+    "armUR": (-35.0, -9.0, -5.0),
+    "armLR": (-10.0, -14.0, -56.0),
+    "handR": (-21.0, -16.0, -30.0),
+    "legUL": (0.0, -40.0, -2.0),
+    "legLL": (2.0, 0.0, 0.0),
+    "footL": (-34.0, 0.0, 0.0),
+    "toeL": (28.0, 0.0, 0.0),
+    "legUR": (-36.0, 46.0, 12.0),
+    "legLR": (117.0, 0.0, 0.0),
+    "footR": (-32.0, 0.0, 0.0),
+    "toeR": (20.0, 0.0, 0.0),
+})
+BAL_PIQUE = dict(IDLE_A, **{
+    "spine01": (0.0, 0.0, 0.0),
+    "spine02": (0.0, -3.0, 0.0),
+    "spine03": (0.0, -3.0, 0.0),
+    "chest": (-3.0, 0.0, 0.0),
+    "neck": (0.0, 0.0, 0.0),
+    "head": (-4.0, 8.0, 0.0),
+    "clavicleL": (0.0, 0.0, 12.0),
+    "clavicleR": (0.0, 0.0, -8.0),
+    "armUL": (-155.0, -12.0, 60.0),
+    "armLL": (-5.0, -12.0, 55.0),
+    "handL": (-21.0, -10.0, 9.0),
+    "armUR": (2.0, 12.0, 19.0),
+    "armLR": (-2.0, -0.0, 7.0),
+    "handR": (-19.0, 1.0, -21.0),
+    "legUL": (0.0, -40.0, -2.0),
+    "legLL": (1.0, 0.0, 0.0),
+    "footL": (-34.0, 0.0, 0.0),
+    "toeL": (28.0, 0.0, 0.0),
+    "legUR": (-60.0, 46.0, -15.0),
+    "legLR": (111.0, 0.0, 0.0),
+    "footR": (-32.0, 0.0, 0.0),
+    "toeR": (20.0, 0.0, 0.0),
+})
+BAL_ATTITUDE = dict(IDLE_A, **{
+    "spine01": (-8.0, 0.0, 0.0),
+    "spine02": (-6.0, 0.0, 0.0),
+    "spine03": (-5.0, 0.0, 0.0),
+    "chest": (-4.0, 0.0, 0.0),
+    "neck": (2.0, 0.0, 0.0),
+    "head": (-6.0, 10.0, 0.0),
+    "clavicleL": (0.0, 0.0, 12.0),
+    "clavicleR": (0.0, 0.0, -8.0),
+    "armUL": (-155.0, -12.0, 60.0),
+    "armLL": (-5.0, -12.0, 55.0),
+    "handL": (-21.0, -10.0, 9.0),
+    "armUR": (2.0, 12.0, 19.0),
+    "armLR": (-2.0, -0.0, 7.0),
+    "handR": (-19.0, 1.0, -21.0),
+    "legUL": (2.0, -40.0, -2.0),
+    "legLL": (2.0, 0.0, 0.0),
+    "footL": (-34.0, 0.0, 0.0),
+    "toeL": (28.0, 0.0, 0.0),
+    "legUR": (43.0, 22.0, 66.0),
+    "legLR": (132.0, 0.0, 0.0),
+    "footR": (-32.0, 0.0, 0.0),
+    "toeR": (20.0, 0.0, 0.0),
+})
+BAL_ARABESQUE = dict(IDLE_A, **{
+    "spine01": (-22.0, 0.0, 0.0),
+    "spine02": (-10.0, 0.0, 0.0),
+    "spine03": (-6.0, 0.0, 0.0),
+    "chest": (6.0, 0.0, 0.0),
+    "neck": (10.0, 0.0, 0.0),
+    "head": (8.0, 0.0, 0.0),
+    "clavicleL": (0.0, 0.0, 10.0),
+    "clavicleR": (0.0, 0.0, -10.0),
+    "armUL": (-91.0, -12.0, 6.0),
+    "armLL": (-2.0, -14.0, 14.0),
+    "handL": (-21.0, 12.0, 28.0),
+    "armUR": (59.0, -12.0, -24.0),
+    "armLR": (-2.0, -13.0, -18.0),
+    "handR": (-15.0, -16.0, 10.0),
+    "legUL": (-10.0, -40.0, -2.0),
+    "legLL": (1.0, 0.0, 0.0),
+    "footL": (-34.0, 0.0, 0.0),
+    "toeL": (28.0, 0.0, 0.0),
+    "legUR": (85.0, 22.0, -40.0),
+    "legLR": (19.0, 0.0, 0.0),
+    "footR": (-32.0, 0.0, 0.0),
+    "toeR": (20.0, 0.0, 0.0),
+})
+BAL_DEVELOPPE = dict(IDLE_A, **{
+    "spine01": (0.0, 0.0, 0.0),
+    "spine02": (0.0, 5.0, 0.0),
+    "spine03": (0.0, 6.0, 0.0),
+    "chest": (-3.0, 0.0, 0.0),
+    "neck": (0.0, 0.0, 0.0),
+    "head": (-2.0, -10.0, 0.0),
+    "clavicleL": (0.0, 0.0, 12.0),
+    "clavicleR": (0.0, 0.0, -10.0),
+    "armUL": (-155.0, -12.0, 60.0),
+    "armLL": (-5.0, -12.0, 55.0),
+    "handL": (-21.0, -10.0, 9.0),
+    "armUR": (2.0, 12.0, 19.0),
+    "armLR": (-2.0, -0.0, 7.0),
+    "handR": (-19.0, 1.0, -21.0),
+    "legUL": (0.0, -40.0, -2.0),
+    "legLL": (1.0, 0.0, 0.0),
+    "footL": (-34.0, 0.0, 0.0),
+    "toeL": (28.0, 0.0, 0.0),
+    "legUR": (-9.0, 46.0, 95.0),
+    "legLR": (6.0, 0.0, 0.0),
+    "footR": (-32.0, 0.0, 0.0),
+    "toeR": (20.0, 0.0, 0.0),
+})
+BAL_STAND = dict(IDLE_A, **{
+    "spine01": (0.0, 0.0, 0.0),
+    "spine02": (0.0, 0.0, 0.0),
+    "spine03": (0.0, 0.0, 0.0),
+    "chest": (-2.0, 0.0, 0.0),
+    "neck": (0.0, 0.0, 0.0),
+    "head": (-2.0, 0.0, 0.0),
+    "clavicleL": (0.0, 0.0, 4.0),
+    "clavicleR": (0.0, 0.0, -4.0),
+    "armUL": (6.0, 8.0, 26.0),
+    "armLL": (-32.0, -10.0, 30.0),
+    "handL": (0.0, 8.0, 22.0),
+    "armUR": (6.0, -8.0, -26.0),
+    "armLR": (-32.0, 10.0, -30.0),
+    "handR": (0.0, -8.0, -22.0),
+    "legUL": (-4.0, -40.0, -4.0),
+    "legLL": (3.0, 0.0, 0.0),
+    "footL": (-4.0, 0.0, 0.0),
+    "toeL": (2.0, 0.0, 0.0),
+    "legUR": (-4.0, 40.0, 4.0),
+    "legLR": (3.0, 0.0, 0.0),
+    "footR": (-4.0, 0.0, 0.0),
+    "toeR": (2.0, 0.0, 0.0),
+})
+BAL_HOLD = dict(IDLE_A, **{
+    "spine01": (0.0, 0.0, 3.3),
+    "spine02": (0.0, 0.0, 3.7),
+    "spine03": (0.0, 0.0, 4.0),
+    "chest": (-2.0, 0.0, 0.0),
+    "neck": (0.0, 4.0, 0.0),
+    "head": (-2.0, 6.0, 0.0),
+    "clavicleL": (0.0, 0.0, 6.0),
+    "clavicleR": (0.0, 0.0, -4.0),
+    "armUL": (12.0, 12.0, 11.0),
+    "armLL": (-2.0, 1.0, 16.0),
+    "handL": (-2.0, 6.0, 28.0),
+    "armUR": (6.0, -8.0, -26.0),
+    "armLR": (-32.0, 10.0, -30.0),
+    "handR": (0.0, -8.0, -22.0),
+    "legUL": (-4.0, -40.0, -4.0),
+    "legLL": (3.0, 0.0, 0.0),
+    "footL": (-4.0, 0.0, 0.0),
+    "toeL": (2.0, 0.0, 0.0),
+    "legUR": (-4.0, 40.0, 4.0),
+    "legLR": (3.0, 0.0, 0.0),
+    "footR": (-4.0, 0.0, 0.0),
+    "toeR": (2.0, 0.0, 0.0),
+})
+BAL_PLIE_B = dict(IDLE_A, **{
+    "spine01": (0.0, 0.0, 3.0),
+    "spine02": (0.0, 0.0, 3.4),
+    "spine03": (0.0, 0.0, 3.6),
+    "chest": (-2.0, 0.0, 0.0),
+    "neck": (0.0, 4.0, 0.0),
+    "head": (-2.0, 6.0, 0.0),
+    "clavicleL": (0.0, 0.0, 6.0),
+    "clavicleR": (0.0, 0.0, -4.0),
+    "armUL": (8.0, 12.0, 6.0),
+    "armLL": (-2.0, -14.0, 25.0),
+    "handL": (-20.0, 12.0, 29.0),
+    "armUR": (2.0, 12.0, 19.0),
+    "armLR": (-2.0, -0.0, 7.0),
+    "handR": (-19.0, 1.0, -21.0),
+    "legUL": (-9.0, -46.0, -15.0),
+    "legLL": (29.0, 0.0, 0.0),
+    "footL": (-6.0, 0.0, 0.0),
+    "toeL": (4.0, 0.0, 0.0),
+    "legUR": (-9.0, 46.0, 15.0),
+    "legLR": (29.0, 0.0, 0.0),
+    "footR": (-6.0, 0.0, 0.0),
+    "toeR": (4.0, 0.0, 0.0),
+})
+BAL_RETIRE = dict(IDLE_A, **{
+    "spine01": (0.0, 0.0, 0.0),
+    "spine02": (0.0, 0.0, 0.0),
+    "spine03": (0.0, 0.0, 0.0),
+    "chest": (-3.0, 0.0, 0.0),
+    "neck": (0.0, 0.0, 0.0),
+    "head": (0.0, 0.0, 0.0),
+    "clavicleL": (0.0, 0.0, 8.0),
+    "clavicleR": (0.0, 0.0, -8.0),
+    "armUL": (-155.0, -12.0, 60.0),
+    "armLL": (-5.0, -12.0, 55.0),
+    "handL": (-21.0, -10.0, 9.0),
+    "armUR": (2.0, 12.0, 19.0),
+    "armLR": (-2.0, -0.0, 7.0),
+    "handR": (-19.0, 1.0, -21.0),
+    "legUL": (0.0, -40.0, -2.0),
+    "legLL": (2.0, 0.0, 0.0),
+    "footL": (-34.0, 0.0, 0.0),
+    "toeL": (28.0, 0.0, 0.0),
+    "legUR": (-36.0, 46.0, 12.0),
+    "legLR": (117.0, 0.0, 0.0),
+    "footR": (-32.0, 0.0, 0.0),
+    "toeR": (20.0, 0.0, 0.0),
+})
+
+
+def _spin(p, deg):
+    """The same pose, turned `deg` about her own axis.
+
+    The pirouette's revolution lives in `pelvis` y — the pelvis is the root
+    bone and its local Y runs up the body, so a rotation there yaws the whole
+    figure, legs included, which is what pivoting on the ball of one foot is.
+    Doing it this way means the game does not have to know a pirouette from a
+    plie: it plays a clip and she turns.
+
+    Everything AFTER the turn carries 360 rather than going back to nought. A
+    key at 0 following a key at 360 unwinds her the whole way round again in
+    half a second; baked to quaternions, 360 and 0 are the same attitude, so
+    the cost of carrying it is nothing.
+    """
+    q = dict(p)
+    r = p.get("pelvis", (0.0, 0.0, 0.0))
+    q["pelvis"] = (r[0], deg, r[2])
+    return q
+
+
+# The exercise, once through. Fifteen seconds is long for one clip and it is
+# what seven positions cost: barre work first — first position, demi-plie,
+# releve — then she lets go of the rail and does the four that need both arms.
+# Every position is entered and left through `BAL_STAND`, so nothing ever cuts
+# from one shape straight into another.
+BALLET_KEYS = [
+    (0.00, IDLE_A), (0.70, BAL_HOLD), (1.55, BAL_PLIE_B), (2.40, BAL_HOLD),
+    (3.15, BAL_RELEVE), (3.90, BAL_RELEVE), (4.55, BAL_STAND),
+    (5.25, BAL_RETIRE), (6.00, BAL_DEVELOPPE), (6.75, BAL_DEVELOPPE),
+    (7.45, BAL_STAND), (8.10, BAL_PIQUE), (8.75, BAL_PIROU),
+    (9.20, _spin(BAL_PIROU, 120)), (9.65, _spin(BAL_PIROU, 240)),
+    (10.10, _spin(BAL_PIROU, 360)), (10.70, _spin(BAL_STAND, 360)),
+    (11.45, _spin(BAL_ATTITUDE, 360)), (12.15, _spin(BAL_ATTITUDE, 360)),
+    (12.90, _spin(BAL_ARABESQUE, 360)), (13.65, _spin(BAL_ARABESQUE, 360)),
+    (14.35, _spin(BAL_STAND, 360)), (15.00, _spin(IDLE_A, 360)),
+]
+
+
+def ballet_floor(rig, clear=0.004):
+    """Sit every ballet key on the deck.
+
+    `passes=0`, deliberately, and for the reason the note on `floor_poses`
+    gives: the staircase a frame-by-frame solve produces is an artefact when
+    the clip is SAMPLED from a continuous function and is the animation itself
+    when it is hand-keyed. Here it is the animation — she sinks 30 mm in the
+    plie and rises 65 mm onto the ball of her foot in the releve, and smoothing
+    that is smoothing away the two positions.
+
+    `IDLE_A` is deliberately not in the list. It is shared with every other
+    clip in this file and solving it here would move all of them.
+    """
+    poses = [p for _t, p in BALLET_KEYS if p is not IDLE_A]
+    worst = floor_poses(rig, poses, clear=clear, passes=0)
+    print("[mh] ballet: floor pass settled, deepest key %+.3f m" % worst)
+    return worst
+
+
 CLIPS = [
     {"name": "idle", "loop": True,
      "keys": [(0.0, IDLE_A), (2.3, IDLE_B), (4.6, IDLE_A)]},
@@ -5762,6 +6131,11 @@ CLIPS = [
     # windows that ride on these times and they have to move together: `held`
     # ramps across 1.10-1.45 and back over 4.40-4.70, `pour` across 2.05-2.55
     # and back over 3.20-3.60, which is key to key in both directions.
+    # The exercise at the ladder. One clip and not two: the phase machine in
+    # src/43-jadrija.js plays it start to finish, and splitting barre work from
+    # centre work would only give it a decision to make that nothing needs.
+    {"name": "ballet", "loop": False, "keys": BALLET_KEYS},
+
     {"name": "wine", "loop": False,
      "keys": [(0.00, IDLE_A), (0.55, WINE_REACH), (1.05, WINE_HOLD),
               (1.50, WINE_LIFT), (2.05, WINE_TIP), (2.55, WINE_POUR),
@@ -6225,6 +6599,7 @@ def main():
         skip_floor(rig)
         walk_floor(rig)
         fire_floor(rig)
+        ballet_floor(rig)
         for name in argv[argv.index("--clipcheck") + 1:]:
             if name.startswith("-"):
                 break
