@@ -13409,6 +13409,17 @@ async function buildJadrija(scene) {
     b = back7;
   }
 
+  /**
+   * The two things standing in the wood behind the huts, in `(t, s)`.
+   *
+   * Up here rather than beside the code that draws them because the car park
+   * has to know: `carSites` lays a nose-in row every four metres and would
+   * otherwise park one against each of them. Both positions are placements —
+   * neither survey frame carries GPS — and both sit on the band the footage
+   * does support, which is the made vehicle surface behind the back row.
+   */
+  const BACK = { anchor: [430.4, JAD.rowB + 3.9], rock: [418.6, JAD.rowB + 8.2] };
+
   // ── what is parked in the wood ─────────────────────────────────────────────
   // Both walk-throughs film cars standing among the pines — nose-in, in loose
   // rows on the bare needle floor, with no marked bay anywhere. That is what
@@ -13458,6 +13469,12 @@ async function buildJadrija(scene) {
       // of them were standing on the turf with the swing frame over them.
       if (t > PLAY.t0 - 3 && t < PLAY.t1 + 3) continue;
       if (t > SAN.t0 - 3 && t < SAN.t1 + 3) continue;
+      // Nor on top of the two things standing in the wood. Without this the
+      // spacing decides it, and 4.0 m of spacing against a 1.8 m boulder means
+      // a car parked hard against it about half the time — which is what the
+      // first cut rendered, twice, one either side.
+      if (Math.abs(t - BACK.rock[0]) < 3.4) continue;
+      if (Math.abs(t - BACK.anchor[0]) < 3.0) continue;
       const s0 = JAD.rowB + 5.0 + jit(t | 0, 23) * 1.4;
       // Which of the five, off a *sixth* slot of the same sine hash. Nothing in
       // this loop touches `rng`, so the model table in src/44-cars.js is free to
@@ -13751,6 +13768,12 @@ async function buildJadrija(scene) {
       if (!clearOfShops(t)) continue;
       if (t > PLAY.t0 - 3 && t < PLAY.t1 + 3) continue;
       if (t > SAN.t0 - 3 && t < SAN.t1 + 3) continue;
+      // Nor on top of the two things standing in the wood. Without this the
+      // spacing decides it, and 4.0 m of spacing against a 1.8 m boulder means
+      // a car parked hard against it about half the time — which is what the
+      // first cut rendered, twice, one either side.
+      if (Math.abs(t - BACK.rock[0]) < 3.4) continue;
+      if (Math.abs(t - BACK.anchor[0]) < 3.0) continue;
       if (k === 3) { stub(t, bs); continue; }
       // One of the six leans, which is the one in `a_052`.
       bollard(t, bs, k === 4 ? 0.13 : 0.012 * (jit(t | 0, 91) - 0.5), k);
@@ -13771,6 +13794,232 @@ async function buildJadrija(scene) {
       panelSign(t - R - 0.014, bs, gAt(t, bs) + 0.62, sw, sh, neParkiraj,
         -Math.PI * 0.5);
     }
+  }
+
+  // ── the anchor in the gravel, and the rock with the tap on it ─────────────
+  //
+  // Two things from the walk behind the kabine, asked for by name: *"use the
+  // survey images/videos to continue building out that area behind the
+  // kabines, there's that rock, the anchor, the car parking lot..."*. The car
+  // park has been there since 23 Aug — see `carSites` — and these two had not.
+  //
+  // **The anchor** is `1000150353`. A rusted admiralty-pattern anchor standing
+  // shank-up in a bed of white limestone lumps on the verge between the nose-in
+  // car row and the lane, with a fan palm behind it and grey-green tussocks
+  // round its foot. It is a monument, not a fitting: somebody dragged it up the
+  // beach and planted it, and it has been going the same colour ever since.
+  // Measured against the cars parked behind it in the frame, the shank stands
+  // about 1.9 m out of the ground and leans a good twenty-five degrees.
+  //
+  // Admiralty pattern and not a modern stockless one, and that is the whole
+  // silhouette: a straight shank, a STOCK across it near the head at right
+  // angles to the arms, two arms curving down off the crown, and a triangular
+  // palm on the end of each. Take the stock off and it stops reading as an
+  // anchor at all — it becomes a fork.
+  //
+  // **The rock** is `1000150358` and `1000150359`. A boulder of honey-coloured
+  // limestone with white calcite veining, about waist high on the man
+  // photographing it, with a **bronze fountain in the shape of a dolphin's
+  // head** bolted to its face on a scalloped bronze plate, and a small concrete
+  // trough on the gravel underneath to catch what comes out of it. It is the
+  // one piece of civic sculpture on this whole shore and it is a tap.
+  //
+  // POSITION for both is a placement, not a measurement: neither frame carries
+  // GPS. What the footage supports is that they are on the verge of the made
+  // vehicle surface behind the huts, which is `JAD.rowB + 3.6` — the same edge
+  // the parking bollards stand on — so that is the band they go in.
+  {
+    const back11 = b;
+    b = up;
+    const RUST = [0.402, 0.208, 0.126];
+    const RUSTD = [0.286, 0.140, 0.086];
+    const LIME = [0.782, 0.760, 0.706];       // the limestone lumps round it
+    const ROCK = [0.742, 0.612, 0.398];       // honey limestone, sunlit
+    const ROCKD = [0.548, 0.442, 0.286];
+    const VEIN = [0.850, 0.828, 0.782];       // calcite
+    const BRONZE = [0.372, 0.268, 0.140];
+    const TROUGH = [0.652, 0.640, 0.612];
+    const gAt2 = (t2, s2) => {
+      const st2 = at(t2);
+      return Math.max(surfaceY(t2, s2),
+        groundAt(st2.x + st2.nx * s2, st2.z + st2.nz * s2));
+    };
+
+    /**
+     * A tapered four-sided bar between two points in a local (Δt, Δs, Δy)
+     * frame, with its section perpendicular to its own run.
+     *
+     * `frustum` cannot do this: its sections are axis-aligned rectangles, which
+     * is right for a table leg and wrong for everything in an anchor, where the
+     * shank leans and the arms curve. Written once here and used eleven times.
+     */
+    const spar = (t0, s0, y0, A, B, r0, r1, col) => {
+      const d = [B[0] - A[0], B[1] - A[1], B[2] - A[2]];
+      const L = Math.hypot(d[0], d[1], d[2]) || 1;
+      const n = [d[0] / L, d[1] / L, d[2] / L];
+      const g = Math.abs(n[2]) > 0.9 ? [1, 0, 0] : [0, 0, 1];
+      let e1 = [n[1] * g[2] - n[2] * g[1], n[2] * g[0] - n[0] * g[2],
+        n[0] * g[1] - n[1] * g[0]];
+      const L1 = Math.hypot(e1[0], e1[1], e1[2]) || 1;
+      e1 = [e1[0] / L1, e1[1] / L1, e1[2] / L1];
+      const e2 = [n[1] * e1[2] - n[2] * e1[1], n[2] * e1[0] - n[0] * e1[2],
+        n[0] * e1[1] - n[1] * e1[0]];
+      const ring = (Q, r) => [0, 1, 2, 3].map((k) => {
+        const a = ((k + 0.5) / 4) * TAU;
+        const c = Math.cos(a) * r, u = Math.sin(a) * r;
+        return W(t0 + Q[0] + e1[0] * c + e2[0] * u,
+          s0 + Q[1] + e1[1] * c + e2[1] * u,
+          y0 + Q[2] + e1[2] * c + e2[2] * u);
+      });
+      const RA = ring(A, r0), RB = ring(B, r1);
+      for (let k = 0; k < 4; k++) {
+        b.quad(RA[k], RA[(k + 1) % 4], RB[(k + 1) % 4], RB[k], col);
+      }
+      b.quad(RB[0], RB[1], RB[2], RB[3], col);
+      b.quad(RA[3], RA[2], RA[1], RA[0], col);
+    };
+
+    // ── the anchor ──
+    {
+      const [t0, s0] = BACK.anchor;
+      const y0 = gAt2(t0, s0);
+      // The shank, leaning back along the shore. 26 deg off vertical, which is
+      // what the frame has, and 1.95 m of it out of the ground.
+      const TH = 0.454, AZ = 0.38;                 // 26 deg, and its heading
+      const dir = [Math.sin(TH) * Math.cos(AZ), Math.sin(TH) * Math.sin(AZ),
+        Math.cos(TH)];
+      const crown = [0, 0, -0.06];                 // a little of it buried
+      const head = [crown[0] + dir[0] * 2.02, crown[1] + dir[1] * 2.02,
+        crown[2] + dir[2] * 2.02];
+      spar(t0, s0, y0, crown, head, 0.062, 0.040, RUST);
+      // The stock, across the shank near the head and at right angles to the
+      // arms. Without it this is a fork.
+      const sk = 0.86;
+      const mid = [crown[0] + (head[0] - crown[0]) * sk,
+        crown[1] + (head[1] - crown[1]) * sk,
+        crown[2] + (head[2] - crown[2]) * sk];
+      // Perpendicular to the shank, in the horizontal-ish plane across the
+      // arms: the arms lie along +/- the shore, so the stock runs across it.
+      const sx = [-Math.sin(AZ), Math.cos(AZ), 0];
+      spar(t0, s0, y0,
+        [mid[0] - sx[0] * 0.66, mid[1] - sx[1] * 0.66, mid[2] - sx[2] * 0.66],
+        [mid[0] + sx[0] * 0.66, mid[1] + sx[1] * 0.66, mid[2] + sx[2] * 0.66],
+        0.034, 0.034, RUSTD);
+      // Two arms off the crown, each a straight run to an elbow and a shorter
+      // one out to the palm, which is enough curve at this size.
+      const ax = [Math.cos(AZ), Math.sin(AZ), 0];
+      for (const sg of [1, -1]) {
+        const elb = [crown[0] + ax[0] * 0.40 * sg, crown[1] + ax[1] * 0.40 * sg,
+          crown[2] + 0.17];
+        const tip = [crown[0] + ax[0] * 0.72 * sg, crown[1] + ax[1] * 0.72 * sg,
+          crown[2] + 0.56];
+        spar(t0, s0, y0, crown, elb, 0.058, 0.046, RUST);
+        spar(t0, s0, y0, elb, tip, 0.046, 0.030, RUST);
+        // The palm: a flattened wedge on the end of the arm, which is the part
+        // that reads as an anchor from thirty metres.
+        const pw = 0.20;
+        spar(t0, s0, y0,
+          [tip[0] - sx[0] * pw, tip[1] - sx[1] * pw, tip[2] - 0.05],
+          [tip[0] + sx[0] * pw, tip[1] + sx[1] * pw, tip[2] - 0.05],
+          0.052, 0.052, RUSTD);
+      }
+      // The ring at the head, eight short bars round a circle.
+      {
+        const rr = 0.11;
+        for (let i = 0; i < 8; i++) {
+          const a0 = (i / 8) * TAU, a1 = ((i + 1) / 8) * TAU;
+          const P = (a) => [head[0] + sx[0] * Math.cos(a) * rr,
+            head[1] + sx[1] * Math.cos(a) * rr,
+            head[2] + Math.sin(a) * rr + 0.10];
+          spar(t0, s0, y0, P(a0), P(a1), 0.020, 0.020, RUSTD);
+        }
+      }
+      // And the bed it stands in: white limestone lumps, which is what makes
+      // it a monument rather than something that fell off a boat.
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * TAU + 0.4;
+        const r = 0.62 + 0.18 * Math.cos(i * 2.7);
+        const lt = t0 + Math.cos(a) * r, ls = s0 + Math.sin(a) * r;
+        const h = 0.17 + 0.07 * Math.sin(i * 1.9);
+        dome(W, lt, ls, gAt2(lt, ls) - 0.03, h, h * 1.5, LIME, 6);
+      }
+    }
+
+    // ── the rock, and the dolphin on it ──
+    {
+      // Out in the wood rather than against the back wall of the huts. In
+      // `1000150362` and `1000150365` this stands on gravel among the pines
+      // with a path going past it, which is where anybody walking through
+      // meets it; at `rowB + 4.4` it was wedged between a parked car and a
+      // rendered wall and could only be seen by somebody already lost.
+      const [t0, s0] = BACK.rock;
+      const y0 = gAt2(t0, s0);
+      // The boulder. A lathe with a per-ring offset is the cheapest thing in
+      // this file that is not a solid of revolution: the rings wander, so the
+      // silhouette has corners in it and no two elevations of it agree.
+      lathe(W, t0, s0, [
+        [y0 - 0.10, 0.00, 0.00, 0.00],
+        [y0 - 0.02, 0.74, 0.04, -0.03],
+        [y0 + 0.34, 0.88, -0.05, 0.06],
+        [y0 + 0.78, 0.82, 0.07, 0.02],
+        [y0 + 1.16, 0.62, -0.03, -0.07],
+        [y0 + 1.44, 0.34, 0.06, 0.04],
+        [y0 + 1.56, 0.00, 0.02, 0.00],
+      ], ROCK, 8);
+      // The shaded side. One more lathe a hair inside the first over its lower
+      // half, which is a cheat and is the same cheat the terrace risers use:
+      // vertex colour does the work a second light would.
+      lathe(W, t0, s0, [
+        [y0 - 0.02, 0.745, 0.04, -0.03],
+        [y0 + 0.34, 0.885, -0.05, 0.06],
+      ], ROCKD, 8);
+      // ONE seam of calcite, and not the two it had. Two rings of white round
+      // a boulder at even spacing is not veining, it is a lampshade — a
+      // regular pattern read as manufacture the moment it went in, which is
+      // the same trap the sea's foam and the promenade's crazing both fell
+      // into. What the photographs have is one irregular seam wandering
+      // across the face and pinching out, so that is what this is: a partial
+      // ring over about a third of the circumference, off-centre, tapering.
+      {
+        const h = 0.62;
+        for (let i = 2; i < 5; i++) {
+          const a0 = (i / 8) * TAU, a1 = ((i + 1) / 8) * TAU;
+          const w = 0.052 - 0.012 * (i - 2);
+          const R = (a, dy) => W(t0 + 0.02 + Math.cos(a) * 0.865,
+            s0 + 0.03 + Math.sin(a) * 0.865, y0 + h + dy + 0.05 * Math.cos(a));
+          b.quad(R(a0, 0), R(a1, 0), R(a1, w), R(a0, w), VEIN);
+        }
+      }
+      // The fountain. A scalloped bronze plate bolted to the seaward face, a
+      // short throat and a dolphin's head with the mouth open — five pieces,
+      // and at this size the one that carries it is the downturned snout.
+      const ft = t0, fs = s0 - 0.80, fy = y0 + 0.92;
+      lathe(W, ft, fs, [
+        [fy - 0.001, 0.000], [fy, 0.135], [fy + 0.02, 0.120],
+        [fy + 0.03, 0.000],
+      ], BRONZE, 10);
+      spar(ft, fs, fy, [0, 0, 0], [0, -0.13, 0.02], 0.052, 0.044, BRONZE);
+      spar(ft, fs, fy, [0, -0.13, 0.02], [0, -0.27, -0.06], 0.062, 0.048,
+        BRONZE);
+      spar(ft, fs, fy, [0, -0.27, -0.06], [0, -0.33, -0.13], 0.048, 0.030,
+        BRONZE);
+      // The tap handle on top of the head, which is what makes it a tap.
+      spar(ft, fs, fy, [0, -0.14, 0.05], [0, -0.13, 0.16], 0.024, 0.022,
+        BRONZE);
+      spar(ft, fs, fy, [-0.09, -0.13, 0.16], [0.09, -0.13, 0.16], 0.020, 0.020,
+        BRONZE);
+      // And the trough on the gravel under it, to catch what comes out.
+      {
+        const ty = gAt2(ft, fs - 0.30);
+        boxTS(ft - 0.24, ft + 0.24, fs - 0.52, fs - 0.10, ty, ty + 0.30,
+          TROUGH, shade(TROUGH, 1.06));
+        // Hollowed, by the only means this buffer has: a darker lid set down
+        // inside the rim. A basin with a flat top is a plinth.
+        boxTS(ft - 0.19, ft + 0.19, fs - 0.47, fs - 0.15, ty + 0.22,
+          ty + 0.245, shade(TROUGH, 0.52));
+      }
+    }
+    b = back11;
   }
 
   // ── the municipal bench at the kabine gable ────────────────────────────────

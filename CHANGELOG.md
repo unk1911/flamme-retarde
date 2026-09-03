@@ -8,6 +8,79 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.172.0] — 2026-09-03
+
+### The ferry is a ferry now, and the walk out to her has boats along it
+
+Four things behind and beyond the kabine, from *"use the survey images/videos
+to continue building out that area behind the kabines, there's that rock, the
+anchor, the car parking lot, the boats sitting parked on the walkway towards the
+boat to sibenik... and while at it, perhaps improve the boat itself.. at the
+moment it is too tiny"*. The car park has been there since 23 August. The other
+three had not, and neither had the size.
+
+**The boat.** She was 15.6 m by 4.20, which on this coast is a twenty-passenger
+day boat — and once the deckhouse and the bulwarks come out of it, about eleven
+square metres of standable deck. *"it's a ferry that ferries like 60 people back
+and forth... for now, only i barely fit on it."* Sixty people need three times
+that, and a Dalmatian wooden passenger boat that carries sixty is 22 to 24 m. So
+`BROD_K` is 1.45: **22.6 m by 6.09, and 2.1× the deck.**
+
+Uniformly, and that word is load-bearing. Stretching her in x and z only would
+have kept the freeboard the mole was tuned against, and would also have left
+every normal in the loft wrong by the anisotropy — a hull is a thing you read
+entirely by its shading. Scaled the same in all three, the normals are untouched
+and every number stays in the proportion it was measured in. It happens to fix
+the boarding rather than break it: the mole is 1.46 m above the sea and her side
+deck was 1.06, so you used to step *down* 0.4 m onto her; it is 1.54 now — level
+with the quay, with 0.7 m of bulwark to swing a leg over, which is how you get on
+a passenger boat.
+
+It is **not an Object3D scale**, and that was the trap. Scaling `boat` would
+scale the mesh correctly and then quietly scale the person standing on it:
+`you.x/z` are local coordinates, so `localToWorld` would have multiplied the
+walking speed by 1.45 and stood your eye 2.35 m over the deck. The mesh goes
+through a wrapper on the builder — one function, so the two hundred literals in
+`brodProto` stay in the metres they were measured in — and the numbers the game
+reasons with are scaled once, off the same constant.
+
+**The anchor**, `1000150353`. A rusted admiralty-pattern anchor standing shank-up
+in a bed of white limestone lumps on the verge of the nose-in car row. Admiralty
+and not stockless, because that is the whole silhouette: a straight shank, a
+stock across it near the head at right angles to the arms, two arms curving off
+the crown with a triangular palm on each. Take the stock off and it stops being
+an anchor and becomes a fork.
+
+**The rock**, `1000150358` and `1000150359`. A boulder of honey limestone with a
+**bronze fountain shaped like a dolphin's head** bolted to its face and a small
+concrete trough underneath to catch what comes out of it — the one piece of civic
+sculpture on this shore, and it is a tap. It went in against the back wall of the
+huts first, where it was wedged between a parked car and a render wall and could
+only be found by somebody already lost; it stands out on the gravel among the
+pines now, where the photographs have it. Its calcite veining was two even white
+rings, which is not veining, it is a lampshade — one irregular seam over a third
+of the circumference instead.
+
+Both are placements and are stated as such: neither frame carries GPS. And
+`carSites` knows about them now, because 4.0 m of car spacing against a 1.8 m
+boulder means a car parked hard against it about half the time — which is what
+the first build rendered, twice, one either side.
+
+**The boats on the walkway.** The note over `BROD.quay` has said for a fortnight
+that the marina of small craft "is not built". It is now: twelve of them
+med-moored bow-to along the pier's other face, which is what `1000150357` has —
+a row of white cabin motorboats side by side with their bows a metre off the
+coping and the walk to the ferry running past their pulpits. Alongside would have
+been easier and is not what is there, and the difference is the point: bow-to is
+why that walk has a wall of boats down one side of it rather than one boat.
+
+One bug worth writing down. The row is laid out on a sine hash taken with
+`% 1` — and JavaScript's remainder keeps the sign of the dividend, so the draw
+lands in (−1, 1) rather than [0, 1). Half the fleet came out at 0.54 scale and
+every negative draw picked the open skiff over the cabin boat, so what got built
+was a line of flat little dinghies with three motorboats in it. `fract` is
+`x - Math.floor(x)`.
+
 ## [1.171.0] — 2026-09-03
 
 ### Seven ballet positions, and a swim ladder for a barre

@@ -64,6 +64,40 @@
 // walk out to her, and she waits.
 // -----------------------------------------------------------------------------
 
+/**
+ * HOW MUCH BIGGER SHE IS THAN SHE WAS AUTHORED.
+ *
+ * Reported: *"the boat itself... at the moment it is too tiny. it has to be
+ * bigger... it's a ferry that ferries like 60 people back and forth... for now,
+ * only i barely fit on it"*. He is right, and the number says why: she was
+ * 15.6 m by 4.20, which on this coast is a twenty-passenger day boat, and once
+ * the deckhouse and the bulwarks are taken out of it there is about eleven
+ * square metres of standable deck. Sixty people need three times that. A
+ * Dalmatian wooden passenger boat that carries sixty is 22 to 24 m.
+ *
+ * So: 1.45, uniformly. 22.6 m by 6.09, and 2.1x the deck.
+ *
+ * UNIFORM, and that word is load-bearing. Stretching her in x and z only would
+ * have kept the freeboard the tide and the mole were tuned against — but it
+ * also leaves every normal in the loft wrong by the anisotropy, and a hull is
+ * a thing you read entirely by its shading. Scaled the same in all three, the
+ * normals are untouched and every number below stays in the proportion it was
+ * measured in.
+ *
+ * And it happens to fix the boarding rather than break it. `JET.top` at the
+ * mole is 1.46 m above the sea; her side deck was 1.06, so you used to step
+ * DOWN 0.4 m onto her. At 1.45 it is 1.54 — level with the quay, with 0.7 m of
+ * bulwark to swing a leg over, which is how you get on a passenger boat.
+ *
+ * IT IS NOT AN OBJECT3D SCALE, deliberately. Scaling `boat` would scale the
+ * mesh correctly and then quietly scale the person standing on it: `you.x/z`
+ * are LOCAL coordinates, so `localToWorld` would multiply the walking speed by
+ * 1.45 and stand your eye 2.35 m over the deck. The mesh is scaled through a
+ * wrapper on the builder and the numbers the game reasons with are scaled here,
+ * once, off the same constant.
+ */
+const BROD_K = 1.45;
+
 const BROD = {
   // Fifteen and a half metres, four and a bit across. The Jadrija boat is a
   // wooden Dalmatian motor passenger boat, and the best picture of one in the
@@ -72,8 +106,11 @@ const BROD = {
   // live with her think she looks like. White hull, dark strake along the
   // sheer with a thin gold cove line under it, low white deckhouse with a long
   // row of square lights, white pipe rails forward, open cockpit aft.
-  loa: 15.6,
-  beam: 4.20,
+  // As built: `BROD_K` times the 15.6 x 4.20 she was drawn at. See the note
+  // over that constant — she is a sixty-passenger boat now, which is 22.6 m,
+  // and both of these are read by the sea-sampling in `place`.
+  loa: 15.6 * BROD_K,
+  beam: 4.20 * BROD_K,
 
   eye: 1.62,                 // your eyes above whatever you are standing on
 
@@ -106,12 +143,17 @@ const BROD = {
   // The bands **overlap** at both joins, and the first match wins, so stepping
   // aft off the side deck puts you down the 0.34 m into the cockpit rather than
   // into the sea.
+  //
+  // Written at the size she was drawn and scaled by `BROD_K` where the table
+  // is closed, so these stay comparable with the stations above and with every
+  // number in `brodProto`.
   decks: [
     { x0: -7.50, x1: -1.20, y: 0.72, hole: 0 },      // the cockpit, full width
     { x0: -1.35, x1: 4.40, y: 1.06, hole: 1.16 },    // the side decks
     { x0: 4.30, x1: 6.60, y: 1.22, hole: 0 },        // the foredeck
   ],
-  edge: 0.06,                // how far in from the bulwark you may stand
+  edge: 0.06,                // how far in from the bulwark you may stand — a
+                             // person's clearance, so it does NOT scale
   walk: 1.55,                // m/s about the deck — it is a deck, not a runway
   run: 2.6,
 
@@ -165,9 +207,9 @@ const BROD = {
    * they were taken on.
    *
    * So she lies on the **south-east face**, which is the face the fittings were
-   * photographed on and the face that looks at the fortress. The marina of small
-   * craft in `1000150378` is the inlet behind the root, running south-west, and
-   * is not built.
+   * photographed on and the face that looks at the fortress. The small craft
+   * in `1000150378` and `1000150357` lie on the other one, med-moored bow-to
+   * in a line — built now, in `moor` below.
    *
    * `wide`, `top` and `apron` are still a placement: the coastline gives the
    * plan and says nothing about the section.
@@ -237,6 +279,17 @@ const CHANNEL = [
  */
 const yawOfX = (dx, dz) => Math.atan2(-dz, dx);
 
+// And the deck bands, brought up to size. In place rather than as a derived
+// table because `deckAt` and `slideIn` are the only readers and both want the
+// built metres — see the note over `BROD_K` for why this is not an Object3D
+// scale. `hole` is the deckhouse's half-width and scales with the house.
+for (const d of BROD.decks) {
+  d.x0 *= BROD_K; d.x1 *= BROD_K; d.y *= BROD_K; d.hole *= BROD_K;
+}
+// The bulwark, which `deckAt` subtracts off the sheer to get the inboard face
+// of it. Structure, not clearance, so it scales.
+const BROD_BULK = 0.24 * BROD_K;
+
 /**
  * Her stations: `[x, keel y, chine y, chine half-beam, sheer y, sheer half-beam]`.
  *
@@ -256,7 +309,8 @@ const yawOfX = (dx, dz) => Math.atan2(-dz, dx);
  * can see of her is a roof. She is a passenger boat: her rail comes to the
  * pier, which is how anybody gets on.
  */
-const BROD_ST = [
+/** As authored, at the size she was drawn. `BROD_ST` below is these times K. */
+const BROD_ST0 = [
   [7.80, 0.35, 0.62, 0.10, 2.24, 0.22],
   [7.10, -0.55, -0.10, 0.34, 2.05, 0.72],
   [5.90, -1.00, -0.52, 0.74, 1.86, 1.26],
@@ -267,6 +321,38 @@ const BROD_ST = [
   [-5.90, -0.90, -0.64, 1.42, 1.54, 1.99],
   [-7.80, -0.62, -0.46, 1.28, 1.62, 1.82],
 ];
+
+/** The same stations at the size she is actually built. */
+const BROD_ST = BROD_ST0.map((r) => r.map((v) => v * BROD_K));
+
+/**
+ * A `propBuilder` that scales everything through it.
+ *
+ * So that `brodProto` below can go on being written in the metres she was
+ * measured in — a deckhouse from x -1.35 to 4.55, seven lights a side, a
+ * 70 mm cove line — while what comes out is 1.45 times the size. The
+ * alternative was multiplying two hundred literals by hand, and the reason not
+ * to is not the typing: half of those numbers are colours, exponents and
+ * counts, and the first one of those multiplied by 1.45 is a bug nobody finds
+ * for a month.
+ *
+ * Normals pass through untouched, which is correct and is the whole reason the
+ * scale is uniform: scaling a vector by a positive scalar does not change its
+ * direction.
+ */
+function scaledBuilder(b, k) {
+  const S = (p) => [p[0] * k, p[1] * k, p[2] * k];
+  return {
+    tri: (a, c, d, cl) => b.tri(S(a), S(c), S(d), cl),
+    quad: (a, c, d, e, cl) => b.quad(S(a), S(c), S(d), S(e), cl),
+    smooth: (a, c, d, na, nb, nc, ca, cb, cc) =>
+      b.smooth(S(a), S(c), S(d), na, nb, nc, ca, cb, cc),
+    box: (cx, cy, cz, sx, sy, sz, cl, top) =>
+      b.box(cx * k, cy * k, cz * k, sx * k, sy * k, sz * k, cl, top),
+    geo: () => b.geo(),
+    count: () => b.count(),
+  };
+}
 
 /** The sheer height and half-beam at any x, interpolated between stations. */
 function brodSheer(x) {
@@ -300,7 +386,10 @@ function brodSheer(x) {
  * anywhere on the water it is most of the silhouette.
  */
 function brodProto() {
-  const b = propBuilder();
+  const raw = propBuilder();
+  // Everything below is written at the size she was drawn; `scaledBuilder`
+  // multiplies it on the way out. See `BROD_K`.
+  const b = scaledBuilder(raw, BROD_K);
   const HULL = [0.905, 0.900, 0.878];       // white, weathered
   const SHEER = [0.118, 0.145, 0.190];      // the dark strake along the sheer
   const COVE = [0.686, 0.545, 0.243];       // and the gold line under it
@@ -316,7 +405,10 @@ function brodProto() {
   //
   // The sheer is the line the whole boat is read by: high at the stem, lowest
   // about two thirds aft, lifting a hand's breadth again at the transom.
-  const ST = BROD_ST;
+  // The AUTHORED stations, not the scaled ones: the builder above does the
+  // scaling, and feeding it a table that has already been scaled would square
+  // the boat.
+  const ST = BROD_ST0;
 
   const NS = 7;
   const N = NS * 2 - 1;
@@ -389,7 +481,19 @@ function brodProto() {
   const sideQuad = (s, A, B, C, D, col) =>
     (s > 0 ? b.quad(D, C, B, A, col) : b.quad(A, B, C, D, col));
 
-  const sheerAt = brodSheer;
+  // Local, and off `BROD_ST0` for the same reason `ST` is: `brodSheer` answers
+  // in built metres, which is what the deck logic wants and is exactly what
+  // must not come in here.
+  const sheerAt = (x) => {
+    let a = BROD_ST0[0], c = BROD_ST0[1];
+    for (let i = 0; i < BROD_ST0.length - 1; i++) {
+      if (x <= BROD_ST0[i][0] && x >= BROD_ST0[i + 1][0]) {
+        a = BROD_ST0[i]; c = BROD_ST0[i + 1]; break;
+      }
+    }
+    const u = clamp((a[0] - x) / ((a[0] - c[0]) || 1), 0, 1);
+    return [a[4] + (c[4] - a[4]) * u, a[5] + (c[5] - a[5]) * u];
+  };
 
   // ── the deck and the bulwark ─────────────────────────────────────────────
   // The sheer curves and the sole does not; that is the whole difference
@@ -932,6 +1036,55 @@ function buildBrod(scene) {
       fitting.rotation.y = yawOfX(ox, oz);
       fitting.updateMatrixWorld();
       scene.add(fitting);
+
+      // ── the small craft on the other face ──
+      //
+      // The note over `BROD.quay` has said for a fortnight that "the marina of
+      // small craft in `1000150378` is the inlet behind the root, running
+      // south-west, and is not built", and this is that. Asked for by name:
+      // *"the boats sitting parked on the walkway towards the boat to
+      // sibenik"*.
+      //
+      // MED MOORED, bows to the quay and sterns out on a line, which is what
+      // `1000150357` has: a row of white cabin motorboats side by side with
+      // their bows a metre off the coping and the walkway running past their
+      // pulpits. Alongside would have been easier and is not what is there —
+      // and the difference matters, because bow-to is why the walk out to the
+      // ferry has a wall of boats down one side of it rather than one boat.
+      //
+      // On the face the ferry does not use. `A.side` picks hers; these take
+      // the other, which is also the sheltered one and is where the photograph
+      // puts them.
+      {
+        const raft = new THREE.Group();
+        raft.position.set(rx, 0, rz);
+        raft.rotation.y = yawOfX(ox, oz);
+        const shells = [boatProto(true), boatProto(false)];
+        // Bow a metre off the coping: the hull is six metres and its origin is
+        // amidships, so the centre sits four metres out from the edge.
+        const v = -sgn * (A.w + 4.6);
+        // FRACT, not `% 1`. JavaScript's remainder keeps the sign of the
+        // dividend, so a sine hash taken with `% 1` lands in (-1, 1) — which
+        // put half the row on a scale of 0.54 and picked the open boat for
+        // every negative draw. What came out was a line of flat little skiffs
+        // with three cabin boats in it, and the fleet in `1000150357` is the
+        // other way round.
+        const fr = (n) => { const x = Math.sin(n) * 43758.5453; return x - Math.floor(x); };
+        for (let k = 0; k < 12; k++) {
+          const h = fr(k * 12.9898);
+          const j = fr(k * 78.233 + 2.1);
+          const m = new THREE.Mesh(shells[h > 0.28 ? 0 : 1], mat);
+          m.position.set(5.5 + k * 2.85 + j * 0.35, 0, v);
+          // Her bow points at the quay, which on this face is +z when the
+          // ferry is on -z. A child whose local +X must land on the group's
+          // ±z takes a quarter turn the matching way round.
+          m.rotation.y = -sgn * Math.PI / 2 + (j - 0.5) * 0.12;
+          m.scale.setScalar(0.88 + h * 0.34);
+          raft.add(m);
+        }
+        raft.updateMatrixWorld();
+        scene.add(raft);
+      }
     }
     reset();
     return true;
@@ -1003,7 +1156,7 @@ function buildBrod(scene) {
    * rectangles. First match wins, and the bands overlap on purpose.
    */
   function deckAt(lx, lz) {
-    const out = brodSheer(lx)[1] - 0.24 - BROD.edge;
+    const out = brodSheer(lx)[1] - BROD_BULK - BROD.edge;
     const a = Math.abs(lz);
     for (const d of BROD.decks) {
       if (lx > d.x0 && lx < d.x1 && a >= d.hole && a < out) return d.y;
@@ -1027,7 +1180,7 @@ function buildBrod(scene) {
    * and on to a side deck the moment you walked at the back of the deckhouse.
    */
   function slideIn(lx, lz) {
-    const out = brodSheer(lx)[1] - 0.24 - BROD.edge;
+    const out = brodSheer(lx)[1] - BROD_BULK - BROD.edge;
     const a = Math.abs(lz);
     for (const d of BROD.decks) {
       if (lx <= d.x0 || lx >= d.x1) continue;
