@@ -8,6 +8,82 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.170.0] — 2026-09-03
+
+### She was holding the bottle by the wrong end
+
+Reported: *"focus on the way she pours that wine... it still looks
+weird/unnatural/backwards"*. It was backwards, and the reason was one number.
+
+`BOT.grip` is how far up the bottle from its foot her fist closes, and it was
+0.185 — which on a 306 mm burgundy bottle is a hand on the *shoulder* of it. So
+185 mm of bottle stuck out behind her fist and only 121 mm reached past it: the
+long half pointed away into the room, the neck sat directly under her palm, and
+the wine appeared to come out of her hand.
+
+Everything else people would have called wrong followed from that. With the lip
+only 121 mm from her fist, her hand had to hover almost on top of the glass,
+which leaves no room for an elbow or a lean. Measured off the running build,
+frame by frame:
+
+| | was | a person |
+|---|---|---|
+| fist up the bottle | 185 mm | 108 mm, round the label |
+| bottle behind the fist | 185 mm | 108 mm |
+| bottle reaching past it | 121 mm | 198 mm |
+| elbow | 168° — locked | 122° |
+| trunk lean | 1° — bolt upright | 12° |
+| palm above the glass rim | 117 mm | 186 mm |
+| tilt off vertical | 119° | 103° |
+| runtime aim correction | 115 mm | 1.4 mm |
+
+That last row is the one that matters. The aim correction is a safety net —
+`stepShow` turns the bottle off the axis her wrist is holding it on by the
+smallest rotation that puts the lip over the glass, and when the pose is right
+it does nothing. At 115 mm it is not a net, it is a hinge: the bottle swung most
+of a right angle out of her grip the instant `pour` began to ramp, held there
+for a second, and swung back.
+
+**The poses are solved now, not typed.** `tools/blender/wine_solve.py` is new,
+and it exists because the pour has to satisfy six things at once — the lip on
+the glass, the tilt, the elbow, the lean, the clearance between the bottle and
+her own forearm, and where she is looking — and five of those are invisible in
+a render until they are badly wrong. Every angle in the version this replaces
+was defensible on its own and had been argued into place against the last
+picture taken; nothing ever checked all six together. The solver runs the rig's
+forward kinematics in `mathutils` rather than through Blender's depsgraph, which
+is what makes a hundred thousand candidate poses cheap, and `--check` proves it
+against Blender's own `pose_bone.matrix` first, because a hand-rolled FK that is
+subtly wrong converges beautifully on nonsense.
+
+Two of its terms are worth naming. The bottle-to-forearm clearance is the one
+nothing else can see: a bottle is a solid of revolution, so an axis lying along
+the forearm buries half of it inside her arm while scoring perfectly on every
+other measure. It was 45 mm and is now 108. And the gaze: without a term for it
+she reached down to a stool at knee height with her face pointed at the far
+wall, which was most of what read as a mannequin.
+
+**She stands somewhere else.** The old mark put the glass 0.29 m in front of her
+and 0.04 m to her right with the bottle dead on her midline, so a right hand had
+to cross her own centre line to pour — a knot no pose gets out of. `kit.wine` is
+derived the other way round now, from where a right-handed person stands to pour
+something: the glass 0.33 in front and 0.14 out to her right, the bottle 0.42
+and 0.23. Those, and the fixed offsets between the two objects on the stool, fix
+the mark and the yaw exactly. The yaw comes out square to the shore, which has
+the side benefit that you now walk in on her front rather than on her back.
+
+**And the pour is visible.** `pourAt` was six centimetres over the rim, which is
+defensible and was also nothing: the stream is drawn from the lip down to the
+wine, so it was six centimetres of a 3 mm cylinder in a dim room. It is fourteen
+now.
+
+The reach was re-solved too, and the interesting part is *where* she bends. The
+first solved version put the range in `spine02` and `spine03` and came out as a
+hunch — curled from the middle of the back with her chin out, like somebody
+reading a label. `spine01` is on the free list now and the three above it are
+capped at a third of their old range, so she hinges at the hips and the back
+stays long, which is what bending to something at knee height looks like.
+
 ## [1.169.1] — 2026-08-31
 
 ### The folded sun lounger is out of the kabina

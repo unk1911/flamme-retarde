@@ -17843,20 +17843,19 @@ async function buildJadrija(scene) {
     // wine is the one part that is not there until she has poured it. Sixteen
     // sides: this is 8 cm across and you look straight down into it from half a
     // metre, which is where a twelve-sided rim shows its corners.
-    // These two numbers are not free. `WINE_POUR` in tools/blender/human_mh.py
-    // puts her wrist 0.32 m in front of her, 0.09 m out to her right and
-    // 1.01 m up, and this is where a glass has to be for the line from that
-    // wrist to it to be a bottle pouring rather than a bottle held over
-    // something: 0.30 m ahead of her standing mark, a hand's width to her
-    // right, on a stool 0.72 m high. Move the stool, the mark or the pose and
-    // the wine goes on the floor.
+    // The glass does not move; the STANDING MARK does. It is `kit.wine` below
+    // that was solved against this glass rather than the other way round, so
+    // what these two numbers have to be is wherever the stool ended up when
+    // the room was furnished — and everything else in the pour was derived
+    // from them. `WINE_POUR` in tools/blender/human_mh.py now puts her palm
+    // 0.295 m in front of her, 0.330 out to her right and 1.076 up, and the
+    // bottle's own axis lands its lip within 3 mm of the target over this
+    // glass, so the runtime aim has 3 mm left to do.
     //
-    // The wrist used to be at 0.36 / 0.29 / 1.08 and the pose that put it
-    // there held the bottle at 52° from vertical, which is nowhere near the
-    // 110° the line from that wrist to this glass wants — so the aim below
-    // swung it a right angle on every frame of the pour. It has been solved
-    // against this glass since, and reaches across her own midline to do it,
-    // which is why the second of those three numbers is now small.
+    // That last number is the one to watch. It used to be 115 mm, and an aim
+    // correction that large is not a correction, it is a hinge: the bottle
+    // swung most of a right angle out of her grip the instant `pour` began to
+    // ramp, held there for a second, and swung back.
     // The height of the seat, which both of the things standing on it need.
     const by = f + 0.722;
     const gt = bt + 0.085, gs = bs + 0.090;
@@ -18143,7 +18142,21 @@ async function buildJadrija(scene) {
       // stand to be able to reach it: 0.55 m off it, turned to face it, which
       // is one pace and an arm.
       rest: [bt, bs, by],
-      wine: [bt + 0.372, bs + 0.191, Math.atan2(-0.191, -0.372)],
+      // WHERE SHE STANDS TO POUR, and it is derived rather than chosen. The
+      // old mark put the glass 0.29 m in front of her and 0.04 m to her right
+      // with the bottle dead on her midline, so a right hand had to cross her
+      // own centre line to pour — a knot no pose gets out of, and the reason
+      // the aim correction below had most of a right angle of work to do on
+      // every frame.
+      //
+      // So it was solved the other way round, from where a right-handed person
+      // stands to pour something: the glass 0.33 in front and 0.14 out to her
+      // right, the bottle 0.42 and 0.23. Both of those and the offsets between
+      // the two objects on the stool fix the mark and the yaw exactly, and the
+      // yaw comes out square to the shore — she faces the front wall, which
+      // has the side benefit that you now walk in on her front rather than on
+      // her back.
+      wine: [bt + 0.225, bs + 0.420, -Math.PI / 2],
       // The cot, for the dog: where he lies on it, how high the mattress is,
       // and where he stands on the floor to get up. Off `cm`/`cs0` rather than
       // typed, because the furniture moved outward on its own when the hut went
@@ -18152,8 +18165,13 @@ async function buildJadrija(scene) {
       cotFoot: [cm - 0.62, cms - 0.10],
       // Where the neck of the bottle has to end up. Not the rim: a lip resting
       // on the rim is a bottle being emptied by somebody who has never poured
-      // one, so this is six centimetres over it, and the stream covers the gap.
-      pourAt: [gt, gs, by + 0.230],
+      // one. It was six centimetres over it, which is defensible and was also
+      // invisible — the stream is drawn from here down to the wine, so six
+      // centimetres of a 3 mm cylinder in a dim room is nothing at all. The
+      // rim is `by + 0.168`, so this is fourteen centimetres of pour, which is
+      // a pour you can see from across the room and still a pour and not a
+      // stunt.
+      pourAt: [gt, gs, by + 0.310],
       // And where the stream stops, which is the surface of what is already in
       // the glass whether or not any of it is there yet.
       cupAt: [gt, gs, by + 0.122],
@@ -24355,7 +24373,24 @@ async function buildJadrija(scene) {
   // arm from shoulder to wrist is 0.47 — and it is where the fingers of a fist
   // that has just lifted something actually are. Not the neck: that is a
   // waiter.
-  const BOT = { grip: 0.185, lip: 0.300 };
+  // THE ONE NUMBER THAT MADE IT LOOK BACKWARDS. `grip` is how far up the
+  // bottle from its foot her fist closes, and it was 0.185 — which on a 306 mm
+  // burgundy bottle is a hand on the SHOULDER of it. So 185 mm of bottle stuck
+  // out behind her fist and only 121 mm reached past it: the long half pointed
+  // away into the room, the neck sat under her palm, and the wine appeared to
+  // come out of her hand. Every other complaint about this clip followed from
+  // it — with the lip only 121 mm from her fist her hand had to hover almost
+  // on top of the glass, which left no room for an elbow (168 deg, locked) or
+  // a lean (1 deg, bolt upright) and forced the bottle nearly flat (119 deg)
+  // to reach at all.
+  //
+  // A wine bottle is held around its LABEL, which on this one runs 48 to
+  // 128 mm up. 0.108 puts the middle of a closed fist there, which leaves
+  // 198 mm reaching past it, which is what lets the hand sit back and outboard
+  // where a hand belongs. The poses in tools/blender/human_mh.py were re-solved
+  // against this number and the standing mark below was re-derived from it;
+  // all three move together or the wine goes on the floor.
+  const BOT = { grip: 0.108, lip: 0.306 };
   // The bottle in the hand, both measured off `IDLE_A` with the arm hanging —
   // see the long note at the grip above. Figure space: +x is in front of her,
   // +y is up, +z is her right.
