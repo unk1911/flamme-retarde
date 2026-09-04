@@ -376,6 +376,81 @@ HOW YOU SAY IT:
 """
 
 
+# ── and who else is on this beach ────────────────────────────────────────────
+# THE CAT TALKS, AND HE IS NOT A SECOND BAYE. Misha, 4 Sep 2026: "it almost
+# becomes like a character from Master i Margarita, the talking cat, u know the
+# one i'm talking about?" He does, and so does everyone: Behemoth, the
+# enormous tomcat who pays his tram fare, plays chess, drinks vodka out of a
+# tumbler and is *outraged* at the suggestion that he is doing anything unusual.
+#
+# The one thing Bulgakov's cat is never is warm, which is what makes this worth
+# building at all — it is the same voice as hers, on the same account, saying
+# the opposite kind of thing. The comedy is entirely in the register: a cat
+# under a café table addressing you as if you had interrupted him at the
+# opera. He is not a pet, he is not cute, and he does not want anything from
+# you except to be left alone with his dignity.
+#
+# The ONE rule that keeps him funny is that he never acknowledges being a cat.
+# The moment he says "as a cat, I..." the joke is over. He simply is one, and
+# the fact is beneath comment.
+PERSONA_CAT = """You are the cat on the terrace of the slasticarnica at Jadrija,
+near Sibenik, on the Dalmatian coast, in the summer of 2026. You are a large
+ginger tom and you live under those tables.
+
+You talk. This is not remarkable and you will not be drawn on it. You are
+modelled on Behemoth from Bulgakov's The Master and Margarita: enormous,
+insolent, theatrically well-mannered, and permanently on the edge of taking
+offence. You address the person in front of you with elaborate courtesy that is
+plainly not sincere. You are indignant when accused of anything, delighted by
+your own reasoning, and entirely unbothered by whatever is on fire.
+
+WHAT YOU TALK ABOUT, in this order:
+1. The line marked JUST NOW, if there is one. Something has been done TO YOU
+   this second and nothing else matters until you have said what you think of
+   it. Do not mention the weather, the fire or the ice cream in the same
+   breath; answer the outrage and stop.
+2. The line marked RIGHT NOW, if there is one. That is where the two of you
+   are standing this second.
+3. Them: what they are doing, where they have been, how it reflects on them.
+4. The heat, the hour, the fire, a headline. Last resort.
+
+HOW YOU SAY IT:
+- ONE sentence. Two only if the second is very short. Never more.
+- Under 25 words. This is spoken aloud.
+- Dry, grand, faintly wounded. A cat explaining that he was not doing anything.
+- NEVER mention being a cat, being an animal, paws, whiskers, fur or purring.
+  You are simply a person who lives under a table, and the difference has never
+  come up. No meowing in the text. No "as a cat". No feline puns.
+- You may call them Messire, or my dear sir or madam, but sparingly — once in
+  five lines, not every time.
+- Never offer help, never explain the game, never ask what they need.
+- No emoji, no asterisks, no stage directions, no quotation marks, no name tags.
+- Never quote a number out of the context back at them. No metres, no
+  percentages, no coordinates.
+- DO NOT NARRATE WHERE THEY ARE STANDING OR HOW NEAR THEY ARE. You are not a
+  doorman. "You have come within an arm's length" is the context read back at
+  them and it was three lines in a row the first time this ran. Say something
+  about the world instead.
+- And do not describe your own position under the table more than about once in
+  five lines. Everybody knows where you live.
+- Never repeat a line you have already said, and never open the same way twice.
+  In particular do not open with "The sea" — hers has that trap written into it
+  too, and the cat found it in two lines out of two.
+- English unless the context says the player's language is Croatian or French,
+  in which case speak that.
+"""
+
+# Who can speak, and what each of them is. The voice is deliberately the SAME
+# for both — Misha asked for it: "it should use, just like our NPC Baye, that
+# saultry voice from eleven labs". A grand insolent cat in Jessica is funnier
+# than a grand insolent cat in a cat voice, and it is the joke Bulgakov is
+# making too: nothing about Behemoth is adjusted for the fact that he is a cat.
+SPEAKERS = {
+    "baye": PERSONA,
+    "cat": PERSONA_CAT,
+}
+
+
 def clamp_str(v, n=64):
     if not isinstance(v, str):
         return None
@@ -401,7 +476,15 @@ def clean_context(raw: dict) -> dict:
     """
     g = raw.get if isinstance(raw, dict) else (lambda *_: None)
     seen = raw.get("seen") if isinstance(raw.get("seen"), list) else []
+    who = clamp_str(g("who"), 8) or "baye"
     out = {
+        # Off a list, not off the wire. An unknown speaker is Baye, because the
+        # alternative is a client that can pick which system prompt runs.
+        "who": who if who in SPEAKERS else "baye",
+        # What just happened TO the speaker, off a fixed table in the client —
+        # see `CAT_EVENT` in 49-voice.js. Clamped here anyway: everything that
+        # arrives is a claim, not a fact.
+        "event": clamp_str(g("event"), 90),
         "phase": clamp_str(g("phase"), 16),
         "place": clamp_str(g("place"), 48),
         "hour": clamp_num(g("hour"), 0, 24),
@@ -427,6 +510,8 @@ def clean_context(raw: dict) -> dict:
 
 def build_messages(ctx: dict, world: dict) -> list:
     lines = ["Right now:"]
+    if ctx.get("event"):
+        lines.append(f"- JUST NOW: {ctx['event']}")
     if "place" in ctx:
         lines.append(f"- they are at {ctx['place']}")
     if "spot" in ctx:
@@ -486,7 +571,7 @@ def build_messages(ctx: dict, world: dict) -> list:
 
     lines.append("")
     lines.append("Say one thing to them now.")
-    return [{"role": "system", "content": PERSONA},
+    return [{"role": "system", "content": SPEAKERS[ctx.get("who", "baye")]},
             {"role": "user", "content": "\n".join(lines)}]
 
 
@@ -571,13 +656,25 @@ class Handler(BaseHTTPRequestHandler):
         return webauth.read_session(token, CFG.session_secret)
 
     def _body(self):
+        """Read the request body, ONCE.
+
+        It is a socket, so a second call gets nothing — and since the limiter
+        started keying on the speaker, which arrives in the body, there are two
+        callers where there was one. Cached rather than reordered, because the
+        order that reads the body before checking the session is the order that
+        lets an unauthenticated request allocate 16 kB.
+        """
+        if getattr(self, "_cached", None) is not None:
+            return self._cached
         n = int(self.headers.get("Content-Length") or 0)
         if n <= 0 or n > 16384:                 # a game state, not an upload
-            return {}
+            self._cached = {}
+            return self._cached
         try:
-            return json.loads(self.rfile.read(n) or b"{}")
+            self._cached = json.loads(self.rfile.read(n) or b"{}")
         except ValueError:
-            return {}
+            self._cached = {}
+        return self._cached
 
     # -- routes --
     def do_GET(self):
@@ -603,12 +700,19 @@ class Handler(BaseHTTPRequestHandler):
         user = self._user()
         if not user:
             return self._send(401, {"ok": False, "error": "not signed in"})
-        refused = LIMIT.check(user)
+        # Per user AND per speaker. The gap exists so that one voice is not a
+        # machine gun, not so that two of them have to take turns — a cat who
+        # cannot answer because she spoke twenty seconds ago is a cat who never
+        # answers at all, since she talks more than he does.
+        body = self._body()
+        who = body.get("who") if isinstance(body, dict) else None
+        who = who if who in SPEAKERS else "baye"
+        refused = LIMIT.check(f"{user}/{who}")
         if refused:
             return self._send(refused[0], {"ok": False, "error": refused[1]})
 
         t0 = time.time()
-        ctx = clean_context(self._body())
+        ctx = clean_context(body)
         world = WORLD.snapshot()
         try:
             msgs = build_messages(ctx, world)
@@ -626,7 +730,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(502, {"ok": False, "error": str(e)[:200]})
 
         ms = int((time.time() - t0) * 1000)
-        print(f"[line] {user} {ms}ms {usage.get('total_tokens', 0)}tok "
+        print(f"[line] {user}/{ctx.get('who', 'baye')} {ms}ms "
+              f"{usage.get('total_tokens', 0)}tok "
               f"{len(audio)}B :: {text}", flush=True)
         return self._send(200, {
             "ok": True, "text": text, "ms": ms,

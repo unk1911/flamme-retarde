@@ -23367,6 +23367,18 @@ async function buildJadrija(scene) {
     c.at[1] += Math.sin(c.head) * step;
   }
 
+  /**
+   * The one thing that has just happened TO the cat, read once and gone.
+   *
+   * A queue of one, because a cat who is still talking about the hose four
+   * lines later is a cat with a grievance rather than a cat, and because the
+   * voice service is asked for a line every ninety-odd seconds while the hose
+   * lands sixty times a second. Whatever is in here when he is next asked is
+   * what he answers about; everything else is water under the table.
+   */
+  let catNewsQ = null;
+  function catNews() { const v = catNewsQ; catNewsQ = null; return v; }
+
   /** Where he is, for the jet to aim at. Read once a trace by 47-ground.js. */
   function catProbe() {
     if (!cat || !cat.mesh.visible) return null;
@@ -23397,6 +23409,8 @@ async function buildJadrija(scene) {
     c.soak = CAT.soak;
     if (already) return;
     audio.meow(1, c.hear);
+    catNewsQ = 'they have just turned a fire hose on you, under the table, '
+      + 'for no reason you can see';
     // The far table, not the near one. `dir` is flipped rather than a target
     // chosen, so he goes on working the row afterwards from wherever he
     // fetched up instead of having a hole in his routine where the bolt was.
@@ -28667,6 +28681,25 @@ async function buildJadrija(scene) {
      * Added for the voice (49-voice.js), which needs one number this module
      * already has and would otherwise have to recompute from the debug tree.
      */
+    /**
+     * How far the cat is from you, in metres, and anything that has just been
+     * done to him — or `null` when there is no cat.
+     *
+     * The same shape and the same job as `bayeGap` below, and measured the
+     * same way: against the WALKER and not against the camera, because with
+     * the third person swung round the camera can be ten metres from where you
+     * are standing and "is he near me" has to mean you or it means nothing.
+     *
+     * `spot` is the terrace, always, because that is where he lives — he is
+     * never anywhere else and a place that never changes is worth saying once
+     * rather than deriving every time.
+     */
+    catGap: () => (cat && show && show.pt != null)
+      ? { m: Math.hypot(cat.at[0] - show.pt, cat.at[1] - show.ps),
+        mode: cat.mode, wet: cat.soak > 0,
+        news: catNews(),
+        spot: 'under the tables outside the slasticarnica, the ice-cream shop' }
+      : null,
     bayeGap: () => (show && show.pt != null && show.t != null)
       ? { m: Math.hypot(show.t - show.pt, show.s - show.ps),
         phase: show.phase, withYou: !!show.withYou, indoors: sheIsIn(),

@@ -51,6 +51,39 @@ const VOICE = {
 };
 
 /**
+ * And the cat, who is the second thing on this beach with a voice.
+ *
+ * Misha, 4 Sep 2026: "it almost becomes like a character from Master i
+ * Margarita, the talking cat, u know the one i'm talking about?" Behemoth. The
+ * persona lives on the server with hers — see `PERSONA_CAT` in
+ * server/baye/baye.py — and everything out here is only about WHEN.
+ *
+ * Three numbers differ from hers and each is the same observation from a
+ * different side: he is a cat under a table, and she is a woman following you
+ * down a promenade.
+ *
+ * `near` is 9 and not 16, because you have to go to him. She arrives; he does
+ * not, and a cat who starts talking from across the terrace is a cat who is
+ * following you, which is the one thing this one is not.
+ *
+ * `gap` is 95 and not 52 for the same reason the routine gives her a barre
+ * roll of one in twenty-two: a character who says something every time you are
+ * near them is a machine, and the rarer of the two has to be the one who does
+ * not want anything from you.
+ */
+const CAT_VOICE = {
+  near: 9,
+  far: 15,
+  gap: 95,
+  jitter: 70,
+  memory: 5,
+  hold: 4.5,
+  /** And how long after the hose he will still bring it up. Past this the
+   *  grievance is stale and he is back to the weather. */
+  news: 25,
+};
+
+/**
  * What to call each locale, in words she can say.
  *
  * `localeAt` answers with an object, not a name — it is machinery for deciding
@@ -69,13 +102,35 @@ const voice = (() => {
   /** The player's switch. On by default — but nothing happens without a
    *  session, so "on" is only a statement of intent until you sign in. */
   let on = true;
+  /**
+   * ONE `busy` FOR BOTH OF THEM, and it is the only thing they share.
+   *
+   * There is one pair of speakers and one subtitle line. Two voices in the
+   * same three seconds is not two characters, it is a fault — and this is the
+   * same voice twice, so it would not even sound like two people arguing, it
+   * would sound like one person talking over herself. Whoever asks first gets
+   * the line; the other one's clock has not moved and it will try again on the
+   * next frame it is allowed to.
+   */
   let busy = false;
   let clock = 0;
-  let nextAt = 0;
-  let inRange = false;
-  let said = [];              // her own last few lines, sent back as "not these"
   const seen = [];            // locales you have actually stood in, in order
   let capT = 0;               // how long the subtitle has left
+
+  /**
+   * Per speaker: when it may next talk, whether you are inside its range, and
+   * the last few things it said — which go back up as "not these".
+   *
+   * `said` is deliberately NOT shared. She should not avoid a line because the
+   * cat used it; they are different characters and the overlap between a
+   * flirtatious woman and an affronted tomcat is not where the repetition is.
+   */
+  const CAST = {
+    baye: { key: 'baye', cfg: VOICE, said: [], nextAt: 0, inRange: false,
+      gap: () => at(() => jadrija.bayeGap()), lead: null },
+    cat: { key: 'cat', cfg: CAT_VOICE, said: [], nextAt: 0, inRange: false,
+      gap: () => at(() => jadrija.catGap()), lead: 'The cat: ' },
+  };
 
   /**
    * Read something out of the game without caring whether it is there.
@@ -132,11 +187,13 @@ const voice = (() => {
     return kind;
   }
 
-  /** Everything she is allowed to know, in the shape the service expects. */
-  function context(gap) {
+  /** Everything the speaker is allowed to know, in the shape the service
+   *  expects. */
+  function context(sp, gap) {
     const p = here();
     const kind = noteWhere();
-    const c = { lang: at(() => LANG, 'en'), seen: seen.slice(-8), said: said.slice(-VOICE.memory) };
+    const c = { who: sp.key, lang: at(() => LANG, 'en'), seen: seen.slice(-8),
+      said: sp.said.slice(-sp.cfg.memory) };
 
     c.phase = state.phase === 'swim' ? 'in the water with you'
       : state.phase === 'ground' ? 'on foot on the beach beside you'
@@ -200,10 +257,16 @@ const voice = (() => {
    * a seven-second line — the caption outran the voice, which is the one thing
    * a subtitle must never do. `ask` starts the clock when playback resolves.
    */
-  function caption(text) {
+  function caption(text, lead) {
     const el = $('saying');
     if (!el) return;
-    el.textContent = text || '';
+    // WHO IS TALKING HAS TO BE ON THE LINE, and only once there were two of
+    // them. Both of them are the same ElevenLabs voice — Misha asked for that
+    // — so with the sound on there is nothing but the words to tell a woman
+    // leaning on a rail from a cat under a table, and with the sound off there
+    // is nothing at all. Hers stays bare, because a subtitle that says who is
+    // speaking when only one thing speaks is a system message; his is led.
+    el.textContent = text ? (lead || '') + text : '';
     el.hidden = !text;
     capT = text ? 1e9 : 0;
   }
@@ -217,16 +280,17 @@ const voice = (() => {
    * for a moment, she says something; that is what it looks like from outside
    * and it is also exactly what is happening.
    */
-  async function ask() {
+  async function ask(sp, gap) {
     if (busy || !AUTH.user || !AUTH.baye) return;
     busy = true;
-    const gap = at(() => jadrija.bayeGap());
     try {
       const r = await fetch(AUTH.baye + '/line', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(context(gap)),
+        body: JSON.stringify(sp.pend
+          ? Object.assign(context(sp, gap), { event: sp.pend })
+          : context(sp, gap)),
       });
       const d = await r.json().catch(() => null);
       if (!d || !d.ok) {
@@ -234,23 +298,75 @@ const voice = (() => {
         // — it means she is being asked too often, which is a bug in the gap
         // above, not something the player did. Anything else is worth a line in
         // the console and nothing on screen.
-        if (r.status !== 429) console.warn('baye:', d && d.error);
-        nextAt = clock + 30;
+        if (r.status !== 429) console.warn(sp.key + ':', d && d.error);
+        sp.nextAt = clock + 30;
         return;
       }
-      said.push(d.text);
-      if (said.length > VOICE.memory) said.shift();
-      caption(d.text);
-      nextAt = clock + VOICE.gap + Math.random() * VOICE.jitter;
+      // Spent, whether it was used or not. A grievance that survives its own
+      // answer is a speaker who brings the hose up for the rest of the
+      // afternoon.
+      sp.pend = null;
+      sp.said.push(d.text);
+      if (sp.said.length > sp.cfg.memory) sp.said.shift();
+      caption(d.text, sp.lead);
+      sp.nextAt = clock + sp.cfg.gap + Math.random() * sp.cfg.jitter;
       await audio.voice(d.audio);
-      // She has stopped. NOW the subtitle gets its few seconds and goes.
-      capT = VOICE.hold;
+      // They have stopped. NOW the subtitle gets its few seconds and goes.
+      capT = sp.cfg.hold;
     } catch (e) {
-      console.warn('baye:', e.message);
-      nextAt = clock + 45;
+      console.warn(sp.key + ':', e.message);
+      sp.nextAt = clock + 45;
     } finally {
       busy = false;
     }
+  }
+
+  /**
+   * Whether one speaker wants the line this frame, and its range hysteresis.
+   *
+   * Returns the gap when it is ready to talk and `null` otherwise, so the
+   * caller can decide between two of them without either of them having
+   * already committed.
+   */
+  /**
+   * Pick up anything that has just been done to a speaker.
+   *
+   * ITS OWN FUNCTION BECAUSE `catGap` HANDS THE NEWS OVER ONCE. Whoever calls
+   * the gap consumes it, so every path that reads a gap has to pass it through
+   * here or the grievance is dropped on the floor — which is exactly what
+   * `voice.now('cat')` did the first time: it fetched its own gap, ate the
+   * hose, and asked the model a question with no hose in it.
+   */
+  function takeNews(sp, gap) {
+    if (gap && gap.news) {
+      sp.pend = gap.news;
+      sp.newsAt = clock;
+      // And he answers it soon rather than on his own clock. Ninety seconds
+      // after the water is not a reaction, it is a memoir.
+      sp.nextAt = Math.min(sp.nextAt, clock + 1.2);
+    }
+    // A grievance goes stale. See `CAT_VOICE.news`.
+    if (sp.pend && clock - (sp.newsAt || 0) > (sp.cfg.news || 25)) sp.pend = null;
+    return gap;
+  }
+
+  function poll(sp) {
+    const gap = takeNews(sp, sp.gap());
+    if (!gap) { sp.inRange = false; return null; }
+    // Hysteresis: `near` to come in, `far` to fall out. One threshold makes a
+    // player standing exactly on it start and stop them every other frame.
+    if (!sp.inRange && gap.m <= sp.cfg.near) {
+      sp.inRange = true;
+      // They notice you rather than continuing whatever they were mid-way
+      // through: a first line within a couple of seconds of walking up is the
+      // difference between a character and a loudspeaker.
+      sp.nextAt = Math.min(sp.nextAt, clock + 1.5);
+    } else if (sp.inRange && gap.m > sp.cfg.far) {
+      sp.inRange = false;
+      return null;
+    }
+    if (!sp.inRange) return null;
+    return clock >= sp.nextAt ? gap : null;
   }
 
   /**
@@ -258,34 +374,28 @@ const voice = (() => {
    *
    * Cheap in the common case on purpose: this runs at Jadrija, where the frame
    * budget is already spent on eight hundred people, and the answer is almost
-   * always "she is not near you, do nothing".
+   * always "nobody is near you, do nothing".
    */
   function step(dt) {
     if (capT > 0 && (capT -= dt) <= 0) caption('');
     if (!on || !AUTH.user) return;
     if (state.phase !== 'ground' && state.phase !== 'swim') {
-      if (inRange) { inRange = false; audio.hush(); }
+      let any = false;
+      for (const k in CAST) { any = any || CAST[k].inRange; CAST[k].inRange = false; }
+      if (any) audio.hush();
       return;
     }
-    const gap = at(() => jadrija.bayeGap());
-    if (!gap) return;
-    // Hysteresis: `near` to come in, `far` to fall out. One threshold makes a
-    // player standing exactly on it start and stop her every other frame.
-    if (!inRange && gap.m <= VOICE.near) {
-      inRange = true;
-      // She notices you rather than continuing whatever she was mid-way
-      // through: a first line within a couple of seconds of walking up is the
-      // difference between a character and a loudspeaker.
-      nextAt = Math.min(nextAt, clock + 1.5);
-    } else if (inRange && gap.m > VOICE.far) {
-      inRange = false;
-      audio.hush();
-      caption('');
-      return;
-    }
-    if (!inRange) return;
     clock += dt;
-    if (clock >= nextAt) ask();
+    // HIM FIRST, and it is not a preference. He speaks about one time in two
+    // of hers and only when you have walked over to him, so a frame where both
+    // are ready is a frame where the rarer of the two is the one worth having
+    // — and she will take the next one, because losing the race does not move
+    // her clock. Ordered the other way round he would have been drowned out on
+    // the terrace, which is the one place he exists.
+    for (const sp of [CAST.cat, CAST.baye]) {
+      const gap = poll(sp);
+      if (gap) { ask(sp, gap); return; }
+    }
   }
 
   /** The switch, and what it says when you flip it. */
@@ -301,16 +411,51 @@ const voice = (() => {
     step,
     toggle,
     get on() { return on; },
-    get near() { return inRange; },
-    /** For a probe: what she has said this session, and where she thinks she is. */
-    stats: () => ({ on, inRange, busy, said: said.slice(), seen: seen.slice(),
-      nextIn: +Math.max(0, nextAt - clock).toFixed(1),
-      gap: at(() => { const g = jadrija.bayeGap(); return g ? +g.m.toFixed(1) : null; }),
-      user: AUTH.user }),
+    get near() { return CAST.baye.inRange || CAST.cat.inRange; },
+    /** For a probe: what each of them has said this session, and where they
+     *  think they are. */
+    stats: () => {
+      const o = { on, busy, seen: seen.slice(), user: AUTH.user };
+      for (const k in CAST) {
+        const sp = CAST[k];
+        const g = sp.gap();
+        o[k] = { inRange: sp.inRange, said: sp.said.slice(),
+          nextIn: +Math.max(0, sp.nextAt - clock).toFixed(1),
+          pend: sp.pend || null,
+          gap: g ? +g.m.toFixed(1) : null };
+      }
+      // The shape the settings panel and the older probes read. Kept, because
+      // one of them is a screenshot plan on disk and the other is a habit.
+      o.inRange = CAST.baye.inRange;
+      o.said = CAST.baye.said.slice();
+      o.nextIn = o.baye.nextIn;
+      o.gap = o.baye.gap;
+      return o;
+    },
     /** Say something now, whatever the clock thinks. For testing, and for the
      *  settings panel's "say something" button. */
-    now: () => { nextAt = 0; clock += 1e6; return ask(); },
-    context: () => context(at(() => jadrija.bayeGap())),
+    now: (who = 'baye') => {
+      const sp = CAST[who] || CAST.baye;
+      // NO `clock += 1e6` ANY MORE, and it cost an afternoon. It was the old
+      // way of saying "never mind the gap" back when `step` was the only thing
+      // that called `ask`, and it is now actively wrong: `takeNews` stamps a
+      // grievance with the clock and throws it away when it is more than
+      // twenty-five seconds old, so jumping the clock eleven days forward made
+      // the hose that had just landed instantly stale. The request went out
+      // with no event in it and the cat talked about the weather. `ask` is
+      // called straight from here, so the gap never needed jumping at all —
+      // clearing `nextAt` is enough to let `step` have another go if this one
+      // finds the line busy.
+      sp.nextAt = 0;
+      return ask(sp, takeNews(sp, sp.gap()));
+    },
+    context: (who = 'baye') => {
+      const sp = CAST[who] || CAST.baye;
+      const gap = takeNews(sp, sp.gap());
+      return sp.pend
+        ? Object.assign(context(sp, gap), { event: sp.pend })
+        : context(sp, gap);
+    },
   };
 })();
 

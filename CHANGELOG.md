@@ -8,6 +8,77 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.231.0] — 2026-09-04
+
+### The cat talks, and he is not pleased
+
+Misha: *"it should use, just like our NPC Baye, that saultry voice from eleven
+labs, and reply with some witty remarks, relevant to what is happening in the
+game... and then it almost becomes like a character from Master i Margarita, the
+talking cat, u know the one i'm talking about?"* Behemoth. Everybody knows the
+one.
+
+He is a second speaker on the same service — same session check, same rate
+limiter, same model, **same voice**. Jessica, exactly as asked, and that is the
+joke rather than a shortcut: a grand insolent tomcat in a sultry voice is
+funnier than one in a cat voice, and it is the joke Bulgakov is making too —
+nothing about Behemoth is adjusted for the fact that he is a cat.
+
+`PERSONA_CAT` in server/baye/baye.py is the whole character, and the one rule
+that keeps him funny is that **he never acknowledges being a cat**. The moment
+he says "as a cat, I..." it is over. He simply is one, and the fact is beneath
+comment — so no paws, no whiskers, no purring, no feline puns. What he does
+instead is take offence:
+
+> *A fire hose, Messire? Your methods are barbaric, your aim is theatrical, and
+> my dignity is now entirely aquatic.*
+>
+> *You turn a fire hose on a gentleman beneath the tables, then stroll the
+> peninsula as though civilisation had not just collapsed.*
+>
+> *The peninsula has brought you on foot to my tables, Messire, which is
+> progress of a sort, though hardly an achievement.*
+
+**Three numbers differ from hers**, and each is the same observation from a
+different side: he is a cat under a table and she is a woman following you down
+a promenade. `near` is 9 m and not 16, because you have to go to him — she
+arrives, he does not, and a cat who starts talking from across the terrace is a
+cat who is following you. `gap` is 95 s and not 52, because the rarer of the two
+has to be the one who does not want anything from you. And the subtitle is led
+with **"The cat:"** where hers stays bare: both are the same ElevenLabs voice,
+so with the sound on there is nothing but the words to tell them apart, and with
+the sound off there is nothing at all.
+
+**One `busy` for both of them**, and it is the only thing they share. Two voices
+in the same three seconds is not two characters, it is a fault — and being the
+same voice twice it would not even sound like an argument, it would sound like
+one person talking over herself. The cat is polled first: he speaks about half
+as often and only when you have walked over to him, so a frame where both are
+ready is a frame where the rarer of the two is worth having. She loses nothing,
+because losing the race does not move her clock.
+
+**Being hosed is an event, not a state.** `catWet` queues one line of news;
+`catGap` hands it over **once**; `takeNews` stamps it with the clock and throws
+it away after twenty-five seconds, because a cat still talking about the water
+ninety seconds later has a grievance rather than a hose. The limiter keys on
+`user/speaker` now, so the cat answering does not cost her a line.
+
+Two bugs found by watching the actual request body rather than the reply:
+
+- **`voice.now()` bumped the clock by 1e6** to jump the gap — an idiom from when
+  `step` was the only caller of `ask`. With a staleness window keyed on that
+  clock, it made a hose that had just landed instantly eleven days old, so the
+  request went out with no event and the cat talked about the weather. `ask` is
+  called straight from `now` and never needed the jump.
+- **The persona ranked RIGHT NOW above JUST NOW**, so a cat with a fire hose on
+  him talked about the shade of the ice-cream shop. The outrage goes first, and
+  answers alone.
+
+Verified end to end on the live site with a minted session: walk into range and
+he notices you; turn the branch on him and the next request carries
+`event: they have just turned a fire hose on you`, and back comes the siege
+engine.
+
 ## [1.230.0] — 2026-09-04
 
 ### Spray the cat and he tells you what he thinks of it

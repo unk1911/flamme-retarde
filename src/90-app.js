@@ -5944,14 +5944,15 @@ window.__fr = {
   /** The help sheet. Toggles when called with nothing, like `body`. */
   help: (v) => { toggleHelp(v); return !$('help').hidden; },
   /**
-   * Baye's voice. `voice()` is what she is doing, `voice.say()` makes her
-   * say something now without waiting out the gap, and `voice.on(false)`
-   * is the switch. `sheet()` opens the sign-in.
+   * The voices. `voice()` is what both of them are doing, `voice.say()` makes
+   * one say something now without waiting out the gap, and `voice.on(false)`
+   * is the switch. There are two speakers on this beach — Baye and the cat —
+   * so `say` and `context` take a name: `__fr.voice.say('cat')`.
    */
   voice: Object.assign(() => voice.stats(), {
-    say: () => voice.now(),
+    say: (who) => voice.now(who),
     on: (v) => voice.toggle(v),
-    context: () => voice.context(),
+    context: (who) => voice.context(who),
   }),
   /** Who the page thinks you are, asked fresh rather than remembered. */
   who: () => authWhoami(),
