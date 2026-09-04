@@ -8,6 +8,56 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.175.0] — 2026-09-04
+
+### First position has the heels together
+
+*"they are ok but sometimes she stands kinda crooked or weird."* It is not a
+lean and it is not the transitions. It is the stance, and it was in every key
+of the clip: measured in the running game, her heels stood **0.547 m apart** in
+what this file calls first position and **0.677 m** in the plié. First position
+has the heels *touching*.
+
+**The turnout was not what did it**, which is why it survived a fitting pass.
+`out` is a twist about the thigh's own axis and a twist cannot move an ankle —
+except that this rig's rest leg is a shallow V, 6.5° at the thigh and 9.3° at
+the shin, so rolling the thigh swings the shin's own offset round with it and
+walks the ankle outward 0.22 m a side. `track`, the abduction, is what pays that
+back, and every leg in the file had it set to **+2 or +4 — the wrong way**.
+
+On one leg it was worse than untidy. The supporting ankle came out **0.31 m from
+her own midline**, so every retiré, développé, piqué, attitude and arabesque was
+balanced on a leg that was nowhere underneath her. That is the crooked.
+
+So the supporting legs are on the solver now, like everything else: heels 0.116 m
+apart in first, ankle under the midline on one leg, turnout held at 44° so it
+does not get sold off to buy the last millimetre, and whatever `track` that
+takes. `fit_leg` also gained a flat-sole pass — a demi-plié tips the shin forward
+and a fixed ankle tips the foot with it, which lifts the heel, and a plié with
+the heels up is a squat on tiptoe. **The condition is that the heel and the ball
+are at the same height, which is one number and is turnout-invariant**; matching
+the full sole direction against a reference foot that was not turned out bought
+the lateral part with pitch, drove the ball 50 mm through the deck, and had the
+floor pass lift the whole figure 54 mm to get it out.
+
+**The plié is a plié now.** It was typed as a wide second and went down 22 mm.
+It is a demi-plié in first, the heels exactly where first position left them, the
+knees tracking out over the toes, and it goes down **102 mm**.
+
+**The retiré's foot is at the knee.** It sat 0.19 m clear of it — a woman
+standing on one leg, not a passé. Four free numbers just place a knee and an
+ankle, except that turnout is bounded at 46° (past that the hip weights fold) and
+turnout is exactly what swings a folded shin inward. So the two targets are
+weighted unevenly: what an eye checks in a retiré is whether the toe is *at* the
+knee, and a thigh two hand's-breadths off its ideal angle is a thing only a
+teacher sees.
+
+And the barre: the hand is fitted to the top of the rail rather than to its axis
+— it was being asked to hold a bar running through its own palm — and the lean
+is 6° standing and **0° in the plié**, because a plié that goes down 102 mm
+brings her shoulder to the rail on its own. Eleven degrees on top of that read as
+a list.
+
 ## [1.174.0] — 2026-09-03
 
 ### The lay figures on the quay are people now, and so are the sunbathers

@@ -177,9 +177,47 @@ def climb(seed, apply, score, lo, hi, iters=5000, sigma=9.0, seedn=1):
     return x, f
 
 
-def fit_leg(base, side, knee_at, ankle_at, seed, iters=6000):
+# Which way the sole points when she is standing on it, measured off the rig
+# rather than assumed. Filled in by `_sole()` the first time anything asks.
+FLAT_SOLE = None
+
+
+def _sole():
+    global FLAT_SOLE
+    if FLAT_SOLE is None:
+        p = pose()
+        leg(p, "R", hip=-4, knee=3, out=0, track=0, ankle=-4, toe=2)
+        g = fk(p, ("footR", "toeR"))
+        FLAT_SOLE = tuple((g["toeR"] - g["footR"]).normalized())
+    return FLAT_SOLE
+
+
+def fit_leg(base, side, knee_at, ankle_at, seed, iters=6000, flat=False,
+            out_lo=22.0, w_knee=400.0, w_ankle=400.0):
     """Fit (hip, knee, out, track, ankle) so the knee and ankle land where a
-    ballet position says they do."""
+    ballet position says they do.
+
+    `flat` adds a second pass on the ankle alone that keeps the sole on the
+    deck — see the note down at the bottom of the fit.
+
+    `w_knee` and `w_ankle` weight the two targets against each other, and the
+    retire needs them uneven. Four free numbers — hip, knee, out, track — is
+    just enough to place a knee and an ankle, except that `out` is bounded at
+    46 degrees because past that the hip weights on this mesh fold, and the
+    turnout is exactly what swings a folded shin in toward the supporting leg.
+    Weighted evenly, the fit spent its budget on the knee and left the foot
+    0.19 m clear of the knee it is meant to be touching. What an eye reads in a
+    retire is whether the toe is AT the knee; a thigh two hand's-breadths off
+    its ideal angle is a thing only a teacher sees.
+
+    `out_lo` raises the floor under the turnout. The standing positions need
+    it: turnout is what a first position LOOKS like, and with the ankle pinned
+    under her the fit will otherwise sell the turnout to buy the last
+    millimetre of ankle, because rolling the thigh is what pushes the ankle out
+    in the first place. Asked freely it came back with 23 degrees, which is a
+    person standing with their feet slightly apart. Held at 44 it comes back
+    with the same ankle and a foot that is turned out.
+    """
     want = ("legL" + side, "foot" + side, "toe" + side)
 
     def apply(v):
@@ -190,17 +228,50 @@ def fit_leg(base, side, knee_at, ankle_at, seed, iters=6000):
 
     def score(p):
         g = fk(p, want)
-        return (400.0 * (g["legL" + side] - Vector(knee_at)).length_squared
-                + 400.0 * (g["foot" + side] - Vector(ankle_at)).length_squared)
+        return (w_knee * (g["legL" + side] - Vector(knee_at)).length_squared
+                + w_ankle * (g["foot" + side] - Vector(ankle_at)).length_squared)
 
     # The ankle and the toe are FIXED, not fitted: the ankle joint's position
     # does not depend on them, so the fitter has no signal and wanders — and
     # left to wander it picked +35 for the arabesque, which is a raised leg
     # with the toes turned UP. A ballet foot is pointed, always, and turnout is
     # bounded because past about 46 deg the hip weights on this mesh fold.
-    lo = [-140, 0, 22, -40, seed[4], seed[5]]
+    lo = [-140, 0, out_lo, -40, seed[4], seed[5]]
     hi = [140, 150, 46, 110, seed[4], seed[5]]
     x, f = climb(seed, apply, score, lo, hi, iters=iters)
+    if not flat:
+        return x, f
+    # Except when the sole has to stay on the deck. A demi-plie tips the shin
+    # forward fifteen-odd degrees and a fixed ankle angle tips the foot with
+    # it, which lifts the heel — and a plie with the heels off the floor is not
+    # a plie, it is a squat on tiptoe. So one more pass, on the ankle alone,
+    # against the direction the sole points when she is standing flat: the
+    # ankle joint's POSITION still does not depend on it, so the fit above is
+    # untouched and this cannot pull the knee anywhere.
+    # ON THE VERTICAL COMPONENT ONLY, and that is the whole of getting this
+    # right. The first version matched the sole's full direction against a
+    # reference foot, and the reference was not turned out: with 44 degrees of
+    # turnout the sole points sideways as well as forward, so matching all
+    # three components made the fit buy the lateral part with PITCH. It came
+    # back with sixteen degrees of plantarflexion — toes driven down — which
+    # put the ball of her foot 50 mm through the deck and then had
+    # `ballet_floor` lift the whole figure 54 mm to get it out, and the barre
+    # arm, fitted against that, ended 66 mm above the rail.
+    #
+    # What "flat" means is that the heel and the ball are at the same height.
+    # That is one number, it does not care which way the foot is pointing, and
+    # it is turnout-invariant.
+    want_z = _sole()[2]
+    best, bv = None, x[4]
+    for k in range(201):
+        a = -60.0 + k * 0.5
+        y = list(x); y[4] = a
+        g = fk(apply(y), ("foot" + side, "toe" + side))
+        d = (g["toe" + side] - g["foot" + side]).normalized()
+        e = (d.z - want_z) ** 2
+        if best is None or e < best:
+            best, bv = e, a
+    x = list(x); x[4] = bv
     return x, f
 
 
@@ -244,7 +315,10 @@ def fit_arm(base, side, hand_at, elbow_at, seed, iters=6000, bend=False):
     lo = [-180, -12, -90, -105, -14, -50, -22, -20, -20]
     hi = [70, 12, 60, -2, 14, 60, 22, 20, 30]
     if bend:
-        lo, hi, seed = lo + [0.0], hi + [11.0], list(seed) + [4.0]
+        # Six degrees and not eleven. Eleven was fitted against a plie that
+        # went down 22 mm; it goes down 102 now, so her shoulder arrives at the
+        # rail on its own and a lean that big just reads as a list.
+        lo, hi, seed = lo + [0.0], hi + [6.0], list(seed) + [3.0]
     x, f = climb(seed, apply, score, lo, hi, iters=iters)
     return x, f
 
@@ -256,13 +330,17 @@ def fit_arm(base, side, hand_at, elbow_at, seed, iters=6000, bend=False):
 # doing and where the arms are — over a supporting leg that is straight and,
 # in five of the seven, risen.
 
-# PLIE. Second position: feet apart and turned out, knees bending straight out
-# over the toes, heels DOWN, back long, arms open low in front. The whole test
-# of a plie is whether the knees track over the toes or fall inward, which the
-# side view cannot see and the front view is entirely about.
+# PLIE. Demi-plie in FIRST, and both of those words are corrections.
+#
+# It used to be typed as a second position — `out=46, track=15` on both legs —
+# and measured in the running game that put her heels 0.677 m apart, which is
+# not a second, it is a straddle. And it went down 22 mm. A demi-plie goes down
+# a hand's breadth: the fitted one drops 117 mm, with the heels exactly where
+# first position left them and the knees tracking out over the toes, which is
+# the whole test of a plie and the one thing the front view is about.
 PLIE = pose()
-leg(PLIE, "L", hip=-9, knee=29, out=46, track=15, ankle=-6, toe=4)
-leg(PLIE, "R", hip=-9, knee=29, out=46, track=15, ankle=-6, toe=4)
+leg(PLIE, "L", hip=-24, knee=52, out=45, track=-11, ankle=27, toe=3)
+leg(PLIE, "R", hip=-25, knee=54, out=46, track=-6, ankle=28, toe=3)
 arms(PLIE,
      spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0), chest=(-2, 0, 0),
      neck=(0, 0, 0), head=(-2, -4, 0),
@@ -276,8 +354,8 @@ arm(PLIE, "R", "bas")
 # this rig, so a big positive number keeps a raised arm tucked against the head
 # rather than opening the oval a fifth position is.
 RELEVE = pose()
-leg(RELEVE, "L", hip=0, knee=2, out=40, track=4, ankle=-34, toe=28)
-leg(RELEVE, "R", hip=0, knee=2, out=40, track=4, ankle=-34, toe=28)
+leg(RELEVE, "L", hip=0, knee=0, out=44, track=-11, ankle=-32, toe=20)
+leg(RELEVE, "R", hip=1, knee=0, out=44, track=-6, ankle=-32, toe=20)
 arms(RELEVE,
      spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0), chest=(-3, 0, 0),
      neck=(0, 0, 0), head=(-2, 0, 0),
@@ -290,12 +368,18 @@ arm(RELEVE, "R", "fifth")
 # supporting knee, arms rounded in front in first. The first draft had the
 # thigh forward instead of out, which is a flamingo.
 #
+# The foot is now actually AT the knee, which it was not: measured in the game
+# it sat 0.19 m clear of it, and a retire whose foot is not touching anything
+# is a woman standing on one leg. Getting it there costs some of the thigh's
+# angle — see `w_knee` and `w_ankle` in `fit_leg` — and that is the right way
+# round, because the toe against the knee is the thing an eye checks.
+#
 # The turn itself is not in the pose — it is a full rotation written into
 # `pelvis` z across the clip's keys, so the clip spins her and the game does
 # not have to know anything about it.
 PIROU = pose()
-leg(PIROU, "L", hip=0, knee=2, out=40, track=2, ankle=-34, toe=28)
-leg(PIROU, "R", hip=-36, knee=117, out=46, track=12, ankle=-32, toe=20)
+leg(PIROU, "L", hip=0, knee=0, out=44, track=-14, ankle=-32, toe=20)
+leg(PIROU, "R", hip=-48, knee=111, out=46, track=-13, ankle=-32, toe=20)
 arms(PIROU,
      spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0), chest=(-3, 0, 0),
      neck=(0, 0, 0), head=(0, 0, 0),
@@ -308,8 +392,8 @@ arm(PIROU, "R", "first")
 # from the pirouette above is the arms and a foot carried a little further
 # forward; the difference the eye reads is that she has arrived somewhere.
 PIQUE = pose()
-leg(PIQUE, "L", hip=0, knee=1, out=40, track=2, ankle=-34, toe=28)
-leg(PIQUE, "R", hip=-60, knee=111, out=46, track=-15, ankle=-32, toe=20)
+leg(PIQUE, "L", hip=0, knee=0, out=44, track=-14, ankle=-32, toe=20)
+leg(PIQUE, "R", hip=-62, knee=110, out=46, track=-25, ankle=-32, toe=20)
 arms(PIQUE,
      spine01=(0, 0, 0), spine02=(0, -3, 0), spine03=(0, -3, 0), chest=(-3, 0, 0),
      neck=(0, 0, 0), head=(-4, 8, 0),
@@ -322,7 +406,7 @@ arm(PIQUE, "R", "second")
 # attitude and not a sloppy arabesque — the knee carried OUT and the foot
 # higher than the knee. One arm up in fifth, the other open to second.
 ATTITUDE = pose()
-leg(ATTITUDE, "L", hip=2, knee=2, out=40, track=2, ankle=-34, toe=28)
+leg(ATTITUDE, "L", hip=0, knee=0, out=44, track=-14, ankle=-32, toe=20)
 leg(ATTITUDE, "R", hip=43, knee=132, out=22, track=66, ankle=-32, toe=20)
 arms(ATTITUDE,
      spine01=(-8, 0, 0), spine02=(-6, 0, 0), spine03=(-5, 0, 0), chest=(-4, 0, 0),
@@ -341,7 +425,7 @@ arm(ATTITUDE, "R", "second")
 # first draft got wrong: 62 there is 28 degrees above the floor, not 28 below
 # the horizontal, and what it rendered was a woman wading.
 ARABESQUE = pose()
-leg(ARABESQUE, "L", hip=-10, knee=1, out=40, track=2, ankle=-34, toe=28)
+leg(ARABESQUE, "L", hip=0, knee=0, out=44, track=-14, ankle=-32, toe=20)
 leg(ARABESQUE, "R", hip=85, knee=19, out=22, track=-40, ankle=-32, toe=20)
 arms(ARABESQUE,
      spine01=(-22, 0, 0), spine02=(-10, 0, 0), spine03=(-6, 0, 0),
@@ -355,7 +439,7 @@ arm(ARABESQUE, "R", "back")
 # the end of it is only interesting because you watched it get there — so the
 # clip plays retire, half-open, and this.
 DEVELOPPE = pose()
-leg(DEVELOPPE, "L", hip=0, knee=1, out=40, track=2, ankle=-34, toe=28)
+leg(DEVELOPPE, "L", hip=0, knee=0, out=44, track=-14, ankle=-32, toe=20)
 leg(DEVELOPPE, "R", hip=-9, knee=6, out=46, track=95, ankle=-32, toe=20)
 arms(DEVELOPPE,
      spine01=(0, 0, 0), spine02=(0, 5, 0), spine03=(0, 6, 0), chest=(-3, 0, 0),
@@ -380,8 +464,13 @@ arm(DEVELOPPE, "R", "second")
 #
 # So she holds it for the plie and lets go for everything after, which is both
 # what the geometry allows and what a class actually looks like.
-LEAN_HOLD = 11.0
-LEAN_PLIE = 10.0
+#
+# Five degrees of lean and not eleven. Eleven was fitted against a plie that
+# only went down 22 mm; the plie goes down 117 now, so her shoulder arrives
+# nearly a hand's breadth closer to the rail on its own and the lean has that
+# much less to do. Eleven on top of it read as a list.
+LEAN_HOLD = 6.0
+LEAN_PLIE = 0.0
 
 
 def lean(p, deg):
@@ -394,9 +483,13 @@ def lean(p, deg):
 # First position, turned out, heels down, both arms low and rounded. The pose
 # every exercise starts and ends on, and the one the clip passes through
 # between positions so that nothing ever cuts from one shape to another.
+#
+# HEELS TOGETHER. They were 0.547 m apart, measured in the running game, which
+# is what "she stands kinda crooked" was: not a lean, a stance. The turnout was
+# never the culprit and is still 44 degrees — see the long note on TARGET_LEG.
 STAND = pose()
-leg(STAND, "L", hip=-4, knee=3, out=40, track=4, ankle=-4, toe=2)
-leg(STAND, "R", hip=-4, knee=3, out=40, track=4, ankle=-4, toe=2)
+leg(STAND, "L", hip=0, knee=0, out=44, track=-11, ankle=0, toe=3)
+leg(STAND, "R", hip=1, knee=0, out=44, track=-7, ankle=0, toe=3)
 arms(STAND, spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0),
      chest=(-2, 0, 0), neck=(0, 0, 0), head=(-2, 0, 0),
      clavicleL=(0, 0, 4), clavicleR=(0, 0, -4))
@@ -405,12 +498,12 @@ arm(STAND, "R", "bas")
 
 # The same, with her left hand on the rail.
 HOLD = pose()
-leg(HOLD, "L", hip=-4, knee=3, out=40, track=4, ankle=-4, toe=2)
-leg(HOLD, "R", hip=-4, knee=3, out=40, track=4, ankle=-4, toe=2)
+leg(HOLD, "L", hip=0, knee=0, out=44, track=-11, ankle=0, toe=3)
+leg(HOLD, "R", hip=1, knee=0, out=44, track=-7, ankle=0, toe=3)
 arms(HOLD, spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0),
      chest=(-2, 0, 0), neck=(0, 4, 0), head=(-2, 6, 0),
      clavicleL=(0, 0, 6), clavicleR=(0, 0, -4),
-     armUL=(12, 12, 11), armLL=(-2, 1, 16), handL=(-2, 6, 28))
+     armUL=(11, 12, 8), armLL=(-2, -14, 24), handL=(-4, 17, 17))
 arm(HOLD, "R", "bas")
 lean(HOLD, LEAN_HOLD)
 
@@ -418,7 +511,7 @@ lean(HOLD, LEAN_HOLD)
 # arm opening to second as she goes down.
 PLIE_B = dict(PLIE)
 arms(PLIE_B, neck=(0, 4, 0), head=(-2, 6, 0), clavicleL=(0, 0, 6),
-     armUL=(8, 12, 6), armLL=(-2, -14, 25), handL=(-20, 12, 29))
+     armUL=(-4, 12, -18), armLL=(-9, 14, 60), handL=(-19, 20, -10))
 arm(PLIE_B, "R", "second")
 lean(PLIE_B, LEAN_PLIE)
 
@@ -473,13 +566,68 @@ TARGET_ARM = {
 # angles unguessable. (knee joint, ankle joint) for the RIGHT leg, which is the
 # working one throughout: retire puts the foot at the supporting knee, attitude
 # carries it behind and above, arabesque takes it straight back to horizontal.
+# Knee and ankle, in her own frame, floor at z = 0 and the pelvis at 0.93.
+# `y` is her LEFT. The third entry is which leg, and it matters now: half of
+# these are supporting legs.
+#
+# WHY THE SUPPORTING LEGS ARE ON THIS LIST AT ALL, which is the change that
+# matters most in this file. Every one of them used to be typed as
+# `out=40, track=2` and left there, and measured in the running game that put
+# her heels 0.547 m apart in what the source calls first position and 0.677 in
+# the plie. First position has the heels TOUCHING. What she was standing in was
+# a straddle, and on one leg it was worse than untidy: the supporting ankle came
+# out 0.31 m from her own midline, so every retire, developpe, pique, attitude
+# and arabesque was balanced on a leg that was nowhere underneath her. That is
+# the "stands kinda crooked" — it is not a lean, it is a stance.
+#
+# The turnout is not what did it. `out` is a twist about the thigh's own axis
+# and a twist cannot move an ankle — except that this rig's rest leg is a
+# shallow V, 6.5 deg at the thigh and 9.3 at the shin, so rolling the thigh
+# swings the shin's own offset around with it and walks the ankle outward
+# 0.22 m a side. `track`, which is the abduction, is what pays that back, and it
+# was set to +2 or +4 — the wrong way. So the legs get fitted like everything
+# else in this file: heels 0.116 m apart in first, ankle under the midline on
+# one leg, and whatever `track` that takes.
 TARGET_LEG = {
-    "retire":   ((0.06, -0.36, 0.72), (0.03, -0.06, 0.50)),
-    "pique":    ((0.15, -0.34, 0.70), (0.11, -0.03, 0.49)),
-    "attitude": ((-0.22, -0.33, 0.78), (-0.34, -0.12, 1.02)),
-    "arabesque": ((-0.34, -0.09, 0.93), (-0.70, -0.05, 1.02)),
-    "plie":     ((0.06, -0.34, 0.55), (-0.02, -0.30, 0.10)),
-    "seconde":  ((0.06, -0.52, 1.02), (0.04, -0.90, 1.08)),
+    # The working leg, in the seven.
+    # RETIRE, and the ankle target is arithmetic rather than taste. The
+    # supporting knee lands at (0.03, +0.07, 0.47); a retire puts the working
+    # toe against it, and with 0.44 m of shin folded up from a knee that the
+    # thigh's own length pins at (0.05, -0.40, 0.62), the ankle that does that
+    # is at +0.02 on her midline and 0.49 up. It was asked for at -0.06 and
+    # came back at -0.11, which is a foot 0.19 m clear of the knee it is
+    # supposed to be touching — a flamingo, not a passe.
+    "retire":   ((0.05, -0.38, 0.63), (0.02, 0.00, 0.49), "R"),
+    "pique":    ((0.13, -0.34, 0.64), (0.09, 0.01, 0.49), "R"),
+    # Not raised, and the attempt is worth recording: asked for a knee at hip
+    # height the fit saturated — `out` on its bound, `track` near it — and paid
+    # for the extra 0.12 m by dropping the FOOT to the knee's own height, which
+    # is not an attitude at all. This rig's hip runs out of extension there.
+    "attitude": ((-0.22, -0.33, 0.78), (-0.34, -0.12, 1.02), "R"),
+    "arabesque": ((-0.34, -0.09, 0.93), (-0.70, -0.05, 1.02), "R"),
+    "seconde":  ((0.06, -0.52, 1.02), (0.04, -0.90, 1.08), "R"),
+    # First position, both feet on the floor: heels 0.116 apart, knees over
+    # them, and the toes wherever the turnout puts them.
+    "firstL":   ((0.025, 0.085, 0.455), (0.000, 0.058, 0.058), "L"),
+    "firstR":   ((0.025, -0.085, 0.455), (0.000, -0.058, 0.058), "R"),
+    # The same on demi-pointe. The ankle target does NOT go up: on demi-pointe
+    # the leg is the same length and the ankle joint is where it always was —
+    # what rises is HER, because the lowest point of the figure becomes the ball
+    # of a pointed foot and `ballet_floor` lifts the root to put it on the deck.
+    # Targeting the ankle 54 mm higher asked the fit to bend something to gain
+    # a centimetre it had no business gaining.
+    "riseL":    ((0.020, 0.085, 0.455), (0.000, 0.058, 0.058), "L"),
+    "riseR":    ((0.020, -0.085, 0.455), (0.000, -0.058, 0.058), "R"),
+    # And on ONE leg, where the ankle comes in under her: flat, and risen.
+    "supL":     ((0.020, 0.050, 0.455), (0.000, 0.022, 0.058), "L"),
+    "supRiseL": ((0.020, 0.050, 0.455), (0.000, 0.022, 0.058), "L"),
+    # Demi-plie in first. The heels stay exactly where first position put them
+    # — that is the whole test of a plie — the knees open out over the toes,
+    # and the ankle target is 0.117 m higher than first because the fit is run
+    # against a pelvis at its rest height and `ballet_floor` turns that
+    # difference into the depth she sinks.
+    "plieL":    ((0.150, 0.230, 0.550), (0.000, 0.058, 0.175), "L"),
+    "plieR":    ((0.150, -0.230, 0.550), (0.000, -0.058, 0.175), "R"),
 }
 
 
@@ -497,15 +645,25 @@ def fit(argv):
               % (name, x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8],
                  g["handL"].x, g["handL"].y, g["handL"].z, f))
     print("# --- legs (hip, knee, out, track, ankle, toe) ---")
-    for name, (knee_at, ankle_at) in TARGET_LEG.items():
-        # Pointed foot for anything off the floor; a plie keeps its heels down.
-        ank, toe = (-6, 4) if name == "plie" else (-32, 20)
-        x, f = fit_leg(BASE, "R", knee_at, ankle_at,
-                       [0, 40, OUT, 20, ank, toe])
+    for name, (knee_at, ankle_at, side) in TARGET_LEG.items():
+        # A foot on the deck keeps its sole on the deck and its toes only
+        # slightly gripped; a foot in the air is pointed, always.
+        onfloor = name.startswith(("first", "plie", "sup")) and "Rise" not in name
+        ank, toe = (-6, 3) if onfloor else (-32, 20)
+        # A stance is turned out on purpose; a working leg's turnout is
+        # whatever gets the foot where the position says.
+        stance = name.startswith(("first", "rise", "sup", "plie"))
+        tuck = name in ("retire", "pique")
+        x, f = fit_leg(BASE, side, knee_at, ankle_at,
+                       [0, 40, 44.0 if stance else OUT, 20, ank, toe],
+                       flat=onfloor, out_lo=44.0 if stance else 22.0,
+                       w_knee=120.0 if tuck else 400.0,
+                       w_ankle=900.0 if tuck else 400.0)
         p = dict(BASE)
-        leg(p, "R", hip=x[0], knee=x[1], out=x[2], track=x[3], ankle=x[4],
+        leg(p, side, hip=x[0], knee=x[1], out=x[2], track=x[3], ankle=x[4],
             toe=x[5])
-        g = fk(p, ("legLR", "footR"))
+        g = fk(p, ("legL" + side, "foot" + side))
+        g = {"legLR": g["legL" + side], "footR": g["foot" + side]}
         print("    %-10s hip=%.0f knee=%.0f out=%.0f track=%.0f ankle=%.0f "
               "toe=%.0f   knee(%+.2f %+.2f %+.2f) ankle(%+.2f %+.2f %+.2f) "
               "err %.4f"
@@ -563,12 +721,16 @@ def barre():
         base = dict(p)
         if name == "BARRE":
             base = dict(BASE)
-            leg(base, "L", hip=-4, knee=3, out=40, track=4, ankle=-4, toe=2)
-            leg(base, "R", hip=-4, knee=3, out=40, track=4, ankle=-4, toe=2)
+            leg(base, "L", hip=0, knee=0, out=44, track=-11, ankle=0, toe=3)
+            leg(base, "R", hip=1, knee=0, out=44, track=-7, ankle=0, toe=3)
             arm(base, "R", "bas")
         _who, low = H._lowest(rig, base)
         root = base.get("@root", (0, 0, 0))[2] + 0.004 - low
-        tgt = (RAIL[0], RAIL[1], RAIL[2] - root)
+        # ON the rail and not through it. `RAIL` is the tube's own axis; a
+        # hand resting on a 20 mm rail has its wrist joint a rail's radius plus
+        # half a hand above that, and fitting to the axis was asking her to
+        # hold a bar that runs through her palm. 45 mm.
+        tgt = (RAIL[0], RAIL[1], RAIL[2] + 0.045 - root)
         elb = (tgt[0] - 0.02, tgt[1] - 0.04, tgt[2] + 0.23)
         x, f = fit_arm(base, "L", tgt, elb,
                        [-6, 0, 26, -12, 0, 20, -4, 0, 8], bend=True)
