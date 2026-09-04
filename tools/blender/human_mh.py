@@ -5544,6 +5544,19 @@ NOTE_B = dict(NOTE_A, **{
 # where it is. What is left for the back is fifteen degrees, and fifteen
 # degrees is a person leaning, not a person hinged.
 WINE_REACH = dict(IDLE_A, **{
+    # Squared, and 1.199.0 is why. `wine_solve.py` strips every `@` key off
+    # `IDLE_A` before it solves — so the whole pour is fitted with the figure
+    # at the origin, and then `dict(IDLE_A, ...)` hands it back the idle
+    # root: a 20 mm shove to her LEFT, which is what puts a woman standing at
+    # ease over her supporting foot. She is on two feet here, `dip_legs` fits
+    # both, and the offset serves nothing.
+    #
+    # It is not cosmetic. Every millimetre of this solve is measured in her own
+    # frame from `kit.wine`, `showSettle` damps her on to that mark to 0.8 mm,
+    # and her palm lands 1 mm from the bottle's grip point — and then the bake
+    # translated all of it 20 mm sideways. On a bottle 77 mm across that is a
+    # quarter of its width. The z stays: `wine_floor` owns it.
+    "@root": (0.0, 0.0, -0.006),
     "fingersR": (-25.0, 0.0, 0.0),
     "thumbR": (-10.0, 0.0, 0.0),
     "spine01": (-14.9, -5.3, -3.8),
@@ -5569,6 +5582,7 @@ WINE_REACH = dict(IDLE_A, **{
 # as a touch. Solved with `HOLD` chained to `REACH`, so the only thing that
 # moves between them is the thing that is supposed to.
 WINE_HOLD = dict(IDLE_A, **{
+    "@root": (0.0, 0.0, -0.006),
     "fingersR": (-110.0, 0.0, 0.0),
     "thumbR": (-45.0, 0.0, 0.0),
     "spine01": (-15.7, -6.0, -4.0),
@@ -5597,6 +5611,7 @@ WINE_HOLD = dict(IDLE_A, **{
 # half a second, because a bottle that comes off a stool and starts pouring in
 # the same movement is a bottle nobody picked up.
 WINE_LIFT = dict(IDLE_A, **{
+    "@root": (0.0, 0.0, -0.006),
     "fingersR": (-110.0, 0.0, 0.0),
     "thumbR": (-45.0, 0.0, 0.0),
     "spine01": (-4.5, -1.9, -3.3),
@@ -5634,6 +5649,7 @@ WINE_LIFT = dict(IDLE_A, **{
 # there. A tighter band buys nothing except an arm that swings out of the pour
 # and back into it to satisfy it, and nothing pours at 77 degrees anyway.
 WINE_TIP = dict(IDLE_A, **{
+    "@root": (0.0, 0.0, -0.006),
     "fingersR": (-110.0, 0.0, 0.0),
     "thumbR": (-45.0, 0.0, 0.0),
     "spine01": (-4.4, -1.9, 2.9),
@@ -5688,6 +5704,7 @@ WINE_TIP = dict(IDLE_A, **{
 # perfectly on everything else. The shipped REACH and HOLD were at 0.045 with
 # 0.077 needed: three centimetres of bottle inside her arm, for a year.
 WINE_POUR = dict(IDLE_A, **{
+    "@root": (0.0, 0.0, -0.006),
     "fingersR": (-110.0, 0.0, 0.0),
     "thumbR": (-45.0, 0.0, 0.0),
     "spine01": (-6.5, -2.3, 6.0),
@@ -5720,6 +5737,7 @@ WINE_POUR = dict(IDLE_A, **{
 # `spine01`, which over the 0.65 s between the two keys is her whole torso
 # rocking in the middle of a held pour.
 WINE_POUR_B = dict(IDLE_A, **{
+    "@root": (0.0, 0.0, -0.006),
     "fingersR": (-110.0, 0.0, 0.0),
     "thumbR": (-45.0, 0.0, 0.0),
     "spine01": (-5.4, -2.0, 6.0),
@@ -5747,6 +5765,7 @@ WINE_POUR_B = dict(IDLE_A, **{
 # against a look target of (2.30, +0.21, 1.66) in her own frame, which is where
 # `kabina.standIn` puts somebody standing. See `wine_solve.py`.
 WINE_MEET = dict(IDLE_A, **{
+    "@root": (0.0, 0.0, -0.006),
     "fingersR": (-30.0, 0.0, 0.0),
     "thumbR": (-14.0, 0.0, 0.0),
     "spine01": (-3.1, 0.8, -3.0),

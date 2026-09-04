@@ -8,6 +8,36 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.217.0] — 2026-09-04
+
+### The pour was solved at the origin and shipped twenty millimetres to the left
+
+The ballet has now had the same fault found four separate times — the pelvis in
+1.196.0, `@root` in 1.199.0, the head in 1.211.0, the hands in 1.214.0 and the
+spine in 1.216.0 — and every one of them is the idle default leaking into a
+position that never overrode it. So this pass asked the pour the same question.
+
+`wine_solve.py` builds its base as
+`idle = {k: v for k, v in H.IDLE_A.items() if not k.startswith("@")}` — it
+**strips every `@` key** — so all seven poses are fitted with the figure at the
+origin. Then `human_mh.py` ships them as `dict(IDLE_A, **{...})`, which hands
+back `@root = (0, +0.020, −0.006)`: the 20 mm shove to her left that puts a
+woman standing at ease over her supporting foot. She is on two feet here,
+`dip_legs` fits both, and the offset serves nothing.
+
+It is not cosmetic, and the arithmetic is the whole argument. Every millimetre of
+this solve is measured in her own frame from `kit.wine`; `showSettle` damps her
+on to that mark to **0.8 mm**; her palm lands **1 mm** from the bottle's grip
+point. And then the bake translated all of it 20 mm sideways. On a bottle 77 mm
+across that is a quarter of its width.
+
+Squared on x and y in all seven poses. The z stays — `wine_floor` owns it.
+
+**And the pelvis stays cocked, which is the difference from the ballet.**
+`pelvis (0, 0, −2.5)` is in every wine pose too, and here it is right: a woman
+standing at a stool pouring a glass of wine stands on one hip. It is only wrong
+in a routine where being square *is* the position. Checked, and left alone.
+
 ## [1.216.0] — 2026-09-04
 
 ### Pulling up
