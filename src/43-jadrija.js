@@ -18977,7 +18977,13 @@ async function buildJadrija(scene) {
       }
       return WINE_R[WINE_R.length - 1][1];
     };
-    const FILLS = 6;
+    // TWENTY AND NOT SIX. The level runs 0.087 to 0.122 — 35 mm of glass —
+    // and six shells step it in 5.8 mm jumps, which at the distance this is
+    // looked at is a six-pixel stair every four tenths of a second on the one
+    // object in the room a player is watching. Twenty makes it 1.8 mm, under
+    // what the eye picks out of a moving surface, and the whole set costs
+    // about three and a half thousand triangles against a resort of 542,000.
+    const FILLS = 20;
     const wbufs = [];
     for (let f = 0; f < FILLS; f++) {
       const top = 0.0870 + (0.1220 - 0.0870) * (f / (FILLS - 1));
@@ -24661,7 +24667,14 @@ async function buildJadrija(scene) {
         const u = S.cur ? S.curT : 0;
         // On to the mark, over the first second, before the bottle leaves the
         // stool at 1.95. See `showSettle`.
-        if (u < 1.2) showSettle(kit.wine, dt);
+        // PLANTED BEFORE SHE REACHES, not while. This ran to 1.2 s against a
+        // clip whose REACH key was at 0.75 — so her hand was going to a bottle
+        // on a stool while her feet were still sliding the last centimetres on
+        // to the mark every millimetre of the solve is measured from. The
+        // reach is at 0.62 now, so the settle has to be finished before it:
+        // at rate 10 the 0.203 m she can arrive adrift is down to 0.8 mm by
+        // 0.55 s, against 7.5 mm at the old rate over the same window.
+        if (u < 0.58) showSettle(kit.wine, dt, 10.0);
         const wn = wineAt(u);
         show.held = wn.held;
         show.pour = wn.pour;
@@ -25894,9 +25907,20 @@ async function buildJadrija(scene) {
     // above is 2.35 s to 3.44 s, and this is halfway down that. Wine that
     // appears before the stream does is wine somebody else poured.
     return {
-      held: sat((u - 1.40) / 0.45) * (1 - sat((u - 6.85) / 0.28)),
-      pour: sat((u - 2.60) / 0.60) * (1 - sat((u - 5.30) / 0.55)),
-      full: u > 3.00,
+      // MOVED WITH THE KEYS, 1.197.0. The note above is right that these and
+      // the clip's key times argue if one moves without the other, and the
+      // clip was retimed off a metronome and on to an actual tempo: HOLD 1.35
+      // -> 0.84, LIFT 1.95 -> 1.42, TIP 2.60 -> 2.24, POUR 3.20 -> 2.72,
+      // POUR_B 5.30 -> 5.05, the recovery TIP 5.85 -> 5.42, HOLD 6.85 -> 6.55.
+      // `held` is the bottle leaving the stool, so it ramps across HOLD->LIFT
+      // and releases across HOLD->REACH; `pour` is the tilt, so it ramps
+      // across TIP->POUR and cuts across POUR_B->TIP.
+      held: sat((u - 0.86) / 0.56) * (1 - sat((u - 6.55) / 0.26)),
+      pour: sat((u - 2.24) / 0.48) * (1 - sat((u - 5.05) / 0.37)),
+      // The stream is drawn while `pour` is over 0.6, which off those ramps is
+      // 2.53 s to 5.20 s, and this is the first frame of it. Wine that appears
+      // before the stream does is wine somebody else poured.
+      full: u > 2.57,
       // AND HOW FULL, which the glass never used to say. It went from empty to
       // its final level between two frames, on the one object in the room a
       // player is watching — and a glass that fills instantly is the tell that
@@ -25908,7 +25932,7 @@ async function buildJadrija(scene) {
       // rises across exactly that. Wine appearing before the stream does is
       // wine somebody else poured; wine still rising after it stops is wine
       // coming from nowhere.
-      level: sat((u - 2.96) / 2.56),
+      level: sat((u - 2.53) / 2.67),
     };
   }
   const vHand = new THREE.Vector3(), vMouth = new THREE.Vector3();

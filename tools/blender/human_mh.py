@@ -6526,10 +6526,28 @@ CLIPS = [
     # a second time — it drives the bottle in the hand and the stream — and the
     # note there says what happens if the two lists drift.
     {"name": "wine", "loop": False,
-     "keys": [(0.00, IDLE_A), (0.75, WINE_REACH), (1.35, WINE_HOLD),
-              (1.95, WINE_LIFT), (2.60, WINE_TIP), (3.20, WINE_POUR),
-              (5.30, WINE_POUR_B), (5.85, WINE_TIP), (6.35, WINE_LIFT),
-              (6.85, WINE_HOLD), (7.10, WINE_REACH), (7.60, IDLE_A)]},
+     # A POUR IS A TEMPO, NOT A METRONOME. Laid out as durations, the old
+     # timing was: 0.75, 0.60, 0.60, 0.65, 0.60, [2.10 pour], 0.55, 0.50,
+     # 0.50, 0.25, 0.50. Every move in it took the same six tenths of a
+     # second, and a sequence of equal beats is the one thing no human action
+     # is. Five passes went into where her hand goes and none of them could
+     # have reached this, because the poses were never what was wrong.
+     #
+     # The worst of them: REACH to HOLD was 0.60 s in which her palm does not
+     # move at all — `--check` puts both at (+0.330, -0.360, +0.829) — while
+     # her fingers close. A hand closes on a bottle in about two tenths, and
+     # the same hand OPENS here in 0.25. Closing took two and a half times
+     # longer than opening for no reason anybody could have given.
+     #
+     # So it is timed as the action: a quick reach, a fast grip, a careful
+     # lift because it is glass, a slow tip because tipping fast makes it
+     # glug, the long pour, and then the sharpest move in the whole thing —
+     # the lift-and-twist that cuts the flow, which is the one motion anybody
+     # would recognise as somebody who has poured wine before. Same 7.60 s.
+     "keys": [(0.00, IDLE_A), (0.62, WINE_REACH), (0.84, WINE_HOLD),
+              (1.42, WINE_LIFT), (2.24, WINE_TIP), (2.72, WINE_POUR),
+              (5.05, WINE_POUR_B), (5.42, WINE_TIP), (5.92, WINE_LIFT),
+              (6.55, WINE_HOLD), (6.78, WINE_REACH), (7.60, IDLE_A)]},
     {"name": "untie", "loop": False,
      "keys": [(0.00, IDLE_A), (0.60, UNTIE_A), (1.05, UNTIE_B),
               (1.35, UNTIE_B), (1.85, UNTIE_C), (2.55, IDLE_A)]},

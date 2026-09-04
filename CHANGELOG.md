@@ -8,6 +8,77 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.197.0] — 2026-09-04
+
+### A pour is a tempo, not a metronome
+
+Five passes have gone into this pour and every one of them went into her arm.
+Run the solver's own `--check` and the arm is fine: her palm lands at
+`(+0.330, -0.360, +0.829)` at both REACH and HOLD against a bottle whose grip
+point is at `(0.330, -0.360, 0.830)` — **one millimetre** — the gaze term tracks
+the glass through all six keys, and the bottle clears her forearm by 97 mm.
+There is nothing left in the poses. So this pass measured the one thing nobody
+had looked at, which is *when* they happen.
+
+```
+IDLE    -> REACH    0.75 s
+REACH   -> HOLD     0.60 s
+HOLD    -> LIFT     0.60 s
+LIFT    -> TIP      0.65 s
+TIP     -> POUR     0.60 s
+POUR    -> POUR_B   2.10 s
+POUR_B  -> TIP      0.55 s
+TIP     -> LIFT     0.50 s
+LIFT    -> HOLD     0.50 s
+HOLD    -> REACH    0.25 s
+REACH   -> IDLE     0.50 s
+```
+
+Every move in it takes the same six tenths of a second. A sequence of equal
+beats is the one thing no human action is, and no amount of work on where her
+hand goes was ever going to reach it.
+
+The worst of them is REACH to HOLD. Both poses put her palm at exactly the same
+point, so that is **0.60 s in which her hand does not move at all** while her
+fingers close on a bottle. A hand closes on a bottle in about two tenths — and
+the same hand *opens*, at the other end of this same clip, in 0.25. Closing took
+two and a half times longer than opening, and nobody could have said why.
+
+Retimed as the action rather than as a bar of music. Still 7.60 s:
+
+```
+IDLE    -> REACH    0.62 s   a reach is quick
+REACH   -> HOLD     0.22 s   and a grip is quicker
+HOLD    -> LIFT     0.58 s   careful; it is glass
+LIFT    -> TIP      0.82 s   slow, because tipping fast makes it glug
+TIP     -> POUR     0.48 s
+POUR    -> POUR_B   2.33 s   the pour
+POUR_B  -> TIP      0.37 s   the sharpest move in the whole thing
+TIP     -> LIFT     0.50 s
+LIFT    -> HOLD     0.63 s
+HOLD    -> REACH    0.23 s
+REACH   -> IDLE     0.82 s   straighten up unhurriedly
+```
+
+That fastest beat is the point: the lift-and-twist that cuts the flow is the one
+motion anybody would recognise as somebody who has poured wine before, and it
+was previously the same speed as everything else. `wineAt`'s three windows moved
+with the keys, which the note over them has been asking for since it was
+written.
+
+**Two more in the same second.** She was still sliding on to her mark while
+reaching: `showSettle` ran to 1.2 s against a REACH key at 0.75, so her hand was
+going to a bottle on a stool while her feet were still finding the spot every
+millimetre of the solve is measured from. It finishes at 0.58 now, at rate 10 —
+which puts the 0.203 m she can arrive adrift down to **0.8 mm**, against 7.5 mm
+at the old rate over the same window.
+
+And the glass filled in six steps. The level runs 0.087 to 0.122 — 35 mm of
+glass — so six shells step it in **5.8 mm jumps**, a six-pixel stair every four
+tenths of a second on the one object in the room a player is watching. Twenty
+shells make it 1.8 mm, under what an eye picks out of a moving surface, for
+about three and a half thousand triangles against a resort of 542,000.
+
 ## [1.196.0] — 2026-09-04
 
 ### She was standing at ease in every position
