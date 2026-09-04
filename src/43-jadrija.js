@@ -15757,6 +15757,63 @@ async function buildJadrija(scene) {
       runs.push({ t0: st2 - 0.85, t1: st2 + 0.85, s0: ss + 0.26, s1: ss + 0.42,
         y, h: 2.10 });
     }
+    // ── the life rings ─────────────────────────────────────────────────────
+    //
+    // A gradsko kupaliste has them and this one did not. Walked end to end at
+    // eye height, the built stretches of this promenade are dense — lamps,
+    // benches, bins, showers, parasols, eight hundred coloured doors — and the
+    // DECK between the kabine and the water is three hundred metres of pale
+    // concrete with a lamp on it. What a public bathing station puts on that
+    // deck, by law and by habit, is a life ring on a post every thirty-odd
+    // metres, and it is the only saturated red anywhere on the whole surface.
+    //
+    // Which is also why it earns its triangles twice: at a hundred metres it is
+    // a red mark that says "somebody looks after this place", and from the
+    // cockpit it is a row of them down the water's edge.
+    //
+    // The ring is built segment by segment rather than lathed, because it
+    // hangs in a VERTICAL plane and `lathe` turns a profile about the vertical
+    // — a hanging ring is the one round object on this shore that a solid of
+    // revolution cannot make.
+    for (let t = JAD.beachTo + 30; t < LEN - 24; t += 34) {
+      const rs = JAD.lip + 0.95, y = surfaceY(t, rs);
+      const POST = [0.775, 0.778, 0.770];
+      const RED = [0.735, 0.135, 0.115];
+      const WHT = [0.895, 0.892, 0.878];
+      // The foot, the post and the hook arm that reaches out over the water.
+      post(W, t, rs, y, y + 0.06, 0.115, [0.520, 0.512, 0.495], 8);
+      post(W, t, rs, y + 0.04, y + 1.30, 0.042, POST, 7);
+      boxTS(t - 0.022, t + 0.022, rs - 0.24, rs + 0.02, y + 1.20, y + 1.26,
+        POST, shade(POST, 1.10));
+      // The ring itself: sixteen segments in four red and four white sectors,
+      // hanging from the arm in the plane of the shore.
+      const R = 0.325, r = 0.052, N = 16;
+      const cy = y + 1.20 - 0.055 - R, cs = rs - 0.20;
+      const pt = (a, ro, ds) =>
+        W(t + Math.cos(a) * ro, cs + ds, cy + Math.sin(a) * ro);
+      for (let k = 0; k < N; k++) {
+        const a0 = (k / N) * TAU, a1 = ((k + 1) / N) * TAU;
+        const col = ((k * 8 / N) | 0) % 2 ? RED : WHT;
+        const A0 = pt(a0, R - r, -r), B0 = pt(a0, R + r, -r);
+        const C0 = pt(a0, R + r, r), D0 = pt(a0, R - r, r);
+        const A1 = pt(a1, R - r, -r), B1 = pt(a1, R + r, -r);
+        const C1 = pt(a1, R + r, r), D1 = pt(a1, R - r, r);
+        b.quad(A0, A1, B1, B0, col);
+        b.quad(B0, B1, C1, C0, shade(col, 1.08));
+        b.quad(C0, C1, D1, D0, shade(col, 0.92));
+        b.quad(D0, D1, A1, A0, col);
+      }
+      // And the line, coiled on the post below it, which is the half of a life
+      // ring that actually gets somebody out.
+      for (let i = 0; i < 4; i++) {
+        lathe(W, t, rs + 0.03, [[y + 0.30 + i * 0.045, 0.075],
+          [y + 0.305 + i * 0.045, 0.088], [y + 0.335 + i * 0.045, 0.088],
+          [y + 0.340 + i * 0.045, 0.075]], [0.880, 0.860, 0.790], 9);
+      }
+      runs.push({ t0: t - 0.09, t1: t + 0.09, s0: rs - 0.09, s1: rs + 0.09,
+        y, h: 1.30 });
+    }
+
     b = back2;
   }
 

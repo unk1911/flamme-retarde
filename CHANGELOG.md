@@ -8,6 +8,33 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.186.0] — 2026-09-04
+
+### A gradsko kupalište has life rings and this one did not
+
+Walked end to end at eye height rather than surveyed shop by shop, and the built
+stretches of this promenade are dense — lamps, benches, bins, showers, parasols,
+eight hundred coloured doors. **The deck between the kabine and the water is
+three hundred metres of pale concrete with a lamp on it.**
+
+What a public bathing station puts on that deck, by law and by habit, is a life
+ring on a post every thirty-odd metres, and it is the only saturated red
+anywhere on the whole surface. Ten of them now, at 34 m centres from the end of
+the sand, each with the hook arm that reaches out over the water, the four red
+and four white sectors, and the coil of line on the post below it — which is the
+half of a life ring that actually gets somebody out.
+
+It earns its triangles twice. At a hundred metres it is a red mark that says
+somebody looks after this place; from the cockpit it is a row of them down the
+water's edge.
+
+**The ring is built segment by segment rather than lathed**, and that is not a
+preference: it hangs in a *vertical* plane and `lathe` turns a profile about the
+vertical, so a hanging ring is the one round object on this shore that a solid of
+revolution cannot make. Sixteen segments, four quads each, 128 triangles a ring.
+
+537 592 triangles to **541 452**, 60 fps.
+
 ## [1.185.0] — 2026-09-04
 
 ### She never stood on the mark
