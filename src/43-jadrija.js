@@ -22838,7 +22838,38 @@ async function buildJadrija(scene) {
       if (tabs.length < 3) throw new Error('no slastičarnica terrace');
       // All four — see CAT, which is where the reason they are not two is
       // written down.
-      CAT.at = tabs.map((x) => [x.ct, x.cs]);
+      // WHERE THE TABLES ARE, and separately, WHERE HE SITS UNDER THEM.
+      //
+      // These were one list until 4 Sep 2026, and the photograph that ended
+      // that is a ginger cat standing under the slasticarnica's table with the
+      // pedestal column coming out of his shoulder. His station WAS the table
+      // centre, and the centre of a pedestal table is the one place under it
+      // that is solid: `pedestalTable` puts a 0.052 m column there from 0.055
+      // up to the top. Exempting the table from his router — which is what
+      // lets him get under it at all — exempted the post with it.
+      //
+      // So `CAT.tab` is the furniture and `CAT.at` is the animal, 0.24 m out
+      // from it. That clears the column by 0.19 and is still 0.07 inside the
+      // 0.31 m top, so he is under the table and not beside it.
+      //
+      // Out along the widest SEAWARD gap in the chair ring rather than in an
+      // arbitrary direction. It costs nothing — at 0.24 he is nowhere near the
+      // chairs, which are on a 0.72 ring — and it is where a cat actually
+      // lies: at the seaward edge of the shade, looking out at the promenade,
+      // with the chair backs behind him.
+      CAT.tab = tabs.map((x) => [x.ct, x.cs]);
+      CAT.at = tabs.map((x) => {
+        // The three seat bearings, and the midpoint of each gap between them.
+        const b = [-1.30, 0.79, 2.88];
+        let best = null, bs = Infinity;
+        for (let i = 0; i < 3; i++) {
+          const lo = b[i], hi = i === 2 ? b[0] + TAU : b[i + 1];
+          const a = x.ang + (lo + hi) * 0.5;
+          const ds = Math.sin(a);
+          if (ds < bs) { bs = ds; best = a; }
+        }
+        return [x.ct + Math.cos(best) * 0.24, x.cs + Math.sin(best) * 0.24];
+      });
       const fig0 = CAT.at[0];
       const p = toWorld(fig0[0], fig0[1]);
       const mesh = fig.mesh;
@@ -23174,7 +23205,14 @@ async function buildJadrija(scene) {
    */
   function catMiss() {
     const out = [];
-    if (!CAT.at || !CAT.at.length) return out;
+    if (!CAT.at || !CAT.at.length || !CAT.tab) return out;
+    // The pedestal columns, which the tables' own blockers hid. A table is
+    // exempt because he lives under it; the post in the middle of it is not,
+    // and it is the only thing on this terrace he was still walking through.
+    // 0.052 is `pedestalTable`'s own column radius, as a box because that is
+    // what `catGap` measures against — a square of that half-extent reaches
+    // 0.074 at the corner, which is 22 mm of extra room he does not miss.
+    for (const a of CAT.tab) out.push({ t: a[0], s: a[1], a: 0.052, c: 0.052 });
     let t0 = Infinity, t1 = -Infinity, s0 = Infinity, s1 = -Infinity;
     for (const a of CAT.at) {
       t0 = Math.min(t0, a[0]); t1 = Math.max(t1, a[0]);
@@ -23185,7 +23223,7 @@ async function buildJadrija(scene) {
       if (!(b.a >= 0) || !(b.c >= 0)) continue;
       if (b.t < t0 - 5 || b.t > t1 + 5 || b.s < s0 - 5 || b.s > s1 + 5) continue;
       let table = false;
-      for (const a of CAT.at) {
+      for (const a of CAT.tab) {
         if (Math.abs(b.t - a[0]) < 0.05 && Math.abs(b.s - a[1]) < 0.05) table = true;
       }
       if (!table) out.push(b);
@@ -23423,6 +23461,36 @@ async function buildJadrija(scene) {
     c.want = Math.atan2(g[1] - c.at[1], g[0] - c.at[0]);
   }
 
+  /**
+   * How high the deck is under him, which under a table is not the deck.
+   *
+   * `pedestalTable`'s foot is a 0.300 m plate 0.062 high with two chamfers in
+   * it, and his station is 0.24 m from the column — which is ON that plate.
+   * Left alone his paws stand 40 mm inside it, which is the same class of
+   * fault as the post through his shoulder and would have been the next
+   * photograph. The profile below IS the lathe's, read off it:
+   *
+   *   r <= 0.120   0.062      the flat top
+   *   r <= 0.245   0.050..0.062  the inner chamfer
+   *   r <= 0.300   0.030..0.050  the outer one
+   *
+   * Which also means he walks up on to it and down off it as he arrives and
+   * leaves, over the 60 mm the chamfers take, rather than stepping up.
+   */
+  function catFloor(t, s) {
+    if (!CAT.tab) return 0;
+    let up = 0;
+    for (const a of CAT.tab) {
+      const r = Math.hypot(t - a[0], s - a[1]);
+      if (r >= 0.300) continue;
+      const h = r <= 0.120 ? 0.062
+        : r <= 0.245 ? 0.062 - (r - 0.120) / 0.125 * 0.012
+          : 0.050 - (r - 0.245) / 0.055 * 0.020;
+      if (h > up) up = h;
+    }
+    return up;
+  }
+
   function stepCat(camPos, dt) {
     if (!cat) return;
     const d = Math.hypot(camPos.x - cat.mesh.position.x,
@@ -23438,7 +23506,7 @@ async function buildJadrija(scene) {
     moveCat(dt);
     cat.fig.update(dt);
     const p = toWorld(cat.at[0], cat.at[1]);
-    cat.mesh.position.set(p[0], p[1], p[2]);
+    cat.mesh.position.set(p[0], p[1] + catFloor(cat.at[0], cat.at[1]), p[2]);
     cat.mesh.rotation.y = rigYaw(cat.at[0], cat.head);
   }
 

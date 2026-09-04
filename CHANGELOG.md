@@ -8,6 +8,42 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.233.0] — 2026-09-04
+
+### The cat sits beside the post, not through it
+
+Misha, with a photograph of a ginger cat standing under the slastičarnica's
+table with the pedestal column coming out of his shoulder: *"the kitty cat still
+seems to not respect the object collision"*.
+
+He was right and it was 1.228.0's own exemption. `catMiss` leaves the four
+tables out of his obstacle list on purpose — his stations are under them and a
+router that walled off the thing he lives beneath would find no route anywhere.
+But his station **was** the table centre, and the centre of a pedestal table is
+the one place under it that is solid: `pedestalTable` stands a 0.052 m column
+there from 0.055 up to the top. Exempting the table exempted the post with it.
+
+So `CAT.tab` is the furniture and `CAT.at` is the animal, **0.24 m out from
+it** — clear of the column by 0.19 and still 0.07 inside the 0.31 m top, so he
+is under the table and not beside it. The exemption test now keys on `CAT.tab`,
+and the columns go into the obstacle list explicitly.
+
+The offset runs along the **widest seaward gap in the chair ring** rather than
+in an arbitrary direction. It costs nothing — at 0.24 m he is nowhere near
+chairs that sit on a 0.72 m ring — and it is where a cat actually lies: at the
+seaward edge of the shade, looking out at the promenade, with the chair backs
+behind him.
+
+**And he stands on the table's foot rather than in it.** `pedestalTable`'s base
+is a 0.300 m plate 0.062 high with two chamfers, and 0.24 m from the column is
+squarely on it — left alone his paws would have been 40 mm inside, which is the
+same class of fault as the post and would have been the next photograph.
+`catFloor` reads the lathe's own profile back out, so he walks up on to the
+plate and down off it over the 60 mm the chamfers take.
+
+Measured after: the nearest thing to him at his station is **0.17 m** away,
+against a girth of 0.11, and he still works the row.
+
 ## [1.232.0] — 2026-09-04
 
 ### The boat carries eighty now, and looks like it
