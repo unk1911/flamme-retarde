@@ -841,7 +841,8 @@ def one(name, height, obj, check=False):
         # to the first one's and `bpy.data.objects["rig"]` is still the first.
         bpy.ops.wm.read_factory_settings(use_empty=True)
         rig = MH.armature(J)
-        _sit_report(rig, sit_clips(rig, J))
+        _sit_report(rig, sit_clips(rig, J) + quay_clips(rig, J)
+                    + lie_clips(rig, J))
         return None
     k = tuple(a / b for a, b in zip(MH.vault(obj, J["l-eye"].z), MH.SKULL))
     print("[bathers]   head frame  %.3f %.3f %.3f" % k)
@@ -866,7 +867,8 @@ def one(name, height, obj, check=False):
     # different colour on every figure.
     clips = ([_stand_clip(c, STAND_CLIPS[c["name"]])
               if c["name"] in STAND_CLIPS else c
-              for c in BATHER_CLIPS] + sit_clips(rig, J))
+              for c in BATHER_CLIPS] + sit_clips(rig, J)
+             + quay_clips(rig, J) + lie_clips(rig, J))
     _sit_report(rig, clips)
     # `repaint` and `dense`, which are the two halves of one answer.
     #
@@ -891,6 +893,259 @@ def one(name, height, obj, check=False):
     return out
 
 
+
+# --------------------------------------------------------------------------- #
+#  the two poses that had no clip                                              #
+# --------------------------------------------------------------------------- #
+#
+# Reported 3 Sep, from the deck west of the kabine: *"there are still three
+# wooden manequen looking bathers left over from old batch... can u remove
+# those"*. They are not left over from anything. They are the instanced tier —
+# eleven boxes and cylinders per figure, `tools/blender/bather.py` — and they
+# were still drawing thirty-nine of this shore's eighty-four people because of
+# one line in src/43-jadrija.js:
+#
+#     const blobbable = b.chair || (b.pose !== 'sit' && b.pose !== 'lie');
+#
+# A blob could not sit on the lip of the quay and could not lie on a towel,
+# because there was no clip for either — so twenty-six quay sitters and eleven
+# sunbathers were permanently ineligible for one of the twenty-four skinned
+# slots. Which is worse than it sounds: the slots go to the nearest eligible
+# people, so with the sitters ruled out the cast was being spent on figures
+# 24 to 42 m away while two lay figures sat 2.6 m and 5.5 m from your face.
+#
+# So here are the two clips. Both are solved on each figure's own skeleton for
+# the reason `sit_clips` is: a quay is a fact about the promenade in metres and
+# these eight are 1.24 m to 1.84 m tall.
+
+# How high the hip JOINT rides above whatever you are sitting on. `SEAT_HIP` is
+# 7.5 cm for a chair, where the pad takes some of it; sitting straight on a
+# concrete slab it is a little more, because what is between the joint and the
+# stone is all of you.
+QUAY_HIP = 0.105
+# And lying on your back on a towel over a concrete deck, which is the same
+# measurement taken through the other side of the pelvis — less what the
+# placement already adds. `B(t, s - 0.55, y + 0.06, ...)` in 43-jadrija.js puts
+# a sunbather's origin 60 mm over the deck because the instanced tier tips
+# about the SOLES and leaves the body's midline on the origin, so 0.075 here is
+# a hip joint 135 mm up, which is a person on their back on a towel.
+TOWEL_HIP = 0.075
+
+
+def _quay_solve(rig, quiet=False):
+    """Thigh and shin angles for somebody sitting on the edge of a quay.
+
+    Two bisections and no interaction between them, which is why this is ten
+    lines against `_sit_solve`'s eighty: nothing here is standing on the
+    ground. The thigh is level — the knee at the height of the hip — and the
+    shin hangs — the ankle under the knee. Those are one angle each and neither
+    moves the other's answer, because a leg over a quay touches nothing.
+
+    Returns (hipx, kneex, drop), with `drop` the metres `@root` comes down to
+    put the hip joint `QUAY_HIP` above the slab.
+    """
+    def at(hipx, kneex):
+        MH.pose(rig, _quay_base(hipx, kneex))
+        B = rig.pose.bones
+        return B["legUL"].head, B["legLL"].head, B["footL"].head
+
+    def bisect(lo, hi, f):
+        a = f(lo)
+        for _ in range(20):
+            mid = 0.5 * (lo + hi)
+            v = f(mid)
+            if (v < 0) == (a < 0):
+                lo, a = mid, v
+            else:
+                hi = mid
+        return 0.5 * (lo + hi)
+
+    # Thigh level: the knee at the hip's height. Negative X is hip flexion —
+    # +X swings a limb's far end backward on every bone in this rig — so the
+    # bracket runs from the leg hanging to well past horizontal.
+    hipx = bisect(-120.0, 0.0, lambda a: at(a, 80.0)[1].z - at(a, 80.0)[0].z)
+    # Shin vertical: the ankle under the knee. The knee's own bend is positive,
+    # the same direction a plie folds it.
+    kneex = bisect(0.0, 130.0, lambda b: at(hipx, b)[2].x - at(hipx, b)[1].x)
+    hip, knee, ankle = at(hipx, kneex)
+    drop = hip.z - QUAY_HIP
+    if not quiet:
+        print("[bathers]   quay: hip %+.1f knee %+.1f  thigh %+.3f m  "
+              "shin %+.3f m  drop %.3f" % (hipx, kneex, knee.z - hip.z,
+                                           ankle.x - knee.x, drop))
+    return hipx, kneex, drop
+
+
+def _quay_base(hipx, kneex, extra=None):
+    """The quay-sitting pose with its two solved leg numbers filled in.
+
+    The knees come apart by a few degrees and the shins with them, which is the
+    difference between two people sitting on a wall and a pair of dividers.
+    """
+    p = {
+        "@root": (0.0, 0.0, 0.0),
+        "spine01": (2, 0, 0), "spine02": (2, 0, 0), "spine03": (1, 0, 0),
+        "chest": (1, 0, 0), "neck": (-2, 0, 0), "head": (-2, 6, 0),
+        "legUL": (hipx, -4, 0), "legLL": (kneex, 0, 0),
+        "footL": (10, 0, 0),
+        "legUR": (hipx, 4, 0), "legLR": (kneex, 0, 0),
+        "footR": (12, 0, 0),
+        "armUL": (-6, 0, STAND_ARM_IN), "armLL": (26, 0, STAND_FORE_IN),
+        "armUR": (-4, 0, -STAND_ARM_IN), "armLR": (23, 0, -STAND_FORE_IN),
+    }
+    if extra:
+        p.update(extra)
+    return p
+
+
+def quay_clips(rig, J):
+    """`sitquay`: on the lip of the promenade with the legs over the water.
+
+    The one pose on this shore that a player walks right past at arm's length,
+    forty-odd times, because the whole seaward edge of the deck is people
+    sitting on it.
+
+    HANDS ON THE THIGHS, and not on the slab, and that is measured rather than
+    chosen. The first cut put both palms flat on the stone behind her hips,
+    which is what everybody does — and `_arm_solve` came back nine centimetres
+    short on every one of the eight. It is not the solver: sitting on a slab
+    puts this rig's shoulder about 0.55 m above it and its whole arm, shoulder
+    to wrist, is 0.55. Her hand cannot reach the ground beside her without a
+    lean far enough back to read as sunbathing on a wall. So the weight goes
+    where it can: half way down the thigh, which is where the other hand of
+    every person sitting on that quay is anyway.
+
+    The loop is the legs. Nothing else on a quay moves much — a shin swinging
+    through six degrees and a head coming round is the whole of it — and the
+    two legs are given different periods so that a row of them does not kick in
+    time, which is the failure the instanced tier's `sit` case names as well.
+    """
+    hipx, kneex, drop = _quay_solve(rig)
+
+    def P(extra, dz=0.0):
+        p = _quay_base(hipx, kneex, extra)
+        p["@root"] = (0.0, 0.0, -(drop + dz))
+        return p
+
+    def arms(torso, targets):
+        p = _quay_base(hipx, kneex, torso)
+        out = dict(torso)
+        for side, want in targets.items():
+            up, lo = _arm_solve(rig, p, side, want[:2], drop,
+                                out=want[2] if len(want) > 2 else None)
+            out["armU" + side], out["armL" + side] = up, lo
+        return out
+
+    # Where her own thigh runs, on this figure, with the legs already solved —
+    # the same measurement `sit_clips` takes for the terrace, and the same
+    # reason it is taken rather than typed: a hand resting on a leg is a fact
+    # about that leg.
+    MH.pose(rig, _quay_base(hipx, kneex))
+    B = rig.pose.bones
+    hipX, kneeX, thighZ = (B["legUL"].head.x, B["legLL"].head.x,
+                           B["legUL"].head.z)
+    HAND = (hipX + 0.46 * (kneeX - hipX), thighZ + 0.055 - drop, 26.0)
+    HAND_B = (HAND[0] - 0.025, HAND[1] + 0.008, 24.0)
+
+    a_t = {"spine01": (5, 0, 0), "spine02": (4, 0, 0), "spine03": (2, 0, 0),
+           "chest": (2, 0, 0), "neck": (-3, 0, 0), "head": (-3, 14, 1),
+           "legLL": (kneex - 5, 0, 0), "legLR": (kneex + 4, 0, 0),
+           "handL": (-14, 0, 0), "handR": (-14, 0, 0)}
+    a = arms(a_t, {"L": HAND, "R": (HAND[0] - 0.02,) + HAND[1:]})
+    b_t = dict(a_t, **{"spine01": (7, 0, 0), "chest": (3, 0, 0),
+                       "head": (-2, -6, -1),
+                       "legLL": (kneex + 5, 0, 0), "legLR": (kneex - 4, 0, 0)})
+    b = arms(b_t, {"L": HAND_B, "R": (HAND_B[0] - 0.02,) + HAND_B[1:]})
+    c_t = dict(a_t, **{"head": (-4, 2, 0),
+                       "legLL": (kneex + 2, 0, 0), "legLR": (kneex + 6, 0, 0)})
+    c = arms(c_t, {"L": HAND, "R": (HAND[0] - 0.02,) + HAND[1:]})
+
+    return [{"name": "sitquay", "loop": True,
+             "keys": [(0.0, P(a)), (2.4, P(b, 0.004)), (4.6, P(c)),
+                      (7.0, P(a))]}]
+
+
+def lie_clips(rig, J):
+    """`sunbathe`: flat on a towel, face up, propped a little on the elbows.
+
+    ONE ROTATION AND NOT ELEVEN. `pelvis` is the root of this skeleton and its
+    local X comes out as a clean pitch — the same property the somersault in
+    human_mh.py leans on — so +90 there lays the whole figure over backwards in
+    one number: the spine, which pointed up, ends up pointing along −x, and the
+    legs, which pointed down, end up along +x. Everything below the pelvis
+    comes with it because everything below the pelvis is below the pelvis.
+    Authoring a recline joint by joint means re-deriving eleven of them for one
+    pose, and it is also how you end up with a figure that is lying down in the
+    hips and standing up in the ribs.
+
+    Head at −x is deliberate and is not a choice made here: the instanced tier
+    lays its sunbathers over the same way, and 43-jadrija.js aims them seaward
+    so that the head comes out inland. A blob that lay the other way would spin
+    end for end the moment it was promoted.
+
+    After the roll, the body's own axes have moved and every angle below reads
+    against the new ones. Her front (+x) is now the sky; her back (−x) is the
+    towel. So a spine key that swings the chest 'backward' pushes it INTO the
+    towel and the propped-up shoulders want the other sign — which is the one
+    thing in this pose worth writing down, because it is the sign that is wrong
+    if she looks like somebody who has passed out rather than somebody reading.
+    """
+    def base(extra=None):
+        p = {
+            "@root": (0.0, 0.0, 0.0),
+            "pelvis": (90.0, 0.0, 0.0),
+            # Propped. Negative lifts the chest off the towel: see the note.
+            "spine01": (-7, 0, 0), "spine02": (-7, 0, 0), "spine03": (-6, 0, 0),
+            "chest": (-4, 0, 0), "neck": (7, 0, 0), "head": (6, 0, 0),
+            # Knees just off straight, and not the same on both sides.
+            "legUL": (-5, -3, 0), "legLL": (7, 0, 0), "footL": (-14, 0, 0),
+            "legUR": (-2, 3, 0), "legLR": (4, 0, 0), "footR": (-12, 0, 0),
+            # Arms down beside her on the towel, elbows a little out so the
+            # forearms lie on the stone rather than on her own hips.
+            "armUL": (10, 0, 44), "armLL": (10, 0, 24), "handL": (0, 0, 8),
+            "armUR": (9, 0, -42), "armLR": (9, 0, -22), "handR": (0, 0, -6),
+        }
+        if extra:
+            p.update(extra)
+        return p
+
+    # Where the hip joint ends up once she is laid over, and how far she has to
+    # come down to put it `TOWEL_HIP` above the deck. Measured rather than
+    # assumed, because the roll happens about the hip and the hip does not move
+    # — but `@root` is applied after the pose and the two have to agree.
+    MH.pose(rig, {k: v for k, v in base().items() if not k.startswith("@")})
+    hipz = rig.pose.bones["legUL"].head.z
+    drop = hipz - TOWEL_HIP
+    # AND ALONG, WHICH IS THE HALF THAT IS EASY TO MISS. The instanced tier
+    # tips its sunbathers about the mesh ORIGIN, which is between their feet,
+    # so the body runs from the anchor back along local −x and 43-jadrija.js
+    # places them accordingly — "the anchor is the soles and `ang` points from
+    # the head towards the feet", `B(t, s - 0.55, ...)`. This clip tips about
+    # the pelvis instead, because the pelvis is the root of the skeleton and
+    # one rotation there lays everything below it over. So the figure comes out
+    # centred on the anchor rather than starting at it, 0.85 m adrift, and the
+    # only person who would ever see it is somebody who walked up to a towel
+    # and watched the sunbather on it slide half a body-length when she was
+    # promoted. `@root` carries an x as well as a z; this is what it is for.
+    ankle = rig.pose.bones["footL"].head.x
+    def P(extra, dz=0.0):
+        p = base(extra)
+        p["@root"] = (-ankle, 0.0, -(drop + dz))
+        return p
+
+    # Breathing, a knee that falls out and comes back, and a head that turns
+    # once in a while. Eight seconds, because a person on a towel is the
+    # slowest thing on this beach and a four-second loop on one reads as a
+    # twitch.
+    a = {}
+    b = {"chest": (-5, 0, 0), "spine03": (-7, 0, 0), "head": (6, -10, 0),
+         "legUL": (-7, -6, 0), "legLL": (10, 0, 0)}
+    c = {"head": (7, 8, 0), "legUR": (-4, 5, 0), "legLR": (7, 0, 0)}
+    return [{"name": "sunbathe", "loop": True,
+             "keys": [(0.0, P(a)), (2.7, P(b, 0.004)), (5.4, P(c, 0.002)),
+                      (8.0, P(a))]}]
+
+
 def _sit_report(rig, clips):
     """Every seated key, measured on the rig, in one block of numbers.
 
@@ -904,7 +1159,7 @@ def _sit_report(rig, clips):
     Nothing here fails the bake. It prints, and the pass is done by looking.
     """
     for c in clips:
-        if not c["name"].startswith("sit"):
+        if not (c["name"].startswith("sit") or c["name"] == "sunbathe"):
             continue
         for i, (t, p) in enumerate(c["keys"][:-1]):
             MH.pose(rig, p)

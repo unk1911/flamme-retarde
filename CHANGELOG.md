@@ -8,6 +8,60 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.174.0] — 2026-09-03
+
+### The lay figures on the quay are people now, and so are the sunbathers
+
+*"there are still three wooden manequen looking bathers left over from old
+batch"*, with a coordinate: 43.723749, 15.845739, which is the deck sixty
+metres west of the kabine. They were not left over from anything. They were the
+instanced tier — eleven boxes and cylinders per figure, which is exactly what a
+wooden lay figure is — and they were drawing **thirty-seven of this shore's
+eighty-four people**, because of one line:
+
+```js
+const blobbable = b.chair || (b.pose !== 'sit' && b.pose !== 'lie');
+```
+
+The bake had three seated clips solved against a 0.46 m café chair and nothing
+else. A sitter on the lip of the quay is half a metre lower with their legs over
+the water; a sunbather had no clip at all. So twenty-six quay sitters and eleven
+sunbathers were **permanently ineligible** for one of the twenty-four skinned
+slots — and that is worse than a third of the beach being instanced, because the
+slots go to the nearest *eligible* person. Measured from where he was standing:
+the cast was being spent on figures **24 to 42 m away** while two lay figures sat
+**2.6 m and 5.5 m** from his face. His three were a quay sitter at 2.6, another
+at 5.5 and a sunbather at 20.
+
+**`sitquay`.** Hips on the slab, thighs level, shins hanging, and it is solved
+per figure the way the terrace's three are, because a quay is a fact about the
+promenade in metres and these eight are 1.24 m to 1.84 m tall. Two bisections —
+the knee at the height of the hip, the ankle under the knee — and neither moves
+the other's answer, because a leg over a quay touches nothing.
+
+Hands on the thighs, and that is measured rather than chosen. The first cut put
+both palms flat on the stone behind her hips, which is what everybody does, and
+`_arm_solve` came back **nine centimetres short on all eight**. It is not the
+solver: sitting on a slab puts this rig's shoulder about 0.55 m above it and its
+whole arm, shoulder to wrist, is 0.55. She cannot reach the ground beside her
+without a lean far enough back to read as sunbathing on a wall.
+
+**`sunbathe`.** One rotation and not eleven: `pelvis` is the root of this
+skeleton and its local X is a clean pitch, so +90 there lays the whole figure
+over in one number. The two things that had to be got right are both about
+matching the tier it replaces — the instanced version tips about the **soles**
+and leaves the body's midline on the mesh origin, so `@root` carries an x as
+well as a z, and without it a promoted sunbather would slide half a body-length
+along her own towel as you walked up to her.
+
+Cost: nothing. The number of skinned slots is unchanged — 24 roving, 24 pinned to
+the terrace — so this is the same budget spent on the people who are actually in
+front of you. 60 fps on the promenade before and after, and 8 × 14 KB on the
+payload for the two clips.
+
+**Measured, standing where he was standing: the nearest instanced figure is now
+44.4 m away. It was 2.6.**
+
 ## [1.173.0] — 2026-09-03
 
 ### The pour is a pour: she bends her knees, and the bottle stops being a coin

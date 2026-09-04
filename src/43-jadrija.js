@@ -19831,10 +19831,12 @@ async function buildJadrija(scene) {
       const cand = [[], []];
       for (let bi = 0; bi < bathers.length; bi++) {
         const b = bathers[bi];
-        // The same predicate the casting loop uses, and it has to be: a chair
-        // sitter is pinned to the terrace and a sunbather has no clip, so
-        // neither is ever a candidate for a roving slot.
-        if (b.chair || b.pose === 'sit' || b.pose === 'lie') continue;
+        // The same predicate the casting loop uses, and it has to be. A chair
+        // sitter is pinned to the terrace and is never lent out; everybody
+        // else on this beach is now a candidate, including the quay sitters
+        // and the sunbathers — see `blobbable` below, and the two clips that
+        // made them eligible.
+        if (b.chair) continue;
         cand[b.k < 0.9 ? 0 : 1].push(bi);
       }
       // Round-robin *along the shore*, and the ordering is the whole of it.
@@ -25134,13 +25136,32 @@ async function buildJadrija(scene) {
     // scripted business and a spread of poses at the front.
     //
     // A blob only if there is one spare AND the pose is one a blob can hold —
-    // and `sit` is now two different questions rather than one. A chair sitter
-    // can be a blob, because there are three seated clips in the bake authored
-    // for a 0.46 m seat. A sitter on the lip of the quay cannot: those play the
-    // instanced tier's `sit`, whose pelvis drop is measured for somebody sitting
-    // on the slab itself with their legs over the water, and the two are half a
-    // metre apart. There is no clip for `lie` at all.
-    const blobbable = b.chair || (b.pose !== 'sit' && b.pose !== 'lie');
+    // and as of 3 Sep that is every pose on this beach.
+    //
+    // It was not. `blobbable` used to read
+    //
+    //     b.chair || (b.pose !== 'sit' && b.pose !== 'lie')
+    //
+    // because the bake had three seated clips solved against a 0.46 m chair
+    // and nothing else: a sitter on the lip of the quay is half a metre lower
+    // with their legs over the water, and a sunbather had no clip at all. So
+    // twenty-six quay sitters and eleven sunbathers — thirty-seven of the
+    // eighty-four people on this shore — could never hold a skinned slot.
+    //
+    // Which is worse than a third of the beach being instanced, because the
+    // twenty-four slots go to the NEAREST eligible person: with the sitters
+    // ruled out, the cast was being spent on figures 24 to 42 m away while two
+    // lay figures sat 2.6 m and 5.5 m from your face. Reported 3 Sep with a
+    // coordinate — "there are still three wooden manequen looking bathers" —
+    // and those three were a quay sitter at 2.6 m, another at 5.5 m and a
+    // sunbather at 20.
+    //
+    // `sitquay` and `sunbathe` are in the bake now — see the long note above
+    // `quay_clips` in tools/blender/bathers_mh.py — so the only people left on
+    // the instanced tier are the two behind the gelato counter, who cannot be
+    // promoted for a different reason: a blob's swimwear is baked into its
+    // vertices and there is no uniform to put a shirt on.
+    const blobbable = true;
     // Pinned to the good tier, for good. Only the chairs are, and the reason
     // is that a café terrace is the one place on this shore you walk up to and
     // *stop*: it is where the ice-cream errand is set, the tables are two

@@ -402,7 +402,23 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
    * has to come out as a person standing rather than as a thrown exception.
    */
   function wantClip(fg, f) {
+    // A sunbather, and until 3 Sep there was no clip for one — which is why
+    // every towel on this beach had a lay figure on it: with nothing to play,
+    // `lie` was ruled out of the skinned tier altogether in 43-jadrija.js and
+    // the eleven of them could never be promoted however close you stood.
+    if (fg.mode === 'lie') {
+      return f.clips && f.clips.includes('sunbathe') ? 'sunbathe' : 'idle';
+    }
     if (fg.mode !== 'sit') return CLIP[fg.mode] || 'idle';
+    // Two different kinds of sitting, and the difference is the furniture.
+    // A terrace sitter is on a 0.46 m chair and plays one of three clips
+    // solved against it; a quay sitter is on the slab itself with their legs
+    // over the water, half a metre lower, and plays `sitquay`. Handing a chair
+    // clip to somebody on the quay is what the old code could not do — it did
+    // not have to, because the quay sitters were all mannequins.
+    if (fg.seat == null) {
+      return f.clips && f.clips.includes('sitquay') ? 'sitquay' : 'idle';
+    }
     const nm = SEATED[((fg.seat | 0) % SEATED.length + SEATED.length)
       % SEATED.length];
     return f.clips && f.clips.includes(nm) ? nm : 'idle';
