@@ -8,6 +8,40 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.220.0] — 2026-09-04
+
+### The same constant, on a shop a third the size
+
+1.219.0's lesson was that a change this file was pleased with broke something two
+releases downstream that nobody re-checked. So this pass audited the rest of last
+night's additions the same way — every new solid against what was already
+standing where it landed.
+
+Three came back clear and are recorded so nobody re-checks them: the cooler
+against the awning strip light at all three shops, the cooler against H2O's three
+piers, and the cooler against the serving opening at the slastičarnica and H2O.
+
+The fourth did not. **At the Trampulin the cooler stands 0.47 m inside the
+serving hole.**
+
+```
+slast    cooler t 328.65-329.55   opening 330.70-340.30   clear
+h2o      cooler t 312.65-313.55   opening 314.34-322.66   clear
+tramp2   cooler t 469.65-470.55   opening 470.08-473.92   OVERLAP 0.47 m
+```
+
+`S.t0 + 1.1` is fine on the two shops it was written against — the slastičarnica
+is 15 m wide and H2O 13, so the opening's 18 per cent inset starts well to the
+right of it. The Trampulin is **six** metres, its inset starts at `t0 + 1.08`,
+and the constant puts a drinks fridge in the middle of the counter. Which is the
+same shape as the roof bands in 1.204.0: a number that was right for the building
+it was measured on and wrong the moment it was reused on a smaller one — and I
+shipped it last night without checking the shop I was adding it to.
+
+Placed off the opening now, `min(S.t0 + 1.1, oa − 0.54)`. There is 1.08 m to the
+left of that hole and the cabinet is 0.90 wide, so it fits with a hand's width
+spare; on the two big shops the `min` never bites and nothing moves.
+
 ## [1.219.0] — 2026-09-04
 
 ### 1.203.0 turned her, and nobody re-checked the way in

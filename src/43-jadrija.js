@@ -9182,7 +9182,22 @@ async function buildJadrija(scene) {
     // single most Jadrija-specific object on this boardwalk.
     if (S.cooler) {
       // The glass-front drinks fridge at the left end, with its white header.
-      const ct = S.t0 + 1.1, cs = S.s0 - 0.55;
+      //
+      // PLACED OFF THE OPENING AND NOT OFF `t0`, and 1.213.0 is why. A constant
+      // `S.t0 + 1.1` is fine on the two shops this was written against — the
+      // slasticarnica is 15 m wide and H2O 13, so the serving hole's 18 per
+      // cent inset starts well right of it. Give the same constant to the
+      // Trampulin, which is **six** metres, and the inset starts at `t0 + 1.08`
+      // — so the cooler was standing 0.47 m inside the hole it is supposed to
+      // sit beside. The same shape as the roof bands in 1.204.0: a number that
+      // was right for the building it was measured on and wrong the moment it
+      // was reused on a smaller one.
+      //
+      // There is 1.08 m to the left of that opening and the cabinet is 0.90
+      // wide, so it fits with a hand's width to spare — and on the two big
+      // shops the `min` never bites and nothing moves.
+      const oaC = S.t0 + (S.t1 - S.t0) * 0.18;
+      const ct = Math.min(S.t0 + 1.1, oaC - 0.54), cs = S.s0 - 0.55;
       boxTS(ct - 0.45, ct + 0.45, cs - 0.32, cs + 0.32, y0, y0 + 1.94,
         [0.560, 0.556, 0.548], [0.590, 0.586, 0.578]);
       // AND SOMETHING BEHIND THE GLASS. A drinks fridge whose front is one dark
