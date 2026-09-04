@@ -18972,13 +18972,19 @@ async function buildJadrija(scene) {
     // So the profile is the continuity law and not a taste: r = r0 * sqrt(v0/v)
     // with v = sqrt(v0^2 + 2gh). Seven rings rather than two, because the
     // narrowing is nearly all in the first third and a straight line between
-    // two radii throws exactly that part away. 4.5 mm at the lip and not 3:
-    // a wine stream is the width of a pencil lead, not a thread, and at 3 mm
-    // in a room with one doorway it was a scratch.
+    // two radii throws exactly that part away.
+    //
+    // And 5.8 mm at the lip, not 3. Measured off the render, 4.5 put six
+    // pixels at the lip against the old four and two and a half at the glass
+    // against four — the right shape, and about two pixels of it, which at the
+    // distance anybody actually stands in this room is a correction nobody can
+    // see. A real pour is 5 to 7 mm leaving the bottle, so the width was never
+    // the constrained end of this: 5.8 spends the honest half of that range and
+    // turns a physically-correct taper into a visible one.
     const jbuf = propBuilder();
     b = jbuf;
     {
-      const V0 = 0.45, GRAV = 9.81, DROP = 0.188, R0 = 0.0045, RINGS = 7;
+      const V0 = 0.45, GRAV = 9.81, DROP = 0.188, R0 = 0.0058, RINGS = 7;
       const prof = [];
       for (let i = 0; i < RINGS; i++) {
         // y is 0 at the wine it lands in and 1 at the lip it leaves.

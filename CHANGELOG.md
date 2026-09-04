@@ -8,6 +8,26 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.194.1] — 2026-09-04
+
+### Right shape, two pixels of it
+
+Measured off the render at the distance you actually stand in that room, the
+new taper was **6 px at the lip against the old 4, and 4 px everywhere below**.
+The physics was right and almost none of it was on screen.
+
+The width was never the constrained end of this — a real pour leaves the bottle
+5 to 7 mm across, and 4.5 was the timid half of that range. At **5.8 mm** the
+same continuity curve measures:
+
+```
+before   4  4  4  4  4  4     a rod
+4.5 mm   6  4  4  4  4  4
+5.8 mm   8  6  6  4  4  4     halves from lip to glass
+```
+
+Which is the shape falling wine has, in pixels, where somebody can see it.
+
 ## [1.194.0] — 2026-09-04
 
 ### The wine was falling upward
