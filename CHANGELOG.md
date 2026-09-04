@@ -8,6 +8,36 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.222.1] — 2026-09-04
+
+### The audit comes back clean
+
+Last of the sweep through this project's own recent changes. Every remaining
+consumer checked, and all of them are fine:
+
+- **`terraceSet`'s other call site** (the Trampulin fence terrace) passes five
+  arguments, so `kind` and `shop` arrive undefined and `tableTop` correctly
+  skips the coupes 1.210.0 added. No gelato on the pizzeria's tables.
+- **The gelato case's own mesh** (1.195.0) took the geometry out of the shared
+  promenade builder without taking its collision `runs` with it — those are
+  pushed separately and still are.
+- **`riser` shares `bay` with `ribbon`** and calls it with two arguments where
+  `ribbon` now passes three, so a riser hashes on the station index and the slab
+  it joins hashes per bay. 1.201.0 caused that and did not think about this
+  caller; both used to share `CONC[i % 3]` and match.
+
+Only the last needed anything, and what it needed was a note rather than a
+change. Rendered at both steps, the risers read correctly: a riser spans a whole
+station while the slab above it is cut into 3.6 m bays, so there is no single bay
+for it to match even if it should — and a step face is a different pour from the
+tread. Both land in the same 0.92–1.08 band off the same palette, so they read as
+the same concrete without pretending to be the same slab. Written down over
+`riser` so the next person does not have to work it out again.
+
+**Three regressions came out of this sweep** — 1.219.0 walking her through a
+stool, 1.220.0 putting a fridge in the Trampulin's serving hatch, 1.221.0 leaving
+the arms fitted to a torso that had moved — and it is now returning clean.
+
 ## [1.222.0] — 2026-09-04
 
 ### Four audits, three clean, and a note that stopped being true

@@ -792,6 +792,22 @@ async function buildJadrija(scene) {
   }
 
   /** The vertical face of a terrace, high side inland. */
+  /**
+   * The vertical face between two of the shore's levels.
+   *
+   * It calls `col(i, s)` with two arguments where `ribbon` passes three, so
+   * `bay`'s `key` falls back to the station index and a riser hashes on a
+   * different key space from the slab it joins. That is deliberate now, having
+   * been an accident: 1.201.0 gave `bay` a per-bay key and did not think about
+   * this caller, and both used to share `CONC[i % 3]` and therefore match.
+   *
+   * Checked against renders of both steps and left alone. A riser spans a whole
+   * station while the slab above it is cut into 3.6 m bays, so there is no
+   * single bay for it to match even if it wanted to — and a step face is a
+   * different pour from the tread anyway. Both sit in the same 0.92-1.08 band
+   * off the same palette, so they read as the same concrete without pretending
+   * to be the same slab.
+   */
   function riser(s, loOf, hiOf, col) {
     for (let i = 0; i < ST.length - 1; i++) {
       const a = ST[i], c = ST[i + 1];
