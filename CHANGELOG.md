@@ -8,6 +8,55 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.228.0] — 2026-09-04
+
+### The cat goes round the chairs
+
+Misha: *"our cat seems to be running through objects like chair legs.. it should
+avoid them"*. He did, and it was not a graze. His legs were straight lines
+between the four table centres of the slastičarnica's terrace, and measured
+against the blocker list the line from table 0 to table 1 passes **0.125 m**
+from the chair at (332.94, 18.15) — a 0.20 half-extent box, so he went through
+the middle of it. Two more were clipped at 0.247 and 0.257 against a corner
+reach of 0.283.
+
+`catRoute` plans each leg when he sets off, not at load, so it sees the terrace
+as it is: a chair pushed in, somebody sitting down, a blocker switched off.
+Three shapes in the order a cat would think of them — straight there; out and
+back round one side; out, along and in — offset from the straight line rather
+than searched as a graph, because what he is getting round is a ring of three
+chairs 0.72 m from a table and the answer is always *go wide*.
+
+Two things it does that a first-fit router would not:
+
+- **The offsets go seaward first.** The shopfront is inland. A detour toward
+  the sea is somewhere he can go; one toward the shop is two metres of terrace
+  and then a wall.
+- **Candidates are scored, not raced.** The channel between two adjacent chairs
+  is 1.247 m centre to centre less two 0.20 half-extents — about 0.75 m — and
+  first-fit lands on the first offset that squeaks through it, measured at
+  12 mm of daylight. `CAT.easy` caps what the score will pay for and a length
+  term spends the rest, so he takes the shortest comfortable route rather than
+  the widest one available.
+
+**The four tables are exempt and that is the whole trick.** His stations *are*
+the table centres and he is under one for ten seconds at a time, so a router
+that treated the thing he lives beneath as a wall would find no route anywhere
+and fall straight back to the line it replaced. They are matched by position,
+because both lists come out of `terraceTables`.
+
+He also steers in the shore frame now instead of in rig yaw. That was fine
+while the turn always finished before the walk began; a dogleg turns him while
+he is moving, and the direction he moves has to be the number the direction he
+faces is read from, or he crabs along a coastline that runs 31° off the world
+axis. The lag at a corner goes the safe way — he overshoots *outward*, away
+from the chair the corner exists to miss.
+
+Soaked one full circuit, all four legs, 391 samples while crossing: the worst
+clearance he actually achieves is **0.173 m** against a girth of 0.11, and it
+matches the planned figure, so the arcs he rounds corners on are not eating
+into the plan. `__fr.jad.raw().cat()` reports `path`, `gap` and `clear`.
+
 ## [1.227.0] — 2026-09-04
 
 ### Her toes point, and the developpe is turned out

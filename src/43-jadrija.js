@@ -22398,6 +22398,34 @@ async function buildJadrija(scene) {
     turn: 3.4,                  // rad/s — a cat turns on the spot faster than a dog
     under: [4.0, 14.0],         // how long he stays under one, seconds
     near: 90,                   // past this he is not posed, see stepCat
+    // HOW WIDE A BERTH HE GIVES A CHAIR LEG.
+    //
+    // Reported 4 Sep: "our cat seems to be running through objects like chair
+    // legs.. it should avoid them". He did, and it was not a near miss. The
+    // legs of his route are straight lines between the four table centres, and
+    // measured against the blocker list on the slastičarnica's terrace the
+    // line from table 0 to table 1 passes 0.125 m from the chair at
+    // (332.94, 18.15) — which is a 0.20 half-extent box, so he went through
+    // the middle of it. Two more chairs are grazed at 0.247 and 0.257 against
+    // a corner reach of 0.283.
+    //
+    // 0.11 on top of the blocker, which is `GROUND.girth` for an animal 0.15 m
+    // across the shoulders instead of 0.55 for a person. Anything more and the
+    // gaps on this terrace close: the chair rings are 0.72 m and adjacent
+    // tables are 4.2 m apart, so the widest clear channel between two rings is
+    // about 0.9 m and a cat asking for a metre of it never finds a route at
+    // all — it falls back to the straight line, which is the bug.
+    girth: 0.11,
+    // How far ahead he looks when rounding a corner. At 0.66 m/s and 3.4 rad/s
+    // his tightest arc is 0.19 m, so a waypoint he aims at until he touches it
+    // is a right-angle stop. Switching a third of a metre out turns the dogleg
+    // into the arc a cat actually walks round a chair on.
+    corner: 0.22,
+    // Clearance he stops shopping for. Twice what he needs: once a candidate
+    // route has this much daylight the search stops buying more and takes the
+    // shorter one, or he would swing a metre and a half out into the gangway
+    // to get past a chair he could have gone round in forty centimetres.
+    easy: 0.22,
   };
   let cat = null;
 
@@ -22597,7 +22625,14 @@ async function buildJadrija(scene) {
       cat = {
         mesh, fig, at: [fig0[0], fig0[1]], tris: fig.tris,
         mode: 'under', timer: 2.0 + Math.random() * 6.0, leg: 0, dir: 1,
-        yaw: mesh.rotation.y, want: mesh.rotation.y,
+        // HIS HEADING IS A SHORE BEARING and the rig yaw is derived from it
+        // once a frame in `stepCat`. It used to be the yaw itself, which was
+        // fine while the turn always finished before the walk began: now a
+        // dogleg turns him while he is moving, and the direction he MOVES has
+        // to be the same number the direction he FACES is read from, or he
+        // crabs along a coastline that runs 31 degrees off the world axis.
+        head: Math.PI * 0.5, want: Math.PI * 0.5,
+        path: [[fig0[0], fig0[1]]], wp: 0, gap: 99,
       };
     } catch (e) {
       console.warn('cat failed:', e.message);
@@ -22892,6 +22927,137 @@ async function buildJadrija(scene) {
    * Deliberately half the state machine the dog has and none of the special
    * cases: no jet, no room, no cot. He is scenery with a gait.
    */
+  /**
+   * What the cat has to get round, which is not everything that stops a person.
+   *
+   * THE FOUR TABLES ARE LEFT OUT ON PURPOSE, and they are the reason this is a
+   * list of its own rather than `blockers`. His stations *are* the table
+   * centres — see CAT — and he is under one for ten seconds at a time, so a
+   * router that treated the thing he lives beneath as a wall would find no
+   * route to anywhere and fall straight back to the line it was meant to
+   * replace. They are identified by position and not by a flag, because both
+   * lists are built out of `terraceTables` and that is what makes the match
+   * exact.
+   *
+   * Everything else within reach is in — the twelve chairs, whoever is sitting
+   * in them, the bin at the end of the row, the shopfront behind it — so this
+   * needs no maintenance when somebody puts another table out. And it is
+   * rebuilt at the start of every leg rather than cached, which is once every
+   * ten seconds or so and is what lets `b.off` mean anything.
+   */
+  function catMiss() {
+    const out = [];
+    if (!CAT.at || !CAT.at.length) return out;
+    let t0 = Infinity, t1 = -Infinity, s0 = Infinity, s1 = -Infinity;
+    for (const a of CAT.at) {
+      t0 = Math.min(t0, a[0]); t1 = Math.max(t1, a[0]);
+      s0 = Math.min(s0, a[1]); s1 = Math.max(s1, a[1]);
+    }
+    for (const b of blockers) {
+      if (b.off) continue;
+      if (!(b.a >= 0) || !(b.c >= 0)) continue;
+      if (b.t < t0 - 5 || b.t > t1 + 5 || b.s < s0 - 5 || b.s > s1 + 5) continue;
+      let table = false;
+      for (const a of CAT.at) {
+        if (Math.abs(b.t - a[0]) < 0.05 && Math.abs(b.s - a[1]) < 0.05) table = true;
+      }
+      if (!table) out.push(b);
+    }
+    return out;
+  }
+
+  /**
+   * How much daylight a route has, in metres, at its worst point.
+   *
+   * Sampled every 5 cm rather than solved, and the error that buys is bounded
+   * and small: distance to a box is 1-Lipschitz along a straight line, so a
+   * 5 cm sample can under-read the true gap by at most 2.5 cm. Which is the
+   * same order as `CAT.girth` being a guess about how wide a cat is, and a
+   * great deal easier to be sure of than four segment-to-rotated-box cases.
+   *
+   * Negative is not possible and is not wanted: a route that goes through
+   * something scores 0 and loses to everything that does not.
+   */
+  function catGap(pts, miss) {
+    let worst = Infinity;
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const dt0 = pts[i + 1][0] - pts[i][0], ds0 = pts[i + 1][1] - pts[i][1];
+      const L = Math.hypot(dt0, ds0);
+      const n = Math.max(1, Math.ceil(L / 0.05));
+      for (let k = 0; k <= n; k++) {
+        const u = k / n;
+        const t = pts[i][0] + dt0 * u, s = pts[i][1] + ds0 * u;
+        for (const b of miss) {
+          const co = b.rot ? Math.cos(b.rot) : 1, sn = b.rot ? Math.sin(b.rot) : 0;
+          const dt1 = t - b.t, ds1 = s - b.s;
+          const x = Math.abs(dt1 * co + ds1 * sn) - b.a;
+          const y = Math.abs(-dt1 * sn + ds1 * co) - b.c;
+          const g = Math.hypot(Math.max(x, 0), Math.max(y, 0));
+          if (g < worst) worst = g;
+          if (worst <= 0) return 0;
+        }
+      }
+    }
+    return worst === Infinity ? 99 : worst;
+  }
+
+  /**
+   * A way from one table to the next that does not go through a chair.
+   *
+   * Three shapes, in the order a cat would think of them: straight there; out
+   * and back in round one side; and out, along and in, which is the one that
+   * actually gets past a chair standing square between two tables. The
+   * candidates are OFFSETS FROM THE STRAIGHT LINE rather than a graph search,
+   * because the thing being got round is a ring of three chairs 0.72 m from a
+   * table and the answer is always "go wide" — there is nothing here for a
+   * planner to discover that a sideways nudge does not find.
+   *
+   * The offset is measured on the SEAWARD normal first and the inland one
+   * after, both times, because the shopfront is inland and the open concrete
+   * is not: a detour toward the sea is somewhere he can go, and one toward the
+   * shop is two metres of terrace and then a wall.
+   *
+   * Scored rather than first-past-the-post, and that is not fastidiousness.
+   * The channel between two adjacent chairs on this terrace is 1.247 m centre
+   * to centre less two 0.20 half-extents, so about 0.75 m wide — first-fit
+   * lands on the first offset that squeaks through it, which measured out at
+   * 12 mm of daylight. `easy` caps what the score will pay for and the length
+   * term spends the rest, so he takes the shortest route that is comfortable
+   * rather than the widest one that exists.
+   */
+  function catRoute(a, b) {
+    const miss = catMiss();
+    const dt0 = b[0] - a[0], ds0 = b[1] - a[1];
+    const L = Math.hypot(dt0, ds0) || 1;
+    // The normal, always pointing seaward, so "out" means the same thing on
+    // the way back along the row as it did on the way there.
+    let nt = -ds0 / L, ns = dt0 / L;
+    if (ns > 0) { nt = -nt; ns = -ns; }
+    const cand = [[b]];
+    for (const d of [0.35, 0.60, 0.85, 1.10, 1.35, 1.60,
+      -0.35, -0.60, -0.85, -1.10]) {
+      cand.push([[(a[0] + b[0]) * 0.5 + nt * d, (a[1] + b[1]) * 0.5 + ns * d], b]);
+      cand.push([
+        [a[0] + dt0 * 0.30 + nt * d, a[1] + ds0 * 0.30 + ns * d],
+        [a[0] + dt0 * 0.70 + nt * d, a[1] + ds0 * 0.70 + ns * d], b]);
+    }
+    let best = null, bestScore = -Infinity;
+    for (const c of cand) {
+      const pts = [a].concat(c);
+      let len = 0;
+      for (let i = 0; i + 1 < pts.length; i++) {
+        len += Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]);
+      }
+      const gap = catGap(pts, miss);
+      // A route he cannot fit down is worth less than any he can, whatever it
+      // costs in distance — hence the cliff at `girth` rather than a slope.
+      const score = (gap < CAT.girth ? gap - 10 : Math.min(gap, CAT.easy))
+        - 0.03 * (len - L);
+      if (score > bestScore) { bestScore = score; best = pts; }
+    }
+    return { path: best.slice(1), gap: catGap(best, miss) };
+  }
+
   function moveCat(dt) {
     const c = cat;
     if (c.mode === 'under') {
@@ -22904,17 +23070,23 @@ async function buildJadrija(scene) {
       if (c.leg + c.dir < 0 || c.leg + c.dir >= CAT.at.length) c.dir = -c.dir;
       c.leg += c.dir;
       c.mode = 'turn';
-      const g = CAT.at[c.leg];
-      c.want = rigYaw(c.at[0], Math.atan2(g[1] - c.at[1], g[0] - c.at[0]));
+      // The route is planned HERE and not at load, so it sees the terrace as
+      // it is when he sets off: a chair pushed in, somebody sitting down, a
+      // blocker switched off. It costs about fifty thousand point-to-box
+      // distances and it happens once every ten seconds.
+      const r = catRoute([c.at[0], c.at[1]], CAT.at[c.leg]);
+      c.path = r.path; c.wp = 0; c.gap = r.gap;
+      const g = c.path[0];
+      c.want = Math.atan2(g[1] - c.at[1], g[0] - c.at[0]);
       return;
     }
     if (c.mode === 'turn') {
       // Shortest way round, and then walk once he is pointing at it.
-      let d = c.want - c.yaw;
+      let d = c.want - c.head;
       while (d > Math.PI) d -= Math.PI * 2;
       while (d < -Math.PI) d += Math.PI * 2;
       const step = Math.sign(d) * Math.min(Math.abs(d), CAT.turn * dt);
-      c.yaw += step;
+      c.head += step;
       if (Math.abs(d) < 0.05) {
         c.mode = 'cross';
         c.fig.play('walk', { fade: 0.12 });
@@ -22922,12 +23094,32 @@ async function buildJadrija(scene) {
       }
       return;
     }
-    // Crossing. Straight at the far table, and stop when he is under it.
-    const g = CAT.at[c.leg];
+    // Crossing, along the route `catRoute` found, and stop when he is under
+    // the far table.
+    //
+    // ALONG HIS OWN NOSE AND NOT ALONG THE VECTOR TO THE WAYPOINT, which the
+    // straight-line version could get away with because the turn was over
+    // before the walk began. A dogleg turns while he is moving, and a cat that
+    // slides sideways into a corner while its body points somewhere else is
+    // the thing every one of these movers is written to avoid. So the yaw
+    // chases the bearing at `CAT.turn` and the feet follow the yaw — which at
+    // 0.66 m/s is an arc of 0.19 m, tighter than any corner here.
+    //
+    // The lag that produces goes the safe way. He overshoots a corner
+    // OUTWARD, away from the chair the corner exists to miss, and curves back
+    // on to the next leg; cutting the corner — which is what aiming at the
+    // next waypoint early would do — would take him back toward it.
+    const g = c.path[Math.min(c.wp, c.path.length - 1)];
+    const last = c.wp >= c.path.length - 1;
     const dt2 = g[0] - c.at[0], ds = g[1] - c.at[1];
     const d = Math.hypot(dt2, ds);
     const step = CAT.trot * dt;
-    if (d <= step) {
+    let e = Math.atan2(ds, dt2) - c.head;
+    while (e > Math.PI) e -= Math.PI * 2;
+    while (e < -Math.PI) e += Math.PI * 2;
+    c.head += Math.sign(e) * Math.min(Math.abs(e), CAT.turn * dt);
+    if (!last && d <= CAT.corner) { c.wp++; return; }
+    if (last && d <= step) {
       c.at[0] = g[0]; c.at[1] = g[1];
       c.mode = 'under';
       c.timer = CAT.under[0] + Math.random() * (CAT.under[1] - CAT.under[0]);
@@ -22940,8 +23132,8 @@ async function buildJadrija(scene) {
       c.fig.state.speed = 0.22;
       return;
     }
-    c.at[0] += dt2 / d * step;
-    c.at[1] += ds / d * step;
+    c.at[0] += Math.cos(c.head) * step;
+    c.at[1] += Math.sin(c.head) * step;
   }
 
   function stepCat(camPos, dt) {
@@ -22955,7 +23147,7 @@ async function buildJadrija(scene) {
     cat.fig.update(dt);
     const p = toWorld(cat.at[0], cat.at[1]);
     cat.mesh.position.set(p[0], p[1], p[2]);
-    cat.mesh.rotation.y = cat.yaw;
+    cat.mesh.rotation.y = rigYaw(cat.at[0], cat.head);
   }
 
   function stepDog(camPos, dt, yt = null, ys = null) {
@@ -28009,7 +28201,16 @@ async function buildJadrija(scene) {
         tris: cat.tris, bones: f.bones.length, clips: f.clips.join('+'),
         mode: cat.mode, leg: cat.leg, dir: cat.dir,
         timer: +cat.timer.toFixed(2),
-        speed: +f.state.speed.toFixed(3), yaw: +cat.yaw.toFixed(3),
+        speed: +f.state.speed.toFixed(3), head: +cat.head.toFixed(3),
+        // The route he is on and the daylight `catRoute` found down it, plus
+        // the daylight he ACTUALLY has where he is standing — which is the
+        // number that matters, because the route is a plan and the arc he
+        // rounds a corner on is not on it. A soak that watches this is how
+        // "he goes round the chairs now" stops being a screenshot.
+        path: cat.path.map((a2) => [+a2[0].toFixed(2), +a2[1].toFixed(2)]),
+        wp: cat.wp, gap: +cat.gap.toFixed(3),
+        clear: +catGap([[cat.at[0], cat.at[1]],
+          [cat.at[0], cat.at[1]]], catMiss()).toFixed(3),
         // The paw ankles, in metres over the plane the animal is placed on.
         // tools/blender/cat.py prints the identical four numbers off the same
         // clip, which is the only way to tell a bake that sinks him from a
