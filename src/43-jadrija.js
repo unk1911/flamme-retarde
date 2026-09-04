@@ -18823,8 +18823,16 @@ async function buildJadrija(scene) {
     b = jbuf;
     lathe(O, 0, 0, [[0, 0.0032], [1, 0.0028]], KIT.wine, 6);
     b = keep;
+    // 0.40 and not 0.22, which is the same lift the poster on this wall got
+    // and for the same reason written over it: *"this room has one doorway and
+    // no lamp, and a print lit correctly for it is a print nobody will ever
+    // see."* The bottle, the glass and the wine in it are the whole subject of
+    // this room and they were sitting at half the poster's exposure — five
+    // releases of solving where her hand goes, on objects you could not make
+    // out. There is a lamp over the tabouret now as well, so the lift has
+    // something to come from.
     const inner = { spec: 0.05, specPower: 14, side: THREE.DoubleSide,
-      emissive: 0.22, body: 'n = gl_FrontFacing ? n : -n; base *= vVCol;' };
+      emissive: 0.40, body: 'n = gl_FrontFacing ? n : -n; base *= vVCol;' };
     const bottle = new THREE.Mesh(bbuf.geo(), solidMaterial(0xffffff, inner));
     const bp = W(bt, bs, by);
     bottle.position.set(bp[0], bp[1], bp[2]);
@@ -18844,6 +18852,54 @@ async function buildJadrija(scene) {
     const stream = new THREE.Mesh(jbuf.geo(), solidMaterial(0xffffff, inner));
     stream.visible = false;
     scene.add(stream);
+
+    // And what is inside the shade, on its own material, because a lamp that
+    // is lit the way the wall behind it is lit is a lamp that is off. The same
+    // call the television's front panel and the radio's dial are: these three
+    // are the only things in this room that emit rather than being lit.
+    {
+      const gbuf = propBuilder();
+      const keep2 = b;
+      b = gbuf;
+      const lt = K.t0 + 0.30, ls = bs - 0.10, ly = f + 1.92;
+      // The inside of the cone, a hair inside the enamel, and the bulb.
+      lathe(W, lt, ls, [[ly + 0.026, 0.023], [ly - 0.108, 0.130]],
+        [1.000, 0.905, 0.720], 12);
+      lathe(W, lt, ls, [[ly - 0.070, 0.000], [ly - 0.062, 0.034],
+        [ly - 0.030, 0.040], [ly + 0.004, 0.030], [ly + 0.012, 0.014]],
+        [1.000, 0.945, 0.820], 10);
+      b = keep2;
+      const glow = new THREE.Mesh(gbuf.geo(), solidMaterial(0xffffff, {
+        spec: 0.0, emissive: 1.0, side: THREE.DoubleSide,
+        body: 'n = gl_FrontFacing ? n : -n; base *= vVCol;',
+      }));
+      scene.add(glow);
+    }
+
+    // ── the lamp over the tabouret ─────────────────────────────────────────
+    //
+    // The note over `KIT` says the television and the radio dial are the only
+    // light in here and that the room was made dark on purpose, which is right
+    // and is why everything that had to be seen — the poster, the bead curtain
+    // — was given its own exposure one object at a time. The wine never was.
+    //
+    // So: an enamel cone on a short arm off the wall the tabouret stands
+    // against, of the kind that is over every work surface in every kabina on
+    // this coast, and a warm glass under it on its own material. It is not a
+    // real light — nothing in this game is — but it is a SOURCE, and a room
+    // where the bright things have somewhere to be bright from is a room and
+    // not a set of exposure decisions.
+    {
+      const lt = K.t0 + 0.30, ls = bs - 0.10, ly = f + 1.92;
+      const ENAM = [0.640, 0.628, 0.600];
+      boxTS(K.t0 + 0.01, K.t0 + 0.06, ls - 0.075, ls + 0.075,
+        ly - 0.10, ly + 0.09, [0.400, 0.392, 0.375], [0.440, 0.432, 0.415]);
+      boxTS(K.t0 + 0.05, lt, ls - 0.018, ls + 0.018, ly - 0.005, ly + 0.030,
+        [0.400, 0.392, 0.375]);
+      // The shade: a cone, wide side down, with the enamel rim a shade lighter.
+      lathe(W, lt, ls, [[ly + 0.030, 0.026], [ly + 0.020, 0.030],
+        [ly - 0.110, 0.135], [ly - 0.118, 0.135]], ENAM, 12);
+    }
 
     // ── the radio, on a small table against the near wall ──
     const rt = dc - 1.66, rs = 19.90;

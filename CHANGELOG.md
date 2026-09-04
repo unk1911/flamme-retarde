@@ -8,6 +8,34 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.188.0] — 2026-09-04
+
+### You could not see it
+
+Sixth pass on the pour, and this one is not about her at all.
+
+The note over `KIT` says it plainly and has for months: *"The screen and the dial
+are the only light in here. That is why the room was made dark."* The note over
+the poster says the consequence: *"this room has one doorway and no lamp, and a
+print lit correctly for it is a print nobody will ever see"* — so the poster was
+given its own exposure, `emissive` 0.46, one object at a time.
+
+**The wine never was.** The bottle, the glass and what goes in it sat at 0.22,
+half the poster's, in a room made dark on purpose. Five releases of solving
+where her hand goes to within two millimetres, on three objects you could not
+make out. Every screenshot taken of this clip since August has been murky and I
+kept reading it as the pose.
+
+They are at 0.40 now — and there is a lamp over the tabouret so the lift has
+somewhere to come from. An enamel cone on a short arm off the wall the stool
+stands against, of the kind that is over every work surface in every kabina on
+this coast, with the shade in the room's own material and a warm glass under it
+on its own. That is the same call the television's front panel and the radio's
+dial are, and those three are now the only things in this room that emit rather
+than being lit. It is not a real light — nothing in this game is — but it is a
+**source**, and a room where the bright things have somewhere to be bright from
+is a room rather than a set of exposure decisions.
+
 ## [1.187.0] — 2026-09-04
 
 ### The ladder is not a barre, measured this time
