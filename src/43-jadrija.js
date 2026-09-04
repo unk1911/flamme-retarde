@@ -25025,10 +25025,17 @@ async function buildJadrija(scene) {
         break;
       }
 
-      // Turned to face you, and that is all this one is. It exists because
-      // everything either side of it is something she is doing to an object,
-      // and without a beat between them she puts a bottle down and starts
-      // undoing her clothes in the same movement.
+      // A BEAT, and since 1.203.0 that is all this one is. It was written as
+      // "turned to face you", and it was: at the old yaw of -50 she finished
+      // the pour 82.5 degrees off the player and this phase swung her round.
+      // Turning her to +30 so that the pour itself faces the mark the player
+      // stands on left this with **4.9 degrees** to do.
+      //
+      // It stays, and it stays for the second half of its own reason, which is
+      // the half that was always the point: everything either side of it is
+      // something she is doing to an object, and without a beat between them
+      // she puts a bottle down and starts undoing her clothes in the same
+      // movement. `showHold` for 1.5 s is the beat. The turn was scenery.
       case 'meet':
         show.want = Math.atan2(ps - show.s, pt - show.t);
         showHold(dt);

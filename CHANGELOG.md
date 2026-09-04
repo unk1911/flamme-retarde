@@ -8,6 +8,42 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.222.0] — 2026-09-04
+
+### Four audits, three clean, and a note that stopped being true
+
+Continuing the sweep of this project's own recent changes. Four consumers of the
+wine work checked; **three came back clean** and are recorded here so nobody
+spends the time again:
+
+- **The parent-bone question** that caught 1.221.0 does not apply to the pour.
+  `wine_solve.py` fits `spine01/02/03`, `chest`, `neck` and `head` *per pose*, so
+  the torso and the arm that hangs off it are consistent by construction. There
+  is no `ARM`-style table fitted against a base that has since moved.
+- **The glance added in 1.212.0 survives to the end of the clip.** MEET's head is
+  (−0.8, −2.7, +1.2) against IDLE_A's (−1.0, −3.0, +1.0) — near identical, and
+  correctly so: the look target sits 0.14 m above her head at 2.3 m, which is
+  three and a half degrees. The movement is the **10.8°** lift out of
+  (−11.6, −9.7) at 6.78, and that is what reads.
+- **`show.leg` is shared by three phases** — `come` (four legs since 1.219.0),
+  the walk home (two) and the barre approach (two) — and each resets and clamps
+  independently. Widening `come` touches neither of the others.
+
+The fourth is a note, and in this file a note that is no longer true is a defect.
+`meet` says *"Turned to face you, and that is all this one is."* It was:
+
+```
+before 1.203.0   she stands at -50.0, meet wants +32.5  ->  turns 82.5 deg
+after  1.203.0   she stands at +30.0, meet wants +34.9  ->  turns  4.9 deg
+```
+
+Turning her to face the mark the player actually stands on took the turn out of
+the turning phase. It stays — for the second half of its own reason, which was
+always the point: everything either side of it is something she is doing to an
+*object*, and without a beat between them she puts a bottle down and starts
+undoing her clothes in the same movement. `showHold` for 1.5 s is the beat. The
+turn was scenery.
+
 ## [1.221.0] — 2026-09-04
 
 ### Lifting her chest moved her hands, and nobody refitted them
