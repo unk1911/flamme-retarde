@@ -8,6 +8,65 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.173.0] — 2026-09-03
+
+### The pour is a pour: she bends her knees, and the bottle stops being a coin
+
+*"no i still don't like how she pours that wine, still looks messed up."* Third
+release on this clip, and this time the two faults were found by rendering the
+six solved poses on a plain ground with the room's props round them, and by
+shooting a contact sheet from the doorway — not by measuring, which is what the
+last two rounds did and which is why they both missed. Every number in
+`WINE_POUR` passed its own test both times.
+
+**She had no knees.** Her fist hangs at 0.865 m and the bottle's grip point
+stands at 0.830, so the height is nothing — but the bottle stood in the middle
+of the tabouret, 0.405 m in front of her, and her whole reach, shoulder to the
+middle of a closed fist, is 0.547 m against a drop of 0.579. **She could not
+touch it standing up.** `wine_solve.py` was given exactly one way to close that
+gap — the trunk — and it spent 28 degrees of it on the reach and held 12 through
+the pour. She folded over the stool with her legs straight and her arm hanging
+down, and that is what "weird" was: a shop dummy taking a bow.
+
+The legs are on the solve now. `dip_legs` turns a knee angle into a hip and an
+ankle by searching for the pair that leaves the sole flat and the ankle where it
+is, so a dip is a dip and not a heel coming off the floor; `wine_floor` drops
+`@root` to match, which the wine clip never needed before because it never bent
+anything. 42 degrees of knee at the stool, 16 on the lift, 5 on the pour. The
+bottle moved on to the near half of the seat with the glass. **The back is down
+from 28 degrees to 15 at its worst, and her head from 0.333 m in front of her
+hips to 0.24.**
+
+**The bottle was edge-on from the one place you watch this from.** A 306 mm
+bottle seen down its own axis is a green ellipse. The glass sat 0.33 in front of
+her and 0.14 out — nearly on her midline — and a right hand pouring into a glass
+on its own midline holds the bottle out at the hip and points it straight across
+the body. She stood square to the shore, so the doorway looked *along* that
+axis. From the door you saw a woman with a disc stuck to her hand and wine
+coming out of nowhere. Swinging the bottle round to point forward-left, which
+was the first attempt at this, changed nothing: the door is forward-left of
+where she stood.
+
+It is fixed with her yaw, not with the bottle. The glass goes 0.235 out, the
+bottle lies **square across her**, and she turns 40 degrees to face the doorway.
+The line of sight from the door now runs 0.99 down her own fore-aft axis with
+the bottle across it — **17 per cent of the bottle along the view where it was
+95** — and she is facing you when you walk in, which the old mark only half
+managed. `kit.wine` computes the mark and the angle from where the glass stands
+rather than carrying them as typed constants, because those two and
+`WINE_POUR` are two ends of one measurement.
+
+**And the bottle was inside her arm.** `REACH` and `HOLD` shipped with 45 mm of
+clearance between the bottle and her forearm against the 77 mm the two radii
+need: three centimetres of glass inside her, invisible in every render because a
+bottle is a solid of revolution and spinning it changes no other number. The
+clearance term was in the cost and was being traded away; it is a barrier now.
+
+Measured in the running game afterwards: tilt 104–110 through the pour, elbow
+122, both feet flat on the floor at every key, and the runtime aim correction —
+the safety net in `stepShow`, not the mechanism — left with **0.2 mm** to do,
+against 115 mm two releases ago.
+
 ## [1.172.0] — 2026-09-03
 
 ### The ferry is a ferry now, and the walk out to her has boats along it

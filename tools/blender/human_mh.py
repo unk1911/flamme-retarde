@@ -3185,6 +3185,7 @@ def export_skin(body, rig, path, clips, tris=26000, J=None, post=True,
     walk_floor(rig)
     fire_floor(rig)
     ballet_floor(rig)
+    wine_floor(rig)
 
     # Duplicate the *object*, not the evaluated mesh.
     #
@@ -5363,70 +5364,92 @@ NOTE_B = dict(NOTE_A, **{
 # version this replaced went wrong, and it is worth writing down how, because
 # every individual number in it was defensible.
 #
-# The pour has to satisfy six things at once, and five of them are invisible in
+# The pour has to satisfy seven things at once, and six of them are invisible in
 # a render until they are badly wrong: the lip over the glass, the tilt off
 # vertical, the elbow, the lean, the clearance between the bottle and her own
-# forearm, and where she is looking. Each one was argued into place against the
-# last picture taken, and nothing ever checked all six together. Measured off
-# the running game, the shipped pose was:
+# forearm, where she is looking, and now the knees. Each one used to be argued
+# into place against the last picture taken, and nothing ever checked all of
+# them together.
 #
-#     her fist 185 mm up the bottle          a hand on the SHOULDER of it
-#     bottle behind the fist  185 mm         and only 121 mm reaching past it
-#     elbow 168 deg                          locked straight
-#     trunk lean 1 deg                       bolt upright
-#     palm 117 mm above the glass rim        hovering right over it
-#     tilt 119 deg off vertical              an empty-bottle angle
+# ROUND ONE fixed the grip. Measured off the running game, the pose then
+# shipping held the bottle 185 mm up from its foot — a fist on the SHOULDER of
+# it, so 185 mm stuck out behind her hand and only 121 mm reached past it: the
+# long half pointed away into the room, the neck sat under her palm, and the
+# wine appeared to come out of her hand. `BOT.grip` in src/43-jadrija.js is
+# 0.108 now, a closed fist around the LABEL, which on a 306 mm Dingac runs 48
+# to 128 mm up.
 #
-# Which is one fault with five symptoms. Holding a bottle by its shoulder puts
-# the long half of it out in the room and the neck under her palm, so the wine
-# appears to come out of her hand — that is the "backwards" — and because the
-# lip is then only 121 mm from her fist, her hand has to hover almost on top of
-# the glass, which leaves no room for an elbow or a lean and forces the bottle
-# nearly flat to reach at all.
+# ROUND TWO — this one — fixed the two things that survived it, and neither was
+# an angle:
 #
-# So the fix is one number and its consequences. `BOT.grip` in
-# src/43-jadrija.js is 0.108: a closed fist around the LABEL, which on a 306 mm
-# Dingac runs 48 to 128 mm up. Now 198 mm of bottle reaches past her fist, her
-# hand sits back and outboard where a hand belongs, and the elbow, the lean and
-# the tilt all have somewhere to be.
+#   SHE HAD NO KNEES. The only way the solver could reach a bottle 0.405 m in
+#   front of her was the trunk, and it spent 28 degrees of it on the reach and
+#   held 12 through the pour. She folded over the stool with her legs straight,
+#   which reads as a bow and not as a person. The legs are on the solve now, as
+#   a fitted dip rather than three typed angles: 42 degrees of knee at the
+#   stool, 16 on the lift, 5 on the pour, with the hip and ankle searched for
+#   the pair that keeps the sole flat and the ankle where it is. The back is
+#   down to fifteen degrees at its worst.
 #
-# THE STANDING MARK MOVED WITH IT. `kit.wine` used to put the glass 0.29 m in
-# front of her and 0.04 m to her right with the bottle dead on her midline, so
-# a right hand had to cross her own centre line to pour — a knot no amount of
-# solving gets out of. It is now derived the other way round, from wanting the
-# glass 0.33 in front and 0.14 out to her right and the bottle 0.42 and 0.23,
-# which is where a right-handed person stands to pour something. That put her
-# at (425.18, 18.62) facing the door wall, which has the side benefit that you
-# now walk in on her front rather than her back.
+#   THE BOTTLE WAS EDGE-ON FROM THE ONE PLACE YOU WATCH THIS FROM. A 306 mm
+#   bottle seen down its own axis is a green ellipse, and hers ran straight
+#   across her body — which is what a right hand does with a glass almost on
+#   the midline, 0.33 in front and 0.14 out. From the doorway you saw a disc.
+#   It is fixed with her yaw rather than with the bottle: the glass goes 0.235
+#   out, the bottle lies square across her, and she turns 40 degrees to face
+#   the door. The line of sight from the doorway now crosses the bottle instead
+#   of running down it — 17 per cent along the view where it was 95.
 #
 # Where things are, in her frame — +x in front of her, +y her left, +z up, off
 # the floor she stands on. All four numbers travel together: move the stool,
 # the mark or a pose and the wine goes on the floor.
 #
-#     the bottle standing on the stool   0.420  -0.230  0.722  (its foot)
-#     so her palm, `BOT.grip` up it      0.420  -0.230  0.830
-#     the glass's rim                    0.330  -0.140  0.890
-#     the lip's target over it           0.330  -0.140  1.030
+#     the bottle standing on the stool   0.330  -0.360  0.722  (its foot)
+#     so her palm, `BOT.grip` up it      0.330  -0.360  0.830
+#     the glass's rim                    0.315  -0.235  0.890
+#     the lip's target over it           0.315  -0.235  1.030
+#     her fist while she pours           0.315  -0.427  1.078
 #
-# Bending to a stool. Her hand has to get to 0.83 m off the floor from a
-# shoulder that starts at 1.40, which is a 0.57 m drop against a 0.48 m arm —
-# so the lean is not decoration, it is the only way the hand arrives at all.
-# What matters is WHERE it bends: the first solved version had the range in
-# spine02 and spine03 and came out as a hunch, curled from the middle of the
-# back with her chin out, like somebody reading a label. `spine01` is on the
-# solver's free list now and the three above it are capped at a third of their
-# old range, so she hinges at the hips and the back stays long.
+# `kit.wine` in src/43-jadrija.js is what carries her to the mark those are
+# measured from, and it computes it: the glass is where the room put it, the
+# yaw is 50 degrees off the shore so she faces the doorway, and the mark is
+# whatever those two make it. Type the mark instead and it drifts.
+
+# Reaching for it, and the first thing to look at is her KNEES.
+#
+# Her fist hangs at 0.865 m and the bottle's grip point stands at 0.830, so the
+# height is nothing — but the bottle was 0.405 m in front of her and her whole
+# reach, shoulder to the middle of a closed fist, is 0.547 m against a drop of
+# 0.579. She could not touch it standing up, and the first solved version was
+# given exactly one way to close that gap: the trunk. It spent 28 degrees of
+# it. She folded over the stool with her legs straight and her arm hanging
+# down, which is what a shop dummy does and is the single thing that made this
+# clip read as somebody taking a bow rather than picking something up.
+#
+# Two changes, and they are worth more than every angle below. The bottle came
+# off the middle of the seat and on to its near half beside the glass, 0.330 in
+# front of her instead of 0.405, which is where you actually leave a bottle you
+# are pouring from. And the knees bend: 42 degrees here, 16 on the lift, 5 on
+# the pour, fitted in `dip_legs` so the sole stays flat and the ankle stays
+# where it is. What is left for the back is fifteen degrees, and fifteen
+# degrees is a person leaning, not a person hinged.
 WINE_REACH = dict(IDLE_A, **{
-    "spine01": (-25.4, 2.5, 1.3),
-    "spine02": (-10.6, 4.1, 3.5),
-    "spine03": (-3.9, 4.2, 3.7),
-    "chest": (0.7, 2.4, 5.5),
-    "neck": (-4.8, 0.5, 2.0),
-    "head": (-8.7, -10.6, 0.2),
-    "clavicleR": (8.0, 4.0, 6.6),
-    "armUR": (-20.0, 7.6, -14.6),
-    "armLR": (13.7, -0.7, -21.7),
-    "handR": (-18.0, 16.2, -17.2),
+    "spine01": (-10.0, -3.2, -2.1),
+    "spine02": (-8.9, -4.1, -2.9),
+    "spine03": (-8.0, -5.0, -0.6),
+    "chest": (0.3, -5.1, -1.4),
+    "neck": (3.4, 1.8, -3.4),
+    "head": (-6.9, -10.0, -1.7),
+    "clavicleR": (6.1, 4.0, -1.3),
+    "armUR": (-38.4, 16.4, -37.8),
+    "armLR": (18.0, 12.8, -19.3),
+    "handR": (-5.0, 38.8, 8.2),
+    "legUL": (-20.6, -11.0, 0.0),
+    "legLL": (42.0, 0.0, 0.0),
+    "footL": (17.6, 0.0, 0.0),
+    "legUR": (-20.6, 11.0, 0.0),
+    "legLR": (42.0, 0.0, 0.0),
+    "footR": (17.6, 0.0, 0.0),
 })
 
 # Closed on it. Same place, the elbow in a few degrees as the hand takes the
@@ -5434,92 +5457,138 @@ WINE_REACH = dict(IDLE_A, **{
 # as a touch. Solved with `HOLD` chained to `REACH`, so the only thing that
 # moves between them is the thing that is supposed to.
 WINE_HOLD = dict(IDLE_A, **{
-    "spine01": (-25.9, 1.8, 0.8),
-    "spine02": (-10.9, 3.8, 3.1),
-    "spine03": (-4.1, 3.7, 3.6),
-    "chest": (0.6, 2.0, 5.7),
-    "neck": (-5.0, 0.5, 2.1),
-    "head": (-8.7, -10.6, 0.0),
-    "clavicleR": (8.0, 4.0, 6.3),
-    "armUR": (-19.9, 8.2, -14.1),
-    "armLR": (9.3, -0.3, -22.6),
-    "handR": (-17.3, 16.8, -17.6),
+    "spine01": (-10.4, -3.5, -2.9),
+    "spine02": (-9.2, -4.4, -3.3),
+    "spine03": (-8.5, -5.6, -1.0),
+    "chest": (-0.2, -5.5, -1.5),
+    "neck": (3.5, 1.5, -3.5),
+    "head": (-7.1, -9.8, -1.6),
+    "clavicleR": (6.3, 3.2, -1.6),
+    "armUR": (-37.8, 16.6, -38.1),
+    "armLR": (10.7, 14.2, -21.6),
+    "handR": (-3.7, 40.6, 8.9),
+    "legUL": (-20.6, -11.0, 0.0),
+    "legLL": (42.0, 0.0, 0.0),
+    "footL": (17.6, 0.0, 0.0),
+    "legUR": (-20.6, 11.0, 0.0),
+    "legLR": (42.0, 0.0, 0.0),
+    "footR": (17.6, 0.0, 0.0),
 })
 
 # Lifted clear of the stool, upright, and on the way to the glass rather than
 # away from it. The first cut of this sent it 0.245 m out to her right hip and
 # then 0.213 m back again — 0.37 m of travel spent arriving where it started,
-# which is not a beat, it is a detour, and a detour was half of what "totally
-# awkward" was pointing at. It is a lift: up and in, elbow closing, and it
-# holds for half a second, because a bottle that comes off a stool and starts
-# pouring in the same movement is a bottle nobody picked up.
+# which is not a beat, it is a detour. It is a lift: up and in, the knees
+# coming back most of the way up under her, elbow closing, and it holds for
+# half a second, because a bottle that comes off a stool and starts pouring in
+# the same movement is a bottle nobody picked up.
 WINE_LIFT = dict(IDLE_A, **{
-    "spine01": (-15.5, 1.5, 2.1),
-    "spine02": (-3.9, -2.1, 1.2),
-    "spine03": (-1.6, 0.6, 2.5),
-    "chest": (-4.9, -0.5, 5.3),
-    "neck": (-2.3, -1.4, 0.8),
-    "head": (-11.4, -9.8, 1.2),
-    "clavicleR": (8.0, 4.0, -5.0),
-    "armUR": (-21.0, 7.3, -15.3),
-    "armLR": (-13.0, -0.1, -33.7),
-    "handR": (12.2, 15.8, -6.9),
+    "spine01": (-13.1, -2.1, -3.5),
+    "spine02": (-2.5, -2.4, 0.8),
+    "spine03": (-2.3, 0.4, 0.0),
+    "chest": (-0.1, -2.0, 4.9),
+    "neck": (-5.5, 3.1, -0.7),
+    "head": (-13.3, -5.0, 2.9),
+    "clavicleR": (8.0, 0.5, -3.0),
+    "armUR": (-13.6, 19.6, -26.5),
+    "armLR": (-15.8, 1.7, -20.4),
+    "handR": (15.4, 39.6, 2.2),
+    "legUL": (-8.1, -11.0, 0.0),
+    "legLL": (16.0, 0.0, 0.0),
+    "footL": (4.7, 0.0, 0.0),
+    "legUR": (-8.1, 11.0, 0.0),
+    "legLR": (16.0, 0.0, 0.0),
+    "footR": (4.7, 0.0, 0.0),
 })
 
 # Arrived over the glass, tipped but not yet pouring.
 #
 # This is the key that separates the travel from the turn: the arm has finished
 # moving here and has not started tipping, and splitting those two is most of
-# why the clip reads as deliberate rather than as one continuous lurch. It
-# shares `WINE_POUR`'s HAND exactly — it is solved chained to it — so
-# everything between this key and the pour is the wrist rolling over, which is
-# what a wrist does and what a shoulder swinging a bottle across a room does
-# not. It is played again on the way back out.
+# why the clip reads as deliberate rather than as one continuous lurch. It is
+# chained hard to `WINE_POUR` and solved after it, so everything between this
+# key and the pour is the wrist rolling over — which is what a wrist does and
+# what a shoulder swinging a bottle across a room does not. Solved in clip
+# order instead, with nothing to chain to yet, it came out twenty degrees away
+# from the pour in `spine01`: her back straightening and hinging again inside
+# half a second, twice, on the way in and on the way out.
+#
+# 77 degrees and not the 45 it was asked for, and that number is the wrist's:
+# with the arm parked where the pour needs it, `handR` runs out of roll about
+# there. A tighter band buys nothing except an arm that swings out of the pour
+# and back into it to satisfy it, and nothing pours at 77 degrees anyway.
 WINE_TIP = dict(IDLE_A, **{
-    "spine01": (-7.9, -6.0, 2.8),
-    "spine02": (-2.6, -6.0, 2.6),
-    "spine03": (-1.2, -4.8, 3.6),
-    "chest": (2.0, -7.5, -5.9),
-    "neck": (-5.2, -0.1, 0.0),
-    "head": (-13.4, 1.0, -0.1),
-    "clavicleR": (-8.0, -2.4, -8.1),
-    "armUR": (-22.3, 0.6, -51.4),
-    "armLR": (-14.6, 2.6, 1.6),
-    "handR": (-8.1, 41.8, 56.9),
+    "spine01": (-9.6, -0.5, 2.6),
+    "spine02": (-4.5, 1.1, 2.5),
+    "spine03": (-3.2, 0.7, 1.7),
+    "chest": (-3.0, -0.8, -6.0),
+    "neck": (-7.9, 1.4, 2.6),
+    "head": (-11.8, -2.6, 2.3),
+    "clavicleR": (-8.0, 3.0, -8.1),
+    "armUR": (-20.2, 10.4, -31.5),
+    "armLR": (-5.8, -25.5, 17.6),
+    "handR": (5.3, 26.7, 39.4),
+    "legUL": (-2.8, -11.0, 0.0),
+    "legLL": (5.0, 0.0, 0.0),
+    "footL": (-0.8, 0.0, 0.0),
+    "legUR": (-2.8, 11.0, 0.0),
+    "legLR": (5.0, 0.0, 0.0),
+    "footR": (-0.8, 0.0, 0.0),
 })
 
-# Pouring.
+# Pouring. THE KEY THE WHOLE ROOM IS FOR, and it is solved before `TIP` now
+# rather than after, because `TIP` is a variation on it.
 #
-# Her palm lands 0.295 in front of her, 0.330 out to her right and 1.076 up,
-# and the bottle's own axis puts its lip within 3 mm of the target over the
-# glass — so the runtime aim correction, which is a safety net and not a
-# mechanism, has 3 mm left to do. That number is the one to watch. The version
-# this replaced left the bottle at 113 deg while the glass sat a hundred-odd
-# degrees away from the hand, so the net did most of a right angle of work on
-# every frame of the pour: the bottle swung out of her grip the instant `pour`
-# started to ramp, held there for a second, and swung back. That was the whole
-# of "the wine bottle gets lodged in her hand". It was never a bad frame, it
-# was a hinge.
+# Her palm lands 0.316 in front of her, 0.427 out to her right and 1.078 up,
+# and the bottle's axis puts its lip within 2 mm of the target over the glass,
+# so the runtime aim correction in src/43-jadrija.js — a safety net, not a
+# mechanism — has 2 mm left to do.
 #
-# tilt 103 deg, elbow 122 deg, lean 12 deg, and 108 mm of clearance between the
-# bottle and her forearm — that last one is the term nothing else can see,
-# because a bottle is a solid of revolution and spinning it changes no other
-# number, so an axis lying along the forearm buries half of it in her arm while
-# scoring perfectly on everything else. See `seg_gap` in the solver.
+# WHAT MOVED IS HER, NOT THE POSE, and the number that decided it is the
+# doorway. A 306 mm bottle seen down its own axis is a green ellipse, so the
+# only question worth asking about the pour's geometry is which way the person
+# watching is looking — and in this room there is one place to watch from.
+#
+# The glass used to sit 0.33 in front of her and 0.14 out, almost on her own
+# midline, and a right hand pouring into a glass on its midline holds the
+# bottle at the hip and points it straight across the body. Standing in the
+# doorway you looked straight down that axis and saw a disc. Swinging the
+# bottle round to point forward-left instead — the first attempt at this —
+# changed nothing, because the door is forward-left of where she stood.
+#
+# So the bottle now lies SQUARE ACROSS her: nothing fore-and-aft, 0.97 lateral,
+# a quarter of it down. And she turns 40 degrees to face the door. The line of
+# sight from the doorway then runs 0.99 down her own fore-aft axis with the
+# bottle across it — 17 per cent of it along the view instead of 95, which is a
+# bottle instead of a coin. `kit.wine` in src/43-jadrija.js derives the mark
+# AND the yaw from where the glass stands, so the two cannot drift apart.
+#
+# tilt 104 deg, elbow 122, lean 13, and 100 mm of clearance between the bottle
+# and her own forearm — that last is the term nothing else can see, because a
+# bottle is a solid of revolution and spinning it changes no other number, so
+# an axis lying along the forearm buries half of it in her arm while scoring
+# perfectly on everything else. The shipped REACH and HOLD were at 0.045 with
+# 0.077 needed: three centimetres of bottle inside her arm, for a year.
 WINE_POUR = dict(IDLE_A, **{
-    "spine01": (-10.5, -5.2, 6.0),
-    "spine02": (-5.4, -5.6, 6.0),
-    "spine03": (-4.6, 0.1, 6.0),
-    "chest": (1.3, -4.6, -1.0),
-    "neck": (-4.3, -0.2, -0.2),
-    "head": (-12.1, 1.6, -0.4),
-    "clavicleR": (-8.0, -3.4, -5.3),
-    "armUR": (-17.6, 0.9, -40.6),
-    "armLR": (-10.2, -7.8, 5.6),
-    "handR": (-18.0, 35.3, 63.6),
+    "spine01": (-11.8, -0.7, 5.9),
+    "spine02": (-6.5, 1.2, 5.7),
+    "spine03": (-4.9, 1.5, 4.4),
+    "chest": (-4.5, -1.0, -4.2),
+    "neck": (-7.4, 1.7, 2.7),
+    "head": (-11.2, -2.5, 2.3),
+    "clavicleR": (-8.0, 3.2, -8.8),
+    "armUR": (-19.7, 10.8, -28.1),
+    "armLR": (-5.9, -28.9, 19.9),
+    "handR": (1.9, 25.5, 44.1),
+    "legUL": (-2.8, -11.0, 0.0),
+    "legLL": (5.0, 0.0, 0.0),
+    "footL": (-0.8, 0.0, 0.0),
+    "legUR": (-2.8, 11.0, 0.0),
+    "legLR": (5.0, 0.0, 0.0),
+    "footR": (-0.8, 0.0, 0.0),
 })
 
-# And a second one, three degrees further over and fifteen millimetres higher.
+# And a second one, two degrees further over and twenty millimetres higher.
 #
 # A pour is held for a second and a bit, which at 30 fps is forty frames of a
 # pose that does not change — and a still frame held for forty frames is the
@@ -5527,20 +5596,26 @@ WINE_POUR = dict(IDLE_A, **{
 # little further as the glass fills and the hand comes up with it, which is
 # what a hand does, and it is small enough that nobody will ever name it.
 #
-# Chained hard to `WINE_POUR` in the solver. Solved free it came out eleven
-# degrees away in `spine01`, which over the 0.65 s between the two keys is her
-# whole torso rocking in the middle of a held pour.
+# Chained hard to `WINE_POUR`. Solved free it came out eleven degrees away in
+# `spine01`, which over the 0.65 s between the two keys is her whole torso
+# rocking in the middle of a held pour.
 WINE_POUR_B = dict(IDLE_A, **{
-    "spine01": (-10.1, -5.5, 6.0),
-    "spine02": (-4.8, -6.0, 6.0),
-    "spine03": (-4.2, 0.2, 6.0),
-    "chest": (1.5, -4.9, 0.0),
-    "neck": (-4.6, -0.3, -0.1),
-    "head": (-12.5, 1.6, -0.5),
-    "clavicleR": (-7.4, -3.7, -5.7),
-    "armUR": (-17.6, 0.0, -41.0),
-    "armLR": (-11.6, -8.1, 5.6),
-    "handR": (-18.7, 35.3, 64.3),
+    "spine01": (-11.2, -0.7, 6.0),
+    "spine02": (-6.0, 1.1, 6.0),
+    "spine03": (-4.7, 1.5, 5.3),
+    "chest": (-4.6, -1.2, -3.9),
+    "neck": (-7.5, 1.8, 2.6),
+    "head": (-11.3, -2.5, 2.2),
+    "clavicleR": (-7.8, 3.0, -9.1),
+    "armUR": (-19.7, 10.5, -28.1),
+    "armLR": (-6.6, -29.0, 20.0),
+    "handR": (1.8, 25.5, 44.5),
+    "legUL": (-2.8, -11.0, 0.0),
+    "legLL": (5.0, 0.0, 0.0),
+    "footL": (-0.8, 0.0, 0.0),
+    "legUR": (-2.8, 11.0, 0.0),
+    "legLR": (5.0, 0.0, 0.0),
+    "footR": (-0.8, 0.0, 0.0),
 })
 
 # And the wrap. Both hands to the knot at her hip, a tug, and then away —
@@ -6022,6 +6097,30 @@ BALLET_KEYS = [
     (12.90, _spin(BAL_ARABESQUE, 360)), (13.65, _spin(BAL_ARABESQUE, 360)),
     (14.35, _spin(BAL_STAND, 360)), (15.00, _spin(IDLE_A, 360)),
 ]
+
+
+def wine_floor(rig, clear=0.004):
+    """Sit every key of the pour on the kabina floor.
+
+    New with the knees. Up to this release the wine poses had straight legs and
+    inherited `IDLE_A`'s root, so there was nothing to solve; now she dips 42
+    degrees of knee at the stool and 5 at the pour, and a knee that bends
+    without a root that drops is a woman standing on her toes with her heels in
+    the air.
+
+    `passes=0`, for the reason on `floor_poses`: the staircase a key-by-key
+    solve produces is an artefact when a clip is sampled and is the animation
+    itself when it is hand-keyed. Here it is the animation — she goes down 70 mm
+    to the bottle and comes back up with it — and smoothing it is smoothing the
+    dip away.
+
+    `IDLE_A` is deliberately not in the list. It is shared with every other clip
+    in this file and solving it here would move all of them.
+    """
+    poses = [WINE_REACH, WINE_HOLD, WINE_LIFT, WINE_TIP, WINE_POUR, WINE_POUR_B]
+    worst = floor_poses(rig, poses, clear=clear, passes=0)
+    print("[mh] wine: floor pass settled, deepest key %+.3f m" % worst)
+    return worst
 
 
 def ballet_floor(rig, clear=0.004):
@@ -6600,6 +6699,7 @@ def main():
         walk_floor(rig)
         fire_floor(rig)
         ballet_floor(rig)
+        wine_floor(rig)
         for name in argv[argv.index("--clipcheck") + 1:]:
             if name.startswith("-"):
                 break

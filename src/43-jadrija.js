@@ -18119,7 +18119,9 @@ async function buildJadrija(scene) {
     // correction that large is not a correction, it is a hinge: the bottle
     // swung most of a right angle out of her grip the instant `pour` began to
     // ramp, held there for a second, and swung back.
-    // The height of the seat, which both of the things standing on it need.
+    // The height of the seat, and where the glass stands on it. The bottle
+    // stands in the middle of the seat and `rest` below says so; the standing
+    // mark is derived from the glass, and it is the mark that moved.
     const by = f + 0.722;
     const gt = bt + 0.085, gs = bs + 0.090;
     lathe(W, gt, gs, [
@@ -18401,25 +18403,43 @@ async function buildJadrija(scene) {
       // cabinet, so that a jet clipping the corner of the wood does not count
       // as changing the channel.
       screen: [vt, vs - 0.10, gy + 0.31, 0.24, 0.40],
-      // Where the bottle lives when nobody is holding it, and where she has to
-      // stand to be able to reach it: 0.55 m off it, turned to face it, which
-      // is one pace and an arm.
+      // Where the bottle lives when nobody is holding it. On the near half of
+      // the seat beside the glass — see the note up at `botT`.
       rest: [bt, bs, by],
-      // WHERE SHE STANDS TO POUR, and it is derived rather than chosen. The
-      // old mark put the glass 0.29 m in front of her and 0.04 m to her right
-      // with the bottle dead on her midline, so a right hand had to cross her
-      // own centre line to pour — a knot no pose gets out of, and the reason
-      // the aim correction below had most of a right angle of work to do on
-      // every frame.
+      // WHERE SHE STANDS TO POUR. Computed from the glass and a yaw, because
+      // typed it drifts: it and `WINE_POUR` in tools/blender/human_mh.py are
+      // two ends of the same measurement and the wine goes on the floor if
+      // they disagree by a centimetre.
       //
-      // So it was solved the other way round, from where a right-handed person
-      // stands to pour something: the glass 0.33 in front and 0.14 out to her
-      // right, the bottle 0.42 and 0.23. Both of those and the offsets between
-      // the two objects on the stool fix the mark and the yaw exactly, and the
-      // yaw comes out square to the shore — she faces the front wall, which
-      // has the side benefit that you now walk in on her front rather than on
-      // her back.
-      wine: [bt + 0.225, bs + 0.420, -Math.PI / 2],
+      // Two marks ago it put the glass 0.29 m in front of her and 0.04 m to her
+      // right with the bottle dead on her midline, so a right hand had to cross
+      // her own centre line to pour — a knot no pose gets out of.
+      //
+      // One mark ago it was solved from where a right-handed person stands:
+      // the glass 0.33 in front and 0.14 out. That fixed the crossing and left
+      // a subtler version of the same fault, which took a contact sheet shot
+      // from the doorway to see. A glass 0.14 out is still nearly on her
+      // midline, and a right hand pouring into a glass on its own midline holds
+      // the bottle out at the hip and points it straight ACROSS the body. A
+      // 306 mm cylinder seen along its own axis is a green ellipse — and she
+      // stood facing the front wall, so the doorway, which is the one place in
+      // this room you ever watch this from, looked straight down that axis. You
+      // saw a woman with a disc stuck to her hand and wine coming from nowhere.
+      //
+      // SO SHE TURNS. The glass goes 0.235 out — the diagonal a person actually
+      // sets a glass down on — the bottle lies square across her, and the yaw
+      // comes off the shore by 50 degrees so that she faces the doorway. The
+      // line of sight from the door now runs 0.99 down her own fore-aft axis
+      // with the bottle across it: 17 per cent of the bottle along the view
+      // where it was 95. She is also facing you when you walk in, which the
+      // square-to-the-shore version only half managed.
+      wine: (() => {
+        const a = -50 * Math.PI / 180;
+        const u = [Math.cos(a), Math.sin(a)], r = [u[1], -u[0]];
+        // p = mark + fwd * u + right * r, solved for the mark.
+        return [gt - 0.315 * u[0] - 0.235 * r[0],
+          gs - 0.315 * u[1] - 0.235 * r[1], a];
+      })(),
       // The cot, for the dog: where he lies on it, how high the mattress is,
       // and where he stands on the floor to get up. Off `cm`/`cs0` rather than
       // typed, because the furniture moved outward on its own when the hut went
