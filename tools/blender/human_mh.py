@@ -3695,6 +3695,23 @@ STAND_ELBOW_UNDO = 44.0
 # out longhand is the sagittal half — the contrapposto, the breath, the head
 # turn — and that is deliberate: those are the pose, and the six are only the
 # A-pose being taken out from under it.
+# THE HAND AT REST, which is new and is the cheapest thing in this file.
+#
+# Every hand on every figure in this game has been a splayed paddle: four
+# fingers straight out, spread, held that way in every clip because there was
+# no bone that could do anything else. A relaxed human hand is not that. It
+# hangs with the fingers curved twenty-odd degrees at the knuckles and the
+# thumb carried a little in — and straight splayed fingers are the single most
+# reliable tell that what you are looking at is a mannequin, which is the word
+# that has been used about the figures on this shore more than once.
+#
+# 26 and 12, on `IDLE_A`, which almost everything in this file is `dict`ed from
+# — so it reaches the walk, the idle, the wave, the notice, the eight bathers
+# and everything else that never asked for a hand shape, and it is overridden
+# by the three things that did: the wine's grip at -110, its reach at -25, and
+# the ballet's soft 22.
+RELAX_F, RELAX_T = -26.0, -12.0
+
 IDLE_A = {
     "@root": (0.000, 0.020, -0.006),
     "pelvis": (0, 0, -2.5),
@@ -3704,6 +3721,8 @@ IDLE_A = {
     "armLL": (-14 + STAND_ELBOW_UNDO, 0, STAND_FORE_IN), "handL": (-4, 0, 0),
     "armUR": (-4, 0, -STAND_ARM_IN),
     "armLR": (-11 + STAND_ELBOW_UNDO, 0, -STAND_FORE_IN), "handR": (-4, 0, 0),
+    "fingersL": (RELAX_F, 0, 0), "thumbL": (RELAX_T, 0, 0),
+    "fingersR": (RELAX_F, 0, 0), "thumbR": (RELAX_T, 0, 0),
     "legUL": (0, 0, STAND_TRACK), "legLL": (1, 0, STAND_SHANK),
     "footL": (0, STAND_SOLE, 0),
     "legUR": (-4, 3, -STAND_TRACK), "legLR": (7, 0, -STAND_SHANK),

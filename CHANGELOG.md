@@ -8,6 +8,30 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.179.0] — 2026-09-04
+
+### Every hand in the game was a splayed paddle
+
+The finger bone went in yesterday to get a bottle into her fist. It is worth
+one line more than that, and this is the line: **`IDLE_A` now carries a hand at
+rest.**
+
+Every hand on every figure in this resort has been four straight fingers held
+apart, in every clip, because until yesterday there was no bone that could say
+anything else. A relaxed human hand is not that — it hangs with the fingers
+curved twenty-odd degrees at the knuckles and the thumb carried a little in.
+Straight splayed fingers are the most reliable single tell that what you are
+looking at is a mannequin, which is the word that has been used about the
+figures on this shore more than once and was answered last release with a
+better *mesh* rather than with a better hand.
+
+26° and 12°, on `IDLE_A` — which almost everything in this file is `dict`ed from
+— so it reaches the idle, the walk, the wave, the notice, the quay sitters, the
+sunbathers, all eight bathers and everything else that never asked for a hand
+shape. It is overridden by the three things that did ask: the wine's grip at
+−110, its reach at −25, and the ballet's soft 22. The eight bather blobs are
+re-baked to pick it up; 178 KB to 182 KB apiece.
+
 ## [1.178.0] — 2026-09-04
 
 ### The pirouette was a topple, and she has ballet hands
