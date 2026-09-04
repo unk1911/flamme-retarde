@@ -8,6 +8,40 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.192.0] — 2026-09-04
+
+### There is something behind the counters now
+
+The note over the serving opening explains the black panel and is right about
+why: *"a bright interior behind a shaded front reads as a lightbox and nothing
+else about the shop can recover from it."* That is an argument against an
+interior lit like the outdoors. **It is not an argument for a void**, and a void
+is what shipped. Photographed square on, the Trampulin's frontage is a cream
+board with the shop's name on it over **a black rectangle four metres wide** —
+at eye height, the most artificial thing on this boardwalk. The slastičarnica
+has had a real back bar behind its counter for weeks. The other three had
+nothing at all.
+
+**It is a relief and not a room, and that is a decision about the building.**
+These boxes are solid extrusions from `s0` to `s1` — the opening was never a
+hole, it is a dark panel painted on the front face — so the first cut of this,
+which built a proper shallow room 0.9 m behind the counter, rendered as
+*absolutely nothing*: it was inside a closed box. Cutting a real opening means
+hollowing the front metre of every body and rebuilding its front as four panels
+round the hole, and every pier, plinth, sign and awning post on this boardwalk is
+placed off `s0`. That is a change to make in daylight with somebody to check it.
+
+So the stock stands in the opening's own plane, 20 to 90 mm proud of the black: a
+warm back with a tiled band up from the worktop, two shelves with what the place
+sells on them, and a cold cabinet at one end with the pale front a lit one has.
+At three metres through a four-metre opening that is a shop with things in it,
+which is the whole of what was missing. From an oblique angle it is a shallow
+relief rather than a deep room — the honest price, and a great deal cheaper than
+the black.
+
+On its own mesh at `emissive` 0.28, which is the same lever the kabina's lamp and
+the poster before it use, so it reads at dusk as well as at noon.
+
 ## [1.191.0] — 2026-09-04
 
 ### The room has a floor and a ceiling now

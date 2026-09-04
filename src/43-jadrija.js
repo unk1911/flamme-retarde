@@ -4141,6 +4141,99 @@ async function buildJadrija(scene) {
     boxTS(S.t0, S.t1, fs - 0.03, fs, y0, y0 + 0.32, shade(body, 0.84));
   }
 
+
+  /**
+   * What is behind a serving opening.
+   *
+   * The note over the opening explains the black panel and is right about why:
+   * *"a bright interior behind a shaded front reads as a lightbox and nothing
+   * else about the shop can recover from it."* That is an argument against an
+   * interior lit like the outdoors. It is not an argument for a VOID — and a
+   * void is what shipped. Photographed square on, the Trampulin's frontage is a
+   * cream board with the name on it over **a black rectangle four metres
+   * wide**, which at eye height is the most artificial thing on this boardwalk.
+   * The slastičarnica has had a real back bar behind its counter for weeks; the
+   * other three had nothing at all.
+   *
+   * IT IS A RELIEF AND NOT A ROOM, and that is a decision about the building
+   * rather than about the shop. These boxes are solid extrusions from `s0` to
+   * `s1` — the opening was never a hole, it is a dark panel painted on the
+   * front face — so anything built *behind* it is inside a closed box and
+   * renders as nothing at all, which is exactly what the first cut of this did.
+   * Cutting a real opening means hollowing the front metre of the body and
+   * rebuilding its front as four panels round the hole, and every pier, plinth,
+   * sign and awning post on this boardwalk is placed off `s0`.
+   *
+   * So the stock stands in the opening's own plane, 20 to 90 mm proud of the
+   * black: a warm back, a worktop, two shelves with what the place sells on
+   * them, and a cold cabinet at one end. At three metres through a 4 m opening
+   * that is a shop with things in it, which is the whole of what was missing,
+   * and from an oblique angle it is a shallow relief rather than a deep room —
+   * which is the honest price and is a great deal cheaper than the black.
+   *
+   * On its own mesh at `emissive` 0.28: the same lever the kabina's lamp and
+   * the poster before it use, enough to read as an interior and nowhere near
+   * the outdoor exposure the original note warns about.
+   */
+  function shopInside(S, y0, top) {
+    const buf = propBuilder();
+    const keep = b;
+    b = buf;
+    const oa = S.t0 + (S.t1 - S.t0) * 0.18, oc = S.t1 - (S.t1 - S.t0) * 0.18;
+    const oy0 = y0 + 0.95, oy1 = top - 0.35;
+    const f0 = S.s0 - 0.09, f1 = S.s0 - 0.02;   // the depth it has to work in
+    const WALL = [0.400, 0.372, 0.330];
+    const TOP = [0.330, 0.322, 0.305];
+    const DARK = [0.150, 0.148, 0.145];
+    const key = S.t0 | 0;
+    // The back: a warm wall rather than a black hole, and a tiled band up from
+    // the worktop the way every one of these has.
+    boxTS(oa, oc, f1, f1 + 0.02, oy0, oy1, WALL, shade(WALL, 1.10));
+    boxTS(oa, oc, f1 - 0.012, f1, oy0 + 0.12, oy0 + 0.62, shade(WALL, 1.16));
+    // The worktop, running the width of the opening.
+    boxTS(oa + 0.05, oc - 0.05, f0 + 0.02, f1, oy0 + 0.02, oy0 + 0.10,
+      TOP, shade(TOP, 1.20));
+    // Two shelves and the stock on them.
+    const BOT = [[0.720, 0.640, 0.180], [0.180, 0.360, 0.180],
+      [0.640, 0.180, 0.150], [0.230, 0.250, 0.300], [0.780, 0.760, 0.700],
+      [0.180, 0.280, 0.520], [0.700, 0.400, 0.140]];
+    for (let k = 0; k < 2; k++) {
+      const sy = oy0 + 0.72 + k * 0.42;
+      if (sy + 0.30 > oy1) break;
+      boxTS(oa + 0.10, oc - 0.10, f0 + 0.03, f1, sy, sy + 0.030,
+        shade(WALL, 0.80), shade(WALL, 0.94));
+      for (let t = oa + 0.16; t < oc - 0.20; t += 0.105) {
+        const h = jit(((t * 9) | 0) + key + k * 53, 640);
+        if (h < 0.18) continue;
+        const c = BOT[(jit(((t * 9) | 0) + key + k * 53, 641) * BOT.length) | 0];
+        boxTS(t, t + 0.070, f0 + 0.035, f1 - 0.006, sy + 0.030,
+          sy + 0.030 + 0.16 + h * 0.13, c, shade(c, 1.20));
+      }
+    }
+    // And the cold cabinet at one end, with the pale front a lit one has.
+    {
+      const ct = oa + 0.62;
+      boxTS(ct - 0.42, ct + 0.42, f0, f1, oy0 + 0.02, Math.min(oy1, oy0 + 1.70),
+        DARK, shade(DARK, 1.30));
+      boxTS(ct - 0.35, ct + 0.35, f0 - 0.012, f0 + 0.01, oy0 + 0.14,
+        Math.min(oy1 - 0.06, oy0 + 1.58), [0.660, 0.700, 0.715]);
+      for (let k = 0; k < 4; k++) {
+        const yy = oy0 + 0.22 + k * 0.33;
+        if (yy > oy1 - 0.12) break;
+        boxTS(ct - 0.33, ct + 0.33, f0 - 0.018, f0 - 0.012, yy, yy + 0.028,
+          shade(DARK, 1.7));
+      }
+    }
+    b = keep;
+    const g = buf.geo();
+    if (!g) return;
+    const m = new THREE.Mesh(g, solidMaterial(0xffffff, {
+      spec: 0.05, specPower: 14, emissive: 0.28,
+      body: 'base *= vVCol;',
+    }));
+    scene.add(m);
+  }
+
   function shopRoof(S, y0, top) {
     const ry = top + 0.06;
     const SCREED = [0.455, 0.448, 0.428];
@@ -8982,6 +9075,7 @@ async function buildJadrija(scene) {
     if (S.kind === 'box') shopRoof(S, y0, top);
     if (S.kind === 'box') terraceKit(S, y0);
     if (S.kind === 'box') wallKit(S, y0, top);
+    if (S.kind === 'box' && !S.metal && !S.solid) shopInside(S, y0, top);
     // `shopKit` is the boardwalk's shared frontage — a serving counter with
     // mullions, a condenser and a flue on the roof, two menu boards flanking
     // the opening and a pair of planted pots. Every one of those is a thing
