@@ -8,6 +8,42 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.182.0] — 2026-09-04
+
+### The pour takes as long as pouring a glass of wine takes, and the glass fills
+
+Fourth pass. The grip was the fault and it is fixed; these are the two things
+nobody had ever checked, and both of them are about *time* rather than about
+where a limb is.
+
+**The clip was five seconds.** She took the bottle off the stool, poured, and put
+it back in five seconds flat — with **0.65 s of that spent pouring**. A glass of
+wine takes three. What that reads as is not a person pouring a drink, it is a
+person in a hurry, and "unnatural" is exactly what somebody would call it without
+being able to say why. It is 7.6 s now: the pour is **2.65 s** of tilt past 95°,
+the grasp and the lift have a beat each, and setting the bottle down is no longer
+done in a second. Every one of those numbers exists twice — `wineAt` in
+43-jadrija.js drives the bottle in the hand and the stream off the same key
+times — and both lists moved together.
+
+**And the glass went from empty to full between two frames**, on the one object
+in the room a player is actually watching. A glass that fills instantly undoes a
+pour however good the arm is.
+
+The wine cannot simply be scaled to fake a level: this shell hugs the *outside*
+of the bowl and its radius is a function of height, so a shell squashed to half
+its height carries the brim's radius down to where the glass is only half as
+wide, and the wine comes out through the crystal. What a rising level is, on a
+solid of revolution, is the same profile **truncated** — so there are six of
+them, each running from the bottom of the bowl to its own surface, and the pour
+shows one after another. Six steps over 2.6 s is a level moving 7 mm every four
+hundred milliseconds, which at three metres is a level rising. About 600
+triangles for the set against 100 for the one.
+
+The window is the stream's own: wine appearing before the stream does is wine
+somebody else poured, and wine still rising after it stops is wine coming from
+nowhere.
+
 ## [1.181.0] — 2026-09-04
 
 ### The arms go through first position, because that is what a port de bras is

@@ -6484,11 +6484,23 @@ CLIPS = [
     # centre work would only give it a decision to make that nothing needs.
     {"name": "ballet", "loop": False, "keys": BALLET_KEYS},
 
+    # SEVEN AND A HALF SECONDS, AND IT WAS FIVE. Nobody had ever timed this
+    # clip against the thing it is of. She took the bottle off the stool,
+    # poured, and put it back in five seconds flat, with 0.65 s of it spent
+    # pouring — and a glass of wine takes three. What that reads as is not a
+    # person pouring a drink, it is a person in a hurry, and "unnatural" is
+    # exactly what somebody would call it without being able to say why.
+    #
+    # The pour is 2.65 s of tilt past 95 degrees now, the grasp and the lift
+    # have a beat each, and setting the bottle down is no longer done in a
+    # second. `wineAt` in src/43-jadrija.js carries every one of these numbers
+    # a second time — it drives the bottle in the hand and the stream — and the
+    # note there says what happens if the two lists drift.
     {"name": "wine", "loop": False,
-     "keys": [(0.00, IDLE_A), (0.55, WINE_REACH), (1.05, WINE_HOLD),
-              (1.50, WINE_LIFT), (2.05, WINE_TIP), (2.55, WINE_POUR),
-              (3.20, WINE_POUR_B), (3.60, WINE_TIP), (4.00, WINE_LIFT),
-              (4.40, WINE_HOLD), (4.60, WINE_REACH), (5.05, IDLE_A)]},
+     "keys": [(0.00, IDLE_A), (0.75, WINE_REACH), (1.35, WINE_HOLD),
+              (1.95, WINE_LIFT), (2.60, WINE_TIP), (3.20, WINE_POUR),
+              (5.30, WINE_POUR_B), (5.85, WINE_TIP), (6.35, WINE_LIFT),
+              (6.85, WINE_HOLD), (7.10, WINE_REACH), (7.60, IDLE_A)]},
     {"name": "untie", "loop": False,
      "keys": [(0.00, IDLE_A), (0.60, UNTIE_A), (1.05, UNTIE_B),
               (1.35, UNTIE_B), (1.85, UNTIE_C), (2.55, IDLE_A)]},

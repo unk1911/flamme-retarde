@@ -18597,12 +18597,50 @@ async function buildJadrija(scene) {
     // height, from the bottom of the bowl up to its own surface — which is what
     // a glass of red actually looks like at three metres anyway. The bottom of
     // the bowl is red, the rim is not, and the line between them is the level.
-    const wbuf = propBuilder();
-    b = wbuf;
-    lathe(O, 0, 0, [
-      [0.0810, 0.0000], [0.0830, 0.0175], [0.0930, 0.0335],
-      [0.1090, 0.0413], [0.1220, 0.0424], [0.1220, 0.0000],
-    ], KIT.wine, 16);
+    // SIX OF THEM, one per level, because the glass used to go from empty to
+    // full between two frames.
+    //
+    // The wine cannot simply be scaled: this shell hugs the OUTSIDE of the
+    // bowl and its radius is a function of height, so a shell squashed to half
+    // its height carries the brim's radius down to where the glass is only
+    // half as wide, and the wine comes out through the crystal. What a rising
+    // level is, on a solid of revolution, is the same profile TRUNCATED — so
+    // there are six of them, each running from the bottom of the bowl to its
+    // own surface, and the pour shows one after another. Six steps over 2.6 s
+    // is a level moving 7 mm every four hundred milliseconds, which at three
+    // metres is a level rising.
+    //
+    // Around 600 triangles for the set, against 100 for the one.
+    const WINE_R = [[0.0810, 0.0000], [0.0830, 0.0175], [0.0930, 0.0335],
+      [0.1090, 0.0413], [0.1220, 0.0424]];
+    const wineR = (y) => {
+      for (let i = 1; i < WINE_R.length; i++) {
+        if (y <= WINE_R[i][0]) {
+          const a = WINE_R[i - 1], c = WINE_R[i];
+          const k = (y - a[0]) / (c[0] - a[0]);
+          return a[1] + (c[1] - a[1]) * k;
+        }
+      }
+      return WINE_R[WINE_R.length - 1][1];
+    };
+    const FILLS = 6;
+    const wbufs = [];
+    for (let f = 0; f < FILLS; f++) {
+      const top = 0.0870 + (0.1220 - 0.0870) * (f / (FILLS - 1));
+      const buf = propBuilder();
+      b = buf;
+      const prof = [];
+      for (const [y, r] of WINE_R) {
+        if (y < top) prof.push([y, r]);
+      }
+      prof.push([top, wineR(top)]);
+      // And the surface, which is the one horizontal face in the glass and the
+      // thing the eye actually reads the level off.
+      prof.push([top, 0.0000]);
+      lathe(O, 0, 0, prof, KIT.wine, 16);
+      wbufs.push(buf);
+    }
+    const wbuf = wbufs[FILLS - 1];
     // And the stream, built one metre long about its own base so that a scale
     // and a position are all it needs. Six sides at 3 mm: it is on screen for
     // about a second and it is 3 mm across.
@@ -18619,11 +18657,15 @@ async function buildJadrija(scene) {
     const scarf = new THREE.Mesh(sbuf.geo(), solidMaterial(0xffffff, inner));
     scarf.visible = false;
     scene.add(scarf);
-    const poured = new THREE.Mesh(wbuf.geo(), solidMaterial(0xffffff, inner));
     const gp = W(gt, gs, by);
-    poured.position.set(gp[0], gp[1], gp[2]);
-    poured.visible = false;
-    scene.add(poured);
+    const fills = wbufs.map((buf) => {
+      const m = new THREE.Mesh(buf.geo(), solidMaterial(0xffffff, inner));
+      m.position.set(gp[0], gp[1], gp[2]);
+      m.visible = false;
+      scene.add(m);
+      return m;
+    });
+    const poured = fills[FILLS - 1];
     const stream = new THREE.Mesh(jbuf.geo(), solidMaterial(0xffffff, inner));
     stream.visible = false;
     scene.add(stream);
@@ -18786,7 +18828,7 @@ async function buildJadrija(scene) {
     radio.draw(0.30, 0.0);
     tv.draw(null, 0x2545);
     return {
-      tv, radio, bottle, scarf, poured, stream,
+      tv, radio, bottle, scarf, poured, fills, stream,
       // Where the set is, for the jet to knock the knob on. The table top plus
       // a hand's width: aiming at a radio means aiming at the thing on the
       // table, not at the table.
@@ -24057,7 +24099,7 @@ async function buildJadrija(scene) {
         // And the glass is full from the middle of the pour on, and stays that
         // way. Nobody drinks it and nothing empties it: she poured it for you
         // and it is sitting there, which is the state this room is about.
-        if (wn.full && kit.poured) kit.poured.visible = true;
+        if (wn.full) fillTo(wn.level);
         if (done) go('meet', 'idle', 0.45);
         break;
       }
@@ -25202,6 +25244,23 @@ async function buildJadrija(scene) {
   const PALM = new THREE.Vector3(0.0443, -0.0748, 0.0096);
   const GRIP_UP = new THREE.Vector3(-0.5014, 0.6297, -0.5934);
 
+
+  /**
+   * Which of the six wine shells is showing, or none.
+   *
+   * `level` is 0 to 1 across the pour, or negative for an empty glass. The
+   * glass keeps whatever it was last set to, because nobody drinks it: she
+   * poured it for you and it stands there, which is the state this room is
+   * about. Only the phase and the debug scrubber ever call this.
+   */
+  function fillTo(level) {
+    if (!kit || !kit.fills) return;
+    const n = kit.fills.length;
+    const k = level < 0 ? -1
+      : Math.min(n - 1, Math.max(0, Math.floor(level * n)));
+    for (let i = 0; i < n; i++) kit.fills[i].visible = (i === k);
+  }
+
   /**
    * The two windows the `wine` clip drives, off one clock, because they are
    * read from the phase and again from the debug scrub and two copies of them
@@ -25217,10 +25276,16 @@ async function buildJadrija(scene) {
     // tools/blender/human_mh.py, so a ramp never starts or stops in the middle
     // of a movement:
     //
-    //     1.05 hold -> 1.50 lift    the bottle comes off the stool
-    //     2.05 tip  -> 2.55 pour    the wrist rolls over and the wine starts
-    //     3.20 pourB -> 3.60 tip    it comes back up and stops
-    //     4.40 hold -> 4.60 reach   it is set down and the fingers open
+    //     1.35 hold -> 1.95 lift    the bottle comes off the stool
+    //     2.60 tip  -> 3.20 pour    the wrist rolls over and the wine starts
+    //     5.30 pourB -> 5.85 tip    it comes back up and stops
+    //     6.85 hold -> 7.10 reach   it is set down and the fingers open
+    //
+    // THE CLIP IS 7.6 s AND IT WAS 5.05. Nobody had ever timed it against the
+    // thing it is of: she took the bottle off the stool, poured and put it
+    // back in five seconds flat, with 0.65 s of that spent pouring, and a
+    // glass of wine takes three. That is not a person pouring a drink, it is a
+    // person in a hurry.
     //
     // They used to end 0.35 s adrift of the keys either side, which put the
     // whole of the aim correction inside a window where the pose was already
@@ -25238,9 +25303,21 @@ async function buildJadrija(scene) {
     // above is 2.35 s to 3.44 s, and this is halfway down that. Wine that
     // appears before the stream does is wine somebody else poured.
     return {
-      held: sat((u - 1.10) / 0.35) * (1 - sat((u - 4.40) / 0.30)),
-      pour: sat((u - 2.05) / 0.50) * (1 - sat((u - 3.20) / 0.40)),
-      full: u > 2.90,
+      held: sat((u - 1.40) / 0.45) * (1 - sat((u - 6.85) / 0.28)),
+      pour: sat((u - 2.60) / 0.60) * (1 - sat((u - 5.30) / 0.55)),
+      full: u > 3.00,
+      // AND HOW FULL, which the glass never used to say. It went from empty to
+      // its final level between two frames, on the one object in the room a
+      // player is watching — and a glass that fills instantly is the tell that
+      // undoes a pour however good the arm is. `kit.fills` is six shells and
+      // this is which of them.
+      //
+      // The window is the stream's own: `kit.stream` is drawn while `pour` is
+      // over 0.6, which off the ramps above is 2.96 s to 5.52 s, and the level
+      // rises across exactly that. Wine appearing before the stream does is
+      // wine somebody else poured; wine still rising after it stops is wine
+      // coming from nowhere.
+      level: sat((u - 2.96) / 2.56),
     };
   }
   const vHand = new THREE.Vector3(), vMouth = new THREE.Vector3();
@@ -26634,7 +26711,9 @@ async function buildJadrija(scene) {
           // stays because nobody drinks it; here the whole point is that `at`
           // goes backwards as often as forwards, and a glass that stayed full
           // would make every frame after the first sheet a lie.
-          if (kit && kit.poured) kit.poured.visible = !!wn.full;
+          // Assigned rather than latched — see the note below — so a
+          // scrubbed frame shows the level the clock is actually at.
+          fillTo(wn.full ? wn.level : -1);
         }
       }
       stepShow(0, show.t, show.s + 2);
