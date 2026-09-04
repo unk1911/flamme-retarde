@@ -3903,6 +3903,127 @@ async function buildJadrija(scene) {
    * tank on a stand, a dish, an aerial, and the block somebody put on the
    * cable so the bora would not take it.
    */
+
+  /**
+   * What stands on a terrace besides the tables.
+   *
+   * The tables got their glasses last release and the terrace they stand on is
+   * still bare paving — eight metres of it, at the one part of this shore a
+   * player walks up to and stops. Every café terrace on this coast has the
+   * same three things and this shore had none of them:
+   *
+   *   a pair of PLANTERS marking where the terrace ends and the promenade
+   *   begins, which is how a terrace with no railing tells you it is a room;
+   *
+   *   a BIN, against the frontage, because forty people an hour buy an ice
+   *   cream here and the napkin has to go somewhere;
+   *
+   *   and a STACK OF SPARE CHAIRS in the corner, which is the single most
+   *   reliable object on any terrace in Dalmatia at four in the afternoon.
+   *
+   * All of it is placed off the shop's own numbers rather than typed, so it
+   * follows a frontage that moves, and all of it is a blocker: the complaint
+   * that started the furniture being solid at all was walking through tables.
+   */
+  function terraceKit(S, y0) {
+    if (!S.awn) return;
+    const fs = S.s0 - S.awn;
+    const key = S.t0 | 0;
+    // A tone a shop, so five terraces in a row are not five of one tub. Cast
+    // concrete on this coast goes anywhere from a pale sand to a wet grey
+    // depending on who mixed it, and every one of them has a tide mark round
+    // the bottom where the hose reaches.
+    const tg = 0.86 + 0.28 * jit(key, 690);
+    const TUB = [0.545 * tg, 0.520 * tg, 0.478 * tg * (0.96 + jit(key, 691) * 0.09)];
+    const SOIL = [0.185, 0.150, 0.115];
+    const LEAF = [[0.180, 0.310, 0.165], [0.235, 0.375, 0.190],
+      [0.145, 0.265, 0.140]];
+
+    // ── the planters, one at each end of the terrace's seaward edge ─────────
+    for (const [i, pt] of [[0, S.t0 + 0.55], [1, S.t1 - 0.55]]) {
+      // 2.5 and not 3.15. `fs` is the awning's seaward edge and the tables
+      // stand 1.9 m out from it, so 3.15 put the tubs a metre and a quarter
+      // PAST the last table — out in the promenade proper, where they read as
+      // something dropped rather than as the edge of a terrace, and where the
+      // walker has to go round them for no reason. 2.5 sets them just outside
+      // the tables, which is where a terrace draws its own line.
+      const ps = fs - 2.5;
+      // A cast tub with a chamfer at the foot and a lip at the top. Square,
+      // because the round ones on this coast are the municipality's and the
+      // square ones belong to whoever swept the terrace this morning.
+      boxTS(pt - 0.30, pt + 0.30, ps - 0.30, ps + 0.30, y0, y0 + 0.06,
+        shade(TUB, 0.88));
+      // The tide mark: a hand's width of it, darker, where the terrace gets
+      // hosed down every morning and the tub does not dry out.
+      boxTS(pt - 0.275, pt + 0.275, ps - 0.275, ps + 0.275, y0 + 0.05,
+        y0 + 0.17, shade(TUB, 0.80));
+      boxTS(pt - 0.27, pt + 0.27, ps - 0.27, ps + 0.27, y0 + 0.05, y0 + 0.46,
+        TUB, shade(TUB, 1.10));
+      boxTS(pt - 0.30, pt + 0.30, ps - 0.30, ps + 0.30, y0 + 0.44, y0 + 0.50,
+        shade(TUB, 1.06), shade(TUB, 1.14));
+      boxTS(pt - 0.24, pt + 0.24, ps - 0.24, ps + 0.24, y0 + 0.44, y0 + 0.47,
+        SOIL);
+      // And what is in it: a clipped ball of something evergreen, drawn as
+      // stubby blades rather than as a sphere, because a sphere of one green
+      // on a terrace is a bowling ball on a stick.
+      const n = 15;
+      for (let k = 0; k < n; k++) {
+        const a = (k / n) * TAU + jit(key + i * 31, 700 + k) * 0.7;
+        const r = 0.10 + jit(key + i * 31, 720 + k) * 0.16;
+        const h = 0.30 + jit(key + i * 31, 740 + k) * 0.34;
+        const c = LEAF[(jit(key + i * 31, 760 + k) * LEAF.length) | 0];
+        const bt = pt + Math.cos(a) * r * 0.45, bs = ps + Math.sin(a) * r * 0.45;
+        b.tri(W(bt - 0.045, bs, y0 + 0.46), W(bt + 0.045, bs, y0 + 0.46),
+          W(bt + Math.cos(a) * r, bs + Math.sin(a) * r, y0 + 0.46 + h), c);
+        b.tri(W(bt, bs - 0.045, y0 + 0.46), W(bt, bs + 0.045, y0 + 0.46),
+          W(bt + Math.cos(a) * r * 0.7, bs + Math.sin(a) * r * 0.7,
+            y0 + 0.46 + h * 0.86), shade(c, 1.16));
+      }
+      furniture.push({ t: pt, s: ps, a: 0.30, c: 0.30, h: 0.50, y: y0 });
+    }
+
+    // ── the bin, against the frontage under the awning ──────────────────────
+    {
+      const bt = S.t1 - 1.15, bs = S.s0 - 0.55;
+      const BIN = [0.245, 0.255, 0.250];
+      post(W, bt, bs, y0, y0 + 0.03, 0.30, shade(BIN, 0.80), 12);
+      post(W, bt, bs, y0 + 0.02, y0 + 0.78, 0.285, BIN, 12);
+      post(W, bt, bs, y0 + 0.76, y0 + 0.83, 0.305, shade(BIN, 1.22), 12);
+      // The mouth, which is a dark disc set into the lid and is the only part
+      // of a bin anybody's eye goes to.
+      post(W, bt, bs, y0 + 0.82, y0 + 0.845, 0.185, [0.055, 0.055, 0.058], 10);
+      // A sack liner showing under the rim, the way it always does.
+      post(W, bt, bs, y0 + 0.70, y0 + 0.79, 0.292, [0.140, 0.145, 0.150], 12);
+      furniture.push({ t: bt, s: bs, a: 0.31, c: 0.31, h: 0.83, y: y0 });
+    }
+
+    // ── and the spare chairs, stacked in the corner ─────────────────────────
+    {
+      const ct = S.t0 + 0.75, cs = S.s0 - 0.75;
+      const SEAT = [0.520, 0.512, 0.492];
+      const n = 4 + ((jit(key, 780) * 3) | 0);
+      for (let k = 0; k < n; k++) {
+        const y = y0 + 0.34 + k * 0.075;
+        const o = (jit(key + k, 790) - 0.5) * 0.03;
+        // The seat, and the back leaning over it — a stack of monoblocs is
+        // seats nesting at 75 mm and backs that stay where they were.
+        boxTS(ct - 0.22 + o, ct + 0.22 + o, cs - 0.21, cs + 0.21,
+          y, y + 0.045, SEAT, shade(SEAT, 1.08));
+        boxTS(ct - 0.22 + o, ct + 0.22 + o, cs + 0.15, cs + 0.21,
+          y + 0.045, y + 0.40, shade(SEAT, 0.96));
+      }
+      // The four legs of the bottom one, which is the only one standing on
+      // anything.
+      for (const [ot, os] of [[-0.18, -0.16], [0.18, -0.16],
+        [-0.18, 0.16], [0.18, 0.16]]) {
+        post(W, ct + ot, cs + os, y0, y0 + 0.35, 0.020,
+          shade(SEAT, 0.82), 5);
+      }
+      furniture.push({ t: ct, s: cs, a: 0.26, c: 0.26,
+        h: 0.40 + n * 0.075, y: y0 });
+    }
+  }
+
   function shopRoof(S, y0, top) {
     const ry = top + 0.06;
     const SCREED = [0.455, 0.448, 0.428];
@@ -8742,6 +8863,7 @@ async function buildJadrija(scene) {
       if (S.reedBack) slastBack(S, y0, top);
     }
     if (S.kind === 'box') shopRoof(S, y0, top);
+    if (S.kind === 'box') terraceKit(S, y0);
     // `shopKit` is the boardwalk's shared frontage — a serving counter with
     // mullions, a condenser and a flue on the roof, two menu boards flanking
     // the opening and a pair of planted pots. Every one of those is a thing

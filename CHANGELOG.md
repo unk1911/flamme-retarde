@@ -8,6 +8,45 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.180.0] — 2026-09-04
+
+### The terraces get the three things every terrace on this coast has
+
+The tables got their glasses last release and the terrace they stand on was
+still bare paving — eight metres of it, at the one part of this shore a player
+walks up to and stops, because the ice-cream errand is set there. Every café
+terrace in Dalmatia has the same three objects and this boardwalk had none of
+them:
+
+**Planters**, marking where the terrace ends and the promenade begins — which is
+how a terrace with no railing tells you it is a room. A cast tub with a chamfered
+foot and a lip, a hand's width of tide mark round the bottom where it gets hosed
+down every morning and does not dry out, and something spiky and evergreen in it
+drawn as fifteen stubby blades rather than as a sphere, because a sphere of one
+green on a terrace is a bowling ball on a stick. A tone per shop, so five
+terraces in a row are not five of one tub.
+
+**A bin** against the frontage under the awning, because forty people an hour buy
+an ice cream here and the napkin has to go somewhere. The mouth is a dark disc
+set into the lid, which is the only part of a bin anybody's eye goes to, and
+there is a sack liner showing under the rim the way there always is.
+
+**A stack of spare chairs** in the corner, which is the single most reliable
+object on any terrace on this coast at four in the afternoon: four to six
+monoblocs nesting at 75 mm with the backs staying where they were, and only the
+bottom one standing on its own legs.
+
+All of it placed off the shop's own numbers rather than typed, so it follows a
+frontage that moves, and all of it solid — the complaint that started the
+furniture being blockers at all was walking through tables. The planters went in
+at 3.15 m off the awning edge first, which is a metre and a quarter *past* the
+last table: out in the promenade proper, where a tub reads as something dropped
+rather than as the edge of anything and where the walker has to go round it for
+no reason. 2.5 sets them just outside the tables, which is where a terrace draws
+its own line.
+
+534 222 triangles to **536 022**, still 60 fps.
+
 ## [1.179.0] — 2026-09-04
 
 ### Every hand in the game was a splayed paddle
