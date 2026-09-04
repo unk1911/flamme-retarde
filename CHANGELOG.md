@@ -8,6 +8,36 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.189.0] — 2026-09-04
+
+### The lamps come on
+
+Last release found that the kabina's wine was sitting at the wrong exposure in a
+room deliberately made dark. That is a question worth asking of the whole resort,
+so I asked it: **what does Jadrija look like when it is not mid-afternoon?**
+
+Pitch black. The sky does a proper Adriatic evening, the shop boards keep glowing
+because they are emissive canvases and always were — which reads, by accident, as
+lit signage and is left alone — and the three hundred metres of promenade under
+them, **with a lamp column every twenty-seven metres of it**, is a black shape.
+Not one of those columns lit. This is a game you fly at dusk.
+
+There is no dynamic light here and there does not need to be. The shared material
+already carries `uNight`, and `body` runs before every term in the shading, so a
+lantern's glass can simply be told what to be: `mix(dark grey, sodium warm,
+uNight)` with `uEmissive` at 1.0 either way. What changes is not how much it
+emits, it is **what it is 1.0 of**. One extra mesh for all eleven of them.
+
+The glass is 50 mm deep and inset 15 mm inside the housing, not a plate on the
+underside. A lantern seen from directly below is its whole glass; seen from along
+the promenade at eye height — which is how a walker sees every one of them except
+the one over his head — it is the *sides* of that glass, and a 20 mm edge is two
+pixels at forty metres.
+
+From the air at dusk it is a row of lights down the shore, which is what a
+bathing station is from a Canadair at that hour and is the whole reason it was
+worth doing.
+
 ## [1.188.0] — 2026-09-04
 
 ### You could not see it

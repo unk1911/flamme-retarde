@@ -12798,6 +12798,21 @@ async function buildJadrija(scene) {
   // than sitting on top of the post — which is most of why the old one looked
   // like a bollard that had grown. The 27 m spacing was right and stays.
   const LAMP = { post: 4.80, arm: 0.90, s: JAD.mid + 1.20 };
+  // ── and the lamps come on ─────────────────────────────────────────────────
+  //
+  // Flown over at dusk, this resort was PITCH BLACK. The sky does a proper
+  // Adriatic evening, the shop boards go on glowing because they are emissive
+  // canvases and always were, and the three hundred metres of promenade under
+  // them — with a lamp column every twenty-seven metres of it — is a black
+  // shape. Not one of those columns lit.
+  //
+  // There is no dynamic light in this game and there does not need to be. The
+  // shared material already carries `uNight`, and `body` runs before every
+  // term in the shading, so a lantern's glass can be told what to be: a dark
+  // grey thing in the afternoon and a warm emitter after sunset, in one line,
+  // on one extra mesh. `uEmissive` is 1.0 on it either way — what changes is
+  // what it is 1.0 OF.
+  const lampGlow = propBuilder();
   for (let t = 12; t < LEN - 8; t += 27) {
     if (!clearOfShops(t)) continue;
     // `surfaceY` and not `st.deck`: a lamp column stands at one inland offset
@@ -12814,6 +12829,36 @@ async function buildJadrija(scene) {
     boxTS(t - 0.11, t + 0.11, LAMP.s - LAMP.arm - 0.20, LAMP.s - LAMP.arm + 0.35,
       top - 0.18, top - 0.09,
       [0.620, 0.612, 0.586], [0.215, 0.210, 0.202]);
+    // The glass, on its own buffer. Set a hair proud of the lantern's
+    // underside so the two never argue about the z-buffer.
+    {
+      const keepB = b;
+      b = lampGlow;
+      // 50 mm deep and inset, not a 20 mm plate on the underside. A lantern
+      // seen from directly below is its whole glass; seen from along the
+      // promenade at eye height — which is how a walker sees every one of them
+      // except the one over his head — it is the SIDES of that glass, and a
+      // 20 mm edge is two pixels at forty metres. Inset 15 mm inside the
+      // housing so all four sides show under its rim.
+      boxTS(t - 0.095, t + 0.095,
+        LAMP.s - LAMP.arm - 0.175, LAMP.s - LAMP.arm + 0.325,
+        top - 0.225, top - 0.175, [1, 1, 1]);
+      b = keepB;
+    }
+  }
+  {
+    const g = lampGlow.geo();
+    if (g) {
+      const m = new THREE.Mesh(g, solidMaterial(0xffffff, {
+        spec: 0.02, specPower: 8, emissive: 1.0,
+        // Dark grey glass by day, sodium-warm after sunset. `uNight` is the
+        // same 0-to-1 the sky runs on, so they come up as it goes down.
+        body: 'base = mix(vec3(0.085, 0.083, 0.078), '
+          + 'vec3(1.00, 0.885, 0.640), uNight);',
+      }));
+      m.frustumCulled = false;
+      scene.add(m);
+    }
   }
 
   // Ladders. Not "one within sight" — one every ten metres, in pairs.
