@@ -8,6 +8,54 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.177.0] — 2026-09-04
+
+### The awnings sag, the roofs have a plant deck, and there is something on the tables
+
+*"keep making general enhancements to jadrija, refine the businesses, add more
+triangles, more details to stuff, more details to the gellato area."* Three
+things, found by flying over the boardwalk rather than walking it — which is the
+right way to look for what is missing in **a game about flying over it**.
+
+**The awnings were one flat quad each.** `bar` extruded a single raked slab, up
+to fifteen metres by three, six triangles, one tone. At eye height under one that
+is exactly right: what you see from below is the valance and the posts. From four
+hundred feet they are the largest surfaces on the promenade and every one of them
+was a grey rectangle. They have bays now — the canvas is carried on rafters at
+about 1.5 m and **dips 75 mm between them**, `sin` across the bay times `sin`
+across the fall, nothing at the edges where it is held. A seam stands 20 mm proud
+on every rafter line, because directly overhead is the one angle the sag itself
+cannot be seen from, and each bay is a shade off its neighbour: a canopy that has
+stood three summers on this coast is not one colour anywhere.
+
+**The flat roofs had a fourteen-per-cent tonal spread**, which from the air is one
+tone. It is 0.88 to 1.10 in bays half the size, hashed on **both** indices — the
+first cut hashed on `t | 0` alone, and with bays 0.95 m apart that takes the same
+value for two bays running and for every band across the fall, so what came out
+was long stripes and a chequer of patches. This file has that failure written
+down elsewhere as *a regular pattern is worse than nothing*, and it caught me
+again.
+
+And they have a plant deck, which is the thing every note in this file about the
+back of a shop already said was there and which nobody had put on a roof: a
+condenser cabinet on four feet with **a fan grille in its lid**, coil louvres
+down its seaward face and two lagged lines dropping off it to the parapet; the
+hatch you get up here through, its lid propped on the stay it has been propped on
+since somebody lost the catch; a repair in dark bitumen every fifteen bays or so;
+a tide line of weathering a hand's width off the kerb, where water stands against
+an upstand; and two crates and a coil of hose that somebody carried up and did
+not carry down.
+
+**And the terraces were laid with bare tops.** A disc, three chairs, and in two of
+the three chairs a person with nothing in front of them — on the one part of this
+shore a player walks up to and *stops*, because the ice-cream errand is set here.
+Two glasses with something left in them, a bottle of water with the cap off beside
+it, a foil ashtray, and the folded card these places stand on their tables. A
+quarter of the tables are cleared, because a quarter of them are.
+
+Jadrija goes from 523 581 triangles to **534 222** — about 2 per cent — and holds
+60 fps on the promenade.
+
 ## [1.176.0] — 2026-09-04
 
 ### Her hand closes on the bottle

@@ -3556,6 +3556,97 @@ async function buildJadrija(scene) {
     }
   }
 
+
+  /**
+   * A canvas canopy that sags between its rafters.
+   *
+   * THE BIGGEST BLANK SURFACE IN THE RESORT, and it took an aeroplane to see
+   * it. Every terrace awning on this boardwalk was one `bar` — a single raked
+   * slab up to fifteen metres by three, six triangles, one flat tone — and at
+   * eye height under it that is exactly right, because what you see from
+   * underneath is the valance and the posts. This is a game about flying over
+   * Jadrija. From four hundred feet the awnings are the largest thing on the
+   * promenade and every one of them was a grey rectangle.
+   *
+   * So: bays. The canvas is carried on rafters at about 1.5 m and dips between
+   * them, and the dip is the whole of what makes fabric read as fabric —
+   * `sin` across the bay times `sin` across the fall, 45 mm at the middle of
+   * each panel and nothing at the edges, where it is held. A seam stands 20 mm
+   * proud on every rafter line, and each bay is a shade off its neighbour the
+   * way the roof screed next door already is, because a canopy that has stood
+   * three summers on this coast is not one colour anywhere.
+   *
+   * Under 500 triangles for a fifteen-metre awning, against six. That is the
+   * trade this whole file is: it is the only surface a Canadair sees close up.
+   */
+  function canopySkin(t0, t1, s0, s1, yF, yB, thick, col, key) {
+    const bays = Math.max(4, Math.round((t1 - t0) / 1.5));
+    const NT = bays * 3, NS = 3, SAG = 0.075;
+    const sag = (u, v) => {
+      const f = (u * bays) % 1;
+      return SAG * Math.sin(Math.PI * f) * Math.sin(Math.PI * v);
+    };
+    const tAt = (i) => t0 + (t1 - t0) * (i / NT);
+    const sAt = (j) => s0 + (s1 - s0) * (j / NS);
+    const yTop = (i, j) => {
+      const u = i / NT, v = j / NS;
+      return yF + (yB - yF) * v - sag(u, v);
+    };
+    for (let i = 0; i < NT; i++) {
+      // One tone a bay, and a shade darker over the seaward third: the water
+      // runs that way off every one of them and takes the dirt with it.
+      const g = 0.905 + 0.165 * jit((key + ((i / 3) | 0) * 7) | 0, 344);
+      for (let j = 0; j < NS; j++) {
+        const h = g * (j === 0 ? 0.94 : 1.0);
+        const c = [col[0] * h, col[1] * h, col[2] * h];
+        const A = W(tAt(i), sAt(j), yTop(i, j));
+        const B = W(tAt(i + 1), sAt(j), yTop(i + 1, j));
+        const C = W(tAt(i + 1), sAt(j + 1), yTop(i + 1, j + 1));
+        const D = W(tAt(i), sAt(j + 1), yTop(i, j + 1));
+        b.quad(A, B, C, D, c);
+        // And the same panel again `thick` lower, wound the other way: this is
+        // a canvas on a frame and you stand under it.
+        const a = W(tAt(i), sAt(j), yTop(i, j) - thick);
+        const q = W(tAt(i + 1), sAt(j), yTop(i + 1, j) - thick);
+        const d = W(tAt(i + 1), sAt(j + 1), yTop(i + 1, j + 1) - thick);
+        const e = W(tAt(i), sAt(j + 1), yTop(i, j + 1) - thick);
+        b.quad(e, d, q, a, shade(col, 0.78));
+      }
+      // The two long edges, so the slab is closed along its length.
+      for (const [j, back] of [[0, false], [NS, true]]) {
+        const A = W(tAt(i), sAt(j), yTop(i, j));
+        const B = W(tAt(i + 1), sAt(j), yTop(i + 1, j));
+        const a = W(tAt(i), sAt(j), yTop(i, j) - thick);
+        const q = W(tAt(i + 1), sAt(j), yTop(i + 1, j) - thick);
+        b.quad(...(back ? [A, B, q, a] : [B, A, a, q]), shade(col, 0.88));
+      }
+    }
+    // The ends.
+    for (const [i, east] of [[0, false], [NT, true]]) {
+      for (let j = 0; j < NS; j++) {
+        const A = W(tAt(i), sAt(j), yTop(i, j));
+        const D = W(tAt(i), sAt(j + 1), yTop(i, j + 1));
+        const a = W(tAt(i), sAt(j), yTop(i, j) - thick);
+        const e = W(tAt(i), sAt(j + 1), yTop(i, j + 1) - thick);
+        b.quad(...(east ? [A, D, e, a] : [D, A, a, e]), shade(col, 0.90));
+      }
+    }
+    // The seams, on the rafter lines, standing 20 mm proud. They are what says
+    // "panels" rather than "a dented sheet" from directly overhead, which is
+    // the one angle the sag itself cannot be seen from.
+    for (let k = 1; k < bays; k++) {
+      const t = t0 + (t1 - t0) * (k / bays);
+      for (let j = 0; j < NS; j++) {
+        const u = k / bays;
+        const y0s = yF + (yB - yF) * (j / NS) - sag(u, j / NS) + 0.020;
+        const y1s = yF + (yB - yF) * ((j + 1) / NS)
+          - sag(u, (j + 1) / NS) + 0.020;
+        boxTS(t - 0.025, t + 0.025, sAt(j), sAt(j + 1),
+          Math.min(y0s, y1s) - 0.03, Math.max(y0s, y1s), shade(col, 0.86));
+      }
+    }
+  }
+
   function shopKit(S, y0, top, fs) {
     const body = S.body || [0.520, 0.492, 0.430];
     // The same test `shopBack` makes, for the same reason and on the other
@@ -3822,14 +3913,41 @@ async function buildJadrija(scene) {
 
     // The screed, in bays, each one a shade off its neighbour — which is what
     // a roof laid in a morning by two people with a bucket looks like.
-    for (let t = a; t < c; t += 1.9) {
-      const t1 = Math.min(t + 1.9, c);
-      for (let k = 0; k < 2; k++) {
-        const b0 = s0 + (s1 - s0) * (k / 2), b1 = s0 + (s1 - s0) * ((k + 1) / 2);
-        const g = 0.93 + 0.14 * ((jit(t | 0, 320 + k) * 5) | 0) / 4;
-        boxTS(t, t1, b0, b1, ry, ry + 0.02,
-          [SCREED[0] * g, SCREED[1] * g, SCREED[2] * g]);
+    //
+    // The spread was 0.93 to 1.07 and from four hundred feet that is one tone.
+    // This is a game about flying over Jadrija: the roofs are the surface it
+    // is seen from most and least often looked at from anywhere else, and a
+    // fourteen-per-cent spread on a fifteen-metre slab is a grey rectangle.
+    // 0.84 to 1.12, in bays half the size, with a patch of fresh bitumen every
+    // so often where somebody chased a leak — which is the one thing every
+    // flat roof on this coast has and no two of them have in the same place.
+    for (let t = a; t < c; t += 0.95) {
+      const t1 = Math.min(t + 0.95, c);
+      for (let k = 0; k < 3; k++) {
+        const b0 = s0 + (s1 - s0) * (k / 3), b1 = s0 + (s1 - s0) * ((k + 1) / 3);
+        // Hashed on BOTH indices, and that is not fastidiousness. `jit(t | 0,
+        // 320 + k)` was the first cut and the bays are 0.95 m apart, so `t | 0`
+        // takes the same value for two bays running and the same value for
+        // every band across the fall: what came out was long stripes down the
+        // roof and a chequer of patches, which is the failure this file has
+        // written down elsewhere as "a regular pattern is worse than nothing".
+        const h = ((t * 1.7) | 0) * 31 + k * 7;
+        const g = 0.88 + 0.22 * ((jit(h, 320) * 6) | 0) / 5;
+        // And a repair every fifteen bays or so rather than every eight, in
+        // bitumen that is dark against the screed and not black against it.
+        const pr = jit(h * 3 + 11, 326);
+        const patch = pr < 0.065;
+        const col = patch ? [0.300 + pr, 0.292 + pr, 0.282 + pr]
+          : [SCREED[0] * g, SCREED[1] * g, SCREED[2] * g];
+        boxTS(t, t1, b0, b1, ry, ry + (patch ? 0.025 : 0.02), col);
       }
+    }
+    // Weathering off the kerb. Water stands against an upstand and leaves a
+    // tide line on the screed a hand's width out from it, and on a roof this
+    // flat it is there on all four sides.
+    for (const [q0, q1] of [[s0 + 0.16, s0 + 0.42], [s1 - 0.42, s1 - 0.16]]) {
+      boxTS(a + 0.16, c - 0.16, q0, q1, ry + 0.019, ry + 0.023,
+        [0.352, 0.348, 0.336]);
     }
     // The kerb: a low upstand all the way round, which is the one line that
     // tells you it is a roof and not a lid.
@@ -3865,6 +3983,73 @@ async function buildJadrija(scene) {
         ry + 1.10 + i * 0.13, ry + 1.13 + i * 0.13, [0.360, 0.362, 0.360]);
     }
 
+    // THE CONDENSER, which is the thing every note in this file about the back
+    // of a shop already says is there and which nobody had put on a roof. A
+    // cabinet on four feet with a fan grille in its lid, the coil louvres down
+    // one long side, and the pair of lagged lines dropping off it to the
+    // parapet — which is what actually makes a flat roof read as a flat roof
+    // from above rather than as a lid.
+    {
+      const ct = S.t0 + 5.4 + jit(key, 327) * 1.4, cs = S.s1 - 2.4;
+      const CAB = [0.560, 0.565, 0.570];
+      for (const [ot, os] of [[-0.42, -0.28], [0.42, -0.28],
+        [-0.42, 0.28], [0.42, 0.28]]) {
+        boxTS(ct + ot - 0.05, ct + ot + 0.05, cs + os - 0.05, cs + os + 0.05,
+          ry, ry + 0.11, [0.330, 0.330, 0.335]);
+      }
+      boxTS(ct - 0.50, ct + 0.50, cs - 0.36, cs + 0.36, ry + 0.10, ry + 0.78,
+        CAB, shade(CAB, 1.06));
+      // The louvres down the seaward face, four slats and no more: at this
+      // size they are the difference between a cabinet and a crate.
+      for (let i = 0; i < 4; i++) {
+        boxTS(ct - 0.46, ct + 0.46, cs - 0.38, cs - 0.355,
+          ry + 0.20 + i * 0.13, ry + 0.28 + i * 0.13, shade(CAB, 0.80));
+      }
+      // The fan: a dark well with a guard ring standing proud of it.
+      post(W, ct, cs, ry + 0.74, ry + 0.78, 0.30, [0.115, 0.115, 0.120], 12);
+      post(W, ct, cs, ry + 0.78, ry + 0.82, 0.31, shade(CAB, 0.90), 12);
+      for (let i = 0; i < 3; i++) {
+        boxTS(ct - 0.30, ct + 0.30, cs - 0.02 + (i - 1) * 0.16,
+          cs + 0.02 + (i - 1) * 0.16, ry + 0.80, ry + 0.83,
+          [0.300, 0.300, 0.308]);
+      }
+      // Two lagged lines, out of the side and along the deck to the parapet.
+      for (const o of [-0.10, 0.10]) {
+        boxTS(ct + 0.48, ct + 1.30, cs + o - 0.035, cs + o + 0.035,
+          ry + 0.30, ry + 0.37, [0.760, 0.752, 0.720]);
+        boxTS(ct + 1.24, ct + 1.30, cs + o - 0.035, cs + o + 0.035,
+          ry + 0.04, ry + 0.34, [0.760, 0.752, 0.720]);
+        boxTS(ct + 1.24, ct + 1.30, cs + o - 0.035, s1 - 0.16,
+          ry + 0.04, ry + 0.10, [0.740, 0.732, 0.700]);
+      }
+    }
+    // The hatch you get up here through, its lid propped on the stay it has
+    // been propped on since somebody lost the catch.
+    {
+      const ht = S.t0 + 2.2, hs = S.s0 + (S.awn ? 0 : 0) + 1.5;
+      const LID = [0.520, 0.512, 0.480];
+      boxTS(ht - 0.42, ht + 0.42, hs - 0.34, hs + 0.34, ry, ry + 0.16,
+        [0.470, 0.462, 0.440], shade(LID, 0.92));
+      bar(ht - 0.45, ht + 0.45,
+        [[hs - 0.37, ry + 0.15], [hs + 0.37, ry + 0.40],
+          [hs + 0.37, ry + 0.45], [hs - 0.37, ry + 0.20]],
+        shade(LID, 0.88), LID);
+    }
+    // And what gets left on a roof: two crates and a coil of hose by the
+    // tank, because somebody carried them up and did not carry them down.
+    {
+      const kt = S.t0 + 3.6, ks = S.s1 - 0.9;
+      const CR = jit(key, 328) < 0.5 ? [0.135, 0.230, 0.145]
+        : [0.480, 0.180, 0.130];
+      for (let i = 0; i < 2; i++) {
+        boxTS(kt - 0.20, kt + 0.20, ks - 0.14, ks + 0.14,
+          ry + i * 0.28, ry + 0.26 + i * 0.28, CR, shade(CR, 1.12));
+      }
+      for (let i = 0; i < 3; i++) {
+        post(W, kt + 0.85, ks + 0.05, ry + 0.01 + i * 0.045,
+          ry + 0.05 + i * 0.045, 0.20 - i * 0.02, [0.180, 0.230, 0.190], 9);
+      }
+    }
     // And the blocks somebody put on the cable, because the bora takes
     // anything that is only lying there.
     for (let i = 0; i < 3; i++) {
@@ -4284,10 +4469,12 @@ async function buildJadrija(scene) {
     }
     if (kind === 'mesh') {
       pedestalTable(R.ct, R.cs, y);
+      tableTop(R.ct, R.cs, y + 0.720, ang);
     } else {
       boxTS(R.ct - 0.30, R.ct + 0.30, R.cs - 0.30, R.cs + 0.30, y + 0.70, y + 0.75,
         [0.520, 0.512, 0.492]);
       post(W, R.ct, R.cs, y, y + 0.70, 0.035, [0.330, 0.334, 0.330], 6);
+      tableTop(R.ct, R.cs, y + 0.750, ang);
     }
     // The table, which is a 0.60 m top on a single pedestal and the thing that
     // was actually named in the report. `y` is the deck it stands on rather
@@ -4295,6 +4482,90 @@ async function buildJadrija(scene) {
     // one that gets a walker over a 0.49 m bench — measures this table from the
     // terrace and not from the water.
     furniture.push({ t: R.ct, s: R.cs, a: 0.28, c: 0.28, h: 0.75, y });
+  }
+
+
+  /**
+   * What is on a café table at four in the afternoon.
+   *
+   * Every terrace on this boardwalk was laid with bare tops: a disc, three
+   * chairs, and in two of the three chairs a person with nothing in front of
+   * them. It is the one place on this shore a player walks up to and STOPS —
+   * the ice-cream errand is set here — and it is also, from a low pass, forty
+   * white discs in a row.
+   *
+   * Nothing here is invented and nothing here is worth modelling on its own:
+   * two glasses, a bottle of water with the cap left off it, a foil ashtray,
+   * and the little folded card every one of these places stands on its tables.
+   * Thirty triangles a table and four hundred over the whole boardwalk, which
+   * against 523 000 is nothing at all.
+   *
+   * A quarter of the tables are cleared, because a quarter of them are.
+   */
+  function tableTop(ct, cs, ty, ang) {
+    const key = ((ct * 7.3) | 0) * 13 + ((cs * 5.1) | 0);
+    if (jit(key, 610) < 0.24) return;
+    // Its own frame, turned with the set, so the card faces the same way the
+    // chairs do rather than square to the shore.
+    const a = ang + Math.PI * 0.5, c = Math.cos(a), sn = Math.sin(a);
+    const P = (dt, ds, yy) => W(ct + dt * c - ds * sn, cs + dt * sn + ds * c, yy);
+    const at2 = (dt, ds) => [ct + dt * c - ds * sn, cs + dt * sn + ds * c];
+    const GLASS = [0.660, 0.700, 0.720];
+    const JUICE = [[0.760, 0.330, 0.090], [0.700, 0.120, 0.140],
+      [0.820, 0.700, 0.240], [0.180, 0.230, 0.190]];
+    // One or two glasses, wherever the hands that put them down left them.
+    const n = 1 + ((jit(key, 611) * 2) | 0);
+    for (let i = 0; i < n; i++) {
+      const dt = -0.14 + jit(key + i * 5, 612) * 0.28;
+      const ds = -0.12 + jit(key + i * 5, 613) * 0.24;
+      const [gt, gs] = at2(dt, ds);
+      lathe(W, gt, gs, [[ty, 0.000], [ty, 0.031], [ty + 0.012, 0.031],
+        [ty + 0.014, 0.028], [ty + 0.105, 0.033], [ty + 0.112, 0.033]],
+        GLASS, 9);
+      // And what is left in it, which is the only part with any colour.
+      if (jit(key + i * 5, 614) < 0.72) {
+        const j = JUICE[(jit(key + i, 615) * JUICE.length) | 0];
+        lathe(W, gt, gs, [[ty + 0.016, 0.000], [ty + 0.016, 0.030],
+          [ty + 0.030 + jit(key + i, 616) * 0.050, 0.031]], j, 9);
+      }
+    }
+    // A bottle of water, on three tables in five, with its cap beside it.
+    if (jit(key, 617) < 0.60) {
+      const [bt, bs] = at2(0.17, 0.06);
+      lathe(W, bt, bs, [[ty, 0.000], [ty, 0.036], [ty + 0.140, 0.036],
+        [ty + 0.175, 0.017], [ty + 0.205, 0.015], [ty + 0.208, 0.015]],
+        [0.760, 0.800, 0.820], 9);
+      lathe(W, bt, bs, [[ty + 0.010, 0.0355], [ty + 0.075, 0.0355]],
+        [0.180, 0.420, 0.640], 9);
+      const [kt, ks] = at2(0.24, -0.02);
+      lathe(W, kt, ks, [[ty, 0.000], [ty, 0.014], [ty + 0.013, 0.014]],
+        [0.180, 0.420, 0.640], 7);
+    }
+    // A foil ashtray, on the half of them that is out of the wind.
+    if (jit(key, 618) < 0.45) {
+      const [tt, ts] = at2(-0.18, 0.13);
+      lathe(W, tt, ts, [[ty, 0.000], [ty, 0.052], [ty + 0.016, 0.060],
+        [ty + 0.017, 0.056], [ty + 0.004, 0.048], [ty + 0.004, 0.000]],
+        [0.620, 0.612, 0.585], 8);
+    }
+    // And the folded card, which is the one thing on the table that is the
+    // shop's rather than the customer's. Two leaves at a shallow angle, so it
+    // stands up from either side.
+    if (jit(key, 619) < 0.55) {
+      const CARD = [0.880, 0.865, 0.820];
+      for (const o of [-1, 1]) {
+        boxIn(P, -0.045, 0.045, o * 0.006 - 0.001, o * 0.006 + 0.001,
+          ty, ty + 0.001, CARD);
+      }
+      for (const o of [-1, 1]) {
+        const A = P(-0.045, o * 0.024, ty);
+        const B = P(0.045, o * 0.024, ty);
+        const C = P(0.045, 0.0, ty + 0.085);
+        const D = P(-0.045, 0.0, ty + 0.085);
+        b.quad(...(o > 0 ? [A, B, C, D] : [D, C, B, A]),
+          o > 0 ? CARD : shade(CARD, 0.86));
+      }
+    }
   }
 
   /**
@@ -8248,9 +8519,8 @@ async function buildJadrija(scene) {
     // helper in this file that can rake a section; a flat box could not.
     if (awn > 0) {
       const fs = S.s0 - awn;
-      bar(S.t0 - 0.4, S.t1 + 0.4,
-        [[fs, top - 0.18], [S.s1, top - 0.06], [S.s1, top + 0.06], [fs, top - 0.06]],
-        S.roof, shade(S.roof, 1.10));
+      canopySkin(S.t0 - 0.4, S.t1 + 0.4, fs, S.s1,
+        top - 0.06, top + 0.06, 0.12, S.roof, S.t0 | 0);
       bar(S.t0 - 0.4, S.t1 + 0.4,
         [[fs - 0.02, top - 0.42], [fs + 0.10, top - 0.42],
           [fs + 0.10, top - 0.16], [fs - 0.02, top - 0.16]],
