@@ -6370,6 +6370,166 @@ async function buildJadrija(scene) {
    * ice cream, which is where a clipped-on plaque is and also the only place
    * one can be read from over the glass.
    */
+  /**
+   * A point on a unit superellipse — a rectangle with its corners rounded off.
+   *
+   * `|x|^n + |y|^n = 1`. n = 2 is a circle and n → ∞ is a square; 6 is the
+   * corner a pressed stainless tray has, and it is the shape the whole gelato
+   * counter is made of. 4 was the first try and the pans came out as ovals —
+   * at that exponent the corner pulls in to 0.84 of the square and, sampled
+   * twelve times round, what is left between the samples is a circle.
+   *
+   * Returned as a scale on the square rather than as the curve itself, so a
+   * caller can lay a plain rectangular grid over its pan and pull the boundary
+   * in: `m/q` is 1 down the middle of each side, where a tray is straight, and
+   * 0.89 at the corners, where it is not.
+   */
+  function superFit(u, v, n = 6) {
+    const au = Math.abs(u), av = Math.abs(v);
+    const m = Math.max(au, av);
+    if (m < 1e-6) return 1;
+    const q = Math.pow(Math.pow(au, n) + Math.pow(av, n), 1 / n);
+    return m / q;
+  }
+
+  /**
+   * One vaschetta: the tray the gelato is in.
+   *
+   * `slasticarnica-ice-cream-selection-3` is sixteen of these seen from above
+   * and the tray is unmistakable in it — a pressed stainless pan with ROUNDED
+   * CORNERS and a rolled rim, and the bright grid those rims make between the
+   * colours is half of what says "gelato counter" rather than "paint chips in
+   * a box". Which is what the old build had: a rectangular frustum, four hard
+   * corners, and the rim a 2 mm ledge nobody could see.
+   *
+   * Sixteen samples round the superellipse and three rings up it — the wall,
+   * the lip, the crown of the roll and the skirt outside it. 96 triangles a
+   * pan, 1 536 for the case, which buys the one edge in this cabinet that is
+   * always in the light.
+   */
+  function vaschetta(ct, cs, rt, rs, yFloor, yRim, col, rim) {
+    const N = 16;
+    const ring = (rad, y) => {
+      const out = [];
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * TAU;
+        const u = Math.cos(a), v = Math.sin(a);
+        const f = superFit(u, v) * rad;
+        out.push(W(ct + u * rt * f, cs + v * rs * f, y));
+      }
+      return out;
+    };
+    // The inner wall, the lip, the crown of the roll and the skirt that falls
+    // away outside it. The skirt is what stops the rim reading as a knife edge
+    // from the promenade, where this is seen almost side on; the wall is
+    // nearly all buried under the gelato and is here so that the hollow in a
+    // pan that has been served from has a tray to be a hollow in.
+    const rings = [
+      [ring(0.90, yRim - 0.050), shade(col, 0.86)],
+      [ring(0.96, yRim - 0.008), col],
+      [ring(1.02, yRim), rim],
+      [ring(1.06, yRim - 0.020), shade(rim, 0.88)],
+    ];
+    for (let k = 0; k < rings.length - 1; k++) {
+      const A = rings[k][0], B = rings[k + 1][0];
+      for (let i = 0; i < N; i++) {
+        const j = (i + 1) % N;
+        b.quad(A[i], A[j], B[j], B[i], rings[k + 1][1]);
+      }
+    }
+  }
+
+  /**
+   * What is actually in the tray, which is not a mound.
+   *
+   * THE OLD ONE WAS A HEAP AND THE PHOTOGRAPHS ARE NOT. Four stacked frustums
+   * carried the gelato 0.14 m proud of its rim and finished in a small flat
+   * crown — a cone of sorbet on a stick, and from the promenade fourteen
+   * coloured wedges standing in a box. Every frame of this counter shows the
+   * opposite: a pan filled level and SCRAPED, doming maybe three centimetres
+   * over the rim at the middle, its whole surface a set of long curved troughs
+   * left by the spatula, and the swirled flavours marbled ALONG those troughs
+   * rather than pooled on top. Half of them have a hollow dug out of one end
+   * where the morning went.
+   *
+   * So it is a height field on the tray's own rounded rectangle, 10 by 7, and
+   * every term in it is one of those observations:
+   *
+   *   dome    the fill, falling to nothing at the rim, which is where the
+   *           gelato meets the steel and has to.
+   *   scrape  one spatula direction per pan, six wavelengths across it. This
+   *           is the whole texture and it costs one sine.
+   *   dig     a Gaussian hollow on the pans that have been served from, which
+   *           is a little over half of them.
+   *
+   * The ribbon rides the scrape instead of sitting on the crown. A swirl in a
+   * gelato pan IS the fold the spatula made, so the same phase that lifts a
+   * ridge is the one that brings the dark up, at a longer wavelength so the
+   * two do not beat against each other into stripes.
+   *
+   * 140 triangles a pan and 2 240 for the case, against 384 for all sixteen
+   * heaps it replaces. The whole resort is half a million.
+   */
+  function gelatoSlab(ct, cs, rt, rs, yLow, yRim, F, k) {
+    const NT = 10, NS = 7;
+    // One spatula direction, one phase and one hollow per pan, all hashed off
+    // the pan index — `jit` is a hash and not a draw, which is rule 4: taking
+    // a number out of the shared stream here would move every parasol, bather
+    // and hut on the shore downstream of it.
+    const ang = jit(k, 640) * Math.PI;
+    const ca = Math.cos(ang), sa = Math.sin(ang);
+    const ph = jit(k, 641) * TAU;
+    // 0.040 to 0.060 over the rim, and the range was measured twice. First
+    // against the photographs — five centimetres on a 250 mm pan, which on
+    // this 380 mm one scales to 0.038 — and then against the CASE, which is
+    // what settled it: the nose rail over the front row tops out at y0+1.10,
+    // so a fill crowning below y0+1.16 is a fill you cannot see over the rail
+    // from the promenade. At 0.026 the pans were right and invisible.
+    const crest = 0.040 + jit(k, 642) * 0.020;
+    const dug = jit(k, 643) > 0.45;
+    const dx = (jit(k, 644) - 0.5) * 1.1, dy = (jit(k, 645) - 0.5) * 0.8;
+    const dig = dug ? 0.028 + jit(k, 646) * 0.020 : 0;
+    const rib = F.rib || null;
+    const P = (i, j) => {
+      const u = -1 + (2 * i) / NT, v = -1 + (2 * j) / NS;
+      const f = superFit(u, v);
+      const x = u * f, y = v * f;
+      const m = Math.max(Math.abs(u), Math.abs(v));
+      const bowl = Math.max(0, 1 - m * m);
+      const w = ca * x + sa * y;
+      // `yRim` here is where the gelato meets the steel, not where the tray
+      // is: the fill is level with the lip at the edge and domes over it in
+      // the middle, which is the whole shape.
+      let h = yRim + crest * bowl
+        + (0.0105 * Math.sin(w * 6.0 + ph)
+          + 0.0045 * Math.sin(w * 13.0 - ph * 2.1)) * bowl;
+      if (dig) {
+        const r2 = (x - dx) * (x - dx) * 1.6 + (y - dy) * (y - dy) * 2.4;
+        h -= dig * Math.exp(-r2 * 2.4) * bowl;
+      }
+      return W(ct + x * rt, cs + y * rs, Math.max(h, yLow));
+    };
+    for (let i = 0; i < NT; i++) {
+      for (let j = 0; j < NS; j++) {
+        let col = F.col;
+        if (rib) {
+          const u = -1 + (2 * i + 1) / NT, v = -1 + (2 * j + 1) / NS;
+          const f = superFit(u, v);
+          const w = ca * u * f + sa * v * f;
+          // 0 to 1 along the fold, squared so the dark is a ribbon and not
+          // half the pan. `1.7` is the beat against the ridge's own 6.0: the
+          // marbling drifts across the scrape rather than tracking it, which
+          // is what a folded-in sauce does.
+          const g = Math.pow(0.5 + 0.5 * Math.sin(w * 3.4 + ph * 1.7), 2.2);
+          col = [F.col[0] + (rib[0] - F.col[0]) * g,
+            F.col[1] + (rib[1] - F.col[1]) * g,
+            F.col[2] + (rib[2] - F.col[2]) * g];
+        }
+        b.quad(P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i, j + 1), col);
+      }
+    }
+  }
+
   function gelatoCase(S, y0) {
     // On its own buffer, so that it can be lit. See the material at the foot of
     // this function.
@@ -6444,88 +6604,56 @@ async function buildJadrija(scene) {
     boxTS(ca, cc, S.s0 - 0.54, S.s0 - 0.50, y0 + 1.02, y0 + 1.20,
       shade(STEEL, 0.58), shade(STEEL, 0.66));
 
-    // The pans. A vaschetta is not a box: it is a shallow tray that flares
-    // outward to a rolled rim, and the ice cream in it is scraped into a mound
-    // that stands proud of the rim in the middle and falls away at the ends.
-    // Two frustums, and the second one is what makes a colour read as a
-    // substance rather than as paint.
+    // The pans. `vaschetta` is the tray and `gelatoSlab` is what is in it;
+    // the note over each says what the photographs made them.
     const row = (list, sA, sB, yBase) => {
       const cs = (sA + sB) * 0.5, hd = (sB - sA) * 0.5;
       list.forEach((F, k) => {
         const ct = t0Pan + k * BAY + BAY * 0.5;
-        // EVERY TOP FACE IN THIS STACK IS ENCLOSED BY THE SOLID ABOVE IT, and
-        // that is the construction rather than a nicety.
+        // THE OLD FAULT IS STILL THE FAULT TO AVOID, and it is worth keeping
+        // the note now that the geometry it was written about has gone.
         //
         // `frustum` puts a full rectangular quad on top of whatever it draws —
-        // not a ring — and a horizontal quad standing out in front of the thing
-        // behind it, seen from a camera only a little above it, paints a band
-        // straight across that thing. The first cut had the pan 0.09 m deep
-        // with the ice cream starting at 0.045, so the pan's own rim quad ran
-        // out to `hd` while the gelato at that height was only hd·0.91, and
-        // every pan in the case came out with a hard salmon-grey bar across the
-        // middle of its colour. It read as a separate object standing in the
-        // cabinet, which is exactly what the brown bar on the kabina television
-        // read as, and it is exactly the same mistake: a face two millimetres
-        // out of the plane it was supposed to be behind.
+        // not a ring — and a horizontal quad standing out in front of the
+        // thing behind it, seen from a camera only a little above it, paints a
+        // band straight across that thing. The first cut had the pan 0.09 m
+        // deep with the ice cream starting at 0.045, so the pan's own rim quad
+        // ran out to `hd` while the gelato at that height was only hd·0.91,
+        // and every pan came out with a hard salmon-grey bar across the middle
+        // of its colour. Painting the five pieces red, green, blue, yellow and
+        // cyan and taking ONE screenshot named it in a single frame.
         //
-        // Painting the five pieces red, green, blue, yellow and cyan and taking
-        // ONE screenshot named it in a single frame. Rule 5's method works;
-        // reasoning about it does not, and it was tried first again anyway.
-        //
-        // So: the ice cream fills the pan to within two millimetres of the rim,
-        // and every stage above starts slightly LOWER and slightly WIDER than
-        // the one below it finishes, which buries the lower stage's top quad
-        // inside the upper stage's skirt. The only top face left showing on the
-        // whole assembly is the pan's own 2 mm rolled rim, which is what a rim
-        // is.
-        //
-        // Three stages and not one, while this is being rebuilt anyway: a
-        // single frustum from pan floor to crown is a straight edge all the way
-        // up and photographs as a lampshade. A scraped heap has a shoulder —
-        // nearly square to the rim, a break, then a much sharper fall to a
-        // small top — and the break is the whole silhouette.
-        frustumTS(yBase, [ct, cs, BAY * 0.420, hd * 0.90],
-          yBase + 0.075, [ct, cs, BAY * 0.470, hd * 1.00],
-          shade(STEEL, 0.62), shade(STEEL, 0.78));
-        frustumTS(yBase + 0.073, [ct, cs, BAY * 0.465, hd * 0.99],
-          yBase + 0.150, [ct, cs, BAY * 0.445, hd * 0.95],
-          F.col, shade(F.col, 1.04));
-        frustumTS(yBase + 0.146, [ct, cs, BAY * 0.450, hd * 0.96],
-          yBase + 0.212, [ct, cs, BAY * 0.330, hd * 0.76],
-          shade(F.col, 1.03), shade(F.col, 1.09));
-        // The crown takes the sauce where there is sauce. Dragging a scoop
-        // through a swirled pan brings the ribbon up and leaves it pooled on
-        // top, which is what every swirled pan in these frames looks like from
-        // standing height: the flank is nearly the body colour and the top is
-        // nearly the ribbon's.
-        //
-        // Three bars laid across the crown was the first try and they were
-        // three specks on a small flat top; turning them front-to-back made
-        // three specks the other way; and running them up the flank as narrow
-        // frustums put them INSIDE the mound, because a frustum 2 % narrower
-        // than the one it sits in is not on the surface, it is under it.
-        const crown = F.rib
-          ? [F.col[0] * 0.55 + F.rib[0] * 0.45, F.col[1] * 0.55 + F.rib[1] * 0.45,
-            F.col[2] * 0.55 + F.rib[2] * 0.45]
-          : shade(F.col, 1.06);
-        frustumTS(yBase + 0.206, [ct, cs, BAY * 0.345, hd * 0.79],
-          yBase + 0.252, [ct, cs, BAY * 0.160, hd * 0.38],
-          crown, shade(crown, 1.10));
-        // And three ridges of it standing out of the crown. Their feet are
-        // buried well inside the mound — nothing skims anything anywhere in
-        // this stack — and only the top third of each is ever drawn.
-        if (F.rib) {
-          for (let i = 0; i < 3; i++) {
-            const o = ((i - 1) * 0.10 + (jit(k, 620 + i) - 0.5) * 0.05) * BAY;
-            frustumTS(yBase + 0.190, [ct + o, cs, BAY * 0.055, hd * 0.32],
-              yBase + 0.276, [ct + o * 0.6, cs, BAY * 0.036, hd * 0.18],
-              F.rib, shade(F.rib, 1.22));
-          }
-        }
+        // `gelatoSlab` sits 0.016 m INSIDE the tray's rim on every side and
+        // starts below it, for the same reason and by the same rule.
+        vaschetta(ct, cs, BAY * 0.470, hd * 1.00, yBase, yBase + 0.078,
+          shade(STEEL, 0.66), shade(STEEL, 0.94));
+        // 0.94 of the tray, so the gelato's own edge tucks UNDER the tray's
+        // inner lip at 0.96 and the 4 mm annulus between them shows as the
+        // dark seam every one of these photographs has where the ice cream has
+        // pulled away from the steel.
+        gelatoSlab(ct, cs, BAY * 0.470 * 0.94, hd * 0.94, yBase + 0.028,
+          yBase + 0.064, F, k);
       });
     };
     row(GELATO.front, S.s0 - 1.40, S.s0 - 1.02, y0 + 1.06);
     row(GELATO.back, S.s0 - 0.96, S.s0 - 0.58, y0 + 1.18);
+
+    // A DIPPER WELL WAS BUILT HERE AND TAKEN OUT AGAIN, which is worth one
+    // note so that nobody spends the afternoon on it twice.
+    //
+    // It is the object a working gelato counter has that nothing else does —
+    // a stainless cup of water let into the deck with the scoops parked
+    // handle-up — and this case does not have one. But the deck has no room:
+    // eight bays of 0.40 in a four-metre cabinet leave 0.35 m at each end and
+    // both ends are already the cup stacks and the coupes, off the same
+    // photographs. Modelled at `ca + 0.24` it overlapped the near cup stack by
+    // 8 mm, which is rule 5 asking the question the right way round.
+    //
+    // And the surface it would really be on is the server's, which IS
+    // photographed: `20260823_111819` is that counter square on from a metre
+    // and a half with five objects on it and nothing else. See `counterKit`.
+    // There is no well in this shop, and a well added here would be a guess
+    // standing next to five measurements.
 
     // The plaques, on their wire clips. Only the ones that could be read.
     const plaques = (list, sPl, yPl, sClip, yClip) => {
@@ -6540,8 +6668,13 @@ async function buildJadrija(scene) {
     // The clip stands 0.08 m in front of the pan it belongs to rather than the
     // 0.02 the first cut had, which was a wire lying in the plane of the pan's
     // own front face — rule 5, in a place nobody would think to look for it.
-    plaques(GELATO.front, S.s0 - 1.52, y0 + 1.34, S.s0 - 1.48, y0 + 1.20);
-    plaques(GELATO.back, S.s0 - 1.08, y0 + 1.48, S.s0 - 1.04, y0 + 1.32);
+    // 1.31 and 1.43, down from 1.34 and 1.48. The rule over this function is
+    // that a plaque stands 0.14 m above the ice cream it labels, and the ice
+    // cream moved: `gelatoSlab` crowns at about 0.16 m over the pan floor
+    // where the old four-frustum heap crowned at 0.28. Left where they were,
+    // fourteen black cards hung in the air a hand's breadth over the flavours.
+    plaques(GELATO.front, S.s0 - 1.52, y0 + 1.31, S.s0 - 1.48, y0 + 1.18);
+    plaques(GELATO.back, S.s0 - 1.08, y0 + 1.43, S.s0 - 1.04, y0 + 1.30);
 
     // The glass. Drawn as its four edges and nothing else, which is not a
     // shortcut — a clean cabinet glass in these photographs is invisible
@@ -6904,6 +7037,12 @@ async function buildJadrija(scene) {
    * white face, black bezel, and the hands at the time the photograph was taken
    * — and the Croatian flag hanging in the corner. Both are unambiguous.
    */
+  // Where the three glass shelves are, as a fraction of the mirror's height
+  // measured DOWN FROM ITS TOP, which is the canvas's own axis and therefore
+  // the axis every other fitting on this wall is placed in. Shared between the
+  // paint and the geometry that stands on it.
+  const BACKBAR_SHELF = [0.40, 0.63, 0.86];
+
   function backBarSkin(w, h) {
     const PX = 1024, C = document.createElement('canvas');
     C.width = PX; C.height = Math.round(PX * h / w);
@@ -6995,36 +7134,24 @@ async function buildJadrija(scene) {
       }
     }
 
-    // Three glass shelves on their brackets, and the stemware standing upside
-    // down on them. A stem is three strokes — a foot, a stalk and a bowl — and
-    // hung the wrong way up it is the bowl that is nearest the shelf, which is
-    // the whole silhouette and the reason a row of them is unmistakable.
-    const SH = [H * 0.40, H * 0.63, H * 0.86];
-    for (const y of SH) {
-      g.fillStyle = 'rgba(238,244,248,0.62)';
-      g.fillRect(24, y, PX - 48, 5);
-      g.fillStyle = 'rgba(255,255,255,0.40)';
-      g.fillRect(24, y - 2, PX - 48, 2);
-      for (let x = 54; x < PX - 40; x += 34) {
-        const bh = H * 0.085;
-        g.fillStyle = 'rgba(236,244,248,0.42)';
-        g.beginPath();
-        g.moveTo(x - 11, y + 5); g.lineTo(x + 11, y + 5);
-        g.lineTo(x + 4, y + 5 + bh * 0.62); g.lineTo(x - 4, y + 5 + bh * 0.62);
-        g.closePath(); g.fill();
-        g.fillRect(x - 2, y + 5 + bh * 0.60, 4, bh * 0.30);
-        g.fillRect(x - 8, y + 5 + bh * 0.88, 16, 3);
-      }
-    }
-    // The boxed stock along the middle shelf. Colour and no words: it is bright
-    // and illegible in both frames and always was.
-    const box = ['#e07a24', '#3f8ed0', '#5aa832', '#c0357a', '#e0b81c'];
-    for (let i = 0; i < 5; i++) {
-      g.fillStyle = box[i];
-      g.fillRect(PX * 0.15 + i * 44, SH[1] - H * 0.155, 36, H * 0.155);
-      g.fillStyle = 'rgba(255,255,255,0.72)';
-      g.fillRect(PX * 0.15 + i * 44 + 6, SH[1] - H * 0.122, 24, H * 0.052);
-    }
+    // THE SHELVES, THE STEMWARE AND THE BOXED STOCK ARE NOT PAINTED HERE ANY
+    // MORE. They were, and the note that stood here said a stem is three
+    // strokes — a foot, a stalk and a bowl. It is, and three strokes on a
+    // canvas is what they read as: a row of white funnels stencilled on a
+    // mirror, flat at the one distance this wall is ever looked at, which is
+    // through the serving opening from the promenade.
+    //
+    // They are geometry now, in `backBar`, standing 0.13 m out from this
+    // plane. Same call as the bathers' swimsuits and for the same reason: the
+    // boundary of a painted thing is whatever the texel grid offers, and a
+    // wine glass is mostly boundary. What stays painted is what is genuinely
+    // flat and on the wall — the tile, the cabinet, the licence, the clock and
+    // the flag.
+    //
+    // Their HEIGHTS are `BACKBAR_SHELF` above, shared with the geometry, so
+    // that the three shelves land on the same three lines the mirror's tile
+    // grid and this whole layout were drawn around.
+
     const tex = new THREE.CanvasTexture(C);
     tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
     return tex;
@@ -7081,11 +7208,93 @@ async function buildJadrija(scene) {
       (yLo + yHi) * 0.5, w, h, 'slast:backbar');
     const body = S.body || [0.520, 0.492, 0.430];
     const nmul = Math.max(2, Math.round((oc - oa) / 1.5));
+    const muls = [];
     for (let k = 1; k < nmul; k++) {
       const t = oa + (oc - oa) * (k / nmul);
       if (t < t0 || t > t1) continue;
+      muls.push(t);
       boxTS(t - 0.035, t + 0.035, S.s0 - 0.26, S.s0 - 0.18, y0 + 1.06,
         top - 0.34, shade(body, 0.78), shade(body, 0.92));
+    }
+
+    // ── the shelves, and what is standing on them ─────────────────────────────
+    //
+    // Painted until 4 Sep 2026, and the note where they used to be drawn says
+    // why they are not any more. This is the same swap the bathers' swimsuits
+    // were: a wine glass is mostly boundary, and the boundary of a painted
+    // thing is whatever the texel grid happens to offer.
+    //
+    // The shelf runs from `s0−0.13`, a centimetre clear of the mirror, out to
+    // `s0−0.31`. That crosses the mullions, which stand at `s0−0.26` to
+    // `−0.18` — so the run is CUT at each of them with 0.055 m of daylight
+    // either side, which is what a shelf in a mullioned opening does anyway.
+    // The alternative was to push the mullions out to `s0−0.40` and have them
+    // standing a third of a metre into the room.
+    //
+    // A horizontal shelf against a vertical mirror is the one adjacency in
+    // this shop rule 5 does not have to worry about: the fault it guards is
+    // two nearly-parallel faces fighting for the depth buffer, and these two
+    // are square to each other.
+    const SGLASS = [0.700, 0.740, 0.748];
+    const SBRIGHT = [0.780, 0.812, 0.815];
+    const sB = S.s0 - 0.31, sF = S.s0 - 0.13;
+    for (const f of BACKBAR_SHELF) {
+      const ys = yHi - h * f;
+      // The run, in spans between the mullions.
+      let a = t0 + 0.06;
+      const cuts = muls.concat([t1 - 0.06]);
+      for (const c of cuts) {
+        const bEnd = Math.min(c - 0.055, t1 - 0.06);
+        if (bEnd - a > 0.10) {
+          boxTS(a, bEnd, sB, sF, ys, ys + 0.016, SGLASS, SBRIGHT);
+        }
+        a = c + 0.055;
+      }
+      // The stemware, upside down on its bowl the way a bar keeps it — which
+      // is what makes a row of them read, because the wide end is the end
+      // nearest the shelf and the silhouette is a row of little bells. 0.13 m
+      // apart, which is a coupe's rim and a finger.
+      const cs = (sB + sF) * 0.5 + 0.012;
+      const n = Math.floor((t1 - t0 - 0.30) / 0.13);
+      for (let i = 0; i <= n; i++) {
+        const ct = t0 + 0.15 + i * 0.13;
+        // Not through a mullion, and not over the gap either side of one.
+        let blocked = false;
+        for (const m of muls) if (Math.abs(ct - m) < 0.10) blocked = true;
+        if (blocked) continue;
+        lathe(W, ct, cs, [
+          [ys + 0.017, 0.037],          // the rim, standing on the glass
+          [ys + 0.052, 0.031],
+          [ys + 0.068, 0.009],          // where the bowl closes on to the stem
+          [ys + 0.112, 0.008],          // the stem
+          [ys + 0.119, 0.027],          // and the foot, uppermost
+          [ys + 0.124, 0.024],
+        ], SGLASS, 8);
+      }
+    }
+    // The boxed stock along the middle shelf, which was five painted
+    // rectangles and is five boxes. Bright and wordless, exactly as it was:
+    // it is illegible in both photographs and always was, and rule 12 says
+    // that is what gets drawn.
+    {
+      const ys = yHi - h * BACKBAR_SHELF[1] + 0.016;
+      const BOX = [[0.560, 0.290, 0.070], [0.130, 0.330, 0.560],
+        [0.180, 0.410, 0.110], [0.470, 0.120, 0.290], [0.560, 0.450, 0.060]];
+      for (let i = 0; i < 5; i++) {
+        const ct = t0 + 0.62 + i * 0.19;
+        if (ct > t1 - 0.20) break;
+        let blocked = false;
+        for (const m of muls) if (Math.abs(ct - m) < 0.13) blocked = true;
+        if (blocked) continue;
+        boxTS(ct - 0.072, ct + 0.072, sB + 0.02, sB + 0.13, ys, ys + 0.215,
+          BOX[i], shade(BOX[i], 1.18));
+        // The label, wholly IN FRONT of the box's own front face at sB+0.02
+        // rather than straddling it. Written the other way round first, which
+        // is a 2 mm slab half inside the thing it is stuck to — rule 5, on a
+        // box 0.14 m wide, and it read as a hole punched through the front.
+        boxTS(ct - 0.055, ct + 0.055, sB + 0.006, sB + 0.018, ys + 0.055,
+          ys + 0.135, [0.780, 0.775, 0.752]);
+      }
     }
   }
 

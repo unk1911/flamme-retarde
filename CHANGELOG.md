@@ -8,6 +8,78 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.229.0] — 2026-09-04
+
+### The gelato is scraped, and the stemware is glass
+
+Misha: *"continue to build out the complexity of triangles/polygons around the
+business, especially the ice-cream shop"*. Two things in the slastičarnica were
+standing in for geometry, and the photographs say what each of them should be.
+
+**The pans were heaps and the photographs are not.** Four stacked rectangular
+frustums carried each flavour 0.14 m proud of its rim and finished in a small
+flat crown — a cone of sorbet on a stick, and from the promenade fourteen
+coloured wedges in a box. `slasticarnica-ice-cream-selection-3` is sixteen of
+them from above and shows the opposite: a **rounded-corner** stainless tray,
+filled level and **scraped**, doming a few centimetres over the rim, its whole
+surface long curved troughs left by the spatula, and the swirled flavours
+marbled *along* those troughs rather than pooled on top. Half of them have a
+hollow dug out of one end where the morning went.
+
+So there are two new builders:
+
+- `vaschetta` — the tray, a superellipse (`|x|ⁿ + |y|ⁿ = 1`, n = 6) at sixteen
+  samples and four rings: wall, lip, the crown of the rolled rim, and the skirt
+  outside it. The bright grid those rims make between the colours is half of
+  what says *gelato counter*. n = 4 was the first try and the pans came out as
+  ovals — at that exponent the corner pulls in to 0.84 of the square and, at
+  twelve samples, what is left between them is a circle.
+- `gelatoSlab` — a 10 × 7 height field on the tray's own rounded rectangle.
+  Three terms, each one of those observations: a **dome** falling to nothing at
+  the rim, where the gelato meets the steel and has to; one **scrape**
+  direction per pan at six wavelengths across it, which is the whole texture
+  and costs one sine; and a Gaussian **dig** on the pans that have been served
+  from, which is a little over half of them. The ribbon rides the scrape
+  instead of sitting on the crown — a swirl in a gelato pan *is* the fold the
+  spatula made — at a longer wavelength so the two do not beat into stripes.
+
+The gelato is 0.94 of the tray, so its edge tucks under the tray's inner lip at
+0.96 and the 4 mm annulus between them shows as the dark seam every one of
+these photographs has. The crest was set twice: 0.038 from the photographs, and
+then 0.040–0.060 from the **case**, because the nose rail over the front row
+tops out at y0+1.10 and a fill crowning below y0+1.16 is a fill nobody standing
+on the promenade can see. The fourteen plaques came down 30 mm with it.
+
+**And the back bar's shelves and stemware were paint.** The whole mirrored wall
+was one canvas, and the note on it said a stem is three strokes — a foot, a
+stalk and a bowl. It is, and three strokes on a canvas read as white funnels
+stencilled on a mirror at the one distance this wall is ever seen from. Three
+glass shelves, ninety upside-down coupes and five boxes of stock are geometry
+now, standing 0.13 m out from the plane. Same call as the bathers' swimsuits and
+the same reason: a wine glass is mostly boundary, and the boundary of a painted
+thing is whatever the texel grid offers. What stays painted is what is genuinely
+flat and on the wall — the tile, the control cabinet, the licence, the clock and
+the flag.
+
+The shelf run is **cut at each mullion** with 55 mm of daylight either side,
+which is what a shelf in a mullioned opening does anyway; the alternative was
+pushing the mullions a third of a metre into the room. A horizontal shelf
+against a vertical mirror is the one adjacency here rule 5 does not have to
+worry about — the fault it guards is two nearly-parallel faces fighting for the
+depth buffer, and these two are square to each other.
+
+**A dipper well was built and taken out again**, and the note where it stood
+says why so nobody spends the afternoon on it twice. It is the object a working
+gelato counter has that nothing else does, and this case has no room: eight bays
+of 0.40 in a four-metre cabinet leave 0.35 m at each end and both ends are
+already the cup stacks and the coupes, off the same photographs. Modelled at
+`ca + 0.24` it overlapped the near cup stack by 8 mm. And the surface it would
+really be on is the server's, which *is* photographed — five objects on it and
+nothing else.
+
+Resort geometry 550 462 → 558 382 triangles, plus the case's own buffer. Census
+unchanged at 446/333/86/27, 60 fps.
+
 ## [1.228.0] — 2026-09-04
 
 ### The cat goes round the chairs
