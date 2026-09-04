@@ -4177,6 +4177,7 @@ async function buildJadrija(scene) {
    */
   function shopInside(S, y0, top) {
     const buf = propBuilder();
+    const tube = propBuilder();
     const keep = b;
     b = buf;
     const oa = S.t0 + (S.t1 - S.t0) * 0.18, oc = S.t1 - (S.t1 - S.t0) * 0.18;
@@ -4224,14 +4225,69 @@ async function buildJadrija(scene) {
           shade(DARK, 1.7));
       }
     }
+    // ── and the light over the counter ──────────────────────────────────
+    //
+    // WHICH IS WHAT MAKES A SHOP READ AS OPEN. Photographed down the row at
+    // 20:42, every one of these was a glowing name board over a black hole —
+    // and once the slastičarnica's case came on in 1.195.0, that stopped being
+    // a shared dimness and became one shop trading beside six that look shut.
+    // A lit sign over a dark counter does not read as evening; it reads as a
+    // sign somebody forgot to switch off.
+    //
+    // What actually lights a counter like this is a tube under the soffit, so
+    // that is what it gets: an enamel channel across the head of the opening
+    // with its tube under it, on a second buffer. The channel is a solid and
+    // shades like one. The tube is told what to BE — an off-white plastic
+    // thing in the afternoon, a warm emitter after sunset — which is the
+    // promenade lamp's lever, and it works here for the same reason it works
+    // there: a tube is one colour, so it can be mixed rather than lifted.
+    // AND IT HANGS OUTSIDE, which is the correction that made it worth
+    // anything. Built at the head of the relief — `f0` to `f1`, which is
+    // `s0-0.09` to `s0-0.02` — it lit almost nothing: measured off the render
+    // at the distance a walker stands, the opening moved 8 per cent at the
+    // beach bar and MINUS three at H2O.
+    //
+    // A strip over a serving hatch is screwed up outside, over the counter and
+    // pointing down at it, and that is what this is.
+    // AND UNDER THE AWNING WHERE THERE IS ONE, which is the second correction
+    // and the one that mattered. H2O and MINI both oversail three metres. Put
+    // against the building the strip is three metres back under a slab, in the
+    // deepest shade on the whole frontage, and from the promenade you see the
+    // edge of a valance and nothing behind it — which is also exactly why the
+    // real ones hang their lights from the awning and not from the wall.
+    // Mid-span, a hand's breadth under the slab.
+    const LEDGE = [0.480, 0.468, 0.440];
+    const awnS = S.awn ? S.s0 - S.awn * 0.52 : S.s0 - 0.30;
+    const lt0 = awnS - 0.045, lt1 = awnS + 0.045;
+    const ly = top - (S.awn ? 0.30 : 0.42);
+    boxTS(oa + 0.14, oc - 0.14, lt0, lt1, ly + 0.034, ly + 0.072,
+      LEDGE, shade(LEDGE, 1.12));
+    b = tube;
+    boxTS(oa + 0.17, oc - 0.17, lt0 + 0.012, lt1 - 0.012, ly, ly + 0.034,
+      [1, 1, 1]);
     b = keep;
+
     const g = buf.geo();
-    if (!g) return;
-    const m = new THREE.Mesh(g, solidMaterial(0xffffff, {
-      spec: 0.05, specPower: 14, emissive: 0.28,
-      body: 'base *= vVCol;',
-    }));
-    scene.add(m);
+    if (g) {
+      // The interior itself lifts with the hour rather than being told a
+      // colour: it is a wall, a worktop, a tiled band and a shelf of bottles,
+      // and mixing all of that toward one warm value would throw away the only
+      // thing it is there for. `emissive` stays 0.28, so at `uNight = 1` the
+      // last light term carries 3.6 x 0.28 of a base that is still its own
+      // colours. Daytime is untouched.
+      scene.add(new THREE.Mesh(g, solidMaterial(0xffffff, {
+        spec: 0.05, specPower: 14, emissive: 0.28,
+        body: 'base *= vVCol * (1.0 + 2.6 * uNight);',
+      })));
+    }
+    const gt = tube.geo();
+    if (gt) {
+      scene.add(new THREE.Mesh(gt, solidMaterial(0xffffff, {
+        spec: 0.02, specPower: 8, emissive: 1.0,
+        body: 'base = mix(vec3(0.760, 0.752, 0.720), '
+          + 'vec3(1.00, 0.955, 0.865), uNight);',
+      })));
+    }
   }
 
   function shopRoof(S, y0, top) {

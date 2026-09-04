@@ -8,6 +8,41 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.198.0] — 2026-09-04
+
+### Six shops that look shut, and one that is open
+
+Lighting the gelato case in 1.195.0 had a consequence nobody asked for.
+Photographed down the row at 20:42, the slastičarnica is now a shop trading —
+and it stands beside six that are a **glowing name board over a black hole**.
+Before, that was a shared dimness and read as evening. Now it reads as one shop
+open and the rest with a sign somebody forgot to switch off, which is worse than
+where this started.
+
+So the rest of the row comes on. Every non-metal, non-solid box shop gets what
+actually lights a counter like this: an enamel channel with a tube under it, on
+its own buffer. The channel is a solid and shades like one. The tube is *told
+what to be* — an off-white plastic thing in the afternoon, a warm emitter after
+sunset — which is the promenade lamp's lever, and it works here for the same
+reason it works there: a tube is one colour, so it can be mixed rather than
+lifted. The shop interiors behind them lift instead of mixing, because a wall,
+a worktop, a tiled band and a shelf of bottles mixed toward one warm value
+throws away the only thing they are there for.
+
+**Where it hangs took two goes and the second one is the finding.** Screwed to
+the building at `s0-0.30`, it did almost nothing: measured at the distance a
+walker stands, the opening moved 8 per cent at the beach bar and *minus three*
+at H2O. H2O and MINI both oversail **three metres** of awning. Against the
+building the strip is three metres back under a slab, in the deepest shade on
+the whole frontage, and from the promenade you are looking at the edge of a
+valance with nothing visible behind it. Which is also, precisely, why the real
+ones hang their lights from the awning and not from the wall — so this one does
+too: mid-span, a hand's breadth under the slab, where a walker can see it
+burning.
+
+Daytime is unchanged: at `uNight = 0` the tube is the off-white it was and the
+interiors carry the `emissive: 0.28` they already had.
+
 ## [1.197.0] — 2026-09-04
 
 ### A pour is a tempo, not a metronome
