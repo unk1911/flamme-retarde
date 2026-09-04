@@ -8,6 +8,31 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.181.0] — 2026-09-04
+
+### The arms go through first position, because that is what a port de bras is
+
+Third pass on *"she stands kinda crooked or weird between/inside the
+positions"*. The stance was 1.175.0 and the pirouette's topple was 1.178.0.
+This one is the word **between**, and it is the arms.
+
+Every bone in a clip is interpolated linearly between its keys, so an arm going
+from bras bas to fifth takes its hand along the **straight line** between them —
+up the front of her body and out through her own chin. Ballet arms do not do
+that, and it is not a stylistic flourish that they don't: bas to first to fifth,
+first to second, and back down the same way, is the grammar of the whole thing.
+Two keys cannot express an arc. Three can.
+
+So there are seven more keys, one in the middle of each big arm change, each one
+the two poses either side blended **with the arms in first**. It costs nothing —
+the clip is the same fifteen seconds, and a key is a pose dict — and it is the
+difference between arms that travel and arms that are teleported between
+photographs.
+
+She also lets go of the rail on the way up to the relevé now, which she has to
+do anyway: the ladder's handrail is 0.93 m and demi-pointe makes her 65 mm
+taller than her own arm can give back.
+
 ## [1.180.0] — 2026-09-04
 
 ### The terraces get the three things every terrace on this coast has

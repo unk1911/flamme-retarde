@@ -6278,16 +6278,72 @@ def _look(p, deg):
 # releve — then she lets go of the rail and does the four that need both arms.
 # Every position is entered and left through `BAL_STAND`, so nothing ever cuts
 # from one shape straight into another.
+# The arms in FIRST, which is where every port de bras passes through, and the
+# reason there is a `_thru` below.
+#
+# Between two keys this file interpolates every bone linearly, so an arm going
+# from bras bas to fifth takes its hand along the STRAIGHT LINE between them —
+# up the front of her body and out through her own chin. Ballet arms do not do
+# that. They travel on an arc, and the arc is not a stylistic flourish, it is
+# the whole grammar: bas to first to fifth, first to second, and back down the
+# same way. Two keys cannot express an arc. Three can.
+#
+# Which is also the answer to "she looks weird BETWEEN the positions": the
+# positions were right and the half-second between each pair of them was a
+# straight-line cut through space with nothing in it.
+BAL_ARM1 = {
+    "armUL": (-35.0, 10.0, 4.0), "armLL": (-11.0, 13.0, 54.0),
+    "handL": (-20.0, 14.0, 29.0),
+    "armUR": (-35.0, -10.0, -4.0), "armLR": (-11.0, -13.0, -54.0),
+    "handR": (-20.0, -14.0, -29.0),
+}
+
+
+def _mid(pa, pb, u=0.5):
+    """Blend two ballet keys. Tolerates keys one of them does not carry.
+
+    `@turn` is a one-tuple and `@root` a three, and one pose in a pair may have
+    a key the other has not — so a missing side is zeros OF THE OTHER'S LENGTH
+    rather than a bare (0, 0, 0), which is what `_lerp_pose` can assume and
+    this cannot.
+    """
+    out = {}
+    for k in set(pa) | set(pb):
+        x, y = pa.get(k), pb.get(k)
+        if x is None:
+            x = tuple(0.0 for _ in y)
+        if y is None:
+            y = tuple(0.0 for _ in x)
+        out[k] = tuple(p + (q - p) * u for p, q in zip(x, y))
+    return out
+
+
+def _thru(pa, pb, u=0.5):
+    """Between two keys, with the arms taken through first position."""
+    return dict(_mid(pa, pb, u), **BAL_ARM1)
+
+
 BALLET_KEYS = [
     (0.00, IDLE_A), (0.70, BAL_HOLD), (1.55, BAL_PLIE_B), (2.40, BAL_HOLD),
-    (3.15, BAL_RELEVE), (3.90, BAL_RELEVE), (4.55, BAL_STAND),
+    # Bas to fifth, through first — and letting go of the rail on the way,
+    # which is what she has to do anyway to get up on demi-pointe.
+    (2.80, _thru(BAL_HOLD, BAL_RELEVE, 0.55)),
+    (3.15, BAL_RELEVE), (3.90, BAL_RELEVE),
+    (4.25, _thru(BAL_RELEVE, BAL_STAND, 0.50)),
+    (4.55, BAL_STAND),
+    (4.92, _thru(BAL_STAND, BAL_RETIRE, 0.50)),
     (5.25, BAL_RETIRE), (6.00, BAL_DEVELOPPE), (6.75, BAL_DEVELOPPE),
-    (7.45, BAL_STAND), (8.10, BAL_PIQUE), (8.75, BAL_PIROU),
+    (7.12, _thru(BAL_DEVELOPPE, BAL_STAND, 0.55)),
+    (7.45, BAL_STAND),
+    (7.80, _thru(BAL_STAND, BAL_PIQUE, 0.50)),
+    (8.10, BAL_PIQUE), (8.75, BAL_PIROU),
     (9.20, _spin(_look(BAL_PIROU, -60), 120)),
     (9.65, _spin(_look(BAL_PIROU, 60), 240)),
     (10.10, _spin(BAL_PIROU, 360)), (10.70, _spin(BAL_STAND, 360)),
+    (11.10, _thru(_spin(BAL_STAND, 360), _spin(BAL_ATTITUDE, 360), 0.52)),
     (11.45, _spin(BAL_ATTITUDE, 360)), (12.15, _spin(BAL_ATTITUDE, 360)),
     (12.90, _spin(BAL_ARABESQUE, 360)), (13.65, _spin(BAL_ARABESQUE, 360)),
+    (14.02, _thru(_spin(BAL_ARABESQUE, 360), _spin(BAL_STAND, 360), 0.55)),
     (14.35, _spin(BAL_STAND, 360)), (15.00, _spin(IDLE_A, 360)),
 ]
 
