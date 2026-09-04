@@ -87,21 +87,24 @@ def arms(p, **kw):
 # her own ear in the first draft, and folded the low ones across her ribs.
 ARM = {
     # Bras bas: rounded and low, hands just in front of the thighs, elbows
-    # lifted off the body. Where every exercise starts and ends.
-    "bas": ((6, 8, 26), (-32, -10, 30), (0, 8, 22)),
+    # lifted off the body. Where every exercise starts and ends — and what
+    # she was NOT doing: this line used to carry a hand-typed 32 deg of
+    # forearm that was never the fitted value, and it folded her wrists up
+    # to her navel with the elbows back against her ribs.
+    "bas": ((-8, 12, 28), (-2, 13, 27), (-20, 17, 21)),
     # First: the same oval carried up to the navel.
-    "first": ((-35, 9, 5), (-10, 14, 56), (-21, 16, 30)),
+    "first": ((-36, 11, 5), (-9, 14, 54), (-17, 16, 28)),
     # Second: open to the sides, a little forward of the shoulders and a little
     # below them, elbow soft, palm down.
-    "second": ((2, -12, -19), (-2, 0, -7), (-19, -1, 21)),
+    "second": ((2, -12, -19), (-2, 2, -7), (-20, -2, 19)),
     # Fifth: overhead. The elbow has to stay nearly open or the hands come down
     # to her ears, which is what thirty degrees of forearm did in the first
     # draft — and past about -160 on the shoulder the two arms cross.
-    "fifth": ((-155, -12, 60), (-5, -12, 55), (-21, -10, 9)),
+    "fifth": ((-155, -12, 54), (-2, -12, 47), (-21, -8, 26)),
     # And the two only the arabesque uses: one arm long in front, on the line
     # of the raised leg, one long behind it.
-    "front": ((-91, -12, 6), (-2, -14, 14), (-21, 12, 28)),
-    "back": ((59, 12, 24), (-2, 13, 18), (-15, 16, -10)),
+    "front": ((-91, -12, 7), (-2, -14, 14), (-18, 10, 29)),
+    "back": ((58, 12, 20), (-2, 14, 25), (-11, 20, -12)),
 }
 
 
@@ -586,15 +589,73 @@ def report(rig, name, p):
 # head at 1.72 — which is all the scale anyone needs to read the table.
 #
 # These are the poses. The angles are just what the rig needs to get here.
-TARGET_ARM = {
+# Her arm, measured off the rest rig rather than off a diagram: the left
+# shoulder joint sits at (0.017, 0.173, 1.408), the humerus is 0.239 and the
+# forearm 0.238, so her wrist can be 0.472 from her shoulder and not one
+# millimetre more.
+#
+# WHICH NOTHING IN THIS TABLE USED TO RESPECT. Every one of the six positions
+# below was written from a photograph and none of them was ever checked against
+# those three numbers: `bas` asked for a hand 109 mm past the end of her arm,
+# `front` 68, `back` 66, and all six put the elbow further from the shoulder
+# than the humerus is long. A target you cannot reach does not fail loudly — it
+# just quietly loses. `fit_arm` scores the hand at 400 and the elbow at 120, so
+# when it cannot have both it keeps the hand and throws the elbow away, and
+# when it cannot have the hand either it parks the whole arm at the least-bad
+# compromise. For bras bas that compromise was her wrists at z = 1.08 with the
+# elbows pinned back against her ribs — 14 cm above the hips they belong in
+# front of. Which is a woman standing with her hands folded at her navel, and
+# it is what she was doing in nineteen of the thirty frames of this routine.
+#
+# So the table keeps saying what the position IS, in her own frame — +x in
+# front of her, +y her left, +z up off the floor. Her hip joints are at 0.934,
+# the supporting knee at about 0.47, her shoulders at 1.40 and the crown of her
+# head at 1.72. And `reachable` below makes it true of the arm she has: it
+# holds the direction of both the hand and the elbow, which is the pose, and
+# gives up only the lengths, which were never anyone's intent.
+SHOULDER_L = (0.017, 0.173, 1.408)
+UPPER_ARM, FOREARM = 0.239, 0.238
+
+
+def reachable(hand, elbow):
+    """Snap a written arm target onto the arm this rig actually has.
+
+    The hand keeps its direction from the shoulder and loses only whatever
+    distance was past full extension — and a little more than that, because a
+    locked elbow is not a position: 0.975 of the reach leaves the few degrees
+    of bend that reads as an arm rather than a stick. The elbow then goes where
+    the triangle puts it, on the side the written elbow was pointing.
+    """
+    S = Vector(SHOULDER_L)
+    h = Vector(hand) - S
+    lim = (UPPER_ARM + FOREARM) * 0.975
+    if h.length > lim:
+        h *= lim / h.length
+    d = max(h.length, 1e-4)
+    u = h / d
+    # Where along the hand's own line the elbow sits, and how far off it.
+    ca = max(-1.0, min(1.0, (UPPER_ARM ** 2 + d * d - FOREARM ** 2)
+                       / (2.0 * UPPER_ARM * d)))
+    sa = math.sqrt(max(0.0, 1.0 - ca * ca))
+    w = Vector(elbow) - S
+    perp = w - u * w.dot(u)
+    if perp.length < 1e-5:
+        perp = Vector((0.0, 0.0, -1.0)) - u * -u.z
+    perp.normalize()
+    return (tuple(S + h), tuple(S + u * (UPPER_ARM * ca) + perp * (UPPER_ARM * sa)))
+
+
+TARGET_ARM = {k: reachable(*v) for k, v in {
     #          hand                    elbow
-    "bas":    ((0.20, 0.11, 0.86), (0.10, 0.26, 1.13)),
+    # Bras bas: a low rounded oval, wrists in front of her thighs and just
+    # under the hips, elbows carried out off the body. Not hands at the navel.
+    "bas":    ((0.19, 0.125, 0.99), (0.05, 0.24, 1.17)),
     "first":  ((0.26, 0.10, 1.10), (0.16, 0.30, 1.20)),
     "second": ((0.14, 0.60, 1.25), (0.10, 0.36, 1.28)),
     "fifth":  ((0.12, 0.14, 1.82), (0.16, 0.36, 1.60)),
     "front":  ((0.52, 0.13, 1.60), (0.32, 0.20, 1.51)),
     "back":   ((-0.34, 0.28, 1.02), (-0.16, 0.28, 1.20)),
-}
+}.items()}
 # And the working leg, for the four positions where the Euler order makes the
 # angles unguessable. (knee joint, ankle joint) for the RIGHT leg, which is the
 # working one throughout: retire puts the foot at the supporting knee, attitude

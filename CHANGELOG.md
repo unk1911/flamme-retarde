@@ -8,6 +8,65 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.193.0] — 2026-09-04
+
+### Every arm position asked for a hand past the end of her arm
+
+Thirty frames of the ballet, half a second apart, front-on: in **nineteen of
+them** her hands are folded at her navel with her elbows pinned back against
+her ribs. Not a bad frame here and there — two thirds of the routine. That is
+a woman standing waiting for a bus, and it is what "she stands kinda crooked or
+weird" looks like from outside.
+
+Bras bas is the position she rests in, and she is in it at 0.70, 2.40, 4.55,
+7.45, 10.70 and 14.35 — every gap between exercises. It is supposed to be a low
+rounded oval, wrists in front of the thighs, elbows carried out off the body.
+Measured, her wrists were at **z = 1.08** — the target says 0.86, her hips are
+at 0.934 and her hands hanging dead are at 0.944. She was holding them *higher
+than gravity would*.
+
+The cause is in `TARGET_ARM`, and it is not one bad row. Her arm, measured off
+the rest rig rather than off a diagram, is a humerus of **0.239 m** and a
+forearm of **0.238**, so her wrist reaches **0.472 m** from her shoulder and not
+a millimetre further. Checked against those three numbers, **all six** written
+positions are impossible: every one puts the elbow further from the shoulder
+than the humerus is long, and three put the hand past full extension —
+`front` by 68 mm, `back` by 66, and bras bas by **109**.
+
+A target you cannot reach does not fail loudly. `fit_arm` scores the hand at
+400 and the elbow at 120, so when it cannot have both it keeps the hand and
+throws the elbow away; when it cannot have the hand either, it parks the whole
+arm at the least-bad compromise and reports a number nobody reads. Bras bas
+came back at **err 9.93**, the worst in the table, and had sat there through
+every pass this thing has had — including the one that added the finger bones
+specifically to make her hands read.
+
+So the table goes on saying what each position *is*, and a new `reachable()`
+makes it true of the arm she has. It keeps the direction of the hand and the
+direction of the elbow — which is the pose — and gives up only the lengths,
+which were never anyone's intent: the hand is pulled back along its own line to
+0.975 of full reach, because a locked elbow is not a position either, and the
+elbow then goes where the triangle puts it, on the side it was already
+pointing.
+
+Refitted, with every residual falling:
+
+| position | before | after |
+| --- | --- | --- |
+| bras bas | 9.93 | **0.33** |
+| first | 0.25 | **0.0001** |
+| second | 2.08 | **1.81** |
+| fifth | 1.25 | **0.03** |
+| front (arabesque) | 5.73 | **0.72** |
+| back (arabesque) | 6.01 | **1.63** |
+
+And one more thing was wrong that the fit had nothing to do with: the shipped
+`ARM["bas"]` was **not the fitted value**. It carried a hand-typed 32° of
+forearm that no solver ever produced, and that fold is what walked her wrists up
+to her navel and her elbows back. The angles in the table are now the ones that
+came out of the fit, and the arabesque's two long arms — the position everybody
+can name — stop being 66 mm short of where they were aimed.
+
 ## [1.192.0] — 2026-09-04
 
 ### There is something behind the counters now
