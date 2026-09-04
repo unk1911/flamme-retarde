@@ -8,6 +8,57 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.251.0] — 2026-09-04
+
+### There is a coffee machine, and it is where the grinder is
+
+Second half of *"they make coffee/machiatos to folks, there's a coffe
+machiens"*. 1.250.0 turned one of the two men into a barista and left him
+turning to a wall.
+
+**What the photographs actually show.** The grinder is in both counter frames —
+bottom right of `20260823_111815` and behind the bowl of tasting spoons in
+`20260823_111819` — and it is unmistakable: a conical hopper with the beans
+showing black through it, wide at the top, narrowing on to a squat body with a
+chrome doser round it and a knob on its flank. The cups are there too:
+`20260823_111819` has small white cups on saucers on the shelf under the row of
+tall glasses, and `20260823_111815` has more of them on the surface beside the
+grinder.
+
+**The machine is read in part and no more.** In `20260823_111815`, immediately
+right of the grinder and cut off by the edge of the frame, there is a brushed
+stainless fascia with one black round knob and two pale rocker switches, and
+cups standing on the surface above it. That is a machine, it is beside the
+grinder, and its top is a cup warmer. Its group heads are in NO frame — the
+counter and the case's hood take the bottom of it in both — so the two groups,
+the portafilters and the steam wand are what that fascia and that grinder
+belong to and not what was seen. Said out loud rather than smuggled in: a
+grinder standing alone is a shop that sells ground coffee.
+
+**Where it goes is not where it is.** In the room the coffee stands on a back
+worktop about half a metre BEHIND the men. There is no half-metre here: this
+stage is 0.20 m deep between the mirror at `s0−0.11` and the shelf fronts at
+`s0−0.31`, everything inland of `s0` is a solid shop body, and the two servers
+are already standing in the middle of it at `s0−0.15`. So the coffee goes on
+the one horizontal surface that exists — `shopKit`'s serving counter at
+`y0+1.06` — at the WEST end of the opening, which is the end the grinder is at
+in both photographs and the end nobody is standing at. It is also the end where
+1.250.0 stopped the two lower shelves.
+
+A 0.54 m machine and not the 0.75 m a two-group really is: 0.54 for the
+machine, 0.21 for the grinder and 0.08 m of daylight in each of the three gaps
+is exactly what the 0.90 m of wall west of the west server will take. Its back
+is 0.03 m clear of the mirror, and the depth ladder — handles at `s0−0.42`,
+groups at `s0−0.335`, fascia at `s0−0.315`, body face at `s0−0.30`, back at
+`s0−0.14` — steps by 0.015 m or more at every rung except the knob and the
+switches, which are BURIED in the fascia and stand a centimetre proud of it. A
+control half inside its own panel cannot fight it for the depth buffer.
+
+**And the top shelf carries china over the coffee and glass everywhere else**,
+which is the photograph rather than a scheme. Cups upright on their saucers,
+the opposite of how the same shelf keeps its stemware, and the saucer starts
+3 mm inside the shelf's own glass rather than on top of it.
+
 ## [1.250.0] — 2026-09-04
 
 ### Two men behind a counter, and one of them is making coffee
