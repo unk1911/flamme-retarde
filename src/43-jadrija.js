@@ -4357,17 +4357,36 @@ async function buildJadrija(scene) {
     // 0.84 to 1.12, in bays half the size, with a patch of fresh bitumen every
     // so often where somebody chased a leak — which is the one thing every
     // flat roof on this coast has and no two of them have in the same place.
+    // AND THE BAYS ARE SQUARE. This ran three bands across the fall whatever
+    // the roof was, so on the slasticarnica — 8.2 m from the awning's leading
+    // edge to the back parapet — a "bay" was 0.95 m along the shop and **2.7 m
+    // across it**. Photographed from 25 m, which is a height this game is
+    // actually played at, that is not a screed laid in bays: it is planks. And
+    // three values of `k` is almost nothing for a hash to work with across the
+    // fall, so what variation there was had to come from `t` alone and read as
+    // banding.
+    //
+    // A screed bay is about as long as it is wide, because it is as far as
+    // somebody can reach across wet mortar from one position. So the band
+    // count comes off the roof's own depth.
+    const bands = Math.max(3, Math.round((s1 - s0) / 0.95));
     for (let t = a; t < c; t += 0.95) {
       const t1 = Math.min(t + 0.95, c);
-      for (let k = 0; k < 3; k++) {
-        const b0 = s0 + (s1 - s0) * (k / 3), b1 = s0 + (s1 - s0) * ((k + 1) / 3);
+      for (let k = 0; k < bands; k++) {
+        const b0 = s0 + (s1 - s0) * (k / bands);
+        const b1 = s0 + (s1 - s0) * ((k + 1) / bands);
         // Hashed on BOTH indices, and that is not fastidiousness. `jit(t | 0,
         // 320 + k)` was the first cut and the bays are 0.95 m apart, so `t | 0`
         // takes the same value for two bays running and the same value for
         // every band across the fall: what came out was long stripes down the
         // roof and a chequer of patches, which is the failure this file has
         // written down elsewhere as "a regular pattern is worse than nothing".
-        const h = ((t * 1.7) | 0) * 31 + k * 7;
+        // `k * 7` was fine while k stopped at 2 and is not now: with nine
+        // bands, `k * 7` runs to 56 and steps straight over `31`, so bay
+        // (ti+1, 0) and bay (ti, 5) land on the same key and get the same
+        // shade. 997 is bigger than the whole range `ti * 31` can reach across
+        // a fifteen-metre shop, so no two bays can collide.
+        const h = ((t * 1.7) | 0) * 31 + k * 997;
         const g = 0.88 + 0.22 * ((jit(h, 320) * 6) | 0) / 5;
         // And a repair every fifteen bays or so rather than every eight, in
         // bitumen that is dark against the screed and not black against it.

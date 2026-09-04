@@ -8,6 +8,59 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.204.0] — 2026-09-04
+
+### The roofs were laid in planks
+
+Last release's lesson was to work out where the player actually is before
+believing a render. Applied to the resort, the answer is unwelcome and obvious:
+**this is a game about flying over Jadrija**. The surface a player sees most is
+the one nobody photographs, because you have to get above it.
+
+Shot straight down from 18 to 40 m, the shop roofs have real content on them —
+the condenser cabinet, the propped hatch, the lagged runs, the crates, the hose
+coil, the tide line off the kerb — and underneath all of it the screed reads as
+banding. The reason is one line that was right when it was written and stopped
+being right the moment the roofs differed in size:
+
+```js
+for (let k = 0; k < 3; k++)
+```
+
+Three bands across the fall, whatever the roof. On the slastičarnica that is
+8.2 m from the awning's leading edge to the back parapet, so a "bay" was 0.95 m
+along the shop and **2.73 m across it** — a plank, at nearly three to one. And
+three values of `k` is almost nothing for a hash to work with in that direction,
+so what variation there was had to come from `t` alone and read as stripes.
+
+A screed bay is about as long as it is wide, because it is as far as somebody
+can reach across wet mortar without moving their feet. The band count comes off
+the roof's own depth now:
+
+```
+slast    8.2 m   3 -> 9 bands   0.95 x 2.73  ->  0.95 x 0.91
+h2o      8.0 m   3 -> 8 bands   0.95 x 2.67  ->  0.95 x 1.00
+f2       7.5 m   3 -> 8 bands   0.95 x 2.50  ->  0.95 x 0.94
+tramp2   6.2 m   3 -> 7 bands   0.95 x 2.07  ->  0.95 x 0.89
+mini     5.7 m   3 -> 6 bands   0.95 x 1.90  ->  0.95 x 0.95
+```
+
+**And the hash had to change with it.** `((t * 1.7) | 0) * 31 + k * 7` was fine
+while `k` stopped at 2. With nine bands `k * 7` runs to 56 and steps straight
+over the 31, so bay `(ti + 1, k = 0)` and bay `(ti, k = 5)` land on the same key
+and come out the same shade — the exact failure the note above that line was
+written to record, reintroduced by widening the loop it guards. `k * 997` is
+larger than the whole range `ti * 31` can reach across a fifteen-metre shop, so
+no two bays on a roof can collide.
+
+About 3,800 triangles across the five roofs, against a scene of 1,959,229.
+
+Also checked this pass and left alone: the gelato area itself, which is dense
+from every standing and seated position around it — sixteen labelled flavours,
+the price boards, the A-board, the terrace with people at the tables — and the
+promenade bays from 1.201.0, which read correctly from 25 m without becoming a
+chessboard.
+
 ## [1.203.0] — 2026-09-04
 
 ### Every pass on this pour was shot from a door nobody stands in
