@@ -10401,19 +10401,33 @@ async function buildJadrija(scene) {
   /**
    * The little free library, off `_367`, `_368` and `_369`.
    *
-   * "A wooden box on two steel posts with a lift-up lid full of books, and
-   * beside it a white panel painted with a row of coloured book spines. Green
-   * cast-iron and timber benches, gravel with a white limestone-block edging."
+   * The catalogue entry this was built from says "a white panel painted with a
+   * row of coloured book spines" standing BESIDE the box. **There is no such
+   * panel and they are not book spines.** `_367` is square on to the thing
+   * from three metres and settles it: the white panel is the box's own
+   * **drop-front**, and what is painted on it is a row of **six kabina doors**
+   * — orange, blue, red, green, blue, yellow — each with the little coloured
+   * transom light over it that every hut in the block behind actually has, and
+   * each with a black dash for a handle. Four are louvred with horizontal
+   * blades, the green one is planked with vertical boards, and the fifth is
+   * painted in wavy horizontal lines. It is a picture of the row of kabine it
+   * stands behind, and it is the best single object in the survey.
    *
-   * `_368` is square on to it at two metres and settles the construction: a
-   * chest of stained pine boards standing on two dark steel legs, the front
-   * panel dropping down on two long galvanised strap hinges, a plank lid
-   * oversailing it at a slight rake, and one packed shelf of books behind.
+   * **And it stands SHUT.** `_368` — the only frame with it open, the one this
+   * was built from, and the one that gave the shelf of books — is timed
+   * 18:28:50, between `_367` at 18:28:36 and `_369` at 18:29:19, both of which
+   * have it shut. It is open in that frame because the photographer opened it.
+   * So the books come out and the painting goes on, and the trade is a good
+   * one: the note this replaces argued that the books were the object because
+   * "a plain dark slot behind a timber box is a meter cupboard", which was
+   * true of what it had. Six painted kabina doors are not a meter cupboard
+   * from anywhere.
    *
-   * The books are the object. Twenty-odd spines at three to five centimetres
-   * each, all different heights and all different colours, is the only thing
-   * in the frame that could not be anything else — a plain dark slot behind a
-   * timber box is a meter cupboard.
+   * `_368` still settles the construction and is unchanged: a chest of stained
+   * pine boards on two dark steel legs, a plank lid oversailing at a slight
+   * rake, and the front dropping on two long galvanised strap hinges — which
+   * are on the INSIDE face, which is why the open frame shows bare pine and no
+   * paint at all.
    *
    * Placed, not measured: none of the three frames carries GPS. It stands at
    * the wood edge east of the lavender bank, on the stretch of `walkTo` a
@@ -10433,42 +10447,82 @@ async function buildJadrija(scene) {
       boxTS(lt + o - 0.035, lt + o + 0.035, ls - 0.035, ls + 0.035,
         gy, gy + 0.60, LEG2);
     }
-    // The carcass, and the drop-front on it.
-    boxTS(lt - HW, lt + HW, ls - HD, ls + HD, gy + 0.56, gy + 1.00,
+    // The carcass, and it is one box now rather than a chest with an open bay
+    // over it: shut, the whole front from the legs to the lid is the painted
+    // board.
+    boxTS(lt - HW, lt + HW, ls - HD, ls + HD, gy + 0.56, gy + 1.44,
       TIMB3, shade(TIMB3, 1.14));
-    boxTS(lt - HW + 0.02, lt + HW - 0.02, ls - HD - 0.022, ls - HD + 0.002,
-      gy + 0.58, gy + 0.98, shade(TIMB3, 1.10), shade(TIMB3, 1.18));
-    for (const o of [-0.34, 0.34]) {
-      boxTS(lt + o - 0.035, lt + o + 0.035, ls - HD - 0.032, ls - HD - 0.020,
-        gy + 0.58, gy + 0.99, GALV2);
-    }
-    // The open bay: a back, two ends, and a shelf across the bottom of it.
-    boxTS(lt - HW, lt + HW, ls + HD - 0.05, ls + HD, gy + 1.00, gy + 1.44,
-      DARKW2, shade(DARKW2, 1.12));
-    for (const o of [-1, 1]) {
-      boxTS(lt + o * HW - o * 0.05, lt + o * HW, ls - HD, ls + HD,
-        gy + 1.00, gy + 1.44, DARKW2, shade(DARKW2, 1.16));
-    }
-    boxTS(lt - HW, lt + HW, ls - HD, ls + HD, gy + 1.00, gy + 1.04,
-      shade(DARKW2, 0.86));
-    // The books. Twenty-two spines, none the same height and none the same
-    // colour, packed tight and leaning at the right-hand end because the shelf
-    // is not quite full — which is what every one of these looks like.
-    const SPINE = [
-      [0.520, 0.150, 0.115], [0.115, 0.235, 0.480], [0.640, 0.560, 0.140],
-      [0.145, 0.375, 0.205], [0.480, 0.470, 0.440], [0.310, 0.130, 0.335],
-      [0.585, 0.330, 0.095], [0.090, 0.330, 0.360], [0.700, 0.690, 0.650],
-      [0.180, 0.180, 0.195],
-    ];
-    let bx = lt - HW + 0.07;
-    for (let i = 0; bx < lt + HW - 0.16; i++) {
-      const w = 0.028 + 0.022 * ((i * 7) % 3);
-      const hgt = 0.20 + 0.055 * ((i * 5) % 4);
-      const col = SPINE[(i * 3) % SPINE.length];
-      boxTS(bx, bx + w, ls - HD + 0.04, ls + HD - 0.055,
-        gy + 1.04, gy + 1.04 + hgt, col, shade(col, 1.20));
-      bx += w + 0.006;
-    }
+    // The drop-front itself, a hair proud of the carcass so that the painting
+    // never shares a plane with the box behind it.
+    boxTS(lt - HW + 0.02, lt + HW - 0.02, ls - HD - 0.024, ls - HD + 0.002,
+      gy + 0.58, gy + 1.42, shade(TIMB3, 1.10), shade(TIMB3, 1.18));
+    // The hasp at the top, which is the only ironmongery you can see with it
+    // shut — the two long strap hinges are on the inside face and that is why
+    // `_368` shows bare pine with hinges on it and no paint whatever.
+    boxTS(lt - 0.055, lt + 0.055, ls - HD - 0.036, ls - HD - 0.022,
+      gy + 1.34, gy + 1.44, GALV2);
+    /**
+     * The painting: six kabina doors on a white ground.
+     *
+     * A canvas rather than geometry, for `panelSign`'s own reason — a louvred
+     * door 0.20 m wide is forty blades, and forty blades in triangles is a
+     * thousand of them for something that is two pixels a blade at the range
+     * anybody sees this from.
+     *
+     * COLOURS are read off `_367` and DIVIDED BY THE WHITE BOARD BESIDE THEM.
+     * The board is in the shade of the pines there — measured 157/172/191,
+     * which is skylight and is bluer than it is red — so the raw door values
+     * are all cold, and every one of them comes out wrong if it is used as
+     * paint. White paint is about 0.85, so the ratios against the board times
+     * 0.85 are the pigments: orange 0.92/0.51/0.33, blue 0.14/0.51/0.84, red
+     * 0.90/0.31/0.35, green 0.33/0.62/0.27, the second blue 0.06/0.39/0.71,
+     * yellow 0.92/0.77/0.21.
+     *
+     * All of it then goes 12 % under, board included, because `panelSign` uses
+     * an UNLIT material: a white board at its own albedo is lighter than every
+     * lit surface round it and reads as a lightbox rather than as paint.
+     */
+    panelSign(lt, ls - HD - 0.040, gy + 1.00, HW * 2 - 0.06, 0.82, (g, C) => {
+      const w = C.width, h = C.height;
+      g.fillStyle = '#c0beb6'; g.fillRect(0, 0, w, h);
+      // The boards the panel is made of, showing through the paint: five
+      // horizontal joints, barely there. `_367` has them across the white.
+      g.fillStyle = 'rgba(120,114,102,0.30)';
+      for (let k = 1; k < 6; k++) g.fillRect(0, (h * k / 6) | 0, w, 1.5);
+      // orange, blue, red, green, blue, yellow — left to right, in that order.
+      const DOOR = ['#cf7349', '#1f73bd', '#cc464f', '#4b8c3d', '#0e589f',
+        '#d0ad30'];
+      const M = w * 0.031;                     // margin at the ends
+      const dw = (w - M * 2) / 6 * 0.82;       // door, against a 0.18 gap
+      const pitch = (w - M * 2 - dw) / 5;
+      const dy0 = h * 0.27, dh = h * 0.52;
+      for (let i = 0; i < 6; i++) {
+        const x = M + i * pitch;
+        g.fillStyle = DOOR[i];
+        // The transom light over the door, in the door's own colour, which is
+        // what the kabine themselves have and is why this reads as a picture
+        // of them rather than as six coloured rectangles.
+        g.fillRect(x + dw * 0.10, h * 0.10, dw * 0.80, h * 0.055);
+        g.fillRect(x, dy0, dw, dh);
+        // The blades. Horizontal on five of them and VERTICAL on the green
+        // one, which is planked rather than louvred — the one asymmetry in
+        // the row and the thing that stops it reading as a pattern.
+        g.fillStyle = 'rgba(0,0,0,0.16)';
+        if (i === 3) {
+          for (let k = 1; k * 5 < dw; k++) {
+            g.fillRect(x + k * 5, dy0 + 2, 1.6, dh - 4);
+          }
+        } else {
+          for (let k = 1; k * 5 < dh; k++) {
+            g.fillRect(x + 2, dy0 + k * 5, dw - 4, 1.6);
+          }
+        }
+        // The handle: a black dash at hand height. Two pixels, and without it
+        // these are panels rather than doors.
+        g.fillStyle = 'rgba(20,18,16,0.85)';
+        g.fillRect(x + dw * 0.52, dy0 + dh * 0.56, dw * 0.30, 2.6);
+      }
+    });
     // The lid: one plank, oversailing all round and raked back, dark with the
     // weather on it.
     bar(lt - HW - 0.08, lt + HW + 0.08,
@@ -10476,30 +10530,64 @@ async function buildJadrija(scene) {
         [ls + HD + 0.08, gy + 1.56], [ls - HD - 0.10, gy + 1.48]],
       DARKW2, shade(DARKW2, 1.20));
     furniture.push({ t: lt, s: ls, a: 0.82, c: 0.30, h: 1.56, y: gy });
-    // The bench beside it: green cast-iron ends and timber slats, which is the
-    // same bench the park has and the frame has one of them a metre away.
-    const bt2 = lt + 1.55, gy2 = surfaceY(bt2, ls);
+    parkBench(lt + 1.55, ls);
+  }
+  freeLibrary(303.5, 40.2);
+
+  /**
+   * The green park bench, lifted out of `freeLibrary` because there is more
+   * than one of them and there always was.
+   *
+   * `_363`, `_366`, `_368` and `_369` between them have **four** of these in
+   * the strip behind the huts — one beside the library, one across the gravel
+   * path from the big agave, and two more further along facing the moorings —
+   * and the code had one, welded into the library's own function. Dark green
+   * cast-iron ends with a scrolled arm, five green-painted timber slats in the
+   * seat and three in the back, standing on gravel with a limestone-lump
+   * edging behind them. Every one in the survey is the same pattern and the
+   * same green, which is what a municipality buys.
+   *
+   * NOT the promenade's `BENCH`, which is the other municipal pattern on this
+   * shore and stands in a run every 33 m: that one is a bent iron end frame in
+   * a lighter green with slats you can see the sea through. Two patterns in
+   * one resort is what a place that has been added to for a century looks
+   * like, which is the same argument the black kabine-gable bench ships under.
+   *
+   * Placements, like the library's: none of the four frames carries GPS.
+   */
+  function parkBench(bt2, bs2) {
+    const gy2 = surfaceY(bt2, bs2);
     const IRONG = [0.075, 0.185, 0.115];
     const SLAT2 = [0.235, 0.390, 0.230];
     for (const o of [-0.62, 0.62]) {
-      boxTS(bt2 + o - 0.035, bt2 + o + 0.035, ls - 0.26, ls + 0.24,
+      boxTS(bt2 + o - 0.035, bt2 + o + 0.035, bs2 - 0.26, bs2 + 0.24,
         gy2, gy2 + 0.44, IRONG);
-      boxTS(bt2 + o - 0.030, bt2 + o + 0.030, ls + 0.16, ls + 0.24,
+      boxTS(bt2 + o - 0.030, bt2 + o + 0.030, bs2 + 0.16, bs2 + 0.24,
         gy2 + 0.44, gy2 + 0.92, IRONG);
     }
     for (let k = 0; k < 3; k++) {
-      boxTS(bt2 - 0.70, bt2 + 0.70, ls - 0.24 + k * 0.16,
-        ls - 0.24 + k * 0.16 + 0.12, gy2 + 0.42, gy2 + 0.47,
+      boxTS(bt2 - 0.70, bt2 + 0.70, bs2 - 0.24 + k * 0.16,
+        bs2 - 0.24 + k * 0.16 + 0.12, gy2 + 0.42, gy2 + 0.47,
         SLAT2, shade(SLAT2, 1.16));
     }
     for (let k = 0; k < 3; k++) {
-      boxTS(bt2 - 0.70, bt2 + 0.70, ls + 0.17, ls + 0.22,
+      boxTS(bt2 - 0.70, bt2 + 0.70, bs2 + 0.17, bs2 + 0.22,
         gy2 + 0.52 + k * 0.14, gy2 + 0.63 + k * 0.14,
         SLAT2, shade(SLAT2, 1.16));
     }
-    furniture.push({ t: bt2, s: ls, a: 0.74, c: 0.30, h: 0.92, y: gy2 });
+    furniture.push({ t: bt2, s: bs2, a: 0.74, c: 0.30, h: 0.92, y: gy2 });
   }
-  freeLibrary(303.5, 40.2);
+  // The other three, in the strip behind the huts, and WHERE they go is
+  // arithmetic. `carSites` fills s 31.1 to 37.1 with a nose-in row every four
+  // metres, so the only car-free ground in that band is the two windows the
+  // car loop already leaves round the things in `BACK` — 3.4 m either side of
+  // the rock at 418.6 and 3.0 either side of the anchor at 430.4. Two of these
+  // go in those, seaward of their object and looking at the water, which is
+  // what all four benches in the survey do. The third stands at the stone
+  // block, in the gap the lump kerb opens for it.
+  parkBench(416.6, 31.70);
+  parkBench(428.2, 31.60);
+  parkBench(443.6, 38.60);
 
   /**
    * The POMMES FRITES lightbox, which the TODO has wanted a source for.
@@ -15634,6 +15722,93 @@ async function buildJadrija(scene) {
       // the box that fits it is a fifth of a metre down-shore of the axis.
       furniture.push({ t: t0 - 0.20, s: s0 - 0.07, a: 0.85, c: 0.96,
         h: 2.35, y: y0 });
+    }
+
+    // ── the limestone edging at the back of the parking ──────────────────────
+    //
+    // `1000150388`, and it is the piece of ground the complaint is about:
+    // *"that area behind the kabines, where the cars and boats are... feels
+    // under-developed"*. The frame is one long **serrated kerb of big broken
+    // white limestone**, blocks 0.4 to 0.9 m across set on end and touching,
+    // running across the back of the car park and holding the pine floor up
+    // against the grass beyond it. It is not the resort's sawn kerb — that is
+    // the four-course wall with a cap beam already built along `walkTo` — and
+    // it is not a rockery. It is what everybody on this coast edges a bed
+    // with, and there is a hundred metres of it in this one photograph.
+    //
+    // **Which band it goes in is arithmetic, not taste.** The huts' back wall
+    // is at `rowB + cabD`, the lane wall at `WALL.s` 29.2, the bollards at
+    // 29.7, and the note over `carSites` records that the deepest tail the
+    // nose-in row can produce is **37.10**. OSM maps no building inside 39 m.
+    // So s 37.5 to 39.0 is a clean metre and a half with nothing in it at
+    // either end, and that is where this goes: 37.75, which leaves 0.3 m
+    // between the biggest lump and the deepest car.
+    //
+    // NO COLLIDER, and the reason is the one written over the sawn kerb
+    // blocks: `GROUND.girth` is 0.55 and `confine` adds it to every
+    // half-extent, so a run of these with blockers on them is fifty metres of
+    // sealed wall across the band the crowd and the cars both cross. You step
+    // over a 0.3 m rock.
+    {
+      const K0 = 402.0, K1 = 470.0;
+      for (let t = K0, i = 0; t < K1; i++) {
+        const r = 0.22 + 0.20 * jit(i, 111);
+        // The gap at t 440-443 is not a mistake in the run: the block group
+        // below stands in it, the way `_388` has the kerb open where the
+        // seats are.
+        if (t > 439.0 && t < 444.0) { t += 0.62; continue; }
+        // Wandering 0.28 m in `s` — a kerb somebody laid by eye is never a
+        // line, and drawn as one it reads as precast.
+        const ks = 37.75 + (jit(i, 113) - 0.5) * 0.28;
+        limeLump(t, ks, r, 0.22 + 0.16 * jit(i, 115), 40 + (i % 23));
+        // Touching, not spaced. `r * 1.55` overlaps each lump into the next by
+        // about a fifth, which is what stops the run reading as a row of buns
+        // and starts it reading as one broken edge.
+        t += r * 1.55;
+      }
+      // And the block group, off the same frame. A quarried ashlar left lying
+      // on the gravel with four rough lumps round it, which is either a table
+      // and four seats or nobody ever moved them. Solved off `_388`: it is a
+      // 23 mm frame, the horizon row comes from two 1.7 m figures standing at
+      // the car park whose feet and heads are 45 px apart (so 29 m away), and
+      // against that horizon the block's front face stands **0.70 m** out of
+      // the gravel at 1.70 m from the lens. About 1.3 m by 1.0 on plan.
+      //
+      // `boxTS` and not `limeLump`, and that is the point of it: everything
+      // else white on this shore is broken karst and this one thing is SAWN,
+      // with four flat faces and square arrises. One cut block in fifty metres
+      // of rubble is what says somebody put it there.
+      {
+        const bt = 441.4, bs = 38.30, by = gAt2(bt, bs);
+        // `bar` rather than `boxTS`, for one reason: the top is not level.
+        // `_388`'s block has spalled along one edge and its top falls 0.09 m
+        // across the width, and a cuboid with a flat lid at this size is a
+        // concrete plinth. Nine centimetres is all it takes.
+        bar(bt - 0.65, bt + 0.65, [[bs - 0.50, by - 0.12], [bs + 0.50,
+          by - 0.12], [bs + 0.50, by + 0.61], [bs - 0.50, by + 0.70]],
+        shade(LIME, 0.94), shade(LIME, 1.06));
+        furniture.push({ t: bt, s: bs, a: 0.65, c: 0.50, h: 0.70, y: by });
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * TAU + 0.7;
+          limeLump(bt + Math.cos(a) * 1.32, bs + Math.sin(a) * 1.05,
+            0.36 + 0.10 * jit(i, 117), 0.34 + 0.08 * jit(i, 119), 70 + i);
+        }
+        // The gravel it stands on, the same apron the fountain rock has and
+        // for the same reason — `_388`'s block sits on white chippings with
+        // the pine litter run out into them, not on the bare floor.
+        const NA = 10, ay = 0.04;
+        const rim = (i) => {
+          const a2 = (i % NA) / NA * TAU;
+          const r2 = 1.65 + 0.34 * jit(i % NA, 121);
+          const gt = bt + Math.cos(a2) * r2, gs = bs + Math.sin(a2) * r2 * 0.72;
+          return W(gt, gs, gAt2(gt, gs) + ay);
+        };
+        const mid = W(bt, bs, gAt2(bt, bs) + ay);
+        for (let i = 0; i < NA; i++) {
+          b.tri(mid, rim(i), rim(i + 1),
+            shade(GRAV, 0.94 + jit(i, 123) * 0.14));
+        }
+      }
     }
     b = back11;
   }

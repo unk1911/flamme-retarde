@@ -8,6 +8,93 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.242.0] — 2026-09-04
+
+### The white panel is a painting of the kabine, and it was shut all along
+
+Misha: *"keep enhancing that area behind the kabines"* — and, earlier, *"that
+area behind the kabines, where the cars and boats are, and road towards Brod,
+that area feels under-developed... use the survey imagery that i had provided
+to u earlier"*.
+
+**The little free library was built off the wrong frame.** The catalogue entry
+it came from says "a white panel painted with a row of coloured book spines"
+standing *beside* the box. There is no such panel and they are not book spines.
+`_367` is square on to it from three metres: the white panel is the box's own
+**drop-front**, and what is painted on it is a row of **six kabina doors** —
+orange, blue, red, green, blue, yellow — each with the little coloured transom
+light over it that every hut in the block behind actually has, and each with a
+black dash for a handle. Four are louvred with horizontal blades; the green one
+is planked with vertical boards; the fifth is painted in wavy lines. It is a
+picture of the row of kabine it stands behind, and it is the best single object
+in the survey.
+
+**And it stands shut.** `_368` — the only frame with it open, the one this was
+built from, and the one that gave the shelf of books — is timed **18:28:50**,
+between `_367` at **18:28:36** and `_369` at **18:29:19**, both of which have it
+shut. It is open in that frame because the photographer opened it. So the books
+come out and the painting goes on. The note this replaces argued the books were
+the object, because "a plain dark slot behind a timber box is a meter cupboard"
+— which was true of what it had. Six painted kabina doors are not a meter
+cupboard from anywhere.
+
+The strap hinges stay on the inside face, which is exactly why the open frame
+shows bare pine and no paint at all.
+
+**Door colours are divided by the board they are painted on.** That board is in
+the shade of the pines and measures 157/172/191 — skylight, bluer than it is red
+— so every raw door value in the frame is cold and every one of them is wrong
+used as paint. White paint is about 0.85, so the ratios against the board times
+0.85 are the pigments: orange 0.92/0.51/0.33, blue 0.14/0.51/0.84, red
+0.90/0.31/0.35, green 0.33/0.62/0.27, second blue 0.06/0.39/0.71, yellow
+0.92/0.77/0.21. All of it then goes 12 % under, board included, because
+`panelSign` draws on an **unlit** material and a white board at its own albedo
+is lighter than every lit surface round it — a lightbox, not paint.
+
+**The bench came out of the library's own function**, where it had been welded
+since it went in. `_363`, `_366`, `_368` and `_369` have **four** of these in
+the strip behind the huts and the code had one. `parkBench` now, and the other
+three are placed — and where they go is arithmetic, not taste: `carSites` fills
+s 31.1 to 37.1 with a nose-in row every four metres, so the only car-free ground
+in that band is the two windows the car loop already leaves round the things in
+`BACK`. Two go in those, seaward of their object and looking at the water, which
+is what all four benches in the survey do.
+
+**And the limestone edging at the back of the parking**, which is the piece of
+ground the complaint is actually about. `_388` is one long **serrated kerb of
+big broken white limestone**, blocks 0.4 to 0.9 m across set on end and
+touching, running across the back of the car park. Not the resort's sawn kerb —
+that is the four-course wall with a cap beam already built along `walkTo` — and
+not a rockery. It is what everybody on this coast edges a bed with, and there is
+a hundred metres of it in one photograph.
+
+Which band it goes in is arithmetic too. The huts' back wall is at
+`rowB + cabD`, the lane wall at 29.2, the bollards at 29.7, and `carSites`
+records that the deepest tail the nose-in row can produce is **37.10**. OSM maps
+no building inside 39 m. So s 37.5 to 39.0 is a clean metre and a half with
+nothing in it at either end: the kerb goes at **37.75**, wandering 0.28 m
+because a kerb somebody laid by eye is never a line, and each lump overlapping
+the next by about a fifth — spaced, it is a row of buns; touching, it is one
+broken edge.
+
+**No collider on any of it**, and the reason is the one written over the sawn
+kerb blocks: `GROUND.girth` is 0.55 and `confine` adds it to every half-extent,
+so a run of these with blockers on them is fifty metres of sealed wall across
+the band the crowd and the cars both cross. You step over a 0.3 m rock.
+
+The kerb opens at t 439–444 for the **stone block**, off the same frame: a
+quarried ashlar lying on the gravel with four rough lumps round it, which is
+either a table and four seats or nobody ever moved them. `_388` is a 23 mm
+frame; the horizon row comes from two 1.7 m figures at the car park whose feet
+and heads are 45 px apart, so 29 m away; and against that horizon the block's
+front face stands **0.70 m** out of the gravel at 1.70 m from the lens, about
+1.3 by 1.0 on plan. Built with `bar` and not `boxTS` for one reason: its top
+falls 0.09 m across the width, and a cuboid with a level lid at this size is a
+concrete plinth.
+
+Census `{seen:446, thin:333, plain:86, rich:27}`. Jadrija 559 039 → **561 824**
+triangles, blockers 762 → 766.
+
 ## [1.241.0] — 2026-09-04
 
 ### The anchor is lying down, and it was standing up
