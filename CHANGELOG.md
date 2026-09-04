@@ -8,6 +8,57 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.200.0] — 2026-09-04
+
+### Two and a third seconds in which she moved by 0.9 degrees
+
+Ran 1.199.0's joint-rate measurement over the retimed pour. The rates are fine —
+the fastest thing in the clip is `fingersR` at 386 deg/s closing on the bottle,
+which is exactly what a hand does, and everything else is under 76. But the
+table sorts both ways, and the bottom of it says this:
+
+```
+ 2.72 ->  5.05   2.33 s   0.9 deg   0.4 deg/s   spine03
+```
+
+Through the entire pour — 2.33 seconds, **nearly a third of the clip**, and the
+one stretch of it anybody is actually looking at — the furthest-moving bone in
+her whole body travels nine tenths of one degree. She is a statue.
+
+The note over `POURB` already knew: *"A pour is held for a second, and a still
+frame held for forty frames is the one thing an eye is certain about. So it
+drifts."* It didn't. Two reasons, and the second one is the real one.
+
+**The bands overlapped.** `band()` returns zero anywhere inside its range, so
+POUR asking for tilt 99–108 and POURB asking for 106–114 can both be satisfied
+at 107 — and POURB is chained to POUR by a `near` term that actively pulls it
+there. They landed at 103.7 and 105.9.
+
+**And separating them barely helped**, which is the part worth writing down.
+96–103 against 110–118 moved POURB to 109.5 and stopped, and quartering the
+chain weight moved it to 109.5 again. Nothing was holding it back. The bottle is
+a **rigid rod** — 0.198 m from the grip to the lip — so if you pin the lip over
+the glass and pin the palm, the angle between them is arithmetic and there is no
+freedom left for a band to have an opinion about:
+
+```
+tilt 105   grip (0.315 -0.426 1.081)   <- which is exactly `hand`
+tilt 110   grip (0.315 -0.421 1.098)
+tilt 117   grip (0.315 -0.411 1.120)
+```
+
+`hand` *is* the grip for 105 degrees. The tilt was never being set by the tilt
+band; it was being set by where her hand was told to be, and `handB` sat 22 mm
+above `hand` when the geometry wanted 53. Set to the grip for 117 with the lip
+14 mm higher, and the solve comes out at **103.1 to 113.9 — 10.8 degrees of
+drift** against 2.2, with her hand rising 50 mm and the tilt term satisfied
+rather than fought. It is also an easier reach: 0.463 m from the shoulder
+against 0.502, because raising a hand toward shoulder height shortens it.
+
+The lip rise stays at 14 mm and not the 35 mm the wine actually climbs, because
+the stream shortening as the level comes up to meet it is the better cue of the
+two and raising the lip in step would cancel exactly that.
+
 ## [1.199.0] — 2026-09-04
 
 ### The key went where the clock was, not where the arm was

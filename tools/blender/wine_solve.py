@@ -502,7 +502,24 @@ def goals(idle):
     # of 95, which is a bottle instead of a coin.
     g0, g1 = ROOM["glass"]
     hand = (0.315, -0.426, 1.081)
-    handB = (0.317, -0.424, 1.103)
+    # AND THIS IS WHAT SETS THE TILT, not the tilt band. The bottle is a rigid
+    # rod: 0.198 m from the grip to the lip. Pin the lip over the glass and pin
+    # the palm, and the angle between them is arithmetic — there is no freedom
+    # left for a `band` to express an opinion about. Which is why asking POURB
+    # for 110-118 moved it from 103.7 to 109.5 and no further, and why loosening
+    # its chain to POUR did almost nothing: nothing was holding it back except
+    # where its own hand was told to be.
+    #
+    #   tilt 105  grip (0.315 -0.426 1.081)   <- which is exactly `hand`
+    #   tilt 110  grip (0.315 -0.421 1.098)
+    #   tilt 117  grip (0.315 -0.411 1.120)
+    #
+    # So `handB` is the grip for 117 with the lip 14 mm higher than `hand`'s:
+    # 53 mm up and 15 mm in toward the glass, against the 22 up and 2 in it
+    # carried before. It is also, incidentally, an easier reach — raising a hand
+    # toward shoulder height shortens it, 0.463 m from the shoulder against
+    # 0.502 at the old value.
+    handB = (0.315, -0.411, 1.134)
     return {
         # Bending to a stool. The hand has to get to 0.83 m off the floor with
         # a shoulder that starts at 1.40, which is a 0.57 m drop against a
@@ -540,15 +557,33 @@ def goals(idle):
         # leaning in across it: that is what a right-handed pour looks like
         # from any seat in the room.
         "POUR": dict(lip=lip, palm=hand, palmW=260.0, look=(g0, g1, ROOM["rim"]),
-                     tilt=(99, 108), elbow=(92, 122), lean=(4, 13),
+                     tilt=(96, 103), elbow=(92, 122), lean=(4, 13),
                      near=idle, nearW=0.00008),
         # A pour is held for a second, and a still frame held for forty frames
         # is the one thing an eye is certain about. So it drifts: further over
         # as the glass fills, and the hand comes up with it.
+        #
+        # AND THE TWO BANDS MUST NOT OVERLAP, which is the whole of why they
+        # did not drift. `band` is zero anywhere inside its range, so 99-108
+        # against 106-114 leaves the solver free to satisfy both at 107 — and
+        # `POURB` is chained to `POUR` with a `near` term that actively pulls
+        # it there. It landed at 103.7 and 105.9. Measured across the retimed
+        # clip, the whole body moved **0.9 degrees in 2.33 seconds** through
+        # the pour: 0.4 deg/s, over nearly a third of the clip, in the one
+        # stretch of it anybody is looking at. A held frame is a held frame
+        # whether or not the note above it says it drifts.
+        #
+        # 96-103 and 110-118 cannot both be satisfied, so the drift is now a
+        # condition rather than a hope: about fourteen degrees, which is what a
+        # bottle has to give back as the fifth of it that fills a glass leaves,
+        # and about 49 mm of travel at the punt where an eye can see it. The
+        # hand rise stays at 14 mm and not the 35 the wine climbs, because the
+        # stream shortening as the level comes up to meet it is the better cue
+        # of the two and raising the lip in step would cancel exactly that.
         "POURB": dict(lip=(lip[0], lip[1], lip[2] + 0.014), palm=handB,
                       look=(g0, g1, ROOM["rim"]),
-                      palmW=260.0, tilt=(106, 114),
-                      elbow=(92, 122), lean=(4, 13),
+                      palmW=260.0, tilt=(114, 120),
+                      elbow=(92, 122), lean=(2, 10),
                       near=idle, nearW=0.00008),
     }
 
@@ -718,7 +753,14 @@ def main():
         # from POUR in `spine01`: her whole back straightening and hinging again
         # inside half a second, twice, which is the lurch this file exists to
         # stop. The names default below are in solve order, not clip order.
-        CHAIN = {"HOLD": ("REACH", 0.0016), "POURB": ("POUR", 0.0060),
+        # POURB's chain to POUR is a quarter of what it was. The chain exists so
+        # the clip interpolates instead of lurching between neighbours, and at
+        # 0.0060 it was strong enough to hold POURB a degree short of its own
+        # tilt band: the pour drifted 6 degrees where the band asked for 14.
+        # POUR to POURB is 2.33 s of interpolation — the longest hold in the
+        # clip by a factor of three — so it is exactly the pair that can afford
+        # to differ, and the one that has to.
+        CHAIN = {"HOLD": ("REACH", 0.0016), "POURB": ("POUR", 0.0015),
                  "TIP": ("POUR", 0.0230)}
         solved = {}
         for n in names:
