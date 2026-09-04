@@ -8,6 +8,52 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.235.0] — 2026-09-04
+
+### The sign-in error was lying, and it cost an hour
+
+*"i can't seem to be able to sign-in btw, what happened?"* — and then, after a
+long walk round the houses, *"i was able to login just fine into
+abliterated.edeliverables.com as unk1911 / … no problem"*.
+
+**The password was right the whole time.** `share_chat.py` signs the
+`ablit_session` cookie with `SESSION_SECRET` and `baye.py` verifies it with the
+same one. The chat app had moved to a host whose `.env` has no `SESSION_SECRET`
+— so it was minting a **random one at every startup**, which
+`share_chat.py:1979` says out loud in its own log and nothing else could ever
+know:
+
+```python
+SESSION_SECRET = os.environ.get("SESSION_SECRET", "").strip()
+if OAUTH_ENABLED and not SESSION_SECRET:
+    SESSION_SECRET = _secrets.token_urlsafe(32)
+```
+
+The app verified its own cookie perfectly. Nothing else on earth could. Proved
+by taking a real token from the live login and asking two machines to verify it:
+both have secret `2c4f07d1…`, and both returned `None`.
+
+**What made it an hour instead of five minutes is that the browser cannot read
+an httponly cookie**, so `/baye/whoami` was the only thing that could say what
+the session meant — and its null answer had exactly one message on it: *rejected
+— check the user and the password*. That sent the search to the password, to the
+user list, to a lockout that does not exist in the code, and to three different
+`users.conf` files on three machines, one of which got a temporary probe account
+added and removed to prove it was not the live one.
+
+So the failure path now asks a second question. `authChatOk` fetches `/abl/` —
+the chat app bounces a signed-out browser to `/login`, so a response that came
+back from anywhere else is a session it *accepted*. One extra request, only ever
+on a sign-in that has already appeared to fail, and it splits the one message
+into two:
+
+| | |
+|---|---|
+| `auth.bad` | rejected — check the user and the password |
+| `auth.half` | password ok — but the session is not accepted downstream (SESSION_SECRET mismatch between the login and the voice service) |
+
+The second one names the fault and the file. The first one never could.
+
 ## [1.234.0] — 2026-09-04
 
 ### She was a boat built for giants

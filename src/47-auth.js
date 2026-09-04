@@ -109,6 +109,32 @@ async function authSignIn(u, p) {
  * it asks rather than assumes, so a logout that did not take shows up as still
  * signed in rather than as a lie on the title screen.
  */
+/**
+ * Did the CHAT app take the sign-in, whatever the voice service thinks?
+ *
+ * THE TWO CAN DISAGREE, AND ON 4 SEP 2026 THEY DID FOR AN HOUR. `authWhoami`
+ * asks `/baye/whoami`, which is the only thing in the browser that can read an
+ * httponly cookie's meaning — so a null answer had exactly one message on it,
+ * "rejected — check the user and the password", and that message was a lie.
+ * The password was right. What was wrong was that `share_chat.py` signs the
+ * cookie with `SESSION_SECRET` and `baye.py` verifies it with the same, and
+ * the host the chat app had moved to had no `SESSION_SECRET` in its `.env` —
+ * so it was inventing a random one at every startup (share_chat.py:1979). The
+ * app happily verified its own cookie; nothing else on earth could.
+ *
+ * One extra request on the failure path tells those two apart. The chat app
+ * bounces a signed-out browser to `/login`, so a response that came back from
+ * anywhere else is a session it accepted. It costs a page fetch and it only
+ * ever runs when the sign-in has already appeared to fail.
+ */
+async function authChatOk() {
+  if (!AUTH.host) return false;
+  try {
+    const r = await fetch(AUTH.host + '/', { credentials: 'same-origin' });
+    return r.ok && !/\/login(\?|$)/.test(r.url);
+  } catch { return false; }
+}
+
 async function authSignOut() {
   if (!AUTH.host) return null;
   try {
@@ -212,7 +238,8 @@ function wireAuth() {
         toggleSignIn(false);
         toast(T('auth.hello').replace('{u}', u));
       } else {
-        $('signin-err').textContent = T('auth.bad');
+        // Which of the two failures was it? See `authChatOk`.
+        $('signin-err').textContent = T(await authChatOk() ? 'auth.half' : 'auth.bad');
       }
     } catch (err) {
       $('signin-err').textContent = String(err.message);
