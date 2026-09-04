@@ -8,6 +8,40 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.207.0] — 2026-09-04
+
+### The floor under skin was not a floor, it was a magic number
+
+1.206.0 gave skin an emissive floor because a person standing in a room lifted
+to 0.40 was measuring at 0.52 of the wall. It put that floor on `loadSkin` and
+called it done. Auditing every `solidMaterial` call in the source — 83 of them,
+57 with no emissive at all — says it left three behind, and they are three that
+matter:
+
+- **The beach crowd.** `42-crowd.js` builds the instanced bathers at
+  `spec: 0.09, specPower: 24` — character for character the numbers the skinned
+  figure carries, because they are the same material intent. Lifting one and not
+  the other puts two kinds of human in one frame lit two ways.
+- **Your own arms in the water.** `60-arms.js` draws them from `ARMS.skin`, and
+  they are in fact the only skin you ever see at arm's length.
+- **Her horns.** Whose own comment reads: *"Her hair's own numbers, so a horn
+  and the crest it stands in are lit by the same lobe."* That promise stopped
+  being true the moment her hair gained an emissive and the horn did not — a
+  seam written into the source by a release whose comment says it exists to
+  prevent exactly that seam.
+
+Which is what a magic number does. So it is a name now — `SKIN_EMISSIVE` in
+`41-skin.js`, with the three that were missed written over it — and anything
+made of a person points at it.
+
+The audit also cleared two that looked like the same fault and are not. The
+shore's ground mesh carries no emissive while the buildings on it carry 0.22,
+and that is deliberate rather than an oversight: the 0.22 is a *bounce* off the
+terrace, and the terrace is the thing doing the bouncing. And the vikendica's
+interiors all carry `emissive: VIK.glow`, which a first pass of this audit
+missed because it only matched numeric literals — the fixed audit matches the
+key.
+
 ## [1.206.0] — 2026-09-04
 
 ### Skin is not a painted wall

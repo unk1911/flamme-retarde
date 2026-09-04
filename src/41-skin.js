@@ -1517,7 +1517,7 @@ function skinnedFigure(data, opts = {}) {
     // concrete they walk on already has, because they are also outdoors in
     // full sun most of the time and the sun term has to stay the one that
     // matters there.
-    emissive: 0.16,
+    emissive: SKIN_EMISSIVE,
     ...opts,
     defines: { FR_SKIN: '', FR_BONES: nb },
     uniforms: { uBones, uBoneRows, ...uFace, ...(opts.uniforms || {}) },
@@ -2055,6 +2055,23 @@ function skinnedFigure(data, opts = {}) {
 }
 
 /** Pull one skinned model out of the inlined payload. Null if it is not there. */
+/**
+ * The floor under every piece of skin in this game.
+ *
+ * 1.206.0 put it on `loadSkin` and left three behind, which is what a magic
+ * number does: the beach crowd (`42-crowd.js`, instanced bathers, `spec 0.09`
+ * — the same 0.09 the skinned figure carries, because they are the same
+ * material intent), your own arms in the water (`60-arms.js`, drawn from
+ * `ARMS.skin`), and her horns, whose own comment says they take "her hair's
+ * own numbers, so a horn and the crest it stands in are lit by the same lobe"
+ * — and which were therefore 0.16 adrift of the crest the moment her hair
+ * moved and they did not.
+ *
+ * So it is a name. Anything made of a person points at this.
+ */
+const SKIN_EMISSIVE = 0.16;
+
+
 async function loadSkin(key, opts) {
   const b64 = PAYLOAD[key];
   if (!b64) { console.warn('no payload for skin', key); return null; }

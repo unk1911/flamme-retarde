@@ -532,6 +532,9 @@ function buildArms() {
     const mat = solidMaterial(
       new THREE.Color(...ARMS.skin), {
         spec: 0.10, specPower: 70, vcol: false,
+        // Your arms are skin, and are in fact the only skin you ever see this
+        // close. See `SKIN_EMISSIVE`.
+        emissive: SKIN_EMISSIVE,
         // The sleeve, and it is the same three fields as on the mirror figure
         // rather than a texture, for the same reason: this rig has no UVs and
         // ink on skin cannot be allowed to slide when the skin moves. vLocal is

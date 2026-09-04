@@ -155,6 +155,10 @@ function crowdLayer(scene, proto, cap) {
     instanced: true,
     spec: 0.09,
     specPower: 24,
+    // The same floor the hand-loaded skins get. These are people on the same
+    // beach as her and they carry the same `spec` for the same reason; lifting
+    // one and not the other puts two kinds of human in one frame lit two ways.
+    emissive: SKIN_EMISSIVE,
     body: `
       // The marker palette from tools/blender/bather.py. Skin is painted pure
       // white, swimwear pure black and hair pure red, and none of those is a

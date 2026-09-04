@@ -21949,6 +21949,10 @@ async function buildJadrija(scene) {
         const g = new THREE.Group();
         g.position.set(CROP.root[0], CROP.root[1], sgn * CROP.root[2]);
         const m = new THREE.Mesh(hornGeo(sgn), solidMaterial(0xffffff, {
+          // ...including the floor. This comment's own promise — that a horn
+          // and the crest it stands in are lit by the same lobe — stopped being
+          // true the moment `loadSkin` gained an emissive and this did not.
+          emissive: SKIN_EMISSIVE,
           // Her hair's own numbers, so a horn and the crest it stands in are
           // lit by the same lobe. `solidMaterial` and not the flat shade in
           // 49-you.js: that one has the sun stuck to the camera, which is
