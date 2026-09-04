@@ -1499,6 +1499,25 @@ function skinnedFigure(data, opts = {}) {
   } : {};
 
   const mat = solidMaterial(0xffffff, {
+    // SKIN IS NOT A PAINTED WALL. `solidMaterial` defaults `emissive` to 0 and
+    // no caller of this function has ever passed one, so every skinned thing in
+    // the game — her, you, the chase figure, the dog, the cat — has been lit by
+    // the sun and the sky and by nothing else. Everything they stand among
+    // carries a lift: the promenade 0.22, the kabina's interior 0.40, a shop's
+    // relief 0.28, the village 0.07. Measured in that kabina, her torso came
+    // out at **0.52 of the wall behind her** — and it made no difference which
+    // way she was facing, so it is not shading, it is the floor she was never
+    // given.
+    //
+    // The lift is also the physics rather than a cheat. Light entering skin
+    // scatters under the surface and leaves somewhere else, so a person's
+    // shadowed side is never the black a shadowed wall goes to — it is the one
+    // material in this game where a flat term added to every fragment is
+    // closer to the truth than leaving it out. 0.16, under the 0.22 the
+    // concrete they walk on already has, because they are also outdoors in
+    // full sun most of the time and the sun term has to stay the one that
+    // matters there.
+    emissive: 0.16,
     ...opts,
     defines: { FR_SKIN: '', FR_BONES: nb },
     uniforms: { uBones, uBoneRows, ...uFace, ...(opts.uniforms || {}) },

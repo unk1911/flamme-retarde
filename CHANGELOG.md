@@ -8,6 +8,49 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.206.0] — 2026-09-04
+
+### Skin is not a painted wall
+
+Turning her to face the player in 1.203.0 raised a second-order question worth
+asking of any staging change: what did it do to her light? At `standIn` the
+doorway is now behind her, so the obvious guess is that she is backlit.
+
+Measured, that guess is wrong and the truth is worse. Her torso against the wall
+behind her:
+
+```
+standIn, u = 3.20    torso 74.4   wall 142.4   0.52
+standIn, u = 0.84    torso 74.1   wall 142.4   0.52
+door,    u = 3.60    torso 64.1   wall 132.5   0.48
+```
+
+Half the room, and **the same half whichever way she is facing** — so it is not
+shading and the turn did not cause it. `solidMaterial` defaults `emissive` to 0
+and no caller of `loadSkin` has ever passed one, so every skinned thing in this
+game has been lit by the sun and the sky and by nothing else. Everything they
+stand among carries a lift and has for releases: the promenade 0.22, the
+kabina's interior 0.40, a shop's serving relief 0.28, the village 0.07. The
+room was raised until it was readable indoors and the person standing in it
+was not.
+
+**And the lift is the physics, not a cheat.** Light entering skin scatters under
+the surface and leaves somewhere else, which is why a person's shadowed side is
+never the black a shadowed wall goes to. Skin is the one material in this game
+where a flat term added to every fragment is closer to the truth than leaving it
+out.
+
+0.16 — under the 0.22 the concrete they walk on already has, because they are
+outdoors in full sun most of the time and the sun term has to stay the one that
+matters there. In the kabina her torso goes **0.52 to 0.69** of the wall; at
+noon on the deck her lit and shaded sides still separate and the body keeps its
+modelling.
+
+It goes in `loadSkin` rather than at one call site, because the argument applies
+equally to all five things that use it — her, you, the chase figure, the dog and
+the cat — and lifting one of them would be the inconsistency. The beach crowd is
+untouched: the instanced bathers are built on a different path.
+
 ## [1.205.0] — 2026-09-04
 
 ### A pirouette is not held in the position you stand in
