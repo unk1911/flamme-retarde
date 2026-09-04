@@ -8,6 +8,35 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.191.0] — 2026-09-04
+
+### The room has a floor and a ceiling now
+
+Putting a lamp in the kabina last release did something I did not plan for: it
+showed me the room. Two of its six surfaces were single flat planes — a grey
+slab underfoot and a black void overhead — in **the one room in this game a
+player walks into and stands still in**. They survived that long for a good
+reason, which is that nobody could see either of them.
+
+**The floor is tiles**, which is what is under every kabina on this coast. 0.33 m
+square, laid square to the walls, each a shade off its neighbours because they
+were laid by whoever owned the hut. The grout is free: each tile is inset 11 mm
+and what shows between them is the dark slab they sit on, so a floor of a hundred
+and ninety tiles is a hundred and ninety quads and not four hundred. A strip of
+the doorstep's own stone across the threshold, which is the one tile in the room
+that is not a tile.
+
+**The ceiling is the underside of the lean-to**, because that is what it is:
+boards running the long way over joists at 0.62 m centres. In a room 1.95 m
+across it is the surface you see most of.
+
+And the tiles went in at `f + 0.005` first, which is **under** the room's own
+inner floor at `floor + 0.01`. They rendered as absolutely nothing, which looks
+exactly like a tone range that is too subtle — and cost a rebuild to tell the two
+apart.
+
+541 452 triangles to **542 116**, 60 fps.
+
 ## [1.190.0] — 2026-09-04
 
 ### She turns to present the two positions that happen behind her

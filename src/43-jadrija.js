@@ -18921,6 +18921,61 @@ async function buildJadrija(scene) {
       scene.add(glow);
     }
 
+    // ── the floor, and the ceiling ─────────────────────────────────────────
+    //
+    // Both were one flat plane, and both are at eye level in the one room in
+    // this game a player walks into and stands still in. They survived that
+    // long for a good reason — the room is deliberately dark and nobody could
+    // see either of them — and they stopped surviving it the moment there was
+    // a lamp in here.
+    //
+    // The floor is tiles, which is what is under every kabina on this coast:
+    // 0.33 m square, laid square to the walls, each one a shade off its
+    // neighbours because they were laid by whoever owned the hut. The grout is
+    // FREE — each tile is inset 8 mm and what shows between them is the dark
+    // slab they are sitting on, so a floor of a hundred and ninety tiles is a
+    // hundred and ninety quads and not four hundred.
+    {
+      const TILE = [0.395, 0.380, 0.348];
+      // f + 0.016 and not f + 0.005. `roomTS` lays the room's own inner floor
+      // at `floor + 0.01` — the tiles went in UNDER it and rendered as nothing
+      // at all, which looks exactly like a tone range that is too subtle and
+      // cost a rebuild to tell apart from one.
+      const g = 0.011, sz = 0.33, fy = f + 0.016;
+      for (let t = K.t0; t < K.t1 - 0.05; t += sz) {
+        for (let ss = K.s0; ss < K.s1 - 0.05; ss += sz) {
+          const t1 = Math.min(t + sz, K.t1), s1t = Math.min(ss + sz, K.s1);
+          const h = ((t * 3.1) | 0) * 37 + ((ss * 3.1) | 0);
+          const k = 0.86 + 0.30 * jit(h, 460);
+          b.quad(W(t + g, ss + g, fy), W(t1 - g, ss + g, fy),
+            W(t1 - g, s1t - g, fy), W(t + g, s1t - g, fy),
+            [TILE[0] * k, TILE[1] * k, TILE[2] * k]);
+        }
+      }
+      // And the threshold, which is the one tile in the room that is not a
+      // tile: a strip of the same stone the doorstep outside is.
+      boxTS(K.dc - K.dj, K.dc + K.dj, K.s0 - 0.02, K.s0 + 0.16,
+        f + 0.010, f + 0.022, [0.470, 0.452, 0.420]);
+    }
+    // The ceiling is the underside of the lean-to, because that is what it is:
+    // joists across the short way at 0.62 and boards running over them. Drawn
+    // downward from `K.top`, so nothing here can argue with the slab above.
+    {
+      const cy = K.top - 0.012;
+      const BOARD = [0.235, 0.180, 0.125], JOIST = [0.180, 0.135, 0.092];
+      for (let ss = K.s0; ss < K.s1 - 0.04; ss += 0.235) {
+        const s1t = Math.min(ss + 0.222, K.s1);
+        const k = 0.88 + 0.26 * jit(((ss * 4.3) | 0) * 11, 470);
+        b.quad(W(K.t1, ss, cy), W(K.t0, ss, cy),
+          W(K.t0, s1t, cy), W(K.t1, s1t, cy),
+          [BOARD[0] * k, BOARD[1] * k, BOARD[2] * k]);
+      }
+      for (let ss = K.s0 + 0.42; ss < K.s1 - 0.2; ss += 0.62) {
+        boxTS(K.t0, K.t1, ss - 0.032, ss + 0.032, cy - 0.075, cy, JOIST,
+          shade(JOIST, 1.18));
+      }
+    }
+
     // ── the lamp over the tabouret ─────────────────────────────────────────
     //
     // The note over `KIT` says the television and the radio dial are the only
