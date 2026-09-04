@@ -8,6 +8,32 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.225.0] — 2026-09-04
+
+### She walks off the barre now instead of vanishing off it
+
+Misha: *"after NPC baye done doing her ballet practice, she seems to teleport
+somewhere."* She did. Measured by driving a ballet from a probe and watching the
+step size frame by frame: **6.21 m in a single frame**, on the first frame after
+the fifteen seconds end.
+
+Nothing was wrong with the ballet or with what follows it. The barre is a swim
+ladder and her mark at it is s 0.30, right at the water. Her wander lane starts
+at `SHOW.lane[0]`, which is 6.4. `play` moves her with `showMove`, and
+`showMove` clamps to the lane as a backstop — so the frame `play` took over, the
+clamp ate the whole 6.1 m at once. She was standing somewhere the wander is not
+allowed to be, and a backstop is not a walk.
+
+So there is now an `offBar` phase, and she walks back the way she came in.
+`toBar` goes out through `lane[0] − 1.2`; this comes back to `lane[0] + 0.5`,
+half a metre inside the lane, so the clamp has nothing left to do when `play`
+resumes. Same probe, same ballet, after: **biggest step 0.60 m in a quarter of a
+second**, which is her walking pace and nothing else. She takes 5.7 s to come up
+the beach.
+
+It is one phase and not a general rule because there is nowhere else this can
+happen: every other thing that takes her out of the lane walks her back itself.
+
 ## [1.224.0] — 2026-09-04
 
 ### Oh look, bars — she takes the hint now

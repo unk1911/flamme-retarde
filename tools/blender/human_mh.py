@@ -3224,7 +3224,7 @@ def post_preview(J, body):
 
 
 def export_skin(body, rig, path, clips, tris=26000, J=None, post=True,
-                repaint=None, dense=None):
+                repaint=None, dense=None, wear=None):
     """Write the figure as a .fr3d **v4** blob: mesh, skeleton and clips.
 
     v1 froze the armature into the vertices, which is why the promenade got a
@@ -3246,6 +3246,15 @@ def export_skin(body, rig, path, clips, tris=26000, J=None, post=True,
     the decimator has to be told to leave alone. Together they are what a figure
     whose paint is finer than its mesh needs; see the notes at the decimator and
     at `hem_group`, and for why neither is simply always on.
+
+    `wear` is a garment, and it is the answer to the question those two are the
+    best available *wrong* answer to. It is called as `wear(mesh, out)` with the
+    undecimated mesh and the same four buffers `post_geometry` fills, appends
+    triangles to them, and returns how many vertices it added; every one of them
+    is skinned off the body underneath rather than pinned to a bone, which is
+    what lets a bikini strap cross a shoulder. See `swimsuit` in
+    tools/blender/bathers_mh.py, and the note over `SUITS` there for why a
+    swimsuit stopped being paint.
     """
     rest = _rest_locals(rig)
     bindex = {name: i for i, (name, _p, _l, _g) in enumerate(rest)}
@@ -3416,6 +3425,17 @@ def export_skin(body, rig, path, clips, tris=26000, J=None, post=True,
             J, _js, _jd = read_joints(fetch())
         npos, nnrm, ncol, nbone, ntri, nshed = post_geometry(
             J, src, body.data, bindex)
+    if wear:
+        # After the lay-on pass and never before it, because `nshed` counts from
+        # the *tail* of the index buffer: anything appended behind a shed run
+        # silently becomes part of it and gets taken off when she catches fire.
+        # No figure has both today; the assert is here so that the day one does
+        # is a stop and not a bikini that burns off.
+        assert not nshed, "a garment cannot be laid on behind a shed run"
+        buf = (list(npos), list(nnrm), list(ncol), list(ntri))
+        n = wear(body.data, buf)
+        npos, nnrm, ncol, ntri = buf
+        nbone = list(nbone) + [None] * n
     # A laid-on vertex with `None` for its bone is SKINNED rather than pinned:
     # it takes the four influences off the body vertices nearest to it, blended
     # by inverse distance. That is the whole of what lets a boot span an ankle.

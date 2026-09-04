@@ -25566,9 +25566,40 @@ async function buildJadrija(scene) {
         if (done) {
           show.barCool = SHOW.barreCool;
           showSay('trill', d);
-          showNext();
+          go('offBar', 'walk', 0.42);
         }
         break;
+
+      // AND THE WALK BACK OFF IT, which is a phase and not a formality.
+      //
+      // Reported 4 Sep: *"after NPC baye done doing her ballet practice, she
+      // seems to teleport somewhere"*. She did, and it measured 6.21 m in a
+      // single frame. Nothing was wrong with the ballet or with `showNext`:
+      // the barre is a swim ladder and her mark at it is s 0.30, right at the
+      // water, while the wander lane starts at `SHOW.lane[0]`, which is 6.4.
+      // `play` moves her with `showMove`, and `showMove` CLAMPS to the lane as
+      // a backstop — so the first frame after the ballet took her from the
+      // water's edge to the lane edge in one step. She was simply standing
+      // somewhere the wander is not allowed to be, and a backstop is not a
+      // walk.
+      //
+      // So she walks back the way she came in. `toBar` goes out through
+      // `lane[0] - 1.2`; this comes back to `lane[0] + 0.5`, half a metre
+      // INSIDE the lane, so that the clamp has nothing left to do on the frame
+      // `play` takes over. Anywhere else this can happen the phase that put her
+      // there brings her back — `come` walks out of the kabina, `wheel` never
+      // leaves the lane — which is why the fix is one phase and not a rule.
+      case 'offBar': {
+        if (!show.bar) { showNext(); break; }
+        show.played += dt;
+        const dist = showTo(show.bar[0], SHOW.lane[0] + 0.5, dt, 0.85);
+        // Six seconds against the two and a half the seven metres actually
+        // cost, because `showClear` can hold her off a blocker indefinitely and
+        // a figure stuck on the water's edge for the rest of the session is a
+        // worse bug than the one this fixes.
+        if (dist < 0.35 || show.tmr > 6) showNext();
+        break;
+      }
 
       case 'aim':
         // Still walking, but now down the promenade and turning her shoulders
@@ -27762,7 +27793,7 @@ async function buildJadrija(scene) {
         show.phase = phase; show.tmr = 0; show.held = 0; show.pour = 0;
         // So that `put(t, s, 'toBar')` from a probe behaves the way the dice
         // do — `barreAt` is hoisted out of `stepShow` for exactly this.
-        if (phase === 'toBar' || phase === 'ballet') {
+        if (phase === 'toBar' || phase === 'ballet' || phase === 'offBar') {
           show.bar = barreAt(t, s) || barreAt(show.t, show.s);
           show.leg = show.s < SHOW.lane[0] ? 1 : 0;
         }
@@ -27780,7 +27811,8 @@ async function buildJadrija(scene) {
           wheel: 'cartwheel', flip: 'flip',
           // The barre. `toBar` is the walk there and shares the walk's clip;
           // `ballet` is the fifteen seconds themselves.
-          toBar: 'walk', ballet: 'ballet' }[phase] || 'idle', { fade: 0 });
+          toBar: 'walk', ballet: 'ballet', offBar: 'walk' }[phase]
+          || 'idle', { fade: 0 });
         // And the latch, for every phase that is downstream of it. Set rather
         // than eased, for the reason `shorn` above exists.
         if (phase !== 'flare' && MUSIC[phase]) {
