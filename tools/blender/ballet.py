@@ -115,8 +115,18 @@ def arm(p, side, name):
     return p
 
 
+# BALLET HANDS. New with the finger bones, and cheap: a dancer's hand is never
+# a splayed paddle. The fingers keep a soft curve with the index a shade
+# straighter than the rest and the thumb carried in toward the middle finger,
+# and it is the difference between an arm in fifth and a traffic policeman.
+# 22 degrees of curl and 18 of thumb — enough to read at three metres, nowhere
+# near the 110 the wine's grip wants.
+HAND_SOFT = {"fingersL": (-22.0, 0.0, 0.0), "fingersR": (-22.0, 0.0, 0.0),
+             "thumbL": (-18.0, 0.0, 0.0), "thumbR": (-18.0, 0.0, 0.0)}
+
+
 def pose(**kw):
-    return dict(BASE, **kw)
+    return dict(BASE, **HAND_SOFT, **kw)
 
 
 # ── fitting, because the Euler order makes guessing hopeless ─────────────────
@@ -674,7 +684,8 @@ def fit(argv):
 
 ORDER = ("spine01", "spine02", "spine03", "chest", "neck", "head",
          "clavicleL", "clavicleR",
-         "armUL", "armLL", "handL", "armUR", "armLR", "handR",
+         "armUL", "armLL", "handL", "thumbL", "fingersL",
+         "armUR", "armLR", "handR", "thumbR", "fingersR",
          "legUL", "legLL", "footL", "toeL", "legUR", "legLR", "footR", "toeR")
 
 

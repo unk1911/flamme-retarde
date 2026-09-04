@@ -1898,9 +1898,32 @@ def _bake_clip(rest, spec):
         # this matrix survives — `rt` below carries the root bone's position
         # and is not touched by `W` — so the body turns about the root joint,
         # which is where a cartwheel turns.
+        # `@turn` is the same idea about the VERTICAL, and the pirouette needs
+        # it for the same reason the cartwheel needs `@roll`.
+        #
+        # The spin used to be written on the pelvis's own Y — `_spin` in the
+        # ballet block — on the assumption that a root bone's local Y, which
+        # runs along it, is a clean yaw. It is not, and the note above already
+        # says why: this bone runs from the hip up to spine-4, **twenty-seven
+        # degrees off vertical**. Twisting about it sweeps her up-axis round a
+        # 27-degree cone, so at a third of a turn she is leaning and at half a
+        # turn she is 54 degrees over. What the clip played was not a pirouette,
+        # it was a slow topple, and photographed at 9.2 s and 9.8 s it is the
+        # ugliest thing in the fifteen seconds.
+        #
+        # `_lowest` does not need to know about this one. A rotation about the
+        # vertical leaves every z where it was, so the floor pass is unaffected
+        # — which is also why the spun copies of a key now floor to the same
+        # root as the key they were spun from, instead of each finding its own
+        # because the tilt had put a different limb lowest.
         roll = blended.get("@roll", (0.0,))[0]
-        W = (Matrix.Rotation(math.radians(roll), 4, Vector((-1.0, 0.0, 0.0)))
-             if roll else None)
+        turn = blended.get("@turn", (0.0,))[0]
+        W = None
+        if roll:
+            W = Matrix.Rotation(math.radians(roll), 4, Vector((-1.0, 0.0, 0.0)))
+        if turn:
+            T = Matrix.Rotation(math.radians(turn), 4, Vector((0.0, 0.0, 1.0)))
+            W = T if W is None else T @ W
         quats = []
         for bi, (name, _parent, local_b, local_g) in enumerate(rest):
             rot = blended.get(name)
@@ -5887,9 +5910,13 @@ BAL_PLIE = dict(IDLE_A, **{
     "armUL": (6.0, 8.0, 26.0),
     "armLL": (-32.0, -10.0, 30.0),
     "handL": (0.0, 8.0, 22.0),
+    "thumbL": (-18.0, 0.0, 0.0),
+    "fingersL": (-22.0, 0.0, 0.0),
     "armUR": (6.0, -8.0, -26.0),
     "armLR": (-32.0, 10.0, -30.0),
     "handR": (0.0, -8.0, -22.0),
+    "thumbR": (-18.0, 0.0, 0.0),
+    "fingersR": (-22.0, 0.0, 0.0),
     "legUL": (-24.0, -45.0, 11.0),
     "legLL": (52.0, 0.0, 0.0),
     "footL": (27.0, 0.0, 0.0),
@@ -5911,9 +5938,13 @@ BAL_RELEVE = dict(IDLE_A, **{
     "armUL": (-155.0, -12.0, 60.0),
     "armLL": (-5.0, -12.0, 55.0),
     "handL": (-21.0, -10.0, 9.0),
+    "thumbL": (-18.0, 0.0, 0.0),
+    "fingersL": (-22.0, 0.0, 0.0),
     "armUR": (-155.0, 12.0, -60.0),
     "armLR": (-5.0, 12.0, -55.0),
     "handR": (-21.0, 10.0, -9.0),
+    "thumbR": (-18.0, 0.0, 0.0),
+    "fingersR": (-22.0, 0.0, 0.0),
     "legUL": (0.0, -44.0, 11.0),
     "legLL": (0.0, 0.0, 0.0),
     "footL": (-32.0, 0.0, 0.0),
@@ -5935,9 +5966,13 @@ BAL_PIROU = dict(IDLE_A, **{
     "armUL": (-35.0, 9.0, 5.0),
     "armLL": (-10.0, 14.0, 56.0),
     "handL": (-21.0, 16.0, 30.0),
+    "thumbL": (-18.0, 0.0, 0.0),
+    "fingersL": (-22.0, 0.0, 0.0),
     "armUR": (-35.0, -9.0, -5.0),
     "armLR": (-10.0, -14.0, -56.0),
     "handR": (-21.0, -16.0, -30.0),
+    "thumbR": (-18.0, 0.0, 0.0),
+    "fingersR": (-22.0, 0.0, 0.0),
     "legUL": (0.0, -44.0, 14.0),
     "legLL": (0.0, 0.0, 0.0),
     "footL": (-32.0, 0.0, 0.0),
@@ -5959,9 +5994,13 @@ BAL_PIQUE = dict(IDLE_A, **{
     "armUL": (-155.0, -12.0, 60.0),
     "armLL": (-5.0, -12.0, 55.0),
     "handL": (-21.0, -10.0, 9.0),
+    "thumbL": (-18.0, 0.0, 0.0),
+    "fingersL": (-22.0, 0.0, 0.0),
     "armUR": (2.0, 12.0, 19.0),
     "armLR": (-2.0, -0.0, 7.0),
     "handR": (-19.0, 1.0, -21.0),
+    "thumbR": (-18.0, 0.0, 0.0),
+    "fingersR": (-22.0, 0.0, 0.0),
     "legUL": (0.0, -44.0, 14.0),
     "legLL": (0.0, 0.0, 0.0),
     "footL": (-32.0, 0.0, 0.0),
@@ -5983,9 +6022,13 @@ BAL_ATTITUDE = dict(IDLE_A, **{
     "armUL": (-155.0, -12.0, 60.0),
     "armLL": (-5.0, -12.0, 55.0),
     "handL": (-21.0, -10.0, 9.0),
+    "thumbL": (-18.0, 0.0, 0.0),
+    "fingersL": (-22.0, 0.0, 0.0),
     "armUR": (2.0, 12.0, 19.0),
     "armLR": (-2.0, -0.0, 7.0),
     "handR": (-19.0, 1.0, -21.0),
+    "thumbR": (-18.0, 0.0, 0.0),
+    "fingersR": (-22.0, 0.0, 0.0),
     "legUL": (0.0, -44.0, 14.0),
     "legLL": (0.0, 0.0, 0.0),
     "footL": (-32.0, 0.0, 0.0),
@@ -6007,9 +6050,13 @@ BAL_ARABESQUE = dict(IDLE_A, **{
     "armUL": (-91.0, -12.0, 6.0),
     "armLL": (-2.0, -14.0, 14.0),
     "handL": (-21.0, 12.0, 28.0),
+    "thumbL": (-18.0, 0.0, 0.0),
+    "fingersL": (-22.0, 0.0, 0.0),
     "armUR": (59.0, -12.0, -24.0),
     "armLR": (-2.0, -13.0, -18.0),
     "handR": (-15.0, -16.0, 10.0),
+    "thumbR": (-18.0, 0.0, 0.0),
+    "fingersR": (-22.0, 0.0, 0.0),
     "legUL": (0.0, -44.0, 14.0),
     "legLL": (0.0, 0.0, 0.0),
     "footL": (-32.0, 0.0, 0.0),
@@ -6031,9 +6078,13 @@ BAL_DEVELOPPE = dict(IDLE_A, **{
     "armUL": (-155.0, -12.0, 60.0),
     "armLL": (-5.0, -12.0, 55.0),
     "handL": (-21.0, -10.0, 9.0),
+    "thumbL": (-18.0, 0.0, 0.0),
+    "fingersL": (-22.0, 0.0, 0.0),
     "armUR": (2.0, 12.0, 19.0),
     "armLR": (-2.0, -0.0, 7.0),
     "handR": (-19.0, 1.0, -21.0),
+    "thumbR": (-18.0, 0.0, 0.0),
+    "fingersR": (-22.0, 0.0, 0.0),
     "legUL": (0.0, -44.0, 14.0),
     "legLL": (0.0, 0.0, 0.0),
     "footL": (-32.0, 0.0, 0.0),
@@ -6055,9 +6106,13 @@ BAL_STAND = dict(IDLE_A, **{
     "armUL": (6.0, 8.0, 26.0),
     "armLL": (-32.0, -10.0, 30.0),
     "handL": (0.0, 8.0, 22.0),
+    "thumbL": (-18.0, 0.0, 0.0),
+    "fingersL": (-22.0, 0.0, 0.0),
     "armUR": (6.0, -8.0, -26.0),
     "armLR": (-32.0, 10.0, -30.0),
     "handR": (0.0, -8.0, -22.0),
+    "thumbR": (-18.0, 0.0, 0.0),
+    "fingersR": (-22.0, 0.0, 0.0),
     "legUL": (0.0, -44.0, 11.0),
     "legLL": (0.0, 0.0, 0.0),
     "footL": (0.0, 0.0, 0.0),
@@ -6079,9 +6134,13 @@ BAL_HOLD = dict(IDLE_A, **{
     "armUL": (11.0, 12.0, 8.0),
     "armLL": (-2.0, -14.0, 24.0),
     "handL": (-4.0, 17.0, 17.0),
+    "thumbL": (-18.0, 0.0, 0.0),
+    "fingersL": (-22.0, 0.0, 0.0),
     "armUR": (6.0, -8.0, -26.0),
     "armLR": (-32.0, 10.0, -30.0),
     "handR": (0.0, -8.0, -22.0),
+    "thumbR": (-18.0, 0.0, 0.0),
+    "fingersR": (-22.0, 0.0, 0.0),
     "legUL": (0.0, -44.0, 11.0),
     "legLL": (0.0, 0.0, 0.0),
     "footL": (0.0, 0.0, 0.0),
@@ -6103,9 +6162,13 @@ BAL_PLIE_B = dict(IDLE_A, **{
     "armUL": (-4.0, 12.0, -18.0),
     "armLL": (-9.0, 14.0, 60.0),
     "handL": (-19.0, 20.0, -10.0),
+    "thumbL": (-18.0, 0.0, 0.0),
+    "fingersL": (-22.0, 0.0, 0.0),
     "armUR": (2.0, 12.0, 19.0),
     "armLR": (-2.0, -0.0, 7.0),
     "handR": (-19.0, 1.0, -21.0),
+    "thumbR": (-18.0, 0.0, 0.0),
+    "fingersR": (-22.0, 0.0, 0.0),
     "legUL": (-24.0, -45.0, 11.0),
     "legLL": (52.0, 0.0, 0.0),
     "footL": (27.0, 0.0, 0.0),
@@ -6127,9 +6190,13 @@ BAL_RETIRE = dict(IDLE_A, **{
     "armUL": (-155.0, -12.0, 60.0),
     "armLL": (-5.0, -12.0, 55.0),
     "handL": (-21.0, -10.0, 9.0),
+    "thumbL": (-18.0, 0.0, 0.0),
+    "fingersL": (-22.0, 0.0, 0.0),
     "armUR": (2.0, 12.0, 19.0),
     "armLR": (-2.0, -0.0, 7.0),
     "handR": (-19.0, 1.0, -21.0),
+    "thumbR": (-18.0, 0.0, 0.0),
+    "fingersR": (-22.0, 0.0, 0.0),
     "legUL": (0.0, -44.0, 14.0),
     "legLL": (0.0, 0.0, 0.0),
     "footL": (-32.0, 0.0, 0.0),
@@ -6144,20 +6211,46 @@ BAL_RETIRE = dict(IDLE_A, **{
 def _spin(p, deg):
     """The same pose, turned `deg` about her own axis.
 
-    The pirouette's revolution lives in `pelvis` y — the pelvis is the root
-    bone and its local Y runs up the body, so a rotation there yaws the whole
-    figure, legs included, which is what pivoting on the ball of one foot is.
-    Doing it this way means the game does not have to know a pirouette from a
-    plie: it plays a clip and she turns.
+    The pirouette's revolution is `@turn`, a rotation of the root in ARMATURE
+    space about the vertical, which the exporter applies — so the game does not
+    have to know a pirouette from a plie: it plays a clip and she turns.
+
+    IT USED TO BE WRITTEN ON `pelvis` y, on the reasoning that the pelvis is
+    the root bone and its local Y runs up the body. That reasoning is wrong and
+    the same file says so forty lines above `@roll`: this bone runs from the hip
+    to spine-4 and is **27 degrees off vertical**. Twisting about it sweeps her
+    up-axis round a 27-degree cone — a third of a turn in she is leaning, half a
+    turn in she is 54 degrees over — so what played was a topple, not a turn.
 
     Everything AFTER the turn carries 360 rather than going back to nought. A
     key at 0 following a key at 360 unwinds her the whole way round again in
     half a second; baked to quaternions, 360 and 0 are the same attitude, so
     the cost of carrying it is nothing.
     """
+    return dict(p, **{"@turn": (deg,)})
+
+
+def _look(p, deg):
+    """Her head, turned `deg` about her own spine. This is the SPOT.
+
+    A pirouette is not a body revolving with a head on it. The head holds on a
+    fixed point out in front for as long as the neck allows, then whips round
+    ahead of the body and picks the same point up again — it is what stops a
+    dancer falling over and it is the single most recognisable thing about the
+    step. Without it, what a spinning figure reads as is a mannequin on a
+    turntable, which is exactly what this was.
+
+    Split 36/64 between the neck and the head because a person's does: about a
+    third of cervical rotation is below the atlas. Sixty degrees total is the
+    honest limit and it is what the keys ask for — the body goes round in three
+    steps of 120, so the head can hold the front to a third of a turn, whip
+    120 across the middle third, and arrive with the body.
+    """
     q = dict(p)
-    r = p.get("pelvis", (0.0, 0.0, 0.0))
-    q["pelvis"] = (r[0], deg, r[2])
+    n = p.get("neck", (0.0, 0.0, 0.0))
+    h = p.get("head", (0.0, 0.0, 0.0))
+    q["neck"] = (n[0], n[1] + deg * 0.36, n[2])
+    q["head"] = (h[0], h[1] + deg * 0.64, h[2])
     return q
 
 
@@ -6171,7 +6264,8 @@ BALLET_KEYS = [
     (3.15, BAL_RELEVE), (3.90, BAL_RELEVE), (4.55, BAL_STAND),
     (5.25, BAL_RETIRE), (6.00, BAL_DEVELOPPE), (6.75, BAL_DEVELOPPE),
     (7.45, BAL_STAND), (8.10, BAL_PIQUE), (8.75, BAL_PIROU),
-    (9.20, _spin(BAL_PIROU, 120)), (9.65, _spin(BAL_PIROU, 240)),
+    (9.20, _spin(_look(BAL_PIROU, -60), 120)),
+    (9.65, _spin(_look(BAL_PIROU, 60), 240)),
     (10.10, _spin(BAL_PIROU, 360)), (10.70, _spin(BAL_STAND, 360)),
     (11.45, _spin(BAL_ATTITUDE, 360)), (12.15, _spin(BAL_ATTITUDE, 360)),
     (12.90, _spin(BAL_ARABESQUE, 360)), (13.65, _spin(BAL_ARABESQUE, 360)),

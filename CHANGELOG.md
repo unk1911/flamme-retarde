@@ -8,6 +8,44 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.178.0] — 2026-09-04
+
+### The pirouette was a topple, and she has ballet hands
+
+*"sometimes she stands kinda crooked or weird between/inside the positions."*
+The stance was the last release. This is the *inside*, and it is one line.
+
+**`_spin` wrote the pelvis's own Y**, on the reasoning that the pelvis is the
+root bone and a root bone's local Y runs up the body, so a rotation there is a
+yaw. That reasoning is wrong, and this same file already says so, forty lines
+above `@roll`, in a note written when the cartwheel hit it: **the pelvis bone
+runs from the hip up to spine-4, twenty-seven degrees off vertical.** Twisting
+about it sweeps her up-axis round a 27° cone — a third of a turn in she is
+leaning, half a turn in she is 54° over. What the clip played was not a
+pirouette, it was a slow topple, and photographed at 9.2 s and 9.8 s it was the
+ugliest thing in the fifteen seconds.
+
+`@turn` is the fix and it is `@roll`'s twin: a rotation of the root in armature
+space, about the vertical instead of about the fore-and-aft axis, applied by the
+exporter so the game still does not have to know a pirouette from a plié. The
+floor pass does not need to know about it either — a rotation about the vertical
+leaves every z where it was — which is also why the spun copies of a key now
+floor to the same root as the key they came from, instead of each finding its
+own because the tilt had put a different limb lowest.
+
+**And she spots.** A pirouette is not a body revolving with a head on it: the
+head holds a point out in front for as long as the neck allows, then whips round
+ahead of the body and picks the same point up again. It is what stops a dancer
+falling over and it is the one thing everybody recognises about the step.
+Sixty degrees, split 36/64 between the neck and the head because a person's
+cervical rotation is — the body goes round in three steps of 120°, so the head
+holds the front through the first third, whips 120° across the middle, and
+arrives with her.
+
+**Ballet hands**, which the finger bone from the last release makes possible: a
+soft 22° curve with the thumb carried in at 18°, on every key. A dancer's hand
+is never a splayed paddle, and until yesterday this rig had no way to say so.
+
 ## [1.177.0] — 2026-09-04
 
 ### The awnings sag, the roofs have a plant deck, and there is something on the tables
