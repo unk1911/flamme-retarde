@@ -633,13 +633,39 @@ async function buildJadrija(scene) {
    * climb with the hill, and a band 7 m wide asked once at its seaward edge
    * is a shelf that the terrain comes through half way along.
    */
-  function ribbon(s0, s1, yOf, col, nS = 1) {
+  /**
+   * A band of the shore, drawn station to station.
+   *
+   * `cut` is the saw-cut spacing ALONG the shore, and it is a guard rather than
+   * a fix — measured, it adds **zero** triangles to this coastline, because the
+   * traced shore already puts its stations about 3.6 m apart and
+   * `round(3.6 / 3.6)` is 1. It is here so that the size of a poured bay stops
+   * being whatever the coastline trace happened to hand over: if that ever
+   * comes back coarser, the slab still gets cut into bays a person could stand
+   * on rather than into panels the length of a bus.
+   *
+   * What was actually wrong with this surface was the colour, not the mesh.
+   * See `conc`. The third argument to `col` is a key unique per bay, which is
+   * what that needed and could not get: the old signature could only say which
+   * STATION a quad belonged to, and every course from the water to the flags
+   * shared it.
+   */
+  function ribbon(s0, s1, yOf, col, nS = 1, cut = 0) {
     for (let i = 0; i < ST.length - 1; i++) {
       const a = ST[i], c = ST[i + 1];
-      for (let k = 0; k < nS; k++) {
-        const u = s0 + (s1 - s0) * (k / nS), v = s0 + (s1 - s0) * ((k + 1) / nS);
-        b.quad(pt(a, u, yOf(a, u)), pt(c, u, yOf(c, u)),
-          pt(c, v, yOf(c, v)), pt(a, v, yOf(a, v)), col(i, (u + v) * 0.5));
+      const nT = cut > 0 ? Math.max(1, Math.round((c.t - a.t) / cut)) : 1;
+      for (let j = 0; j < nT; j++) {
+        // `at` rather than a lerp of the two stations: it already carries the
+        // three level heights and is the one place that knows how to make a
+        // station out of an arc length.
+        const A = nT === 1 ? a : at(a.t + (c.t - a.t) * (j / nT));
+        const C = nT === 1 ? c : at(a.t + (c.t - a.t) * ((j + 1) / nT));
+        for (let k = 0; k < nS; k++) {
+          const u = s0 + (s1 - s0) * (k / nS), v = s0 + (s1 - s0) * ((k + 1) / nS);
+          b.quad(pt(A, u, yOf(A, u)), pt(C, u, yOf(C, u)),
+            pt(C, v, yOf(C, v)), pt(A, v, yOf(A, v)),
+            col(i, (u + v) * 0.5, (i * 8 + j) * 4 + k));
+        }
       }
     }
   }
@@ -852,14 +878,37 @@ async function buildJadrija(scene) {
    * resort's ground and the terrain's does not show. See the note over it.
    */
   const shore = (i, s) => mixc(SHINGLE[i % 4], LITTER[i % 3], sat((s - 9) / 9));
-  const bay = (i, s = 0) => mixc(CONC[i % 3], shore(i, s), beachAt(i));
-  const bayIn = (i, s = 0) => mixc(CONC[(i + 2) % 3], shore(i + 1, s), beachAt(i));
+  /**
+   * The colour of one poured bay.
+   *
+   * `CONC[i % 3]` was a three-entry cycle indexed by the shore STATION, which
+   * is two faults in one expression: it repeats with a period of three down all
+   * 572 m, and it does not vary across the band at all, so a whole course of
+   * slab from the water to the flags took one colour. What that draws is
+   * stripes running inland on a three-beat — and the note over the shop roofs
+   * has already been through why a regular pattern is worse than no pattern.
+   *
+   * Now it hashes on the bay's own key, and takes a second hash for the
+   * brightness, because two bays poured the same week out of the same batch
+   * still are not the same colour and the ones on this promenade were not
+   * poured the same decade. Six per cent either way: enough that the grid of
+   * saw-cuts reads as a grid of separate pours, nowhere near enough to read as
+   * dirt.
+   */
+  const conc = (key, pal) => {
+    const c = pal[(jit(key, 41) * pal.length) | 0] || pal[0];
+    const g = 0.92 + jit(key, 77) * 0.16;
+    return [c[0] * g, c[1] * g, c[2] * g];
+  };
+  const bay = (i, s = 0, key = i) => mixc(conc(key, CONC), shore(i, s), beachAt(i));
+  const bayIn = (i, s = 0, key = i) =>
+    mixc(conc(key + 3, CONC), shore(i + 1, s), beachAt(i));
   const duff = (i) => LITTER[i % 3];
 
   // The three levels, seaward to inland, then the quay wall down into the water.
-  ribbon(0, JAD.lip, lipOf, bay);
+  ribbon(0, JAD.lip, lipOf, bay, 1, 3.6);
   riser(JAD.lip, lipOf, midOf, bayIn);
-  ribbon(JAD.lip, JAD.mid, midOf, bayIn);
+  ribbon(JAD.lip, JAD.mid, midOf, bayIn, 2, 3.6);
   riser(JAD.mid, midOf, deckOf, bay);
   // The promenade, and then the ground behind the back row, which is not
   // promenade. The concrete on this shore stops a stride behind the last hut
@@ -874,7 +923,7 @@ async function buildJadrija(scene) {
   const walkTo = JAD.rowA + JAD.cabD + 1.0;
   // Poured slab by the water, flags inland of it, and a straight seam between.
   const PAVE = Math.min(walkTo - 1.5, JAD.mid + 7.5);
-  ribbon(JAD.mid, PAVE, deckOf, bay, 2);
+  ribbon(JAD.mid, PAVE, deckOf, bay, 2, 3.6);
   // And the flags go to shingle over the sand for the same reason the slab
   // does. The crazy paving used to run the full 572 m, which was invisible
   // while the western end of it was a metre under the hillside; lift it on to

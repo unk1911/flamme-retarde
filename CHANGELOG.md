@@ -8,6 +8,50 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.201.0] — 2026-09-04
+
+### The promenade was striped on a three-beat
+
+Walked the shore at eye height looking for the flattest thing left in it, then
+looked down at what a walker actually spends the time looking at. The paving
+inland — the crazy-paved limestone flags — reads: sampled along a line, its
+luminance steps by **36 levels out of 255** between one stone and the next. The
+poured slab seaward of it, which is the wider band, the more-walked band and
+571 metres of it, steps by **4**. It is a grey sheet.
+
+The cause is one expression:
+
+```js
+const bay = (i, s = 0) => mixc(CONC[i % 3], shore(i, s), beachAt(i));
+```
+
+`CONC` has three entries and `i` is the shore STATION, so the colour repeats on
+a three-beat down the whole coast — and it does not take `s` into account at
+all, so a whole course of slab from the water's edge to the flags takes one
+value. What that draws is not bays. It is stripes running inland, on a
+three-beat, in three tones that differ by twelve per cent. The note over the
+shop roofs has already been through why a regular pattern is worse than no
+pattern; this is the same trap in the largest surface in the resort.
+
+It hashes per bay now, and takes a second hash for the brightness, because two
+bays poured the same week out of the same batch are not the same colour and the
+ones on this promenade were not poured the same decade. Eight per cent either
+way on top of the palette's own twelve: enough that the saw-cut grid reads as a
+grid of separate pours from the deck and from fourteen metres up, and little
+enough that from 180 m it is still a promenade and not a chessboard — which is
+the constraint that matters here, because this is a game you fly over.
+
+**And a correction to my own first account of it.** The obvious diagnosis was
+that the bays were too big and the slab needed subdividing, so `ribbon` gained a
+`cut` argument that splits each station pair into bays of a set length. Measured
+after: the deck mesh is **39,564 triangles, exactly what it was**. `cut` at
+3.6 m is inert on this coastline, because the traced shore already lands its
+stations about 3.6 m apart. The geometry was right the whole time and only the
+colour was wrong. The argument stays — it is a guard, so that the size of a
+poured bay stops depending on what the coastline trace happens to hand over —
+and it is documented as adding nothing here rather than as having fixed
+something.
+
 ## [1.200.0] — 2026-09-04
 
 ### Two and a third seconds in which she moved by 0.9 degrees
