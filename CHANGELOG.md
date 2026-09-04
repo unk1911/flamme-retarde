@@ -8,6 +8,53 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.203.0] — 2026-09-04
+
+### Every pass on this pour was shot from a door nobody stands in
+
+Six passes have gone into this pour and all six were photographed from the
+kabina's doorway, because the note over `kit.wine` says the doorway is *"the one
+place in this room you ever watch this from"*. It is not. `standIn` is — that is
+the mark the crossing puts you on, and it is inside the room, 1.9 m from her.
+
+Shot from there for the first time, the whole seven and a half seconds is **her
+back**. She pours on her right; the standing mark is on her left; her body is
+between the player and the entire action.
+
+Scored from six points in the room against her own axes — `fwd` along her
+facing, `rt` toward the side she pours on:
+
+```
+door      fwd +1.00  rt +0.07   front, pour side, 2.6 m
+standIn   fwd +0.13  rt -0.99   side,  BLIND side, 1.8 m
+mid       fwd +0.91  rt -0.41   front, BLIND side, 1.1 m
+back      fwd -0.45  rt -0.90   back,  BLIND side, 3.0 m
+near      fwd -0.10  rt -0.99   side,  BLIND side, 1.3 m
+```
+
+Five of six on her blind side, and the one that is not is the **threshold**. A
+millimetre-accurate palm, a gaze term that tracks the glass through six keys, a
+stream taper off the continuity law, 10.8 degrees of drift through the pour —
+all of it landing on the side of her the player cannot see.
+
+The yaw goes from **-50 to +30** and the two swap:
+
+```
+standIn   fwd +1.00  rt -0.09   dead in front of her
+door      fwd +0.30  rt +0.95   a clean side-on of the pour
+mid       fwd +0.81  rt +0.58   front, pour side
+```
+
+`standIn` now gets exactly what the old note wanted the doorway to have, and for
+the reason it gives: the sight line runs down her own fore-aft axis with the
+bottle lying across it. The door becomes a side-on of the pour, which is a
+perfectly good thing to walk past on your way in.
+
+Nothing else moved. The mark is still solved backwards from the glass, so the
+glass stays where it stands on the stool and she walks round it — from
+(425.014, 18.682) to (424.646, 18.336), 0.34 m off the stool's centre and 3.4 m
+clear of the cot.
+
 ## [1.202.0] — 2026-09-04
 
 ### Four positions she was holding perfectly still

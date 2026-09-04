@@ -19488,8 +19488,35 @@ async function buildJadrija(scene) {
       // with the bottle across it: 17 per cent of the bottle along the view
       // where it was 95. She is also facing you when you walk in, which the
       // square-to-the-shore version only half managed.
+      //
+      // AND IT IS +30 AND NOT -50, WHICH IS THE SAME ARGUMENT MADE AT THE
+      // RIGHT PLACE. Everything above is correct about the doorway and wrong
+      // about where anybody watches this from. Scored from six points inside
+      // this room against her own axes:
+      //
+      //   door     fwd +1.00  rt +0.07   front, pour side, 2.6 m
+      //   standIn  fwd +0.13  rt -0.99   side,  BLIND side, 1.8 m
+      //   mid      fwd +0.91  rt -0.41   front, BLIND side, 1.1 m
+      //   back     fwd -0.45  rt -0.90   back,  BLIND side, 3.0 m
+      //   near     fwd -0.10  rt -0.99   side,  BLIND side, 1.3 m
+      //
+      // She pours on her right. Five of the six are on her left, and the one
+      // that is not is the DOORWAY — which is a threshold you pass through,
+      // not a place you stand. `standIn` is where crossing actually puts you,
+      // and it is at rt -0.99: her body is exactly between you and the whole
+      // action. Every pass on this pour has been shot from the door, and every
+      // millimetre of a millimetre-accurate solve has been landing on the side
+      // of her the player cannot see.
+      //
+      // At +30 the two swap. `standIn` goes to fwd +1.00, rt -0.04 — dead in
+      // front of her, which is where the note above wanted the doorway to be
+      // and for the reason it gives: the sight line runs down her own fore-aft
+      // axis with the bottle lying across it. The door goes to fwd +0.01,
+      // rt +1.00, a clean side-on of the pour, which is a perfectly good thing
+      // to walk past. Nothing else moves: the mark is still solved backwards
+      // from the glass, so the glass stays on the stool and she walks round it.
       wine: (() => {
-        const a = -50 * Math.PI / 180;
+        const a = 30 * Math.PI / 180;
         const u = [Math.cos(a), Math.sin(a)], r = [u[1], -u[0]];
         // p = mark + fwd * u + right * r, solved for the mark.
         return [gt - 0.315 * u[0] - 0.235 * r[0],
