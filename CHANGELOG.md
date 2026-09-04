@@ -8,6 +8,73 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.226.0] — 2026-09-04
+
+### The bathers are wearing swimsuits now, not paint
+
+Misha, with a photograph of the slim woman on the quay: *"the bathing suits on
+the bathers are kinda crappy looking... can u fix them to look like real bathing
+suits?"* Two faults at once, and only one of them was a shape.
+
+**A painted edge cannot be a hem.** The colour lives on the vertices, so the
+boundary of a garment is whatever polyline the mesh happens to offer, and on a
+7 000-triangle figure that is a sawtooth with 25 to 50 mm teeth. Two releases
+were already spent on this from the paint side — `repaint` took the ramp from
+80 mm to one triangle, `dense` took that triangle from 50 mm to 16 — and at a
+metre and a half it still read as torn paper, because a soft edge is not what a
+garment has. There is no third lever there.
+
+**And the shape was two tubes.** A row of ellipsoid punches at bust height and
+another at the hips paints a constant-height band all the way round: a bandeau
+over a boxer short, and it reads as neither.
+
+So the suit is geometry. `swimsuit` in tools/blender/bathers_mh.py builds it,
+`export_skin` lays it on after the decimator the way the nails and the hip wrap
+already were, and every vertex of it is **skinned off the body underneath**
+rather than pinned to a bone — which is what lets a strap cross a shoulder.
+A two-piece is 584 vertices and 940 triangles; trunks are 240 and 400. The paint
+went, and `dense` with it, which hands about a tenth of the decimator's budget
+back to the body.
+
+The women get a brief and a bikini top with cups, a gore between them, a narrow
+band round the back and a strap over each shoulder. The men and the boy get
+square-cut trunks. All eight rebaked; the payload is 186 KB a figure to 194–204,
+and the page is 27.00 MB to 27.13.
+
+Four things were measured rather than written down, and each of them was a bug
+until it was:
+
+- **`spine-1` is not the bust line.** This file has claimed for a year that it
+  lands within a centimetre of it. It is 77.5 per cent of stature on the slim
+  woman, 72.7 on the full-figured one and 73.5 on the old one; the apex measured
+  off the mesh is 74.7, 69.4 and 68.7. Every band was drawn 48 to 68 mm high,
+  which is why the thing in the photograph sits across a collar bone.
+- **The hands are in front of the hips.** Taking the fore-aft axis as the middle
+  of the x range at waist height put it 230 mm forward of the slim woman's spine
+  instead of 24, because 9 400 of the 11 000 vertices at that height are two
+  hands. The wrap built about it ballooned.
+- **A max-radius profile is only the surface where the section is star-shaped.**
+  A chest is, a pair of hips is, a pair of thighs is not: below the crotch a ray
+  crosses the near thigh twice, so the biggest radius in that direction is the
+  FAR side of it, and the trunks were built round the outside of a leg they
+  should have been lying on. Casting inward and taking the first hit fixes it —
+  and shooting on through any face the arm owns is what keeps a bikini off an
+  upper arm that a ray meets 80 mm before it meets a rib.
+- **`ob.ray_cast` asks the evaluated object.** By the time `export_skin` runs it,
+  the rig has been through eight clip bakes and is standing in whatever pose the
+  last one left. Every ray would have been cast at a woman mid-cartwheel —
+  silently, and only in the bake, because the preview path poses nothing and
+  would have gone on looking right. It casts against the mesh data now.
+
+`--preview` in bathers_mh.py is the other half of the answer: it runs the real
+`swimsuit` and hangs the result on a real object, so a guess at a garment costs
+forty seconds instead of a Blender run, a ten-megabyte page build and a headless
+browser. The bandeau survived as long as it did because nobody could see it.
+
+Checked standing, walking, sitting on the quay and lying on a towel: no
+poke-through in any of them. `census` is unchanged at 446/333/86/27 and the
+frame rate has not moved.
+
 ## [1.225.0] — 2026-09-04
 
 ### She walks off the barre now instead of vanishing off it

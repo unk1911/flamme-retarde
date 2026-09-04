@@ -2,7 +2,8 @@
 
     tools/blender/blender.sh -b -P tools/blender/bathers_mh.py
     tools/blender/blender.sh -b -P tools/blender/bathers_mh.py -- --only girl_child
-    tools/blender/blender.sh -b -P tools/blender/bathers_mh.py -- --preview
+    tools/blender/blender.sh -b -P tools/blender/bathers_mh.py -- \
+        --only woman_young_slim --preview top hips whole --out /tmp/bathers
 
 Writes build/payload/bather_<name>.fr3d.gz, one per figure.
 
@@ -64,6 +65,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import bmesh  # type: ignore  # noqa: E402
 import bpy  # type: ignore  # noqa: E402
 from mathutils import Vector  # type: ignore  # noqa: E402
 from mathutils.bvhtree import BVHTree  # type: ignore  # noqa: E402
@@ -84,12 +86,16 @@ TRIS = 7000
 # blob: there is no runtime palette to ask, and no need for one. Eight payloads
 # is eight chances to be a different person.
 #
-# `kind` is what they have on. Women and the girl get briefs and a band, which
-# reads as a two-piece from ten metres and does not need to be modelled to read
-# as one; the men and the boy get trunks, which run further down the thigh. The
-# suit is *painted*, not built, which is the convention tools/blender/bather.py
-# set for the crowd it replaces — geometry that thin is a waste of triangles on
-# a figure this size and a rigging problem on any figure at all.
+# `kind` is what they have on. Women and the girl get a two-piece — a brief and
+# a bikini top with straps; the men and the boy get square-cut trunks. Both are
+# BUILT and not painted, which reverses what this file said for a year: that
+# geometry that thin is a waste of triangles and a rigging problem. It is 900
+# triangles of a 7 000 budget and the rigging is free, because a laid-on vertex
+# can be skinned off the body under it. See the long note over `swimsuit`.
+#
+# The colours are also the ones `BATHER_PAINT` in src/42-crowd.js repaints the
+# instanced stand-in with, so that nobody changes colour when you walk up to
+# them. Change one here and change it there.
 SUITS = {
     "girl_child":       ("two", (0.86, 0.31, 0.42), (0.80, 0.64, 0.53)),
     "boy_child":        ("trunks", (0.16, 0.36, 0.62), (0.72, 0.56, 0.42)),
@@ -115,131 +121,558 @@ SUITS = {
 }
 
 
-def _coat(name, mark, prev, prio, c, r, rows=12, seg=20):
-    """One paint volume, in the shape `cutters(J)` hands to `paint`.
+# ── the swimwear, which is geometry and it was paint ───────────────────────── #
+#
+# Reported 4 Sep 2026: *"the bathing suits on the bathers are kinda crappy
+# looking... can u fix them to look like real bathing suits?"* — with a photo of
+# the slim woman in what is unmistakably red tape rather than a bikini.
+#
+# It was two faults at once and only one of them was a shape.
+#
+# **A painted edge cannot be a hem.** The colour lives on the vertices, so the
+# boundary of a garment is whatever polyline the mesh happens to offer, and on a
+# 7 000-triangle figure that polyline is a sawtooth with 25 to 50 mm teeth —
+# every triangle that straddles the hem is a red tongue reaching out on to the
+# skin. Two releases were spent on this from the paint side. `repaint` took the
+# ramp from 80 mm to one triangle and `dense` took that triangle from 50 mm to
+# 16, and both are real improvements, and at 1.5 m it still reads as torn paper
+# because a soft edge is not what a garment has. There is no third lever there:
+# vertex colour cannot draw a line finer than the mesh under it.
+#
+# **And the shape was two tubes.** A row of ellipsoid punches at bust height and
+# another at hip height paints a constant-height band all the way round, which
+# is a bandeau over a boxer short and reads as neither. A brief has a rise and
+# leg openings; a bikini top has cups, a gore between them, a narrow band round
+# the back and straps over the shoulders. None of those is a ring.
+#
+# So the suit is now a surface, laid on after the decimator the way the nails
+# and the hip wrap are, and skinned off the body vertices under it rather than
+# pinned to a bone — which is what lets a strap cross a shoulder. About 900
+# triangles a figure on a 7 000 budget, and the paint that used to stand in for
+# it is gone along with the `dense` hem group that protected its edge, which
+# hands that tenth of the budget back to the body.
+#
+# Everything below is measured off the figure rather than written in metres.
+# There are 1.24 m and 1.84 m people here and a waistband written down is a
+# waistband on one of them.
 
-    Same discipline as the cutters in human_mh.py and worth restating, because
-    getting it wrong here looks like a bug in the morph rather than in the
-    paint: a cutter is a *punch*, not a garment. It runs deep and crosses the
-    surface steeply, and it is tight only in the directions that draw the
-    shape. A hip band is therefore an ellipsoid half a metre across in x and y
-    and four centimetres tall in z — nearly a cylinder where it meets the body,
-    which is what makes its edges straight. Sized to look like a pair of trunks
-    it would lie tangent to the hip and come back with a fuzzy halo.
+SWIM_GAP = 0.006          # how far the shell stands off the skin
+SWIM_SEG = 40             # segments round the body
+SWIM_ROWS = 5             # rows down a wrap, top edge to hem
+SWIM_BINS = 48            # angular resolution of the body profile
+STRAP_N = 16              # samples along a shoulder strap
+TAU = math.pi * 2.0
+
+# The arm, by bone. `_profile` takes the biggest radius it finds in each cell,
+# and at bust height the biggest thing at 90 degrees is not the ribcage, it is
+# the upper arm at 260 mm — which would put the back of the bikini out in mid
+# air. human_mh's own `_profile` fends this off with an `rlim` that works at hip
+# height and cannot work at bust height, where the arm is inboard of 300 mm on
+# every one of the eight. The body is already skinned by the time this runs, so
+# the honest test is which bone owns the vertex.
+ARM_BONES = ("armUL", "armLL", "handL", "thumbL", "fingersL",
+             "armUR", "armLR", "handR", "thumbR", "fingersR")
+
+
+def _dang(a):
+    """An angle wrapped to (-pi, pi]."""
+    return (a + math.pi) % TAU - math.pi
+
+
+def _skip(ob, names=ARM_BONES):
+    """Vertex-group indices for the arm, so a measurement can leave it out."""
+    return {g.index for g in ob.vertex_groups if g.name in names}
+
+
+def _owned(v, gskip):
+    """Is this vertex mostly owned by `gskip` — as a group, not one at a time?
+
+    The SUM and not the dominant bone, which was the first version and let the
+    whole hand through. The base mesh spends 9 400 of the 11 000 vertices at hip
+    height on two hands, and every vertex near a knuckle splits its weight
+    between `handL` and `fingersL` — neither of them over a half — so a test on
+    the biggest single bone kept them all and put the wrap's axis 230 mm forward
+    of a woman's spine.
     """
-    vs, fs = MH.ball(c[0], c[1], c[2], r[0], r[1], r[2], rows, seg)
-    lo = Vector((min(v[a] for v in vs) for a in range(3)))
-    hi = Vector((max(v[a] for v in vs) for a in range(3)))
-    return (BVHTree.FromPolygons([tuple(v) for v in vs], fs,
-                                 all_triangles=False),
-            mark, prev, prio, lo, hi, name)
+    if not gskip or not v.groups:
+        return False
+    return sum(e.weight for e in v.groups if e.group in gskip) > 0.5
 
 
-def _band(name, suit, z, rz, halfY, deep, n=9):
-    """A belt of constant height, as a row of overlapping punches.
+def _axis(ob, z0, z1):
+    """Where the body's own axis is, fore and aft, over a band of heights.
 
-    Not one ellipsoid. An ellipsoid tight in z and as wide as the torso in y is
-    a *lens*: its vertical extent goes to zero at the ends, so the band it
-    paints is full height down the middle of the chest and tapers to nothing at
-    the flank. That is what the first two versions of this looked like, and it
-    read as a yellow smudge rather than as a garment — which was blamed on the
-    decimator, wrongly, and survived a doubling of the triangle budget without
-    changing at all.
+    SCARF_CX is 0.015 and is Baye's; on a heavy 1.71 m man the belly puts it
+    somewhere else entirely, and a wrap built about the wrong axis stands off at
+    the front and cuts in at the back.
 
-    Widening y instead does not work either, because the next thing out there
-    is an arm. So the belt is built as a row of punches spaced across the
-    torso, each narrow enough in y to keep its full height and overlapping its
-    neighbours. Their union has straight edges. They are separate coats and may
-    overlap freely: `_inside` is a parity test per volume, and `paint` only
-    ever overwrites.
-
-    How much they overlap is the whole of the tuning, and the first version had
-    it wrong in both directions at once. Each punch was as wide as the gap to
-    its neighbour, so halfway between two centres the union was down to 81 per
-    cent of its height — a scalloped edge, seven times across a chest — and the
-    outermost punch was centred *on* `halfY` and so reached a full radius past
-    it, into the arm.
-
-    Both come out of the same arithmetic. `ry` is 2.5 times the spacing, which
-    puts the dip between neighbours at 96 per cent instead of 81; and the
-    centres are inset by `ry`, so the row's outer edge lands exactly on `halfY`
-    and the caller's measurement means what it says.
+    AND THE ARMS COME OUT FIRST. In the rest pose the hands hang beside the hips
+    and the elbows are forward of the ribs, so the front-most vertex at waist
+    height is a knuckle. Taken straight, this put the axis 120 mm in front of
+    the slim woman instead of 33 — and a wrap about a point four inches out from
+    the navel is the ballooned sheet the first render came back with.
     """
-    out = []
-    ry = 2.5 * halfY / (n - 1)
-    span = max(0.0, halfY - ry)
-    step = (2.0 * span) / (n - 1)
+    gskip = _skip(ob)
+    # And a belt round the midline on top of the bone test, because the two
+    # answer different halves of the same question: the bones take out a hand
+    # that is hanging in front of a hip, and `|y| < 0.05` takes out anything
+    # else at all that is not the trunk. What is left between the two is a
+    # sternum and a spine, or a pubis and a sacrum, which is the axis.
+    xs = [v.co.x for v in ob.data.vertices
+          if z0 <= v.co.z <= z1 and abs(v.co.y) < 0.05 and not _owned(v, gskip)]
+    return 0.5 * (min(xs) + max(xs)) if xs else 0.0
+
+
+def _bust(ob, cx, J):
+    """The height of the bust apex, measured. Not `spine-1`.
+
+    This file has said for a year that "`spine-1` lands within a centimetre of
+    nipple height on all four of the women, which is the usual 72 to 75 per cent
+    of stature". It does not. It is 77.5 per cent on the slim woman, 72.7 on the
+    full-figured one and 73.5 on the old one, and the apex measured off the mesh
+    is 74.7, 69.4 and 68.7 — so the band was drawn 48 to 68 mm too high on every
+    one of them, which is why the thing in the photograph sits across a collar
+    bone rather than on a bust.
+
+    Measured as the height at which the chest reaches furthest FORWARD, in a
+    window of `y` that is over the breast and inboard of the flank. The search
+    starts a quarter of the way up from `spine-2` rather than at it, because on
+    a flat-chested figure — the 1.24 m girl — there is no maximum to find and an
+    unbounded search walks down to the bottom of the range and puts her top on
+    her stomach.
+    """
+    s1, s2 = J["spine-1"].z, J["spine-2"].z
+    z0, z1 = s2 + 0.25 * (s1 - s2), J["l-shoulder"].z
+    rows = {}
+    for v in ob.data.vertices:
+        p = v.co
+        if not (z0 - 0.012 <= p.z <= z1 + 0.012) or not (0.02 < abs(p.y) < 0.09):
+            continue
+        i = int((p.z - z0) / 0.012)
+        rows[i] = max(rows.get(i, -9.9), p.x - cx)
+    if not rows:
+        return 0.5 * (s1 + s2)
+    i = max(rows, key=lambda j: rows[j])
+    return z0 + (i + 0.5) * 0.012
+
+
+def _crotch(me, leg):
+    """The lowest height at which the two legs are still one mass.
+
+    Measured, because it is the anchor every hem below the waist is written
+    against and it is not a fixed fraction of anything: it comes out 92 mm under
+    the hip socket on the slim woman and 108 on the full-figured one. Scanning
+    DOWN from the socket for the first four-millimetre slice with nothing on the
+    midline in it — two empty slices in a row, so that a single missing row of
+    vertices is not a crotch.
+    """
+    occ = {int(v.co.z / 0.004) for v in me.vertices
+           if abs(v.co.y) < 0.015 and leg - 0.35 < v.co.z < leg + 0.02}
+    b = int(leg / 0.004)
+    while b > int((leg - 0.35) / 0.004):
+        if b not in occ and (b - 1) not in occ:
+            return (b + 1) * 0.004
+        b -= 1
+    return leg - 0.10
+
+
+def _face_arm(ob, idx, gskip):
+    """Is this polygon part of an arm? Used to shoot straight through one."""
+    if not gskip or idx < 0 or idx >= len(ob.data.polygons):
+        return False
+    vs = ob.data.polygons[idx].vertices
+    n = sum(1 for vi in vs if _owned(ob.data.vertices[vi], gskip))
+    return n * 2 > len(vs)
+
+
+def _profile(ob, tree, z0, z1, rows, bins, cx, skip=ARM_BONES):
+    """The body's silhouette as a radius per (height, angle), by ray.
+
+    THE HISTOGRAM THIS REPLACES IS WHY THE TRUNKS WERE A SKIRT, and it is worth
+    the paragraph because the histogram is the obvious way to do it and is right
+    almost everywhere. Binning every vertex by angle and keeping the biggest
+    radius is exactly the surface, as long as the cross section is star-shaped
+    about the axis — which a chest is, and a pair of hips is, and a pair of
+    THIGHS is not. Below the crotch the section is two circles with a gap
+    between them, and a ray at 45 degrees crosses the near thigh twice: the
+    biggest radius in that bin is the far side of it. So the wrap was built
+    around the outside of a leg it should have been lying on, standing a
+    thigh's thickness off it, and that is the stiff little skirt every pair of
+    trunks came back wearing.
+    
+    So: cast INWARD from half a metre out and take the first thing hit, which is
+    the outermost surface along that direction and is exactly where cloth
+    stretched round would touch. Where the ray finds nothing — straight up the
+    midline between two legs — the cell is left empty for the fill below.
+
+    The arms are shot through rather than binned out. A ray coming in at
+    shoulder height meets an upper arm 80 mm before it meets a rib, and a
+    bikini built on that would hang in mid air; walking the ray on past any face
+    the arm owns lands it on the ribcage. Six hops is four more than a limb can
+    cost and stops a grazing hit looping.
+    """
+    gskip = _skip(ob, skip)
+    dz = (z1 - z0) / (rows - 1)
+    tab = [[0.0] * bins for _ in range(rows)]
+    far = 0.55
+    for i in range(rows):
+        z = z0 + i * dz
+        for k in range(bins):
+            a = TAU * k / bins
+            d = Vector((-math.cos(a), -math.sin(a), 0.0))
+            o = Vector((cx, 0.0, z)) - d * far
+            left = far
+            for _ in range(6):
+                loc, _nv, idx, _dd = tree.ray_cast(o, d, left)
+                if loc is None:
+                    break
+                if not _face_arm(ob, idx, gskip):
+                    tab[i][k] = math.hypot(loc.x - cx, loc.y)
+                    break
+                step = (loc - o).length + 0.004
+                o = o + d * step
+                left -= step
+                if left <= 0:
+                    break
+    # Empty cells filled round the ring, between the nearest neighbour each
+    # way. There is only one place they happen and it is the one that matters:
+    # straight up the midline below the crotch, where the ray goes between the
+    # legs and out the far side. Interpolating round the ring bridges from the
+    # cloth on one thigh to the cloth on the other, which is what a gusset is.
+    for row in tab:
+        have = [k for k in range(bins) if row[k] > 0]
+        if not have:
+            row[:] = [0.15] * bins
+            continue
+        for k in range(bins):
+            if row[k] > 0:
+                continue
+            lo = max((j for j in have if j <= k), default=have[-1] - bins)
+            hi = min((j for j in have if j >= k), default=have[0] + bins)
+            span = hi - lo
+            f = 0.0 if span == 0 else (k - lo) / span
+            row[k] = row[lo % bins] * (1 - f) + row[hi % bins] * f
+    # DILATE, THEN SMOOTH, and in that order. The table is sampled every 7.5
+    # degrees and every 12 mm and `_at` reads it bilinearly, so the flat patch
+    # between four samples cuts the corner of anything convex enough and ends up
+    # inside it — both women with a full bust came back with the tip of each one
+    # through the front of her cup. Taking each cell up to the largest of its
+    # nine neighbours first is what a bilinear patch needs to stay outside a
+    # curve its own samples sit on.
+    #
+    # And then smoothed, twice round the ring and twice down the rows, which are
+    # not the same pass twice: a ray that grazes a fold — the underside of a
+    # belly, the inside of a heavy thigh — lands a centimetre out from where its
+    # neighbour a row up landed, and a surface built straight on that creases
+    # and folds through itself. Smoothing round the ring cannot see that,
+    # because the jump is between rows. The heavy man's trunks were a bag of
+    # knots until the second pass went in.
+    was = [row[:] for row in tab]
+    for i in range(rows):
+        for k in range(bins):
+            tab[i][k] = max(was[r][(k + o) % bins]
+                            for r in (max(i - 1, 0), i,
+                                      min(i + 1, rows - 1))
+                            for o in (-1, 0, 1))
+    for row in tab:
+        for _ in range(2):
+            row[:] = [(row[(k - 1) % bins] + 2 * row[k] + row[(k + 1) % bins]) / 4
+                      for k in range(bins)]
+    for _ in range(2):
+        was = [row[:] for row in tab]
+        for i in range(rows):
+            a, b, c = was[max(i - 1, 0)], was[i], was[min(i + 1, rows - 1)]
+            tab[i][:] = [(a[k] + 2 * b[k] + c[k]) / 4 for k in range(bins)]
+    return tab, z0, dz
+
+
+def _at(prof, z, ang):
+    """Bilinear lookup into `_profile`'s table, wrapping in angle."""
+    tab, z0, dz = prof
+    rows, bins = len(tab), len(tab[0])
+    f = max(0.0, min(rows - 1.001, (z - z0) / dz))
+    i0 = int(f)
+    ti = f - i0
+    g = (ang % TAU) / TAU * bins
+    b0 = int(g) % bins
+    tb = g - int(g)
+    b1 = (b0 + 1) % bins
+    lo = tab[i0][b0] * (1 - tb) + tab[i0][b1] * tb
+    hi = tab[i0 + 1][b0] * (1 - tb) + tab[i0 + 1][b1] * tb
+    return lo * (1 - ti) + hi * ti
+
+
+def _wrap(prof, cx, top, bot, rows, seg, colour, out, gap=SWIM_GAP):
+    """One garment surface: a ring round the body between two edge curves.
+
+    `top(a)` and `bot(a)` are heights as functions of the angle round the body,
+    and they are the whole of what makes a brief a brief and a pair of trunks a
+    pair of trunks: the same eight lines of geometry draw both, and what differs
+    is where the hem goes at the front and where it goes at the flank.
+
+    Wound the way `hip_scarf` is wound and for the reason its note gives — `k`
+    runs anticlockwise and `i` runs downwards, so the obvious order builds the
+    surface inside out and a `FrontSide` material shows you the far half of it.
+
+    Normals off the grid rather than radially. A hip wrap is near enough a
+    cylinder for the radial shortcut; a bikini cup is not — its surface climbs
+    130 mm of height over 40 mm of radius, and lit with a radial normal it reads
+    as a decal rather than as cloth.
+    """
+    pos, nrm, col, tri = out
+    base = len(pos)
+    n = rows + 1
+    grid = []
     for i in range(n):
-        y = -span + i * step
-        out.append(_coat("%s-%d" % (name, i), MH.SUIT_M, suit, 6,
-                         (0.0, y, z), (deep, ry, rz),
-                         rows=12, seg=24))
-    return out
+        rv = i / rows
+        row = []
+        for kk in range(seg):
+            a = TAU * kk / seg
+            t, b = top(a), bot(a)
+            z = t + (b - t) * rv
+            # A shade more clearance at the hem than at the waist, the way the
+            # hip wrap has it: a free edge that stands off reads as cloth, and
+            # one that sinks in reads as a tear.
+            r = _at(prof, z, a) + gap + 0.005 * rv
+            row.append(Vector((cx + math.cos(a) * r, math.sin(a) * r, z)))
+        grid.append(row)
+    for i in range(n):
+        for kk in range(seg):
+            p = grid[i][kk]
+            tk = grid[i][(kk + 1) % seg] - grid[i][(kk - 1) % seg]
+            tv = grid[min(i + 1, n - 1)][kk] - grid[max(i - 1, 0)][kk]
+            out_r = Vector((p.x - cx, p.y, 0.0))
+            nv = tk.cross(tv)
+            if nv.length < 1e-9:
+                nv = out_r
+            nv = nv.normalized()
+            if nv.dot(out_r) < 0:
+                nv = -nv
+            pos.append(p)
+            nrm.append(nv)
+            col.append(colour)
+    for i in range(rows):
+        for kk in range(seg):
+            k2 = (kk + 1) % seg
+            a0 = base + i * seg + kk
+            b0 = base + i * seg + k2
+            c0 = base + (i + 1) * seg + kk
+            d0 = base + (i + 1) * seg + k2
+            tri.append((a0, c0, d0))
+            tri.append((a0, d0, b0))
+    return n * seg
 
 
-def swimwear(J, kind, suit, h):
-    """Briefs and a band, or trunks. Sized off the figure's own joints.
+def _spline(pts, t):
+    """Catmull-Rom through `pts`, t in [0, 1]. Four control points or more."""
+    n = len(pts) - 1
+    f = max(0.0, min(n - 1e-9, t * n))
+    i = int(f)
+    u = f - i
+    p0, p1 = pts[max(i - 1, 0)], pts[i]
+    p2, p3 = pts[i + 1], pts[min(i + 2, n)]
+    return 0.5 * (2 * p1 + (p2 - p0) * u
+                  + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u
+                  + (3 * p1 - p0 - 3 * p2 + p3) * u * u * u)
 
-    Everything here is measured from `pelvis`, `l-upper-leg` and `spine-1`
-    rather than written as a height, because the eight figures are 1.24 m to
-    1.84 m and a waistband written in metres is a waistband on one of them.
-    `k` only scales the thicknesses, which do not follow stature as steeply as
-    the landmarks do.
+
+def _strap(tree, origin, ctrl, width, colour, out, gap=SWIM_GAP,
+           n=STRAP_N):
+    """A ribbon over the shoulder, cast on to the skin from one interior point.
+
+    Two versions of this went in the bin and the reason is worth keeping,
+    because it is the same reason twice. A spline through five points measured
+    on a shoulder lies UNDER it — a shoulder is convex — so the raw curve is
+    inside the body. Snapping every sample to the nearest vertex fixes that and
+    zigzags, because the vertices under a deltoid are 8 mm apart in no
+    particular direction. Smoothing the zigzag out sinks it again, for the same
+    convexity. Snap, smooth, snap still left the strap surfacing in pieces: a
+    nearest-vertex query from a point inside a shoulder can answer with the arm,
+    the neck or the trapezius, and which one it picks changes sample to sample.
+
+    So the surface is found by a RAY and not by a search. `origin` is one point
+    inside the chest, level with the armpit and a little over toward the strap's
+    own side, and the whole path — up the front, over the shoulder, down the
+    back — is star-shaped about it: every sample is a direction from that point,
+    and where that direction leaves the body is where the strap goes. Rotating
+    smoothly through the path gives a smoothly moving hit, and there is nothing
+    left to snap or smooth.
     """
+    pos, nrm, col, tri = out
+    base = len(pos)
+    line, norms = [], []
+    for j in range(n):
+        p = _spline(ctrl, j / (n - 1))
+        d = p - origin
+        far = d.length * 2.4
+        loc, nv, _i, _dd = tree.ray_cast(origin, d.normalized(), far)
+        if loc is not None:
+            line.append(loc + nv * gap)
+            norms.append(nv.copy())
+        else:
+            line.append(p)
+            norms.append(d.normalized())
+    # The two ends belong to the wrap and not to the ray: the wrap's own edge is
+    # built on a max-radius profile and sits a millimetre or two proud of the
+    # surface, and a strap that lands on the true skin instead leaves a step
+    # exactly where it is supposed to be part of the same garment.
+    line[0], line[-1] = ctrl[0], ctrl[-1]
+    for j in range(n):
+        along = line[min(j + 1, n - 1)] - line[max(j - 1, 0)]
+        side = along.cross(norms[j])
+        side = side.normalized() if side.length > 1e-9 else Vector((0, 1, 0))
+        for sgn in (-1.0, 1.0):
+            pos.append(line[j] + side * (sgn * width * 0.5))
+            nrm.append(norms[j])
+            col.append(colour)
+    for j in range(n - 1):
+        a0 = base + j * 2
+        b0, c0, d0 = a0 + 1, a0 + 2, a0 + 3
+        tri.append((a0, b0, d0))
+        tri.append((a0, d0, c0))
+    return n * 2
+
+
+def swimsuit(J, ob, kind, suit, h, out):
+    """The whole garment: a bottom half for everybody and a top for the women.
+
+    Called by `export_skin` through its `wear` hook, with the undecimated mesh
+    and the four laid-on buffers. Returns how many vertices it added.
+    """
+    me = ob.data
+    # A tree off the MESH DATA, and not `ob.ray_cast`, which is the same
+    # question asked of the *evaluated* object. By the time `export_skin` calls
+    # this the rig has been through `wheel_floor` and eight clip bakes and is
+    # standing in whatever pose the last of them left it in — so every ray would
+    # have been cast at a woman doing a cartwheel, silently, and only in the
+    # bake. The preview path never poses anything and would have gone on looking
+    # correct. Mesh data is the bind shape whatever the armature is doing.
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bm.faces.ensure_lookup_table()
+    tree = BVHTree.FromBMesh(bm)
     k = h / 1.75
-    hip = J["pelvis"].z
-    leg = J["l-upper-leg"].z
-    # Deep front-to-back, tight across.
-    #
-    # Only x has to be deep: that is the direction the punch crosses the chest
-    # and the belly in, and depth there is what keeps the edge sharp. Making y
-    # deep as well — 0.55 to a side, which was the first version — encloses the
-    # arms, and a bikini band half a metre wide paints straight across both of
-    # them. She came back with yellow shoulders.
-    #
-    # So y stops at the torso, and it is measured off the figure rather than
-    # written down: the hip socket marker is about 55 per cent of the way out to
-    # the skin at the widest, which holds across a 1.24 m girl and a heavy
-    # 1.71 m man because it is the same anatomy scaled.
-    deep = 0.5 * k
-    hipY = J["l-upper-leg"].y * 1.85 + 0.02 * k
-    out = []
-    # ── and why a brief is 11 cm and not 7 ──────────────────────────────
-    #
-    # Because paint arrives with a gradient. The decimator averages the colours
-    # of the vertices it collapses, which puts three or four centimetres of
-    # fade on every edge — and a garment 7 cm tall with 4 cm of fade top and
-    # bottom has no solid middle at all. It is gradient the whole way through,
-    # which is precisely what it looked like: a red smear across the hips.
-    #
-    # Doubling the triangle budget does not fix it and was tried: 7 000 to
-    # 14 000 changed nothing visible, because the fade is a fixed number of
-    # *vertices* and the vertices got smaller along with it. What fixes it is
-    # giving the garment a middle — so the brief runs from the natural waist to
-    # the top of the thigh, which is 11 cm and is also what a brief is. The
-    # trunks were never affected: they were 20 cm from the start.
-    #
-    # That reasoning was right about the gradient and wrong about where to fix
-    # it, and it stayed wrong until 23 Aug: the fade is not a property of the
-    # paint at all, it is the decimator averaging the colours of the vertices it
-    # merges, and the answer is to paint the export copy after it has run rather
-    # than to grow the garment until the fade is a smaller fraction of it. See
-    # `repaint` at the bottom of `one`. 11 cm is kept because 11 cm is what a
-    # brief is, which is the only reason it ever needed.
+    hip, leg = J["pelvis"].z, J["l-upper-leg"].z
+    zc = _crotch(me, leg)
+    # Its own axis for each garment. A chest and a pelvis are not on the same
+    # fore-aft line on anybody and they are 40 mm apart on the heavy man.
+    cx = _axis(ob, zc, hip + 0.08 * k)
+    made = 0
+
     if kind == "trunks":
-        top, bot = hip + 0.02 * k, leg - 0.17 * k
+        # Square-cut trunks, and they are ONE surface rather than a waistband
+        # with two legs hanging off it, which is a fact about where the hem goes
+        # rather than a saving. Seen as a ring round the body, a pair of trunks
+        # is scooped UP at the front and back centre — that is the crotch, and
+        # there is no cloth between the legs below it — and hangs LOW at the two
+        # flanks, which is the outer thigh. Nothing has to be split to say that.
+        zw = hip + 0.020 * k
+        mid, side = zc + 0.030, zc - 0.055 * k
+
+        def btop(a):
+            return zw - 0.008 * k * math.cos(a)
+
+        def bbot(a):
+            # 1.8 and not 1.3, and the scoop starts 30 mm ABOVE the crotch
+            # rather than 12 below it. Both are about the same thing: a wrap
+            # about the body's axis has to bridge the gap between the legs
+            # wherever its hem is below the crotch, and that bridge is a web
+            # with nothing under it. At 1.3 the hem was below the crotch from
+            # 25 degrees out, so a third of the garment was web and it read as a
+            # stiff little skirt. At 1.8 the drop is held back to the flanks,
+            # where it is over a thigh and there is a leg inside it.
+            return mid + (side - mid) * abs(math.sin(a)) ** 1.8
     else:
-        top, bot = hip + 0.055 * k, leg - 0.045 * k
-    out += _band("suit-hip", suit, (top + bot) / 2, (top - bot) / 2,
-                 hipY, deep)
-    if kind == "two":
-        # The band, at the bust. `spine-1` lands within a centimetre of nipple
-        # height on all four of the women, which is the usual 72 to 75 per cent
-        # of stature — so it is used directly rather than as a fraction. Kept
-        # inboard of the shoulder joint, which is where the arm starts.
-        out += _band("suit-band", suit, J["spine-1"].z + 0.005 * k, 0.062 * k,
-                     J["l-shoulder"].y * 0.80, deep)
-    return out
+        # And a brief is the same ring with the scoop the other way up: deep at
+        # the front and back, narrow over the hip bone, which is where the leg
+        # opening cuts. 55 mm at the flank is what a bikini bottom actually is.
+        zw = hip + 0.050 * k
+
+        def btop(a):
+            return zw - 0.012 * k * math.cos(a)
+
+        def bbot(a):
+            deep = zc + (0.020 if math.cos(a) >= 0 else 0.032)
+            flank = btop(a) - 0.055 * k
+            return flank + (deep - flank) * abs(math.cos(a)) ** 1.5
+
+    lo = min(bbot(TAU * i / 64) for i in range(64)) - 0.02
+    hi = max(btop(TAU * i / 64) for i in range(64)) + 0.02
+    prof = _profile(ob, tree, lo, hi, 19, SWIM_BINS, cx)
+    # Two millimetres more clearance below the waist than above it, and it is
+    # not a taste: a belly overhangs a groin, so the profile's own axis is
+    # dragged forward and the radius it reports at the fold is short of the
+    # skin. On the heavy man that showed as a slit of him through the front of
+    # his trunks. Eight millimetres of cloth off a hip is still a hip.
+    made += _wrap(prof, cx, btop, bbot, SWIM_ROWS, SWIM_SEG, suit, out,
+                  gap=0.008)
+    print("[bathers]   bottom  waist %.3f  crotch %.3f  axis %.3f  z %.3f..%.3f"
+          % (zw, zc, cx, lo + 0.02, hi - 0.02))
+
+    if kind != "two":
+        bm.free()
+        return made
+
+    # ── the top ────────────────────────────────────────────────────────────
+    #
+    # One ring again, and everything that makes it a bikini rather than a
+    # bandeau is in the two edge curves: a cup either side of the front, a dip
+    # between them for the gore, and a band that narrows and drops toward the
+    # back. `spine-1` lands within a centimetre of the bust line on all four
+    # women — the usual 72 to 75 per cent of stature — so it is used directly.
+    tcx = _axis(ob, J["spine-2"].z, J["l-shoulder"].z)
+    zb = _bust(ob, tcx, J)
+    ac, wc, wg = math.radians(28.0), math.radians(19.0), math.radians(14.0)
+
+    def cup(a):
+        return min(1.0, math.exp(-(_dang(a - ac) / wc) ** 2)
+                   + math.exp(-(_dang(a + ac) / wc) ** 2))
+
+    def mid(a):
+        # The ring's centre line, and it drops 30 mm on the way round to the
+        # back — a bra band runs under the bust at the front and across the
+        # ribs behind, and a level ring is the bandeau this replaces.
+        return zb - 0.010 * k - 0.030 * k * (1.0 - math.cos(a)) * 0.5
+
+    def ttop(a):
+        return (mid(a) + 0.016 * k + 0.044 * k * cup(a)
+                - 0.038 * k * math.exp(-(_dang(a) / wg) ** 2))
+
+    def tbot(a):
+        return mid(a) - 0.016 * k - 0.044 * k * cup(a)
+
+    lo = min(tbot(TAU * i / 64) for i in range(64)) - 0.02
+    hi = max(ttop(TAU * i / 64) for i in range(64)) + 0.02
+    tprof = _profile(ob, tree, lo, hi, 15, SWIM_BINS, tcx)
+    made += _wrap(tprof, tcx, ttop, tbot, SWIM_ROWS + 1, SWIM_SEG, suit, out)
+
+    sy, sz = J["l-shoulder"].y, J["l-shoulder"].z
+    cz = J["l-clavicle"].z
+    rf, rb = _at(tprof, zb, 0.0), _at(tprof, zb, math.pi)
+    ab = math.pi - math.radians(38.0)
+    for sgn in (1.0, -1.0):
+        a0, a4 = ac * sgn, ab * sgn
+        r0 = _at(tprof, ttop(a0), a0) + SWIM_GAP
+        r4 = _at(tprof, ttop(a4), a4) + SWIM_GAP
+        # 0.58 of the way out to the shoulder joint and no further: a strap
+        # further out than that snaps on to the deltoid, which belongs to the
+        # arm, and a bikini strap that swings when she waves is worse than none.
+        ctrl = [
+            Vector((tcx + math.cos(a0) * r0, math.sin(a0) * r0, ttop(a0))),
+            Vector((tcx + 0.60 * rf, 0.58 * sy * sgn, cz - 0.020 * k)),
+            Vector((tcx, 0.58 * sy * sgn, sz + 0.045 * k)),
+            Vector((tcx - 0.55 * rb, 0.54 * sy * sgn, cz - 0.055 * k)),
+            Vector((tcx + math.cos(a4) * r4, math.sin(a4) * r4, ttop(a4))),
+        ]
+        made += _strap(tree, Vector((tcx, 0.34 * sy * sgn, zb + 0.030 * k)),
+                       ctrl, 0.014 * k, suit, out)
+    bm.free()
+    print("[bathers]   top     bust %.3f (%.1f%%)  axis %.3f  cup %.3f..%.3f"
+          "  band %.3f..%.3f"
+          % (zb, 100 * zb / h, tcx, tbot(ac), ttop(ac),
+             tbot(math.pi), ttop(math.pi)))
+    return made
+
 
 # ── standing about, re-tracked onto a different skeleton ───────────────────── #
 #
@@ -853,8 +1286,7 @@ def one(name, height, obj, check=False):
     MH.smooth(body, 1, above=J["neck"].z)
     rig = MH.armature(J)
     MH.skin(body, rig)
-    wear = swimwear(J, kind, suit, height)
-    coats = MH.cutters(J, k=k, torso=False, tail=False) + wear
+    coats = MH.cutters(J, k=k, torso=False, tail=False)
     MH.paint(body, coats)
     out = OUT / ("bather_%s.fr3d.gz" % name)
     # `post=False`, and that is the difference between eight bathers and eight
@@ -870,26 +1302,27 @@ def one(name, height, obj, check=False):
               for c in BATHER_CLIPS] + sit_clips(rig, J)
              + quay_clips(rig, J) + lie_clips(rig, J))
     _sit_report(rig, clips)
-    # `repaint` and `dense`, which are the two halves of one answer.
+    # `repaint`, which is now about the FACE and no longer about the suit.
     #
-    # Baye is 28 085 triangles and these are 7 000, and that quarter is where
-    # every paint complaint about them has come from. It cost the nape wedge,
-    # which was a cutter for a ponytail nobody here has; it cost the brief two
-    # rewrites; and it was still costing the suit, which arrived as red blotches
-    # across the back and buttocks of the woman walking the promenade — 72 mm of
-    # red inside 182 mm of pink and a streak of it 136 mm down her thigh, on a
-    # brief drawn 110 mm tall.
+    # The decimator interpolates every attribute it carries, colour included, so
+    # a boundary that was one vertex wide before it runs arrives two or three
+    # deep after it. Measured on these eight, that ramp is 25 to 80 mm on every
+    # side of every painted edge, whatever the edge is — a property of the mesh
+    # and not of the paint. Repainting the decimated copy collapses it to the
+    # single triangle that straddles the boundary, which is what a soft edge
+    # actually is, and it costs one more pass of the same ray-parity test.
     #
-    # Neither the colour nor the volume was wrong. The mesh was: the decimator
-    # averages the colours it merges and then interpolates what is left across
-    # triangles half the height of the garment. So the export copy is painted
-    # again after the decimator has run, and the decimator is told to leave the
-    # hem alone before it runs — see the notes beside it and beside `hem_group`
-    # in human_mh.py. It comes back 100 per cent solid, 107 mm tall, over 16 mm
-    # triangles, and 1.8 KB *smaller*; the rig, the bone table and all nine
-    # clips are bit-identical.
+    # It used to be half of the swimsuit's answer and the other half was
+    # `dense`, a vertex group that stopped the decimator collapsing the hem —
+    # 80 mm of ramp down to one 16 mm triangle, for about a tenth of the
+    # triangle budget. Both are gone from the suit, because the suit is geometry
+    # now and a mesh edge needs no help from either; that tenth is back in the
+    # body. What is left is the face, where the same ramp is the difference
+    # between an eyebrow and a smudge, and where there is no garment to build.
     MH.export_skin(body, rig, out, clips, tris=TRIS, post=False,
-                   repaint=coats, dense=wear)
+                   repaint=coats,
+                   wear=lambda me, buf: swimsuit(J, body, kind, suit,
+                                                 height, buf))
     return out
 
 
@@ -1173,10 +1606,94 @@ def _sit_report(rig, clips):
                      B["head"].tail.z + root))
 
 
+# Azimuth, elevation, the height to aim at as a FRACTION OF STATURE, and how
+# far back to stand in metres on a 1.75 m figure. A fraction and not a height
+# because there is a 1.24 m girl in this cast and a 1.84 m man, and one number
+# aimed at a bust is aimed at a forehead on the other.
+SWIM_VIEWS = {
+    "top": (14.0, 6.0, 0.775, 0.85),
+    "topside": (86.0, 4.0, 0.775, 0.85),
+    "topback": (168.0, 6.0, 0.775, 0.85),
+    "hips": (14.0, 6.0, 0.545, 0.85),
+    "hipside": (86.0, 4.0, 0.545, 0.85),
+    "hipback": (168.0, 6.0, 0.545, 0.85),
+    "whole": (26.0, 6.0, 0.560, 2.55),
+    "legs": (22.0, 8.0, 0.440, 1.25),
+    "legside": (84.0, 6.0, 0.440, 1.25),
+}
+
+
+def preview(name, height, obj, views):
+    """Build one figure and render the suit, without exporting anything.
+
+    The suit ships from inside `export_skin` and is therefore invisible to every
+    camera in this file, which is the same problem `post_preview` in human_mh.py
+    exists to solve and this is the same answer: run the real `swimsuit` and
+    hang what it returns on a real object. What renders is what ships.
+
+    Worth the forty lines. Without it the loop on a garment shape is a Blender
+    run, a ten-megabyte page build and a headless browser — four minutes a
+    guess, which is how the bandeau survived as long as it did.
+    """
+    kind, suit, skin_p = SUITS[name]
+    MH.TARGET_H = height
+    MH.SKIN_P = skin_p
+    J, scale, drop = MH.read_joints(obj)
+    k = tuple(a / b for a, b in zip(MH.vault(obj, J["l-eye"].z), MH.SKULL))
+    body = MH.load(obj, scale, drop)
+    MH.smooth(body, 1, above=J["neck"].z)
+    rig = MH.armature(J)
+    MH.skin(body, rig)
+    MH.paint(body, MH.cutters(J, k=k, torso=False, tail=False))
+
+    out = ([], [], [], [])
+    n = swimsuit(J, body, kind, suit, height, out)
+    pos, nrm, col, tri = out
+    print("[bathers]   suit %d verts %d tris" % (n, len(tri)))
+    me = bpy.data.meshes.new("swim")
+    me.from_pydata([tuple(p) for p in pos], [], [list(t) for t in tri])
+    me.validate()
+    a_p = me.color_attributes.new("prev", "FLOAT_COLOR", "POINT")
+    for i, c in enumerate(col):
+        a_p.data[i].color = (*c, 1.0)
+    # Custom normals off the ones the builder computed, because the render is
+    # the only place the lighting of a cup can be judged and Blender would
+    # otherwise average the face normals of a strip two vertices wide.
+    for pg in me.polygons:
+        pg.use_smooth = True
+    try:
+        me.normals_split_custom_set_from_vertices([tuple(v) for v in nrm])
+    except (AttributeError, RuntimeError) as e:
+        print("[bathers]   (no custom normals: %s)" % e)
+    ob = bpy.data.objects.new("swim", me)
+    bpy.context.collection.objects.link(ob)
+    MH._material(body)
+    ob.data.materials.append(body.data.materials[0])
+    MH._lights()
+    MH.PREVIEW = str(PREVIEW_DIR / name)
+    MH.NO_RENDER = False
+    for v in views:
+        az, el, tz, rad = SWIM_VIEWS[v]
+        MH.VIEWS[v] = (az, el, tz * height, rad * height / 1.75, 760, 900)
+    MH.render("swim", list(views))
+    print("[bathers]   %s_swim_*.png" % MH.PREVIEW)
+
+
+PREVIEW_DIR = Path("/tmp/bathers")
+
+
 def main():
+    global PREVIEW_DIR
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     only = argv[argv.index("--only") + 1] if "--only" in argv else None
     check = "--check" in argv
+    shots = None
+    if "--preview" in argv:
+        rest = argv[argv.index("--preview") + 1:]
+        shots = [a for a in rest if a in SWIM_VIEWS] or ["top", "hips", "whole"]
+    if "--out" in argv:
+        PREVIEW_DIR = Path(argv[argv.index("--out") + 1])
+    PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
     OUT.mkdir(parents=True, exist_ok=True)
     for name, height, _recipe in mh_morph.BATHERS:
         if only and name != only:
@@ -1186,6 +1703,9 @@ def main():
             print("[bathers] no %s — run tools/blender/mh_morph.py first" % obj)
             continue
         print("[bathers] %s at %.2f m" % (name, height))
+        if shots:
+            preview(name, height, obj, shots)
+            continue
         p = one(name, height, obj, check=check)
         if p:
             print("[bathers]   %s  %.0f KB" % (p.name, p.stat().st_size / 1024))
