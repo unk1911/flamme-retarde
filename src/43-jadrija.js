@@ -16132,7 +16132,29 @@ async function buildJadrija(scene) {
     // The bench on the promenade is not the backed timber one in the tree line.
     // It is a six-metre precast plinth with two metres of slats inset flush at
     // one end, and it reads as part of the paving rather than as a chair.
-    for (let t = JAD.beachTo + 24; t < LEN - 20; t += 61) {
+    // 38 m AND NOT 61. Tabulated against every other along-shore run on this
+    // shore — lamps at 27, trees at 34 to 56, life rings at 34, ladders at 88,
+    // and a dozen smaller ones between 1.9 and 17 — the bench was the second
+    // sparsest thing on the promenade.
+    //
+    // AND THE SPACING IS NOT WHAT MAKES IT SPARSE, which is worth writing down
+    // because halving it was the obvious fix and it is mostly not the fix.
+    // Counted off overhead renders at every candidate: at 38 there are nine
+    // positions on this run and **three** survive — 267, 381 and 419. The rest
+    // are eaten by `clearOfShops` and by the vikendica exclusion below, which
+    // between them take two thirds of the shore. At 61 it was six positions and
+    // about two. So this is 2 to 3 and not 4 to 7, and the binding constraint
+    // is the exclusions rather than the step.
+    //
+    // Left at 38 anyway: it is a real gain for nothing, and it means that if
+    // those exclusions are ever loosened the run is already dense enough to
+    // benefit. But the note is here so the next person does not halve it again
+    // and wonder why nothing happened.
+    //
+    // Safe to change: this loop takes no `rng()` draw, so the beach layout east
+    // of it does not move (rule 4). Verified rather than asserted — the census
+    // reads {seen 446, thin 333, plain 86, rich 27} on both sides.
+    for (let t = JAD.beachTo + 24; t < LEN - 20; t += 38) {
       if (!clearOfShops(t)) continue;
       // And not across the front of the vikendica. The run starts at
       // `beachTo + 24` = 229 and the house is at 232, so the first bench of the

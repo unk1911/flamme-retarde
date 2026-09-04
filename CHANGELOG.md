@@ -8,6 +8,38 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.215.0] — 2026-09-04
+
+### The bench was the second sparsest thing on the promenade
+
+Tabulated every along-shore run on this shore by its step: lamps at 27 m, trees
+at 34 to 56, life rings at 34, swimming ladders at 88, and a dozen smaller ones
+between 1.9 and 17. The precast bench — the six-metre plinth with two metres of
+slats inset, the one thing on this promenade a walker actually sits on — runs at
+**61**.
+
+So it goes to 38. And then it got counted, off overhead renders at every
+candidate position, which is where this stops being the tidy story it looked
+like:
+
+```
+at 61   six positions      about two survive
+at 38   nine positions     three survive -- 267, 381, 419
+```
+
+**The spacing was not what made it sparse.** `clearOfShops` and the vikendica
+exclusion between them eat two thirds of the run, and they would have eaten two
+thirds of any step. This is a gain of one bench, not the three the arithmetic
+suggested, and the note in the source now says so — so that the next person does
+not halve it again and wonder why nothing happened.
+
+It stays at 38 regardless: it is a real bench for nothing, and if those
+exclusions are ever loosened the run is already dense enough to benefit.
+
+Rule 4 checked rather than asserted — this loop takes no `rng()` draw, and the
+census reads `{seen 446, thin 333, plain 86, rich 27}` on both sides of the
+change, so nothing on the beach moved.
+
 ## [1.214.0] — 2026-09-04
 
 ### One hand shape for the whole routine
