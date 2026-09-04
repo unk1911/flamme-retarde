@@ -8,6 +8,52 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.212.0] — 2026-09-04
+
+### She never once looked at the person she was pouring for
+
+The ballet's last pass came from tabulating a thing nobody had tabulated. Same
+question here, and the wine's gaze *is* solved — there is a `gaze` term and it
+has been in the cost function for releases. Tabulated, what it is solved **to**
+is this:
+
+```
+REACH   look = the bottle
+HOLD    look = the bottle
+LIFT    look = the glass rim
+TIP     look = the glass rim
+POUR    look = the glass rim
+POUR_B  look = the glass rim
+```
+
+All six. So for the whole 7.6 seconds her eyes are on the bottle or on the glass
+and never once on the person she is pouring for. That was defensible while she
+faced a doorway nobody stands in. 1.203.0 turned her to face `standIn`, and
+there is now somewhere for her eyes to go.
+
+So there is a seventh pose. The bottle is back on the stool by 6.81 — `held`
+releases across 6.55 to 6.81 — so `MEET` has no lip and no tilt to satisfy and
+is three things only: her hand coming away, her back coming up, and her eyes
+arriving on yours. `standIn` scores fwd +1.00, rt −0.09 at 2.3 m from her mark
+and stands 1.66 off her floor, so in her own frame the look target is
+**(2.30, +0.21, 1.66)** — a shade above her own head, which is right: she is
+looking up at somebody standing while she is still bent over a stool.
+
+Solved: palm within 2 mm of target, hips **0.875 → 0.927** as she straightens,
+lean square at −0, and no `gaze` term in the cost at all. Keyed at 7.06, between
+letting go at 6.78 and standing at 7.60.
+
+Two things worth recording about how it went:
+
+- Re-solving all seven at once produced *worse* minima for POUR (0.63 → 1.15)
+  and POUR_B (0.12 → 0.77) than what already ships, because a hill climb is
+  stochastic. So only MEET was solved and only MEET was spliced, and
+  `--verify` confirms the other six are unmoved to four decimals — which is the
+  guard from 1.209.0 doing precisely the job it was written for.
+- `DIP`, the table of knee angles, had no entry for the new pose, and the solve
+  died on `KeyError: 'MEET'` rather than quietly using a default. Which is the
+  right way for that to fail.
+
 ## [1.211.0] — 2026-09-04
 
 ### Her eyes were level in every position that has somewhere to look

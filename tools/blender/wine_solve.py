@@ -475,7 +475,9 @@ GRIP_STAND = (ROOM["bottleFoot"][0], ROOM["bottleFoot"][1],
 # each of these into a hip, a knee and an ankle that leave her feet flat and
 # her hips over them.
 DIP = {"REACH": 42.0, "HOLD": 42.0, "LIFT": 16.0,
-       "TIP": 5.0, "POUR": 5.0, "POURB": 5.0}
+       "TIP": 5.0, "POUR": 5.0, "POURB": 5.0,
+       # Straightening up out of the last of the bend, on her way to standing.
+       "MEET": 20.0}
 
 
 def goals(idle):
@@ -556,6 +558,24 @@ def goals(idle):
         # hand belongs outboard of the glass, on her right, with the bottle
         # leaning in across it: that is what a right-handed pour looks like
         # from any seat in the room.
+        # AND THEN SHE LOOKS UP AT YOU, which is the beat this clip has never
+        # had. Tabulated, every one of the six goals above aims `look` at the
+        # bottle or at the glass — so for all 7.6 seconds she never once looks
+        # at the person she is pouring for. That was defensible while she was
+        # facing a doorway nobody stands in; 1.203.0 turned her to face
+        # `standIn`, and there is now somewhere for her eyes to go.
+        #
+        # The bottle is back on the stool by 6.81 (`held` releases across
+        # 6.55 to 6.81), so this pose has no lip and no tilt to satisfy. It is
+        # three things: her hand coming away, her back coming up, and her eyes
+        # arriving on yours. `standIn` scores fwd +1.00, rt -0.09 at 2.3 m from
+        # her mark, and stands 1.66 off the floor she is on — so in her own
+        # frame that is (2.30, +0.21, 1.66), and it is a shade above her own
+        # head, which is right: she is looking up at somebody standing while
+        # she is still bent over a stool.
+        "MEET": dict(palm=(0.26, -0.34, 0.92), palmW=140.0,
+                     look=(2.30, 0.21, 1.66), tilt=(0, 24), elbow=(112, 165),
+                     lean=(0, 9), near=idle, nearW=0.00030),
         "POUR": dict(lip=lip, palm=hand, palmW=260.0, look=(g0, g1, ROOM["rim"]),
                      tilt=(96, 103), elbow=(92, 122), lean=(4, 13),
                      near=idle, nearW=0.00008),
@@ -735,12 +755,18 @@ def main():
         # weighted 90 while being pulled by the strongest chain here, on
         # purpose.
         SOLVED = {"REACH": 0.0582, "HOLD": 0.0652, "LIFT": 0.0230,
-                  "POUR": 0.0147, "POURB": 0.0356, "TIP": 1.4426}
+                  "POUR": 0.0147, "POURB": 0.0356, "TIP": 1.4426,
+                  # Nearly all of MEET's is the `gap` term, which measures
+                  # clearance between her forearm and a bottle she has
+                  # already put down. Harmless, and recorded rather than
+                  # special-cased so the baseline stays honest.
+                  "MEET": 0.1561}
         G = goals(idle)
         bad = 0
         print("[verify] %-7s %9s %9s   %s" % ("pose", "solved", "now", "drift"))
         for nm, key in (("REACH", "REACH"), ("HOLD", "HOLD"), ("LIFT", "LIFT"),
-                        ("TIP", "TIP"), ("POUR", "POUR"), ("POUR_B", "POURB")):
+                        ("TIP", "TIP"), ("POUR", "POUR"), ("POUR_B", "POURB"),
+                        ("MEET", "MEET")):
             g = dict(G[key])
             # `near` is scored against whatever the solve chained it to, which
             # is not reconstructible here, so it comes out of the comparison on
@@ -785,7 +811,8 @@ def main():
         names = [n for n in argv[argv.index("--solve") + 1:]
                  if not n.startswith("-")]
         G = goals(idle)
-        names = names or ["REACH", "HOLD", "LIFT", "POUR", "POURB", "TIP"]
+        names = names or ["REACH", "HOLD", "LIFT", "POUR", "POURB", "TIP",
+                          "MEET"]
         # Each key is seeded from the one before it, so the clip comes out as
         # one movement rather than six poses that happen to share a room.
         base = dict(idle)
@@ -812,7 +839,7 @@ def main():
         # clip by a factor of three — so it is exactly the pair that can afford
         # to differ, and the one that has to.
         CHAIN = {"HOLD": ("REACH", 0.0016), "POURB": ("POUR", 0.0015),
-                 "TIP": ("POUR", 0.0230)}
+                 "TIP": ("POUR", 0.0230), "MEET": ("REACH", 0.0012)}
         solved = {}
         for n in names:
             g = dict(G[n])

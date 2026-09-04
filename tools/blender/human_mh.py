@@ -5740,6 +5740,33 @@ WINE_POUR_B = dict(IDLE_A, **{
     "footR": (-0.8, 0.0, 0.0),
 })
 
+
+# And the beat where she looks up at you. The bottle is back on the stool by
+# 6.81, so this pose has no bottle to satisfy: it is her hand coming away, her
+# back coming up (hips 0.875 -> 0.927) and her eyes arriving on yours. Solved
+# against a look target of (2.30, +0.21, 1.66) in her own frame, which is where
+# `kabina.standIn` puts somebody standing. See `wine_solve.py`.
+WINE_MEET = dict(IDLE_A, **{
+    "fingersR": (-30.0, 0.0, 0.0),
+    "thumbR": (-14.0, 0.0, 0.0),
+    "spine01": (-3.1, 0.8, -3.0),
+    "spine02": (-1.1, 0.5, -1.5),
+    "spine03": (0.9, -0.1, 0.8),
+    "chest": (2.0, -1.8, 4.7),
+    "neck": (1.8, 0.3, -0.6),
+    "head": (-0.8, -2.7, 1.2),
+    "clavicleR": (8.0, 4.0, 5.3),
+    "armUR": (-14.1, 7.0, -27.2),
+    "armLR": (28.1, 5.0, -14.9),
+    "handR": (2.5, 16.1, 12.0),
+    "legUL": (-10.0, -11.0, 0.0),
+    "legLL": (20.0, 0.0, 0.0),
+    "footL": (6.6, 0.0, 0.0),
+    "legUR": (-10.0, 11.0, 0.0),
+    "legLR": (20.0, 0.0, 0.0),
+    "footR": (6.6, 0.0, 0.0),
+})
+
 # And the wrap. Both hands to the knot at her hip, a tug, and then away —
 # the hands drop rather than being put anywhere, because what she is doing is
 # letting go of it. The scarf itself is not skinned and never was: the game
@@ -6612,7 +6639,8 @@ CLIPS = [
      "keys": [(0.00, IDLE_A), (0.62, WINE_REACH), (0.84, WINE_HOLD),
               (1.42, WINE_LIFT), (2.24, WINE_TIP), (2.72, WINE_POUR),
               (5.05, WINE_POUR_B), (5.42, WINE_TIP), (5.92, WINE_LIFT),
-              (6.55, WINE_HOLD), (6.78, WINE_REACH), (7.60, IDLE_A)]},
+              (6.55, WINE_HOLD), (6.78, WINE_REACH),
+              (7.06, WINE_MEET), (7.60, IDLE_A)]},
     {"name": "untie", "loop": False,
      "keys": [(0.00, IDLE_A), (0.60, UNTIE_A), (1.05, UNTIE_B),
               (1.35, UNTIE_B), (1.85, UNTIE_C), (2.55, IDLE_A)]},
