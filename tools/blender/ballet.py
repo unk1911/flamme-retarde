@@ -842,6 +842,58 @@ ORDER = ("pelvis",
          "legUL", "legLL", "footL", "toeL", "legUR", "legLR", "footR", "toeR")
 
 
+def verify():
+    """Check that what SHIPS is what this file fits.
+
+    Three separate bugs in one night were this shape and only this shape: a
+    value fitted here and a different value living in `human_mh.py`.
+    `ARM["bas"]` carried 32 degrees of forearm no solver ever produced;
+    `pelvis` was squared in `pose()` and never emitted because it was not in
+    `ORDER`; `@root` the same, because it is not a bone. Each one was found by
+    accident, and each one had been shipping for releases.
+
+    None of them could survive this. It rebuilds every pose from the tables in
+    this file and compares it, key by key, against the `BAL_*` that `human_mh`
+    actually plays. A key present on one side only counts as a difference when
+    its value is not zero, because that is the `pelvis` case exactly.
+
+    It found one on the day it was written, and the mechanism is worth keeping:
+    `BAL_PLIE` sits ABOVE `BAL_RELEVE` in `human_mh.py`, and four re-splices in
+    a row had each taken the dump from `BAL_RELEVE` onward — so the dump's own
+    first block was thrown away every time. Nothing played it, so nothing broke;
+    it simply sat there holding the pre-1.193 arms, the pre-1.196 legs and the
+    idle pelvis cock, waiting for somebody to put it in a key list.
+    """
+    bad = 0
+    for name, p in POSES + POSES2:
+        shipped = getattr(H, "BAL_" + name.upper(), None)
+        if shipped is None:
+            print("[verify] BAL_%s MISSING from human_mh" % name.upper())
+            bad += 1
+            continue
+        diffs = []
+        for k in sorted(set(p) | set(shipped)):
+            a, b = p.get(k), shipped.get(k)
+            if a is None or b is None:
+                v = b if a is None else a
+                if any(abs(x) > 1e-6 for x in v):
+                    diffs.append("%s only in %s = %s"
+                                 % (k, "shipped" if a is None else "ballet.py", v))
+                continue
+            if len(a) != len(b) or any(abs(x - y) > 0.051 for x, y in zip(a, b)):
+                diffs.append("%s %s vs %s" % (k, tuple(round(x, 3) for x in a),
+                                              tuple(round(y, 3) for y in b)))
+        if diffs:
+            bad += len(diffs)
+            print("[verify] BAL_%s" % name.upper())
+            for d in diffs:
+                print("           %s" % d)
+    print("[verify] %s" % ("%d divergence(s) -- re-run --dump and splice"
+                           % bad if bad else
+                           "every shipped pose matches the one this file fits"))
+    return bad
+
+
 def dump():
     """Print the finished poses as human_mh.py source.
 
@@ -963,6 +1015,9 @@ def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     if "--fit" in argv:
         fit(argv)
+        return
+    if "--verify" in argv:
+        verify()
         return
     if "--dump" in argv:
         dump()

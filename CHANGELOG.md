@@ -8,6 +8,40 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.208.0] — 2026-09-04
+
+### Three bugs in one night were the same bug
+
+1.193.0, 1.196.0 and 1.199.0 each fixed something different about the ballet and
+each turned out, underneath, to be one thing: **a value fitted in `ballet.py`
+and a different value living in `human_mh.py`.**
+
+- `ARM["bas"]` carried 32 degrees of forearm no solver ever produced.
+- `pelvis` was squared in `pose()` and shipped uncocked in exactly none of the
+  poses, because it is not in `ORDER` and every dumped block is a
+  `dict(IDLE_A, **{...})`.
+- `@root` the same, because it is not a bone.
+
+Each was found by accident. Each had been shipping for releases. So this pass
+wrote the thing that makes that class impossible to miss: `ballet.py --verify`
+rebuilds every pose from the tables in this file and compares it key by key
+against the `BAL_*` that `human_mh` actually plays. A key present on one side
+only counts as a difference when its value is not zero, which is the `pelvis`
+case exactly.
+
+**It found one on the day it was written, and the mechanism is the reason it is
+worth keeping.** `BAL_PLIE` sits at line 5920 of `human_mh.py`, *above*
+`BAL_RELEVE` at 5948 — and all four re-splices tonight took the dump from
+`/^BAL_RELEVE = dict/` onward. The dump emits eleven blocks. Every splice threw
+away the first one and I counted ten each time and thought that was the number.
+
+Nothing plays `BAL_PLIE`, so nothing broke and nothing about the running clip
+changes in this release. What it was doing was sitting in the file holding the
+pre-1.193 bras bas, the pre-1.196 leg fits and `pelvis (0, 0, -2.5)` — the idle
+hip cock, three releases after it was measured out — waiting for somebody to put
+it in a key list. It is re-dumped with the other ten, and `--verify` now reports
+**every shipped pose matches the one this file fits.**
+
 ## [1.207.0] — 2026-09-04
 
 ### The floor under skin was not a floor, it was a magic number
