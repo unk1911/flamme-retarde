@@ -8,6 +8,54 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.221.0] — 2026-09-04
+
+### Lifting her chest moved her hands, and nobody refitted them
+
+Third pass running where auditing this file's own recent work was worth more
+than looking for something new. 1.216.0 lifted the chest from −2/−3 to +1 in
+eight poses. **The clavicles are children of the chest**, so the whole shoulder
+girdle went with it — and the arm angles in `ARM` were fitted against a torso
+that no longer exists.
+
+Isolated by rebuilding each pose with the old chest and diffing the wrist:
+
+```
+BAL_STAND      27.6 mm      BAL_RELEVE     73.6 mm
+BAL_HOLD       27.5 mm      BAL_RETIRE     73.7 mm
+BAL_PIROU      27.2 mm      BAL_PIQUE      73.6 mm
+BAL_PLIE_B     12.8 mm      BAL_DEVELOPPE  73.4 mm
+```
+
+Twenty-seven millimetres standing and **seventy-four with the arms in fifth**,
+because overhead the arm is near vertical and a chest rotation swings it through
+the longest lever it has. Measured against its target, `fifth` had gone to
+x +0.024 from 0.12 — from slightly forward, where a dancer can *see* her hands,
+to straight overhead where she cannot.
+
+The cause is one line in `fit()`: it solves every arm against `BASE`, which is
+`IDLE_A` and carries `IDLE_A`'s chest. That was a small error while the ballet
+poses sat at −2/−3 against the idle's −1.5. Lifting them to +1 made it a
+two-and-a-half degree lie, and 2.5° at half a metre of arm is 22 mm before the
+girdle is even counted.
+
+Fitted against the torso the poses actually have now — `BASE + SQUARE + LIFT`
+with the lifted chest:
+
+```
+             off target      residual
+fifth        100 -> 38 mm    0.0575
+stand         44 -> 35 mm
+pirouette     38 -> 27 mm
+```
+
+`second` stays the worst at 72 mm and 2.04, which it has been since 1.193.0 and
+for the reason recorded there: its target sits at full arm extension, so the fit
+has no slack to spend.
+
+The general shape, for the next time: **a bone that moves carries its children,
+and anything fitted against the old parent is stale the moment you commit.**
+
 ## [1.220.0] — 2026-09-04
 
 ### The same constant, on a shop a third the size

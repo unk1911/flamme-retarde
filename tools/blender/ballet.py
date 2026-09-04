@@ -113,23 +113,23 @@ ARM = {
     # she was NOT doing: this line used to carry a hand-typed 32 deg of
     # forearm that was never the fitted value, and it folded her wrists up
     # to her navel with the elbows back against her ribs.
-    "bas": ((-7, 12, 29), (-2, 14, 26), (-18, 19, 21)),
+    "bas": ((-3, 12, 29), (-2, 14, 26), (-11, 19, 17)),
     # First: the same oval carried up to the navel.
-    "first": ((-36, 9, 6), (-9, 13, 56), (-15, 20, 30)),
+    "first": ((-34, 11, 9), (-2, 1, 56), (-6, 15, 29)),
     # First carried up to the diaphragm, for turning. Seeded off first; the
     # numbers below are what the fit returned against `TARGET_ARM["turn"]`.
-    "turn": ((-43, 4, -19), (-49, 12, 57), (-9, 1, 22)),
+    "turn": ((-40, 10, -19), (-44, 10, 53), (-9, -15, 29)),
     # Second: open to the sides, a little forward of the shoulders and a little
     # below them, elbow soft, palm down.
-    "second": ((2, -12, -17), (-2, -14, -14), (-16, -5, 2)),
+    "second": ((4, -12, -17), (-2, -14, -7), (-15, -19, -4)),
     # Fifth: overhead. The elbow has to stay nearly open or the hands come down
     # to her ears, which is what thirty degrees of forearm did in the first
     # draft — and past about -160 on the shoulder the two arms cross.
-    "fifth": ((-154, -12, 48), (-2, -3, 42), (-11, -11, 28)),
+    "fifth": ((-144, -12, 52), (-2, -4, 44), (-5, 9, 28)),
     # And the two only the arabesque uses: one arm long in front, on the line
     # of the raised leg, one long behind it.
-    "front": ((-93, -12, 5), (-2, -14, 15), (-11, 1, 18)),
-    "back": ((60, 12, 22), (-2, 14, 24), (-16, 15, -13)),
+    "front": ((-81, -12, -12), (-2, 14, 10), (-8, -4, 24)),
+    "back": ((62, 12, 19), (-2, 14, 27), (-14, 18, -3)),
 }
 
 
@@ -841,7 +841,21 @@ def fit(argv):
         seed = [ARM[name][0][0], ARM[name][0][1], ARM[name][0][2],
                 ARM[name][1][0], ARM[name][1][1], ARM[name][1][2],
                 ARM[name][2][0], ARM[name][2][1], ARM[name][2][2]]
-        x, f = fit_arm(dict(BASE, **SQUARE), "L", hand, elbow, seed)
+        # AGAINST THE TORSO THESE ARE ACTUALLY USED ON. `BASE` is `IDLE_A` and
+        # carries its chest, and every position in this table is used on a pose
+        # that does not. 1.216.0 made that bite: lifting the chest from -2/-3 to
+        # +1 carried the shoulder girdle with it — the clavicles are children of
+        # the chest — and moved the fitted hands 27 mm in the standing positions
+        # and **74 mm** in the ones with the arms in fifth, where the arm is
+        # near vertical and a chest rotation swings it through the longest lever
+        # it has. Measured after: `fifth` sat at x +0.024 against a target of
+        # 0.12, so the hands had gone from slightly forward — where a dancer can
+        # see them — to straight overhead.
+        #
+        # So the fit gets the torso the standing poses have, which is what nine
+        # of the eleven use.
+        x, f = fit_arm(dict(BASE, **SQUARE, **LIFT, chest=(1, 0, 0)),
+                       "L", hand, elbow, seed)
         g = fk(fit_arm_apply(BASE, "L", x), ("handL", "armLL"))
         print('    "%s": ((%.0f, %.0f, %.0f), (%.0f, %.0f, %.0f), '
               '(%.0f, %.0f, %.0f)),   # hand(%+.2f %+.2f %+.2f) err %.4f'
