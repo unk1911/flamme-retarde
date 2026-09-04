@@ -8,6 +8,45 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.216.0] — 2026-09-04
+
+### Pulling up
+
+The last joint in this routine nobody had tabulated. Across all thirty keys,
+**twenty-one carry `spine01/02/03 = 0, 0, 0` with `chest` at −2 or −3** — and on
+this rig `+x` tips a bone's far end backward, measured on the neck in 1.211.0
+where `+15` walks the head joint from x +0.027 to −0.003. So a chest of −3 is a
+chest tipped **forward**. Every standing, turning and rising position in this
+routine was a neutral spine with a slight slump in it.
+
+"Pull up" is the first thing anybody is told in a ballet class and the last thing
+they stop being told: the spine lengthens, the sternum lifts, the ribs close over
+it. It is the difference between standing in first position and standing in a
+queue — and it is the same fault as the pelvis in 1.196.0, the head in 1.211.0
+and the hands in 1.214.0. The idle default leaked in and no position ever
+overrode it.
+
+Four degrees spread up the back against a chest that was going the other way:
+
+```
+                       was      now
+bras bas, first,      -2.0     +4.0
+relevé, pirouette,    -3.0     +4.0
+retiré, développé…
+attitude             -23.0    -23.0    kept
+arabesque            -32.0    -32.0    kept
+```
+
+A net swing of six to seven degrees at the sternum — a lift and not an arch. The
+attitude and the arabesque keep the spines they were given, because theirs are
+the *position* rather than the posture: an arabesque hinges forward as the leg
+goes back, and that is the shape, not a slouch.
+
+It is a named `LIFT` rather than four numbers copied into eight `arms()` calls,
+and the two poses that carry a deliberate spine *yaw* — the piqué and the
+développé — keep it and gain the pitch. `--verify` confirms all eleven spliced
+clean.
+
 ## [1.215.0] — 2026-09-04
 
 ### The bench was the second sparsest thing on the promenade

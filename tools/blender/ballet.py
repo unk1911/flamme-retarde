@@ -75,6 +75,28 @@ def arms(p, **kw):
     return p
 
 
+# PULLING UP.
+#
+# Tabulated across all thirty keys of the routine, twenty-one of them carry
+# `spine01/02/03 = 0, 0, 0` with `chest` at -2 or -3. And on this rig `+x` tips
+# a bone's far end BACKWARD — measured on the neck in 1.211.0, where `+15` walks
+# the head joint from x +0.027 to -0.003 — so a chest of -3 is a chest tipped
+# FORWARD. Every standing, turning and rising position in this routine is a
+# neutral spine with a slight slump in it.
+#
+# "Pull up" is the first thing anybody is told in a ballet class and the last
+# thing they stop being told: the spine lengthens, the sternum lifts, the ribs
+# close over it. It is the difference between standing in first position and
+# standing in a queue, and it is the same fault as the pelvis, the head and the
+# hands — the idle default leaked in and no position ever overrode it.
+#
+# Four degrees, spread up the back, against a chest that was going the other
+# way: a net swing of six to seven degrees at the sternum. A lift and not an
+# arch. The arabesque and the attitude keep the spines they were given, because
+# theirs are the position rather than the posture.
+LIFT = dict(spine01=(0, 0, 0), spine02=(1.5, 0, 0), spine03=(1.5, 0, 0))
+
+
 # ── the arm positions ────────────────────────────────────────────────────────
 #
 # Five shapes, and every ballet pose in this file is two of them. Written as
@@ -414,7 +436,7 @@ PLIE = pose()
 leg(PLIE, "L", hip=-25, knee=53, out=46, track=-8, ankle=28, toe=3)
 leg(PLIE, "R", hip=-25, knee=53, out=46, track=-8, ankle=28, toe=3)
 arms(PLIE,
-     spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0), chest=(-2, 0, 0),
+     **LIFT, chest=(1, 0, 0),
      neck=(0, 0, 0), head=(-2, -4, 0),
      clavicleL=(0, 0, 4), clavicleR=(0, 0, -4))
 arm(PLIE, "L", "bas")
@@ -437,7 +459,7 @@ leg(RELEVE, "R", hip=1, knee=0, out=44, track=-9, ankle=-32, toe=20)
 # joint travels from x +0.027 to -0.003. So ten degrees of lift, split between
 # the two the way a neck actually does it.
 arms(RELEVE,
-     spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0), chest=(-3, 0, 0),
+     **LIFT, chest=(1, 0, 0),
      neck=(4, 0, 0), head=(6, 0, 0),
      clavicleL=(0, 0, 12), clavicleR=(0, 0, -12))
 arm(RELEVE, "L", "fifth")
@@ -461,7 +483,7 @@ PIROU = pose()
 leg(PIROU, "L", hip=0, knee=0, out=44, track=-12, ankle=-32, toe=20)
 leg(PIROU, "R", hip=-48, knee=111, out=46, track=-15, ankle=-32, toe=20)
 arms(PIROU,
-     spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0), chest=(-3, 0, 0),
+     **LIFT, chest=(1, 0, 0),
      neck=(0, 0, 0), head=(0, 0, 0),
      clavicleL=(0, 0, 8), clavicleR=(0, 0, -8))
 arm(PIROU, "L", "turn")
@@ -475,7 +497,8 @@ PIQUE = pose()
 leg(PIQUE, "L", hip=0, knee=0, out=44, track=-12, ankle=-32, toe=20)
 leg(PIQUE, "R", hip=-62, knee=109, out=46, track=-28, ankle=-32, toe=20)
 arms(PIQUE,
-     spine01=(0, 0, 0), spine02=(0, -3, 0), spine03=(0, -3, 0), chest=(-3, 0, 0),
+     spine01=(0, 0, 0), spine02=(1.5, -3, 0), spine03=(1.5, -3, 0),
+     chest=(1, 0, 0),
      neck=(0, 0, 0), head=(-4, 8, 0),
      clavicleL=(0, 0, 12), clavicleR=(0, 0, -8))
 arm(PIQUE, "L", "fifth")
@@ -542,7 +565,8 @@ DEVELOPPE = pose()
 leg(DEVELOPPE, "L", hip=0, knee=0, out=44, track=-12, ankle=-32, toe=20)
 leg(DEVELOPPE, "R", hip=-11, knee=7, out=42, track=92, ankle=-32, toe=20)
 arms(DEVELOPPE,
-     spine01=(0, 0, 0), spine02=(0, 5, 0), spine03=(0, 6, 0), chest=(-3, 0, 0),
+     spine01=(0, 0, 0), spine02=(1.5, 5, 0), spine03=(1.5, 6, 0),
+     chest=(1, 0, 0),
      neck=(0, 0, 0), head=(-2, -10, 0),
      clavicleL=(0, 0, 12), clavicleR=(0, 0, -10))
 arm(DEVELOPPE, "L", "fifth")
@@ -590,8 +614,8 @@ def lean(p, deg):
 STAND = pose()
 leg(STAND, "L", hip=0, knee=0, out=44, track=-9, ankle=0, toe=3)
 leg(STAND, "R", hip=0, knee=0, out=44, track=-9, ankle=0, toe=3)
-arms(STAND, spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0),
-     chest=(-2, 0, 0), neck=(0, 0, 0), head=(-2, 0, 0),
+arms(STAND, **LIFT,
+     chest=(1, 0, 0), neck=(0, 0, 0), head=(-2, 0, 0),
      clavicleL=(0, 0, 4), clavicleR=(0, 0, -4))
 arm(STAND, "L", "bas")
 arm(STAND, "R", "bas")
@@ -613,8 +637,8 @@ arm(STAND, "R", "bas")
 HOLD = pose()
 leg(HOLD, "L", hip=0, knee=0, out=44, track=-9, ankle=0, toe=3)
 leg(HOLD, "R", hip=0, knee=0, out=44, track=-9, ankle=0, toe=3)
-arms(HOLD, spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0),
-     chest=(-2, 0, 0), neck=(0, 4, 0), head=(-2, 8, 0),
+arms(HOLD, **LIFT,
+     chest=(1, 0, 0), neck=(0, 4, 0), head=(-2, 8, 0),
      clavicleL=(0, 0, 5), clavicleR=(0, 0, -5))
 arm(HOLD, "L", "bas")
 arm(HOLD, "R", "bas")
