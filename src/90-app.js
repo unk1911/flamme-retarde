@@ -1020,6 +1020,10 @@ async function boot() {
     // hittable for exactly as long as he exists — `dogProbe` returns null when
     // he does not — and what he does about it is his own business.
     ground.addGuest(jadrija.dogProbe, jadrija.dogWet);
+    // And the cat, who is a third guest and answers nothing like the second.
+    // A wet dog stands in it and shakes at you; a wet cat is gone. See
+    // `catWet`.
+    ground.addGuest(jadrija.catProbe, jadrija.catWet);
     // And the transistor set on the table in the kabina, which is a guest in
     // the same sense: something in the world the jet can land on that the hose
     // code has no business knowing anything else about.

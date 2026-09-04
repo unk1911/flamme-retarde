@@ -3944,8 +3944,109 @@ function buildAudio() {
     slowLp.frequency.value = 20000 * Math.pow(620 / 20000, clamp(k, 0, 1));
   }
 
+  /**
+   * A cat, complaining.
+   *
+   * Synthesised rather than sampled, like almost everything else in this file
+   * and for the same reason: a meow is a *contour*, not a texture, and a
+   * contour is four ramps. The bark is the exception here because a human word
+   * is a texture and nothing short of a recording of one is one.
+   *
+   * What makes it a cat and not a slide whistle is that the pitch and the
+   * mouth move on DIFFERENT curves. A cat opens on a closed mouth — "m" — then
+   * opens it — "eee-ow" — then closes it again, and the formant that does that
+   * sweeps up and back down over the whole call while the pitch arcs once and
+   * falls away at the end. Locked together they make one glide and it reads as
+   * an electronic bleep; offset, it reads as an animal. That is the whole
+   * trick, and it was two goes to find it.
+   *
+   *   f0        420 → 760 → 560 Hz     one arc, the fall longer than the rise
+   *   formant   700 → 1900 → 800 Hz    the mouth, lagging the pitch
+   *
+   * `hard` at 1 is a cat that has just been hit with a hose. Below about 0.5
+   * it is the same animal being talked to, which is a shorter call, lower and
+   * without the rasp — so the one function covers both and the caller says
+   * which by how hard it happened.
+   */
+  function meow(hard = 1, d = 0) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime + 0.01;
+    const far = Math.max(0.05, 1 - d / 26);
+    // Longer when he is upset, and no two the same: a cat that answers with
+    // the identical call twice is a doorbell.
+    const dur = (0.42 + hard * 0.30) * (0.88 + Math.random() * 0.24);
+    const up = dur * 0.30;
+    const v = 0.90 + Math.random() * 0.22;
+    const f0 = 420 * v, fPk = 760 * v, fEnd = 560 * v;
+
+    const osc = ctx.createOscillator();
+    // Sawtooth and not sine, because the formants have to have something to
+    // filter. A sine through a band-pass is a sine.
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(f0, t0);
+    osc.frequency.exponentialRampToValueAtTime(fPk, t0 + up);
+    osc.frequency.exponentialRampToValueAtTime(fEnd, t0 + dur * 0.86);
+    osc.frequency.exponentialRampToValueAtTime(fEnd * 0.72, t0 + dur);
+    // The wobble in a held cat note. Slow and shallow — deep vibrato is a
+    // singer, not a cat.
+    const vib = ctx.createOscillator();
+    vib.type = 'sine'; vib.frequency.value = 17 + Math.random() * 7;
+    const vg = ctx.createGain(); vg.gain.value = 11 * hard;
+    vib.connect(vg).connect(osc.frequency);
+
+    // 1.05 and not 0.30, and the difference is the two band-passes. A Q of 5.5
+    // on a sawtooth throws most of the signal away, so the number here is not
+    // the level — it is the level before the mouth. Recorded off `audio.tap()`
+    // with tools/sfx.mjs, 0.30 came back at 0.048 RMS against a beach bed
+    // sitting at 0.12: a cat you could not hear over the sea, which is exactly
+    // what it would have shipped as.
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(0.0001, t0);
+    out.gain.exponentialRampToValueAtTime(1.05 * far, t0 + 0.035);
+    out.gain.setValueAtTime(1.05 * far, t0 + dur * 0.55);
+    out.gain.exponentialRampToValueAtTime(0.0001, t0 + dur + 0.10);
+
+    // Two formants. The first is the vowel and carries the call; the second is
+    // the edge on it, and it is what a cat has that a hum does not.
+    for (const [mul, q, gain, lag] of [[1.0, 5.5, 1.0, 0.0], [2.6, 9.0, 0.42, 0.06]]) {
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.Q.value = q;
+      const ta = t0 + lag * dur;
+      bp.frequency.setValueAtTime(700 * mul, ta);
+      bp.frequency.exponentialRampToValueAtTime(1900 * mul, ta + dur * 0.52);
+      bp.frequency.exponentialRampToValueAtTime(800 * mul, t0 + dur);
+      const g = ctx.createGain(); g.gain.value = gain;
+      osc.connect(bp).connect(g).connect(out);
+    }
+    // And the rasp, which only a cross cat has. Noise through the same mouth,
+    // an eighth of the level, and it is the difference between "meow" and
+    // "MEOW".
+    if (hard > 0.5 && noiseBuf) {
+      const air = ctx.createBufferSource();
+      air.buffer = noiseBuf; air.loop = true;
+      const nf = ctx.createBiquadFilter();
+      nf.type = 'bandpass'; nf.Q.value = 2.2;
+      nf.frequency.setValueAtTime(1200, t0);
+      nf.frequency.exponentialRampToValueAtTime(3000, t0 + dur * 0.5);
+      nf.frequency.exponentialRampToValueAtTime(1400, t0 + dur);
+      const ng = ctx.createGain();
+      ng.gain.setValueAtTime(0.0001, t0);
+      ng.gain.exponentialRampToValueAtTime(0.075 * far * (hard - 0.5) * 2, t0 + 0.06);
+      ng.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      air.connect(nf).connect(ng).connect(out);
+      air.start(t0); air.stop(t0 + dur + 0.12);
+    }
+    out.connect(bed || master);
+    if (verbSend) {
+      const w = ctx.createGain(); w.gain.value = 0.16 * far;
+      out.connect(w).connect(verbSend);
+    }
+    osc.start(t0); osc.stop(t0 + dur + 0.14);
+    vib.start(t0); vib.stop(t0 + dur + 0.14);
+  }
+
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, canopy, boots,
+    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow,
     /**
      * The last node before the speakers, and the context it lives in.
      *

@@ -22635,6 +22635,23 @@ async function buildJadrija(scene) {
     // shorter one, or he would swing a metre and a half out into the gangway
     // to get past a chair he could have gone round in forty centimetres.
     easy: 0.22,
+    // ── being hit with a hose ────────────────────────────────────────────────
+    //
+    // Misha, 4 Sep: "if u spray the cat with water, it should Meow". He is a
+    // guest on the jet the way the dog and the transistor set are — see
+    // `addGuest` in 90-app.js — and what he does about it is his own business,
+    // which for a cat is: complain, and leave.
+    hitR: 0.24, hitH: 0.30,     // what the jet has to land on. He is small.
+    bolt: 2.4,                  // m/s. A cat hit with water does not trot.
+    // How long one hit is remembered. The jet traces every frame while the
+    // branch is on him, and without this he would meow sixty times a second;
+    // `catWet` refreshes it and only the FIRST refresh makes a sound. Same
+    // shape as `dogWet` and for the same reason written there.
+    soak: 1.6,
+    // And how long he sulks under the table he ran to before the routine
+    // starts again. Longer than a normal stay, because he is not settling, he
+    // is waiting for you to go away.
+    sulk: [11.0, 19.0],
   };
   let cat = null;
 
@@ -22842,6 +22859,7 @@ async function buildJadrija(scene) {
         // crabs along a coastline that runs 31 degrees off the world axis.
         head: Math.PI * 0.5, want: Math.PI * 0.5,
         path: [[fig0[0], fig0[1]]], wp: 0, gap: 99,
+        soak: 0, dash: false, hear: 999,
       };
     } catch (e) {
       console.warn('cat failed:', e.message);
@@ -23298,8 +23316,8 @@ async function buildJadrija(scene) {
       c.head += step;
       if (Math.abs(d) < 0.05) {
         c.mode = 'cross';
-        c.fig.play('walk', { fade: 0.12 });
-        c.fig.state.speed = CAT.trot / CAT.walk;
+        c.fig.play('walk', { fade: c.dash ? 0.04 : 0.12 });
+        c.fig.state.speed = (c.dash ? CAT.bolt : CAT.trot) / CAT.walk;
       }
       return;
     }
@@ -23322,7 +23340,7 @@ async function buildJadrija(scene) {
     const last = c.wp >= c.path.length - 1;
     const dt2 = g[0] - c.at[0], ds = g[1] - c.at[1];
     const d = Math.hypot(dt2, ds);
-    const step = CAT.trot * dt;
+    const step = (c.dash ? CAT.bolt : CAT.trot) * dt;
     let e = Math.atan2(ds, dt2) - c.head;
     while (e > Math.PI) e -= Math.PI * 2;
     while (e < -Math.PI) e += Math.PI * 2;
@@ -23331,7 +23349,11 @@ async function buildJadrija(scene) {
     if (last && d <= step) {
       c.at[0] = g[0]; c.at[1] = g[1];
       c.mode = 'under';
-      c.timer = CAT.under[0] + Math.random() * (CAT.under[1] - CAT.under[0]);
+      // A bolt ends in a sulk and not in a stay. He is not settling under this
+      // one, he is waiting for whoever had the hose to lose interest.
+      const [lo, hi] = c.dash ? CAT.sulk : CAT.under;
+      c.timer = lo + Math.random() * (hi - lo);
+      c.dash = false;
       // Back to the walk at a stroll rather than to an idle: there is exactly
       // one clip in this file — see tools/blender/cat.py, which had one action
       // to bake and baked it — so "sitting under a table" is the same cycle
@@ -23345,10 +23367,57 @@ async function buildJadrija(scene) {
     c.at[1] += Math.sin(c.head) * step;
   }
 
+  /** Where he is, for the jet to aim at. Read once a trace by 47-ground.js. */
+  function catProbe() {
+    if (!cat || !cat.mesh.visible) return null;
+    const p = toWorld(cat.at[0], cat.at[1]);
+    return { x: p[0], y: p[1], z: p[2], r: CAT.hitR, h: CAT.hitH };
+  }
+
+  /**
+   * Hit with the hose.
+   *
+   * Litres are ignored, the same way they are for her and for the dog. What
+   * matters is that it happened, and `soak` is what stops it happening sixty
+   * times a second: the jet is traced every frame the branch is on him, so
+   * only the first refresh of the memory makes a sound.
+   *
+   * AND HE DOES NOT SHAKE, WHICH IS THE WHOLE DIFFERENCE FROM THE DOG. A wet
+   * dog stands in the water and shakes at you; a wet cat is gone. So he goes
+   * — at 2.4 m/s, which is nearly four times his trot — to a table that is NOT
+   * the one he was just hit under, because the one thing a cat will not do is
+   * sit back down in the spot where the water found him. `catRoute` plans the
+   * run exactly as it plans a stroll, so he still goes round the chairs while
+   * he is bolting.
+   */
+  function catWet(_litres) {
+    if (!cat || !CAT.at) return;
+    const c = cat;
+    const already = c.soak > 0;
+    c.soak = CAT.soak;
+    if (already) return;
+    audio.meow(1, c.hear);
+    // The far table, not the near one. `dir` is flipped rather than a target
+    // chosen, so he goes on working the row afterwards from wherever he
+    // fetched up instead of having a hole in his routine where the bolt was.
+    if (c.leg + c.dir < 0 || c.leg + c.dir >= CAT.at.length) c.dir = -c.dir;
+    c.leg += c.dir;
+    const r = catRoute([c.at[0], c.at[1]], CAT.at[c.leg]);
+    c.path = r.path; c.wp = 0; c.gap = r.gap;
+    c.mode = 'turn'; c.dash = true;
+    const g = c.path[0];
+    c.want = Math.atan2(g[1] - c.at[1], g[0] - c.at[0]);
+  }
+
   function stepCat(camPos, dt) {
     if (!cat) return;
     const d = Math.hypot(camPos.x - cat.mesh.position.x,
       camPos.z - cat.mesh.position.z);
+    // How far off you are, kept here so `catWet` can hand it to the mixer
+    // without repeating the hypot — the jet is traced from a nozzle, not from
+    // a camera, and the sound is heard at the camera.
+    cat.hear = d;
+    if (cat.soak > 0) cat.soak -= dt;
     // Tighter than the dog's 120 m, because he is half the dog and under a
     // table: at ninety metres this is a smudge in the shade of a terrace.
     if (d > CAT.near) return;
@@ -28418,6 +28487,8 @@ async function buildJadrija(scene) {
         // "he goes round the chairs now" stops being a screenshot.
         path: cat.path.map((a2) => [+a2[0].toFixed(2), +a2[1].toFixed(2)]),
         wp: cat.wp, gap: +cat.gap.toFixed(3),
+        soak: +cat.soak.toFixed(2), dash: !!cat.dash,
+        hear: +cat.hear.toFixed(1),
         clear: +catGap([[cat.at[0], cat.at[1]],
           [cat.at[0], cat.at[1]]], catMiss()).toFixed(3),
         // The paw ankles, in metres over the plane the animal is placed on.
@@ -28717,7 +28788,8 @@ async function buildJadrija(scene) {
     /** Where she is standing, so the back door can put you in front of her. */
     figureAt: testFigure ? testFigure.at : null,
     /** The two ends of the hose hook — 47-ground.js wires them together. */
-    figureProbe, figureWet, dogProbe, dogWet, radioProbe, radioWet,
+    figureProbe, figureWet, dogProbe, dogWet, catProbe, catWet,
+    radioProbe, radioWet,
     tvProbe, tvWet,
     /** The set on the table: where it is, what it is doing, and knock it on. */
     radio: (knock) => {

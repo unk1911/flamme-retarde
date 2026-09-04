@@ -8,6 +8,61 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.230.0] — 2026-09-04
+
+### Spray the cat and he tells you what he thinks of it
+
+Misha: *"if u spray the cat with water, it should Meaw"*. He is a guest on the
+jet now — the third, after her and the dog — so `catProbe` says where he is and
+`catWet` decides what he does about it, and 47-ground.js goes on knowing nothing
+about any of them.
+
+**He does not shake, and that is the whole difference from the dog.** A wet dog
+stands in the water and shakes at you; a wet cat is *gone*. So he goes, at
+2.4 m/s against a trot of 0.66, to a table that is **not** the one he was hit
+under — the one thing a cat will not do is sit back down where the water found
+him. `catRoute` plans the bolt exactly as it plans a stroll, so he still goes
+round the chairs while he is running. He arrives and sulks for eleven to
+nineteen seconds instead of the usual four to fourteen: he is not settling, he
+is waiting for whoever had the hose to lose interest.
+
+**The meow is synthesised**, like almost everything else in 80-audio.js and for
+the same reason: a meow is a *contour*, not a texture, and a contour is four
+ramps. What makes it a cat and not a slide whistle is that the pitch and the
+mouth move on **different** curves — a cat opens on a closed mouth, opens it,
+and closes it again, while the pitch arcs once and falls away at the end. Locked
+together they make one glide and it reads as an electronic bleep.
+
+|  | start | peak | end |
+|---|---|---|---|
+| f0 | 420 Hz | 760 | 560 |
+| formant | 700 Hz | 1900 | 800, lagging the pitch |
+
+Measured off the recording: the f0 track runs 485 → 760 → 678 and the dominant
+formant below 4 kHz runs 975 → 725 → 1525 → 1300. A rasp of band-passed noise
+comes in above `hard = 0.5`, which is the difference between "meow" and "MEOW".
+
+**And a new tool, because none of the above could be judged by reading it.**
+`tools/sfx.mjs` opens the page, clicks through so the AudioContext starts, arms
+a MediaRecorder on `audio.tap()` — the last node before the speakers, so what
+comes out is what you would have heard, reverb and master gain and all — fires
+an expression a few times and writes a wav:
+
+```
+node tools/sfx.mjs --out /tmp/meow.wav --js "audio.meow(1)" --n 3 --every 1.3
+```
+
+It earned itself back on the first run. The meow shipped at a peak gain of 0.30
+and came off the tap at **0.048 RMS against a beach bed sitting at 0.12** — a
+cat you cannot hear over the sea. The number in the code is not the level, it is
+the level *before* the mouth, and two band-passes at Q 5.5 and 9 throw most of a
+sawtooth away. At 1.05 the calls land at 0.15–0.17 against that same bed, with
+the peak sample at 0.43.
+
+Verified end to end rather than by calling `catWet` directly: standing 2.2 m
+off, the branch aimed at `catProbe`'s own coordinates, the water on for a third
+of a second — `soak` 1.6, `dash` true, and he is on his way to the next table.
+
 ## [1.229.0] — 2026-09-04
 
 ### The gelato is scraped, and the stemware is glass
