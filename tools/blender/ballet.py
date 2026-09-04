@@ -149,7 +149,15 @@ HAND_SOFT = {"fingersL": (-22.0, 0.0, 0.0), "fingersR": (-22.0, 0.0, 0.0),
 # 4 to 5 degrees apart, which is not something a symmetric rig fitted to
 # symmetric targets should do — it is a solver quietly paying for a tilt
 # nobody had told it about.
-SQUARE = {"pelvis": (0.0, 0.0, 0.0)}
+# And the other half of the same stance. `IDLE_A` also carries
+# `@root = (0, +0.020, -0.006)` — a 20 mm shove to her LEFT, which is what
+# puts a woman standing at ease over her supporting foot instead of over
+# the line between them. `ballet_floor` re-solves the z of this per key and
+# leaves x and y alone, so squaring the pelvis in 1.196.0 left her skeleton
+# symmetric and the whole figure still standing 20 mm off the mark her feet
+# are supposed to be on. The z stays: that is the floor solve's to own.
+SQUARE = {"pelvis": (0.0, 0.0, 0.0),
+          "@root": (0.0, 0.0, BASE.get("@root", (0.0, 0.0, 0.0))[2])}
 
 
 def pose(**kw):
@@ -836,6 +844,13 @@ def dump():
             if v is None:
                 continue
             print('    "%s": (%.1f, %.1f, %.1f),' % (b, v[0], v[1], v[2]))
+        # `@root` is not a bone and so is not in ORDER, and every block here is
+        # a `dict(IDLE_A, **{...})` — so without this line the squared root is
+        # fitted in this file and the idle one ships. Exactly the trap `pelvis`
+        # fell into. Four decimals: it is metres, not degrees.
+        r = p.get("@root")
+        if r is not None:
+            print('    "@root": (%.4f, %.4f, %.4f),' % (r[0], r[1], r[2]))
         print("})")
         print("")
 

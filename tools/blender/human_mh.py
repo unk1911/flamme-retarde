@@ -5973,6 +5973,7 @@ BAL_RELEVE = dict(IDLE_A, **{
     "legLR": (0.0, 0.0, 0.0),
     "footR": (-32.0, 0.0, 0.0),
     "toeR": (20.0, 0.0, 0.0),
+    "@root": (0.0000, 0.0000, -0.0060),
 })
 
 BAL_PIROU = dict(IDLE_A, **{
@@ -6003,6 +6004,7 @@ BAL_PIROU = dict(IDLE_A, **{
     "legLR": (111.0, 0.0, 0.0),
     "footR": (-32.0, 0.0, 0.0),
     "toeR": (20.0, 0.0, 0.0),
+    "@root": (0.0000, 0.0000, -0.0060),
 })
 
 BAL_PIQUE = dict(IDLE_A, **{
@@ -6033,6 +6035,7 @@ BAL_PIQUE = dict(IDLE_A, **{
     "legLR": (109.0, 0.0, 0.0),
     "footR": (-32.0, 0.0, 0.0),
     "toeR": (20.0, 0.0, 0.0),
+    "@root": (0.0000, 0.0000, -0.0060),
 })
 
 BAL_ATTITUDE = dict(IDLE_A, **{
@@ -6063,6 +6066,7 @@ BAL_ATTITUDE = dict(IDLE_A, **{
     "legLR": (132.0, 0.0, 0.0),
     "footR": (-32.0, 0.0, 0.0),
     "toeR": (20.0, 0.0, 0.0),
+    "@root": (0.0000, 0.0000, -0.0060),
 })
 
 BAL_ARABESQUE = dict(IDLE_A, **{
@@ -6093,6 +6097,7 @@ BAL_ARABESQUE = dict(IDLE_A, **{
     "legLR": (14.0, 0.0, 0.0),
     "footR": (-32.0, 0.0, 0.0),
     "toeR": (20.0, 0.0, 0.0),
+    "@root": (0.0000, 0.0000, -0.0060),
 })
 
 BAL_DEVELOPPE = dict(IDLE_A, **{
@@ -6123,6 +6128,7 @@ BAL_DEVELOPPE = dict(IDLE_A, **{
     "legLR": (7.0, 0.0, 0.0),
     "footR": (-32.0, 0.0, 0.0),
     "toeR": (20.0, 0.0, 0.0),
+    "@root": (0.0000, 0.0000, -0.0060),
 })
 
 BAL_STAND = dict(IDLE_A, **{
@@ -6153,6 +6159,7 @@ BAL_STAND = dict(IDLE_A, **{
     "legLR": (0.0, 0.0, 0.0),
     "footR": (0.0, 0.0, 0.0),
     "toeR": (3.0, 0.0, 0.0),
+    "@root": (0.0000, 0.0000, -0.0060),
 })
 
 BAL_HOLD = dict(IDLE_A, **{
@@ -6183,6 +6190,7 @@ BAL_HOLD = dict(IDLE_A, **{
     "legLR": (0.0, 0.0, 0.0),
     "footR": (0.0, 0.0, 0.0),
     "toeR": (3.0, 0.0, 0.0),
+    "@root": (0.0000, 0.0000, -0.0060),
 })
 
 BAL_PLIE_B = dict(IDLE_A, **{
@@ -6213,6 +6221,7 @@ BAL_PLIE_B = dict(IDLE_A, **{
     "legLR": (53.0, 0.0, 0.0),
     "footR": (28.0, 0.0, 0.0),
     "toeR": (3.0, 0.0, 0.0),
+    "@root": (0.0000, 0.0000, -0.0060),
 })
 
 BAL_RETIRE = dict(IDLE_A, **{
@@ -6243,6 +6252,7 @@ BAL_RETIRE = dict(IDLE_A, **{
     "legLR": (111.0, 0.0, 0.0),
     "footR": (-32.0, 0.0, 0.0),
     "toeR": (20.0, 0.0, 0.0),
+    "@root": (0.0000, 0.0000, -0.0060),
 })
 
 
@@ -6310,6 +6320,21 @@ def _look(p, deg):
 # Which is also the answer to "she looks weird BETWEEN the positions": the
 # positions were right and the half-second between each pair of them was a
 # straight-line cut through space with nothing in it.
+#
+# AND THE KEY GOES WHERE THE ARM IS, NOT WHERE THE CLOCK IS. Every one of
+# these was first dropped at the MIDPOINT IN TIME of its transition, which
+# is the obvious place and the wrong one: first position is not halfway
+# from bras bas to fifth, it is a fifth of the way. `armUL` runs -7 in bas,
+# -36 in first and -154 in fifth, so a key at the midpoint gives the arm 29
+# degrees to cover in the first half and 118 in the second. Measured across
+# the clip that came out at 73 to 83 deg/s on the way in and **337 to 393**
+# on the way out — the six fastest joint rates in the whole routine, all of
+# them this one bone, all of them in a `_thru`. A controlled port de bras is
+# 150 to 240. 393 is a throw.
+#
+# So each key sits at the fraction of the transition the ARM's travel says,
+# and its blend `u` moves with it so that the legs, which do interpolate
+# straight, still cross at constant speed. Both halves now run 196 to 226.
 BAL_ARM1 = {
     "armUL": (-36.0, 9.0, 6.0), "armLL": (-9.0, 13.0, 56.0),
     "handL": (-15.0, 20.0, 30.0),
@@ -6346,15 +6371,15 @@ BALLET_KEYS = [
     (0.00, IDLE_A), (0.70, BAL_HOLD), (1.55, BAL_PLIE_B), (2.40, BAL_HOLD),
     # Bas to fifth, through first — and letting go of the rail on the way,
     # which is what she has to do anyway to get up on demi-pointe.
-    (2.80, _thru(BAL_HOLD, BAL_RELEVE, 0.55)),
+    (2.55, _thru(BAL_HOLD, BAL_RELEVE, 0.20)),
     (3.15, BAL_RELEVE), (3.90, BAL_RELEVE),
-    (4.25, _thru(BAL_RELEVE, BAL_STAND, 0.50)),
+    (4.42, _thru(BAL_RELEVE, BAL_STAND, 0.80)),
     (4.55, BAL_STAND),
-    (4.92, _thru(BAL_STAND, BAL_RETIRE, 0.50)),
+    (4.69, _thru(BAL_STAND, BAL_RETIRE, 0.20)),
     (5.25, BAL_RETIRE), (6.00, BAL_DEVELOPPE), (6.75, BAL_DEVELOPPE),
-    (7.12, _thru(BAL_DEVELOPPE, BAL_STAND, 0.55)),
+    (7.31, _thru(BAL_DEVELOPPE, BAL_STAND, 0.80)),
     (7.45, BAL_STAND),
-    (7.80, _thru(BAL_STAND, BAL_PIQUE, 0.50)),
+    (7.58, _thru(BAL_STAND, BAL_PIQUE, 0.20)),
     (8.10, BAL_PIQUE), (8.75, BAL_PIROU),
     (9.20, _spin(_look(BAL_PIROU, -60), 120)),
     (9.65, _spin(_look(BAL_PIROU, 60), 240)),
@@ -6369,10 +6394,10 @@ BALLET_KEYS = [
     # Seventy degrees, out and back, on the same `@turn` the pirouette already
     # uses. A dancer turns to present a line; this is that, and it costs two
     # numbers.
-    (11.10, _thru(_spin(BAL_STAND, 360), _spin(BAL_ATTITUDE, 430), 0.52)),
+    (10.85, _thru(_spin(BAL_STAND, 360), _spin(BAL_ATTITUDE, 430), 0.20)),
     (11.45, _spin(BAL_ATTITUDE, 430)), (12.15, _spin(BAL_ATTITUDE, 430)),
     (12.90, _spin(BAL_ARABESQUE, 430)), (13.65, _spin(BAL_ARABESQUE, 430)),
-    (14.02, _thru(_spin(BAL_ARABESQUE, 430), _spin(BAL_STAND, 360), 0.55)),
+    (14.11, _thru(_spin(BAL_ARABESQUE, 430), _spin(BAL_STAND, 360), 0.66)),
     (14.35, _spin(BAL_STAND, 360)), (15.00, _spin(IDLE_A, 360)),
 ]
 

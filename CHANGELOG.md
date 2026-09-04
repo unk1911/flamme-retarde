@@ -8,6 +8,73 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.199.0] — 2026-09-04
+
+### The key went where the clock was, not where the arm was
+
+The wine's last pass found that a clip's *timing* can be wrong however right its
+poses are. A ballet exercise is danced to counts, so metronomic timing is not
+the fault here — but there is a version of the same question that is. Take every
+consecutive pair of keys in the routine, find the bone that moves furthest
+between them, and divide by the gap. The ten fastest:
+
+```
+ 7.80 ->  8.10   0.30 s   118 deg   393 deg/s   armUL
+ 4.92 ->  5.25   0.33 s   118 deg   358 deg/s   armUL
+11.10 -> 11.45   0.35 s   118 deg   337 deg/s   armUL
+ 2.80 ->  3.15   0.35 s   118 deg   337 deg/s   armUL
+ 3.90 ->  4.25   0.35 s   118 deg   337 deg/s   armUL
+ 6.75 ->  7.12   0.37 s   118 deg   319 deg/s   armUL
+```
+
+Six of the top eight are the same bone doing the same 118 degrees, and every one
+of them is inside a `_thru` — the transition keys added in 1.188.0 precisely so
+that the arms would pass through first position instead of cutting straight.
+A controlled port de bras runs 150 to 240 deg/s. **393 is a throw.**
+
+The cause is one assumption nobody wrote down: each `_thru` was dropped at the
+**midpoint in time** of its transition. That is the obvious place and it is the
+wrong one, because first position is not halfway from bras bas to fifth — it is
+a fifth of the way. `armUL` is -7 in bas, -36 in first and -154 in fifth. A key
+at the temporal midpoint therefore hands the arm 29 degrees to cover in the
+first half and 118 in the second: it crawls out at 73 to 83 deg/s and then
+sprints at 337 to 393. The arc was there. It was being travelled at two
+completely different speeds, and the fast half is the half everybody watches,
+because it ends in fifth.
+
+So each key now sits at the fraction of its transition that the arm's own travel
+says, and its blend `u` moves with it so the legs — which do interpolate
+straight — still cross at constant speed:
+
+```
+                    was            now
+HOLD -> RELEVE      73 / 337       196 / 196    key 2.80 -> 2.55, u 0.55 -> 0.20
+RELEVE -> STAND    337 /  97       226 / 226    key 4.25 -> 4.42, u 0.50 -> 0.80
+STAND -> RETIRE     78 / 358       210 / 210    key 4.92 -> 4.69, u 0.50 -> 0.20
+DEVELOPPE -> STAND 319 /  88       210 / 210    key 7.12 -> 7.31, u 0.55 -> 0.80
+STAND -> PIQUE      83 / 393       226 / 226    key 7.80 -> 7.58, u 0.50 -> 0.20
+STAND -> ATTITUDE   72 / 337       196 / 196    key 11.10 -> 10.85, u 0.52 -> 0.20
+ARABESQUE -> STAND 154 /  88       123 / 123    key 14.02 -> 14.11, u 0.55 -> 0.66
+```
+
+The fastest joint in the whole fifteen seconds is now **231 deg/s**, against 393,
+and the spread across the routine is 210 to 231 rather than 73 to 393.
+
+### And the other half of the idle stance
+
+1.196.0 took 2.5 degrees of roll out of the pelvis and left the rest of it
+behind. `IDLE_A` also carries `@root = (0, +0.020, -0.006)` — a 20 mm shove to
+her left, which is what puts a woman standing at ease over her supporting foot
+rather than over the line between them. `ballet_floor` re-solves the **z** of
+that per key and leaves x and y alone, so squaring the pelvis made her skeleton
+symmetric while the whole figure went on standing 20 mm off the mark her feet
+are on.
+
+And `dump()` would have shipped none of it, for the second time and the same
+reason: `@root` is not a bone, so it is not in `ORDER`, so every block came out
+as a `dict(IDLE_A, **{...})` carrying the idle root. It is emitted explicitly
+now, at four decimals, with the trap written over it.
+
 ## [1.198.0] — 2026-09-04
 
 ### Six shops that look shut, and one that is open
