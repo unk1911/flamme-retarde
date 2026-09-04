@@ -91,20 +91,20 @@ ARM = {
     # she was NOT doing: this line used to carry a hand-typed 32 deg of
     # forearm that was never the fitted value, and it folded her wrists up
     # to her navel with the elbows back against her ribs.
-    "bas": ((-8, 12, 28), (-2, 13, 27), (-20, 17, 21)),
+    "bas": ((-7, 12, 29), (-2, 14, 26), (-18, 19, 21)),
     # First: the same oval carried up to the navel.
-    "first": ((-36, 11, 5), (-9, 14, 54), (-17, 16, 28)),
+    "first": ((-36, 9, 6), (-9, 13, 56), (-15, 20, 30)),
     # Second: open to the sides, a little forward of the shoulders and a little
     # below them, elbow soft, palm down.
-    "second": ((2, -12, -19), (-2, 2, -7), (-20, -2, 19)),
+    "second": ((2, -12, -17), (-2, -14, -14), (-16, -5, 2)),
     # Fifth: overhead. The elbow has to stay nearly open or the hands come down
     # to her ears, which is what thirty degrees of forearm did in the first
     # draft — and past about -160 on the shoulder the two arms cross.
-    "fifth": ((-155, -12, 54), (-2, -12, 47), (-21, -8, 26)),
+    "fifth": ((-154, -12, 48), (-2, -3, 42), (-11, -11, 28)),
     # And the two only the arabesque uses: one arm long in front, on the line
     # of the raised leg, one long behind it.
-    "front": ((-91, -12, 7), (-2, -14, 14), (-18, 10, 29)),
-    "back": ((58, 12, 20), (-2, 14, 25), (-11, 20, -12)),
+    "front": ((-93, -12, 5), (-2, -14, 15), (-11, 1, 18)),
+    "back": ((60, 12, 22), (-2, 14, 24), (-16, 15, -13)),
 }
 
 
@@ -128,8 +128,32 @@ HAND_SOFT = {"fingersL": (-22.0, 0.0, 0.0), "fingersR": (-22.0, 0.0, 0.0),
              "thumbL": (-18.0, 0.0, 0.0), "thumbR": (-18.0, 0.0, 0.0)}
 
 
+# AND THE PELVIS IS SQUARE. `BASE` is `IDLE_A`, which is a woman standing at
+# ease — weight on one leg, one hip carried higher than the other, and 2.5
+# degrees of roll written into `pelvis` z to do it. Every pose in this file
+# overrides the legs, the spine, the arms and the head. Not one of them ever
+# overrode the pelvis, so that 2.5 degrees was underneath first position,
+# demi-plie, releve, fifth and all seven of the positions, in every frame of the
+# routine.
+#
+# Measured up the chain it is not small. At rest every spine head sits at
+# y = 0.0000; carrying the cock they walk off the midline the whole way up —
+# spine01 -0.0024, spine02 -0.0046, spine03 -0.0082, chest -0.0151, neck
+# -0.0210, and her head **25 mm** to her right of the line her feet are
+# standing on. A dancer's pelvis is square; it is the first thing anybody is
+# taught and it is the difference between standing in first position and
+# standing about.
+#
+# It is also, almost certainly, what bent the leg fits. `TARGET_LEG` asks for
+# `firstL` and `firstR` at mirrored targets and the two came back with `track`
+# 4 to 5 degrees apart, which is not something a symmetric rig fitted to
+# symmetric targets should do — it is a solver quietly paying for a tilt
+# nobody had told it about.
+SQUARE = {"pelvis": (0.0, 0.0, 0.0)}
+
+
 def pose(**kw):
-    return dict(BASE, **HAND_SOFT, **kw)
+    return dict(BASE, **SQUARE, **HAND_SOFT, **kw)
 
 
 # ── fitting, because the Euler order makes guessing hopeless ─────────────────
@@ -353,8 +377,8 @@ def fit_arm(base, side, hand_at, elbow_at, seed, iters=6000, bend=False):
 # first position left them and the knees tracking out over the toes, which is
 # the whole test of a plie and the one thing the front view is about.
 PLIE = pose()
-leg(PLIE, "L", hip=-24, knee=52, out=45, track=-11, ankle=27, toe=3)
-leg(PLIE, "R", hip=-25, knee=54, out=46, track=-6, ankle=28, toe=3)
+leg(PLIE, "L", hip=-25, knee=53, out=46, track=-8, ankle=28, toe=3)
+leg(PLIE, "R", hip=-25, knee=53, out=46, track=-8, ankle=28, toe=3)
 arms(PLIE,
      spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0), chest=(-2, 0, 0),
      neck=(0, 0, 0), head=(-2, -4, 0),
@@ -368,8 +392,8 @@ arm(PLIE, "R", "bas")
 # this rig, so a big positive number keeps a raised arm tucked against the head
 # rather than opening the oval a fifth position is.
 RELEVE = pose()
-leg(RELEVE, "L", hip=0, knee=0, out=44, track=-11, ankle=-32, toe=20)
-leg(RELEVE, "R", hip=1, knee=0, out=44, track=-6, ankle=-32, toe=20)
+leg(RELEVE, "L", hip=1, knee=0, out=44, track=-9, ankle=-32, toe=20)
+leg(RELEVE, "R", hip=1, knee=0, out=44, track=-9, ankle=-32, toe=20)
 arms(RELEVE,
      spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0), chest=(-3, 0, 0),
      neck=(0, 0, 0), head=(-2, 0, 0),
@@ -392,8 +416,8 @@ arm(RELEVE, "R", "fifth")
 # `pelvis` z across the clip's keys, so the clip spins her and the game does
 # not have to know anything about it.
 PIROU = pose()
-leg(PIROU, "L", hip=0, knee=0, out=44, track=-14, ankle=-32, toe=20)
-leg(PIROU, "R", hip=-48, knee=111, out=46, track=-13, ankle=-32, toe=20)
+leg(PIROU, "L", hip=0, knee=0, out=44, track=-12, ankle=-32, toe=20)
+leg(PIROU, "R", hip=-48, knee=111, out=46, track=-15, ankle=-32, toe=20)
 arms(PIROU,
      spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0), chest=(-3, 0, 0),
      neck=(0, 0, 0), head=(0, 0, 0),
@@ -406,8 +430,8 @@ arm(PIROU, "R", "first")
 # from the pirouette above is the arms and a foot carried a little further
 # forward; the difference the eye reads is that she has arrived somewhere.
 PIQUE = pose()
-leg(PIQUE, "L", hip=0, knee=0, out=44, track=-14, ankle=-32, toe=20)
-leg(PIQUE, "R", hip=-62, knee=110, out=46, track=-25, ankle=-32, toe=20)
+leg(PIQUE, "L", hip=0, knee=0, out=44, track=-12, ankle=-32, toe=20)
+leg(PIQUE, "R", hip=-62, knee=109, out=46, track=-28, ankle=-32, toe=20)
 arms(PIQUE,
      spine01=(0, 0, 0), spine02=(0, -3, 0), spine03=(0, -3, 0), chest=(-3, 0, 0),
      neck=(0, 0, 0), head=(-4, 8, 0),
@@ -420,8 +444,8 @@ arm(PIQUE, "R", "second")
 # attitude and not a sloppy arabesque — the knee carried OUT and the foot
 # higher than the knee. One arm up in fifth, the other open to second.
 ATTITUDE = pose()
-leg(ATTITUDE, "L", hip=0, knee=0, out=44, track=-14, ankle=-32, toe=20)
-leg(ATTITUDE, "R", hip=43, knee=132, out=22, track=66, ankle=-32, toe=20)
+leg(ATTITUDE, "L", hip=0, knee=0, out=44, track=-12, ankle=-32, toe=20)
+leg(ATTITUDE, "R", hip=42, knee=132, out=22, track=64, ankle=-32, toe=20)
 arms(ATTITUDE,
      spine01=(-8, 0, 0), spine02=(-6, 0, 0), spine03=(-5, 0, 0), chest=(-4, 0, 0),
      neck=(2, 0, 0), head=(-6, 10, 0),
@@ -448,8 +472,8 @@ arm(ATTITUDE, "R", "second")
 # roll rather than an abduction. Opened to -75 the fit settles at -60 of its
 # own accord and the ankle lands on the midline.
 ARABESQUE = pose()
-leg(ARABESQUE, "L", hip=0, knee=0, out=44, track=-14, ankle=-32, toe=20)
-leg(ARABESQUE, "R", hip=84, knee=12, out=22, track=-60, ankle=-32, toe=20)
+leg(ARABESQUE, "L", hip=0, knee=0, out=44, track=-12, ankle=-32, toe=20)
+leg(ARABESQUE, "R", hip=83, knee=14, out=22, track=-64, ankle=-32, toe=20)
 arms(ARABESQUE,
      spine01=(-22, 0, 0), spine02=(-10, 0, 0), spine03=(-6, 0, 0),
      chest=(6, 0, 0), neck=(10, 0, 0), head=(8, 0, 0),
@@ -462,8 +486,8 @@ arm(ARABESQUE, "R", "back")
 # the end of it is only interesting because you watched it get there — so the
 # clip plays retire, half-open, and this.
 DEVELOPPE = pose()
-leg(DEVELOPPE, "L", hip=0, knee=0, out=44, track=-14, ankle=-32, toe=20)
-leg(DEVELOPPE, "R", hip=-9, knee=6, out=46, track=95, ankle=-32, toe=20)
+leg(DEVELOPPE, "L", hip=0, knee=0, out=44, track=-12, ankle=-32, toe=20)
+leg(DEVELOPPE, "R", hip=-11, knee=7, out=42, track=92, ankle=-32, toe=20)
 arms(DEVELOPPE,
      spine01=(0, 0, 0), spine02=(0, 5, 0), spine03=(0, 6, 0), chest=(-3, 0, 0),
      neck=(0, 0, 0), head=(-2, -10, 0),
@@ -511,8 +535,8 @@ def lean(p, deg):
 # is what "she stands kinda crooked" was: not a lean, a stance. The turnout was
 # never the culprit and is still 44 degrees — see the long note on TARGET_LEG.
 STAND = pose()
-leg(STAND, "L", hip=0, knee=0, out=44, track=-11, ankle=0, toe=3)
-leg(STAND, "R", hip=1, knee=0, out=44, track=-7, ankle=0, toe=3)
+leg(STAND, "L", hip=0, knee=0, out=44, track=-9, ankle=0, toe=3)
+leg(STAND, "R", hip=0, knee=0, out=44, track=-9, ankle=0, toe=3)
 arms(STAND, spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0),
      chest=(-2, 0, 0), neck=(0, 0, 0), head=(-2, 0, 0),
      clavicleL=(0, 0, 4), clavicleR=(0, 0, -4))
@@ -534,8 +558,8 @@ arm(STAND, "R", "bas")
 # the only thing on this shore shaped like a barre and she goes to it — and
 # what she does when she gets there is what a dancer does with no barre.
 HOLD = pose()
-leg(HOLD, "L", hip=0, knee=0, out=44, track=-11, ankle=0, toe=3)
-leg(HOLD, "R", hip=1, knee=0, out=44, track=-7, ankle=0, toe=3)
+leg(HOLD, "L", hip=0, knee=0, out=44, track=-9, ankle=0, toe=3)
+leg(HOLD, "R", hip=0, knee=0, out=44, track=-9, ankle=0, toe=3)
 arms(HOLD, spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0),
      chest=(-2, 0, 0), neck=(0, 4, 0), head=(-2, 8, 0),
      clavicleL=(0, 0, 5), clavicleR=(0, 0, -5))
@@ -732,7 +756,7 @@ def fit(argv):
         seed = [ARM[name][0][0], ARM[name][0][1], ARM[name][0][2],
                 ARM[name][1][0], ARM[name][1][1], ARM[name][1][2],
                 ARM[name][2][0], ARM[name][2][1], ARM[name][2][2]]
-        x, f = fit_arm(BASE, "L", hand, elbow, seed)
+        x, f = fit_arm(dict(BASE, **SQUARE), "L", hand, elbow, seed)
         g = fk(fit_arm_apply(BASE, "L", x), ("handL", "armLL"))
         print('    "%s": ((%.0f, %.0f, %.0f), (%.0f, %.0f, %.0f), '
               '(%.0f, %.0f, %.0f)),   # hand(%+.2f %+.2f %+.2f) err %.4f'
@@ -763,7 +787,11 @@ def fit(argv):
         # over `fit_leg` says the Euler order makes impossible to reason about
         # and which is why these are fitted at all. -75 lets it square up.
         tlo = -75.0 if name == "arabesque" else -40.0
-        x, f = fit_leg(BASE, side, knee_at, ankle_at,
+        # Against the SQUARE pelvis, not against `BASE`. `BASE` is `IDLE_A`
+        # and carries the idle cock; fitting a stance on top of it is what
+        # made `firstL` and `firstR` come back 4 degrees apart off targets
+        # that are exact mirrors of each other. See `SQUARE`.
+        x, f = fit_leg(dict(BASE, **SQUARE), side, knee_at, ankle_at,
                        [0, 40, 44.0 if stance else OUT, 20, ank, toe],
                        flat=onfloor, out_lo=44.0 if stance else 22.0,
                        w_knee=120.0 if tuck else 400.0,
@@ -782,7 +810,13 @@ def fit(argv):
                  g["footR"].x, g["footR"].y, g["footR"].z, f))
 
 
-ORDER = ("spine01", "spine02", "spine03", "chest", "neck", "head",
+# `pelvis` FIRST, and it is not decoration. Every block `dump()` writes is a
+# `dict(IDLE_A, **{...})`, so any bone missing from this tuple keeps whatever
+# `IDLE_A` had — and `IDLE_A` is a woman standing at ease with 2.5 degrees of
+# roll in her pelvis. Squaring it in `pose()` alone fixed the poses that get
+# FITTED here and shipped none of it. See `SQUARE`.
+ORDER = ("pelvis",
+         "spine01", "spine02", "spine03", "chest", "neck", "head",
          "clavicleL", "clavicleR",
          "armUL", "armLL", "handL", "thumbL", "fingersL",
          "armUR", "armLR", "handR", "thumbR", "fingersR",

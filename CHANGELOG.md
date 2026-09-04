@@ -8,6 +8,69 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.196.0] — 2026-09-04
+
+### She was standing at ease in every position
+
+"Sometimes she stands kinda crooked" has been read as a leg problem twice and a
+stance problem once. It was never measured as what the word actually says, so
+this pass measured it: for every pose the routine holds that ought to be
+symmetric, take each left/right bone pair and check that it mirrors — same `x`,
+same `z`, opposite `y`.
+
+None of them did.
+
+```
+                worst mirror error
+BAL_STAND       0.0369 m   at the shoulder
+BAL_HOLD        0.0370 m   at the shoulder
+BAL_PLIE_B      0.0438 m   at the hand
+BAL_RELEVE      0.0650 m   at the hand
+```
+
+And one number was the same in all four, to the tenth of a millimetre:
+`clavicle dy = -0.0336`. It did not move when the clavicle angles moved, which
+means it was not the clavicles — it was inherited. Walking the chain up from the
+root, at rest every spine head sits at `y = 0.0000`, and in first position they
+step off the midline the whole way up: spine01 −0.0024, spine02 −0.0046,
+spine03 −0.0082, chest −0.0151, neck −0.0210, **head −0.0251**.
+
+`BASE = dict(H.IDLE_A)`. `IDLE_A` is a woman standing at ease — weight on one
+leg, one hip carried higher, and **2.5 degrees of roll in `pelvis` z** to do it.
+Every pose in `ballet.py` overrides the legs, the spine, the arms and the head.
+Not one of them ever overrode the pelvis. So the idle hip-cock was underneath
+first position, demi-plié, relevé, fifth and all seven of the positions, in
+every frame of the fifteen seconds — her head 25 mm to the right of the line her
+own feet were standing on. A dancer's pelvis is square. It is the first thing
+anybody is taught.
+
+**And it had bent the leg solver.** `TARGET_LEG` asks for `firstL` and `firstR`
+at targets that are exact mirrors, and the two came back with `track` 4 degrees
+apart — which a symmetric rig fitted to symmetric targets has no business doing.
+It was the fit quietly paying for a tilt nobody had told it about, and the price
+came out in the feet: 23 mm of toe asymmetry in first position. Refitted against
+a square pelvis, both sides return **the same angles and the same residual to
+four decimals** — `firstL` and `firstR` both `track=-9, err 0.1907`;
+`plieL`/`plieR` both `track=-8, err 0.7586`.
+
+**The bug that would have shipped none of this.** `dump()` writes each pose as
+`dict(IDLE_A, **{...})` and emits only the bones listed in `ORDER` — and
+`pelvis` was not in `ORDER`. Squaring it in `pose()` fixed every pose fitted in
+that file and exported the old cock regardless. `pelvis` is the first entry in
+`ORDER` now, with the reason written over it.
+
+Measured again, on the poses that actually ship:
+
+```
+BAL_STAND   worst mirror error  0.0000 m    head y  -0.0000
+BAL_HOLD    worst mirror error  0.0000 m    head y  -0.0000
+BAL_PLIE_B  worst mirror error  0.0000 m    head y  -0.0000
+BAL_RELEVE  worst mirror error  0.0000 m    head y  -0.0000
+```
+
+Arms refitted against the square pelvis too, since they were fitted against the
+tilted one: `second` 1.81 → 1.42, `back` 1.63 → 1.31, `first` 0.03 → 0.03.
+
 ## [1.195.0] — 2026-09-04
 
 ### The gelato case comes on
