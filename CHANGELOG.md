@@ -8,6 +8,63 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.227.0] — 2026-09-04
+
+### Her toes point, and the developpe is turned out
+
+Misha, watching the barre routine: *"she is also a bit turned in when performing
+developpe a la second"*, and then *"oh and her toes are not pointed... she is
+pointing her feet ok, but tip of the toes are horrific... must point!"* Two
+reports, two numbers, and both of them had been wrong since the seven positions
+shipped.
+
+**`toe` is not how pointed the foot is.** There are 34 degrees built into the
+rest rig between the metatarsal — the `foot` bone, ankle to ball — and the `toe`
+bone, ball to tip, because that is where the arch is. So `toe` measures how far
+the toes are bent back OUT of the line the foot is already making, and zero is
+already a hook. Every airborne foot in the routine carried **+20**, which is 54
+degrees of hook on a leg whose entire job is to make one straight line:
+
+| | foot dir | toe dir | tip vs the ball |
+|---|---|---|---|
+| developpe, before | 24.8° above horizontal | 44.5° above | **61 mm above** |
+| developpe, after  | 35.3° above horizontal | 34.7° above | 49 mm below |
+
+The same +20 was on the foot she **stands** on, where it means something else
+again. Demi-pointe is the ball and the toe pad on the deck with the heel lifted;
+at +20 the toe tip sat 16 mm *below* the ball, so `ballet_floor` dutifully
+balanced her on her toe tips — barefoot pointe, on wet concrete, which nobody
+has ever done. So the two cases are now two constants, `TOE_POINT = -34` and
+`TOE_FLAT = 31`, solved off the mesh rather than typed: the pointed foot puts
+ankle, ball and tip on one line to within half a degree in all six positions
+that have one, and the demi-pointe lays the toe pad flat to within 0.4 mm.
+
+**And turnout on a straight working leg is not fittable.** `out` is a twist
+about the thigh's own axis and the knee joint is *on* that axis, so turnout
+cannot move the knee at all — and on a leg with 7 degrees of bend the ankle is
+all but on it too. Measured across the developpe: 26 degrees of turnout moves
+the knee 36 mm and the ankle 30. `fit_leg` scores knee and ankle at 400 apiece
+and nothing else, so it can buy all 26 back with a degree of hip and two of
+track and never feel it. It is the same blindness the file already records for
+the ankle and the toe, which is why those two are pinned — the third one went
+unnoticed because 42 is a plausible-looking number.
+
+With the leg out to the side the **sole** is the tell: no turnout puts it facing
+straight backward, full turnout puts it facing straight down.
+
+| turnout | sole | knee faces |
+|---|---|---|
+| 42° (fitted) | (-0.56, -0.60, -0.56) | forward |
+| 68° (pinned) | (-0.22, -0.63, -0.74) | up |
+
+68 and not the 46 the fitter is bounded to, because that bound is about the hip
+*crease* and a leg abducted 92 degrees has no crease left to fold — rendered at
+42, 55, 65 and 75, the top of the thigh is smooth at every one. The knee and the
+ankle move 36 and 30 mm, so the position it was fitted to is still the position.
+
+`ballet.py --verify` passes, the census is unchanged at 446/333/86/27, and the
+payload is 669 KB against 668.
+
 ## [1.226.0] — 2026-09-04
 
 ### The bathers are wearing swimsuits now, not paint
