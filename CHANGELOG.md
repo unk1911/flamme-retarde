@@ -8,6 +8,36 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.187.0] — 2026-09-04
+
+### The ladder is not a barre, measured this time
+
+This file has said so twice and compromised both times. The compromise is now
+measured out of existence, by reading `ladder()`'s own numbers instead of a
+survey note about them.
+
+What the game builds is an **inverted U** — two legs at t ± 0.28, up to
+`lip + 0.90`, over the coping and down the seaward face. There is no rail
+spanning between them, so what her hand can go on is the crown of the near one.
+`RAIL` was authored at 0.930 off a note; the thing itself tops out at **0.900**.
+Measured in the running game, her hand was floating **79 mm** over it.
+
+Moving her in fixes that end and breaks the other. At L + 0.46 the crown lands
+0.18 out — inside her own shoulder, so the arm hangs on to it instead of
+stretching for it, and the hand lands. And then a demi-plié in first with 44° of
+turnout carries her knee **0.19 to 0.23** out, which puts the post inside her own
+knee: rendered, her thigh goes through it. **There is no distance that is both.**
+The 0.60 that was there was itself a correction for a first position 0.547 m
+wide — and first position has been 0.116 m wide since 1.175.0, which is why the
+old spacing was solving a problem that no longer existed.
+
+So she stands at 0.60, clear of it, and does centre work. The ladder is what
+draws her over — it is the only thing on this shore shaped like a barre and she
+walks to it — and what she does when she gets there is what a dancer does with no
+barre: both hands her own, bras bas, and the plié opening both arms to second
+instead of keeping one on a rail it could not reach. The lateral lean goes with
+it, which was only ever there to buy the reach.
+
 ## [1.186.0] — 2026-09-04
 
 ### A gradsko kupalište has life rings and this one did not

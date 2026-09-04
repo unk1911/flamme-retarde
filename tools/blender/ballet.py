@@ -329,7 +329,7 @@ def fit_arm(base, side, hand_at, elbow_at, seed, iters=6000, bend=False):
         # Six degrees and not eleven. Eleven was fitted against a plie that
         # went down 22 mm; it goes down 102 now, so her shoulder arrives at the
         # rail on its own and a lean that big just reads as a list.
-        lo, hi, seed = lo + [0.0], hi + [6.0], list(seed) + [3.0]
+        lo, hi, seed = lo + [0.0], hi + [10.0], list(seed) + [3.0]
     x, f = climb(seed, apply, score, lo, hi, iters=iters)
     return x, f
 
@@ -489,7 +489,7 @@ arm(DEVELOPPE, "R", "second")
 # only went down 22 mm; the plie goes down 117 now, so her shoulder arrives
 # nearly a hand's breadth closer to the rail on its own and the lean has that
 # much less to do. Eleven on top of it read as a list.
-LEAN_HOLD = 6.0
+LEAN_HOLD = 10.0
 LEAN_PLIE = 0.0
 
 
@@ -516,24 +516,37 @@ arms(STAND, spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0),
 arm(STAND, "L", "bas")
 arm(STAND, "R", "bas")
 
-# The same, with her left hand on the rail.
+# The same, and her hands stay her own.
+#
+# THE LADDER IS NOT A BARRE, and this is the third time this file has said so —
+# the first two ended in a compromise that measurement has now removed. Its
+# crown is at `lip + 0.90` and the near upright lands 0.32 out to her left when
+# she stands clear of it; her shoulder is 0.19 out and her arm is 0.474, so the
+# reach is 0.478 and the hand floats 79 mm over the rail. Standing 140 mm closer
+# fixes that and breaks the other end: a demi-plie in first with 44 degrees of
+# turnout carries her knee 0.19 to 0.23 out, so the post ends up inside her own
+# knee and her thigh goes through it. There is no distance that is both.
+#
+# So she does centre work beside it. The ladder is what draws her over — it is
+# the only thing on this shore shaped like a barre and she goes to it — and
+# what she does when she gets there is what a dancer does with no barre.
 HOLD = pose()
 leg(HOLD, "L", hip=0, knee=0, out=44, track=-11, ankle=0, toe=3)
 leg(HOLD, "R", hip=1, knee=0, out=44, track=-7, ankle=0, toe=3)
 arms(HOLD, spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0),
-     chest=(-2, 0, 0), neck=(0, 4, 0), head=(-2, 6, 0),
-     clavicleL=(0, 0, 6), clavicleR=(0, 0, -4),
-     armUL=(11, 12, 8), armLL=(-2, -14, 24), handL=(-4, 17, 17))
+     chest=(-2, 0, 0), neck=(0, 4, 0), head=(-2, 8, 0),
+     clavicleL=(0, 0, 5), clavicleR=(0, 0, -5))
+arm(HOLD, "L", "bas")
 arm(HOLD, "R", "bas")
-lean(HOLD, LEAN_HOLD)
 
-# Demi-plie at the rail: the legs of PLIE, the left hand still on it, the right
-# arm opening to second as she goes down.
+# Demi-plie: the legs of PLIE with both arms opening to second as she goes
+# down, which is what a plie's arms do when there is no rail to keep one of
+# them on. See the note over HOLD.
 PLIE_B = dict(PLIE)
-arms(PLIE_B, neck=(0, 4, 0), head=(-2, 6, 0), clavicleL=(0, 0, 6),
-     armUL=(-4, 12, -18), armLL=(-9, 14, 60), handL=(-19, 20, -10))
+arms(PLIE_B, neck=(0, 3, 0), head=(-2, 5, 0),
+     clavicleL=(0, 0, 7), clavicleR=(0, 0, -7))
+arm(PLIE_B, "L", "second")
 arm(PLIE_B, "R", "second")
-lean(PLIE_B, LEAN_PLIE)
 
 # Retire, which is where the developpe unfolds from: the pirouette's legs with
 # the arms already open, so the leg is the only thing that moves.
@@ -733,12 +746,31 @@ def dump():
 
 
 # Where the ladder's handrail is, in her frame, once she has stood herself
-# beside it. 0.93 m off the deck and 0.24 out to her left — which is CLOSE, and
+# beside it — and it is the TOP of the tube, read off `ladder()` in
+# src/43-jadrija.js rather than off a note about it. That function builds an
+# inverted U: two legs at t +/- 0.28, up to `lip + 0.90`, over the coping and
+# down the seaward face. There is no rail spanning between them, so what her
+# hand goes on is the CROWN of the near one, at t = L + 0.28.
+#
+# AND SHE STANDS AT L + 0.46 NOW, NOT L + 0.60. At 0.60 the rail is 0.32 out to
+# her left; her shoulder is only 0.19 out, so the last 0.13 has to be reached —
+# and reached at a hand height of 0.94, which is exactly where her wrist hangs
+# anyway. Measured: shoulder to that point is 0.478 m against an arm of 0.474.
+# She was at full extension, the fit could not close the last 39 mm, and her
+# hand floated over the rail.
+#
+# 0.60 was itself a correction — at 0.52 her turned-out foot landed inside the
+# rail's footprint — but that was measured against a first position 0.547 m
+# wide. It is 0.116 m wide since 1.175.0. Her foot now reaches L + 0.39 at
+# worst against a leg that ends at L + 0.315, so she can stand 100 mm closer
+# and rest a straight arm on the thing.
+#
+# 0.90 m off the deck and 0.22 out to her left — which is CLOSE, and
 # it has to be: the rail is 0.90 m and her shoulder is 1.40 with a 0.48 m arm,
 # so a hand on this barre is an arm hanging nearly straight. A dance studio's
 # barre is 1.05; a swim ladder is not a dance studio, and the pose has to admit
 # that or the hand floats.
-RAIL = (0.05, 0.32, 0.930)
+RAIL = (0.05, 0.18, 0.900)
 
 
 def barre():
@@ -763,11 +795,22 @@ def barre():
             arm(base, "R", "bas")
         _who, low = H._lowest(rig, base)
         root = base.get("@root", (0, 0, 0))[2] + 0.004 - low
-        # ON the rail and not through it. `RAIL` is the tube's own axis; a
-        # hand resting on a 20 mm rail has its wrist joint a rail's radius plus
-        # half a hand above that, and fitting to the axis was asking her to
-        # hold a bar that runs through her palm. 45 mm.
-        tgt = (RAIL[0], RAIL[1], RAIL[2] + 0.045 - root)
+        # ON the rail and not through it — and `RAIL` is the TOP of the tube
+        # now, not a guess at its axis. Measured in the running game against
+        # `ladder()`'s own numbers, her hand was floating **79 mm** over it:
+        # 30 of that was `RAIL[2]`, which was written as 0.930 off a survey
+        # note while the thing the game actually builds is an inverted U whose
+        # crown tops out at `lip + 0.90`, and the other 45 was an offset for
+        # the tube's radius that had already been counted.
+        #
+        # AND THE TARGET IS THE TOP ITSELF, not 40 mm over it, because the fit
+        # cannot land exactly and the two sides of the error are not equal. A
+        # hand a few centimetres ABOVE a rail is floating and everybody sees
+        # it; a hand a few centimetres INTO one is gripping it, and the bar is
+        # 70 mm thick so there is that much to hide in. Aimed at the top, the
+        # standing key lands 30 mm proud — a palm on the bar — and the plie's
+        # lands 10 mm inside it, which is a hand closed round it.
+        tgt = (RAIL[0], RAIL[1], RAIL[2] + 0.005 - root)
         elb = (tgt[0] - 0.02, tgt[1] - 0.04, tgt[2] + 0.23)
         x, f = fit_arm(base, "L", tgt, elb,
                        [-6, 0, 26, -12, 0, 20, -4, 0, 8], bend=True)

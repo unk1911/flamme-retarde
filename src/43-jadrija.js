@@ -23798,6 +23798,24 @@ async function buildJadrija(scene) {
     }
     if (best === null) return null;
     if (best < SHOW.t0 + 1 || best > SHOW.t1 - 1) return null;
+    // AND SHE DOES NOT HOLD IT. The ladder is not a barre, which this file
+    // concluded once and then compromised on, and the compromise is now
+    // measured out of existence:
+    //
+    //   At L + 0.60 the crown is 0.32 out to her left and her shoulder is only
+    //   0.19 out, so the last 0.13 is a reach — 0.478 m against an arm of
+    //   0.474. Her hand floated **79 mm** over the thing it was holding.
+    //
+    //   Move her in to L + 0.46 and the crown comes to 0.18, inside her own
+    //   shoulder, and the hand lands. But a demi-plie in first with 44 degrees
+    //   of turnout carries her knee 0.19 to 0.23 out — so the post is now
+    //   INSIDE her knee, and the plie she was holding the rail for puts her
+    //   thigh through it.
+    //
+    // There is no distance that is both. She stands at 0.60, clear of it, and
+    // does centre work: the ladder is what draws her over, not something she
+    // leans on. Which is also what a person does at a rail built for getting
+    // out of the sea.
     return [best + 0.60, 0.30, Math.PI / 2];
   }
 
