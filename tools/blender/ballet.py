@@ -111,6 +111,26 @@ ARM = {
 }
 
 
+# AND THE HAND BELONGS TO THE POSITION IT IS IN.
+#
+# `HAND_SOFT` puts -22 degrees of curl on both hands and `pose()` applies it to
+# everything, so all eleven poses ship the identical `fingersL: (-22, 0, 0)` —
+# one hand shape across all thirty keys of the routine, from bras bas to the
+# arabesque.
+#
+# A dancer's hand is not a constant. It is softest where the arm is folded and
+# lengthens as the arm opens, and in an arabesque the front hand is the longest
+# thing on her, because the line everybody is looking at runs out THROUGH the
+# fingertips and stops wherever they stop. Curling that hand the same 22 degrees
+# as the one resting in front of her thighs shortens the position by a hand's
+# length.
+#
+# So the curl lives in the table with the angles, which is where it belongs, and
+# the thumb tracks it at about four fifths.
+CURL = {"bas": -24.0, "first": -22.0, "turn": -22.0, "second": -14.0,
+        "fifth": -16.0, "front": -8.0, "back": -12.0}
+
+
 def arm(p, side, name):
     """Put one arm in a named position. The mirror is in the sign of z."""
     sg = 1.0 if side == "L" else -1.0
@@ -118,6 +138,9 @@ def arm(p, side, name):
     p["armU" + side] = (u[0], u[1] * sg, u[2] * sg)
     p["armL" + side] = (l[0], l[1] * sg, l[2] * sg)
     p["hand" + side] = (h[0], h[1] * sg, h[2] * sg)
+    c = CURL.get(name, -22.0)
+    p["fingers" + side] = (c, 0.0, 0.0)
+    p["thumb" + side] = (c * 0.8, 0.0, 0.0)
     return p
 
 

@@ -8,6 +8,43 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.214.0] — 2026-09-04
+
+### One hand shape for the whole routine
+
+Last release tabulated the head and found it level in fourteen keys out of
+thirty. Same question, one joint further out: **all eleven poses ship the
+identical `fingersL: (-22.0, 0.0, 0.0)`.** Both hands, all thirty keys, from
+bras bas to the arabesque.
+
+`HAND_SOFT` was added with the finger bones and it is a good number — 22 degrees
+of curl is what turns a splayed paddle into a hand. But `pose()` applies it to
+everything and `arm()` never touches the fingers, so it is the *only* number.
+
+A dancer's hand is not a constant. It is softest where the arm is folded and
+lengthens as the arm opens, and in an arabesque the front hand is the longest
+thing on her — because the line everybody is looking at runs out **through** the
+fingertips and stops wherever they stop. Curling that hand the same 22 degrees
+as the one resting in front of her thighs shortens the position by a hand's
+length.
+
+So the curl lives in the table with the angles, which is where it belongs, and
+`arm()` sets it along with the shoulder and the wrist:
+
+```
+bras bas   -24     softest, the low rounded oval
+first      -22
+turn       -22
+fifth      -16     overhead, opening
+second     -14     lengthening out to the side
+back       -12
+front       -8     the arabesque's front hand, the longest thing on her
+```
+
+The thumb tracks the fingers at four fifths. Five distinct hand shapes across
+the routine where there was one, and `--verify` confirms all eleven poses
+spliced clean.
+
 ## [1.213.0] — 2026-09-04
 
 ### One business had eight features and its neighbour had two
