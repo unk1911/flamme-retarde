@@ -8,6 +8,39 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.185.0] — 2026-09-04
+
+### She never stood on the mark
+
+Fifth pass on the pour, and the fault was found the way the last two were: by
+driving the thing in play instead of scrubbing it. **In a real walk-in she
+arrives 0.203 m from `kit.wine` and pours from there.**
+
+Every millimetre of the wine solve is measured from `kit.wine`. The palm target,
+the lip over the glass, the clearance from her forearm, the 0.2 mm the runtime
+aim correction was left with — all of it is relative to a mark she was never
+standing on. `showTo` calls a leg finished when it is inside its tolerance of
+the target, and the kabina's last leg allows **0.20 m**. What happens next is
+exactly the thing three releases have been spent removing: the aim correction
+picks up two hundred millimetres of error and swings the bottle out of her grip
+to put the lip back over the glass. That is a hinge. That is what "the bottle
+gets lodged in her hand" was.
+
+The barre has the same fault at 0.16 m, against an arm fitted to 9 mm.
+
+**Tightening the arrival tolerance is the obvious fix and is the wrong one.**
+`showTo` steers on a heading toward a target it can orbit, and a tolerance small
+enough to matter is a tolerance she can fail to reach at all — which is a woman
+who never starts pouring. So she arrives loosely and then *settles*: a damped
+ease on to the exact mark over the first second of the clip, while she is
+standing still anyway and long before anything is in her hand. Measured:
+**0.206 m to under 5 mm in 0.35 s**, and the 5 mm is the debug's own rounding.
+
+And the debug now prints her position to a centimetre rather than a tenth of a
+metre, because chasing this the settle appeared to converge to 22.6 mm and stop
+dead — and 22.6 mm is exactly the distance from `kit.wine` to `kit.wine` rounded
+to a tenth. **The floor was the ruler.**
+
 ## [1.184.0] — 2026-09-04
 
 ### The arabesque stops crossing her own midline, and the routine is proved

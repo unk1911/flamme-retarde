@@ -22911,6 +22911,36 @@ async function buildJadrija(scene) {
     skinFig.state.speed = 1;
   }
 
+
+  /**
+   * Ease her the last few centimetres on to a mark she has just walked to.
+   *
+   * THE POSE IS SOLVED TO MILLIMETRES AND SHE NEVER STOOD ON THE MARK. `showTo`
+   * calls a leg finished when it is within its tolerance of the target, and for
+   * the kabina's last leg that tolerance is 0.20 m — so measured in a real
+   * play-through she arrived to pour **0.203 m** from `kit.wine`, and every
+   * millimetre of the wine solve is measured from `kit.wine`. What happens
+   * then is the thing the whole rebuild was for: the runtime aim correction
+   * picks up 0.2 m of error and swings the bottle out of her grip to put the
+   * lip back over the glass, which is a hinge, which is what "the bottle gets
+   * lodged in her hand" was.
+   *
+   * The barre has the same fault at 0.16 m, against an arm fitted to 9 mm.
+   *
+   * Tightening the arrival tolerance is the obvious fix and is the wrong one:
+   * `showTo` steers on a heading and a target it can orbit, and a tolerance
+   * small enough to matter is a tolerance she can fail to reach at all, which
+   * is a woman who never starts pouring. So she arrives loosely and then
+   * settles — a damped ease over the first second of the clip, while she is
+   * standing still anyway and long before anything is in her hand. At 0.2 m it
+   * is a shift of weight; there is nothing to see.
+   */
+  function showSettle(mark, dt, rate = 6.0) {
+    if (!mark) return;
+    show.t = damp(show.t, mark[0], rate, dt);
+    show.s = damp(show.s, mark[1], rate, dt);
+  }
+
   /** Advance her along her heading, kept on the deck and inside the resort. */
   function showMove(v, dt) {
     show.t = clamp(show.t + Math.cos(show.ang) * v * dt, show.t0, show.t1);
@@ -24211,6 +24241,9 @@ async function buildJadrija(scene) {
         show.want = kit.wine[2];
         showHold(dt);
         const u = S.cur ? S.curT : 0;
+        // On to the mark, over the first second, before the bottle leaves the
+        // stool at 1.95. See `showSettle`.
+        if (u < 1.2) showSettle(kit.wine, dt);
         const wn = wineAt(u);
         show.held = wn.held;
         show.pour = wn.pour;
@@ -24614,6 +24647,10 @@ async function buildJadrija(scene) {
       case 'ballet':
         show.want = show.bar ? show.bar[2] : show.ang;
         showHold(dt);
+        // The same settle the pour gets, and for the same reason: `toBar`
+        // finishes its last leg within 0.16 m and the barre arm is fitted to
+        // 9 mm. Faster, because her hand is on the rail by 0.70 s.
+        if (S.cur && S.curT < 0.6) showSettle(show.bar, dt, 9.0);
         show.played += dt;
         if (done) {
           show.barCool = SHOW.barreCool;
@@ -27105,7 +27142,13 @@ async function buildJadrija(scene) {
         leg: show.hutLeg, withYou: show.withYou,
         dHer: changing ? +Math.hypot(show.t - changing.t,
           show.s - changing.s).toFixed(1) : -1 },
-      t: +show.t.toFixed(1), s: +show.s.toFixed(1),
+      // Two decimals and not one. A tenth of a metre is plenty for "where is
+      // she on the promenade" and is useless for the only question anybody
+      // ever asks this in anger: whether she is ON a mark. Chasing the wine's
+      // 0.2 m arrival error, the settle looked as if it converged to 22.6 mm
+      // and stopped dead there — and 22.6 mm is exactly the distance from
+      // `kit.wine` to `kit.wine` ROUNDED to a tenth. The floor was the ruler.
+      t: +show.t.toFixed(2), s: +show.s.toFixed(2),
       // Who she is attending to, in the shore's frame. This is the WALKER and
       // not the camera; if those two ever agree while the third person is on
       // and swung round, something has gone back to reading `cam`.
