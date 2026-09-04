@@ -7372,6 +7372,7 @@ async function buildJadrija(scene) {
     }
     // And the coffee, on the counter in the room the shelf cut made.
     backBarKit(S, y0, COFF);
+    counterWork(S, y0, (S.t0 + S.t1) * 0.5);
   }
 
   /**
@@ -7542,6 +7543,111 @@ async function buildJadrija(scene) {
         [yc + 0.452, 0.109],
         [yc + 0.465, 0.088],
       ], [0.250, 0.235, 0.225], 10);
+    }
+  }
+
+  /**
+   * The three things on the plain counter west of the case, which between them
+   * are what says somebody is serving from it.
+   *
+   * `counterKit` is the five objects on the case's HOOD, and its note is
+   * emphatic that `20260823_111819` shows that surface "with five objects on
+   * it and nothing else". This is the OTHER surface in the same frame. Left of
+   * the fishbowl and the drainer tray, on the run of counter that carries on
+   * west past the end of the cabinet, there are three more:
+   *
+   *   — a big brushed-steel box with a hinged lid raked down toward the
+   *     customer, which is the largest object in the frame after the case
+   *     itself;
+   *   — a stainless caddy with long-handled gelato spades standing in it,
+   *     bowls uppermost;
+   *   — a dusty-pink cloth, folded. It is in `_111819` and again in `_111815`
+   *     on the worktop behind, and it is the one object on this counter that
+   *     is only there because somebody is working.
+   *
+   * They go on `shopKit`'s counter at `y0+1.06` and not on the hood, and that
+   * is a translation rather than a reading: in the room the two surfaces are
+   * within a hand's breadth of each other, and in this model the hood is at
+   * `y0+1.86` because the cabinet is drawn 1.92 m to the top of it. The lower
+   * one is the surface that is west of the case at all.
+   *
+   * WHICH LEAVES 0.32 m AND 0.20 m TO PUT THEM IN, and that is the whole of
+   * the placement. The east server stands at `cm−2.50` and is 0.23 m across
+   * the shoulders at the scale he is drawn, with another 0.04 m when the pass
+   * swings his arm out — so he owns `cm−2.80` to `cm−2.20`. West of him,
+   * between the mullion at t 332.30 and that, is `cm−3.14` to `cm−2.82`. East
+   * of him, up to the cabinet's west face at `cm−2.00`, is `cm−2.20` to
+   * `cm−2.00`. The spades are the only one of the three small enough for the
+   * second pocket, and the cloth ends up lying on the box's lid, which is
+   * where a bar towel lives anyway.
+   *
+   * Nothing goes east of the cabinet's face. The counter runs on under it, but
+   * the case's own back panel stands at `y0+1.20`, and anything shorter than
+   * that behind it is a thing nobody can see.
+   *
+   * Every back face is at `s0−0.17` or further out — 0.06 m clear of the
+   * mirror at `s0−0.11`, and the note in `backBar` about what happened at
+   * `s0−0.08` is why that is a measured number rather than a comfortable one.
+   */
+  function counterWork(S, y0, cm) {
+    const STEEL = [0.505, 0.500, 0.486];
+    const BRIGHT = [0.645, 0.638, 0.622];
+    const yc = y0 + 1.06;
+
+    // The lidded box. Its body is buried 0.03 m in the counter and the lid's
+    // FRONT edge is buried 0.012 m in the body, so the one horizontal joint
+    // this object has is inside a solid rather than on top of one. The lid
+    // rakes 0.046 m over 0.172 m, which is the pitch a shut lid takes when its
+    // hinge is the thick end.
+    const bt0 = cm - 3.14, bt1 = cm - 2.82;
+    boxTS(bt0, bt1, S.s0 - 0.33, S.s0 - 0.17, yc - 0.03, yc + 0.10,
+      BRIGHT, shade(BRIGHT, 1.06));
+    bar(bt0 - 0.006, bt1 + 0.006, [
+      [S.s0 - 0.336, yc + 0.088], [S.s0 - 0.164, yc + 0.134],
+      [S.s0 - 0.164, yc + 0.152], [S.s0 - 0.336, yc + 0.106],
+    ], STEEL, shade(STEEL, 1.14));
+    // The hinge, along the high edge. Two centimetres of a darker steel, and
+    // it is the only thing that says which way this lid opens.
+    boxTS(bt0, bt1, S.s0 - 0.182, S.s0 - 0.164, yc + 0.134, yc + 0.156,
+      shade(STEEL, 0.78));
+    // And the cloth on it, sunk into the rake at the front and standing
+    // 0.013 m proud of it at the back. Written as one box crossing a sloped
+    // face rather than as a slab laid on it: two nearly-parallel faces a
+    // millimetre apart is the fault this shop has three notes about, and a
+    // solid that goes through the thing it lies on cannot have it.
+    boxTS(bt0 + 0.06, bt0 + 0.16, S.s0 - 0.300, S.s0 - 0.220,
+      yc + 0.108, yc + 0.150, [0.620, 0.430, 0.455], [0.660, 0.470, 0.495]);
+
+    // The caddy of spades, in the second pocket. Same construction as the bowl
+    // of tasting spoons in `counterKit` and for the reason written up there: a
+    // cup on its own is a lump, and it is the handles standing out of it at
+    // every angle that make it a thing somebody has just put down.
+    //
+    // Four and not nine. These are gelato spades, not tasting spoons — one to
+    // a family of flavours, not one to a customer — and nine of them in a
+    // 0.11 m caddy is a hedgehog.
+    {
+      const ct = cm - 2.10, cs = S.s0 - 0.245;
+      lathe(W, ct, cs, [
+        [yc - 0.03, 0.050], [yc + 0.005, 0.054],
+        [yc + 0.095, 0.056], [yc + 0.108, 0.052],
+      ], STEEL, 10);
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * TAU + 0.6, lean = 0.030 + jit(i, 815) * 0.020;
+        const hi = yc + 0.235 + jit(i, 816) * 0.030;
+        // The handle, and then the spade's own bowl on the head of it — the
+        // widening at the top is what tells it from a spoon at this size.
+        frustumTS(yc + 0.06,
+          [ct + Math.cos(a) * 0.016, cs + Math.sin(a) * 0.016, 0.007, 0.007],
+          hi, [ct + Math.cos(a) * lean, cs + Math.sin(a) * lean, 0.009, 0.009],
+          [0.660, 0.666, 0.660], [0.700, 0.706, 0.700]);
+        frustumTS(hi - 0.003,
+          [ct + Math.cos(a) * lean, cs + Math.sin(a) * lean, 0.010, 0.010],
+          hi + 0.051,
+          [ct + Math.cos(a) * lean * 1.25, cs + Math.sin(a) * lean * 1.25,
+            0.020, 0.017],
+          [0.690, 0.696, 0.690], [0.730, 0.736, 0.730]);
+      }
     }
   }
 

@@ -8,6 +8,52 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.252.0] — 2026-09-04
+
+### The other surface in the same photograph
+
+`counterKit`'s note is emphatic that `20260823_111819` shows the case's hood
+"with five objects on it and nothing else", and it is right — about the hood.
+The same frame has a second counter in it, the plain run that carries on west
+past the end of the cabinet, and there are three more things on that:
+
+- a big brushed-steel box with a hinged lid raked down toward the customer,
+  which is the largest object in the frame after the case itself;
+- a stainless caddy with long-handled gelato spades standing in it, bowls
+  uppermost — the tool the whole shop turns on;
+- a dusty-pink cloth, folded. It is in `_111819` and again in `_111815` on the
+  worktop behind, and it is the one object on this counter that is only there
+  because somebody is working.
+
+They go on `shopKit`'s counter at `y0+1.06` rather than on the hood, which is a
+translation and not a reading: in the room the two surfaces are within a hand's
+breadth of each other, and here the hood is at `y0+1.86` because the cabinet is
+drawn 1.92 m to the top of it. The lower one is the surface that is west of the
+case at all.
+
+**Which leaves 0.32 m and 0.20 m to put them in.** The east server stands at
+`cm−2.50` and is 0.23 m across the shoulders at the scale he is drawn, with
+another 0.04 m when the pass swings his arm out, so he owns `cm−2.80` to
+`cm−2.20`. West of him, between the mullion at t 332.30 and that, is one
+pocket; east of him, up to the cabinet's west face at `cm−2.00`, is the other.
+The spades are the only one of the three small enough for the second, and the
+cloth ends up lying on the box's lid — which is where a bar towel lives anyway,
+and which avoided laying a 2 mm slab on a sloped face a millimetre away from
+it. It is written as one box crossing the rake instead: a solid that goes
+THROUGH the thing it lies on cannot fight it for the depth buffer.
+
+Nothing is drawn east of the cabinet's face. The counter runs on under it, but
+the case's own back panel stands at `y0+1.20` and anything shorter than that
+behind it is a thing nobody can see.
+
+**A note on what is not here.** The child at the counter being handed the cone
+was tried and dropped. The two children at `s0−1.15` are on the roving skinned
+cast — `hid: true` at every distance the shop is looked at from — and the pose
+switch in 42-crowd.js only drives the instanced tier, so a `reach` written for
+them would show at forty metres and never at four. Pinning them off the skinned
+rig with `staff: true` would work and costs the two best-looking figures in the
+shop their geometry at the one distance anybody sees them. Not worth an arm.
+
 ## [1.251.0] — 2026-09-04
 
 ### There is a coffee machine, and it is where the grinder is
