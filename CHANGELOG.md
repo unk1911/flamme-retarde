@@ -8,6 +8,40 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.211.0] — 2026-09-04
+
+### Her eyes were level in every position that has somewhere to look
+
+Seven passes have measured the arms, the legs, the pelvis, the transitions and
+the timing of this routine. Nobody has measured the head. Tabulated across all
+thirty keys, the yaw is **0.0 in fourteen of them** and the pitch is the same
+`-2` she carries standing about — including in the two positions where the head
+is most of the position.
+
+- **Relevé.** Both arms overhead in fifth, on demi-pointe, eyes dead level. A
+  dancer rising into fifth looks up into it. Standing under your own arms with
+  your gaze on the horizon is somebody being shown where to put them. Ten
+  degrees of lift, split between neck and head.
+- **Arabesque.** It already had the lift — `neck 10, head 8`, which on this
+  rig's sign is the gaze going up — and **no turn at all**. An arabesque's line
+  runs from the raised foot behind her, through the shoulders, out along the
+  reaching hand, and the head is the last joint on it. Square to the shoulders,
+  that line stops at her collar. Fourteen degrees toward the front arm, split
+  36/64 the way `_look` splits one, because the head turns further than the neck
+  and always has.
+
+Both signs were measured rather than guessed, which on this rig is not optional:
+`+x` tips the head **back** — at `neck +15` the head joint travels from
+x +0.027 to −0.003 — and positive yaw is toward her **left**, read off the
+pirouette's spot, which lags at −60 while `@turn` carries her the other way.
+
+Checked and left alone: the développé, whose head is already at −10, turned to
+the working side; the attitude, at +10 toward the raised arm; and the pirouette's
+±60 spot.
+
+And `--verify`, one release old, earned itself: it confirmed all eleven poses
+spliced clean, which is the check that would have caught the `BAL_PLIE` drop.
+
 ## [1.210.0] — 2026-09-04
 
 ### The ice cream parlour's tables had no ice cream on them

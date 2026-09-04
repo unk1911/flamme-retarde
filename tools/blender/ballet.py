@@ -405,9 +405,17 @@ arm(PLIE, "R", "bas")
 RELEVE = pose()
 leg(RELEVE, "L", hip=1, knee=0, out=44, track=-9, ankle=-32, toe=20)
 leg(RELEVE, "R", hip=1, knee=0, out=44, track=-9, ankle=-32, toe=20)
+# THE EYES GO WITH THE HANDS. Measured across the whole routine, the head yaw
+# is 0.0 in fourteen of the thirty keys, and the pitch is the same -2 it carries
+# standing about — including here, with both arms overhead in fifth. A dancer
+# rising into fifth looks up into it; standing on demi-pointe with her arms over
+# her head and her eyes dead level is somebody being shown where to put their
+# arms. `+x` tips the head BACK on this rig, measured: at neck `+15` the head
+# joint travels from x +0.027 to -0.003. So ten degrees of lift, split between
+# the two the way a neck actually does it.
 arms(RELEVE,
      spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0), chest=(-3, 0, 0),
-     neck=(0, 0, 0), head=(-2, 0, 0),
+     neck=(4, 0, 0), head=(6, 0, 0),
      clavicleL=(0, 0, 12), clavicleR=(0, 0, -12))
 arm(RELEVE, "L", "fifth")
 arm(RELEVE, "R", "fifth")
@@ -485,9 +493,20 @@ arm(ATTITUDE, "R", "second")
 ARABESQUE = pose()
 leg(ARABESQUE, "L", hip=0, knee=0, out=44, track=-12, ankle=-32, toe=20)
 leg(ARABESQUE, "R", hip=83, knee=14, out=22, track=-64, ankle=-32, toe=20)
+# The arabesque already had the LIFT — `neck 10, head 8`, which on this rig's
+# sign is the gaze going up — and no TURN at all. An arabesque's head goes with
+# the front arm: the line runs from the raised foot behind her, through the
+# shoulders, out along the reaching hand, and the head is the last joint on it.
+# Square to the shoulders, that line stops at her collar.
+#
+# The front arm here is the LEFT one (`arm(ARABESQUE, "L", "front")`), and
+# positive yaw is toward her left on this rig — read off the pirouette's spot,
+# which lags the body at `-60` while `@turn` is carrying her the other way.
+# Fourteen degrees, split 36/64 between neck and head the way `_look` splits
+# one, because the head turns further than the neck does and always has.
 arms(ARABESQUE,
      spine01=(-22, 0, 0), spine02=(-10, 0, 0), spine03=(-6, 0, 0),
-     chest=(6, 0, 0), neck=(10, 0, 0), head=(8, 0, 0),
+     chest=(6, 0, 0), neck=(10, 5, 0), head=(8, 9, 0),
      clavicleL=(0, 0, 10), clavicleR=(0, 0, -10))
 arm(ARABESQUE, "L", "front")
 arm(ARABESQUE, "R", "back")
