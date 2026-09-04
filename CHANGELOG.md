@@ -8,6 +8,79 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.240.0] — 2026-09-04
+
+### The rock is a metre taller than we built it, and the frame says so
+
+Misha: *"make sure the Jadrija rock is in place, find it in my survey photos!"*
+
+It was in place. It was also **1.56 m tall**, and the photograph will not
+support that under any reading.
+
+`1000150359` carries `FocalLengthIn35mmFormat 13 mm`, which is 1444 px of focal
+length on its 4000 px long axis, and that turns the frame into a ruler. The
+scale comes off the tap in `1000150358`, shot at 69 mm from about a metre: the
+escutcheon rosette is 310 px there and the knob is 165, so the knob is 0.53 of
+the rosette — and a decorative fountain rosette is 90–110 mm against a bibcock
+knob of 45–55, which is the same ratio and the only pair of numbers in either
+frame with a catalogue behind it. Take the rosette at **0.10 m** and everything
+else falls out: the spout projects **0.19 m** and drops **0.12**.
+
+Back in `_359` that tap sits on the principal point and measures 78 px across
+an object 0.20 m long, so it stands **1.26 m** from the lens. A phone at 1.50 m
+looking at a tap 1.00 m up gives a down-tilt of **23°** and a face plane 1.16 m
+out. Run the frame edges back through that and the block is **2.19 m above the
+gravel where it leaves the top of the picture** — and it leaves the top of the
+picture, and the right-hand edge too. 2.19 is a floor. The left silhouette is
+still converging at the top edge and closes about a fifth of a metre above it:
+**2.35 m**, built.
+
+Two more numbers out of the same solve, both of which had been small. The
+**trough is 0.41 m**, not 0.30 — 0.30 is a doorstep. And the **tap is 1.00 m
+up**, not 0.92: 0.92 is where a tap is if you guess, 1.00 is where a tap is
+that people fill bottles at.
+
+**It is a block, not a boulder.** `lathe` builds rings that are circles, so
+what shipped was a loaf. Eight corners a ring with their own radii, phased a
+half step so one face looks straight down `−s` and the rosette has something
+flat to sit on — and the spread between the eight is the whole job. At ±12 % it
+was still an egg from behind; it is **±40 %** now, with the ring centres walking
+0.44 m along the shore between the foot and the apex.
+
+**The colour was already right and is untouched.** `_353` has sunlit white
+limestone at 229/217/188 a minute before `_359` has this rock's sunlit face at
+234/185/106 — same sun, same exposure. Against white limestone the stone is
+1.02/0.85/0.56 and `ROCK` is 1.00/0.83/0.54. The ochre is the stone, not the
+hour.
+
+**What was wrong was everything white beside it.** The same pair of frames puts
+the lumps at 0.726/0.718/0.706 — near neutral, barely warm at all — where the
+code had 0.782/0.760/0.706, brighter and 0.076 warmer across R−B, and a ring of
+them round the block rendered as ice cubes. Calcite came down too: at
+0.850/0.828/0.782 the seam was 2.1 stops over the face it is in and read as a
+strip light, where `_359` has the white streaks about a third of a stop over.
+
+And the bed. The whole bottom third of `_359` is white chippings with
+children's chalk lying on them, and the game stood the block on the same grey
+slab the lane is made of. There is an apron now — twelve triangles sampled at
+their own corners so it follows a surface that is not level, 0.045 m proud, and
+a radius that wanders 2.05–2.35 m so the edge is not a circle. Nine kerb lumps
+on it, set on end the way `_362` has the beds along the path, and two flat
+weathered plates off `_386` and `_388` lying where they were dropped.
+
+Lumps are faceted now rather than domes. What is lying about at Jadrija is
+broken karst — angular plates with flat faces, photographed at arm's length in
+`_386` and `_387` — and 21 triangles spent on seven corners reads as stone
+where the same 21 spent on a dome reads as a bun.
+
+**And you can no longer walk through 2.35 m of limestone.** The rock and the
+trough are colliders. The box is a fifth of a metre down-shore of the axis,
+because the widest ring runs t0−1.00 to t0+0.44.
+
+Census `{seen:446, thin:333, plain:86, rich:27}` throughout — nothing in here
+touches `rng`, the per-facet tint is `jit`. Jadrija 558 382 → **558 633**
+triangles, 61 fps at the car park.
+
 ## [1.233.0] — 2026-09-04
 
 ### The cat sits beside the post, not through it

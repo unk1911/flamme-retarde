@@ -15028,16 +15028,82 @@ async function buildJadrija(scene) {
     b = up;
     const RUST = [0.402, 0.208, 0.126];
     const RUSTD = [0.286, 0.140, 0.086];
-    const LIME = [0.782, 0.760, 0.706];       // the limestone lumps round it
+    // The white limestone, re-measured against the ochre block rather than
+    // guessed. `1000150353` has a sunlit lump at 229/217/188 and `1000150359`
+    // has the fountain rock's sunlit face at 234/185/106 a minute later — same
+    // sun, same exposure — so with `ROCK` at 0.742/0.612/0.398 the lumps come
+    // out 0.726/0.718/0.706: **near neutral**, and barely warm at all. The old
+    // 0.782/0.760/0.706 was both brighter and 0.076 warmer across R-B, and at
+    // this scene's exposure a ring of them round the block rendered as ice
+    // cubes. Taken a further 6 % down because these are dusty and half of what
+    // is seen of them is a shaded face.
+    const LIME = [0.684, 0.676, 0.664];       // the limestone lumps round it
+    // The same stone crushed, and 15 % under the lumps rather than equal to
+    // them: a bed of chippings is mostly the shadow between the chippings.
+    // At `LIME` exactly it rendered as a patch of snow on the lane.
+    const GRAV = [0.582, 0.574, 0.558];
     const ROCK = [0.742, 0.612, 0.398];       // honey limestone, sunlit
     const ROCKD = [0.548, 0.442, 0.286];
-    const VEIN = [0.850, 0.828, 0.782];       // calcite
+    // Calcite, and DOWN from 0.850/0.828/0.782. A seam at that value against
+    // this block is 2.1 stops brighter than the stone it is in and read as a
+    // strip light rather than as a mineral. In `_359` the white streaks are
+    // about a third of a stop over the face beside them and no more.
+    const VEIN = [0.796, 0.770, 0.716];       // calcite
     const BRONZE = [0.372, 0.268, 0.140];
-    const TROUGH = [0.652, 0.640, 0.612];
+    // The casting is not one metal and reads as three. Off `1000150358`, all
+    // three measured against the rock face beside them in the same frame
+    // (196/157/105) so the low sun divides out: the polished knob comes back
+    // at 0.74/0.70/0.60 of the stone, the oxidised rosette at 0.50/0.62/0.78
+    // — grey-GREEN, and the only cold thing on the whole object — and the
+    // snout is very nearly black. `BRONZE` above stays for the throat.
+    const BRONZED = [0.150, 0.118, 0.078];    // the head, patinated near black
+    const BRASS = [0.520, 0.400, 0.210];      // the knob, handled bright
+    const PATINA = [0.352, 0.360, 0.298];     // the rosette, verdigris
+    const TROUGH = [0.640, 0.596, 0.558];     // 108/100/94 in shade: warm grey
     const gAt2 = (t2, s2) => {
       const st2 = at(t2);
       return Math.max(surfaceY(t2, s2),
         groundAt(st2.x + st2.nx * s2, st2.z + st2.nz * s2));
+    };
+
+    /**
+     * One lump of white limestone, faceted, sitting in the ground.
+     *
+     * These were `dome`s, and a dome is the wrong solid: what is lying about
+     * at Jadrija is broken karst — angular plates with flat faces and hard
+     * arrises, photographed at arm's length in `1000150386` and `_387` and in
+     * a kerb line in `_362`. Seven corners at seven different radii, one
+     * course of quads and a fan, is 21 triangles and reads as stone; a dome
+     * of the same size is 21 triangles and reads as a bun.
+     *
+     * BURIED by a quarter of its height. Rule 5: a lump resting exactly on the
+     * ground plane shows its own base edge from the far side of the car park
+     * and z-fights with the surface at this distance from the origin.
+     */
+    const limeLump = (lt, ls, r, h, seed) => {
+      const ly = gAt2(lt, ls);
+      // `k` shrinks the ring and `dy` lifts it, so the two rings are one
+      // expression and the seven radii below them are shared — which is what
+      // makes the arrises line up from the foot to the shoulder.
+      // 0.78 to 1.10 and not 0.66 to 1.10. At the wider spread the corners
+      // came out as spikes and seven of them together read as crumpled paper,
+      // which is the opposite failure to the dome and no better.
+      const P = (i, k, dy) => {
+        const a = ((i % 7) + 0.5) / 7 * TAU;
+        const rr = r * (0.78 + 0.32 * jit(i % 7, seed * 3 + 7)) * k;
+        return W(lt + Math.cos(a) * rr, ls + Math.sin(a) * rr,
+          ly - h * 0.25 + dy);
+      };
+      for (let i = 0; i < 7; i++) {
+        b.quad(P(i, 1, 0), P(i + 1, 1, 0),
+          P(i + 1, 0.62, h * 0.72), P(i, 0.62, h * 0.72),
+          shade(LIME, 0.86 + jit(i, seed * 5 + 3) * 0.22));
+      }
+      const cap = W(lt + r * 0.10, ls - r * 0.08, ly - h * 0.25 + h);
+      for (let i = 0; i < 7; i++) {
+        b.tri(P(i, 0.62, h * 0.72), P(i + 1, 0.62, h * 0.72), cap,
+          shade(LIME, 0.96 + jit(i, seed * 5 + 11) * 0.14));
+      }
     };
 
     /**
@@ -15141,78 +15207,233 @@ async function buildJadrija(scene) {
     }
 
     // ── the rock, and the dolphin on it ──
+    //
+    // REBUILT off the two frames at full size, with the camera solved rather
+    // than the object guessed. `1000150359` carries `FocalLengthIn35mmFormat
+    // 13 mm`, which is 1444 px of focal length on its 4000 px long axis, and
+    // that turns the frame into a ruler. `1000150358` is the same tap at 69 mm
+    // — 7667 px — from about a metre, and it is what the sizes below are keyed
+    // to.
+    //
+    // **The tap sets the scale.** The escutcheon rosette is 310 px tall in
+    // `_358` and the tap knob is 165, so the knob is 0.53 of the rosette. A
+    // decorative fountain rosette is 90-110 mm and a bibcock knob 45-55, which
+    // is the same ratio and is the only pair of numbers in either frame with a
+    // catalogue behind them: take the rosette at 0.10 m and everything else
+    // falls out. The spout projects 190 mm from the face and drops 123, so the
+    // whole casting is about 0.20 m long and 0.17 tall.
+    //
+    // **Which then sizes the rock.** In `_359` the tap is dead on the
+    // principal point and measures 78 px across an object 0.20 m long, so it
+    // stands 1.26 m from the lens; a phone held at 1.50 m looking at a tap
+    // 1.00 m up gives a down-tilt of 23 deg and a face plane 1.16 m out. Run
+    // the frame edges back through that and the rock is **2.19 m above the
+    // gravel where it leaves the top of the picture** — and it leaves the top
+    // of the picture, and the right-hand side too. So 2.19 is a floor, not a
+    // height. The silhouette on the left is still converging at the top edge
+    // and meets itself about a fifth of a metre above it: **2.35 m**, built.
+    // The model had it at 1.56 and that is the whole reason it read as a
+    // boulder somebody could sit on rather than as a block nobody could move.
+    //
+    // Two more numbers out of the same solve, both of which the first cut had
+    // small: the **trough is 0.41 m tall**, not 0.30, and the **tap is 1.00 m
+    // up**, not 0.92 — which matters, because 0.92 is where a tap is if you
+    // guess and 1.00 is where a tap is that people fill bottles at.
+    //
+    // The COLOUR was already right and is left alone. `_353` has sunlit white
+    // limestone at 229/217/188 a minute before `_359` has this rock's sunlit
+    // face at 234/185/106 — same sun, same exposure — so against white
+    // limestone this stone is 1.02/0.85/0.56, and `ROCK` is 1.00/0.83/0.54.
+    // The ochre is the stone and not the hour.
     {
-      // Out in the wood rather than against the back wall of the huts. In
-      // `1000150362` and `1000150365` this stands on gravel among the pines
-      // with a path going past it, which is where anybody walking through
-      // meets it; at `rowB + 4.4` it was wedged between a parked car and a
-      // rendered wall and could only be seen by somebody already lost.
       const [t0, s0] = BACK.rock;
       const y0 = gAt2(t0, s0);
-      // The boulder. A lathe with a per-ring offset is the cheapest thing in
-      // this file that is not a solid of revolution: the rings wander, so the
-      // silhouette has corners in it and no two elevations of it agree.
-      lathe(W, t0, s0, [
-        [y0 - 0.10, 0.00, 0.00, 0.00],
-        [y0 - 0.02, 0.74, 0.04, -0.03],
-        [y0 + 0.34, 0.88, -0.05, 0.06],
-        [y0 + 0.78, 0.82, 0.07, 0.02],
-        [y0 + 1.16, 0.62, -0.03, -0.07],
-        [y0 + 1.44, 0.34, 0.06, 0.04],
-        [y0 + 1.56, 0.00, 0.02, 0.00],
-      ], ROCK, 8);
-      // The shaded side. One more lathe a hair inside the first over its lower
-      // half, which is a cheat and is the same cheat the terrace risers use:
-      // vertex colour does the work a second light would.
-      lathe(W, t0, s0, [
-        [y0 - 0.02, 0.745, 0.04, -0.03],
-        [y0 + 0.34, 0.885, -0.05, 0.06],
-      ], ROCKD, 8);
+      // Eight corners to a ring, each with its OWN radius, and the ring
+      // centres wander. `lathe` cannot do this and that is why it was wrong:
+      // its rings are circles, so what came out was a loaf. A split karst
+      // block is half a dozen flat fracture faces meeting at hard edges, and
+      // the edge is the entire difference between limestone and dough at
+      // twenty metres.
+      //
+      // Phased a half step so face 5 looks straight down -s. That is the face
+      // the tap is on and the face the path sees, and having it be a face
+      // rather than an arris is what lets the rosette sit flat on it.
+      const N = 8;
+      const cnr = (rg, i) => {
+        const a = ((i % N) + 0.5) / N * TAU;
+        return W(t0 + rg[2] + Math.cos(a) * rg[1][i % N],
+          s0 + rg[3] + Math.sin(a) * rg[1][i % N], y0 + rg[0]);
+      };
+      // Widest at 0.58 m and undercut below it, which is what the frame has:
+      // the trough is tucked in under the overhang rather than standing out
+      // in front of it. Leaning back and along the shore above the tap, which
+      // is the other thing the silhouette does.
+      //
+      // The spread between the eight radii is the whole job and the first cut
+      // had it at plus or minus 12 %, which from behind was an egg. It is plus
+      // or minus 40 % now, and the ring centres walk 0.44 m along the shore
+      // between the foot and the apex, so no two elevations of it agree and
+      // none of them is a solid of revolution.
+      const RG = [
+        [-0.18, [0.52, 0.66, 0.48, 0.58, 0.70, 0.54, 0.64, 0.50], 0.00, 0.00],
+        [+0.16, [0.72, 0.94, 0.62, 0.80, 1.00, 0.72, 0.90, 0.66], 0.03, -0.05],
+        [+0.58, [0.76, 1.06, 0.66, 0.86, 1.10, 0.80, 1.02, 0.70], 0.02, -0.09],
+        [+1.06, [0.66, 0.98, 0.58, 0.80, 1.02, 0.74, 0.92, 0.62], 0.10, -0.04],
+        [+1.62, [0.40, 0.76, 0.34, 0.62, 0.80, 0.52, 0.70, 0.38], 0.22, +0.05],
+        [+2.08, [0.16, 0.44, 0.14, 0.34, 0.48, 0.26, 0.40, 0.16], 0.34, +0.12],
+      ];
+      for (let k = 0; k < RG.length - 1; k++) {
+        for (let i = 0; i < N; i++) {
+          // Per-facet tint off `jit`, never off `rng` — see the note over
+          // `jit`. 0.90 to 1.06 is what a weathered face does against its
+          // neighbour, and the bottom course goes to `ROCKD` on top of that
+          // because the foot of a block standing in gravel is always in its
+          // own shadow.
+          const v = 0.90 + jit(i, 41 + k * 7) * 0.16;
+          const col = k === 0
+            ? [ROCKD[0] * v, ROCKD[1] * v, ROCKD[2] * v]
+            : [ROCK[0] * v, ROCK[1] * v, ROCK[2] * v];
+          b.quad(cnr(RG[k], i), cnr(RG[k], i + 1),
+            cnr(RG[k + 1], i + 1), cnr(RG[k + 1], i), col);
+        }
+      }
+      // The cap, as a fan to a point that is not over the centre — a boulder
+      // with a symmetrical top is a tent.
+      {
+        const top = W(t0 + 0.44, s0 + 0.18, y0 + 2.35);
+        const last = RG[RG.length - 1];
+        for (let i = 0; i < N; i++) {
+          b.tri(cnr(last, i), cnr(last, i + 1), top,
+            shade(ROCK, 0.96 + jit(i, 83) * 0.12));
+        }
+      }
       // ONE seam of calcite, and not the two it had. Two rings of white round
       // a boulder at even spacing is not veining, it is a lampshade — a
       // regular pattern read as manufacture the moment it went in, which is
       // the same trap the sea's foam and the promenade's crazing both fell
       // into. What the photographs have is one irregular seam wandering
-      // across the face and pinching out, so that is what this is: a partial
-      // ring over about a third of the circumference, off-centre, tapering.
-      {
-        const h = 0.62;
-        for (let i = 2; i < 5; i++) {
-          const a0 = (i / 8) * TAU, a1 = ((i + 1) / 8) * TAU;
-          const w = 0.052 - 0.012 * (i - 2);
-          const R = (a, dy) => W(t0 + 0.02 + Math.cos(a) * 0.865,
-            s0 + 0.03 + Math.sin(a) * 0.865, y0 + h + dy + 0.05 * Math.cos(a));
-          b.quad(R(a0, 0), R(a1, 0), R(a1, w), R(a0, w), VEIN);
-        }
+      // across the face and pinching out, so that is what this is: three
+      // facets' worth, off-centre, tapering, and riding on the block's own
+      // corners so it cannot float off a face that moved.
+      for (let i = 2; i < 5; i++) {
+        // 0.034 m and tapering to 0.014, not 0.055 to 0.029. At the wider
+        // figure the seam was three centimetres of white on a face two metres
+        // away and read as a pipe clipped to the rock.
+        const w = 0.034 - 0.010 * (i - 2);
+        const lo = 0.66 + 0.05 * i;
+        // Two rings interpolated at the seam's own height, pushed 0.02 m proud
+        // so it never shares a plane with the face it is on — rule 5, and at
+        // 2 km from the origin a coplanar white band flickers rather than
+        // shows.
+        const at2 = (i2, dy) => {
+          const a = ((i2 % N) + 0.5) / N * TAU;
+          const u = (lo + dy - RG[2][0]) / (RG[3][0] - RG[2][0]);
+          const r = (RG[2][1][i2 % N] * (1 - u) + RG[3][1][i2 % N] * u) + 0.02;
+          const ot = RG[2][2] * (1 - u) + RG[3][2] * u;
+          const os = RG[2][3] * (1 - u) + RG[3][3] * u;
+          return W(t0 + ot + Math.cos(a) * r, s0 + os + Math.sin(a) * r,
+            y0 + lo + dy);
+        };
+        b.quad(at2(i, 0), at2(i + 1, 0), at2(i + 1, w), at2(i, w), VEIN);
       }
-      // The fountain. A scalloped bronze plate bolted to the seaward face, a
-      // short throat and a dolphin's head with the mouth open — five pieces,
-      // and at this size the one that carries it is the downturned snout.
-      const ft = t0, fs = s0 - 0.80, fy = y0 + 0.92;
+      // The fountain. A scalloped rosette bolted flat to the seaward face, a
+      // short fluted throat, a dolphin's head with the mouth open, and the
+      // brass knob on top — and the knob is the piece that decides what this
+      // is. Without it the casting is an ornament; with it, it is a tap, and
+      // `_358` is a photograph of somebody's water supply.
+      //
+      // Face 5 is the one that looks down −s, and its two corners are at
+      // sin(247.5 deg) = sin(292.5 deg) = −0.9239 of their own radii, so the
+      // face is not square to the shore — it slopes from −0.72 to −0.89 at
+      // ring 3. Solved at t0 and at y 1.00 it stands at **s0 − 0.790**, so the
+      // rosette at −0.82 is 0.03 m proud of it and nothing skims anything.
+      // Rule 5, and it is not a formality: this is 2 km from the origin.
+      const ft = t0, fs = s0 - 0.82, fy = y0 + 1.00;
       lathe(W, ft, fs, [
-        [fy - 0.001, 0.000], [fy, 0.135], [fy + 0.02, 0.120],
-        [fy + 0.03, 0.000],
-      ], BRONZE, 10);
-      spar(ft, fs, fy, [0, 0, 0], [0, -0.13, 0.02], 0.052, 0.044, BRONZE);
-      spar(ft, fs, fy, [0, -0.13, 0.02], [0, -0.27, -0.06], 0.062, 0.048,
-        BRONZE);
-      spar(ft, fs, fy, [0, -0.27, -0.06], [0, -0.33, -0.13], 0.048, 0.030,
-        BRONZE);
-      // The tap handle on top of the head, which is what makes it a tap.
-      spar(ft, fs, fy, [0, -0.14, 0.05], [0, -0.13, 0.16], 0.024, 0.022,
-        BRONZE);
-      spar(ft, fs, fy, [-0.09, -0.13, 0.16], [0.09, -0.13, 0.16], 0.020, 0.020,
-        BRONZE);
-      // And the trough on the gravel under it, to catch what comes out.
+        [fy - 0.001, 0.000], [fy, 0.050], [fy + 0.014, 0.045],
+        [fy + 0.022, 0.000],
+      ], PATINA, 9);
+      // The throat and the head: 0.19 m of projection and 0.12 m of drop,
+      // measured, in three tapering pieces. The one that carries it at any
+      // distance is the downturned snout.
+      spar(ft, fs, fy, [0, 0, 0], [0, -0.075, 0.005], 0.036, 0.031, BRONZE);
+      spar(ft, fs, fy, [0, -0.075, 0.005], [0, -0.150, -0.045], 0.041, 0.033,
+        BRONZED);
+      spar(ft, fs, fy, [0, -0.150, -0.045], [0, -0.190, -0.105], 0.033, 0.019,
+        BRONZED);
+      // The knob. 53 mm across and fluted, sitting on a collar over the
+      // throat, tilted back the way the photograph has it.
+      spar(ft, fs, fy, [0, -0.070, 0.028], [0, -0.062, 0.062], 0.017, 0.015,
+        BRASS);
+      lathe(W, ft, fs - 0.062, [
+        [fy + 0.062, 0.000], [fy + 0.068, 0.0265], [fy + 0.090, 0.0245],
+        [fy + 0.100, 0.000],
+      ], BRASS, 8);
+      // And the trough on the gravel under it. 0.41 m tall out of the camera
+      // solve — the first cut had 0.30, which is a doorstep. Its back edge is
+      // at s0 − 0.90 and the block's face at the trough's own mid height is at
+      // s0 − 0.840, so there is 0.06 m of daylight between them and the rock
+      // leans out over it without touching, which is what `_359` has.
       {
-        const ty = gAt2(ft, fs - 0.30);
-        boxTS(ft - 0.24, ft + 0.24, fs - 0.52, fs - 0.10, ty, ty + 0.30,
+        const ty = gAt2(ft, fs - 0.29);
+        boxTS(ft - 0.25, ft + 0.25, fs - 0.50, fs - 0.08, ty - 0.04, ty + 0.41,
           TROUGH, shade(TROUGH, 1.06));
         // Hollowed, by the only means this buffer has: a darker lid set down
         // inside the rim. A basin with a flat top is a plinth.
-        boxTS(ft - 0.19, ft + 0.19, fs - 0.47, fs - 0.15, ty + 0.22,
-          ty + 0.245, shade(TROUGH, 0.52));
+        boxTS(ft - 0.19, ft + 0.19, fs - 0.44, fs - 0.14, ty + 0.30,
+          ty + 0.33, shade(TROUGH, 0.52));
+        furniture.push({ t: ft, s: fs - 0.29, a: 0.25, c: 0.21, h: 0.41,
+          y: ty });
       }
+      // The bed. Everything under the block in `_359` is white crushed
+      // limestone — the whole bottom third of the frame is chippings, with
+      // children's chalk lying on them — and the game stands it on the same
+      // grey slab the lane is made of. So an apron goes down first.
+      //
+      // Sampled at each of its own corners rather than laid flat: the surface
+      // here is not level and a flat disc either floats at one edge or is
+      // buried at the other. 0.045 m proud, which is over rule 5's 0.03 and
+      // under a kerb — a gravel bed is a dressing, not a plinth. The radius
+      // wanders 2.05-2.35 m so that the edge is not a circle, which is the
+      // one thing a raked bed never is.
+      {
+        const NA = 12, ay = 0.045;
+        const rim = (i) => {
+          const a = (i % NA) / NA * TAU;
+          const r = 2.05 + 0.30 * jit(i % NA, 71);
+          const gt = t0 + Math.cos(a) * r, gs = s0 + Math.sin(a) * r;
+          return W(gt, gs, gAt2(gt, gs) + ay);
+        };
+        const mid = W(t0, s0, gAt2(t0, s0) + ay);
+        for (let i = 0; i < NA; i++) {
+          b.tri(mid, rim(i), rim(i + 1),
+            shade(GRAV, 0.94 + jit(i, 73) * 0.14));
+        }
+      }
+      // Then the kerb. `_359` has a ring of angular lumps round the block and
+      // `_362` is the same treatment on the beds along the path: small blocks
+      // set on end in a serrated line, not a mortared edging. Nine of them at
+      // 1.85-2.15 m, which sits them just inside the apron's edge and keeps
+      // the furthest well inside the 3.4 m the car loop already leaves clear.
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * TAU + 0.55;
+        const r = 1.85 + 0.30 * jit(i, 57);
+        const lt = t0 + Math.cos(a) * r, ls = s0 + Math.sin(a) * r;
+        limeLump(lt, ls, 0.34 + 0.14 * jit(i, 59), 0.19 + 0.10 * jit(i, 61), i);
+      }
+      // And the two that are not kerb — the flat weathered plates of `_386`
+      // and `_388`, wider than they are high and lying where they were
+      // dropped rather than set in a line. `_386` is one of these at arm's
+      // length: 1.3 m long against the olive trunk behind it, 0.55 m out of
+      // the gravel, with solution hollows through the top of it.
+      limeLump(t0 - 2.60, s0 + 1.15, 0.66, 0.30, 21);
+      limeLump(t0 + 2.15, s0 - 2.00, 0.58, 0.24, 22);
+      // Walk into it rather than through it. 2.35 m of limestone was a hole
+      // in the collider until now. Not centred on `t0, s0`: the widest ring
+      // runs from t0 − 1.00 to t0 + 0.44 and from s0 − 1.03 to s0 + 0.89, so
+      // the box that fits it is a fifth of a metre down-shore of the axis.
+      furniture.push({ t: t0 - 0.20, s: s0 - 0.07, a: 0.85, c: 0.96,
+        h: 2.35, y: y0 });
     }
     b = back11;
   }
