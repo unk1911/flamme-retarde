@@ -8,6 +8,39 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.210.0] — 2026-09-04
+
+### The ice cream parlour's tables had no ice cream on them
+
+`tableTop` dresses every terrace on this boardwalk and takes four arguments:
+where, how high, and which way round. Not *whose*. So the slastičarnica's four
+tables carried the same one-or-two drinks glasses, water bottle and ashtray as
+the pizzeria's — while four metres away its counter holds sixteen labelled
+flavours, not one of which had ever appeared on a table.
+
+A coupe is the object that says what this shop sells from the seat you eat it
+in, so the shop's key is threaded down through `terraceSet` and the
+slastičarnica gets them: a stemmed bowl — the wide shallow *coppa*, not the tall
+sundae glass of the English seaside — with two scoops sitting proud of the rim
+and slightly apart, the long flat-bowled spoon standing out of them at whatever
+angle it was pushed in, and a rolled wafer in one bowl in two.
+
+The scoops take their colours from **`GELATO`'s own palette** rather than a
+second list, because the whole point is that what is in the bowl is what is in
+the case.
+
+Two things caught on the way, both of them things this file has recorded before:
+
+- I wrote a `bar(0, 1, [[0, 0]], …)` no-op into this exact function, which is
+  the exact degenerate call that was found and removed from this exact function
+  once already. Gone before it built.
+- `dome` takes the HEIGHT before the RADIUS. Swapped, a scoop comes out 60 mm
+  across in an 88 mm bowl and hangs over both sides of it. That is written over
+  the call now.
+
+About 1,160 triangles — measured, 1,959,229 to 1,960,389, and the only shop with
+key `slast` is the one that has them.
+
 ## [1.209.0] — 2026-09-04
 
 ### The same guard, for the pour

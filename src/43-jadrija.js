@@ -4861,7 +4861,7 @@ async function buildJadrija(scene) {
    * differs at MINI is the two objects the ring is made of, and those are
    * `meshChair` and `pedestalTable`.
    */
-  function terraceSet(t, s, y, ang, col, kind) {
+  function terraceSet(t, s, y, ang, col, kind, shop) {
     const seat = [0.230, 0.235, 0.240];
     const R = seatRing(t, s, ang);
     for (const [ct, cs, face] of R.seats) {
@@ -4924,12 +4924,12 @@ async function buildJadrija(scene) {
     }
     if (kind === 'mesh') {
       pedestalTable(R.ct, R.cs, y);
-      tableTop(R.ct, R.cs, y + 0.720, ang);
+      tableTop(R.ct, R.cs, y + 0.720, ang, shop);
     } else {
       boxTS(R.ct - 0.30, R.ct + 0.30, R.cs - 0.30, R.cs + 0.30, y + 0.70, y + 0.75,
         [0.520, 0.512, 0.492]);
       post(W, R.ct, R.cs, y, y + 0.70, 0.035, [0.330, 0.334, 0.330], 6);
-      tableTop(R.ct, R.cs, y + 0.750, ang);
+      tableTop(R.ct, R.cs, y + 0.750, ang, shop);
     }
     // The table, which is a 0.60 m top on a single pedestal and the thing that
     // was actually named in the report. `y` is the deck it stands on rather
@@ -4957,7 +4957,7 @@ async function buildJadrija(scene) {
    *
    * A quarter of the tables are cleared, because a quarter of them are.
    */
-  function tableTop(ct, cs, ty, ang) {
+  function tableTop(ct, cs, ty, ang, shop) {
     const key = ((ct * 7.3) | 0) * 13 + ((cs * 5.1) | 0);
     if (jit(key, 610) < 0.24) return;
     // Its own frame, turned with the set, so the card faces the same way the
@@ -4968,6 +4968,73 @@ async function buildJadrija(scene) {
     const GLASS = [0.660, 0.700, 0.720];
     const JUICE = [[0.760, 0.330, 0.090], [0.700, 0.120, 0.140],
       [0.820, 0.700, 0.240], [0.180, 0.230, 0.190]];
+
+    // ── and at the slasticarnica, what people are actually eating ──────────
+    //
+    // This function knew nothing about which shop's terrace it was dressing,
+    // so the ice cream parlour's tables carried the same drinks glasses, water
+    // bottle and ashtray as the pizzeria's. The counter four metres away has
+    // sixteen labelled flavours in it and not one of them was ever on a table.
+    //
+    // A coupe is the one object that says what this shop sells from the seat
+    // you eat it in: a stemmed bowl with two scoops in it, a long spoon
+    // standing out of them, and a wafer stuck in at an angle. The scoops come
+    // out of `GELATO`'s own palette rather than a second list of colours,
+    // because the whole point is that what is in the bowl is what is in the
+    // case.
+    if (shop === 'slast' && jit(key, 620) < 0.72) {
+      const FLAV = GELATO.back.concat(GELATO.front);
+      const cups = 1 + ((jit(key, 621) * 2) | 0);
+      for (let i = 0; i < cups; i++) {
+        const dt = -0.13 + jit(key + i * 9, 622) * 0.26;
+        const ds = -0.11 + jit(key + i * 9, 623) * 0.22;
+        const [ut, us] = at2(dt, ds);
+        // The bowl: a foot, a short stem and a wide shallow cup, which is what
+        // a coppa is and is not the tall sundae glass of the English seaside.
+        lathe(W, ut, us, [
+          [ty + 0.000, 0.000], [ty + 0.000, 0.030], [ty + 0.006, 0.028],
+          [ty + 0.008, 0.008], [ty + 0.030, 0.008], [ty + 0.034, 0.020],
+          [ty + 0.050, 0.038], [ty + 0.062, 0.044],
+          // and back down the inside, or a bowl is a lump. See `kit.fills`.
+          [ty + 0.060, 0.041], [ty + 0.036, 0.019], [ty + 0.032, 0.010],
+        ], GLASS, 10);
+        // Two scoops, sitting proud of the rim and slightly apart, which is
+        // how they land and not how they are drawn on a menu.
+        for (let k = 0; k < 2; k++) {
+          const f = FLAV[(jit(key + i * 9 + k * 3, 624) * FLAV.length) | 0];
+          const [st, ss] = at2(dt + (k ? 0.016 : -0.016), ds + (k ? -0.011 : 0.011));
+          // `dome` takes the HEIGHT before the radius, which is worth
+          // saying out loud: swapped, a scoop comes out 60 mm across
+          // in an 88 mm bowl and hangs over both sides of it.
+          dome(W, st, ss, ty + 0.048, 0.024, 0.021, f.col, 9);
+        }
+        // The spoon: the long flat-bowled one every one of these places has,
+        // standing out of the scoops at whatever angle it was pushed in.
+        {
+          const sa = jit(key + i * 9, 625) * Math.PI * 2;
+          const lean = 0.052;
+          const [p0t, p0s] = at2(dt + Math.cos(sa) * 0.004,
+            ds + Math.sin(sa) * 0.004);
+          const [p1t, p1s] = at2(dt + Math.cos(sa) * lean,
+            ds + Math.sin(sa) * lean);
+          const A = W(p0t, p0s, ty + 0.044), B = W(p1t, p1s, ty + 0.128);
+          const w = 0.006;
+          b.quad([A[0] - w, A[1], A[2]], [A[0] + w, A[1], A[2]],
+            [B[0] + w, B[1], B[2]], [B[0] - w, B[1], B[2]],
+            [0.72, 0.73, 0.74]);
+        }
+        // And a wafer in one bowl in two, the flat rolled kind.
+        if (jit(key + i * 9, 626) < 0.5) {
+          const wa = jit(key + i * 9, 627) * Math.PI * 2;
+          const [w0t, w0s] = at2(dt + Math.cos(wa) * 0.010,
+            ds + Math.sin(wa) * 0.010);
+          const [w1t, w1s] = at2(dt + Math.cos(wa) * 0.055,
+            ds + Math.sin(wa) * 0.055);
+          post(W, (w0t + w1t) * 0.5, (w0s + w1s) * 0.5,
+            ty + 0.050, ty + 0.112, 0.006, [0.780, 0.660, 0.430], 5);
+        }
+      }
+    }
     // One or two glasses, wherever the hands that put them down left them.
     const n = 1 + ((jit(key, 611) * 2) | 0);
     for (let i = 0; i < n; i++) {
@@ -9264,7 +9331,8 @@ async function buildJadrija(scene) {
         terraceSet(t, fs - 1.9 + (k % 2) * 0.5, y0, (k % 2) * 0.5 - 0.25,
           mesh ? [0.735, 0.733, 0.720]
             : k % 3 === 0 ? [0.190, 0.200, 0.210] : [0.560, 0.548, 0.512],
-          mesh ? 'mesh' : undefined);
+          mesh ? 'mesh' : undefined,
+          S.key);
       }
     }
     // Except at beach bar MINI, whose shade is a different object entirely and
