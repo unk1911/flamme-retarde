@@ -2730,6 +2730,10 @@ async function buildJadrija(scene) {
     { key: 'h2o', kind: 'box', t0: 312, t1: 325, s0: 22, s1: 27.0, h: 2.8,
       name: 'Caffee bar H2O', roof: [0.470, 0.462, 0.440],
       body: [0.505, 0.528, 0.545], awn: 3.0, fg: '#1c2b33', bg: '#e9eced',
+      // A caffe bar with a drinks fridge, which is every caffe bar. Tabulated
+      // against its neighbours this shop had two features to the
+      // slasticarnica's eight, and it is thirteen metres of frontage.
+      cooler: true,
       pier: [0.430, 0.405, 0.360] },
     // The fascia was red on cream and it is not: slasticarnica-behind-view
     // catches the awning band square on from the lane and it is near-black
@@ -2758,7 +2762,9 @@ async function buildJadrija(scene) {
       name: 'Caffe TRAMPULIN', roof: [0.430, 0.252, 0.180],
       body: [0.560, 0.535, 0.487], awn: 3.2, fg: '#33302c', bg: '#e8e0cf',
       pergola: [0.075, 0.230, 0.140], bench: [0.330, 0.145, 0.095],
-      wallName: true },
+      wallName: true ,
+      // Caffe TRAMPULIN, same argument. It had ONE feature.
+      cooler: true },
   ];
   // What the promenade's own loops have to keep out of. A lamp coming up
   // through an awning and a bench standing inside a shop are the two failures
@@ -9179,8 +9185,61 @@ async function buildJadrija(scene) {
       const ct = S.t0 + 1.1, cs = S.s0 - 0.55;
       boxTS(ct - 0.45, ct + 0.45, cs - 0.32, cs + 0.32, y0, y0 + 1.94,
         [0.560, 0.556, 0.548], [0.590, 0.586, 0.578]);
-      boxTS(ct - 0.40, ct + 0.40, cs - 0.34, cs - 0.29, y0 + 0.22, y0 + 1.58,
-        [0.120, 0.150, 0.180]);
+      // AND SOMETHING BEHIND THE GLASS. A drinks fridge whose front is one dark
+      // rectangle is the same fault the serving openings had before 1.192.0,
+      // on a smaller object: it is not a fridge, it is a hole.
+      //
+      // AND IT IS A RELIEF, NOT A ROOM — which is the same correction that
+      // note records, made again here for the same reason. The cabinet body is
+      // a solid box from `cs - 0.32` inward, so the first cut of this put nine
+      // rounded bottles on four shelves at `cs - 0.245` and buried every one of
+      // them inside it. There is 20 mm between the body's face and the glass,
+      // which will not hold a 60 mm bottle, so the bottles are slabs 15 mm deep
+      // standing in that gap with the pane in front of them.
+      //
+      // The colours hash on the SHOP as well as the shelf, because there are
+      // three of these on this boardwalk now and they are the same appliance —
+      // which is true of the cabinet and must not be true of what is in it.
+      {
+        const skey = S.t0 | 0;
+        const BOT = [[0.120, 0.360, 0.180], [0.680, 0.180, 0.130],
+          [0.820, 0.560, 0.130], [0.180, 0.220, 0.300],
+          [0.760, 0.740, 0.700], [0.240, 0.420, 0.560]];
+        for (let sh = 0; sh < 4; sh++) {
+          const sy = y0 + 0.30 + sh * 0.32;
+          boxTS(ct - 0.37, ct + 0.37, cs - 0.339, cs - 0.322, sy, sy + 0.014,
+            [0.480, 0.484, 0.490]);
+          for (let i = 0; i < 9; i++) {
+            const h = jit(skey * 17 + sh * 31 + i, 640);
+            const bt = ct - 0.335 + i * 0.083;
+            const c = BOT[(h * BOT.length) | 0];
+            boxTS(bt - 0.030, bt + 0.030, cs - 0.338, cs - 0.323,
+              sy + 0.014, sy + 0.185 + h * 0.050, c, shade(c, 1.12));
+            boxTS(bt - 0.016, bt + 0.016, cs - 0.336, cs - 0.325,
+              sy + 0.185 + h * 0.050, sy + 0.208 + h * 0.050,
+              [0.760, 0.740, 0.690]);
+          }
+        }
+      }
+      // The door, which is a FRAME and not a pane. This was one opaque box in
+      // the colour of dark glass, and an opaque box is exactly as good at
+      // hiding a shelf of bottles as the solid cabinet was — which is why the
+      // first two attempts at stocking this fridge both came out as the same
+      // dark rectangle they were trying to fix. There is no transparency in
+      // this material and there does not need to be: a glass door reads as its
+      // frame and what is behind it, so that is what gets drawn.
+      const FR = [0.120, 0.150, 0.180];
+      boxTS(ct - 0.40, ct + 0.40, cs - 0.346, cs - 0.340,
+        y0 + 0.22, y0 + 0.27, FR);
+      boxTS(ct - 0.40, ct + 0.40, cs - 0.346, cs - 0.340,
+        y0 + 1.53, y0 + 1.58, FR);
+      for (const e of [-0.40, -0.365, 0.365, 0.40]) {
+        boxTS(ct + e - 0.018, ct + e + 0.018, cs - 0.346, cs - 0.340,
+          y0 + 0.22, y0 + 1.58, FR);
+      }
+      // and the handle, down the closing edge.
+      post(W, ct + 0.335, cs - 0.360, y0 + 0.55, y0 + 1.25, 0.014,
+        [0.620, 0.616, 0.600], 6);
       boxTS(ct - 0.45, ct + 0.45, cs - 0.34, cs - 0.28, y0 + 1.62, y0 + 1.90,
         [0.930, 0.930, 0.925]);
       runs.push({ t0: ct - 0.5, t1: ct + 0.5, s0: cs - 0.4, s1: cs + 0.4,

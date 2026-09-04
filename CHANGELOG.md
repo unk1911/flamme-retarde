@@ -8,6 +8,56 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.213.0] — 2026-09-04
+
+### One business had eight features and its neighbour had two
+
+Tabulated the shop table by what each business actually carries:
+
+```
+slast     vitrine cooler scallop panels reedBack backBar awn sub    8
+f2        awn solid painted                                        3
+mini      awn pier plinth split                                    4
+h2o       awn pier                                                 2
+tramp2    awn                                                      1
+```
+
+Every survey, every photograph and every pass has gone into the slastičarnica.
+**H2O is a caffè bar with thirteen metres of frontage and two features**, and
+Caffe TRAMPULIN has one. So both get the `cooler` — the glass-front drinks
+fridge, which is not a gelateria object, it is what every caffè bar on that
+coast has one of, and which was already built and tested.
+
+**And the fridge had the same fault the shops used to have.** Its front was one
+box in the colour of dark glass: not a fridge, a hole. Stocking it took three
+goes and both failures are worth writing down, because they are the same
+mistake in two costumes:
+
+1. Nine rounded bottles on four shelves at `cs - 0.245` — **inside** the
+   cabinet, which is a solid box from `cs - 0.32` inward. Buried, exactly as
+   `shopInside`'s first cut built a room behind a wall. There is 20 mm between
+   the body's face and the door, which will not hold a 60 mm bottle, so they are
+   slabs 15 mm deep standing in that gap.
+2. Then the pane went back over them — and *the pane is opaque*. There is no
+   transparency in this material. An opaque box is exactly as good at hiding a
+   shelf as the solid cabinet was, which is how two consecutive attempts to fix
+   a dark rectangle both produced the same dark rectangle.
+
+A glass door reads as its **frame** and what is behind it, so that is what is
+drawn: a head and sill, two stiles, a handle down the closing edge, and four
+shelves of bottles visible between them.
+
+The bottle colours hash on the **shop** as well as the shelf, because there are
+three of these on the boardwalk now and they are the same appliance — which is
+true of the cabinet and must not be true of what is in it. H2O, the Trampulin
+and the slastičarnica are stocked differently, and a bar stocks what it sells.
+
+`panels` was considered for H2O and **not** given: the board carries TONIC,
+FANTA, ORANGINA and COCA COLA at 3.00 € with the opening hours under them, which
+is a bar's board and not a gelateria's and would have suited it — but
+`menuPanels` takes only a size, so two shops ten metres apart would have carried
+the identical board. That is the regular-pattern trap wearing a new hat.
+
 ## [1.212.0] — 2026-09-04
 
 ### She never once looked at the person she was pouring for
