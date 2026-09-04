@@ -13239,6 +13239,21 @@ async function buildJadrija(scene) {
     if (t > JAD.beachTo) clutter(t + 1.1, LAMP.s - 1.4, y, 3, (t | 0) * 7 + 1);
     boxTS(t - 0.075, t + 0.075, LAMP.s - 0.075, LAMP.s + 0.075, y, top,
       [0.190, 0.186, 0.178]);
+    // AND YOU CANNOT WALK THROUGH IT. Twenty-one of these down the promenade
+    // and not one of them registered a collider — every other thing standing on
+    // this concrete does, benches and bins through `furniture` and trees
+    // through `greens`, and the columns were simply missed.
+    //
+    // 0.22 and not the post's true 0.075, and the half-centimetre matters
+    // twice. `confine` adds `GROUND.girth` (0.55) for the player, so this holds
+    // you off 0.77 m from the centre — which is about the berth anybody gives a
+    // lamp column anyway. And `showAhead` ignores any blocker whose
+    // `hypot(a, c)` is under `SHOW.seeR` (0.30): at the true size it reads 0.11
+    // and she would never STEER round it, only be stopped by it — which the
+    // note over `showSteer` is explicit is the wrong answer ("a figure that
+    // walks at a mast until something stops her and then slides down it is the
+    // thing the report was about"). At 0.22 it reads 0.311 and she goes round.
+    solid(t, LAMP.s, 0.22, 0.22, LAMP.post);
     // The arm, cranked seaward over the promenade.
     boxTS(t - 0.045, t + 0.045, LAMP.s - LAMP.arm, LAMP.s, top - 0.09, top,
       [0.190, 0.186, 0.178]);
@@ -23135,6 +23150,12 @@ async function buildJadrija(scene) {
     // — so the same test that keeps her out of the crowd's way keeps her from
     // swerving at nine centimetres of aluminium.
     seeR: 0.30,
+    // Her half-width for the HARD stop, which is not `girth` above. That one is
+    // 0.42 and deliberately generous, because it is the distance at which she
+    // starts turning; this is the distance at which she cannot be. A body is
+    // about this wide and using the steering figure here would hold her a
+    // hand's breadth off everything she walks past.
+    solid: 0.24,
     // ── the hop ───────────────────────────────────────────────────────────
     // 4.0 m/s off the deck against 10.5, which is a 0.76 m apex and 0.76 s in
     // the air. The player's own hop is 7.0 against 12.0 and goes to 1.98 m:
@@ -23562,12 +23583,80 @@ async function buildJadrija(scene) {
    * with the clamp taken off and a target instead of a heading, and the
    * distance it returns is what the caller uses to decide it has arrived.
    *
-   * She still has no collision — see the note at the top of the performance —
-   * so the doorway is threaded by putting the waypoints in it rather than by
-   * pushing her out of anything. Which is also why there are three of them and
-   * not one: a straight line from the promenade to the tabouret goes through a
-   * metre and a half of hut.
+   * SHE HAS COLLISION NOW — `showClear`, below — and this note used to say she
+   * did not, and to point at "the note at the top of the performance" for why.
+   * That note is gone; nothing in this file says it any more. What was left was
+   * a dangling justification for a gap, which is how the gap survived: she went
+   * through benches, bins and trees on every scripted leg, because steering is
+   * only consulted while she WANDERS and a leg sets `show.want` straight at its
+   * waypoint.
+   *
+   * The doorway is still threaded by putting the waypoints in it rather than by
+   * pushing her out of anything — `showClear` stands off inside the kabina for
+   * the reason written over it — and there are FOUR of them and not one, which
+   * this note said was three until 1.219.0 added the fourth: a straight line
+   * from the promenade to the tabouret goes through a metre and a half of hut,
+   * and the last leg went through the tabouret itself.
    */
+  /**
+   * The hard stop under her walk.
+   *
+   * `showSteer` has turned her away from things since it was written and
+   * `showOver` hops the low ones, and both are good — but steering is a lean,
+   * not a wall, and it is only consulted while she is WANDERING. Every scripted
+   * leg in this file sets `show.want` straight to a waypoint bearing and never
+   * calls `showAhead` at all, so on the walk into the kabina, on the way to a
+   * ladder and on the way home she went through whatever stood in the line.
+   * `showTo` integrated a position and asked nothing.
+   *
+   * This is `confine`'s push-out from 47-ground.js in the frame she already
+   * lives in: `blockers` are laid out in locale (t, s), which is why the
+   * player's version converts into that frame and back out and this one does
+   * not. Four passes, because leaving one box can put you inside the next.
+   *
+   * TWO EXEMPTIONS, both found by checking rather than assumed.
+   *
+   * The hop. `show.air` is her height off the deck and while it is non-zero she
+   * is over something on purpose — a bench is 0.49 m and she is authored to
+   * clear it. Deciding per blocker which one she is above would need `b.y`, and
+   * `b.y` means two things in this file: `solid()` writes the shore frame's
+   * zero and `runs.push` writes a world height, which `showAhead` already works
+   * around. Skipping the test outright while airborne cannot fight the hop.
+   *
+   * And the kabina. Her wine mark is 0.306 m from the tabouret's centre and the
+   * tabouret is a blocker 0.32 by 0.24 — she stands that close on purpose,
+   * because she is reaching over it to pour. Pushed out, she would go 0.43 m
+   * off the mark the whole solve is measured from and never arrive at all. That
+   * room is four metres across, hand-placed, and her route through it is four
+   * hand-checked waypoints; it does not want a physics system, and every phase
+   * inside it is in `KABIN`.
+   */
+  function showClear() {
+    if (KABIN[show.phase]) return;
+    if (show.air > 0 || show.hopV > 0) return;
+    const g = SHOW.solid;
+    for (let pass = 0; pass < 4; pass++) {
+      let moved = false;
+      for (const b of blockers) {
+        if (b.off) continue;
+        if (!(b.a >= 0) || !(b.c >= 0)) continue;
+        const co = b.rot ? Math.cos(b.rot) : 1, sn = b.rot ? Math.sin(b.rot) : 0;
+        const dt0 = show.t - b.t, ds0 = show.s - b.s;
+        const dt = dt0 * co + ds0 * sn, ds = -dt0 * sn + ds0 * co;
+        const ea = b.a + g, ec = b.c + g;
+        if (Math.abs(dt) >= ea || Math.abs(ds) >= ec) continue;
+        // Out by the nearest face, which is what a wall does.
+        let ot = dt, os = ds;
+        if (ea - Math.abs(dt) < ec - Math.abs(ds)) ot = Math.sign(dt || 1) * ea;
+        else os = Math.sign(ds || 1) * ec;
+        show.t = b.t + ot * co - os * sn;
+        show.s = b.s + ot * sn + os * co;
+        moved = true;
+      }
+      if (!moved) break;
+    }
+  }
+
   function showTo(tt, ss, dt, mul = 1) {
     const d0 = tt - show.t, d1 = ss - show.s;
     const dist = Math.hypot(d0, d1);
@@ -23578,6 +23667,7 @@ async function buildJadrija(scene) {
     skinFig.state.speed = clamp(show.vel / SHOW.walk, 0.55, 1.75);
     show.t += Math.cos(show.ang) * show.vel * dt;
     show.s += Math.sin(show.ang) * show.vel * dt;
+    showClear();
     return dist;
   }
 
@@ -23634,6 +23724,7 @@ async function buildJadrija(scene) {
     skinFig.state.speed = 1;
     show.t += Math.cos(show.ang) * show.vel * dt;
     show.s += Math.sin(show.ang) * show.vel * dt;
+    showClear();
     return dist;
   }
 

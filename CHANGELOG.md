@@ -8,6 +8,71 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.223.0] — 2026-09-04
+
+### She walked through the furniture, and you walked through the lamp posts
+
+Two reports, and they turned out to be two different bugs.
+
+**The lamp posts.** Twenty-one columns down the promenade and not one of them
+registered a collider. Everything else standing on that concrete does — benches
+and bins through `furniture`, trees through `greens`, the huts through `runs` —
+and the columns were simply missed. Fifteen of them exist after `clearOfShops`
+and there were **zero** blockers for them.
+
+They are 0.22 rather than the post's true 0.075, and the difference matters
+twice. `confine` adds `GROUND.girth` (0.55) for the player, so this holds you
+0.77 m off the centre, which is about the berth anybody gives a lamp column.
+And `showAhead` discards any blocker whose `hypot(a, c)` is under `SHOW.seeR`
+(0.30): at the true size it reads 0.11, so she would never *steer* round one,
+only be stopped by it — which the note over `showSteer` says in as many words is
+the wrong answer, *"a figure that walks at a mast until something stops her and
+then slides down it is the thing the report was about"*. At 0.22 it reads 0.311
+and she goes round.
+
+**Her collision.** She had none at all. `showTo` integrated a position and asked
+nothing:
+
+```js
+show.t += Math.cos(show.ang) * show.vel * dt;
+show.s += Math.sin(show.ang) * show.vel * dt;
+```
+
+`showSteer` has avoided things since it was written and `showOver` hops the low
+ones, and both are good — but steering is a lean, not a wall, and **it is only
+consulted while she wanders**. Every scripted leg in the file sets `show.want`
+straight at a waypoint and never calls `showAhead`, so on the way into the
+kabina, out to a ladder or home again she went through whatever was in the line.
+
+`showClear` is `confine`'s push-out in the frame she already lives in — the
+blockers are laid out in locale (t, s), which is why the player's version
+converts in and back out and hers does not.
+
+**Two exemptions, both found by checking rather than assumed.** The hop, because
+`show.air` means she is over something on purpose and reasoning per blocker
+would need `b.y`, which means two different things in this file. And the kabina:
+her wine mark is 0.306 m from the tabouret's centre and the tabouret is a
+blocker — she stands that close because she is reaching over it to pour, and a
+push-out would take her 0.43 m off the mark the whole solve is measured from and
+she would never arrive.
+
+Measured after:
+
+```
+lamp colliders          0 -> 15
+her lane still walkable       92.5 %
+frames inside a blocker, 400 of normal movement     0
+placed dead inside one, ejected on frame            88
+  (frames 0-40 she is in `notice`/`down` — stationary phases run no mover,
+   so she stays; the moment `crawl` moves her she is pushed out and stays out)
+```
+
+Two stale notes fixed on the way. `showTo` said *"She still has no collision —
+see the note at the top of the performance"*, and that note is gone; nothing in
+the file says it any more. A dangling justification for a gap is how the gap
+survived. It also still said the kabina has three waypoints, which 1.219.0 made
+four.
+
 ## [1.222.1] — 2026-09-04
 
 ### The audit comes back clean
