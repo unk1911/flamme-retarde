@@ -8,6 +8,26 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.190.0] — 2026-09-04
+
+### She turns to present the two positions that happen behind her
+
+Scanned frame by frame from where a player stands — inland, on the promenade,
+which is the way she faces — the attitude and the arabesque read as **a woman
+standing with her arms out**. Both of them are positions whose whole content is
+the working leg going *behind* her, and a leg directly behind a body is a leg you
+cannot see. The arabesque is the one position in ballet everybody can name and it
+was invisible from the only place anybody watches it from.
+
+Seventy degrees, out and back, on the same `@turn` the pirouette already uses:
+she turns to present the line, holds both positions side-on, and turns back for
+the close. A dancer does exactly this and it costs two numbers.
+
+It only became possible last release. Until `@turn` existed the clip's only way
+to rotate her was the pelvis's own Y, which is 27° off vertical and tips her over
+rather than turning her — so "turn her to present" would have meant "lean her
+over to present".
+
 ## [1.189.0] — 2026-09-04
 
 ### The lamps come on

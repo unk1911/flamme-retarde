@@ -6340,10 +6340,20 @@ BALLET_KEYS = [
     (9.20, _spin(_look(BAL_PIROU, -60), 120)),
     (9.65, _spin(_look(BAL_PIROU, 60), 240)),
     (10.10, _spin(BAL_PIROU, 360)), (10.70, _spin(BAL_STAND, 360)),
-    (11.10, _thru(_spin(BAL_STAND, 360), _spin(BAL_ATTITUDE, 360), 0.52)),
-    (11.45, _spin(BAL_ATTITUDE, 360)), (12.15, _spin(BAL_ATTITUDE, 360)),
-    (12.90, _spin(BAL_ARABESQUE, 360)), (13.65, _spin(BAL_ARABESQUE, 360)),
-    (14.02, _thru(_spin(BAL_ARABESQUE, 360), _spin(BAL_STAND, 360), 0.55)),
+    # AND SHE TURNS TO PRESENT THEM. The attitude and the arabesque are the two
+    # positions whose whole content is behind her, and she stands facing
+    # inland, which is where the promenade is and therefore where anybody
+    # watching is. Scanned frame by frame from there, the arabesque — the one
+    # position in ballet everybody can name — reads as a woman standing with
+    # her arms out, because the leg that makes it is directly behind her body.
+    #
+    # Seventy degrees, out and back, on the same `@turn` the pirouette already
+    # uses. A dancer turns to present a line; this is that, and it costs two
+    # numbers.
+    (11.10, _thru(_spin(BAL_STAND, 360), _spin(BAL_ATTITUDE, 430), 0.52)),
+    (11.45, _spin(BAL_ATTITUDE, 430)), (12.15, _spin(BAL_ATTITUDE, 430)),
+    (12.90, _spin(BAL_ARABESQUE, 430)), (13.65, _spin(BAL_ARABESQUE, 430)),
+    (14.02, _thru(_spin(BAL_ARABESQUE, 430), _spin(BAL_STAND, 360), 0.55)),
     (14.35, _spin(BAL_STAND, 360)), (15.00, _spin(IDLE_A, 360)),
 ]
 
