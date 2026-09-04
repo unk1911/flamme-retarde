@@ -96,7 +96,46 @@
  * wrapper on the builder and the numbers the game reasons with are scaled here,
  * once, off the same constant.
  */
-const BROD_K = 1.45;
+const BROD_K = 1.75;
+
+/**
+ * AND BIGGER AGAIN, BECAUSE SIZE WAS ONLY HALF OF IT.
+ *
+ * Misha, 4 Sep 2026: *"the boat itself, it's still not big enough, it must
+ * carry 60-80 people to sibenik... your boat can maybe carry 1.25 people....
+ * needs to be BIGGGGGER"*. He is right twice over, and the second one is the
+ * interesting one.
+ *
+ * 1.45 put her at 22.6 m, which on this coast really is a sixty-passenger
+ * hull. 1.75 puts her at **27.3 m by 7.35**, which is the top of the range and
+ * not the bottom of it, and that is the easy half.
+ *
+ * The hard half is that a hull does not say how many people it takes — SEATS
+ * do. What she was, at any scale, was an open boat with a shed on it and two
+ * benches down the cockpit: fifteen metres of bench, about thirty places, and
+ * from thirty metres off nothing at all to count. Which is precisely what "1.25
+ * people" means. So she now has what every excursion boat on this coast has and
+ * she did not:
+ *
+ *   - an UPPER DECK on the deckhouse roof, railed all round, with a bench down
+ *     each side of it. This is the single thing that reads as capacity from the
+ *     shore, and it is the reason you can tell a working passenger boat from a
+ *     large private one at half a mile.
+ *   - four benches in the cockpit where there were two.
+ *   - a boarding gate cut in the port bulwark, which she needs now for a
+ *     reason the note below explains.
+ *
+ * Counted, at 0.50 m a place: 2 x 5.95 m up top and 4 x 5.30 m below, times
+ * 1.75, is 20.8 + 37.1 = **58 m of bench, about 116 places seated and standing
+ * room besides**. She is a boat that takes eighty people and looks like one.
+ *
+ * THE STEP AT THE QUAY CHANGES, and that is what the gate is for. At 1.45 her
+ * side deck was 1.54 against a mole at 1.46 — level, step across. At 1.75 it is
+ * 1.86 and her bulwark top is 1.13 m above the coping, which nobody swings a
+ * leg over. Every boat this size has a gate cut in the bulwark instead, and now
+ * so does she: a gap in the topsides amidships to port with a threshold in it,
+ * on the side she lies alongside.
+ */
 
 const BROD = {
   // Fifteen and a half metres, four and a bit across. The Jadrija boat is a
@@ -568,6 +607,50 @@ function brodProto() {
   b.box(1.475, 1.06 + 1.99, 0, 5.95, 0.10, 2.46, HOUSE, HOUSE);
   b.box(3.75, 1.06 + 1.99, 0, 1.20, 0.10, 2.10, HOUSE, HOUSE);
 
+  // ── the upper deck ───────────────────────────────────────────────────────
+  // And what stands on that roof, which is the whole answer to "your boat can
+  // maybe carry 1.25 people". A hull does not say how many people it takes;
+  // seats do, and the one place a boat this size puts them where they can be
+  // COUNTED from the shore is on top of the house.
+  //
+  // Stanchions and two rails, not a solid coaming: a solid one is a bulwark
+  // and reads as a second deckhouse, and what has to read from half a mile is
+  // that there is nothing up there but people.
+  {
+    const y0 = 1.06 + 2.04;                  // the roof's top face
+    const X0 = -1.44, X1 = 4.39, Z = 1.19;   // just inboard of the roof edge
+    const NS2 = 9;
+    for (let i = 0; i <= NS2; i++) {
+      const x = X0 + (X1 - X0) * (i / NS2);
+      for (const s of [1, -1]) b.box(x, y0 + 0.45, s * Z, 0.05, 0.90, 0.05, RAIL);
+    }
+    // The two rails, and the transverse pair that closes the after end. The
+    // forward end is open on to the wheelhouse roof, which is where the
+    // skipper's ladder comes up and where nobody stands.
+    for (const h of [0.42, 0.86]) {
+      for (const s of [1, -1]) {
+        b.box((X0 + X1) * 0.5, y0 + h, s * Z, X1 - X0, 0.045, 0.045, RAIL);
+      }
+      b.box(X0, y0 + h, 0, 0.045, 0.045, Z * 2, RAIL);
+    }
+    // A bench down each side, backs to the rail, which is how they are on
+    // every one of these. The seat is 0.42 off the deck and 0.40 across, so a
+    // person on it sits with their knees inboard and their back to the sea.
+    for (const s of [1, -1]) {
+      b.box(1.475, y0 + 0.42, s * 0.94, 5.95, 0.08, 0.40, TRIM);
+      b.box(1.475, y0 + 0.21, s * 1.12, 5.95, 0.42, 0.06, TRIM);
+      b.box(1.475, y0 + 0.66, s * 1.13, 5.95, 0.34, 0.05, TRIM);
+    }
+    // The ladder up, on the starboard side against the after wall of the
+    // house. Five rungs from the side deck to the roof.
+    for (let i = 0; i <= 5; i++) {
+      b.box(-1.22, 1.06 + i * (0.98 / 5) + 0.08, 0.88, 0.05, 0.05, 0.52, RAIL);
+    }
+    for (const z of [0.64, 1.12]) {
+      b.box(-1.22, 1.06 + 0.57, z, 0.06, 1.14, 0.06, RAIL);
+    }
+  }
+
   // ── the rails ────────────────────────────────────────────────────────────
   // Pipe stanchions and two wires round the foredeck only. Aft the bulwark is
   // the rail, which is why you can sit on it.
@@ -600,9 +683,80 @@ function brodProto() {
   // that reads from the far side of a fifteen-metre deck is red-white-blue.
   b.box(4.44, 1.06 + 2.90, 0, 0.14, 3.90, 0.14, TRIM);
   b.box(2.40, 1.06 + 2.36, -0.86, 0.16, 0.66, 0.16, DARK);
+  // FOUR benches in the cockpit and not two: the outboard pair against the
+  // bulwark, which is where they always were, and an inboard pair back to back
+  // with them down the middle. That is the arrangement on a boat that has to
+  // seat people rather than carry a family, and it doubles what can be counted
+  // from the pier without narrowing the gangway either side to less than the
+  // 0.55 m a person needs.
   for (const s of [1, -1]) {
     b.box(-4.20, 0.72 + 0.42, s * 1.42, 5.30, 0.08, 0.52, TRIM);
     b.box(-4.20, 0.72 + 0.20, s * 1.66, 5.30, 0.42, 0.06, TRIM);
+    b.box(-4.20, 0.72 + 0.42, s * 0.48, 5.30, 0.08, 0.46, TRIM);
+    b.box(-4.20, 0.72 + 0.62, s * 0.24, 5.30, 0.32, 0.05, TRIM);
+  }
+  // The boarding gate, to port, amidships, on the side she lies alongside.
+  // See the note over `BROD_K`: her bulwark now stands 1.13 m over the coping
+  // and a passenger boat answers that with a gap in the topsides, not with a
+  // longer leg. Drawn as the two posts either side of it and a threshold
+  // across the bottom — the gap itself is the absence of the dark strake, and
+  // the strake is lofted, so what makes the hole is a piece of deck-coloured
+  // hull standing in front of it.
+  {
+    const [ys, ws] = sheerAt(0.60);
+    b.box(0.60, ys - 0.32, -(ws - 0.05), 1.30, 0.64, 0.10, DECK, DECK);
+    for (const dx of [-0.72, 0.72]) {
+      b.box(0.60 + dx, ys - 0.20, -(ws - 0.06), 0.13, 0.90, 0.13, TRIM);
+    }
+    b.box(0.60, ys + 0.02, -(ws - 0.06), 1.58, 0.09, 0.14, TRIM);
+  }
+  // Two lifebuoys, lashed to the after rail of the upper deck where they can
+  // be reached. 0.42 across and not 0.62: a lifebuoy is 0.75 m outside and
+  // this table is authored at 1/1.75 of built, so the first cut put two
+  // metre-and-a-bit rings on the roof and they read as deck cargo.
+  for (const s of [1, -1]) {
+    b.box(-1.46, 1.06 + 2.50, s * 0.62, 0.09, 0.42, 0.42, [0.760, 0.180, 0.090]);
+    b.box(-1.44, 1.06 + 2.50, s * 0.62, 0.09, 0.22, 0.22, HOUSE);
+  }
+
+  // ── the awning over the aft deck ──────────────────────────────────────────
+  // The other half of what makes a hull read as a ferry, and the half that is
+  // about SHADE. Nobody crosses this channel in August on an open deck: every
+  // excursion boat on this coast has a flat canvas over the after well on four
+  // posts, stepped down from the deckhouse roof, and from the shore it is the
+  // thing that turns a long open boat into a boat with a saloon on it.
+  //
+  // The posts stand hard against the bulwark rather than inboard, so the whole
+  // 0.55 m gangway between the benches stays clear. The canvas is a solid
+  // panel and not cloth, for the same reason the ensign is: at the distance
+  // this is looked at, a slack surface and a flat one differ by nothing and
+  // one of them costs a simulation.
+  {
+    const yS = 0.72, yT = 0.72 + 2.14;      // the cockpit sole and the canvas
+    const XS = [-6.95, -1.62];
+    for (const x of XS) {
+      const [, w] = sheerAt(x);
+      for (const sg of [1, -1]) {
+        b.box(x, (yS + yT) * 0.5, sg * (w - 0.16), 0.10, yT - yS, 0.10, TRIM);
+      }
+    }
+    const [, wA] = sheerAt(XS[0]), [, wF] = sheerAt(XS[1]);
+    // 0.86 of the sheer and not right out to it. An awning that reaches the
+    // bulwark is a roof, and from above — which is the one view where this
+    // thing is the whole boat — a roof over the full beam hides the deck it is
+    // shading and she goes back to being a box.
+    const wm = (Math.max(wA, wF) - 0.10) * 0.86;
+    // The canvas, with a shallow fall aft so it is not a table top, and a
+    // valance round the edge which is the only part of it anybody sees from
+    // the deck under it.
+    // Cream and not white. At 0.88 it came back off the render as a lit
+    // rectangle with no shading in it at all — canvas in full Dalmatian sun is
+    // bright, but a face that clips is a face with no form, and from overhead
+    // the awning is most of what you see of her.
+    b.box((XS[0] + XS[1]) * 0.5, yT, 0, XS[1] - XS[0] + 0.40, 0.06, wm * 2,
+      [0.735, 0.722, 0.688], [0.775, 0.762, 0.726]);
+    b.box((XS[0] + XS[1]) * 0.5, yT - 0.09, 0, XS[1] - XS[0] + 0.40, 0.12, 0.05,
+      [0.640, 0.628, 0.598]);
   }
   for (let i = 0; i < 3; i++) {
     const col = [[0.78, 0.16, 0.16], [0.94, 0.94, 0.94], [0.10, 0.20, 0.52]][i];

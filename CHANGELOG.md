@@ -8,6 +8,57 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.232.0] — 2026-09-04
+
+### The boat carries eighty now, and looks like it
+
+Misha: *"the boat itself, it's still not big enough, it must carry 60-80 people
+to sibenik... your boat can maybe carry 1.25 people.... needs to be BIGGGGGER"*.
+Right twice over, and the second one is the interesting half.
+
+**Bigger.** `BROD_K` 1.45 → 1.75, uniformly, for the reason the note over it has
+carried since the last time: a hull is read entirely by its shading, and an
+anisotropic scale leaves every normal in the loft wrong. She is **27.3 m by
+7.35** — the top of the Dalmatian passenger-boat range rather than the bottom.
+
+**And seats, which is what actually says how many people a boat takes.** What
+she was, at any scale, was an open boat with a shed on it and two benches down
+the cockpit: fifteen metres of bench, thirty places, and nothing to count from
+thirty metres off. Which is precisely what "1.25 people" means. So she now has
+what every excursion boat on this coast has and she did not:
+
+- **An upper deck** on the deckhouse roof — railed all round on stanchions with
+  two wires, a bench down each side backs-to-the-rail, a ladder up from the side
+  deck, two lifebuoys lashed aft. This is the single thing that reads as
+  capacity from the shore, and it is how you tell a working passenger boat from
+  a large private one at half a mile.
+- **An awning over the aft deck**, flat canvas on four posts, stepped down from
+  the deckhouse roof. Nobody crosses this channel in August on an open deck.
+- **Four benches in the cockpit** where there were two: the outboard pair
+  against the bulwark and an inboard pair back to back down the middle, which
+  leaves the 0.55 m a person needs either side.
+
+Counted at 0.50 m a place: 2 × 5.95 m up top and 4 × 5.30 m below, times 1.75,
+is **58 m of bench — about 116 places**, and standing room besides.
+
+**The step at the quay changes, and that is what the gate is for.** At 1.45 her
+side deck was 1.54 m against a mole at 1.46 — level, step across. At 1.75 it is
+1.86 and her bulwark stands **1.13 m over the coping**, which nobody swings a
+leg over. Every boat this size answers that with a gap cut in the topsides
+instead, and now so does she: a gate amidships to port, on the side she lies
+alongside, with a threshold in it and a post either side.
+
+Two things came off the render rather than out of the code. The lifebuoys were
+authored at 0.62 in a table that is 1/1.75 of built, so two metre-and-a-bit
+rings sat on the roof reading as deck cargo — 0.42 now. And the awning was
+white at 0.88 and came back as a lit rectangle with no shading in it at all,
+which from overhead is most of what you see of her; cream at 0.735, and pulled
+in to 0.86 of the sheer so the side decks still show under it. An awning that
+reaches the bulwark is a roof, and a roof over the full beam hides the deck it
+is shading.
+
+1 624 → 2 320 triangles.
+
 ## [1.231.0] — 2026-09-04
 
 ### The cat talks, and he is not pleased
