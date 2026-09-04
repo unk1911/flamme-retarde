@@ -6158,6 +6158,11 @@ async function buildJadrija(scene) {
    * one can be read from over the glass.
    */
   function gelatoCase(S, y0) {
+    // On its own buffer, so that it can be lit. See the material at the foot of
+    // this function.
+    const buf = propBuilder();
+    const keep = b;
+    b = buf;
     // Warmer and lighter than the first cut, which came out blue. Stainless in
     // the shade of an awning takes its colour from the sky over half its
     // hemisphere and from the concrete over the other half, and setting it at a
@@ -6391,6 +6396,41 @@ async function buildJadrija(scene) {
 
     runs.push({ t0: ca, t1: cc, s0: S.s0 - 1.72, s1: S.s0 - 0.50, y: y0, h: 1.92 });
     counterKit(S, y0, ca, cc, cm);
+    b = keep;
+
+    // AND IT COMES ON. Flown over at dusk, this resort was pitch black and the
+    // promenade lamps fixed that; the note over them is about columns. This is
+    // the same argument one object further in, and a worse case of it.
+    //
+    // A gelato cabinet is a refrigerated box with fluorescent tubes in its
+    // soffit. It is the brightest thing on any promenade in the Adriatic after
+    // sunset — it is *why* the shop stays open until midnight, and the board
+    // over this one says RADNO VRIJEME 07-00. Measured off the render at 20:24
+    // against noon, the pans were at 0.62 to 0.69 of their daylight value and
+    // the concrete outside was at 0.75. So the one object in this resort that
+    // should have been getting brighter than its surroundings was getting
+    // DARKER than them, and for a mechanical reason: the pans sit under a
+    // soffit inside a case, so they see less sky than anything around them, and
+    // less sky is the whole of what dusk leaves.
+    //
+    // The lift is on `base` and not on `uEmissive`, which is a uniform and
+    // cannot be told about the hour. `col += base * uEmissive` is the last
+    // light term in the shared shader, so multiplying `base` by four multiplies
+    // that term by four — and it keeps `vVCol`, which is where the pistachio
+    // and the jagoda live. A lamp glass can be told to BE a colour after dark
+    // because it is one colour; a case with sixteen flavours in it cannot.
+    //
+    // The daytime half is arithmetic and not taste: `emissive: 0.22` and
+    // `body: FACE` are exactly what the promenade builder these solids used to
+    // go into already carries, so at `uNight = 0` this is the same object it
+    // was, to the bit.
+    const g = buf.geo();
+    if (g) {
+      scene.add(new THREE.Mesh(g, solidMaterial(0xffffff, {
+        spec: 0.05, specPower: 14, side: THREE.DoubleSide, emissive: 0.22,
+        body: 'n = gl_FrontFacing ? n : -n; base *= vVCol * (1.0 + 3.2 * uNight);',
+      })));
+    }
   }
 
   /**

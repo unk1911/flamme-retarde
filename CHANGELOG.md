@@ -8,6 +8,50 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.195.0] — 2026-09-04
+
+### The gelato case comes on
+
+Flown over at dusk, this resort was pitch black, and 1.169.0 fixed that with a
+lamp on every promenade column. That note is about columns. This is the same
+argument one object further in, and a worse case of it.
+
+A gelato cabinet is a refrigerated box with fluorescent tubes in its soffit. It
+is the brightest thing on any promenade in the Adriatic after sunset — it is
+*why* the shop stays open until midnight, and the board over this one says
+**RADNO VRIJEME 07-00**. Measured off the render at 20:24 against noon, the pans
+were at **0.62 to 0.69** of their daylight value while the concrete outside was
+at 0.75. The one object in this resort that should be getting brighter than its
+surroundings was getting **darker** than them.
+
+And for a mechanical reason, not a stylistic one. The pans sit under a soffit
+inside a case, so they see less sky than anything around them — and less sky is
+the whole of what dusk leaves. The case was *correctly* shaded into darkness by
+the same rule that shades everything else, which is why five passes over this
+counter never caught it: nothing was wrong, there was just nothing switched on.
+
+The lift goes on `base`, not on `uEmissive`. `uEmissive` is a uniform and cannot
+be told about the hour; `col += base * uEmissive` is the last light term in the
+shared shader, so multiplying `base` by four multiplies that term by four — and
+it keeps `vVCol`, which is where the pistaccio and the jagoda live. The
+promenade lamp could be *told to be* a warm colour after dark because a lamp
+glass is one colour. A case with sixteen flavours in it cannot.
+
+The daytime half is arithmetic and not taste: the case now carries
+`emissive: 0.22` and the same `body: FACE` that the promenade builder these
+solids used to go into already had, so at `uNight = 0` it is the object it was
+— every static sample across the frontage measures identical.
+
+| | before, dusk | after, dusk | after, 21:36 |
+| --- | --- | --- | --- |
+| the pans | 0.62 – 0.69 | 0.93 – 1.05 | **1.23 – 1.33** |
+| case back | 0.77 | 1.20 | **1.47** |
+
+*(as a fraction of the same patch at noon)*
+
+At 21:36 the flavours are brighter than they are at midday, which is what a lit
+case does and why you can read Stracciatella from the water's edge.
+
 ## [1.194.1] — 2026-09-04
 
 ### Right shape, two pixels of it
