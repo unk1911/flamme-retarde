@@ -203,7 +203,8 @@ def _sole():
 
 
 def fit_leg(base, side, knee_at, ankle_at, seed, iters=6000, flat=False,
-            out_lo=22.0, w_knee=400.0, w_ankle=400.0):
+            out_lo=22.0, w_knee=400.0, w_ankle=400.0, track_hi=110.0,
+            track_lo=-40.0):
     """Fit (hip, knee, out, track, ankle) so the knee and ankle land where a
     ballet position says they do.
 
@@ -246,8 +247,8 @@ def fit_leg(base, side, knee_at, ankle_at, seed, iters=6000, flat=False,
     # left to wander it picked +35 for the arabesque, which is a raised leg
     # with the toes turned UP. A ballet foot is pointed, always, and turnout is
     # bounded because past about 46 deg the hip weights on this mesh fold.
-    lo = [-140, 0, out_lo, -40, seed[4], seed[5]]
-    hi = [140, 150, 46, 110, seed[4], seed[5]]
+    lo = [-140, 0, out_lo, track_lo, seed[4], seed[5]]
+    hi = [140, 150, 46, track_hi, seed[4], seed[5]]
     x, f = climb(seed, apply, score, lo, hi, iters=iters)
     if not flat:
         return x, f
@@ -434,9 +435,18 @@ arm(ATTITUDE, "R", "second")
 # `legU` angles are measured from the leg hanging DOWN, which is the thing the
 # first draft got wrong: 62 there is 28 degrees above the floor, not 28 below
 # the horizontal, and what it rendered was a woman wading.
+#
+# And the leg is SQUARE now. Fitted against a `track` bracket that stopped at
+# -40 it came out 0.03 m to her LEFT — a raised leg crossed over her own
+# midline behind her — because the bracket bound before the fit was done. That
+# is the exact fault the note over `fit_leg` says the Euler order makes
+# impossible to reason your way out of: `track` is applied last about the leg's
+# REST fore-aft axis, so on a leg already swung 84 degrees behind her it is a
+# roll rather than an abduction. Opened to -75 the fit settles at -60 of its
+# own accord and the ankle lands on the midline.
 ARABESQUE = pose()
 leg(ARABESQUE, "L", hip=0, knee=0, out=44, track=-14, ankle=-32, toe=20)
-leg(ARABESQUE, "R", hip=85, knee=19, out=22, track=-40, ankle=-32, toe=20)
+leg(ARABESQUE, "R", hip=84, knee=12, out=22, track=-60, ankle=-32, toe=20)
 arms(ARABESQUE,
      spine01=(-22, 0, 0), spine02=(-10, 0, 0), spine03=(-6, 0, 0),
      chest=(6, 0, 0), neck=(10, 0, 0), head=(8, 0, 0),
@@ -664,11 +674,27 @@ def fit(argv):
         # whatever gets the foot where the position says.
         stance = name.startswith(("first", "rise", "sup", "plie"))
         tuck = name in ("retire", "pique")
+        # ATTITUDE, AND A NEGATIVE RESULT WORTH KEEPING. Its knee sits 0.26 m
+        # below her hip and an attitude derriere carries it AT hip height, so
+        # the bracket on `track` was opened to 150 and the target raised. The
+        # knee went up — and the FOOT came down to 0.77, below the knee, which
+        # is not an attitude at all, it is a leg that has given up. `track` was
+        # not even on its bound at 97: what runs out is the knee, at 134 of a
+        # possible 150, with the shin already folded as far as this rig folds.
+        # The shape it can hold is the one it has. Left at 110.
+        thi = 110.0
+        # The ARABESQUE is the one that wanted the bracket, and on the other
+        # side. Fitted at -40 its working leg came out 0.03 to her LEFT — a leg
+        # crossed over her own midline behind her, which is the fault the note
+        # over `fit_leg` says the Euler order makes impossible to reason about
+        # and which is why these are fitted at all. -75 lets it square up.
+        tlo = -75.0 if name == "arabesque" else -40.0
         x, f = fit_leg(BASE, side, knee_at, ankle_at,
                        [0, 40, 44.0 if stance else OUT, 20, ank, toe],
                        flat=onfloor, out_lo=44.0 if stance else 22.0,
                        w_knee=120.0 if tuck else 400.0,
-                       w_ankle=900.0 if tuck else 400.0)
+                       w_ankle=900.0 if tuck else 400.0, track_hi=thi,
+                       track_lo=tlo)
         p = dict(BASE)
         leg(p, side, hip=x[0], knee=x[1], out=x[2], track=x[3], ankle=x[4],
             toe=x[5])

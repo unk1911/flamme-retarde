@@ -6296,10 +6296,34 @@ window.__fr = {
         r: +b.r.toFixed(2), top: +b.top.toFixed(2),
         d: +Math.hypot(b.x - p.x, b.z - p.z).toFixed(2) }));
     },
-    // `camera.position`, not `camPos`: the smoothed follow position is written
-    // once a frame by the render loop, and this exists precisely because the
-    // render loop is not running often enough to be trusted.
-    step: (secs) => { jadrija.step(secs, camera.position); return jadrija.show(); },
+    /**
+     * Drive her routine forward by hand, `secs` of it.
+     *
+     * `camera.position`, not `camPos`: the smoothed follow position is written
+     * once a frame by the render loop, and this exists precisely because the
+     * render loop is not running often enough to be trusted.
+     *
+     * TWO THINGS THAT LOOK LIKE THIS BEING BROKEN AND ARE NOT, both of which
+     * cost an hour on 4 Sep before they were written down here:
+     *
+     *   The routine only runs in GROUND phase. `stepShow` computes `withYou`
+     *   as `state.phase === 'ground' && d < SHOW.lose`, and every branch of the
+     *   performance hangs off it — from the cockpit there is nobody on the
+     *   promenade to perform to. Stepping from the air advances nothing and
+     *   looks exactly like a hang. `__fr.jad.stand(t, s)` first.
+     *
+     *   And the camera has to be NEAR HER. `updateCrowd` skips the whole pose
+     *   past 250 m, and a probe that calls `__fr.look` and then steps in the
+     *   same tick has not rendered a frame yet — so the camera is still
+     *   wherever the aeroplane left it. Let a frame run in between.
+     *
+     * `cam` is honoured now rather than ignored, which is the third thing: it
+     * used to take the argument and pass `camera.position` regardless.
+     */
+    step: (secs, cam) => {
+      jadrija.step(secs, cam || camera.position);
+      return jadrija.show();
+    },
     /** Fill her soak meter, so the turn starts on the next frame she is stepped. */
     flare: () => { jadrija.flare(); return jadrija.show(); },
     /** Her blink and her smile, held still — see `face` in 43-jadrija.js. */

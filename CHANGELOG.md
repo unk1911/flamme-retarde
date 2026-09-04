@@ -8,6 +8,44 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.184.0] — 2026-09-04
+
+### The arabesque stops crossing her own midline, and the routine is proved
+
+**First, it works.** Thirteen minutes of the promenade routine driven by hand,
+on foot, beside her: the ballet fires four times — about once every three
+minutes — walks her to a barre and plays all fifteen seconds of it. That has
+never been checked before, and three releases of polish would have been worth
+nothing if `barreAt` had never picked a ladder in practice.
+
+Getting that test to run took an hour, and the reasons are now written into
+`__fr.jad.step`, because every one of them looks exactly like the feature being
+broken. The routine only runs in **ground** phase — `withYou` is
+`state.phase === 'ground' && d < SHOW.lose`, and from the cockpit there is
+nobody on the promenade to perform to, so stepping from the air advances
+nothing. The camera has to be **within 250 m** of her or `updateCrowd` skips the
+pose — and a probe that calls `__fr.look` and then steps in the same tick has
+not rendered a frame, so the camera is still wherever the aeroplane left it. And
+`__fr.jad.step(secs, cam)` **took a `cam` argument and ignored it**, passing
+`camera.position` regardless. It honours it now.
+
+**The arabesque's working leg was crossed over her own midline.** Fitted against
+a `track` bracket that stopped at −40, it came out 0.03 m to her *left* — behind
+her, which is a leg wrapped round the standing one. The bracket bound before the
+fit was done. This is the exact fault the note over `fit_leg` says the Euler
+order makes impossible to reason your way out of: `track` is applied **last**,
+about the leg's *rest* fore-aft axis, so on a leg already swung 84° behind her it
+is a roll and not an abduction. Opened to −75 the fit settles at −60 of its own
+accord and the ankle lands on the midline.
+
+**And a negative result, kept because it is worth as much.** The attitude's knee
+sits 0.26 m below her hip and an attitude derrière carries it *at* hip height, so
+the bracket was opened to 150 and the target raised. The knee went up — and the
+**foot came down to 0.77**, below the knee, which is not an attitude, it is a leg
+that has given up. `track` was not even on its bound at 97: what runs out is the
+knee, at 134 of a possible 150, with the shin folded as far as this rig folds.
+The shape it can hold is the one it has.
+
 ## [1.183.0] — 2026-09-04
 
 ### The things bolted to a wall, on the walls nobody had put anything on
