@@ -7238,17 +7238,55 @@ async function buildJadrija(scene) {
     const SGLASS = [0.700, 0.740, 0.748];
     const SBRIGHT = [0.780, 0.812, 0.815];
     const sB = S.s0 - 0.31, sF = S.s0 - 0.13;
-    for (const f of BACKBAR_SHELF) {
+
+    // ── AND THE WEST END OF THE TWO LOWER SHELVES IS NOT DRAWN AT ALL ────────
+    //
+    // Because two men are standing in it. The pair behind this counter are
+    // placed at `cm−3.50` and `cm−2.50` at `s0−0.15`, and the shelf band is
+    // `s0−0.31` to `s0−0.13`: their trunks occupy `s0−0.27` to `s0−0.03`, so
+    // every shelf in this run went straight through both of them.
+    //
+    // Measured on the built figures rather than argued: the instanced rig
+    // stands 1.696 m at scale 1 — `__fr.jad.raw().crowd.cast().rigH` — and
+    // these two are drawn at 1.005 and 1.019, so 1.705 m and 1.728 m. Their
+    // shoulders are at y0+1.39 and the head runs y0+1.45 to y0+1.73. The three
+    // shelves land at y0+1.272, y0+1.555 and y0+1.838. The bottom one crossed
+    // the chest, the MIDDLE ONE WENT THROUGH THE FACE, and the five boxes
+    // standing on the middle shelf step at 0.19 m from t 331.47 — so the one
+    // at 332.04 stood four centimetres off the west man's nose and took his
+    // whole head. Shot from the promenade, and what came back was two black
+    // tubs with arms and no heads on them, which is exactly the complaint.
+    //
+    // The top shelf clears the taller of the two by 0.11 m and runs the whole
+    // way, which is what the photographs have over the machine anyway.
+    //
+    // Moving the shelves instead is not available. The mirror is at `s0−0.11`
+    // and the shop body is solid from `s0`, so there is nowhere behind them to
+    // go; and a server cannot come further out than `s0−0.15` without his legs
+    // appearing in front of the counter panel, which is the measurement the
+    // placement note in the casting is built on. In 20260823_111815 the
+    // shelving stands about half a metre behind the men and everything is
+    // fine. This stage is 0.20 m deep and does not have the half-metre.
+    //
+    // `cm−2.15` is 0.35 m east of the east man, which is a shoulder and a
+    // hand's width. It leaves 2.49 m of the lower two shelves, all of it east
+    // of him, which is the half of the wall you see over the gelato case.
+    const wEnd = (S.t0 + S.t1) * 0.5 - 2.15;
+
+    BACKBAR_SHELF.forEach((f, si) => {
       const ys = yHi - h * f;
+      // `si === 0` is the top shelf — `BACKBAR_SHELF` is measured DOWN from
+      // the head of the wall, so the smallest fraction is the highest shelf.
+      const wa = si === 0 ? t0 + 0.06 : Math.max(t0 + 0.06, wEnd);
       // The run, in spans between the mullions.
-      let a = t0 + 0.06;
+      let a = wa;
       const cuts = muls.concat([t1 - 0.06]);
       for (const c of cuts) {
         const bEnd = Math.min(c - 0.055, t1 - 0.06);
         if (bEnd - a > 0.10) {
           boxTS(a, bEnd, sB, sF, ys, ys + 0.016, SGLASS, SBRIGHT);
         }
-        a = c + 0.055;
+        a = Math.max(a, c + 0.055);
       }
       // The stemware, upside down on its bowl the way a bar keeps it — which
       // is what makes a row of them read, because the wide end is the end
@@ -7258,6 +7296,8 @@ async function buildJadrija(scene) {
       const n = Math.floor((t1 - t0 - 0.30) / 0.13);
       for (let i = 0; i <= n; i++) {
         const ct = t0 + 0.15 + i * 0.13;
+        // Off the west end of a cut-back shelf there is no shelf to stand on.
+        if (ct < wa + 0.09) continue;
         // Not through a mullion, and not over the gap either side of one.
         let blocked = false;
         for (const m of muls) if (Math.abs(ct - m) < 0.10) blocked = true;
@@ -7271,17 +7311,21 @@ async function buildJadrija(scene) {
           [ys + 0.124, 0.024],
         ], SGLASS, 8);
       }
-    }
+    });
     // The boxed stock along the middle shelf, which was five painted
     // rectangles and is five boxes. Bright and wordless, exactly as it was:
     // it is illegible in both photographs and always was, and rule 12 says
     // that is what gets drawn.
+    //
+    // They start at `wEnd + 0.16` and not at `t0 + 0.62`, for the reason the
+    // note over the shelves gives: at `t0 + 0.62` the third of them stood in
+    // front of the west man's face.
     {
       const ys = yHi - h * BACKBAR_SHELF[1] + 0.016;
       const BOX = [[0.560, 0.290, 0.070], [0.130, 0.330, 0.560],
         [0.180, 0.410, 0.110], [0.470, 0.120, 0.290], [0.560, 0.450, 0.060]];
       for (let i = 0; i < 5; i++) {
-        const ct = t0 + 0.62 + i * 0.19;
+        const ct = wEnd + 0.16 + i * 0.19;
         if (ct > t1 - 0.20) break;
         let blocked = false;
         for (const m of muls) if (Math.abs(ct - m) < 0.13) blocked = true;
@@ -16807,7 +16851,17 @@ async function buildJadrija(scene) {
       // one pair of figures on it whose height is not a matter of taste: the
       // bottom of the height jitter is 1.56 m, and 1.56 m behind a 1.20 m
       // screen is a man showing his collar.
-      for (const [t, pose] of [[cm - 3.50, 'serve'], [cm - 2.50, 'stand']]) {
+      //
+      // NEITHER OF THEM IS `stand` ANY MORE. The east one is at the gelato
+      // case and the west one is at the coffee, which is the whole difference
+      // between two men behind a counter and a shop with two people in it —
+      // and `stand` is the promenade's idle, so the second of these was a man
+      // who had wandered into work and was waiting for a bus. The two poses
+      // are one block in 42-crowd.js and the note over it says what each does.
+      // West is `cm−3.50`, because the shore's `t` runs east and the coffee
+      // goes at the west end of the opening, which is where the two lower
+      // shelves now stop — see the note over them in `backBar`.
+      for (const [t, pose] of [[cm - 3.50, 'barista'], [cm - 2.50, 'serve']]) {
         const ss = S.s0 - 0.15;
         bathers.push({ t, s: ss, y: y0, ang: -Math.PI / 2,
           pose, k: 1.08, beat: null, sex: 'm', shirt: TEE, hair: CROP,

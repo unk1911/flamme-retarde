@@ -800,64 +800,212 @@ function makeCrowd(scene, rig, cap) {
         skel.armRL.rotation.z = 0.26;
         break;
 
-      case 'serve': {
+      case 'serve':
+      case 'barista': {
         // Working a counter, which is the one thing on this shore that is a
         // job rather than an afternoon. 20260823_111815 and _111819: two young
-        // men behind the gelato case, one with his head down in it and one
-        // looking out, and everything they do happens between the case in
-        // front of them and the mirror 0.36 m behind.
+        // men behind the gelato case, one bowed over something in front of him
+        // with the back of his head to the shop and one turned right away to
+        // the back bar, and everything either of them does happens between the
+        // case in front of them and the mirror behind.
         //
-        // So the motion is a cycle rather than a sway: a few seconds still,
-        // then a dig into the case and back. `fg.seed` sets the rate and the
-        // phase, and it is the same seed that decides which piece of business
-        // a standing figure has — two people working one counter must never
-        // reach at the same moment, which is exactly what one shared clock
-        // gave the beach and is recorded at length in the standing case below.
+        // TWO MODES OUT OF ONE BLOCK, because they are the same job at two
+        // ends of the same counter and the posture — hips against it, elbows
+        // out, weight on one leg — is the whole of what they share. `serve` is
+        // the man at the gelato case: he bows into it and he hands things
+        // across. `barista` is the man at the coffee machine, which stands at
+        // the WEST end of this counter — the placement is in 43-jadrija.js —
+        // so his work is a turn to his own right and back again.
+        const bar = fg.mode === 'barista';
+
+        // THE SIGN OF `rotation.z` IS NOT THE SAME FOR A LIMB AND FOR A SPINE,
+        // and the note that used to stand here had it backwards for both the
+        // head and the torso. The convention at the top of this file — "a
+        // joint's rotation.z swings its far end toward +X, i.e. forward" — is
+        // written for a limb, and a limb hangs DOWN: Rz(θ) takes (0,−1,0) to
+        // (sin θ, −cos θ, 0), so a positive z does swing a hanging arm
+        // forward. The torso and the head point UP, and Rz(θ) takes (0,1,0) to
+        // (−sin θ, cos θ, 0), which is BACKWARD. So a positive
+        // `torso.rotation.z` leans a standing figure back and a positive
+        // `head.rotation.z` lifts his chin.
+        //
+        // Which is exactly what the old `dig` did while the comment over it
+        // said "head down into the case": `torso.rotation.z = 0.05 + dig·0.16`
+        // with `head.rotation.z = 0.04 + dig·0.11` leaned him AWAY from the
+        // counter and put his chin UP, every time he was supposed to be
+        // reaching into it. `sit`, two cases above, has had the sign right all
+        // along at `torso.rotation.z = −0.14` for somebody leaning forward.
+        //
+        // It also retires the 0.11 rad cap the old note argued for at length.
+        // That cap was there because a positive `head.rotation.z` walks the
+        // crown INLAND — 0.15 m at 0.33 rad, measured — into a shop body that
+        // is solid from `s0` while a server stands at `s0−0.15`. Bowing with a
+        // NEGATIVE angle walks it the other way, out over a counter with a
+        // metre and a half of nothing in front of it. The measurement stands;
+        // the limit it implied only ever applied to the wrong sign.
+
+        // A cycle, not a sway. `u` runs 0 to 1 once every 11 to 21 s off the
+        // figure's own seed, and each piece of business is a window in it — so
+        // two people working one counter can never reach at the same moment,
+        // which is what one shared clock did to the beach and is written up at
+        // length in the standing case below. `hump` is sin², which leaves and
+        // arrives with zero slope: a movement that starts and stops without a
+        // corner in it.
         const rate = 0.70 + fg.seed * 0.70;
+        const u = (ph * 0.075 * rate + fg.seed) % 1;
+        const hump = (a, c) => {
+          if (u <= a || u >= c) return 0;
+          const s = Math.sin(Math.PI * (u - a) / (c - a));
+          return s * s;
+        };
+        // Two businesses each, and the windows do not touch: whatever else
+        // happens, there is a third of every cycle in which the man is simply
+        // standing at his counter, which is what makes the other two read as
+        // him deciding to do something.
+        const dig = bar ? 0 : hump(0.05, 0.36);      // down into the case
+        const pass = bar ? 0 : hump(0.50, 0.78);     // and hand it across
+        const pull = bar ? hump(0.04, 0.34) : 0;     // round to the machine
+        const set = bar ? hump(0.46, 0.72) : 0;      // and the cup on the bar
+
+        // The weight shift, same shape as the standing pose and half the size:
+        // a man behind a counter has one hip against it and does not rock the
+        // way somebody loose on the concrete does.
         const w = Math.sin(ph * 0.31 * rate);
-        // Zero for most of the cycle and then a full reach, on the same shape
-        // the standing figure's business uses.
-        const dig = sat((Math.sin(ph * 0.26 * rate + fg.seed * 5.1) - 0.35) / 0.45);
         skel.pelvis.rotation.x = w * 0.05;
-        skel.torso.rotation.z = 0.05 + dig * 0.16;
-        skel.torso.rotation.x = -w * 0.045;
-        skel.torso.rotation.y = -dig * 0.16;
-        // Head down into the case when digging, and looking about the shop
-        // when not — never at the sea, because there is a mirror that way.
-        //
-        // 0.11 and not 0.28, and the 0.17 rad between them is a whole head.
-        // This joint's `rotation.z` swings the crown BACKWARD, not the chin
-        // down, and the head's pivot is far enough below its centre that at
-        // 0.33 rad the crown travels about 0.15 m inland. A server stands at
-        // `s0 - 0.15`, which is the number that puts his hip exactly on the
-        // counter panel's face, so 0.15 m inland of that is inside the shop
-        // body — a solid box from `s0` to `s1`. The gelato server has been
-        // shipping since 1.154.0 with the top of his skull inside the back
-        // wall and it read as nothing at all, because what is left is a neck.
-        // Found by putting three of them at 0.15, 0.60 and 1.20 m of standoff
-        // in one build and shooting the row: the near one had no head and the
-        // other two did. Checked at four phases of the dig cycle, since `dig`
-        // is what moves it and a still frame only proves one phase.
-        skel.head.rotation.z = 0.04 + dig * 0.11;
-        skel.head.rotation.y = Math.sin(ph * 0.23 * rate) * 0.26 - dig * 0.14;
+        skel.pelvis.position.y = skel.restY - Math.abs(w) * 0.020;
         skel.legLU.rotation.x = w * 0.05;
         skel.legRU.rotation.x = w * 0.05;
         skel.legLL.rotation.z = -(0.04 + 0.11 * Math.max(0, w));
         skel.legRL.rotation.z = -(0.04 + 0.11 * Math.max(0, -w));
-        // Both forearms up and in, which is the shape of somebody working at
-        // a counter — and the shape this has to be, because a counter is
-        // 1.06 m and hides everything a reaching arm does below it. The first
-        // cut sent the working arm 46 degrees forward and 60 more at the
-        // elbow, which is a scoop into a case and rendered as a bare arm
-        // hanging down the OUTSIDE of the counter in front of the customers.
-        // What is left to read with is the head, the shoulders and a pair of
-        // elbows, so that is what moves.
-        skel.armLU.rotation.x = SPLAY * 0.9;
-        skel.armRU.rotation.x = -SPLAY * 0.9;
-        skel.armLU.rotation.z = -0.12 + dig * 0.26;
-        skel.armRU.rotation.z = -0.08 + dig * 0.06;
-        skel.armLL.rotation.z = 1.52 + dig * 0.22;
-        skel.armRL.rotation.z = 1.58;
+
+        // ELBOWS UP, and this is the number the whole pose turns on.
+        //
+        // A counter hides everything below 1.06 m, so an arm that reads at all
+        // has to have its hand ABOVE that line. The rig, measured off the bake
+        // rather than guessed: shoulder 1.38, elbow 1.07, hand 0.79, all at
+        // scale 1, and these two are drawn at 1.005 and 1.019. The old pose
+        // hung the upper arm at −0.12 and swung the forearm out flat at 1.52,
+        // which puts the hand at 1.08 m — two centimetres of wrist over the
+        // lip of the counter, from a shop the promenade looks at from four
+        // metres, and it is why the pair read as two busts with stumps.
+        //
+        // 0.55 at the shoulder and 1.15 at the elbow lifts the elbow to 1.12
+        // and puts the hand at 1.16 m, 0.45 m out: a hand ON the counter
+        // rather than under it, and both of them in the frame.
+        const eUp = 0.55, eFl = 1.15;
+        skel.armLU.rotation.x = SPLAY * 1.5;
+        skel.armRU.rotation.x = -SPLAY * 1.5;
+        skel.armLU.rotation.z = eUp;
+        skel.armRU.rotation.z = eUp;
+        skel.armLL.rotation.z = eFl;
+        skel.armRL.rotation.z = eFl;
+
+        // The idle head. Never at the sea, because that way is a mirror — it
+        // sweeps the shop and the queue, on two frequencies so that it arrives
+        // somewhere and looks about once it is there.
+        let hy = Math.sin(ph * 0.27 * rate) * 0.30
+          + Math.sin(ph * 0.58 * rate + 1.1) * 0.11;
+        let hz = -0.05;
+        let ty = Math.sin(ph * 0.27 * rate) * 0.10;
+        let tz = -0.04;
+
+        if (!bar) {
+          // THE BOW. The case is 0.5 m east of where he stands, which is his
+          // own left — he faces the sea and the shore's `t` runs east — so it
+          // is a lean forward with a quarter turn into it and the chin down.
+          //
+          // 0.24 and not 0.30, and the six hundredths are the difference
+          // between a man and a man with a hole in him. The shoulder sits
+          // 0.42 m above the waist pivot this leans about, so it travels
+          // 0.42·sin(lean) SEAWARD — 0.14 m at 0.34 rad, which puts it at
+          // `s0−0.29`. The counter's front panel is a plane at `s0−0.28`, and
+          // in front of a plane there is no such thing as nearly hidden: at
+          // one centimetre out the whole of everything hanging off that
+          // shoulder renders in full. 0.28 rad total keeps it at `s0−0.266`.
+          tz -= dig * 0.24;
+          ty += dig * 0.34;
+          hz -= dig * 0.34;
+          hy = hy * (1 - dig) + dig * 0.30;
+          // AND THE ELBOW NEVER GOES BELOW THE COUNTER, which is the one rule
+          // this pose has. It is arithmetic: the elbow hangs at
+          // 1.39 − 0.31·cos θ off the shoulder angle θ, the counter is at
+          // 1.06, and the arm is 0.04 m thick — so θ must stay over 0.54 rad
+          // or the elbow is under the lip. Below that the forearm and the hand
+          // hang in front of the panel and there is a bare arm in the air over
+          // the promenade, which is the fault the old note recorded and which
+          // this pass reproduced twice: once at −0.45/−0.85, which hangs the
+          // arm at 39° and drops the hand to `s0−0.51`, and once at
+          // −0.62/−1.05, which hangs it plumb at 0.79 m and looked, from the
+          // promenade, like a pair of legs standing in front of the shop.
+          // Photographed both times; the arithmetic that said it would be
+          // hidden had left the lean out.
+          //
+          // So the bow closes the ELBOW and leaves the shoulder alone. 0.60 at
+          // the shoulder and 1.75 at the elbow puts the hand at 1.19 m and
+          // 0.47 m out — with the lean, 0.10 m over the counter top and 0.42 m
+          // in front of its face. Both hands out low over the counter with the
+          // head down between them, which is what reaching into a case looks
+          // like from the far side of one.
+          skel.armLU.rotation.z = eUp + dig * 0.05 + pass * 0.06;
+          skel.armLL.rotation.z = eFl + dig * 0.60;
+          // THE HAND ACROSS, on the other arm and on the other half of the
+          // cycle. His right is west, which is where the two children at the
+          // open counter are, and 1.05 at the shoulder with 0.77 at the elbow
+          // reaches the hand to 1.30 m and 0.55 m out — a quarter of a metre
+          // above the counter top and a third of a metre in front of its face,
+          // which is an arm out over a counter and cannot be read as anything
+          // else. It is 0.24 m clear of the counter slab at its lowest, so
+          // there is nothing here for rule 5 to catch.
+          //
+          // The two businesses have to be told apart at four metres, so they
+          // are told apart by more than the arm: the bow is both hands LOW and
+          // the head down and the body turned to the case, the pass is one
+          // hand HIGH and the head up and the body square to the queue.
+          skel.armRU.rotation.z = eUp + dig * 0.05 + pass * 0.50;
+          skel.armRL.rotation.z = eFl + dig * 0.60 - pass * 0.38;
+          skel.armRU.rotation.x = -SPLAY * 1.5 + pass * SPLAY * 1.1;
+          tz -= pass * 0.09;
+          ty -= pass * 0.13;
+          hy = hy * (1 - pass) - pass * 0.16;
+          hz += pass * 0.05;
+        } else {
+          // THE TURN TO THE MACHINE. 0.62 rad is 35°, and the point of doing
+          // it in the torso rather than in the arm is that a turned body aims
+          // the arm for nothing: his forward is then 35° west of seaward, so
+          // the same elbow-up posture puts his hand at 0.26 m west and 0.37 m
+          // out — over the grinder at t 331.63, which is 0.37 m west of him.
+          // An arm swung out sideways from a square body reaches the same
+          // place and reads as a man pointing at a wall.
+          ty -= pull * 0.62;
+          hy = hy * (1 - pull) - pull * 0.34;
+          hz -= pull * 0.26;
+          tz -= pull * 0.10;
+          skel.armRU.rotation.z = eUp + pull * 0.32;
+          skel.armRL.rotation.z = eFl - pull * 0.22;
+          skel.armRU.rotation.x = -SPLAY * 1.5 - pull * SPLAY * 1.6;
+          // The other arm stays at the counter through the turn — nobody works
+          // a machine with both hands and nothing to lean on. It comes DOWN by
+          // a tenth and no more: the elbow floor above is 0.54 rad and this
+          // one starts at 0.55.
+          skel.armLU.rotation.z = eUp - pull * 0.10;
+
+          // AND THE CUP DOWN. Back square to the counter, a shade of a lean
+          // into it, and the left hand out and down to where a saucer would
+          // go. Smaller than the gelato man's reach on purpose: he is putting
+          // something down 0.4 m away, not handing it to a child a metre off.
+          skel.armLU.rotation.z += set * 0.38;
+          skel.armLL.rotation.z = eFl - set * 0.24;
+          tz -= set * 0.11;
+          ty += set * 0.09;
+          hy = hy * (1 - set) + set * 0.12;
+          hz -= set * 0.16;
+        }
+
+        skel.torso.rotation.z = tz;
+        skel.torso.rotation.y = ty;
+        skel.torso.rotation.x = -w * 0.045;
+        skel.head.rotation.z = hz;
+        skel.head.rotation.y = hy;
         break;
       }
 

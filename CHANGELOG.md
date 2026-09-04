@@ -8,6 +8,76 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.250.0] — 2026-09-04
+
+### Two men behind a counter, and one of them is making coffee
+
+Misha, on the pair behind the slastičarnica's gelato case: *"right now they look
+like 2 busts/heads — they need to be more functional agile"*.
+
+They did, and three separate things were making them that.
+
+**The middle glass shelf went through their faces.** The back bar's three
+shelves land at `y0+1.272`, `y0+1.555` and `y0+1.838`; the instanced rig stands
+1.696 m at scale 1 and these two are drawn at 1.005 and 1.019, so their
+shoulders are at `y0+1.39` and their heads run `y0+1.45` to `y0+1.73`. The
+bottom shelf crossed the chest and the middle one crossed the head — and the
+five boxes standing on the middle shelf step at 0.19 m from t 331.47, so the one
+at 332.04 stood four centimetres off the west man's nose and took the whole of
+it. From the promenade: two black tubs with arms and no heads on them.
+
+The shelf band is `s0−0.31` to `s0−0.13` and their trunks occupy `s0−0.27` to
+`s0−0.03`, so there is no version of this that does not intersect. In
+`20260823_111815` the shelving stands about half a metre behind the men; this
+stage is 0.20 m deep between the mirror at `s0−0.11` and the counter, and does
+not have the half-metre. So the two lower shelves and all five boxes now stop
+at `cm−2.15`, a shoulder and a hand's width east of the east man. The top shelf
+clears the taller of them by 0.11 m and runs the whole way, which is what the
+photograph has over the machine anyway.
+
+**The bow leaned them backwards.** `serve` set `torso.rotation.z = 0.05 +
+dig·0.16` and `head.rotation.z = 0.04 + dig·0.11` under a comment that said
+"head down into the case". Positive is the wrong sign for both: the convention
+at the top of 42-crowd.js is written for a limb, which hangs DOWN, and `Rz(θ)`
+takes `(0,−1,0)` forward but `(0,1,0)` — a spine, a neck — BACKWARD. So every
+time either of them reached into the case he leaned away from it with his chin
+up. `sit`, two cases above, has had the sign right all along.
+
+That also retires the 0.11 rad cap the old note argued for at length. The cap
+existed because a positive `head.rotation.z` walks the crown 0.15 m INLAND into
+a shop body that is solid from `s0`. Bowing with a negative angle walks it the
+other way, over a counter with a metre and a half of nothing in front of it.
+
+**And the hands were under the counter.** The counter is 1.06 m and hides
+everything below it. The old pose hung the upper arm at −0.12 and swung the
+forearm flat at 1.52, which puts the hand at 1.08 m — two centimetres of wrist
+over the lip, from a shop the promenade looks at from four metres. 0.55 at the
+shoulder and 1.15 at the elbow lifts the elbow to 1.12 and the hand to 1.16 m,
+0.45 m out: a hand ON the counter rather than under it.
+
+**What they do now.** One cycle of 11 to 21 s off each man's own seed, split
+into windows that cannot overlap, with a third of every cycle in which he is
+simply standing there — which is what makes the rest read as him deciding
+something. `serve` bows into the case with both hands low and the head down
+between them, and hands something across on the other half of the cycle: one
+arm out to 1.30 m and 0.55 m forward, over the counter, toward the two children
+standing at it. `barista` turns 35° to his own right and works the machine at
+the west end, then comes back square and sets a cup down.
+
+Two rules came out of getting the arms wrong twice, both photographed off the
+render rather than reasoned about:
+
+- **The elbow never goes below the counter.** It hangs at `1.39 − 0.31·cos θ`,
+  the counter is at 1.06 and the arm is 0.04 thick, so θ must stay over
+  0.54 rad. Under it the forearm and hand hang in front of the panel and there
+  is a bare arm in the air over the promenade — twice, once at 39° from
+  vertical and once plumb, where it looked like a pair of legs standing in
+  front of the shop.
+- **The bow is 0.24 rad and not 0.30.** The shoulder is 0.42 m above the waist
+  pivot, so it travels `0.42·sin(lean)` seaward: 0.14 m at 0.34 rad puts it at
+  `s0−0.29`, and the counter's front panel is a plane at `s0−0.28`. In front of
+  a plane there is no such thing as nearly hidden.
+
 ## [1.233.0] — 2026-09-04
 
 ### The cat sits beside the post, not through it
