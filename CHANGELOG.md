@@ -8,6 +8,59 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.176.0] — 2026-09-04
+
+### Her hand closes on the bottle
+
+*"the wine pour STILL sucks... u just can't seem to be able to get that right."*
+Right, and the reason all three previous rounds missed is that all three were
+solving where her **wrist** goes. This one is a photograph taken at 30 cm,
+through the kabina's own doorway, of the thing itself.
+
+**Her hand was a flat plate lying on top of the bottle.** Palm down, four
+fingers splayed straight out past the far side, nothing touching anything, the
+bottle hanging underneath like a thing that happened to be there. That is what
+"backwards" has meant for three releases. It is not the grip height, not the
+tilt, not the elbow, not the yaw — every one of which was measured, argued and
+corrected while this sat in plain sight in the middle of the frame.
+
+There were no finger bones. The note over the fingernails said so as a fact
+about the mesh — *"a fingertip is rigid to its hand in every clip this figure
+has"* — and that was true, and the price of it only came due when she picked
+something up.
+
+**There are two now, 28 bones to 30.** One per hand, the four fingers as a
+single curl, because what a grip has to do is bring four fingertips round the
+far side of something and that is one rotation. The runtime already sized its
+palette from `data.bones.length` rather than assuming, so nothing there had to
+change. It is additive: every clip that does not key it leaves it at the rest
+that is the straight hand they all already had.
+
+**The roll took two goes and the first is worth recording.** `align_roll` sets
+a bone's local Z and every pose in the file writes its swing on local X, and for
+a limb that hangs, world −X gives a clean sagittal swing — which is what
+`ROLL_UP` is for and why the FLAT bones take world up. For fingers that gives
+*nothing*: a hand can be anywhere, so "world up" is an arbitrary direction
+across the palm. Rendered on the pour at 100° it pressed the fingertips into the
+top of the bottle instead of taking them round it. A finger flexes about the
+line of the knuckles, so that is the roll now — local Z is the knuckle line
+crossed with the finger, which puts local X *on* the knuckle line.
+
+**−110° is measured.** At that angle the fingertips sit 4.5 mm proud of a
+38.5 mm bottle — with the thickness of a finger, touching it — and the
+silhouette seen down the bottle's own axis shows them wrapped past its far edge.
+−80 leaves them on the near shoulder; −125 puts them through the glass. The
+thumb opposes at −45, where its tip lands exactly on the surface. `REACH` keeps
+the hand open and everything from `HOLD` on is closed, so the closing happens
+across the half second between them: a hand that is already a fist when it
+arrives has not grasped anything.
+
+And the ten fingernails, which were pinned to `handR` because there was nothing
+else to pin them to, ride the finger bone now. Pinned to the hand they would
+have stayed exactly where they were while the fingertip curled out from under
+them — which nobody could have seen before there was a curl, and everybody would
+see on a bottle held 30 cm from the camera.
+
 ## [1.175.0] — 2026-09-04
 
 ### First position has the heels together

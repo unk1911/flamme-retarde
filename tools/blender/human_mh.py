@@ -705,6 +705,30 @@ for _s, _t in (("l", "L"), ("r", "R")):
         ("armL" + _t, "armU" + _t, "%s-elbow" % _s, "%s-hand" % _s),
         ("hand" + _t, "armL" + _t, "%s-hand" % _s, "%s-hand-2" % _s),
         ("thumb" + _t, "hand" + _t, "%s-finger-1-1" % _s, "%s-finger-1-3" % _s),
+        # THE FOUR FINGERS, AS ONE BONE, and it is here because of the wine.
+        #
+        # There were no finger bones for two years and the note over the nails
+        # said so as a fact about the mesh: "a fingertip is rigid to its hand in
+        # every clip this figure has". True, and the price of it only came due
+        # when she picked something up. Photographed at 30 cm through the
+        # kabina's own doorway, her hand on the bottle is a FLAT PLATE lying on
+        # top of it — palm down, four fingers splayed straight out past the far
+        # side, nothing touching anything. Which is what "the pour looks
+        # backwards" has meant for three releases: not the grip height, not the
+        # tilt, not the yaw. The bottle was not in her hand, and no amount of
+        # solving where her wrist goes was ever going to put it there.
+        #
+        # One bone and not twelve. A real hand curls at three joints per finger
+        # and there is nothing on this figure that needs the difference: what a
+        # grip has to do is bring four fingertips round the far side of
+        # something, and that is one rotation. Two bones, 28 to 30, which the
+        # runtime sizes its palette from (`nb = data.bones.length` in
+        # 41-skin.js) rather than assuming.
+        #
+        # It is ADDITIVE. Every clip in this file that does not key it leaves it
+        # at its rest, which is the straight hand every one of them already had,
+        # so nothing that shipped before this moves by a vertex.
+        ("fingers" + _t, "hand" + _t, "%s-finger-3-1" % _s, "%s-finger-3-4" % _s),
         ("eye" + _t, "head", "%s-eye" % _s, "%s-eye-target" % _s),
         ("legU" + _t, "pelvis", "%s-upper-leg" % _s, "%s-knee" % _s),
         ("legL" + _t, "legU" + _t, "%s-knee" % _s, "%s-ankle" % _s),
@@ -723,7 +747,7 @@ for _s, _t in (("l", "L"), ("r", "R")):
 ROLL_UP = Vector((-1.0, 0.0, 0.0))
 ROLL_FLAT = Vector((0.0, 0.0, 1.0))
 FLAT = ("footL", "footR", "toeL", "toeR", "clavicleL", "clavicleR",
-        "thumbL", "thumbR", "jaw", "eyeL", "eyeR")
+        "thumbL", "thumbR", "fingersL", "fingersR", "jaw", "eyeL", "eyeR")
 
 
 def armature(J):
@@ -741,7 +765,26 @@ def armature(J):
         b.head, b.tail = J[h], J[t]
         if (b.tail - b.head).length < 1e-4:
             b.tail = b.head + Vector((0.0, 0.0, 0.02))
-        b.align_roll(ROLL_FLAT if name in FLAT else ROLL_UP)
+        # THE FINGERS TAKE THEIR ROLL FROM THE HAND, not from the world.
+        #
+        # `align_roll` sets a bone's local Z, and local X — the axis every pose
+        # in this file writes a swing on — comes out perpendicular to both that
+        # and the bone. For a limb that hangs, world −X gives a clean sagittal
+        # swing and that is what ROLL_UP is for. For fingers it gives nothing:
+        # a hand can be anywhere, so "world up" is an arbitrary direction across
+        # the palm and rotating about the X it produces does not curl anything.
+        # Rendered on the wine pour at 100 degrees it pressed the fingertips
+        # into the top of the bottle instead of taking them round it.
+        #
+        # A finger flexes about the line of the knuckles. So that is the roll:
+        # local Z is the knuckle line crossed with the finger, which puts local
+        # X ON the knuckle line, and +X curls them into the palm.
+        if name.startswith("fingers"):
+            side = "l" if name.endswith("L") else "r"
+            kn = (J["%s-finger-5-1" % side] - J["%s-finger-2-1" % side])
+            b.align_roll(kn.cross(b.tail - b.head).normalized())
+        else:
+            b.align_roll(ROLL_FLAT if name in FLAT else ROLL_UP)
         if parent and parent in made:
             b.parent = made[parent]
             b.use_connect = False
@@ -2405,8 +2448,13 @@ def nail_patches(J, src, bindex):
             r = _finger_radius(src, m3, axis, length)
             hw = NAIL_WIDE * r
             style = NAIL_STYLES[fi - 1]
+            # Fingers 2 to 4 ride the finger bone now rather than the hand.
+            # Pinned to the hand they stayed put while the fingertip curled
+            # away from underneath them, which nobody would ever have seen
+            # before there was a curl and everybody would see on a bottle held
+            # 30 cm from the camera.
             b = bindex["thumb" + ("L" if side > 0 else "R")] if fi == 1 \
-                else bindex["hand" + ("L" if side > 0 else "R")]
+                else bindex["fingers" + ("L" if side > 0 else "R")]
 
             base = len(pos)
             for i in range(NAIL_ROWS + 1):
@@ -5415,6 +5463,26 @@ NOTE_B = dict(NOTE_A, **{
 # yaw is 50 degrees off the shore so she faces the doorway, and the mark is
 # whatever those two make it. Type the mark instead and it drifts.
 
+# AND HER HAND CLOSES, which is the fault every one of the three previous
+# rounds on this clip was standing on top of and none of them could see.
+#
+# Photographed at 30 cm through the kabina's own doorway, her hand on the
+# bottle was a FLAT PLATE lying across the top of it: palm down, four fingers
+# splayed straight out past the far side, nothing touching anything, the bottle
+# hanging underneath like a thing that happened to be there. That is what "the
+# pour looks backwards" has meant all along, and no amount of solving where her
+# wrist goes was ever going to fix it — because there were no finger bones.
+# There are two now; see `BONES`.
+#
+# -110 is measured and not chosen: at that angle the fingertips sit 4.5 mm
+# proud of a 38.5 mm bottle, which with the thickness of a finger is touching
+# it, and the silhouette from the end shows them wrapped past its far edge. -80
+# leaves them on the near shoulder and -125 puts them through the glass. The
+# thumb opposes at -45, where its tip lands exactly on the surface.
+#
+# REACH keeps the hand OPEN and everything from HOLD on is closed, so the
+# closing happens across the half-second between them. A hand that is already
+# a fist as it arrives has not grasped anything.
 # Reaching for it, and the first thing to look at is her KNEES.
 #
 # Her fist hangs at 0.865 m and the bottle's grip point stands at 0.830, so the
@@ -5434,6 +5502,8 @@ NOTE_B = dict(NOTE_A, **{
 # where it is. What is left for the back is fifteen degrees, and fifteen
 # degrees is a person leaning, not a person hinged.
 WINE_REACH = dict(IDLE_A, **{
+    "fingersR": (-25.0, 0.0, 0.0),
+    "thumbR": (-10.0, 0.0, 0.0),
     "spine01": (-10.0, -3.2, -2.1),
     "spine02": (-8.9, -4.1, -2.9),
     "spine03": (-8.0, -5.0, -0.6),
@@ -5457,6 +5527,8 @@ WINE_REACH = dict(IDLE_A, **{
 # as a touch. Solved with `HOLD` chained to `REACH`, so the only thing that
 # moves between them is the thing that is supposed to.
 WINE_HOLD = dict(IDLE_A, **{
+    "fingersR": (-110.0, 0.0, 0.0),
+    "thumbR": (-45.0, 0.0, 0.0),
     "spine01": (-10.4, -3.5, -2.9),
     "spine02": (-9.2, -4.4, -3.3),
     "spine03": (-8.5, -5.6, -1.0),
@@ -5483,6 +5555,8 @@ WINE_HOLD = dict(IDLE_A, **{
 # half a second, because a bottle that comes off a stool and starts pouring in
 # the same movement is a bottle nobody picked up.
 WINE_LIFT = dict(IDLE_A, **{
+    "fingersR": (-110.0, 0.0, 0.0),
+    "thumbR": (-45.0, 0.0, 0.0),
     "spine01": (-13.1, -2.1, -3.5),
     "spine02": (-2.5, -2.4, 0.8),
     "spine03": (-2.3, 0.4, 0.0),
@@ -5518,6 +5592,8 @@ WINE_LIFT = dict(IDLE_A, **{
 # there. A tighter band buys nothing except an arm that swings out of the pour
 # and back into it to satisfy it, and nothing pours at 77 degrees anyway.
 WINE_TIP = dict(IDLE_A, **{
+    "fingersR": (-110.0, 0.0, 0.0),
+    "thumbR": (-45.0, 0.0, 0.0),
     "spine01": (-9.6, -0.5, 2.6),
     "spine02": (-4.5, 1.1, 2.5),
     "spine03": (-3.2, 0.7, 1.7),
@@ -5570,6 +5646,8 @@ WINE_TIP = dict(IDLE_A, **{
 # perfectly on everything else. The shipped REACH and HOLD were at 0.045 with
 # 0.077 needed: three centimetres of bottle inside her arm, for a year.
 WINE_POUR = dict(IDLE_A, **{
+    "fingersR": (-110.0, 0.0, 0.0),
+    "thumbR": (-45.0, 0.0, 0.0),
     "spine01": (-11.8, -0.7, 5.9),
     "spine02": (-6.5, 1.2, 5.7),
     "spine03": (-4.9, 1.5, 4.4),
@@ -5600,6 +5678,8 @@ WINE_POUR = dict(IDLE_A, **{
 # `spine01`, which over the 0.65 s between the two keys is her whole torso
 # rocking in the middle of a held pour.
 WINE_POUR_B = dict(IDLE_A, **{
+    "fingersR": (-110.0, 0.0, 0.0),
+    "thumbR": (-45.0, 0.0, 0.0),
     "spine01": (-11.2, -0.7, 6.0),
     "spine02": (-6.0, 1.1, 6.0),
     "spine03": (-4.7, 1.5, 5.3),
@@ -6454,6 +6534,30 @@ def main():
     # pose so the angles can be *looked at* rather than reasoned about.
     # Re-run the bind on the saved blend and save it back. Weighting is the one
     # slow step that is not the mesh, so it gets its own door.
+    if "--rerig" in argv:
+        # Rebuild the SKELETON on a finished blend, which `--rebind` cannot do:
+        # that re-solves the weights against whatever bones are already there,
+        # and a bone added to `BONES` is not there. Drops the old armature,
+        # builds a new one from the same joints — so every existing bone comes
+        # back with the same rest matrix — re-skins, and re-exports.
+        bpy.ops.wm.open_mainfile(filepath=str(BLEND))
+        body = bpy.data.objects["human"]
+        J, _scale, _drop = read_joints(fetch())
+        old = bpy.data.objects.get("rig")
+        if old:
+            for m in list(body.modifiers):
+                if m.type == "ARMATURE":
+                    body.modifiers.remove(m)
+            bpy.data.objects.remove(old, do_unlink=True)
+        rig = armature(J)
+        skin(body, rig)
+        pose(rig, {})
+        export_skin(body, rig, ROOT / "build" / "payload" / "human_skin.fr3d.gz",
+                    CLIPS, J=J)
+        bpy.ops.wm.save_as_mainfile(filepath=str(BLEND))
+        print("[mh] re-rigged %s: %d bones" % (BLEND, len(rig.data.bones)))
+        return
+
     if "--rebind" in argv:
         bpy.ops.wm.open_mainfile(filepath=str(BLEND))
         body, rig = bpy.data.objects["human"], bpy.data.objects["rig"]
