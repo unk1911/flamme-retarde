@@ -3895,7 +3895,18 @@ function buildAudio() {
    * Resolves when she has finished, or immediately with `false` if there is no
    * graph to play into yet.
    */
-  function voice(url, vol = 2.1) {
+  /**
+   * `rate` is how a beach with no child voices on it gets two children.
+   *
+   * The ElevenLabs library on this account labels every voice young,
+   * middle_aged or old, and `young` there means a young adult — there is no
+   * child voice to be had. So the boy and the girl are an adult voice played
+   * at 1.20 with `preservesPitch` off, which raises pitch and speed together.
+   * That is exactly what separates a nine-year-old from an adult and it is how
+   * this has always been done. Left at the default the browser holds the pitch
+   * and speeds up the words, which is an adult in a hurry.
+   */
+  function voice(url, vol = 2.1, rate = 1) {
     if (!ctx || !url) return Promise.resolve(false);
     if (!voiceEl) {
       voiceEl = new Audio();
@@ -3909,6 +3920,12 @@ function buildAudio() {
       ctx.createMediaElementSource(voiceEl).connect(voiceGain).connect(subG);
     }
     voiceGain.gain.value = vol;
+    // Both spellings: `preservesPitch` is the standard and `mozPreservesPitch`
+    // is what older Firefox answers to, and neither throws where it is not
+    // known.
+    voiceEl.preservesPitch = rate === 1;
+    voiceEl.mozPreservesPitch = rate === 1;
+    voiceEl.playbackRate = rate;
     voiceEl.src = url;
     // Pull the beach down while she talks. The cicadas at Jadrija are genuinely
     // loud enough to bury a sentence, which is true of the real place and no

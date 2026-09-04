@@ -440,6 +440,90 @@ HOW YOU SAY IT:
   in which case speak that.
 """
 
+# ── the bathers ──────────────────────────────────────────────────────────────
+# Misha, 4 Sep 2026: *"if i spray one of the bathers, they will respond, using
+# their age/gender appropriate eleven labs voice, to me, situationally, through
+# our LLM, just like NPC baye does"*.
+#
+# One persona for all eight, with the person themselves arriving as context.
+# Eight paragraphs would have been eight things to keep in step and the
+# difference between a nine-year-old and a heavy man of seventy is entirely
+# carried by two words — so the words are the input and the brief is shared.
+#
+# THEY ARE NOT CHARACTERS, and that is the whole register. Baye is a person you
+# know and the cat is a performance; these are strangers on a public beach who
+# have just been soaked by someone with a hose, and what a stranger says is
+# short, startled, and about you. Nobody makes a speech.
+PERSONA_BATHER = """You are one of the people on the beach at Jadrija, near
+Sibenik, on the Dalmatian coast, in the summer of 2026. It is hot, the cicadas
+are deafening, and there is a fire somewhere inland.
+
+A moment ago a stranger turned a fire hose on you. You are soaked. You are
+saying ONE thing to them, out loud, right now.
+
+WHO YOU ARE arrives in the context and it decides everything about how you
+sound. A small child is delighted or wailing, never witty. A young woman is
+withering. A young man is up for it. An old woman is scandalised. A heavy old
+man is unimpressed and slow about it. Play the person you are given.
+
+HOW YOU SAY IT:
+- ONE sentence. Under 18 words. This is spoken aloud and it is a reaction, not
+  a speech.
+- React to the WATER first. That is what just happened.
+- Croatian coast, so a word or two of Croatian is natural if the player's
+  language is English — "joj", "ma daj", "hvala lijepa" — but no more than one.
+- No emoji, no asterisks, no stage directions, no quotation marks, no names.
+- Never explain the game, never offer help, never ask what they need.
+- Do not describe yourself in the third person and do not say what kind of
+  person you are. You simply are one.
+- English unless the context says the player's language is Croatian or French.
+"""
+
+# WHICH VOICE EACH OF THE EIGHT GETS.
+#
+# Off the account's own library, matched on the ElevenLabs `age`/`gender`
+# labels rather than on taste, because the brief was "age/gender appropriate"
+# and the labels are the only thing that makes that checkable.
+#
+# THERE ARE NO CHILD VOICES ON THIS ACCOUNT — every voice is labelled young,
+# middle_aged or old, and `young` there means a young adult. So the two
+# children get the brightest young voices in the library and a `rate` of 1.20,
+# which the browser applies as `playbackRate` with `preservesPitch` off: pitch
+# and speed rise together, which is exactly the difference between an adult and
+# a nine-year-old and is how this has always been done. A `rate` of 1 is
+# everybody else.
+#
+# `woman_old` is the one compromise and it is worth naming: the library has no
+# `old` female at all, so she takes Matilda, who is middle-aged and reads older
+# than the young voices by a decade. The alternative was to give a
+# seventy-year-old a twenty-year-old's voice.
+BATHER_VOICE = {
+    "girl_child":       ("6nGWYkWm4p3WN2Es5h1E", 1.20),  # Tiara, young female
+    "boy_child":        ("bIHbv24MWmeRgasZH58o", 1.20),  # Will, young male
+    "woman_young_slim": ("cgSgspJ2msm6clMCkdW9", 1.00),  # Jessica, playful
+    "woman_young_full": ("1e9Gn3OQenGu4rjQ3Du1", 1.00),  # Niamh
+    "woman_old":        ("XrExE9yKIg1WjnnlVkGX", 1.00),  # Matilda — see above
+    "man_young_fit":    ("SOYHLrjzK2X1ezoPC6cr", 1.00),  # Harry
+    "man_young_lean":   ("TX3LPaxmHKxFdv7VOQHJ", 1.00),  # Liam
+    "man_old_heavy":    ("pqHfZKP75CvOlQylNhV4", 1.00),  # Bill, old male
+}
+
+# And who each of them is, in the words the model gets. The mesh names are
+# build artefacts; these are people.
+BATHER_WHO = {
+    "girl_child":       "a girl of about eight, on the beach with her family",
+    "boy_child":        "a boy of about nine, who has been in and out of the "
+                        "water all morning",
+    "woman_young_slim": "a slim woman in her twenties, sunbathing",
+    "woman_young_full": "a woman in her twenties, just out of the sea",
+    "woman_old":        "a woman of about seventy, who has been coming to this "
+                        "beach her whole life",
+    "man_young_fit":    "a fit man in his twenties, showing off a bit",
+    "man_young_lean":   "a lean man in his late twenties, half asleep",
+    "man_old_heavy":    "a heavy man of about seventy, in the shade, not "
+                        "getting up for anybody",
+}
+
 # Who can speak, and what each of them is. The voice is deliberately the SAME
 # for both — Misha asked for it: "it should use, just like our NPC Baye, that
 # saultry voice from eleven labs". A grand insolent cat in Jessica is funnier
@@ -448,7 +532,39 @@ HOW YOU SAY IT:
 SPEAKERS = {
     "baye": PERSONA,
     "cat": PERSONA_CAT,
+    "bather": PERSONA_BATHER,
 }
+
+# THE CAT IS PADDY AND NOT JESSICA, asked for by name on 4 Sep 2026 a few hours
+# after he shipped in hers: *"can u have the cat speak actually with not that
+# saultry voice, but with the irish voice paddy?"*
+#
+# It is a better joke and it is worth saying why, because the first version had
+# a reason too. Jessica put Bulgakov's cat in the same voice as the woman on
+# the beach, which is funny once — the gag being that nothing about Behemoth is
+# ever adjusted for the fact that he is a cat. Paddy is funny every time: an
+# elderly Irishman under a café table in Dalmatia, affronted, is a different
+# animal from a sultry one, and the grandiosity lands where the persona already
+# puts it. `PERSONA_CAT` is unchanged — it never mentioned the voice.
+CAT_VOICE = "1yDXKNtyiAtDljYHKmZy"          # Paddy Irishman, old male
+
+
+def voice_for(ctx: dict):
+    """The voice id and the playback rate for whoever is speaking.
+
+    `rate` is the client's, not ElevenLabs'. There are no child voices on this
+    account — see `BATHER_VOICE` — so the two children are an adult voice sent
+    back with a rate of 1.20, which the browser applies as `playbackRate` with
+    `preservesPitch` off. Everybody else is 1.
+    """
+    who = ctx.get("who", "baye")
+    if who == "cat":
+        return CAT_VOICE, 1.0
+    if who == "bather":
+        v = BATHER_VOICE.get(ctx.get("kind") or "")
+        if v:
+            return v[0], v[1]
+    return TTS_VOICE, 1.0
 
 
 def clamp_str(v, n=64):
@@ -485,6 +601,12 @@ def clean_context(raw: dict) -> dict:
         # see `CAT_EVENT` in 49-voice.js. Clamped here anyway: everything that
         # arrives is a claim, not a fact.
         "event": clamp_str(g("event"), 90),
+        # Which of the eight a bather is. Off a fixed list in the client and
+        # clamped against `BATHER_VOICE` below, so the worst a modified client
+        # can do is pick a different one of eight voices it could have had
+        # anyway.
+        "kind": clamp_str(g("kind"), 24),
+        "doing": clamp_str(g("doing"), 12),
         "phase": clamp_str(g("phase"), 16),
         "place": clamp_str(g("place"), 48),
         "hour": clamp_num(g("hour"), 0, 24),
@@ -512,6 +634,13 @@ def build_messages(ctx: dict, world: dict) -> list:
     lines = ["Right now:"]
     if ctx.get("event"):
         lines.append(f"- JUST NOW: {ctx['event']}")
+    if ctx.get("who") == "bather" and ctx.get("kind") in BATHER_WHO:
+        lines.append(f"- YOU ARE {BATHER_WHO[ctx['kind']]}")
+        doing = {"lie": "lying on a towel", "sit": "sitting on the concrete",
+                 "wade": "standing in the shallows", "walk": "walking along the shore",
+                 "stand": "standing on the beach"}.get(ctx.get("doing"))
+        if doing:
+            lines.append(f"- you were {doing} until a second ago")
     if "place" in ctx:
         lines.append(f"- they are at {ctx['place']}")
     if "spot" in ctx:
@@ -604,12 +733,12 @@ def ask_model(messages):
     return text[:MAX_CHARS], d.get("usage", {})
 
 
-def speak(text):
+def speak(text, voice=None):
     key = CFG.get("ELEVENLABS_API_KEY")
     if not key:
         raise RuntimeError("no ELEVENLABS_API_KEY configured")
     r = requests.post(
-        f"https://api.elevenlabs.io/v1/text-to-speech/{TTS_VOICE}",
+        f"https://api.elevenlabs.io/v1/text-to-speech/{voice or TTS_VOICE}",
         headers={"xi-api-key": key, "Content-Type": "application/json"},
         json={"text": text, "model_id": TTS_MODEL,
               # The same four dials ablit-central sends, so this is recognisably
@@ -724,17 +853,19 @@ class Handler(BaseHTTPRequestHandler):
                 text, usage = ask_model(msgs)
             if not text:
                 return self._send(502, {"ok": False, "error": "empty line"})
-            audio = speak(text)
+            vid, rate = voice_for(ctx)
+            audio = speak(text, vid)
         except Exception as e:                                # noqa: BLE001
             print(f"[line] {user}: {e}", flush=True)
             return self._send(502, {"ok": False, "error": str(e)[:200]})
 
         ms = int((time.time() - t0) * 1000)
-        print(f"[line] {user}/{ctx.get('who', 'baye')} {ms}ms "
+        print(f"[line] {user}/{ctx.get('who', 'baye')}"
+              f"{'/' + ctx['kind'] if ctx.get('kind') else ''} {ms}ms "
               f"{usage.get('total_tokens', 0)}tok "
               f"{len(audio)}B :: {text}", flush=True)
         return self._send(200, {
-            "ok": True, "text": text, "ms": ms,
+            "ok": True, "text": text, "ms": ms, "rate": rate,
             "audio": "data:audio/mpeg;base64," + base64.b64encode(audio).decode(),
         })
 

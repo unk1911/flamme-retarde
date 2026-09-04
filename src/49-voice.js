@@ -71,6 +71,48 @@ const VOICE = {
  * near them is a machine, and the rarer of the two has to be the one who does
  * not want anything from you.
  */
+/**
+ * And the bathers, who are the third and by far the largest voice on this
+ * beach — eight people rather than one, and the only one of the three that
+ * NEVER speaks on a clock.
+ *
+ * Misha, 4 Sep 2026: *"if i spray one of the bathers, they will respond, using
+ * their age/gender appropriate eleven labs voice, to me, situationally"*. So
+ * `onlyNews`: there is no gap, no jitter and no proximity to fall in and out
+ * of, because a stranger on a beach does not start talking because you walked
+ * past. Something has to have been DONE to them, and the only thing that
+ * counts is the hose.
+ *
+ * `gap` here is the whole trigger as well as the range test — `batherGap`
+ * answers `null` on every frame nobody has just been hosed on, so the poll is
+ * one property read in the common case.
+ */
+const BATHER_VOICE = {
+  memory: 4,
+  hold: 4.0,
+  /** How long a soaking is worth answering. Shorter than the cat's twenty-five:
+   *  he has a grievance and they have a wet towel. */
+  news: 14,
+  /** And the least time between two of them answering, so hosing a whole
+   *  terrace is a conversation and not a riot. The server has its own floor of
+   *  20 s per user and speaker; this is the one that makes it a beach. */
+  gap: 26,
+  jitter: 0,
+};
+
+/** What a subtitle calls each of the eight. `BATHER_CAST`'s names are build
+ *  artefacts — nobody is called `woman_young_slim`. */
+const BATHER_LEAD = {
+  girl_child: 'The girl: ',
+  boy_child: 'The boy: ',
+  woman_young_slim: 'The young woman: ',
+  woman_young_full: 'The young woman: ',
+  woman_old: 'The old woman: ',
+  man_young_fit: 'The young man: ',
+  man_young_lean: 'The young man: ',
+  man_old_heavy: 'The old man: ',
+};
+
 const CAT_VOICE = {
   near: 9,
   far: 15,
@@ -130,6 +172,9 @@ const voice = (() => {
       gap: () => at(() => jadrija.bayeGap()), lead: null },
     cat: { key: 'cat', cfg: CAT_VOICE, said: [], nextAt: 0, inRange: false,
       gap: () => at(() => jadrija.catGap()), lead: 'The cat: ' },
+    bather: { key: 'bather', cfg: BATHER_VOICE, said: [], nextAt: 0,
+      inRange: false, onlyNews: true,
+      gap: () => at(() => jadrija.batherGap()), lead: null },
   };
 
   /**
@@ -289,7 +334,9 @@ const voice = (() => {
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sp.pend
-          ? Object.assign(context(sp, gap), { event: sp.pend })
+          ? Object.assign(context(sp, gap), { event: sp.pend },
+            sp.pendGap && sp.pendGap.kind
+              ? { kind: sp.pendGap.kind, doing: sp.pendGap.pose } : null)
           : context(sp, gap)),
       });
       const d = await r.json().catch(() => null);
@@ -305,12 +352,18 @@ const voice = (() => {
       // Spent, whether it was used or not. A grievance that survives its own
       // answer is a speaker who brings the hose up for the rest of the
       // afternoon.
-      sp.pend = null;
+      // The subtitle's lead, for a speaker whose name depends on WHO was hit.
+      const lead = sp.lead
+        || (sp.pendGap && BATHER_LEAD[sp.pendGap.kind]) || null;
+      sp.pend = null; sp.pendGap = null;
       sp.said.push(d.text);
       if (sp.said.length > sp.cfg.memory) sp.said.shift();
-      caption(d.text, sp.lead);
+      caption(d.text, lead);
       sp.nextAt = clock + sp.cfg.gap + Math.random() * sp.cfg.jitter;
-      await audio.voice(d.audio);
+      // `d.rate` is the server's, and it is 1 for everybody but the two
+      // children — see `voice_for` in server/baye/baye.py and the note over
+      // `voice` in 80-audio.js.
+      await audio.voice(d.audio, 2.1, d.rate || 1);
       // They have stopped. NOW the subtitle gets its few seconds and goes.
       capT = sp.cfg.hold;
     } catch (e) {
@@ -340,18 +393,34 @@ const voice = (() => {
   function takeNews(sp, gap) {
     if (gap && gap.news) {
       sp.pend = gap.news;
+      // AND THE GAP THAT CARRIED IT, because for a speaker that only ever
+      // talks when something happens there is no second chance to ask: the
+      // bathers' `gap` is null on every frame nobody has been hosed on, so
+      // the frame the news arrives on is the only frame that knows who it was.
+      sp.pendGap = gap;
       sp.newsAt = clock;
       // And he answers it soon rather than on his own clock. Ninety seconds
       // after the water is not a reaction, it is a memoir.
       sp.nextAt = Math.min(sp.nextAt, clock + 1.2);
     }
     // A grievance goes stale. See `CAT_VOICE.news`.
-    if (sp.pend && clock - (sp.newsAt || 0) > (sp.cfg.news || 25)) sp.pend = null;
+    if (sp.pend && clock - (sp.newsAt || 0) > (sp.cfg.news || 25)) {
+      sp.pend = null; sp.pendGap = null;
+    }
     return gap;
   }
 
   function poll(sp) {
     const gap = takeNews(sp, sp.gap());
+    // A speaker with `onlyNews` has no clock and no range: it is silent until
+    // somebody does something to it, and then it answers once. `nextAt` is the
+    // only brake, and it is there so that hosing a whole terrace is a
+    // conversation rather than a riot.
+    if (sp.onlyNews) {
+      if (!sp.pend || !sp.pendGap) return null;
+      sp.inRange = true;
+      return clock >= sp.nextAt ? sp.pendGap : null;
+    }
     if (!gap) { sp.inRange = false; return null; }
     // Hysteresis: `near` to come in, `far` to fall out. One threshold makes a
     // player standing exactly on it start and stop them every other frame.
@@ -392,7 +461,11 @@ const voice = (() => {
     // — and she will take the next one, because losing the race does not move
     // her clock. Ordered the other way round he would have been drowned out on
     // the terrace, which is the one place he exists.
-    for (const sp of [CAST.cat, CAST.baye]) {
+    // The bathers first of the three. They only ever speak because you have
+    // just done something, so a frame where one of them is ready is a frame
+    // where the player is owed an answer — and the other two lose nothing by
+    // waiting, because losing the race does not move their clocks.
+    for (const sp of [CAST.bather, CAST.cat, CAST.baye]) {
       const gap = poll(sp);
       if (gap) { ask(sp, gap); return; }
     }

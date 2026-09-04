@@ -1024,6 +1024,10 @@ async function boot() {
     // A wet dog stands in it and shakes at you; a wet cat is gone. See
     // `catWet`.
     ground.addGuest(jadrija.catProbe, jadrija.catWet);
+    // And the six people nearest you on the sand, who answer out loud. One
+    // guest per slot and not one per bather: there are four hundred and fifty
+    // of them and `traceJet` reads every guest once a trace.
+    for (const [probe, wet] of jadrija.batherGuests) ground.addGuest(probe, wet);
     // And the transistor set on the table in the kabina, which is a guest in
     // the same sense: something in the world the jet can land on that the hose
     // code has no business knowing anything else about.

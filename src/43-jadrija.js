@@ -21268,6 +21268,11 @@ async function buildJadrija(scene) {
   // spending has to happen where the people are bound, and those are not the
   // same place.
   let castBlob = null;                  // bather index -> blob, or -1
+  // blob -> which of `BATHER_CAST` it is, by name. `parsed` is filtered, so a
+  // missing payload shifts every index after it and the eight names can NOT be
+  // read off `BATHER_CAST` directly — which is the whole reason this exists.
+  // It is what carries a bather's age and sex to the voice service.
+  let CAST_KIND = null;
   let castNatH = null;                  // blob -> how tall it stands, in metres
   let castSlot = null;                  // roving slot -> which blob it is
   {
@@ -21302,7 +21307,7 @@ async function buildJadrija(scene) {
     };
     // Parsed in parallel — eight inflates of 150 KB apiece is worth doing at
     // once, and they are independent.
-    const parsed = (await Promise.all(BATHER_CAST.map(async (name) => {
+    const parsedAll = await Promise.all(BATHER_CAST.map(async (name) => {
       const key = 'bather_' + name + '_fr3d';
       if (!PAYLOAD[key]) return null;
       try {
@@ -21311,7 +21316,14 @@ async function buildJadrija(scene) {
         console.warn('bather failed:', key, e.message);
         return null;
       }
-    }))).filter(Boolean);
+    }));
+    const parsed = [];
+    CAST_KIND = [];
+    parsedAll.forEach((skin, i) => {
+      if (!skin) return;
+      parsed.push(skin);
+      CAST_KIND.push(BATHER_CAST[i]);
+    });
     // ── who is who, and which mesh a slot has to be ────────────────────────
     //
     // A roving slot cannot be pointed at just anybody. The slot *is* a mesh —
@@ -23405,6 +23417,89 @@ async function buildJadrija(scene) {
     c.at[1] += Math.sin(c.head) * step;
   }
 
+  // ── the bathers, as things the jet can hit and things that answer ─────────
+  //
+  // Misha, 4 Sep 2026: *"if i spray one of the bathers, they will respond,
+  // using their age/gender appropriate eleven labs voice, to me,
+  // situationally, through our LLM, just like NPC baye does"*.
+  //
+  // SIX GUESTS AND NOT EIGHT HUNDRED. `traceJet` snapshots every guest's probe
+  // once per trace and there are ~450 people on this shore, so one guest per
+  // bather is 450 probes and 450 sweep tests a frame while the branch is on.
+  // One guest is not enough either: a single "nearest to you" probe answers for
+  // whoever happens to be closest, so aiming at the man two paces to his left
+  // soaks the wrong person and the wrong voice replies — which is worse than
+  // no feature.
+  //
+  // So: the six nearest to YOU, each in its own slot, and the jet's own
+  // geometry decides which of the six it actually hit. Six covers every case
+  // that is not a crowd at a bar, it is 6 probes a trace, and the sort behind
+  // it runs once per trace rather than once per slot — `batherNear` stamps
+  // itself with `state.t` and the other five slots read the same list.
+  const BATHER_GUESTS = 6;
+  let nearB = { at: -1, list: [] };
+
+  function batherNear() {
+    if (nearB.at === state.t) return nearB.list;
+    nearB.at = state.t;
+    nearB.list = [];
+    if (!show || show.pt == null || !castBlob) return nearB.list;
+    const out = [];
+    for (let i = 0; i < bathers.length; i++) {
+      if (castBlob[i] < 0) continue;         // no face, no voice
+      const b = bathers[i];
+      const dt = b.t - show.pt, ds = b.s - show.ps;
+      const d2 = dt * dt + ds * ds;
+      if (d2 > 26 * 26) continue;            // further than a branch throws
+      out.push([d2, i]);
+    }
+    out.sort((x, y) => x[0] - y[0]);
+    nearB.list = out.slice(0, BATHER_GUESTS).map((r) => r[1]);
+    return nearB.list;
+  }
+
+  /**
+   * Slot `k`'s probe: where the k-th nearest bather is, and how big a target.
+   *
+   * The hit box follows the POSE, because it has to. A stander is 1.75 m of
+   * person and a sunbather is 0.35 m of person lying down over two metres of
+   * towel, and one box for both means either the jet passes over somebody
+   * asleep or it soaks a stander you were aiming a metre above.
+   */
+  function batherProbe(k) {
+    const list = batherNear();
+    const bi = list[k];
+    if (bi == null) return null;
+    const b = bathers[bi];
+    const p = toWorld(b.t, b.s);
+    const tall = b.pose === 'lie' ? 0.34 : b.pose === 'sit' ? 0.95 : 1.72;
+    const wide = b.pose === 'lie' ? 0.80 : 0.42;
+    return { x: p[0], y: p[1], z: p[2], r: wide * (b.k || 1),
+      h: tall * (b.k || 1), bi };
+  }
+
+  /**
+   * One line of news per bather, read once and gone — the same shape as the
+   * cat's and for the same reason. `who` is the index into `BATHER_CAST`, which
+   * is what carries the age and the sex to the voice service.
+   */
+  let batherNewsQ = null;
+  function batherNews() { const v = batherNewsQ; batherNewsQ = null; return v; }
+
+  function batherWet(k) {
+    if (!CAST_KIND || !castBlob) return;
+    const list = batherNear();
+    const bi = list[k];
+    if (bi == null) return;
+    const b = bathers[bi];
+    if (b.soak > 0) { b.soak = 1.6; return; }
+    b.soak = 1.6;
+    const kind = CAST_KIND[castBlob[bi]] || null;
+    if (!kind) return;
+    batherNewsQ = { kind, pose: b.pose,
+      m: Math.hypot(b.t - show.pt, b.s - show.ps) };
+  }
+
   /**
    * The one thing that has just happened TO the cat, read once and gone.
    *
@@ -23500,6 +23595,12 @@ async function buildJadrija(scene) {
     // a camera, and the sound is heard at the camera.
     cat.hear = d;
     if (cat.soak > 0) cat.soak -= dt;
+    // The bathers' own memory of being hit, which only the six near you can
+    // have, so this costs six subtractions and not four hundred and fifty.
+    for (const bi of nearB.list) {
+      const b = bathers[bi];
+      if (b.soak > 0) b.soak -= dt;
+    }
     // Tighter than the dog's 120 m, because he is half the dog and under a
     // table: at ninety metres this is a smudge in the shade of a terrace.
     if (d > CAT.near) return;
@@ -28762,6 +28863,18 @@ async function buildJadrija(scene) {
      * never anywhere else and a place that never changes is worth saying once
      * rather than deriving every time.
      */
+    /**
+     * Whoever has just been hosed, once, with everything the voice service
+     * needs to know about them: which of the eight they are (age and sex live
+     * in the name), what they were doing, and how far off you are.
+     */
+    batherGap: () => {
+      const n = batherNews();
+      if (!n || !show || show.pt == null) return null;
+      return { m: n.m, kind: n.kind, pose: n.pose,
+        news: 'they have just turned a fire hose on you',
+        spot: voiceSpot() };
+    },
     catGap: () => (cat && show && show.pt != null)
       ? { m: Math.hypot(cat.at[0] - show.pt, cat.at[1] - show.ps),
         mode: cat.mode, wet: cat.soak > 0,
@@ -28890,6 +29003,10 @@ async function buildJadrija(scene) {
     figureAt: testFigure ? testFigure.at : null,
     /** The two ends of the hose hook — 47-ground.js wires them together. */
     figureProbe, figureWet, dogProbe, dogWet, catProbe, catWet,
+    // Six slots rather than one function, so the jet's own geometry picks
+    // which of the people near you it actually hit. See `batherProbe`.
+    batherGuests: Array.from({ length: BATHER_GUESTS }, (_, k) => [
+      () => batherProbe(k), () => batherWet(k)]),
     radioProbe, radioWet,
     tvProbe, tvWet,
     /** The set on the table: where it is, what it is doing, and knock it on. */

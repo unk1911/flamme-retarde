@@ -8,6 +8,78 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.236.0] — 2026-09-04
+
+### Hose a bather and they answer, in their own voice
+
+Misha: *"if i spray one of the bathers, they will respond, using their
+age/gender appropriate eleven labs voice, to me, situationally, through our
+LLM, just like NPC baye does... to make things even more interactive"*. And, an
+hour later: *"can u have the cat speak actually with not that saultry voice, but
+with the irish voice paddy?"*
+
+**Six guests, not eight hundred.** `traceJet` reads every guest's probe once per
+trace and there are ~450 people on this shore, so one guest per bather is 450
+probes and 450 sweep tests a frame while the branch is on. One guest is not
+enough either: a single "nearest to you" probe answers for whoever happens to be
+closest, so aiming at the man two paces to his left soaks the wrong person and
+the wrong voice replies — worse than no feature. So the **six nearest to you**
+each get a slot, and the jet's own geometry decides which it hit. The sort
+behind them runs once per trace and the other five slots read the same list.
+
+The hit box follows the **pose**, because it has to: a stander is 1.72 m of
+person and a sunbather is 0.34 m of person lying over two metres of towel, and
+one box for both means either the jet passes over somebody asleep or it soaks a
+stander you were aiming a metre above.
+
+**They never speak on a clock.** A stranger on a beach does not start talking
+because you walked past, so the bathers are the first speaker with `onlyNews`:
+no gap, no jitter, no proximity to fall in and out of. `batherGap` answers
+`null` on every frame nobody has just been hosed on, which makes the poll one
+property read in the common case and the trigger and the range test the same
+thing. `takeNews` had to learn to keep the gap that carried the news, because
+for a speaker like this the frame the news arrives on is the only frame that
+knows who it was.
+
+**One persona for all eight**, with the person arriving as context — eight
+paragraphs would have been eight things to keep in step, and the difference
+between a nine-year-old and a heavy man of seventy is carried entirely by two
+words. They are not characters: Baye is somebody you know and the cat is a
+performance, but these are strangers who have just been soaked, so it is one
+sentence under eighteen words that reacts to the *water* first.
+
+> *Joj, you got me all wet!* — the girl
+>
+> *Joj, now I'm soaked, and I was perfectly comfortable before your little
+> performance.* — the heavy old man
+>
+> *Joj, I was already wet from the sea — was the fire inland not enough for
+> you?* — in game, hosed on the sand
+
+**There are no child voices on the account.** Every voice in the library is
+labelled young, middle_aged or old, and `young` there means a young adult. So
+the boy and the girl get the brightest young voices and a `rate` of **1.20**,
+which the browser applies as `playbackRate` with `preservesPitch` off — pitch
+and speed rise together, which is exactly what separates a nine-year-old from an
+adult. Left at the default the browser holds the pitch and speeds up the words,
+which is an adult in a hurry. `woman_old` is the one compromise and it is worth
+naming: the library has no `old` female at all, so she takes a middle-aged voice
+that reads a decade older than the young ones. The alternative was giving a
+seventy-year-old a twenty-year-old's voice.
+
+**And the cat is Paddy now.** Jessica put Bulgakov's cat in the same voice as
+the woman on the beach, which is funny once — the gag being that nothing about
+Behemoth is ever adjusted for the fact that he is a cat. An elderly Irishman
+under a café table in Dalmatia, affronted, is funny every time. `PERSONA_CAT` is
+unchanged; it never mentioned the voice.
+
+> *What an astonishing breach of etiquette, Messire; I was merely contemplating,
+> and now I am drenched like a common criminal.*
+
+`CAST_KIND` is new and load-bearing: `parsed` is filtered, so a missing payload
+shifts every index after it and the eight names cannot be read off
+`BATHER_CAST` directly.
+
 ## [1.235.0] — 2026-09-04
 
 ### The sign-in error was lying, and it cost an hour
