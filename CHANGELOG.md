@@ -8,6 +8,59 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.194.0] — 2026-09-04
+
+### The wine was falling upward
+
+Five passes on this pour have all been passes on her **arm** — where the grip
+sits, how far the bottle tips, what her knees do, where she stands. Shot close
+on the glass instead of on her, the arm is not what is wrong with it. The
+stream is.
+
+It was one lathe call: `[[0, 0.0032], [1, 0.0028]]`, six sides. Read that in
+the direction the wine travels and it is a jet that leaves the bottle 2.8 mm
+across and arrives 3.2 mm across — **wine that gets fatter the further it
+falls**. Nothing does that. The flow through every cross-section is the same,
+so area times speed is constant, and speed is the one thing gravity is
+definitely changing: over the 188 mm from this lip to this glass the wine goes
+from a gentle 0.45 m/s to 1.93 m/s and the stream narrows to **48 per cent** of
+what left the bottle. That taper is most of what makes poured liquid read as
+liquid — it is the whole difference between a stream and a dowel — and it was
+not just missing, it was inverted.
+
+So the profile is the continuity law now and not a taste: `r = r0·√(v0/v)` with
+`v = √(v0² + 2gh)`, sampled over **seven** rings instead of two, because the
+narrowing is nearly all in the first third of the fall and a straight line
+between two radii throws exactly that part away. Eight sides. And 4.5 mm at the
+lip rather than 3: a wine stream is the width of a pencil lead, and at 3 mm in a
+room with one doorway it was a scratch on the picture.
+
+**And it ended above its own wine.** `cupAt` — where the stream stops — is
+`by + 0.122`, which is the surface of a *full* glass. The six fill shells put
+their surface anywhere from `by + 0.087` up, so from the first frame of the
+pour until the last the stream was stopping up to **35 mm above the wine it was
+supposed to be landing in**. Hidden behind the bowl, which is why it survived
+five passes. It also meant the strongest cue in the whole action — the stream
+visibly *shortening* as the level climbs to meet it — was never on screen. The
+stream now ends on the shell that is actually drawn, quantised the same way
+`fillTo` quantises it, so the two can never disagree.
+
+**And something happens where it lands.** A stream arriving on a mirror-flat
+disc and simply stopping is the other half of why this read as plastic. Pouring
+wine into wine makes a churned, paler spot with a raised lip round it, and in a
+still room it is the only part of the glass that moves: a 22 mm mound, 3 mm
+proud, in the pinker colour foam actually is. It sits under the *stream*, not
+under the glass's centre — so if the lip is ever off to one side, the splash
+says so rather than covering for it.
+
+Measured mid-pour: stream 0.202 m long, ending at 3.9435 — which is fill shell
+3 of 6, exactly where the wine is.
+
+Also: `__fr.jad.raw().kabina.kit()` now exists. Every wine pass so far has had
+to rederive the standing mark from `bt`/`bs` by reading the source, which is one
+transcription error away from measuring a millimetre-accurate solve at the
+wrong place.
+
 ## [1.193.0] — 2026-09-04
 
 ### Every arm position asked for a hand past the end of her arm

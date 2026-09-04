@@ -18956,11 +18956,47 @@ async function buildJadrija(scene) {
     }
     const wbuf = wbufs[FILLS - 1];
     // And the stream, built one metre long about its own base so that a scale
-    // and a position are all it needs. Six sides at 3 mm: it is on screen for
-    // about a second and it is 3 mm across.
+    // and a position are all it needs.
+    //
+    // IT USED TO BE A ROD, and a rod tapering the wrong way: 3.2 mm at the
+    // bottom and 2.8 at the top, six sides, which is a jet of wine that gets
+    // FATTER the further it falls. Falling liquid does the opposite and does
+    // it hard. The flow through every cross-section is the same, so area times
+    // speed is constant, and speed is the one thing gravity is definitely
+    // changing: over the 188 mm from this lip to this glass the wine goes from
+    // a gentle 0.45 m/s to 1.93, and the stream narrows to **48 per cent** of
+    // what left the bottle. That taper is most of what makes poured liquid
+    // read as liquid — it is the reason a stream looks like a stream and a
+    // dowel looks like a dowel — and it was inverted.
+    //
+    // So the profile is the continuity law and not a taste: r = r0 * sqrt(v0/v)
+    // with v = sqrt(v0^2 + 2gh). Seven rings rather than two, because the
+    // narrowing is nearly all in the first third and a straight line between
+    // two radii throws exactly that part away. 4.5 mm at the lip and not 3:
+    // a wine stream is the width of a pencil lead, not a thread, and at 3 mm
+    // in a room with one doorway it was a scratch.
     const jbuf = propBuilder();
     b = jbuf;
-    lathe(O, 0, 0, [[0, 0.0032], [1, 0.0028]], KIT.wine, 6);
+    {
+      const V0 = 0.45, GRAV = 9.81, DROP = 0.188, R0 = 0.0045, RINGS = 7;
+      const prof = [];
+      for (let i = 0; i < RINGS; i++) {
+        // y is 0 at the wine it lands in and 1 at the lip it leaves.
+        const y = i / (RINGS - 1);
+        const v = Math.sqrt(V0 * V0 + 2 * GRAV * DROP * (1 - y));
+        prof.push([y, R0 * Math.sqrt(V0 / v)]);
+      }
+      lathe(O, 0, 0, prof, KIT.wine, 8);
+    }
+    // And where it lands. A stream arriving on a mirror-flat disc of wine and
+    // simply stopping is the other half of why this read as plastic: pouring
+    // wine into wine makes a churned, paler spot with a raised lip round it,
+    // and it is the only part of the glass that moves. A 22 mm mound, 3 mm
+    // proud, in the pinker colour foam actually is.
+    const pbuf = propBuilder();
+    b = pbuf;
+    lathe(O, 0, 0, [[0.0000, 0.0110], [0.0020, 0.0092], [0.0032, 0.0000]],
+      [0.520, 0.200, 0.215], 10);
     b = keep;
     // 0.40 and not 0.22, which is the same lift the poster on this wall got
     // and for the same reason written over it: *"this room has one doorway and
@@ -18991,6 +19027,9 @@ async function buildJadrija(scene) {
     const stream = new THREE.Mesh(jbuf.geo(), solidMaterial(0xffffff, inner));
     stream.visible = false;
     scene.add(stream);
+    const splash = new THREE.Mesh(pbuf.geo(), solidMaterial(0xffffff, inner));
+    splash.visible = false;
+    scene.add(splash);
 
     // And what is inside the shade, on its own material, because a lamp that
     // is lit the way the wall behind it is lit is a lamp that is off. The same
@@ -19253,7 +19292,7 @@ async function buildJadrija(scene) {
     radio.draw(0.30, 0.0);
     tv.draw(null, 0x2545);
     return {
-      tv, radio, bottle, scarf, poured, fills, stream,
+      tv, radio, bottle, scarf, poured, fills, stream, splash,
       // Where the set is, for the jet to knock the knob on. The table top plus
       // a hand's width: aiming at a radio means aiming at the thing on the
       // table, not at the table.
@@ -19317,6 +19356,14 @@ async function buildJadrija(scene) {
       // And where the stream stops, which is the surface of what is already in
       // the glass whether or not any of it is there yet.
       cupAt: [gt, gs, by + 0.122],
+      // ...which is the surface of a FULL glass, and the glass is not full for
+      // most of the pour. The six fill shells put their surface between
+      // by+0.087 and by+0.122, so a stream ending at `cupAt` from the first
+      // frame is a stream ending 35 mm above its own wine — hidden behind the
+      // bowl, which is why it survived, but it also meant the one cue that the
+      // glass is filling (the stream getting shorter as the wine comes up to
+      // meet it) was never there.
+      cupLo: by + 0.087,
     };
   }
 
@@ -24575,6 +24622,7 @@ async function buildJadrija(scene) {
         // And the glass is full from the middle of the pour on, and stays that
         // way. Nobody drinks it and nothing empties it: she poured it for you
         // and it is sitting there, which is the state this room is about.
+        show.level = wn.full ? wn.level : -1;
         if (wn.full) fillTo(wn.level);
         if (done) go('meet', 'idle', 0.45);
         break;
@@ -25674,13 +25722,30 @@ async function buildJadrija(scene) {
       if (kit.stream) {
         const on = show.pour > 0.6 && show.held > 0.9;
         kit.stream.visible = on;
+        if (kit.splash) kit.splash.visible = false;
         if (on) {
           const c = kit.cupAt, cw = toWorld(c[0], c[1]);
+          // The wine it is landing ON, not the wine there will eventually be.
+          // `show.level` is quantised the same way `fillTo` quantises it, so
+          // the end of the stream sits on the shell that is actually drawn
+          // rather than hovering over it or sinking through it.
+          const n = kit.fills.length;
+          const k = show.level < 0 ? 0
+            : Math.min(n - 1, Math.max(0, Math.floor(show.level * n)));
+          const surf = kit.cupLo + (c[2] - kit.cupLo) * (k / (n - 1));
           vSip.set(0, BOT.lip, 0).applyQuaternion(qAim).add(vPos);
-          kit.stream.position.set(vSip.x, c[2], vSip.z);
-          kit.stream.scale.set(1, Math.max(0.01, vSip.y - c[2]), 1);
-          if (Math.abs(vSip.x - cw[0]) > 0.09 || Math.abs(vSip.z - cw[2]) > 0.09) {
-            kit.stream.visible = false;
+          kit.stream.position.set(vSip.x, surf, vSip.z);
+          kit.stream.scale.set(1, Math.max(0.01, vSip.y - surf), 1);
+          const off = Math.abs(vSip.x - cw[0]) > 0.09
+            || Math.abs(vSip.z - cw[2]) > 0.09;
+          if (off) kit.stream.visible = false;
+          // The churn where it arrives. On the surface, under the stream —
+          // not under the glass's centre, because if the lip is off to one
+          // side then so is the splash, and that is the tell that says the
+          // aim is off rather than hiding it.
+          if (kit.splash) {
+            kit.splash.visible = !off;
+            kit.splash.position.set(vSip.x, surf, vSip.z);
           }
         }
       }
@@ -27193,6 +27258,7 @@ async function buildJadrija(scene) {
           // would make every frame after the first sheet a lie.
           // Assigned rather than latched — see the note below — so a
           // scrubbed frame shows the level the clock is actually at.
+          show.level = wn.full ? wn.level : -1;
           fillTo(wn.full ? wn.level : -1);
         }
       }
@@ -27272,6 +27338,12 @@ async function buildJadrija(scene) {
       dc: special.dc, dj: special.dj,
       standIn: [special.dc, special.face + 2.45],
       standOut: [special.dc, special.face - 1.40],
+      // And the marks the room's own furniture defines — `wine` above all,
+      // which is where she has to be standing for a solve measured in
+      // millimetres at the glass to mean anything. Every wine pass so far has
+      // had to rederive it from `bt`/`bs` by reading the source, which is one
+      // transcription error away from measuring the pour at the wrong place.
+      kit: () => kit,
     },
     // Where everybody started, as {t, s, y, ang, pose, k, beat}. Kept because a
     // test needs somewhere to point the camera — but note this is the placement
