@@ -6343,6 +6343,36 @@ BAL_ARM1 = {
 }
 
 
+def _sustain(p, **kw):
+    """The second frame of a held position, which is not the first one again.
+
+    Measured across the routine, four of its key pairs move by **0.00 degrees**:
+    the releve at 3.15-3.90, the developpe at 6.00-6.75, the attitude at
+    11.45-12.15 and the arabesque at 12.90-13.65. That is 2.95 seconds of a
+    fifteen second clip — a fifth of it, four separate times, each one landing
+    on the money position of its own exercise — in which the figure is a static
+    mesh. The wine pour had exactly this and it is the same answer: a frame held
+    for forty frames is the one thing an eye is certain about.
+
+    And a held position in ballet is the opposite of a still one. It is called
+    sustaining: the supporting side goes on pressing up, the working leg goes on
+    lifting, the line goes on lengthening for as long as she can hold it. So
+    each of these gets a few degrees more of exactly the thing the position is
+    about, over three quarters of a second — around 4 deg/s, which is the same
+    order as the pour's drift and for the same reason. On the demi-pointe poses
+    it also raises her, because pressing higher moves the lowest point of the
+    figure and `ballet_floor` answers by lifting the root.
+
+    `kw` is bone -> a delta added to that bone, so the sustain reads as what it
+    changes rather than as a second copy of thirty numbers.
+    """
+    q = dict(p)
+    for k, d in kw.items():
+        v = q.get(k, (0.0, 0.0, 0.0))
+        q[k] = (v[0] + d[0], v[1] + d[1], v[2] + d[2])
+    return q
+
+
 def _mid(pa, pb, u=0.5):
     """Blend two ballet keys. Tolerates keys one of them does not carry.
 
@@ -6372,11 +6402,14 @@ BALLET_KEYS = [
     # Bas to fifth, through first — and letting go of the rail on the way,
     # which is what she has to do anyway to get up on demi-pointe.
     (2.55, _thru(BAL_HOLD, BAL_RELEVE, 0.20)),
-    (3.15, BAL_RELEVE), (3.90, BAL_RELEVE),
+    (3.15, BAL_RELEVE),
+    (3.90, _sustain(BAL_RELEVE, footL=(-3.0, 0, 0), footR=(-3.0, 0, 0),
+                    armUL=(-3.0, 0, 0), armUR=(-3.0, 0, 0))),
     (4.42, _thru(BAL_RELEVE, BAL_STAND, 0.80)),
     (4.55, BAL_STAND),
     (4.69, _thru(BAL_STAND, BAL_RETIRE, 0.20)),
-    (5.25, BAL_RETIRE), (6.00, BAL_DEVELOPPE), (6.75, BAL_DEVELOPPE),
+    (5.25, BAL_RETIRE), (6.00, BAL_DEVELOPPE),
+    (6.75, _sustain(BAL_DEVELOPPE, legUR=(0, 0, 3.0), footL=(-2.0, 0, 0))),
     (7.31, _thru(BAL_DEVELOPPE, BAL_STAND, 0.80)),
     (7.45, BAL_STAND),
     (7.58, _thru(BAL_STAND, BAL_PIQUE, 0.20)),
@@ -6395,8 +6428,12 @@ BALLET_KEYS = [
     # uses. A dancer turns to present a line; this is that, and it costs two
     # numbers.
     (10.85, _thru(_spin(BAL_STAND, 360), _spin(BAL_ATTITUDE, 430), 0.20)),
-    (11.45, _spin(BAL_ATTITUDE, 430)), (12.15, _spin(BAL_ATTITUDE, 430)),
-    (12.90, _spin(BAL_ARABESQUE, 430)), (13.65, _spin(BAL_ARABESQUE, 430)),
+    (11.45, _spin(BAL_ATTITUDE, 430)),
+    (12.15, _spin(_sustain(BAL_ATTITUDE, legUR=(0, 0, 3.0),
+                           footL=(-2.0, 0, 0)), 430)),
+    (12.90, _spin(BAL_ARABESQUE, 430)),
+    (13.65, _spin(_sustain(BAL_ARABESQUE, legUR=(3.0, 0, 0),
+                           armUL=(-2.5, 0, 0), footL=(-2.0, 0, 0)), 430)),
     (14.11, _thru(_spin(BAL_ARABESQUE, 430), _spin(BAL_STAND, 360), 0.66)),
     (14.35, _spin(BAL_STAND, 360)), (15.00, _spin(IDLE_A, 360)),
 ]

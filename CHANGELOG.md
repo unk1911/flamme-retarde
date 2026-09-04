@@ -8,6 +8,51 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.202.0] — 2026-09-04
+
+### Four positions she was holding perfectly still
+
+1.199.0 sorted the routine's key pairs by how fast the fastest bone moves and
+fixed the top of that table. The wine pour's last pass found its answer at the
+*bottom* of the same table. So: the bottom of the ballet's.
+
+```
+ 3.15 ->  3.90   0.75 s   0.00 deg   0.00 deg/s    the releve
+ 6.00 ->  6.75   0.75 s   0.00 deg   0.00 deg/s    the developpe
+11.45 -> 12.15   0.70 s   0.00 deg   0.00 deg/s    the attitude
+12.90 -> 13.65   0.75 s   0.00 deg   0.00 deg/s    the arabesque
+```
+
+Not "nearly zero" — **zero**. Each of those pairs is the same pose object twice,
+so for 2.95 seconds of a fifteen second clip — a fifth of it, four separate
+times — the figure is a static mesh. And each one lands on the money position of
+its own exercise: the four shapes the whole routine exists to arrive at are the
+four it stops dead in.
+
+A held position in ballet is the opposite of a still one. The word for it is
+*sustaining*: the supporting side goes on pressing up, the working leg goes on
+lifting, the line goes on lengthening for as long as she can hold it. So each
+hold now gets a few degrees more of exactly the thing that position is about,
+over three quarters of a second:
+
+- **relevé** — both feet press higher onto demi-pointe and the fifth lengthens.
+  On a demi-pointe pose that also *raises her*, because pressing higher moves
+  the lowest point of the figure and `ballet_floor` answers by lifting the root.
+- **développé à la seconde** — the working leg goes on opening.
+- **attitude** — the knee lifts. Three degrees and not ten: the note on
+  `TARGET_LEG` records that this rig's hip runs out of extension here.
+- **arabesque** — the leg rises behind her and the front arm goes on reaching,
+  because the line is the entire content of the position.
+
+Measured after: **4.0 to 4.3 deg/s** on all four, which is the same order as the
+pour's drift and for the same reason. `_sustain` takes the deltas rather than a
+second copy of thirty numbers, so a hold reads as what it changes.
+
+Also checked and left alone: the demi-pointe geometry. Flat, her ankle sits
+73 mm above the ball of her foot; on relevé, 128 mm. The foot extends and the
+floor pass lifts her by the difference, which is the right mechanism and lands
+in the right range.
+
 ## [1.201.0] — 2026-09-04
 
 ### The promenade was striped on a three-beat
