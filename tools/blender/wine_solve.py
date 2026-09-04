@@ -707,6 +707,57 @@ def main():
                      m["palm"].z, spec["legUL"][0], spec["footL"][0]))
         return
 
+    if "--verify" in argv:
+        # THE SAME GUARD `ballet.py` GOT IN 1.208.0, and this file is the other
+        # half of the same trap: the goals live here, the poses ship from
+        # `human_mh.py`, and nothing has ever checked that the second still
+        # answers the first.
+        #
+        # WHAT IT CANNOT DO is check the bands. A hill climb is stochastic, so
+        # re-solving and comparing angle for angle proves nothing — and the
+        # bands are not hard constraints anyway, they are terms with weights.
+        # Tried that first and it reported six "failures" that are all the
+        # solver doing its job: TIP is 90 mm off a palm target carrying a
+        # weight of 90 against POUR's 260, and is chained to POUR at 0.0230,
+        # the strongest chain in the file. It is SUPPOSED to be dragged. A
+        # checker that calls that broken is a checker nobody will run twice.
+        #
+        # What it can do is measure DRIFT. `cost()` is the solver's own
+        # objective, it is deterministic, and every pose below was written down
+        # with the cost the solve that produced it reported. Recompute it. If a
+        # pose has been edited by hand, or a goal has been changed without
+        # re-solving, or a splice dropped a block, the number moves.
+        # Measured off the shipped poses at 1.209.0, `near` excluded on both
+        # sides. These are NOT the costs the solve printed — those carry the
+        # chain, which is scored against whichever pose the run happened to
+        # chain from and is therefore not reconstructible from the file. TIP is
+        # the big one and stays the big one: it is 90 mm off a palm target
+        # weighted 90 while being pulled by the strongest chain here, on
+        # purpose.
+        SOLVED = {"REACH": 0.0582, "HOLD": 0.0652, "LIFT": 0.0230,
+                  "POUR": 0.0147, "POURB": 0.0356, "TIP": 1.4426}
+        G = goals(idle)
+        bad = 0
+        print("[verify] %-7s %9s %9s   %s" % ("pose", "solved", "now", "drift"))
+        for nm, key in (("REACH", "REACH"), ("HOLD", "HOLD"), ("LIFT", "LIFT"),
+                        ("TIP", "TIP"), ("POUR", "POUR"), ("POUR_B", "POURB")):
+            g = dict(G[key])
+            # `near` is scored against whatever the solve chained it to, which
+            # is not reconstructible here, so it comes out of the comparison on
+            # both sides rather than being guessed at.
+            g.pop("near", None)
+            c = cost(getattr(H, "WINE_" + nm), g)[0]
+            ref = SOLVED[key]
+            d = abs(c - ref)
+            flag = ""
+            if d > max(0.05, ref * 0.15):
+                flag = "  <<< DRIFTED"
+                bad += 1
+            print("[verify] %-7s %9.4f %9.4f   %+.4f%s" % (nm, ref, c, c - ref, flag))
+        print("[verify] %s" % ("%d pose(s) drifted -- re-run --solve" % bad if bad
+                               else "every shipped pose still answers its own goal"))
+        return
+
     if "--shipped" in argv:
         # The poses as they stand in human_mh.py, drawn with the room's own
         # props, on a plain ground and from three fixed angles. Judging a pour

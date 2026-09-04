@@ -8,6 +8,52 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.209.0] — 2026-09-04
+
+### The same guard, for the pour
+
+`ballet.py --verify` was written yesterday because three separate ballet bugs
+turned out to be one: a value fitted in the tool and a different value shipping
+from `human_mh.py`. `wine_solve.py` is the other half of that trap — the goals
+live in the tool, the six poses ship from the module, and nothing has ever
+checked that the second still answers the first.
+
+**The obvious version of this check does not work, and finding that out is most
+of the release.** A first cut compared each shipped pose against its goal
+*bands* and reported six failures. All six are the solver doing its job:
+`WINE_TIP` is 90 mm off a palm target carrying a weight of **90** against
+POUR's 260, while being chained to POUR at 0.0230, the strongest chain in the
+file. It is supposed to be dragged. Those bands are terms with weights, not
+constraints, and a checker that calls a correct trade-off a failure is a checker
+nobody runs twice.
+
+What does work is **drift**. `cost()` is the solver's own objective and it is
+deterministic, so the check recomputes it against the goal and compares with the
+number recorded for each pose. Hand-edit a pose, change a goal without
+re-solving, drop a block in a splice — the number moves.
+
+The `near` term comes out of both sides, because it is scored against whichever
+pose that run happened to chain from and cannot be reconstructed from the file.
+Which means the recorded baselines are *not* the costs the solve printed, and
+saying so in the source matters: the first run reported all six as drifted by
+exactly the chain, which looks like a catastrophe and is an artefact of the
+checker.
+
+```
+[verify] pose       solved       now   drift
+[verify] REACH      0.0582    0.0582   -0.0000
+[verify] HOLD       0.0652    0.0652   -0.0000
+[verify] LIFT       0.0230    0.0230   +0.0000
+[verify] TIP        1.4426    1.4426   +0.0000
+[verify] POUR       0.0147    0.0147   -0.0000
+[verify] POUR_B     0.0356    0.0356   +0.0000
+```
+
+And it was tested by breaking something, because a guard nobody has seen fire is
+decoration. Three degrees on one bone of `WINE_POUR` — `armUR` x, −23.4 to
+−20.4 — and it reports `POUR 0.0147 -> 0.5898, DRIFTED`, alone, with the other
+five untouched.
+
 ## [1.208.0] — 2026-09-04
 
 ### Three bugs in one night were the same bug
