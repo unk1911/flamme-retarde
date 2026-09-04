@@ -8,6 +8,54 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.224.0] — 2026-09-04
+
+### Oh look, bars — she takes the hint now
+
+Misha: *"she doesn't often go to the bars, maybe if i go there, she should
+indirectly get the hint that i want her to do her ballet moves? ... maybe she
+should follow me around a bit more tightly."* Two changes, and the second is
+what makes the first reachable.
+
+**She looks at where YOU are standing before she rolls for a barre.** The roll
+was there all along and it was rolled entirely off her own position: about once
+every twenty seconds of larking about, and only landing if a swim ladder
+happened to be within `barreFrom` of *her* — roughly a third of the shore. So
+you could stand at a ladder for a minute and be nothing to her. Now, if she is
+with you and there is a ladder near you, that is the ladder she goes to and the
+odds go up sevenfold, from `barre` 0.045 to `barreYou` 0.34. Standing at the
+ladder at t 380 and letting her wander, over ten runs each:
+
+| | median | slowest of ten |
+|---|---|---|
+| before | 43 s | never, in two minutes |
+| after | 7 s | 25 s |
+
+And that "before" column is the *kind* case — she was dropped six metres from
+the ladder, so her own roll could find it. Out on the open deck it simply never
+came up. `barreCool` is unchanged at 55 s, so standing there does not put her in
+a loop; she does the routine, and then she is done with that ladder for a while.
+
+**And the follow band is tighter: `keep` 7.5 → 5.5, `band` 3.5 → 3.0, `pull`
+0.9 → 1.15.** At the old numbers she held station about seven and a half metres
+off and the tether only began to tell past eleven, which reads as somebody who
+happens to be going the same way. Two hundred seconds of walking, sampled twice
+a second:
+
+| | mean | median | 90th | worst |
+|---|---|---|---|---|
+| before | 7.52 m | 7.36 m | 10.91 m | 16.18 m |
+| after | 5.90 m | 5.84 m | 9.48 m | 13.91 m |
+
+The shape is unchanged and the old note still governs it — the tether is zero
+inside the band, because a figure that closes to nought and stays there is a
+figure standing on your feet. It is the same behaviour, held in closer and
+pulled a little harder. Which is also the half that makes the barre hint fire:
+a ladder near you is only near her if she is near you.
+
+**`__fr.jad.raw().barreAt(t, s)`** is exposed, because the new rule asks that
+question of your position and a test of it has to be able to ask it too.
+
 ## [1.223.0] — 2026-09-04
 
 ### She walked through the furniture, and you walked through the lamp posts

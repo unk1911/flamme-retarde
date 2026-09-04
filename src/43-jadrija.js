@@ -23107,6 +23107,10 @@ async function buildJadrija(scene) {
     // ballet is the longest single thing she does; twice in a minute would
     // stop being a surprise, which is the whole of what it is for.
     barre: 0.045, barreFrom: 14.0, barreCool: 55,
+    // The same roll when the ladder is one YOU are standing at. See the note
+    // over the roll itself: 0.045 is a wander tick's odds of her thinking of it
+    // unprompted, and this is her being shown.
+    barreYou: 0.34,
     turn: [0.55, 1.35], swing: 1.5, pace: [0.80, 1.55],
     crawlTurn: [0.9, 2.0], crawlSwing: 0.7,
     // How fast a drawn speed is taken up. `showWander` hands `showPace` a fresh
@@ -23194,9 +23198,16 @@ async function buildJadrija(scene) {
     // `pull` is weighed against a unit heading vector, so at 0.9 the tether is
     // very slightly the stronger of the two and the walk toward you is still
     // three-quarters wander.
-    keep: 7.5,
-    band: 3.5,
-    pull: 0.9,
+    // TIGHTER THAN IT WAS — 7.5/3.5/0.9. At that band she held station about
+    // eight metres off and the tether only started to tell past eleven, which
+    // reads as somebody who happens to be going the same way rather than
+    // somebody with you. The shape is unchanged and the note below still
+    // governs it: zero inside the band, because a figure that closes to nought
+    // and stays there is a figure standing on your feet. It is the same
+    // behaviour, held in closer and pulled a little harder.
+    keep: 5.5,
+    band: 3.0,
+    pull: 1.15,
     // And how much further than her own stage she will go to stay with you.
     // Her stage is 86 m either side of her spot and that is the right fence for
     // a woman larking about on her own; it is the wrong one for a woman walking
@@ -25433,8 +25444,24 @@ async function buildJadrija(scene) {
           // needs a ladder within a few paces, so a roll that lands on it with
           // nothing in reach has to fall through to the rest rather than eat
           // the turn — which a table that breaks on its first hit cannot do.
-          if (show.barCool <= 0 && Math.random() < SHOW.barre) {
-            const bar = barreAt(show.t, show.s);
+          //
+          // AND IT LOOKS AT WHERE YOU ARE FIRST, which is most of what makes it
+          // read as her taking a hint rather than as a coincidence. Rolled off
+          // her own position alone this fires about once every twenty seconds
+          // of wandering and then only lands if a ladder happens to be within
+          // `barreFrom` of HER — roughly a third of the shore — so you can
+          // stand at a barre for a minute waiting for her to notice it.
+          //
+          // So: if you are with her and there is a ladder near YOU, that is the
+          // one she goes to and the odds go up by a factor of seven or so. At
+          // `barreYou` she takes about three seconds to decide, which is the
+          // difference between somebody spotting a barre and somebody being
+          // sent to one. `barreCool` is unchanged at 55 s, so standing there
+          // does not put her in a loop.
+          const yourBar = withYou ? barreAt(pt, ps) : null;
+          const odds = yourBar ? SHOW.barreYou : SHOW.barre;
+          if (show.barCool <= 0 && Math.random() < odds) {
+            const bar = yourBar || barreAt(show.t, show.s);
             if (bar) {
               show.bar = bar;
               // Skip the waypoint if she is already seaward of it. She never
@@ -27722,6 +27749,11 @@ async function buildJadrija(scene) {
      * meter, because `placeHorns` derives one from the other every frame and
      * would put a number set on its own straight back to zero.
      */
+    // Where the nearest ladder she would use as a barre is, from a point —
+    // which is the question `stepShow` now asks of YOUR position and not only
+    // of hers, so a test of that behaviour needs to be able to ask it too.
+    // Returns her standing mark `[t, s, ang]`, or null if none is in reach.
+    barreAt: (t, s) => barreAt(t, s),
     putShow: (t, s, phase, at, ang, shorn) => {
       if (!show || !skinFig) return null;
       show.t = t; show.s = s; show.vel = 0; show.rate = 0; show.leg = 0;
