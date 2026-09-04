@@ -3945,6 +3945,69 @@ function buildAudio() {
   }
 
   /**
+   * A ship's whistle.
+   *
+   * Misha: *"it should make boat sounds, those long whistles"*. A boat's
+   * whistle is not a note, it is a CHORD with a beat in it: the air column is
+   * driven hard enough that the fundamental and its first few partials all
+   * sound at once, and no two of the diaphragms are quite in tune, so what you
+   * hear over a kilometre of water is a slow throb between them. Two
+   * oscillators a few cents apart give that beat for nothing; one gives a
+   * foghorn out of a synthesiser catalogue.
+   *
+   * 148 Hz because that is about where a boat this size sits — a 27 m wooden
+   * motor vessel is a D3-ish whistle, an ocean ship is nearer 70 and a launch
+   * nearer 300 — and the fifth above it is the partial that makes it read as
+   * a whistle rather than as a hum.
+   *
+   * `secs` is the pull on the lanyard. Two seconds is the short blast a boat
+   * gives leaving a berth; four to six is the long one.
+   */
+  function horn(secs = 2.2, gain = 1, d = 0) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime + 0.01;
+    const far = Math.max(0.06, 1 - d / 900);
+    const out = ctx.createGain();
+    // Slow on and slow off, both. A whistle takes a moment to get the column
+    // going and rather longer to stop ringing, and a square envelope on this
+    // is the single thing that makes a synthesised horn sound synthesised.
+    out.gain.setValueAtTime(0.0001, t0);
+    out.gain.exponentialRampToValueAtTime(0.30 * gain * far, t0 + 0.28);
+    out.gain.setValueAtTime(0.30 * gain * far, t0 + secs);
+    out.gain.exponentialRampToValueAtTime(0.0001, t0 + secs + 0.75);
+
+    const F0 = 148;
+    // Fundamental, its detuned twin, and the fifth. The fifth is quieter than
+    // either — it is a partial of the same pipe, not a second note.
+    for (const [mul, cents, lvl, type] of [
+      [1.0, 0, 1.00, 'sawtooth'], [1.0, 7, 0.92, 'sawtooth'],
+      [1.5, -4, 0.42, 'sawtooth'], [2.0, 3, 0.20, 'square']]) {
+      const o = ctx.createOscillator();
+      o.type = type;
+      const f = F0 * mul * Math.pow(2, cents / 1200);
+      // A whistle sags a little as the pressure comes off the reservoir, which
+      // is most of why a long blast sounds long.
+      o.frequency.setValueAtTime(f * 1.012, t0);
+      o.frequency.exponentialRampToValueAtTime(f, t0 + 0.5);
+      o.frequency.exponentialRampToValueAtTime(f * 0.986, t0 + secs + 0.4);
+      const g = ctx.createGain(); g.gain.value = lvl;
+      // The mouth of the thing. A whistle is broad and dark, not bright.
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 1500; lp.Q.value = 0.7;
+      o.connect(lp).connect(g).connect(out);
+      o.start(t0); o.stop(t0 + secs + 0.85);
+    }
+    out.connect(bed || master);
+    // Twice the reverb anything else on this shore gets, because the thing
+    // that makes a horn read as a horn AND as distance is the return off the
+    // far side of the channel.
+    if (verbSend) {
+      const w = ctx.createGain(); w.gain.value = 0.55 * far;
+      out.connect(w).connect(verbSend);
+    }
+  }
+
+  /**
    * A cat, complaining.
    *
    * Synthesised rather than sampled, like almost everything else in this file
@@ -4046,7 +4109,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow,
+    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn,
     /**
      * The last node before the speakers, and the context it lives in.
      *

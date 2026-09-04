@@ -137,6 +137,41 @@ const BROD_K = 1.75;
  * on the side she lies alongside.
  */
 
+/**
+ * A dimension A PERSON USES, written in real metres.
+ *
+ * THE HULL SCALES AND THE ACCOMMODATION DOES NOT, and getting that wrong is
+ * what "it's all messed up in there in that boat" was. Everything in this file
+ * is authored at 1/`BROD_K` of built and multiplied on the way out, which is
+ * right for the hull — it is a shape, it is read by its shading, and a
+ * uniform scale leaves every normal in the loft alone. It is wrong for
+ * everything above the sheer, because a deckhouse is not a shape, it is a
+ * ROOM, and a room is the size of the people in it whatever the boat is.
+ *
+ * Measured on her at 1.75 before this went in:
+ *
+ *   deckhouse headroom   3.40 m
+ *   bench seat height    0.74 m
+ *   saloon door          3.01 m
+ *   foredeck guardrail   1.40 m
+ *   cockpit sole to roof 4.16 m, up eight treads of 0.52
+ *
+ * A boat for giants. So every height above the sheer goes through this, which
+ * divides by the same constant the builder is about to multiply by and leaves
+ * a real metre a real metre. Horizontal extents are NOT put through it: the
+ * length of the house and the width of the awning are proportions of the hull
+ * and they should grow with her.
+ */
+const BROD_P = (m) => m / BROD_K;
+
+// The three levels, authored, so `BROD.decks` and `brodProto` cannot drift.
+// They were two hand-matched sets of numbers and the upper deck was the first
+// thing that needed them to agree.
+const BROD_DK = 1.06;                                 // the side deck
+const BROD_HT = BROD_P(2.10);                         // deckhouse headroom
+const BROD_ROOF = BROD_DK + BROD_HT + BROD_P(0.10);   // the upper deck's sole
+const BROD_WELL = 0.72;                               // the cockpit sole
+
 const BROD = {
   // Fifteen and a half metres, four and a bit across. The Jadrija boat is a
   // wooden Dalmatian motor passenger boat, and the best picture of one in the
@@ -186,10 +221,35 @@ const BROD = {
   // Written at the size she was drawn and scaled by `BROD_K` where the table
   // is closed, so these stay comparable with the stations above and with every
   // number in `brodProto`.
+  //
+  // FOUR BANDS NOW, AND TWO LEVELS. Misha, 4 Sep 2026: *"once i board it, i
+  // should be able to walk around it freely, go up and down, instead it's all
+  // messed up in there"*. She had one level and three bands and no way on to
+  // the upper deck at all, which had just been built as scenery.
+  //
+  // `ramp` makes a band a STAIR: the sole runs from `y` at `x0` to `y + ramp`
+  // at `x1`, so walking forward up the companionway carries you up it with no
+  // mode, no key and no state to get wrong. It is first in the list because it
+  // stands inside the cockpit's own x range and first match wins.
+  //
+  // `lim` is the athwart limit where a band is bounded by something that is
+  // not the hull — on the upper deck that is the rail. It is also what makes
+  // two levels work without the walker tracking which one it is on: the upper
+  // deck exists only at |z| < 1.10 and the side decks only at |z| >= 1.16, so
+  // the two bands are DISJOINT and no (x, z) is ever on both. That 60 mm is
+  // the deckhouse wall, and it is why this needs no `you.level`.
   decks: [
-    { x0: -7.50, x1: -1.20, y: 0.72, hole: 0 },      // the cockpit, full width
-    { x0: -1.35, x1: 4.40, y: 1.06, hole: 1.16 },    // the side decks
-    { x0: 4.30, x1: 6.60, y: 1.22, hole: 0 },        // the foredeck
+    // The companionway, up the middle of the cockpit against the after face of
+    // the house. 2.38 m of rise over 2.70 of run is 41 degrees, which is a
+    // steep stair and is exactly what a boat this size has aft.
+    { x0: -4.20, x1: -1.50, y: BROD_WELL, hole: 0, lim: 0.50,
+      ramp: BROD_ROOF - BROD_WELL },
+    { x0: -7.50, x1: -1.20, y: BROD_WELL, hole: 0 },  // the cockpit, full width
+    { x0: -1.35, x1: 4.40, y: BROD_DK, hole: 1.16 },  // the side decks
+    { x0: 4.30, x1: 6.60, y: 1.22, hole: 0 },         // the foredeck
+    // The upper deck, between the rails. Its after end is the stair head and
+    // its forward end is the wheelhouse roof, which nobody stands on.
+    { x0: -1.55, x1: 4.30, y: BROD_ROOF, hole: 0, lim: 1.10 },
   ],
   edge: 0.06,                // how far in from the bulwark you may stand — a
                              // person's clearance, so it does NOT scale
@@ -324,6 +384,11 @@ const yawOfX = (dx, dz) => Math.atan2(-dz, dx);
 // scale. `hole` is the deckhouse's half-width and scales with the house.
 for (const d of BROD.decks) {
   d.x0 *= BROD_K; d.x1 *= BROD_K; d.y *= BROD_K; d.hole *= BROD_K;
+  // `lim` and `ramp` are both lengths on the boat and scale with her. `edge`
+  // below does not, because it is a person's clearance and a person is the
+  // same size whatever the boat is.
+  if (d.lim != null) d.lim *= BROD_K;
+  if (d.ramp != null) d.ramp *= BROD_K;
 }
 // The bulwark, which `deckAt` subtracts off the sheer to get the inboard face
 // of it. Structure, not clearance, so it scales.
@@ -588,24 +653,36 @@ function brodProto() {
   // end of the house, and a house 2.40 across leaves a side deck that has
   // narrowed to nothing by the time it reaches the wheelhouse. A side deck you
   // cannot get to the end of is a side deck that ends in a wall.
-  b.box(1.475, 1.06 + 0.97, 0, 5.65, 1.94, 2.20, HOUSE, HOUSE);
-  b.box(3.75, 1.06 + 1.20, 0, 1.10, 1.48, 1.90, HOUSE, HOUSE);
+  // 2.10 m of headroom and not 3.40. See `BROD_P`: the length and the width of
+  // this box are proportions of the hull and grow with her, and its HEIGHT is
+  // a room's and does not.
+  b.box(1.475, BROD_DK + BROD_HT * 0.5, 0, 5.65, BROD_HT, 2.20, HOUSE, HOUSE);
+  b.box(3.75, BROD_DK + BROD_HT - BROD_P(1.60) * 0.5, 0, 1.10, BROD_P(1.60),
+    1.90, HOUSE, HOUSE);
   {
-    const y = 1.06 + 1.22;
+    // A saloon light 0.75 m deep with its sill at chest height, which is what
+    // the mural has and what you can see out of sitting down.
+    const y = BROD_DK + BROD_P(1.30);
     for (let i = 0; i < 7; i++) {
       const x = -0.85 + i * 0.79;
-      for (const s of [1, -1]) b.box(x, y, s * 1.115, 0.52, 0.60, 0.03, GLASS);
+      for (const s of [1, -1]) {
+        b.box(x, y, s * 1.115, 0.52, BROD_P(0.75), 0.03, GLASS);
+      }
     }
     for (let i = -1; i <= 1; i++) {
-      b.box(4.31, 1.06 + 1.36, i * 0.60, 0.03, 0.64, 0.52, GLASS);
+      b.box(4.31, BROD_DK + BROD_P(1.42), i * 0.60, 0.03, BROD_P(0.80), 0.52,
+        GLASS);
     }
-    // The door into the house, on the port side aft, standing open.
-    b.box(-1.37, 1.06 + 0.86, -0.56, 0.04, 1.72, 0.70, DARK);
+    // The door into the house, on the port side aft, standing open. Two metres,
+    // not the three the uniform scale had made of it.
+    b.box(-1.37, BROD_DK + BROD_P(1.00), -0.56, 0.04, BROD_P(2.00), 0.70, DARK);
   }
   // The roof: a flat deck with a coaming, and the boat's one piece of shade.
   // Everybody on every boat in the survey sits under this.
-  b.box(1.475, 1.06 + 1.99, 0, 5.95, 0.10, 2.46, HOUSE, HOUSE);
-  b.box(3.75, 1.06 + 1.99, 0, 1.20, 0.10, 2.10, HOUSE, HOUSE);
+  b.box(1.475, BROD_ROOF - BROD_P(0.05), 0, 5.95, BROD_P(0.10), 2.46,
+    HOUSE, HOUSE);
+  b.box(3.75, BROD_ROOF - BROD_P(0.05), 0, 1.20, BROD_P(0.10), 2.10,
+    HOUSE, HOUSE);
 
   // ── the upper deck ───────────────────────────────────────────────────────
   // And what stands on that roof, which is the whole answer to "your boat can
@@ -617,17 +694,19 @@ function brodProto() {
   // and reads as a second deckhouse, and what has to read from half a mile is
   // that there is nothing up there but people.
   {
-    const y0 = 1.06 + 2.04;                  // the roof's top face
+    const y0 = BROD_ROOF;                    // the roof's top face
     const X0 = -1.44, X1 = 4.39, Z = 1.19;   // just inboard of the roof edge
     const NS2 = 9;
     for (let i = 0; i <= NS2; i++) {
       const x = X0 + (X1 - X0) * (i / NS2);
-      for (const s of [1, -1]) b.box(x, y0 + 0.45, s * Z, 0.05, 0.90, 0.05, RAIL);
+      for (const s of [1, -1]) {
+        b.box(x, y0 + BROD_P(0.50), s * Z, 0.05, BROD_P(1.00), 0.05, RAIL);
+      }
     }
     // The two rails, and the transverse pair that closes the after end. The
     // forward end is open on to the wheelhouse roof, which is where the
     // skipper's ladder comes up and where nobody stands.
-    for (const h of [0.42, 0.86]) {
+    for (const h of [BROD_P(0.42), BROD_P(0.90)]) {
       for (const s of [1, -1]) {
         b.box((X0 + X1) * 0.5, y0 + h, s * Z, X1 - X0, 0.045, 0.045, RAIL);
       }
@@ -637,19 +716,65 @@ function brodProto() {
     // every one of these. The seat is 0.42 off the deck and 0.40 across, so a
     // person on it sits with their knees inboard and their back to the sea.
     for (const s of [1, -1]) {
-      b.box(1.475, y0 + 0.42, s * 0.94, 5.95, 0.08, 0.40, TRIM);
-      b.box(1.475, y0 + 0.21, s * 1.12, 5.95, 0.42, 0.06, TRIM);
-      b.box(1.475, y0 + 0.66, s * 1.13, 5.95, 0.34, 0.05, TRIM);
-    }
-    // The ladder up, on the starboard side against the after wall of the
-    // house. Five rungs from the side deck to the roof.
-    for (let i = 0; i <= 5; i++) {
-      b.box(-1.22, 1.06 + i * (0.98 / 5) + 0.08, 0.88, 0.05, 0.05, 0.52, RAIL);
-    }
-    for (const z of [0.64, 1.12]) {
-      b.box(-1.22, 1.06 + 0.57, z, 0.06, 1.14, 0.06, RAIL);
+      // A bench: seat 0.45 m up, back to 0.90. At the uniform scale these came
+      // out at 0.74 and 1.45 and from the upper deck they read as two brown
+      // walls with the sea behind them.
+      b.box(1.475, y0 + BROD_P(0.45), s * 0.94, 5.95, BROD_P(0.08), 0.40, TRIM);
+      b.box(1.475, y0 + BROD_P(0.22), s * 1.12, 5.95, BROD_P(0.45), 0.06, TRIM);
+      b.box(1.475, y0 + BROD_P(0.68), s * 1.13, 5.95, BROD_P(0.45), 0.05, TRIM);
     }
   }
+
+  // ── the companionway ─────────────────────────────────────────────────────
+  // The way up, and the reason the upper deck is a place rather than scenery.
+  // Misha: *"once i board it, i should be able to walk around it freely, go up
+  // and down"*. It stands up the middle of the cockpit against the after face
+  // of the house, and it matches `BROD.decks`' stair band exactly — 0.72 to
+  // 3.10 over x -4.20 to -1.50, which is 2.38 m of rise on 2.70 of run.
+  //
+  // A LADDER FIRST, and it was wrong for a reason worth keeping. Five rungs
+  // against the house is what a crew uses and it is what the first cut of the
+  // upper deck had; a boat that carries eighty people in swimwear has a STAIR,
+  // because eighty people includes somebody's grandmother. It is also the only
+  // shape the deck model can carry without a second level: a stair is a band
+  // whose sole runs, and a ladder is a teleport.
+  {
+    const X0 = -4.20, X1 = -1.50, Y0 = BROD_WELL, Y1 = BROD_ROOF;
+    // Fifteen treads and not eight. The rise is 2.80 m built over 4.72 of run,
+    // which is 31 degrees — a stair somebody's grandmother goes up. At the
+    // uniform scale the same flight was a 4.16 m climb in eight treads of
+    // 0.52 each, which is not a stair, it is a wall with notches in it.
+    const N = Math.max(4, Math.round((Y1 - Y0) * BROD_K / 0.19));
+    const go = (X1 - X0) / N, rise = (Y1 - Y0) / N;
+    for (let i = 0; i < N; i++) {
+      // The tread's top face is the sole `deckAt` hands you at its middle, so
+      // your feet are on the tread and not in it.
+      const x = X0 + (i + 0.5) * go;
+      b.box(x, Y0 + (i + 0.5) * rise - BROD_P(0.025), 0, go * 1.02,
+        BROD_P(0.05), 1.00, TRIM);
+    }
+    // The stringers, as quads because a raked plate is not a box. Both
+    // windings, like the foredeck's wires and for the same reason: you are as
+    // often inboard of one of these as outboard.
+    for (const sg of [1, -1]) {
+      const z = sg * 0.52;
+      const A = [X0, Y0 - BROD_P(0.06), z], B = [X1, Y1 - BROD_P(0.06), z];
+      const C = [X1, Y1 - BROD_P(0.34), z], D = [X0, Y0 - BROD_P(0.34), z];
+      b.quad(A, B, C, D, TRIM);
+      b.quad(D, C, B, A, TRIM);
+      // And the handrail over it, 0.95 m above the nosings, on four posts.
+      for (let i = 0; i <= 3; i++) {
+        const u = i / 3;
+        const x = X0 + (X1 - X0) * u, y = Y0 + (Y1 - Y0) * u;
+        b.box(x, y + BROD_P(0.48), z, 0.06, BROD_P(0.95), 0.06, RAIL);
+      }
+      const P0 = [X0, Y0 + BROD_P(0.95), z], Q = [X1, Y1 + BROD_P(0.95), z];
+      const R = [X1, Y1 + BROD_P(0.905), z], S2 = [X0, Y0 + BROD_P(0.905), z];
+      b.quad(P0, Q, R, S2, RAIL);
+      b.quad(S2, R, Q, P0, RAIL);
+    }
+  }
+
 
   // ── the rails ────────────────────────────────────────────────────────────
   // Pipe stanchions and two wires round the foredeck only. Aft the bulwark is
@@ -659,10 +784,13 @@ function brodProto() {
     for (let i = 0; i <= NST; i++) {
       const x = 4.7 + (7.3 - 4.7) * (i / NST);
       const [y, w] = sheerAt(x);
-      for (const s of [1, -1]) b.box(x, y + 0.40, s * (w - 0.12), 0.05, 0.80, 0.05, RAIL);
+      // A guardrail is 1.00 m over the deck, not 1.40. `BROD_P` again.
+      for (const s of [1, -1]) {
+        b.box(x, y + BROD_P(0.50), s * (w - 0.12), 0.05, BROD_P(1.00), 0.05, RAIL);
+      }
     }
     for (const s of [1, -1]) {
-      for (const h of [0.36, 0.72]) {
+      for (const h of [BROD_P(0.36), BROD_P(0.72)]) {
         const [ya, wa] = sheerAt(4.7), [yb, wb] = sheerAt(7.3);
         // Both windings, not one: a wire is 35 mm of nothing and you are as
         // often inboard of it as outboard, so it is the one thing on her that
@@ -683,17 +811,17 @@ function brodProto() {
   // that reads from the far side of a fifteen-metre deck is red-white-blue.
   b.box(4.44, 1.06 + 2.90, 0, 0.14, 3.90, 0.14, TRIM);
   b.box(2.40, 1.06 + 2.36, -0.86, 0.16, 0.66, 0.16, DARK);
-  // FOUR benches in the cockpit and not two: the outboard pair against the
-  // bulwark, which is where they always were, and an inboard pair back to back
-  // with them down the middle. That is the arrangement on a boat that has to
-  // seat people rather than carry a family, and it doubles what can be counted
-  // from the pier without narrowing the gangway either side to less than the
-  // 0.55 m a person needs.
+  // TWO benches in the cockpit, outboard against the bulwark, and the middle
+  // of the well left clear. 1.232.0 put an inboard pair down the centre of it
+  // and they had to come out again the moment the upper deck became somewhere
+  // you could go: the companionway stands exactly there, and a stair through a
+  // bench is worse than a bench short. The places the inboard pair was worth
+  // are on the roof now, where they can be seen from the pier anyway.
   for (const s of [1, -1]) {
-    b.box(-4.20, 0.72 + 0.42, s * 1.42, 5.30, 0.08, 0.52, TRIM);
-    b.box(-4.20, 0.72 + 0.20, s * 1.66, 5.30, 0.42, 0.06, TRIM);
-    b.box(-4.20, 0.72 + 0.42, s * 0.48, 5.30, 0.08, 0.46, TRIM);
-    b.box(-4.20, 0.72 + 0.62, s * 0.24, 5.30, 0.32, 0.05, TRIM);
+    b.box(-4.20, BROD_WELL + BROD_P(0.45), s * 1.42, 5.30, BROD_P(0.08),
+      0.52, TRIM);
+    b.box(-4.20, BROD_WELL + BROD_P(0.22), s * 1.66, 5.30, BROD_P(0.45),
+      0.06, TRIM);
   }
   // The boarding gate, to port, amidships, on the side she lies alongside.
   // See the note over `BROD_K`: her bulwark now stands 1.13 m over the coping
@@ -715,8 +843,10 @@ function brodProto() {
   // this table is authored at 1/1.75 of built, so the first cut put two
   // metre-and-a-bit rings on the roof and they read as deck cargo.
   for (const s of [1, -1]) {
-    b.box(-1.46, 1.06 + 2.50, s * 0.62, 0.09, 0.42, 0.42, [0.760, 0.180, 0.090]);
-    b.box(-1.44, 1.06 + 2.50, s * 0.62, 0.09, 0.22, 0.22, HOUSE);
+    b.box(-1.46, BROD_ROOF + BROD_P(0.45), s * 0.62, 0.09, BROD_P(0.75),
+      BROD_P(0.75), [0.760, 0.180, 0.090]);
+    b.box(-1.44, BROD_ROOF + BROD_P(0.45), s * 0.62, 0.09, BROD_P(0.40),
+      BROD_P(0.40), HOUSE);
   }
 
   // ── the awning over the aft deck ──────────────────────────────────────────
@@ -732,7 +862,8 @@ function brodProto() {
   // this is looked at, a slack surface and a flat one differ by nothing and
   // one of them costs a simulation.
   {
-    const yS = 0.72, yT = 0.72 + 2.14;      // the cockpit sole and the canvas
+    // 2.15 m of headroom under the canvas, which is a person plus a hat.
+    const yS = BROD_WELL, yT = BROD_WELL + BROD_P(2.15);
     const XS = [-6.95, -1.62];
     for (const x of XS) {
       const [, w] = sheerAt(x);
@@ -749,14 +880,32 @@ function brodProto() {
     // The canvas, with a shallow fall aft so it is not a table top, and a
     // valance round the edge which is the only part of it anybody sees from
     // the deck under it.
+    // TWO PANELS AND A SLOT UP THE MIDDLE, which is not a flourish — the
+    // companionway comes up through here. The stair's sole passes 2.86 m at
+    // x -1.77 and a person on it wants two metres over their head, so an
+    // unbroken canvas would have to stop at x -4.04 to clear them, which is
+    // the whole awning. A stairwell in the shade deck is what a boat with a
+    // centre companionway actually has, and it costs no seats.
+    //
     // Cream and not white. At 0.88 it came back off the render as a lit
     // rectangle with no shading in it at all — canvas in full Dalmatian sun is
     // bright, but a face that clips is a face with no form, and from overhead
     // the awning is most of what you see of her.
-    b.box((XS[0] + XS[1]) * 0.5, yT, 0, XS[1] - XS[0] + 0.40, 0.06, wm * 2,
-      [0.735, 0.722, 0.688], [0.775, 0.762, 0.726]);
-    b.box((XS[0] + XS[1]) * 0.5, yT - 0.09, 0, XS[1] - XS[0] + 0.40, 0.12, 0.05,
-      [0.640, 0.628, 0.598]);
+    const SLOT = 0.66;                       // half the opening, clear of the
+                                             // stair's own 0.52 stringers
+    const cx = (XS[0] + XS[1]) * 0.5, cl = XS[1] - XS[0] + 0.40;
+    for (const sg of [1, -1]) {
+      const zi = SLOT, zo = wm;
+      b.box(cx, yT, sg * (zi + zo) * 0.5, cl, 0.06, zo - zi,
+        [0.735, 0.722, 0.688], [0.775, 0.762, 0.726]);
+      // The edge beam along the slot, which is what the stairwell is framed
+      // in and what stops the canvas reading as a torn sheet.
+      b.box(cx, yT - 0.07, sg * (zi + 0.035), cl, 0.14, 0.07,
+        [0.600, 0.560, 0.470]);
+    }
+    // The centreline batten that used to run under the canvas is gone: it sat
+    // at z 0, which is now the middle of the stairwell, and a beam down the
+    // middle of an opening is a beam you walk your head into.
   }
   for (let i = 0; i < 3; i++) {
     const col = [[0.78, 0.16, 0.16], [0.94, 0.94, 0.94], [0.10, 0.20, 0.52]][i];
@@ -1313,7 +1462,12 @@ function buildBrod(scene) {
     const out = brodSheer(lx)[1] - BROD_BULK - BROD.edge;
     const a = Math.abs(lz);
     for (const d of BROD.decks) {
-      if (lx > d.x0 && lx < d.x1 && a >= d.hole && a < out) return d.y;
+      if (lx <= d.x0 || lx >= d.x1) continue;
+      if (a < d.hole) continue;
+      if (a >= (d.lim != null ? Math.min(d.lim, out) : out)) continue;
+      // A stair is a band whose sole runs. Linear in x, which is what a flight
+      // of even treads is.
+      return d.ramp ? d.y + (lx - d.x0) / (d.x1 - d.x0) * d.ramp : d.y;
     }
     return null;
   }
@@ -1339,6 +1493,12 @@ function buildBrod(scene) {
     for (const d of BROD.decks) {
       if (lx <= d.x0 || lx >= d.x1) continue;
       if (a < d.hole || out <= d.hole + 0.04) continue;
+      // NOT ON A BAND THAT HAS ITS OWN LIMIT. `out` is the hull, and sliding
+      // somebody in against the hull is right on a side deck and wrong on the
+      // upper deck, where the thing that stops you is a rail two metres inside
+      // it — the clamp would have walked you straight through the rail and
+      // left you standing on the roof coaming over the water.
+      if (d.lim != null) continue;
       return { z: Math.sign(lz || 1) * Math.min(a, out - 0.02), y: d.y };
     }
     return null;
@@ -1408,6 +1568,16 @@ function buildBrod(scene) {
     let out = null;
 
     if (phase === 'letgo') {
+      // ONE LONG BLAST BEFORE SHE MOVES, and a short one as she comes
+      // alongside at the far end — which is not decoration, it is the rule:
+      // a vessel leaving a berth sounds one prolonged blast. Misha asked for
+      // "those long whistles" and this is where a boat actually uses them.
+      //
+      // Hung off `tmr` crossing a mark rather than off entering the phase,
+      // because `enter` is called from a debug hook as well as from the mole
+      // and a horn on `enter` would sound every time a probe teleported
+      // aboard. Half a second in, so it lands after the deck has settled.
+      if (tmr > 0.5 && tmr - dt <= 0.5) audio.horn(3.4);
       if (tmr > BROD.letGo) { phase = 'run'; tmr = 0; }
     } else if (phase === 'run') {
       sp = Math.min(BROD.cruise, sp + BROD.accel * dt);
@@ -1422,6 +1592,9 @@ function buildBrod(scene) {
       sp = Math.min(sp, Math.sqrt(2 * BROD.brake * d));
       sp = Math.max(sp, 0.45 * sat(d / 30));
       s += sp * dt;
+      // The single short blast that says she is going astern on to the quay.
+      // At 60 m out, which is about twenty seconds off at this speed.
+      if (d < 60 && d + sp * dt >= 60) audio.horn(1.1, 0.85);
       if (d < 0.5) { phase = 'alongside'; sp = 0; s = total; out = 'alongside'; }
     }
 

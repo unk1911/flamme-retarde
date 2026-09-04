@@ -8,6 +8,74 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.234.0] — 2026-09-04
+
+### She was a boat built for giants
+
+Misha: *"once i board it, i should be able to walk around it freely, go up and
+down, instead it's all messed up in there in that boat... my boat experience
+must be amazeballs, right now it's total crap... it should make boat sounds,
+those long whistles"*.
+
+**The hull scales and the accommodation does not**, and getting that wrong is
+what "all messed up in there" was. Everything in this file is authored at
+1/`BROD_K` and multiplied on the way out, which is right for the hull — it is a
+shape, it is read by its shading, and a uniform scale leaves every normal in the
+loft alone. It is wrong for everything above the sheer, because a deckhouse is
+not a shape, it is a **room**, and a room is the size of the people in it
+whatever the boat is. Measured on her at 1.75 before this went in:
+
+| | was | now |
+|---|---|---|
+| deckhouse headroom | 3.40 m | 2.10 |
+| bench seat height | 0.74 m | 0.45 |
+| bench back | 1.45 m | 0.90 |
+| saloon door | 3.01 m | 2.00 |
+| foredeck guardrail | 1.40 m | 1.00 |
+| cockpit sole to roof | 4.16 m in 8 treads of 0.52 | 2.80 in 15 of 0.19 |
+
+`BROD_P(m)` divides by the constant the builder is about to multiply by and
+leaves a real metre a real metre. Horizontal extents deliberately do **not** go
+through it: the length of the house and the width of the awning are proportions
+of the hull and should grow with her.
+
+**And you can go up.** `BROD.decks` has four bands and two levels now. A `ramp`
+on a band makes it a **stair** — the sole runs from `y` at `x0` to `y + ramp` at
+`x1` — so walking forward up the companionway carries you up it with no mode, no
+key and no state to get wrong. A ladder was tried first and was wrong twice
+over: a boat that carries eighty people in swimwear has a stair because eighty
+people includes somebody's grandmother, and a stair is the only shape this deck
+model can carry, because a ladder is a teleport.
+
+The two levels need no `you.level` either, and that falls out of the geometry:
+the upper deck exists only at |z| < 1.10 and the side decks only at |z| >= 1.16,
+so the bands are **disjoint** and no point is ever on both. That 60 mm is the
+deckhouse wall.
+
+The companionway stands up the middle of the after well, which cost the inboard
+pair of benches 1.232.0 had put there — a stair through a bench is worse than a
+bench short, and those places are on the roof now where they can be counted from
+the pier anyway. The awning is **two panels with a slot** up the middle for the
+stair to come through: the sole passes 2.86 m at x −1.77 and a person on it
+wants two metres over their head, so an unbroken canvas would have had to stop
+at x −4.04, which is the whole awning.
+
+**And the whistle.** A boat's whistle is not a note, it is a chord with a beat
+in it — the column is driven hard enough that the fundamental and its partials
+all sound at once and no two diaphragms are quite in tune. Two oscillators seven
+cents apart give that throb for nothing; one gives a foghorn out of a catalogue.
+148 Hz, because a 27 m wooden motor vessel sits about there. Recorded off
+`audio.tap()`: partials at 148, 220, 295, 442, 592, 738 and 888 Hz, peak 0.67.
+
+One prolonged blast before she lets go and one short one sixty metres off the
+far quay, which is not decoration — it is the rule for a vessel leaving a berth.
+Hung off the clock crossing a mark rather than off entering the phase, because
+`enter` is also a debug hook and a horn on `enter` would sound every time a
+probe teleported aboard.
+
+Walked end to end: cockpit sole 1.26 m, mid-stair 1.95, upper deck 4.05, and
+back down again.
+
 ## [1.233.0] — 2026-09-04
 
 ### The cat sits beside the post, not through it
