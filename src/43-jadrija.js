@@ -24947,15 +24947,34 @@ async function buildJadrija(scene) {
       // the tabouret goes through a metre and a half of hut. Out to the middle
       // of the doorway, through it, and then round to the bottle.
       case 'come': {
+        // FOUR AND NOT THREE, and the fourth is a regression this file put in
+        // itself. 1.203.0 turned her from -50 to +30 to face the mark the
+        // player actually stands on, and the mark is solved backwards from the
+        // glass — so turning her moved where she stands, from (425.014, 18.682)
+        // to (424.646, 18.336). Nobody re-checked the walk in. Measured against
+        // the tabouret, which did not move:
+        //
+        //   before   final leg 1.78 m, passes 0.444 m from the stool's centre
+        //   after    final leg 1.97 m, passes 0.039 m
+        //
+        // The stool is 0.19 m in radius. She was walking through it.
+        //
+        // The extra waypoint swings her round it on the inland side, and it is
+        // derived from `kit.wine` rather than typed so that it follows if the
+        // mark ever moves again — which is exactly what caught this out.
+        // Clearances now 0.95 m on the leg in and 0.27 m on the leg to the
+        // mark, against a stool that needs 0.19.
         const legs = [[K.dc, K.face - 1.55], [K.dc, K.face + 0.55],
+          [kit.wine[0] + 0.95, kit.wine[1] + 0.56],
           [kit.wine[0], kit.wine[1]]];
         const g = legs[Math.min(show.leg, legs.length - 1)];
         // Slower on the last leg. She is arriving somewhere small and dark, and
         // walking into it at promenade pace reads as somebody who has come to
         // fix the boiler.
-        const dist = showTo(g[0], g[1], dt, show.leg === 2 ? 0.72 : 1.05);
-        if (dist < (show.leg === 2 ? 0.20 : 0.40)) {
-          if (show.leg >= 2) { show.leg = 0; go('wine', 'wine', 0.42); }
+        const last = legs.length - 1;
+        const dist = showTo(g[0], g[1], dt, show.leg === last ? 0.72 : 1.05);
+        if (dist < (show.leg === last ? 0.20 : 0.40)) {
+          if (show.leg >= last) { show.leg = 0; go('wine', 'wine', 0.42); }
           else show.leg++;
         }
         break;

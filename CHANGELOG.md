@@ -8,6 +8,45 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.219.0] — 2026-09-04
+
+### 1.203.0 turned her, and nobody re-checked the way in
+
+Started this pass on the product question — does the pour reliably happen? It
+does, and more reliably than the ballet: there is no roll. Walk into the kabina
+while she is in it and `show.phase` goes to `come`, three waypoints later it
+goes to `wine`, every time. Which is what justifies nine passes on it.
+
+Then the waypoints got read, and the last one is `[kit.wine[0], kit.wine[1]]`.
+
+**`kit.wine` moved two releases ago.** 1.203.0 turned her from −50° to +30° so
+that she faces the mark the player actually stands on — and the mark is solved
+*backwards from the glass*, so turning her walked it from (425.014, 18.682) to
+(424.646, 18.336). The tabouret did not move. Measured against it:
+
+```
+before   final leg 1.78 m, passes 0.444 m from the stool's centre
+after    final leg 1.97 m, passes 0.039 m
+```
+
+The stool is 0.19 m in radius. **She has been walking through it for two
+releases**, and the release that caused it is one this file wrote and was pleased
+with.
+
+A fourth waypoint swings her round it on the inland side. It is derived from
+`kit.wine` rather than typed — `[+0.95, +0.56]` off the mark — precisely because
+a typed one is what would have gone stale again the next time the mark moves,
+which is the whole shape of this bug. The last-leg test is `legs.length - 1`
+now rather than a hard `2`, for the same reason.
+
+Clearances, checked on every leg rather than just the one that broke:
+
+```
+leg 0   2.10 m   clears by 1.643
+leg 1   1.48 m   clears by 0.940
+leg 2   1.10 m   clears by 0.272
+```
+
 ## [1.218.0] — 2026-09-04
 
 ### One value, two spellings — again, in the crowd
