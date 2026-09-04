@@ -8,6 +8,87 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.241.0] — 2026-09-04
+
+### The anchor is lying down, and it was standing up
+
+Misha: *"make sure the jadrija Anchor is present, find from photos!"*
+
+Present, and in the wrong attitude and in the wrong place.
+
+**Attitude first, because it is the whole silhouette.** What stood here was a
+shank planted vertically with a stock across it near the top and the arms at
+the bottom — which is how you set an anchor up as a war memorial, and is not
+what `1000150353` shows. Opened at full size the frame settles it three ways:
+
+* **The ring is at the joint.** A ring goes at the head, and the head is where
+  the stock crosses the shank. A joint two thirds of the way *down* a standing
+  member cannot be a head, because a standing shank's head is its top.
+* **There is a rectangular slot in the standing member** just above that joint.
+  That is a forelock keyway, and a forelock goes through the *stock* to key it
+  into the shank. So the standing member is the stock.
+* **The two flat spade plates are at the far end of the horizontal member.**
+  Flat plates are palms, palms are on arms, arms are at the crown. So the
+  horizontal member is the shank, running from the head at the joint to the
+  crown on the ground. Both arms leave the crown the same way, so from the side
+  they nearly superimpose — which is exactly the near palm and the smaller,
+  paler, further one the frame has.
+
+Somebody dragged it up the beach and dropped it in the flowerbed. It is half
+buried, on its side, with its iron stock in the air.
+
+**Measured, not guessed.** `_353` is 13 mm equivalent — 1444 px of focal length
+across its 4000 px long axis — the sea horizon at the far left fixes the horizon
+row, and a phone at 1.50 m over flat gravel then gives a distance for every
+ground contact and a height for everything over it. Stock **1.84 m** out of the
+ground with the ball on top; head **0.60 m** up; shank head-to-crown **1.82 m**
+at about 16°; ring **0.40 m** outside in **45 mm** bar; stock **78 mm** at the
+shank going to a **110 mm** ball; shank **90 mm**; palms **0.30 × 0.29 m** in
+25 mm plate. Stock 1.84 against shank 1.82 — and on a real admiralty anchor
+those two are equal, which is the check that says the solve is the right one.
+
+**And it moved, `rowB + 3.9` to `rowB + 7.6`.** The back row's rear wall is at
+`rowB + cabD`, so 3.9 stood it in a **1.1 m alley** between a rendered wall and
+the parking. `_353` is not a photograph of an alley — it is a planted bed in the
+open with the nose-in cars one side and the lane the other, a playground across
+the road behind, and eighty metres of sightline. That is the correction the rock
+already carried in its own note and the anchor had never had.
+
+**Two pines were standing in it.** One in the middle of the shank, one across
+the rock's face, and neither is a bug in the tree code: nothing was keeping
+either pass off two objects that are not OSM footprints.
+
+Adding them to `grove`'s built list does **not** fix it, and finding that out
+cost a build. `built` makes `grove.at` return **null**, and null in
+`45-trees.js` means *not mine, ask the cover map* — which on this peninsula is
+`GROWS[URBAN]` and a cypress. That swaps a pine for a cypress and leaves the
+trunk where it was. So `grove.at` returns a frozen **empty table** over them
+instead: truthy, so the cover map is never asked, and the species roll finds
+nothing in it.
+
+The resort's own three-row planting loop needed the opposite fix. A `continue`
+is not available there — `pine`, `olive` and `oleander` all draw from `rng` and
+they draw a *variable* number of times, so dropping one shifts every parasol,
+bather and hut downstream. The tree is **pushed** instead, radially in `s`, out
+to 2.4 m. Moving it costs no draws at all.
+
+The bed is `_353`'s and not a rockery: white limestone lumps along the seaward
+edge only — a kerb holding the bed up against the parking, where a ring of them
+made it a grave — two **dwarf fan palms**, and seven low grey-green cushions
+with the dry summer grass between them. *Chamaerops humilis* is new and is not
+any of the three the resort already grows: no trunk, and a flat pleated fan on
+the end of each stalk, which is the thing you read at ten metres. Nine fronds;
+twelve was tried and the extra three are invisible.
+
+Colours all off the same frame and all divided by the sunlit white limestone
+lump in it (229/217/188), so the 18:25 sun comes out of the numbers: frond
+0.352/0.398/0.168, cushions 0.318/0.352/0.238, dry grass 0.383/0.331/0.297 —
+warm against cold, a different colour and not a darker one.
+
+Census `{seen:446, thin:333, plain:86, rich:27}` throughout, which is the whole
+reason the tree is pushed rather than skipped. Jadrija 558 633 → **559 039**
+triangles, 60 fps.
+
 ## [1.240.0] — 2026-09-04
 
 ### The rock is a metre taller than we built it, and the frame says so

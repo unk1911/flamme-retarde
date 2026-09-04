@@ -14611,9 +14611,19 @@ async function buildJadrija(scene) {
    * has to know: `carSites` lays a nose-in row every four metres and would
    * otherwise park one against each of them. Both positions are placements —
    * neither survey frame carries GPS — and both sit on the band the footage
-   * does support, which is the made vehicle surface behind the back row.
+   * does support, which is the wood behind the back row of huts.
+   *
+   * The anchor has MOVED, `rowB + 3.9` to `rowB + 7.6`, and it is the same
+   * correction the rock already carries in its own note. The back row's rear
+   * wall is at `rowB + cabD`, so 3.9 put the anchor in a **1.1 m alley**
+   * between a rendered wall and the parking, where it could be seen by
+   * nobody who was not already lost. `1000150353` is not a photograph of an
+   * alley: it is a planted bed in the open with the nose-in cars on one side
+   * of it and the lane on the other, a playground across the road behind, and
+   * eighty metres of sightline in every direction. 7.6 is the band that gives
+   * that, and it is the band the rock is already in.
    */
-  const BACK = { anchor: [430.4, JAD.rowB + 3.9], rock: [418.6, JAD.rowB + 8.2] };
+  const BACK = { anchor: [430.4, JAD.rowB + 7.6], rock: [418.6, JAD.rowB + 8.2] };
 
   // ── what is parked in the wood ─────────────────────────────────────────────
   // Both walk-throughs film cars standing among the pines — nose-in, in loose
@@ -15020,9 +15030,11 @@ async function buildJadrija(scene) {
   // one piece of civic sculpture on this whole shore and it is a tap.
   //
   // POSITION for both is a placement, not a measurement: neither frame carries
-  // GPS. What the footage supports is that they are on the verge of the made
-  // vehicle surface behind the huts, which is `JAD.rowB + 3.6` — the same edge
-  // the parking bollards stand on — so that is the band they go in.
+  // GPS. What the footage supports is that both stand in the OPEN in the wood
+  // behind the huts with the nose-in car row beside them and a sightline in
+  // every direction, so that is the band they go in — see the note over
+  // `BACK`, which also records why the anchor had to be moved out of the
+  // 1.1 m alley behind the back row's rear wall that it used to be in.
   {
     const back11 = b;
     b = up;
@@ -15059,6 +15071,13 @@ async function buildJadrija(scene) {
     const BRONZED = [0.150, 0.118, 0.078];    // the head, patinated near black
     const BRASS = [0.520, 0.400, 0.210];      // the knob, handled bright
     const PATINA = [0.352, 0.360, 0.298];     // the rosette, verdigris
+    // The planting in the anchor's bed, all three off `1000150353` and all
+    // three divided by the sunlit white limestone lump in the same frame
+    // (229/217/188) so that the 18:25 sun comes out of the numbers.
+    const PALMG = [0.352, 0.398, 0.168];      // Chamaerops frond, 113/120/41
+    const PTRUNK = [0.235, 0.190, 0.135];     // its fibrous stub of a trunk
+    const TUSS = [0.318, 0.352, 0.238];       // the grey-green cushions
+    const DRYG = [0.383, 0.331, 0.297];       // and the dry grass, 121/100/79
     const TROUGH = [0.640, 0.596, 0.558];     // 108/100/94 in shade: warm grey
     const gAt2 = (t2, s2) => {
       const st2 = at(t2);
@@ -15107,6 +15126,78 @@ async function buildJadrija(scene) {
     };
 
     /**
+     * A dwarf fan palm, which is the plant standing behind the anchor in
+     * `1000150353` and is not any of the three the resort already grows.
+     *
+     * *Chamaerops humilis*, the only palm native to this coast: no trunk to
+     * speak of, a clump of stiff stalks out of the ground, and a flat pleated
+     * FAN on the end of each. That fan is the whole object. `pine` and
+     * `olive` are masses and are drawn as `puff`s, and an agave is a rosette
+     * of straight blades — this is neither. It is a dozen flat discs held out
+     * at a dozen angles, and at ten metres what you read is the discs.
+     *
+     * Nine fronds. Twelve was tried and the extra three are invisible: the
+     * fans overlap at that count and all they cost is triangles.
+     *
+     * Drawn on both windings, the way `agave` is, because a fan is one sheet
+     * and half of them face away from you.
+     */
+    const fanPalm = (lt, ls, r, seed) => {
+      const ly = gAt2(lt, ls);
+      const N = 9, ty = ly + 0.24;
+      post(W, lt, ls, ly - 0.12, ty, 0.14, PTRUNK, 6);
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * TAU + jit(i, seed * 13 + 1) * 0.42;
+        // Elevation of the stalk, 20 to 62 deg. A clump with every stalk at
+        // the same angle is a parasol.
+        const e = 0.35 + 0.73 * jit(i, seed * 13 + 5);
+        const L = r * (0.40 + 0.16 * jit(i, seed * 13 + 9));
+        const ca = Math.cos(a), sa = Math.sin(a);
+        const hub = [lt + ca * L * Math.cos(e), ls + sa * L * Math.cos(e),
+          ty + L * Math.sin(e)];
+        // The stalk: a thin blade rather than a bar, which is what a
+        // Chamaerops petiole is and costs two triangles instead of eight.
+        b.tri(W(lt - sa * 0.028, ls + ca * 0.028, ty),
+          W(lt + sa * 0.028, ls - ca * 0.028, ty),
+          W(hub[0], hub[1], hub[2]), shade(PTRUNK, 1.30));
+        b.tri(W(lt + sa * 0.028, ls - ca * 0.028, ty),
+          W(lt - sa * 0.028, ls + ca * 0.028, ty),
+          W(hub[0], hub[1], hub[2]), shade(PTRUNK, 1.30));
+        // The fan, as four segments swept 100 deg either side of the stalk
+        // and drooping at the edges the way a fan palm's does.
+        const R = r * (0.42 + 0.14 * jit(i, seed * 13 + 17));
+        const rim = (k) => {
+          const bta = (k / 4 - 0.5) * 1.75;
+          const cb = Math.cos(bta), sb = Math.sin(bta);
+          const ox = ca * Math.cos(e) * cb - sa * sb;
+          const oz = sa * Math.cos(e) * cb + ca * sb;
+          const oy = Math.sin(e) * cb - 0.34 * (1 - cb);
+          return W(hub[0] + ox * R, hub[1] + oz * R, hub[2] + oy * R);
+        };
+        const H = W(hub[0], hub[1], hub[2]);
+        for (let k = 0; k < 4; k++) {
+          const c = shade(PALMG, 0.88 + jit(k + i * 4, seed * 13 + 23) * 0.28);
+          b.tri(H, rim(k), rim(k + 1), c);
+          b.tri(H, rim(k + 1), rim(k), shade(c, 0.72));
+        }
+      }
+    };
+
+    /**
+     * One cushion of the low grey-green scrub in the anchor's bed. A dome, and
+     * for once a dome is the right solid: these are wind-clipped subshrubs and
+     * the top of one really is a smooth cap. Alternating with the dry summer
+     * grass, which is what the frame has between them and is a different
+     * colour, not a darker one — 0.383/0.331/0.297 against 0.318/0.352/0.238,
+     * warm against cold, both read off `_353` in the same sun.
+     */
+    const tussock = (lt, ls, r, seed) => {
+      const c = (seed % 2) ? DRYG : TUSS;
+      dome(W, lt, ls, gAt2(lt, ls) - 0.04, r * (0.52 + 0.24 * jit(seed, 87)),
+        r, shade(c, 0.92 + jit(seed, 89) * 0.20), 6);
+    };
+
+    /**
      * A tapered four-sided bar between two points in a local (Δt, Δs, Δy)
      * frame, with its section perpendicular to its own run.
      *
@@ -15141,69 +15232,178 @@ async function buildJadrija(scene) {
     };
 
     // ── the anchor ──
+    //
+    // REBUILT, and the thing that was wrong was not a dimension. **It is lying
+    // down.** What stood here was a shank planted vertically with a stock
+    // across it near the top and the arms at the bottom, which is how an
+    // anchor is set up as a war memorial. It is not what `1000150353` shows,
+    // and the frame settles it three separate ways once it is opened at full
+    // size:
+    //
+    //   * **The ring is at the joint.** A ring goes at the HEAD, and the head
+    //     is where the stock crosses the shank. So the joint two thirds of the
+    //     way DOWN the standing member is the head — which cannot be true of a
+    //     standing shank, because a shank's head is its top.
+    //   * **There is a rectangular slot in the standing member** just above
+    //     the joint. That is a forelock keyway, and a forelock goes through
+    //     the STOCK to key it into the shank. The standing member is the stock.
+    //   * **The two flat spade plates are at the far end of the member that
+    //     leaves the joint horizontally.** Flat plates are palms, palms are on
+    //     arms, and arms are at the crown. So that horizontal member is the
+    //     shank, and it runs from the head at the joint to the crown on the
+    //     ground 1.8 m away. Both arms point the same way off the crown, so
+    //     from the side they nearly superimpose — which is exactly the near
+    //     palm and the smaller, paler, further one the frame has.
+    //
+    // Somebody dragged it up the beach and dropped it in the flowerbed. It is
+    // half buried, on its side, with its iron stock in the air, and that is a
+    // far better silhouette than the memorial one because nothing else on this
+    // shore has it.
+    //
+    // MEASURED off the same frame, solved rather than guessed. `_353` is
+    // 13 mm equivalent — 1444 px of focal length across its 4000 px long axis
+    // — the sea horizon at the far left fixes the horizon row, and a phone
+    // held at 1.50 m over flat gravel then gives a distance for every ground
+    // contact and a height for everything above it:
+    //
+    //   * stock: **1.84 m** out of the ground, ball end at the top;
+    //   * head (ring and stock through the shank): **0.60 m** up;
+    //   * shank, head to crown: **1.82 m**, lying at about 16 deg;
+    //   * ring: **0.40 m** outside diameter in **45 mm** bar;
+    //   * stock **78 mm** at the shank going to a **110 mm** ball;
+    //   * shank **90 mm** at the head;
+    //   * palms **0.30 x 0.29 m**, about 25 mm of plate.
+    //
+    // Stock length against shank length is 1.84 against 1.82, and on a real
+    // admiralty anchor those two are equal. Two independent readings of the
+    // same frame agreeing to a centimetre is the check that says the solve is
+    // the right one.
     {
       const [t0, s0] = BACK.anchor;
       const y0 = gAt2(t0, s0);
-      // The shank, leaning back along the shore. 26 deg off vertical, which is
-      // what the frame has, and 1.95 m of it out of the ground.
-      const TH = 0.454, AZ = 0.38;                 // 26 deg, and its heading
-      const dir = [Math.sin(TH) * Math.cos(AZ), Math.sin(TH) * Math.sin(AZ),
-        Math.cos(TH)];
-      const crown = [0, 0, -0.06];                 // a little of it buried
-      const head = [crown[0] + dir[0] * 2.02, crown[1] + dir[1] * 2.02,
-        crown[2] + dir[2] * 2.02];
-      spar(t0, s0, y0, crown, head, 0.062, 0.040, RUST);
-      // The stock, across the shank near the head and at right angles to the
-      // arms. Without it this is a fork.
-      const sk = 0.86;
-      const mid = [crown[0] + (head[0] - crown[0]) * sk,
-        crown[1] + (head[1] - crown[1]) * sk,
-        crown[2] + (head[2] - crown[2]) * sk];
-      // Perpendicular to the shank, in the horizontal-ish plane across the
-      // arms: the arms lie along +/- the shore, so the stock runs across it.
-      const sx = [-Math.sin(AZ), Math.cos(AZ), 0];
+      // Local (dt, ds, dy) throughout, and `spar` takes them straight. The
+      // shank runs along the shore so that the promenade sees it broadside:
+      // head down-shore, crown up-shore, and `BACK.anchor` is its middle
+      // rather than one of its ends, which keeps the whole object inside the
+      // 3.0 m the car loop leaves clear either side of that station.
+      const head = [-0.85, -0.26, 0.60];
+      const crown = [+0.85, +0.26, 0.10];
+      spar(t0, s0, y0, head, crown, 0.045, 0.058, RUST);
+      // The band round the shank a third of the way out, which the frame has
+      // and which is the only thing that stops the shank reading as pipe.
       spar(t0, s0, y0,
-        [mid[0] - sx[0] * 0.66, mid[1] - sx[1] * 0.66, mid[2] - sx[2] * 0.66],
-        [mid[0] + sx[0] * 0.66, mid[1] + sx[1] * 0.66, mid[2] + sx[2] * 0.66],
-        0.034, 0.034, RUSTD);
-      // Two arms off the crown, each a straight run to an elbow and a shorter
-      // one out to the palm, which is enough curve at this size.
-      const ax = [Math.cos(AZ), Math.sin(AZ), 0];
-      for (const sg of [1, -1]) {
-        const elb = [crown[0] + ax[0] * 0.40 * sg, crown[1] + ax[1] * 0.40 * sg,
-          crown[2] + 0.17];
-        const tip = [crown[0] + ax[0] * 0.72 * sg, crown[1] + ax[1] * 0.72 * sg,
-          crown[2] + 0.56];
-        spar(t0, s0, y0, crown, elb, 0.058, 0.046, RUST);
-        spar(t0, s0, y0, elb, tip, 0.046, 0.030, RUST);
-        // The palm: a flattened wedge on the end of the arm, which is the part
-        // that reads as an anchor from thirty metres.
-        const pw = 0.20;
-        spar(t0, s0, y0,
-          [tip[0] - sx[0] * pw, tip[1] - sx[1] * pw, tip[2] - 0.05],
-          [tip[0] + sx[0] * pw, tip[1] + sx[1] * pw, tip[2] - 0.05],
-          0.052, 0.052, RUSTD);
-      }
-      // The ring at the head, eight short bars round a circle.
+        [head[0] + 0.55, head[1] + 0.17, head[2] - 0.16],
+        [head[0] + 0.66, head[1] + 0.20, head[2] - 0.19], 0.070, 0.070, RUSTD);
+      // The stock, standing. Buried 0.25 m — the lower arm of it is in the
+      // soil, which is why only a third of its length shows below the shank
+      // where a free stock would show half. Leaning 0.16 m along the shore at
+      // the top, which is what the frame has.
+      const st0 = [head[0] - 0.04, head[1] + 0.02, head[2] - 0.85];
+      const st1 = [head[0] + 0.12, head[1] - 0.08, head[2] + 1.24];
+      spar(t0, s0, y0, st0, st1, 0.042, 0.034, RUST);
+      // The ball on the end of it. Not a decoration: a stock has a ball or a
+      // nut at one end so that it cannot pull through the shank, and at 1.84 m
+      // up it is the whole of the object's top silhouette — 110 mm across,
+      // which is three times the bar it sits on and is why you can pick this
+      // out against the sky from the far side of the car park.
+      lathe(W, t0 + st1[0], s0 + st1[1], [
+        [y0 + st1[2] - 0.020, 0.034], [y0 + st1[2] + 0.014, 0.055],
+        [y0 + st1[2] + 0.062, 0.055], [y0 + st1[2] + 0.090, 0.000],
+      ], RUST, 8);
+      // The forelock keyway, 0.10 m above the shank. Twenty-eight millimetres
+      // of dark on a rusty bar, and it is the piece of evidence this whole
+      // rebuild turns on, so it goes in.
+      boxTS(t0 + head[0] + 0.06, t0 + head[0] + 0.075,
+        s0 + head[1] - 0.045, s0 + head[1] + 0.045,
+        y0 + head[2] + 0.085, y0 + head[2] + 0.113, shade(RUSTD, 0.42));
+      // The ring, hanging off a boss at the head, in the vertical plane that
+      // contains the shank — which is the plane the promenade looks at, so it
+      // shows as a circle rather than as a line. Eight bars round 0.178 m of
+      // centreline radius in 22 mm bar: 0.40 m outside, measured.
       {
-        const rr = 0.11;
+        const RC = [head[0] - 0.02, head[1] - 0.10, head[2] - 0.20];
+        const un = 1 / Math.hypot(1.70, 0.52);
+        const ex = [1.70 * un, 0.52 * un, 0];       // along the shank
         for (let i = 0; i < 8; i++) {
-          const a0 = (i / 8) * TAU, a1 = ((i + 1) / 8) * TAU;
-          const P = (a) => [head[0] + sx[0] * Math.cos(a) * rr,
-            head[1] + sx[1] * Math.cos(a) * rr,
-            head[2] + Math.sin(a) * rr + 0.10];
-          spar(t0, s0, y0, P(a0), P(a1), 0.020, 0.020, RUSTD);
+          const P = (i2) => {
+            const a = (i2 / 8) * TAU;
+            return [RC[0] + ex[0] * Math.cos(a) * 0.178,
+              RC[1] + ex[1] * Math.cos(a) * 0.178,
+              RC[2] + Math.sin(a) * 0.178];
+          };
+          spar(t0, s0, y0, P(i), P(i + 1), 0.022, 0.022, RUSTD);
+        }
+        // The shackle boss between the ring and the shank.
+        spar(t0, s0, y0, head, [RC[0], RC[1], RC[2] + 0.16], 0.055, 0.040,
+          RUST);
+      }
+      // Two arms off the crown, and both of them point the SAME way — up-shore,
+      // the way the shank came from — spread either side of it in the plane at
+      // right angles to the stock. That is what an anchor's arms do and it is
+      // why they superimpose in a side view.
+      {
+        // Along the shank, and across it in the horizontal plane.
+        const un = 1 / Math.hypot(1.70, 0.52);
+        const ax = [1.70 * un, 0.52 * un, 0];
+        const sx = [-0.52 * un, 1.70 * un, 0];
+        for (const sg of [1, -1]) {
+          const elb = [crown[0] + ax[0] * 0.16 + sx[0] * 0.30 * sg,
+            crown[1] + ax[1] * 0.16 + sx[1] * 0.30 * sg, crown[2] + 0.10];
+          const tip = [crown[0] + ax[0] * 0.02 + sx[0] * 0.60 * sg,
+            crown[1] + ax[1] * 0.02 + sx[1] * 0.60 * sg, crown[2] + 0.26];
+          spar(t0, s0, y0, crown, elb, 0.056, 0.044, RUST);
+          spar(t0, s0, y0, elb, tip, 0.044, 0.028, RUSTD);
+          // The palm. A spade plate 0.30 across and 0.29 long in the plane of
+          // the arms, drawn as a real plate with 25 mm of thickness rather
+          // than as a fat bar: the whole of what says anchor at thirty metres
+          // is that the end of the arm is FLAT, and a square-section spar with
+          // the same footprint reads as a lump.
+          const L = (o) => W(t0 + tip[0] + ax[0] * o[0] + sx[0] * o[1] * sg
+            + (0) * o[2], s0 + tip[1] + ax[1] * o[0] + sx[1] * o[1] * sg,
+          y0 + tip[2] + o[2]);
+          // Outline in (along the arm, across it, up), a kite: the throat at
+          // the arm, the two shoulders, the point.
+          const O = [[-0.10, -0.02, -0.10], [0.06, -0.06, 0.02],
+            [0.19, 0.02, 0.14], [-0.02, 0.06, 0.13]];
+          const th = 0.0125;
+          const F = O.map((o) => L([o[0], o[1], o[2] + th]));
+          const Bk = O.map((o) => L([o[0], o[1], o[2] - th]));
+          b.quad(F[0], F[1], F[2], F[3], RUSTD);
+          b.quad(Bk[3], Bk[2], Bk[1], Bk[0], shade(RUSTD, 0.82));
+          for (let k = 0; k < 4; k++) {
+            b.quad(F[k], Bk[k], Bk[(k + 1) % 4], F[(k + 1) % 4],
+              shade(RUSTD, 0.92));
+          }
         }
       }
-      // And the bed it stands in: white limestone lumps, which is what makes
-      // it a monument rather than something that fell off a boat.
-      for (let i = 0; i < 7; i++) {
-        const a = (i / 7) * TAU + 0.4;
-        const r = 0.62 + 0.18 * Math.cos(i * 2.7);
+      // The bed it lies in. `_353` is not gravel here — it is a PLANTED bed
+      // between the nose-in car row and the lane: white limestone lumps set as
+      // a kerb along its seaward edge, dwarf fan palms behind the anchor, and
+      // low grey-green tussocks all through the foot of it, with the dry
+      // summer grass showing between them. What was here was seven smooth
+      // domes, and a dome is the one shape broken karst never takes.
+      // The lumps go along the SEAWARD edge only — an arc of 130 deg centred
+      // on −s — because that is where they are in the frame: a kerb holding
+      // the bed up against the parking, not a ring round the anchor. A ring
+      // was drawn first and it turned the thing into a grave.
+      for (let i = 0; i < 6; i++) {
+        const a = -Math.PI * 0.5 + (i / 5 - 0.5) * 2.27;
+        const r = 1.15 + 0.22 * jit(i, 63);
         const lt = t0 + Math.cos(a) * r, ls = s0 + Math.sin(a) * r;
-        const h = 0.17 + 0.07 * Math.sin(i * 1.9);
-        dome(W, lt, ls, gAt2(lt, ls) - 0.03, h, h * 1.5, LIME, 6);
+        limeLump(lt, ls, 0.24 + 0.10 * jit(i, 65), 0.15 + 0.07 * jit(i, 67),
+          30 + i);
       }
+      fanPalm(t0 - 1.35, s0 + 1.05, 1.02, 3);
+      fanPalm(t0 + 0.55, s0 + 1.45, 0.86, 4);
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * TAU + 1.1;
+        const r = 0.72 + 0.55 * jit(i, 69);
+        tussock(t0 + Math.cos(a) * r, s0 + Math.sin(a) * r,
+          0.20 + 0.10 * jit(i, 75), i);
+      }
+      // Walk round it rather than through it. Low, because it IS low: the box
+      // is the shank and the flukes, and the stock stands inside its footprint.
+      furniture.push({ t: t0, s: s0, a: 0.98, c: 0.52, h: 0.66, y: y0 });
     }
 
     // ── the rock, and the dolphin on it ──
@@ -17662,7 +17862,21 @@ async function buildJadrija(scene) {
       // Also held inside the 39 m band. Three rows at 10.5 m spacing reached
       // s 59, which is well into the OSM footprints, and a pine growing up
       // through a roof is the same bug as a car parked in a hall.
-      const s = JAD.rowB + 2.2 + row * 3.4 + rng() * 3.0;
+      let s = JAD.rowB + 2.2 + row * 3.4 + rng() * 3.0;
+      // Off the two things in `BACK`, and PUSHED rather than skipped. This is
+      // the loop that was standing a pine in the middle of the anchor and
+      // across the face of the rock, and a `continue` here is not available:
+      // `pine`, `olive` and `oleander` all draw from `rng` and they draw a
+      // VARIABLE number of times, so dropping one shifts every parasol,
+      // bather and hut downstream of it and the census moves. Moving the tree
+      // costs no draws at all. Out to 2.4 m, radially in `s`, which is inside
+      // the 39 m band at every station this loop reaches.
+      for (const [bt, bs] of [BACK.rock, BACK.anchor]) {
+        const dt2 = t - bt;
+        if (Math.abs(dt2) >= 2.4) continue;
+        const need = Math.sqrt(2.4 * 2.4 - dt2 * dt2);
+        if (Math.abs(s - bs) < need) s = bs + (s >= bs ? need : -need);
+      }
       // Not inside the playground railing either — a pine growing up through
       // the climbing frame is the same bug as one growing through a roof.
       if (t > PLAY.t0 - 1.5 && t < PLAY.t1 + 1.5
@@ -20993,6 +21207,40 @@ async function buildJadrija(scene) {
       }
     }
 
+    /**
+     * The two things in `BACK`, as world-space circles, and the reason they
+     * cannot go in the grid above with the compounds.
+     *
+     * The rebuilt anchor's first frame had a pine standing in the middle of
+     * its shank and the rock has had one across its face since it went in.
+     * Neither is an OSM footprint, so nothing was keeping the dart pass off
+     * them — but adding them to `built` does NOT fix it, and finding that out
+     * cost a build: `built` makes `at` return **null**, and null in
+     * `45-trees.js` means "not mine, ask the cover map", which on this
+     * peninsula is `GROWS[URBAN]` and a cypress. Excluding them that way
+     * swaps a pine for a cypress and leaves the trunk exactly where it was.
+     *
+     * So these return an EMPTY table instead. It is truthy, so the cover map
+     * is never consulted, and the species roll finds nothing in it and the
+     * dart is dropped. `NOTHING` is frozen because it is handed out by
+     * reference to a caller that iterates it.
+     *
+     * 2.4 m of radius. `1000150353` and `1000150359` both have sky behind
+     * their subject rather than canopy, and at 2.4 the nearest trunk is far
+     * enough back to be behind the object rather than in it.
+     */
+    const NOTHING = Object.freeze({});
+    const BACKXZ = [BACK.rock, BACK.anchor].map(([bt, bs]) => {
+      const w = toWorld(bt, bs);
+      return [w[0], w[2]];
+    });
+    function backClear(x, z) {
+      for (const [bx, bz] of BACKXZ) {
+        if ((x - bx) * (x - bx) + (z - bz) * (z - bz) < 5.76) return true;
+      }
+      return false;
+    }
+
     /** Is (x, z) inside a standing house, or close enough to be its wall? */
     function built(x, z) {
       const list = grid.get(key(Math.floor(x / GROVE.cell), Math.floor(z / GROVE.cell)));
@@ -21051,6 +21299,7 @@ async function buildJadrija(scene) {
         if (t < GROVE.t0 || t > LEN + GROVE.t1 || sv < GROVE.s0 || sv > GROVE.s1) {
           return null;
         }
+        if (backClear(x, z)) return NOTHING;
         if (inField(x, z, 4)) return null;
         if (built(x, z)) return null;
         return sv > 180 ? NECK : WOOD;
