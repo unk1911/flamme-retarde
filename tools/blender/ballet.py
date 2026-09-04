@@ -94,6 +94,9 @@ ARM = {
     "bas": ((-7, 12, 29), (-2, 14, 26), (-18, 19, 21)),
     # First: the same oval carried up to the navel.
     "first": ((-36, 9, 6), (-9, 13, 56), (-15, 20, 30)),
+    # First carried up to the diaphragm, for turning. Seeded off first; the
+    # numbers below are what the fit returned against `TARGET_ARM["turn"]`.
+    "turn": ((-43, 4, -19), (-49, 12, 57), (-9, 1, 22)),
     # Second: open to the sides, a little forward of the shoulders and a little
     # below them, elbow soft, palm down.
     "second": ((2, -12, -17), (-2, -14, -14), (-16, -5, 2)),
@@ -430,8 +433,8 @@ arms(PIROU,
      spine01=(0, 0, 0), spine02=(0, 0, 0), spine03=(0, 0, 0), chest=(-3, 0, 0),
      neck=(0, 0, 0), head=(0, 0, 0),
      clavicleL=(0, 0, 8), clavicleR=(0, 0, -8))
-arm(PIROU, "L", "first")
-arm(PIROU, "R", "first")
+arm(PIROU, "L", "turn")
+arm(PIROU, "R", "turn")
 
 # PIQUE. Stepping straight up onto one leg, the other in retire in front of the
 # supporting knee, one arm up in fifth and one open to second. The difference
@@ -683,6 +686,14 @@ TARGET_ARM = {k: reachable(*v) for k, v in {
     # under the hips, elbows carried out off the body. Not hands at the navel.
     "bas":    ((0.19, 0.125, 0.99), (0.05, 0.24, 1.17)),
     "first":  ((0.26, 0.10, 1.10), (0.16, 0.30, 1.20)),
+    # And the one a TURN is held in, which is not the one she stands in.
+    # Measured off the shipped pirouette, her hands sat at z = 1.10 — correct
+    # for first position on two feet, 17 cm above her own hip joints, and low
+    # for a pirouette. A turning first is carried at the diaphragm with the
+    # elbows lifted and well forward, because what is spinning has to read as a
+    # ring: at navel height with the elbows near the ribs, seen from the side
+    # halfway round, it reads as arms hanging.
+    "turn":   ((0.24, 0.11, 1.23), (0.16, 0.30, 1.30)),
     "second": ((0.14, 0.60, 1.25), (0.10, 0.36, 1.28)),
     "fifth":  ((0.12, 0.14, 1.82), (0.16, 0.36, 1.60)),
     "front":  ((0.52, 0.13, 1.60), (0.32, 0.20, 1.51)),

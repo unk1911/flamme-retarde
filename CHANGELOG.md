@@ -8,6 +8,45 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.205.0] — 2026-09-04
+
+### A pirouette is not held in the position you stand in
+
+1.203.0's lesson was to score where the player actually is before believing a
+render, so this pass ran that on the ballet first. Unlike the wine, **it comes
+back clean.** From every position a walker can occupy on the promenade:
+
+```
+                     first position, releve, developpe
+  on the lip      fwd +1.00  rt -0.00   4.7 m
+  mid level       fwd +1.00  rt -0.00   7.2 m
+  deck near       fwd +1.00  rt -0.00  10.7 m
+  far deck        fwd +1.00  rt -0.00  15.2 m
+
+                     the attitude and arabesque, turned 70
+  deck near       fwd +0.34  rt +0.94  10.7 m
+```
+
+She faces the promenade dead on for the standing positions, and the `@turn` that
+1.190.0 added for the arabesque puts her at a front three-quarter with the
+working side toward the viewer — which is exactly what that position needs,
+since the leg that makes it goes behind her. That staging was done right the
+first time and nothing here changes it.
+
+**What the close look found is the pirouette's arms.** Measured off the shipped
+pose, `arm(PIROU, …, "first")` puts her hands at **z = 1.10** — 17 cm above her
+own hip joints. That is correct for first position standing on two feet and low
+for a turn. Scanned frame by frame through the revolution, at the quarter and
+three-quarter marks it reads as arms hanging: at navel height with the elbows
+near the ribs, seen from the side, there is no shape to it.
+
+A turning first is carried at the diaphragm with the elbows lifted and well
+forward, because what is spinning has to read as a **ring**. So `ARM` gains
+`turn` — first position taken up 13 cm, hands at z = 1.23, fitted against
+`TARGET_ARM` through `reachable()` like everything else in that table, residual
+**0.0391**. Only the pirouette uses it; every other position keeps the first it
+had.
+
 ## [1.204.0] — 2026-09-04
 
 ### The roofs were laid in planks
