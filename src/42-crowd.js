@@ -405,6 +405,17 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
    * is committed, not built — so a blob baked before the seated clips existed
    * has to come out as a person standing rather than as a thrown exception.
    */
+  /**
+   * The phase a figure's clip starts at when it has no clock of its own yet.
+   *
+   * `43-jadrija.js` seeds `fg.clock = fg.seed * 11.3` when the beach is built
+   * and advances it every frame for everybody, drawn or not — so this is only
+   * ever reached by a figure whose seed is 0. It is a name rather than a
+   * literal so that the three places in this file which need it cannot drift
+   * apart again, which is what they had already done.
+   */
+  const phaseOf = (fg) => fg.seed * 11.3;
+
   function wantClip(fg, f) {
     // A sunbather, and until 3 Sep there was no clip for one — which is why
     // every towel on this beach had a lay figure on it: with nothing to play,
@@ -512,8 +523,21 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
       f.aim('head', 0, 1, 0, 0);
       fg.aimed = false;
       fg.lag = 0;
-      if (f.playing() !== want) f.play(want, { fade: 0, from: fg.clock || 0 });
-      else if (f.state) { f.state.curT = fg.clock || 0; f.state.prev = null; }
+      // `|| phaseOf(fg)` and not `|| 0`, which is what these two said. Three
+      // places in this file seed a figure's clip phase and one of them fell
+      // back to a different number than the other two — the same "one value,
+      // two spellings" that cost three releases in `ballet.py` overnight. It
+      // bites only the figure whose seed is 0, because `fg.clock` is
+      // initialised to `fg.seed * 11.3` and never legitimately reaches zero
+      // again; that one bather rebinding to a clip at phase 0 while everybody
+      // around them is mid-cycle is exactly the tell the note fifty lines down
+      // exists to prevent.
+      if (f.playing() !== want) {
+        f.play(want, { fade: 0, from: fg.clock || phaseOf(fg) });
+      } else if (f.state) {
+        f.state.curT = fg.clock || phaseOf(fg);
+        f.state.prev = null;
+      }
       fg.rebound = true;
     }
 
@@ -550,7 +574,7 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
       // clock is that same offset, still running, so a person who changes what
       // they are doing lands mid-clip instead of at whatever phase they were
       // handed when the beach was built.
-      f.play(want, { fade: 0.28, from: fg.clock || fg.seed * 11.3 });
+      f.play(want, { fade: 0.28, from: fg.clock || phaseOf(fg) });
     }
     // The walk clip is authored at about 0.92 m/s; anybody strolling faster
     // than that plays it faster rather than sliding.

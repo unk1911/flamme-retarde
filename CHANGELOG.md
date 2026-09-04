@@ -8,6 +8,37 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.218.0] — 2026-09-04
+
+### One value, two spellings — again, in the crowd
+
+Three checks on the beach crowd this pass. Two came back clean and are recorded
+so nobody re-checks them:
+
+- **The clip phase is properly per-figure.** `43-jadrija.js` seeds
+  `fg.clock = fg.seed * 11.3` when the beach is built and advances it every
+  frame for everybody, drawn or not. The note in `42-crowd.js` already says why
+  — *"a crowd that shares one clock breathes in and out as one"* — and it is
+  doing what it says.
+- **The distribution along the shore is a clustering, not a gap.** 98 figures on
+  the promenade, binned in 60 m: 2, 8, 1, 11, 18, **25**, 14, 9, 6, 4. The peak
+  is on the shop row and it thins to both ends, which is where people actually
+  stand on a boardwalk.
+
+The third did not. Three places in `42-crowd.js` seed a figure's clip phase and
+**one of them fell back to a different number than the other two**: two said
+`fg.clock || 0` and the third said `fg.clock || fg.seed * 11.3`. That is the
+same "one value, two spellings" that cost three separate releases in
+`ballet.py` overnight, and it is why `SKIN_EMISSIVE` got a name in 1.207.0.
+
+It bites exactly one bather — the one whose seed is 0, since `fg.clock` is
+initialised from the seed and never legitimately returns to zero — who would
+rebind to a clip at phase 0 while everybody around them is mid-cycle. Which is
+precisely the tell the note fifty lines below it exists to prevent.
+
+`phaseOf(fg)` now, named once, with the reason over it. Census unchanged at
+`{seen 446, thin 333, plain 86, rich 27}`.
+
 ## [1.217.0] — 2026-09-04
 
 ### The pour was solved at the origin and shipped twenty millimetres to the left
