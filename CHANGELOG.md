@@ -8,6 +8,38 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.183.0] — 2026-09-04
+
+### The things bolted to a wall, on the walls nobody had put anything on
+
+`shopBack` dresses the service elevation and dresses it well — a steel door, a
+meter cabinet, a condenser, a downpipe. What it never touched is the two **end
+walls** of every box on this boardwalk, and on the pizzeria the **front** as
+well: that one is `solid`, so it has no serving opening to break it up, and what
+the player walks past is **thirteen metres of flat grey render** with a single
+shuttered window in it.
+
+A building on this coast is never that. Every one of them carries a downpipe off
+the eaves with a shoe at the bottom and brackets up it, a splash line where thirty
+winters of rain have come off the paving, a meter cabinet with its own door line
+and a louvre at the foot, a vent grille, and — on the pizzeria's front — a
+bulkhead lamp and a hose bib with the hose still on its hook, because the paving
+gets washed at eleven. None of it is worth modelling on its own; all of it
+together is the difference between a wall and a slab, which is the same argument
+the note over `shopKit` makes about a frontage and is just as true round the side.
+
+One thing each per end, so the two ends of a building are not a mirror: a vent on
+one, a meter cabinet on the other.
+
+**Under the canopy, not through it.** The first cut ran every downpipe to
+`top − 0.02`, and on the four awninged shops the awning is a raked slab spanning
+the whole of the box's `t` — both end walls included — with its underside about
+0.13 m below the eaves. Four pipes came up through the canvas. On a shop with an
+awning the water comes off the awning's own gutter anyway, so the run stops
+0.26 m short.
+
+536 022 triangles to **537 592**, 60 fps.
+
 ## [1.182.0] — 2026-09-04
 
 ### The pour takes as long as pouring a glass of wine takes, and the glass fills

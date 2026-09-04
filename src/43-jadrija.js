@@ -4024,6 +4024,123 @@ async function buildJadrija(scene) {
     }
   }
 
+
+  /**
+   * The things bolted to a wall, on the walls nobody had put anything on.
+   *
+   * `shopBack` dresses the service elevation and it dresses it well — a steel
+   * door, a meter cabinet, a condenser, a downpipe. What it does not touch is
+   * the two END walls of every box on this boardwalk, and on the pizzeria the
+   * FRONT as well: that one is `solid`, so it has no serving opening to break
+   * it up, and what the player walks past is thirteen metres of flat grey
+   * render with a single shuttered window in it.
+   *
+   * A building on this coast is never that. It carries a downpipe off the
+   * eaves with a shoe at the bottom and brackets up it, a splash line where
+   * thirty winters of rain have come off the paving, a meter cabinet, a
+   * bulkhead lamp, a hose bib with the hose still hanging on its hook, and a
+   * vent grille. None of it is worth modelling on its own; all of it together
+   * is the difference between a wall and a slab, which is the same argument
+   * the note over `shopKit` makes about the frontage and is just as true round
+   * the side.
+   *
+   * Everything is placed off the shop's own extents, so a frontage that moves
+   * takes its downpipe with it.
+   */
+  function wallKit(S, y0, top) {
+    const body = S.body || [0.520, 0.492, 0.430];
+    const key = S.t0 | 0;
+    const PIPE = [0.615, 0.605, 0.580];
+    const DARK = [0.300, 0.300, 0.310];
+
+    /** One downpipe, its shoe and its brackets, standing off a wall. */
+    // Under the canopy, not through it. The awning is a raked slab spanning
+    // the whole of the box's t including both end walls, and its underside at
+    // the seaward corner sits about 0.13 m below the eaves — so a pipe run to
+    // `top - 0.02` comes up through the canvas. On an awninged shop the water
+    // comes off the awning's own gutter anyway.
+    const eave = S.awn ? top - 0.26 : top - 0.02;
+    const drop = (t, s, dt, ds) => {
+      post(W, t, s, y0 + 0.10, eave, 0.036, PIPE, 6);
+      // The shoe, which turns out at the bottom and is the only part of a
+      // downpipe anybody has ever looked at.
+      boxTS(t - 0.042 + dt * 0.02, t + 0.042 + dt * 0.02,
+        s - 0.042 + ds * 0.02, s + 0.042 + ds * 0.02, y0 + 0.02, y0 + 0.16,
+        shade(PIPE, 0.92));
+      boxTS(t - 0.05 + dt * 0.10, t + 0.05 + dt * 0.10,
+        s - 0.05 + ds * 0.10, s + 0.05 + ds * 0.10, y0, y0 + 0.05,
+        shade(PIPE, 0.80));
+      for (let k = 0; k < 3; k++) {
+        const y = y0 + 0.55 + k * ((eave - y0 - 0.85) / 2);
+        boxTS(t - 0.05, t + 0.05, s - 0.05, s + 0.05, y, y + 0.035,
+          shade(PIPE, 0.74));
+      }
+    };
+
+    // ── the two end walls ───────────────────────────────────────────────────
+    for (const [i, wt, sg] of [[0, S.t0, -1], [1, S.t1, 1]]) {
+      const o = wt + sg * 0.03;
+      // The splash line: a band of render that has been wet every winter for
+      // thirty years and is a shade darker and slightly proud for it.
+      boxTS(Math.min(wt, o + sg * 0.03), Math.max(wt, o + sg * 0.03),
+        S.s0 - 0.02, S.s1 + 0.02, y0, y0 + 0.32, shade(body, 0.84));
+      drop(o, S.s0 + 0.30, sg, 0);
+      // And one thing each, so the two ends of a building are not a mirror of
+      // each other: a vent on one, a meter cabinet on the other.
+      if (i === 0) {
+        const vs = (S.s0 + S.s1) * 0.5;
+        boxTS(Math.min(wt, o + sg * 0.05), Math.max(wt, o + sg * 0.05),
+          vs - 0.22, vs + 0.22, top - 0.75, top - 0.42, DARK);
+        for (let k = 0; k < 4; k++) {
+          boxTS(Math.min(wt, o + sg * 0.08), Math.max(wt, o + sg * 0.08),
+            vs - 0.19, vs + 0.19, top - 0.72 + k * 0.08,
+            top - 0.68 + k * 0.08, shade(DARK, 1.55));
+        }
+      } else {
+        const ms = S.s1 - 1.10;
+        const CAB = [0.560, 0.548, 0.520];
+        boxTS(Math.min(wt, o + sg * 0.11), Math.max(wt, o + sg * 0.11),
+          ms - 0.24, ms + 0.24, y0 + 0.95, y0 + 1.62, CAB,
+          shade(CAB, 1.10));
+        // The door's own line, and the little louvre at the bottom of it.
+        boxTS(Math.min(wt, o + sg * 0.125), Math.max(wt, o + sg * 0.125),
+          ms - 0.01, ms + 0.01, y0 + 0.97, y0 + 1.60, shade(CAB, 0.72));
+        boxTS(Math.min(wt, o + sg * 0.125), Math.max(wt, o + sg * 0.125),
+          ms - 0.16, ms + 0.16, y0 + 1.00, y0 + 1.09, shade(CAB, 0.66));
+      }
+    }
+
+    // ── and the blank front, which only the pizzeria has ────────────────────
+    if (!S.solid) return;
+    const fs = S.s0 - 0.03;
+    const ft = S.t0 + (S.t1 - S.t0) * 0.72;
+    // A bulkhead lamp, high, with its own little shadow gap off the render.
+    {
+      const LAMP = [0.735, 0.715, 0.660];
+      boxTS(ft - 0.10, ft + 0.10, fs - 0.13, fs, top - 0.55, top - 0.34,
+        LAMP, shade(LAMP, 1.14));
+      boxTS(ft - 0.06, ft + 0.06, fs - 0.06, fs, top - 0.51, top - 0.38,
+        [0.320, 0.312, 0.295]);
+    }
+    // The hose bib and the hose still on its hook, which is on the wall of
+    // every kitchen on this coast because the paving gets washed at eleven.
+    {
+      const ht = S.t0 + 1.35;
+      post(W, ht, fs - 0.06, y0 + 0.52, y0 + 0.60, 0.022, DARK, 5);
+      boxTS(ht - 0.03, ht + 0.03, fs - 0.10, fs, y0 + 0.50, y0 + 0.56, DARK);
+      // Three coils on a hook, drawn as three flat rings.
+      for (let k = 0; k < 3; k++) {
+        lathe(W, ht + 0.30, fs - 0.10 - k * 0.012,
+          [[y0 + 0.90, 0.115], [y0 + 0.905, 0.128], [y0 + 0.94, 0.128],
+            [y0 + 0.945, 0.115]], [0.180, 0.230, 0.190], 10);
+      }
+      boxTS(ht + 0.27, ht + 0.33, fs - 0.05, fs, y0 + 1.02, y0 + 1.08,
+        shade(DARK, 1.3));
+    }
+    // And the splash line along the whole of it.
+    boxTS(S.t0, S.t1, fs - 0.03, fs, y0, y0 + 0.32, shade(body, 0.84));
+  }
+
   function shopRoof(S, y0, top) {
     const ry = top + 0.06;
     const SCREED = [0.455, 0.448, 0.428];
@@ -8864,6 +8981,7 @@ async function buildJadrija(scene) {
     }
     if (S.kind === 'box') shopRoof(S, y0, top);
     if (S.kind === 'box') terraceKit(S, y0);
+    if (S.kind === 'box') wallKit(S, y0, top);
     // `shopKit` is the boardwalk's shared frontage — a serving counter with
     // mullions, a condenser and a flue on the roof, two menu boards flanking
     // the opening and a pair of planted pots. Every one of those is a thing
