@@ -500,20 +500,42 @@ async function buildJadrija(scene) {
    * A box in the shore frame. Curvature over a two-metre hut is nothing, so the
    * four uprights are taken from the frame at their own corners and the faces
    * are allowed to be a hair non-planar rather than being carefully unwarped.
+   *
+   * `cut` is where that stops being true, and it is worth writing down what a
+   * thirteen-metre box does on a bend. The corners sit ON the shore curve and
+   * the face between them is a CHORD, so mid-span the face lies inside the
+   * curve by the sagitta — measured at Caffee bar H2O, whose front spans
+   * t 312 to 325, that is **0.345 m**. Everything else in a shop is drawn in
+   * the shore frame in short pieces and follows the curve, so the building's
+   * own face was bowing 0.345 m seaward of its own frontage: the counter, the
+   * back wall, the dark backing panel and the man at the counter were all
+   * standing INSIDE the box that is supposed to be behind them.
+   *
+   * With `cut` the face is broken into pieces no longer than that many metres
+   * and follows the curve like everything else. At 1.5 m the residual sagitta
+   * on H2O's radius is 5 mm. The joints between pieces get no end caps, so a
+   * cut box is the same solid with a bowed face and no interior quads; passing
+   * nothing, or a span shorter than `cut`, reproduces the old six quads
+   * exactly.
    */
-  function boxIn(P, t0, t1, s0, s1, y0, y1, col, topCol) {
-    const A = P(t0, s0, y0), B = P(t1, s0, y0), C = P(t1, s1, y0), D = P(t0, s1, y0);
-    const a = [A[0], y1, A[2]], q = [B[0], y1, B[2]];
-    const c = [C[0], y1, C[2]], d = [D[0], y1, D[2]];
-    b.quad(a, q, c, d, topCol || col);
-    b.quad(D, C, B, A, col);
-    b.quad(A, B, q, a, col);
-    b.quad(C, D, d, c, col);
-    b.quad(B, C, c, q, col);
-    b.quad(D, A, a, d, col);
+  function boxIn(P, t0, t1, s0, s1, y0, y1, col, topCol, cut) {
+    const n = cut > 0 ? Math.max(1, Math.ceil((t1 - t0) / cut)) : 1;
+    for (let i = 0; i < n; i++) {
+      const ta = t0 + (t1 - t0) * (i / n), tb = t0 + (t1 - t0) * ((i + 1) / n);
+      const A = P(ta, s0, y0), B = P(tb, s0, y0);
+      const C = P(tb, s1, y0), D = P(ta, s1, y0);
+      const a = [A[0], y1, A[2]], q = [B[0], y1, B[2]];
+      const c = [C[0], y1, C[2]], d = [D[0], y1, D[2]];
+      b.quad(a, q, c, d, topCol || col);
+      b.quad(D, C, B, A, col);
+      b.quad(A, B, q, a, col);
+      b.quad(C, D, d, c, col);
+      if (i === n - 1) b.quad(B, C, c, q, col);
+      if (i === 0) b.quad(D, A, a, d, col);
+    }
   }
-  const boxTS = (t0, t1, s0, s1, y0, y1, col, topCol) =>
-    boxIn(W, t0, t1, s0, s1, y0, y1, col, topCol);
+  const boxTS = (t0, t1, s0, s1, y0, y1, col, topCol, cut) =>
+    boxIn(W, t0, t1, s0, s1, y0, y1, col, topCol, cut);
 
   /**
    * A tapered, leaning box: a rectangle at `y0` joined to a different rectangle
@@ -877,22 +899,34 @@ async function buildJadrija(scene) {
   const SHOP_STAFF = [
     ['mini', 274.60, null, 'serve', 1.00],
     ['konoba', 244.00, 0.35, 'stand', 1.02],
-    // 5.60 rather than null, which puts him at s 21.40 instead of 21.85.
+    // Back on the standard standoff, and what was in the way was the shop.
     //
-    // NOT A CAUSE, A POSITION THAT WORKS, and it is worth being exact about
-    // the difference. At s 19, out on the open terrace, he is a whole man. At
-    // 21.40 he is a barman from the waist up with the bottles behind him. At
-    // 21.85 — the standoff every other counter in this list uses — he is two
-    // hands and a sliver of shoulder, which is the report this note has
-    // carried since the day the four of them were built.
+    // He was shipped at a `backOff` of 5.60 — s 21.40, 0.45 m out in front of
+    // where he belongs — because at 21.85 he was two hands and a sliver of
+    // shoulder, and five things had been ruled out by a build and a photograph
+    // each: `shopInside`'s shelves, `S.pier`, the mullion at t 317.1, the
+    // crowd layer, and finally the back-bar wall, which is cut 0.62 m either
+    // side of everybody in this list and fixed the identical fault at Caffe
+    // TRAMPULIN without touching this one.
     //
-    // Ruled out, each by a build and a photograph rather than by reading:
-    // `shopInside`'s shelves (removed entirely — no change), `S.pier` (turned
-    // off — no change), the mullion at t 317.1 that the note above warns about
-    // (moved to 317.8, midway between two — no change), and the crowd layer
-    // itself, which draws him perfectly at 19 and at 21.40. Whatever it is
-    // lives in the last 0.45 m and it is not any of those.
-    ['h2o', 317.20, 5.60, 'serve', 0.99],
+    // It was **the shop's own body**, and the reason it is H2O and not
+    // Trampulin is arithmetic. `boxIn` takes a box's four corners off the
+    // shore curve and joins them with flat faces, so a front face is a CHORD:
+    // mid-span it lies inside the curve by the sagitta. H2O's front spans
+    // t 312 to 325, and measured off `toWorld` the chord at t 317.2 runs
+    // **0.345 m** seaward of the s 22 it was drawn for. So the face of the
+    // building stood at 21.655 and the man at 21.85 was a fifth of a metre
+    // inside it — along with the interior wall, the dark backing panel and
+    // everything else in the opening that is drawn in short pieces and
+    // therefore follows the curve. Trampulin's front is six metres and its
+    // sagitta is nought, which is why the same standoff always worked there.
+    //
+    // Proved by painting the body magenta — the man's silhouette came back
+    // magenta — and then by retracting it 1 m, which put a whole barman, a
+    // warm back wall and the black lightbox panel on screen at once. The fix
+    // is in `shopfront`: the body is cut into 1.5 m pieces and its front
+    // follows the shore like everything hung on it.
+    ['h2o', 317.20, null, 'serve', 0.99],
     ['tramp2', 471.60, null, 'stand', 1.03],
   ];
 
@@ -4405,6 +4439,17 @@ async function buildJadrija(scene) {
     // a worktop present their front EDGE, which stands at `f0`, and every one
     // of those drew at 0.43 m the moment the slab moved.
     //
+    // AND THE 0.26 WAS PARTLY THE CHORD, which is worth knowing before anybody
+    // spends another six slabs on it. Those slabs were built into THIS
+    // opening, and at the time H2O's body face was bowing up to 0.345 m
+    // seaward of the s0 they were measured against — so the bottom two were
+    // not losing a depth test, they were genuinely behind the wall. Repeated
+    // at t 317.2 with the body cut to follow the shore, 0.16 m draws and 0.06
+    // m still does not, so the real floor is somewhere in between and about a
+    // tenth of a metre. Nothing here moves on the strength of that: the room
+    // reads where it stands and 0.30 is a comfortable margin over a floor
+    // nobody has pinned down closer than 0.06 to 0.16.
+    //
     // What this leaves is a shape rather than a number. There is no room for a
     // back wall BEHIND the counter: `shopKit`'s counter top already stands 0.34
     // m proud and its body 0.28, so anything far enough out to draw is out in
@@ -4436,6 +4481,14 @@ async function buildJadrija(scene) {
     // Measured rather than reasoned, and it took three builds: at s 19, out on
     // the terrace, he is a whole man; at 21.4, in front of this wall, he is a
     // barman from the waist up; at 21.85, behind it, he is nothing at all.
+    //
+    // This cut is necessary and it was not sufficient, which took another five
+    // builds to find out. At Caffe TRAMPULIN it is the whole story. At H2O the
+    // man stayed a pair of hands with the wall cut and the shelves gone,
+    // because a SECOND thing stood in front of him: the shop's own body, whose
+    // front face is one quad across thirteen metres of bend and therefore a
+    // chord 0.345 m inside the curve at mid-span. That is fixed where it
+    // belongs, in `shopfront`, and both of them had to go.
     //
     // 0.62 m of gap, which is a shoulder width and a hand either side. The
     // shelves go with the wall — a bottle at head height is the same problem —
@@ -10751,8 +10804,15 @@ async function buildJadrija(scene) {
 
     const h = S.h, top = y0 + h;
     const awn = S.awn || 0;
-    // The body.
-    boxTS(S.t0, S.t1, S.s0, S.s1, y0, top, body, shade(body, 0.9));
+    // The body, cut into 1.5 m pieces so its front follows the shore.
+    //
+    // ONE QUAD ACROSS THIRTEEN METRES OF BEND IS A CHORD, and at H2O that
+    // chord ran 0.345 m seaward of the s0 it was asked for — which is more
+    // than the 0.15 m standoff the man behind the counter stands on, so the
+    // shop's own body was drawn in front of him. See the note over `boxIn`
+    // and the one over `SHOP_STAFF`. 1.5 m is the mullion spacing, and it
+    // leaves 5 mm of sagitta on this radius.
+    boxTS(S.t0, S.t1, S.s0, S.s1, y0, top, body, shade(body, 0.9), 1.5);
     // The serving front: a dark backing panel behind the opening, which is the
     // whole trick — a bright interior behind a shaded front reads as a lightbox
     // and nothing else about the shop can recover from it.
@@ -19025,16 +19085,16 @@ async function buildJadrija(scene) {
     // heights are a shade apart because four men the same height behind four
     // counters is a chorus line.
     //
-    // TWO, and it was meant to be four. H2O and Trampulin were built, placed,
-    // scaled and unhidden at the same standoff and shot from five stations
-    // between them, and at neither shop does a figure behind the counter show
-    // more than a shoulder and two hands. It is not occlusion by anything
-    // static — a raycast from the camera to the head point comes back empty —
-    // and it is not the deck datum, which is now taken from the shop's own
-    // midpoint the way `shopfront` takes it. It is something in the crowd
-    // layer that this pass did not get to the bottom of. Two counters with
-    // somebody at them beats four with two men made of hands, so the other
-    // two are recorded here rather than shipped.
+    // FOUR, and for a while it was two. H2O and Trampulin were built, placed,
+    // scaled and unhidden at the same standoff as the other pair and at
+    // neither shop did the figure show more than a shoulder and two hands,
+    // which this note recorded for months as "something in the crowd layer".
+    // It was not the crowd layer and it was not the deck datum. It was
+    // occlusion by something static after all — the back-bar wall at
+    // Trampulin, and at H2O the shop's own body, whose thirteen-metre front
+    // face is a chord across a bend and stood 0.345 m seaward of where it was
+    // asked to be. See the note over the H2O entry in `SHOP_STAFF` and the
+    // `cut` argument to `boxIn`.
     for (const [key, t, backOff, pose, k] of SHOP_STAFF) {
       const S = SHOPS.find((x) => x.key === key);
       if (!S) continue;
