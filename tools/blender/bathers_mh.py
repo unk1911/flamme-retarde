@@ -807,9 +807,41 @@ def _stand(p):
         q[nm] = (a[0], sign * STAND_SOLE, a[2])
     for up, lo, sign in (("armUL", "armLL", 1), ("armUR", "armLR", -1)):
         a, b = p.get(up, (0, 0, 0)), p.get(lo, (0, 0, 0))
-        q[up] = (a[0], a[1], sign * STAND_ARM_IN)
-        q[lo] = (b[0] + STAND_ELBOW_UNDO - MH.STAND_ELBOW_UNDO,
-                 b[1], sign * STAND_FORE_IN)
+        # AN ARM THAT IS DOING SOMETHING IS LEFT DOING IT.
+        #
+        # This loop used to be unconditional, and it silently destroyed the
+        # only clip on this beach that raises one. A lift is written in Z —
+        # `WAVE_UP` is `armUR: (-16, 0, 96)` and the 96 IS the raise — and the
+        # tuck this applies is `sign * STAND_ARM_IN`, so a ninety-six degree
+        # lift came out of the bake as a thirty-three degree tuck, on every key
+        # of the clip. The result loaded, reported itself as playing, ran its
+        # clock from 0 to 2.5, and moved the wrist fifteen centimetres. The
+        # same clip on the show figure, which does not come through here, lifts
+        # it from 0.85 m to 1.54 m over the soles.
+        #
+        # The test is the SIGN and not the size. A standing arm is tucked
+        # toward the body, which on this rig is `sign`; anything on the other
+        # side of vertical is a pose that has decided to put the arm somewhere,
+        # and there is no stance to re-track it to. `IDLE_A` and `NOTICE` are
+        # +33 and +37 on the correct side and go through as before; `WAVE_UP`
+        # and `WAVE_OUT` are +96 and +30 on the wrong one and are left alone.
+        #
+        # The gate is on the UPPER arm and it decides for the whole limb. A
+        # forearm's own Z is 0 in `WAVE_UP` and would pass a test of its own,
+        # and eighteen degrees of tuck on the forearm of a raised arm is a
+        # second, quieter version of the same bug. Where the shoulder has been
+        # placed deliberately, the elbow below it has been too.
+        #
+        # UNVERIFIED IN A BAKE. build/payload/bather_*.fr3d.gz is committed
+        # rather than built and Blender was not run for this change, so the
+        # eight blobs on disk still carry the flat wave. Nothing at runtime
+        # waits for it: the greeting solves its own arm — see `greetArm` in
+        # src/42-crowd.js, which says why. What this buys is that `wave` means
+        # something again the next time these are baked.
+        if a[2] * sign >= 0:
+            q[up] = (a[0], a[1], sign * STAND_ARM_IN)
+            q[lo] = (b[0] + STAND_ELBOW_UNDO - MH.STAND_ELBOW_UNDO,
+                     b[1], sign * STAND_FORE_IN)
     return q
 
 

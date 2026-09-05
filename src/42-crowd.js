@@ -312,6 +312,149 @@ function clipRate(fg) {
     : 0.90 + fg.seed * 0.22;
 }
 
+// ── a hand up, solved, because the baked one does nothing ────────────────────
+//
+// THE BAKED `wave` DOES NOT MOVE THESE FIGURES' ARMS AND NEVER HAS. It is in
+// `BATHER_CLIPS`, it loads, `playing()` returns it and `curT` runs from 0 to
+// 2.5 — and the hand comes up fifteen centimetres and goes down again. It was
+// in the `BIZ` list above for as long as that list has existed and nobody
+// noticed, because what it produced was a figure standing still.
+//
+// The cause is one line in tools/blender/bathers_mh.py. `_stand` re-tracks
+// Baye's standing poses onto these eight skeletons, and part of that is
+// rewriting the arms' lateral angle to `STAND_ARM_IN` so the hands hang beside
+// the thighs rather than bowed out round them. `wave`'s raise is written in
+// exactly that channel — `WAVE_UP` is `armUR: (-16, 0, 96)` and the 96 is the
+// Z — so the re-tracking overwrites a 96-degree lift with a 33-degree tuck,
+// on every key, every time the bake runs. Measured either way to be sure: the
+// same clip on the show figure, which does not go through `_stand`, lifts her
+// wrist from 0.85 m to 1.54 m over her own soles; on a bather it goes 0.81 to
+// 0.96.
+//
+// `bathers_mh.py` is fixed, and this does not wait for it. The payloads under
+// build/payload are committed rather than built — see the note over the parse
+// in 43-jadrija.js — so the eight blobs on disk still carry the flat wave and
+// will until somebody runs Blender. What follows makes the arm out of the two
+// things that are already true at runtime: the skinning palette says where the
+// arm IS, and `aim` can lay one rotation per bone over it.
+//
+// It is `holdPhone`'s solve with the target moved. Two bones, two minimal
+// rotations, exact on the frame it is asked for; and the same three traps,
+// which are written up over there at length:
+//
+//   `aim` is a DELTA and `boneAt` reports the RESULT, so the last delta has to
+//   come off the measurement before the next one goes on — and the solve must
+//   never run twice against one measurement, which is why the only caller is
+//   inside the pose ladder's guard, immediately before the `update` that
+//   rebuilds the palette.
+//
+//   `aims` keeps ONE rotation per bone, and the phones already own `armUR`,
+//   `armLR`, `handR`, `fingersR` and `neck`. So anybody holding a phone waves
+//   with the OTHER hand, which is what a person does anyway.
+//
+//   And the mesh outlives the person on it. A slot changing hands with a
+//   delta still on its shoulder is the next occupant arriving with their arm
+//   in the air, so `clearArm` is called from the rebind as well as from the
+//   end of the greeting.
+const WAVE = {
+  // Where the upper arm points, in FIGURE space — +x is the way they face,
+  // +y is up, and their own left is −z. Mostly OUT to the side being greeted
+  // and only twenty-one degrees above horizontal, which is an elbow at about
+  // shoulder height.
+  //
+  // It was (0.40, 0.70, 0.59) first, which is forty-four degrees up, and
+  // photographed at five metres that is a hand raised in a classroom: the
+  // upper arm and the forearm end up thirty degrees apart, so the whole limb
+  // reads as one straight stick pointing at the sky. Dropping the shoulder to
+  // twenty-one degrees opens the elbow to fifty-one and is the difference
+  // between hailing a taxi and saying hello.
+  up: [0.34, 0.36, 0.87],
+  // And the forearm off that, near enough vertical. The two put the wrist
+  // 0.38 m above the shoulder: on a 1.38 m shoulder that is 1.76 m, which is
+  // over the top of a 1.70 m head — and being over the head is the whole of
+  // whether a wave reads across a promenade or is an elbow in a crowd. The
+  // hand ends up 0.34 m out to the side, well clear of it.
+  fore: [0.12, 0.95, 0.29],
+  // 2.2 Hz, about the rate a hand actually waves, and the rock is about the
+  // figure's own FORWARD axis so the whole arm swings from the shoulder
+  // rather than the wrist flapping on the end of a fixed one.
+  hz: 13.8, sweep: 0.22,
+};
+const _wS = new THREE.Vector3(), _wE = new THREE.Vector3();
+const _wW = new THREE.Vector3(), _wU = new THREE.Vector3();
+const _wF = new THREE.Vector3(), _wG = new THREE.Vector3();
+const _wT = new THREE.Vector3(), _wP = new THREE.Vector3();
+const _wX = new THREE.Vector3(1, 0, 0);
+const _wI = new THREE.Quaternion(), _wJ = new THREE.Quaternion();
+const _wA = new THREE.Quaternion(), _wB = new THREE.Quaternion();
+const _wID = new THREE.Quaternion();
+
+/** `aim` takes an axis and an angle; a solve hands back a quaternion. */
+function armAimQ(f, name, q) {
+  const s = Math.hypot(q.x, q.y, q.z);
+  f.aim(name, q.x, q.y, q.z, 2 * Math.atan2(s, q.w));
+}
+
+/** Give the arm back to the clip, and forget what was done to it. */
+function clearArm(f, rec) {
+  if (!rec || !rec.on) return;
+  rec.on = false;
+  rec.qa.identity();
+  rec.qb.identity();
+  // ONLY THE SIDE THAT WAS USED. Clearing both would delete the phone solve's
+  // own aims off the right arm of anybody reading one, and the symptom of that
+  // is twelve people whose hands drop off their phones the moment somebody
+  // near them says hello.
+  f.aim(rec.left ? 'armUL' : 'armUR', 0, 1, 0, 0);
+  f.aim(rec.left ? 'armLL' : 'armLR', 0, 1, 0, 0);
+}
+
+/**
+ * Put this figure's hand up, `g` of the way, on the given side.
+ *
+ * @param g     0 to 1, the weight — ramped from identity rather than from the
+ *              clip, so the arm rises and falls instead of snapping.
+ * @param left  which arm. See the phone note above.
+ */
+function greetArm(f, rec, g, left, t, seed) {
+  // A side that has changed under a running greeting is the old side still
+  // holding a delta nobody is going to take off it.
+  if (rec.on && rec.left !== left) clearArm(f, rec);
+  const nu = left ? 'armUL' : 'armUR', nl = left ? 'armLL' : 'armLR';
+  const iu = f.boneIndex(nu), il = f.boneIndex(nl);
+  const ih = f.boneIndex(left ? 'handL' : 'handR');
+  if (iu < 0 || il < 0 || ih < 0) return;
+  f.boneAt(iu, _wS); f.boneAt(il, _wE); f.boneAt(ih, _wW);
+  // What the clip is doing under the last solve. A bone's delta is laid on
+  // outside its parent's — `measured = qb · qa · clip` for the forearm — so
+  // the clip's own arm is the measurement with those taken back off it in the
+  // order they went on.
+  const ia = _wI.copy(rec.qa).invert(), ib = _wJ.copy(rec.qb).invert();
+  _wU.copy(_wE).sub(_wS).applyQuaternion(ia).normalize();
+  _wF.copy(_wW).sub(_wE).applyQuaternion(ib).applyQuaternion(ia).normalize();
+  // The target, on the correct side and rocking.
+  const sd = left ? -1 : 1;
+  const ph = Math.sin(t * WAVE.hz + seed * 6.283) * WAVE.sweep;
+  _wT.set(WAVE.up[0], WAVE.up[1], sd * WAVE.up[2]).normalize()
+    .applyAxisAngle(_wX, ph);
+  _wP.set(WAVE.fore[0], WAVE.fore[1], sd * WAVE.fore[2]).normalize()
+    .applyAxisAngle(_wX, ph);
+  // Two turns, each the minimal rotation that takes a bone's own direction
+  // where it has to go. The forearm's is measured AFTER the upper arm's,
+  // because an aim on a parent carries its children round with it.
+  _wA.setFromUnitVectors(_wU, _wT);
+  _wB.setFromUnitVectors(_wG.copy(_wF).applyQuaternion(_wA), _wP);
+  // Ramped from identity and not from the clip: at g = 1 both are exact, and
+  // below it the arm is part of the way to where it is going, which is what a
+  // hand coming up looks like.
+  rec.qa.copy(_wID).slerp(_wA, g);
+  rec.qb.copy(_wID).slerp(_wB, g);
+  armAimQ(f, nu, rec.qa);
+  armAimQ(f, nl, rec.qb);
+  rec.on = true;
+  rec.left = left;
+}
+
 /**
  * The same contract as `makeCrowd`, backed by one skinned figure per person.
  *
@@ -364,6 +507,13 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
   let drawn = 0;
   let last = -1;
   let ups = 0, downs = 0;
+  // What `greetArm` has done to each MESH, and it is per mesh and not per
+  // person for the reason `clearArm` gives: the delta lives on the bone and
+  // the bone outlives whoever is standing on it.
+  const waves = figs.map(() => ({
+    on: false, left: true,
+    qa: new THREE.Quaternion(), qb: new THREE.Quaternion(),
+  }));
 
   // What each pose is called over here. The crowd's `mode` is a body position
   // and a clip is a body position over time, so most of them land on `idle`:
@@ -380,12 +530,26 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
     lie: 'idle', wait: 'idle' };
   const SEATED = ['sit', 'sitback', 'sittable'];
   // What somebody standing about does that `idle` does not: a look off to one
-  // side and, less often, a wave. Both are one-shots in the bake and both are
-  // keyed from `IDLE_A` at either end — see BATHER_CLIPS in
-  // tools/blender/bathers_mh.py — so they drop into a loop of `idle` with
-  // nothing between them and it, which is exactly why they are the two that
-  // are usable here and `kneel` is not.
-  const BIZ = ['notice', 'notice', 'notice', 'wave'];
+  // side. It is a one-shot in the bake and it is keyed from `IDLE_A` at either
+  // end — see BATHER_CLIPS in tools/blender/bathers_mh.py — so it drops into a
+  // loop of `idle` with nothing between it and it, which is exactly why it is
+  // usable here and `kneel` is not.
+  //
+  // `wave` WAS IN THIS LIST and is not any more, for two reasons and either
+  // would have been enough.
+  //
+  // Which piece of business a figure does is fixed by their seed, so a quarter
+  // of everybody standing on this shore waved at nobody every half minute,
+  // forever — not one head in the frame turning to see it. A wave with nobody
+  // looking back is worse than no wave, and a wave that is aimed at somebody
+  // has to be asked for by whoever knows who that is: `stepGreet` in
+  // 43-jadrija.js, through `fg.cue` below.
+  //
+  // And the clip does not work. See the long note over `greetArm` at the top
+  // of this file: the bake flattens it, the arm comes up fifteen centimetres,
+  // and what a quarter of this beach was actually doing every half minute was
+  // nothing at all. The greeting solves its own arm instead.
+  const BIZ = ['notice'];
   // How often, in metres, a figure is re-posed. Posing one of these is
   // twenty-eight bones on the CPU and then a texture upload of the palette,
   // and the upload is the expensive half — it is a driver call per figure per
@@ -521,6 +685,14 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
     if (fg.rebind) {
       fg.rebind = false;
       f.aim('head', 0, 1, 0, 0);
+      // And the shoulders, which arrived with the greetings and are the same
+      // hazard the head has always been: an aim is a delta left standing on a
+      // MESH, and the mesh outlives whoever was on it. A slot handed over
+      // mid-greeting with a turned chest is the next occupant sitting there
+      // wrenched round at nothing until they happen to greet somebody
+      // themselves. Same argument as `dropHold` in 43-jadrija.js.
+      f.aim('chest', 0, 1, 0, 0);
+      clearArm(f, waves[i]);
       fg.aimed = false;
       fg.lag = 0;
       // `|| phaseOf(fg)` and not `|| 0`, which is what these two said. Three
@@ -539,6 +711,30 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
         f.state.prev = null;
       }
       fg.rebound = true;
+    }
+
+    // ── something somebody has asked them to do ──────────────────────────────
+    //
+    // `fg.cue` is a clip by name, written from outside — `stepGreet` in
+    // 43-jadrija.js, which is the half of a greeting that knows who is greeting
+    // whom. A cue and not a mode, because it is over in a second or two and
+    // then the person goes back to whatever they were doing: `next: want` is
+    // the whole of the going back.
+    //
+    // CLEARED WHETHER OR NOT IT WAS PLAYED, and that is not tidiness. A person
+    // on this beach is drawn by whichever tier is cheaper at the moment — see
+    // `assign` — so a cue can be written on somebody who is a blob and never
+    // reach a mesh at all. Left standing it would fire the next time they were
+    // promoted, which could be a minute later and two hundred metres down the
+    // shore, and what you would see is somebody waving at nobody. The
+    // scheduler clears it at the end of the greeting too; this is the other
+    // end of the same guarantee.
+    if (fg.cue) {
+      const nm = fg.cue;
+      fg.cue = null;
+      if (!midBiz(f) && f.clips && f.clips.includes(nm)) {
+        f.play(nm, { fade: 0.22, next: want });
+      }
     }
 
     // A piece of business, on this figure's own clock.
@@ -601,8 +797,31 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
     // walks the bone list by name to find the head and there are twenty-eight
     // of them, which is nothing once and is thirty-two lookups a frame if it
     // is asked unconditionally for a crowd that is not being bumped.
+    //
+    // AND THE SHOULDERS WITH IT, which they were not until the greetings went
+    // in. The instanced tier has carried its torso a third of the way round
+    // with the head since the bump landed — see the note at the foot of `pose`
+    // — and this tier had the neck and nothing else, which is the difference
+    // between somebody turning to look at you and a head on a spindle. It was
+    // survivable on a bump, where you are standing on their toes and the head
+    // is all you are looking at. It is not survivable on a greeting, because
+    // half the people greeting each other on this shore are sitting down and a
+    // seated figure that cannot turn its shoulders cannot turn at all.
+    //
+    // Split 0.30 / 0.70 and not 0.30 / 1.00: `aims` compose down the chain, so
+    // the head's own share is laid over a chest that has already gone 30 per
+    // cent of the way and the total at the eyes is the full `lookY`. Which is
+    // exactly what the instanced tier writes, and the two tiers draw the same
+    // people.
+    //
+    // `chest` and not `neck`, and that is not a matter of taste either: the
+    // phone solve owns `neck` — see `holdPhone` in 43-jadrija.js — and `aims`
+    // keeps ONE rotation per bone. Twelve people on this beach are holding a
+    // phone and every one of them can be greeted.
     if (fg.look || fg.aimed) {
-      f.aim('head', 0, 1, 0, fg.look ? fg.lookY * fg.look : 0);
+      const a = fg.look ? fg.lookY * fg.look : 0;
+      f.aim('head', 0, 1, 0, a * 0.70);
+      f.aim('chest', 0, 1, 0, a * 0.30);
       fg.aimed = !!fg.look;
     }
     // The pose, at a rate that falls off with distance — see POSE_NEAR. The
@@ -617,6 +836,18 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
     const every = d2 < nearSq ? 1 : d2 < midSq ? 3 : 8;
     fg.lag = (fg.lag || 0) + dt;
     if (fg.rebound || every === 1 || (frame + i) % every === 0) {
+      // The greeting arm, immediately before the update and nowhere else.
+      // `aim` writes a delta and `boneAt` reads the palette, and the palette
+      // is only rebuilt by the line below — so a solve on a frame the ladder
+      // skips would measure a pose that does not yet carry the last solve and
+      // take the delta off a second time. Which arm, and why the phone gets a
+      // say in it, is over `greetArm`.
+      if (fg.gArm > 0) {
+        greetArm(f, waves[i], fg.gArm, fg.phone ? true : !!fg.gArmL,
+          t, fg.seed);
+      } else {
+        clearArm(f, waves[i]);
+      }
       f.update(fg.lag);
       fg.lag = 0;
       fg.rebound = false;
@@ -1171,6 +1402,60 @@ function makeCrowd(scene, rig, cap) {
       skel.head.rotation.y = skel.head.rotation.y * (1 - w) + fg.lookY * w;
       skel.torso.rotation.y = skel.torso.rotation.y * (1 - w)
         + fg.lookY * 0.30 * w;
+    }
+
+    // ── and a hand up to whoever it is ────────────────────────────────────────
+    //
+    // The other half of a greeting, on the tier that has no clips. `fg.gArm`
+    // is the weight and `fg.gArmL` which side, both written by `stepGreet` in
+    // 43-jadrija.js — the same two figures, greeting each other, are drawn by
+    // whichever tier is cheaper at the moment and neither of them may be this
+    // one. The skinned tier answers the same two fields with the solve at the
+    // top of this file; this is what the same gesture looks like when the
+    // person is four pixels of tapered box.
+    //
+    // After the switch, for the reason the look above is: four of the six poses
+    // write the arms from their own clock and one of them — `stand` — has a
+    // piece of business that shakes a towel out with both of them.
+    //
+    // THE RAISE GOES IN `rotation.x` AND NOT IN `rotation.z`, and that is the
+    // one thing about this that is not obvious. Three.js composes XYZ as
+    // Rx·Ry·Rz, so `z` is applied FIRST and swings a hanging arm forward in
+    // the sagittal plane; the lateral `x` then acts on what is left of the
+    // vertical, which past forty degrees of z is almost nothing. Raising with
+    // z gives an arm pointing forward at the sea, which is a man reaching for
+    // something. `x` alone takes (0,−1,0) to (0, −cos x, −sin x), so 1.94 rad
+    // is twenty-one degrees ABOVE horizontal and 0.89 out to the figure's own
+    // left — an elbow at shoulder height, out to the side, which is the shape
+    // the eye reads as a wave from a silhouette four pixels wide. The 0.30 of
+    // z left in it is the forward lean that keeps it off the shoulder blade.
+    //
+    // Same numbers as `WAVE` up at the top of this file, which is the solved
+    // version the skinned tier uses. They are the same gesture at two levels
+    // of detail and they have to agree, because one person is drawn by both
+    // over the course of one walk down the promenade.
+    //
+    // The sweep is on the UPPER arm and not the elbow, which is the other
+    // thing that was got wrong first. `rotation.x` on the elbow swings the
+    // forearm about its own root and moves the hand by 0.055 m; on the
+    // shoulder it carries the forearm with it and moves the hand by 0.10. Half
+    // of that back on the elbow keeps the forearm from going along for the
+    // whole ride, which is a wave rather than a windscreen wiper.
+    if (fg.gArm > 0) {
+      const g = fg.gArm;
+      // 2.2 Hz. Off `t` and the seed rather than off the greeting's own clock,
+      // so that two people waving at each other are not waving in step.
+      const sw = Math.sin(t * 13.8 + fg.seed * 6.283) * 0.26;
+      const U = fg.gArmL ? skel.armLU : skel.armRU;
+      const L = fg.gArmL ? skel.armLL : skel.armRL;
+      const sd = fg.gArmL ? 1 : -1;
+      U.rotation.z = U.rotation.z * (1 - g) + 0.30 * g;
+      U.rotation.x = U.rotation.x * (1 - g) + sd * (1.94 + sw) * g;
+      L.rotation.z = L.rotation.z * (1 - g) + 0.18 * g;
+      L.rotation.x = L.rotation.x * (1 - g) + sd * (0.95 - sw * 0.5) * g;
+      // The shoulder rides up with the arm. Two centimetres, and it is the
+      // difference between an arm on a person and an arm on a hinge.
+      skel.torso.rotation.z -= g * 0.05;
     }
 
     skel.root.position.set(fg.x, fg.y, fg.z);
