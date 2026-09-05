@@ -1362,10 +1362,29 @@ function buildBrod(scene) {
         const raft = new THREE.Group();
         raft.position.set(rx, 0, rz);
         raft.rotation.y = yawOfX(ox, oz);
-        const shells = [boatProto(true), boatProto(false)];
+        // THE NEAR PROTO, and it should always have been. `boatProto` is four
+        // flat stations and a box for an engine, and its own note says so: it
+        // is "the right answer two hundred times over at a kilometre" and the
+        // wrong one from the water. This fleet is not at a kilometre. It is
+        // the thing you walk the length of on the way to the boat, at arm's
+        // length, and `1000150357` is a photograph taken from that walkway —
+        // so what was drawn was a row of white wedges where the frame has
+        // cabins, screens, pulpits and covers.
+        //
+        // It costs what the note over `boatNearProto` says it costs and no
+        // more: twelve hulls, once, at the one place on this shore anybody
+        // stands next to one.
+        const shells = [boatNearProto(true), boatNearProto(false)];
         // Bow a metre off the coping: the hull is six metres and its origin is
         // amidships, so the centre sits four metres out from the edge.
-        const v = -sgn * (A.w + 4.6);
+        //
+        // 3.9 and not 4.6. Measured off the render rather than off the
+        // arithmetic: at 4.6 the row stood a clear two metres off the stone
+        // with daylight under every bow, and `1000150357` has them close
+        // enough that the pulpits overhang the walkway. The near proto's stem
+        // reaches x 3.00 against the far one's 3.00 as well, so the change is
+        // the gap and not the hull.
+        const v = -sgn * (A.w + 3.9);
         // FRACT, not `% 1`. JavaScript's remainder keeps the sign of the
         // dividend, so a sine hash taken with `% 1` lands in (-1, 1) — which
         // put half the row on a scale of 0.54 and picked the open boat for
@@ -1373,11 +1392,17 @@ function buildBrod(scene) {
         // with three cabin boats in it, and the fleet in `1000150357` is the
         // other way round.
         const fr = (n) => { const x = Math.sin(n) * 43758.5453; return x - Math.floor(x); };
-        for (let k = 0; k < 12; k++) {
+        // Sixteen on 2.30 m centres and not twelve on 2.85. A 2.2 m boat on
+        // 2.85 m centres has 0.65 m of water between it and the next one,
+        // which from the walkway is a row of separate objects; the frame is a
+        // wall of hulls with fenders squeezed between them. 2.30 leaves 0.10 m
+        // — which is what a marina in August looks like — and the extra four
+        // fill the length the tighter spacing frees up.
+        for (let k = 0; k < 16; k++) {
           const h = fr(k * 12.9898);
           const j = fr(k * 78.233 + 2.1);
           const m = new THREE.Mesh(shells[h > 0.28 ? 0 : 1], mat);
-          m.position.set(5.5 + k * 2.85 + j * 0.35, 0, v);
+          m.position.set(5.5 + k * 2.30 + j * 0.22, 0, v);
           // Her bow points at the quay, which on this face is +z when the
           // ferry is on -z. A child whose local +X must land on the group's
           // ±z takes a quarter turn the matching way round.
