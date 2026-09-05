@@ -817,7 +817,7 @@ function updateCamera(dt) {
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
   trees, landmarks, alerts, roads, rail, props, airfield, jadrija, ground, birds, eject,
   mirror, mirrorP, swim, under, seabed, arms, mask, kites, ride, foil, chase, you,
-  brod, ao;
+  brod, ao, backlane, backlaneCars;
 /** You plus the three wingmen, as the birds see them. Built once, in boot(). */
 let birdFlush = [];
 
@@ -946,6 +946,13 @@ async function boot() {
   if (mirror && you) mirror.guests.push(you.mesh);
   if (mirrorP && you) mirrorP.guests.push(you.mesh);
   city = buildCity(scene);
+  // The back lane, and the plots along it. After the town rather than before
+  // it, because it is an overlay on ground the town builder has already had its
+  // say about — see src/46-backlane.js. Its blockers go straight into the
+  // locale's own list, which `47-ground.js` has not read yet.
+  backlane = buildBackLane(scene, jadrija, city);
+  backlaneCars = backlane && backlane.sites.length
+    ? await buildJadrijaCars(scene, backlane.sites) : null;
 
   await step(80, 'load.streets');
   airfield = buildAirfield(scene);
@@ -999,6 +1006,14 @@ async function boot() {
     // town's cars get, and a car is nine texels across in the far map.
     for (const m of jadrija.carMeshes || []) {
       shadow.cast(m, { instanced: true, near: true });
+    }
+  }
+  if (backlane) {
+    for (const m of backlane.casters) shadow.cast(m);
+    if (backlaneCars) {
+      for (const m of backlaneCars.meshes()) {
+        shadow.cast(m, { instanced: true, near: true });
+      }
     }
   }
 
@@ -6037,6 +6052,12 @@ window.__fr = {
         pyramid: city.forms[3], skillion: city.forms[4], round: city.forms[5] },
     } : null,
     roads: roads ? { runs: roads.drawn, km: Math.round(roads.km), tris: roads.tris } : null,
+    backlane: backlane ? {
+      tris: Math.round(backlane.tris), blockers: backlane.blockers,
+      dressed: backlane.dressed,
+      cars: backlaneCars ? backlaneCars.count : 0,
+      models: backlaneCars ? backlaneCars.counts : null,
+    } : null,
     field: airfield && airfield.site ? {
       at: [Math.round(airfield.site.x), Math.round(airfield.site.z)],
       hdgDeg: Math.round(airfield.site.yaw * 180 / Math.PI),
