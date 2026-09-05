@@ -1458,9 +1458,851 @@ async function buildVikendica(scene, field) {
     return [w[0], w[2]];
   };
 
+  // ── the fly ────────────────────────────────────────────────────────────────
+  /**
+   * One housefly in the big room, and the whole of it is behaviour.
+   *
+   * The mesh cannot help. Seven millimetres is four pixels across from two
+   * metres, so nothing about its shape is going to say "fly" — what says fly
+   * is how it moves, and a fly moves like nothing else in this game:
+   *
+   *   STRAIGHT, THEN INSTANTLY NOT. A housefly holds a heading for one to four
+   *      tenths of a second and then changes it in about thirty milliseconds
+   *      with no arc in it at all. Those are its saccades and they are the
+   *      whole tell. Anything that eases from one heading into the next is a
+   *      bee or a moth and no amount of size or speed will save it afterwards
+   *      — which is why the heading below is a step function with a 30 ms ramp
+   *      on it rather than a steered velocity with a turn rate.
+   *   IT SITS. Most of a fly's day is spent still. Landing, sitting for four to
+   *      twenty seconds, grooming, and going again is not a garnish on the
+   *      flying — it is the larger half of the animal, and something that
+   *      never lands is a mote of dust on the lens.
+   *   THE CEILING WINS. Given the choice it goes up, and it walks about up
+   *      there upside down, which nothing else in a room does.
+   *   LOOPS, NOT ERRANDS. Its track round a room is a loose circuit that keeps
+   *      returning to the same few places rather than a series of crossings,
+   *      so a run of saccades here all turn the same way before the bias flips.
+   *   THE LIGHT. The terrace doors are by a long way the brightest thing in
+   *      this flat, and a fly in this room goes to the window.
+   *
+   * The turns are `Math.random()` at frame rate and that is deliberate. RULE 4
+   * — never a draw from the world's own stream — is about the BUILD, which the
+   * census is the checksum of. Where a fly goes next is not part of the world;
+   * it is part of the afternoon, and it should be different every time you
+   * walk in.
+   */
+  const FLY = {
+    // The air it uses, in the house's own metres — the big room's inner faces
+    // pulled in far enough to clear everything that stands in it above head
+    // height. The room is x −0.74…3.19 by z −0.635…3.665 under a 5.30 ceiling;
+    // 4.16 is over the top corner of the television at 4.09, 5.13 is under the
+    // lampshade over the sofa, which hangs to 5.16, and the west end starts at
+    // −0.20 because west of that the fridge stands 1.86 m off the floor and
+    // its case tops out at 4.76, squarely in the band. The plan sheets and the
+    // fish on the spine stand 16 mm proud of z −0.635, so −0.48 is a hand's
+    // width off them.
+    box: { x0: -0.20, x1: 3.03, z0: -0.48, z1: 3.50, y0: 4.16, y1: 5.13 },
+
+    // One straight segment in seconds, and how far the saccade at the end of
+    // it turns, in radians. A housefly holds a heading for one to four tenths
+    // and then changes it by something between a quarter turn and a third of
+    // one.
+    seg: [0.10, 0.42],
+    turn: [0.60, 2.00],
+    // And how long that turn takes. THIRTY MILLISECONDS, which is the one
+    // number this whole thing stands on: at 0.03 the track is a polygon and
+    // reads as a fly, at 0.20 it is a smooth ribbon and reads as a bumblebee,
+    // and there is nothing in between that reads as either.
+    snap: 0.030,
+    speed: [0.55, 1.35],       // m/s, and it steps at the saccade as well
+
+    // How long it stays up before it wants somewhere to sit, and how long it
+    // sits. Four seconds in the air against ten on the plaster is about the
+    // ratio you actually watch.
+    air: [2.4, 9.0],
+    rest: [3.5, 18.0],
+    land: 0.16,                // s, the flare and the roll on to the surface
+    off: 0.14,                 // s, the jump off it
+
+    // Walking about where it has landed, which is most of what a sitting fly
+    // does that is visible: a centimetre a second, in bursts, with a turn on
+    // the spot at the start of each.
+    step: 0.011,
+    walk: [0.35, 1.60],
+    still: [0.9, 3.4],
+
+    // Where the body rides with the feet down: the legs are 2.7 mm long and
+    // drop 40 degrees off a pivot 0.8 mm under the thorax, so a standing fly
+    // is 2.1 mm clear of the surface.
+    stand: 0.0021,
+
+    hear: 6.5,                 // m — the room, and not a metre past its walls
+  };
+
+  /**
+   * The few places it goes back to, which is what a fly's day in a room is.
+   *
+   * Each is a patch of a real surface in the house's own metres with the
+   * outward normal of that surface, and every one of them was read off
+   * tools/blender/vikendica.py rather than eyeballed, because a fly sitting
+   * two centimetres inside the plaster is the one way this can look broken
+   * from close up.
+   *
+   * The weights are the argument. The ceiling gets five because that is where
+   * a housefly is when you look for it; the two panes of the terrace door get
+   * three between them because a fly in a room goes to the light; the long
+   * clear stretch of the east wall gets two; and the three horizontal surfaces
+   * a fly will actually stand on — the plastic desk, the low table and the top
+   * of the television cabinet — get one each.
+   */
+  const PERCH = [
+    { k: 'ceiling', w: 5, n: [0, -1, 0], y: 5.30,
+      x: [-0.12, 2.96], z: [-0.42, 3.46] },
+    // The two glazed leaves of the 220 opening. Their inner face is at 3.758
+    // and the mullion between them stands 35 mm proud of it, so they are two
+    // patches and not one. High up them, because that is where a fly on a
+    // window is.
+    { k: 'window', w: 1.5, n: [0, 0, -1], z: 3.758,
+      x: [0.66, 1.53], y: [4.10, 4.88] },
+    { k: 'window', w: 1.5, n: [0, 0, -1], z: 3.758,
+      x: [1.76, 2.62], y: [4.10, 4.88] },
+    // The east wall between the front door and the terrace, which is the one
+    // long stretch of plaster in this room with nothing standing against it.
+    { k: 'wall', w: 2, n: [-1, 0, 0], x: 3.19,
+      z: [1.15, 3.28], y: [3.95, 5.10] },
+    // The white plastic garden table that is the desk, west of the laptop.
+    { k: 'desk', w: 1, n: [0, 1, 0], y: 3.640,
+      x: [0.96, 1.12], z: [2.52, 3.18] },
+    // The low round table beside the armchair, inside its 0.32 rim and east of
+    // the little box that stands on it.
+    { k: 'table', w: 1, n: [0, 1, 0], y: 3.340,
+      x: [0.62, 0.74], z: [1.84, 2.16] },
+    // And the cabinet top in front of the set, between the screen and the edge.
+    { k: 'tv', w: 1, n: [0, 1, 0], y: 3.560,
+      x: [-0.10, 0.44], z: [3.26, 3.42] },
+  ];
+
+  // The four places its circuits are centred on, which is the other half of
+  // "it comes back to the same few places": under the ceiling light over the
+  // sofa, in front of the terrace doors, over the desk, and down the west end
+  // over the television. The second is drawn twice as often as the others for
+  // the same reason the window perches are weighted the way they are — a room
+  // with a fly in it has the fly at the window.
+  const HAUNT = [
+    [1.35, 4.80, 0.60], [1.75, 4.62, 3.00], [1.75, 4.62, 3.00],
+    [1.15, 4.92, 2.05], [0.30, 4.70, 2.55],
+  ];
+
+  // The three pairs of legs, standing and flying, as (sweep, droop) in radians
+  // per row — front, middle, hind. Sweep turns the leg about the body's up
+  // axis, droop drops it below the body, and the left side is the mirror.
+  //
+  // A fly does not fly with its feet down. The front pair comes up under the
+  // head, the middle pair tucks and the hind pair trails; a fly crossing a
+  // room in the standing stance is the single thing that most clearly reads as
+  // a model of a fly rather than a fly, because six legs hanging down is what
+  // a dead one on a windowsill looks like.
+  const LEG_STAND = [[-0.85, -0.70], [-1.75, -0.70], [-2.45, -0.70]];
+  const LEG_AIR = [[-0.60, 0.42], [-2.30, -0.22], [-2.80, -0.45]];
+
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const pick = (a) => a[Math.min(a.length - 1, Math.floor(Math.random() * a.length))];
+  const wrapPi = (a) => {
+    let v = a;
+    while (v > Math.PI) v -= TAU;
+    while (v < -Math.PI) v += TAU;
+    return v;
+  };
+
+  /**
+   * The lid over the room, which the renovation moves.
+   *
+   * With the gable that is there it is the 5.30 slab over the whole plan. With
+   * the mezzanine on there is no slab: the deck's soffit is at 5.29 over the
+   * north two thirds — DECK less the 160 mm its joists and boards take — and
+   * the south third is open to a ridge four metres up, where a fly walking
+   * upside down would be walking on nothing. So a ceiling perch is refused
+   * there rather than faked.
+   */
+  const loftOn = () => !!(parts.loft && parts.loft.visible);
+  const ceilY = () => (loftOn() ? plan.deck - 0.16 : plan.floor + plan.clear);
+
+  // The one hard stop, and it is a net rather than a rule: `saccade` keeps the
+  // fly inside `FLY.box` and this catches the frames around a landing and a
+  // take-off, where it is legitimately outside it — a fly leaving the ceiling
+  // starts 17 cm above the box's own lid.
+  //
+  // Every bound is a real surface less the 2.1 mm a standing fly rides at, and
+  // not a round number with slack in it. It was 3.77 on the z side, which is
+  // 12 mm past the inner face of the terrace glazing, and a run of ten minutes
+  // found the approach jitter using every one of those millimetres — a fly
+  // with a third of itself inside a pane, for a frame at a time.
+  const HARD = { x0: -0.66, x1: 3.188, z0: -0.56, z1: 3.756, y0: 3.30 };
+
+  const flyRig = new THREE.Group();
+  const flyWing = [new THREE.Group(), new THREE.Group()];
+  const flyLeg = [];
+  // The wings, and they are nearly not there. Emissive was 0.34 and specular
+  // 0.30 — a white sheet lit from inside — and against the beech of the table
+  // they came out as two solid cream wedges, which is a paper aeroplane and
+  // not an insect. A wing is a membrane: it takes a catch-light off one edge
+  // and otherwise you see the room through it. `uOpacity` is animated in
+  // `poseFly`, thinner in the air than folded.
+  const flyWingMat = solidMaterial(new THREE.Color(0.90, 0.91, 0.93), {
+    spec: 0.16, specPower: 90, emissive: 0.10, vcol: false,
+    opacity: 0.22, transparent: true, depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  {
+    // One unit sphere shared by all four lumps of it, scaled per part. A fly
+    // is a chain of three ellipsoids and two enormous eyes and there is no
+    // reading distance at which more than that is visible.
+    const ball = new THREE.SphereGeometry(1, 8, 6);
+    const dark = solidMaterial(new THREE.Color(0.105, 0.098, 0.090), {
+      // Hard and shiny, which is the whole of what says INSECT at four pixels:
+      // a fly is a chitinous thing with a catch-light on it and a matt black
+      // speck of the same size is a piece of grit.
+      spec: 0.55, specPower: 70, emissive: VIK.glow * 1.5, vcol: false,
+    });
+    // And a lighter grey for the thorax, which is the one piece of a housefly's
+    // colouring that survives being four pixels wide: the thorax is pale grey
+    // with four black stripes down it and the abdomen is nearly black, so a fly
+    // is light at the shoulders and dark at the tail. One material apart is
+    // enough to carry that; the stripes are not, at any distance.
+    const grey = solidMaterial(new THREE.Color(0.245, 0.238, 0.225), {
+      spec: 0.42, specPower: 55, emissive: VIK.glow * 1.5, vcol: false,
+    });
+    const eye = solidMaterial(new THREE.Color(0.330, 0.105, 0.075), {
+      spec: 0.60, specPower: 80, emissive: VIK.glow * 1.6, vcol: false,
+    });
+    // Model axes: +X is the way it is pointing, +Y is its back.
+    //
+    // Musca domestica off a ruler: 7.3 mm from the front of the eyes to the
+    // tip of the abdomen, 2.4 across the thorax, 15 across the wings — and it
+    // is modelled at that and not a millimetre over. There is no reading
+    // distance at which a bigger fly would help: close enough to see it, the
+    // size is the first thing that would be wrong.
+    const lump = (mat, sx, sy, sz, px, py) => {
+      const m = new THREE.Mesh(ball, mat);
+      m.scale.set(sx, sy, sz);
+      m.position.set(px, py || 0, 0);
+      m.castShadow = false; m.receiveShadow = false;
+      flyRig.add(m);
+      return m;
+    };
+    lump(grey, 0.00140, 0.00115, 0.00120, 0.00040);        // thorax
+    lump(dark, 0.00195, 0.00115, 0.00105, -0.00235, -0.00015);  // abdomen
+    lump(grey, 0.00080, 0.00085, 0.00092, 0.00205);        // head
+    lump(eye, 0.00062, 0.00080, 0.00098, 0.00235);         // and it is all eye
+
+    // The wings, on pivots at their roots so the sweep can be animated: out at
+    // 25 degrees in the air, folded back over the abdomen the moment it lands.
+    // No flapping, and there could not be — 190 beats a second against 60
+    // frames is nine strokes a frame, so what a camera sees is a smear, and a
+    // pale translucent sheet held still IS that smear.
+    //
+    // Shaped and not a rectangle. A translucent rectangle over a contrasty
+    // background is a rectangle — against the channel through the terrace
+    // glass the folded pair read as a pale sticky label on the abdomen. A
+    // wing is a rounded blade, widest two thirds of the way out, and five
+    // segments a curve is all it takes to say so at this size.
+    const L = 0.0062, WD = 0.00120;
+    const blade = new THREE.Shape();
+    blade.moveTo(0, -0.00028);
+    blade.lineTo(0, 0.00030);
+    blade.quadraticCurveTo(-L * 0.35, WD, -L * 0.72, WD * 0.92);
+    blade.quadraticCurveTo(-L * 0.98, WD * 0.55, -L, 0.0);
+    blade.quadraticCurveTo(-L * 0.92, -WD * 0.62, -L * 0.55, -WD * 0.80);
+    blade.quadraticCurveTo(-L * 0.22, -WD * 0.60, 0, -0.00028);
+    const vane = new THREE.ShapeGeometry(blade, 5);
+    vane.rotateX(-Math.PI / 2);
+    for (let i = 0; i < 2; i++) {
+      const s = i ? 1 : -1;
+      // The two roots are 0.06 mm apart in height, which is RULE 5 and nothing
+      // else: folded, the pair lie one over the other down the abdomen, and
+      // two coplanar sheets are two coplanar sheets even when they are 6 mm
+      // long and drawn without depth.
+      flyWing[i].position.set(0.00060, 0.00105 + s * 0.00003, s * 0.00075);
+      const m = new THREE.Mesh(vane, flyWingMat);
+      m.castShadow = false; m.receiveShadow = false;
+      m.renderOrder = 2;
+      flyWing[i].add(m);
+      flyRig.add(flyWing[i]);
+    }
+
+    // Six legs, on pivots, splayed down and out — see LEG_STAND. Sub-pixel at
+    // any honest distance and worth the twelve triangles anyway: a landed fly
+    // is a squat thing standing on a fringe, and without them it is a bean.
+    const shank = new THREE.BoxGeometry(0.0027, 0.00022, 0.00022);
+    shank.translate(0.00135, 0, 0);
+    for (let i = 0; i < 6; i++) {
+      const s = i & 1 ? 1 : -1;
+      const row = i >> 1;
+      const g = new THREE.Group();
+      g.position.set([0.00115, -0.00015, -0.00145][row], -0.00080, s * 0.00085);
+      g.rotation.set(0, s * LEG_STAND[row][0], LEG_STAND[row][1]);
+      const m = new THREE.Mesh(shank, dark);
+      m.castShadow = false; m.receiveShadow = false;
+      g.add(m);
+      flyRig.add(g);
+      flyLeg.push(g);
+    }
+    root.add(flyRig);
+  }
+
+  /**
+   * Where it is, what it is doing, and what it is going to do next.
+   *
+   * `mode` is one of: `cruise` (up, patrolling), `in` (homing on a perch),
+   * `down` (the last 14 cm and the roll on to the surface), `sit` (still, or
+   * walking about, or grooming) and `off` (the jump).
+   */
+  const F = {
+    p: new THREE.Vector3(1.4, 4.85, 1.1),
+    yaw: 0.4, pitch: 0,
+    yaw0: 0.4, yawD: 0, pitch0: 0, pitchD: 0,
+    turnT: 0,                  // what is left of the 30 ms
+    speed: 0.9, speed0: 0.9, speedD: 0,
+    up: new THREE.Vector3(0, 1, 0),
+    upFrom: new THREE.Vector3(0, 1, 0),
+    mode: 'cruise', seg: 0, hold: 0, u: 0,
+    // Where it is going: `aimSurf` is the point its feet will be on and `aim`
+    // is 14 cm off it along the normal, which is where the approach ends and
+    // the flare begins.
+    perch: null, aim: new THREE.Vector3(), aimSurf: new THREE.Vector3(),
+    // Where the flare starts from, which is wherever the approach ended and
+    // not the standoff point: the two are up to 5 cm apart, and 5 cm is seven
+    // body lengths to snap through on one frame.
+    from: new THREE.Vector3(),
+    loop: { x: 1.3, y: 4.78, z: 0.70, dir: 1, left: 6 },
+    doing: 'still', act: 0, rock: 0, wig: 0,
+    buzz: 0, hz: 1,
+    held: false, far: true,
+  };
+  const fwd = new THREE.Vector3(1, 0, 0);
+  const side = new THREE.Vector3();
+  const upN = new THREE.Vector3();
+  const aimV = new THREE.Vector3();
+  const basis = new THREE.Matrix4();
+  const camRight = new THREE.Vector3();
+
+  /**
+   * Where the fly is in world metres.
+   *
+   * By hand rather than through `world()`, and the difference is not rounding.
+   * `world()` goes out through `field.toWorld`, which follows the traced
+   * shoreline — so a point 3.7 m along the house comes back a centimetre or so
+   * from where the house's own rigid transform puts it, because the house is
+   * straight and the shore is not. Everything else in this file can use either;
+   * this one cannot, because it is what the debug camera aims at and a
+   * centimetre at 30 cm is two degrees off the middle of the frame.
+   *
+   * `root.rotation.y = yaw` sends local +X to (cos yaw, −sin yaw).
+   */
+  const flyWorld = () => {
+    const c = Math.cos(yaw), s = Math.sin(yaw);
+    return [root.position.x + F.p.x * c + F.p.z * s,
+      base + F.p.y,
+      root.position.z - F.p.x * s + F.p.z * c];
+  };
+
+  const headingTo = (dx, dz) => Math.atan2(dz, dx);
+  const setHeading = (y, p, sp) => {
+    F.yaw0 = F.yaw; F.yawD = wrapPi(y - F.yaw);
+    F.pitch0 = F.pitch; F.pitchD = clamp(p, -1.1, 1.1) - F.pitch;
+    F.speed0 = F.speed; F.speedD = sp - F.speed;
+    F.turnT = FLY.snap;
+  };
+  const headOf = (v, y, p) => {
+    const c = Math.cos(p);
+    v.set(c * Math.cos(y), Math.sin(p), c * Math.sin(y));
+  };
+
+  /**
+   * One saccade: the whole animal, in twenty lines.
+   *
+   * The new heading is the old one turned the way this circuit is turning, by
+   * a random amount, pulled a little toward whatever the fly is currently
+   * orbiting — and then thrown away and drawn again if it would put the fly
+   * through a wall within a third of a second. Eight tries, and the fallback
+   * is the middle of the room, which is what a fly that has run out of ideas
+   * in a corner does anyway.
+   *
+   * The wall test is what makes this look deliberate rather than random. A
+   * real fly saccades BECAUSE the wall is expanding in its eye, so a turn that
+   * happens at a wall and points back into the room is not a cheat — it is the
+   * mechanism.
+   */
+  function saccade(bias = 0.28) {
+    const B = FLY.box;
+    const gx = F.loop.x - F.p.x, gy = F.loop.y - F.p.y, gz = F.loop.z - F.p.z;
+    const home = headingTo(gx, gz);
+    const homeP = clamp(gy * 1.2, -0.55, 0.55);
+    let best = null;
+    for (let i = 0; i < 8; i++) {
+      const y = wrapPi(F.yaw + F.loop.dir * rnd(FLY.turn[0], FLY.turn[1])
+        + (i ? rnd(-0.9, 0.9) : 0));
+      // Pulled toward the circuit's own centre, gently. Hard, and it is a
+      // moth going round a bulb; not at all, and it is a random walk that
+      // ends up in a corner and stays there.
+      const yb = F.yaw + wrapPi(y - F.yaw) * (1 - bias)
+        + wrapPi(home - F.yaw) * bias;
+      const p = clamp(rnd(-0.30, 0.30) + homeP * 0.5, -0.75, 0.75);
+      const sp = rnd(FLY.speed[0], FLY.speed[1]);
+      headOf(side, yb, p);
+      const ax = F.p.x + side.x * sp * 0.34;
+      const ay = F.p.y + side.y * sp * 0.34;
+      const az = F.p.z + side.z * sp * 0.34;
+      if (ax > B.x0 && ax < B.x1 && az > B.z0 && az < B.z1
+        && ay > B.y0 && ay < B.y1) { best = [yb, p, sp]; break; }
+    }
+    if (!best) {
+      const cx = (B.x0 + B.x1) / 2, cy = (B.y0 + B.y1) / 2, cz = (B.z0 + B.z1) / 2;
+      best = [headingTo(cx - F.p.x, cz - F.p.z),
+        clamp((cy - F.p.y) * 1.5, -0.7, 0.7), rnd(FLY.speed[0], FLY.speed[1])];
+    }
+    setHeading(best[0], best[1], best[2]);
+    F.seg = rnd(FLY.seg[0], FLY.seg[1]);
+    // And the circuit itself: a run of same-way turns, then a flip and a new
+    // centre. Without this the track is a random walk with no shape in it, and
+    // a fly's track has a shape — it is why "there is a fly going round the
+    // room" is a sentence people say.
+    if (--F.loop.left <= 0) {
+      F.loop.dir = -F.loop.dir;
+      F.loop.left = 4 + Math.floor(Math.random() * 6);
+      const h = pick(HAUNT);
+      F.loop.x = clamp(h[0] + rnd(-0.50, 0.50), FLY.box.x0 + 0.1, FLY.box.x1 - 0.1);
+      F.loop.y = clamp(h[1] + rnd(-0.25, 0.25), FLY.box.y0 + 0.1, FLY.box.y1 - 0.1);
+      F.loop.z = clamp(h[2] + rnd(-0.50, 0.50), FLY.box.z0 + 0.1, FLY.box.z1 - 0.1);
+    }
+  }
+
+  /**
+   * A landing place: which perch, and the point on it the feet go.
+   *
+   * `kind` picks one by name for the debug hook; without it the draw is the
+   * weighted one, which is where "the ceiling is its favourite place" actually
+   * lives.
+   *
+   * The point comes back stood off along the surface's normal by `FLY.stand`,
+   * which is where the body rides when the feet are down — the legs are 2.7 mm
+   * long and drop 40 degrees, so the underside of a fly is a little over two
+   * millimetres clear of whatever it is standing on. Landing the body ON the
+   * plane instead buries half of it, and it is a third of the animal's own
+   * width, so it shows.
+   */
+  function choosePerch(kind) {
+    const usable = (s) => !kind || s.k === kind;
+    let tot = 0;
+    for (const s of PERCH) if (usable(s)) tot += s.w;
+    let r = Math.random() * tot;
+    let got = null;
+    for (const s of PERCH) {
+      if (!usable(s)) continue;
+      got = s;
+      r -= s.w;
+      if (r <= 0) break;
+    }
+    if (!got) got = PERCH[0];
+    const at = new THREE.Vector3(s3(got, 'x'), s3(got, 'y'), s3(got, 'z'));
+    if (got.k === 'ceiling') {
+      at.y = ceilY();
+      // With the mezzanine on there is no 5.30 slab: the deck's soffit is the
+      // ceiling over the north two thirds and the south third is open to a
+      // ridge four metres up, where there is nothing to stand on. So the patch
+      // shrinks to what is actually over the room.
+      if (loftOn()) at.z = Math.min(at.z, 1.05);
+    }
+    at.x += got.n[0] * FLY.stand;
+    at.y += got.n[1] * FLY.stand;
+    at.z += got.n[2] * FLY.stand;
+    return { site: got, at };
+  }
+  // A coordinate of a perch: the fixed one where the surface fixes it, a draw
+  // across the patch where it does not.
+  function s3(s, k) {
+    const v = s[k];
+    return Array.isArray(v) ? rnd(v[0], v[1]) : v;
+  }
+
+  /** Put it on a perch, this instant, facing anywhere. */
+  function alight(hit) {
+    const n = hit.site.n;
+    F.p.copy(hit.at);
+    F.up.set(n[0], n[1], n[2]);
+    F.upFrom.copy(F.up);
+    F.perch = hit.site;
+    F.mode = 'sit';
+    F.hold = rnd(FLY.rest[0], FLY.rest[1]);
+    F.doing = 'still';
+    F.act = rnd(FLY.still[0], FLY.still[1]);
+    F.buzz = 0;
+    // Facing along the surface, which for a wall or the window means the yaw
+    // is measured in a different plane — but the yaw is only ever used to make
+    // `fwd`, and `fwd` is re-projected into the surface below, so one number
+    // covers all three cases.
+    F.yaw = rnd(-Math.PI, Math.PI); F.pitch = 0; F.turnT = 0;
+    F.speed = 0; F.speed0 = 0; F.speedD = 0;
+  }
+
+  /**
+   * Sitting: still, walking, or grooming, and it is the grooming that sells it.
+   *
+   * A fly at rest is not a static prop. It rubs its front feet together, it
+   * wipes its head with them, it scrapes its wings with the back pair, and
+   * between bouts it walks a couple of centimetres and stops again. From
+   * across a room none of the legs is resolvable and it does not matter: what
+   * you see is a speck that twitches, walks a little way and twitches again,
+   * and that is unmistakably an insect and not a mark on the plaster.
+   */
+  function stepSit(dt) {
+    F.act -= dt;
+    if (F.act <= 0) {
+      // Three quarters of the time it grooms or sits, a quarter it walks —
+      // and a walk always starts with a turn on the spot, because a fly does
+      // not sidle.
+      const r = Math.random();
+      if (r < 0.34) {
+        F.doing = 'walk';
+        F.act = rnd(FLY.walk[0], FLY.walk[1]);
+        F.yaw = wrapPi(F.yaw + rnd(-2.4, 2.4));
+      } else if (r < 0.78) {
+        F.doing = Math.random() < 0.62 ? 'front' : 'back';
+        F.act = rnd(0.55, 2.10);
+      } else {
+        F.doing = 'still';
+        F.act = rnd(FLY.still[0], FLY.still[1]);
+      }
+    }
+    if (F.doing === 'walk') {
+      headOf(fwd, F.yaw, 0);
+      // Projected into the surface, so the same yaw walks it across a ceiling,
+      // a wall or a table without three cases.
+      fwd.addScaledVector(F.up, -fwd.dot(F.up));
+      if (fwd.lengthSq() < 1e-6) fwd.set(1, 0, 0);
+      fwd.normalize();
+      const s = FLY.step * dt;
+      const nx = F.p.x + fwd.x * s, ny = F.p.y + fwd.y * s, nz = F.p.z + fwd.z * s;
+      const P = F.perch;
+      const ok = (v, r0) => !Array.isArray(r0) || (v > r0[0] && v < r0[1]);
+      if (P && ok(nx, P.x) && ok(ny, P.y) && ok(nz, P.z)) {
+        F.p.set(nx, ny, nz);
+      } else {
+        // It has reached the edge of its patch, so it turns round, which is
+        // what a fly walking off the edge of a picture frame does.
+        F.yaw = wrapPi(F.yaw + rnd(2.0, 4.3));
+      }
+      F.rock += (0.35 - F.rock) * Math.min(1, dt * 10);
+      F.wig = 0;
+    } else if (F.doing === 'still') {
+      F.rock += (0 - F.rock) * Math.min(1, dt * 8);
+      F.wig = 0;
+    } else {
+      // A groom is fast — six or seven strokes a second — and the body rocks
+      // with it, which is the half of it that carries across a room.
+      F.wig = F.doing === 'front' ? 1 : -1;
+      F.rock += (1 - F.rock) * Math.min(1, dt * 14);
+    }
+    F.hold -= dt;
+    if (F.hold <= 0) {
+      F.mode = 'off';
+      F.u = 0;
+      F.upFrom.copy(F.up);
+      F.doing = 'still'; F.wig = 0;
+      // Straight up off the surface and then away: the take-off heading is
+      // whatever the room offers, and the first saccade a hundred
+      // milliseconds later will have an opinion about it.
+      F.yaw = rnd(-Math.PI, Math.PI);
+      F.pitch = 0; F.turnT = 0;
+      F.speed = 0.20; F.speed0 = 0.20; F.speedD = 0;
+    }
+  }
+
+  /** Wings out or wings folded, and the legs doing whatever they are doing. */
+  function poseFly(dt) {
+    const air = F.mode !== 'sit';
+    // 25 degrees out and swept back in the air, folded down the abdomen on the
+    // ground. Fast, because a fly folds its wings the instant it is down.
+    const wantS = air ? 0.42 : 0.09;
+    const wantT = air ? -0.12 : 0.02;
+    for (let i = 0; i < 2; i++) {
+      const s = i ? 1 : -1;
+      const w = flyWing[i];
+      w.rotation.y += (s * wantS - w.rotation.y) * Math.min(1, dt * 16);
+      w.rotation.z += (wantT - w.rotation.z) * Math.min(1, dt * 16);
+    }
+    // Thinner in the air than on the ground, which is what a smear is: two
+    // wings beating 190 times a second are not two sheets, they are a haze
+    // with the room showing through. Folded, they are actual membrane over
+    // the abdomen and there is more of them to see.
+    flyWingMat.uniforms.uOpacity.value = air ? 0.20 : 0.34;
+    // The front pair rubbing, or the back pair over the wings. `wig` says
+    // which, `act` runs the clock, and outside a bout everything returns to
+    // the stance.
+    const t = performance.now() / 1000;
+    const beat = Math.sin(t * 42) * (F.wig ? 1 : 0);
+    for (let i = 0; i < 6; i++) {
+      const s = i & 1 ? 1 : -1;
+      const row = i >> 1;
+      const [sweep, droop] = air ? LEG_AIR[row] : LEG_STAND[row];
+      const on = !air && ((F.wig > 0 && row === 0) || (F.wig < 0 && row === 2));
+      const g = flyLeg[i];
+      const wantY = s * sweep + (on ? s * 0.55 * beat : 0);
+      const wantZ = droop + (on ? 0.40 * beat : 0);
+      g.rotation.y += (wantY - g.rotation.y) * Math.min(1, dt * 20);
+      g.rotation.z += (wantZ - g.rotation.z) * Math.min(1, dt * 20);
+    }
+  }
+
+  /**
+   * A frame of the fly.
+   *
+   * `who` is the person, in world metres — the ear the buzz arrives at.
+   */
+  function stepFly(dt, who) {
+    if (!who) { poseFly(dt); return; }
+    // What it costs when nobody is in the flat: two subtractions. The house is
+    // 2 km from the origin and this thing is 7 mm across, so there is no
+    // distance at which it is worth stepping and cannot be seen.
+    const dx = who.x - root.position.x, dz = who.z - root.position.z;
+    const near = dx * dx + dz * dz < 30 * 30;
+    if (!near) {
+      if (!F.far) { F.far = true; flyRig.visible = false; if (audio) audio.fly(0); }
+      return;
+    }
+    if (F.far) { F.far = false; flyRig.visible = true; }
+
+    const d = Math.min(dt, 0.05);
+    // `hold` freezes the animal and NOT the frame: the mesh is still placed
+    // where the state says it is, and the buzz still measured off it. It stops
+    // early once — the first version returned before the pose — and the fly
+    // then stayed drawn wherever it had last been stepped while `go()` moved
+    // it somewhere else, which is a debug handle that lies.
+    if (F.held) { poseRig(d, who); return; }
+    switch (F.mode) {
+      case 'cruise': {
+        F.seg -= d;
+        // The wall, which triggers a saccade of its own — and this is not a
+        // cheat bolted on to a wander. A real fly saccades BECAUSE the wall is
+        // expanding in its eye; a turn that happens at a wall and points back
+        // into the room is the mechanism, not a correction to it.
+        headOf(fwd, F.yaw, F.pitch);
+        const B = FLY.box;
+        const ax = F.p.x + fwd.x * F.speed * 0.22;
+        const ay = F.p.y + fwd.y * F.speed * 0.22;
+        const az = F.p.z + fwd.z * F.speed * 0.22;
+        const out = ax < B.x0 || ax > B.x1 || az < B.z0 || az > B.z1
+          || ay < B.y0 || ay > B.y1;
+        if (F.seg <= 0 || out) saccade(out ? 0.55 : 0.28);
+        break;
+      }
+      case 'in': {
+        // Homing: the same saccades, shorter, aimed mostly at a point 14 cm
+        // off the surface. It is not a glide path — a fly arrives at a ceiling
+        // in the same jerks it crossed the room in.
+        F.seg -= d;
+        if (F.seg <= 0) {
+          aimV.subVectors(F.aim, F.p);
+          const len = aimV.length() || 1;
+          // Slowing into it, but not creeping: at 2.2 times the distance
+          // remaining the last twenty centimetres took three seconds, and a
+          // fly does not hover its way on to a ceiling — it arrives.
+          setHeading(headingTo(aimV.x, aimV.z) + rnd(-0.32, 0.32),
+            Math.asin(clamp(aimV.y / len, -1, 1)) + rnd(-0.22, 0.22),
+            clamp(len * 2.6, 0.38, 1.05));
+          F.seg = rnd(0.07, 0.20);
+        }
+        // Close enough to flare — or long enough trying. The timeout has
+        // never fired in ten minutes of recorded flying, and it is here so
+        // that a heading the jitter got badly wrong cannot leave the animal
+        // circling a spot on the ceiling for the rest of the afternoon.
+        F.hold -= d;
+        if (F.p.distanceTo(F.aim) < 0.055 || F.hold <= 0) {
+          F.mode = 'down'; F.u = 0;
+          F.upFrom.copy(F.up);
+          F.from.copy(F.p);
+        }
+        break;
+      }
+      case 'down': {
+        F.u += d / FLY.land;
+        if (F.u >= 1) {
+          alight({ site: F.perch, at: F.aimSurf });
+          break;
+        }
+        // In along the normal, decelerating, and rolling over as it goes. On
+        // the ceiling that roll IS the somersault a fly does to get its feet
+        // up there, and at 160 ms it is the right length for one.
+        const e = F.u * F.u * (3 - 2 * F.u);
+        const n = F.perch.n;
+        F.p.lerpVectors(F.from, F.aimSurf, e);
+        upN.set(n[0], n[1], n[2]);
+        F.up.copy(F.upFrom).lerp(upN, e);
+        if (F.up.lengthSq() < 1e-6) F.up.copy(upN);
+        F.up.normalize();
+        break;
+      }
+      case 'off': {
+        F.u += d / FLY.off;
+        const n = F.perch ? F.perch.n : [0, 1, 0];
+        F.p.x += n[0] * 0.55 * d; F.p.y += n[1] * 0.55 * d; F.p.z += n[2] * 0.55 * d;
+        upN.set(0, 1, 0);
+        F.up.copy(F.upFrom).lerp(upN, Math.min(1, F.u)).normalize();
+        F.speed = 0.20 + 0.9 * Math.min(1, F.u);
+        if (F.u >= 1) {
+          F.mode = 'cruise';
+          F.up.set(0, 1, 0);
+          F.hold = rnd(FLY.air[0], FLY.air[1]);
+          F.seg = 0;
+          F.pitch = clamp(0.5 * -n[1], -0.6, 0.6);
+          saccade(0.5);
+        }
+        break;
+      }
+      default:
+        stepSit(d);
+        break;
+    }
+
+    // The 30 ms, which is the only interpolation in the whole animal.
+    if (F.turnT > 0) {
+      F.turnT -= d;
+      const u = clamp(1 - Math.max(0, F.turnT) / FLY.snap, 0, 1);
+      F.yaw = wrapPi(F.yaw0 + F.yawD * u);
+      F.pitch = F.pitch0 + F.pitchD * u;
+      F.speed = F.speed0 + F.speedD * u;
+    }
+
+    if (F.mode === 'cruise' || F.mode === 'in' || F.mode === 'off') {
+      headOf(fwd, F.yaw, F.pitch);
+      F.p.addScaledVector(fwd, F.speed * d);
+      // And the net. `saccade` is what keeps it in the room; this is only here
+      // so that no arithmetic anywhere above can ever put a fly through a wall.
+      F.p.x = clamp(F.p.x, HARD.x0, HARD.x1);
+      F.p.y = clamp(F.p.y, HARD.y0, ceilY() + 0.001);
+      F.p.z = clamp(F.p.z, HARD.z0, HARD.z1);
+    }
+
+    // Time to look for somewhere to sit.
+    if (F.mode === 'cruise') {
+      F.hold -= d;
+      if (F.hold <= 0) {
+        const hit = choosePerch();
+        F.perch = hit.site;
+        F.aimSurf.copy(hit.at);
+        const n = hit.site.n;
+        F.aim.copy(F.aimSurf);
+        F.aim.x += n[0] * 0.14; F.aim.y += n[1] * 0.14; F.aim.z += n[2] * 0.14;
+        F.mode = 'in';
+        F.seg = 0;
+        F.hold = 8;
+      }
+    }
+
+    poseRig(d, who);
+  }
+
+  /**
+   * Where the state says the animal is: the mesh, the wings, the legs, and
+   * what it sounds like from where you are standing.
+   *
+   * Its own function rather than the tail of `stepFly` because `hold` has to
+   * be able to run it without running the simulation — see the note there.
+   */
+  function poseRig(d, who) {
+    headOf(fwd, F.yaw, F.pitch);
+    if (F.mode === 'sit' || F.mode === 'down') {
+      // On a surface the heading lies in the surface, not in the world.
+      fwd.addScaledVector(F.up, -fwd.dot(F.up));
+      if (fwd.lengthSq() < 1e-6) fwd.set(F.up.y, -F.up.x, 0);
+      fwd.normalize();
+    }
+    upN.copy(F.up);
+    if (Math.abs(upN.dot(fwd)) > 0.98) upN.set(0, 1, 0);
+    side.crossVectors(fwd, upN).normalize();
+    upN.crossVectors(side, fwd).normalize();
+    // Nose up, in the air, and it is not decoration. A fly does not point
+    // where it is going: the wing stroke plane is roughly level whatever the
+    // body is doing, so at anything under its own top speed the body hangs
+    // under the wings at twenty or thirty degrees to the flight path — which
+    // is why a fly crossing a room in front of you looks like it is climbing
+    // when it is not. Rotated about the body's own side axis, so it works
+    // upside down and on the way out of a ceiling as well.
+    if (F.mode !== 'sit' && F.mode !== 'down') {
+      const a = 0.38 * (1 - 0.5 * clamp((F.speed - FLY.speed[0])
+        / (FLY.speed[1] - FLY.speed[0]), 0, 1));
+      const c2 = Math.cos(a), s2 = Math.sin(a);
+      aimV.copy(fwd);
+      fwd.multiplyScalar(c2).addScaledVector(upN, s2).normalize();
+      upN.multiplyScalar(c2).addScaledVector(aimV, -s2).normalize();
+      side.crossVectors(fwd, upN).normalize();
+    }
+    // The grooming rock, on the body's own two axes so it reads whichever way
+    // up the fly is.
+    if (F.rock > 0.002) {
+      const t = performance.now() / 1000;
+      const a = F.rock * 0.14 * Math.sin(t * (F.wig ? 44 : 13));
+      const b = F.rock * 0.10 * Math.sin(t * (F.wig ? 31 : 9) + 1.1);
+      upN.addScaledVector(fwd, -a).addScaledVector(side, b).normalize();
+      side.crossVectors(fwd, upN).normalize();
+    }
+    basis.makeBasis(fwd, upN, side);
+    flyRig.quaternion.setFromRotationMatrix(basis);
+    flyRig.position.copy(F.p);
+    poseFly(d);
+
+    // ── and what it sounds like ──────────────────────────────────────────────
+    // Airborne or not, first, because that is the whole of it: the buzz is the
+    // wings and the wings are either going or they are not.
+    const airborne = F.mode !== 'sit';
+    F.buzz += ((airborne ? 1 : 0) - F.buzz) * Math.min(1, d * 40);
+    // Faster wings when it is working, which is audible: a fly coming out of a
+    // turn or off a ceiling is a semitone up on one crossing the room.
+    F.hz = 0.94 + 0.34 * clamp((F.speed - FLY.speed[0])
+      / (FLY.speed[1] - FLY.speed[0]), 0, 1) + (F.mode === 'off' ? 0.22 : 0);
+    if (!audio) return;
+    const c = Math.cos(yaw), s = Math.sin(yaw);
+    const [wx, wy, wz] = flyWorld();
+    const ex = who.x - wx, ey = who.y - wy, ez = who.z - wz;
+    const dist = Math.sqrt(ex * ex + ey * ey + ez * ez);
+    // Inside the flat with it, and nowhere else — the same shape of test the
+    // near clip and the room's own dimming use in `indoorsAt`, run on the
+    // LISTENER rather than on the fly. A buzz audible from the promenade is
+    // not a fly in a room, it is a fly in your headphones. Ramped over the
+    // last 35 cm so that the doorway is a fade rather than a switch, and
+    // banded to the upper storey so that it is not heard downstairs either.
+    const hx = who.x - root.position.x, hz2 = who.z - root.position.z;
+    const lx = hx * c - hz2 * s, lz = hx * s + hz2 * c, ly = who.y - base;
+    const O = plan.outer;
+    const off = Math.hypot(Math.max(O.x0 - lx, lx - O.x1, 0),
+      Math.max(O.z0 - lz, lz - O.z1, 0));
+    const storey = ly > plan.floor - 0.7 && ly < plan.floor + 2.9 ? 1 : 0;
+    const inFlat = storey * clamp(1 - off / 0.35, 0, 1);
+    // Linear in distance and not squared, for the reason written over the
+    // Bucketeer's hum: squared, it is gone at two metres, which is well inside
+    // the range at which you can see the thing making it.
+    const far = Math.pow(clamp(1 - dist / FLY.hear, 0, 1), 1.6);
+    let pan = 0;
+    if (camera && camera.matrixWorld) {
+      // Which ear. The camera's own right vector and not the walker's, because
+      // the pan is about the head the sound arrives at — the same reach for the
+      // app's camera that 49-you.js and 60-arms.js make.
+      camRight.setFromMatrixColumn(camera.matrixWorld, 0);
+      pan = clamp((camRight.x * -ex + camRight.z * -ez)
+        / Math.max(0.30, dist), -1, 1) * 0.85;
+    }
+    audio.fly(F.buzz * far * inFlat, F.hz, pan);
+  }
+
+  /** The clock, the fan, the set, and the fly. */
+  function tickHouse(dt, who) {
+    tickClock();
+    stepFly(dt || 0, who);
+  }
+
   return {
     root, parts, plan, base, yaw,
-    floorAt, blockers, tight, indoorsAt, hull, headroom, tick: tickClock,
+    floorAt, blockers, tight, indoorsAt, hull, headroom, tick: tickHouse,
     /** The television: where it is in world metres, and the knock. */
     tv: {
       at: () => { const [wx, wz] = world(tv.at[0], tv.at[2]);
@@ -1497,6 +2339,84 @@ async function buildVikendica(scene, field) {
     station(name) {
       const a = plan.anchors[name];
       return a ? [VIK.t + a[0], VIK.s - a[2]] : null;
+    },
+    /**
+     * The fly — src/90-app.js hangs `__fr.fly` off this.
+     *
+     * It exists for the same reason every other handle in this file does: the
+     * thing it drives happens on a clock nobody can wait for. Ten seconds of
+     * a housefly is a landing and a take-off; a headless page runs about one
+     * frame a second, so waiting for a screenshot of a fly sitting on the
+     * ceiling is waiting for something that will not happen.
+     */
+    fly: {
+      /** Where it is in world metres, which is what a camera wants. */
+      at: () => flyWorld(),
+      /**
+       * And in the house's own metres, which is what a perch is written in.
+       *
+       * To five places rather than the three `stats` prints, because this is
+       * the one a recorded track is plotted from: the animal itself is 7 mm
+       * long, so a millimetre of rounding on a 15 mm step is three degrees of
+       * heading noise and it swamps the only measurement that matters here —
+       * how straight a straight segment is.
+       */
+      here: () => [+F.p.x.toFixed(5), +F.p.y.toFixed(5), +F.p.z.toFixed(5)],
+      /**
+       * Put it where you want it.
+       *
+       * `cruise` sends it up, `land` starts an approach it will fly properly,
+       * and a perch name — ceiling, window, wall, desk, table, tv — puts it
+       * there this instant, sitting, which is the one a screenshot wants.
+       */
+      go: (what = 'ceiling') => {
+        if (what === 'cruise' || what === 'up') {
+          if (F.mode === 'sit') { F.hold = 0; stepSit(0.0001); }
+          else { F.mode = 'cruise'; F.hold = rnd(FLY.air[0], FLY.air[1]); }
+        } else if (what === 'land') {
+          // From the air only. Forcing 'cruise' on a sitting fly would leave
+          // it hanging a couple of millimetres off whatever it was standing
+          // on with its wings folded, for the frame before it noticed.
+          if (F.mode === 'sit') return 'sitting';
+          F.mode = 'cruise'; F.hold = 0;
+        } else {
+          alight(choosePerch(what));
+        }
+        return F.mode;
+      },
+      /** Hold it still, so a photograph of it is a photograph of one frame. */
+      hold: (on = true) => { F.held = !!on; return F.held; },
+      /** Run its clock forward without waiting for the wall one. */
+      step: (secs = 1, who = null, dtStep = 1 / 60) => {
+        for (let t = 0; t < secs; t += dtStep) stepFly(dtStep, who);
+        return F.mode;
+      },
+      /** Every perch it knows, for a test that wants to visit all of them. */
+      perches: () => PERCH.map((s) => s.k),
+      stats: () => ({
+        mode: F.mode,
+        doing: F.mode === 'sit' ? F.doing : null,
+        perch: F.perch ? F.perch.k : null,
+        // House-local, because that is the frame every number above is in.
+        at: [+F.p.x.toFixed(3), +F.p.y.toFixed(3), +F.p.z.toFixed(3)],
+        aim: F.mode === 'in' || F.mode === 'down'
+          ? [+F.aimSurf.x.toFixed(3), +F.aimSurf.y.toFixed(3),
+            +F.aimSurf.z.toFixed(3)] : null,
+        yaw: +F.yaw.toFixed(3),
+        pitch: +F.pitch.toFixed(3),
+        speed: +F.speed.toFixed(3),
+        // What is left of this straight segment, and of the 30 ms turn at the
+        // end of it. A reading with `turn` above zero is a fly mid-saccade.
+        seg: +Math.max(0, F.seg).toFixed(3),
+        turn: +Math.max(0, F.turnT).toFixed(3),
+        loop: F.loop.dir > 0 ? 'cw' : 'ccw',
+        hold: +Math.max(0, F.hold).toFixed(2),
+        buzz: +F.buzz.toFixed(3),
+        hz: +(192 * F.hz).toFixed(1),
+        up: [+F.up.x.toFixed(2), +F.up.y.toFixed(2), +F.up.z.toFixed(2)],
+        held: F.held,
+        drawn: flyRig.visible,
+      }),
     },
     stats: () => ({
       at: [+VIK.t.toFixed(1), +VIK.s.toFixed(1)],

@@ -8,6 +8,112 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.319.0] — 2026-09-05
+
+### One fly on the gornji kat, and it is the turning that makes it a fly
+
+*"implant 1 fly to buzz around 2nd floor of vikendica"*
+
+One. Not a swarm, not a particle system — one housefly in the big room of the
+flat, and almost everything in `src/44-vikendica.js` that is new is behaviour
+rather than mesh. It has to be. The animal is 7.3 mm from its eyes to the tip
+of its abdomen and it is modelled at exactly that, so from two metres it is
+four pixels and nothing about its shape can tell you what it is.
+
+**THIRTY MILLISECONDS is the number the whole thing stands on.** A housefly
+holds a heading for one to four tenths of a second and then changes it in about
+thirty milliseconds with no arc in it at all. Those are its saccades, and they
+are the entire tell: anything that eases from one heading into the next is a
+bee or a moth, and no amount of size or speed rescues it afterwards. So the
+heading here is a step function with a 30 ms ramp on it and not a steered
+velocity with a turn rate — and the measurement, taken off a 40 s track
+recorded through the debug hook and sampled every 1/60 s, is what says it
+worked:
+
+    median heading change per frame   0.017 deg
+    frames turning less than 1 deg      72 %
+    frames turning more than 20 deg    9.5 %
+    p99 / max                        74.6 / 97.4 deg
+
+Dead straight, then a jump. A wander with Perlin noise on it reads as a steady
+few degrees a frame and there is no threshold that separates the two.
+
+**It sits, and that is the larger half of the animal.** Ten minutes of its own
+clock, run forward in a probe: 353 s sitting against 247 s in the air, 63
+landings. Something that never lands is a mote of dust on the lens. Where it
+lands is weighted, and the weights are the argument — the ceiling gets five
+because that is where a housefly is when you look for it, the two glazed leaves
+of the terrace door get three between them because a fly in a room goes to the
+light, the clear stretch of the east wall gets two, and the desk, the low table
+and the top of the television cabinet get one each. Over those 63 landings:
+
+    ceiling 30    window 10    tv 8    wall 6    table 5    desk 4
+
+On the ceiling it is upside down, because the pose is built from a surface
+normal rather than from world up, and the 160 ms roll on the way in is the
+somersault a fly actually does to get its feet up there. Sitting, it walks a
+centimetre or two at a time, turns on the spot before each walk, and grooms —
+front legs rubbing, or the hind pair back over the wings — with the body
+rocking, which is the half of the grooming that carries across a room.
+
+**It circles rather than crosses.** Every saccade turns the same way for a run
+of four to nine before the bias flips and the circuit re-centres on one of five
+haunts: under the ceiling light over the sofa, twice in front of the terrace
+doors, over the desk, and down the west end over the television. Without that
+the track is a random walk that ends up in a corner and stays there.
+
+**Every perch is a real surface**, read off `tools/blender/vikendica.py` rather
+than eyeballed: the ceiling at 5.30 (and the mezzanine deck's soffit at 5.29
+when the renovation roof is on, where the ceiling slab is not there at all),
+the inner face of the terrace glazing at z 3.758 in two patches because the
+mullion between the leaves stands 35 mm proud of it, the east wall at x 3.19,
+and the three table tops at 3.640, 3.340 and 3.560. The air it uses is the
+room's own box pulled in to clear the only three things standing in it above
+head height — the television's top corner at 4.09, the lampshade hanging to
+5.16, and the fridge, whose case tops out at 4.76 and which is why the west end
+of the box starts at x −0.20.
+
+**The buzz, in `src/80-audio.js`.** A wingbeat and not a note: 192 Hz, and the
+reason a sine at 190 sounds like a test signal is that a wing is a flapper —
+every stroke is a puff of air, so the spectrum is the whole harmonic series
+with a broad hump on it. A sawtooth through two wide band-passes is that.
+Recorded off `audio.tap()` with `tools/sfx.mjs`, the partials come back at
+193 / 378 / 567 / 755 / 944 Hz — the series, out to the ninth. On top of it two
+LFOs at 5.3 and 21 Hz, because a fly never holds a level; a 2.8 kHz hiss
+chopped at the wingbeat, which is the air off the tips and is what stops the
+buzz being a kazoo; and a wingbeat that rises with the fly's own speed.
+
+**And it stops dead the instant it lands.** There is no release envelope, only
+a 20 ms ramp so that it does not click. Over 12 000 frames of the state machine
+there were 6 643 sitting and not one of them carried any buzz at all, and 5 357
+airborne and not one of them was quiet. It cuts on the frame the feet touch and
+comes back on the frame the wings do.
+
+It is quiet — 0.035 peak and 0.0056 RMS at arm's length, a twelfth of the cat
+and a sixth of Baye humming — and loud where it counts: recorded standing in
+the flat with the fly flying, the strongest partial in the entire mix is its
+own 205 Hz. Recorded in the same place with the fly sitting, there is nothing
+in that band. Recorded from the terrace, two metres outside the same glass,
+there is nothing in that band either: the level is gated on the listener being
+inside the flat, on the upper storey, ramped over 35 cm so the doorway is a
+fade rather than a switch. It goes straight to `master` and not to `bed` or to
+`outBus`, because the fly is on your side of the wall and the one thing that
+must never happen is the room's own muffle taking it away.
+
+**`__fr.fly`** is the handle, and it exists for the reason every other one in
+this project does: a housefly's clock cannot be waited on. `go()` puts it on
+any perch by name or sends it up, `step(s)` runs its own clock forward without
+the wall one, `hold()` freezes the animal without freezing the frame — the mesh
+is still placed where the state says it is — and `watch(d, fov)` stands the
+camera `d` metres off it on a long lens, which is the only way to photograph
+something nine pixels wide.
+
+Census unchanged at `{seen: 446, thin: 333, plain: 86, rich: 27}`: the turn
+decisions are `Math.random()` at frame rate, deliberately, and RULE 4 is about
+the build stream, which the census is the checksum of. Where a fly goes next is
+not part of the world — it is part of the afternoon, and it should be different
+every time you walk in.
+
 ## [1.299.0] — 2026-09-05
 
 ### The Bucketeer, and the stairs are outside

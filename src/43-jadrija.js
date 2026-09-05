@@ -32612,8 +32612,10 @@ async function buildJadrija(scene) {
     // The Bucketeer, who carries her own range gate for the same reason Baye's
     // is here rather than inside her stepper.
     if (bucketeer) bucketeer.step(dt, cam);
-    // And the fish, which is three hands and a Date and is not worth a gate.
-    if (vik) vik.tick();
+    // And the fish, which is three hands and a Date and is not worth a gate —
+    // and the fly upstairs, which carries its own: `who` is the ear it is
+    // heard at, and past thirty metres it stops being stepped at all.
+    if (vik) vik.tick(dt, who);
   }
 
   const mid = at(gapAt);
