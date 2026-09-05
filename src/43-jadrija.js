@@ -605,18 +605,31 @@ async function buildJadrija(scene) {
   const frustumTS = (y0, r0, y1, r1, col, topCol) =>
     frustum(W, y0, r0, y1, r1, col, topCol);
 
-  function barIn(P, t0, t1, sec, col, topCol) {
+  /**
+   * `cut` is `boxIn`'s, and for the same reason — see the note there. A prism
+   * run straight between two stations is a CHORD across whatever the shore is
+   * doing between them, and the awning valances are the longest ones on this
+   * boardwalk: measured off `toWorld`, the H2O valance bows 0.367 m against its
+   * own 0.12 m depth, which puts its true mid-span within four centimetres of
+   * the plane the name board hangs on. Two objects 0.40 m apart by construction
+   * were arriving in the same place.
+   */
+  function barIn(P, t0, t1, sec, col, topCol, cut) {
     const [P0, P1, P2, P3] = sec;
-    const A = P(t0, P0[0], P0[1]), B = P(t1, P0[0], P0[1]);
-    const D = P(t0, P1[0], P1[1]), C = P(t1, P1[0], P1[1]);
-    const d = P(t0, P2[0], P2[1]), c = P(t1, P2[0], P2[1]);
-    const a = P(t0, P3[0], P3[1]), q = P(t1, P3[0], P3[1]);
-    b.quad(a, q, c, d, topCol || col);
-    b.quad(D, C, B, A, col);
-    b.quad(A, B, q, a, col);
-    b.quad(C, D, d, c, col);
-    b.quad(B, C, c, q, col);
-    b.quad(D, A, a, d, col);
+    const n = cut > 0 ? Math.max(1, Math.ceil((t1 - t0) / cut)) : 1;
+    for (let i = 0; i < n; i++) {
+      const ta = t0 + (t1 - t0) * (i / n), tb = t0 + (t1 - t0) * ((i + 1) / n);
+      const A = P(ta, P0[0], P0[1]), B = P(tb, P0[0], P0[1]);
+      const D = P(ta, P1[0], P1[1]), C = P(tb, P1[0], P1[1]);
+      const d = P(ta, P2[0], P2[1]), c = P(tb, P2[0], P2[1]);
+      const a = P(ta, P3[0], P3[1]), q = P(tb, P3[0], P3[1]);
+      b.quad(a, q, c, d, topCol || col);
+      b.quad(D, C, B, A, col);
+      b.quad(A, B, q, a, col);
+      b.quad(C, D, d, c, col);
+      if (i === n - 1) b.quad(B, C, c, q, col);
+      if (i === 0) b.quad(D, A, a, d, col);
+    }
   }
   /**
    * The same, in the shore frame, which is where all but one caller wants it.
@@ -625,8 +638,8 @@ async function buildJadrija(scene) {
    * shore frame stretches under it — see the block over `DIVE` — and so passes
    * a rigid frame of its own, exactly as `boxIn` and `frustum` already allow.
    */
-  function bar(t0, t1, sec, col, topCol) {
-    barIn(W, t0, t1, sec, col, topCol);
+  function bar(t0, t1, sec, col, topCol, cut) {
+    barIn(W, t0, t1, sec, col, topCol, cut);
   }
 
   /** The commonest cross-section of all: an upright rectangle. */
@@ -4331,7 +4344,7 @@ async function buildJadrija(scene) {
       // The splash line: a band of render that has been wet every winter for
       // thirty years and is a shade darker and slightly proud for it.
       boxTS(Math.min(wt, o + sg * 0.03), Math.max(wt, o + sg * 0.03),
-        S.s0 - 0.02, S.s1 + 0.02, y0, y0 + 0.32, shade(body, 0.84));
+        S.s0 - 0.02, S.s1 + 0.02, y0, y0 + 0.32, shade(body, 0.84), null, 1.5);
       drop(o, S.s0 + 0.30, sg, 0);
       // And one thing each, so the two ends of a building are not a mirror of
       // each other: a vent on one, a meter cabinet on the other.
@@ -4763,8 +4776,11 @@ async function buildJadrija(scene) {
     }
     // The kerb: a low upstand all the way round, which is the one line that
     // tells you it is a roof and not a lid.
-    boxTS(a, c, s0, s0 + 0.16, ry, ry + 0.13, KERB, shade(KERB, 1.08));
-    boxTS(a, c, s1 - 0.16, s1, ry, ry + 0.13, KERB, shade(KERB, 1.08));
+    // The two long ones are cut; the two ends are 0.16 m and cannot bow.
+    // 0.364 m at H2O against a 0.16 m upstand — the line that tells you it is
+    // a roof was leaving the wall it caps.
+    boxTS(a, c, s0, s0 + 0.16, ry, ry + 0.13, KERB, shade(KERB, 1.08), 1.5);
+    boxTS(a, c, s1 - 0.16, s1, ry, ry + 0.13, KERB, shade(KERB, 1.08), 1.5);
     boxTS(a, a + 0.16, s0, s1, ry, ry + 0.13, KERB, shade(KERB, 1.08));
     boxTS(c - 0.16, c, s0, s1, ry, ry + 0.13, KERB, shade(KERB, 1.08));
 
@@ -10887,10 +10903,13 @@ async function buildJadrija(scene) {
       const fs = S.s0 - awn;
       canopySkin(S.t0 - 0.4, S.t1 + 0.4, fs, S.s1,
         top - 0.06, top + 0.06, 0.12, S.roof, S.t0 | 0);
+      // Cut, and it is the longest chord on this boardwalk: 0.367 m of bow at
+      // H2O against a 0.12 m section, which put the valance's true mid-span
+      // within four centimetres of the plane `shopSign` hangs its board on.
       bar(S.t0 - 0.4, S.t1 + 0.4,
         [[fs - 0.02, top - 0.42], [fs + 0.10, top - 0.42],
           [fs + 0.10, top - 0.16], [fs - 0.02, top - 0.16]],
-        shade(S.roof, 0.94));
+        shade(S.roof, 0.94), null, 1.5);
       // Stopping at top - 0.44 and not top - 0.20, which is what put a post
       // straight through the middle of "Slastičarnica". The valance hangs from
       // top - 0.42 down, and the name is on it: a prop that reaches into that
@@ -10956,11 +10975,11 @@ async function buildJadrija(scene) {
       bar(S.t0 - 0.35, S.t1 + 0.35,
         [[S.s0 - 0.35, top], [S.s1 + 0.35, top],
           [S.s1 + 0.35, top + 0.10], [S.s0 - 0.35, top + 0.10]],
-        S.roof, shade(S.roof, 1.08));
+        S.roof, shade(S.roof, 1.08), 1.5);
       bar(S.t0 - 0.35, S.t1 + 0.35,
         [[S.s0 + 1.2, top + 0.10], [S.s1 - 1.2, top + 0.10],
           [S.s1 - 1.2, top + 0.62], [S.s0 + 1.2, top + 0.62]],
-        S.roof, shade(S.roof, 1.14));
+        S.roof, shade(S.roof, 1.14), 1.5);
       // Not for a kiosk: those get the fascia board below, and drawing both
       // put two names on Tisak and two on Maslina, twenty centimetres apart.
       // `painted` shops have no board to put a name on. The pizzeria's name is
