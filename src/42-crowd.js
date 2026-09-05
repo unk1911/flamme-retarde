@@ -675,6 +675,22 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
     shadows: (shadow) => figs.map((f) => f.cast(shadow, { near: true })),
     /** Everybody this tier is answerable for right now. See `tierCount`. */
     live: () => figures.concat(slots.filter(Boolean)),
+    /**
+     * Each bather paired with the skinned figure currently standing in for
+     * them, so a caller can hang something on a BONE.
+     *
+     * `live()` answers "who is on this tier" and that is all most callers
+     * want. Carrying a prop needs the other half — the `skinnedFigure` itself,
+     * because `boneAt` / `boneTurn` / `boneIndex` live on it and they are the
+     * only way to find a hand that is being animated. See the note over
+     * `boneTurn` in 41-skin.js, which was written for exactly this and had no
+     * caller until the phones.
+     *
+     * A null first element is a slot standing in for nobody, and the caller
+     * has to expect it: the roving half of this tier is emptied and refilled
+     * as you walk.
+     */
+    pairs: () => figs.map((f, i) => [i < PIN ? figures[i] : slots[i - PIN], f]),
     tris: figs.reduce((a, f) => a + f.tris, 0),
     get drawn() { return drawn; },
     /**

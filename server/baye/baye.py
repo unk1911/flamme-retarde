@@ -279,17 +279,28 @@ class World:
 
     def _crypto(self):
         r = requests.get("https://api.coingecko.com/api/v3/simple/price",
-                         params={"ids": "bitcoin,ethereum", "vs_currencies": "usd,eur",
+                         params={"ids": "bitcoin,ethereum,litecoin",
+                                 "vs_currencies": "usd,eur",
                                  "include_24hr_change": "true"},
                          timeout=12)
         r.raise_for_status()
         d = r.json()
         out = {}
-        for name, key in (("btc", "bitcoin"), ("eth", "ethereum")):
+        # Litecoin joined the two on 4 Sep 2026 because the phones on the
+        # beach show three coins and she only ever mentioned one. It is the
+        # same request — CoinGecko takes a comma-separated list — so a third
+        # coin costs nothing.
+        for name, key in (("btc", "bitcoin"), ("eth", "ethereum"),
+                          ("ltc", "litecoin")):
             if key in d:
-                out[name] = {"usd": round(d[key].get("usd", 0)),
+                usd = d[key].get("usd", 0)
+                # Whole dollars over a thousand and cents under it. Bitcoin at
+                # $79,679.41 does not want the cents and litecoin at $51 badly
+                # does — rounded to the dollar it lost 43 cents on a $51 coin,
+                # which on the beach phones is a price that is visibly wrong.
+                out[name] = {"usd": round(usd) if usd >= 1000 else round(usd, 2),
                              "eur": round(d[key].get("eur", 0)),
-                             "chg24": round(d[key].get("usd_24h_change", 0), 1)}
+                             "chg24": round(d[key].get("usd_24h_change", 0), 2)}
         return out
 
     def _news(self):
@@ -844,6 +855,17 @@ class Handler(BaseHTTPRequestHandler):
     # -- routes --
     def do_GET(self):
         path = urlparse(self.path).path.rstrip("/") or "/"
+        # The world feed, for anything in the page that wants a real number.
+        # Behind the session like everything else here — the prices are public
+        # but the route is not, because the rule on this service is that only
+        # `/health` answers without a cookie and one exception is how a service
+        # ends up with two.
+        if path in ("/baye/world", "/world"):
+            if not self._user():
+                return self._send(401, {"ok": False, "error": "not signed in"})
+            w = WORLD.snapshot()
+            return self._send(200, {"ok": True, "crypto": w.get("crypto") or {},
+                                    "weather": w.get("weather") or {}})
         if path in ("/baye/health", "/health"):
             return self._send(200, {"ok": True, "service": "baye",
                                     "version": VERSION,

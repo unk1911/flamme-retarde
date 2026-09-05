@@ -23035,6 +23035,25 @@ async function buildJadrija(scene) {
   // read off `BATHER_CAST` directly — which is the whole reason this exists.
   // It is what carries a bather's age and sex to the voice service.
   let CAST_KIND = null;
+
+  // UP HERE AND NOT DOWN WITH `stepPhones`, and it is the temporal dead zone
+  // again — the same trap `terraceSet` records four hundred lines further up.
+  // The loop that decides who is on their phone runs inside the crowd's async
+  // parse, which is a long way ABOVE the drawing code; a `const` declared
+  // beside the drawing code is unreachable from there, and what that looks
+  // like is not an exception in the console, it is a page that never finishes
+  // loading. Cost one headless run to find, exactly as the note over
+  // `terraceSet` promises it will.
+  const PHONE = {
+    /** How many of the seated get one. Two in five, by hash — never `rng()`,
+     *  which is Rule 4: a draw here would move every parasol on the shore. */
+    share: 0.40,
+    /** Past this nobody is reading anything, so the pool stops being written.
+     *  It is generous because the phone is bright and catches the eye further
+     *  out than it can be read at. */
+    near: 34,
+    w: 0.071, h: 0.146, d: 0.009,
+  };
   let castNatH = null;                  // blob -> how tall it stands, in metres
   let castSlot = null;                  // roving slot -> which blob it is
   {
@@ -23086,6 +23105,19 @@ async function buildJadrija(scene) {
       parsed.push(skin);
       CAST_KIND.push(BATHER_CAST[i]);
     });
+    // WHO IS ON THEIR PHONE. Seated people, two in five, and split three to
+    // one between looking at it and talking into it — which is roughly what a
+    // café terrace looks like and is the only part of this anybody would
+    // notice being wrong.
+    //
+    // `jit` and not `rng()`: Rule 4. A draw taken here would walk every
+    // parasol, bather and hut on the shore one place down the shared stream.
+    for (let i = 0; i < bathers.length; i++) {
+      const b = bathers[i];
+      if (b.pose !== 'sit') continue;
+      if (jit(i, 9137) >= PHONE.share) continue;
+      b.phone = jit(i, 9138) < 0.25 ? 2 : 1;
+    }
     // ── who is who, and which mesh a slot has to be ────────────────────────
     //
     // A roving slot cannot be pointed at just anybody. The slot *is* a mesh —
@@ -25177,6 +25209,219 @@ async function buildJadrija(scene) {
     }
     c.at[0] += Math.cos(c.head) * step;
     c.at[1] += Math.sin(c.head) * step;
+  }
+
+  // ── the phones ───────────────────────────────────────────────────────────
+  //
+  // Misha, 4 Sep 2026: *"maybe make some of the bathers, especially those
+  // sitting down be on their cellphones, talking some stuff, or just looking at
+  // their phones and once we come closer to take a look we see crypto prices on
+  // them screens. bitcoin, litecoin, etherium"*.
+  //
+  // ON THE SKINNED TIER AND NOWHERE ELSE, and that is forced rather than
+  // chosen. A phone is 70 by 145 mm. The instanced tier draws people from about
+  // four metres out to two hundred and forty, and at four metres a phone is
+  // forty pixels of dark rectangle — but the instanced tier is also HIDDEN the
+  // moment somebody is close enough to read anything (`fg.hidden`, set by
+  // `assign`), so a phone built there would vanish at exactly the distance the
+  // joke needs it. The skinned figures are the ones you can walk up to, and
+  // they have real bones.
+  //
+  // Which is what `boneAt` / `boneTurn` / `boneIndex` in 41-skin.js are for.
+  // The note over `boneTurn` has said since it was written that it exists to
+  // carry "a card in her hands, a hat on her head", and it had no caller until
+  // this.
+  let phones = null;                    // the pool, built on first use
+  const tmpP = new THREE.Vector3();     // scratch for the hand bone read
+  let phoneTex = null;
+  let phoneHand = -1;                   // bone indices, resolved once
+  let phoneHead = -1;
+
+  /**
+   * The screen: three coins, a price, a change and a sparkline each.
+   *
+   * The numbers are REAL and they are the only thing on this shore that is
+   * fetched at runtime — see `phoneQuotes`. Baked at build time as a floor, so
+   * the page still works opened off a filesystem with no network, which is a
+   * property this whole project has and is not giving up for a gag. Signed in
+   * on the deployed site they are refreshed from the voice service, which was
+   * already pulling them every three minutes for Baye to mention.
+   *
+   * Rule 12 does not apply and it is worth saying why, because it looks like
+   * it should: the rule is that lettering nobody can read in a photograph is
+   * not invented. A price is data, not signage — and inventing one would be
+   * the same offence in a different costume, which is why the fallback is a
+   * real quote with the date it was taken beside it.
+   */
+  function phoneScreen(q) {
+    const W = 256, H = 512;
+    const C = document.createElement('canvas');
+    C.width = W; C.height = H;
+    const g = C.getContext('2d');
+    g.fillStyle = '#0b0d12'; g.fillRect(0, 0, W, H);
+    // The status bar, because a phone screen without one is a poster.
+    g.fillStyle = '#8b93a4';
+    g.font = '600 15px system-ui, sans-serif';
+    g.fillText('09:41', 12, 26);
+    g.fillRect(W - 40, 14, 22, 11);
+    g.fillStyle = '#0b0d12'; g.fillRect(W - 38, 16, 18 - 8, 7);
+    g.fillStyle = '#e8ecf4';
+    g.font = '700 21px system-ui, sans-serif';
+    g.fillText('Markets', 12, 60);
+    const rows = [['BTC', q.btc], ['LTC', q.ltc], ['ETH', q.eth]];
+    rows.forEach(([sym, v], i) => {
+      const y = 92 + i * 128;
+      g.fillStyle = '#151a24'; g.fillRect(8, y, W - 16, 112);
+      g.fillStyle = '#e8ecf4';
+      g.font = '700 25px system-ui, sans-serif';
+      g.fillText(sym, 20, y + 34);
+      g.font = '600 23px system-ui, sans-serif';
+      const px = v.usd >= 1000 ? Math.round(v.usd).toLocaleString('en-US')
+        : v.usd.toFixed(2);
+      g.fillText('$' + px, 20, y + 66);
+      const up = v.chg >= 0;
+      g.fillStyle = up ? '#3fd18b' : '#ef5a5a';
+      g.font = '600 19px system-ui, sans-serif';
+      g.fillText((up ? '+' : '') + v.chg.toFixed(2) + '%', 20, y + 95);
+      // The sparkline. Shape from a hash of the symbol so the three are not
+      // the same wiggle, slope from the actual 24-hour change — which is the
+      // only part of it that is a fact and the only part that has to be.
+      g.strokeStyle = up ? '#3fd18b' : '#ef5a5a';
+      g.lineWidth = 2; g.beginPath();
+      for (let k = 0; k <= 22; k++) {
+        const u = k / 22;
+        const wob = (jit(k, sym.charCodeAt(0) * 7) - 0.5) * 16;
+        const yy = y + 66 - (u - 0.5) * v.chg * 3.2 + wob;
+        const xx = 132 + u * (W - 152);
+        if (k) g.lineTo(xx, yy); else g.moveTo(xx, yy);
+      }
+      g.stroke();
+    });
+    g.fillStyle = '#5a6478';
+    g.font = '500 13px system-ui, sans-serif';
+    g.fillText(q.at, 12, H - 14);
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    return tex;
+  }
+
+  /**
+   * What the screens say. Real, and dated.
+   *
+   * The floor is a quote taken on the build date. `refresh` replaces it from
+   * `/baye/world` when there is a session, which costs one GET on the frame
+   * the first phone is drawn and never again.
+   */
+  const phoneQuotes = {
+    q: { btc: { usd: 79679, chg: -1.37 }, ltc: { usd: 51.43, chg: 0.81 },
+      eth: { usd: 2454.3, chg: -1.80 }, at: 'CoinGecko · 4 Sep 2026' },
+    asked: false,
+    async refresh() {
+      if (this.asked || typeof AUTH === 'undefined' || !AUTH.baye) return;
+      this.asked = true;
+      try {
+        const r = await fetch(AUTH.baye + '/world', { credentials: 'same-origin' });
+        const d = await r.json();
+        const c = d && d.ok && d.crypto;
+        if (!c || !c.btc) return;
+        const put = (k, v) => { if (v) this.q[k] = { usd: v.usd, chg: v.chg24 }; };
+        put('btc', c.btc); put('ltc', c.ltc); put('eth', c.eth);
+        this.q.at = 'CoinGecko · live';
+        if (phoneTex) { phoneTex.dispose(); phoneTex = null; }
+      } catch { /* the baked quote stands */ }
+    },
+  };
+
+  /**
+   * Place a phone in the hand of everybody on the skinned tier who has one.
+   *
+   * BILLBOARDED ABOUT ITS OWN UP AXIS, and that is a deliberate cheat. A person
+   * looking at a phone holds it facing themselves, so the honest thing to draw
+   * is the back of it — which is a black rectangle and no joke at all. Turned
+   * to face the camera the screen is readable from wherever you walk up, and
+   * the hand it sits in is still the hand the bake put there, so it never
+   * separates from the figure. The alternative was to bake a new hold, which is
+   * eight re-bakes for a gag.
+   */
+  function stepPhones(cam) {
+    const skin = crowds.skin;
+    if (!skin || !skin.pairs) return;
+    if (!phones) {
+      phones = [];
+      const grp = new THREE.Group();
+      grp.matrixAutoUpdate = false;
+      scene.add(grp);
+      phones.grp = grp;
+    }
+    if (!phoneTex) phoneTex = phoneScreen(phoneQuotes.q);
+    phoneQuotes.refresh();
+    let n = 0;
+    for (const [fg, f] of skin.pairs()) {
+      if (!fg || !fg.phone || !f.mesh.visible) continue;
+      const dx = f.mesh.position.x - cam.x, dz = f.mesh.position.z - cam.z;
+      if (dx * dx + dz * dz > PHONE.near * PHONE.near) continue;
+      if (phoneHand < 0) {
+        phoneHand = f.boneIndex('handR');
+        phoneHead = f.boneIndex('head');
+      }
+      if (phoneHand < 0) return;
+      let m = phones[n];
+      if (!m) {
+        const g = new THREE.Group();
+        const body = new THREE.Mesh(
+          new THREE.BoxGeometry(PHONE.w, PHONE.h, PHONE.d),
+          new THREE.MeshBasicMaterial({ color: 0x14161c }));
+        const face = new THREE.Mesh(
+          new THREE.PlaneGeometry(PHONE.w * 0.90, PHONE.h * 0.90),
+          new THREE.MeshBasicMaterial({ map: phoneTex }));
+        face.position.z = PHONE.d * 0.51 + 0.0006;
+        g.add(body); g.add(face);
+        phones.grp.add(g);
+        phones[n] = m = { g, face };
+      }
+      if (m.face.material.map !== phoneTex) {
+        m.face.material.map = phoneTex;
+        m.face.material.needsUpdate = true;
+      }
+      // A PHONE AT THE EAR GOES ON THE HEAD BONE, and one being read goes on
+      // the hand. Both were on the hand at first and the ear one was a lift of
+      // 0.20 m off the wrist, which is a phone floating beside a lap: a seated
+      // figure's forearm does not come up in these bakes, so there was nothing
+      // between the hand and the ear to make the gesture read. The head is a
+      // real bone, it is where the phone actually is, and it needs no cheat.
+      const ear = fg.phone === 2 && phoneHead >= 0;
+      f.boneAt(ear ? phoneHead : phoneHand, tmpP);
+      // IN THE FIGURE'S OWN SPACE, and it has to be put back into the world's.
+      // `boneAt` reads the skinning palette, which is built in the mesh's local
+      // frame — the same frame `cat()` reports paw heights in. Left as it came
+      // out, twelve phones stacked within 30 cm of the world origin, four
+      // kilometres from the beach and under the sea.
+      tmpP.applyMatrix4(f.mesh.matrixWorld);
+      m.g.rotation.set(0, Math.atan2(cam.x - tmpP.x, cam.z - tmpP.z), 0);
+      if (ear) {
+        // Beside the head and a little above the jaw, tipped the way a handset
+        // sits. 0.115 m out is the width of a head plus the phone's own half.
+        const yaw = m.g.rotation.y;
+        m.g.position.set(tmpP.x + Math.cos(yaw) * 0.115, tmpP.y + 0.055,
+          tmpP.z - Math.sin(yaw) * 0.115);
+        m.g.rotation.z = 0.34;
+        m.g.rotation.x = 0;
+      } else {
+        // Up out of the hand, which is where a phone sits when it is being
+        // held rather than where the wrist joint is, and tilted back so the
+        // screen is read at an angle instead of edge on.
+        m.g.position.set(tmpP.x, tmpP.y + 0.085, tmpP.z);
+        m.g.rotation.z = 0;
+        m.g.rotation.x = -0.34;
+      }
+      m.g.visible = true;
+      n++;
+    }
+    for (let i = n; i < phones.length; i++) {
+      if (phones[i]) phones[i].g.visible = false;
+    }
+    phones.grp.updateMatrixWorld(true);
   }
 
   // ── the bathers, as things the jet can hit and things that answer ─────────
@@ -29327,6 +29572,12 @@ async function buildJadrija(scene) {
       if (paint) { fg.skin = paint.skin; fg.suit = paint.suit; }
       fg.hair = BATHER_HAIR;
     }
+    // The phone comes across from the BATHER, which is a different object
+    // from the figure. `b` is the person the shore placed and `fg` is the
+    // record a crowd tier draws, and everything the tier needs has to be
+    // copied over — `fg.phone` was left behind on the first cut and the
+    // symptom was twelve people marked as holding one and nought drawn.
+    if (b.phone) fg.phone = b.phone;
     C.figures.push(fg);
     if (roveOk) rove[fg.blob].push(fg);
     if (b.beat) walkers.push(fg);
@@ -29687,6 +29938,7 @@ async function buildJadrija(scene) {
     // purpose, because that question really is about the viewer.
     const who = at || cam;
     const [pt, ps] = local(who.x, who.z);
+    stepPhones(cam);
 
     // Unconditional, and carries its own gate inside instead. The balloon work
     // is two subtractions and a hypot and wants no gate at all; the pose is
@@ -30644,6 +30896,21 @@ async function buildJadrija(scene) {
         news: 'they have just turned a fire hose on you',
         spot: voiceSpot() };
     },
+    /** How many people are on a phone, how many are drawn, and what the
+     *  screens are showing — which is the only way to tell a live quote from
+     *  the baked one without walking up to somebody. */
+    phones: () => ({
+      holders: bathers.filter((b) => b.phone).length,
+      looking: bathers.filter((b) => b.phone === 1).length,
+      talking: bathers.filter((b) => b.phone === 2).length,
+      drawn: phones ? phones.filter((m) => m && m.g.visible).length : 0,
+      at: bathers.filter((b) => b.phone)
+        .map((b) => [+b.t.toFixed(1), +b.s.toFixed(1), b.phone]),
+      quote: phoneQuotes.q,
+      world: phones ? phones.filter((m) => m && m.g.visible)
+        .map((m) => [+m.g.position.x.toFixed(2), +m.g.position.y.toFixed(2),
+          +m.g.position.z.toFixed(2)]) : [],
+    }),
     catGap: () => (cat && show && show.pt != null)
       ? { m: Math.hypot(cat.at[0] - show.pt, cat.at[1] - show.ps),
         mode: cat.mode, wet: cat.soak > 0,
