@@ -24,12 +24,21 @@
 //
 // The cookie is httponly, so this file cannot read it and does not try. The
 // only way to know whether you are signed in is to ask, which is `authWhoami`.
+//
+// TWO DOORS, FOR AS LONG AS THE CUTOVER TAKES. 1.270.0 moved the minting out of
+// the chat app and into `flamme-auth` on mpcn0, reached at `/auth/` — see
+// `server/auth/CUTOVER.md`. That is a deploy on somebody else's afternoon, and
+// this file ships on its own schedule, so it must work either side of it and in
+// either order. So it ASKS: `/auth/whoami` answers `{service:"auth"}` where the
+// new service is mounted and 404s where it is not, and the answer picks which
+// set of URLs the rest of the file uses. One probe, cached for the life of the
+// page, folded into the `whoami` this file was doing anyway.
 // -----------------------------------------------------------------------------
 
 const ON_SITE = /(^|\.)edeliverables\.com$/.test(location.hostname);
 
 const AUTH = {
-  /** The model and the sign-in, proxied. `null` off the deployed site. */
+  /** The model, proxied. `null` off the deployed site. */
   host: ON_SITE ? '/abl' : null,
   /** Baye's voice, proxied. Same origin, same cookie, different machine. */
   baye: ON_SITE ? '/baye' : null,
@@ -38,6 +47,14 @@ const AUTH = {
   /** Whether we have asked yet, so a caller can tell "no" from "not yet". */
   checked: false,
 };
+
+/**
+ * Where the sign-in lives: `'/auth'` once we have found it, `''` once we have
+ * found it absent, `undefined` until asked. Three states and not two, because
+ * "not asked" and "not there" want opposite behaviour on the next call — the
+ * first should probe, the second must never probe again.
+ */
+let authCentral;
 
 const authListeners = [];
 
@@ -50,24 +67,51 @@ function fireAuth() {
   }
 }
 
+/** GET some JSON, or `null` for any reason at all. */
+async function authJson(url) {
+  try {
+    const r = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });
+    return r.ok ? await r.json() : null;
+  } catch { return null; }
+}
+
 /**
- * Who are we? Asked of Baye's service rather than the model's.
+ * Who are we? Asked of the sign-in itself, or — before the cutover — of Baye.
  *
- * Both verify the same cookie against the same secret, but `/baye/whoami` is a
- * hundred bytes of JSON with the username in it, where the model's cheapest
- * honest answer is `/gradio_api/info` — a full endpoint listing, fetched for
- * one bit of information. The laptop still asks for that listing, because it
- * genuinely needs the endpoint names; nothing else should have to.
+ * `/auth/whoami` answers 200 with `user: null` when you are signed out, rather
+ * than 401. That is deliberate on the service's side and it is what makes this
+ * function possible: the browser has to tell three states apart — signed in,
+ * signed out, and *this service is not deployed here* — and the third one is an
+ * Apache 404. A 401 would collapse the last two into "not ok" and there would
+ * be no way to decide whether to fall back.
+ *
+ * The fallback is `/baye/whoami`, which is what this asked before 1.270.0.
+ * Baye's service was never the right place to ask who you are — it verifies the
+ * cookie because it has to, and answering `whoami` was a side effect — but it
+ * was the only thing on the site that would say a username out loud in a
+ * hundred bytes, where the model's cheapest honest answer is `/gradio_api/info`
+ * (a full endpoint listing, fetched for one bit of information).
  */
 async function authWhoami() {
   AUTH.checked = true;
-  if (!AUTH.baye) { AUTH.user = null; return null; }
-  try {
-    const r = await fetch(AUTH.baye + '/whoami',
-      { credentials: 'same-origin', cache: 'no-store' });
-    const d = r.ok ? await r.json() : null;
-    AUTH.user = (d && d.ok && d.user) ? d.user : null;
-  } catch { AUTH.user = null; }
+  if (!ON_SITE) { AUTH.user = null; fireAuth(); return null; }
+  let user = null;
+  if (authCentral !== '') {                    // '/auth', or not yet asked
+    const d = await authJson('/auth/whoami');
+    if (d && d.service === 'auth') {
+      authCentral = '/auth';
+      user = d.user || null;
+    } else if (authCentral === undefined) {
+      authCentral = '';                        // not mounted here — never re-ask
+    }
+    // A transient failure once we KNOW it is there reads as signed out, which
+    // is the same thing every other failure here has always read as.
+  }
+  if (authCentral === '') {
+    const d = await authJson(AUTH.baye + '/whoami');
+    user = (d && d.ok && d.user) ? d.user : null;
+  }
+  AUTH.user = user;
   fireAuth();
   return AUTH.user;
 }
@@ -75,28 +119,48 @@ async function authWhoami() {
 /**
  * Sign in, by posting the same form the login page posts.
  *
- * The service answers a good password with a 302 and a session cookie, and a
- * bad one with a 302 to `/login?e=bad`. Both are 302s, so the redirect is not
- * the answer — asking a second question afterwards is.
+ * Both doors take the same body — the same two form fields — at two paths that
+ * look alike and are not the same: `/auth/password` on the central service,
+ * `/abl/auth/password` on the chat app it was carved out of. Written as one
+ * concatenation first, and `'/auth' + '/auth/password'` is a 404 that reads
+ * exactly like a wrong password. Spell both out.
  *
- * `redirect: 'manual'` because the Location it sends is a bare `/`, which
- * through the proxy points at this site rather than at the service. The cookie
- * is on the 302 itself; there is nothing worth following.
+ * `redirect: 'manual'` because the Location either of them sends is a bare `/`,
+ * which through the proxy points at this site rather than at the service. The
+ * cookie is on the response itself; there is nothing worth following.
+ *
+ * `Accept: application/json` is the new part and it is the fix for the error
+ * message that lied. Under `redirect: 'manual'` a 302 arrives as an opaque
+ * response with status 0 and no readable anything, so the old code could only
+ * ask `whoami` afterwards and guess at *why* the answer was no. The central
+ * service honours that Accept and answers 200 / 401 / 429 with a reason. The
+ * chat app ignores it and 302s as before, which is exactly the `status === 0`
+ * case below, so one code path serves both.
  */
 async function authSignIn(u, p) {
-  if (!AUTH.host) throw new Error(T('auth.offOrigin'));
+  if (!ON_SITE) throw new Error(T('auth.offOrigin'));
+  if (authCentral === undefined) await authWhoami();      // learn which door
+  const url = authCentral ? authCentral + '/password' : AUTH.host + '/auth/password';
   const body = new URLSearchParams({ username: u, password: p });
+  let r;
   try {
-    await fetch(AUTH.host + '/auth/password', {
+    r = await fetch(url, {
       method: 'POST',
       credentials: 'same-origin',
       redirect: 'manual',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
       body,
     });
   } catch (e) {
-    throw new Error('no route to the model (' + e.message + ')');
+    throw new Error('no route to the sign-in (' + e.message + ')');
   }
+  // The one refusal that is worth naming rather than re-asking about: being
+  // throttled looks exactly like a wrong password from the outside, and telling
+  // somebody to check a password they typed correctly is how an hour goes.
+  if (r.status === 429) throw new Error(T('auth.rate'));
   return authWhoami();
 }
 
@@ -126,9 +190,15 @@ async function authSignIn(u, p) {
  * bounces a signed-out browser to `/login`, so a response that came back from
  * anywhere else is a session it accepted. It costs a page fetch and it only
  * ever runs when the sign-in has already appeared to fail.
+ *
+ * ONLY ON THE OLD PATH. Once `flamme-auth` is mounted, the thing that mints the
+ * cookie and the thing that reads it back are the same process holding the same
+ * secret in the same variable — they cannot disagree, there is no half state to
+ * detect, and a no means the password was wrong. The check stays for as long as
+ * the old door does, and goes out with it.
  */
 async function authChatOk() {
-  if (!AUTH.host) return false;
+  if (!AUTH.host || authCentral) return false;
   try {
     const r = await fetch(AUTH.host + '/', { credentials: 'same-origin' });
     return r.ok && !/\/login(\?|$)/.test(r.url);
@@ -136,9 +206,13 @@ async function authChatOk() {
 }
 
 async function authSignOut() {
-  if (!AUTH.host) return null;
+  if (!ON_SITE) return null;
+  if (authCentral === undefined) await authWhoami();
+  // `/auth/logout` on the central service, `/abl/logout` on the chat app. Not
+  // the same tail, which is why this is not `base + '/logout'`.
+  const url = authCentral ? authCentral + '/logout' : AUTH.host + '/logout';
   try {
-    await fetch(AUTH.host + '/logout',
+    await fetch(url,
       { credentials: 'same-origin', redirect: 'manual', cache: 'no-store' });
   } catch { /* asked below anyway */ }
   return authWhoami();

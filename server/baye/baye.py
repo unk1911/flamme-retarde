@@ -55,11 +55,18 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
 BAYE_ENV = Path(os.environ.get("BAYE_ENV", "/etc/baye/baye.env"))
+# flamme-auth's own config, which is where `SESSION_SECRET` lives once the
+# sign-in has moved off the GPU box — see `server/auth/`. Read at higher
+# precedence than anything else, and its absence is not an error: on a machine
+# without flamme-auth this file simply is not there and the old sources below
+# answer exactly as they did. That is also the rollback for the cutover — move
+# this file aside, restart, and baye is back on the previous secret.
+AUTH_ENV = Path(os.environ.get("AUTH_ENV", "/etc/flamme-auth/auth.env"))
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("BAYE_PORT", "8791"))
 
@@ -99,16 +106,18 @@ def _parse_env(path: Path) -> dict:
 
 
 class Config:
-    """The keys, re-read when ablit-central's .env is touched.
+    """The keys, re-read when a file they live in is touched.
 
-    Rotating `SESSION_SECRET` or the ElevenLabs key over there should not need a
-    deploy over here, and an operator who has just rotated a key is exactly the
-    person least inclined to remember a second service depends on it.
+    Rotating `SESSION_SECRET` or the ElevenLabs key should not need a deploy
+    over here, and an operator who has just rotated a key is exactly the person
+    least inclined to remember a second service depends on it.
     """
 
     def __init__(self):
         self._mtime = 0.0
+        self._auth_mtime = None
         self._ablit = {}
+        self._auth = {}
         self._baye = _parse_env(BAYE_ENV)
         self.refresh()
 
@@ -120,11 +129,23 @@ class Config:
         if m != self._mtime:
             self._mtime = m
             self._ablit = _parse_env(ABLIT / ".env")
+        try:
+            a = AUTH_ENV.stat().st_mtime
+        except OSError:
+            a = None
+        if a != self._auth_mtime:
+            self._auth_mtime = a
+            self._auth = _parse_env(AUTH_ENV) if a is not None else {}
 
     def get(self, key, default=""):
-        # /etc/baye wins, so a machine can override without touching the chat
-        # app's own configuration.
-        return (self._baye.get(key)
+        # flamme-auth wins over everything, because it is the machine's single
+        # authority for `SESSION_SECRET` and the reason it exists is that
+        # "which file was it reading?" cost an hour on 4 Sep. Then /etc/baye,
+        # so a machine can override without touching the chat app's own
+        # configuration; then ablit-central's .env, which is still where the
+        # ElevenLabs and Brave keys live.
+        return (self._auth.get(key)
+                or self._baye.get(key)
                 or self._ablit.get(key)
                 or os.environ.get(key)
                 or default)
@@ -643,17 +664,32 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _user(self):
-        """The signed-in username from the ablit_session cookie, or None."""
-        raw = self.headers.get("Cookie", "") or ""
-        token = ""
-        for part in raw.split(";"):
+        """The signed-in username from the ablit_session cookie, or None.
+
+        EVERY cookie of that name, not the first one. Until 1.270.0 this took
+        the first and stopped, which is wrong in the one case that matters: a
+        browser can be holding two `ablit_session` cookies at once — the old
+        host-only one `share_chat.py` set for edeliverables.com and the new
+        `Domain=.edeliverables.com` one `flamme-auth` sets — and it sends both,
+        in an order the RFC does not pin down beyond path length. During the
+        cutover that is the normal state of every already-signed-in browser, and
+        picking the stale one means Baye goes silent for no visible reason.
+
+        It also closes cookie tossing: a hostile sibling subdomain can add a
+        third `ablit_session`, but it cannot make one that verifies, so trying
+        them all means it cannot lock anybody out either. The cost is at most a
+        couple of extra HMACs on a request that is about to spend five seconds
+        in two API calls.
+        """
+        secret = CFG.session_secret
+        for part in (self.headers.get("Cookie", "") or "").split(";"):
             k, _, v = part.strip().partition("=")
-            if k == SESSION_COOKIE:
-                token = v
-                break
-        if not token:
-            return None
-        return webauth.read_session(token, CFG.session_secret)
+            if k != SESSION_COOKIE or not v:
+                continue
+            user = webauth.read_session(v, secret)
+            if user:
+                return user
+        return None
 
     def _body(self):
         """Read the request body, ONCE.
