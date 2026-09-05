@@ -244,7 +244,18 @@ const BROD = {
     // steep stair and is exactly what a boat this size has aft.
     { x0: -4.20, x1: -1.50, y: BROD_WELL, hole: 0, lim: 0.50,
       ramp: BROD_ROOF - BROD_WELL },
-    { x0: -7.50, x1: -1.20, y: BROD_WELL, hole: 0 },  // the cockpit, full width
+    // THE LANDING AT THE HEAD OF IT, and without it the stair went nowhere.
+    // The flight stops at x -1.50 and the roof begins at -1.55, but the COCKPIT
+    // band ran on to -1.20 and is tested first — so the last stride off the top
+    // tread matched the cockpit and put you back on its sole, 2.79 m below,
+    // with no fall and no sound. Fifteen centimetres of flat at roof level,
+    // the width of the flight, closes it.
+    { x0: -1.50, x1: -1.35, y: BROD_ROOF, hole: 0, lim: 0.50 },
+    // The cockpit, full width — and it stops at the house's after face rather
+    // than 0.15 past it. `soleAt` draws the sole to -1.35 and this band claimed
+    // to -1.20, so there were fifteen centimetres of cockpit you could stand on
+    // where the floor had already ended.
+    { x0: -7.50, x1: -1.35, y: BROD_WELL, hole: 0 },
     { x0: -1.35, x1: 4.40, y: BROD_DK, hole: 1.16 },  // the side decks
     { x0: 4.30, x1: 6.60, y: 1.22, hole: 0 },         // the foredeck
     // The upper deck, between the rails. Its after end is the stair head and
@@ -253,6 +264,15 @@ const BROD = {
   ],
   edge: 0.06,                // how far in from the bulwark you may stand — a
                              // person's clearance, so it does NOT scale
+  // And how far up or down one stride may take you. A person's, so these do
+  // NOT scale with `BROD_K` — but they have to clear the largest step she
+  // actually has, which is the 0.595 m from the cockpit sole up on to the side
+  // deck (`BROD_DK - BROD_WELL`, built). Set under that and the player is shut
+  // in the cockpit, which is a worse bug than the one being fixed. Set at 0.66
+  // they clear it with a hand's width and still refuse the 2.795 m the roof is
+  // above the sole by a factor of four.
+  stepUp: 0.66,
+  stepDown: 0.85,
   walk: 1.55,                // m/s about the deck — it is a deck, not a runway
   run: 2.6,
 
@@ -1586,7 +1606,13 @@ function buildBrod(scene) {
   /** Put her back alongside at Jadrija with her engine ticking over. */
   function reset() {
     phase = 'moored'; s = 0; sp = 0; tmr = 0; said = -1;
-    you.x = -4.4; you.z = 0; you.yaw = 0; you.pitch = -0.02; you.deck = 0.72;
+    // Built metres here too, and the same fault: -4.4 with z 0 is halfway up
+    // the companionway and 0.72 is the cockpit sole's AUTHORED height, so she
+    // came back alongside with her passenger standing on the stair at a deck
+    // level half a metre under his own feet. In the cockpit, off the flight,
+    // and the sole read rather than typed.
+    you.x = -6.0; you.z = 1.60; you.yaw = 0; you.pitch = -0.02;
+    you.deck = deckAt(you.x, you.z) ?? BROD_WELL * BROD_K;
     if (berth) place(berth.x, berth.z, berth.yaw);
   }
 
@@ -1731,8 +1757,15 @@ function buildBrod(scene) {
     group.visible = true;
     phase = 'letgo';
     s = 0; sp = 0; tmr = 0; said = -1;
-    you.x = 1.20; you.z = -1.30; you.yaw = 0; you.pitch = -0.02;
-    you.deck = deckAt(you.x, you.z) ?? 1.06;
+    // IN BUILT METRES, WHICH THESE WERE NOT. `you.z = -1.30` was written when
+    // she was 15.6 m long and it never went through `BROD_K` when she grew:
+    // the deckhouse's half-width is 2.03 m now, so 1.30 is INSIDE the house,
+    // and the only band that answers there is the upper deck. Boarding put you
+    // on the roof, looking down at the awning you were supposed to be under.
+    // 2.45 is between the house at 2.03 and the bulwark at about 3.19, which
+    // is the port side deck and is where the note below says you land.
+    you.x = 1.20; you.z = -2.45; you.yaw = 0; you.pitch = -0.02;
+    you.deck = deckAt(you.x, you.z) ?? BROD_DK * BROD_K;
     return true;
   }
 
@@ -1801,20 +1834,51 @@ function buildBrod(scene) {
       const c = Math.cos(you.yaw), sn = Math.sin(you.yaw);
       const nx = you.x + (c * f - sn * r) * step;
       const nz = you.z + (sn * f + c * r) * step;
+      // A STEP IS A STEP, and until now it was not.
+      //
+      // `deckAt` answers with a height and this took any height at all: from
+      // the cockpit sole you could walk forward into the deckhouse's footprint,
+      // where the only band that answers is the upper deck, and rise 2.79 m in
+      // one 4 cm stride — standing on the roof having walked through the house.
+      // The same thing worked in reverse off the stair head. It is the whole of
+      // *"it's all messed up in there"* and it is not a geometry bug at all: it
+      // is a walk model with no rise limit in it, which is the one thing every
+      // walk model has.
+      //
+      // 0.45 up and 0.65 down, and they do not scale with `BROD_K` for the same
+      // reason `edge` does not: a step is a person's, and a person is the same
+      // size whatever the boat is. Up is the shorter of the two because
+      // stepping up is a lift and stepping down is a drop, and 0.45 clears the
+      // 0.24 m tread this stair actually has with most of a tread to spare.
       const dy = deckAt(nx, nz);
-      if (dy != null) { you.x = nx; you.z = nz; you.deck = dy; }
-      else {
+      const rise = dy == null ? 0 : dy - you.deck;
+      if (dy != null && rise <= BROD.stepUp && rise >= -BROD.stepDown) {
+        you.x = nx; you.z = nz; you.deck = dy;
+      } else {
+        // And the hull's clamp obeys the limit too. This was the leak the
+        // walk test found: `deckAt` answers 2.135 for the foredeck and the
+        // rise check refuses it, so the code falls through to here — and here
+        // took any height at all. Walking forward off the upper deck you were
+        // refused the 1.92 m drop and then handed it anyway, and ended up at
+        // the stem having stepped down two metres through the wheelhouse roof.
         const sl = slideIn(nx, nz);
-        if (sl) { you.x = nx; you.z = sl.z; you.deck = sl.y; }
+        const slr = sl ? sl.y - you.deck : 0;
+        if (sl && slr <= BROD.stepUp && slr >= -BROD.stepDown) {
+          you.x = nx; you.z = sl.z; you.deck = sl.y;
+        }
         else {
           // And then, only if the hull could not take it, slide along whichever
           // axis still lands on a deck — so the side of the house is something
           // you brush past rather than stop dead against. Same rule the walk
           // model uses ashore.
+          // Both of these obey the same limit. A wall you cannot walk into
+          // head-on is not a wall if you can get through it sideways.
+          const ok = (v) => v != null && v - you.deck <= BROD.stepUp
+            && v - you.deck >= -BROD.stepDown;
           const ax = deckAt(nx, you.z);
-          if (ax != null) { you.x = nx; you.deck = ax; }
+          if (ok(ax)) { you.x = nx; you.deck = ax; }
           const az = deckAt(you.x, nz);
-          if (az != null) { you.z = nz; you.deck = az; }
+          if (ok(az)) { you.z = nz; you.deck = az; }
         }
       }
     }
@@ -1894,6 +1958,16 @@ function buildBrod(scene) {
       place(P.x, P.z, P.yaw);
       return s;
     },
+    /**
+     * The sole at a point in her own frame, or null — `deckAt`, exposed.
+     *
+     * Same reason `seek` is: *"once i board it, i should be able to walk around
+     * it freely, go up and down, instead it's all messed up in there"* is a
+     * complaint about a FLOOR PLAN, and a floor plan cannot be checked from a
+     * screenshot. A probe can walk a grid over her in a tenth of a second and
+     * say where the holes are, which is what this is for.
+     */
+    deckAt,
     /** Where you are standing, in world metres — for the handover to the water. */
     where: () => {
       tmpW.set(you.x, you.deck, you.z);
