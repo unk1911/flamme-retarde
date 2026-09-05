@@ -776,9 +776,31 @@ async function buildJadrija(scene) {
         // Multiplied out rather than passed through `shade`, which is declared
         // four hundred lines below this and would be in the temporal dead zone
         // when the shore builds. That trap has cost this file four evenings.
-        const mortar = [stone[0] * 0.76, stone[1] * 0.76, stone[2] * 0.76];
+        // ── AND THE MORTAR GOES TO SHINGLE AS WELL, WHICH IT DID NOT ────────
+        //
+        // The paragraph above got half of this right and it is worth being
+        // exact about which half. The mortar stopped being a constant and
+        // started taking its colour from the stone, so the grey grid on orange
+        // sand went away — and what replaced it is a grid 24 per cent darker
+        // than the sand, which from the beach is still a grid. Photographed
+        // walking the shore at t 70 to 150 the west end reads as a municipal
+        // esplanade: forty metres of rectilinear grout lines laid across open
+        // sand, in a sector whose own note in `JAD.beachTo` says there is
+        // "sand and pale shingle running into the water with no quay, no
+        // terraces and no steps".
+        //
+        // A beach has no mortar. So the step closes with `beachOf` — 0.76
+        // inland, 1.00 on the sand — and once it has closed there is no flag
+        // left to draw either: the bed IS the ground, one quad a cell, and the
+        // per-cell colour hash that made the flags vary makes the shingle vary
+        // instead. Rule 5 is why the flag is dropped rather than laid flush:
+        // two quads of the same colour a hair apart is exactly the fight.
+        const beach = beachOf(i * step);
+        const mk = 0.76 + 0.24 * beach;
+        const mortar = [stone[0] * mk, stone[1] * mk, stone[2] * mk];
         b.quad(pt(a, a0, yOf(a, a0)), pt(c, c0, yOf(c, c0)),
           pt(c, c1, yOf(c, c1)), pt(a, a1, yOf(a, a1)), mortar);
+        if (beach > 0.985) continue;
         // And the stone on top of it. A cell narrower than two joints has no
         // stone left to draw and is all mortar, which is what a sliver between
         // two big flags actually is.
@@ -14817,8 +14839,22 @@ async function buildJadrija(scene) {
     // and the deck is only the height of the promenade where there is one. On
     // the beach the hill is above it and a column set on `st.deck` goes in to
     // the shin. See the note over `deckOf`.
+    // ── AND NOT ON THE BEACH ────────────────────────────────────────────────
+    //
+    // This loop had no `beachTo` gate at all, and it is the only piece of
+    // municipal furniture on this shore that did not: the benches, the wheelie
+    // bins and the showers all start at `beachTo + 24` because west of that
+    // line there is no promenade to stand them on. Twenty-one 4.8 m lamp
+    // columns with cast arms and lanterns marched the whole 572 m anyway,
+    // every 27 m, straight down the open sand — which with the flag joints
+    // that used to run there was most of why the west end read as a town
+    // esplanade rather than as a beach.
+    //
+    // `+ 4` and not `+ 24`: the columns can stand where the concrete starts,
+    // which is a little seaward of where the benches begin.
+    if (t < JAD.beachTo + 4) continue;
     const y = surfaceY(t, LAMP.s), top = y + LAMP.post;
-    if (t > JAD.beachTo) clutter(t + 1.1, LAMP.s - 1.4, y, 3, (t | 0) * 7 + 1);
+    clutter(t + 1.1, LAMP.s - 1.4, y, 3, (t | 0) * 7 + 1);
     boxTS(t - 0.075, t + 0.075, LAMP.s - 0.075, LAMP.s + 0.075, y, top,
       [0.190, 0.186, 0.178]);
     // AND YOU CANNOT WALK THROUGH IT. Twenty-one of these down the promenade
