@@ -4329,31 +4329,61 @@ async function buildJadrija(scene) {
     // bar H2O has thirteen metres of frontage and nothing but this, and from
     // the terrace it was a flat blue-grey wall with a name over it.
     //
-    // So the room is built between 0.17 and 0.46 m proud — clear of the body
-    // by half again what `backBar` needed, and deep enough that the worktop is
-    // a worktop rather than a ledge. Not for the two shops that already have
-    // their own frontage: the mirror is at `s0 − 0.11` and the gelato case
-    // fills the opening, and pulling this out in front of either of them would
-    // put a shelf of bottles through the middle of the flavours.
+    // ── AND THE NUMBER IS 0.26, WHICH IS NOT WHAT ANYBODY GUESSED ────────────
+    //
+    // Measured rather than argued, because reasoning about it named the wrong
+    // depth twice. Six red slabs were built into this opening at 0.06, 0.16,
+    // 0.26, 0.36, 0.46 and 0.56 m proud, stacked so that each one occupies its
+    // own band of the wall, and the frontage was photographed from the terrace
+    // six and a half metres away. The bottom two do not draw. The top four do.
+    //
+    // So a plane PARALLEL to the shop's own face needs about a quarter of a
+    // metre of standoff before it survives, and 0.17 — which was the first fix
+    // and looked generous against `backBar`'s 0.11 — is on the wrong side of
+    // that line. The horizontal work is not affected and never was: a shelf and
+    // a worktop present their front EDGE, which stands at `f0`, and every one
+    // of those drew at 0.43 m the moment the slab moved.
+    //
+    // What this leaves is a shape rather than a number. There is no room for a
+    // back wall BEHIND the counter: `shopKit`'s counter top already stands 0.34
+    // m proud and its body 0.28, so anything far enough out to draw is out in
+    // front of the counter and hanging over the terrace. So the room is built
+    // ABOVE the counter instead — which is where a caffe bar's back actually
+    // is, and is what `backBar` does at the slasticarnica by a different route.
+    // The wall face is at 0.30, the shelves come forward of it to 0.54, and
+    // `shopInside`'s own worktop and cold cabinet are not drawn at all for
+    // these shops: the counter is `shopKit`'s and there is already a drinks
+    // fridge outside the west reveal under `cooler`. Two worktops one
+    // centimetre apart is rule 5 on the one horizontal surface in the shop.
+    //
+    // None of it for the two that have their own frontage: the mirror is at
+    // `s0 − 0.11` and the gelato case fills the opening, and pulling this out
+    // in front of either would put a shelf of bottles through the flavours.
     const deep = !S.vitrine && !S.backBar;
-    const f0 = S.s0 - (deep ? 0.46 : 0.09), f1 = S.s0 - (deep ? 0.17 : 0.02);
+    const f0 = S.s0 - (deep ? 0.54 : 0.09), f1 = S.s0 - (deep ? 0.30 : 0.02);
+    // Where the shelving starts. Above `shopKit`'s counter for a deep shop, and
+    // on the old ledge for everybody else.
+    const wy = deep ? y0 + 1.10 : oy0;
     const WALL = [0.400, 0.372, 0.330];
     const TOP = [0.330, 0.322, 0.305];
     const DARK = [0.150, 0.148, 0.145];
     const key = S.t0 | 0;
     // The back: a warm wall rather than a black hole, and a tiled band up from
     // the worktop the way every one of these has.
-    boxTS(oa, oc, f1, f1 + 0.02, oy0, oy1, WALL, shade(WALL, 1.10));
-    boxTS(oa, oc, f1 - 0.012, f1, oy0 + 0.12, oy0 + 0.62, shade(WALL, 1.16));
-    // The worktop, running the width of the opening.
-    boxTS(oa + 0.05, oc - 0.05, f0 + 0.02, f1, oy0 + 0.02, oy0 + 0.10,
-      TOP, shade(TOP, 1.20));
+    boxTS(oa, oc, f1, f1 + 0.02, wy, oy1, WALL, shade(WALL, 1.10));
+    boxTS(oa, oc, f1 - 0.015, f1, wy + 0.04, wy + 0.50, shade(WALL, 1.16));
+    // The worktop, running the width of the opening — and only where the shop
+    // has not got `shopKit`'s counter standing in the same plane.
+    if (!deep) {
+      boxTS(oa + 0.05, oc - 0.05, f0 + 0.02, f1, oy0 + 0.02, oy0 + 0.10,
+        TOP, shade(TOP, 1.20));
+    }
     // Two shelves and the stock on them.
     const BOT = [[0.720, 0.640, 0.180], [0.180, 0.360, 0.180],
       [0.640, 0.180, 0.150], [0.230, 0.250, 0.300], [0.780, 0.760, 0.700],
       [0.180, 0.280, 0.520], [0.700, 0.400, 0.140]];
     for (let k = 0; k < 2; k++) {
-      const sy = oy0 + 0.72 + k * 0.42;
+      const sy = wy + (deep ? 0.56 : 0.72) + k * 0.42;
       if (sy + 0.30 > oy1) break;
       boxTS(oa + 0.10, oc - 0.10, f0 + 0.03, f1, sy, sy + 0.030,
         shade(WALL, 0.80), shade(WALL, 0.94));
@@ -4391,8 +4421,10 @@ async function buildJadrija(scene) {
         ], shade(c, 0.62), 6);
       }
     }
-    // And the cold cabinet at one end, with the pale front a lit one has.
-    {
+    // And the cold cabinet at one end, with the pale front a lit one has. Not
+    // on a deep shop: `cooler` already stands one at the west reveal, and the
+    // room above the counter is not where a fridge goes anyway.
+    if (!deep) {
       const ct = oa + 0.62;
       boxTS(ct - 0.42, ct + 0.42, f0, f1, oy0 + 0.02, Math.min(oy1, oy0 + 1.70),
         DARK, shade(DARK, 1.30));
