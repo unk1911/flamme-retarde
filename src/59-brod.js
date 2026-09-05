@@ -172,6 +172,47 @@ const BROD_HT = BROD_P(2.10);                         // deckhouse headroom
 const BROD_ROOF = BROD_DK + BROD_HT + BROD_P(0.10);   // the upper deck's sole
 const BROD_WELL = 0.72;                               // the cockpit sole
 
+/**
+ * The two runs of bench, out here for the reason the three levels above are.
+ *
+ * They were four `b.box` calls inside `brodProto` and nothing else in the game
+ * knew a bench existed, which was fine for as long as nobody sat on one. It is
+ * not fine now: 60-pax.js puts twenty-two people on this boat and most of them
+ * are on these planks, and a seat height written down twice is a seat height
+ * that ends up level with somebody's knees the first time the hull is scaled.
+ *
+ * Authored, like everything else in this file. `x` and `len` do not go through
+ * `BROD_P`: a run of bench is as long as the deck it is on and it should grow
+ * with her, and its length is the whole of what says she takes eighty people.
+ *
+ * `BROD_SEAT`, `BROD_SEATT` AND `d` DO, and the last of those is a correction.
+ * A seat's height and its DEPTH are both the size of the person on it — 0.45 m
+ * off the sole and about half a metre front to back, on a twelve-metre boat or
+ * a thirty-metre one — and only the height ever went through `BROD_P`. So the
+ * cockpit plank was 0.91 m deep and the upper deck's 0.70, which is not a bench,
+ * it is a daybed, and nobody noticed for as long as they were empty.
+ *
+ * Twenty-two people made it impossible to miss. A figure far enough back on a
+ * 0.91 m plank to have their back against something has both shins coming down
+ * *through* the plank; far enough forward for their feet to reach the deck and
+ * they are perched on the front third of it with half a metre of empty bench
+ * behind them. Perching was tried first and photographed, and it is what put
+ * this note here.
+ *
+ * The OUTBOARD edge is what holds still — `z` moves in by half the depth that
+ * came off — because that is the edge the riser stands under and the backrest
+ * stands on, and it is the edge you see. What the change actually looks like is
+ * a wider gangway: 4.06 m between the cockpit benches becomes 4.84.
+ */
+const BROD_SEAT = BROD_P(0.45);        // the plank's middle over its own sole
+const BROD_SEATT = BROD_P(0.08);       // and how thick the plank is
+const BROD_BENCH = {
+  well: { y: BROD_WELL, x: -4.20, len: 5.30, z: 1.68 - BROD_P(0.52) * 0.5,
+    d: BROD_P(0.52) },
+  roof: { y: BROD_ROOF, x: 1.475, len: 5.95, z: 1.14 - BROD_P(0.44) * 0.5,
+    d: BROD_P(0.44) },
+};
+
 const BROD = {
   // Fifteen and a half metres, four and a bit across. The Jadrija boat is a
   // wooden Dalmatian motor passenger boat, and the best picture of one in the
@@ -416,6 +457,27 @@ for (const d of BROD.decks) {
 // The bulwark, which `deckAt` subtracts off the sheer to get the inboard face
 // of it. Structure, not clearance, so it scales.
 const BROD_BULK = 0.24 * BROD_K;
+
+// And the benches, in BUILT metres, on the same table the builder reads in
+// authored ones. Added fields rather than a second object, so there is exactly
+// one place a bench is described and no way to update half of it: `brodProto`
+// takes `x`, `len`, `z`, `d` and goes through `scaledBuilder`, and 60-pax.js
+// takes the five below and does not have to know that scale exists.
+//
+//   top   the plank's top face — where somebody's backside goes
+//   zIn   its inboard edge, which is what a pair of shins has to clear
+//   zOut  its outboard edge, against the bulwark or the backrest
+//   x0/x1 the run of it fore and aft
+//
+// Measured out of this on the built page: both planks stand 0.49 m over their
+// own sole, the cockpit's is 0.52 m deep and the upper deck's 0.44.
+for (const B of [BROD_BENCH.well, BROD_BENCH.roof]) {
+  B.top = (B.y + BROD_SEAT + BROD_SEATT * 0.5) * BROD_K;
+  B.zIn = (B.z - B.d * 0.5) * BROD_K;
+  B.zOut = (B.z + B.d * 0.5) * BROD_K;
+  B.x0 = (B.x - B.len * 0.5) * BROD_K;
+  B.x1 = (B.x + B.len * 0.5) * BROD_K;
+}
 
 /**
  * Her stations: `[x, keel y, chine y, chine half-beam, sheer y, sheer half-beam]`.
@@ -736,15 +798,17 @@ function brodProto() {
       b.box(X0, y0 + h, 0, 0.045, 0.045, Z * 2, RAIL);
     }
     // A bench down each side, backs to the rail, which is how they are on
-    // every one of these. The seat is 0.42 off the deck and 0.40 across, so a
-    // person on it sits with their knees inboard and their back to the sea.
+    // every one of these. The seat is 0.45 m off the deck and 0.44 across, so
+    // a person on it sits with their knees inboard and their back to the sea —
+    // see `BROD_BENCH`, which is where both of those numbers now live.
+    const RB = BROD_BENCH.roof;
     for (const s of [1, -1]) {
       // A bench: seat 0.45 m up, back to 0.90. At the uniform scale these came
       // out at 0.74 and 1.45 and from the upper deck they read as two brown
       // walls with the sea behind them.
-      b.box(1.475, y0 + BROD_P(0.45), s * 0.94, 5.95, BROD_P(0.08), 0.40, TRIM);
-      b.box(1.475, y0 + BROD_P(0.22), s * 1.12, 5.95, BROD_P(0.45), 0.06, TRIM);
-      b.box(1.475, y0 + BROD_P(0.68), s * 1.13, 5.95, BROD_P(0.45), 0.05, TRIM);
+      b.box(RB.x, y0 + BROD_SEAT, s * RB.z, RB.len, BROD_SEATT, RB.d, TRIM);
+      b.box(RB.x, y0 + BROD_P(0.22), s * 1.12, RB.len, BROD_P(0.45), 0.06, TRIM);
+      b.box(RB.x, y0 + BROD_P(0.68), s * 1.13, RB.len, BROD_P(0.45), 0.05, TRIM);
     }
   }
 
@@ -902,11 +966,13 @@ function brodProto() {
   // you could go: the companionway stands exactly there, and a stair through a
   // bench is worse than a bench short. The places the inboard pair was worth
   // are on the roof now, where they can be seen from the pier anyway.
-  for (const s of [1, -1]) {
-    b.box(-4.20, BROD_WELL + BROD_P(0.45), s * 1.42, 5.30, BROD_P(0.08),
-      0.52, TRIM);
-    b.box(-4.20, BROD_WELL + BROD_P(0.22), s * 1.66, 5.30, BROD_P(0.45),
-      0.06, TRIM);
+  {
+    const WB = BROD_BENCH.well;
+    for (const s of [1, -1]) {
+      b.box(WB.x, WB.y + BROD_SEAT, s * WB.z, WB.len, BROD_SEATT, WB.d, TRIM);
+      b.box(WB.x, WB.y + BROD_P(0.22), s * 1.66, WB.len, BROD_P(0.45),
+        0.06, TRIM);
+    }
   }
   // The boarding gate, to port, amidships, on the side she lies alongside.
   // See the note over `BROD_K`: her bulwark now stands 1.13 m over the coping
@@ -1533,6 +1599,8 @@ function buildBrod(scene) {
   group.add(boat);
 
   let fitting = null;            // the pier furniture, once we know where it goes
+  let pax = null;                // the passengers, once their rigs have loaded
+  let paxT = 0;                  // their clock — see `draw`
   let route = null;              // [[x, z], ...], berth first
   let arc = null;                // cumulative metres along it
   let total = 0;
@@ -1811,6 +1879,20 @@ function buildBrod(scene) {
       }
     }
     reset();
+    // The passengers, which is the one thing aboard her that cannot be built
+    // synchronously: the instanced rigs are two payload blobs that have to be
+    // inflated. Kicked off from here rather than from `buildBrod` because
+    // `moor` is where she becomes a boat that exists in the world, and dropped
+    // on the floor if it fails — a ferry with nobody on it is what she was
+    // yesterday and it is not worth a broken load.
+    //
+    // `deckAt` goes in as a callback. It is the walkable model and there is
+    // supposed to be exactly one of those; a passenger standing on a deck the
+    // player cannot reach is a passenger standing on a deck that is not there.
+    if (!pax) {
+      buildBrodPax(scene, deckAt).then((p) => { pax = p; })
+        .catch((e) => console.warn('brod passengers failed:', e.message));
+    }
     return true;
   }
 
@@ -2061,7 +2143,15 @@ function buildBrod(scene) {
       // size whatever the boat is. Up is the shorter of the two because
       // stepping up is a lift and stepping down is a drop, and 0.45 clears the
       // 0.24 m tread this stair actually has with most of a tread to spare.
-      const dy = deckAt(nx, nz);
+      // SOMEBODY IS STANDING THERE. Twenty-two people on a deck four metres
+      // across are only aboard if they cannot be walked through, and the test
+      // is the cheapest possible one — 22 squared distances in her own frame,
+      // which is the frame both they and you are already in. It goes in front
+      // of the deck test rather than behind it so that a refusal falls through
+      // to the same two axis slides the deckhouse does: you brush past a
+      // passenger rather than stopping dead in front of them.
+      const who = (x2, z2) => !(pax && pax.solid(x2, z2));
+      const dy = who(nx, nz) ? deckAt(nx, nz) : null;
       const rise = dy == null ? 0 : dy - you.deck;
       if (dy != null && rise <= BROD.stepUp && rise >= -BROD.stepDown) {
         you.x = nx; you.z = nz; you.deck = dy;
@@ -2072,7 +2162,7 @@ function buildBrod(scene) {
         // took any height at all. Walking forward off the upper deck you were
         // refused the 1.92 m drop and then handed it anyway, and ended up at
         // the stem having stepped down two metres through the wheelhouse roof.
-        const sl = slideIn(nx, nz);
+        const sl = who(nx, nz) ? slideIn(nx, nz) : null;
         const slr = sl ? sl.y - you.deck : 0;
         if (sl && slr <= BROD.stepUp && slr >= -BROD.stepDown) {
           you.x = nx; you.z = sl.z; you.deck = sl.y;
@@ -2086,9 +2176,9 @@ function buildBrod(scene) {
           // head-on is not a wall if you can get through it sideways.
           const ok = (v) => v != null && v - you.deck <= BROD.stepUp
             && v - you.deck >= -BROD.stepDown;
-          const ax = deckAt(nx, you.z);
+          const ax = who(nx, you.z) ? deckAt(nx, you.z) : null;
           if (ok(ax)) { you.x = nx; you.deck = ax; }
-          const az = deckAt(you.x, nz);
+          const az = who(you.x, nz) ? deckAt(you.x, nz) : null;
           if (ok(az)) { you.z = nz; you.deck = az; }
         }
       }
@@ -2136,10 +2226,39 @@ function buildBrod(scene) {
     const d = Math.hypot(cam.x - berth.x, cam.z - berth.z);
     group.visible = d < 1000;
     if (group.visible) place(berth.x, berth.z, berth.yaw, dt);
+    // And the people on her, who are the whole point of walking out to the
+    // Brod: what tells you from the road that there is a boat to catch is that
+    // there are people already sitting on it. `place` has just left
+    // `boat.matrixWorld` current, which is the frame they are posed in.
+    drawPax(dt, cam, group.visible);
   }
 
-  /** Nothing on her animates yet. See the header for what is missing. */
-  function draw() {}
+  /**
+   * Her passengers, every frame she is on the screen.
+   *
+   * `paxT` and not wall time. The crowd's idle motion is a function of a clock,
+   * and `__fr.filmDt` exists to pin the world's step to a fixed number of
+   * seconds a frame so that a film comes out evenly timed — a crowd off
+   * `performance.now()` would be the one thing in the frame still running at
+   * real speed.
+   *
+   * The instanced layers are added to the SCENE by `crowdLayer`, not to
+   * `group`, and the instance transforms are absolute. So `group.visible` does
+   * not take them down with her and this has to: `hide` is what stops
+   * twenty-two people hanging in the air over the channel once she is more than
+   * a kilometre off.
+   */
+  function drawPax(dt, cam, on) {
+    if (!pax) return;
+    if (!on) { pax.hide(); return; }
+    paxT += dt;
+    pax.flush(paxT, cam, boat.matrixWorld);
+  }
+
+  /** Her passengers, while you are aboard. See `drawPax`. */
+  function draw(dt, cam) {
+    if (cam) drawPax(dt, cam, group.visible);
+  }
 
   return {
     you,
@@ -2205,6 +2324,9 @@ function buildBrod(scene) {
       dock: dock ? [+dock.x.toFixed(0), +dock.z.toFixed(0)] : null,
       tris: hull.geometry.attributes.position.count / 3
         + (fitting ? fitting.geometry.attributes.position.count / 3 : 0),
+      pax: pax ? pax.stats() : null,
     }),
+    /** The passengers, for a probe. Null until their rigs have inflated. */
+    get pax() { return pax; },
   };
 }

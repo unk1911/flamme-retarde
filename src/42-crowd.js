@@ -946,6 +946,24 @@ function makeCrowd(scene, rig, cap) {
   const _p = new THREE.Vector3();
   const _q = new THREE.Quaternion();
   const _s = new THREE.Vector3();
+  /**
+   * The frame everybody in this crowd is placed in, or null for the world.
+   *
+   * Set for the length of one `flush` and read by `pose`. Null is every crowd
+   * on the shore: a beach does not move, so `fg.x/y/z` are world metres and the
+   * scratch skeleton's root matrix *is* its world matrix.
+   *
+   * A boat is the other case, and it is the reason this exists. See the header
+   * of 60-pax.js: her deck heels and trims off the Gerstner surface every frame
+   * and everything on her is a child of a group that carries that, so a
+   * passenger placed in world metres would stand in the sea while she sailed
+   * out from under them. With a frame the figure is posed in HER metres —
+   * x forward, z to starboard, y off `deckAt` — and the boat's own world matrix
+   * is composed on the outside of it, which is exactly what being aboard means.
+   */
+  let frame = null;
+  const _inv = new THREE.Matrix4();
+  const _cl = new THREE.Vector3();
 
   /**
    * Pose the scratch skeleton as `fg`, at time `t`.
@@ -984,15 +1002,37 @@ function makeCrowd(scene, rig, cap) {
         // hovering, which is exactly what the first cut did — a row of people
         // sitting on nothing, half a metre in the air, legs straight out.
         skel.pelvis.position.y = skel.restY - 0.72;
-        skel.legLU.rotation.z = 1.55;
-        skel.legRU.rotation.z = 1.52;
+        // AND HOW FAR THE SOLES ARE UNDER THE SEAT, which is the one thing
+        // about this pose that is a property of the seat and not of the person.
+        //
+        // Everything above is measured for the lip of the lowest platform: the
+        // hip 0.14 m over the slab, the thighs level, the shins plumb, and the
+        // feet 0.318 m below the slab hanging over water, where nothing is
+        // waiting to be stood on. Put the same pose on a BENCH — 0.49 m over
+        // its own sole, which is what both of the Brod's are — and the feet
+        // stop 0.17 m short of the deck, which from two metres is a row of
+        // people sitting in mid-air.
+        //
+        // `fg.thigh` is the delta that answers it, and it goes on the thigh
+        // rather than on the hip: raising the hip lifts the whole figure off
+        // the plank, while dropping the knee lets the leg reach further down
+        // without moving the part of them that is actually on the seat. The
+        // shin takes the same delta back, so the shank stays as near plumb as
+        // it was and the feet come down under the knee instead of swinging
+        // forward. See `PAX_THIGH` in 60-pax.js for the solve.
+        //
+        // Zero for everybody on the shore, and `x + 0` is `x`, so the beach is
+        // untouched to the last bit.
+        const dth = fg.thigh || 0;
+        skel.legLU.rotation.z = 1.55 + dth;
+        skel.legRU.rotation.z = 1.52 + dth;
         // Same clock per figure and the same complaint answered as in the
         // standing case below: two people sitting on a quay do not swing their
         // legs in time with each other, and a pair of shins moving through five
         // degrees is a pair of shins that is not moving.
         const sr = 0.70 + fg.seed * 0.70;
-        skel.legLL.rotation.z = -1.50 + Math.sin(ph * 0.62 * sr) * 0.19;
-        skel.legRL.rotation.z = -1.46 + Math.sin(ph * 0.55 * sr + 2.1) * 0.17;
+        skel.legLL.rotation.z = -1.50 - dth + Math.sin(ph * 0.62 * sr) * 0.19;
+        skel.legRL.rotation.z = -1.46 - dth + Math.sin(ph * 0.55 * sr + 2.1) * 0.17;
         // The trunk rocks slowly over the hips, which is what you do when there
         // is nothing behind you to lean on.
         skel.torso.rotation.z = -0.14 + Math.sin(ph * 0.24 * sr) * 0.085;
@@ -1463,13 +1503,40 @@ function makeCrowd(scene, rig, cap) {
     // happens in the figure's own frame and the yaw then aims the result.
     skel.root.rotation.set(0, fg.yaw, tip);
     skel.root.scale.setScalar(fg.scale);
-    skel.root.updateMatrixWorld(true);
+    if (!frame) { skel.root.updateMatrixWorld(true); return; }
+    // The four lines `updateMatrixWorld(true)` is, with the parent it does not
+    // have. Three.js would do this for nothing if the scratch skeleton were a
+    // CHILD of the boat — but the skeleton is shared by every figure this crowd
+    // draws, and a crowd that has to be re-parented per figure is a crowd that
+    // can only ever be in one place. A matrix passed to `flush` costs one
+    // multiply per person and leaves the same crowd able to hold people on a
+    // beach and people on a moving deck at once.
+    //
+    // Nothing downstream has to know: `flush` decomposes the joint world
+    // matrices into position, quaternion and scale exactly as before, and the
+    // composition is exact because a boat carries rotation and translation
+    // only — no shear and no scale for the decompose to lose.
+    skel.root.updateMatrix();
+    skel.root.matrixWorld.multiplyMatrices(frame, skel.root.matrix);
+    for (const c of skel.root.children) c.updateMatrixWorld(true);
   }
 
   let drawn = 0;
 
-  /** Pose everybody in range and hand the transforms to the GPU. */
-  function flush(t, cam) {
+  /**
+   * Pose everybody in range and hand the transforms to the GPU.
+   *
+   * `fr` is the optional frame — see the note over `frame` above. The range
+   * test has to go with it: `fg.x/fg.z` are metres in whatever frame the crowd
+   * is placed in, and a passenger two metres from the camera is at x 1.4, z 2.3
+   * in the boat's, which against a camera at world (-1596, 343) is two
+   * kilometres away and culled. So the camera comes into the frame instead of
+   * the crowd going out of it — one inverse a flush rather than one transform
+   * a head.
+   */
+  function flush(t, cam, fr) {
+    frame = fr || null;
+    if (frame) cam = _cl.copy(cam).applyMatrix4(_inv.copy(frame).invert());
     let n = 0;
     const maxSq = CROWD.poseM * CROWD.poseM;
     for (const fg of figures) {

@@ -5267,7 +5267,14 @@ function frame() {
   // The one mode that is drawn when it is *not* running: she lies at the mole
   // whenever you are near enough to see her, which is what makes walking out
   // there something you do on purpose. See `idle` in 59-brod.js.
-  if (brod) { if (state.phase === 'brod') brod.draw(); else brod.idle(dt, camera.position); }
+  // `draw` takes the step and the eye now, for the same reason `idle` always
+  // has: her passengers are a crowd, a crowd runs off a clock, and the clock
+  // has to be the world's step rather than wall time or a film comes out with
+  // twenty-two people moving at the wrong speed. See `drawPax` in 59-brod.js.
+  if (brod) {
+    if (state.phase === 'brod') brod.draw(dt, camera.position);
+    else brod.idle(dt, camera.position);
+  }
   if (chase && (chase.active || chase.poised)) chase.draw(dt);
   U.uCamPos.value.copy(camera.position);
   // How deep the eye itself is, which is what dims the water rather than
