@@ -4291,12 +4291,38 @@ async function buildJadrija(scene) {
       if (sy + 0.30 > oy1) break;
       boxTS(oa + 0.10, oc - 0.10, f0 + 0.03, f1, sy, sy + 0.030,
         shade(WALL, 0.80), shade(WALL, 0.94));
+      // BOTTLES AND NOT COLOURED RECTANGLES. They were `boxTS` — a flat
+      // front 70 mm wide with a square top — and behind a counter you can
+      // walk up to that is a shelf of paint chips. It is the same call the
+      // back bar's stemware got and the bathers' swimwear before it: what
+      // makes a bottle a bottle is the shoulder and the neck, and neither of
+      // those is a thing a box has.
+      //
+      // Six sides and five rings. A bottle on a shelf is seen from the front
+      // through a serving hatch and never from above, so the facets cost
+      // nothing and a seventh would buy nothing; the rings are where the
+      // shape actually is — base, body, shoulder, neck, lip.
+      const bs = (f0 + 0.035 + f1 - 0.006) * 0.5;
       for (let t = oa + 0.16; t < oc - 0.20; t += 0.105) {
         const h = jit(((t * 9) | 0) + key + k * 53, 640);
         if (h < 0.18) continue;
         const c = BOT[(jit(((t * 9) | 0) + key + k * 53, 641) * BOT.length) | 0];
-        boxTS(t, t + 0.070, f0 + 0.035, f1 - 0.006, sy + 0.030,
-          sy + 0.030 + 0.16 + h * 0.13, c, shade(c, 1.20));
+        const y = sy + 0.030;
+        const bodyH = 0.105 + h * 0.085;      // where the shoulder starts
+        const topH = bodyH + 0.075 + h * 0.03;
+        lathe(W, t + 0.035, bs, [
+          [y + 0.002, 0.030],
+          [y + 0.010, 0.034],
+          [y + bodyH, 0.034],
+          [y + bodyH + 0.038, 0.013],         // the shoulder, which is the shape
+          [y + topH - 0.012, 0.012],
+        ], c, 6);
+        // The cap. Darker than the glass and a hair wider than the neck, which
+        // is the one detail that stops a neck reading as a spike.
+        lathe(W, t + 0.035, bs, [
+          [y + topH - 0.014, 0.0145],
+          [y + topH, 0.0145],
+        ], shade(c, 0.62), 6);
       }
     }
     // And the cold cabinet at one end, with the pale front a lit one has.
@@ -10560,11 +10586,22 @@ async function buildJadrija(scene) {
             const h = jit(skey * 17 + sh * 31 + i, 640);
             const bt = ct - 0.335 + i * 0.083;
             const c = BOT[(h * BOT.length) | 0];
-            boxTS(bt - 0.030, bt + 0.030, cs - 0.338, cs - 0.323,
-              sy + 0.014, sy + 0.185 + h * 0.050, c, shade(c, 1.12));
-            boxTS(bt - 0.016, bt + 0.016, cs - 0.336, cs - 0.325,
-              sy + 0.185 + h * 0.050, sy + 0.208 + h * 0.050,
-              [0.760, 0.740, 0.690]);
+            // Turned, not boxed — the same call the kiosk's back shelf got.
+            // The door of this cabinet is a FRAME and not a pane, which its
+            // own note two paragraphs down is proud of, and the whole point of
+            // that is that you see what is in it: a square-topped box behind
+            // an open frame is a worse lie than one behind glass.
+            const top = sy + 0.185 + h * 0.050;
+            lathe(W, bt, cs - 0.3305, [
+              [sy + 0.016, 0.026],
+              [sy + 0.022, 0.029],
+              [top - 0.062, 0.029],
+              [top - 0.028, 0.011],           // the shoulder
+              [top, 0.010],
+            ], c, 6);
+            lathe(W, bt, cs - 0.3305, [
+              [top, 0.0125], [top + 0.020, 0.0125],
+            ], [0.760, 0.740, 0.690], 6);
           }
         }
       }
