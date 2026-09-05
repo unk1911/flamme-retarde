@@ -25258,8 +25258,15 @@ async function buildJadrija(scene) {
     b.soak = 1.6;
     const kind = CAST_KIND[castBlob[bi]] || null;
     if (!kind) return;
-    batherNewsQ = { kind, pose: b.pose,
-      m: Math.hypot(b.t - show.pt, b.s - show.ps) };
+    const m = Math.hypot(b.t - show.pt, b.s - show.ps);
+    // THE SOUND FIRST, AND THAT IS THE POINT OF IT. The sentence is a model
+    // call and a speech synthesis back to back — three to six seconds — and
+    // nothing here can make that shorter. What it can do is stop being the
+    // first thing that happens: a yelp on the frame the water lands turns the
+    // wait into somebody drawing breath, which is what the cat has been doing
+    // since the hour he shipped. See `yelp` in 80-audio.js.
+    audio.yelp(kind, m);
+    batherNewsQ = { kind, pose: b.pose, m };
   }
 
   /**

@@ -4025,6 +4025,110 @@ function buildAudio() {
   }
 
   /**
+   * A person, hit with cold water.
+   *
+   * THIS IS A LATENCY FIX AND NOT A SOUND EFFECT. Misha, 4 Sep 2026: *"I love
+   * how the folks now reply to getting sprayed. the only issue is the delay I
+   * guess because it takes time to synthesize responses... not sure if there
+   * is much that can be done about that latency"*. There is, and it is the
+   * thing the cat has already been doing since the hour he shipped: he MEOWS
+   * on the frame the water lands and the sentence arrives four seconds later
+   * on top of it. The round trip cannot be made shorter — it is a model call
+   * and a speech synthesis, back to back, on somebody else's machines — but it
+   * can stop being the FIRST thing that happens. A reaction that is instant
+   * and a line that is late reads as a person drawing breath. Only the line
+   * reads as lag.
+   *
+   * So: a vowel, synthesised here, with no network in it at all.
+   *
+   * What makes it a person rather than a bleep is the same trick the meow
+   * uses — pitch and mouth on different curves — plus two formants that ARE
+   * the vowel. F1 and F2 are where "ah" lives; a child's vocal tract is
+   * shorter, so both go up by about a quarter, which is why `girl_child` is
+   * not simply the woman's yelp played fast.
+   *
+   *   f0    the voice: 110 for a heavy old man, 420 for a child
+   *   F1/F2 the mouth: 700/1200 for "ah", scaled with the tract
+   *   rise  how much the pitch jumps — a yelp jumps, a grunt does not
+   *
+   * `man_old_heavy` is the one that is not a yelp. He does not jump; he
+   * objects, on one low note, and it is funnier for it.
+   */
+  const YELP = {
+    girl_child:       { f0: 440, f1: 880, f2: 1560, dur: 0.34, rise: 0.34, rasp: 0.18 },
+    boy_child:        { f0: 400, f1: 860, f2: 1500, dur: 0.36, rise: 0.30, rasp: 0.22 },
+    woman_young_slim: { f0: 258, f1: 760, f2: 1320, dur: 0.42, rise: 0.26, rasp: 0.14 },
+    woman_young_full: { f0: 244, f1: 740, f2: 1280, dur: 0.44, rise: 0.24, rasp: 0.14 },
+    woman_old:        { f0: 226, f1: 700, f2: 1180, dur: 0.50, rise: 0.14, rasp: 0.26 },
+    man_young_fit:    { f0: 142, f1: 660, f2: 1120, dur: 0.40, rise: 0.20, rasp: 0.20 },
+    man_young_lean:   { f0: 150, f1: 680, f2: 1160, dur: 0.38, rise: 0.22, rasp: 0.18 },
+    man_old_heavy:    { f0: 108, f1: 610, f2: 1020, dur: 0.60, rise: 0.04, rasp: 0.34 },
+  };
+
+  function yelp(kind, d = 0) {
+    if (!ctx) return;
+    const V = YELP[kind] || YELP.woman_young_slim;
+    const t0 = ctx.currentTime + 0.01;
+    const far = Math.max(0.05, 1 - d / 30);
+    const j = 0.90 + Math.random() * 0.20;
+    const dur = V.dur * j;
+    const f0 = V.f0 * j;
+
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    // The catch of breath. Up fast, then down through the whole vowel — which
+    // is a yelp; held flat it is singing, and falling from the start it is a
+    // groan.
+    osc.frequency.setValueAtTime(f0, t0);
+    osc.frequency.exponentialRampToValueAtTime(f0 * (1 + V.rise), t0 + dur * 0.16);
+    osc.frequency.exponentialRampToValueAtTime(f0 * 0.86, t0 + dur);
+
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(0.0001, t0);
+    out.gain.exponentialRampToValueAtTime(0.95 * far, t0 + 0.028);
+    out.gain.setValueAtTime(0.95 * far, t0 + dur * 0.42);
+    out.gain.exponentialRampToValueAtTime(0.0001, t0 + dur + 0.12);
+
+    // The two formants, and a third weak one that is only there to stop the
+    // vowel sounding like a filter sweep.
+    for (const [hz, q, lvl] of [[V.f1, 7.0, 1.0], [V.f2, 9.0, 0.55],
+      [V.f2 * 2.1, 11.0, 0.16]]) {
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.Q.value = q;
+      // The mouth OPENS on the way out — "ah" widens as the breath goes — so
+      // F1 climbs a little while the pitch is already falling. Locked to the
+      // pitch it is one glide again and the person is a theremin.
+      bp.frequency.setValueAtTime(hz * 0.86, t0);
+      bp.frequency.exponentialRampToValueAtTime(hz, t0 + dur * 0.30);
+      bp.frequency.exponentialRampToValueAtTime(hz * 0.92, t0 + dur);
+      const g = ctx.createGain(); g.gain.value = lvl;
+      osc.connect(bp).connect(g).connect(out);
+    }
+    // The breath under it. Every real vocal noise has one and it is most of
+    // what separates a shout from a synthesiser.
+    if (noiseBuf && V.rasp > 0) {
+      const air = ctx.createBufferSource();
+      air.buffer = noiseBuf; air.loop = true;
+      const nf = ctx.createBiquadFilter();
+      nf.type = 'bandpass'; nf.Q.value = 1.4;
+      nf.frequency.setValueAtTime(V.f2 * 1.2, t0);
+      nf.frequency.exponentialRampToValueAtTime(V.f2 * 2.2, t0 + dur);
+      const ng = ctx.createGain();
+      ng.gain.setValueAtTime(0.0001, t0);
+      ng.gain.exponentialRampToValueAtTime(0.10 * V.rasp * far, t0 + 0.05);
+      ng.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      air.connect(nf).connect(ng).connect(out);
+      air.start(t0); air.stop(t0 + dur + 0.14);
+    }
+    out.connect(bed || master);
+    if (verbSend) {
+      const w = ctx.createGain(); w.gain.value = 0.20 * far;
+      out.connect(w).connect(verbSend);
+    }
+    osc.start(t0); osc.stop(t0 + dur + 0.16);
+  }
+
+  /**
    * A cat, complaining.
    *
    * Synthesised rather than sampled, like almost everything else in this file
@@ -4126,7 +4230,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn,
+    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn, yelp,
     /**
      * The last node before the speakers, and the context it lives in.
      *
