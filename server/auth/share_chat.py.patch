@@ -1,0 +1,435 @@
+share_chat.py — verify only. Never mint.
+=========================================
+
+WHAT THIS IS. A prepared patch for `~/ablit-central/bin/share_chat.py`, which
+lives in a different repository, on a machine this could not be tested against.
+It is the ablit-central half of the centralised-auth rebuild; the other half is
+`server/auth/` in this repository. `server/auth/CUTOVER.md` is the runbook, and
+this patch is step 6 of it. Do not apply it on its own — applied before
+flamme-auth is up and reachable, it leaves the chat app redirecting to a sign-in
+that does not exist.
+
+WHERE IT WAS PREPARED AGAINST. `bin/share_chat.py` as of ablit-central's working
+tree on alien18, 2026-09-04, 175989 bytes, the copy that also sits on mpcn0.
+The chat app itself runs on auroraR16, which is not reachable from here, so this
+has been compile-checked and read but never run. Diff it before you trust it.
+
+HOW TO APPLY.
+
+    cd ~/ablit-central
+    git status                       # commit or stash first; you want a revert
+    patch -p1 --dry-run < share_chat.py.patch
+    patch -p1 < share_chat.py.patch
+    python3 -m py_compile bin/share_chat.py
+
+HOW TO ROLL BACK. `patch -R -p1 < share_chat.py.patch`, or `git checkout --
+bin/share_chat.py` if it was clean when you started. The rollback is a genuine
+rollback: nothing in this patch changes a stored format, a hash, a cookie name
+or a file on disk, so the old code picks up exactly where it left off. The one
+thing it does NOT undo is a rotated SESSION_SECRET — see CUTOVER.md step 9.
+
+WHAT IT CHANGES, IN SIX PIECES.
+
+ 1. THE BUG, KILLED AT THE ROOT. The four lines that invented a random
+    SESSION_SECRET when the environment had none are gone. In their place, a
+    hard `SystemExit` if the key is missing OR is still the unexpanded
+    `<python -c ...>` placeholder from .env.example. A chat app that cannot
+    verify a session must not start: it is a private model with the door open,
+    and "logins reset on restart" was never the real symptom — the real symptom
+    was that every OTHER service silently stopped recognising anybody.
+
+ 2. `AUTH_URL` + `CENTRAL_AUTH` replace `OAUTH_ENABLED` as the gate on the
+    custom-route path. The gate is no longer "is Google configured" (it never
+    should have been); it is "does this instance delegate sign-in", which every
+    deployment does. `TUNNEL=gradio` — local development — still gets Gradio's
+    built-in form and its own users.conf, and `auth_fn` is labelled accordingly.
+
+ 3. `/login`, `/auth/password`, `/auth/google/*` and `/logout` become redirects
+    to flamme-auth. They are kept rather than deleted because they are in
+    bookmarks, in history and in older builds of the game. Note `/auth/password`
+    answers **303**, not 302: a browser must turn that POST into a GET, because
+    the password must not be forwarded to a machine that is no longer allowed to
+    see one.
+
+ 4. `/logout` cannot do the job alone and says so. The cookie is now
+    `Domain=.edeliverables.com`, and a `Set-Cookie` from
+    abliterated.edeliverables.com can only clear a cookie scoped to
+    abliterated.edeliverables.com. Only the issuer can revoke it. The
+    `delete_cookie` that remains is for the OLD host-only cookie this app set
+    before the cutover, which nothing else can reach either.
+
+ 5. `_session_user()` — a new reader that tries EVERY `ablit_session` cookie in
+    the raw header and takes the first that verifies. `request.cookies` is a
+    dict, so two cookies of the same name collapse into one and which survives
+    is a coin toss. Two is the *normal* state of an already-signed-in browser
+    for the seven days after the cutover, because the old host-only cookie sits
+    in the jar next to the new domain-scoped one. Without this, roughly half of
+    all requests from those browsers read as signed out. `baye.py` and
+    `server/auth/auth.py` got the same change in the same release.
+
+ 6. `_login_html` is left in place and unreferenced, with a comment saying so.
+    It moved to flamme-auth. It stays here so that reverting this patch is one
+    command and not an archaeological dig.
+
+WHAT IT DELIBERATELY DOES NOT CHANGE. The cookie name, the token format, the
+hash format, `webauth.py`, or anything a user can see once they are signed in.
+Every password in `/etc/flamme-auth/users.conf` is the same
+`pbkdf2_sha256$200000$…` line it was in `conf/users.conf`, copied verbatim, so
+every password that worked yesterday works today.
+
+WHAT IT NEEDS IN THE ENVIRONMENT ON auroraR16 (or wherever the app is that day):
+
+    SESSION_SECRET=<the value from /etc/flamme-auth/auth.env on mpcn0>
+    AUTH_URL=https://edeliverables.com/auth      # this is also the default
+
+The first is now load-bearing rather than optional, which is the entire point.
+
+--- 8< --- the diff itself ---------------------------------------------------
+
+--- a/bin/share_chat.py
++++ b/bin/share_chat.py
+@@ -286,8 +286,7 @@
+         return False
+     ids = {(getattr(request, "username", "") or "").strip().lower()}
+     try:  # the webauth cookie directly, like _whoami(): Google logins carry the email
+-        u = webauth.read_session((request.cookies or {}).get(SESSION_COOKIE, ""),
+-                                 SESSION_SECRET)
++        u = _session_user(request)
+         if u:
+             ids.add(u.strip().lower())
+     except Exception:
+@@ -614,10 +613,17 @@
+     yield status, radio, start, stop
+ # -----------------------------------------------------------------------------
+ 
+-# ---- multi-user auth -------------------------------------------------------
+-# Users live in conf/users.conf, one per line:  username:pbkdf2_sha256$iters$salt$hash
+-# (hashed, never cleartext — generate with bin/adduser). If the file is absent/empty,
+-# we fall back to the single CHAT_USER / CHAT_PASS pair.
++# ---- multi-user auth: DEVELOPMENT ONLY -------------------------------------
++# Everything in this block is dead when CENTRAL_AUTH is on, which is every
++# deployment. It survives for `TUNNEL=gradio`, the local development mode that
++# has no custom routes and therefore no way to hand sign-in to anybody else.
++#
++# READ THIS BEFORE YOU RUN ./bin/adduser. `conf/users.conf` under THIS checkout
++# is not the file that lets anybody in. The one that counts is
++# /etc/flamme-auth/users.conf on mpcn0, written by flamme-retarde's
++# server/auth/authuser, which checks it is on the right machine before it writes
++# — because this checkout exists on at least three machines and running adduser
++# on two of them was a silent success that changed nothing.
+ USERS_PATH = ROOT / "conf" / "users.conf"
+ 
+ 
+@@ -666,6 +672,11 @@
+ 
+ 
+ def auth_fn(username: str, password: str) -> bool:
++    """DEV ONLY. Gradio's built-in login form, for `TUNNEL=gradio`.
++
++    A deployed instance never reaches this: `build_app` passes
++    `auth_dependency=get_current_user` instead, which verifies a cookie minted
++    somewhere else. Do not add a caller."""
+     users = current_users()                # picks up edits to users.conf live
+     enc = users.get(username)
+     if enc is not None:
+@@ -1974,20 +1985,86 @@
+ OAUTH_ENABLED = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET
+                      and OAUTH_REDIRECT_URL and TUNNEL != "gradio")
+ 
+-# Secret that signs session cookies. Set SESSION_SECRET in .env so logins survive
+-# restarts; otherwise we mint an ephemeral one (sessions reset on each restart).
++# The secret that VERIFIES session cookies. This app no longer signs any.
++#
++# It used to do both, and that was the bug. Identity followed the GPU box —
++# alien18, auroraR16, a Lambda burst — and on 4 Sep 2026 it landed on a host
++# whose .env had no SESSION_SECRET, so the four lines that used to be here
++# invented a random one at startup:
++#
++#     SESSION_SECRET = os.environ.get("SESSION_SECRET", "").strip()
++#     if OAUTH_ENABLED and not SESSION_SECRET:
++#         SESSION_SECRET = _secrets.token_urlsafe(32)
++#
++# This app then verified its own cookie perfectly and nothing else on earth
++# could. The game's sign-in said "rejected — check the user and the password".
++# The password was right. That cost an hour, and it would have cost another one
++# the next time the app moved, because a random key is indistinguishable from a
++# correct one until something *else* tries to read a session.
++#
++# So: no fallback. If the key is missing, or is still the never-expanded
++# placeholder that shipped in .env.example, this REFUSES TO START. A chat app
++# that cannot check a session and starts anyway is a private model with the door
++# open; a service that will not come up is a line in `systemctl status` that
++# somebody reads in thirty seconds.
+ SESSION_SECRET = os.environ.get("SESSION_SECRET", "").strip()
+-if OAUTH_ENABLED and not SESSION_SECRET:
+-    import secrets as _secrets
+-    SESSION_SECRET = _secrets.token_urlsafe(32)
+-    print("[auth] SESSION_SECRET not set — using an ephemeral one "
+-          "(logins will reset on restart). Set SESSION_SECRET in .env to persist.")
++
++# Where sessions come from now: flamme-auth on mpcn0, behind Apache on the web
++# host. See flamme-retarde's server/auth/. This app only ever verifies.
++AUTH_URL = (os.environ.get("AUTH_URL", "").strip().rstrip("/")
++            or "https://edeliverables.com/auth")
++
++# Replaces OAUTH_ENABLED as the gate for the custom-route path. It is no longer
++# about Google — the Google flow moved to flamme-auth with the rest of the
++# minting — it is about whether this instance delegates sign-in at all.
++# gradio-share mode has no custom routes, so it keeps Gradio's built-in form and
++# its own local users.conf; that is a development mode and nothing else.
++CENTRAL_AUTH = bool(AUTH_URL and TUNNEL != "gradio")
++
++if CENTRAL_AUTH:
++    if not SESSION_SECRET:
++        raise SystemExit(
++            "[auth] FATAL: no SESSION_SECRET in the environment.\n"
++            "       It is not optional and there is no fallback: this app "
++            "verifies sessions minted by flamme-auth on mpcn0, and without the "
++            "same key it rejects every one of them.\n"
++            "       Copy it from /etc/flamme-auth/auth.env on mpcn0 into this "
++            "machine's .env — it is the ONLY place it is authoritative.")
++    if SESSION_SECRET.startswith("<") or SESSION_SECRET.endswith(">"):
++        raise SystemExit(
++            "[auth] FATAL: SESSION_SECRET is the unexpanded placeholder from "
++            ".env.example. It is published in a public repository, which makes "
++            "it a forgeable HMAC key for every account. Replace it with the "
++            "value in /etc/flamme-auth/auth.env on mpcn0.")
++
++
++def _session_user(request) -> str | None:
++    """The signed-in username, trying EVERY ablit_session cookie we were sent.
++
++    `request.cookies` is a dict, so two cookies of the same name collapse into
++    one and which one survives is a coin toss — and two is the normal state of
++    an already-signed-in browser during the cutover, because the old host-only
++    cookie this app used to set sits in the jar next to the new
++    Domain=.edeliverables.com one flamme-auth sets. Reading the raw header and
++    trying them all is the difference between "signed out for no reason" and
++    "signed in", roughly half the time.
++
++    baye.py and flamme-auth's auth.py got the same change in the same release.
++    """
++    for part in (request.headers.get("cookie", "") or "").split(";"):
++        k, _, v = part.strip().partition("=")
++        if k != SESSION_COOKIE or not v:
++            continue
++        u = webauth.read_session(v, SESSION_SECRET)
++        if u:
++            return u
++    return None
+ 
+ 
+ def get_current_user(request) -> str | None:
+-    """auth_dependency for Gradio: derive the logged-in identity from our signed
++    """auth_dependency for Gradio: derive the logged-in identity from the signed
+     session cookie. Returns the username/email, or None (Gradio -> 401)."""
+-    return webauth.read_session(request.cookies.get(SESSION_COOKIE, ""), SESSION_SECRET)
++    return _session_user(request)
+ 
+ 
+ # Link-unfurl scrapers (Discord/Slack/etc.) hit the URL unauthenticated and only see
+@@ -2082,7 +2159,7 @@
+     "<span>eDeliverables.com 2026 &copy;</span>"
+     "<span class='ac-dot'>·</span>"
+     "<a href='mailto:dolphin@edeliverables.com'>Contact Us</a>"
+-    + ("<span class='ac-dot'>·</span><a href='/logout'>Sign out</a>" if OAUTH_ENABLED else "")
++    + ("<span class='ac-dot'>·</span><a href='/logout'>Sign out</a>" if CENTRAL_AUTH else "")
+     + "</div>"
+ )
+ 
+@@ -2708,12 +2785,15 @@
+     Google session cookie; falls back to the Gradio username (password login)
+     or the email's local-part."""
+     name = ""
+-    try:
+-        cookie = (request.cookies or {}).get(SESSION_COOKIE, "")
+-    except Exception:
+-        cookie = ""
+-    if cookie:
+-        name = webauth.session_display_name(cookie, SESSION_SECRET)
++    # Every ablit_session we were sent, not the one the dict happened to keep —
++    # see _session_user. A display name is cosmetic, but taking it from the
++    # stale cookie shows the wrong person's name, which is worse than none.
++    for part in (request.headers.get("cookie", "") or "").split(";"):
++        k, _, v = part.strip().partition("=")
++        if k == SESSION_COOKIE and v:
++            name = webauth.session_display_name(v, SESSION_SECRET)
++            if name:
++                break
+     if not name:
+         u = getattr(request, "username", "") or ""
+         name = u.split("@")[0] if "@" in u else u
+@@ -2722,15 +2802,20 @@
+     # Sign out up top where the identity is shown (the footer link stays too —
+     # on phones it was buried below a very long page).
+     signout = ("<span class='ac-dot'>·</span> <a href='/logout' class='ac-signout'>"
+-               "Sign out</a>" if OAUTH_ENABLED else "")
++               "Sign out</a>" if CENTRAL_AUTH else "")
+     return (f"<div class='ac-user'><span aria-hidden='true'>👤</span> "
+             f"Signed in as <b>{html.escape(name)}</b> {signout}</div>")
+ 
+ 
+ def _login_html(err: str = "", user: str = "") -> str:
+-    """Standalone sign-in page (served outside Gradio): username/password +
+-    a 'Continue with Google' button. Only used when OAUTH_ENABLED. `user`
+-    refills the username after a failed attempt (only the password was wrong)."""
++    """The sign-in page this app used to serve. NOTHING CALLS THIS ANY MORE.
++
++    It moved, near enough verbatim, to flamme-auth's `login_html` — the page a
++    password is typed into has to live with the thing that checks the password,
++    or there are two of them and one is a phishing target with a real
++    certificate. Kept here, unreferenced, because reverting this patch is the
++    rollback and the rollback should be one `git revert` and not an
++    archaeological dig."""
+     msg = _LOGIN_ERRORS.get(err, "")
+     logo = f"<img src='{BRAND_DATA_URI}' alt='ottakyo'>" if BRAND_DATA_URI else ""
+     err_html = f"<div class='err' role='alert'>{msg}</div>" if msg else ""
+@@ -3214,88 +3299,80 @@
+                 return HTMLResponse(_unfurl_card())
+             # Send unauthenticated humans to our own login page (with the
+             # Google button) instead of Gradio's bare 401.
+-            if OAUTH_ENABLED and not get_current_user(request):
++            if CENTRAL_AUTH and not get_current_user(request):
+                 return RedirectResponse("/login", status_code=302)
+         return await call_next(request)
+ 
+-    if OAUTH_ENABLED:
+-        _cookie = dict(max_age=webauth.SESSION_TTL, httponly=True,
+-                       secure=True, samesite="lax")
++    if CENTRAL_AUTH:
++        # THIS APP NO LONGER MINTS A SESSION. Everything below is a signpost to
++        # flamme-auth on mpcn0; the routes are kept rather than deleted because
++        # they are in browser history, in bookmarks, in older builds of the game
++        # and in at least one chat message, and a 404 on /login is a much worse
++        # answer than a redirect.
++        #
++        # Where a sign-in comes back to: this app's own public URL, so that
++        # signing in at edeliverables.com/auth/login lands you back here rather
++        # than on the game's title screen. That works only because flamme-auth
++        # sets the cookie with Domain=.edeliverables.com — a host-only cookie
++        # set on the web host would never be sent to
++        # abliterated.edeliverables.com, which is a CNAME to ngrok and a
++        # different machine entirely. server/auth/auth.py sets out what that
++        # widening costs.
++        _HERE = PUBLIC_URL or ""
++
++        def _to_auth(path: str) -> RedirectResponse:
++            nxt = (_HERE + "/?__theme=dark") if _HERE else ""
++            q = ("?next=" + urllib.parse.quote(nxt)) if nxt else ""
++            return RedirectResponse(f"{AUTH_URL}{path}{q}", status_code=302)
+ 
+         @app.get("/login", include_in_schema=False)
+         async def _login_page(request: Request):
+             if get_current_user(request):
+                 return RedirectResponse("/?__theme=dark", status_code=302)
+-            return HTMLResponse(_login_html(request.query_params.get("e", ""),
+-                                            request.query_params.get("u", "")))
++            return _to_auth("/login")
+ 
+         @app.post("/auth/password", include_in_schema=False)
+         async def _password_login(username: str = Form(""), password: str = Form("")):
+-            # Mobile keyboards auto-capitalize + pad the username; auth is
+-            # exact-match, so normalize the obvious accidents.
+-            username = username.strip()
+-            if auth_fn(username, password):
+-                # ?__theme=dark skips the client-side theme-pin redirect (a full
+-                # white-flash double load over the tunnel) on this hot path.
+-                r = RedirectResponse("/?__theme=dark", status_code=302)
+-                r.set_cookie(SESSION_COOKIE,
+-                             webauth.make_session(username, SESSION_SECRET, via="password"),
+-                             **_cookie)
+-                return r
+-            # Carry the username back so only the password needs retyping.
+-            u = urllib.parse.quote(username[:64])
+-            return RedirectResponse(f"/login?e=bad&u={u}", status_code=302)
++            # A POST cannot be redirected to another origin with its body
++            # intact, and we would not want it to be: the password must not be
++            # bounced through a machine that is no longer allowed to see one.
++            # 303 turns the browser's POST into a GET of the real form, which is
++            # the correct and only safe answer to a stale cached page. The two
++            # arguments stay in the signature so FastAPI still consumes the body
++            # rather than 422-ing on it.
++            return RedirectResponse(f"{AUTH_URL}/login", status_code=303)
+ 
+         @app.get("/auth/google/login", include_in_schema=False)
+         async def _google_login():
+-            state = webauth.make_state(SESSION_SECRET)
+-            r = RedirectResponse(
+-                webauth.auth_redirect_url(GOOGLE_CLIENT_ID, OAUTH_REDIRECT_URL, state),
+-                status_code=302)
+-            r.set_cookie(OAUTH_STATE_COOKIE, state, max_age=webauth.STATE_TTL,
+-                         httponly=True, secure=True, samesite="lax")
+-            return r
++            return _to_auth("/google/login")
+ 
+         @app.get("/auth/google/callback", include_in_schema=False)
+-        async def _google_callback(request: Request):
+-            code = request.query_params.get("code", "")
+-            state = request.query_params.get("state", "")
+-            cookie_state = request.cookies.get(OAUTH_STATE_COOKIE, "")
+-            # CSRF: the returned state must match our cookie AND verify/not be expired.
+-            if not code or not state or not hmac.compare_digest(state, cookie_state) \
+-                    or not webauth.unsign(state, SESSION_SECRET):
+-                return RedirectResponse("/login?e=state", status_code=302)
+-            try:
+-                info = webauth.exchange_code(code, GOOGLE_CLIENT_ID,
+-                                             GOOGLE_CLIENT_SECRET, OAUTH_REDIRECT_URL)
+-            except Exception as ex:
+-                print(f"[oauth] code exchange failed: {ex}", flush=True)
+-                return RedirectResponse("/login?e=google", status_code=302)
+-            email = (info.get("email") or "").strip()
+-            allowed = webauth.email_allowed(email, webauth.load_allowlist(ALLOWLIST_PATH))
+-            if not info.get("email_verified") or not allowed:
+-                print(f"[oauth] denied {email!r} "
+-                      f"(verified={info.get('email_verified')}, allowed={allowed})", flush=True)
+-                return RedirectResponse("/login?e=denied", status_code=302)
+-            r = RedirectResponse("/?__theme=dark", status_code=302)
+-            r.set_cookie(SESSION_COOKIE,
+-                         webauth.make_session(email, SESSION_SECRET, via="google",
+-                                              name=(info.get("name") or "").strip()), **_cookie)
+-            r.delete_cookie(OAUTH_STATE_COOKIE)
+-            print(f"[oauth] login ok: {email}", flush=True)
+-            return r
++        async def _google_callback():
++            # Only reachable from a Google console entry that has not been
++            # repointed at /auth/google/callback yet. Say so by sending them
++            # somewhere that works instead of failing a CSRF check.
++            return _to_auth("/login")
+ 
+         @app.get("/logout", include_in_schema=False)
+         async def _logout():
+-            r = RedirectResponse("/login", status_code=302)
++            # The cookie is Domain=.edeliverables.com now, and THIS app cannot
++            # delete it: a Set-Cookie from abliterated.edeliverables.com can
++            # only clear a cookie scoped to abliterated.edeliverables.com. Only
++            # the issuer can revoke it, so sign-out has to go there. The
++            # delete_cookie below is not redundant — it clears the *old*
++            # host-only cookie this app set before the cutover, which nothing
++            # else can reach either.
++            r = RedirectResponse(f"{AUTH_URL}/logout?next="
++                                 + urllib.parse.quote(_HERE or "/"),
++                                 status_code=302)
+             r.delete_cookie(SESSION_COOKIE)
+             return r
+ 
+     mount_kwargs = dict(path="/", favicon_path=favicon, head=HEAD_HTML, css=_CSS, theme=_THEME)
+-    if OAUTH_ENABLED:
+-        mount_kwargs["auth_dependency"] = get_current_user      # our session cookie
++    if CENTRAL_AUTH:
++        mount_kwargs["auth_dependency"] = get_current_user      # the shared session cookie
+     else:
+-        mount_kwargs["auth"] = auth_fn                          # Gradio's built-in form
++        mount_kwargs["auth"] = auth_fn                          # dev only — see auth_fn
+     return gr.mount_gradio_app(app, ui, **mount_kwargs)
+ 
+ 
+@@ -3328,7 +3405,8 @@
+ 
+         app = build_app(ui, favicon)
+         print(f"[gradio] serving on http://127.0.0.1:{GRADIO_PORT}/ (tunnel: {TUNNEL}, "
+-              f"auth: {'google+password' if OAUTH_ENABLED else 'password'})", flush=True)
++              f"auth: {'central @ ' + AUTH_URL if CENTRAL_AUTH else 'local dev form'})",
++              flush=True)
+         if OAUTH_ENABLED:
+             _allow = webauth.load_allowlist(ALLOWLIST_PATH)
+             print(f"[oauth] redirect_uri={OAUTH_REDIRECT_URL}  "

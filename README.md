@@ -557,18 +557,82 @@ laptop at Jadrija, which talks to a private model on a GPU box, and Baye, who
 talks to you.
 
 It is **one** sign-in. The credential is `ablit_session` — an HMAC-signed,
-httponly cookie minted by [ablit-central](https://abliterated.edeliverables.com)'s
-`webauth.py`, good for seven days. The title screen's `sign in` link and the
-laptop's own form post the same body to the same endpoint and get the same
+httponly cookie, good for seven days, minted by **one service on one machine**
+and merely verified by everything else. The title screen's `sign in` link and
+the laptop's own form post the same body to the same endpoint and get the same
 cookie back, so doing it once does it everywhere: sit down at the Alienware
 afterwards and the prompt is already blinking.
 
-Both back ends are reached **same-origin**, through Apache, and that is not
-tidiness. A cross-site fetch to either dies at CORS, and the session cookie
-would not survive the trip. So `/abl/` proxies the model and `/baye/` proxies
-the voice, and the browser only ever sees one origin. Off the deployed site — a
-`file://` copy, a local server — there is no proxy and nothing to talk to; the
-sign-in sheet says so, the laptop says so, and Baye is simply quiet.
+All three back ends are reached **same-origin**, through Apache, and that is not
+tidiness. A cross-site fetch to any of them dies at CORS, and the session cookie
+would not survive the trip. So `/auth/` proxies the sign-in, `/abl/` proxies the
+model and `/baye/` proxies the voice, and the browser only ever sees one origin.
+Off the deployed site — a `file://` copy, a local server — there is no proxy and
+nothing to talk to; the sign-in sheet says so, the laptop says so, and Baye is
+simply quiet.
+
+### `server/auth/`
+
+**The thing that mints identity must not live on the thing that moves.** That is
+the whole design, and it was written the day after the alternative cost an hour.
+
+Until 1.270.0 `share_chat.py` both *was* the chat app and *minted* the cookie, so
+identity followed the GPU box — alien18, then auroraR16, then a Lambda burst on
+whatever region was cheapest that hour. On 4 Sep 2026 it landed on a host whose
+`.env` had no `SESSION_SECRET`, and it invented a random one at startup. It then
+verified its own cookie perfectly and **nothing else on earth could**. The game
+said "rejected — check the user and the password". The password was right.
+
+The same mistake wore a second hat: `conf/users.conf` existed on three machines
+and only one counted, so `./bin/adduser` on the wrong box was a silent no-op.
+
+| | |
+|---|---|
+| `auth.py` | the service — the only mint, the only `users.conf`, the only `SESSION_SECRET` |
+| `authuser` | add or change a password, and refuse to do it on the wrong machine |
+| `flamme-auth.service` | systemd unit; binds `127.0.0.1:8792` on mpcn0 |
+| `flamme-auth-tunnel.service` | `ssh -R` out to the web host, where Apache proxies `/auth/` |
+| `selftest.py` | boots it against a throwaway config and mints a real session |
+| `selftest-client.mjs` | runs `src/47-auth.js` itself against that service, both doors |
+| `share_chat.py.patch` | the ablit-central half — verify only, never mint |
+| `CUTOVER.md` | the runbook: what breaks at each step, how to undo it |
+
+Four routes. `GET /auth/health` needs no session and names no user. `GET
+/auth/whoami` answers **200 with `user: null`** when you are signed out rather
+than 401 — deliberately unlike `/baye/whoami`, because the browser has to tell
+three states apart (signed in, signed out, *not deployed here*) and the third one
+is an Apache 404. `POST /auth/password` takes the same form body the old endpoint
+took and answers a 302 to a browser or JSON to a `fetch` that asks for it.
+`GET /auth/logout` clears the cookie — and also the old host-only one, which
+nothing else can reach. `GET /auth/login` serves the standalone form, and the
+Google flow moved here too, off by default until its redirect URI is
+re-registered.
+
+**The cookie is `Domain=.edeliverables.com`**, where the old one had no domain at
+all. That widening is what makes the split work: the sign-in is served from
+`edeliverables.com`, but the chat app the session is *for* answers on
+`abliterated.edeliverables.com`, which is a CNAME to ngrok on a different
+machine, and a host-only cookie is never sent there. The cost is that every
+`*.edeliverables.com` host now receives the cookie — all of them the same
+operator's Apache on the same droplet — so a break-in there widens from "the
+site" to "the site plus the chat app", and no further. `HttpOnly` still means an
+XSS cannot read it, and every reader in the system now tries **all** the
+`ablit_session` values it is sent and takes the first that verifies, so a
+shadowing cookie from a sibling subdomain can annoy but cannot lock anybody out.
+That last change is also what carries already-signed-in browsers through the
+cutover, when they legitimately hold two.
+
+**Passwords.** `pbkdf2_sha256$200000$salt$hash`, one line per user, the format
+`bin/adduser` has always written — so the existing file was copied across
+verbatim and every password that worked the day before worked the day after. An
+unknown username costs the same 60 ms as a known one, so there is no timing
+oracle for who is on the list, and three throttles sit in front of all of it: per
+IP, per username, and a global cap that exists because 200k PBKDF2 rounds is 60 ms
+of a 4-vCPU box that also runs Baye.
+
+**Where it runs.** mpcn0, bound to `127.0.0.1` and nothing else — the same
+machine and the same reason as `baye.py` below, and deliberately the least
+capable machine involved, because nobody is ever tempted to move it.
 
 ### `server/baye/`
 
@@ -589,7 +653,8 @@ to the port that arrives on its own loopback.
 
 **What it does with a request.** Verifies the cookie (`webauth.unsign`, the same
 module and the same `SESSION_SECRET`, imported from the checkout next door
-rather than reimplemented so the two cannot drift). Rate-limits per user.
+rather than reimplemented so the two cannot drift). It never mints one — since
+1.270.0 only `flamme-auth` does. Rate-limits per user.
 Assembles the moment — where you are, what phase, what you have seen, plus three
 live feeds — and asks `gpt-5.6-luna` for one line in her register. Sends that
 line to ElevenLabs as Jessica (`LEnmbrrxYsUYS7vsRRwD`), the voice and the four
@@ -612,45 +677,79 @@ balance on anything but a line of Baye's dialogue.
 
 ### Secrets
 
-None of them are in this repository, which is public. `OPENAI_API_KEY` lives in
-`/etc/baye/baye.env` (`0640 root:unk1911` — the service runs as `unk1911`, and
-`0600 root:root` means a service that cannot read its own key).
-`SESSION_SECRET`, `ELEVENLABS_API_KEY` and `BRAVE_API_KEY` are read live out of
-ablit-central's `.env` and re-read when its mtime moves, so rotating a key there
-rotates it here without a deploy.
+None of them are in this repository, which is public.
+
+`SESSION_SECRET` lives in **exactly one place**: `/etc/flamme-auth/auth.env` on
+mpcn0 (`0640 root:unk1911` — the services run as `unk1911`, and `0600 root:root`
+means a service that cannot read its own key). Both `auth.py` and `baye.py` read
+that file at higher precedence than anything else and both re-read it when its
+mtime moves, so rotating the key is one file write that flips both services at
+the same instant with no restart. The chat app is the only piece that needs a
+restart, and it is the only piece on a machine that moves.
+
+`OPENAI_API_KEY` lives in `/etc/baye/baye.env`. `ELEVENLABS_API_KEY` and
+`BRAVE_API_KEY` are still read live out of ablit-central's `.env` — they are
+Baye's keys, not the system's identity, and nothing else depends on them.
 
 ### Installing it
 
 ```sh
-scp server/baye/baye.py            mpcn0:~/baye/
-scp server/baye/*.service          mpcn0:/tmp/ && ssh mpcn0 '
-  sudo mv /tmp/baye*.service /etc/systemd/system/ &&
+scp server/auth/auth.py server/auth/authuser  mpcn0:~/flamme-auth/
+scp server/baye/baye.py                       mpcn0:~/baye/
+scp server/*/[bf]*.service                    mpcn0:/tmp/ && ssh mpcn0 '
+  sudo mv /tmp/*.service /etc/systemd/system/ &&
   sudo systemctl daemon-reload &&
-  sudo systemctl enable --now baye.service baye-tunnel.service'
+  sudo systemctl enable --now baye.service baye-tunnel.service
+                              flamme-auth.service flamme-auth-tunnel.service'
 ```
 
 The Apache side is one shared include, `/etc/apache2/flamme-backends.inc`,
 pulled into both the `edeliverables.com` and `flamme-retarde.edeliverables.com`
 vhosts — the same files are served under both names, and `/abl` was 404 on the
-main one until 1.168.0.
+main one until 1.168.0. It carries one `<Location>` per back end and no cookie
+rewriting at all, for reasons the file itself spells out at length.
+
+**Do not follow the block above blind.** `server/auth/CUTOVER.md` is the ordered
+version, with what breaks at each step and how to undo it; the sign-in is the one
+piece of this system where a wrong order locks everybody out.
 
 ### Testing it
+
+`python3 server/auth/selftest.py` needs no mpcn0, no Apache, no tunnel and no
+network. It makes a throwaway config under `/tmp`, starts `auth.py` as a real
+subprocess, and asserts 30 things end to end — that it refuses to start on a
+missing or placeholder secret, that a good password mints a cookie with the
+right attributes, that the token verifies under `webauth` (which is to say
+`baye.py` will accept it), that a stale cookie sitting beside a good one still
+resolves, that `?next=` is not an open redirect, and that the throttle engages.
+
+`node server/auth/selftest-client.mjs` proves the half nothing else can: that
+`src/47-auth.js` — the real file, run through `new Function` with `fetch` and
+`location` stubbed, not a copy of its logic — picks the right door in all three
+states. It caught the first version building the sign-in URL as
+`base + '/auth/password'`, which is right for `/abl` and gives
+`/auth/auth/password` for the new service: a 404 the client would have reported
+as *rejected — check the user and the password*. The same lie, in a new place,
+in the release written to stop telling it.
 
 `tools/shoot.mjs --cookie ablit_session=<token>` sets a session before the first
 navigation, which is the only way a headless run can exercise any of this. Mint
 one on the box:
 
 ```sh
-ssh mpcn0 'python3 -c "
+ssh mpcn0 'sudo -n python3 -c "
 import sys; sys.path.insert(0, \"/home/unk1911/ablit-central/bin\")
 import webauth
-env = dict(l.split(\"=\", 1) for l in open(\"/home/unk1911/ablit-central/.env\")
+env = dict(l.split(\"=\", 1) for l in open(\"/etc/flamme-auth/auth.env\")
            if \"=\" in l and not l.startswith(\"#\"))
 print(webauth.make_session(\"unk1911\", env[\"SESSION_SECRET\"].strip()))"'
 ```
 
-`curl -s https://edeliverables.com/baye/health` needs no session and reports
-which feeds are populated.
+`curl -s https://edeliverables.com/auth/health` needs no session and reports how
+many users the one real `users.conf` holds. `curl -s
+https://edeliverables.com/baye/health` reports which of Baye's feeds are
+populated. Between them they answer "is it me or is it the system" in two
+commands.
 
 ## Licence
 

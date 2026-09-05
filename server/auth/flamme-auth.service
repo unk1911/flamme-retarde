@@ -1,0 +1,37 @@
+# The sign-in. Runs on mpcn0 and nowhere else — that is the entire point of it.
+#
+# The thing that mints identity must not live on the thing that moves. The chat
+# app follows the GPU (alien18, auroraR16, a Lambda burst); mpcn0 is a 4-vCPU
+# droplet with no card in it, so nobody is ever tempted to move it. It already
+# holds baye.service for the same reason.
+[Unit]
+Description=flamme-auth — the one place a session is minted
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=unk1911
+Group=unk1911
+WorkingDirectory=/home/unk1911/flamme-auth
+Environment=PYTHONUNBUFFERED=1
+Environment=ABLIT_ROOT=/home/unk1911/ablit-central
+Environment=AUTH_CONF=/etc/flamme-auth
+ExecStart=/usr/bin/python3 /home/unk1911/flamme-auth/auth.py
+Restart=always
+RestartSec=3
+
+# It reads two files and writes none. `ProtectSystem=strict` makes /etc
+# read-only for it, which is correct: `authuser` writes users.conf as the
+# operator, not as the service, and the service picks the change up off the
+# mtime with no restart.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -8,6 +8,146 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.270.0] — 2026-09-04
+
+### One place for the authentication crap, and it does not move
+
+Misha: *"what we are doing here is pretty insane... i think we should have one
+place for this authentication crap, and it should always run in 1 spot, on
+mpcn0.... do u not think that is a better design....?"* — and then *"so that
+will be used both by the game, and by the ablit-central login both. and that
+would solve the problem of whether the abliterated model is controlled by PC or
+not"*.
+
+Yes. **The thing that mints identity must not live on the thing that moves.**
+
+1.235.0 diagnosed the bug and made its error message honest. This removes the
+bug. `share_chat.py` both *was* the chat app and *minted* the `ablit_session`
+cookie, so identity followed the GPU box: alien18, then auroraR16, then a Lambda
+burst in whatever region was cheapest that hour. The box it landed on had no
+`SESSION_SECRET`, so it invented one at startup, verified its own cookie
+perfectly, and nothing else on earth could. The same mistake wore a second hat:
+`conf/users.conf` existed on three machines and only one counted, so
+`./bin/adduser` on the wrong box was a silent success that changed nothing.
+
+Both are authority in a place that is allowed to move. Both go away if there is
+exactly one minting service on the one machine that never moves — mpcn0, a
+4-vCPU droplet with no card in it, which is precisely why nobody is ever tempted
+to move it. It already holds Baye for the same reason.
+
+#### `server/auth/` — the whole surface
+
+| | |
+|---|---|
+| `GET /auth/health` | no session, names no user, counts the one real `users.conf` |
+| `GET /auth/whoami` | **200 with `user: null`** when signed out, not 401 |
+| `POST /auth/password` | the same form body the old endpoint took; 302 to a browser, JSON to a `fetch` that asks |
+| `GET /auth/logout` | clears the cookie, and the old host-only one too |
+| `GET /auth/login` | the standalone form, moved verbatim off the chat app |
+| `GET /auth/google/*` | the OAuth flow, moved too, off until its redirect URI is re-registered |
+
+The `whoami` contract is the load-bearing one. It answers 200 signed out because
+the browser has to tell **three** states apart — signed in, signed out, and *this
+service is not deployed here* — and the third is an Apache 404. A 401 collapses
+the last two and the game cannot decide whether to fall back. Which it does:
+`src/47-auth.js` probes once on load and picks its door, so the build works
+either side of the cutover and in either order, and a deploy that lands early
+costs nothing.
+
+#### The cookie is `Domain=.edeliverables.com` now
+
+Decided deliberately, because it is the one change here that widens something.
+
+It has to. The sign-in is served from `edeliverables.com`, but the chat app the
+session is *for* answers on `abliterated.edeliverables.com` — a CNAME to ngrok,
+a different machine at the far end of a tunnel — and a host-only cookie set by
+the web host is never sent there. Three names, one session, one cookie.
+
+What it costs: every `*.edeliverables.com` host now receives it — hoshinomura,
+iceland, poetry, wordle, fumarov, edu, a-steroids, and whatever comes next. All
+of them are the same operator's Apache on the same droplet, so a break-in there
+widens from "the site" to "the site plus the chat app", and no further.
+`HttpOnly` still means an XSS on any of them cannot *read* the token, and
+`SameSite=Lax` still limits riding it. The remaining hole is cookie tossing — a
+sibling subdomain can set a same-named cookie for the parent domain and shadow
+ours — which is why **every reader in the system now tries all the
+`ablit_session` values it is sent and takes the first that verifies**, instead of
+the first that arrives. `auth.py`, `baye.py` and the `share_chat.py` patch all
+got that change in this release.
+
+That fix earns its keep twice. For the seven days after the cutover, every
+already-signed-in browser legitimately holds two of these cookies — the old
+host-only one and the new domain one — and the naive reader picks the stale one
+about half the time and reports you signed out.
+
+#### `SESSION_SECRET` has exactly one home
+
+`/etc/flamme-auth/auth.env` on mpcn0, `0640 root:unk1911`. `auth.py` and
+`baye.py` both read it at higher precedence than anything else and both re-read
+it off its mtime, so **rotating the key is one file write that flips both
+services at the same instant with no restart of either**. The chat app is the
+only piece that needs restarting, and it is the only piece on a machine that
+moves.
+
+It is also rotated as part of the cutover, because the value in use was the
+literal, never-expanded placeholder from `.env.example`:
+
+```
+SESSION_SECRET=<python -c "import secrets;print(secrets.token_urlsafe(32))">
+```
+
+Not a weak key — a **published** one. Anyone who has read that public file could
+forge a session for any account. `auth.py` refuses to start on it, on `""`, on
+anything under 32 characters, and says which.
+
+#### And the four lines that started it are gone
+
+The `share_chat.py` patch replaces them with a `SystemExit`. A chat app that
+cannot verify a session must not start: it is a private model with the door
+open, and "logins reset on restart" was never the real symptom — the real
+symptom was that every *other* service silently stopped recognising anybody.
+
+#### What else is in the box
+
+- `authuser` replaces `bin/adduser` for anything that counts, and **refuses to
+  write unless `flamme-auth` is listening on the machine it is running on** —
+  the cheapest true answer to "am I on the right box", and the direct fix for
+  three `users.conf` files where one was wanted.
+- An unknown username costs the same 60 ms as a known one, so there is no timing
+  oracle for who is on the list; three throttles sit in front of that, the third
+  being a global cap that exists because 200k PBKDF2 rounds is 60 ms of a 4-vCPU
+  box that also has to run Baye.
+- `?next=` accepts a site-relative path or an absolute `https` URL under the
+  cookie domain, and nothing else. An open redirect on the one page users are
+  trained to type a password into is the phishing primitive you least want.
+- `selftest.py` — 30 assertions, no mpcn0, no Apache, no network. And
+  `selftest-client.mjs`, which runs `src/47-auth.js` itself — the real file,
+  not a copy of its logic — against that service in all three probe states.
+  It earned its place immediately: the first version built the sign-in URL as
+  `base + '/auth/password'`, which is right for `/abl` and gives
+  `/auth/auth/password` for the new service. A 404, which the client reports
+  as *rejected — check the user and the password*. The same lie, in a new
+  place, in the release written to stop telling it. It also caught
+  `COOKIE_DOMAIN=` (blank) — the documented rollback for the widening — being
+  silently ignored, because the config reader treated empty as absent.
+- `CUTOVER.md` — seven preparation steps that change nothing visible and can be
+  undone with `rm`, then a sixty-second switch, then everybody signs in once.
+  Every step says what breaks and how to undo it, and the last table says which
+  single row to reach for at 2am.
+
+Nothing about the *format* of a session changed. Same cookie name, same token,
+same `pbkdf2_sha256$200000$…` lines copied across verbatim — every password that
+worked yesterday works today.
+
+#### One thing found on the way past
+
+`mpcn0:~/baye/baye.py` is **883 lines**; `server/baye/baye.py` here is 752, and
+so is every other branch in this repository. Those 131 lines are deployed, live,
+and in no commit anywhere — put there from an uncommitted tree or edited on the
+box. The obvious `scp server/baye/baye.py mpcn0:~/baye/` would delete them
+without a word, which is the same mistake as the one this release is about:
+authority somewhere it can be overwritten. `CUTOVER.md` step 5 now starts with a
+`diff` and refuses to be a copy until somebody has looked at it.
 ## [1.260.0] — 2026-09-04
 
 ### The kiosk had a shop and no yard, and the wrong face turned to the sea

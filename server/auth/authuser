@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+"""Add or change a password in the ONE users file.
+
+    ./authuser <username>            # prompts for the password, twice, hidden
+    ./authuser <username> --stdin    # read the password from stdin
+    ./authuser --list                # names only, never hashes
+    ./authuser --delete <username>
+
+Why this exists when `ablit-central/bin/adduser` already did the same job
+--------------------------------------------------------------------------
+Because `adduser` writes `conf/users.conf` *relative to its own checkout*, and
+that checkout exists on at least three machines — alien18, mpcn0, and whichever
+GPU box the chat app is on this week. Only one of those files was ever read, and
+running the tool on any of the other two was a silent success that changed
+nothing. Somebody adds a user, tells them the password, and it does not work.
+
+So this writes one absolute path, `/etc/flamme-auth/users.conf`, which exists on
+mpcn0 and nowhere else, and it CHECKS that it is on the machine that serves it
+before writing: if `flamme-auth` is not answering on 127.0.0.1:8792, you are on
+the wrong box and it says so and stops. `--force` overrides that, for the case
+where you are setting the machine up and the service is not running yet.
+
+The hash format is unchanged from `bin/adduser` — `pbkdf2_sha256$200000$salt$hash`
+— so the existing file can be copied across verbatim at cutover and every
+password that worked yesterday still works.
+
+Ownership: the file is `0600 unk1911:unk1911` inside a `0750 root:unk1911`
+directory. The service reads it as unk1911 and this writes it as unk1911, so
+adding a user needs no sudo; nothing else on the box can even list the
+directory. The secret next door (`auth.env`) is `0640 root:unk1911` and DOES
+need sudo, which is the right asymmetry: guest list, cheap; key, expensive.
+"""
+import getpass
+import hashlib
+import os
+import secrets
+import socket
+import sys
+from pathlib import Path
+
+# Byte-identical to bin/adduser. Raising it would silently invalidate nothing —
+# the count is stored in each record — but it must never be *lowered*, and it
+# must stay in step with auth.py's dummy-hash cost or the timing oracle that
+# `authenticate()` closes reopens.
+ITERATIONS = 200_000
+
+CONF = Path(os.environ.get("AUTH_USERS", "/etc/flamme-auth/users.conf"))
+PORT = int(os.environ.get("AUTH_PORT", "8792"))
+
+
+def encode(password: str) -> str:
+    salt = secrets.token_bytes(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, ITERATIONS)
+    return f"pbkdf2_sha256${ITERATIONS}${salt.hex()}${dk.hex()}"
+
+
+def service_is_here() -> bool:
+    """Is flamme-auth listening on this machine's loopback?
+
+    The whole point of the tool. It is not a security check — anybody who can
+    write the file can write the file — it is a *are you on the right box* check,
+    and it is the cheapest true signal available: the service binds 127.0.0.1
+    and only 127.0.0.1, so if it answers, this is the machine whose users.conf
+    is the one that counts.
+    """
+    try:
+        with socket.create_connection(("127.0.0.1", PORT), timeout=1):
+            return True
+    except OSError:
+        return False
+
+
+def read_lines() -> list:
+    try:
+        return CONF.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        return []
+
+
+def write_lines(lines: list):
+    try:
+        CONF.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        os.chmod(CONF, 0o600)
+    except PermissionError:
+        # The directory is 0750 root:unk1911, so this user can rewrite the file
+        # in place but cannot CREATE it. That is on purpose — a users.conf
+        # appearing where there was none is how the three-copies problem
+        # started — but it makes for a baffling traceback on a fresh box, so
+        # say the one command that fixes it.
+        sys.exit(f"error: cannot write {CONF}.\n"
+                 f"       On a fresh machine the file has to be created once, "
+                 f"with the right owner:\n"
+                 f"         sudo install -d -o root -g unk1911 -m 750 {CONF.parent}\n"
+                 f"         sudo install -o unk1911 -g unk1911 -m 600 /dev/null {CONF}\n"
+                 f"       then run this again.")
+
+
+def main(argv):
+    force = "--force" in argv
+    use_stdin = "--stdin" in argv
+    args = [a for a in argv if not a.startswith("-")]
+
+    if "--list" in argv:
+        for line in read_lines():
+            if line.strip() and not line.startswith("#") and ":" in line:
+                print(line.split(":", 1)[0].strip())
+        return 0
+
+    if len(args) != 1:
+        print(__doc__.strip().split("\n\nWhy")[0])
+        return 1
+    username = args[0].strip()
+    if not username or ":" in username:
+        print("error: username must be non-empty and contain no ':'")
+        return 1
+
+    if not force and not service_is_here():
+        print(f"error: nothing is listening on 127.0.0.1:{PORT}, so flamme-auth "
+              f"does not run here.\n"
+              f"       {CONF} on THIS machine is not the file anybody reads — "
+              f"editing it is a silent no-op, which is the exact bug this check "
+              f"exists to stop.\n"
+              f"       Run this on mpcn0, or pass --force if you are setting the "
+              f"service up and it is not started yet.")
+        return 2
+
+    if "--delete" in argv:
+        lines = [ln for ln in read_lines()
+                 if ln.split(":", 1)[0].strip() != username]
+        if len(lines) == len(read_lines()):
+            print(f"no user '{username}' in {CONF}")
+            return 1
+        write_lines(lines)
+        print(f"Removed '{username}' from {CONF} — their existing session cookie "
+              f"stays valid until it expires. Rotate SESSION_SECRET to kill it now.")
+        return 0
+
+    if use_stdin:
+        password = sys.stdin.readline().rstrip("\n")
+    else:
+        password = getpass.getpass(f"Password for '{username}': ")
+        if password != getpass.getpass("Confirm password: "):
+            print("error: passwords do not match")
+            return 1
+    if not password:
+        print("error: empty password")
+        return 1
+
+    lines, found = [], False
+    for line in read_lines():
+        if ":" in line and line.split(":", 1)[0].strip() == username:
+            lines.append(f"{username}:{encode(password)}")
+            found = True
+        else:
+            lines.append(line)
+    if not found:
+        lines.append(f"{username}:{encode(password)}")
+    write_lines(lines)
+    # No restart needed: auth.py re-reads this file whenever its mtime moves.
+    print(f"{'Updated' if found else 'Added'} '{username}' in {CONF} "
+          f"(live on the next sign-in — no restart)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

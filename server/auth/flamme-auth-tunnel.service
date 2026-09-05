@@ -1,0 +1,39 @@
+# mpcn0 has no inbound port open to the internet but 22 — DigitalOcean's
+# firewall drops 443 above ufw, which is why abliterated.edeliverables.com is an
+# ngrok CNAME and not an A record. So the sign-in does not listen publicly
+# either: this dials OUT to the web host and hands it 127.0.0.1:8792 on the far
+# side, where Apache proxies /auth/ to it. Plain ssh rather than autossh —
+# ServerAliveInterval detects the dead link and Restart=always is the supervisor
+# autossh was invented to be.
+#
+# The port is one above baye's 8791, on purpose: they are the same shape of
+# thing on the same box reached the same way, and the next person reading
+# `ss -ltn` should be able to guess which is which.
+#
+# NOTE the failure mode this unit has and baye's does not. If this tunnel is
+# down, NOBODY CAN SIGN IN — not the game, not the chat app, not the laptop.
+# Existing sessions keep working for their full seven days because verification
+# is local to each service, so an outage here is a slow puncture rather than a
+# blowout; but it is the one dependency worth an alert.
+[Unit]
+Description=flamme-auth — reverse tunnel to the web host
+After=network-online.target flamme-auth.service
+Wants=network-online.target
+BindsTo=flamme-auth.service
+
+[Service]
+Type=simple
+User=unk1911
+ExecStart=/usr/bin/ssh -N -T \
+  -o BatchMode=yes \
+  -o ExitOnForwardFailure=yes \
+  -o ServerAliveInterval=30 \
+  -o ServerAliveCountMax=3 \
+  -o StrictHostKeyChecking=accept-new \
+  -R 127.0.0.1:8792:127.0.0.1:8792 \
+  unk1911@edeliverables.com
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
