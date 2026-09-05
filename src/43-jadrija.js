@@ -1808,16 +1808,24 @@ async function buildJadrija(scene) {
     return n;
   }
 
-  /** A white PVC door: one leaf, one panel, no louvres and no paint. */
+  /** A white PVC door: one leaf, two mouldings, no louvres and no paint. */
   function pvcDoor(dc, front, floor) {
     const h = DOORW * 0.5;
     const WHITEP = [0.665, 0.668, 0.668];
     const face = front + 0.045;
     boxTS(dc - h + 0.012, dc + h - 0.012, face, face + 0.032,
       floor + 0.010, floor + DOORH - 0.010, WHITEP, shade(WHITEP, 1.06));
-    // The moulded panel, which is the only relief on one of these.
+    // The mouldings, which are the only relief on one of these. TWO, not one:
+    // f68 and the right-hand leaf of f65 are both a tall panel with a short one
+    // under it and a rail between, and that rail is the only line across a leaf
+    // that is otherwise a blank white slab — take it away and the door reads as
+    // a sheet of paper stuck in the hole. f24 does have a single panel, so this
+    // is the commoner of the two and not the only one.
     boxTS(dc - h + 0.10, dc + h - 0.10, face - 0.010, face,
-      floor + 0.16, floor + DOORH - 0.30, shade(WHITEP, 1.10),
+      floor + 0.545, floor + DOORH - 0.16, shade(WHITEP, 1.10),
+      shade(WHITEP, 1.14));
+    boxTS(dc - h + 0.10, dc + h - 0.10, face - 0.010, face,
+      floor + 0.16, floor + 0.445, shade(WHITEP, 1.10),
       shade(WHITEP, 1.14));
     // A brushed handle, and it is a lever rather than a hasp.
     boxTS(dc + h - 0.24, dc + h - 0.10, face - 0.030, face - 0.012,
@@ -1858,8 +1866,21 @@ async function buildJadrija(scene) {
    *
    * `depth` is how far back in the reveal the leaf hangs, so the hardware lands
    * on the door rather than floating in front of the wall.
+   *
+   * `key` is the bay's own index. Pass it and the door gets a padlock; leave it
+   * out and it does not, which is how the one hut you can walk into keeps its
+   * hasp without a lock hanging on a doorway that has no leaf in it.
    */
-  function doorKit(dc, front, floor, half, depth) {
+  // Brass and satin steel, near enough half and half over the frames that show
+  // a lock at all. Kept out here because `doorKit` runs once a bay.
+  //
+  // Both are lighter than the `IRON` the hasp is drawn in — that is the whole
+  // job of these two numbers. The lock sits inside the reveal, where the render
+  // is already shading everything, and a padlock the same value as the plate it
+  // hangs on is a wider hasp.
+  const LOCKB = [[0.360, 0.298, 0.148], [0.445, 0.450, 0.458]];
+  const SHACK = [0.400, 0.408, 0.416];
+  function doorKit(dc, front, floor, half, depth, key) {
     const IRON = [0.190, 0.178, 0.166];
     const f = front + depth;
     for (const y of [floor + 0.42, floor + 1.62]) {
@@ -1870,6 +1891,90 @@ async function buildJadrija(scene) {
       floor + 1.00, floor + 1.07, IRON);
     boxTS(dc + half - 0.13, dc + half - 0.09, f - 0.061, f - 0.022,
       floor + 0.99, floor + 1.09, IRON);
+    // ── AND THE LOCK THAT GOES THROUGH IT ────────────────────────────────────
+    //
+    // The hasp and the staple were drawn and the padlock never was, which is a
+    // hasp standing open on eighty shut huts: the fitting whose entire purpose
+    // is to hold a lock, holding nothing. f42 has the real one — a body hanging
+    // BELOW the staple with the shackle up through it, so what reads at two
+    // metres is not the ironmongery on the leaf but a small bright block
+    // floating clear of it against the dark of the reveal.
+    //
+    // 54 by 68 by 24 mm. A 40 mm padlock is what is actually on these doors and
+    // at 54 mm this is drawn at the big end of the range on purpose: below about
+    // 45 mm the body is under a pixel across at two metres and all the shape
+    // buys you is a darker speck on the hasp.
+    if (key === undefined) return;
+    // One shut door in eight has none — an owner who took his lock away with
+    // him. Off `jit` and the bay index, so it is fixed for the life of the seed
+    // and costs the beach no draw of `rng`.
+    if (jit(key, 918) < 0.13) return;
+    const px = dc + half - 0.110;    // the staple's own centre
+    const py = floor + 0.898;
+    const body = LOCKB[jit(key, 917) < 0.5 ? 0 : 1];
+    boxTS(px - 0.027, px + 0.027, f - 0.072, f - 0.048, py, py + 0.068,
+      body, shade(body, 1.14));
+    // The shackle, 6 mm clear of the staple's face so it reads as passing in
+    // front of it rather than being swallowed by it — the staple here is one
+    // solid box and a shackle drawn inside its span would simply vanish.
+    for (const o of [-1, 1]) {
+      boxTS(px + o * 0.018 - 0.006, px + o * 0.018 + 0.006, f - 0.068, f - 0.054,
+        py + 0.058, py + 0.154, SHACK);
+    }
+    boxTS(px - 0.024, px + 0.024, f - 0.068, f - 0.054,
+      py + 0.142, py + 0.154, SHACK);
+  }
+
+  /**
+   * A coat-hook batten screwed to the render beside a door.
+   *
+   * `kabinasi` already draws one of these, and until now it drew the only one
+   * on the beach: hooks were treated as part of the sign wall, which made them
+   * municipal. They are not. f26 has a six-hook batten on the plain white
+   * render an arm's length to the right of an ordinary door, and f60 has a
+   * five-loop wire rack in the same place beside another. Both are empty and
+   * both are crooked, which is the whole point of them — one owner put one up
+   * because he wanted somewhere to hang a towel, and the hut two along has
+   * nothing.
+   *
+   * Measured off f60, where the leaf gives the scale: the door is 0.90 m across
+   * 94 px and the batten's hooks are 1.65 m off the ground, so it goes at the
+   * hook height `kabinasi` already uses.
+   *
+   * The width is what the bay decides. Both battens in the pan are wide — f26's
+   * is about 0.75 m over a 0.90 m door — and both of them are therefore running
+   * past the party wall into the neighbour's hut, which a batten screwed up by
+   * one owner does not get to do here. A bay is 2.15 m and the architrave round
+   * a 0.90 m door reaches 0.505 m from its middle, so the clear render is
+   * 0.57 m: 0.52 m of batten centred 0.80 m off the door's middle leaves 35 mm
+   * at the architrave and 15 mm at the party wall. Any wider and it grows
+   * through the door frame, which at 26 mm proud it would do silently.
+   *
+   * Timber or grey plastic. On white render a white batten is not there at all,
+   * so both of these are darker than any wash on the row.
+   */
+  const HOOKB = [[0.230, 0.180, 0.120], [0.340, 0.336, 0.322]];
+  function hookBatten(dc, front, floor, key, side) {
+    const hc = dc + side * 0.80, hy = floor + 1.62;
+    const bat = HOOKB[jit(key, 433) < 0.5 ? 0 : 1];
+    const IRON = [0.115, 0.110, 0.102];
+    // The batten's back is buried 10 mm INSIDE the render rather than laid on
+    // it: the wall's seaward face is at `front`, and a batten that stopped there
+    // would be two coplanar quads 2 km from the origin. The wall is solid from
+    // `front` to `front + REVEAL`, so there is nothing behind it to poke into.
+    boxTS(hc - 0.26, hc + 0.26, front - 0.026, front + 0.010,
+      hy, hy + 0.070, bat, shade(bat, 1.12));
+    const n = 5;
+    for (let i = 0; i < n; i++) {
+      const sv = hc - 0.208 + i * (0.416 / (n - 1));
+      // Through the batten's face and out, so the two solids interpenetrate
+      // instead of meeting; then the turned-down tip, which is the only thing
+      // that says hook rather than stud.
+      boxTS(sv - 0.011, sv + 0.011, front - 0.052, front - 0.018,
+        hy + 0.014, hy + 0.036, IRON);
+      boxTS(sv - 0.011, sv + 0.011, front - 0.052, front - 0.032,
+        hy - 0.030, hy + 0.020, IRON);
+    }
   }
 
   /**
@@ -2064,30 +2169,81 @@ async function buildJadrija(scene) {
       // One in six stands open with a curtain in it. Off the bay index and the
       // run's own t, so it is fixed for the life of the seed and costs no draw
       // — see `openDoor`.
+      const key = k + (t0 | 0);
       const oIx = stone ? 1 : (k * 7 + (t0 | 0) * 3) % 6;
+      // ── AND PVC IS NOT A STONE-BAY FITTING ───────────────────────────────
+      //
+      // It was, and that was two findings welded into one. `pvcDoor` was only
+      // ever reached through `stone`, so a white leaf could not appear on this
+      // beach without a wall of crazy paving behind it: one improvement, done
+      // twice, by two owners who happened to do both halves of it.
+      //
+      // Counted off the pan rather than guessed. Every door I can tell apart in
+      // the batch, each one once: the promenade row (f03, f04, f08, f10, f11,
+      // f12, f13) is about 24 leaves and one of them is white — that side is
+      // paint, and it is the side the postcards are of. Walk round the back and
+      // it inverts: of the 17 doors on that face I can separate (f24, f25, f31,
+      // f35, f36, f41, f43, f45, f46, f47/f48, f49, f50, f51, f52, f53, f54,
+      // f60), FIVE are white PVC in ordinary painted render — f24 in peach, f36
+      // in white, f48 in yellow-green, f51 in cream, f49 standing open — and
+      // only one, f52, has the stone. Forty-one doors, six PVC. One in seven.
+      //
+      // The flat-roofed annex at f62-f66 is left out of that count on purpose.
+      // Every leaf on it is the same pale panel, but it is one later building
+      // that was built that way rather than eighty huts one of whose owners
+      // changed his mind, and counting it would have put the rate at a third.
+      //
+      // So the hash is set at one shut bay in five, and the number that matters
+      // is what came out of the built scene rather than what went into the
+      // threshold: the block draws 115 bays, 23 of them standing open, and this
+      // puts a white leaf in 14 of the other 92 — 16 with the two stone ones,
+      // which is one bay in seven and the number the pan gives. The stone stays
+      // at two.
+      //
+      // `jit` and not a modulo on `k`: at this rate a modulo puts a white door
+      // every seventh hut down a hundred metres of row, and a beach that
+      // upgraded its joinery on a metronome is worse than one that never
+      // upgraded it at all. The hash lets two land side by side, which f65 has,
+      // and lets twenty-six bays go by without one.
+      const pvc = stone || (oIx !== 0 && jit(key, 913) < 0.20);
       if (oIx === 0) {
         openDoor(dc, front, fl, col, (k * 3 + (t0 | 0)) % 4);
-      } else if (stone) {
-        // A stone-faced bay has a white PVC door in it and no hasp: the whole
-        // of the improvement is that somebody replaced the joinery as well as
-        // the wall, and a painted hasp on a PVC leaf would undo it.
+      } else if (pvc) {
+        // A PVC bay has no hasp: the whole of the improvement is that somebody
+        // replaced the joinery, and a painted hasp on a PVC leaf would undo it.
+        // The lever and the euro cylinder are on the leaf, in `pvcDoor`.
         pvcDoor(dc, front, fl);
       } else {
         door(dc, front, fl, col, (k * 5 + (t0 | 0)) % 3 !== 0);
-        doorKit(dc, front, fl, DOORW * 0.5, 0.045);
+        doorKit(dc, front, fl, DOORW * 0.5, 0.045, key);
       }
       // The rail between the door head and the vent, filling the last of the
-      // opening. Painted with the door, because it was.
+      // opening. Painted with the door, because it was — and when the door came
+      // out in favour of PVC the frame went with it, which is why this follows
+      // `pvc` and not `stone`. f24 is the clearest: a peach wall, a grey lintel
+      // and every millimetre of joinery in it white.
       boxTS(dc - DOORW * 0.5, dc + DOORW * 0.5, front + 0.010, front + REVEAL,
         fl + DOORH, fl + OPENH - VENTH,
-        stone ? [0.605, 0.608, 0.608] : shade(col, 0.86));
+        pvc ? [0.605, 0.608, 0.608] : shade(col, 0.86));
       vent(dc, front, fl + OPENH - VENTH, DOORW - 0.06,
-        stone ? [0.640, 0.642, 0.642] : col, (k * 5 + (t0 | 0) * 3) % 3);
-      surround(dc, front, fl, stone ? [0.640, 0.642, 0.642] : col,
+        pvc ? [0.640, 0.642, 0.642] : col, (k * 5 + (t0 | 0) * 3) % 3);
+      surround(dc, front, fl, pvc ? [0.640, 0.642, 0.642] : col,
         DOORW * 0.5, fl + OPENH + 0.045);
       // And a line of washing across one shut bay in nine.
       if (oIx !== 0 && (k * 4 + (t0 | 0)) % 9 === 0) {
         clothesline(a, c, front, fl, k + (t0 | 0));
+      }
+      // A coat-hook batten beside one shut bay in fourteen — 7 of the 92 shut
+      // bays in the block — on whichever side of the door the hash puts it.
+      // Three of the roughly forty doors in the pan have one — f06, f26, f60 —
+      // and none of the three is on the sign wall, which is where this build had
+      // put every hook on the beach. See `hookBatten`.
+      //
+      // Not on the stone bays: `crazyFace` stands its flags 50 to 64 mm off the
+      // wall face and a batten laid on the render sits at 26, so a batten there
+      // would be walled up inside the paving with five hooks growing out of it.
+      if (!stone && oIx !== 0 && jit(key, 431) < 0.07) {
+        hookBatten(dc, front, fl, key, jit(key, 432) < 0.5 ? -1 : 1);
       }
     }
     // The name of the thing, on the end wall of the run that carries the one
