@@ -8,7 +8,7 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
-## [1.294.0] — 2026-09-05
+## [1.299.0] — 2026-09-05
 
 ### The Bucketeer, and the stairs are outside
 
