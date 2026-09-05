@@ -301,6 +301,46 @@ function buildAudio() {
     // Combustion / exhaust rumble.
     nodes.rumble = loopNoise(0, 'lowpass', 260, 1.0);
 
+    // ── the Brod's diesel, from her own deck ──────────────────────────────
+    //
+    // She is a nine-and-a-half-minute passage and until now she made no sound
+    // at all except two blasts on the horn. Standing on the deck of a sixteen-
+    // metre wooden boat under way, the engine is not a detail — it is the floor
+    // of everything, and its absence is why the crossing felt like a slideshow.
+    //
+    // There IS a diesel in this file already and it is the wrong one. `BOAT`
+    // plays boat.mp3 as an ambient pass across the channel, and its own note is
+    // explicit that the clip is "roughly what is left of an engine after a few
+    // hundred metres of open water" — 65 Hz firing order and almost nothing
+    // above a kilohertz. That is a boat you can hear. This is a boat you are
+    // standing on, and what is missing from the recording is exactly what you
+    // get at two metres: the clatter over the thump, and the water going past.
+    //
+    // Firing order rather than a guess at a note. A six-cylinder four-stroke
+    // fires three times a revolution, so 700 rpm at the berth is 35 Hz and
+    // 1600 at cruise is 80. Two oscillators a few cents apart, because the
+    // beat between them is most of what a single big slow diesel sounds like
+    // and one oscillator is a hum.
+    nodes.brodEng = [];
+    for (const detune of [0, 9]) {
+      const osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.value = 36;
+      osc.detune.value = detune;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 240; lp.Q.value = 2.6;
+      const g = ctx.createGain();
+      g.gain.value = 0;
+      osc.connect(lp).connect(g).connect(master);
+      osc.start();
+      nodes.brodEng.push({ osc, lp, g });
+    }
+    // The block itself, through the hull and up through your feet.
+    nodes.brodRum = loopNoise(0, 'lowpass', 150, 1.0);
+    // And the water going past her, which is the other half of being on a boat
+    // and is the half the horn and the engine together still would not say.
+    nodes.brodWash = loopNoise(0, 'bandpass', 700, 0.75);
+
     // ── airflow over the airframe ─────────────────────────────────────────
     nodes.air = loopNoise(0, 'bandpass', 900, 0.7);
 
@@ -3688,6 +3728,48 @@ function buildAudio() {
     // is gone, so this now goes with it.
     set(nodes.rumble.g.gain, own * (0.10 + s.throttle * 0.13) * s.near, 0.12);
     set(nodes.rumble.f.frequency, 180 + s.throttle * 160, 0.2);
+
+    // ── the Brod, when you are on her ─────────────────────────────────────
+    //
+    // Gated on being aboard and on nothing else. She is a locale you stand in,
+    // not a thing in the world you hear from a distance — `BOAT`'s ambient
+    // passes already do that job for every other hull in the channel, and two
+    // diesels running at once on the same boat would be one too many.
+    //
+    // `thr` is 0 lying alongside with the engine ticking over and 1 at cruise.
+    // The pitch moves the whole way because a diesel's does — unlike the
+    // turboprop above, where the shaft speed barely changes and the timbre
+    // carries the information.
+    {
+      const bo = s.brod || null;
+      const thr = bo ? bo.thr : 0;
+      const lvl = bo ? 1 : 0;
+      for (let i = 0; i < nodes.brodEng.length; i++) {
+        const e = nodes.brodEng[i];
+        set(e.osc.frequency, 35 + thr * 45 + i * 0.6, 0.30);
+        // Up to 900 at cruise and not 530. Recorded off `audio.tap()` and
+        // looked at as a spectrogram, the first cut was almost all of its
+        // energy under 500 Hz — which is a thump, and a thump is what you hear
+        // from the next boat, not from the deck of this one. The comment above
+        // promises the clatter over the thump; opening the ceiling is what
+        // pays for it, and it costs nothing on the meter because the harmonics
+        // that come through are 20 dB down on the fundamental anyway.
+        set(e.lp.frequency, 230 + thr * 670, 0.30);
+        // 0.085 at cruise against the aeroplane's 0.20 in the cockpit. She is
+        // a passenger boat and you are on her deck in the open, not in an
+        // engine room — the number that matters is that it is UNDER the sea
+        // and the gulls rather than over them.
+        set(e.g.gain, lvl * (0.044 + thr * 0.028), 0.40);
+      }
+      set(nodes.brodRum.g.gain, lvl * (0.047 + thr * 0.047), 0.40);
+      set(nodes.brodRum.f.frequency, 120 + thr * 90, 0.40);
+      // The wash is speed and not throttle: she carries her way for a long
+      // time after the revs come off, which is the one thing about twenty
+      // tonnes that the ear can hear.
+      const wsh = bo ? sat(bo.speed / 8.0) : 0;
+      set(nodes.brodWash.g.gain, lvl * wsh * wsh * 0.075, 0.45);
+      set(nodes.brodWash.f.frequency, 520 + wsh * 520, 0.45);
+    }
 
     // ── airflow ───────────────────────────────────────────────────────────
     // Likewise, and for a subtler reason: this is the slipstream over *your*

@@ -5777,6 +5777,11 @@ function frame() {
     // walked away from it — see the note on `dead` in 80-audio.js.
     afoot: state.phase === 'ground' || state.phase === 'chute'
       || state.phase === 'swim' || state.phase === 'brod',
+    // Her diesel, and only while you are standing on her. See the note in
+    // 80-audio.js: `BOAT`'s ambient passes are every other hull in the channel
+    // heard from the shore, and this is the one you are aboard.
+    brod: brod && brod.active ? { thr: brod.speed / BROD.cruise,
+      speed: brod.speed } : null,
   });
 
   if (state.phase === 'ground') {
