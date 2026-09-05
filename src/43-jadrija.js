@@ -1473,7 +1473,115 @@ async function buildJadrija(scene) {
    */
   const DOORW = 0.90, DOORH = 1.98;
   const REVEAL = 0.09;             // how deep the opening is cut into the render
-  function door(dc, front, floor, col, louvred) {
+  /**
+   * What the sea has done to the paint, worked out once for a whole leaf.
+   *
+   * The walls of this block weather — `plaster` has carried float grain, patch
+   * lines, a foot stain, an algae crown and a peel since August, and its own
+   * note explains at length why a single weathering strength was wrong in both
+   * directions at once. The DOORS did not, and they are the only saturated
+   * surface on a hundred metres of white render: a hundred flat, uniform,
+   * evenly-coated leaves in nine colours, which is the same "lido" mistake the
+   * walls were fixed for, made on the object that carries the eye.
+   *
+   * Two failures, both measured off the batch rather than described.
+   *
+   * PAINT LOSS. `f45` is a petrol-teal door about a fifth gone: measured over
+   * the leaf at 640x360, the intact coat is rgb(17, 31, 38) and what shows
+   * through is rgb(168, 178, 184), against a sunlit wall beside it at
+   * rgb(172, 174, 176). So the substrate is not bare timber, it is white
+   * PRIMER, and it comes out very slightly cooler than the render — which is
+   * what an acrylic undercoat under a repaint looks like next to cement. The
+   * pale fraction over the whole leaf is 0.20, and it is not spread evenly:
+   * it runs as one washed-out column about a quarter of the leaf wide with
+   * islands scattered off it, which is water running down a leaf that faces
+   * the weather. `f42`, fifty metres along, is a green door in the same row
+   * with essentially none of this. So severity travels per door, the way
+   * `WEAR` travels per run — most owners repaint, some do not.
+   *
+   * RUST BLEED. `f26` is a cream door with orange running down the stile below
+   * every fitting. Measured against the clean panel beside it the streak is
+   * rgb(178, 142, 100) on rgb(232, 206, 168) — 0.77 / 0.69 / 0.60 of it,
+   * biased hard to the blue. That is a MIX and not a multiply: iron oxide is a
+   * deposit sitting on the paint, so it darkens a cream door and lightens a
+   * dark green one, and a multiply would take the teal in `f45` to black.
+   *
+   * Returns `[chips, stains]` as rectangles in the leaf's own (t, y), for
+   * `wearOn` to clip against whatever element is actually in front.
+   */
+  const PRIMER = [0.598, 0.632, 0.660];
+  const RUSTY = [0.290, 0.132, 0.058];
+  function doorWear(dc, floor, col, key) {
+    const h = DOORW * 0.5;
+    const chips = [], stains = [];
+    // 0.42 of them are sound, and the tail past that is thin: `^1.7` puts the
+    // median failed door at 0.06 of its face gone and only the last few near
+    // the 0.20 the worst one in the batch measures.
+    const sev = jit(key, 811);
+    const loss = sev < 0.42 ? 0 : Math.pow((sev - 0.42) / 0.58, 1.7) * 0.22;
+    if (loss > 0.004) {
+      // The column, and then the islands off it. One big blotch does most of
+      // the area for four rectangles, which is the whole reason the coverage
+      // in the photograph is affordable at all: speckle alone would need three
+      // hundred chips a door to reach a fifth of the face.
+      const wc = dc - h + 0.14 + jit(key, 812) * (DOORW - 0.28);
+      const nBig = 1 + (loss > 0.10 ? 1 : 0) + (loss > 0.17 ? 1 : 0);
+      for (let g = 0; g < nBig; g++) {
+        const gt = wc + (jit(key * 3 + g, 813) - 0.5) * 0.34;
+        const gy = floor + 0.26 + jit(key * 3 + g, 814) * (DOORH - 0.70);
+        for (let i = 0; i < 4; i++) {
+          const q = key * 17 + g * 5 + i;
+          const w = 0.048 + 0.072 * jit(q, 815);
+          const d = 0.085 + 0.185 * jit(q, 816);
+          const ct = gt + (jit(q, 817) - 0.5) * 0.11;
+          const cy = gy + (jit(q, 818) - 0.5) * 0.28;
+          chips.push([ct - w * 0.5, ct + w * 0.5, cy, cy + d]);
+        }
+      }
+      // and the speckle, thrown round the column with a square falloff so it
+      // thins toward the hinges instead of stopping at a line.
+      const nSm = Math.round(loss * 420);
+      for (let i = 0; i < nSm; i++) {
+        const q = key * 29 + i;
+        const off = jit(q, 819) - 0.5;
+        const ct = wc + off * Math.abs(off) * 2.4 * DOORW;
+        const cy = floor + 0.10 + jit(q, 820) * (DOORH - 0.24);
+        const w = 0.008 + 0.040 * Math.pow(jit(q, 821), 2.0);
+        const d = 0.006 + 0.034 * Math.pow(jit(q, 822), 2.0);
+        chips.push([ct - w * 0.5, ct + w * 0.5, cy, cy + d]);
+      }
+    }
+    // The streaks. Under the two hinges on the hanging side and under the hasp
+    // on the swinging one, which is where `doorKit` bolts its four fittings and
+    // therefore the only four places on a painted leaf that can rust.
+    const rst = jit(key, 823);
+    if (rst > 0.22) {
+      const k2 = (rst - 0.22) / 0.78;
+      const run = [[dc - h + 0.075, floor + 0.42], [dc - h + 0.115, floor + 1.62],
+        [dc + h - 0.145, floor + 1.00]];
+      for (let i = 0; i < run.length; i++) {
+        const [t, y] = run[i];
+        const d = (0.16 + 0.42 * jit(key * 7 + i, 824)) * (0.45 + 0.55 * k2);
+        // Three of unequal width and length, because a stain that starts as one
+        // band and stays one band down half a metre reads as a painted stripe.
+        // The widest is 45 mm — a hasp is 40 mm of iron and what runs off it
+        // does not fan out to the 110 mm the first cut drew, which came out as
+        // brown tape stuck down the leaf rather than as a stain.
+        stains.push([t - 0.022, t + 0.023, y - d, y + 0.02]);
+        stains.push([t - 0.011, t + 0.013, y - d * 1.75, y - d * 0.4]);
+        stains.push([t + 0.014, t + 0.028, y - d * 0.9, y + 0.01]);
+      }
+    }
+    // 0.16 to 0.38 of the way to iron oxide, and no further. Measured off
+    // `f26`, the streak is 0.77 / 0.69 / 0.60 of the clean panel beside it,
+    // which is a wash you have to look for; the first cut mixed 0.42 to 0.72
+    // and put an opaque brown block on every fitting.
+    const mx = 0.16 + 0.22 * rst;
+    return [chips, stains,
+      [col[0] + (RUSTY[0] - col[0]) * mx, col[1] + (RUSTY[1] - col[1]) * mx,
+        col[2] + (RUSTY[2] - col[2]) * mx]];
+  }
+  function door(dc, front, floor, col, louvred, key) {
     const h = DOORW * 0.5;
     // No hole is cut here — `frontSkin` did that, and it is why any of this is
     // visible at all. The first version of this drew the leaf at `front + 0.04`
@@ -1481,14 +1589,51 @@ async function buildJadrija(scene) {
     // say it drew a door in the middle of a solid block of masonry: what came
     // out was a row of white walls with coloured picture frames on them.
     const face = front + 0.045;
+    const [chips, stains, rust] = doorWear(dc, floor, col, key | 0);
+    /**
+     * Lay whatever has failed on the element that was just drawn.
+     *
+     * `sf` is that element's OWN seaward face, and every chip goes 3 mm proud
+     * of it rather than all of them going on one plane out in front of the
+     * leaf. A louvred door has its odd slats at `face - 0.019` and its even
+     * ones at `face - 0.009`; one flake plane would sit flat on half of them
+     * and hang a centimetre off the other half, which is a floating card the
+     * moment you look along the row instead of at it.
+     *
+     * Proud rather than sunk, and it is the wrong way round physically — paint
+     * comes off, so the primer is BEHIND the coat, not in front of it. Three
+     * millimetres is under the eye at any distance you can get to one of these
+     * and it makes the depth test unambiguous, which is what rule 5 asks for.
+     * `plaster`'s render patch has shipped with the same compromise since it
+     * went in.
+     */
+    const wearOn = (a0, a1, b0, b1, sf) => {
+      for (let i = 0; i < chips.length + stains.length; i++) {
+        const from = i < chips.length;
+        const r = from ? chips[i] : stains[i - chips.length];
+        const t0 = Math.max(a0, r[0]), t1 = Math.min(a1, r[1]);
+        const y0 = Math.max(b0, r[2]), y1 = Math.min(b1, r[3]);
+        if (t1 - t0 < 0.004 || y1 - y0 < 0.004) continue;
+        // ONE quad and not a `boxTS`, which is six of them for a patch that
+        // has exactly one visible face. A hundred doors carrying a hundred
+        // chips each is the difference between 35 000 triangles on this block
+        // and 210 000. The winding is `boxIn`'s own seaward face, copied so
+        // the normals match every other wall on this shore.
+        b.quad(W(t0, sf, y0), W(t1, sf, y0), W(t1, sf, y1), W(t0, sf, y1),
+          from ? PRIMER : rust);
+      }
+    };
     boxTS(dc - h + 0.012, dc + h - 0.012, face, face + 0.032,
       floor + 0.010, floor + DOORH - 0.010, shade(col, 0.90));
     // Stiles up both edges, standing a little proud of whatever fills between
     // them. Every real one of these has them and they are what stops a louvred
     // door reading as a radiator.
     for (const o of [-1, 1]) {
-      boxTS(dc + o * (h - 0.012) - o * 0.075, dc + o * (h - 0.012),
+      const s0 = dc + o * (h - 0.012) - o * 0.075, s1 = dc + o * (h - 0.012);
+      boxTS(Math.min(s0, s1), Math.max(s0, s1),
         face - 0.014, face + 0.032, floor + 0.010, floor + DOORH - 0.010, col);
+      wearOn(Math.min(s0, s1), Math.max(s0, s1),
+        floor + 0.010, floor + DOORH - 0.010, face - 0.014);
     }
     if (louvred) {
       const n = 12, y0 = floor + 0.08, y1 = floor + DOORH - 0.08;
@@ -1497,8 +1642,10 @@ async function buildJadrija(scene) {
         const y = y0 + i * sp;
         // Alternating depth, and alternating tone with it: the near edge of a
         // slat catches the sun and the throat under it does not.
-        boxTS(dc - h + 0.082, dc + h - 0.082, face - (i % 2 ? 0.019 : 0.009), face,
+        const sf = face - (i % 2 ? 0.019 : 0.009);
+        boxTS(dc - h + 0.082, dc + h - 0.082, sf, face,
           y + 0.004, y + sp - 0.010, shade(col, i % 2 ? 1.08 : 0.84));
+        wearOn(dc - h + 0.082, dc + h - 0.082, y + 0.004, y + sp - 0.010, sf);
       }
     } else {
       // Planked: five boards up the leaf with a seam between each, and two
@@ -1508,10 +1655,13 @@ async function buildJadrija(scene) {
         const x = dc - h + 0.082 + i * sp;
         boxTS(x + 0.006, x + sp - 0.006, face - 0.012, face,
           floor + 0.045, floor + DOORH - 0.045, shade(col, i % 2 ? 1.05 : 0.95));
+        wearOn(x + 0.006, x + sp - 0.006,
+          floor + 0.045, floor + DOORH - 0.045, face - 0.012);
       }
       for (const y of [floor + 0.34, floor + DOORH - 0.42]) {
         boxTS(dc - h + 0.075, dc + h - 0.075, face - 0.019, face - 0.010,
           y, y + 0.105, shade(col, 1.10));
+        wearOn(dc - h + 0.075, dc + h - 0.075, y, y + 0.105, face - 0.019);
       }
     }
   }
@@ -2086,7 +2236,8 @@ async function buildJadrija(scene) {
         // the wall, and a painted hasp on a PVC leaf would undo it.
         pvcDoor(dc, front, fl);
       } else {
-        door(dc, front, fl, col, (k * 5 + (t0 | 0)) % 3 !== 0);
+        door(dc, front, fl, col, (k * 5 + (t0 | 0)) % 3 !== 0,
+          k * 31 + (t0 | 0) * 7);
         doorKit(dc, front, fl, DOORW * 0.5, 0.045);
       }
       // The rail between the door head and the vent, filling the last of the
