@@ -10424,9 +10424,52 @@ async function buildJadrija(scene) {
       // surface facing DOWN, so it gets no sun at all and only bounce, and an
       // honest albedo for translucent yellow plastic comes out of the renderer
       // as brown. What is being modelled here is a light source, not a colour.
+      //
+      // AND IT IS LAID IN SHEETS. The paragraph above fixed the ceiling's
+      // COLOUR and left it one quad: 13 m by 10 of unbroken amber, which is
+      // still the largest surface anybody standing at this bar can see, and a
+      // surface that size with nothing on it reads as a game whatever colour
+      // it is — the same finding the kabine row and the mole deck are both
+      // built around.
+      //
+      // Translucent roofing comes in sheets about a metre wide, screwed down
+      // over purlins, and no two of them pass the same light: they are laid at
+      // different times, they weather at different rates, and the one under
+      // the pine is greener than the one in the sun. So the ceiling is twelve
+      // bays with a batten between each pair, and each bay takes a step of
+      // tone off `jit` of its index — 0.86 to 1.10, which is a wider spread
+      // than it sounds because this is a light source rather than a colour.
       const AMBER = [0.760, 0.585, 0.165];
-      boxTS(S.t0 - 0.5, S.t1 + 0.5, S.s0 - 0.5, S.s1 + 0.5,
-        y0 + S.h, y0 + S.h + 0.10, AMBER, shade(AMBER, 0.9));
+      const BAT = [0.300, 0.232, 0.098];      // the batten, and the shadow of it
+      {
+        const a0 = S.t0 - 0.5, a1 = S.t1 + 0.5;
+        const c0 = S.s0 - 0.5, c1 = S.s1 + 0.5;
+        const n = Math.max(4, Math.round((a1 - a0) / 1.05));
+        const w = (a1 - a0) / n;
+        for (let i = 0; i < n; i++) {
+          const g = 0.86 + jit(i, 733 + (S.t0 | 0)) * 0.24;
+          boxTS(a0 + i * w + 0.020, a0 + (i + 1) * w - 0.020, c0, c1,
+            y0 + S.h, y0 + S.h + 0.10,
+            [AMBER[0] * g, AMBER[1] * g, AMBER[2] * g],
+            shade(AMBER, 0.9 * g));
+          // The batten over the joint, standing 30 mm below the sheets so it
+          // is a line you can see from underneath rather than a seam that is
+          // exactly coplanar with them — rule 5, on the one surface in this
+          // shop nobody can avoid looking at.
+          if (i) {
+            boxTS(a0 + i * w - 0.032, a0 + i * w + 0.032, c0, c1,
+              y0 + S.h - 0.030, y0 + S.h + 0.10, BAT, shade(BAT, 1.2));
+          }
+        }
+        // And the purlins the sheets are screwed to, running the other way.
+        // Four of them, which is what a ten-metre span needs and what the
+        // ceiling wants in order to read as a structure rather than a lid.
+        for (let k = 1; k < 5; k++) {
+          const sPos = c0 + (c1 - c0) * (k / 5);
+          boxTS(a0, a1, sPos - 0.055, sPos + 0.055,
+            y0 + S.h - 0.075, y0 + S.h - 0.005, BAT, shade(BAT, 1.15));
+        }
+      }
       boxTS(S.t0 - 0.62, S.t1 + 0.62, S.s0 - 0.62, S.s1 + 0.62,
         y0 + S.h + 0.10, y0 + S.h + 0.38, S.roof, shade(S.roof, 1.12));
       // The counter, an L round two sides, with its teal top.
