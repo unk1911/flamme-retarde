@@ -8,6 +8,719 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.289.0] — 2026-09-05
+
+### You can walk her now, and the stair went nowhere
+
+*"once i board it, i should be able to walk around it freely, go up and down,
+instead it's all messed up in there in that boat"*. That complaint is about a
+FLOOR PLAN, and a floor plan cannot be checked from a screenshot — which is
+presumably why it has survived three releases that were all about her. So
+`deckAt` is exposed the way `seek` is, a probe walks a grid over her in a tenth
+of a second, and the map says exactly where the holes are. There were five.
+
+**One: the stair went nowhere.** The flight stops at x −1.50 and the roof begins
+at −1.55, but the cockpit band runs on to −1.20 and is tested first — so the
+last stride off the top tread matched the cockpit and put you back on its sole
+**2.79 m below**, with no fall and no sound. A landing at the head of it, fifteen
+centimetres of flat at roof level the width of the flight, closes it.
+
+**Two: there was no step limit anywhere in the walk model.** `deckAt` answers
+with a height and the code took any height at all. From the cockpit sole you
+could walk forward into the deckhouse's footprint — where the only band that
+answers is the upper deck — and rise 2.79 m in one four-centimetre stride,
+standing on the roof having walked through the house. This is the whole of "it's
+all messed up in there" and it is not a geometry bug: it is a walk model missing
+the one thing every walk model has.
+
+0.66 m up and 0.85 down, and they are a person's rather than the boat's, so they
+do not scale with `BROD_K`. 0.66 is not arbitrary either — it has to clear the
+0.595 m from the cockpit sole up on to the side deck, which is the largest step
+she actually has. Set under that and the player is shut in the cockpit, which is
+a worse bug than the one being fixed.
+
+**Three: the hull's clamp leaked round it.** Found by the test after the limit
+went in: `deckAt` answers 2.135 for the foredeck, the rise check refuses the
+1.92 m drop, the code falls through to `slideIn` — and `slideIn` took any height
+at all. Walking forward off the upper deck you were refused the drop and then
+handed it anyway, and ended up at the stem having stepped down two metres
+through the wheelhouse roof.
+
+**Four: boarding put you on the roof.** `you.z = -1.30` was written when she was
+15.6 m long and never went through `BROD_K` when she grew. The deckhouse's
+half-width is 2.03 m now, so 1.30 is inside the house and the only band that
+answers there is the upper deck. You came aboard on top of the deckhouse,
+looking down at the awning you were meant to be under. 2.45 is between the house
+and the bulwark, which is the port side deck the note has always described.
+
+**Five: `reset` had the same fault twice over** — x −4.4 with z 0 is halfway up
+the companionway, and 0.72 is the cockpit sole's AUTHORED height, so she came
+back alongside with her passenger standing on the stair at a deck level half a
+metre under his own feet. Both read off `deckAt` now instead of being typed.
+
+Walked, not argued. Five routes, each sixty to ninety simulated steps:
+
+    board                 -> (1.20, -2.45)  1.85   the port side deck
+    cockpit, up the stair -> (3.30,  0.20)  4.05   up the flight and out
+    on forward from there -> (7.49,  0.20)  4.05   stops at the forward rail
+    upper deck, back aft  -> (-9.40, 0.20)  1.26   down the flight, into the cockpit
+    cockpit into the house-> (-2.43, 1.60)  1.26   stopped at the after face
+    side deck to the bow  -> (7.95,  2.39)  2.13   and the hull clamps her in
+    upper deck, outboard  -> (2.00,  1.86)  4.05   held by the rail
+
+Census {446, 333, 86, 27}, 585992 triangles, 60 fps — nothing ashore moved.
+/tmp/dm1.png is the stair from the head of it, looking down into the cockpit
+with the moored fleet either side.
+
+## [1.288.0] — 2026-09-05
+
+### The phones worked, and the hand was through the screen
+
+1.273.0 put twelve people on their phones with live crypto on the screens and
+nobody has walked up to one since. So: walked up to one. Twelve holders, nine
+reading and three talking, and the screen at half a metre reads exactly as asked
+— a dark markets app, status bar, **BTC $79,679 −1.37 %** in red, **LTC $51.43
++0.81 %** in green, **ETH $2,454.30** under it, CoinGecko and the date at the
+foot. That part is right and needed nothing.
+
+Two things were wrong and both are the same class of mistake: a bone is not the
+thing you think it is.
+
+**`handR` is the WRIST.** The phone went 0.085 m straight up from it, and a hand
+is 0.18 m long — so the phone was inside the fingers, and photographed at half a
+metre what you got was a thumb through the middle of the ETH row. It is pushed
+0.105 m along the viewing bearing now as well as up. The screen is already
+billboarded at the camera, so pushing along the same bearing is coherent from
+every angle rather than from one: the hand ends up behind the phone wherever you
+stand, which is where a hand holding a phone is.
+
+**And the three on a call were showing the room the bitcoin price.** Everything
+in `stepPhones` billboards the screen at the camera, which is right for the nine
+reading one and exactly wrong for the three with one against an ear — glass out,
+handset back against their own cheek. Half a turn in yaw for the ear variant
+puts the glass against the head, where glass is, and what you see is the black
+back of a handset tilted at the jaw.
+
+Photographed at MINI's terrace and at H2O's — and the H2O frame is worth keeping
+for its own sake, because the back bar from 1.284.0 is in it: two shelves of
+bottles running the full thirteen metres behind a man on his phone, in the shop
+that was a flat blue-grey wall three hours ago.
+
+Census {446, 333, 86, 27}, 585992 triangles, 58 fps. Nothing moved but two
+offsets.
+
+## [1.287.0] — 2026-09-05
+
+### The hosed bather answers in two and a half seconds, not five
+
+*"the only issue is the delay I guess because it takes time to synthesize
+responses... not sure if there is much that can be done about that latency"*.
+
+There is, and it was worth measuring before answering. Timed on mpcn0 against
+the live APIs, same sentence, two runs each:
+
+    eleven_multilingual_v2      1.12 s   1.17 s
+    eleven_turbo_v2_5           0.26 s   0.24 s
+    eleven_flash_v2_5           0.31 s   0.29 s
+
+    gpt-5.6-luna as it stands   4.37 s   2.56 s    (reasoning 148, 92 tokens)
+    the same, reasoning_effort low  2.00 s   2.86 s    (reasoning 69, 78)
+
+**The synthesis was never the five seconds everybody assumed.** It is one, and
+nine tenths of that one is recoverable. What the five seconds actually were:
+1.2 s of client brake before the request even leaves, ~0.15 s of Apache and the
+ssh tunnel, ~2.6 s of model, ~1.3 s of speech.
+
+Three changes, and the whole of the argument is who they apply to.
+
+**Turbo instead of multilingual, for the two speakers who are reacting.** A
+bather and the cat only ever speak because you have just hosed them, and a
+reaction that arrives late is not a reaction — it is a memoir, which is this
+file's own line about the same problem from the other end. Baye speaks on a
+clock: she is not answering anything, a second costs her nothing, and
+`eleven_multilingual_v2` is the voice that was chosen for her. So she keeps it.
+Turbo rather than flash because it is the quality-balanced fast model and 0.25
+against 0.30 is not worth trading a voice for.
+
+**`reasoning_effort: low` on the same two.** Not `minimal` — this model rejects
+it outright, measured, 400 with "Unsupported value", and low is where the saving
+is anyway. A side effect worth having: the fast lines come back shorter and
+harder. *"Joj, you soaked me!"* against *"Joj, that seawater was freezing—next
+time, aim at the..."*, which is what somebody who has just been hit with a hose
+actually says.
+
+**And the client brake goes 1.2 s to 0.25.** It was doing two jobs badly. The
+note in `poll` says it exists "so that hosing a whole terrace is a conversation
+rather than a riot" — and that job is actually done by the gap set AFTER a line
+lands, in `ask`. What this number did was sit between the water arriving and the
+request leaving, and it was a fifth of the whole delay.
+
+Verified end to end against the running service on mpcn0, three runs each, real
+`build_messages` and real API calls:
+
+    fast   llm 1.90 / 2.10 / 2.07   tts 0.26 / 0.25 / 0.24   mean total 2.27 s
+    slow   llm 2.38 / 3.26 / 2.01   tts 1.31 / 1.55 / 1.03   mean total 3.85 s
+
+With the brake and the tunnel that is **5.2 s to 2.7 s** for a hosed bather. The
+instant yelp from 1.272.0 still lands the moment the water does; what changed is
+how long it has to carry on its own.
+
+`server/baye/baye.py` is deployed to mpcn0 and the service restarted;
+`/baye/health` answers in 0.17 s through the tunnel. Census {446, 333, 86, 27}
+and 585992 triangles, unchanged — nothing in the world moved.
+
+## [1.286.0] — 2026-09-05
+
+### The shrubs behind the kabine were green boulders
+
+Walk the lane behind the back row and the loudest object in the frame is a
+two-and-a-half-metre dark green lump sitting on bare orange dust with five white
+specks stuck to it. It is `oleander`, and its own note half knew what was wrong:
+*"a mound of four, because one dome the size of a whole shrub is a dome"* — and
+then it built four smooth ones on top of each other.
+
+Frame 100 of the kabine pan settles it. A shrub this size at four metres,
+standing on the gravel beside the exposed-aggregate litter bin, and it is not a
+mound at all: it is a dense body with a hundred individual sprays coming out of
+the top and the sides of it, so the outline is ragged the whole way round and
+there is sky between the shoots for a hand's breadth outside the body. At 2.6 m
+across, alone on open ground, smooth sides read as a boulder — which is exactly
+what this looked like from the lane.
+
+Three changes and they are one change. **The jag goes 0.32 to 0.62**, which is
+the pine's number, and the pine is the one thing in this file whose outline was
+argued out properly. **The body goes taller than wide** — 1.02 r against 0.82,
+with its base buried rather than resting on the ground, because a shrub nobody
+clips is upright and does not sit on the dust like an egg. And **every draw that
+used to place a flower now places shoots as well**: narrow upright tufts, 0.30 r
+tall against 0.15 across, pushed out past the body on their own bearing, which
+is what puts sky INSIDE the outline instead of beside it.
+
+The flowers are 0.20 r across against 0.13 and they ride ON the shoots rather
+than hovering over the mass, and they are flat rather than round, because what
+an oleander carries at the tip of a cane is a corymb and a corymb is a plate.
+"Oleander in August is more flower than leaf" was already the note's own line;
+nine specks a tenth of the shrub's width did not say it.
+
+**Eighteen shoots and not nine, and the extra nine are off `jit`.** Nine round a
+two-metre shrub is one every forty degrees and the arcs between them are still
+smooth body. The stream cannot pay for the other nine — rule 4, and the census
+is downstream of every shrub on this shore — but `jit` can, and this is exactly
+what it is for: a hash of the plant's own station and an index, deterministic,
+free, and invisible to every parasol east of it.
+
+Thirty-five draws off `rng` going in and thirty-five coming out, in the same
+order. Census {446, 333, 86, 27}, unchanged, which is the only proof that
+matters. 571016 to 585992 triangles, 55 fps from the lane. /tmp/bv0.png.
+
+## [1.285.0] — 2026-09-05
+
+### The pathway to the boat, which is forty-six metres of it
+
+*"the pathway to it looks crappy"* — and standing at the root and looking out
+along it, it is. The deck was laid in 2.2 m bays back in 1.246.0 with a joint
+between each pair and a tone step off a sine hash, and that was half the job.
+The other half is that a quay has a grain running the OTHER way too, and without
+it the bays read as lines drawn on a plane rather than as slabs.
+
+`1000150357` is a photograph taken from that walkway at the height a walker's
+eye is, and it settles what is there: an edge strip about a metre wide down each
+side in its own tone, a joint between it and the field, and the field between
+them scuffed pale down the middle. The two edges are where the bollards, the
+ropes and the weed are and nobody walks on them, so they stay dark; the middle
+is where forty years of feet have polished the aggregate up. **That contrast — a
+light lane between two dark ones — is most of what makes a photograph of a quay
+read as a route rather than as a surface**, and it is the thing you are looking
+at for the whole forty-six metres out to the boat.
+
+Measured against the frame rather than eyeballed: field-to-edge value ratio is
+1.14 in the render against 1.12 in the photograph. The tone step between bays
+went from 0.055 to 0.075 at the same time — at 0.055 on a 0.507 deck the slabs
+differ by five per cent, which is under what this renderer's ambient will show
+on a horizontal surface in full sun, so the joints were doing all the work and
+the slabs between them were one colour.
+
+**And the rim is walked in segments now, not four long quads.** The waterline is
+the one line on this structure that is never clean, and `_357` and `_378` both
+show the same thing from a metre above it: the outer hand's breadth of the
+coping is dark green-black — weed that dries between tides and never quite goes
+— and the wall under it is two colours, a wet band about half a metre deep under
+the lip and dry stone below. Drawn as one 46 m quad a side none of that can
+exist, and what you get is a pier with a clean edge, which is a pier nobody has
+ever moored anything to. 2.2 m segments now, each with its own tone and its own
+draw on how weedy it is, sharing the bays' hash so a slab and the coping beside
+it were poured on the same day.
+
+The splash band is 0.55 m and that is measured from the structure rather than
+picked: this mole has 1.15 m of freeboard.
+
++624 triangles on the quay mesh. Census {446, 333, 86, 27} and 571016 unchanged,
+62 fps from the walkway. /tmp/mp0.png looking out, /tmp/mr0.png over the coping.
+
+Honestly: the weed on the lip is 0.10 m wide and from standing height it is
+edge-on and does not read — sampled at the edge it comes back the same value as
+the strip inboard of it. It is for the view from the water and from the moored
+boats, and it earns its place there. From the deck what changed is the lanes.
+
+## [1.284.0] — 2026-09-05
+
+### The standoff is 0.26 m, measured, and the bar goes above the counter
+
+1.283.0 moved the caffe bars' interiors from 2 cm proud of the shop body out to
+17, and said plainly what it had not fixed: the back wall and its tiled band
+still read as the body's blue-grey, and H2O's bottle run stopped a third of the
+way along both shelves. Both are fixed, and the first one is fixed because the
+number got measured instead of argued.
+
+**Six red slabs.** Built into H2O's opening at 0.06, 0.16, 0.26, 0.36, 0.46 and
+0.56 m proud, each occupying its own band of the wall so all six are in one
+frame, and photographed from the terrace six and a half metres away. The bottom
+two do not draw. The top four do. So a plane PARALLEL to the shop's own face
+needs about a quarter of a metre of standoff here before it survives, and 0.17 —
+which looked generous against `backBar`'s 0.11 and was the whole of the last
+release — is on the wrong side of that line. Reasoning had named the wrong depth
+twice by then; the ladder answered it in one build.
+
+The horizontal work was never affected and that is the tell: a shelf and a
+worktop present their front EDGE, and every edge in this room stands at `f0`,
+which is why all of them appeared at 0.43 m the moment the slab moved.
+
+**What that leaves is a shape, not a number.** There is no room for a back wall
+behind the counter: `shopKit`'s counter top already stands 0.34 m proud and its
+body 0.28, so anything far enough out to draw is out in front of the counter and
+hanging over the terrace. So the room is built ABOVE the counter instead — which
+is where a caffe bar's back actually is, and is what the slasticarnica's own
+`backBar` does by a different route. Wall face at 0.30, shelves forward to 0.54,
+the tiled band up from the counter top.
+
+And two things are no longer drawn on these shops. `shopInside`'s worktop, which
+sat one centimetre under `shopKit`'s counter top — two horizontal surfaces a
+centimetre apart on the one horizontal surface in the shop, which is rule 5 and
+was also half of why the room looked wrong. And its cold cabinet, because
+`cooler` already stands a drinks fridge at the west reveal and the room above a
+counter is not where a fridge goes. That cabinet was also the answer to the
+second fault: it was 0.84 m of DARK box standing in front of the west end of both
+shelves, and with the shelves at counter height it was hiding the bottles rather
+than standing beside them. The run is edge to edge now.
+
+Caffee bar H2O and Caffe TRAMPULIN both have a back bar. The slasticarnica is
+pixel-identical — `deep` is off wherever `vitrine` or `backBar` is set.
+
+Census {446, 333, 86, 27}, 571016 triangles, both unchanged; 60 fps from the
+Trampulin camera and 42 from a cold start. /tmp/h40.png and /tmp/tr0.png.
+
+## [1.283.0] — 2026-09-05
+
+### Caffee bar H2O had an interior all along, two centimetres proud
+
+Stand on the terrace at t 318 and look at the shop you are sitting outside. It is
+thirteen metres of frontage, a name board, and one flat blue-grey plane. No
+opening, no counter, no bottles, nothing. Three metres east the slasticarnica has
+a gelato case with the flavours named on it, a mirrored back bar, a coffee
+machine, a grinder and two people working behind it.
+
+The note over `cooler` in the shop table has said for a week that "tabulated
+against its neighbours this shop had two features to the slasticarnica's eight,
+and it is thirteen metres of frontage", and a drinks fridge was added. That was
+the wrong diagnosis. **H2O has had a full interior the whole time — a warm back
+wall, a worktop, two shelves of turned bottles and a cold cabinet — and not one
+of them has ever been drawn.**
+
+`shopInside` built the entire room in the 7 cm between `s0 − 0.09` and
+`s0 − 0.02`. Rule 5, and this file already knew the number: the note over
+`backBar`'s mirror records that a plane at `s0 − 0.08` "stops being drawn — eight
+centimetres in front of the shop's own body is not enough separation two
+kilometres out from the origin", and that `s0 − 0.11` works. The back wall was at
+two. Worse, it was a 2 cm slab spanning `s0 − 0.02` to `s0`, which is *inside*
+the serving opening's own dark backing panel — so on the frames where it did win
+against the body it lost to that.
+
+Two thousand metres out a float has about a tenth of a millimetre of resolution
+left and a depth buffer has considerably less. The interior of every caffe bar on
+this boardwalk was being decided by rounding. It only showed on the two shops
+that have nothing else in the opening: the slasticarnica reads because its
+vitrine, mirror and gelato case were all measured out to 0.11–0.42 m, and nobody
+noticed that the room behind them was invisible too.
+
+The room is now built between 0.17 and 0.46 m proud — clear of the body by half
+again what `backBar` needed, and deep enough that the worktop is a worktop and
+not a ledge. Not for the two shops that have their own frontage: pulling this out
+in front of the mirror would put a shelf of bottles through the middle of the
+flavours, so `deep` is off wherever `vitrine` or `backBar` is set.
+
+Caffee bar H2O and Caffe TRAMPULIN are both bars now: two shelves of bottles the
+width of the opening, cut at the mullions, the cold cabinet at the west end and
+the counter under them. Photographed from the terrace at /tmp/h40.png and
+/tmp/tr0.png. The slasticarnica is pixel-identical.
+
+WHAT IS STILL WRONG, because half a fix reported as a whole one is worse than
+none: the back wall and its tiled band are at 0.17 and 0.155 m and STILL read as
+the shop body's blue-grey rather than the warm render they are painted, so
+something is beating them that the shelves in front of them survive. And the
+bottle run stops about a third of the way along both shelves at H2O and leaves
+three metres of empty shelf that is not explained by the 18 % skip. Both are the
+next thing to chase.
+
+Census {446, 333, 86, 27} and 571016 triangles, both unchanged — nothing was
+added, it was moved. 53 fps from the terrace camera.
+
+## [1.282.0] — 2026-09-05
+
+### The wood floor had no scale between 1.6 m and 9 cm
+
+Standing in the grove behind the kabine, the ground is speckled at your feet and
+one unbroken orange from the next tree to the horizon. Count what the terrain
+shader actually has on that floor and the reason is arithmetic: mottle at 90 m,
+at 21 m and at 1.6 m, then chippings at 9 cm that are deliberately gone by about
+twelve metres because procedural speckle crawls once a feature drops under a
+pixel. Between 1.6 m and 9 cm there is nothing at all — and the band from four
+metres out to thirty, which is most of what any frame of that wood is made of,
+was being carried by a 1.6 m term at plus or minus eight per cent.
+
+At eight per cent nothing is being carried.
+
+`1000150345` and `_346` say what lives in that band, and it is not more chip: it
+is that the chippings **drift**. Bare scuffed dust where the feet go, a pale
+wash of stone where they do not, dark needle gathered under the drip line, at
+forty centimetres to a metre. So: one more octave at 0.38 m, asymmetric the same
+way the chips are and for the same reason — a drift of stone is bright and has a
+shape, needle litter is dark and has none — and faded out on the pixel footprint
+by the time a pixel covers 28 cm, which is where a 38 cm feature would start to
+crawl.
+
+Held back where the chips are strongest, and only there. At arm's length the
+material *is* chippings and the drift is the arrangement of them; both at full
+strength over the same square metre is the same stone counted twice, and the
+first cut of this read as dapple rather than as ground. 55 % under your feet,
+the whole of it by eight metres out.
+
+Measured, on the sunlit floor beyond the playground fence at t 200: local
+contrast (grey standard deviation over a 200 x 62 patch) goes 22.2 to 32.7. The
+same statistic on the sunlit floor in `1000150345` is 43 to 46, so this closes
+about half the gap and does not close it — the rest is shadow structure the
+canopy is not throwing, which is a different fix. 12 fps at the same two cameras
+against 12 on deployed 1.281.0; census {446, 333, 86, 27}, 571016 triangles,
+both unchanged, because this adds no geometry at all.
+
+## [1.281.0] — 2026-09-05
+
+### The fleet was moored to nothing, and had no ironwork on it
+
+1.274.0 gave the small craft beside the mole a hull worth walking past: seven
+stations, smooth-shaded, a real sheer. Standing on the coping tonight and taking
+the shot `1000150357` actually is — down the row at arm's length — what it looks
+like is sixteen white lozenges. The photograph does not look like that, and the
+difference is not the hull.
+
+**Three things, all of them the same finding: a marina is made of what is not
+the boat.**
+
+**One: the ironwork.** Every hull in `1000150357` and `1000150377` carries a
+pulpit round the stem and guardrails running aft off it, and at the distance
+those frames were taken from, the polished tube is most of what is in them —
+it catches the sun, and the white topsides do not. So: a rail at 0.62 above the
+deck sweeping from x 1.28 round the stemhead and back, a lower lifeline at 0.31
+under it, stanchions at the bends, and the same pair of wires carried aft down
+both side decks to the after end of the house. It stops short either side of the
+stem, because every pulpit on this coast does — that gap is where the anchor
+comes over.
+
+All of it 28 mm stainless through a new `propTube`, which extrudes a section
+along a polyline. Four sides, and that is not a shortcut: a 28 mm rail is two
+pixels wide wherever anybody stands next to one, and a square two pixels across
+is a round two pixels across. Fenders and bollards ask for six and eight,
+because they are 200 mm.
+
+`propTube` sits at module scope in 37-props.js rather than inside
+`boatNearProto`, because 59-brod.js runs the mooring lines off the same cleats
+and a second copy of that arithmetic is a second place for the winding to be
+wrong.
+
+**Two: the boats were inside each other.** The row was pitched at a fixed 2.30 m
+and the note said that left 0.10 m of water between hulls — true at scale 1, and
+the scale draw is 0.88 to 1.22. The widest pair in the line was 2.68 m of boat
+in a 2.30 m berth. They interpenetrated, and what a walk down the coping showed
+was not sixteen boats but one continuous lozenge with cabins standing on it.
+Pitch off the two beams either side of each gap instead, and the gap is a gap.
+
+**Three: nothing held them there.** A row of boats a metre off a wall with
+nothing crossing the gap is a row of boats about to be somewhere else, and that
+gap was the whole reason the fleet read as parked rather than moored.
+`1000150377` has two bow lines off every hull, white and sagging, and they are
+the only thing in the frame that crosses the water. Now they are the only thing
+in the render that crosses it too: from both bow cleats, over the coping, on to
+cast-iron bollards — one every other boat, not one apiece, because a quay
+carries iron every five metres or so and a berth here is two and a half. Half
+the row lies to its neighbour's, which is why the lines in the photograph run
+slantwise rather than square, and that is worth reproducing rather than tidying.
+
+Also: the fenders were three grey boxes sitting on the side deck. A fender that
+is not over the side is a fender in a locker. They hang now, on a lanyard, and
+they are 0.42 long and not 0.56 — the freeboard amidships is half a metre and
+the first cut had their bottoms 60 mm under water.
+
+Measured: census {seen 446, thin 333, plain 86, rich 27}, unchanged. 14 fps at
+the walkway camera against 14 fps on deployed 1.280.0 from the same camera —
+the ironwork is instanced and costs nothing readable. Shot from the coping at
+/tmp/fl7.png and /tmp/fl4.png.
+
+## [1.280.0] — 2026-09-05
+
+### The konoba's ceiling was the right colour and one quad
+
+The note over that roof has been right for a fortnight and only half finished.
+It says the underside is "the largest surface anybody standing at this bar can
+see", and it fixed the colour — warm amber, high, because it is a horizontal
+surface facing down and what is being modelled is a light source rather than a
+pigment. It left it as one box.
+
+13 m by 10 of unbroken amber is still the largest surface in the shop, and a
+surface that size with nothing on it reads as a game whatever colour it is —
+the same finding the kabine row and the mole deck are built around.
+
+Translucent roofing comes in metre-wide sheets over purlins, and no two pass
+the same light: laid at different times, weathered at different rates, the one
+under the pine greener than the one in the sun. Twelve bays with a batten
+between each pair, each a step of tone off jit of its index (0.86 to 1.10, a
+wider spread than it sounds because this is a light source), and four purlins
+running the other way underneath — what a ten-metre span needs and what turns
+a lid into a structure.
+
+The battens stand 30 mm below the sheets rather than flush: rule 5, on the one
+surface in this shop nobody can avoid looking at.
+
+566294 to 571016 triangles, census unchanged, 61 fps.
+
+## [1.279.0] — 2026-09-05
+
+### The third shelf, and an assumption that was wrong
+
+1.278.0 shipped with a known remainder: a third shelf loop still drawing boxes.
+It is in shopKit, it is the one at Maslina, and finding it corrected the
+assumption behind the whole exercise.
+
+Those boxes were right. The array is called GOOD, the items are 115 mm wide,
+and a carton IS a box — converting them all to bottles would have been worse
+than leaving it alone. What was wrong is that every item was the same 115 mm
+slab: nine in a row, three courses deep, which is a bar chart.
+
+Three things now — five cartons, three bottles and one can in nine, walked by
+index so the mix is even along the shelf rather than clumping, and hashed on
+the row so the courses do not line up into columns. The bottles are narrower
+than the cartons beside them, which is most of what makes a mixed shelf read
+as mixed, and the can is 66 mm across and 115 tall.
+
+Also closes out why 1.278.0 could not be photographed: shopInside only runs
+for kind === 'box' and Maslina is a kiosk, so the two shelves changed there
+are real and are simply not the shelf I kept pointing a camera at.
+
+Census unchanged at 446/333/86/27.
+
+## [1.278.0] — 2026-09-05
+
+### Bottles instead of coloured rectangles, on two shelves of three
+
+The same call the back bar's stemware got and the bathers' swimwear before it:
+what makes a bottle a bottle is the shoulder and the neck, and neither is a
+thing a box has. Two shelf systems drew their stock as boxTS — a flat front
+70 mm wide with a square top — and both are behind openings you can walk up
+to: the kiosk interior's back shelf, and the cold cabinet, whose own note is
+proud that its door is a frame and not a pane.
+
+Six sides and five rings each — base, body, shoulder, neck, lip — plus a cap a
+hair wider than the neck, which stops a neck reading as a spike. Seen from the
+front through a serving hatch and never from above, so the facets cost nothing.
+
+What is verified and what is not: the cabinet change is confirmed by the
+triangle count, 566294 to 570182, census unchanged at 446/333/86/27, 61 fps. I
+did not manage to get a camera onto either shelf tonight — every framing put
+the eye inside a wall or on the wrong fitting, and the one shelf I did
+photograph turned out to be a third loop I have not found. This ships on the
+count and the code rather than on a picture, and that third shelf is a known
+remainder.
+
+## [1.277.0] — 2026-09-04
+
+### The grove had a floor colour but no floor
+
+The terrain shader already lays dead Aleppo needles over limestone dust: the
+right ground colour and the wrong ground texture, because a shader cannot put
+anything ON a surface. In 1000150345 and _349 the grove floor is pale chippings
+with grey-green tussocks standing in them, dry khaki grass between, and lumps
+of limestone coming through wherever the dust is thin. From standing height
+that is the difference between a wood and a brown plane with trees on it.
+
+Clustered on the trees, which is the whole placement rule: needle litter and
+the tufts that survive it are under and around pines, because that is where
+the shade and the drip line are. Scattered evenly over the band the same
+objects read as confetti. Each pine gets its own two at 1.4 to 3.4 m off jit
+of its index, reading greens back rather than extending the planting loop —
+which keeps it off the shared rng stream and means it cannot move a parasol.
+
+The limestone is wider than it is tall, deliberately: bedrock showing through,
+not boulders on the dust. The first cut had them as domes half a metre proud
+and it read as a field of molehills.
+
+212 objects, 560842 to 566294 triangles, census unchanged, 61 fps.
+
+## [1.276.0] — 2026-09-04
+
+### A hammock in the pines behind the kabine
+
+1000150346: two people sitting in a blue-and-teal hammock strung between two
+trunks in the grove behind the kabine, on the pale gravel. The most alive
+thing in that part of the survey and there was nothing like it in the game.
+
+Slung between pines that actually exist. The grove is planted with rng(), so
+which pair ends up 3 to 5 m apart differs in every build of the shore, and a
+typed pair of coordinates would be a hammock in mid-air the first time anybody
+touched the planting. It reads greens back and takes the first pair in the
+band — no draw, Rule 4, because those trees are already placed. Found two at
+t 21, 3.06 m apart, out of 147 pines.
+
+A catenary, and the sag is not a guess: empty a hammock hangs about a twelfth
+of its span, loaded nearer a sixth; 0.16 is one just got out of. The cloth is
+gathered to nothing at the ends — a constant half-width is a plank — and inset
+0.34 m short of each trunk, because run to the trunk it vanishes into the bark
+and leaves the whippings with no length, so the thing that says "tied on" was
+never drawn.
+
+And the second temporal-dead-zone fault of the night after PHONE. Same shape
+every time in a file this long: the writer runs during the build near the top,
+the reader is a debug accessor two thousand lines below. What it looks like is
+not an exception anybody sees, it is BUILD DID NOT FINISH at 78% and the whole
+shore missing. Rule now written down beside both: declare a variable next to
+the thing it is derived from.
+
+Census unchanged at 446/333/86/27.
+
+## [1.275.0] — 2026-09-04
+
+### The barrier that kept you on the mole was putting you in the sea
+
+Measured across the mole, a metre at a time: 4.5 m of deck at 1.15 m, open sea
+a step either side. The pier's standable already refused that step, correctly.
+What it could not know is what 47-ground.js does with a refusal, and that code
+says so itself: "when a step is refused and the thing a metre and a half
+further on is water, say so and let the caller take you swimming".
+
+Exactly right on a beach — you walk down the sand into the sea and the game
+takes you swimming, which is why the barrier stopped being a wall. Exactly
+wrong on a quay. Every long edge of the mole was a shoreline as far as that
+paragraph was concerned, so the code written to keep you on the pier was the
+code putting you off it, and on 4.5 m of deck that is most of the walk out to
+the boat.
+
+A locale with structures standing over water can say `brink` now, and a
+refused step there is an edge you stop at rather than a shore you walk into.
+0.6 m outside the coping and no more.
+
+Verified both ways: driven hard sideways off the middle of the mole for seven
+seconds, phase stays ground, the deck stays 1.15, the walker moves 1.0 m and
+stops. And the guard is `field.brink && field.brink(...)`, with the Brod the
+only locale that defines it — so every other shoreline takes the identical
+path by construction rather than by testing.
+
+## [1.274.0] — 2026-09-04
+
+### The fleet you walk past was drawn for a kilometre away
+
+boatProto is four flat stations with a box for an engine, and 37-props.js has
+said since it was written that it is "the right answer two hundred times over
+at a kilometre" and the wrong one from the water. The moored fleet at the mole
+is not at a kilometre — it is the thing you walk the length of on the way to
+the boat, and 1000150357 is a photograph taken from that walkway. What was
+drawn was a row of white wedges where the frame has cabins, screens, pulpits
+and covers. boatNearProto now.
+
+Two numbers off the render rather than the arithmetic. The bows stood 2 m off
+the stone: the comment said "a metre off the coping" and the constant said
+4.6, which put daylight under every bow — 3.9, and in the photograph the
+pulpits overhang the walkway. And sixteen on 2.30 m centres rather than twelve
+on 2.85: a 2.2 m boat on 2.85 centres has 0.65 m of water beside it, which
+from the walkway is a row of separate objects, where the frame is a wall of
+hulls with the fenders squeezed between them.
+
+Census unchanged at 446/333/86/27.
+
+## [1.273.0] — 2026-09-04
+
+### Twelve people on the beach are watching bitcoin
+
+On the skinned tier and nowhere else, and that is forced. A phone is 70 by 145
+mm; the instanced tier draws people from four metres out to two hundred and
+forty, but it is hidden the moment somebody is close enough to read anything,
+so a phone built there would vanish at exactly the distance the joke needs it.
+The skinned figures have real bones — which is what boneAt/boneTurn/boneIndex
+are for. The note over boneTurn has said since it was written that it exists
+to carry "a card in her hands, a hat on her head", and it had no caller until
+this one.
+
+Twelve holders, nine reading and three talking, chosen by jit over the seated
+and never by rng(). Census unchanged at 446/333/86/27, 60 fps.
+
+A phone at the ear goes on the head bone. Both started on the hand with the
+ear one lifted 0.20 m off the wrist, which is a phone floating beside a lap: a
+seated figure's forearm does not come up in these bakes, so nothing made the
+gesture read. The head is a real bone and needs no cheat.
+
+The screen is billboarded, and that one IS a cheat. Somebody looking at a
+phone holds it facing themselves, so the honest draw is the back of it — a
+black rectangle and no joke. Facing the camera it reads from wherever you walk
+up, and the hand it sits in is still the hand the bake put there.
+
+The prices are real. /baye/world is a new route on the voice service, which
+was already pulling crypto for Baye to mention; litecoin joined the same
+request. Sub-$1000 coins keep their cents — rounded to the dollar litecoin
+lost 43 cents on $51.43, which on a screen is visibly wrong. The baked
+fallback is a real quote with its date, because the page must open off a
+filesystem with no network.
+
+Three bugs, all found by looking rather than reasoning: PHONE was a const
+below the loop that reads it (the temporal dead zone — not an exception, a
+page that never finishes loading); the flag was set on the bather and read off
+the figure, so twelve holders drew nought; and boneAt answers in the figure's
+own frame, which stacked twelve phones at the world origin under the sea.
+
+## [1.272.0] — 2026-09-04
+
+### They make a noise before they find the words
+
+The round trip on a sprayed bather's reply is a model call and a speech
+synthesis back to back, and nothing here can shorten it. What it can stop
+being is the FIRST thing that happens. The cat has been doing this since the
+hour he shipped: he meows on the frame the water lands and the sentence
+arrives four seconds later on top of it. A reaction that is instant and a line
+that is late reads as somebody drawing breath; only the line on its own reads
+as lag.
+
+So `yelp` — a vowel, synthesised in the browser with no network in it, one per
+person, played by batherWet before the request is even built.
+
+Pitch and mouth on different curves, as the meow does, plus two formants that
+ARE the vowel. F1/F2 are where "ah" lives, and a child's tract is shorter so
+both go up by a quarter — which is why girl_child is not the woman's yelp
+played fast, and is a different fix from the one the spoken child voices need.
+The mouth opens on the way out, so F1 climbs while the pitch is already
+falling; locked together they are one glide and the person is a theremin.
+
+man_old_heavy has a rise of 0.04. He does not jump, he objects, on one low
+note for six-tenths of a second.
+
+Measured off audio.tap(): girl 580 to 490 Hz, young woman 321 to 277, young
+man 170 to 158, all falling through the vowel as designed.
+
+## [1.271.0] — 2026-09-04
+
+### The centralised auth service, merged
+
+`server/auth/` — the build of 1.270.0 — brought on to `main` off its own
+worktree. No behaviour changed with the merge: the cutover is seven reversible
+prep steps and a sixty-second switch, written out in `server/auth/CUTOVER.md`,
+and it has deliberately not been performed. The shared `SESSION_SECRET` is still
+the literal placeholder; rotating it is step one of the cutover and not of the
+merge.
+
 ## [1.270.0] — 2026-09-04
 
 ### One place for the authentication crap, and it does not move
