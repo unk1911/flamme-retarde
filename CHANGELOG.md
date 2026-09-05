@@ -8,6 +8,246 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.242.0] — 2026-09-04
+
+### The white panel is a painting of the kabine, and it was shut all along
+
+Misha: *"keep enhancing that area behind the kabines"* — and, earlier, *"that
+area behind the kabines, where the cars and boats are, and road towards Brod,
+that area feels under-developed... use the survey imagery that i had provided
+to u earlier"*.
+
+**The little free library was built off the wrong frame.** The catalogue entry
+it came from says "a white panel painted with a row of coloured book spines"
+standing *beside* the box. There is no such panel and they are not book spines.
+`_367` is square on to it from three metres: the white panel is the box's own
+**drop-front**, and what is painted on it is a row of **six kabina doors** —
+orange, blue, red, green, blue, yellow — each with the little coloured transom
+light over it that every hut in the block behind actually has, and each with a
+black dash for a handle. Four are louvred with horizontal blades; the green one
+is planked with vertical boards; the fifth is painted in wavy lines. It is a
+picture of the row of kabine it stands behind, and it is the best single object
+in the survey.
+
+**And it stands shut.** `_368` — the only frame with it open, the one this was
+built from, and the one that gave the shelf of books — is timed **18:28:50**,
+between `_367` at **18:28:36** and `_369` at **18:29:19**, both of which have it
+shut. It is open in that frame because the photographer opened it. So the books
+come out and the painting goes on. The note this replaces argued the books were
+the object, because "a plain dark slot behind a timber box is a meter cupboard"
+— which was true of what it had. Six painted kabina doors are not a meter
+cupboard from anywhere.
+
+The strap hinges stay on the inside face, which is exactly why the open frame
+shows bare pine and no paint at all.
+
+**Door colours are divided by the board they are painted on.** That board is in
+the shade of the pines and measures 157/172/191 — skylight, bluer than it is red
+— so every raw door value in the frame is cold and every one of them is wrong
+used as paint. White paint is about 0.85, so the ratios against the board times
+0.85 are the pigments: orange 0.92/0.51/0.33, blue 0.14/0.51/0.84, red
+0.90/0.31/0.35, green 0.33/0.62/0.27, second blue 0.06/0.39/0.71, yellow
+0.92/0.77/0.21. All of it then goes 12 % under, board included, because
+`panelSign` draws on an **unlit** material and a white board at its own albedo
+is lighter than every lit surface round it — a lightbox, not paint.
+
+**The bench came out of the library's own function**, where it had been welded
+since it went in. `_363`, `_366`, `_368` and `_369` have **four** of these in
+the strip behind the huts and the code had one. `parkBench` now, and the other
+three are placed — and where they go is arithmetic, not taste: `carSites` fills
+s 31.1 to 37.1 with a nose-in row every four metres, so the only car-free ground
+in that band is the two windows the car loop already leaves round the things in
+`BACK`. Two go in those, seaward of their object and looking at the water, which
+is what all four benches in the survey do.
+
+**And the limestone edging at the back of the parking**, which is the piece of
+ground the complaint is actually about. `_388` is one long **serrated kerb of
+big broken white limestone**, blocks 0.4 to 0.9 m across set on end and
+touching, running across the back of the car park. Not the resort's sawn kerb —
+that is the four-course wall with a cap beam already built along `walkTo` — and
+not a rockery. It is what everybody on this coast edges a bed with, and there is
+a hundred metres of it in one photograph.
+
+Which band it goes in is arithmetic too. The huts' back wall is at
+`rowB + cabD`, the lane wall at 29.2, the bollards at 29.7, and `carSites`
+records that the deepest tail the nose-in row can produce is **37.10**. OSM maps
+no building inside 39 m. So s 37.5 to 39.0 is a clean metre and a half with
+nothing in it at either end: the kerb goes at **37.75**, wandering 0.28 m
+because a kerb somebody laid by eye is never a line, and each lump overlapping
+the next by about a fifth — spaced, it is a row of buns; touching, it is one
+broken edge.
+
+**No collider on any of it**, and the reason is the one written over the sawn
+kerb blocks: `GROUND.girth` is 0.55 and `confine` adds it to every half-extent,
+so a run of these with blockers on them is fifty metres of sealed wall across
+the band the crowd and the cars both cross. You step over a 0.3 m rock.
+
+The kerb opens at t 439–444 for the **stone block**, off the same frame: a
+quarried ashlar lying on the gravel with four rough lumps round it, which is
+either a table and four seats or nobody ever moved them. `_388` is a 23 mm
+frame; the horizon row comes from two 1.7 m figures at the car park whose feet
+and heads are 45 px apart, so 29 m away; and against that horizon the block's
+front face stands **0.70 m** out of the gravel at 1.70 m from the lens, about
+1.3 by 1.0 on plan. Built with `bar` and not `boxTS` for one reason: its top
+falls 0.09 m across the width, and a cuboid with a level lid at this size is a
+concrete plinth.
+
+Census `{seen:446, thin:333, plain:86, rich:27}`. Jadrija 559 039 → **561 824**
+triangles, blockers 762 → 766.
+
+## [1.241.0] — 2026-09-04
+
+### The anchor is lying down, and it was standing up
+
+Misha: *"make sure the jadrija Anchor is present, find from photos!"*
+
+Present, and in the wrong attitude and in the wrong place.
+
+**Attitude first, because it is the whole silhouette.** What stood here was a
+shank planted vertically with a stock across it near the top and the arms at
+the bottom — which is how you set an anchor up as a war memorial, and is not
+what `1000150353` shows. Opened at full size the frame settles it three ways:
+
+* **The ring is at the joint.** A ring goes at the head, and the head is where
+  the stock crosses the shank. A joint two thirds of the way *down* a standing
+  member cannot be a head, because a standing shank's head is its top.
+* **There is a rectangular slot in the standing member** just above that joint.
+  That is a forelock keyway, and a forelock goes through the *stock* to key it
+  into the shank. So the standing member is the stock.
+* **The two flat spade plates are at the far end of the horizontal member.**
+  Flat plates are palms, palms are on arms, arms are at the crown. So the
+  horizontal member is the shank, running from the head at the joint to the
+  crown on the ground. Both arms leave the crown the same way, so from the side
+  they nearly superimpose — which is exactly the near palm and the smaller,
+  paler, further one the frame has.
+
+Somebody dragged it up the beach and dropped it in the flowerbed. It is half
+buried, on its side, with its iron stock in the air.
+
+**Measured, not guessed.** `_353` is 13 mm equivalent — 1444 px of focal length
+across its 4000 px long axis — the sea horizon at the far left fixes the horizon
+row, and a phone at 1.50 m over flat gravel then gives a distance for every
+ground contact and a height for everything over it. Stock **1.84 m** out of the
+ground with the ball on top; head **0.60 m** up; shank head-to-crown **1.82 m**
+at about 16°; ring **0.40 m** outside in **45 mm** bar; stock **78 mm** at the
+shank going to a **110 mm** ball; shank **90 mm**; palms **0.30 × 0.29 m** in
+25 mm plate. Stock 1.84 against shank 1.82 — and on a real admiralty anchor
+those two are equal, which is the check that says the solve is the right one.
+
+**And it moved, `rowB + 3.9` to `rowB + 7.6`.** The back row's rear wall is at
+`rowB + cabD`, so 3.9 stood it in a **1.1 m alley** between a rendered wall and
+the parking. `_353` is not a photograph of an alley — it is a planted bed in the
+open with the nose-in cars one side and the lane the other, a playground across
+the road behind, and eighty metres of sightline. That is the correction the rock
+already carried in its own note and the anchor had never had.
+
+**Two pines were standing in it.** One in the middle of the shank, one across
+the rock's face, and neither is a bug in the tree code: nothing was keeping
+either pass off two objects that are not OSM footprints.
+
+Adding them to `grove`'s built list does **not** fix it, and finding that out
+cost a build. `built` makes `grove.at` return **null**, and null in
+`45-trees.js` means *not mine, ask the cover map* — which on this peninsula is
+`GROWS[URBAN]` and a cypress. That swaps a pine for a cypress and leaves the
+trunk where it was. So `grove.at` returns a frozen **empty table** over them
+instead: truthy, so the cover map is never asked, and the species roll finds
+nothing in it.
+
+The resort's own three-row planting loop needed the opposite fix. A `continue`
+is not available there — `pine`, `olive` and `oleander` all draw from `rng` and
+they draw a *variable* number of times, so dropping one shifts every parasol,
+bather and hut downstream. The tree is **pushed** instead, radially in `s`, out
+to 2.4 m. Moving it costs no draws at all.
+
+The bed is `_353`'s and not a rockery: white limestone lumps along the seaward
+edge only — a kerb holding the bed up against the parking, where a ring of them
+made it a grave — two **dwarf fan palms**, and seven low grey-green cushions
+with the dry summer grass between them. *Chamaerops humilis* is new and is not
+any of the three the resort already grows: no trunk, and a flat pleated fan on
+the end of each stalk, which is the thing you read at ten metres. Nine fronds;
+twelve was tried and the extra three are invisible.
+
+Colours all off the same frame and all divided by the sunlit white limestone
+lump in it (229/217/188), so the 18:25 sun comes out of the numbers: frond
+0.352/0.398/0.168, cushions 0.318/0.352/0.238, dry grass 0.383/0.331/0.297 —
+warm against cold, a different colour and not a darker one.
+
+Census `{seen:446, thin:333, plain:86, rich:27}` throughout, which is the whole
+reason the tree is pushed rather than skipped. Jadrija 558 633 → **559 039**
+triangles, 60 fps.
+
+## [1.240.0] — 2026-09-04
+
+### The rock is a metre taller than we built it, and the frame says so
+
+Misha: *"make sure the Jadrija rock is in place, find it in my survey photos!"*
+
+It was in place. It was also **1.56 m tall**, and the photograph will not
+support that under any reading.
+
+`1000150359` carries `FocalLengthIn35mmFormat 13 mm`, which is 1444 px of focal
+length on its 4000 px long axis, and that turns the frame into a ruler. The
+scale comes off the tap in `1000150358`, shot at 69 mm from about a metre: the
+escutcheon rosette is 310 px there and the knob is 165, so the knob is 0.53 of
+the rosette — and a decorative fountain rosette is 90–110 mm against a bibcock
+knob of 45–55, which is the same ratio and the only pair of numbers in either
+frame with a catalogue behind it. Take the rosette at **0.10 m** and everything
+else falls out: the spout projects **0.19 m** and drops **0.12**.
+
+Back in `_359` that tap sits on the principal point and measures 78 px across
+an object 0.20 m long, so it stands **1.26 m** from the lens. A phone at 1.50 m
+looking at a tap 1.00 m up gives a down-tilt of **23°** and a face plane 1.16 m
+out. Run the frame edges back through that and the block is **2.19 m above the
+gravel where it leaves the top of the picture** — and it leaves the top of the
+picture, and the right-hand edge too. 2.19 is a floor. The left silhouette is
+still converging at the top edge and closes about a fifth of a metre above it:
+**2.35 m**, built.
+
+Two more numbers out of the same solve, both of which had been small. The
+**trough is 0.41 m**, not 0.30 — 0.30 is a doorstep. And the **tap is 1.00 m
+up**, not 0.92: 0.92 is where a tap is if you guess, 1.00 is where a tap is
+that people fill bottles at.
+
+**It is a block, not a boulder.** `lathe` builds rings that are circles, so
+what shipped was a loaf. Eight corners a ring with their own radii, phased a
+half step so one face looks straight down `−s` and the rosette has something
+flat to sit on — and the spread between the eight is the whole job. At ±12 % it
+was still an egg from behind; it is **±40 %** now, with the ring centres walking
+0.44 m along the shore between the foot and the apex.
+
+**The colour was already right and is untouched.** `_353` has sunlit white
+limestone at 229/217/188 a minute before `_359` has this rock's sunlit face at
+234/185/106 — same sun, same exposure. Against white limestone the stone is
+1.02/0.85/0.56 and `ROCK` is 1.00/0.83/0.54. The ochre is the stone, not the
+hour.
+
+**What was wrong was everything white beside it.** The same pair of frames puts
+the lumps at 0.726/0.718/0.706 — near neutral, barely warm at all — where the
+code had 0.782/0.760/0.706, brighter and 0.076 warmer across R−B, and a ring of
+them round the block rendered as ice cubes. Calcite came down too: at
+0.850/0.828/0.782 the seam was 2.1 stops over the face it is in and read as a
+strip light, where `_359` has the white streaks about a third of a stop over.
+
+And the bed. The whole bottom third of `_359` is white chippings with
+children's chalk lying on them, and the game stood the block on the same grey
+slab the lane is made of. There is an apron now — twelve triangles sampled at
+their own corners so it follows a surface that is not level, 0.045 m proud, and
+a radius that wanders 2.05–2.35 m so the edge is not a circle. Nine kerb lumps
+on it, set on end the way `_362` has the beds along the path, and two flat
+weathered plates off `_386` and `_388` lying where they were dropped.
+
+Lumps are faceted now rather than domes. What is lying about at Jadrija is
+broken karst — angular plates with flat faces, photographed at arm's length in
+`_386` and `_387` — and 21 triangles spent on seven corners reads as stone
+where the same 21 spent on a dome reads as a bun.
+
+**And you can no longer walk through 2.35 m of limestone.** The rock and the
+trough are colliders. The box is a fifth of a metre down-shore of the axis,
+because the widest ring runs t0−1.00 to t0+0.44.
+
+Census `{seen:446, thin:333, plain:86, rich:27}` throughout — nothing in here
+touches `rng`, the per-facet tint is `jit`. Jadrija 558 382 → **558 633**
+triangles, 61 fps at the car park.
 ## [1.252.0] — 2026-09-04
 
 ### The other surface in the same photograph

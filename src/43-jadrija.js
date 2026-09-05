@@ -10754,19 +10754,33 @@ async function buildJadrija(scene) {
   /**
    * The little free library, off `_367`, `_368` and `_369`.
    *
-   * "A wooden box on two steel posts with a lift-up lid full of books, and
-   * beside it a white panel painted with a row of coloured book spines. Green
-   * cast-iron and timber benches, gravel with a white limestone-block edging."
+   * The catalogue entry this was built from says "a white panel painted with a
+   * row of coloured book spines" standing BESIDE the box. **There is no such
+   * panel and they are not book spines.** `_367` is square on to the thing
+   * from three metres and settles it: the white panel is the box's own
+   * **drop-front**, and what is painted on it is a row of **six kabina doors**
+   * — orange, blue, red, green, blue, yellow — each with the little coloured
+   * transom light over it that every hut in the block behind actually has, and
+   * each with a black dash for a handle. Four are louvred with horizontal
+   * blades, the green one is planked with vertical boards, and the fifth is
+   * painted in wavy horizontal lines. It is a picture of the row of kabine it
+   * stands behind, and it is the best single object in the survey.
    *
-   * `_368` is square on to it at two metres and settles the construction: a
-   * chest of stained pine boards standing on two dark steel legs, the front
-   * panel dropping down on two long galvanised strap hinges, a plank lid
-   * oversailing it at a slight rake, and one packed shelf of books behind.
+   * **And it stands SHUT.** `_368` — the only frame with it open, the one this
+   * was built from, and the one that gave the shelf of books — is timed
+   * 18:28:50, between `_367` at 18:28:36 and `_369` at 18:29:19, both of which
+   * have it shut. It is open in that frame because the photographer opened it.
+   * So the books come out and the painting goes on, and the trade is a good
+   * one: the note this replaces argued that the books were the object because
+   * "a plain dark slot behind a timber box is a meter cupboard", which was
+   * true of what it had. Six painted kabina doors are not a meter cupboard
+   * from anywhere.
    *
-   * The books are the object. Twenty-odd spines at three to five centimetres
-   * each, all different heights and all different colours, is the only thing
-   * in the frame that could not be anything else — a plain dark slot behind a
-   * timber box is a meter cupboard.
+   * `_368` still settles the construction and is unchanged: a chest of stained
+   * pine boards on two dark steel legs, a plank lid oversailing at a slight
+   * rake, and the front dropping on two long galvanised strap hinges — which
+   * are on the INSIDE face, which is why the open frame shows bare pine and no
+   * paint at all.
    *
    * Placed, not measured: none of the three frames carries GPS. It stands at
    * the wood edge east of the lavender bank, on the stretch of `walkTo` a
@@ -10786,42 +10800,82 @@ async function buildJadrija(scene) {
       boxTS(lt + o - 0.035, lt + o + 0.035, ls - 0.035, ls + 0.035,
         gy, gy + 0.60, LEG2);
     }
-    // The carcass, and the drop-front on it.
-    boxTS(lt - HW, lt + HW, ls - HD, ls + HD, gy + 0.56, gy + 1.00,
+    // The carcass, and it is one box now rather than a chest with an open bay
+    // over it: shut, the whole front from the legs to the lid is the painted
+    // board.
+    boxTS(lt - HW, lt + HW, ls - HD, ls + HD, gy + 0.56, gy + 1.44,
       TIMB3, shade(TIMB3, 1.14));
-    boxTS(lt - HW + 0.02, lt + HW - 0.02, ls - HD - 0.022, ls - HD + 0.002,
-      gy + 0.58, gy + 0.98, shade(TIMB3, 1.10), shade(TIMB3, 1.18));
-    for (const o of [-0.34, 0.34]) {
-      boxTS(lt + o - 0.035, lt + o + 0.035, ls - HD - 0.032, ls - HD - 0.020,
-        gy + 0.58, gy + 0.99, GALV2);
-    }
-    // The open bay: a back, two ends, and a shelf across the bottom of it.
-    boxTS(lt - HW, lt + HW, ls + HD - 0.05, ls + HD, gy + 1.00, gy + 1.44,
-      DARKW2, shade(DARKW2, 1.12));
-    for (const o of [-1, 1]) {
-      boxTS(lt + o * HW - o * 0.05, lt + o * HW, ls - HD, ls + HD,
-        gy + 1.00, gy + 1.44, DARKW2, shade(DARKW2, 1.16));
-    }
-    boxTS(lt - HW, lt + HW, ls - HD, ls + HD, gy + 1.00, gy + 1.04,
-      shade(DARKW2, 0.86));
-    // The books. Twenty-two spines, none the same height and none the same
-    // colour, packed tight and leaning at the right-hand end because the shelf
-    // is not quite full — which is what every one of these looks like.
-    const SPINE = [
-      [0.520, 0.150, 0.115], [0.115, 0.235, 0.480], [0.640, 0.560, 0.140],
-      [0.145, 0.375, 0.205], [0.480, 0.470, 0.440], [0.310, 0.130, 0.335],
-      [0.585, 0.330, 0.095], [0.090, 0.330, 0.360], [0.700, 0.690, 0.650],
-      [0.180, 0.180, 0.195],
-    ];
-    let bx = lt - HW + 0.07;
-    for (let i = 0; bx < lt + HW - 0.16; i++) {
-      const w = 0.028 + 0.022 * ((i * 7) % 3);
-      const hgt = 0.20 + 0.055 * ((i * 5) % 4);
-      const col = SPINE[(i * 3) % SPINE.length];
-      boxTS(bx, bx + w, ls - HD + 0.04, ls + HD - 0.055,
-        gy + 1.04, gy + 1.04 + hgt, col, shade(col, 1.20));
-      bx += w + 0.006;
-    }
+    // The drop-front itself, a hair proud of the carcass so that the painting
+    // never shares a plane with the box behind it.
+    boxTS(lt - HW + 0.02, lt + HW - 0.02, ls - HD - 0.024, ls - HD + 0.002,
+      gy + 0.58, gy + 1.42, shade(TIMB3, 1.10), shade(TIMB3, 1.18));
+    // The hasp at the top, which is the only ironmongery you can see with it
+    // shut — the two long strap hinges are on the inside face and that is why
+    // `_368` shows bare pine with hinges on it and no paint whatever.
+    boxTS(lt - 0.055, lt + 0.055, ls - HD - 0.036, ls - HD - 0.022,
+      gy + 1.34, gy + 1.44, GALV2);
+    /**
+     * The painting: six kabina doors on a white ground.
+     *
+     * A canvas rather than geometry, for `panelSign`'s own reason — a louvred
+     * door 0.20 m wide is forty blades, and forty blades in triangles is a
+     * thousand of them for something that is two pixels a blade at the range
+     * anybody sees this from.
+     *
+     * COLOURS are read off `_367` and DIVIDED BY THE WHITE BOARD BESIDE THEM.
+     * The board is in the shade of the pines there — measured 157/172/191,
+     * which is skylight and is bluer than it is red — so the raw door values
+     * are all cold, and every one of them comes out wrong if it is used as
+     * paint. White paint is about 0.85, so the ratios against the board times
+     * 0.85 are the pigments: orange 0.92/0.51/0.33, blue 0.14/0.51/0.84, red
+     * 0.90/0.31/0.35, green 0.33/0.62/0.27, the second blue 0.06/0.39/0.71,
+     * yellow 0.92/0.77/0.21.
+     *
+     * All of it then goes 12 % under, board included, because `panelSign` uses
+     * an UNLIT material: a white board at its own albedo is lighter than every
+     * lit surface round it and reads as a lightbox rather than as paint.
+     */
+    panelSign(lt, ls - HD - 0.040, gy + 1.00, HW * 2 - 0.06, 0.82, (g, C) => {
+      const w = C.width, h = C.height;
+      g.fillStyle = '#c0beb6'; g.fillRect(0, 0, w, h);
+      // The boards the panel is made of, showing through the paint: five
+      // horizontal joints, barely there. `_367` has them across the white.
+      g.fillStyle = 'rgba(120,114,102,0.30)';
+      for (let k = 1; k < 6; k++) g.fillRect(0, (h * k / 6) | 0, w, 1.5);
+      // orange, blue, red, green, blue, yellow — left to right, in that order.
+      const DOOR = ['#cf7349', '#1f73bd', '#cc464f', '#4b8c3d', '#0e589f',
+        '#d0ad30'];
+      const M = w * 0.031;                     // margin at the ends
+      const dw = (w - M * 2) / 6 * 0.82;       // door, against a 0.18 gap
+      const pitch = (w - M * 2 - dw) / 5;
+      const dy0 = h * 0.27, dh = h * 0.52;
+      for (let i = 0; i < 6; i++) {
+        const x = M + i * pitch;
+        g.fillStyle = DOOR[i];
+        // The transom light over the door, in the door's own colour, which is
+        // what the kabine themselves have and is why this reads as a picture
+        // of them rather than as six coloured rectangles.
+        g.fillRect(x + dw * 0.10, h * 0.10, dw * 0.80, h * 0.055);
+        g.fillRect(x, dy0, dw, dh);
+        // The blades. Horizontal on five of them and VERTICAL on the green
+        // one, which is planked rather than louvred — the one asymmetry in
+        // the row and the thing that stops it reading as a pattern.
+        g.fillStyle = 'rgba(0,0,0,0.16)';
+        if (i === 3) {
+          for (let k = 1; k * 5 < dw; k++) {
+            g.fillRect(x + k * 5, dy0 + 2, 1.6, dh - 4);
+          }
+        } else {
+          for (let k = 1; k * 5 < dh; k++) {
+            g.fillRect(x + 2, dy0 + k * 5, dw - 4, 1.6);
+          }
+        }
+        // The handle: a black dash at hand height. Two pixels, and without it
+        // these are panels rather than doors.
+        g.fillStyle = 'rgba(20,18,16,0.85)';
+        g.fillRect(x + dw * 0.52, dy0 + dh * 0.56, dw * 0.30, 2.6);
+      }
+    });
     // The lid: one plank, oversailing all round and raked back, dark with the
     // weather on it.
     bar(lt - HW - 0.08, lt + HW + 0.08,
@@ -10829,30 +10883,64 @@ async function buildJadrija(scene) {
         [ls + HD + 0.08, gy + 1.56], [ls - HD - 0.10, gy + 1.48]],
       DARKW2, shade(DARKW2, 1.20));
     furniture.push({ t: lt, s: ls, a: 0.82, c: 0.30, h: 1.56, y: gy });
-    // The bench beside it: green cast-iron ends and timber slats, which is the
-    // same bench the park has and the frame has one of them a metre away.
-    const bt2 = lt + 1.55, gy2 = surfaceY(bt2, ls);
+    parkBench(lt + 1.55, ls);
+  }
+  freeLibrary(303.5, 40.2);
+
+  /**
+   * The green park bench, lifted out of `freeLibrary` because there is more
+   * than one of them and there always was.
+   *
+   * `_363`, `_366`, `_368` and `_369` between them have **four** of these in
+   * the strip behind the huts — one beside the library, one across the gravel
+   * path from the big agave, and two more further along facing the moorings —
+   * and the code had one, welded into the library's own function. Dark green
+   * cast-iron ends with a scrolled arm, five green-painted timber slats in the
+   * seat and three in the back, standing on gravel with a limestone-lump
+   * edging behind them. Every one in the survey is the same pattern and the
+   * same green, which is what a municipality buys.
+   *
+   * NOT the promenade's `BENCH`, which is the other municipal pattern on this
+   * shore and stands in a run every 33 m: that one is a bent iron end frame in
+   * a lighter green with slats you can see the sea through. Two patterns in
+   * one resort is what a place that has been added to for a century looks
+   * like, which is the same argument the black kabine-gable bench ships under.
+   *
+   * Placements, like the library's: none of the four frames carries GPS.
+   */
+  function parkBench(bt2, bs2) {
+    const gy2 = surfaceY(bt2, bs2);
     const IRONG = [0.075, 0.185, 0.115];
     const SLAT2 = [0.235, 0.390, 0.230];
     for (const o of [-0.62, 0.62]) {
-      boxTS(bt2 + o - 0.035, bt2 + o + 0.035, ls - 0.26, ls + 0.24,
+      boxTS(bt2 + o - 0.035, bt2 + o + 0.035, bs2 - 0.26, bs2 + 0.24,
         gy2, gy2 + 0.44, IRONG);
-      boxTS(bt2 + o - 0.030, bt2 + o + 0.030, ls + 0.16, ls + 0.24,
+      boxTS(bt2 + o - 0.030, bt2 + o + 0.030, bs2 + 0.16, bs2 + 0.24,
         gy2 + 0.44, gy2 + 0.92, IRONG);
     }
     for (let k = 0; k < 3; k++) {
-      boxTS(bt2 - 0.70, bt2 + 0.70, ls - 0.24 + k * 0.16,
-        ls - 0.24 + k * 0.16 + 0.12, gy2 + 0.42, gy2 + 0.47,
+      boxTS(bt2 - 0.70, bt2 + 0.70, bs2 - 0.24 + k * 0.16,
+        bs2 - 0.24 + k * 0.16 + 0.12, gy2 + 0.42, gy2 + 0.47,
         SLAT2, shade(SLAT2, 1.16));
     }
     for (let k = 0; k < 3; k++) {
-      boxTS(bt2 - 0.70, bt2 + 0.70, ls + 0.17, ls + 0.22,
+      boxTS(bt2 - 0.70, bt2 + 0.70, bs2 + 0.17, bs2 + 0.22,
         gy2 + 0.52 + k * 0.14, gy2 + 0.63 + k * 0.14,
         SLAT2, shade(SLAT2, 1.16));
     }
-    furniture.push({ t: bt2, s: ls, a: 0.74, c: 0.30, h: 0.92, y: gy2 });
+    furniture.push({ t: bt2, s: bs2, a: 0.74, c: 0.30, h: 0.92, y: gy2 });
   }
-  freeLibrary(303.5, 40.2);
+  // The other three, in the strip behind the huts, and WHERE they go is
+  // arithmetic. `carSites` fills s 31.1 to 37.1 with a nose-in row every four
+  // metres, so the only car-free ground in that band is the two windows the
+  // car loop already leaves round the things in `BACK` — 3.4 m either side of
+  // the rock at 418.6 and 3.0 either side of the anchor at 430.4. Two of these
+  // go in those, seaward of their object and looking at the water, which is
+  // what all four benches in the survey do. The third stands at the stone
+  // block, in the gap the lump kerb opens for it.
+  parkBench(416.6, 31.70);
+  parkBench(428.2, 31.60);
+  parkBench(443.6, 38.60);
 
   /**
    * The POMMES FRITES lightbox, which the TODO has wanted a source for.
@@ -14964,9 +15052,19 @@ async function buildJadrija(scene) {
    * has to know: `carSites` lays a nose-in row every four metres and would
    * otherwise park one against each of them. Both positions are placements —
    * neither survey frame carries GPS — and both sit on the band the footage
-   * does support, which is the made vehicle surface behind the back row.
+   * does support, which is the wood behind the back row of huts.
+   *
+   * The anchor has MOVED, `rowB + 3.9` to `rowB + 7.6`, and it is the same
+   * correction the rock already carries in its own note. The back row's rear
+   * wall is at `rowB + cabD`, so 3.9 put the anchor in a **1.1 m alley**
+   * between a rendered wall and the parking, where it could be seen by
+   * nobody who was not already lost. `1000150353` is not a photograph of an
+   * alley: it is a planted bed in the open with the nose-in cars on one side
+   * of it and the lane on the other, a playground across the road behind, and
+   * eighty metres of sightline in every direction. 7.6 is the band that gives
+   * that, and it is the band the rock is already in.
    */
-  const BACK = { anchor: [430.4, JAD.rowB + 3.9], rock: [418.6, JAD.rowB + 8.2] };
+  const BACK = { anchor: [430.4, JAD.rowB + 7.6], rock: [418.6, JAD.rowB + 8.2] };
 
   // ── what is parked in the wood ─────────────────────────────────────────────
   // Both walk-throughs film cars standing among the pines — nose-in, in loose
@@ -15373,24 +15471,171 @@ async function buildJadrija(scene) {
   // one piece of civic sculpture on this whole shore and it is a tap.
   //
   // POSITION for both is a placement, not a measurement: neither frame carries
-  // GPS. What the footage supports is that they are on the verge of the made
-  // vehicle surface behind the huts, which is `JAD.rowB + 3.6` — the same edge
-  // the parking bollards stand on — so that is the band they go in.
+  // GPS. What the footage supports is that both stand in the OPEN in the wood
+  // behind the huts with the nose-in car row beside them and a sightline in
+  // every direction, so that is the band they go in — see the note over
+  // `BACK`, which also records why the anchor had to be moved out of the
+  // 1.1 m alley behind the back row's rear wall that it used to be in.
   {
     const back11 = b;
     b = up;
     const RUST = [0.402, 0.208, 0.126];
     const RUSTD = [0.286, 0.140, 0.086];
-    const LIME = [0.782, 0.760, 0.706];       // the limestone lumps round it
+    // The white limestone, re-measured against the ochre block rather than
+    // guessed. `1000150353` has a sunlit lump at 229/217/188 and `1000150359`
+    // has the fountain rock's sunlit face at 234/185/106 a minute later — same
+    // sun, same exposure — so with `ROCK` at 0.742/0.612/0.398 the lumps come
+    // out 0.726/0.718/0.706: **near neutral**, and barely warm at all. The old
+    // 0.782/0.760/0.706 was both brighter and 0.076 warmer across R-B, and at
+    // this scene's exposure a ring of them round the block rendered as ice
+    // cubes. Taken a further 6 % down because these are dusty and half of what
+    // is seen of them is a shaded face.
+    const LIME = [0.684, 0.676, 0.664];       // the limestone lumps round it
+    // The same stone crushed, and 15 % under the lumps rather than equal to
+    // them: a bed of chippings is mostly the shadow between the chippings.
+    // At `LIME` exactly it rendered as a patch of snow on the lane.
+    const GRAV = [0.582, 0.574, 0.558];
     const ROCK = [0.742, 0.612, 0.398];       // honey limestone, sunlit
     const ROCKD = [0.548, 0.442, 0.286];
-    const VEIN = [0.850, 0.828, 0.782];       // calcite
+    // Calcite, and DOWN from 0.850/0.828/0.782. A seam at that value against
+    // this block is 2.1 stops brighter than the stone it is in and read as a
+    // strip light rather than as a mineral. In `_359` the white streaks are
+    // about a third of a stop over the face beside them and no more.
+    const VEIN = [0.796, 0.770, 0.716];       // calcite
     const BRONZE = [0.372, 0.268, 0.140];
-    const TROUGH = [0.652, 0.640, 0.612];
+    // The casting is not one metal and reads as three. Off `1000150358`, all
+    // three measured against the rock face beside them in the same frame
+    // (196/157/105) so the low sun divides out: the polished knob comes back
+    // at 0.74/0.70/0.60 of the stone, the oxidised rosette at 0.50/0.62/0.78
+    // — grey-GREEN, and the only cold thing on the whole object — and the
+    // snout is very nearly black. `BRONZE` above stays for the throat.
+    const BRONZED = [0.150, 0.118, 0.078];    // the head, patinated near black
+    const BRASS = [0.520, 0.400, 0.210];      // the knob, handled bright
+    const PATINA = [0.352, 0.360, 0.298];     // the rosette, verdigris
+    // The planting in the anchor's bed, all three off `1000150353` and all
+    // three divided by the sunlit white limestone lump in the same frame
+    // (229/217/188) so that the 18:25 sun comes out of the numbers.
+    const PALMG = [0.352, 0.398, 0.168];      // Chamaerops frond, 113/120/41
+    const PTRUNK = [0.235, 0.190, 0.135];     // its fibrous stub of a trunk
+    const TUSS = [0.318, 0.352, 0.238];       // the grey-green cushions
+    const DRYG = [0.383, 0.331, 0.297];       // and the dry grass, 121/100/79
+    const TROUGH = [0.640, 0.596, 0.558];     // 108/100/94 in shade: warm grey
     const gAt2 = (t2, s2) => {
       const st2 = at(t2);
       return Math.max(surfaceY(t2, s2),
         groundAt(st2.x + st2.nx * s2, st2.z + st2.nz * s2));
+    };
+
+    /**
+     * One lump of white limestone, faceted, sitting in the ground.
+     *
+     * These were `dome`s, and a dome is the wrong solid: what is lying about
+     * at Jadrija is broken karst — angular plates with flat faces and hard
+     * arrises, photographed at arm's length in `1000150386` and `_387` and in
+     * a kerb line in `_362`. Seven corners at seven different radii, one
+     * course of quads and a fan, is 21 triangles and reads as stone; a dome
+     * of the same size is 21 triangles and reads as a bun.
+     *
+     * BURIED by a quarter of its height. Rule 5: a lump resting exactly on the
+     * ground plane shows its own base edge from the far side of the car park
+     * and z-fights with the surface at this distance from the origin.
+     */
+    const limeLump = (lt, ls, r, h, seed) => {
+      const ly = gAt2(lt, ls);
+      // `k` shrinks the ring and `dy` lifts it, so the two rings are one
+      // expression and the seven radii below them are shared — which is what
+      // makes the arrises line up from the foot to the shoulder.
+      // 0.78 to 1.10 and not 0.66 to 1.10. At the wider spread the corners
+      // came out as spikes and seven of them together read as crumpled paper,
+      // which is the opposite failure to the dome and no better.
+      const P = (i, k, dy) => {
+        const a = ((i % 7) + 0.5) / 7 * TAU;
+        const rr = r * (0.78 + 0.32 * jit(i % 7, seed * 3 + 7)) * k;
+        return W(lt + Math.cos(a) * rr, ls + Math.sin(a) * rr,
+          ly - h * 0.25 + dy);
+      };
+      for (let i = 0; i < 7; i++) {
+        b.quad(P(i, 1, 0), P(i + 1, 1, 0),
+          P(i + 1, 0.62, h * 0.72), P(i, 0.62, h * 0.72),
+          shade(LIME, 0.86 + jit(i, seed * 5 + 3) * 0.22));
+      }
+      const cap = W(lt + r * 0.10, ls - r * 0.08, ly - h * 0.25 + h);
+      for (let i = 0; i < 7; i++) {
+        b.tri(P(i, 0.62, h * 0.72), P(i + 1, 0.62, h * 0.72), cap,
+          shade(LIME, 0.96 + jit(i, seed * 5 + 11) * 0.14));
+      }
+    };
+
+    /**
+     * A dwarf fan palm, which is the plant standing behind the anchor in
+     * `1000150353` and is not any of the three the resort already grows.
+     *
+     * *Chamaerops humilis*, the only palm native to this coast: no trunk to
+     * speak of, a clump of stiff stalks out of the ground, and a flat pleated
+     * FAN on the end of each. That fan is the whole object. `pine` and
+     * `olive` are masses and are drawn as `puff`s, and an agave is a rosette
+     * of straight blades — this is neither. It is a dozen flat discs held out
+     * at a dozen angles, and at ten metres what you read is the discs.
+     *
+     * Nine fronds. Twelve was tried and the extra three are invisible: the
+     * fans overlap at that count and all they cost is triangles.
+     *
+     * Drawn on both windings, the way `agave` is, because a fan is one sheet
+     * and half of them face away from you.
+     */
+    const fanPalm = (lt, ls, r, seed) => {
+      const ly = gAt2(lt, ls);
+      const N = 9, ty = ly + 0.24;
+      post(W, lt, ls, ly - 0.12, ty, 0.14, PTRUNK, 6);
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * TAU + jit(i, seed * 13 + 1) * 0.42;
+        // Elevation of the stalk, 20 to 62 deg. A clump with every stalk at
+        // the same angle is a parasol.
+        const e = 0.35 + 0.73 * jit(i, seed * 13 + 5);
+        const L = r * (0.40 + 0.16 * jit(i, seed * 13 + 9));
+        const ca = Math.cos(a), sa = Math.sin(a);
+        const hub = [lt + ca * L * Math.cos(e), ls + sa * L * Math.cos(e),
+          ty + L * Math.sin(e)];
+        // The stalk: a thin blade rather than a bar, which is what a
+        // Chamaerops petiole is and costs two triangles instead of eight.
+        b.tri(W(lt - sa * 0.028, ls + ca * 0.028, ty),
+          W(lt + sa * 0.028, ls - ca * 0.028, ty),
+          W(hub[0], hub[1], hub[2]), shade(PTRUNK, 1.30));
+        b.tri(W(lt + sa * 0.028, ls - ca * 0.028, ty),
+          W(lt - sa * 0.028, ls + ca * 0.028, ty),
+          W(hub[0], hub[1], hub[2]), shade(PTRUNK, 1.30));
+        // The fan, as four segments swept 100 deg either side of the stalk
+        // and drooping at the edges the way a fan palm's does.
+        const R = r * (0.42 + 0.14 * jit(i, seed * 13 + 17));
+        const rim = (k) => {
+          const bta = (k / 4 - 0.5) * 1.75;
+          const cb = Math.cos(bta), sb = Math.sin(bta);
+          const ox = ca * Math.cos(e) * cb - sa * sb;
+          const oz = sa * Math.cos(e) * cb + ca * sb;
+          const oy = Math.sin(e) * cb - 0.34 * (1 - cb);
+          return W(hub[0] + ox * R, hub[1] + oz * R, hub[2] + oy * R);
+        };
+        const H = W(hub[0], hub[1], hub[2]);
+        for (let k = 0; k < 4; k++) {
+          const c = shade(PALMG, 0.88 + jit(k + i * 4, seed * 13 + 23) * 0.28);
+          b.tri(H, rim(k), rim(k + 1), c);
+          b.tri(H, rim(k + 1), rim(k), shade(c, 0.72));
+        }
+      }
+    };
+
+    /**
+     * One cushion of the low grey-green scrub in the anchor's bed. A dome, and
+     * for once a dome is the right solid: these are wind-clipped subshrubs and
+     * the top of one really is a smooth cap. Alternating with the dry summer
+     * grass, which is what the frame has between them and is a different
+     * colour, not a darker one — 0.383/0.331/0.297 against 0.318/0.352/0.238,
+     * warm against cold, both read off `_353` in the same sun.
+     */
+    const tussock = (lt, ls, r, seed) => {
+      const c = (seed % 2) ? DRYG : TUSS;
+      dome(W, lt, ls, gAt2(lt, ls) - 0.04, r * (0.52 + 0.24 * jit(seed, 87)),
+        r, shade(c, 0.92 + jit(seed, 89) * 0.20), 6);
     };
 
     /**
@@ -15428,143 +15673,494 @@ async function buildJadrija(scene) {
     };
 
     // ── the anchor ──
+    //
+    // REBUILT, and the thing that was wrong was not a dimension. **It is lying
+    // down.** What stood here was a shank planted vertically with a stock
+    // across it near the top and the arms at the bottom, which is how an
+    // anchor is set up as a war memorial. It is not what `1000150353` shows,
+    // and the frame settles it three separate ways once it is opened at full
+    // size:
+    //
+    //   * **The ring is at the joint.** A ring goes at the HEAD, and the head
+    //     is where the stock crosses the shank. So the joint two thirds of the
+    //     way DOWN the standing member is the head — which cannot be true of a
+    //     standing shank, because a shank's head is its top.
+    //   * **There is a rectangular slot in the standing member** just above
+    //     the joint. That is a forelock keyway, and a forelock goes through
+    //     the STOCK to key it into the shank. The standing member is the stock.
+    //   * **The two flat spade plates are at the far end of the member that
+    //     leaves the joint horizontally.** Flat plates are palms, palms are on
+    //     arms, and arms are at the crown. So that horizontal member is the
+    //     shank, and it runs from the head at the joint to the crown on the
+    //     ground 1.8 m away. Both arms point the same way off the crown, so
+    //     from the side they nearly superimpose — which is exactly the near
+    //     palm and the smaller, paler, further one the frame has.
+    //
+    // Somebody dragged it up the beach and dropped it in the flowerbed. It is
+    // half buried, on its side, with its iron stock in the air, and that is a
+    // far better silhouette than the memorial one because nothing else on this
+    // shore has it.
+    //
+    // MEASURED off the same frame, solved rather than guessed. `_353` is
+    // 13 mm equivalent — 1444 px of focal length across its 4000 px long axis
+    // — the sea horizon at the far left fixes the horizon row, and a phone
+    // held at 1.50 m over flat gravel then gives a distance for every ground
+    // contact and a height for everything above it:
+    //
+    //   * stock: **1.84 m** out of the ground, ball end at the top;
+    //   * head (ring and stock through the shank): **0.60 m** up;
+    //   * shank, head to crown: **1.82 m**, lying at about 16 deg;
+    //   * ring: **0.40 m** outside diameter in **45 mm** bar;
+    //   * stock **78 mm** at the shank going to a **110 mm** ball;
+    //   * shank **90 mm** at the head;
+    //   * palms **0.30 x 0.29 m**, about 25 mm of plate.
+    //
+    // Stock length against shank length is 1.84 against 1.82, and on a real
+    // admiralty anchor those two are equal. Two independent readings of the
+    // same frame agreeing to a centimetre is the check that says the solve is
+    // the right one.
     {
       const [t0, s0] = BACK.anchor;
       const y0 = gAt2(t0, s0);
-      // The shank, leaning back along the shore. 26 deg off vertical, which is
-      // what the frame has, and 1.95 m of it out of the ground.
-      const TH = 0.454, AZ = 0.38;                 // 26 deg, and its heading
-      const dir = [Math.sin(TH) * Math.cos(AZ), Math.sin(TH) * Math.sin(AZ),
-        Math.cos(TH)];
-      const crown = [0, 0, -0.06];                 // a little of it buried
-      const head = [crown[0] + dir[0] * 2.02, crown[1] + dir[1] * 2.02,
-        crown[2] + dir[2] * 2.02];
-      spar(t0, s0, y0, crown, head, 0.062, 0.040, RUST);
-      // The stock, across the shank near the head and at right angles to the
-      // arms. Without it this is a fork.
-      const sk = 0.86;
-      const mid = [crown[0] + (head[0] - crown[0]) * sk,
-        crown[1] + (head[1] - crown[1]) * sk,
-        crown[2] + (head[2] - crown[2]) * sk];
-      // Perpendicular to the shank, in the horizontal-ish plane across the
-      // arms: the arms lie along +/- the shore, so the stock runs across it.
-      const sx = [-Math.sin(AZ), Math.cos(AZ), 0];
+      // Local (dt, ds, dy) throughout, and `spar` takes them straight. The
+      // shank runs along the shore so that the promenade sees it broadside:
+      // head down-shore, crown up-shore, and `BACK.anchor` is its middle
+      // rather than one of its ends, which keeps the whole object inside the
+      // 3.0 m the car loop leaves clear either side of that station.
+      const head = [-0.85, -0.26, 0.60];
+      const crown = [+0.85, +0.26, 0.10];
+      spar(t0, s0, y0, head, crown, 0.045, 0.058, RUST);
+      // The band round the shank a third of the way out, which the frame has
+      // and which is the only thing that stops the shank reading as pipe.
       spar(t0, s0, y0,
-        [mid[0] - sx[0] * 0.66, mid[1] - sx[1] * 0.66, mid[2] - sx[2] * 0.66],
-        [mid[0] + sx[0] * 0.66, mid[1] + sx[1] * 0.66, mid[2] + sx[2] * 0.66],
-        0.034, 0.034, RUSTD);
-      // Two arms off the crown, each a straight run to an elbow and a shorter
-      // one out to the palm, which is enough curve at this size.
-      const ax = [Math.cos(AZ), Math.sin(AZ), 0];
-      for (const sg of [1, -1]) {
-        const elb = [crown[0] + ax[0] * 0.40 * sg, crown[1] + ax[1] * 0.40 * sg,
-          crown[2] + 0.17];
-        const tip = [crown[0] + ax[0] * 0.72 * sg, crown[1] + ax[1] * 0.72 * sg,
-          crown[2] + 0.56];
-        spar(t0, s0, y0, crown, elb, 0.058, 0.046, RUST);
-        spar(t0, s0, y0, elb, tip, 0.046, 0.030, RUST);
-        // The palm: a flattened wedge on the end of the arm, which is the part
-        // that reads as an anchor from thirty metres.
-        const pw = 0.20;
-        spar(t0, s0, y0,
-          [tip[0] - sx[0] * pw, tip[1] - sx[1] * pw, tip[2] - 0.05],
-          [tip[0] + sx[0] * pw, tip[1] + sx[1] * pw, tip[2] - 0.05],
-          0.052, 0.052, RUSTD);
-      }
-      // The ring at the head, eight short bars round a circle.
+        [head[0] + 0.55, head[1] + 0.17, head[2] - 0.16],
+        [head[0] + 0.66, head[1] + 0.20, head[2] - 0.19], 0.070, 0.070, RUSTD);
+      // The stock, standing. Buried 0.25 m — the lower arm of it is in the
+      // soil, which is why only a third of its length shows below the shank
+      // where a free stock would show half. Leaning 0.16 m along the shore at
+      // the top, which is what the frame has.
+      const st0 = [head[0] - 0.04, head[1] + 0.02, head[2] - 0.85];
+      const st1 = [head[0] + 0.12, head[1] - 0.08, head[2] + 1.24];
+      spar(t0, s0, y0, st0, st1, 0.042, 0.034, RUST);
+      // The ball on the end of it. Not a decoration: a stock has a ball or a
+      // nut at one end so that it cannot pull through the shank, and at 1.84 m
+      // up it is the whole of the object's top silhouette — 110 mm across,
+      // which is three times the bar it sits on and is why you can pick this
+      // out against the sky from the far side of the car park.
+      lathe(W, t0 + st1[0], s0 + st1[1], [
+        [y0 + st1[2] - 0.020, 0.034], [y0 + st1[2] + 0.014, 0.055],
+        [y0 + st1[2] + 0.062, 0.055], [y0 + st1[2] + 0.090, 0.000],
+      ], RUST, 8);
+      // The forelock keyway, 0.10 m above the shank. Twenty-eight millimetres
+      // of dark on a rusty bar, and it is the piece of evidence this whole
+      // rebuild turns on, so it goes in.
+      boxTS(t0 + head[0] + 0.06, t0 + head[0] + 0.075,
+        s0 + head[1] - 0.045, s0 + head[1] + 0.045,
+        y0 + head[2] + 0.085, y0 + head[2] + 0.113, shade(RUSTD, 0.42));
+      // The ring, hanging off a boss at the head, in the vertical plane that
+      // contains the shank — which is the plane the promenade looks at, so it
+      // shows as a circle rather than as a line. Eight bars round 0.178 m of
+      // centreline radius in 22 mm bar: 0.40 m outside, measured.
       {
-        const rr = 0.11;
+        const RC = [head[0] - 0.02, head[1] - 0.10, head[2] - 0.20];
+        const un = 1 / Math.hypot(1.70, 0.52);
+        const ex = [1.70 * un, 0.52 * un, 0];       // along the shank
         for (let i = 0; i < 8; i++) {
-          const a0 = (i / 8) * TAU, a1 = ((i + 1) / 8) * TAU;
-          const P = (a) => [head[0] + sx[0] * Math.cos(a) * rr,
-            head[1] + sx[1] * Math.cos(a) * rr,
-            head[2] + Math.sin(a) * rr + 0.10];
-          spar(t0, s0, y0, P(a0), P(a1), 0.020, 0.020, RUSTD);
+          const P = (i2) => {
+            const a = (i2 / 8) * TAU;
+            return [RC[0] + ex[0] * Math.cos(a) * 0.178,
+              RC[1] + ex[1] * Math.cos(a) * 0.178,
+              RC[2] + Math.sin(a) * 0.178];
+          };
+          spar(t0, s0, y0, P(i), P(i + 1), 0.022, 0.022, RUSTD);
+        }
+        // The shackle boss between the ring and the shank.
+        spar(t0, s0, y0, head, [RC[0], RC[1], RC[2] + 0.16], 0.055, 0.040,
+          RUST);
+      }
+      // Two arms off the crown, and both of them point the SAME way — up-shore,
+      // the way the shank came from — spread either side of it in the plane at
+      // right angles to the stock. That is what an anchor's arms do and it is
+      // why they superimpose in a side view.
+      {
+        // Along the shank, and across it in the horizontal plane.
+        const un = 1 / Math.hypot(1.70, 0.52);
+        const ax = [1.70 * un, 0.52 * un, 0];
+        const sx = [-0.52 * un, 1.70 * un, 0];
+        for (const sg of [1, -1]) {
+          const elb = [crown[0] + ax[0] * 0.16 + sx[0] * 0.30 * sg,
+            crown[1] + ax[1] * 0.16 + sx[1] * 0.30 * sg, crown[2] + 0.10];
+          const tip = [crown[0] + ax[0] * 0.02 + sx[0] * 0.60 * sg,
+            crown[1] + ax[1] * 0.02 + sx[1] * 0.60 * sg, crown[2] + 0.26];
+          spar(t0, s0, y0, crown, elb, 0.056, 0.044, RUST);
+          spar(t0, s0, y0, elb, tip, 0.044, 0.028, RUSTD);
+          // The palm. A spade plate 0.30 across and 0.29 long in the plane of
+          // the arms, drawn as a real plate with 25 mm of thickness rather
+          // than as a fat bar: the whole of what says anchor at thirty metres
+          // is that the end of the arm is FLAT, and a square-section spar with
+          // the same footprint reads as a lump.
+          const L = (o) => W(t0 + tip[0] + ax[0] * o[0] + sx[0] * o[1] * sg
+            + (0) * o[2], s0 + tip[1] + ax[1] * o[0] + sx[1] * o[1] * sg,
+          y0 + tip[2] + o[2]);
+          // Outline in (along the arm, across it, up), a kite: the throat at
+          // the arm, the two shoulders, the point.
+          const O = [[-0.10, -0.02, -0.10], [0.06, -0.06, 0.02],
+            [0.19, 0.02, 0.14], [-0.02, 0.06, 0.13]];
+          const th = 0.0125;
+          const F = O.map((o) => L([o[0], o[1], o[2] + th]));
+          const Bk = O.map((o) => L([o[0], o[1], o[2] - th]));
+          b.quad(F[0], F[1], F[2], F[3], RUSTD);
+          b.quad(Bk[3], Bk[2], Bk[1], Bk[0], shade(RUSTD, 0.82));
+          for (let k = 0; k < 4; k++) {
+            b.quad(F[k], Bk[k], Bk[(k + 1) % 4], F[(k + 1) % 4],
+              shade(RUSTD, 0.92));
+          }
         }
       }
-      // And the bed it stands in: white limestone lumps, which is what makes
-      // it a monument rather than something that fell off a boat.
-      for (let i = 0; i < 7; i++) {
-        const a = (i / 7) * TAU + 0.4;
-        const r = 0.62 + 0.18 * Math.cos(i * 2.7);
+      // The bed it lies in. `_353` is not gravel here — it is a PLANTED bed
+      // between the nose-in car row and the lane: white limestone lumps set as
+      // a kerb along its seaward edge, dwarf fan palms behind the anchor, and
+      // low grey-green tussocks all through the foot of it, with the dry
+      // summer grass showing between them. What was here was seven smooth
+      // domes, and a dome is the one shape broken karst never takes.
+      // The lumps go along the SEAWARD edge only — an arc of 130 deg centred
+      // on −s — because that is where they are in the frame: a kerb holding
+      // the bed up against the parking, not a ring round the anchor. A ring
+      // was drawn first and it turned the thing into a grave.
+      for (let i = 0; i < 6; i++) {
+        const a = -Math.PI * 0.5 + (i / 5 - 0.5) * 2.27;
+        const r = 1.15 + 0.22 * jit(i, 63);
         const lt = t0 + Math.cos(a) * r, ls = s0 + Math.sin(a) * r;
-        const h = 0.17 + 0.07 * Math.sin(i * 1.9);
-        dome(W, lt, ls, gAt2(lt, ls) - 0.03, h, h * 1.5, LIME, 6);
+        limeLump(lt, ls, 0.24 + 0.10 * jit(i, 65), 0.15 + 0.07 * jit(i, 67),
+          30 + i);
       }
+      fanPalm(t0 - 1.35, s0 + 1.05, 1.02, 3);
+      fanPalm(t0 + 0.55, s0 + 1.45, 0.86, 4);
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * TAU + 1.1;
+        const r = 0.72 + 0.55 * jit(i, 69);
+        tussock(t0 + Math.cos(a) * r, s0 + Math.sin(a) * r,
+          0.20 + 0.10 * jit(i, 75), i);
+      }
+      // Walk round it rather than through it. Low, because it IS low: the box
+      // is the shank and the flukes, and the stock stands inside its footprint.
+      furniture.push({ t: t0, s: s0, a: 0.98, c: 0.52, h: 0.66, y: y0 });
     }
 
     // ── the rock, and the dolphin on it ──
+    //
+    // REBUILT off the two frames at full size, with the camera solved rather
+    // than the object guessed. `1000150359` carries `FocalLengthIn35mmFormat
+    // 13 mm`, which is 1444 px of focal length on its 4000 px long axis, and
+    // that turns the frame into a ruler. `1000150358` is the same tap at 69 mm
+    // — 7667 px — from about a metre, and it is what the sizes below are keyed
+    // to.
+    //
+    // **The tap sets the scale.** The escutcheon rosette is 310 px tall in
+    // `_358` and the tap knob is 165, so the knob is 0.53 of the rosette. A
+    // decorative fountain rosette is 90-110 mm and a bibcock knob 45-55, which
+    // is the same ratio and is the only pair of numbers in either frame with a
+    // catalogue behind them: take the rosette at 0.10 m and everything else
+    // falls out. The spout projects 190 mm from the face and drops 123, so the
+    // whole casting is about 0.20 m long and 0.17 tall.
+    //
+    // **Which then sizes the rock.** In `_359` the tap is dead on the
+    // principal point and measures 78 px across an object 0.20 m long, so it
+    // stands 1.26 m from the lens; a phone held at 1.50 m looking at a tap
+    // 1.00 m up gives a down-tilt of 23 deg and a face plane 1.16 m out. Run
+    // the frame edges back through that and the rock is **2.19 m above the
+    // gravel where it leaves the top of the picture** — and it leaves the top
+    // of the picture, and the right-hand side too. So 2.19 is a floor, not a
+    // height. The silhouette on the left is still converging at the top edge
+    // and meets itself about a fifth of a metre above it: **2.35 m**, built.
+    // The model had it at 1.56 and that is the whole reason it read as a
+    // boulder somebody could sit on rather than as a block nobody could move.
+    //
+    // Two more numbers out of the same solve, both of which the first cut had
+    // small: the **trough is 0.41 m tall**, not 0.30, and the **tap is 1.00 m
+    // up**, not 0.92 — which matters, because 0.92 is where a tap is if you
+    // guess and 1.00 is where a tap is that people fill bottles at.
+    //
+    // The COLOUR was already right and is left alone. `_353` has sunlit white
+    // limestone at 229/217/188 a minute before `_359` has this rock's sunlit
+    // face at 234/185/106 — same sun, same exposure — so against white
+    // limestone this stone is 1.02/0.85/0.56, and `ROCK` is 1.00/0.83/0.54.
+    // The ochre is the stone and not the hour.
     {
-      // Out in the wood rather than against the back wall of the huts. In
-      // `1000150362` and `1000150365` this stands on gravel among the pines
-      // with a path going past it, which is where anybody walking through
-      // meets it; at `rowB + 4.4` it was wedged between a parked car and a
-      // rendered wall and could only be seen by somebody already lost.
       const [t0, s0] = BACK.rock;
       const y0 = gAt2(t0, s0);
-      // The boulder. A lathe with a per-ring offset is the cheapest thing in
-      // this file that is not a solid of revolution: the rings wander, so the
-      // silhouette has corners in it and no two elevations of it agree.
-      lathe(W, t0, s0, [
-        [y0 - 0.10, 0.00, 0.00, 0.00],
-        [y0 - 0.02, 0.74, 0.04, -0.03],
-        [y0 + 0.34, 0.88, -0.05, 0.06],
-        [y0 + 0.78, 0.82, 0.07, 0.02],
-        [y0 + 1.16, 0.62, -0.03, -0.07],
-        [y0 + 1.44, 0.34, 0.06, 0.04],
-        [y0 + 1.56, 0.00, 0.02, 0.00],
-      ], ROCK, 8);
-      // The shaded side. One more lathe a hair inside the first over its lower
-      // half, which is a cheat and is the same cheat the terrace risers use:
-      // vertex colour does the work a second light would.
-      lathe(W, t0, s0, [
-        [y0 - 0.02, 0.745, 0.04, -0.03],
-        [y0 + 0.34, 0.885, -0.05, 0.06],
-      ], ROCKD, 8);
+      // Eight corners to a ring, each with its OWN radius, and the ring
+      // centres wander. `lathe` cannot do this and that is why it was wrong:
+      // its rings are circles, so what came out was a loaf. A split karst
+      // block is half a dozen flat fracture faces meeting at hard edges, and
+      // the edge is the entire difference between limestone and dough at
+      // twenty metres.
+      //
+      // Phased a half step so face 5 looks straight down -s. That is the face
+      // the tap is on and the face the path sees, and having it be a face
+      // rather than an arris is what lets the rosette sit flat on it.
+      const N = 8;
+      const cnr = (rg, i) => {
+        const a = ((i % N) + 0.5) / N * TAU;
+        return W(t0 + rg[2] + Math.cos(a) * rg[1][i % N],
+          s0 + rg[3] + Math.sin(a) * rg[1][i % N], y0 + rg[0]);
+      };
+      // Widest at 0.58 m and undercut below it, which is what the frame has:
+      // the trough is tucked in under the overhang rather than standing out
+      // in front of it. Leaning back and along the shore above the tap, which
+      // is the other thing the silhouette does.
+      //
+      // The spread between the eight radii is the whole job and the first cut
+      // had it at plus or minus 12 %, which from behind was an egg. It is plus
+      // or minus 40 % now, and the ring centres walk 0.44 m along the shore
+      // between the foot and the apex, so no two elevations of it agree and
+      // none of them is a solid of revolution.
+      const RG = [
+        [-0.18, [0.52, 0.66, 0.48, 0.58, 0.70, 0.54, 0.64, 0.50], 0.00, 0.00],
+        [+0.16, [0.72, 0.94, 0.62, 0.80, 1.00, 0.72, 0.90, 0.66], 0.03, -0.05],
+        [+0.58, [0.76, 1.06, 0.66, 0.86, 1.10, 0.80, 1.02, 0.70], 0.02, -0.09],
+        [+1.06, [0.66, 0.98, 0.58, 0.80, 1.02, 0.74, 0.92, 0.62], 0.10, -0.04],
+        [+1.62, [0.40, 0.76, 0.34, 0.62, 0.80, 0.52, 0.70, 0.38], 0.22, +0.05],
+        [+2.08, [0.16, 0.44, 0.14, 0.34, 0.48, 0.26, 0.40, 0.16], 0.34, +0.12],
+      ];
+      for (let k = 0; k < RG.length - 1; k++) {
+        for (let i = 0; i < N; i++) {
+          // Per-facet tint off `jit`, never off `rng` — see the note over
+          // `jit`. 0.90 to 1.06 is what a weathered face does against its
+          // neighbour, and the bottom course goes to `ROCKD` on top of that
+          // because the foot of a block standing in gravel is always in its
+          // own shadow.
+          const v = 0.90 + jit(i, 41 + k * 7) * 0.16;
+          const col = k === 0
+            ? [ROCKD[0] * v, ROCKD[1] * v, ROCKD[2] * v]
+            : [ROCK[0] * v, ROCK[1] * v, ROCK[2] * v];
+          b.quad(cnr(RG[k], i), cnr(RG[k], i + 1),
+            cnr(RG[k + 1], i + 1), cnr(RG[k + 1], i), col);
+        }
+      }
+      // The cap, as a fan to a point that is not over the centre — a boulder
+      // with a symmetrical top is a tent.
+      {
+        const top = W(t0 + 0.44, s0 + 0.18, y0 + 2.35);
+        const last = RG[RG.length - 1];
+        for (let i = 0; i < N; i++) {
+          b.tri(cnr(last, i), cnr(last, i + 1), top,
+            shade(ROCK, 0.96 + jit(i, 83) * 0.12));
+        }
+      }
       // ONE seam of calcite, and not the two it had. Two rings of white round
       // a boulder at even spacing is not veining, it is a lampshade — a
       // regular pattern read as manufacture the moment it went in, which is
       // the same trap the sea's foam and the promenade's crazing both fell
       // into. What the photographs have is one irregular seam wandering
-      // across the face and pinching out, so that is what this is: a partial
-      // ring over about a third of the circumference, off-centre, tapering.
-      {
-        const h = 0.62;
-        for (let i = 2; i < 5; i++) {
-          const a0 = (i / 8) * TAU, a1 = ((i + 1) / 8) * TAU;
-          const w = 0.052 - 0.012 * (i - 2);
-          const R = (a, dy) => W(t0 + 0.02 + Math.cos(a) * 0.865,
-            s0 + 0.03 + Math.sin(a) * 0.865, y0 + h + dy + 0.05 * Math.cos(a));
-          b.quad(R(a0, 0), R(a1, 0), R(a1, w), R(a0, w), VEIN);
-        }
+      // across the face and pinching out, so that is what this is: three
+      // facets' worth, off-centre, tapering, and riding on the block's own
+      // corners so it cannot float off a face that moved.
+      for (let i = 2; i < 5; i++) {
+        // 0.034 m and tapering to 0.014, not 0.055 to 0.029. At the wider
+        // figure the seam was three centimetres of white on a face two metres
+        // away and read as a pipe clipped to the rock.
+        const w = 0.034 - 0.010 * (i - 2);
+        const lo = 0.66 + 0.05 * i;
+        // Two rings interpolated at the seam's own height, pushed 0.02 m proud
+        // so it never shares a plane with the face it is on — rule 5, and at
+        // 2 km from the origin a coplanar white band flickers rather than
+        // shows.
+        const at2 = (i2, dy) => {
+          const a = ((i2 % N) + 0.5) / N * TAU;
+          const u = (lo + dy - RG[2][0]) / (RG[3][0] - RG[2][0]);
+          const r = (RG[2][1][i2 % N] * (1 - u) + RG[3][1][i2 % N] * u) + 0.02;
+          const ot = RG[2][2] * (1 - u) + RG[3][2] * u;
+          const os = RG[2][3] * (1 - u) + RG[3][3] * u;
+          return W(t0 + ot + Math.cos(a) * r, s0 + os + Math.sin(a) * r,
+            y0 + lo + dy);
+        };
+        b.quad(at2(i, 0), at2(i + 1, 0), at2(i + 1, w), at2(i, w), VEIN);
       }
-      // The fountain. A scalloped bronze plate bolted to the seaward face, a
-      // short throat and a dolphin's head with the mouth open — five pieces,
-      // and at this size the one that carries it is the downturned snout.
-      const ft = t0, fs = s0 - 0.80, fy = y0 + 0.92;
+      // The fountain. A scalloped rosette bolted flat to the seaward face, a
+      // short fluted throat, a dolphin's head with the mouth open, and the
+      // brass knob on top — and the knob is the piece that decides what this
+      // is. Without it the casting is an ornament; with it, it is a tap, and
+      // `_358` is a photograph of somebody's water supply.
+      //
+      // Face 5 is the one that looks down −s, and its two corners are at
+      // sin(247.5 deg) = sin(292.5 deg) = −0.9239 of their own radii, so the
+      // face is not square to the shore — it slopes from −0.72 to −0.89 at
+      // ring 3. Solved at t0 and at y 1.00 it stands at **s0 − 0.790**, so the
+      // rosette at −0.82 is 0.03 m proud of it and nothing skims anything.
+      // Rule 5, and it is not a formality: this is 2 km from the origin.
+      const ft = t0, fs = s0 - 0.82, fy = y0 + 1.00;
       lathe(W, ft, fs, [
-        [fy - 0.001, 0.000], [fy, 0.135], [fy + 0.02, 0.120],
-        [fy + 0.03, 0.000],
-      ], BRONZE, 10);
-      spar(ft, fs, fy, [0, 0, 0], [0, -0.13, 0.02], 0.052, 0.044, BRONZE);
-      spar(ft, fs, fy, [0, -0.13, 0.02], [0, -0.27, -0.06], 0.062, 0.048,
-        BRONZE);
-      spar(ft, fs, fy, [0, -0.27, -0.06], [0, -0.33, -0.13], 0.048, 0.030,
-        BRONZE);
-      // The tap handle on top of the head, which is what makes it a tap.
-      spar(ft, fs, fy, [0, -0.14, 0.05], [0, -0.13, 0.16], 0.024, 0.022,
-        BRONZE);
-      spar(ft, fs, fy, [-0.09, -0.13, 0.16], [0.09, -0.13, 0.16], 0.020, 0.020,
-        BRONZE);
-      // And the trough on the gravel under it, to catch what comes out.
+        [fy - 0.001, 0.000], [fy, 0.050], [fy + 0.014, 0.045],
+        [fy + 0.022, 0.000],
+      ], PATINA, 9);
+      // The throat and the head: 0.19 m of projection and 0.12 m of drop,
+      // measured, in three tapering pieces. The one that carries it at any
+      // distance is the downturned snout.
+      spar(ft, fs, fy, [0, 0, 0], [0, -0.075, 0.005], 0.036, 0.031, BRONZE);
+      spar(ft, fs, fy, [0, -0.075, 0.005], [0, -0.150, -0.045], 0.041, 0.033,
+        BRONZED);
+      spar(ft, fs, fy, [0, -0.150, -0.045], [0, -0.190, -0.105], 0.033, 0.019,
+        BRONZED);
+      // The knob. 53 mm across and fluted, sitting on a collar over the
+      // throat, tilted back the way the photograph has it.
+      spar(ft, fs, fy, [0, -0.070, 0.028], [0, -0.062, 0.062], 0.017, 0.015,
+        BRASS);
+      lathe(W, ft, fs - 0.062, [
+        [fy + 0.062, 0.000], [fy + 0.068, 0.0265], [fy + 0.090, 0.0245],
+        [fy + 0.100, 0.000],
+      ], BRASS, 8);
+      // And the trough on the gravel under it. 0.41 m tall out of the camera
+      // solve — the first cut had 0.30, which is a doorstep. Its back edge is
+      // at s0 − 0.90 and the block's face at the trough's own mid height is at
+      // s0 − 0.840, so there is 0.06 m of daylight between them and the rock
+      // leans out over it without touching, which is what `_359` has.
       {
-        const ty = gAt2(ft, fs - 0.30);
-        boxTS(ft - 0.24, ft + 0.24, fs - 0.52, fs - 0.10, ty, ty + 0.30,
+        const ty = gAt2(ft, fs - 0.29);
+        boxTS(ft - 0.25, ft + 0.25, fs - 0.50, fs - 0.08, ty - 0.04, ty + 0.41,
           TROUGH, shade(TROUGH, 1.06));
         // Hollowed, by the only means this buffer has: a darker lid set down
         // inside the rim. A basin with a flat top is a plinth.
-        boxTS(ft - 0.19, ft + 0.19, fs - 0.47, fs - 0.15, ty + 0.22,
-          ty + 0.245, shade(TROUGH, 0.52));
+        boxTS(ft - 0.19, ft + 0.19, fs - 0.44, fs - 0.14, ty + 0.30,
+          ty + 0.33, shade(TROUGH, 0.52));
+        furniture.push({ t: ft, s: fs - 0.29, a: 0.25, c: 0.21, h: 0.41,
+          y: ty });
+      }
+      // The bed. Everything under the block in `_359` is white crushed
+      // limestone — the whole bottom third of the frame is chippings, with
+      // children's chalk lying on them — and the game stands it on the same
+      // grey slab the lane is made of. So an apron goes down first.
+      //
+      // Sampled at each of its own corners rather than laid flat: the surface
+      // here is not level and a flat disc either floats at one edge or is
+      // buried at the other. 0.045 m proud, which is over rule 5's 0.03 and
+      // under a kerb — a gravel bed is a dressing, not a plinth. The radius
+      // wanders 2.05-2.35 m so that the edge is not a circle, which is the
+      // one thing a raked bed never is.
+      {
+        const NA = 12, ay = 0.045;
+        const rim = (i) => {
+          const a = (i % NA) / NA * TAU;
+          const r = 2.05 + 0.30 * jit(i % NA, 71);
+          const gt = t0 + Math.cos(a) * r, gs = s0 + Math.sin(a) * r;
+          return W(gt, gs, gAt2(gt, gs) + ay);
+        };
+        const mid = W(t0, s0, gAt2(t0, s0) + ay);
+        for (let i = 0; i < NA; i++) {
+          b.tri(mid, rim(i), rim(i + 1),
+            shade(GRAV, 0.94 + jit(i, 73) * 0.14));
+        }
+      }
+      // Then the kerb. `_359` has a ring of angular lumps round the block and
+      // `_362` is the same treatment on the beds along the path: small blocks
+      // set on end in a serrated line, not a mortared edging. Nine of them at
+      // 1.85-2.15 m, which sits them just inside the apron's edge and keeps
+      // the furthest well inside the 3.4 m the car loop already leaves clear.
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * TAU + 0.55;
+        const r = 1.85 + 0.30 * jit(i, 57);
+        const lt = t0 + Math.cos(a) * r, ls = s0 + Math.sin(a) * r;
+        limeLump(lt, ls, 0.34 + 0.14 * jit(i, 59), 0.19 + 0.10 * jit(i, 61), i);
+      }
+      // And the two that are not kerb — the flat weathered plates of `_386`
+      // and `_388`, wider than they are high and lying where they were
+      // dropped rather than set in a line. `_386` is one of these at arm's
+      // length: 1.3 m long against the olive trunk behind it, 0.55 m out of
+      // the gravel, with solution hollows through the top of it.
+      limeLump(t0 - 2.60, s0 + 1.15, 0.66, 0.30, 21);
+      limeLump(t0 + 2.15, s0 - 2.00, 0.58, 0.24, 22);
+      // Walk into it rather than through it. 2.35 m of limestone was a hole
+      // in the collider until now. Not centred on `t0, s0`: the widest ring
+      // runs from t0 − 1.00 to t0 + 0.44 and from s0 − 1.03 to s0 + 0.89, so
+      // the box that fits it is a fifth of a metre down-shore of the axis.
+      furniture.push({ t: t0 - 0.20, s: s0 - 0.07, a: 0.85, c: 0.96,
+        h: 2.35, y: y0 });
+    }
+
+    // ── the limestone edging at the back of the parking ──────────────────────
+    //
+    // `1000150388`, and it is the piece of ground the complaint is about:
+    // *"that area behind the kabines, where the cars and boats are... feels
+    // under-developed"*. The frame is one long **serrated kerb of big broken
+    // white limestone**, blocks 0.4 to 0.9 m across set on end and touching,
+    // running across the back of the car park and holding the pine floor up
+    // against the grass beyond it. It is not the resort's sawn kerb — that is
+    // the four-course wall with a cap beam already built along `walkTo` — and
+    // it is not a rockery. It is what everybody on this coast edges a bed
+    // with, and there is a hundred metres of it in this one photograph.
+    //
+    // **Which band it goes in is arithmetic, not taste.** The huts' back wall
+    // is at `rowB + cabD`, the lane wall at `WALL.s` 29.2, the bollards at
+    // 29.7, and the note over `carSites` records that the deepest tail the
+    // nose-in row can produce is **37.10**. OSM maps no building inside 39 m.
+    // So s 37.5 to 39.0 is a clean metre and a half with nothing in it at
+    // either end, and that is where this goes: 37.75, which leaves 0.3 m
+    // between the biggest lump and the deepest car.
+    //
+    // NO COLLIDER, and the reason is the one written over the sawn kerb
+    // blocks: `GROUND.girth` is 0.55 and `confine` adds it to every
+    // half-extent, so a run of these with blockers on them is fifty metres of
+    // sealed wall across the band the crowd and the cars both cross. You step
+    // over a 0.3 m rock.
+    {
+      const K0 = 402.0, K1 = 470.0;
+      for (let t = K0, i = 0; t < K1; i++) {
+        const r = 0.22 + 0.20 * jit(i, 111);
+        // The gap at t 440-443 is not a mistake in the run: the block group
+        // below stands in it, the way `_388` has the kerb open where the
+        // seats are.
+        if (t > 439.0 && t < 444.0) { t += 0.62; continue; }
+        // Wandering 0.28 m in `s` — a kerb somebody laid by eye is never a
+        // line, and drawn as one it reads as precast.
+        const ks = 37.75 + (jit(i, 113) - 0.5) * 0.28;
+        limeLump(t, ks, r, 0.22 + 0.16 * jit(i, 115), 40 + (i % 23));
+        // Touching, not spaced. `r * 1.55` overlaps each lump into the next by
+        // about a fifth, which is what stops the run reading as a row of buns
+        // and starts it reading as one broken edge.
+        t += r * 1.55;
+      }
+      // And the block group, off the same frame. A quarried ashlar left lying
+      // on the gravel with four rough lumps round it, which is either a table
+      // and four seats or nobody ever moved them. Solved off `_388`: it is a
+      // 23 mm frame, the horizon row comes from two 1.7 m figures standing at
+      // the car park whose feet and heads are 45 px apart (so 29 m away), and
+      // against that horizon the block's front face stands **0.70 m** out of
+      // the gravel at 1.70 m from the lens. About 1.3 m by 1.0 on plan.
+      //
+      // `boxTS` and not `limeLump`, and that is the point of it: everything
+      // else white on this shore is broken karst and this one thing is SAWN,
+      // with four flat faces and square arrises. One cut block in fifty metres
+      // of rubble is what says somebody put it there.
+      {
+        const bt = 441.4, bs = 38.30, by = gAt2(bt, bs);
+        // `bar` rather than `boxTS`, for one reason: the top is not level.
+        // `_388`'s block has spalled along one edge and its top falls 0.09 m
+        // across the width, and a cuboid with a flat lid at this size is a
+        // concrete plinth. Nine centimetres is all it takes.
+        bar(bt - 0.65, bt + 0.65, [[bs - 0.50, by - 0.12], [bs + 0.50,
+          by - 0.12], [bs + 0.50, by + 0.61], [bs - 0.50, by + 0.70]],
+        shade(LIME, 0.94), shade(LIME, 1.06));
+        furniture.push({ t: bt, s: bs, a: 0.65, c: 0.50, h: 0.70, y: by });
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * TAU + 0.7;
+          limeLump(bt + Math.cos(a) * 1.32, bs + Math.sin(a) * 1.05,
+            0.36 + 0.10 * jit(i, 117), 0.34 + 0.08 * jit(i, 119), 70 + i);
+        }
+        // The gravel it stands on, the same apron the fountain rock has and
+        // for the same reason — `_388`'s block sits on white chippings with
+        // the pine litter run out into them, not on the bare floor.
+        const NA = 10, ay = 0.04;
+        const rim = (i) => {
+          const a2 = (i % NA) / NA * TAU;
+          const r2 = 1.65 + 0.34 * jit(i % NA, 121);
+          const gt = bt + Math.cos(a2) * r2, gs = bs + Math.sin(a2) * r2 * 0.72;
+          return W(gt, gs, gAt2(gt, gs) + ay);
+        };
+        const mid = W(bt, bs, gAt2(bt, bs) + ay);
+        for (let i = 0; i < NA; i++) {
+          b.tri(mid, rim(i), rim(i + 1),
+            shade(GRAV, 0.94 + jit(i, 123) * 0.14));
+        }
       }
     }
     b = back11;
@@ -17804,7 +18400,21 @@ async function buildJadrija(scene) {
       // Also held inside the 39 m band. Three rows at 10.5 m spacing reached
       // s 59, which is well into the OSM footprints, and a pine growing up
       // through a roof is the same bug as a car parked in a hall.
-      const s = JAD.rowB + 2.2 + row * 3.4 + rng() * 3.0;
+      let s = JAD.rowB + 2.2 + row * 3.4 + rng() * 3.0;
+      // Off the two things in `BACK`, and PUSHED rather than skipped. This is
+      // the loop that was standing a pine in the middle of the anchor and
+      // across the face of the rock, and a `continue` here is not available:
+      // `pine`, `olive` and `oleander` all draw from `rng` and they draw a
+      // VARIABLE number of times, so dropping one shifts every parasol,
+      // bather and hut downstream of it and the census moves. Moving the tree
+      // costs no draws at all. Out to 2.4 m, radially in `s`, which is inside
+      // the 39 m band at every station this loop reaches.
+      for (const [bt, bs] of [BACK.rock, BACK.anchor]) {
+        const dt2 = t - bt;
+        if (Math.abs(dt2) >= 2.4) continue;
+        const need = Math.sqrt(2.4 * 2.4 - dt2 * dt2);
+        if (Math.abs(s - bs) < need) s = bs + (s >= bs ? need : -need);
+      }
       // Not inside the playground railing either — a pine growing up through
       // the climbing frame is the same bug as one growing through a roof.
       if (t > PLAY.t0 - 1.5 && t < PLAY.t1 + 1.5
@@ -21135,6 +21745,40 @@ async function buildJadrija(scene) {
       }
     }
 
+    /**
+     * The two things in `BACK`, as world-space circles, and the reason they
+     * cannot go in the grid above with the compounds.
+     *
+     * The rebuilt anchor's first frame had a pine standing in the middle of
+     * its shank and the rock has had one across its face since it went in.
+     * Neither is an OSM footprint, so nothing was keeping the dart pass off
+     * them — but adding them to `built` does NOT fix it, and finding that out
+     * cost a build: `built` makes `at` return **null**, and null in
+     * `45-trees.js` means "not mine, ask the cover map", which on this
+     * peninsula is `GROWS[URBAN]` and a cypress. Excluding them that way
+     * swaps a pine for a cypress and leaves the trunk exactly where it was.
+     *
+     * So these return an EMPTY table instead. It is truthy, so the cover map
+     * is never consulted, and the species roll finds nothing in it and the
+     * dart is dropped. `NOTHING` is frozen because it is handed out by
+     * reference to a caller that iterates it.
+     *
+     * 2.4 m of radius. `1000150353` and `1000150359` both have sky behind
+     * their subject rather than canopy, and at 2.4 the nearest trunk is far
+     * enough back to be behind the object rather than in it.
+     */
+    const NOTHING = Object.freeze({});
+    const BACKXZ = [BACK.rock, BACK.anchor].map(([bt, bs]) => {
+      const w = toWorld(bt, bs);
+      return [w[0], w[2]];
+    });
+    function backClear(x, z) {
+      for (const [bx, bz] of BACKXZ) {
+        if ((x - bx) * (x - bx) + (z - bz) * (z - bz) < 5.76) return true;
+      }
+      return false;
+    }
+
     /** Is (x, z) inside a standing house, or close enough to be its wall? */
     function built(x, z) {
       const list = grid.get(key(Math.floor(x / GROVE.cell), Math.floor(z / GROVE.cell)));
@@ -21193,6 +21837,7 @@ async function buildJadrija(scene) {
         if (t < GROVE.t0 || t > LEN + GROVE.t1 || sv < GROVE.s0 || sv > GROVE.s1) {
           return null;
         }
+        if (backClear(x, z)) return NOTHING;
         if (inField(x, z, 4)) return null;
         if (built(x, z)) return null;
         return sv > 180 ? NECK : WOOD;
