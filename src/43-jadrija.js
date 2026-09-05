@@ -17116,7 +17116,38 @@ async function buildJadrija(scene) {
    * eighty metres of sightline in every direction. 7.6 is the band that gives
    * that, and it is the band the rock is already in.
    */
-  const BACK = { anchor: [430.4, JAD.rowB + 7.6], rock: [418.6, JAD.rowB + 8.2] };
+  /**
+   * The two things standing in the wood behind the kabine.
+   *
+   * THE ANCHOR MOVED INLAND BY 4.3 m, and the file's own notes are what settle
+   * it rather than a new reading of the photograph. Three of them, all written
+   * before this and all about the same frame:
+   *
+   *   the anchor's own note: it stands "in a bed of white limestone lumps ON
+   *   THE VERGE between the nose-in car row and the lane";
+   *   the limestone bed's note: that edging is "what everybody on this coast
+   *   edges a bed with, and there is a hundred metres of it IN THIS ONE
+   *   PHOTOGRAPH" — the same `1000150353` — and it is laid at s 37.75;
+   *   `carSites`: the nose-in row runs from s 31.1 and the deepest tail it can
+   *   produce is 37.10.
+   *
+   * So the bed the anchor stands in is at 37.75, and the anchor was at 33.7 —
+   * four metres seaward of it and dead in the middle of the parked cars. It was
+   * never on the verge; it was in the car park, with its own bed of lumps drawn
+   * round it in a place that had none.
+   *
+   * And it is why nobody could see it. Its stock is built 1.84 m proud with a
+   * 110 mm ball on top for the stated reason that "you can pick this out
+   * against the sky from the far side of the car park", and five separate
+   * eye-level approaches — along the row from either end, from the lane, from
+   * the kabine side, from inland — all found a car bonnet or a pine trunk in
+   * front of it. A 1.9 m object standing between two rows of 1.45 m cars is
+   * hidden from every direction the cars are in, which is every direction.
+   *
+   * `carSites` still opens its 3.0 m window at t 430.4, so nothing parks on it;
+   * that window is in `t` and the move is in `s`.
+   */
+  const BACK = { anchor: [430.4, JAD.rowB + 11.9], rock: [418.6, JAD.rowB + 8.2] };
 
   // ── what is parked in the wood ─────────────────────────────────────────────
   // Both walk-throughs film cars standing among the pines — nose-in, in loose
@@ -17592,8 +17623,9 @@ async function buildJadrija(scene) {
      * ground plane shows its own base edge from the far side of the car park
      * and z-fights with the surface at this distance from the origin.
      */
-    const limeLump = (lt, ls, r, h, seed) => {
+    const limeLump = (lt, ls, r, h, seed, bury) => {
       const ly = gAt2(lt, ls);
+      const dig = bury == null ? 0.25 : bury;
       // `k` shrinks the ring and `dy` lifts it, so the two rings are one
       // expression and the seven radii below them are shared — which is what
       // makes the arrises line up from the foot to the shoulder.
@@ -17604,14 +17636,14 @@ async function buildJadrija(scene) {
         const a = ((i % 7) + 0.5) / 7 * TAU;
         const rr = r * (0.78 + 0.32 * jit(i % 7, seed * 3 + 7)) * k;
         return W(lt + Math.cos(a) * rr, ls + Math.sin(a) * rr,
-          ly - h * 0.25 + dy);
+          ly - h * dig + dy);
       };
       for (let i = 0; i < 7; i++) {
         b.quad(P(i, 1, 0), P(i + 1, 1, 0),
           P(i + 1, 0.62, h * 0.72), P(i, 0.62, h * 0.72),
           shade(LIME, 0.86 + jit(i, seed * 5 + 3) * 0.22));
       }
-      const cap = W(lt + r * 0.10, ls - r * 0.08, ly - h * 0.25 + h);
+      const cap = W(lt + r * 0.10, ls - r * 0.08, ly - h * dig + h);
       for (let i = 0; i < 7; i++) {
         b.tri(P(i, 0.62, h * 0.72), P(i + 1, 0.62, h * 0.72), cap,
           shade(LIME, 0.96 + jit(i, seed * 5 + 11) * 0.14));
@@ -18154,6 +18186,37 @@ async function buildJadrija(scene) {
     // half-extent, so a run of these with blockers on them is fifty metres of
     // sealed wall across the band the crowd and the cars both cross. You step
     // over a 0.3 m rock.
+    //
+    // AND IT READ AS A ROW OF BUNS ANYWAY, which is what the note under it was
+    // written to prevent. Photographed from t 430.4, s 41.5 looking seaward it
+    // is fourteen near-identical white pentagons at an even pitch along a
+    // straight line — the failure this project has a rule about, that a wrong
+    // regular pattern is worse than no pattern at all. Four separate things
+    // were conspiring and every one of them is arithmetic:
+    //
+    //   THE STEP WAS PROPORTIONAL TO THE SIZE. `t += r * 1.55` means a big
+    //   lump is followed by a big gap and a small one by a small gap, so the
+    //   apparent PERIOD of the bumps came out constant however much the radius
+    //   varied. That is the metronome, and it is the one that mattered: the
+    //   size variation was cancelling itself.
+    //
+    //   THE LINE WAS A LINE. 0.28 m of wander on an object 0.6 m across is a
+    //   twentieth of a lump's width either side of dead straight. Somebody
+    //   edging a bed by eye meanders by half a metre and comes back.
+    //
+    //   THEY WERE ALL THE SAME HEIGHT OUT OF THE GROUND. `limeLump` buried
+    //   every one of them by exactly a quarter, so a run of stones dropped and
+    //   trodden in over twenty years came out graded like ballast.
+    //
+    //   AND THE SHAPE REPEATED EVERY 23. The seed was `40 + (i % 23)` and the
+    //   run is about 135 lumps, so the same six silhouettes came round six
+    //   times.
+    //
+    // The seaward edge is the one number that cannot move. The deepest car
+    // tail `carSites` can produce is 37.10 and the widest footprint here is
+    // r * 1.10 = 0.46, so 37.75 is the seaward limit and the meander runs
+    // INLAND of it, to 38.55 — which leaves the far edge at 39.01 and the OSM
+    // 39 m band still clear.
     {
       const K0 = 402.0, K1 = 470.0;
       for (let t = K0, i = 0; t < K1; i++) {
@@ -18162,14 +18225,27 @@ async function buildJadrija(scene) {
         // below stands in it, the way `_388` has the kerb open where the
         // seats are.
         if (t > 439.0 && t < 444.0) { t += 0.62; continue; }
-        // Wandering 0.28 m in `s` — a kerb somebody laid by eye is never a
-        // line, and drawn as one it reads as precast.
-        const ks = 37.75 + (jit(i, 113) - 0.5) * 0.28;
-        limeLump(t, ks, r, 0.22 + 0.16 * jit(i, 115), 40 + (i % 23));
-        // Touching, not spaced. `r * 1.55` overlaps each lump into the next by
-        // about a fifth, which is what stops the run reading as a row of buns
-        // and starts it reading as one broken edge.
-        t += r * 1.55;
+        // One in eleven is simply not there — a stone taken for a step, or
+        // kicked into the dust by a reversing car.
+        const gone = jit(i, 117) < 0.09;
+        // Two octaves of meander plus a per-lump nudge: the long one at about
+        // 9 m carries the edge in and out, the short one at 2 m breaks it up,
+        // and the nudge stops two neighbours ever sitting at the same offset.
+        const mA = jit((t / 9.1) | 0, 113) - 0.5;
+        const mB = jit((t / 2.2) | 0, 114) - 0.5;
+        const ks = 37.75 + Math.min(0.80, Math.max(0,
+          0.40 + mA * 0.80 + mB * 0.34 + (jit(i, 118) - 0.5) * 0.16));
+        // Buried between a tenth and three fifths, so some stand up and some
+        // are barely a pale patch in the dust.
+        const dig = 0.10 + 0.50 * jit(i, 119);
+        if (!gone) {
+          limeLump(t, ks, r, 0.22 + 0.16 * jit(i, 115), 40 + i, dig);
+        }
+        // Touching, not spaced — but the step is now DECOUPLED from the size,
+        // so a big lump can be crowded by its neighbour and a small one can
+        // have air round it. 0.26 to 0.62 against a mean footprint of 0.60
+        // means most of them overlap and a few do not.
+        t += 0.26 + 0.36 * jit(i, 121);
       }
       // And the block group, off the same frame. A quarried ashlar left lying
       // on the gravel with four rough lumps round it, which is either a table
