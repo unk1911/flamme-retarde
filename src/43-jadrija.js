@@ -2102,10 +2102,37 @@ async function buildJadrija(scene) {
     const mid = (front + back) * 0.5;
     const e0 = front - JAD.cabEave, e1 = back + JAD.cabEave;
     const T0 = t0 - JAD.cabEave, T1 = t1 + JAD.cabEave;
+    // ── AND THE ROOF FOLLOWS THE ROW, WHICH IT DID NOT ───────────────────────
+    //
+    // Every wall, door, vent and jamb in this block is drawn per bay, so the
+    // row curves with the shore. The roof was **one quad between the run's two
+    // end stations** — a straight ribbon laid over a curving row — and it does
+    // not even go through `boxIn`, so the chord fix of 1.305.0 never reached
+    // it.
+    //
+    // Measured off `toWorld` at the kabine's own s: a five-hut run at t 468
+    // bows **1.04 m** and a ten-hut run there bows **3.18 m**; at t 454 a
+    // ten-hut run bows 3.24. A hut is 2.90 m deep. So on the worst runs the
+    // roof was not overhanging its walls, it was standing beside them — off
+    // the row entirely and out over the promenade.
+    //
+    // It survived because of the angle it is seen from. Walk the row and the
+    // roof is edge-on and reads as a line; the first four photographs of this
+    // block taken today all looked correct. From fourteen metres up it is
+    // unmistakable, and that is the shot that should have been taken first.
+    //
+    // Cut at one bay, `JAD.cabW`, rather than at some general distance: the
+    // row is built in 2.15 m modules and a roof that changes direction where
+    // the huts do is a roof, where one that changes direction every 1.5 m is a
+    // polyline that happens to be near some huts.
+    const nR = Math.max(1, Math.ceil((T1 - T0) / JAD.cabW));
     for (const [sa, sb, ya, yb] of [[e0, mid, eave, ridge], [mid, e1, ridge, eave]]) {
-      b.quad(W(T0, sa, ya), W(T1, sa, ya), W(T1, sb, yb), W(T0, sb, yb), roofCol);
-      b.quad(W(T0, sb, yb - 0.09), W(T1, sb, yb - 0.09),
-        W(T1, sa, ya - 0.09), W(T0, sa, ya - 0.09), [0.145, 0.135, 0.125]);
+      for (let i = 0; i < nR; i++) {
+        const a0 = T0 + (T1 - T0) * (i / nR), a1 = T0 + (T1 - T0) * ((i + 1) / nR);
+        b.quad(W(a0, sa, ya), W(a1, sa, ya), W(a1, sb, yb), W(a0, sb, yb), roofCol);
+        b.quad(W(a0, sb, yb - 0.09), W(a1, sb, yb - 0.09),
+          W(a1, sa, ya - 0.09), W(a0, sa, ya - 0.09), [0.145, 0.135, 0.125]);
+      }
     }
     for (const [T, o] of [[T0, -1], [T1, 1]]) {
       const A = W(T, e0, eave), B = W(T, mid, ridge), C = W(T, e1, eave);
