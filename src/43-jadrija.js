@@ -4923,7 +4923,7 @@ async function buildJadrija(scene) {
    * with the back at +ds, which is `terraceSet`'s convention and the reason
    * the frame handed in here is `face + PI/2`. See the note there.
    */
-  function meshChair(P, y, col) {
+  function meshChair(P, y, col, pad) {
     const HW = 0.225, HD = 0.215;        // half across, half fore-and-aft
     const SEAT = y + 0.420;
     const bar = shade(col, 0.92);
@@ -4982,6 +4982,18 @@ async function buildJadrija(scene) {
         B(HW, h + 0.008, 0.014), B(-HW, h + 0.008, 0.014), bar);
       b.quad(B(HW, h + 0.008, 0.026), B(-HW, h + 0.008, 0.026),
         B(-HW, h - 0.008, 0.026), B(HW, h - 0.008, 0.026), bar);
+    }
+    // The cushion, on the ones that have one.
+    //
+    // Frame 95 of the kabine pan is this chair at three metres and every dark
+    // one in it is carrying a rust-red pad — which is most of why they read as
+    // a set somebody bought rather than as stacking chairs. It sits ON the
+    // mesh, inset a hair so the seat frame still shows round it, and it is
+    // 55 mm thick: a garden cushion is thin and this is the sort of number
+    // that reads as a mattress if it is guessed generously.
+    if (pad) {
+      boxIn(P, -HW + 0.022, HW - 0.022, -HD + 0.024, HD - 0.024,
+        SEAT + 0.031, SEAT + 0.086, pad, shade(pad, 1.14));
     }
     // The arms. Square section, and they are half of why this is not a
     // monobloc: a moulded garden chair has none.
@@ -5049,6 +5061,14 @@ async function buildJadrija(scene) {
    * differs at MINI is the two objects the ring is made of, and those are
    * `meshChair` and `pedestalTable`.
    */
+  // The dark half of beach bar MINI's chairs, and the pad on them. Read off
+  // frame 95 against the paving in the same light rather than sampled — at 640
+  // by 360 in a low sun a 30 px crop lands on whatever is behind the chair as
+  // often as on the chair. The dark is 0.30 of the paving's value and neutral;
+  // the pad is 0.75 : 0.46 : 0.47 of it, which is the rust red.
+  const MESH_DK = [0.152, 0.150, 0.152];
+  const MESH_PAD = [0.365, 0.205, 0.190];
+
   function terraceSet(t, s, y, ang, col, kind, shop) {
     const seat = [0.230, 0.235, 0.240];
     const R = seatRing(t, s, ang);
@@ -5079,7 +5099,29 @@ async function buildJadrija(scene) {
       const c = Math.cos(a), sn = Math.sin(a);
       const P = (dt, ds, yy) => W(ct + dt * c - ds * sn, cs + dt * sn + ds * c, yy);
       if (kind === 'mesh') {
-        meshChair(P, y, col || seat);
+        // ── AND THEY ARE NOT ALL WHITE ──────────────────────────────────────
+        //
+        // The note over `meshChair` reads `20260823_111954` correctly — a
+        // dozen white perforated-mesh armchairs, and it is the commonest
+        // object in that photograph. Frames 92 to 95 of the kabine pan are the
+        // same terrace from the other end and they settle what that photograph
+        // could not: **the set is two-tone.** The white ones are round the bar
+        // counter and up against the frontage; the low tables out on the
+        // concrete carry the same chair in dark anthracite with a rust-red
+        // cushion on it, and there are as many of those as there are white.
+        //
+        // Not a different model, which is what this was nearly built as — the
+        // weave in those frames is the same square-hole resin mesh, arm for arm
+        // and leg for leg. It is a colour and a pad, and finding that out cost
+        // one crop at 300 per cent and saved a hundred and fifty triangles a
+        // chair.
+        //
+        // Hashed on the seat's own position rather than on an index, because
+        // `terraceSet` is called per set and an index would put the same chair
+        // in the same corner of every set on the boardwalk.
+        const dk = jit(((ct * 13 + cs * 29) * 8) | 0, 812) < 0.46;
+        if (dk) meshChair(P, y, MESH_DK, MESH_PAD);
+        else meshChair(P, y, col || seat);
       } else {
         boxIn(P, -0.24, 0.24, -0.23, 0.23, y + 0.40, y + 0.46, col || seat);
         boxIn(P, -0.24, 0.24, 0.17, 0.23, y + 0.46, y + 0.86, col || seat);
