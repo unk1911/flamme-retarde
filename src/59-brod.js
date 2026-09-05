@@ -1410,23 +1410,86 @@ function buildBrod(scene) {
         // with three cabin boats in it, and the fleet in `1000150357` is the
         // other way round.
         const fr = (n) => { const x = Math.sin(n) * 43758.5453; return x - Math.floor(x); };
-        // Sixteen on 2.30 m centres and not twelve on 2.85. A 2.2 m boat on
-        // 2.85 m centres has 0.65 m of water between it and the next one,
-        // which from the walkway is a row of separate objects; the frame is a
-        // wall of hulls with fenders squeezed between them. 2.30 leaves 0.10 m
-        // — which is what a marina in August looks like — and the extra four
-        // fill the length the tighter spacing frees up.
+        // Sixteen, and no longer on 2.30 m fixed centres.
+        //
+        // That number was written against a 2.20 m beam, and the scale here is
+        // 0.88 to 1.22 — so the widest pair in the row was 2.68 m of boat in a
+        // 2.30 m berth. They interpenetrated, and what a walk down the coping
+        // showed was not sixteen boats but one continuous white lozenge with
+        // cabins standing on it. Pitch off the two beams either side of each
+        // gap instead and the gap is a gap: 0.10 to 0.20 m of water, which is
+        // what a marina in August has and is close enough that the fenders are
+        // doing work.
+        const HALF = 1.10;                       // sheer half-beam, at scale 1
+        const at = [];
+        let u = 4.0, prev = 0;
         for (let k = 0; k < 16; k++) {
           const h = fr(k * 12.9898);
           const j = fr(k * 78.233 + 2.1);
+          const sc = 0.88 + h * 0.34;
+          const hb = HALF * sc;
+          u += prev + hb + 0.10 + j * 0.10;
+          prev = hb;
           const m = new THREE.Mesh(shells[h > 0.28 ? 0 : 1], mat);
-          m.position.set(5.5 + k * 2.30 + j * 0.22, 0, v);
+          m.position.set(u, 0, v);
           // Her bow points at the quay, which on this face is +z when the
           // ferry is on -z. A child whose local +X must land on the group's
           // ±z takes a quarter turn the matching way round.
-          m.rotation.y = -sgn * Math.PI / 2 + (j - 0.5) * 0.12;
-          m.scale.setScalar(0.88 + h * 0.34);
+          const th = -sgn * Math.PI / 2 + (j - 0.5) * 0.12;
+          m.rotation.y = th;
+          m.scale.setScalar(sc);
           raft.add(m);
+          at.push({ u, sc, th });
+        }
+
+        // ── and what holds them there ──
+        //
+        // A row of boats lying a metre off a wall with nothing between them and
+        // it is a row of boats about to be somewhere else. `1000150377` has two
+        // bow lines off every hull in the frame, running up on to the coping —
+        // white, sagging, and the only thing in the photograph that crosses the
+        // gap. The render had none of them, and that gap was the reason the
+        // fleet read as parked rather than moored.
+        //
+        // Iron every other boat rather than one apiece: a quay carries bollards
+        // every five metres or so and a berth here is two and a half, so half
+        // the row lies to its neighbour's. That is why the lines in the frame
+        // run slantwise, and it is worth reproducing rather than tidying away.
+        {
+          const lb = propBuilder();
+          const IRON = [0.258, 0.242, 0.224];
+          const LINE = [0.860, 0.848, 0.808];
+          const zq = -sgn * (A.w - 0.45);        // where the iron stands
+          const yq = A.top;
+          for (let k = 0; k < 16; k += 2) {
+            const bx = at[k].u;
+            propTube(lb, [[bx, yq, zq], [bx, yq + 0.34, zq]], 0.105, IRON, 8);
+            propTube(lb, [[bx, yq + 0.34, zq], [bx, yq + 0.40, zq]], 0.128, IRON, 8);
+          }
+          for (let k = 0; k < 16; k++) {
+            const { u: bu, sc, th } = at[k];
+            const c = Math.cos(th), sn = Math.sin(th);
+            const bx = at[k - (k % 2)].u;
+            for (const side of [-1, 1]) {
+              // The cleat, put back into the raft's frame. The proto's bow pair
+              // is at x 2.30, z ±0.26, on a deck whose sheer there is 0.673 —
+              // and three.js maps a child's local +X to (cos θ, −sin θ) and its
+              // +Z to (sin θ, cos θ), which is the whole of the transform.
+              const lx = 2.30, ly = 0.745, lz = side * 0.26;
+              const cx = bu + sc * (lx * c + lz * sn);
+              const cy = sc * ly;
+              const cz = v + sc * (-lx * sn + lz * c);
+              const pts = [];
+              for (let i = 0; i <= 6; i++) {
+                const t = i / 6;
+                pts.push([cx + (bx - cx) * t,
+                  cy + (yq + 0.30 - cy) * t - Math.sin(t * Math.PI) * 0.17,
+                  cz + (zq - cz) * t]);
+              }
+              propTube(lb, pts, 0.019, LINE, 4);
+            }
+          }
+          raft.add(new THREE.Mesh(lb.geo(), mat));
         }
         raft.updateMatrixWorld();
         scene.add(raft);

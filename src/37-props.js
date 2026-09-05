@@ -132,6 +132,51 @@ function boatProto(cabin) {
 }
 
 /**
+ * An extruded tube through a polyline, into any `propBuilder`.
+ *
+ * The section is carried along the run rather than swept with a parallel frame,
+ * which is wrong for a knot and exactly right for everything that uses it: a
+ * guardrail is a gentle curve and a mooring line is a catenary, and neither of
+ * them twists. The perpendicular is taken horizontally first because most of
+ * this is horizontal; a vertical stanchion is the degenerate case and gets +X.
+ *
+ * `n` is the sides of the section, and four is usually enough — a 28 mm rail is
+ * two pixels wide at the distance anybody looks at one, and a square two pixels
+ * across is a round two pixels across. Fenders and bollards ask for six or
+ * eight because they are 200 mm and you stand next to them.
+ *
+ * Module scope rather than inside `boatNearProto`, because 59-brod.js runs the
+ * mooring lines from the same points and a second copy of this arithmetic is a
+ * second place for the winding to be wrong.
+ */
+function propTube(b, pts, r, cl, n = 4) {
+  const S = [];
+  for (let k = 0; k < n; k++) {
+    const a = ((k + 0.5) / n) * Math.PI * 2;
+    S.push([Math.cos(a) * r, Math.sin(a) * r]);
+  }
+  for (let i = 0; i < pts.length - 1; i++) {
+    const A = pts[i], B = pts[i + 1];
+    let ax = B[0] - A[0], ay = B[1] - A[1], az = B[2] - A[2];
+    const L = Math.hypot(ax, ay, az) || 1;
+    ax /= L; ay /= L; az /= L;
+    let ux = -az, uz = ax;
+    let ul = Math.hypot(ux, uz);
+    if (ul < 1e-4) { ux = 1; uz = 0; ul = 1; }
+    ux /= ul; uz /= ul;
+    // uy is 0 by construction, so the second perpendicular drops three terms.
+    const vx = ay * uz, vy = az * ux - ax * uz, vz = -ay * ux;
+    const P = (p, k) => [p[0] + ux * S[k][0] + vx * S[k][1],
+      p[1] + vy * S[k][1],
+      p[2] + uz * S[k][0] + vz * S[k][1]];
+    for (let k = 0; k < n; k++) {
+      const k2 = (k + 1) % n;
+      b.quad(P(A, k), P(A, k2), P(B, k2), P(B, k), cl);
+    }
+  }
+}
+
+/**
  * The same boat, for when you are swimming past it.
  *
  * `boatProto` is four stations of flat plate with a flat deck on top and a
@@ -341,13 +386,110 @@ function boatNearProto(cabin) {
     // and a bench across the back of the cockpit
     b.box(-2.05, 0.28, 0, 0.44, 0.24, 1.44, [0.86, 0.85, 0.82], [0.82, 0.81, 0.77]);
   }
-  // Two fenders over the side, which every moored boat on this coast has.
-  for (const [fx, fs] of [[-0.60, 1], [-1.70, 1], [-1.15, -1]]) {
-    const w = 1.09;
-    b.box(fx, 0.34, fs * w, 0.20, 0.44, 0.20, [0.80, 0.79, 0.74]);
+  // ── the ironwork ────────────────────────────────────────────────────────
+  //
+  // What `1000150357` is actually a photograph of. The frame is taken from the
+  // walkway with the bows a metre off the coping, and the thing that fills it
+  // is not hulls — it is a thicket of polished tube: a pulpit round every stem,
+  // guardrails running aft off it, cleats, and fenders hanging over the side.
+  // Sixteen white lozenges in a row are sixteen white lozenges. Sixteen pulpits
+  // read as a marina from the far end of the pier, because the tube catches the
+  // sun and the hulls do not.
+  //
+  // All of it is 28 mm stainless, which is what the whole coast fits, and at 28
+  // mm a four-sided section reads as round from anywhere you can stand.
+
+  const STEEL = [0.780, 0.792, 0.800];
+  const ROPE = [0.836, 0.824, 0.780];
+
+  /** The sheer at any x: [y, half-width], interpolated down `ST`. */
+  const sheerXY = (x) => {
+    let a = ST[0], c = ST[1];
+    for (let i = 0; i < ST.length - 1; i++) {
+      if (x <= ST[i][0] && x >= ST[i + 1][0]) { a = ST[i]; c = ST[i + 1]; break; }
+    }
+    const u = clamp((a[0] - x) / ((a[0] - c[0]) || 1), 0, 1);
+    return [a[4] + (c[4] - a[4]) * u, a[5] + (c[5] - a[5]) * u];
+  };
+
+  const tube = (pts, r, cl, n) => propTube(b, pts, r, cl, n);
+
+  // The pulpit: one rail round the stem at knee-and-a-half, a lower lifeline
+  // under it, and stanchions where the bends are. It stops short either side of
+  // the stemhead — every pulpit on this coast does, because that is where the
+  // anchor comes over — so the two ends meet across a hand's breadth of gap.
+  {
+    const PX = [1.28, 1.86, 2.36, 2.72, 2.95];
+    for (const RH of [0.62, 0.31]) {
+      const rail = [];
+      for (const s of [-1, 1]) {
+        const xs = s < 0 ? PX : PX.slice().reverse();
+        for (const x of xs) {
+          const [sy, sw] = sheerXY(x);
+          rail.push([x, sy + RH, s * Math.max(0.06, sw - 0.06)]);
+        }
+      }
+      tube(rail, 0.016, STEEL);
+    }
+    for (const s of [-1, 1]) {
+      for (const x of [PX[0], PX[2], PX[4]]) {
+        const [sy, sw] = sheerXY(x);
+        const z = s * Math.max(0.06, sw - 0.06);
+        tube([[x, sy - 0.03, z], [x, sy + 0.63, z]], 0.016, STEEL);
+      }
+    }
   }
-  // A cleat and a short mast for the light, so the deck is not empty.
-  b.box(2.30, 0.74, 0, 0.16, 0.08, 0.22, TRIM);
+
+  // And the guardrails aft of it, down the side decks to the after end of the
+  // house. Two wires, three stanchions a side; the run is straight because the
+  // sheer between x 1.3 and x −1.3 very nearly is.
+  {
+    const GX = [1.28, 0.20, -1.20];
+    for (const s of [-1, 1]) {
+      for (const RH of [0.62, 0.31]) {
+        tube(GX.map((x) => {
+          const [sy, sw] = sheerXY(x);
+          return [x, sy + RH, s * Math.max(0.06, sw - 0.06)];
+        }), 0.014, STEEL);
+      }
+      for (const x of GX.slice(1)) {
+        const [sy, sw] = sheerXY(x);
+        const z = s * Math.max(0.06, sw - 0.06);
+        tube([[x, sy - 0.03, z], [x, sy + 0.63, z]], 0.016, STEEL);
+      }
+    }
+  }
+
+  // Cleats, and they are the reason the ironwork got written: `BROD_MOOR` runs
+  // two lines from the bow pair of every boat in the raft up on to the coping,
+  // and a line has to come off something. A cleat is a stem and a bar across
+  // it, and at 20 cm that is all of one.
+  const cleat = (x, z) => {
+    const [sy] = sheerXY(x);
+    b.box(x, sy + 0.030, z, 0.060, 0.060, 0.090, TRIM);
+    b.box(x, sy + 0.072, z, 0.048, 0.036, 0.230, TRIM, TRIM);
+  };
+  for (const s of [-1, 1]) {
+    cleat(2.30, s * 0.26);
+    const [, sw] = sheerXY(-0.30);
+    cleat(-0.30, s * (sw - 0.09));
+  }
+
+  // Fenders: cylinders hanging over the side on a lanyard, not the boxes
+  // sitting on the deck that were here before. A fender that is not over the
+  // side is a fender in a locker, and the whole row of them in `1000150377` is
+  // squeezed between hulls where the gap is 10 cm wide.
+  for (const [fx, fs] of [[-0.60, 1], [-1.70, 1], [-1.15, -1], [0.35, -1]]) {
+    const [sy, sw] = sheerXY(fx);
+    const z = fs * (sw + 0.055);
+    // 0.42 long and not 0.56: the freeboard amidships is half a metre, and a
+    // fender hung 0.56 below the sheer has its bottom 60 mm under water.
+    tube([[fx, sy - 0.06, z], [fx, sy - 0.48, z]], 0.088, [0.796, 0.788, 0.744], 6);
+    tube([[fx, sy + 0.03, fs * (sw - 0.10)], [fx, sy - 0.06, z]], 0.010, ROPE);
+  }
+
+  // The stern light on its little mast, which is the last thing left of the old
+  // block and is still right.
   b.box(-2.92, 0.94, 0, 0.04, 0.72, 0.04, [0.86, 0.85, 0.82]);
   return b.geo();
 }
