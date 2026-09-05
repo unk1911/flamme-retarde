@@ -268,6 +268,46 @@ void main(){
       base *= 1.0 + chipFade * (smoothstep(0.735, 0.815, chip) * 0.72
                               - smoothstep(0.560, 0.300, chip) * 0.26);
     }
+
+    // ── the drifts, and the band that had nothing in it ────────────────────
+    //
+    // Count the scales this shader had on the wood floor: 90 m, 21 m, 1.6 m,
+    // and then 9 cm of chip that is gone by about twelve metres. Between 1.6 m
+    // and 9 cm there was nothing at all, and that is the reason a photograph
+    // and the render disagree so badly about this ground. Stand in the grove
+    // and the floor is speckled at your feet, and from the next tree to the
+    // horizon it is one unbroken orange. Everything from four metres out to
+    // thirty — which is most of what any frame of that wood is made of — was
+    // being carried by a 1.6 m mottle at plus or minus eight per cent, and at
+    // eight per cent nothing is being carried.
+    //
+    // 1000150345 and _346 say what actually lives in that band: the chippings
+    // do not lie evenly, they DRIFT. Bare scuffed dust where the feet go, a
+    // pale wash of stone where they do not, dark needle gathered under the
+    // drip line — at forty centimetres to a metre, which is exactly the size
+    // that was missing.
+    //
+    // Asymmetric the same way the chips are and for the same reason: a drift
+    // of stone is bright and has a shape, needle litter is dark and has none.
+    // A third of their amplitude, because this is a drift of chippings and not
+    // a chipping, and it has to survive being seen next to one.
+    //
+    // Faded on the pixel footprint like everything else here, and out by the
+    // time a pixel covers 28 cm — a 38 cm feature is then under a pixel and a
+    // half, which is where hard procedural detail starts to crawl.
+    // Held back where the chips are strongest, and only there. At arm's length
+    // the material IS chippings and the drift is the arrangement of them; both
+    // at full strength over the same square metre is the same stone counted
+    // twice, and it reads as dapple rather than as ground. 55 % under your feet
+    // and the whole of it by the time a pixel covers 3 cm, which is about eight
+    // metres out and about where the chip band starts to go.
+    float driftFade = (1.0 - smoothstep(0.090, 0.280, fw)) * litter
+      * (0.55 + 0.45 * smoothstep(0.006, 0.030, fw));
+    if (driftFade > 0.001) {
+      float drift = fbm2(p * 2.6 + 8.1, 2);
+      base *= 1.0 + driftFade * (smoothstep(0.560, 0.790, drift) * 0.38
+                              - smoothstep(0.470, 0.230, drift) * 0.23);
+    }
   }
 
   // ── the seabed ──────────────────────────────────────────────────────────
