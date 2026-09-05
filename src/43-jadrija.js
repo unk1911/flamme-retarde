@@ -25799,11 +25799,29 @@ async function buildJadrija(scene) {
           tmpP.z - Math.sin(yaw) * 0.115);
         m.g.rotation.z = 0.34;
         m.g.rotation.x = 0;
+        // AND TURNED ROUND, so what faces you is the back of it. Everything
+        // above billboards the screen at the camera, which is right for the
+        // nine people reading one and exactly wrong for the three with one
+        // against an ear: what they were showing was the bitcoin price to the
+        // room and the back of the handset to their own cheek. Half a turn
+        // puts the glass against the head, where the glass is.
+        m.g.rotation.y = yaw + Math.PI;
       } else {
         // Up out of the hand, which is where a phone sits when it is being
         // held rather than where the wrist joint is, and tilted back so the
         // screen is read at an angle instead of edge on.
-        m.g.position.set(tmpP.x, tmpP.y + 0.085, tmpP.z);
+        //
+        // AND A HAND'S DEPTH TOWARDS THE VIEWER, which is the correction.
+        // `handR` is the WRIST, and a hand is 0.18 m long: at 0.085 straight
+        // up the phone came out inside the fingers, and photographed at half a
+        // metre what you got was a thumb through the middle of the ETH row.
+        // The screen is already billboarded, so pushing along the same bearing
+        // is coherent from every angle rather than only from one — the hand
+        // ends up behind the phone wherever you stand, which is where the hand
+        // holding a phone is.
+        const yaw = m.g.rotation.y;
+        m.g.position.set(tmpP.x + Math.sin(yaw) * 0.105, tmpP.y + 0.118,
+          tmpP.z + Math.cos(yaw) * 0.105);
         m.g.rotation.z = 0;
         m.g.rotation.x = -0.34;
       }
