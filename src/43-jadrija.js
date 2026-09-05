@@ -2778,6 +2778,9 @@ async function buildJadrija(scene) {
     // with a pallet on end, a green steel vessel on its side, a stump, a broken
     // kerb block, a second bin, folded trestles and the shop's power lead
     // across the ground — see `tisakYard`. A kiosk is ninety per cent clutter.
+    // All of it BEHIND the counter line, though: _343 is the land side, and the
+    // pan's two passes along the promenade have the apron in front of this
+    // shop bare. Ninety per cent clutter and none of it where you walk.
     { key: 'tisak', kind: 'kiosk', metal: true,
       t0: 305.5, t1: 309, s0: 22, s1: 24.2, h: 2.55,
       name: 'TISAK', roof: [0.545, 0.532, 0.500], body: [0.500, 0.418, 0.300],
@@ -9080,8 +9083,15 @@ async function buildJadrija(scene) {
     // and 0.73 deep with the lid overhanging at the back and two wheels under
     // the lip. Municipal green, and it is in the frame because the shop has
     // nowhere else to put it.
+    //
+    // The frame being `1000150343`, which is taken from the LAND side — the bin
+    // stands against the long panelled wall about 1.5 m from the west end, on
+    // the far side of the box from the sea. It shipped 0.62 m in FRONT of the
+    // counter instead, where the pan at 04:24 has nothing but paving and where
+    // a bin is the first thing you meet walking up to buy a newspaper. Behind
+    // the front line now, beside the other one. See `tisakYard`.
     {
-      const bt = S.t0 - 0.62, bs = S.s0 - 0.62;
+      const bt = S.t0 - 0.62, bs = S.s0 + 1.30;
       const GREEN = [0.145, 0.245, 0.135];
       boxTS(bt - 0.29, bt + 0.29, bs - 0.30, bs + 0.30, y0 + 0.20, y0 + 1.00,
         GREEN, shade(GREEN, 1.14));
@@ -9382,12 +9392,32 @@ async function buildJadrija(scene) {
    * None of it was here and all of it is the point. A kiosk is ninety per cent
    * clutter and the model had a bin and a ladder.
    *
-   * Everything is between `t 302.4` and `S.t0`, on the seaward side of the
-   * kiosk line, and every position was found by walking the block outward from
-   * the objects that were already there rather than by measuring off the frame,
+   * Everything is between `t 302.3` and `S.t0`, BEHIND the shop's own front
+   * line, and every position was found by walking the block outward from the
+   * objects that were already there rather than by measuring off the frame,
    * which has no scale in that corner. What the frame does give is the
    * inventory, the sizes relative to the 240 litre bin standing among them, and
    * the colours — and those are the three things it is used for.
+   *
+   * Behind the line, and that is a correction. This yard shipped on the SEAWARD
+   * side of `S.s0` — the kerb block 2.00 m out, the drum and the pallet 1.15 m
+   * out — which put six of its ten objects in front of the shop and three of
+   * those out past `walkTo` on the crazy paving itself, which is the surface
+   * the promenade is walked on. The two frames that look at this
+   * corner from where a player actually stands say the opposite. `1000150414`
+   * at 04:24 and at 04:27 both have the apron west of the kiosk as bare white
+   * gravel: a picnic table, a plastic stool and a low block, three objects
+   * across eight metres, and nothing else between them and the Jana cooler.
+   * The yard is not on that apron. It is behind it — `1000150343` is taken
+   * from the LAND side, so every object in it is on the far side of the box
+   * from the sea, and the only things the pan can see at the west end are the
+   * step ladder and the trestle stack, both flat against the wall.
+   *
+   * So the pocket is `s 22.15` to `s 25.1`: the shop's front plane to three
+   * metres behind it, which is the depth the frame shows between the kiosk's
+   * wall and the oleander. Same ten objects, same arrangement, same 3.2 by
+   * 2.9 m of ground — reflected about the front line, which is the one number
+   * that was wrong.
    *
    * Sun on the objects in this corner is the kiosk's own shadow, so every
    * number sampled off them is a shade value and not a paint value. They are
@@ -9420,7 +9450,7 @@ async function buildJadrija(scene) {
     // `slat` section swept along `t`, because a leaning board is the one thing
     // `boxTS` structurally cannot do — see the note over `bar`.
     {
-      const pt2 = 304.05, ps = S.s0 - 1.15, ang = 0.24, tn = Math.tan(ang);
+      const pt2 = 304.25, ps = S.s0 + 1.94, ang = 0.24, tn = Math.tan(ang);
       for (let k = 0; k < 5; k++) {
         const cy = y0 + 0.16 + k * 0.245;
         bar(pt2 - 0.50, pt2 + 0.50,
@@ -9441,7 +9471,7 @@ async function buildJadrija(scene) {
     // along the shore for twenty-four triangles, and a rounder one is a swept
     // profile nothing else on this shore needs.
     {
-      const dt = 303.04, ds = S.s0 - 1.20, dy = y0 + 0.245, r = 0.275;
+      const dt = 302.95, ds = S.s0 + 2.15, dy = y0 + 0.245, r = 0.275;
       const lower = [[ds - r * 0.55, dy - r], [ds + r * 0.55, dy - r],
         [ds + r, dy], [ds - r, dy]];
       const upper = [[ds - r, dy], [ds + r, dy],
@@ -9486,30 +9516,40 @@ async function buildJadrija(scene) {
     // `frustumTS` rather than `post` for the one reason that matters at this
     // size: it has a top face, and a stump seen from a standing eye is mostly
     // its top.
-    frustumTS(y0 - 0.06, [302.72, S.s0 + 0.20, 0.29, 0.29],
-      y0 + 0.40, [302.72, S.s0 + 0.20, 0.255, 0.265],
+    frustumTS(y0 - 0.06, [302.70, S.s0 + 1.25, 0.29, 0.29],
+      y0 + 0.40, [302.70, S.s0 + 1.25, 0.255, 0.265],
       STUMP, shade(STUMP, 1.42));
     // The kerb block, broken off something and dropped. Neutral grey, 114 flat
     // across all three channels in the frame, which is the one object in that
     // corner that is not either green or brown.
-    boxTS(302.32, 303.22, S.s0 - 2.00, S.s0 - 1.56, y0 - 0.06, y0 + 0.34,
+    //
+    // It is the westmost thing in the yard and the one nearest the promenade,
+    // and 0.15 m behind `S.s0` is as near as it goes: this is the object that
+    // was 2.00 m out on the paving, and a 0.9 m grey brick standing alone on
+    // crazy paving is a hazard, not a yard.
+    boxTS(302.35, 303.25, S.s0 + 0.15, S.s0 + 0.59, y0 - 0.06, y0 + 0.34,
       CONC, shade(CONC, 1.06));
-    furniture.push({ t: 302.77, s: S.s0 - 1.78, a: 0.50, c: 0.26, h: 0.34, y: y0 });
+    furniture.push({ t: 302.80, s: S.s0 + 0.37, a: 0.50, c: 0.26, h: 0.34, y: y0 });
     // The heap the pallet leans on: two flat slabs, a sheet of something red,
     // and a bucket. Kept low and kept flat — everything in that part of the
     // frame is on its side or lying down, and a heap built as a pile of boxes
     // reads as a delivery rather than as rubbish.
-    boxTS(303.25, 304.10, S.s0 + 0.02, S.s0 + 0.62, y0, y0 + 0.14,
+    //
+    // Directly behind the pallet now rather than 1.2 m from it. The pallet's
+    // top board lands at `S.s0 + 2.21` and the heap starts at 2.42, so the
+    // thing the comment above has always said it leans back on is finally in
+    // the place it would have to be for that to be true.
+    boxTS(303.75, 304.62, S.s0 + 2.42, S.s0 + 3.00, y0, y0 + 0.14,
       [0.235, 0.225, 0.215], [0.300, 0.290, 0.278]);
-    boxTS(303.45, 304.25, S.s0 + 0.16, S.s0 + 0.72, y0 + 0.12, y0 + 0.22,
+    boxTS(303.95, 304.75, S.s0 + 2.54, S.s0 + 3.06, y0 + 0.12, y0 + 0.22,
       [0.300, 0.292, 0.280], [0.360, 0.352, 0.338]);
-    boxTS(303.55, 303.95, S.s0 + 0.24, S.s0 + 0.50, y0 + 0.20, y0 + 0.235,
+    boxTS(304.05, 304.45, S.s0 + 2.60, S.s0 + 2.86, y0 + 0.20, y0 + 0.235,
       [0.520, 0.185, 0.130], [0.580, 0.215, 0.155]);
-    post(W, 304.30, S.s0 - 0.30, y0, y0 + 0.30, 0.165,
+    post(W, 305.05, S.s0 + 2.70, y0, y0 + 0.30, 0.165,
       [0.500, 0.512, 0.520], 7);
     // The lilac towel somebody dropped against the wall, which is the one warm
     // colour in three metres of grey and brown and is why it is worth a box.
-    boxTS(302.30, 302.95, S.s0 + 0.62, S.s0 + 0.86, y0, y0 + 0.035,
+    boxTS(302.35, 303.00, S.s0 + 2.62, S.s0 + 2.86, y0, y0 + 0.035,
       [0.330, 0.275, 0.400], [0.395, 0.335, 0.470]);
 
     // ── the second bin, and the sack over it ───────────────────────────────
@@ -9518,8 +9558,15 @@ async function buildJadrija(scene) {
     // least two of them; this is the nearer of the pair, turned and pushed back
     // against the wall, with a black sack sitting on the lid where somebody put
     // it down rather than opening it.
+    //
+    // Beside the other one and not in front of it. The pair used to sit nose to
+    // tail at the same `t`, 0.9 m apart in `s`, so from the promenade you read
+    // one green bin with a second green bin directly behind it — which is the
+    // one arrangement two bins never take, because you cannot wheel the back
+    // one out. They stand side by side against the wall with 0.43 m between the
+    // lids, which is `1000150343`'s reading of the two lids anyway.
     {
-      const bt = S.t0 - 0.65, bs = S.s0 + 0.27;
+      const bt = S.t0 - 1.65, bs = S.s0 + 1.30;
       boxTS(bt - 0.29, bt + 0.29, bs - 0.30, bs + 0.30, y0 + 0.20, y0 + 1.00,
         shade(BIN, 0.88), shade(BIN, 1.02));
       boxTS(bt - 0.30, bt + 0.30, bs - 0.32, bs + 0.32, y0 + 0.98, y0 + 1.07,
@@ -9534,11 +9581,19 @@ async function buildJadrija(scene) {
     // Three dark folded somethings leaning on the west end — folding tables by
     // their proportions, and the frame will not say more than that. They are
     // in because a shop stores its spare furniture against its own wall and
-    // this is the one place at Jadrija where that is photographed.
+    // this is the one place at Jadrija where that is photographed. The pan at
+    // 04:27 has them from the promenade side as well, a black stack flat
+    // against the west end with the step ladder beside it, and they are the
+    // only part of the yard that reads from out there at all.
+    //
+    // 0.30 m off the corner, not against it. `slat` leans in `s`, so these
+    // boards' faces are the two that could sit parallel to the kiosk's west
+    // end, and at the old offset the nearest of the three came within 0.04 m
+    // of it — rule 5, two kilometres from the origin.
     for (let k = 0; k < 3; k++) {
       const o = k * 0.055;
-      bar(S.t0 - 0.24 + k * 0.09, S.t0 + 0.04 + k * 0.09,
-        slat(S.s0 - 0.80 + o, y0 + 0.44, 0.20, 0.94, 0.036),
+      bar(S.t0 - 0.76 + k * 0.09, S.t0 - 0.48 + k * 0.09,
+        slat(S.s0 + 0.45 + o, y0 + 0.44, 0.20, 0.94, 0.036),
         [0.145, 0.148, 0.155], [0.215, 0.220, 0.230]);
     }
 
@@ -9549,19 +9604,23 @@ async function buildJadrija(scene) {
     // one of the two things in that corner that say the kiosk is plugged in to
     // something rather than parked on a beach.
     //
-    // Four AXIS-ALIGNED runs and not a polyline through the four corners it
-    // turns at. `boxTS` builds the bounding box of its arguments, so a diagonal
-    // run 0.3 m by 0.4 m is not a 25 mm cable laid at an angle, it is a 0.3 by
-    // 0.4 slab of tarmac — which is exactly what the first cut put on the
-    // gravel. A staircase of straight runs is what a lead somebody dropped
-    // looks like anyway.
+    // AXIS-ALIGNED runs and not a polyline through the corners it turns at.
+    // `boxTS` builds the bounding box of its arguments, so a diagonal run
+    // 0.3 m by 0.4 m is not a 25 mm cable laid at an angle, it is a 0.3 by 0.4
+    // slab of tarmac — which is exactly what the first cut put on the gravel.
+    // A staircase of straight runs is what a lead somebody dropped looks like
+    // anyway.
+    //
+    // Three of them, out of the WEST end and away behind the yard rather than
+    // out of the front and across the promenade. It ends at the drum: past
+    // that it would run under the heap, and a cable buried in a slab is a pair
+    // of coincident horizontal faces with nothing between them.
     {
       const CAB = [0.055, 0.052, 0.055];
       for (const [a, c, u, v] of [
-        [S.t0 + 0.49, S.t0 + 0.52, S.s0 - 0.28, S.s0 - 0.03],
-        [S.t0 + 0.12, S.t0 + 0.52, S.s0 - 0.31, S.s0 - 0.28],
-        [S.t0 + 0.12, S.t0 + 0.15, S.s0 - 0.52, S.s0 - 0.31],
-        [S.t0 - 0.70, S.t0 + 0.15, S.s0 - 0.55, S.s0 - 0.52],
+        [S.t0 - 0.30, S.t0, S.s0 + 1.72, S.s0 + 1.75],
+        [S.t0 - 0.33, S.t0 - 0.30, S.s0 + 1.75, S.s0 + 2.30],
+        [S.t0 - 2.00, S.t0 - 0.30, S.s0 + 2.30, S.s0 + 2.33],
       ]) {
         boxTS(a, c, u, v, y0 + 0.005, y0 + 0.032, CAB);
       }
