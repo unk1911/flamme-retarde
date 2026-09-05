@@ -1062,13 +1062,126 @@ async function buildJadrija(scene) {
   // thing that can turn it on is the pass that actually lays the flags.
   paveBand = [PAVE, walkTo];
   ribbon(walkTo, JAD.back, deckOf, duff, 3);
+  /**
+   * The quay wall, which from the water was a flat black band 572 m long.
+   *
+   * It used to be ONE QUAD a station from the bed to the coping in one colour,
+   * plus a darker strip near the waterline. Measured off a frame taken with the
+   * eye at 0.45 m, square on at t 300: the wall reads rgb(41, 42, 40) with a
+   * standard deviation of 12.7 over its whole height, against water at its own
+   * foot at rgb(176, 249, 246). Six to one, with nothing inside it — which is
+   * not a wall seen from the sea, it is a silhouette, and it is the shape the
+   * whole shoreline takes at swimming height.
+   *
+   * The face is 1.48 m above the water and 1.9 m below it, so what a swimmer
+   * has in front of him is a metre and a half of concrete with the brightest
+   * thing in the scene lying against the bottom of it. Four things come out of
+   * that and none of them were drawn:
+   *
+   *   BOUNCE. Sunlit water throws light back up the wall. It is the single
+   *   loudest thing about any sea wall photographed from the water and it dies
+   *   away over about half a metre. Faked in the albedo the way every other
+   *   light on this shore is — `shade` is doing the same job on the kabine
+   *   eaves — because a real bounce term would want the water it bounced off.
+   *
+   *   THE WET BAND, which is where SALT was already pointing and was drawn
+   *   0.57 m tall. The Adriatic has 0.3 m of tide: what is permanently damp is
+   *   the bottom 0.12 m and what is splashed is another 0.25 m above that.
+   *
+   *   ALGAE below the line, going to almost black by half a metre down, and
+   *   the bleached salt crust immediately above it, which is the PALEST part of
+   *   the whole wall and was the darkest.
+   *
+   *   AND IT IS NOT ONE POUR. Broken along its length into pieces no more than
+   *   1.1 m wide, each a shade off its neighbour, with the occasional darker
+   *   one where something drains over the coping.
+   */
+  const QUAY_ALGAE = [0.088, 0.126, 0.080];
+  const QUAY_CRUST = [0.605, 0.585, 0.532];
+  function quayTone(j, w, jm) {
+    // `w` is metres above the waterline: negative under it, up to the coping.
+    let col = STONE;
+    if (w < -0.02) {
+      // Under water. Weed takes hold immediately and is total by half a metre.
+      const g = Math.min(1, (-w) / 0.55) * (0.72 + 0.26 * jit(j, 903));
+      col = mixc(STONE, QUAY_ALGAE, g);
+    } else if (w < 0.12) {
+      // Never dry. The darkest strip on the wall, and only a hand tall.
+      col = mixc(SALT, QUAY_ALGAE, 0.34 + 0.22 * jit(j, 904));
+    } else if (w < 0.37) {
+      // Splashed, then dried, over and over: this is salt, and it is the
+      // brightest thing on the face.
+      col = mixc(STONE, QUAY_CRUST, 0.52 + 0.30 * jit(j, 905)
+        * (1 - Math.abs(w - 0.245) / 0.125));
+    }
+    // The bounce, strongest at the water and gone by 0.6 m. Modulated along the
+    // wall rather than laid on evenly: caustic light off a moving surface is
+    // never a band of one brightness, and an even one would read as a painted
+    // stripe, which is the thing the kabine's rust streaks had to be talked out
+    // of two releases ago.
+    const up = Math.max(0, w);
+    const bo = Math.exp(-up / 0.34) * (0.78 + 0.72 * jit(j, 906))
+      * (w < -0.02 ? 0.35 : 1);
+    // and a per-piece tone, plus one piece in nine that something drains over.
+    const k = jm * (1 + 1.15 * bo) * (0.93 + 0.14 * jit(j, 907));
+    return [Math.min(1, col[0] * k), Math.min(1, col[1] * k),
+      Math.min(1, col[2] * k)];
+  }
+  let quayJ = 0;
   for (let i = 0; i < ST.length - 1; i++) {
     const a = ST[i], c = ST[i + 1];
-    b.quad(pt(a, 0, -JAD.quay), pt(c, 0, -JAD.quay),
-      pt(c, 0, lipOf(c, 0)), pt(a, 0, lipOf(a, 0)), STONE);
-    // A darker band just above the water, where it is never quite dry.
-    b.quad(pt(a, 0.02, 0.05), pt(c, 0.02, 0.05),
-      pt(c, 0.02, 0.62), pt(a, 0.02, 0.62), SALT);
+    const ha = lipOf(a, 0), hc = lipOf(c, 0);
+    const span = Math.hypot(c.x - a.x, c.z - a.z);
+    const nT = Math.max(1, Math.ceil(span / 1.1));
+    const N = 9;
+    for (let m = 0; m < nT; m++) {
+      const va = m / nT, vb = (m + 1) / nT;
+      const P = (v, y) => {
+        const st = { x: a.x + (c.x - a.x) * v, z: a.z + (c.z - a.z) * v,
+          nx: a.nx + (c.nx - a.nx) * v, nz: a.nz + (c.nz - a.nz) * v };
+        return pt(st, 0, y);
+      };
+      const hA = ha + (hc - ha) * va, hB = ha + (hc - ha) * vb;
+      const j = quayJ++;
+      // A drain stain, one piece in nine, over the whole height of the face.
+      const jm = (j * 7 + (j >> 2)) % 9 === 4 ? 0.80 : 1.0;
+      for (let k = 0; k < N; k++) {
+        const u0 = k / N, u1 = (k + 1) / N;
+        const yA0 = -JAD.quay + (hA + JAD.quay) * u0;
+        const yA1 = -JAD.quay + (hA + JAD.quay) * u1;
+        const yB0 = -JAD.quay + (hB + JAD.quay) * u0;
+        const yB1 = -JAD.quay + (hB + JAD.quay) * u1;
+        const wm = -JAD.quay + (hA + JAD.quay) * (u0 + u1) * 0.5;
+        b.quad(P(va, yA0), P(vb, yB0), P(vb, yB1), P(va, yA1),
+          quayTone(j, wm, jm));
+      }
+      // The coping, and it is the reason the shoreline read as a black band
+      // from the water however the face was toned. The wall stopped dead
+      // against the sky: no nosing, no overhang, nothing to catch the light at
+      // the one place a quay always has something to catch it. Every ladder on
+      // this shore is described as bending OVER the coping and there was no
+      // coping for it to bend over. 0.07 m proud and 0.16 m deep, in the
+      // promenade's own concrete, so the top of the wall is a line rather than
+      // an edge.
+      const cs = -0.07;
+      const cj = 0.94 + 0.11 * jit(j, 908);
+      const CAP = [CONC[2][0] * cj, CONC[2][1] * cj, CONC[2][2] * cj];
+      const Q = (v, sv, y) => {
+        const st = { x: a.x + (c.x - a.x) * v, z: a.z + (c.z - a.z) * v,
+          nx: a.nx + (c.nx - a.nx) * v, nz: a.nz + (c.nz - a.nz) * v };
+        return pt(st, sv, y);
+      };
+      // The nosing's face, its soffit, and the shadow the soffit throws on the
+      // wall behind it, which is the whole of what makes an overhang read.
+      b.quad(Q(va, cs, hA - 0.16), Q(vb, cs, hB - 0.16),
+        Q(vb, cs, hB), Q(va, cs, hA), CAP);
+      b.quad(Q(va, cs, hA - 0.16), Q(va, 0, hA - 0.16),
+        Q(vb, 0, hB - 0.16), Q(vb, cs, hB - 0.16),
+        [CAP[0] * 0.52, CAP[1] * 0.52, CAP[2] * 0.50]);
+      b.quad(Q(va, -0.004, hA - 0.30), Q(vb, -0.004, hB - 0.30),
+        Q(vb, -0.004, hB - 0.17), Q(va, -0.004, hA - 0.17),
+        [STONE[0] * 0.46, STONE[1] * 0.46, STONE[2] * 0.44]);
+    }
   }
   // The blend into the hill, and end walls so the slab is not a floating shelf.
   for (let i = 0; i < ST.length - 1; i++) {
