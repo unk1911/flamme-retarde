@@ -30165,8 +30165,16 @@ async function buildJadrija(scene) {
     // Arm the turn. Aimed on the next frame rather than here, because the
     // collider is called from `confine` and has no camera to aim at — and a
     // head that starts moving one frame late is a head nobody can time.
-    if (!fg.look) {
+    // `fg.bumping` and not `!fg.look`, which is what this said and what broke
+    // the moment a greeting could write the same two fields. A bather part-way
+    // through saying hello to somebody has `fg.look` set and is not in
+    // `looking`, so the old test took the `else` branch, found `lookT` still
+    // small, and pushed nobody — walk into somebody mid-greeting and their head
+    // would never come round to you at all. The flag says what the test was
+    // always trying to ask: is this figure already one of MINE.
+    if (!fg.bumping) {
       fg.lookT = 0; fg.look = 1e-4; fg.lookY = 0;
+      fg.bumping = true;
       looking.push(fg);
     } else if (fg.lookT > BUMP.turn) {
       // Brushed again while still looking: hold, rather than start over. The
@@ -30229,7 +30237,9 @@ async function buildJadrija(scene) {
       // Kept aimed while the head is out, so somebody who walks round in front
       // of them while they are still looking is still what they are looking at.
       if (u < BUMP.turn + BUMP.hold) fg.lookY = bumpAim(fg, cam);
-      if (fg.look <= 0) { fg.look = 0; looking.splice(i, 1); }
+      if (fg.look <= 0) {
+        fg.look = 0; fg.bumping = false; looking.splice(i, 1);
+      }
     }
     if (!bumpSaid) return;
     const b = bumpBalloon, fg = bumpSaid.fg;
@@ -30244,6 +30254,479 @@ async function buildJadrija(scene) {
     // a balloon that tilts back as you climb away is the one thing in the scene
     // that knows where the camera is.
     b.mesh.rotation.y = Math.atan2(cam.x - fg.x, cam.z - fg.z);
+  }
+
+  // ── people who know each other ─────────────────────────────────────────────
+  //
+  // Misha, of the beach: "it would be cool for some of the bathers to more
+  // actively engage with each other, and perhaps with me (Chloe), in some way
+  // ... it could be simple, like saying hello".
+  //
+  // What was wrong is worth stating exactly, because it was not that nobody
+  // moved. Ninety-eight people on this shore each ran their own clock and not
+  // one of them had ever been given the address of another, so every gesture
+  // any of them made was aimed at the horizon. Twenty-four skinned figures
+  // stood about playing `idle`, a quarter of them waved at nothing every half
+  // minute — see `BIZ` in 42-crowd.js, where that wave has now gone — and the
+  // resort read as what it was: a crowd of strangers who happened to share a
+  // beach.
+  //
+  // HALF THE CLIPS WERE ALREADY THERE, and finding out which half was most of
+  // the day. `wave` and `notice` have been in BATHER_CLIPS since the blobs were
+  // baked and both are one-shots keyed from `IDLE_A` at either end, which is
+  // exactly what makes them droppable into a loop of `idle` — so this started
+  // as a pure SCHEDULING problem: find two people who are near each other and
+  // turned the right way, point them at each other, and let the bake do the
+  // rest.
+  //
+  // `notice` does the rest. `wave` does nothing at all: the bake flattens its
+  // raise, and has since the day these eight were made. It is written up over
+  // `greetArm` in 42-crowd.js with the measurement that settles it, and the
+  // consequence for this file is that the arm is solved here rather than
+  // played — which turned out to be the better answer anyway, because a solved
+  // arm works on somebody sitting in a chair and a standing clip does not.
+  //
+  // WHICH TIER CARRIES IT, measured rather than assumed. `tiers(28)` walked
+  // down the promenade at eight stations comes back skin 3/3, 3/3, 9/10,
+  // 16/17, 23/25, 13/13, 10/10, 7/7 — the only instanced figures within
+  // twenty-eight metres of you anywhere on this shore are the three shop staff,
+  // who cannot be promoted because their t-shirts are per-instance paint. So
+  // the skinned tier carries this outright, and the file's older note about
+  // "eight figures on 570 m" is two changes out of date: there are forty-eight
+  // of them now — SKIN_SEATED on the terraces and SKIN_CAST roving — and they
+  // follow you. Pairs within five metres of each other at the two busy
+  // stations: eighteen and twenty-seven, of which sixteen and nineteen are
+  // skinned on both sides. This is not a rare event that has to be engineered
+  // into existence; it has to be RATIONED.
+  //
+  // Hence the shape of everything below. `every` is an attempt and not a
+  // greeting: most attempts find nobody, because the pair test only passes
+  // where people are actually standing together, and that is what makes the
+  // result clustered rather than evenly spread. Same lesson as the beach
+  // pitches and the grove floor.
+  const GREET = {
+    // How far apart two people can be and still be greeting each other. Four
+    // and a half metres is across a café table, along a towel, or the width of
+    // the promenade. Further than that and they are two people on the same
+    // beach rather than two people together, which is the whole distinction
+    // this is trying to draw.
+    near: 4.5,
+    // And how close is too close. Under this they are not two people who have
+    // seen each other, they are two people who arrived on the same square
+    // metre, and a wave at somebody 40 cm away is a slap.
+    min: 0.85,
+    // The wedge in front of somebody that counts as "they could have seen
+    // them". 72 degrees off their own forward, which is a glance; past it they
+    // are being greeted by the back of a head.
+    //
+    // Tied to `reach` and not chosen for its own sake. A head plus shoulders
+    // gets 1.05 rad round and no further, so a partner further out than that
+    // is somebody the turn ends up looking PAST — photographed at 1.40, where
+    // both parties clamp and each is aimed twenty degrees wide of the other.
+    // 1.25 leaves eleven degrees, which at four metres is 0.8 m and is inside
+    // the width of the person being looked at.
+    arc: 1.25,
+    // Only where it can be seen. Past forty metres a raised arm is under a
+    // pixel and all a greeting costs is a clip nobody watches.
+    see: 40,
+    // How often the beach is ASKED, and how often an ask that finds a pair is
+    // allowed to become a greeting.
+    //
+    // These two are the whole rate and the rate is the whole feel of it: a
+    // beach where everybody waves is worse than one where nobody does. Six and
+    // a half seconds at two in five, counted over six hundred seconds of sim
+    // at each of four stations, comes out at one greeting somewhere in view
+    // every 21 s at t 280, every 23 s at t 340, every 86 s on the thinner
+    // stretch at t 220 — and NONE AT ALL in the whole ten minutes out west at
+    // t 60, where there is nobody to greet.
+    //
+    // That last number is the one that matters. `every` is an ATTEMPT and not
+    // a greeting: most attempts find nobody, because the pair test only passes
+    // where people are actually standing together. So the result is clustered
+    // by construction rather than spread flat, and the empty half of this
+    // shore stays empty without a word of special-casing.
+    every: 6.5,
+    odds: 0.40,
+    // The reply lands this long after the hail. Spread rather than fixed: two
+    // people answering each other on the same beat is a chorus line, and the
+    // gap is most of what makes the second one read as an ANSWER.
+    reply: [0.55, 1.00],
+    // The same person does not do it again inside this. Forty seconds is long
+    // enough that you cannot stand and watch one pair repeat, and short enough
+    // that walking the promenade twice is not the same beach twice.
+    again: 40,
+    // The turn: out, hold, back. Half a second longer at the hold than a
+    // bump's, because this is somebody they know rather than somebody who has
+    // just walked into them.
+    turn: 0.40, hold: 1.90, back: 0.85,
+    // What a neck does before the body has to follow. `BUMP.reach`'s number,
+    // and for its reason.
+    reach: 1.05,
+    // The hand up: how long it takes to get there, and when it starts coming
+    // down. Under the head's `turn + hold`, so the arm is down again before
+    // the face turns away — which is the order it happens in on a person.
+    armUp: 0.30, armFor: 1.75, armDown: 0.45,
+    // AND HOW FAR AWAY SOMEBODY HAS TO BE BEFORE A HAND GOES UP AT ALL.
+    //
+    // The commonest greeting on this shore by a distance is two people in
+    // chairs — `sit+sit` is 21 of the sixty logged over four hundred seconds
+    // at five stations, because the café terraces are where people who are
+    // together actually sit. They are 1.4 m apart across a table, and nobody
+    // waves at somebody 1.4 m away: they turn and talk to them. A wave at that
+    // range does not read as friendly, it reads as a semaphore.
+    //
+    // So the arm is a function of the distance and not of the pose. Past 1.9 m
+    // it is a hail across a gap and the hand goes up; inside it, the head and
+    // the shoulders are the whole gesture, which is the right one.
+    armFrom: 1.9,
+    // And how long somebody stops walking to do it.
+    //
+    // Walkers are in 43 of the sixty greetings logged in the first pass, which
+    // was the surprise in the measurement: most greetings on a promenade
+    // involve somebody going past. They could only ever turn their heads,
+    // because `notice` is keyed from a standing pose and dropping it on a
+    // walker freezes the legs under a figure that is still sliding along the
+    // deck.
+    //
+    // The fix is not a clip. It is that PEOPLE STOP WHEN SOMEBODY SAYS HELLO —
+    // and the walkers already have the machinery for it, because they stop
+    // every few seconds anyway to look at things. A `wait` is a walker in
+    // `stand`, and a walker in `stand` is somebody the bake can be dropped on
+    // like anybody else. See the note over `pause` in 42-crowd.js for where
+    // this number sits in that spread; it is a short one, deliberately.
+    //
+    // 3.4 s covers the HEAD, which is the long half: `turn + hold + back` is
+    // 3.15 s against the arm's 2.20. Cut it short of that and the walk clip
+    // comes back under somebody who is still turned to a friend, and what you
+    // get is a person walking down the promenade looking over their shoulder
+    // at nothing. The answerer waits their reply's own delay on top — see
+    // `greetStop`.
+    stop: 3.4,
+    // ── and you ──
+    // How close you have to walk past somebody to be noticed, how often the
+    // question is asked, how often the answer is yes, and how long before that
+    // same person looks up at you again. Nobody follows you around: it is one
+    // turn of a head, it ends, and the sixty seconds is per person.
+    // `youHigh` is the one that is not about the beach at all. `who` is the
+    // person where there is one and the CAMERA where there is not, and from
+    // the cockpit there is not — so without a vertical test a bather would
+    // look up at a Canadair four metres to one side of them and three hundred
+    // metres over their head, and turn their face to an empty patch of sky.
+    // Three metres is a step up on to the quay and nothing more.
+    youNear: 4.2, youHigh: 3.0, youEvery: 8.0, youOdds: 0.55, youAgain: 60,
+    // Of the people who look up at you, how many also put a hand up. A third,
+    // because a beach on which every stranger waves at you is a beach that
+    // wants something.
+    youWave: 0.34,
+  };
+  const greeting = [];       // the figures with a hello part-way through
+  let greetClock = 0;
+  // Zero and NOT the `1e9` `castClk` uses. That idiom is right next door and
+  // it is wrong here: the resort poses itself once at build time, with `who`
+  // set to the middle of the shore, and a clock that starts long makes that
+  // one frame fire a greeting between two people three and a half kilometres
+  // from wherever you are about to arrive. Nobody sees it and it costs both of
+  // them their cooldown. The casting pass has to happen on that frame — a slot
+  // pointed at nobody is twenty-four blobs on the origin — and a hello does
+  // not.
+  let greetClk = 0;
+  let youClk = 0;
+  let greetN = 0, youN = 0;  // how many have fired, for the probe
+  /**
+   * What has fired, tallied by the pair of poses.
+   *
+   * The rate is the whole tuning of this and a rate cannot be photographed:
+   * "one somewhere in view every twenty or thirty seconds" is a claim about
+   * four hundred seconds of beach, not about a frame. So the greetings count
+   * themselves, and the poses come with the count because WHICH pairs turn up
+   * decided how much of this had to be built — a shore where every greeting is
+   * two people in chairs needs no arm at all, and one where they are all
+   * standing needs nothing but the baked clip.
+   */
+  const greetLog = {};
+
+  /**
+   * The yaw that turns `fg` toward a point, in the frame `fg.yaw` is written in.
+   *
+   * `bumpAim` without the clamp, and it is separate rather than shared because
+   * the two callers want different things from it: the bump only ever needs a
+   * head angle and clamps on the way out, while this is also the test for
+   * whether two people could see each other at all — and a bearing that has
+   * already been clamped to the neck's reach cannot answer that. See the note
+   * over `bumpAim` for why it is `atan2(-dz, dx)` and not the other way round;
+   * that right angle cost a release.
+   */
+  function greetAim(fg, x, z) {
+    let e = Math.atan2(fg.z - z, x - fg.x) - fg.yaw;
+    while (e > Math.PI) e -= TAU;
+    while (e < -Math.PI) e += TAU;
+    return e;
+  }
+
+  /**
+   * Whether this person is free to say hello.
+   *
+   * `lie` is out for the reason `bumpReact` has it out: a sunbather's figure is
+   * tipped a quarter turn about its own long axis and everything in here is
+   * written in the upright frame, so a "head turn" on one is a roll.
+   *
+   * The three shop staff are out because they are at work. It is one line and
+   * it is the difference between a barista who greets the queue and a barista
+   * who abandons the machine to wave at somebody on the promenade.
+   */
+  const freeToGreet = (fg) => fg.mode !== 'lie' && fg.mode !== 'serve'
+    && fg.mode !== 'barista' && !fg.bumping && !fg.gr;
+  /**
+   * And whether they are free AND have not just done it.
+   *
+   * Split from the test above because the debug hook wants the first half and
+   * not the second: `greetNow` exists to force a greeting for a photograph, and
+   * a hook that silently declines because the two people in front of the camera
+   * said hello thirty seconds ago is a hook that fails intermittently and gets
+   * blamed on the feature. It cost half an hour before it was split.
+   */
+  const canGreet = (fg) => freeToGreet(fg)
+    && greetClock - (fg.gAt == null ? -1e3 : fg.gAt) >= GREET.again;
+
+  /**
+   * Whether the `notice` clip can be dropped on to this person.
+   *
+   * `notice` is a second and a half of head up, chin round and shoulders back,
+   * keyed from `IDLE_A` at both ends — so it drops into a loop of `idle` with
+   * nothing between it and it, and it is meaningless on anybody who is not on
+   * their feet. Playing it on somebody in a chair stands them up out of it.
+   *
+   * The arm is NOT this test. It is solved rather than played, on both tiers,
+   * and it works on anybody who is not lying down — the long note over
+   * `greetArm` in 42-crowd.js says why the baked `wave` could not be used and
+   * what was measured to establish it.
+   */
+  const canNotice = (fg) => fg.mode === 'stand' || fg.mode === 'wade';
+
+  /** Take a greeting off somebody and leave nothing of it behind. */
+  function endGreet(fg) {
+    fg.gr = null;
+    fg.look = 0;
+    fg.lookY = 0;
+    fg.gArm = 0;
+    // The cue as well, and this is the half that bites. A cue written on
+    // somebody who was being drawn as an instance never reached a mesh, and a
+    // cue left on them fires the next time they are promoted — which can be a
+    // minute later, two hundred metres away, at nobody. 42-crowd.js clears it
+    // on consumption; this is the other end.
+    fg.cue = null;
+  }
+
+  /**
+   * Start one, between two people or between one person and you.
+   *
+   * `b` is null for you, and that is the only difference: everything below is
+   * written against a point rather than against a figure, so being greeted by
+   * somebody on this beach and watching two of them greet each other run down
+   * exactly the same code.
+   */
+  function fireGreet(a, b, dly, hail, answer) {
+    const key = b ? [a.mode, b.mode].sort().join('+') : `you+${a.mode}`;
+    greetLog[key] = (greetLog[key] || 0) + 1;
+    // Close enough to talk, or far enough to wave. See `armFrom`.
+    const far = !b || Math.hypot(a.x - b.x, a.z - b.z) > GREET.armFrom;
+    a.gr = { to: b, t: 0, arm: hail && far, said: false };
+    a.gAt = greetClock;
+    greetStop(a, 0);
+    greeting.push(a);
+    if (!b) return;
+    b.gr = { to: a, t: -dly, arm: answer && far, said: false };
+    b.gAt = greetClock;
+    greetStop(b, dly);
+    greeting.push(b);
+  }
+
+  /**
+   * A walker stops for it.
+   *
+   * `wait` is the promenade's own "stand still and look at something" and the
+   * loop in `updateCrowd` turns it into `mode = 'stand'` on the next frame,
+   * which is the whole trick: a walker who has stopped is somebody `notice`
+   * can be dropped on, and a walker who has not is a pair of frozen legs
+   * sliding down the deck. `max` and not an assignment, so a hello does not
+   * cut short a pause somebody was already taking.
+   */
+  function greetStop(fg, lag) {
+    if (fg.beat) fg.wait = Math.max(fg.wait || 0, GREET.stop + lag);
+  }
+
+  /**
+   * Two people who are plausibly together, or nothing.
+   *
+   * Scanned from a random offset rather than from the front, which is the whole
+   * of why this does not always pick the same pair: `pool` is in casting order
+   * and casting order is stable, so a scan from zero would find the same two
+   * people on the terrace every time and the rest of the beach would never say
+   * a word. Runtime `Math.random` and not `rng` — rule 4 is about the LAYOUT,
+   * and who says hello to whom at 14:32 is not part of it.
+   */
+  function findPair(pool, from = -1) {
+    const n = pool.length;
+    if (n < 2) return null;
+    // `from` is the debug hook's, which hands in a pool sorted by how far away
+    // it is and wants the nearest pair rather than a random one — a frame shot
+    // of two people saying hello thirty-five metres behind you is a frame of
+    // the promenade.
+    const o = from >= 0 ? from : (Math.random() * n) | 0;
+    for (let ii = 0; ii < n; ii++) {
+      const a = pool[(o + ii) % n];
+      for (let jj = 1; jj < n; jj++) {
+        const b = pool[(o + ii + jj) % n];
+        const dx = b.x - a.x, dz = b.z - a.z;
+        const d = Math.sqrt(dx * dx + dz * dz);
+        if (d > GREET.near || d < GREET.min) continue;
+        // Both of them, and this is the test that stops a wave being thrown at
+        // the back of somebody's head. One-sided reads far worse than none:
+        // the eye finds the raised arm, follows it, and lands on a stranger
+        // facing the sea.
+        if (Math.abs(greetAim(a, b.x, b.z)) > GREET.arc) continue;
+        if (Math.abs(greetAim(b, a.x, a.z)) > GREET.arc) continue;
+        return [a, b];
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Advance every hello that is part-way through, and now and then start one.
+   *
+   * Called before `stepBump` and after the walkers have moved. The order is
+   * load-bearing at both ends: the walkers write their own `x`/`z` in the loop
+   * above and a greeting aimed at last frame's position is a greeting aimed a
+   * metre behind somebody, while `stepBump` writes the same `fg.look` and has
+   * to be the one that wins — being walked into is more urgent than being said
+   * hello to, and a figure that is both drops the hello on the next frame.
+   */
+  function stepGreet(dt, who) {
+    greetClock += dt;
+    // The running ones first, so that a greeting which ends on this frame
+    // gives its two people back to the search below rather than making them
+    // wait another six and a half seconds.
+    for (let i = greeting.length - 1; i >= 0; i--) {
+      const fg = greeting[i];
+      const g = fg.gr;
+      // Walked into mid-hello. The bump takes the head over from here — see
+      // `bumpReact` — so this must let go of it completely rather than fight
+      // for it a frame at a time.
+      if (!g || fg.bumping) { endGreet(fg); greeting.splice(i, 1); continue; }
+      g.t += dt;
+      // Still waiting their turn. The answer has not happened yet and nothing
+      // about them should have moved.
+      if (g.t < 0) continue;
+      const u = g.t;
+      // Out, hold, back, eased at both ends — `stepBump`'s shape and its
+      // reasoning: linear in and linear out is a servo.
+      const k = u < GREET.turn ? sat(u / GREET.turn)
+        : u < GREET.turn + GREET.hold ? 1
+          : 1 - sat((u - GREET.turn - GREET.hold) / GREET.back);
+      fg.look = k * k * (3 - 2 * k);
+      // Kept aimed while the head is out, so that two people who are walking
+      // stay pointed at each other rather than at where the other one was when
+      // this started. A walker greeted mid-stride covers a metre and a half in
+      // the time the head is round.
+      if (u < GREET.turn + GREET.hold) {
+        const to = g.to;
+        fg.lookY = clamp(greetAim(fg, to ? to.x : who.x, to ? to.z : who.z),
+          -GREET.reach, GREET.reach);
+        // Which arm goes up: the one on the side they are turning toward. A
+        // positive `lookY` is a turn to the figure's own left — the rig's
+        // forward is +X and its left is −Z, so `rotation.y` swings the front
+        // toward −Z — and greeting somebody on your left with your right hand
+        // is a gesture across your own chest.
+        fg.gArmL = fg.lookY > 0;
+      }
+      // The hand, up quickly and down before the face turns away.
+      fg.gArm = g.arm
+        ? sat(u / GREET.armUp) * (1 - sat((u - GREET.armFor) / GREET.armDown))
+        : 0;
+      // And the clip, once. Set on the PERSON rather than played on the mesh,
+      // because at this point in the frame nobody knows which mesh — if any —
+      // is going to draw them: 42-crowd.js consumes `fg.cue` when it next
+      // poses them, and drops it if they turn out to be an instance.
+      //
+      // NOT ON THE FIRST FRAME, and that is the walkers. `greetStop` asks a
+      // walker to stand still, and the loop that turns `wait` into `stand`
+      // runs BEFORE this one — so on the frame a greeting fires a walker is
+      // still in `walk` and `canNotice` says no. Half a second of asking is
+      // enough for the mode to change and short enough that a cue can never
+      // arrive after the head has started coming back.
+      if (!g.said) {
+        if (canNotice(fg)) {
+          g.said = true;
+          fg.cue = 'notice';
+        } else if (u > 0.5) {
+          g.said = true;
+        }
+      }
+      if (k <= 0) { endGreet(fg); greeting.splice(i, 1); }
+    }
+
+    // ── and now and then, somebody says hello ────────────────────────────────
+    greetClk += dt;
+    if (greetClk >= GREET.every) {
+      greetClk = 0;
+      if (Math.random() < GREET.odds) {
+        const pool = [];
+        const rr = GREET.see * GREET.see;
+        for (const k in crowds) {
+          for (const fg of crowds[k].live()) {
+            const dx = fg.x - who.x, dz = fg.z - who.z;
+            if (dx * dx + dz * dz > rr) continue;
+            if (canGreet(fg)) pool.push(fg);
+          }
+        }
+        const pair = findPair(pool);
+        if (pair) {
+          const dly = GREET.reply[0]
+            + Math.random() * (GREET.reply[1] - GREET.reply[0]);
+          // Both of them put a hand up, one after the other, and the gap is
+          // what makes the second one an answer. The first cut had the hail
+          // wave and the answer only turn its head, on the theory that two
+          // waves was too much; photographed, what that reads as is one person
+          // waving and one person staring, which is the fault this whole pass
+          // exists to fix.
+          fireGreet(pair[0], pair[1], dly, true, true);
+          greetN++;
+        }
+      }
+    }
+
+    // ── and now and then, one of them notices you ────────────────────────────
+    //
+    // `notice` is a second and a half of head up, chin round, shoulders back,
+    // and it was baked for exactly this. It fires off PROXIMITY and not off a
+    // collision, which is the difference between it and the bump: you should
+    // not have to walk into somebody to be seen.
+    youClk += dt;
+    if (youClk < GREET.youEvery) return;
+    youClk = 0;
+    if (Math.random() >= GREET.youOdds) return;
+    let best = null, bd = GREET.youNear * GREET.youNear;
+    for (const k in crowds) {
+      for (const fg of crowds[k].live()) {
+        const dx = fg.x - who.x, dz = fg.z - who.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 > bd) continue;
+        if (Math.abs((who.y || 0) - fg.y) > GREET.youHigh) continue;
+        if (!canGreet(fg)) continue;
+        if (greetClock - (fg.yAt == null ? -1e3 : fg.yAt) < GREET.youAgain) {
+          continue;
+        }
+        // In front of them, on the same test the pairs use. Somebody with
+        // their back to the promenade has not seen you go past.
+        if (Math.abs(greetAim(fg, who.x, who.z)) > GREET.arc) continue;
+        bd = d2; best = fg;
+      }
+    }
+    if (!best) return;
+    best.yAt = greetClock;
+    fireGreet(best, null, 0, Math.random() < GREET.youWave, false);
+    youN++;
   }
 
   const walkers = [];
@@ -30875,6 +31358,16 @@ async function buildJadrija(scene) {
       w.yaw = rigYaw(w.t, w.dir > 0 ? 0 : Math.PI);
     }
 
+    // Who is saying hello to whom, and it goes FIRST of the two: both write
+    // `fg.look`, and being walked into has to beat being greeted. See the note
+    // over `stepGreet`.
+    //
+    // `who` and not `cam`, for the reason the note at the top of this function
+    // gives at length: a bather deciding whether you have walked past close
+    // enough to look up is deciding about Chloe, not about a camera three
+    // metres behind her shoulder.
+    stepGreet(dt, who);
+
     // Before the flush and after the walkers have moved, because both tiers
     // read `fg.look` while they are posing and a walker's `x` and `z` are
     // written just above. Unconditional, and it carries its own early-out: the
@@ -30968,6 +31461,115 @@ async function buildJadrija(scene) {
           ? bumpBalloon.said : null,
         cool: +bumpCool.toFixed(2),
       }),
+      /**
+       * Who is saying hello, and how many have.
+       *
+       * `n` and `you` are the two numbers the whole thing is tuned against —
+       * a greeting somewhere in view every twenty or thirty seconds — and the
+       * only way to see them is to step the sim and read them, because
+       * standing on the promenade waiting to catch one is not a measurement.
+       */
+      greets: () => {
+        // Which mesh, if any, is drawing each of them, so the clip can be read
+        // off it. The whole question "is the wave actually playing" is
+        // invisible from `fg` — the clip lives on the FIGURE and the two are
+        // joined only by the slot table — and it is the one thing a
+        // screenshot of a crowded terrace cannot settle.
+        const mesh = new Map();
+        if (crowds.skin) {
+          for (const [fg2, f] of crowds.skin.pairs()) if (fg2) mesh.set(fg2, f);
+        }
+        // How high the waving hand actually is over the soles, in figure
+        // metres. The one measurement that tells a clip which is CURRENT from
+        // a clip which is MOVING something — `playing()` and `curT` both said
+        // `wave` was running while the arm hung at the hip, and only this said
+        // which of the two was lying.
+        const _bv = new THREE.Vector3();
+        const handY = (f, left) => {
+          // The side that is actually waving. Measuring `handR` regardless
+          // reads a hand that never moved on everybody greeting somebody on
+          // their left, which looks exactly like the solve not running.
+          const i = f.boneIndex(left ? 'handL' : 'handR');
+          if (i < 0) return null;
+          f.boneAt(i, _bv);
+          return +_bv.y.toFixed(2);
+        };
+        return {
+          n: greetN, you: youN, clock: +greetClock.toFixed(1), by: greetLog,
+          live: greeting.map((fg) => ({
+            idx: fg.idx, mode: fg.mode, to: fg.gr && fg.gr.to
+              ? fg.gr.to.idx : 'you',
+            t: fg.gr ? +fg.gr.t.toFixed(2) : null,
+            look: +(fg.look || 0).toFixed(3),
+            lookY: +(fg.lookY || 0).toFixed(3),
+            arm: +(fg.gArm || 0).toFixed(3),
+            cue: fg.cue || null,
+            clip: mesh.has(fg) ? mesh.get(fg).playing() : null,
+            // How far into it, which is the difference between a clip that is
+            // playing and a clip that is merely current.
+            clipT: mesh.has(fg) && mesh.get(fg).state
+              ? +mesh.get(fg).state.curT.toFixed(2) : null,
+            hand: mesh.has(fg)
+              ? handY(mesh.get(fg), fg.phone ? true : !!fg.gArmL) : null,
+            d: +Math.hypot(fg.x - lastCam.x, fg.z - lastCam.z).toFixed(1),
+            w: [+fg.x.toFixed(1), +fg.y.toFixed(2), +fg.z.toFixed(1)],
+            // Which way they are pointing, so a probe can put a camera in
+            // front of a raised arm instead of behind it.
+            yaw: +fg.yaw.toFixed(3),
+          })),
+        };
+      },
+      /**
+       * Make two people say hello, here, now.
+       *
+       * A greeting is three seconds long and happens at most every sixteen,
+       * somewhere on four hundred metres of shore, so the odds of a probe
+       * standing in the right place at the right moment are not good enough to
+       * photograph against. This picks the nearest pair to you that passes the
+       * same tests `findPair` applies and fires them through the same
+       * `fireGreet` — so what a frame shot after this shows is the real thing
+       * and not a private copy of it.
+       *
+       * `greetNow('you')` does the other one: whoever is nearest looks up.
+       * Any other string is a POSE, and it narrows the pool to people in it —
+       * `greetNow('stand')` is how a greeting between two people ON THEIR FEET
+       * gets photographed, which is a different picture from the commonest
+       * one: the nearest pair to you on this shore is nearly always two people
+       * at a café table, and at 1.4 m apart they turn to each other rather
+       * than waving. See `armFrom`.
+       */
+      greetNow: (mode) => {
+        const pool = [];
+        for (const k in crowds) {
+          for (const fg of crowds[k].live()) {
+            const dx = fg.x - lastCam.x, dz = fg.z - lastCam.z;
+            if (dx * dx + dz * dz > GREET.see * GREET.see) continue;
+            if (mode && mode !== 'you' && fg.mode !== mode) continue;
+            if (freeToGreet(fg)) pool.push(fg);
+          }
+        }
+        pool.sort((a2, b2) => Math.hypot(a2.x - lastCam.x, a2.z - lastCam.z)
+          - Math.hypot(b2.x - lastCam.x, b2.z - lastCam.z));
+        if (mode === 'you') {
+          const fg = pool.find((f2) => Math.abs(greetAim(f2, lastCam.x,
+            lastCam.z)) <= GREET.arc);
+          if (!fg) return null;
+          fg.yAt = greetClock;
+          fireGreet(fg, null, 0, true, false);
+          youN++;
+          return { idx: fg.idx, mode: fg.mode,
+            d: +Math.hypot(fg.x - lastCam.x, fg.z - lastCam.z).toFixed(2) };
+        }
+        const pair = findPair(pool, 0);
+        if (!pair) return null;
+        fireGreet(pair[0], pair[1], 0.75, true, true);
+        greetN++;
+        return pair.map((fg) => ({ idx: fg.idx, mode: fg.mode,
+          d: +Math.hypot(fg.x - lastCam.x, fg.z - lastCam.z).toFixed(2),
+          apart: +Math.hypot(pair[0].x - pair[1].x,
+            pair[0].z - pair[1].z).toFixed(2),
+          w: [+fg.x.toFixed(1), +fg.y.toFixed(2), +fg.z.toFixed(1)] }));
+      },
       /** The instanced layers, so the near shadow cascade can occlude with them. */
       meshes: () => Object.values(crowds).flatMap((c) => c.layers.map((L) => L.mesh)),
       /** And the skinned ones, which each need a palette of their own. */

@@ -6341,6 +6341,27 @@ window.__fr = {
       ? jadrija.crowd.tiers(r) : null),
     /** The roving skinned cast: who is in a slot, and how tall they come out. */
     cast: () => (jadrija && jadrija.crowd.cast ? jadrija.crowd.cast() : null),
+    /**
+     * Who is saying hello to whom, and how many have since the page loaded.
+     *
+     * See `stepGreet` in 43-jadrija.js. The rate is the whole tuning of it and
+     * a rate cannot be seen in a screenshot, so it is counted instead: step the
+     * ground sim for a few minutes at a station and read `n`.
+     */
+    greets: () => (jadrija && jadrija.crowd.greets ? jadrija.crowd.greets()
+      : null),
+    /**
+     * Force one, now, between the nearest pair — or `greetNow('you')` for
+     * somebody to look up at you.
+     *
+     * A greeting lasts three seconds and happens every sixteen or so somewhere
+     * on four hundred metres of shore, which is not odds a probe can shoot
+     * against. Same reasoning as `pose(clip, at, settle)` next door: this goes
+     * through `fireGreet` rather than round it, so what comes out is the real
+     * thing.
+     */
+    greetNow: (mode) => (jadrija && jadrija.crowd.greetNow
+      ? jadrija.crowd.greetNow(mode) : null),
     /** Debug: who is standing close enough to be resolved against right now. */
     bodies: (pad = 1.2) => {
       if (!jadrija || !jadrija.bodies) return null;
