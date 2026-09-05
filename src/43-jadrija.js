@@ -860,6 +860,42 @@ async function buildJadrija(scene) {
   // years of salt on local limestone aggregate. The ratio between the two
   // measurements, 1.019 / 0.939 / 0.858, is applied here rather than to the
   // light, because it is this concrete that is warm and not the afternoon.
+  /**
+   * Who stands behind which counter, and where.
+   *
+   * Up here rather than beside the loop that pushes them, because
+   * `shopInside` has to know: a back bar drawn across the whole opening stands
+   * between you and anybody working at it, and the wall has to be cut where
+   * the person is. `backBar` does exactly this at the slasticarnica by hand
+   * and its note explains why — "AND THE WEST END OF THE TWO LOWER SHELVES IS
+   * NOT DRAWN AT ALL, because two men are standing in it". This is that rule,
+   * written once, for the shops whose bar is generated rather than hand-placed.
+   *
+   * `[key, t, backOff, pose, scale]`. A null `backOff` means the standard
+   * `s0 - 0.15`, which puts the front of the hip on the counter's front panel.
+   */
+  const SHOP_STAFF = [
+    ['mini', 274.60, null, 'serve', 1.00],
+    ['konoba', 244.00, 0.35, 'stand', 1.02],
+    // 5.60 rather than null, which puts him at s 21.40 instead of 21.85.
+    //
+    // NOT A CAUSE, A POSITION THAT WORKS, and it is worth being exact about
+    // the difference. At s 19, out on the open terrace, he is a whole man. At
+    // 21.40 he is a barman from the waist up with the bottles behind him. At
+    // 21.85 — the standoff every other counter in this list uses — he is two
+    // hands and a sliver of shoulder, which is the report this note has
+    // carried since the day the four of them were built.
+    //
+    // Ruled out, each by a build and a photograph rather than by reading:
+    // `shopInside`'s shelves (removed entirely — no change), `S.pier` (turned
+    // off — no change), the mullion at t 317.1 that the note above warns about
+    // (moved to 317.8, midway between two — no change), and the crowd layer
+    // itself, which draws him perfectly at 19 and at 21.40. Whatever it is
+    // lives in the last 0.45 m and it is not any of those.
+    ['h2o', 317.20, 5.60, 'serve', 0.99],
+    ['tramp2', 471.60, null, 'stand', 1.03],
+  ];
+
   const CONC = [[0.479, 0.427, 0.364], [0.450, 0.402, 0.341], [0.507, 0.451, 0.383]];
   // The flags of the old promenade: warm honey limestone, five shades.
   //
@@ -4386,6 +4422,38 @@ async function buildJadrija(scene) {
     // in front of either would put a shelf of bottles through the flavours.
     const deep = !S.vitrine && !S.backBar;
     const f0 = S.s0 - (deep ? 0.54 : 0.09), f1 = S.s0 - (deep ? 0.30 : 0.02);
+    // ── AND IT IS CUT WHERE SOMEBODY IS STANDING ─────────────────────────────
+    //
+    // This is 1.284.0's bill arriving. Moving the room out to 0.30 m proud is
+    // what made it draw at all, and it also put a solid wall from y0+1.10 to
+    // y0+2.45 across the full width of the opening — in front of anyone at the
+    // counter, who stands at `s0 − 0.15`. The note over `SHOP_STAFF` records
+    // that two of the four counters were built with a server and shipped
+    // without one, because "at neither shop does a figure behind the counter
+    // show more than a shoulder and two hands... something in the crowd layer
+    // that this pass did not get to the bottom of". It was not the crowd layer.
+    //
+    // Measured rather than reasoned, and it took three builds: at s 19, out on
+    // the terrace, he is a whole man; at 21.4, in front of this wall, he is a
+    // barman from the waist up; at 21.85, behind it, he is nothing at all.
+    //
+    // 0.62 m of gap, which is a shoulder width and a hand either side. The
+    // shelves go with the wall — a bottle at head height is the same problem —
+    // and the worktop and the cold cabinet do not, because they are below the
+    // counter and he is standing behind them, not in front.
+    const gaps = SHOP_STAFF.filter((p) => p[0] === S.key).map((p) => p[1]);
+    const spans = (a, c) => {
+      let runs = [[a, c]];
+      for (const g of gaps) {
+        const out = [];
+        for (const [u0, u1] of runs) {
+          if (g - 0.31 > u0) out.push([u0, Math.min(u1, g - 0.31)]);
+          if (g + 0.31 < u1) out.push([Math.max(u0, g + 0.31), u1]);
+        }
+        runs = out.filter(([u0, u1]) => u1 - u0 > 0.12);
+      }
+      return runs;
+    };
     // Where the shelving starts. Above `shopKit`'s counter for a deep shop, and
     // on the old ledge for everybody else.
     const wy = deep ? y0 + 1.10 : oy0;
@@ -4395,8 +4463,10 @@ async function buildJadrija(scene) {
     const key = S.t0 | 0;
     // The back: a warm wall rather than a black hole, and a tiled band up from
     // the worktop the way every one of these has.
-    boxTS(oa, oc, f1, f1 + 0.02, wy, oy1, WALL, shade(WALL, 1.10));
-    boxTS(oa, oc, f1 - 0.015, f1, wy + 0.04, wy + 0.50, shade(WALL, 1.16));
+    for (const [u0, u1] of spans(oa, oc)) {
+      boxTS(u0, u1, f1, f1 + 0.02, wy, oy1, WALL, shade(WALL, 1.10));
+      boxTS(u0, u1, f1 - 0.015, f1, wy + 0.04, wy + 0.50, shade(WALL, 1.16));
+    }
     // The worktop, running the width of the opening — and only where the shop
     // has not got `shopKit`'s counter standing in the same plane.
     if (!deep) {
@@ -4410,8 +4480,10 @@ async function buildJadrija(scene) {
     for (let k = 0; k < 2; k++) {
       const sy = wy + (deep ? 0.56 : 0.72) + k * 0.42;
       if (sy + 0.30 > oy1) break;
-      boxTS(oa + 0.10, oc - 0.10, f0 + 0.03, f1, sy, sy + 0.030,
-        shade(WALL, 0.80), shade(WALL, 0.94));
+      for (const [u0, u1] of spans(oa + 0.10, oc - 0.10)) {
+        boxTS(u0, u1, f0 + 0.03, f1, sy, sy + 0.030,
+          shade(WALL, 0.80), shade(WALL, 0.94));
+      }
       // BOTTLES AND NOT COLOURED RECTANGLES. They were `boxTS` — a flat
       // front 70 mm wide with a square top — and behind a counter you can
       // walk up to that is a shelf of paint chips. It is the same call the
@@ -4427,6 +4499,7 @@ async function buildJadrija(scene) {
       for (let t = oa + 0.16; t < oc - 0.20; t += 0.105) {
         const h = jit(((t * 9) | 0) + key + k * 53, 640);
         if (h < 0.18) continue;
+        if (gaps.some((g) => Math.abs(t - g) < 0.31)) continue;
         const c = BOT[(jit(((t * 9) | 0) + key + k * 53, 641) * BOT.length) | 0];
         const y = sy + 0.030;
         const bodyH = 0.105 + h * 0.085;      // where the shoulder starts
@@ -18962,11 +19035,7 @@ async function buildJadrija(scene) {
     // layer that this pass did not get to the bottom of. Two counters with
     // somebody at them beats four with two men made of hands, so the other
     // two are recorded here rather than shipped.
-    const posts = [
-      ['mini', 274.60, null, 'serve', 1.00],
-      ['konoba', 244.00, 0.35, 'stand', 1.02],
-    ];
-    for (const [key, t, backOff, pose, k] of posts) {
+    for (const [key, t, backOff, pose, k] of SHOP_STAFF) {
       const S = SHOPS.find((x) => x.key === key);
       if (!S) continue;
       const ss = backOff == null ? S.s0 - 0.15 : S.s1 - backOff;
@@ -32415,6 +32484,21 @@ async function buildJadrija(scene) {
         news: 'they have just turned a fire hose on you',
         spot: voiceSpot() };
     },
+    /**
+     * The four people behind counters: where they are, and whether anything is
+     * actually drawing them.
+     *
+     * Added because two of them were not, and the note over `posts` had it
+     * recorded as "something in the crowd layer that this pass did not get to
+     * the bottom of" — which is a thing you cannot get to the bottom of by
+     * reading, because what is missing is a figure and figures are chosen at
+     * runtime.
+     */
+    staff: () => bathers.map((b, i) => [i, b])
+      .filter(([, b]) => b.staff)
+      .map(([i, b]) => ({ i, t: +b.t.toFixed(1), s: +b.s.toFixed(2),
+        pose: b.pose, k: b.k, beat: b.beat, hid: !!b.hidden,
+        blob: b.blob == null ? null : b.blob })),
     /** How many people are on a phone, how many are drawn, and what the
      *  screens are showing — which is the only way to tell a live quote from
      *  the baked one without walking up to somebody. */
