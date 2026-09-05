@@ -1646,18 +1646,37 @@ async function buildGround(scene, field) {
     // what gets handed back to `walkY` next tick; `you.y` is where your feet
     // actually are, which during a hop is above it.
     you.gy = field.walkY(you.x, you.z, you.gy != null ? you.gy : you.y);
-    if (you.hop > 0 || you.hopV !== 0) {
+    const air = you.hop > 0 || you.hopV !== 0;
+    // And how hard you arrive, which is `hopV` on the frame the arc runs out.
+    // Worth carrying rather than assuming: stepping off a kerb and coming down
+    // off the vikendica's rail are the same event to everything else in here,
+    // and they are not the same noise.
+    let land = 0;
+    if (air) {
       you.hopV -= GROUND.hopG * dt;
       you.hop += you.hopV * dt;
-      if (you.hop <= 0) { you.hop = 0; you.hopV = 0; }
+      if (you.hop <= 0) { land = -you.hopV; you.hop = 0; you.hopV = 0; }
     }
     you.y = you.gy + you.hop;
     // Eased, so ducking under the eaves is a movement and not a cut. The hard
     // cap in pose() is what stops a teleport arriving on the deck at full
     // height with its head outside.
     you.eye = damp(you.eye, eyeAt(you.x, you.z, you.y), 9, dt);
-    gait(moved, dt);
+    gait(moved, dt, air);
+    // Two boots at once, off `footstep` rather than a sound of its own — it is
+    // a boot arriving and that is what the function is. Louder than a stride
+    // and by how fast you came in, so the step down off a bench is a step and
+    // a full jump is a thump: 1.8 against the 1.2 a run is taking.
+    if (land > 0) audio.footstep(underfoot(), 0.9 + sat(land / GROUND.hopV) * 0.9);
   }
+
+  /**
+   * What is under the boots. The apron is the only paved thing you can stand
+   * on; everywhere else is limestone, scrub and pine needles. Shared by the
+   * stride and by the landing, which are the same boot on the same ground.
+   */
+  const underfoot = () =>
+    (field.onPaved && field.onPaved(you.x, you.z) ? 1 : 0.18);
 
   /**
    * That you are walking.
@@ -1677,9 +1696,17 @@ async function buildGround(scene, field) {
    * `sin(2·gait)` is one per *step* (the head dropping as each boot lands).
    * Getting those two the same period is the classic mistake and it produces a
    * hopping motion nobody walks with.
+   *
+   * And it stops dead while your feet are off the ground — see below, which is
+   * the one place the distance rule is a lie.
    */
-  function gait(moved, dt) {
-    if (moved > 1e-4) {
+  function gait(moved, dt, air) {
+    // Not while your feet are off the ground. `moved` is the horizontal step
+    // and nothing about a hop stops it — a jump taken at a run carries 10.65 m
+    // of it, measured, which at a 0.78 m stride is thirteen footfalls the boots
+    // never made, played over the top of the one thing in this model that is
+    // unambiguously not walking.
+    if (moved > 1e-4 && !air) {
       const before = you.gait;
       you.gait += (moved / GROUND.stride) * Math.PI;
       // A footfall every time the phase crosses a multiple of π. Compared
@@ -1687,10 +1714,7 @@ async function buildGround(scene, field) {
       // cannot silently swallow a step or fire fifty of them.
       if (Math.floor(you.gait / Math.PI) !== Math.floor(before / Math.PI)) {
         const sp = Math.hypot(you.vx, you.vz);
-        // The apron is the only paved thing you can stand on; everywhere else
-        // is limestone, scrub and pine needles.
-        const hard = field.onPaved && field.onPaved(you.x, you.z) ? 1 : 0.18;
-        audio.footstep(hard, 0.7 + sat(sp / GROUND.run) * 0.5);
+        audio.footstep(underfoot(), 0.7 + sat(sp / GROUND.run) * 0.5);
       }
     }
     // Amplitude follows the speed, so a slow shuffle is not the same picture as
@@ -1698,7 +1722,10 @@ async function buildGround(scene, field) {
     // is rather than being wound back, so setting off again continues the
     // stride you were in the middle of.
     const sp = Math.hypot(you.vx, you.vz);
-    you.bob = damp(you.bob, sat(sp / GROUND.walk), 7, dt);
+    // And the head stops bobbing with the feet, rather than riding the speed
+    // it still has all the way through the arc. Damped to nothing rather than
+    // cut, so it leaves with them and comes back with them.
+    you.bob = damp(you.bob, air ? 0 : sat(sp / GROUND.walk), 7, dt);
   }
 
   const distToPlane = () =>

@@ -417,17 +417,13 @@ addEventListener('keydown', (e) => {
   // jump under the same key without collapsing them would have made a second
   // one dead the same way.
   //
-  // The order is the order of specificity: a trampoline bed is one square metre
-  // of the resort, the vikendica's plinth is one building, and the hop is
-  // everywhere else. Each of the first two declines quietly when you are not
-  // standing on the thing it is about.
+  // The order is the order of specificity, and it now lives in `jumpOut` with
+  // the two jumps it calls rather than here — the ladder is the interesting
+  // part of this key and it was written out in a keydown handler, where the
+  // only way to reach it was a keydown.
   if (e.code === 'Enter' || e.code === 'NumpadEnter') {
     if (state.phase === 'ground' && ground && ground.ok && !state.paused) {
-      e.preventDefault();
-      if (bounceOut()) return;
-      if (hopOut()) return;
-      ground.hop();
-      return;
+      e.preventDefault(); jumpOut(); return;
     }
   }
   // J for e[J]ect. Deliberately not next to anything: it is the one key in the
@@ -2999,9 +2995,36 @@ function hopOut() {
   if (!ground || !ground.ok || !ground.active || state.paused) return false;
   if (!eject || eject.active) return false;
   const v = jadrija && jadrija.vik;
-  if (!v) return false;
+  if (!v || ground.field !== jadrija) return false;
   const { x, y, z, yaw, vx, vz } = ground.you;
   if (y < v.base + HOP.minUp) return false;
+  // AND ON THE HOUSE, which is what the note above has always claimed and what
+  // the code did not do. The only test was a height, and 4.50 m above the sea
+  // is most of this map: the apron stands at 20.05 m, the pine slope behind
+  // Jadrija reaches 4.9, so a height on its own says "balcony" about an
+  // aerodrome. The other gate is worse than useless here, because it is the
+  // one that decides *when*: `minSp` means the jump is stolen precisely while
+  // you are moving.
+  //
+  // Misha, 5 Sep: *"when i'm running around (using the 'Q' button and the 'UP'
+  // arrow), i should, at the same time, be able to JUMP up <Enter>"*. He could
+  // not, and the whole on-foot mission is on that aerodrome: Enter while
+  // moving there threw you under a canopy at 10.5 m/s, and had done since the
+  // day the three jumps were collapsed onto the one key (24 Aug) and this one
+  // stopped being dead code.
+  //
+  // `floorAt` answers null off the footprint and a surface height on it, so it
+  // is the plinth test the note was describing. The height gate stays in front
+  // of it: it is what keeps the ramp up to the front door from counting.
+  const [t, s] = jadrija.local(x, z);
+  if (v.floorAt(t, s, y) == null) return false;
+  // And not from indoors, which the footprint alone does not exclude: the
+  // rooms and the terrace share a floor plate, so `floorAt` answers for the
+  // living room as readily as for the balcony and a running Enter took you out
+  // through your own roof. `indoorsAt` is the line between them — measured, 1
+  // in the living room and on the loft deck, 0 on the terrace, which is the
+  // one place this was ever about.
+  if (v.indoorsAt(t, s, y)) return false;
   if (Math.hypot(vx || 0, vz || 0) < HOP.minSp) return false;
   launchedFrom = { stranded: ground.stranded };
   ground.bail();
@@ -3067,6 +3090,29 @@ function bounceOut() {
   startFlyCut(bed, g.yaw);
   toast(T('toast.tramp'));
   return true;
+}
+
+/**
+ * Enter, on foot: one verb, three things it can mean, and the order they are
+ * tried in.
+ *
+ * Specificity first. A trampoline bed is one square metre of the resort, the
+ * vikendica's plinth is one building, and the jump is everywhere else — so the
+ * general case is the last rung and it is the one that can always run. That is
+ * the whole safety property of this ladder, and it only holds while the two
+ * above it decline quietly off the thing they are about, which is what the
+ * plinth test in `hopOut` is for.
+ *
+ * A function rather than three lines inside the keydown handler because it was
+ * three lines inside the keydown handler and there is more than one key now:
+ * the on-screen pad has no jump, and the day it gets one it must get this
+ * ladder and not a second copy of it in the wrong order. Returns which rung
+ * answered, which is what a probe wants to read.
+ */
+function jumpOut() {
+  if (bounceOut()) return 'tramp';
+  if (hopOut()) return 'balcony';
+  return ground.hop() ? 'jump' : '';
 }
 
 // -----------------------------------------------------------------------------
@@ -6839,12 +6885,25 @@ window.__fr = {
     out: () => toggleGround(),
     apron: () => airfield.apron,
     put: (x, z, yaw, pitch, yHint) => ground.put(x, z, yaw, pitch, yHint),
-    /** Debug: the balcony jump, without having to be running when you ask. */
+    /**
+     * Debug: the balcony jump, without having to be running when you ask.
+     *
+     * Still only the balcony jump, and since the plinth test it declines off
+     * the house like the key does. A test that wants "whatever Enter would do
+     * here" wants `enter()` below.
+     */
     hop: (sp = 2.0) => {
       if (ground && ground.you) { ground.you.vx = -Math.sin(ground.you.yaw) * sp;
         ground.you.vz = -Math.cos(ground.you.yaw) * sp; }
       return hopOut();
     },
+    /**
+     * Debug: the Enter key on foot, through the ladder rather than round it,
+     * and which of the three rungs answered — 'tramp', 'balcony' or 'jump'.
+     * The thing worth asserting is nearly always which one: the bug this was
+     * written for was a jump that came out as a parachute.
+     */
+    enter: () => jumpOut(),
     confine: (x, z, y) => ground.confine(x, z, y),
     walkY: (x, z, y) => ground.walkY(x, z, y),
     /** Debug: is the land cover at (x, z) water? The shoreline test. */
