@@ -260,7 +260,10 @@ const BROD = {
     { x0: 4.30, x1: 6.60, y: 1.22, hole: 0 },         // the foredeck
     // The upper deck, between the rails. Its after end is the stair head and
     // its forward end is the wheelhouse roof, which nobody stands on.
-    { x0: -1.55, x1: 4.30, y: BROD_ROOF, hole: 0, lim: 1.10 },
+    // x1 3.42 and not 4.30: the funnel casing stands at 3.86 and is 0.88 long,
+    // so its after face is at 3.42. A walkable band that ran to 4.30 walked you
+    // into the middle of it. See the casing in `brodProto`.
+    { x0: -1.55, x1: 3.42, y: BROD_ROOF, hole: 0, lim: 1.10 },
   ],
   edge: 0.06,                // how far in from the bulwark you may stand — a
                              // person's clearance, so it does NOT scale
@@ -830,7 +833,69 @@ function brodProto() {
   // cockpit. The ensign is a flat panel and not cloth, because the only thing
   // that reads from the far side of a fifteen-metre deck is red-white-blue.
   b.box(4.44, 1.06 + 2.90, 0, 0.14, 3.90, 0.14, TRIM);
-  b.box(2.40, 1.06 + 2.36, -0.86, 0.16, 0.66, 0.16, DARK);
+
+  // ── the funnel casing, and what was there instead ────────────────────────
+  //
+  // A 0.28 by 0.28 black post 1.16 m tall, standing in the middle of the
+  // passenger deck with nothing at its base and no cap on it. Ridden the whole
+  // nine and a half minutes to Sibenik and photographed at four points along
+  // it, that post is a black slab hanging in the same place in every frame — it
+  // silhouettes against the sky and it is the loudest thing on her.
+  //
+  // `1000150392` says what belongs there. The mural on the kabine end wall is
+  // still the best picture of this boat in the whole survey and it has, plainly
+  // and at the aft end of her upper deck, a **dark oxblood casing** with the
+  // lifebuoys hung on its face. Sampled off the frame at three points the paint
+  // runs R:G:B 1.59 : 1.00 : 1.04 against a hull white of 84 in the same light,
+  // which is oxblood and not brown and not black.
+  //
+  // Forward rather than aft, and that is the one departure. In the mural she
+  // carries it over the engine, which on her is amidships; on this hull the
+  // stair comes up at the after end of the roof and a casing there would be a
+  // wall across the head of the flight. So it stands at the forward end where
+  // the wheelhouse roof begins, and `BROD.decks`' upper band is shortened to
+  // meet it — see the note there. You walk up to it, not through it.
+  // `shade` is 43-jadrija's, not this file's — these are its three steps
+  // written out. Caught by a probe and not by the build: `node --check` passes
+  // an undefined identifier happily and what you get is BUILD DID NOT FINISH
+  // at 70 %, which is the same silent shape as a temporal dead zone.
+  const CASE = [0.430, 0.270, 0.281];
+  const CASE_LIT = [0.482, 0.302, 0.315];
+  const CASE_MID = [0.370, 0.232, 0.242];
+  const CASE_DK = [0.310, 0.194, 0.202];
+  {
+    const y0c = BROD_ROOF;
+    b.box(3.86, y0c + 0.46, 0, 0.88, 0.92, 1.16, CASE, CASE_LIT);
+    // The lip round the top of it, which is what stops a painted box reading
+    // as a painted box: every casing on every one of these has a rolled edge.
+    b.box(3.86, y0c + 0.94, 0, 0.98, 0.08, 1.26, CASE_DK, CASE_MID);
+    // And the exhaust out of the top of it — round, capped, and standing to
+    // port of centre the way the old stub did, because that part was right.
+    // Eight sides: a pipe 0.26 m across is four pixels at the distance anybody
+    // on this deck is from it, and the cap is the only part with a silhouette.
+    {
+      const ex = 3.60, ez = -0.34;
+      const ring = (y, r) => {
+        const o = [];
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2;
+          o.push([ex + Math.cos(a) * r, y, ez + Math.sin(a) * r]);
+        }
+        return o;
+      };
+      const P = [ring(y0c + 0.96, 0.075), ring(y0c + 1.56, 0.075),
+        ring(y0c + 1.58, 0.115), ring(y0c + 1.64, 0.104)];
+      for (let k = 0; k < 3; k++) {
+        for (let i = 0; i < 8; i++) {
+          const j = (i + 1) % 8;
+          b.quad(P[k][i], P[k][j], P[k + 1][j], P[k + 1][i],
+            k === 1 ? [0.225, 0.231, 0.244] : DARK);
+        }
+      }
+      const top = P[3];
+      for (let i = 1; i < 7; i++) b.tri(top[0], top[i], top[i + 1], [0.05, 0.05, 0.055]);
+    }
+  }
   // TWO benches in the cockpit, outboard against the bulwark, and the middle
   // of the well left clear. 1.232.0 put an inboard pair down the centre of it
   // and they had to come out again the moment the upper deck became somewhere
@@ -858,6 +923,78 @@ function brodProto() {
     }
     b.box(0.60, ys + 0.02, -(ws - 0.06), 1.58, 0.09, 0.14, TRIM);
   }
+  // ── the ship's boat, in davits off the starboard quarter ─────────────────
+  //
+  // `1000150392` again, and at the stern end of the mural it is unmistakable:
+  // a white clinker boat sitting up above the rail with a pair of thin curved
+  // posts either side of it. That is a tender in davits and it is the one thing
+  // on her silhouette that says WORKING BOAT rather than pleasure craft — every
+  // Dalmatian passenger boat of this size carries one and none of them carries
+  // it anywhere you can walk.
+  //
+  // Which is also why it goes here rather than on the roof where the mural has
+  // it. Slung outboard over the water it costs no deck at all: the upper deck's
+  // limit is 1.10 and her sheer is well outside that, so nothing about
+  // `deckAt` has to know this exists.
+  //
+  // Starboard, because port is the side she lies alongside and a boat in davits
+  // over the pier is a boat nobody could have got off.
+  {
+    const TX = -2.40;                       // her middle, on the quarter
+    const [ys, ws] = sheerAt(TX);
+    const TZ = ws + 0.62;                   // hung clear of the topsides
+    const KEEL = ys + 0.28;                 // and up above the rail
+    // 1.85 and not 1.05. A ship's boat on a twenty-seven-metre passenger boat
+    // is three and a half metres, which is 1.85 authored — the first cut was
+    // half that and photographed from above it read as a white sliver under the
+    // davits rather than as a boat somebody could get into.
+    const L = 1.85, BW = 0.52;
+    // The hull: five stations of a half-section, mirrored, so she has a stem, a
+    // sheer and some deadrise rather than being a slipper.
+    const ST2 = [[-L, 0.10, 0.12], [-L * 0.55, -0.10, 0.42],
+      [0, -0.15, 0.52], [L * 0.58, -0.10, 0.41], [L, 0.13, 0.10]];
+    const WH = [0.865, 0.858, 0.836];
+    const WD = [0.700, 0.688, 0.658];
+    for (let i = 0; i < ST2.length - 1; i++) {
+      const [x0, k0, w0] = ST2[i], [x1, k1, w1] = ST2[i + 1];
+      for (const sg of [1, -1]) {
+        // topside
+        b.quad([TX + x0, KEEL + 0.34, TZ + sg * w0],
+          [TX + x1, KEEL + 0.34, TZ + sg * w1],
+          [TX + x1, KEEL + k1, TZ + sg * w1 * 0.42],
+          [TX + x0, KEEL + k0, TZ + sg * w0 * 0.42], WH);
+        // and the bottom, which you see because she is hanging over your head
+        b.quad([TX + x0, KEEL + k0, TZ + sg * w0 * 0.42],
+          [TX + x1, KEEL + k1, TZ + sg * w1 * 0.42],
+          [TX + x1, KEEL + k1 - 0.03, TZ],
+          [TX + x0, KEEL + k0 - 0.03, TZ], WD);
+      }
+    }
+    // The gunwale, one strip a side, and two thwarts across her.
+    for (const sg of [1, -1]) {
+      for (let i = 0; i < ST2.length - 1; i++) {
+        const [x0, , w0] = ST2[i], [x1, , w1] = ST2[i + 1];
+        b.quad([TX + x0, KEEL + 0.34, TZ + sg * w0],
+          [TX + x1, KEEL + 0.34, TZ + sg * w1],
+          [TX + x1, KEEL + 0.30, TZ + sg * w1 * 0.97],
+          [TX + x0, KEEL + 0.30, TZ + sg * w0 * 0.97], TRIM);
+      }
+    }
+    for (const dx of [-0.34, 0.36]) {
+      b.box(TX + dx, KEEL + 0.28, TZ, 0.10, 0.045, BW * 1.7, TRIM);
+    }
+    // The davits. Two, raked out over the water, with the fall from each head
+    // down to her stem and stern — which is the detail that says she is HUNG
+    // and not sitting on a shelf.
+    for (const dx of [-L * 0.66, L * 0.68]) {
+      const bx = TX + dx;
+      b.box(bx, ys + 0.30, ws - 0.10, 0.11, 1.28, 0.11, RAIL);
+      b.box(bx, ys + 0.92, (ws + TZ) * 0.5 - 0.05, 0.11, 0.11,
+        TZ - ws + 0.34, RAIL);
+      b.box(bx, ys + 0.70, TZ, 0.05, 0.44, 0.05, [0.780, 0.770, 0.730]);
+    }
+  }
+
   // Two lifebuoys, lashed to the after rail of the upper deck where they can
   // be reached. 0.42 across and not 0.62: a lifebuoy is 0.75 m outside and
   // this table is authored at 1/1.75 of built, so the first cut put two
