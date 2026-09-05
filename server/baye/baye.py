@@ -161,6 +161,33 @@ CFG = Config()
 OPENAI_MODEL = CFG.get("BAYE_MODEL", "gpt-5.6-luna")
 TTS_VOICE = CFG.get("BAYE_VOICE_ID", "LEnmbrrxYsUYS7vsRRwD")   # Jessica
 TTS_MODEL = CFG.get("BAYE_TTS_MODEL", "eleven_multilingual_v2")
+# ── the fast path, and who is on it ──────────────────────────────────────────
+#
+# Misha: *"the only issue is the delay I guess because it takes time to
+# synthesize responses... not sure if there is much that can be done about that
+# latency"*. There is, and it was worth measuring before answering. Timed on
+# mpcn0 against the live APIs, same sentence, two runs each:
+#
+#   eleven_multilingual_v2   1.12 s, 1.17 s
+#   eleven_turbo_v2_5        0.26 s, 0.24 s
+#   eleven_flash_v2_5        0.31 s, 0.29 s
+#
+#   gpt-5.6-luna as it stands        4.37 s, 2.56 s   (reasoning 148, 92)
+#   the same with reasoning_effort low  2.00 s, 2.86 s   (reasoning 69, 78)
+#
+# So the synthesis was never the five seconds it was assumed to be — it is one
+# — and nine tenths of that one is recoverable. Turbo rather than flash: it is
+# the quality-balanced fast model and the difference between 0.25 and 0.30 is
+# not worth a voice for.
+#
+# NOT FOR BAYE. She speaks on a clock; she is not answering anything, so a
+# second of latency on her costs nothing at all, and `eleven_multilingual_v2`
+# is the voice that was chosen for her. The fast path is for the two speakers
+# whose entire point is that they are REACTING — the bather you have just
+# hosed and the cat you have just hosed — and a reaction that arrives late is
+# not a reaction, it is a memoir. Same argument as the one in `takeNews`.
+TTS_FAST = CFG.get("BAYE_TTS_FAST", "eleven_turbo_v2_5")
+FAST_WHO = {"bather", "cat"}
 
 # What one line is allowed to cost.
 #
@@ -737,16 +764,22 @@ def build_messages(ctx: dict, world: dict) -> list:
 
 
 # ── the two calls out ────────────────────────────────────────────────────────
-def ask_model(messages):
+def ask_model(messages, fast=False):
     key = CFG.get("OPENAI_API_KEY")
     if not key:
         raise RuntimeError("no OPENAI_API_KEY configured")
+    body = {"model": OPENAI_MODEL, "messages": messages,
+            "max_completion_tokens": MAX_TOKENS}
+    # `low`, and not `minimal`. This model rejects minimal outright — measured,
+    # 400 with "Unsupported value: 'reasoning_effort' does not support..." — and
+    # low is where the saving is anyway: it took the reasoning spend from 148
+    # and 92 tokens down to 69 and 78 on the same prompt.
+    if fast:
+        body["reasoning_effort"] = "low"
     r = requests.post("https://api.openai.com/v1/chat/completions",
                       headers={"Authorization": f"Bearer {key}",
                                "Content-Type": "application/json"},
-                      json={"model": OPENAI_MODEL, "messages": messages,
-                            "max_completion_tokens": MAX_TOKENS},
-                      timeout=45)
+                      json=body, timeout=45)
     if r.status_code != 200:
         raise RuntimeError(f"openai {r.status_code}: {r.text[:200]}")
     d = r.json()
@@ -765,14 +798,14 @@ def ask_model(messages):
     return text[:MAX_CHARS], d.get("usage", {})
 
 
-def speak(text, voice=None):
+def speak(text, voice=None, fast=False):
     key = CFG.get("ELEVENLABS_API_KEY")
     if not key:
         raise RuntimeError("no ELEVENLABS_API_KEY configured")
     r = requests.post(
         f"https://api.elevenlabs.io/v1/text-to-speech/{voice or TTS_VOICE}",
         headers={"xi-api-key": key, "Content-Type": "application/json"},
-        json={"text": text, "model_id": TTS_MODEL,
+        json={"text": text, "model_id": TTS_FAST if fast else TTS_MODEL,
               # The same four dials ablit-central sends, so this is recognisably
               # the same person and not merely the same voice id.
               "voice_settings": {"stability": 0.4, "similarity_boost": 0.75,
@@ -901,25 +934,27 @@ class Handler(BaseHTTPRequestHandler):
         t0 = time.time()
         ctx = clean_context(body)
         world = WORLD.snapshot()
+        fast = who in FAST_WHO
         try:
             msgs = build_messages(ctx, world)
-            text, usage = ask_model(msgs)
+            text, usage = ask_model(msgs, fast)
             if not text:
                 # One retry, because an empty reply here is a budget accident
                 # rather than a decision — see MAX_TOKENS. Retrying a refusal
                 # would be rude; retrying a truncation is just finishing.
-                text, usage = ask_model(msgs)
+                text, usage = ask_model(msgs, fast)
             if not text:
                 return self._send(502, {"ok": False, "error": "empty line"})
             vid, rate = voice_for(ctx)
-            audio = speak(text, vid)
+            audio = speak(text, vid, fast)
         except Exception as e:                                # noqa: BLE001
             print(f"[line] {user}: {e}", flush=True)
             return self._send(502, {"ok": False, "error": str(e)[:200]})
 
         ms = int((time.time() - t0) * 1000)
         print(f"[line] {user}/{ctx.get('who', 'baye')}"
-              f"{'/' + ctx['kind'] if ctx.get('kind') else ''} {ms}ms "
+              f"{'/' + ctx['kind'] if ctx.get('kind') else ''}"
+              f"{' fast' if fast else ''} {ms}ms "
               f"{usage.get('total_tokens', 0)}tok "
               f"{len(audio)}B :: {text}", flush=True)
         return self._send(200, {

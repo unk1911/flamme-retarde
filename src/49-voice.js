@@ -401,7 +401,17 @@ const voice = (() => {
       sp.newsAt = clock;
       // And he answers it soon rather than on his own clock. Ninety seconds
       // after the water is not a reaction, it is a memoir.
-      sp.nextAt = Math.min(sp.nextAt, clock + 1.2);
+      //
+      // A QUARTER OF A SECOND, not 1.2. This is the only brake on an
+      // `onlyNews` speaker and it was doing two jobs badly: the note in `poll`
+      // says it is there "so that hosing a whole terrace is a conversation
+      // rather than a riot", and that job is actually done by the gap set
+      // AFTER a line lands, in `ask`. What this number does is sit between the
+      // water arriving and the request even leaving, on top of a round trip
+      // that was measured at six seconds. It was a fifth of the total delay
+      // and it bought nothing. See the fast-path note in baye.py for the other
+      // three seconds.
+      sp.nextAt = Math.min(sp.nextAt, clock + 0.25);
     }
     // A grievance goes stale. See `CAT_VOICE.news`.
     if (sp.pend && clock - (sp.newsAt || 0) > (sp.cfg.news || 25)) {
