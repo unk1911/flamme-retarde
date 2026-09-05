@@ -25748,6 +25748,25 @@ async function buildJadrija(scene) {
   let phoneTex = null;
   let phoneHand = -1;                   // bone indices, resolved once
   let phoneHead = -1;
+  let phoneArmU = -1, phoneArmL = -1, phoneFing = -1;
+  /** By index into `pairs()`, which is stable per FIGURE and not per person:
+   *  the three deltas the hold has laid on that figure's arm and the pose it
+   *  read to work them out. See `holdPhone`. */
+  const arms = [];
+  /** The worst gap between a drawn phone and the fingers holding it, in
+   *  metres. The whole of this feature is whether that number is small. */
+  let holdGap = 0;
+  // Scratch for the solve, allocated once: the four joints it reads, the elbow
+  // it works out, the directions it turns things onto, and room to undo the
+  // three deltas it left there last time.
+  const _hS = new THREE.Vector3(), _hE = new THREE.Vector3();
+  const _hW = new THREE.Vector3(), _hT = new THREE.Vector3();
+  const _hL = new THREE.Vector3(), _hU = new THREE.Vector3();
+  const _hV = new THREE.Vector3(), _hD = new THREE.Vector3();
+  const _hP = new THREE.Vector3(), _hN = new THREE.Vector3();
+  const _hF = new THREE.Vector3(), _hG = new THREE.Vector3();
+  const _hA = new THREE.Quaternion(), _hB = new THREE.Quaternion();
+  const _hC = new THREE.Quaternion(), _hQ = new THREE.Quaternion();
 
   /**
    * The screen: three coins, a price, a change and a sparkline each.
@@ -25845,6 +25864,70 @@ async function buildJadrija(scene) {
     },
   };
 
+  // ── the hold ──────────────────────────────────────────────────────────────
+  //
+  // Misha, 5 Sep 2026: *"their cellphones are often times not 'held' just kinda
+  // floating there, they need to be holding or looking at their cellphones,
+  // right now the cellphones just kinda floating in space"*.
+  //
+  // AND THE PHONE WAS NEVER THE THING THAT WAS WRONG. It sat on `handR`, and
+  // `handR` is wherever the bake left it: in the lap for `sit`, flat on the
+  // table for `sittable`, down on the stone for `sitquay`. A phone lifted
+  // 0.118 m off a hand lying in a lap is a phone hovering over a lap, which is
+  // exactly the report. The note this replaces had already hit the same wall at
+  // the ear — "a seated figure's forearm does not come up in these bakes" — and
+  // worked round it by moving the phone to the head rather than the arm to the
+  // phone.
+  //
+  // The arm comes up now, and it costs no re-bake. `aim` (41-skin.js) lays one
+  // extra rotation over the clip in FIGURE space, so a two-bone solve is the
+  // whole of it: measure where the shoulder, elbow and wrist have got to,
+  // decide where the wrist has to be, turn the two bones to put it there. It
+  // reads the pose it is correcting instead of assuming one, which is why one
+  // set of numbers covers four seated clips and eight bodies.
+  //
+  // IN FRACTIONS OF THE ARM'S OWN REACH, never in metres. The eight blobs stand
+  // 1.24 m to 1.84 m and their arms are 0.35 m to 0.50 m: "0.30 m in front of
+  // the shoulder" is a phone at reading distance on the man and a dislocated
+  // shoulder on the six-year-old. Reach is |shoulder→elbow| + |elbow→wrist|,
+  // measured off the figure every frame, and it is the only length in here.
+  const GRIP = {
+    /** The wrist, from the right shoulder: forward, up, inboard. The first
+     *  number is the pose — it is the fraction of the reach the hand is held
+     *  at, so it *is* the elbow (1.0 is a straight arm, 0.3 is a hand at your
+     *  own ear), and 0.58 comes out at about 70° at the elbow. */
+    read: [0.58, -0.12, -0.15],
+    /** The phone, from the wrist: up about a hand's length and a little
+     *  further out, because the wrist is a joint and the phone is in the
+     *  fingers. */
+    lift: [0.06, 0.22, 0.00],
+    /** The phone at the ear, from the head bone — which is the base of the
+     *  skull, so this is up to the ear and out past the cheek. In the FIGURE's
+     *  frame, and that is the other half of the same bug: the old offset was
+     *  0.115 m along the BILLBOARD bearing, so the handset slid round the head
+     *  to whichever side you happened to be standing on and was at neither ear.
+     */
+    ear: [-0.02, -0.09, 0.20],
+    /** And the wrist under it, holding it there. */
+    hand: [0.02, -0.17, 0.04],
+    /** Which way the elbow falls. Every point on a circle perpendicular to the
+     *  line from the shoulder to the hand is a legal elbow and the solve has to
+     *  be told which one to take: down, back and a little out from the ribs for
+     *  a reader; down and further out for a handset at an ear. */
+    poleRead: [-0.30, -1, 0.45],
+    poleEar: [0.15, -1, 0.55],
+    /** And the head over it, because a person reading a phone looks at it.
+     *  On the NECK and not on `head`: the crowd turns the head to watch you go
+     *  past (42-crowd.js) and `aims` holds one rotation per bone, so two
+     *  writers on that bone is whichever ran last. The neck carries the head
+     *  with it and nobody can tell the difference. */
+    chin: 0.30,
+    /** A handset is not read, so that head tips toward the shoulder instead. */
+    tilt: 0.13,
+    /** How far the four fingers come round it. See the curl in `holdPhone`. */
+    curl: 0.85,
+  };
+
   /**
    * Place a phone in the hand of everybody on the skinned tier who has one.
    *
@@ -25852,9 +25935,8 @@ async function buildJadrija(scene) {
    * looking at a phone holds it facing themselves, so the honest thing to draw
    * is the back of it — which is a black rectangle and no joke at all. Turned
    * to face the camera the screen is readable from wherever you walk up, and
-   * the hand it sits in is still the hand the bake put there, so it never
-   * separates from the figure. The alternative was to bake a new hold, which is
-   * eight re-bakes for a gag.
+   * the hand is solved onto the phone rather than the phone hung off the hand,
+   * so it never separates from the figure however it is turned.
    */
   function stepPhones(cam) {
     const skin = crowds.skin;
@@ -25869,15 +25951,29 @@ async function buildJadrija(scene) {
     if (!phoneTex) phoneTex = phoneScreen(phoneQuotes.q);
     phoneQuotes.refresh();
     let n = 0;
-    for (const [fg, f] of skin.pairs()) {
-      if (!fg || !fg.phone || !f.mesh.visible) continue;
+    holdGap = 0;
+    const pairs = skin.pairs();
+    for (let k = 0; k < pairs.length; k++) {
+      const fg = pairs[k][0], f = pairs[k][1];
       const dx = f.mesh.position.x - cam.x, dz = f.mesh.position.z - cam.z;
-      if (dx * dx + dz * dz > PHONE.near * PHONE.near) continue;
+      // Nobody, nobody with a phone, out of sight or out of range — and in
+      // every one of those cases the arm has to come DOWN. A roving slot
+      // changes hands (`assign` in 42-crowd.js) without the bones knowing, so
+      // an aim left standing is the next occupant sitting there holding
+      // nothing at chest height for as long as they are on that mesh.
+      if (!fg || !fg.phone || !f.mesh.visible
+        || dx * dx + dz * dz > PHONE.near * PHONE.near) {
+        dropHold(f, arms[k]);
+        continue;
+      }
       if (phoneHand < 0) {
         phoneHand = f.boneIndex('handR');
         phoneHead = f.boneIndex('head');
+        phoneArmU = f.boneIndex('armUR');
+        phoneArmL = f.boneIndex('armLR');
+        phoneFing = f.boneIndex('fingersR');
       }
-      if (phoneHand < 0) return;
+      if (phoneHand < 0 || phoneArmU < 0 || phoneArmL < 0) return;
       let m = phones[n];
       if (!m) {
         const g = new THREE.Group();
@@ -25896,52 +25992,41 @@ async function buildJadrija(scene) {
         m.face.material.map = phoneTex;
         m.face.material.needsUpdate = true;
       }
-      // A PHONE AT THE EAR GOES ON THE HEAD BONE, and one being read goes on
-      // the hand. Both were on the hand at first and the ear one was a lift of
-      // 0.20 m off the wrist, which is a phone floating beside a lap: a seated
-      // figure's forearm does not come up in these bakes, so there was nothing
-      // between the hand and the ear to make the gesture read. The head is a
-      // real bone, it is where the phone actually is, and it needs no cheat.
+      let rec = arms[k];
+      if (!rec) {
+        rec = arms[k] = {
+          on: false, qa: new THREE.Quaternion(), qb: new THREE.Quaternion(),
+          qc: new THREE.Quaternion(),
+          ex: 0, ey: 0, ez: 0, wx: 0, wy: 0, wz: 0,
+        };
+      }
+      // A PHONE AT THE EAR IS A DIFFERENT POSE, not a different offset. Both
+      // are a hand solved onto a phone; what changes is where the phone is —
+      // out at the ear for a caller, out in front of the chest for a reader —
+      // and how tightly that folds the arm, which the solve works out for
+      // itself from the distance.
       const ear = fg.phone === 2 && phoneHead >= 0;
-      f.boneAt(ear ? phoneHead : phoneHand, tmpP);
+      holdPhone(f, rec, ear, tmpP);
       // IN THE FIGURE'S OWN SPACE, and it has to be put back into the world's.
       // `boneAt` reads the skinning palette, which is built in the mesh's local
       // frame — the same frame `cat()` reports paw heights in. Left as it came
       // out, twelve phones stacked within 30 cm of the world origin, four
       // kilometres from the beach and under the sea.
       tmpP.applyMatrix4(f.mesh.matrixWorld);
+      m.g.position.copy(tmpP);
       m.g.rotation.set(0, Math.atan2(cam.x - tmpP.x, cam.z - tmpP.z), 0);
       if (ear) {
-        // Beside the head and a little above the jaw, tipped the way a handset
-        // sits. 0.115 m out is the width of a head plus the phone's own half.
-        const yaw = m.g.rotation.y;
-        m.g.position.set(tmpP.x + Math.cos(yaw) * 0.115, tmpP.y + 0.055,
-          tmpP.z - Math.sin(yaw) * 0.115);
-        m.g.rotation.z = 0.34;
-        m.g.rotation.x = 0;
         // AND TURNED ROUND, so what faces you is the back of it. Everything
         // above billboards the screen at the camera, which is right for the
         // nine people reading one and exactly wrong for the three with one
         // against an ear: what they were showing was the bitcoin price to the
         // room and the back of the handset to their own cheek. Half a turn
         // puts the glass against the head, where the glass is.
-        m.g.rotation.y = yaw + Math.PI;
+        m.g.rotation.z = 0.34;
+        m.g.rotation.x = 0;
+        m.g.rotation.y += Math.PI;
       } else {
-        // Up out of the hand, which is where a phone sits when it is being
-        // held rather than where the wrist joint is, and tilted back so the
-        // screen is read at an angle instead of edge on.
-        //
-        // AND A HAND'S DEPTH TOWARDS THE VIEWER, which is the correction.
-        // `handR` is the WRIST, and a hand is 0.18 m long: at 0.085 straight
-        // up the phone came out inside the fingers, and photographed at half a
-        // metre what you got was a thumb through the middle of the ETH row.
-        // The screen is already billboarded, so pushing along the same bearing
-        // is coherent from every angle rather than only from one — the hand
-        // ends up behind the phone wherever you stand, which is where the hand
-        // holding a phone is.
-        const yaw = m.g.rotation.y;
-        m.g.position.set(tmpP.x + Math.sin(yaw) * 0.105, tmpP.y + 0.118,
-          tmpP.z + Math.cos(yaw) * 0.105);
+        // Tilted back, so the screen is read at an angle rather than edge on.
         m.g.rotation.z = 0;
         m.g.rotation.x = -0.34;
       }
@@ -25952,6 +26037,163 @@ async function buildJadrija(scene) {
       if (phones[i]) phones[i].g.visible = false;
     }
     phones.grp.updateMatrixWorld(true);
+  }
+
+  /**
+   * Take the solve back off an arm, so the clip has it again.
+   *
+   * Cheap to call on everybody every frame, which is what the loop above does:
+   * a figure that was never holding anything has no record and this returns on
+   * the first test. Only a hand-off actually walks the bone list.
+   */
+  function dropHold(f, rec) {
+    if (!rec || !rec.on) return;
+    rec.on = false;
+    rec.qa.identity();
+    rec.qb.identity();
+    rec.qc.identity();
+    f.aim('armUR', 0, 1, 0, 0);
+    f.aim('armLR', 0, 1, 0, 0);
+    f.aim('handR', 0, 1, 0, 0);
+    f.aim('fingersR', 0, 1, 0, 0);
+    f.aim('neck', 0, 1, 0, 0);
+  }
+
+  /** `aim` is told an axis and an angle; a solve hands back a quaternion. */
+  function aimQ(f, name, q) {
+    const s = Math.hypot(q.x, q.y, q.z);
+    f.aim(name, q.x, q.y, q.z, 2 * Math.atan2(s, q.w));
+  }
+
+  /**
+   * Bring the right hand onto the phone, and answer where the phone is.
+   *
+   * EXACT IN ONE PASS and not an iteration that creeps up on it. The elbow is
+   * placed by the cosine rule, the two turns are the minimal rotations that
+   * take the bones to it, and the wrist therefore lands on the target the first
+   * frame the figure is posed — which matters because a slot changes hands
+   * whenever you walk down the beach and an arm that took half a second to come
+   * up would come up in front of you every time.
+   *
+   * THE ONE THING IT HAS TO REMEMBER is what it did last time. `aim` is a delta
+   * over the clip and `boneAt` reports the result, so the arm this reads is the
+   * arm this put there; undoing `rec.qa`/`rec.qb` is what recovers the clip's
+   * own directions to solve against. Which is also why the guard below is not
+   * an optimisation. Run twice against one measurement and the second run would
+   * take deltas back off a pose that never had them in it, and fold the arm
+   * again — so the measurement is what says whether there is anything to do.
+   *
+   * @returns the phone's place, in FIGURE space, in `out`.
+   */
+  function holdPhone(f, rec, ear, out) {
+    const S = _hS, E = _hE, W = _hW, T = _hT;
+    f.boneAt(phoneArmU, S);
+    f.boneAt(phoneArmL, E);
+    f.boneAt(phoneHand, W);
+    if (phoneFing >= 0) f.boneAt(phoneFing, _hF);
+    const Lu = E.distanceTo(S), Lf = W.distanceTo(E), L = Lu + Lf;
+    // The phone is placed first and the hand put under it, rather than the
+    // hand placed and the phone hung off it. The phone is the thing that has to
+    // be somewhere a person would hold one; the hand is wherever holding it
+    // there puts the hand, and that is what the solve is for.
+    if (ear) {
+      f.boneAt(phoneHead, out);
+      out.set(out.x + GRIP.ear[0] * L, out.y + GRIP.ear[1] * L,
+        out.z + GRIP.ear[2] * L);
+      T.set(out.x + GRIP.hand[0] * L, out.y + GRIP.hand[1] * L,
+        out.z + GRIP.hand[2] * L);
+    } else {
+      T.set(S.x + GRIP.read[0] * L, S.y + GRIP.read[1] * L,
+        S.z + GRIP.read[2] * L);
+      out.set(T.x + GRIP.lift[0] * L, T.y + GRIP.lift[1] * L,
+        T.z + GRIP.lift[2] * L);
+    }
+    // Nothing under the deltas has moved, so nothing about the answer has
+    // either. This is every frame the pose ladder skips — 42-crowd.js re-poses
+    // a figure past POSE_NEAR every third frame and past POSE_MID every eighth
+    // — and it is what keeps this to one solve per pose.
+    if (rec.on && E.x === rec.ex && E.y === rec.ey && E.z === rec.ez
+      && W.x === rec.wx && W.y === rec.wy && W.z === rec.wz) return out;
+    // What the clip is doing under the last solve. A bone's delta is laid on
+    // OUTSIDE its parent's — `measured = qb · qa · clip` for the forearm — so
+    // the clip's own arm is the measurement with those taken back off it in
+    // the order they went on.
+    const ia = _hA.copy(rec.qa).invert(), ib = _hB.copy(rec.qb).invert();
+    const uc = _hU.copy(E).sub(S).applyQuaternion(ia).normalize();
+    const fc = _hD.copy(W).sub(E).applyQuaternion(ib).applyQuaternion(ia)
+      .normalize();
+    // Where the elbow has to be: `a` along the line from the shoulder to the
+    // hand by the cosine rule, `h` off it by Pythagoras, and the pole says
+    // which way off. The target is pulled inside the arm's own reach first,
+    // which is what keeps `h` real and the elbow out of its straight-arm
+    // singularity.
+    const v = _hV.copy(T).sub(S);
+    const d = Math.min(Math.max(v.length(), Math.abs(Lu - Lf) + 1e-3),
+      L - 1e-3);
+    v.normalize();
+    T.copy(S).addScaledVector(v, d);
+    const a = (d * d + Lu * Lu - Lf * Lf) / (2 * d);
+    const h = Math.sqrt(Math.max(0, Lu * Lu - a * a));
+    const pole = ear ? GRIP.poleEar : GRIP.poleRead;
+    const p = _hP.set(pole[0], pole[1], pole[2]);
+    p.addScaledVector(v, -p.dot(v));
+    if (p.lengthSq() < 1e-6) p.set(v.y, -v.x, 0);   // any perpendicular will do
+    p.normalize();
+    const el = _hL.copy(S).addScaledVector(v, a).addScaledVector(p, h);
+    // Two turns, each the minimal rotation that takes a bone's own direction
+    // where it has to go. The forearm's is measured AFTER the upper arm's,
+    // because the aim on a parent carries its children round with it.
+    rec.qa.setFromUnitVectors(uc, _hN.copy(el).sub(S).normalize());
+    rec.qb.setFromUnitVectors(fc.applyQuaternion(rec.qa),
+      _hN.copy(T).sub(el).normalize());
+    aimQ(f, 'armUR', rec.qa);
+    aimQ(f, 'armLR', rec.qb);
+    if (ear) f.aim('neck', 1, 0, 0, GRIP.tilt);
+    else f.aim('neck', 0, 0, -1, GRIP.chin);
+    // Stamped HERE and not at the bottom, because the guard above is what makes
+    // undoing the deltas legal and the two have to be set together — an early
+    // return past this would leave the next frame taking deltas off a pose that
+    // was never measured with them on.
+    rec.on = true;
+    rec.ex = E.x; rec.ey = E.y; rec.ez = E.z;
+    rec.wx = W.x; rec.wy = W.y; rec.wz = W.z;
+    if (phoneFing < 0) return out;
+    // AND THE HAND POINTED AT IT, which is the third turn and the one that
+    // makes the other two read. Two bones put the wrist under the phone and
+    // stop there — the hand carries on in whatever direction the clip was
+    // holding it, which for `sit` is a flat palm across a lap, so what you got
+    // was a phone floating beside a hand reaching past it. The knuckles are a
+    // hand's length from the wrist and the phone is `lift` above it, so
+    // pointing the one at the other puts the phone in the fingers.
+    const hc = _hG.copy(_hF).sub(W).applyQuaternion(_hC.copy(rec.qc).invert())
+      .applyQuaternion(ib).applyQuaternion(ia).normalize();
+    _hN.copy(out).sub(T).normalize();
+    rec.qc.setFromUnitVectors(
+      hc.applyQuaternion(rec.qa).applyQuaternion(rec.qb), _hN);
+    aimQ(f, 'handR', rec.qc);
+    // AND THE FINGERS ROUND IT. Four fingers as one bone, and the note over
+    // `fingers` in tools/blender/human_mh.py says why that bone exists: a flat
+    // hand on a wine bottle photographs as a plate lying on top of the bottle.
+    // A hand solved onto a phone and left flat is the same picture.
+    //
+    // The axis is MEASURED and not typed. Which way a finger folds is a fact
+    // about where the hand has got to, and there is no constant that is right
+    // for both a woman reading in a deckchair and a man with a handset at his
+    // ear. `boneTurn` is how far the hand has come off the bind pose, and the
+    // bind pose is arms down with the palms to the thighs — so the palm faces
+    // the figure's own inboard axis carried through that turn, and the curl is
+    // about the axis that swings the fingers toward it.
+    const palm = _hP.set(0, 0, -1).applyQuaternion(f.boneTurn(phoneHand, _hQ));
+    const axis = _hG.copy(_hN).cross(palm);
+    if (axis.lengthSq() > 1e-6) {
+      f.aim('fingersR', axis.x, axis.y, axis.z, GRIP.curl);
+    }
+    // How far the hand is from the phone it is holding, worst of anybody drawn
+    // — see `phones()`. Measured off the FINGERS and not the wrist, because the
+    // wrist is where the solve put it by construction and would only answer its
+    // own question.
+    holdGap = Math.max(holdGap, _hF.distanceTo(out));
+    return out;
   }
 
   // ── the bathers, as things the jet can hit and things that answer ─────────
@@ -31434,6 +31676,12 @@ async function buildJadrija(scene) {
       looking: bathers.filter((b) => b.phone === 1).length,
       talking: bathers.filter((b) => b.phone === 2).length,
       drawn: phones ? phones.filter((m) => m && m.g.visible).length : 0,
+      /** How far the worst-held phone is from the fingers holding it. The
+       *  hold is solved rather than baked (see `holdPhone`), so this is the
+       *  one number that says whether it worked: a phone is 0.146 m long, so
+       *  anything under about 0.08 is a hand on a phone and 0.3 is the lap
+       *  the phone used to float over. */
+      gap: +holdGap.toFixed(3),
       at: bathers.filter((b) => b.phone)
         .map((b) => [+b.t.toFixed(1), +b.s.toFixed(1), b.phone]),
       quote: phoneQuotes.q,
