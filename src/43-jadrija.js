@@ -15552,6 +15552,187 @@ async function buildJadrija(scene) {
       // the head at the waterline, so it stops at the waterline.
       frustum(P, -1.9, [L + 0.35, 0, 1.6, W2 + 1.0],
         Math.min(TOP - 0.34, 0.78), [L + 0.35, 0, 1.0, W2 + 0.55], STONE, CONC[1]);
+
+      // ── the ironwork, and there was none ────────────────────────────────
+      //
+      // Forty-three metres of bare concrete, and `1000150378` is taken standing
+      // on it: the bottom third of that frame is nothing but the mole's own
+      // furniture. A heavy rusted mushroom bollard on a cast pad with a white
+      // line coiled twice round it, a second bollard beside it in bright metal
+      // that somebody has clearly added since, a dark timber strake laid along
+      // the very lip, and a tyre over the side on a rope. Not one of those
+      // existed. You could walk the whole thing and there was nothing on it to
+      // say it was a quay rather than a causeway.
+      //
+      // COLOURS, divided out rather than sampled. `_378` is evening sun and
+      // everything in it is warm, so the deck's own concrete is the reference:
+      // it measures rgb(156, 143, 126) against `CONC[2]`'s albedo of
+      // 0.507/0.451/0.383, which puts the illuminant at 0.65/0.60/0.54 — warm,
+      // as expected. Dividing the fittings by that:
+      //
+      //   rusted bollard   rgb(127, 86, 68) lit  ->  0.322 / 0.157 / 0.107
+      //   dark strake      rgb(90, 82, 79) lit   ->  0.157 / 0.140 / 0.143
+      //
+      // The bright one is not treated that way and it would be wrong to: it
+      // reads rgb(212, 184, 141) at its highlights, which is a polished metal
+      // returning a warm evening sky and not a warm albedo. Galvanised grey.
+      //
+      // SIZES are proportions off the frame with the absolute set by what a
+      // mole bollard is. The stainless base plate is 90 px and a quay bollard's
+      // plate is 0.30 m, which puts the frame at 3.3 mm a pixel there; the
+      // rusted head then comes out 0.35 m across and 0.33 m tall, which is a
+      // mole bollard exactly. Nothing here is solved off a horizon.
+      //
+      // NO COLLIDERS, the same call the limestone edging makes: `GROUND.girth`
+      // is 0.55 and `confine` adds it to every half-extent, so a bollard every
+      // six metres down both edges would be two rows of 1.4 m posts turning a
+      // 5.5 m quay into a 2.7 m corridor. You step over a bollard.
+      const IRON_R = [0.355, 0.178, 0.112];      // the rusted one
+      const IRON_G = [0.560, 0.552, 0.530];      // and the one added since
+      const STRAKE = [0.115, 0.105, 0.100];
+      const PAD = [0.430, 0.412, 0.372];
+      /**
+       * A round bar between two world points, four-sided, at any angle.
+       *
+       * `frustum` CANNOT DO THIS and the first cut of the mooring lines found
+       * out the hard way: it stacks axis-aligned rectangles upwards, so a rope
+       * running mostly along the quay came out as a sequence of flat slabs a
+       * few millimetres tall and was invisible from every angle. The anchor's
+       * `spar` exists for the same reason and says so. Built in world space
+       * off an arbitrary perpendicular basis, which is the only thing that
+       * does not care which way the segment points.
+       */
+      const seg3 = (A, B, r, col) => {
+        const dx = B[0] - A[0], dy = B[1] - A[1], dz = B[2] - A[2];
+        const Ln = Math.hypot(dx, dy, dz) || 1;
+        const ux = dx / Ln, uy = dy / Ln, uz = dz / Ln;
+        // Any vector not parallel to the run, then two crosses for the basis.
+        const px = Math.abs(uy) > 0.9 ? 1 : 0, py2 = Math.abs(uy) > 0.9 ? 0 : 1;
+        let ex = uy * 0 - uz * py2, ey = uz * px - ux * 0, ez = ux * py2 - uy * px;
+        const me = Math.hypot(ex, ey, ez) || 1;
+        ex /= me; ey /= me; ez /= me;
+        const fx = uy * ez - uz * ey, fy = uz * ex - ux * ez, fz = ux * ey - uy * ex;
+        const o = (a, Q) => [Q[0] + (Math.cos(a) * ex + Math.sin(a) * fx) * r,
+          Q[1] + (Math.cos(a) * ey + Math.sin(a) * fy) * r,
+          Q[2] + (Math.cos(a) * ez + Math.sin(a) * fz) * r];
+        for (let i = 0; i < 4; i++) {
+          const a0 = (i / 4) * TAU, a1 = ((i + 1) / 4) * TAU;
+          b.quad(o(a0, A), o(a0, B), o(a1, B), o(a1, A), col);
+        }
+      };
+      // A rope between two points in the mole's own frame, as a chain of short
+      // bars down a catenary. Twelve segments: at eight the sag is a hinge and
+      // at twenty it costs triangles nobody can see at 24 mm of diameter.
+      const ropeTo = (u0, v0, y0, u1, v1, y1, sag, col) => {
+        const N = 12;
+        let A = P(u0, v0, y0);
+        for (let i = 1; i <= N; i++) {
+          const q = i / N;
+          const u = u0 + (u1 - u0) * q, v = v0 + (v1 - v0) * q;
+          const y = y0 + (y1 - y0) * q - sag * Math.sin(Math.PI * q);
+          const B = P(u, v, y);
+          seg3(A, B, 0.012, col);
+          A = B;
+        }
+      };
+      const LINE = [0.640, 0.618, 0.560];
+      // Bollards down both edges. 6.4 m is what the photograph's two pairs
+      // scale to and it is also what a mole this size is fitted with — close
+      // enough that a boat has one at each end of itself.
+      const bStep = 6.4;
+      const nB = Math.max(1, Math.floor((L - 3.0) / bStep));
+      for (let i = 0; i <= nB; i++) {
+        for (const sgn of [-1, 1]) {
+          const key = i * 7 + (sgn > 0 ? 3 : 0) + m * 61;
+          const u = 2.4 + i * bStep + (jit(key, 41) - 0.5) * 0.5;
+          if (u > L - 1.2) continue;
+          const v = sgn * (W2 - 0.62 - jit(key, 42) * 0.10);
+          const y0 = TOP;
+          // One station in four has the pair the photograph has: the old iron
+          // one still standing and a new one beside it. The rest are single,
+          // and one in five of those is the new pattern on its own.
+          const pair = jit(key, 43) < 0.26;
+          const newOne = jit(key, 44) < 0.20;
+          const rusted = (ru, rv) => {
+            frustum(P, y0 - 0.02, [ru, rv, 0.155, 0.155],
+              y0 + 0.045, [ru, rv, 0.140, 0.140], PAD, shade(PAD, 1.12));
+            lathe(P, ru, rv, [[y0 + 0.040, 0.112], [y0 + 0.085, 0.098],
+              [y0 + 0.205, 0.082], [y0 + 0.250, 0.146], [y0 + 0.300, 0.152],
+              [y0 + 0.330, 0.118], [y0 + 0.352, 0]],
+            shade(IRON_R, 0.88 + jit(key, 45) * 0.26), 9);
+          };
+          const bright = (ru, rv) => {
+            frustum(P, y0 - 0.02, [ru, rv, 0.125, 0.125],
+              y0 + 0.050, [ru, rv, 0.115, 0.115], PAD, shade(PAD, 1.10));
+            lathe(P, ru, rv, [[y0 + 0.045, 0.096], [y0 + 0.078, 0.090],
+              [y0 + 0.092, 0.070], [y0 + 0.215, 0.070], [y0 + 0.232, 0.094],
+              [y0 + 0.262, 0.088], [y0 + 0.292, 0.052], [y0 + 0.302, 0]],
+            IRON_G, 10);
+          };
+          if (pair) {
+            rusted(u, v);
+            bright(u + 0.46, v - sgn * 0.05);
+          } else if (newOne) {
+            bright(u, v);
+          } else {
+            rusted(u, v);
+          }
+          // And a line off two bollards in five, coiled round the column and
+          // over the side. It goes into the water rather than to a boat: there
+          // is nothing alongside yet, and a rope ending in mid-air is worse
+          // than no rope.
+          if (jit(key, 46) < 0.40) {
+            const cy = y0 + 0.13;
+            for (let k = 0; k < 2; k++) {
+              lathe(P, u, v, [[cy + k * 0.036, 0.098], [cy + 0.030 + k * 0.036, 0.098],
+                [cy + 0.030 + k * 0.036, 0.086], [cy + k * 0.036, 0.086]], LINE, 9);
+            }
+            ropeTo(u, v, cy + 0.05, u + (jit(key, 47) - 0.5) * 2.2,
+              sgn * (W2 + 0.35 + jit(key, 48) * 0.5), 0.06, 0.22, LINE);
+          }
+        }
+      }
+      // The strake along the lip. In bays like everything else on this
+      // structure, so it takes a step of tone and does not read as one extruded
+      // line forty-three metres long.
+      for (const sgn of [-1, 1]) {
+        const nS = Math.max(1, Math.round(L / 2.2));
+        for (let i = 0; i < nS; i++) {
+          const u0 = (i / nS) * L, u1 = ((i + 1) / nS) * L - 0.05;
+          const g = 0.86 + jit(i + m * 29 + (sgn > 0 ? 17 : 0), 51) * 0.30;
+          frustum(P, TOP, [(u0 + u1) * 0.5, sgn * (W2 - 0.085),
+            (u1 - u0) * 0.5, 0.085],
+          TOP + 0.105, [(u0 + u1) * 0.5, sgn * (W2 - 0.085),
+            (u1 - u0) * 0.5, 0.075],
+          [STRAKE[0] * g, STRAKE[1] * g, STRAKE[2] * g],
+          [STRAKE[0] * g * 1.5, STRAKE[1] * g * 1.45, STRAKE[2] * g * 1.40]);
+        }
+      }
+      // Tyres over the side, on a rope through the top of each. Every working
+      // quay on this coast has them and `_378` has one at the left of the
+      // frame, hard against the strake.
+      const nT = Math.max(1, Math.round(L / 11.0));
+      for (let i = 0; i < nT; i++) {
+        const key = i * 13 + m * 71;
+        const sgn = jit(key, 55) < 0.5 ? -1 : 1;
+        const u = 4.0 + (i + jit(key, 56) * 0.7) * (L - 7.0) / nT;
+        const v = sgn * (W2 + 0.145);
+        const cy = TOP - 0.46 - jit(key, 57) * 0.22;
+        const TYRE = [0.075, 0.072, 0.074];
+        // A REAL TORUS, lathed about a HORIZONTAL axis. The first cut was nine
+        // axis-aligned blocks round a circle and came out as a dark rectangle
+        // on the face of the quay — the blocks do not turn to follow the ring,
+        // so the hole closes up and what is left is a slab. `lathe` revolves
+        // about its third argument, so handing it a frame with `v` and `y`
+        // swapped puts the axis athwart the mole, which is how a tyre hangs.
+        // The profile closes back on its first point: `lathe` joins consecutive
+        // pairs only, and without the repeat one face of the tyre is missing.
+        const Q = (a, bb, c) => P(a, c, bb);
+        lathe(Q, u, cy, [[v - 0.072, 0.150], [v - 0.078, 0.198],
+          [v - 0.048, 0.243], [v + 0.048, 0.243], [v + 0.078, 0.198],
+          [v + 0.072, 0.150], [v - 0.072, 0.150]], TYRE, 12);
+        ropeTo(u, sgn * (W2 - 0.10), TOP + 0.02, u, v, cy + 0.26, 0.0, LINE);
+      }
     }
     b = backM;
   }
