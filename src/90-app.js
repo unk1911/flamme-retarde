@@ -963,6 +963,15 @@ async function boot() {
   // in a bone palette that the two shared ones know nothing about. Near
   // cascade: she is 1.75 m and the far map cannot draw anything under two.
   if (jadrija && jadrija.figure) jadrija.figure.cast(shadow);
+  // The same for the Bucketeer, plus the bucket — which is not skinned and is
+  // the one thing she is carrying that a missing shadow would show up on,
+  // because half of her loop is spent standing on a sunlit porch with it.
+  if (jadrija && jadrija.bucketeer) {
+    jadrija.bucketeer.fig.cast(shadow);
+    // `castTree`, because the pail and its bail turn against each other and are
+    // two meshes on one group. Near cascade, like everything under two metres.
+    shadow.castTree(jadrija.bucketeer.pail, { dynamic: true, near: true });
+  }
   // And the two things on her that are not skinned. `syncMoving` reads the
   // source mesh's `visible` every frame, so before the turn — when they are
   // hidden — they cast nothing.
@@ -6743,6 +6752,58 @@ window.__fr = {
       vikWalk.u = Math.min(0.9999, rem / VIK_WALK[vikWalk.leg].dur);
       stepVikWalk(0);
       return { leg: vikWalk.leg, u: +vikWalk.u.toFixed(3) };
+    },
+  },
+
+  /**
+   * The Bucketeer — src/45-bucketeer.js.
+   *
+   * `ways()` is her route, `go(phase)` drops her on a beat of it and `tick(s)`
+   * runs the loop forward without waiting for the wall clock. `watch(k, back)`
+   * is the one that gets a picture: it stands you `back` metres behind waypoint
+   * `k` looking at it, which is how each stage of the loop was photographed.
+   *
+   *   __fr.buck.go('tip'); __fr.buck.watch(11, 4); __fr.buck.tick(1.2);
+   */
+  buck: {
+    raw: () => jadrija && jadrija.bucketeer,
+    stats: () => (jadrija && jadrija.bucketeer ? jadrija.bucketeer.stats() : null),
+    ways: () => (jadrija && jadrija.bucketeer ? jadrija.bucketeer.ways() : null),
+    go: (phase, leg) => (jadrija && jadrija.bucketeer
+      ? jadrija.bucketeer.go(phase, leg) : null),
+    tick: (secs = 1) => (jadrija && jadrija.bucketeer
+      ? jadrija.bucketeer.tick(secs) : null),
+    hold: (on) => (jadrija && jadrija.bucketeer
+      ? jadrija.bucketeer.hold(on) : null),
+    /**
+     * Stand off her and look at her, on whichever floor she is on.
+     *
+     * `back` is metres in front of her, so the default is her face; negative is
+     * over her shoulder. `side` is to her right. `aim` is what the camera is
+     * pointed at, measured up from her feet — 0.35 for the bucket, 1.5 for her
+     * face — and it is the only reason this is not `vik.stand`: her whole loop
+     * is about a thing at ankle height, and a camera holding a 1.66 m eye level
+     * cannot see one without a pitch.
+     *
+     * `yHint` is hers, which is what stops the camera dropping to the
+     * prizemlje when she is standing in the flat above it.
+     */
+    watch: (back = 4, side = 0, aim = 1.0) => {
+      const b = jadrija && jadrija.bucketeer;
+      if (!b || !ground || !ground.ok) return null;
+      const [hx, hy, hz] = b.where();
+      const yaw = b.stats().yaw;
+      const fx = Math.cos(yaw), fz = -Math.sin(yaw);
+      const x = hx + fx * back + fz * side;
+      const z = hz + fz * back - fx * side;
+      ground.retarget(jadrija);
+      ground.dropIn(x, z, 0);
+      const a = Math.atan2(-(hx - x), -(hz - z));
+      const eye = ground.you.y + 1.66;
+      const p = Math.atan2(hy + aim - eye, Math.hypot(hx - x, hz - z));
+      ground.put(x, z, a, p, hy);
+      return { at: [+x.toFixed(1), +z.toFixed(1)], yaw: +a.toFixed(3),
+        pitch: +p.toFixed(3), her: [+hx.toFixed(1), +hy.toFixed(2), +hz.toFixed(1)] };
     },
   },
 

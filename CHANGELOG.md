@@ -8,6 +8,133 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.294.0] — 2026-09-05
+
+### The Bucketeer, and the stairs are outside
+
+*"a new character, who hangs around the vikendica, she looks like the NPC baye,
+with the only difference is she has a bathing suit, and she is the 'Bucketeer',
+she carries buckets of water from the 2nd floor bathroom, down the stairs, and
+empties them out in the front porch, does this on a loop, while humming."*
+
+**THE STAIRS ARE OUTSIDE, and the whole route follows from that.** She does not
+carry a bucket down an internal staircase, because there is not one and there
+never was. `floorAt` in 44-vikendica.js has said so since the prizemlje went in:
+*"there is no internal stair between them, so from inside one you can never be
+within a step of the other."* The flat is the gornji kat, the storey underneath
+is a separate dwelling with its own front door on the porch, and the only way
+between the two is the seventeen risers up the east face — which is not a
+shortcut the model took, it is what the drawings show and what half the coast is
+built like.
+
+So the loop goes out of the bathroom, across the big room, through the front
+door, along the landing and down an open flight in the sun with the channel in
+front of her. Which is a far better thing to watch than an interior stairwell
+would have been, and is the reason it is worth having at all.
+
+**Her route**, in the house's own metres, and every point of it checked against
+the sidecar's wall rectangles AND against the furniture in
+tools/blender/vikendica.py, which the sidecar knows nothing about:
+
+    0  (−1.60, 0.24)   at the basin, where she stands while it fills
+    1  (−1.15, 0.16)   clear of the basin's east end
+    2  (−0.79, −0.05)  the bathroom door
+    3  ( 0.15, 0.02)   past the end of the sofa
+    4  ( 1.45, 0.16)   the middle of the big room
+    5  ( 2.70, 0.20)   inside the front door
+    6  ( 3.92, 0.20)   outside it, on the landing
+    7  ( 3.98, 0.95)   the head of the flight
+    8  ( 3.98, 3.62)   the foot of it
+    9  ( 4.00, 4.45)   off the bottom step
+    10 ( 2.50, 4.90)   on to the porch — terrasa 8, under the terrace above
+    11 ( 0.95, 5.62)   and the place she tips it
+
+Forty-six seconds a lap: nineteen down at 0.76 m/s with ten kilos on one arm and
+0.44 on the flight, twelve back up empty at 1.16 and 0.78, and fifteen standing
+still — the tap running, the roll, the bucket set down, and a moment looking at
+the water before she goes back for the next one.
+
+**Walked in a probe rather than argued about.** `__fr.buck` runs the loop
+forward without the wall clock and the trace prints where she is every quarter
+second against every blocker in the locale. It found one: waypoint 1 was at
+(−1.05, 0.22), which cut the corner out of the bathroom and took her within
+**0.277 m** of the door jamb. `GROUND.tight` indoors is 0.26, so she cleared it
+by fifteen millimetres — which is not a clearance, it is a coincidence. The
+bathroom is a 1.65 m room with a basin 0.48 m deep on the same wall as the door,
+so the way out of it is a dog-leg and not a diagonal. Worst clearance over a
+whole lap is now **0.362 m**.
+
+**The suit is painted and it is a one-piece**, and that is a decision rather
+than a default. 1.226.0 put the bathers into modelled swimsuits because a
+painted band at bust height over a painted band at the hips *"reads as neither"*
+— and the half of that complaint paint can answer is the outline. A one-piece
+has one: a leg line cut low at the midline and high over the hip, a scoop that
+is lower at the back than the front, and two straps that are the top edge
+lifted rather than a second shape laid over it. Chloe's vest is a band in
+HEIGHT and the note over it says what that costs — the top of a shoulder is a
+horizontal surface, so a band in y lands on it as a patch and the scoop fills in
+behind it as a bib. There is a darker line at both edges, which is the nearest
+paint can get to a hem, and a little more specular than skin, which is what wet
+lycra has and plaster does not.
+
+Everything else about her is Baye's, because *"the only difference is she has a
+bathing suit"*: the same blob, the same face rig, the same hair dyed off the
+same skin-to-hair line with the same five colours. Her hip wrap comes straight
+off through `wear(false)`, which is a draw range and costs nothing. She is a
+second `loadSkin` and not a second `skinnedFigure` over one parse — two figures
+would share a geometry, `sway` writes back into it, and the wrap would wear the
+pose of whichever was stepped last.
+
+**The bucket is the house's own bucket.** Ten litres, 29 across the mouth, 24
+across the base, 28 tall, in the same two cobalt colours as the one baked into
+the bathroom floor at (−1.74, 0.83) — because it is the bucket you would buy,
+and the flat already has one. Hers has a bail, which the baked one has the lugs
+for and not the wire. It is built about the PIN and not about its base, which is
+the whole of what makes the tip work: a bucket rolls over about the bail it is
+hanging from, so the pail turns and the handle stays in her fist. It hangs in
+world Y whatever her wrist is doing — a bucket on a bail is a pendulum, and
+everything the wine bottle needed `GRIP_UP` for, gravity does here for free —
+and six centimetres outboard, because the pail is 145 mm in the radius and a
+palm is about 90 mm off the outside of a thigh.
+
+**The pour is a sheet and not a stream.** The first one was the wine's, an
+8-sided column 30 mm across, and ten litres coming over a 290 mm rim is not
+30 mm of anything: it is the width of the lip, which is why a bucket empties in
+a second and a bottle takes a minute. What it leaves is dark — wet concrete is
+not water-coloured, it is the same concrete four stops down with a sheen on it,
+and the first patch was a pale blue-grey lens over pale limestone paving that
+could not be found in the frame. It has no bottom cap, which is rule 5 answered
+rather than dodged: a disc laid on the porch is two nearly-parallel faces 2 km
+from the world origin, and a lens with its underside open has nothing to be
+co-planar with. It dries over fifty seconds, so the porch is never quite dry —
+which is the point of somebody doing this all day.
+
+**The hum is one oscillator for the whole phrase**, and that is the whole of
+what makes it a hum and not a xylophone. Every other voice in 80-audio.js is an
+event and gets a note each; a hum is not a sequence of notes, it is one breath
+with the pitch stepping inside it. So the frequency is stepped with
+`setValueAtTime` at each note boundary and the gain only dips on the way past,
+which is the tongue, and rests to nothing at a `.`, which is where she takes a
+breath. And the mouth is SHUT: a cat is a sawtooth through two sweeping formants
+because a cat opens its mouth, and a hum radiates through the nose with almost
+nothing above the third harmonic. A triangle under a gentle low-pass is that;
+any band-pass at all made it a kazoo.
+
+The tune is written rather than borrowed — four bars, call and answer, up to the
+octave and back down to the root, which is about as much as anybody hums while
+carrying something and is nobody's song. Two phrases alternate and neither is in
+the same key twice.
+
+Levelled off `audio.tap()` with tools/sfx.mjs rather than by ear. The first pass
+peaked at **0.410** against the meow's 0.430 — a woman humming to herself as
+loud as a cat being hosed, and humming for four and a half seconds at a time
+rather than for half of one. Halved: peak **0.246** and 0.136 RMS at arm's
+length, **0.095 / 0.059 at fourteen metres**, nothing at twenty-six. Audible on
+the forecourt, gone from the water.
+
+**Census unchanged: 446 / 333 / 86 / 27, before and after.** Rule 4 holds — this
+file takes no `rng()` draw at all.
+
 ## [1.289.0] — 2026-09-05
 
 ### You can walk her now, and the stair went nowhere

@@ -23609,6 +23609,9 @@ async function buildJadrija(scene) {
   // own +X along the shore precisely so that they could.
   vik = await buildVikendica(scene, { toWorld, local });
   if (vik) for (const b of vik.blockers()) blockers.push(b);
+  // And the woman who carries water out of it — see src/45-bucketeer.js. She
+  // takes no `rng()` draw, so the shore behind her is the same shore (rule 4).
+  const bucketeer = vik ? await buildBucketeer(scene, vik, walkY) : null;
 
   // ── the cars in the wood ───────────────────────────────────────────────────
   // Placed by the loop far above, which is where the shore rules live; drawn
@@ -30648,6 +30651,9 @@ async function buildJadrija(scene) {
     stepCast(dt, cam);
 
     for (const k in crowds) crowds[k].flush(crowdT, cam);
+    // The Bucketeer, who carries her own range gate for the same reason Baye's
+    // is here rather than inside her stepper.
+    if (bucketeer) bucketeer.step(dt, cam);
     // And the fish, which is three hands and a Date and is not worth a gate.
     if (vik) vik.tick();
   }
@@ -31262,6 +31268,8 @@ async function buildJadrija(scene) {
       playing: skinFig ? skinFig.playing() : 'none' },
     /** The skinned figure, for the debug API and for whatever animates her. */
     figure: skinFig,
+    /** The second one, on the vikendica's stairs with a bucket. */
+    bucketeer,
     /**
      * The two horns, for the shadow pass and nothing else.
      *

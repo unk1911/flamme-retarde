@@ -4229,8 +4229,138 @@ function buildAudio() {
     vib.start(t0); vib.stop(t0 + dur + 0.14);
   }
 
+  // ── the Bucketeer's hum ─────────────────────────────────────────────────────
+  /**
+   * A woman humming to herself with a bucket in her hand.
+   *
+   * ONE OSCILLATOR FOR THE WHOLE PHRASE, and that is the whole of what makes
+   * this a hum and not a xylophone. Every other voice in this file is an event
+   * — a step, a call, a bark — and gets a note each. A hum is not a sequence of
+   * notes; it is one breath with the pitch stepping inside it, and the moment
+   * each note is given its own oscillator and its own attack you have somebody
+   * whistling in semiquavers. So the frequency is stepped with
+   * `setValueAtTime` at each note boundary and the gain only dips a little on
+   * the way past, which is the tongue, and rests to nothing at a `.`, which is
+   * where she takes a breath.
+   *
+   * And the mouth is SHUT, which is the other half of it. A cat is a sawtooth
+   * through two sweeping formants because a cat opens its mouth; a hum
+   * radiates through the nose and has almost nothing above the third harmonic.
+   * A triangle under a gentle low-pass is that, and any band-pass at all made
+   * it a kazoo.
+   *
+   * The tune is written rather than borrowed. Four bars, call and answer, up to
+   * the octave and back down to the root — which is about as much as anybody
+   * hums while carrying something, and is nobody's song.
+   */
+  const HUM = {
+    root: 220.0,        // A3, which is where a woman hums without trying
+    beat: 0.556,        // s — 108 to the minute, a walking pace and no faster
+    range: 26,          // m — audible on the forecourt, gone from the water
+    // MEASURED, not guessed, and it started at twice this. Recorded off
+    // `audio.tap()` with tools/sfx.mjs the first version peaked at 0.410
+    // against the meow's 0.430 — a woman humming to herself as loud as a cat
+    // being hosed, and humming for four and a half seconds at a time rather
+    // than for half of one. Halved, she peaks around 0.21 and sits near 0.13
+    // RMS at arm's length, which is under the beach bed's own 0.12 by the time
+    // you are ten metres off her.
+    gain: 0.22,
+    lp: 840,            // the closed mouth
+  };
+  // An eighth per character. A digit is semitones off the root, `-` holds the
+  // note before it, `.` is where she stops for breath. `a` and `c` are the ten
+  // and the twelve that will not fit in a column.
+  //                1  &  2  &  3  &  4  &
+  const HUM_A = '5-5.7-9-' + 'c-9-7--.';
+  const HUM_B = '9-7-5-4-' + '2-4-0---';
+  const HUM_N = { 0: 0, 2: 2, 4: 4, 5: 5, 7: 7, 9: 9, a: 10, c: 12 };
+  let humAlt = 0;
+
+  /**
+   * @param d     metres between her and the listener
+   * @param gain  0…1, for the beat she is doing something else
+   * @returns     how long the phrase runs, so a caller can time the next one
+   */
+  function hum(d = 0, gain = 1) {
+    const pat = (humAlt++ & 1) ? HUM_B : HUM_A;
+    const step = HUM.beat * 0.5;
+    const dur = pat.length * step;
+    // The length is returned even when nothing is played, because the caller's
+    // clock is what keeps her phrasing regular — walk out of earshot and back
+    // and she should be part-way through a phrase, not starting one.
+    if (!ctx || ctx.state === 'suspended') return dur;
+    // Linear in distance and not squared, for the reason written over Baye's
+    // own carry: squared, she is inaudible at fifteen metres, which is inside
+    // the range at which you can see what she is doing.
+    const far = 1 - Math.max(0, d) / HUM.range;
+    if (far <= 0.04 || gain <= 0.03) return dur;
+    const amp = HUM.gain * far * clamp(gain, 0, 1);
+
+    const t0 = ctx.currentTime + 0.02;
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    // Nobody hums the same phrase in the same key twice, and a hum that is
+    // always at A is a doorbell. A whole tone of drift either way.
+    const v = Math.pow(2, (Math.random() - 0.5) * 0.17);
+
+    // The waver. Slow and shallow — 17 Hz and a tenth of a semitone is a cat's
+    // rasp — and faded in over the first note, because vibrato that is there
+    // on the attack is a singer warming up rather than somebody not thinking
+    // about it.
+    const lfo = ctx.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = 4.7 + Math.random() * 1.1;
+    const lg = ctx.createGain();
+    lg.gain.setValueAtTime(0.0001, t0);
+    lg.gain.exponentialRampToValueAtTime(HUM.root * 0.011, t0 + 0.9);
+    lfo.connect(lg).connect(osc.frequency);
+
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = HUM.lp;
+    lp.Q.value = 0.9;
+
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+
+    let i = 0, first = true;
+    while (i < pat.length) {
+      const ch = pat[i];
+      let n = 1;
+      while (i + n < pat.length && pat[i + n] === '-') n++;
+      const a = t0 + i * step, b = a + n * step;
+      if (ch === '.') {
+        g.gain.exponentialRampToValueAtTime(0.0001, a + 0.12);
+      } else {
+        osc.frequency.setValueAtTime(HUM.root * v * Math.pow(2, HUM_N[ch] / 12), a);
+        // Breathed into rather than snapped on: the first note of a phrase
+        // takes a fifth of a second to arrive, and every one after it dips to
+        // a third and comes back, which is the tongue between two notes on one
+        // breath. Without the dip a run of held notes is one long tone with
+        // the pitch jumping about inside it, which sounds like a fault.
+        if (!first) g.gain.exponentialRampToValueAtTime(amp * 0.34, a + 0.014);
+        g.gain.exponentialRampToValueAtTime(amp,
+          a + (first ? 0.21 : Math.min(0.13, n * step * 0.34)));
+        g.gain.setValueAtTime(amp, b - 0.035);
+        first = false;
+      }
+      i += n;
+    }
+    // And the end of the breath, which is a fall and not a cut.
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur + 0.26);
+
+    osc.connect(lp).connect(g).connect(bed || master);
+    if (verbSend) {
+      const w = ctx.createGain(); w.gain.value = 0.15 * far;
+      g.connect(w).connect(verbSend);
+    }
+    osc.start(t0); osc.stop(t0 + dur + 0.34);
+    lfo.start(t0); lfo.stop(t0 + dur + 0.34);
+    return dur;
+  }
+
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn, yelp,
+    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn, yelp, hum,
     /**
      * The last node before the speakers, and the context it lives in.
      *
