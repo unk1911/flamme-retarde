@@ -3413,7 +3413,25 @@ async function buildJadrija(scene) {
       // not a second print. At full brightness the far side of a parasol read
       // as a mirror-image sign hung inside it, which is the sort of thing that
       // looks like a bug even when it is nearly right.
-      body: 'base = texture2D(uBrandMap, vUv).rgb * (gl_FrontFacing ? 1.0 : 0.72);'
+      //
+      // A FLAT 0.72 DID NOT FIX THAT, and could not have. It scales the ink and
+      // the ground it sits on by the same factor, so the ratio between them —
+      // which is the whole of legibility — comes out unchanged and all that
+      // happens is the band gets darker. Photographed from under the awning at
+      // t 311 the inside of Corona's hem read AИOЯOC as cleanly as the front
+      // read CORONA. What show-through actually does is lose CONTRAST: you are
+      // looking at dyed cloth with a little ink behind it, so the answer is to
+      // mix toward the ground and not to multiply.
+      //
+      // The ground is taken from the texture's own top row rather than from a
+      // second uniform carrying `bg`. `bg` is linear and the canvas is painted
+      // through `linHex`, so a uniform would have to guess which side of the
+      // decode this sampler lands on; the texel cannot guess, it is already
+      // whatever the front face is showing. v runs 1 at the hem's top and the
+      // upper rule starts at 0.945, so 0.975 is ground on every one of the six.
+      body: 'vec3 print = texture2D(uBrandMap, vUv).rgb;'
+        + '\n  vec3 cloth = texture2D(uBrandMap, vec2(vUv.x, 0.975)).rgb;'
+        + '\n  base = gl_FrontFacing ? print : mix(cloth, print, 0.22);'
         + '\n  n = gl_FrontFacing ? n : -n;',
       uniforms: { uBrandMap: { value: brandTexture(key) } },
     });
