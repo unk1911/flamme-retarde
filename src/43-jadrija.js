@@ -20306,6 +20306,126 @@ async function buildJadrija(scene) {
       }
     }
 
+
+    // ── AND THE TWO HUNDRED METRES WEST OF `beachTo`, WHICH HAD NOTHING ──────
+    //
+    // The run above starts at `beachTo + 5`, and the BEACH is everything west
+    // of `beachTo`. So the towels were laid the length of the concrete terraces
+    // and the sand — the half of this shore people actually camp on — was bare
+    // shingle for its whole two hundred metres. Photographed at t 78 there is
+    // not one object on the ground between the water and the promenade.
+    //
+    // Frames 110 to 112 of the kabine pan are three consecutive shots of that
+    // beach and there is not a square metre of open shingle in any of them:
+    // towels laid flat in colours you can see from the water, dark folding
+    // chairs, bags, a cool box, a pushchair, flip-flops. And all of it in
+    // PITCHES — a family's things inside a couple of metres of each other, then
+    // six or eight metres of empty shingle, then the next lot. That clustering
+    // is the whole of it and it is the same rule the grove floor is built on:
+    // spread the same objects evenly and they stop being somebody's things and
+    // become litter.
+    //
+    // Off `jit` throughout, like everything else in this block: this runs after
+    // the beach has been laid out and a draw on `rng` here moves every bather,
+    // parasol and hut west of it.
+    {
+      const CHAIR = [0.132, 0.140, 0.152];        // the dark folding chair
+      const CHFR = [0.310, 0.316, 0.328];         // and its frame
+      const BAG = [[0.240, 0.190, 0.230], [0.520, 0.170, 0.150],
+        [0.180, 0.260, 0.360], [0.560, 0.520, 0.470]];
+      // One folding chair, from six boxes and four legs. Low, splayed, and its
+      // back raked — a beach chair sits you 0.38 m off the ground with your
+      // knees up, which is why every one of them in the frames reads as a dark
+      // wedge rather than as a chair shape.
+      const chair = (ct, cs, cy, ang) => {
+        const P = facing(ct, cs, ang);
+        const q = (a, c, yy) => P(a, c, yy);
+        for (const [la, lc] of [[-0.24, -0.22], [0.24, -0.22],
+          [-0.20, 0.24], [0.20, 0.24]]) {
+          const p0 = q(la, lc, cy), p1 = q(la * 0.6, lc * 0.7, cy + 0.38);
+          for (let e = 0; e < 4; e++) {
+            const a0 = (e / 4) * TAU, a1 = ((e + 1) / 4) * TAU;
+            const r = 0.017;
+            b.quad([p0[0] + Math.cos(a0) * r, p0[1], p0[2] + Math.sin(a0) * r],
+              [p0[0] + Math.cos(a1) * r, p0[1], p0[2] + Math.sin(a1) * r],
+              [p1[0] + Math.cos(a1) * r, p1[1], p1[2] + Math.sin(a1) * r],
+              [p1[0] + Math.cos(a0) * r, p1[1], p1[2] + Math.sin(a0) * r], CHFR);
+          }
+        }
+        // The seat, and the back raked off the far edge of it.
+        b.quad(q(-0.26, -0.24, cy + 0.38), q(0.26, -0.24, cy + 0.38),
+          q(0.26, 0.26, cy + 0.40), q(-0.26, 0.26, cy + 0.40), CHAIR);
+        b.quad(q(-0.26, 0.26, cy + 0.40), q(0.26, 0.26, cy + 0.40),
+          q(0.26, 0.46, cy + 0.86), q(-0.26, 0.46, cy + 0.86), CHAIR);
+        b.quad(q(-0.26, 0.46, cy + 0.86), q(0.26, 0.46, cy + 0.86),
+          q(0.26, 0.26, cy + 0.40), q(-0.26, 0.26, cy + 0.40),
+          shade(CHAIR, 1.35));
+        // Two arms, which are the only part of one of these that catches sun.
+        for (const sg of [-1, 1]) {
+          b.quad(q(sg * 0.27, -0.20, cy + 0.60), q(sg * 0.27, 0.30, cy + 0.62),
+            q(sg * 0.23, 0.30, cy + 0.62), q(sg * 0.23, -0.20, cy + 0.60), CHFR);
+        }
+      };
+      // A towel, three panels of it, laid flat and wrinkled. The same
+      // construction the concrete run uses — it is right and it is cheap.
+      const towel = (tt, ts, ty, ang, col, key) => {
+        const P = facing(tt, ts, ang);
+        for (let i = 0; i < 3; i++) {
+          const ds = -0.62 + i * 0.42;
+          const wob = (jit(key + i, 271) - 0.5) * 0.10;
+          const hw = 0.34 + wob;
+          b.quad(P(-hw, ds, ty + 0.012 + wob * 0.05),
+            P(hw, ds, ty + 0.012 - wob * 0.05),
+            P(hw, ds + 0.44, ty + 0.012 + wob * 0.04),
+            P(-hw, ds + 0.44, ty + 0.012 - wob * 0.04),
+            i === 1 ? col : shade(col, 0.92));
+        }
+      };
+      // 6.2 m between pitches and seven in ten of them taken, which comes out
+      // at one group every nine metres of shore. The first cut was 9.4 and
+      // 0.62 — a pitch every sixteen metres — and photographed from the sand it
+      // read as three families on two hundred metres of beach in August. The
+      // frames have them close enough that you walk between them.
+      for (let t = 14; t < JAD.beachTo - 6; t += 6.2) {
+        const k = t | 0;
+        if (jit(k, 262) > 0.72) continue;
+        if (!clearOfShops(t) || onMoleT(t)) continue;
+        if (t > PLAY.t0 - 4 && t < PLAY.t1 + 4) continue;
+        const cs = 2.6 + jit(k, 263) * 3.4;
+        const base = (jit(k, 264) - 0.5) * 1.1;
+        // Two or three towels, always. A pitch with no towel on it is a pitch
+        // nobody has claimed.
+        const nt = 2 + ((jit(k, 265) * 2) | 0);
+        b = deck;
+        for (let i = 0; i < nt; i++) {
+          const dt2 = (jit(k, 266 + i) - 0.5) * 2.6;
+          const ds2 = (jit(k, 276 + i) - 0.5) * 1.7;
+          const tt = t + dt2, ts = cs + ds2;
+          towel(tt, ts, surfaceY(tt, ts), base + (jit(k, 286 + i) - 0.5) * 0.9,
+            TOWEL[((jit(k, 296 + i) * 97) | 0) % TOWEL.length], k * 7 + i * 13);
+        }
+        b = up;
+        // Nought to two chairs, and the second one only where the first is.
+        const nc = (jit(k, 268) * 2.4) | 0;
+        for (let i = 0; i < nc; i++) {
+          const ct = t + (jit(k, 306 + i) - 0.5) * 2.8;
+          const cc = cs + 1.0 + jit(k, 316 + i) * 1.3;
+          chair(ct, cc, surfaceY(ct, cc), base + (jit(k, 326 + i) - 0.5) * 1.5);
+        }
+        // And the bag, which is what is left when everybody is in the water.
+        if (jit(k, 269) < 0.72) {
+          const bt = t + (jit(k, 336) - 0.5) * 2.4;
+          const bs = cs - 0.8 - jit(k, 337) * 0.7;
+          const by = surfaceY(bt, bs);
+          const bc = BAG[((jit(k, 338) * 97) | 0) % BAG.length];
+          boxTS(bt - 0.22, bt + 0.22, bs - 0.15, bs + 0.15, by, by + 0.26,
+            bc, shade(bc, 1.18));
+          boxTS(bt - 0.06, bt + 0.06, bs - 0.13, bs + 0.13, by + 0.26,
+            by + 0.31, shade(bc, 0.7));
+        }
+      }
+    }
+
     // Under the pines: cones and the coarse litter that is not needles. The
     // floor of that stand is the best reference photograph in the survey and
     // it is not bare — it is orange-brown duff with cones and white limestone
