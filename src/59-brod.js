@@ -999,11 +999,22 @@ function brodProto() {
   // be reached. 0.42 across and not 0.62: a lifebuoy is 0.75 m outside and
   // this table is authored at 1/1.75 of built, so the first cut put two
   // metre-and-a-bit rings on the roof and they read as deck cargo.
+  //
+  // ON THE CASING, and that is `murals/brod-mural.jpg` rather than a
+  // preference. That file is a square-on photograph of the whole mural in flat
+  // light — the pan frame this boat was read from is a hand-held pass at an
+  // angle in a low sun — and it settles three things at once: the casing is
+  // oxblood, there is a ship's boat in davits at the stern, and **the two
+  // lifebuoys hang on the casing's face**, side by side, not on a rail.
+  //
+  // Which is also where they belong. A lifebuoy goes where somebody can reach
+  // it without leaving the deck, and the casing is the one vertical surface on
+  // the upper deck that everybody walks past.
   for (const s of [1, -1]) {
-    b.box(-1.46, BROD_ROOF + BROD_P(0.45), s * 0.62, 0.09, BROD_P(0.75),
+    b.box(3.37, BROD_ROOF + 0.50, s * 0.30, 0.06, BROD_P(0.75),
       BROD_P(0.75), [0.760, 0.180, 0.090]);
-    b.box(-1.44, BROD_ROOF + BROD_P(0.45), s * 0.62, 0.09, BROD_P(0.40),
-      BROD_P(0.40), HOUSE);
+    b.box(3.34, BROD_ROOF + 0.50, s * 0.30, 0.06, BROD_P(0.40),
+      BROD_P(0.40), CASE);
   }
 
   // ── the awning over the aft deck ──────────────────────────────────────────
