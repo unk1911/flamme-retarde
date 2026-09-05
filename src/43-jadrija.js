@@ -4308,7 +4308,35 @@ async function buildJadrija(scene) {
     b = buf;
     const oa = S.t0 + (S.t1 - S.t0) * 0.18, oc = S.t1 - (S.t1 - S.t0) * 0.18;
     const oy0 = y0 + 0.95, oy1 = top - 0.35;
-    const f0 = S.s0 - 0.09, f1 = S.s0 - 0.02;   // the depth it has to work in
+    // ── HOW FAR PROUD, AND WHY IT IS NOT TWO CENTIMETRES ─────────────────────
+    //
+    // This whole room used to be built in the 7 cm between `s0 − 0.09` and
+    // `s0 − 0.02`, and none of it has ever been drawn. Rule 5, and the file
+    // already knew the number: the note over `backBar`'s mirror records that a
+    // plane at `s0 − 0.08` "stops being drawn — eight centimetres in front of
+    // the shop's own body is not enough separation two kilometres out from the
+    // origin", and that it works at `s0 − 0.11`. The back wall here was at
+    // `s0 − 0.02`. Worse, it was a 2 cm slab spanning `s0 − 0.02` to `s0` —
+    // which is INSIDE the serving opening's own dark backing panel, so even
+    // when it won the depth test against the body it lost to that.
+    //
+    // Two kilometres from the origin a float has about 0.12 mm of resolution
+    // left, and a depth buffer has a great deal less than that; the whole
+    // interior of every caffe bar on this boardwalk was being decided by
+    // rounding. It showed on the one shop that has nothing else in its
+    // opening. The slasticarnica reads because its vitrine, its mirror and its
+    // gelato case all stand 0.11 to 0.42 m proud and were measured to; Caffee
+    // bar H2O has thirteen metres of frontage and nothing but this, and from
+    // the terrace it was a flat blue-grey wall with a name over it.
+    //
+    // So the room is built between 0.17 and 0.46 m proud — clear of the body
+    // by half again what `backBar` needed, and deep enough that the worktop is
+    // a worktop rather than a ledge. Not for the two shops that already have
+    // their own frontage: the mirror is at `s0 − 0.11` and the gelato case
+    // fills the opening, and pulling this out in front of either of them would
+    // put a shelf of bottles through the middle of the flavours.
+    const deep = !S.vitrine && !S.backBar;
+    const f0 = S.s0 - (deep ? 0.46 : 0.09), f1 = S.s0 - (deep ? 0.17 : 0.02);
     const WALL = [0.400, 0.372, 0.330];
     const TOP = [0.330, 0.322, 0.305];
     const DARK = [0.150, 0.148, 0.145];
