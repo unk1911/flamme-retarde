@@ -18686,6 +18686,19 @@ async function buildJadrija(scene) {
   // because it takes salt and nothing eats it; agave on the rough slope past the
   // concrete, which is exactly where it grows without being planted.
   const greens = [];
+  // Where the hammock ended up, for a screenshot to find it — the pair of
+  // pines it hangs between is whatever the planting produced.
+  //
+  // DECLARED HERE, BESIDE `greens`, AND NOT DOWN WITH THE DEBUG SURFACE THAT
+  // READS IT. Second temporal-dead-zone fault of the night — `PHONE` was the
+  // first — and it is the same shape every time in a file this long: the
+  // writer runs during the build, near the top, and the reader is a debug
+  // accessor two thousand lines below it. A `let` beside the reader is
+  // unreachable from the writer, and what that looks like is not an exception
+  // anybody sees, it is `BUILD DID NOT FINISH` at 78 %. The rule that avoids
+  // it is to declare a variable beside the thing it is DERIVED from, which for
+  // this one is the tree list.
+  let hammockAt = null;
   // ── the sanitary block ─────────────────────────────────────────────────────
   //
   // Photographed straight on at t 355: the flat-roofed rendered block behind
@@ -19189,6 +19202,94 @@ async function buildJadrija(scene) {
         greens.push([t, s, 0.50, 5]);
       } else {
         oleander(t, s, y, 0.85 + rng() * 0.55);
+      }
+    }
+  }
+
+  /**
+   * A hammock, slung between two of the pines that were just planted.
+   *
+   * `1000150346`: two people sitting in a blue-and-teal hammock strung between
+   * two trunks in the grove behind the kabine, on the pale gravel, with the
+   * shadows running long across it. It is the single most alive thing in the
+   * whole of that part of the survey and there was nothing like it in the game.
+   *
+   * SLUNG BETWEEN PINES THAT ACTUALLY EXIST, which is why this reads `greens`
+   * rather than choosing a spot. The grove is planted with `rng()` and the pair
+   * that ends up 3 to 5 m apart is different in every build of the shore; a
+   * typed pair of coordinates would be a hammock hanging in mid-air the first
+   * time anybody touched the planting. Reading the list back costs no draw —
+   * Rule 4 — because every one of these trees has already been placed.
+   *
+   * A catenary and not a straight line, and the sag is not a guess: a hammock
+   * with nobody in it hangs about a twelfth of its span; with somebody in it,
+   * nearer a sixth. 0.16 of the span is a hammock that has just been got out
+   * of, which is what it looks like from a distance and what it means at any
+   * other one.
+   */
+  {
+    // The band is where the grove behind the kabine actually is, and it was
+    // 40..62 on the first cut, which found no pair at all: the pines run
+    // further inland than that and the ones nearest the huts are the young
+    // staked ones, which are not in `greens` as pines. 34..76 with a 3.0-6.0 m
+    // separation finds one every build.
+    const pines = greens.filter((g) => g[3] === 9 && g[1] > 34 && g[1] < 76);
+    let pair = null;
+    for (let i = 0; i < pines.length && !pair; i++) {
+      for (let j = i + 1; j < pines.length; j++) {
+        const d = Math.hypot(pines[i][0] - pines[j][0], pines[i][1] - pines[j][1]);
+        if (d > 3.0 && d < 6.0) { pair = [pines[i], pines[j], d]; break; }
+      }
+    }
+    if (pair) {
+      const [A, B, span] = pair;
+      hammockAt = [+A[0].toFixed(1), +A[1].toFixed(1),
+        +B[0].toFixed(1), +B[1].toFixed(1), +span.toFixed(2)];
+      // 1.45 m up each trunk, which is where a hammock is tied: high enough
+      // that the sag clears the ground and low enough to get into.
+      const yA = surfaceY(A[0], A[1]) + 1.45;
+      const yB = surfaceY(B[0], B[1]) + 1.45;
+      const sag = span * 0.16;
+      const CLOTH = [0.118, 0.318, 0.372];      // teal, off the frame
+      const EDGE = [0.545, 0.180, 0.118];       // the red-orange selvedge
+      const ROPE = [0.404, 0.372, 0.300];
+      const N = 12;
+      // Half-width: gathered to nothing at the ends and full in the middle,
+      // which is the whole shape of a hammock and the reason a flat strip
+      // reads as a plank.
+      const wAt = (u) => 0.30 * Math.sin(Math.PI * u) ** 0.55;
+      // The cloth is gathered SHORT of each trunk and the whipping spans the
+      // gap. Run right to the trunk it disappears into the bark, which reads
+      // as a hammock growing out of a tree — and it also leaves the two ropes
+      // with no length, so the thing that says "tied on" was never drawn.
+      const INSET = 0.34 / span;
+      const pt = (u, o) => {
+        const uu = INSET + u * (1 - 2 * INSET);
+        const t = A[0] + (B[0] - A[0]) * uu, ss = A[1] + (B[1] - A[1]) * uu;
+        // Across the span, in the shore's own frame.
+        const dt = -(B[1] - A[1]) / span, ds = (B[0] - A[0]) / span;
+        const y = yA + (yB - yA) * uu - sag * Math.sin(Math.PI * u) ** 0.85;
+        return W(t + dt * o, ss + ds * o, y);
+      };
+      for (let i = 0; i < N; i++) {
+        const u0 = i / N, u1 = (i + 1) / N;
+        const w0 = wAt(u0), w1 = wAt(u1);
+        b.quad(pt(u0, -w0), pt(u1, -w1), pt(u1, w1), pt(u0, w0), CLOTH);
+        b.quad(pt(u0, w0), pt(u1, w1), pt(u1, -w1), pt(u0, -w0), CLOTH);
+        // The selvedge, a hand's breadth of it, on both edges and both faces.
+        for (const sg of [1, -1]) {
+          b.quad(pt(u0, sg * w0), pt(u1, sg * w1),
+            pt(u1, sg * w1 * 0.80), pt(u0, sg * w0 * 0.80), EDGE);
+          b.quad(pt(u0, sg * w0 * 0.80), pt(u1, sg * w1 * 0.80),
+            pt(u1, sg * w1), pt(u0, sg * w0), EDGE);
+        }
+      }
+      // The two whippings, trunk to gathered end.
+      for (const [E, yE, u] of [[A, yA, 0], [B, yB, 1]]) {
+        const g = pt(u, 0);
+        const o = W(E[0], E[1], yE);
+        b.quad(o, g, [g[0], g[1] + 0.035, g[2]], [o[0], o[1] + 0.035, o[2]], ROPE);
+        b.quad([o[0], o[1] + 0.035, o[2]], [g[0], g[1] + 0.035, g[2]], g, o, ROPE);
       }
     }
   }
@@ -30907,6 +31008,8 @@ async function buildJadrija(scene) {
       at: bathers.filter((b) => b.phone)
         .map((b) => [+b.t.toFixed(1), +b.s.toFixed(1), b.phone]),
       quote: phoneQuotes.q,
+      hammock: hammockAt,
+      pines: greens.filter((g) => g[3] === 9).length,
       world: phones ? phones.filter((m) => m && m.g.visible)
         .map((m) => [+m.g.position.x.toFixed(2), +m.g.position.y.toFixed(2),
           +m.g.position.z.toFixed(2)]) : [],
