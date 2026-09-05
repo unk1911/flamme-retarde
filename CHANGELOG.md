@@ -8,6 +8,71 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.260.0] — 2026-09-04
+
+### The kiosk had a shop and no yard, and the wrong face turned to the sea
+
+Misha: *"continue building out the Tisak in its complexity... from data in the
+survey images/videos"*.
+
+Going further into the same photographs turned up a second source that nothing
+in this file had ever seen. The survey pan `1000150414` at **04:24-04:28** is
+this shop from the promenade, and `1000150343` — which the whole kiosk was built
+from — is taken from the **land** side. They are opposite faces of one box. The
+pressed panels, the vinyl strip with TISAK on it, the open door and the wheelie
+bin are the back and the west end; the front is a serving counter the length of
+the shop under a **red folding-arm awning**. The projecting slab over the
+doorway in _343 that was read as a roof overhang is that awning end-on.
+
+**The awning**, over the eastern 2.05 m of the frontage: a red canopy on a
+1.30 m throw, a cream batten across the front bar, and a 0.40 m fascia carrying
+the chain's five coloured chips and `CENTAR`. Three numbers off the frame,
+scaled against the counter, which is the one object in it whose height is not in
+doubt — 0.95 m measuring 280 px, so 1 m is 295 px. The fascia is 136 px, which
+is 0.46 m; the batten is 28 px, which is 0.095 m. The throw is the one thing the
+frame cannot give, because the shot is square on. Not run full width: the fascia
+then hides the vinyl strip from anywhere nearer than twelve metres and the shop
+loses its name, so the awning takes the serving end and the strip keeps the
+panelled end. `USLUGA` is not written — the fig tree eats it after `USLU` and
+what a sign in Croatia obviously says is not the same thing as having read it.
+
+**The counter and what is behind the glass.** Four shelves of six coloured boxes
+was a guess. What is there is a wall of cigarette packets — six courses, twenty
+to a course, a gold price rail across the front of each — with confectionery, a
+block of postcards and a low shelf of covers under it. A hundred and forty
+packets is 1700 triangles of thing nobody can resolve at ten metres, so the wall
+is a canvas and the **raked magazine rack** in front of it is geometry: four
+tiers at 0.50 rad off vertical, which is what makes a newsagent's rack a
+silhouette rather than a shelf. Plus the crisp bags on their clips, the counter
+ledge, and two stacks of newspapers lying on it.
+
+**The yard**, which is the half of `1000150343` that is not a shop and had
+nothing in it at all. A pallet stood on end and leaning back at 0.24 rad, a
+green steel pressure vessel lying on its side with dead weeds out of the open
+end, a sawn stump, a broken kerb block, a second wheelie bin with a black sack
+on the lid, three folded trestles against the corner, a bucket, a lilac towel,
+and the shop's power lead across the gravel. A kiosk is ninety per cent clutter.
+
+**The livery strip** is applied bay by bay with the khaki frame crossing it, and
+the bays are four different reds — 165/108/84 at the TISAK end against 102/29/30
+under the phone number, which is a bleached terracotta beside a red that still
+has its pigment. Both go in the canvas: as geometry the stiles would be five
+boxes standing 0.16 m proud of a wall they are flush with. The freephone block
+moves from 0.42 of the strip to 0.50, which is 0.80 of the panelled side, which
+is where the frame has it. Under the band, the continuous black-green run-off
+the streak system never had — 92/76/60 against 126/101/72, which is 0.73 of the
+paint and not a streak of it — plus the pale ghost where a sticker came off.
+
+**The step ladder** was two stiles and six rungs leaning on the east end and is
+an aluminium platform step ladder standing free in front of the glass, with the
+tall tubular grab handle that gives it its whole silhouette. **The Jana cooler**
+was a pale green box with two lemons drawn as coins lying flat — `post` builds a
+vertical prism, so a 0.40 m disc 0.02 m thick is a 20 mm line seen from the
+promenade. It is a near-white cream with seven lemons and four leaves on it, a
+D-handle, a louvred grille and the second printed leaf standing across it.
+
+Census held at `{seen:446, thin:333, plain:86, rich:27}`; Jadrija 558382 → 559360
+triangles, +978.
 ## [1.242.0] — 2026-09-04
 
 ### The white panel is a painting of the kabine, and it was shut all along

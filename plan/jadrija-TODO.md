@@ -679,6 +679,26 @@ bed. See the commit.
   other, and a Bierzeltgarnitur on the gravel in front. **BUILT 31 Aug** —
   see `tisakFront`. Nothing green about it, and nothing about the green
   kiosk is a newsagent.
+  **The stretch at 4:24-4:28 of `1000150414` is the TISAK's FRONT.** **FOUND
+  AND BUILT 4 Sep** — _343 is taken from the land side, so everything the
+  entry above describes is the back and the west end of the box; the pan is
+  taken from the promenade and has the counter side, which is a red
+  folding-arm awning the length of the frontage with TISAK on it and the
+  chain's five coloured chips and `CENTAR USLU…` at the far end, a serving
+  counter under it, and behind the glass a wall of cigarette packets in six
+  courses with a gold price rail across each, confectionery, a block of
+  postcards, hanging crisp bags and a raked magazine rack. The projecting slab
+  over the doorway in _343, read at the time as a roof overhang, is that
+  awning end-on. The Jana cooler stands at the west end of the counter in both
+  sources, which is what ties them together as one building. See `tisakAwnBand`
+  and `tisakDisplay`. **The yard** — the two metres of gravel between the
+  kiosk's west end and the stone wall in the left half of _343 — had nothing
+  in it at all and now has the pallet on end, the green steel vessel on its
+  side, the stump, the kerb block, the second bin with the black sack, the
+  folded trestles, the bucket, the towel and the power lead: see `tisakYard`.
+  Still not built and wanting a source: the air-conditioning unit on the stone
+  wall behind, and the furled dark parasol standing beyond the kiosk — both are
+  in _343 and neither is the shop's.
   **The stretch at 4:48-6:10** was listed here as "beach bar MINI and the
   grill" and it is NOT MINI. **CORRECTED 31 Aug** — read frame by frame, the
   last eighty seconds of the pan are the KONOBA's terrace from the seaward
