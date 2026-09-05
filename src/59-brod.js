@@ -1081,20 +1081,69 @@ function brodQuay(M) {
   // thing that says "pier" at two hundred metres and at two, which is why the
   // coping is its own course and not just the top of the wall.
   const rim = [[0, -W], [0, W], [L, W], [L, -W], [0, -W]];
+  // A sine hash, shared by the rim and the deck so a bay and the coping beside
+  // it are not independent draws — they were poured on the same day.
+  const hash = (i) => {
+    const x = Math.sin(i * 12.9898 + 4.1414) * 43758.5453;
+    return x - Math.floor(x);
+  };
+  // ── AND THE RIM IS WALKED IN SEGMENTS, NOT IN FOUR LONG QUADS ─────────────
+  //
+  // The waterline is the one line on this structure that is never clean.
+  // `1000150357` and `_378` are both taken from a metre above it and both show
+  // the same thing: the outer hand's breadth of the coping is dark, green-black
+  // and uneven — weed that dries out between tides and never quite goes — and
+  // the wall under it is two colours, a wet band a half metre deep under the
+  // lip and dry stone below that. Drawn as one 46 m quad a side, none of that
+  // can exist, and what you get is a pier with a clean edge, which is a pier
+  // nobody has ever moored anything to.
+  const WET = [0.318, 0.286, 0.244];        // the splash band under the lip
+  const WEED = [0.212, 0.238, 0.170];       // and what grows on the very edge
   for (let i = 0; i < rim.length - 1; i++) {
-    const [u0, v0] = rim[i], [u1, v1] = rim[i + 1];
+    const [a0, b0] = rim[i], [a1, b1] = rim[i + 1];
     // Outward from this side, so the batter leans the right way on each face
     // without anything having to know which face it is on.
-    const ex = u1 - u0, ev = v1 - v0;
+    const ex = a1 - a0, ev = b1 - b0;
     const el = Math.hypot(ex, ev) || 1;
     const ou = ev / el, ov = -ex / el;
     const O = (u, v, d, y) => P(u + ou * d, v + ov * d, y);
-    b.quad(O(u0, v0, BAT, BASE), O(u1, v1, BAT, BASE),
-      O(u1, v1, LIP, TOP - COPE_H), O(u0, v0, LIP, TOP - COPE_H), FACE);
-    b.quad(O(u0, v0, LIP, TOP - COPE_H), O(u1, v1, LIP, TOP - COPE_H),
-      O(u1, v1, LIP, TOP), O(u0, v0, LIP, TOP), COPE);
-    b.quad(O(u0, v0, LIP, TOP), O(u1, v1, LIP, TOP),
-      O(u1, v1, 0, TOP), O(u0, v0, 0, TOP), COPE);
+    const nSeg = Math.max(1, Math.round(el / 2.2));
+    for (let j = 0; j < nSeg; j++) {
+      const t0 = j / nSeg, t1 = (j + 1) / nSeg;
+      const u0 = a0 + ex * t0, v0 = b0 + ev * t0;
+      const u1 = a0 + ex * t1, v1 = b0 + ev * t1;
+      const k = (hash(i * 97 + j * 13 + 5) - 0.5) * 0.070;
+      const w = hash(i * 41 + j * 29 + 11);              // how weedy this one is
+      const fc = [FACE[0] + k, FACE[1] + k * 0.94, FACE[2] + k * 0.86];
+      const cc = [COPE[0] + k, COPE[1] + k * 0.94, COPE[2] + k * 0.86];
+      // The wall, in two courses: dry stone, then the wet band under the lip.
+      // The band is 0.55 m and not the whole face, because that is the depth
+      // the sea actually reaches on a mole with 1.15 m of freeboard.
+      const wetTop = TOP - COPE_H;
+      const wetLo = wetTop - 0.55;
+      const dLo = BAT + (LIP - BAT) * ((wetLo - BASE) / (wetTop - BASE));
+      b.quad(O(u0, v0, BAT, BASE), O(u1, v1, BAT, BASE),
+        O(u1, v1, dLo, wetLo), O(u0, v0, dLo, wetLo), fc);
+      const wm = 0.55 + w * 0.45;
+      b.quad(O(u0, v0, dLo, wetLo), O(u1, v1, dLo, wetLo),
+        O(u1, v1, LIP, wetTop), O(u0, v0, LIP, wetTop),
+        [fc[0] + (WET[0] - fc[0]) * wm, fc[1] + (WET[1] - fc[1]) * wm,
+          fc[2] + (WET[2] - fc[2]) * wm]);
+      // The shadow line under the coping, which is what says "pier" at two
+      // hundred metres and at two.
+      b.quad(O(u0, v0, LIP, wetTop), O(u1, v1, LIP, wetTop),
+        O(u1, v1, LIP, TOP), O(u0, v0, LIP, TOP), cc);
+      // And the top of the lip: half of it the coping's own stone, the outer
+      // half whatever is growing on it this month.
+      const wd = 0.35 + w * 0.55;
+      const wc = [cc[0] + (WEED[0] - cc[0]) * wd * 0.85,
+        cc[1] + (WEED[1] - cc[1]) * wd * 0.85,
+        cc[2] + (WEED[2] - cc[2]) * wd * 0.85];
+      b.quad(O(u0, v0, LIP, TOP), O(u1, v1, LIP, TOP),
+        O(u1, v1, LIP * 0.42, TOP), O(u0, v0, LIP * 0.42, TOP), wc);
+      b.quad(O(u0, v0, LIP * 0.42, TOP), O(u1, v1, LIP * 0.42, TOP),
+        O(u1, v1, 0, TOP), O(u0, v0, 0, TOP), cc);
+    }
   }
   // The deck, laid in slabs across the pier with a joint between each pair.
   //
@@ -1109,14 +1158,49 @@ function brodQuay(M) {
   // are exact at any distance, and two that share a plane are the z-fight rule
   // 5 is about. So the joint is a slab of its own colour, not a line laid over
   // the top of one.
+  // ── AND ACROSS THE WIDTH AS WELL AS ALONG IT ─────────────────────────────
+  //
+  // Bays alone were half the job. Six metres of quay is not poured in one
+  // piece and is not walked on evenly either, and `1000150357` shows both:
+  // there is an edge strip about a metre wide down each side in its own tone,
+  // a joint between it and the field, and the field between them is scuffed
+  // pale down the middle where forty years of feet have polished the aggregate
+  // up. The two edges are where the bollards, the ropes and the weed are and
+  // nobody walks on them, so they stay dark. That contrast — a light lane
+  // between two dark ones — is most of what makes a photograph of a quay read
+  // as a route rather than as a surface, and it is the thing you are looking
+  // at for the whole forty-six metres out to the boat.
+  //
+  // The tone step went from 0.055 to 0.075 at the same time. At 0.055 on a
+  // 0.507 deck the bays differ by five per cent, which is under what this
+  // renderer's ambient will show on a horizontal surface in full sun: the
+  // joints were doing all the work and the slabs between them were one colour.
   const BAY = 2.2, JW = 0.06;
   const nBay = Math.max(1, Math.round(L / BAY));
-  const hash = (i) => Math.sin(i * 12.9898 + 4.1414) * 43758.5453;
+  const EDGE = 0.95;                       // how wide the edge strip is
+  const LANE = [[-W, -W + EDGE], [-W + EDGE + JW, W - EDGE - JW], [W - EDGE, W]];
   for (let i = 0; i < nBay; i++) {
     const u0 = (i / nBay) * L, u1 = ((i + 1) / nBay) * L;
-    const k = (hash(i) - Math.floor(hash(i)) - 0.5) * 0.055;
-    const cl = [DECK[0] + k, DECK[1] + k * 0.92, DECK[2] + k * 0.84];
-    b.quad(P(u0, -W, TOP), P(u0, W, TOP), P(u1 - JW, W, TOP), P(u1 - JW, -W, TOP), cl);
+    const kb = (hash(i) - 0.5) * 0.075;
+    for (let n = 0; n < 3; n++) {
+      const [v0, v1] = LANE[n];
+      const ks = (hash(i * 7 + n * 131 + 3) - 0.5) * 0.045;
+      const k = kb + ks + (n === 1 ? 0.052 : -0.030);
+      // And the edges are greyer, not just darker. Wet stone loses its warmth
+      // before it loses its value, which is why a dry quay photographs yellow
+      // and its own edge photographs grey in the same frame.
+      const g = n === 1 ? 1 : 0.962;
+      const cl = [DECK[0] + k, (DECK[1] + k * 0.94) * g,
+        (DECK[2] + k * 0.86) * g * g];
+      b.quad(P(u0, v0, TOP), P(u0, v1, TOP),
+        P(u1 - JW, v1, TOP), P(u1 - JW, v0, TOP), cl);
+    }
+    // The two joints down the length. Adjacent and never overlapping, which is
+    // the rule the transverse joint below was already written to.
+    for (const vj of [-W + EDGE, W - EDGE - JW]) {
+      b.quad(P(u0, vj, TOP), P(u0, vj + JW, TOP),
+        P(u1 - JW, vj + JW, TOP), P(u1 - JW, vj, TOP), JOINT);
+    }
     if (i < nBay - 1) {
       b.quad(P(u1 - JW, -W, TOP), P(u1 - JW, W, TOP),
         P(u1, W, TOP), P(u1, -W, TOP), JOINT);
