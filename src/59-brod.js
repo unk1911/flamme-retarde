@@ -1730,6 +1730,69 @@ function buildBrod(scene) {
               propTube(lb, pts, 0.019, LINE, 4);
             }
           }
+          // ── AND THE TWO THINGS `1000150357` HAS ON THE COPING ─────────────
+          //
+          // Cropped at full size, that frame is mostly quay rather than boat,
+          // and there are two objects on it that nothing in this file had.
+          //
+          // THE STEP STANDS. Two of them in the one frame, standing on the
+          // coping between the bows: a little galvanised frame about knee high
+          // with a weathered plank across the top, which is what you put your
+          // foot on to get over a bow pulpit and on to a boat moored bow-to.
+          // They are the reason a Mediterranean mooring is climbable at all,
+          // and they are unmistakable — a pale horizontal plank at 0.55 m with
+          // daylight under it, against a quay that is otherwise flat.
+          // 0.42 high and not 0.52, and the plank 0.80 long and not 0.88.
+          // Photographed at the first size it read as a card table: a 0.88 m
+          // top on 0.52 m legs is furniture proportions, and the thing in the
+          // frame is squat — the plank is about twice its own height off the
+          // ground, which is what makes it a step rather than a table.
+          const STEP = [0.560, 0.540, 0.498];    // the plank, sun-bleached
+          const GALV = [0.430, 0.438, 0.446];    // and the frame under it
+          for (let k = 3; k < 16; k += 6) {
+            const bx = at[k].u + 1.05;
+            const bz = -sgn * (A.w - 0.78);
+            propTube(lb, [[bx, yq, bz], [bx, yq + 0.42, bz]], 0.026, GALV, 4);
+            for (const dz of [-0.19, 0.19]) {
+              for (const dx of [-0.36, 0.36]) {
+                propTube(lb, [[bx + dx, yq, bz + dz],
+                  [bx + dx * 0.78, yq + 0.42, bz + dz * 0.78]], 0.023, GALV, 4);
+              }
+            }
+            // The top face barely lifted off the sides. It was 0.612 against
+            // the plank's 0.560 and against a quay deck of 0.507, and a plank
+            // ten per cent brighter than the concrete it stands on reads as
+            // white furniture from ten metres. In the frame the two are within
+            // a shade of each other.
+            lb.box(bx, yq + 0.452, bz, 0.80, 0.052, 0.38, STEP,
+              [0.578, 0.556, 0.512]);
+          }
+          // THE CHAIN. This is the correction, not an addition: the bow lines
+          // above run to bollards, and in the frame the heavy stuff does not.
+          // A boat lying bow-to is held off the quay by a laid mooring, and
+          // what you see from the coping is chain — black, thick, and going
+          // over the edge and straight down into the water, with a red-and-
+          // white line beside it. The bollards and the white nylon are right
+          // and they are the light half of it; without the chain the row reads
+          // as tied up rather than as moored.
+          //
+          // Under the surface for a metre, because that is where it goes and
+          // the sea is clear enough here to see it.
+          const CHAIN = [0.098, 0.094, 0.090];
+          for (let k = 1; k < 16; k += 3) {
+            const bx = at[k].u - 0.55;
+            const ze = -sgn * A.w;
+            const pts = [];
+            for (let i = 0; i <= 5; i++) {
+              const t2 = i / 5;
+              pts.push([bx + t2 * 0.10,
+                yq - 0.10 - t2 * t2 * 1.35,
+                ze - sgn * (0.05 + t2 * 0.62)]);
+            }
+            propTube(lb, [[bx, yq + 0.04, ze + sgn * 0.30],
+              [bx + 0.02, yq - 0.06, ze - sgn * 0.04]], 0.030, CHAIN, 4);
+            propTube(lb, pts, 0.030, CHAIN, 4);
+          }
           raft.add(new THREE.Mesh(lb.geo(), mat));
         }
         raft.updateMatrixWorld();
