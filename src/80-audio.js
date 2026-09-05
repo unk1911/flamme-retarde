@@ -4441,8 +4441,152 @@ function buildAudio() {
     return dur;
   }
 
+  // ── the fly in the vikendica ────────────────────────────────────────────────
+  /**
+   * One housefly, which you hear before you see.
+   *
+   * A WINGBEAT AND NOT A NOTE. Musca domestica beats at 180 to 220 Hz and
+   * everybody knows that number as "the sound a fly makes", so the obvious
+   * thing is a sine at 190 — and a sine at 190 is a test tone. A wing is a
+   * flapper: every stroke is a puff of air, which means the spectrum is the
+   * whole harmonic series of the beat with a broad hump on it where the thorax
+   * and the wing surface radiate best. A sawtooth through two wide band-passes
+   * is that, and it is the difference between a fly and a doorbell.
+   *
+   * Three things sit on top of it and each has a job:
+   *
+   *   the two LFOs  A fly never holds a level for a second together. It rolls,
+   *                 it turns, it swings its own axis past your ear four or five
+   *                 times a second, and the buzz swells and dies with it.
+   *                 Steady, this reads as a transformer in a cupboard.
+   *   the hiss      Noise through a high band-pass, chopped at the wingbeat.
+   *                 That is the air off the tips, and it is what stops the buzz
+   *                 sounding like a kazoo.
+   *   `hz`          Handed in per frame, because a fly coming out of a turn
+   *                 beats faster and it is plainly audible.
+   *
+   * `level` is the caller's number and not a distance. src/44-vikendica.js
+   * knows how far off the fly is, whether you are in the flat with it, and —
+   * the only part that matters — whether it is in the air at all, and this
+   * obeys. Which is the whole of "the buzz stops dead when it lands": there is
+   * no envelope in here, only a 20 ms ramp, because a fly's buzz ends when its
+   * wings do and starts again the instant they start.
+   *
+   * Straight to `master`. Not `bed`, which is the beach and gets ducked; not
+   * `outBus`, which is everything a wall stands between you and — the fly is
+   * on YOUR side of the wall, in the room with you, and the one thing that
+   * must never happen is the room's own muffle taking it away. And no reverb
+   * send: `verb` is a limestone valley with a 2.9 s tail, which is a fair
+   * account of the channel and a lie about a 4 m room.
+   */
+  const FLYBUZZ = {
+    hz: 192,          // the wingbeat, mid-range for a housefly
+    // Quiet, and measured off `audio.tap()` the way the meow and the hum were.
+    // At 0.055, with the fly at arm's length, tools/sfx.mjs comes back with a
+    // peak of 0.035 and 0.0056 RMS — a twelfth of the cat and a sixth of Baye
+    // humming, which is about right for an animal the size of a lentil.
+    //
+    // That is quiet in absolute terms and loud where it counts: recorded
+    // standing in the flat with the fly flying, the strongest partial in the
+    // whole mix is its own 205 Hz, and with the fly sitting there is nothing
+    // in that band at all. Which is the only test worth running on this —
+    // a fly is not loud, it is *the thing in the room*.
+    gain: 0.055,
+    lp: 4200,         // no fizz above the fourth formant; a fly has no top end
+  };
+  let flyNodes = null;
+  /**
+   * @param level  0…1 — how loud, and 0 means the wings have stopped
+   * @param hz     multiplier on the wingbeat, ~0.9 to 1.35
+   * @param pan    −1 left, +1 right, which ear it is in
+   */
+  function fly(level, hz = 1, pan = 0) {
+    if (!ctx || dead) return;
+    const t = ctx.currentTime;
+    const want = Math.max(0, Math.min(1, level));
+    if (!flyNodes) {
+      // Nothing is built until something asks for it. A fly two hundred metres
+      // away across the water is six oscillators running for nobody.
+      if (want < 0.002) return;
+      const out = ctx.createGain();
+      out.gain.value = 0.0001;
+      const pn = ctx.createStereoPanner();
+      pn.pan.value = 0;
+      // The wing envelope, which is what makes it an animal. Base plus two
+      // LFOs summed on to the same AudioParam: 0.62 either side of 0.36 of
+      // swing, so it never quite dies and never sits still.
+      const am = ctx.createGain();
+      am.gain.value = 0.62;
+      const lfo = [];
+      for (const [hzL, depth] of [[5.3, 0.25], [21.0, 0.11]]) {
+        const o = ctx.createOscillator();
+        o.type = 'sine';
+        o.frequency.value = hzL;
+        const g = ctx.createGain();
+        g.gain.value = depth;
+        o.connect(g).connect(am.gain);
+        o.start();
+        lfo.push(o);
+      }
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = FLYBUZZ.lp; lp.Q.value = 0.5;
+      am.connect(lp).connect(out).connect(pn).connect(master);
+
+      const osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.value = FLYBUZZ.hz;
+      // The waver in the pitch, slow and shallow. A wingbeat locked to three
+      // decimal places is a synthesiser; two per cent either way at three a
+      // second is an insect.
+      const wob = ctx.createOscillator();
+      wob.type = 'sine'; wob.frequency.value = 3.1;
+      const wobG = ctx.createGain(); wobG.gain.value = FLYBUZZ.hz * 0.022;
+      wob.connect(wobG).connect(osc.frequency);
+      // Two formants, and they are where the buzz lives. 520 is the third
+      // harmonic of the beat and carries it; 1500 is the edge, and without it
+      // this is a tuba.
+      for (const [at, q, g] of [[520, 0.9, 1.0], [1500, 1.4, 0.40]]) {
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass'; bp.frequency.value = at; bp.Q.value = q;
+        const gg = ctx.createGain(); gg.gain.value = g;
+        osc.connect(bp).connect(gg).connect(am);
+      }
+      // And the air off the wing tips: noise, high, chopped at the beat by a
+      // square wave on its own gain. The chop is the point — unchopped this is
+      // a hiss, and a hiss over a buzz is a leak, not a fly.
+      let chop = null;
+      if (noiseBuf) {
+        const air = ctx.createBufferSource();
+        air.buffer = noiseBuf; air.loop = true;
+        const nbp = ctx.createBiquadFilter();
+        nbp.type = 'bandpass'; nbp.frequency.value = 2800; nbp.Q.value = 1.2;
+        const gate = ctx.createGain();
+        gate.gain.value = 0.5;
+        chop = ctx.createOscillator();
+        chop.type = 'square'; chop.frequency.value = FLYBUZZ.hz;
+        const chopG = ctx.createGain(); chopG.gain.value = 0.5;
+        chop.connect(chopG).connect(gate.gain);
+        const ng = ctx.createGain(); ng.gain.value = 0.085;
+        air.connect(nbp).connect(gate).connect(ng).connect(am);
+        air.start(); chop.start();
+      }
+      osc.start(); wob.start();
+      flyNodes = { osc, chop, out, pan: pn, lfo, wob };
+    }
+    const n = flyNodes;
+    // 20 ms, which is a ramp only so that it does not click. A fly's buzz has
+    // no release: it is on while the wings beat and off the instant six feet
+    // are on the plaster, and anything slower than this reads as the fly
+    // gliding in, which no fly has ever done.
+    n.out.gain.setTargetAtTime(Math.max(0.00005, want * FLYBUZZ.gain), t, 0.020);
+    const f = FLYBUZZ.hz * Math.max(0.6, Math.min(1.8, hz));
+    n.osc.frequency.setTargetAtTime(f, t, 0.05);
+    if (n.chop) n.chop.frequency.setTargetAtTime(f, t, 0.05);
+    n.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), t, 0.06);
+  }
+
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn, yelp, hum,
+    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn, yelp, hum, fly,
     /**
      * The last node before the speakers, and the context it lives in.
      *

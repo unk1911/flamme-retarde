@@ -6856,6 +6856,60 @@ window.__fr = {
   },
 
   /**
+   * The fly on the gornji kat — src/44-vikendica.js.
+   *
+   *   __fr.vik.stand('living'); __fr.fly.go('ceiling'); __fr.fly.watch(0.5);
+   *
+   * `go` puts it where you want it — cruise, land, or a perch by name —
+   * `step(s)` runs its own clock forward without waiting for the wall one, and
+   * `watch(d)` stands the camera `d` metres off it and points at it. The lens
+   * goes with the last of those, because a seven-millimetre animal at half a
+   * metre through a 58 degree lens is nine pixels and there is no argument to
+   * be had about nine pixels.
+   */
+  fly: {
+    raw: () => (jadrija && jadrija.vik ? jadrija.vik.fly : null),
+    stats: () => (jadrija && jadrija.vik ? jadrija.vik.fly.stats() : null),
+    go: (what) => (jadrija && jadrija.vik ? jadrija.vik.fly.go(what) : null),
+    hold: (on) => (jadrija && jadrija.vik ? jadrija.vik.fly.hold(on) : null),
+    at: () => (jadrija && jadrija.vik ? jadrija.vik.fly.at() : null),
+    perches: () => (jadrija && jadrija.vik ? jadrija.vik.fly.perches() : null),
+    /**
+     * Run the fly's clock. The person is handed in because that is what it
+     * measures the buzz against — see `stepFly`.
+     */
+    step: (secs = 1) => {
+      const v = jadrija && jadrija.vik;
+      if (!v) return null;
+      v.fly.step(secs, personAt());
+      return v.fly.stats();
+    },
+    /**
+     * Stand off it and look at it, on a long lens. `d` is metres, `fov` the
+     * lens, and `__fr.free()` puts both back.
+     *
+     * The eye goes on the room side of the fly — toward the middle of the big
+     * room, at (1.2, 4.6, 1.4) in the house's own metres — so that a fly on
+     * the ceiling is photographed from underneath and one on the window from
+     * inside, which are the two views there are.
+     */
+    watch: (d = 0.5, fov = 16) => {
+      const v = jadrija && jadrija.vik;
+      if (!v) return null;
+      const p = v.fly.at();
+      const mid = v.at([1.2, 4.60, 1.40]);
+      let dx = mid[0] - p[0], dy = mid[1] - p[1], dz = mid[2] - p[2];
+      const len = Math.hypot(dx, dy, dz) || 1;
+      dx /= len; dy /= len; dz /= len;
+      camera.fov = fov;
+      camera.updateProjectionMatrix();
+      camOverride = [p[0] + dx * d, p[1] + dy * d, p[2] + dz * d,
+        p[0], p[1], p[2]];
+      return { at: p.map((n) => +n.toFixed(2)), d, fov };
+    },
+  },
+
+  /**
    * The Bucketeer — src/45-bucketeer.js.
    *
    * `ways()` is her route, `go(phase)` drops her on a beat of it and `tick(s)`
