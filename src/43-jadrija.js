@@ -7238,17 +7238,59 @@ async function buildJadrija(scene) {
     const SGLASS = [0.700, 0.740, 0.748];
     const SBRIGHT = [0.780, 0.812, 0.815];
     const sB = S.s0 - 0.31, sF = S.s0 - 0.13;
-    for (const f of BACKBAR_SHELF) {
+
+    // ── AND THE WEST END OF THE TWO LOWER SHELVES IS NOT DRAWN AT ALL ────────
+    //
+    // Because two men are standing in it. The pair behind this counter are
+    // placed at `cm−3.50` and `cm−2.50` at `s0−0.15`, and the shelf band is
+    // `s0−0.31` to `s0−0.13`: their trunks occupy `s0−0.27` to `s0−0.03`, so
+    // every shelf in this run went straight through both of them.
+    //
+    // Measured on the built figures rather than argued: the instanced rig
+    // stands 1.696 m at scale 1 — `__fr.jad.raw().crowd.cast().rigH` — and
+    // these two are drawn at 1.005 and 1.019, so 1.705 m and 1.728 m. Their
+    // shoulders are at y0+1.39 and the head runs y0+1.45 to y0+1.73. The three
+    // shelves land at y0+1.272, y0+1.555 and y0+1.838. The bottom one crossed
+    // the chest, the MIDDLE ONE WENT THROUGH THE FACE, and the five boxes
+    // standing on the middle shelf step at 0.19 m from t 331.47 — so the one
+    // at 332.04 stood four centimetres off the west man's nose and took his
+    // whole head. Shot from the promenade, and what came back was two black
+    // tubs with arms and no heads on them, which is exactly the complaint.
+    //
+    // The top shelf clears the taller of the two by 0.11 m and runs the whole
+    // way, which is what the photographs have over the machine anyway.
+    //
+    // Moving the shelves instead is not available. The mirror is at `s0−0.11`
+    // and the shop body is solid from `s0`, so there is nowhere behind them to
+    // go; and a server cannot come further out than `s0−0.15` without his legs
+    // appearing in front of the counter panel, which is the measurement the
+    // placement note in the casting is built on. In 20260823_111815 the
+    // shelving stands about half a metre behind the men and everything is
+    // fine. This stage is 0.20 m deep and does not have the half-metre.
+    //
+    // `cm−2.15` is 0.35 m east of the east man, which is a shoulder and a
+    // hand's width. It leaves 2.49 m of the lower two shelves, all of it east
+    // of him, which is the half of the wall you see over the gelato case.
+    const wEnd = (S.t0 + S.t1) * 0.5 - 2.15;
+    // And what goes into the room the cut made: the coffee. Both ends of it in
+    // `t`, shared with `backBarKit` below and with the top shelf, which
+    // carries cups over the machine and stemware everywhere else.
+    const COFF = [t0 + 0.05, t0 + 0.90];
+
+    BACKBAR_SHELF.forEach((f, si) => {
       const ys = yHi - h * f;
+      // `si === 0` is the top shelf — `BACKBAR_SHELF` is measured DOWN from
+      // the head of the wall, so the smallest fraction is the highest shelf.
+      const wa = si === 0 ? t0 + 0.06 : Math.max(t0 + 0.06, wEnd);
       // The run, in spans between the mullions.
-      let a = t0 + 0.06;
+      let a = wa;
       const cuts = muls.concat([t1 - 0.06]);
       for (const c of cuts) {
         const bEnd = Math.min(c - 0.055, t1 - 0.06);
         if (bEnd - a > 0.10) {
           boxTS(a, bEnd, sB, sF, ys, ys + 0.016, SGLASS, SBRIGHT);
         }
-        a = c + 0.055;
+        a = Math.max(a, c + 0.055);
       }
       // The stemware, upside down on its bowl the way a bar keeps it — which
       // is what makes a row of them read, because the wide end is the end
@@ -7258,10 +7300,38 @@ async function buildJadrija(scene) {
       const n = Math.floor((t1 - t0 - 0.30) / 0.13);
       for (let i = 0; i <= n; i++) {
         const ct = t0 + 0.15 + i * 0.13;
+        // Off the west end of a cut-back shelf there is no shelf to stand on.
+        if (ct < wa + 0.09) continue;
         // Not through a mullion, and not over the gap either side of one.
         let blocked = false;
         for (const m of muls) if (Math.abs(ct - m) < 0.10) blocked = true;
         if (blocked) continue;
+        // CUPS OVER THE COFFEE AND GLASSES EVERYWHERE ELSE, which is the
+        // photograph rather than a scheme: `20260823_111819` has two rows of
+        // small white cups on saucers on a shelf at the LEFT of the back bar,
+        // under the row of tall glasses and directly over the grinder, and
+        // stemware along the rest of the run. So the top shelf — the only one
+        // that still crosses the coffee station, the other two stopping at
+        // `wEnd` — carries china for the first 1.30 m and glass after it.
+        //
+        // Upright and on their saucers, which is how a bar keeps cups and the
+        // opposite of how it keeps glasses; the note under this one says why
+        // the stemware is upside down. The saucer starts 3 mm INSIDE the
+        // shelf's 16 mm glass rather than on top of it — rule 5, on the one
+        // adjacency in this run where two faces are parallel.
+        if (si === 0 && ct < COFF[1] + 0.45) {
+          const CHINA = [0.775, 0.768, 0.750];
+          lathe(W, ct, cs, [
+            [ys + 0.013, 0.047],        // the saucer, buried in the shelf
+            [ys + 0.020, 0.049],
+            [ys + 0.024, 0.030],
+            [ys + 0.026, 0.023],        // and the cup standing in its well
+            [ys + 0.034, 0.026],
+            [ys + 0.058, 0.030],
+            [ys + 0.062, 0.028],
+          ], CHINA, 8);
+          continue;
+        }
         lathe(W, ct, cs, [
           [ys + 0.017, 0.037],          // the rim, standing on the glass
           [ys + 0.052, 0.031],
@@ -7271,17 +7341,21 @@ async function buildJadrija(scene) {
           [ys + 0.124, 0.024],
         ], SGLASS, 8);
       }
-    }
+    });
     // The boxed stock along the middle shelf, which was five painted
     // rectangles and is five boxes. Bright and wordless, exactly as it was:
     // it is illegible in both photographs and always was, and rule 12 says
     // that is what gets drawn.
+    //
+    // They start at `wEnd + 0.16` and not at `t0 + 0.62`, for the reason the
+    // note over the shelves gives: at `t0 + 0.62` the third of them stood in
+    // front of the west man's face.
     {
       const ys = yHi - h * BACKBAR_SHELF[1] + 0.016;
       const BOX = [[0.560, 0.290, 0.070], [0.130, 0.330, 0.560],
         [0.180, 0.410, 0.110], [0.470, 0.120, 0.290], [0.560, 0.450, 0.060]];
       for (let i = 0; i < 5; i++) {
-        const ct = t0 + 0.62 + i * 0.19;
+        const ct = wEnd + 0.16 + i * 0.19;
         if (ct > t1 - 0.20) break;
         let blocked = false;
         for (const m of muls) if (Math.abs(ct - m) < 0.13) blocked = true;
@@ -7294,6 +7368,285 @@ async function buildJadrija(scene) {
         // box 0.14 m wide, and it read as a hole punched through the front.
         boxTS(ct - 0.055, ct + 0.055, sB + 0.006, sB + 0.018, ys + 0.055,
           ys + 0.135, [0.780, 0.775, 0.752]);
+      }
+    }
+    // And the coffee, on the counter in the room the shelf cut made.
+    backBarKit(S, y0, COFF);
+    counterWork(S, y0, (S.t0 + S.t1) * 0.5);
+  }
+
+  /**
+   * The coffee end of the counter: a machine, a grinder, and the cups.
+   *
+   * WHAT IS PHOTOGRAPHED AND WHAT IS NOT, because half of this is read off the
+   * frames and half is not, and the difference belongs on the record.
+   *
+   * READ. The grinder is in both counter frames — bottom right of
+   * `20260823_111815` and behind the bowl of tasting spoons in
+   * `20260823_111819` — and it is unmistakable: a conical hopper with the
+   * beans showing black through it, wide at the top, narrowing on to a squat
+   * body with a chrome doser round it and a round knob on its flank.
+   *
+   * READ. The cups. `20260823_111819` has small white cups on saucers on the
+   * shelf under the row of tall glasses at the left of the back bar, and
+   * `20260823_111815` has more of them standing on the surface next to the
+   * grinder.
+   *
+   * READ IN PART. The machine. In `20260823_111815`, immediately right of the
+   * grinder and cut off by the edge of the frame, there is a brushed stainless
+   * fascia with one black round knob and two pale rocker switches on it, and
+   * cups standing on the surface above it. That is a machine, it is beside the
+   * grinder, and its top is a cup warmer. Its group heads are in NO frame —
+   * the counter and the case's hood take the bottom of it in both — so the two
+   * groups, the portafilters and the steam wand below are what that fascia and
+   * that grinder belong to, and not what was seen. Written out rather than
+   * smuggled in: a grinder standing alone is a shop that sells ground coffee.
+   *
+   * WHERE IT GOES, WHICH IS NOT WHERE IT IS. In the room, the grinder and the
+   * machine stand on a back worktop about half a metre BEHIND the men, with
+   * the mirror behind that again. There is no half-metre here. This stage is
+   * 0.20 m deep between the mirror at `s0−0.11` and the shelf fronts at
+   * `s0−0.31`, everything inland of `s0` is inside a solid shop body, and the
+   * two servers already stand in the middle of it at `s0−0.15`. So the coffee
+   * goes on the one horizontal surface there is — `shopKit`'s serving counter
+   * at `y0+1.06` — at the WEST end of the opening, which is the end the
+   * grinder is at in both photographs and the end nobody is standing at. The
+   * note over the shelves in `backBar` says why the shelving stops there.
+   *
+   * The depth ladder, because rule 5 has caught this shop three times:
+   *
+   *   s0−0.42  the portafilter handles    s0−0.30  the body face
+   *   s0−0.335 the group heads            s0−0.14  the machine back
+   *   s0−0.315 the fascia band            s0−0.11  the mirror
+   *
+   * The back is 0.03 m clear of the mirror, and every step in that ladder is
+   * 0.015 m or more — except the knob and the switches, which are BURIED in
+   * the fascia and stand proud of it by a centimetre. A control half inside
+   * its own panel cannot fight it for the depth buffer; that is the
+   * construction and not an accident, and it is the same trick the grinder's
+   * doser lever and the machine's own feet use.
+   *
+   * And the heights are bounded above as well as below. The middle shelf's
+   * line is `y0+1.555`; the shelf itself stops at `wEnd` and never reaches
+   * here, but the machine's cups top out at `y0+1.53` and the grinder's lid at
+   * `y0+1.525` anyway, so moving `wEnd` west later cannot put a shelf through
+   * either of them.
+   */
+  function backBarKit(S, y0, COFF) {
+    const STEEL = [0.505, 0.500, 0.486];
+    const BRIGHT = [0.645, 0.638, 0.622];
+    const CHROME = [0.700, 0.706, 0.700];
+    const DARK = [0.120, 0.120, 0.128];
+    const CHINA = [0.775, 0.768, 0.750];
+    const yc = y0 + 1.06;                      // the serving counter's top
+
+    // ── the machine ──────────────────────────────────────────────────────────
+    const mt0 = COFF[0], mt1 = COFF[0] + 0.54;
+    const mtc = (mt0 + mt1) * 0.5;
+    // 0.54 m and not the 0.75 a two-group machine really is. The opening's
+    // west reveal is at `oa` and the mirror starts 0.15 m east of it, and the
+    // grinder has to sit between this and the man at `cm−3.50` with a hand's
+    // width either side: 0.54 for the machine, 0.21 for the grinder and
+    // 0.08 m of daylight in each of the three gaps is what the 0.90 m of wall
+    // west of the west server will take. It is a small machine in a small
+    // shop, which is what this shop is.
+    {
+      // The drip tray, buried 0.03 m in the counter so that whatever the
+      // counter's top is doing the tray's base is inside it rather than
+      // skimming it — the same rule every foot in `counterKit` is set by.
+      boxTS(mt0 - 0.012, mt1 + 0.012, S.s0 - 0.335, S.s0 - 0.135,
+        yc - 0.03, yc + 0.055, STEEL, BRIGHT);
+      // The body, and the fascia standing 0.015 m proud of it. A band rather
+      // than a panel let into the face: a recess is a hole at this size and a
+      // hole is what the serving openings read as before 1.192.0.
+      boxTS(mt0, mt1, S.s0 - 0.30, S.s0 - 0.135, yc + 0.04, yc + 0.38,
+        BRIGHT, shade(BRIGHT, 1.08));
+      boxTS(mt0 + 0.02, mt1 - 0.02, S.s0 - 0.315, S.s0 - 0.135,
+        yc + 0.13, yc + 0.31, shade(STEEL, 0.86), shade(STEEL, 0.94));
+      // The cup warmer, and the cups on it. Four, because that is what the top
+      // of a machine this size holds and because `20260823_111815` has a
+      // stack of them there.
+      boxTS(mt0 - 0.008, mt1 + 0.008, S.s0 - 0.305, S.s0 - 0.135,
+        yc + 0.38, yc + 0.415, STEEL, BRIGHT);
+      for (let i = 0; i < 4; i++) {
+        const ct = mt0 + 0.10 + i * 0.115;
+        lathe(W, ct, S.s0 - 0.215, [
+          [yc + 0.405, 0.024],        // buried 0.01 in the warmer's plate
+          [yc + 0.428, 0.027],
+          [yc + 0.462, 0.031],
+          [yc + 0.470, 0.029],
+        ], CHINA, 8);
+      }
+      // The two groups, hanging under the body's front overhang, each with a
+      // portafilter locked into it. The handle is the thing that says espresso
+      // machine from four metres — it is the one part of the object that is
+      // not a box — and it hangs 0.08 m out over the counter's front edge at
+      // `s0−0.34`, which is where a portafilter handle is.
+      for (const dt of [-0.135, 0.135]) {
+        const ct = mtc + dt;
+        post(W, ct, S.s0 - 0.335, yc + 0.067, yc + 0.155, 0.027, CHROME, 8);
+        lathe(W, ct, S.s0 - 0.335, [
+          [yc + 0.042, 0.040],
+          [yc + 0.058, 0.043],
+          [yc + 0.068, 0.030],
+        ], DARK, 8);
+        boxTS(ct - 0.016, ct + 0.016, S.s0 - 0.42, S.s0 - 0.335,
+          yc + 0.042, yc + 0.062, DARK);
+      }
+      // The knob and the two switches, buried in the fascia.
+      boxTS(mtc + 0.19, mtc + 0.232, S.s0 - 0.330, S.s0 - 0.305,
+        yc + 0.185, yc + 0.227, DARK);
+      for (const dt of [-0.232, -0.185]) {
+        boxTS(mtc + dt, mtc + dt + 0.032, S.s0 - 0.326, S.s0 - 0.305,
+          yc + 0.192, yc + 0.222, [0.740, 0.735, 0.715]);
+      }
+      // The steam wand, off the east cheek and angled down and out. A leaning
+      // taper rather than a post, because a wand that hangs plumb is a pipe.
+      frustumTS(yc + 0.34, [mt1 - 0.03, S.s0 - 0.20, 0.010, 0.010],
+        yc + 0.10, [mt1 - 0.03, S.s0 - 0.325, 0.007, 0.007], CHROME, CHROME);
+    }
+
+    // ── the grinder ──────────────────────────────────────────────────────────
+    //
+    // 0.73 m east of the machine's west edge, which puts 0.085 m between the
+    // two of them and 0.045 m between the hopper and the west server's
+    // shoulder at `cm−3.50`. Both are gaps rather than clearances — nothing
+    // here is parallel to anything there — but they are the reason the machine
+    // is 0.54 m wide and not 0.65.
+    {
+      const gt = COFF[0] + 0.73, gs = S.s0 - 0.235;
+      // The body. Dark with a red flank, which is what it is in `z`-depth in
+      // both frames: the paint is not legible but the value and the hue are.
+      post(W, gt, gs, yc - 0.03, yc + 0.20, 0.085, [0.300, 0.115, 0.095], 10);
+      // The doser, and its lever. The lever is buried in the doser's own
+      // cylinder and sticks 0.05 m out of it.
+      lathe(W, gt, gs, [
+        [yc + 0.185, 0.090],
+        [yc + 0.200, 0.098],
+        [yc + 0.270, 0.096],
+        [yc + 0.280, 0.086],
+      ], CHROME, 10);
+      boxTS(gt - 0.012, gt + 0.012, gs - 0.135, gs - 0.060,
+        yc + 0.215, yc + 0.238, DARK);
+      // The hopper: a cone the right way up, wide at the top, with the beans
+      // in it. One solid and one colour — the beans and the smoked plastic
+      // around them are the same near-black in both photographs and a second
+      // shell here would be a shell nobody can see through.
+      lathe(W, gt, gs, [
+        [yc + 0.275, 0.050],
+        [yc + 0.300, 0.062],
+        [yc + 0.440, 0.105],
+      ], [0.145, 0.105, 0.080], 10);
+      // And the lid, which is the one part of a hopper that catches the light.
+      lathe(W, gt, gs, [
+        [yc + 0.430, 0.107],
+        [yc + 0.452, 0.109],
+        [yc + 0.465, 0.088],
+      ], [0.250, 0.235, 0.225], 10);
+    }
+  }
+
+  /**
+   * The three things on the plain counter west of the case, which between them
+   * are what says somebody is serving from it.
+   *
+   * `counterKit` is the five objects on the case's HOOD, and its note is
+   * emphatic that `20260823_111819` shows that surface "with five objects on
+   * it and nothing else". This is the OTHER surface in the same frame. Left of
+   * the fishbowl and the drainer tray, on the run of counter that carries on
+   * west past the end of the cabinet, there are three more:
+   *
+   *   — a big brushed-steel box with a hinged lid raked down toward the
+   *     customer, which is the largest object in the frame after the case
+   *     itself;
+   *   — a stainless caddy with long-handled gelato spades standing in it,
+   *     bowls uppermost;
+   *   — a dusty-pink cloth, folded. It is in `_111819` and again in `_111815`
+   *     on the worktop behind, and it is the one object on this counter that
+   *     is only there because somebody is working.
+   *
+   * They go on `shopKit`'s counter at `y0+1.06` and not on the hood, and that
+   * is a translation rather than a reading: in the room the two surfaces are
+   * within a hand's breadth of each other, and in this model the hood is at
+   * `y0+1.86` because the cabinet is drawn 1.92 m to the top of it. The lower
+   * one is the surface that is west of the case at all.
+   *
+   * WHICH LEAVES 0.32 m AND 0.20 m TO PUT THEM IN, and that is the whole of
+   * the placement. The east server stands at `cm−2.50` and is 0.23 m across
+   * the shoulders at the scale he is drawn, with another 0.04 m when the pass
+   * swings his arm out — so he owns `cm−2.80` to `cm−2.20`. West of him,
+   * between the mullion at t 332.30 and that, is `cm−3.14` to `cm−2.82`. East
+   * of him, up to the cabinet's west face at `cm−2.00`, is `cm−2.20` to
+   * `cm−2.00`. The spades are the only one of the three small enough for the
+   * second pocket, and the cloth ends up lying on the box's lid, which is
+   * where a bar towel lives anyway.
+   *
+   * Nothing goes east of the cabinet's face. The counter runs on under it, but
+   * the case's own back panel stands at `y0+1.20`, and anything shorter than
+   * that behind it is a thing nobody can see.
+   *
+   * Every back face is at `s0−0.17` or further out — 0.06 m clear of the
+   * mirror at `s0−0.11`, and the note in `backBar` about what happened at
+   * `s0−0.08` is why that is a measured number rather than a comfortable one.
+   */
+  function counterWork(S, y0, cm) {
+    const STEEL = [0.505, 0.500, 0.486];
+    const BRIGHT = [0.645, 0.638, 0.622];
+    const yc = y0 + 1.06;
+
+    // The lidded box. Its body is buried 0.03 m in the counter and the lid's
+    // FRONT edge is buried 0.012 m in the body, so the one horizontal joint
+    // this object has is inside a solid rather than on top of one. The lid
+    // rakes 0.046 m over 0.172 m, which is the pitch a shut lid takes when its
+    // hinge is the thick end.
+    const bt0 = cm - 3.14, bt1 = cm - 2.82;
+    boxTS(bt0, bt1, S.s0 - 0.33, S.s0 - 0.17, yc - 0.03, yc + 0.10,
+      BRIGHT, shade(BRIGHT, 1.06));
+    bar(bt0 - 0.006, bt1 + 0.006, [
+      [S.s0 - 0.336, yc + 0.088], [S.s0 - 0.164, yc + 0.134],
+      [S.s0 - 0.164, yc + 0.152], [S.s0 - 0.336, yc + 0.106],
+    ], STEEL, shade(STEEL, 1.14));
+    // The hinge, along the high edge. Two centimetres of a darker steel, and
+    // it is the only thing that says which way this lid opens.
+    boxTS(bt0, bt1, S.s0 - 0.182, S.s0 - 0.164, yc + 0.134, yc + 0.156,
+      shade(STEEL, 0.78));
+    // And the cloth on it, sunk into the rake at the front and standing
+    // 0.013 m proud of it at the back. Written as one box crossing a sloped
+    // face rather than as a slab laid on it: two nearly-parallel faces a
+    // millimetre apart is the fault this shop has three notes about, and a
+    // solid that goes through the thing it lies on cannot have it.
+    boxTS(bt0 + 0.06, bt0 + 0.16, S.s0 - 0.300, S.s0 - 0.220,
+      yc + 0.108, yc + 0.150, [0.620, 0.430, 0.455], [0.660, 0.470, 0.495]);
+
+    // The caddy of spades, in the second pocket. Same construction as the bowl
+    // of tasting spoons in `counterKit` and for the reason written up there: a
+    // cup on its own is a lump, and it is the handles standing out of it at
+    // every angle that make it a thing somebody has just put down.
+    //
+    // Four and not nine. These are gelato spades, not tasting spoons — one to
+    // a family of flavours, not one to a customer — and nine of them in a
+    // 0.11 m caddy is a hedgehog.
+    {
+      const ct = cm - 2.10, cs = S.s0 - 0.245;
+      lathe(W, ct, cs, [
+        [yc - 0.03, 0.050], [yc + 0.005, 0.054],
+        [yc + 0.095, 0.056], [yc + 0.108, 0.052],
+      ], STEEL, 10);
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * TAU + 0.6, lean = 0.030 + jit(i, 815) * 0.020;
+        const hi = yc + 0.235 + jit(i, 816) * 0.030;
+        // The handle, and then the spade's own bowl on the head of it — the
+        // widening at the top is what tells it from a spoon at this size.
+        frustumTS(yc + 0.06,
+          [ct + Math.cos(a) * 0.016, cs + Math.sin(a) * 0.016, 0.007, 0.007],
+          hi, [ct + Math.cos(a) * lean, cs + Math.sin(a) * lean, 0.009, 0.009],
+          [0.660, 0.666, 0.660], [0.700, 0.706, 0.700]);
+        frustumTS(hi - 0.003,
+          [ct + Math.cos(a) * lean, cs + Math.sin(a) * lean, 0.010, 0.010],
+          hi + 0.051,
+          [ct + Math.cos(a) * lean * 1.25, cs + Math.sin(a) * lean * 1.25,
+            0.020, 0.017],
+          [0.690, 0.696, 0.690], [0.730, 0.736, 0.730]);
       }
     }
   }
@@ -16807,7 +17160,17 @@ async function buildJadrija(scene) {
       // one pair of figures on it whose height is not a matter of taste: the
       // bottom of the height jitter is 1.56 m, and 1.56 m behind a 1.20 m
       // screen is a man showing his collar.
-      for (const [t, pose] of [[cm - 3.50, 'serve'], [cm - 2.50, 'stand']]) {
+      //
+      // NEITHER OF THEM IS `stand` ANY MORE. The east one is at the gelato
+      // case and the west one is at the coffee, which is the whole difference
+      // between two men behind a counter and a shop with two people in it —
+      // and `stand` is the promenade's idle, so the second of these was a man
+      // who had wandered into work and was waiting for a bus. The two poses
+      // are one block in 42-crowd.js and the note over it says what each does.
+      // West is `cm−3.50`, because the shore's `t` runs east and the coffee
+      // goes at the west end of the opening, which is where the two lower
+      // shelves now stop — see the note over them in `backBar`.
+      for (const [t, pose] of [[cm - 3.50, 'barista'], [cm - 2.50, 'serve']]) {
         const ss = S.s0 - 0.15;
         bathers.push({ t, s: ss, y: y0, ang: -Math.PI / 2,
           pose, k: 1.08, beat: null, sex: 'm', shirt: TEE, hair: CROP,

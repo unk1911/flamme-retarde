@@ -8,6 +8,172 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.252.0] — 2026-09-04
+
+### The other surface in the same photograph
+
+`counterKit`'s note is emphatic that `20260823_111819` shows the case's hood
+"with five objects on it and nothing else", and it is right — about the hood.
+The same frame has a second counter in it, the plain run that carries on west
+past the end of the cabinet, and there are three more things on that:
+
+- a big brushed-steel box with a hinged lid raked down toward the customer,
+  which is the largest object in the frame after the case itself;
+- a stainless caddy with long-handled gelato spades standing in it, bowls
+  uppermost — the tool the whole shop turns on;
+- a dusty-pink cloth, folded. It is in `_111819` and again in `_111815` on the
+  worktop behind, and it is the one object on this counter that is only there
+  because somebody is working.
+
+They go on `shopKit`'s counter at `y0+1.06` rather than on the hood, which is a
+translation and not a reading: in the room the two surfaces are within a hand's
+breadth of each other, and here the hood is at `y0+1.86` because the cabinet is
+drawn 1.92 m to the top of it. The lower one is the surface that is west of the
+case at all.
+
+**Which leaves 0.32 m and 0.20 m to put them in.** The east server stands at
+`cm−2.50` and is 0.23 m across the shoulders at the scale he is drawn, with
+another 0.04 m when the pass swings his arm out, so he owns `cm−2.80` to
+`cm−2.20`. West of him, between the mullion at t 332.30 and that, is one
+pocket; east of him, up to the cabinet's west face at `cm−2.00`, is the other.
+The spades are the only one of the three small enough for the second, and the
+cloth ends up lying on the box's lid — which is where a bar towel lives anyway,
+and which avoided laying a 2 mm slab on a sloped face a millimetre away from
+it. It is written as one box crossing the rake instead: a solid that goes
+THROUGH the thing it lies on cannot fight it for the depth buffer.
+
+Nothing is drawn east of the cabinet's face. The counter runs on under it, but
+the case's own back panel stands at `y0+1.20` and anything shorter than that
+behind it is a thing nobody can see.
+
+**A note on what is not here.** The child at the counter being handed the cone
+was tried and dropped. The two children at `s0−1.15` are on the roving skinned
+cast — `hid: true` at every distance the shop is looked at from — and the pose
+switch in 42-crowd.js only drives the instanced tier, so a `reach` written for
+them would show at forty metres and never at four. Pinning them off the skinned
+rig with `staff: true` would work and costs the two best-looking figures in the
+shop their geometry at the one distance anybody sees them. Not worth an arm.
+
+## [1.251.0] — 2026-09-04
+
+### There is a coffee machine, and it is where the grinder is
+
+Second half of *"they make coffee/machiatos to folks, there's a coffe
+machiens"*. 1.250.0 turned one of the two men into a barista and left him
+turning to a wall.
+
+**What the photographs actually show.** The grinder is in both counter frames —
+bottom right of `20260823_111815` and behind the bowl of tasting spoons in
+`20260823_111819` — and it is unmistakable: a conical hopper with the beans
+showing black through it, wide at the top, narrowing on to a squat body with a
+chrome doser round it and a knob on its flank. The cups are there too:
+`20260823_111819` has small white cups on saucers on the shelf under the row of
+tall glasses, and `20260823_111815` has more of them on the surface beside the
+grinder.
+
+**The machine is read in part and no more.** In `20260823_111815`, immediately
+right of the grinder and cut off by the edge of the frame, there is a brushed
+stainless fascia with one black round knob and two pale rocker switches, and
+cups standing on the surface above it. That is a machine, it is beside the
+grinder, and its top is a cup warmer. Its group heads are in NO frame — the
+counter and the case's hood take the bottom of it in both — so the two groups,
+the portafilters and the steam wand are what that fascia and that grinder
+belong to and not what was seen. Said out loud rather than smuggled in: a
+grinder standing alone is a shop that sells ground coffee.
+
+**Where it goes is not where it is.** In the room the coffee stands on a back
+worktop about half a metre BEHIND the men. There is no half-metre here: this
+stage is 0.20 m deep between the mirror at `s0−0.11` and the shelf fronts at
+`s0−0.31`, everything inland of `s0` is a solid shop body, and the two servers
+are already standing in the middle of it at `s0−0.15`. So the coffee goes on
+the one horizontal surface that exists — `shopKit`'s serving counter at
+`y0+1.06` — at the WEST end of the opening, which is the end the grinder is at
+in both photographs and the end nobody is standing at. It is also the end where
+1.250.0 stopped the two lower shelves.
+
+A 0.54 m machine and not the 0.75 m a two-group really is: 0.54 for the
+machine, 0.21 for the grinder and 0.08 m of daylight in each of the three gaps
+is exactly what the 0.90 m of wall west of the west server will take. Its back
+is 0.03 m clear of the mirror, and the depth ladder — handles at `s0−0.42`,
+groups at `s0−0.335`, fascia at `s0−0.315`, body face at `s0−0.30`, back at
+`s0−0.14` — steps by 0.015 m or more at every rung except the knob and the
+switches, which are BURIED in the fascia and stand a centimetre proud of it. A
+control half inside its own panel cannot fight it for the depth buffer.
+
+**And the top shelf carries china over the coffee and glass everywhere else**,
+which is the photograph rather than a scheme. Cups upright on their saucers,
+the opposite of how the same shelf keeps its stemware, and the saucer starts
+3 mm inside the shelf's own glass rather than on top of it.
+
+## [1.250.0] — 2026-09-04
+
+### Two men behind a counter, and one of them is making coffee
+
+Misha, on the pair behind the slastičarnica's gelato case: *"right now they look
+like 2 busts/heads — they need to be more functional agile"*.
+
+They did, and three separate things were making them that.
+
+**The middle glass shelf went through their faces.** The back bar's three
+shelves land at `y0+1.272`, `y0+1.555` and `y0+1.838`; the instanced rig stands
+1.696 m at scale 1 and these two are drawn at 1.005 and 1.019, so their
+shoulders are at `y0+1.39` and their heads run `y0+1.45` to `y0+1.73`. The
+bottom shelf crossed the chest and the middle one crossed the head — and the
+five boxes standing on the middle shelf step at 0.19 m from t 331.47, so the one
+at 332.04 stood four centimetres off the west man's nose and took the whole of
+it. From the promenade: two black tubs with arms and no heads on them.
+
+The shelf band is `s0−0.31` to `s0−0.13` and their trunks occupy `s0−0.27` to
+`s0−0.03`, so there is no version of this that does not intersect. In
+`20260823_111815` the shelving stands about half a metre behind the men; this
+stage is 0.20 m deep between the mirror at `s0−0.11` and the counter, and does
+not have the half-metre. So the two lower shelves and all five boxes now stop
+at `cm−2.15`, a shoulder and a hand's width east of the east man. The top shelf
+clears the taller of them by 0.11 m and runs the whole way, which is what the
+photograph has over the machine anyway.
+
+**The bow leaned them backwards.** `serve` set `torso.rotation.z = 0.05 +
+dig·0.16` and `head.rotation.z = 0.04 + dig·0.11` under a comment that said
+"head down into the case". Positive is the wrong sign for both: the convention
+at the top of 42-crowd.js is written for a limb, which hangs DOWN, and `Rz(θ)`
+takes `(0,−1,0)` forward but `(0,1,0)` — a spine, a neck — BACKWARD. So every
+time either of them reached into the case he leaned away from it with his chin
+up. `sit`, two cases above, has had the sign right all along.
+
+That also retires the 0.11 rad cap the old note argued for at length. The cap
+existed because a positive `head.rotation.z` walks the crown 0.15 m INLAND into
+a shop body that is solid from `s0`. Bowing with a negative angle walks it the
+other way, over a counter with a metre and a half of nothing in front of it.
+
+**And the hands were under the counter.** The counter is 1.06 m and hides
+everything below it. The old pose hung the upper arm at −0.12 and swung the
+forearm flat at 1.52, which puts the hand at 1.08 m — two centimetres of wrist
+over the lip, from a shop the promenade looks at from four metres. 0.55 at the
+shoulder and 1.15 at the elbow lifts the elbow to 1.12 and the hand to 1.16 m,
+0.45 m out: a hand ON the counter rather than under it.
+
+**What they do now.** One cycle of 11 to 21 s off each man's own seed, split
+into windows that cannot overlap, with a third of every cycle in which he is
+simply standing there — which is what makes the rest read as him deciding
+something. `serve` bows into the case with both hands low and the head down
+between them, and hands something across on the other half of the cycle: one
+arm out to 1.30 m and 0.55 m forward, over the counter, toward the two children
+standing at it. `barista` turns 35° to his own right and works the machine at
+the west end, then comes back square and sets a cup down.
+
+Two rules came out of getting the arms wrong twice, both photographed off the
+render rather than reasoned about:
+
+- **The elbow never goes below the counter.** It hangs at `1.39 − 0.31·cos θ`,
+  the counter is at 1.06 and the arm is 0.04 thick, so θ must stay over
+  0.54 rad. Under it the forearm and hand hang in front of the panel and there
+  is a bare arm in the air over the promenade — twice, once at 39° from
+  vertical and once plumb, where it looked like a pair of legs standing in
+  front of the shop.
+- **The bow is 0.24 rad and not 0.30.** The shoulder is 0.42 m above the waist
+  pivot, so it travels `0.42·sin(lean)` seaward: 0.14 m at 0.34 rad puts it at
+  `s0−0.29`, and the counter's front panel is a plane at `s0−0.28`. In front of
+  a plane there is no such thing as nearly hidden.
 ## [1.236.0] — 2026-09-04
 
 ### Hose a bather and they answer, in their own voice
