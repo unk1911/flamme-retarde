@@ -1581,35 +1581,324 @@ async function buildJadrija(scene) {
   }
 
   /**
-   * A clothesline between two huts, with towels pegged on it.
+   * A clothesline between two huts, with somebody's washing on it.
    *
    * Survey/4: "a line strung from a nail on the wall to the next hut with
    * towels pegged on it… two of the frames are of nothing but that." It hangs
    * across the front of a bay, so it goes on shut ones only — a towel across
    * an open door is a curtain, and there is already one of those.
+   *
+   * ── AND IT WAS SIX FLAT RECTANGLES ───────────────────────────────────────
+   *
+   * Three solid panels off a six-colour palette, square corners, no pegs. At
+   * two metres the line covers more of the frame than the wall behind it does,
+   * so that was the loudest wrong thing on the whole block: it read as bunting
+   * strung between two huts rather than as anybody's laundry.
+   *
+   * What the two back-row pans actually have on the line, frame by frame:
+   *
+   *   f23 — the one frame that shows a whole line end to end. Left to right: a
+   *     black bikini top and two pairs of near-black socks, every one of them
+   *     on a white plastic peg that sits ON the cord and is plainly visible at
+   *     that distance; then a grass-green towel on two pegs with a hem band of
+   *     red, yellow and green and a white care label out of the seam; then a
+   *     cream shirt with more socks beyond it. The cord sags a good 3 cm.
+   *   f33 — a pale pink towel FOLDED over the cord, no pegs at all, with a
+   *     magenta band 10 cm up from the hem carrying golden starfish, seahorses
+   *     and fish, and a thin magenta pinstripe higher up.
+   *   f51 — a black one-piece hung over the cord BY ITS OWN STRAPS: the two of
+   *     them loop over the line and make a narrow V, the body hangs bunched
+   *     below in three widths, two clasp rings catch the light at the chest,
+   *     and the lining shows pale where the leg is turned back. Beside it a
+   *     pink ombré towel, vertical stripes running deep rose at one edge to
+   *     near-white at the other.
+   *   f32 — a blue T-shirt over the cord, sleeves flopping either side.
+   *   f22 — one small dark garment alone in the middle of an otherwise empty
+   *     span, which is why the loop below is allowed to stop at two.
+   *
+   * Six kinds of thing, then, and the printed border is the entire difference
+   * between a towel and a coloured rectangle.
    */
-  const TOWELS = [
-    [0.560, 0.115, 0.105], [0.115, 0.310, 0.520], [0.640, 0.560, 0.155],
-    [0.545, 0.520, 0.480], [0.180, 0.420, 0.260], [0.580, 0.330, 0.115],
-  ];
+  // Read off the frames named above, not chosen. These sit in the same band
+  // the rest of the beach is painted in — the palette this replaces topped out
+  // at 0.640 and nothing here goes over it, so the line is lit by the same sun
+  // as the render behind it.
+  const LAUNDRY = {
+    green:  [0.180, 0.470, 0.185],   // f23, the towel
+    hemG:   [0.130, 0.380, 0.145],   // f23, the three stripes in its hem
+    hemR:   [0.560, 0.080, 0.070],
+    hemY:   [0.630, 0.510, 0.080],
+    label:  [0.555, 0.545, 0.520],   // f23, the care label out of the seam
+    peg:    [0.585, 0.575, 0.545],   // f23, white plastic pegs
+    pegW:   [0.430, 0.320, 0.175],   // and the wooden ones further along it
+    cream:  [0.590, 0.548, 0.452],   // f23, the shirt at the right-hand end
+    pink:   [0.665, 0.452, 0.470],   // f33, the pale field
+    band:   [0.590, 0.115, 0.290],   // f33, the magenta border
+    motif:  [0.655, 0.500, 0.090],   // f33, the starfish, seahorses and fish
+    rose:   [0.545, 0.150, 0.310],   // f51, the deep end of the ombré
+    ombre:  [0.618, 0.520, 0.520],   // f51, the pale end of it
+    black:  [0.062, 0.060, 0.066],   // f51's one-piece, f23's socks and top
+    lining: [0.400, 0.392, 0.380],   // f51, the lining at the hem of the suit
+    clasp:  [0.385, 0.372, 0.345],   // f51, the slider on the front seam
+    shirt:  [0.300, 0.330, 0.470],   // f32, the blue T-shirt
+  };
+  // How wide each kind hangs, so the packer below knows whether the next one
+  // still fits before it draws it. Indices are the six kinds in `hang`.
+  const HUNGW = [0.46, 0.42, 0.28, 0.26, 0.19, 0.40];
+  // And how often each turns up. Twelve slots weighted the way f23's line is
+  // loaded: its left-hand third is nothing but socks and a bikini top and the
+  // right two thirds are towels, so towels are six of the twelve and the small
+  // things are the other six.
+  const HUNGKIND = [0, 1, 2, 0, 4, 1, 3, 5, 0, 4, 1, 2];
   function clothesline(a, c, front, floor, k) {
     const y = floor + 1.94;
     const fs = front - 0.16;
-    // The line itself: 6 mm of cord, and it sags, which is two boxes stepping
-    // down and back up rather than one straight one.
     const CORD = [0.400, 0.386, 0.350];
-    const mid = (a + c) * 0.5;
-    boxTS(a + 0.05, mid, fs - 0.004, fs + 0.004, y - 0.03, y + 0.003, CORD);
-    boxTS(mid, c - 0.05, fs - 0.004, fs + 0.004, y - 0.03, y + 0.003, CORD);
-    boxTS(a + 0.02, a + 0.07, front - 0.03, front, y, y + 0.03, CORD);
-    boxTS(c - 0.07, c - 0.02, front - 0.03, front, y, y + 0.03, CORD);
-    for (let i = 0; i < 3; i++) {
-      const w = 0.30 + 0.08 * ((k + i * 3) % 3);
-      const x = a + 0.14 + i * ((c - a - 0.30) / 3);
-      const drop = 0.52 + 0.16 * ((k * 5 + i) % 3);
-      const col = TOWELS[(k * 2 + i) % TOWELS.length];
-      boxTS(x, Math.min(x + w, c - 0.06), fs - 0.016, fs + 0.016,
-        y - 0.03 - drop, y - 0.02, col, shade(col, 1.16));
+    const x0 = a + 0.05, x1 = c - 0.05, L = x1 - x0;
+    // The cord sags. It did not before — the two boxes the old comment called
+    // "stepping down and back up" were at the same height as each other, so
+    // the line was dead straight — and in f23 the drop over a 2 m span is a
+    // good 3 cm, which is what a wet towel does to 2 mm of washing line.
+    //
+    // Ten steps and not four: a parabola cut into four is 2 cm a tread at the
+    // anchors, and on a 6 mm cord you can count the stairs.
+    const SAG = 0.035;
+    const sag = (x) => {
+      const u = (x - x0) / L;
+      return y - SAG * 4 * u * (1 - u);
+    };
+    for (let i = 0; i < 10; i++) {
+      const p = x0 + L * (i / 10), q = x0 + L * ((i + 1) / 10);
+      boxTS(p, q, fs - 0.003, fs + 0.003,
+        Math.min(sag(p), sag(q)) - 0.004, Math.max(sag(p), sag(q)) + 0.004, CORD);
+    }
+    // The two nails, back to the render at either end. Buried 3 cm INTO the
+    // skin rather than stopped dead on its face, where the old pair ended: the
+    // front skin's outer plane is exactly `front`, so a box whose back face
+    // was also exactly `front` was two parallel faces skimming 2 km from the
+    // origin — rule 5, and silent.
+    boxTS(a + 0.02, a + 0.07, front - 0.03, front + 0.03, y, y + 0.03, CORD);
+    boxTS(c - 0.07, c - 0.02, front - 0.03, front + 0.03, y, y + 0.03, CORD);
+
+    // A peg. f23's are white plastic, 7 cm long, sitting on the cord with
+    // about a third of them showing above it. Fatter in `s` than a real one —
+    // 4 cm — because it has to straddle 2.4 cm of towel and still be seen
+    // either side of it, and being seen is the entire point of drawing it.
+    const peg = (px, cy, wood) => {
+      const pc = wood ? LAUNDRY.pegW : LAUNDRY.peg;
+      boxTS(px - 0.012, px + 0.012, fs - 0.020, fs + 0.020,
+        cy - 0.048, cy + 0.022, pc, shade(pc, 1.20));
+    };
+
+    // ── THE SIX THINGS ───────────────────────────────────────────────────
+    //
+    // Every one of these stacks boxes at different half-depths in `s` — the
+    // hem band stands 3.5 mm proud of the field it is printed on, the gold
+    // creatures stand 3 mm proud of the band — so that no two parallel faces
+    // in the pile are ever coplanar. Rule 5. Butting two panels edge to edge
+    // and calling it a stripe is exactly the trap, so where stripes are wanted
+    // they overlap by 2 mm and alternate their depth instead.
+    const hang = (kind, x, kk) => {
+      const w = HUNGW[kind], cy = sag(x + w * 0.5);
+      if (kind === 0) {
+        // f23's green towel: pegged flat by two corners, with the printed hem.
+        // Cream instead of green on a third of them — f23 has one of each on
+        // the same line, and a line of nothing but green towels is the fault
+        // this whole function is here to fix.
+        const fld = jit(kk, 41) < 0.34 ? LAUNDRY.cream : LAUNDRY.green;
+        const drop = 0.52 + 0.14 * jit(kk, 17);
+        boxTS(x, x + w, fs - 0.012, fs + 0.012, cy - drop, cy - 0.005,
+          fld, shade(fld, 1.16));
+        const yb = cy - drop;
+        const st = [[-0.002, 0.012, LAUNDRY.hemG, 0.0155],
+          [0.010, 0.027, LAUNDRY.hemR, 0.0180],
+          [0.025, 0.041, LAUNDRY.hemY, 0.0155],
+          [0.039, 0.052, LAUNDRY.hemG, 0.0180]];
+        for (const [p, q, sc, dz] of st)
+          boxTS(x + 0.006, x + w - 0.006, fs - dz, fs + dz, yb + p, yb + q, sc);
+        // The label, sticking 3 cm out of the seam at the bottom. It is white,
+        // it is the only white on a green towel, and it is in the frame.
+        boxTS(x + w * 0.62, x + w * 0.62 + 0.030, fs - 0.009, fs + 0.009,
+          yb - 0.028, yb + 0.004, LAUNDRY.label);
+        peg(x + 0.055, cy, false);
+        peg(x + w - 0.055, cy, jit(kk, 29) < 0.4);
+        return;
+      }
+      if (kind === 1) {
+        // A towel folded over the cord, which is why it has no pegs on it —
+        // f33 and f51 are both hung this way and neither has one. Two of them:
+        // f33's pale pink with the printed border, and f51's ombré.
+        const drop = 0.74 + 0.16 * jit(kk, 53);
+        const ombre = jit(kk, 61) < 0.45;
+        // The roll of fabric over the line: the fattest part of a folded
+        // towel, and the thing that says "folded" rather than "pegged".
+        const lipC = ombre ? LAUNDRY.rose : LAUNDRY.pink;
+        boxTS(x, x + w, fs - 0.021, fs + 0.021, cy - 0.006, cy + 0.034,
+          shade(lipC, 1.10), shade(lipC, 1.26));
+        if (ombre) {
+          // f51's vertical stripes, deep rose at one edge to near-white at the
+          // other. Seven columns: at six you can count them, at eight the
+          // stripe is under a pixel by the far end of the run. They overlap by
+          // 4 mm and alternate depth rather than butting — see above.
+          //
+          // The ramp is wobbled ±0.14 per column and the deep end goes either
+          // way round. A clean monotonic ramp is a gradient swatch; f51's is
+          // woven terry, where a stripe here and there comes out darker than
+          // the one outboard of it — and two of these hanging side by side off
+          // a clean ramp were plainly the same object twice.
+          const flip = jit(kk, 71) < 0.5;
+          const A = LAUNDRY.rose, B = LAUNDRY.ombre;
+          for (let m = 0; m < 7; m++) {
+            const u = Math.max(0, Math.min(1,
+              (flip ? 1 - m / 6 : m / 6) + 0.28 * (jit(kk * 5 + m, 83) - 0.5)));
+            const dz = (m % 2) ? 0.0135 : 0.0165;
+            const cm = [A[0] + (B[0] - A[0]) * u, A[1] + (B[1] - A[1]) * u,
+              A[2] + (B[2] - A[2]) * u];
+            boxTS(x + w * (m / 7) - (m ? 0.004 : 0),
+              x + w * ((m + 1) / 7) + (m < 6 ? 0.004 : 0),
+              fs - dz, fs + dz, cy - drop, cy - 0.004, cm, shade(cm, 1.14));
+          }
+          return;
+        }
+        boxTS(x, x + w, fs - 0.016, fs + 0.016, cy - drop, cy - 0.004,
+          LAUNDRY.pink, shade(LAUNDRY.pink, 1.14));
+        // f33's border: a magenta band 5.5 cm deep sitting 10 cm up from the
+        // hem with five gold creatures in it. They come out 3 cm across, which
+        // at two metres is a couple of pixels — enough to read as a print
+        // rather than as a plain stripe, which is all that is being claimed.
+        const yB = cy - drop + 0.10;
+        boxTS(x + 0.005, x + w - 0.005, fs - 0.0195, fs + 0.0195,
+          yB, yB + 0.055, LAUNDRY.band);
+        for (let m = 0; m < 5; m++) {
+          // A starfish is square, a seahorse is tall and narrow, a fish is
+          // wide and short. Three silhouettes off the index, which is as much
+          // as a 3 cm print can carry and as much as f33 shows.
+          const mw = [0.017, 0.011, 0.020][m % 3], mh = [0.016, 0.021, 0.011][m % 3];
+          const mx = x + 0.045 + m * ((w - 0.09) / 4);
+          boxTS(mx - mw, mx + mw, fs - 0.0225, fs + 0.0225,
+            yB + 0.0275 - mh, yB + 0.0275 + mh, LAUNDRY.motif);
+        }
+        boxTS(x + 0.005, x + w - 0.005, fs - 0.018, fs + 0.018,
+          yB + 0.20, yB + 0.208, LAUNDRY.band);
+        return;
+      }
+      if (kind === 2) {
+        // f51's one-piece, hung over the cord BY ITS OWN STRAPS. This is the
+        // frame the whole rewrite is for: the two straps loop over the line
+        // and show above it as well as below, which no pegged thing does, and
+        // that silhouette is what makes it a swimsuit at two metres instead of
+        // a dark smudge.
+        //
+        // ── AND IT TOOK THREE GOES NOT TO BE A CAT ─────────────────────────
+        //
+        // The two things that made it one were both attempts to be faithful.
+        // A raised shoulder at the top of each strap — f51 does have a scooped
+        // neckline, and boxes can only fake the scoop by standing the corners
+        // up over a lower centre — drew two ears. Two clasp rings side by side
+        // at the chest — f51 plainly has two — drew two eyes between them. A
+        // symmetric pair of bright marks under a symmetric pair of horns is a
+        // face at any resolution, and a face is worse than no detail at all.
+        //
+        // So: no shoulders, long thin straps straight down to a squared bust,
+        // and ONE slider bar instead of two rings. At two metres the two rings
+        // are 4 px nine apart and merge into that bar anyway.
+        const K = LAUNDRY.black;
+        for (const sx of [x + 0.052, x + w - 0.052]) {
+          boxTS(sx - 0.011, sx + 0.011, fs - 0.014, fs + 0.014,
+            cy - 0.012, cy + 0.030, K, shade(K, 2.4));
+          boxTS(sx - 0.008, sx + 0.008, fs - 0.010, fs + 0.010,
+            cy - 0.150, cy - 0.006, K);
+        }
+        // Bust, waist, gusset. The taper is gentle and the bottom is a 9 cm
+        // tail, not a point: an aggressive taper gives a head and a neck.
+        boxTS(x + 0.022, x + w - 0.022, fs - 0.022, fs + 0.022,
+          cy - 0.300, cy - 0.145, K, shade(K, 2.2));
+        boxTS(x + 0.040, x + w - 0.040, fs - 0.019, fs + 0.019,
+          cy - 0.400, cy - 0.295, K, shade(K, 1.8));
+        boxTS(x + 0.096, x + w - 0.096, fs - 0.017, fs + 0.017,
+          cy - 0.500, cy - 0.395, K, shade(K, 1.7));
+        // The lining, pale where the leg is turned back at the hem.
+        boxTS(x + 0.101, x + w - 0.101, fs - 0.019, fs + 0.019,
+          cy - 0.514, cy - 0.496, LAUNDRY.lining);
+        // The slider on the centre-front seam, at the sternum.
+        boxTS(x + w * 0.5 - 0.019, x + w * 0.5 + 0.019, fs - 0.026, fs + 0.026,
+          cy - 0.268, cy - 0.254, LAUNDRY.clasp);
+        return;
+      }
+      if (kind === 3) {
+        // f23's bikini top: two cups, the bridge between them, one peg, and
+        // the neck ties dangling at unequal lengths — they do in the frame,
+        // and equal ones would be the giveaway.
+        const K = LAUNDRY.black;
+        boxTS(x, x + 0.105, fs - 0.018, fs + 0.018,
+          cy - 0.155, cy - 0.020, K, shade(K, 2.2));
+        boxTS(x + w - 0.105, x + w, fs - 0.018, fs + 0.018,
+          cy - 0.155, cy - 0.020, K, shade(K, 2.2));
+        boxTS(x + 0.100, x + w - 0.100, fs - 0.013, fs + 0.013,
+          cy - 0.095, cy - 0.030, K);
+        for (let n2 = 0; n2 < 2; n2++) {
+          const tx = x + (n2 ? w - 0.028 : 0.028);
+          const tl = 0.10 + 0.10 * jit(kk * 3 + n2, 23);
+          boxTS(tx - 0.006, tx + 0.006, fs - 0.008, fs + 0.008,
+            cy - 0.155 - tl, cy - 0.148, K);
+        }
+        peg(x + w * 0.5, cy, false);
+        return;
+      }
+      if (kind === 4) {
+        // f23's socks: two of them, hung by the cuff on a peg each, and the
+        // foot turns out at the ankle because a sock does not hang plumb.
+        // 3.8 cm across the leg and 19 cm down it — a sock, not a flannel. At
+        // 5.2 by 16 the pair drew as two dark tiles with pegs on them.
+        const K = LAUNDRY.black;
+        for (let n2 = 0; n2 < 2; n2++) {
+          const lx = x + 0.030 + n2 * 0.098, turn = n2 ? 0.024 : -0.020;
+          boxTS(lx - 0.019, lx + 0.019, fs - 0.014, fs + 0.014,
+            cy - 0.195, cy - 0.008, K, shade(K, 2.1));
+          boxTS(lx - 0.017 + turn, lx + 0.030 + turn, fs - 0.018, fs + 0.018,
+            cy - 0.242, cy - 0.188, K, shade(K, 1.9));
+          peg(lx, cy, n2 === 1);
+        }
+        return;
+      }
+      // f32's T-shirt, over the cord with the shoulders rolled on it and the
+      // sleeves flopping either side — the outer one lower, because in the
+      // frame one of them has slipped.
+      const C = LAUNDRY.shirt;
+      boxTS(x + 0.075, x + w - 0.075, fs - 0.020, fs + 0.020,
+        cy - 0.008, cy + 0.030, shade(C, 1.10), shade(C, 1.26));
+      boxTS(x + 0.070, x + w - 0.070, fs - 0.015, fs + 0.015,
+        cy - 0.430, cy - 0.004, C, shade(C, 1.14));
+      boxTS(x, x + 0.078, fs - 0.019, fs + 0.019,
+        cy - 0.235, cy - 0.055, C, shade(C, 1.20));
+      boxTS(x + w - 0.078, x + w, fs - 0.019, fs + 0.019,
+        cy - 0.220, cy - 0.055, C, shade(C, 1.20));
+      // The collar, which on every shirt ever made is a different tone.
+      boxTS(x + w * 0.5 - 0.045, x + w * 0.5 + 0.045, fs - 0.023, fs + 0.023,
+        cy - 0.075, cy - 0.050, shade(C, 0.78));
+    };
+
+    // Pack the line left to right until the next thing will not fit. Which
+    // things, how wide the gaps are and every variation inside them come off
+    // `jit` on the bay index — rule 4: no draw of `rng` reaches this far down
+    // the beach build, and one taken here would move every parasol, bather and
+    // hut downstream of this hut.
+    //
+    // Both arguments of `jit` move with the slot, not just the first: stepping
+    // only the first by a constant left neighbouring slots correlated enough
+    // to put three pairs of socks on one line and two identical towels on
+    // another. And the same kind never lands twice running — it takes the next
+    // entry in the table instead. Both of those are about the one failure this
+    // whole function exists to fix, which is a line that reads as a repeat.
+    let x = x0 + 0.04, prev = -1;
+    for (let i = 0; i < 6; i++) {
+      let ix = Math.floor(jit(k + i * 97, 3 + i * 11) * HUNGKIND.length);
+      if (HUNGKIND[ix] === prev) ix = (ix + 1) % HUNGKIND.length;
+      const kind = HUNGKIND[ix];
+      if (x + HUNGW[kind] > x1 - 0.02) break;
+      hang(kind, x, k * 7 + i);
+      prev = kind;
+      x += HUNGW[kind] + 0.045 + 0.11 * jit(k * 9 + i, 11);
     }
   }
 
@@ -2088,6 +2377,7 @@ async function buildJadrija(scene) {
       // And a line of washing across one shut bay in nine.
       if (oIx !== 0 && (k * 4 + (t0 | 0)) % 9 === 0) {
         clothesline(a, c, front, fl, k + (t0 | 0));
+        washLines.push([+dc.toFixed(1), +front.toFixed(1)]);
       }
     }
     // The name of the thing, on the end wall of the run that carries the one
@@ -2610,6 +2900,11 @@ async function buildJadrija(scene) {
   // And where the two of them ended up, because "the 17th bay in the block" is
   // not a place anybody can go and look at. `__fr.jad.raw().stoneBays`.
   const stoneBays = [];
+  // Same for the washing. One shut bay in nine gets a line across it and the
+  // rule that picks them is a modulo on two numbers neither of which is a
+  // position, so finding one to stand in front of meant walking the whole
+  // block. `__fr.jad.raw().washLines` — [t of the bay centre, s of the row].
+  const washLines = [];
   const kabFrom = squareRow(JAD.rowA, JAD.cabW * KAB.bays);
   for (const [front, phase] of [[JAD.rowA, 0], [JAD.rowB, JAD.cabW * 0.5]]) {
    for (const [tA, tB] of JAD.rows) {
@@ -31916,7 +32211,7 @@ async function buildJadrija(scene) {
       if (s < JAD.reachIn) return true;
       return !isSea(x, z);
     },
-    blockers, local, toWorld, walkY, inField, vik, stoneBays,
+    blockers, local, toWorld, walkY, inField, vik, stoneBays, washLines,
     /**
      * The four trampoline beds, in world metres, and which one you are on.
      *
