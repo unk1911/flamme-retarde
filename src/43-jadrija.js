@@ -15544,27 +15544,82 @@ async function buildJadrija(scene) {
     }
   }
 
-  /** Oleander: a mound of dark leaf with the flowers sitting on top of it. */
+  /**
+   * The shrub mass behind the promenade: a mound of dark leaf, the shoots
+   * coming out of it, and the flowers sitting in the top.
+   *
+   * A DOME IS THE WRONG SOLID, and the old note here half knew it — "a mound
+   * of four, because one dome the size of a whole shrub is a dome" — and then
+   * built four smooth ones on top of each other. Frame 100 of the kabine pan
+   * is a shrub this size at four metres, standing on the gravel beside the
+   * litter bin, and it is not a mound at all: it is a dense body with a
+   * hundred individual sprays coming out of the top and sides, so the outline
+   * is ragged the whole way round and there is sky between the shoots for a
+   * hand's breadth outside the body. At 2.6 m across, standing on bare ground
+   * with nothing near it, smooth sides read as a green boulder — which is
+   * exactly what this looked like from the lane behind the kabine.
+   *
+   * Three changes and they are all one change. The jag goes from 0.32 to 0.62,
+   * which is the pine's number and the pine is the one thing in this file
+   * whose outline was got right. The body goes TALLER THAN WIDE, because a
+   * shrub nobody clips is. And every one of the nine draws that used to place
+   * a flower now places a SHOOT as well — a narrow upright tuft out past the
+   * body's own radius on the same bearing — so the silhouette is broken in
+   * nine more places for no extra draw at all.
+   *
+   * The flowers are 0.20 r across against 0.13 and they sit ON the shoots
+   * rather than hovering over the mass. "Oleander in August is more flower
+   * than leaf" is the old note's own line and nine specks a tenth of the
+   * shrub's width did not say it.
+   *
+   * RULE 4. Thirty-five draws off `rng` going in and thirty-five coming out,
+   * in the same order: one for the facing, two for each of the three side
+   * puffs, one for the flower colour, three for each of the nine shoots. The
+   * whole beach layout is downstream of this stream and a shrub that spends
+   * one more draw than it used to moves every parasol east of it.
+   */
   function oleander(t, s, y, r) {
     const P = facing(t, s, rng() * TAU);
-    const band = [y, y + r * 1.9];
+    const band = [y, y + r * 2.1];
     const DK = [0.098, 0.158, 0.094], LT = [0.220, 0.350, 0.208];
-    // A mound of four, because one dome the size of a whole shrub is a dome.
-    puff(P, 0, 0, y + r * 0.78, r * 0.86, r * 0.92, DK, LT, band, 8, 3, 0.32, 11);
+    // The body: taller than wide, and its base buried rather than resting on
+    // the ground, so there is no ellipse sitting on the dust.
+    puff(P, 0, 0, y + r * 1.00, r * 1.02, r * 0.82, DK, LT, band, 9, 4, 0.62, 11);
     for (let i = 0; i < 3; i++) {
       const a = (i / 3) * TAU + rng();
-      puff(P, Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55,
-        y + r * (0.52 + rng() * 0.35), r * 0.52, r * 0.58,
-        DK, LT, band, 7, 3, 0.36, 13 + i);
+      puff(P, Math.cos(a) * r * 0.42, Math.sin(a) * r * 0.42,
+        y + r * (0.70 + rng() * 0.60), r * 0.62, r * 0.46,
+        DK, LT, band, 7, 3, 0.62, 13 + i);
     }
-    // Oleander in August is more flower than leaf.
     const flower = rng() < 0.5 ? [0.880, 0.480, 0.600] : [0.945, 0.930, 0.910];
     const fdk = flower.map((v) => v * 0.62);
     for (let i = 0; i < 9; i++) {
-      const a = rng() * TAU, d = rng() * r * 0.86;
-      puff(P, Math.cos(a) * d, Math.sin(a) * d,
-        y + r * (1.05 + rng() * 0.55), r * 0.13, r * 0.16,
-        fdk, flower, [y + r * 0.9, y + r * 1.8], 6, 2, 0.30, 17 + i);
+      const a = rng() * TAU, d = 0.55 + rng() * 0.52;
+      const hh = 0.72 + rng() * 0.92;
+      // The shoots. Narrow and standing up — 0.30 r tall against 0.15 across —
+      // and pushed out past the body on their own bearing, which is what puts
+      // sky inside the outline instead of beside it.
+      //
+      // TWO of them per draw, and the second one is off `jit`. Nine shoots
+      // round a 2 m shrub is one every forty degrees and the gaps between them
+      // are still smooth body; eighteen is a rim. The stream cannot pay for
+      // the extra nine — rule 4 — but `jit` can, and this is exactly what it
+      // is for: a hash of the shrub's own station and an index, deterministic,
+      // free, and invisible to every parasol downstream.
+      const key = (t * 4) | 0;
+      for (let q = 0; q < 2; q++) {
+        const aq = q ? a + 0.62 + jit(key + i * 7, 811) * 1.9 : a;
+        const dq = q ? 0.58 + jit(key + i * 7, 812) * 0.48 : d;
+        const hq = q ? 0.68 + jit(key + i * 7, 813) * 0.98 : hh;
+        puff(P, Math.cos(aq) * r * dq * 1.10, Math.sin(aq) * r * dq * 1.10,
+          y + r * hq, r * 0.30, r * 0.15, DK, LT, band, 5, 2, 0.52,
+          17 + i + q * 47);
+      }
+      // And the head on top of it. Flat rather than round: what an oleander
+      // carries at the tip of a cane is a corymb, which is a plate of flower.
+      puff(P, Math.cos(a) * r * d * 0.94, Math.sin(a) * r * d * 0.94,
+        y + r * (hh + 0.42), r * 0.16, r * 0.20,
+        fdk, flower, [y + r * 1.0, y + r * 2.1], 6, 2, 0.34, 29 + i);
     }
   }
 
