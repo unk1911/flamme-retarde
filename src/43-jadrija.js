@@ -15708,6 +15708,232 @@ async function buildJadrija(scene) {
           [STRAKE[0] * g * 1.5, STRAKE[1] * g * 1.45, STRAKE[2] * g * 1.40]);
         }
       }
+      // ── the craft lying alongside ───────────────────────────────────────
+      //
+      // `_378` has one under the camera — a small white sportsboat against the
+      // mole's outboard face with a black outboard on the transom — and
+      // `_357` has the rest of the fleet fifty metres away, bow-on, with
+      // chrome pulpits, a blue sheer stripe, mooring lines in catenaries and
+      // registration numbers on the bows. The quay had bollards with ropes
+      // running off them into empty water.
+      //
+      // TWO NUMBERS ARE READ AND THE REST OF THE FLEET GOES BARE, which is
+      // rule 12 doing its job. Opened at the source resolution — `_357` is
+      // 4000 x 2252, not the 1100 the contact sheet gives — two of them come
+      // up clean:
+      //
+      //   SB 6051   blue serif digits on a CREAM hull, a royal-blue sheer
+      //             stripe above them and a near-black boot band below
+      //   SB 208    dark bold digits on a white hull, a different boat and a
+      //             different signwriter
+      //
+      // A third reads "SB 5" and then disappears behind the boat in front of
+      // it, so it is not used. Inventing the other three digits would be
+      // inventing a boat registration, which is exactly the kind of text
+      // rule 12 exists to keep off this shore.
+      //
+      // COLOURS divided out against the white hull, which is the one surface
+      // in that frame whose albedo is not in doubt: SB 208 reads rgb(215, 210,
+      // 205) against an assumed 0.85, so the illuminant is 0.78/0.74/0.71.
+      // The cream then comes out 0.94/0.82/0.58 — high, but that is what an
+      // older gelcoat next to a new white one looks like, and it is why the
+      // two hulls in the photograph do not read as the same colour.
+      const HULLS = [
+        { hull: [0.760, 0.690, 0.520], num: 'ŠB 6051', ink: '#173a86',
+          stripe: [0.060, 0.180, 0.560] },
+        { hull: [0.782, 0.778, 0.762], num: 'ŠB 208', ink: '#14161c',
+          stripe: [0.090, 0.130, 0.185] },
+        { hull: [0.775, 0.770, 0.750], num: null, ink: null,
+          stripe: [0.480, 0.120, 0.105] },
+      ];
+      const BOOT = [0.060, 0.072, 0.100];
+      const ANTIF = [0.140, 0.108, 0.098];
+      const CHROME = [0.615, 0.622, 0.630];
+      /**
+       * One small craft lying alongside, bow toward the head.
+       *
+       * Lofted from seven stations rather than boxed: a boat is the one object
+       * on this shore where the SHEER — the curve of the gunwale seen from the
+       * side — is the whole silhouette, and a prism has none. Each station is
+       * [along, half-beam, gunwale height], and three rings run through them:
+       * the keel at −0.32, the waterline, and the gunwale. Four bands between
+       * them carry the antifouling, the boot, the topsides and the stripe.
+       */
+      const craft = (u0, v0, kind, key) => {
+        const H = HULLS[kind % HULLS.length];
+        const C = (a, c, y) => P(u0 + a, v0 + c, y);
+        const ST2 = [[-2.80, 0.58, 0.44], [-2.20, 0.82, 0.45],
+          [-1.00, 0.95, 0.48], [0.40, 0.94, 0.53], [1.60, 0.72, 0.61],
+          [2.40, 0.41, 0.69], [2.86, 0.07, 0.78]];
+        const ring = (i, lvl) => {
+          const [a, hb, sh] = ST2[i];
+          if (lvl === 0) return [a, hb * 0.20, -0.32];
+          if (lvl === 1) return [a, hb * 0.88, 0.00];
+          if (lvl === 2) return [a, hb * 0.965, 0.16];
+          if (lvl === 3) return [a, hb, sh - 0.12];
+          return [a, hb, sh];
+        };
+        const band = [ANTIF, BOOT, H.hull, H.stripe];
+        for (let i = 0; i < ST2.length - 1; i++) {
+          for (let lv = 0; lv < 4; lv++) {
+            const A0 = ring(i, lv), A1 = ring(i, lv + 1);
+            const B0 = ring(i + 1, lv), B1 = ring(i + 1, lv + 1);
+            for (const sg of [-1, 1]) {
+              const q = [C(A0[0], sg * A0[1], A0[2]), C(B0[0], sg * B0[1], B0[2]),
+                C(B1[0], sg * B1[1], B1[2]), C(A1[0], sg * A1[1], A1[2])];
+              if (sg > 0) b.quad(q[0], q[1], q[2], q[3], band[lv]);
+              else b.quad(q[3], q[2], q[1], q[0], band[lv]);
+            }
+          }
+        }
+        // The transom, and the deck as one ring inset from the gunwale. The
+        // inside of a boat you look down into from a quay is most of what you
+        // see of her, so it is a real recess and not a lid.
+        const T0 = ST2[0];
+        b.quad(C(T0[0], -T0[1] * 0.20, -0.32), C(T0[0], T0[1] * 0.20, -0.32),
+          C(T0[0], T0[1], T0[2]), C(T0[0], -T0[1], T0[2]), H.hull);
+        for (let i = 0; i < ST2.length - 1; i++) {
+          const [a0, h0, y0b] = ST2[i], [a1, h1, y1b] = ST2[i + 1];
+          for (const sg of [-1, 1]) {
+            b.quad(C(a0, sg * h0, y0b), C(a1, sg * h1, y1b),
+              C(a1, sg * h1 * 0.80, y1b - 0.06), C(a0, sg * h0 * 0.80, y0b - 0.06),
+              shade(H.hull, 1.06));
+          }
+          // the sole, well down inside her
+          b.quad(C(a0, -h0 * 0.80, y0b - 0.40), C(a0, h0 * 0.80, y0b - 0.40),
+            C(a1, h1 * 0.80, y1b - 0.40), C(a1, -h1 * 0.80, y1b - 0.40),
+            [0.395, 0.372, 0.330]);
+        }
+        // A COVER over the cockpit on two in three, which is what half the boats
+        // in `_357` are wearing and is also the honest answer to what you see
+        // when you look down into a moored boat from a quay: not her sole, a
+        // sheet of canvas over it. The first cut had 4 m of flat grey sole
+        // showing and it read as a tarpaulin already — badly, in a stipple of
+        // shadow-map dither, because a large flat horizontal surface is the
+        // worst case for it. This is the same surface done on purpose, tented
+        // so it sheds.
+        if (jit(key, 64) < 0.66) {
+          const CVR = jit(key, 65) < 0.5 ? [0.155, 0.205, 0.290]
+            : [0.395, 0.400, 0.385];
+          for (let i = 1; i < 4; i++) {
+            const [a0, h0, y0b] = ST2[i], [a1, h1, y1b] = ST2[i + 1];
+            const r0 = h0 * 0.86, r1 = h1 * 0.86;
+            const c0 = y0b + 0.20, c1 = y1b + 0.20;
+            for (const sg of [-1, 1]) {
+              b.quad(C(a0, sg * r0, y0b - 0.02), C(a1, sg * r1, y1b - 0.02),
+                C(a1, 0, c1), C(a0, 0, c0), shade(CVR, sg > 0 ? 1.10 : 0.90));
+            }
+          }
+        } else {
+          // and thwarts on the open ones, because a boat you can see into has
+          // something to sit on in her.
+          for (const ta of [-1.30, 0.30]) {
+            const hb = 0.92;
+            boxIn(C, ta - 0.10, ta + 0.10, -hb * 0.82, hb * 0.82,
+              ST2[3][2] - 0.30, ST2[3][2] - 0.22,
+              [0.640, 0.585, 0.470], [0.700, 0.645, 0.520]);
+          }
+        }
+        // A cuddy forward on two in three, a windscreen on the rest.
+        if (jit(key, 61) < 0.66) {
+          const cy = ST2[3][2];
+          boxIn(C, 0.55, 2.05, -0.62, 0.62, cy - 0.10, cy + 0.62,
+            shade(H.hull, 1.02), shade(H.hull, 0.90));
+          boxIn(C, 0.62, 1.20, -0.50, 0.50, cy + 0.60, cy + 0.66,
+            [0.105, 0.125, 0.150]);
+        }
+        // The pulpit and the guard rail: uprights and a top rail in chrome,
+        // which is the brightest thing on any of these boats and the one you
+        // pick a marina out by at three hundred metres.
+        for (const sg of [-1, 1]) {
+          let prev = null;
+          for (let i = 2; i < ST2.length; i++) {
+            const [a, hb, sh] = ST2[i];
+            const top = [a, sg * (hb - 0.05), sh + 0.56];
+            post(C, a, sg * (hb - 0.05), sh, sh + 0.56, 0.017, CHROME, 5);
+            if (prev) {
+              seg3(C(prev[0], prev[1], prev[2]), C(top[0], top[1], top[2]),
+                0.016, CHROME);
+            }
+            prev = top;
+          }
+          // and across the stem, which is what makes it a pulpit
+          seg3(C(prev[0], prev[1], prev[2]), C(2.98, 0, ST2[6][2] + 0.56),
+            0.016, CHROME);
+        }
+        // An outboard on the transom for one in three — `_378`'s boat has one
+        // and it is the loudest thing on her.
+        if (jit(key, 62) < 0.34) {
+          const oy = ST2[0][2];
+          boxIn(C, -3.16, -2.86, -0.20, 0.20, oy - 0.06, oy + 0.30,
+            [0.075, 0.075, 0.080], [0.115, 0.115, 0.122]);
+          boxIn(C, -3.10, -2.92, -0.09, 0.09, oy - 0.80, oy - 0.04,
+            [0.100, 0.100, 0.105]);
+          boxIn(C, -3.14, -2.88, -0.13, 0.13, oy - 1.02, oy - 0.76,
+            [0.070, 0.070, 0.075]);
+        }
+        // Two fenders over the quay side, because that is the side she lies on
+        // and a boat alongside without them loses her gelcoat.
+        //
+        // HANGING, not sticking out. The first cut lathed them about an athwart
+        // axis, which put a 0.23 m ball on her shoulder — from the quay it read
+        // as a mooring buoy sitting on the foredeck. A fender hangs on a
+        // lanyard: the axis is VERTICAL and it is outboard of the gunwale, not
+        // through it.
+        const fSide = v0 < 0 ? 1 : -1;
+        for (const fa of [-1.30, 0.85]) {
+          const fy = ST2[3][2];
+          const fc = fSide * (0.99 + 0.05 * jit(key + fa * 7, 63));
+          lathe(C, fa, fc, [[fy - 0.52, 0], [fy - 0.50, 0.055],
+            [fy - 0.44, 0.082], [fy - 0.16, 0.082], [fy - 0.10, 0.055],
+            [fy - 0.08, 0]], [0.735, 0.728, 0.700], 8);
+          seg3(C(fa, fc, fy - 0.09), C(fa, fSide * 0.90, fy + 0.03),
+            0.010, LINE);
+        }
+        // Her number, on BOTH bows.
+        //
+        // The quay side alone was the first cut and it is nearly unreadable:
+        // this mole's deck is 2.19 m over the water and the number sits at
+        // 0.31, so from the only place you can stand to see that side you are
+        // looking 1.9 m down at a plate 0.83 m out — foreshortened to a smear.
+        // A registration goes on both bows in life anyway, and the outboard
+        // one is the one you read, from the water, swimming past.
+        //
+        // Facing the right way took THREE goes, and the reason is worth writing
+        // down: a `DoubleSide` plane never complains. A mirrored ŠB is still a
+        // rendered ŠB, so the only thing that catches it is reading the
+        // photograph. `PlaneGeometry`'s normal is +Z and `rotation.y = t` sends
+        // that to (sin t, cos t), so the angle wanted is `atan2(N.x, N.z)` for
+        // the outward normal N — which on the quay side is +n and on the
+        // outboard side is −n, both of which are `side * n`. I had that, then
+        // negated it on a hunch without re-photographing, and shipped it
+        // backwards for one build.
+        if (H.num) {
+          const w = 0.86, hh = 0.19;
+          const tex = paintedWord(H.num, H.ink, w / hh, false, 600);
+          for (const side of [-1, 1]) {
+            const pw = C(1.75, side * 0.83, ST2[4][2] - 0.30);
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, hh),
+              new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide,
+                transparent: true, depthWrite: false }));
+            mesh.position.set(pw[0], pw[1], pw[2]);
+            mesh.rotation.y = Math.atan2(side * A.nx, side * A.nz);
+            mesh.name = 'boat:' + H.num + (side > 0 ? ':stbd' : ':port');
+            scene.add(mesh);
+          }
+        }
+        // And she is tied to the quay: bow and stern lines up to the deck.
+        ropeTo(u0 + 2.60, v0 + (v0 < 0 ? 0.55 : -0.55), ST2[5][2] + 0.10,
+          u0 + 4.10, (v0 < 0 ? -1 : 1) * (W2 - 0.30), TOP + 0.16, 0.28, LINE);
+        ropeTo(u0 - 2.60, v0 + (v0 < 0 ? 0.55 : -0.55), ST2[0][2] + 0.10,
+          u0 - 4.10, (v0 < 0 ? -1 : 1) * (W2 - 0.30), TOP + 0.16, 0.28, LINE);
+      };
+      if (m === 0) {
+        for (let i = 0; i < 3; i++) {
+          craft(9.5 + i * 8.6, -(W2 + 1.35), i, i * 17 + 5);
+        }
+      }
+
       // Tyres over the side, on a rope through the top of each. Every working
       // quay on this coast has them and `_378` has one at the left of the
       // frame, hard against the strake.
