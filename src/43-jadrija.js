@@ -18699,6 +18699,9 @@ async function buildJadrija(scene) {
   // it is to declare a variable beside the thing it is DERIVED from, which for
   // this one is the tree list.
   let hammockAt = null;
+  // How many tussocks and limestone lumps the grove floor got. Beside
+  // `greens` for the reason written above it.
+  let groveFloor = 0;
   // ── the sanitary block ─────────────────────────────────────────────────────
   //
   // Photographed straight on at t 355: the flat-roofed rendered block behind
@@ -19204,6 +19207,61 @@ async function buildJadrija(scene) {
         oleander(t, s, y, 0.85 + rng() * 0.55);
       }
     }
+  }
+
+  /**
+   * The floor of the grove: dry tussocks and limestone breaking the surface.
+   *
+   * The terrain shader already lays dead Aleppo needles over limestone dust —
+   * see the needle floor in TERRAIN_FRAG — and that is the right ground colour
+   * and the wrong ground *texture*, because a shader cannot put anything on
+   * the surface. In `1000150345` and `_349` the grove floor is not a surface at
+   * all: it is pale chippings with grey-green tussocks standing in it, dry
+   * khaki grass between them, and lumps of limestone coming through wherever
+   * the dust is thin. From standing height that is the difference between a
+   * wood and a brown plane with trees on it.
+   *
+   * CLUSTERED ON THE TREES, and that is the whole placement rule. Needle
+   * litter and the tufts that survive it are under and around pines, because
+   * that is where the shade and the drip line are — scattered evenly over the
+   * band, the same objects read as confetti. So each pine is asked for its own
+   * two, at 1.4 to 3.4 m, off `jit` of its index.
+   *
+   * `greens` is read back rather than the loop being extended, which keeps
+   * this off the shared `rng` stream — Rule 4 — and means it cannot move a
+   * single parasol.
+   */
+  {
+    const TUSS = [0.318, 0.352, 0.268];      // grey-green, the live tufts
+    const DRYG = [0.462, 0.430, 0.298];      // and the dry khaki between them
+    const ROCK = [0.560, 0.522, 0.442];      // limestone through the dust
+    let n = 0;
+    greens.forEach((g, i) => {
+      if (g[3] !== 9) return;                // pines only: olives are elsewhere
+      const [gt, gs] = g;
+      if (gs < 30 || gs > 78) return;        // the grove behind the kabine
+      for (let k = 0; k < 2; k++) {
+        const a2 = jit(i, 311 + k) * TAU;
+        const r = 1.4 + jit(i, 331 + k) * 2.0;
+        const t = gt + Math.cos(a2) * r, ss = gs + Math.sin(a2) * r;
+        const y = surfaceY(t, ss);
+        const w = jit(i, 351 + k);
+        if (w < 0.34) {
+          // Limestone. Wider than it is tall — this is bedrock showing, not a
+          // boulder sitting on the dust, and the first cut had them as domes
+          // half a metre proud which read as a field of molehills.
+          const rr = 0.26 + jit(i, 371 + k) * 0.34;
+          dome(W, t, ss, y - 0.06, rr * 0.30, rr,
+            shade(ROCK, 0.92 + jit(i, 381 + k) * 0.16), 5);
+        } else {
+          const rr = 0.22 + jit(i, 391 + k) * 0.26;
+          dome(W, t, ss, y - 0.05, rr * (0.55 + jit(i, 401 + k) * 0.30), rr,
+            shade(w < 0.68 ? TUSS : DRYG, 0.90 + jit(i, 411 + k) * 0.22), 5);
+        }
+        n++;
+      }
+    });
+    groveFloor = n;
   }
 
   /**
@@ -31010,6 +31068,7 @@ async function buildJadrija(scene) {
       quote: phoneQuotes.q,
       hammock: hammockAt,
       pines: greens.filter((g) => g[3] === 9).length,
+      groveFloor,
       world: phones ? phones.filter((m) => m && m.g.visible)
         .map((m) => [+m.g.position.x.toFixed(2), +m.g.position.y.toFixed(2),
           +m.g.position.z.toFixed(2)]) : [],
