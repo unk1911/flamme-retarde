@@ -4516,10 +4516,26 @@ async function buildJadrija(scene) {
     const key = S.t0 | 0;
     // The back: a warm wall rather than a black hole, and a tiled band up from
     // the worktop the way every one of these has.
-    for (const [u0, u1] of spans(oa, oc)) {
-      boxTS(u0, u1, f1, f1 + 0.02, wy, oy1, WALL, shade(WALL, 1.10));
-      boxTS(u0, u1, f1 - 0.015, f1, wy + 0.04, wy + 0.50, shade(WALL, 1.16));
-    }
+    // ── AND THE WALL DOES NOT NEED CUTTING ANY MORE ──────────────────────────
+    //
+    // It did, for one release, and the reason it stopped is 1.305.0. The back
+    // wall sat 0.30 m proud because the standoff was believed to be 0.26 —
+    // a number measured through the chord bug, with the shop's own face 0.345 m
+    // out of place. With the body following the shore, 0.02 m proud draws.
+    //
+    // So the wall goes to 0.06, which is BEHIND the man at 0.15 rather than in
+    // front of him, and it runs unbroken again. Cutting it worked, and it left
+    // him standing in a hard-edged black rectangle exactly the width of the
+    // gap: what showed through was the serving opening's own lightbox panel,
+    // with warm render either side of it. A dark interior behind a barman is
+    // right — that panel exists precisely so a shaded front does not read as a
+    // window on to a white wall — but a dark interior shaped like the hole cut
+    // for him is not an interior, it is a hole.
+    //
+    // The shelves still cut, because they are at 0.30 to 0.54 and he is not.
+    const wallS = S.s0 - (deep ? 0.06 : 0.02);
+    boxTS(oa, oc, wallS, wallS + 0.02, wy, oy1, WALL, shade(WALL, 1.10));
+    boxTS(oa, oc, wallS - 0.015, wallS, wy + 0.04, wy + 0.50, shade(WALL, 1.16));
     // The worktop, running the width of the opening — and only where the shop
     // has not got `shopKit`'s counter standing in the same plane.
     if (!deep) {
