@@ -6951,6 +6951,25 @@ window.__fr = {
     const fsw = sea.mat.uniforms.uFarSwell;
     if (o && Number.isFinite(o.waveLod)) lod.value = o.waveLod;
     if (o && Number.isFinite(o.farSwell)) fsw.value = o.farSwell;
+    // WIND, and it is here because a question about this sea could not be
+    // asked without it. Wave amplitude is `0.34 * uWaveScale * (0.45 + 0.055 *
+    // uWindSpeed)` and the whitecap gate is a threshold on SLOPE, so whether
+    // this channel ever caps at all is a question about a number nothing could
+    // reach from the console: a scouting pass came back with "no visible foam
+    // offshore at the default 9.5, and no exposed knob to find out whether the
+    // threshold is simply uncrossed or genuinely broken." That is a bad place
+    // to leave a debug surface. It drives the sky's cloud drift and the swim
+    // and ride models off the same uniform, so turning it up moves the whole
+    // weather and not just the water, which is correct and is the point.
+    //
+    // `state.windSpeed` and NOT `U.uWindSpeed.value`, which was the first cut
+    // and did nothing at all: line 5207 of the frame loop writes
+    // `U.uWindSpeed.value = state.windSpeed * (0.8 + 0.4 * state.gust)` every
+    // frame, so a uniform written from the console is gone before the next
+    // picture. The measurement said so before the code did — amp came back
+    // 0.337, 0.340, 0.343 for winds of 14, 20 and 32, which is the gust
+    // wandering and not the knob working.
+    if (o && Number.isFinite(o.wind)) state.windSpeed = Math.max(0, o.wind);
     for (const [k, v] of Object.entries(o || {})) {
       if (map[k] && Number.isFinite(v)) map[k][0][map[k][1]] = v;
     }
@@ -6958,6 +6977,13 @@ window.__fr = {
     for (const [k, [vec, c]] of Object.entries(map)) out[k] = +vec[c].toFixed(4);
     out.waveLod = +lod.value.toFixed(3);
     out.farSwell = +fsw.value.toFixed(3);
+    out.wind = +state.windSpeed.toFixed(2);
+    out.windNow = +U.uWindSpeed.value.toFixed(2);   // after the gust
+    // The two numbers the foam gate actually compares, so a reading can be
+    // taken rather than a screenshot argued over: the wave amplitude this wind
+    // gives, and the slope band `steep` smoothsteps across.
+    out.amp = +(0.34 * sea.mat.uniforms.uWaveScale.value
+      * (0.45 + 0.055 * U.uWindSpeed.value)).toFixed(3);
     return out;
   },
 
