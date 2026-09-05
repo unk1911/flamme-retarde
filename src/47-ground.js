@@ -1601,7 +1601,23 @@ async function buildGround(scene, field) {
     // now. So when a step is refused and the thing a metre and a half further
     // on is water, say so and let the caller take you swimming; the barrier
     // stays for everybody who is merely walking along the front.
-    if (hit && !wet) {
+    //
+    // EXCEPT AT A BRINK. The paragraph above is a beach: you walk down the sand
+    // into the water and the game takes you swimming, which is right and is
+    // the whole reason the barrier stopped being a wall. It is wrong at a QUAY.
+    // Reported 4 Sep 2026: *"the pathway to it looks crappy, i somehow land in
+    // water, half the time"* — the Brod's mole is 4.5 m across with 1.15 m of
+    // freeboard, and every one of its long edges was a shoreline as far as this
+    // was concerned. Walk out to the boat, drift a metre off the middle, and
+    // the code that exists to keep you on the pier put you in the sea instead.
+    //
+    // A locale that has structures standing over water says so with `brink`,
+    // and only for the ground it is actually standing on — so the shore either
+    // side of that same pier still hands you to the swim.
+    if (hit && !wet && field.brink && field.brink(you.x, you.z)) {
+      // nothing: a refused step here is an edge you stop at, not a shore you
+      // walk into.
+    } else if (hit && !wet) {
       // Off `wx, wz` — where the keys are asking to go — and not off velocity,
       // which by the second frame against a barrier is zero and stays there.
       // Marched rather than sampled at one distance: the barrier is a metre

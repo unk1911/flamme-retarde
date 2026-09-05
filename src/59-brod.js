@@ -1215,6 +1215,24 @@ function brodLocale(city) {
       if (v > -M.w && v < M.w && u > -A && u < M.out) return true;
       return !isSea(wx, wz);
     },
+    /**
+     * Standing on the pier, a refused step is an EDGE and not a shoreline.
+     *
+     * See the note in 47-ground.js where this is read. `standable` above
+     * already refuses the step off the side — correctly — but a refused step
+     * with water a metre and a half beyond it is the shoreline handover, so
+     * the barrier that exists to keep you on the mole was the thing putting
+     * you in the sea. On 4.5 m of deck with 1.15 m of freeboard, that is most
+     * of the walk out to the boat.
+     *
+     * Only while you are ON it, and the margin is deliberately tight. A metre
+     * outside the coping you are in the water and the swim is right; the shore
+     * either side of the root is a beach and is unaffected.
+     */
+    brink: (wx, wz) => {
+      const [u, v] = M.local(wx, wz);
+      return v > -M.w - 0.6 && v < M.w + 0.6 && u > -A && u < M.out + 0.6;
+    },
   };
 }
 
