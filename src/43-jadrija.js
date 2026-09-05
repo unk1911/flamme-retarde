@@ -3823,13 +3823,51 @@ async function buildJadrija(scene) {
         const sy = y0 + 1.24 + r * 0.42;
         boxTS(oa + 0.12, oc - 0.12, S.s0 - 0.155, S.s0 - 0.095, sy, sy + 0.032,
           [0.395, 0.382, 0.360], [0.430, 0.418, 0.395]);
+        // THREE THINGS AND NOT ONE. Every item on this shelf was the same
+        // 115 mm slab, and nine of them in a row three rows deep is a bar
+        // chart. A kiosk shelf holds cartons, bottles and cans, and the boxes
+        // were never wrong — `GOOD` is goods, and a carton IS a box, which is
+        // why converting the lot to bottles would have been a worse answer
+        // than leaving it alone. What it wanted was the other two.
+        //
+        // Five in nine cartons, three bottles, one can, walked by index so the
+        // mix is even along the shelf rather than clumping — and hashed on the
+        // row as well, so the three courses do not line up into columns.
         for (let i = 0; i < 9; i++) {
           const ct = oa + 0.22 + i * ((oc - oa - 0.44) / 9);
           const g = 0.80 + ((i * 5 + r * 3) % 4) * 0.10;
           const col = GOOD[(i * 3 + r) % GOOD.length];
-          boxTS(ct, ct + 0.115, S.s0 - 0.150, S.s0 - 0.105, sy + 0.030,
-            sy + 0.030 + 0.20 + 0.05 * ((i + r) % 3),
-            [col[0] * g, col[1] * g, col[2] * g], shade(col, 1.14));
+          const c = [col[0] * g, col[1] * g, col[2] * g];
+          const kind = (i * 4 + r * 3) % 9;
+          const cy = S.s0 - 0.1275;                 // the middle of the shelf
+          if (kind < 5) {
+            boxTS(ct, ct + 0.115, S.s0 - 0.150, S.s0 - 0.105, sy + 0.030,
+              sy + 0.030 + 0.20 + 0.05 * ((i + r) % 3), c, shade(col, 1.14));
+          } else if (kind < 8) {
+            // A bottle: base, body, shoulder, neck, cap. Narrower than the
+            // carton it stands beside, which is most of what makes a mixed
+            // shelf read as a mixed shelf.
+            const h = 0.235 + 0.045 * ((i + r) % 3);
+            lathe(W, ct + 0.052, cy, [
+              [sy + 0.032, 0.030],
+              [sy + 0.040, 0.034],
+              [sy + h - 0.088, 0.034],
+              [sy + h - 0.034, 0.013],
+              [sy + h - 0.006, 0.012],
+            ], c, 6);
+            lathe(W, ct + 0.052, cy, [
+              [sy + h - 0.008, 0.0145], [sy + h + 0.010, 0.0145],
+            ], shade(col, 0.60), 6);
+          } else {
+            // And a can, which is 66 mm across and 115 tall and is the one
+            // thing on here that is unmistakable at a glance.
+            lathe(W, ct + 0.052, cy, [
+              [sy + 0.032, 0.028],
+              [sy + 0.040, 0.033],
+              [sy + 0.138, 0.033],
+              [sy + 0.146, 0.028],
+            ], c, 7);
+          }
         }
       }
     }
