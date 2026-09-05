@@ -419,9 +419,52 @@ void main(){
                * (1.0 - rooted) * (1.0 - outcrop) * nearby;
     // Not a grating. The crest lines wander over a few metres and the spacing
     // wanders with them, which is the difference between sand and corduroy.
+    //
+    // IT WAS A GRATING FOR EIGHT MONTHS, and the cause is one multiplication.
+    // The old line read
+    //
+    //     float rk = 19.0 + 4.0 * fbm2(p * 0.035 + 12.1, 2);
+    //     float rph = dot(p, rdir) * rk + ...;
+    //
+    // which is a spatially varying WAVENUMBER multiplying an ABSOLUTE world
+    // position, and that is never what it looks like. Differentiate it: the
+    // local wavenumber of that phase is not rk, it is rk + dot(p, rdir) *
+    // d(rk)/dx, and dot(p, rdir) at Jadrija is about -1077 METRES. The wander
+    // term contributes a couple of tenths of a radian per metre squared, so the
+    // second half of that sum is more than ten times the first. What got drawn
+    // was a corrugation a couple of centimetres across, not the 33 cm the
+    // number says, and at swimming range that is fabric. The moire rings are
+    // the same thing where it goes under a pixel. The comment describing the
+    // wander was right about what it wanted and the arithmetic under it did the
+    // opposite, which is why nobody looked at it again for eight months.
+    //
+    // The first repair made the identical mistake in a new place: it kept a
+    // constant wavenumber and rotated rdir with a noise field instead, and
+    // dot(p, ROTATING) is the same trap with |p| = 2200 instead of 1077 — worse,
+    // and the ripples vanished into a grain finer than a pixel. Both are one
+    // rule: NOTHING THAT MULTIPLIES AN ABSOLUTE POSITION MAY VARY WITH IT.
+    // Two kilometres from the origin, a one per cent variation in a coefficient
+    // is twenty-two metres of error in what it multiplies.
+    //
+    // So the variation goes in a DOMAIN WARP, where it is added to the position
+    // rather than multiplied by it. Both wanders fall out of the one term and
+    // neither can blow up: displacing p by up to 2.2 m over a 15 m field bends
+    // the crest lines by about seventeen degrees and swings the spacing by
+    // thirty per cent, because the gradient of the warp is what both of those
+    // are, and the gradient of the warp is bounded by construction.
+    //
+    // 44 rad/m is 0.143 m crest to crest, which is the hand's breadth this
+    // comment has claimed since it was written and has never once drawn.
+    vec2 rw = vec2(fbm2(p * 0.068 + 33.7, 2), fbm2(p * 0.068 + 71.2, 2)) - 0.5;
     vec2 rdir = normalize(vec2(0.62, 0.78));
-    float rk = 19.0 + 4.0 * fbm2(p * 0.035 + 12.1, 2);
-    float rph = dot(p, rdir) * rk + fbm2(p * 0.11 + 5.7, 2) * 5.2;
+    // The snake and the fork. Where a phase wander crosses half a cycle the
+    // crest splits in two, and a bifurcation is the most recognisable thing
+    // about a real ripple field.
+    float rph = dot(p + rw * 4.4, rdir) * 44.0
+              + (fbm2(p * 0.42 + 5.7, 2) - 0.5) * 5.2;
+    // Patchy at 3.3 m, so the ripples run out into smooth sand and pick up
+    // again. They are not laid edge to edge across a bay.
+    ripD *= 0.30 + 0.85 * fbm2(p * 0.30 + 41.0, 2);
     dn += rdir * cos(rph) * 0.155 * ripD;
     // And the troughs are darker, because that is where the fine dark stuff
     // ends up. Free, now that the phase is to hand.
