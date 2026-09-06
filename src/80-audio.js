@@ -2278,7 +2278,29 @@ function buildAudio() {
     // is a Q of 0.7071, which is Butterworth, which is flat.
     q: -3.01,
     ref: 0.0368,         // the follower's mean on lapping.mp3, measured offline
-    of: 0.375,           // and what the body is worth against the recording
+    // And what the body is worth against the recording.
+    //
+    // ASKED AND ANSWERED: once `cut_field.py` stopped burying the pier's low
+    // end under an 18 dB/octave high-pass and notched the 120 Hz machine out
+    // instead, the obvious question was whether this synthetic band could go.
+    // It cannot. Measured over thirty seconds at the water's edge, `of` at 0
+    // against `of` at 0.375:
+    //
+    //     clip only, body off    LF-to-mid  -15.5 dB
+    //     clip + body            LF-to-mid   -5.1 dB
+    //     the real shore                     -2.7 dB
+    //
+    // The re-cut gave back what a filter had taken. It could not give back what
+    // was never recorded: the pier take was made at 19:43 on a calm evening and
+    // has no Beaufort 5 in it to recover. The body is doing 10.4 dB of work.
+    //
+    // And 0.375 STAYS rather than climbing the last 2.4 dB to the shore's own
+    // number, for the reason it was picked: it is halfway in dB between the
+    // calm pier take and the two daytime references, and both of those are a
+    // phone on an exposed edge that cannot be cleared of wind on its own
+    // microphone. -2.7 is an overestimate of the target and closing on it
+    // exactly would be fitting to the wind.
+    of: 0.375,
   };
   // |x|, built once. A WaveShaper is the only rectifier Web Audio has, and an
   // odd-length curve puts a sample exactly on zero so the fold has no step in
