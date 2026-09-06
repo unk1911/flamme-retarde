@@ -6381,8 +6381,40 @@ window.__fr = {
      */
     tiers: (r = 15) => (jadrija && jadrija.crowd.tiers
       ? jadrija.crowd.tiers(r) : null),
-    /** The roving skinned cast: who is in a slot, and how tall they come out. */
+    /** The roving skinned cast: who is in a slot, and how tall they come out.
+     *  An OBJECT keyed by slot, not an array — `.filter` on it throws. */
     cast: () => (jadrija && jadrija.crowd.cast ? jadrija.crowd.cast() : null),
+    /**
+     * WHERE THE PEOPLE ARE ALONG THE SHORE, in bins of `m` metres.
+     *
+     * This exists because the question "is this stretch of beach empty?" could
+     * not be answered from the console, and two separate passes have gone
+     * looking. `tiers(r)` counts who is within `r` of the PLAYER, which cannot
+     * tell you about a stretch you are not standing on; `cast()` is an object
+     * keyed by slot and not an array, so it does not filter; and `raw().people`
+     * is the bathers array but a probe over it throws on the entries that carry
+     * no `t`. So the honest answer took a photograph from 26 m up, which is
+     * above the crowd's own promotion radius and therefore measures the LOD
+     * rather than the beach — a 200 m stretch came back looking deserted while
+     * `tiers(40)` said thirty-two people were standing in it.
+     *
+     * `total` is everybody the layout placed; `binned` is how many of those
+     * carry a shore coordinate; the rest are on the Brod, in a shop or indoors.
+     * A gap in `per` is a real gap. Nothing here reads the draw state, so it
+     * answers about the BEACH and not about what is currently on screen.
+     */
+    spread: (m = 25) => {
+      if (!jadrija || !jadrija.people) return null;
+      const per = {};
+      let binned = 0;
+      for (const b of jadrija.people) {
+        if (!b || typeof b.t !== 'number') continue;
+        const k = Math.floor(b.t / m) * m;
+        per[k] = (per[k] || 0) + 1;
+        binned++;
+      }
+      return { total: jadrija.people.length, binned, bin: m, per };
+    },
     /**
      * Who is saying hello to whom, and how many have since the page loaded.
      *
