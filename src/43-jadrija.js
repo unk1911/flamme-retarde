@@ -6963,35 +6963,95 @@ async function buildJadrija(scene) {
       tex0.anisotropy = 8;
       return tex0;
     }
-    // The 100, whose zeros are the front of a kabina: an arch, four doors in
-    // it, and a step under the lot.
-    const ay = H * 0.505, aw = CW * 0.125, ah = H * 0.285;
-    g.fillStyle = '#f6f4ec';
-    g.font = `800 ${H * 0.30}px "Helvetica Neue", Arial, sans-serif`;
-    g.textAlign = 'right';
-    g.fillText('1', cx - aw * 0.86, ay + ah * 0.86);
-    g.textAlign = 'center';
-    // The arch.
+    // The 100, and IT IS TWO ARCHES AND NOT ONE.
+    //
+    // What was here drew a "1" and then a single arch with four doors in it,
+    // which on the built panel reads as "1O" — a numeral beside a dome. The
+    // frame that settles it is `1000150414` at 342 s, opened at the source
+    // 3840 x 2160: the mark is a kabina row of FIVE doorways with THREE arches
+    // over it, and the three are the 1 and the two zeros. Each zero is an arch
+    // spanning a PAIR of doorways with a narrow slot cut down its middle, and
+    // the slot lines up with the gap between that pair — which is the whole
+    // conceit, and is why it reads as a hundred and as a row of huts at the
+    // same time.
+    //
+    // `hundredMark`, three hundred lines up, has had the two-arch reading since
+    // it was written, and its own note says the two disagree and one of them is
+    // wrong: *"the evidence in hand is a photograph of THIS wall, not of the
+    // hoarding, and swapping the glyph would silently redraw three shipped
+    // objects on the strength of it. The seam is here when somebody has a frame
+    // of the hoarding close enough to settle it."* This is that frame, and the
+    // hoarding is the one that was wrong.
+    //
+    // Proportions off the same crop, every one of them divided by the mark's
+    // own height: total 1285 x 775 px, so 1.658 wide; the band carrying the
+    // flag and the arches is 0.361 of the height; five doorways at a pitch of a
+    // fifth of the width, each 0.845 of its pitch.
+    const mh = H * 0.285, mw = mh * 1.658;
+    const mx = cx - mw * 0.5, my = H * 0.505;
+    const band = mh * 0.361, sill = my + mh, dTop = my + band;
+    const mPitch = mw / 5, mDw = mPitch * 0.845;
+    const dAt = (i) => mx + i * mPitch + (mPitch - mDw) * 0.5;
+    const WHITE = '#f6f4ec';
+    g.fillStyle = WHITE;
+    // The 1: a slab with a stepped flag and no base serif, drawn rather than
+    // typeset. It does not stand on anything — the doorway under it does.
+    const s1 = dAt(0);
     g.beginPath();
-    g.moveTo(cx - aw * 0.62, ay + ah);
-    g.lineTo(cx - aw * 0.62, ay + ah * 0.40);
-    g.arc(cx + aw * 0.10, ay + ah * 0.40, aw * 0.72, Math.PI, 0);
-    g.lineTo(cx + aw * 0.82, ay + ah);
-    g.closePath(); g.fill();
-    // Four doors inside it.
-    const inner = [CREAM, '#5f9a55', '#d6b048', '#c0453b'];
-    for (let i = 0; i < 4; i++) {
-      g.fillStyle = inner[i];
-      const bw = aw * 0.26;
-      g.fillRect(cx - aw * 0.50 + i * bw * 1.12, ay + ah * 0.44, bw, ah * 0.52);
-      g.fillStyle = 'rgba(240,238,230,0.9)';
-      g.fillRect(cx - aw * 0.50 + i * bw * 1.12 + bw * 0.62,
-        ay + ah * 0.66, bw * 0.18, ah * 0.035);
+    g.moveTo(s1 - mDw * 0.68, my + band * 0.54);
+    g.lineTo(s1 + mDw * 0.06, my);
+    g.lineTo(s1 + mDw, my);
+    g.lineTo(s1 + mDw, dTop);
+    g.lineTo(s1 - mDw * 0.68, dTop);
+    g.closePath();
+    g.fill();
+    // The two zeros. Doors 2 and 3 carry the first, 4 and 5 the second.
+    for (const i of [1, 3]) {
+      const ax = dAt(i), aw2 = dAt(i + 1) + mDw - ax, r = aw2 * 0.5;
+      g.fillStyle = WHITE;
+      g.beginPath();
+      g.moveTo(ax, dTop);
+      g.lineTo(ax, my + r);
+      g.arc(ax + r, my + r, r, Math.PI, 0);
+      g.lineTo(ax + aw2, dTop);
+      g.closePath();
+      g.fill();
+      // The counter, cut in the panel's own cream rather than with
+      // `destination-out` — this canvas is opaque and a hole in it would be a
+      // hole in the hoarding.
+      const sw = (mPitch - mDw) * 1.15;
+      g.fillStyle = CREAM;
+      g.fillRect(ax + r - sw * 0.5, my + r * 0.52, sw, dTop - (my + r * 0.52));
     }
-    // The step.
-    g.fillStyle = '#f6f4ec';
-    g.fillRect(cx - aw * 0.86, ay + ah * 1.02, aw * 1.72, ah * 0.075);
-    g.fillRect(cx - aw * 0.54, ay + ah * 1.14, aw * 1.08, ah * 0.055);
+    // The five doorways. One and five are the mark's own white; the middle
+    // three are green, ochre and red left to right, which is the same three the
+    // grid round them is drawn from.
+    // Lighter than the grid's, and for the reason the grid's own note gives
+    // about itself: this is flat printed colour on a cream panel in full sun.
+    // Measured off the mark in `t342` and not off the kabina palette —
+    // rgb(95,190,135), rgb(232,168,65), rgb(222,78,82) — where the first cut
+    // reused the doors' own saturation and the three came out as three dark
+    // slabs under a white arch instead of as a drawing of three doors.
+    const inner = [WHITE, '#5fbe87', '#e8a841', '#de4e52', WHITE];
+    for (let i = 0; i < 5; i++) {
+      g.fillStyle = inner[i];
+      g.fillRect(dAt(i), dTop, mDw, sill - dTop);
+      g.fillStyle = (i === 0 || i === 4) ? CREAM : 'rgba(246,244,236,0.92)';
+      g.fillRect(dAt(i) + mDw * 0.16, dTop + (sill - dTop) * 0.46,
+        mDw * 0.30, Math.max(1, mh * 0.022));
+    }
+    // And the water under it: two long lines, the second shorter and stepped
+    // right, then two dashes. The old version had two plain bars and called
+    // them a step, which is a plinth — this is the sea, and it is what stops
+    // the mark reading as a terrace of shops.
+    g.fillStyle = WHITE;
+    const wLh = Math.max(1, mh * 0.072);
+    for (const [x0, x1, dy] of [[0.00, 1.00, 0.030], [0.19, 0.92, 0.165]]) {
+      g.fillRect(mx + mw * x0, sill + mh * dy, mw * (x1 - x0), wLh);
+    }
+    for (const [x0, wq] of [[0.47, 0.085], [0.62, 0.21]]) {
+      g.fillRect(mx + mw * x0, sill + mh * 0.300, mw * wq, wLh);
+    }
     // And the ladder in the corner, which is the other thing this shore is.
     const lx = CW * 0.90, ly = H * 0.74, lw = CW * 0.035, lh = H * 0.20;
     g.strokeStyle = '#f6f4ec'; g.lineWidth = Math.max(2, H * 0.011);
