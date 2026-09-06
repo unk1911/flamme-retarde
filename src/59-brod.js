@@ -779,36 +779,36 @@ const BROD_PAINT_GLSL = /* glsl */ `
     // therefore be a shimmer rather than a texture.
     float near = 1.0 - smoothstep(30.0, 90.0, dist);
     vec2 hp = vec2(vLocal.x, dep + vLocal.z * 0.9);
-    vec2 cell = vec2(3.0, 1.5);
-    float up = 0.40, dn = 1.00, tone = 1.0, cool = 1.0;
+    vec2 cell = vec2(2.8, 0.55);
+    float up = 0.26, dn = 1.00, tone = 1.0, cool = 1.0;
 
     if (vUv.x < 1.5) {                       // 1 - the white topsides
       float t = clamp((dep - 0.875) / 0.99, 0.0, 1.0);
       tone = exp(-0.119 * max(dep - 0.875, 0.0));
-      up = 0.40;
-      dn = mix(0.60, 2.70, t);
+      up = 0.26;
+      dn = mix(0.55, 2.60, t);
     } else if (vUv.x < 2.5) {                // 2 - her one dark tin
       float w = smoothstep(1.30, 1.85, dep); // strake above, boot-top below
-      cell = vec2(4.5, 2.2);
-      up = mix(0.55, 0.85, w);
-      dn = mix(0.62, 1.30, w);
+      cell = vec2(4.0, 1.6);
+      up = mix(0.45, 0.72, w);
+      dn = mix(0.55, 1.15, w);
       cool = 0.0;
     } else if (vUv.x < 3.5) {                // 3 - the gold cove
       cell = vec2(0.45, 0.45);
-      up = 0.25; dn = 1.30; cool = 0.0;
+      up = 0.18; dn = 0.60; cool = 0.0;
     } else if (vUv.x < 4.5) {                // 4 - the deckhouse and the
       // painted-out inside of the bulwark. Off her own height rather than off
       // the sheer: everything in this class is ABOVE the sheer, where the
       // depth channel has run out.
       hp = vec2(vLocal.x, vLocal.y * 1.3 + vLocal.z * 0.9);
-      up = 0.35; dn = 1.05;
+      up = 0.24; dn = 0.85;
     } else {                                 // 5 - antifouling
       cell = vec2(4.0, 2.0);
-      up = 0.25; dn = 0.70; cool = 0.0;
+      up = 0.22; dn = 0.60; cool = 0.0;
     }
 
     vec2 q = hp / cell + 17.3;
-    float s = fbm2(q, 3) * 2.0 - 1.0;
+    float s = fbm2(q, 4) * 2.0 - 1.0;
     s += (vnoise2(q * 7.0) - 0.5) * 0.62 * near;
     float d = max(-s, 0.0);
     float f = exp(up * max(s, 0.0) - dn * d * sqrt(d)) * tone;
