@@ -2168,6 +2168,168 @@ function buildAudio() {
     // not.
     gain: 0.28,
   };
+
+  // ── the body under it ───────────────────────────────────────────────────────
+  /**
+   * What the high-pass took out, put back.
+   *
+   * MEASURED, and this is the whole argument. Every band below is a third
+   * octave read off a Welch spectrum and quoted relative to that same
+   * recording's own 1 kHz band, so the gain of whatever it was recorded on
+   * cancels and only the colour is being compared:
+   *
+   *                            63 Hz   80    125    160    200    250
+   *   the water at the edge,
+   *   21 Aug, whitecapping      -0.6  -0.5   -1.7   -0.2   +0.2    0.0
+   *   the front of the rows,
+   *   23 Aug, water on concrete -1.4  +0.5   -3.4   +1.1   +1.4   +1.8
+   *   the pier take this bed
+   *   is cut from, 16 Aug      -13.5 -15.8  -17.6  -15.1  -13.2  -10.5
+   *   what the game played     -24.1 -25.8  -22.5  -20.5  -17.1  -11.7
+   *
+   * Two separate losses, and they compound. The pier was recorded at 19:43 on
+   * a calm evening — small water on a stone pier, which genuinely has no body
+   * — and it is already thirteen to seventeen decibels under either daytime
+   * recording of this shore down there. Then `tools/cut_field.py` high-passes
+   * every bed at 180 Hz, and it is right to: that take has a 120 Hz tone in it
+   * eighteen decibels proud of its own floor, which is a recorder or a pump
+   * and is not the sound of anywhere. But a third-order high-pass at 180 Hz is
+   * eighteen decibels an octave, and what went out with the tone was the
+   * eight to ten decibels of broadband the pier did have. Notch the tone out
+   * and measure the source again and that is exactly the gap in the last two
+   * rows above.
+   *
+   * So the sea at Jadrija arrived in the game as a band-limited hiss between
+   * 300 Hz and 2 kHz — twenty-one to twenty-six decibels short of the real
+   * thing at 63 to 160 Hz — while 25-sea.js drew it whitecapping at nine and a
+   * half metres a second. You could see a Beaufort 5 and hear a calm evening.
+   *
+   * WHAT THIS IS NOT. It is not a shelf on the clip: there is nothing left
+   * down there to lift but the remains of a filtered tone and the decoder's
+   * own floor, and lifting those by twenty decibels returns the 120 Hz hum
+   * this bed was cleaned of. And it is not a second loop, because a bed with a
+   * period is the one thing that gives itself away — see the note on length
+   * above.
+   *
+   * It is a band of noise with the recording's own envelope on it. The clip is
+   * bandpassed at 760 Hz to isolate the slap, rectified through a WaveShaper,
+   * smoothed twice at 11 Hz, and the result drives the gain of a 40-190 Hz
+   * noise band. So the body arrives when a slap arrives and goes when it goes,
+   * it inherits sixty-nine and a half seconds of water's own aperiodic
+   * rhythm, and there is no interval in it for an ear to find that is not
+   * already in the sea you can hear over it.
+   *
+   * Two smoothing stages at 11 Hz rather than one at 6: same thirty
+   * milliseconds of attack, four poles rather than two on the rectifier
+   * ripple, and a normalised corner a browser's biquad is comfortable at.
+   *
+   * `ref` is the follower's own mean output on this clip, computed offline by
+   * running the same three filters over the shipped MP3: 0.0368, and it moves
+   * only 0.6 dB either side of that over any 35 s window of the loop. `of` is
+   * what the body then plays at as a fraction of what the recording plays at,
+   * so the whole layer hangs off `LAP.gain` and travels with it — it is wired
+   * into the bed's own distance gain, which means the rows duck it, the
+   * seventy-metre fade takes it, and a shut door shuts it, with no second
+   * copy of any of that to keep in step.
+   *
+   * 0.375 was set by recording the running mixer through tools/sfx.mjs and
+   * reading the same third octaves back, not by the offline model, which
+   * under-predicted the graph by four decibels and was wrong for at least one
+   * reason worth knowing — see `q`. What comes out, standing on the edge with
+   * the promenade and the hillside held off so the bed is on its own:
+   *
+   *                          63 Hz   80    100    125    160    200
+   *   was                   -24.1 -25.8  -26.2  -22.5  -20.5  -17.1
+   *   is                     -9.2  -8.9   -8.0   -9.2   -9.2  -10.7
+   *
+   * which is deliberately short of the two daytime references. Both of those
+   * are a phone held on an exposed concrete edge and neither can be cleared of
+   * wind on its own microphone; the pier take can, and is the floor. So this
+   * sits halfway between them in decibels — a sea bigger than the evening it
+   * was recorded on, smaller than a number that might be half breeze. It costs
+   * 1.3 dB on the bed's own RMS and nothing at all on the balance between the
+   * beds, because it is inside one of them, and it does not make the
+   * compressor pump: the 2-6 kHz band of the whole mix — cicadas, which have
+   * nothing to do with the water — moves LESS after this than before (2.6 dB
+   * of spread against 3.2) and shows no dip behind an LF peak at any lag.
+   *
+   * WHAT IT COSTS, said plainly. The low end is now a shadow of the mid: the
+   * two envelopes correlate at 0.51 where the real edge correlates at 0.20,
+   * and the peak-to-median of the low band is 16 dB against the real 13. Both
+   * are the price of taking the rhythm from the recording instead of inventing
+   * one, and both were preferred to the alternative, which is a constant floor
+   * under the modulation — that buys the numbers back and buys them with a
+   * drone, and a drone at 80 Hz is a machine parked off the beach.
+   */
+  const BODY = {
+    band: 760,           // Hz — where the slap lives, and so where to listen
+    bandQ: 0.42,         // about two and a half octaves of it
+    smooth: 11,          // Hz, twice — the follower's own lid
+    lp: 190,             // Hz — the top of the body
+    hp: 40,              // and its bottom, so nothing subsonic goes on the bus
+    // -3.01 and not 0.7, and this is not a taste. A BiquadFilterNode reads its
+    // `Q` in DECIBELS for `lowpass` and `highpass` and as a plain Q for
+    // `bandpass` — the spec says so and Chrome agrees: asked for its response
+    // at its own corner, a 190 Hz lowpass at Q 0.7 answers 1.0839, which is
+    // 10^(0.7/20) and not 0.7. So every lowpass in this file written as 0.4 or
+    // 0.7 or 1.0 is a filter with a half-decibel of resonance on it rather
+    // than the damping it was asked for. Harmless in most of them; not here,
+    // because a bump at the corner of a band this narrow is a note. -3.01 dB
+    // is a Q of 0.7071, which is Butterworth, which is flat.
+    q: -3.01,
+    ref: 0.0368,         // the follower's mean on lapping.mp3, measured offline
+    of: 0.375,           // and what the body is worth against the recording
+  };
+  // |x|, built once. A WaveShaper is the only rectifier Web Audio has, and an
+  // odd-length curve puts a sample exactly on zero so the fold has no step in
+  // it.
+  let rectCurve = null;
+
+  /**
+   * The follower and the band it drives, hung off a playhead that is already
+   * running.
+   *
+   * `src` is tapped rather than intercepted — a source node feeds as many
+   * destinations as you connect it to — so nothing about the bed's own path
+   * changes and a failure here leaves the recording playing exactly as it did.
+   */
+  function seaBody(src, dest) {
+    if (!noiseBuf) return null;
+    if (!rectCurve) {
+      const n = 2049;
+      rectCurve = new Float32Array(n);
+      for (let i = 0; i < n; i++) rectCurve[i] = Math.abs((i / (n - 1)) * 2 - 1);
+    }
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = BODY.band; bp.Q.value = BODY.bandQ;
+    const rect = ctx.createWaveShaper();
+    rect.curve = rectCurve;
+    const sm1 = ctx.createBiquadFilter();
+    sm1.type = 'lowpass'; sm1.frequency.value = BODY.smooth; sm1.Q.value = BODY.q;
+    const sm2 = ctx.createBiquadFilter();
+    sm2.type = 'lowpass'; sm2.frequency.value = BODY.smooth; sm2.Q.value = BODY.q;
+    const scale = ctx.createGain();
+    scale.gain.value = BODY.of / BODY.ref;
+    src.connect(bp).connect(rect).connect(sm1).connect(sm2).connect(scale);
+
+    const ns = ctx.createBufferSource();
+    ns.buffer = noiseBuf; ns.loop = true;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = BODY.lp; lp.Q.value = BODY.q;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = BODY.hp; hp.Q.value = BODY.q;
+    // Nothing of its own. The gain of this node *is* the follower: an
+    // AudioParam sums what is connected to it on top of its own value, and its
+    // own value here is zero, so the band is silent between slaps rather than
+    // sitting under them at a floor.
+    const vca = ctx.createGain();
+    vca.gain.value = 0;
+    scale.connect(vca.gain);
+    ns.connect(lp).connect(hp).connect(vca).connect(dest);
+    ns.start(ctx.currentTime);
+    return { ns, vca, scale };
+  }
+
   let lapBuf = null, lapNodes = null;
 
   /** @param d metres to the water's edge, or null for "not on your feet". */
@@ -2193,7 +2355,9 @@ function buildAudio() {
       // its two ends — and a bed with a period longer than a minute does not
       // need help having one.
       const srcs = voices(lapBuf, 1, 0, g, t0);
-      lapNodes = { srcs, g };
+      // And the body under it, into the same gain, so it is the same bed and
+      // not a second one to keep in step. See BODY.
+      lapNodes = { srcs, g, body: seaBody(srcs[0], g) };
     }
     // Linear in distance and not squared. This is a line source — the whole
     // frontage and forty-two metres of mole, all of it working at once — and a
@@ -4886,6 +5050,14 @@ function buildAudio() {
       gain: shoreNodes ? +shoreNodes.g.gain.value.toFixed(4) : 0,
       lp: shoreNodes ? Math.round(shoreNodes.lp.frequency.value) : 0,
       lap: lapNodes ? +lapNodes.g.gain.value.toFixed(4) : 0,
+      // What the body under the water is worth at an average slap. Not the
+      // VCA's own value, which is zero by construction and always will be —
+      // the follower is a signal on that param, not a number written to it —
+      // so this is the bed's gain times BODY.of, which is what the layer plays
+      // at when the follower is at the mean it was calibrated on. Zero here
+      // with `lap` non-zero means the body never got built.
+      body: lapNodes && lapNodes.body
+        ? +(lapNodes.g.gain.value * BODY.of).toFixed(4) : 0,
       rows: rowNodes ? +rowNodes.g.gain.value.toFixed(4) : 0,
       // Where the morph thinks you are and what it is doing about it — the one
       // place the whole positional crossfade can be read off. `cede` is the
