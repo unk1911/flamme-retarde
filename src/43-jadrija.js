@@ -3886,7 +3886,11 @@ async function buildJadrija(scene) {
     // that was here. The roof is pale sheet, not the terracotta every other
     // kiosk on this shore has.
     { key: 'kiosk', kind: 'kiosk', t0: 290, t1: 293, s0: 20, s1: 23, h: 2.4,
-      name: null, roof: [0.545, 0.545, 0.528], body: [0.235, 0.470, 0.185] },
+      name: null, roof: [0.545, 0.545, 0.528], body: [0.235, 0.470, 0.185],
+      // And it is TWO gables side by side with the ridges running inland, not
+      // the flat slab with a box on it that every kiosk on this shore wears.
+      // See `twinGableRoof`, which is off `1000150342` and is only this shop's.
+      twinGable: true },
     // 1000150343, square on to the whole of it, and the shop it shows is not
     // the shop the survey note describes. That note reads "the green kiosk
     // (_342/_343): bright green painted metal with a TISAK sign, beer crates
@@ -9490,11 +9494,88 @@ async function buildJadrija(scene) {
     }
   }
 
+  /**
+   * TWO SHALLOW GABLES SIDE BY SIDE, off `1000150342`.
+   *
+   * The generic kiosk roof in this file is the `else` branch above: a flat
+   * slab from `s0 − 0.35` to `s1 + 0.35` with a second, narrower slab stood on
+   * top of it. On a fifteen-metre shop that reads as a parapet with a
+   * lantern; on a three-metre one it is a lid with a box on it, which is what
+   * the green kiosk has been wearing.
+   *
+   * `1000150342` is taken from the pine wood at the kiosk's own corner and the
+   * roof in it is unmistakable and unlike anything else on this shore. TWO
+   * gable ends stand side by side, apexes about 380 px apart in a frame where
+   * the door is 145 px for 0.90 m — so a little over two metres between them,
+   * which on a three-metre shop is one ridge per half. The ridges therefore
+   * run SEAWARD-INLAND, not along the shore: two units butted together, a
+   * valley down the join, and both gables presented to anybody walking the
+   * promenade past the end of it.
+   *
+   * Pitch off the same frame: the near gable rises about 90 px over a half
+   * span of 250 px, so 20°, which on a 1.5 m half is 0.27 m of rise.
+   *
+   * The sheet is pale and COOL. Sampled against the gravel apron in the same
+   * light — apron 115/109/99, sheet 114/146/160 — it is 0.99/1.34/1.62 of it,
+   * because a painted steel sheet laid nearly flat under a Dalmatian sky is
+   * mostly reflecting that sky. The kiosk carried a warm neutral grey.
+   */
+  function twinGableRoof(S, y0, top, body) {
+    const OV = 0.14;                 // barge and eaves overhang
+    const TH = 0.05;                 // sheet thickness
+    const RISE = 0.27;               // ridge over eaves — 20° on a 1.5 m half
+    const SHEET = [0.505, 0.528, 0.545];
+    const UND = shade(SHEET, 0.60);
+    const sa = S.s0 - OV, sb = S.s1 + OV;
+    const tm = (S.t0 + S.t1) * 0.5;
+    for (const [ta, tc] of [[S.t0 - OV, tm], [tm, S.t1 + OV]]) {
+      const tr = (ta + tc) * 0.5;
+      for (const [x0, x1, ya, yb] of [[ta, tr, top, top + RISE],
+        [tr, tc, top + RISE, top]]) {
+        // `canopySkin`'s winding for an upward face — t+ then s+ — and its
+        // reverse for the soffit. Rule 10: a cap wound the way a solid wants
+        // its bottom closed is culled from every camera above it, and this
+        // roof is looked down on from a Canadair.
+        b.quad(W(x0, sa, ya), W(x1, sa, yb), W(x1, sb, yb), W(x0, sb, ya),
+          SHEET);
+        b.quad(W(x0, sb, ya - TH), W(x1, sb, yb - TH),
+          W(x1, sa, yb - TH), W(x0, sa, ya - TH), UND);
+      }
+      // The green gable infill, in the wall planes rather than the barge's,
+      // so the sheet oversails it the way the frame has it. Drawn both ways
+      // round: it is one triangle of sheet steel with a face on each side and
+      // the shop is walked past on both.
+      for (const gs of [S.s0, S.s1]) {
+        const A = W(ta + OV, gs, top), B = W(tr, gs, top + RISE);
+        const C = W(tc - OV, gs, top);
+        b.tri(A, B, C, shade(body, 1.06));
+        b.tri(C, B, A, shade(body, 0.94));
+      }
+    }
+    // The fascia along the two outer eaves and down the valley, which is the
+    // dark line under the sheet in the frame and the only thing that stops a
+    // pale roof reading as a card folded over the walls.
+    const FASC = [0.145, 0.150, 0.152];
+    for (const ft of [S.t0 - OV, tm, S.t1 + OV]) {
+      boxTS(ft - 0.030, ft + 0.030, sa, sb, top - TH - 0.055, top - TH, FASC);
+    }
+  }
+
   function greenKiosk(S, y0, top) {
     const body = S.body;
     const DK = [0.062, 0.148, 0.075];         // the joinery, near-black green
     const IRON = [0.055, 0.055, 0.058];
-    const GLASS = [0.072, 0.098, 0.088];
+    // ── AND THE WINDOW IS LIT ──────────────────────────────────────────────
+    //
+    // 0.072/0.098/0.088 is a pane with the shop shut behind it, and this shop
+    // is not shut: `1000150342` has the window propped open on a WHITE
+    // interior with a chest fridge in it, and the door beside it open on the
+    // same. Against the wall's own shaded green at 25/33/27 in that frame the
+    // opening reads 101/105/82 — four times the value, not a quarter of it —
+    // so the two openings on this elevation were the darkest thing on the
+    // building when in life they are the brightest. Between them they are
+    // 2.4 m of a 3 m frontage: the shop was a black band with a roof on it.
+    const GLASS = [0.205, 0.212, 0.198];
     const YEL = [0.720, 0.560, 0.075];
 
     // ── the cladding, which is sheet with standing joints ───────────────────
@@ -9504,6 +9585,48 @@ async function buildJadrija(scene) {
     }
     boxTS(S.t0, S.t1, S.s0 - 0.19, S.s0 - 0.15, y0 + 0.05, y0 + 0.11,
       shade(body, 0.82));
+    // ── AND EACH PANEL IS IN A RAISED FRAME, ON EVERY FACE ─────────────────
+    //
+    // Vertical joints alone is not what `1000150342` has. Opened at source
+    // resolution the green is a grid of RECESSED PANELS: a raised batten up
+    // every joint, a rail across the head a hand's width under the eaves and
+    // another across the foot, and the panel sunk inside them — so in raking
+    // light every panel carries a shadow line on all four sides. It is the
+    // only surface texture the building has and it is what tells you this is
+    // bolted sheet steel and not a rendered hut with a colour on it.
+    //
+    // And it was on the FRONT ONLY. Both ends were plain green rectangles,
+    // which is the elevation you meet first walking the promenade: the frame
+    // is taken at the kiosk's own corner and reads the west end and the long
+    // face in the same view. The back is left to `greenBack`, which has a
+    // door, a window and six courses of Pepsi crates on it already.
+    {
+      const RL = shade(body, 0.80);
+      const hRail = top - 0.34, cRail = y0 + 0.22;
+      // The head and cill rails on the front, standing 5 mm and 15 mm off the
+      // battens' own two faces rather than flush with either: two members
+      // crossing with a face in the same plane is rule 5 once per crossing,
+      // and there are four crossings on this elevation alone.
+      for (const ry of [hRail, cRail]) {
+        boxTS(S.t0 + 0.04, S.t1 - 0.04, S.s0 - 0.185, S.s0 - 0.145,
+          ry, ry + 0.055, RL, shade(body, 0.92));
+      }
+      // The ends. A batten every 0.74 m in s, plus the same two rails, set
+      // 0.05 m proud of the wall and buried 0.02 m into it — a frame that
+      // stops exactly at the wall plane shares a face with it.
+      for (const [tf, o] of [[S.t0, -1], [S.t1, 1]]) {
+        const fa = tf + o * 0.05, fb = tf - o * 0.02;
+        const ta = Math.min(fa, fb), tb = Math.max(fa, fb);
+        for (let sv = S.s0 + 0.74; sv < S.s1 - 0.1; sv += 0.74) {
+          boxTS(ta, tb, sv - 0.030, sv + 0.030, y0 + 0.05, top - 0.05, RL);
+        }
+        for (const ry of [hRail, cRail]) {
+          const ra = tf + o * 0.042, rb = tf - o * 0.018;
+          boxTS(Math.min(ra, rb), Math.max(ra, rb), S.s0 + 0.04, S.s1 - 0.04,
+            ry, ry + 0.055, RL, shade(body, 0.92));
+        }
+      }
+    }
     // The barge board at the gable: pale, and the only pale thing on it.
     boxTS(S.t0 - 0.12, S.t1 + 0.12, S.s0 - 0.22, S.s0 - 0.14, top - 0.11, top,
       [0.520, 0.518, 0.500], [0.548, 0.546, 0.530]);
@@ -9519,29 +9642,87 @@ async function buildJadrija(scene) {
     for (let k = 0; k < 3; k++) {
       const sy = y0 + 1.02 + k * 0.32;
       boxTS(wt - 0.48, wt + 0.48, S.s0 - 0.232, S.s0 - 0.222, sy, sy + 0.11,
-        [0.235, 0.250, 0.230], [0.265, 0.280, 0.258]);
+        [0.400, 0.396, 0.372], [0.445, 0.440, 0.412]);
     }
     // The doorway, and the leaf standing open on to the step.
     boxTS(dt - 0.52, dt + 0.52, S.s0 - 0.26, S.s0 - 0.19, y0, y0 + 2.10,
       DK, shade(DK, 1.30));
     boxTS(dt - 0.42, dt + 0.42, S.s0 - 0.22, S.s0 - 0.14, y0 + 0.02, y0 + 2.00,
       [0.048, 0.052, 0.046]);
+    // ── AND WHAT IS THROUGH IT ─────────────────────────────────────────────
+    //
+    // A door standing open on to a black rectangle is a door standing open on
+    // to nothing, and it is the difference between a shed and a shop somebody
+    // is working in this afternoon — the same argument the note over the
+    // kabine's open doors makes. `1000150342` at source resolution has the
+    // leaf swung right back and a LIT WHITE INTERIOR behind it: a pale wall,
+    // a chest fridge standing against it and a carton on the floor, all of it
+    // three or four times the value of the doorway's own shadow.
+    //
+    // Layered inland of the opening's back face at s0−0.14 with 10 mm between
+    // each, because rule 5 and because at 2.4 m tall these are the four
+    // largest parallel planes in the building.
+    boxTS(dt - 0.38, dt + 0.38, S.s0 - 0.130, S.s0 - 0.120, y0 + 0.04,
+      y0 + 1.96, [0.470, 0.462, 0.430]);
+    boxTS(dt - 0.30, dt + 0.02, S.s0 - 0.115, S.s0 - 0.105, y0 + 0.06,
+      y0 + 0.92, [0.620, 0.615, 0.590], [0.650, 0.646, 0.622]);
+    boxTS(dt + 0.10, dt + 0.34, S.s0 - 0.115, S.s0 - 0.105, y0 + 0.06,
+      y0 + 0.34, [0.545, 0.470, 0.320]);
     boxTS(dt + 0.44, dt + 0.49, S.s0 - 0.96, S.s0 - 0.20, y0 + 0.02, y0 + 2.00,
       DK, shade(DK, 1.24));
     boxTS(dt + 0.452, dt + 0.482, S.s0 - 0.90, S.s0 - 0.28, y0 + 0.50,
       y0 + 1.86, GLASS);
-    // The two canopies. In the frame they are wrought iron scrolled up into a
-    // shallow arch with a sheet over them; at this size an arch is three short
-    // boxes stepping up and that is enough to say bracket rather than shelf.
-    for (const ct of [wt, dt]) {
+    // ── THE TWO DOOR HOODS, AND THEY ARE GLASS ON IRON ─────────────────────
+    //
+    // "Wrought iron scrolled up into a shallow arch with a sheet over them" is
+    // the right reading of `1000150342` and what got built was the opposite of
+    // it: two SOLID BLACK SLABS 1.24 m across and 0.22 m deep in section, hung
+    // at top−0.52, which on a 2.4 m kiosk is y0+1.88 — straight across the
+    // head of a window that runs to y0+2.02 and the head of a door that runs
+    // to y0+2.10. Both openings were behind them. From the promenade this
+    // shop had no window and no door, it had two black shelves.
+    //
+    // What the frame has, opened at source resolution: a CLEAR arched sheet —
+    // you can see the green wall through it, and the pine litter that has
+    // drifted along its back edge lying ON it — carried on two slim black
+    // brackets that scroll up off the wall. The sheet is pale where the sky is
+    // in it and the only black on the whole assembly is the two brackets.
+    //
+    // Hung at y0+2.16: clear of the door head at 2.10, clear of the window
+    // head at 2.02, and 0.19 m under the eaves soffit at 2.35.
+    // Widths 1.04 m and 0.96 m and no wider. The first cut ran 1.44 and 1.32
+    // on a shop three metres across: the two hoods overlapped by 0.11 m and
+    // read as one continuous ribbon across the whole frontage. The frame has
+    // them separate, with a clear hand's breadth of green between.
+    for (const [ct, cw] of [[wt, 0.52], [dt, 0.48]]) {
+      const hy = y0 + 2.16;
+      const SH = [0.545, 0.556, 0.562];
+      // The arc: four courses stepping out from the wall and falling away, the
+      // fall going as the square so the profile is a curve and not a ramp.
       for (let k = 0; k < 4; k++) {
-        const w2 = 0.62 - k * 0.055, yy = top - 0.52 + k * 0.055;
-        boxTS(ct - w2, ct + w2, S.s0 - 0.36 - k * 0.045, S.s0 - 0.30 - k * 0.045,
-          yy, yy + 0.05, IRON);
+        const sOut = S.s0 - 0.28 - k * 0.115;
+        const yy = hy + 0.10 - ((k + 1) / 4) * ((k + 1) / 4) * 0.30;
+        boxTS(ct - cw, ct + cw, sOut - 0.115, sOut, yy, yy + 0.022,
+          SH, shade(SH, 1.14));
       }
-      for (const o of [-0.58, 0.58]) {
-        boxTS(ct + o - 0.022, ct + o + 0.022, S.s0 - 0.34, S.s0 - 0.20,
-          top - 0.52, top - 0.28, IRON);
+      // The needle drift along the back of it, which is the detail that says
+      // this canopy has been up since the spring. Under the pines all four
+      // frames of this end of the shore have it on every horizontal surface.
+      boxTS(ct - cw + 0.06, ct + cw - 0.06, S.s0 - 0.30, S.s0 - 0.19,
+        hy + 0.122, hy + 0.150, [0.300, 0.222, 0.150]);
+      // The two brackets, and they are the only black on it: a stem on the
+      // wall and a stay raking out under the sheet's far end.
+      for (const o of [-cw + 0.05, cw - 0.05]) {
+        boxTS(ct + o - 0.020, ct + o + 0.020, S.s0 - 0.30, S.s0 - 0.20,
+          hy - 0.34, hy + 0.11, IRON);
+        b.quad(W(ct + o - 0.018, S.s0 - 0.235, hy - 0.34),
+          W(ct + o - 0.018, S.s0 - 0.70, hy - 0.03),
+          W(ct + o + 0.018, S.s0 - 0.70, hy - 0.03),
+          W(ct + o + 0.018, S.s0 - 0.235, hy - 0.34), IRON);
+        b.quad(W(ct + o + 0.018, S.s0 - 0.235, hy - 0.34),
+          W(ct + o + 0.018, S.s0 - 0.70, hy - 0.03),
+          W(ct + o - 0.018, S.s0 - 0.70, hy - 0.03),
+          W(ct + o - 0.018, S.s0 - 0.235, hy - 0.34), IRON);
       }
     }
     // The guard rail across the window, which is what stops anybody stepping
@@ -13419,6 +13600,8 @@ async function buildJadrija(scene) {
         top, top + 0.055, S.roof, shade(S.roof, 1.10));
       boxTS(S.t0 - 0.11, S.t1 + 0.11, S.s0 - 0.11, S.s1 + 0.11,
         top + 0.045, top + 0.085, shade(S.roof, 0.86));
+    } else if (S.twinGable) {
+      twinGableRoof(S, y0, top, body);
     } else {
       // A pitched roof and the name straight on the render, which is what the
       // pizzeria and the café at the far end both have.
