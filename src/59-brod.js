@@ -698,10 +698,19 @@ function brodCleatAt(x) {
  * topside the angular power in the 0.04–0.4 m band splits 37 % into gradients
  * that run down her (streaks lying ALONG the hull) against 35 % into gradients
  * that run along her (streaks lying down it). That is isotropic with a hair of
- * along-hull bias, which is what a chalked, scrubbed, repainted topside looks
+ * along-hull bias, and where there is coherent structure at all — one 80 px
+ * box of clean paint where the wall's own roughcast does not swamp it — the
+ * correlation runs 15 px along her against 6 px down: **elongated ALONG the
+ * hull, 2.5 to 1**. Which is what a chalked, scrubbed, repainted topside looks
  * like and not what a rust weep looks like. Building vertical streaks would
  * have been a regular pattern that is not there, which is worse than nothing.
- * So the field is a plain fbm, elongated 2:1 along her and no more.
+ *
+ * So: a plain fbm in a cell 2.8 m along her by 0.55 m down. The base cell is
+ * 5:1 rather than the measured 2.5:1 for a reason that has nothing to do with
+ * anisotropy — the topside is only 0.99 m tall, so a cell as deep as the
+ * measurement wants gives every column ONE value and the field cannot vary
+ * down her at all. Four octaves of `fbm2` rotate as they go, so what comes out
+ * is nearer 2:1 than 5:1, and the fleck on the end of it is isotropic.
  *
  * **THE VARIATION IS ONE-SIDED.** Look at the two tails: at 0.42 m the bright
  * end is +0.128 in log and the dark end is −0.304, and by 0.83 m it is +0.156
@@ -710,11 +719,35 @@ function brodCleatAt(x) {
  * the other half of the table: the IQR is only 0.109 while the tenth percentile
  * is 20 % down. Most of her is clean and some of her is filthy.
  *
- * **IT GETS WORSE DOWNWARD.** `dn` runs 0.60 at the cove to 2.70 at the
- * boot-top, which reproduces −0.27 at 0.2 m and −0.65 at 0.9 m. On top of that
- * the median itself falls: fitting ln L over the clean 0.20–0.80 m band gives
- * **−0.119 per metre**, so 0.888 a metre and ×0.87 over the 1.20 m from the
- * cove to the stripe. That is the whole of the tone term.
+ * **IT GETS WORSE DOWNWARD.** `dn` runs 0.55 at the cove to 3.10 at the
+ * boot-top. On top of that the median itself falls: fitting ln L over the
+ * clean 0.20–0.80 m band gives **−0.119 per metre**, so 0.888 a metre and
+ * ×0.87 over the 1.20 m from the cove to the stripe. That is the whole of the
+ * tone term.
+ *
+ * WHAT CAME BACK OUT OF THE RENDER, measured with the same statistic on 2 481
+ * columns of her own topside in three broadside frames — and on a BEFORE frame
+ * to say what the renderer already supplies without any of this:
+ *
+ *   depth below the cove   0.21    0.42    0.62    0.83
+ *   mural   P10            0.795   0.738   0.642   0.507
+ *   render  P10            0.830   0.683   0.658   0.603
+ *   mural   P90            1.260   1.137   1.160   1.169
+ *   render  P90            1.595   1.182   1.140   1.188
+ *   mural   sd(ln)         0.109   0.109   0.155   0.262
+ *   render  sd(ln)         0.213   0.157   0.148   0.219
+ *   BEFORE  sd(ln)         0.000   0.000   0.000   0.013
+ *
+ * The one row that does not land is the top, and it is the statistic and not
+ * the paint: every column is divided by its OWN median before the percentiles
+ * are taken, so a column whose bottom third is heavily dirtied has its median
+ * dragged down and its clean top reads high. Turning that P90 down means
+ * turning the dark ramp off, which is the thing the other three rows are made
+ * of.
+ *
+ * Zero to three places on the flat hull, which is both the size of the defect
+ * and the answer to the obvious objection: the renderer's own shading puts
+ * NOTHING into this statistic, so there is nothing here being counted twice.
  *
  * **VALUE AND HUE MOVE TOGETHER.** Inside the topside paint the bright four
  * fifths sit at R/L 1.008, G/L 1.009, B/L 0.874 — the same cream at every
@@ -774,9 +807,9 @@ const BROD_PAINT_GLSL = /* glsl */ `
   if (vUv.x > 0.5) {
     float dep = vUv.y;                       // metres below the sheer, at her
     float dist = length(vWorld - uCamPos);
-    // The finest octave is 0.4 m across and is gone by the time she is a
-    // hundred metres off, where it would be well under a pixel and would
-    // therefore be a shimmer rather than a texture.
+    // The finest term inside the exponent is a 0.40 by 0.08 m cell, and it is
+    // gone by the time she is ninety metres off, where 0.08 m is under a pixel
+    // and would be a shimmer rather than a texture.
     float near = 1.0 - smoothstep(30.0, 90.0, dist);
     vec2 hp = vec2(vLocal.x, dep + vLocal.z * 0.9);
     vec2 cell = vec2(2.8, 0.55);
@@ -785,8 +818,7 @@ const BROD_PAINT_GLSL = /* glsl */ `
     if (vUv.x < 1.5) {                       // 1 - the white topsides
       float t = clamp((dep - 0.875) / 0.99, 0.0, 1.0);
       tone = exp(-0.119 * max(dep - 0.875, 0.0));
-      up = 0.26;
-      dn = mix(0.55, 2.60, t);
+      dn = mix(0.55, 3.10, t);
     } else if (vUv.x < 2.5) {                // 2 - her one dark tin
       float w = smoothstep(1.30, 1.85, dep); // strake above, boot-top below
       cell = vec2(4.0, 1.6);
@@ -798,12 +830,11 @@ const BROD_PAINT_GLSL = /* glsl */ `
       up = 0.18; dn = 0.60; cool = 0.0;
     } else if (vUv.x < 4.5) {                // 4 - the deckhouse and the
       // painted-out inside of the bulwark. Off her own height rather than off
-      // the sheer: everything in this class is ABOVE the sheer, where the
-      // depth channel has run out.
-      // And its own cell. The topside's is 5:1 along her, which is right for
-      // a hull and wrong for a deckhouse: on a flat white wall a 5:1 streak
-      // reads as clapboard. The mural's house is blotchy, sd(ln) 0.142, with
-      // no grain in it.
+      // the sheer, because everything in this class is ABOVE the sheer, where
+      // the depth channel has run out - and in a cell of its own, because the
+      // topside's is 5:1 along her, which is right for a hull and on a flat
+      // white wall reads as clapboard. The mural's house is blotchy at
+      // sd(ln) 0.142 with no grain in it.
       hp = vec2(vLocal.x, vLocal.y * 1.3 + vLocal.z * 0.9);
       cell = vec2(1.7, 0.95);
       up = 0.22; dn = 0.80;
@@ -827,12 +858,14 @@ const BROD_PAINT_GLSL = /* glsl */ `
     // metres off she was a set of soft grey washes with no grain in them. The
     // mural at that range is not smooth anywhere: the band from 0.04 to
     // 0.17 m carries sd(ln) 0.16 and 0.13, of which some is the wall's own
-    // roughcast, so half of it goes on. Isotropic, unlike everything above -
+    // roughcast and the rest is set by what the whole band has to add up to:
+    // 0.20 is what puts the render's sd(ln) back on the mural's at the depths
+    // where the two already agreed. Isotropic, unlike everything above -
     // at a hand's width the angular power in the mural has no direction in it
-    // at all. And out by twenty metres, where 0.17 m is a fifth of a pixel and
-    // a fleck is a shimmer rather than a fleck.
-    float grain = 1.0 - smoothstep(7.0, 22.0, dist);
-    base *= 1.0 + (vnoise2(hp * 6.0 + 41.7) - 0.5) * 0.30 * grain;
+    // at all. And gone by forty-five metres, where its 0.17 m cell is down to
+    // four pixels and a fleck is on its way to being a shimmer.
+    float grain = 1.0 - smoothstep(12.0, 45.0, dist);
+    base *= 1.0 + (vnoise2(hp * 6.0 + 41.7) - 0.5) * 0.20 * grain;
   }
 `;
 
