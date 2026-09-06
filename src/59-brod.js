@@ -229,6 +229,45 @@ const BROD = {
 
   eye: 1.62,                 // your eyes above whatever you are standing on
 
+  /**
+   * B, ON HER DECK. Misha: *"why cant I roam around freely with my regular
+   * navigation controls, press 'B', press 'Z', and all that good stuff?"*
+   *
+   * `third` is the pull-back and it is **3.10 m, the same as the promenade's**
+   * — not copied, arrived at from the same arithmetic, because it is the same
+   * camera and the same body. At `back` behind an eye 1.62 m over the deck her
+   * boots fall atan(1.66 / back) below the middle of the screen and half the
+   * vertical field is 29 degrees: 3.10 puts them at 28.2, just inside, and she
+   * reads whole. Anything shorter and her feet are off the bottom.
+   *
+   * Everything else here is HER number and not the promenade's, because a
+   * 27.3 m boat is not a resort:
+   *
+   *   `camLow`   how near the sea it may get. Her local y = 0 IS the designed
+   *              waterline — `place` puts her on the surface — so this is
+   *              metres of air under the lens. It is reached: looking down
+   *              40 degrees from the cockpit spends 1.99 m of the 2.88 the eye
+   *              has there.
+   *   `camHead`  how far it must clear a sole to be OUTSIDE the boat rather
+   *              than in the middle of a deck.
+   *   `camRoof`  and how far it may rise over the COCKPIT sole, which is the
+   *              only deck on her with a roof: the awning is a solid panel
+   *              2.15 m over that sole, and a camera that has gone up through
+   *              it is a camera looking at a sheet of canvas. Tested against
+   *              the sole rather than against a box, so the awning may be
+   *              moved and this still knows where it is.
+   *   `camMin`   under which the third person gives up and hands the frame
+   *              back to the first — the promenade's argument, unchanged:
+   *              under a metre it is a face full of neck.
+   */
+  third: 3.10,               // m the camera falls back when B is on
+  camStep: 0.15,             // m a probe — the march, as 47-ground.js marches
+  camMin: 1.00,
+  camLow: 1.00,
+  camHead: 0.35,
+  camRoof: 2.05,
+  camEase: 6.0,              // m/s the pull-back is allowed to LENGTHEN at
+
   // Speed. A 16 m wooden boat on a single diesel does 13 to 16 knots and this
   // one does 15.6, which puts 4 469 m of channel at nine and a half minutes.
   // That is a long time to be a passenger and it is the honest number; the
@@ -809,10 +848,21 @@ const BROD_PAINT_GLSL = /* glsl */ `
   if (vUv.x > 0.5) {
     float dep = vUv.y;                       // metres below the sheer, at her
     float dist = length(vWorld - uCamPos);
+    // HOW BIG A PIXEL IS ON THIS SURFACE, and not how far away it is. The two
+    // are the same thing only when you are square on to something, and the
+    // third person on her deck is never square on to anything: from the
+    // foredeck the inside of her port bulwark runs away from the lens at four
+    // degrees, and a fade written on distance alone left the whole of it
+    // ALIASING — the field's own 0.35 m octave, compressed by the grazing
+    // angle into three-pixel bars, read as a striped fence at two metres.
+    // Footprint goes as dist / cos(angle to the normal), which is this to
+    // within the constant that both smoothsteps below absorb. Floored at 0.06
+    // so a face exactly edge-on is fifteen times its distance and not
+    // infinity.
+    float foot = dist / max(abs(dot(normalize(vWorld - uCamPos), n)), 0.06);
     // The finest term inside the exponent is a 0.40 by 0.08 m cell, and it is
-    // gone by the time she is ninety metres off, where 0.08 m is under a pixel
-    // and would be a shimmer rather than a texture.
-    float near = 1.0 - smoothstep(30.0, 90.0, dist);
+    // gone by the time a pixel covers a fair fraction of it.
+    float near = 1.0 - smoothstep(30.0, 90.0, foot);
     vec2 hp = vec2(vLocal.x, dep + vLocal.z * 0.9);
     vec2 cell = vec2(2.8, 0.55);
     float up = 0.26, dn = 1.00, tone = 1.0, cool = 1.0;
@@ -864,9 +914,10 @@ const BROD_PAINT_GLSL = /* glsl */ `
     // 0.20 is what puts the render's sd(ln) back on the mural's at the depths
     // where the two already agreed. Isotropic, unlike everything above -
     // at a hand's width the angular power in the mural has no direction in it
-    // at all. And gone by forty-five metres, where its 0.17 m cell is down to
-    // four pixels and a fleck is on its way to being a shimmer.
-    float grain = 1.0 - smoothstep(12.0, 45.0, dist);
+    // at all. And gone by forty-five metres of FOOTPRINT - see foot above -
+    // where its 0.17 m cell is down to four pixels and a fleck is on its way
+    // to being a shimmer.
+    float grain = 1.0 - smoothstep(12.0, 45.0, foot);
     base *= 1.0 + (vnoise2(hp * 6.0 + 41.7) - 0.5) * 0.20 * grain;
   }
 `;
@@ -916,6 +967,29 @@ function brodPaint(g, pal) {
   }
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   return g;
+}
+
+/**
+ * Hand the game's own body to the boat, past the name that is in the way.
+ *
+ * `you` inside `buildBrod` is HER passenger — a local `{ x, z, yaw, pitch,
+ * deck }` in the boat's frame, and it has been called that since the mode was
+ * written. `you` at module scope is 49-you.js's figure, the one B has been
+ * showing you on the promenade and in the water since 1.29x. They are two
+ * different objects with one name and the inner one wins everywhere inside
+ * that closure, so the boat cannot reach the figure at all.
+ *
+ * Three lines out here rather than renaming thirty references in there. It is
+ * also the honest shape: this is the ONE thing about the third person on her
+ * deck that is not the boat's business, and it is the only line in this file
+ * that knows 49-you.js exists.
+ *
+ * Safe to call before boot for the same reason every other deferred reader of
+ * a module-scope `let` is: the binding is initialised when 90-app.js's top
+ * level runs, and nothing here runs before a frame.
+ */
+function brodDriveYou(o) {
+  if (you) you.drive(o);
 }
 
 /**
@@ -2515,6 +2589,9 @@ function buildBrod(scene) {
   let phase = 'moored';          // moored | letgo | run | slow | alongside
   let s = 0, sp = 0, tmr = 0;
   let said = -1;                 // index of the last callout fired
+  let third = 0;                 // m the camera has actually got behind you
+  let bodyOn = false;            // is 49-you.js's figure ours this frame
+  let wasX = 0, wasZ = 0;        // where you stood last step, for the walk clip
 
   const you = { x: -4.4, z: 0, yaw: 0, pitch: -0.02, deck: 0.38 };
   const att = { y: 0, roll: 0, pitch: 0, yaw: 0 };
@@ -3241,7 +3318,19 @@ function buildBrod(scene) {
     return true;
   }
 
-  function leave() { active = false; }
+  /**
+   * Off her.
+   *
+   * The body goes back with the same call `leaveGround` makes, and it has to
+   * be here rather than left to 90-app.js: `poseSwimBody` only ever hands back
+   * a figure IT is driving, so a third person walked over the side would leave
+   * a body standing on the water astern of her.
+   */
+  function leave() {
+    active = false;
+    third = 0;
+    if (bodyOn) { brodDriveYou(null); bodyOn = false; }
+  }
 
   function look(dx, dy) {
     you.yaw += dx;
@@ -3300,6 +3389,11 @@ function buildBrod(scene) {
     // Walking her deck. Everything is in her frame, so the deck moves under you
     // and you are never integrated in world metres at all — which is the whole
     // reason a passenger is cheap where a driver is not.
+    //
+    // Where you stood before it, for `driveBody`: the walk is refused by the
+    // house, by a passenger and by a rise over 0.66 m, so what the legs should
+    // be doing is what the DECK says happened and not what the keys asked for.
+    wasX = you.x; wasZ = you.z;
     const step = (ctl.sprint ? BROD.run : BROD.walk) * dt;
     const f = clamp(ctl.fwd || 0, -1, 1), r = clamp(ctl.side || 0, -1, 1);
     if (f || r) {
@@ -3370,7 +3464,77 @@ function buildBrod(scene) {
   }
 
   /**
-   * Put the camera where your head is.
+   * May the camera stand at this point in her frame?
+   *
+   * HER OWN FLOOR PLAN IS THE COLLIDER, which is 47-ground.js's rule — the
+   * march there tests `confine`, the same function that decides where your
+   * body may go — read on to a boat. `deckAt` answers "there is a walkable
+   * sole here, at this height", and a camera under `sole + camHead` is
+   * therefore inside a deck rather than over one. That one test covers the
+   * deckhouse (the upper-deck band answers 4.055 across its whole footprint,
+   * so everything under 4.4 inside the house is refused), the roof slab, the
+   * companionway, the foredeck and both side decks, and it cannot disagree
+   * with the walk about where the walls are because it IS the walk.
+   *
+   * Off the plan there are two cases and they are opposite: outboard of her,
+   * which is open water and fine, and inside her plating, which is not.
+   * `brodBeam` inverts the loft analytically — it is what the fenders and the
+   * mooring hang off — so the second is the hull itself and not a box round
+   * it. Above the sheer neither applies: over the bow, over the transom and
+   * over the awning are all sky.
+   */
+  function camClear(lx, ly, lz) {
+    // y = 0 in her frame is the designed waterline, so this is air under the
+    // lens and not an arbitrary floor.
+    if (ly < BROD.camLow) return false;
+    const sole = deckAt(lx, lz);
+    if (sole == null) {
+      return ly >= brodSheer(lx)[0] || Math.abs(lz) > brodBeam(lx, ly) + 0.15;
+    }
+    if (ly < sole + BROD.camHead) return false;
+    // Her one roof. See `camRoof`: the cockpit is the only sole she has an
+    // awning over, and it is the sole itself that says which one that is.
+    return !(sole < BROD_WELL * BROD_K + 0.05 && ly > sole + BROD.camRoof);
+  }
+
+  /**
+   * IS SOMEBODY STANDING WHERE THE LENS IS?
+   *
+   * The same 0.35 m disc the WALK refuses — `pax.solid`, unchanged, in the
+   * frame both they and the camera are already in. Found by pressing W in the
+   * third person on her starboard side deck: the march put the lens 1.2 m back
+   * and 1.2 m back was the inside of a passenger's head, which filled the
+   * frame with a jaw.
+   *
+   * IN THE MARCH AND NOT AT THE STOPPING POINT, and that was measured both
+   * ways because it is not obvious. Testing only where the lens comes to rest
+   * is cheaper by every number — 8.0 % of her deck falls back to the first
+   * person against 16.2 %, and the mean pull-back is 2.63 m against 2.31 — and
+   * it is the wrong answer, because it stops the camera being INSIDE somebody
+   * and does nothing about somebody being between the camera and you. That is
+   * not a theoretical case on this boat: photographed at 1.2 m of pull-back on
+   * her starboard side deck, the shot was a passenger's jaw across a third of
+   * the frame with the body it was supposed to be behind nowhere in it. The
+   * promenade can ignore this because you can walk away from a stranger on a
+   * promenade; her side deck is 1.27 m wide with twenty-two people on it.
+   *
+   * So the eight points go, and what is bought with them is that the first
+   * person — which is a shot, and a good one — is what you get instead of a
+   * shot of the back of somebody's head.
+   *
+   * Only within a person's height of the sole they are standing on: `solid` is
+   * a disc and knows nothing about how tall anybody is, so without the height
+   * test the camera 4.4 m over the cockpit — which is where it goes when you
+   * are on the upper deck — would be refused by somebody sitting under it.
+   */
+  function camInPax(lx, ly, lz) {
+    if (!pax) return false;
+    const sole = deckAt(lx, lz);
+    return sole != null && ly < sole + 2.0 && pax.solid(lx, lz);
+  }
+
+  /**
+   * Put the camera where your head is — or, with `back`, behind you.
    *
    * The head is composed **on top of her attitude** rather than beside it —
    * `qBoat * qHead` — so her heel rolls the horizon under you and her trim
@@ -3380,16 +3544,184 @@ function buildBrod(scene) {
    *
    * `-π/2 - you.yaw` is the quarter turn between a camera, which looks down its
    * own -Z, and a hull, whose forward is +X. See `yawOfX`.
+   *
+   * ── AND THE THIRD PERSON ────────────────────────────────────────────────
+   *
+   * `back` is metres and 0 is the first person, which is exactly the code that
+   * was here: at `d = 0` the two branches below compute the same point and the
+   * same quaternion, so B off is not a mode, it is a zero.
+   *
+   * IT IS THE SAME ORIENTATION, and that is the whole reason this is eleven
+   * lines rather than 47-ground.js's ninety. The promenade's third person has
+   * to `lookAt`, because its camera swings round her and the aim has to follow;
+   * hers is a straight slide down the view line, so the direction from the
+   * camera to what it is looking at is the direction it was already looking in.
+   * Which means the quaternion above is still right — and that matters more
+   * here than anywhere else in the game, because `lookAt` would throw away
+   * `qBoat` and with it the roll. A third person on a boat with no roll in it
+   * is a third person standing on a car park.
+   *
+   * MARCHED AND NOT SOLVED, again as the promenade marches: a hand's breadth
+   * at a time down the line, stopping at the last point `camClear` allows.
+   * Twenty-one probes a frame and only while B is on. Her deck is 1.27 m wide
+   * between the deckhouse and the bulwark, so the march is doing real work —
+   * see `thirdD` for what it actually finds, which is measured and not guessed.
+   *
+   * NO ORBIT. The promenade walks the camera round you when you stand still,
+   * and it is deliberately not here: the reason it can is that the ground is
+   * flat and open in every direction, and this deck is a corridor with a house
+   * down the middle of it. A lap round somebody on her side deck spends half
+   * of itself inside the deckhouse, which the march would refuse — so the
+   * camera would collapse into her head and pop out again twice a lap, which
+   * reads as the camera breaking rather than as a camera meeting a wall.
    */
-  function pose(camera) {
+  function pose(camera, back = 0, dt = 0) {
     if (!active) return;
-    tmpV.set(you.x, you.deck + BROD.eye, you.z);
+    const ex = you.x, ey = you.deck + BROD.eye, ez = you.z;
+    // Her view line, in her frame. The walk uses (cos yaw, sin yaw) for
+    // forward, so this is that with the pitch on it.
+    const cp = Math.cos(you.pitch);
+    const lx = cp * Math.cos(you.yaw), ly = Math.sin(you.pitch),
+      lz = cp * Math.sin(you.yaw);
+    let d = 0;
+    if (back > 0) {
+      // MARCHED AT EYE HEIGHT, which is 47-ground.js's rule and here it is
+      // load-bearing rather than tidy. She has 2.15 m of awning over the
+      // cockpit sole and you are 1.62 m of it, so there is half a metre of air
+      // over your eyes down there — and a march that took the height off the
+      // view line lost the whole shot the moment you glanced at your own feet:
+      // measured over her deck, looking down 26 degrees in the cockpit found
+      // 0.99 m, under `camMin`, and handed the frame back to the first person.
+      // How far BACK the camera can get is a question about walls; how high it
+      // ends up is a separate one and is settled below.
+      for (let k = BROD.camStep; k <= back + 1e-6; k += BROD.camStep) {
+        if (!camClear(ex - lx * k, ey, ez - lz * k)) break;
+        if (camInPax(ex - lx * k, ey, ez - lz * k)) break;
+        d = k;
+      }
+      if (d < BROD.camMin) d = 0;
+    }
+    // OUT SLOWLY, IN AT ONCE. What the march finds is not continuous along her
+    // deck — walk aft off the side deck and the awning takes 3.10 m down to
+    // whatever is left before the cockpit, in one stride — and a camera that
+    // eases INTO a wall is a camera inside it. Lengthening is the only
+    // direction with any slack in it, so it is the only one that gets an ease.
+    if (d < third || third <= 0 || dt <= 0) third = d;
+    else third = Math.min(d, third + BROD.camEase * dt);
+    d = third;
+    let cx = ex, cy = ey, cz = ez;
+    if (d > 0) {
+      cx = ex - lx * d; cz = ez - lz * d;
+      // And now the height, CLAMPED and not refused — the promenade's argument
+      // and its method: the test is monotone in height inside a deck, so five
+      // halvings put the lens within 3 cm of whatever stopped it for five
+      // calls instead of the twenty a second march would cost. `ey` is known
+      // good because the march above tested exactly that point at exactly that
+      // height. Both directions, unlike the promenade's, because looking UP
+      // drops the camera towards the sea rather than lifting it into a
+      // ceiling, and out here the sea is the thing it hits.
+      const want = ey - ly * d;
+      if (camClear(cx, want, cz)) cy = want;
+      else {
+        let lo = ey, hi = want;
+        for (let i = 0; i < 5; i++) {
+          const mid = (lo + hi) * 0.5;
+          if (camClear(cx, mid, cz)) lo = mid; else hi = mid;
+        }
+        cy = lo;
+      }
+    }
+    tmpV.set(cx, cy, cz);
     boat.localToWorld(tmpV);
     camera.position.copy(tmpV);
     boat.getWorldQuaternion(qBoat);
-    eHead.set(you.pitch, -Math.PI / 2 - you.yaw, 0, 'YXZ');
+    if (d > 0 && cy !== ey - ly * d) {
+      // The clamp has taken the lens off the view line, so aim it at the point
+      // the view line was going to rather than along it — 6 m ahead of YOU,
+      // which is what keeps you in the frame and not the deck at your feet.
+      // Rebuilt as a yaw and a pitch and NOT as a `lookAt`, because `lookAt`
+      // writes the whole quaternion and would throw away `qBoat` with it. A
+      // third person on a boat with no roll in it is a third person standing
+      // on a car park.
+      const gx = ex + lx * BROD.camAhead - cx;
+      const gy = ey + ly * BROD.camAhead - cy;
+      const gz = ez + lz * BROD.camAhead - cz;
+      const gl = Math.hypot(gx, gy, gz) || 1;
+      eHead.set(Math.asin(clamp(gy / gl, -1, 1)),
+        -Math.PI / 2 - Math.atan2(gz, gx), 0, 'YXZ');
+    } else {
+      // Untouched, and literally so: at `back` 0 this is the only branch that
+      // runs and it is the line that was here before the third person existed.
+      eHead.set(you.pitch, -Math.PI / 2 - you.yaw, 0, 'YXZ');
+    }
     qHead.setFromEuler(eHead);
     camera.quaternion.copy(qBoat).multiply(qHead);
+  }
+
+  /**
+   * And the body the camera is now behind.
+   *
+   * 49-you.js's figure, the one B has always shown — not a twenty-third
+   * passenger. `buildBrodPax` was read first, because it is a crowd and a
+   * crowd is the cheap answer to twenty-two people; it is the wrong answer to
+   * one. Its people are instanced, posed off a shared clock, dressed from
+   * `crowdLayer`'s palettes and hidden by `pax.hide()` as a block — so putting
+   * you in it would put a stranger on the deck wearing somebody else's
+   * swimsuit, and the one body in this game that is yours would be the one
+   * body not on the boat. `you.drive` is what the promenade and the swim both
+   * use and it costs nothing here that it does not cost there.
+   *
+   * IN THE WORLD AND NOT IN HER FRAME, because `drive` is world-space: the
+   * position goes through `boat.localToWorld`, so it rides her exactly, and
+   * the heading is her local forward pushed through the same matrix and read
+   * off as the yaw the rig wants. `atan2(-fz, fx)` and not a constant offset:
+   * `tick` in 49-you.js points the rig's +X at (cos y, 0, -sin y), so that
+   * expression is the inverse of the thing that draws her, and it does not
+   * care what convention any other mode uses.
+   *
+   * NO HEEL AND NO TRIM ON THE BODY, and that is measured rather than skipped.
+   * `stats` reports her attitude alongside as heel -1.5 degrees and trim -1.8:
+   * on a 1.7 m figure that is 5 cm at the crown, which is a third of what her
+   * own walk cycle moves the same point. Her FEET are exact either way — the
+   * position goes through the boat's matrix — and it is the feet that would
+   * show.
+   *
+   * DRIVEN FROM `draw` AND NOT FROM `pose`, which is an ordering and not a
+   * preference. 90-app.js runs `poseSwimBody` between the two, and that
+   * function ends by handing the figure BACK whenever it is not the one
+   * driving her — so a body driven in `pose` is a body released in the same
+   * frame. `draw` is after it, and `you.tick`, which is where the drive is
+   * actually consumed, is after that.
+   */
+  function driveBody(dt) {
+    if (!active || third <= 0) {
+      if (bodyOn) { brodDriveYou(null); bodyOn = false; }
+      return;
+    }
+    tmpW.set(you.x, you.deck, you.z);
+    boat.localToWorld(tmpW);
+    tmpV.set(Math.cos(you.yaw), 0, Math.sin(you.yaw));
+    boat.localToWorld(tmpV).sub(boat.position);
+    // What she is actually doing, off the deck and not off the keys: the walk
+    // is refused by the deckhouse, by a passenger and by every rise over
+    // 0.66 m, and a body walking on the spot against a wall she is not moving
+    // along is the one thing you can see from back here and cannot see from
+    // inside your own head.
+    const sp2 = dt > 0 ? Math.hypot(you.x - wasX, you.z - wasZ) / dt : 0;
+    const moving = sp2 > 0.35;
+    brodDriveYou({
+      at: [tmpW.x, tmpW.y, tmpW.z],
+      yaw: Math.atan2(-tmpV.z, tmpV.x),
+      pitch: 0,
+      clip: moving ? 'walk' : 'idle',
+      // The clip is authored at about 0.92 m/s — 42-crowd.js measures it and
+      // says so — and her deck runs at 1.55 and 2.6, which is inside the range
+      // the promenade already clamps for a mode that reaches 9.4.
+      speed: moving ? clamp(sp2 / 0.92, 0.6, 2.4) : 1,
+      seen: true,
+      wet: false,
+    });
+    bodyOn = true;
   }
 
   /**
@@ -3402,6 +3734,10 @@ function buildBrod(scene) {
    */
   function idle(dt, cam) {
     if (active || !berth) return;
+    // She is scenery again, so nothing on her deck is yours. Idempotent, and
+    // it runs every frame you are ashore rather than once on the way out,
+    // because `reset` is not the only door off her.
+    if (bodyOn) { brodDriveYou(null); bodyOn = false; }
     const d = Math.hypot(cam.x - berth.x, cam.z - berth.z);
     group.visible = d < 1000;
     if (group.visible) place(berth.x, berth.z, berth.yaw, dt);
@@ -3445,9 +3781,10 @@ function buildBrod(scene) {
     pax.flush(paxT, cam, boat.matrixWorld);
   }
 
-  /** Her passengers, while you are aboard. See `drawPax`. */
+  /** Her passengers, and you, while you are aboard. See `drawPax`. */
   function draw(dt, cam) {
     if (cam) drawPax(dt, cam, group.visible);
+    driveBody(dt);
   }
 
   return {
@@ -3462,6 +3799,13 @@ function buildBrod(scene) {
     get berth() { return berth; },
     get quay() { return quay; },
     moor, reset, enter, leave, look, update, pose, draw, idle, canBoard,
+    /**
+     * How far behind you the camera actually got, in metres, or 0 for the
+     * first person. Read by a probe rather than by the game — 90-app.js does
+     * not have to know, because unlike the promenade this file drives its own
+     * body and can answer the question for itself.
+     */
+    thirdD: () => third,
     /**
      * Put her `m` metres along the passage. Nothing in the game calls this: it
      * is for a screenshot and for a test, because nine and a half minutes is
