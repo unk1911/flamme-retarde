@@ -2475,6 +2475,7 @@ const JUMP = {
 let jumpWas = 0, jumpPush = 0, jumpLand = 0, jumpPosed = false;
 
 /** Third person in the water: off, or on with the mask down. */
+const _look = new THREE.Vector3();
 let bodyCam = false;
 
 /**
@@ -5437,9 +5438,14 @@ function frame() {
   // is the walker; everywhere else there is nobody on the ground and the
   // camera is the only answer there is.
   if (jadrija) {
+    // And WHERE YOU ARE LOOKING, which is the camera's and not the walker's:
+    // the person's own yaw is where her feet point, and you can stand still and
+    // turn your head. Distance is decided against the walker and attention
+    // against the eye, and they are two different questions.
     jadrija.update(dt, camera.position,
       state.phase === 'ground' && ground && ground.ok
-        ? { x: ground.you.x, y: ground.you.y, z: ground.you.z } : null);
+        ? { x: ground.you.x, y: ground.you.y, z: ground.you.z } : null,
+      camera.getWorldDirection(_look));
   }
   rail.update(dt);
   sea.update(camera);

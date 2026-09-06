@@ -36195,7 +36195,7 @@ async function buildJadrija(scene) {
    * that pauses in the same places every run is a machine, and nothing about
    * where somebody stops for a moment on a promenade needs to survive a reload.
    */
-  function updateCrowd(dt, cam, at = null) {
+  function updateCrowd(dt, cam, at = null, dir = null) {
     crowdT += dt;
     lastCam.x = cam.x; lastCam.z = cam.z;
     // The one skinned figure here is posed on the CPU — twenty-eight bones,
@@ -36344,7 +36344,12 @@ async function buildJadrija(scene) {
     for (const k in crowds) crowds[k].flush(crowdT, cam);
     // The Bucketeer, who carries her own range gate for the same reason Baye's
     // is here rather than inside her stepper.
-    if (bucketeer) bucketeer.step(dt, cam);
+    // `who` and `dir`, not `cam`. She had the bug the note at the top of this
+    // function was written about — measured against the camera, so with the
+    // third person on she was deciding about a point 3.10 m behind Chloe's
+    // shoulder. Misha reported that about Baye on 28 Aug and the Bucketeer was
+    // never given the fix.
+    if (bucketeer) bucketeer.step(dt, who, cam, dir);
     // And the fish, which is three hands and a Date and is not worth a gate —
     // and the fly upstairs, which carries its own: `who` is the ear it is
     // heard at, and past thirty metres it stops being stepped at all.

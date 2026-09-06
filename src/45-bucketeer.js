@@ -80,6 +80,19 @@ const BUCK = {
   // there is more silence than tune and the gulls have somewhere to land.
   // OFF until there is a real song to put in it — see the call site.
   hum: false,
+  // How close you get before she stops rather than walks through you, and how
+  // far round in front of her that has to be. 0.95 m is her own reach plus a
+  // shoulder; 0.30 is about 70 degrees either side, so somebody beside her or
+  // behind her is not in her way and she carries on.
+  yieldM: 0.95,
+  yieldDot: 0.30,
+  // Noticing you. 4.6 m is close enough that a look is aimed rather than
+  // swept, and 0.82 is about 35 degrees off her — you have to be looking AT
+  // her, not past her at the water.
+  noticeM: 4.6,
+  noticeDot: 0.82,
+  noticeHold: 3.4,     // s she stays turned toward you
+  noticeGap: 11.0,     // s before she will do it again, so she does not nag
   humGap: 3.2,
   humJit: 5.0,
 
@@ -642,6 +655,7 @@ async function buildBucketeer(scene, vik, walkY) {
   const cF = new THREE.Vector3(), cG = new THREE.Vector3();
   const cTU = new THREE.Vector3(...BUCK.armUp).normalize();
   const cTF = new THREE.Vector3(...BUCK.armFore).normalize();
+  const cTO = new THREE.Vector3();          // the same, lifted, when she offers
   const cIA = new THREE.Quaternion(), cIB = new THREE.Quaternion();
   const cA = new THREE.Quaternion(), cB = new THREE.Quaternion();
   const cID = new THREE.Quaternion();
@@ -667,6 +681,11 @@ async function buildBucketeer(scene, vik, walkY) {
     poolAt: null,       // where the last one landed, and how long ago
     poolT: 0,
     humAt: 0.8,
+    // You, and whether she has seen you. `yield` is her legs stopped because
+    // you are in the doorway; `notice`/`noticeAmt` is the seconds left of her
+    // having looked up and the eased shape of it; `offered` is whether there
+    // was anything in her hand worth holding out when she did.
+    yield: false, notice: 0, noticeCool: 0, noticeAmt: 0, offered: false,
     hold: false,        // debug: the loop stopped where it stands
     x: 0, y: 0, z: 0,
   };
@@ -907,7 +926,23 @@ async function buildBucketeer(scene, vik, walkY) {
     // direction is what stops the lean above from carrying the pail sideways
     // into her thigh. The forearm's is measured AFTER the upper arm's, because
     // an aim on a parent carries its children round with it.
-    cA.setFromUnitVectors(cU, cTU);
+    // THE OFFER, and it is a lift rather than a reach.
+    //
+    // Reaching needs to know which way is forward in figure space, and a wrong
+    // sign on that axis is exactly how nine sunbathers ended up with their
+    // heads under their towels. Up is the one axis nobody can be wrong about.
+    // An arm raised with a full pail on the end of it, by somebody who has
+    // just stopped and turned to look at you, reads as an offer without
+    // needing a word — and it is what she would do, because the alternative is
+    // putting ten litres down first.
+    const offer = st.offered ? st.noticeAmt : 0;
+    if (offer > 0.002) {
+      cTO.set(cTU.x, cTU.y * (1 - offer) - 0.20 * offer,
+        cTU.z * (1 + 0.55 * offer)).normalize();
+    } else {
+      cTO.copy(cTU);
+    }
+    cA.setFromUnitVectors(cU, cTO);
     cB.setFromUnitVectors(cG.copy(cF).applyQuaternion(cA), cTF);
     // Ramped from identity, so at h = 0 both are the identity and `carryQ`
     // deletes them — the clip gets its arm back the moment she lets go.
@@ -1067,10 +1102,53 @@ async function buildBucketeer(scene, vik, walkY) {
    * who is on screen. She stops where she is and picks it up again, which for a
    * loop this slow is invisible.
    */
-  function step(dt, cam) {
-    const dx = cam.x - st.x, dz = cam.z - st.z;
+  function step(dt, who, cam, dir) {
+    const dx = who.x - st.x, dz = who.z - st.z;
     const d2 = dx * dx + dz * dz;
     if (d2 > BUCK.poseM * BUCK.poseM) return;
+
+    // ── you are in the way, and she is not a ghost ──────────────────────────
+    //
+    // Her route was hand-checked against every wall and every stick of the
+    // vikendica's furniture, which is why nothing in this file ever tested a
+    // blocker: the path is static and it was cleared once. What it was never
+    // cleared against is YOU, because you move — so she walked through Chloe,
+    // and through anybody standing on her porch, at a steady 0.76 m/s.
+    //
+    // She stops rather than sidesteps, and that is the route and not laziness.
+    // Two of her twelve legs are a 1.65 m bathroom and a 1.00 m doorway, and a
+    // person who tries to squeeze past you in a doorway with ten litres in one
+    // hand is a person clipping through a jamb. Standing still and waiting is
+    // what somebody actually does, and it costs nothing to be right about.
+    const near = Math.sqrt(d2);
+    const ahead = st.vel > 0.02
+      ? (dx * Math.sin(st.yaw) + dz * Math.cos(st.yaw)) / (near || 1) : 1;
+    st.yield = near < BUCK.yieldM && ahead > BUCK.yieldDot;
+
+    // ── and she knows you are there ─────────────────────────────────────────
+    //
+    // Near AND looked at, and those are TWO DIFFERENT POINTS. Distance is from
+    // `who`, because that is where you are standing. Attention is from `cam`,
+    // because that is where you are looking from — and the ray has to start at
+    // the eye. Measuring the camera's direction against the vector from her to
+    // your FEET is only the same question in first person; with the third
+    // person on, the eye is 3.10 m behind your shoulder and the two answers
+    // are different. That was the first cut and it never fired once.
+    let lookAt = false;
+    if (dir && cam) {
+      const ex = st.x - cam.x, ez = st.z - cam.z;
+      const el = Math.hypot(ex, ez) || 1;
+      lookAt = (dir.x * ex + dir.z * ez) / el > BUCK.noticeDot;
+    }
+    const wants = near < BUCK.noticeM && lookAt;
+    if (wants && st.noticeCool <= 0) {
+      st.notice = BUCK.noticeHold;
+      st.noticeCool = BUCK.noticeGap;
+      st.offered = st.held > 0.5;      // she can only offer what she is holding
+    }
+    st.noticeCool -= dt;
+    st.notice = Math.max(0, st.notice - dt);
+    st.noticeAmt = damp(st.noticeAmt, st.notice > 0 ? 1 : 0, 3.6, dt);
 
     // `hold` takes the loop out of the frame loop and leaves everything else in
     // it, which is the same split `__fr.jad.pose` makes for Baye: the step is
@@ -1079,7 +1157,19 @@ async function buildBucketeer(scene, vik, walkY) {
     // headless page settles for seconds of real time and this loop is fifty
     // seconds long — set her on the porch, wait for the frame, and by the time
     // it is taken she is back upstairs.
-    if (!st.hold) stepLoop(dt);
+    if (!st.hold && !st.yield) stepLoop(dt);
+    // Yielding stops the LEGS and nothing else: the pail still swings, the
+    // water still settles, her hair still moves. A figure frozen whole is a
+    // statue and reads as a bug, which is the same distinction `hold` makes
+    // just above for the debug door.
+    if (st.yield) st.vel = damp(st.vel, 0, 9, dt);
+    // Turn to you — but only once she is actually standing. `faceTo` writes
+    // `st.yaw`, and overriding it mid-leg is a woman walking sideways down her
+    // own stairs. She is standing for most of this loop anyway: filling,
+    // tipping, breathing on the porch, and now yielding to you in a doorway.
+    if (st.notice > 0 && st.vel < 0.05 && near > 0.35) {
+      faceTo(Math.atan2(dx, dz), dt);
+    }
     st.y = walkY(st.x, st.z, st.y);
     mesh.position.set(st.x, st.y, st.z);
     mesh.rotation.y = st.yaw;
@@ -1130,6 +1220,9 @@ async function buildBucketeer(scene, vik, walkY) {
       /** How loaded she is POSED as. `held * fill`, eased. */
       load: +st.load.toFixed(2),
       tip: +st.tip.toFixed(2), vel: +st.vel.toFixed(2),
+      // You, and what she is doing about you.
+      yielding: !!st.yield, notice: +st.notice.toFixed(2),
+      noticeAmt: +st.noticeAmt.toFixed(3), offered: !!st.offered,
       yaw: +st.yaw.toFixed(3), clip: fig.playing(),
       bucket: kanta.position.toArray().map((n) => +n.toFixed(2)),
       pool: +st.poolT.toFixed(2),
