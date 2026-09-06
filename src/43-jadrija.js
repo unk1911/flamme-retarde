@@ -3990,14 +3990,45 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * The shops whose name is PAINTED ON THE AWNING and not screwed to a board.
+   *
+   * `20260821_175806` at source resolution, and `20260823_111954` at five
+   * times it, settle this for beach bar MINI and settle it the same way. The
+   * name is black lettering straight on the cream valance cloth: the strokes
+   * follow the cloth's perspective exactly, the awning's own creases and one
+   * of its vertical seams run under and through them, and there is no board
+   * edge, no drop shadow and no tray anywhere along it. The hand that painted
+   * "beach bar" light and "MINI" heavy — which `S.split` is already for — did
+   * it on the awning itself, which is why the two weights are on one line.
+   *
+   * What the game had instead is `shopSign`'s default: a 6.4 m by 0.46 m cream
+   * plane standing 0.40 m off the valance with a 0.30 grey tray behind it.
+   * From the promenade that is the hardest-edged object on the frontage and it
+   * floats — taller than the valance it hangs on, so it crosses the awning
+   * above and the shade below, and it is most of why this awning reads as a
+   * slab rather than as cloth.
+   *
+   * Kept here rather than in `SHOPS`, which is a table of buildings; the other
+   * three awninged shops on this shore keep their boards, and one of them —
+   * the slasticarnica — was rebuilt off its own photographs hours before this
+   * and is not being re-litigated on a frame it does not appear in.
+   */
+  const PAINTED_VALANCE = new Set(['mini']);
+
+  /**
    * A painted sign, on a canvas.
    *
    * Basic rather than lit, for the same reason `mapBoard` is: the one job this
    * surface has is to be read, and a fascia in August with the eave's shadow
    * across half of it is correct and useless. Croatian diacritics come through
    * the same font stack the wall map already proves them on.
+   *
+   * `painted` is the same lettering with no board under it — see
+   * `PAINTED_VALANCE`. It drops the cream ground and the tray behind it and
+   * leaves the canvas transparent, so what shows through between the strokes
+   * is the awning cloth the name is actually painted on.
    */
-  function shopSign(S, t, s, y, w, h) {
+  function shopSign(S, t, s, y, w, h, painted) {
     // Sized off the HEIGHT, not the width, and this is the whole of why none of
     // these could be read.
     //
@@ -4012,8 +4043,13 @@ async function buildJadrija(scene) {
     C.height = 128;
     C.width = Math.min(2048, Math.max(128, Math.round(128 * w / h)));
     const g = C.getContext('2d');
-    g.fillStyle = S.bg || '#eeece6';
-    g.fillRect(0, 0, C.width, C.height);
+    // A 2d canvas starts fully transparent, so a painted name is had by not
+    // filling it: no ground, and `alphaTest` throws away everything that is
+    // not a stroke.
+    if (!painted) {
+      g.fillStyle = S.bg || '#eeece6';
+      g.fillRect(0, 0, C.width, C.height);
+    }
     g.fillStyle = S.fg || '#1a1a18';
     g.textAlign = 'center';
     // Fitted both ways, which the first version was not: it only ever shrank.
@@ -4085,14 +4121,23 @@ async function buildJadrija(scene) {
     //
     // A sign box stands proud of its backing anyway. 0.10 m is both the fix
     // and the right depth.
-    const back = b;
-    b = up;
-    boxTS(t - w * 0.5 - 0.05, t + w * 0.5 + 0.05, s + 0.10, s + 0.20,
-      y - h * 0.5 - 0.04, y + h * 0.5 + 0.04, [0.300, 0.296, 0.288]);
-    b = back;
+    // And no tray at all on a painted one: the tray is the back of a sign box,
+    // and a name painted on cloth is not in a box.
+    if (!painted) {
+      const back = b;
+      b = up;
+      boxTS(t - w * 0.5 - 0.05, t + w * 0.5 + 0.05, s + 0.10, s + 0.20,
+        y - h * 0.5 - 0.04, y + h * 0.5 + 0.04, [0.300, 0.296, 0.288]);
+      b = back;
+    }
     const st = at(t), p = W(t, s, y);
+    // `alphaTest` and not `transparent`, so the letters stay in the opaque
+    // pass and are depth-sorted against the awning like any other solid. There
+    // is nothing translucent behind them to blend with and a great deal of
+    // geometry in front of them to lose to.
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
-      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+      new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide,
+        alphaTest: painted ? 0.5 : 0 }));
     mesh.position.set(p[0], p[1], p[2]);
     // Facing the sea, which is ninety degrees off what this was doing.
     //
@@ -13181,9 +13226,40 @@ async function buildJadrija(scene) {
       // Stood 0.40 m off the valance rather than 0.16, and 0.46 m deep
       // rather than 0.38 — which did not fix what it was meant to fix, but is
       // the right depth for the board anyway.
+      //
+      // ── OR NO BOARD AT ALL, WHICH IS WHAT BEACH BAR MINI HAS ──────────────
+      //
+      // See `PAINTED_VALANCE`. A painted name lands ON the valance instead of
+      // in front of it, so all four numbers change and every one of them is
+      // measured off the band it is painted on rather than off the building:
+      //
+      //  · `top − 0.29`, height 0.26 — dead on the valance, which `bar` hangs
+      //    from `top − 0.42` to `top − 0.16`. The board was 0.46 deep and
+      //    centred on `top − 0.34`, so it stood 0.15 m taller than the thing
+      //    it was supposed to be lettering and crossed the awning above it.
+      //  · Caps come out at 0.16 m against the board's 0.285. In `_111954` at
+      //    five times source the capital M is a little under three quarters of
+      //    the valance's depth, and 0.16 on a 0.26 band is 0.62 of it.
+      //  · 4.1 m and not 6.4. Partly the frame — the name is about a third of
+      //    this awning, not two thirds — and partly the canvas: `shopSign`
+      //    caps its texture at 2048 px and derives the width from the height,
+      //    so anything over `16 × h` gets its letters stretched sideways by
+      //    the ratio it was clipped by. At 0.26 m deep that ceiling is 4.16 m.
+      //  · 0.18 m proud of the valance face and not 0.40. The plane is a flat
+      //    `PlaneGeometry` and the valance follows the shore, so mid-span the
+      //    chord gives 0.034 m of the standoff back on a 4.1 m sign — see the
+      //    sagitta note over `boxIn` — which still leaves 0.146 m, and the
+      //    depth buffer needs about 0.11 m out here (see `backBar`). Any more
+      //    than that and lettering that is supposed to be paint has visible
+      //    parallax against the cloth.
       if (S.name && !S.wallName) {
-        shopSign(S, (S.t0 + S.t1) * 0.5, fs - 0.40, top - 0.34,
-          Math.min(6.4, (S.t1 - S.t0) * 0.72), 0.46);
+        if (PAINTED_VALANCE.has(S.key)) {
+          shopSign(S, (S.t0 + S.t1) * 0.5, fs - 0.18, top - 0.29,
+            Math.min(4.1, (S.t1 - S.t0) * 0.42), 0.26, true);
+        } else {
+          shopSign(S, (S.t0 + S.t1) * 0.5, fs - 0.40, top - 0.34,
+            Math.min(6.4, (S.t1 - S.t0) * 0.72), 0.46);
+        }
       }
       // Trampulin has an awning AND its name on the wall behind it, which is
       // the combination this branch could not express: `awn > 0` took the
