@@ -701,7 +701,26 @@ void main(){
   // The far fade is partial. A whitecap a kilometre off is a couple of pixels
   // and cannot be drawn as a shape, but it is still white, and taking it to
   // zero is what left the far channel looking like enamel.
-  float crest = smoothstep(uFoamK.z, uFoamK.w, vFoamCrest) * (1.0 - far * 0.65);
+  //
+  // And it reads the per-pixel measure, not only the interpolated one. The
+  // fragment has been computing waveBrk since the wave sum moved in here and
+  // throwing it away, which cost the foam its resolution: vFoamCrest is a
+  // VERTEX quantity on a lattice whose cell is 0.09 + 0.058 * d metres, so it
+  // is a metre wide under you and 12 m at 200 m out and 60 m at a kilometre —
+  // and a whitecap is 5 to 15 m. Past about 150 m the lattice simply cannot
+  // carry one, so the interpolated crest never crosses uFoamK.z and the
+  // channel came out glassy from the third of the frame onward. Measured with
+  // the lattice forced uniform: opening the resolvability fade alone put back
+  // almost nothing, opening the lattice as well put whitecaps across the whole
+  // 300 m the flattened mesh reached. Both gates were binding, in series.
+  //
+  // waveBrk has no such limit — gradF and hF in seaWave accumulate at a0,
+  // before every fade — so it is the same field at pixel resolution, already
+  // paid for. The max keeps the vertex path, which is the one carrying the two
+  // history taps: the memory of a crest that broke a second ago lives there and
+  // a single per-pixel evaluation has none.
+  float crest = smoothstep(uFoamK.z, uFoamK.w, max(vFoamCrest, waveBrk))
+              * (1.0 - far * 0.65);
 
   // How much of a whitecap this pixel can still resolve. A cap is five to
   // fifteen metres of broken water; once a pixel covers more than that there is
