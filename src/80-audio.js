@@ -4590,15 +4590,39 @@ function buildAudio() {
     // than for half of one. Halved, she peaks around 0.21 and sits near 0.13
     // RMS at arm's length, which is under the beach bed's own 0.12 by the time
     // you are ten metres off her.
-    gain: 0.22,
+    // Then measured AGAINST THE BIRDS and cut again, because being under the
+    // beach bed is not the test — the test is what she does to everything else
+    // you are listening for. Recorded at arm's length with a gull firing in the
+    // same take: the hum band, 180-460 Hz, stood +9.7 dB over the gull band at
+    // 600-1300 and +35 dB over the swifts at 3500-5600, and the take peaked at
+    // -2.99 dBFS. A woman humming to herself was the loudest thing on this
+    // shore and she was masking the sky. 0.065 puts her peak just under the
+    // gull's own 0.070 amp, which is where somebody humming under their breath
+    // belongs: plainly there when you walk up to her, gone as a nuisance.
+    gain: 0.065,
     lp: 840,            // the closed mouth
   };
   // An eighth per character. A digit is semitones off the root, `-` holds the
   // note before it, `.` is where she stops for breath. `a` and `c` are the ten
   // and the twelve that will not fit in a column.
   //                1  &  2  &  3  &  4  &
-  const HUM_A = '5-5.7-9-' + 'c-9-7--.';
-  const HUM_B = '9-7-5-4-' + '2-4-0---';
+  //
+  // THE TUNE IS "BUCKASTEERS OF AMERICA", by request, and it is written to the
+  // words rather than to the bar: eight syllables, stresses on BUCK and MER,
+  // scanned 2-1-2-1-1-2-1-2 eighths, which is what those words do when you say
+  // them out loud. Call and answer, and the two phrases carry the same rhythm
+  // so it is one tune and not two — A climbs to the octave on "mer" and leaves
+  // "ca" hanging on the fifth, B answers it down to the root.
+  //
+  //             Buck  a  steers  of  A  mer  i   ca
+  //   A:          5   5    9      7  9   c   9   7   (unresolved)
+  //   B:          5   5    7      5  4   7   4   0   (home)
+  //
+  // No words are sung and none are drawn — her mouth is shut, which is the
+  // whole of why this is a triangle under a low-pass. Rule 12 is about text on
+  // signs and there is no text here.
+  const HUM_A = '5-59-79c' + '-97-....';
+  const HUM_B = '5-57-547' + '-40-....';
   const HUM_N = { 0: 0, 2: 2, 4: 4, 5: 5, 7: 7, 9: 9, a: 10, c: 12 };
   let humAlt = 0;
 
