@@ -4082,9 +4082,27 @@ async function buildJadrija(scene) {
       const wl = g.measureText(lead).width || 1;
       g.font = `800 118px ${FF}`;
       const we = g.measureText(emph).width || 1;
-      const k = Math.min(C.height * 0.62 / 100, C.width * 0.88 / (wl + we));
+      // MEASURED AGAINST THE BAND IT IS PAINTED ON, once there is a band and
+      // not a board to measure against. `20260821_175806` at four times source
+      // is square enough on this valance to take both numbers off one column:
+      // the capital M of MINI is 222 px tall where the valance is 300 px deep,
+      // and 0.74 is the same figure `_111954` gives at five times source at
+      // the other end of the day. 0.62 of a canvas puts a Trebuchet capital at
+      // 0.53 of it — cap height is 0.715 em, not 1 em — so the old number was
+      // never the ratio it looks like, and on a board 0.46 m deep nobody could
+      // tell. On the 0.26 m valance it is the difference between lettering and
+      // a caption.
+      const cap = painted ? 0.90 : 0.62;
+      const k = Math.min(C.height * cap / 100, C.width * 0.88 / (wl + we));
       g.textAlign = 'left';
-      const x0 = (C.width - (wl + we) * k) * 0.5, base = C.height * 0.78;
+      const x0 = (C.width - (wl + we) * k) * 0.5;
+      // And sat where the painter sat it. Same column of `_175806`: 48 px of
+      // clear cloth over the capitals, 222 of capital, 25 under the baseline,
+      // on a valance 295 deep — 16 / 75 / 8.5. A board's 0.78 baseline puts
+      // that at 7 / 71 / 21 and floats the name in the top of the band, which
+      // on a 0.26 m valance is the difference between a name painted on an
+      // awning and one printed on a strip of tape stuck along the top of it.
+      const base = C.height * (painted ? 0.895 : 0.78);
       g.font = `400 ${100 * k}px ${FF}`;
       g.fillText(lead, x0, base);
       g.font = `800 ${118 * k}px ${FF}`;
