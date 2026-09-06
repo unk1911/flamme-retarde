@@ -75,6 +75,128 @@ const BUCK = {
   // A hum with no gaps in it is a kettle.
   humGap: 1.4,
   humJit: 2.6,
+
+  // ── ten kilos on one arm ───────────────────────────────────────────────────
+  //
+  // Everything below is laid over the baked `walk` clip with `aim`, because the
+  // clip knows nothing about what she is holding: it walks with a straight
+  // spine and both arms swinging, and — measured on this figure over a full
+  // cycle — the right hand travels 396 mm fore-and-aft every step. The pail
+  // hangs off that hand, so the pail travelled 396 mm with it. A bucket that
+  // swings like an empty one IS an empty one, however much water is drawn
+  // inside it, and that swing was the single loudest thing in the frame saying
+  // she was carrying nothing.
+  //
+  // THE SIGNS WERE MEASURED, NOT TYPED. This rig's fore-aft is x and its
+  // lateral is z; her right is +z (`armUR` sits at z +0.159 and `armUL` at
+  // −0.193 in figure space); and a rotation about +x is ABDUCTION, not flexion
+  // — the docstring on `__fr.jad.youAim` is what two releases of knees bending
+  // sideways bought, and every number here was read back off `boneAt` rather
+  // than guessed. The pail is in her RIGHT hand, so leaning away from it is a
+  // turn about −x.
+  //
+  // The lean, split over three spine bones so it is a curve and not a hinge.
+  // Radians, and they add. Measured pelvis-to-chest over a walk cycle: she
+  // stands at 6.4 degrees off vertical on average, ranging 3.4 to 8.6 because
+  // the clip's own shoulders rock plus or minus 2.6 either way — against
+  // −0.5 degrees walking back up with an empty pail. Six and a half is the
+  // middle of the five-to-eight a person carrying ten litres actually stands
+  // at, and the range is the walk, not the load.
+  //
+  // All of it is above the pelvis, which is the bone the legs hang off: put
+  // any of this on the pelvis and her feet tilt off the floor with it.
+  leanA: 0.055, leanB: 0.055, leanC: 0.045,
+  // And the head kept nearer level than the trunk, which is what a person does
+  // without thinking — eyes stay horizontal. Two thirds of the lean handed
+  // back, not all of it: a head bolt upright over a leaning body is a doll on
+  // a spring.
+  leanHead: 0.10,
+  // The shoulders, and the loaded one is the BIGGER number, which is not what
+  // it looks like it should be.
+  //
+  // Measured at 0.25 on both clavicles: the left rises 36 mm and the right
+  // drops 37 mm — one turn about +x does both, because the left clavicle points
+  // at −z and the right at +z. But the lean above is working against that on
+  // the loaded side. Leaning to her left drops the left shoulder 25 mm and
+  // LIFTS the right one 20 mm, so a symmetric shrug came out with her loaded
+  // shoulder 17 mm higher than her free one, which is the picture of somebody
+  // carrying nothing. 0.34 on the right is that 45 mm of lean paid back with
+  // interest. Measured over a cycle it now comes out with the free shoulder
+  // 22 mm above the loaded one, against 3 mm — level — when the pail is empty.
+  //
+  // The right clavicle also swings the whole right arm 120 mm INBOARD at 0.25,
+  // which would put the pail inside her thigh. It does not, because the arm
+  // solve below re-points that arm at an absolute direction afterwards and only
+  // the shoulder's own drop survives.
+  shrugL: 0.20, shrugR: 0.34,
+  // The free arm swung out for counterweight, on top of the shoulder lift.
+  // Small, because the lift is already most of it: 0.20 on the clavicle takes
+  // the left hand 86 mm out on its own and the lean carries the shoulder 43 mm
+  // further, so this is the last 27 mm rather than the whole gesture. Measured
+  // at 0.40 on `armUL` the left hand goes 178 mm out and 47 mm up, and 178 mm
+  // is a scarecrow.
+  freeArm: 0.06,
+  // What is left of the clip's swing in the LOADED arm. 0.86 of the correction
+  // and not all of it: a hand solved dead on to a fixed direction is a
+  // shop-window mannequin holding a prop. Measured, the loaded hand travels
+  // 96 mm fore-and-aft against the free hand's 396 — an arm that is being kept
+  // still rather than an arm that has been welded.
+  armDamp: 0.86,
+  // And how much of that the arm gets when the pail is in her hand but EMPTY.
+  //
+  // Two ramps and not one, because the trunk and the arm are answering
+  // different questions. The lean is about weight — no water, no lean, which is
+  // the whole point of driving it on `held * fill`. The arm is about geometry:
+  // a bucket hanging off a fist cannot be inside the thigh next to it whether
+  // or not there is anything in it, and on the walk back up the stairs it was —
+  // 148 mm inside, the same as before any of this. So the arm goes three
+  // quarters of the way out on `held` alone. Measured: 16 to 18 degrees of
+  // abduction, the pail's inner wall standing at z 0.217 against a thigh that
+  // reaches 0.205 — 12 mm of daylight — and 174 mm of the clip's 396 mm swing
+  // left in it. An empty bucket is light and the arm it is on still swings.
+  carryEmpty: 0.75,
+  // Where that arm hangs, in figure space, as [upper, forearm]. Down and 26.8
+  // degrees abducted, with the elbow a little behind the shoulder-to-hand line
+  // so it is not a straight stick. It is a TARGET and `armDamp` only takes her
+  // 86 per cent of the way to it, so what she actually stands at is 21 to 22
+  // degrees loaded.
+  //
+  // TWENTY-SIX DEGREES IS NOT A STYLE CHOICE, IT IS THE THIGH. `placePail`
+  // says the palm is "about 90 mm off the outside of a thigh" and offsets the
+  // pail 60 mm outboard on the strength of it, and that number is wrong by its
+  // own sign: the bind mesh's right thigh reaches z 0.205 in every 50 mm band
+  // from 0.55 to 0.80, and the clip's hand hangs at z 0.166 to 0.185. The palm
+  // is INSIDE the leg's own silhouette, so no offset of a few centimetres was
+  // ever going to help — and it did not. Swept over a walk cycle, the pail
+  // overlapped the thigh by 149 mm at worst, which is a third of the bucket
+  // inside her leg, exactly as the note there admits and then fails to fix.
+  //
+  // Nobody had seen it because the pail was empty: the water disc below never
+  // drew, so what was inside the bucket was a dark hole and the leg in it was
+  // one more dark shape. Fixing the water is what made this unignorable.
+  //
+  // The arithmetic: the pail is 145 mm in the radius, so its axis has to stand
+  // at 0.205 + 0.145 = 0.350 to clear, and `placePail` gives 60 mm of that. So
+  // the wrist has to reach 0.290 over an arm 0.477 long off a shoulder that
+  // sits at z 0.113 once she is leaning, and that is 22 degrees. It is a lot of
+  // abduction — and it is what a person does with a full bucket, because the
+  // alternative is wearing it on their knee.
+  //
+  // What it BUYS, swept over a cycle: the pail's inner wall now stands at
+  // z 0.195 at the worst instant of the stride, against the thigh's 0.205. Ten
+  // millimetres of overlap, at one phase of one step, where there were 149 —
+  // and it is the shoulder that is left, not the arm: the lean pulls the whole
+  // shoulder 46 mm inboard and the clip rocks it 43 mm more, so the hand rides
+  // that whether it is pointed correctly or not. Closing the last centimetre
+  // needs the wrist solved to a POSITION rather than a direction, the way
+  // `holdPhone` does it, and that is an arm with no life left in it at all.
+  armUp: [-0.05, -0.890, 0.45],
+  armFore: [0.17, -0.875, 0.45],
+  // How fast the whole thing comes on and off, as a rate — 1/e in 0.29 s.
+  // `held * fill` is a step at the top of `lift` and a ramp on the way out of
+  // `tip`, and a lean that snapped on with the first frame of a pick-up would
+  // be a woman being yanked sideways.
+  loadEase: 3.4,
 };
 
 // Her route, in the house's own metres: +x along the shore past the front door,
@@ -173,6 +295,11 @@ const BUCK_HAIR = {
 // thing that failed.
 const BUCK_SUIT = [0.520, 0.108, 0.122];
 const BUCK_HEM = [0.300, 0.058, 0.070];
+
+// Every bone the carry pose writes to, so that letting go of the pail is one
+// loop and not nine lines that have to be kept in step with the nine above.
+const CARRY_BONES = ['spine01', 'spine02', 'spine03', 'neck',
+  'clavicleL', 'clavicleR', 'armUL', 'armUR', 'armLR'];
 
 const bckGl = (a) => a.map((n) => n.toFixed(3)).join(', ');
 
@@ -395,8 +522,32 @@ async function buildBucketeer(scene, vik, walkY) {
   // and then there is none, because the level is drained on the roll — see
   // `tip` below — and the honest way to show a bucket going over is the stream
   // coming out of it rather than the shell that used to be inside.
+  //
+  // AND WOUND BY HAND, FACING UP, which is the whole of why nobody had ever
+  // seen it. It was a `pailLathe` cap — `[[0, 0], [0, 1]]` — and both of that
+  // function's cap branches wind a ring the way a solid of revolution wants
+  // its BOTTOM closed: `propBuilder.tri` takes the flat normal off the winding
+  // as (b−a)×(c−a), and for either branch that comes out (0, −1, 0). So the
+  // disc's front face pointed at the floor. Single-sided, it was culled from
+  // every camera above the rim — which is every camera that can see into a
+  // bucket at all — and the one place it would have drawn is under the pail's
+  // own opaque base. Ten litres of water rendered exactly nowhere, for six
+  // releases, with the code for it right here and looking correct.
+  //
+  // A fan the other way round, three lines, and no double-siding: the normal
+  // is then (0, +1, 0) as well as the winding, so it is lit by the sky like a
+  // horizontal surface instead of by whatever is under the floor.
   const waterBuf = propBuilder();
-  pailLathe(waterBuf, [[0, 0], [0, 1]], PAIL.water, 16);
+  {
+    const N = 16;
+    const rim = (i) => {
+      const a = (i % N / N) * Math.PI * 2;
+      return [Math.cos(a), 0, Math.sin(a)];
+    };
+    for (let i = 0; i < N; i++) {
+      waterBuf.tri([0, 0, 0], rim(i + 1), rim(i), PAIL.water);
+    }
+  }
   const water = new THREE.Mesh(waterBuf.geo(), solidMaterial(0xffffff, {
     spec: 0.30, specPower: 60, emissive: 0.06, body: 'base *= vVCol;',
   }));
@@ -469,6 +620,25 @@ async function buildBucketeer(scene, vik, walkY) {
   const qUp = new THREE.Vector3(0, 1, 0);
   const vRest = new THREE.Vector3(), vHold = new THREE.Vector3();
 
+  // Scratch for the carry pose, allocated once. `carry` is what the last solve
+  // laid on each of the two arm bones, and it is not an optimisation: `aim`
+  // writes a DELTA and `boneAt` reports the RESULT, so the arm this reads is
+  // the arm this put there, and the only way back to the clip's own direction
+  // is to take the last delta off the measurement. `greetArm` in 42-crowd.js
+  // is the same three lines with the same three traps written up over it.
+  const carry = {
+    qa: new THREE.Quaternion(), qb: new THREE.Quaternion(),
+    iU: -1, iL: -1, iH: -1, off: true,
+  };
+  const cS = new THREE.Vector3(), cE = new THREE.Vector3();
+  const cW = new THREE.Vector3(), cU = new THREE.Vector3();
+  const cF = new THREE.Vector3(), cG = new THREE.Vector3();
+  const cTU = new THREE.Vector3(...BUCK.armUp).normalize();
+  const cTF = new THREE.Vector3(...BUCK.armFore).normalize();
+  const cIA = new THREE.Quaternion(), cIB = new THREE.Quaternion();
+  const cA = new THREE.Quaternion(), cB = new THREE.Quaternion();
+  const cID = new THREE.Quaternion();
+
   // ── the loop ───────────────────────────────────────────────────────────────
   // `leg` is which waypoint she is walking towards and `u` is how far along
   // that leg; `dir` is +1 going out with it full and −1 coming back empty.
@@ -480,6 +650,12 @@ async function buildBucketeer(scene, vik, walkY) {
     yaw: 0, vel: 0,
     fill: 0,            // 0…1, how much water is in it
     held: 0,            // 0 on the ground, 1 in her hand
+    // How loaded she is POSED as, which is `held * fill` eased. Its own term
+    // because the two it is made of are steps and the body they drive is not:
+    // she is only carrying weight when she has actually picked up a full pail,
+    // and on the way back up the stairs — `fill` 0, `held` 1 — there is nothing
+    // in her hand to lean away from.
+    load: 0,
     tip: 0,             // radians the pail has rolled about its bail
     poolAt: null,       // where the last one landed, and how long ago
     poolT: 0,
@@ -638,6 +814,100 @@ async function buildBucketeer(scene, vik, walkY) {
         st.phase = 'fill'; st.clock = 0;
     }
     if (st.phase !== 'down' && st.phase !== 'up') st.vel = 0;
+    // And how loaded the BODY is, chasing what is in her hand. Here rather
+    // than in the pose, so `tick` — which runs the loop forward without ever
+    // drawing a frame — settles the lean along with everything else.
+    st.load += (st.held * st.fill - st.load)
+      * (1 - Math.exp(-BUCK.loadEase * dt));
+  }
+
+  /** `aim` is told an axis and an angle; a solve hands back a quaternion. */
+  function carryQ(name, q) {
+    const s = Math.hypot(q.x, q.y, q.z);
+    fig.aim(name, q.x, q.y, q.z, 2 * Math.atan2(s, q.w));
+  }
+
+  /**
+   * Put the weight of ten litres into her, over whatever the clip is doing.
+   *
+   * BEFORE `fig.update`, and only ever once per update. `aim` stores a delta
+   * that `update` folds into the palette on its way past, so a pose set after
+   * it is a pose a frame late; and the arm solve below reads the palette to
+   * find the clip's own arm, so running it twice against one measurement would
+   * take its own delta off a second time and fold the arm again. Both of those
+   * are `holdPhone`'s notes in 43-jadrija.js, learned there.
+   *
+   * The trunk is four fixed turns scaled by `st.load`, which is all a lean
+   * needs. The carrying arm is a solve, because it is not enough to add a
+   * rotation to it: the thing that has to go is the clip's 397 mm of swing,
+   * and a constant delta moves a swing without shrinking it.
+   */
+  function poseCarry() {
+    // `g` is the WEIGHT and drives the trunk; `h` is the pail being in her hand
+    // at all and drives the arm. See `carryEmpty`: no water means no lean, and
+    // it does not mean a bucket may hang inside her leg.
+    const g = st.load;
+    const h = Math.max(g, st.held * BUCK.carryEmpty);
+    if (h < 0.002) {
+      // Empty-handed: every bone back to the clip, once. `aim` with a zero
+      // angle deletes the entry rather than storing an identity, so this is
+      // the whole of undoing it — and the latch is what keeps the beats she
+      // walks with nothing in her hand from paying for a solve every frame.
+      if (carry.off) return;
+      carry.off = true;
+      carry.qa.identity();
+      carry.qb.identity();
+      for (const n of CARRY_BONES) fig.aim(n, 0, 1, 0, 0);
+      return;
+    }
+    carry.off = false;
+    // Away from the pail, which is in her right hand and so on +z: about −x.
+    fig.aim('spine01', -1, 0, 0, BUCK.leanA * g);
+    fig.aim('spine02', -1, 0, 0, BUCK.leanB * g);
+    fig.aim('spine03', -1, 0, 0, BUCK.leanC * g);
+    // The head back towards level, so the lean is in her body and not in her
+    // eye line. +x, because it is undoing a −x.
+    fig.aim('neck', 1, 0, 0, BUCK.leanHead * g);
+    // Free shoulder up, loaded shoulder down. Both are +x: the left clavicle
+    // points at −z and the right at +z, and one turn about +x therefore lifts
+    // the one and drops the other, which is exactly the shape wanted.
+    fig.aim('clavicleL', 1, 0, 0, BUCK.shrugL * g);
+    fig.aim('clavicleR', 1, 0, 0, BUCK.shrugR * g);
+    // And the free arm out. It keeps the clip's swing — the arm that is NOT
+    // carrying anything swings more, not less — and this is laid on top of it.
+    fig.aim('armUL', 1, 0, 0, BUCK.freeArm * g);
+
+    // ── the carrying arm ──────────────────────────────────────────────────
+    if (carry.iU < 0) {
+      carry.iU = fig.boneIndex('armUR');
+      carry.iL = fig.boneIndex('armLR');
+      carry.iH = fig.boneIndex('handR');
+    }
+    if (carry.iU < 0 || carry.iL < 0 || carry.iH < 0) return;
+    fig.boneAt(carry.iU, cS);
+    fig.boneAt(carry.iL, cE);
+    fig.boneAt(carry.iH, cW);
+    // What the clip is doing under the last solve. A bone's delta is laid on
+    // OUTSIDE its parent's — `measured = qb · qa · clip` for the forearm — so
+    // the clip's own arm is the measurement with those taken back off it in
+    // the order they went on.
+    const ia = cIA.copy(carry.qa).invert(), ib = cIB.copy(carry.qb).invert();
+    cU.copy(cE).sub(cS).applyQuaternion(ia).normalize();
+    cF.copy(cW).sub(cE).applyQuaternion(ib).applyQuaternion(ia).normalize();
+    // Two turns, each the minimal rotation taking a bone's own direction to an
+    // ABSOLUTE one in figure space. Absolute is the point: a hanging arm hangs
+    // under gravity whatever the trunk over it is doing, so solving to a fixed
+    // direction is what stops the lean above from carrying the pail sideways
+    // into her thigh. The forearm's is measured AFTER the upper arm's, because
+    // an aim on a parent carries its children round with it.
+    cA.setFromUnitVectors(cU, cTU);
+    cB.setFromUnitVectors(cG.copy(cF).applyQuaternion(cA), cTF);
+    // Ramped from identity, so at h = 0 both are the identity and `carryQ`
+    // deletes them — the clip gets its arm back the moment she lets go.
+    carry.qa.copy(cID).slerp(cA, h * BUCK.armDamp);
+    carry.qb.copy(cID).slerp(cB, h * BUCK.armDamp);
+    carryQ('armUR', carry.qa);
+    carryQ('armLR', carry.qb);
   }
 
   /** Where the bucket is when it is not in her hand, in world metres. */
@@ -690,12 +960,20 @@ async function buildBucketeer(scene, vik, walkY) {
       // out to tip something, it puts the water clear of her feet, and it is
       // small enough that her fist is still on the bail.
       const sw = Math.sin(clamp(st.tip / 2.05, 0, 1) * Math.PI * 0.5);
-      // And six centimetres outboard, which is not a cheat but a measurement.
-      // The pail is 145 mm in the radius and the palm is about 90 mm off the
-      // outside of a thigh, so a bucket hung dead under the fist has a third of
-      // itself inside her leg. It is why people carry one with the arm held a
-      // little away from the body, and it is the difference between a bucket
-      // she is holding and a bucket she has grown.
+      // And six centimetres outboard, which was not a cheat but a measurement,
+      // and the measurement was wrong. It said "the palm is about 90 mm off
+      // the outside of a thigh"; the bind mesh's right thigh reaches z 0.205
+      // and the clip's palm hangs at 0.166 to 0.185, so the palm is 20 mm
+      // INSIDE the leg's own silhouette and 60 mm was never going to reach
+      // past it. It did not: swept over a walk cycle the pail sat 149 mm
+      // inside her thigh.
+      //
+      // The 60 mm stays, because it is right for what it is — a fist is a fist
+      // wide, and the bail is still under it. What was missing is the arm: see
+      // `armUp` in BUCK, which abducts the whole limb on `held` and is where
+      // the clearance actually comes from now. Any more than 60 mm here and
+      // the pail stops hanging plumb under the hand holding it, which is the
+      // one thing a bucket on a bail always does.
       const rx = Math.sin(st.yaw), rz = Math.cos(st.yaw);   // her right
       vHold.set(vPalm.x + Math.cos(st.yaw) * 0.22 * sw + rx * 0.06,
         vPalm.y - PAIL.bail + 0.08 * sw,
@@ -805,6 +1083,11 @@ async function buildBucketeer(scene, vik, walkY) {
     fig.play(moving ? 'walk' : 'idle', { fade: 0.28 });
     fig.state.speed = moving
       ? clamp(st.vel / BUCK.clipSpeed, BUCK.clipMin, BUCK.clipMax) : 1;
+    // The weight, immediately before the update and nowhere else — see the
+    // note over `poseCarry`. She already walks the loaded legs slower than the
+    // empty ones (0.44 m/s down the flight against 0.78 back up); this is the
+    // half of carrying ten litres that is above the waist.
+    poseCarry();
     fig.update(dt);
     if (d2 < BUCK.faceM * BUCK.faceM) fig.faceTick(dt);
     mesh.updateMatrixWorld();
@@ -832,6 +1115,8 @@ async function buildBucketeer(scene, vik, walkY) {
       phase: st.phase, leg: st.leg, u: +st.u.toFixed(2), dir: st.dir,
       at: [+st.x.toFixed(1), +st.y.toFixed(2), +st.z.toFixed(1)],
       fill: +st.fill.toFixed(2), held: +st.held.toFixed(2),
+      /** How loaded she is POSED as. `held * fill`, eased. */
+      load: +st.load.toFixed(2),
       tip: +st.tip.toFixed(2), vel: +st.vel.toFixed(2),
       yaw: +st.yaw.toFixed(3), clip: fig.playing(),
       bucket: kanta.position.toArray().map((n) => +n.toFixed(2)),
@@ -891,6 +1176,11 @@ async function buildBucketeer(scene, vik, walkY) {
         const sg = nx >= 0 && nx < BUCK_WAY.length ? 1 : -1;
         st.yaw = Math.atan2(-sg * (n[2] - st.z), sg * (n[0] - st.x));
       }
+      // Snapped and not eased. A still of a beat is a still of that beat, and
+      // a lean that had to be waited for would put half a lean in every frame
+      // a probe took of `go`.
+      st.load = st.held * st.fill;
+      poseCarry();
       fig.update(0);
       mesh.position.set(st.x, st.y, st.z);
       mesh.rotation.y = st.yaw;
@@ -913,6 +1203,7 @@ async function buildBucketeer(scene, vik, walkY) {
       }
       mesh.position.set(st.x, st.y, st.z);
       mesh.rotation.y = st.yaw;
+      poseCarry();
       fig.update(0);
       mesh.updateMatrixWorld();
       placePail();
