@@ -144,8 +144,13 @@ function stepLens(dt) {
   // fire is a smudge on a hill you cannot walk up, the Canadair is a speck,
   // and the beach you are trying to reach is a line. There is nothing you can
   // do about any of it except look, so let the looking be worth something.
+  // `brod` belongs in this list and was left out of it, which is the whole of
+  // why you could not zoom from her deck. The note above argues for the lens on
+  // the grounds that there is nothing to do but look — and a passenger on a
+  // nine-minute crossing is the strongest case in the game for exactly that.
   const want = (state.phase === 'ground' || state.phase === 'swim'
-    || state.phase === 'ride' || state.phase === 'foil')
+    || state.phase === 'ride' || state.phase === 'foil'
+    || state.phase === 'brod')
     && (keys.has('KeyZ') || TOUCH.glook) ? 1 : 0;
   zoom = damp(zoom, want, LENS.ease, dt);
   if (zoom < 1e-4 && want === 0) zoom = 0;
@@ -460,6 +465,11 @@ addEventListener('keydown', (e) => {
   // is worth more than a second key would have been.
   if (e.code === 'KeyT' && state.phase === 'swim') {
     e.preventDefault(); toggleSwimAuto(); return;
+  }
+  // And on her deck, where it makes the same promise a third time: let the
+  // passage run itself. See `brodFast`.
+  if (e.code === 'KeyT' && state.phase === 'brod') {
+    e.preventDefault(); toggleBrodFast(); return;
   }
   if (state.phase === 'ground' || state.phase === 'chute'
     || state.phase === 'swim' || state.phase === 'foil'
@@ -3423,6 +3433,27 @@ function paintFoilHud() {
  * a dash and not as a lie, and so the last three hundred metres — where she is
  * braking — count down slower, which is what braking is.
  */
+// Eight, and the walking zeroed, for the reasons written at the call site.
+const BROD_FAST = 8;
+const BROD_STILL = { fwd: 0, side: 0, sprint: false };
+let brodFast = false;
+
+/**
+ * T on her deck: let the passage run itself.
+ *
+ * The same promise the key makes in the other two seats — in the aeroplane it
+ * flies the job list, in the water it swims you at the one job, and here it
+ * takes the nine and a half minutes off your hands. Somebody else has the
+ * controls until you take them back, which you do by pressing it again, by
+ * walking into the last 300 m, or by arriving.
+ */
+function toggleBrodFast(on) {
+  if (!brod || !brod.active) return false;
+  if (brod.phase === 'slow' || brod.phase === 'alongside') return false;
+  brodFast = on == null ? !brodFast : !!on;
+  return brodFast;
+}
+
 function paintBrodHud() {
   if (!brod || !brod.active) return;
   const left = Math.max(0, brod.total - brod.run);
@@ -3433,7 +3464,7 @@ function paintBrodHud() {
   $('br-say').textContent = c ? T(c.key) : '';
   $('br-hint').innerHTML = brod.phase === 'alongside'
     ? TK('brod.ashoreHint', 'brod.ashoreHintTouch')
-    : TK('brod.hint', 'brod.hintTouch');
+    : (brodFast ? T('brod.fast') : TK('brod.hint', 'brod.hintTouch'));
   if (IS_TOUCH) paintBrodTouch();
 }
 
@@ -5205,7 +5236,7 @@ function frame() {
   if (state.phase === 'brod') {
     // She is still going in somewhere behind you, same as under the canopy.
     if (eject.active) flyDerelict(dt);
-    const out = brod.update(dt, {
+    const ctl = {
       // The only input on her: two axes of walking her deck. There is no
       // throttle and no wheel — see the header of 59-brod.js.
       fwd: (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0)
@@ -5213,7 +5244,35 @@ function frame() {
       side: (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0)
         - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0) + TOUCH.sx,
       sprint: keys.has('ShiftLeft') || keys.has('ShiftRight') || TOUCH.sfast,
-    });
+    };
+    let out = brod.update(dt, ctl);
+    // And the clock, which is NOT her engine.
+    //
+    // 59-brod.js argues for the nine and a half minutes and the argument is
+    // sound: she is a 16 m wooden boat on one diesel, 15.6 knots is what that
+    // is, and the subject of this mode is how long and how slow this coast is.
+    // So her speed is untouched. What runs faster is the passage, by stepping
+    // her integrator again on the SAME frame — seven more times, with the
+    // walking zeroed out, so the coast goes by at eight times and you still
+    // cross her deck at your own pace. A time-lapse says "time passed". A
+    // faster boat would have said "she is a RIB", which is the one thing that
+    // note asked us not to say.
+    //
+    // It gives itself up at `slow`, 300 m out, because coming alongside is the
+    // part nobody wants compressed — and because a passage that ends at eight
+    // times ends without you noticing it has.
+    if (brodFast) {
+      if (brod.phase === 'slow' || brod.phase === 'alongside') brodFast = false;
+      else {
+        for (let i = 1; i < BROD_FAST; i++) {
+          const o = brod.update(dt, BROD_STILL);
+          if (o) out = o;
+          if (brod.phase === 'slow' || brod.phase === 'alongside') {
+            brodFast = false; break;
+          }
+        }
+      }
+    }
     if (out === 'call' && brod.call) toast(T(brod.call.key));
     else if (out === 'alongside') toast(T('brod.arrived'), 'good');
     paintBrodHud();
@@ -6753,6 +6812,12 @@ window.__fr = {
       paintBrodHud();
       return { ...brod.stats(), out };
     },
+    /**
+     * The clock, not the engine. `fast()` toggles, `fast(true)` sets — the same
+     * thing T does on her deck, exposed because a nine-minute passage is not
+     * something a probe can sit through.
+     */
+    fast: (v) => toggleBrodFast(v),
     /** Jump to a point on the passage, in metres run, and look at the world. */
     at: (m) => {
       if (!brod) return null;
