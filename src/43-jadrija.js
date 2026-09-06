@@ -1624,7 +1624,7 @@ async function buildJadrija(scene) {
    */
   const PRIMER = [0.598, 0.632, 0.660];
   const RUSTY = [0.290, 0.132, 0.058];
-  function doorWear(dc, floor, col, key) {
+  function doorWear(dc, floor, col, key, hand = 1) {
     const h = DOORW * 0.5;
     const chips = [], stains = [];
     // 0.42 of them are sound, and the tail past that is thin: `^1.7` puts the
@@ -1670,8 +1670,14 @@ async function buildJadrija(scene) {
     const rst = jit(key, 823);
     if (rst > 0.22) {
       const k2 = (rst - 0.22) / 0.78;
-      const run = [[dc - h + 0.075, floor + 0.42], [dc - h + 0.115, floor + 1.62],
-        [dc + h - 0.145, floor + 1.00]];
+      // `hand` is which stile carries the hinges, and -1 mirrors all three:
+      // `openDoor` folds its leaf back along the row and half of them end up
+      // hinged on the other edge. A streak has to start under the fitting that
+      // made it or it is a painted stripe, so this follows the ironmongery —
+      // `doorKit` takes the same argument for the same reason.
+      const run = [[dc - hand * (h - 0.075), floor + 0.42],
+        [dc - hand * (h - 0.115), floor + 1.62],
+        [dc + hand * (h - 0.145), floor + 1.00]];
       for (let i = 0; i < run.length; i++) {
         const [t, y] = run[i];
         const d = (0.16 + 0.42 * jit(key * 7 + i, 824)) * (0.45 + 0.55 * k2);
@@ -1694,15 +1700,21 @@ async function buildJadrija(scene) {
       [col[0] + (RUSTY[0] - col[0]) * mx, col[1] + (RUSTY[1] - col[1]) * mx,
         col[2] + (RUSTY[2] - col[2]) * mx]];
   }
-  function door(dc, front, floor, col, louvred, key) {
+  function door(dc, front, floor, col, louvred, key, faceAt, hand = 1) {
     const h = DOORW * 0.5;
     // No hole is cut here — `frontSkin` did that, and it is why any of this is
     // visible at all. The first version of this drew the leaf at `front + 0.04`
     // inside a wall that ran from `front` to the back of the hut, which is to
     // say it drew a door in the middle of a solid block of masonry: what came
     // out was a row of white walls with coloured picture frames on them.
-    const face = front + 0.045;
-    const [chips, stains, rust] = doorWear(dc, floor, col, key | 0);
+    //
+    // Where the leaf's own seaward face lands. Inside the reveal for a shut
+    // door, which is every caller but one: `openDoor` folds its leaf out onto
+    // the render and passes the face it comes to rest on, so that an open bay's
+    // leaf is built, weathered and fitted out by this function rather than by a
+    // second copy of it that would drift away from it.
+    const face = faceAt == null ? front + 0.045 : faceAt;
+    const [chips, stains, rust] = doorWear(dc, floor, col, key | 0, hand);
     /**
      * Lay whatever has failed on the element that was just drawn.
      *
@@ -2192,9 +2204,48 @@ async function buildJadrija(scene) {
    * off that stream — so which huts are open is fixed and nothing downstream of
    * them moves.
    *
-   * The leaf swings INWARD and stands at a right angle in the doorway, which is
-   * what the frame has and is also the only version that costs nothing: a leaf
-   * folded back against the render outside would cover its neighbour's door.
+   * ── AND THE LEAF FOLDS FLAT ON THE RENDER, WHICH IT DID NOT ─────────────
+   *
+   * It used to swing INWARD and stand at a right angle in the doorway, and the
+   * note here said that was the only version costing nothing, because "a leaf
+   * folded back against the render outside would cover its neighbour's door".
+   * Both halves of that are wrong and both are measurable.
+   *
+   * It does not cover the neighbour's door. A bay is 2.15 m and a leaf is
+   * 0.90 m, so one folded flat from its own jamb reaches 1.35 m from the bay's
+   * middle while the neighbour's architrave begins at 1.645 m: 0.295 m clear.
+   *
+   * And the inward leaf could not be seen at all. Painted magenta and shot from
+   * eight standing positions between 1.2 m and 3.6 m out, the WHOLE leaf came
+   * to between 9 and 970 pixels of a 620x760 frame — 0.002% to 0.21% — and
+   * square on at 3 m it was a hairline TEN PIXELS wide. A leaf at a right angle
+   * to the wall is edge-on to everyone standing in front of it; of the 0.70 m
+   * of it that goes into the hut only the 25 mm nearest the face clears the
+   * reveal, and the strip curtain hangs across that. Every chip and streak
+   * `doorWear` could lay on such a leaf would land inside ten pixels.
+   *
+   * f32 settles what it should do instead — the same frame the steel door came
+   * off. The leaf is folded RIGHT BACK, flat on the render beside its own
+   * opening, with a curtain hanging in the empty hole and a clothesline
+   * crossing in front of it. A door lying flat on the OUTSIDE wall is a door
+   * that opens outward, so what faces the promenade is its weather face, which
+   * is the face `doorWear` measured; and it is a 0.90 by 1.98 m painted panel
+   * instead of a hairline. So it goes through `door` like every shut one and
+   * gets its stiles, its louvres, its paint failure and its rust streaks from
+   * the same code rather than from a copy.
+   *
+   * 75 mm off the render, not the 40 to 60 mm a butt hinge alone would give:
+   * the two stone bays stand their crazy paving 64 mm proud (see `crazyFace`)
+   * and a leaf folded onto one at hinge thickness would have flags growing
+   * through it. 75 mm clears the paving by 11 mm and the render skirt by 65.
+   *
+   * `room` is which way it folds, and it folds toward the middle of its run:
+   * the last bay in a run has a gable end on its far side and nothing to fold a
+   * door onto. It carries through `door`, `doorWear` and `doorKit` as `hand`,
+   * so the hinges stay on the stile nearest the opening either way round. Two
+   * open bays can never be neighbours — `oIx` steps by one each bay, so a run
+   * of six goes by between any two zeroes — which is the whole reason two
+   * folded leaves can never be laid on the same piece of render.
    */
   const HANGCOL = [
     // The plastic strip curtain, in the four ribbons the frame names.
@@ -2210,16 +2261,19 @@ async function buildJadrija(scene) {
     [[0.545, 0.500, 0.430], [0.330, 0.288, 0.240], [0.560, 0.516, 0.445],
       [0.300, 0.262, 0.220]],
   ];
-  function openDoor(dc, front, floor, col, kind) {
+  const OPENOFF = 0.075;           // the folded leaf's back, off the render
+  function openDoor(dc, front, floor, col, kind, key, louvred, room) {
     const h = DOORW * 0.5;
-    // The leaf, standing in the doorway at a right angle to the wall. Hinged on
-    // the left, which is the side `doorKit` puts the hinges on.
-    const face = front + 0.045;
-    boxTS(dc - h + 0.012, dc - h + 0.048, face + 0.02, face + 0.72,
-      floor + 0.010, floor + DOORH - 0.010, shade(col, 0.94), col);
-    // A sliver of the back of it, which is never painted the same as the front.
-    boxTS(dc - h + 0.044, dc - h + 0.048, face + 0.02, face + 0.72,
-      floor + 0.010, floor + DOORH - 0.010, shade(col, 0.62));
+    // The leaf, flat on the render one full leaf-width along from its own jamb,
+    // and built by the same function that builds the eighty shut ones.
+    const lt = dc + room * (h + DOORW * 0.5);
+    const fs = front - OPENOFF - 0.032;
+    door(lt, front, floor, col, louvred, key, fs, room);
+    // Hinges, hasp and staple — and no padlock, which is what `doorKit` does
+    // when it is handed no key. The hut is standing open: the lock came off it
+    // and went into somebody's bag, and a padlock shut through the hasp of an
+    // open door is the one thing on this leaf that would read as a mistake.
+    doorKit(lt, front, floor, h, fs - front, undefined, room);
     // And what is hanging in the hole. Six ribbons across 0.88 m, or four wide
     // bands if it is cloth, and the difference between them is only the width:
     // the strips are cut narrow and a curtain is not.
@@ -2373,6 +2427,144 @@ async function buildJadrija(scene) {
     return n;
   }
 
+  /**
+   * The one steel door on the beach.
+   *
+   * f32 is the only frame in the pan that has one, and a scouting pass over the
+   * batch called it the most surprising single object in fifty frames. Against
+   * a hundred metres of painted timber and the occasional white PVC leaf, one
+   * door is a welded steel frame in red oxide with two frosted panes in it,
+   * rusted clean through to bare metal along every horizontal.
+   *
+   * ONE. `bayN === 34`, counted as the bays are drawn, exactly the way the two
+   * stone bays are picked and on the same argument: the survey found one, so
+   * there is one, and it is counted rather than dealt off a modulo that can
+   * come out none or three the day a run gets a hut longer.
+   *
+   * 34 and not 32, which was the first choice and was photographed: 32's
+   * neighbour is one of the fourteen white PVC leaves, and side by side the two
+   * pale doors read as a pair — a bay that upgraded its joinery next to a bay
+   * that upgraded its joinery, which is the opposite of a one-off. 34 is a
+   * front-row bay four along in a seven-hut run with ordinary painted timber
+   * either side of it, neither of the stone pair and none of the three of them
+   * standing open, so the glass has nothing on the row to be mistaken for.
+   *
+   * Measured off f32 as ratios against the sunlit render beside it at
+   * rgb(175, 177, 180), because nothing in that frame is at full value:
+   *
+   *   red oxide, sound        rgb( 98,  60,  62)   0.56 / 0.34 / 0.35
+   *   rusted through, sunlit  rgb(130, 102,  93)   0.74 / 0.58 / 0.52
+   *   rusted through, pitted  rgb( 50,  35,  36)   0.29 / 0.20 / 0.20
+   *   upper pane              rgb(187, 200, 218)   1.07 / 1.13 / 1.21
+   *   lower pane              rgb(123, 123, 115)   0.70 / 0.69 / 0.64
+   *
+   * The upper pane is BRIGHTER than the sunlit wall and pulled hard to blue,
+   * which is what a translucent panel with the sky behind it does, and it is
+   * the whole reason this door carries from down the row: it is the only thing
+   * on a hundred metres of facade lighter than the render. The lower pane is
+   * nothing like it — warm, dull and green — and that reading was taken inside
+   * the mid rail's own shadow, so it is drawn a little above the ratio. What
+   * matters is not the exact value but that the two panes are not the same
+   * glass: one of them has been replaced.
+   *
+   * The paint has gone off the HORIZONTALS and nowhere else, which is where
+   * water stands on a steel section, so it is drawn that way rather than as
+   * scattered patches: the mid rail in f32 has not a trace of red left on it
+   * while the stile 40 mm away is still sound.
+   */
+  const OXIDE = [0.345, 0.209, 0.215];
+  const OXBARE = [0.455, 0.357, 0.320];
+  const OXHALF = [0.406, 0.290, 0.273];
+  const OXPIT = [0.178, 0.123, 0.123];
+  const PANE1 = [0.658, 0.695, 0.744];
+  const PANE2 = [0.470, 0.474, 0.428];
+  function steelDoor(dc, front, floor, key) {
+    const h = DOORW * 0.5;
+    const face = front + 0.045;
+    const S = 0.055;                 // stile and rail: 55 mm of angle section
+    const y0 = floor + 0.010, y1 = floor + DOORH - 0.010;
+    const mid = floor + 0.770;       // the middle rail, 40 mm either side of it
+    const kick = y0 + 0.100;         // the bottom rail
+    // The glass goes in first and the sections lie over it, overlapping by
+    // 12 mm all round. A pane cut exactly to the daylight opening would stand
+    // its four edge faces flush with the frame's four inner ones, which is
+    // eight skimming parallels per light; it is also not how a pane is bedded.
+    const pb = face + 0.012;
+    for (const [ya, yb, pc] of [[mid + 0.040, y1 - S, PANE1],
+      [kick, mid - 0.040, PANE2]]) {
+      boxTS(dc - h + S - 0.012, dc + h - S + 0.012, pb, pb + 0.010,
+        ya - 0.012, yb + 0.012, pc, shade(pc, 1.05));
+    }
+    // The rust down the upper pane. f32 has a broken line of it running the
+    // full height of that light, a hand's width in from the lock stile: water
+    // off the top rail, carrying the rail down with it. The warmest of those
+    // pixels are 0.80 / 0.65 / 0.63 of the clean pane beside them, which is the
+    // same wash `doorWear` measured off the cream door in f26 (0.77 / 0.69 /
+    // 0.60). Rust on this beach is that ratio of whatever it is lying on.
+    const FLECK = [PANE1[0] * 0.80, PANE1[1] * 0.65, PANE1[2] * 0.63];
+    const ft = dc + 0.10 + jit(key, 931) * 0.10;
+    // Jittered along its length and with a fifth of the marks simply missing,
+    // because nine of anything at one spacing is a dashed line and a dashed
+    // line down a pane of glass is a leaded light. What is in f32 is a broken
+    // trail with two long gaps in it.
+    const span = (y1 - S - mid - 0.24) / 9;
+    for (let i = 0; i < 9; i++) {
+      const q = key * 13 + i;
+      if (jit(q, 935) < 0.20) continue;
+      const yv = mid + 0.10 + (i + jit(q, 936) * 0.85) * span;
+      const tv = ft + (jit(q, 932) - 0.5) * 0.05;
+      const w = 0.006 + 0.014 * jit(q, 933);
+      const d = 0.014 + 0.055 * jit(q, 934);
+      // ONE quad, 3 mm proud of the pane, in `wearOn`'s winding — see the note
+      // there for why a mark on a surface is drawn in front of it and not sunk
+      // into it, and why one quad and not a box.
+      b.quad(W(tv - w * 0.5, pb - 0.003, yv), W(tv + w * 0.5, pb - 0.003, yv),
+        W(tv + w * 0.5, pb - 0.003, yv + d), W(tv - w * 0.5, pb - 0.003, yv + d),
+        FLECK);
+    }
+    // The stiles, in two pieces each so that the halves below the mid rail can
+    // go over to rust with it. In f32 the paint dies at that rail and the
+    // sections under it are bare metal all the way to the sill.
+    for (const o of [-1, 1]) {
+      const e0 = dc + o * h, e1 = dc + o * (h - S);
+      const t0 = Math.min(e0, e1), t1 = Math.max(e0, e1);
+      boxTS(t0, t1, face, face + 0.032, mid, y1, OXIDE, shade(OXIDE, 1.10));
+      boxTS(t0, t1, face, face + 0.032, y0, mid, OXHALF, OXBARE);
+    }
+    boxTS(dc - h, dc + h, face, face + 0.032, y1 - S, y1,
+      OXIDE, shade(OXIDE, 1.10));
+    // And the two horizontals, on neither of which is there any red oxide left.
+    // `OXPIT` on top rather than underneath: the pitted, near-black end of the
+    // range is what stands on the upward face of a rusted rail, and it is the
+    // face the sun is on, so putting it there is the difference between a rail
+    // that has rotted and a rail that is merely a darker brown.
+    boxTS(dc - h, dc + h, face, face + 0.032, mid - 0.040, mid + 0.040,
+      OXBARE, OXPIT);
+    boxTS(dc - h, dc + h, face, face + 0.032, y0, kick, OXBARE, OXPIT);
+    // The lock block: a plate welded to the closing stile with the handle gone
+    // off it and the cylinder still in. f32 has exactly that — a small pale
+    // rose with an empty spindle hole in it and a keyway 80 mm under.
+    //
+    // It is wider than the 55 mm stile it is on, which is what f32 shows and is
+    // why the first cut of it hung 15 mm off the EDGE of the leaf: a plate
+    // centred on a narrow stile has to grow INWARD, over the pane, and not both
+    // ways. So it runs from 28 mm inboard of the stile to 4 mm short of the
+    // leaf's own edge, and the four pieces of it are each bedded into the piece
+    // behind rather than laid flush on it, so no two of them share a plane and
+    // the nearest pair of parallels — the plate's back and the pane's front —
+    // are 6 mm apart.
+    const lk = dc + h - S * 0.5 - 0.012;
+    boxTS(dc + h - S - 0.028, dc + h - 0.004, face - 0.008, face + 0.006,
+      floor + 0.845, floor + 1.175, OXHALF, OXBARE);
+    const ROSE = [0.520, 0.522, 0.508];
+    boxTS(lk - 0.028, lk + 0.028, face - 0.022, face - 0.004,
+      floor + 1.030, floor + 1.058, ROSE, shade(ROSE, 1.12));
+    boxTS(lk - 0.011, lk + 0.011, face - 0.026, face - 0.018,
+      floor + 1.033, floor + 1.055, [0.055, 0.052, 0.050]);
+    boxTS(lk - 0.010, lk + 0.010, face - 0.016, face - 0.004,
+      floor + 0.930, floor + 0.968, [0.080, 0.076, 0.072]);
+  }
+
   /** A white PVC door: one leaf, two mouldings, no louvres and no paint. */
   function pvcDoor(dc, front, floor) {
     const h = DOORW * 0.5;
@@ -2445,17 +2637,25 @@ async function buildJadrija(scene) {
   // hangs on is a wider hasp.
   const LOCKB = [[0.360, 0.298, 0.148], [0.445, 0.450, 0.458]];
   const SHACK = [0.400, 0.408, 0.416];
-  function doorKit(dc, front, floor, half, depth, key) {
+  function doorKit(dc, front, floor, half, depth, key, hand = 1) {
     const IRON = [0.190, 0.178, 0.166];
     const f = front + depth;
+    // `hand` mirrors the lot, for the leaves `openDoor` folds back the other
+    // way along the row: the hinges belong on the stile nearest the opening
+    // whichever side of it the leaf came to rest. `boxTS` wants its t range in
+    // order and a mirrored offset arrives out of order, which is what `T` is
+    // for and why these are not four literals any more.
+    const T = (d0, d1) => [Math.min(dc + hand * d0, dc + hand * d1),
+      Math.max(dc + hand * d0, dc + hand * d1)];
     for (const y of [floor + 0.42, floor + 1.62]) {
-      boxTS(dc - half + 0.03, dc - half + 0.20, f - 0.021, f - 0.004, y, y + 0.075, IRON);
+      const [g0, g1] = T(-half + 0.03, -half + 0.20);
+      boxTS(g0, g1, f - 0.021, f - 0.004, y, y + 0.075, IRON);
     }
     // Hasp and staple on the swinging side, at the height a hand finds it.
-    boxTS(dc + half - 0.20, dc + half - 0.05, f - 0.024, f - 0.004,
-      floor + 1.00, floor + 1.07, IRON);
-    boxTS(dc + half - 0.13, dc + half - 0.09, f - 0.061, f - 0.022,
-      floor + 0.99, floor + 1.09, IRON);
+    const [p0, p1] = T(half - 0.20, half - 0.05);
+    boxTS(p0, p1, f - 0.024, f - 0.004, floor + 1.00, floor + 1.07, IRON);
+    const [q0, q1] = T(half - 0.13, half - 0.09);
+    boxTS(q0, q1, f - 0.061, f - 0.022, floor + 0.99, floor + 1.09, IRON);
     // ── AND THE LOCK THAT GOES THROUGH IT ────────────────────────────────────
     //
     // The hasp and the staple were drawn and the padlock never was, which is a
@@ -2474,7 +2674,7 @@ async function buildJadrija(scene) {
     // him. Off `jit` and the bay index, so it is fixed for the life of the seed
     // and costs the beach no draw of `rng`.
     if (jit(key, 918) < 0.13) return;
-    const px = dc + half - 0.110;    // the staple's own centre
+    const px = dc + hand * (half - 0.110);   // the staple's own centre
     const py = floor + 0.898;
     const body = LOCKB[jit(key, 917) < 0.5 ? 0 : 1];
     boxTS(px - 0.027, px + 0.027, f - 0.072, f - 0.048, py, py + 0.068,
@@ -2725,7 +2925,11 @@ async function buildJadrija(scene) {
       // there are TWO, so there are two, and they are counted.
       bayN++;
       const stone = bayN === 17 || bayN === 52;
+      // And the one steel-framed glazed leaf. Counted, not hashed — see
+      // `steelDoor` for why 34 and why exactly one.
+      const steel = bayN === 34;
       if (stone) stoneBays.push([+dc.toFixed(1), +front.toFixed(1)]);
+      if (steel) steelBay.push([+dc.toFixed(1), +front.toFixed(1)]);
       if (stone) crazyFace(a, c, dc, front, fl, eave, DOORW * 0.5, k + (t0 | 0));
       else plaster(a, front, fl, eave, wash, k + (t0 | 0), dc);
       b = up;
@@ -2771,8 +2975,28 @@ async function buildJadrija(scene) {
       // upgraded it at all. The hash lets two land side by side, which f65 has,
       // and lets twenty-six bays go by without one.
       const pvc = stone || (oIx !== 0 && jit(key, 913) < 0.20);
-      if (oIx === 0) {
-        openDoor(dc, front, fl, col, (k * 3 + (t0 | 0)) % 4);
+      // What the rail, the vent and the architrave are painted. Hoisted out of
+      // the three calls at the foot of this block because there are now three
+      // kinds of joinery in a bay and not two, and a third ternary written out
+      // three times is where the fourth one goes wrong. The steel bay carries
+      // its own frame right round the opening — jambs, head and transom are one
+      // welded thing on a door like that, which is what makes it a steel-FRAMED
+      // door rather than a steel leaf in somebody's timber frame.
+      const railCol = steel ? shade(OXIDE, 0.86)
+        : pvc ? [0.605, 0.608, 0.608] : shade(col, 0.86);
+      const trimCol = steel ? OXIDE : pvc ? [0.640, 0.642, 0.642] : col;
+      if (steel) {
+        steelDoor(dc, front, fl, key);
+      } else if (oIx === 0) {
+        openBays.push([+dc.toFixed(1), +front.toFixed(1)]);
+        // The leaf folds toward the middle of the run: the last bay in one has
+        // a gable end on its far side and no render to fold a door onto. The
+        // style and the wear key are the same expressions the shut doors below
+        // use, so an open bay's leaf is dealt out of the bay index exactly as
+        // its neighbours' are — see `openDoor`.
+        openDoor(dc, front, fl, col, (k * 3 + (t0 | 0)) % 4,
+          k * 31 + (t0 | 0) * 7, (k * 5 + (t0 | 0)) % 3 !== 0,
+          k < n - 1 ? 1 : -1);
       } else if (pvc) {
         // A PVC bay has no hasp: the whole of the improvement is that somebody
         // replaced the joinery, and a painted hasp on a PVC leaf would undo it.
@@ -2789,12 +3013,10 @@ async function buildJadrija(scene) {
       // `pvc` and not `stone`. f24 is the clearest: a peach wall, a grey lintel
       // and every millimetre of joinery in it white.
       boxTS(dc - DOORW * 0.5, dc + DOORW * 0.5, front + 0.010, front + REVEAL,
-        fl + DOORH, fl + OPENH - VENTH,
-        pvc ? [0.605, 0.608, 0.608] : shade(col, 0.86));
-      vent(dc, front, fl + OPENH - VENTH, DOORW - 0.06,
-        pvc ? [0.640, 0.642, 0.642] : col, (k * 5 + (t0 | 0) * 3) % 3);
-      surround(dc, front, fl, pvc ? [0.640, 0.642, 0.642] : col,
-        DOORW * 0.5, fl + OPENH + 0.045);
+        fl + DOORH, fl + OPENH - VENTH, railCol);
+      vent(dc, front, fl + OPENH - VENTH, DOORW - 0.06, trimCol,
+        (k * 5 + (t0 | 0) * 3) % 3);
+      surround(dc, front, fl, trimCol, DOORW * 0.5, fl + OPENH + 0.045);
       // And a line of washing across one shut bay in nine.
       if (oIx !== 0 && (k * 4 + (t0 | 0)) % 9 === 0) {
         clothesline(a, c, front, fl, k + (t0 | 0));
@@ -3338,6 +3560,16 @@ async function buildJadrija(scene) {
   // position, so finding one to stand in front of meant walking the whole
   // block. `__fr.jad.raw().washLines` — [t of the bay centre, s of the row].
   const washLines = [];
+  // And where the open ones are. `oIx` is a modulo on the bay index and the
+  // run's own t, so which bays stand open is fixed but is not a position you
+  // can work out on paper — finding one to photograph meant walking a hundred
+  // metres of row. `__fr.jad.raw().openBays` — [t of the bay centre, s of the
+  // row], same shape as `stoneBays`.
+  const openBays = [];
+  // And the single steel-framed bay, for the same reason — "the 34th bay in the
+  // block" is not somewhere anybody can go and stand.
+  // `__fr.jad.raw().steelBay`.
+  const steelBay = [];
   const kabFrom = squareRow(JAD.rowA, JAD.cabW * KAB.bays);
   for (const [front, phase] of [[JAD.rowA, 0], [JAD.rowB, JAD.cabW * 0.5]]) {
    for (const [tA, tB] of JAD.rows) {
@@ -4040,6 +4272,25 @@ async function buildJadrija(scene) {
       staropramen: { ar: 4.2, bg: [0.395, 0.072, 0.082],
         ink: [0.882, 0.858, 0.795], rule: GOLD, text: 'STAROPRAMEN',
         sub: 'LIVE YOUR WAY', weight: '800' },
+      // The header of the bottle cooler behind the konoba's counter, and the
+      // seventh thing this survey can say outright: `20260821_175856` has the
+      // script on the white front header of the cabinet and the frame at 5:14
+      // of `1000150414` has it again, white on red, wrapping the red side
+      // panel. Red ground and white type, which is the side the game's camera
+      // is on and the more legible of the two.
+      //
+      // 0.520 rather than the tavern's 0.430. Measured in the same deep shade
+      // under the same reed roof as the stools beside it: the fridge panel is
+      // rgb(100, 23, 29) and the scarlet stool rgb(117, 34, 40), so the fridge
+      // sits about a sixth under a stool this file already carries at 0.620.
+      // Ožujsko's maroon is a beer's red and would read as a beer fridge.
+      //
+      // Prints ONCE across the header like `staropramen`, so `ar` is that
+      // panel's own aspect — 0.66 m of band by 0.22 m of drop — and not a
+      // repeat length.
+      cocacola: { ar: 3.0, bg: [0.520, 0.075, 0.080],
+        ink: [0.905, 0.892, 0.870], rule: [0.905, 0.892, 0.870],
+        text: 'Coca-Cola', weight: '700' },
     }[key];
   }
 
@@ -10677,31 +10928,473 @@ async function buildJadrija(scene) {
           [t + 0.20, cs + 0.5, 0.18, 0.49],
           [0.560 * g, 0.535 * g, 0.485 * g]);
       }
+      // ── the floor, which was this shop's poured pad ──────────────────────
+      //
+      // `shopfront` lays every business a slab of CONC before it draws
+      // anything, and for the four boxes on this boardwalk that is right: they
+      // stand on the promenade. This one does not. 20260821_175856 is half
+      // floor — the woman in the foreground is walking on it — and every metre
+      // of it is CRAZY PAVING: irregular limestone flags with wide joints,
+      // under the roof, round the pine and out well past the drip line. At
+      // thirteen metres by ten it is the largest surface in the shop after the
+      // ceiling and it was the only one still flat grey.
+      //
+      // The stone is the promenade's own. `paving` lays FLAG from s 15.9 to
+      // 21.1 and that seam runs straight through this terrace, so a second
+      // palette here would put a colour join across the floor where in life
+      // there is none — the counter stands on the same flags the promenade is
+      // paved in.
+      //
+      // What is different is how they have weathered. The promenade's flags
+      // were measured off v_022 as warm honey, R:B 1.59; this terrace reads
+      // rgb(196, 194, 193) sunlit and rgb(139, 137, 137) in the roof's shade,
+      // which is R:B 1.02 — neutral, in the same evening sun that makes the
+      // honey honey. So each of the five shades is pulled a fifth of the way
+      // to its own luminance and lifted seven per cent: the same stone, washed
+      // paler and greyer, which is what a hose and twenty summers of bare feet
+      // do to limestone that never dries in the sun. A fifth and not a
+      // quarter, and 1.07 and not 1.10, because at the full measurement the
+      // join with the promenade's honey along `S.s1 + 0.35` reads from behind
+      // the bar as two different materials rather than as two different ages.
+      //
+      // In the deck buffer and OVER the pad rather than instead of it, because
+      // the pad is also the shop's kerb and its four sides. 15 mm of lift for
+      // the mortar and 12 more for the stone: rule 5 wants 3 and `paving`'s
+      // own flags stand 50 mm over their bed, but 50 cannot be used here —
+      // `standY` knows about `paveBand` and knows nothing about this apron, so
+      // every millimetre of lift is a millimetre your feet are inside the
+      // floor. 15 is a shoe sole; 50 is the animal in the concrete the note
+      // over PAVE_LIFT is about.
+      //
+      // ── AND IT CROSSES THE PROMENADE'S OWN FLAGS, WHICH IS WORTH BEING
+      // EXACT ABOUT ─────────────────────────────────────────────────────────
+      //
+      // `paving` lays FLAG from s 15.9 to 21.1 down the whole shore, so it is
+      // under this shop too, and its stone sits at `surfaceY + 0.05`, which
+      // FOLLOWS the deck. The deck climbs 171 mm across this frontage —
+      // measured with `heights`: 3.076 at t 239, 3.247 at t 253 — and this
+      // apron is FLAT at `y0`, which is 3.193, because the shop it floors is
+      // flat: the counter, the stools, the cooler and the posts are all built
+      // off `y0` and a floor that followed the ground would leave the west end
+      // of the counter standing 117 mm in the air.
+      //
+      // A flat plane crosses a sloping one, and these two cross at t 245.7,
+      // where they are within rule 5's 3 mm across the 3.5 m of the flag band.
+      // That crossing is NOT introduced here: the pad it replaces is flat at
+      // `y0 + 0.02` and crosses the same flags at t 243.9, which is the beige
+      // patch that has been showing through the paving in front of this
+      // counter all along. What this apron changes is what the crossing is
+      // BETWEEN — two pale limestones a shade apart instead of grey slab
+      // against honey stone — so the seam it can produce is a mottle rather
+      // than a step. Shot at 12.4 and 18.7 from four angles, including square
+      // down the crossing at grazing incidence, and it does not show.
+      //
+      // Removing it outright means clearing the highest flag in the footprint,
+      // which is `y0 + 0.115`, and then rebuilding the counter, the stools,
+      // the cooler, the parasol, the pine collar and the whole terrace kit
+      // against a new floor datum with a skirt round the apron. That is a
+      // different job from paving this terrace and it is written down here so
+      // that the next person does not have to find the 171 mm again.
+      {
+        const knBuf = b;
+        b = deck;
+        const knFLAG = FLAG.map((c) => {
+          const l = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+          return [(c[0] + (l - c[0]) * 0.20) * 1.07,
+            (c[1] + (l - c[1]) * 0.20) * 1.07,
+            (c[2] + (l - c[2]) * 0.20) * 1.07];
+        });
+        // The pad is `S.t0 - 0.6 … S.t1 + 0.6` by `S.s0 - 0.8 … S.s1 + 0.4`,
+        // and the apron is inset 50 mm inside it all round so the kerb still
+        // shows as a kerb from the promenade.
+        const knA0 = S.t0 - 0.55, knA1 = S.t1 + 0.55;
+        const knB0 = S.s0 - 0.75, knB1 = S.s1 + 0.35;
+        const knNT = 13, knNS = 9;    // about 1.01 m by 1.12 m a flag
+        // One jittered lattice, shared: cell (i, k) takes the four corners
+        // `knV(i, k)`, `knV(i+1, k)`, `knV(i+1, k+1)`, `knV(i, k+1)`, so two
+        // neighbours read the same corner and the flags tile with no gap and
+        // no overlap however far a corner has wandered. Pinned on all four
+        // edges of the apron so it ends square on the pad.
+        const knV = (i, k) => {
+          const u = knA0 + (knA1 - knA0) * (i / knNT);
+          const v = knB0 + (knB1 - knB0) * (k / knNS);
+          return [
+            i === 0 || i === knNT ? u
+              : u + (jit(i, k * 13 + 5) - 0.5) * ((knA1 - knA0) / knNT) * 0.62,
+            k === 0 || k === knNS ? v
+              : v + (jit(i * 11 + 3, k) - 0.5) * ((knB1 - knB0) / knNS) * 0.62,
+          ];
+        };
+        const knY = y0 + 0.035, knSY = y0 + 0.047;
+        for (let i = 0; i < knNT; i++) {
+          for (let k = 0; k < knNS; k++) {
+            const knQ = [knV(i, k), knV(i + 1, k),
+              knV(i + 1, k + 1), knV(i, k + 1)];
+            const knSt = knFLAG[(jit(i, k * 37 + 11) * 4096 | 0) % knFLAG.length];
+            const knG = 0.93 + jit(i * 7 + 1, k * 5 + 2) * 0.14;
+            const knStone = [knSt[0] * knG, knSt[1] * knG, knSt[2] * knG];
+            // The bed first, full size, so two neighbours' beds meet under the
+            // joint and there is no hole between the flags.
+            const knMort = knStone.map((v) => v * 0.76);
+            b.quad(W(knQ[0][0], knQ[0][1], knY), W(knQ[1][0], knQ[1][1], knY),
+              W(knQ[2][0], knQ[2][1], knY), W(knQ[3][0], knQ[3][1], knY),
+              knMort);
+            // and the stone on it, shrunk toward the cell's own centre rather
+            // than inset by a fixed distance in t and s: a flag that has
+            // wandered into a wedge keeps a wedge-shaped joint round it, which
+            // is what wide-jointed crazy paving looks like and what a
+            // rectangular inset cannot draw.
+            const knCt = (knQ[0][0] + knQ[1][0] + knQ[2][0] + knQ[3][0]) * 0.25;
+            const knCv = (knQ[0][1] + knQ[1][1] + knQ[2][1] + knQ[3][1]) * 0.25;
+            const knIn = 0.082;
+            const knP = (n) => W(knQ[n][0] + (knCt - knQ[n][0]) * knIn,
+              knQ[n][1] + (knCv - knQ[n][1]) * knIn, knSY);
+            b.quad(knP(0), knP(1), knP(2), knP(3), knStone);
+          }
+        }
+        b = knBuf;
+      }
+
+      // ── the stools, which are the loudest thing in either frame ──────────
+      //
+      // They were a coloured slab on four white sticks, and the two sources
+      // agree on three things about them and none of the three was there.
+      // 20260821_175856 at source resolution, and the frame at 5:14 of
+      // `1000150414` from the other side and closer:
+      //
+      //  · they are MONOBLOC. Seat, back and legs are one moulding in one
+      //    colour — the red stool has red legs, the lime one lime — and the
+      //    chrome is most of why five of them read as bar tools rather than as
+      //    bar stools.
+      //  · the back is PERFORATED. A honeycomb mesh you can see the terrace
+      //    through, which is `meshChair`'s finding at beach bar MINI arrived at
+      //    again on a different chair: a dark rectangle reads as the exact
+      //    opposite of a mesh.
+      //  · the back is at the BACK. It was drawn at `s + 0.17`, which is the
+      //    counter side — the sitter faces the bar, so a backrest inboard of
+      //    him is a backrest in his stomach.
+      //
+      // And there are two sets, not one. The survey frame has scarlet and lime
+      // along the west half of the counter; the video frame, six metres east,
+      // has the same moulding in anthracite — MESH_DK, which is the resin MINI
+      // seats its terrace on, because it is the same resin.
       const SCAR = [0.620, 0.115, 0.095], LIME = [0.400, 0.640, 0.120];
-      for (let k = 0; k < 5; k++) {
-        const t = S.t0 + 1.9 + k * 1.15, s = cs - 0.78;
-        const col = k % 2 ? LIME : SCAR;
-        for (const [ot, os] of [[-0.15, -0.15], [0.15, -0.15],
-          [-0.15, 0.15], [0.15, 0.15]]) {
-          post(W, t + ot, s + os, y0, y0 + 0.72, 0.018, [0.560, 0.566, 0.560], 5);
+      /**
+       * One moulded bar stool, in the shore frame, facing the counter.
+       *
+       * Nothing is rotated because nothing needs to be: the counter runs along
+       * `t` and every stool at it faces inland, so the shop's own frame is the
+       * stool's. That is also why the back is at `-s` throughout — `+s` is the
+       * bar.
+       */
+      const knStool = (knT, knS, knC) => {
+        const knDk = shade(knC, 0.86);
+        // 0.735 under a 1.08 counter is 0.345 of knee, which is bar height.
+        const knSeat = y0 + 0.735, knTop = y0 + 0.781;
+        // Four legs, splayed. `frustumTS` joins two rectangles that differ in
+        // centre as well as in size, so a raked tapering leg is one call — the
+        // splay is the difference between a stool and four dowels and `post`
+        // cannot express it.
+        for (const [ot, os] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+          frustumTS(y0 + 0.004,
+            [knT + ot * 0.205, knS + os * 0.198, 0.019, 0.019], knSeat,
+            [knT + ot * 0.160, knS + os * 0.156, 0.016, 0.016], knDk);
         }
-        // The foot ring, which is what stops a bar stool reading as a stick.
-        for (const os of [-0.17, 0.17]) {
-          boxTS(t - 0.17, t + 0.17, s + os - 0.015, s + os + 0.015,
-            y0 + 0.24, y0 + 0.27, [0.560, 0.566, 0.560]);
+        // The footrest, all four sides, taken at the offsets the legs actually
+        // have at that height rather than at the ones they have at the floor.
+        // The two pairs sit 4 mm apart in height where they cross, which is
+        // cheaper than mitring them and keeps two horizontal faces off each
+        // other (rule 5).
+        for (const os of [-0.185, 0.185]) {
+          boxTS(knT - 0.191, knT + 0.191, knS + os - 0.011, knS + os + 0.011,
+            y0 + 0.213, y0 + 0.237, knDk);
         }
-        boxTS(t - 0.20, t + 0.20, s - 0.20, s + 0.20, y0 + 0.72, y0 + 0.79,
-          col, shade(col, 1.12));
-        // A low back, on the ones that have one.
-        if (k % 2 === 0) {
-          boxTS(t - 0.19, t + 0.19, s + 0.17, s + 0.21, y0 + 0.79, y0 + 1.10,
-            shade(col, 0.92));
+        for (const ot of [-0.191, 0.191]) {
+          boxTS(knT + ot - 0.011, knT + ot + 0.011, knS - 0.185, knS + 0.185,
+            y0 + 0.217, y0 + 0.241, knDk);
+        }
+        boxTS(knT - 0.200, knT + 0.200, knS - 0.190, knS + 0.190,
+          knSeat, knTop, knC, shade(knC, 1.10));
+        // The back. `knBk` is its own sheared, bowed frame: `s` falls away
+        // with height (the rake) and comes forward at the ends (the tub), so
+        // every bar in the mesh follows the curve without any of them knowing
+        // about it.
+        const knHW = 0.185, knH = 0.375, knBow = 0.060;
+        const knBk = (dt, h, dv) => W(knT + dt,
+          knS - 0.168 - 0.30 * h + knBow * (dt * dt) / (knHW * knHW) + (dv || 0),
+          knTop + h);
+        // Both windings on everything in the back, for `meshChair`'s reason: a
+        // mesh is one ply and you are meant to see the far side of it.
+        const knFace = (A, C, D, E, c) => {
+          b.quad(A, C, D, E, c);
+          b.quad(E, D, C, A, c);
+        };
+        for (const dt of [-(knHW - 0.020), knHW - 0.020]) {
+          for (let j = 0; j < 3; j++) {
+            const h0 = knH * (j / 3), h1 = knH * ((j + 1) / 3);
+            knFace(knBk(dt - 0.020, h0), knBk(dt + 0.020, h0),
+              knBk(dt + 0.020, h1), knBk(dt - 0.020, h1), knC);
+          }
+        }
+        // The top rail, which is the thing a hand goes on and the one part of
+        // a mesh back that is solid.
+        for (let j = 0; j < 4; j++) {
+          const d0 = -knHW + 2 * knHW * (j / 4);
+          const d1 = -knHW + 2 * knHW * ((j + 1) / 4);
+          knFace(knBk(d0, knH - 0.048), knBk(d1, knH - 0.048),
+            knBk(d1, knH), knBk(d0, knH), knC);
+          b.quad(knBk(d0, knH), knBk(d1, knH),
+            knBk(d1, knH, -0.026), knBk(d0, knH, -0.026), shade(knC, 1.08));
+        }
+        // The mesh: uprights, then crossbars a centimetre behind them.
+        for (let i = 1; i < 5; i++) {
+          const u = -knHW + 2 * knHW * (i / 5);
+          for (let j = 0; j < 2; j++) {
+            const h0 = knH * (j / 2), h1 = knH * ((j + 1) / 2) - 0.048 * j;
+            knFace(knBk(u - 0.009, h0), knBk(u + 0.009, h0),
+              knBk(u + 0.009, h1), knBk(u - 0.009, h1), knDk);
+          }
+        }
+        for (let i = 1; i < 4; i++) {
+          const h = (knH - 0.048) * (i / 4);
+          for (let j = 0; j < 3; j++) {
+            const d0 = -knHW + 2 * knHW * (j / 3);
+            const d1 = -knHW + 2 * knHW * ((j + 1) / 3);
+            knFace(knBk(d0, h - 0.009, -0.014), knBk(d1, h - 0.009, -0.014),
+              knBk(d1, h + 0.009, -0.014), knBk(d0, h + 0.009, -0.014), knDk);
+          }
         }
         // The counter behind them blocks and the stools did not, so the one
-        // business on this boardwalk with nothing to walk through had five
-        // scarlet and lime bar stools you walked through instead.
-        furniture.push({ t, s, a: 0.18, c: 0.18, h: 1.10, y: y0 });
+        // business on this boardwalk with nothing to walk through had a row of
+        // bar stools you walked through instead.
+        furniture.push({ t: knT, s: knS, a: 0.21, c: 0.21, h: 1.16, y: y0 });
+      };
+      // Six at 1.06 m, which is what 6.2 m of counter takes, and not the
+      // strict red-green-red the five used to alternate on: 175856 has two
+      // scarlet together at the west end, and a run that alternates perfectly
+      // is the regular pattern this file keeps finding is worse than nothing.
+      for (let k = 0; k < 6; k++) {
+        knStool(S.t0 + 1.75 + k * 1.06, cs - 0.72,
+          [SCAR, SCAR, LIME, MESH_DK, LIME, MESH_DK][k]);
       }
+      // ── the parasol, which is standing UNDER the roof ────────────────────
+      //
+      // Both frames have it and it took the video frame to see what it was.
+      // At 5:14 of `1000150414` it fills the top third: a big shallow yellow
+      // canopy on a dark mast, its crown pushed up under the reed and its rim
+      // hanging a metre over the counter, with heavy dark ribs radiating out
+      // of the hub. In 175856 it is the wide olive-yellow band under the roof
+      // that reads as part of the ceiling until you know it is cloth.
+      //
+      // Nobody puts a parasol up inside a building. What this is, is a café
+      // parasol that lives on this terrace and gets wound up out of the way of
+      // the tables and left there, which is why it stands at the bar rather
+      // than out on the paving, and it is the second-brightest thing in the
+      // shop after the stools.
+      //
+      // NOT `parasol`. That draws a hired beach one — alternate white panels,
+      // a JANA hem — and it opens with `rng()`, which is rule 4 and would move
+      // every bather on the beach. This is written out here off `jit` and off
+      // the cafés' octagons, which is the object it actually is.
+      //
+      // 0.760 / 0.545 / 0.085 is the amber ceiling's own value taken redder.
+      // The cloth photographs rgb(131, 81, 9) — R:G:B 1 : 0.62 : 0.07 — where
+      // the translucent roofing beside it is 1 : 0.77 : 0.22, so the parasol
+      // is the more saturated of the two by a clear margin in the one frame
+      // that has them touching, and both are surfaces facing DOWN with no sun
+      // on them at all. See the note over AMBER: what is modelled is a light
+      // source, not a pigment.
+      {
+        const knPT = S.t0 + 4.55, knPS = cs - 2.15;
+        const knYEL = [0.760, 0.545, 0.085];
+        const knRIB = [0.088, 0.072, 0.056];
+        const knR = 1.86, knHub = y0 + 2.44, knRim = y0 + 2.02;
+        // The base is the wheel rim full of exposed aggregate that every
+        // parasol on this coast stands in — see the note at the cafés'
+        // octagons, where it was photographed from two metres.
+        post(W, knPT, knPS, y0, y0 + 0.15, 0.42, [0.140, 0.128, 0.118], 12);
+        post(W, knPT, knPS, y0 + 0.02, y0 + 0.19, 0.360, [0.522, 0.494, 0.444], 12);
+        post(W, knPT, knPS, y0 + 0.10, knHub + 0.09, 0.043,
+          [0.225, 0.208, 0.185], 8);
+        // Twelve panels, and the canopy is domed along a rib and sagged across
+        // one, which is `parasol`'s finding and the whole of what says cloth
+        // over a frame. Both windings on every quad: you are standing under it.
+        const knSEG = 2, knCRS = 2;
+        const knCan = (a, u, v) => {
+          const r = knR * u;
+          const sag = 0.075 * Math.sin(Math.PI * v) * u * u;
+          return W(knPT + Math.cos(a) * r, knPS + Math.sin(a) * r,
+            knHub - (knHub - knRim) * Math.pow(u, 1.5) - sag);
+        };
+        for (let i = 0; i < 12; i++) {
+          const a0 = (i / 12) * TAU, a1 = ((i + 1) / 12) * TAU;
+          for (let k = 0; k < knCRS; k++) {
+            const v0 = k / knCRS, v1 = (k + 1) / knCRS;
+            const A0 = a0 + (a1 - a0) * v0, A1 = a0 + (a1 - a0) * v1;
+            for (let j = 0; j < knSEG; j++) {
+              const u0 = j / knSEG, u1 = (j + 1) / knSEG;
+              const p00 = knCan(A0, u0, v0), p01 = knCan(A0, u1, v0);
+              const p11 = knCan(A1, u1, v1), p10 = knCan(A1, u0, v1);
+              b.quad(p00, p01, p11, p10, knYEL);
+              b.quad(p10, p11, p01, p00, knYEL);
+            }
+          }
+          // And the rib itself, which is the detail that separates this
+          // parasol from the cream ones on the promenade: theirs are cloth
+          // seams and these are black spokes you can count from ten metres.
+          // 25 mm under the cloth so the two never skim (rule 5).
+          // Built in the SHORE frame and handed to `W` like everything else.
+          // Offsetting the cloth's own world points sideways by `sin a`, `cos a`
+          // would be wrong by the 31° the shore runs off the x axis.
+          const knRp = (u, w, sgn) => W(
+            knPT + Math.cos(a0) * knR * u - Math.sin(a0) * w * sgn,
+            knPS + Math.sin(a0) * knR * u + Math.cos(a0) * w * sgn,
+            knHub - (knHub - knRim) * Math.pow(u, 1.5) - 0.025);
+          for (let j = 0; j < knSEG; j++) {
+            const u0 = Math.max(0.06, j / knSEG), u1 = (j + 1) / knSEG;
+            const w0 = 0.018 + 0.010 * u0, w1 = 0.018 + 0.010 * u1;
+            b.quad(knRp(u0, w0, -1), knRp(u1, w1, -1),
+              knRp(u1, w1, 1), knRp(u0, w0, 1), knRIB);
+            b.quad(knRp(u0, w0, 1), knRp(u1, w1, 1),
+              knRp(u1, w1, -1), knRp(u0, w0, -1), knRIB);
+          }
+        }
+        // The hem, which on this one is not a printed valance but the dark
+        // border the cloth is edged with — a band of it under every rim point,
+        // scalloped because the rim is.
+        //
+        // 0.085 and olive, having shipped at 0.155 in the ribs' own near-black
+        // once. On a 1.86 m canopy that is a hand's width of pure black round
+        // the whole rim, and from under it the parasol read as a black crown
+        // with a yellow lining rather than as a yellow parasol with a dark
+        // edge. The border in the frame is a border: dark against the cloth,
+        // and made of the same cloth.
+        const knHEM = [0.150, 0.108, 0.038];
+        for (let i = 0; i < 24; i++) {
+          const p0 = knCan((i / 24) * TAU, 1, (i % 2) / 2);
+          const p1 = knCan(((i + 1) / 24) * TAU, 1, ((i + 1) % 2) / 2);
+          b.quad(p0, p1, [p1[0], p1[1] - 0.085, p1[2]],
+            [p0[0], p0[1] - 0.085, p0[2]], knHEM);
+          b.quad([p0[0], p0[1] - 0.085, p0[2]], [p1[0], p1[1] - 0.085, p1[2]],
+            p1, p0, knHEM);
+        }
+        furniture.push({ t: knPT, s: knPS, a: 0.42, c: 0.42, h: 0.19, y: y0 });
+      }
+
+      // ── the bottle cooler behind the bar ─────────────────────────────────
+      //
+      // 175856 has it square on at the west end of the counter — a white
+      // upright with a glass door, shelves of bottles behind it and the red
+      // Coca-Cola header across the top — and the video frame has the same
+      // cabinet from behind, its red side panel out. It is the only saturated
+      // thing on the service side and it is what says this is a bar and not a
+      // shed with a plank across it.
+      //
+      // At `S.s1 - 0.22` it stands 90 mm clear of the counter's back face, in
+      // the 0.6 m of service run this shop has, and under the reed — the roof
+      // oversails to `S.s1 + 0.62` — with no wall behind it because this shop
+      // has no walls.
+      {
+        const knFT = S.t0 + 1.95, knFS = S.s1 - 0.22;
+        const knCASE = [0.572, 0.568, 0.552];
+        const knGLASS = [0.055, 0.068, 0.070];
+        const knFront = knFS - 0.29;
+        boxTS(knFT - 0.34, knFT + 0.34, knFS - 0.29, knFS + 0.29,
+          y0, y0 + 0.09, [0.128, 0.126, 0.130]);
+        boxTS(knFT - 0.34, knFT + 0.34, knFS - 0.29, knFS + 0.29,
+          y0 + 0.09, y0 + 1.86, knCASE, shade(knCASE, 1.10));
+        // The door is ONE quad and not a box — one face of it is visible and
+        // rule 7 says that is one quad — 8 mm proud of the case so the white
+        // frame still shows round it.
+        b.quad(W(knFT - 0.29, knFront - 0.008, y0 + 0.30),
+          W(knFT + 0.29, knFront - 0.008, y0 + 0.30),
+          W(knFT + 0.29, knFront - 0.008, y0 + 1.50),
+          W(knFT - 0.29, knFront - 0.008, y0 + 1.50), knGLASS);
+        // Three shelves of bottles behind the glass. Reds and browns and one
+        // green, because a cooler at a Croatian beach bar is Coke, Coke, Coke,
+        // Ožujsko and a Jana — and at this size what carries is that there is
+        // colour and repetition behind the glass rather than a black panel.
+        const knBOT = [[0.400, 0.070, 0.075], [0.400, 0.070, 0.075],
+          [0.115, 0.180, 0.095], [0.330, 0.255, 0.090], [0.400, 0.070, 0.075],
+          [0.150, 0.310, 0.360]];
+        for (let sh = 0; sh < 3; sh++) {
+          const sy = y0 + 0.40 + sh * 0.36;
+          b.quad(W(knFT - 0.275, knFront - 0.014, sy - 0.020),
+            W(knFT + 0.275, knFront - 0.014, sy - 0.020),
+            W(knFT + 0.275, knFront - 0.014, sy),
+            W(knFT - 0.275, knFront - 0.014, sy), [0.480, 0.478, 0.470]);
+          for (let i = 0; i < 6; i++) {
+            const bt = knFT - 0.245 + i * 0.098;
+            const c = knBOT[(i + sh * 2) % knBOT.length];
+            b.quad(W(bt - 0.031, knFront - 0.014, sy),
+              W(bt + 0.031, knFront - 0.014, sy),
+              W(bt + 0.031, knFront - 0.014, sy + 0.235),
+              W(bt - 0.031, knFront - 0.014, sy + 0.235), c);
+          }
+        }
+        // The header, and the point list runs DOWN in t. `brandBand` winds
+        // `top[i] → top[i+1] → bot[i+1]`, so on a face at constant `s` the
+        // normal comes out along `-(c - a) × Y`: a list that climbs in `t`
+        // faces INLAND, which is the barman's side, and what the terrace then
+        // sees is the back face — dimmed to 0.72 and, because the print is one
+        // ply seen through the cloth, MIRRORED. Shipped that way once and the
+        // screenshot read `aloC-acoC`. Running the list the other way turns
+        // the normal round and the type with it, which is the same fix
+        // `brandRing`'s note arrives at from the other end.
+        brandBand('cocacola',
+          [W(knFT + 0.33, knFront - 0.010, y0 + 1.80),
+            W(knFT - 0.33, knFront - 0.010, y0 + 1.80)],
+          [W(knFT + 0.33, knFront - 0.010, y0 + 1.58),
+            W(knFT - 0.33, knFront - 0.010, y0 + 1.58)], { once: true });
+        furniture.push({ t: knFT, s: knFS, a: 0.36, c: 0.31, h: 1.86, y: y0 });
+      }
+
+      // ── and what is on the counter ───────────────────────────────────────
+      //
+      // Bottles, glasses, two cups and saucers and the machine, along the
+      // staff edge of the cap. Both frames have this and it is small — but a
+      // bar counter with nothing standing on it is a shelf, and this one was
+      // six metres of empty teal.
+      {
+        const knCY = y0 + 1.08, knCS = cs + 0.66;
+        const knGREEN = [0.105, 0.155, 0.085], knBROWN = [0.245, 0.130, 0.060];
+        const knPALE = [0.720, 0.716, 0.700], knWH = [0.800, 0.796, 0.782];
+        // Bottles, grouped the way an opened one gets put back down: three
+        // together and one apart.
+        for (const [bt, bc] of [[S.t0 + 3.15, knGREEN], [S.t0 + 3.33, knGREEN],
+          [S.t0 + 3.52, knBROWN], [S.t0 + 5.90, knGREEN]]) {
+          lathe(W, bt, knCS, [[knCY, 0.034], [knCY + 0.175, 0.034],
+            [knCY + 0.230, 0.014], [knCY + 0.295, 0.013]], bc, 8);
+        }
+        for (const gt of [S.t0 + 3.78, S.t0 + 3.96, S.t0 + 5.66]) {
+          post(W, gt, knCS - 0.05, knCY, knCY + 0.128, 0.032, knPALE, 8);
+        }
+        for (const ct2 of [S.t0 + 4.50, S.t0 + 4.76]) {
+          post(W, ct2, knCS - 0.02, knCY, knCY + 0.010, 0.058, knWH, 10);
+          post(W, ct2, knCS - 0.02, knCY + 0.010, knCY + 0.062, 0.036, knWH, 8);
+        }
+        // The machine, which in 175856 is the one dark solid on the counter.
+        boxTS(S.t0 + 4.95, S.t0 + 5.31, knCS - 0.13, knCS + 0.13,
+          knCY, knCY + 0.32, [0.115, 0.112, 0.118], [0.145, 0.142, 0.148]);
+        // and the napkin box beside it.
+        boxTS(S.t0 + 5.40, S.t0 + 5.58, knCS - 0.07, knCS + 0.07,
+          knCY, knCY + 0.115, knWH, shade(knWH, 1.08));
+      }
+
+      // ── the bulb ─────────────────────────────────────────────────────────
+      //
+      // One bare lamp on a black flex off the roof, hanging to about the
+      // parasol's rim. It is in both frames — the video has it against the
+      // yellow at 5:14 — and it is four quads and a lathe.
+      {
+        const knLT = S.t0 + 6.9, knLS = cs - 0.55;
+        post(W, knLT, knLS, y0 + 1.96, y0 + S.h, 0.006, [0.072, 0.068, 0.066], 4);
+        post(W, knLT, knLS, y0 + 1.960, y0 + 2.045, 0.028, [0.090, 0.085, 0.082], 8);
+        lathe(W, knLT, knLS, [[y0 + 1.855, 0.000], [y0 + 1.878, 0.030],
+          [y0 + 1.918, 0.034], [y0 + 1.948, 0.022], [y0 + 1.962, 0.014]],
+        [0.880, 0.862, 0.808], 8);
+      }
+
       // The concrete collar somebody poured round the pine that comes up
       // through this terrace. The tree itself is planted in `shopPlanting`,
       // below: `pine` is fine to call from here — it is a declaration and it
@@ -10725,10 +11418,20 @@ async function buildJadrija(scene) {
       // Three things in it and not one of them is a monobloc: dark wicker
       // armchairs with white cushions, white barrel poseur tables in Jamnica's
       // livery, and a surfboard leaning against the rail.
+      //
+      // All of them stand on `knGround` and not on `surfaceY`, which is the
+      // second half of the paving change above. `surfaceY` answers with the
+      // SHORE — and the shore climbs 171 mm across this frontage while the
+      // shop's floor is flat, so the chairs at t 242.6 were standing 74 mm
+      // inside the pad before the flags went down and 101 mm inside them
+      // after: a quarter of a 360 mm leg, buried. The terrace kit belongs on
+      // the terrace. `max` and not the floor outright, so anything ever
+      // placed past the apron's own edge still finds the ground.
+      const knGround = (gt, gs) => Math.max(surfaceY(gt, gs), y0 + 0.047);
       const WICK = [0.185, 0.140, 0.108];
       const CUSH = [0.680, 0.672, 0.650];
       const wicker = (wt, ws, ang) => {
-        const gy = surfaceY(wt, ws);
+        const gy = knGround(wt, ws);
         const co = Math.cos(ang), sn = Math.sin(ang);
         const P = (u, v, yy) => W(wt + u * co - v * sn, ws + u * sn + v * co, yy);
         for (const [u, v] of [[-0.24, -0.24], [0.24, -0.24], [-0.24, 0.24],
@@ -10753,11 +11456,26 @@ async function buildJadrija(scene) {
       // has one at arm's length: a white drum about knee to elbow with a small
       // round top, and the print wraps it rather than sitting on a hem.
       const poseur = (pt2, ps2) => {
-        const gy = surfaceY(pt2, ps2);
+        const gy = knGround(pt2, ps2);
         const WH = [0.700, 0.696, 0.680];
-        post(W, pt2, ps2, gy, gy + 1.02, 0.30, WH, shade(WH, 1.10), 14);
-        post(W, pt2, ps2, gy + 1.00, gy + 1.07, 0.40, shade(WH, 1.14),
-          shade(WH, 1.20), 14);
+        // AND IT HAS NEVER DRAWN. `post` takes EIGHT arguments —
+        // `post(P, dt, ds, y0, y1, r, col, sides)` — and both calls here were
+        // written with a `topCol` in the middle of them, so `shade(WH, 1.10)`
+        // landed in `sides`, `i < sides` compared a number with an Array, the
+        // Array coerced to NaN and the loop ran zero times. What has actually
+        // been standing on this terrace since it was furnished is the JAMNICA
+        // hem, in mid-air, wrapped round nothing — see the render at t 232.
+        //
+        // `lathe` is the right call anyway: it takes the drum, the overhang
+        // under the top, the top's edge and the top face in one profile, and
+        // it closes the top with a ring of zero radius, which `post` cannot do
+        // at all. Three other calls in the file have the same nine arguments
+        // and the same silence — the two parasol bases' aggregate fill. They
+        // are not this shop's and are left alone.
+        lathe(W, pt2, ps2, [
+          [gy + 0.004, 0.300], [gy + 1.000, 0.300],
+          [gy + 1.000, 0.400], [gy + 1.070, 0.400], [gy + 1.070, 0.000],
+        ], WH, 14);
         const ring = [];
         for (let i = 0; i < 14; i++) {
           const a2 = (i / 14) * TAU;
@@ -10770,7 +11488,7 @@ async function buildJadrija(scene) {
       // and square where the boardwalk's are pale and round.
       const DKT = [0.135, 0.128, 0.122];
       for (const [ct, cs2] of [[S.t0 + 2.6, S.s0 + 2.1], [S.t0 + 6.9, S.s0 + 1.5]]) {
-        const gy = surfaceY(ct, cs2);
+        const gy = knGround(ct, cs2);
         for (const [u, v] of [[-0.30, -0.30], [0.30, -0.30], [-0.30, 0.30],
           [0.30, 0.30]]) {
           post(W, ct + u, cs2 + v, gy, gy + 0.72, 0.022, DKT, 4);
@@ -10786,11 +11504,40 @@ async function buildJadrija(scene) {
       }
       poseur(S.t0 + 4.7, S.s0 + 0.9);
       poseur(S.t1 - 1.5, S.s0 + 2.6);
+      // The round stone-topped table on a chrome column. `1000150414` at 5:14
+      // has one at arm's length in the bottom corner of the frame with an
+      // ashtray and a glass standing on it — a speckled pale top about 0.68 m
+      // across on a slim bright column and a heavy foot, which is a different
+      // object again from the dark square tables at the other end of this
+      // terrace and from the barrel poseurs beside it. Not `pedestalTable`:
+      // that one is MINI's and is black all through, and the whole of what
+      // makes this one this one is that the column is bright and the top is
+      // stone.
+      {
+        const knTT = S.t0 + 8.9, knTS = S.s0 + 1.2;
+        const knGy = knGround(knTT, knTS);
+        const knCHR = [0.560, 0.566, 0.574];
+        const knTERR = [0.610, 0.590, 0.548];
+        lathe(W, knTT, knTS, [[knGy + 0.004, 0.245], [knGy + 0.028, 0.245],
+          [knGy + 0.046, 0.150]], [0.330, 0.332, 0.340], 12);
+        lathe(W, knTT, knTS, [[knGy + 0.040, 0.045], [knGy + 0.688, 0.045],
+          [knGy + 0.702, 0.092]], knCHR, 10);
+        lathe(W, knTT, knTS, [[knGy + 0.700, 0.340], [knGy + 0.716, 0.348],
+          [knGy + 0.734, 0.340], [knGy + 0.734, 0.000]], knTERR, 16);
+        // The ashtray and the glass, because they are what the frame has on it
+        // and a bare table is the same nothing the counter was.
+        lathe(W, knTT + 0.09, knTS - 0.05, [[knGy + 0.734, 0.060],
+          [knGy + 0.754, 0.066], [knGy + 0.748, 0.048]],
+        [0.470, 0.462, 0.446], 10);
+        post(W, knTT - 0.10, knTS + 0.07, knGy + 0.734, knGy + 0.858, 0.031,
+          [0.735, 0.730, 0.712], 8);
+        furniture.push({ t: knTT, s: knTS, a: 0.36, c: 0.36, h: 0.74, y: knGy });
+      }
       // And a surfboard stood against the end post. `slat` rakes a section in
       // the (inland, up) plane, which is the only way a leaning thing gets
       // drawn in this file — `boxTS` cannot tip.
       {
-        const bt = S.t0 + 0.55, gy = surfaceY(bt, S.s0 + 0.6);
+        const bt = S.t0 + 0.55, gy = knGround(bt, S.s0 + 0.6);
         const BOARD = [0.700, 0.696, 0.682];
         bar(bt - 0.03, bt + 0.03,
           slat(S.s0 + 0.70, gy + 1.05, 0.30, 2.24, 0.55), BOARD,
@@ -12165,8 +12912,14 @@ async function buildJadrija(scene) {
         // them. It is the standard parasol base on this coast and it was a
         // plain grey disc. The rim first, then the fill standing above it.
         post(W, t, s2, yy, yy + 0.15, 0.44, [0.140, 0.128, 0.118], 12);
-        post(W, t, s2, yy + 0.02, yy + 0.19, 0.375, [0.520, 0.492, 0.442],
-          [0.548, 0.518, 0.466], 12);
+        // NINE ARGUMENTS INTO AN EIGHT-ARGUMENT FUNCTION, and it drew nothing.
+        // `post(P, dt, ds, y0, y1, r, col, sides)` has no `topCol`, so the
+        // second colour landed in `sides`, `i < sides` compared a number
+        // against an Array, that coerced to NaN, and the loop ran zero times.
+        // No error, no warning, no geometry: the rim has been standing empty
+        // since it was written. Found by a pass on the konoba's terrace that
+        // hit the same bug on `poseur`'s barrel drums and named these two.
+        post(W, t, s2, yy + 0.02, yy + 0.19, 0.375, [0.520, 0.492, 0.442], 12);
         dome(W, t, s2, yy + 0.19, 0.05, 0.375, [0.545, 0.516, 0.464], 12);
         // The nut on the collar, which is the only bright thing on it.
         post(W, t, s2, yy + 0.19, yy + 0.27, 0.075, [0.480, 0.472, 0.452], 6);
@@ -16777,8 +17530,13 @@ async function buildJadrija(scene) {
     // The foot is the same wheel rim the terrace parasols stand in, poured
     // full of exposed aggregate — see the note on the cafe ones.
     post(P, 0, 0, y, y + 0.13, 0.38, [0.140, 0.128, 0.118], 10);
-    post(P, 0, 0, y + 0.02, y + 0.17, 0.325, [0.520, 0.492, 0.442],
-      [0.548, 0.518, 0.466], 10);
+    // The same nine-into-eight as the cafe ones — see the note there — and on
+    // this one it costs more, because there is no `dome` after it to cap the
+    // fill. Nine hundred parasols have been standing in a hollow rusty ring
+    // with a hole through the middle of it, and from anywhere above the beach
+    // that is nine hundred holes.
+    post(P, 0, 0, y + 0.02, y + 0.17, 0.325, [0.520, 0.492, 0.442], 10);
+    dome(P, 0, 0, y + 0.17, 0.045, 0.325, [0.545, 0.516, 0.464], 10);
     post(P, 0, 0, y + 1.94, y + 2.02, 0.058, POLE, 6);            // the hub
 
     // `u` runs out along a rib, `v` across a panel between two of them.
@@ -33289,6 +34047,7 @@ async function buildJadrija(scene) {
       return !isSea(x, z);
     },
     blockers, local, toWorld, walkY, inField, vik, stoneBays, washLines,
+    openBays, steelBay,
     /**
      * The four trampoline beds, in world metres, and which one you are on.
      *
