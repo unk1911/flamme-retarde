@@ -1624,7 +1624,7 @@ async function buildJadrija(scene) {
    */
   const PRIMER = [0.598, 0.632, 0.660];
   const RUSTY = [0.290, 0.132, 0.058];
-  function doorWear(dc, floor, col, key) {
+  function doorWear(dc, floor, col, key, hand = 1) {
     const h = DOORW * 0.5;
     const chips = [], stains = [];
     // 0.42 of them are sound, and the tail past that is thin: `^1.7` puts the
@@ -1670,8 +1670,14 @@ async function buildJadrija(scene) {
     const rst = jit(key, 823);
     if (rst > 0.22) {
       const k2 = (rst - 0.22) / 0.78;
-      const run = [[dc - h + 0.075, floor + 0.42], [dc - h + 0.115, floor + 1.62],
-        [dc + h - 0.145, floor + 1.00]];
+      // `hand` is which stile carries the hinges, and -1 mirrors all three:
+      // `openDoor` folds its leaf back along the row and half of them end up
+      // hinged on the other edge. A streak has to start under the fitting that
+      // made it or it is a painted stripe, so this follows the ironmongery —
+      // `doorKit` takes the same argument for the same reason.
+      const run = [[dc - hand * (h - 0.075), floor + 0.42],
+        [dc - hand * (h - 0.115), floor + 1.62],
+        [dc + hand * (h - 0.145), floor + 1.00]];
       for (let i = 0; i < run.length; i++) {
         const [t, y] = run[i];
         const d = (0.16 + 0.42 * jit(key * 7 + i, 824)) * (0.45 + 0.55 * k2);
@@ -1694,15 +1700,21 @@ async function buildJadrija(scene) {
       [col[0] + (RUSTY[0] - col[0]) * mx, col[1] + (RUSTY[1] - col[1]) * mx,
         col[2] + (RUSTY[2] - col[2]) * mx]];
   }
-  function door(dc, front, floor, col, louvred, key) {
+  function door(dc, front, floor, col, louvred, key, faceAt, hand = 1) {
     const h = DOORW * 0.5;
     // No hole is cut here — `frontSkin` did that, and it is why any of this is
     // visible at all. The first version of this drew the leaf at `front + 0.04`
     // inside a wall that ran from `front` to the back of the hut, which is to
     // say it drew a door in the middle of a solid block of masonry: what came
     // out was a row of white walls with coloured picture frames on them.
-    const face = front + 0.045;
-    const [chips, stains, rust] = doorWear(dc, floor, col, key | 0);
+    //
+    // Where the leaf's own seaward face lands. Inside the reveal for a shut
+    // door, which is every caller but one: `openDoor` folds its leaf out onto
+    // the render and passes the face it comes to rest on, so that an open bay's
+    // leaf is built, weathered and fitted out by this function rather than by a
+    // second copy of it that would drift away from it.
+    const face = faceAt == null ? front + 0.045 : faceAt;
+    const [chips, stains, rust] = doorWear(dc, floor, col, key | 0, hand);
     /**
      * Lay whatever has failed on the element that was just drawn.
      *
@@ -2192,9 +2204,48 @@ async function buildJadrija(scene) {
    * off that stream — so which huts are open is fixed and nothing downstream of
    * them moves.
    *
-   * The leaf swings INWARD and stands at a right angle in the doorway, which is
-   * what the frame has and is also the only version that costs nothing: a leaf
-   * folded back against the render outside would cover its neighbour's door.
+   * ── AND THE LEAF FOLDS FLAT ON THE RENDER, WHICH IT DID NOT ─────────────
+   *
+   * It used to swing INWARD and stand at a right angle in the doorway, and the
+   * note here said that was the only version costing nothing, because "a leaf
+   * folded back against the render outside would cover its neighbour's door".
+   * Both halves of that are wrong and both are measurable.
+   *
+   * It does not cover the neighbour's door. A bay is 2.15 m and a leaf is
+   * 0.90 m, so one folded flat from its own jamb reaches 1.35 m from the bay's
+   * middle while the neighbour's architrave begins at 1.645 m: 0.295 m clear.
+   *
+   * And the inward leaf could not be seen at all. Painted magenta and shot from
+   * eight standing positions between 1.2 m and 3.6 m out, the WHOLE leaf came
+   * to between 9 and 970 pixels of a 620x760 frame — 0.002% to 0.21% — and
+   * square on at 3 m it was a hairline TEN PIXELS wide. A leaf at a right angle
+   * to the wall is edge-on to everyone standing in front of it; of the 0.70 m
+   * of it that goes into the hut only the 25 mm nearest the face clears the
+   * reveal, and the strip curtain hangs across that. Every chip and streak
+   * `doorWear` could lay on such a leaf would land inside ten pixels.
+   *
+   * f32 settles what it should do instead — the same frame the steel door came
+   * off. The leaf is folded RIGHT BACK, flat on the render beside its own
+   * opening, with a curtain hanging in the empty hole and a clothesline
+   * crossing in front of it. A door lying flat on the OUTSIDE wall is a door
+   * that opens outward, so what faces the promenade is its weather face, which
+   * is the face `doorWear` measured; and it is a 0.90 by 1.98 m painted panel
+   * instead of a hairline. So it goes through `door` like every shut one and
+   * gets its stiles, its louvres, its paint failure and its rust streaks from
+   * the same code rather than from a copy.
+   *
+   * 75 mm off the render, not the 40 to 60 mm a butt hinge alone would give:
+   * the two stone bays stand their crazy paving 64 mm proud (see `crazyFace`)
+   * and a leaf folded onto one at hinge thickness would have flags growing
+   * through it. 75 mm clears the paving by 11 mm and the render skirt by 65.
+   *
+   * `room` is which way it folds, and it folds toward the middle of its run:
+   * the last bay in a run has a gable end on its far side and nothing to fold a
+   * door onto. It carries through `door`, `doorWear` and `doorKit` as `hand`,
+   * so the hinges stay on the stile nearest the opening either way round. Two
+   * open bays can never be neighbours — `oIx` steps by one each bay, so a run
+   * of six goes by between any two zeroes — which is the whole reason two
+   * folded leaves can never be laid on the same piece of render.
    */
   const HANGCOL = [
     // The plastic strip curtain, in the four ribbons the frame names.
@@ -2210,16 +2261,19 @@ async function buildJadrija(scene) {
     [[0.545, 0.500, 0.430], [0.330, 0.288, 0.240], [0.560, 0.516, 0.445],
       [0.300, 0.262, 0.220]],
   ];
-  function openDoor(dc, front, floor, col, kind) {
+  const OPENOFF = 0.075;           // the folded leaf's back, off the render
+  function openDoor(dc, front, floor, col, kind, key, louvred, room) {
     const h = DOORW * 0.5;
-    // The leaf, standing in the doorway at a right angle to the wall. Hinged on
-    // the left, which is the side `doorKit` puts the hinges on.
-    const face = front + 0.045;
-    boxTS(dc - h + 0.012, dc - h + 0.048, face + 0.02, face + 0.72,
-      floor + 0.010, floor + DOORH - 0.010, shade(col, 0.94), col);
-    // A sliver of the back of it, which is never painted the same as the front.
-    boxTS(dc - h + 0.044, dc - h + 0.048, face + 0.02, face + 0.72,
-      floor + 0.010, floor + DOORH - 0.010, shade(col, 0.62));
+    // The leaf, flat on the render one full leaf-width along from its own jamb,
+    // and built by the same function that builds the eighty shut ones.
+    const lt = dc + room * (h + DOORW * 0.5);
+    const fs = front - OPENOFF - 0.032;
+    door(lt, front, floor, col, louvred, key, fs, room);
+    // Hinges, hasp and staple — and no padlock, which is what `doorKit` does
+    // when it is handed no key. The hut is standing open: the lock came off it
+    // and went into somebody's bag, and a padlock shut through the hasp of an
+    // open door is the one thing on this leaf that would read as a mistake.
+    doorKit(lt, front, floor, h, fs - front, undefined, room);
     // And what is hanging in the hole. Six ribbons across 0.88 m, or four wide
     // bands if it is cloth, and the difference between them is only the width:
     // the strips are cut narrow and a curtain is not.
@@ -2373,6 +2427,144 @@ async function buildJadrija(scene) {
     return n;
   }
 
+  /**
+   * The one steel door on the beach.
+   *
+   * f32 is the only frame in the pan that has one, and a scouting pass over the
+   * batch called it the most surprising single object in fifty frames. Against
+   * a hundred metres of painted timber and the occasional white PVC leaf, one
+   * door is a welded steel frame in red oxide with two frosted panes in it,
+   * rusted clean through to bare metal along every horizontal.
+   *
+   * ONE. `bayN === 34`, counted as the bays are drawn, exactly the way the two
+   * stone bays are picked and on the same argument: the survey found one, so
+   * there is one, and it is counted rather than dealt off a modulo that can
+   * come out none or three the day a run gets a hut longer.
+   *
+   * 34 and not 32, which was the first choice and was photographed: 32's
+   * neighbour is one of the fourteen white PVC leaves, and side by side the two
+   * pale doors read as a pair — a bay that upgraded its joinery next to a bay
+   * that upgraded its joinery, which is the opposite of a one-off. 34 is a
+   * front-row bay four along in a seven-hut run with ordinary painted timber
+   * either side of it, neither of the stone pair and none of the three of them
+   * standing open, so the glass has nothing on the row to be mistaken for.
+   *
+   * Measured off f32 as ratios against the sunlit render beside it at
+   * rgb(175, 177, 180), because nothing in that frame is at full value:
+   *
+   *   red oxide, sound        rgb( 98,  60,  62)   0.56 / 0.34 / 0.35
+   *   rusted through, sunlit  rgb(130, 102,  93)   0.74 / 0.58 / 0.52
+   *   rusted through, pitted  rgb( 50,  35,  36)   0.29 / 0.20 / 0.20
+   *   upper pane              rgb(187, 200, 218)   1.07 / 1.13 / 1.21
+   *   lower pane              rgb(123, 123, 115)   0.70 / 0.69 / 0.64
+   *
+   * The upper pane is BRIGHTER than the sunlit wall and pulled hard to blue,
+   * which is what a translucent panel with the sky behind it does, and it is
+   * the whole reason this door carries from down the row: it is the only thing
+   * on a hundred metres of facade lighter than the render. The lower pane is
+   * nothing like it — warm, dull and green — and that reading was taken inside
+   * the mid rail's own shadow, so it is drawn a little above the ratio. What
+   * matters is not the exact value but that the two panes are not the same
+   * glass: one of them has been replaced.
+   *
+   * The paint has gone off the HORIZONTALS and nowhere else, which is where
+   * water stands on a steel section, so it is drawn that way rather than as
+   * scattered patches: the mid rail in f32 has not a trace of red left on it
+   * while the stile 40 mm away is still sound.
+   */
+  const OXIDE = [0.345, 0.209, 0.215];
+  const OXBARE = [0.455, 0.357, 0.320];
+  const OXHALF = [0.406, 0.290, 0.273];
+  const OXPIT = [0.178, 0.123, 0.123];
+  const PANE1 = [0.658, 0.695, 0.744];
+  const PANE2 = [0.470, 0.474, 0.428];
+  function steelDoor(dc, front, floor, key) {
+    const h = DOORW * 0.5;
+    const face = front + 0.045;
+    const S = 0.055;                 // stile and rail: 55 mm of angle section
+    const y0 = floor + 0.010, y1 = floor + DOORH - 0.010;
+    const mid = floor + 0.770;       // the middle rail, 40 mm either side of it
+    const kick = y0 + 0.100;         // the bottom rail
+    // The glass goes in first and the sections lie over it, overlapping by
+    // 12 mm all round. A pane cut exactly to the daylight opening would stand
+    // its four edge faces flush with the frame's four inner ones, which is
+    // eight skimming parallels per light; it is also not how a pane is bedded.
+    const pb = face + 0.012;
+    for (const [ya, yb, pc] of [[mid + 0.040, y1 - S, PANE1],
+      [kick, mid - 0.040, PANE2]]) {
+      boxTS(dc - h + S - 0.012, dc + h - S + 0.012, pb, pb + 0.010,
+        ya - 0.012, yb + 0.012, pc, shade(pc, 1.05));
+    }
+    // The rust down the upper pane. f32 has a broken line of it running the
+    // full height of that light, a hand's width in from the lock stile: water
+    // off the top rail, carrying the rail down with it. The warmest of those
+    // pixels are 0.80 / 0.65 / 0.63 of the clean pane beside them, which is the
+    // same wash `doorWear` measured off the cream door in f26 (0.77 / 0.69 /
+    // 0.60). Rust on this beach is that ratio of whatever it is lying on.
+    const FLECK = [PANE1[0] * 0.80, PANE1[1] * 0.65, PANE1[2] * 0.63];
+    const ft = dc + 0.10 + jit(key, 931) * 0.10;
+    // Jittered along its length and with a fifth of the marks simply missing,
+    // because nine of anything at one spacing is a dashed line and a dashed
+    // line down a pane of glass is a leaded light. What is in f32 is a broken
+    // trail with two long gaps in it.
+    const span = (y1 - S - mid - 0.24) / 9;
+    for (let i = 0; i < 9; i++) {
+      const q = key * 13 + i;
+      if (jit(q, 935) < 0.20) continue;
+      const yv = mid + 0.10 + (i + jit(q, 936) * 0.85) * span;
+      const tv = ft + (jit(q, 932) - 0.5) * 0.05;
+      const w = 0.006 + 0.014 * jit(q, 933);
+      const d = 0.014 + 0.055 * jit(q, 934);
+      // ONE quad, 3 mm proud of the pane, in `wearOn`'s winding — see the note
+      // there for why a mark on a surface is drawn in front of it and not sunk
+      // into it, and why one quad and not a box.
+      b.quad(W(tv - w * 0.5, pb - 0.003, yv), W(tv + w * 0.5, pb - 0.003, yv),
+        W(tv + w * 0.5, pb - 0.003, yv + d), W(tv - w * 0.5, pb - 0.003, yv + d),
+        FLECK);
+    }
+    // The stiles, in two pieces each so that the halves below the mid rail can
+    // go over to rust with it. In f32 the paint dies at that rail and the
+    // sections under it are bare metal all the way to the sill.
+    for (const o of [-1, 1]) {
+      const e0 = dc + o * h, e1 = dc + o * (h - S);
+      const t0 = Math.min(e0, e1), t1 = Math.max(e0, e1);
+      boxTS(t0, t1, face, face + 0.032, mid, y1, OXIDE, shade(OXIDE, 1.10));
+      boxTS(t0, t1, face, face + 0.032, y0, mid, OXHALF, OXBARE);
+    }
+    boxTS(dc - h, dc + h, face, face + 0.032, y1 - S, y1,
+      OXIDE, shade(OXIDE, 1.10));
+    // And the two horizontals, on neither of which is there any red oxide left.
+    // `OXPIT` on top rather than underneath: the pitted, near-black end of the
+    // range is what stands on the upward face of a rusted rail, and it is the
+    // face the sun is on, so putting it there is the difference between a rail
+    // that has rotted and a rail that is merely a darker brown.
+    boxTS(dc - h, dc + h, face, face + 0.032, mid - 0.040, mid + 0.040,
+      OXBARE, OXPIT);
+    boxTS(dc - h, dc + h, face, face + 0.032, y0, kick, OXBARE, OXPIT);
+    // The lock block: a plate welded to the closing stile with the handle gone
+    // off it and the cylinder still in. f32 has exactly that — a small pale
+    // rose with an empty spindle hole in it and a keyway 80 mm under.
+    //
+    // It is wider than the 55 mm stile it is on, which is what f32 shows and is
+    // why the first cut of it hung 15 mm off the EDGE of the leaf: a plate
+    // centred on a narrow stile has to grow INWARD, over the pane, and not both
+    // ways. So it runs from 28 mm inboard of the stile to 4 mm short of the
+    // leaf's own edge, and the four pieces of it are each bedded into the piece
+    // behind rather than laid flush on it, so no two of them share a plane and
+    // the nearest pair of parallels — the plate's back and the pane's front —
+    // are 6 mm apart.
+    const lk = dc + h - S * 0.5 - 0.012;
+    boxTS(dc + h - S - 0.028, dc + h - 0.004, face - 0.008, face + 0.006,
+      floor + 0.845, floor + 1.175, OXHALF, OXBARE);
+    const ROSE = [0.520, 0.522, 0.508];
+    boxTS(lk - 0.028, lk + 0.028, face - 0.022, face - 0.004,
+      floor + 1.030, floor + 1.058, ROSE, shade(ROSE, 1.12));
+    boxTS(lk - 0.011, lk + 0.011, face - 0.026, face - 0.018,
+      floor + 1.033, floor + 1.055, [0.055, 0.052, 0.050]);
+    boxTS(lk - 0.010, lk + 0.010, face - 0.016, face - 0.004,
+      floor + 0.930, floor + 0.968, [0.080, 0.076, 0.072]);
+  }
+
   /** A white PVC door: one leaf, two mouldings, no louvres and no paint. */
   function pvcDoor(dc, front, floor) {
     const h = DOORW * 0.5;
@@ -2445,17 +2637,25 @@ async function buildJadrija(scene) {
   // hangs on is a wider hasp.
   const LOCKB = [[0.360, 0.298, 0.148], [0.445, 0.450, 0.458]];
   const SHACK = [0.400, 0.408, 0.416];
-  function doorKit(dc, front, floor, half, depth, key) {
+  function doorKit(dc, front, floor, half, depth, key, hand = 1) {
     const IRON = [0.190, 0.178, 0.166];
     const f = front + depth;
+    // `hand` mirrors the lot, for the leaves `openDoor` folds back the other
+    // way along the row: the hinges belong on the stile nearest the opening
+    // whichever side of it the leaf came to rest. `boxTS` wants its t range in
+    // order and a mirrored offset arrives out of order, which is what `T` is
+    // for and why these are not four literals any more.
+    const T = (d0, d1) => [Math.min(dc + hand * d0, dc + hand * d1),
+      Math.max(dc + hand * d0, dc + hand * d1)];
     for (const y of [floor + 0.42, floor + 1.62]) {
-      boxTS(dc - half + 0.03, dc - half + 0.20, f - 0.021, f - 0.004, y, y + 0.075, IRON);
+      const [g0, g1] = T(-half + 0.03, -half + 0.20);
+      boxTS(g0, g1, f - 0.021, f - 0.004, y, y + 0.075, IRON);
     }
     // Hasp and staple on the swinging side, at the height a hand finds it.
-    boxTS(dc + half - 0.20, dc + half - 0.05, f - 0.024, f - 0.004,
-      floor + 1.00, floor + 1.07, IRON);
-    boxTS(dc + half - 0.13, dc + half - 0.09, f - 0.061, f - 0.022,
-      floor + 0.99, floor + 1.09, IRON);
+    const [p0, p1] = T(half - 0.20, half - 0.05);
+    boxTS(p0, p1, f - 0.024, f - 0.004, floor + 1.00, floor + 1.07, IRON);
+    const [q0, q1] = T(half - 0.13, half - 0.09);
+    boxTS(q0, q1, f - 0.061, f - 0.022, floor + 0.99, floor + 1.09, IRON);
     // ── AND THE LOCK THAT GOES THROUGH IT ────────────────────────────────────
     //
     // The hasp and the staple were drawn and the padlock never was, which is a
@@ -2474,7 +2674,7 @@ async function buildJadrija(scene) {
     // him. Off `jit` and the bay index, so it is fixed for the life of the seed
     // and costs the beach no draw of `rng`.
     if (jit(key, 918) < 0.13) return;
-    const px = dc + half - 0.110;    // the staple's own centre
+    const px = dc + hand * (half - 0.110);   // the staple's own centre
     const py = floor + 0.898;
     const body = LOCKB[jit(key, 917) < 0.5 ? 0 : 1];
     boxTS(px - 0.027, px + 0.027, f - 0.072, f - 0.048, py, py + 0.068,
@@ -2725,7 +2925,11 @@ async function buildJadrija(scene) {
       // there are TWO, so there are two, and they are counted.
       bayN++;
       const stone = bayN === 17 || bayN === 52;
+      // And the one steel-framed glazed leaf. Counted, not hashed — see
+      // `steelDoor` for why 34 and why exactly one.
+      const steel = bayN === 34;
       if (stone) stoneBays.push([+dc.toFixed(1), +front.toFixed(1)]);
+      if (steel) steelBay.push([+dc.toFixed(1), +front.toFixed(1)]);
       if (stone) crazyFace(a, c, dc, front, fl, eave, DOORW * 0.5, k + (t0 | 0));
       else plaster(a, front, fl, eave, wash, k + (t0 | 0), dc);
       b = up;
@@ -2771,8 +2975,28 @@ async function buildJadrija(scene) {
       // upgraded it at all. The hash lets two land side by side, which f65 has,
       // and lets twenty-six bays go by without one.
       const pvc = stone || (oIx !== 0 && jit(key, 913) < 0.20);
-      if (oIx === 0) {
-        openDoor(dc, front, fl, col, (k * 3 + (t0 | 0)) % 4);
+      // What the rail, the vent and the architrave are painted. Hoisted out of
+      // the three calls at the foot of this block because there are now three
+      // kinds of joinery in a bay and not two, and a third ternary written out
+      // three times is where the fourth one goes wrong. The steel bay carries
+      // its own frame right round the opening — jambs, head and transom are one
+      // welded thing on a door like that, which is what makes it a steel-FRAMED
+      // door rather than a steel leaf in somebody's timber frame.
+      const railCol = steel ? shade(OXIDE, 0.86)
+        : pvc ? [0.605, 0.608, 0.608] : shade(col, 0.86);
+      const trimCol = steel ? OXIDE : pvc ? [0.640, 0.642, 0.642] : col;
+      if (steel) {
+        steelDoor(dc, front, fl, key);
+      } else if (oIx === 0) {
+        openBays.push([+dc.toFixed(1), +front.toFixed(1)]);
+        // The leaf folds toward the middle of the run: the last bay in one has
+        // a gable end on its far side and no render to fold a door onto. The
+        // style and the wear key are the same expressions the shut doors below
+        // use, so an open bay's leaf is dealt out of the bay index exactly as
+        // its neighbours' are — see `openDoor`.
+        openDoor(dc, front, fl, col, (k * 3 + (t0 | 0)) % 4,
+          k * 31 + (t0 | 0) * 7, (k * 5 + (t0 | 0)) % 3 !== 0,
+          k < n - 1 ? 1 : -1);
       } else if (pvc) {
         // A PVC bay has no hasp: the whole of the improvement is that somebody
         // replaced the joinery, and a painted hasp on a PVC leaf would undo it.
@@ -2789,12 +3013,10 @@ async function buildJadrija(scene) {
       // `pvc` and not `stone`. f24 is the clearest: a peach wall, a grey lintel
       // and every millimetre of joinery in it white.
       boxTS(dc - DOORW * 0.5, dc + DOORW * 0.5, front + 0.010, front + REVEAL,
-        fl + DOORH, fl + OPENH - VENTH,
-        pvc ? [0.605, 0.608, 0.608] : shade(col, 0.86));
-      vent(dc, front, fl + OPENH - VENTH, DOORW - 0.06,
-        pvc ? [0.640, 0.642, 0.642] : col, (k * 5 + (t0 | 0) * 3) % 3);
-      surround(dc, front, fl, pvc ? [0.640, 0.642, 0.642] : col,
-        DOORW * 0.5, fl + OPENH + 0.045);
+        fl + DOORH, fl + OPENH - VENTH, railCol);
+      vent(dc, front, fl + OPENH - VENTH, DOORW - 0.06, trimCol,
+        (k * 5 + (t0 | 0) * 3) % 3);
+      surround(dc, front, fl, trimCol, DOORW * 0.5, fl + OPENH + 0.045);
       // And a line of washing across one shut bay in nine.
       if (oIx !== 0 && (k * 4 + (t0 | 0)) % 9 === 0) {
         clothesline(a, c, front, fl, k + (t0 | 0));
@@ -3338,6 +3560,16 @@ async function buildJadrija(scene) {
   // position, so finding one to stand in front of meant walking the whole
   // block. `__fr.jad.raw().washLines` — [t of the bay centre, s of the row].
   const washLines = [];
+  // And where the open ones are. `oIx` is a modulo on the bay index and the
+  // run's own t, so which bays stand open is fixed but is not a position you
+  // can work out on paper — finding one to photograph meant walking a hundred
+  // metres of row. `__fr.jad.raw().openBays` — [t of the bay centre, s of the
+  // row], same shape as `stoneBays`.
+  const openBays = [];
+  // And the single steel-framed bay, for the same reason — "the 34th bay in the
+  // block" is not somewhere anybody can go and stand.
+  // `__fr.jad.raw().steelBay`.
+  const steelBay = [];
   const kabFrom = squareRow(JAD.rowA, JAD.cabW * KAB.bays);
   for (const [front, phase] of [[JAD.rowA, 0], [JAD.rowB, JAD.cabW * 0.5]]) {
    for (const [tA, tB] of JAD.rows) {
@@ -33289,6 +33521,7 @@ async function buildJadrija(scene) {
       return !isSea(x, z);
     },
     blockers, local, toWorld, walkY, inField, vik, stoneBays, washLines,
+    openBays, steelBay,
     /**
      * The four trampoline beds, in world metres, and which one you are on.
      *
