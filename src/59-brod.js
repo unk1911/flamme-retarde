@@ -2249,8 +2249,54 @@ function buildBrod(scene) {
     const ox = A.along[0], oz = A.along[1];
     const sgn = A.side;
     const px = A.athw[0] * sgn, pz = A.athw[1] * sgn;
-    const bx = hx - ox * BERTH_IN + px * (A.w + 2.35);
-    const bz = hz - oz * BERTH_IN + pz * (A.w + 2.35);
+    /**
+     * HOW FAR OFF THE PIER SHE LIES, AND SHE WAS INSIDE IT.
+     *
+     * This was `A.w + 2.35`, and the note it was carrying said she lay 2.35 m
+     * off the coping. She did not. `A.w + 2.35` is the offset of her
+     * CENTRELINE from the pier's, and the pier is six metres wide — so 2.35
+     * was measured off the middle of the masonry and there is another three
+     * metres of it between there and the water.
+     *
+     * Measured on the built page rather than argued, by walking every vertex
+     * of both meshes into the pier's own (u, v) frame:
+     *
+     *     u        her port extreme      the pier's face
+     *     24 m     v 1.82                v 3.00
+     *     28 m     v 1.66                v 3.00
+     *     32 m     v 1.59                v 3.00
+     *     36 m     v 1.65                v 3.00
+     *     40 m     v 1.74                v 3.00
+     *
+     * She was through the wall by 1.2 to 1.4 m for twenty metres of her
+     * length: her plating inside the masonry from the keel up, her port tyres
+     * buried in it to the axle, and her bulwark hanging a metre and a third
+     * over the coping. It is not visible from most angles only because she
+     * occludes the thing she is standing in; from the coping looking aft it
+     * is the pier ending in her topsides.
+     *
+     * SO THE OFFSET IS DERIVED NOW AND NOT TYPED. `brodFendOut()` is the
+     * outermost point of anything on her side — the widest tyre, at 3.779 m
+     * off her centreline, 52 mm proud of her own bulwark. The mole's rubbing
+     * baulk is a 0.24 m timber bedded on the coping at `w − 0.10`, so its
+     * outer face stands 0.02 m proud of the stone: that is what she bears on
+     * and that is what the clearance is measured to.
+     *
+     * 0.03 m of daylight and not zero. Rule 5 wants 3 mm between parallel
+     * faces; a torus tangent to a wall is not that, but a tyre that is exactly
+     * touching is a tyre one wave away from being inside — and 30 mm at 27 m
+     * of boat is a tyre bearing on a baulk, which is what it has to look like.
+     *
+     * What comes out is `A.w + 3.83`, and the geometry that follows from it:
+     * her bulwark 0.10 m outboard of the coping edge instead of 1.33 m over
+     * it, her boarding gate 0.31 m off the stone, and 0.15 m of air between
+     * her topside and the mole's own hanging fender.
+     */
+    const BAULK = 0.02;                      // the timber, proud of the coping
+    const BEAR = 0.03;                       // and what is left between them
+    const OFF = A.w + BAULK + BEAR + brodFendOut();
+    const bx = hx - ox * BERTH_IN + px * OFF;
+    const bz = hz - oz * BERTH_IN + pz * OFF;
     berth = { x: bx, z: bz, yaw: yawOfX(ox, oz) };
     dock = { x: hx - ox * BERTH_IN + px * (A.w - 1.4),
       z: hz - oz * BERTH_IN + pz * (A.w - 1.4), y: A.top };
@@ -2683,7 +2729,8 @@ function buildBrod(scene) {
    * Port because that is the rail the pier is against, and it is worth being
    * exact about why, because this was wrong and the comment that was here was
    * the reason it stayed wrong. She lies bow-out, offset from the pier's
-   * centreline by `w + 2.35` on the side the pier's fittings are on — so the
+   * centreline by the width of the pier plus her own fenders, on the side the
+   * pier's fittings are on — see the berth in `moor` — so the
    * pier is on the hand a boat bow-out has to *its own port*, whatever face of
    * the pier that is. This said "starboard because that is the side the mole
    * is on", asserted rather than derived, and it had you stepping over her and
