@@ -164,6 +164,38 @@ const RUNS = [
 ];
 
 const LANE_COL = {
+  /*
+   * EVERY FLAT GROUND COLOUR IN HERE IS AN ALBEDO, NOT A PHOTOGRAPH.
+   *
+   * This block used to hold the numbers straight off the frames, and it was
+   * wrong in a way no amount of re-reading the frames could show, because the
+   * error is not in the frames. A photograph of concrete under a Dalmatian sky
+   * ALREADY CONTAINS THAT SKY. Feed it back in as an albedo and the renderer
+   * adds the sky a second time.
+   *
+   * Measured rather than argued. The pour was built flat at its own constant,
+   * 1.000:0.969:0.929, and photographed from directly above at t 277 with the
+   * strip masked off exactly (paint it magenta, threshold the frame, keep the
+   * mask — 67,372 px of nothing but lane). It came back 1.000:1.054:1.114.
+   * So this surface renders
+   *
+   *     T = [1.000, 1.088, 1.199]
+   *
+   * against its own albedo: eight per cent green-heavy and TWENTY per cent
+   * blue-heavy. A warm concrete at R/B 1.076 leaves the screen at 0.898. The
+   * lane was not a cool grey because anybody chose one; it was a warm grey with
+   * the sky counted twice.
+   *
+   * So every flat number below is now the albedo that RENDERS at what the walk
+   * measured, which is the frame value divided by T. They look absurd on the
+   * page — the pour is a pale terracotta — and they are correct on the screen.
+   * Check them by shooting, never by reading.
+   *
+   * The masonry is NOT corrected. T was calibrated on an up-facing surface,
+   * which takes the whole sky hemisphere; a wall takes half of it and has its
+   * own transform. `render`, `renderCap`, `stone`, `core`, `iron` and `steel`
+   * are still frame values and still owe this same measurement.
+   */
   // The carriageway.
   //
   // Measured as a RATIO and not as a number, which is the lesson the lavender
@@ -177,21 +209,35 @@ const LANE_COL = {
   // 0.348,0.338,0.318, and that difference is the point of building it: the
   // apron is twenty summers of asphalt and warm-grey, the lane is concrete and
   // cool-grey, and the seam between them is where the resort stops.
-  road: [0.452, 0.438, 0.420],
+  road: [0.4930, 0.4309, 0.3703],
   // The crown, a shade darker. `a_024` has the wheel tracks and the middle
   // within one count of each other, so this is deliberately almost nothing —
   // 4%, which is a line you notice and cannot measure. Anything more is a
   // painted centre stripe, and this lane has none.
-  crown: [0.434, 0.420, 0.403],
+  crown: [0.4729, 0.4133, 0.3552],
+  // The earth, tracked onto the pour — and this is the ground's single largest
+  // surface, not a detail laid on it.
+  //
+  // Classified by red-over-blue across eight frames of the walk, the ground out
+  // here falls in three populations and not two: cool pour at 1.000:0.985:0.982
+  // for 34% of it, red earth at 1.000:0.825:0.634 for 21%, and BETWEEN those,
+  // at 1.000:0.923:0.837, forty-four per cent of every frame. The build had one
+  // per cent of that middle. Pour and earth met at a polygon edge and nothing
+  // crossed it, which is why the ground read as two paints and not as a place.
+  //
+  // So this is the middle, held at the pour's own luminance less 4% — dust
+  // darkens concrete a little — and carried a shade past the measured ratio to
+  // 1.000:0.900:0.800, because it is the far end of a blend and not its mean.
+  tracked: [0.5090, 0.4072, 0.3141],
   // The limestone edging. Warmer and darker than the pour it is laid against —
   // 174,161,144 off `a_036`, which against that frame's carriageway is about
   // 0.94 : 0.92 : 0.90.
-  kerb: [0.442, 0.412, 0.372],
+  kerb: [0.4821, 0.4053, 0.3280],
   joint: [0.352, 0.330, 0.300],
   // Lumps of the old surface lying off the seaward edge. The apron already has
   // these and for the same reason: an edge somebody laid is straight and an
   // edge that broke is not.
-  crumb: [0.396, 0.382, 0.364],
+  crumb: [0.4319, 0.3758, 0.3209],
   // Render on the west boundary's base wall. A newer wall than the lane wall
   // down at s 29.2, so a little paler than its 0.615.
   render: [0.648, 0.630, 0.592],
@@ -220,8 +266,8 @@ const LANE_COL = {
   // The worn dust of the apron itself, where the tyres have taken the needles
   // off. The resort's own track is drawn in these; the same four, because it is
   // the same dirt.
-  dust: [[0.520, 0.470, 0.392], [0.545, 0.492, 0.410],
-    [0.498, 0.452, 0.378], [0.560, 0.508, 0.428]],
+  dust: [[0.5672, 0.4624, 0.3456], [0.5944, 0.4840, 0.3615],
+    [0.5432, 0.4447, 0.3333], [0.6108, 0.4998, 0.3774]],
 };
 
 /**
@@ -427,7 +473,21 @@ function buildBackLane(scene, jad, city) {
         // A pour is not one colour along its length either. 5%, which is the
         // width of the band the three frames disagree over.
         const g = 0.955 + jit(k * 7 + c, 305) * 0.095;
-        const col = [base[0] * g, base[1] * g, base[2] * g];
+        // And it is not one colour ACROSS, which is the whole of what was wrong
+        // with it. See `tracked`. The earth comes up onto the pour at both long
+        // edges — hard at the seaward one, because that is the side the cars
+        // cross — so the colour ramps in from each edge, and the strength of
+        // the ramp wanders along the lane in two octaves. Patchy and not two
+        // ruled stripes: a lane is dirtiest where somebody turned on it.
+        const u = (c + 0.5) / NC;
+        const along = 0.40 + 0.62
+          * (0.66 * jit(k, 317) + 0.34 * jit(k >> 2, 318));
+        const wash = Math.min(0.90, along
+          * (Math.max(0, 1 - u / 0.42)
+            + Math.max(0, 1 - (1 - u) / 0.28) * 0.66));
+        const col = [base[0] * g * (1 - wash) + LANE_COL.tracked[0] * wash,
+          base[1] * g * (1 - wash) + LANE_COL.tracked[1] * wash,
+          base[2] * g * (1 - wash) + LANE_COL.tracked[2] * wash];
         b.quad(P(t, a0, gY(t, a0) + LANE.lift),
           P(t1, a0, gY(t1, a0) + LANE.lift),
           P(t1, a1, gY(t1, a1) + LANE.lift),
