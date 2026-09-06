@@ -36176,6 +36176,18 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * Everybody, flattened once.
+   *
+   * The list does not change after the build and every walker needs all of it
+   * on every frame, so a `flatMap` per walker would be twenty-seven throwaway
+   * arrays a frame for a constant. Lazy because `crowds` is filled after this
+   * closure is made.
+   */
+  let folkFlat = null;
+  const allFolk = () => (folkFlat
+    || (folkFlat = Object.values(crowds).flatMap((c) => c.figures)));
+
+  /**
    * Walk the walkers, then pose everybody.
    *
    * The randomness here runs at frame rate rather than at build, which is a
@@ -36261,9 +36273,39 @@ async function buildJadrija(scene) {
       // Step around you rather than through you. This is what pays for taking
       // the walkers out of the blocker list: a figure that yields is better
       // than a box that stops you, but only if it actually yields.
+      //
+      // AND AROUND EACH OTHER, which this promised and never did. `CROWD.clear`
+      // has carried the words "being brushed past is fine and being walked
+      // through is not" since it was written, and the test underneath it only
+      // ever named `pt`/`ps` — the player. Measured before touching it: over
+      // eighteen seconds of promenade, 11.2 pairs of bodies overlapped per
+      // sample, and the closest approach between two adults was 0.074 m against
+      // radii summing to 0.459. One walked through the other.
+      //
+      // The yield is the same mechanism, not a second one: everybody already
+      // carries a lateral `off` in the shore frame, so avoiding a person is
+      // avoiding a number. The pushes sum, so a walker threading a group leans
+      // away from all of it rather than snapping between two of them.
       const here = w.lane + w.off;
-      if (Math.abs(w.t - pt) < 1.7 && Math.abs(here - ps) < CROWD.clear) {
-        w.off = clamp(w.off + (here >= ps ? 1 : -1) * dt * 1.7, -1.5, 1.5);
+      let push = (Math.abs(w.t - pt) < 1.7 && Math.abs(here - ps) < CROWD.clear)
+        ? (here >= ps ? 1 : -1) * 1.7 : 0;
+      for (const f of allFolk()) {
+        if (f === w) continue;
+        const dts = f.t - w.t;
+        if (dts > CROWD.near || dts < -CROWD.near) continue;
+        const gap = here - (f.lane + (f.off || 0));
+        if (gap > CROWD.body || gap < -CROWD.body) continue;
+        // Somebody you are walking AT, not somebody you have already passed.
+        const ahead = dts * w.dir > -0.25 ? 1 : 0.3;
+        // Dead level is the one case a sign test cannot answer — both would
+        // pick the same way and neither would ever clear. Break it on the seed
+        // they were built with, which is stable and is not a draw (rule 4).
+        const side = Math.abs(gap) > 0.02 ? (gap >= 0 ? 1 : -1)
+          : (w.seed < (f.seed || 0) ? -1 : 1);
+        push += side * ahead * 1.25 * (1 - Math.abs(gap) / CROWD.body);
+      }
+      if (push !== 0) {
+        w.off = clamp(w.off + clamp(push, -2.4, 2.4) * dt, -1.5, 1.5);
       } else {
         w.off -= w.off * Math.min(1, dt * 1.1);
       }

@@ -43,6 +43,19 @@ const CROWD = {
   // than an arm's length, because being brushed past is fine and being walked
   // through is not.
   clear: 1.15,
+  // And how close two of THEM get, which is a different number and was missing
+  // entirely — the line above promised "being walked through is not [fine]"
+  // and the promise was only ever kept about the player.
+  //
+  // Measured rather than chosen: the collision radii this crowd carries sum to
+  // 0.46-0.64 m between two adults, so 0.70 is a shoulder's clearance and not
+  // a corridor. Strangers pass each other far closer than they pass you, which
+  // is why this is not `clear`.
+  body: 0.70,
+  // How far up the shore a walker looks for somebody to step round. Two metres
+  // at a stroll is a second and a half of warning, which is about when a person
+  // actually starts to drift.
+  near: 2.0,
 };
 
 // How far an arm hangs out from the body at rest. Zero is a soldier at

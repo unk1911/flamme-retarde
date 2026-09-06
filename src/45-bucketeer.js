@@ -78,6 +78,8 @@ const BUCK = {
   // she was humming through two-thirds of every minute, which is not somebody
   // humming to herself, it is a radio. 3.2 + 0-5.0 puts her at 35-58%, so
   // there is more silence than tune and the gulls have somewhere to land.
+  // OFF until there is a real song to put in it — see the call site.
+  hum: false,
   humGap: 3.2,
   humJit: 5.0,
 
@@ -1099,13 +1101,18 @@ async function buildBucketeer(scene, vik, walkY) {
     placePail();
     placeWater(dt);
 
-    // And the humming. One phrase at a time, with the distance read afresh for
-    // each — she covers two metres in a phrase and the level is fixed when it
-    // is scheduled, which is an error nobody can hear. A watchdog fed every
-    // frame would track her exactly and would also be a second sequencer in a
-    // file that already has one.
+    // And the humming, WHICH IS OFF.
+    //
+    // It read as chords rather than as a person. One oscillator stepping its
+    // pitch inside one breath is the right shape for a hum and it is what the
+    // synthesiser does; what it is not is a tune somebody could be humming,
+    // and a written four-bar phrase with a call and an answer sounds composed
+    // — because it was. `BUCK.hum` is the switch and everything under it is
+    // left standing, including "Buckasteers of America" in `HUM_A`/`HUM_B`,
+    // because the intent is to replace the melody with a real one rather than
+    // to take her voice away.
     st.humAt -= dt;
-    if (st.humAt <= 0 && audio && state.phase !== 'intro') {
+    if (BUCK.hum && st.humAt <= 0 && audio && state.phase !== 'intro') {
       // A little under her breath while she is tipping ten kilos out, which is
       // the one moment in the loop nobody hums through.
       const len = audio.hum(Math.sqrt(d2), st.phase === 'tip' ? 0.45 : 1);
