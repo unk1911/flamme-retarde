@@ -3112,13 +3112,47 @@ async function buildJadrija(scene) {
     // row is built in 2.15 m modules and a roof that changes direction where
     // the huts do is a roof, where one that changes direction every 1.5 m is a
     // polyline that happens to be near some huts.
-    const nR = Math.max(1, Math.ceil((T1 - T0) / JAD.cabW));
-    for (const [sa, sb, ya, yb] of [[e0, mid, eave, ridge], [mid, e1, ridge, eave]]) {
-      for (let i = 0; i < nR; i++) {
-        const a0 = T0 + (T1 - T0) * (i / nR), a1 = T0 + (T1 - T0) * ((i + 1) / nR);
-        b.quad(W(a0, sa, ya), W(a1, sa, ya), W(a1, sb, yb), W(a0, sb, yb), roofCol);
-        b.quad(W(a0, sb, yb - 0.09), W(a1, sb, yb - 0.09),
-          W(a1, sa, ya - 0.09), W(a0, sa, ya - 0.09), [0.145, 0.135, 0.125]);
+    // ── AND IT STOPS AT THE CAFE, WHICH IS THE THIRD PLACE THIS WAS WRITTEN ──
+    //
+    // The note further down says it in so many words — "geometry and collision
+    // written in two places, and only one of them told about the exception" —
+    // and there were three. The huts through Caffe TRAMPULIN are skipped bay
+    // by bay in the k loop (`cafeBlocks`) and the blocker is split in
+    // `pushRun`; this roof was neither. It is drawn per RUN, from `T0` to `T1`
+    // in one sweep, so both rows laid a full pitched ribbon straight over the
+    // one building on this shore they had been carved out of — nine metres of
+    // kabina roof with no kabine under it, hanging over the cafe's terrace.
+    //
+    // What it cost: `JAD.rowA` is 17.2 and `cabEave` 0.10, so that ribbon's
+    // seaward edge is at s 17.10 — SEVENTY CENTIMETRES further out than
+    // Trampulin's own canopy front at 17.80, and above it. Standing anywhere
+    // on that terrace the roof you were looking up at was the kabine's, and
+    // the cane mat, its frame and its whole fringed eave were behind it. Two
+    // cuts of the fringe were built, measured and photographed against the sky
+    // before this was found: the eave line never moved because it was never
+    // the eave.
+    //
+    // Split at `EAST_CAFE` on the same test the huts and the blocker use, and
+    // capped at each cut so the ribbon ends as a gable and not as paper.
+    for (const [ra, rc] of cafeBlocks(T0, T1, front)
+      ? [[T0, EAST_CAFE.t0], [EAST_CAFE.t1, T1]] : [[T0, T1]]) {
+      if (rc - ra < 0.15) continue;
+      const nR = Math.max(1, Math.ceil((rc - ra) / JAD.cabW));
+      for (const [sa, sb, ya, yb] of [[e0, mid, eave, ridge], [mid, e1, ridge, eave]]) {
+        for (let i = 0; i < nR; i++) {
+          const a0 = ra + (rc - ra) * (i / nR), a1 = ra + (rc - ra) * ((i + 1) / nR);
+          b.quad(W(a0, sa, ya), W(a1, sa, ya), W(a1, sb, yb), W(a0, sb, yb), roofCol);
+          b.quad(W(a0, sb, yb - 0.09), W(a1, sb, yb - 0.09),
+            W(a1, sa, ya - 0.09), W(a0, sa, ya - 0.09), [0.145, 0.135, 0.125]);
+        }
+      }
+      // The cut ends only. `T0` and `T1` already get a gable and an end wall
+      // below; these are the two faces the split made, and they close on to
+      // nothing, so they get the triangle and no wall.
+      for (const [T, o] of [[ra, -1], [rc, 1]]) {
+        if (T === T0 || T === T1) continue;
+        const A = W(T, e0, eave), B = W(T, mid, ridge), C = W(T, e1, eave);
+        if (o > 0) b.tri(A, B, C, TRIM); else b.tri(C, B, A, TRIM);
       }
     }
     for (const [T, o] of [[T0, -1], [T1, 1]]) {
@@ -4998,15 +5032,36 @@ async function buildJadrija(scene) {
     const oa = S.t0 + (S.t1 - S.t0) * 0.18, oc = S.t1 - (S.t1 - S.t0) * 0.18;
     // Rafters under the canopy, and the gutter along its front edge.
     if (fs != null) {
+      // Dark steel under a cane mat, terracotta under a canvas. `20260821_174947`
+      // is taken from under Caffe TRAMPULIN's canopy looking up and the frame is
+      // black — these rafters were `shade(S.roof, 0.82)`, which on that shop is
+      // 0.82 of the pantile terracotta, so the grid overhead was the colour of
+      // a roof tile.
       for (let t = S.t0 - 0.2; t <= S.t1 + 0.21; t += 1.15) {
         boxTS(t - 0.035, t + 0.035, fs + 0.10, S.s0 - 0.05,
-          top - 0.22, top - 0.17, shade(S.roof, 0.82));
+          top - 0.22, top - 0.17,
+          S.reed ? [0.098, 0.100, 0.098] : shade(S.roof, 0.82));
       }
+      // ── AND NO GUTTER ON A REED ROOF ────────────────────────────────────
+      //
       // Along the *top* of the canopy edge. Across its face is where the sign
       // is, and a gutter there is a gutter over the name of the shop.
-      boxTS(S.t0 - 0.45, S.t1 + 0.45, fs - 0.06, fs + 0.06,
-        top + 0.02, top + 0.11, STEEL);
-      boxTS(S.t0 - 0.42, S.t0 - 0.34, fs - 0.05, fs + 0.05, y0, top + 0.02, STEEL);
+      //
+      // This 0.09 m pale steel box stood at top+0.02…top+0.11 — eight to
+      // seventeen centimetres ABOVE the canvas it drains, straddling the front
+      // edge at fs±0.06 — and it is what you have been seeing as the eave of
+      // Caffe TRAMPULIN from every position on that terrace. The reed fringe
+      // was built, drawn, and completely hidden behind it: from above the
+      // teeth are plainly there and from the apron the skyline is a straight
+      // pale rail. Neither photograph of that terrace has a gutter on it, and
+      // a cane mat is not a surface anybody plumbs — the water goes through
+      // it. See `reed` in SHOPS.
+      if (!S.reed) {
+        boxTS(S.t0 - 0.45, S.t1 + 0.45, fs - 0.06, fs + 0.06,
+          top + 0.02, top + 0.11, STEEL);
+        boxTS(S.t0 - 0.42, S.t0 - 0.34, fs - 0.05, fs + 0.05, y0, top + 0.02,
+          STEEL);
+      }
     }
     // The serving counter, and the mullions standing in the opening. Skipped
     // on a `solid` frontage, which has neither because it has no opening.
@@ -5816,7 +5871,23 @@ async function buildJadrija(scene) {
     const SCREED = [0.455, 0.448, 0.428];
     const KERB = [0.520, 0.512, 0.488];
     const a = S.t0 - 0.30, c = S.t1 + 0.30;
-    const s0 = (S.awn ? S.s0 - S.awn : S.s0) + 0.30, s1 = S.s1 + 0.30;
+    // ── AND IT STOPS AT THE WALL WHERE THE TERRACE HAS ITS OWN ROOF ────────
+    //
+    // On this boardwalk the awning IS the building's leading edge — the screed
+    // runs out over it and the kerb caps the whole thing, which is right for
+    // H2O and the slastičarnica. Caffe TRAMPULIN is not built that way and the
+    // photographs say so twice: its terrace stands under a separate cane roof
+    // on its own posts, and the render wall carries on up behind it to the
+    // shop's own eaves.
+    //
+    // What the shared rule did there was stand a 0.13 m pale kerb at fs+0.30,
+    // 0.25 m above the mat and a third of a metre behind its edge — so from
+    // anywhere on the apron the eave you saw against the sky was a straight
+    // grey upstand and not the reed at all. Standing at the counter, camera at
+    // 1.2 m, the kerb subtends 37.0° and the mat's fringe 37.0°: the two are
+    // exactly level, which is why the fringe could be built and still be
+    // invisible from every viewpoint that matters. See `reed` in SHOPS.
+    const s0 = (S.awn && !S.reed ? S.s0 - S.awn : S.s0) + 0.30, s1 = S.s1 + 0.30;
     const key = S.t0 | 0;
 
     // The screed, in bays, each one a shade off its neighbour — which is what
@@ -12431,20 +12502,23 @@ async function buildJadrija(scene) {
       // the top. The game drew the skin and nothing else, so from a chair on
       // this terrace the shade overhead was one unbroken sheet.
       //
-      // Heights: the skin's front edge undersides at top−0.18, so the purlins
-      // hang at top−0.26…top−0.19 and the rafters at top−0.258…top−0.198 —
-      // eight millimetres shallower on purpose, because two members crossing
-      // at right angles with their tops in the SAME plane share a face over
-      // every crossing, which is rule 5 twelve times over on one roof.
+      // ONLY THE CROSS RAILS. `shopKit` already runs rafters out from the wall
+      // at 1.15 m under every canopy on this boardwalk, and they are now dark
+      // on this one — a second set of mine at the same spacing put two grids
+      // 0.2 m out of step with each other over the same terrace. What was
+      // genuinely missing is the other direction: the rails ACROSS them, which
+      // is what divides _174947's underside into panels rather than stripes.
+      //
+      // They hang at top−0.26…top−0.19, under the skin (front underside
+      // top−0.18) and crossing `shopKit`'s rafters at top−0.22…top−0.17. The
+      // two sets intersect in solid, which is what a welded frame does; what
+      // they do not do is share a face, which is the rule-5 trap when two
+      // members cross with their tops in the same plane.
       const REEDF = S.reed || [0.185, 0.163, 0.132];
       const FRM = [0.098, 0.100, 0.098];
       for (const ps of [fs + 0.02, fs + 1.28, fs + 2.55]) {
         boxTS(S.t0 - 0.40, S.t1 + 0.40, ps - 0.025, ps + 0.025,
           top - 0.26, top - 0.19, FRM, shade(FRM, 1.35));
-      }
-      for (let t = S.t0 - 0.40; t <= S.t1 + 0.41; t += 1.15) {
-        boxTS(t - 0.028, t + 0.028, fs - 0.10, S.s0 - 0.02,
-          top - 0.258, top - 0.198, FRM, shade(FRM, 1.25));
       }
       // The fringe, which is the silhouette of this whole building.
       //
@@ -12461,12 +12535,20 @@ async function buildJadrija(scene) {
       // on it.
       {
         const t0f = S.t0 - 0.40, t1f = S.t1 + 0.40;
-        const n = Math.round((t1f - t0f) / 0.055);
+        const n = Math.round((t1f - t0f) / 0.040);
         for (let i = 0; i < n; i++) {
           const t = t0f + (i + 0.5) * (t1f - t0f) / n;
-          const len = 0.055 + jit(i, 311) * 0.105;
-          const dy = top - 0.062 - jit(i, 907) * 0.032;
-          boxTS(t - 0.021, t + 0.021, fs - len, fs + 0.06, dy, dy + 0.024,
+          // A HAND'S WIDTH, not a centimetre. Two cuts of this were built and
+          // neither could be seen from the terrace: the reeds ran 0.055–0.16 m
+          // out and 0.02 m proud, which at the two metres you stand from this
+          // eave is under a degree of sawtooth — the line reads straight. In
+          // `_174947`, taken from under it against the sky, the ragged zone is
+          // three to five per cent of a canopy 3.2 m deep, so 0.10 to 0.28 m of
+          // overhang with the tips wandering 45 mm in height. A cane mat's eave
+          // course is a bundle of ends, not a trimmed edge.
+          const len = 0.10 + jit(i, 311) * 0.18;
+          const dy = top - 0.058 - jit(i, 907) * 0.022;
+          boxTS(t - 0.018, t + 0.018, fs - len, fs + 0.06, dy, dy + 0.030,
             shade(REEDF, 1.00 + jit(i, 613) * 0.72),
             shade(REEDF, 1.30 + jit(i, 613) * 0.90));
         }
