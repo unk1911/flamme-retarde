@@ -543,15 +543,37 @@ function scaledBuilder(b, k) {
   };
 }
 
-/** The sheer height and half-beam at any x, interpolated between stations. */
+/**
+ * The sheer height and half-beam at any x, interpolated between stations.
+ *
+ * **CLAMPED FIRST, AND THAT IS NOT TIDYING.** The loop only finds a pair when
+ * x lies *between* two stations; for anything outside the table it fell
+ * through with `a` and `c` still on the first pair and `u` saturated at 1, so
+ * every x aft of the transom answered with the **stem's** station — sheer 2.05
+ * where it should be 1.62, half-beam 0.72 where it should be 1.82.
+ *
+ * That was not a rounding error, it was the loudest thing on the boat. The
+ * deck loop in `brodProto` runs to x −8.2 authored, which is 0.4 aft of the
+ * last station, so its final bulwark segment was drawn from the transom to a
+ * point 0.7 m abaft it, pinched to the stem's beam and lifted 0.75 m: a pair
+ * of blades, navy on the outside face and white on the inside, sticking three
+ * metres out of her counter and down through the waterline. From the quay
+ * astern of her — which is where you stand waiting for her — it was most of
+ * her silhouette. Photographed from the mole at 22 m before the fix.
+ *
+ * Both loops in `brodProto` now stop on the hull as well, which is the other
+ * half of it: a clamp alone would have left a metre of flat cap projecting
+ * aft of the transom instead of a blade.
+ */
 function brodSheer(x) {
+  const q = clamp(x, BROD_ST[BROD_ST.length - 1][0], BROD_ST[0][0]);
   let a = BROD_ST[0], c = BROD_ST[1];
   for (let i = 0; i < BROD_ST.length - 1; i++) {
-    if (x <= BROD_ST[i][0] && x >= BROD_ST[i + 1][0]) {
+    if (q <= BROD_ST[i][0] && q >= BROD_ST[i + 1][0]) {
       a = BROD_ST[i]; c = BROD_ST[i + 1]; break;
     }
   }
-  const u = clamp((a[0] - x) / ((a[0] - c[0]) || 1), 0, 1);
+  const u = clamp((a[0] - q) / ((a[0] - c[0]) || 1), 0, 1);
   return [a[4] + (c[4] - a[4]) * u, a[5] + (c[5] - a[5]) * u];
 }
 
@@ -584,6 +606,18 @@ function brodProto() {
   const COVE = [0.686, 0.545, 0.243];       // and the gold line under it
   const BOOT = [0.230, 0.106, 0.086];       // antifouling
   const DECK = [0.560, 0.470, 0.352];       // laid timber, oiled
+  // The face of a step in the sole, which never sees the sky. 0.78 of `DECK`,
+  // written out rather than shaded: `shade` is 43-jadrija.js's and is a
+  // closure-local helper there, so every tone step in this file is inline —
+  // the funnel casing's four values are the same thing at more length.
+  const RISER = [0.437, 0.367, 0.275];
+  // The boot-top's drop under the deck edge and its half-depth, up here rather
+  // than beside the loop that draws it because the transom carries the same
+  // stripe round the stern and is built four hundred lines earlier. A `const`
+  // below its reader is BUILD DID NOT FINISH at some percentage, not an
+  // exception — this file has been bitten by it. Measured off the mural; see
+  // the note over the strip itself.
+  const BTY = BROD_P(2.014), BTH = BROD_P(0.15);
   const HOUSE = [0.912, 0.906, 0.886];
   const GLASS = [0.140, 0.196, 0.216];
   const TRIM = [0.400, 0.290, 0.170];       // varnished mahogany
@@ -641,15 +675,83 @@ function brodProto() {
       b.smooth(A, C, D, na, nc, nd, col, col, col);
     }
   }
-  // The transom, fanned to a point a little below the sole so she has a counter
-  // and a shadow under it rather than a wall.
+  /**
+   * The transom.
+   *
+   * **IT WAS WOUND FORWARD, so she had no stern at all.** Rule 8, and the
+   * whole panel rather than one cap: the old fan ran
+   * `tri(row[j + 1], row[j], c)` from the last station's thirteen points to a
+   * centreline apex, and its normal works out at (+1.26, 0, 0) at BOTH ends of
+   * the row — dead forward, into the boat. `G`'s rows run bow to stern, so the
+   * row's order is the mirror of what a fan closing an after end wants;
+   * `propBuilder.tri` takes the face off the winding and three.js culls the
+   * back one.
+   *
+   * From anywhere astern of her you were therefore looking through a
+   * six-metre hole into the boat, and what came through it — her far topside
+   * seen from inboard, carrying the cove and the boot-top — read as a grey
+   * blade hanging off her counter down into the water. It survived the fix to
+   * `brodSheer` and that is how it got noticed: the two blades went and this
+   * one did not. Found by painting the fan green and getting a frame back with
+   * no green anywhere in it, which is the only symptom a culled face has.
+   *
+   * AND BANDS, NOT A FAN, now that it can be seen. The apex sat at y −0.10
+   * with the keel at −0.62, so every triangle radiated from a point half a
+   * metre above the bottom of the outline and the colour rule — one `tAt(j)`
+   * per triangle — painted her stern in pie slices: a 1.5 m navy wedge from
+   * the port sheer to the middle, nothing matching it to starboard, and the
+   * antifouling as six spokes. A transom's paint runs in HORIZONTAL bands
+   * because a waterline is horizontal.
+   *
+   * Six quads between the seven levels of the loft instead, port point to
+   * starboard point across the whole width, with the keel closed by one
+   * triangle. Same polygon, same seam with the plating — the colour rule is
+   * the plating's own, `max(t) < 0.62`, so the boundary lands on the chine
+   * exactly where the sides put it.
+   *
+   * With her two lines carried round it, which is the other half of what makes
+   * a stern read as the same boat as the sides: the dark strake down from the
+   * sheer and the boot-top, both standing 0.030 aft of the panel — 52 mm, the
+   * bulwark's own standoff, well past rule 5's 3 mm — and both cut to the
+   * outline by `tw` so neither hangs over the edge.
+   */
   {
     const row = G[G.length - 1];
-    const c = [row[0][0], -0.10, 0];
-    for (let j = 0; j < N - 1; j++) {
-      const col = tAt(j) < 0.62 ? BOOT : (tAt(j) > 0.90 ? SHEER : HULL);
-      b.tri(row[j + 1], row[j], c, col);
+    const tX = row[0][0];
+    // The half-beam of the transom outline at a height, off the outline's own
+    // points rather than off `beamAt`: `beamAt` is a `const` declared three
+    // hundred lines below this and reading it here is a temporal dead zone,
+    // and chording the same polyline the panel is drawn from is what keeps a
+    // stripe from overhanging the edge it is painted on.
+    const tw = (y) => {
+      for (let k = 0; k < NS - 1; k++) {
+        const a = row[k], c = row[k + 1];
+        if (y <= a[1] && y >= c[1]) {
+          const u = (a[1] - y) / ((a[1] - c[1]) || 1);
+          return Math.abs(a[2]) + (Math.abs(c[2]) - Math.abs(a[2])) * u;
+        }
+      }
+      return Math.abs(row[0][2]);
+    };
+    // A band across her, port to starboard, wound aft. Checked rather than
+    // guessed: with A and B the two ends of the LOW edge and C the starboard
+    // end of the high one, (B−A) is 2w along +z and (C−A) climbs in y, so the
+    // cross comes out along −x, which is astern.
+    for (let k = 0; k < NS - 2; k++) {
+      const col = Math.max(tAt(k), tAt(k + 1)) < 0.62 ? BOOT : HULL;
+      b.quad(row[k + 1], row[N - 2 - k], row[N - 1 - k], row[k], col);
     }
+    b.tri(row[NS - 2], row[NS - 1], row[NS], BOOT);
+    // The strake and the boot-top, round the stern.
+    const aft = tX - 0.030;
+    const [, , , , tsy] = ST[ST.length - 1];
+    const strip = (ylo, yhi, col) => {
+      const wl = tw(ylo), wh = tw(yhi);
+      b.quad([aft, ylo, -wl], [aft, ylo, wl], [aft, yhi, wh], [aft, yhi, -wh], col);
+    };
+    strip(tsy - 0.40, tsy, SHEER);
+    strip(tsy - 0.50, tsy - 0.43, COVE);
+    strip(tsy - BTY - BTH, tsy - BTY + BTH, SHEER);
   }
 
   /**
@@ -673,15 +775,92 @@ function brodProto() {
   // Local, and off `BROD_ST0` for the same reason `ST` is: `brodSheer` answers
   // in built metres, which is what the deck logic wants and is exactly what
   // must not come in here.
+  // Clamped for the reason `brodSheer` above is clamped, and it is the same
+  // bug: this is the copy that DREW the blades off her counter.
   const sheerAt = (x) => {
+    const q = clamp(x, BROD_ST0[BROD_ST0.length - 1][0], BROD_ST0[0][0]);
     let a = BROD_ST0[0], c = BROD_ST0[1];
     for (let i = 0; i < BROD_ST0.length - 1; i++) {
-      if (x <= BROD_ST0[i][0] && x >= BROD_ST0[i + 1][0]) {
+      if (q <= BROD_ST0[i][0] && q >= BROD_ST0[i + 1][0]) {
         a = BROD_ST0[i]; c = BROD_ST0[i + 1]; break;
       }
     }
-    const u = clamp((a[0] - x) / ((a[0] - c[0]) || 1), 0, 1);
+    const u = clamp((a[0] - q) / ((a[0] - c[0]) || 1), 0, 1);
     return [a[4] + (c[4] - a[4]) * u, a[5] + (c[5] - a[5]) * u];
+  };
+
+  /**
+   * The whole station row at any x, and the half-beam at any HEIGHT on it.
+   *
+   * `sheerAt` answers for the deck edge, which is all the bulwark ever needed.
+   * A thing hung on her SIDE needs to know where her side is at the height it
+   * hangs at, and she has 0.35 m of flare between the chine and the sheer
+   * amidships — a fender placed off the sheer half-beam floats a third of a
+   * metre clear of the topsides, and one placed off the chine's is buried.
+   *
+   * Inverted off the same loft `pt` above plates her with, so the answer is
+   * the surface and not an approximation of it: `pt` puts the topside at
+   * `y = cy + (sy − cy) u^0.94` and `w = cw + (sw − cw) u^0.58`, so u comes
+   * back off the first and goes into the second.
+   */
+  const stAt = (x) => {
+    const q = clamp(x, BROD_ST0[BROD_ST0.length - 1][0], BROD_ST0[0][0]);
+    let a = BROD_ST0[0], c = BROD_ST0[1];
+    for (let i = 0; i < BROD_ST0.length - 1; i++) {
+      if (q <= BROD_ST0[i][0] && q >= BROD_ST0[i + 1][0]) {
+        a = BROD_ST0[i]; c = BROD_ST0[i + 1]; break;
+      }
+    }
+    const u = clamp((a[0] - q) / ((a[0] - c[0]) || 1), 0, 1);
+    return a.map((v, k) => v + (c[k] - v) * u);
+  };
+  const beamAt = (x, y) => {
+    const [, , cy, cw, sy, sw] = stAt(x);
+    if (sy <= cy) return sw;
+    const u = Math.pow(clamp((y - cy) / (sy - cy), 0, 1), 1 / 0.94);
+    return cw + (sw - cw) * Math.pow(u, 0.58);
+  };
+
+  /**
+   * A four-sided bar between two arbitrary points — a rope, a lanyard, a stay.
+   *
+   * `frustum` cannot do this and `b.box` cannot either: both stack or span
+   * axis-aligned boxes, so anything running mostly along the deck or mostly
+   * athwart comes out as a slab a few millimetres tall and disappears. Built
+   * off an arbitrary perpendicular basis instead, which is the only
+   * construction that does not care which way the run points.
+   *
+   * BOTH WINDINGS, and for the reason the foredeck's guardrail wires give a
+   * few lines further down: a 24 mm lanyard is nothing at all, you are as
+   * often inboard of one as outboard, and on a closed tube a reversed winding
+   * does not announce itself — the silhouette is identical and only the
+   * shading is wrong. Eight quads a segment against four is not a price worth
+   * arguing about for a member this thin.
+   *
+   * Coordinates go through `scaledBuilder` like everything else here, so `r`
+   * is authored: put real millimetres through `BROD_P`.
+   */
+  const seg3 = (A, B, r, col, solid) => {
+    const dx = B[0] - A[0], dy = B[1] - A[1], dz = B[2] - A[2];
+    const Ln = Math.hypot(dx, dy, dz) || 1;
+    const ux = dx / Ln, uy = dy / Ln, uz = dz / Ln;
+    // Any vector not parallel to the run, then two crosses for the basis.
+    const px = Math.abs(uy) > 0.9 ? 1 : 0, py = Math.abs(uy) > 0.9 ? 0 : 1;
+    let ex = -uz * py, ey = uz * px, ez = ux * py - uy * px;
+    const me = Math.hypot(ex, ey, ez) || 1;
+    ex /= me; ey /= me; ez /= me;
+    const fx2 = uy * ez - uz * ey, fy2 = uz * ex - ux * ez, fz2 = ux * ey - uy * ex;
+    const o = (a, Q) => [Q[0] + (Math.cos(a) * ex + Math.sin(a) * fx2) * r,
+      Q[1] + (Math.cos(a) * ey + Math.sin(a) * fy2) * r,
+      Q[2] + (Math.cos(a) * ez + Math.sin(a) * fz2) * r];
+    for (let i = 0; i < 4; i++) {
+      const a0 = (i / 4) * TAU, a1 = ((i + 1) / 4) * TAU;
+      const P0 = o(a0, A), P1 = o(a0, B), P2 = o(a1, B), P3 = o(a1, A);
+      b.quad(P0, P3, P2, P1, col);
+      // `solid` is for a member you can never be inside — an 88 mm pipe. A
+      // lanyard is 36 mm and gets both, for the reason above.
+      if (!solid) b.quad(P1, P2, P3, P0, col);
+    }
   };
 
   // ── the deck and the bulwark ─────────────────────────────────────────────
@@ -690,21 +869,57 @@ function brodProto() {
   // twice going forward — cockpit, side deck, foredeck — which is what the
   // engine under the house and the chain locker under the foredeck do to it.
   const soleAt = (x) => (x > 4.30 ? 1.22 : (x > -1.35 ? 1.06 : 0.72));
+  // ON THE HULL AND NOT PAST IT, both ends, and forty segments and not
+  // twenty-six.
+  //
+  // The old range was 7.6 down to −8.2 while the loft runs 7.80 to −7.80: it
+  // stopped 0.35 m short of the stem at one end and overshot the transom by
+  // 0.70 m at the other, and the overshoot is what `brodSheer`'s note is
+  // about. Ending ON the last station instead — a hair inside it at each end
+  // so the cap never skims the transom fan, per rule 5.
+  //
+  // Twenty-six segments over 15.5 is 1.04 m of bulwark a segment, and her
+  // sheer lifts 0.33 m in the last 1.2 m of the bow: the forward end of the
+  // dark strake came out as a visible flight of four steps against the sky in
+  // every bow-on frame. At forty it is 0.68 m a segment and the steps are
+  // inside the width of the strake itself.
+  //
+  // AND THE BULWARK PLANKING STANDS OUTSIDE THE TOPSIDE PLANKING, which is
+  // both true of a wooden boat and the fix for the thing that made the strake
+  // look chewed. The outer face was drawn at z = `w0` — the sheer's own
+  // half-beam, which is exactly where the loft puts its topmost row of
+  // plating. The two shared that edge to the millimetre, and just under it the
+  // hull falls away on its flare so slowly that the plating and the flat face
+  // stay within a centimetre of each other for the top fifth of the strake.
+  // What came off the render was a row of clean pale wedges bitten out of the
+  // top of the dark band, four of them in every bow-on frame, worst where the
+  // sheer rises fastest — and they moved when `NX` changed, which is what said
+  // it was a coincidence and not geometry. 0.030 authored is 52 mm built,
+  // which is a bulwark plank, and the wedges are gone.
+  //
+  // The cove three blocks down had this problem solved in its own comment —
+  // "standing 12 mm off the topside so it never z-fights the hull it is
+  // painted on" — and the bulwark, which is not painted on the hull but bolted
+  // to it, never got the same treatment.
+  const BSTAND = 0.030;
   {
-    const NX = 26;
+    const NX = 40;
+    const XF = 7.76, XA = -7.78;
+    let pSy = null;                         // the sole one segment aft, for the steps
     for (let i = 0; i < NX; i++) {
-      const x0 = 7.6 - 15.8 * (i / NX);
-      const x1 = 7.6 - 15.8 * ((i + 1) / NX);
+      const x0 = XF + (XA - XF) * (i / NX);
+      const x1 = XF + (XA - XF) * ((i + 1) / NX);
       const [y0, w0] = sheerAt(x0), [y1, w1] = sheerAt(x1);
+      const o0 = w0 + BSTAND, o1 = w1 + BSTAND;
       const i0 = Math.max(0.02, w0 - 0.24), i1 = Math.max(0.02, w1 - 0.24);
       const sy = soleAt((x0 + x1) * 0.5);
       for (const s of [1, -1]) {
         // cap
-        sideQuad(s, [x0, y0, s * w0], [x1, y1, s * w1],
+        sideQuad(s, [x0, y0, s * o0], [x1, y1, s * o1],
           [x1, y1, s * i1], [x0, y0, s * i0], TRIM);
         // outer face, in the dark strake colour
-        sideQuad(s, [x0, y0 - 0.40, s * w0], [x1, y1 - 0.40, s * w1],
-          [x1, y1, s * w1], [x0, y0, s * w0], SHEER);
+        sideQuad(s, [x0, y0 - 0.40, s * o0], [x1, y1 - 0.40, s * o1],
+          [x1, y1, s * o1], [x0, y0, s * o0], SHEER);
         // Inner face, painted out white like the rest of the inside — and
         // carried all the way down to the sole rather than a fixed 0.40, which
         // is what left a gap you could see the sea through once the sheer went
@@ -713,16 +928,113 @@ function brodProto() {
           [x0, sy, s * i0], [x0, y0, s * i0], HOUSE);
       }
       b.quad([x0, sy, -i0], [x1, sy, -i1], [x1, sy, i1], [x0, sy, i0], DECK);
+      // ── AND A RISER AT EACH STEP IN THE SOLE ───────────────────────────────
+      //
+      // `soleAt` steps 0.34 authored at x 4.30 and again at −1.35 and NOTHING
+      // CLOSED EITHER OF THEM. Every sole quad is horizontal, so where the
+      // height changed between one segment and the next there was a 0.6 m
+      // slot straight across her full beam with no face in it: standing in the
+      // cockpit and looking forward past the companionway you saw a bright
+      // cyan band of open sea running across her deck from bulwark to bulwark,
+      // twice. It is the only hole in the boat and it is at eye level from the
+      // one place every passenger stands.
+      //
+      // At the boundary and not at the midpoint: `sy` is sampled at the
+      // segment's middle, so the height changes on the shared edge between
+      // two segments and that edge is `x0`.
+      //
+      // Both windings. You are on the low side of a riser looking at its face
+      // and on the high side looking down past its nose, and at 1.8 km from
+      // the origin a step you can see under is the same failure as a step you
+      // can see through. Two quads.
+      if (pSy != null && sy !== pSy) {
+        const lo = Math.min(sy, pSy), hi = Math.max(sy, pSy);
+        const A = [x0, lo, -i0], B = [x0, lo, i0];
+        const C = [x0, hi, i0], D = [x0, hi, -i0];
+        b.quad(A, B, C, D, RISER);
+        b.quad(D, C, B, A, RISER);
+      }
+      pSy = sy;
     }
     // The gold cove line: one 70 mm strip a side, standing 12 mm off the
     // topside so it never z-fights the hull it is painted on.
+    //
+    // TO THE STEM AND TO THE TRANSOM. It ran 7.3 to −7.9 — 0.9 m short of the
+    // stemhead forward and 0.2 m past the transom aft — and both ends showed.
+    // In `murals/brod-mural.jpg` the gold is the one line that carries the
+    // whole sheer: it sweeps up and dies into the stemhead, and it is the last
+    // thing still legible on her at the far end of the mole. Ours stopped in
+    // the middle of the bow with nothing at its end, which reads as a stripe
+    // somebody gave up painting.
     for (let i = 0; i < NX; i++) {
-      const x0 = 7.3 - 15.2 * (i / NX);
-      const x1 = 7.3 - 15.2 * ((i + 1) / NX);
+      const x0 = XF + (XA - XF) * (i / NX);
+      const x1 = XF + (XA - XF) * ((i + 1) / NX);
       const [y0, w0] = sheerAt(x0), [y1, w1] = sheerAt(x1);
       for (const s of [1, -1]) {
         sideQuad(s, [x0, y0 - 0.50, s * (w0 + 0.012)], [x1, y1 - 0.50, s * (w1 + 0.012)],
           [x1, y1 - 0.43, s * (w1 + 0.012)], [x0, y0 - 0.43, s * (w0 + 0.012)], COVE);
+      }
+    }
+
+    // ── AND THE BOOT-TOP, WHICH IS THE OTHER LINE ON HER ────────────────────
+    //
+    // Under the gold, the whole of her topside was one flat white plane from
+    // the cove down through the water, and it read as a hull that had been
+    // undercoated and never finished. Every hull in `1000150357` has a stripe
+    // at the waterline and `murals/brod-mural.jpg` has a heavy one.
+    //
+    // Measured off the mural by running a vertical cut through the paint at
+    // x 1600 and reading it band by band: white 1290 to 1375, dark 1378 to
+    // 1397, and the gold's warm band centred on 1280. That is 107 px of
+    // separation, and her hull is 2625 px stem to transom for 27.3 m of built
+    // length, so 96 px a metre: the stripe's centre is **1.11 m below the
+    // cove's** and it is 0.21 m deep. A second cut further aft gives 1.32 and
+    // 0.43 — the mural is painted at an angle and the stripe converges on the
+    // gold going aft — so 1.20 and 0.30 is the middle of it and that is what
+    // is built.
+    //
+    // OFF THE SHEER AND NOT OFF THE WATERLINE. A boot-top follows the water,
+    // but this one plainly does not: in the mural it runs parallel to the gold
+    // and sweeps up with it into the bow, well clear of the sea. It is a
+    // painted stripe on the topsides, so it goes on where the painter's eye
+    // put it, which is a fixed drop under the cove.
+    //
+    // `SHEER` and not a third dark. She has one dark tin and it went on the
+    // strake and on this, which is what these boats do and is why the two
+    // read as the same boat rather than as two decisions.
+    //
+    // Standing off the hull on `beamAt` and NOT on the sheer's half-beam the
+    // way the cove does. The cove sits 0.81 m under the deck edge where the
+    // flare has barely started; this is 2.0 m under it, where she is 0.24 m
+    // narrower, and hanging it off `w0` would have left a fin standing a
+    // quarter of a metre off her side down her whole length.
+    // `BTY` and `BTH` are declared with the colours at the top of this
+    // function: the transom carries the same stripe round the stern and is
+    // built long before this loop runs.
+    for (let i = 0; i < NX; i++) {
+      const x0 = XF + (XA - XF) * (i / NX);
+      const x1 = XF + (XA - XF) * ((i + 1) / NX);
+      const [y0] = sheerAt(x0), [y1] = sheerAt(x1);
+      const a0 = y0 - BTY - BTH, a1 = y1 - BTY - BTH;
+      const c0 = y0 - BTY + BTH, c1 = y1 - BTY + BTH;
+      // Both edges sampled at their own height, so the strip lies along the
+      // section instead of chording it. Over 0.30 m of depth the chord error
+      // is 1.2 mm, which is inside the 21 mm it stands proud by anyway — but
+      // the top edge and the bottom edge are 0.05 m apart in beam here and
+      // that much a flat quad would show.
+      // 0.030 and not the cove's 0.012, for the reason the bulwark's own
+      // standoff is 0.030: `beamAt` inverts the loft ANALYTICALLY and the
+      // plating chords it, in both directions at once — across the section
+      // between two of the seven points a side, and along her between two of
+      // the nine stations. The two disagree by up to 11 mm authored, so a
+      // 12 mm standoff leaves one segment in ten of this strip inside the
+      // plating and bitten out. Measured, once the strake was fixed and one
+      // notch was left: 52 mm built clears it everywhere.
+      for (const s of [1, -1]) {
+        sideQuad(s,
+          [x0, a0, s * (beamAt(x0, a0) + 0.030)], [x1, a1, s * (beamAt(x1, a1) + 0.030)],
+          [x1, c1, s * (beamAt(x1, c1) + 0.030)], [x0, c0, s * (beamAt(x0, c0) + 0.030)],
+          SHEER);
       }
     }
   }
@@ -864,29 +1176,67 @@ function brodProto() {
 
 
   // ── the rails ────────────────────────────────────────────────────────────
-  // Pipe stanchions and two wires round the foredeck only. Aft the bulwark is
+  // Pipe stanchions and two rails round the foredeck only. Aft the bulwark is
   // the rail, which is why you can sit on it.
+  //
+  // AND IT CLOSES AT THE STEMHEAD, which it did not. The run ended at x 7.3
+  // with the stem at 7.80, so the last stanchion stood three quarters of a
+  // metre short of the bow and the two rails simply stopped in the air with
+  // nothing at their ends and a gap between them you could have walked out of.
+  //
+  // `murals/brod-mural.jpg` is unambiguous about what belongs there and it is
+  // the one part of her the mural shows square-on: the rail runs forward, ends
+  // in a **vertical post at the stemhead**, and a **diagonal stay** comes back
+  // off the head of that post down to the deck edge. Measured on the frame —
+  // the crop at +2950+1020, at the mural's 96 px a metre — the stay's head is
+  // 0.25 m abaft the stem and its foot 1.96 m abaft it, which is authored 7.66
+  // and 6.68. The rail height reads 0.94 m over the gold two metres aft of the
+  // stem, so `BROD_P(1.00)` was already right and is unchanged.
+  //
+  // Rails as `seg3` and PER SPAN. They were one straight quad from 4.7 to 7.3
+  // while her sheer lifts 0.37 authored over that run, so the rail was a chord
+  // and the middle stanchions did not reach it — there was daylight between a
+  // stanchion top and the rail it was supposed to be holding up. Per span it
+  // follows the sheer through every stanchion. `solid`, because an 88 mm pipe
+  // is a thing you are never inside.
   {
-    const NST = 6;
+    const NST = 8;
+    const X0 = 4.7, X1 = 7.62;                 // last stanchion, just off the stem
+    const XS = 7.74;                           // and the stemhead post itself
+    const RH = [BROD_P(0.36), BROD_P(0.72)];
+    const RR = 0.025;                          // 88 mm pipe, as the stanchions are
+    const at = (x) => { const [y, w] = sheerAt(x); return [y, w - 0.12]; };
     for (let i = 0; i <= NST; i++) {
-      const x = 4.7 + (7.3 - 4.7) * (i / NST);
-      const [y, w] = sheerAt(x);
+      const x = X0 + (X1 - X0) * (i / NST);
+      const [y, w] = at(x);
       // A guardrail is 1.00 m over the deck, not 1.40. `BROD_P` again.
       for (const s of [1, -1]) {
-        b.box(x, y + BROD_P(0.50), s * (w - 0.12), 0.05, BROD_P(1.00), 0.05, RAIL);
+        b.box(x, y + BROD_P(0.50), s * w, 0.05, BROD_P(1.00), 0.05, RAIL);
       }
     }
-    for (const s of [1, -1]) {
-      for (const h of [BROD_P(0.36), BROD_P(0.72)]) {
-        const [ya, wa] = sheerAt(4.7), [yb, wb] = sheerAt(7.3);
-        // Both windings, not one: a wire is 35 mm of nothing and you are as
-        // often inboard of it as outboard, so it is the one thing on her that
-        // has to be visible from both sides.
-        b.quad([4.7, ya + h, s * (wa - 0.12)], [7.3, yb + h, s * (wb - 0.12)],
-          [7.3, yb + h + 0.035, s * (wb - 0.12)], [4.7, ya + h + 0.035, s * (wa - 0.12)],
-          RAIL);
-        b.quad([4.7, ya + h + 0.035, s * (wa - 0.12)], [7.3, yb + h + 0.035, s * (wb - 0.12)],
-          [7.3, yb + h, s * (wb - 0.12)], [4.7, ya + h, s * (wa - 0.12)], RAIL);
+    const [ysm] = at(XS);
+    b.box(XS, ysm + BROD_P(0.50), 0, 0.05, BROD_P(1.00), 0.05, RAIL);
+    for (const h of RH) {
+      for (const s of [1, -1]) {
+        for (let i = 0; i < NST; i++) {
+          const xa = X0 + (X1 - X0) * (i / NST);
+          const xb = X0 + (X1 - X0) * ((i + 1) / NST);
+          const [ya, wa] = at(xa), [yb, wb] = at(xb);
+          seg3([xa, ya + h, s * wa], [xb, yb + h, s * wb], RR, RAIL, true);
+        }
+        // In to the post. Both sides meet on the centreline at the stem, which
+        // is what makes it a rail rather than two rails.
+        const [ye, we] = at(X1);
+        seg3([X1, ye + h, s * we], [XS, ysm + h, 0], RR, RAIL, true);
+      }
+    }
+    // The stay. `seg3` and not `frustum` per rule 9: this member falls 0.76
+    // authored while running 1.06 aft and 0.67 outboard, and a stack of
+    // axis-aligned rectangles is three flat slabs a few millimetres tall.
+    {
+      const [yf, wf] = at(6.68);
+      for (const s of [1, -1]) {
+        seg3([XS, ysm + BROD_P(1.00), 0], [6.68, yf + 0.04, s * wf], RR, RAIL, true);
       }
     }
   }
@@ -989,6 +1339,133 @@ function brodProto() {
     }
     b.box(0.60, ys + 0.02, -(ws - 0.06), 1.58, 0.09, 0.14, TRIM);
   }
+
+  // ── the tyre fenders ──────────────────────────────────────────────────────
+  //
+  // The loudest thing `murals/brod-mural.jpg` has that she did not, and the
+  // one you are nearest to: she lies port-to against a mole that carries a
+  // squared rubbing baulk, a mushroom bollard, a stainless bitt with rope on
+  // it and a fender of its own — and her side, a metre and a half off it, was
+  // one unbroken plane of white paint with nothing hanging on it at all. Every
+  // working boat on this coast wears old lorry tyres lashed along the topsides
+  // and leaves them there under way, because the next quay is never the one
+  // you planned for.
+  //
+  // MEASURED, not assumed. In the mural her hull runs 2625 px stem to transom,
+  // which against 27.3 m of built length is 96 px a metre, and three tyres are
+  // plain on her starboard side at 2.9, 6.9 and 10.8 m forward of the transom.
+  // Those are the three aft ones below, converted straight through: authored
+  // x −6.14, −3.86, −1.63.
+  //
+  // The plants in front of the wall hide her forward half, so the two forward
+  // of those are NOT read off the frame and are not a continuation of a
+  // pattern either — rule 10. They are at the shoulder, which is where a hull
+  // this shape bears on a straight quay when the stern is already fended, and
+  // they are placed to clear the boarding gate (authored x −0.19 to 1.39)
+  // rather than to fall on a spacing. The five gaps come out 4.0, 3.9, 6.9 and
+  // 3.7 m, which is what a boat's fenders look like.
+  //
+  // BOTH SIDES. The mural shows her starboard side — bow to the right means
+  // the near side is starboard — and she berths port-to here; a boat that has
+  // been photographed with them to starboard and moors with her port side to
+  // the coping carries them both sides, which is also what the marina in
+  // `1000150357` shows on every hull in it.
+  //
+  // 0.98 m across the tyre and 0.22 through the tread, which is a lorry tyre
+  // and not a car's, and both go through `BROD_P`: a tyre is a real object
+  // that does not know how big the boat is. In the mural one measures 89 px,
+  // which is 0.93 m — right at the top of the range, and these are the big
+  // ones off a truck.
+  //
+  // Colour off the frame as a ratio, per rule 11, because the mural is flat
+  // overcast light and nothing in it can be read as an absolute: the tyre body
+  // samples (136, 141, 137) against hull white (183, 188, 180) 60 px above it
+  // in the same paint, which is 0.74 : 0.75 : 0.76 — flat, neutral, and
+  // nothing like black. A tyre that has spent fifteen years in Dalmatian sun
+  // and been painted over with the topside white more than once goes exactly
+  // that pale grey. 0.74 of `HULL`.
+  const TYRE = [0.669, 0.666, 0.650];
+  const LASH = [0.640, 0.618, 0.560];       // sun-bleached three-strand
+  {
+    const RR = BROD_P(0.38);                // ring centreline radius
+    const rr = BROD_P(0.11);                // and half the tread's thickness
+    // 1.42 m below the deck edge, which is set by two things at once. The
+    // mural hangs them 1.20 m down; the mole's rubbing baulk lies at built y
+    // 1.12 to 1.32 and a fender that does not cover the baulk is decoration.
+    // At 1.42 the tyre spans built 0.68 to 1.66 and covers it with a third of
+    // itself either side. It also puts the top of the tyre 55 mm under the
+    // gold cove rather than through it — rule 5's neighbourhood, though a
+    // torus crossing a 70 mm strip would be an interpenetration and not a
+    // skim.
+    const DROP = BROD_P(1.42);
+    for (const fx of [-6.14, -3.86, -1.63, 2.30, 4.40]) {
+      const [sy, sw] = sheerAt(fx);
+      const cy = sy - DROP;
+      // Off the beam at the tyre's TOP and not at the sheer. She carries 0.35 m
+      // of flare here, so the sheer's half-beam would hang the whole tyre a
+      // third of a metre clear of the paint; the chine's would bury it. Taking
+      // the widest point the tyre spans and standing 52 mm off that leaves the
+      // top just touching and the bottom 0.23 m out, which is how a fender on
+      // one lanyard actually hangs against a flared topside.
+      const zc = beamAt(fx, cy + RR + rr) + rr + 0.030;
+      for (const s of [1, -1]) {
+        const cz = s * zc;
+        const NM = 12, NN = 6;
+        // A torus in her fore-and-aft plane, so the ring's axis is athwart and
+        // no arbitrary basis is needed: the major circle lies in x/y and the
+        // minor sweep is the only thing that touches z.
+        const pt2 = (i, j) => {
+          const th = (i % NM) / NM * TAU, ph = (j % NN) / NN * TAU;
+          const cr = RR + rr * Math.cos(ph);
+          return [fx + cr * Math.cos(th), cy + cr * Math.sin(th),
+            cz + s * rr * Math.sin(ph)];
+        };
+        // Exact, because a torus knows its own normal: radially out in the
+        // ring's plane, rolled by the minor angle. `smooth` takes them, so a
+        // twelve-by-six ring shades round instead of faceted at the two metres
+        // you stand from it on the coping.
+        const nm2 = (i, j) => {
+          const th = (i % NM) / NM * TAU, ph = (j % NN) / NN * TAU;
+          return [Math.cos(ph) * Math.cos(th), Math.cos(ph) * Math.sin(th),
+            s * Math.sin(ph)];
+        };
+        for (let i = 0; i < NM; i++) {
+          for (let j = 0; j < NN; j++) {
+            const A = pt2(i, j), B = pt2(i + 1, j);
+            const C = pt2(i + 1, j + 1), D = pt2(i, j + 1);
+            const na = nm2(i, j), nb = nm2(i + 1, j);
+            const nc = nm2(i + 1, j + 1), nd = nm2(i, j + 1);
+            // The starboard winding puts (∂θ × ∂φ) outwards, which is what
+            // `propBuilder.tri` reads the face off. The port copy is that
+            // mirrored in z and **a mirror reverses winding** — the same trap
+            // `sideQuad` above exists for, and on a closed ring it does not
+            // announce itself: an inside-out torus has an identical
+            // silhouette and only its shading is wrong, lit from the far side.
+            if (s > 0) {
+              b.smooth(A, B, C, na, nb, nc, TYRE, TYRE, TYRE);
+              b.smooth(A, C, D, na, nc, nd, TYRE, TYRE, TYRE);
+            } else {
+              b.smooth(C, B, A, nc, nb, na, TYRE, TYRE, TYRE);
+              b.smooth(D, C, A, nd, nc, na, TYRE, TYRE, TYRE);
+            }
+          }
+        }
+        // The lanyard, up over the cap rail. In the mural these lean forward
+        // about 30 degrees from the vertical, which is what a rope made off at
+        // the rail and a tyre that has swung aft under way looks like: 0.53 m
+        // of run over 0.93 of rise, and that is the angle.
+        //
+        // 36 mm and not 24. At 24 the first cut came back off the render as a
+        // hairline you had to be told was there — in the mural the lanyard is
+        // as legible as the tyre it holds, because it is a doubled line and
+        // because it crosses the white where the tyre does not. A fender
+        // pendant on a boat this size is 18 mm doubled, which is this.
+        seg3([fx, cy + RR + rr - 0.02, cz],
+          [fx + 0.30, sy + 0.05, s * (sw - 0.02)], BROD_P(0.018), LASH);
+      }
+    }
+  }
+
   // ── the ship's boat, in davits off the starboard quarter ─────────────────
   //
   // `1000150392` again, and at the stern end of the mural it is unmistakable:
