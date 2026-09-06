@@ -3915,6 +3915,17 @@ async function buildJadrija(scene) {
       // with a corrugated upper storey over it, and not the shared render
       // back. See `slastBack` and `slasticarnica-behind-view`.
       reedBack: true,
+      // AND NO WATER TANK, which is the one shop on this shore that can say so.
+      // `shopRoof` stands a 1.12 m drum 1.58 m over the deck at `s1 − 1.1` on
+      // every box on the boardwalk, and there is no photograph of any of those
+      // roofs — except this one. `slasticarnica-behind-view` is the back
+      // elevation square on from the wood, and the sightline from eye height
+      // at thirteen metres clears this parapet by 0.13 m at `s1 − 1.1`: a tank
+      // there would stand 1.45 m of black drum against the sky. What is
+      // actually against the sky in that frame is one small vent box and
+      // nothing else, the whole length of the parapet. The tank stays on the
+      // other nine, where nothing says otherwise.
+      roofBare: true,
       // 20260823_111815 and _111819: the wall behind this counter is mirror
       // tile floor to ceiling with three glass shelves of stemware on it.
       backBar: true },
@@ -4798,12 +4809,46 @@ async function buildJadrija(scene) {
     }
 
     // ── the roof vent, and the bulkhead lamp on the sheet ───────────────────
+    //
+    // THE ONE BOX ON THIS ROOF, and it is the only one now — the `slast` block
+    // in `shopExtras` built a second at `t0 + 3.2` off this same frame and the
+    // pair merged into a drum twice the size of anything in the photograph.
+    // The note there records it.
+    //
+    // 0.78 by 0.58 and not 0.60 by 0.58, which is the frame measured rather
+    // than guessed: the reed wall below it runs 250 px for its 2.10 m and the
+    // roof is about 15 per cent further off, so 101 px a metre — and the box
+    // is 80 px across and 55 tall. 0.79 wide, 0.54 to the underside of its
+    // cap. The depth stays: nothing in the frame reads a box's depth.
+    //
+    // AND IT IS NOT A BLACK BOX. Opened at source resolution this is a timber
+    // plant screen and not a chimney: four pale softwood corner posts and a
+    // pale top rail with a dark open panel between them, which is what a
+    // condenser gets boxed in on a flat roof. Measured against the corrugated
+    // wall below it in the same shade — sRGB 0.224/0.257/0.295 — the posts run
+    // 0.392/0.358/0.309, which is 1.8/1.4/1.1 of it and a warm surface in sun;
+    // the panel runs 0.113/0.097/0.100, which is 0.30/0.18/0.14 of it in
+    // linear and is a shadowed void. The old cut painted the whole thing
+    // 0.115 grey, and grey is what a screen looks like from the wrong side of
+    // a 200 per cent crop.
+    //
+    // The posts stand 0.02 PROUD of the body and bury 0.02 into it, per rule
+    // 5: a batten drawn flush with the panel it frames is two faces in one
+    // plane, which is the whole of that rule.
     {
-      const vt = S.t0 + 3.4, VENT = [0.115, 0.118, 0.122];
-      boxTS(vt - 0.30, vt + 0.30, back - 1.10, back - 0.52, top - 0.02,
-        top + 0.42, VENT, shade(VENT, 1.35));
-      boxTS(vt - 0.34, vt + 0.34, back - 1.14, back - 0.48, top + 0.40,
-        top + 0.46, shade(VENT, 1.20));
+      const vt = S.t0 + 3.4;
+      const VENT = [0.110, 0.098, 0.092];       // the open panel, a warm void
+      const VPOST = [0.545, 0.490, 0.385];      // weathered softwood in sun
+      boxTS(vt - 0.39, vt + 0.39, back - 1.10, back - 0.52, top - 0.02,
+        top + 0.46, VENT, shade(VENT, 1.35));
+      for (const pt of [vt - 0.365, vt + 0.365]) {
+        for (const ps of [back - 1.075, back - 0.555]) {
+          boxTS(pt - 0.045, pt + 0.045, ps - 0.045, ps + 0.045,
+            top - 0.02, top + 0.48, VPOST, shade(VPOST, 1.10));
+        }
+      }
+      boxTS(vt - 0.43, vt + 0.43, back - 1.14, back - 0.48, top + 0.44,
+        top + 0.52, VPOST, shade(VPOST, 1.14));
     }
     {
       const lt = tR - 0.55, LAMP = [0.720, 0.700, 0.650];
@@ -5820,16 +5865,24 @@ async function buildJadrija(scene) {
     boxTS(c - 0.16, c, s0, s1, ry, ry + 0.13, KERB, shade(KERB, 1.08));
 
     // The water tank, on its stand, with the pipe going down through the roof.
-    const wt = S.t0 + 1.9 + jit(key, 321) * 1.2, ws = S.s1 - 1.1;
-    for (const [ot, os] of [[-0.52, -0.52], [0.52, -0.52], [-0.52, 0.52], [0.52, 0.52]]) {
-      post(W, wt + ot, ws + os, ry, ry + 0.34, 0.05, [0.400, 0.406, 0.400], 5);
+    //
+    // `roofBare` skips it, and the slastičarnica is the one shop that carries
+    // that flag. The note on its SHOPS entry has the sightline: this tank is
+    // 1.12 m across and stands 1.58 m over the deck at `s1 − 1.1`, and on the
+    // one roof in this resort that is photographed square on from the lane it
+    // is not there. Nine roofs keep it; the tenth has evidence.
+    if (!S.roofBare) {
+      const wt = S.t0 + 1.9 + jit(key, 321) * 1.2, ws = S.s1 - 1.1;
+      for (const [ot, os] of [[-0.52, -0.52], [0.52, -0.52], [-0.52, 0.52], [0.52, 0.52]]) {
+        post(W, wt + ot, ws + os, ry, ry + 0.34, 0.05, [0.400, 0.406, 0.400], 5);
+      }
+      boxTS(wt - 0.62, wt + 0.62, ws - 0.62, ws + 0.62, ry + 0.30, ry + 0.38,
+        [0.360, 0.366, 0.360]);
+      const TANK = jit(key, 322) < 0.5 ? [0.140, 0.175, 0.230] : [0.115, 0.115, 0.125];
+      post(W, wt, ws, ry + 0.38, ry + 1.46, 0.56, TANK, 10);
+      post(W, wt, ws, ry + 1.46, ry + 1.58, 0.20, shade(TANK, 1.25), 8);
+      post(W, wt, ws + 0.60, ry + 0.10, ry + 0.44, 0.035, [0.520, 0.516, 0.500], 5);
     }
-    boxTS(wt - 0.62, wt + 0.62, ws - 0.62, ws + 0.62, ry + 0.30, ry + 0.38,
-      [0.360, 0.366, 0.360]);
-    const TANK = jit(key, 322) < 0.5 ? [0.140, 0.175, 0.230] : [0.115, 0.115, 0.125];
-    post(W, wt, ws, ry + 0.38, ry + 1.46, 0.56, TANK, 10);
-    post(W, wt, ws, ry + 1.46, ry + 1.58, 0.20, shade(TANK, 1.25), 8);
-    post(W, wt, ws + 0.60, ry + 0.10, ry + 0.44, 0.035, [0.520, 0.516, 0.500], 5);
 
     // A dish on a short cranked post, pointed the way every dish on this coast
     // is pointed, and an aerial beside it.
@@ -5901,7 +5954,15 @@ async function buildJadrija(scene) {
     // And what gets left on a roof: two crates and a coil of hose by the
     // tank, because somebody carried them up and did not carry them down.
     {
-      const kt = S.t0 + 3.6, ks = S.s1 - 0.9;
+      // t0+4.6 and not t0+3.6, which stood the crates INSIDE the slastičarnica's
+      // roof vent. `slastBack` builds that screen at `t0 + 3.4` — measured, it
+      // is a third of the way along the parapet in the photograph — and it is
+      // 0.78 wide by 0.58 deep at `s1 − 1.10` to `s1 − 0.52`, which is exactly
+      // where these two crates were: overlapping in t, in s and in y, with the
+      // upper crate standing out through the top of the screen. A metre along
+      // clears it by 0.61 and clears the tank's stand by 0.68, and on the nine
+      // roofs that are not photographed a metre is nothing.
+      const kt = S.t0 + 4.6, ks = S.s1 - 0.9;
       const CR = jit(key, 328) < 0.5 ? [0.135, 0.230, 0.145]
         : [0.480, 0.180, 0.130];
       for (let i = 0; i < 2; i++) {
@@ -7943,8 +8004,9 @@ async function buildJadrija(scene) {
    * So it is a height field on the tray's own rounded rectangle, 10 by 7, and
    * every term in it is one of those observations:
    *
-   *   dome    the fill, falling to nothing at the rim, which is where the
-   *           gelato meets the steel and has to.
+   *   fill    level and scraped flat, turning down only in the last 30 mm at
+   *           the tray wall. See the note on `bowl`: this was a dome and the
+   *           photographs are not.
    *   scrape  one spatula direction per pan, six wavelengths across it. This
    *           is the whole texture and it costs one sine.
    *   dig     a Gaussian hollow on the pans that have been served from, which
@@ -7955,11 +8017,16 @@ async function buildJadrija(scene) {
    * ridge is the one that brings the dark up, at a longer wavelength so the
    * two do not beat against each other into stripes.
    *
-   * 140 triangles a pan and 2 240 for the case, against 384 for all sixteen
-   * heaps it replaces. The whole resort is half a million.
+   * 18 BY 12 AND NOT 10 BY 7, and the old grid was under-sampling its own
+   * shader. The scrape's second term is `sin(w · 13)` — 4.1 cycles across the
+   * pan — and ten samples give 2.4 of them per cycle, which is under Nyquist:
+   * the fine ridge was not being drawn at all, it was being aliased into a
+   * slow wobble. At 18 it is 4.3 samples a cycle and the ribbon's 3.5 gets
+   * 5.1, which is the margin rule 6 asks for. 432 triangles a pan and 6 912
+   * for the case, up from 2 240, on a Jadrija that is 641 000.
    */
   function gelatoSlab(ct, cs, rt, rs, yLow, yRim, F, k) {
-    const NT = 10, NS = 7;
+    const NT = 18, NS = 12;
     // One spatula direction, one phase and one hollow per pan, all hashed off
     // the pan index — `jit` is a hash and not a draw, which is rule 4: taking
     // a number out of the shared stream here would move every parasol, bather
@@ -7983,7 +8050,24 @@ async function buildJadrija(scene) {
       const f = superFit(u, v);
       const x = u * f, y = v * f;
       const m = Math.max(Math.abs(u), Math.abs(v));
-      const bowl = Math.max(0, 1 - m * m);
+      // A SCRAPED BLOCK AND NOT A LENS, and this is the correction the note
+      // above asked for and did not finish. `1 - m·m` is a dome: it has given
+      // away a quarter of its height by the middle of the pan and two thirds
+      // by four fifths of the way out, so the outer half of every fill slopes
+      // — and a sloping surface under a soffit light is a DARKER surface.
+      // Photographed at the counter, sixteen pans each came out as a bright
+      // patch of colour inside a wide dark ring of its own gelato, which read
+      // as a puddle in a steel dish. `selection-2` is the opposite: measured
+      // across Vanilija and Zelena Jabuka, the fill is one even tone from wall
+      // to wall — 0.67/0.58/0.33 sRGB at the middle against 0.65/0.57/0.32 two
+      // thirds out, a 3 per cent fall, not the 40 per cent this was drawing.
+      // A pan is filled level and scraped flat, and it turns down only in the
+      // last 30 mm where the spatula rolls it into the tray wall.
+      //
+      // 0.16 of the half-width is that 30 mm on a 376 mm pan. The 10 by 7 grid
+      // has no sample inside the band, so it draws as a single chamfer quad
+      // off the outermost ring — which is the shape and costs nothing.
+      const bowl = Math.min(1, (1 - m) / 0.16);
       const w = ca * x + sa * y;
       // `yRim` here is where the gelato meets the steel, not where the tray
       // is: the fill is level with the lip at the edge and domes over it in
@@ -8008,7 +8092,33 @@ async function buildJadrija(scene) {
           // half the pan. `1.7` is the beat against the ridge's own 6.0: the
           // marbling drifts across the scrape rather than tracking it, which
           // is what a folded-in sauce does.
-          const g = Math.pow(0.5 + 0.5 * Math.sin(w * 3.4 + ph * 1.7), 2.2);
+          //
+          // MORE FOLDS, AND NOT ONE MORE STRIPE. `w` runs -1 to 1 across an
+          // axis-aligned pan, so the old 3.4 was 6.8 radians end to end —
+          // 1.08 cycles, a single dark band through the middle of every
+          // swirled flavour, and once the fill was drawn flat that band was
+          // the only thing on it. Counted in `selection-2`, Čokolada has five
+          // dark chocolate folds across its pan and Jogurt Šumsko voće four.
+          //
+          // Raising the frequency alone was tried and is WORSE THAN THE ONE
+          // FOLD. `sin(w · 11)` is a function of `w` and of nothing else, so
+          // every band is a perfectly straight line parallel to every other
+          // band at a perfectly even spacing: at 3.5 cycles Čokolada, Cookies
+          // and Stracciatella all came out as barcodes. A regular pattern is
+          // worse than nothing, and the fix is not to go back to nothing.
+          //
+          // So the fold is BENT and UNEVENLY SPACED, which is what it is in
+          // the photograph. `wp` is the axis across the fold, and phase-
+          // shifting by 1.6 radians of it swings each band a quarter of its
+          // own spacing sideways over the width of the pan — an S, not a
+          // rule. The second term modulates the spacing itself along `w`, so
+          // the gaps run between about 1.4 and 3.2 cycles instead of sitting
+          // at one number. Peak local frequency is 3.2 cycles, which on the
+          // 18-sample grid is 5.6 samples a cycle: resolved, per rule 6.
+          const wp = -sa * u * f + ca * v * f;
+          const wq = w * 7.0 + 1.6 * Math.sin(wp * 2.6 + ph)
+            + 0.9 * Math.sin(w * 2.1 - ph);
+          const g = Math.pow(0.5 + 0.5 * Math.sin(wq + ph * 1.7), 2.2);
           col = [F.col[0] + (rib[0] - F.col[0]) * g,
             F.col[1] + (rib[1] - F.col[1]) * g,
             F.col[2] + (rib[2] - F.col[2]) * g];
@@ -8143,13 +8253,37 @@ async function buildJadrija(scene) {
     // There is no well in this shop, and a well added here would be a guess
     // standing next to five measurements.
 
+    // THE PLAQUES WERE HALF AGAIN LIFE SIZE AND THEY STOOD IN FRONT OF THE
+    // ICE CREAM, which is the loudest thing about this counter from where a
+    // customer stands and it is arithmetic, not taste.
+    //
+    // Measured on `selection-2`, where a pan and its card are in the same
+    // plane: "Vanilija" is 112 px on a 270 px pan, "Čokolada" 128 on 290,
+    // "Zelena Jabuka" 145 on 305. That is 0.42, 0.44 and 0.48 of a pan's
+    // width — call it 0.44, which on this 0.376 m pan is a card 0.165 m wide
+    // and about 0.077 tall. They were drawn at 0.24 by 0.105.
+    //
+    // And a plaque at `s0−1.52` labelling a pan centred at `s0−1.21` stands
+    // 0.31 m nearer the camera than the thing it names, so from 1.9 m away it
+    // is magnified 1.15 on top of that: 0.24 × 1.15 / 0.376 = 0.73 of the
+    // pan's apparent width, against the photograph's 0.44. Eight black cards
+    // covering the front row, and the ice cream behind them.
+    //
+    // 0.190 keeps the reason the old note gave for going over life size — a
+    // card has to be READ from the promenade — and 0.190 at 1.64 m on a
+    // 1050-wide 55° frame is 117 px of plaque and a 24 px cap on a one-line
+    // name, which is not four pixels by any measure. With the front row moved
+    // back to `s0−1.46` the apparent width comes to 0.56 of a pan. Life size
+    // would be 0.49 and unreadable on a phone; this is the trade.
+    const PLQ_W = 0.190, PLQ_H = 0.083;    // 256×112 canvas, aspect kept
+
     // The plaques, on their wire clips. Only the ones that could be read.
     const plaques = (list, sPl, yPl, sClip, yClip) => {
       list.forEach((F, k) => {
         if (!F.name) return;
         const ct = t0Pan + k * BAY + BAY * (0.5 + (F.off || 0));
         post(W, ct, sClip, yClip, yPl - 0.045, 0.006, [0.600, 0.606, 0.600], 4);
-        seaFacing(flavourPlaque(F.name), ct, sPl, yPl, 0.24, 0.105,
+        seaFacing(flavourPlaque(F.name), ct, sPl, yPl, PLQ_W, PLQ_H,
           'slast:plaque:' + F.name);
       });
     };
@@ -8161,7 +8295,16 @@ async function buildJadrija(scene) {
     // cream moved: `gelatoSlab` crowns at about 0.16 m over the pan floor
     // where the old four-frustum heap crowned at 0.28. Left where they were,
     // fourteen black cards hung in the air a hand's breadth over the flavours.
-    plaques(GELATO.front, S.s0 - 1.52, y0 + 1.31, S.s0 - 1.48, y0 + 1.18);
+    //
+    // The front row moved back 0.06 to `s0−1.46`, and the three clearances
+    // were counted rather than assumed. The glass leans from `s0−1.60` at its
+    // foot to `s0−1.46` at its head, so at the plaque's own y0+1.31 the pane
+    // is at `s0−1.527` — 67 mm in front of the card, where it was 7. The
+    // tray's skirt reaches 1.06 of the pan's half-depth, which is `s0−1.411`,
+    // so the clip at `s0−1.44` stands 29 mm proud of it and 20 mm behind the
+    // card it carries. The back row is left where it was: it is 0.38 m
+    // further in and nothing about it was crowding anything.
+    plaques(GELATO.front, S.s0 - 1.46, y0 + 1.31, S.s0 - 1.44, y0 + 1.18);
     plaques(GELATO.back, S.s0 - 1.08, y0 + 1.43, S.s0 - 1.04, y0 + 1.30);
 
     // The glass. Drawn as its four edges and nothing else, which is not a
@@ -12113,17 +12256,24 @@ async function buildJadrija(scene) {
           y0 + 2.26, top - 0.02, k % 2 ? SHEET : shade(SHEET, 0.90),
           shade(SHEET, 1.06));
       }
-      // And the flue: a square dark box on the roof with a hood on it, which is
-      // the one thing standing above this building's parapet in the photograph
-      // and reads from the whole lane.
-      const ft = S.t0 + 3.2, fs2 = S.s1 - 2.4;
-      // Started at top+0.04, which is two centimetres INSIDE the roof screed
-      // at top+0.06 to top+0.08. A flue whose base sits exactly on the screed
-      // is two horizontal faces in the same plane.
-      boxTS(ft - 0.24, ft + 0.24, fs2 - 0.24, fs2 + 0.24, top + 0.04, top + 0.86,
-        [0.215, 0.220, 0.225], [0.245, 0.250, 0.255]);
-      boxTS(ft - 0.30, ft + 0.30, fs2 - 0.30, fs2 + 0.30, top + 0.86, top + 0.96,
-        [0.260, 0.265, 0.270], [0.290, 0.295, 0.300]);
+      // AND THERE IS NO FLUE HERE, because it was built twice.
+      //
+      // A dark box on the roof at `t0 + 3.2`, 0.48 square and 0.92 tall to the
+      // top of its hood, used to stand here — written off the one thing that
+      // shows above this building's parapet in `slasticarnica-behind-view`.
+      // `slastBack` builds that same box off that same photograph, 0.20 m away
+      // at `t0 + 3.4`, and the two passes never met. Photographed from the
+      // lane at 26° they merge into a single black drum 0.94 m across and
+      // 0.78 tall, which is the largest object on this roofline and is nothing
+      // that is in the frame.
+      //
+      // What the frame has is ONE box. Scaled off the reed wall — 250 px for
+      // its 2.10 m, and about 15 per cent less at the roof's distance, so
+      // 101 px a metre — it measures 80 px by 55, which is 0.79 m wide and
+      // 0.54 tall. `slastBack`'s is the one that is kept and it is widened to
+      // that; this one goes, because a flue at `s1 − 2.4` is 2.4 m in from the
+      // parapet and the box in the photograph stands with its base hidden
+      // behind it, which is where the other one already is.
 
       // What is standing in the yard behind it, which is the other half of
       // slasticarnica-behind-view: the folded sun loungers leaning on the wall
