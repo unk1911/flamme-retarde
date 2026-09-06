@@ -772,10 +772,12 @@ function brodCleatAt(x) {
  *   - the ONE DARK TIN — bulwark strake and boot-top — taking only the dark
  *     population of the band so the white rails crossing it are not in the
  *     sample, swings +0.770 up against −0.566 down: a dark paint chalks PALE,
- *     the opposite sign to the topsides. Halved on the way in, because ours is
- *     already 7.5x lighter than the mural's near-black and because sd(ln) on a
- *     near-black JPEG is mostly the codec. The boot-top gets more of it than
- *     the strake: sd(ln) 1.27 against 0.444, and it is the band that lives in
+ *     the opposite sign to the topsides. A QUARTER of it goes on — +0.180 and
+ *     −0.144 built against the measured +0.770 and −0.566 — because ours is
+ *     already 7.5x lighter than the mural's near-black, and because sd(ln)
+ *     measured on near-black JPEG pixels is mostly the codec. The boot-top
+ *     gets more of it than the strake, +0.289 against −0.302: sd(ln) 1.27 in
+ *     the mural against the strake's 0.444, and it is the band that lives in
  *     the water.
  *   - the GOLD COVE is a broken line, not a dirty one. Its half-correlation
  *     along her is 0.03–0.07 m against the topside's 1.55 m, and after a 4.2 m
