@@ -13255,9 +13255,10 @@ async function buildJadrija(scene) {
       //    from `top − 0.42` to `top − 0.16`. The board was 0.46 deep and
       //    centred on `top − 0.34`, so it stood 0.15 m taller than the thing
       //    it was supposed to be lettering and crossed the awning above it.
-      //  · Caps come out at 0.16 m against the board's 0.285. In `_111954` at
-      //    five times source the capital M is a little under three quarters of
-      //    the valance's depth, and 0.16 on a 0.26 band is 0.62 of it.
+      //  · Caps come out at 0.191 m against the board's 0.285 — 0.735 of the
+      //    valance, which is what `_175806` at four times source and `_111954`
+      //    at five both measure. See the `cap` and `base` numbers in
+      //    `shopSign`, which is where that is actually solved.
       //  · 4.1 m and not 6.4. Partly the frame — the name is about a third of
       //    this awning, not two thirds — and partly the canvas: `shopSign`
       //    caps its texture at 2048 px and derives the width from the height,
