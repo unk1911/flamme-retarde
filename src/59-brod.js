@@ -648,6 +648,34 @@ function brodFendOut() {
 }
 
 /**
+ * Her mooring cleats, and where the rope comes off one.
+ *
+ * `1000150377` is a photograph of the mole's bitt with three turns of white
+ * rope on it and the tail flaked out on the concrete, and — this is the part
+ * worth being exact about — **there is no boat in the frame**. So the rope
+ * leading nowhere is not a mistake in the model, it is the survey: he
+ * photographed a bollard on an empty quay. The mistake is only that the game
+ * puts a twenty-seven metre boat against that quay and left her lying to
+ * nothing at all.
+ *
+ * A boat alongside is made fast, and she had nothing to make fast *to*: not
+ * one cleat, one bitt or one samson post anywhere on her. So: two a side, on
+ * the capping, where the rope can come straight off them and down to the
+ * stone without a fairlead. Both sides for the reason the tyres are both
+ * sides — she has been photographed to starboard and she berths port-to.
+ *
+ * Returned in her AUTHORED frame so `brodProto` can draw it and `moor` can
+ * multiply by `BROD_K`, which is the same contract `BROD_FEND` has. `z` comes
+ * back positive; the port copy is the same numbers negated.
+ */
+const BROD_CLEAT = [3.80, -6.30];        // authored stations, fore and aft
+const BROD_CLEAT_Y = BROD_P(0.17);       // the horn, over the capping
+function brodCleatAt(x) {
+  const s = brodStation(x);
+  return [x, s[4] + BROD_CLEAT_Y, s[5] - BROD_P(0.10)];
+}
+
+/**
  * The hull, the house and everything standing on her.
  *
  * Local frame is `boatProto`'s — **+X forward, +Y up, +Z to starboard** — so
@@ -1367,6 +1395,43 @@ function brodProto() {
       b.box(0.60 + dx, ys - 0.20, -(ws - 0.06), 0.13, 0.90, 0.13, TRIM);
     }
     b.box(0.60, ys + 0.02, -(ws - 0.06), 1.58, 0.09, 0.14, TRIM);
+  }
+
+  // ── the mooring cleats ────────────────────────────────────────────────────
+  //
+  // See `brodCleatAt`. Four of them, two a side, standing on the capping: a
+  // bedplate, two feet and a horn bar across the top, which is the whole of a
+  // cleat at the size a 0.40 m one is on a boat you are two metres from.
+  //
+  // GALVANISED AND NOT VARNISHED. Every fitting on her that is not structure
+  // is `TRIM`, which is mahogany, and a mahogany cleat on a working ferry is a
+  // yacht's fitting: what is on these boats is hot-dip galvanised steel that
+  // has gone the colour of the sky. Same value as the raft's mooring irons in
+  // `moor`, deliberately — they are the same ironmongery from the same yard.
+  {
+    const GALV = [0.430, 0.438, 0.446];
+    const GDK = [0.352, 0.360, 0.368];
+    for (const cx of BROD_CLEAT) {
+      const [, cy, cz] = brodCleatAt(cx);
+      for (const s of [1, -1]) {
+        const z = s * cz;
+        // The bedplate, and it is SUNK 15 mm rather than laid on. `cy` is the
+        // top of the horn and `brodCleatAt` puts it BROD_P(0.17) over the cap,
+        // so a 40 mm plate under it lands its own underside exactly on the
+        // cap's top quad — two coplanar faces, which is rule 5 and which on a
+        // pale grey plate over a brown capping is a flicker you see from the
+        // whole length of the mole. 60 mm thick with its bottom bedded into
+        // the timber: the plate is a plate, and nothing is coincident.
+        b.box(cx, cy - BROD_P(0.155), z, BROD_P(0.34), BROD_P(0.06),
+          BROD_P(0.13), GDK, GALV);
+        for (const dx of [-BROD_P(0.11), BROD_P(0.11)]) {
+          b.box(cx + dx, cy - BROD_P(0.085), z, BROD_P(0.07), BROD_P(0.09),
+            BROD_P(0.08), GALV, GALV);
+        }
+        b.box(cx, cy - BROD_P(0.025), z, BROD_P(0.42), BROD_P(0.05),
+          BROD_P(0.075), GALV, GALV);
+      }
+    }
   }
 
   // ── the tyre fenders ──────────────────────────────────────────────────────
@@ -2164,6 +2229,8 @@ function buildBrod(scene) {
   group.add(boat);
 
   let fitting = null;            // the pier furniture, once we know where it goes
+  let lines = null;              // her mooring lines — see `moorLines` below
+  let moorRun = null;            // [{ cleat, post, sag }], her end in HER frame
   let pax = null;                // the passengers, once their rigs have loaded
   let paxT = 0;                  // their clock — see `draw`
   let route = null;              // [[x, z], ...], berth first
@@ -2239,6 +2306,88 @@ function buildBrod(scene) {
     tex.anisotropy = 8;
     regCache[text] = tex;
     return tex;
+  }
+
+  /**
+   * A mooring line, as a tube that is rewritten every frame.
+   *
+   * Ten segments and four sides — 80 quads for both lines together. A rope is
+   * a thing you can be on either side of, so the material is `DoubleSide`
+   * rather than the geometry carrying both windings: it is the same picture
+   * for half the triangles, and on a member this thin the shading comes off
+   * the per-vertex normal, which is exact here because a tube knows its own.
+   *
+   * 44 mm and not 24. A mooring warp for a boat of twenty-odd tonnes is 22 mm
+   * three-strand and at 22 mm it is a hairline you have to be told is there —
+   * the same finding as the fender lanyards four hundred lines up, from the
+   * same distance. Drawn at twice its rope size it reads as a rope.
+   */
+  const MOOR_N = 10, MOOR_S = 4, MOOR_R = 0.022;
+  const mA = new THREE.Vector3(), mB = new THREE.Vector3();
+  const mD = new THREE.Vector3(), mE = new THREE.Vector3(), mF = new THREE.Vector3();
+  const mP = [];
+  for (let i = 0; i <= MOOR_N; i++) mP.push(new THREE.Vector3());
+
+  function moorGeo(n) {
+    const tris = n * MOOR_N * MOOR_S * 2;
+    const g = new THREE.BufferGeometry();
+    for (const name of ['position', 'normal']) {
+      const a = new THREE.BufferAttribute(new Float32Array(tris * 9), 3);
+      a.setUsage(THREE.DynamicDrawUsage);
+      g.setAttribute(name, a);
+    }
+    return g;
+  }
+
+  /**
+   * Lay both of them out for where she is lying THIS frame.
+   *
+   * Her end goes through `boat.localToWorld`, so the rope follows her roll and
+   * her trim; the mole's end is a world constant. The dip is a half sine and
+   * not a catenary: over eleven metres with 0.4 m of sag the two differ by
+   * about a centimetre, and the sine costs one call.
+   */
+  function drawMoor() {
+    if (!lines || !moorRun) return;
+    const pos = lines.geometry.attributes.position.array;
+    const nor = lines.geometry.attributes.normal.array;
+    let k = 0;
+    const put = (P, ex, ey, ez) => {
+      pos[k] = P.x + ex * MOOR_R; nor[k++] = ex;
+      pos[k] = P.y + ey * MOOR_R; nor[k++] = ey;
+      pos[k] = P.z + ez * MOOR_R; nor[k++] = ez;
+    };
+    for (const L of moorRun) {
+      mA.copy(L.cleat);
+      boat.localToWorld(mA);
+      mB.copy(L.post);
+      for (let i = 0; i <= MOOR_N; i++) {
+        const t = i / MOOR_N;
+        mP[i].lerpVectors(mA, mB, t);
+        mP[i].y -= Math.sin(t * Math.PI) * L.sag;
+      }
+      for (let i = 0; i < MOOR_N; i++) {
+        const P = mP[i], Q = mP[i + 1];
+        mD.subVectors(Q, P).normalize();
+        // Athwart the run. A mooring line at this berth is never within forty
+        // degrees of vertical, so there is no basis to get degenerate.
+        mE.set(-mD.z, 0, mD.x).normalize();
+        mF.crossVectors(mD, mE);
+        for (let s = 0; s < MOOR_S; s++) {
+          const a0 = (s / MOOR_S) * TAU, a1 = ((s + 1) / MOOR_S) * TAU;
+          const c0 = Math.cos(a0), s0 = Math.sin(a0);
+          const c1 = Math.cos(a1), s1 = Math.sin(a1);
+          const x0 = mE.x * c0 + mF.x * s0, y0 = mE.y * c0 + mF.y * s0,
+            z0 = mE.z * c0 + mF.z * s0;
+          const x1 = mE.x * c1 + mF.x * s1, y1 = mE.y * c1 + mF.y * s1,
+            z1 = mE.z * c1 + mF.z * s1;
+          put(P, x0, y0, z0); put(Q, x0, y0, z0); put(Q, x1, y1, z1);
+          put(P, x0, y0, z0); put(Q, x1, y1, z1); put(P, x1, y1, z1);
+        }
+      }
+    }
+    lines.geometry.attributes.position.needsUpdate = true;
+    lines.geometry.attributes.normal.needsUpdate = true;
   }
 
   function moor() {
@@ -2576,6 +2725,61 @@ function buildBrod(scene) {
         raft.updateMatrixWorld();
         scene.add(raft);
       }
+
+      // ── AND HER OWN LINES, WHICH ARE THE THING THAT WAS MISSING ───────────
+      //
+      // The pier's rope is photographed and correct: `1000150377` has three
+      // turns on the bitt and the tail flaked on the slab, with no boat in the
+      // frame. What the model was short of is HER lines, and a scheduled ferry
+      // lying alongside with her engine on has them.
+      //
+      // TWO CROSSED SPRINGS, and the arrangement is forced rather than chosen.
+      // The mole carries exactly two things you can put a rope on — the
+      // mushroom 6.4 m in from the head and the bitt 12.8 m in — and both of
+      // them lie under her waist: she spans u 24 to 52 on a pier that ends at
+      // 46. There is nothing ahead of her stem and nothing abaft her transom,
+      // so a head rope and a stern rope are not available and would not hold
+      // her if they were. What holds a boat between two bollards under her
+      // waist is a pair of springs that cross: her bow cleat leading AFT to
+      // the bitt, her quarter cleat leading FORWARD to the mushroom. That is
+      // also what `1000150378` shows of the fleet on the other face — the
+      // lines in it run slantwise, not square.
+      //
+      // THEY ARE REDRAWN EVERY FRAME, and that is not gold plating. She lies
+      // to the real Gerstner surface and `place` chases it: measured at the
+      // berth over five and a half seconds she rolls through 2.9 degrees and
+      // trims through 3.0, which at the fore cleat is 0.24 m of vertical
+      // travel. A rope baked into the mole's frame would spend half its life
+      // hanging off her rail with daylight under it. Two lines of ten segments
+      // is 160 triangles rewritten a frame, which is nothing.
+      lines = new THREE.Mesh(moorGeo(2), new THREE.MeshBasicMaterial());
+      lines.material.dispose();
+      lines.material = solidMaterial(new THREE.Color(0.855, 0.836, 0.786), {
+        vcol: false, spec: 0.05, specPower: 18, side: THREE.DoubleSide });
+      lines.frustumCulled = false;
+      lines.visible = false;
+      scene.add(lines);
+      {
+        // Her cleats, in her own frame and in BUILT metres — `brodCleatAt`
+        // answers authored, like everything the builder eats.
+        const cl = (x) => {
+          const [cx, cy, cz] = brodCleatAt(x);
+          return new THREE.Vector3(cx * BROD_K, cy * BROD_K, -cz * BROD_K);
+        };
+        // And the mole's, in the world. The mushroom's swelling and the bitt's
+        // shank are both about 0.30 m over the coping, which is where a turn
+        // sits on either of them.
+        const post = (u, vin) => {
+          const w = A.toW(u, sgn * (A.w - vin));
+          return new THREE.Vector3(w[0], A.top + 0.30, w[1]);
+        };
+        moorRun = [
+          // Bow cleat to the bitt: 11.7 m, leading aft.
+          { cleat: cl(BROD_CLEAT[0]), post: post(A.out - 12.8, 0.66), sag: 0.40 },
+          // Quarter cleat to the mushroom: 12.7 m, leading forward.
+          { cleat: cl(BROD_CLEAT[1]), post: post(A.out - 6.4, 0.62), sag: 0.35 },
+        ];
+      }
     }
     reset();
     // The passengers, which is the one thing aboard her that cannot be built
@@ -2748,6 +2952,10 @@ function buildBrod(scene) {
     if (!route || active) return false;
     active = true;
     group.visible = true;
+    // Let go fore and aft. `idle` is what maintains the lines and it stops
+    // running the moment she is `active`, so without this the two springs
+    // would stay where they were and follow her up the channel.
+    if (lines) lines.visible = false;
     phase = 'letgo';
     s = 0; sp = 0; tmr = 0; said = -1;
     // IN BUILT METRES, WHICH THESE WERE NOT. `you.z = -1.30` was written when
@@ -2926,6 +3134,17 @@ function buildBrod(scene) {
     const d = Math.hypot(cam.x - berth.x, cam.z - berth.z);
     group.visible = d < 1000;
     if (group.visible) place(berth.x, berth.z, berth.yaw, dt);
+    // Her lines, after `place` and not before it: they hang off her cleats
+    // through `boat.localToWorld`, so laying them out against last frame's
+    // matrix is a rope that lags her roll by a frame.
+    //
+    // Redrawn inside 300 m and not inside 1000. She is scenery out to a
+    // kilometre and a 44 mm rope is under a pixel past a couple of hundred
+    // metres, so beyond that the two lines are eighty quads of nothing.
+    if (lines) {
+      lines.visible = group.visible && d < 300;
+      if (lines.visible) drawMoor();
+    }
     // And the people on her, who are the whole point of walking out to the
     // Brod: what tells you from the road that there is a boat to catch is that
     // there are people already sitting on it. `place` has just left
