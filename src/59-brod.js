@@ -543,15 +543,37 @@ function scaledBuilder(b, k) {
   };
 }
 
-/** The sheer height and half-beam at any x, interpolated between stations. */
+/**
+ * The sheer height and half-beam at any x, interpolated between stations.
+ *
+ * **CLAMPED FIRST, AND THAT IS NOT TIDYING.** The loop only finds a pair when
+ * x lies *between* two stations; for anything outside the table it fell
+ * through with `a` and `c` still on the first pair and `u` saturated at 1, so
+ * every x aft of the transom answered with the **stem's** station — sheer 2.05
+ * where it should be 1.62, half-beam 0.72 where it should be 1.82.
+ *
+ * That was not a rounding error, it was the loudest thing on the boat. The
+ * deck loop in `brodProto` runs to x −8.2 authored, which is 0.4 aft of the
+ * last station, so its final bulwark segment was drawn from the transom to a
+ * point 0.7 m abaft it, pinched to the stem's beam and lifted 0.75 m: a pair
+ * of blades, navy on the outside face and white on the inside, sticking three
+ * metres out of her counter and down through the waterline. From the quay
+ * astern of her — which is where you stand waiting for her — it was most of
+ * her silhouette. Photographed from the mole at 22 m before the fix.
+ *
+ * Both loops in `brodProto` now stop on the hull as well, which is the other
+ * half of it: a clamp alone would have left a metre of flat cap projecting
+ * aft of the transom instead of a blade.
+ */
 function brodSheer(x) {
+  const q = clamp(x, BROD_ST[BROD_ST.length - 1][0], BROD_ST[0][0]);
   let a = BROD_ST[0], c = BROD_ST[1];
   for (let i = 0; i < BROD_ST.length - 1; i++) {
-    if (x <= BROD_ST[i][0] && x >= BROD_ST[i + 1][0]) {
+    if (q <= BROD_ST[i][0] && q >= BROD_ST[i + 1][0]) {
       a = BROD_ST[i]; c = BROD_ST[i + 1]; break;
     }
   }
-  const u = clamp((a[0] - x) / ((a[0] - c[0]) || 1), 0, 1);
+  const u = clamp((a[0] - q) / ((a[0] - c[0]) || 1), 0, 1);
   return [a[4] + (c[4] - a[4]) * u, a[5] + (c[5] - a[5]) * u];
 }
 
@@ -673,15 +695,50 @@ function brodProto() {
   // Local, and off `BROD_ST0` for the same reason `ST` is: `brodSheer` answers
   // in built metres, which is what the deck logic wants and is exactly what
   // must not come in here.
+  // Clamped for the reason `brodSheer` above is clamped, and it is the same
+  // bug: this is the copy that DREW the blades off her counter.
   const sheerAt = (x) => {
+    const q = clamp(x, BROD_ST0[BROD_ST0.length - 1][0], BROD_ST0[0][0]);
     let a = BROD_ST0[0], c = BROD_ST0[1];
     for (let i = 0; i < BROD_ST0.length - 1; i++) {
-      if (x <= BROD_ST0[i][0] && x >= BROD_ST0[i + 1][0]) {
+      if (q <= BROD_ST0[i][0] && q >= BROD_ST0[i + 1][0]) {
         a = BROD_ST0[i]; c = BROD_ST0[i + 1]; break;
       }
     }
-    const u = clamp((a[0] - x) / ((a[0] - c[0]) || 1), 0, 1);
+    const u = clamp((a[0] - q) / ((a[0] - c[0]) || 1), 0, 1);
     return [a[4] + (c[4] - a[4]) * u, a[5] + (c[5] - a[5]) * u];
+  };
+
+  /**
+   * The whole station row at any x, and the half-beam at any HEIGHT on it.
+   *
+   * `sheerAt` answers for the deck edge, which is all the bulwark ever needed.
+   * A thing hung on her SIDE needs to know where her side is at the height it
+   * hangs at, and she has 0.35 m of flare between the chine and the sheer
+   * amidships — a fender placed off the sheer half-beam floats a third of a
+   * metre clear of the topsides, and one placed off the chine's is buried.
+   *
+   * Inverted off the same loft `pt` above plates her with, so the answer is
+   * the surface and not an approximation of it: `pt` puts the topside at
+   * `y = cy + (sy − cy) u^0.94` and `w = cw + (sw − cw) u^0.58`, so u comes
+   * back off the first and goes into the second.
+   */
+  const stAt = (x) => {
+    const q = clamp(x, BROD_ST0[BROD_ST0.length - 1][0], BROD_ST0[0][0]);
+    let a = BROD_ST0[0], c = BROD_ST0[1];
+    for (let i = 0; i < BROD_ST0.length - 1; i++) {
+      if (q <= BROD_ST0[i][0] && q >= BROD_ST0[i + 1][0]) {
+        a = BROD_ST0[i]; c = BROD_ST0[i + 1]; break;
+      }
+    }
+    const u = clamp((a[0] - q) / ((a[0] - c[0]) || 1), 0, 1);
+    return a.map((v, k) => v + (c[k] - v) * u);
+  };
+  const beamAt = (x, y) => {
+    const [, , cy, cw, sy, sw] = stAt(x);
+    if (sy <= cy) return sw;
+    const u = Math.pow(clamp((y - cy) / (sy - cy), 0, 1), 1 / 0.94);
+    return cw + (sw - cw) * Math.pow(u, 0.58);
   };
 
   // ── the deck and the bulwark ─────────────────────────────────────────────
@@ -690,11 +747,26 @@ function brodProto() {
   // twice going forward — cockpit, side deck, foredeck — which is what the
   // engine under the house and the chain locker under the foredeck do to it.
   const soleAt = (x) => (x > 4.30 ? 1.22 : (x > -1.35 ? 1.06 : 0.72));
+  // ON THE HULL AND NOT PAST IT, both ends, and forty segments and not
+  // twenty-six.
+  //
+  // The old range was 7.6 down to −8.2 while the loft runs 7.80 to −7.80: it
+  // stopped 0.35 m short of the stem at one end and overshot the transom by
+  // 0.70 m at the other, and the overshoot is what `brodSheer`'s note is
+  // about. Ending ON the last station instead — a hair inside it at each end
+  // so the cap never skims the transom fan, per rule 5.
+  //
+  // Twenty-six segments over 15.5 is 1.04 m of bulwark a segment, and her
+  // sheer lifts 0.33 m in the last 1.2 m of the bow: the forward end of the
+  // dark strake came out as a visible flight of four steps against the sky in
+  // every bow-on frame. At forty it is 0.68 m a segment and the steps are
+  // inside the width of the strake itself.
   {
-    const NX = 26;
+    const NX = 40;
+    const XF = 7.76, XA = -7.78;
     for (let i = 0; i < NX; i++) {
-      const x0 = 7.6 - 15.8 * (i / NX);
-      const x1 = 7.6 - 15.8 * ((i + 1) / NX);
+      const x0 = XF + (XA - XF) * (i / NX);
+      const x1 = XF + (XA - XF) * ((i + 1) / NX);
       const [y0, w0] = sheerAt(x0), [y1, w1] = sheerAt(x1);
       const i0 = Math.max(0.02, w0 - 0.24), i1 = Math.max(0.02, w1 - 0.24);
       const sy = soleAt((x0 + x1) * 0.5);
@@ -716,9 +788,17 @@ function brodProto() {
     }
     // The gold cove line: one 70 mm strip a side, standing 12 mm off the
     // topside so it never z-fights the hull it is painted on.
+    //
+    // TO THE STEM AND TO THE TRANSOM. It ran 7.3 to −7.9 — 0.9 m short of the
+    // stemhead forward and 0.2 m past the transom aft — and both ends showed.
+    // In `murals/brod-mural.jpg` the gold is the one line that carries the
+    // whole sheer: it sweeps up and dies into the stemhead, and it is the last
+    // thing still legible on her at the far end of the mole. Ours stopped in
+    // the middle of the bow with nothing at its end, which reads as a stripe
+    // somebody gave up painting.
     for (let i = 0; i < NX; i++) {
-      const x0 = 7.3 - 15.2 * (i / NX);
-      const x1 = 7.3 - 15.2 * ((i + 1) / NX);
+      const x0 = XF + (XA - XF) * (i / NX);
+      const x1 = XF + (XA - XF) * ((i + 1) / NX);
       const [y0, w0] = sheerAt(x0), [y1, w1] = sheerAt(x1);
       for (const s of [1, -1]) {
         sideQuad(s, [x0, y0 - 0.50, s * (w0 + 0.012)], [x1, y1 - 0.50, s * (w1 + 0.012)],
