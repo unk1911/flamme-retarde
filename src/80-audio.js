@@ -4147,6 +4147,86 @@ function buildAudio() {
     man_old_heavy:    { f0: 108, f1: 610, f2: 1020, dur: 0.60, rise: 0.04, rasp: 0.34 },
   };
 
+  /**
+   * The other half of what he asked for: *"an instant local yelp/gasp"*.
+   *
+   * `gasp` already exists in this file and CANNOT BE USED FOR THIS, which is
+   * worth writing down because reusing it is the obvious move. That one is a
+   * SURFACING: 0.34 s of swell, then the surface breaking over your head, then
+   * the water running off, then the breath. Its whole shape is "here it comes",
+   * built so you hear the head rising. A hose landing on your back is the exact
+   * opposite — there is no lead-in at all, and the reaction has to be at its
+   * peak on the first frame or it is not a startle, it is a comment.
+   *
+   * So this is its own thing, and the difference from `yelp` is one word:
+   * UNVOICED. A yelp is a vowel — an oscillator with formants and a pitch
+   * contour, which is a person making a noise ON PURPOSE. A startle is air: the
+   * glottis opens and the intake goes through the throat with no voice behind
+   * it, and only at the very end does a little voicing catch up. That is why
+   * somebody who saw it coming yelps and somebody who did not gasps, and it is
+   * the whole of why both are here.
+   *
+   * The eight voices come off `YELP`'s own table so a child's startle is
+   * brighter than a heavy man's without a second set of numbers to keep in
+   * step. 0.055 s to full, against the yelp's 0.028 — a gasp is a fraction
+   * slower to peak because air has to move, and it is shorter overall.
+   */
+  function startle(kind, d = 0) {
+    if (!ctx || !noiseBuf) return;
+    const V = YELP[kind] || YELP.woman_young_slim;
+    const t0 = ctx.currentTime + 0.01;
+    const far = Math.max(0.05, 1 - d / 30);
+    const j = 0.90 + Math.random() * 0.20;
+    const dur = (0.20 + V.dur * 0.22) * j;
+
+    // The intake. One band sweeping up through the throat — low and closed at
+    // the start, open and bright a tenth of a second later.
+    const air = ctx.createBufferSource();
+    air.buffer = noiseBuf; air.loop = true;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = 1.15;
+    bp.frequency.setValueAtTime(V.f1 * 0.55, t0);
+    bp.frequency.exponentialRampToValueAtTime(V.f2 * 1.55, t0 + dur * 0.42);
+    bp.frequency.exponentialRampToValueAtTime(V.f2 * 0.95, t0 + dur);
+    const ag = ctx.createGain();
+    ag.gain.setValueAtTime(0.0001, t0);
+    ag.gain.exponentialRampToValueAtTime(1.15 * far, t0 + 0.055);
+    ag.gain.exponentialRampToValueAtTime(0.34 * far, t0 + dur * 0.62);
+    ag.gain.exponentialRampToValueAtTime(0.0001, t0 + dur + 0.09);
+    air.connect(bp).connect(ag).connect(master);
+    air.start(t0); air.stop(t0 + dur + 0.14);
+
+    // A second, higher band with almost nothing in it — the hiss across the
+    // teeth. Without it the intake is a filter sweep and not a mouth.
+    const hs = ctx.createBufferSource();
+    hs.buffer = noiseBuf; hs.loop = true;
+    const hf = ctx.createBiquadFilter();
+    hf.type = 'highpass'; hf.frequency.value = V.f2 * 2.4;
+    const hg = ctx.createGain();
+    hg.gain.setValueAtTime(0.0001, t0);
+    hg.gain.exponentialRampToValueAtTime(0.085 * V.rasp * 4 * far, t0 + 0.04);
+    hg.gain.exponentialRampToValueAtTime(0.0001, t0 + dur * 0.72);
+    hs.connect(hf).connect(hg).connect(master);
+    hs.start(t0); hs.stop(t0 + dur);
+
+    // And the voice catching up at the end, which is the half-syllable that
+    // comes out after the air does. Quiet, short, and falling — it is not a
+    // yelp, it is the tail of one that never happened.
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    const tv = t0 + dur * 0.46;
+    osc.frequency.setValueAtTime(V.f0 * j * 1.06, tv);
+    osc.frequency.exponentialRampToValueAtTime(V.f0 * j * 0.80, tv + dur * 0.54);
+    const vf = ctx.createBiquadFilter();
+    vf.type = 'bandpass'; vf.Q.value = 6.0; vf.frequency.value = V.f1;
+    const vg = ctx.createGain();
+    vg.gain.setValueAtTime(0.0001, tv);
+    vg.gain.exponentialRampToValueAtTime(0.42 * far, tv + 0.035);
+    vg.gain.exponentialRampToValueAtTime(0.0001, tv + dur * 0.62);
+    osc.connect(vf).connect(vg).connect(master);
+    osc.start(tv); osc.stop(tv + dur * 0.7);
+  }
+
   function yelp(kind, d = 0) {
     if (!ctx) return;
     const V = YELP[kind] || YELP.woman_young_slim;
@@ -4586,7 +4666,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn, yelp, hum, fly,
+    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn, yelp, startle, hum, fly,
     /**
      * The last node before the speakers, and the context it lives in.
      *

@@ -3826,6 +3826,15 @@ async function buildJadrija(scene) {
       body: [0.520, 0.528, 0.508], awn: 2.6, fg: '#1a2a3a', bg: '#ded7c7',
       pier: [0.075, 0.290, 0.140],
       plinth: [0.520, 0.430, 0.270],
+      // A GLASS-DOOR UPRIGHT DRINKS FRIDGE, which every caffe bar on this
+      // shore has and this one did not. `20260821_175806` at source resolution
+      // stands it hard against the reveal of the serving opening — a black
+      // frame with a lit interior behind the pane, its white vented compressor
+      // grille at the bottom reading rgb(76, 76, 77) against stone at
+      // rgb(135, 112, 84) in the same shade — and it is the tallest solid on
+      // the whole frontage after the awning posts. See `cooler`, which already
+      // draws exactly this cabinet for H2O and the slasticarnica.
+      cooler: true,
       // 20260823_111954: the shade over this terrace is a pair of big square
       // taupe canopies on grey steel masts standing in plinths of stacked
       // washed-aggregate block, and not the cream octagon in a car rim that
@@ -11028,6 +11037,107 @@ async function buildJadrija(scene) {
    */
   let konobaPad = null;
 
+  /**
+   * One moulded bar stool, in the shore frame, facing the counter.
+   *
+   * Nothing is rotated because nothing needs to be: every counter on this
+   * shore runs along `t` and every stool at one faces inland, so the shop's
+   * own frame is the stool's. That is also why the back is at `-s` throughout
+   * — `+s` is the bar.
+   *
+   * SHARED, and it was written as the konoba's. It came off 20260821_175856,
+   * where six of them stand at that counter in scarlet and lime; beach bar
+   * MINI has the same moulding in white along its own drinking ledge in
+   * 20260821_175806 and 20260823_111954, and the perforated back is the thing
+   * both frames agree on. One stool drawn twice, not two stools.
+   *
+   * `bsY` is the floor it stands on and is passed rather than closed over,
+   * because the konoba's terrace is 177 mm over the deck datum every other
+   * shop on this boardwalk is built off — see `konobaFloor`.
+   */
+  function barStool(knT, knS, bsY, knC) {
+    const knDk = shade(knC, 0.86);
+    // 0.735 under a 1.08 counter is 0.345 of knee, which is bar height.
+    const knSeat = bsY + 0.735, knTop = bsY + 0.781;
+    // Four legs, splayed. `frustumTS` joins two rectangles that differ in
+    // centre as well as in size, so a raked tapering leg is one call — the
+    // splay is the difference between a stool and four dowels and `post`
+    // cannot express it.
+    for (const [ot, os] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      frustumTS(bsY + 0.004,
+        [knT + ot * 0.205, knS + os * 0.198, 0.019, 0.019], knSeat,
+        [knT + ot * 0.160, knS + os * 0.156, 0.016, 0.016], knDk);
+    }
+    // The footrest, all four sides, taken at the offsets the legs actually
+    // have at that height rather than at the ones they have at the floor.
+    // The two pairs sit 4 mm apart in height where they cross, which is
+    // cheaper than mitring them and keeps two horizontal faces off each
+    // other (rule 5).
+    for (const os of [-0.185, 0.185]) {
+      boxTS(knT - 0.191, knT + 0.191, knS + os - 0.011, knS + os + 0.011,
+        bsY + 0.213, bsY + 0.237, knDk);
+    }
+    for (const ot of [-0.191, 0.191]) {
+      boxTS(knT + ot - 0.011, knT + ot + 0.011, knS - 0.185, knS + 0.185,
+        bsY + 0.217, bsY + 0.241, knDk);
+    }
+    boxTS(knT - 0.200, knT + 0.200, knS - 0.190, knS + 0.190,
+      knSeat, knTop, knC, shade(knC, 1.10));
+    // The back. `knBk` is its own sheared, bowed frame: `s` falls away
+    // with height (the rake) and comes forward at the ends (the tub), so
+    // every bar in the mesh follows the curve without any of them knowing
+    // about it.
+    const knHW = 0.185, knH = 0.375, knBow = 0.060;
+    const knBk = (dt, h, dv) => W(knT + dt,
+      knS - 0.168 - 0.30 * h + knBow * (dt * dt) / (knHW * knHW) + (dv || 0),
+      knTop + h);
+    // Both windings on everything in the back, for `meshChair`'s reason: a
+    // mesh is one ply and you are meant to see the far side of it.
+    const knFace = (A, C, D, E, c) => {
+      b.quad(A, C, D, E, c);
+      b.quad(E, D, C, A, c);
+    };
+    for (const dt of [-(knHW - 0.020), knHW - 0.020]) {
+      for (let j = 0; j < 3; j++) {
+        const h0 = knH * (j / 3), h1 = knH * ((j + 1) / 3);
+        knFace(knBk(dt - 0.020, h0), knBk(dt + 0.020, h0),
+          knBk(dt + 0.020, h1), knBk(dt - 0.020, h1), knC);
+      }
+    }
+    // The top rail, which is the thing a hand goes on and the one part of
+    // a mesh back that is solid.
+    for (let j = 0; j < 4; j++) {
+      const d0 = -knHW + 2 * knHW * (j / 4);
+      const d1 = -knHW + 2 * knHW * ((j + 1) / 4);
+      knFace(knBk(d0, knH - 0.048), knBk(d1, knH - 0.048),
+        knBk(d1, knH), knBk(d0, knH), knC);
+      b.quad(knBk(d0, knH), knBk(d1, knH),
+        knBk(d1, knH, -0.026), knBk(d0, knH, -0.026), shade(knC, 1.08));
+    }
+    // The mesh: uprights, then crossbars a centimetre behind them.
+    for (let i = 1; i < 5; i++) {
+      const u = -knHW + 2 * knHW * (i / 5);
+      for (let j = 0; j < 2; j++) {
+        const h0 = knH * (j / 2), h1 = knH * ((j + 1) / 2) - 0.048 * j;
+        knFace(knBk(u - 0.009, h0), knBk(u + 0.009, h0),
+          knBk(u + 0.009, h1), knBk(u - 0.009, h1), knDk);
+      }
+    }
+    for (let i = 1; i < 4; i++) {
+      const h = (knH - 0.048) * (i / 4);
+      for (let j = 0; j < 3; j++) {
+        const d0 = -knHW + 2 * knHW * (j / 3);
+        const d1 = -knHW + 2 * knHW * ((j + 1) / 3);
+        knFace(knBk(d0, h - 0.009, -0.014), knBk(d1, h - 0.009, -0.014),
+          knBk(d1, h + 0.009, -0.014), knBk(d0, h + 0.009, -0.014), knDk);
+      }
+    }
+    // The counter behind them blocks and the stools did not, so the one
+    // business on this boardwalk with nothing to walk through had a row of
+    // bar stools you walked through instead.
+    furniture.push({ t: knT, s: knS, a: 0.21, c: 0.21, h: 1.16, y: bsY });
+  }
+
   /** One business. Everything upright goes in `up`; pads stay in `deck`. */
   /**
    * What one shop has that the others do not.
@@ -11210,102 +11320,12 @@ async function buildJadrija(scene) {
       // has the same moulding in anthracite — MESH_DK, which is the resin MINI
       // seats its terrace on, because it is the same resin.
       const SCAR = [0.620, 0.115, 0.095], LIME = [0.400, 0.640, 0.120];
-      /**
-       * One moulded bar stool, in the shore frame, facing the counter.
-       *
-       * Nothing is rotated because nothing needs to be: the counter runs along
-       * `t` and every stool at it faces inland, so the shop's own frame is the
-       * stool's. That is also why the back is at `-s` throughout — `+s` is the
-       * bar.
-       */
-      const knStool = (knT, knS, knC) => {
-        const knDk = shade(knC, 0.86);
-        // 0.735 under a 1.08 counter is 0.345 of knee, which is bar height.
-        const knSeat = y0 + 0.735, knTop = y0 + 0.781;
-        // Four legs, splayed. `frustumTS` joins two rectangles that differ in
-        // centre as well as in size, so a raked tapering leg is one call — the
-        // splay is the difference between a stool and four dowels and `post`
-        // cannot express it.
-        for (const [ot, os] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-          frustumTS(y0 + 0.004,
-            [knT + ot * 0.205, knS + os * 0.198, 0.019, 0.019], knSeat,
-            [knT + ot * 0.160, knS + os * 0.156, 0.016, 0.016], knDk);
-        }
-        // The footrest, all four sides, taken at the offsets the legs actually
-        // have at that height rather than at the ones they have at the floor.
-        // The two pairs sit 4 mm apart in height where they cross, which is
-        // cheaper than mitring them and keeps two horizontal faces off each
-        // other (rule 5).
-        for (const os of [-0.185, 0.185]) {
-          boxTS(knT - 0.191, knT + 0.191, knS + os - 0.011, knS + os + 0.011,
-            y0 + 0.213, y0 + 0.237, knDk);
-        }
-        for (const ot of [-0.191, 0.191]) {
-          boxTS(knT + ot - 0.011, knT + ot + 0.011, knS - 0.185, knS + 0.185,
-            y0 + 0.217, y0 + 0.241, knDk);
-        }
-        boxTS(knT - 0.200, knT + 0.200, knS - 0.190, knS + 0.190,
-          knSeat, knTop, knC, shade(knC, 1.10));
-        // The back. `knBk` is its own sheared, bowed frame: `s` falls away
-        // with height (the rake) and comes forward at the ends (the tub), so
-        // every bar in the mesh follows the curve without any of them knowing
-        // about it.
-        const knHW = 0.185, knH = 0.375, knBow = 0.060;
-        const knBk = (dt, h, dv) => W(knT + dt,
-          knS - 0.168 - 0.30 * h + knBow * (dt * dt) / (knHW * knHW) + (dv || 0),
-          knTop + h);
-        // Both windings on everything in the back, for `meshChair`'s reason: a
-        // mesh is one ply and you are meant to see the far side of it.
-        const knFace = (A, C, D, E, c) => {
-          b.quad(A, C, D, E, c);
-          b.quad(E, D, C, A, c);
-        };
-        for (const dt of [-(knHW - 0.020), knHW - 0.020]) {
-          for (let j = 0; j < 3; j++) {
-            const h0 = knH * (j / 3), h1 = knH * ((j + 1) / 3);
-            knFace(knBk(dt - 0.020, h0), knBk(dt + 0.020, h0),
-              knBk(dt + 0.020, h1), knBk(dt - 0.020, h1), knC);
-          }
-        }
-        // The top rail, which is the thing a hand goes on and the one part of
-        // a mesh back that is solid.
-        for (let j = 0; j < 4; j++) {
-          const d0 = -knHW + 2 * knHW * (j / 4);
-          const d1 = -knHW + 2 * knHW * ((j + 1) / 4);
-          knFace(knBk(d0, knH - 0.048), knBk(d1, knH - 0.048),
-            knBk(d1, knH), knBk(d0, knH), knC);
-          b.quad(knBk(d0, knH), knBk(d1, knH),
-            knBk(d1, knH, -0.026), knBk(d0, knH, -0.026), shade(knC, 1.08));
-        }
-        // The mesh: uprights, then crossbars a centimetre behind them.
-        for (let i = 1; i < 5; i++) {
-          const u = -knHW + 2 * knHW * (i / 5);
-          for (let j = 0; j < 2; j++) {
-            const h0 = knH * (j / 2), h1 = knH * ((j + 1) / 2) - 0.048 * j;
-            knFace(knBk(u - 0.009, h0), knBk(u + 0.009, h0),
-              knBk(u + 0.009, h1), knBk(u - 0.009, h1), knDk);
-          }
-        }
-        for (let i = 1; i < 4; i++) {
-          const h = (knH - 0.048) * (i / 4);
-          for (let j = 0; j < 3; j++) {
-            const d0 = -knHW + 2 * knHW * (j / 3);
-            const d1 = -knHW + 2 * knHW * ((j + 1) / 3);
-            knFace(knBk(d0, h - 0.009, -0.014), knBk(d1, h - 0.009, -0.014),
-              knBk(d1, h + 0.009, -0.014), knBk(d0, h + 0.009, -0.014), knDk);
-          }
-        }
-        // The counter behind them blocks and the stools did not, so the one
-        // business on this boardwalk with nothing to walk through had a row of
-        // bar stools you walked through instead.
-        furniture.push({ t: knT, s: knS, a: 0.21, c: 0.21, h: 1.16, y: y0 });
-      };
       // Six at 1.06 m, which is what 6.2 m of counter takes, and not the
       // strict red-green-red the five used to alternate on: 175856 has two
       // scarlet together at the west end, and a run that alternates perfectly
       // is the regular pattern this file keeps finding is worse than nothing.
       for (let k = 0; k < 6; k++) {
-        knStool(S.t0 + 1.75 + k * 1.06, cs - 0.72,
+        barStool(S.t0 + 1.75 + k * 1.06, cs - 0.72, y0,
           [SCAR, SCAR, LIME, MESH_DK, LIME, MESH_DK][k]);
       }
       // ── the parasol, which is standing UNDER the roof ────────────────────
@@ -11684,36 +11704,163 @@ async function buildJadrija(scene) {
     }
 
     if (S.key === 'mini') {
-      // 175806. The awning over this terrace is not on the building: it is a
-      // cantilever on a grey steel mast with a stack of pebble-aggregate
-      // ballast slabs at its foot, and the ballast is the memorable half.
-      const mt = S.t1 - 1.2, ms = S.s0 - 5.2;
-      for (let i = 0; i < 3; i++) {
-        const r = 0.78 - i * 0.07;
-        boxTS(mt - r, mt + r, ms - r, ms + r,
-          y0 + i * 0.15, y0 + 0.15 + i * 0.15,
-          [0.520, 0.500, 0.455], [0.548, 0.528, 0.482]);
+      // ── THE THIRD CANOPY, WHICH WAS STANDING INSIDE THE SECOND ───────────
+      //
+      // A cantilever mast, its ballast and its canopy used to be built here,
+      // at `t1 − 1.2, s0 − 5.2` — and `bigShade` stands one at `t0 + 1.3` and
+      // another at `t0 + 1.3 + (t1 − t0 − 2.6)`, which on this shop is
+      // t 282.7, s 11.8. The two east ones were 0.1 m apart in `t` and 1.0 m
+      // apart in `s`: two stacks of grey block interpenetrating, two masts a
+      // metre apart, and one canopy inside the other. Shot from above it is
+      // unmistakable — a grey arm hanging in the air over the Jamnica valance
+      // with nothing under it, and the head of a second mast poking through
+      // the canopy's top surface.
+      //
+      // `bigShade` was written later off `20260823_111954` and is the better
+      // object of the two; what it did not carry over from this one is the
+      // CRANK, which both frames of this terrace show plainly. So the crank
+      // moves there and the duplicate goes, and with it the one collider it
+      // pushed — see the count in `bigShade`.
+      //
+      // ── the counter, which is a rubble wall with a plank across it ────────
+      //
+      // 20260821_175806 at source resolution, and standing on the promenade it
+      // is the loudest thing about this frontage: it is not the flat grey band
+      // `shopKit` draws for the boardwalk. Under the serving opening there is
+      // a limestone RUBBLE BASE COURSE a little over half a metre high, and
+      // standing on that a two-tier timber counter — a drinking ledge with
+      // white stools along it and a display shelf over it carrying a stack of
+      // bowls, a carton and a jar. Between the two you see the shop through
+      // the poles.
+      //
+      // MEASURED AS A RATIO, because every frame of this bay has it in the
+      // awning's shade (rule 8). The stone reads rgb(135, 112, 84) in the same
+      // shade in which the terrace concrete a metre in front of it reads
+      // rgb(145, 133, 116) — 0.93 / 0.84 / 0.72 of the promenade, which
+      // against `CONC[2]` is 0.472 / 0.380 / 0.277. That is honey limestone
+      // and a good deal warmer than the concrete it stands on, and it is
+      // darker than the konoba's sawn kerb because this is a rubble wall with
+      // its own mortar shadows in it rather than a cut face.
+      //
+      // The ledge plank is 0.49 / 0.42 / 0.40 of that stone again, which lands
+      // within a thousandth of `TIMB`; the shelf over it measures 0.67 / 0.61
+      // / 0.63 of the stone, so a third lighter than the ledge.
+      const mnOA = S.t0 + (S.t1 - S.t0) * 0.18;
+      const mnOC = S.t1 - (S.t1 - S.t0) * 0.18;
+      const MNSTONE = [0.472, 0.380, 0.277];
+      // Laid as separate stones with their own reach, which is `knRun`'s
+      // finding on the konoba's kerb arrived at again: eight metres of one
+      // extruded face is the flat band this file keeps finding is worse than
+      // nothing, and a rubble wall is a course of stones nobody sorted. The
+      // BACK of every stone is at `s0 − 0.26`, two centimetres INSIDE
+      // `shopKit`'s counter face at `s0 − 0.28`, so the two are never a
+      // coplanar pair (rule 5); the 12 mm between stones is the mortar joint
+      // and keeps their end caps out of each other's planes for the same
+      // reason.
+      //
+      // TWO COURSES, and the first cut was one. Half a metre of wall in stones
+      // 0.34 to 0.76 m long is four blocks tall as a man's knee laid end to
+      // end, and photographed from the promenade that is not a rubble wall, it
+      // is a row of cartons — the same failure the kiosk's shelf had before
+      // its own note was written. The stones in the frame are a hand and a
+      // half across at most and there are two courses of them, so that is what
+      // this is: 0.16 to 0.46 m long, the upper course started a third of a
+      // stone along so the vertical joints break, and the upper one's bottom
+      // face at 0.285 sitting INSIDE the lower one, which is never shorter
+      // than 0.30.
+      for (let mnCr = 0; mnCr < 2; mnCr++) {
+        const mnSalt = mnCr * 40;
+        let mnU = mnOA - 0.10 + mnCr * 0.17, mnI = 0;
+        while (mnU < mnOC + 0.08) {
+          const mnLen = Math.min(0.16 + jit(mnI, 771 + mnSalt) * 0.30,
+            mnOC + 0.10 - mnU);
+          const g = 0.84 + jit(mnI * 3 + 1, 772 + mnSalt) * 0.32;
+          const cl = [MNSTONE[0] * g, MNSTONE[1] * g, MNSTONE[2] * g];
+          boxTS(mnU, mnU + mnLen - 0.012,
+            S.s0 - 0.525 - jit(mnI * 5 + 2, 773 + mnSalt) * 0.080, S.s0 - 0.26,
+            mnCr ? y0 + 0.285 : y0 + 0.015,
+            mnCr ? y0 + 0.545 + jit(mnI * 7 + 3, 774 + mnSalt) * 0.070
+              : y0 + 0.300 + jit(mnI * 7 + 3, 774) * 0.030,
+            cl, shade(cl, 1.12));
+          mnU += mnLen; mnI++;
+        }
       }
-      post(W, mt, ms, y0 + 0.45, y0 + 3.45, 0.085, [0.400, 0.406, 0.410], 8);
-      // The arm, cranked out over the tables, and the canopy hanging off it.
-      boxTS(mt - 0.06, mt + 0.06, ms, ms + 2.9, y0 + 3.30, y0 + 3.45,
-        [0.400, 0.406, 0.410]);
-      for (let i = 0; i < 4; i++) {
-        const a0 = (i / 4) * TAU + 0.4, a1 = ((i + 1) / 4) * TAU + 0.4;
-        const R = 2.15;
-        b.quad(W(mt, ms + 2.6, y0 + 3.34),
-          W(mt + Math.cos(a0) * R, ms + 2.6 + Math.sin(a0) * R, y0 + 2.88),
-          W(mt + Math.cos(a1) * R, ms + 2.6 + Math.sin(a1) * R, y0 + 2.88),
-          W(mt, ms + 2.6, y0 + 3.34),
-          i % 2 ? [0.585, 0.570, 0.530] : [0.555, 0.540, 0.502]);
+      // The two shelves. `shopKit`'s counter slab is 0.98 to 1.06 at
+      // `s0 − 0.34`, and the plank's back edge is at `s0 − 0.30` with its
+      // UNDERSIDE at 1.02 — buried in that slab rather than resting on it,
+      // because a plank whose bottom face is in the same plane as the top it
+      // sits on is rule 5 on the one horizontal surface here.
+      //
+      // It starts 1.04 m east of the opening's own west end, and the number is
+      // arithmetic and not taste: `panelSign` hangs RENT A BOAT across
+      // t 274.22…274.52 and the chalkboard across 274.67…275.07, both of them
+      // at `s0 − 0.10`, and a ledge standing 0.30 m proud of that plane would
+      // be across the bottom half of both boards.
+      const mnL0 = mnOA + 1.04, mnL1 = mnOC + 0.06;
+      const MNLEDGE = [0.250, 0.163, 0.113];
+      const MNSHELF = [0.330, 0.240, 0.180];
+      boxTS(mnL0, mnL1, S.s0 - 0.64, S.s0 - 0.30, y0 + 1.02, y0 + 1.10,
+        MNLEDGE, shade(MNLEDGE, 1.34));
+      // The upper shelf at 1.545 and not at the 1.60 the frame's proportions
+      // suggest, because `shopInside` hangs its first shelf of bottles at
+      // `y0 + 1.66` from `s0 − 0.54` to `s0 − 0.30` — the wall this shelf
+      // stands in front of. 0.115 m of daylight between the two.
+      boxTS(mnL0 + 0.10, mnL1 - 0.10, S.s0 - 0.60, S.s0 - 0.33,
+        y0 + 1.475, y0 + 1.545, MNSHELF, shade(MNSHELF, 1.26));
+      // The poles both shelves stand on, and they are ROUND and knotty rather
+      // than sawn: this counter is made of the same driftwood as the bay at
+      // the west end of the frontage, which is the one thing on this shore
+      // somebody made out of what washed up. Five across six and a half
+      // metres. They start at 0.52, inside the stone, and finish at 1.52,
+      // inside the shelf.
+      const MNPOLE = [0.430, 0.352, 0.248];
+      for (let k = 0; k < 5; k++) {
+        post(W, mnL0 + 0.34 + k * ((mnL1 - mnL0 - 0.68) / 4), S.s0 - 0.46,
+          y0 + 0.52, y0 + 1.52, 0.038, MNPOLE, 5);
       }
-      // The ballast and the mast standing in it. Three metres of grey steel in
-      // the middle of the busiest terrace on the shore, and you walked through
-      // the lot of it. 0.70 against the bottom slab's own 0.78 — the stack
-      // steps in as it rises and 0.78 plus the girth would hold you off the top
-      // slab by a metre. `h` is the mast's, not the ballast's, because nobody
-      // hops a cantilever mast.
-      furniture.push({ t: mt, s: ms, a: 0.70, c: 0.70, h: 3.45, y: y0 });
+      // And WHAT IS ON IT, which is the half of "counter" this frontage did
+      // not have at all. 175806 has, west to east along the shelf: a stack of
+      // white bowls, a small carton, a lidded jar and a cup. Four objects
+      // across six metres and no more — a shelf packed end to end is a shop
+      // window, and this is a shelf somebody keeps the crockery on.
+      //
+      // Every one of them starts at 1.53, which is INSIDE the shelf's own
+      // 1.475…1.545, so no base sits in the plane of the top it stands on.
+      const MNWARE = [0.720, 0.706, 0.672];
+      for (let k = 0; k < 4; k++) {
+        const mnWT = mnL0 + 0.95 + k * ((mnL1 - mnL0 - 1.9) / 3);
+        const mnWS = S.s0 - 0.47;
+        if (k === 0) {
+          // The bowls, three of them nested and each a little narrower than
+          // the one under it, which is what a stack of bowls is.
+          for (let j = 0; j < 3; j++) {
+            post(W, mnWT, mnWS, y0 + 1.53 + j * 0.048,
+              y0 + 1.575 + j * 0.048, 0.092 - j * 0.007,
+              j % 2 ? shade(MNWARE, 0.92) : MNWARE, 9);
+          }
+        } else if (k === 1) {
+          boxTS(mnWT - 0.085, mnWT + 0.085, mnWS - 0.065, mnWS + 0.065,
+            y0 + 1.53, y0 + 1.735,
+            [0.560, 0.430, 0.280], [0.600, 0.470, 0.315]);
+        } else if (k === 2) {
+          post(W, mnWT, mnWS, y0 + 1.53, y0 + 1.715, 0.070,
+            [0.640, 0.630, 0.585], 8);
+          post(W, mnWT, mnWS, y0 + 1.705, y0 + 1.755, 0.056,
+            [0.330, 0.330, 0.320], 8);
+        } else {
+          post(W, mnWT, mnWS, y0 + 1.53, y0 + 1.625, 0.055, MNWARE, 8);
+        }
+      }
+      // The stools, and they are the konoba's — see `barStool`. Three of them,
+      // in the white `terraceSet` already seats this terrace on, tucked so
+      // that the seat's inland edge at `s0 − 0.67` stands 30 mm off the
+      // ledge's front face. They block, for `barStool`'s own reason: nothing
+      // else out here stops you.
+      const MNWHT = [0.735, 0.733, 0.720];
+      for (let k = 0; k < 3; k++) {
+        barStool(mnL0 + 0.80 + k * ((mnL1 - mnL0 - 1.6) / 2), S.s0 - 0.86,
+          y0, MNWHT);
+      }
       // The planter on legs. What grows in it is planted in `shopPlanting`,
       // and so are the yellow deckchairs.
       const pt = S.t0 + 6.4, ps = S.s0 - 3.6;
@@ -12168,17 +12315,51 @@ async function buildJadrija(scene) {
    *
    * Two of them, at the same two anchors the cream pair used, because those are
    * where the tables are and the photograph has them over the tables.
+   *
+   * ── AND THEY ARE CANTILEVERS, WHICH IS WHY THE PLINTH IS THERE ────────────
+   *
+   * `20260821_175732` catches both of them furled from twenty metres west and
+   * `175806` has the east one open from underneath, and in each the mast is
+   * OUTSIDE the shade: a plumb column with a cranked arm over the top of it
+   * and the canopy hung off the far end of the arm. That is the whole reason
+   * for the plinth — a centre-pole parasol takes its overturning moment down
+   * its own pole and stands in a rim, and a side-arm one has to be ballasted
+   * or it falls over, which is what half a tonne of stacked block is doing on
+   * a concrete apron.
+   *
+   * The crank is 2.05 m — a shade more than the canopy's own half — so the
+   * mast stands a hand's width clear of the cloth's edge, which is what both
+   * frames show and is the point of the thing: nothing in the middle of the
+   * table.
+   *
+   * The whole assembly went up 0.48 m with the crank, and that is not taste
+   * either. Cranked inland the canopy reaches `s0 − 0.63`, over the shop's own
+   * awning; the roof kerb there tops out at `y0 + 2.64` and the eave was at
+   * `y + 2.52`. At `y + 3.00` it passes 0.36 m over the kerb and 0.55 m over
+   * the fascia the name is painted on, which is also the relationship
+   * `20260823_111954` has — the taupe canopy overlapping the white awning and
+   * standing clear above it.
+   *
+   * This was the SECOND of these to be built. `shopExtras` had a third mast
+   * with a crank of its own standing 0.1 m in `t` and 1.0 m in `s` from the
+   * east one here — inside it, in other words — and it went; the crank is what
+   * survives of it. Its collider went with it, which is the one subtraction in
+   * this pass's blocker arithmetic: 815 − 1 (that mast) + 3 (the bar stools
+   * now at MINI's counter) + 1 (the drinks fridge `cooler` stands at its west
+   * reveal) = 818.
    */
   function bigShade(S, y0, fs) {
     const CANV = S.shade.canvas || [0.508, 0.468, 0.352];
     const MAST = S.shade.mast || [0.335, 0.340, 0.348];
     const BLOCK = S.shade.block || [0.500, 0.487, 0.440];
     const HALF = 1.92;                     // half the canopy, so 3.84 m square
+    const CRANK = 2.05;                    // mast to canopy centre, inland
     const PL = 0.66;                       // half the plinth
     const BH = 0.135;                      // one course of blocks
     for (let k = 0; k < 2; k++) {
       const t = S.t0 + 1.3 + k * ((S.t1 - S.t0 - 2.6) || 1);
       const s = fs - 3.6;
+      const cs = s + CRANK;                // where the cloth actually is
       const y = at(t).deck;
 
       // The plinth. Three courses of blocks laid as a square ring — a ring and
@@ -12234,9 +12415,51 @@ async function buildJadrija(scene) {
         yp + 0.26, [t + dt * 0.070, s + ds * 0.070, 0.008 + 0.012 * Math.abs(ds),
           0.008 + 0.012 * Math.abs(dt)], MAST, shade(MAST, 1.08));
       }
-      const top = y + 2.86;
-      boxTS(t - 0.065, t + 0.065, s - 0.065, s + 0.065, yp, top, MAST,
+      // The mast, and it is 0.21 m across rather than 0.13. `111954` has it
+      // full height and square on from four metres, wider than the shoulder of
+      // the woman sitting beside it: it is a hollow section carrying a
+      // two-metre lever arm, not a parasol pole.
+      const top = y + 3.34;
+      boxTS(t - 0.105, t + 0.105, s - 0.105, s + 0.105, yp, top, MAST,
         shade(MAST, 1.10));
+      // The arm. It runs from the head of the mast to over the canopy's crown
+      // and dies inside it — the crown's top face at `top − 0.055` is BETWEEN
+      // the arm's own two horizontal faces, so a hollow section and a sheet of
+      // cloth intersect rather than skim (rule 5).
+      boxTS(t - 0.075, t + 0.075, s, cs + 0.10, top - 0.16, top,
+        MAST, shade(MAST, 1.06));
+      // The SPEAKER bolted to it, which `20260821_175806` catches from eight
+      // metres: a grey outdoor cabinet on a bracket at about head-and-a-half
+      // height on the seaward face of the mast, its top level with the shop's
+      // own awning, with a white cable looping out of it and back up the
+      // column. It is the only thing hung on three metres of steel and it is
+      // what says the terrace has music on it.
+      //
+      // The dark face is the grille and it is on the front only. A box in one
+      // grey is a bracket; a box with one dark face is a speaker.
+      //
+      // The cabinet is 0.15 m across against the mast's 0.21 and its BACK is
+      // at `s − 0.088`, seventeen millimetres inside the column: a box whose
+      // back face sat in the plane of the mast's front face would be rule 5 on
+      // a pair that is 3 m up and lit from the side all afternoon, and burying
+      // it further would only lengthen the strip over which the cabinet's
+      // sides and the mast's run parallel 30 mm apart.
+      //
+      // The grille is ONE QUAD standing 8 mm off the cabinet's face, and it is
+      // a quad precisely because a box would bring three more faces with it
+      // and two of them would run alongside the cabinet's own. Both windings,
+      // because a plate this small is cheaper to draw twice than to reason
+      // about.
+      boxTS(t - 0.075, t + 0.075, s - 0.275, s - 0.088, y + 2.42, y + 2.74,
+        shade(MAST, 0.84), shade(MAST, 0.96));
+      {
+        const gr = [W(t - 0.055, s - 0.283, y + 2.47),
+          W(t + 0.055, s - 0.283, y + 2.47),
+          W(t + 0.055, s - 0.283, y + 2.69),
+          W(t - 0.055, s - 0.283, y + 2.69)];
+        b.quad(gr[0], gr[1], gr[2], gr[3], [0.115, 0.118, 0.122]);
+        b.quad(gr[3], gr[2], gr[1], gr[0], [0.115, 0.118, 0.122]);
+      }
 
       // The canopy. Four panels falling from a small square crown to the eaves,
       // and a valance hanging straight down off the rim. Drawn from both sides:
@@ -12246,19 +12469,30 @@ async function buildJadrija(scene) {
       // Nearly flat and not conical. 0.30 m of fall over 1.9 m is about nine
       // degrees, which is what the frame has — a market canopy is a taut sheet
       // with a slight crown, and anything steeper reads as a circus tent.
-      const eave = top - 0.34, crown = 0.34;
+      const cy = top - 0.055;
+      const eave = cy - 0.34, crown = 0.34;
       for (let e = 0; e < 4; e++) {
         const sg = e < 2 ? 1 : -1, ax = e % 2 === 0;
-        const A = ax ? [t + sg * HALF, s - HALF] : [t - HALF, s + sg * HALF];
-        const Bp = ax ? [t + sg * HALF, s + HALF] : [t + HALF, s + sg * HALF];
-        const C = ax ? [t + sg * crown, s + crown] : [t + crown, s + sg * crown];
-        const D = ax ? [t + sg * crown, s - crown] : [t - crown, s + sg * crown];
+        const A = ax ? [t + sg * HALF, cs - HALF] : [t - HALF, cs + sg * HALF];
+        const Bp = ax ? [t + sg * HALF, cs + HALF] : [t + HALF, cs + sg * HALF];
+        const C = ax ? [t + sg * crown, cs + crown] : [t + crown, cs + sg * crown];
+        const D = ax ? [t + sg * crown, cs - crown] : [t - crown, cs + sg * crown];
         const cl = e % 2 ? CANV : shade(CANV, 1.06);
         b.quad(W(A[0], A[1], eave), W(Bp[0], Bp[1], eave),
-          W(C[0], C[1], top), W(D[0], D[1], top), cl);
-        b.quad(W(D[0], D[1], top), W(C[0], C[1], top),
+          W(C[0], C[1], cy), W(D[0], D[1], cy), cl);
+        b.quad(W(D[0], D[1], cy), W(C[0], C[1], cy),
           W(Bp[0], Bp[1], eave), W(A[0], A[1], eave), shade(cl, 0.86));
       }
+      // THE CROWN, which was a 0.68 m square hole in the middle of the cloth.
+      // Four panels rising to a small square and no square drawn: while the
+      // mast came up through the middle it was plugged by the mast and nobody
+      // could see it, and the moment the crank moved the mast off to one side
+      // it opened on to the sky. Both windings, like the panels, because you
+      // spend this terrace underneath it.
+      const cq = [W(t - crown, cs - crown, cy), W(t + crown, cs - crown, cy),
+        W(t + crown, cs + crown, cy), W(t - crown, cs + crown, cy)];
+      b.quad(cq[0], cq[1], cq[2], cq[3], shade(CANV, 1.10));
+      b.quad(cq[3], cq[2], cq[1], cq[0], shade(CANV, 0.86));
       // The valance, 0.23 m of it, which is the band the eye reads the canopy's
       // edge off. Without it the four panels end in a line in the air.
       //
@@ -12275,14 +12509,16 @@ async function buildJadrija(scene) {
       // print on the box's outer face is rule 5's co-planar pair exactly, and
       // standing it 0.10 m off would be a valance floating clear of its own
       // canopy. A valance is one ply of cloth and is now built as one.
-      brandRing('jamnica', [[t - HALF, s - HALF], [t + HALF, s - HALF],
-        [t + HALF, s + HALF], [t - HALF, s + HALF]], eave + 0.01, eave - 0.22);
+      brandRing('jamnica', [[t - HALF, cs - HALF], [t + HALF, cs - HALF],
+        [t + HALF, cs + HALF], [t - HALF, cs + HALF]], eave + 0.01, eave - 0.22);
       // Blocked: the plinth stops you and the mast stops you, and both are
-      // things you would walk into rather than step over. The canopy is 2.5 m
-      // up and is not a blocker, which is the whole point of standing under it.
+      // things you would walk into rather than step over. The canopy is three
+      // metres up and is not a blocker, which is the whole point of standing
+      // under it — and now that it is cranked off the mast, the shade and the
+      // thing you can walk into are not even in the same place.
       runs.push({ t0: t - PL, t1: t + PL, s0: s - PL, s1: s + PL,
         y, h: 3 * BH });
-      furniture.push({ t, s, a: 0.10, c: 0.10, h: 2.4, y });
+      furniture.push({ t, s, a: 0.14, c: 0.14, h: 3.34, y });
     }
   }
 
@@ -29093,7 +29329,27 @@ async function buildJadrija(scene) {
     // first thing that happens: a yelp on the frame the water lands turns the
     // wait into somebody drawing breath, which is what the cat has been doing
     // since the hour he shipped. See `yelp` in 80-audio.js.
-    audio.yelp(kind, m);
+    //
+    // AND WHICH NOISE IS THE POSE'S, which is the other half of what was asked
+    // for — *"an instant local yelp/gasp"*. The two are not interchangeable and
+    // the difference is whether they saw it coming.
+    //
+    // A yelp is VOICED: an oscillator through formants with a pitch contour on
+    // it, which is a person making a noise on purpose. A startle is AIR — the
+    // glottis opens and the intake goes through the throat with no voice behind
+    // it until the very end. Measured off the two synths, the startle comes out
+    // at a twentieth of the yelp's tonality (51 to 91 against 735 to 2 700) and
+    // twice as bright (3 100 to 3 900 Hz against 1 300 to 2 300), at the same
+    // peak level and two thirds the length.
+    //
+    // So: somebody lying down is face down and asleep and has no idea it is
+    // coming — that is a reflex and it is unvoiced. Somebody sitting up may
+    // have seen the hose swing, and mostly yelps; one in four is looking the
+    // other way. Standing, you saw it.
+    const eyesOn = b.pose === 'lie' ? 0
+      : b.pose === 'sit' ? (jit(bi, 917) < 0.25 ? 0 : 1) : 1;
+    if (eyesOn) audio.yelp(kind, m);
+    else audio.startle(kind, m);
     batherNewsQ = { kind, pose: b.pose, m };
   }
 
