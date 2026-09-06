@@ -760,15 +760,42 @@ function brodProto() {
     // x runs bow to stern down the array, so the cross comes out pointing in.
     return [-n[0] / L, -n[1] / L, -n[2] / L];
   }));
-  // Three bands rather than two: antifouling under the chine, white topsides,
-  // and the last strake before the gunwale in the dark colour.
+  /**
+   * TWO BANDS, AND THE THIRD ONE WAS A TRAP.
+   *
+   * This read `max(t0,t1) < 0.62 ? BOOT : (min(t0,t1) > 0.90 ? SHEER : HULL)`,
+   * over a comment promising "the last strake before the gunwale in the dark
+   * colour", and the second test **can never be true**. `tAt(j)` is
+   * `|j − 6| / 6` at `NS = 7`, so the topmost band a side runs from t 1.0 to
+   * t 0.8333 and its `min` is 0.8333. Both ends of the row, every station,
+   * every scale she has ever been built at. The dark band you can see at her
+   * gunwale is the BULWARK's outer face, three hundred lines down, which is
+   * why nothing ever looked wrong.
+   *
+   * DELETED RATHER THAN REPAIRED, and that is a measurement and not a taste.
+   * `murals/brod-mural.jpg` settles it: sampling the paint along her own gold
+   * cove line, at 96 px a metre, the median luminance runs
+   *
+   *     0.90 m above the cove   0.113      0.20 m below   0.779
+   *     0.50 m above            0.118      0.40 m below   0.756
+   *     0.10 m above            0.248      0.80 m below   0.647
+   *                                        1.20 m below   0.340  (the boot-top)
+   *
+   * — dark above the gold, white below it for eight hundred millimetres, then
+   * the boot-top. Her one dark tin goes on the bulwark and on the stripe, and
+   * the plating between them is white. Repairing the test would have painted
+   * the top band of the loft dark, and at the widest station that band is
+   * **1.58 m deep**: a metre and a half of navy hung under the cove, on a boat
+   * whose reference photograph has none.
+   *
+   * So: antifouling under the chine, white above it, and nothing else. `SHEER`
+   * is still the bulwark's and the boot-top's colour and stays declared.
+   */
   for (let i = 0; i < G.length - 1; i++) {
     for (let j = 0; j < N - 1; j++) {
       const A = G[i][j], B = G[i][j + 1], C = G[i + 1][j + 1], D = G[i + 1][j];
       const na = GN[i][j], nb = GN[i][j + 1], nc = GN[i + 1][j + 1], nd = GN[i + 1][j];
-      const t0 = tAt(j), t1 = tAt(j + 1);
-      const col = Math.max(t0, t1) < 0.62 ? BOOT
-        : (Math.min(t0, t1) > 0.90 ? SHEER : HULL);
+      const col = Math.max(tAt(j), tAt(j + 1)) < 0.62 ? BOOT : HULL;
       b.smooth(A, B, C, na, nb, nc, col, col, col);
       b.smooth(A, C, D, na, nc, nd, col, col, col);
     }
