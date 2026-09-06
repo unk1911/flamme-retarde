@@ -43,7 +43,38 @@ const SEA = {
   // Whitecaps, as (steepA, steepB, crestA, crestB): where on the slope
   // distribution a wave starts to spill, and where the resulting coverage is
   // taken as foam. Tunable live — see __fr.sea in 90-app.js.
-  foamK: [0.075, 0.145, 0.12, 0.62],
+  //
+  // 0.095 to 0.120, from a measured sweep. The rig: a nadir camera 130 m over
+  // the channel, which is the one camera whose ground area per pixel is exactly
+  // uniform (the weight is h^2/|Dy|^3 and Dy is constant for a nadir basis), so
+  // a pixel count IS an areal fraction — a horizon shot is not, it over-samples
+  // the distance by three orders of magnitude. Clock pinned to 100*pi, where
+  // sin(0.11 t) is zero so the gust multiplier is exactly 1 and windNow is the
+  // nominal wind. Every frame shot twice, the second with uSeaK.w at 0, which
+  // is the only reader of that uniform and so turns all foam off and nothing
+  // else; the difference of the pair recovers the raft opacity exactly, with no
+  // threshold on colour that a whitecap and a sun glint would both pass.
+  //
+  // Areal coverage, per cent, against Monahan's open-ocean W = 3.84e-6 U^3.41:
+  //
+  //   U            6      9.5     14      20      32
+  //   Monahan     0.17    0.83    3.11   10.49   52.11
+  //   0.075-0.145 0.21    0.65    1.50    2.69    4.28
+  //   0.095-0.120 0.27    0.82    1.83    3.09    4.61
+  //
+  // So the old band was NOT an order of magnitude under Beaufort 5 — that
+  // reading came from a screen-space count in a perspective view. It was 22 per
+  // cent under, and this puts it on the number. What is genuinely wrong is the
+  // slope of the response, and no band can fix it: see the ceiling in seaWave.
+  //
+  // Narrow on purpose. 0.075 to 0.145 spans a factor of 1.93 in slope, which is
+  // not a threshold, it is a long ramp — and everything downstream of it is
+  // multiplicative (lee, above, the windrow mask, the carved ramp), so a steep
+  // of 0.4 never survives to paint anything and most of the gate's output was
+  // being thrown away. 0.095 to 0.120 spans 1.26, and 0.095 is 1.27x the RMS
+  // slope this sea actually has at 9.5 m/s, which is 0.075 by
+  // sqrt(0.5 * sum (k a0)^2) over the six components.
+  foamK: [0.095, 0.120, 0.12, 0.62],
   // (micro, microFade, backlit, windrow): the strength of the capillary normal,
   // the footprint in metres at which it starts to go, how hard a backlit crest
   // glows, and how hard the windrows carve the foam.
@@ -51,7 +82,33 @@ const SEA = {
   // (capA, capB, capMin, -): the footprint in metres over which a whitecap
   // stops being resolvable as a shape, and how much of the white paint is left
   // once it has. See capRes in the fragment.
-  capK: [0.55, 2.2, 0.00, 0.70],
+  //
+  // 1.2 and 3.2, up from 0.55 and 2.2, and the reason is that those two were
+  // set when the crest term came off the vertex lattice. A lattice cell is
+  // 0.09 + 0.058*d metres, so past about 150 m it could not carry a whitecap at
+  // all and it did not matter where this fade sat. Now that the fragment reads
+  // its own waveBrk the fade is the ONLY band limit, and 0.55 m is ten times
+  // tighter than this file's own argument two hundred lines down — a cap is 5
+  // to 15 m of broken water and a pixel covering 0.55 m of it has 10 to 27
+  // pixels across the thing.
+  //
+  // Measured, at the footprint where it bites. A camera at eye height e sees a
+  // footprint of r^2 * (pixel angle) / e at range r, so at 1080p the range at
+  // which foam goes from full to gone moves from 19-37 m to 28-45 m for a
+  // swimmer, and from 66-100 m to 98-160 m from 13 m over the channel.
+  //
+  // The ceiling on it is the 540 m view, where "little white dashes" was
+  // measured once and settled. Repeated here as mean absolute pixel-to-pixel
+  // difference over the open water at 540 m, 20 degrees down, and the peak,
+  // which is the number that says "hard edge" rather than "texture":
+  //
+  //   0.55, 2.2   mean 1.834   p99.9 19   peak  43     as it shipped
+  //   1.2,  3.2   mean 1.857   p99.9 21   peak  49     no change worth seeing
+  //   2.0,  5.0   mean 2.200   p99.9 71   peak 161     edges arriving
+  //   3.5,  9.0   mean 3.049   p99.9 136  peak 175     the rejected picture
+  //
+  // So 1.2 is under the cliff and 2.0 is over it. capMin stays at 0.
+  capK: [1.2, 3.2, 0.00, 0.70],
   // capK.w is where the per-pixel wave field starts fading to flat, in metres
   // of footprint — see waveFade. How eagerly the sum drops an individual
   // component as the footprint overtakes it. 1 fades each one out between a wavelength every eight pixels
@@ -262,6 +319,19 @@ void seaWave(vec2 p, float t, float cell, float fw, out vec3 disp, out vec3 n,
   // RMS slope is about 0.076, so a physically honest number would never fire
   // either; uFoamK.xy picks off the top few per cent of the distribution, which
   // is what a whitecap is.
+  //
+  // What this gate CANNOT do is grow with the wind the way a real sea does.
+  // Monahan has coverage going as U^3.41; measured over 6 to 20 m/s this sea
+  // manages U^2.1, and no band changes that much — pushed out to 0.130-0.160 it
+  // reaches U^3.6 but is dead flat calm at Force 4, which is wrong the other
+  // way. The reason is a hard ceiling downstream, and it was measured by
+  // forcing this gate fully open (steepA 0, steepB 0.002, so every square metre
+  // of water is entitled to foam) and reading the coverage back: 6.6 per cent.
+  // The windrow mask in the fragment throws away the other 93, and it does that
+  // at any wind, because the tile has no idea what the weather is. So Beaufort
+  // 8 and above cannot be drawn by this model at all — 32 m/s wants 52 per cent
+  // and the architecture tops out at 6.6. Raising uSeaK.w to 3 lifts the
+  // ceiling to 16.9 per cent, which is the knob if that day ever matters.
   float slope = length(gradF);
   float lee = 0.55 - 0.45 * clamp(dot(gradF / max(slope, 1e-4), w), -1.0, 1.0);
   float above = smoothstep(0.25, 1.10, hF / max(amp, 1e-4));
