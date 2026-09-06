@@ -126,7 +126,7 @@ function rigSkeleton(rig) {
  * reserved colours that mean "ask the instance", and this is where they are
  * asked. See that file's docstring for the convention.
  */
-function crowdLayer(scene, proto, cap) {
+function crowdLayer(scene, proto, cap, part) {
   const geo = new THREE.InstancedBufferGeometry();
   geo.setAttribute('position', proto.attributes.position);
   geo.setAttribute('normal', proto.attributes.normal);
@@ -176,6 +176,15 @@ function crowdLayer(scene, proto, cap) {
   }));
   mesh.frustumCulled = false;
   mesh.renderOrder = 1;
+  // Named so that the crowd can be MEASURED. `aInstPos` on one of these is the
+  // world origin of one joint of one person, which is the only place the pose
+  // this tier actually drew is written down — `pose` runs on a scratch skeleton
+  // that is overwritten by the next figure before anything could read it. A
+  // probe that walks the scene for `crowd:head` and `crowd:pelvis` can take the
+  // head-over-hips offset of every person on the beach in one frame, and that
+  // is how "are these ninety people all standing the same way" stops being a
+  // matter of opinion. Costs a string per part.
+  mesh.name = 'crowd:' + (part || 'part');
   scene.add(mesh);
   geo.instanceCount = 0;
   return { geo, mesh, ...A };
@@ -937,7 +946,7 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
 }
 
 function makeCrowd(scene, rig, cap) {
-  const layers = rig.parts.map((p) => crowdLayer(scene, p.geo, cap));
+  const layers = rig.parts.map((p) => crowdLayer(scene, p.geo, cap, p.name));
   const skel = rigSkeleton(rig);
   // Which layer is the trunk, so that one person on this beach can be wearing
   // something. See `fg.shirt` in the write below.
