@@ -10898,6 +10898,94 @@ async function buildJadrija(scene) {
     }
   }
 
+  // ── the konoba's terrace, which is a RAISED floor and not a pad ────────────
+  //
+  // Every other business on this boardwalk stands ON the promenade, and
+  // `shopfront` gives each one a 20 mm skim of concrete to say so. This one
+  // cannot, and the reason is a number. The deck climbs 169.7 mm across this
+  // frontage — `heights` reads 3.0839 at t 239.45 and 3.2535 at t 252.10 —
+  // while everything the shop is made of is built off ONE datum, because the
+  // bar top is level and the roof is flat. A flat plane and a sloping one
+  // cross, and these crossed at t 245.7, inside the 3.45 m of the promenade's
+  // own flags that run under this terrace from s 15.9: two pale limestones
+  // within 3 mm of each other across a 3.5 m band, two kilometres from the
+  // origin, decided per pixel. It did not show from the four angles it was
+  // shot from, and it is the depth buffer that decides it and not the camera,
+  // so "it does not show" was a report about one afternoon's cameras. Rule 5.
+  //
+  // So the floor is lifted clear of the highest promenade flag anywhere in its
+  // own footprint, given a skirt so that it reads as a terrace and not as a
+  // slab hanging in the air, and everything that stands on it — counter,
+  // stools, cooler, parasol, bulb, pine collar, wicker, poseurs, surfboard and
+  // the barman behind the bar — is built off `konobaFloor` and not off the
+  // deck. Nothing is left at the old height.
+  //
+  // MEASURED, NOT TYPED. The number first written down for this job was
+  // `y0 + 0.115`: 3.3085 against a highest flag of 3.3035, which is 5 mm and
+  // the same fight one course up. A fixed offset off the shop's own mid
+  // station cannot be right, because what has to be cleared is the shore's
+  // maximum UNDER THE APRON and the mid station is not where that is — it is
+  // 60 mm below it, which is most of the error. `konobaFloor` walks the
+  // footprint and asks.
+  /** The terrace bed's clearance over the highest promenade flag under it. */
+  const KONOBA_CLEAR = 0.055;
+  /**
+   * Bed to the face of the stone laid on it, which is `paving`'s own 12 mm.
+   *
+   * The apron already had it — the flags were drawn at `y0 + 0.047` on a bed
+   * at `y0 + 0.035` — and it is named here because the mass of the terrace has
+   * to stop short of the bed by more than this or the two tops fight, which is
+   * the fault this whole pass exists to remove and not one to reintroduce
+   * underneath it.
+   */
+  const KONOBA_BED = 0.012;
+  /** The kerb's own stone, measured — see the skirt in the `canopy` block. */
+  const KONOBA_KERB = [0.597, 0.512, 0.355];
+  /**
+   * The level of the konoba's terrace floor — the face of its paving — in
+   * locale y.
+   *
+   * A `function` and not a `const` arrow on purpose. Four passes a thousand
+   * lines apart read it: `shopfront`, `shopExtras`, the planting pass that
+   * puts the pine through the terrace, and the pass that puts a barman behind
+   * the counter. A `const` above four readers in four places is the temporal
+   * dead zone this file has lost four evenings to; declarations hoist.
+   *
+   * `PAVE_LIFT` is in it because `paving` draws its stone that far over the
+   * height it is handed, and the stone is the surface that has to be cleared —
+   * the mortar bed under it is not what anybody's eye or the depth test meets.
+   */
+  function konobaFloor(S) {
+    let hi = -Infinity;
+    // The deck is linear between stations, so the maximum over the footprint
+    // is at a station or at an end; 265 samples across 13.2 m is finer than
+    // that by two orders and costs one build-time loop. Three lines in `s`
+    // rather than one because `deckOf` takes the hill when the hill is higher,
+    // and out here it is not — but that is a fact about this stretch of shore
+    // and not about the function.
+    for (let i = 0; i <= 264; i++) {
+      const t = S.t0 - 0.6 + (S.t1 - S.t0 + 1.2) * (i / 264);
+      for (const s of [S.s0 - 0.8, (S.s0 + S.s1) * 0.5, S.s1 + 0.4]) {
+        hi = Math.max(hi, surfaceY(t, s));
+      }
+    }
+    return hi + PAVE_LIFT + KONOBA_CLEAR + KONOBA_BED;
+  }
+  /**
+   * The terrace, for `standY`: a floor you step UP on to.
+   *
+   * Filled by `shopfront`, and the same job `changing.pad` does — `surfaceY`
+   * answers with the shore and the shore is 117 to 287 mm under this floor, so
+   * without it every foot placed here is that deep in the paving, which is the
+   * animal in the concrete the note over `PAVE_LIFT` is about. Two things are
+   * different from the changing station's. It carries an ABSOLUTE level rather
+   * than a height above the ground, because the whole point of the terrace is
+   * that it does NOT follow the deck. And the ramp is 0.45 m rather than 0.20,
+   * because the step it is smoothing is 287 mm at the west corner rather than
+   * 100 mm, and a stride is what a person takes to get up one.
+   */
+  let konobaPad = null;
+
   /** One business. Everything upright goes in `up`; pads stay in `deck`. */
   /**
    * What one shop has that the others do not.
@@ -10957,44 +11045,43 @@ async function buildJadrija(scene) {
       // join with the promenade's honey along `S.s1 + 0.35` reads from behind
       // the bar as two different materials rather than as two different ages.
       //
-      // In the deck buffer and OVER the pad rather than instead of it, because
-      // the pad is also the shop's kerb and its four sides. 15 mm of lift for
-      // the mortar and 12 more for the stone: rule 5 wants 3 and `paving`'s
-      // own flags stand 50 mm over their bed, but 50 cannot be used here —
-      // `standY` knows about `paveBand` and knows nothing about this apron, so
-      // every millimetre of lift is a millimetre your feet are inside the
-      // floor. 15 is a shoe sole; 50 is the animal in the concrete the note
-      // over PAVE_LIFT is about.
+      // In the deck buffer, and its bed is 12 mm under the face of its stone —
+      // `paving`'s own relationship, stone over bed with a smaller footprint,
+      // which is what keeps two limestones a hair apart from fighting.
       //
-      // ── AND IT CROSSES THE PROMENADE'S OWN FLAGS, WHICH IS WORTH BEING
-      // EXACT ABOUT ─────────────────────────────────────────────────────────
+      // ── AND IT NO LONGER CROSSES THE PROMENADE'S OWN FLAGS ───────────────
       //
-      // `paving` lays FLAG from s 15.9 to 21.1 down the whole shore, so it is
-      // under this shop too, and its stone sits at `surfaceY + 0.05`, which
-      // FOLLOWS the deck. The deck climbs 171 mm across this frontage —
-      // measured with `heights`: 3.076 at t 239, 3.247 at t 253 — and this
-      // apron is FLAT at `y0`, which is 3.193, because the shop it floors is
-      // flat: the counter, the stools, the cooler and the posts are all built
-      // off `y0` and a floor that followed the ground would leave the west end
-      // of the counter standing 117 mm in the air.
+      // `paving` lays FLAG from s 15.9 to 21.1 down the whole shore, so the
+      // promenade's flags are under this shop too, and their stone sits at
+      // `surfaceY + 0.05`, which FOLLOWS the deck. The deck climbs 169.7 mm
+      // across this footprint — `heights` reads 3.0839 at t 239.45 and 3.2535
+      // at t 252.10 — and this apron is FLAT, because the shop it floors is:
+      // the counter, the stools, the cooler and the posts are one datum, and a
+      // floor that followed the ground would leave the west end of the counter
+      // standing 117 mm in the air.
       //
-      // A flat plane crosses a sloping one, and these two cross at t 245.7,
-      // where they are within rule 5's 3 mm across the 3.5 m of the flag band.
-      // That crossing is NOT introduced here: the pad it replaces is flat at
-      // `y0 + 0.02` and crosses the same flags at t 243.9, which is the beige
-      // patch that has been showing through the paving in front of this
-      // counter all along. What this apron changes is what the crossing is
-      // BETWEEN — two pale limestones a shade apart instead of grey slab
-      // against honey stone — so the seam it can produce is a mottle rather
-      // than a step. Shot at 12.4 and 18.7 from four angles, including square
-      // down the crossing at grazing incidence, and it does not show.
+      // A flat plane and a sloping one cross, and these two used to cross at
+      // t 245.7, within rule 5's 3 mm across the 3.5 m of flag band — and the
+      // pad before the apron crossed the same flags at t 243.9, which is the
+      // beige patch that showed through in front of this counter for months.
+      // Neither shows from the ground on any afternoon it was photographed,
+      // and that was never the test: the winner is picked by the depth buffer
+      // two kilometres from the origin, per pixel, and it changes when the
+      // camera moves or the shore is re-cut.
       //
-      // Removing it outright means clearing the highest flag in the footprint,
-      // which is `y0 + 0.115`, and then rebuilding the counter, the stools,
-      // the cooler, the parasol, the pine collar and the whole terrace kit
-      // against a new floor datum with a skirt round the apron. That is a
-      // different job from paving this terrace and it is written down here so
-      // that the next person does not have to find the 171 mm again.
+      // So the floor is no longer at the deck's height at all. `konobaFloor`
+      // walks the whole footprint, takes the shore's own maximum under it, and
+      // clears the flag that stands on it: the apron's bed lands 55 mm over
+      // the highest promenade flag anywhere beneath this shop, and its face
+      // 67 mm over. Nothing here crosses anything any more, and the number is
+      // derived at build time rather than typed, so a shore that is re-cut
+      // moves the terrace with it instead of quietly burying it again.
+      //
+      // What that costs is a step, and the step is the point: the skirt in the
+      // `canopy` block stands 117 mm proud of the promenade at the east corner
+      // and 287 mm at the west, because a level floor over a shore that falls
+      // 170 mm has to. That is a kerb at one end and one generous step at the
+      // other, which is what a raised konoba terrace on this coast is.
       {
         const knBuf = b;
         b = deck;
@@ -11004,9 +11091,11 @@ async function buildJadrija(scene) {
             (c[1] + (l - c[1]) * 0.20) * 1.07,
             (c[2] + (l - c[2]) * 0.20) * 1.07];
         });
-        // The pad is `S.t0 - 0.6 … S.t1 + 0.6` by `S.s0 - 0.8 … S.s1 + 0.4`,
-        // and the apron is inset 50 mm inside it all round so the kerb still
-        // shows as a kerb from the promenade.
+        // The apron IS the terrace: `S.t0 - 0.55 … S.t1 + 0.55` by
+        // `S.s0 - 0.75 … S.s1 + 0.35`, which is the rectangle the skirt in
+        // the `canopy` block is built round and the rectangle `konobaPad`
+        // hands `standY`. Three copies of four numbers, and they have to be
+        // the same four.
         const knA0 = S.t0 - 0.55, knA1 = S.t1 + 0.55;
         const knB0 = S.s0 - 0.75, knB1 = S.s1 + 0.35;
         const knNT = 13, knNS = 9;    // about 1.01 m by 1.12 m a flag
@@ -11419,14 +11508,15 @@ async function buildJadrija(scene) {
       // armchairs with white cushions, white barrel poseur tables in Jamnica's
       // livery, and a surfboard leaning against the rail.
       //
-      // All of them stand on `knGround` and not on `surfaceY`, which is the
-      // second half of the paving change above. `surfaceY` answers with the
-      // SHORE — and the shore climbs 171 mm across this frontage while the
-      // shop's floor is flat, so the chairs at t 242.6 were standing 74 mm
-      // inside the pad before the flags went down and 101 mm inside them
-      // after: a quarter of a 360 mm leg, buried. The terrace kit belongs on
-      // the terrace. `max` and not the floor outright, so anything ever
-      // placed past the apron's own edge still finds the ground.
+      // All of them stand on `knGround` and not on `surfaceY`. `surfaceY`
+      // answers with the SHORE, and the shore is now 117 to 287 mm under this
+      // floor — so a chair on it would be a chair with a third of a 360 mm leg
+      // in the paving, which is the fault this used to have at 74 mm and would
+      // have again, worse, at the new datum. `y0 + 0.047` IS `konobaFloor(S)`:
+      // `y0` here is the set-out datum the canopy block handed down, one flag
+      // under the floor. `max` and not the floor outright, so anything ever
+      // placed past the apron's own edge still finds the ground rather than
+      // hovering at terrace height over the promenade.
       const knGround = (gt, gs) => Math.max(surfaceY(gt, gs), y0 + 0.047);
       const WICK = [0.185, 0.140, 0.108];
       const CUSH = [0.680, 0.672, 0.650];
@@ -12160,9 +12250,37 @@ async function buildJadrija(scene) {
     const body = S.body || [0.520, 0.492, 0.430];
 
     // The pad, in the deck buffer so it does not pick up the upright bounce.
+    //
+    // The konoba does not get one. Its floor is 177 mm over the deck datum —
+    // see `konobaFloor` — so what would be a 20 mm skim is instead the MASS of
+    // a raised terrace: a core that fills the box between the promenade and
+    // the paving so that nothing can ever be seen through it.
+    //
+    // Its top is at `knF - 0.040`, and that is the one place in this assembly
+    // where a height had to be chosen rather than derived. There are 55 mm
+    // between the apron's bed and the highest promenade flag underneath it —
+    // that clearance IS `KONOBA_CLEAR` — and this top sits in the middle of
+    // them: 28 mm under the bed and 27 mm over the flag. Neither pair crosses
+    // and neither pair is close, which matters even though the core is sealed
+    // on every side (the bed covers it from above, the skirt from the side,
+    // the ground from below). Rule 5 is the reason this job exists and leaving
+    // a second crossing 40 mm under the floor would be a poor way to finish
+    // it, whether or not a camera could reach it.
+    //
+    // And 70 mm inside the apron's edge on all four sides, so that its faces
+    // are not in the same planes as the skirt's inner faces.
     b = deck;
-    boxTS(S.t0 - 0.6, S.t1 + 0.6, S.s0 - (S.awn || 0) - 0.8, S.s1 + 0.4,
-      y0 - 0.35, y0 + 0.02, CONC[1], CONC[2]);
+    if (S.key === 'konoba') {
+      const knF = konobaFloor(S);
+      konobaPad = { t0: S.t0 - 0.55, t1: S.t1 + 0.55,
+        s0: S.s0 - 0.75, s1: S.s1 + 0.35, y: knF, ramp: 0.45 };
+      boxTS(S.t0 - 0.48, S.t1 + 0.48, S.s0 - 0.68, S.s1 + 0.28,
+        y0 - 0.35, knF - 0.040,
+        shade(KONOBA_KERB, 0.82), shade(KONOBA_KERB, 0.74));
+    } else {
+      boxTS(S.t0 - 0.6, S.t1 + 0.6, S.s0 - (S.awn || 0) - 0.8, S.s1 + 0.4,
+        y0 - 0.35, y0 + 0.02, CONC[1], CONC[2]);
+    }
     b = up;
 
     if (S.kind === 'fence') {
@@ -12308,9 +12426,99 @@ async function buildJadrija(scene) {
       // No walls. The reed roof sits on eight posts and there is a counter
       // under one end of it — the best walk-in business on the boardwalk
       // precisely because there is nothing to walk through.
+      //
+      // `y0` appears nowhere below this line, and that is the whole of this
+      // pass: the floor of this shop is 177 mm over the deck datum the rest of
+      // the boardwalk is built off. The posts stand on the terrace, so the
+      // roof goes up with it — 2.70 m of headroom is measured from the floor
+      // somebody is standing on, and a canopy that kept the deck's ceiling
+      // height would have lost 177 mm of it. See `konobaFloor`.
+      const knFloor = konobaFloor(S);
+      // And the datum this shop's kit is SET OUT from, which is 47 mm INTO
+      // that floor and not on it. Every solid in this shop — counter, stools,
+      // cooler, parasol foot, pine collar — was already drawn from the deck
+      // with the apron's flags laid 47 mm over it, so each of them had 47 mm
+      // of its foot under the paving; that is what keeps a bottom face out of
+      // the floor's own plane (rule 5), and it is not a number to lose while
+      // moving the floor. `knFloor` is what you stand on; `knSet` is what the
+      // furniture is built off, and the difference between them is the thickness
+      // of one flag.
+      const knSet = knFloor - 0.047;
+      // ── the skirt ────────────────────────────────────────────────────────
+      //
+      // A floor lifted clear of the ground and left open at the edge is a slab
+      // in mid-air, which is the reverse failure this job can produce and the
+      // one thing worse than the seam it removes. `20260821_175856` says what
+      // the edge is: the crazy paving runs to a straight sawn margin and stops
+      // against cut stone, and the block round the post at the counter's east
+      // end stands a good hand's depth proud of the flags in front of it.
+      //
+      // MEASURED off that block rather than guessed. Its cut face reads
+      // rgb(185, 174, 162) in the same evening light in which the terrace
+      // beside it reads rgb(192, 190, 189) — so the kerb is 0.96 / 0.92 / 0.86
+      // of the terrace's own value, which is to say the same limestone with a
+      // saw cut through it: barely darker, and much WARMER, because a fresh
+      // face has none of the twenty summers of hose and bare feet that made
+      // the floor neutral. Against `knFLAG`'s washed honey that comes out at
+      // 0.597 / 0.512 / 0.355. See `KONOBA_KERB`.
+      //
+      // Laid as separate stones with their own reach, 35 to 75 mm proud of the
+      // apron's edge, because thirteen metres of one extruded face is the flat
+      // band this file keeps finding is worse than nothing — and a rubble kerb
+      // is not flat, it is a course of stones nobody sorted. The reach is the
+      // detail that does it: every end cap in the run catches its own light.
+      //
+      // The inner face stops 22 mm inside the apron's edge, and the number is
+      // arithmetic rather than taste. `knIn` shrinks each flag 8.2 per cent
+      // toward its own cell centre, and the outermost cells are jittered, so
+      // the least any edge flag is inset from the pinned edge is 0.082 of the
+      // shortest half-cell there is: 28.5 mm in t and 31.7 mm in s. A kerb
+      // reaching past those would put its top face in the same plane as a
+      // flag's AND over the top of it, which is rule 5 on the one surface this
+      // whole pass exists to get clear of. At 22 mm the two are coplanar and
+      // never overlap, which is a joint and not a fight.
+      //
+      // Down to `knFloor - 0.34`, which is 3.031 against a shore that is never
+      // lower than 3.084 under this perimeter: buried by at least 53 mm all
+      // the way round, so there is no rim to see under from the promenade.
+      {
+        const knK0 = S.t0 - 0.55, knK1 = S.t1 + 0.55;
+        const knL0 = S.s0 - 0.75, knL1 = S.s1 + 0.35;
+        const knRun = (along, u0, u1, sideAt, outward) => {
+          // A seed per side, so the four runs are four different runs. Without
+          // it the seaward course and the west course draw the same stones in
+          // the same order and the two meet at a corner, which is the mirrored
+          // pattern that is worse than no pattern.
+          const kSd = (outward > 0 ? 7 : 0) + (along ? 0 : 31);
+          let u = u0, i = 0;
+          while (u < u1 - 0.02) {
+            const len = Math.min(0.46 + jit(i, 941 + kSd) * 0.48, u1 - u);
+            const g = 0.90 + jit(i * 3 + 1, 962 + kSd) * 0.20;
+            const cl = [KONOBA_KERB[0] * g, KONOBA_KERB[1] * g,
+              KONOBA_KERB[2] * g];
+            const reach = 0.035 + jit(i * 5 + 2, 983 + kSd) * 0.040;
+            const a2 = sideAt - outward * 0.022, c2 = sideAt + outward * reach;
+            if (along) {
+              boxTS(u, u + len, Math.min(a2, c2), Math.max(a2, c2),
+                knFloor - 0.34, knFloor, cl, shade(cl, 1.06));
+            } else {
+              boxTS(Math.min(a2, c2), Math.max(a2, c2), u, u + len,
+                knFloor - 0.34, knFloor, cl, shade(cl, 1.06));
+            }
+            u += len; i++;
+          }
+        };
+        // The two runs along the shore reach the full width; the two across it
+        // stop 10 mm short at each end, so their end caps die INSIDE the other
+        // pair rather than in the same plane as their inner faces.
+        knRun(true, knK0 - 0.075, knK1 + 0.075, knL0, -1);
+        knRun(true, knK0 - 0.075, knK1 + 0.075, knL1, 1);
+        knRun(false, knL0 + 0.01, knL1 - 0.01, knK0, -1);
+        knRun(false, knL0 + 0.01, knL1 - 0.01, knK1, 1);
+      }
       for (let t = S.t0; t <= S.t1 + 0.01; t += 3.0) {
-        post(W, t, S.s0 + 0.4, y0, y0 + S.h, 0.075, S.post, 6);
-        post(W, t, S.s1 - 0.4, y0, y0 + S.h, 0.075, S.post, 6);
+        post(W, t, S.s0 + 0.4, knSet, knSet + S.h, 0.075, S.post, 6);
+        post(W, t, S.s1 - 0.4, knSet, knSet + S.h, 0.075, S.post, 6);
       }
       // The roof is two layers, and it has to be, because 20260821_175856 shows
       // the two doing different jobs.
@@ -12357,7 +12565,7 @@ async function buildJadrija(scene) {
         for (let i = 0; i < n; i++) {
           const g = 0.86 + jit(i, 733 + (S.t0 | 0)) * 0.24;
           boxTS(a0 + i * w + 0.020, a0 + (i + 1) * w - 0.020, c0, c1,
-            y0 + S.h, y0 + S.h + 0.10,
+            knSet + S.h, knSet + S.h + 0.10,
             [AMBER[0] * g, AMBER[1] * g, AMBER[2] * g],
             shade(AMBER, 0.9 * g));
           // The batten over the joint, standing 30 mm below the sheets so it
@@ -12366,7 +12574,7 @@ async function buildJadrija(scene) {
           // shop nobody can avoid looking at.
           if (i) {
             boxTS(a0 + i * w - 0.032, a0 + i * w + 0.032, c0, c1,
-              y0 + S.h - 0.030, y0 + S.h + 0.10, BAT, shade(BAT, 1.2));
+              knSet + S.h - 0.030, knSet + S.h + 0.10, BAT, shade(BAT, 1.2));
           }
         }
         // And the purlins the sheets are screwed to, running the other way.
@@ -12375,7 +12583,7 @@ async function buildJadrija(scene) {
         for (let k = 1; k < 5; k++) {
           const sPos = c0 + (c1 - c0) * (k / 5);
           boxTS(a0, a1, sPos - 0.055, sPos + 0.055,
-            y0 + S.h - 0.075, y0 + S.h - 0.005, BAT, shade(BAT, 1.15));
+            knSet + S.h - 0.075, knSet + S.h - 0.005, BAT, shade(BAT, 1.15));
         }
       }
       // ── and the reed itself, which was one flat box ──────────────────────
@@ -12410,7 +12618,7 @@ async function buildJadrija(scene) {
       {
         const ra0 = S.t0 - 0.62, ra1 = S.t1 + 0.62;
         const rc0 = S.s0 - 0.62, rc1 = S.s1 + 0.62;
-        const rY = y0 + S.h + 0.10;
+        const rY = knSet + S.h + 0.10;
         // The courses. Thatch is laid in laps and each lap sits a little proud
         // of the one behind it, so the top reads as bands rather than as a
         // plane — the same reason the mole's deck is in bays and the kabine
@@ -12462,15 +12670,15 @@ async function buildJadrija(scene) {
       // the return only — which is why the row of red and green stools reads
       // against it the way it does. Painted teal all the way down, the stools
       // sat on a wall of their own colour family and the counter had no base.
-      boxTS(S.t0 + 1.2, S.t0 + 7.2, S.s1 - 1.4, S.s1 - 0.6, y0, y0 + 0.86,
+      boxTS(S.t0 + 1.2, S.t0 + 7.2, S.s1 - 1.4, S.s1 - 0.6, knSet, knSet + 0.86,
         [0.245, 0.075, 0.070]);
       boxTS(S.t0 + 1.2, S.t0 + 7.2, S.s1 - 1.4, S.s1 - 0.6,
-        y0 + 0.86, y0 + 1.02, body);
+        knSet + 0.86, knSet + 1.02, body);
       boxTS(S.t0 + 1.1, S.t0 + 7.3, S.s1 - 1.5, S.s1 - 0.5,
-        y0 + 1.02, y0 + 1.08, shade(body, 1.2));
+        knSet + 1.02, knSet + 1.08, shade(body, 1.2));
       runs.push({ t0: S.t0 + 1.1, t1: S.t0 + 7.3, s0: S.s1 - 1.5, s1: S.s1 - 0.5,
-        y: y0, h: 1.08 });
-      shopExtras(S, y0, y0 + S.h);
+        y: knSet, h: 1.08 });
+      shopExtras(S, knSet, knSet + S.h);
       // Only the counter blocks; the rest is a roof you walk under.
       b = deck;
       return;
@@ -21275,7 +21483,15 @@ async function buildJadrija(scene) {
       // the counter is 1.06 m above that, so a figure standing on the deck at
       // his own `t` is off by however much the shore rises between the two —
       // and the whole question here is how much of him clears a counter.
-      const y0 = at((S.t0 + S.t1) * 0.5).deck;
+      //
+      // Except at the konoba, whose own datum is not the deck at all: its
+      // floor is 177 mm over it — see `konobaFloor` — and the barman is
+      // standing behind the bar, ON that floor. Left on the deck he would have
+      // been the only man on this shore up to his ankles in his own terrace,
+      // and 177 mm is most of a head of counter clearance. One flag under the
+      // floor, like everything else in that shop; see `knSet`.
+      const y0 = S.key === 'konoba' ? konobaFloor(S) - 0.047
+        : at((S.t0 + S.t1) * 0.5).deck;
       bathers.push({ t, s: ss, y: y0, ang: -Math.PI / 2,
         pose, k, beat: null, sex: 'm', shirt: TEE, hair: CROP, staff: true });
     }
@@ -23439,7 +23655,14 @@ async function buildJadrija(scene) {
     b = up;
     for (const S of SHOPS) {
       if (S.key === 'konoba') {
-        const y0 = at((S.t0 + S.t1) * 0.5).deck;
+        // The deck datum is 177 mm under this shop's floor and the tree comes
+        // up THROUGH the floor, so it is planted off `konobaFloor` and not off
+        // `at().deck` — the collar `shopExtras` pours round it stands from
+        // 3 mm under the paving to 113 mm over it, and a trunk on the deck
+        // datum would rise out of the middle of a ring it never met. The
+        // set-out datum is one flag under the floor, which is the same
+        // relation everything else in this shop keeps: see `knSet`.
+        const y0 = konobaFloor(S) - 0.047;
         pine(S.t1 - 1.6, S.s0 + 2.2, y0 + 0.10, 11.5, -1);
         greens.push([S.t1 - 1.6, S.s0 + 2.2, 0.55, 9]);
       }
@@ -25850,6 +26073,27 @@ async function buildJadrija(scene) {
     // themselves included — and lifting it would move the paving out from
     // under itself. `standY` is the one that answers "what is under your
     // feet", which is the question with a stone in the way.
+    // The konoba's terrace, which is a floor and not a lift off the ground.
+    //
+    // Ahead of the flags and not after them, and the flag lift is folded into
+    // the base it ramps FROM rather than lost: half this apron is inside
+    // `paveBand` and half is outside it, so a ramp that started from the
+    // mortar on one side of s 15.9 and from the stone on the other would put a
+    // 50 mm ridge down the middle of the terrace — the same class of fault as
+    // the one the terrace was raised to remove.
+    //
+    // An absolute level and not an offset, because a terrace that followed the
+    // deck is the thing that crossed the promenade's flags in the first place.
+    // See `konobaFloor`.
+    const KN = konobaPad;
+    if (KN) {
+      const d = Math.min(t - KN.t0, KN.t1 - t, s - KN.s0, KN.s1 - s);
+      if (d > -KN.ramp) {
+        const base = paveBand && s > paveBand[0] && s < paveBand[1]
+          ? y + PAVE_LIFT : y;
+        return base + (KN.y - base) * sat((d + KN.ramp) / KN.ramp);
+      }
+    }
     if (paveBand && s > paveBand[0] && s < paveBand[1]) return y + PAVE_LIFT;
     // The changing station's pad. Same problem as the kabina's and the same
     // answer, except that a pad is approached from all four sides rather than
