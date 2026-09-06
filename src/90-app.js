@@ -6913,11 +6913,23 @@ window.__fr = {
    * The Bucketeer — src/45-bucketeer.js.
    *
    * `ways()` is her route, `go(phase)` drops her on a beat of it and `tick(s)`
-   * runs the loop forward without waiting for the wall clock. `watch(k, back)`
-   * is the one that gets a picture: it stands you `back` metres behind waypoint
-   * `k` looking at it, which is how each stage of the loop was photographed.
+   * runs the loop forward without waiting for the wall clock. `watch` is the
+   * one that gets a picture.
    *
-   *   __fr.buck.go('tip'); __fr.buck.watch(11, 4); __fr.buck.tick(1.2);
+   * THIS COMMENT USED TO SAY `watch(k, back)` — "stands you `back` metres
+   * behind waypoint `k` looking at it" — and that is not what `watch` does or
+   * has ever done. It takes `(back, side, aim)` and it frames HER, wherever she
+   * is, off `b.where()`; the correct description has been on the function
+   * itself the whole time and the two disagreed. Following the wrong one costs
+   * about twenty minutes: `watch(1, 2.4)` reads as waypoint 1 at 2.4 m and
+   * means 1 m in front and 2.4 m to her right, so the camera lands beside her
+   * looking past her at a wall, and every frame comes back with no Bucketeer
+   * in it. Which is exactly what happened.
+   *
+   *   __fr.buck.go('tip'); __fr.buck.tick(1.2); __fr.buck.watch(2.6, 0.8, 0.5);
+   *
+   * The phase names `go` accepts are the ones `stats().phase` reports:
+   * fill, lift, down, tip, set, up — not the waypoint labels.
    */
   buck: {
     raw: () => jadrija && jadrija.bucketeer,
