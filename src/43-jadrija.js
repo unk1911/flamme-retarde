@@ -11021,13 +11021,36 @@ async function buildJadrija(scene) {
     // 0.20, ...)` is a 0.40 m disc lying flat like a coin two centimetres
     // thick — seen from the promenade it is a 20 mm line. They are flat plates
     // on the face of the cabinet now, which is what a printed lemon is.
+    //
+    // ── AND IT WAS STANDING ACROSS THE SHOP WINDOW ──────────────────────────
+    //
+    // The note above says the cabinet is "standing just outside" the kiosk, and
+    // it was pitched at `t1 − 0.30`, `s0 − 1.05` and built 1.32 m wide: dead in
+    // front of the glazed corner, which runs `t1 − 1.30` to `t1`. 1.32 m of
+    // printed cream across a 1.30 m window, a metre proud of it. The parasol
+    // that came off this shop in 1.340.0 was hiding six things at three metres;
+    // this was hiding the display, the rack, the counter and the papers at one.
+    //
+    // Both sources put it PAST the end. `1000150343` reads, left to right:
+    // panelled side, the door, the glazed corner with the ladder standing in
+    // front of it, the kiosk's corner post — and only then the cooler's open
+    // door leaf and the cabinet behind it, on the gravel outside. `1000150414`
+    // at 04:24-04:28 has the same object at the far end of the counter run,
+    // standing clear of the glass with the whole frontage beside it.
+    //
+    // And it is an UPRIGHT, not a chest. Scaled in `_343` against the woman in
+    // the hat who is standing beside it — 800 px from her hat to her feet, so
+    // 465 px to the metre at that depth — the cabinet's face measures 315 px
+    // by 925: 0.68 m wide and 1.99 m tall. It was drawn 1.32 by 1.46, which is
+    // twice the width and three quarters of the height, and is why it read as
+    // a chest freezer somebody had stood on end.
     {
-      const ct = S.t1 - 0.30, cs = S.s0 - 1.05;
+      const ct = S.t1 + 0.42, cs = S.s0 - 0.42;
       const WRAP = [0.660, 0.680, 0.590];      // the cream of the print
       const LEM = [0.780, 0.715, 0.235];
       const LEAF = [0.245, 0.470, 0.230];
       const CAB = [0.665, 0.662, 0.650];
-      const hw = 0.66, hd = 0.36, hh = 1.46;
+      const hw = 0.34, hd = 0.30, hh = 1.99;
       boxTS(ct - hw, ct + hw, cs - hd, cs + hd, y0, y0 + hh,
         WRAP, shade(WRAP, 1.10));
       // The lemons and the leaves, on the front and on both returns, because a
@@ -11050,14 +11073,20 @@ async function buildJadrija(scene) {
         boxTS(a - r * 0.725, a + r * 0.725, b - 0.008, b + 0.004,
           c - r * 0.675, c + r * 0.675, LEM, shade(LEM, 1.08));
       };
-      for (const [lt, ly, r] of [[ct - 0.40, 1.24, 0.17], [ct + 0.12, 1.30, 0.13],
-        [ct - 0.12, 0.50, 0.16], [ct + 0.44, 0.62, 0.14],
-        [ct - 0.46, 0.30, 0.12]]) {
+      // Re-laid over the corrected face. The old five were spread over 0.90 m
+      // of width and 1.00 m of height at radii up to 0.17; on a face 0.68 wide
+      // and 1.99 tall, two of them hung in the air beside the cabinet and the
+      // biggest was half its width. The lemon in `_343` measures about 110 px
+      // across at 465 px to the metre, which is 0.24 m — so r 0.12, and the
+      // rest of the print is leaves and the name.
+      for (const [lt, ly, r] of [[ct - 0.19, 1.62, 0.12], [ct + 0.14, 1.46, 0.10],
+        [ct - 0.06, 0.72, 0.12], [ct + 0.20, 0.48, 0.10],
+        [ct - 0.22, 0.34, 0.09]]) {
         lemon(lt, cs - hd - 0.018, y0 + ly, r);
       }
       // The two on the returns, which is the same cross turned through ninety
       // degrees, so `lemon` cannot draw them.
-      for (const [ls, ly, r] of [[cs - 0.16, 1.06, 0.13], [cs + 0.14, 0.78, 0.11]]) {
+      for (const [ls, ly, r] of [[cs - 0.14, 1.40, 0.12], [cs + 0.12, 0.80, 0.10]]) {
         for (const [tf, dr] of [[ct - hw - 0.018, 1], [ct + hw + 0.010, -1]]) {
           boxTS(tf, tf + 0.008, ls - r, ls + r,
             y0 + ly - r * 0.50, y0 + ly + r * 0.50, LEM, shade(LEM, 1.08));
@@ -11066,14 +11095,15 @@ async function buildJadrija(scene) {
             y0 + ly - r * 0.675, y0 + ly + r * 0.675, LEM, shade(LEM, 1.08));
         }
       }
-      for (const [lt, ly] of [[ct - 0.22, 1.12], [ct + 0.30, 0.94],
-        [ct - 0.52, 0.74], [ct + 0.02, 0.36]]) {
-        boxTS(lt - 0.075, lt + 0.075, cs - hd - 0.014, cs - hd - 0.009,
-          y0 + ly, y0 + ly + 0.055, LEAF);
+      for (const [lt, ly] of [[ct - 0.24, 1.34], [ct + 0.16, 1.04],
+        [ct - 0.10, 0.62], [ct + 0.22, 0.28]]) {
+        boxTS(lt - 0.062, lt + 0.062, cs - hd - 0.014, cs - hd - 0.009,
+          y0 + ly, y0 + ly + 0.050, LEAF);
       }
-      // The D-handle down the right-hand edge of the door.
-      boxTS(ct + hw - 0.135, ct + hw - 0.085, cs - hd - 0.060, cs - hd - 0.020,
-        y0 + 0.62, y0 + 0.96, [0.640, 0.648, 0.655]);
+      // The D-handle down the right-hand edge of the door, at the height a
+      // handle is on a two-metre cabinet rather than on a 1.46 m one.
+      boxTS(ct + hw - 0.115, ct + hw - 0.070, cs - hd - 0.060, cs - hd - 0.020,
+        y0 + 0.95, y0 + 1.35, [0.640, 0.648, 0.655]);
       // The name across the middle, on all four sides, because a wrap is
       // printed all the way round and this one is seen from three of them.
       // A centimetre proud of the cabinet, and it has to be. Written flush,
@@ -11085,7 +11115,7 @@ async function buildJadrija(scene) {
       const wo = 0.012;
       brandRing('jana', [[ct - hw - wo, cs - hd - wo], [ct + hw + wo, cs - hd - wo],
         [ct + hw + wo, cs + hd + wo], [ct - hw - wo, cs + hd + wo]],
-      y0 + 1.02, y0 + 0.72);
+      y0 + 1.28, y0 + 0.98);
       // The grille along the foot, and the lid. Three louvres and not one white
       // slab: in `c343_jana` it is a stack of pressed slots, and a slab there
       // reads as a skirting board rather than as the place the heat comes out.
@@ -11096,7 +11126,7 @@ async function buildJadrija(scene) {
       }
       boxTS(ct - hw - 0.02, ct + hw + 0.02, cs - hd - 0.02, cs + hd + 0.02,
         y0 + hh, y0 + hh + 0.055, CAB, shade(CAB, 1.10));
-      furniture.push({ t: ct, s: cs, a: 0.70, c: 0.40, h: hh, y: y0 });
+      furniture.push({ t: ct, s: cs, a: 0.38, c: 0.34, h: hh, y: y0 });
       // ── the second printed leaf ──────────────────────────────────────────
       //
       // There are TWO Jana faces in the frame and they are at an angle to each
@@ -11108,8 +11138,8 @@ async function buildJadrija(scene) {
       const lt2 = ct - hw - 0.05;
       boxTS(lt2 - 0.055, lt2 + 0.005, cs - 0.34, cs + 0.26, y0, y0 + hh,
         WRAP, shade(WRAP, 1.10));
-      for (const [ls, ly, r] of [[cs - 0.16, 1.12, 0.15], [cs + 0.06, 0.56, 0.13],
-        [cs - 0.22, 0.34, 0.10]]) {
+      for (const [ls, ly, r] of [[cs - 0.14, 1.48, 0.12], [cs + 0.06, 0.86, 0.11],
+        [cs - 0.18, 0.40, 0.09]]) {
         boxTS(lt2 - 0.070, lt2 - 0.062, ls - r, ls + r,
           y0 + ly - r * 0.50, y0 + ly + r * 0.50, LEM, shade(LEM, 1.08));
         boxTS(lt2 - 0.078, lt2 - 0.066, ls - r * 0.725, ls + r * 0.725,
@@ -11117,7 +11147,7 @@ async function buildJadrija(scene) {
       }
       brandRing('jana', [[lt2 - 0.070, cs - 0.352], [lt2 + 0.020, cs - 0.352],
         [lt2 + 0.020, cs + 0.272], [lt2 - 0.070, cs + 0.272]],
-      y0 + 0.96, y0 + 0.68);
+      y0 + 1.16, y0 + 0.88);
       furniture.push({ t: lt2, s: cs - 0.04, a: 0.09, c: 0.34, h: hh, y: y0 });
     }
     // The two square parasols. `1000150343` has a big white one with CORONA on
