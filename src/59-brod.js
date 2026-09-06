@@ -770,11 +770,11 @@ function brodCleatAt(x) {
  *
  *   depth below the cove   0.21    0.42    0.62    0.83
  *   mural   P10            0.795   0.738   0.642   0.507
- *   render  P10            0.830   0.683   0.658   0.603
+ *   render  P10            0.853   0.675   0.658   0.588
  *   mural   P90            1.260   1.137   1.160   1.169
- *   render  P90            1.595   1.182   1.140   1.188
+ *   render  P90            1.590   1.175   1.128   1.166
  *   mural   sd(ln)         0.109   0.109   0.155   0.262
- *   render  sd(ln)         0.213   0.157   0.148   0.219
+ *   render  sd(ln)         0.192   0.144   0.131   0.214
  *   BEFORE  sd(ln)         0.000   0.000   0.000   0.013
  *
  * The one row that does not land is the top, and it is the statistic and not
