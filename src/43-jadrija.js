@@ -11631,8 +11631,83 @@ async function buildJadrija(scene) {
             y0 + S.h - 0.075, y0 + S.h - 0.005, BAT, shade(BAT, 1.15));
         }
       }
-      boxTS(S.t0 - 0.62, S.t1 + 0.62, S.s0 - 0.62, S.s1 + 0.62,
-        y0 + S.h + 0.10, y0 + S.h + 0.38, S.roof, shade(S.roof, 1.12));
+      // ── and the reed itself, which was one flat box ──────────────────────
+      //
+      // The paragraph above got the CEILING right — twelve bays of amber with
+      // battens and purlins, because that is what you stand under — and left
+      // the thing on top of it as a single 13 x 10 m slab 0.28 m thick with
+      // four square corners. From the promenade and from the air that slab is
+      // the whole building, and `20260821_175856` says it is nothing like a
+      // slab: it is REED, and what makes it read as reed at fifty metres is
+      // that the eave is RAGGED. The stems hang past the frame at every
+      // length there is, so the roof has no edge — it has a fringe.
+      //
+      // Two colours and not one. Reed goes grey as it ages and a roof is not
+      // rethatched all at once, so a bundle takes one or the other off `jit`.
+      //
+      // The brown is MEASURED, and measured as a ratio rather than as an
+      // absolute, because the only frame with sunlit thatch in it is deep
+      // evening under a canopy and nothing in it is at full value.
+      // `1000150414` at 314 s has the roof and the sand beside it in the same
+      // light: reed rgb(100, 66, 38) against sand rgb(122, 104, 82), so the
+      // reed is 0.82 / 0.63 / 0.46 of the sand's albedo, and this shore's sand
+      // is about 0.62/0.58/0.50. Which gives 0.508/0.365/0.230 — browner and
+      // more saturated than the first cut, which took the trska off the
+      // slastičarnica's service wall and came out the colour of straw rather
+      // than of a roof.
+      //
+      // `_175856` is no use for this at all: a pine branch lies across the
+      // sunlit half of that roof and every crop I took of it came back canopy.
+      const REEDA = [0.508, 0.365, 0.230];
+      const REEDB = [0.400, 0.352, 0.262];
+      {
+        const ra0 = S.t0 - 0.62, ra1 = S.t1 + 0.62;
+        const rc0 = S.s0 - 0.62, rc1 = S.s1 + 0.62;
+        const rY = y0 + S.h + 0.10;
+        // The courses. Thatch is laid in laps and each lap sits a little proud
+        // of the one behind it, so the top reads as bands rather than as a
+        // plane — the same reason the mole's deck is in bays and the kabine
+        // row is not one box.
+        const nC = Math.max(6, Math.round((rc1 - rc0) / 0.72));
+        for (let i = 0; i < nC; i++) {
+          const s0r = rc0 + (rc1 - rc0) * (i / nC);
+          const s1r = rc0 + (rc1 - rc0) * ((i + 1) / nC) + 0.06;
+          const g = 0.88 + jit(i + (S.t0 | 0), 811) * 0.26;
+          const base = jit(i * 3 + (S.t0 | 0), 812) < 0.34 ? REEDB : REEDA;
+          const cl = [base[0] * g, base[1] * g, base[2] * g];
+          boxTS(ra0, ra1, s0r, s1r, rY, rY + 0.26 + (i % 2) * 0.022,
+            cl, shade(cl, 1.14));
+        }
+        // The fringe. Every stem a different length and a different reach, all
+        // round the perimeter — 0.13 m apart, which is close enough that from
+        // the promenade it is one ragged edge and not a row of teeth.
+        const fringe = (along, aFrom, aTo, cAt, out) => {
+          const n = Math.max(2, Math.round(Math.abs(aTo - aFrom) / 0.13));
+          for (let i = 0; i < n; i++) {
+            const k = i + (S.t0 | 0) * 7 + (out > 0 ? 400 : 0)
+              + (along ? 0 : 900);
+            const u0 = aFrom + (aTo - aFrom) * (i / n);
+            const u1 = aFrom + (aTo - aFrom) * ((i + 0.82) / n);
+            const drop = 0.09 + jit(k, 815) * 0.29;
+            const reach = 0.03 + jit(k, 816) * 0.15;
+            const g = 0.80 + jit(k, 817) * 0.34;
+            const base = jit(k, 818) < 0.34 ? REEDB : REEDA;
+            const cl = [base[0] * g, base[1] * g, base[2] * g];
+            const cA = cAt, cB = cAt + out * reach;
+            if (along) {
+              boxTS(u0, u1, Math.min(cA, cB), Math.max(cA, cB),
+                rY + 0.26 - drop, rY + 0.27, cl, shade(cl, 1.10));
+            } else {
+              boxTS(Math.min(cA, cB), Math.max(cA, cB), u0, u1,
+                rY + 0.26 - drop, rY + 0.27, cl, shade(cl, 1.10));
+            }
+          }
+        };
+        fringe(true, ra0, ra1, rc0, -1);
+        fringe(true, ra0, ra1, rc1, 1);
+        fringe(false, rc0, rc1, ra0, -1);
+        fringe(false, rc0, rc1, ra1, 1);
+      }
       // The counter, an L round two sides, with its teal top.
       //
       // The front of it is not teal. 20260821_175856 has dark maroon vertical
