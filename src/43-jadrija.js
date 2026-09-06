@@ -3970,9 +3970,54 @@ async function buildJadrija(scene) {
     { key: 'tramp', kind: 'fence', t0: 348, t1: 362, s0: 46, s1: 56, h: 2.2,
       name: null, post: [0.640, 0.520, 0.060], body: [0.055, 0.075, 0.062],
       rail: [0.660, 0.545, 0.075], skirt: [0.545, 0.075, 0.065] },
-    { key: 'maslina', kind: 'kiosk', t0: 352, t1: 358, s0: 28, s1: 30.5, h: 2.6,
-      name: 'Maslina', roof: [0.100, 0.108, 0.115], body: [0.075, 0.082, 0.088],
-      flag: [0.185, 0.075, 0.165], fg: '#f0e8f0', bg: '#4e2c48' },
+    // ── AND MASLINA IS A SHIPPING CONTAINER ────────────────────────────────
+    //
+    // FOUND 6 Sep, and it had been in two sources all along. The kiosk here
+    // was the generic one — a render box, a pitched roof, the shared `shopKit`
+    // counter with mullions, a condenser, a flue, two menu boards and two
+    // planted pots — and it is none of that.
+    //
+    // `20260821_175215` is taken from four metres and `1000150414` at
+    // 03:29-03:34 has the whole of it across the plaza with both ends in
+    // frame. What they agree on: an ANTHRACITE STEEL SHIPPING CONTAINER on
+    // gravel, its long side opened up into a glazed shopfront, a dark grey
+    // folding-arm awning in two cassettes running the full length, a FLAT
+    // roof with a big tilted framed panel standing on legs above it, a glazed
+    // personnel door in a shallow reveal at the east end, and a white dome
+    // camera under the roof edge beside it. Behind the glass: a curved black
+    // heated cabinet, a square glass display case of baked goods on a stainless
+    // counter, a till, and posters — HOT & FRESH, ONLY 35" FRENCH FRIES,
+    // CALZONE — stuck to the sliding doors at the west end.
+    //
+    // THE NAME IS ON THE FLAGS AND NOWHERE ELSE, and there are two of them,
+    // one off each end of the frontage. `_414` reads them: `Maslina` in a
+    // white script running up the flag with `BAKERY & DELI` in small caps
+    // beside it, on a dusty rose ground. Nothing on the building itself
+    // carries a word except the posters, so the shop had a purple board on a
+    // pole where it has two rose feathers, and the board is the only thing on
+    // this shore that was named by a fascia that does not exist.
+    //
+    // MASSING: 6.0 by 2.5 by 2.6 was already a 20 ft ISO box to within six
+    // centimetres (6.058 × 2.438 × 2.591) and does not move. The corner
+    // castings in `_175215` are unmistakable and settle what it is.
+    //
+    // COLOUR. The shipped 0.075/0.082/0.088 was half what the frames have.
+    // Measured as a ratio in its own frame rather than as a value: the ribbed
+    // end reads 37/40/44 against gravel at 154/156/164, which is 0.240 of it.
+    // The same ratio taken at TISAK — panel 126/101/72 against gravel
+    // 122/120/123 in `_343` — is what ships there as body 0.500/0.418/0.300,
+    // so a gravel ratio of 1.033 buys 0.500 and one of 0.240 buys 0.118.
+    // 0.120/0.127/0.133, which is anthracite and not black.
+    //
+    // The roof takes the same paint because it is the same box, and it is the
+    // one face of it that is up-facing: this file is NOT sky-corrected, so the
+    // container's lid renders about twenty per cent blue-heavy against this
+    // albedo and will read a shade cooler than the walls under it. That is the
+    // world's, not the number's, and the number is not bent to hide it.
+    { key: 'maslina', kind: 'kiosk', container: true,
+      t0: 352, t1: 358, s0: 28, s1: 30.5, h: 2.6,
+      name: 'Maslina', roof: [0.120, 0.127, 0.133], body: [0.120, 0.127, 0.133],
+      flag: [0.520, 0.372, 0.432], fg: '#f6eef0', bg: '#6a4550' },
     // ── AND ITS SHADE IS A REED MAT, NOT AN AWNING ─────────────────────────
     //
     // `20260821_174947` is taken from under it and `_174940` from fifteen
@@ -11032,17 +11077,47 @@ async function buildJadrija(scene) {
       furniture.push({ t: lt2, s: cs - 0.04, a: 0.09, c: 0.34, h: hh, y: y0 });
     }
     // The two square parasols. `1000150343` has a big white one with CORONA on
-    // its valance standing over the front of the kiosk and a golden Ožujsko one
-    // beyond it, and square is the read: every other parasol on this shore is
-    // an octagon in a car rim and these two are four panels on a mast.
+    // its valance and a golden Ožujsko one beyond it, and square is the read:
+    // every other parasol on this shore is an octagon in a car rim and these
+    // two are four panels on a mast.
     //
     // Two beers at one pitch, which the terrace note explicitly rules out —
     // "no terrace on this shore is asked to sell two beers". This is not a
     // terrace. It is a newsagent with somebody else's shade standing beside it,
     // and both brands are in the frame and both are among the six Misha named.
+    //
+    // ── AND NEITHER OF THEM STANDS IN FRONT OF THE SHOP ─────────────────────
+    //
+    // The CORONA was pitched at `t0 + 1.10`, `s0 − 2.95`: dead centre of a
+    // 3.5 m frontage and three metres out from it. A 2.64 m canopy there is
+    // not shade beside a kiosk, it is a lid on it. Photographed from the
+    // promenade at twelve metres — which is the one direction anybody
+    // approaches this shop from — the panelled side, the livery band with
+    // TISAK on it, the glazed corner, the cigarette wall, the display and the
+    // magazine rack were ALL behind cloth, and what the frame showed of a shop
+    // that cost seven hundred lines was a parasol, a cooler and two
+    // centimetres of red awning end.
+    //
+    // Both sources say the apron is bare. The pan's two passes along the
+    // promenade have nothing in front of this frontage at all — `1000150414`
+    // at 04:24-04:28 is the counter square on with clear ground to the kerb —
+    // and in `1000150343`, read left to right, the order along the wall is
+    // panelled side, glazed corner with the door, END OF THE KIOSK, the Jana
+    // cooler standing just outside it, and only THEN the CORONA mast, with
+    // the Ožujsko one further out again toward the water. The parasol is
+    // beyond the shop in the one frame it appears in, and the model had it
+    // in front.
+    //
+    // So the CORONA goes past the door end into the gap between this shop and
+    // h2o — `t1 + 1.45` spans t 309.13…311.77 and h2o starts at 312, so it
+    // clears both — and the Ožujsko drops three metres further seaward, which
+    // is where `_343` has it relative to the CORONA and which also keeps two
+    // canopies at one eave height from sharing any plan area at all. Their s
+    // spans are 18.08…20.72 and 15.25…17.61: half a metre of daylight, and
+    // rule 5 never gets asked the question.
     for (const [pt2, ps2, half, cloth, key] of [
-      [S.t0 + 1.10, S.s0 - 2.95, 1.32, [0.735, 0.728, 0.700], 'corona'],
-      [S.t1 + 2.30, S.s0 - 3.15, 1.18, [0.680, 0.545, 0.115], 'ozujsko'],
+      [S.t1 + 1.45, S.s0 - 2.60, 1.32, [0.735, 0.728, 0.700], 'corona'],
+      [S.t1 + 2.30, S.s0 - 5.60, 1.18, [0.680, 0.545, 0.115], 'ozujsko'],
     ]) {
       const gy = surfaceY(pt2, ps2);
       // A 0.34 m rise over a 1.32 m half is 14 degrees, which is not a parasol,
@@ -11070,9 +11145,13 @@ async function buildJadrija(scene) {
     }
     // Two garden benches under the shade, timber slats on a dark frame with a
     // pale cushion on each, which is what the two people in the frame are
-    // sitting on.
+    // sitting on. They follow the CORONA: the whole reason they are anywhere
+    // is that they are UNDER it, and left at `t0 + 2.15` with the parasol moved
+    // past the door end they would have been two benches in the sun in front of
+    // a counter with the shade five metres away. Same two offsets, same two
+    // angles, hung off the new mast instead of the old one.
     for (const [bt, bs, ang] of [
-      [S.t0 + 2.15, S.s0 - 2.85, 0.0], [S.t0 + 0.15, S.s0 - 2.55, 0.5],
+      [S.t1 + 2.15, S.s0 - 2.50, 0.0], [S.t1 + 0.60, S.s0 - 2.20, 0.5],
     ]) {
       const gy = surfaceY(bt, bs);
       const co = Math.cos(ang), sn = Math.sin(ang);
@@ -11618,6 +11697,561 @@ async function buildJadrija(scene) {
     furniture.push({ t: knT, s: knS, a: 0.21, c: 0.21, h: 1.16, y: bsY });
   }
 
+  /**
+   * The whole of Maslina, off `20260821_175215` and `1000150414` at 03:29-03:34.
+   *
+   * A 20 ft steel shipping container in anthracite, stood on gravel, with its
+   * long side cut open into a glazed shopfront and a dark grey folding-arm
+   * awning in two cassettes over the whole of it. Everything the generic kiosk
+   * gave this shop is switched off in `shopfront` — the pitched slab with the
+   * box on it, the mullioned serving hole, the plain render back, the shared
+   * `shopKit` with its counter, condenser, flue, menu boards and pots — because
+   * none of them is what a container is.
+   *
+   * THE TWO SOURCES ARE THE SAME FACE, taken from four metres and from forty,
+   * which is the opposite of TISAK's problem and much the easier one: `_175215`
+   * has the west two thirds of the frontage at reading distance — the posters,
+   * the hot cabinet, the pastry case, the corner casting, the ribs — and the
+   * pan has the whole silhouette with both ends, the flags, the framed panel
+   * over the roof and the bin cabinets. Nothing here is averaged between them.
+   *
+   * WHAT THE PAN CANNOT RESOLVE, AND IS THEREFORE NOT DRAWN: what the big
+   * tilted panel over the roof is FOR. It is a pale frame about 3.7 m long
+   * carrying a dark infill, standing on legs three quarters of a metre above
+   * the lid and raked back — photovoltaic, or a mesh screen over plant, and
+   * forty metres is not close enough to say. It is built as what it looks
+   * like: a framed dark panel. No cells are drawn on it, because drawing cells
+   * would be deciding.
+   *
+   * Depth outward from `s0` —
+   *
+   *   s0+0.05  the dark inside        s0−0.30  the counter ledge
+   *   s0−0.020 the glass              s0−0.42  the pastry case
+   *   s0−0.035 the posters            s0−0.55  the hot cabinet
+   *   s0−0.055 the ribs, the frame    s0−1.95  the awning, at its front bar
+   *   s0−0.075 the door reveal        s0−2.02  the awning valance
+   */
+  function maslinaFront(S, y0, top) {
+    const body = S.body;
+    // The ribs are the whole reason a container reads as a container at thirty
+    // metres, and they are not a colour difference: corrugation is a shadow
+    // pattern. Crest and valley are set by RATIO off the ribbed end in
+    // `_175215`, which runs 46 at the crest and 28 in the valley against a
+    // 37 median — 1.24 and 0.76 of the paint.
+    const CREST = shade(body, 1.22);
+    const VALLEY = shade(body, 0.78);
+    const FRAME = shade(body, 1.10);       // the corner posts and the rails
+    const CAST = [0.235, 0.238, 0.240];    // the corner castings, unpainted
+    const GLASS = [0.055, 0.062, 0.070];
+    const VOID = [0.030, 0.028, 0.028];
+    // The cloth, anchored against the box it is bolted to rather than against
+    // anything across the frame. In `_175215` the awning's underside reads
+    // 31/31/24 where the container's header immediately under it reads
+    // 14/15/19 in the same shade — 2.2 times the paint — and the paint is
+    // 0.120, so the cloth is 0.264. Warm: blue is 0.92 of red on it and 1.11
+    // of red on the steel, which is the difference between a dyed acrylic and
+    // a grey enamel and is most of why the two do not read as one object.
+    //
+    // It was first set at 0.360 off a cross-frame comparison with the cream
+    // bin cabinets, and that comparison was worthless: in the pan the cabinets
+    // are in evening sun and the cloth is under the pines, and in the render
+    // it is the other way about — the cabinets stand in the shop's own shadow
+    // and the cloth is the one surface here in open sky. Two surfaces at
+    // ninety degrees in different light cannot be ratioed. The header can.
+    const AWN = [0.262, 0.253, 0.242];
+    const ALU = [0.520, 0.522, 0.515];
+    const STEEL2 = [0.585, 0.592, 0.588];
+    // The east end carries the door, which is where `_175215` has it: the
+    // reveal, the glazed leaf and the camera over it are all in the last
+    // 1.15 m of the frontage.
+    const dt0 = S.t1 - 1.15, dt1 = S.t1 - 0.22;
+    // Where the glazing stops and the door bay begins.
+    const gt1 = dt0 - 0.06;
+
+    // ── the corrugated shell ────────────────────────────────────────────────
+    //
+    // Ribs on the two ends and the back; the front is mostly glass and gets
+    // them only in the header and the plinth. 0.28 m pitch, which is what a
+    // container profile runs and what `_175215` counts across the end panel:
+    // eleven crests over 2.44 m plus the two corner posts.
+    //
+    // 0.022 proud. A rib is not a groove — a groove is two extra faces to say
+    // what one raised strip says, and it can be lost by the depth test at two
+    // kilometres out. Same argument as TISAK's battens, at a third the depth.
+    const ribBand = (a, c, sA, sB, lo, hi, along) => {
+      const n = Math.max(2, Math.round(Math.abs((along ? c - a : sB - sA))
+        / 0.28));
+      for (let i = 0; i < n; i++) {
+        const f0 = i / n, f1 = (i + 0.52) / n;
+        if (along) {
+          boxTS(a + (c - a) * f0, a + (c - a) * f1, sA - 0.022, sA, lo, hi,
+            CREST, shade(CREST, 1.05));
+        } else {
+          boxTS(a - 0.022, a, sA + (sB - sA) * f0, sA + (sB - sA) * f1, lo, hi,
+            CREST, shade(CREST, 1.05));
+        }
+      }
+    };
+    // The body box itself is already drawn by `shopfront`; these darken the
+    // field the crests stand on, so the two together read as a profile and not
+    // as a row of stripes on flat sheet.
+    boxTS(S.t0 - 0.012, S.t0, S.s0, S.s1, y0 + 0.09, top - 0.09, VALLEY);
+    boxTS(S.t1, S.t1 + 0.012, S.s0, S.s1, y0 + 0.09, top - 0.09, VALLEY);
+    boxTS(S.t0, S.t1, S.s1, S.s1 + 0.012, y0 + 0.09, top - 0.09, VALLEY);
+    ribBand(S.t0, S.t0, S.s0 + 0.06, S.s1 - 0.06, y0 + 0.09, top - 0.09, false);
+    // The east end's ribs run the other way off `t1`, so the crest boxes have
+    // to grow inland from `t1` and not seaward of `t0`.
+    {
+      const n = Math.max(2, Math.round((S.s1 - S.s0 - 0.12) / 0.28));
+      for (let i = 0; i < n; i++) {
+        const sA = S.s0 + 0.06 + (S.s1 - S.s0 - 0.12) * (i / n);
+        const sB = S.s0 + 0.06 + (S.s1 - S.s0 - 0.12) * ((i + 0.52) / n);
+        boxTS(S.t1, S.t1 + 0.022, sA, sB, y0 + 0.09, top - 0.09,
+          CREST, shade(CREST, 1.05));
+        // And the back, whose ribs run along t and stand inland of s1.
+      }
+      const m = Math.max(2, Math.round((S.t1 - S.t0 - 0.12) / 0.28));
+      for (let i = 0; i < m; i++) {
+        const a = S.t0 + 0.06 + (S.t1 - S.t0 - 0.12) * (i / m);
+        const c = S.t0 + 0.06 + (S.t1 - S.t0 - 0.12) * ((i + 0.52) / m);
+        boxTS(a, c, S.s1, S.s1 + 0.022, y0 + 0.09, top - 0.09,
+          CREST, shade(CREST, 1.05));
+      }
+    }
+
+    // ── the frame: four corner posts, a top rail and a bottom rail ──────────
+    //
+    // These stand 0.055 proud, a third of a rib clear of the crests at 0.022,
+    // so the profile dies into them the way it does on the real box and rule 5
+    // is never asked about a 33 mm gap it would have had to decide.
+    for (const [ta, tc] of [[S.t0 - 0.055, S.t0], [S.t1, S.t1 + 0.055]]) {
+      boxTS(ta, tc, S.s0 - 0.055, S.s1 + 0.055, y0 + 0.02, top - 0.02, FRAME);
+    }
+    for (const [sa, sc] of [[S.s0 - 0.055, S.s0], [S.s1, S.s1 + 0.055]]) {
+      boxTS(S.t0 - 0.055, S.t1 + 0.055, sa, sc, y0 + 0.02, top - 0.02, FRAME);
+    }
+    for (const [ya, yc] of [[y0 + 0.02, y0 + 0.14], [top - 0.16, top - 0.02]]) {
+      boxTS(S.t0 - 0.058, S.t1 + 0.058, S.s0 - 0.058, S.s1 + 0.058, ya, yc,
+        FRAME, shade(FRAME, 1.06));
+    }
+    // The eight corner castings, which are the one detail that says ISO box
+    // rather than site cabin, and they are the sharpest thing in `_175215`:
+    // a pale block at every corner with the oval hole in its face.
+    for (const ta of [S.t0, S.t1]) {
+      for (const sa of [S.s0, S.s1]) {
+        for (const yb of [y0 + 0.01, top - 0.19]) {
+          const td = ta === S.t0 ? -1 : 1, sd = sa === S.s0 ? -1 : 1;
+          boxTS(Math.min(ta, ta + td * 0.18), Math.max(ta, ta + td * 0.18),
+            Math.min(sa, sa + sd * 0.16), Math.max(sa, sa + sd * 0.16),
+            yb, yb + 0.18, CAST, shade(CAST, 1.10));
+        }
+      }
+    }
+
+    // ── the lid ─────────────────────────────────────────────────────────────
+    //
+    // FLAT, and it is up-facing: see the note in `SHOPS`. The container's own
+    // top rail stands 0.06 proud of the deck all round, which is what a
+    // container roof looks like from anywhere you can see onto it — a shallow
+    // tray, not a slab.
+    boxTS(S.t0 - 0.055, S.t1 + 0.055, S.s0 - 0.055, S.s1 + 0.055,
+      top - 0.02, top + 0.03, S.roof, shade(S.roof, 1.06));
+    boxTS(S.t0 - 0.055, S.t1 + 0.055, S.s0 - 0.055, S.s0 + 0.005,
+      top + 0.02, top + 0.09, FRAME);
+    boxTS(S.t0 - 0.055, S.t1 + 0.055, S.s1 - 0.005, S.s1 + 0.055,
+      top + 0.02, top + 0.09, FRAME);
+
+    // ── the framed panel over it ────────────────────────────────────────────
+    //
+    // Four legs, a pale perimeter frame and a dark infill, raked back toward
+    // the land. In the pan it runs from about a quarter of the way along to
+    // just short of the door end and stands clear of the lid by three
+    // quarters of a metre, with its low edge seaward — the rake is 17 degrees
+    // over a 1.5 m slope, which is 0.44 m of rise, and its high edge is level
+    // with the top of the awning cassette behind it.
+    //
+    // `bar` is what rakes it: a near-horizontal member is exactly what
+    // `frustum` cannot draw, and a stack of thin boxes stepping up the rake
+    // would be a staircase at fifteen metres. `slat` gives the raked section
+    // and `bar` sweeps it along t, which is one quad per piece and follows the
+    // shore like everything else.
+    {
+      const pa = S.t0 + 1.35, pc = S.t0 + 5.05;
+      const ps = (S.s0 + S.s1) * 0.5 + 0.14;   // the panel's mid-depth
+      const py = top + 0.70;                   // its mid-height
+      // POSITIVE, and the sign is the whole read. `slat`'s long axis runs
+      // along (sin ang, cos ang) in (inland, up), so a NEGATIVE angle raises
+      // the SEAWARD end — which is a panel tipped at the water, and the pan
+      // has it the other way about: the low edge is seaward and it climbs
+      // going inland. Built with the minus, the whole underside faced the
+      // promenade and the shop wore a billboard.
+      const RAKE = 0.34;
+      const HALF = 0.775;                      // half the panel's slope length
+      const PANEL = [0.115, 0.108, 0.112];
+      // The infill first, then the frame a hair proud of it on both faces.
+      bar(pa + 0.05, pc - 0.05, slat(ps, py, RAKE, 1.48, 0.035),
+        PANEL, shade(PANEL, 1.20), 1.2);
+      // The frame: two rails along the length and two stiles across the ends.
+      for (const e of [-1, 1]) {
+        bar(pa, pc, slat(ps + e * Math.sin(RAKE) * HALF,
+          py + e * Math.cos(RAKE) * HALF, RAKE, 0.075, 0.075),
+        ALU, shade(ALU, 1.12), 1.2);
+      }
+      for (const [ea, ec] of [[pa, pa + 0.075], [pc - 0.075, pc]]) {
+        bar(ea, ec, slat(ps, py, RAKE, 1.62, 0.070), ALU, shade(ALU, 1.12));
+      }
+      // Four legs. They stand on the lid, not through it, and they are set in
+      // from the panel's ends so the frame oversails them — a leg at the very
+      // corner reads as a table and this is a stand. Each foot is under the
+      // rail it carries, so the seaward pair are short and the inland pair
+      // long, which is what makes the rake read from below.
+      for (const lt of [pa + 0.55, pc - 0.55]) {
+        for (const e of [-1, 1]) {
+          const ls = ps + e * Math.sin(RAKE) * 0.64;
+          const ly = py + e * Math.cos(RAKE) * 0.64;
+          post(W, lt, ls, top + 0.03, ly, 0.028, STEEL2, 4);
+        }
+      }
+    }
+
+    // ── the glazed shopfront ────────────────────────────────────────────────
+    //
+    // The whole length between the corner posts and the door bay, in one run.
+    // The dark inside goes in first so that everything put in front of it is a
+    // lit object in a shop: the same argument the generic frontage makes and
+    // the one thing about it worth keeping.
+    const gLo = y0 + 0.36, gHi = top - 0.30;
+    boxTS(S.t0 + 0.09, gt1, S.s0 - 0.005, S.s0 + 0.08, gLo, gHi, VOID);
+    boxTS(S.t0 + 0.09, gt1, S.s0 - 0.020, S.s0 - 0.010, gLo, gHi,
+      GLASS, shade(GLASS, 1.9));
+    // The header over it, and the plinth under it, both ribbed: those are the
+    // two strips of the container's own sheet that were left when the side was
+    // cut out, and in `_175215` the ribs run straight through them.
+    ribBand(S.t0 + 0.09, gt1, S.s0, S.s0, gHi + 0.005, top - 0.18, true);
+    ribBand(S.t0 + 0.09, gt1, S.s0, S.s0, y0 + 0.16, gLo - 0.005, true);
+    boxTS(S.t0 + 0.09, gt1, S.s0 - 0.012, S.s0, gHi + 0.005, top - 0.18,
+      VALLEY);
+    boxTS(S.t0 + 0.09, gt1, S.s0 - 0.012, S.s0, y0 + 0.16, gLo - 0.005,
+      VALLEY);
+    // The mullions. Five bays across 4.7 m, which is what the frame counts
+    // between the sliding doors at the west end and the open hatch: the two
+    // door leaves, a fixed light, and the hatch in two.
+    for (let k = 0; k <= 5; k++) {
+      const mt = S.t0 + 0.09 + (gt1 - (S.t0 + 0.09)) * (k / 5);
+      boxTS(mt - 0.030, mt + 0.030, S.s0 - 0.055, S.s0 - 0.015, gLo, gHi,
+        FRAME, shade(FRAME, 1.08));
+    }
+    // And the transom over the shutter track, which is the line the hatch
+    // slides up behind and the line the posters hang from.
+    boxTS(S.t0 + 0.09, gt1, S.s0 - 0.052, S.s0 - 0.018, gHi - 0.115, gHi,
+      shade(FRAME, 0.88));
+
+    // ── what is behind the glass ────────────────────────────────────────────
+    //
+    // Left to right in `_175215`: the two poster-covered sliding leaves, then
+    // the open hatch with the curved black hot cabinet, the stainless counter
+    // with the glass pastry case on it, and the till. The counter runs the
+    // length; the cases stand on it.
+    const cY = y0 + 1.02;
+    boxTS(S.t0 + 0.30, gt1 - 0.10, S.s0 - 0.30, S.s0 + 0.02, cY - 0.04, cY,
+      STEEL2, shade(STEEL2, 1.12));
+    boxTS(S.t0 + 0.30, gt1 - 0.10, S.s0 - 0.26, S.s0 + 0.02, y0 + 0.36,
+      cY - 0.04, [0.105, 0.100, 0.098]);
+    // The curved hot cabinet: a black base with a glass hood, and the hood is
+    // three facets rather than a box, because what reads at ten metres is the
+    // highlight running round the curve and a box has one flat of it.
+    {
+      const ha = S.t0 + 1.62, hc = S.t0 + 2.94;
+      boxTS(ha, hc, S.s0 - 0.55, S.s0 - 0.14, cY, cY + 0.22,
+        [0.075, 0.072, 0.072]);
+      for (const [ang, hh2] of [[-0.62, 0.20], [-0.16, 0.22], [0.36, 0.20]]) {
+        bar(ha, hc, slat(S.s0 - 0.345 + Math.sin(ang) * 0.20,
+          cY + 0.44 - Math.cos(ang) * 0.02, ang, hh2, 0.018),
+        [0.130, 0.148, 0.160], [0.300, 0.330, 0.345], 1.2);
+      }
+      boxTS(ha, hc, S.s0 - 0.55, S.s0 - 0.14, cY + 0.60, cY + 0.66,
+        [0.085, 0.082, 0.082]);
+    }
+    // The pastry case: a square glass box on the counter with the baskets in
+    // it. Two shelves of warm crust, which at this range is a band of colour
+    // with a shadow under it and not eleven loaves.
+    {
+      const pa = S.t0 + 3.16, pc = S.t0 + 4.52;
+      boxTS(pa, pc, S.s0 - 0.42, S.s0 - 0.06, cY, cY + 0.06,
+        [0.545, 0.552, 0.548]);
+      for (const yy of [cY + 0.10, cY + 0.34]) {
+        boxTS(pa + 0.05, pc - 0.05, S.s0 - 0.39, S.s0 - 0.10, yy, yy + 0.11,
+          [0.520, 0.395, 0.230], [0.585, 0.455, 0.275]);
+      }
+      // The glass, four thin edges and no faces: a filled box here is a grey
+      // slab over the only warm colour on this frontage.
+      for (const [ta, tc] of [[pa, pa + 0.022], [pc - 0.022, pc]]) {
+        boxTS(ta, tc, S.s0 - 0.42, S.s0 - 0.06, cY + 0.04, cY + 0.56,
+          [0.360, 0.395, 0.405]);
+      }
+      boxTS(pa, pc, S.s0 - 0.42, S.s0 - 0.398, cY + 0.04, cY + 0.56,
+        [0.300, 0.330, 0.345]);
+      boxTS(pa, pc, S.s0 - 0.42, S.s0 - 0.06, cY + 0.54, cY + 0.56,
+        [0.420, 0.448, 0.455]);
+    }
+    // The till, on a black riser at the east end of the counter.
+    boxTS(gt1 - 0.62, gt1 - 0.28, S.s0 - 0.30, S.s0 - 0.06, cY, cY + 0.30,
+      [0.100, 0.098, 0.098]);
+    boxTS(gt1 - 0.60, gt1 - 0.30, S.s0 - 0.31, S.s0 - 0.28, cY + 0.14,
+      cY + 0.28, [0.235, 0.250, 0.258]);
+    // The strip light along the head, which is why the inside is lit at all.
+    boxTS(S.t0 + 0.30, gt1 - 0.10, S.s0 + 0.02, S.s0 + 0.06, gHi - 0.20,
+      gHi - 0.14, [0.760, 0.752, 0.720]);
+
+    // ── the posters on the two sliding leaves ───────────────────────────────
+    //
+    // Rule 12, and it is the whole reason these are drawn at all: every word
+    // on them is READ off `20260821_175215` at four metres and none of it is
+    // invented. HOT & FRESH over ONLY 35" over FRENCH FRIES, in white and gold
+    // on black, on the leaf at the west end, with the same three lines again
+    // on the leaf beside it and a chip of the fries graphic below. What the
+    // frame also carries and this does not is the CALZONE poster behind the
+    // door glass, which is legible in the still only as its first word.
+    {
+      const w2 = 0.86, h2 = 1.12;
+      for (const pt of [S.t0 + 0.64, S.t0 + 1.20]) {
+        seaFacing(maslinaPoster(w2, h2), pt, S.s0 - 0.035, cY + 0.52, w2, h2,
+          'maslina:poster' + (pt > S.t0 + 1 ? '2' : ''));
+      }
+    }
+
+    // ── the door bay ────────────────────────────────────────────────────────
+    //
+    // A shallow reveal with a glazed leaf set back in it, standing open in
+    // neither source — it is shut in `_175215` and shut in the pan.
+    boxTS(dt0, dt1, S.s0 - 0.075, S.s0 + 0.02, y0 + 0.12, top - 0.30, FRAME);
+    boxTS(dt0 + 0.07, dt1 - 0.07, S.s0 - 0.045, S.s0 - 0.010, y0 + 0.16,
+      top - 0.36, GLASS, shade(GLASS, 1.8));
+    boxTS(dt0 + 0.07, dt1 - 0.07, S.s0 - 0.008, S.s0 + 0.05, y0 + 0.16,
+      top - 0.36, VOID);
+    // The lever handle, and the threshold plate under the leaf.
+    boxTS(dt1 - 0.20, dt1 - 0.12, S.s0 - 0.085, S.s0 - 0.048, y0 + 1.02,
+      y0 + 1.10, [0.545, 0.552, 0.550]);
+    boxTS(dt0 + 0.05, dt1 - 0.05, S.s0 - 0.085, S.s0 + 0.02, y0 + 0.10,
+      y0 + 0.16, shade(FRAME, 1.14));
+    // The dome camera under the roof edge beside it, white on a small bracket.
+    // It is the one pale object anywhere on this box and in `_175215` it is
+    // what the eye lands on after the posters.
+    {
+      const ct2 = dt0 - 0.30;
+      boxTS(ct2 - 0.035, ct2 + 0.035, S.s0 - 0.12, S.s0 - 0.03, top - 0.30,
+        top - 0.24, [0.640, 0.638, 0.630]);
+      post(W, ct2, S.s0 - 0.115, top - 0.40, top - 0.28, 0.062,
+        [0.740, 0.738, 0.728], 8);
+    }
+
+    // ── the awning ──────────────────────────────────────────────────────────
+    //
+    // Two folding-arm cassettes end to end over the whole frontage, which is
+    // what the pan shows: there is a joint about halfway along and the two
+    // halves hang a few centimetres apart at the front bar. Charcoal cloth,
+    // measured in the pan at 148/132/129 against a cream bin cabinet at
+    // 233/203/162 in the same light — 0.635 of it in red and 0.796 in blue,
+    // which is a warm mid grey and not the terracotta this shop's `roof`
+    // colour would have made of it.
+    //
+    // Projection 1.90 m and a drop of 0.56 over it, which is 16 degrees. At
+    // the 9 degrees this was first built with, the cloth read as a flat pale
+    // ROOF over the shop rather than as an awning on its wall — a folding-arm
+    // awning is pitched, and what says so from underneath is the run of the
+    // arms. 16 degrees also drops the front bar to 1.72 m, which is a bar you
+    // duck under and not a soffit you walk beneath.
+    {
+      const aLo = top - 0.34, aOut = S.s0 - 1.90;
+      for (const [ca, cc] of [[S.t0 - 0.06, S.t0 + 2.98],
+        [S.t0 + 3.02, S.t1 + 0.06]]) {
+        // The cassette, tight under the top rail.
+        boxTS(ca, cc, S.s0 - 0.22, S.s0 - 0.045, aLo, aLo + 0.20,
+          ALU, shade(ALU, 1.10));
+        // The cloth. `bar` rakes it; a flat box could not, and a box stepped
+        // down in courses would be a staircase seen from under it.
+        bar(ca, cc, [[S.s0 - 0.045, aLo - 0.02], [aOut, aLo - 0.58],
+          [aOut, aLo - 0.62], [S.s0 - 0.045, aLo - 0.06]],
+        AWN, shade(AWN, 1.04), 1.5);
+        // The front bar, and the valance hanging off it. 0.14 m, which is what
+        // the pan shows and is a hem rather than a fascia: nothing is printed
+        // on it, because nothing is printed on it in either source. The name
+        // is on the flags.
+        boxTS(ca, cc, aOut - 0.055, aOut, aLo - 0.635, aLo - 0.555,
+          shade(ALU, 0.92));
+        boxTS(ca, cc, aOut - 0.048, aOut - 0.020, aLo - 0.775, aLo - 0.630,
+          shade(AWN, 0.88), shade(AWN, 1.02));
+        // The two folding arms per cassette, seen edge-on from the promenade
+        // and only visible at all because they are paler than the cloth.
+        for (const at2 of [ca + 0.42, cc - 0.42]) {
+          bar(at2 - 0.022, at2 + 0.022,
+            [[S.s0 - 0.05, aLo - 0.10], [aOut - 0.02, aLo - 0.66],
+              [aOut - 0.02, aLo - 0.72], [S.s0 - 0.05, aLo - 0.16]],
+            shade(ALU, 0.86), null, 1.5);
+        }
+      }
+    }
+
+    // ── the two bin cabinets ────────────────────────────────────────────────
+    //
+    // Cream louvred enclosures standing at the door end, in front of the
+    // frontage and clear of it, side by side with a finger of daylight
+    // between them. They are the brightest thing in the whole of this shop's
+    // half of the pan and the model had nothing there at all.
+    {
+      const CAB = [0.720, 0.672, 0.552];
+      for (const bt of [S.t1 - 1.55, S.t1 - 0.35]) {
+        const bs = S.s0 - 1.05;
+        const gy = surfaceY(bt, bs);
+        boxTS(bt - 0.55, bt + 0.55, bs - 0.36, bs + 0.36, gy, gy + 1.26,
+          CAB, shade(CAB, 1.08));
+        // The louvres: vertical, close, and read entirely by their own
+        // shadows — 0.075 apart, which is what the pan resolves across a
+        // 1.1 m door and is fine enough not to read as planks.
+        for (let u = -0.50; u <= 0.50; u += 0.075) {
+          boxTS(bt + u - 0.020, bt + u + 0.020, bs - 0.385, bs - 0.36,
+            gy + 0.06, gy + 1.20, shade(CAB, 0.90));
+        }
+        boxTS(bt - 0.57, bt + 0.57, bs - 0.40, bs + 0.38, gy + 1.24,
+          gy + 1.30, shade(CAB, 1.12));
+        furniture.push({ t: bt, s: bs, a: 0.57, c: 0.40, h: 1.30, y: gy });
+      }
+    }
+  }
+
+  /**
+   * The poster on Maslina's sliding leaf, off `20260821_175215` at four metres.
+   *
+   * Rule 12: every word here is read off the frame and none is invented. Three
+   * lines on black — HOT & FRESH in white, ONLY and a boxed 35" in gold, and
+   * FRENCH FRIES in a hairline box under them. The 35" is the frame's own
+   * punctuation and is left exactly as it is written there.
+   */
+  function maslinaPoster(w, h) {
+    const C = document.createElement('canvas');
+    C.height = 256;
+    C.width = Math.max(96, Math.round(256 * w / h));
+    const g = C.getContext('2d');
+    const CW = C.width, CH = C.height;
+    const FF = '"Helvetica Neue", Arial, sans-serif';
+    g.fillStyle = '#0d0d0f';
+    g.fillRect(0, 0, CW, CH);
+    g.textAlign = 'center';
+    g.fillStyle = '#f2f0ec';
+    g.font = '800 ' + Math.round(CH * 0.125) + 'px ' + FF;
+    g.fillText('HOT & FRESH', CW * 0.5, CH * 0.20);
+    g.fillStyle = '#d8a832';
+    g.font = '800 ' + Math.round(CH * 0.115) + 'px ' + FF;
+    g.fillText('ONLY', CW * 0.30, CH * 0.345);
+    // The boxed price, which is the loudest thing on the sheet.
+    g.strokeStyle = '#d8a832';
+    g.lineWidth = Math.max(1, CH * 0.016);
+    const bw = CW * 0.40, bh = CH * 0.125;
+    const bx = CW * 0.56 - bw * 0.5, by = CH * 0.245;
+    g.beginPath();
+    g.moveTo(bx, by + bh * 0.5);
+    g.arcTo(bx, by, bx + bw * 0.5, by, bh * 0.5);
+    g.arcTo(bx + bw, by, bx + bw, by + bh * 0.5, bh * 0.5);
+    g.arcTo(bx + bw, by + bh, bx + bw * 0.5, by + bh, bh * 0.5);
+    g.arcTo(bx, by + bh, bx, by + bh * 0.5, bh * 0.5);
+    g.closePath();
+    g.stroke();
+    g.fillText('35"', bx + bw * 0.5, by + bh * 0.80);
+    g.strokeStyle = '#8c8378';
+    g.lineWidth = Math.max(1, CH * 0.008);
+    g.strokeRect(CW * 0.10, CH * 0.415, CW * 0.80, CH * 0.115);
+    g.fillStyle = '#f2f0ec';
+    g.font = '800 ' + Math.round(CH * 0.078) + 'px ' + FF;
+    g.fillText('FRENCH FRIES', CW * 0.5, CH * 0.500);
+    // The fries graphic under it: a gold wedge with the chips fanning out of
+    // it. Two thirds of this poster is that picture in the frame, and a black
+    // rectangle under the lettering is not what any of it looks like.
+    g.fillStyle = '#e0aa2e';
+    g.beginPath();
+    g.moveTo(CW * 0.38, CH * 0.98);
+    g.lineTo(CW * 0.62, CH * 0.98);
+    g.lineTo(CW * 0.58, CH * 0.76);
+    g.lineTo(CW * 0.42, CH * 0.76);
+    g.closePath();
+    g.fill();
+    for (let i = 0; i < 7; i++) {
+      const a = -1.20 + i * 0.40;
+      g.save();
+      g.translate(CW * 0.5, CH * 0.78);
+      g.rotate(a * 0.34);
+      g.fillStyle = i % 2 ? '#f0cc58' : '#e8b840';
+      g.fillRect(-CW * 0.022, -CH * 0.20, CW * 0.044, CH * 0.20);
+      g.restore();
+    }
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    return tex;
+  }
+
+  /**
+   * The print on Maslina's feather flags, off `1000150414` at 03:29-03:34.
+   *
+   * `Maslina` in a white script over `BAKERY & DELI` in small white caps, both
+   * running UP the flag — which is how a feather is printed and why the shop's
+   * name could never have gone on `shopSign`'s horizontal board. Rule 12:
+   * those four words are what the frame carries and there is nothing else
+   * legible on either flag.
+   *
+   * The canvas is drawn on its side and rotated, because a vertical string
+   * set letter-by-letter down a column is not a script — the join between the
+   * letters is most of what makes this read as handwriting at twenty metres,
+   * and `paintedWord`'s `vert` mode breaks exactly that.
+   *
+   * Clear ground, not rose: the cloth behind it is geometry with the measured
+   * paint on it and is lit by the world. A canvas with the flag colour printed
+   * on it would be that colour twice over — the note in `canvas-textures` — and
+   * would sit a flat unlit rectangle over the middle of a lit flag.
+   */
+  function maslinaFlagPrint(w, h) {
+    const C = document.createElement('canvas');
+    // The canvas keeps the PLANE's aspect — tall and narrow — and the context
+    // is turned a quarter so the type is set along the long axis. Sizing the
+    // canvas the other way round and letting the plane stretch it would set
+    // the words across the flag and squash every glyph by three to one.
+    C.height = 1024;
+    C.width = Math.max(64, Math.round(1024 * w / h));
+    const g = C.getContext('2d');
+    const CW = C.width, CH = C.height;
+    // After this, +x runs UP the flag and +y runs across it toward the leech.
+    g.translate(CW * 0.5, CH * 0.5);
+    g.rotate(-Math.PI / 2);
+    const L = CH, T = CW;
+    g.textAlign = 'center';
+    g.fillStyle = '#f6f0f1';
+    // The script. Trebuchet's italic is the nearest hand in the stack this
+    // file already loads, and at this size what carries is the slope and the
+    // join rather than any particular face.
+    g.font = 'italic 600 ' + Math.round(T * 0.44) + 'px "Trebuchet MS", '
+      + '"Segoe UI", Georgia, serif';
+    g.fillText('Maslina', -L * 0.06, -T * 0.05);
+    // And the strapline, tracked wide, running beside the script toward the
+    // leech. Tracking has to be set a letter at a time: canvas has no
+    // letter-spacing, and the frame's is about half an em.
+    g.font = '600 ' + Math.round(T * 0.115) + 'px "Helvetica Neue", Arial, '
+      + 'sans-serif';
+    const SUB = 'BAKERY & DELI';
+    const tr = T * 0.055;
+    let wid = tr * (SUB.length - 1);
+    for (const ch of SUB) wid += g.measureText(ch).width;
+    let x = -L * 0.06 - wid * 0.5;
+    for (const ch of SUB) {
+      const cw = g.measureText(ch).width;
+      g.fillText(ch, x + cw * 0.5, T * 0.26);
+      x += cw + tr;
+    }
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    tex.userData.clear = true;
+    return tex;
+  }
+
   /** One business. Everything upright goes in `up`; pads stay in `deck`. */
   /**
    * What one shop has that the others do not.
@@ -11632,6 +12266,7 @@ async function buildJadrija(scene) {
     const TIMB = [0.235, 0.150, 0.105];
 
     if (S.key === 'tisak') { tisakFront(S, y0, top); return; }
+    if (S.key === 'maslina') { maslinaFront(S, y0, top); return; }
     if (S.key === 'f2') pizzeriaFront(S, y0, top);
     if (S.key === 'kiosk') { greenKiosk(S, y0, top); greenBack(S, y0, top); return; }
 
@@ -13539,7 +14174,11 @@ async function buildJadrija(scene) {
     // round the corner and up the stone steps past the freezer. A serving hole
     // eight metres wide with a black lightbox behind it was the single biggest
     // thing about that shop and it is not there in life.
-    if (!S.metal && !S.solid) {
+    // Nor on a `container` one, and for the same reason turned through ninety
+    // degrees: Maslina's opening is not a hole two thirds as wide as the shop
+    // with a lightbox behind it, it is a glazed shopfront the WHOLE length with
+    // a hatch slid open across the middle of it. See `maslinaFront`.
+    if (!S.metal && !S.solid && !S.container) {
       boxTS(oa, oc, S.s0 - 0.02, S.s0 + 0.10, y0 + 0.95, top - 0.35,
         [0.045, 0.041, 0.038]);
       boxTS(oa, oc, S.s0 - 0.10, S.s0 + 0.04, y0 + 0.86, y0 + 0.98,
@@ -13695,6 +14334,11 @@ async function buildJadrija(scene) {
         top, top + 0.055, S.roof, shade(S.roof, 1.10));
       boxTS(S.t0 - 0.11, S.t1 + 0.11, S.s0 - 0.11, S.s1 + 0.11,
         top + 0.045, top + 0.085, shade(S.roof, 0.86));
+    } else if (S.container) {
+      // A container has a FLAT top with a rail round it, and the roof — with
+      // the framed panel that stands over it — is drawn with the rest of the
+      // box in `maslinaFront`. Nothing here: the pitched slab and the raised
+      // box below were 0.62 m of silhouette this shop has never had.
     } else if (S.twinGable) {
       twinGableRoof(S, y0, top, body);
     } else {
@@ -13919,22 +14563,111 @@ async function buildJadrija(scene) {
       furniture.push({ t: (S.t0 + S.t1) * 0.5, s: fs - 0.20,
         a: (S.t1 - S.t0) * 0.5 + 0.5, c: 0.15, h: 0.50, y: y0 });
     }
-    // The feather flag, which is all the branding Maslina has.
+    // ── the feather flags, which are all the branding Maslina has ───────────
+    //
+    // TWO of them, and it had one. `1000150414` at 03:29-03:34 has a flag off
+    // each end of the frontage, and a pair either side of a six-metre shop is
+    // a different object from a single board beside it: it is what says the
+    // whole of the box between them is one business.
+    //
+    // AND THEY ARE FEATHERS, not boards. What shipped was a flat rectangle
+    // 0.77 m by 2.1 m on a pole — a signboard, and the one shape a feather
+    // flag never is. The frame has the classic profile: a straight luff bound
+    // to the pole, a head that carries on past the top of it and curves
+    // forward, and a leech that falls away from the peak to the tack. Three
+    // pieces along the luff with the leech stepping out then back is what
+    // draws that at thirty metres, and it costs nine quads.
+    //
+    // COLOUR. The shipped 0.185/0.075/0.165 was a saturated dark magenta and
+    // the cloth is a dusty rose. Sampled in the pan across sun and shade, the
+    // flag runs 134/104/118 lit and 63/42/54 shaded, and the hue holds through
+    // both at r : g : b of 1 : 0.70 : 0.83 — red highest, BLUE SECOND, green
+    // lowest, which is a muted old rose and not a purple. Against the cream
+    // bin cabinet beside it at 233/203/162 in the same light, the lit cloth is
+    // 0.575 of it, so the paint is about 0.42 in red. 0.415/0.290/0.345.
+    //
+    // The print is `Maslina` in a white script with `BAKERY & DELI` in small
+    // caps beside it, both running UP the flag — which is how a feather is
+    // printed, and the reason `shopSign`'s horizontal board could never have
+    // carried it. Rule 12: those four words are read off the frame and there
+    // is nothing else legible on either flag.
     if (S.flag) {
-      const ft = S.t1 + 0.9;
-      post(W, ft, S.s0 - 0.6, y0, y0 + 3.1, 0.035, [0.500, 0.505, 0.500], 5);
-      // Three metres of pole standing on open ground beside the kiosk. Thin,
-      // and blocked anyway: everything else on this stretch stops you and a
-      // flagpole that does not is the one that reads as a bug.
-      furniture.push({ t: ft, s: S.s0 - 0.6, a: 0.05, c: 0.05, h: 3.1, y: y0 });
-      boxTS(ft - 0.02, ft + 0.02, S.s0 - 1.35, S.s0 - 0.58, y0 + 0.9, y0 + 3.0,
-        S.flag);
-      if (S.name) shopSign(S, ft, S.s0 - 1.42, y0 + 2.0, 0.66, 1.8);
+      for (const [ft, fs, wind] of [
+        [S.t0 - 0.85, S.s0 - 1.55, 1], [S.t1 + 0.80, S.s0 - 1.15, -1],
+      ]) {
+        const gy = surfaceY(ft, fs);
+        // A 3.4 m pole in three tapering sections, which is what a feather
+        // flag stands on and what makes the head bend: the top section is
+        // thin enough to be pulled forward by the cloth.
+        post(W, ft, fs, gy, gy + 2.30, 0.028, [0.545, 0.548, 0.540], 5);
+        post(W, ft, fs, gy + 2.24, gy + 3.36, 0.019, [0.545, 0.548, 0.540], 5);
+        // The ground spike's cross base, and the block that stops you. Thin,
+        // and blocked anyway: everything else on this stretch stops you and a
+        // flagpole that does not is the one that reads as a bug.
+        for (const turn of [0, 1]) {
+          boxTS(ft - (turn ? 0.05 : 0.34), ft + (turn ? 0.05 : 0.34),
+            fs - (turn ? 0.34 : 0.05), fs + (turn ? 0.34 : 0.05),
+            gy, gy + 0.035, [0.300, 0.302, 0.298]);
+        }
+        furniture.push({ t: ft, s: fs, a: 0.08, c: 0.08, h: 3.36, y: gy });
+        // The cloth. `wind` is which way the leech falls, and the two flags
+        // get opposite signs: a pair blowing identically at ten metres apart
+        // is the machined read the fascia note warns about, and the frame has
+        // them hanging differently anyway.
+        //
+        // Luff at the pole, leech `lw` out from it, and the profile is a table
+        // of (height above the tack, how far the leech stands out) — 0 at the
+        // tack, full at two thirds, and back to the tip where the head curves
+        // over. Drawn BOTH WAYS ROUND: a flag is one ply of cloth and a fan
+        // wound once is invisible from one whole hemisphere, which is exactly
+        // how tonight's missing transom happened.
+        const lw = 0.62 * wind;
+        const PRO = [[0.00, 0.30], [0.42, 0.92], [1.10, 1.00],
+          [1.86, 0.94], [2.42, 0.72], [2.78, 0.34], [2.94, 0.00]];
+        const tack = gy + 0.42;
+        // The head runs past the top of the pole and curves forward, so the
+        // luff is not straight all the way: above 2.42 it leans out with the
+        // cloth. `lean` is that, and it is what makes this read as a feather
+        // and not as a triangle.
+        // The cloth hangs ALONG the shore, not across it: the flag is read
+        // broadside from the promenade, which is the same plane the shopfront
+        // is in. Built across t at a constant s, so the leech runs out along
+        // the frontage and `seaFacing` can hang the print on it with no turn.
+        const lean = (u) => (u < 2.30 ? 0 : (u - 2.30) * 0.30);
+        for (let i = 0; i < PRO.length - 1; i++) {
+          const [u0, e0] = PRO[i], [u1, e1] = PRO[i + 1];
+          const A = W(ft + lean(u0) * wind, fs - 0.03, tack + u0);
+          const B = W(ft + lean(u1) * wind, fs - 0.03, tack + u1);
+          // `lean` needs the wind sign on the leech too. `lw` carries it and
+          // `lean` did not, so on the east flag the luff leaned one way and
+          // the leech the other and the head came out as a triangular flap
+          // standing off the peak.
+          const C2 = W(ft + lean(u1) * wind + lw * e1, fs - 0.03,
+            tack + u1 - 0.06);
+          const D = W(ft + lean(u0) * wind + lw * e0, fs - 0.03,
+            tack + u0 - 0.04);
+          b.quad(A, B, C2, D, S.flag);
+          b.quad(D, C2, B, A, shade(S.flag, 0.86));
+        }
+        // The print, on a plane four centimetres seaward of the cloth. Its own
+        // panel is the middle 1.95 m of the flag against the luff, which is
+        // where the script sits in the frame.
+        seaFacing(maslinaFlagPrint(0.58, 1.95), ft + 0.30 * wind,
+          fs - 0.07, tack + 1.30, 0.58, 1.95,
+          'maslina:flag' + (wind > 0 ? 'W' : 'E'));
+      }
     }
     // Maslina is a kiosk and six metres long, and from the lane its back was
     // the same void h2o's was. Short kiosks are skipped: the yard kit does not
     // fit in three and a half metres and comes out as a pile.
-    if (S.kind === 'box' || (S.kind === 'kiosk' && S.t1 - S.t0 > 5)) {
+    // NOT on the container. `shopBack` puts a plain render skin over anything
+    // whose body luminance is under 0.16 — "a brand colour is a front, not a
+    // building, and nobody paints the service side" — and that rule is right
+    // for a painted kiosk and wrong for a steel box, which is the same
+    // corrugated anthracite all the way round. Maslina's back is drawn as
+    // container in `maslinaFront`.
+    if (!S.container
+      && (S.kind === 'box' || (S.kind === 'kiosk' && S.t1 - S.t0 > 5))) {
       shopBack(S, y0, top);
       if (S.reedBack) slastBack(S, y0, top);
     }
@@ -13948,7 +14681,14 @@ async function buildJadrija(scene) {
     // this kiosk does not have: it is sealed steel with a door, and what stood
     // outside it in the photograph is a wheelie bin, a step ladder and a
     // drinks cooler. See `tisakFront`.
-    if (!S.metal) shopKit(S, y0, top, awn > 0 ? S.s0 - awn : null);
+    // Nor on the container, and the list of what it does not have is nearly
+    // the same list: no mullioned serving hole, no condenser, no flue, no menu
+    // boards on the wall and no planted pots. What stands outside Maslina in
+    // `1000150414` is two cream louvred bin cabinets and a shrub bed, and
+    // what is behind its glass is a hot cabinet and a case of pastry.
+    if (!S.metal && !S.container) {
+      shopKit(S, y0, top, awn > 0 ? S.s0 - awn : null);
+    }
     shopExtras(S, y0, top);
     // Chairs and tables under the awning, four sets to a frontage. Every café
     // in the survey has them and the game had not one chair on this shore.
