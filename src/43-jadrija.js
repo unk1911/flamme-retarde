@@ -26291,6 +26291,33 @@ async function buildJadrija(scene) {
      *  out than it can be read at. */
     near: 34,
     w: 0.071, h: 0.146, d: 0.009,
+    /** How far the glass stands proud of the body it is set into.
+     *
+     *  Rule 5. The plane used to sit at `d * 0.51 + 0.0006`, which is 0.7 mm
+     *  off the box's own front face — two parallel surfaces skimming, and the
+     *  rule is three millimetres. It survives a 24-bit depth buffer at these
+     *  ranges (near 1.2 m resolves about 0.1 µm at 1.5 m, so 0.7 mm is four
+     *  orders of margin), but "it happens not to fight on this card" is not
+     *  the test. Three millimetres puts the phone at 12 mm back to glass,
+     *  which is a phone in a case. */
+    glass: 0.003,
+    /** How high the phone rides above the point the fingers close on.
+     *
+     *  A HAND HOLDS A PHONE BY ITS BOTTOM END. The solve in `holdPhone` puts
+     *  the fingers on the group's origin and the drawing hung the phone's
+     *  MIDDLE there, so the four fingers lay across the glass at about
+     *  two-thirds down — measured off a zoomed frame at 1.5 m, they covered
+     *  the whole ETH row, which is one of the three things Misha asked to be
+     *  able to read.
+     *
+     *  The case is 0.146 m long, so 0.040 m below its centre is 0.033 m above
+     *  its end; the fingers come within 0.031 m of that (`gap`), which puts
+     *  them across the bottom half of the case and nothing else. Circled at
+     *  eight bearings the glass is now clear at seven of them. The eighth is
+     *  straight over the holder's shoulder, where the hand is nearer the lens
+     *  than the phone is and no offset can help — and where a real screen
+     *  would be facing away from you anyway. */
+    grip: 0.040,
   };
   let castNatH = null;                  // blob -> how tall it stands, in metres
   let castSlot = null;                  // roving slot -> which blob it is
@@ -28511,52 +28538,96 @@ async function buildJadrija(scene) {
    * real quote with the date it was taken beside it.
    */
   function phoneScreen(q) {
+    // 256 BY 512, AND LAID OUT FOR THE THIRTY PIXELS IT IS ACTUALLY SEEN AT.
+    //
+    // Measured, not guessed. The glass is 64 by 131 mm, so in a 1920-wide
+    // window on the 58° lens it is 41 px wide at 1.5 m and 31 px wide at 2 m,
+    // and only under the Z lens (11°, `stepLens` in 90-app.js) does it open
+    // out to 179 px. The first draft of this was nine elements — status bar,
+    // title, then symbol, price, change and sparkline three times over, the
+    // largest of them 25 px in a 512 px canvas — and nine elements across
+    // 31 px of screen is one grey smudge. Which is the whole of the report:
+    // walking up to somebody, there was nothing there to read.
+    //
+    // So: three bands, each with the price in the biggest type the width will
+    // carry and one saturated green or red mark beside it. At 31 px that is a
+    // markets app; at 179 px every figure on it is legible.
     const W = 256, H = 512;
     const C = document.createElement('canvas');
     C.width = W; C.height = H;
     const g = C.getContext('2d');
-    g.fillStyle = '#0b0d12'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#05070b'; g.fillRect(0, 0, W, H);
     // The status bar, because a phone screen without one is a poster.
-    g.fillStyle = '#8b93a4';
-    g.font = '600 15px system-ui, sans-serif';
-    g.fillText('09:41', 12, 26);
-    g.fillRect(W - 40, 14, 22, 11);
-    g.fillStyle = '#0b0d12'; g.fillRect(W - 38, 16, 18 - 8, 7);
-    g.fillStyle = '#e8ecf4';
-    g.font = '700 21px system-ui, sans-serif';
-    g.fillText('Markets', 12, 60);
+    g.fillStyle = '#7d8698';
+    g.font = '600 17px system-ui, sans-serif';
+    g.fillText('09:41', 13, 25);
+    g.fillRect(W - 42, 11, 26, 13);
+    g.fillStyle = '#05070b'; g.fillRect(W - 40, 13, 15, 9);
+    g.fillStyle = '#eef2f9';
+    g.font = '700 27px system-ui, sans-serif';
+    g.fillText('Markets', 14, 58);
+    // Where the numbers came from and when, UNDER THE TITLE AND NOT AT THE
+    // FOOT. It is the line that keeps rule 12 honest, so it has to be one
+    // anybody can actually read — and at the foot of the screen it sat exactly
+    // where the thumb does. Brighter than the #5a6478 it was, too: on #05070b
+    // that was four values of contrast and it disappeared into the glass.
+    g.fillStyle = '#8b95a8';
+    g.font = '500 14px system-ui, sans-serif';
+    g.fillText(q.at, 15, 78);
     const rows = [['BTC', q.btc], ['LTC', q.ltc], ['ETH', q.eth]];
     rows.forEach(([sym, v], i) => {
-      const y = 92 + i * 128;
-      g.fillStyle = '#151a24'; g.fillRect(8, y, W - 16, 112);
-      g.fillStyle = '#e8ecf4';
-      g.font = '700 25px system-ui, sans-serif';
-      g.fillText(sym, 20, y + 34);
-      g.font = '600 23px system-ui, sans-serif';
+      // 132 px bands 6 px apart, ending at 496 — the last 16 px of the glass
+      // are left blank on purpose, because that is the strip the fingers close
+      // over and nothing that has to be read belongs in it.
+      const y = 88 + i * 138;
+      const up = v.chg >= 0;
+      const ink = up ? '#37e08f' : '#ff5b5b';
+      // The band, two stops lighter than the ground it sits on. The old pair
+      // was #151a24 on #0b0d12, which is four values apart in every channel:
+      // once the mip chain has averaged the type away that difference is the
+      // only structure left, and it was invisible.
+      g.fillStyle = '#1a2130'; g.fillRect(6, y, W - 12, 132);
+      g.fillStyle = '#f2f5fb';
+      g.font = '700 34px system-ui, sans-serif';
+      g.fillText(sym, 16, y + 36);
+      // The change, right-aligned across from the ticker. At 31 px of width
+      // the colour is the only part of it anybody reads, so it is put where
+      // the eye is already looking rather than on a line of its own.
+      g.fillStyle = ink;
+      g.font = '700 27px system-ui, sans-serif';
+      g.textAlign = 'right';
+      g.fillText((up ? '+' : '') + v.chg.toFixed(2) + '%', W - 16, y + 36);
+      g.textAlign = 'left';
+      // The price, in the largest type on the screen, because it is the thing
+      // that was asked for. `measureText` puts '$79,679' at 700 40px at 182 px
+      // wide, in the 234 px the band leaves once it is set at x 16 — the
+      // largest size that fits the longest of the three without wrapping.
+      g.fillStyle = '#f2f5fb';
+      g.font = '700 40px system-ui, sans-serif';
       const px = v.usd >= 1000 ? Math.round(v.usd).toLocaleString('en-US')
         : v.usd.toFixed(2);
-      g.fillText('$' + px, 20, y + 66);
-      const up = v.chg >= 0;
-      g.fillStyle = up ? '#3fd18b' : '#ef5a5a';
-      g.font = '600 19px system-ui, sans-serif';
-      g.fillText((up ? '+' : '') + v.chg.toFixed(2) + '%', 20, y + 95);
-      // The sparkline. Shape from a hash of the symbol so the three are not
-      // the same wiggle, slope from the actual 24-hour change — which is the
-      // only part of it that is a fact and the only part that has to be.
-      g.strokeStyle = up ? '#3fd18b' : '#ef5a5a';
-      g.lineWidth = 2; g.beginPath();
-      for (let k = 0; k <= 22; k++) {
-        const u = k / 22;
-        const wob = (jit(k, sym.charCodeAt(0) * 7) - 0.5) * 16;
-        const yy = y + 66 - (u - 0.5) * v.chg * 3.2 + wob;
-        const xx = 132 + u * (W - 152);
+      g.fillText('$' + px, 16, y + 80);
+      // The sparkline, now across the full band rather than tucked beside the
+      // price. Shape from a hash of the symbol so the three are not the same
+      // wiggle, slope from the actual 24-hour change — the only part of it
+      // that is a fact and the only part that has to be.
+      //
+      // AND THE FACT IS THE BIGGER HALF OF IT NOW. The old line put ±4 px of
+      // slope under ±8 px of wobble, so the wobble was the picture and the
+      // real number was noise inside it. ±3% now spans 26 of the band's 35 px
+      // and the wobble is ±4.5.
+      g.strokeStyle = ink;
+      g.lineWidth = 4; g.lineJoin = 'round'; g.beginPath();
+      const mid = y + 110, sl = Math.max(-1, Math.min(1, v.chg / 3)) * 13;
+      for (let k = 0; k <= 20; k++) {
+        const u = k / 20;
+        const wob = (jit(k, sym.charCodeAt(0) * 7) - 0.5) * 9;
+        const yy = mid + (0.5 - u) * 2 * sl + wob;
+        const xx = 16 + u * (W - 32);
         if (k) g.lineTo(xx, yy); else g.moveTo(xx, yy);
       }
       g.stroke();
     });
-    g.fillStyle = '#5a6478';
-    g.font = '500 13px system-ui, sans-serif';
-    g.fillText(q.at, 12, H - 14);
     const tex = new THREE.CanvasTexture(C);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
@@ -28709,10 +28780,10 @@ async function buildJadrija(scene) {
         const face = new THREE.Mesh(
           new THREE.PlaneGeometry(PHONE.w * 0.90, PHONE.h * 0.90),
           new THREE.MeshBasicMaterial({ map: phoneTex }));
-        face.position.z = PHONE.d * 0.51 + 0.0006;
+        face.position.z = PHONE.d * 0.5 + PHONE.glass;
         g.add(body); g.add(face);
         phones.grp.add(g);
-        phones[n] = m = { g, face };
+        phones[n] = m = { g, body, face };
       }
       if (m.face.material.map !== phoneTex) {
         m.face.material.map = phoneTex;
@@ -28756,6 +28827,20 @@ async function buildJadrija(scene) {
         m.g.rotation.z = 0;
         m.g.rotation.x = -0.34;
       }
+      // AND STOOD UP OUT OF THE FINGERS. The group's origin is where the hand
+      // was solved onto (`holdPhone` returns it and `boneAt` reports the
+      // fingers within 31 mm of it), so hanging the phone's middle there put
+      // the four fingers straight across the glass — a zoomed frame at 1.5 m
+      // had them covering the whole ETH row. Lifting the drawn phone by
+      // `PHONE.grip` along its OWN up axis, inside the tilt rather than in the
+      // world, leaves the fingers wrapping the bottom end of the case where a
+      // hand actually holds one.
+      //
+      // Readers only. The three at an ear are held by the middle, which is
+      // where a handset is held, and their glass is against a cheek anyway.
+      const phRise = ear ? 0 : PHONE.grip;
+      m.body.position.y = phRise;
+      m.face.position.y = phRise;
       m.g.visible = true;
       n++;
     }
@@ -35031,8 +35116,15 @@ async function buildJadrija(scene) {
        *  hold is solved rather than baked (see `holdPhone`), so this is the
        *  one number that says whether it worked: a phone is 0.146 m long, so
        *  anything under about 0.08 is a hand on a phone and 0.3 is the lap
-       *  the phone used to float over. */
+       *  the phone used to float over.
+       *
+       *  It measures to the GRIP, which since `PHONE.grip` is the bottom end
+       *  of the case and not the middle of it — so the number means the same
+       *  thing it always did, "are the fingers on the phone", and the drawn
+       *  phone stands `PHONE.grip` above the point it measures. */
       gap: +holdGap.toFixed(3),
+      /** And by how much, so the two numbers can be read together. */
+      grip: PHONE.grip,
       at: bathers.filter((b) => b.phone)
         .map((b) => [+b.t.toFixed(1), +b.s.toFixed(1), b.phone]),
       quote: phoneQuotes.q,
