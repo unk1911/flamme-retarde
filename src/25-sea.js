@@ -44,37 +44,43 @@ const SEA = {
   // distribution a wave starts to spill, and where the resulting coverage is
   // taken as foam. Tunable live — see __fr.sea in 90-app.js.
   //
-  // 0.095 to 0.120, from a measured sweep. The rig: a nadir camera 130 m over
-  // the channel, which is the one camera whose ground area per pixel is exactly
-  // uniform (the weight is h^2/|Dy|^3 and Dy is constant for a nadir basis), so
-  // a pixel count IS an areal fraction — a horizon shot is not, it over-samples
-  // the distance by three orders of magnitude. Clock pinned to 100*pi, where
-  // sin(0.11 t) is zero so the gust multiplier is exactly 1 and windNow is the
-  // nominal wind. Every frame shot twice, the second with uSeaK.w at 0, which
-  // is the only reader of that uniform and so turns all foam off and nothing
-  // else; the difference of the pair recovers the raft opacity exactly, with no
-  // threshold on colour that a whitecap and a sun glint would both pass.
+  // Left where it was, and that is a measurement and not an omission. Nine
+  // bands were swept; this one wins, and it wins on the number.
+  //
+  // The rig, because the reading that said this sea whitecaps an order of
+  // magnitude too little was taken the wrong way round. A nadir camera 130 m
+  // over the channel is the one camera whose ground area per pixel is exactly
+  // uniform — the area weight is h^2/|Dy|^3 and Dy is constant for a nadir
+  // basis — so a pixel count IS an areal fraction. A horizon shot is not: it
+  // over-samples the distance by three orders of magnitude. Clock pinned to
+  // 100*pi, where sin(0.11 t) is zero, so the gust multiplier is exactly 1 and
+  // windNow is the nominal wind. Every frame shot twice, the second with
+  // uSeaK.w at 0 — the only reader of that uniform, so it turns all foam off
+  // and nothing else — and the difference of the pair recovers the raft opacity
+  // exactly, with no threshold on colour that a whitecap and a sun glint would
+  // both pass. Five gust-neutral instants averaged, because one frame of this
+  // sea scatters by 25 per cent on wave phase alone and a band picked off one
+  // frame is a band picked out of the noise. That happened once here.
   //
   // Areal coverage, per cent, against Monahan's open-ocean W = 3.84e-6 U^3.41:
   //
-  //   U            6      9.5     14      20      32
+  //   U            6      9.5      14      20      32
   //   Monahan     0.17    0.83    3.11   10.49   52.11
-  //   0.075-0.145 0.21    0.65    1.50    2.69    4.28
-  //   0.095-0.120 0.27    0.82    1.83    3.09    4.61
+  //   0.075-0.145 0.27    0.83    1.83    3.07    4.52   +-0.15
+  //   0.095-0.120 0.37    1.06    2.20    3.46    4.85
+  //   0.105-0.130 0.20    0.71    1.72    3.02    4.35
   //
-  // So the old band was NOT an order of magnitude under Beaufort 5 — that
-  // reading came from a screen-space count in a perspective view. It was 22 per
-  // cent under, and this puts it on the number. What is genuinely wrong is the
-  // slope of the response, and no band can fix it: see the ceiling in seaWave.
+  // Beaufort 5 is 1.01x Monahan on this band. It is not an order of magnitude
+  // under anything; it is on the number, for an open ocean, from a channel that
+  // has every excuse to be under it. Moving the band up makes Force 4 twice
+  // what the ocean does and moving it down takes Beaufort 5 off the number, so
+  // the band stays.
   //
-  // Narrow on purpose. 0.075 to 0.145 spans a factor of 1.93 in slope, which is
-  // not a threshold, it is a long ramp — and everything downstream of it is
-  // multiplicative (lee, above, the windrow mask, the carved ramp), so a steep
-  // of 0.4 never survives to paint anything and most of the gate's output was
-  // being thrown away. 0.095 to 0.120 spans 1.26, and 0.095 is 1.27x the RMS
-  // slope this sea actually has at 9.5 m/s, which is 0.075 by
-  // sqrt(0.5 * sum (k a0)^2) over the six components.
-  foamK: [0.095, 0.120, 0.12, 0.62],
+  // What is genuinely wrong is the SLOPE of the response, and no band fixes it
+  // — see the ceiling in seaWave — and what makes the channel look unbroken is
+  // not the coverage at all but how little of it survives to the screen, which
+  // is capK below and the lattice note by the crest term in the fragment.
+  foamK: [0.075, 0.145, 0.12, 0.62],
   // (micro, microFade, backlit, windrow): the strength of the capillary normal,
   // the footprint in metres at which it starts to go, how hard a backlit crest
   // glows, and how hard the windrows carve the foam.
