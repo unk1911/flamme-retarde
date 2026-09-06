@@ -2910,7 +2910,49 @@ async function buildJadrija(scene) {
       // with its wall would take the one clean saturated thing on the facade
       // and put ninety years of it on that too.
       b = rendNow;
-      boxTS(a, c, front + REVEAL, back, fl, eave, wash);
+      // ── AND THE BODY IS CUT WHERE THE FACE IS, WHICH IT WAS NOT ────────────
+      //
+      // The body was ONE box across the whole 2.15 m bay while `frontSkin`
+      // cuts the face into three panels around the opening. A `boxTS` face is
+      // a CHORD between its two ends — see `boxIn` — so the two disagreed
+      // about where the wall is by however much the shore turns inside a bay,
+      // and the body won, because it is the one behind the hole.
+      //
+      // Measured at the open kabina at t 482.38, s 17.2, which is the bay this
+      // was found on. The shore polyline has stations at t 475.11, 482.77 and
+      // 492.18 here — 7.7 and 9.4 m apart — and the middle one is a **23.7°
+      // kink**, the tip of the spit. It falls 0.39 m off that bay's centre,
+      // inside the body's 2.15 m span. So the body's seaward face bowed 130 mm
+      // out over the middle of its own bay, while the 0.94 m backing panel and
+      // the 0.90 m curtain, being much shorter chords across the same kink,
+      // bowed only 17 and 16 mm: the body face stood **84.7 mm in front of the
+      // dark backing and 61.7 mm in front of the curtain**, in a reveal that is
+      // 90 mm deep. The opening was filled with plain wall and the bead curtain
+      // was inside the masonry.
+      //
+      // What made it read as a half-drawn architrave rather than as a bricked-
+      // up door is that everything ELSE on the bay is seaward of the face —
+      // architrave at front − 7 mm, vent frame at −30, folded leaf at −107 —
+      // so all of it went on being drawn correctly round a hole that was not
+      // there. The missing right jamb is not missing either: the leaf folds
+      // flat from dc + 0.45 and covers it square on, on every open bay.
+      //
+      // Six of the 115 bays in the block had the body in front of their own
+      // backing panel — t 456.29 by 0.5 mm, 462.74 by 38.7, 482.38 by 84.7,
+      // 504.03 by 15.2, 517.08 by 28.0 — and exactly one of the six stands
+      // open. That is the whole reason this was one bay in a hundred and not a
+      // hundred: on a shut bay the leaf fills the hole whatever is behind it.
+      //
+      // Cut at the opening and not at some general distance. `boxIn`'s `cut`
+      // splits into equal pieces that do not line up with the hole, and the
+      // thing that has to agree is the piece BEHIND the opening with the panel
+      // in front of it. These are the same three spans `frontSkin` uses, so the
+      // body and the face now share their ends and cannot disagree at all.
+      const kbH = DOORW * 0.5;
+      for (const [kbA, kbC] of
+        [[a, dc - kbH], [dc - kbH, dc + kbH], [dc + kbH, c]]) {
+        boxTS(kbA, kbC, front + REVEAL, back, fl, eave, wash);
+      }
       frontSkin(a, c, dc, front, fl, eave, wash);
       // Two bays in the block are faced in stone instead of rendered, and they
       // get neither the skirt nor the render patch nor the eave shadow — see
