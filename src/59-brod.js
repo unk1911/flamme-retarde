@@ -840,7 +840,7 @@ function brodProto() {
    * Coordinates go through `scaledBuilder` like everything else here, so `r`
    * is authored: put real millimetres through `BROD_P`.
    */
-  const seg3 = (A, B, r, col) => {
+  const seg3 = (A, B, r, col, solid) => {
     const dx = B[0] - A[0], dy = B[1] - A[1], dz = B[2] - A[2];
     const Ln = Math.hypot(dx, dy, dz) || 1;
     const ux = dx / Ln, uy = dy / Ln, uz = dz / Ln;
@@ -857,7 +857,9 @@ function brodProto() {
       const a0 = (i / 4) * TAU, a1 = ((i + 1) / 4) * TAU;
       const P0 = o(a0, A), P1 = o(a0, B), P2 = o(a1, B), P3 = o(a1, A);
       b.quad(P0, P3, P2, P1, col);
-      b.quad(P1, P2, P3, P0, col);
+      // `solid` is for a member you can never be inside — an 88 mm pipe. A
+      // lanyard is 36 mm and gets both, for the reason above.
+      if (!solid) b.quad(P1, P2, P3, P0, col);
     }
   };
 
@@ -1174,29 +1176,67 @@ function brodProto() {
 
 
   // ── the rails ────────────────────────────────────────────────────────────
-  // Pipe stanchions and two wires round the foredeck only. Aft the bulwark is
+  // Pipe stanchions and two rails round the foredeck only. Aft the bulwark is
   // the rail, which is why you can sit on it.
+  //
+  // AND IT CLOSES AT THE STEMHEAD, which it did not. The run ended at x 7.3
+  // with the stem at 7.80, so the last stanchion stood three quarters of a
+  // metre short of the bow and the two rails simply stopped in the air with
+  // nothing at their ends and a gap between them you could have walked out of.
+  //
+  // `murals/brod-mural.jpg` is unambiguous about what belongs there and it is
+  // the one part of her the mural shows square-on: the rail runs forward, ends
+  // in a **vertical post at the stemhead**, and a **diagonal stay** comes back
+  // off the head of that post down to the deck edge. Measured on the frame —
+  // the crop at +2950+1020, at the mural's 96 px a metre — the stay's head is
+  // 0.25 m abaft the stem and its foot 1.96 m abaft it, which is authored 7.66
+  // and 6.68. The rail height reads 0.94 m over the gold two metres aft of the
+  // stem, so `BROD_P(1.00)` was already right and is unchanged.
+  //
+  // Rails as `seg3` and PER SPAN. They were one straight quad from 4.7 to 7.3
+  // while her sheer lifts 0.37 authored over that run, so the rail was a chord
+  // and the middle stanchions did not reach it — there was daylight between a
+  // stanchion top and the rail it was supposed to be holding up. Per span it
+  // follows the sheer through every stanchion. `solid`, because an 88 mm pipe
+  // is a thing you are never inside.
   {
-    const NST = 6;
+    const NST = 8;
+    const X0 = 4.7, X1 = 7.62;                 // last stanchion, just off the stem
+    const XS = 7.74;                           // and the stemhead post itself
+    const RH = [BROD_P(0.36), BROD_P(0.72)];
+    const RR = 0.025;                          // 88 mm pipe, as the stanchions are
+    const at = (x) => { const [y, w] = sheerAt(x); return [y, w - 0.12]; };
     for (let i = 0; i <= NST; i++) {
-      const x = 4.7 + (7.3 - 4.7) * (i / NST);
-      const [y, w] = sheerAt(x);
+      const x = X0 + (X1 - X0) * (i / NST);
+      const [y, w] = at(x);
       // A guardrail is 1.00 m over the deck, not 1.40. `BROD_P` again.
       for (const s of [1, -1]) {
-        b.box(x, y + BROD_P(0.50), s * (w - 0.12), 0.05, BROD_P(1.00), 0.05, RAIL);
+        b.box(x, y + BROD_P(0.50), s * w, 0.05, BROD_P(1.00), 0.05, RAIL);
       }
     }
-    for (const s of [1, -1]) {
-      for (const h of [BROD_P(0.36), BROD_P(0.72)]) {
-        const [ya, wa] = sheerAt(4.7), [yb, wb] = sheerAt(7.3);
-        // Both windings, not one: a wire is 35 mm of nothing and you are as
-        // often inboard of it as outboard, so it is the one thing on her that
-        // has to be visible from both sides.
-        b.quad([4.7, ya + h, s * (wa - 0.12)], [7.3, yb + h, s * (wb - 0.12)],
-          [7.3, yb + h + 0.035, s * (wb - 0.12)], [4.7, ya + h + 0.035, s * (wa - 0.12)],
-          RAIL);
-        b.quad([4.7, ya + h + 0.035, s * (wa - 0.12)], [7.3, yb + h + 0.035, s * (wb - 0.12)],
-          [7.3, yb + h, s * (wb - 0.12)], [4.7, ya + h, s * (wa - 0.12)], RAIL);
+    const [ysm] = at(XS);
+    b.box(XS, ysm + BROD_P(0.50), 0, 0.05, BROD_P(1.00), 0.05, RAIL);
+    for (const h of RH) {
+      for (const s of [1, -1]) {
+        for (let i = 0; i < NST; i++) {
+          const xa = X0 + (X1 - X0) * (i / NST);
+          const xb = X0 + (X1 - X0) * ((i + 1) / NST);
+          const [ya, wa] = at(xa), [yb, wb] = at(xb);
+          seg3([xa, ya + h, s * wa], [xb, yb + h, s * wb], RR, RAIL, true);
+        }
+        // In to the post. Both sides meet on the centreline at the stem, which
+        // is what makes it a rail rather than two rails.
+        const [ye, we] = at(X1);
+        seg3([X1, ye + h, s * we], [XS, ysm + h, 0], RR, RAIL, true);
+      }
+    }
+    // The stay. `seg3` and not `frustum` per rule 9: this member falls 0.76
+    // authored while running 1.06 aft and 0.67 outboard, and a stack of
+    // axis-aligned rectangles is three flat slabs a few millimetres tall.
+    {
+      const [yf, wf] = at(6.68);
+      for (const s of [1, -1]) {
+        seg3([XS, ysm + BROD_P(1.00), 0], [6.68, yf + 0.04, s * wf], RR, RAIL, true);
       }
     }
   }
