@@ -4152,6 +4152,39 @@ function toast(msg, kind = '') {
 // ── HUD ──────────────────────────────────────────────────────────────────────
 
 let hudAcc = 0;
+/**
+ * Put the aeroplane's instruments away, every frame you are not in it.
+ *
+ * `updateHUD` DOES NOT RUN ON FOOT — see the dispatch that calls this — so
+ * whatever it wrote in its last airborne frame is still sitting in the DOM:
+ * "TANK FULL", a stall warning, an autopilot note, a tank hint. The only thing
+ * keeping that off the screen is `#hud` being hidden, and every one of the
+ * fifteen-odd transitions out of the aeroplane has to remember to hide it.
+ * The ones that go through `toggleGround` or `skipToJadrija` do. The debug
+ * doors — `__fr.jad.stand`, and everything built on it — do not, and then you
+ * are running around Jadrija under a stale set of flight gauges telling you
+ * the tank is full.
+ *
+ * So it is ASSERTED FROM THE FRAME LOOP rather than trusted to a transition,
+ * which makes every route correct including the ones nobody has written yet.
+ * And it blanks the text as well as hiding the box, because hidden is where a
+ * bug hides and blank is where it cannot: if `#hud` is ever shown again by
+ * mistake, there is nothing stale left in it to show.
+ *
+ * Idempotent and guarded, so it costs four string compares a frame and no DOM
+ * writes at all once it has settled.
+ */
+function stowFlightHUD() {
+  const h = $('hud');
+  if (h && !h.hidden) h.hidden = true;
+  for (const id of ['warn', 'ap', 'gpws']) {
+    const e = $(id);
+    if (e && e.innerHTML !== '') e.innerHTML = '';
+  }
+  const th = $('tank-hint');
+  if (th && th.textContent !== '') th.textContent = '';
+}
+
 function updateHUD(dt) {
   hudAcc += dt;
   if (hudAcc < 0.06) return;
@@ -4218,7 +4251,13 @@ function updateHUD(dt) {
   if (state.speed < FLIGHT.vStall * 1.05 && state.altAgl > 3 && !p.onGround) {
     w.push(`<span class="pulse">${T('warn.stall')}</span>`);
   }
-  if (p.water > CONFIG.tankCapacity * 0.99 && !state.dropping) w.push(T('warn.tankFull'));
+  // `!p.onGround` for the same reason the stall warning above has it, and it
+  // was missed here when that one was fixed: a full tank is not news while she
+  // is sitting on her wheels, and it is the line people actually complained
+  // about seeing over Jadrija.
+  if (p.water > CONFIG.tankCapacity * 0.99 && !state.dropping && !p.onGround) {
+    w.push(T('warn.tankFull'));
+  }
   // The other end of the envelope. Only reachable with the overboost gate open,
   // which is the point: holding W past the stop should have a number attached.
   if (state.speed > FLIGHT.vNever * 0.97) {
@@ -5807,8 +5846,10 @@ function frame() {
   });
 
   if (state.phase === 'ground') {
+    stowFlightHUD();
     updateGroundHUD(dt);
   } else if (eject.active) {
+    stowFlightHUD();
     updateChuteHUD();
   } else {
     updateStickHUD();
