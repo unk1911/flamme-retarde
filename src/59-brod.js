@@ -800,8 +800,13 @@ const BROD_PAINT_GLSL = /* glsl */ `
       // painted-out inside of the bulwark. Off her own height rather than off
       // the sheer: everything in this class is ABOVE the sheer, where the
       // depth channel has run out.
+      // And its own cell. The topside's is 5:1 along her, which is right for
+      // a hull and wrong for a deckhouse: on a flat white wall a 5:1 streak
+      // reads as clapboard. The mural's house is blotchy, sd(ln) 0.142, with
+      // no grain in it.
       hp = vec2(vLocal.x, vLocal.y * 1.3 + vLocal.z * 0.9);
-      up = 0.24; dn = 0.85;
+      cell = vec2(1.7, 0.95);
+      up = 0.22; dn = 0.80;
     } else {                                 // 5 - antifouling
       cell = vec2(4.0, 2.0);
       up = 0.22; dn = 0.60; cool = 0.0;
@@ -816,6 +821,18 @@ const BROD_PAINT_GLSL = /* glsl */ `
     // hole in her side is not weathering.
     base *= max(f, 0.32);
     base *= mix(vec3(1.0), ${BROD_COOL}, cool * clamp(d * 2.4, 0.0, 1.0));
+    // THE FLECK, and it goes on OUTSIDE the exponent on purpose. The dark
+    // side above is d^1.5, whose slope at d = 0 is zero, so every fine wobble
+    // on the clean four fifths of her was flattened to nothing and from three
+    // metres off she was a set of soft grey washes with no grain in them. The
+    // mural at that range is not smooth anywhere: the band from 0.04 to
+    // 0.17 m carries sd(ln) 0.16 and 0.13, of which some is the wall's own
+    // roughcast, so half of it goes on. Isotropic, unlike everything above -
+    // at a hand's width the angular power in the mural has no direction in it
+    // at all. And out by twenty metres, where 0.17 m is a fifth of a pixel and
+    // a fleck is a shimmer rather than a fleck.
+    float grain = 1.0 - smoothstep(7.0, 22.0, dist);
+    base *= 1.0 + (vnoise2(hp * 6.0 + 41.7) - 0.5) * 0.30 * grain;
   }
 `;
 
