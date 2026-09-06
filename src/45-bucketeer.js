@@ -73,8 +73,13 @@ const BUCK = {
   faceM: 34,
   // Seconds between one hummed phrase and the next, plus up to as much again.
   // A hum with no gaps in it is a kettle.
-  humGap: 1.4,
-  humJit: 2.6,
+  // Opened up, because the level was only half of why she was masking the
+  // birds. A 4.45 s phrase against a 1.4-4.0 s gap is a 53-76% duty cycle —
+  // she was humming through two-thirds of every minute, which is not somebody
+  // humming to herself, it is a radio. 3.2 + 0-5.0 puts her at 35-58%, so
+  // there is more silence than tune and the gulls have somewhere to land.
+  humGap: 3.2,
+  humJit: 5.0,
 
   // ── ten kilos on one arm ───────────────────────────────────────────────────
   //
