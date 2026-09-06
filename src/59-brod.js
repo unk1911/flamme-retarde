@@ -676,6 +676,197 @@ function brodCleatAt(x) {
 }
 
 /**
+ * HER PAINT, MEASURED OFF THE MURAL.
+ *
+ * She was one flat white from the cove to the boot-top down all 27.3 m of her,
+ * one flat navy above it and one flat gold between, and the mural is none of
+ * those things. `murals/brod-mural.jpg` rectified along her own gold cove — the
+ * line fits to 2.1 px rms with a quartic, which straightens the whole sheer and
+ * turns "0.4 m below the cove" into a row of the image — at her 96.2 px a metre
+ * gives, over 946 columns of hull with no rope, tyre or planter in them and
+ * every column normalised by its own median so the wall's lighting drops out:
+ *
+ *   depth below the cove   0.21    0.42    0.62    0.83
+ *   P10 / median           0.795   0.738   0.642   0.507
+ *   P90 / median           1.260   1.137   1.160   1.169
+ *   sd(ln) from the IQR    0.109   0.109   0.155   0.262
+ *
+ * Four things come straight off that table and all four are built below.
+ *
+ * **IT IS NOT A VERTICAL STREAK, and that was the assumption to kill first.**
+ * A hull weeps down and this one does not: over 35 clean 88 px squares of her
+ * topside the angular power in the 0.04–0.4 m band splits 37 % into gradients
+ * that run down her (streaks lying ALONG the hull) against 35 % into gradients
+ * that run along her (streaks lying down it). That is isotropic with a hair of
+ * along-hull bias, which is what a chalked, scrubbed, repainted topside looks
+ * like and not what a rust weep looks like. Building vertical streaks would
+ * have been a regular pattern that is not there, which is worse than nothing.
+ * So the field is a plain fbm, elongated 2:1 along her and no more.
+ *
+ * **THE VARIATION IS ONE-SIDED.** Look at the two tails: at 0.42 m the bright
+ * end is +0.128 in log and the dark end is −0.304, and by 0.83 m it is +0.156
+ * against −0.679. Paint does not brighten; dirt darkens it. So the field goes
+ * through `exp(up·s⁺ − dn·(s⁻)^1.5)` — the 1.5 keeps the core tight, which is
+ * the other half of the table: the IQR is only 0.109 while the tenth percentile
+ * is 20 % down. Most of her is clean and some of her is filthy.
+ *
+ * **IT GETS WORSE DOWNWARD.** `dn` runs 0.60 at the cove to 2.70 at the
+ * boot-top, which reproduces −0.27 at 0.2 m and −0.65 at 0.9 m. On top of that
+ * the median itself falls: fitting ln L over the clean 0.20–0.80 m band gives
+ * **−0.119 per metre**, so 0.888 a metre and ×0.87 over the 1.20 m from the
+ * cove to the stripe. That is the whole of the tone term.
+ *
+ * **VALUE AND HUE MOVE TOGETHER.** Inside the topside paint the bright four
+ * fifths sit at R/L 1.008, G/L 1.009, B/L 0.874 — the same cream at every
+ * level — and the darkest fifth swings to 0.858, 1.036, 1.059. The dirt is
+ * blue-grey and the chalk is not. Their ratio, normalised back to luminance 1,
+ * is (0.851, 1.027, 1.212), and that is `BROD_COOL` below.
+ *
+ * WHAT WAS *NOT* CHANGED, AND WHY. The same sampling says her white is
+ * B/L 0.874 where the mural's white pipe rails are 0.962 — a hull 9 % short of
+ * neutral in blue, which would mean warming `HULL` and `HOUSE`. It is not
+ * built, because the white balance will not hold still: three white witnesses
+ * in the same photograph give 1.010, 0.962 and 0.912, and the bare cream render
+ * ABOVE the mural comes back at 0.874 — exactly the hull's number, which is
+ * what a global warm cast in the photograph looks like. A between-image
+ * measurement that cannot survive its own control does not get built. The hue
+ * term above is a *within*-image one — bright paint against dark paint in the
+ * same square inch — and the cast cancels out of it, which is why that one is
+ * here and the base colour is not.
+ *
+ * The three materials do not weather alike, and that is measured too:
+ *
+ *   - the ONE DARK TIN — bulwark strake and boot-top — taking only the dark
+ *     population of the band so the white rails crossing it are not in the
+ *     sample, swings +0.770 up against −0.566 down: a dark paint chalks PALE,
+ *     the opposite sign to the topsides. Halved on the way in, because ours is
+ *     already 7.5x lighter than the mural's near-black and because sd(ln) on a
+ *     near-black JPEG is mostly the codec. The boot-top gets more of it than
+ *     the strake: sd(ln) 1.27 against 0.444, and it is the band that lives in
+ *     the water.
+ *   - the GOLD COVE is a broken line, not a dirty one. Its half-correlation
+ *     along her is 0.03–0.07 m against the topside's 1.55 m, and after a 4.2 m
+ *     box mean only 0.06 of its sd(ln) 0.556 is left — it flickers hard at a
+ *     hand's width and drifts not at all. So: a fine cell, a hard dark bias
+ *     (gold wears through to what is under it) and no depth ramp.
+ *   - the DECKHOUSE is the same paint as the hull — the mural's top fifth of
+ *     both is rgb (0.701, 0.701, 0.604), to three places — but it is out of the
+ *     splash, so it gets the field with no waterline ramp and at 0.7 of it.
+ *
+ * AND IT MUST NOT REPEAT ALONG HER. The coarsest cell is 3.0 m by 1.5 m and
+ * `vnoise2` wraps at 512, so there is no repeat inside her 27.3 m and none
+ * inside the 512 m she would have to be to find one. The field is keyed on
+ * `vLocal` and not on `vWorld` for the reason every other position-driven term
+ * in this game is: she SAILS. Keyed on the world she would swim 3 850 m
+ * through her own paint on the way to Šibenik.
+ *
+ * Half-beam goes into the second axis as well as depth, so the two sides of
+ * her never carry the same paint — smoothly, so the stem, where the two sides
+ * meet and z passes through zero, has no seam in it.
+ */
+const BROD_COOL = 'vec3(0.851, 1.027, 1.212)';
+const BROD_PAINT_GLSL = /* glsl */ `
+  base *= vVCol;
+  // vUv is not a texture coordinate on this mesh. x carries which paint the
+  // vertex was given, y how far under the sheer it sits — both stamped on by
+  // brodPaint() off the finished geometry. Anything else drawn with this
+  // material has no uv at all, reads (0, 0), and falls straight through.
+  if (vUv.x > 0.5) {
+    float dep = vUv.y;                       // metres below the sheer, at her
+    float dist = length(vWorld - uCamPos);
+    // The finest octave is 0.4 m across and is gone by the time she is a
+    // hundred metres off, where it would be well under a pixel and would
+    // therefore be a shimmer rather than a texture.
+    float near = 1.0 - smoothstep(30.0, 90.0, dist);
+    vec2 hp = vec2(vLocal.x, dep + vLocal.z * 0.9);
+    vec2 cell = vec2(3.0, 1.5);
+    float up = 0.40, dn = 1.00, tone = 1.0, cool = 1.0;
+
+    if (vUv.x < 1.5) {                       // 1 - the white topsides
+      float t = clamp((dep - 0.875) / 0.99, 0.0, 1.0);
+      tone = exp(-0.119 * max(dep - 0.875, 0.0));
+      up = 0.40;
+      dn = mix(0.60, 2.70, t);
+    } else if (vUv.x < 2.5) {                // 2 - her one dark tin
+      float w = smoothstep(1.30, 1.85, dep); // strake above, boot-top below
+      cell = vec2(4.5, 2.2);
+      up = mix(0.55, 0.85, w);
+      dn = mix(0.62, 1.30, w);
+      cool = 0.0;
+    } else if (vUv.x < 3.5) {                // 3 - the gold cove
+      cell = vec2(0.45, 0.45);
+      up = 0.25; dn = 1.30; cool = 0.0;
+    } else if (vUv.x < 4.5) {                // 4 - the deckhouse and the
+      // painted-out inside of the bulwark. Off her own height rather than off
+      // the sheer: everything in this class is ABOVE the sheer, where the
+      // depth channel has run out.
+      hp = vec2(vLocal.x, vLocal.y * 1.3 + vLocal.z * 0.9);
+      up = 0.35; dn = 1.05;
+    } else {                                 // 5 - antifouling
+      cell = vec2(4.0, 2.0);
+      up = 0.25; dn = 0.70; cool = 0.0;
+    }
+
+    vec2 q = hp / cell + 17.3;
+    float s = fbm2(q, 3) * 2.0 - 1.0;
+    s += (vnoise2(q * 7.0) - 0.5) * 0.62 * near;
+    float d = max(-s, 0.0);
+    float f = exp(up * max(s, 0.0) - dn * d * sqrt(d)) * tone;
+    // A floor, because the dark tail of an exponential has no bottom and a
+    // hole in her side is not weathering.
+    base *= max(f, 0.32);
+    base *= mix(vec3(1.0), ${BROD_COOL}, cool * clamp(d * 2.4, 0.0, 1.0));
+  }
+`;
+
+/**
+ * Stamp the paint class and the depth under the sheer on to a finished hull.
+ *
+ * OFF THE GEOMETRY AND NOT OFF THE CALL SITES, which is the whole trick. The
+ * builder is handed a colour at every one of a hundred call sites in
+ * `brodProto`, and threading a class through all of them is a hundred chances
+ * to miss one; the colours themselves are five distinct `const` arrays and the
+ * builder has already written them into `aVCol`, one triple a vertex. So this
+ * reads them back out and recognises them. `2e-4` because a float64 literal
+ * comes back as its float32 rounding and the palette entries are 6e-3 apart at
+ * the closest — `HULL` against `HOUSE`, which are meant to be the same paint.
+ *
+ * `uv` and not a new attribute, and that is not laziness either. `solidVertex`
+ * already declares `attribute vec2 uv`, already carries it to `vUv`, and
+ * three.js supplies (0, 0) for every geometry that has not got one — so the
+ * quay, the mole fittings and the mooring lines, which share this material,
+ * come out of the branch above without a line of code. A new attribute would
+ * have to be declared through `opts.decl`, and `decl` is spliced into the
+ * FRAGMENT shader as well, where `attribute` does not exist.
+ *
+ * The depth is `brodSheer` at the vertex's own x, which is the same clamped
+ * interpolation the loft, the fenders and the mooring all read, in built
+ * metres — so the field lies along her sheer, and the paint under the bow is
+ * the paint under the bow and not the paint at some horizontal height.
+ */
+function brodPaint(g, pal) {
+  const pos = g.getAttribute('position').array;
+  const col = g.getAttribute('aVCol').array;
+  const n = pos.length / 3;
+  const uv = new Float32Array(n * 2);
+  const KEY = [[pal.HULL, 1], [pal.SHEER, 2], [pal.COVE, 3],
+    [pal.HOUSE, 4], [pal.BOOT, 5]];
+  for (let i = 0; i < n; i++) {
+    const r = col[i * 3], gr = col[i * 3 + 1], bl = col[i * 3 + 2];
+    let k = 0;
+    for (let j = 0; j < KEY.length; j++) {
+      const c = KEY[j][0];
+      if (Math.abs(r - c[0]) < 2e-4 && Math.abs(gr - c[1]) < 2e-4
+        && Math.abs(bl - c[2]) < 2e-4) { k = KEY[j][1]; break; }
+    }
+    uv[i * 2] = k;
+    uv[i * 2 + 1] = k ? brodSheer(pos[i * 3])[0] - pos[i * 3 + 1] : 0;
+  }
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  return g;
+}
+
+/**
  * The hull, the house and everything standing on her.
  *
  * Local frame is `boatProto`'s — **+X forward, +Y up, +Z to starboard** — so
@@ -1748,7 +1939,8 @@ function brodProto() {
     const col = [[0.78, 0.16, 0.16], [0.94, 0.94, 0.94], [0.10, 0.20, 0.52]][i];
     b.box(4.90, 1.06 + 4.40 - i * 0.18, 0, 0.80, 0.18, 0.02, col);
   }
-  return b.geo();
+  // Her paint, last, off the finished triangle soup — see `brodPaint`.
+  return brodPaint(b.geo(), { HULL, SHEER, COVE, HOUSE, BOOT });
 }
 
 /**
@@ -2248,7 +2440,7 @@ function buildBrod(scene) {
   scene.add(group);
 
   const mat = solidMaterial(0xffffff, { spec: 0.10, specPower: 30,
-    body: 'base *= vVCol;' });
+    body: BROD_PAINT_GLSL });
 
   const hull = new THREE.Mesh(brodProto(), mat);
   const boat = new THREE.Group();
