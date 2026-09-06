@@ -686,6 +686,7 @@ async function buildBucketeer(scene, vik, walkY) {
     // having looked up and the eased shape of it; `offered` is whether there
     // was anything in her hand worth holding out when she did.
     yield: false, notice: 0, noticeCool: 0, noticeAmt: 0, offered: false,
+    newsPend: null, newsAt: 0,
     hold: false,        // debug: the loop stopped where it stands
     x: 0, y: 0, z: 0,
   };
@@ -1145,7 +1146,15 @@ async function buildBucketeer(scene, vik, walkY) {
       st.notice = BUCK.noticeHold;
       st.noticeCool = BUCK.noticeGap;
       st.offered = st.held > 0.5;      // she can only offer what she is holding
+      // And something for her to talk about, ONCE. `takeNews` in 49-voice.js
+      // throws an event away when it is more than twenty-five seconds old, so
+      // a flag that latches is a flag that makes her mention the bucket long
+      // after she has tipped it out.
+      st.newsPend = st.offered ? 'offer' : 'seen';
+      st.newsAt = 0;
     }
+    st.newsAt += dt;
+    if (st.newsAt > 8) st.newsPend = null;
     st.noticeCool -= dt;
     st.notice = Math.max(0, st.notice - dt);
     st.noticeAmt = damp(st.noticeAmt, st.notice > 0 ? 1 : 0, 3.6, dt);
@@ -1212,6 +1221,28 @@ async function buildBucketeer(scene, vik, walkY) {
 
   return {
     step, fig, mesh, pail: kanta,
+    /**
+     * What she has just done that is worth a line, taken once.
+     *
+     * Read by `bayeGap` in 43-jadrija.js and handed to the voice service as an
+     * event. One-shot on purpose — see the note where it is set — and it says
+     * what happened rather than what to say, because the line is the model's
+     * and inventing one here would be putting words in her mouth twice.
+     */
+    news: () => {
+      const n = st.newsPend;
+      st.newsPend = null;
+      return n === 'offer'
+        ? 'you have just looked at her while she was carrying a full ten-litre '
+          + 'bucket of water down to the porch, and she has stopped, looked '
+          + 'back at you and held the bucket out to you'
+        : (n === 'seen'
+          ? 'you have just looked at her while she was carrying water, and she '
+            + 'has stopped and looked back at you'
+          : null);
+    },
+    /** Where she is from you, for whoever has to decide who you are near. */
+    gapTo: (x, z) => Math.hypot(x - st.x, z - st.z),
     /** Where she is now, and what she is doing. */
     stats: () => ({
       phase: st.phase, leg: st.leg, u: +st.u.toFixed(2), dir: st.dir,

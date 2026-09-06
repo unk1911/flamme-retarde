@@ -37389,12 +37389,37 @@ async function buildJadrija(scene) {
         news: catNews(),
         spot: 'under the tables outside the slasticarnica, the ice-cream shop' }
       : null,
-    bayeGap: () => (show && show.pt != null && show.t != null)
-      ? { m: Math.hypot(show.t - show.pt, show.s - show.ps),
-        phase: show.phase, withYou: !!show.withYou, indoors: sheIsIn(),
+    /**
+     * Baye, and SHE IS TWO ERRANDS AND NOT TWO WOMEN.
+     *
+     * The figure on the shore and the one carrying water down from the
+     * vikendica share a face, a rig and a voice, and Misha calls the second one
+     * "the Bucketeer baye" — one person, doing one thing or the other. So this
+     * answers about whichever of them you are actually next to, and the voice
+     * service never has to know there are two.
+     *
+     * The Bucketeer wins only when she is genuinely the nearer, which keeps a
+     * line about a bucket from arriving while you are stood on the sand beside
+     * the other one.
+     */
+    bayeGap: () => {
+      if (!show || show.pt == null || show.t == null) return null;
+      const w = toWorld(show.pt, show.ps);
+      const mShore = Math.hypot(show.t - show.pt, show.s - show.ps);
+      const mBuck = bucketeer ? bucketeer.gapTo(w[0], w[2]) : Infinity;
+      if (bucketeer && mBuck < mShore) {
+        const b = bucketeer.stats();
+        return { m: +mBuck.toFixed(2), phase: b.phase, withYou: false,
+          indoors: b.at[1] > 4.5, carrying: b.held > 0.5,
+          news: bucketeer.news(),
+          spot: 'on the steps and the porch of the vikendica, carrying water '
+            + 'down from the flat to tip on the plants' };
+      }
+      return { m: mShore, phase: show.phase, withYou: !!show.withYou,
+        indoors: sheIsIn(),
         // What is within earshot to talk about. See `voiceSpot`.
-        spot: voiceSpot() }
-      : null,
+        spot: voiceSpot() };
+    },
     /**
      * Fill the soak meter by hand, so the turn can be seen without standing
      * there with the branch on her for sixteen seconds — which is exactly as
