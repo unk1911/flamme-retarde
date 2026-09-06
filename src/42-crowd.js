@@ -50,6 +50,33 @@ const CROWD = {
 const SPLAY = 0.11;
 
 /**
+ * The hash, and RULE 4 is why there is one.
+ *
+ * Not one draw off `rng` in this file, ever. The Jadrija layout is downstream
+ * of a single stream and `pose` runs a hundred times a frame; a draw taken
+ * here would not just move a parasol, it would move every parasol on the beach
+ * on every frame. `__fr.stats().jadrija.census` is the proof and it reads
+ * `{seen: 446, thin: 333, plain: 86, rich: 27}` with 818 blockers either side
+ * of everything below.
+ *
+ * The same two lines as `jit` in the shore build, `laneJit` in 46-backlane and
+ * `paxJit` in 60-pax, and copied a fourth time rather than imported for the
+ * reason those give: a hash is pure, two callers landing on the same (i, k)
+ * costs nothing, and what a shared one would cost is a dependency on a file
+ * that belongs to somebody else's evening.
+ *
+ * Keyed on `fg.seed` and not on `fg.idx`, because `idx` is the beach's name
+ * for somebody and the boat's passengers have never had one — see 60-pax.js.
+ * Every figure on either has a seed. Multiplied up before it goes in: `seed`
+ * lives in [0, 1) and the hash's first term is `i * 12.9898`, so a whole crowd
+ * squeezed into one radian of sine is a crowd with visible bands in it.
+ */
+function crowdJit(i, k) {
+  const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
+  return v - Math.floor(v);
+}
+
+/**
  * Every joint written every frame, from rest.
  *
  * Touching only what changes means a pose left over from `alight` bleeds into
@@ -988,6 +1015,26 @@ function makeCrowd(scene, rig, cap) {
   function pose(fg, t) {
     restPose(skel);
     let tip = 0;
+    // The other two whole-figure rotations, and they exist for the same reason
+    // `tip` does: the root is shared, so anything written on it has to be
+    // written EVERY time or the last sunbather's roll is on the next ninety
+    // people. Nought for everybody who is not lying down — see the write at
+    // the bottom of this function, where `x + 0` is `x` to the last bit.
+    //
+    // `spin` is a half turn added to the bearing and `roll` a rotation about
+    // the figure's own long axis, which for somebody laid over is the axis
+    // running head to heel. Three.js composes the root as Ry·Rx·Rz, so `tip`
+    // happens first in the figure's own frame, `roll` then turns the tipped
+    // body about world X — which the tip has just made the body's long axis —
+    // and the yaw aims the result. That ordering is the whole reason a roll
+    // can be one number here rather than a re-derivation of eleven joints.
+    let spin = 0;
+    let roll = 0;
+    // And how far to lift the whole figure off the deck, in metres. A body
+    // rolled onto its shoulder is deeper than a body flat on its back, and the
+    // rotation is about a line that runs through the middle of it, so without
+    // this the shoulder goes through the towel.
+    let lift = 0;
     const ph = t * 0.9 + fg.seed * 6.283;
 
     switch (fg.mode) {
@@ -1062,39 +1109,229 @@ function makeCrowd(scene, rig, cap) {
           + Math.sin(ph * 0.52 * sr + 0.8) * 0.11;
         break;
 
-      case 'lie':
-        // Flat on a lounger, face up. The tip is one rotation of the whole
-        // figure rather than something spread through the joints: a reclining
-        // figure is a standing figure laid over and then bent a little, and
-        // doing it the other way round means re-deriving eleven joints for one
-        // pose.
+      case 'lie': {
+        // Somebody lying down, and there are as many ways of doing that as
+        // there are people doing it.
         //
-        // +π/2 and not −π/2: about Z, local +X (the front of the body) goes to
-        // world up, which is a sunbather. The other sign is face down on a
-        // lounger, which nobody does.
+        // The tip is one rotation of the whole figure rather than something
+        // spread through the joints: a reclining figure is a standing figure
+        // laid over and then bent a little, and doing it the other way round
+        // means re-deriving eleven joints for one pose.
         //
-        // It also puts the head along local −X — the *opposite* of the bearing
-        // the figure was placed with — which is why 43-jadrija.js aims these
-        // seaward to get a head that ends up inland.
-        tip = Math.PI / 2;
-        // Propped on the backrest, which climbs over the last half-metre of
-        // the lounger. Positive, because a joint's rotation.z swings its far
-        // end toward the front of the body and the front of the body is now
-        // pointing at the sky — so this lifts the head. Negative drives it down
-        // through the frame, which is what the first cut did and which reads,
-        // convincingly and horribly, as somebody who has passed out.
-        skel.torso.rotation.z = 0.58;
-        skel.head.rotation.z = 0.16;
-        // Knees just off straight. Nobody lies with their legs locked.
-        skel.legLU.rotation.z = 0.16 + Math.sin(ph * 0.3) * 0.02;
-        skel.legRU.rotation.z = 0.09;
-        skel.legLL.rotation.z = -0.22;
-        skel.legRL.rotation.z = -0.12;
-        skel.armLU.rotation.z = -0.26; skel.armLU.rotation.x = SPLAY * 1.8;
-        skel.armRU.rotation.z = -0.22; skel.armRU.rotation.x = -SPLAY * 1.8;
-        skel.armLL.rotation.z = 0.30;
-        skel.armRL.rotation.z = 0.26;
+        // ── WHAT WAS HERE, AND THE TWO THINGS WRONG WITH IT ─────────────────
+        //
+        // ONE POSE, TO THE MILLIMETRE. Every value below used to be a literal
+        // and the only term with a clock in it was `sin(ph * 0.3) * 0.02` on
+        // one thigh — 1.1 degrees, on a limb 0.43 m long, which is four
+        // millimetres of knee. Measured off the drawn instance buffers rather
+        // than argued about: the mean pairwise difference between two people
+        // lying on this beach, over the offsets of head, trunk, elbows and
+        // knees from the hip and with height divided out, was 0.002 m. The
+        // standing crowd measures 0.176 and the walkers 0.283. Nine sunbathers
+        // were the same statue stamped out nine times, and the fact that they
+        // were also motionless is the smaller half of it.
+        //
+        // AND THE TRUNK LEANED THE WRONG WAY. `torso.rotation.z = 0.58` with
+        // a note over it claiming that lifted the head. It does not. The
+        // convention at the top of this file — "a joint's rotation.z swings
+        // its far end toward +X" — is written for a limb, and a limb hangs
+        // DOWN; the trunk and the head point UP, so Rz(θ) takes (0,1,0) to
+        // (−sin θ, cos θ, 0) and a POSITIVE z leans them BACKWARD. Face up,
+        // backward is into the ground. The same mistake is written up at
+        // length in the `serve` case below, where it was found and fixed; it
+        // was never carried back here.
+        //
+        // The arithmetic, and then the photograph. Trunk pivot 0.10 above the
+        // hip, neck 0.50 above that: at z = +0.58 the neck lands at local
+        // (−0.274, +0.518), which the tip lays down as 0.518 m toward the head
+        // and 0.274 m BELOW the hip. Read straight off the instance buffers as
+        // (−0.526, −0.276) — the head end of every sunbather on this shore was
+        // a quarter of a metre under the towel it was lying on. Photographed
+        // at t 513.6 from 83 m with a 4° lens: a red swimsuit on a red towel
+        // and no head anywhere in the frame. The arms went the same way for
+        // the same reason, at −0.26 on both shoulders.
+        //
+        // ── AND WHAT THE SURVEY ACTUALLY SHOWS ──────────────────────────────
+        //
+        // 20260821_175413 is one figure on one towel on the promenade slab and
+        // it is worth the whole of this rewrite: she is FACE DOWN, propped on
+        // her forearms, with both knees bent so the shins stand in the air and
+        // the ankles crossed. The old note here said face down was "what
+        // nobody does". 20260821_175924 has three more under the pines — one
+        // on her back with an arm thrown up past her head, one curled on her
+        // side, one face down with her head on her folded arms — and not one
+        // of the four is the pose this case used to draw.
+        //
+        // Counted over 175413, 175924, 175838 and 175408, about eleven people
+        // lying down: six on their backs, three face down, two on their sides.
+        // Which is the split below, and it is the reason face down is a
+        // quarter of this beach rather than a novelty.
+        //
+        // Every number off `crowdJit(fg.seed …)`. Rule 4: no draw off `rng`,
+        // and the seed a figure was given at build time is the way that person
+        // lies for the whole session — a beach where somebody re-chooses their
+        // posture on a frame boundary is a beach of people flinching.
+        const hk = (k) => crowdJit(fg.seed * 1024 + 3, k);
+        const h1 = hk(11), h2 = hk(23), h3 = hk(37);
+        const h4 = hk(53), h5 = hk(71), h6 = hk(97);
+
+        // FACE UP OR FACE DOWN, and the pair of rotations that makes the
+        // second one possible without moving anybody.
+        //
+        // +π/2 about Z takes local +X — the front of the body — to world up,
+        // which is a sunbather on her back, and it puts the head along local
+        // −X, the OPPOSITE of the bearing the figure was placed with. That is
+        // why 43-jadrija.js aims these seaward to get a head that ends up
+        // inland, and it is the constraint the prone case has to satisfy too:
+        // −π/2 on its own turns her over AND swaps her end for end, so her
+        // feet would be on the backrest and her head off the seaward end of
+        // the lounger.
+        //
+        // A half turn of the bearing puts them back. Ry(y+π)·Rz(−π/2) takes
+        // (0,1,0) to (−cos y, 0, sin y), which is exactly where Ry(y)·Rz(+π/2)
+        // takes it — the same head, in the same place, on the same towel — and
+        // it takes the body's front (1,0,0) to (0,−1,0), which is the ground.
+        const prone = h1 > 0.74;
+        tip = prone ? -Math.PI / 2 : Math.PI / 2;
+        spin = prone ? Math.PI : 0;
+
+        // ON THE SIDE. One rotation about the body's own long axis, for the
+        // same reason the tip is one rotation: a person on their side is a
+        // person on their back rolled over, not eleven joints re-solved.
+        //
+        // Two in eleven of the survey's figures are on their side, and the
+        // rest still get a few degrees of it — nobody lies perfectly square to
+        // the ground, and a beach where everybody does reads as a morgue.
+        //
+        // The lift is not optional. The roll is about a line through the
+        // middle of the body — the tip leaves the pelvis at root height — so a
+        // shoulder swung down goes through the towel. The trunk is 0.28 m
+        // front to back and 0.34 m across, so rolling it through 65° trades
+        // 0.14 m of half-depth for 0.17 m and puts 0.07 m of shoulder under
+        // the concrete. `0.075·|sin roll|` buys it back and is nought for
+        // everybody lying flat.
+        const side = h2 > 0.81;
+        roll = side ? (h3 < 0.5 ? -1 : 1) * (0.72 + h4 * 0.44)
+          : (h3 - 0.5) * 0.34;
+        lift = Math.abs(Math.sin(roll)) * 0.075;
+
+        // How far the chest is lifted off the ground, and the sign that is the
+        // whole of the bug above: away from the ground is BACKWARD when face
+        // up and FORWARD when face down, so the same number serves both with
+        // the tip's sign on it.
+        //
+        // Face up it runs from flat on the towel to propped on the elbows or
+        // on a lounger's backrest, which climbs over the last half-metre of
+        // one. Face down the range is smaller and starts higher: nobody lies
+        // on their front completely flat for long, and 175413 is propped.
+        //
+        // The clock in it is a breath, at about eleven a minute. Two
+        // hundredths of a radian is 1.5 cm at the shoulder, which is nothing
+        // at fifty metres and is the difference between a person asleep and a
+        // prop at five.
+        const rate = 0.70 + fg.seed * 0.70;
+        const breath = Math.sin(ph * 0.62 * rate) * 0.020;
+        const prop = (prone ? 0.30 + h5 * 0.34 : h5 * 0.62) + breath;
+        const sgn = prone ? 1 : -1;
+        skel.torso.rotation.z = sgn * prop;
+
+        // ── the business, which for somebody lying down is a shift ──────────
+        //
+        // Not a wave and not a stretch: the whole point of these people is
+        // that they are the still part of the beach. But nobody holds one
+        // position for an afternoon, and `act` is the couple of seconds in
+        // every seventy-odd where a knee comes up, the head goes over to the
+        // other side and the near arm moves. Same shape as the standing case's
+        // — off the figure's own clock, so no two of them do it together.
+        const act = sat((Math.sin(ph * 0.115 * rate + fg.seed * 5.7) - 0.86)
+          / 0.10);
+
+        // THE HEAD. Turned to one side, which is what a head resting on
+        // something does, and over to the other side when the shift comes.
+        // `rotation.z` carries the tip's sign for the reason the trunk does:
+        // positive lifts the chin away from the body's front.
+        skel.head.rotation.z = sgn * (prone ? 0.10 + prop * 0.55
+          : -0.06 - prop * 0.28);
+        skel.head.rotation.y = (h6 - 0.5) * 0.92 * (1 - act * 2)
+          + Math.sin(ph * 0.09 * rate) * 0.10;
+
+        // THE LEGS, and they are the loudest thing in a silhouette that is
+        // otherwise a bar 1.7 m long.
+        //
+        // Face up: the hip lifts the knee into the air and the knee then folds
+        // the shin back down to the deck, so the foot ends up flat and the leg
+        // is a triangle standing off the towel. `1.55` is what returns the
+        // shin: thigh at +k points (sin k, −cos k) in body space and the shank
+        // at k − 1.55k is back below the knee.
+        //
+        // Face down: no hip at all — flexing it face down drives the thigh
+        // through the ground — and the knee alone, which swings the shin
+        // toward the body's back, which is now the sky. That is 175413 exactly.
+        //
+        // The two legs get separate hashes. One knee up and one flat is the
+        // commonest thing on this beach and it cannot happen if both legs read
+        // the same number.
+        const kL = prone ? 0 : (hk(131) > 0.55 ? 0.55 + hk(151) * 0.72 : 0.10);
+        const kR = prone ? 0 : (hk(173) > 0.62 ? 0.50 + hk(191) * 0.75 : 0.06);
+        const bL = prone ? -(0.70 + hk(131) * 0.80) : -(0.20 + kL * 1.55);
+        const bR = prone ? -(0.62 + hk(173) * 0.86) : -(0.14 + kR * 1.55);
+        skel.legLU.rotation.z = kL + act * 0.42;
+        skel.legRU.rotation.z = kR;
+        skel.legLL.rotation.z = bL - act * 0.60;
+        skel.legRL.rotation.z = bR;
+        // And a splay, because two legs lying dead parallel is a mannequin in
+        // a shop window. Off the same two hashes so a bent leg falls outward.
+        skel.legLU.rotation.x = (hk(151) - 0.35) * 0.20;
+        skel.legRU.rotation.x = (hk(191) - 0.65) * 0.20;
+
+        // ── THE ARMS ───────────────────────────────────────────────────────
+        //
+        // Face down there is only one thing to do with them and it is what
+        // holds the chest up: the upper arm down to the deck and the forearm
+        // forward along it. Solved rather than guessed — the upper arm wants
+        // to point mostly at the ground and a little toward the head, which is
+        // (0.86, 0.51) in body space and so 2.05 rad at the shoulder, and the
+        // forearm wants to lie flat pointing at the head, which is π in total
+        // and so 1.05 at the elbow. `fold` brings the hands in under the chin
+        // instead, which is the third figure in 175924.
+        //
+        // Face up, three habits and they are independent per arm: down at the
+        // side, out on the towel, or thrown up past the head. The last is the
+        // one that reads at distance — an arm at 2.35 at the shoulder points
+        // up and over the crown, and with 0.9 at the elbow the forearm comes
+        // back down almost along the deck above the head.
+        const armOf = (u, l, s, ha, hb) => {
+          if (prone) {
+            const fold = ha > 0.55;
+            u.rotation.z = fold ? 2.28 : 2.05;
+            l.rotation.z = fold ? 1.52 : 1.05;
+            u.rotation.x = s * SPLAY * (fold ? -1.1 : 2.2);
+            l.rotation.x = 0;
+            return;
+          }
+          if (ha > 0.70) {                       // up past the head
+            u.rotation.z = 2.20 + hb * 0.30;
+            l.rotation.z = 0.70 + hb * 0.45;
+            u.rotation.x = s * SPLAY * (1.0 + hb * 1.4);
+          } else if (ha > 0.36) {                // out on the towel
+            u.rotation.z = -0.04 + hb * 0.20;
+            l.rotation.z = 0.12 + hb * 0.30;
+            u.rotation.x = s * SPLAY * (2.6 + hb * 1.6);
+          } else {                               // down beside the hip
+            u.rotation.z = 0.02 + hb * 0.14;
+            l.rotation.z = 0.10 + hb * 0.22;
+            u.rotation.x = s * SPLAY * (0.7 + hb * 0.9);
+          }
+        };
+        armOf(skel.armLU, skel.armLL, 1, hk(211), hk(233));
+        armOf(skel.armRU, skel.armRL, -1, hk(257), hk(277));
+        // The near arm moves with the shift. On the shoulder rather than the
+        // elbow, for the reason the greeting gives at the bottom of this
+        // function: the shoulder carries the forearm with it.
+        skel.armRU.rotation.z += act * 0.55;
+        skel.armRL.rotation.z += act * 0.30;
         break;
+      }
 
       case 'serve':
       case 'barista': {
@@ -1507,10 +1744,10 @@ function makeCrowd(scene, rig, cap) {
       skel.torso.rotation.z -= g * 0.05;
     }
 
-    skel.root.position.set(fg.x, fg.y, fg.z);
+    skel.root.position.set(fg.x, fg.y + lift, fg.z);
     // Written in full every time, never touched in part. YXZ order, so the tip
     // happens in the figure's own frame and the yaw then aims the result.
-    skel.root.rotation.set(0, fg.yaw, tip);
+    skel.root.rotation.set(roll, fg.yaw + spin, tip);
     skel.root.scale.setScalar(fg.scale);
     if (!frame) { skel.root.updateMatrixWorld(true); return; }
     // The four lines `updateMatrixWorld(true)` is, with the parent it does not
