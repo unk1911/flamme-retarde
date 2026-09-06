@@ -144,8 +144,13 @@ BEDS = [
     dict(key='wood',    src=6, window=(2.0, 92.0), length=(52.0, 76.0),
          rate=24000, kbps=96, hp=(6, 2400), lp=(2, 10500), rms=-25.23,
          what='inside the pines, 17 Aug'),
+    # THE ONLY BED WITH A `notch`, and the reason `notch` exists. See the long
+    # note above `filt`: this take has a machine in it, the machine was taken
+    # out with a 180 Hz high-pass, and the high-pass took the sea's bottom with
+    # it. Three stopbands and a 45 Hz corner take the machine and leave the sea.
     dict(key='lapping', src=4, window=(0.6, 72.4), length=(52.0, 70.0),
-         rate=22050, kbps=96, hp=(3, 180), lp=None,  rms=-23.98,
+         rate=22050, kbps=96, hp=(2, 45),  lp=None,  rms=-23.98,
+         notch=[(120.49, 1.35), (132.75, 1.45), (149.78, 1.65)],
          what='the pier, 16 Aug'),
     dict(key='boat',    src=5, window=(1.0, 119.0), length=(34.0, 44.0),
          rate=16000, kbps=64, hp=(2, 45),  lp=None,  rms=-20.45,
@@ -489,7 +494,87 @@ def filt(y, spec):
     """
     The filters, at 48 kHz and before the resample, so the resampler's own
     anti-alias is the only thing shaping the top and nothing has to be undone.
+
+    `notch` COMES FIRST AND IS WHY THIS FUNCTION IS NO LONGER FOUR LINES.
+
+    The pier take has a machine in it. Read in 0.18 Hz bins over the whole 73 s
+    there is a tone at 120.48 Hz standing 26 dB over its own local floor, with
+    partners at 132.75 (17 dB), 149.6 (8.5), 180.2 (11) and 240.97 (14) — the
+    last three of which are a harmonic series on about 60.2 Hz, so it is one
+    thing and not five. It is in every eight-second block of the recording at
+    15 to 25 dB and it is not the sound of anywhere.
+
+    Until now it was dealt with by `hp=(3, 180)`, and that was wrong for two
+    separate reasons, both of them measurable.
+
+    IT NEVER REMOVED THE TONE. A high-pass attenuates a tone and the noise it
+    is sitting in by exactly the same amount, so the *prominence* — the only
+    thing that makes a tone a tone rather than a level — comes out unchanged.
+    Measured on the shipped window: 27.1 dB over local floor before the filter
+    and 28.3 dB after it. What the high-pass did was push the whole 100-180 Hz
+    region so far down that nothing there could be heard, tone included. It
+    worked the way turning a room's lights off deals with a stain.
+
+    AND IT WAS SIXTH ORDER, NOT THIRD. `sosfiltfilt` runs the filter forwards
+    and backwards, which squares the magnitude response: `hp=(3, 180)` is 36 dB
+    an octave, not 18. Against the window's own 1 kHz band it left the bed at
+    -65.9 dB at 63 Hz where the source had -13.0.
+
+    So the sea arrived in the game as a band-limited hiss and 80-audio.js had
+    to synthesise a body under it. What is left below is the surgical version.
+
+    THE STOPBANDS. Each tone drifts — 120.48 wanders between 120.12 and 120.85
+    across the recording, 149.6 between 149.05 and 150.51, all of them by about
+    six parts in a thousand, which is a machine whose speed is not quite
+    constant. A biquad notch is a V and a V misses a moving target: at Q 25 it
+    leaves 7.7 dB of the 120 Hz tone standing, and opening it to Q 12 to catch
+    the drift costs 13 dB of the 125 Hz third octave, which is the band this
+    whole exercise is trying to get back. What is wanted is a plateau with
+    steep sides, which is a Chebyshev-II bandstop: 60 dB of stopband, sixth
+    order, half a hertz and a half either side of centre.
+
+    Sixth order and Chebyshev-II specifically, both by measurement and not by
+    preference. The fractional bandwidth here is 2.7 Hz in 48 000, and a design
+    that narrow is at the edge of what float64 biquads will hold: `ellip` at
+    the same width comes out looking fine and leaves 9 dB of tone standing, and
+    `cheby2` at EIGHTH order is worse than at sixth (7.2 dB against 1.6). Both
+    are the coefficients quietly losing precision, and the tell is that the
+    thing that is supposed to remove a tone stops removing it. Sixth order
+    Chebyshev-II is the one that measures right, so it is the one that ships.
+
+    Residual prominence over local floor, worst 8 s block of the window:
+
+                        120 Hz   133    150
+        before            27.1   16.1   11.9
+        old hp3@180       28.3   14.6   11.6
+        these stopbands    1.6    1.9  -15.0
+
+    WHAT IS DELIBERATELY LEFT IN. 180.2 and 241.0 Hz are the same machine's
+    third and fourth harmonics and they are NOT notched, because they sit above
+    the old 180 Hz corner and have therefore been shipping at full prominence —
+    12.6 and 16.1 dB — in every build the game has ever had, unheard. A tone is
+    audible when it stands over the noise in its own critical band, not over
+    one FFT bin: the ERB at 120 Hz is 38 Hz, which is 103 bins at this
+    resolution, so a tone 27 dB over a bin is 7 dB over the band and a tone
+    16 dB over a bin is 5 dB *under* it. Only the 120 Hz one is over the line,
+    and 133 and 150 go with it because they are in the region the high-pass was
+    hiding and would otherwise arrive newly exposed. Notching 180 and 241 as
+    well was cut and measured and costs 1.3 dB of the 200 Hz band and 1.9 of
+    the 250 Hz band — bands the game already matches its source in to within
+    two decibels — to remove something nobody has ever heard.
+
+    THE CORNER IS 45 Hz AND NOT 65. There is nothing under 50 Hz in this
+    recording to remove: 35-45 Hz reads -51.1 dB against -41.5 for 56-71, and
+    5-20 Hz reads -73.4. It is a smooth roll-off and not a rumble, so a corner
+    put up at 65 Hz to be safe is 3.5 dB off the 63 Hz third octave and 2.0 off
+    the 80, bought for nothing. Measured as the LF-to-mid ratio the game is
+    scored on, 65 Hz costs 1.35 dB against 45 Hz and 45 Hz costs 0.2 dB against
+    40. Second order, so 24 dB an octave once `sosfiltfilt` has doubled it.
     """
+    for f0, half in spec.get('notch') or ():
+        y = sig.sosfiltfilt(sig.iirfilter(6, [f0 - half, f0 + half],
+                                          btype='bandstop', ftype='cheby2',
+                                          rs=60, fs=SR, output='sos'), y)
     if spec['hp']:
         y = sig.sosfiltfilt(sig.butter(spec['hp'][0], spec['hp'][1],
                                        btype='high', fs=SR, output='sos'), y)
