@@ -578,6 +578,76 @@ function brodSheer(x) {
 }
 
 /**
+ * The whole station row at an AUTHORED x, and the half-beam at a height on it.
+ *
+ * Up here rather than inside `brodProto`, where both of these lived, because
+ * `moor` has to answer a question the loft is the only thing that knows: how
+ * far off the pier's centreline she has to lie for her fenders to touch it and
+ * her plating not to. That number was typed — `A.w + 2.35` — and it was wrong
+ * by more than a metre in the direction nobody checks, which is *into* the
+ * masonry. See the note over the berth in `moor`.
+ *
+ * Clamped for the reason `brodSheer` is clamped, and it is the same bug: this
+ * is the copy that drew the blades off her counter.
+ *
+ * `brodBeam` inverts the loft `pt` in `brodProto` analytically rather than
+ * approximating it: `pt` puts the topside at `y = cy + (sy − cy) u^0.94` and
+ * `w = cw + (sw − cw) u^0.58`, so u comes back off the first and goes into the
+ * second. Anything hung on her SIDE needs it — she carries 0.35 m of flare
+ * between chine and sheer amidships, so a fender placed off the sheer's
+ * half-beam floats a third of a metre clear of the paint and one placed off
+ * the chine's is buried.
+ */
+function brodStation(x) {
+  const q = clamp(x, BROD_ST0[BROD_ST0.length - 1][0], BROD_ST0[0][0]);
+  let a = BROD_ST0[0], c = BROD_ST0[1];
+  for (let i = 0; i < BROD_ST0.length - 1; i++) {
+    if (q <= BROD_ST0[i][0] && q >= BROD_ST0[i + 1][0]) {
+      a = BROD_ST0[i]; c = BROD_ST0[i + 1]; break;
+    }
+  }
+  const u = clamp((a[0] - q) / ((a[0] - c[0]) || 1), 0, 1);
+  return a.map((v, k) => v + (c[k] - v) * u);
+}
+function brodBeam(x, y) {
+  const [, , cy, cw, sy, sw] = brodStation(x);
+  if (sy <= cy) return sw;
+  const u = Math.pow(clamp((y - cy) / (sy - cy), 0, 1), 1 / 0.94);
+  return cw + (sw - cw) * Math.pow(u, 0.58);
+}
+
+/**
+ * Her tyre fenders — where they hang, and how far out they reach.
+ *
+ * The stations and the sizes were inside `brodProto` and the note explaining
+ * them still is; what is up here is only what somebody outside the builder has
+ * to be able to ask. `brodFendOut` is that question: **the outermost point of
+ * anything on her side, in BUILT metres off her centreline**, which is the one
+ * number the berth is a function of.
+ *
+ * It comes out at the tyre and not at the bulwark, and only just: the bulwark's
+ * outer face stands at (2.10 + 0.030) x 1.75 = 3.727 and the widest tyre
+ * reaches 3.779, so the tyres are 52 mm proud of her topsides — which is what
+ * makes them fenders rather than decoration, and is why the berth is measured
+ * off them.
+ */
+const BROD_FEND = [-6.14, -3.86, -1.63, 2.30, 4.40];   // authored stations
+const BROD_FEND_RR = BROD_P(0.38);      // ring centreline radius
+const BROD_FEND_RR2 = BROD_P(0.11);     // and half the tread's thickness
+const BROD_FEND_DROP = BROD_P(1.42);    // below the deck edge
+const BROD_FEND_OFF = 0.030;            // and how far the lanyard holds it off
+function brodFendOut() {
+  let out = 0;
+  for (const fx of BROD_FEND) {
+    const cy = brodStation(fx)[4] - BROD_FEND_DROP;
+    const zc = brodBeam(fx, cy + BROD_FEND_RR + BROD_FEND_RR2)
+      + BROD_FEND_RR2 + BROD_FEND_OFF;
+    out = Math.max(out, zc + BROD_FEND_RR2);
+  }
+  return out * BROD_K;
+}
+
+/**
  * The hull, the house and everything standing on her.
  *
  * Local frame is `boatProto`'s — **+X forward, +Y up, +Z to starboard** — so
@@ -772,54 +842,13 @@ function brodProto() {
   const sideQuad = (s, A, B, C, D, col) =>
     (s > 0 ? b.quad(D, C, B, A, col) : b.quad(A, B, C, D, col));
 
-  // Local, and off `BROD_ST0` for the same reason `ST` is: `brodSheer` answers
+  // AUTHORED, off `BROD_ST0`, for the same reason `ST` is: `brodSheer` answers
   // in built metres, which is what the deck logic wants and is exactly what
-  // must not come in here.
-  // Clamped for the reason `brodSheer` above is clamped, and it is the same
-  // bug: this is the copy that DREW the blades off her counter.
-  const sheerAt = (x) => {
-    const q = clamp(x, BROD_ST0[BROD_ST0.length - 1][0], BROD_ST0[0][0]);
-    let a = BROD_ST0[0], c = BROD_ST0[1];
-    for (let i = 0; i < BROD_ST0.length - 1; i++) {
-      if (q <= BROD_ST0[i][0] && q >= BROD_ST0[i + 1][0]) {
-        a = BROD_ST0[i]; c = BROD_ST0[i + 1]; break;
-      }
-    }
-    const u = clamp((a[0] - q) / ((a[0] - c[0]) || 1), 0, 1);
-    return [a[4] + (c[4] - a[4]) * u, a[5] + (c[5] - a[5]) * u];
-  };
-
-  /**
-   * The whole station row at any x, and the half-beam at any HEIGHT on it.
-   *
-   * `sheerAt` answers for the deck edge, which is all the bulwark ever needed.
-   * A thing hung on her SIDE needs to know where her side is at the height it
-   * hangs at, and she has 0.35 m of flare between the chine and the sheer
-   * amidships — a fender placed off the sheer half-beam floats a third of a
-   * metre clear of the topsides, and one placed off the chine's is buried.
-   *
-   * Inverted off the same loft `pt` above plates her with, so the answer is
-   * the surface and not an approximation of it: `pt` puts the topside at
-   * `y = cy + (sy − cy) u^0.94` and `w = cw + (sw − cw) u^0.58`, so u comes
-   * back off the first and goes into the second.
-   */
-  const stAt = (x) => {
-    const q = clamp(x, BROD_ST0[BROD_ST0.length - 1][0], BROD_ST0[0][0]);
-    let a = BROD_ST0[0], c = BROD_ST0[1];
-    for (let i = 0; i < BROD_ST0.length - 1; i++) {
-      if (q <= BROD_ST0[i][0] && q >= BROD_ST0[i + 1][0]) {
-        a = BROD_ST0[i]; c = BROD_ST0[i + 1]; break;
-      }
-    }
-    const u = clamp((a[0] - q) / ((a[0] - c[0]) || 1), 0, 1);
-    return a.map((v, k) => v + (c[k] - v) * u);
-  };
-  const beamAt = (x, y) => {
-    const [, , cy, cw, sy, sw] = stAt(x);
-    if (sy <= cy) return sw;
-    const u = Math.pow(clamp((y - cy) / (sy - cy), 0, 1), 1 / 0.94);
-    return cw + (sw - cw) * Math.pow(u, 0.58);
-  };
+  // must not come in here. `brodStation` and `brodBeam` are the module-scope
+  // pair — clamped, and clamped for the reason `brodSheer` is: an unclamped
+  // copy of this is what DREW the blades off her counter.
+  const sheerAt = (x) => { const s = brodStation(x); return [s[4], s[5]]; };
+  const beamAt = brodBeam;
 
   /**
    * A four-sided bar between two arbitrary points — a rope, a lanyard, a stay.
@@ -1386,9 +1415,14 @@ function brodProto() {
   // that pale grey. 0.74 of `HULL`.
   const TYRE = [0.669, 0.666, 0.650];
   const LASH = [0.640, 0.618, 0.560];       // sun-bleached three-strand
+  //
+  // THE STATIONS AND THE SIZES ARE MODULE SCOPE NOW — `BROD_FEND` and the
+  // three constants beside it. `moor` has to know how far out these reach to
+  // know where she lies, and a berth measured off a copy of this table is a
+  // berth that goes wrong the day somebody moves one fender.
   {
-    const RR = BROD_P(0.38);                // ring centreline radius
-    const rr = BROD_P(0.11);                // and half the tread's thickness
+    const RR = BROD_FEND_RR;                // ring centreline radius
+    const rr = BROD_FEND_RR2;               // and half the tread's thickness
     // 1.42 m below the deck edge, which is set by two things at once. The
     // mural hangs them 1.20 m down; the mole's rubbing baulk lies at built y
     // 1.12 to 1.32 and a fender that does not cover the baulk is decoration.
@@ -1397,8 +1431,8 @@ function brodProto() {
     // gold cove rather than through it — rule 5's neighbourhood, though a
     // torus crossing a 70 mm strip would be an interpenetration and not a
     // skim.
-    const DROP = BROD_P(1.42);
-    for (const fx of [-6.14, -3.86, -1.63, 2.30, 4.40]) {
+    const DROP = BROD_FEND_DROP;
+    for (const fx of BROD_FEND) {
       const [sy, sw] = sheerAt(fx);
       const cy = sy - DROP;
       // Off the beam at the tyre's TOP and not at the sheer. She carries 0.35 m
@@ -1407,7 +1441,7 @@ function brodProto() {
       // the widest point the tyre spans and standing 52 mm off that leaves the
       // top just touching and the bottom 0.23 m out, which is how a fender on
       // one lanyard actually hangs against a flared topside.
-      const zc = beamAt(fx, cy + RR + rr) + rr + 0.030;
+      const zc = beamAt(fx, cy + RR + rr) + rr + BROD_FEND_OFF;
       for (const s of [1, -1]) {
         const cz = s * zc;
         const NM = 12, NN = 6;
