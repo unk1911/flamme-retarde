@@ -227,12 +227,40 @@ const LANE_COL = {
    * faces then render bluer than the sunlit target, which is correct: shaded
    * stone is bluer in the frames too.
    *
-   * `iron` and `steel` are NOT corrected, deliberately. Both were read in deep
-   * shade — the railing is near-black at 0.08, where the whole reading is the
-   * sky it reflects, and the green fence was measured at 26,38,36 against
-   * foliage at 53,60,57. T was calibrated on a skylit face in the open. Deep
-   * shade has its own transform and these two owe that measurement, not this
-   * one.
+   * `iron` and `steel` ARE corrected now, and under T_shade rather than T_sun,
+   * because both of their references are shade readings — which is what the
+   * previous note said and then used as a reason to leave them alone.
+   *
+   * The railing's target was re-measured off `w_004`, which has a dark
+   * horizontal-slat fence, a wheelie bin and a letterbox standing in the same
+   * shadow. The fence reads 1.000:1.139:1.112 and the bin 1.000:1.000:1.108 —
+   * agreeing on red-over-blue to within 0.4% across two different objects,
+   * which is the claim the old note made without a number: at near-black the
+   * whole reading IS the sky. (The letterbox comes back at 1.005 and is not
+   * used; it sits where the lane bounces light back into it.)
+   *
+   * `steel`'s target is this file's own recorded reading, 26,38,36 against
+   * foliage at 53,60,57 — half the value of the leaf and bluer than it.
+   *
+   * AND THEY ARE NOT DIVIDED BY T_shade, WHICH IS WHAT THE FIRST CUT DID.
+   *
+   * Dividing by it overshot both — iron landed at 1.000:1.096:1.065 against a
+   * target of 1.112 in blue, steel at 1.000:1.361:1.242 against 1.385 — and the
+   * reason is the same trap as before, one level down. These are not shaded
+   * faces. They are thin members catching light from every direction at once,
+   * so neither T_sun nor T_shade is their transform.
+   *
+   * The fix is to stop guessing which regime an element is in and MEASURE ITS
+   * OWN. Build it flat, paint it, mask it, and divide the rendered ratio by the
+   * albedo you fed in — that is the transform, whatever combination of sun,
+   * sky and bounce produced it:
+   *
+   *     iron   1.000:1.0395:1.1316  ->  1.000:1.115:1.249   T [1, 1.073, 1.104]
+   *     steel  1.000:1.5345:1.3966  ->  1.000:1.559:1.504   T [1, 1.016, 1.077]
+   *
+   * Both are LESS blue than T_sun, which is the giveaway that a railing is not
+   * a wall and not a floor. The albedos below are the frame targets divided by
+   * those two, at each colour's own original luminance.
    */
   // The carriageway.
   //
@@ -287,7 +315,7 @@ const LANE_COL = {
   // The railing. Near-black, a hair blue, and kept within a few per cent of the
   // garden wall's own railing at 0.082,0.084,0.090 — the two are a hundred and
   // fifty metres apart on one lane and are not two different blacks.
-  iron: [0.076, 0.079, 0.086],
+  iron: [0.0755, 0.0802, 0.0761],
   // Painted steel, and it is GREEN.
   //
   // `a_048` has a welded-mesh panel fence on green posts and `a_051` has a
@@ -296,7 +324,7 @@ const LANE_COL = {
   // leaf and bluer than it: this is a moss green with a real blue lean, not the
   // yellow-green the shutters are painted. Mixed at 0.082,0.128,0.098 — the
   // shutter colour — it came out as more foliage.
-  steel: [0.116, 0.178, 0.162],
+  steel: [0.1226, 0.1765, 0.1577],
   // Vine, over the pergola. Dark underneath and sunlit on top, which is the
   // whole of why a leaf mass reads as one.
   vineDk: [0.088, 0.176, 0.084],
