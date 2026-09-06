@@ -25,11 +25,11 @@ is a real footprint.
 |---|---|
 | mouse | fly — the virtual stick springs back to centre on its own |
 | `↑ ↓ ← →` | fly, held — no spring, if you prefer a steady input |
-| `W` `S` | throttle — keep holding `W` past the stop for overboost |
+| `W` `S` | throttle — hold `W` past the stop for overboost |
 | `A` `D` | rudder |
 | `Z` | **hold to level the wings** — the panic button |
 | `T` | **autopilot** — flies you to the water, or to the fire, whichever the job is |
-| `SPACE` | scoop (hold it; wings level, under 14 m, over open water) |
+| `SPACE` | scoop (hold; wings level, under 14 m, over open water) |
 | `F` / left click | drop |
 | `shift` | flaps |
 | `C` | camera — chase, close, cockpit, wing |
@@ -37,730 +37,96 @@ is a real footprint.
 | `G` | gear — you need it down to land at Rokići |
 | `E` | **get out** — on the ground at Rokići, with the field alight |
 | `J` | **e[J]ect** — the seat, the canopy, and the aeroplane is gone |
-| `0` | **skip straight to Rokići, on foot** — the back door, see below |
+| `0` | **skip straight to Rokići, on foot** |
 | `P` / `Esc` | **pause** — the fire stops too |
-| `H` | hide the HUD |
-| `L` | **record** — press to start, press again to stop and keep the `.webm` |
+| `H` | hide the HUD · `L` record a `.webm` |
 
-On foot at the airfield:
+**On foot**, and on the boat: mouse looks, `W A S D` walks, `shift` runs, `Z`
+holds a zoom, `B` is third person, `E` climbs back in — or boards the boat at
+the head of the Jadrija mole. **Under the canopy**: the mouse steers, where you
+look is where you go.
 
-| key | |
-|---|---|
-| mouse | look |
-| `W` `A` `S` `D` | walk |
-| `shift` | run |
-| `SPACE` / left click | **open the branch** |
-| `E` | climb back in — stand next to the aeroplane · **or board the boat**, at the head of the Jadrija mole |
-| `B` | **third person** — see yourself; stand still and the camera walks round you |
+The autopilot is a *fly me to the job* button, not an autoplayer. Pause really
+is a pause — the simulation stops where it stood, and so does the fire.
 
-Under the canopy:
+### Where you can go
 
-| key | |
-|---|---|
-| mouse | **steer** — where you look is where it goes |
-| `A` `D` / `← →` | the same, on the keyboard |
-| `SPACE` | flare — a garnish; you never need it |
-
-The autopilot is a *fly me to the job* button, not an autoplayer: it lines the
-aeroplane up on a scoop run or brings you in over the fire, and hands the scoop
-and the drop back to you. Any real stick input disengages it.
-
-Pause really is a pause: the simulation stops where it stood, the fire stops
-spreading, the engines duck to silence, and the clock does not collect the
-interval and hand it back as one enormous step when you return. It also pauses
-itself if you switch tabs or lose the pointer lock, so nothing burns down while
-you are somewhere else.
-
-### Getting out
-
-`J` fires the seat. There is no confirmation on it and there is not going to be
-one: half the point of the key is that it is available in the two seconds before
-the ridge arrives, and a dialogue box in those two seconds is the same as not
-having the key at all. The price is paid the other way — the aeroplane is gone
-the instant you press it, she rolls off and goes down with nobody in her, and
-the results screen says so.
-
-The sequence is the real one. You leave with the aeroplane's velocity and a kick
-up the rails, you are a falling body for the best part of a second, the canopy
-streams and inflates against whatever airspeed you brought with you — the
-opening shock is capped at six g, which is a hard one you walk away from — and
-then it is suddenly very quiet.
-
-Under the canopy you sink at five and a half metres a second and fly forward at
-six and a half. What decides where you land is the wind gradient: at six hundred
-metres the canopy sees most of the wind the fire is being fanned by and you are
-largely a passenger, and down in the friction layer the wind is a third of that
-and the canopy is the faster of the two. So you do not pick your field from
-height. You pick it from two hundred metres, and you spend the rest getting near
-it. Over Šibenik that matters, because two thirds of what you can drift over is
-the Adriatic, and a canopy in the water is a net with you under it.
-
-**Where you land is where you carry on.** Touch down on dry ground and the game
-puts you on your feet on the spot, first person, and the mission goes on without
-your aeroplane. Inside the wire at Rokići that is the aerodrome, buildings solid
-and crew and all; anywhere else in the hundred and sixty-nine square kilometres
-it synthesises a locale around wherever you came down — a kilometre and a half
-of open country, heights straight off the DEM. So you can put the thing down on
-the shoulder above Jadrija and walk to the water.
-
-And on the Jadrija waterfront itself, you land in a place that was built to be
-stood in — see below.
-
-Once the canopy has taken air, you live. Five and a half metres a second is a
-heavy step off a wall, and the water is the August Adriatic a few hundred metres
-off a beach with three other aircraft and a lookout who all watched you go — you
-are in a lifejacket and there is a boat. Coming down in the channel loses you
-the mission, not your life. The one thing that still kills you is leaving too
-low for the cloth to open at all, and the toast says so as you go.
-
-`SPACE` is the flare and there are about two seconds of it. It is a garnish:
-you never need it, because an untouched canopy already puts you down safely.
-Sit on it and you stall the canopy and come down half again as fast, which is
-now merely undignified.
-
-### Jadrija
-
-Four hundred metres of the real shore, hand-built rather than generated, because
-the two are for different distances. Everything else here is authored to be flown
-over: from three hundred metres a roof is a coloured quadrilateral and that is
-the correct amount of roof. From 1.62 m it is a grey box with black rectangles
-painted on it.
-
-What makes Jadrija Jadrija is not its houses, it is its concrete. Three bathing
-terraces stepping down to a quay wall, ladders bolted into the coping, steps into
-the sea, a jetty out over the water for the taxi boat from Šibenik — and behind
-them the *kabine*, the rows of little wooden changing huts that have stood on
-that shore since the 1920s and are a protected monument. They are joined side by
-side under one roofline with a door apiece, and no two are the same colour.
-
-Behind them the village: 169 real footprints, taken out of the town and built
-again with the things that stick out — a stone plinth, an overhanging pantile hip
-with a fascia under it, window surrounds with sills and jambs, shutters two in
-five of which are closed against the afternoon, chimneys, and a first-floor
-terrace on whichever side faces the water. Same outlines and heights OSM has;
-nothing invents a building that is not there.
-
-And it is the sixth of August, so there are people on it. Parasols and loungers
-on the middle terrace, bathers sitting on the lowest step with their feet over
-the water, somebody halfway down a ladder, families on the promenade, dinghies on
-their moorings off the shelf. Behind the huts there are Aleppo pines drawn the
-way one looks from underneath rather than from three hundred metres — a bare
-leaning trunk and a flat broken umbrella you can see sky through — with olives,
-oleander along the back of the walk, and agave out on the rough slope where the
-concrete stops. Nothing here animates: at the two distances Jadrija is ever seen
-from, a still figure in a plausible pose is a person, and thirty of them are a
-beach.
-
-The whole resort is laid out in a frame that follows the water's edge — metres
-along the shore, metres inland — and that edge is traced from the sea mask when
-the world loads rather than typed in, so it cannot drift off the coast if the
-terrain is ever re-baked. It is the same shape of frame the aerodrome uses, which
-is what lets the on-foot mode walk here without knowing where "here" is. You can
-walk 135 m inland, and the huts and every house are solid.
-
-### The boat to Šibenik
-
-At the head of the Jadrija mole there is a boat lying alongside with her engine
-ticking over: fifteen and a half metres of wooden Dalmatian passenger boat,
-white with a dark strake along the sheer and a gold line under it. Walk out to
-her and press `E`, and she takes you to Šibenik.
-
-**It is the one thing in this game that is not the fire.** You do not steer her
-— a scheduled boat is not a vehicle you are given, it is a vehicle you are on —
-and there is nothing to do for the next nine and a half minutes except walk her
-deck and look at where you are. Which is the point: everything the rest of the
-game is flown over at three hundred metres goes past at eye height.
-
-The route is not drawn by hand. It is a minimum-clearance path through the same
-land-cover raster the fire reads its fuel from, run from the mole to the town
-quay and then smoothed — thirty-one waypoints, 4 469 m, eight to thirty-five
-metres of water under it the whole way. It leaves Jadrija to the south, rounds
-Rt Jadrija with the lighthouse 184 m to port, passes **Tvrđava svetog Nikole**
-104 m to starboard — the sixteenth-century artillery fort on its islet, and that
-is the hand it passes on coming in from the sea — turns up into **Kanal svetog
-Ante**, runs the narrows where there are two hundred metres of water and karst
-both sides, and comes alongside the riva at Šibenik eighty-six metres from the
-cathedral. She heels and pitches on the actual wave surface, sampled at her four
-corners.
-
-`E` again gets you off her: at Šibenik that is the gangway and you carry on on
-foot under the cathedral; anywhere else on those four and a half kilometres it
-is over the side, and you are swimming. The fire does not spread while you are
-aboard — a side quest that ends your mission from somewhere off the fortress,
-every time, is a way of losing rather than a thing to do.
-
-### On foot
-
-Once the front is within spotting range of the airfield, Rokići starts taking
-embers and calls it in. Put the gear down, land on the runway, taxi to the apron
-and stop, and the game offers you the door.
-
-The aerodrome buildings are solid — the terminal, both hangars, the tower and
-the fuel farm, tested against the nose, the tail and both wingtips. Under
-22 m/s you scrape one and stop; above it you have hit a building. Nothing else
-in the world is solid: the town is thirteen thousand extruded OSM footprints
-whose heights were guessed from their outlines, and making those solid would
-turn every low pass over Šibenik into a crash on a building that was never
-really there.
-
-People are solid too, on foot. Anybody on their feet holds you off at sixty
-centimetres; anybody who is down does not, because a body on the ground is knee
-height and you have to be able to stand over the person you are putting out. You
-are never displaced by a person — only your own input moves you — so a burning
-runner can be cornered and held, and sixty centimetres is point blank for the
-branch, but a crowd can never shove you into a wall.
-
-What is on the other side of it is a different game: a branch instead of six
-tonnes, a jet that reaches twenty metres instead of a drop that covers two
-hundred, four hundred litres at a time instead of six thousand, and a walk back
-to the aeroplane every forty-three seconds to refill off the tank. What burns is
-drums, crates, a fuel bowser, tugs, three light aircraft — and some of the ground
-crew, who are alight and running, which is what people do and is the worst
-possible thing to do. You soak them and they go down and they are safe — and
-then they get their breath back, stand up, turn round to whoever put them out
-with a hand raised, and jog off to the muster point. Be slow and they collapse;
-be slower and you lose them.
-
-None of it is scripted. Leave the airfield alone for three minutes and five
-objects and three of the seven crew are gone, whether or not you were ever
-there. The runway is a firebreak, because that is half of what a runway is.
-
-**Press `0` to skip the whole approach.** It lights the field, puts the
-aeroplane on the apron and opens the door, in one key — because the ground
-mission otherwise sits behind twenty minutes of flying, a spot fire that has to
-find the airfield on its own, and a landing, and that is a ridiculous thing to
-ask of somebody who just wants to see whether it is any good. Your tank comes
-with you. `E` gets you back in, and you can take off again from where you are
-parked. On a phone there is no `0` to press, so
-[**`?ground`**](https://flamme-retarde.edeliverables.com/?nointro&ground) does
-the same thing as a link.
-
-**What stops you on foot** is not the same list as what stops the aeroplane.
-Walking, everything you can reach is solid: the houses and trees at Jadrija, and
-now the benches, loungers, parasol poles and everybody standing or sitting on
-the concrete. Land anywhere else by parachute and the locale synthesised around
-you takes its walls straight from the city's own footprints — every building
-within the 780 m you are allowed to walk, which in the densest part of the old
-town is a little over eight hundred of them.
-
-And you cannot walk on the sea. The open-country locale used to clamp your
-height to the waterline and say nothing about whether you might stand there, so
-you could set off across the channel; now the shoreline is a limit you slide
-along rather than a surface you cross. The trees at Jadrija are squared off to
-the trunk rather than the crown, on the grounds that being stopped by foliage
-two metres above your head is worse than walking through it.
-
-**On a phone or a tablet**, drag anywhere on the left half to fly — the stick
-appears under your thumb wherever you put it — and the throttle is the lever on
-the right. `SCOOP` and `DROP` are held, not tapped. `LVL` latches. Landscape.
-On foot it is the same two halves meaning the opposite thing in both: the left
-thumb walks, the right half of the screen is a head, and `WATER` is held.
-
-**Languages: English, Croatian, French**, switchable in the settings panel at
-any time, including mid-flight. It starts in whichever of the three your
-browser asks for, and English otherwise.
-
-**The cinematic plays once.** The first time you open the game, **Take off**
-plays it, because that is what it is for. After that the button goes straight to
-the aeroplane and a **Watch the intro** button appears beside it, so a fourth
-attempt at the same fire is not a fourth viewing of the same thirty seconds.
-Remembered in `localStorage`; skipping it counts as having watched it.
-
-`?nointro` skips the cinematic. `?ground` starts you on foot at Rokići with the
-apron alight. `?q=low|mid|high` forces a detail level. `?touch` / `?notouch`
-force the control scheme.
-
----
+Land at **Rokići** and get out, and the game becomes a walk. **Jadrija** is a
+real beach across the channel: kabine, a promenade, seven businesses down the
+front, sunbathers, a dog, a cat, a woman carrying water. The **vikendica** is a
+real flat you can go inside. From the head of the mole a **passenger boat**
+runs to Šibenik — nine and a half honest minutes at 15.6 knots, or press `T`
+and let the passage run itself at eight times while you walk her deck.
 
 ## How it is made
 
-**Everything you fly over is derived from public data.** Elevation comes from
-AWS Terrarium tiles (RGB-packed metres, z=14); the coastline, land cover,
-building footprints, roads and landmark positions come from OpenStreetMap via
-Overpass. `tools/bake.py` turns 17 MB of that into a 6 MB payload: a 2048²
-height field encoded 16-bit across the red and green channels of a PNG, a cover
-raster, and gzipped JSON for the town. The browser decodes the PNG through a
-canvas and the JSON through `DecompressionStream`. Nothing is fetched at run
-time.
+**Everything you fly over is derived from public data.** Elevation from AWS
+Terrarium tiles; coastline, land cover, footprints, roads and landmarks from
+OpenStreetMap via Overpass. `tools/bake.py` turns 17 MB of that into a 6 MB
+payload — a 2048² height field packed 16-bit across two channels of a PNG, a
+cover raster, and gzipped JSON for the town. The browser decodes it locally.
+Nothing is fetched at run time.
 
 **Every building has openings, and none of them are geometry.** Windows, doors,
 sills, lintels, shutters and a string course at each floor line are all
-fragment-shader tests — which is the only way thirteen thousand buildings can
-afford a facade. The wall carries two numbers in the one spare UV the shared
-material already had: metres along the frontage, run cumulatively so a wall that
-OSM happens to have split into three nodes keeps one window rhythm, and metres
-above that building's *own* doorstep, so a house on a hillside takes its floors
-from its own ground line rather than from sea level. The wall's height rides in
-the same float, because a window may only be drawn where the whole storey it
-belongs to actually exists — otherwise the roofline slices the top row in half.
+fragment-shader tests — the only way thirteen thousand buildings can afford a
+facade. The wall carries metres along its frontage and metres above that
+building's *own* doorstep, so a house on a hillside takes its floors from its
+own ground line rather than from sea level.
 
-**The town is 13 343 real footprints, and OSM knows more about them than a
-height.** 2 456 carry a roof shape, and 82% of those are hipped — so the roofs
-are hipped, gabled, flat with a parapet, pyramidal, skillion and barrel as
-tagged. The 11 234 that say nothing are not given a default: they are drawn
-from that distribution, conditioned on how narrow and how hemmed-in the
-footprint is, because a continuous terrace on a narrow plot is gabled where a
-detached villa is hipped on all four sides. Tagged colours win over the
-palette.
+**All the sound is synthesised or recorded here.** The engines, the water, the
+voices and the animals are built in `src/80-audio.js` out of oscillators and
+filters; the beds are field recordings made at Jadrija in August 2026.
 
-**The roads are the ones in the data**, 292 km of them, draped on the terrain
-and mitred through the bends. Water crossings are still cut rather than laid
-flat on the sea — a bridge deck is geometry, not a ribbon — and now the one
-crossing that matters is that geometry.
-
-**There is a railway, and something running on it.** The Knin–Šibenik line:
-single track, unelectrified, down the valley from Perković to a terminus on the
-waterfront, with the freight branch out to Ražine. 44 ways, 24.3 km, straight
-from Overpass. Ballast and shoulders are a draped ribbon like a road; the two
-rails are laterally shifted copies of the same run at 1 435 mm gauge, because
-through a curve the offset has to be perpendicular at every sample and that is
-not the same thing as sliding a texture sideways. The sleepers are a shader
-stripe on 600 mm centres. A four-car set works the longest stretch of running
-line, decelerating into each end, waiting, and going back — a terminus branch
-has nowhere else to be.
-
-**The traffic, the boats and the parasols are placed from the rasters**, not
-from OSM — cover says where the water is, the shore channel how far the
-waterline is, the urban channel where people are. They are there for scale: a
-four-metre car is the only object in the scene that reads as *small*. There are
-no people out there, because from a hundred metres a person is one pixel and a
-parasol is six, and they say the same thing. The only people modelled are the
-ones you can walk up to — the seven ground crew at Rokići and the ninety-two
-bathers at Jadrija — and you meet both from four metres away.
-
-**The fire is a cellular automaton on a 256² grid** that reads its fuel from the
-land cover — bare limestone is the natural firebreak, maquis is the reason the
-whole coast goes up. Spread is driven by wind, slope (fire runs uphill, because
-flames preheat the fuel above them), moisture and fuel load, and embers spot
-downwind. The old town is unreachable by ground from the ignition point; the
-only way the cathedral burns is by spotting across the channel, which is what
-the whole mission is really about.
-
-**The vegetation is placed from the same cover map the fire reads**, so a tree
-standing in a burning cell is a tree standing in a burning cell — it chars and
-shrinks as its cell's fuel goes. Aleppo pine, cypress, olive and maquis scrub,
-generated per 512 m tile from a positional hash so a tree is always in the same
-place, repacked into four instance buffers. There is no L-system and no
-imported model: a tree is a stack of rings lofted into a tube, and 356
-triangles is the entire flora of Šibenik. **[How a tree is
-drawn](docs/how-a-tree-is-drawn.pdf)** works through the whole of it — the ring
-equation and why its frequency is deliberately not an integer, the four species
-profiles, and the per-instance and per-frame terms.
-
-**There are gulls, swifts and hooded crows**, which on this coast in August is
-the honest list. They fly differently from one another in the ways you would
-notice from a boat — the gulls soar and wheel and a third of them are sitting on
-the water, the swifts flicker around the roofs of the old town, the crows beat
-steadily inland — and they react: a Canadair at ninety metres a second puts
-everything within two hundred up off the water, and nothing stays over a cell
-that is alight. Their calls are synthesised the same way the cicadas are and
-panned by where the bird actually is. The whole flock is two instanced draws.
-
-**The five landmarks are modelled in Blender** — St James' Cathedral, the
-fortress of St Nicholas, the fortress of St Michael, the Jadrija lighthouse, and
-the **Šibenik bridge**: 390 m overall on a single concrete arch of 246 m with the
-deck 33 m above the Kanal svetog Ante, which is the clearance the channel needs
-for anything going up the Krka. It was one of the longest concrete arches in the
-world when it opened in 1966. The 390 m is not a guess — OSM way 70310004 is
-tagged `bridge=yes` and measures 389 m in the game's frame, which is exactly
-where it is placed. It is the one landmark positioned from coordinates rather
-than a name, because a span has two ends and no centroid worth naming, and the
-one placed at absolute height rather than on the ground, because the ground
-under the middle of it is forty metres of seabed.
-
-All five are baked to a small binary blob (position, normal, colour, index) so there is
-no glTF parser in the bundle. `tools/blender/landmarks.py` builds them
-procedurally with bmesh and leaves `build/landmarks.blend` behind for hand
-editing.
-
-**The sixth Blender model is a person.** `tools/blender/firefighter.py` builds
-the aerodrome ground crew you go in after on foot: limbs lofted from stacked
-superelliptical rings so a thigh tapers to a knee, two-segment arms and legs
-with balls on the joints, a helmet with a brim and a nape flap, a line pack,
-gloves and reflective banding. It exports a **version 2** blob that adds a
-parts table — name, parent, pivot, vertex and index ranges — so the runtime can
-hang it off a tree of eleven joints and animate it. There is still no skinning
-solver and still no glTF: somebody in heavy kit reads as rigid pieces anyway,
-and the reader is thirty lines.
-
-**The seventh and eighth are the Jadrija bathers.** `tools/blender/bather.py`
-builds a man and a woman from the same code, differing in shoulder width, hip
-width, waist and whether there is a top — on the *same eleven joints under the
-same names* as the ground crew, which is what lets one walk cycle drive both
-casts. Height is not baked: the canonical figure is 1.70 m and the runtime
-scales per instance, which is also where the children come from.
-
-Their vertex colours are not colours. Skin is painted pure white, swimwear pure
-black and hair pure red — three markers the shader recognises and replaces per
-figure, so two meshes are a beach of different people instead of a rack of the
-same doll. `src/42-crowd.js` draws them as one instanced layer per rig part,
-posed off a single scratch skeleton that is re-posed for each figure and read
-out into the instance buffers: ninety-odd people for twenty-two draw calls and
-no per-figure Three.js objects at all. Twenty-seven of them walk the promenade,
-pause, turn at the end of their beat, and step around you rather than through
-you.
-
-Everything else — the aircraft, the town, the sea, the sky, the fire, the
-water — is generated in code.
-
-**Shadows** are two orthographic cascades, hand-rolled because three.js's own
-pass wants standard materials and every surface here is a custom shader. Depth
-is packed into RGBA8 so it works without float-render support, and each cascade
-snaps to its own texel grid so the edges do not crawl as you fly.
-
-The far one is 900 m across and follows the aircraft — 44 cm a texel, which
-draws an aeroplane and a hangar and is incapable of anything smaller. The near
-one is 110 m across and follows the *camera*, at 5.4 cm, and it is the reason
-anything you can walk up to is attached to the ground instead of hovering over
-it. The two are crossfaded rather than switched, or the boundary is a seam
-sweeping across the ground as you walk. Everything small — cars, boats,
-parasols, the bathers, the ground crew — is registered into the near cascade
-alone: what a car writes into the far map is a speckle, and there are three
-thousand of them.
-
-**The sea** is a camera-centred grid with a radial exponential warp, so the
-triangles are dense at your feet and kilometres wide at the horizon, and the
-noise detail is chosen per-pixel from `fwidth` rather than per-vertex.
-
-**The audio is synthesised**, all of it: pink noise shaped into engine and
-airflow beds, blade-pass oscillators at four times shaft speed, inharmonic bell
-partials for the bomblets, and a convolution reverb whose impulse response is
-built at load time from a few discrete slap-backs off the hillsides plus a
-decaying noise tail.
-
-**The intro panels are painted.** Ten of them, generated with Gemini 2.5 Flash
-Image from the reference photographs, cross-fading over the live 3-D on a slow
-push, so the film cuts between painting and engine. `tools/gen_panels.py`
-regenerates them; the prompts are in the file.
-
-**Nothing warns you about the ground unless it should.** There is a real ground
-proximity system — a radio-altimeter tick that speeds up as the ground comes
-up, SINK RATE for a descent too steep for the height, and the swept PULL UP
-whoop when the terrain *ahead* is going to win rather than the terrain below.
-All of it inhibits itself the moment the scoop conditions are met, because being
-five metres over the sea is the job and an alarm you hear on every fill is an
-alarm you stop hearing.
-
-![St James](docs/02-town.png)
-
----
+**The source is `src/NN-*.js`**, concatenated in filename order into one IIFE by
+`build.py`. There is no module system and no bundler. `tools/` holds the
+pipeline: the data bake, the Blender rigs, the field-recording cuts.
 
 ## Building it
 
-Playing needs nothing. Rebuilding `flamme-retarde.html` needs Python 3:
+Playing needs nothing. Rebuilding needs Python 3:
 
 ```sh
-python3 build.py          # concatenate src/, inline the payload, deploy
+python3 build.py          # concatenate src/, inline the payload, write the HTML
 ```
 
-`build.py` downloads and rewrites Three.js into `vendor/` on first run, runs
-`node --check` on the concatenated app before shipping it, and writes the single
-HTML file.
+`build.py` fetches and rewrites Three.js into `vendor/` on first run, runs
+`node --check` on the concatenated app before shipping it, and replaces the
+output with a visible **BUILD FAILED** page if that check does not pass — so a
+stale bundle can never be served as if it were fresh.
 
-`VERSION` and `BUILD_DATE` at the top of `build.py` are stamped into the page:
-top right of the title screen, at the foot of the settings panel, on the console
-at boot, and into a `<meta name="version">` near the top of the file — so a
-deployed page can be identified without downloading ten megabytes of it:
+`VERSION` and `BUILD_DATE` at the top of `build.py` are stamped into the page,
+including a `<meta name="version">` near the top of the file, so a deployed page
+can be identified without downloading ten megabytes of it:
 
 ```sh
 curl -sr 0-800 https://flamme-retarde.edeliverables.com/ | grep 'name="version"'
 ```
 
-They are constants rather than `git describe` and today's date on purpose. An
-unchanged tree rebuilds byte-for-byte identically, which is what makes comparing
-checksums a real check that the server has what the repo has. Bump them by hand
-when cutting a release.
+They are constants rather than `git describe`, so an unchanged tree rebuilds
+byte-for-byte identically.
 
-To regenerate the world from scratch (needs network, and is slow):
+### The two small servers
 
-```sh
-python3 tools/fetch_dem.py     # AWS Terrarium elevation tiles
-python3 tools/fetch_osm.py     # Overpass: coastline, landcover, buildings, roads
-python3 tools/bake.py          # -> build/payload
-```
+Neither is needed to play. [`server/auth/`](server/auth/) is the sign-in that
+gates the laptop in the vikendica; [`server/baye/`](server/baye/) is the voice
+service behind Baye and the cat.
 
-To rebuild the Blender models (needs Blender 4.x on `PATH`):
-
-```sh
-blender --background --python tools/blender/landmarks.py    # the five buildings
-blender --background --python tools/blender/firefighter.py  # the ground crew
-blender --background --python tools/blender/bather.py       # the Jadrija bathers
-```
-
-Add `-- --preview` to `bather.py` for four turntable renders of each figure into
-`/tmp/bathers`. Worth it: the markers mean a bather looks nothing like itself in
-Blender's viewport, and the preview substitutes plausible colours so form can be
-judged.
-
-To retypeset [the vegetation note](docs/how-a-tree-is-drawn.pdf) (needs Chrome
-or Chromium on `PATH` — it is MathML printed headless, there being no LaTeX in
-this toolchain):
-
-```sh
-python3 tools/gen_tree_doc.py              # -> docs/how-a-tree-is-drawn.pdf
-```
-
-Its figures are computed from the ring tables rather than drawn, so they follow
-a change to the profiles instead of quietly going stale. `--html-only` skips
-the render and writes the page beside the PDF.
-
-To regenerate the intro panels (needs `GEMINI_API_KEY` and the reference
-photographs, which are not in this repository — see `refs/README.md`):
-
-```sh
-python3 tools/gen_panels.py
-```
-
-`tools/shoot.mjs` drives a software-GL headless Chrome over CDP to capture
-frames, and `window.__fr` exposes hooks for it — including `fastForward(secs)`,
-which steps the simulation without rendering.
-
-### Recording what you played
-
-`tools/record.mjs` films the vikendica cutscene by holding its clock and
-scrubbing it frame by frame, which only works because a cutscene is a function
-of time. Gameplay is a function of the mouse, so it is recorded rather than
-reconstructed: `L` starts a `MediaRecorder` over the canvas and `L` again stops
-it and drops the whole take into your downloads as a `.webm`, with the game's
-own sound in it. One key, both ends. Takes are arbitrary length —
-one deck, never recycled, never cut, so what comes out is a complete file
-Chrome wrote itself; there is a half-hour ceiling, and it stops and says so
-rather than dropping the beginning, because a WebM missing its head decodes
-wrong instead of failing. There is a `REC` indicator in the bottom right corner
-whenever it is armed, because the failure this prevents is playing for twenty
-minutes with the recorder switched off.
-
-It was a ten-second rolling buffer until 23 Aug 2026 — the idea being that you
-could keep a thing after it had happened rather than before. What that could
-not do is film a demo.
-
-What it films is the canvas, so the HUD, the toasts and the indicator itself
-are never in the clip.
-
-```sh
-node tools/clip.mjs ~/Downloads/fr-clip-20260821-113044.webm --out frames
-```
-
-turns one of those into `frames/%05d.png` at 848x480 and 16 fps — the last ten
-seconds of it, centre-cropped to the target aspect rather than squashed to it —
-which is what `tools/vacejob.py --frames` wants. It writes the trimmed sound
-alongside as `frames-audio.m4a` and prints the two commands that come next.
-
-Changes are tracked in [CHANGELOG.md](CHANGELOG.md).
-
----
-
-## Signing in, and Baye's voice
-
-Most of the game needs nothing but a browser. Two things need a session: the
-laptop at Jadrija, which talks to a private model on a GPU box, and Baye, who
-talks to you.
-
-It is **one** sign-in. The credential is `ablit_session` — an HMAC-signed,
-httponly cookie, good for seven days, minted by **one service on one machine**
-and merely verified by everything else. The title screen's `sign in` link and
-the laptop's own form post the same body to the same endpoint and get the same
-cookie back, so doing it once does it everywhere: sit down at the Alienware
-afterwards and the prompt is already blinking.
-
-All three back ends are reached **same-origin**, through Apache, and that is not
-tidiness. A cross-site fetch to any of them dies at CORS, and the session cookie
-would not survive the trip. So `/auth/` proxies the sign-in, `/abl/` proxies the
-model and `/baye/` proxies the voice, and the browser only ever sees one origin.
-Off the deployed site — a `file://` copy, a local server — there is no proxy and
-nothing to talk to; the sign-in sheet says so, the laptop says so, and Baye is
-simply quiet.
-
-### `server/auth/`
-
-**The thing that mints identity must not live on the thing that moves.** That is
-the whole design, and it was written the day after the alternative cost an hour.
-
-Until 1.270.0 `share_chat.py` both *was* the chat app and *minted* the cookie, so
-identity followed the GPU box — alien18, then auroraR16, then a Lambda burst on
-whatever region was cheapest that hour. On 4 Sep 2026 it landed on a host whose
-`.env` had no `SESSION_SECRET`, and it invented a random one at startup. It then
-verified its own cookie perfectly and **nothing else on earth could**. The game
-said "rejected — check the user and the password". The password was right.
-
-The same mistake wore a second hat: `conf/users.conf` existed on three machines
-and only one counted, so `./bin/adduser` on the wrong box was a silent no-op.
-
-| | |
-|---|---|
-| `auth.py` | the service — the only mint, the only `users.conf`, the only `SESSION_SECRET` |
-| `authuser` | add or change a password, and refuse to do it on the wrong machine |
-| `flamme-auth.service` | systemd unit; binds `127.0.0.1:8792` on mpcn0 |
-| `flamme-auth-tunnel.service` | `ssh -R` out to the web host, where Apache proxies `/auth/` |
-| `selftest.py` | boots it against a throwaway config and mints a real session |
-| `selftest-client.mjs` | runs `src/47-auth.js` itself against that service, both doors |
-| `share_chat.py.patch` | the ablit-central half — verify only, never mint |
-| `CUTOVER.md` | the runbook: what breaks at each step, how to undo it |
-
-Four routes. `GET /auth/health` needs no session and names no user. `GET
-/auth/whoami` answers **200 with `user: null`** when you are signed out rather
-than 401 — deliberately unlike `/baye/whoami`, because the browser has to tell
-three states apart (signed in, signed out, *not deployed here*) and the third one
-is an Apache 404. `POST /auth/password` takes the same form body the old endpoint
-took and answers a 302 to a browser or JSON to a `fetch` that asks for it.
-`GET /auth/logout` clears the cookie — and also the old host-only one, which
-nothing else can reach. `GET /auth/login` serves the standalone form, and the
-Google flow moved here too, off by default until its redirect URI is
-re-registered.
-
-**The cookie is `Domain=.edeliverables.com`**, where the old one had no domain at
-all. That widening is what makes the split work: the sign-in is served from
-`edeliverables.com`, but the chat app the session is *for* answers on
-`abliterated.edeliverables.com`, which is a CNAME to ngrok on a different
-machine, and a host-only cookie is never sent there. The cost is that every
-`*.edeliverables.com` host now receives the cookie — all of them the same
-operator's Apache on the same droplet — so a break-in there widens from "the
-site" to "the site plus the chat app", and no further. `HttpOnly` still means an
-XSS cannot read it, and every reader in the system now tries **all** the
-`ablit_session` values it is sent and takes the first that verifies, so a
-shadowing cookie from a sibling subdomain can annoy but cannot lock anybody out.
-That last change is also what carries already-signed-in browsers through the
-cutover, when they legitimately hold two.
-
-**Passwords.** `pbkdf2_sha256$200000$salt$hash`, one line per user, the format
-`bin/adduser` has always written — so the existing file was copied across
-verbatim and every password that worked the day before worked the day after. An
-unknown username costs the same 60 ms as a known one, so there is no timing
-oracle for who is on the list, and three throttles sit in front of all of it: per
-IP, per username, and a global cap that exists because 200k PBKDF2 rounds is 60 ms
-of a 4-vCPU box that also runs Baye.
-
-**Where it runs.** mpcn0, bound to `127.0.0.1` and nothing else — the same
-machine and the same reason as `baye.py` below, and deliberately the least
-capable machine involved, because nobody is ever tempted to move it.
-
-### `server/baye/`
-
-A small service that turns game state into a sentence and an mp3.
-
-| | |
-|---|---|
-| `baye.py` | the service — session check, world feeds, model, speech |
-| `baye.service` | systemd unit; binds `127.0.0.1:8791` on mpcn0 |
-| `baye-tunnel.service` | `ssh -R` out to the web host, where Apache proxies `/baye/` |
-
-**Why the tunnel.** mpcn0 has no inbound port open to the internet except 22.
-`ss` shows Caddy listening on 443 and `ufw` allows it, but from outside that
-port is *no route to host* — a DigitalOcean firewall above ufw. It is the same
-reason `abliterated.edeliverables.com` is an ngrok tunnel and not an A record.
-So the service does not listen publicly: it dials out, and the web host proxies
-to the port that arrives on its own loopback.
-
-**What it does with a request.** Verifies the cookie (`webauth.unsign`, the same
-module and the same `SESSION_SECRET`, imported from the checkout next door
-rather than reimplemented so the two cannot drift). It never mints one — since
-1.270.0 only `flamme-auth` does. Rate-limits per user.
-Assembles the moment — where you are, what phase, what you have seen, plus three
-live feeds — and asks `gpt-5.6-luna` for one line in her register. Sends that
-line to ElevenLabs as Jessica (`LEnmbrrxYsUYS7vsRRwD`), the voice and the four
-dials ablit-central reads its own replies in. Hands back text and audio.
-
-The feeds run on their own clocks in a background thread and are **never awaited
-by a request**: Open-Meteo for air and sea temperature and wind at Jadrija's own
-coordinates, CoinGecko for BTC and ETH, Brave for world and Croatian-local
-headlines. A feed that is down leaves its slot empty and she talks about
-something else, which is correct for a beach — a line that arrives ten seconds
-late because CoinGecko was thinking is worse than a line that does not mention
-bitcoin.
-
-**What the browser is not trusted with.** No key, no prompt, no model name. The
-page posts structured game state — numbers and short strings, every one clamped
-server-side — and never a prompt. The persona, the model, the voice and the
-token ceiling all live in `baye.py`. A modified client can lie about the
-altitude; it cannot make her say something else, and it cannot spend the OpenAI
-balance on anything but a line of Baye's dialogue.
-
-### Secrets
-
-None of them are in this repository, which is public.
-
-`SESSION_SECRET` lives in **exactly one place**: `/etc/flamme-auth/auth.env` on
-mpcn0 (`0640 root:unk1911` — the services run as `unk1911`, and `0600 root:root`
-means a service that cannot read its own key). Both `auth.py` and `baye.py` read
-that file at higher precedence than anything else and both re-read it when its
-mtime moves, so rotating the key is one file write that flips both services at
-the same instant with no restart. The chat app is the only piece that needs a
-restart, and it is the only piece on a machine that moves.
-
-`OPENAI_API_KEY` lives in `/etc/baye/baye.env`. `ELEVENLABS_API_KEY` and
-`BRAVE_API_KEY` are still read live out of ablit-central's `.env` — they are
-Baye's keys, not the system's identity, and nothing else depends on them.
-
-### Installing it
-
-```sh
-scp server/auth/auth.py server/auth/authuser  mpcn0:~/flamme-auth/
-scp server/baye/baye.py                       mpcn0:~/baye/
-scp server/*/[bf]*.service                    mpcn0:/tmp/ && ssh mpcn0 '
-  sudo mv /tmp/*.service /etc/systemd/system/ &&
-  sudo systemctl daemon-reload &&
-  sudo systemctl enable --now baye.service baye-tunnel.service
-                              flamme-auth.service flamme-auth-tunnel.service'
-```
-
-The Apache side is one shared include, `/etc/apache2/flamme-backends.inc`,
-pulled into both the `edeliverables.com` and `flamme-retarde.edeliverables.com`
-vhosts — the same files are served under both names, and `/abl` was 404 on the
-main one until 1.168.0. It carries one `<Location>` per back end and no cookie
-rewriting at all, for reasons the file itself spells out at length.
-
-**Do not follow the block above blind.** `server/auth/CUTOVER.md` is the ordered
-version, with what breaks at each step and how to undo it; the sign-in is the one
-piece of this system where a wrong order locks everybody out.
-
-### Testing it
-
-`python3 server/auth/selftest.py` needs no mpcn0, no Apache, no tunnel and no
-network. It makes a throwaway config under `/tmp`, starts `auth.py` as a real
-subprocess, and asserts 30 things end to end — that it refuses to start on a
-missing or placeholder secret, that a good password mints a cookie with the
-right attributes, that the token verifies under `webauth` (which is to say
-`baye.py` will accept it), that a stale cookie sitting beside a good one still
-resolves, that `?next=` is not an open redirect, and that the throttle engages.
-
-`node server/auth/selftest-client.mjs` proves the half nothing else can: that
-`src/47-auth.js` — the real file, run through `new Function` with `fetch` and
-`location` stubbed, not a copy of its logic — picks the right door in all three
-states. It caught the first version building the sign-in URL as
-`base + '/auth/password'`, which is right for `/abl` and gives
-`/auth/auth/password` for the new service: a 404 the client would have reported
-as *rejected — check the user and the password*. The same lie, in a new place,
-in the release written to stop telling it.
-
-`tools/shoot.mjs --cookie ablit_session=<token>` sets a session before the first
-navigation, which is the only way a headless run can exercise any of this. Mint
-one on the box:
-
-```sh
-ssh mpcn0 'sudo -n python3 -c "
-import sys; sys.path.insert(0, \"/home/unk1911/ablit-central/bin\")
-import webauth
-env = dict(l.split(\"=\", 1) for l in open(\"/etc/flamme-auth/auth.env\")
-           if \"=\" in l and not l.startswith(\"#\"))
-print(webauth.make_session(\"unk1911\", env[\"SESSION_SECRET\"].strip()))"'
-```
-
-`curl -s https://edeliverables.com/auth/health` needs no session and reports how
-many users the one real `users.conf` holds. `curl -s
-https://edeliverables.com/baye/health` reports which of Baye's feeds are
-populated. Between them they answer "is it me or is it the system" in two
-commands.
+**No secret is in this repository, which is public.** `SESSION_SECRET` lives in
+exactly one place on the host, `0640 root:unk1911`, and both services re-read it
+when its mtime moves — so rotating it is one file write that flips both at the
+same instant with no restart. `OPENAI_API_KEY` has its own file; the ElevenLabs
+and Brave keys are read live from elsewhere and nothing here depends on them.
 
 ## Licence
 
-Two grants, because this is two things. The engine — `src/`, `tools/`, `build.py`
-— is **MIT**: take the terrain sampler, the collision solver, the synthesised
-audio graph, do what you like. The game itself — the prose, the worlds, the
-Blender models, the assembled `flamme-retarde.html` — is **CC BY-SA 4.0**, to
-match the open data it is built out of.
+Two grants, because this is two things. The engine — `src/`, `tools/`,
+`build.py` — is **MIT**. The game itself — the prose, the worlds, the Blender
+models, the assembled `flamme-retarde.html` — is **CC BY-SA 4.0**, to match the
+open data it is built out of.
 
-The third-party components below keep their own terms, and the intro panels are
-deliberately outside both grants — they are machine output painted from
+Third-party components below keep their own terms, and the intro panels are
+deliberately outside both grants: they are machine output painted from
 photographs that are not mine. [LICENSE](LICENSE) sets all of it out in full,
 including how to rebuild without the parts you may not want.
 
@@ -770,139 +136,55 @@ including how to rebuild without the parts you may not want.
 - Coastline, land cover, buildings, roads, landmarks: © OpenStreetMap contributors, [ODbL](https://www.openstreetmap.org/copyright).
 - [Three.js](https://threejs.org), MIT.
 - Intro panels generated with Google Gemini 2.5 Flash Image from reference photographs.
-- **The ambience**: recorded at Jadrija in **August 2026**, mine, no third-party
-  terms. Six field recordings became five mono clips in the payload, cut by
-  [`tools/cut_field.py`](tools/cut_field.py):
 
-  | clip | source | s | rate | kbps | KB |
-  |---|---|---|---|---|---|
-  | `shore.mp3` | the promenade, 13 Aug | 24.6 | 22 050 | 96 | 288 |
-  | `cicadas.mp3` | the hillside, 12 Aug | 10.1 | 24 000 | 96 | 118 |
-  | `wood.mp3` | inside the pines, 17 Aug | 68.1 | 24 000 | 96 | 798 |
-  | `lapping.mp3` | the pier, 16 Aug | 69.6 | 22 050 | 96 | 816 |
-  | `boat.mp3` | a boat off Šibenik, 17 Aug | 44.1 | 16 000 | 64 | 345 |
+**The ambience** — recorded at Jadrija in August 2026, mine, no third-party
+terms. Six field recordings became five mono clips (`shore`, `cicadas`, `wood`,
+`lapping`, `boat`), cut by [`tools/cut_field.py`](tools/cut_field.py): each
+trimmed to the window whose ends match best in level and spectrum so the loop
+seam is inaudible, notched and high-passed to remove a 117–120 Hz rumble, and
+levelled so nothing passes −0.6 dBFS peak. Distance, weather, walls and Doppler
+are applied live and none of it is baked in.
 
-  *Changes made*: each trimmed to the window whose two ends match best in level
-  and in spectrum, so the loop seam is inaudible; high-passed (180 Hz for the
-  promenade and the pier, 1.9 and 2.4 kHz for the two choruses, 45 Hz for the
-  boat) to take out a 117 Hz rumble that is the loudest single thing in three of
-  the six sources, and in the choruses the footfall of the walk they were
-  recorded on; the two choruses low-passed at 10.5 kHz and levelled to the same
-  −25.2 dBFS RMS so they crossfade without a step; nothing taken past −0.6 dBFS
-  peak. Distance, weather, walls and Doppler are applied live at run time and
-  none of it is baked into the files.
+**The birds** — eight species, seven of them other people's recordings:
 
-  Each window is as long as its source honestly gives, because a bed gives
-  itself away by having a period and not by having a join. The promenade
-  recording is 27.6 s end to end and 24.6 of it is here; the pier and the walk
-  through the pines run over a minute each. The hillside chorus is the exception
-  and cannot be helped: it is in the first twelve seconds of that recording and
-  the other twenty-nine have no chorus in them at all, so that clip is ten
-  seconds and the game plays it on two playheads at rates 2.3 % either side of
-  one, which puts the pair's period at three and a quarter minutes instead of ten
-  seconds. The promenade gets the same treatment for the same reason.
+| clip | species | source | recordist | licence |
+|---|---|---|---|---|
+| `dove.mp3` | *Streptopelia decaocto* | recorded at Jadrija, 24 Aug 2026 | Misha | mine |
+| `crow.mp3` | *Corvus cornix* | [Corvus cornix.ogg](https://commons.wikimedia.org/wiki/File:Corvus_cornix.ogg) | Oona Räisänen (Mysid) | public domain |
+| `gull.mp3` | *Larus michahellis* | [Yellow-legged Gull.ogg](https://commons.wikimedia.org/wiki/File:Yellow-legged_Gull_-_Larus_michahellis_michahellis.ogg) | Cedric Mroczko | CC BY-SA 4.0 |
+| `swift.mp3` | *Apus pallidus* | [Cri de martinet pâle, Espagne.wav](https://commons.wikimedia.org/wiki/File:Cri_de_martinet_p%C3%A2le,_Espagne.wav) | Xavier Riera | CC BY-SA 4.0 |
+| `beeeater.mp3` | *Merops apiaster* | [Bijeneter — Beeld en Geluid.ogg](https://commons.wikimedia.org/wiki/File:Bijeneter_-_SoundCloud_-_Beeld_en_Geluid.ogg) | Beeld en Geluid | CC BY-SA 3.0 |
+| `blackbird.mp3` | *Turdus merula* | [Common Blackbird song.ogg](https://commons.wikimedia.org/wiki/File:Common_Blackbird_song_(Turdus_merula).ogg) | Diana Tudor | CC BY 4.0 |
+| `swallow.mp3` | *Hirundo rustica* | [Barn Swallow XC468712.mp3](https://commons.wikimedia.org/wiki/File:Hirundo_rustica_-_Barn_Swallow_XC468712.mp3) | Marie-Lan Taÿ Pamart | CC BY-SA 4.0 |
+| `wagtail.mp3` | *Motacilla flava* | [Western Yellow Wagtail XC436362.mp3](https://commons.wikimedia.org/wiki/File:Motacilla_flava_-_Western_Yellow_Wagtail_XC436362.mp3) | Joost van Bruggen | CC BY-SA 4.0 |
 
-  Engines, water, fire, footsteps, the crowd and three radio stations are still
-  synthesised from oscillators and noise at run time and owe nobody a credit.
-  The recorded clips that are *not* mine are the bead curtain, the off-air
-  radio and the eight bird calls below; [LICENSE](LICENSE) section 3 sets out
-  each of them.
-- **The birds**: eight species, seven of them other people's recordings. Misha
-  named them on 25 August 2026, having heard the lot from the vikendica that
-  morning. The collared dove is his own recording and is cut by
-  `tools/cut_field.py` with the rest of the ambience; the other seven come from
-  Wikimedia Commons and are cut by
-  [`tools/cut_birds.py`](tools/cut_birds.py), which fetches each source from
-  Commons on first run rather than committing 7 MB of somebody else's audio.
+**The cat**: [*cat*](https://www.meshy.ai/3d-models/cat-01979f8f-28e0-785a-bb0d-1828950e2725)
+by **hsunq2007**, generated with [Meshy](https://www.meshy.ai) and published
+there under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). A
+*generated* mesh, said plainly rather than left to be noticed —
+[LICENSE](LICENSE) section 3 sets out why that is worth distinguishing from the
+CC0 dog even though the licence is the same.
 
-  | clip | species | source | recordist | licence |
-  |---|---|---|---|---|
-  | `dove.mp3` | *Streptopelia decaocto* | recorded at Jadrija, 24 Aug 2026 | Misha | mine |
-  | `crow.mp3` | *Corvus cornix* | [Corvus cornix.ogg](https://commons.wikimedia.org/wiki/File:Corvus_cornix.ogg) | Oona Räisänen (Mysid) | public domain |
-  | `gull.mp3` | *Larus michahellis* | [Yellow-legged Gull — Larus michahellis michahellis.ogg](https://commons.wikimedia.org/wiki/File:Yellow-legged_Gull_-_Larus_michahellis_michahellis.ogg) | Cedric Mroczko | CC BY-SA 4.0 |
-  | `swift.mp3` | *Apus pallidus* | [Cri de martinet pâle, Espagne.wav](https://commons.wikimedia.org/wiki/File:Cri_de_martinet_p%C3%A2le,_Espagne.wav) | Xavier Riera | CC BY-SA 4.0 |
-  | `beeeater.mp3` | *Merops apiaster* | [Bijeneter — SoundCloud — Beeld en Geluid.ogg](https://commons.wikimedia.org/wiki/File:Bijeneter_-_SoundCloud_-_Beeld_en_Geluid.ogg) | Beeld en Geluid | CC BY-SA 3.0 |
-  | `blackbird.mp3` | *Turdus merula* | [Common Blackbird song (Turdus merula).ogg](https://commons.wikimedia.org/wiki/File:Common_Blackbird_song_(Turdus_merula).ogg) | Diana Tudor | CC BY 4.0 |
-  | `swallow.mp3` | *Hirundo rustica* | [Hirundo rustica — Barn Swallow XC468712.mp3](https://commons.wikimedia.org/wiki/File:Hirundo_rustica_-_Barn_Swallow_XC468712.mp3) | Marie-Lan Taÿ Pamart | CC BY-SA 4.0 |
-  | `wagtail.mp3` | *Motacilla flava* | [Motacilla flava — Western Yellow Wagtail XC436362.mp3](https://commons.wikimedia.org/wiki/File:Motacilla_flava_-_Western_Yellow_Wagtail_XC436362.mp3) | Joost van Bruggen | CC BY-SA 4.0 |
+**The dog**: [*Pug*](https://poly.pizza/m/1gXKv15ik8) by
+**[Quaternius](https://quaternius.com)**, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+CC0 asks for no attribution; this is here anyway.
 
-  *Changes made*: one call, one strophe or one twitter taken from each source by
-  hand; band-limited to what the species actually occupies (250 Hz–3.8 kHz for
-  the crow, 2.8–11 kHz for the wagtail, and so on) so that whatever else was in
-  the recording is not; 8 ms fades on both ends; levelled to −1.0 dBFS **peak**
-  rather than to a fixed RMS, because these are transients in silence at 14 to
-  22 dB of crest and a fixed RMS put six of the seven over 0 dBFS. All 58 KB of
-  them. Distance, direction, the lowpass that stands for air and the wall of the
-  vikendica are applied live and none of it is baked in.
+**The people**: every human figure is built on
+**[MakeHuman](http://www.makehumancommunity.org/)**'s base mesh and morph
+targets, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) per that
+project's `LICENSE.ASSETS.md`. Nothing of MakeHuman's is committed here —
+`tools/blender/mh_morph.py` fetches what it needs on first run. The rigs, the
+weights, the clips, the faces, the paint and the clothes are this project's.
 
-  Four of the eight sit still and are played from a fixed station behind or
-  beside the vikendica — the dove and the blackbird in the pines, the swallows
-  on the wire at the back of the plot, the wagtail down at the waterline. The
-  other four already flew over this map with a synthesised voice and now use
-  their own: gull, pallid swift, hooded crow and — new — bee-eater, all in
-  `src/44-birds.js`. Nothing about how they fly changed.
-- **The cat**: [*cat*](https://www.meshy.ai/3d-models/cat-01979f8f-28e0-785a-bb0d-1828950e2725)
-  by **hsunq2007**, generated with [Meshy](https://www.meshy.ai) and published
-  there under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
-  A *generated* mesh, said plainly rather than left to be noticed —
-  [LICENSE](LICENSE) section 3 sets out why that is worth distinguishing from
-  the CC0 dog even though the licence is the same. The source `.glb` is
-  committed at `tools/blender/assets/cat.glb`, and here the usual argument for
-  committing rather than fetching is not hypothetical: Meshy's download URL is
-  signed and expires within days, so there is no re-fetching it.
-  [`tools/blender/cat.py`](tools/blender/cat.py) turns it into
-  `build/payload/cat.fr3d.gz` — onto the game's +X, scaled on a real cat's
-  head-and-body length of 0.46 m (which puts its shoulder at 0.253 m, and a
-  domestic shorthair is 23–25 cm, so two dimensions agree off one factor),
-  dropped onto z = 0, decimated 10 000 → 4 200 triangles, and its 2048×2048
-  texture baked down to one colour per vertex and thrown away, because nothing
-  in this game samples a texture. It keeps its 27-bone armature and its walk
-  cycle, and lives under the slastičarnica's terrace tables.
-- **The people**: every human figure in the game — Chloe, Baye, the crew and
-  the twenty-seven bathers — is built on
-  **[MakeHuman](http://www.makehumancommunity.org/)**'s base mesh and its
-  morph targets, released under
-  [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) per
-  `LICENSE.ASSETS.md` in that project. Nothing of MakeHuman's is committed
-  here: `tools/blender/mh_morph.py` fetches `base.obj` and the `.target` files
-  it needs on first run, caches them under `build/`, and bakes a body as a
-  weighted sum — which is all MakeHuman itself is, one mesh plus several
-  hundred lists of per-vertex deltas. The rigs, the weights, the clips, the
-  faces, the paint and the clothes are this project's. CC0 asks for no
-  attribution; this is here anyway.
+**The sea, partly**: the whitecap and capillary work was done after reading
+**[ABYSSAL](https://github.com/Token-Gremlin/natural-disasters)** by **Davi
+(Token-Gremlin)**, MIT. No code was copied — what was taken is the *reasoning*,
+that folding alone leaves a wind sea glassy and steepness is the criterion.
 
-- **The dog**: [*Pug*](https://poly.pizza/m/1gXKv15ik8) by
-  **[Quaternius](https://quaternius.com)**, dedicated to the public domain under
-  [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). The source
-  `.glb` is committed at `tools/blender/assets/pug.glb` and
-  `tools/blender/dog.py` turns it into `build/payload/dog.fr3d.gz` — turned onto
-  the game's +X, scaled to 36 cm at the ears, dropped onto z = 0 and split along
-  its material seam so its two colours become vertex colours like everything
-  else here. CC0 asks for no attribution; this is here anyway.
-
-- **The sea, partly**: the whitecap and capillary work in 1.150.0 was done
-  after reading
-  **[ABYSSAL](https://github.com/Token-Gremlin/natural-disasters)** by
-  **Davi (Token-Gremlin)**, MIT-licensed — a procedural ocean and weather
-  simulation that solves several problems this sea had also been having, and
-  solves them better. No code was copied: the wave sum here is still six
-  Gerstner components rather than three FFT cascades, and the noise, the tiling
-  and the bake are this project's. What was taken is the *reasoning* — that
-  folding alone leaves a wind sea glassy and steepness is the criterion that
-  fires; that foam has to be integrated as a rate rather than snapped on; that
-  surface foam combs into downwind windrows and isotropic noise reads as wet
-  sand; that a capillary layer wants a mipped tile and not per-pixel noise —
-  plus a handful of its constants that there was no sense re-deriving, among
-  them the two tap rotations, the windrow stretch, and a baked normal slope of
-  0.030 that this project first got wrong by a factor of twenty-eight. MIT asks
-  for the notice only where code travels; this is here anyway.
-
-  It and the cat are the only *objects* in the game that were not authored for
-  it — the people are the base mesh above, given everything that makes them
-  people here. Everything else — four landmarks, the aeroplane, thirteen thousand
-  footprints, a hundred and sixty-nine square kilometres of karst — is built by
-  something in `tools/`, because all of it is *specific*. A dog on a beach is
-  not specific.
+The cat and the dog are the only *objects* in the game that were not authored
+for it. Everything else — four landmarks, the aeroplane, thirteen thousand
+footprints, a hundred and sixty-nine square kilometres of karst — is built by
+something in `tools/`, because all of it is *specific*. A dog on a beach is not.
 
 ## What actually happened
 
@@ -929,3 +211,5 @@ Reporting: [morski.hr](https://www.morski.hr/zaustavljena-buktinja-u-sibeniku-iz
 [ŠibenikIN](https://www.sibenik.in/crna-kronika/pozar-i-dalje-aktivan-no-pod-kontrolom-je-vatrogasaca-izgorjela-je-povrsina-od-oko-3-5-hektara/),
 [Index.hr](https://index.hr/vijesti/clanak/iznad-sibenika-izbio-pozar-blizu-kuca-je-cuju-se-detonacije-moze-biti-opasno/2588456.aspx),
 [N1](https://n1info.hr/vijesti/pozar-sibenik-06082024/).
+
+A full history of every release is in [CHANGELOG.md](CHANGELOG.md).

@@ -8,6 +8,1868 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.348.0] — 2026-09-06
+
+### a railing is not a wall and not a floor, so stop guessing its transform and measure it
+
+1.337.0 corrected the back lane's masonry and left `iron` and `steel` alone,
+with a note saying both were read in deep shade and owed a T_shade measurement.
+This is that measurement, and doing it properly meant discovering that T_shade
+is the wrong answer too.
+
+THE TARGETS, both from the frames. `iron` was re-measured off `w_004`, which
+has a dark horizontal-slat fence, a wheelie bin and a letterbox standing in one
+shadow: the fence reads 1.000:1.139:1.112 and the bin 1.000:1.000:1.108,
+agreeing on red-over-blue to within 0.4% across two different objects. That is
+the claim this file already made without a number — at near-black the whole
+reading IS the sky. (The letterbox comes back at 1.005 and is not used; it sits
+where the lane bounces light into it.) `steel`'s target is this file's own
+recorded reading, 26,38,36 against foliage at 53,60,57.
+
+THE FIRST CUT DIVIDED BY T_shade AND OVERSHOT BOTH. Iron landed at
+1.000:1.096:1.065 against a target of 1.112 in blue, steel at 1.000:1.361:1.242
+against 1.385. Same trap as the wall, one level down: these are not shaded
+faces. A railing is thin members catching light from every direction at once,
+and neither T_sun nor T_shade is its transform.
+
+So each element's OWN transform was measured, the same way the wall's was —
+build it flat, paint it (magenta for the ironwork, cyan for the painted steel),
+threshold an exact mask, and divide the rendered ratio by the albedo fed in.
+76,523 px of ironwork at t 218 and 3,421 px of steel at t 300:
+
+  iron   1.000:1.0395:1.1316  ->  1.000:1.115:1.249   T [1, 1.073, 1.104]
+  steel  1.000:1.5345:1.3966  ->  1.000:1.559:1.504   T [1, 1.016, 1.077]
+
+BOTH ARE LESS BLUE THAN T_sun, which is the giveaway: a member that sees the
+whole sky also sees the ground, and the ground here is terra rossa.
+
+                 shipped            T_shade cut        measured-T cut     the frames
+  iron   1.000:1.115:1.249   1.000:1.096:1.065   1.000:1.128:1.152   1.000:1.139:1.112
+  steel  1.000:1.559:1.504   1.000:1.361:1.242   1.000:1.478:1.407   1.000:1.462:1.385
+
+Steel is within 1.6% on both channels and iron within 1% in green. The
+"before" column was measured by serving 1.347.0's own committed HTML through
+the same masks, so no second build was needed for it.
+
+The lesson, written into the file: there is not one transform, and there are
+not two. There is one per surface-and-its-light, and the cheap way to get it is
+to divide what rendered by what you fed in.
+
+Census {seen:446, thin:333, plain:86, rich:27}, blockers 818.
+
+## [1.347.0] — 2026-09-06
+
+### the parasol and the cooler were on the wrong end of TISAK, and three witnesses say so
+
+1.340.0 moved the CORONA parasol "past the door" and 1.345.0 moved the Jana
+cooler "past the end", both on a reading of `1000150343` that had the door end
+facing east. IT FACES WEST. Three witnesses, and none of them needs the others.
+
+THE FRAME. `toWorld` puts t 272 at world (-2051.5, 379.3) and t 328 at
+(-2001.1, 413.9): increasing t runs 50.4 m east and 34.6 south, bearing 124,
+ESE. s 26 to s 14 runs (-6.1, +10.3), bearing 211, so the sea is SSW. Larger t
+is EAST — which is what the head of this file has always said.
+
+THE SUN. `_343` carries EXIF 2026:08:23 18:19:49 +02:00, and at 43.72N 15.83E
+that is a sun at azimuth 271.5 degrees, due west to within two, 14.9 up. The
+frame is lit FROM THE RIGHT: the parasol's shadow falls down-left across the
+kiosk's end panel, the ladder's falls left, the open door leaf is bright at the
+top with its shadow running down-left. Light from the right and the sun due
+west means frame-right is west — and the Jana, the CORONA and the Ožujsko are
+all on the right of that frame.
+
+THE PAN. `1000150414` opens at the kabine, which is the east end, and walks
+west, and its text reads the right way round throughout, so it is not a
+mirrored clip. At 04:24 the Jana is at the LEFT of the frontage with CENTAR
+USLUGA at the right; at 04:26-04:29 the Ožujsko swings in from the left with
+TISAK still at the right; at 04:34 it is beach bar MINI at t 272-284. The
+Ožujsko stands between MINI and TISAK.
+
+So the CORONA goes to `t0 - 1.45`, the Ožujsko to `t0 - 2.30`, the two benches
+follow their mast to `t0 - 2.15` and `t0 - 0.60`, and the Jana cabinet to
+`t0 - 0.42`. Its leaf and its D-handle turn round with it — the leaf stands on
+the side facing the kiosk, the handle on the edge away from it — and the leaf's
+brand ring is listed in reverse, because mirroring a ring reverses its winding
+and `brandRing` walks what it is given backwards.
+
+The apron in front of the counter stays bare, which was the whole point of
+1.340.0 and is what both sources show. It is the WEST apron that has the shade
+on it.
+
+Census {seen:446, thin:333, plain:86, rich:27} unmoved. Blockers 818 before and
+818 after, bucketed by t in 25 m steps and identical bucket for bucket: six
+blockers move and every one of them stays inside its own bucket.
+
+Two releases were wrong about this and a third caught it. The reading that
+failed was a single frame read for its content; the readings that held were the
+world's own coordinate frame, an EXIF timestamp turned into a sun azimuth, and
+a pan whose direction of travel is fixed by what it starts on. When a
+photograph has to be oriented, orient it against something that is not the
+photograph.
+
+## [1.346.0] — 2026-09-06
+
+### her paint streaks ALONG her and not down her, B works on her deck, and a failed build can no longer serve yesterday's page
+
+HER PAINT. The brief said vertical weeps from the rail down, and measurement
+killed it. The mural was rectified along her own gold cove — a quartic fits
+that line to 2.1 px rms, which straightens the whole sheer — and the topside
+measured over 946 clean columns at 96.2 px/m, each column normalised by its own
+median so the wall's lighting drops out.
+
+  depth below cove   0.21   0.42   0.62   0.83
+  P10 / median      0.795  0.738  0.642  0.507
+  sd(ln) from IQR   0.109  0.109  0.155  0.262
+
+Over 35 clean 88 px squares the angular power in the 0.04-0.4 m band splits
+37% "along the hull" against 35% "down it", and in the one box where coherent
+structure survives the roughcast it runs 15 px along against 6 px down —
+ELONGATED ALONG HER, 2.5 to 1. Building vertical streaks would have been a
+regular pattern that is not there.
+
+Three more things the measurement said. The variation is ONE-SIDED (+0.128
+bright against -0.304 dark at 0.42 m): paint does not brighten, dirt darkens
+it. The median falls 0.119 per metre of depth, so she is 0.87 at the boot-top
+of what she is at the cove. And value and hue move together — the bright four
+fifths sit at B/L 0.874 and the darkest fifth at 1.059, because dirt is
+blue-grey and chalk is not. Three materials, three behaviours: the one dark
+tin chalks PALE, the gold cove is a BROKEN line rather than a dirty one (half-
+correlation 0.03-0.07 m against the topside's 1.55), and the deckhouse is the
+same paint as the hull to three places.
+
+Disproved and NOT built: her white looked 9% short of neutral in blue against
+the mural's rails. Three white witnesses in that photograph give 1.010, 0.962
+and 0.912, and the bare cream render ABOVE the mural comes back at 0.874 —
+the hull's own number. It is a global warm cast on the photograph, not paint.
+
+  before  sd(ln) on the flat hull   0.000  0.000  0.000  0.013
+  after                             0.192  0.144  0.131  0.214
+  the mural                         0.109  0.109  0.155  0.262
+
+Zero to three places is both the size of the defect and the answer to the
+double-count worry: the renderer's own shading puts nothing into this
+statistic. Keyed on `vLocal` and verified body-fixed by photographing her at
+1 200 / 1 320 / 1 440 m along the channel — 240 m of passage, the same wash
+between the same two lifebuoys.
+
+B ON HER DECK, which Misha asked for. `pose(camera, back, dt)`, and at back 0
+it is the code that was there line for line. The orientation is never rebuilt
+from a `lookAt` — that would throw away `qBoat` and with it her roll. Her own
+floor plan is the collider, marched at eye height with the height clamped
+after: taking the height off the view line, looking down 26 degrees in the
+cockpit found 0.99 m and gave up, and marched flat it keeps the full 3.10.
+
+Measured over her whole deck plan, 15 216 samples at 0.5 x 0.4 m, 8 headings,
+3 pitches: 16.2% of the boat stays first person, mean pull-back 2.31 m of 3.10;
+the side decks are the worst at 31.5%, and that is her and not the camera —
+1.27 m between deckhouse and bulwark. Passengers are IN the march, tested both
+ways: excluding them scores better on every number and is the wrong answer,
+because at 1.2 m of pull-back it put a passenger's jaw across a third of the
+frame.
+
+Verified here after merging, with the camera measured RELATIVE TO HER HULL
+because she is making 8 knots and her own travel swamps the difference:
+body off [2.60, 3.29, -1.00], body on [0.00, 3.95, -2.60] — 3.12 m of
+pull-back against `BROD.third` 3.10.
+
+AND A FAILED BUILD CAN NO LONGER SERVE YESTERDAY'S PAGE. `check_syntax` runs
+before `OUT` is written, so on a syntax error the previous good bundle stayed
+on disk and anything already serving it kept serving a page that renders
+perfectly and is one edit out of date. An agent lost a cycle to exactly that:
+it edited a shader, the build failed on a backtick inside a GLSL literal, and
+its next two measurements came back byte-identical. It read that as "the change
+did nothing" rather than "the change is not in the file", which is the worst
+way for a build to fail — silently, into a measurement. `poison()` now replaces
+the stale output and both deploy copies with a BUILD FAILED page carrying the
+error and a timestamp. Tested by breaking the build on purpose: 28.07 MB became
+a 751-byte red page, in the repo and in the deploy copy, then restored.
+
+One more instrument that was lying. `__fr.swim.body()` with no argument
+TOGGLES; it is not a getter. Reading it to check the state flipped the state,
+which made the switch look like the frame loop was resetting it. `bodyOn()` is
+the pure read, and `body()` now says so in its own note.
+
+Census {seen:446, thin:333, plain:86, rich:27}, blockers 818, 22 of 22
+passengers drawn, passage end to end.
+
+Left for someone: 44-birds.js can call `birdCall` with a NaN — "Failed to set
+the 'value' property on 'AudioParam': The provided float value is non-finite",
+seen once after teleporting the boat with `__fr.brod.at(1500)`, not reproduced.
+
+## [1.345.0] — 2026-09-06
+
+### the ruler was wrong, so everything measured against it was: TISAK was drawn at 295 px a metre and the wall is 530
+
+THE SCALE WAS A NEWSPAPER SHELF MISTAKEN FOR A COUNTER.
+
+The awning note took the horizontal in front of the glass as a counter at
+0.95 m and got 295 px/m. It is not a counter. It is the low newspaper shelf and
+it is 0.62 m, which makes the shopfront 530 px/m — and every dimension on this
+kiosk had been derived from the wrong one. Two independent checks on the new
+figure: the chest freezer standing on the shop floor comes out with its lid at
+0.91 m, which is a real chest freezer to the centimetre, and the shelf's nosing
+crosses the man at the crotch while standing behind him.
+
+                  measured   was drawn
+  glass head        1.74 m     2.17
+  shutter box       0.19       absent
+  awning valance    0.29       0.40
+  Jana cabinet   0.68 x 1.99   1.32 x 1.46
+  door leaf         1.95       2.17
+  poster band    1.13-1.54     0.86-1.72
+
+THE STRADDLING CLUE WAS THE WORDMARK, and it checked out. TISAK was set at
+CH*0.28 = u 0.022 with the first cut centred at 0.017 and 0.15 m wide, so it
+spanned -0.004 to 0.038: THE STILE WAS DRAWN DOWN THE T AND HALF THE I. The
+phone block missed by a millimetre at the other end. The stile is 0.060 m, not
+0.15 — that was the battens under it at 0.070. Re-measured against the bay,
+which is the only ruler on that wall plane the roof overhang does not cut, and
+the letters are squeezed on x because the real mark is condensed: 2.64 wide per
+cap high where Arial Bold sets 4.19.
+
+AND THREE MORE THINGS WERE STANDING IN FRONT OF THE SHOP — the parasol's
+mistake again, smaller, and all of it shipped in the release that removed the
+parasol. The Jana cabinet, 1.32 m wide and 1.05 m proud, dead across a 1.30 m
+window, hiding the display, the rack, the counter and the papers; both sources
+put it PAST the end of the frontage. A 2 m beer-tent table at mid-frontage,
+2.55 m out; all three frames have it on the gravel. The step ladder stays,
+because `1000150343` genuinely has it across the west jamb and it is narrow.
+
+Inside, rebuilt off the frontage rather than off a sliver of doorway: there is
+NO GOLD RAIL anywhere in the photograph, and six evenly spaced 1.30 m gold
+lines were the loudest thing in the shop. The gantry's pattern is vertical
+slots with dark shelf edges and small white price cards. The postcards are one
+raked column of five, not a 4x5 block. The magazine rack was twelve identical
+covers on a fixed pitch — rule 11, and now two per tier on a wandering width
+and gap. The door leaf was `GLASS` and drew as a black slab; it measures
+1.02/1.31/1.68 of the panel beside it in the same light, which is within 2% of
+`ALU` in all three channels.
+
+  before  census {446,333,86,27}  blockers 818  tris 642257
+  after   census {446,333,86,27}  blockers 818  tris 642533
+
+Blockers did not move and EVERY TEN-METRE BUCKET IS IDENTICAL before and after
+— the whole list was bucketed by t both times; t 290/300/310/320 stay
+23/28/27/28, and the three objects that moved each stayed inside their own
+bucket. Tris +276. MINI, the green kiosk, H2O, the slasticarnica and Maslina
+regression-shot after: unchanged.
+
+ONE THING WORTH AN HOUR, LEFT ALONE DELIBERATELY. `1000150343`'s east/west may
+be reversed. In the pan, left = west, fixed by the order Artois, TISAK,
+Ozujsko, MINI and by MINI standing at t 272 — which puts the Ozujsko terrace
+WEST of TISAK and the Jana at the west end. In `_343` the CORONA, the Ozujsko
+and the Jana are all on the same side as each other, and 1.340.0 read that side
+as EAST. Both cannot be true. The parasols are left where 1.340.0 argued them,
+because that is a different question from this one, but it means a shipped
+change may be mirrored.
+
+Also measured and not built: the Ledo chest freezer standing on the apron at
+the east end in three frames of the pan, polar bear legible. The apron was just
+cleared and a one-metre chest on it deserves its own measurement.
+
+## [1.344.0] — 2026-09-06
+
+### the sea's synthetic low end cannot be dropped, and now nobody has to ask again
+
+1.340.0 re-cut lapping.mp3 properly: three Chebyshev-II bandstops on the pier's
+120 Hz machine and its two partners, and a gentle second-order high-pass at
+45 Hz, in place of a third-order one at 180 that never removed the tone at all
+and only buried the region around it. That left one question open, and the
+release said so: with the recording's real low end back, is the synthetic
+40-190 Hz body added in 1.339.0 still needed?
+
+Measured rather than assumed. `BODY.of` at 0 against 0.375, thirty seconds at
+the water's edge each — thirty and not ten, because ten-second windows of an
+aperiodic field recording vary by 4.35 dB and a difference this size would
+have drowned in that:
+
+  clip only, body off     LF-to-mid   -15.5 dB
+  clip + body              LF-to-mid    -5.1 dB
+  the real shore                        -2.7 dB
+
+So: no. The body is doing 10.4 dB of work and stays. The re-cut gave back what
+a filter had taken away; it could not give back what was never recorded. That
+take was made at 19:43 on a calm evening and there is no Beaufort 5 in it to
+recover — which is the whole reason a synthetic band exists rather than a
+shelf on the clip.
+
+And `of` STAYS AT 0.375 rather than climbing the last 2.4 dB to the shore's own
+figure, for exactly the reason it was chosen: it sits halfway in dB between the
+calm pier take and the two daytime references, and both of those are a phone on
+an exposed edge that cannot be cleared of wind on its own microphone. -2.7 is
+an overestimate of the target, and closing on it exactly would be fitting to
+the wind rather than to the water.
+
+Restored and re-measured after the test: -5.9 dB, which is -5.1 within the
+window variance the paragraph above is about.
+
+The finding is written into the constant's own note so the next person to
+notice a synthetic band sitting on top of a real recording finds the answer
+next to it instead of running the experiment again.
+
+## [1.343.0] — 2026-09-06
+
+### T runs the passage, Z looks from her deck, and neither of them makes her a RIB
+
+THE NINE AND A HALF MINUTES ARE UNTOUCHED, AND SO IS SHE.
+
+59-brod.js argues its case and the case is sound: she is a 16 m wooden boat on
+one diesel, 15.6 knots is what that is, and "the subject of this whole mode is
+how long and how slow this coast is". Making her faster would have answered a
+boredom complaint by deleting the thing the mode is about.
+
+So her speed is not touched. What runs faster is the PASSAGE, by stepping her
+own integrator again on the same frame — seven more times, with the walking
+input zeroed — so the coast goes by at eight times while you still cross her
+deck at your own pace. A time-lapse says "time passed". A faster boat would
+have said "she is a RIB".
+
+  measured, four seconds of real time at mid-passage:
+    normal   29 m   (7.25 m/s, still gathering way toward her 8.0)
+    T on    256 m   (8.8x)
+
+3 813 m becomes about a minute. The HUD says "making way" while it runs.
+
+IT GIVES ITSELF UP AT 300 m. `slow` is where she comes off cruise for the
+berth, and coming alongside is the part nobody wants compressed — a passage
+that ends at eight times ends without you noticing it has. Verified: engaging
+at 3 600 m REFUSES (returns false, phase already `slow`), and a run started at
+3 300 m dropped out by itself with the hint reverting to the walking hint.
+
+THE KEY IS T because T already means this. In the aeroplane it flies the job
+list; in the water it swims you at the one job; here it takes the crossing off
+your hands. Somebody else has the controls until you take them back — by
+pressing it again, by reaching the last 300 m, or by arriving. `__fr.brod.fast()`
+is the same switch from the console, because a nine-minute passage is not
+something a probe can sit through.
+
+AND Z LOOKS, which it should always have. The lens is gated to
+`ground | swim | ride | foil` and `brod` was simply missing from the list. The
+note over that gate argues for the zoom on the grounds that there is nothing to
+do but look — and a passenger on a nine-minute crossing is the strongest case
+in the game for exactly that. Measured: 0.9 s of her own motion changes 41.8%
+of the frame; the same interval with Z down changes 97.3%, which is a focal
+length moving and not a boat.
+
+NOT DONE: B, the third person. `toggleBodyCam` is gated to `swim` and `ground`,
+and unlike those two `brod.pose(camera)` takes no body argument — there is no
+figure on her deck to put a camera behind. That is a real piece of work in
+59-brod.js and not a phase-list edit, so it is handed to the agent already in
+that file rather than bodged here.
+
+## [1.342.0] — 2026-09-06
+
+### the aeroplane's instruments are stowed from the frame loop, not by whoever remembered to hide them
+
+"Leftover" was the right word for it. `updateHUD` DOES NOT RUN on foot — the
+frame dispatch sends the ground phase to `updateGroundHUD` and never calls it —
+so whatever the aeroplane's HUD painted in its last airborne frame is still
+sitting in the DOM. "TANK FULL", a stall warning, an autopilot note, a tank
+hint, the wingman radio. The only thing keeping any of it off the screen is
+`#hud` carrying the `hidden` attribute.
+
+And that attribute is set by hand in fifteen-odd places, once per transition
+out of the aeroplane. `toggleGround` does it. `skipToJadrija` does it, which is
+why `?tgps=` has always been clean. The debug doors do NOT — `__fr.jad.stand`
+places you on the shore and swaps nothing — and every screenshot taken through
+one of them last night carried a full set of flight gauges over Jadrija:
+TANK FULL, 310 km/h, 540 m AGL, the 6137-litre bar and FULL - DROP IT, over a
+man walking to the water.
+
+So it is asserted from the frame loop instead. `stowFlightHUD()` runs on every
+ground and parachute frame, hides `#hud`, and BLANKS `warn`, `ap`, `gpws` and
+the tank hint. Hiding alone was what let this sit: hidden is where a bug hides,
+blank is where it cannot. Now if anything ever shows that box by mistake there
+is nothing stale left in it to show, and every route out of the aeroplane is
+correct including the ones nobody has written yet. Idempotent and guarded, so
+once it has settled it costs four string compares a frame and no DOM writes.
+
+Also, the guard the stall warning already had and this one never got:
+
+  if (state.speed < vStall * 1.05 && state.altAgl > 3 && !p.onGround)   <- had it
+  if (p.water > tankCapacity * 0.99 && !state.dropping)                 <- did not
+
+The note over the stall line says it was added because "a parked aeroplane was
+warning you about a stall the entire twenty minutes you were on foot beside
+it". The tank warning was two lines below it, had the same fault, and was left.
+It has `!p.onGround` now. A full tank is not news while she is on her wheels.
+
+Verified both ways. Through the debug door that used to fail: phase ground,
+`#hud` display none, `warn` empty, `ap` empty. In the air, unchanged: display
+block, 322 km/h, 540 m, 6 137 litres, and "tank full" still says tank full,
+because up there it is worth saying.
+
+## [1.341.0] — 2026-09-06
+
+### she hums Buckasteers of America, and she is no longer the loudest thing on this shore
+
+THE MUSIC WAS HER. The radio on the table is off by default (band -1), so what
+was playing over the birds was the Bucketeer humming to herself, and she was
+doing it far too loudly and far too much of the time.
+
+Measured at arm's length with tools/sfx.mjs, hum band against bird band:
+
+  hum 180-460 Hz stood +9.7 dB over the gull band at 600-1300 Hz
+  and +35 dB over the swifts at 3500-5600
+  the take peaked at -2.99 dBFS, which was the hum
+
+A woman humming under her breath was the loudest single thing on this beach
+and she was masking the sky. The file's own note had checked her against the
+beach bed and found her under it — but being under the bed is not the test.
+The test is what she does to the things you are listening FOR.
+
+And it was only half the problem. A 4.45 s phrase against a 1.4-4.0 s gap is a
+53-76% duty cycle: she was humming through two-thirds of every minute, which
+is not somebody humming to herself, it is a radio.
+
+  HUM.gain     0.22 -> 0.065   (her peak now just under the gull's own 0.070)
+  BUCK.humGap  1.4  -> 3.2
+  BUCK.humJit  2.6  -> 5.0     (35-58% duty: more silence than tune)
+
+After: she is no longer the peak of the mix at all — the take's peak moved from
+-2.99 dBFS, which was her, to -5.35 dBFS, which is something else.
+
+THE TUNE, by request, is "Buckasteers of America".
+
+Written to the WORDS and not to the bar: eight syllables, stresses on BUCK and
+MER, scanned 2-1-2-1-1-2-1-2 eighths, which is what those words do when you
+say them out loud. Call and answer on one rhythm, so it is one tune and not
+two — A climbs to the octave on "mer" and leaves "ca" hanging on the fifth,
+B answers it down to the root.
+
+              Buck  a  steers  of  A  mer  i   ca
+    A:          5   5    9      7  9   c   9   7    (unresolved)
+    B:          5   5    7      5  4   7   4   0    (home)
+
+Verified by recording a phrase and tracking its fundamental in eighth-note
+windows. Intervals off the phrase's opening note came back
+0 +4 +2 +4 +7 +4 +2, which is exactly the line above.
+
+No words are sung and none are drawn. Her mouth is shut — that is the whole of
+why this is a triangle under an 840 Hz low-pass — so rule 12, which is about
+text on signs, has nothing to bite on here.
+
+The one-oscillator-per-phrase machinery is untouched. A hum is one breath with
+the pitch stepping inside it, and the moment each note gets its own oscillator
+you have somebody whistling in semiquavers.
+
+## [1.340.0] — 2026-09-06
+
+### salvaged: she was INSIDE the mole, TISAK was behind a parasol, and the high-pass never removed the tone at all
+
+Four agents were killed mid-flight by a session limit. All four worktrees were
+checked before anything was assumed lost, and three of them held finished,
+committed work — eight commits. This is that work. The unfinished remainders
+(117 lines of Brod paint, 33 lines of TISAK interior, both mid-edit) were
+discarded rather than guessed at.
+
+THE BROD, and it corrects what the previous pass reported.
+
+She was not lying 1.7 m off the mole with her fenders touching nothing. She
+was INSIDE IT BY A METRE AND A THIRD. `A.w + 2.35` is her centreline's offset
+from the pier's CENTRELINE, and the pier is six metres wide. Measured on the
+built page by walking every vertex of both meshes into the pier's own frame:
+her port extreme ran v 1.59 to 1.82 against a coping face at v 3.00 — plating
+inside the masonry from the keel up, port tyres buried to the axle, bulwark
+hanging 1.33 m over the coping. It hides behind her own silhouette from
+everywhere except the coping itself.
+
+The offset is derived now: `A.w` + the rubbing baulk + 30 mm of daylight +
+`brodFendOut()`, which is 3.78 m and is the widest TYRE, not the bulwark. That
+needed `stAt`, `beamAt` and the five fender stations hoisted out of
+`brodProto`'s closure, where `moor` could not see them. After: her port
+extreme v 3.07 at the tightest station against the baulk's 3.02, so the tyres
+bear.
+
+And the bitt with three turns of rope leading nowhere was not the defect. The
+survey settles it: `1000150377` is a photograph of a bollard on an EMPTY quay,
+tail flaked on the slab, no boat in the frame. What was missing was HER lines.
+She also had nothing to make fast to — not a cleat, a bitt or a post anywhere
+on her — so there are four now, and she lies to two crossed springs, forced by
+the geometry rather than chosen: the mole carries exactly two things a rope
+goes on, and both lie under her waist.
+
+The dead sheer-strake branch is deleted rather than repaired, on the mural's
+evidence: sampled along her own gold cove at 96 px a metre, median luminance
+is 0.113 at 0.90 m above the cove and 0.779 at 0.20 m below it. Turning the
+branch on would have painted the loft's top band dark, and at the widest
+station that band is 1.58 m deep.
+
+TISAK AND MASLINA.
+
+TISAK was a parasol. Photographed from the promenade at twelve metres — the
+one direction anybody walks up to this shop from — the panelled side, the
+livery band, the glazed corner, the cigarette wall, the printed display and
+the raked magazine rack were every one of them behind cloth. A 2.64 m canopy
+dead centre of a 3.5 m frontage, three metres out. Both sources say that
+ground is bare.
+
+Maslina is a shipping container. `20260821_175215` from four metres off its
+west end and `1000150414` across the plaza with both ends in frame agree: an
+anthracite 20 ft container on gravel, its long side cut open into a glazed
+shopfront, a folding-arm awning in two cassettes running the full length, a
+FLAT roof with a big tilted framed panel on legs above it, a glazed door in a
+shallow reveal and a dome camera over it. What shipped was the generic kiosk —
+a render body and a pitched slab with a box on it.
+
+THE FIELD RECORDING, and this one is the best of the three.
+
+The 180 Hz third-order high-pass NEVER REMOVED THE 120 Hz TONE. A high-pass
+attenuates a tone and the noise around it equally: the tone stood 27.1 dB over
+its local floor before the filter and 28.3 dB after. What the filter did was
+push the whole 100-180 Hz region far enough down that nothing there could be
+heard — and `sosfiltfilt` made it 36 dB an octave rather than 18, so the sea
+came out of the cut at -65.9 dB at 63 Hz where the source has -13.0. The cure
+was never working; it was only burying the patient.
+
+Three Chebyshev-II bandstops at the drifting tone and its two partners, and a
+gentle second-order high-pass at 45 Hz instead of third-order at 180. Measured
+over thirty seconds at the water's edge:
+
+  LF-to-mid   1.339.0 -6.2 dB  ->  -5.1 dB   (the real shore is -2.7)
+  120 Hz tone            -12.9 dB  ->  -12.5 dB relative to its own floor
+
+A 3.3 dB apparent level drop was chased down and is NOT real: the per-ten-
+second windows inside one thirty-second recording span -36.98 to -32.63, a
+4.35 dB spread, and `cut_field.py`'s normalisation target is unchanged at
+rms -23.98. It was window variance in an aperiodic field recording.
+
+Census {seen:446, thin:333, plain:86, rich:27} unchanged. Blockers 816 -> 818,
+accounted by probing the previous build's own blocker list from the committed
+HTML and bucketing both by t: two relocated from the t 300 bucket to t 310,
+and two new at t 350 — the TISAK/Maslina end, where the parasol moved off the
+roof to stand past the door and Maslina became a container. Nothing moved
+anywhere else on 572 m of shore.
+
+NOT DONE, because the agents were killed before reaching it: the Brod's chalky
+paint, TISAK's posters and interior, and the decision on whether the synthetic
+LF body added in 1.339.0 can now be reduced or removed given the re-cut clip.
+
+## [1.339.0] — 2026-09-06
+
+### the game drew a Beaufort 5 and played a calm evening
+
+There are two seas in 80-audio.js and only one of them is the beach's.
+`nodes.sea` is a fixed bandpass noise at 620 Hz gated on overSea and faded out
+above 100 m AGL — that is the aeroplane's. The beach's is `lapping()`: one
+playhead of a 69.5 s field recording, level linear in distance from 7 m to
+70 m, ducked in the kabine alley. It answers distance and the rows and NOTHING
+ELSE. Not wind, not sea state, not fetch. `state.windSpeed` is not even in the
+`audio.update` feed.
+
+Third octaves, each quoted against that recording's own 1 kHz band so device
+gain cancels:
+
+                            63 Hz   80    100    125    160    200
+  water at the edge, 21 Aug  -0.6  -0.5   -1.1   -1.7   -0.2   +0.2
+  front of the rows, 23 Aug  -1.4  +0.5   -3.6   -3.4   +1.1   +1.4
+  the pier take, notched    -13.5 -15.8  -19.4  -17.6  -15.1  -13.2
+  THE GAME, before          -24.1 -25.8  -26.2  -22.5  -20.5  -17.1
+  THE GAME, after            -9.2  -8.9   -8.0   -9.2   -9.2  -10.7
+
+Two losses that compound. The pier take was recorded at 19:43 on a calm
+evening and is already 13-17 dB under either daytime recording of this shore
+down there. Then `cut_field.py`'s 180 Hz THIRD-ORDER high-pass — 18 dB/octave,
+applied to kill a discrete 120 Hz tone — took the 8-10 dB of broadband the
+pier did have. Above 250 Hz the game tracked its source to within 1-2 dB. It
+was exactly the clip, minus its bottom: a band-limited hiss between 300 Hz and
+2 kHz, twenty-one to twenty-six decibels short at 63-160 Hz.
+
+The fix is a 40-190 Hz noise band whose gain IS THE RECORDING'S OWN ENVELOPE.
+Bandpass the clip at 760 Hz to isolate the slap, rectify through a WaveShaper,
+smooth twice at 11 Hz, drive the noise band's gain with it. Wired into the
+bed's own distance gain, so the rows duck it, the 70 m fade takes it and a
+shut door shuts it, with no second copy to keep in step. Not a shelf: there is
+nothing left down there but a filtered tone and codec floor, and lifting it
+20 dB returns the 120 Hz hum. Not a second loop: a bed with a period gives
+itself away. It inherits 69.5 s of water's own aperiodic rhythm.
+
+                                        before    after    real
+  LF-to-mid at the edge (55-170/400-1600) -21.5    -6.0    -2.7 dB
+  bed RMS                                -35.62  -34.29
+  whole mix RMS at the edge               -34.94  -33.50
+  r(LF envelope, mid envelope)             +0.02   +0.51   +0.20
+  LF crest (p99.5/median)                   7.8    16.3    12.6 dB
+
+No pumping: the 2-6 kHz band of the whole mix moves LESS after than before,
+2.63 dB of spread against 3.17, with no dip behind an LF peak at any lag out
+to 300 ms. It travels: 47 m off, the low band is 9.8 dB down and the midband
+10.5, so the ratio holds across the fade.
+
+Reference segments chosen and stated: the 21 Aug 14:48 take is the only one
+whose sea state matches the game's 9.5 m/s (the stills from the same folder
+show a red flag flying and chop on the frontage). Two walking videos were
+rejected because their low end is footfall, and a pocketed phone because it
+has a cliff above 250 Hz. The pier take's 1 kHz hump was confirmed to be water
+and not insects — its envelope AM peaks at 2-4 Hz, not the 20-80 Hz pulse rate
+of a chorus.
+
+A Web Audio fact proved on the way and worth keeping: BiquadFilterNode reads
+its Q IN DECIBELS for lowpass and highpass, and as a plain Q for bandpass.
+A 190 Hz lowpass at Q = 0.7 answers 1.0839 at its own corner, which is
+10^(0.7/20); Butterworth is Q = -3.01. Every lowpass and highpass in this file
+written as 0.4 / 0.7 / 0.9 / 1.0 is a half- to one-decibel resonance at its
+corner, not the damping it reads as. The four filters added here ask for
+-3.01. The others are left alone — that is a wider decision.
+
+Census {seen:446, thin:333, plain:86, rich:27}, blockers 816. Verified
+independently after merge: LF-to-mid at the edge reads -6.2 dB.
+
+The honest fix is upstream and is NOT done: `tools/cut_field.py`'s blanket
+hp=(3, 180) on every bed is an 18 dB/octave answer to a narrowband problem. A
+notch at 120/133/149 Hz and a gentler high-pass at 60-70 Hz would let the
+pier's real low end through, and the synthetic body here could then be reduced
+or dropped. That needs a re-cut and a new payload.
+
+## [1.338.0] — 2026-09-06
+
+### nine sunbathers were the same statue to two millimetres, and their heads were under the towel
+
+The instanced crowd tier had never been measured, because it could not be:
+nothing in it was named. Naming the instance layers (crowd:head, crowd:pelvis
+and the rest) makes aInstPos readable per drawn person, and the mean pairwise
+pose difference in the figure's own frame, height divided out, comes out:
+
+  mode    n    spread
+  stand  30    0.176
+  walk    9    0.283
+  sit     7    0.111   (all of it in one arm; leg sd exactly 0.000)
+  lie     9    0.002
+
+Nine people lying on the beach were the same statue to two millimetres. And
+the mean head offset read (-0.526, -0.276) — the head end a quarter of a metre
+BELOW the towel.
+
+The lie trunk leaned the wrong way and had since it was written. torso.rotation.z
+= 0.58 sat under a note claiming it lifted the head. It does not. The "+z
+swings the far end forward" convention is for a LIMB, which hangs down; a
+trunk points up, so +z leans it backward, which face up is into the ground.
+Both shoulders went the same way at -0.26. The serve case documents finding
+and fixing exactly this sign and it was never carried back. Photographed at
+83 m on a 4-degree lens: a red swimsuit on a red towel and no head in frame.
+
+Rebuilt with real per-figure variation, off the survey rather than invented.
+Eleven people lying down across five frames: six on their backs, three face
+down, two on their sides. Face-down is tip = -pi/2 plus a half turn of
+bearing, because Ry(y+pi).Rz(-pi/2) and Ry(y).Rz(+pi/2) send (0,1,0) to the
+same place — the same head on the same towel, body turned over. On-the-side is
+a roll about the body's long axis, which the tip has already made world X,
+with 0.075*|sin roll| of lift so the shoulder does not go through the towel.
+Then per-limb knees, three arm habits, a head turn, a breath, and a two-second
+shift every seventy seconds or so. 20260821_175413 settled one of them: a
+woman face down, propped on her forearms, both knees bent and the shins in the
+air — the pose this file's own note called "what nobody does".
+
+  lie spread   0.002 -> 0.839,  closest pair 0.086 (no two identical)
+  head offset  (-0.526, -0.276) -> (-0.556, +0.202)
+  stand 0.175, walk 0.289, sit 0.097 — untouched
+  split 4 prone / 7 supine / 1 on the side, of 11
+
+Everything off a local sine hash keyed on fg.seed. No rng() draw. Census
+{seen:446, thin:333, plain:86, rich:27}, blockers 816, 56-61 fps.
+
+Left alone deliberately: sit, 26 people at spread 0.097 with leg components at
+sd exactly 0.000 — the same disease with less of it, and better done properly
+than alongside this.
+
+And the finding that is not in this file. THE WATER IS EMPTY. The game has one
+wade in a hundred people and no swimming pose exists at all. The photographs
+have 8 of ~19 visible people in the sea in 20260821_175752 (42%), ~24% in
+_175838, ~11% in the windy _175408. Even the low end is eleven times the game.
+A hundred metres of promenade in the render has not one head in the water; the
+same view in _175408 has six. That is the largest population discrepancy on
+this beach and it is one 10% bracket in the quay loop at 43-jadrija.js:18909.
+
+## [1.337.0] — 2026-09-06
+
+### there are two transforms, not one, and the first cut of this would have turned every sunlit wall pink
+
+1.334.0 corrected the back lane's flat ground and left a note saying the
+masonry still owed the same measurement. This is that measurement, and it
+found something the ground pass had hidden.
+
+Measured twice over, because there are two masonries and they are independent
+samples of one question. The render body was built flat at its own constant
+and painted magenta; the field stones flat and painted cyan; both shot from
+the lane at eye height looking inland, so only the seaward face is in frame,
+and masked exactly — 47,738 px of render and 19,696 px of stone.
+
+  render  1.000:0.972:0.914  ->  1.000:1.096:1.147   T [1, 1.128, 1.256]
+  stone   1.000:0.941:0.848  ->  1.000:1.056:1.071   T [1, 1.123, 1.262]
+
+Half a per cent apart on two different surfaces, so that number is real. And
+it is the WRONG NUMBER TO USE, which took one more measurement to see. Those
+masked faces come back at RGB 54,59,62 — luminance 58 out of 255, off a cream
+albedo of 0.65. Nothing is lit there. The whole face is sky, and its ratio is
+flat across its own brightness range (top decile 1.100:1.154, bottom quarter
+1.095:1.146), which is what says there is no second population in it.
+
+The stone's top decile does have one — 133,136,135, ratio 1.000:1.023:1.018 —
+and dividing by the stone's albedo gives
+
+  T_sun   = [1.000, 1.088, 1.200]
+  T_shade = [1.000, 1.125, 1.259]
+
+T_sun is the GROUND's transform to three decimals, measured on a different
+surface at a different orientation. That agreement is the whole argument: sun
+adds a warm component and shade is pure sky, so there is one transform for
+each condition rather than one per surface. The first cut of this release
+divided by T_shade and would have put every wall the sun reaches into pink.
+
+The walk's walls were photographed IN SUN — dry limestone 1.000:0.951:0.859
+and 1.000:0.945:0.886 in two frames, a rendered wall 1.000:0.970:0.958 — so
+render, renderCap, stone and core are now the albedos that land there under
+T_sun. Verified on the lit population, not on the average:
+
+  stone, sunlit decile   1.000:0.951:0.878   R/B 1.138
+  the walk, in sun       1.000:0.948:0.872   R/B 1.147
+  whole face, mostly shade  1.000:0.982:0.926
+
+The shaded face renders bluer than the sunlit target, and that is correct:
+shaded stone is bluer in the frames too.
+
+iron and steel are NOT corrected, deliberately. Both were read in deep shade —
+the railing is near-black at 0.08, where the whole reading is the sky it
+reflects, and the green fence was measured at 26,38,36 against foliage at
+53,60,57. Correcting them needs T_shade and a shade-lit target, which is a
+different pair of measurements from this one.
+
+Census {seen:446, thin:333, plain:86, rich:27}, blockers 816, unchanged.
+
+## [1.336.0] — 2026-09-06
+
+### she had no transom and two blades off her counter, and the cafe had nine metres of somebody else's roof over it
+
+THE BROD. Seven defects, ranked by how loud they are beside her.
+
+She had no transom. The fan ran tri(row[j+1], row[j], c) and its normal is
+(+1.26, 0, 0) at BOTH ends of the row — dead forward. G's rows run bow to
+stern, so the order was the mirror of what a fan closing an after end wants.
+From anywhere astern you looked through a six-metre hole into the boat. Found
+by painting the fan green and getting a frame back with no green in it
+anywhere. Rebuilt as six horizontal bands between the loft's seven levels —
+the apex had sat ABOVE the keel and one tAt(j) per triangle painted her stern
+in pie slices, a 1.5 m navy wedge to port with nothing matching to starboard —
+with the strake, the gold and the boot-top carried round it.
+
+She had two three-metre blades sticking out of her counter. brodSheer and its
+copy in brodProto walk the station table for the interval bracketing x; past
+the table the walk finds nothing, a and c stay on the FIRST pair and u
+saturates at 1, so every x abaft the transom answered with the STEM's station.
+The deck loop ran to -8.2 and the cove to -7.9, both past the last station at
+-7.80, so their final segments were lofted from the transom to a point 0.7 m
+abaft it, pinched to the stem's beam and lifted 0.75 m: navy outside, white
+inside, and a gold one between. Clamped both lookups. The same two lines gave
+the cove back its last 0.9 m to the stemhead.
+
+Two holes in her deck: soleAt steps 0.34 at x 4.30 and -1.35 and nothing
+closed either, so a 0.6 m slot ran across her full beam, twice. Standing in
+the cockpit looking forward you saw a bright cyan band of open sea across her
+deck at eye level.
+
+The strake was bitten. The bulwark's outer face sat at w0, exactly where the
+loft puts its topmost plating row, so the two shared that edge to the
+millimetre — four pale wedges in every bow-on frame that MOVED WHEN NX
+CHANGED, which is what said coincidence and not geometry. Rule 5. The planking
+now stands 52 mm outside the topside.
+
+Also: five tyre fenders a side, placed off the mural at 96 px/m and sized
+through BROD_P because a tyre does not know how big the boat is; a boot-top,
+measured by cutting a vertical column through the mural and taken off the
+SHEER rather than the waterline, which is how it runs in the picture; and her
+bow rail, which stopped 0.75 m short of the stem and was one straight chord
+across a sheer that lifts 0.37, so the middle stanchions did not reach the
+rail they held up. Rails are seg3 per span now.
+
+Checked and left correctly alone: no name, no port of registry, no anchor.
+1000150377 and 1000150378 do not show her at all — they are the mole's
+fittings and the marina. The mural is the only view of her and carries no
+lettering at any zoom. Rule 12.
+
+CAFFE TRAMPULIN AND THE GREEN KIOSK.
+
+The bug behind the bug: two cuts of a fringed reed eave were built, sized off
+the frames and photographed against the sky, and the eave line never moved —
+because it was never the eave. kabina draws its roof PER RUN, one ribbon from
+T0 to T1, while the huts through the cafe are skipped on cafeBlocks and the
+collider is split in pushRun. rowA 17.2 less cabEave 0.10 puts that ribbon at
+s 17.10, seven-tenths of a metre seaward of Trampulin's canopy and above it.
+Both rows had been laying nine metres of kabina roof over a cafe with no
+kabine under it. This file's own note already said "geometry and collision
+written in two places, and only one of them told about the exception" — there
+were three.
+
+The shade is a cane mat and not an awning: reed deck on a dark steel grid with
+a ragged fringed eave, 0.10-0.28 m of overhang at 40 mm pitch, tips wandering
+22 mm, length and droop and tone off three separate jit keys. Colour as a
+ratio against the shop's own pantile ridge three metres away in the same
+light: 0.24 of it in red. It had been shipping in the terracotta of the tiles
+beside it. Seven posts stood on a six-metre frontage (two post lines both
+drawn, the frame has four green tubes and no cream ones). The name is paint,
+not a plaque. Two CORONA parasols stood in front of eighteen square metres of
+reed on a steel frame; both frames have bare gravel out to the lane.
+
+The kiosk wore the generic lid — a flat slab and a box. 1000150342 has twin
+shallow gables, ridges seaward-inland, apexes ~2 m apart measured against the
+0.90 m door, pitch 20 degrees. Framed panels on every face, including the west
+end, which is what you meet walking the promenade. Its hoods were black slabs
+hung straight across a window head at 2.02 and a door head at 2.10 — both
+openings were behind them. And the openings are LIT: glass at 0.072 is a shop
+that is shut, and in the frame the opening reads 101/105/82 against the wall's
+shaded green at 25/33/27. Between them they are 2.4 m of a 3 m frontage.
+
+Census {seen:446, thin:333, plain:86, rich:27} unchanged. Blockers 818 -> 816,
+fully accounted: the two removed parasols each pushed one runs entry.
+
+Left for a decision: she lies 1.7 m off the mole face, so her new fenders
+touch nothing and the mole's bitt has rope on it leading nowhere. And the
+plating's dark sheer strake is a dead branch — the test is min(t0,t1) > 0.90
+and with NS = 7 the topmost band is (1.0, 0.833), so it never draws. Nothing
+is visibly wrong today because the dark band you see is the bulwark's outer
+face, but the branch is unreachable.
+
+## [1.335.0] — 2026-09-06
+
+### the whitecaps were drawn at lattice resolution, and the fade that hid them was ten times too tight
+
+Beaufort 5 was never an order of magnitude under the open ocean. That reading
+was a screen-space pixel count compared against an areal fraction, which is
+not a comparison. Re-derived properly: a nadir camera 130 m up, the one camera
+whose ground area per pixel is uniform, so a pixel count IS an areal fraction;
+the clock pinned to 100*pi s where the gust multiplier is exactly 1.000; the
+lattice forced uniform; a low sun, because at nadir the default 62 degrees
+puts ndh 0.97 over the whole frame; and every frame shot TWICE, the second
+with windrow 0, so the difference of the pair is foam and nothing a glint can
+pass. Five gust-neutral instants, because one frame scatters 25% on phase.
+
+  U            6     9.5     14      20      32
+  Monahan    0.17   0.83   3.11   10.49   52.11
+  shipped    0.27   0.83   1.83    3.07    4.52
+
+Beaufort 5 sits at 1.01x Monahan. Nine bands swept and the band is UNCHANGED
+at 0.075-0.145: up makes Force 4 twice the open ocean, down takes Beaufort 5
+off its number. It was briefly moved on a single-frame sweep and reversed when
+the five-phase mean came in; that reversal is its own commit.
+
+Two real gates, in series:
+
+1. The crest was drawn at lattice resolution. vFoamCrest is a VERTEX quantity
+   on a lattice whose cell is 0.09 + 0.058*d metres — 12 m at 200 m, 60 m at a
+   kilometre — against a whitecap of five to fifteen. The fragment has been
+   computing the same field per pixel and unfaded ever since the wave sum
+   moved in there, and throwing it away. Now max(vFoamCrest, waveBrk): free,
+   and the vertex path still carries its two history taps.
+
+2. The resolvability fade was ten times too tight. Coverage against footprint,
+   measured by raising the nadir camera: 0.66% at fw 0.23, 0.71% at 0.54,
+   0.001% at 1.07. From 13 m over the channel that cliff sits at 70-100 m.
+   capA 0.55 was set when the lattice could not carry a cap past 150 m anyway
+   and contradicts this file's own line that a cap is five to fifteen metres.
+   Now 1.2 / 3.2, bounded by repeating the 540 m test that settled capMin:
+   mean |dx| over open water 1.834 shipped, 1.857 at 1.2, 2.200 at 2.0, 3.049
+   at 3.5, peaks 43 / 49 / 161 / 175. The cliff into white dashes is between
+   1.2 and 2.0, so 1.2 is free and 2.0 is not. capMin STAYS 0 — 3.5/9.0
+   reproduces the rejected picture exactly, confirmed by photograph.
+
+Three things left open and documented rather than changed:
+
+- The wind response is architecturally capped. Measured W proportional to
+  U^2.0 against Monahan's U^3.41, and no band fixes it. Force the slope gate
+  fully open — every square metre entitled to foam — and coverage is 6.6%.
+  The windrow mask discards the other 93% at any wind, because the tile has no
+  idea what the weather is. 32 m/s wants 52%. Fixing it needs the mask to
+  modulate rather than gate, and that risks the quad-sized slabs the mask
+  exists to prevent.
+- Past ~160 m a cap is genuinely sub-pixel, and the only truthful way to show
+  it is coverage-as-brightness, which is capMin > 0. That call was made once,
+  measured, and not reopened.
+- At 9.5 m/s it reads as slick rather than as breaking water: soft-edged beads
+  along the windrows, no bright leading edge, no dissipating tail. And at the
+  default hour the capillary glitter is as white as the foam and swamps it
+  from three or four metres. That one is exposure, so it was left alone.
+
+Census {seen:446, thin:333, plain:86, rich:27}, blockers 818, 59 fps.
+
+## [1.334.0] — 2026-09-06
+
+### the lane was a warm grey with the sky counted twice, and MINI's name is painted on the cloth
+
+The back lane's ground colours were read straight off the survey frames and
+fed in as albedo. A photograph of concrete under a Dalmatian sky already
+contains that sky, so the renderer added it a second time.
+
+Measured rather than argued. The pour was built flat at its own constant
+(1.000:0.969:0.929) and photographed from directly above with the strip
+masked off exactly — paint it magenta, threshold the frame, keep the mask,
+67,372 px of nothing but lane. It came back 1.000:1.054:1.114. This surface
+renders T = [1.000, 1.088, 1.199] against its albedo: 8% green-heavy and
+20% blue-heavy. A warm concrete at R/B 1.076 left the screen at 0.898.
+
+That is also why the ground read as two paints and not as a place. Classified
+by red-over-blue across eight frames of the walk, the real ground falls in
+three populations: cool pour 34%, red earth 21%, and BETWEEN them, at
+1.000:0.923:0.837, forty-four per cent of every frame. The build had one per
+cent of that middle. Pour and earth met at a polygon edge and nothing crossed.
+
+So: every flat ground colour is now the albedo that renders at what the walk
+measured, and the earth is tracked up onto the pour at both long edges — hard
+at the seaward one, because that is the side the cars cross — with the
+strength wandering along the lane in two octaves so it is patchy and not two
+ruled stripes. The crown stays clean, which is what a crown is.
+
+  lane, before   1.000:1.054:1.114   R/B 0.898   warm-bin  0.1%
+  lane, after    1.000:0.940:0.880   R/B 1.136   warm-bin 52.0%
+  the walk       1.000:0.950:0.900   R/B 1.111   warm-bin 44.5%
+
+The masonry is NOT corrected and the note says so: T was calibrated on an
+up-facing surface, which takes the whole sky hemisphere. A wall takes half of
+it and still owes this same measurement.
+
+Also recovered the back lane's own reference frames, which had been lost with
+a scratch dir — the walk is v595 and re-extracts at 8 s to 55 frames. The
+a_0xx indices the file cites do NOT map onto them: no uniform step puts the
+carport pair adjacent and the green fence and the railing where the comments
+say. The imagery is back, the numbering is not.
+
+MINI, from the agent, and it disproved the brief rather than following it: at
+5x the valance hem is straight to under half a per cent of its run, so the
+sag belongs in the cloth above it, where canopySkin already puts it. Moving
+it to the hem would have scalloped four awnings identically. What was really
+wrong is that the game hung the name on a cream board 0.40 m off the cloth
+with a grey tray behind it; in every frame that shows it the lettering is
+painted straight onto the valance, strokes following the cloth's creases and
+one seam running through them. shopSign gains a painted mode, gated to MINI
+alone, with the caps, baseline and run measured off the band.
+
+Side effect worth a decision: removing the board exposed the counter strip
+light at emissive 1.0, which is now the brightest thing on that frontage.
+Pre-existing geometry, left alone rather than changed on a hunch.
+
+Census {seen:446, thin:333, plain:86, rich:27}, blockers 818, both unchanged.
+
+## [1.333.0] — 2026-09-06
+
+### where the hundred people actually are, and the hook that can finally say
+
+A pass on the crowd, and it turned into a pass on the debug surface, because
+the question could not be asked.
+
+"IS THIS STRETCH OF BEACH EMPTY?" was unanswerable from the console, and two
+separate passes have now gone looking. `tiers(r)` counts who is within `r` of
+the PLAYER, which cannot tell you about a stretch you are not standing on.
+`cast()` is an OBJECT keyed by slot, not an array, so `.filter` on it throws —
+that cost time earlier tonight and its docstring now says so. And `raw().people`
+is the bathers array but a probe over it comes back empty.
+
+So the honest answer took a photograph from 26 metres up, which is ABOVE the
+crowd's own promotion radius and therefore measures the LOD and not the beach.
+A 200 m stretch came back looking deserted while `tiers(40)` was simultaneously
+reporting thirty-two people standing in it. Both readings were right about
+different things and neither was about the beach.
+
+`__fr.jad.spread(m)` bins everybody by their shore coordinate and reads nothing
+about the draw state, so it answers about the BEACH rather than about what is on
+screen. At 50 m:
+
+    t     0    50   100  150  200  250  300  350  400  450  500  550
+    n     2    4    5    2    11   16   24   14   4    10   5    3
+
+100 placed, 100 of them on the shore.
+
+WHAT THAT SAYS. The crowd clusters where the businesses are — t 250 to 400 holds
+54 of the 100 — and thins toward both ends, which is what a bathing station does
+and is not a defect. The west 200 m carries 13 people, one every 15 m.
+
+AND THE FINDING, WHICH IS NOT THE PEOPLE. Photographed from above at t 90, 170,
+250, 330, 410 and 490, the west end carries the full FURNITURE of a busy beach —
+parasols up, loungers open, towels down, bags out — with essentially nobody
+under any of it. The props and the population were placed by different rules and
+do not agree with each other. An open parasol with nobody under it, every twenty
+metres for two hundred metres, is the tell; the thinness of the crowd there is
+not, on its own, wrong.
+
+Not fixed here. Which of the two moves — thinning the furniture at the quiet end
+or spreading the people into it — is a judgement about what Jadrija is like in
+August, and it wants Misha's eye rather than mine. The measurement is now one
+call away either way.
+
+Census 446/333/86/27, blockers 818, no geometry changed.
+
+## [1.332.0] — 2026-09-06
+
+### the slastičarnica at arm's length, salvaged from an agent that was killed mid-flight
+
+The session hosting two agents exited before either could commit. One left
+nothing; the other left 220 lines of finished, uncommitted work in its worktree.
+Committed by hand from the main checkout and merged rather than thrown away —
+the worktrees survive a process exit and are worth checking before assuming a
+task is lost.
+
+What it found and fixed, all off `survey/2/` opened at source resolution:
+
+  THE PLAQUES WERE HALF AGAIN LIFE SIZE AND STOOD IN FRONT OF THE ICE CREAM,
+  which is the loudest thing about this counter from where anybody stands. A
+  flavour card has to be READ from the promenade and the sizing was solved for
+  the wrong distance.
+
+  NO WATER TANK. The one shop on this shore that can say so — its own SHOPS
+  note carries the sightline that rules one out, and it had one anyway.
+
+  ONE BOX ON THE ROOF, not two, AND IT IS NOT A BLACK BOX: at source
+  resolution it is timber. The second was built twice, and so was a flue that
+  is not there.
+
+  THE CRATES STOOD INSIDE THE SHOP. Moved from t0+3.6 to t0+4.6, which is
+  where the frontage actually ends.
+
+  A SCRAPED BLOCK AND NOT A LENS, correcting a note rather than adding to it.
+
+And the awning's fold, which is the one worth reading. Raising the frequency
+alone was tried and came out WORSE THAN THE SINGLE FOLD: `sin(w * 11)` is a
+function of `w` and of nothing else, so every bay folds identically and what you
+get is a wrong regular pattern — which this project has a rule about. The fold
+is bent and unevenly spaced now, which is what a canvas awning does.
+
+Census {seen 446, thin 333, plain 86, rich 27}, blockers 818. 640 943 to 640 869
+triangles — slightly DOWN, which is the tank and the duplicate box coming out.
+
+Also in this build: BUILD_DATE moves to 2026-09-06.
+
+## [1.331.0] — 2026-09-05
+
+### she carries it like it weighs something, the water is visible for the first time, and the pail was inside her leg
+
+THE WATER NEVER DREW. Six releases of it. `PAIL`'s fill term, the surface radius
+read off the cone's own profile at its height, `water.visible` — all of it
+correct and all of it invisible, and I said so in 1.328.0 without being able to
+say why.
+
+It is the winding. The surface is a `pailLathe` cap on the profile
+`[[0, 0], [0, 1]]`, and BOTH of that function's cap branches wind the way a
+solid wants its BOTTOM closed. `propBuilder.tri` takes the flat normal off the
+winding as (b−a)×(c−a), which came out (0, −1, 0): single-sided, so the disc was
+culled from every camera above the rim, and the one place it would have drawn is
+under the pail's own opaque base. Three lines, wound the other way by hand, no
+double-siding. It is a dark blue-green disc under her hand now.
+
+AND THE WATER EXPOSED A THIRD THING. `placePail`'s comment says the palm sits
+"about 90 mm off the outside of a thigh" and offsets the pail 60 mm on that. THE
+NUMBER IS WRONG BY ITS SIGN. The bind mesh's right thigh reaches z 0.205 in
+every 50 mm band from 0.55 to 0.80 and the clip's palm hangs at 0.166 to 0.185 —
+the palm is INSIDE the leg, so 60 mm never reached past it. Swept over a stride
+the pail sat 149 mm inside her thigh, loaded and empty. Empty it was a dark hole
+and nobody saw it; full, it is a leg standing in the water.
+
+Fixed at the arm rather than the offset — 26.8 degrees of abduction as a target,
+21 to 22 as stood, driven by `held` rather than `load`, because a bucket cannot
+be inside a leg whether or not there is water in it. Worst instant of the stride
+is now 10 mm of overlap loaded and 12 mm of daylight empty, against 149 and 148.
+The wrong measurement is annotated in place rather than deleted.
+
+AND THE WEIGHT. She played a `walk` clip with a straight spine and her free arm
+at her side, carrying ten litres.
+
+  lean       0.155 rad over spine01/02/03 on `held * fill`, eased at 1/e in
+             0.29 s. Measured pelvis to chest over a cycle: 6.4 degrees mean,
+             3.4 to 8.6 — the clip's own shoulders rock ±2.6 — against −0.5
+             walking back up empty.
+  shoulders  took two goes. One turn about +x lifts the left clavicle 36 mm and
+             drops the right 37, which looks like the whole answer — but leaning
+             left DROPS the left shoulder 25 mm and LIFTS the right 20, so a
+             symmetric shrug came out with the LOADED shoulder 17 mm high.
+             0.34 right against 0.20 left measures +22 mm the right way.
+  swing      the loud one. The clip travels her right hand 396 mm fore and aft
+             per step and the pail hangs off it, so the bucket swung 396 mm. The
+             carrying arm is a two-bone solve to an absolute figure-space
+             direction now, ramped to 0.86: 96 mm.
+  and        `load` is 0 through rest, take, up and set, so the pose latches off
+             and hands every bone back to the clip.
+
+Signs measured off `boneAt`, not typed: her right is +z (armUR z +0.159 against
+armUL −0.193), so leaning away from the pail is a turn about −x. This file has
+lost two releases to guessing that.
+
+AND THE POSE GOES BEFORE `fig.update`, NOT AFTER. My brief said after and the
+brief was wrong: aims are consumed INSIDE `update` when the palette is built
+(41-skin.js:1728), which is why `greetArm`'s only call site in 42-crowd.js:846
+is the line before it. Posing after lands a frame late and makes the arm solve
+read a stale measurement.
+
+Stride length on the loaded side is not done — it is baked into the clip and
+there is no lever short of a new bake. The slower pace was already there: 0.44
+m/s down loaded against 0.78 empty.
+
+Not managed: the last centimetre of the pail's clearance is the SHOULDER and not
+the arm — the lean pulls it 46 mm inboard and the clip rocks it 43 more, so the
+hand rides that wherever it points. Closing it needs the wrist solved to a
+position the way `holdPhone` does, which is an arm with no life left in it. And
+`PAIL.water`'s colour has never been seen in situ until tonight and reads fairly
+dark; not changed on one frame's evidence.
+
+Census {seen 446, thin 333, plain 86, rich 27}, blockers 818. The full loop runs
+clean — fill, lift, down, tip, right, rest, take, up, set — 45.3 s a cycle.
+
+## [1.330.0] — 2026-09-05
+
+### a startle is air, a yelp is a vowel; and MINI had two canopies
+
+TWO THINGS, and the first is the other half of a request I had marked done.
+
+*"an instant local yelp/gasp the moment the water lands"* — the yelp shipped and
+the gasp never did. Recorded off `tools/sfx.mjs` and measured, the eight yelps
+are correct and distinct: girl_child f0 588 Hz over a 2 282 Hz centroid in
+0.21 s, man_old_heavy 108 Hz over 1 333 in 0.34 — he does not jump, he grunts,
+which is what his own note says he should do. Onsets identical to 2 ms across
+all four sampled, so there is no latency in the trigger either.
+
+But `gasp` in this file CANNOT BE USED FOR THIS, and reusing it is the obvious
+move so it is worth writing down why. That one is a SURFACING: 0.34 s of swell,
+then the surface breaking over your head, then the water running off, then the
+breath. Its whole shape is "here it comes". A hose landing on your back is the
+exact opposite — no lead-in at all, at its peak on the first frame, or it is not
+a startle, it is a comment.
+
+So `startle(kind, d)` is its own synth and the difference from `yelp` is one
+word: UNVOICED. A yelp is a vowel — an oscillator through formants with a pitch
+contour, a person making a noise ON PURPOSE. A startle is air: the glottis opens,
+the intake goes through the throat with no voice behind it, and only at the end
+does a little voicing catch up. Measured on the same three voices:
+
+                       dur     centroid    peak    tonality
+    yelp    girl       0.213    2 282 Hz   0.175        735
+    startle girl       0.144    3 923      0.182         51
+    yelp    woman_old  0.273    1 526      0.300      2 644
+    startle woman_old  0.168    3 338      0.178         74
+    yelp    man_old    0.343    1 333      0.250      2 700
+    startle man_old    0.199    3 111      0.194         91
+
+A twentieth of the tonality, twice as bright, two thirds the length, the same
+peak. And it still tracks the kind — the child's is brightest and the heavy
+man's darkest — because it reads its formants off `YELP`'s own table rather than
+carrying a second set of numbers to keep in step.
+
+The intake's gain is 1.15 against the yelp's 0.95 and that is not a typo. An
+oscillator through three resonant bandpasses concentrates its energy where the
+formants are; broadband noise through one does not. At equal nominal gain the
+startle measured a third of the yelp's peak — 0.09 against 0.28 — which for a
+reflex is the wrong way round.
+
+WHICH NOISE YOU GET IS THE POSE'S, and the rule is whether they saw it coming.
+Lying down is face down and asleep: no idea, so it is unvoiced. Sitting up may
+have seen the hose swing and mostly yelps, one in four looking the other way.
+Standing, you saw it.
+
+AND BEACH BAR MINI HAD TWO CANOPIES. `shopExtras` drew a cantilever mast,
+ballast and canopy at t 282.8 / s 12.8; `bigShade` drew another at 282.7 / 11.8.
+Two block stacks interpenetrating, two masts a metre apart, and from above a
+grey arm hanging over the Jamnica valance with nothing under it. Removed — and
+what survived is the CRANK, moved into `bigShade`, which never had one: both
+frames show the mast standing OUTSIDE the shade with the canopy on an arm, which
+is the only thing that explains half a tonne of ballast. Cranked 2.05 m inland,
+raised 0.48 so it clears the roof kerb by 0.36, mast widened 0.13 to 0.21, plus
+the grey outdoor speaker bolted to it that `_175806` catches.
+
+Moving it opened a second bug that had been plugged by the first: the canopy
+crown was a 0.68 m HOLE in the cloth all along, and the old mast happened to
+stand in it. Capped.
+
+MINI's counter was eight metres of flat grey band. `_175806` has a limestone
+rubble base course half a metre high, a two-tier timber counter on rough poles
+standing on it — a drinking ledge at 1.10 m and a display shelf at 1.545 with a
+bowl stack, a carton, a jar and a cup on it — and white bar stools along it. All
+measured as ratios because the bay is in shade in every frame: stone
+rgb(135,112,84) against concrete rgb(145,133,116) gives 0.472/0.380/0.277 on
+`CONC[2]`, and the ledge at 0.49/0.42/0.40 of the stone lands within a
+thousandth of the existing `TIMB`. Laid in two courses of 0.16 to 0.46 m stones
+with broken joints — one course of big stones read as cardboard cartons on the
+first build.
+
+WHERE MINI IS AND IS NOT, so nobody re-treads it: five frames only —
+`20260821_175806` (close, evening, the counter face on), `_175726`, `_175732`,
+`_175830`, and `20260823_111954`. `survey/4/` contains NO MINI at all; it is the
+pizzeria, konoba, green kiosk and TISAK end. `survey/2/` is the slastičarnica.
+
+Census {seen 446, thin 333, plain 86, rich 27}. Blockers 815 to 818, fully
+accounted: minus one duplicate mast, plus three bar stools, plus one for the
+fridge's run.
+
+Not done, and both bigger than MINI: the awning is a rigid slab where the real
+one is white fabric on posts, sagging, with the painted valance hung off it; and
+the east half of the frontage is a solid wall where `_175806` has a glazed room
+you see the pine trunks through. Both are changes to the shared `box` frontage
+rather than to this shop.
+
+## [1.328.0] — 2026-09-05
+
+### MINI's counter is a rubble wall with a plank on it, and the third canopy was standing inside the second
+
+> **Numbering note.** 1.328.0 was used twice on the night of 5-6 September, during the run with several agents building in parallel. This is the second of the two and it shipped after 1.328.0 and 1.329.0 were already out. The version stamped in that build was 1.328.0; the entry is kept under its own heading rather than renumbered, because the artifact that went to the server carried that number.
+
+Beach bar MINI, worked from `20260821_175806`, `_175726`, `_175732` and
+`20260823_111954` at source resolution rather than from the code.
+
+**The counter.** From the promenade this frontage was eight metres of the
+flat grey band `shopKit` draws for the whole boardwalk, and 175806 says it
+is nothing of the sort: a limestone RUBBLE BASE COURSE half a metre high,
+and standing on it a two-tier timber counter — a drinking ledge at 1.10 m
+with white stools along it and a display shelf over it carrying a stack of
+bowls, a carton, a jar and a cup. Measured as a ratio because the whole bay
+is in the awning's shade in every frame (rule 8): the stone reads
+rgb(135, 112, 84) where the concrete a metre in front of it reads
+rgb(145, 133, 116), which against `CONC[2]` is 0.472/0.380/0.277, and the
+ledge is 0.49/0.42/0.40 of the stone again — within a thousandth of `TIMB`.
+Two courses of stones 0.16 to 0.46 m long with the joints broken, because
+one course in 0.34-to-0.76 m stones is not a rubble wall, it is a row of
+cartons.
+
+**A drinks fridge**, which every caffe bar on this shore has and this one
+did not. `cooler: true` and nothing else: the cabinet 175806 stands against
+the west reveal is the one `cooler` already draws for H2O.
+
+**The third canopy.** `shopExtras` built a cantilever mast, its ballast and
+its canopy at t 282.8, s 12.8 — and `bigShade` stands one at t 282.7,
+s 11.8. Two stacks of block interpenetrating, two masts a metre apart, one
+canopy inside the other, and from above a grey arm hanging over the Jamnica
+valance with nothing under it. The duplicate goes; what survives of it is
+the CRANK, which is the one thing `bigShade` never had and which both
+frames of this terrace show plainly — the mast stands OUTSIDE the shade
+with the canopy hung off an arm, which is also the only arrangement that
+explains half a tonne of stacked block on a concrete apron. Cranked 2.05 m
+inland and raised 0.48 m so it passes 0.36 m over the shop's own roof kerb,
+which is the relationship `111954` has. The mast goes to 0.21 m across, and
+takes the grey outdoor SPEAKER 175806 has bolted to it at head-and-a-half
+height.
+
+And the crown of that canopy was a 0.68 m hole in the cloth all along —
+plugged by the mast while the mast came up the middle of it, open to the
+sky the moment the crank moved the mast aside.
+
+`knStool` comes out of the konoba branch as `barStool`: MINI's white stools
+are the same moulding, and one stool drawn twice is not two stools.
+
+Census unchanged at {seen:446, thin:333, plain:86, rich:27}. Blockers
+815 -> 818: -1 the duplicate mast, +3 the bar stools, +1 the fridge.
+
+## [1.329.0] — 2026-09-05
+
+### BTC $79,679, LTC $51.43, ETH $2,454, and you can read them
+
+*"put some bathers, especially the sitting ones, on their cellphones — talking
+into them or looking at them, and close up the screens show live crypto prices:
+bitcoin, litecoin, ethereum."*
+
+MY DIAGNOSIS WAS WRONG AND IT IS WORTH SAYING SO FIRST. I circled a phone at
+30 cm from eight azimuths, got the back of a slab or nothing every time, and
+briefed an agent that the screens face the holder's eyes and are unreadable.
+Thirty centimetres is INSIDE THE 1.2 m NEAR PLANE. Every one of those frames was
+the clip, not the phone. `stepPhones` has billboarded the glass at the camera
+since it was written; re-circled at 1.2 m and 2.5 m the screen faces you from
+seven bearings of eight, and the eighth is over the holder's shoulder where the
+hand is nearer the lens than the phone — which is where a real screen faces away
+too.
+
+That is the second time the near clip has cost this project a false diagnosis.
+
+TWO THINGS WERE ACTUALLY WRONG, both readability rather than orientation.
+
+THE FINGERS LAY ACROSS THE GLASS. `holdPhone` solves the hand onto the group's
+origin and `boneAt` reports the fingers within 31 mm of it — and the drawing
+hung the phone's MIDDLE on that point. At 1.5 m the four fingers covered the
+whole ETH row. `PHONE.grip` = 0.040 m lifts the drawn phone along its own up
+axis, inside the tilt, so the grip sits 33 mm above the case's end and the
+fingers wrap the bottom half and nothing else. Readers only; the three holding
+one to an ear are untouched.
+
+AND THE LAYOUT WAS SIZED FOR THE CANVAS, NOT THE SCREEN. The glass is
+64 x 131 mm, which on the 58 degree lens at 1920 wide is 41 PIXELS at 1.5 m and
+31 at 2 m — only under the Z lens does it reach 179. What was on it was nine
+elements, the largest 25 px in a 512 px canvas. It is three bands now: the price
+at 700 weight 40 px, measured with `measureText` to 182 of the 234 the band
+leaves; the change right-aligned across from the ticker; and the sparkline
+across the full band with the real 24-hour change worth 26 px of slope against
+9 of wobble. It was 4 against 16 — THE WOBBLE WAS THE PICTURE AND THE FACT WAS
+NOISE.
+
+The provenance line moved from the foot of the screen to under the title and
+came up from #5a6478 to #8b95a8: at the foot it sat exactly where the thumb
+does, and rule 12's line has to be readable to be worth having. And rule 5 — the
+glass plane sat 0.7 mm off the body's front face and is now 3.
+
+Photographed at 1.3 m and 1.8 m on the default lens and under the Z at 1.8:
+09:41, Markets, CoinGecko · 4 Sep 2026, BTC $79,679 −1.37%, LTC $51.43 +0.81%,
+ETH $2,454 −1.80%, all three sparklines, hand entirely clear. Checked on two
+different bodies in two locales.
+
+Census {seen 446, thin 333, plain 86, rich 27}, blockers 815. `phones()` now
+also reports `grip`, so the gap and the drawn offset can be read together.
+
+## [1.328.0] — 2026-09-05
+
+### the Bucketeer verified round her whole loop, and a docstring that cost twenty minutes
+
+A verification pass on the Bucketeer, who has not been looked at since she
+shipped. She is correct. Photographed at four beats and the state machine read
+at each:
+
+    fill   in the bathroom, the pail on the tiles at her feet, fill 0 -> 1
+    lift   fill 1, held rising 0 -> 1 as the bail comes up
+    down   leg 7, walking the external stair with a full pail, vel 0.44
+    tip    leg 11, on the porch, fill draining 0.82 and falling, tip rising
+    up     leg 8, empty, vel 0.78 — faster going up than coming down, which is
+           what carrying ten litres does to you and is in the model
+
+Red one-piece, blonde ponytail, blue pail, and the stairs outside, which is what
+was asked for and what the drawings show.
+
+AND THE DOCSTRING ON `__fr.buck` IS WRONG, which is the only thing this release
+changes. It said:
+
+    `watch(k, back)` is the one that gets a picture: it stands you `back` metres
+    behind waypoint `k` looking at it
+
+`watch` does not do that and never has. It takes `(back, side, aim)` and it
+frames HER, wherever she is, off `b.where()` — and the correct description has
+been sitting on the function itself the whole time. The two disagreed and I
+followed the wrong one.
+
+The cost is specific and worth recording, because a stale docstring on a debug
+hook is worse than none: `watch(1, 2.4)` reads as "waypoint 1 at 2.4 m" and
+means "1 m in front of her and 2.4 m to her right", so the camera lands beside
+her looking past her at a wall. Four frames came back with no Bucketeer in any
+of them, which reads exactly like a figure that has stopped drawing. Twenty
+minutes went on hunting a bug that was a sentence.
+
+The comment now says what it does, gives a call that works, and names the phases
+`go` actually accepts — fill, lift, down, tip, set, up — which are the ones
+`stats().phase` reports and not the waypoint labels I guessed at.
+
+Census {seen 446, thin 333, plain 86, rich 27}, blockers 815. No geometry
+changed.
+
+TWO THINGS OBSERVED AND NOT FIXED, both in her file:
+
+She carries a full pail with a straight spine and her free arm at her side. Ten
+litres in one hand makes you lean away from it and lift the other shoulder;
+there is no lean term anywhere in 45-bucketeer.js. It is the one thing that
+would make the carry read as weight.
+
+And I could not get a camera down into the pail to confirm the water surface
+draws. The code is there and is driven by `fill` — `water.visible`, and the
+surface radius read off the cone's own profile at its height — but every angle I
+tried was below the rim or inside her. Not asserted either way.
+
+## [1.327.0] — 2026-09-05
+
+### the konoba's terrace stands on its own datum now, and a fixed offset could never have got there
+
+Two coplanar-ish surfaces were crossing at t 245.7 within 3 mm: `paving` lays the
+promenade's flags under this shop at `surfaceY + 0.05`, which FOLLOWS the deck,
+and the apron was flat at `y0` because the shop is. It did not show — shot at
+four angles including square down it at grazing incidence — but it is decided
+per pixel two kilometres from the origin and rule 5 exists for exactly that.
+
+THE PREVIOUS PASS'S NUMBER DOES NOT CLEAR, and measuring it is the whole of this
+release:
+
+    y0 = at(246).deck                              3.193474
+    shore max under the apron, t 252.10            3.253540
+    shore min under the apron, t 239.45            3.083886   a 169.7 mm fall
+    highest promenade flag under it, +PAVE_LIFT    3.303540
+    y0 + 0.115                                     3.308500   -> 5.7 mm
+
+Five point seven millimetres. The same fight, one course up. The mid station is
+60 mm below the footprint's own maximum, and that is most of the error — which
+means A FIXED OFFSET OFF `at(tc).deck` STRUCTURALLY CANNOT BE RIGHT on a
+frontage that falls 170 mm. `konobaFloor(S)` walks the footprint at build time
+and returns `max(surfaceY) + PAVE_LIFT + KONOBA_CLEAR + KONOBA_BED` = 3.37054,
+which is `y0 + 0.1771`. If the shore is ever re-cut, the terrace moves with it.
+
+THE WORST CLEARANCE IS NOW 55.0 mm, between the apron's mortar bed at 3.35854
+and the highest flag stone under the shop at 3.30355 (t 252.09, s 15.98). Paving
+face to flag is 67.0. Confirmed by a probe sampling 600 x 120 stations across
+the whole footprint rather than by argument. Everything else touched, worst
+first: mass core over the highest flag 27.0, core under the bed 28.0, skirt
+inner face to core face 48, skirt buried 53 or more all round.
+
+THE SKIRT IS IN THE PHOTOGRAPH. `20260821_175856` at source resolution has the
+crazy paving running to a sawn margin against cut stone, and the block round the
+post at the counter's east end standing a hand's depth proud. Its face measures
+rgb(185, 174, 162) against rgb(192, 190, 189) for the terrace beside it —
+barely darker, much warmer, which is the same limestone with a saw cut through
+it. Laid as separate stones with their own reach, 35 to 75 mm proud, on four
+per-side `jit` seeds so the seaward and west courses are not one course mirrored
+at the corner.
+
+It stands 117 mm proud at the east corner and 287 at the west, and that spread
+is forced rather than chosen: 170 mm of fall plus the flags' own 50 means even a
+zero-clearance floor has a 182 mm step at the west end. Checked at eye height
+from the promenade at 24 m and at 7 m, from the south-west corner, from inland
+and from behind the bar — it reads as one step, not as a stage.
+
+Rebuilt against the new datum: counter, six stools, cooler, parasol, bulb, pine
+collar and the pine through it, wicker chairs, dark tables, poseurs, stone
+table, surfboard, rubble base course, the eight posts, the reed roof (headroom
+still 2.653 m), the counter's blocker, and THE BARMAN — who was placed off
+`at().deck` in a generic `SHOP_STAFF` loop and would otherwise have been the
+only man on this shore standing in his own terrace.
+
+`standY` learns the terrace the way it already knows the kabina floor and the
+changing pad, ramped over 0.45 m outside the edge. The flag lift is folded into
+the base it ramps FROM, because half this apron is inside `paveBand` and half
+outside — a ramp starting from the mortar on one side of s 15.9 and the stone on
+the other would have laid a 50 mm ridge down the middle of the floor.
+
+Census {seen 446, thin 333, plain 86, rich 27} and blockers 815, both unchanged.
+
+## [1.326.0] — 2026-09-05
+
+### the chord again, at the tip of the spit, in one bay of a hundred and sixteen
+
+The open kabine bay at t 482.38 drew half an architrave, no vent grille and no
+dark reveal, and filled its own opening with plain wall. It was found and proved
+against a pristine build yesterday and left undiagnosed.
+
+IT IS `boxIn`'s CHORD, the same failure the shops were fixed for at 1.305.0 and
+the kabine roofs at 1.308.0 — and this time it hid inside a single 2.15 m bay.
+
+Four suspected causes eliminated first, each with a number:
+
+  not a run boundary   runs are laid `t += span + 4.1 + rng() * 1.5` and cannot
+                       overlap; run 4 spans 468.41 to 489.91 and this is its
+                       seventh bay of ten
+  not `cafeBlocks`     that skips k 0 to 3, t 468.41 to 477.01; the bay starts
+                       4.3 m past the last skipped one
+  not a guard          `clearOfShops`, `PLAY` and `SAN` are not read anywhere
+                       in `cabinRun`
+  not a missing hole   `frontSkin`'s panels painted red and the hut body green:
+                       the opening came out GREEN. The hole is cut correctly
+                       and the body is showing through it
+
+The hut body was ONE `boxTS` across the whole bay while `frontSkin` cuts the
+same face into three panels around the opening — so the two disagreed about
+where the wall is by however much the shore turns inside 2.15 m. The polyline
+has stations at t 475.11, 482.77 and 492.18, and the middle one is a 23.7 degree
+KINK — the tip of the spit — standing 0.39 m off this bay's centre. The body's
+seaward face bowed 130 mm out over the middle of its own bay; the 0.94 m backing
+panel and the 0.90 m curtain, much shorter chords across the same kink, bowed 17
+and 16. The body finished 84.7 mm in front of its backing and 61.7 mm in front
+of its curtain, in a reveal 90 mm deep.
+
+That explains both halves of the symptom. The architrave sits 7 mm seaward of
+the face, the vent frame 30 and the folded leaf 107, so all three went on
+drawing correctly round a hole that was no longer there — which is what read as
+half an architrave. And THE MISSING RIGHT JAMB WAS NEVER MISSING: the leaf folds
+flat from dc + 0.45 and covers that jamb square on, on every open bay, healthy
+ones included.
+
+WHY ONE BAY IN A HUNDRED AND SIXTEEN. Six bays had the body in front of their
+own backing — t 456.29 by 0.5 mm, 462.74 by 38.7, 482.38 by 84.7, 504.03 by
+15.2, 517.08 by 28.0 — and exactly one of the six stands open. A shut bay's leaf
+fills the hole whatever is behind it.
+
+The fix is not `boxIn`'s `cut`, which splits a span into equal pieces that do
+not line up with the opening. The body is cut into the same three spans
+`frontSkin` uses, so body and face share their ends and cannot disagree.
+
+Swept analytically across all 116 bays in both rows: every one now clears its
+backing by 5.6 to 7.5 mm and its curtain by 31.9 to 35.0, and the tightest
+architrave clearance in the block is 5.0 mm against rule 5's 3. Zero violations.
+The whole of run 4 got its door reveals back — before this its SHUT doors were
+reading flush too.
+
+And the row was then walked: all 116 bays shot square on, one per bay, both
+rows, read as four contact sheets. No other bay draws itself wrong.
+
+Census {seen 446, thin 333, plain 86, rich 27}, blockers 815. +2 760 triangles,
+24 a bay.
+
+## [1.325.0] — 2026-09-05
+
+### thirty metres of causeway, and it was one flat quad
+
+`brodQuay`'s deck is laid in 2.2 m bays, three lanes across, with joints down
+the length and a transverse joint between bays, tone stepped per bay and per
+lane, the edge strips pulled grey. All of that was written because "the joints
+were doing all the work and the slabs between them were one colour."
+
+The causeway got none of it. Twenty lines further down the same function, thirty
+metres of approach drawn as one quad a segment in one colour — and the causeway
+is the half of this structure you WALK. Its own note says the confirmed
+coordinate, 43.724982 / 15.847840, is fifteen metres along it, and that this is
+where a photograph of the pier gets taken from.
+
+Photographed from 26 m out it is a flat grey ribbon running over the water: a
+painted plank, which is the same failure its own flanks were added to fix one
+surface up — "a ribbon with no sides reads as a painted line on the water from
+the deck of the boat."
+
+Same construction as the deck now, with two differences that are the causeway
+rather than the pier.
+
+IT IS POURED IN SITU OVER A WET SHELF, not dressed, so the tone step per bay is
+wider — 0.105 against the deck's 0.075. A causeway is patched where the sea has
+taken it and the patches do not match.
+
+AND THE MARGINS ARE WET. The deck's edges are greyer than its middle because
+"wet stone loses its warmth before it loses its value". This one runs from 0.10
+to 1.15 m over a shelf the DEM puts at 0.01, so for the first twenty metres its
+edges are within a hand of standing water — the outer lanes darken toward the
+low end as well as greying, on a term that runs 1 at the shore and 0 at the
+pier.
+
+The flanks stay one piece a segment. Nobody sees the side of a causeway they are
+standing on, and from the boat it is a 0.25 m band at forty metres.
+
+Census {seen 446, thin 333, plain 86, rich 27}, blockers 815 — this is
+59-brod.js and takes no draw from the Jadrija stream.
+
+## [1.324.0] — 2026-09-05
+
+### nine hundred parasols were standing in an empty rim
+
+Three bodies of work, and the one that matters most is a bug neither of them
+was looking for.
+
+NINE ARGUMENTS INTO AN EIGHT-ARGUMENT FUNCTION, AND IT DREW NOTHING.
+`post(P, dt, ds, y0, y1, r, col, sides)` has no `topCol`. Two calls passed one
+anyway, so the second colour landed in `sides`, `i < sides` compared a number
+against an Array, that coerced to NaN, and the loop ran zero times. No error, no
+warning, no geometry.
+
+    12683  the cafe parasols' aggregate fill — the 40 mm of pebble concrete
+           standing above the wheel rim
+    17295  the beach parasols' — and this one costs more, because there is no
+           `dome` after it to cap the fill
+
+`props.parasols` is 900. Nine hundred parasols have been standing in a hollow
+rusty ring with a hole straight through the middle of it, and from anywhere
+above the beach that is nine hundred holes. The rim drew, the pole drew, the
+canopy drew, and the thing they all stand in never has.
+
+Found by a terrace pass that hit the same signature on `poseur`'s barrel drums —
+the JAMNICA hem has been hanging in mid-air round nothing — and named these two
+rather than fixing them out of scope. That is the right way round.
+
+THE KONOBA'S TERRACE, at arm's length, off `20260821_175856` and the 4K frame at
+314 s.
+
+  the floor    every business gets a poured pad and this one's is half of every
+               shot; `_175856` is half floor and all of it is crazy paving. A
+               jittered flag lattice, 13 x 9 at about 1.0 x 1.1 m, in the
+               promenade's own palette pulled a fifth toward luminance and
+               lifted 7% — the promenade photographs honey at R:B 1.59 and this
+               terrace photographs rgb(196,194,193), R:B 1.02.
+  the stools   were a coloured slab on four white sticks with the back on the
+               wrong side. Monobloc now: splayed tapering legs in the stool's
+               own colour, a four-sided footrest, and a raked bowed perforated
+               back drawn both windings. Six at 1.06 m in scarlet, lime and
+               anthracite, which is what the two frames have.
+  and          the yellow parasol under the roof, the Coca-Cola cooler, counter
+               clutter, the bare bulb on its flex, the stone-topped table with
+               the ashtray the video frame has on it.
+
+The terrace kit also stood on the shore rather than on the floor: the deck
+climbs 171 mm across this frontage while the shop's pad is flat, so the wicker
+chairs were 74 mm inside it.
+
+NO LETTERING ON THE COUNTER. Both frames have a word painted on the boards and
+at source resolution it reads Z, Z, E, R and nothing else. PIZZERIA is a guess,
+so it ships bare. Coca-Cola IS legible in both, so the cooler carries it.
+
+THE KABINE'S OPEN BAYS, and the brief I wrote for this was wrong.
+
+I asked for `doorWear` to be laid on the open leaf. The agent measured the
+premise instead of taking it: `openDoor` swung its leaf INWARD to a right angle,
+which is edge-on to everyone in front of it — of its 0.70 m only the 25 mm
+nearest the wall clears the reveal, and the strip curtain hangs across that.
+Painted magenta and shot from eight standing positions at 1.2 to 3.6 m it came
+to 9 to 970 pixels of a 620 x 760 frame, and square on at 3 m it was a hairline
+ten pixels wide. Weathering it would have shipped seven hundred invisible quads.
+
+The old note justified the inward swing by saying a folded leaf "would cover its
+neighbour's door". It does not: a folded leaf reaches 1.35 m from the bay's
+middle and the neighbour's architrave starts at 1.645. And `f32` — the frame
+handed over for the OTHER job — shows the real thing folded flat back on the
+render with the curtain in the hole and a clothesline across it.
+
+So the leaf folds flat now and goes through `door()`: stiles, louvres or planks,
+paint failure, rust streaks, hinges, hasp and staple. A leaf lying on the
+outside wall opens outward, so what faces the promenade is its weather face,
+which is the face `doorWear` was measured on. No padlock — the hut is open.
+75 mm of standoff and not 40, because `crazyFace` stands its flags 64 mm proud.
+
+AND ONE RUSTED STEEL DOOR, at `bayN === 34`. Red-oxide welded frame, two frosted
+panes, every horizontal rusted through, a lock block with the handle gone and
+the cylinder still in it, a rust trail down the upper pane. Colours as ratios
+against `f32`'s sunlit render at rgb(175,177,180): oxide 0.56/0.34/0.35,
+rusted-through 0.74/0.58/0.52, upper pane 1.07/1.13/1.21 — brighter than the
+wall and blue, the only thing on the row lighter than the render, which is why
+it carries — and the lower pane 0.70/0.69/0.64, a different glass.
+
+Built at bay 32 first and moved: 32's neighbour is a white PVC leaf and side by
+side the two pale doors read as a pair, which is the opposite of a one-off.
+
+Census {seen 446, thin 333, plain 86, rich 27} throughout. Blockers 811 to 815,
+all four accounted — a sixth stool, the parasol base, the cooler, the stone
+table. 624 399 to 633 587 triangles.
+
+TWO THINGS LEFT OPEN, both proved against a pristine build of main:
+
+The open bay at t 482.4, s 17.2 draws its architrave's left jamb and head and
+then no right jamb, no vent grille and no dark reveal — the opening is filled
+with plain wall and its curtain never shows. One bay in 115 drawing itself half
+finished.
+
+And `paving` lays the promenade's flags from s 15.9 under the konoba at
+`surfaceY + 0.05`, which follows the deck, while the shop's apron is flat
+because the shop is. The two cross at t 245.7 within 3 mm across a 3.5 m band.
+It is not new — the pad it replaces crosses the same flags at t 243.9, which is
+the beige patch that has been showing in front of that counter all along.
+Photographed at four angles including square down it at grazing incidence and it
+does not show. Clearing it properly means lifting the terrace 0.115 m and
+rebuilding the counter, stools, cooler, parasol and pine collar against a new
+datum with a skirt, which is a different job.
+
+## [1.323.0] — 2026-09-05
+
+### ŠB 6051 and ŠB 208 on the walk out to the ferry
+
+`1000150357` is a photograph taken FROM the walkway out to the Brod, and the
+loudest readable thing in it is the registration on a bow. Sixteen boats lie
+bow-to along that quay in the game — cabins, screens, pulpits, covers, bow lines
+up on to the coping, all of it already there — and not one of them was lettered.
+
+Opened at the source 4000 x 2252, not the 1100 a contact sheet gives, two of
+them come up clean:
+
+    ŠB 6051   blue serif digits on a cream hull
+    ŠB 208    dark bold digits on a white one — a different boat, a different
+              signwriter
+
+TWO, AND THE OTHER FOURTEEN GO BARE. A third in the frame reads "ŠB 5" and then
+disappears behind the boat in front of it, and inventing the rest of it would be
+inventing a boat registration. ŠB is Šibenik; both bows carry it, as they do in
+life.
+
+THE TWO ON THE ENDS OF THE ROW, and that is not a taste. These lie bow-to with
+0.10 to 0.20 m of water between them, so every topside in the middle of the row
+is behind the next boat's hull. Lettering k 3 and k 9 was the first cut and both
+numbers were occluded from every camera on the walkway — I built them, went
+looking, and could not find either. It is also why exactly two are readable in
+`_357`: a row of boats has two outboard sides and the rest is hull against hull.
+k 0's faces back down the walkway toward anybody coming out to the ferry, and
+k 15's faces the head.
+
+Placed on the hull's own numbers rather than by eye. `boatNearProto`'s stations
+put the sheer half-beam at 0.735 and the chine at 0.501 at x 1.75, so the
+topside flares 19 degrees there; 0.66 is the hull at plate height and 0.695
+stands it 35 mm proud, clear of the flare at both edges without reading as a
+sticker. The face is Georgia and not Helvetica because the digits in `_357` have
+serifs and a flagged 1, which is what half the boats on this coast are lettered
+in.
+
+`paintedWord` in 43-jadrija.js does this job already and could not be used: it
+is a closure-local helper and both 37-props.js and 59-brod.js sort outside that
+closure. Eighteen lines was cheaper than moving it. The table and the helper are
+hoisted above `moor` — a `const` declared below its reader in this file gives
+BUILD DID NOT FINISH at some percentage rather than an exception, which has bit
+here before.
+
+CHECKED AND NOT A DUPLICATION, because it looked like one for a while:
+`59-brod.js` has had `moleFittings` — rubbing baulk, mushroom bollard, stainless
+bitt, flaked rope, rubber fender — since it was written, and 1.318.0 put
+bollards, a strake, tyres and lines on a mole in 43-jadrija.js without knowing.
+They are different structures 200 m apart: `BROD.quay` is the ferry pier at
+[-1770.5, 328.5], 46 m by 6, deck 1.15; `MOLE[0]` is the bathing mole at
+[-1932.3, 473.4], 42.8 by 4.2, deck 2.19. The Brod's own note even says so — "the
+bathing mole's is 1.46". Nothing overlaps. The reason my 1.318.0 photographs
+showed bare concrete is that the pier, its fittings and its fleet are all built
+lazily on the first `moor()`, and none of my probes had called it.
+
+Census {seen 446, thin 333, plain 86, rich 27}, blockers 811, triangles
+unchanged.
+
+## [1.322.0] — 2026-09-05
+
+### the konoba's reed roof was a flat brown box
+
+The konoba is the open bar on the water at t 240, and the pass that built it got
+the CEILING right and left the roof alone. Twelve bays of amber translucent
+sheet with battens and purlins, because that is what you stand under — and on
+top of it a single 13 x 10 m slab, 0.28 m thick, with four square corners.
+
+From the promenade and from the air that slab IS the building. `20260821_175856`
+is the frame the ceiling was built from and it says the top is nothing like a
+slab: it is reed, and what makes reed read as reed at fifty metres is that the
+eave is RAGGED. The stems hang past the frame at every length there is, so the
+roof has no edge at all — it has a fringe.
+
+    the courses  thatch is laid in laps and each lap sits proud of the one
+                 behind it, so the top reads as bands and not as a plane —
+                 the same finding the mole deck and the kabine row are built
+                 around. Eighteen courses, each a step of tone off `jit`.
+    the fringe   every stem a different length and a different reach, all round
+                 the perimeter at 0.13 m — close enough that from the promenade
+                 it is one ragged edge and not a row of teeth.
+
+THE COLOUR IS MEASURED AS A RATIO, and that is deliberate: the only frame with
+sunlit thatch in it is deep evening under a canopy, and nothing in it is at full
+value. `1000150414` at 314 s has the roof and the sand beside it in the same
+light — reed rgb(100, 66, 38) against sand rgb(122, 104, 82) — so the reed is
+0.82 / 0.63 / 0.46 of the sand's albedo, and this shore's sand is about
+0.62/0.58/0.50. That gives 0.508/0.365/0.230.
+
+The first cut took the trska off the slastičarnica's service wall instead and
+came out the colour of straw rather than of a roof: too pale, too yellow, and
+from above it read as a sandbank. The greyer second colour is old reed — a roof
+is not rethatched all at once, so a bundle takes one or the other off `jit`.
+
+`_175856` itself is no use for this: a pine branch lies across the sunlit half
+of that roof and every crop I took of it came back canopy.
+
+Census {seen 446, thin 333, plain 86, rich 27}, blockers 811. 619 899 to 624 399
+triangles, all of it the fringe.
+
+CHECKED AND NOT A DEFECT, from the same evening's frames, so the next pass does
+not go chasing them: the terrace parasols are furled and tied in every survey
+frame shot at ten to six, and the game already does that — `furled` is
+`(CONFIG.hour || 14) > 17`, which is the same hour the photographs were taken.
+And the pizzeria at t 200 is a solid rendered wall with a shuttered opening and
+the way in round the corner past the freezer, which is what `1000150335` shows;
+the thatched bar with PIZZERIA on its counter in the 314 s frame is this konoba
+seen from the other side, not a business the game is missing.
+
+## [1.321.0] — 2026-09-05
+
+### the centenary hoarding said 1O, and now it says 100
+
+`jadrija100` draws the printed enclosure out on the chippings behind the
+businesses, and its own note calls the print "the best piece of graphic design
+at Jadrija". It was drawing a "1" and then ONE arch with four doors in it. On
+the built panel that reads as a numeral standing beside a dome — as 1O, not as
+a hundred.
+
+THE FRAME THAT SETTLES IT is `1000150414` at 342 s, opened at the source
+3840 x 2160 rather than off a contact sheet. The mark is a kabina row of FIVE
+doorways with THREE arches over it, and the three arches are the 1 and the two
+zeros:
+
+  the 1 is a slab with a stepped flag standing over doorway one — drawn, not
+    typeset, and with no base serif, because it does not stand on anything;
+  each zero is an arch spanning a PAIR of doorways with a narrow slot cut down
+    its middle, and the slot lines up with the gap between that pair;
+  the five doorways are white, green, ochre, red, white, each with a handle
+    dash at hand height;
+  and under the lot, two long water lines — the second shorter and stepped
+    right — then two dashes.
+
+That last one was drawn as two plain bars and called "the step". A step is a
+plinth. This is the sea, and it is what stops the mark reading as a terrace of
+shops.
+
+`hundredMark`, three hundred lines further up the same file, has had the
+two-arch reading since it was written, and its own note says the two disagree
+and one of them is wrong:
+
+    "the evidence in hand is a photograph of THIS wall, not of the hoarding,
+     and swapping the glyph would silently redraw three shipped objects on the
+     strength of it. The seam is here when somebody has a frame of the hoarding
+     close enough to settle it."
+
+This is that frame, and the hoarding is the one that was wrong. Every
+proportion below is that crop divided by its own height: the mark is 1285 x 775
+px, so 1.658 wide; the band carrying the flag and the arches is 0.361 of the
+height; five doorways at a pitch of a fifth of the width, each 0.845 of its
+pitch.
+
+The mark's three coloured doors are lighter than the grid's, and for exactly
+the reason the grid's own note gives about itself — this is flat printed colour
+on a cream panel in full sun. Measured off the same crop: rgb(95, 190, 135),
+rgb(232, 168, 65), rgb(222, 78, 82). The first cut reused the kabina palette's
+saturation and the three came out as dark slabs under a white arch rather than
+as a drawing of three doors.
+
+A FALSE START WORTH RECORDING. I found the mural, did not recognise it, and
+rebuilt `centenaryTex` — the small mint board on legs at t 346 — into the
+photograph's livery before noticing that `jadrija100` already existed, was
+already researched off `20260821_175215` and `175149`, and was already the
+object in my frame. That work was reverted whole rather than half-kept: two
+shipped boards had been repainted in a third object's colours on the strength
+of a photograph of neither. `centenaryTex` is untouched.
+
+Census {seen 446, thin 333, plain 86, rich 27}, blockers 811, triangles
+unchanged — this is a canvas, not geometry.
+
+## [1.320.0] — 2026-09-05
+
+### ŠB 6051 and ŠB 208, tied to the bollards 1.318.0 gave them
+
+1.318.0 put ironwork on the mole and left every mooring line running off a
+bollard into empty water, because there was nothing alongside to tie to. Three
+craft now lie against her outboard face, bow toward the head, with bow and
+stern lines up to the deck.
+
+TWO NUMBERS ARE READ AND THE THIRD BOAT GOES BARE, which is rule 12 doing its
+job. `_357` is 4000 x 2252 at source, not the 1100 a contact sheet gives, and
+opened there two of them come up clean:
+
+    ŠB 6051   blue serif digits on a CREAM hull, a royal-blue sheer stripe
+              above them and a near-black boot band below
+    ŠB 208    dark bold digits on a white hull — a different boat, a different
+              signwriter, and a different livery
+
+A third reads "ŠB 5" and then disappears behind the boat in front of it, so it
+is not used. Inventing the other three digits would be inventing a boat
+registration, and that is exactly the sort of text rule 12 exists to keep off
+this shore.
+
+COLOURS divided out against the white hull, which is the one surface in that
+frame whose albedo is not in doubt: ŠB 208 reads rgb(215, 210, 205) against an
+assumed 0.85, so the illuminant is 0.78/0.74/0.71. The cream then comes out
+0.94/0.82/0.58 — high, but that is what an older gelcoat looks like beside a
+new white one, and it is why the two hulls in the photograph do not read as the
+same colour.
+
+Each hull is LOFTED from seven stations, not boxed. A boat is the one object on
+this shore where the sheer — the curve of the gunwale seen from the side — is
+the whole silhouette, and a prism has none. Three rings run through the
+stations, the keel at −0.32, the waterline and the gunwale, with four bands
+between them carrying the antifouling, the boot, the topsides and the stripe.
+Then a chrome pulpit and guard rail, a cuddy on two in three, an outboard on
+one in three, and two fenders over the quay side.
+
+THREE THINGS I BUILT WRONG AND THE PHOTOGRAPH CAUGHT EVERY ONE.
+
+The fenders stuck out sideways. Lathed about an ATHWART axis they came out as a
+0.23 m ball on her shoulder, which from the quay reads as a mooring buoy sitting
+on the foredeck. A fender hangs on a lanyard: the axis is vertical and it is
+outboard of the gunwale, not through it.
+
+The cockpits were four metres of flat grey sole, and a large flat horizontal
+surface is the worst case for the shadow map — it came out in a stipple of
+dither that read as a badly-drawn tarpaulin. Two in three now wear a real
+cockpit cover, tented so it sheds, which is what half the boats in `_357` are
+wearing anyway. The open third got thwarts, because a boat you can see into
+needs something to sit on in her.
+
+AND THE NUMBERS READ BACKWARDS, which took three goes, and the reason is worth
+writing down: A `DoubleSide` PLANE NEVER COMPLAINS. A mirrored ŠB is still a
+rendered ŠB; nothing errors, nothing looks obviously wrong, and the only thing
+that catches it is reading the photograph. `PlaneGeometry`'s normal is +Z and
+`rotation.y = t` sends that to (sin t, cos t), so the angle wanted is
+`atan2(N.x, N.z)` for the outward normal N — which is `+n` on the quay side and
+`−n` outboard, both of which are `side * n`. I had that, negated it on a hunch
+without re-photographing, and shipped it backwards for one build.
+
+They go on BOTH bows, and that is not decoration. This mole's deck is 2.19 m
+over the water and a number sits at 0.31, so from the only place you can stand
+to see the quay side you are looking 1.9 m down at a plate 0.83 m out —
+foreshortened to a smear. A registration goes on both bows in life, and the
+outboard one is the one you read, from the water, swimming past.
+
+Census {seen 446, thin 333, plain 86, rich 27}, blockers 811. 617 829 to
+619 899 triangles for three boats.
+
 ## [1.319.0] — 2026-09-05
 
 ### One fly on the gornji kat, and it is the turning that makes it a fly
