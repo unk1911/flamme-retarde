@@ -10739,14 +10739,23 @@ async function buildJadrija(scene) {
    * couple of centimetres apart there are decided by rounding. Outward from
    * the wall —
    *
-   *   s0+0.05  the dark inside          s0−0.11  the notices in the glass
-   *   s0−0.03  the pressed panels       s0−0.16  the livery strip
-   *   s0−0.04  the run-off streaks      s0−0.30  the counter ledge
-   *   s0−0.045 the printed display      s0−0.60  the notices on the door
-   *   s0−0.05  the algae under the band s0−0.90  the step ladder
-   *   s0−0.06  the ghost, the labels    s0−1.05  the Jana cooler
-   *   s0−0.075 the magazine rack        s0−1.32  the awning, at its front bar
-   *   s0−0.09  the frame, and the door  s0−1.46  the awning fascia print
+   *   s0+0.05  the dark inside          s0−0.075 the snack rack posts
+   *   s0−0.022 the counter apron field  s0−0.088 the snack bags
+   *   s0−0.03  the pressed panels       s0−0.105 the magazine rack
+   *   s0−0.04  the run-off streaks      s0−0.11  the notices in the glass
+   *   s0−0.045 the printed display      s0−0.13  the window frame
+   *   s0−0.048 the counter apron frame  s0−0.15  the shutter box
+   *   s0−0.05  the algae under the band s0−0.16  the livery strip
+   *   s0−0.058 the snack rails          s0−0.17  the notice on the beam
+   *   s0−0.06  the ghost, the labels    s0−0.30  the counter ledge
+   *   s0−0.07  the strip light          s0−0.90  the step ladder
+   *
+   * The door leaf lies along s rather than across it, so its own stack runs in
+   * t off `da`: the leaf at `da`, the handle rose at `da−0.014`, the battens at
+   * `da−0.026`, and the five posters stepping out 7 mm at a time from
+   * `da−0.008` to `da−0.035`. The Jana cabinet is off the elevation entirely
+   * now — `t1 + 0.42`, `s0 − 0.42` — and the awning is unchanged at `s0−1.32`
+   * for its front bar and `s0−1.475` for the printed fascia.
    */
   function tisakFront(S, y0, top) {
     const body = S.body;
