@@ -1637,6 +1637,45 @@ function buildBrod(scene) {
    * of water under her there against 1.15 m of draught, and the pier's other
    * side is the one the small craft use.
    */
+  /**
+   * The two registrations that can actually be read, and a plate to put them on.
+   *
+   * Hoisted here rather than left in `moor` because of the temporal dead zone
+   * this file has been bitten by before: a `const` declared below its reader
+   * gives BUILD DID NOT FINISH at some percentage, not an exception.
+   *
+   * `paintedWord` in 43-jadrija.js does this job already and cannot be used —
+   * it is a closure-local helper, and 37-props.js and this file both sort
+   * outside that closure. Eighteen lines is cheaper than moving it.
+   */
+  const BOAT_REG = [
+    { num: 'ŠB 6051', ink: '#173a86' },
+    { num: 'ŠB 208', ink: '#14161c' },
+  ];
+  const regCache = {};
+  function regPlate(text, ink) {
+    if (regCache[text]) return regCache[text];
+    const C = document.createElement('canvas');
+    C.width = 512; C.height = 112;
+    const g = C.getContext('2d');
+    g.textAlign = 'center';
+    g.fillStyle = ink;
+    // Georgia rather than Helvetica: the digits in `_357` have serifs and a
+    // flagged 1, which is the face half the boats on this coast are lettered
+    // in and is not what a sans gives.
+    g.font = '600 82px Georgia, "Times New Roman", serif';
+    const w = g.measureText(text).width || 1;
+    if (w > C.width * 0.94) {
+      g.font = '600 ' + Math.round(82 * C.width * 0.94 / w) + 'px Georgia, serif';
+    }
+    g.fillText(text, C.width * 0.5, C.height * 0.80);
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    regCache[text] = tex;
+    return tex;
+  }
+
   function moor() {
     const A = brodAnchor();
     const BERTH_IN = 8.0;
@@ -1752,6 +1791,55 @@ function buildBrod(scene) {
           prev = hb;
           const m = new THREE.Mesh(shells[h > 0.28 ? 0 : 1], mat);
           m.position.set(u, 0, v);
+          // ── her number, on two of the sixteen ──
+          //
+          // `1000150357` is a photograph taken from this walkway, and the
+          // loudest readable thing in it is the registrations on the bows.
+          // Opened at the source 4000 x 2252 — not the 1100 a contact sheet
+          // gives — two of them come up clean:
+          //
+          //   ŠB 6051   blue serif digits on a cream hull
+          //   ŠB 208    dark bold digits on a white one
+          //
+          // TWO, AND THE OTHER FOURTEEN GO BARE. A third in the frame reads
+          // "ŠB 5" and then disappears behind the boat in front of it, and
+          // inventing the rest of it would be inventing a boat registration —
+          // which is what rule 12 exists to keep off this shore. It is also
+          // what the photograph looks like: bows overlap, and you can read two
+          // of them.
+          //
+          // ŠB is Šibenik. Both bows carry it, as they do in life, and here
+          // that matters for a second reason: these lie bow-to with their
+          // sides against each other, so the number you actually read is on a
+          // boat further down the row, seen at a slant.
+          //
+          // THE TWO ON THE ENDS OF THE ROW, and that is not a taste. These lie
+          // bow-to with 0.10 to 0.20 m of water between them, so every topside
+          // in the middle of the row is behind the next boat's hull — lettering
+          // k 3 and k 9 was the first cut and both numbers were occluded from
+          // every camera on the walkway. It is also why you can read exactly
+          // two of them in `_357`: the row has two outboard sides and the rest
+          // are hull against hull. k 0's faces back down the walkway toward
+          // anybody coming out to the ferry, and k 15's faces the head.
+          const reg = k === 0 ? 0 : k === 15 ? 1 : -1;
+          if (reg >= 0) {
+            const R = BOAT_REG[reg];
+            // x 1.75 is a third of the way aft of the stem, where the frame
+            // has them. The topside flares 19 degrees there — sheer half-beam
+            // 0.735 against 0.501 at the chine — so 0.66 is the hull at plate
+            // height and 0.695 stands it 35 mm proud, which is clear of the
+            // flare at both edges without reading as a sticker.
+            for (const sd of [-1, 1]) {
+              const pl = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.135),
+                new THREE.MeshBasicMaterial({ map: regPlate(R.num, R.ink),
+                  side: THREE.DoubleSide, transparent: true,
+                  depthWrite: false }));
+              pl.position.set(1.75, 0.28, sd * 0.695);
+              pl.rotation.y = sd > 0 ? 0 : Math.PI;
+              pl.name = 'reg:' + R.num;
+              m.add(pl);
+            }
+          }
           // Her bow points at the quay, which on this face is +z when the
           // ferry is on -z. A child whose local +X must land on the group's
           // ±z takes a quarter turn the matching way round.
