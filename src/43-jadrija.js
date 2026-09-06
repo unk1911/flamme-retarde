@@ -10452,25 +10452,71 @@ async function buildJadrija(scene) {
   }
 
   /**
-   * The wall behind the counter: the cigarette display, and what is over and
-   * under it.
+   * The wall behind the counter, off the frontage frame rather than the sliver.
    *
-   * `1000150414` at 04:25 and `1000150343` opened at full size on the doorway.
-   * Read off the frame, head down: a black brand strip along the very top with
-   * two roundels on it; six courses of cigarette packets stood on end with a
-   * gold price rail across the front of every course, which is far and away the
-   * densest pattern in the shop; a course of confectionery in loud wrappers; a
-   * block of postcards, which at Jadrija in August is half a square metre of
-   * blue; and a low shelf of magazine covers.
+   * REBUILT, and the reason is that the old one was read through a doorway.
+   * `1000150343` is taken from the land side and the only thing it shows of
+   * this wall is what is visible through the open door — a slice about a third
+   * of a metre wide. `1000150414` at 04:24-04:28 is the frontage square on
+   * from the promenade and has the whole of it at 4K, and it is not the wall
+   * that was drawn.
+   *
+   * What was drawn: six full-width courses of cigarette packets with a GOLD
+   * price rail across every one of them, a course of confectionery, a 4 by 5
+   * block of postcards at the right, and a shelf of covers along the foot. Six
+   * gold lines 1.30 m long, evenly spaced, was the loudest thing in the shop
+   * and it is not in the photograph at all.
+   *
+   * What the frontage has, left to right and measured against the glass —
+   * which runs 2405 to 3740 across and 1000 to 1595 down in that frame, so
+   * every fraction below is a pixel measurement and not a proportion somebody
+   * liked:
+   *
+   *   u 0.00-0.37   the tobacco gantry. Near-black, and the pattern is
+   *                 VERTICAL: narrow slots with the pale end of a packet in
+   *                 each. The shelf edges are DARK with small white price
+   *                 cards clipped along them, four or five to a shelf. There
+   *                 is no gold rail anywhere on it.
+   *   u 0.40-0.56   a printed ad card across the head, dark with pale type.
+   *                 The word on it is `tomato`, which is a real Croatian
+   *                 prepaid brand and is legible at 4K — and is four pixels
+   *                 tall where this canvas is looked at, so it goes on as a
+   *                 bar (rule 12). Under it the sweets and gum.
+   *   u 0.40-0.57   a row of nine LIGHTERS stood on end in green, pink, blue,
+   *                 orange and yellow, with price cards under them. The
+   *                 brightest 0.15 m in the shop.
+   *   u 0.59-0.69   the postcard rack: ONE column of five raked landscape
+   *                 cards on a white wire frame, every one of them a blue
+   *                 coastal photograph. Not a block of twenty.
+   *   u 0.71-1.00   the snack rails. Three of them, and they are drawn in
+   *                 geometry in front of this canvas — see the note there —
+   *                 so what is on the canvas is the dark behind and the rows
+   *                 of white price cards, which show between the bags.
+   *   v 0.80-1.00   the counter shelf: raked covers standing at the back with
+   *                 flat stacks of newspapers in front, and at the east end
+   *                 the pale blue chest freezer with a printed beach towel
+   *                 over its lid.
+   *
+   * THE BANDS ARE FITTED TO THE GEOMETRY IN FRONT and not to the photograph's
+   * own fractions, which run 0.00-0.42, 0.42-0.60, 0.60-0.72, 0.72-1.00. Two
+   * objects stand between this canvas and the glass — the raked press rack on
+   * the west and three rails of snack bags on the east — and the first cut had
+   * the rack over the lighters and the bags over all five postcards. Every
+   * band is pushed to the width the frame leaves it, which is why the gantry
+   * loses 0.05 and the middle three gain it back. Nothing is dropped.
+   *
+   * The window itself is 1.30 m and the shop it stands for is 3.3, so this is
+   * a 1.30 m CROP of that wall rather than the whole of it squashed. Which
+   * crop: the gantry, the sweets, the lighters, the postcards and the snacks,
+   * in the order the photograph has them.
    *
    * All of it is one canvas and none of it is geometry, and the reason is the
    * count: the frame has something like a hundred and forty packets on that
    * wall and each one is a box. At the size this window is on the built page —
-   * about eighty pixels across at ten metres — the packets are a texture, and
-   * the only thing that survives the distance is that there are courses of them
-   * with a gold line under each course. Drawn bright rather than dim: the
-   * inside of a kiosk is a lit box and the whole trick of the dark `VOID`
-   * behind is that whatever is put in front of it reads as lit.
+   * about eighty pixels across at ten metres — the packets are a texture.
+   * Drawn bright rather than dim: the inside of a kiosk is a lit box and the
+   * whole trick of the dark `VOID` behind is that whatever is put in front of
+   * it reads as lit.
    *
    * Deterministic from the loop index. This runs at build time and taking a
    * draw off `rng` here would move a bather three hundred metres away (rule 4).
@@ -10485,66 +10531,176 @@ async function buildJadrija(scene) {
       const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
       return x - Math.floor(x);
     };
-    g.fillStyle = '#241f1b';
+    // The shop, unlit. Not black: everything drawn over this is a lit object
+    // and a lit object on black is a decal.
+    g.fillStyle = '#2a2521';
     g.fillRect(0, 0, CW, CH);
-    // The brand strip across the head, with its two roundels. There is a word
-    // on it and it is four pixels tall here, so it goes on as a bar (rule 12).
-    g.fillStyle = '#0e0d0c';
-    g.fillRect(0, 0, CW, CH * 0.075);
-    g.fillStyle = 'rgba(226,222,210,0.80)';
-    g.fillRect(CW * 0.06, CH * 0.026, CW * 0.13, CH * 0.026);
-    for (const u of [0.36, 0.43]) {
-      g.beginPath();
-      g.arc(CW * u, CH * 0.037, CH * 0.020, 0, Math.PI * 2);
-      g.fill();
-    }
-    // The cigarette wall: six courses, a gold rail under each, packets stood on
-    // end. The packet colours are the four a Croatian gantry actually is —
-    // cream, gold, deep red and near-black — and the widths wander a little so
-    // the courses do not comb.
-    const PK = ['#d8cdb4', '#c9a24a', '#8e2622', '#2c2724'];
-    const cy0 = CH * 0.10, ch = CH * 0.082;
-    for (let r = 0; r < 6; r++) {
-      const yy = cy0 + r * ch;
-      let x = CW * 0.03;
+
+    // A price card. The single commonest object on this wall — there are more
+    // of them than there are of anything else — and it is a white rectangle
+    // 40 mm across with two pixels of print on it, so it is a white rectangle.
+    const card = (x, y, ww) => {
+      g.fillStyle = '#e8e4da';
+      g.fillRect(x, y, ww, CH * 0.026);
+      g.fillStyle = 'rgba(40,36,32,0.55)';
+      g.fillRect(x + ww * 0.15, y + CH * 0.008, ww * 0.5, CH * 0.008);
+    };
+
+    // ── the tobacco gantry, u 0 to 0.42 ─────────────────────────────────────
+    //
+    // The packets stand in slots and the slot is the unit, so the loop runs
+    // across in slots and puts a packet in each. Widths wander so the rows do
+    // not comb: a regular grid here is the failure the fascia note warns about
+    // one shop up, at a tenth the size and forty times over.
+    const GW = CW * 0.37;
+    g.fillStyle = '#1b1815';
+    g.fillRect(0, CH * 0.02, GW, CH * 0.82);
+    const PK = ['#d8cdb4', '#c9a24a', '#8e2622', '#b8b2a4', '#6d6357'];
+    for (let r = 0; r < 7; r++) {
+      const yy = CH * (0.14 + r * 0.098);
+      let x = CW * 0.012;
       let i = 0;
-      while (x < CW * 0.72) {
-        const pw = CW * (0.019 + hs(r * 31 + i) * 0.008);
-        g.fillStyle = PK[(i + r) % 4];
-        g.fillRect(x, yy, pw * 0.86, ch * 0.74);
+      while (x < GW - CW * 0.016) {
+        const pw = CW * (0.0138 + hs(r * 31 + i) * 0.0050);
+        g.fillStyle = PK[(i * 3 + r * 2) % 5];
+        g.fillRect(x, yy, pw * 0.84, CH * 0.070);
         x += pw;
         i++;
       }
-      // The rail. Gold, and it is the only horizontal in the whole wall.
-      g.fillStyle = '#d9b855';
-      g.fillRect(CW * 0.02, yy + ch * 0.76, CW * 0.71, ch * 0.15);
-    }
-    // The confectionery course under it, in the loud wrappers confectionery is.
-    const SW = ['#d8452c', '#e0a327', '#3f6fbe', '#cf7f2f', '#8f4a9c'];
-    for (let i = 0; i < 16; i++) {
-      g.fillStyle = SW[i % 5];
-      g.fillRect(CW * (0.03 + i * 0.043), CH * 0.615, CW * 0.036, CH * 0.075);
-    }
-    // The postcards. Four columns of five, and at Jadrija in August every one
-    // of them is the same blue.
-    for (let cxi = 0; cxi < 4; cxi++) {
-      for (let cyi = 0; cyi < 5; cyi++) {
-        const b6 = 0.72 + hs(cxi * 9 + cyi) * 0.28;
-        g.fillStyle = 'rgb(' + Math.round(70 * b6) + ','
-          + Math.round(128 * b6) + ',' + Math.round(178 * b6) + ')';
-        g.fillRect(CW * (0.76 + cxi * 0.055), CH * (0.11 + cyi * 0.088),
-          CW * 0.046, CH * 0.074);
+      // The shelf the course stands on: a dark edge with its price cards.
+      g.fillStyle = '#100e0c';
+      g.fillRect(0, yy + CH * 0.072, GW, CH * 0.020);
+      for (let c = 0; c < 4; c++) {
+        card(CW * (0.026 + c * 0.086 + hs(r * 7 + c) * 0.018),
+          yy + CH * 0.074, CW * 0.028);
       }
     }
-    // and the low shelf of covers along the foot.
+    // The brand headers along the top of it, in the gold and khaki a gantry's
+    // own fascia cards are. Not a word on them at this size.
+    for (let c = 0; c < 4; c++) {
+      const b6 = 0.78 + hs(c * 13) * 0.22;
+      g.fillStyle = 'rgb(' + Math.round(196 * b6) + ','
+        + Math.round(172 * b6) + ',' + Math.round(96 * b6) + ')';
+      g.fillRect(CW * (0.010 + c * 0.092), CH * 0.030, CW * 0.080, CH * 0.075);
+    }
+
+    // ── the printed ad card at the head, and the sweets under it ────────────
+    g.fillStyle = '#171512';
+    g.fillRect(CW * 0.400, CH * 0.025, CW * 0.155, CH * 0.075);
+    g.fillStyle = 'rgba(226,222,210,0.86)';
+    g.fillRect(CW * 0.422, CH * 0.048, CW * 0.108, CH * 0.028);
+    // Confectionery, in the colours confectionery is — which is loud but not
+    // NEON. Six columns of pure hue on a 0.026 pitch came out as a colour test
+    // chart: every cell the same size, every cell touching the next, and the
+    // whole block the brightest thing on the shore from twelve metres. Four
+    // wider boxes to a shelf with daylight between them, half of them in the
+    // browns and creams a chocolate wrapper is, and the saturated ones kept
+    // for one in three.
+    const SW = ['#c4552f', '#c9973a', '#8a6a4a', '#a8763c', '#7d5a86',
+      '#5f8a58', '#c8b664', '#a8a094'];
+    for (let r = 0; r < 5; r++) {
+      for (let i = 0; i < 4; i++) {
+        const k = r * 4 + i;
+        g.fillStyle = SW[(k * 3 + r) % 8];
+        g.fillRect(CW * (0.400 + i * 0.041 + hs(k * 5) * 0.006),
+          CH * (0.135 + r * 0.088), CW * 0.030, CH * 0.068);
+      }
+      g.fillStyle = '#100e0c';
+      g.fillRect(CW * 0.396, CH * (0.135 + r * 0.088) + CH * 0.072,
+        CW * 0.164, CH * 0.016);
+    }
+
+    // ── the lighters ────────────────────────────────────────────────────────
+    //
+    // Nine of them stood on end on one shelf, and at 25 mm apiece they are the
+    // smallest thing on this canvas that is worth drawing — because they are
+    // also the most saturated. In the frame they read before the sweets do.
+    const LT = ['#3ad26a', '#ec4fa2', '#3aa8e8', '#f08a2a', '#f2d431'];
     for (let i = 0; i < 9; i++) {
+      g.fillStyle = LT[i % 5];
+      g.fillRect(CW * (0.400 + i * 0.0185), CH * 0.600, CW * 0.013, CH * 0.055);
+    }
+    g.fillStyle = '#100e0c';
+    g.fillRect(CW * 0.394, CH * 0.657, CW * 0.176, CH * 0.016);
+    for (let c = 0; c < 3; c++) card(CW * (0.406 + c * 0.056), CH * 0.660, CW * 0.028);
+
+    // ── the postcard rack, u 0.60 to 0.72 ───────────────────────────────────
+    //
+    // One column of five, raked, on a white wire frame — which is why it is
+    // drawn as five landscape cards each with a white lip under it rather than
+    // as a grid of twenty portrait ones. Every card is the same blue because at
+    // Jadrija in August every card is the same blue, and they are lightened
+    // toward the top because the tier above shows more of its own face.
+    for (let k = 0; k < 5; k++) {
+      const yy = CH * (0.175 + k * 0.076);
+      const b6 = 0.74 + hs(k * 11 + 2) * 0.26;
+      g.fillStyle = 'rgb(' + Math.round(74 * b6) + ','
+        + Math.round(136 * b6) + ',' + Math.round(186 * b6) + ')';
+      g.fillRect(CW * 0.586, yy, CW * 0.104, CH * 0.062);
+      // The sky at the top of each and the wire lip under it.
+      g.fillStyle = 'rgba(206,224,238,' + (0.55 + hs(k * 3) * 0.25).toFixed(2) + ')';
+      g.fillRect(CW * 0.586, yy, CW * 0.104, CH * 0.018);
+      g.fillStyle = '#dcd8ce';
+      g.fillRect(CW * 0.580, yy + CH * 0.062, CW * 0.116, CH * 0.010);
+    }
+
+    // ── the snack wall, u 0.72 to 1.00 ──────────────────────────────────────
+    //
+    // The bags are geometry in front of this. What is drawn here is the shop
+    // behind them — dark, with a second layer of stock showing between — and
+    // the three rows of price cards, which are what makes the rails read as
+    // rails and not as three shelves of nothing.
+    g.fillStyle = '#1e1a17';
+    g.fillRect(CW * 0.71, CH * 0.02, CW * 0.29, CH * 0.76);
+    for (let r = 0; r < 3; r++) {
+      const yy = CH * (0.115 + r * 0.268);
+      for (let i = 0; i < 5; i++) {
+        const b6 = 0.62 + hs(r * 17 + i) * 0.30;
+        g.fillStyle = 'rgb(' + Math.round(150 * b6) + ','
+          + Math.round(96 * b6) + ',' + Math.round(58 * b6) + ')';
+        g.fillRect(CW * (0.722 + i * 0.054), yy, CW * 0.044, CH * 0.115);
+      }
+      g.fillStyle = '#0e0c0a';
+      g.fillRect(CW * 0.71, yy + CH * 0.118, CW * 0.29, CH * 0.020);
+      for (let c = 0; c < 4; c++) {
+        card(CW * (0.726 + c * 0.068), yy + CH * 0.120, CW * 0.032);
+      }
+    }
+
+    // ── the counter shelf along the foot ────────────────────────────────────
+    //
+    // Raked covers standing at the back, flat stacks of newspaper in front of
+    // them, and the chest freezer at the east end with a towel over its lid.
+    // This is the one band of the window a person walking past is level with.
+    for (let i = 0; i < 7; i++) {
       const b6 = 0.70 + hs(i * 7 + 3) * 0.30;
       g.fillStyle = 'rgb(' + Math.round(214 * b6) + ','
         + Math.round(206 * b6) + ',' + Math.round(190 * b6) + ')';
-      g.fillRect(CW * (0.03 + i * 0.105), CH * 0.735, CW * 0.088, CH * 0.225);
-      g.fillStyle = SW[i % 5];
-      g.fillRect(CW * (0.03 + i * 0.105), CH * 0.735, CW * 0.088, CH * 0.048);
+      g.fillRect(CW * (0.020 + i * 0.094), CH * 0.800, CW * 0.080, CH * 0.145);
+      g.fillStyle = SW[i % 8];
+      g.fillRect(CW * (0.020 + i * 0.094), CH * 0.800, CW * 0.080, CH * 0.040);
     }
+    // The flat stacks in front of the covers, which is what a kiosk's own
+    // trade looks like lying down: pale grey edges with a shadow under.
+    for (let i = 0; i < 3; i++) {
+      g.fillStyle = 'rgb(196,192,182)';
+      g.fillRect(CW * (0.028 + i * 0.212), CH * 0.905, CW * 0.190, CH * 0.052);
+      g.fillStyle = 'rgba(30,26,22,0.45)';
+      g.fillRect(CW * (0.028 + i * 0.212), CH * 0.952, CW * 0.190, CH * 0.014);
+    }
+    // The freezer. Pale blue body, a darker blue foot, and the towel — which
+    // in the frame is the one thing in the whole window that is not for sale.
+    g.fillStyle = '#8fbcd6';
+    g.fillRect(CW * 0.680, CH * 0.800, CW * 0.320, CH * 0.200);
+    g.fillStyle = '#4a86ac';
+    g.fillRect(CW * 0.680, CH * 0.945, CW * 0.320, CH * 0.055);
+    g.fillStyle = '#4fa6d8';
+    g.fillRect(CW * 0.700, CH * 0.800, CW * 0.280, CH * 0.070);
+    g.fillStyle = '#e8eef2';
+    g.fillRect(CW * 0.760, CH * 0.812, CW * 0.070, CH * 0.048);
+    g.fillStyle = '#c2373a';
+    g.fillRect(CW * 0.700, CH * 0.918, CW * 0.086, CH * 0.020);
+
     const tex = new THREE.CanvasTexture(C);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
@@ -10755,7 +10911,25 @@ async function buildJadrija(scene) {
     }
 
     // ── the glazed corner ───────────────────────────────────────────────────
-    const gLo = y0 + 0.70, gHi = bandLo - 0.04;
+    //
+    // THE HEAD WAS 0.35 m TOO HIGH, and that is measured rather than judged.
+    // `gHi` was hung off the livery strip — `bandLo − 0.04`, which is
+    // `y0 + 2.17` — so the glass ran from the cill to within four centimetres
+    // of the band, 1.47 m of window with nothing over it but the awning.
+    //
+    // `1000150414` at 04:26 is the frontage square on and it has a HEAD BEAM:
+    // between the top of the glass and the awning's valance there is a pale
+    // ribbed box the width of the shop with a strip light under it, which is
+    // the roller shutter rolled up in the daytime. Scaled off that frame at
+    // 530 px to the metre — see the note over the counter ledge for where that
+    // number comes from and what checks it — the glass is 595 px, the shutter
+    // box 100 and the valance 155, so 1.12 m of glass, 0.19 of box and 0.29 of
+    // valance. The glass is 1.12 m and the head lands at `gLo + 1.12`.
+    //
+    // The door does NOT follow it down. `dHi` was `gHi + 0.04` and a 2.17 m
+    // leaf; at the new head it would be 1.78, which is a door you duck under.
+    // It is set on its own at `y0 + 2.00` now, which is a door.
+    const gLo = y0 + 0.70, gHi = gLo + 1.12;
     // The inside, dark, so that everything put in front of it is a lit object
     // in a shop and not a decal on a wall — the lightbox argument the generic
     // frontage makes and the one thing about it worth keeping.
@@ -10791,39 +10965,110 @@ async function buildJadrija(scene) {
     // newsagent's rack is built that way and the whole of what it looks like.
     // 0.50 rad, because at 0.25 the tiers read as flat shelves and at 0.80 the
     // covers are lying down and the rack has no face at all.
+    //
+    // MOVED WEST AND SHORTENED, both forced by the frame rather than chosen.
+    // The rack sat over `gt + 0.56 … t1 − 0.10`, which is the EAST two thirds
+    // of the window — and the east two thirds of this window is where the
+    // photograph puts the postcard column and the three rails of snack bags,
+    // which are the two loudest things behind the glass. A wire rack of raked
+    // covers standing in front of them is two dense objects on one square
+    // metre and the eye resolves neither. In `1000150343` the rack stands
+    // against the glass with the DARK of the shop behind it, which is exactly
+    // the tobacco gantry on the canvas below, so it goes to the west half and
+    // both things get a background to be read against.
+    //
+    // And four tiers at 0.30 put the top one at `gLo + 1.16`, four centimetres
+    // ABOVE the head now that the head is measured — it would have stood in
+    // the shutter box. 0.245 apart from `gLo + 0.18` fits four under 1.12 with
+    // the top tier's covers reaching 1.02.
+    //
+    // AND NO TWO COVERS THE SAME SIZE. Three per tier at 0.18 on a 0.21 pitch,
+    // four tiers, all twelve identical and all twelve aligned in columns: that
+    // is a lattice, and a regular pattern is worse than none. It is two covers
+    // to a tier now on a wandering width and a wandering gap, off an index
+    // hash and NOT off `rng` — a draw taken here moves a bather three hundred
+    // metres away (rule 4). A magazine is 0.21 m across the cover and two of
+    // them is what fits in the 0.46 m the rack has left after the postcards
+    // and the snack rails were given their share of the glass.
+    const rkA = gt + 0.06, rkB = gt + 0.52;
+    const rh = (n) => {
+      const x = Math.sin(n * 8.7411 + 41.113) * 17311.77;
+      return x - Math.floor(x);
+    };
     for (let k = 0; k < 4; k++) {
-      const cy = gLo + 0.26 + k * 0.30;
+      const cy = gLo + 0.18 + k * 0.245;
       const cs = S.s0 - 0.105 + k * 0.014;
-      for (let i = 0; i < 3; i++) {
-        const ta = gt + 0.58 + i * 0.21;
-        // Three covers to a tier and each tier its own family, which at this
-        // size is a band with colour changes in it and not three magazines.
+      let ta = rkA + 0.012 + rh(k * 5) * 0.020;
+      for (let i = 0; i < 2 && ta < rkB - 0.14; i++) {
+        const cw = 0.165 + rh(k * 5 + i + 1) * 0.055;
+        // Each tier its own family, which at this size is a band with colour
+        // changes in it and not two magazines.
         const g6 = 0.80 + ((i * 5 + k * 3) % 4) * 0.10;
         const col = k === 0 ? [0.660 * g6, 0.610 * g6, 0.540 * g6]
           : k === 1 ? [0.245 * g6, 0.345 * g6, 0.585 * g6]
             : k === 2 ? [0.640 * g6, 0.235 * g6, 0.175 * g6]
               : [0.620 * g6, 0.545 * g6, 0.215 * g6];
-        bar(ta, ta + 0.19, slat(cs, cy, 0.50, 0.24, 0.030), col,
-          shade(col, 1.14));
+        bar(ta, ta + cw, slat(cs, cy, 0.50, 0.19 + rh(k * 5 + i + 3) * 0.035,
+          0.030), col, shade(col, 1.14));
+        ta += cw + 0.012 + rh(k * 5 + i + 2) * 0.030;
       }
       // The wire tier itself, a hair below its magazines.
-      bar(gt + 0.56, S.t1 - 0.10, slat(cs + 0.020, cy - 0.055, 0.50, 0.20, 0.012),
+      bar(rkA, rkB, slat(cs + 0.020, cy - 0.050, 0.50, 0.18, 0.012),
         [0.585, 0.592, 0.585]);
     }
-    for (const t of [gt + 0.56, S.t1 - 0.11]) {
-      post(W, t, S.s0 - 0.075, gLo + 0.06, gLo + 1.22, 0.011,
+    for (const t of [rkA, rkB]) {
+      post(W, t, S.s0 - 0.075, gLo + 0.06, gLo + 1.06, 0.011,
         [0.585, 0.592, 0.585], 4);
     }
-    // The crisps, on clips, over the west end of the glass. In the frame they
-    // are a vertical strip of six or seven bags in the reds and yellows every
-    // crisp bag on this coast is, hung one under another off a hanging strip.
-    for (let k = 0; k < 5; k++) {
-      const ty = gHi - 0.20 - k * 0.135;
-      const g6 = 0.84 + (k % 3) * 0.10;
-      const col = k % 2 ? [0.680 * g6, 0.235 * g6, 0.155 * g6]
-        : [0.690 * g6, 0.520 * g6, 0.145 * g6];
-      boxTS(gt + 0.14, gt + 0.36, S.s0 - 0.088, S.s0 - 0.072, ty - 0.10, ty,
-        col, shade(col, 1.10));
+    // ── the snack bags, and they were a stripe in the wrong place ───────────
+    //
+    // Five bags in a 0.22 m column at the WEST end of the glass, which is a
+    // reading of `1000150343` — where all you can see of this wall is a sliver
+    // through the doorway. `1000150414` at 04:26 has the whole of it and it is
+    // nothing like a column: it is a FIELD, three horizontal rails across the
+    // east half of the window with six or seven bags hanging off each, and a
+    // row of small white price cards clipped along the front of every rail.
+    // The rails are the pattern — the one thing in this shop that repeats and
+    // that a photograph of it is full of.
+    //
+    // The bags go on in geometry and the cards on the canvas behind, because
+    // the cards are 40 mm objects and eighteen of them is 216 triangles of
+    // something nobody can resolve at four metres, while the bags are what
+    // gives the field its depth against the flat print.
+    //
+    // Widths wander with the index so the rows do not comb (rule: a regular
+    // pattern is worse than none). Deterministic and NOT off `rng` — a draw
+    // taken here moves a bather three hundred metres away (rule 4).
+    {
+      const hz = (n) => {
+        const x = Math.sin(n * 21.7351 + 13.9021) * 21943.113;
+        return x - Math.floor(x);
+      };
+      // Kept off the postcard column. The rails ran from `gt + 0.80`, which
+      // on the canvas behind is u 0.63 — straight over the five postcards at
+      // 0.58…0.70 — so the one object in this window that is a shape rather
+      // than a texture was behind three rows of crisps. They start at 0.90.
+      const ra = gt + 0.90, rb = S.t1 - 0.05;
+      for (let r = 0; r < 3; r++) {
+        const ry = gHi - 0.14 - r * 0.29;
+        // The rail the row hangs off, dark, and the bags under it.
+        boxTS(ra, rb, S.s0 - 0.070, S.s0 - 0.058, ry, ry + 0.016,
+          [0.155, 0.150, 0.145]);
+        let ta = ra + 0.015;
+        let i = 0;
+        while (ta < rb - 0.075) {
+          const bw = 0.075 + hz(r * 17 + i) * 0.030;
+          const g6 = 0.82 + ((i + r) % 3) * 0.09;
+          const col = (i + r) % 3 === 0 ? [0.680 * g6, 0.235 * g6, 0.155 * g6]
+            : (i + r) % 3 === 1 ? [0.690 * g6, 0.520 * g6, 0.145 * g6]
+              : [0.560 * g6, 0.245 * g6, 0.215 * g6];
+          boxTS(ta, ta + bw * 0.86, S.s0 - 0.088, S.s0 - 0.072,
+            ry - 0.115 - hz(r * 17 + i + 5) * 0.020, ry,
+            col, shade(col, 1.10));
+          ta += bw;
+          i++;
+        }
+      }
     }
     // The counter ledge, which projects and which the papers go on. It stops
     // 0.20 m short of `S.t1` on purpose: the open door leaf swings across
@@ -10848,9 +11093,73 @@ async function buildJadrija(scene) {
     }
     boxTS(gt, S.t1, S.s0 - 0.13, S.s0 - 0.09, gHi - 0.06, gHi, ALU);
     boxTS(gt, S.t1, S.s0 - 0.14, S.s0 - 0.08, gLo - 0.06, gLo, ALU);
-    // Below the cill the front is sheet, not glass.
-    boxTS(gt + 0.05, S.t1 - 0.05, S.s0 - 0.045, S.s0, y0 + 0.06, gLo - 0.04,
-      shade(body, 0.86));
+    // Below the cill the front is sheet, not glass — and it is not a BLANK
+    // sheet, which is what 1.20 m by 0.60 of flat khaki was. In `1000150414`
+    // at 04:26 the counter apron is a run of pressed panels with a frame
+    // between them and a plinth along the foot, and it is the band of this
+    // shop a person standing at the counter is looking straight at.
+    //
+    // Same construction as the panelled side above and for the same reason:
+    // the field is set back to `s0 − 0.022` and the frame stands proud at
+    // `s0 − 0.048`, because a routed groove is two extra faces to say what one
+    // raised member says, and a raised member cannot be lost by the depth test
+    // two kilometres out.
+    boxTS(gt + 0.05, S.t1 - 0.05, S.s0 - 0.022, S.s0, y0 + 0.06, gLo - 0.04,
+      shade(body, 0.80));
+    for (const t of [gt + 0.05, gt + 0.63, S.t1 - 0.05]) {
+      boxTS(t - 0.028, t + 0.028, S.s0 - 0.048, S.s0, y0 + 0.06, gLo - 0.04,
+        shade(body, 1.02), shade(body, 1.10));
+    }
+    for (const [yA, yB] of [[y0 + 0.06, y0 + 0.16], [gLo - 0.11, gLo - 0.04]]) {
+      boxTS(gt + 0.05, S.t1 - 0.05, S.s0 - 0.048, S.s0, yA, yB,
+        shade(body, 1.02), shade(body, 1.10));
+    }
+
+    // ── the shutter box over it, and the strip light under that ─────────────
+    //
+    // What the frame has between the glass and the valance, and the model had
+    // 0.35 m of extra window instead. It is not a lintel: at 04:26 the box is
+    // paler than the kiosk and RIBBED across its face, which is a roller
+    // shutter rolled up — the shop is a steel box on a public beach and it
+    // shuts with one. Three ribs and not a texture, because at this size the
+    // whole thing is 0.19 m deep and what carries it is the shadow under each
+    // rib rather than any pattern on the sheet.
+    //
+    // It runs the width of the glass and 0.02 m proud of the jambs' own face,
+    // so the box laps over the frame the way a shutter housing does and the
+    // two are never coplanar (rule 5).
+    {
+      const bLo = gHi, bHi = top - 0.47;
+      const CASE = shade(body, 1.24);
+      boxTS(gt - 0.05, S.t1, S.s0 - 0.15, S.s0 - 0.06, bLo, bHi,
+        CASE, shade(CASE, 1.08));
+      for (let k = 0; k < 3; k++) {
+        const ry = bLo + 0.035 + k * ((bHi - bLo - 0.07) / 3);
+        boxTS(gt - 0.04, S.t1 - 0.01, S.s0 - 0.158, S.s0 - 0.150,
+          ry, ry + 0.012, shade(CASE, 0.78));
+      }
+      // The strip light along the underside, which is the reason anything in
+      // the window is lit at all and is why the display behind reads as a lit
+      // box rather than as paint. Same member the container up the shore has;
+      // see `maslinaFront`, which found its own at four metres.
+      boxTS(gt + 0.16, S.t1 - 0.22, S.s0 - 0.055, S.s0 - 0.010,
+        bLo - 0.055, bLo - 0.012, [0.780, 0.772, 0.740]);
+      // ── the poster on it ─────────────────────────────────────────────────
+      //
+      // The one printed sheet on the front of this shop, and it is on the head
+      // beam at the east end: a small white card with a RED HEAD BAR across
+      // the top and three or four lines of black under it, screwed to the
+      // frame just inside the corner. In `1000150414` at 04:26 it measures
+      // 89 px by 42 at 530 px to the metre, which is 0.17 m by 0.08 — an A5
+      // landscape, and at that size the black lines are two pixels and go on
+      // as nothing at all (rule 12). What is READ is a white card with a red
+      // top, so a white card with a red top is what is drawn.
+      const nt = S.t1 - 0.30;
+      boxTS(nt - 0.085, nt + 0.085, S.s0 - 0.168, S.s0 - 0.162,
+        bLo + 0.045, bLo + 0.125, [0.815, 0.808, 0.790]);
+      boxTS(nt - 0.085, nt + 0.085, S.s0 - 0.174, S.s0 - 0.168,
+        bLo + 0.102, bLo + 0.125, [0.640, 0.145, 0.125]);
+    }
 
     // ── the red awning ──────────────────────────────────────────────────────
     //
@@ -10863,14 +11172,26 @@ async function buildJadrija(scene) {
     // canopy the length of the counter, a cream batten across its front bar,
     // and a red fascia hanging off that with the chain's mark on it.
     //
-    // Three numbers off the frame, all scaled against the counter, which is the
-    // one object in it whose height is not in doubt (0.95 m, and it measures
-    // 280 px, so 1 m is 295 px): the fascia is 136 px deep, which is 0.46 m and
-    // is drawn at 0.40; the cream batten is 28 px, which is 0.095 m and is
-    // drawn at 0.14 because below that it stops separating the two reds; and
-    // the projection is the one thing the frame cannot give, because the shot
-    // is square on to the frontage. 1.30 m is a folding-arm awning's usual
-    // throw and is what people are standing under in the frame.
+    // Three numbers off the frame, all scaled against the counter — and the
+    // counter is the one that was wrong. It was taken as 0.95 m, which set
+    // 295 px to the metre, which made the fascia 0.46 and it was drawn at 0.40.
+    //
+    // THE COUNTER IS NOT 0.95 m. It is the low display shelf the newspapers lie
+    // on, and it is 0.62: against the man standing at it in `1000150414` at
+    // 04:26 the scale at the shopfront is 530 px to the metre, and the shelf
+    // stands 328 px over the paving. Two things check it and neither is a
+    // guess. The chest freezer standing on the shop floor behind the glass has
+    // its lid 0.91 m up at that scale, which is what a chest freezer is to a
+    // centimetre. And the man's own bum-bag hangs at his hip with the shelf's
+    // nosing crossing him at the crotch — and the shelf is BEHIND him, so it is
+    // lower than that, not level with it.
+    //
+    // At 530 px the fascia is 155 px, which is 0.29 m, and it is drawn at 0.30.
+    // The cream batten is 45 px, which is 0.085, and stays at 0.14 because
+    // below that it stops separating the two reds. The projection is the one
+    // thing the frame cannot give, because the shot is square on to the
+    // frontage. 1.30 m is a folding-arm awning's usual throw and is what people
+    // are standing under in the frame.
     //
     // It stops 2.05 m short of `S.t1` rather than running the frontage, and
     // that is deliberate. In life the awning and the vinyl strip are on
@@ -10896,8 +11217,8 @@ async function buildJadrija(scene) {
       // The two end cheeks, which is what closes a fixed canopy off and what
       // stops it reading as a plank lying on the air.
       for (const [ca, cc] of [[at0 - 0.03, at0 + 0.01], [at1 - 0.01, at1 + 0.03]]) {
-        bar(ca, cc, [[S.s0 - 1.44, top - 0.57], [sIn, top - 0.01],
-          [sIn, top + 0.03], [S.s0 - 1.44, top - 0.53]], shade(AWN, 0.74));
+        bar(ca, cc, [[S.s0 - 1.44, top - 0.47], [sIn, top - 0.01],
+          [sIn, top + 0.03], [S.s0 - 1.44, top - 0.43]], shade(AWN, 0.74));
       }
       // The cream batten along the front bar, then the fascia hanging off it,
       // then the brighter hem along its bottom edge — every one of them set to
@@ -10905,12 +11226,12 @@ async function buildJadrija(scene) {
       // meet exactly on this shore meet in the depth buffer as well (rule 5).
       boxTS(at0, at1, S.s0 - 1.40, S.s0 - 1.30, top - 0.19, top - 0.05,
         BATT, shade(BATT, 1.10));
-      boxTS(at0, at1, S.s0 - 1.44, S.s0 - 1.36, top - 0.57, top - 0.17,
+      boxTS(at0, at1, S.s0 - 1.44, S.s0 - 1.36, top - 0.47, top - 0.17,
         AWN, shade(AWN, 1.08));
       boxTS(at0 - 0.01, at1 + 0.01, S.s0 - 1.46, S.s0 - 1.375,
-        top - 0.605, top - 0.555, shade(AWN, 1.26));
-      seaFacing(tisakAwnBand(at1 - at0, 0.40), (at0 + at1) * 0.5, S.s0 - 1.475,
-        top - 0.37, at1 - at0, 0.40, 'tisak:awning');
+        top - 0.505, top - 0.455, shade(AWN, 1.26));
+      seaFacing(tisakAwnBand(at1 - at0, 0.30), (at0 + at1) * 0.5, S.s0 - 1.475,
+        top - 0.32, at1 - at0, 0.30, 'tisak:awning');
     }
 
     // ── the door, standing open on to the promenade ─────────────────────────
@@ -10928,7 +11249,10 @@ async function buildJadrija(scene) {
     // there is no depth question left to lose.
     const dj = S.t1 - 0.10, da = dj - 0.05;
     const dS0 = S.s0 - 0.86, dS1 = S.s0 - 0.04;
-    const dLo = y0 + 0.04, dHi = gHi + 0.04;
+    // The head is its own number now and not `gHi + 0.04`. With the window's
+    // head measured down to `gLo + 1.12` a leaf hung off it is 1.78 m, which is
+    // a door you duck under; 2.00 is a door.
+    const dLo = y0 + 0.04, dHi = y0 + 2.00;
     boxTS(da, dj, dS0, dS0 + 0.075, dLo, dHi, ALU);
     boxTS(da, dj, dS1 - 0.075, dS1, dLo, dHi, ALU);
     boxTS(da, dj, dS0, dS1, dHi - 0.075, dHi, ALU);
@@ -11306,7 +11630,14 @@ async function buildJadrija(scene) {
     // again rather than shared because the tavern's is a closure inside its
     // own block, and one of the two would have to move to reach the other.
     {
-      const bt = (S.t0 + S.t1) * 0.5 - 0.10, bs = S.s0 - 2.55;
+      // AND NOT IN FRONT OF THE COUNTER. It was pitched at the middle of the
+      // frontage, 2.55 m out — a two-metre table across the one elevation this
+      // shop has, which is the parasol's mistake at half the height. All three
+      // frames agree on where it actually is: `1000150414` at 04:26 and 04:27
+      // has it on the GRAVEL among the pines several metres west of the Jana
+      // cabinet, and `1000150343` has it on the land side by the door. West of
+      // `t0` and off the paving, where the pan's clear apron stays clear.
+      const bt = S.t0 - 1.85, bs = S.s0 - 1.30;
       const WOOD = [0.452, 0.276, 0.190];
       const WTOP = [0.508, 0.316, 0.222];
       const LEG = [0.098, 0.096, 0.100];
