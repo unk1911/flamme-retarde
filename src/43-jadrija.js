@@ -11032,17 +11032,47 @@ async function buildJadrija(scene) {
       furniture.push({ t: lt2, s: cs - 0.04, a: 0.09, c: 0.34, h: hh, y: y0 });
     }
     // The two square parasols. `1000150343` has a big white one with CORONA on
-    // its valance standing over the front of the kiosk and a golden Ožujsko one
-    // beyond it, and square is the read: every other parasol on this shore is
-    // an octagon in a car rim and these two are four panels on a mast.
+    // its valance and a golden Ožujsko one beyond it, and square is the read:
+    // every other parasol on this shore is an octagon in a car rim and these
+    // two are four panels on a mast.
     //
     // Two beers at one pitch, which the terrace note explicitly rules out —
     // "no terrace on this shore is asked to sell two beers". This is not a
     // terrace. It is a newsagent with somebody else's shade standing beside it,
     // and both brands are in the frame and both are among the six Misha named.
+    //
+    // ── AND NEITHER OF THEM STANDS IN FRONT OF THE SHOP ─────────────────────
+    //
+    // The CORONA was pitched at `t0 + 1.10`, `s0 − 2.95`: dead centre of a
+    // 3.5 m frontage and three metres out from it. A 2.64 m canopy there is
+    // not shade beside a kiosk, it is a lid on it. Photographed from the
+    // promenade at twelve metres — which is the one direction anybody
+    // approaches this shop from — the panelled side, the livery band with
+    // TISAK on it, the glazed corner, the cigarette wall, the display and the
+    // magazine rack were ALL behind cloth, and what the frame showed of a shop
+    // that cost seven hundred lines was a parasol, a cooler and two
+    // centimetres of red awning end.
+    //
+    // Both sources say the apron is bare. The pan's two passes along the
+    // promenade have nothing in front of this frontage at all — `1000150414`
+    // at 04:24-04:28 is the counter square on with clear ground to the kerb —
+    // and in `1000150343`, read left to right, the order along the wall is
+    // panelled side, glazed corner with the door, END OF THE KIOSK, the Jana
+    // cooler standing just outside it, and only THEN the CORONA mast, with
+    // the Ožujsko one further out again toward the water. The parasol is
+    // beyond the shop in the one frame it appears in, and the model had it
+    // in front.
+    //
+    // So the CORONA goes past the door end into the gap between this shop and
+    // h2o — `t1 + 1.45` spans t 309.13…311.77 and h2o starts at 312, so it
+    // clears both — and the Ožujsko drops three metres further seaward, which
+    // is where `_343` has it relative to the CORONA and which also keeps two
+    // canopies at one eave height from sharing any plan area at all. Their s
+    // spans are 18.08…20.72 and 15.25…17.61: half a metre of daylight, and
+    // rule 5 never gets asked the question.
     for (const [pt2, ps2, half, cloth, key] of [
-      [S.t0 + 1.10, S.s0 - 2.95, 1.32, [0.735, 0.728, 0.700], 'corona'],
-      [S.t1 + 2.30, S.s0 - 3.15, 1.18, [0.680, 0.545, 0.115], 'ozujsko'],
+      [S.t1 + 1.45, S.s0 - 2.60, 1.32, [0.735, 0.728, 0.700], 'corona'],
+      [S.t1 + 2.30, S.s0 - 5.60, 1.18, [0.680, 0.545, 0.115], 'ozujsko'],
     ]) {
       const gy = surfaceY(pt2, ps2);
       // A 0.34 m rise over a 1.32 m half is 14 degrees, which is not a parasol,
@@ -11070,9 +11100,13 @@ async function buildJadrija(scene) {
     }
     // Two garden benches under the shade, timber slats on a dark frame with a
     // pale cushion on each, which is what the two people in the frame are
-    // sitting on.
+    // sitting on. They follow the CORONA: the whole reason they are anywhere
+    // is that they are UNDER it, and left at `t0 + 2.15` with the parasol moved
+    // past the door end they would have been two benches in the sun in front of
+    // a counter with the shade five metres away. Same two offsets, same two
+    // angles, hung off the new mast instead of the old one.
     for (const [bt, bs, ang] of [
-      [S.t0 + 2.15, S.s0 - 2.85, 0.0], [S.t0 + 0.15, S.s0 - 2.55, 0.5],
+      [S.t1 + 2.15, S.s0 - 2.50, 0.0], [S.t1 + 0.60, S.s0 - 2.20, 0.5],
     ]) {
       const gy = surfaceY(bt, bs);
       const co = Math.cos(ang), sn = Math.sin(ang);
