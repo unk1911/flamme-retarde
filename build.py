@@ -19,7 +19,9 @@ import base64
 import json
 import re
 import shutil
+import datetime
 import sys
+from html import escape as html_escape
 import urllib.request
 from pathlib import Path
 
@@ -36,7 +38,7 @@ DEPLOY = Path("/mnt/c/tmp/flamme-retarde")
 # rebuild byte-for-byte identically, because comparing checksums is how we
 # check that what is on the server is what is in the repo. Bump them together
 # when cutting a release, next to the CHANGELOG entry.
-VERSION = "1.345.0"
+VERSION = "1.346.0"
 BUILD_DATE = "2026-09-06"
 
 THREE_VERSION = "0.180.0"
@@ -211,12 +213,50 @@ def check_syntax(app: str) -> None:
         r = subprocess.run(["node", "--check", tmp], capture_output=True, text=True)
         if r.returncode != 0:
             err = (r.stderr or "").replace(tmp, "app.js")
+            poison(err)
             sys.exit(f"error: generated app has a syntax error\n{err}")
         print("  syntax ok")
     except FileNotFoundError:
         print("  (node not found — skipping syntax check)")
     finally:
         Path(tmp).unlink(missing_ok=True)
+
+
+def poison(err: str) -> None:
+    """
+    Make a failed build LOOK failed, because a loud stderr is not enough.
+
+    This check runs before `OUT` is written, so on a syntax error the previous
+    good bundle stays on disk — and anything already serving it keeps serving a
+    page that renders perfectly and is one edit out of date. An agent lost a
+    cycle to exactly that in September: it edited a shader, the build failed on
+    a backtick inside a GLSL template literal, and its next two measurements
+    came back byte-identical to the ones before. It read that as "the change did
+    nothing" rather than "the change is not in the file", which is the worst
+    possible way for a build to fail — silently, into a measurement.
+
+    So the stale output is replaced with a page that says so. It costs one
+    failed build its cached copy and buys back the guarantee that what you
+    photograph is what you wrote.
+    """
+    stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    body = html_escape(err.strip()) or "(no message)"
+    page = (
+        "<!doctype html><meta charset=utf-8><title>BUILD FAILED</title>"
+        "<style>html{background:#2b0b0b;color:#ffd9d9;font:14px/1.5 ui-monospace,"
+        "SFMono-Regular,Menlo,monospace;padding:6vh 6vw}h1{font-size:2.4rem;"
+        "letter-spacing:.04em;color:#ff6b6b;margin:0 0 .4em}pre{white-space:pre-wrap;"
+        "background:#1a0606;padding:1em;border-left:3px solid #ff6b6b}</style>"
+        f"<h1>BUILD FAILED</h1><p>{stamp} — the bundle was NOT rebuilt, and the "
+        "stale one has been replaced by this page on purpose. Fix the error, "
+        f"build again.</p><pre>{body}</pre>"
+    )
+    for path in (OUT, DEPLOY / "flamme-retarde.html", DEPLOY / "index.html"):
+        try:
+            if path.exists():
+                path.write_text(page)
+        except OSError:
+            pass
 
 
 def main() -> None:

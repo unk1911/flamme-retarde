@@ -2487,7 +2487,8 @@ let bodyCam = false;
  * first-person view is worse than no button.
  */
 function toggleBodyCam() {
-  if (state.phase !== 'swim' && state.phase !== 'ground') return;
+  if (state.phase !== 'swim' && state.phase !== 'ground'
+    && state.phase !== 'brod') return;
   bodyCam = !bodyCam;
   syncBodyBtn();
   toast(TK(bodyCam ? 'body.on' : 'body.off',
@@ -5345,7 +5346,10 @@ function frame() {
   else if (state.phase === 'ground') ground.pose(camera, bodyCam ? 3.10 : 0, dt);
   else if (state.phase === 'ride') ride.pose(camera);
   else if (state.phase === 'foil') foil.pose(camera);
-  else if (state.phase === 'brod') brod.pose(camera);
+  // On her deck the pull-back is 59-brod.js's own number and that file drives
+  // its own body — see `pose` and `driveBody` there. 3.10 is ground's figure
+  // too, but it is kept where the reasoning for it lives.
+  else if (state.phase === 'brod') brod.pose(camera, bodyCam ? BROD.third : 0, dt);
   else if (state.phase === 'swim') swim.pose(camera);
   else if (state.phase === 'chute' || eject.active) eject.pose(camera);
   else if (state.phase !== 'intro') updateCamera(dt);
@@ -6854,7 +6858,16 @@ window.__fr = {
      * `body()` in a probe flips the state it was meant to be reading, which
      * has now cost two wrong test runs. Pass `true` to read-and-set.
      */
+    /**
+     * THIS TOGGLES. It is not a getter, and calling it to "check" the state
+     * flips the thing you are checking — which cost a measurement: set true,
+     * read (flipped to false), read again after a frame (flipped back to
+     * true), and the reading looked like the switch was being reset by the
+     * frame loop. Use `bodyOn()` to read.
+     */
     body: (v) => { bodyCam = v == null ? !bodyCam : !!v; syncBodyBtn(); return bodyCam; },
+    /** Read it without changing it. */
+    bodyOn: () => bodyCam,
     /** The changing station: dressed or not, and which cubicle she is in. */
     changed: (v) => {
       if (v != null) setDressed(!v);
