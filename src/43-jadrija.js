@@ -10318,27 +10318,71 @@ async function buildJadrija(scene) {
     const FF = '"Helvetica Neue", Arial, sans-serif';
     g.fillStyle = '#ffffff';
     g.textAlign = 'left';
-    g.font = '800 ' + Math.round(CH * 0.62) + 'px ' + FF;
-    g.fillText('TISAK', CH * 0.28, CH * 0.78);
+    // ── the two printed blocks, and both of them were under a stile ─────────
+    //
+    // The wordmark was set at `CH * 0.28` from the canvas's left edge, which is
+    // 0.022 of a 3.56 m strip, and the FIRST cut — the frame member on the
+    // kiosk's west corner — is centred at 0.017 and is 0.15 m wide, so it spans
+    // −0.004…0.038. TISAK started at 0.022. The stile was drawn straight down
+    // the T and half of the I: a livery strip whose one word is behind a piece
+    // of the frame. The small block had the same fault at the other end, at a
+    // millimetre or two rather than a letter and a half — it began at 0.500 and
+    // the fourth stile's right edge is at 0.501.
+    //
+    // Both are placed off `cuts` now rather than off the canvas, so they follow
+    // the frame if anybody moves `gt` or the bay count, and both offsets are
+    // measured on `1000150343` against the BAY as the ruler — the one thing in
+    // that frame that is on the wall plane and not cut by the roof overhang.
+    // Against a bay of 202 px at the west end and 275 px at the east, and a
+    // band 132 px and 143 px deep at the same two places:
+    //
+    //   TISAK       starts 0.295 of the band right of the first stile's centre
+    //   the block   starts 0.490 of the band right of the fourth stile's
+    //
+    // WIDTH IS SET AND NOT LEFT TO THE FONT. Measured, TISAK is 1.06 of the
+    // band deep by 0.40 of it tall — 2.64 wide for one cap high, where Arial
+    // Bold sets the same five letters at 4.19. The real mark is a condensed
+    // face, and neither this machine nor a phone can be relied on to have one:
+    // set in Arial at the measured cap height it comes out 1.6 times too long
+    // and runs into the next bay. So each block is measured and squeezed on x
+    // to the width the photograph has, which is right in whatever font Chrome
+    // finds — the same argument `posterSkin`'s `fit` makes, one step further.
+    const C0 = cuts.length ? cuts[0] : 0.017;
+    const C3 = cuts.length > 3 ? cuts[3] : 0.48;
+    const press = (text, x, y, px, wide, weight) => {
+      g.font = weight + ' ' + Math.round(px) + 'px ' + FF;
+      const k = wide / Math.max(1, g.measureText(text).width);
+      g.save();
+      g.translate(x, y);
+      g.scale(k, 1);
+      g.fillText(text, 0, 0);
+      g.restore();
+    };
+    press('TISAK', CW * C0 + CH * 0.295, CH * 0.63, CH * 0.558, CH * 1.06, '800');
     // The two small lines. They are legible in the frame and they are not
     // legible from the promenade, which is the point: what they buy at ten
     // metres is that the left-hand end of this strip is not the only thing
     // printed on it.
     //
     // 0.42 of the strip was a guess and the frame settles it: the block sits in
-    // the LAST bay of the panelled side, at 0.80 of that side's own length. The
-    // panelled side is the western 0.62 of this strip — east of that is the
-    // glazed corner, which has the vinyl over it and no panels behind it — so
-    // 0.80 of 0.62 is 0.50, and that is where it goes.
-    g.font = '600 ' + Math.round(CH * 0.20) + 'px ' + FF;
-    const x2 = CW * 0.50;
-    g.fillText('www.tisak.hr', x2, CH * 0.46);
-    g.fillText('0800 666 770', x2, CH * 0.78);
+    // the LAST bay of the panelled side. Both lines set to one width, because
+    // in the frame they are one width to two pixels — 134 px and 136 px — which
+    // is what a printed block of contact details is.
+    const x2 = CW * C3 + CH * 0.490;
+    press('www.tisak.hr', x2, CH * 0.524, CH * 0.274, CH * 0.94, '600');
+    press('0800 666 770', x2, CH * 0.825, CH * 0.274, CH * 0.94, '600');
     // and the frame over the top of all of it. A dark edge either side, because
-    // what carries a 0.15 m stile at fifteen metres is its two shadow lines and
-    // not the khaki between them — the same argument the battens below the band
+    // what carries a stile at fifteen metres is its two shadow lines and not
+    // the khaki between them — the same argument the battens below the band
     // are drawn with, and the reason they are 0.045 m proud rather than routed.
-    const sw = Math.max(2, CW * 0.15 / w);
+    //
+    // 0.070 and not 0.15. The stile at the east end of the strip is the one
+    // seen nearly face-on in `1000150343` and it measures 30 px against a bay
+    // of 275, which on a 0.55 m bay is 0.060 m — and the battens drawn in
+    // geometry directly under this strip are 0.070 m. A 0.15 m stile on the
+    // band over a 0.07 m batten on the panel is one frame member drawn twice
+    // at two different widths, and the join is at eye height.
+    const sw = Math.max(2, CW * 0.070 / w);
     for (const u of cuts) {
       const x = CW * u;
       g.fillStyle = '#6b5c43';
