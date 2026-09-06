@@ -11257,38 +11257,103 @@ async function buildJadrija(scene) {
     boxTS(da, dj, dS1 - 0.075, dS1, dLo, dHi, ALU);
     boxTS(da, dj, dS0, dS1, dHi - 0.075, dHi, ALU);
     boxTS(da, dj, dS0, dS1, dLo, dLo + 0.075, ALU);
-    boxTS(da, dj, dS0, dS1, y0 + 0.52, y0 + 0.60, ALU);
-    boxTS(da, dj, dS0 + 0.070, dS1 - 0.070, dLo + 0.070, y0 + 0.53, ALU);
-    boxTS(da, dj, dS0 + 0.070, dS1 - 0.070, y0 + 0.59, dHi - 0.070, GLASS);
+    boxTS(da, dj, dS0, dS1, y0 + 0.44, y0 + 0.52, ALU);
+    // AND THE LEAF IS NOT GLAZED. The upper panel was `GLASS` at 0.062/0.075/
+    // 0.088, so the one object in this shop with paper all over it drew as a
+    // black slab — and in `1000150343` the leaf is the PALEST thing in that
+    // half of the frame after the Jana wrap. Sampled at full size it reads
+    // 177/179/173 in the kiosk's own shade against 173/137/103 for the pressed
+    // panel two metres from it in the same light, which is 1.02/1.31/1.68 of
+    // the paint: a neutral pale grey with nothing khaki left in it. Against
+    // `body` that is 0.510/0.548/0.504, and it lands within two per cent of
+    // `ALU` in all three channels, which is its own check — a kiosk's back door
+    // is the same white aluminium as its window frames.
+    //
+    // Below the mid rail it is two panels side by side and not one, which is
+    // what `1000150414` at 04:27 shows of the same leaf from the other side.
+    const LEAF2 = [0.510, 0.548, 0.504];
+    for (const [pa, pb] of [[dS0 + 0.070, S.s0 - 0.480], [S.s0 - 0.440, dS1 - 0.070]]) {
+      boxTS(da, dj, pa, pb, dLo + 0.070, y0 + 0.45, LEAF2, shade(LEAF2, 1.06));
+    }
+    boxTS(da, dj, S.s0 - 0.485, S.s0 - 0.435, dLo + 0.070, y0 + 0.45, ALU);
+    boxTS(da, dj, dS0 + 0.070, dS1 - 0.070, y0 + 0.51, dHi - 0.070,
+      LEAF2, shade(LEAF2, 1.06));
     furniture.push({ t: dj, s: S.s0 - 0.45, a: 0.06, c: 0.42, h: 2.0, y: y0 });
-    // What is taped to it, which is the second thing you notice about the open
-    // door after the fact that it is open. Three sheets at chest and eye
-    // height: a plain A4 portrait, a printed one with a coloured table on it
-    // that is legible in the frame as bands and as nothing more (rule 12), and
-    // a small red sticker under them. On the WEST face of the leaf and not the
-    // east: the frame has them on the side facing into the doorway, and on this
-    // elevation that side is turned away from everybody who ever walks past.
-    for (const [ns, ny, nw, nh, col] of [
-      [0.60, 1.42, 0.21, 0.30, [0.760, 0.755, 0.735]],
-      [0.38, 1.06, 0.19, 0.26, [0.735, 0.735, 0.715]],
-      [0.34, 0.86, 0.075, 0.055, [0.640, 0.190, 0.165]],
+    // ── the posters on it ───────────────────────────────────────────────────
+    //
+    // What is taped to this leaf is the second thing you notice about the open
+    // door after the fact that it is open, and it is the only pinboard this
+    // shop has: `1000150414` at 04:27 catches the same leaf from the sea side
+    // past the end of the kiosk and has the same sheets on it.
+    //
+    // MEASURED IN `1000150343`, which has the leaf 850 px tall for a 1.95 m
+    // door — 436 px to the metre — with the threshold at 1450. They are not
+    // three sheets spread down a metre of door. They are FIVE, overlapping,
+    // inside a band 0.41 m deep between 1.13 and 1.54 m over the threshold:
+    //
+    //   a small card at the top          1.47 - 1.52
+    //   the big printed one              1.15 - 1.44, and 0.24 m across
+    //   a second sheet lapping its edge  1.31 - 1.42
+    //   a red sticker on top of both     1.27 - 1.32, 0.10 m across
+    //   the sheet with the table on it   1.15 - 1.25
+    //
+    // The model had the topmost at 1.42-1.72, which is above the whole cluster,
+    // and the red sticker at 0.86, which is 0.45 m below where it is. What is
+    // ON any of them is print two pixels tall and goes on as nothing (rule 12)
+    // — except the coloured table, which is legible in the frame as bands, and
+    // so is drawn as bands.
+    //
+    // They overlap, so each gets its own 6 mm slab stepped 7 mm further out
+    // than the one under it. Five sheets at one depth is rule 5's coplanar
+    // pair four times over, on the one object in this shop a player can stand
+    // half a metre from.
+    //
+    // On the WEST face of the leaf and not the east: the frame has them on the
+    // side facing into the doorway, and on this elevation that side is turned
+    // away from everybody who ever walks past.
+    for (const [ns, ny, nw, nh, dp, col] of [
+      [0.60, 1.19, 0.24, 0.29, 0, [0.760, 0.755, 0.735]],
+      [0.42, 1.35, 0.20, 0.11, 1, [0.735, 0.735, 0.715]],
+      [0.58, 1.51, 0.16, 0.05, 1, [0.775, 0.770, 0.750]],
+      [0.45, 1.19, 0.22, 0.10, 2, [0.745, 0.748, 0.730]],
+      [0.38, 1.31, 0.10, 0.05, 3, [0.640, 0.190, 0.165]],
     ]) {
-      boxTS(da - 0.016, da - 0.008, S.s0 - ns - nw * 0.5, S.s0 - ns + nw * 0.5,
+      const sf = da - 0.008 - dp * 0.007;
+      boxTS(sf - 0.006, sf, S.s0 - ns - nw * 0.5, S.s0 - ns + nw * 0.5,
         y0 + ny, y0 + ny + nh, col, shade(col, 1.06));
     }
-    // The banded table on the middle sheet, and it is three bars of colour.
+    // The banded table on the lowest sheet, and it is three bars of colour.
     for (let k = 0; k < 3; k++) {
       const c3 = k === 0 ? [0.300, 0.560, 0.330]
         : k === 1 ? [0.560, 0.520, 0.240] : [0.300, 0.400, 0.600];
-      boxTS(da - 0.021, da - 0.017, S.s0 - 0.455 + k * 0.055,
-        S.s0 - 0.415 + k * 0.055, y0 + 1.13, y0 + 1.24, c3);
+      boxTS(da - 0.029, da - 0.025, S.s0 - 0.530 + k * 0.052,
+        S.s0 - 0.492 + k * 0.052, y0 + 1.205, y0 + 1.275, c3);
+    }
+    // The lever handle, on the free edge — the leaf is hinged at `dS1`, hard
+    // against the jamb, and swings out to `dS0`. 0.83 m, which is where the
+    // frame has it at 436 px to the metre and is where a handle is.
+    boxTS(da - 0.014, da - 0.004, S.s0 - 0.815, S.s0 - 0.735, y0 + 0.78,
+      y0 + 0.88, [0.545, 0.552, 0.550]);
+    boxTS(da - 0.034, da - 0.014, S.s0 - 0.800, S.s0 - 0.760, y0 + 0.815,
+      y0 + 0.845, [0.640, 0.648, 0.655]);
+    // And the two timber battens screwed across the foot of it, which are the
+    // reason this door reads as a working door on a shop somebody repairs
+    // rather than as a shop-fitter's leaf. Bare pine against the white, 0.16
+    // to 0.46 over the threshold in the frame.
+    for (const bs of [0.72, 0.56]) {
+      boxTS(da - 0.026, da - 0.014, S.s0 - bs - 0.035, S.s0 - bs + 0.035,
+        y0 + 0.16, y0 + 0.46, [0.455, 0.310, 0.195], [0.520, 0.365, 0.230]);
     }
     // And the two notices taped inside the glass beside the door, which is
     // where a kiosk puts its hours and its price list. At the glass line, not
     // on the display behind it: 0.06 m in front of the printed wall and 0.02 m
     // clear of the jamb either side, which is the gap rule 5 wants and is the
     // whole reason they are not simply painted into `tisakDisplay`.
-    for (const [nt, ny, nh] of [[gt + 0.11, 1.62, 0.20], [gt + 0.30, 1.58, 0.15]]) {
+    //
+    // Lowered with the head. At 1.62 and 1.58 the taller of the two ran to
+    // 1.82, which IS the head now — it would have been a sheet of paper inside
+    // the frame member, coplanar with it over its whole width.
+    for (const [nt, ny, nh] of [[gt + 0.11, 1.50, 0.20], [gt + 0.30, 1.46, 0.15]]) {
       boxTS(nt, nt + 0.145, S.s0 - 0.115, S.s0 - 0.105, y0 + ny, y0 + ny + nh,
         [0.780, 0.775, 0.755]);
     }
