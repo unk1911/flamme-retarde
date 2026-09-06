@@ -1309,14 +1309,28 @@ function makeCrowd(scene, rig, cap) {
             l.rotation.x = 0;
             return;
           }
-          if (ha > 0.70) {                       // up past the head
-            u.rotation.z = 2.20 + hb * 0.30;
-            l.rotation.z = 0.70 + hb * 0.45;
-            u.rotation.x = s * SPLAY * (1.0 + hb * 1.4);
+          if (ha > 0.76) {                       // up past the head
+            // AND FLAT, WHICH IS THE NUMBER THIS TURNS ON. π at the shoulder
+            // lays the upper arm along the deck pointing at the crown —
+            // Rz(θ)(0,−1,0) is (sin θ, −cos θ) and at π that is (0, 1), which
+            // the tip lays down as "toward the head, level". 2.20 was the
+            // first cut and it puts the elbow 0.81 of an upper arm toward the
+            // body's FRONT, which face up is 0.26 m in the air: a lying figure
+            // with a limb standing straight out of it, which is a thing nobody
+            // in the survey is doing and which reads at eighty metres as a
+            // mast. 2.72 to 3.06 keeps the elbow inside 0.09 m of the deck.
+            u.rotation.z = 2.72 + hb * 0.34;
+            l.rotation.z = 0.22 + hb * 0.42;
+            u.rotation.x = s * SPLAY * (0.8 + hb * 1.2);
           } else if (ha > 0.36) {                // out on the towel
+            // The spread is `rotation.x` and it costs nothing to be generous
+            // with: the tip is about Z and leaves Z alone, so lateral stays
+            // lateral and an arm spread this way slides across the towel
+            // rather than lifting off it. 25° to 44° from the body, which is
+            // what an arm lying loose beside somebody actually does.
             u.rotation.z = -0.04 + hb * 0.20;
             l.rotation.z = 0.12 + hb * 0.30;
-            u.rotation.x = s * SPLAY * (2.6 + hb * 1.6);
+            u.rotation.x = s * SPLAY * (4.0 + hb * 3.0);
           } else {                               // down beside the hip
             u.rotation.z = 0.02 + hb * 0.14;
             l.rotation.z = 0.10 + hb * 0.22;
