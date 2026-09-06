@@ -10754,8 +10754,20 @@ async function buildJadrija(scene) {
    * t off `da`: the leaf at `da`, the handle rose at `da−0.014`, the battens at
    * `da−0.026`, and the five posters stepping out 7 mm at a time from
    * `da−0.008` to `da−0.035`. The Jana cabinet is off the elevation entirely
-   * now — `t1 + 0.42`, `s0 − 0.42` — and the awning is unchanged at `s0−1.32`
+   * now — `t0 − 0.42`, `s0 − 0.42` — and the awning is unchanged at `s0−1.32`
    * for its front bar and `s0−1.475` for the printed fascia.
+   *
+   * THE SPLIT ITSELF IS STILL MIRRORED and is left that way deliberately. The
+   * paragraph above says "the western half is _343's panelled back": in the
+   * photograph the panels are the EAST of that box and the glazed corner with
+   * the door is the west end, which is why the Jana stands beside it there.
+   * Turning the elevation round is not a sign change — it re-cuts `gt`, the
+   * bay loop, the streaks, the ghost, the `cuts` the wordmark hangs off and
+   * the end return at `S.t0` — and it wants doing at the same time as
+   * `gt = t1 − 2.05`, which re-cuts all of the same things for a different
+   * reason. See the note in plan/jadrija-TODO.md. What is NOT mirrored is the
+   * livery: TISAK reads at the low-t end and CENTAR USLUGA at the high-t end,
+   * which is west and east, which is what the pan has.
    */
   function tisakFront(S, y0, top) {
     const body = S.body;
@@ -11436,6 +11448,21 @@ async function buildJadrija(scene) {
     // at 04:24-04:28 has the same object at the far end of the counter run,
     // standing clear of the glass with the whole frontage beside it.
     //
+    // ── AND PAST THE END IS PAST `t0`, NOT PAST `t1` ────────────────────────
+    //
+    // 1.345.0 pitched it at `t1 + 0.42` and that is the east end. Both sources
+    // put this cabinet at the WEST end and the argument is written out over
+    // the parasols below: increasing t runs ESE on this shore, the sun in
+    // `_343` is due west and lights the frame from the right, and the pan
+    // walks west from the kabine and has the Jana at the LEFT of the frontage
+    // with CENTAR USLUGA at the right. So it goes to `t0 − 0.42`, which is the
+    // same 0.42 m of daylight off the other end of the same box.
+    //
+    // Two things inside the cabinet are relative to the kiosk rather than to
+    // the compass and so turn round with it: the second printed leaf, which
+    // stands on the side FACING the kiosk, and the D-handle, which is on the
+    // edge AWAY from it. Both were written for a cabinet standing east.
+    //
     // And it is an UPRIGHT, not a chest. Scaled in `_343` against the woman in
     // the hat who is standing beside it — 800 px from her hat to her feet, so
     // 465 px to the metre at that depth — the cabinet's face measures 315 px
@@ -11443,7 +11470,7 @@ async function buildJadrija(scene) {
     // twice the width and three quarters of the height, and is why it read as
     // a chest freezer somebody had stood on end.
     {
-      const ct = S.t1 + 0.42, cs = S.s0 - 0.42;
+      const ct = S.t0 - 0.42, cs = S.s0 - 0.42;
       const WRAP = [0.660, 0.680, 0.590];      // the cream of the print
       const LEM = [0.780, 0.715, 0.235];
       const LEAF = [0.245, 0.470, 0.230];
@@ -11498,9 +11525,11 @@ async function buildJadrija(scene) {
         boxTS(lt - 0.062, lt + 0.062, cs - hd - 0.014, cs - hd - 0.009,
           y0 + ly, y0 + ly + 0.050, LEAF);
       }
-      // The D-handle down the right-hand edge of the door, at the height a
-      // handle is on a two-metre cabinet rather than on a 1.46 m one.
-      boxTS(ct + hw - 0.115, ct + hw - 0.070, cs - hd - 0.060, cs - hd - 0.020,
+      // The D-handle down the right-hand edge of the door in `_343`, at the
+      // height a handle is on a two-metre cabinet rather than on a 1.46 m one.
+      // Right-hand in that frame is the edge AWAY from the kiosk, and with the
+      // cabinet moved to the west end that is the low-t edge.
+      boxTS(ct - hw + 0.070, ct - hw + 0.115, cs - hd - 0.060, cs - hd - 0.020,
         y0 + 0.95, y0 + 1.35, [0.640, 0.648, 0.655]);
       // The name across the middle, on all four sides, because a wrap is
       // printed all the way round and this one is seen from three of them.
@@ -11533,18 +11562,26 @@ async function buildJadrija(scene) {
       // that is the cabinet's own door swung open or a second unit — the join
       // is behind the woman with the basket — and it is built as the door,
       // because a door is what explains one panel standing across another.
-      const lt2 = ct - hw - 0.05;
-      boxTS(lt2 - 0.055, lt2 + 0.005, cs - 0.34, cs + 0.26, y0, y0 + hh,
+      //
+      // Mirrored with the cabinet: it is the leaf on the KIOSK side in `_343`
+      // — the panel the door swings back against — so at the west end it is
+      // the high-t side. Every offset off `lt2` is negated with it, and the
+      // brand ring's four corners are listed in the reverse order as well:
+      // mirroring a ring reverses its winding, and `brandRing` walks whatever
+      // it is given backwards on the way to the world, so a ring that stayed
+      // in its old order would print on the inside of the panel.
+      const lt2 = ct + hw + 0.05;
+      boxTS(lt2 - 0.005, lt2 + 0.055, cs - 0.34, cs + 0.26, y0, y0 + hh,
         WRAP, shade(WRAP, 1.10));
       for (const [ls, ly, r] of [[cs - 0.14, 1.48, 0.12], [cs + 0.06, 0.86, 0.11],
         [cs - 0.18, 0.40, 0.09]]) {
-        boxTS(lt2 - 0.070, lt2 - 0.062, ls - r, ls + r,
+        boxTS(lt2 + 0.062, lt2 + 0.070, ls - r, ls + r,
           y0 + ly - r * 0.50, y0 + ly + r * 0.50, LEM, shade(LEM, 1.08));
-        boxTS(lt2 - 0.078, lt2 - 0.066, ls - r * 0.725, ls + r * 0.725,
+        boxTS(lt2 + 0.066, lt2 + 0.078, ls - r * 0.725, ls + r * 0.725,
           y0 + ly - r * 0.675, y0 + ly + r * 0.675, LEM, shade(LEM, 1.08));
       }
-      brandRing('jana', [[lt2 - 0.070, cs - 0.352], [lt2 + 0.020, cs - 0.352],
-        [lt2 + 0.020, cs + 0.272], [lt2 - 0.070, cs + 0.272]],
+      brandRing('jana', [[lt2 + 0.070, cs + 0.272], [lt2 - 0.020, cs + 0.272],
+        [lt2 - 0.020, cs - 0.352], [lt2 + 0.070, cs - 0.352]],
       y0 + 1.16, y0 + 0.88);
       furniture.push({ t: lt2, s: cs - 0.04, a: 0.09, c: 0.34, h: hh, y: y0 });
     }
@@ -11580,16 +11617,55 @@ async function buildJadrija(scene) {
     // beyond the shop in the one frame it appears in, and the model had it
     // in front.
     //
-    // So the CORONA goes past the door end into the gap between this shop and
-    // h2o — `t1 + 1.45` spans t 309.13…311.77 and h2o starts at 312, so it
-    // clears both — and the Ožujsko drops three metres further seaward, which
-    // is where `_343` has it relative to the CORONA and which also keeps two
-    // canopies at one eave height from sharing any plan area at all. Their s
-    // spans are 18.08…20.72 and 15.25…17.61: half a metre of daylight, and
-    // rule 5 never gets asked the question.
+    // So the CORONA goes past the door end — and the door end is the WEST one.
+    //
+    // ── AND 1.340.0 PUT THEM ON THE WRONG END ───────────────────────────────
+    //
+    // The paragraph above is right about "past the door" and was mirrored about
+    // which end that is: it shipped them at `t1 + 1.45` and `t1 + 2.30`, out
+    // toward h2o, on a reading of `_343` that had the Jana side facing EAST.
+    // Three independent witnesses say it faces west, and the shore frame is
+    // the one that cannot be argued with —
+    //
+    //   THE FRAME. `jadrija.toWorld` says t 272 is world (−2051.5, 379.3) and
+    //   t 328 is (−2001.1, 413.9), so increasing t runs (+50.4 east, +34.6
+    //   south) = bearing 124°, ESE; and s 26 → s 14 runs (−6.1, +10.3) =
+    //   bearing 211°, so the sea is SSW and inland is NNE. Larger t is EAST.
+    //   That is the same order the file has always claimed at the head — the
+    //   kabine east at t 396-557, then slast, h2o, MINI, the mole, F2 going
+    //   west — so nothing else in the resort is mirrored, only this shop's
+    //   furniture.
+    //
+    //   THE SUN. `1000150343` carries EXIF 2026:08:23 18:19:49 +02:00. At
+    //   43.72 N 15.83 E that is a sun at azimuth 271.5° — due west to within
+    //   two degrees — and 14.9° up. Everything in the frame is lit from the
+    //   RIGHT: the parasol's shadow falls down-LEFT across the kiosk's end
+    //   panel, the step ladder's falls left, the open door leaf is bright at
+    //   the top with the shadow running down-left. Light from frame-right, sun
+    //   due west, therefore FRAME-RIGHT IS WEST. The Jana, the CORONA and the
+    //   Ožujsko are all on the right of that frame. This one needs no shore
+    //   frame and no shop-order argument at all.
+    //
+    //   THE PAN. `1000150414` starts at the kabine — the east end, and the
+    //   only run of them — and walks west; its text reads the right way round
+    //   everywhere (TISAK, Ožujsko, ŽUJA JE ZAKON!, Jana, Ledo), so it is not
+    //   a mirrored front-camera clip. It reaches TISAK at 04:24 with the Jana
+    //   at the LEFT of the frontage and CENTAR USLUGA at the right, then at
+    //   04:26-04:29 the Ožujsko parasol swings in from the left with TISAK
+    //   still at the right, and at 04:34 it is "beach bar MINI" (t 272-284).
+    //   The Ožujsko therefore stands BETWEEN MINI and TISAK: west of this
+    //   shop. Camera on the promenade facing inland, so frame-left is WNW.
+    //
+    // Mirrored, then: `t0 − 1.45` spans t 302.73…305.37 and the shop starts at
+    // 305.5, and the green kiosk ends at 293, so it clears both. The Ožujsko
+    // still drops three metres further seaward, which is where `_343` has it —
+    // its mast stands out on the paving by the water while the CORONA's hem is
+    // over the cabinet — and that is what keeps two canopies at one eave height
+    // from sharing any plan area: the s spans are 18.08…20.72 and 15.25…17.61,
+    // half a metre of daylight, and rule 5 never gets asked the question.
     for (const [pt2, ps2, half, cloth, key] of [
-      [S.t1 + 1.45, S.s0 - 2.60, 1.32, [0.735, 0.728, 0.700], 'corona'],
-      [S.t1 + 2.30, S.s0 - 5.60, 1.18, [0.680, 0.545, 0.115], 'ozujsko'],
+      [S.t0 - 1.45, S.s0 - 2.60, 1.32, [0.735, 0.728, 0.700], 'corona'],
+      [S.t0 - 2.30, S.s0 - 5.60, 1.18, [0.680, 0.545, 0.115], 'ozujsko'],
     ]) {
       const gy = surfaceY(pt2, ps2);
       // A 0.34 m rise over a 1.32 m half is 14 degrees, which is not a parasol,
@@ -11618,12 +11694,13 @@ async function buildJadrija(scene) {
     // Two garden benches under the shade, timber slats on a dark frame with a
     // pale cushion on each, which is what the two people in the frame are
     // sitting on. They follow the CORONA: the whole reason they are anywhere
-    // is that they are UNDER it, and left at `t0 + 2.15` with the parasol moved
-    // past the door end they would have been two benches in the sun in front of
-    // a counter with the shade five metres away. Same two offsets, same two
-    // angles, hung off the new mast instead of the old one.
+    // is that they are UNDER it, and left in front of the counter with the
+    // parasol moved past the door end they would have been two benches in the
+    // sun with the shade five metres away. Same two offsets, same two angles,
+    // hung off the mast — and they follow it west with it, for the same
+    // reason they followed it east in 1.340.0.
     for (const [bt, bs, ang] of [
-      [S.t1 + 2.15, S.s0 - 2.50, 0.0], [S.t1 + 0.60, S.s0 - 2.20, 0.5],
+      [S.t0 - 2.15, S.s0 - 2.50, 0.0], [S.t0 - 0.60, S.s0 - 2.20, 0.5],
     ]) {
       const gy = surfaceY(bt, bs);
       const co = Math.cos(ang), sn = Math.sin(ang);
