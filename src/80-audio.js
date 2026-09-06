@@ -2224,22 +2224,42 @@ function buildAudio() {
    * ripple, and a normalised corner a browser's biquad is comfortable at.
    *
    * `ref` is the follower's own mean output on this clip, computed offline by
-   * running the same three filters over the shipped MP3: 0.0368. `of` is what
-   * the body then plays at as a fraction of what the recording plays at, so
-   * the whole layer hangs off `LAP.gain` and travels with it — it is wired
+   * running the same three filters over the shipped MP3: 0.0368, and it moves
+   * only 0.6 dB either side of that over any 35 s window of the loop. `of` is
+   * what the body then plays at as a fraction of what the recording plays at,
+   * so the whole layer hangs off `LAP.gain` and travels with it — it is wired
    * into the bed's own distance gain, which means the rows duck it, the
    * seventy-metre fade takes it, and a shut door shuts it, with no second
    * copy of any of that to keep in step.
    *
-   * 0.43 is where the measurement lands, and it is deliberately short of the
-   * two daytime references. Both of those are a phone held on an exposed
-   * concrete edge and neither can be cleared of wind on its own microphone;
-   * the pier take can, and is the floor. So this sits halfway between them in
-   * decibels — 63 Hz comes out at -7.9 against the pier's -13.5 and the
-   * whitecapping sea's -0.6 — which is a sea bigger than the evening it was
-   * recorded on and smaller than a number that might be half breeze. It costs
-   * 1.6 dB on the bed's own RMS and nothing at all on the balance between the
-   * beds, because it is inside one of them.
+   * 0.375 was set by recording the running mixer through tools/sfx.mjs and
+   * reading the same third octaves back, not by the offline model, which
+   * under-predicted the graph by four decibels and was wrong for at least one
+   * reason worth knowing — see `q`. What comes out, standing on the edge with
+   * the promenade and the hillside held off so the bed is on its own:
+   *
+   *                          63 Hz   80    100    125    160    200
+   *   was                   -24.1 -25.8  -26.2  -22.5  -20.5  -17.1
+   *   is                     -9.2  -8.9   -8.0   -9.2   -9.2  -10.7
+   *
+   * which is deliberately short of the two daytime references. Both of those
+   * are a phone held on an exposed concrete edge and neither can be cleared of
+   * wind on its own microphone; the pier take can, and is the floor. So this
+   * sits halfway between them in decibels — a sea bigger than the evening it
+   * was recorded on, smaller than a number that might be half breeze. It costs
+   * 1.3 dB on the bed's own RMS and nothing at all on the balance between the
+   * beds, because it is inside one of them, and it does not make the
+   * compressor pump: the 2-6 kHz band of the whole mix — cicadas, which have
+   * nothing to do with the water — moves LESS after this than before (2.6 dB
+   * of spread against 3.2) and shows no dip behind an LF peak at any lag.
+   *
+   * WHAT IT COSTS, said plainly. The low end is now a shadow of the mid: the
+   * two envelopes correlate at 0.51 where the real edge correlates at 0.20,
+   * and the peak-to-median of the low band is 16 dB against the real 13. Both
+   * are the price of taking the rhythm from the recording instead of inventing
+   * one, and both were preferred to the alternative, which is a constant floor
+   * under the modulation — that buys the numbers back and buys them with a
+   * drone, and a drone at 80 Hz is a machine parked off the beach.
    */
   const BODY = {
     band: 760,           // Hz — where the slap lives, and so where to listen
@@ -2247,8 +2267,18 @@ function buildAudio() {
     smooth: 11,          // Hz, twice — the follower's own lid
     lp: 190,             // Hz — the top of the body
     hp: 40,              // and its bottom, so nothing subsonic goes on the bus
+    // -3.01 and not 0.7, and this is not a taste. A BiquadFilterNode reads its
+    // `Q` in DECIBELS for `lowpass` and `highpass` and as a plain Q for
+    // `bandpass` — the spec says so and Chrome agrees: asked for its response
+    // at its own corner, a 190 Hz lowpass at Q 0.7 answers 1.0839, which is
+    // 10^(0.7/20) and not 0.7. So every lowpass in this file written as 0.4 or
+    // 0.7 or 1.0 is a filter with a half-decibel of resonance on it rather
+    // than the damping it was asked for. Harmless in most of them; not here,
+    // because a bump at the corner of a band this narrow is a note. -3.01 dB
+    // is a Q of 0.7071, which is Butterworth, which is flat.
+    q: -3.01,
     ref: 0.0368,         // the follower's mean on lapping.mp3, measured offline
-    of: 0.43,            // and what the body is worth against the recording
+    of: 0.375,           // and what the body is worth against the recording
   };
   // |x|, built once. A WaveShaper is the only rectifier Web Audio has, and an
   // odd-length curve puts a sample exactly on zero so the fold has no step in
@@ -2275,9 +2305,9 @@ function buildAudio() {
     const rect = ctx.createWaveShaper();
     rect.curve = rectCurve;
     const sm1 = ctx.createBiquadFilter();
-    sm1.type = 'lowpass'; sm1.frequency.value = BODY.smooth; sm1.Q.value = 0.5;
+    sm1.type = 'lowpass'; sm1.frequency.value = BODY.smooth; sm1.Q.value = BODY.q;
     const sm2 = ctx.createBiquadFilter();
-    sm2.type = 'lowpass'; sm2.frequency.value = BODY.smooth; sm2.Q.value = 0.5;
+    sm2.type = 'lowpass'; sm2.frequency.value = BODY.smooth; sm2.Q.value = BODY.q;
     const scale = ctx.createGain();
     scale.gain.value = BODY.of / BODY.ref;
     src.connect(bp).connect(rect).connect(sm1).connect(sm2).connect(scale);
@@ -2285,9 +2315,9 @@ function buildAudio() {
     const ns = ctx.createBufferSource();
     ns.buffer = noiseBuf; ns.loop = true;
     const lp = ctx.createBiquadFilter();
-    lp.type = 'lowpass'; lp.frequency.value = BODY.lp; lp.Q.value = 0.7;
+    lp.type = 'lowpass'; lp.frequency.value = BODY.lp; lp.Q.value = BODY.q;
     const hp = ctx.createBiquadFilter();
-    hp.type = 'highpass'; hp.frequency.value = BODY.hp; hp.Q.value = 0.7;
+    hp.type = 'highpass'; hp.frequency.value = BODY.hp; hp.Q.value = BODY.q;
     // Nothing of its own. The gain of this node *is* the follower: an
     // AudioParam sums what is connected to it on top of its own value, and its
     // own value here is zero, so the band is silent between slaps rather than
