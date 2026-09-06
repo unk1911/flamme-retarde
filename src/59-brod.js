@@ -1469,11 +1469,65 @@ function brodQuay(M) {
     const k = (u + A) / A;
     return gy(-A, 0) * (1 - k) + TOP * k;
   };
+  // AND IT WAS ONE QUAD A SEGMENT IN ONE COLOUR, thirty metres of it.
+  //
+  // The deck twenty lines up is laid in 2.2 m bays, three lanes across, with
+  // joints down the length and a transverse joint between bays, tone stepped
+  // per bay and per lane, and the edge strips pulled grey — all of it written
+  // because "the joints were doing all the work and the slabs between them
+  // were one colour". The causeway got none of it, and the causeway is the
+  // half of this structure you WALK: the note above says the confirmed
+  // coordinate is 15 m along it and that this is where a photograph of the
+  // pier gets taken from. Photographed from 26 m out it is a flat grey ribbon
+  // running over the water — a painted plank, which is the same failure its
+  // own flanks were added to fix, one surface up.
+  //
+  // The same construction as the deck, with two differences that are the
+  // causeway rather than the pier.
+  //
+  //   IT IS POURED IN SITU OVER A WET SHELF, not dressed, so the tone step per
+  //   bay is wider — 0.105 against the deck's 0.075. A causeway is patched
+  //   where the sea has taken it and the patches do not match.
+  //
+  //   AND THE MARGINS ARE WET. The deck's edges are greyer than its middle
+  //   because "wet stone loses its warmth before it loses its value"; this
+  //   runs at 0.10 to 1.15 m over a shelf the DEM puts at 0.01, so its edges
+  //   are not merely greyer, they are within a hand of standing water for the
+  //   first twenty metres. The outer lane darkens toward the low end.
+  const CBAY = 2.2, CJW = 0.06;
+  const nCw = Math.max(2, Math.round(A / CBAY));
+  const CEDGE = 0.85;
+  const CLANE = [[-W, -W + CEDGE], [-W + CEDGE + CJW, W - CEDGE - CJW],
+    [W - CEDGE, W]];
+  for (let i = 0; i < nCw; i++) {
+    const u0 = -A + (i / nCw) * A, u1 = -A + ((i + 1) / nCw) * A;
+    const y0 = ry(u0), y1 = ry(u1 - CJW), yj = ry(u1);
+    // 0 at the shore end, 1 at the pier — how far up out of the water it is.
+    const wet = 1 - (i + 0.5) / nCw;
+    const kb = (hash(i * 5 + 71) - 0.5) * 0.105;
+    for (let n = 0; n < 3; n++) {
+      const [v0, v1] = CLANE[n];
+      const ks = (hash(i * 11 + n * 137 + 17) - 0.5) * 0.055;
+      const k = kb + ks + (n === 1 ? 0.048 : -0.034);
+      const g = n === 1 ? 1 : 0.948 - 0.055 * wet;
+      const cl = [(RUB[0] + k) * (n === 1 ? 1 : 1 - 0.10 * wet),
+        (RUB[1] + k * 0.94) * g, (RUB[2] + k * 0.86) * g * g];
+      b.quad(P(u0, v0, y0), P(u0, v1, y0),
+        P(u1 - CJW, v1, y1), P(u1 - CJW, v0, y1), cl);
+    }
+    for (const vj of [-W + CEDGE, W - CEDGE - CJW]) {
+      b.quad(P(u0, vj, y0), P(u0, vj + CJW, y0),
+        P(u1 - CJW, vj + CJW, y1), P(u1 - CJW, vj, y1), JOINT);
+    }
+    b.quad(P(u1 - CJW, -W, y1), P(u1 - CJW, W, y1),
+      P(u1, W, yj), P(u1, -W, yj), JOINT);
+  }
+  // The flanks, down to whatever the shelf is doing under them. Still one
+  // piece a segment: nobody sees the side of a causeway they are standing on,
+  // and from the boat it is a 0.25 m band at forty metres.
   for (let i = 0; i < NSEG; i++) {
     const u0 = -A + (i / NSEG) * A, u1 = -A + ((i + 1) / NSEG) * A;
     const y0 = ry(u0), y1 = ry(u1);
-    b.quad(P(u0, -W, y0), P(u0, W, y0), P(u1, W, y1), P(u1, -W, y1), RUB);
-    // the two flanks, down to whatever the shelf is doing under them
     b.quad(P(u0, -W, gy(u0, -W) - 0.25), P(u1, -W, gy(u1, -W) - 0.25),
       P(u1, -W, y1), P(u0, -W, y0), FACE);
     b.quad(P(u1, W, gy(u1, W) - 0.25), P(u0, W, gy(u0, W) - 0.25),
