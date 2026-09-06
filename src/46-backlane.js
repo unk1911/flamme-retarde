@@ -191,10 +191,48 @@ const LANE_COL = {
    * page — the pour is a pale terracotta — and they are correct on the screen.
    * Check them by shooting, never by reading.
    *
-   * The masonry is NOT corrected. T was calibrated on an up-facing surface,
-   * which takes the whole sky hemisphere; a wall takes half of it and has its
-   * own transform. `render`, `renderCap`, `stone`, `core`, `iron` and `steel`
-   * are still frame values and still owe this same measurement.
+   * THERE ARE TWO TRANSFORMS, NOT ONE: SUN AND SHADE.
+   *
+   * Measured the same way and twice over, because there are two masonries and
+   * they are independent samples of the same question. The render body was
+   * built flat at its own constant and painted magenta; the field stones flat
+   * and painted cyan; both shot from the lane at eye height looking inland, so
+   * only the seaward face is in frame, and masked exactly — 47,738 px of
+   * render, 19,696 px of stone.
+   *
+   *     render  1.000:0.972:0.914  ->  1.000:1.096:1.147   T [1, 1.128, 1.256]
+   *     stone   1.000:0.941:0.848  ->  1.000:1.056:1.071   T [1, 1.123, 1.262]
+   *
+   * Half a per cent apart on two surfaces, so that number is real. And it is
+   * WRONG TO USE, which took one more measurement to see. Those masked faces
+   * come back at RGB 54,59,62 — luminance 58 out of 255, off a cream albedo of
+   * 0.65. Nothing is lit there. The whole face is sky, and its ratio is flat
+   * across its own brightness range (top decile 1.100:1.154, bottom quarter
+   * 1.095:1.146), which is what says there is no second population in it.
+   *
+   * The stone's top decile does have one — 133,136,135, ratio 1.000:1.023:1.018
+   * — and dividing that by the stone's albedo gives
+   *
+   *     T_sun   = [1.000, 1.088, 1.200]      T_shade = [1.000, 1.125, 1.259]
+   *
+   * T_sun is the GROUND's transform, to three decimals, measured on a
+   * different surface at a different orientation. That agreement is the whole
+   * argument: sun adds a warm component and shade is pure sky, and there is
+   * one transform for each rather than one per surface.
+   *
+   * The walk's walls were photographed IN SUN — dry limestone 1.000:0.951:0.859
+   * and 1.000:0.945:0.886 in two frames, a rendered wall 1.000:0.970:0.958 —
+   * so the albedo is chosen against T_sun. Divide by T_shade instead, as the
+   * first cut of this did, and every wall the sun reaches goes pink. Shaded
+   * faces then render bluer than the sunlit target, which is correct: shaded
+   * stone is bluer in the frames too.
+   *
+   * `iron` and `steel` are NOT corrected, deliberately. Both were read in deep
+   * shade — the railing is near-black at 0.08, where the whole reading is the
+   * sky it reflects, and the green fence was measured at 26,38,36 against
+   * foliage at 53,60,57. T was calibrated on a skylit face in the open. Deep
+   * shade has its own transform and these two owe that measurement, not this
+   * one.
    */
   // The carriageway.
   //
@@ -240,12 +278,12 @@ const LANE_COL = {
   crumb: [0.4319, 0.3758, 0.3209],
   // Render on the west boundary's base wall. A newer wall than the lane wall
   // down at s 29.2, so a little paler than its 0.615.
-  render: [0.648, 0.630, 0.592],
-  renderCap: [0.552, 0.536, 0.494],
+  render: [0.6954, 0.6196, 0.5554],
+  renderCap: [0.5923, 0.5272, 0.4635],
   // Field rubble, and these are the approach piers' own two colours: the stones
   // sit loose on the face and what shows between them is mortar in shadow.
-  stone: [0.455, 0.428, 0.386],
-  core: [0.330, 0.315, 0.288],
+  stone: [0.4849, 0.4225, 0.3527],
+  core: [0.3517, 0.3109, 0.2631],
   // The railing. Near-black, a hair blue, and kept within a few per cent of the
   // garden wall's own railing at 0.082,0.084,0.090 — the two are a hundred and
   // fifty metres apart on one lane and are not two different blacks.
