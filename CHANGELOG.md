@@ -8,6 +8,92 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.352.0] — 2026-09-07
+
+### five reports, and three of them were not the thing they looked like
+
+Misha, 7 Sep, listed five defects. Three turned out to be misfiled, and
+saying so is most of the value here.
+
+THE MOUSTACHE IS NOT FACIAL HAIR. *"some with mustaches seem to also have
+swimsuits"* — and there is no moustache, beard or stubble asset anywhere in
+the pipeline, no morph target, and the instanced tier has no face at all. The
+dark mark is the MOUTH cutter sitting on the philtrum. `cutters()` hung the
+nine mouth shells on `jaw.z + 0.043 * kz`: a face measurement scaled by the
+BRAINCASE, which the `vault()` docstring already says is invalid below the eye
+line. Measured on every shipped blob, the cutter sat +8.5 to +18.1 mm above
+the lip crease on all eight. It read as a sex bug because the four worst are
+the four in two-pieces — a woman's face is shorter below the eye against the
+same braincase. Now `min(jaw.z + 0.043 * kz, eye.z - 0.071860 * kz)`, the eye
+being the landmark the file already trusts for the face, and 0.071860 being
+Baye's own eye-to-crease, so it is a re-anchoring and not a re-measuring. Baye
+and Chloe unchanged, bit for bit.
+
+THE PHONE WAS NEVER FLOATING AGAIN. The 5 Sep report was the attachment and
+that solve is sound (worst gap 14 mm). This one is ergonomics, and there were
+two defects, not one. Readers held the screen 0.05 m ABOVE the shoulder joint
+and 25 degrees under the eye line — the pose of somebody showing you a photo.
+Callers had it worse: the handset's inner face sat 19 mm INSIDE the cheek and
+photographed as a black patch printed on the ear, the forearm crossed the
+throat with the wrist broken 79 degrees, and `poleEar`'s -1 was eaten by the
+projection onto the shoulder-wrist circle, throwing the elbow 0.105 m across
+the chest. Shoulder flexion 36.3 to 29.8 degrees, wrist 79 to 11, handset now
+16 mm clear of the skull.
+
+THE WALKERS ALREADY AVOIDED EACH OTHER. 1.349.0 works: 0.00 overlapping
+body-body pairs per sample over three 150 s runs. What leaked is that the walk
+loop resolved against people and against you and never against the BEACH —
+eighteen of twenty-seven beats had their lane laid through something solid,
+68 crossings, 96.5 m of shore walked inside concrete, timber and pine. The
+same shape as the note over `showClear`, which is this bug reported about Baye
+a hundred releases ago and fixed only for her. Contacts per sample 1.44 to
+0.03, deepest penetration 1.194 m to 0.39.
+
+AND THE LIST GROWS AFTER `buildJadrija` RETURNS. `37-props.js` pushes eight
+parasol poles onto `jadrija.blockers` and `46-backlane.js` pushes its runs, so
+`stats().jadrija.blockers` reads 818 while the crowd was placed against 810.
+The eight missing poles were all between s 8.9 and s 12.0, the middle of four
+lanes.
+
+"PARDON!" on genuine contact, reusing `bumpReact` entirely — silent, because
+`bark` is 32 recordings and there is no 33rd, and a head coming round reads at
+fifteen metres. Untranslated: a Croatian word on a Croatian beach. One to three
+in 150 s.
+
+THE BEACH TALKS TO ITSELF. `43-chatter.js` — greetings on the turn each party
+already had scheduled, groups of two or three holding the floor for 16-46 s,
+listeners nodding on `neck` because 42-crowd owns `head` and `chest`. The first
+geometry matched ZERO pairs at every station: everything here that faces is
+5 m away and everything close is side-on. The 86 survey stills say that is
+real — Jadrija groups sit 0.4-1.1 m apart, and one of the two geometries is a
+row facing out at the water, i.e. a conversation at a 90 degree bearing. So
+there are two bands and the participants turn their bodies. Measured 2.1 dB
+UNDER the bed at 3 m, and 0.07 dB inside the vikendica, which is below the
+control's own floor: the birds are on `perchBus` and untouched.
+
+NO NEWSPAPER. Eighty-six stills and nobody is reading anything — every
+hand-held rectangle that resolves is a phone, including the man in the classic
+elbows-on-knees posture. Rule 12 applies to a prop as much as to a masthead.
+
+### she says it in nine words now, not nineteen
+
+Measured off the live model before anything was touched: 19.3 words mean for
+Baye, 16.5 for the cat, 13 of 15 lines over twelve. The brief said "Under 25
+words", and a model handed a ceiling writes to the ceiling. The lever is not
+the number — it is worked examples, of which all three personas had none. Now
+8.7 mean, none over twelve. `MAX_TOKENS` stays 700 deliberately: this model
+thinks against the same ceiling, so lowering it buys empty replies.
+
+### an error hangs up, so a refused request stops eating the next one
+
+`protocol_version` is HTTP/1.1 and `do_POST` answers 404 and 401 before
+`_body` has read anything — deliberate, to stop an unauthenticated caller
+allocating 16 kB, but the refused body stays in the socket and the parser
+takes the next request's first line out of the middle of it. Seven days of the
+running service: 142 lines answered, 23 refused as garbage. One request in
+seven was a casualty of the one before it, and from the beach that was Baye
+going quiet for no reason.
+
 ## [1.348.0] — 2026-09-06
 
 ### a railing is not a wall and not a floor, so stop guessing its transform and measure it
