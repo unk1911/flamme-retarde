@@ -3063,6 +3063,393 @@ function buildAudio() {
     o.start(t0); o.stop(t0 + 0.45);
   }
 
+  // ── the set on the shelf in the vikendica ──────────────────────────────────
+  /**
+   * The Bucketeers of America, out of a radio downstairs, heard in the yard.
+   *
+   * Misha, 7 Sep: "we now have the 'Bucketeers of America' song, that we can
+   * hear playing on the radio, when we stand on the 1st floor of the
+   * vikendica, in the front yard... but it's important that this music doesn't
+   * overpower our beautiful bird calls that can be heard on the 2nd floor of
+   * the vikendica, ya know what i mean? all those beautiful birds".
+   *
+   * That is two requirements and only one of them is about the song. The
+   * second is the one this file has already got wrong once: on 1.349.0 the
+   * Bucketeer's synthesised humming was removed outright — "it's overpowering
+   * my bird calls" — after its gain had already been cut from 0.22 to 0.065
+   * and that had not been enough either. A complaint made twice is not a
+   * complaint about a level. So the bird headroom is what is built here and
+   * the song is what has to fit inside it, and the whole of how that is done
+   * is one number and one filter: see `storey` below.
+   *
+   * WHERE IT IS. On the middle shelf of the little white cased unit on the
+   * east wall of the boravak — the one with the coloured books on it in
+   * `vikendica.py`'s `boravak()`, hung on the spine at house x 0.06-0.26 and
+   * z 0.815-1.35, shelves at 1.10, 1.42 and 1.74 over the floor. A real
+   * modelled object in a real modelled room, for the same reason the dove
+   * above sits in a pine that `veg.nearest` actually planted: the choice of
+   * this shelf is a choice, and it is one that can be looked at.
+   *
+   * It is 2.6 m back from the front wall, and the front wall of the prizemlje
+   * is where PD_TERR is — a 2.20 m sliding opening from house x -2.76 to
+   * -0.56, which is the door standing open in the screenshot he sent, with the
+   * dining table just inside it. So the path from the set to somebody standing
+   * on the paving is: across the room, out through that opening, and four and
+   * a half metres of yard. That is why this is a point in 3D with a distance
+   * law and a lowpass on it rather than a stereo bed laid over the house.
+   *
+   * WHY IT IS GONE UPSTAIRS, which is the request.
+   *
+   * The vikendica is two flats and *there is no stair between them*. `floorAt`
+   * says so in its own comment — "there is no internal stair between them, so
+   * from inside one you can never be within a step of the other" — and the
+   * only way from the boravak to the gornji kat is out of the front door,
+   * across the yard and up seventeen risers on the outside of the east wall.
+   * So what stands between this set and somebody listening to the birds
+   * upstairs is a 30 cm floor slab with no opening in it at all.
+   *
+   * `storey` is 0.020, which is 34 dB, and it is deliberately LESS than a slab
+   * alone would give: 160 mm of reinforced concrete is 50 dB of airborne
+   * insulation and the honest figure has to leave room for the flanking path,
+   * which is out of the open slider, up past the soffit and in through the
+   * upper terrace glazing — eight metres instead of three, but round the
+   * outside rather than through anything.
+   *
+   * `lpStorey` is the half that actually does the job, and it is the half the
+   * physics is surest about. A slab is a low-pass, not a fader: what gets
+   * through it is the bottom and nothing else. At 260 Hz the song loses 25 dB
+   * of its own RMS — measured off the shipped clip's band energies — and it
+   * loses far more than that in the bands the birds live in, which are 550 Hz
+   * for the dove and 2-11 kHz for the blackbird, the swallow and the wagtail.
+   * A voice cannot mask what it has no energy at.
+   *
+   * WHAT THAT COMES OUT AS, measured at `songStats().rms`, which is an
+   * AnalyserNode on this voice after its own panner — so it is the dBFS the
+   * graph computed and not a gain anybody wrote:
+   *
+   *   in the boravak, 2.0 m    -30.5 dBFS, lidded at 4470 Hz — the loudest
+   *                            thing in that room, which is the point of it
+   *   the yard, 4.6 m          -36.7, lidded at 3010
+   *   the living room above,   -77.6, lidded at 280
+   *   2.8 m and one slab
+   *
+   * Forty-one decibels between the yard and the room upstairs, over a
+   * straight-line distance that is SHORTER upstairs than out in the yard —
+   * the set is very nearly directly under you up there. None of it is
+   * distance. All of it is the slab, and that is the answer to the request.
+   *
+   * And what it does to the mix in that room, which is the number the request
+   * actually turns on. -77.6 on this bus is -79.0 at the tap once the master
+   * has taken its 1.4 dB, against a control run of the whole room at -46.8:
+   *
+   *     10 log10(1 + 10^((-79.0 + 46.8)/10)) = +0.0026 dB
+   *
+   * Thirty seconds recorded in the living room with the set playing and thirty
+   * with `songMute(true)` come out at -47.65 and -46.79 dBFS — the run WITH
+   * the radio is 0.86 dB quieter, which is the aperiodic bed's own variation
+   * and not a measurement of anything this voice did. Ten-second thirds of the
+   * control alone spread 2.5 dB. The dove fires in both runs and its phrases
+   * land at the same -45 to -49 dBFS in the 450-750 Hz band. It is not
+   * touching the birds and there is no level at which it could.
+   *
+   * And it is gated on `roomV` as well as on height, which matters at exactly
+   * one place: the landing and the upper terrace. Standing out there you are
+   * 2.9 m above the yard in the open air with the door below you open, and you
+   * would hear the radio perfectly well — there is no slab in that path, only
+   * a balcony floor you are standing on top of. `indoorsAt` is false out there
+   * and true in the room, so multiplying by `roomV` is the whole of the
+   * distinction and it costs nothing: the mixer already has that number.
+   *
+   * The terrace therefore hears it at about what the paving hears it at, and
+   * that is a couple of decibels generous rather than wrong: the real path out
+   * there is out of the slider, across the yard and up round the edge of the
+   * balcony slab, which is nearer seven metres than the 4.8 the straight line
+   * measures. Not corrected, and stated instead, because the terrace is
+   * outdoors with the whole promenade at full level over it — `outBus` is 1
+   * out there — and nothing about the birds is decided on a balcony.
+   *
+   * HOW IT STARTS AND STOPS, which is the other half of the design.
+   *
+   * Both mixes arrived already cut, and both are cut *mid-phrase at full
+   * level* — the first sample of each is -8 dBFS and so is the last. There is
+   * no musical way to loop that and no musical way to stop it dead, so neither
+   * is attempted. Each pass fades up over 2.20 s and down over 2.20 s, which
+   * is one bar at the recording's measured 108.85 bpm: a whole musical unit
+   * rather than a clipped one, and it is also, exactly, what a small radio at
+   * four metres behind a shrub does anyway as the beach and the wind move over
+   * it. What you hear is the song swelling up out of the yard and going again.
+   *
+   * Then nothing from the set for `every` seconds. NOT a loop: twenty seconds
+   * coming round for ever is the loudest possible statement that a radio is a
+   * sound effect, and cut_field.py's whole note on window length is about
+   * exactly that failure. And not the station either — everything else it
+   * plays that afternoon is not ours to play, so the honest thing is to play
+   * what we have and be quiet in between rather than to invent filler.
+   *
+   * The two mixes alternate and `ix` resets to 0 whenever nobody has been in
+   * earshot, so the first thing you hear on walking up is always mix 1, which
+   * is the one he asked to be prioritised, and standing there for a while
+   * never gives you the same twenty seconds twice running.
+   *
+   * What [30, 75] comes out as, run through `songRun(3600, 4)` and counted:
+   * 50 passes in the hour, gaps of 51 to 93 s between the starts of them, and
+   * the set playing 31% of the time somebody is standing in the yard. Which is
+   * about what a station does, and it means the two mixes come round about
+   * once every two and a half minutes each — far enough apart that nothing is
+   * ever heard to repeat inside the time anybody stands there.
+   *
+   * `arm` and `hear` are the same idea as `perchTick`'s bout reset, and they
+   * are a game's convenience rather than a claim about radios — said out loud
+   * because it is the one thing here that is. A twenty-second song with a
+   * seventy-second gap after it means that most of the times you walk into the
+   * yard there is nothing playing, and what he asked for is to hear it. So the
+   * pass clock only runs while somebody is within `hear` of the house, and
+   * outside that it is PARKED at `arm` rather than paused — walk up and the
+   * song follows you in by a few paces. `hear` is 12 m and `gone` is 60, which
+   * is the honest part: a pass that has already started is still audible from
+   * five times as far away as it takes to start one, so catching the end of
+   * one from the promenade happens and is not arranged.
+   *
+   * 3.5 s and not immediately, because a sound that lands on the frame the
+   * mode changes reads as a thing the game did rather than a thing the house
+   * did — and the bar-long fade puts another second on top of that before
+   * there is anything to notice.
+   *
+   * A HUMMING VERSION OF THE SAME TUNE IS COMING, for the Bucketeer to carry
+   * as she moves. It is not here and nothing below is it: this is a fixed
+   * point in a room with a wall in front of it, and she walks. When it lands
+   * it wants its own row in tools/cut_song.py and its own voice next to hers
+   * in 45-bucketeer.js, not a second clip in `mix` here.
+   */
+  const SONG = {
+    // Where it stands, in the resort's own frame, and how high off the paving
+    // outside — the same three numbers a PERCH row carries, resolved to a
+    // world point once by 90-app.js. House (0.13, 1.08), which is on the
+    // middle of the unit's three shelves: 1.42 over a floor that is itself
+    // 0.30 over the house's own base, plus 0.05 for a set standing on a shelf
+    // rather than being one. The base is 2.902 and the shore frame reads the
+    // grade at that station as 3.003, so 2.902 + 1.77 - 3.003 = 1.669.
+    t: 232.136, s: 24.319, up: 1.67,
+    // The ground floor's ceiling, over the same ground `up` is measured from:
+    // base + VIK.floor - toWorld = 2.902 + 2.90 - 3.003. 90-app.js turns the
+    // eye's height above this into `up` in the call below.
+    slab: 2.80,
+    // What the clip is scaled by at nought metres, and it is set against what
+    // it has to be heard OVER rather than against the file it scales.
+    //
+    // Both mixes decode at -19.38 dBFS RMS — tools/cut_song.py measures that
+    // off the file it has just written — so 0.31 is 0.033 RMS at the cone.
+    // The number that matters is what that comes out as on the paving against
+    // the beach that is already there, and it was measured both ways: thirty
+    // seconds in the yard reads -35.66 dBFS at the tap with the set muted and
+    // -34.30 with it playing, so the song is carrying +1.37 dB of the total
+    // and is therefore 4.3 dB under everything else in the yard. For something
+    // with a tune in it that is well clear — a beach is broadband and a song
+    // is not, and the ear pulls one out of the other long before the levels
+    // cross — and the bands say so: +2.5 dB at 1.2-2.2 kHz and +3.3 at
+    // 2.2-4 kHz, which is where the tune is.
+    //
+    // The first pass at this was 0.13, which put it 10.5 dB under and added
+    // 0.37 dB: audible if you already knew it was there, and not the thing he
+    // asked to be able to hear.
+    gain: 0.31,
+    // How far off it carries. Inverse-square and not the pines' 1.5: past the
+    // opening this is a point source in open air over a hard paved yard, which
+    // is the one case the square law is actually written for. Half the level
+    // at 4.5 m, a twelfth by fifteen, and 33 dB down at thirty — so it owns
+    // the yard and the room and is not something you hear from the promenade.
+    half: 4.5, roll: 2.0, gone: 60,
+    // A doorway and then air. Open in the room with it, and by the far end of
+    // its range there is nothing left above the body of the mix — which is the
+    // order a wall does things in, and it is why you hear that a radio is on
+    // before you hear what it is playing.
+    lpNear: 5200, lpFar: 900,
+    // The slab, and the lid the slab is. See the long note above.
+    storey: 0.020, lpStorey: 260,
+    // One bar, up and down. Combed off the onset envelopes of the two mixes at
+    // one, two and four beats, they run at 108.85 and 107.55 bpm — 2.205 and
+    // 2.232 s to the bar — so 2.20 is a bar of either to within 1.5%, which is
+    // well inside what a fade needs to sit on a musical unit rather than
+    // across one.
+    fade: 2.20,
+    // Seconds of nothing between passes; how near somebody has to be for the
+    // clock to run at all; and what it is parked at while nobody is.
+    every: [30, 75], hear: 12, arm: 3.5,
+    mix: ['bucketeers1', 'bucketeers2'],
+  };
+  const songBuf = [null, null];
+  let songNodes = null, songEye = null;
+  /**
+   * The control run's switch, and it earns its place in shipping code.
+   *
+   * The question this whole voice has to answer — does it overpower the birds
+   * upstairs — is not answerable from one recording, because the room it is
+   * asked about is never silent: there is a beach through a wall, a hillside
+   * of cicadas and four birds firing on their own clocks. What settles it is
+   * the SAME thirty seconds with one voice taken out, so the pair can be
+   * differenced. Every other way of getting that control — a second build, a
+   * git stash, a hand-edited gain — is a different page, and a different page
+   * is a different answer.
+   *
+   * It is off, it is never written by the game, and `__fr.audio.songMute` is
+   * the only thing that touches it.
+   */
+  let songMuted = false;
+  // The pass clock, and where the listener is. `at` is seconds until the next
+  // pass and `left` is what is left of the one playing — both in the ticker's
+  // own seconds and not the context's, so `songRun` can fast-forward the whole
+  // thing and read back the intervals it designed. `ix` is which mix goes next.
+  const songNow = { at: SONG.arm, left: 0, ix: 0, plays: 0, mixSecs: 0,
+    d: 1e9, pan: 0, up: 0, gain: 0, hz: 0, clock: 0, log: [] };
+
+  /**
+   * The set's own front end, built once and left up.
+   *
+   * `lp` is the room, the opening and the slab — everything between the cone
+   * and the ear — and it is written every frame. `env` is the pass, and it is
+   * the only node here that is scheduled rather than followed: a fade that is
+   * ramped by hand at pass time cannot be walked on by the distance term,
+   * which is a `setTargetAtTime` on a different node. `g` is where you are
+   * standing, and the panner is last so the pan is of the finished sound.
+   */
+  function songRig() {
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = SONG.lpFar; lp.Q.value = 0.5;
+    const env = ctx.createGain();
+    env.gain.value = 0.0001;
+    const g = ctx.createGain();
+    g.gain.value = 0.0001;
+    const pn = ctx.createStereoPanner();
+    pn.pan.value = 0;
+    lp.connect(env).connect(g).connect(pn).connect(bed);
+    // An eye on it, and it is here for the reason `perchEye` is: what a test
+    // needs is not the gain somebody wrote, it is the dBFS of samples the
+    // graph actually computed. This is the number the whole bird question is
+    // settled with, so it is measured and not inferred. After the panner, so
+    // it reads the finished voice.
+    songEye = ctx.createAnalyser();
+    songEye.fftSize = 2048;
+    pn.connect(songEye);
+    // Over limestone with a hillside behind it, same as the kabina set.
+    if (verbSend) {
+      const w = ctx.createGain(); w.gain.value = 0.22;
+      g.connect(w).connect(verbSend);
+    }
+    return { lp, env, g, pn };
+  }
+
+  /**
+   * Where the listener is, relative to the set — written every frame by
+   * 90-app.js, which is the only place that knows both the shore frame and
+   * where the camera's eye is.
+   *
+   * `up` is 0 anywhere at or below the ground floor's ceiling and 1 a metre
+   * above it. It is NOT "which storey am I on": that question is answered here
+   * by multiplying it with `roomV`, because the terrace and the landing are
+   * both above the slab and neither has one between you and the set.
+   */
+  function song(d, pan, up) {
+    songNow.d = d;
+    songNow.pan = pan;
+    songNow.up = sat(up);
+  }
+
+  /**
+   * The pass clock, and the level every frame.
+   *
+   * Above the `dead` gate in update(), like the boat and the birds and for the
+   * same reason: a radio in a house has no opinion about whether your
+   * aeroplane is still flying.
+   */
+  function songTick(dt, afoot) {
+    if (!ctx || !bed) return;
+    // Asked for every frame, and long before the first pass — the same lesson
+    // as `beadWarm` and `radioTune`. A decode that starts when the sound is
+    // wanted is a sound that is missing the first time it is asked for.
+    for (let i = 0; i < SONG.mix.length; i++) {
+      if (!songBuf[i]) sampleLoad(SONG.mix[i], (b) => { songBuf[i] = b; });
+    }
+    songNow.clock += dt;
+    const t0 = ctx.currentTime;
+    // What is left of the pass now playing, in the ticker's own seconds. On a
+    // page whose frame loop is being throttled this runs out later than the
+    // buffer does and the gap that follows is correspondingly longer, which is
+    // a test harness's problem and not a game's — see `songRun`.
+    if (songNow.left > 0) songNow.left = Math.max(0, songNow.left - dt);
+    // Nobody near enough to start one, or in the aeroplane. The timer is
+    // parked rather than paused — see `arm` in the note above — and the mix
+    // index goes back to the one he asked to be prioritised. A pass already
+    // running is left alone to finish: walking away from a radio does not stop
+    // it, the distance term takes it away by itself, and cutting it would be
+    // the one thing here anybody could actually catch the game doing.
+    const near = afoot && songNow.d < SONG.hear;
+    if (!near) {
+      if (songNow.left <= 0) { songNow.at = SONG.arm; songNow.ix = 0; }
+    } else if (songNow.left <= 0) {
+      songNow.at -= dt;
+      if (songNow.at <= 0) {
+        const buf = songBuf[songNow.ix] || songBuf[0];
+        if (!buf) {
+          // Nothing decoded yet and the timer has run out, so try again in a
+          // moment rather than sixty times a second for the rest of the day.
+          songNow.at = 2;
+        } else {
+          if (!songNodes) songNodes = songRig();
+          songPlay(buf, t0);
+          songNow.left = buf.duration + 0.10;
+          songNow.ix = (songNow.ix + 1) % SONG.mix.length;
+          songNow.at = SONG.every[0]
+            + Math.random() * (SONG.every[1] - SONG.every[0]);
+        }
+      }
+    }
+    if (!songNodes) return;
+    // The distance law, the slab, and the one lowpass that carries both.
+    const d = Math.max(songNow.d, 0);
+    const dist = 1 / (1 + Math.pow(d / SONG.half, SONG.roll));
+    // The slab is only a slab when there is a room over you as well as height:
+    // the upper terrace is above it and outdoors, and from out there the yard
+    // is simply below you with its door open.
+    const thru = songNow.up * roomV;
+    const amp = (songMuted ? 0 : SONG.gain)
+      * dist * (1 - (1 - SONG.storey) * thru);
+    const cut = SONG.lpFar + (SONG.lpNear - SONG.lpFar) * dist;
+    const hz = cut + (SONG.lpStorey - cut) * thru;
+    songNow.gain = amp;
+    songNow.hz = hz;
+    songNodes.g.gain.setTargetAtTime(Math.max(amp, 0.000001), t0, 0.12);
+    songNodes.lp.frequency.setTargetAtTime(hz, t0, 0.20);
+    // 0.7 rather than 1: a room heard through its own door is off to one side,
+    // not in one ear — and less than the birds' 0.8, because a radio in a room
+    // is a wall's worth of reflections and not a point in a tree.
+    songNodes.pn.pan.setTargetAtTime(clamp(songNow.pan * 0.7, -1, 1), t0, 0.15);
+  }
+
+  /** One pass: the whole of a mix, a bar up and a bar down. */
+  function songPlay(buf, t0) {
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const at = t0 + 0.05;
+    const dur = buf.duration;
+    // Linear ramps and not exponentials. An exponential fade is right for a
+    // one-shot that has to get out of the way in 40 ms; over a whole bar what
+    // it does is spend most of the bar near silence and then jump, which is
+    // the opposite of a swell.
+    const e = songNodes.env.gain;
+    e.cancelScheduledValues(at);
+    e.setValueAtTime(0.0001, at);
+    e.linearRampToValueAtTime(1, at + SONG.fade);
+    e.setValueAtTime(1, at + dur - SONG.fade);
+    e.linearRampToValueAtTime(0.0001, at + dur);
+    src.connect(songNodes.lp);
+    src.start(at);
+    src.stop(at + dur + 0.02);
+    songNow.plays += 1;
+    songNow.mixSecs += dur;
+    songNow.log.push(+songNow.clock.toFixed(2));
+    if (songNow.log.length > 20) songNow.log.shift();
+  }
+
   /**
    * How far inside the kabina the listener is, 0…1 — the same ramp the
    * exposure and the near plane hang off.
@@ -3859,6 +4246,9 @@ function buildAudio() {
     // And the birds sitting in the pines, which are nobody's aeroplane's
     // business either.
     perchTick(dt, !!s.afoot);
+    // And the set on the shelf downstairs at the vikendica, which is nobody's
+    // aeroplane's business either — somebody left it on before any of this.
+    songTick(dt, !!s.afoot);
     // And the hillside, which needs a clock of its own for two reasons. It has
     // to be able to swap the oscillators for the recordings on the frame the
     // decode lands rather than on the frame somebody happens to walk, and the
@@ -4930,6 +5320,18 @@ function buildAudio() {
      */
     perches: () => PERCH,
     perch,
+    /**
+     * The set on the shelf downstairs at the vikendica. Same shape as the
+     * birds and for the same reason: the mixer owns what it sounds like and
+     * when it plays, and the only thing it cannot know is where it is, because
+     * a station in the resort's frame means nothing over the channel. `song`
+     * is 90-app.js's answer — the distance, the bearing, and how far the eye
+     * is above the ground floor's ceiling.
+     */
+    songAt: () => ({ t: SONG.t, s: SONG.s, up: SONG.up, slab: SONG.slab }),
+    song,
+    /** For a control recording — see `songMuted`, where the argument is. */
+    songMute: (v) => { songMuted = !!v; return songMuted; },
     /** Where the pointer sits for each station, so the dial can be drawn. */
     radioDial: () => DIAL.map((d) => d.f),
     /**
@@ -5067,6 +5469,84 @@ function buildAudio() {
             log: n.log.slice(),
           };
         }),
+      };
+    },
+    /**
+     * For a test: what the set downstairs is actually doing, and — the only
+     * number in here that is evidence — the dBFS the graph computed for it.
+     *
+     * `rms` is an AnalyserNode after the panner, so it is the finished voice
+     * and not a gain somebody wrote. It is the number the whole request turns
+     * on: read it in the yard and read it again in the living room upstairs,
+     * and the difference between those two is the answer to "does this
+     * overpower my bird calls". `-120` is the empty reading, which is also what
+     * it says between passes, correctly.
+     */
+    songStats: () => {
+      let rms = -120;
+      if (songEye) {
+        const d = new Float32Array(songEye.fftSize);
+        songEye.getFloatTimeDomainData(d);
+        let sum = 0;
+        for (let i = 0; i < d.length; i++) sum += d[i] * d[i];
+        rms = +(10 * Math.log10(Math.max(sum / d.length, 1e-12))).toFixed(2);
+      }
+      return {
+        rms,
+        now: ctx ? +ctx.currentTime.toFixed(2) : -1,
+        // Which mix decoded and how long each came back as, because a build
+        // that silently shipped one of them would look identical from every
+        // other number here — `sampleLoad` fails silently by design.
+        mix: SONG.mix.map((k, i) => ({
+          key: k, tried: sampleTried.has(k), loaded: !!songBuf[i],
+          secs: songBuf[i] ? +songBuf[i].duration.toFixed(3) : 0,
+          rate: songBuf[i] ? songBuf[i].sampleRate : 0,
+        })),
+        d: +songNow.d.toFixed(1), pan: +songNow.pan.toFixed(2),
+        // How far the eye is over the ground floor's ceiling, and what that
+        // plus the room comes out as — `thru` is the slab, and `thru` at 1 is
+        // the whole of why the birds upstairs are untouched.
+        up: +songNow.up.toFixed(2), thru: +(songNow.up * roomV).toFixed(3),
+        gain: +songNow.gain.toFixed(6), hz: Math.round(songNow.hz),
+        playing: songNow.left > 0, left: +songNow.left.toFixed(2),
+        at: +songNow.at.toFixed(2),
+        next: SONG.mix[songNow.ix], plays: songNow.plays,
+        clock: +songNow.clock.toFixed(2), log: songNow.log.slice(),
+      };
+    },
+    /**
+     * For a test: run the passes forward without waiting a minute a pass.
+     *
+     * The real ticker at the real frame time, exactly as `perchRun` is, and
+     * for the same reason — a headless page throttles to about a frame a
+     * second, so thirty seconds of wall time is a second and a half of world
+     * and no scheduled thing ever happens in it. `log` comes back in the
+     * ticker's own seconds.
+     *
+     * `d` is where the listener is put for the run, because the whole question
+     * is what happens while somebody is standing in the yard and the ticker
+     * will not start a pass otherwise. It is restored afterwards.
+     *
+     * Every pass this schedules is a real BufferSource at the real context
+     * time, so an hour of fast-forward puts an hour of songs on top of each
+     * other in the next twenty seconds. `perchRun` has the same property and
+     * the same answer: this is for counting, not for listening.
+     */
+    songRun: (secs, d = 4, step = 1 / 60) => {
+      const was = songNow.d, hadLeft = songNow.left;
+      songNow.d = d;
+      const first = songNow.plays, s0 = songNow.mixSecs;
+      for (let i = 0; i < Math.round(secs / step); i++) songTick(step, true);
+      songNow.d = was;
+      const gaps = [];
+      for (let i = 1; i < songNow.log.length; i++) {
+        gaps.push(+(songNow.log[i] - songNow.log[i - 1]).toFixed(2));
+      }
+      return {
+        secs, plays: songNow.plays - first, hadLeft: +hadLeft.toFixed(2),
+        log: songNow.log.slice(), gaps,
+        // What share of the time somebody in the yard is hearing something.
+        duty: +((songNow.mixSecs - s0) / Math.max(secs, 1)).toFixed(3),
       };
     },
     /**
