@@ -38211,6 +38211,11 @@ async function buildJadrija(scene) {
       if (bucketeer && mBuck < mShore) {
         const b = bucketeer.stats();
         return { m: +mBuck.toFixed(2), phase: b.phase, withYou: false,
+          // WHICH ERRAND, and the voice reads it to decide how often she is
+          // allowed to open her mouth. Misha, 7 Sep: "her role is to carry
+          // buckets not chat chat". One woman, two errands, and only one of
+          // them is standing about talking to you -- see `VOICE.gapBucket`.
+          bucket: true,
           indoors: b.at[1] > 4.5, carrying: b.held > 0.5,
           news: bucketeer.news(),
           spot: 'on the steps and the porch of the vikendica, carrying water '

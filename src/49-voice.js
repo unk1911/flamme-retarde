@@ -44,6 +44,30 @@ const VOICE = {
   gap: 52,
   /** Plus up to this much, so she is not a metronome. */
   jitter: 38,
+  /** AND THE SAME WOMAN ON THE OTHER ERRAND, who is working.
+   *
+   * Misha, 7 Sep 2026: *"the Bucketeer baye needs to talk less frequently...
+   * right now it seems every 45s-1m she says something, it must be much less
+   * frequent... maybe once every 5 minutes... her role is to carry buckets not
+   * chat chat"*.
+   *
+   * 52 + up to 38 is 52 to 90 seconds, which is exactly what he measured. But
+   * the gap was never the whole story and raising it alone would not have
+   * fixed this: `poll` pulls `nextAt` to `clock + 1.5` every time she comes
+   * back INTO range, and that rule was written about you walking up to her.
+   * The Bucketeer walks a fixed twelve-waypoint route that takes her indoors
+   * and out again, so it is SHE who keeps crossing your threshold while you
+   * stand still, and every crossing re-armed her. That, and not the gap, is
+   * why she seemed to talk on a minute's clock.
+   *
+   * 245 + up to 110 is 245 to 355 seconds, mean 300 -- once every five
+   * minutes, as asked. The GESTURE is untouched: she still stops, turns and
+   * holds the bucket out whenever you look at her, because that costs nothing
+   * and is the part that reads as her noticing you. What is rare now is her
+   * narrating it.
+   */
+  gapBucket: 245,
+  jitterBucket: 110,
   /** How many of her own lines she is reminded of, so she does not repeat. */
   memory: 6,
   /** How long a subtitle stays up after she stops speaking. */
@@ -359,7 +383,11 @@ const voice = (() => {
       sp.said.push(d.text);
       if (sp.said.length > sp.cfg.memory) sp.said.shift();
       caption(d.text, lead);
-      sp.nextAt = clock + sp.cfg.gap + Math.random() * sp.cfg.jitter;
+      // Which errand she was on when she said it -- see `VOICE.gapBucket`.
+      const bk = !!(gap && gap.bucket);
+      sp.nextAt = clock
+        + (bk ? sp.cfg.gapBucket : sp.cfg.gap)
+        + Math.random() * (bk ? sp.cfg.jitterBucket : sp.cfg.jitter);
       // `d.rate` is the server's, and it is 1 for everybody but the two
       // children — see `voice_for` in server/baye/baye.py and the note over
       // `voice` in 80-audio.js.
@@ -411,7 +439,16 @@ const voice = (() => {
       // that was measured at six seconds. It was a fifth of the total delay
       // and it bought nothing. See the fast-path note in baye.py for the other
       // three seconds.
-      sp.nextAt = Math.min(sp.nextAt, clock + 0.25);
+      //
+      // AND NOT FOR THE BUCKETEER, who generates her own news. The cat's and
+      // the bathers' events are things YOU did to them -- the hose -- and
+      // answering those late is the memoir problem above. Hers is that you
+      // looked at her while she was carrying, which she can raise again every
+      // `BUCK.noticeGap`, eleven seconds. Letting that jump the clock would
+      // hand back exactly the minute's cadence `gapBucket` was added to stop.
+      // She still stops, turns and holds the bucket out every single time; the
+      // offer simply stops being narrated.
+      if (!gap.bucket) sp.nextAt = Math.min(sp.nextAt, clock + 0.25);
     }
     // A grievance goes stale. See `CAT_VOICE.news`.
     if (sp.pend && clock - (sp.newsAt || 0) > (sp.cfg.news || 25)) {
@@ -439,7 +476,14 @@ const voice = (() => {
       // They notice you rather than continuing whatever they were mid-way
       // through: a first line within a couple of seconds of walking up is the
       // difference between a character and a loudspeaker.
-      sp.nextAt = Math.min(sp.nextAt, clock + 1.5);
+      //
+      // EXCEPT WHEN IT IS THEY WHO ARRIVED. This rule assumes you walked up to
+      // somebody standing still, and the Bucketeer breaks that assumption: her
+      // route carries her indoors and back out past you, so a player who never
+      // moves still trips this on every lap. Re-arming there is not "she
+      // noticed you", it is a doorway on a timer. She keeps whatever clock the
+      // last line gave her.
+      if (!gap.bucket) sp.nextAt = Math.min(sp.nextAt, clock + 1.5);
     } else if (sp.inRange && gap.m > sp.cfg.far) {
       sp.inRange = false;
       return null;
