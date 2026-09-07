@@ -8,6 +8,114 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.353.0] — 2026-09-07
+
+### the camera was inside her, and both floors were under the near plane
+
+Misha, 7 Sep: *"when we press 'B'... the camera sometimes is too close to
+Chloe, and it slices right through me so i see sorta 'inside' myself"*.
+
+The near plane is 1.2 m, so anything closer is not drawn. The third-person
+camera's two "give up" floors were `THIRD.min` 0.95 m and `BROD.camMin` 1.00 m
+— BOTH UNDER IT — and both were measured to her EYE, a point on her spine,
+before her own half-metre of body was subtracted. Marched in 0.15 m steps the
+promenade's shortest hand-out was 1.05 m from the eye, 0.87 m from her back.
+
+Two aggravating mechanisms, both verified. LOOKING UP DROPS THE LENS rather
+than moving it away, because the pull-back is a slide down the view line: at
+57 degrees of pitch with an obstruction 0.7 m behind you the lens lands level
+with her hip. And THE HEIGHT CLAMPS RUN AFTER THE DISTANCE CHECK, so a
+distance that passed the floor is a distance the clamp then spends.
+
+Worst camera-to-SKIN distance, measured with a new CPU skinning instrument
+over the nearest of 14 717 vertices:
+
+  promenade   0.436 m -> 1.400 m   (128 304 samples)
+  her deck    0.321 m -> 1.599 m   (21 264 samples)
+  swim        1.169 m -> 1.275 m   (only bites in the channel; the seabed
+                                    ramp masks it inshore)
+
+The cost is honest and worth stating: third person is kept on 78.5 per cent of
+promenade frames rather than 83.3, and on her deck 53.3 rather than 83.3 — but
+the whole loss is in steep looks, 89-90 per cent kept at level and half a
+radian. At her 1.20 rad clamp, 3.10 m down the line is 2.89 m of drop against
+1.12 m of reach and NO legal position exists, so it goes to first person
+rather than through her skull. `brod.pose` had the same bug and the swim
+camera had it in deep water; both fixed the same way. The chase-cut and the
+trampoline fly-cut were measured and are clean at 2.368 m and 5.977 m.
+
+The indoors tests are untouched — the diff contains no line mentioning
+`personAt`, and the latch that drives the near clip and exposure still reads
+the walker, confirmed live with 3.00 m of pull-back at the vikendica stair.
+
+### the phone billboards, so the hand has to billboard with it
+
+The third report about the phones, and the third different defect. The first
+was the attachment and the second was the arm; both were fixed and neither was
+this. `gap` is 0.016 m — the phone IS in the hand — and the fingers really do
+curl. What was wrong is that `m.g.rotation.y` spins the phone to face the
+camera every frame while `holdPhone` solved the hand against a fixed
+figure-space orientation, so the angle between palm and glass depended on
+where you were standing.
+
+Measured as a new permanent diagnostic, `phones().roll` — how far each wrist
+is from square to its own glass — A/B'd through a kill switch in ONE browser
+session so the crowd state is identical either side, eight bearings at 2.8 m:
+
+  MINI reader A   25.3-154.3 deg, spread 129  ->  9.2
+  MINI reader B   26.2-171.3 deg, spread 145  ->  5.5
+  caller          6.6-173.4 deg,  spread 167  ->  9.9
+
+Past 150 degrees is the BACK OF THE HAND laid on the screen. The residue is
+the new per-person `GRIP.vary.roll`, constant to a tenth of a degree across
+bearings. Callers were never right from any bearing.
+
+Two more defects the same measurement turned up. THE LEAN WAS IN THE WRONG
+FRAME: `rotation.set(0, yaw, 0)` then `rotation.x` composes as Rx.Ry on a
+default XYZ Euler, so the 19.5 degree tilt was taken about the WORLD x after
+the billboard — the glass normal's height ran -0.323 to +0.333 across the
+eight bearings, passing through 0.004, which is dead flat with the whole lean
+gone into roll. `rotation.order = 'YXZ'` gives 0.333 from everywhere. And THE
+PALM WAS NOT A PALM: the curl's assumed (0,0,-1) stood at 114.2 degrees to the
+knuckle line rather than 90, because the rig binds in an A-pose with about 24
+degrees of abduction.
+
+Cost 0.32 microseconds a phone. The hold is split rather than re-guarded:
+`holdPhone` stays behind its one-solve-per-pose guard and caches the axes,
+`rollHand` runs every frame off that cache. Re-running the guarded solve
+against one measurement would have folded the arm twice.
+
+### the blob is the person, so stop flipping a second coin for their sex
+
+`castBlob` deals the eight baked bodies along the shore on HEIGHT alone,
+because it runs before the casting loop and there is no sex to consult yet.
+The casting loop then flipped its own coin for the instanced rig and the bark
+voice. Two answers about one person, never compared: 41 of 79 promotable
+bathers disagreed, which is exactly what a fair coin against a fixed deal
+gives. What it looks like is a figure with a fall of hair down her neck who
+yelps in a woman's voice and becomes a heavy old man in trunks as you walk up
+— or the reverse, which is the man in a two-piece, since the blob's suit is
+painted into its vertices and there is nothing to overrule it with.
+
+Measured at four stations, 24 in slots at each: disagree 0, and 12 female to
+12 male at every one, so reading sex off the deal did not skew the shore.
+
+### the Bucketeer is working, not chatting
+
+Misha: *"her role is to carry buckets not chat chat"*. 52 + up to 38 is 52 to
+90 seconds, which is what he measured — but the gap was never what drove her.
+`poll` re-armed `nextAt` to `clock + 1.5` every time she came back INTO range,
+and that rule was written about somebody standing still while you walk up: her
+twelve-waypoint route takes her indoors and out again, so SHE crosses your
+threshold on every lap. `takeNews` pulled it to `clock + 0.25` on any event,
+and hers fires every eleven seconds.
+
+`bayeGap` now reports which errand she is on and all three paths read it.
+245 + up to 110 is a mean of 300 seconds. The gesture is untouched — she still
+stops, turns and holds the bucket out every time you look at her; what is rare
+now is her narrating it. The shore Baye keeps her old clock, measured at
+0.54 m.
+
 ## [1.352.0] — 2026-09-07
 
 ### five reports, and three of them were not the thing they looked like
