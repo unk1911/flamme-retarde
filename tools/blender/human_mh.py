@@ -1349,8 +1349,10 @@ def cutters(J, k=(1.0, 1.0, 1.0), torso=True, tail=True):
     # ── the mouth ──────────────────────────────────────────────────────────
     #
     # Placed off the chin, because `J["mouth"]` is unusable (see above) and the
-    # chin marker is a real landmark on a real surface. Measured down the
-    # midline, the profile from the nose to the chin goes
+    # chin marker is a real landmark on a real surface — on HER. On a morph it
+    # is neither, which is the moustache; see the note over `lip` below, where
+    # the eye now shares the job. Measured down the midline, the profile from
+    # the nose to the chin goes
     #
     #     z 1.586  x 0.1762   nose tip
     #     z 1.570  x 0.1645   subnasale, the bottom of the philtrum
@@ -1403,7 +1405,62 @@ def cutters(J, k=(1.0, 1.0, 1.0), torso=True, tail=True):
     # Overlapping is fine here and only here: parity is a property of a single
     # closed shell, and these are nine separate cutters tested independently,
     # not nine halves of one volume.
-    lip = J["jaw"].z + 0.043 * kz
+    # ── and why it is hung off the eye and not off the chin any more ──────
+    #
+    # This is the moustache. Reported 7 Sep 2026: *"some bathers have a
+    # mustache… can't have women with mustaches lol"*. There is no facial hair
+    # anywhere in this pipeline. What is on those faces is THIS cutter, landing
+    # a centimetre and a half too high — a dark rose mark under the nose, on
+    # the philtrum, with the actual lips left bare underneath it. Rendered
+    # unlit with the markers flagged it is unmistakable: the paint is on the
+    # upper lip and the mouth is empty.
+    #
+    # `J["jaw"] + 0.043` is right on Baye and only on Baye. Two things go wrong
+    # on a morph, and they go wrong the same way:
+    #
+    #   - the offset is 43 mm of *face* scaled by `kz`, which is the braincase.
+    #     The vault docstring says in as many words that below the eye line a
+    #     face is features and not proportions, and this is below the eye line.
+    #   - the jaw marker is not the chin surface on anybody but her. MakeHuman's
+    #     jaw joint rides the macro morphs, so chin-to-mouth measured against it
+    #     comes out 25 mm on the old woman where 43 x kz asks for 39.
+    #
+    # The eye does not have either problem, and it is already the anchor this
+    # file trusts for everything else on the face — see `fx`, which was moved on
+    # to it for exactly this reason and checked on all eight. Measured off each
+    # shipped blob, crease against cutter (the crease found by the flip in the
+    # surface normal: the underside of the upper lip faces down, the top of the
+    # lower lip faces up, and nothing else on a face does that):
+    #
+    #                        chin anchor   eye anchor
+    #     baye                    0.0 mm      0.0 mm
+    #     girl_child            +18.1        -3.5
+    #     woman_young_full      +16.7        +1.5
+    #     woman_old             +16.5        +1.6
+    #     woman_young_slim      +12.5        +3.6
+    #     man_old_heavy         +15.2        +9.8
+    #
+    # 0.071860 is Baye's own eye-to-crease — her eye is at 1.623190 and this
+    # cutter has been at 1.551330 since it was written — so it is a
+    # re-anchoring and not a re-measuring: the mouth does not move on the
+    # figure every number here was measured on.
+    #
+    # Both anchors are kept and the LOWER one wins, which is not a hedge. The
+    # failure is one-sided: a mouth painted above the lip is a moustache and is
+    # the whole of this bug, while a mouth painted a millimetre low is a
+    # slightly fuller lower lip and nobody will ever see it. Taking the lower
+    # also leaves alone the three figures the chin anchor already has right —
+    # and Chloe, whose face targets take 7 mm off her chin, so that the chin
+    # anchor puts her mouth 2.4 mm LOWER than the eye anchor would. Her blob
+    # and Baye's come out of this unchanged, which matters: they are the two
+    # faces in this game that are ever seen from thirty centimetres.
+    #
+    # Which figures it actually moves, and by how much:
+    #
+    #     girl_child       -21.6 mm    woman_young_full  -15.2 mm
+    #     woman_old        -14.9       woman_young_slim   -8.9
+    #     man_old_heavy     -5.4       everybody else      0.0
+    lip = min(J["jaw"].z + 0.043 * kz, E.z - 0.071860 * kz)
     HALF, LIFT, BACK = 0.0215 * ky, 0.0026 * kz, 0.0105 * kx
     for i in range(9):
         f = i / 4.0 - 1.0                 # -1 at her right corner, +1 at her left
