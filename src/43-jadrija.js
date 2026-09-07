@@ -35646,7 +35646,7 @@ async function buildJadrija(scene) {
    * who abandons the machine to wave at somebody on the promenade.
    */
   const freeToGreet = (fg) => fg.mode !== 'lie' && fg.mode !== 'serve'
-    && fg.mode !== 'barista' && !fg.bumping && !fg.gr;
+    && fg.mode !== 'barista' && !fg.bumping && !fg.gr && !fg.chat;
   /**
    * And whether they are free AND have not just done it.
    *
@@ -35658,6 +35658,32 @@ async function buildJadrija(scene) {
    */
   const canGreet = (fg) => freeToGreet(fg)
     && greetClock - (fg.gAt == null ? -1e3 : fg.gAt) >= GREET.again;
+
+  /**
+   * And the other thing two people near each other do, which is stand and talk.
+   *
+   * A greeting is over in 3.15 s; a conversation runs for half a minute with
+   * turns in it. The whole of that lives in 43-chatter.js — this is the three
+   * things it needs from in here and cannot see from out there.
+   *
+   * `freeToGreet` is handed over rather than re-derived, and it now carries
+   * `!fg.chat` as well, which is what keeps the two from writing one head: the
+   * greeting will not pick somebody who is already talking, and the chatter
+   * drops anybody who is greeted or walked into on the next frame.
+   *
+   * `voice` is which of the eight this person is. `CAST_KIND[fg.blob]` is the
+   * same lookup `batherWet` uses to pick a yelp, so the woman who says dobar
+   * dan is the woman who shrieks when you hose her. The fallback is for the
+   * handful who can never be promoted — the shop staff — and picks by sex and
+   * seed so that two of them are not one person.
+   */
+  const chatter = makeChatter({
+    aim: greetAim,
+    free: freeToGreet,
+    voice: (fg) => (fg.blob >= 0 && CAST_KIND ? CAST_KIND[fg.blob] : null)
+      || (fg.sex === 'f' ? (fg.seed < 0.5 ? 'woman_young_slim' : 'woman_old')
+        : (fg.seed < 0.5 ? 'man_young_lean' : 'man_old_heavy')),
+  });
 
   /**
    * Whether the `notice` clip can be dropped on to this person.
@@ -35834,6 +35860,21 @@ async function buildJadrija(scene) {
           g.said = true;
         }
       }
+      // AND THE HELLO ITSELF, OUT LOUD, which this has never had.
+      //
+      // Two people waving at each other on a promenade in August and saying
+      // nothing reads as a mime, and it is half of what was asked for: "they
+      // should greet each other". One to three syllables off the hello pool in
+      // 43-chatter.js, synthesised — the argument against the voice service and
+      // against the bark clips is in that file's header.
+      //
+      // On the FIRST FRAME THIS PERSON'S TURN COMES ROUND, which is not the
+      // same frame for both of them: the answerer's `g.t` starts at `-dly` and
+      // the loop above has already returned for every frame it was negative. So
+      // the hail lands at once, the answer half a second to a second later, and
+      // the gap that makes the second one read as an ANSWER is the same gap
+      // that carries the voices apart. Nothing extra had to be scheduled.
+      if (!g.spoke) { g.spoke = true; chatter.hail(fg, who); }
       if (k <= 0) { endGreet(fg); greeting.splice(i, 1); }
     }
 
@@ -36943,6 +36984,14 @@ async function buildJadrija(scene) {
       w.yaw = rigYaw(w.t, w.dir > 0 ? 0 : Math.PI);
     }
 
+    // Who is standing about talking to whom, and it goes first of the THREE
+    // for the reason the two below give between themselves: all of them write
+    // `fg.look`, and the order is urgency. Being walked into beats being said
+    // hello to, and being said hello to beats a conversation you were already
+    // having — so this runs first, the other two overwrite it on the frame
+    // they fire, and the group lets the person go on the next one.
+    chatter.step(dt, who, crowds);
+
     // Who is saying hello to whom, and it goes FIRST of the two: both write
     // `fg.look`, and being walked into has to beat being greeted. See the note
     // over `stepGreet`.
@@ -37165,6 +37214,21 @@ async function buildJadrija(scene) {
             pair[0].z - pair[1].z).toFixed(2),
           w: [+fg.x.toFixed(1), +fg.y.toFixed(2), +fg.z.toFixed(1)] }));
       },
+      /**
+       * Who is standing about talking, and how many have. See 43-chatter.js.
+       *
+       * `chats()` is the tally and the live groups; `chatNow(mode)` opens one
+       * between the nearest people who pass the same tests, so a conversation
+       * can be photographed instead of waited for; `chatSay(kind, line, d)`
+       * fires one utterance on demand, which is how the synth gets levelled
+       * against the bed it has to sit inside; `chatSurvey()` is every pair on
+       * this stretch and the geometry that decides which of them can talk.
+       */
+      chats: () => chatter.stats(lastCam),
+      chatNow: (mode) => chatter.now(crowds, lastCam, mode),
+      chatSay: (kind, line, d) => chatter.sayNow(kind, line, d || 3),
+      chatLines: () => chatter.lines(),
+      chatSurvey: () => chatter.survey(crowds, lastCam),
       /** The instanced layers, so the near shadow cascade can occlude with them. */
       meshes: () => Object.values(crowds).flatMap((c) => c.layers.map((L) => L.mesh)),
       /** And the skinned ones, which each need a palette of their own. */
