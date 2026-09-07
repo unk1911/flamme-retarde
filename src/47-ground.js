@@ -2068,19 +2068,62 @@ async function buildGround(scene, field) {
     // pull-back is more than most of them have behind you, so the march below
     // will be shortening this a lot more often than it used to. That is the
     // right way round — a camera that is occasionally closer than it wants is
-    // better than one that never shows you your own feet — and the floor at
-    // `min` is what stops the short end being ugly.
+    // better than one that never shows you your own feet — and `stand` is what
+    // decides where "occasionally closer" stops being a shot at all. Measured
+    // over the whole resort, 83.3 % of the frames used to get a third person
+    // and 78.5 % still do; the 5.8 % of them that no longer do are the ones
+    // that were drawing her sliced open.
     back: 3.10,             // m down the view line
     up: 0.06,               // m of lift, applied after the pull-back
     step: 0.15,             // m per collision probe — see below
     ahead: 6.0,             // where lookAt is put, ahead of HER and not of the camera
-    // Below this the third person gives up and hands the frame back to the
-    // first. Measured against the failure rather than chosen: with her back to
-    // the mural wall the march finds 0.05 m, which puts the camera inside her
-    // own head — and the inside of a skull is the thing 49-you.js says nobody
-    // wants a view of. Anything under about a metre is a face full of neck, so
-    // under a metre it is not worth having and the eye is better.
-    min: 0.95,
+    /**
+     * HOW CLOSE THE LENS MAY GET TO HER BODY, AND IT IS NOT MEASURED TO HER EYE.
+     *
+     * Misha, 7 Sep: *"the camera sometimes is too close to Chloe, and it slices
+     * right through me so i see sorta 'inside' myself, which is weird, the
+     * camera should never cross over or be so close to me that it slices into
+     * me"*. That is the front plane. It sits at 1.2 m out of doors, so a
+     * triangle of her nearer than that is not drawn, and what is left is the
+     * inside of her back facing you through the hole where her front was.
+     *
+     * This replaces `min: 0.95`, which was the same idea measured against the
+     * wrong thing twice over. It was a distance from her EYE — a point on her
+     * spine, with a body hung round it — and it was BELOW the front plane, so
+     * every frame it accepted at the short end was a frame with her front cut
+     * off. Marched at 0.15 m a step the shortest it ever actually allowed was
+     * 1.05 m, and 1.05 from the eye is 0.87 to her back: 0.33 m inside a plane
+     * at 1.2. That is not an edge case, it is what "with your back to a wall"
+     * has always looked like.
+     *
+     * And the eye is the wrong point for a second reason, which is the one that
+     * produced the worst frames of the lot. The pull-back is a slide DOWN THE
+     * VIEW LINE, so looking up drops the lens: at 57 degrees of pitch and the
+     * 1.2 m a promenade sunbed leaves behind you, the lens ends up 0.65 m from
+     * her and level with her hip, having travelled its whole 1.2 m. Measured
+     * over 128 304 samples — every 7 m of the shore by every 2.8 m inland, at
+     * eight headings, six pitches and her three shapes on foot — the worst gap
+     * between the lens and her skin was 0.436 m.
+     *
+     * So the test is against the COLUMN SHE STANDS IN and not against a point:
+     * `tall` metres of it, from her boots to her crown, and the lens must be
+     * `stand` clear of the line. 1.70 is 1.20 of front plane plus half a metre
+     * of her — she reaches 0.263 m off her own axis at the shoulder, 0.410
+     * mid-stride and 0.468 at the top of a jump, all measured off her own
+     * skinned buffer through `__fr.swim.bodyGap`. Calibrated against the same
+     * 128 304 samples: 1.65 is the shortest stand-off at which no accepted
+     * frame cuts her at all — its worst is 1.340 — and 1.70 takes that to
+     * 1.400, which is 0.20 m of daylight in front of the plane. Both keep the
+     * third person in 94 % of the frames that used to have one, and the next
+     * step up is a cliff: at 1.85 it collapses to 78 %, and 1.70 is nowhere
+     * near it.
+     */
+    stand: 1.70,
+    // Her crown over her own root, measured off the rig: 1.742 standing,
+    // 1.707 mid-stride, 1.741 at the top of a jump. The root is between her
+    // boots, which is where `poseSwimBody` drives her from, so this is the
+    // whole of her and the column is exact at both ends.
+    tall: 1.75,
     // ── the slow turn round her ────────────────────────────────────────────
     //
     // Misha, 27 Aug: "when i use 'B', i always can only just see myself from
@@ -2220,6 +2263,39 @@ async function buildGround(scene, field) {
         return lo;
       };
 
+      /**
+       * One candidate lens position, and whether her own body will fit in
+       * front of it. See `THIRD.stand`.
+       *
+       * THE STAND-OFF IS TESTED LAST, WHICH IS THE WHOLE POINT. The march is a
+       * push-back off the walls and `lift` is a push-down off the ceiling, and
+       * either of them run after a distance check is a check that has been
+       * undone: `lift` in particular takes the lens OFF the view line, so a
+       * glance at your own boots inside a kabina keeps the 3.10 m the march
+       * found and spends nearly all of it going up into a roof that then hands
+       * it back — 3.10 m of pull-back arriving as 0.68 m of clear air.
+       *
+       * `d < THIRD.stand` first is necessary before it is sufficient, and it
+       * is free: every point this can produce lies on a line through her eye,
+       * her eye is ON the column, and `lift` only ever moves the lens back
+       * towards eye height — so the lens can never be further from the column
+       * than it is from the eye. Failing that comparison means failing the
+       * real one, and it saves the five `confine` calls the lift costs.
+       */
+      const place = (a) => {
+        const [d, bx, bz] = march(a);
+        if (d < THIRD.stand) return null;
+        const px = ex + bx * d, pz = ez + bz * d;
+        const py = lift(px, pz, ey - ly * d + THIRD.up);
+        // Her own position and not the eye's: `ex`/`ez` carry the gait's sway
+        // and `ey` carries its bob, and the body `poseSwimBody` draws carries
+        // neither. A few centimetres, and they are centimetres of the thing
+        // being measured.
+        const sy = clamp(py, you.y, you.y + THIRD.tall);
+        if (Math.hypot(px - you.x, py - sy, pz - you.z) < THIRD.stand) return null;
+        return [d, px, py, pz];
+      };
+
       // Advance the lap, or wind it back in. Moving wins outright and it winds
       // back the short way round, so walking off never sends the camera the
       // long way about her to catch up.
@@ -2244,23 +2320,25 @@ async function buildGround(scene, field) {
         orb += THIRD.orbit * orbDir * dt;
       }
 
-      let [d, bx, bz] = march(orb);
+      let hit = place(orb);
       // A wall it cannot get round. Turn round and sweep back rather than
       // collapsing to the first person: the march is a function of the angle,
       // so an unchecked lap past a wall would drop into her eye for a third of
       // a revolution and pop back out — which reads as the camera breaking
       // rather than as a camera meeting a wall. Standing still, the angle that
       // worked last frame still works.
-      if (d < THIRD.min && orb !== was && was !== 0) {
+      if (!hit && orb !== was && was !== 0) {
         orbDir = -orbDir;
         orb = was;
-        [d, bx, bz] = march(orb);
+        hit = place(orb);
       }
-      if (d < THIRD.min) d = 0;
-      thirdD = d;
-      if (d > 0) {
-        cx = ex + bx * d; cz = ez + bz * d;
-        cy = lift(cx, cz, ey - ly * d + THIRD.up);
+      // And when neither way round leaves room for her, the eye. She is not
+      // drawn at all in the first person — `poseSwimBody` hangs her on
+      // `thirdD() > 0` — so the one thing that cannot happen here is the thing
+      // that was reported: a body drawn at a range the front plane cuts.
+      thirdD = hit ? hit[0] : 0;
+      if (hit) {
+        cx = hit[1]; cy = hit[2]; cz = hit[3];
         // And once it is off the view line there is no sense aiming down it —
         // she would walk out of frame within a quarter of the lap. Blended in
         // over the first half radian so nothing jumps at the start of one.
