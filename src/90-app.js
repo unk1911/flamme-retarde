@@ -2391,6 +2391,34 @@ const BODY = {
   // about. She is being told where to be rather than swimming there, so
   // without this every flick of the mouse is a body teleporting.
   ease: 9.0,
+  /**
+   * AND THE FLOOR UNDER `back`, WHICH IS THE SAME BUG AS THE PROMENADE'S.
+   *
+   * Misha, 7 Sep, about the third person on foot: *"the camera ... slices right
+   * through me so i see sorta 'inside' myself"*. It slices out here too, and it
+   * was worse for being invisible: the front plane in the water is normally
+   * pulled in to a few centimetres by `bedNow`, so over the shallows off the
+   * beach nothing shows. Out in the channel the bed is twenty metres down, the
+   * plane goes back to its standing 1.2 m, and the shot is 1.17 m off her toes.
+   * Measured with `__fr.swim.bodyGap` at (-2212, 658): 1.189 m cruising and
+   * 1.169 m nose-down, both inside the plane, both a pair of feet cut off flat.
+   *
+   * `stand` is the plane and `reach` is her, and unlike the promenade she is a
+   * body LYING DOWN — a column round her own axis is the wrong shape and a
+   * sphere round her root is the right one, because the pitch swings her whole
+   * length about that point. Measured off her own skinned buffer: the `swim`
+   * clip reaches 0.988 m from the root and `tread` 0.557, so 1.05 and 0.65
+   * are those with a centimetre or two on top.
+   *
+   * There is nothing out here to collide with, so unlike the promenade this
+   * never has to give up and hand the frame back: the lens simply goes further
+   * back until she fits. Measured at the same two places, that is a tenth of a
+   * metre on 2.5 and it buys 1.277 and 1.275 — which is why the framing this
+   * file argued for is still the framing you get.
+   */
+  stand: 1.20,
+  reach: 1.05,
+  reachUp: 0.65,
 };
 
 /**
@@ -2612,10 +2640,12 @@ function poseSwimBody(dt) {
       // No pitch. Looking up does not lean a walking body back, it moves a
       // head — and the head is not what the camera is behind.
       pitch: 0,
-      // Not drawn when the camera could not get behind her — see THIRD.min in
-      // 47-ground.js. With her back to a wall the pull-back collapses to a few
-      // centimetres, the shot is the first person in all but name, and a body
-      // drawn at that range is the inside of her head.
+      // Not drawn when the camera could not get behind her — see `THIRD.stand`
+      // in 47-ground.js, which is where the whole of "the camera slices into
+      // me" is settled. With her back to a wall the pull-back collapses, the
+      // shot is the first person in all but name, and a body drawn at that
+      // range is not a body: it is her front cut off by the 1.2 m plane and
+      // the inside of her back showing through the hole.
       seen: ground.thirdD() > 0,
       clip: sp > 0.35 ? 'walk' : 'idle',
       // The walk clip is authored at about 0.92 m/s — 42-crowd.js measures it
@@ -2670,9 +2700,24 @@ function poseSwimBody(dt) {
   // And the camera, behind and a little over her. Aimed ahead of her rather
   // than at her, so she sits low in the frame with the water she is going
   // through in it — a camera pointed at a swimmer's back is a portrait.
+  //
+  // `back` is a floor and not a distance — see `BODY.stand`. The lens slides
+  // further down the same line, and only ever further, until the sphere her
+  // body turns inside clears the front plane. Solved rather than stepped,
+  // because it is one quadratic: the lens runs along a horizontal unit vector
+  // at a fixed height, so |lens(b) - root|² is b² - 2pb + q and the larger root
+  // is the b that puts her exactly `need` away. `p*p - q + need*need` cannot go
+  // negative at a `need` this side of her own reach, and the guard is there for
+  // the frame where it does rather than for the case where it should.
+  const dx = w.x - _bodyAt.x, dz = w.z - _bodyAt.z;
+  const dy = w.y + BODY.up - _bodyAt.y;
+  const need = BODY.stand + (prone ? BODY.reach : BODY.reachUp);
+  const pb = fx * dx + fz * dz;
+  const disc = pb * pb - (dx * dx + dy * dy + dz * dz) + need * need;
+  const back = Math.max(BODY.back, disc > 0 ? pb + Math.sqrt(disc) : BODY.back);
   camera.up.set(0, 1, 0);
   camera.position.set(
-    w.x - fx * BODY.back, w.y + BODY.up, w.z - fz * BODY.back,
+    w.x - fx * back, w.y + BODY.up, w.z - fz * back,
   );
   const cp = Math.cos(w.pitch);
   camera.lookAt(w.x + fx * BODY.ahead * cp,
@@ -6898,6 +6943,95 @@ window.__fr = {
     body: (v) => { bodyCam = v == null ? !bodyCam : !!v; syncBodyBtn(); return bodyCam; },
     /** Read it without changing it. */
     bodyOn: () => bodyCam,
+    /**
+     * THE ONE NUMBER THE B KEY HANGS ON: metres of clear air between the lens
+     * and HER SKIN.
+     *
+     * Not from the camera to her origin, which is between her boots, and not
+     * from the camera to her eye, which is what `thirdD` reports and what every
+     * threshold in this game was written against. Misha, 7 Sep: *"the camera
+     * sometimes is too close to Chloe, and it slices right through me so i see
+     * sorta 'inside' myself"* — and that is a statement about her SURFACE and a
+     * front plane, so it can only be settled by a number measured to the
+     * surface. `thirdD` said 1.05 m at the moment the shot was of the inside of
+     * her head, and 1.05 looks perfectly healthy next to a floor of 0.95.
+     *
+     * So the rig is skinned on the CPU, exactly as the vertex program skins it
+     * — `uBones` is the same palette the GPU reads, three RGBA texels a bone
+     * holding a 3x4, and `aBoneIdx`/`aBoneWt` are the same two attributes — and
+     * the nearest of the seven thousand vertices to the lens is the answer.
+     * Slow and correct: it is one pass over the buffer, off the frame loop,
+     * asked by a probe and by nothing else.
+     *
+     * `cut` is the whole point: the front plane is at `camera.near`, so any gap
+     * under it is a triangle of her thrown away and the back faces behind it
+     * showing through the hole.
+     *
+     * `stride` skips vertices, for a sweep that asks this question ten thousand
+     * times. At 8 it reads about a centimetre long — the spacing of her own
+     * mesh — which is nothing next to the quarter of a metre this is used to
+     * find. Leave it at 1 for a number that goes in a commit message.
+     */
+    bodyGap: (stride = 1) => {
+      if (!you) return null;
+      const fig = you.fig;
+      const P = fig.uBones.value.image.data;
+      const g = fig.mesh.geometry;
+      const pos = g.attributes.position.array;
+      const bi = g.attributes.aBoneIdx.array;
+      const bw = g.attributes.aBoneWt.array;
+      const n = pos.length / 3;
+      fig.mesh.updateMatrixWorld();
+      const m = fig.mesh.matrixWorld.elements;
+      const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
+      let best = Infinity, bx = 0, by = 0, bz = 0;
+      for (let v = 0; v < n; v += stride) {
+        const px = pos[v * 3], py = pos[v * 3 + 1], pz = pos[v * 3 + 2];
+        let sx = 0, sy = 0, sz = 0;
+        for (let k = 0; k < 4; k++) {
+          const w = bw[v * 4 + k];
+          if (w === 0) continue;
+          const q = w / 255, o = bi[v * 4 + k] * 12;
+          sx += q * (P[o] * px + P[o + 1] * py + P[o + 2] * pz + P[o + 3]);
+          sy += q * (P[o + 4] * px + P[o + 5] * py + P[o + 6] * pz + P[o + 7]);
+          sz += q * (P[o + 8] * px + P[o + 9] * py + P[o + 10] * pz + P[o + 11]);
+        }
+        const wx = m[0] * sx + m[4] * sy + m[8] * sz + m[12];
+        const wy = m[1] * sx + m[5] * sy + m[9] * sz + m[13];
+        const wz = m[2] * sx + m[6] * sy + m[10] * sz + m[14];
+        const d = (wx - cx) * (wx - cx) + (wy - cy) * (wy - cy)
+          + (wz - cz) * (wz - cz);
+        if (d < best) { best = d; bx = wx; by = wy; bz = wz; }
+      }
+      const gap = Math.sqrt(best);
+      // And the number the fix is actually written against: how far the lens is
+      // from the SEGMENT her body stands on — her root to her crown, 1.75 m of
+      // it. A capsule and not a point, because a point is what `thirdD` already
+      // is and a point is what let the lens end up beside her hip with a
+      // perfectly healthy-looking 1.05 m on the clock.
+      const ax = m[12], az = m[14];
+      // 1.75 m: her crown in the bind pose, measured off this same buffer —
+      // 1.742 in the idle, 1.707 mid-stride, 1.741 at the top of a jump.
+      const ay = clamp(cy, m[13], m[13] + 1.75);
+      const spine = Math.hypot(cx - ax, cy - ay, cz - az);
+      return {
+        gap: +gap.toFixed(3),
+        spine: +spine.toFixed(3),
+        near: +camera.near.toFixed(3),
+        cut: gap < camera.near,
+        seen: fig.mesh.visible,
+        phase: state.phase,
+        // What the mode thinks it managed, for the gap between the two.
+        thirdD: state.phase === 'ground' && ground && ground.ok
+          ? +ground.thirdD().toFixed(3)
+          : (state.phase === 'brod' && brod ? +brod.thirdD().toFixed(3) : null),
+        cam: [+cx.toFixed(2), +cy.toFixed(2), +cz.toFixed(2)],
+        // The nearest vertex itself, so a reading that looks wrong can be
+        // checked against the picture: a hit on her crown and a hit on her heel
+        // are different bugs.
+        hit: [+bx.toFixed(2), +by.toFixed(2), +bz.toFixed(2)],
+      };
+    },
     /** The changing station: dressed or not, and which cubicle she is in. */
     changed: (v) => {
       if (v != null) setDressed(!v);

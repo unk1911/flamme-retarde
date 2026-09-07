@@ -256,13 +256,47 @@ const BROD = {
    *              it is a camera looking at a sheet of canvas. Tested against
    *              the sole rather than against a box, so the awning may be
    *              moved and this still knows where it is.
-   *   `camMin`   under which the third person gives up and hands the frame
-   *              back to the first — the promenade's argument, unchanged:
-   *              under a metre it is a face full of neck.
+   *   `camStand` under which the third person gives up and hands the frame
+   *              back to the first, and it is measured to your BODY. This was
+   *              `camMin: 1.00`, measured to your eye, and a metre to the eye
+   *              is 0.85 m to the back of your own head against a front plane
+   *              at 1.2 — so every frame the old floor accepted at the short
+   *              end was a frame with your front clipped away and the inside
+   *              of your back showing through the hole. Photographed on her
+   *              starboard side deck at `camMin`'s own 1.05 m: a hollow ring
+   *              where the beanie was, and the scalp inside it.
+   *
+   *              1.70 and `THIRD.stand`'s reasoning, because it is the same
+   *              body and the same plane — but the numbers behind it are hers.
+   *              Swept over her whole deck, 0.5 m fore-and-aft by 0.4 m
+   *              athwart, eight headings by six pitches, 21 264 samples of
+   *              which 17 703 drew her: the worst gap between the lens and her
+   *              skin was **0.321 m**, worse than the promenade's 0.436, and
+   *              1 in 4 of the frames that drew her at all were inside the
+   *              plane. At 1.70 the worst is 1.599 m and 64 % of them still
+   *              have a third person.
+   *
+   *              THE 36 % IS NOT SPREAD OVER HER DECK, and that is what makes
+   *              the trade a good one: at level and half a radian either way
+   *              it keeps 89 to 90 %, and the whole loss is in the steep
+   *              looks. At the top of her own pitch clamp — 1.20 rad, 69
+   *              degrees — it keeps NONE of them, and it cannot: 3.10 m down
+   *              a line that steep is 2.89 m of drop and 1.12 m of reach, so
+   *              the lens is under the sole beside your knees before the
+   *              clamp has said anything. That shot was never a shot; it was
+   *              a sliced body against the sky, and now it is your own eyes.
+   *
+   *              Tested at the END, for the reason `THIRD.stand` gives: the
+   *              height clamp below takes the lens off the view line, so a
+   *              distance checked before it is a distance the clamp can spend.
+   *   `camTall`  and how much of you the clamp has to keep clear of — your
+   *              boots to your crown, which is where `driveBody` puts the
+   *              figure it draws.
    */
   third: 3.10,               // m the camera falls back when B is on
   camStep: 0.15,             // m a probe — the march, as 47-ground.js marches
-  camMin: 1.00,
+  camStand: 1.70,
+  camTall: 1.75,
   camLow: 1.00,
   camHead: 0.35,
   camRoof: 2.05,
@@ -3591,7 +3625,7 @@ function buildBrod(scene) {
       // over your eyes down there — and a march that took the height off the
       // view line lost the whole shot the moment you glanced at your own feet:
       // measured over her deck, looking down 26 degrees in the cockpit found
-      // 0.99 m, under `camMin`, and handed the frame back to the first person.
+      // 0.99 m, under the floor, and handed the frame back to the first person.
       // How far BACK the camera can get is a question about walls; how high it
       // ends up is a separate one and is settled below.
       for (let k = BROD.camStep; k <= back + 1e-6; k += BROD.camStep) {
@@ -3599,7 +3633,7 @@ function buildBrod(scene) {
         if (camInPax(ex - lx * k, ey, ez - lz * k)) break;
         d = k;
       }
-      if (d < BROD.camMin) d = 0;
+      if (d < BROD.camStand) d = 0;
     }
     // OUT SLOWLY, IN AT ONCE. What the march finds is not continuous along her
     // deck — walk aft off the side deck and the awning takes 3.10 m down to
@@ -3629,6 +3663,29 @@ function buildBrod(scene) {
           if (camClear(cx, mid, cz)) lo = mid; else hi = mid;
         }
         cy = lo;
+      }
+      // AND NOW HER, WHICH IS THE LAST WORD BECAUSE IT HAS TO BE.
+      //
+      // The march is a push-back off her deckhouse and the clamp just above is
+      // a push-down off her awning and off the sea, and both of them spend the
+      // distance the floor at `camStand` was supposed to guarantee. The march
+      // runs at EYE HEIGHT and reports what it found along the tilted line, so
+      // on any steep look most of that length is vertical — and the clamp then
+      // takes the vertical part off again and leaves the lens beside you with
+      // the full figure still on the clock. Measured over her deck, that is
+      // how the lens ends up 0.321 m from your own skin holding a 1.20.
+      //
+      // The column and not the eye — `you.deck` is under your boots and
+      // `driveBody` stands the figure on exactly that point, so this is the
+      // body that is actually drawn. All in her frame, which costs nothing:
+      // the lens is not in the world yet.
+      const sy = clamp(cy, you.deck, you.deck + BROD.camTall);
+      if (Math.hypot(cx - you.x, cy - sy, cz - you.z) < BROD.camStand) {
+        // Back to the eye, and `third` with it — `driveBody` hangs the figure
+        // on `third > 0`, so zero here is the one state in which nothing of
+        // her can be cut, because nothing of her is drawn.
+        third = 0; d = 0;
+        cx = ex; cy = ey; cz = ez;
       }
     }
     tmpV.set(cx, cy, cz);
