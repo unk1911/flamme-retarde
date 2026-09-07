@@ -637,7 +637,14 @@ async function buildVikendica(scene, field) {
     tv.at = [0.17, plan.floor + 0.955, 3.40];
   }
 
-  // ── the two drawings on the spine ──────────────────────────────────────────
+  // Things that are on the wall under the roof that is THERE and come off it
+  // under the one the renovation would build. `loftOnly` down in the blockers
+  // is the same idea the other way round, and for the same reason: `roof()` is
+  // a switch a player presses, so anything that differs between the two states
+  // has to be switchable in place rather than decided once at build time.
+  const nowOnly = [];
+
+  // ── the two drawings on the spine, and the poster on the east wall ─────────
   /**
    * A floor plan, drawn.
    *
@@ -895,24 +902,217 @@ async function buildVikendica(scene, field) {
     //
     // Blender's y is three.js's −z, and the wall face is at 0.630 in the plan's
     // own frame — so the sheets face +z, which is into the big room.
-    const WALL = -0.622;
-    const hang = (tex, x0, x1, y0, y1) => {
-      const frameMat = solidMaterial(new THREE.Color(0.145, 0.130, 0.110), {
-        spec: 0.24, specPower: 40, emissive: VIK.glow, vcol: false,
-      });
-      const w = x1 - x0, h = y1 - y0, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-      const fr = new THREE.Mesh(
-        new THREE.BoxGeometry(w + 0.030, h + 0.030, 0.020), frameMat);
-      fr.position.set(cx, cy, WALL - 0.006);
-      root.add(fr);
-      const sheet = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
-        new THREE.MeshBasicMaterial({ map: tex }));
-      sheet.position.set(cx, cy, WALL + 0.006);
-      root.add(sheet);
-      for (const m of [fr, sheet]) { m.castShadow = false; m.receiveShadow = false; }
+    //
+    // ── THE TWO WALLS THINGS HANG ON, AND WHY THE SECOND ONE IS MEASURED ──
+    //
+    // `SPINE` is the partition between the big room and the two bedrooms, whose
+    // face this file already carried at 0.622. `EAST` is the long blank wall on
+    // the right of the stair-head door, and its number is NOT off the plan:
+    // `plan.blockers` puts that wall's inner face at x 3.19 and the GEOMETRY
+    // puts it at 3.150. The blockers are the walk volume, deliberately fat — a
+    // blocker exists to stop you walking into a wall and is 4 cm clear of it on
+    // purpose — so hanging off one buries the frame 40 mm inside the render.
+    // Raycast in the ROOT's own frame at 24 points across the run: 3.150
+    // everywhere from z 0.80 to 3.55 and from 0.70 to 2.10 above the floor, and
+    // 3.154 on the last row before the wall head.
+    //
+    // In the root's frame and not `at()`'s, which is the other half of that
+    // measurement. `at()` goes through the shore field, and the shore field is a
+    // CURVE; `root` is a rigid group with one yaw. Over the 2.9 m from the
+    // middle of the room to this wall the two disagree by 27 mm, so the first
+    // pass of this raycast reported the wall at 3.217 and would have hung the
+    // poster in mid-air.
+    const SPINE = { yaw: 0, p: (a, y) => [a, y, -0.622] };
+    const EAST = { yaw: -Math.PI / 2, p: (a, y) => [3.150, y, a] };
+
+    // One frame for everything on a wall in this house: dark stained wood, a
+    // hard small highlight, and the same `VIK.glow` the plaster gets.
+    const frameMat = solidMaterial(new THREE.Color(0.145, 0.130, 0.110), {
+      spec: 0.24, specPower: 40, emissive: VIK.glow, vcol: false,
+    });
+
+    /**
+     * Hang a framed sheet on a wall.
+     *
+     * `a0..a1` is its extent ALONG the wall and `y0..y1` its height, both in
+     * house metres — x on the spine, z on the east wall, which is the whole
+     * reason this goes in a group rather than setting three components by hand.
+     * The group is stood on the wall face with `wall.yaw`, so everything below
+     * is written once in the sheet's own frame: +z is the room, and the only
+     * numbers left are how far off the wall each piece stands.
+     *
+     * `tex` is the picture; `o.mat` replaces the material that carries it, and
+     * a caller that supplies one hands the same texture over twice on purpose
+     * — the first argument says what the sheet IS whichever shader draws it.
+     *
+     * Two kinds of frame, and the difference is not decoration:
+     *
+     *  - the drawings get a solid box behind them, which is what they have
+     *    always had. A sheet of paper 2 mm in front of a board is fine at half
+     *    a metre across and in a corner of the room nobody stands in.
+     *  - the poster gets FOUR BARS AND A HOLE. Same call the bar poster in the
+     *    kabina makes and for the reason written there: a backing board puts a
+     *    second surface a couple of millimetres behind the paper, and two
+     *    millimetres over a metre of diagonal is half a degree — the first cut
+     *    of that one buried half the print in its own frame. With nothing behind
+     *    it the only thing the paper can argue with is the wall, 20 mm back,
+     *    which is rule 5 with a factor of six in hand.
+     */
+    const hang = (tex, a0, a1, y0, y1, o = {}) => {
+      const wall = o.wall || SPINE;
+      const w = a1 - a0, h = y1 - y0;
+      const g = new THREE.Group();
+      const p = wall.p((a0 + a1) / 2, (y0 + y1) / 2);
+      g.position.set(p[0], p[1], p[2]);
+      g.rotation.y = wall.yaw;
+      root.add(g);
+      const put = (m, x, y, z) => {
+        m.position.set(x, y, z);
+        m.castShadow = false; m.receiveShadow = false;
+        g.add(m);
+      };
+      if (o.open) {
+        // 28 mm of moulding, 24 mm deep, its back 8 mm off the render so the
+        // frame reads as hung and not as printed on. Top and bottom run the
+        // full width and the stiles fit between them, which is a butt joint and
+        // not two coplanar front faces fighting over the corners.
+        const b = 0.028, d = 0.024, zc = 0.008 + d / 2;
+        const bar = (bw, bh, bx, by) =>
+          put(new THREE.Mesh(new THREE.BoxGeometry(bw, bh, d), frameMat),
+            bx, by, zc);
+        bar(w + 2 * b, b, 0, (h + b) / 2);
+        bar(w + 2 * b, b, 0, -(h + b) / 2);
+        bar(b, h, -(w + b) / 2, 0);
+        bar(b, h, (w + b) / 2, 0);
+      } else {
+        put(new THREE.Mesh(
+          new THREE.BoxGeometry(w + 0.030, h + 0.030, 0.020), frameMat),
+        0, 0, -0.006);
+      }
+      // The paper. `PlaneGeometry` faces its own +z and the group's +z is the
+      // room, so this is the right way round on either wall without a flip —
+      // and getting that backwards is a poster that is simply not there.
+      put(new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+        o.mat || new THREE.MeshBasicMaterial({ map: tex })),
+      0, 0, o.open ? 0.020 : 0.006);
+      return g;
     };
     hang(priz, 1.40, 1.96, 4.40, 4.80);
     hang(kat, 2.10, 2.50, 4.32, 4.88);
+
+    // ── BUCKETEERS OF AMERICA, on the east wall ──────────────────────────────
+    /**
+     * The poster on the wall to the right of the stair-head door.
+     *
+     * It is a supplied image and not a canvas — the one piece of artwork in
+     * this game that is neither drawn by this file nor a photograph of a real
+     * place — so rule 12 is satisfied by REPRODUCING it rather than by
+     * retyping its wording into a 2d context. It goes through `build/payload`
+     * the way every other baked asset does, and `build.py` turns it into a
+     * data URI, so the finished page still opens off the filesystem.
+     *
+     * 512×768 and 67 KB of WebP, down from the 1024×1536 it came in at, which
+     * costs the bundle 90 KB of base64 out of 28 MB. Sized against the job it
+     * has and MEASURED off the frames: in a 1200-px window the paper is 120 px
+     * across from where you stand in this room, and 279 px with your nose on
+     * the 1.2 m near clip, which is as close as the camera is ever allowed to
+     * get. On a 1080p panel that is 192 px standing and 446 px with your nose
+     * on it, so 512 is two and a half times what the room ever asks for and
+     * one-to-one at the extreme; on a 4K panel the extreme wants 893 and gets
+     * 512, which is a softness you have to walk up to the wall to find. 1024
+     * would be four times the bytes to serve only that walk.
+     *
+     * ── AND THE COLOUR SPACE, WHICH IS THE WHOLE JOB ─────────────────────────
+     *
+     * NOT `SRGBColorSpace`. Everywhere else in this game that line is correct
+     * and here it is the bug, and the difference is which end of the pipe the
+     * number comes from.
+     *
+     * A canvas texture is written by this code in css bytes and read by the
+     * shader as an albedo, so it needs the decode to land back on the number
+     * the file meant — that is what the `paint()` helper in `brodMural` exists
+     * for and what the note over it records. A SHIPPED IMAGE is already the
+     * answer: its bytes ARE display-referred, and `solidFragment` writes its
+     * colour straight to the framebuffer in display space, tone mapping and all
+     * left off. Decode it and you have applied a transfer function that nothing
+     * downstream undoes.
+     *
+     * MEASURED, by building it BOTH WAYS and photographing the same frame from
+     * the same place in the same light, then reading the rendered sheet back
+     * against the file it was made from — rendered over source, per region:
+     *
+     *                              undecoded    tagged SRGB
+     *     whole sheet, luma          0.947         0.574
+     *     the deep blue foot band    0.915         0.304
+     *     the headline and paper     0.952         0.694
+     *
+     * and the band itself, (20, 64, 106) in the file, comes back (16, 59, 103)
+     * undecoded and (9, 18, 40) decoded. That is a navy band rendered as a
+     * black one, three times too dark, on a sheet whose whole bottom eighth it
+     * is. This is the failure the gull and the fish hid for three builds by
+     * being near-white — at the top of the tonal range the error is a third
+     * and at the bottom it is a factor of three, and a poster is the one kind
+     * of artwork that lives at both ends at once.
+     *
+     * So the texture is left undecoded and the shipped file is left alone. The
+     * alternative — pre-encoding the artwork so that a decode lands back on it —
+     * is the same arithmetic done twice and stores a washed-out image that
+     * looks broken in any viewer, and it would put the lossy WebP quantiser to
+     * work in a stretched space.
+     *
+     * `emissive` is the plaster's own `VIK.glow` and nothing more. The bar
+     * poster in the kabina takes 0.46 because that room is lit by a television;
+     * this wall renders at (190, 203, 215) in the middle of an August
+     * afternoon, and a print that has to out-glow that is a lightbox.
+     */
+    const boaTex = (() => {
+      const img = new Image();
+      const tex = new THREE.Texture(img);
+      tex.colorSpace = THREE.NoColorSpace;
+      tex.anisotropy = 8;
+      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      // The payload arrives as a data URI, so the decode is a microtask and
+      // not a request — but it is still not synchronous, and a texture whose
+      // image has no width yet uploads as nothing at all.
+      img.onload = () => { tex.needsUpdate = true; };
+      img.src = PAYLOAD.boa_poster;
+      return tex;
+    })();
+
+    // 0.500 × 0.750, which is the file's own 1024:1536 exactly. Between A2
+    // (0.420 × 0.594) and B1 (0.700 × 1.000) and a shade taller than B2
+    // (0.500 × 0.707) — a printed public-service sheet, not a postcard and not
+    // a hoarding.
+    //
+    // Centred on the blank run and at 1.55 m, which are both measured. The run
+    // is 2.89 m of wall — the door lining stops at z 0.73 and the corner into
+    // the terrace wall is at 3.62 — so the centre is 2.175 and there is 1.19 m
+    // of clear wall either side of the paper. 1.55 m of centre height puts the
+    // headline at eye level for a standing adult (this game's own eye is
+    // 1.66 m), the top edge 0.475 m under a 2.40 m ceiling and the bottom edge
+    // 1.175 m off the floor, clear of anything that could ever stand there.
+    //
+    // AND IT COMES DOWN WHEN THE LOFT GOES IN, which is not a dodge. The
+    // renovation runs its ladder-stair UP THIS WALL — twelve treads from z 3.14
+    // to z 0.90, hard against the render, `VIK.loftStair` — and there is no
+    // 0.556 m of clear wall left anywhere on the run: 0.17 m between the door
+    // lining and the foot of the flight and 0.48 m between its head and the
+    // corner. Raycast in loft mode: at z 2.10 and 1.20 m off the floor a tread's
+    // outer face is at x 2.22 and it runs back to the render at 3.15, straight
+    // through a frame whose own front stands at 3.118. So the
+    // poster is registered `nowOnly` and `roof()` takes it off the wall with
+    // the old roof, which is what anybody would do with a picture on the wall
+    // they were about to build a staircase up.
+    nowOnly.push(hang(boaTex, 1.925, 2.425, 4.075, 4.825, {
+      wall: EAST,
+      open: true,
+      mat: solidMaterial(0xffffff, {
+        spec: 0.03, emissive: VIK.glow, vcol: false,
+        decl: 'uniform sampler2D uBoaMap;',
+        body: 'base = texture2D(uBoaMap, vUv).rgb;',
+        uniforms: { uBoaMap: { value: boaTex } },
+      }),
+    }));
   }
 
   // ── the fan ────────────────────────────────────────────────────────────────
@@ -2320,6 +2520,8 @@ async function buildVikendica(scene, field) {
         if (parts[k]) parts[k].visible = which === 'loft';
       }
       for (const b of loftOnly) b.off = which !== 'loft';
+      // And what the loft's own ladder-stair would be built straight through.
+      for (const m of nowOnly) m.visible = which !== 'loft';
       return which;
     },
     get roofNow() { return parts.loft && parts.loft.visible ? 'loft' : 'now'; },
