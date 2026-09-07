@@ -35089,6 +35089,13 @@ async function buildJadrija(scene) {
     // small, and pushed nobody — walk into somebody mid-greeting and their head
     // would never come round to you at all. The flag says what the test was
     // always trying to ask: is this figure already one of MINE.
+    // And it is YOU they look at, whatever they were looking at before. A
+    // bather part-way through turning to the stranger who just caught their
+    // shoulder — see `pardon` — carries a `lookOn`, and a look aimed at
+    // somebody else while you are the one who walked into them is the exact
+    // complaint the head turn was built to answer. Cleared on both branches,
+    // because being brushed twice takes the second one.
+    fg.lookOn = null;
     if (!fg.bumping) {
       fg.lookT = 0; fg.look = 1e-4; fg.lookY = 0;
       fg.bumping = true;
@@ -35133,6 +35140,101 @@ async function buildJadrija(scene) {
     return true;
   }
 
+  /**
+   * "Pardon!" — one word, and the whole of what one bather says to another.
+   *
+   * Misha, with the report that produced the avoidance below: "if bump into
+   * each other should be like 'pardon!' which is what they say in Croatia if
+   * you accidentally bump into someone." It is the word he asked for and it is
+   * not translated, which is the one place this differs from `EXCUSE` above.
+   * Those are a stranger's English snapped at you and are localised with the
+   * rest of the game's speech; this is a Croatian word said on a Croatian
+   * beach, in the same class as the name on the sign. Rule 12 is about invented
+   * text, and this one was dictated.
+   *
+   * SILENT, and that is not an oversight. `bark` is thirty-two recordings and
+   * there is no thirty-third; a synthesised syllable next to two hours of
+   * ElevenLabs would be the one voice on this beach that is obviously a
+   * machine. The note over `BUMP` already settles what to do about that: "a
+   * head coming round is free, silent, and reads at fifteen metres". So this is
+   * the head and the balloon, which is what a bump looks like from three metres
+   * away with the sea running.
+   *
+   * Everything under it is `bumpReact`'s, deliberately. One balloon on this
+   * shore, one `looking` list, one per-person clock — a second mechanism for
+   * the same event would be two captions over one promenade the first time
+   * somebody was shoved next to somebody else. What is new is three gates:
+   *
+   *   CONTACT, not proximity. The yield keeps 0.70 m between two of them and
+   *   the radii sum to 0.46-0.64, so by the time this fires the avoidance has
+   *   already failed. That is exactly when a person says it. Measured after the
+   *   fix, standing at t 260: one to two of them in 150 s, which is once every
+   *   couple of minutes and is the whole of what is wanted.
+   *
+   *   EARSHOT. The balloon is a world object; one hung over somebody four
+   *   hundred metres up the beach is a caption nobody can read and a plane
+   *   nobody needs drawn. `lastCam` and not `who`, because "is this worth
+   *   drawing" really is a question about the viewer — see `updateCrowd`.
+   *
+   *   RARITY, and it is the gate that matters. A beach where everybody says
+   *   pardon is worse than a silent one. `PARDON.cool` is four times
+   *   `BUMP.cool` and is a SEPARATE clock on purpose: being barged into by the
+   *   player must never be answered with silence because two strangers brushed
+   *   each other behind you, so this yields to that and never the other way
+   *   round. It takes the balloon only when nothing else has it, and
+   *   `bumpReact` may take it back mid-word.
+   *
+   * The one who WALKED INTO the other says it and the other looks up, which is
+   * the way round it happens on a promenade. `bumpReact` gives the line to the
+   * person who was hit, because there the one who walked into them is you.
+   */
+  const PARDON = {
+    cool: 9.0,      // s before anybody on this shore says it again
+    near: 20,       // m from the camera, past which it is a plane nobody reads
+    hold: 1.5,      // s the word stays up. One word is not `BUMP.hold`.
+  };
+  let pardonCool = 0;
+  /**
+   * The last few of them, newest last, for the same reason `bumpLog` exists: a
+   * gate this hard is a gate you cannot photograph, and "did that fire" has to
+   * have an answer that is not a screenshot taken at the right ninth of a
+   * second. A ring and not a log — see `bumpLog`.
+   */
+  const pardonLog = [];
+
+  function pardon(w, f) {
+    if (pardonCool > 0 || bumpCool > 0 || bumpSaid) return;
+    const dx = w.x - lastCam.x, dz = w.z - lastCam.z;
+    if (dx * dx + dz * dz > PARDON.near * PARDON.near) return;
+    // The same fourteen seconds a person gets before they will speak to you
+    // again, and the same field, so somebody who has just snapped at you does
+    // not immediately apologise to a stranger.
+    if (bumpClock - (w.saidAt == null ? -1e3 : w.saidAt) < BUMP.again) return;
+    w.saidAt = bumpClock;
+    pardonCool = PARDON.cool;
+    // The one who was walked into looks up — at the walker and not at you,
+    // which is what `lookOn` is for. A sunbather is out for the reason
+    // `bumpReact` has them out: prone, the neck solve is not a neck.
+    if (f.mode !== 'lie' && !f.bumping) {
+      f.lookT = 0; f.look = 1e-4; f.lookY = 0;
+      f.bumping = true;
+      f.lookOn = w;
+      looking.push(f);
+    }
+    if (!bumpBalloon) {
+      bumpBalloon = makeBalloon();
+      bumpBalloon.mesh.scale.setScalar(1.45);
+      scene.add(bumpBalloon.mesh);
+    }
+    bumpBalloon.say('Pardon!');
+    bumpBalloon.said = 'Pardon!';
+    bumpSaid = { fg: w, t: 0, dur: PARDON.hold };
+    pardonLog.push({ said: w.idx, at: f.idx, mode: f.mode,
+      t: +w.t.toFixed(1), s: +(w.lane + w.off).toFixed(2),
+      clock: +bumpClock.toFixed(1) });
+    if (pardonLog.length > 12) pardonLog.shift();
+  }
+
   /** Advance every head that is part-way round, and the line over one of them. */
   function stepBump(dt, cam) {
     // Ask for the six clips before anybody is walked into. Same lesson as
@@ -35141,6 +35243,11 @@ async function buildJadrija(scene) {
     if (audio && audio.barkWarm) audio.barkWarm();
     bumpClock += dt;
     if (bumpCool > 0) bumpCool -= dt;
+    // Kept outside the early-out below, which is the mistake this clock would
+    // otherwise make: a cooldown that only runs while somebody is being looked
+    // at is a cooldown that never reaches nine seconds. Same lesson as the note
+    // over the `stepBump` call in `updateCrowd`.
+    if (pardonCool > 0) pardonCool -= dt;
     if (!looking.length && !bumpSaid) return;
     for (let i = looking.length - 1; i >= 0; i--) {
       const fg = looking[i];
@@ -35153,15 +35260,20 @@ async function buildJadrija(scene) {
       fg.look = k * k * (3 - 2 * k);
       // Kept aimed while the head is out, so somebody who walks round in front
       // of them while they are still looking is still what they are looking at.
-      if (u < BUMP.turn + BUMP.hold) fg.lookY = bumpAim(fg, cam);
+      // `lookOn` is whoever walked into them when it was not you — see
+      // `pardon`. Any object with an `x` and a `z` will do, which is what lets
+      // a bather be aimed at another bather through the same solve.
+      if (u < BUMP.turn + BUMP.hold) fg.lookY = bumpAim(fg, fg.lookOn || cam);
       if (fg.look <= 0) {
-        fg.look = 0; fg.bumping = false; looking.splice(i, 1);
+        fg.look = 0; fg.bumping = false; fg.lookOn = null; looking.splice(i, 1);
       }
     }
     if (!bumpSaid) return;
     const b = bumpBalloon, fg = bumpSaid.fg;
     bumpSaid.t += dt;
-    if (bumpSaid.t > BUMP.turn + BUMP.hold) {
+    // `dur` where the caller gave one: four words snapped at you and one word
+    // of apology are not up for the same length of time.
+    if (bumpSaid.t > (bumpSaid.dur || BUMP.turn + BUMP.hold)) {
       b.mesh.visible = false; bumpSaid = null; return;
     }
     const h = BUMP.high[fg.mode] || BUMP.high.stand;
@@ -36093,6 +36205,340 @@ async function buildJadrija(scene) {
   /** The shared buffer `bodies` fills. Read it, do not keep it. */
   const bodyList = () => bodyBuf;
 
+  // ── things you cannot walk through either ──────────────────────────────────
+  //
+  // THE OTHER HALF OF THE SAME REPORT, and it went a year without being asked.
+  // 1.349.0 gave the walkers each other and 1.350.0 gave the Bucketeer you, and
+  // Misha came back with "some bathers still don't respect object collision
+  // boundaries and walk right thru each other... or other objects". The second
+  // clause is the one that was still true. Measured before touching anything,
+  // over three runs of 150 s sampled at 10 Hz: body against body came back at
+  // 0.00 overlapping pairs a sample — 1.349.0 did work — and body against the
+  // WORLD at 1.44, 1.51 and 1.67, over 67, 68 and 69 distinct static blockers,
+  // with a walker standing 1.194 m inside the 3.0 by 4.2 m terrace box at
+  // t 180 on every single pass. Walked end to end at a quarter of a metre a
+  // step, the twenty-seven beats enter sixty distinct boxes and carry 80.3 m of
+  // walking done inside solid concrete, timber and pine.
+  //
+  // The reason is one line long and it is a whole-file pattern: the walk loop
+  // resolves against people and against you, and `blockers` was never in it.
+  // Everything else that moves down here already had this. `confine` in
+  // 47-ground.js walks the list for you; `showClear` walks it for Baye — and
+  // the note over that one is worth reading, because it is this bug reported
+  // about her a hundred releases ago and fixed only for her: "she went through
+  // benches, bins and trees on every scripted leg". The walkers went through
+  // the same benches, the same bins and the same trees, on every beat.
+  //
+  // So this is `showClear`'s idea with one constraint added: LATERAL AND ONLY
+  // LATERAL. Baye can be pushed any of four ways because she has no route; a
+  // walker's `t` is its beat and it cannot stop, so being ejected along the
+  // shore would be a figure skipping a metre up the promenade, which is the one
+  // artefact worse than the bench it was standing in.
+  //
+  // Bucketed along the shore, because 818 boxes times 27 walkers is 22 000 box
+  // tests a frame for a question whose answer is always "the dozen I am walking
+  // past". Eight metres a bin, a box in every bin its own length touches plus a
+  // look-ahead and a shoulder either side, and one bin lookup is the whole
+  // broad phase. Measured: 196 of the 818 survive the band filter, they land in
+  // 77 bins, the fullest holds thirty-four and the average is 5.6 — so the
+  // whole crowd's sweep is about three hundred box tests a frame. `updateCrowd`
+  // times the same at 0.412 ms a step before this and 0.400 after, five runs of
+  // 1200 steps apiece: inside the noise, which is what it had to be.
+  //
+  // Filtered to the band the beats can reach, which is where most of the 818 go
+  // away: the lanes run s 10.2 to 16.7 and `CROWD.wide` caps the drift at 1.5,
+  // so the huts behind the back row, the houses up the lanes and the pines on
+  // the hillside are boxes no walker could touch if it tried. Both ends of that
+  // filter are measured off `walkers` rather than written down, so a beat moved
+  // tomorrow moves the filter with it.
+  const WALK_BIN = 8;
+  const walkBins = new Map();
+  // How long `blockers` was when the bins were last laid, and it is the whole
+  // of why this is not built once and forgotten.
+  //
+  // THE LIST GROWS AFTER THIS FILE HAS FINISHED WITH IT, which took an evening
+  // to find because nothing in here says so. `src/37-props.js` pushes eight
+  // parasol poles straight on to `jadrija.blockers` once the resort is handed
+  // back, and `src/46-backlane.js` pushes its wall runs the same way — so the
+  // 818 that `__fr.stats().jadrija.blockers` reports is 810 at the moment the
+  // crowd is placed. A snapshot taken here is a snapshot with eight 2.3 m
+  // parasol poles missing from it, all eight of them standing between s 8.9 and
+  // s 12.0, which is the middle of four promenade lanes. Measured: the walker
+  // on lane 11.71 walked through the pole at t 372.26 on every pass, its ban
+  // list came back EMPTY, and the loop was right about every box it had been
+  // given.
+  //
+  // One integer compare a frame is the price of never having that again.
+  let walkBinsAt = -1;
+  function layWalkBins() {
+    walkBinsAt = blockers.length;
+    walkBins.clear();
+    let sLo = Infinity, sHi = -Infinity;
+    for (const w of walkers) {
+      if (w.lane < sLo) sLo = w.lane;
+      if (w.lane > sHi) sHi = w.lane;
+    }
+    // The widest a walker can get off its lane, and a shoulder on top: `scale`
+    // runs to 1.08, so the biggest body radius on this beach is 0.26.
+    const pad = CROWD.wide + BODY.r * 1.1;
+    sLo -= pad; sHi += pad;
+    const reach = CROWD.see + BODY.r * 1.1;
+    for (const b of blockers) {
+      if (b.off || !(b.a >= 0) || !(b.c >= 0) || !(b.h >= 0)) continue;
+      // A blocker that exists only on one storey is a blocker for somebody on
+      // a storey, and nobody in this crowd is. Same reading `confine` gives it:
+      // no height passed means a banded blocker does not apply at all.
+      if (b.y0 != null) continue;
+      // The shore-frame reach of a box that carries its own rotation. A house
+      // at 40 degrees to the shore is not as wide as its own diagonal, but
+      // nothing standing on a lane is rotated at all and being generous with
+      // the ones that are costs a bin entry apiece.
+      const rad = b.rot ? Math.hypot(b.a, b.c) : b.c;
+      if (b.s + rad < sLo || b.s - rad > sHi) continue;
+      const along = (b.rot ? Math.hypot(b.a, b.c) : b.a) + reach;
+      const i0 = Math.floor((b.t - along) / WALK_BIN);
+      const i1 = Math.floor((b.t + along) / WALK_BIN);
+      for (let i = i0; i <= i1; i++) {
+        const list = walkBins.get(i);
+        if (list) list.push(b); else walkBins.set(i, [b]);
+      }
+    }
+  }
+  layWalkBins();
+
+  /**
+   * The stretches of shore a walker may not stand on, in `s`, at its own `t`.
+   *
+   * Intervals and not boxes, and that is the whole of what the first cut of
+   * this got wrong. Deciding per box which side to leave by gives the right
+   * answer to the wrong question: at t 235 a walker on lane 15.40 is 0.10 m off
+   * the axis of a 0.60 m pine, so the near way out is 0.74 m INLAND — and 0.55 m
+   * inland of that pine is a 4 m planter wall it had been walking clear of all
+   * day. Measured, first cut: the deepest penetration on the shore moved from
+   * 1.194 m inside a terrace to 0.392 m inside that wall, and the number of
+   * distinct things being walked through went UP, from thirty-three to
+   * thirty-five. A box is never the only box.
+   *
+   * So the bans are collected first and the way out is chosen against all of
+   * them at once. Fed into two flat arrays and a count rather than returned,
+   * because this runs twice a walker a frame and a fresh pair of arrays sixty
+   * times a second is the kind of garbage that shows up as a hitch and not as a
+   * frame time — the same argument `bodyBuf` makes.
+   *
+   * `reach` is how far up the shore to look: `CROWD.see` for the steering,
+   * which wants the line it is about to walk, and nought for the ejection,
+   * which wants the ground it is standing on.
+   *
+   * A box that carries its own rotation is reduced to its shore-frame bounding
+   * box, which is the one direction it is safe to be wrong in — and it is never
+   * exercised: everything with a `rot` on this shore is a house or the
+   * vikendica, all of them inland of s 25, and the band filter over `walkBins`
+   * has already thrown every one of them away. Where nothing is turned this is
+   * exact, because `|a·0| + |c·1|` is `c`.
+   */
+  const banLo = [], banHi = [];
+  let banN = 0;
+  /**
+   * And the people, gathered once a walker a frame by the loop below.
+   *
+   * They are in the STEERING's list and not the ejection's, and that asymmetry
+   * is the whole of what this file already believes about `soft` versus
+   * `blockers`: concrete cannot step aside and a person can. A walker routes
+   * round a seated group from three and a half metres off; if it arrives anyway
+   * it brushes a shoulder and says something (see `pardon`), which is what
+   * people do. Ejected out of each other they would jump, and two figures both
+   * being ejected from the same contact jump twice.
+   *
+   * Measured, and this was a REGRESSION and not a refinement. With the static
+   * bans in and the people out of them, the worst body-to-body overlap on the
+   * shore went from 0.091 m to 0.315 m: `CROWD.shove` is 2.4 m/s and the lean
+   * is 1.25, so a walker being taken round a bench simply outvoted whoever was
+   * standing on the far side of it. Three flat arrays and one pass, filled
+   * where the crowd is already being swept, so nothing is walked twice.
+   */
+  const folkT = [], folkS = [], folkR = [];
+  let folkN = 0;
+  // Metres of shore between the walker and the nearest thing its CURRENT line
+  // runs into. This is the clock the urgency is measured against, and it is
+  // filled here because it falls out of the same sweep.
+  let banGap = 0;
+
+  function bans(w, s, reach, folk) {
+    banN = 0; banGap = 1e9;
+    // See `walkBinsAt`: the list this indexes is still being added to when the
+    // crowd is first stepped, and a stale index is a bench nobody can see.
+    if (walkBinsAt !== blockers.length) layWalkBins();
+    const bin = walkBins.get(Math.floor(w.t / WALK_BIN));
+    if (!bin) return 0;
+    const r = BODY.r * (w.scale || 1);
+    const to = w.t + w.dir * reach;
+    const t0 = Math.min(w.t, to), t1 = Math.max(w.t, to);
+    for (const b of bin) {
+      // Nothing they can step over. `b.y` means two different things on this
+      // list — `solid()` writes the shore frame's zero and `runs.push` writes a
+      // world height — so the test is only applied where it can be trusted,
+      // which is exactly the workaround `showAhead` makes over the same pair.
+      // `CROWD.step` and not `showAhead`'s 0.10, for the reason written over it:
+      // 0.10 is the height four of these things actually are.
+      if (b.y > 0 && b.y + b.h < w.y + CROWD.step) continue;
+      const co = b.rot ? Math.cos(b.rot) : 1, sn = b.rot ? Math.sin(b.rot) : 0;
+      const ea = (b.rot ? Math.abs(b.a * co) + Math.abs(b.c * sn) : b.a) + r;
+      // Three millimetres proud of the face and not flush against it, which is
+      // rule 5 spent on a collider rather than on a pair of quads. `freeS`
+      // answers with an edge of this list exactly, so a ban laid on the face
+      // puts the walker's circle EXACTLY tangent to the box — and the same
+      // subtraction read back the other way rounds inside it about half the
+      // time. Measured: 285 of 468 residual contacts a minute were that, at
+      // depths of 10^-15 m. The standoff is under a tenth of the 40 mm the
+      // walk's own settle moves in a frame and cannot be seen.
+      const ec = (b.rot ? Math.abs(b.a * sn) + Math.abs(b.c * co) : b.c)
+        + r + 0.003;
+      if (b.t + ea < t0 || b.t - ea > t1) continue;
+      banLo[banN] = b.s - ec; banHi[banN] = b.s + ec; banN++;
+      // Only something the line would actually hit sets the clock. A bench
+      // beside the lane and clear of it is not a reason to hurry.
+      if (s > b.s - ec && s < b.s + ec) {
+        const g = w.dir > 0 ? (b.t - ea) - w.t : w.t - (b.t + ea);
+        if (g < banGap) banGap = g;
+      }
+    }
+    // The people, where the caller wants them. Circles rather than boxes, so
+    // the same half-width does for both axes.
+    if (folk) {
+      for (let i = 0; i < folkN; i++) {
+        if (folkT[i] + folkR[i] < t0 || folkT[i] - folkR[i] > t1) continue;
+        banLo[banN] = folkS[i] - folkR[i]; banHi[banN] = folkS[i] + folkR[i];
+        banN++;
+        if (s > banLo[banN - 1] && s < banHi[banN - 1]) {
+          const g = w.dir > 0 ? (folkT[i] - folkR[i]) - w.t
+            : w.t - (folkT[i] + folkR[i]);
+          if (g < banGap) banGap = g;
+        }
+      }
+    }
+    return banN;
+  }
+
+  const inBan = (s) => {
+    for (let i = 0; i < banN; i++) if (s > banLo[i] && s < banHi[i]) return true;
+    return false;
+  };
+
+  /** One step out of whichever ban holds `s`, going `dir`. */
+  function banStep(s, dir) {
+    for (let i = 0; i < banN; i++) {
+      if (s > banLo[i] && s < banHi[i]) return dir > 0 ? banHi[i] : banLo[i];
+    }
+    return s;
+  }
+
+  /**
+   * The nearest `s` clear of every ban, preferring the lane's own window.
+   *
+   * Both ways at once and the shorter wins, with `banN` steps each because
+   * leaving one ban can land in the next — benches run end to end in two places
+   * on this promenade and the pines at t 229 and t 235 each have a planter wall
+   * behind them.
+   *
+   * `lo`/`hi` are `CROWD.wide` either side of the lane and they are a
+   * PREFERENCE, not a bound: where one way out lands inside the window and the
+   * other does not, the window wins whatever the distances say, and where
+   * neither does the shorter one is taken anyway. A walker held against a face
+   * it cannot get round is a walker standing next to a bench, which is a thing
+   * people do; a walker refusing to leave a bench because the way out is 1.6 m
+   * is a walker inside a bench, which is not.
+   */
+  function freeS(s, lo, hi, bias) {
+    if (!inBan(s)) return s;
+    let up = s, dn = s;
+    for (let k = 0; k < banN; k++) { const n = banStep(up, 1); if (n === up) break; up = n; }
+    for (let k = 0; k < banN; k++) { const n = banStep(dn, -1); if (n === dn) break; dn = n; }
+    const upOk = up >= lo && up <= hi, dnOk = dn >= lo && dn <= hi;
+    // Where the steering has already picked a way round, go that way — and this
+    // is not a refinement, it is the difference between working and not. The
+    // two halves see different lists on purpose: the lean looks `CROWD.see` up
+    // the shore and the wall looks at the ground underfoot, so at t 233 the lean
+    // wants the SEAWARD side of a 4.96 m planter wall (because a second wall
+    // stands across the inland side two metres further on) while the wall,
+    // seeing only the first, takes the nearer face and puts them back inland.
+    // Measured: a walker held on that face at 2.4 m/s of steering for the whole
+    // crossing, then thrown 1.66 m sideways in one frame when the second wall
+    // finally came into the ejection's own list. It was the last thing on this
+    // shore anybody was still walking through.
+    if (bias != null) {
+      if (bias > s && upOk) return up;
+      if (bias < s && dnOk) return dn;
+    }
+    if (upOk !== dnOk) return upOk ? up : dn;
+    return (up - s) <= (s - dn) ? up : dn;
+  }
+
+  /**
+   * Something in the way, seen far enough off to walk round rather than into.
+   *
+   * The push comes back as a lateral RATE and not as a shape, and that is the
+   * whole design: the walker knows how far it has to move sideways to clear the
+   * line and how long it has to do it in, and a metre to move with a second
+   * left is a metre a second. Far off it is a drift; a step away it is a
+   * sidestep, capped by `CROWD.shove`. Nothing here had to be tuned, because
+   * the urgency IS the geometry — which is the difference between this and the
+   * people term above it, whose 1.25 was chosen.
+   */
+  let solidWant = null;
+  function walkSolid(w, here) {
+    solidWant = null;
+    if (!bans(w, here, CROWD.see, true)) return 0;
+    const want = freeS(here, w.lane - CROWD.wide, w.lane + CROWD.wide);
+    if (want === here) return 0;
+    // Kept for `walkClear`, which has to come to the same conclusion off a
+    // shorter list. See the `bias` note in `freeS`.
+    solidWant = want;
+    const secs = Math.max(0.25, Math.max(0, banGap) / Math.max(0.2, w.speed));
+    return clamp((want - here) / secs, -CROWD.shove, CROWD.shove);
+  }
+
+  /**
+   * And the wall under the steering, for when the steering was not enough.
+   *
+   * Steering is a lean; this is the thing that cannot be argued with, and it
+   * exists because eighteen of the twenty-seven beats have their LANE laid
+   * through something solid. There is no amount of early warning that fixes a
+   * line drawn through a bench: the walker has to be stood out of it, every
+   * frame, for the whole six metres it spends beside it.
+   *
+   * `reach` of nought, because this is about the ground under their feet and
+   * not about the ground ahead. Steering with the look-ahead and ejecting
+   * without it is the same split `showSteer` and `showClear` make for Baye.
+   */
+  function walkClear(w, s, bias) {
+    if (!bans(w, s, 0, false)) return s;
+    return freeS(s, w.lane - CROWD.wide, w.lane + CROWD.wide, bias);
+  }
+
+  /**
+   * How hard one walker leans away from one other body on the shore.
+   *
+   * Lifted out of the loop below so that there is one yield and not two: the
+   * crowd is in `crowds` and Baye is not — see `bodies`, which has the same
+   * exception for the same reason — and a second copy of this arithmetic for
+   * her is a second copy to keep in step. `seed` is only the tie-break, so she
+   * can be given a constant one.
+   */
+  function yieldTo(w, here, ft, fs, seed) {
+    const dts = ft - w.t;
+    if (dts > CROWD.near || dts < -CROWD.near) return 0;
+    const gap = here - fs;
+    if (gap > CROWD.body || gap < -CROWD.body) return 0;
+    // Somebody you are walking AT, not somebody you have already passed.
+    const ahead = dts * w.dir > -0.25 ? 1 : 0.3;
+    // Dead level is the one case a sign test cannot answer — both would pick
+    // the same way and neither would ever clear. Break it on the seed they were
+    // built with, which is stable and is not a draw (rule 4).
+    const side = Math.abs(gap) > 0.02 ? (gap >= 0 ? 1 : -1)
+      : (w.seed < seed ? -1 : 1);
+    return side * ahead * 1.25 * (1 - Math.abs(gap) / CROWD.body);
+  }
+
   // Set by the reaction code below; called by the collider above when the player
   // walks into somebody. `kind` is 'baye' or 'bather', `idx` indexes the crowd,
   // (t, s) is where the contact happened.
@@ -36289,28 +36735,66 @@ async function buildJadrija(scene) {
       const here = w.lane + w.off;
       let push = (Math.abs(w.t - pt) < 1.7 && Math.abs(here - ps) < CROWD.clear)
         ? (here >= ps ? 1 : -1) * 1.7 : 0;
+      folkN = 0;
       for (const f of allFolk()) {
         if (f === w) continue;
         const dts = f.t - w.t;
-        if (dts > CROWD.near || dts < -CROWD.near) continue;
-        const gap = here - (f.lane + (f.off || 0));
-        if (gap > CROWD.body || gap < -CROWD.body) continue;
-        // Somebody you are walking AT, not somebody you have already passed.
-        const ahead = dts * w.dir > -0.25 ? 1 : 0.3;
-        // Dead level is the one case a sign test cannot answer — both would
-        // pick the same way and neither would ever clear. Break it on the seed
-        // they were built with, which is stable and is not a draw (rule 4).
-        const side = Math.abs(gap) > 0.02 ? (gap >= 0 ? 1 : -1)
-          : (w.seed < (f.seed || 0) ? -1 : 1);
-        push += side * ahead * 1.25 * (1 - Math.abs(gap) / CROWD.body);
+        if (dts > CROWD.see || dts < -CROWD.see) continue;
+        const fs = f.lane + (f.off || 0);
+        const touch = BODY.r * ((w.scale || 1) + (f.scale || 1))
+          // A sunbather is 1.75 m of person and not a circle by any reading.
+          // `bodies` gives them two discs half a metre apart along the way they
+          // are lying; there is no yaw in this frame to lie them along, so they
+          // get the disc that contains both. Conservative, and never exercised
+          // — the towels are on the sand at s under 8 and the beats start at
+          // s 10.2 — but a 0.24 m sunbather would be a lie.
+          + (f.mode === 'lie' ? BODY.lieR + BODY.lieSpan * 0.5 - BODY.r : 0);
+        // Somebody who is not going to move goes in the ban list with the
+        // benches, so the steering threads BETWEEN a bench and a bystander
+        // rather than choosing one of them. Somebody walking is left to the
+        // lean, because they are leaning back. See `folkT`.
+        if (!f.beat) {
+          folkT[folkN] = f.t; folkS[folkN] = fs; folkR[folkN] = touch; folkN++;
+        }
+        const lean = yieldTo(w, here, f.t, fs, f.seed || 0);
+        if (lean === 0) continue;
+        push += lean;
+        // And CONTACT, which is a different question from close. Everything
+        // above is about not arriving; this is the two frames where it did not
+        // work, and it is the only moment a person actually says anything. One
+        // subtraction, and only for the handful already leaning.
+        const gap = here - fs;
+        if (dts * dts + gap * gap < touch * touch) pardon(w, f);
       }
+      // And her, who is not one of the crowd and is the one you are looking at.
+      // `allFolk` is `crowds`, and `show` has never been in `crowds` — so the
+      // walkers stepped round each other and through Baye, which is the same
+      // gap `bodies` had to be told about separately. Only while she is drawn:
+      // past 250 m `stepShow` stops being called and yielding to where she was
+      // left standing is a hole in the promenade with nobody in it.
+      if (show && skinFig && skinFig.mesh.visible) {
+        push += yieldTo(w, here, show.t, show.s, 0.5);
+      }
+      // And the world. See `walkSolid`.
+      push += walkSolid(w, here);
       if (push !== 0) {
-        w.off = clamp(w.off + clamp(push, -2.4, 2.4) * dt, -1.5, 1.5);
+        // The steering is bounded by `CROWD.wide` — except where an ejection
+        // has already put them further out than that, which it is allowed to
+        // do. Clamping to the constant unconditionally would drag a walker who
+        // had been stood out of a bench straight back into it, once a frame,
+        // for the whole crossing.
+        const lim = Math.max(CROWD.wide, Math.abs(w.off));
+        w.off = clamp(w.off + clamp(push, -CROWD.shove, CROWD.shove) * dt,
+          -lim, lim);
       } else {
         w.off -= w.off * Math.min(1, dt * 1.1);
       }
 
-      const s = w.lane + w.off;
+      // The backstop, after the steering and before anything is drawn. See
+      // `walkClear`: eighteen of the twenty-seven beats have their lane laid
+      // through something solid, and no amount of warning fixes that.
+      const s = walkClear(w, w.lane + w.off, solidWant);
+      w.off = s - w.lane;
       const p = toWorld(w.t, s);
       w.x = p[0]; w.z = p[2];
       w.y = surfaceY(w.t, s);
@@ -36710,6 +37194,86 @@ async function buildJadrija(scene) {
      */
     bodies, bodyList, bump, setBumpHandler, setThud,
     bumps: () => bumpLog.slice(),
+    /**
+     * The last few times one bather walked into another. See `pardon`.
+     *
+     * `said` is who apologised — the one who did the walking — and `at` is who
+     * looked up. Both index the casting order, like `bumpLog`'s `idx`.
+     */
+    pardons: () => pardonLog.slice(),
+    /**
+     * Why one walker is standing where it is, which is otherwise unaskable.
+     *
+     * The steering and the ejection both turn on a list of forbidden stretches
+     * of `s` that is built and thrown away sixty times a second, and every
+     * wrong answer this has given has been a wrong list rather than wrong
+     * arithmetic — the first cut walked somebody out of a pine and into the
+     * wall behind it, and reading the loop could not tell you that because the
+     * wall is only in the list for the 0.8 m of shore it is beside. So: the
+     * list, at this instant, for this person, with the answer it produced.
+     */
+    walkWhy: (i, reach = CROWD.see) => {
+      const w = walkers.find((f) => f.idx === i) || walkers[i] || walkers[0];
+      if (!w) return null;
+      const s = w.lane + w.off;
+      // The people list is filled per walker inside the loop and left there, so
+      // asking about somebody who is not the last one stepped would come back
+      // with the wrong crowd. Refilled here for the person actually asked
+      // about, which is the whole point of the accessor.
+      folkN = 0;
+      for (const f of allFolk()) {
+        if (f === w || f.beat) continue;
+        const dts = f.t - w.t;
+        if (dts > CROWD.see || dts < -CROWD.see) continue;
+        folkT[folkN] = f.t;
+        folkS[folkN] = f.lane + (f.off || 0);
+        folkR[folkN] = BODY.r * ((w.scale || 1) + (f.scale || 1))
+          + (f.mode === 'lie' ? BODY.lieR + BODY.lieSpan * 0.5 - BODY.r : 0);
+        folkN++;
+      }
+      const n = bans(w, s, reach, true);
+      const list = [];
+      for (let k = 0; k < n; k++) {
+        list.push([+banLo[k].toFixed(2), +banHi[k].toFixed(2)]);
+      }
+      const bi = Math.floor(w.t / WALK_BIN);
+      return { idx: w.idx, t: +w.t.toFixed(2), lane: +w.lane.toFixed(2),
+        off: +w.off.toFixed(3), s: +s.toFixed(2), y: +w.y.toFixed(2),
+        dir: w.dir, mode: w.mode, bans: list, gap: +banGap.toFixed(2),
+        // Which bin was asked and what was in it, because every wrong answer
+        // this has given has been an empty list where a bench plainly stood.
+        bin: bi, binN: (walkBins.get(bi) || []).length,
+        binAt: (walkBins.get(bi) || []).map((b) => [+b.t.toFixed(1),
+          +b.s.toFixed(1), +b.a.toFixed(2), +b.c.toFixed(2), +b.h.toFixed(1),
+          +b.y.toFixed(1)]),
+        want: +freeS(s, w.lane - CROWD.wide, w.lane + CROWD.wide).toFixed(3),
+        push: +walkSolid(w, s).toFixed(3) };
+    },
+    /**
+     * How the static broad phase came out, so a change to a beat or a bench
+     * can be checked without reading the loop.
+     *
+     * `kept` is how many of the 818 blockers are inside the band the lanes can
+     * reach at all; `worst` is the fullest bin, which is what the per-frame
+     * sweep actually costs. See `walkBins`.
+     */
+    walkBins: (full) => {
+      let kept = 0, worst = 0, sum = 0;
+      const seen = new Set();
+      for (const [, list] of walkBins) {
+        if (list.length > worst) worst = list.length;
+        sum += list.length;
+        for (const b of list) seen.add(b);
+      }
+      kept = seen.size;
+      if (full) {
+        return [...seen].map((b) => [+b.t.toFixed(2), +b.s.toFixed(2)])
+          .sort((p, q) => p[0] - q[0]);
+      }
+      return { bins: walkBins.size, kept, worst,
+        mean: +(sum / Math.max(1, walkBins.size)).toFixed(1),
+        of: blockers.length };
+    },
     /**
      * The four heights at one station, side by side, because the difference
      * between them is the bug this file keeps having.

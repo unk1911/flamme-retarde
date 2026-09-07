@@ -56,6 +56,47 @@ const CROWD = {
   // at a stroll is a second and a half of warning, which is about when a person
   // actually starts to drift.
   near: 2.0,
+  // And how far ahead it looks for a BENCH — or for anybody who is not going to
+  // move — which is a longer number for a reason worth writing down: a person
+  // yields to a person late and to a wall early. Two adults closing head-on
+  // share their approach, so `near` is really four metres of warning; a bench
+  // closes at the walker's own 1.3 m/s and nothing else.
+  //
+  // 3.6 and not the 2.6 this started at, and the difference is measured. What
+  // is being decided here is not "lean away" but WHICH SIDE to pass on, and
+  // that answer is only as good as the window it is taken over: at t 278 there
+  // is a standing figure on the lane with a knot of six more inland of him, so
+  // over 2.6 m the answer was "go inland" until the sixth of them came into the
+  // window and it flipped to "go seaward" with 0.3 s left. Measured over 150 s
+  // of promenade, that flip was the deepest body-to-body overlap on the shore:
+  // 0.363 m at 2.6, 0.008 m at 3.6. Three seconds of notice is enough to see
+  // the whole knot before choosing.
+  see: 3.6,
+  // The most lateral speed a yield may ask for, m/s, and the cap both halves
+  // share. It was the literal 2.4 under the loop and it is named here because
+  // there are now two callers and a number two callers agree on by coincidence
+  // is a number that stops agreeing.
+  shove: 2.4,
+  // And how far off its own lane a walker may end up, which is the other
+  // literal. The promenade beats sit between s 10.2 and s 16.7 on about seven
+  // metres of walkable concrete, so 1.5 m is a walker using the width it has
+  // rather than stepping into the sea or under an awning. It bounds the
+  // STEERING only: being ejected out of a bench is allowed to beat it, because
+  // a lane that runs through one cannot be steered out of.
+  wide: 1.5,
+  // How high a thing has to stand over your own feet before you walk ROUND it
+  // rather than over it. A kerb, a doorstep and a 0.19 m plinth are things a
+  // stroller's foot clears without the owner noticing; a 0.30 m box is not.
+  //
+  // Measured, and it sits in a real gap. Of the 196 static blockers a promenade
+  // lane can reach, the low ones stand 0.10, 0.12, 0.13 and 0.19 m — and then
+  // there is nothing at all until 0.30, 0.41 and the 0.49 m benches. So the
+  // threshold can be put where no object is, which is the whole point of
+  // choosing it here rather than copying `showAhead`'s 0.10: that one lands ON
+  // the four 0.10 m ones, where a centimetre of terrain under the feet decides
+  // the answer. Two walkers were stepping into the 0.10 m plinths at t 329 and
+  // t 341 and out again on alternate frames for exactly that reason.
+  step: 0.24,
 };
 
 // How far an arm hangs out from the body at rest. Zero is a soldier at
