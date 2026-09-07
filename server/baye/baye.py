@@ -1027,8 +1027,37 @@ class Handler(BaseHTTPRequestHandler):
     def _send(self, code, payload, ctype="application/json"):
         body = (json.dumps(payload).encode() if ctype == "application/json"
                 else payload)
+        # AN ERROR HANGS UP. Not politeness — it is the only thing standing
+        # between one 401 and the request that follows it down the same socket.
+        #
+        # `protocol_version` above is HTTP/1.1, so connections are kept alive,
+        # and `do_POST` answers 404 and 401 *before* `_body` has read anything.
+        # That is deliberate and the note over `_body` explains why: checking
+        # the session first is what stops an unauthenticated request allocating
+        # sixteen kilobytes. The cost was invisible until the log was read.
+        # The refused request's body is still sitting in the socket, so the
+        # parser takes the next request's first line from the middle of it:
+        #
+        #   code 400, message Bad request syntax
+        #     ('{"who":"baye","lang":"en",...}POST /baye/line HTTP/1.1')
+        #
+        # Measured over seven days before this line existed: 142 lines
+        # answered, 23 refused as garbage, alongside 59 legitimate 401s — so
+        # one request in seven was a casualty of the one before it, and it
+        # looked from the beach like Baye going quiet for no reason.
+        #
+        # CLOSING rather than draining, because draining is the thing the
+        # ordering was chosen to avoid: reading a body to throw it away is
+        # still reading a body an unauthenticated caller chose the size of.
+        # A dead socket cannot be desynchronised.
         self.send_response(code)
         self.send_header("Content-Type", ctype)
+        # SAID OUT LOUD as well as done, because the flag alone only drops the
+        # socket -- a caller that has already pipelined the next request reads
+        # that as a network error rather than as an answer. `send_header` sets
+        # `close_connection` itself, so this is the whole of it.
+        if code >= 400:
+            self.send_header("Connection", "close")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
@@ -1076,6 +1105,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._cached
         n = int(self.headers.get("Content-Length") or 0)
         if n <= 0 or n > 16384:                 # a game state, not an upload
+            # The same desynchronisation as in `_send`, one floor down and
+            # worse, because an oversize body is refused here and the handler
+            # then carries on to answer 200 — a success that poisons the next
+            # request. There is nothing to drain when `n` is zero; when it is
+            # too large the refusal to read it is the whole point, so the
+            # socket has to go instead.
+            if n > 16384:
+                self.close_connection = True
             self._cached = {}
             return self._cached
         try:
