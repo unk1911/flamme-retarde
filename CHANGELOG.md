@@ -8,6 +8,106 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.354.0] — 2026-09-07
+
+### Bucketeers of America — a poster on the wall, a set left on downstairs, and her own voice an octave up
+
+Misha supplied all three assets. What made them work was three separate
+measurements, and in each case the obvious thing would have been wrong.
+
+THE POSTER, on the east wall of the flat, right of the stair-head door where
+he pointed. 0.500 x 0.750 m, the file's own 1024:1536, centred 1.55 m off the
+floor on a blank run measured at 2.89 m by 2.40 m.
+
+The gamma was the trap and the answer was the opposite of the house rule. A
+CANVAS in this project is written in css bytes and needs the sRGB decode; a
+SHIPPED IMAGE is already display-referred and `solidFragment` writes straight
+to the framebuffer. Built both ways and shot the same frame: whole-sheet luma
+against source 0.947 undecoded against 0.574 tagged, and the deep blue foot
+band -- (20, 64, 106) in the file -- renders (16, 59, 103) correct and
+(9, 18, 40) decoded. Navy as black. `MeshBasicMaterial` was ruled out on the
+same evidence: it goes through ACES at 0.42 exposure indoors, which is why the
+existing TLOCRT sheets' near-white paper renders at 42 per cent of source.
+
+Two other things. The wall is at house-local x 3.150 and NOT the 3.19 the plan
+says, because `plan.blockers` is the walk volume and sits 4 cm clear of the
+render on purpose. And the rays have to be cast in the ROOT's frame: `at()`
+goes through the curved shore field while `root` is rigid, and over 2.9 m
+across one room they disagree by 27 mm. Also, pressing `V` runs the
+renovation's ladder-stair up this wall and would have built a tread through the
+frame, so the poster is registered `nowOnly` and `roof()` takes it down.
+
+THE RADIO, on the middle shelf of the cased unit in the boravak, 2.6 m back
+from the slider. A mono point source that gets LOUDER when you walk in.
+
+The birds are safe for a structural reason rather than a quiet one: the
+vikendica is two flats with NO STAIR BETWEEN THEM, so the only thing between
+the set and the gornji kat is a floor slab with no opening in it. A slab is a
+LOW-PASS AND NOT A FADER -- 34 dB of gain and, far more to the point, a 260 Hz
+lid, and a voice cannot mask what it has no energy at. 41 dB between the front
+yard and the room directly above it, over a straight line that is SHORTER
+upstairs. None of it is distance.
+
+  front yard      -35.66 dBFS off  ->  -34.30 on
+  second floor    -46.79 dBFS off  ->  -47.65 on
+
+The upstairs run is 0.86 dB QUIETER with the radio playing, i.e. inside the
+bed's own variation. Deterministic: a tap at -79.0 into a room at -46.8 is
++0.0026 dB, twenty-seven times under the standard.
+
+Both mixes arrived cut mid-phrase at full level at both ends, so neither a
+loop nor a hard stop was available: each pass fades up over a bar and down over
+a bar, then nothing for 30 to 75 s. Fifty passes an hour, playing 31 per cent
+of the time, mix 1 always what you hear on walking up. 1385 KB of masters ship
+as 260 KB -- mono, 200 Hz to 6 kHz, 16 kHz, 48 kbps -- with the cutoffs matched
+to the `radio.mp3` already in the build rather than chosen.
+
+HER HUMMING, which is her own voice pitched up an octave, and it is TWICE the
+peak the synth was cut to and QUIETER against the birds than the synth was.
+
+That is not a trick, it is the whole finding. The old synth was a triangle on a
+tune that climbed to the octave, so on its top note the fundamental sat at
+440 Hz and the second harmonic at 880 -- in the middle of the gulls. This clip
+never leaves 190-350 Hz: 97.1 per cent of its power is under 500 Hz, 0.20 per
+cent is in the gull band and 0.006 per cent in the swifts'. Third-octave, her
+excess in the mix is +4.2 dB at 251-317 Hz and -0.01 dB at 1007-1269 Hz.
+
+  outdoors 3.2 m   her band +2.84   gulls -0.09   birds +0.02   swifts -0.20
+  indoors 1.8 m    her band +11.55  gulls +0.10   birds -1.12   swifts -0.46
+
+Every bird band moves less than the scene moves between two identical runs,
+and half move the wrong way.
+
+She hums on a table of beats and everything absent from it is silent: `up`
+1.00, `down` 0.88, `rest` 0.85 scaled by what is left in the pail, `fill` 0.72,
+and nothing at all on `lift`, `take`, `set`, `tip` or `right`, because you
+cannot hum while the weight is moving. A phrase already sounding is CUT WHERE
+IT STANDS when she reaches an exertion beat, and the burst clock does not
+reset, so she stops mid-tune to heave the bucket and picks it up again on the
+stairs. Bursts and not a loop: one to three phrases with a 0.30-0.75 s breath,
+then 8 to 17 s of nothing, duty cycle 16 per cent. The truncation points are
+measured -- 0.40 and 0.74 of the clip are the two deepest interior dips in its
+own 10 ms envelope, at 0.775 s and 1.42 s, which is where she takes a breath.
+
+71 933 bytes ship as 6 381, 91 per cent off. The synth is DELETED and not
+switched off -- `HUM_A`, `HUM_B`, `HUM_N`, `humAlt`, the oscillator, the
+vibrato and the note-boundary envelope are all gone, with a tombstone keeping
+the verdict that killed them. `BUCK.hum` survives as the one switch that
+silences her, and it is `true`.
+
+### the recorder was running the world at a twentieth of real time
+
+`tools/sfx.mjs` was pinned to SwiftShader. Software GL renders about one frame
+a second, and `frame()` clamps its delta to 0.05 s, so the WORLD advanced at a
+twentieth of wall time: thirty seconds of recording was a second and a half of
+game, in which no bout of birdsong fires, no radio comes on and nothing
+scheduled ever happens. What came back was half a minute of bed and the
+conclusion that whatever you had just added was silent. It now takes the card
+like `shoot.mjs`, with `--gl swiftshader` still available.
+
+Continuous sound measured through it is roughly sound; anything SCHEDULED
+measured before this is worth re-running.
+
 ## [1.353.0] — 2026-09-07
 
 ### the camera was inside her, and both floors were under the near plane
