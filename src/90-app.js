@@ -4732,6 +4732,13 @@ let indoors = 0;
  * because the shore frame does not move and neither do they.
  */
 let perchW = null;
+/**
+ * And the set on the shelf downstairs at the vikendica — see SONG in
+ * src/80-audio.js. Four numbers, resolved the same way and for the same
+ * reason: the point it plays from, and the height of the slab over it, which
+ * is the whole of what keeps it off the birds upstairs.
+ */
+let songW = null;
 let inLatch = 0;
 let cicadaAt = 0;
 let waterAt = -1, wetAt = -1;
@@ -5867,6 +5874,35 @@ function frame() {
         audio.perch(i, bd, bd > 1 ? (bx * e[0] + bz * e[2]) / bd : 0);
       }
     }
+    // And the radio on the shelf downstairs, which is the same coupling again
+    // with one number more.
+    //
+    // THE THIRD NUMBER IS THE STOREY AND IT IS ASKED OF THE EYE, not of the
+    // camera. Everything else here is measured from `camera.position`, which
+    // is right: what you hear should follow where you are looking from. But
+    // this one is multiplied by `roomV` on the far side — see SONG in
+    // src/80-audio.js — and `roomV` is fed from `indoors`, which is fed from
+    // `personAt()`. Feed a camera into one half of a product and a person into
+    // the other and the third-person pull-back can have the slab half applied
+    // with nobody upstairs, which is the same class of bug as the shimmer.
+    //
+    // Ramped over 0.9 m off the slab rather than stepped, because the storey
+    // it decides is a storey you walk up an outside stair to reach: there is
+    // no doorway here to make the crossing at, and a hard edge in mid-air over
+    // a terrace is a place the song switches off as you stand up.
+    if (!songW && jadrija.toWorld) {
+      const set = audio.songAt();
+      const w = jadrija.toWorld(set.t, set.s);
+      songW = [w[0], w[1] + set.up, w[2], w[1] + set.slab];
+    }
+    if (songW) {
+      const e = camera.matrixWorld.elements;
+      const sx = songW[0] - camera.position.x, sy = songW[1] - camera.position.y,
+        sz = songW[2] - camera.position.z;
+      const sd = Math.hypot(sx, sy, sz);
+      audio.song(sd, sd > 1 ? (sx * e[0] + sz * e[2]) / sd : 0,
+        clamp((at.y - songW[3]) / 0.9, 0, 1));
+    }
   }
 
   if (state.scooping) {
@@ -6392,6 +6428,18 @@ window.__fr = {
      */
     perch: () => audio.perchStats(),
     perchRun: (secs = 300, step) => audio.perchRun(secs, step),
+    /**
+     * The radio on the shelf downstairs at the vikendica: which mixes decoded,
+     * how far off it is, what the slab is doing to it, and the dBFS an
+     * analyser measured off the finished voice. `songRun(1800, 4)` runs half
+     * an hour of passes past somebody standing in the yard in a few
+     * milliseconds and hands back the gaps, which is the only way to see the
+     * interval distribution without sitting through it.
+     */
+    song: () => audio.songStats(),
+    songRun: (secs = 1800, d = 4, step) => audio.songRun(secs, d, step),
+    /** And the switch a control recording is taken against. */
+    songMute: (v) => audio.songMute(v),
     /** And the four in the air: whether each has its recording yet. */
     voices: () => audio.voiceStats(),
   },

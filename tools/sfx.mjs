@@ -41,7 +41,18 @@ const URL_BASE = opt('url', 'http://127.0.0.1:8794/flamme-retarde.html');
 const PORT = 9333 + (Number(opt('port', 9)) | 0);
 const maxWait = Number(opt('wait', 240)) * 1000;
 
-const GL = gpuLaunch('swiftshader');
+// The card if this machine has one, SwiftShader if not — the same line
+// shoot.mjs carries, and `--gl swiftshader` still forces the old behaviour.
+//
+// This was pinned to SwiftShader and that was wrong for anything with a clock
+// in it. `frame()` clamps its delta to 0.05 s, so a page rendering at one frame
+// a second advances the WORLD at a twentieth of wall time: thirty seconds of
+// recording is a second and a half of game, in which no bout of birdsong fires,
+// no radio comes on, and nothing scheduled ever happens. What comes back is a
+// half-minute of bed and the conclusion that the thing you added is silent. On
+// the card the page runs faster than 20 fps, the clamp never bites, and a
+// thirty-second recording is thirty seconds of the game.
+const GL = gpuLaunch(opt('gl', null));
 const chrome = spawn('google-chrome', [
   '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
   ...GL.args,
