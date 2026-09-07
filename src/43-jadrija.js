@@ -30698,9 +30698,17 @@ async function buildJadrija(scene) {
   const _hL = new THREE.Vector3(), _hU = new THREE.Vector3();
   const _hV = new THREE.Vector3(), _hD = new THREE.Vector3();
   const _hP = new THREE.Vector3(), _hN = new THREE.Vector3();
-  const _hF = new THREE.Vector3(), _hG = new THREE.Vector3();
+  const _hF = new THREE.Vector3();
   const _hA = new THREE.Quaternion(), _hB = new THREE.Quaternion();
   const _hC = new THREE.Quaternion(), _hQ = new THREE.Quaternion();
+  const _hR = new THREE.Quaternion();
+  // And for the roll, which runs every frame rather than once per pose and so
+  // keeps its own scratch: the glass's normal, the palm, the two of them
+  // flattened onto the plane the wrist can actually turn in, and room to pull
+  // the figure's own rotation out of its world matrix.
+  const _rG = new THREE.Vector3(), _rA = new THREE.Vector3();
+  const _rB = new THREE.Vector3(), _rX = new THREE.Vector3();
+  const _rS = new THREE.Vector3(), _rQ = new THREE.Quaternion();
 
   /**
    * The screen: three coins, a price, a change and a sparkline each.
@@ -30992,8 +31000,30 @@ async function buildJadrija(scene) {
      *  which is the head leaning the last centimetre on to the phone rather
      *  than the phone being pressed on to a head held straight. */
     tilt: 0.20,
-    /** How far the four fingers come round it. See the curl in `holdPhone`. */
+    /** How far the four fingers come round it. See the curl in `rollHand`. */
     curl: 0.85,
+    /** How far the case leans back out of the reader's own hand, in radians.
+     *  19.5 deg, so the screen is read at an angle rather than edge on.
+     *
+     *  NAMED because two things now need the same number: the drawn case, and
+     *  the palm that has to end up behind it. It was a literal in the drawing
+     *  block and it was applied in the WRONG FRAME — `rotation.set(0, yaw, 0)`
+     *  followed by `rotation.x` on a default XYZ Euler composes as Rx.Ry, so
+     *  the lean was taken about the WORLD x axis after the billboard had
+     *  already turned the case. Standing north or south of a reader that is a
+     *  lean; standing east or west of the same reader it is 19.5 deg of pure
+     *  ROLL about the screen's own normal, and the case is cockeyed with the
+     *  bitcoin row running downhill. Order `YXZ` composes Ry.Rx instead, which
+     *  takes the lean about the case's OWN x.
+     *
+     *  MEASURED BOTH WAYS at the eight bearings round the MINI terrace, as the
+     *  height of the glass normal: on `XYZ` it ran -0.323 to +0.333, which is
+     *  the case leaning 19 deg back from one bearing, 19 deg FORWARD from the
+     *  opposite one and standing dead flat (0.004) from the two in between —
+     *  where the whole of the lean had gone into roll instead. On `YXZ` it is
+     *  0.333 from every one of the eight, which is sin 0.34 and the lean the
+     *  number was written to be. */
+    lean: 0.34,
     /**
      * And not all twelve of them the same.
      *
@@ -31010,8 +31040,19 @@ async function buildJadrija(scene) {
      * of reach is ±22 mm of phone on an adult, which is the difference between
      * two people reading and nowhere near enough to put a hand through a knee.
      * `chin` and `tilt` are radians, so ±0.09 is ±5°.
+     *
+     * `roll` is the newest of them and the only one that is not a posture.
+     * `rollHand` puts every palm square behind its own glass, which is right
+     * and which would also make twelve wrists agree to the degree — and a hand
+     * at exactly 0° to the phone it is holding is a clamp rather than a grip.
+     * ±0.20 rad is ±11° of wrist, which is the slop a real one-handed hold has
+     * in it and is well inside what the fingers close over. It is also all
+     * that `phones().roll` reads once the hold is right — 2.6°, 5.5°, 9.3° and
+     * 10.0° on the four measured — so a number near 11 there is this spread
+     * and not a defect.
      */
-    vary: { read: 0.045, high: 0.055, pole: 0.12, chin: 0.09, tilt: 0.05 },
+    vary: { read: 0.045, high: 0.055, pole: 0.12, chin: 0.09, tilt: 0.05,
+      roll: 0.20 },
   };
 
   /**
@@ -31023,6 +31064,14 @@ async function buildJadrija(scene) {
    * to face the camera the screen is readable from wherever you walk up, and
    * the hand is solved onto the phone rather than the phone hung off the hand,
    * so it never separates from the figure however it is turned.
+   *
+   * AND THAT LAST SENTENCE WAS HALF TRUE FOR TWO RELEASES. It is a claim about
+   * POSITION, and the third report about these phones was about ORIENTATION: a
+   * case that turns with the camera, held by a hand that was solved in the
+   * figure's own frame and knows nothing about it. See `rollHand`, which is
+   * where the other half now lives — the palm is brought round behind the
+   * glass after the case has been turned, so the hold means the same thing
+   * from every bearing and not just from the one it was tuned at.
    */
   function stepPhones(cam) {
     const skin = crowds.skin;
@@ -31063,6 +31112,9 @@ async function buildJadrija(scene) {
       let m = phones[n];
       if (!m) {
         const g = new THREE.Group();
+        // YXZ, so the lean below is taken about the case's own x and not the
+        // world's. See `GRIP.lean` for the 19.5 deg of roll that cost.
+        g.rotation.order = 'YXZ';
         const body = new THREE.Mesh(
           new THREE.BoxGeometry(PHONE.w, PHONE.h, PHONE.d),
           new THREE.MeshBasicMaterial({ color: 0x14161c }));
@@ -31083,6 +31135,13 @@ async function buildJadrija(scene) {
         rec = arms[k] = {
           on: false, qa: new THREE.Quaternion(), qb: new THREE.Quaternion(),
           qc: new THREE.Quaternion(),
+          // What the roll needs and the solve alone knows: the knuckle line
+          // and the palm normal with the two arm deltas already on them, and
+          // the wrist-to-phone axis the roll turns about. Cached rather than
+          // re-derived, because `rollHand` runs on frames the solve is
+          // guarded out of and there is nothing to undo the deltas against.
+          hd: new THREE.Vector3(), pm: new THREE.Vector3(),
+          n: new THREE.Vector3(),
           ex: 0, ey: 0, ez: 0, wx: 0, wy: 0, wz: 0, id: -1,
         };
       }
@@ -31122,8 +31181,13 @@ async function buildJadrija(scene) {
       } else {
         // Tilted back, so the screen is read at an angle rather than edge on.
         m.g.rotation.z = 0;
-        m.g.rotation.x = -0.34;
+        m.g.rotation.x = -GRIP.lean;
       }
+      // AND THE PALM BROUGHT ROUND BEHIND IT, now that the case has been
+      // turned. Here and not inside the solve because this is the one thing in
+      // the hold that depends on where you are standing, and the case's own
+      // rotation is the whole of what it needs to know.
+      rollHand(f, rec, m, fg.idx | 0);
       // AND STOOD UP OUT OF THE FINGERS. The group's origin is where the hand
       // was solved onto (`holdPhone` returns it and `boneAt` reports the
       // fingers within 31 mm of it), so hanging the phone's middle there put
@@ -31138,6 +31202,10 @@ async function buildJadrija(scene) {
       const phRise = ear ? 0 : PHONE.grip;
       m.body.position.y = phRise;
       m.face.position.y = phRise;
+      // Whose hand this one is in, so `phones()` can ask the question the
+      // per-frame path has no reason to: the angle between that palm and this
+      // glass. One assignment; the trigonometry only runs when a probe asks.
+      m.f = f;
       m.g.visible = true;
       n++;
     }
@@ -31145,6 +31213,60 @@ async function buildJadrija(scene) {
       if (phones[i]) phones[i].g.visible = false;
     }
     phones.grp.updateMatrixWorld(true);
+  }
+
+  /**
+   * How far round the wrist is from square to the glass it is holding.
+   *
+   * MEASUREMENT ONLY, and it is here because "awkward" is not a number. The
+   * case is billboarded in WORLD space and the hold is solved in FIGURE space,
+   * so the one thing pinned nowhere is the roll between them — and a bad grip
+   * is exactly that: a hand at right angles to the thing it is gripping. See
+   * `rollHand`, which is what now sets it.
+   *
+   * ABOUT THE HAND'S OWN AXIS, because that is the only part of the angle the
+   * wrist can do anything about. A turn about the wrist-to-knuckle line cannot
+   * move anything lying along it, and the drawn case does not stand along that
+   * line anyway — it stands up out of the world with `GRIP.lean` on it, and
+   * the hand points a little forward of the figure's own up. So the two are
+   * flattened onto the plane the roll can reach and what comes back is the
+   * roll: 0 is a palm square behind the glass, 90 is a hand holding it edge on.
+   *
+   * MEASURED AND NOT READ BACK. Off the skinning palette and off the bone
+   * positions, not off the record the solve wrote — same reasoning as `gap`
+   * being taken to the fingers and not to the wrist. A number that asks the
+   * solve what the solve did would answer its own question.
+   */
+  const _pmA = new THREE.Vector3(), _pmB = new THREE.Vector3();
+  const _pmV = new THREE.Vector3(), _pmS = new THREE.Vector3();
+  const _pmN = new THREE.Vector3(), _pmQ = new THREE.Quaternion();
+  function palmOff(m) {
+    if (!m || !m.f || phoneHand < 0 || phoneFing < 0) return null;
+    const f = m.f;
+    // The hand's own axis: wrist to knuckles, as the palette has it.
+    f.boneAt(phoneHand, _pmV);
+    f.boneAt(phoneFing, _pmS);
+    const N = _pmN.copy(_pmS).sub(_pmV);
+    if (N.lengthSq() < 1e-8) return null;
+    N.normalize();
+    // The palm, squared to that axis. The figure's own left is the side of a
+    // right hand the palm is on; the share of it that lies along the bones is
+    // the rig's A-pose abduction and not a palm — see `rec.pm` in `holdPhone`.
+    _pmA.set(0, 0, -1).applyQuaternion(f.boneTurn(phoneHand, _pmQ));
+    _pmA.addScaledVector(N, -_pmA.dot(N));
+    // And the glass, out of the world and into the figure's frame. The pool
+    // group carries no transform of its own, so the case's local rotation is
+    // its world one; `decompose` rather than `setFromRotationMatrix` because
+    // these figures are scaled.
+    f.mesh.matrixWorld.decompose(_pmV, _pmQ, _pmS);
+    _pmB.set(0, 0, 1).applyQuaternion(m.g.quaternion)
+      .applyQuaternion(_pmQ.invert());
+    _pmB.addScaledVector(N, -_pmB.dot(N));
+    if (_pmA.lengthSq() < 1e-8 || _pmB.lengthSq() < 1e-8) return null;
+    _pmA.normalize();
+    _pmB.normalize();
+    return +(Math.abs(Math.atan2(_pmS.copy(_pmA).cross(_pmB).dot(N),
+      _pmA.dot(_pmB))) * 180 / Math.PI).toFixed(1);
   }
 
   /**
@@ -31231,6 +31353,19 @@ async function buildJadrija(scene) {
       out.set(T.x + GRIP.lift[0] * L, T.y + GRIP.lift[1] * L,
         T.z + GRIP.lift[2] * L);
     }
+    // How far the hand is from the phone it is holding, worst of anybody drawn
+    // — see `phones()`. Measured off the FINGERS and not the wrist, because the
+    // wrist is where the solve put it by construction and would only answer its
+    // own question.
+    //
+    // ABOVE THE GUARD, and it used to be below it. The phone's place is worked
+    // out on every frame and the fingers are read on every frame, so there was
+    // never a reason for the one number this feature is judged on to be
+    // reported only on the frames the solve happened to run — and on the ones
+    // it did not, `holdGap` was left at the zero the loop clears it to. Twelve
+    // guards returning early is a probe that answers "0.000", which reads as a
+    // hand welded to the phone rather than as no measurement at all.
+    if (phoneFing >= 0) holdGap = Math.max(holdGap, _hF.distanceTo(out));
     // Nothing under the deltas has moved, so nothing about the answer has
     // either. This is every frame the pose ladder skips — 42-crowd.js re-poses
     // a figure past POSE_NEAR every third frame and past POSE_MID every eighth
@@ -31299,11 +31434,139 @@ async function buildJadrija(scene) {
     // was a phone floating beside a hand reaching past it. The knuckles are a
     // hand's length from the wrist and the phone is `lift` above it, so
     // pointing the one at the other puts the phone in the fingers.
-    const hc = _hG.copy(_hF).sub(W).applyQuaternion(_hC.copy(rec.qc).invert())
-      .applyQuaternion(ib).applyQuaternion(ia).normalize();
-    _hN.copy(out).sub(T).normalize();
-    rec.qc.setFromUnitVectors(
-      hc.applyQuaternion(rec.qa).applyQuaternion(rec.qb), _hN);
+    //
+    // CACHED HERE AND TURNED IN `rollHand`, which is the split the third
+    // report bought. Pointing the knuckles at the phone is a fact about the
+    // POSE and belongs under the guard; the roll about that line is a fact
+    // about where the camera is and cannot be. So the solve leaves behind the
+    // two directions the roll needs — the knuckle line and the palm normal,
+    // both with the arm's own two deltas already laid on them — and the roll
+    // uses them without having to undo anything, which it could not do
+    // anyway: on a frame the guard skips, `rec.qa` and `rec.qb` are the
+    // deltas already baked into the measurement it would be undoing them off.
+    const ic = _hC.copy(rec.qc).invert();
+    rec.hd.copy(_hF).sub(W).applyQuaternion(ic).applyQuaternion(ib)
+      .applyQuaternion(ia).normalize()
+      .applyQuaternion(rec.qa).applyQuaternion(rec.qb);
+    rec.n.copy(out).sub(T).normalize();
+    // AND THE PALM, WORKED OUT INSTEAD OF READ BACK. The curl used to take it
+    // straight off `boneTurn`, which reports the palette — so it was the palm
+    // of the PREVIOUS solve, one pose behind, and it could not answer at all
+    // for a turn that had not been applied yet. The same arithmetic that
+    // recovers the clip's own arm recovers the clip's own hand: a bone's
+    // deltas go on outermost, so `measured = qc · qb · qa · clip` and the
+    // clip's frame is that with the three taken back off in reverse. Carry the
+    // figure's own left — (0, 0, -1), which is the side of a right hand the
+    // palm is on — through it and then through the two NEW arm deltas.
+    //
+    // AND THEN SQUARED TO THE HAND, which is the correction the measurement
+    // asked for. The note this replaces called (0, 0, -1) the bind pose's palm
+    // "with the arms down"; the arms are not down. This rig binds in an A
+    // POSE — measured, `phones()` reported the figure's left standing at
+    // 114.2 deg to the knuckle line rather than 90, so the arms hang about 24
+    // deg abducted — and a palm normal that is 24 deg off perpendicular to the
+    // hand it belongs to is not a palm normal. It cost 24 deg of roll error
+    // that no amount of turning the wrist could take out, and it aimed the
+    // curl 24 deg off the knuckle line with it. Taking the share along the
+    // hand off leaves the component that is a palm: inboard, square to the
+    // bones, and whatever the bind pose happens to be.
+    rec.pm.set(0, 0, -1).applyQuaternion(
+      _hQ.copy(ia).multiply(ib).multiply(ic)
+        .multiply(f.boneTurn(phoneHand, _hR)))
+      .applyQuaternion(rec.qa).applyQuaternion(rec.qb);
+    rec.pm.addScaledVector(rec.hd, -rec.pm.dot(rec.hd)).normalize();
+    return out;
+  }
+
+  /**
+   * Roll the wrist so the palm stays behind the glass, whatever the bearing.
+   *
+   * THE THIRD REPORT WAS A THIRD DEFECT. Misha, 7 Sep 2026, over a screenshot
+   * of the MINI terrace: *"the way some of them hold their cellphone still too
+   * fucking awkward"*. Not the first one — `gap` is 0.016, the fingers are
+   * 16 mm off a case they are wrapped round. Not the second one either — the
+   * reader's shoulder flexes 30 deg and the caller's handset stands 16 mm off
+   * the skull. What was left is the one thing neither of those two numbers can
+   * see: the case is billboarded in WORLD space and the hold is solved in
+   * FIGURE space, and nothing anywhere held the two together. The comment over
+   * `stepPhones` claimed the cheat was safe because the hand is solved onto
+   * the phone rather than the phone hung off the hand, "so it never separates
+   * from the figure however it is turned" — which is true of POSITION and says
+   * nothing at all about ORIENTATION.
+   *
+   * MEASURED, because "awkward" is not a number. `phones().roll` is how far
+   * round each wrist is from square to its own glass. Circled at 2.8 m at
+   * eight bearings, the two readers on that terrace ran 25–154 deg and
+   * 26–171 deg, a third behind them 170–180 from every bearing it could be
+   * seen from, and the caller at t 470.9 s 17 ran 7–173 deg. Square to the
+   * case from one bearing; at right angles to it from the ones a quarter turn
+   * away, which is a hand holding it edge on; and past 150 deg — the BACK of
+   * the hand laid on the screen — from the far side. That is the flat splayed
+   * hand beside a floating rectangle in the screenshot. It was never a bad
+   * pose. It was a good pose photographed from the wrong side.
+   *
+   * So the last turn of the hand follows the billboard. `holdPhone` still
+   * points the knuckles at the phone and that is what puts the case in the
+   * fingers; the minimal rotation which does it leaves exactly one degree of
+   * freedom free — the roll about the wrist-to-phone line — and picks it
+   * arbitrarily off whatever the clip was doing. That line is very nearly the
+   * case's own long axis, so that free roll IS the angle between palm and
+   * glass. Turned until the two agree, the hand grips the case from every
+   * bearing, and what `roll` reads afterwards is `GRIP.vary.roll` and nothing
+   * else.
+   *
+   * BOTH BRANCHES, and the rule is the same one twice. A reader's glass faces
+   * you and their palm is behind it; a caller's glass faces their own cheek
+   * and their palm is on the back of the case, which is the same side of the
+   * same normal. So both want the palm on the group's own +z, and the half
+   * turn the caller's case takes is already in the quaternion this reads.
+   *
+   * EVERY FRAME, and measured before it was written that way. The arm solve
+   * stays behind its guard — that is what the split is for — and what runs
+   * here is one `decompose`, two quaternions built, four vector projections
+   * and two `aim`s, per drawn phone and at most twelve of them. Timed in the
+   * page over 600 000 calls it is 0.32 µs a phone, so 3.8 µs a frame with all
+   * twelve of them on screen: two hundredths of one per cent of a 16.7 ms
+   * frame, on a shore that is already stepping four hundred figures.
+   *
+   * Quantising the bearing and re-solving only past a threshold was the
+   * alternative, and at that price it buys nothing and costs correctness: the
+   * guard's key would have to carry the bearing, and the guard is not an
+   * optimisation. It is the measurement saying whether the pose has moved, and
+   * a solve run twice against one measurement takes the deltas off a pose that
+   * never had them in it and folds the arm a second time.
+   */
+  function rollHand(f, rec, m, id) {
+    if (!rec.on || phoneFing < 0) return;
+    // The glass's own normal, out of the world and back into the figure's
+    // frame. The case's local rotation is its world one — the pool group is
+    // parented straight to the scene and carries no transform of its own — and
+    // `decompose` rather than `setFromRotationMatrix` because these figures
+    // are scaled: eight blobs from 1.24 m to 1.84 m.
+    _rG.set(0, 0, 1).applyQuaternion(m.g.quaternion);
+    f.mesh.matrixWorld.decompose(_rS, _rQ, _rX);
+    _rG.applyQuaternion(_rQ.invert());
+    // The hand pointed at the phone, which is where `holdPhone` stopped.
+    const N = rec.n;
+    _rQ.setFromUnitVectors(rec.hd, N);
+    _rA.copy(rec.pm).applyQuaternion(_rQ);
+    // Both flattened onto the plane the roll can reach — a turn about N cannot
+    // move anything along N, so the share of each that lies along it is not
+    // the roll's business and would only bias the angle.
+    _rA.addScaledVector(N, -_rA.dot(N));
+    _rB.copy(_rG).addScaledVector(N, -_rG.dot(N));
+    if (_rA.lengthSq() > 1e-8 && _rB.lengthSq() > 1e-8) {
+      _rA.normalize();
+      _rB.normalize();
+      // Signed, and about N: `atan2` of the cross product's share along the
+      // axis against the dot. A bare `acos` answers the size and not the way,
+      // and half of these would roll the wrong way round.
+      const ang = Math.atan2(_rX.copy(_rA).cross(_rB).dot(N), _rA.dot(_rB))
+        + spread(id, 9157) * GRIP.vary.roll;
+      rec.qc.setFromAxisAngle(N, ang).multiply(_rQ);
+    } else {
+      rec.qc.copy(_rQ);            // the palm is along the axis: nothing to do
+    }
     aimQ(f, 'handR', rec.qc);
     // AND THE FINGERS ROUND IT. Four fingers as one bone, and the note over
     // `fingers` in tools/blender/human_mh.py says why that bone exists: a flat
@@ -31313,21 +31576,17 @@ async function buildJadrija(scene) {
     // The axis is MEASURED and not typed. Which way a finger folds is a fact
     // about where the hand has got to, and there is no constant that is right
     // for both a woman reading in a deckchair and a man with a handset at his
-    // ear. `boneTurn` is how far the hand has come off the bind pose, and the
-    // bind pose is arms down with the palms to the thighs — so the palm faces
-    // the figure's own inboard axis carried through that turn, and the curl is
-    // about the axis that swings the fingers toward it.
-    const palm = _hP.set(0, 0, -1).applyQuaternion(f.boneTurn(phoneHand, _hQ));
-    const axis = _hG.copy(_hN).cross(palm);
-    if (axis.lengthSq() > 1e-6) {
-      f.aim('fingersR', axis.x, axis.y, axis.z, GRIP.curl);
+    // ear: it is the wrist-to-phone line crossed with the palm, which is the
+    // line of the knuckles, and the curl swings the fingers over the glass.
+    // Now that the palm is put where it is put rather than read off the last
+    // pose, that line comes out along the case's own width — so the four
+    // fingers close across the back of the phone instead of at whatever angle
+    // the previous frame happened to leave them.
+    _rA.copy(rec.pm).applyQuaternion(rec.qc);
+    _rB.copy(N).cross(_rA);
+    if (_rB.lengthSq() > 1e-6) {
+      f.aim('fingersR', _rB.x, _rB.y, _rB.z, GRIP.curl);
     }
-    // How far the hand is from the phone it is holding, worst of anybody drawn
-    // — see `phones()`. Measured off the FINGERS and not the wrist, because the
-    // wrist is where the solve put it by construction and would only answer its
-    // own question.
-    holdGap = Math.max(holdGap, _hF.distanceTo(out));
-    return out;
   }
 
   // ── the bathers, as things the jet can hit and things that answer ─────────
@@ -38143,6 +38402,21 @@ async function buildJadrija(scene) {
       gap: +holdGap.toFixed(3),
       /** And by how much, so the two numbers can be read together. */
       grip: PHONE.grip,
+      /** THE SECOND NUMBER, and the one the third report was about. How far
+       *  round each wrist is from square to its own glass, in degrees — see
+       *  `palmOff`. `gap` says the hand is ON the phone; this says whether it
+       *  is holding it or lying across the edge of it.
+       *
+       *  A billboarded case held by a figure-space palm answered whatever the
+       *  bearing made it: circled at 2.8 m at eight bearings round the two
+       *  readers on the MINI terrace it ran 25–154 deg and 26–171 deg, and
+       *  round the caller at t 470.9 s 17 it ran 7–173 deg. That is a grip
+       *  from one bearing and a flat hand beside a floating rectangle from the
+       *  ones either side of it. It now reads `GRIP.vary.roll` and nothing
+       *  else — 2.6, 5.5, 9.3 and 10.0 deg on those four, the same to a tenth
+       *  from all eight bearings — so anything past about 12 is a defect. */
+      roll: phones ? phones.filter((m) => m && m.g.visible)
+        .map((m) => palmOff(m)) : [],
       at: bathers.filter((b) => b.phone)
         .map((b) => [+b.t.toFixed(1), +b.s.toFixed(1), b.phone]),
       quote: phoneQuotes.q,
