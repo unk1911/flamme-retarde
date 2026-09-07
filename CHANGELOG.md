@@ -94,6 +94,83 @@ running service: 142 lines answered, 23 refused as garbage. One request in
 seven was a casualty of the one before it, and from the beach that was Baye
 going quiet for no reason.
 
+## [1.351.0] — 2026-09-06
+
+### she is two errands and not two women, so the bucket gets a line
+
+Misha calls her "the Bucketeer baye", and that settles a question the code had
+quietly answered the other way. The figure on the shore and the one carrying
+water down from the vikendica share a face, a rig and a voice — but the voice
+service's `baye` was only ever the shore one, and `bayeGap` had NO `news` field
+at all, where the cat and the bathers both have one. So the Bucketeer could
+stop, turn and hold a bucket out to you with no channel to say a word about it.
+
+`bayeGap` now answers about whichever of her you are actually next to, and the
+voice service never has to know there are two. The Bucketeer wins only when she
+is genuinely nearer, which keeps a line about a bucket from arriving while you
+are on the sand beside the other one.
+
+The event says what happened, not what to say — the line itself is the model's.
+One-shot, because `takeNews` throws away an event more than twenty-five seconds
+old and a flag that latches has her mentioning the bucket long after she has
+tipped it out.
+
+## [1.350.0] — 2026-09-06
+
+### she stops rather than walking through you, and she looks up and holds the bucket out
+
+SHE HAD NO COLLISION AT ALL. `45-bucketeer.js` contained not one blocker test
+in 1 238 lines. That was a half-truth rather than an oversight — her twelve
+waypoints WERE hand-checked against every wall and stick of furniture in the
+flat. What the static path was never cleared against is YOU, because you move.
+She walked through Chloe at a steady 0.76 m/s.
+
+She STOPS rather than sidesteps, and that is the route and not laziness: two of
+her legs are a 1.65 m bathroom and a 1.00 m doorway. Yielding stops the LEGS
+and nothing else — the pail still swings, the water still settles — because a
+figure frozen whole is a statue and reads as a bug.
+
+AND SHE HAD THE BUG THE CROWD ALREADY FIXED. `step(dt, cam)` measured her
+distance against the CAMERA, which `updateCrowd` carries a long note about:
+Misha reported it of Baye on 28 Aug, *"seems to gravitate towards the camera,
+not to me (Chloe)"*, and the Bucketeer was never given the fix. With third
+person on she was deciding about a point 3.10 m behind your shoulder.
+
+She notices you on TWO DIFFERENT POINTS — distance from `who` because that is
+where you stand, attention from `cam` because a look starts at the eye. The
+offer is a LIFT and not a reach: reaching needs to know which way is forward in
+figure space, and a wrong sign on that axis is how nine sunbathers ended up
+with their heads under their towels.
+
+## [1.349.0] — 2026-09-06
+
+### the walkers step round each other now, and the humming is off until there is a song for it
+
+THEY WALKED THROUGH EACH OTHER, and the file already knew they should not.
+`CROWD.clear` has carried the words "being brushed past is fine and being
+walked through is not" since it was written, and the test underneath it only
+ever named the player. Everybody else was a ghost to everybody else.
+
+  11.2 overlapping pairs per sample
+  closest approach 0.074 m between two adults whose radii sum to 0.459
+
+Seven centimetres apart when they should have been forty-six. The yield is the
+same mechanism rather than a second one: every figure already carries a lateral
+`off`, so avoiding a person is avoiding a number. Dead level is the one case a
+sign test cannot answer, so that breaks on the seed they were built with, which
+is stable and is not a draw (rule 4).
+
+  closest approach   0.074 m  ->  0.426 m
+
+`CROWD.body` is 0.70 and is NOT `clear`'s 1.15: strangers pass each other far
+closer than they pass you. The per-sample overlap count stays at 11, and that
+is not a miss — those are people STANDING together, and people stand shoulder
+to shoulder.
+
+THE HUMMING IS OFF. It read as chords rather than as a person, and it sat over
+the bird calls. The note tables stay standing so the real song is a melody swap
+and not a rebuild.
+
 ## [1.348.0] — 2026-09-06
 
 ### a railing is not a wall and not a floor, so stop guessing its transform and measure it
