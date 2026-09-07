@@ -3252,7 +3252,21 @@ function buildAudio() {
     // The first pass at this was 0.13, which put it 10.5 dB under and added
     // 0.37 dB: audible if you already knew it was there, and not the thing he
     // asked to be able to hear.
-    gain: 0.31,
+    //
+    // AND 0.31 WAS STILL NOT IT. Misha, 7 Sep: *"the radio downstairs that
+    // plays 'Bucketeers of america' is too quiet can't hear it too well"*. The
+    // reasoning above is sound about a beach being broadband and a song not,
+    // and it is still the wrong call: 4.3 dB under is a thing you notice, and
+    // he asked to HEAR it. Doubled to 0.62, +6.0 dB, which puts the song about
+    // 1.7 dB OVER the rest of the yard rather than 4.3 under.
+    //
+    // The birds pay nothing for it, and that is the slab and not luck. The
+    // upstairs path is `storey` 0.020 behind a 260 Hz lid, so this scales a
+    // tap that was measured at -79.0 dBFS against a room at -46.8: six decibels
+    // on it is 0.0104 dB in that room, against the 0.07 dB standard. There is
+    // room to go louder still if he wants it — 0.9 would be 0.022 dB — and the
+    // ceiling on this number is the yard's taste, not the birds.
+    gain: 0.62,
     // How far off it carries. Inverse-square and not the pines' 1.5: past the
     // opening this is a point source in open air over a hard paved yard, which
     // is the one case the square law is actually written for. Half the level

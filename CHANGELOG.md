@@ -8,6 +8,45 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.355.0] — 2026-09-07
+
+### the radio goes up 6 dB, and the jump was never on the space bar
+
+*"the radio downstairs that plays 'Bucketeers of america' is too quiet can't
+hear it too well"*. `SONG.gain` 0.31 -> 0.62. Measured at the tap in the yard,
+6.3 m out and playing: -39.95 -> -33.93 dBFS against a yard bed of -34.66, so
+the song has gone from 5.3 dB UNDER everything else out there to 0.7 dB over
+it. The note under the old number argued that a beach is broadband and a song
+is not and the ear pulls one out of the other; that is true and it was still
+the wrong call, because he asked to HEAR it.
+
+The birds pay 0.0104 dB for it, and that is the slab rather than luck: the
+upstairs path is `storey` 0.020 behind a 260 Hz lid, so six decibels on the
+source is six decibels on a tap that was already 32 dB under the room it
+arrives in. There is room to double it again if the yard wants it — the
+ceiling on this number is taste, not the birds.
+
+A note on measuring it, because the obvious method fails: the set plays 31 per
+cent of the time, so a thirty-second window averages the song against the
+silence between passes and reports +1.4 dB whatever the gain is. Two runs six
+decibels apart came back 0.07 dB from each other. The number that means
+anything is `song().rms`, the tap on its own output, sampled while `playing`.
+
+### and the jump
+
+Misha, 7 Sep: *"somehow holding Q + Up Arrow + 'Space' to jump stopped working
+(regressed?) can u restore it"*. Nothing regressed and nothing was restored,
+because the jump has never been on the space bar. It is ENTER, has been since
+1.292.0, and the help sheet says `ENTER` in the row next to `help.k.hop`. On
+foot the space bar is the hose.
+
+Verified rather than assumed, by dispatching real key events at the page: at
+rest `hopV` is 0; after a synthetic Enter keydown it is 7.0, which is
+`GROUND.hopV`. Holding KeyQ, ArrowUp and Space together leaves it at 0, and
+adding Enter on top of those three still gives 7.0 — so the ladder works,
+including at a run, and the combination in the report is not one that ever
+jumped.
+
 ## [1.354.0] — 2026-09-07
 
 ### Bucketeers of America — a poster on the wall, a set left on downstairs, and her own voice an octave up
